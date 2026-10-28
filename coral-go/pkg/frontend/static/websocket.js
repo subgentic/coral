@@ -39,6 +39,28 @@ const FEED_CLOSE_SESSION_ENDED = 4401;
 let _feedFailures = 0;
 let _lastSidebarRenderAt = 0;
 
+// The page says when the feed has been gone a few seconds, and when it is back (connection_bar.js, #10296): a blip says nothing.
+const FEED_DOWN_BAR_MS = 3000;
+let _downTimer = 0, _barShown = false;
+function feedDown() {
+    if (_downTimer) return;
+    _downTimer = setTimeout(() => {
+        _downTimer = 0;
+        if (navigator.onLine !== false && state.coralWs && state.coralWs.readyState === 1) return; // the feed is up and the browser is online: nothing to say
+        importOnce('./connection_bar.js').then(m => { _barShown = true; m.showNoConnection(); }).catch(() => {});
+    }, FEED_DOWN_BAR_MS);
+}
+function feedUp() {
+    if (_downTimer) { clearTimeout(_downTimer); _downTimer = 0; }
+    if (_barShown) { _barShown = false; importOnce('./connection_bar.js').then(m => m.showBackOnline()).catch(() => {}); }
+}
+
+// A browser that goes offline keeps its open socket for a while (DevTools' Offline does): its own word starts the same few seconds, and coming back online ends them.
+if (typeof window !== 'undefined') {
+    window.addEventListener('offline', feedDown);
+    window.addEventListener('online', () => { if (state.coralWs && state.coralWs.readyState === 1) feedUp(); });
+}
+
 function scheduleFeedReconnect() {
     if (isSignedOut()) {
         if (_feedFailures < 4) { // a false 401 must not end the feed: re-check sign-in (#6233)
@@ -95,7 +117,8 @@ export function connectCoralWs() {
     ws.addEventListener('open', () => { if (current()) markReady('feed'); }); // window.__coralReady (#3118)
     // The machine-health card shows unknown while the feed is down (#3446).
     ws.addEventListener('open', () => { if (current()) document.dispatchEvent(new CustomEvent('coral:feed-state')); });
-    ws.addEventListener('close', () => { if (current()) document.dispatchEvent(new CustomEvent('coral:feed-state')); });
+    ws.addEventListener('close', () => { if (current()) { document.dispatchEvent(new CustomEvent('coral:feed-state')); } });
+    ws.addEventListener('open', () => { if (current()) feedUp(); });
 
     ws.onmessage = (event) => {
         _feedFailures = 0;   // a socket that delivers is healthy; the next drop starts the backoff over
@@ -104,6 +127,7 @@ export function connectCoralWs() {
 
     ws.onclose = (ev) => {
         dbg('coralWs CLOSE', { code: ev.code, reason: ev.reason });
+        feedDown(); // from the handler, not a listener: a test page that detaches the feed (agent_view_harness) says nothing
         if (ev.code === FEED_CLOSE_SESSION_ENDED) { recheckSignIn(); return; }
         scheduleFeedReconnect();
     };
