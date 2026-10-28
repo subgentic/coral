@@ -88,7 +88,10 @@ const STUB = `(() => { const R = window.fetch; const json = b => Promise.resolve
             if (mobile) {
                 assert.equal(await ev(`!!document.querySelector('#mobile-analytics-list ${pane}')`), true, at + 'the pane is in the phone page');
                 assert.equal(await ev(`[...document.querySelectorAll('#mobile-analytics-list .sidebar-hide-btn')].some(b => b.getClientRects().length > 0)`), false, at + 'no Hide on a phone');
-                assert.equal(await ev(`document.getElementById('cost-page').getClientRects().length`), 0, at + 'the page is not shown until a view is chosen');
+                assert.ok(await ev(`document.getElementById('cost-page').getClientRects().length`) > 0, at + 'the page opens on Overview, not the bare list of views (#10064: moved from "not shown until a view is chosen")');
+                assert.equal(await ev(`document.querySelector('.cost-phone-back').textContent.trim()`), '\u2190 Analytics', at + 'with the way back to the list');
+                await ev(`document.querySelector('.cost-phone-back').click(); true`);
+                await waitFor(`document.getElementById('mobile-analytics-list').getClientRects().length > 0 && document.getElementById('cost-page').getClientRects().length === 0`, at + 'the way back is the list', 4000);
                 assert.deepEqual(await ev(`(() => { const rows = [...document.querySelectorAll('${pane} li')].filter(l => l.querySelector('.row-btn')); return [rows.length, [...new Set(rows.map(l => Math.round(l.getBoundingClientRect().height)))]]; })()`), [4, [44]], at + 'the views are the shared row: 44 px on a phone');
                 await shot(`analytics-one-list-${w}`);
                 await choose('By model');
