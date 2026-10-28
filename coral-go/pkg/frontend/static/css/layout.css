@@ -64,6 +64,8 @@
 .nav-more-menu {
     position: fixed;
     z-index: 60;
+    overflow-y: auto; /* nav_tabs.js sets its max-height to the room under the button (#10767) */
+    overscroll-behavior: contain;
 } /* where it sits: what it looks like is the one menu's (.menu, layout.css) */
 .nav-more-item { gap: 12px; } /* its icon and its words */
 .nav-more-item.active { background: var(--bg-hover); } /* the open view */
