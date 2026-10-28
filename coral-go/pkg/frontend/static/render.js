@@ -2,7 +2,7 @@
 
 // Load order only (#4996): the imports below with no names are loaded for what the module registers at load, in the order this module imported them before the split (the startup-sequence golden records it).
 import './model_labels.js';
-import './import_once.js';
+import { importOnce, loadedModule } from './import_once.js';
 import { state } from './state.js';
 import { LAUNCH_CARDS } from './launch_cards.js';
 import './settings_lists.js';
@@ -27,7 +27,6 @@ import { machineState } from './launch_server.js';
 import { syncHubFirstRun, hubEmptyListHtml } from './hub_first_run.js';
 import './format.js';
 import { registerLiveListRenderer, redrawLiveList, liveListEl } from './list_hooks.js';
-import { _boardChatSelectAll, _boardChatSelectNone, _boardMentionInput, _boardMentionKey, _cancelBoardChatSelect, _exportBoardChatSelected, _insertBoardMention, _toggleBoardChatMsgSelect, _toggleBoardChatPause } from './board_chat.js';
 import { buildSessionTooltip } from './session_state.js';
 import './board_accents.js';
 import { followServerOrder } from './list_order.js';
@@ -57,7 +56,11 @@ export { syncDisplayMenu, toggleArchivedSection } from './session_rows.js';
 export { moveGroupDown, moveGroupUp, moveSessionDown, moveSessionUp } from './list_order.js';
 export { setBoardAccentColor } from './board_accents.js';
 export { buildSessionTooltip, commandPlaceholder, startingPlaceholder, deriveSessionState, resolveSessionIdentity, sessionStateInfo, terminalDotClass, applyTerminalDot } from './session_state.js';
-export { getActiveBoardChat, hideBoardChatTab, showBoardChatTab } from './board_chat.js';
+// The board chat (board_chat.js, about 21 KB) loads when an agent on a board is first shown, not at start (page weight): these are the same calls, answered once the file is in. Hiding and the
+// actions on its own markup need no load: with the file not loaded there is no chat panel to hide or to click.
+const boardChatNow = () => loadedModule('./board_chat.js');
+export const showBoardChatTab = (...args) => importOnce('./board_chat.js', 'the board chat').then(m => m.showBoardChatTab(...args)).catch(() => {});
+export const hideBoardChatTab = (...args) => boardChatNow()?.hideBoardChatTab(...args);
 
 /* ── Helpers ────────────────────────────────────────────────────────── */
 
@@ -454,17 +457,17 @@ registerActions({
     'msg-edit-resubmit': el => window.editAndResubmit(el),
     // The board chat panel beside an agent.
     'board-chat-open': (el, event) => { event.preventDefault(); const b = textOf(el.dataset.board); if (b) window.selectBoardProject(b); },
-    'board-chat-pause': el => { const b = textOf(el.dataset.board); if (b) _toggleBoardChatPause(b); },
+    'board-chat-pause': el => { const b = textOf(el.dataset.board); if (b) boardChatNow()?._toggleBoardChatPause(b); },
     'board-chat-select': () => window.__coral._toggleBoardChatSelect(),
     'board-chat-all': () => { const i = document.getElementById('board-panel-input'); if (i) { i.value = '@all ' + i.value; i.focus(); } },
     'board-chat-send': el => { const b = textOf(el.dataset.board); if (b) window.__coral._sendBoardChat(b); },
     // Enter sends and Shift+Enter adds a line, as in the chat (#6239; Ctrl/Cmd+Enter still sends); while the @mention list is open the arrow keys, Enter, Tab and Escape drive it. Enter that confirms an IME composition is not a send.
-    'board-chat-key': (el, event) => { if (_boardMentionKey(event)) return; if (event.key === 'Enter' && !event.isComposing && (!event.shiftKey || event.ctrlKey || event.metaKey)) { event.preventDefault(); const b = textOf(el.dataset.board); if (b) window.__coral._sendBoardChat(b); } },
-    'board-chat-mention': (el, event) => { const b = textOf(el.dataset.board); if (b) _boardMentionInput(event, b); },
-    'board-mention-pick': (el, event) => { event.preventDefault(); const n = textOf(el.dataset.name); if (n) _insertBoardMention(n); },
-    'board-chat-msg-select': el => { const id = idOf(el.dataset.msgId); if (id) _toggleBoardChatMsgSelect(id, el.checked); },
-    'board-chat-select-all': () => _boardChatSelectAll(),
-    'board-chat-select-none': () => _boardChatSelectNone(),
-    'board-chat-export': () => _exportBoardChatSelected(),
-    'board-chat-select-cancel': () => _cancelBoardChatSelect(),
+    'board-chat-key': (el, event) => { if (boardChatNow()?._boardMentionKey(event)) return; if (event.key === 'Enter' && !event.isComposing && (!event.shiftKey || event.ctrlKey || event.metaKey)) { event.preventDefault(); const b = textOf(el.dataset.board); if (b) window.__coral._sendBoardChat(b); } },
+    'board-chat-mention': (el, event) => { const b = textOf(el.dataset.board); if (b) boardChatNow()?._boardMentionInput(event, b); },
+    'board-mention-pick': (el, event) => { event.preventDefault(); const n = textOf(el.dataset.name); if (n) boardChatNow()?._insertBoardMention(n); },
+    'board-chat-msg-select': el => { const id = idOf(el.dataset.msgId); if (id) boardChatNow()?._toggleBoardChatMsgSelect(id, el.checked); },
+    'board-chat-select-all': () => boardChatNow()?._boardChatSelectAll(),
+    'board-chat-select-none': () => boardChatNow()?._boardChatSelectNone(),
+    'board-chat-export': () => boardChatNow()?._exportBoardChatSelected(),
+    'board-chat-select-cancel': () => boardChatNow()?._cancelBoardChatSelect(),
 });
