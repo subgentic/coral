@@ -41,7 +41,7 @@ try {
     assert.equal(row.querySelector('.dt-mail-avatar').textContent, 'flag');
     // the other two folders carry their rows' spec
     const sidebar = read('static/inbox_sidebar.js'), arts = read('static/team_artifacts_page.js');
-    assert.match(sidebar, /mail: f => \(\{ lead: \{ text: f\.title \|\| f\.which, name: f\.title \|\| f\.which \}, title: f\.title \|\| f\.which, snippet: f\.snip, time: f\.saved \}\)/, 'Saved: who it is from, the message as its name cuts it, when it was saved');
+    assert.match(sidebar, /mail: f => \(\{ lead: \{ text: f\.title \|\| f\.which, name: f\.title \|\| f\.which \}, title: f\.title \|\| f\.which, snippet: f\.snip, time: f\.saved, data: \{ id: String\(f\.id\) \} \}\)/, 'Saved: who it is from, the message as its name cuts it, when it was saved, and its id on the button (Back finds the row again, #9783)');
     assert.match(sidebar, /\.\.\.\(dock \? \{\} : \{ mail: f =>/, "the agent dock's Saved tab keeps its table: only the Inbox page has the mail row");
     assert.match(arts, /\.\.\.\(inbox \? \{ mail: item => \(\{ lead: \{ icon: 'description'/, 'Artifacts of the Inbox: a file glyph, the name, its team and task');
     assert.ok(!/mail:/.test(arts.slice(0, arts.indexOf('...(inbox ? { mail:'))), 'only the Inbox list, not the team page, agent or goal lists');
