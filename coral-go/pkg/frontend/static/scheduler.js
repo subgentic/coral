@@ -404,6 +404,8 @@ registerActions({
         const opened = await window.selectHistorySession(sid);
         const back = document.getElementById('history-back'); // the way back is the job it came from, not All chats (#10378)
         if (opened !== false && job && back) { back.hidden = false; back.textContent = `\u2190 ${job.name}`; back.setAttribute('data-on-click', 'job-result-back'); back.dataset.jobId = String(jobId); }
+        const phoneBack = document.querySelector('.mobile-history-back'); // a phone shows its own back control, not that one (#10578)
+        if (opened !== false && job && phoneBack) { phoneBack.textContent = `\u2190 ${job.name}`; phoneBack.setAttribute('aria-label', `Back to ${job.name}`); phoneBack.setAttribute('data-on-click', 'job-result-back'); phoneBack.dataset.jobId = String(jobId); }
     },
     'job-result-back': el => { const id = Number(el.dataset.jobId); if (id) { window.switchNavTab?.('automations'); selectScheduledJob(id); } },
 });
