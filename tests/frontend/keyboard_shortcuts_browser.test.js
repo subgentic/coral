@@ -20,7 +20,7 @@ const BASE = require('./test_base').BASE;
         await ev(`document.activeElement && document.activeElement.blur(); true`);
         await key('?', { text: '?', modifiers: 8 }); await settle(300);
         const text = await listOpen();
-        assert.ok(text && /Alt\+N\s+New agent/.test(text) && /Show these shortcuts/.test(text), 'the list is shown: ' + JSON.stringify(text));
+        assert.ok(text && /(Alt\+N|Cmd\+Option\+N)\s+New agent/.test(text) && /Show these shortcuts/.test(text), 'the list is shown: ' + JSON.stringify(text));
         await ev(`document.getElementById('alert-modal-ok').click(); true`); await settle(200);
         assert.equal(await listOpen(), null, 'the list closes');
         // ? typed into a field stays a ?
