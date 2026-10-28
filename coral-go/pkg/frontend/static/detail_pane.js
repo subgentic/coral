@@ -3,7 +3,7 @@
  * a title (17/700) with one line under it, key facts as a label and a value, the document, and the actions pinned at the bottom, the primary first. Escape and the close button close it and give the focus back to the row that opened it
  * (found again by its key if the table was drawn again meanwhile); choosing another row replaces the content; opening a tab clears it.
  *
- *   openDetailPane({ key, title, sub, facts: [[label, value]], extra: node (under the title row), body(el, { signal, isStale }), actions: [{ label, primary, run(button) | href, download }], opener, onClose, resizable, mainMin, backLabel, focus, focusClose, subTitle, details })
+ *   openDetailPane({ key, title, sub, facts: [[label, value]], note: a line of text above the actions, extra: node (under the title row), body(el, { signal, isStale }), actions: [{ label, primary, run(button) | href, download }], opener, onClose, resizable, mainMin, backLabel, focus, focusClose, subTitle, details })
  *   Content first (#7775): facts: [[label, value]] and whatever `details(h, { isStale })` adds through h.add(node) / h.clear() are behind ONE closed "Details" button in the header row (details_disclosure.js); the document comes straight under the header.
  *   resizable: the pane is a right sidebar like a goal page's task column (#7702): a handle on its left edge, dragged or moved with the keys, the width remembered (dock_resize.js). backLabel: the phone's way back ("Knowledge" -> "<- Knowledge"), shown only where the pane is a sheet. focus: false leaves the focus where it is (the pane opened by itself).
  *   closeDetailPane({ restoreFocus: true })      isDetailOpen()      detailKey()
@@ -52,7 +52,7 @@ function addResizeHandle(aside) {
     attachDockResize(grip, { panel: aside, row, mainMin, key: 'coral-detail-width', apply: (w) => { aside.style.setProperty('--detail-w', w ? `${w}px` : ''); value(); } }).restore();
 }
 
-export function openDetailPane({ key, title, sub = '', facts = [], body = null, actions = [], opener = null, onClose = null, host = null, resizable = false, backLabel = '', focus = true, focusClose = false, subTitle = '', details = null, extra = null, hiddenFacts = 0, mainMin = 0 }) {
+export function openDetailPane({ key, title, sub = '', facts = [], body = null, actions = [], note = '', opener = null, onClose = null, host = null, resizable = false, backLabel = '', focus = true, focusClose = false, subTitle = '', details = null, extra = null, hiddenFacts = 0, mainMin = 0 }) {
     const aside = host || pane(); // host: a pane of its own, a sheet over a panel (the agent's Artifacts), not the team page's aside
     if (!aside) return false;
     if (current && current.aside !== aside) closeDetailPane(); // one document at a time: the other pane is put away
@@ -110,6 +110,7 @@ export function openDetailPane({ key, title, sub = '', facts = [], body = null, 
         foot.append(b);
     }
     aside.append(head, more.panel, main);
+    if (note && actions.length) aside.append(el('p', 'detail-note', note)); // a line of plain words above the buttons: what two of them mean when their names are close (Star and Keep, #10539)
     if (actions.length) aside.append(foot);
     if (mainMin > 0) aside.dataset.mainMin = String(mainMin); else delete aside.dataset.mainMin; // what the list beside the pane keeps at its widest (End): the team page's Artifacts keep their Name and Updated (#9410)
     if (resizable && (!host || host.classList.contains('inbox-detail-pane') || host.classList.contains('goal-detail-pane'))) addResizeHandle(aside); else aside.style.removeProperty('--detail-w'); // a pane that is not resizable has its own width, not the last one's

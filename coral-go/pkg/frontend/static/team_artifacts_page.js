@@ -96,7 +96,7 @@ export function createArtifactsList({ inbox = false } = {}) {
         if (on) model.kept.add(hex); else model.kept.delete(hex);
         button.setAttribute('aria-pressed', String(on));
         button.textContent = on ? 'Kept' : 'Keep';
-        button.title = on ? 'Kept: never pruned (click to release)' : 'Keep: never prune this';
+        button.title = on ? 'Kept: Coral\u2019s cleanup never deletes this file (click to release)' : 'Keep: Coral\u2019s cleanup never deletes this file';
         say(`${on ? 'Kept' : 'Released'} ${name}`);
     }
 
@@ -109,7 +109,7 @@ export function createArtifactsList({ inbox = false } = {}) {
         document.dispatchEvent(new CustomEvent('artifact-star-changed')); // the Inbox's Starred folder reads its artifacts again (#10258)
         button.setAttribute('aria-pressed', String(on));
         button.textContent = on ? 'Starred' : 'Star';
-        button.title = on ? 'Starred (click to remove the star)' : 'Star: find this again in Starred only';
+        button.title = on ? 'Starred (click to remove the star)' : 'Star: add it to your Starred list (it can still be cleaned up)';
         say(`${on ? 'Starred' : 'Unstarred'} ${name}`);
     }
 
@@ -452,17 +452,18 @@ export function createArtifactsList({ inbox = false } = {}) {
             if (link.preview) actions.push(isCloud() ? { label: 'Download', run: () => importOnce('./artifact_download.js').then(m => m.downloadArtifact(link.url, m.sanitizeDownloadName(name))).catch(() => showToast('The artifact could not be downloaded', true)) } : { label: 'Download', href: link.url, download: true });
             else actions.push({ label: 'Open link', primary: true, href: link.url });
             actions.push({ label: 'Copy link', run: () => { navigator.clipboard?.writeText(hex ? `coral://artifacts/${hex}` : new URL(link.url, location.href).href).then(() => showToast('Link copied'), () => showToast('The link could not be copied', true)); } });
-            if (hex) actions.push({ label: item.starred ? 'Starred' : 'Star', title: item.starred ? 'Starred (click to remove the star)' : 'Star: find this again in Starred only', pressed: !!item.starred, run: b => toggleStar(hex, name, b, item) });
+            if (hex) actions.push({ label: item.starred ? 'Starred' : 'Star', title: item.starred ? 'Starred (click to remove the star)' : 'Star: add it to your Starred list (it can still be cleaned up)', pressed: !!item.starred, run: b => toggleStar(hex, name, b, item) });
             if (hex && local()) {
                 const on = model.kept.has(hex);
-                actions.push({ label: on ? 'Kept' : 'Keep', title: on ? 'Kept: never pruned (click to release)' : 'Keep: never prune this', pressed: on, run: b => toggleKeep(hex, name, b) });
+                actions.push({ label: on ? 'Kept' : 'Keep', title: on ? 'Kept: Coral\u2019s cleanup never deletes this file (click to release)' : 'Keep: Coral\u2019s cleanup never deletes this file', pressed: on, run: b => toggleKeep(hex, name, b) });
                 actions.push({ label: 'Delete', danger: true, run: () => deleteArtifact(hex, name, sizeText(item.size)) });
             }
         }
+        const note = hex ? `Star puts it in your Starred list.${hex && local() ? ' Keep stops Coral\u2019s cleanup from deleting the file.' : ''}` : ''; // the two buttons are not the same thing, and their names are close (#10539)
         const editor = hex ? Tags.tagEditor({ project: inbox ? item.board_id : model.project, hex, tags: item.tags, editable: local(), offer: teamTags, onChange: tags => retag(hex, tags) }) : null; // a stored file's tags (#8594)
         const dropped = ['team', 'goal'].filter(k => { const th = root?.querySelector(`th[data-key="${k}"]`); return !!th && getComputedStyle(th).display === 'none'; }).length; // a narrow box drops the row's Team and Task columns: their facts are behind Details, and the button says how many
         openDetailPane({
-            key, opener, hiddenFacts: dropped, title: name, host: hooks.detailHost || null, extra: editor, backLabel: inbox ? 'Artifacts' : '', focusClose: inbox, resizable: true, mainMin: inbox ? 0 : 380, // the team page's pane wears the same handle as the Inbox's (detail_pane.js: drag, keys, double click, the width kept; the agent's Artifacts sheet has a host and no handle) (#9410)
+            key, opener, note, hiddenFacts: dropped, title: name, host: hooks.detailHost || null, extra: editor, backLabel: inbox ? 'Artifacts' : '', focusClose: inbox, resizable: true, mainMin: inbox ? 0 : 380, // the team page's pane wears the same handle as the Inbox's (detail_pane.js: drag, keys, double click, the width kept; the agent's Artifacts sheet has a host and no handle) (#9410)
             sub: [un ? '' : typeText(item), un ? '' : sizeText(item.size), whenText(item.created_at)].filter(Boolean).join(' · '), subTitle: createdText(item), // the exact time behind the one in words
             facts: facts.filter(([, v]) => v != null && v !== ''),
             details: link && link.preview && hex ? (h, { isStale }) => { // the Operator's "Who can read this" (#5577) is behind Details with the facts, for a stored artifact
@@ -521,10 +522,18 @@ export function createArtifactsList({ inbox = false } = {}) {
         return loadArtifacts();
     }
 
-    return { loadArtifacts, showArtifacts, useBar, reviewPills, setFilters: next => setFilters(next), filters: () => model.filters, teams: () => model.teams, names: () => [...new Set(model.items.flatMap(i => [i.produced_by, i.sent_by]).filter(n => typeof n === 'string' && n))].sort().slice(0, 50) };
+    /** An artifact was made from a file of this agent (Share as artifact): its list, when it is the one on screen, reads again; otherwise the next time it is drawn (#10539). */
+    function listChanged(sessionId) {
+        if (!model.scope || model.scope.session !== sessionId) return;
+        model.loaded = false;
+        if (root && root.isConnected && root.getClientRects().length) loadArtifacts({ keep: true });
+    }
+
+    return { listChanged, loadArtifacts, showArtifacts, useBar, reviewPills, setFilters: next => setFilters(next), filters: () => model.filters, teams: () => model.teams, names: () => [...new Set(model.items.flatMap(i => [i.produced_by, i.sent_by]).filter(n => typeof n === 'string' && n))].sort().slice(0, 50) };
 }
 
 const teamList = createArtifactsList(); // the team page's and the agent tab's: one at a time on screen
 export const { loadArtifacts, showArtifacts } = teamList;
+document.addEventListener('artifact-shared', e => teamList.listChanged(e.detail && e.detail.session_id));
 
 export { closeDetailPane };
