@@ -107,11 +107,11 @@ async function run() {
     await nextFrame(); // the key handler runs synchronously; a row selection would show by the next frame
     check('14 Enter on a row\'s own kebab button acts on the button, not row selection (the goal sparkle is gone, #9686)', await ev(`document.querySelector('#live-sessions-list [data-session-id="${B}"]').getAttribute('aria-current') === 'true'`)); await ev(`window.closeSidebarKebabs(); true`);
     // the context moved to the agent page's header line (#9686): the number is right, and it follows a state tick
-    const hdrCtx = () => ev(`(document.getElementById('terminal-header-model') || {}).textContent || ''`);
-    await until(`/ctx 42%/.test((document.getElementById('terminal-header-model') || {}).textContent || '')`, 'the header context');
+    const hdrCtx = () => ev(`(document.getElementById('apd-context') || {}).textContent || ''`);
+    await until(`/ctx 42%/.test((document.getElementById('apd-context') || {}).textContent || '')`, 'the Details context');
     check('12 the selected agent\'s header line says its context (B: ctx 42%)', /ctx 42%/.test(await hdrCtx()), await hdrCtx());
     await ev(`window._coralHandleWsMessage({ type: 'coral_diff', changed: [${JSON.stringify({ ...SESSIONS[1], context_pct: 91 })}] }); true`);
-    await until(`/ctx 91%/.test((document.getElementById('terminal-header-model') || {}).textContent || '')`, 'the header context follows');
+    await until(`/ctx 91%/.test((document.getElementById('apd-context') || {}).textContent || '')`, 'the Details context follows');
     check('12 and it follows a state tick (B: ctx 91%), with no pill on the row', /ctx 91%/.test(await hdrCtx()) && (await ev(`!document.querySelector('#live-sessions-list [data-session-id="${B}"] .session-ctx-pill')`)), await hdrCtx());
     // rename/state tick updates aria-label in place
     await ev(`window._coralHandleWsMessage({ type: 'coral_diff', changed: [${JSON.stringify({ ...SESSIONS[1], display_name: 'Renamed Bot', waiting_for_input: false, working: true })}] }); true`); await nextFrame();
