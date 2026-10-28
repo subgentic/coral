@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/subgentic/coral/internal/gitutil"
+	"github.com/subgentic/coral/internal/safefs"
 )
 
 // jobFolderError is jobRepoError plus the first commit a worktree is made from: "" when the folder is a repository with at least one commit.
@@ -93,7 +94,7 @@ func (h *ScheduleHandler) InitJobRepo(w http.ResponseWriter, r *http.Request) {
 
 // sameDir reports whether two directories are the same, links resolved.
 func sameDir(a, b string) bool {
-	ra, ea := filepath.EvalSymlinks(a)
-	rb, eb := filepath.EvalSymlinks(b)
+	ra, ea := safefs.Resolve(a) // follows Windows junctions too, which filepath.EvalSymlinks does not (the routes lint)
+	rb, eb := safefs.Resolve(b)
 	return ea == nil && eb == nil && ra == rb
 }
