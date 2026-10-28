@@ -22,6 +22,25 @@ function isStarting(row) {
 }
 const CLI_NAMES = { claude: "Claude", codex: "Codex", pi: "Pi", agy: "Antigravity", antigravity: "Antigravity", gemini: "Antigravity" };
 
+// A new agent's first seconds, counted (#10299, Desktop pass 26: from Launch to a ready message box takes 15 to 60 s, and the chat said nothing that moved, so it looked stuck): while the live list says the CLI has not
+// emitted its first event (row.starting, #6381) the chat's title is "Starting Claude... 12 s", counting from the agent's own start; when the row stops saying it, "Ready" for a moment; after 90 s it says what to check.
+const CHECK_AFTER_S = 90, READY_MS = 3000;
+const readyAt = new Map(); // session_id -> ms when a counted start ended, while the chat is still empty
+let startTick = 0, tickContainer = null;
+function startedAt(row) {
+    const created = Date.parse(row.created_at || "");
+    if (Number.isFinite(created) && created <= Date.now() + 5000 && Date.now() - created < 10 * 60 * 1000) return created;
+    if (!firstSeen.has(row.session_id)) firstSeen.set(row.session_id, Date.now());
+    return firstSeen.get(row.session_id);
+}
+function countingStart(row) { return !!row && row.starting === true && row.agent_type !== "terminal" && !row.sleeping && !row.not_started; }
+/** Redraw the empty chat each second while a start is being counted or its Ready is showing; nothing runs otherwise. */
+function tickWhile(container, on) {
+    if (!on) { if (startTick) { clearInterval(startTick); startTick = 0; } tickContainer = null; return; }
+    tickContainer = container;
+    if (!startTick) startTick = setInterval(() => { if (!tickContainer || !tickContainer.isConnected) { tickWhile(null, false); return; } syncEmptyState(tickContainer); }, 1000); // interval-ok: a second-by-second counter that runs only while a start is counted (or its Ready shows) and stops itself; it fetches nothing
+}
+
 const MODE_NAMES = { '': 'Auto mode', auto: 'Auto mode', default: 'Default mode', acceptEdits: 'Accept edits mode', plan: 'Plan mode', dontAsk: "Don't ask mode", bypassPermissions: 'Bypass permissions mode' };
 // Where the agent works and how it acts, in the words Settings and the New agent footer use for its CLI (#10035, the desktop tester: no hint what this agent can touch): the folder's name, then its permission mode and what that allows for this CLI (Auto is not the same for Claude, Codex, Antigravity, Gemini and Pi, #10000).
 let permissionDescription = null; // permission_flags.js is loaded lazily (it carries the settings modules): the first empty chat asks for it, and draws the words again when it is here
@@ -38,7 +57,17 @@ function worksIn(row) {
 // What a brand-new agent's empty chat says, by what the agent is doing: a title, and a hint on what to do next.
 function emptyStateWords(session) {
     const row = (state.liveSessions || []).find(s => s.session_id === session?.session_id) || session;
-    if (isStarting(row) && deriveSessionState(row) === "idle") return [`Waiting for ${CLI_NAMES[row.agent_type] || "the agent"} to start`, "Its first screen is not up yet. You can type below once it is."];
+    const cli = CLI_NAMES[row?.agent_type] || "the agent";
+    if (countingStart(row) && deriveSessionState(row) === "idle") {
+        const secs = Math.max(0, Math.floor((Date.now() - startedAt(row)) / 1000));
+        readyAt.set(row.session_id, 0); // a count in progress: its end is Ready
+        return secs >= CHECK_AFTER_S
+            ? [`Starting ${cli}...`, `Still not ready after ${CHECK_AFTER_S} s. Check that ${cli} is installed and signed in, then open the terminal to see what it says.`, secs]
+            : [`Starting ${cli}...`, "Its first screen is not up yet. You can type below once it is.", secs];
+    }
+    if (row && readyAt.get(row.session_id) === 0) readyAt.set(row.session_id, Date.now()); // the count just ended
+    if (row && readyAt.get(row.session_id) > 0 && Date.now() - readyAt.get(row.session_id) < READY_MS && deriveSessionState(row) !== "sleeping") return ["Ready", `${cli} is up. Type below to start.`];
+    if (isStarting(row) && deriveSessionState(row) === "idle") return [`Waiting for ${cli} to start`, "Its first screen is not up yet. You can type below once it is."];
     switch (deriveSessionState(row)) {
         case 'sleeping': return row.sleep_reason === 'agent_exited' ? ["This agent has ended", "Its CLI exited. Use Restart below to start it again."] : ["This agent is asleep", "Use Wake below to chat with it."];
         default: return ["Say hello to your agent", [worksIn(row), "Type below to start."].filter(Boolean).join(' ')];
@@ -52,9 +81,14 @@ export function syncEmptyState(container) {
     let el = container.querySelector(":scope > .chat-empty");
     if (hasContent || busy) {
         if (el) el.remove();
+        tickWhile(null, false);
         return;
     }
-    const [title, hint] = emptyStateWords(state.currentSession);
+    const [title, hint, secs] = emptyStateWords(state.currentSession);
+    { // one tick a second only while a count or its Ready shows
+        const cur = (state.liveSessions || []).find(x => x.session_id === state.currentSession?.session_id) || state.currentSession;
+        tickWhile(container, countingStart(cur) || (!!cur && readyAt.get(cur.session_id) > 0 && Date.now() - readyAt.get(cur.session_id) < READY_MS));
+    }
     if (!el) {
         el = document.createElement("div");
         el.className = "chat-empty";
@@ -64,7 +98,14 @@ export function syncEmptyState(container) {
     }
     // Only write a word that changed, so a screen reader is not told the same thing at every poll
     const t = el.querySelector(".chat-empty-title"), h = el.querySelector(".chat-empty-hint");
-    if (t.textContent !== title) t.textContent = title;
+    const base = t.firstChild && t.firstChild.nodeType === 3 ? t.firstChild.data : t.textContent;
+    if (base !== title) t.textContent = title;
+    // the seconds are drawn, not announced: a status region that said a new number each second would talk over everything (#10299)
+    let sp = t.querySelector(".chat-empty-secs");
+    if (secs === undefined) { if (sp) sp.remove(); } else {
+        if (!sp) { sp = document.createElement("span"); sp.className = "chat-empty-secs"; sp.setAttribute("aria-hidden", "true"); t.append(sp); }
+        const txt = ` ${secs} s`; if (sp.textContent !== txt) sp.textContent = txt;
+    }
     if (h.textContent !== hint) h.textContent = hint;
 }
 
