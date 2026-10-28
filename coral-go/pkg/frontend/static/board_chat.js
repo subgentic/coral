@@ -601,7 +601,7 @@ async function _boardChatCopyLink(id) {
     try { await navigator.clipboard.writeText(`${location.origin}${build(keyRoute('team', _activeBoardChat, 'messages', Number(id)))}`); showToast('Link copied'); } catch { showToast('Could not copy the link', true); }
 }
 
-onRowActions('.board-chat-messages', { reply: _boardChatReply, link: _boardChatCopyLink, task: id => openTask(_activeBoardChat, id) });
+onRowActions('.board-chat-messages', { reply: _boardChatReply, link: _boardChatCopyLink, task: (id, el) => openTask(_activeBoardChat, id, el) });
 
 async function _sendBoardChat(boardName) {
     const inputEl = document.getElementById('board-panel-input');
