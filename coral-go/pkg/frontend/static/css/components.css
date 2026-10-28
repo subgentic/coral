@@ -3725,6 +3725,8 @@ body:has(#launch-modal[style*="flex"] :is(#launch-tmux-slot, #team-tmux-slot)[da
 .net-level-row > select { width: 100%; }
 .net-level-text > label { display: block; }
 #settings-cloud .cloud-command-row { align-self: stretch; flex-wrap: nowrap; }
+.editions-commands { align-items: flex-start; margin: 4px 0 12px; }
+.editions-commands code { flex: 1 1 auto; min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere; } /* the two commands, one to a line, with their two comment lines (#10572) */
 #settings-cloud .cloud-command-row code { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
 #settings-cloud .cloud-command-row .btn { flex: none; margin: 0; }
 @container settingspane (max-width: 40rem) { .net-level-row { grid-template-columns: minmax(0, 1fr); } }
