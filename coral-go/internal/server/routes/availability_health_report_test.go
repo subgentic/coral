@@ -30,7 +30,7 @@ func TestAvailabilityHealthReport_BlockedTasks(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			assert.Equal(t, tc.want, availabilityHealthReport([]board.Task{tc.task}))
+			assert.Equal(t, tc.want, availabilityHealthReport([]board.Task{tc.task}, []board.Task{tc.task}))
 		})
 	}
 }
