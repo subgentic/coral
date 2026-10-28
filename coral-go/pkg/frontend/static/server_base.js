@@ -305,6 +305,13 @@ export function sessionTeamKey(s) {
     return s && s.board_project ? identityKey(sessionServer(s), s.board_project) : '';
 }
 
+/** The folder a team works in (#9970): the working directory of one of its agents, found by the team's KEY ("@server/name" for a team on another computer, the bare name here), not by the session's bare board name:
+ *  over the Hub the two differ, the folder came back empty and Add agent asked for one. '' when none of its agents has one. */
+export function teamWorkDir(sessions, teamKey) {
+    const s = (sessions || []).find(x => x && x.working_directory && sessionTeamKey(x) === teamKey);
+    return s ? s.working_directory : '';
+}
+
 /** The team key of a waiting agent's goal: the session's own team (qualified for another server), else the goal's board; '' when neither. */
 export function goalTeamKey(s) {
     return sessionTeamKey(s) || String((s && s.goal && s.goal.board) || '');
