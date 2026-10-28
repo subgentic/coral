@@ -98,7 +98,7 @@ export function autoAcceptMenuItem(s) {
     return `<button type="button" class="menu-item overflow-menu-item auto-accept-menu-item" role="menuitemcheckbox" aria-checked="${on}"`
         + `${supported ? '' : ' disabled aria-disabled="true"'}${why ? ` title="${escapeAttr(why)}"` : ''}`
         + ` data-on-click="agent-auto-accept" data-name="${escapeAttr(s.name)}" data-session-id="${escapeAttr(sid)}">`
-        + '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8.5l3 3 7-7"/></svg>'
+        + '<span class="menu-switch" aria-hidden="true"></span>' // a switch, not a tick: it reads as on or off, not as a status (#10785)
         + `Auto-accept prompts<span class="auto-accept-state">${stateText}</span></button>`;
 }
 

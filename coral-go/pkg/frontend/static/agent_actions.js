@@ -9,7 +9,7 @@ import { redrawLiveList } from './list_hooks.js';
 import { showConfirmModal } from './confirm_dialog.js';
 import { importOnce } from './import_once.js';
 import { resolveSessionIdentity } from './session_state.js';
-import { agentWords, WHAT_STAYS_KILL, WHAT_STAYS_ARCHIVE } from './agent_words.js';
+import { agentWords, WHAT_STAYS_KILL, WHAT_STAYS_ARCHIVE, WHAT_STAYS_SLEEP } from './agent_words.js';
 import { applySleepingView } from './sleeping_view.js';
 
 // What Kill does with the agent's terminal log, said in every Kill confirmation (#4399): it is kept, on both terminal backends
@@ -118,7 +118,9 @@ export function toggleAgentSleep(name, agentType, sessionId, action) {
         }
     };
     if (action === 'sleep') {
-        showConfirmModal('Sleep agent', `Put "${name}" to sleep?`, doIt, undefined, { danger: false, label: 'Sleep agent' });
+        const row = state.liveSessions.find(x => x.session_id === sessionId && sessionServer(x) === server);
+        const who = agentWords(row, row ? resolveSessionIdentity(row) : name).label; // the agent's own name and team, not the folder it works in (#10785)
+        showConfirmModal('Sleep agent', `Put ${who} to sleep? ${WHAT_STAYS_SLEEP}`, doIt, undefined, { danger: false, label: 'Sleep agent' });
         return Promise.resolve(false);
     }
     return doIt();
