@@ -217,6 +217,7 @@ function drawStatus(data) {
     // no signal yet, or (right after Wake, while the read still says so) still asleep: nothing says they are well (#10006), and a just-woken team is counted as it reports (#10052, #10359)
     const notYet = a => a.availability === 'unknown' || (waking && a.availability === 'sleeping');
     const unknown = data.agents.filter(notYet).length;
+    S.unknown = unknown; // while an agent has not reported, the page reads again every 3 s (startCounts)
     const asleep = !waking && teamAsleep(); // every agent of the team asleep: "Asleep", not "All well" in green (Mobile tester, #10359)
     // Just woken from here: how many have reported so far, until all have (or two minutes pass), not only "waiting" (#10052).
     const wakingNow = unknown > 0 && !n && waking;
@@ -277,8 +278,11 @@ async function readCounts() {
 document.addEventListener('coral:team-sleep-changed', e => { if (S.team && e.detail && e.detail.team === S.team) readCounts(); });
 function startCounts() {
     readCounts();
+    S.fastUntil = Date.now() + 120000; // each opening of a team page starts its two minutes
     if (S.timer) return;
-    S.timer = pollEvery(() => { const v = $('team-page-view'); if (v && v.style.display !== 'none' && S.team) readCounts(); }, 30000);
+    // The status is read every 30 s, and every 3 s for the first two minutes while an agent has not sent its first message, so the header follows the posts of a team that is starting (#10589: it said "2 of 3 waiting" 15 s after the third had posted)
+    let tick = 0;
+    S.timer = pollEvery(() => { const v = $('team-page-view'); if (!v || v.style.display === 'none' || !S.team) return; tick++; if (tick % 10 === 0 || (S.unknown && Date.now() < S.fastUntil)) readCounts(); }, 3000);
 }
 
 // ── tabs ─────────────────────────────────────────────────────────────────
