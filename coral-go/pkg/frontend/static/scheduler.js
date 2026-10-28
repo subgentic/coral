@@ -389,6 +389,7 @@ export function initScheduler() {
 registerActions({
     'job-new': () => importOnce('./job_form.js', 'the job form').then(m => m.showJobModal()).catch(() => {}), // the form loads when it is first opened (#10218)
     'job-edit': el => withId(el.dataset.jobId, id => importOnce('./job_form.js', 'the job form').then(m => m.editScheduledJob(id)).catch(() => {})),
+    'job-open': el => withId(el.dataset.jobId, selectScheduledJob), // a run's page links back to the job that started it
     'job-toggle': el => withId(el.dataset.jobId, toggleScheduledJob),
     'job-run-now': el => withId(el.dataset.jobId, id => runScheduledJobNow(id, el)),
     'job-delete': el => withId(el.dataset.jobId, deleteScheduledJob),
