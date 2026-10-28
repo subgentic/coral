@@ -841,11 +841,9 @@ async function _openLaunchedTeam(server, boardName, goal, agents, seen, boardSet
         if (input && !input.value) { input.value = content; input.dispatchEvent(new Event('input', { bubbles: true })); }
         showToast('The team started, but the first task was not sent. It is in the message box: press Send to try again.', true);
     }
-    if (!goal || !sent) {
-        // A mouse: the box, where the person types next. A touch screen: the page's heading, not the box, whose focus raises the on-screen keyboard over a page nobody has looked at yet (#10281, as the password dialog's close, #10067).
-        const heading = window.matchMedia?.('(pointer: coarse)').matches ? document.getElementById('team-page-title') : null;
-        (heading || input)?.focus({ preventScroll: !!heading });
-    }
+    // A mouse: the box, where the person types next, with a first task sent or not (a launch left the keyboard on the page's body, Beta #10401). A touch screen: the page's heading, not the box, whose focus raises the on-screen keyboard over a page nobody has looked at yet (#10281, as the password dialog's close, #10067).
+    const heading = window.matchMedia?.('(pointer: coarse)').matches ? document.getElementById('team-page-title') : null;
+    (heading || input)?.focus({ preventScroll: !!heading });
 }
 window.launchTeam = launchTeam;
 
