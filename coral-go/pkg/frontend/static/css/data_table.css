@@ -454,3 +454,12 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 /* A row not opened since it changed (#9687; UI/UX): an 8 px accent dot and the name at 600 (a read name is 500); the snippet and the time do not change with it. A desktop row shows the dot before the name, named for a screen reader. */
 .dt-row.dt-unread:not(.dt-mailed) .dt-primary { font-weight: var(--fw-strong); }
 .dt-row.dt-unread:not(.dt-mailed) .dt-primary::before { content: "" / "Unread"; display: inline-block; width: 8px; height: 8px; margin-right: 8px; border-radius: 50%; background: var(--accent); vertical-align: middle; }
+
+/* A column with nothing in it on any row is not drawn (#9846): its head and its cells; the header draws it again when a row has a value. */
+.dt-table .dt-col-unused, .dt-table .dt-col-tight { display: none; }
+
+/* Column sizing (#9846): the sizes a column declares (data_table.js sizeColumn), read while the table is laid out as a table; a folded row is laid out its own way. */
+.dt-table :is(th, td) { --dt-min: 0; --dt-max: none; --dt-w: auto; } /* the defaults: a column that declares a size sets these on its own cells (inline), and the three rules below read them */
+.dt-box:not(.dt-folded) .dt-table :is(th, td)[data-dt-min] { min-width: var(--dt-min); }
+.dt-box:not(.dt-folded) .dt-table :is(th, td)[data-dt-max] { max-width: var(--dt-max); }
+.dt-box:not(.dt-folded) .dt-table :is(th, td)[data-dt-w] { width: var(--dt-w); }

@@ -13,7 +13,7 @@ const BASE = require('./test_base').BASE;
     const rows = `document.querySelectorAll('#group-table-view [data-review-artifact]')`;
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({source:PRELOAD});
-        for (const width of [1280,390]) {
+        for (const width of [1280,1024,390]) {
             try {
                 await Emulation.setDeviceMetricsOverride({width,height:900,deviceScaleFactor:1,mobile:width===390});
                 await Emulation.setTouchEmulationEnabled({enabled:width===390});
@@ -50,6 +50,14 @@ const BASE = require('./test_base').BASE;
                 assert.equal(await ev(`document.getElementById('nav-tab-hub-inbox-badge').textContent`),'9+','all pending artifacts count: the pill reads 9+ past nine (#9821)');
                 assert.match(await ev(`document.getElementById('nav-tab-hub-inbox').getAttribute('aria-label')`),/^Inbox, 13 /,'and the tab\'s accessible name keeps the exact count');
                 assert.ok(await ev(`document.documentElement.scrollWidth<=innerWidth+1`),'no horizontal overflow');
+                if (width !== 390) { // column sizing (#9846): an empty column is not drawn, Item has room, Actions is whole, the table fits its box
+                    const cols = await ev(`(() => { const box = document.querySelector('#group-table-view .dt-box'), br = box.getBoundingClientRect(), shown = e => !!e && getComputedStyle(e).display !== 'none'; const ch = (() => { const td = box.querySelector('tbody tr.dt-row td.dt-td'), s = document.createElement('span'); s.style.cssText = 'position:absolute;visibility:hidden;width:1ch;font:inherit'; td.append(s); const w = s.getBoundingClientRect().width; s.remove(); return w; })(); const heads = [...box.querySelectorAll('thead th.dt-th')].filter(shown).map(th => th.dataset.key + ':' + Math.round(th.getBoundingClientRect().width)); const row = box.querySelector('tbody tr.dt-row'), cell = k => row.querySelector('td[data-key="' + k + '"]'), r = e => e.getBoundingClientRect(); return { heads, itemCh: Math.round(r(cell('agent')).width / ch), goalCh: cell('goal') && shown(cell('goal')) ? Math.round(r(cell('goal')).width / ch) : 0, actionsRight: Math.round(r(cell('review')).right), boxRight: Math.round(br.right), actionsLeft: Math.round(r(cell('review')).left), fits: box.scrollWidth <= box.clientWidth + 1, scroll: box.scrollWidth, client: box.clientWidth, ch }; })()`);
+                    assert.ok(!cols.heads.some(h => /^(cli|folder):/.test(h)), `${width}: CLI and Folder are empty on every review row and are not drawn: ` + JSON.stringify(cols.heads));
+                    assert.ok(cols.itemCh >= 24, `${width}: Item has at least 24 characters of room: ` + JSON.stringify(cols));
+                    assert.ok(cols.goalCh >= 16 || (width < 1280 && !cols.heads.some(h => /^goal:/.test(h))), `${width}: Goal has at least 16 characters, or at a narrower box it is the next optional column to go: ` + JSON.stringify(cols));
+                    assert.ok(cols.actionsRight <= cols.boxRight + 1 && cols.fits, `${width}: Actions is whole inside the table box and the box does not scroll: ` + JSON.stringify(cols));
+                    { const d = process.env.CORAL_SCREENSHOT_DIR; if (d) { fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(path.join(d, `needs-review-${width}.png`), Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); } } // the picture of the sizing
+                }
                 assert.equal(await ev(`document.querySelector('#group-table-view .inbox-folder-head .session-group-count').textContent`),'12 of 13','heading explains the cap');
                 const names = await ev(`(() => {const r=${row('Review file 01.txt')},name=r.querySelector('.inbox-review-name');return {title:name.title,text:name.textContent,open:r.querySelector('.inbox-review-actions button').getAttribute('aria-label')};})()`);
                 assert.equal(names.title,'Review file 01.txt','ellipsis keeps the full filename in its tooltip');
