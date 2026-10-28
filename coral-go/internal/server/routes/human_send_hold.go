@@ -106,7 +106,17 @@ func (h *SessionsHandler) deliverPersonSend(ctx context.Context, name, agentType
 		}
 		return m.id, nil
 	}
-	return "", h.deliverHumanSend(ctx, name, agentType, sessionID, text)
+	return "", h.deliverPersonNow(ctx, name, agentType, sessionID, text)
+}
+
+// deliverPersonNow types a person's chat message into the agent and, once it is typed, lists it on the agent's live row (pending_sends) until its transcript has it, so another screen shows it as sent (#10467).
+func (h *SessionsHandler) deliverPersonNow(ctx context.Context, name, agentType, sessionID, text string) error {
+	err := h.deliverHumanSend(ctx, name, agentType, sessionID, text)
+	if err == nil {
+		h.sends.note(sessionID, text)
+		h.kickWS()
+	}
+	return err
 }
 
 // newHeldID is a held message's id: unguessable, short.
@@ -294,7 +304,7 @@ func (h *SessionsHandler) releaseOne(m *personHeld) error {
 			h.kickWS()
 			sctx, scancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer scancel()
-			return h.deliverHumanSend(sctx, m.name, m.agentType, m.sessionID, m.text)
+			return h.deliverPersonNow(sctx, m.name, m.agentType, m.sessionID, m.text)
 		}
 		if err := sleepCtx(ctx, personHoldPoll.Load()); err != nil {
 			if errors.Is(err, context.DeadlineExceeded) {

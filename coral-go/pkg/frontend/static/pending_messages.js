@@ -236,6 +236,30 @@ export function addPendingMessage(sessionId, text, sentAt = Date.now(), { sendin
     if (sending) announceSend(sessionId, "Sending message");
 }
 
+// What the agent's live row lists as typed in the last 90 seconds and not yet in its transcript (pending_sends, #10467): a message another screen sent shows here as a pending bubble, settled
+// like this screen's own when the transcript has it. Each listed message is looked at once; one this screen sent itself (its own pending bubble has the same words), or that its transcript
+// already holds, is not shown twice.
+const adoptedSends = new Set();
+function isKnownSend(sessionId, text, at) {
+    const want = pendingMatchText(text);
+    if ((pendingBySession.get(sessionId) || []).some(p => pendingMatchText(p.text) === want)) return true;
+    return (recentUserEntriesBySession.get(sessionId) || []).some(e => pendingMatchText(e.content) === want && (!Number.isFinite(at) || e.receivedAt >= at - 60000));
+}
+export function syncSendsFromRow(row) {
+    if (!row || !row.session_id || !Array.isArray(row.pending_sends)) return;
+    const sid = row.session_id;
+    for (const p of row.pending_sends) {
+        if (!p || !p.id || !p.text) continue;
+        const k = `${sid}|${p.id}`;
+        if (adoptedSends.has(k)) continue;
+        if (adoptedSends.size > 500) adoptedSends.clear();
+        adoptedSends.add(k);
+        const at = Date.parse(p.at);
+        if (isKnownSend(sid, p.text, at)) continue;
+        addPendingMessage(sid, p.text, Number.isFinite(at) ? at : Date.now());
+    }
+}
+
 /** The server said the send at sentAt was submitted: its bubble says Sent (or Queued) from now on (#4587). */
 export function confirmPendingMessage(sessionId, sentAt) {
     const p = (pendingBySession.get(sessionId) || []).find(x => x.at === sentAt);
