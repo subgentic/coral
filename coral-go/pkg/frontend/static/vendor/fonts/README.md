@@ -5,10 +5,10 @@ referrer reaches a third party; CSP: no external font/style hosts).
 
 | File | Font | Licence | Source |
 |---|---|---|---|
-| `jakarta-latin.woff2`, `jakarta-latin-ext.woff2` | Plus Jakarta Sans (400-700, latin and latin-ext subsets) | SIL Open Font License 1.1 | Google Fonts, `fonts.gstatic.com/s/plusjakartasans/v12/` |
+| `jakarta-latin.woff2` | Plus Jakarta Sans (400-700, latin subset) | SIL Open Font License 1.1 | Google Fonts, `fonts.gstatic.com/s/plusjakartasans/v12/` |
 | `material-icons.woff2` | Material Icons (regular), **subset** to the icons the dashboard's source names (`material-icons.names.txt`) | Apache License 2.0 | Google Fonts, `fonts.gstatic.com/s/materialicons/v145/`, reduced by `coral-go/tools/subset_icons.py` (fonttools, MIT) |
 
-Cyrillic and Vietnamese subsets of Plus Jakarta Sans are not bundled; those characters fall back to the
+The Latin Extended, Cyrillic and Vietnamese subsets of Plus Jakarta Sans are not bundled (the Latin Extended one, 21.7 KB, was dropped for the static tree's byte budget, #10594); those characters fall back to the
 system font. Add them with a matching `@font-face` in `css/fonts.css` if needed.
 
 The icon font is a ligature font (an element's text, such as `close`, is the icon), so an icon missing from the subset shows as

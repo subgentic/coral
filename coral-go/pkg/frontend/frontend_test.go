@@ -111,7 +111,7 @@ func TestNoThirdPartyHosts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, f := range []string{"jakarta-latin.woff2", "jakarta-latin-ext.woff2", "material-icons.woff2"} {
+	for _, f := range []string{"jakarta-latin.woff2", "material-icons.woff2"} {
 		if !strings.Contains(string(css), f) {
 			t.Errorf("fonts.css does not use %s", f)
 		}
