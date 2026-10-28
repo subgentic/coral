@@ -491,3 +491,10 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 /* A job or workflow Coral added as an example: its name and an Example tag on one line (#10001). */
 .dt-name-example { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .dt-name-example .dt-primary { min-width: 0; flex: 0 1 auto; width: auto; }
+
+/* A Needs you row's answer buttons (#10400): the card's own choices, 44 px on a phone. */
+.inbox-answers { display: inline-flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.inbox-answered { color: var(--text-secondary); }
+@media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) { .inbox-answers .inbox-answer { min-height: var(--control-touch-height, 44px); } }
+.dt-mail-cell:has(> .inbox-answers) { flex-wrap: wrap; }
+.dt-mail-cell > .inbox-answers { flex: 1 1 100%; padding: 0 12px 8px 56px; } /* under the mail line, in line with its text */
