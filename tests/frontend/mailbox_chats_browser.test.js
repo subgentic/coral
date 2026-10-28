@@ -66,7 +66,7 @@ const { ROW_WORDS } = require('./helpers/folder_rows');
         console.log('3. Star and Archive call the flags route');
         const rowFlag = `[...document.querySelectorAll('#group-table-view .dt-table tbody tr:not(.dt-group)')][0].querySelector('.dt-chat-flags .dt-flag')`;
         await client.Input.dispatchMouseEvent({ type: 'mouseMoved', x: 2, y: 2 }); // the mouse in a neutral corner: a pointer resting on the row would show them (a runner's Chrome has a mouse, and where it last was is not this test's to assume)
-        await waitFor(`getComputedStyle(${rowFlag}).opacity === '0'`, 'a row\'s Star and Archive are icons that wait for hover or focus', 10000);
+        await waitFor(`getComputedStyle(${rowFlag}).opacity === '0'`, 'a row\'s Star and Archive are icons that wait for hover or focus', 3000); // the mouse move is dispatched above; the hide is the button's own fade, so a slow product still fails
         assert.match(await ev(`${rowFlag}.getAttribute('aria-label')`), /^Star: /, 'the icon button is named for its chat');
         await Emulation.setFocusEmulationEnabled({ enabled: true }); // a page nobody looks at still has the focus the rules ask for
         await ev(`${rowFlag}.focus(); true`);

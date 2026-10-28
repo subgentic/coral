@@ -168,7 +168,7 @@ const AGENTS = (waiting) => waiting ? [
             await Emulation.setTouchEmulationEnabled({ enabled: false });
             await waitFor(`!matchMedia('(pointer: coarse)').matches`, at + 'the touch emulation is off again', 10000); // a loaded machine re-evaluates the media feature late
             await mouseTo(2, 2);
-            await waitFor(`getComputedStyle(document.querySelector('#group-table-view tbody .dt-hover-action')).opacity === '0'`, at + 'and hidden again at rest on a pointer (the mouse in a neutral corner)', 10000);
+            await waitFor(`getComputedStyle(document.querySelector('#group-table-view tbody .dt-hover-action')).opacity === '0'`, at + 'and hidden again at rest on a pointer (the mouse in a neutral corner)', 3000); // the 10 s above is for the emulation to switch; the hide itself is a transition, so a 6 s product lag still fails
             const rowAt = await ev(`(() => { const r = document.querySelector('#group-table-view tbody tr.dt-row').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
             await mouseTo(rowAt.x, rowAt.y);
             await waitFor(`getComputedStyle(document.querySelector('#group-table-view tbody .dt-hover-action')).opacity === '1'`, at + 'and shown again when the mouse is on the row', 3000);
