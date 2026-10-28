@@ -65,8 +65,9 @@ export function resolveSessionIdentity(s) {
     const src = sessionIdentitySource(s);
     if (src) return oneLine(src, 60);
     if (s.agent_type === 'terminal') return 'Terminal';
-    // An agent nobody named is called by the folder it works in, else by its CLI (the home folder is no name): "my-app", "Claude", not "Agent" (#5990).
-    return defaultAgentName(s.working_directory, s.agent_type);
+    // An agent nobody named is called by the folder it works in, else by its CLI (the home folder is no name): "my-app", "Claude", not "Agent" (#5990). A second agent with the same default is "Claude 2" (the server numbers them, #10249).
+    const base = defaultAgentName(s.working_directory, s.agent_type);
+    return Number(s.name_number) > 1 ? `${base} ${Number(s.name_number)}` : base;
 }
 
 /** The name an unnamed agent shows: its folder's name (not the home folder, the root or a drive), else the CLI's name, else "Agent". */
