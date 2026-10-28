@@ -79,12 +79,21 @@ const { ROW_WORDS } = require('./helpers/folder_rows');
         await ev(`${rowFlag}.click(); true`);
         await waitFor(`window.__flags.length === 1`, 'the star saved');
         assert.deepEqual(await ev(`window.__flags[0]`), ['chat-000', { starred: true }], 'the PATCH names the chat and the flag');
+        // Archive from the list says so in a toast with Undo (#10391): Undo puts the chat back with the same route
+        const rowArchive = `[...document.querySelectorAll('#group-table-view .dt-table tbody tr:not(.dt-group)')][0].querySelector('.dt-chat-flags .dt-flag[data-flag="archived"]')`;
+        await ev(`${rowArchive}.click(); true`);
+        await waitFor(`window.__flags.length === 2`, 'the archive saved');
+        assert.deepEqual(await ev(`window.__flags[1]`), ['chat-000', { archived: true }], 'the archive PATCH names the chat');
+        await waitFor(`[...document.querySelectorAll('.toast')].some(t => /^Archived: /.test(t.textContent) && [...t.querySelectorAll('button')].some(b => /^Undo$/.test(b.textContent.trim())))`, 'a toast that says Archived with an Undo', 4000);
+        await ev(`[...document.querySelectorAll('.toast button')].find(b => /^Undo$/.test(b.textContent.trim())).click(); true`);
+        await waitFor(`window.__flags.length === 3`, 'the undo saved');
+        assert.deepEqual(await ev(`window.__flags[2]`), ['chat-000', { archived: false }], 'Undo unarchives the same chat');
         // the opened chat carries them too (a phone has no hover): Star there calls the same route and draws the star
         await ev(`(async () => { const st = (await import((window.__coralStatic || '/static/') + 'state.js')).state, m = await import((window.__coralStatic || '/static/') + 'sessions.js'); st.currentSession = { type: 'history', name: 'chat-001' }; st.historySessionsList = [{ session_id: 'chat-001', starred: false, archived: false }]; m.drawChatFlags(st.historySessionsList[0]); window.__tog = m.toggleChatFlag; return true; })()`);
         assert.equal(await ev(`document.getElementById('history-flags').hidden`), false, 'the opened chat shows Star and Archive');
         await ev(`window.__tog('starred').then(() => true)`);
-        await waitFor(`window.__flags.length === 2 && document.getElementById('history-star').classList.contains('dt-flag-on')`, 'the opened chat\'s star saved and drawn');
-        assert.deepEqual(await ev(`window.__flags[1]`), ['chat-001', { starred: true }]);
+        await waitFor(`window.__flags.length === 4 && document.getElementById('history-star').classList.contains('dt-flag-on')`, 'the opened chat\'s star saved and drawn');
+        assert.deepEqual(await ev(`window.__flags[3]`), ['chat-001', { starred: true }]);
         assert.equal(await ev(`document.getElementById('history-star').getAttribute('aria-pressed')`), 'true');
         await waitFor(`document.querySelectorAll('#group-table-view .dt-table tbody tr:not(.dt-group)').length >= 50`, 'the list read again');
         console.log('   ✓');

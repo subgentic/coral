@@ -224,8 +224,13 @@ async function setFlag(s, flag, value, after, said) {
     const hadFocus = !!document.activeElement && document.activeElement.matches?.('button.dt-flag') && document.activeElement.dataset.sid === s.session_id;
     if (!(await setChatFlag(s.session_id, flag, value, s.server))) return;
     after();
-    if (said) importOnce('./notifications.js').then(m => m.announceNotice(said)).catch(() => {});
+    if (flag === 'archived' && value && said) undoToast(said, [s], after); // an archive says so where it can be seen, with the way back (#10391)
+    else if (said) importOnce('./notifications.js').then(m => m.announceNotice(said)).catch(() => {});
     if (hadFocus) refocusFlag(s.session_id, flag);
+}
+/** "Archived: <chat>" as a toast with Undo, which puts the chats back through the same route; said once by the notices' own region (the toast itself is silent). */
+function undoToast(text, rows, after) {
+    importOnce('./notifications.js').then(m => m.showToast(text, false, 8000, { silent: false, action: { label: 'Undo', onClick: async () => { for (const r of rows) await setChatFlag(r.session_id, 'archived', false, r.server); after(); } } })).catch(() => {});
 }
 
 const chatState = DT.tableState(); // the chats the person has selected on a phone (an avatar tap): kept across the redraws of a folder
@@ -244,7 +249,7 @@ function chatFolderSpec(key, ctx) {
         node: () => { const table = DT.dataTable({ label: `${folder.title}, ${folderCount(key) ?? rows.length}`, rows, rowKey: s => `${s.server}:${s.session_id}`, state: chatState,
             onModeChange: () => ctx.redraw?.(), // the window crossed 767 px: this spec's selectable (phone only) is decided at draw, so the owner draws the table again
             selectable: isCloud() || !window.matchMedia?.('(max-width: 767px)').matches ? null : { contextKey: key, canSelect: s => !isGroup(s) && (!s.server || s.server === 'local'), onChange: keys => ctx.selection?.(keys.size ? table.bar : null),
-                actions: [{ label: 'Star', run: async rows => { for (const s of rows) await setChatFlag(s.session_id, 'starred', true, s.server); chatState.selected.clear(); ctx.after(); } }, { label: 'Archive', run: async rows => { for (const s of rows) await setChatFlag(s.session_id, 'archived', true, s.server); chatState.selected.clear(); ctx.after(); } }] }, // select by the avatar on a phone, then Star or Archive (the flags route: this computer's chats only) rowName: s => name(s) || historyLabel(s),
+                actions: [{ label: 'Star', run: async rows => { for (const s of rows) await setChatFlag(s.session_id, 'starred', true, s.server); chatState.selected.clear(); ctx.after(); } }, { label: 'Archive', run: async rows => { for (const s of rows) await setChatFlag(s.session_id, 'archived', true, s.server); chatState.selected.clear(); ctx.after(); undoToast(rows.length === 1 ? 'Archived 1 chat' : `Archived ${rows.length} chats`, rows, ctx.after); } }] }, // select by the avatar on a phone, then Star or Archive (the flags route: this computer's chats only) rowName: s => name(s) || historyLabel(s),
             groupBy: s => ({ key: dayOf(stampOf(s)), label: dayOf(stampOf(s)) }),
             open: s => ctx.open(s),
             unread: s => IR.isUnread(readKind(s), readKey(s), stampOf(s)),
