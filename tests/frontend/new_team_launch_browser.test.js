@@ -56,6 +56,21 @@ const AGENT_KEYS = ['name', 'prompt', 'icon', 'capabilities', 'agent_type', 'mod
             assert.ok(q.working_mode, 'working_mode is in the request'); assert.equal(typeof q.working_mode.mode, 'string'); assert.equal(q.working_mode.dependency_guidance, true); assert.equal(q.working_mode.custom_instructions, 'Keep the diff small.', 'the additional instructions are custom_instructions');
             assert.equal(q.health_monitor, true, 'health_monitor is true');
         });
+        await S.run('the First task is a real task of the team assigned to the Orchestrator, and still a board line to it (#10007)', async () => {
+            await install_stub(200); await fresh(); await t.to(2, { template: /^Blank/ }); await t.click('button', N.addOrch); await settle(250); await t.click('button', N.next); await t.step(3);
+            await tab('Start'); await t.type('textarea', /^First task/i, 'Look at the build.\nThen fix what is red.', N.team);
+            await ev(`(() => { const R = window.fetch; window.__qa.board = []; window.fetch = (u, o = {}) => { const url = new URL(String(u), location.origin); const m = (o.method || 'GET').toUpperCase();
+                const hit = /^\\/api\\/board\\/[^/]+\\/(tasks|messages)$/.exec(url.pathname);
+                if (hit && m === 'POST') { window.__qa.board.push({ kind: hit[1], body: JSON.parse(o.body) }); return Promise.resolve(new Response(JSON.stringify({ id: 1 }), { status: 201, headers: { 'Content-Type': 'application/json' } })); }
+                return R(u, o); }; return true; })()`);
+            await t.click('button', N.launch);
+            await waitFor(`window.__qa.board.length >= 2`, 'the first task and the board line', 8000);
+            const b = (await sent()).board, task = b.find(x => x.kind === 'tasks'), msg = b.find(x => x.kind === 'messages');
+            assert.ok(task, 'a task is created'); assert.equal(task.body.title, 'Look at the build.', 'its first line is the title'); assert.equal(task.body.body, 'Look at the build.\nThen fix what is red.', 'the whole text is the body');
+            assert.equal(task.body.assigned_to, 'Orchestrator', 'assigned to the Orchestrator'); assert.equal(task.body.created_by, 'Operator');
+            assert.ok(msg && /^@Orchestrator Look at the build\./.test(msg.body.content), 'the board line to the Orchestrator is kept');
+            assert.ok(b.indexOf(task) < b.indexOf(msg), 'the task exists before the line that points at it');
+        });
         await S.run('step 3 health number out of range (#8455): Launch team sends nothing, opens the Health check tab, names the number and focuses it', async () => {
             await install_stub(200); await fresh(); await t.to(2, { template: /^Blank/ }); await t.click('button', N.addOrch); await settle(250); await t.click('button', N.next); await t.step(3);
             await tab('Health check'); assert.ok(await check(/^Send health check/i, true), 'the Send health check switch');

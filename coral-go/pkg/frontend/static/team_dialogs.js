@@ -757,6 +757,20 @@ async function launchTeam() {
         if (launchBtn) { launchBtn.disabled = false; launchBtn.textContent = 'Launch team'; }
     }
 }
+/** The first task as a task of the team, assigned to its lead: its first line is the title (at most 120 characters), the whole text the body. A refusal is said in a toast and the board line still goes (#10007). */
+async function addFirstTask(key, lead, goal) {
+    const line = goal.split('\n').find(l => l.trim()) || goal;
+    const flat = line.trim().replace(/\s+/g, ' ');
+    const title = flat.length > 120 ? flat.slice(0, 119).trimEnd() + '\u2026' : flat;
+    try {
+        const r = await boardFetch(key, '/tasks', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title, body: goal, assigned_to: lead, created_by: 'Operator' }),
+        });
+        if (!r.ok) throw new Error(String(r.status));
+    } catch { showToast('The team started, but the first task was not added to its Tasks tab.', true); }
+}
 /** Open the launched team, and post the goal to its lead: the agent named Orchestrator, else the first member. The goal that could not be sent is left in the message box of the team page's Messages tab with a toast, to send again without launching the team twice. */
 async function _openLaunchedTeam(server, boardName, goal, agents, seen, boardSettings = null) {
     const key = identityKey(server, boardName);
@@ -768,6 +782,7 @@ async function _openLaunchedTeam(server, boardName, goal, agents, seen, boardSet
         const unsaved = await applyTeamBoardSettings(key, boardSettings); // Require a goal, the health check's rules and the messaging switches, held until the board existed (#7407)
         if (unsaved) showToast(unsaved, true, undefined, { action: { label: 'Open Team settings', onClick: () => window.showTeamWorkingModeWorkspace?.(key) } });
         if (goal) {
+            await addFirstTask(key, lead, goal); // the request is work on the Tasks tab as well as a line on the board (#10007)
             const r = await boardFetch(key, '/messages', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
