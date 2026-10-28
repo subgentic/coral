@@ -418,6 +418,7 @@ export function syncNeedsInputCard(container, session) {
     const key = JSON.stringify(info) + (phoneBar() ? '|bar' : ''); // the form of the answers follows the window's width
     const shape = JSON.stringify(info, (k, v) => (k === "checked" ? undefined : v)); // the card but for its boxes' marks
     promptLive();
+    const isNew = !el;
     if (!el) {
         el = document.createElement("div");
         el.className = "chat-needs-input";
@@ -458,7 +459,27 @@ export function syncNeedsInputCard(container, session) {
         container.appendChild(el);
     }
     watchCardInView(el);
+    if (isNew) takeKeyboard(el);
 }
+
+// A new question takes the keyboard on its first answer (#10410, Beta #10401: it went to the hidden terminal box and the answers were 53 Tab stops away), unless the person is in the middle of a message in the box or somewhere else that holds words.
+function takeKeyboard(card) {
+    const now = document.activeElement;
+    const free = !now || now === document.body || (now.id === "command-input" && !now.value);
+    const first = free && card.querySelector(".cni-answer:not(:disabled)");
+    if (first) first.focus({ preventScroll: true });
+}
+
+// The numbers a question's answers are labelled with pick them (1 Red, 2 Blue), from the keyboard in the card (#10410).
+document.addEventListener("keydown", (e) => {
+    if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey || e.shiftKey || !/^[1-9]$/.test(e.key)) return;
+    const a = document.activeElement;
+    if (!a || !(a instanceof Element) || /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) || a.isContentEditable) return;
+    const card = a.closest(".chat-needs-input");
+    if (!card || !ownPromptCards.has(card)) return;
+    const b = card.querySelector(`.cni-answer[data-n="${e.key}"]:not(:disabled)`);
+    if (b) { e.preventDefault(); b.click(); }
+});
 
 // A change of what the person may do on this computer (the Hub says so) draws the card again: answers come or go.
 document.addEventListener('coral:hub-access-changed', () => refreshNeedsInputCard());
