@@ -143,7 +143,24 @@ export function noticeColumn() {
         document.body.appendChild(col);
     }
     placeNotices();
+    watchMenus();
     return col;
+}
+
+// An open menu is never under a banner (#10194): the column is hidden while a menu is open and comes back when it closes. Menus open and close on a click or a key, so that is when it looks.
+let _menuTimer = 0;
+function syncMenuOpen() {
+    const col = document.getElementById("notices");
+    if (!col) return;
+    const open = [...document.querySelectorAll(".menu:not([hidden])")].some(m => m.getClientRects().length > 0);
+    col.style.visibility = open ? "hidden" : "";
+}
+function watchMenus() {
+    if (watchMenus._wired) return;
+    watchMenus._wired = true;
+    const later = () => { clearTimeout(_menuTimer); _menuTimer = setTimeout(syncMenuOpen, 30); }; // after the click or key has been handled by the menu's own code
+    document.addEventListener("click", later, true);
+    document.addEventListener("keydown", later, true);
 }
 
 let _noticeFlip = false;
@@ -187,11 +204,22 @@ function placeNotices() {
     document.getElementById("notices")?.style.setProperty("--notice-top", top);
     // A page's pinned bar (its actions: Run, Edit, Done) is never under a toast: the column sits above the bar on the screen (UI/UX #7588 item 3; a phone's is at the top, where the bar is not).
     const pinned = [...document.querySelectorAll(".item-bar")].map(b => b.getBoundingClientRect()).find(r => r.height > 0 && r.bottom > window.innerHeight - 90 && r.top < window.innerHeight);
-    document.getElementById("notices")?.style.setProperty("--notice-bottom", `${Math.max(20, pinned ? Math.ceil(window.innerHeight - pinned.top) + 8 : 0)}px`);
+    // The open agent's composer (its text box and Send) is never under a banner either: on a desktop the column sits above it (a phone's is at the top, under the header).
+    const composer = document.getElementById("command-pane");
+    const composerRect = composer && composer.getClientRects().length ? composer.getBoundingClientRect() : null;
+    const aboveComposer = composerRect && composerRect.height > 0 && composerRect.top < window.innerHeight ? Math.ceil(window.innerHeight - composerRect.top) + 8 : 0;
+    document.getElementById("notices")?.style.setProperty("--notice-bottom", `${Math.max(20, pinned ? Math.ceil(window.innerHeight - pinned.top) + 8 : 0, aboveComposer)}px`);
     if (!placeNotices._wired) {
         placeNotices._wired = true; window.addEventListener("resize", placeNotices);
         if (typeof ResizeObserver === 'function') { const observer = new ResizeObserver(placeNotices); if (bar) observer.observe(bar); if (banner) observer.observe(banner); }
     }
+}
+
+/** A notification toast (an agent needs input, a workflow notice) sits in the one column with the short toasts, not fixed at the top right over the agent's name and menu (#10194): the column is placed under the headers on a phone and above the composer on a desktop, so it never covers Send. */
+function joinColumn(toast) {
+    for (const [k, v] of [["position", "static"], ["top", "auto"], ["right", "auto"], ["min-width", "0"], ["max-width", "none"], ["pointer-events", "auto"]]) toast.style.setProperty(k, v);
+    toastHost().appendChild(toast);
+    syncMenuOpen();
 }
 
 export function showWorkflowNotification(title, message, level = 'info', duration = 8000) {
@@ -207,7 +235,7 @@ export function showWorkflowNotification(title, message, level = 'info', duratio
             ${message ? `<span class="notification-toast-detail">${escapeHtml(plainResult(message)?.words || message)}</span>` : ''}
         </div>`;
     toast.querySelector(".notification-toast-close").addEventListener("click", () => toast.remove());
-    document.body.appendChild(toast);
+    joinColumn(toast);
     announceNotice([title || 'Notification', message].filter(Boolean).join(': '));
     setTimeout(() => toast.remove(), duration);
 }
@@ -317,7 +345,7 @@ export function showNotificationToast(agentLabel, detail, onClick) {
         toast.remove();
     });
     toast.querySelector(".notification-toast-close").addEventListener("click", () => toast.remove());
-    document.body.appendChild(toast);
+    joinColumn(toast);
     announceNotice(`${toast.querySelector(".notification-toast-title").textContent.replace(/^\S+\s/, "")}${detail ? ": " + toast.querySelector(".notification-toast-detail").textContent : ""}`);
     setTimeout(() => toast.remove(), 10000);
 }
