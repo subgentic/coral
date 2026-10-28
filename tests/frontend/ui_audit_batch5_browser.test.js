@@ -22,10 +22,10 @@ const BASE = require('./test_base').BASE;
             console.log(`1. (${w}) Agents: defaults, models, switches, then the CLI paths`);
             await open('agents');
             const names = await ev(`[...document.querySelectorAll('#settings-pane-agents .sv-row')].map(r => { const c = (r.querySelector('.sv-label, .sv-heading, dt label, dt') || document.createElement('i')).cloneNode(true); return c.textContent.trim().replace(/\\s+/g, ' ').slice(0, 40); })`).then(l => l.filter(Boolean)); // fields, headings and the live parts (Custom models, CLI paths) in page order
-            assert.deepEqual(names.slice(0, 5), ['Defaults', 'Default permission mode', 'Default working directory', 'Default thinking', 'Default models'], JSON.stringify(names));
+            assert.deepEqual(names.slice(0, 9), ['Defaults', 'Default permission mode', 'Default working directory', 'Default thinking', 'Claude CLI path', 'Codex CLI path', 'Antigravity CLI path', 'Pi CLI path', 'Default models'], JSON.stringify(names)); // the CLI paths fold sits under Defaults (#9955)
             const cli = names.findIndex(n => /CLI path$/.test(n)); // the CLI paths are four fields now (Claude, Codex, Antigravity, Pi), not one live part
-            assert.ok(cli > 5 && names.slice(cli).every(n => /CLI path$/.test(n)), 'the CLI paths come last: ' + JSON.stringify(names));
-            assert.ok(names.slice(5, cli).length >= 4 && names.slice(5, cli).every(n => !/CLI path$/.test(n)), 'the switches are between: ' + JSON.stringify(names));
+            assert.ok(cli === 4 && names.slice(cli, cli + 4).every(n => /CLI path$/.test(n)) && !names.slice(cli + 4).some(n => /CLI path$/.test(n)), 'the CLI paths come right under Defaults, no longer last (#9955): ' + JSON.stringify(names));
+            assert.ok(names.slice(cli + 4).length >= 4 && names.slice(cli + 4).includes('Behaviour') && names.slice(cli + 4).every(n => !/CLI path$/.test(n)), 'the models and the switches come after the paths: ' + JSON.stringify(names));
             await ev(`(() => { for (const id of ['settings-working-dir', 'settings-cli-path-claude', 'settings-cli-path-codex', 'settings-cli-path-agy', 'settings-cli-path-pi']) { const e = document.getElementById(id); if (e) e.value = id === 'settings-working-dir' ? '/work/project' : ''; } return true; })()`); // for the picture only (the dialog is closed unsaved): the test server's own folders are not shown
             await shot('agents-order', w);
             await ev(`window.hideSettingsModal(); true`);
