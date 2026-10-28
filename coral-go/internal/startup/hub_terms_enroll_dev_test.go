@@ -23,6 +23,7 @@ import (
 	"github.com/subgentic/coral/internal/config"
 	"github.com/subgentic/coral/internal/license"
 	"github.com/subgentic/coral/internal/store"
+	"github.com/subgentic/coral/internal/testguard"
 	terms "github.com/subgentic/coral/pkg/license"
 )
 
@@ -59,6 +60,8 @@ func (h *termsHub) asked() int {
 }
 
 func isolatedTermsStart(t *testing.T, hub *termsHub) (*config.Config, string) {
+	// The guard learns where the real ~/.coral is on its first check, before this test points HOME at a temp folder: the acceptance marker (always under HOME/.coral) is then written in the temp one.
+	testguard.CheckDataPath(filepath.Join(t.TempDir(), "x"))
 	iso := t.TempDir()
 	for _, k := range []string{"TMPDIR", "TMP", "TEMP"} {
 		t.Setenv(k, iso)
@@ -73,7 +76,6 @@ func isolatedTermsStart(t *testing.T, hub *termsHub) (*config.Config, string) {
 	t.Setenv("CORAL_CLOUD_URL", "")
 	require.NoError(t, os.MkdirAll(filepath.Join(iso, "home"), 0o700))
 	require.NoError(t, os.MkdirAll(home, 0o700))
-	t.Cleanup(license.SetMarkerPathForTest(filepath.Join(home, ".eula-accepted"))) // the marker is under the test's data folder, never the real ~/.coral
 	cred := filepath.Join(iso, "credential")
 	require.NoError(t, os.WriteFile(cred, []byte("chb_0123456789abcdefABCDEF_-xyz\n"), 0o600))
 
