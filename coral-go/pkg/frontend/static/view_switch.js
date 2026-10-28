@@ -74,6 +74,7 @@ export function buildWelcome() {
 
 export function showView(activeId) {
     _viewChanges++;
+    state.atWelcome = activeId === 'welcome-screen'; // the welcome page is on screen: no agent row is the selected one (session_rows.js, #10035)
     if (activeId === 'welcome-screen') buildWelcome();
     for (const id of VIEW_IDS) {
         const el = document.getElementById(id);

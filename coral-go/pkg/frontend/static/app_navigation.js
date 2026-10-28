@@ -126,8 +126,9 @@ export function currentChatsQuery() {
 
 export function showHome() {
     showView(isPhoneLayout() ? "mobile-agent-list" : "welcome-screen");
-    // Deselect sidebar items
-    document.querySelectorAll('.sidebar .session-item.active, .sidebar .session-item.selected').forEach(el => {
-        el.classList.remove('active', 'selected');
+    // Deselect sidebar items: the welcome page replaces the open chat, so its row is no longer the selected one (the list's rows are .session-group-item since the one-line rows; the old selector matched none, #10035)
+    document.querySelectorAll('.sidebar .session-item.active, .sidebar .session-item.selected, .sidebar .session-group-item.active').forEach(el => {
+        el.classList.remove('active', 'selected', 'list-row-current');
+        if (el.getAttribute('aria-current') === 'true') el.removeAttribute('aria-current');
     });
 }
