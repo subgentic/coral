@@ -162,17 +162,17 @@ const AGENTS = (waiting) => waiting ? [
             await ev(`document.querySelector('#group-table-view tbody .dt-hover-action').focus(); true`);
             await waitFor(`getComputedStyle(document.querySelector('#group-table-view tbody .dt-hover-action')).opacity === '1'`, at + 'Done shows when the keyboard is on it', 3000); // the button's own transition settles
             await ev(`document.activeElement.blur(); true`);
-            // on a touch screen (a coarse pointer) there is no hover and no focus ring to wait for: Done is always drawn (QA Engineer, #9634)
-            await Emulation.setTouchEmulationEnabled({ enabled: true, maxTouchPoints: 5 });
-            await waitFor(`matchMedia('(pointer: coarse)').matches && getComputedStyle(document.querySelector('#group-table-view tbody .dt-hover-action')).opacity === '1'`, at + 'Done is shown on touch without hover or focus', 3000);
-            await Emulation.setTouchEmulationEnabled({ enabled: false });
-            await waitFor(`!matchMedia('(pointer: coarse)').matches`, at + 'the touch emulation is off again', 10000); // a loaded machine re-evaluates the media feature late
             await mouseTo(2, 2);
             await waitFor(`getComputedStyle(document.querySelector('#group-table-view tbody .dt-hover-action')).opacity === '0'`, at + 'and hidden again at rest on a pointer (the mouse in a neutral corner)', 3000); // the 10 s above is for the emulation to switch; the hide itself is a transition, so a 6 s product lag still fails
             const rowAt = await ev(`(() => { const r = document.querySelector('#group-table-view tbody tr.dt-row').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
             await mouseTo(rowAt.x, rowAt.y);
             await waitFor(`getComputedStyle(document.querySelector('#group-table-view tbody .dt-hover-action')).opacity === '1'`, at + 'and shown again when the mouse is on the row', 3000);
             await mouseTo(2, 2);
+            // on a touch screen (a coarse pointer) there is no hover and no focus ring to wait for: Done is always drawn (QA Engineer, #9634). After the pointer steps, on the last desktop width: switching the touch emulation off again does not give a build server's Chrome its pointer back (the CI run of #9864 never saw Done hidden again), and no step after this one needs a pointer.
+            if (w === 1024) {
+                await Emulation.setTouchEmulationEnabled({ enabled: true, maxTouchPoints: 5 });
+                await waitFor(`matchMedia('(pointer: coarse)').matches && getComputedStyle(document.querySelector('#group-table-view tbody .dt-hover-action')).opacity === '1'`, at + 'Done is shown on touch without hover or focus', 3000);
+            }
             assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view .team-tb-pills .goals-chip')].map(c => c.textContent.replace(/\\s+/g, ' ').trim() + (c.getAttribute('aria-pressed') === 'true' ? '*' : ''))`), ['Open 2*', 'Done 1'], at + 'Open and Done chips with counts');
             assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view tbody .dt-quiet')].map(b => b.textContent)`), ['Done', 'Done'], at + 'one quiet Done button per row');
             assert.deepEqual(await ev(`(${ON_SCALE})(document.getElementById('group-table-view'), ${SCALE})`), [], at + 'every text of the saved table is on the scale');

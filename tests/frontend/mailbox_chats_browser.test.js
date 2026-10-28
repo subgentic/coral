@@ -23,8 +23,11 @@ const { ROW_WORDS } = require('./helpers/folder_rows');
             return R(u, o); }; return true; })()`);
     const open = async (w, h, mobile, failBig = false) => {
         await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled(mobile ? { enabled: true, maxTouchPoints: 5 } : { enabled: false });
+        await Emulation.setTimezoneOverride({ timezoneId: 'Asia/Kolkata' }); // a clock whose morning is before the seeded 12:59 chats: the case a runner in UTC is in (#9864)
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
         await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`); await ev(`window.__failBig = ${failBig}; true`); await stub();
+        // the seeded chats are stamped at fixed hours of today: on a runner whose clock is before them they are in the future of a marker that began now and would count as unread. A first load with no marker gets one that began tomorrow, so nothing is unread whatever the hour (parts 6 and after set their own).
+        await ev(`if (!localStorage.getItem('coral.inbox.read.v1')) localStorage.setItem('coral.inbox.read.v1', JSON.stringify({ since: Date.now() + 86400000, items: {} })); true`);
         await ev(`window.switchNavTab('hub-inbox'); true`);
         await ev(`import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab('chats')).then(() => true)`);
         await waitFor(`document.querySelectorAll('#group-table-view .dt-table tbody tr:not(.dt-group)').length >= 50`, 'the first page of chats', 15000);
