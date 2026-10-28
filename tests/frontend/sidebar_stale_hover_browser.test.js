@@ -27,7 +27,7 @@ const BASE = require('./test_base').BASE;
         const moved = [], tips = [];
         for (const [name, x, y] of spots) {
             for (let i = 0; i < 3; i++) {
-                await Input.dispatchMouseEvent({ type: 'mouseMoved', x, y }); await sleep(200); // sleep-ok: the tooltip's own show delay
+                await Input.dispatchMouseEvent({ type: 'mouseMoved', x, y }); await sleep(1000); // sleep-ok: the tooltip's own show delay (800 ms since #9999)
                 const p = await pos(); if (p.top !== base.top || p.scroll !== base.scroll) moved.push([name, x, y, p]);
                 const t = await ev(`(() => { const t = [...document.querySelectorAll('.session-tooltip')].find(e => getComputedStyle(e).display !== 'none'); if (!t) return null; const r = t.getBoundingClientRect(); const li = t.closest('li'); const lr = li && li.getBoundingClientRect(); return { top: r.top, left: r.left, h: r.height, rowTop: lr ? lr.top : null, inLi: !!li }; })()`);
                 if (t) tips.push(t);

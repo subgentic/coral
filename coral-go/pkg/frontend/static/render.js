@@ -197,6 +197,8 @@ function _rowSession(item) {
 
 
 
+const HOVER_CARD_DELAY_MS = 800; // how long the pointer rests on an agent row before its card opens (#9999)
+
 // Puts the markup in the list and wires what is new: tooltips, drag and drop, team token usage, the keyboard focus the redraw took, and the phone's page.
 function _applyListHtml(list, html, focusedSid, focusedInMenu) {
     // Only the parts that changed are re-parsed; unchanged rows keep their nodes,
@@ -210,15 +212,17 @@ function _applyListHtml(list, html, focusedSid, focusedInMenu) {
         if (!tip) continue;
         const show = () => {
             // Built when the pointer (or the keyboard) comes, from the session as it is now: a row carries an empty tooltip until then (#4497; the table was built for every row on every render).
-            const sess = _rowSession(item);
-            if (sess) tip.innerHTML = buildSessionTooltip(sess);
+            const sess = _rowSession(item), label = item.querySelector('.session-label');
+            if (sess) tip.innerHTML = buildSessionTooltip(sess, { nameCut: !!label && [label, ...label.querySelectorAll('*')].some(e => e.scrollWidth > e.clientWidth + 1), inTeam: !!item.closest('.session-board-card') });
             const rect = item.getBoundingClientRect();
             tip.style.left = rect.right + 8 + "px";
             tip.style.top = rect.top + "px";
             tip.style.display = "block";
         };
-        const hide = () => { tip.style.display = "none"; };
-        item.addEventListener("mouseenter", show);
+        let wait = 0;
+        const hide = () => { clearTimeout(wait); tip.style.display = "none"; };
+        // The pointer has to rest: a card that opened as the pointer passed covered the chat (#9999, the beta tester); the keyboard gets it at once (#9831)
+        item.addEventListener("mouseenter", () => { clearTimeout(wait); wait = setTimeout(show, HOVER_CARD_DELAY_MS); });
         item.addEventListener("mouseleave", hide);
         // The same tip for the keyboard (#9831: a cut name was readable only with a mouse): it shows when the keyboard puts focus on the row or a control in it, goes when focus leaves the row or on Escape, and takes no focus (the row's name for a screen reader is its own, unchanged).
         item.addEventListener("focusin", (e) => { if (e.target.matches(":focus-visible")) show(); });
