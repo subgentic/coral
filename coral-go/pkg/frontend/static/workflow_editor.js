@@ -5,7 +5,8 @@ import { mountSettingsView } from './settings_view.js';
 import { showToast } from './utils.js';
 import { registerActions, withId } from './actions.js';
 import { apiFetch } from './api.js';
-import { limitSeconds, limitParts } from './time_limit.js';
+import { importOnce } from './import_once.js';
+const { limitSeconds, limitParts } = await importOnce('./time_limit.js'); // only the lazy forms use it (#10218)
 
 let view = null;
 let editingWorkflowId = null; // non-null when editing

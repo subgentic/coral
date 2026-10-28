@@ -6,7 +6,6 @@ import { escapeHtml, escapeAttr, showToast, showView, setRowCurrent } from './ut
 import { announceNotice } from './notifications.js';
 import { registerActions, withId, uuidOf } from './actions.js';
 import { pollEvery } from './overload.js';
-import { showJobModal, editScheduledJob } from './job_form.js';
 import { compactDuration } from './format.js';
 import { runFailure } from './run_failure.js';
 import { cronWords, atWords, awayWords, whenWords, resultWords, reasonWords, lastWords, limitWords, exitNote, resultLine, zoneNote, deleteJobWords } from './job_words.js';
@@ -368,8 +367,8 @@ export function initScheduler() {
 // The scheduled jobs' markup (#3645): data-on-* names, never code.
 // Ids are checked (idOf, uuidOf) before use: a bad one does nothing. Deleting still asks first.
 registerActions({
-    'job-new': () => showJobModal(),
-    'job-edit': el => withId(el.dataset.jobId, editScheduledJob),
+    'job-new': () => importOnce('./job_form.js').then(m => m.showJobModal()), // the form loads when it is first opened (#10218)
+    'job-edit': el => withId(el.dataset.jobId, id => importOnce('./job_form.js').then(m => m.editScheduledJob(id))),
     'job-toggle': el => withId(el.dataset.jobId, toggleScheduledJob),
     'job-run-now': el => withId(el.dataset.jobId, id => runScheduledJobNow(id, el)),
     'job-delete': el => withId(el.dataset.jobId, deleteScheduledJob),

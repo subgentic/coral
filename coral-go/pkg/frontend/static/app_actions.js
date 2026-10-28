@@ -20,7 +20,6 @@ import { popoutRetry } from './popout.js';
 import { setLiveViewMode, showTerminalView } from './live_chat.js';
 import { switchAgenticTab } from './agentic_state.js';
 import { copyBranchName, showToast } from './utils.js';
-import { showJobModal, hideJobModal, reshowJobModal } from './job_form.js';
 import { selectBoardProject, postBoardMessage, deleteMessageBoardProject, toggleBoardPause, showExportBoardModal, toggleSelectMode } from './message_board.js';
 import { showFolderTagDropdown, addFolderTag, removeFolderTag, createAndAddFolderTag } from './folder_tags.js';
 import { pinFolder, unpinFolder, showOpenFolderModal, hideOpenFolderModal, submitOpenFolder } from './pinned_folders.js';
@@ -39,6 +38,12 @@ import { loadHistoryPage } from './history_filters.js';
 import { switchNavTab } from './app_navigation.js';
 import { selectWorkflow, selectWorkflowRun, showWorkflowCreateModal, hideWorkflowCreateModal, launchWorkflowAgent, showCostDashboard, _refreshCostDashboard, _costTimeRangeChanged, openTeamPage, exitTeamPage, showTeamWorkingModeWorkspace, showTeamLinkDialog, showDocsTab, selectDoc, showThemeConfigurator, hideThemeConfigurator, showLaunchModal, hideLaunchModal, launchSession, hideInfoModal, copyInfoCommand, showSettingsModal, hideSettingsModal, applySettings, toggleFlag, showAddAgentToBoard, launchTerminalToBoard, launchDefaultAgent, showAddStandaloneAgent, launchStandaloneTerminal, exportPersonas, importPersonas, importTeamTemplates, showResumeModal, hideResumeModal, resumeLaunchNew, showDefaultPromptsModal, hideDefaultPromptsModal, resetDefaultPrompt, saveDefaultPrompts } from './app_panels.js';
 import { MENU_KEYS, menuMove } from './menu_keys.js';
+
+// The New job form (job_form.js, about 28 KB) loads when a person first opens it, not at start (#10218): these are the same calls, answered once the file is in.
+const jobForm = () => importOnce('./job_form.js');
+const showJobModal = (...args) => jobForm().then(m => m.showJobModal(...args));
+const hideJobModal = (...args) => jobForm().then(m => m.hideJobModal(...args));
+const reshowJobModal = (...args) => jobForm().then(m => m.reshowJobModal(...args));
 
 registerActions({
     'mb-select-mode': () => toggleSelectMode(),

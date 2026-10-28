@@ -36,7 +36,7 @@ const MISSING = 'The base branch main does not exist in /work/repo. Its branches
             await waitFor(`window.__sched.jobList().length > 0`, 'the job', 8000);
 
             console.log(`${tag}: the form`);
-            await ev(`window.showJobModal(); document.querySelector('.job-type-btn[data-type="prompt"]').click(); true`);
+            await ev(`window.showJobModal().then(() => { document.querySelector('.job-type-btn[data-type="prompt"]').click(); return true; })`); // the form loads on first use (#10218)
             const f = await ev(`({ value: document.getElementById('job-modal-branch').value, placeholder: document.getElementById('job-modal-branch').placeholder })`);
             check(`${tag}: Base branch starts empty, and its placeholder says the repo's current branch`, f.value === '' && /current branch/.test(f.placeholder), JSON.stringify(f));
             await ev(`{ const set = (id, v) => { const i = document.getElementById(id); i.value = v; i.dispatchEvent(new Event('input', { bubbles: true })); }; set('job-modal-name', 'agent-job'); set('job-modal-repo', '/work/repo'); set('job-modal-prompt', 'Tidy the repo.'); document.querySelector('.sched-preset').click(); } true`);

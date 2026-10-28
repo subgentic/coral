@@ -17,7 +17,6 @@ import { loadChangedFiles } from './changed_files.js';
 import { loadAgentEvents } from './agentic_state.js';
 import { selectScheduledJob } from './scheduler.js';
 import { go } from './nav.js';
-import { editScheduledJob } from './job_form.js';
 import { closeAllTabs as closeAllPreviewTabs, openPreviewTab } from './preview_pane.js';
 import { hideServersModal } from './servers.js';
 import { cancelSelectMode, deleteMessageBoardProject, showExportBoardModal, showMessageBoardProjects, postBoardMessage, toggleSelectMode } from './message_board.js';
@@ -25,6 +24,7 @@ import { hideFolderTagDropdown } from './folder_tags.js';
 import { showTeamAvailability } from './team_availability.js';
 /** The Automations tab on a folder (jobs or workflows), as a link to it would open it. */
 const openAutomationsFolder = folder => go({ view: 'automations', folder });
+const editScheduledJob = (...a) => importOnce('./job_form.js').then(m => m.editScheduledJob(...a)); // the form loads on first use (#10218)
 const showTeamWorkingMode = (...a) => importOnce('./team_working_mode.js').then(m => m.showTeamWorkingMode(...a)); // the team settings module is loaded when first used (#5364), not at startup
 import { lazyFns, loadWorkflows, loadTemplateBrowser, loadChatSearch, loadModals, loadResumeDialog } from './lazy_panels.js';
 import { hasAction } from './actions.js';

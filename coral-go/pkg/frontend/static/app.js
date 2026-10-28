@@ -54,7 +54,6 @@ import './agentic_state.js';
 import { buildWelcome } from './utils.js';
 import './preview_pane.js';
 import './scheduler.js';
-import './job_form.js';
 import './live_jobs.js';
 import './message_board.js';
 import './folder_tags.js';
