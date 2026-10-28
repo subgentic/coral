@@ -57,7 +57,7 @@ async function answer(s, o, ask, cell) {
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         read.delete(askKey(s));
         cell.replaceChildren(Object.assign(document.createElement('span'), { className: 'inbox-answered', textContent: `Answered: ${o.label}` }));
-        showToast(`Answered: ${o.label}`, false, 4000, { silent: true });
+        showToast(`Answered: ${o.label} for ${resolveSessionIdentity(s)}`, false, 4000); // said once by the page's live region: nothing else says it
         document.dispatchEvent(new CustomEvent('coral:inbox-answered', { detail: { session_id: s.session_id } }));
     } catch {
         buttons.forEach(b => { b.disabled = false; });
