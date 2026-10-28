@@ -40,7 +40,7 @@ func (h *SessionsHandler) ShareFileArtifact(w http.ResponseWriter, r *http.Reque
 	if refuseIfDiskLow(w) {
 		return
 	}
-	content, _, ok := h.readWorkFile(w, r, name, sessionID, fp, maxAgentArtifactSize)
+	content, _, ok := h.readWorkFile(w, r, name, sessionID, fp, maxAgentArtifactSize, "This file is too large to share (the limit is 64 MiB)")
 	if !ok {
 		return
 	}
