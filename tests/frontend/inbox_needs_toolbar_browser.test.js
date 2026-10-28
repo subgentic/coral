@@ -41,7 +41,7 @@ const { FOLDER_ROWS } = require('./helpers/folder_rows');
             await waitNames(4, 'the four waiting agents'); await settle(300);
             const before = await folders();
 
-            check(`${label}: opening the folder puts the focus on the page's search box`, await ev(`(() => { const a = document.activeElement; return !!a && a.matches('input[type=search]') && !!a.closest('.inbox-folder-toolbar'); })()`));
+            check(`${label}: ${label === '390' ? 'opening the folder does not put the keyboard on the search box: a phone starts at the first row or the heading (#9985)' : "opening the folder puts the focus on the page's search box"}`, await ev(`(() => { const a = document.activeElement; return ${label === '390' ? '!a || !/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)' : "!!a && a.matches('input[type=search]') && !!a.closest('.inbox-folder-toolbar')"}; })()`));
             const g = await geometry();
             check(`${label}: the Needs you page has a search box named "Search needs you" and the Filters icon in the same row, to its right`, g && g.qName === 'Search needs you' && g.sameRow && g.right && /Filters/.test(g.toggleName), JSON.stringify(g));
             if (mobile) check(`${label}: the pills are not in the row (one select in the Filters sheet since #8700), the search keeps at least 10rem, nothing is wider than the screen`, g && !g.select && !g.pills && g.searchW >= 160 && g.over <= 0, JSON.stringify(g));
