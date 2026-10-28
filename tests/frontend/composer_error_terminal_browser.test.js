@@ -36,6 +36,11 @@ const CASES = [
                 assert.match(e.text, /Open terminal shows what the agent is showing/, at + 'the words say what Open terminal does: ' + e.text);
                 assert.match(e.text, /Restart stops the agent and starts it again/, at + 'and what Restart does: ' + e.text);
                 assert.ok(e.right <= w, at + 'inside the screen: ' + JSON.stringify(e));
+                // a normal-width block with wrapped text and the buttons under it (#10602): the text was squeezed to one word a line, ~30 px wide and 800 px tall, at 390
+                const g = await ev(`(() => { const b = document.getElementById('composer-error'), t = b.querySelector('.composer-error-text'), r = b.querySelector('.composer-error-restart'), o = b.querySelector('.composer-error-terminal'), bb = b.getBoundingClientRect(), tb = t.getBoundingClientRect();
+                    return { boxW: Math.round(bb.width), boxH: Math.round(bb.height), textW: Math.round(tb.width), textH: Math.round(tb.height), btnsBelow: Math.round(Math.min(r.getBoundingClientRect().top, o.getBoundingClientRect().top) - tb.bottom) }; })()`);
+                assert.ok(g.textW >= g.boxW * 0.6 && g.boxH <= 260, at + 'the text is a block of normal width, not a word a line: ' + JSON.stringify(g));
+                if (mobile) assert.ok(g.btnsBelow >= -1, at + 'the buttons sit under the text, not beside a squeezed one: ' + JSON.stringify(g));
             }
             // Open terminal is the same action as the card's (terminal_open_from_card_browser pins what it does)
             assert.equal(await ev(`document.querySelector('#composer-error .composer-error-terminal').getAttribute('data-on-click')`), 'terminal-view-open', `${w}: Open terminal is the card's own action`);

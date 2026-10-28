@@ -431,6 +431,7 @@ body.popout-mode.popout-terminal-blocked .attach-image-btn { pointer-events: non
 /* A failed send, under the text where the user typed (#3218): not a toast over the composer. */
 .composer-error {
     display: flex;
+    flex-wrap: wrap; /* the text is a block of its own and the buttons sit under it: a squeezed one-word-a-line column beside three buttons was 800 px tall at 390 (#10602) */
     align-items: center;
     gap: 8px;
     margin: 6px 12px 0;
@@ -446,8 +447,8 @@ body.popout-mode.popout-terminal-blocked .attach-image-btn { pointer-events: non
 .composer-hint { margin: 0 0 6px; font-size: var(--fs-sm); color: var(--text-secondary); }
 .composer-hint[hidden] { display: none; }
 .composer-starting-count { font-weight: var(--fw-medium); color: var(--text-primary); font-variant-numeric: tabular-nums; }
-.composer-error-text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
-.composer-error-restart { flex-shrink: 0; }
+.composer-error-text { flex: 1 1 14rem; min-width: 0; overflow-wrap: anywhere; }
+.composer-error-restart, .composer-error-terminal { flex-shrink: 0; }
 .composer-error-dismiss {
     flex-shrink: 0;
     min-width: 28px;
