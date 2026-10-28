@@ -142,15 +142,15 @@ const { setTheme } = require('./helpers/contrast');
             await waitFor(`document.querySelectorAll('#team-agents-list .team-agent-row').length === 4`, 'the members'); // the form opens with the default team's three members (#9877) and this suite adds the Orchestrator: four, pinned so the default stays covered (Security Reviewer)
             await ev(`document.getElementById('launch-team-next').click(); true`); // step 3
             await waitFor(`!!document.querySelector('#launch-step-team [name=on]')`, 'the Health check tab');
-            assert.equal(await ev(`document.querySelector('#launch-step-team [name=on]').checked`), false, 'the health check switch is off by default');
-            if (ticked) await ev(`document.querySelector('#launch-step-team [name=on]').click(); true`);
+            assert.equal(await ev(`document.querySelector('#launch-step-team [name=on]').checked`), true, 'the health check switch starts on for a new team (#10683)');
+            if (!ticked) await ev(`document.querySelector('#launch-step-team [name=on]').click(); true`);
             const before = await ev(`window.__launches.length`);
             await ev(`document.getElementById('launch-team-go').click(); true`);
             await waitFor(`window.__launches.length === ${before} + 1`, 'the launch request');
             return await ev(`window.__launches[window.__launches.length - 1]`);
         };
-        assert.equal('health_monitor' in await launchTeam('hl-launch', false), false, 'not sent while the switch is off: the team gets the default (off)');
-        assert.equal((await launchTeam('hl-launch-2', true)).health_monitor, true, 'sent as true when the switch is on');
-        console.log('PASS team health monitor: off by default, the icon (dimmed off, accent on, 44 px on a phone, none through the Hub), it opens the setting, a switch in the launch dialog sent only when on');
+        assert.equal((await launchTeam('hl-launch', false)).health_monitor, false, 'sent as false when the person turned the switch off: the launch stores it off');
+        assert.equal((await launchTeam('hl-launch-2', true)).health_monitor, true, 'sent as true when the switch is left on');
+        console.log('PASS team health monitor: off by default, the icon (dimmed off, accent on, 44 px on a phone, none through the Hub), it opens the setting, a switch in the launch dialog that starts on and is sent either way');
     } finally { await removeBoards(ev, [TEAM, 'hl-launch', 'hl-launch-2']); await client.close(); } // the suite's board goes (the runner's end-check names one left)
 })().catch(e => { console.error(e); process.exitCode = 1; });

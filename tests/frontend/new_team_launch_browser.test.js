@@ -130,13 +130,13 @@ const AGENT_KEYS = ['name', 'prompt', 'icon', 'capabilities', 'agent_type', 'mod
         await S.run('board settings (Require a goal, health Every, Send it to, Post when all is well, Messaging): ONE PUT /api/board/<the id the launch returned>/settings, after the launch answered, with those values', async () => {
             await install_stub(200); await fresh(); await t.to(2, { template: /^Blank/ }); await t.click('button', N.addOrch); await settle(250); await t.click('button', N.next); await t.step(3);
             await tab('Workflow'); assert.ok(await check(/^Require a goal/i, true), 'a Require a goal switch');
-            await tab('Health check'); assert.ok(await check(/^Send health check/i, true), 'Send health check'); await t.type('input', /^Every/i, '20'); assert.ok(await check(/all is well/i, true), 'Post when all is well');
+            await tab('Health check'); assert.ok(await check(/^Send health check/i, true), 'Send health check'); await t.type('input', /^Every/i, '20'); assert.ok(await check(/all is well/i, false), 'Post when all is well turned off');
             await tab('Messaging'); assert.ok(await check(/^Message teams on other computers/i, true), 'Message teams switch'); assert.ok(await check(/^Share files with teams on other computers/i, true), 'Share files switch');
             await t.click('button', N.launch); await waitFor(`window.__qa.put.length >= 1`, 'the board settings PUT', 8000); await settle(500);
             const s = await sent(); assert.equal(s.put.length, 1, 'one PUT, not one per setting'); assert.equal(s.put[0].path, '/api/board/qa-board-7/settings', 'to the board the launch returned');
             assert.deepEqual(s.order, ['launch', 'put'], 'the PUT is after the launch');
             const b = s.put[0].body; assert.equal(b.require_goal, true, 'require_goal'); assert.equal(b.cross_team_messaging, true, 'cross_team_messaging'); assert.equal(b.cross_team_artifacts, true, 'cross_team_artifacts');
-            assert.ok(b.health && (b.health.on === true || b.health.enabled === true || JSON.stringify(b.health).includes('true')), `the health setting is in the PUT (${JSON.stringify(b.health)})`);
+            assert.ok(b.health && b.health.on === true && b.health.all_clear === false, `the health setting is in the PUT: on (it starts on, #10683) and Post when all is well off (${JSON.stringify(b.health)})`);
         });
         await S.run('if the board settings PUT fails the team is already running: the dialog closes, one toast names the setting that was not saved', async () => {
             await install_stub(500); await fresh(); await t.to(2, { template: /^Blank/ }); await t.click('button', N.addOrch); await settle(250); await t.click('button', N.next); await t.step(3);

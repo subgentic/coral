@@ -737,7 +737,7 @@ async function launchTeam() {
     };
     if (boardServer) payload.board_server = boardServer;
     if (settings.working_mode) payload.working_mode = settings.working_mode; // the working mode, its guidance and the Additional instructions (#7407)
-    if (settings.health_monitor) payload.health_monitor = true;
+    if (typeof settings.health_monitor === 'boolean') payload.health_monitor = settings.health_monitor; // on to begin with: an off is sent too, so the launch stores it (#10683)
     if (useWorktree) {
         payload.worktree = true;
         if (baseBranch) payload.base_branch = baseBranch;

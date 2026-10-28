@@ -14,13 +14,16 @@ const WORKFLOW_HINT = 'Guidance the agents get on how to share the folder. It do
 let _view = null;
 let _defaultMode = 'none'; // the working mode a new team starts with: 'none', or the one the chosen team template names (#8919)
 
+// A new team's health check starts on (#10683, the operator); a team that never stored a setting stays off (HEALTH_DEFAULTS), and Team settings shows what it has.
+const NEW_TEAM_HEALTH = { ...HEALTH_DEFAULTS, on: true };
+
 // What a new team starts with: nothing from the last team stays.
-const startValues = () => ({ first_task: '', save_goal: true, custom_instructions: '', mode: _defaultMode, dependency_guidance: false, asks_are_tasks: true, require_goal: false, ...healthToValues(HEALTH_DEFAULTS), cross_team_messaging: false, cross_team_artifacts: false });
+const startValues = () => ({ first_task: '', save_goal: true, custom_instructions: '', mode: _defaultMode, dependency_guidance: false, asks_are_tasks: true, require_goal: false, ...healthToValues(NEW_TEAM_HEALTH), cross_team_messaging: false, cross_team_artifacts: false });
 
 // The health check's own rows, less who gets it: at launch that is the Orchestrator (a list of one is noise); another recipient is in Team settings.
 const healthRows = () => healthFields({
     members: () => Promise.resolve([]), hasHeld: () => false, monitorOff: () => false, openSettings: () => {},
-    onReset: view => { for (const [k, v] of Object.entries(healthToValues(HEALTH_DEFAULTS))) view.set(k, v); },
+    onReset: view => { for (const [k, v] of Object.entries(healthToValues(NEW_TEAM_HEALTH))) view.set(k, v); },
 }).filter(f => f.key !== 'recipient' && !f.key.endsWith('_nudge')); // no members to pick from yet
 
 const MODE_WORDS = { shared_checkout: 'Shared checkout', worktrees: 'Worktrees', task_queue: 'Task queue' };
@@ -30,7 +33,7 @@ function menuStates(v) {
     return {
         start: v.first_task || v.custom_instructions ? 'set' : 'none',
         workflow: MODE_WORDS[v.mode] || (v.dependency_guidance ? 'guidance' : 'none'),
-        health: valuesToHealth(v, HEALTH_DEFAULTS).on ? 'on' : 'off',
+        health: valuesToHealth(v, NEW_TEAM_HEALTH).on ? 'on' : 'off',
         messaging: v.cross_team_messaging || v.cross_team_artifacts ? 'on' : 'off',
     };
 }
@@ -104,9 +107,9 @@ export function readTeamLaunchSettings() {
     out.save_goal = !!v.save_goal; // the first task's goal (team_dialogs.js): on by default
     const board = {};
     if (v.require_goal) board.require_goal = true;
-    const h = valuesToHealth(v, HEALTH_DEFAULTS);
-    if (h.on) out.health_monitor = true;
-    if (JSON.stringify(h) !== JSON.stringify(HEALTH_DEFAULTS)) board.health = h;
+    const h = valuesToHealth(v, NEW_TEAM_HEALTH);
+    out.health_monitor = h.on; // sent either way: the switch is on to begin with, and an off is the person's choice, so the launch stores it
+    if (JSON.stringify(h) !== JSON.stringify(NEW_TEAM_HEALTH)) board.health = h;
     if (v.cross_team_messaging) board.cross_team_messaging = true;
     if (v.cross_team_artifacts) board.cross_team_artifacts = true;
     if (Object.keys(board).length) out.board = board;

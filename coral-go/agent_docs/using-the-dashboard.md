@@ -49,12 +49,12 @@ The numbers come from `by_agent_type`, `by_model` and `by_thinking` in [Token Us
 
 ## Turn on the team health monitor
 
-A team's health check is **off by default**. When it is on, Coral checks in on the team every few minutes (10 by default, 5 to 1440 in settings) to spot stuck or idle agents, and types one summary into one person's terminal: the orchestrator unless you pick another team member. It says who is idle, stuck or waiting, and what changed. **It uses tokens each time**, because the recipient's agent reads and answers it.
+A team's health check is **on when you make the team** (the New project dialog's Health check switch starts on; turn it off there if you do not want it), and **off for a team that existed before and never had it set**. When it is on, Coral checks in on the team every few minutes (10 by default, 5 to 1440 in settings) to spot stuck or idle agents, and types one summary into one person's terminal: the orchestrator unless you pick another team member. It says who is idle, stuck or waiting, and what changed. **It uses tokens each time**, because the recipient's agent reads and answers it.
 
 ![Two teams in the agent list: the health icon is on, beside each team's info button](docs-img/team-health.png)
 
 - **The icon** sits beside the team's info button in the agent list: a plain, dimmed outline while the check is off, an accent icon on a tinted pill while it is on. It is named "Team health monitor: off" or "on". Click it to open the team's settings on the **Health check** tab. There is no icon where the list carries no state (Coral Hub).
-- **Turn it on** in the Health check tab of Team settings (**Send a health check to this team**). It is off for a new team; the New project dialog has no option for it.
+- **Turn it on or off** in the Health check tab of Team settings (**Send a health check to this team**). A new team starts with it on; a team made before that never had it set is off until you turn it on.
 - **Also in that tab:** how often, who receives it, whether to post a short line when nothing needs attention, and each automatic rule (nudge an idle agent to claim its work, ask a quiet agent for a status, report a held delivery). Those rules act only while the check is on. Handing a review to the default reviewers works whether or not it is on.
 
 A separate switch, **Team health checks** in Settings > Agents, is on by default and is read when Coral starts: turning it off stops the background monitor for every team, and each team's Health check tab then says it needs that switch, with a link to Settings. See [Teams](teams.md#board-health-monitor-setting).
