@@ -1191,9 +1191,11 @@ body.panel-dragging .agentic-state {
 
 .inline-preview-actions {
     display: flex;
+    align-items: center;
     gap: 4px;
     flex-shrink: 0;
 }
+.inline-preview-actions .btn-xs { margin: 0; } /* .btn-xs's negative margin is for a button in a row of text: in this bar it pushed the star and Share 4 px above it, cut at the top (#10539) */
 
 .inline-preview-mode-btn,
 .inline-preview-save {

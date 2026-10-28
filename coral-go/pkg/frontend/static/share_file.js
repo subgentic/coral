@@ -18,6 +18,7 @@ export async function shareFileAsArtifact(filepath) {
             showToast(data.error || data.message || `${name} could not be shared as an artifact`, true);
             return;
         }
+        document.dispatchEvent(new CustomEvent('artifact-shared', { detail: { session_id: s.session_id } })); // the agent's Artifacts tab lists it at once (#10539)
         showToast(`Shared ${name} as an artifact: ${shortLink(data.uri)}`, false, undefined, {
             action: { label: 'Copy link', onClick: async () => showToast((await copyText(data.uri)) ? 'Link copied' : 'Could not copy the link', false) },
         });

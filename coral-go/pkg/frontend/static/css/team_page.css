@@ -404,3 +404,5 @@
 /* The Inbox's Starred folder, its second part (#10258): starred artifacts under the starred chats, a heading's room above and below. */
 .inbox-starred-artifacts { margin-top: 1.25rem; }
 .inbox-starred-artifacts > h3 { margin-bottom: 0.5rem; }
+
+.detail-note { margin: 0; padding: 6px 16px 0; font-size: var(--fs-sm); color: var(--text-secondary); } /* what Star and Keep each do, above the buttons (#10539) */
