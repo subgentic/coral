@@ -166,7 +166,7 @@ const BASE = require('./test_base').BASE;
             window.switchNavTab('servers');
             for (let i = 0; i < 100 && !document.querySelector('#server-row-r1'); i++) await new Promise(r => setTimeout(r, 50));
             const text = sel => (document.querySelector(sel)?.textContent || '').replace(/\\s+/g, ' ').trim();
-            const localText = text('#server-row-local td:nth-child(3)') + ' · ' + text('#server-row-local td:last-child'); // the Version column and the Agents column (one line a row, Goal #79)
+            const localText = text('#server-row-local td[data-key="version"]') + ' · ' + text('#server-row-local td[data-key="agents"]'); // the Version column and the Agents column by their keys (one line a row, Goal #79; the Servers page's Status and Needs you columns came before them, #9679)
             document.querySelector('#server-row-r1 [data-action=open]').click(); // the unreachable server's facts and hint are on its page (#7638)
             for (let i = 0; i < 100 && !document.querySelector('.servers-page'); i++) await new Promise(r => setTimeout(r, 50));
             const out = { local: localText, r1meta: [...document.querySelectorAll('.servers-fact')].map(f => f.textContent.replace(/\\s+/g, ' ').trim()).join(' · '), r1hint: text('.servers-page .servers-row-hint') };
