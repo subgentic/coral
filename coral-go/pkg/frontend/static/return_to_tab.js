@@ -1,7 +1,8 @@
 /* Coming back to the page (the tab, or an installed app brought up from the background) refreshes what it shows at once and says so (#10068, desktop #10063 and mobile #10089):
  * a page that was in the background has a stale chat (its poll skips hidden windows) and often a feed socket the system closed, so the Working line a person sees is minutes old.
  * On return the feed reconnects now (not at the next backoff tick) and the open agent's chat and terminal are read again, with "Reconnecting…" (the feed is down) or "Loading chat…"
- * above the chat until that is done: never a blank view, never an old Working time with no word about it. The chat already on screen stays where it is. */
+ * above the chat until that is done: never a blank view, never an old Working time with no word about it. The chat already on screen stays where it is.
+ * Read when a return happens (app_wiring.js listens for visibilitychange, pageshow from the back-forward cache and the network coming back), not at start: the start weight is guarded. */
 import { state } from './state.js';
 import { connectCoralWs } from './websocket.js';
 import { refreshCapture } from './capture.js';
@@ -44,11 +45,4 @@ export function refreshOnReturn() {
     if (note) timers.push(setTimeout(done, GIVE_UP_MS));
     running = Promise.allSettled([refreshCapture(), refreshLiveHistory()]).then(done);
     return running;
-}
-
-/** Come back to the tab, restore from the browser's back-forward cache, or regain the network: all of them are a return. */
-export function wireReturnToTab() {
-    document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshOnReturn(); });
-    window.addEventListener('pageshow', e => { if (e.persisted) refreshOnReturn(); });
-    window.addEventListener('online', () => refreshOnReturn());
 }

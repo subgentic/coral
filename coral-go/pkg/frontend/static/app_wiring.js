@@ -4,6 +4,7 @@ import { accountTag, setStoreOwner, ageOutStored, DAY_MS } from './local_store.j
 import { applyTabPrefs } from './tab_customize.js';
 import { loadPendingFromStorage, initCommandInputAutosize } from './live_chat.js';
 import { platform } from './platform/detect.js';
+import { importOnce } from './import_once.js';
 import { initNative } from './platform/native.js';
 import { initMacOS } from './platform/macos.js';
 import { initWindows } from './platform/windows.js';
@@ -20,7 +21,6 @@ import { initSidebarResize, initTaskBarResize, initSidebarCollapse, initAgenticP
 import { restoreAgenticTabs } from './agentic_state.js';
 import { initPreviewPane } from './preview_pane.js';
 import { syncPaneWidth } from './capture.js';
-import { wireReturnToTab } from './return_to_tab.js';
 import { fitTerminal } from './xterm_renderer.js';
 
 // What was typed and where people worked, kept in this browser (local_store.js, #3681): owned by the
@@ -171,7 +171,12 @@ export function wireWindowEvents() {
     // Skip in native apps — WKWebView may report document.hidden=true permanently.
     // The transcript poll skips hidden windows, so a window that was in the background has no chat yet (or a stale one), and its feed may have been closed by the system:
     // coming back reconnects and reads the open agent again at once, saying "Reconnecting…" or "Loading chat…" meanwhile (return_to_tab.js, #10068).
-    if (!platform.isNative) wireReturnToTab();
+    if (!platform.isNative) {
+        const back = () => importOnce('./return_to_tab.js').then(m => m.refreshOnReturn()).catch(() => {}); // read when a return happens, not at start (the start weight is guarded)
+        document.addEventListener("visibilitychange", () => { if (!document.hidden) back(); });
+        window.addEventListener("pageshow", e => { if (e.persisted) back(); });
+        window.addEventListener("online", back);
+    }
 
     // Sync tmux pane width on window resize and panel drag
     let resizeDebounce;
