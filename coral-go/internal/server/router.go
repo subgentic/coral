@@ -444,7 +444,7 @@ func (s *Server) registerCloud(r *chi.Mux) {
 	routes.SetHubOwnerLabel(ownerCloud.OwnerUser)
 	routes.SetHubOwnerRecord(ownerCloud.OwnerRecord) // and what it is enrolled as: a person's or an organisation's (#7061)
 	s.cloudHandler.SetOwnerLabelStore(ownerCloud)    // and where the person at this computer records it when it is missing (#6108)
-	updater := routes.BuildRelaunchUpdater(s.cfg.CoralDir(), endThisServer)
+	updater := routes.BuildRelaunchUpdater(s.cfg.CoralDir(), func() { s.endForUpdate(endThisServer) })
 	if s.sysHandler != nil {
 		s.sysHandler.SetUpdaterRecord(updater.Record) // the update notice reads what the updater's last check found, and asks GitHub for nothing where the updater checks (#9726)
 	}
