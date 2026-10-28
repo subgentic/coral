@@ -49,6 +49,16 @@ const COUNTS = { all: 2, group: 1, notes: 0, starred: 1, active: 0, archived: 1,
             check(`${label}: it was never empty and never said "Loading chats" on the way`, !(await ev(`window.__sawLoading`)) && !(await ev(`window.__sawRows.includes(0)`)), JSON.stringify(await ev(`window.__sawRows`)));
             check(`${label}: the re-read was one read`, (await reads()) === before + 1, `${before} then ${await reads()}`);
             await ev(`window.__slow = 0; true`);
+            // a list kept from an earlier look is read again once it is old, with no counts read at all (#10262: after a restart the folder kept the one chat it was first opened with)
+            await ev(`window.__n = 1; window.__stuck = false; (async () => { const m = await import((window.__coralStatic || '/static/') + 'mailbox_chats.js'); m.resetChatLists(); })(); true`); await openFolder('chats-group', mobile, 'Board history'); await openFolder('chats', mobile, 'All chats'); await waitFor(`document.querySelectorAll('button.dt-primary, button.dt-person').length === 1`, 'the list with one chat', 8000).catch(() => {});
+            await ev(`window.__n = 2; true`);
+            const staleBefore = await reads();
+            await ev(`(async () => { const g = await import((window.__coralStatic || '/static/') + 'sidebar_groups.js'); g.refreshGroupTable('hub-inbox'); return true; })()`); await settle(300);
+            check(`${label}: a list that is not old is not read again by a redraw`, (await reads()) === staleBefore, `${staleBefore} then ${await reads()}`);
+            await ev(`window.__realNow = Date.now; Date.now = () => window.__realNow() + 25000; (async () => { const g = await import((window.__coralStatic || '/static/') + 'sidebar_groups.js'); g.refreshGroupTable('hub-inbox'); })(); true`);
+            await waitFor(`document.querySelectorAll('button.dt-primary, button.dt-person').length === 2`, 'the old list read again with the second chat', 8000).catch(() => {});
+            await ev(`Date.now = window.__realNow; true`);
+            check(`${label}: an old list shows the chat that came in since it was read`, (await rowsShown()) === 2, String(await rowsShown()));
             // a count that stays different from the list's total reads it once, not at every counts read
             const beforeStuck = await reads();
             await ev(`window.__stuck = true; (async () => { const m = await import((window.__coralStatic || '/static/') + 'mailbox_chats.js'); const g = await import((window.__coralStatic || '/static/') + 'sidebar_groups.js'); for (let i = 0; i < 4; i++) { await m.loadChatCounts(() => g.refreshGroupTable('hub-inbox')); await new Promise(r => setTimeout(r, 90)); } })(); true`);
