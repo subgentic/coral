@@ -260,6 +260,9 @@ export function _renderSessionItem(s, groupName, isCompact, collapsed, teamDefau
     // A message the paste gate held (the last automated one Coral did not type, #7727) is a state a person must see: the row's one chip, "Message held", when no attention chip owns it (Needs you wins; the hold stays in the tip and on the page).
     const skipped = s.sleeping || !(Number(s.board_unread) > 0) ? null : skippedOf(s);
     const heldChip = !waitingBadge && skipped ? ` <span class="chip chip-caps session-state-pill neutral session-held-chip" title="${escapeAttr(skipped.why)}">Message held</span>` : '';
+    // A sleeping agent is a row like any other (#10062): its one quiet chip says Sleeping (when no other chip owns the row; titled when Coral stopped it), and Wake is on the row at a hover or the keyboard, named for the agent
+    const sleepChip = s.sleeping && !waitingBadge && !heldChip ? ` <span class="chip chip-caps session-state-pill neutral"${s.sleep_reason === 'coral_stopped' ? ' title="Asleep since Coral restarted"' : ''}>Sleeping</span>` : '';
+    const wakeBtn = s.sleeping && !isStaleSession(s) ? ` <button type="button" class="btn btn-quiet btn-small" data-on-click="agent-sleep" data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type)}" data-session-id="${escapeAttr(s.session_id || '')}" data-mode="wake" aria-label="Wake ${escapeAttr(resolveSessionIdentity(s))}">Wake</button>` : '';
     const ctxHigh = s.context_pct !== null && s.context_pct !== undefined && s.context_pct >= 80;
     const isTerminal = s.agent_type === "terminal";
     const sid = s.session_id || ""; // raw: every use below escapes it (it was escaped here too, and a second time at each use: an id with a quote or an ampersand reached the click handlers as "&#39;")
@@ -317,7 +320,7 @@ export function _renderSessionItem(s, groupName, isCompact, collapsed, teamDefau
                 <span class="session-dot ${dotClass}${ctxHigh ? ' ctx-high' : ''}" aria-hidden="true"></span>
                 <span class="session-label list-row-title${nameTail ? ' session-label-split' : ''}"><span class="session-label-name${s.agent_type === 'terminal' ? ' is-terminal' : ''}"${agentNameColor(s) ? ` style="--agent-name-color:${agentNameColor(s)}"` : ''}>${nameTail ? `<span class="sln-head">${escapeHtml(nameHead)}</span><span class="sln-tail">${escapeHtml(nameTail)}</span>` : escapeHtml(displayLabel)}</span>${nameTail ? `<span class="session-label-tags">${reminderTag}${typeTag}${dirChip}</span>` : `${reminderTag}${typeTag}${dirChip}`}</span>${autoAcceptChip(s)}${terminalGoneChip(s)}${hooksMissingChip(s)}
                 <span class="session-name-spacer"></span>
-                ${stale ? '' : waitingBadge + heldChip}
+                ${stale ? '' : waitingBadge + heldChip + sleepChip + wakeBtn}
                 ${stale ? '' : kebabMenu}
             </div>
         </div>
@@ -348,6 +351,8 @@ function _renderSleepingSummary(sleepingAgents, groupName, isCompact, teamDefaul
     return html;
 }
 
+const SLEEPING_ROWS_UP_TO = 3;
+
 export function _renderAgentListWithSubgroups(agents, teamDefaultDir, isCompact, groupName) {
     if (!agents.length) return "";
 
@@ -361,7 +366,10 @@ export function _renderAgentListWithSubgroups(agents, teamDefaultDir, isCompact,
     // sidebar sub-groups.
     let html = awake.map(s => _renderSessionItem(s, groupName, isCompact, false, teamDefaultDir)).join('');
 
-    if (sleeping.length > 0) {
+    // Up to three asleep in a team are rows (a returning person sees the agent, not "1 sleeping agent", #10062); more fold into the summary as before, so a team of nineteen asleep is not a wall of rows
+    if (sleeping.length > 0 && sleeping.length <= SLEEPING_ROWS_UP_TO) {
+        html += sleeping.map(s => _renderSessionItem(s, groupName, isCompact, false, teamDefaultDir)).join('');
+    } else if (sleeping.length > 0) {
         html += _renderSleepingSummary(sleeping, groupName, isCompact, teamDefaultDir);
     }
 

@@ -1,6 +1,6 @@
 // After Coral restarts, its agents come back asleep (sleep_reason "coral_stopped"); a returning person must be told that, not shown a bare grey "2 sleeping agents" (#10057, Beta Tester #10044 point 2).
-// The sidebar's folded row says "2 sleeping agents, all after Coral restarted" with a Wake button that wakes exactly those; an ordinary sleep stays "1 sleeping agent" with no button; a group with both says how many came back
-// asleep and wakes only those. 1280 and 390 px. Drives Chrome over CDP through agent_view_harness.js (mocked live list and wake) against the isolated dev server.
+// Since #10062 up to three asleep in a team are rows (a returning person sees the agent, not a bare line): each is Sleeping (titled "Asleep since Coral restarted" when Coral stopped it) with its own Wake; four or more
+// fold into "4 sleeping agents, all after Coral restarted" (#10246's words) with the one Wake for exactly those. 1280 and 390 px. Drives Chrome over CDP through agent_view_harness.js (mocked live list and wake) against the isolated dev server.
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 
@@ -26,25 +26,30 @@ const BASE = require('./test_base').BASE;
                 window.__m.add('mix-up', 'M', 2, { sleeping: false, board_project: 'mixed-team' });
                 window.__m.add('mix-d', 'D', 2, { sleeping: true, sleep_reason: 'coral_stopped', board_project: 'mixed-team' });
                 window.__m.add('mix-e', 'E', 2, { sleeping: true, board_project: 'mixed-team' });
+                window.__m.add('big-lead', 'B', 2, { sleeping: false, board_project: 'big-team' });
+                for (const n of ['big-1', 'big-2', 'big-3', 'big-4']) window.__m.add(n, 'G', 2, { sleeping: true, sleep_reason: 'coral_stopped', board_project: 'big-team' });
                 window.T.render.renderLiveSessions(window.T.state.liveSessions); return true; })()`);
             await ev(`import((window.__coralStatic || '/static/') + 'mobile.js').then(m => { m.syncMobileAgentList(); return true; })`);
             await sleep(600); // sleep-ok: the list draws over frames
             let r = await rows();
             const byGroup = g => r.find(x => (x.group || '').includes(g));
-            const restart = byGroup('restart-team'), nap = byGroup('napping-team'), mixed = byGroup('mixed-team');
-            check(`${tag}: two agents asleep after a restart say so, with a Wake button`, restart && restart.text === '2 sleeping agents, all after Coral restarted' && restart.wake === 'Wake' && restart.wakeShown, JSON.stringify(r));
-            check(`${tag}: an ordinary sleep stays "1 sleeping agent", with no button`, nap && nap.text === '1 sleeping agent' && nap.wake === null, JSON.stringify(nap));
-            check(`${tag}: a group with both says how many came back asleep, and the button wakes those`, mixed && mixed.text === '2 sleeping agents, 1 after Coral restarted' && mixed.wake === 'Wake', JSON.stringify(mixed));
-            check(`${tag}: the button is named for what it wakes${mobile ? ' and is 44 px high' : ''}, and stays inside the row`, restart && /^Wake 2 agents/.test(restart.wakeLabel || '') && (!mobile || restart.wakeH >= 43.5) && restart.right >= 0, JSON.stringify(restart));
+            const group = g => ev(`[...document.querySelectorAll(${JSON.stringify(LIST)} + ' .session-group-item')].filter(li => (li.dataset.group || '').includes(${JSON.stringify(g)})).map(li => { const b = li.querySelector('.session-name-row > .btn[data-mode="wake"]'), c = li.querySelector('.session-name-row > .chip'); return { name: li.dataset.sessionId, asleep: li.classList.contains('sleeping'), chip: c ? c.textContent.trim() : '', chipTitle: c ? c.title : '', wake: b ? b.getAttribute('aria-label') : null }; })`);
+            // #10062: up to three asleep in a team are rows, each with its Sleeping chip (titled when Coral stopped it) and its own Wake; four or more fold into the summary, which says how many came back asleep and wakes those
+            const restart = await group('restart-team'), nap = await group('napping-team'), mixed = await group('mixed-team');
+            check(`${tag}: two agents asleep after a restart are rows, each Sleeping since Coral restarted, each with its Wake`, restart.filter(x => x.asleep).length === 2 && restart.filter(x => x.asleep).every(x => x.chip === 'Sleeping' && x.chipTitle === 'Asleep since Coral restarted' && /^Wake /.test(x.wake || '')) && !byGroup('restart-team'), JSON.stringify(restart));
+            check(`${tag}: an ordinary sleep is a row too, with no restart title`, nap.length === 1 && nap[0].asleep && nap[0].chip === 'Sleeping' && nap[0].chipTitle === '' && !!nap[0].wake, JSON.stringify(nap));
+            check(`${tag}: a group with both has a row for each`, mixed.length === 3 && mixed.filter(x => x.asleep).length === 2, JSON.stringify(mixed));
+            const big = byGroup('big-team');
+            check(`${tag}: four asleep after a restart still fold, in #10246's words, with the one Wake`, big && big.text === '4 sleeping agents, all after Coral restarted' && big.wake === 'Wake', JSON.stringify(r));
             await shot(`restart-sleep-summary-${w}`);
-            await ev(`window.__m.requests.length = 0; document.querySelector(${JSON.stringify(LIST)} + ' .sleeping-summary-row[data-group*="restart-team"] .sleeping-wake').click(); true`);
-            await waitFor(`window.__m.requests.filter(q => q.kind === 'wake').length >= 2`, 'both wakes', 6000);
+            await ev(`window.__m.requests.length = 0; document.querySelector(${JSON.stringify(LIST)} + ' .session-group-item.sleeping[data-session-id="dev-a-id"] .session-name-row > .btn[data-mode="wake"]').click(); true`);
+            await waitFor(`window.__m.requests.filter(q => q.kind === 'wake').length >= 1`, 'the wake', 6000);
             const reqs = await ev(`window.__m.requests.filter(q => q.kind === 'wake').map(q => q.agent).sort()`);
-            check(`${tag}: Wake wakes exactly those two (not the napping or mixed groups' agents)`, JSON.stringify(reqs) === JSON.stringify(['dev-a', 'dev-b']), JSON.stringify(reqs));
-            await ev(`import((window.__coralStatic || '/static/') + 'mobile.js').then(m => { m.syncMobileAgentList(); return true; })`);
-            await sleep(500); // sleep-ok: the list redraws after the wakes
-            r = await rows();
-            check(`${tag}: after the wake the row is gone`, !byGroup('restart-team') && !!byGroup('napping-team'), JSON.stringify(r));
+            check(`${tag}: a row's Wake wakes that agent only`, JSON.stringify(reqs) === JSON.stringify(['dev-a']), JSON.stringify(reqs));
+            await ev(`window.__m.requests.length = 0; document.querySelector(${JSON.stringify(LIST)} + ' .sleeping-summary-row[data-group*="big-team"] .sleeping-wake').click(); true`);
+            await waitFor(`window.__m.requests.filter(q => q.kind === 'wake').length >= 4`, 'the four wakes', 6000);
+            const reqs4 = await ev(`window.__m.requests.filter(q => q.kind === 'wake').map(q => q.agent).sort()`);
+            check(`${tag}: the folded row's Wake wakes those four`, JSON.stringify(reqs4) === JSON.stringify(['big-1', 'big-2', 'big-3', 'big-4']), JSON.stringify(reqs4));
         }
     } finally { await client.close(); }
     if (results.some(x => !x)) { console.error(`${results.filter(x => !x).length} of ${results.length} failed`); process.exit(1); }
