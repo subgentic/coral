@@ -57,6 +57,7 @@ const { connect } = require('./agent_view_harness');
             const read = (rail) => ev(`(() => {
                 const layout = document.querySelector('.layout');
                 if (layout.classList.contains('sidebar-collapsed') !== ${rail}) window.toggleSidebarRail();
+                T.state.atWelcome = false; T.state.selectedTeam = null; // a selected row is not the current one while Home (the welcome screen) is open
                 T.state.currentSession = { type: 'live', name: 'qa', agent_type: 'claude', session_id: 'sid-p2' };
                 T.state.liveSessions = window.__RAIL_LIVE; T.render.renderLiveSessions(window.__RAIL_LIVE);
                 const cs = e => e ? getComputedStyle(e) : null;
