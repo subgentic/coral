@@ -147,9 +147,9 @@ const NEW_BOARD_NAME_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
 const RESERVED_BOARD_NAMES = new Set(['projects', 'remotes', 'tasks']);
 export function boardNameProblem(name) {
     const n = String(name || '');
-    if (!n) return 'A board name is required.';
-    if (n.length > 64) return 'A board name is at most 64 characters.';
-    if (!NEW_BOARD_NAME_RE.test(n)) return "Use only letters, digits, '-' and '_' (no spaces, dots, '@' or '/'), starting with a letter or digit.";
+    if (!n) return 'A name is required.';
+    if (n.length > 64) return 'A name is at most 64 characters.';
+    if (!NEW_BOARD_NAME_RE.test(n)) return 'Use letters, digits, - or _, starting with a letter or digit.'; // short: the same words are on the field and are not said again in the footer (#10371)
     if (RESERVED_BOARD_NAMES.has(n.toLowerCase())) return `"${n}" is reserved; choose another name.`;
     return '';
 }

@@ -123,7 +123,7 @@ function _teamGateReason() {
         if (!_teamStepPressed) return '';
         const name = (document.getElementById('team-board-name')?.value || '').trim(), dir = (document.getElementById('launch-team-dir')?.value || '').trim();
         if (!name) return 'Team name is required';
-        if (boardNameProblem(name)) return boardNameProblem(name);
+        if (boardNameProblem(name)) return 'Fix the team name to continue'; // the field above says what is wrong, once
         if (!dir) return 'Choose a folder for the team';
     } else if (step === 'members') {
         if (_membersPressed && !hasOrchestrator()) return 'Add an Orchestrator to continue';
@@ -652,7 +652,7 @@ function _validateTeamName() {
     form.error('name', problem);
     if (problem) return false;
     // A name in use is allowed (#3536): launching asks whether to join that board or start another.
-    if (launch.existingTeamBoardNames.has(value.toLowerCase())) hint.textContent = "A board with this name exists. Launching asks whether to join it or start another.";
+    if (launch.existingTeamBoardNames.has(value.toLowerCase())) hint.textContent = "A team with this name exists. Launching asks whether to join it or start another.";
     return true;
 }
 window._validateTeamName = _validateTeamName;
