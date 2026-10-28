@@ -1,5 +1,5 @@
-// A job's name in the Jobs list wraps at its hyphens, not one letter a line (#10475, Mobile automation pass): at 390 and 320 px a long name of a job that is turned off (its chip sits beside the name in the one narrow
-// column) takes at most four lines and its longest line is a word, not a letter or two. A stubbed server. Drives Chrome over CDP through agent_view_harness.js.
+// A job's name in the Jobs list wraps at its hyphens, not one letter a line (#10475, Mobile automation pass): at 390 and 320 px a long name of a job that is turned off, and the seeded example whose Example badge sits
+// beside its name (67 px of a 148 px cell: the Mobile Beta Tester's measure), takes at most four lines and its longest line is a word, not a letter or two. A stubbed server. Drives Chrome over CDP through agent_view_harness.js.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
@@ -9,7 +9,8 @@ const BASE = require('./test_base').BASE;
     const STUB = `(() => {
         const real = window.fetch; const json = (o, status) => Promise.resolve(new Response(JSON.stringify(o), { status: status || 200, headers: { 'Content-Type': 'application/json' } }));
         const base = { description: '', timezone: 'UTC', agent_type: 'claude', repo_path: '/work/project', base_branch: 'main', prompt: 'Tidy.', enabled: 1, max_duration_s: 3600, cleanup_worktree: 0, flags: '', consecutive_failures: 0, last_run: null };
-        const jobs = [{ ...base, id: 1, name: 'nightly-database-backup-verification', cron_expr: '0 3 * * *', enabled: 0, next_fire_at: null }, { ...base, id: 2, name: 'weekly-cleanup-of-old-worktrees', cron_expr: '0 9 * * 1', next_fire_at: new Date(Date.now() + 30 * 3600000).toISOString() }];
+        const jobs = [{ ...base, id: 1, name: 'nightly-database-backup-verification', cron_expr: '0 3 * * *', enabled: 0, next_fire_at: null }, { ...base, id: 2, name: 'weekly-cleanup-of-old-worktrees', cron_expr: '0 9 * * 1', next_fire_at: new Date(Date.now() + 30 * 3600000).toISOString() },
+            { ...base, id: 3, name: 'morning-motivation', description: 'Example (switched off): would run the daily-motivation workflow every weekday at 9am. Turn it on to try it.', cron_expr: '0 9 * * 1-5', enabled: 0, next_fire_at: null }];
         window.fetch = (u, o) => { const url = String(u), method = (o && o.method) || 'GET';
             if (method === 'GET' && /\\/api\\/scheduled\\/jobs$/.test(url)) return json({ jobs });
             if (method === 'GET' && /\\/api\\/workflows$/.test(url)) return json({ workflows: [] });
@@ -23,7 +24,7 @@ const BASE = require('./test_base').BASE;
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
             await ev(`window.__coralReady.startup('liveList', 'settings')`);
             await ev(`window.openAutomationsFolder('jobs'); true`);
-            await waitFor(`document.querySelectorAll('#group-table-view button.dt-primary').length === 2`, `${w}: the two jobs`, 10000);
+            await waitFor(`document.querySelectorAll('#group-table-view button.dt-primary').length === 3`, `${w}: the three jobs`, 10000);
             await new Promise(r => setTimeout(r, 400)); // sleep-ok: the list draws
             const names = await ev(`[...document.querySelectorAll('#group-table-view button.dt-primary')].map(b => { const range = document.createRange(); range.selectNodeContents(b); const lines = new Map(); for (const r of range.getClientRects()) lines.set(Math.round(r.top), Math.max(lines.get(Math.round(r.top)) || 0, r.width)); const cs = getComputedStyle(b), lh = parseFloat(cs.lineHeight) || parseFloat(cs.fontSize) * 1.3;
                 return { t: b.textContent.trim(), lines: Math.round(b.getBoundingClientRect().height / lh), width: Math.round(b.getBoundingClientRect().width), sideways: document.documentElement.scrollWidth > innerWidth + 1 }; })`);
