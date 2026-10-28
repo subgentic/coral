@@ -50,10 +50,13 @@ const SAVED = { theme: 'light', default_agent_type: 'codex', default_working_dir
         });
         await run('the unsaved note follows the form and is tied to Save while it shows', async () => {
             await open('general'); assert.equal(await noteShown(), false, 'hidden at open');
+            assert.equal(await ev(`document.getElementById('settings-cancel-btn').textContent`), 'Close', 'nothing changed: the way out is Close, there is nothing to cancel (#9955)');
             assert.equal(await ev(`document.getElementById('settings-save-btn').hasAttribute('aria-describedby')`), false);
             await type('settings-working-dir', '/work/other'); await waitFor(`!document.getElementById('settings-unsaved').hidden`, 'the note after an edit', 5000);
+            assert.equal(await ev(`document.getElementById('settings-cancel-btn').textContent`), 'Cancel', 'after an edit it is Cancel');
             assert.equal(await ev(`document.getElementById('settings-save-btn').getAttribute('aria-describedby')`), 'settings-unsaved');
             await type('settings-working-dir', '/work/saved'); await waitFor(`document.getElementById('settings-unsaved').hidden`, 'the note gone when the edit is undone', 5000);
+            assert.equal(await ev(`document.getElementById('settings-cancel-btn').textContent`), 'Close', 'and Close again when the edit is undone');
             assert.equal(await ev(`document.getElementById('settings-save-btn').hasAttribute('aria-describedby')`), false);
         });
         await run('cancelled edits are gone on the next open', async () => {
