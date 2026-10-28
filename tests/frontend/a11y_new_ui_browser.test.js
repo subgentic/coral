@@ -102,7 +102,7 @@ const LABELS = ['Feels like a slideshow', "Doesn't show the game", 'Tone/story i
                 const inPanel = order.filter(o => /ac-(filter|whole|lock|act|cancel|send|input)|ac-sheet-close/.test(o.f.cls || ''));
                 check(`${tag}: with the comments sheet shut, Tab never lands in it (${inPanel.map(o => o.k).join(' | ')})`, inPanel.length === 0);
                 check(`${tag}: and never on a control that is not on screen`, order.every(o => o.f.none || o.f.onScreen), JSON.stringify(order.filter(o => !o.f.none && !o.f.onScreen).map(o => o.k)));
-                const shutAx = ax.nodes.filter(n => /^(Open|Resolved|All|Reply|Resolve|Comment on the whole document)/.test(n.name));
+                const shutAx = ax.nodes.filter(n => /^(Open|Resolved|All|Reply|Resolve|Comment on the whole document)/.test(n.name) && !/^Open in new tab/.test(n.name)); // the viewer's own header link is not in the sheet (#10619)
                 check(`${tag}: and the accessibility tree does not offer them (${shutAx.map(n => n.name).join(', ')})`, shutAx.length === 0);
                 await ev(`document.querySelector('.ac-toggle').focus(); true`); await press('Enter'); await settle(500);
                 f = await focused();
