@@ -11,6 +11,7 @@ import { sessionServer, noteBoardLabels, sessionTeamKey } from './server_base.js
 import './sleeping_view.js';
 import './knowledge_distill.js';
 import { escapeHtml, showToast } from './utils.js';
+import { MENU_KEYS, menuMove } from './menu_keys.js';
 import { registerActions, idOf, tokenOf, textOf } from './actions.js';
 import './live_chat.js';
 import './tags.js';
@@ -284,9 +285,9 @@ function emptyListHtml(unfilteredCount) {
 // It is written into the markup (the same string is drawn and parsed again), so a redraw never has two stops.
 let rowStop = ''; // the session id of the row the keyboard moved to
 function oneRowStop(html) {
-    const rows = [...html.matchAll(/<li class="session-group-item([^"]*)"[^>]*?data-session-id="([^"]*)"/g)].map(m => ({ cls: m[1], sid: m[2] }));
+    const rows = [...html.matchAll(/<li class="session-group-item([^"]*)"[^>]*?data-session-id="([^"]*)"/g)];
     if (!rows.length) return html;
-    const stop = (rows.find(r => r.sid === rowStop) || rows.find(r => / active /.test(`${r.cls} `)) || rows.find(r => !/ collapsed/.test(r.cls)) || rows[0]).sid;
+    const stop = (rows.find(m => m[2] === rowStop) || rows.find(m => / active /.test(`${m[1]} `)) || rows[0])[2];
     return html.replace(/(<li class="session-group-item[^"]*"[^>]*?)tabindex="0"([^>]*?data-session-id="([^"]*)")/g, (all, a, b, sid) => `${a}tabindex="${sid === stop ? 0 : -1}"${b}`);
 }
 
@@ -401,14 +402,13 @@ function _wireListKeyboard(container) {
         }
         const row = e.target.closest ? e.target.closest('.session-group-item') : null;
         if (!row || e.target !== row) return; // only the row itself, never its inner controls
-        if (!e.altKey && !e.ctrlKey && !e.metaKey && ['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key)) { // Up and Down move between the rows, Home and End to the ends: the list is one Tab stop (#10579)
-            const rows = [...container.querySelectorAll('.session-group-item[data-session-id]')].filter(r => r.getClientRects().length), i = rows.indexOf(row);
-            const to = e.key === 'ArrowDown' ? Math.min(rows.length - 1, i + 1) : e.key === 'ArrowUp' ? Math.max(0, i - 1) : e.key === 'Home' ? 0 : rows.length - 1;
+        if (!e.altKey && !e.ctrlKey && !e.metaKey && MENU_KEYS.has(e.key)) { // Up and Down move between the rows, Home and End to the ends: the list is one Tab stop (#10579)
+            const rows = [...container.querySelectorAll('.session-group-item[data-session-id]')].filter(r => r.getClientRects().length), to = rows[menuMove(e.key, rows.length, rows.indexOf(row))];
             e.preventDefault();
-            if (to < 0 || !rows[to]) return;
-            rowStop = rows[to].dataset.sessionId || '';
-            for (const r of container.querySelectorAll('.session-group-item')) r.tabIndex = r === rows[to] ? 0 : -1;
-            rows[to].focus();
+            if (!to) return;
+            rowStop = to.dataset.sessionId || '';
+            for (const r of container.querySelectorAll('.session-group-item')) r.tabIndex = r === to ? 0 : -1;
+            to.focus();
             return;
         }
         if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
@@ -430,7 +430,7 @@ function _wireListKeyboard(container) {
 
 
 registerActions({
-    'skip-to-message': (el, event) => { event.preventDefault(); const box = document.getElementById('command-input'); if (box && box.getClientRects().length) box.focus(); else showToast('Open an agent first.'); }, // the sidebar's skip link (#10579)
+    'skip-to-message': (el, event) => { event.preventDefault(); const box = document.getElementById('command-input'); if (box?.getClientRects().length) box.focus(); else showToast('Open an agent first.'); }, // the sidebar's skip link (#10579)
     'agent-search-clear': () => { const i = document.getElementById('agent-search-input'); if (i) { i.value = ''; i.focus(); } filterLiveAgents(''); },
     'agent-filters-clear': () => { setListFilters(_NO_LIST_FILTERS); redrawLiveList(); },
     'kebab-close': (el, event) => { event.stopPropagation(); window.closeSidebarKebabs(); },
