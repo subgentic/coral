@@ -139,7 +139,7 @@ const S = `(window.__coralStatic || '/static/')`;
             // #9293: a paused job's primary is Enable; Run now is still there, and Pause is not
             await ev(`import(${S} + 'scheduler.js').then(m => m.selectScheduledJob(3)).then(() => true)`);
             await waitFor(`!!document.querySelector('#scheduler-detail .sched-actions')`, `${at}: the paused job's page`, 4000);
-            assert.deepEqual(await ev(`[...document.querySelectorAll('#scheduler-detail .sched-actions > .btn')].map(b => b.textContent.trim() + (b.classList.contains('btn-primary') ? '*' : ''))`), ['Edit', 'Run now', 'Turn on*'], `${at}: paused: Turn on is the primary, Run now is there`);
+            assert.deepEqual(await ev(`[...document.querySelectorAll('#scheduler-detail .sched-actions > .btn')].map(b => b.textContent.trim() + (b.classList.contains('btn-primary') ? '*' : ''))`), ['Turn on*', 'Edit', 'Run now'], `${at}: paused: Turn on is the primary and Run now is last, where a workflow's Run is (#10476)`);
             assert.deepEqual(await ev(`[...document.querySelectorAll('#scheduler-detail .sched-more-menu .menu-item')].map(b => b.textContent.trim())`), ['Delete'], `${at}: a paused job's More holds only Delete`);
             await shot(`jobs-page-paused-${w}`);
         }
