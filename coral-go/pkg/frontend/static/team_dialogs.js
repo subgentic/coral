@@ -149,7 +149,7 @@ function _syncTeamGate() {
     if (reason) {
         recap.append(reason);
         const blocked = step === 'start' ? (document.querySelector('#launch-step-team [data-blocks-launch]:not(#team-tmux-slot)')?.textContent || '').trim().match(/^(claude|codex|agy|antigravity|gemini|pi)\b/i) : null; // a member's CLI blocks Launch team: the fix is one tap away, on this line (#10013)
-        const setPath = blocked && cliPathButton(blocked[1].toLowerCase(), () => document.querySelectorAll('#launch-step-team [data-blocks-launch]:not(#team-tmux-slot) button:not(.cli-set-path)').forEach(b => b.click())); // when Settings closes: every blocked member's own Check again (a team has one warning per member)
+        const setPath = blocked && cliPathButton(blocked[1].toLowerCase(), () => document.querySelectorAll('#launch-step-team [data-blocks-launch]:not(#team-tmux-slot) button:not(.cli-set-path)').forEach(b => b.click()), () => !!document.querySelector('#launch-step-team [data-blocks-launch]:not(#team-tmux-slot)')); // when Settings closes: every blocked member's own Check again (a team has one warning per member), again while it is still blocked
         if (setPath) recap.append(' ', setPath);
         return;
     }

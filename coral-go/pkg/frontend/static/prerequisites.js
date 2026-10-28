@@ -21,7 +21,7 @@ function blocksLaunch(element, on) {
 }
 const PATH_FIELD = { claude: 'claude', codex: 'codex', pi: 'pi', agy: 'agy', antigravity: 'agy', gemini: 'agy' }; // the Settings field of each CLI (one for Antigravity and Gemini)
 /** A 'Set path' button for a launch that a missing CLI blocks (Mobile and Desktop testers, #10013): it opens Settings > Agents with the CLI paths open and that CLI's field in it, and when Settings is closed again `onClosed` runs (the check again), so the person is back in the dialog with the blocker gone or still named. */
-export function cliPathButton(type, onClosed) {
+export function cliPathButton(type, onClosed, stillBlocked = () => false) {
     const field = PATH_FIELD[String(type).toLowerCase()];
     if (!field) return null;
     const b = document.createElement('button'); b.type = 'button'; b.className = 'btn btn-small btn-primary cli-set-path';
@@ -31,7 +31,13 @@ export function cliPathButton(type, onClosed) {
         const paths = document.getElementById('settings-cli-paths'); if (paths) paths.open = true;
         const input = document.getElementById(`settings-cli-path-${field}`); if (input) { input.scrollIntoView({ block: 'center' }); input.focus(); }
         const modal = document.getElementById('settings-modal'); if (!modal || !onClosed) return;
-        const watch = new MutationObserver(() => { if (getComputedStyle(modal).display === 'none') { watch.disconnect(); onClosed(); } });
+        const watch = new MutationObserver(() => {
+            if (getComputedStyle(modal).display !== 'none') return;
+            watch.disconnect();
+            onClosed();
+            // a save that has only just gone through may not show in the first check: look again while it is still blocked (#10161)
+            for (const ms of [700, 1800, 3500]) setTimeout(() => { if (stillBlocked()) onClosed(); }, ms);
+        });
         watch.observe(modal, { attributes: true, attributeFilter: ['style', 'class'] });
     });
     return b;
@@ -53,7 +59,7 @@ function renderCLI(element, text, recheck, {pending = false, command = '', url =
     const button = document.createElement('button'); button.type = 'button'; button.className = 'btn btn-small';
     button.textContent = pending ? 'Checking…' : 'Check again'; button.disabled = pending;
     button.addEventListener('click', recheck);
-    const setPath = pathType && !pending ? cliPathButton(pathType, recheck) : null; // the fix, one tap away, beside the re-check button (#10013)
+    const setPath = pathType && !pending ? cliPathButton(pathType, recheck, () => element.dataset.blocksLaunch === '1') : null; // the fix, one tap away, beside the re-check button (#10013)
     if (!setPath) { element.append(button); return; }
     const actions = document.createElement('span'); actions.className = 'cli-actions'; actions.append(button, setPath); element.append(actions); // the two wrap together, right-aligned
 }
@@ -67,6 +73,7 @@ export async function checkAgentCLI(type, element, {force = false, command = '',
     if (type === 'terminal') { element.style.display = 'none'; return; }
     const recheck = () => checkAgentCLI(type, element, {force:true,command,url,note,server});
     const show = data => {
+        document.dispatchEvent(new CustomEvent('cli-checked', { detail: { type, found: data.found === true } })); // the agent tiles follow it (launch_agent_pick.js, #10161)
         if (data.found && (data.status === 'probe_failed' || data.status === 'timeout')) {
             renderCLI(element, `${type} CLI found, but version check ${data.status === 'timeout' ? 'timed out' : 'failed'}.`, recheck); blocksLaunch(element, false); return;
         }
