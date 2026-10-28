@@ -1265,14 +1265,14 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
     pointer-events: none;
 }
 #warning-toasts:has(.security-warning-toast) { margin-bottom: 10px; }
-#notices:not(:has(.toast, .update-toast)) { display: none; } /* nothing to show: no empty "Notifications" region either */
+#notices:not(:has(.toast, .update-toast, .notification-toast)) { display: none; } /* the question's "needs your answer" toast is one: with it alone in the column the column was hidden, and nobody saw it (#10251) */ /* nothing to show: no empty "Notifications" region either */
 #warning-toasts > .security-warning-toast { position: static; min-width: 0; pointer-events: auto; animation: none; }
 #warning-toasts .security-warning-text { max-height: 26vh; } /* three can show at once: each scrolls its own text before the column outgrows the window */
 /* The update notice is a child of the column too: on a desktop it stays fixed at the top right, as it was. */
 #warning-toasts > .update-toast:not(.security-warning-toast) { pointer-events: auto; }
 .update-toast-more { display: none; } /* the arrow that opens a notice is a phone's: a desktop shows them whole */
 /* The short toasts share one column (a second no longer hides the first): bottom right, as each was. */
-#toast-host { display: flex; flex-direction: column; align-items: stretch; gap: 8px; width: max-content; max-width: min(520px, 100%); pointer-events: none; } /* as wide as the widest toast, and every toast that wide: two stacked toasts were two widths (#9452 item 14) */
+#toast-host { display: flex; flex-direction: column; align-items: stretch; gap: 8px; width: max-content; max-width: min(380px, 100%); pointer-events: none; } /* as wide as the widest toast, and every toast that wide: two stacked toasts were two widths (#9452 item 14) */
 #toast-host > .toast { position: static; pointer-events: auto; animation: slideIn 0.3s ease, fadeOut 0.3s ease 2.7s; }
 #toast-host > .toast.has-action { animation: slideIn 0.3s ease; }
 /* On a phone the notices and the short toasts are at the top: at the bottom they sat over the composer, Send, Wake and a dialog's buttons (#6162, found on a Windows run where the data-folder warning covered Wake). The column scrolls when several are open. */
