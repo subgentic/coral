@@ -46,8 +46,9 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
         const items = []; for (let n = h.nextElementSibling; n && !n.classList.contains('session-group-header'); n = n.nextElementSibling) if (n.matches('.session-group-item')) items.push(n.textContent.trim().slice(0, 40));
         const menu = [...h.querySelectorAll('.sidebar-kebab-menu .overflow-menu-item')].map(b => { const c = b.cloneNode(true); c.querySelectorAll('.menu-item-hint').forEach(x => x.remove()); return c.textContent.trim(); }); // a row's one-line explanation (#10077) is not its name
         return { items, menu, count: (h.querySelector('.session-group-count') || {}).textContent || '' }; })()`);
+    // an item may carry its one-line hint after the label (#10164: "Opens a shell in this folder")
     const menuClick = (name, label) => ev(`(() => { const h = ${HDR(name)}; h.querySelector('.group-kebab-btn').click();
-        const b = [...h.querySelectorAll('.sidebar-kebab-menu .overflow-menu-item')].find(x => x.textContent.trim() === ${JSON.stringify(label)}); if (!b) return false; b.click(); return true; })()`);
+        const b = [...h.querySelectorAll('.sidebar-kebab-menu .overflow-menu-item')].find(x => x.textContent.trim().startsWith(${JSON.stringify(label)})); if (!b) return false; b.click(); return true; })()`);
     let busySid = null;
     try {
         await Page.enable();
