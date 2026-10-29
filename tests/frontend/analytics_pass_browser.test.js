@@ -56,11 +56,11 @@ const BASE = require('./test_base').BASE;
         // 3. an empty range says to try a longer one, except the longest
         await open({ input_tokens: 0, output_tokens: 0, cost_usd: 0, num_requests: 0 });
         const empty = () => ev(`document.getElementById('cost-dashboard-view').textContent`);
-        await waitFor(`/It appears once an agent has used tokens/.test(document.getElementById('cost-dashboard-view').textContent)`, 'an empty-state line', 10000);
+        await waitFor(`/It appears once an agent has done some work/.test(document.getElementById('cost-dashboard-view').textContent)`, 'an empty-state line', 10000);
         assert.match(await empty(), /try a longer range/, 'a day with nothing says to try a longer range');
         await ev(`(() => { const sel = document.getElementById('cost-time-range'); sel.value = 'month'; sel.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
         await waitFor(`!/try a longer range/.test(document.getElementById('cost-dashboard-view').textContent)`, 'the longest range without the hint', 10000);
-        assert.match(await empty(), /It appears once an agent has used tokens\./, 'but still says what makes data appear');
+        assert.match(await empty(), /It appears once an agent has done some work\./, 'but still says what makes data appear');
         // 4. Tool and API calls (Coral's own routes) is under Advanced, and its 14-day keep is said in the range's words
         const names = () => ev(`[...document.querySelectorAll('#cost-nav-list .row-btn')].map(b => b.textContent.trim())`);
         assert.deepEqual(await names(), ['Overview', 'Tokens per commit', 'Task time', 'Advanced'], 'the list has three views and Advanced');
