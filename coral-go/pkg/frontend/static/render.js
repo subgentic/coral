@@ -205,12 +205,29 @@ function _rowSession(item) {
 
 const HOVER_CARD_DELAY_MS = 800; // how long the pointer rests on an agent row before its card opens (#9999)
 
+// A row whose markup changed is replaced by the redraw, and its open action menu with it: a person who opened the menu and clicked Rename a few seconds later clicked
+// nothing (#10786). The row's identity is noted before the redraw and its menu opened again on the new row (the first click on an item acts).
+function openRowMenuIdentity(list) {
+    const menu = [...list.querySelectorAll('.sidebar-kebab-menu[data-lazy-menu]')].find(m => m.style.display !== 'none');
+    const li = menu && menu.closest('.session-group-item');
+    return li ? { sid: li.dataset.sessionId || '', server: li.dataset.server || '', name: li.dataset.name || '' } : null;
+}
+function reopenRowMenu(list, was) {
+    if (!was) return;
+    const li = [...list.querySelectorAll('.session-group-item')].find(r => (r.dataset.sessionId || '') === was.sid && (r.dataset.server || '') === was.server && (r.dataset.name || '') === was.name);
+    const menu = li && li.querySelector('.sidebar-kebab-menu[data-lazy-menu]');
+    const btn = menu && menu.previousElementSibling;
+    if (btn && menu.style.display === 'none') window.toggleSidebarKebab(btn);
+}
+
 // Puts the markup in the list and wires what is new: tooltips, drag and drop, team token usage, the keyboard focus the redraw took, and the phone's page.
 function _applyListHtml(list, html, focusedSid, focusedInMenu) {
     // Only the parts that changed are re-parsed; unchanged rows keep their nodes,
     // listeners and late-filled text (#3121). `added` is what is new.
     _lastListHtml = html;
+    const openMenuRow = openRowMenuIdentity(list);
     const added = morphHtml(list, html);
+    reopenRowMenu(list, openMenuRow);
 
     // Attach hover listeners for fixed-position tooltips (new rows only)
     for (const item of _within(added, ".session-group-item")) {
