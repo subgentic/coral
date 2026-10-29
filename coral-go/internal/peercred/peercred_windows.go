@@ -141,3 +141,6 @@ func tcpTable(family uint32) ([]byte, error) {
 	}
 	return nil, errors.New("peercred: GetExtendedTcpTable kept growing")
 }
+
+// relayOwner: WSL's localhost relay is a Linux kernel's socket owner; nothing here is one.
+func relayOwner(client, server netip.AddrPort) bool { return false }

@@ -1,13 +1,17 @@
 package peercred
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"net"
+	"net/http"
 	"net/netip"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // #95 (Security's conditions 1 and 5): only a positive answer is Self. Another user is OtherUser;
@@ -54,4 +58,28 @@ func TestAttribute(t *testing.T) {
 			assert.GreaterOrEqual(t, times[1].Sub(times[0]), retryWait, "%s: the re-read waits", tc.name)
 		}
 	}
+}
+
+// #396: the relay is its own verdict, but not one anything but the sign-in link may tell from another user: SameUser says "not the same user" for it, like OtherUser.
+func TestARelayIsNotTheSameUser(t *testing.T) {
+	oldOwner, oldRelay := ownerCheck, relayCheck
+	ownerCheck = func(netip.AddrPort, netip.AddrPort, time.Time) (bool, error) { return false, nil }
+	relayCheck = func(netip.AddrPort, netip.AddrPort) bool { return true }
+	t.Cleanup(func() { ownerCheck, relayCheck = oldOwner, oldRelay })
+	if !Supported {
+		t.Skip("no peer check on this platform")
+	}
+	v, err := Attribute(client, server)
+	require.NoError(t, err)
+	assert.Equal(t, Relay, v)
+
+	r := httptestRequest()
+	r = r.WithContext(context.WithValue(r.Context(), http.LocalAddrContextKey, net.Addr(&net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 8420})))
+	same, supported := SameUser(r)
+	assert.False(t, same, "the relay is not the same user")
+	assert.True(t, supported)
+
+	relayCheck = func(netip.AddrPort, netip.AddrPort) bool { return false }
+	v, _ = Attribute(client, server)
+	assert.Equal(t, OtherUser, v, "without the relay check it is another user, as before")
 }

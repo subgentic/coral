@@ -182,6 +182,7 @@ func (s *Server) registerAuth(r *chi.Mux) {
 		return peerUser(r)
 	})
 	s.keyStore.SetPeerUnknown(func(r *http.Request) bool { return auth.PeerReason(r) == auth.PeerUnattributed }) // ... but one whose opener could not be told is retried, not used up (#385)
+	s.keyStore.SetPeerRelay(auth.PeerIsRelay)                                                                    // except through WSL's localhost relay, which hides the user and may open the link (#396)
 	r.Post("/auth/password", authRoutes.SignInWithPassword)
 	r.Post("/auth/password/create", authRoutes.CreatePassword)
 	r.Get("/api/auth/setup-code", authRoutes.GetSetupCode)

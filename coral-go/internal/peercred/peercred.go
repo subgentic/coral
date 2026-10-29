@@ -212,7 +212,14 @@ const (
 	// Unattributed: the owner couldn't be told: no row (after a re-read), two rows that disagree, a
 	// process or token that can't be opened, any error. Fail closed: as another user's.
 	Unattributed
+	// Relay: the client socket is WSL's localhost relay (#396): a root-owned socket on the VM's own loopback, on a WSL kernel, while Coral does not run as root. Behind it the Windows
+	// user is invisible to this side. It is NOT Self, and every consumer treats it exactly as OtherUser (SameUser says "not the same user"); only the sign-in link may tell it apart
+	// (auth.PeerIsRelay), because that link is a single-use secret the opener already holds.
+	Relay
 )
+
+// relayCheck is relayOwner (a test seam).
+var relayCheck = relayOwner
 
 // retryWait is how long Attribute waits before re-reading a socket table that has no row for the
 // connection yet (the race with accept, or a short-lived client).
@@ -240,6 +247,9 @@ func AttributeAt(client, server netip.AddrPort, accepted time.Time) (Verdict, er
 		if me, err = ownerCheck(client, server, accepted); err == nil {
 			if me {
 				return Self, nil
+			}
+			if relayCheck(client, server) {
+				return Relay, nil
 			}
 			return OtherUser, nil
 		}
@@ -283,6 +293,8 @@ func SameUser(r *http.Request) (same, supported bool) {
 		return false, false
 	case Unattributed:
 		logRefused(unmap(client), err)
+	case Relay:
+		// not the same user, like OtherUser: no power that means "the user Coral runs as" is given to the relay
 	}
 	return false, true
 }

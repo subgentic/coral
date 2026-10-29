@@ -182,6 +182,10 @@ func (ks *KeyStore) handleLoginToken(w http.ResponseWriter, r *http.Request) boo
 	if ks.peerUser != nil {
 		same, supported := ks.peerUser(r)
 		switch {
+		case supported && !same && ks.peerRelay != nil && ks.peerRelay(r):
+			// WSL's localhost relay (#396): a browser on Windows reaches a WSL Coral through it, and which Windows user is behind it can't be told. The link is a single-use secret the
+			// opener already holds, so it is accepted here (and only here); it is spent below like any other, and the session is an ordinary one. The link itself is not logged.
+			log.Printf("[auth] a sign-in link was opened through WSL's localhost relay (which Windows user is behind it can't be told): accepted, single use")
 		case supported && !same:
 			// Whose connection it is could not be told (the socket table can lag a connection by a moment): say "try again", and do not use the link up. A socket that is
 			// positively another user's, and a link still undecided after linkRetryMax tries, get the final answer (#385).
