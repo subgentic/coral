@@ -445,10 +445,28 @@ func TestMessageSearchIndexIsCheckedAfterOpen(t *testing.T) {
 	defer s.Close()
 	a, b := queryBoth(t, s, MessageQueryParams{Q: []string{"heron"}, Limit: []string{"50"}})
 	require.NotEqual(t, b.Total, a.Total, "just after open the stale index still misses the edited word (the check has not run yet)")
+	// A read that lands while the rebuild drops and makes the index again can answer with an error ("database schema has changed"): the poll treats an error as "not yet", and only the answer after it counts.
+	// 60 s, not 10: on a loaded runner the check's own wait and the rebuild are slow, and the wait is for an event, not a speed.
 	require.Eventually(t, func() bool {
-		a, b := queryBoth(t, s, MessageQueryParams{Q: []string{"heron"}, Limit: []string{"50"}})
-		return b.Total == 1 && a.Total == 1
-	}, 10*time.Second, 50*time.Millisecond, "the check after open rebuilt the index: the edited word is found through it")
+		count := func(force bool) (int, bool) {
+			q, err := ParseMessageQuery(MessageQueryParams{Q: []string{"heron"}, Limit: []string{"50"}})
+			if err != nil {
+				return 0, false
+			}
+			q.Project = "proj"
+			if force {
+				q.Shown = func(s string) string { return s }
+			}
+			res, err := s.QueryMessages(context.Background(), q)
+			if err != nil {
+				return 0, false
+			}
+			return res.Total, true
+		}
+		viaIndex, ok1 := count(false)
+		viaScan, ok2 := count(true)
+		return ok1 && ok2 && viaIndex == 1 && viaScan == 1
+	}, 60*time.Second, 50*time.Millisecond, "the check after open rebuilt the index: the edited word is found through it")
 }
 
 // #10913: the repair looks at the disk first, as every build does. Without the room for a new index the stale one stays (a search answers
