@@ -71,27 +71,30 @@ const (
 func VPCName(machine string) string      { return VPCPrefix + machine }
 func FirewallName(machine string) string { return FirewallPrefix + machine }
 
-// ValidSSHSource reports whether s is one address or one prefix. The all-addresses forms are refused: a firewall that opens SSH to the world is not isolation.
-func ValidSSHSource(s string) error {
-	s = strings.TrimSpace(s)
+// firewallSource checks an address the cloud firewall opens SSH to: the same one-address-or-prefix check the user-data builder makes (ValidSSHSource, which returns it canonical), and not a loopback,
+// multicast or unspecified address, which could never be the one the credential is delivered from.
+func firewallSource(s string) (string, error) {
+	c, err := ValidSSHSource(s)
+	if err != nil {
+		return "", err
+	}
 	var p netip.Prefix
-	if strings.Contains(s, "/") {
-		var err error
-		if p, err = netip.ParsePrefix(s); err != nil {
-			return fmt.Errorf("%q is not an address or a prefix", s)
-		}
+	if strings.Contains(c, "/") {
+		p, err = netip.ParsePrefix(c)
 	} else {
-		a, err := netip.ParseAddr(s)
-		if err != nil {
-			return fmt.Errorf("%q is not an address or a prefix", s)
+		var a netip.Addr
+		if a, err = netip.ParseAddr(c); err == nil {
+			p = netip.PrefixFrom(a, a.BitLen())
 		}
-		p = netip.PrefixFrom(a, a.BitLen())
+	}
+	if err != nil {
+		return "", fmt.Errorf("%q is not an address or a prefix", s)
 	}
 	if p.Bits() == 0 {
-		return fmt.Errorf("%q is every address: SSH is opened to one address, not to the world", s)
+		return "", fmt.Errorf("%q is every address: SSH is opened to one address, not to the world", s)
 	}
 	if a := p.Addr(); a.IsLoopback() || a.IsUnspecified() || a.IsMulticast() {
-		return fmt.Errorf("%q cannot be the address the credential is delivered from", s)
+		return "", fmt.Errorf("%q cannot be the address the credential is delivered from", s)
 	}
-	return nil
+	return c, nil
 }

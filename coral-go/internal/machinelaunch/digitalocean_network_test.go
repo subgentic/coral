@@ -160,11 +160,13 @@ func TestDeleteSSHKeyIsByIdOrFingerprint(t *testing.T) {
 	assert.Error(t, d.DeleteSSHKey(t.Context(), "../account"))
 }
 
-func TestValidSSHSource(t *testing.T) {
+func TestFirewallSource(t *testing.T) {
 	for _, ok := range []string{"203.0.113.7", "203.0.113.0/24", "2001:db8::1", "2001:db8::/48"} {
-		assert.NoError(t, ValidSSHSource(ok), ok)
+		_, err := firewallSource(ok)
+		assert.NoError(t, err, ok)
 	}
 	for _, bad := range []string{"", "0.0.0.0/0", "::/0", "::", "0.0.0.0", "127.0.0.1", "::1", "224.0.0.1", "1.2.3.4/33", "a.b.c.d"} {
-		assert.Error(t, ValidSSHSource(bad), bad)
+		_, err := firewallSource(bad)
+		assert.Error(t, err, bad)
 	}
 }
