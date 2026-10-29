@@ -127,7 +127,7 @@ func (h *BoardHandler) putReviewInPool(ctx context.Context, project string, id i
 	h.postNotice(ctx, project, line)
 	for _, f := range fits {
 		if busy, err := h.bs.HasActiveTaskForAssignee(ctx, project, f, 0); err == nil && !busy {
-			h.sendTaskNudge(ctx, project, f, "[A review is waiting in the pool] Run 'coral-board task claim' to take the oldest one that matches your areas.")
+			h.sendTaskNudge(ctx, project, f, reviewPoolNudge)
 		}
 	}
 	return true

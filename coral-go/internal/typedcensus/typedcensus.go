@@ -24,6 +24,9 @@ type Case struct {
 	Plain, Hostile string
 }
 
+// anywhere are what no typed line may hold, fixed text included.
+var anywhere = []string{"`", "$(", "${", "<", ">", "|", "&"}
+
 // cmdChars are what cmd.exe acts on anywhere in a line; shellChars are what PowerShell or a POSIX shell act on.
 const (
 	cmdChars   = "&|<>()^%"
@@ -45,6 +48,13 @@ func Run(t *testing.T, cases []Case) {
 			if strings.ContainsAny(form.line, "\r\n\u2028\u2029") {
 				t.Errorf("%s (%s): more than one line: %q", c.Name, form.which, form.line)
 			}
+			// Fixed text too (Security on goal #7): a backtick pair or $( runs a command in bash, ${ expands, and cmd sets up a < > | &
+			// redirection, pipe or second command even when the first word is not a program.
+			for _, bad := range anywhere {
+				if strings.Contains(form.line, bad) {
+					t.Errorf("%s (%s): has %q, which a shell acts on wherever it is: %q", c.Name, form.which, bad, form.line)
+				}
+			}
 		}
 		for _, ch := range cmdChars + shellChars {
 			if p, h := strings.Count(c.Plain, string(ch)), strings.Count(c.Hostile, string(ch)); h != p {
@@ -53,8 +63,11 @@ func Run(t *testing.T, cases []Case) {
 		}
 	}
 	for _, o := range board.TypedOpeners {
-		if p, err := exec.LookPath(o); err == nil {
-			t.Errorf("the opener %q is a program on this computer (%s): a typed notice would run it", o, p)
+		// as the shells look it up: the name alone, and with each extension cmd and PowerShell add (Security on goal #7)
+		for _, ext := range []string{"", ".exe", ".com", ".cmd", ".bat", ".ps1"} {
+			if p, err := exec.LookPath(o + ext); err == nil {
+				t.Errorf("the opener %q is a program on this computer (%s): a typed notice would run it", o, p)
+			}
 		}
 	}
 	checkPowerShell(t, cases)

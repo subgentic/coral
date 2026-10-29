@@ -29,6 +29,7 @@ func TestTypedNoticeCensus(t *testing.T) {
 		{"tasks available", taskNudge, taskNudge},
 		{"artifact reminder", claudeArtifactNudgeText, claudeArtifactNudgeText},
 		{"agent UI action", uiActionPrompt(7, "panel-1", 3), uiActionPrompt(7, "panel-1", 3)},
+		{"review pool", reviewPoolNudge, reviewPoolNudge},
 	}
 	typedcensus.Run(t, cases)
 }
@@ -41,4 +42,31 @@ func TestTheCompletionNoticeCarriesNoMessage(t *testing.T) {
 	assert.Equal(t, "reported", typedOutcome("anything else"), "an outcome is one of the fixed words")
 	assert.Equal(t, "success", typedOutcome(""))
 	assert.Equal(t, "[Wait resolved] Lead Developer posted on b-team. Run 'coral-board read' to see the message.", typedMessageWaitResolved("Lead Developer", "b-team"), "no preview")
+}
+
+// Every call in this package that types text into an agent's terminal, and where its text comes from (Security on goal #7: the census
+// above must not miss a new sender). A new call fails here until its text comes from a census builder and it is listed.
+func TestEveryTypedSenderIsInTheCensus(t *testing.T) {
+	typedcensus.CheckSites(t, ".", []typedcensus.Site{
+		{"agent_exited.go", `board.OneLine(text), "board message"`, 1, "sendAutomated: forwards the text of the callers listed here"},
+		{"agent_tasks.go", `prompt, "task notification"`, 1, "claimPrompt (census: personal task)"},
+		{"agent_ui.go", `prompt, "agent UI action"`, 1, "uiActionPrompt (census)"},
+		{"agent_ui_request.go", `notification, ls.AgentType`, 1, "exception: the person's own request, typed as their own send is (the Orchestrator, goal #7)"},
+		{"auto_review.go", `taskClaimNudge(`, 1, "census: task available"},
+		{"board_notifications.go", `notification); err`, 1, "typedCompletedNotice (census)"},
+		{"board_notifications.go", `typed); err`, 1, "typedStalledNotice (census)"},
+		{"board_notifications.go", `sub.SessionName, text); err`, 1, "sendTaskNudge: forwards the text of the callers listed here"},
+		{"board_notifications.go", `assignee, text); err`, 1, "typedTaskReminder (census)"},
+		{"board_notifications.go", `subscriberID, text); err`, 1, "taskNudge or taskClaimNudge (census)"},
+		{"board_notifications.go", `typedPeriodicReminder(`, 1, "census"},
+		{"board_reminders.go", `typedBoardReminder(`, 1, "census"},
+		{"board_task_create.go", `taskClaimNudge(`, 1, "census"},
+		{"board_task_create.go", `taskNudge)`, 1, "census: tasks available"},
+		{"board_task_edit.go", `taskClaimNudge(`, 4, "census"},
+		{"board_task_flow.go", `taskClaimNudge(`, 1, "census"},
+		{"board_waits.go", `nudge); err`, 2, "typedMessageWaitResolved, typedTaskWaitResolved (census)"},
+		{"claude_artifact_nudge.go", `text, what)`, 1, "the nudger's deliver: forwards claudeArtifactNudgeText"},
+		{"claude_artifact_nudge.go", `claudeArtifactNudgeText`, 1, "census: artifact reminder"},
+		{"review_pool.go", `reviewPoolNudge`, 1, "census"},
+	})
 }
