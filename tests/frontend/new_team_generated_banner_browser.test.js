@@ -21,7 +21,10 @@ const BASE = require('./test_base').BASE;
         await t.click('button', N.next); await t.step(2); await settle(400);
         await ev(`document.getElementById('team-describe').click(); true`);
         await waitFor(`getComputedStyle(document.getElementById('team-wizard-modal')).display !== 'none'`, 'the Describe box', 5000);
-        await ev(`window.testTeamWizard(); true`); // what Try a sample's button calls: the draft goes straight to the Members step (#10517)
+        // what Try a sample's button calls: with members on the step (the default team since #9877) the first press says what it replaces and the second does it (#10658); then the draft goes to the Members step (#10517)
+        await ev(`window.testTeamWizard(); true`);
+        await waitFor(`/The sample replaces the/.test(document.getElementById('team-wizard-error').textContent)`, 'the preview of what the sample replaces', 4000);
+        await ev(`window.testTeamWizard(); true`);
         await waitFor(`!!document.getElementById('generated-team-banner') && document.getElementById('generated-team-banner').getClientRects().length > 0`, 'the notice', 6000);
         const r = await ev(`(() => { const b = document.getElementById('generated-team-banner').getBoundingClientRect(), h = document.getElementById('launch-team-title').getBoundingClientRect(), s = document.getElementById('team-stage-sub').getBoundingClientRect(); const lh = parseFloat(getComputedStyle(document.getElementById('launch-team-title')).lineHeight) || 24;
             return { overlap: !(b.bottom <= h.top || b.top >= h.bottom || b.right <= h.left || b.left >= h.right), titleLines: Math.round(h.height / lh), belowStep: b.top >= s.bottom - 1, text: document.getElementById('launch-team-title').textContent.trim() }; })()`);
