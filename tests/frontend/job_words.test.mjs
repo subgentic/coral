@@ -4,6 +4,11 @@ import { installDom, importUi } from './helpers/jsdom_env.mjs';
 
 installDom({ mode: 'local' });
 const w = await importUi('job_words');
+// every time a job says is in the person's own clock (#10978): the expected words below are written in 24 h and said through the same clock, so they hold on a 12 h locale and a 24 h one alike
+const T = text => text.replace(/\b([01]\d|2[0-3]):([0-5]\d)\b/g, (_, h, m) => w.clock(h, m));
+const eq = assert.equal.bind(assert); assert.equal = (a, b, m) => eq(a, typeof b === 'string' ? T(b) : b, m);
+eq(w.clock(9, 0, 'en-US'), '9:00 AM'); eq(w.clock(14, 30, 'en-US'), '2:30 PM'); eq(w.clock(0, 5, 'en-US'), '12:05 AM');
+eq(w.clock(9, 0, 'de-DE'), '09:00'); eq(w.clock(14, 30, 'en-GB'), '14:30');
 for (const [cron, words] of [['0 * * * *', 'Every hour'], ['0 */6 * * *', 'Every 6 hours'], ['0 2 * * *', 'Every day at 02:00'], ['30 18 * * 1-5', 'Weekdays at 18:30'], ['0 9 * * 1', 'Mondays at 09:00'], ['0 9 * * 0', 'Sundays at 09:00'], ['0 9 * * 7', 'Sundays at 09:00'], ['0 8 * * 0,6', 'Weekends at 08:00'], ['*/15 * * * *', 'Every 15 minutes'], ['0 6 1 * *', 'Monthly on day 1 at 06:00'], ['0 0 1 1 *', 'At 00:00, on January 1'], ['bad', 'Schedule: bad'], ['', '']]) assert.equal(w.cronWords(cron), words, cron);
 const now = new Date(2026, 9, 23, 14, 0, 0);
 assert.equal(w.atWords(new Date(2026, 9, 24, 2, 0).toISOString(), now), 'tomorrow 02:00');

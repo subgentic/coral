@@ -36,8 +36,8 @@ const S = `(window.__coralStatic || '/static/')`;
             const rows = await ev(`Object.fromEntries([...document.querySelectorAll('#group-table-view tbody tr[data-key]')].map(r => [r.querySelector('.dt-primary').textContent, r.textContent.replace(/\\s+/g, ' ').trim()]))`);
             assert.match(rows['passes'], /Passed/, at + 'a pass says so in its row: ' + JSON.stringify(rows['passes']));
             assert.match(rows['fails-plain'], /Failed/, at + 'a failed run says so in its row: ' + JSON.stringify(rows['fails-plain']));
-            assert.match(rows['odd-cron'], /Every 5 minutes, from 09:00 to 17:59, weekdays \(UTC\)/, at + 'an unusual schedule is in words, with its zone: ' + rows['odd-cron']);
-            assert.match(rows['passes'], /Every day at 02:00 \(UTC\)/, at + 'the row names the schedule\'s zone: ' + rows['passes']);
+            assert.match(rows['odd-cron'], /Every 5 minutes, from (09:00|9:00 AM) to (17:59|5:59 PM), weekdays \(UTC\)/, at + 'an unusual schedule is in words, with its zone: ' + rows['odd-cron']);
+            assert.match(rows['passes'], /Every day at (02:00|2:00 AM) \(UTC\)/, at + 'the row names the schedule\'s zone: ' + rows['passes']);
             await shot(`jobs-list-${w}`);
             // Jobs is titled once
             const heads = await ev(`[...document.querySelectorAll('h1, h2, h3')].filter(h => h.textContent.replace(/\\s+/g, ' ').trim() === 'Jobs' || /^Jobs \\d*$/.test(h.textContent.replace(/\\s+/g, ' ').trim())).filter(h => h.checkVisibility() && h.getBoundingClientRect().width > 4 && h.getBoundingClientRect().height > 4).length`);
