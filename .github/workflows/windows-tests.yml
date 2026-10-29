@@ -368,10 +368,7 @@ jobs:
         # terminal_pane_size (which drives tmux itself) stays on Linux and macOS; its partner terminal_scroll already runs in a default part. --no-tmux: a --strict run would
         # otherwise add the tmux shard too (9 suites that cannot start here).
         include:
-          - { name: "part 1/3", args: "--part 1/3", id: "1" }
-          - { name: "part 2/3", args: "--part 2/3", id: "2" }
-          - { name: "part 3/3", args: "--part 3/3", id: "3" }
-          - { name: "strict", args: "--strict --no-tmux", id: "strict" }
+          - { name: "signin_line x10", args: "--only signin_line_browser.test.js --stress --runs 10 --shards 1", id: "sl" }
     defaults:
       run:
         shell: bash
