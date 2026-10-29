@@ -571,7 +571,7 @@ func runForeground(host string, port int, noBrowser, debugMode bool, backendType
 			log.Println("coral-tray exited")
 			if closedBySystem && runtime.GOOS == "windows" {
 				// The library ran this from WM_ENDSESSION and keeps its message loop going: end it, so this process exits and frees its files (#335).
-				go systray.Quit()
+				safego.Go("coral-tray/systray-quit", systray.Quit)
 			}
 		})
 	})

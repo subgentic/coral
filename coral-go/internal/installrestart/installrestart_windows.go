@@ -24,6 +24,8 @@ import (
 	"unsafe"
 
 	"golang.org/x/sys/windows"
+
+	"github.com/subgentic/coral/internal/logsafe"
 )
 
 // MaxAge is the longest an install may take between closing Coral and starting it again.
@@ -61,6 +63,13 @@ func folderFor(exe string) (string, error) {
 		return "", err
 	}
 	return folderUnder(local, exe), nil
+}
+
+// SetFolderForTest puts the mark's folder at dir until the returned function is called (for the tests of programs that use this package, which cannot reach the variable).
+func SetFolderForTest(dir string) (restore func()) {
+	old := folder
+	folder = func() (string, error) { return dir, nil }
+	return func() { folder = old }
 }
 
 // folderUnder is the mark's folder below the user's Local AppData folder local, for a program at exe.
@@ -110,7 +119,7 @@ func openPlainFolder(dir string) (*plainFolder, error) {
 	}
 	if info.FileAttributes&windows.FILE_ATTRIBUTE_REPARSE_POINT != 0 || info.FileAttributes&windows.FILE_ATTRIBUTE_DIRECTORY == 0 {
 		d.Close()
-		log.Printf("installrestart: the folder %s is a link or not a folder: refused, so Coral will not be started again by the installer", dir)
+		log.Printf("installrestart: the folder %s is a link or not a folder: refused, so Coral will not be started again by the installer", logsafe.Path(dir))
 		return nil, ErrNotPlainFolder
 	}
 	// An ancestor that is a link: the handle's final path is where the folder really is, which then is not where it was asked for.
@@ -118,7 +127,7 @@ func openPlainFolder(dir string) (*plainFolder, error) {
 	if err != nil || !sameFolder(final, longPath(dir)) {
 		d.Close()
 		// One line that explains "Coral did not restart after the install": the folder is reached through a link (a redirected profile, OneDrive, a network folder).
-		log.Printf("installrestart: the folder %s is really %s (a redirected profile, OneDrive, a network folder or a link above it): refused, so Coral will not be started again by the installer", dir, final)
+		log.Printf("installrestart: the folder %s is really %s (a redirected profile, OneDrive, a network folder or a link above it): refused, so Coral will not be started again by the installer", logsafe.Path(dir), logsafe.Path(final))
 		return nil, ErrNotPlainFolder
 	}
 	return d, nil

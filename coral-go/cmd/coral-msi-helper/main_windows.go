@@ -46,6 +46,7 @@ import (
 
 	"github.com/subgentic/coral/internal/installrestart"
 	"github.com/subgentic/coral/internal/license"
+	"github.com/subgentic/coral/internal/logsafe"
 	"github.com/subgentic/coral/internal/msiproduct"
 	"github.com/subgentic/coral/internal/trayevent"
 )
@@ -125,6 +126,9 @@ func finalPath(dir string) string {
 	return strings.TrimPrefix(s, `\\?\`)
 }
 
+// processElevated says whether this run's token is elevated (a variable so a test can run both paths whatever token the runner has).
+var processElevated = func() bool { return windows.GetCurrentProcessToken().IsElevated() }
+
 // openLog sends the log to a new coral-msi-helper-<random>.log in this user's temporary folder, and only there: a GUI program that Windows
 // Installer starts has no standard error, and a MultiWriter with it stopped at its failed write, so the file stayed empty (Security on
 // #155, tested live). A fixed name in a folder the user can write is a link an elevated run could be made to write through: a new file with
@@ -133,7 +137,7 @@ func openLog() func() {
 	log.SetFlags(log.LstdFlags)
 	var f *os.File
 	var err error
-	if windows.GetCurrentProcessToken().IsElevated() {
+	if processElevated() {
 		// An elevated run never writes into TEMP (the user's, a folder where a link can be planted): the log is created new in the opened, plain mark folder (#155
 		// review). No such folder, no log: never a fallback to TEMP.
 		f, err = installrestart.CreateLog("coral-msi-helper")
@@ -143,8 +147,8 @@ func openLog() func() {
 	if err != nil {
 		return func() {}
 	}
-	log.SetOutput(f)
-	log.Printf("coral-msi-helper %s (elevated: %v)", strings.Join(os.Args[1:], " "), windows.GetCurrentProcessToken().IsElevated())
+	log.SetOutput(logsafe.Writer(f)) // a profile folder, user name or computer name never reaches the log
+	log.Printf("coral-msi-helper %s (elevated: %v)", strings.Join(os.Args[1:], " "), processElevated())
 	return func() { f.Close() }
 }
 
