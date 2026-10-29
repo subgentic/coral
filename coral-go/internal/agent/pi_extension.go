@@ -21,7 +21,7 @@ import (
 var piExtensionSource string
 
 // piExtensionDigest is the SHA-256 of pi_extension/coral_pi.js as embedded: a test pins it, so the file cannot change without this line and its review changing too.
-const piExtensionDigest = "2819fc38bfecc88424c09dfc857c433831ab4e6a6ea533f253a22e17a06c5df8"
+const piExtensionDigest = "63202a62dd3a1a7b7f8a570e4d364e9560a85b584b1dd1741509ba64e9eb9522"
 
 // piConfigPlaceholder is what the extension file holds where Coral writes its configuration.
 const piConfigPlaceholder = "/*__CORAL_PI_CONFIG__*/ null"

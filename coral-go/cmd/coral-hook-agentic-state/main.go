@@ -33,7 +33,7 @@ func main() {
 	if !ok {
 		return
 	}
-	agyEvent, hooksRev := opts.agyEvent, opts.hooksRev
+	agyEvent := opts.agyEvent
 	agyModel := agyModelOf(d, agyEvent)               // read before fromAgy rewrites the payload
 	agyConversation := agyConversationOf(d, agyEvent) // read before fromAgy rewrites the payload
 	if agyEvent != "" {
@@ -57,6 +57,16 @@ func main() {
 		return // --pi named an event Coral does not record
 	}
 
+	if stop, _ := d["_pi_stop"].(map[string]any); stop != nil {
+		delete(d, "_pi_stop")
+		handle(stop, opts, agyModel, agyConversation) // Pi's last event carries the Stop that has not been sent: Stop, then SessionEnd, in this order, in this one process (#11107 slice 1b)
+	}
+	handle(d, opts, agyModel, agyConversation)
+}
+
+// handle posts one hook event: the payload already in the Claude shape.
+func handle(d map[string]any, opts hookArgs, agyModel, agyConversation string) {
+	agyEvent, hooksRev := opts.agyEvent, opts.hooksRev
 	hookType := hookTypeOf(d)
 	hooks.DebugLog(fmt.Sprintf("AGENTIC_STATE INPUT: hook_type=%s argv=%v", hooks.LogID(hookType), os.Args[1:]))
 

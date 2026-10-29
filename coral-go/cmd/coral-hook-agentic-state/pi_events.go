@@ -3,7 +3,9 @@ package main
 import (
 	"math"
 	"regexp"
+	"strings"
 
+	"github.com/subgentic/coral/internal/clitext"
 	"github.com/subgentic/coral/internal/hooks"
 )
 
@@ -13,22 +15,31 @@ import (
 // The state it gives is display only: whatever posts here (the extension, or anything running as the user) can claim any state, as the Claude hooks can.
 
 // piAllowedKeys are the only keys of a Pi payload this program reads.
-var piAllowedKeys = []string{"session_id", "reason", "tool_name", "tool_use_id", "is_error", "aborted", "model", "thinking_level", "input_tokens", "output_tokens", "cost_usd", "num_turns"}
+var piAllowedKeys = []string{"session_id", "reason", "tool_name", "tool_use_id", "is_error", "aborted", "model", "thinking_level", "input_tokens", "output_tokens", "cost_usd", "num_turns", "stop"}
 
 var piSafeID = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$`)
 
-// piName is a short name (a tool, a model, a level) or "" when it is not one: printable, no control characters, bounded.
+// piName is a short name (a tool, a level) or "" when it is not one. The same rule as the extension's (printable ASCII, 200 characters at most) and the dashboard's: a name that clitext.CleanName would change
+// (a control character, a bidi override or isolate, a zero-width or other format character, an invisible filler) is DROPPED, not repaired, so no name the extension (or anything running as the user) posts can
+// reorder or hide text on a row. A test probes each of those.
 func piName(v any, max int) string {
 	s, _ := v.(string)
-	if s == "" || len(s) > 200 {
+	if s == "" || len(s) > 200 || clitext.CleanName(s) != s || strings.ContainsAny(s, "\u2028\u2029") {
 		return ""
 	}
-	for _, r := range s {
-		if r < 0x20 || r == 0x7f {
-			return ""
-		}
-	}
 	return hooks.Truncate(s, max)
+}
+
+// piModelID is a model id by the same rule as internal/jsonl's cleanModelID (a test pins the two together): a plain identifier, or "".
+var piModelID = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/@\[\]+-]{0,127}$`)
+
+func piModel(v any) string {
+	m, _ := v.(string)
+	m = strings.TrimSpace(m)
+	if !piModelID.MatchString(m) {
+		return ""
+	}
+	return m
 }
 
 // piCount is a token count or a cost: a finite, non-negative number, or nil.
@@ -78,7 +89,7 @@ func fromPi(d map[string]any, event string) (map[string]any, bool) {
 		if aborted, _ := d["aborted"].(bool); aborted {
 			out["reason"] = "aborted"
 		}
-		if m := piName(d["model"], 80); m != "" {
+		if m := piModel(d["model"]); m != "" {
 			out["model"] = m
 		}
 		if v := piCount(d["input_tokens"]); v != nil {
@@ -97,6 +108,12 @@ func fromPi(d map[string]any, event string) (map[string]any, bool) {
 		out["reason"] = "other"
 		if r, _ := d["reason"].(string); r == "quit" {
 			out["reason"] = "prompt_input_exit"
+		}
+		// The shutdown event may carry a Stop that was not sent (a run that had not settled, or a settle still queued) with its usage: the program posts that Stop first, then the session's end, in one process.
+		if stop, _ := d["stop"].(bool); stop {
+			if st, ok := fromPi(d, "Stop"); ok {
+				out["_pi_stop"] = st
+			}
 		}
 	default:
 		return nil, false

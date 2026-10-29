@@ -30,6 +30,7 @@ function create(deps) {
   const childEnv = () => { const out = {}; for (const k of config.envNames) { if (typeof k === 'string' && env[k] !== undefined) out[k] = env[k]; } return out; };
   const queue = []; let sending = false; let lastTool = -Infinity;
   const usage = { input: 0, output: 0, cost: 0, turns: 0, model: undefined, seen: false };
+  let running = false; // an agent run has started and not settled
 
   function send(event, payload) {
     if (queue.length >= QUEUE_MAX) queue.shift();
@@ -38,12 +39,12 @@ function create(deps) {
   }
   // One hook program at a time, in the order the events happened: independent processes would race (a late "agent started" after "agent settled" would leave the agent Working). Nothing waits for it on Pi's path:
   // the next one starts when the last has ended, and a hook that has not ended by CHILD_MS is killed and the queue goes on. When Pi is shutting down the process ends with its extension, so whatever is still queued
-  // is started at once (flush): the last events, a Stop and the session's end, must not be lost to the order.
+  // is dealt with in ONE hook process (shutdownNow): whatever Stop had not been sent, with its usage, and the session's end, posted by that one program in that order.
   function start(item, then) {
     let finished = false;
     const next = () => { if (!finished) { finished = true; if (then) then(); } };
     try {
-      const child = spawn(config.hookBin, ['--pi', item.event], { detached: true, stdio: ['pipe', 'ignore', 'ignore'], env: childEnv(), windowsHide: true, shell: false });
+      const child = spawn(config.hookBin, ['--pi', item.event, '--hooks-rev', String(config.rev || 1)], { detached: true, stdio: ['pipe', 'ignore', 'ignore'], env: childEnv(), windowsHide: true, shell: false });
       child.on('error', next); child.on('exit', next);
       if (child.stdin) { child.stdin.on('error', () => {}); child.stdin.end(JSON.stringify(item.payload)); }
       const t = setTimer(() => { try { child.kill(); } catch (e) { /* gone already */ } next(); }, CHILD_MS); if (t && t.unref) t.unref();
@@ -55,7 +56,6 @@ function create(deps) {
     if (!item) { sending = false; return; }
     start(item, () => setTimer(drain, 0));
   }
-  function flush() { while (queue.length) start(queue.shift(), null); }
   const tool = (event, e, extra) => {
     const t = now(); if (t - lastTool < TOOL_EVERY_MS) return; lastTool = t;
     const toolName = name(e && e.toolName, 60); if (!toolName) return;
@@ -72,19 +72,34 @@ function create(deps) {
       usage.model = name(m.model, 80) || usage.model;
     }
   };
+  const settledPayload = e => {
+    const p = { aborted: !!(e && e.aborted) };
+    if (usage.seen) { p.input_tokens = usage.input; p.output_tokens = usage.output; p.cost_usd = usage.cost; p.num_turns = usage.turns; if (usage.model) p.model = usage.model; }
+    usage.input = usage.output = usage.cost = usage.turns = 0; usage.model = undefined; usage.seen = false;
+    return p;
+  };
+  // The process ends with the extension: ONE event carries the last of it (a Stop that was not sent yet, with its usage) and the session's end; the program posts Stop, then SessionEnd, in this order, in one process.
+  // Everything still queued is superseded by it (display only), except a queued agent_settled, whose payload it takes over.
+  const shutdownNow = e => {
+    let settled = null;
+    for (const q of queue) if (q.event === 'agent_settled') settled = q.payload;
+    queue.length = 0;
+    const p = { reason: name(e && e.reason, 20) };
+    if (settled || running || usage.seen) {
+      p.stop = true;
+      Object.assign(p, settled || settledPayload(null));
+    }
+    running = false;
+    start({ event: 'session_shutdown', payload: p }, null);
+  };
   const handlers = {
     session_start: e => send('session_start', { reason: name(e && e.reason, 20) }),
-    agent_start: () => send('agent_start', {}),
+    agent_start: () => { running = true; send('agent_start', {}); },
     tool_execution_start: e => tool('tool_execution_start', e, {}),
     tool_execution_end: e => tool('tool_execution_end', e, { is_error: !!(e && e.isError) }),
     agent_end: e => noteUsage(e),
-    agent_settled: e => {
-      const p = { aborted: !!(e && e.aborted) };
-      if (usage.seen) { p.input_tokens = usage.input; p.output_tokens = usage.output; p.cost_usd = usage.cost; p.num_turns = usage.turns; if (usage.model) p.model = usage.model; }
-      usage.input = usage.output = usage.cost = usage.turns = 0; usage.model = undefined; usage.seen = false;
-      send('agent_settled', p);
-    },
-    session_shutdown: e => { send('session_shutdown', { reason: name(e && e.reason, 20) }); flush(); },
+    agent_settled: e => { running = false; send('agent_settled', settledPayload(e)); },
+    session_shutdown: e => shutdownNow(e),
   };
   return function register(pi) {
     if (!active) return;

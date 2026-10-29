@@ -68,7 +68,7 @@ const s = rig();
 s.fire('agent_start', {}); s.run();
 assert.equal(s.spawned.length, 1);
 const c = s.spawned[0];
-assert.equal(c.bin, CONFIG.hookBin); assert.deepEqual(c.args, ['--pi', 'agent_start']);
+assert.equal(c.bin, CONFIG.hookBin); assert.deepEqual(c.args, ['--pi', 'agent_start', '--hooks-rev', '1'], 'the revision is the handshake: every event carries it');
 assert.equal(c.opts.shell, false); assert.equal(c.opts.detached, true); assert.equal(c.opts.windowsHide, true); assert.deepEqual(c.opts.stdio, ['pipe', 'ignore', 'ignore']);
 assert.ok(c.unrefd, 'unref: a child never holds Pi\'s exit');
 assert.deepEqual(Object.keys(c.opts.env).sort(), [...ENV_NAMES].sort(), 'only the listed variables');
@@ -82,7 +82,7 @@ console.log('pi_extension: the one program, no shell, listed env only, unref, ki
 const ALLOWED = new Set(['reason', 'tool_name', 'tool_use_id', 'is_error', 'aborted', 'model', 'input_tokens', 'output_tokens', 'cost_usd', 'num_turns']);
 const h = rig();
 const hostile = { prompt: CANARY, text: CANARY, args: { command: CANARY }, result: { content: CANARY }, messages: [{ role: 'user', content: CANARY }, { role: 'assistant', content: CANARY, model: 'm-1', usage: { input: 3, output: 2, cost: { total: 0.25 } } }], message: { content: CANARY }, systemPrompt: CANARY, apiKey: CANARY, images: [CANARY], toolName: 'bash', toolCallId: 'call_1', isError: true, reason: 'startup', aborted: true, cwd: CANARY };
-for (const [i, name] of ext.EVENTS.entries()) { h.advance(1000 * (i + 1)); h.fire(name, hostile); }
+for (const [i, name] of ext.EVENTS.entries()) { h.advance(1000 * (i + 1)); h.fire(name, hostile); if (name !== 'session_shutdown') h.run(); }
 h.run();
 const seen = payloads(h);
 assert.equal(seen.length, 6, 'agent_end only collects: it posts nothing');
@@ -127,11 +127,21 @@ o.run(false);
 assert.ok(o.spawned[1].killed, 'killed');
 assert.equal(o.spawned.length, 3, 'and the queue goes on');
 assert.deepEqual(o.spawned.map(c => c.args[1]), ['agent_start', 'agent_settled', 'tool_execution_end'], 'in order');
-// shutdown: the process is ending with the extension, so what is still queued is started at once, in order
+// shutdown: the process is ending with the extension: ONE event, carrying the Stop that had not been sent (a queued agent_settled, or a run that never settled, with its usage) and the session's end
 const z = rig(); z.advance(5000);
-z.fire('agent_start', {}); z.fire('agent_settled', { aborted: false }); z.fire('session_shutdown', { reason: 'quit' });
-assert.equal(z.spawned.length, 3, 'at shutdown the whole queue is started without waiting');
-assert.deepEqual(z.spawned.map(c => c.args[1]), ['agent_start', 'agent_settled', 'session_shutdown']);
+z.fire('agent_start', {}); z.fire('agent_end', { messages: [{ role: 'assistant', model: 'm-1', usage: { input: 4, output: 2, cost: 0.5 } }] }); z.fire('agent_settled', { aborted: false }); z.fire('tool_execution_end', { toolName: 'ls' });
+z.fire('session_shutdown', { reason: 'quit' });
+assert.equal(z.spawned.length, 1, 'at shutdown the queue is superseded by ONE event');
+assert.deepEqual(z.spawned[0].args.slice(0, 2), ['--pi', 'session_shutdown']);
+assert.deepEqual(JSON.parse(z.spawned[0].stdin.data), { reason: 'quit', stop: true, aborted: false, input_tokens: 4, output_tokens: 2, cost_usd: 0.5, num_turns: 1, model: 'm-1' }, 'the queued settle\'s usage rides in it');
+const y = rig(); y.advance(5000);
+y.fire('agent_start', {}); y.run(); y.fire('agent_end', { messages: [{ role: 'assistant', model: 'm-2', usage: { input: 1, output: 1 } }] });
+y.fire('session_shutdown', { reason: 'quit' });
+assert.deepEqual(JSON.parse(y.spawned[y.spawned.length - 1].stdin.data), { reason: 'quit', stop: true, aborted: false, input_tokens: 1, output_tokens: 1, cost_usd: 0, num_turns: 1, model: 'm-2' }, 'a run that never settled: its Stop and usage go with the end');
+const x = rig(); x.advance(5000);
+x.fire('agent_start', {}); x.fire('agent_settled', { aborted: false }); x.run();
+x.fire('session_shutdown', { reason: 'quit' });
+assert.deepEqual(JSON.parse(x.spawned[x.spawned.length - 1].stdin.data), { reason: 'quit' }, 'nothing unsent: only the end');
 console.log('pi_extension: one at a time, in order, a hung hook killed ok');
 
 // 8. the queue is bounded; the oldest goes

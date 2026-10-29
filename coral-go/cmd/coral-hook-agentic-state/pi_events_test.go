@@ -7,6 +7,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/subgentic/coral/internal/jsonl"
 )
 
 // #11093/#11102: Coral's Pi extension posts through this binary with --pi <event>; fromPi reads an allow-list of keys and nothing else.
@@ -82,7 +84,95 @@ func TestFromPiNeverReadsAnythingOutsideTheAllowList(t *testing.T) {
 		rawEvent, _ := json.Marshal(posted)
 		assert.NotContains(t, string(rawEvent), piCanary, event+": the event that would be posted")
 		for k := range out {
-			assert.Contains(t, append([]string{"hook_event_name", "source", "reason", "error", "model", "tool_name", "tool_use_id", "session_id", "total_input_tokens", "total_output_tokens", "total_cost_usd", "num_turns"}, piAllowedKeys...), k, event+": key "+k+" is not one fromPi may write")
+			assert.Contains(t, append([]string{"hook_event_name", "source", "reason", "error", "model", "tool_name", "tool_use_id", "session_id", "total_input_tokens", "total_output_tokens", "total_cost_usd", "num_turns", "_pi_stop"}, piAllowedKeys...), k, event+": key "+k+" is not one fromPi may write")
 		}
 	}
+}
+
+// Security's SHOULD 1 (slice 1b): the hook applies the same name rule as the extension (printable ASCII) and the dashboard's (clitext.CleanName): a name that rule would change is dropped, whatever the unicode trick.
+func TestFromPiDropsNamesThatCouldReorderOrHideText(t *testing.T) {
+	probes := map[string]string{
+		"right-to-left override":    "ba\u202esh",
+		"left-to-right override":    "ba\u202dsh",
+		"bidi isolate":              "ba\u2066sh",
+		"bidi pop":                  "ba\u2069sh",
+		"zero-width space":          "ba\u200bsh",
+		"zero-width joiner":         "ba\u200dsh",
+		"zero-width non-joiner":     "ba\u200csh",
+		"word joiner":               "ba\u2060sh",
+		"soft hyphen":               "ba\u00adsh",
+		"byte order mark":           "ba\ufeffsh",
+		"variation selector":        "ba\ufe0fsh",
+		"hangul filler":             "ba\u3164sh",
+		"braille blank":             "ba\u2800sh",
+		"line separator":            "ba\u2028sh",
+		"paragraph separator":       "ba\u2029sh",
+		"newline":                   "ba\nsh",
+		"escape":                    "ba\x1bsh",
+		"nul":                       "ba\x00sh",
+		"a name that is only space": "   ",
+	}
+	for what, name := range probes {
+		_, ok := fromPi(map[string]any{"tool_name": name}, "PreToolUse")
+		assert.False(t, ok, "%s in a tool name drops the event", what)
+		if strings.TrimSpace(name) == "" {
+			continue // a model id is trimmed, as the transcript reader trims it
+		}
+		out, ok := fromPi(map[string]any{"model": "gpt-" + name}, "Stop")
+		require.True(t, ok)
+		assert.NotContains(t, out, "model", "%s in a model id drops the model", what)
+	}
+	_, ok := fromPi(map[string]any{"tool_name": "bash"}, "PreToolUse")
+	assert.True(t, ok)
+}
+
+// The model rule is internal/jsonl's cleanModelID, said again here so the hook program does not link the transcript reader: the two agree on a corpus.
+func TestPiModelRuleIsTheTranscriptReadersRule(t *testing.T) {
+	for _, m := range []string{"claude-opus-5-5", "gpt-6-astra", "opus[1m]", "fake-chat", " spaced ", "<synthetic>", "", "a b", "bad\nname", "x" + strings.Repeat("y", 200), "../etc", "-leading", "m\u202e", "model:tag/v1@2+x", "ok.model_1"} {
+		assert.Equal(t, jsonl.CleanModelID(m), piModel(m), "model id %q", m)
+	}
+}
+
+// Security's SHOULD 2: the shutdown event may carry a Stop that was not sent, with its usage; the program posts that Stop and then SessionEnd, in this order, in one process; without it, only the end.
+func TestPiShutdownPostsStopThenSessionEndInOneProcess(t *testing.T) {
+	payload := func(fields map[string]any) []byte { return flowPayload(t, fields) }
+	paths := func(r flowResult) []string {
+		var out []string
+		for _, q := range r.Requests {
+			ev := ""
+			if b, ok := q.Body.(map[string]any); ok {
+				ev, _ = b["event_type"].(string)
+			}
+			out = append(out, q.Path[strings.LastIndex(q.Path, "/")+1:]+":"+ev)
+		}
+		return out
+	}
+	with := runFlow(t, flowRun{cli: "pi", args: []string{"--pi", "session_shutdown"}, stdin: payload(map[string]any{"reason": "quit", "stop": true, "aborted": false, "input_tokens": 12.0, "output_tokens": 3.0, "num_turns": 1.0})})
+	got := paths(with)
+	require.GreaterOrEqual(t, len(got), 3, "%v", got)
+	assert.Equal(t, []string{"events:stop", "token-usage:", "events:session_end"}, got, "Stop (and its usage), then the session's end")
+	without := runFlow(t, flowRun{cli: "pi", args: []string{"--pi", "session_shutdown"}, stdin: payload(map[string]any{"reason": "quit"})})
+	assert.Equal(t, []string{"events:session_end"}, paths(without), "no Stop to send: only the end")
+}
+
+// The whole program with a payload that carries a secret in every key Pi has: no request to Coral holds it.
+func TestPiFlowSendsNothingOutsideTheAllowList(t *testing.T) {
+	fields := map[string]any{"tool_name": "bash", "tool_use_id": "call_1", "is_error": true, "stop": true, "aborted": true, "model": "fake-chat", "input_tokens": 5.0}
+	for _, k := range []string{"prompt", "text", "args", "tool_input", "result", "output", "messages", "message", "systemPrompt", "content", "command", "api_key", "env", "images", "summary", "input", "last_assistant_message", "transcript_path", "cwd_note"} {
+		fields[k] = piCanary + " " + k
+	}
+	for _, event := range []string{"session_start", "agent_start", "tool_execution_start", "tool_execution_end", "agent_settled", "session_shutdown"} {
+		res := runFlow(t, flowRun{cli: "pi", args: []string{"--pi", event}, stdin: flowPayload(t, copyMap(fields))})
+		raw, _ := json.Marshal(res)
+		assert.NotContains(t, string(raw), piCanary, event+": nothing outside the allow-list reaches a request to Coral")
+		assert.NotEmpty(t, res.Requests, event)
+	}
+}
+
+func copyMap(m map[string]any) map[string]any {
+	out := make(map[string]any, len(m))
+	for k, v := range m {
+		out[k] = v
+	}
+	return out
 }
