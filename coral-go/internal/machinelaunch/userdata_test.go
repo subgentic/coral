@@ -131,9 +131,12 @@ func TestUserDataSaysWhatItMustAlwaysSay(t *testing.T) {
 		"systemctl disable --now ssh.socket ssh.service sshd.service", "systemctl mask ssh.socket ssh.service sshd.service", "ufw --force delete allow 22/tcp",
 		"rm -f /home/coral/.ssh/authorized_keys /etc/ssh/ssh_host_*_key /etc/ssh/ssh_host_*_key.pub", "rm -f /etc/ssh/sshd_config.d/10-coral-bootstrap.conf",
 		"/var/lib/cloud/instance/user-data.txt*", "/var/lib/cloud/instances/*/user-data.txt*", "cloud-config.txt", "/var/lib/cloud/instance/scripts", "/var/log/cloud-init.log", "systemctl enable coral.service",
+		// every cloud-init copy (Security's SHOULD on #10917): the pickled instance, the instance-data JSON, the rotated logs
+		"/var/lib/cloud/instance/obj.pkl", "/var/lib/cloud/instances/*/obj.pkl", "/run/cloud-init/instance-data*.json", "/var/log/cloud-init.log.*", "/var/log/cloud-init-output.log.*",
 	} {
 		assert.Contains(t, finish, want, "the finish step: "+want)
 	}
+	assert.NotContains(t, finish, "cloud-init clean", "never: a reboot would then run the user-data again and open SSH")
 	assert.Contains(t, got, "OnActiveSec=20min", "the fallback closes SSH on its own if the launcher never finishes")
 	assert.Contains(t, got, "PathExists=/run/coral/bootstrap.d/done", "and the launcher's done file closes it at once")
 	sshd := fileOf(t, doc, "/etc/ssh/sshd_config.d/10-coral-bootstrap.conf")
