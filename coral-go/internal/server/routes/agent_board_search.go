@@ -75,7 +75,7 @@ func (h *SessionsHandler) SearchAgentBoard(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	if ls == nil || ls.BoardName == nil || *ls.BoardName == "" {
-		writeJSON(w, http.StatusForbidden, map[string]string{"error": "This agent was not launched on a board, so it has no board to search", "code": "no_board"})
+		writeError(w, http.StatusForbidden, "no_board", "This agent was not launched on a board, so it has no board to search")
 		return
 	}
 	boardKey := *ls.BoardName
