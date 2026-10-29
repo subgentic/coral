@@ -14,7 +14,7 @@ const DT = await importOnce('./data_table.js'); // the one table (#7743): the go
 const GC = await importOnce('./goal_columns.js');
 
 import * as W from './goal_words.js';
-const { mountGoal } = await importOnce('./goal_view.js');
+const { mountGoal, goalNotYet } = await importOnce('./goal_view.js');
 let detail = null, detailHost = null, detailId = 0;
 function clearDetail() { detail?.dispose(); detail = null; detailHost = null; detailId = 0; }
 
@@ -158,7 +158,7 @@ function drawTableRaw(col) {
         selectable: { contextKey: model.project, canSelect: g => !g.noGoal && W.isOpenGoal(g), actions: goalBulkActions(), onChange: keys => Toolbar.mountSelection(toolbar, keys.size ? table.bar : null) },
         onSort: () => drawList(), // keep the no-goal navigation row last in either direction
         open: g => g.noGoal ? window.openTeamPage?.(model.project, { tab: 'tasks', noGoal: true }) : openGoal(g.id, true),
-        columns: GC.goalColumns({ progressLabel: 'Tasks', closeReady: g => { model.closeWhenOpen = g.id; openGoal(g.id, true); } }, ['goal', 'state', 'progress', 'updated']), oneLine: true, sortBar: false,
+        columns: GC.goalColumns({ progressLabel: 'Tasks', notYet: g => goalNotYet(model.project, g), closeReady: g => { model.closeWhenOpen = g.id; openGoal(g.id, true); } }, ['goal', 'state', 'progress', 'updated']), oneLine: true, sortBar: false,
     });
     col.append(table.el); Toolbar.mountSelection(toolbar, goalsTableState.selected.size ? table.bar : null);
     if (PHONE.matches) toolbar.querySelector('.goals-new')?.before(table.selectButton);

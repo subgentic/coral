@@ -15,6 +15,12 @@ const DT = await importOnce('./data_table.js');
 const TV = await importOnce('./tasks_view.js');
 const PAGE = 50;
 
+const NOT_YET_KEY = 'coral.goals.notyet';
+/** "Not yet" said to a goal's all-done prompt, per team, goal and task total: it comes back when a task is added or removed. The goal page and the team's Goals row read the same list (#10692). */
+export const goalNotYetKey = (project, g) => `${project}|${g.id}|${W.allTasksOf(g.rollup)}`;
+function notYetList() { try { const v = JSON.parse(browserLocal.get(NOT_YET_KEY) || '[]'); return Array.isArray(v) ? v : []; } catch { return []; } }
+export const goalNotYet = (project, g) => notYetList().includes(goalNotYetKey(project, g));
+
 /** Mount one goal; each mount owns its task pages, search and phone screen. */
 export function mountGoal(host, { team, id, back, onTask, goal, refresh, status, teamLink, focusOnOpen = true, backLabel = 'Goals' }) { // focusOnOpen: false where the page opens in place and the heading should not take the focus (the Inbox, #8681)
     const root = host;
@@ -318,10 +324,8 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
 
     // ── closing, reopening, and the all-done prompt (#7272, UI/UX's #7270) ─────
 
-    const NOT_YET_KEY = 'coral.goals.notyet';
-    const notYetKey = (g) => `${model.project}|${g.id}|${W.allTasksOf(g.rollup)}`; // per goal and task total: it comes back when a task is added or removed
-    function notYetList() { try { const v = JSON.parse(browserLocal.get(NOT_YET_KEY) || '[]'); return Array.isArray(v) ? v : []; } catch { return []; } }
-    const isNotYet = (g) => notYetList().includes(notYetKey(g));
+    const notYetKey = (g) => goalNotYetKey(model.project, g);
+    const isNotYet = (g) => goalNotYet(model.project, g);
     const announcedDone = new Set(); // the all-done strips already said, by goal and task total: said once when it first appears, not on every redraw
     function announceAllDone(g) { const k = notYetKey(g); if (announcedDone.has(k)) return; announcedDone.add(k); say(W.allDoneSaid(W.allTasksOf(g.rollup), g.title)); }
     function setNotYet(g) { try { browserLocal.set(NOT_YET_KEY, JSON.stringify([...notYetList().filter(k => k !== notYetKey(g)), notYetKey(g)].slice(-100))); } catch { /* the strip comes back on the next read */ } }

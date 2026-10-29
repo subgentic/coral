@@ -19,7 +19,7 @@ export function goalColumns(ctx = {}, keys = ['state', 'goal', 'team', 'progress
             cell: g => g.noGoal ? '' : DT.chip(W.stateWord(g), `goal-state-${g.state || 'unknown'}`) },
         goal: { key: 'goal', label: 'Goal', primary: true, width: 'grow', sort: true, sortValue: g => g.title, line: 1,
             cell: g => { const b = DT.primaryButton(g.title || `Goal ${g.id}`); b.dataset.goalId = String(g.id); if (g.noGoal) b.classList.add('goals-no-goal');
-                if (!ctx.closeReady || g.noGoal || !W.readyToClose(g)) return b;
+                if (!ctx.closeReady || g.noGoal || !W.readyToClose(g) || ctx.notYet?.(g)) return b; // a goal the person said Not yet to on its page is quiet here too (#10692)
                 // every task of an active goal is done: the row says so, quietly, with a Close that goes straight to the close dialog (#10604)
                 const w = DT.el('span', 'dt-title-cell'), note = DT.el('span', 'dt-title-snippet goals-ready-note', 'All tasks done: close the goal?'), c = DT.el('button', 'btn btn-small goals-ready-close', 'Close');
                 c.type = 'button'; c.setAttribute('aria-label', `Close the goal: ${g.title || g.id}`); c.addEventListener('click', e => { e.stopPropagation(); ctx.closeReady(g); });
