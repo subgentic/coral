@@ -97,6 +97,8 @@ func TestAdoptCandidateIsOnlyASingleForegroundProgram(t *testing.T) {
 	assert.False(t, ok, "two candidates: nothing is adopted")
 	_, ok = adoptCandidate(pane("  700   600 S    "+t1+" claude"), 600)
 	assert.False(t, ok, "a background program is not a candidate")
+	_, ok = adoptCandidate(pane(append([]string{"  700   600 S+   " + t1 + " claude"}, deepShells(nestedShellDepth+3)...)...), 600)
+	assert.False(t, ok, "a tree too deep to walk to the end adopts nothing, whatever single program was seen")
 	p, ok := adoptCandidate(pane("  700   600 S+   "+t1+" claude"), 600)
 	assert.True(t, ok)
 	assert.Equal(t, AgentProc{PID: 700, Start: t1}, p)
