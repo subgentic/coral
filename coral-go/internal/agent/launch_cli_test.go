@@ -108,6 +108,10 @@ func TestLaunchCLIFindsACommonInstallPlace(t *testing.T) {
 	require.NoError(t, os.WriteFile(exe, []byte("x"), 0o755))
 
 	// The test's own folders are in the temp folder, where a CLI is never picked up from a common place (CommonPlaceCLI): so the temp folder is another one for this test.
+	// t.TempDir folders share a parent, and with GOTMPDIR set that parent is not os.TempDir(): make it the temp folder.
+	for _, k := range []string{"TMP", "TEMP", "TMPDIR"} {
+		t.Setenv(k, filepath.Dir(local))
+	}
 	got, err := LaunchCLI(nil, "agy")
 	var nf *CLINotFoundError
 	require.ErrorAs(t, err, &nf, "a CLI in the temp folder is not picked up")
