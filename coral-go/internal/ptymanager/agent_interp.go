@@ -13,6 +13,7 @@ import (
 // allowed), its argument vector is exactly [interpreter, script, ...args] with no flag before the script, the script is an absolute path whose realpath is the resolved CLI file's realpath,
 // and the CLI file's own shebang names that same interpreter. The arguments are compared and dropped. Anything else (a flag first, a relative path, an unreadable line, a space in the path on
 // macOS, another script, another interpreter) needs the button.
+//// On macOS the image comes from `ps comm`, which follows argv[0] (`exec -a node`): there this rule is a convenience for the one-time update of already-running agents, not a check that// holds against a program built to imitate the agent. Linux's /proc/<pid>/exe cannot be rewritten by the process, so there it is a check.
 
 var interpreterRe = regexp.MustCompile(`^(node|bun|deno)([-_.]?v?[0-9][0-9.]*)?$`)
 

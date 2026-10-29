@@ -448,6 +448,8 @@ b PUT /api/sessions/history/{sessionID}/notes
 b PUT /api/sessions/live/{name}/display-name
 b PUT /api/sessions/live/{name}/file-content
 b POST /api/sessions/live/{name}/share-file
+b POST /api/sessions/live/{sessionID}/record-agent
+b POST /api/sessions/record-agents
 b PUT /api/sessions/live/{name}/icon
 b PUT /api/sessions/live/{name}/instructions
 b PUT /api/sessions/live/{name}/name-color
@@ -468,4 +470,5 @@ b PUT /api/workflows/{workflowID}
 b QUERY /api/remote/{server}/*
 b TRACE /api/remote/{server}/*
 b GET /api/sessions/history/counts
+b GET /api/sessions/live/{sessionID}/agent-candidate
 b PATCH /api/sessions/history/{sessionID}/flags
