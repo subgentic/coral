@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/gitutil"
 	"github.com/subgentic/coral/internal/store"
 )
@@ -15,7 +16,11 @@ import (
 // TokenUsageHandler provides HTTP handlers for token usage API.
 type TokenUsageHandler struct {
 	ts *store.TokenUsageStore
+	bs *board.Store // board labels: a team's row says its name, not its id (#10936)
 }
+
+// SetBoardStore lets the by-team answer carry each team's current label.
+func (h *TokenUsageHandler) SetBoardStore(bs *board.Store) { h.bs = bs }
 
 // NewTokenUsageHandler creates a new TokenUsageHandler.
 func NewTokenUsageHandler(db *store.DB) *TokenUsageHandler {
@@ -439,7 +444,28 @@ func (h *TokenUsageHandler) UsageSummaryByBoard(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{"teams": teams})
+	// Each row also says its team's current label (a board renamed later shows its new name; one with no board row, or no board store, shows its id): the page names a team by it, with the id as its fallback (#10936).
+	ids := make([]string, 0, len(teams))
+	for _, t := range teams {
+		ids = append(ids, t.BoardName)
+	}
+	labels := map[string]string{}
+	if h.bs != nil {
+		labels = h.bs.BoardLabels(r.Context(), ids)
+	}
+	type teamRow struct {
+		store.BoardUsageSummary
+		BoardLabel string `json:"board_label"`
+	}
+	rows := make([]teamRow, 0, len(teams))
+	for _, t := range teams {
+		label := labels[t.BoardName]
+		if label == "" {
+			label = t.BoardName
+		}
+		rows = append(rows, teamRow{BoardUsageSummary: t, BoardLabel: label})
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"teams": rows})
 }
 
 // withNotReported is the usage by thinking level: the levels the transcripts recorded (tracked) and, for each agent type and model, a ""

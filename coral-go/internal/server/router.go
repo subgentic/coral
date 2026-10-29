@@ -530,6 +530,7 @@ func (s *Server) registerSystem(r *chi.Mux, h *routeHandlers) {
 
 	// Token usage
 	tokenHandler := routes.NewTokenUsageHandler(s.db)
+	tokenHandler.SetBoardStore(s.boardStore) // the by-team rows carry the team's label (#10936)
 	r.Get("/api/token-usage", tokenHandler.ListUsage)
 	r.Get("/api/token-usage/summary", tokenHandler.UsageSummary)
 	r.Get("/api/token-usage/session/{sessionID}/turns", tokenHandler.SessionTurns)

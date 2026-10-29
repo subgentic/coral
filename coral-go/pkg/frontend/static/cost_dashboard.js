@@ -5,7 +5,7 @@ import { showView, escapeHtml, escapeAttr } from './utils.js';
 import { state } from './state.js';
 import { emptyState } from './dom_write.js';
 import { pollEvery } from './overload.js';
-import { keyLabel } from './server_base.js';
+import { keyLabel, noteBoardLabels } from './server_base.js';
 import { compactFigure, compactDuration, formatCost, noDataWords } from './format.js';
 import { importOnce } from './import_once.js';
 import { isPhoneLayout } from './phone_layout.js';
@@ -385,6 +385,7 @@ export async function _refreshCostDashboard({ force = false } = {}) {
         // Render team breakdown
         if (teamResp && teamResp.ok) {
             const data = await teamResp.json();
+            noteBoardLabels(data.teams, 'board_name'); // the team's current name from the answer itself: a board this page has not met by another route shows its name, not its id (#10936)
             _renderTeamTable(data.teams || []);
         }
 
@@ -854,7 +855,7 @@ function _renderTeamTable(teams) {
     const filtered = _applyColFilters(teams, 'team', { board_name: t => t.board_name || '(no team)' });
     const total = teams.reduce((n, t) => n + (t.cost_usd || 0), 0) || 1;
     _drawTable(container, 'team', [
-        _textCol('team', 'board_name', 'Team', t => t.board_name || '', { cell: _swatched('team', t => (t.board_name ? keyLabel(t.board_name) : '(no team)')) }),
+        _textCol('team', 'board_name', 'Team', t => t.board_name || '', { cell: _swatched('team', t => (t.board_name ? keyLabel(t.board_name) : '(no team)')) }), // keyLabel is the team's name: the rows' board_label was handed to it when they arrived (#10936)
         _numCol('num_agents', 'Agents', t => t.num_agents || 0, String),
         _tokCol('input_tokens', 'Input'), _tokCol('output_tokens', 'Output'), ..._cacheCols(),
         _costCol(), _shareBarCol(total),
