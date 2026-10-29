@@ -111,3 +111,24 @@ func TestEgressRulesetIsValidNftables(t *testing.T) {
 	}
 	assert.NoError(t, err, string(out))
 }
+
+// The user-data carries the egress block: the rules, the unit and the check, the unit enabled before anything else in runcmd, and coral.service refusing to start without it.
+func TestUserDataCarriesTheEgressBlockAndCoralRequiresIt(t *testing.T) {
+	ud, err := BuildUserData(goldenSpec())
+	require.NoError(t, err)
+	for _, path := range []string{"/etc/coral/egress.nft", "/etc/systemd/system/coral-egress.service", "/usr/local/sbin/coral-egress-check"} {
+		assert.Contains(t, ud, "path: "+path)
+	}
+	assert.Contains(t, ud, "meta skuid != 0 ip daddr { 169.254.0.0/16")
+	assert.Contains(t, ud, "  - nftables")
+	assert.Contains(t, ud, "Requires=coral-egress.service", "coral.service does not start without the rule")
+	assert.Contains(t, ud, "After=network-online.target coral-egress.service")
+	runcmd := ud[strings.Index(ud, "runcmd:"):]
+	enable := strings.Index(runcmd, "enable, --now, coral-egress.service")
+	ufw := strings.Index(runcmd, "ufw, default")
+	setup := strings.Index(runcmd, "coral-machine-setup")
+	require.True(t, enable > 0 && ufw > 0 && setup > 0)
+	assert.Less(t, enable, ufw, "the block is loaded before the host firewall and before anything is installed")
+	assert.Less(t, enable, setup)
+	assert.NotContains(t, ud, "chb_", "and the user-data still holds no credential")
+}

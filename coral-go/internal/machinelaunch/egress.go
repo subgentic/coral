@@ -90,3 +90,19 @@ for ns in $resolvers; do
 done
 `, egressTableName)
 }
+
+// EgressFile is one file of the egress block, as it is put on the machine.
+type EgressFile struct {
+	Path    string // where it goes on the machine
+	Mode    string // its mode, as cloud-init writes it
+	Content string
+}
+
+// EgressFiles are the rules, the unit and the check, in the order the user-data writes them. `coral machine egress-files` writes the same files to a folder, for the real-machine check (tools/machine-egress-check.sh).
+func EgressFiles() []EgressFile {
+	return []EgressFile{
+		{egressRulesPath, "0600", EgressRuleset()},
+		{egressUnitPath, "0644", EgressUnit()},
+		{egressCheckPath, "0700", EgressCheckScript()},
+	}
+}

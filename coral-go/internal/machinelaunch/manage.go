@@ -168,13 +168,13 @@ func Teardown(ctx context.Context, p Provider, ids IDs, tune Tuning, out io.Writ
 
 // ManageDeps are what delete, prune and list use; tests give stubs.
 type ManageDeps struct {
-	Provider        Provider
-	IdentityRevoker IdentityRevoker // nil: the machine's Hub identity is not revoked (no destroy credential was given)
-	State           *State
-	Out             io.Writer
-	Confirm         func(summary string) (bool, error)
-	Tune            Tuning
-	Now             func() time.Time
+	Provider Provider
+	Revoker  IdentityRevoker // nil: the machine's Hub identity is not revoked (no destroy credential was given)
+	State    *State
+	Out      io.Writer
+	Confirm  func(summary string) (bool, error)
+	Tune     Tuning
+	Now      func() time.Time
 	// ContinueIfRevokeFails destroys the machine even when its Hub identity could not be revoked (the person chose it): the failure is still said.
 	ContinueIfRevokeFails bool
 }
@@ -222,12 +222,12 @@ func Delete(ctx context.Context, name string, d ManageDeps) (*DeleteReport, erro
 	rep.Found = true
 
 	switch {
-	case d.IdentityRevoker == nil:
+	case d.Revoker == nil:
 		rep.RevokeNote = "the machine's Hub identity was not revoked: no destroy credential was given (--hub-destroy-file); revoke it in Coral Hub"
 	case rec.CredentialID == "":
 		rep.RevokeNote = "the machine's Hub identity was not revoked: the state file has no credential id for it; revoke it in Coral Hub"
 	default:
-		if err := d.IdentityRevoker.Revoke(ctx, rec.CredentialID); err != nil {
+		if err := d.Revoker.Revoke(ctx, rec.CredentialID); err != nil {
 			var re *IdentityRevokeError
 			notFound := errors.As(err, &re) && re.Kind == RevokeNotFound
 			if !notFound && !d.ContinueIfRevokeFails {

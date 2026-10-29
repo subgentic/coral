@@ -203,7 +203,7 @@ func BuildUserData(spec UserDataSpec) (string, error) {
 	w("  ed25519_public: %s", hostPub)
 	w("package_update: true")
 	w("packages:")
-	for _, p := range []string{"ca-certificates", "curl", "git", "tmux", "ufw"} { // node and npm are installed with the agent CLIs, after Coral has redeemed its credential
+	for _, p := range []string{"ca-certificates", "curl", "git", "nftables", "tmux", "ufw"} { // node and npm are installed with the agent CLIs, after Coral has redeemed its credential
 		w("  - %s", p)
 	}
 	w("write_files:")
@@ -226,12 +226,17 @@ func BuildUserData(spec UserDataSpec) (string, error) {
 	emitFile("/etc/systemd/system/coral-finish.path", "0644", finishPathUnit())
 	emitFile("/etc/systemd/system/coral-finish.service", "0644", finishServiceUnit())
 	emitFile("/etc/systemd/system/coral-finish.timer", "0644", finishTimerUnit())
+	for _, f := range EgressFiles() { // #10918: every non-root user is off the metadata service and the private ranges (egress.go)
+		emitFile(f.Path, f.Mode, f.Content)
+	}
 	emitFile("/usr/local/sbin/coral-machine-setup", "0700", setupScript(spec.CoralVersion, spec.CoralDigests))
 	emitFile("/usr/local/sbin/coral-machine-finish", "0700", finishScript(len(agents) > 0))
 	if len(agents) > 0 {
 		emitFile("/usr/local/sbin/coral-machine-agents", "0700", agentsScript(agents))
 	}
 	w("runcmd:")
+	w("  - [ systemctl, daemon-reload ]")
+	w("  - [ systemctl, enable, --now, %s ] # the egress block, before anything else: coral.service Requires it, so Coral never starts without it", egressUnitName)
 	w("  - [ ufw, default, deny, incoming ]")
 	w("  - [ ufw, default, allow, outgoing ]")
 	w("  - [ ufw, allow, from, '%s', to, any, port, '22', proto, tcp ] # SSH, for the launcher's address only: closed again by coral-machine-finish", sshFrom)
@@ -423,8 +428,9 @@ func finishScript(withAgents bool) string {
 func serviceUnit(hub, mode string) string {
 	return fmt.Sprintf(`[Unit]
 Description=Coral
-After=network-online.target
+After=network-online.target coral-egress.service
 Wants=network-online.target
+Requires=coral-egress.service
 
 [Service]
 User=coral
