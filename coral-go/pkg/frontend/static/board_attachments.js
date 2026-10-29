@@ -4,6 +4,7 @@
  * opens nothing (board_artifacts.js does that swap, from the data attributes this module puts on the message). Messages that are not from another Coral are not touched. */
 import { escapeHtml, escapeAttr } from './html_escape.js';
 import { artifactRefHex } from './markdown.js';
+import { visibleName } from './artifact_names.js';
 
 const MAX_SHOWN = 50;
 
@@ -23,7 +24,8 @@ function messageAttachments(m) {
     for (const a of list) {
         const hex = a && typeof a === 'object' ? artifactRefHex(`coral://artifacts/${a.id}`) : '';
         if (!hex) continue;
-        out.push({ hex, name: String(a.name || 'file').slice(0, 200), type: String(a.media_type || '').split(';')[0].trim().toLowerCase(), size: Number(a.size) });
+        // the sender's text, without the characters that hide or reorder it, as every artifact name is shown (visibleName, Security on #220)
+        out.push({ hex, name: visibleName(a.name).slice(0, 200) || 'file', type: String(a.media_type || '').split(';')[0].trim().toLowerCase(), size: Number(a.size) });
         if (out.length >= MAX_SHOWN) break;
     }
     return out;

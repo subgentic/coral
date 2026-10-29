@@ -68,7 +68,12 @@ const { coralReady } = require('./helpers/wait');
             return [n.cleanArtifactName('a\\u034fb\\u180ec\\u206ad\\u206fe\\ufe00f\\ufe0fg\\u{E0100}h\\u{E01EF}.md'),
                 it.readableName({ name: 'report\\u202efdp.exe' }), it.readableName({ name: 'zero\\u200bwidth\\u2066.txt' }),
                 it.readableName({ name: '', task_title: 'Plan\\u202e' })]; })()`);
-        assert.deepEqual(more, ['abcdefgh.md', 'reportfdp.exe', 'zerowidth.txt', 'Plan — artifact'], JSON.stringify(more));
+        // and a cross-team message's attachment chip (board_attachments.js), which shows the sending Coral's name for the file
+        const chip = await ev(`(async () => { const b = await import(${S} + 'board_attachments.js'); const host = document.createElement('div');
+            host.innerHTML = b.messageAttachmentsHtml({ external: { direction: 'inbound', server_id: 'other', attachments: [{ id: ${JSON.stringify(HEX)}, name: 'invoice\\u202efdp.exe', media_type: 'application/octet-stream', size: 10 }] } });
+            return host.textContent; })()`);
+        assert.ok(chip.includes('invoicefdp.exe') && !/[\u202a-\u202e\u2066-\u2069]/.test(chip), 'the chip shows the name without the override: ' + JSON.stringify(chip));
+        assert.deepEqual(more, ['abcdefgh.md', 'reportfdp.exe', 'zerowidth.txt', 'Plan— artifact'], JSON.stringify(more));
         // a later render of the same body uses the name at once
         assert.match(await ev(`(async () => (await import(${S} + 'board_message_text.js')).renderBoardMessageBody({ id: 97002, content: 'again coral://artifacts/${HEX}' }))()`), /Ñotas 日本語\.txt/);
         const inbox = await ev(`(async () => { const p = await (await import(${S} + 'inbox_coral.js')).artifactLinkPolicy('see coral://artifacts/${HEX}'); return p('coral://artifacts/${HEX}'); })()`);
