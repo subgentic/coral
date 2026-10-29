@@ -56,13 +56,13 @@ func TestAgentShellIdleFollowsTheCLI(t *testing.T) {
 	require.NoError(t, c.SendRawKeys(ctx, terminalinput.Unclassified, name, []string{"C-c"}, "claude", sid))
 	require.Eventually(t, idle, shellWait, 25*time.Millisecond, "idle again once it exits")
 
-	// A CLI started through a shell wrapper script shows 'sh' in the foreground, yet
-	// it is running: the pane's shell has a child, so it is not taken as exited.
+	// A CLI started through a shell wrapper script shows 'sh' in the foreground: a shell the pane is in. Under the three-answer rule (#387) that is not the agent: nothing is typed as a
+	// notice, and it is named as the nested shell. #389's recorded process is what tells a real wrapper around the CLI from a person's shell.
 	require.NoError(t, c.SendKeysToTarget(ctx, terminalinput.Unclassified, name+".0", "sh -c 'sleep 30; true'"))
 	require.Eventually(t, func() bool {
-		fg, err := c.DisplayMessage(ctx, name+".0", "#{pane_current_command}")
-		return err == nil && fg != "" && busy()
-	}, shellWait, 25*time.Millisecond, "a wrapper script is not an exited agent")
+		sh, err := c.NestedShell(ctx, name, "claude", sid)
+		return err == nil && sh != "" && idle()
+	}, shellWait, 25*time.Millisecond, "a wrapper shell is nested: not the agent")
 	require.NoError(t, c.SendRawKeys(ctx, terminalinput.Unclassified, name, []string{"C-c"}, "claude", sid))
 	require.Eventually(t, idle, shellWait, 25*time.Millisecond)
 }
@@ -271,7 +271,7 @@ func TestAgentShellIdleANestedBashIsABarePrompt(t *testing.T) {
 		out, _ := exec.Command("pgrep", "-P", strings.TrimSpace(pid), "bash").Output()
 		return strings.TrimSpace(string(out)) != ""
 	}, shellWait, 25*time.Millisecond, "the nested bash never started")
-	time.Sleep(500 * time.Millisecond) // sleep-ok: a negative proof; the pane must still read as idle after the nested bash has had time to be wrongly counted
+	time.Sleep(procTableTTL + 200*time.Millisecond) // sleep-ok: a negative proof; past the process table cache (procTableTTL), so the check reads a fresh table
 	idle, ok := state()
 	require.True(t, ok)
 	assert.True(t, idle, "a bash a person started is a bare prompt, not the agent")
@@ -286,7 +286,7 @@ func TestAgentShellIdleANestedBashIsABarePrompt(t *testing.T) {
 		out, _ := exec.Command("pgrep", "-x", "sleep").Output()
 		return strings.TrimSpace(string(out)) != ""
 	}, shellWait, 25*time.Millisecond, "the sleep never started")
-	time.Sleep(500 * time.Millisecond) // sleep-ok: a negative proof; the pane must still read as not the agent after the sleep has had time to be wrongly counted
+	time.Sleep(procTableTTL + 200*time.Millisecond) // sleep-ok: a negative proof; past the process table cache (procTableTTL), so the check reads a fresh table
 	idle, ok = state()
 	require.True(t, ok)
 	assert.True(t, idle, "a program in a nested bash is not the agent: nothing is typed")
