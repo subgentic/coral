@@ -4,6 +4,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 const COPY = `<button type="button" class="btn btn-quiet btn-icon btn-xs chat-copy-btn" title="Copy" aria-label="Copy message"><span class="material-icons" aria-hidden="true">content_copy</span></button>`;
 
 (async () => {
@@ -17,7 +18,7 @@ const COPY = `<button type="button" class="btn btn-quiet btn-icon btn-xs chat-co
         for (const [w, h, mobile] of [[1280, 900, false], [390, 844, true]]) {
             const at = `at ${w}px: `;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled(mobile ? { enabled: true, maxTouchPoints: 5 } : { enabled: false });
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
             await ev(`(async () => { const m = await import(${S} + 'saved_marks.js'); document.getElementById('chat-probe')?.remove();
                 const host = document.body.appendChild(Object.assign(document.createElement('div'), { id: 'chat-probe', className: 'chat-messages', style: 'position:fixed;left:16px;top:90px;width:' + Math.min(innerWidth - 32, 560) + 'px;z-index:9999;background:var(--bg-primary);padding:12px;display:flex;flex-direction:column;gap:14px' }));
                 host.innerHTML = '<div class="chat-bubble assistant" style="position:relative;padding:10px 40px 10px 12px;border:1px solid var(--border);border-radius:10px">A reply from an agent with a button pair in its corner.' + ${JSON.stringify(COPY)} + m.SAVE_BUTTON + '</div><div class="chat-bubble human" style="position:relative;padding:10px 40px 10px 12px;border:1px solid var(--border);border-radius:10px">A message from the person.' + m.SAVE_BUTTON + '</div>'; return true; })()`);

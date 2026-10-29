@@ -3,6 +3,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, PRELOAD, install } = await connect();
@@ -14,7 +15,7 @@ const BASE = require('./test_base').BASE;
         for (const [w, h, mobile] of [[1280, 900, false], [390, 844, true]]) {
             const at = `at ${w}px: `;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled(mobile ? { enabled: true, maxTouchPoints: 5 } : { enabled: false });
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
             await ev(`(() => { document.getElementById('tpl-probe')?.remove(); const box = document.body.appendChild(Object.assign(document.createElement('div'), { id: 'tpl-probe', style: 'position:fixed;left:16px;top:90px;width:' + Math.min(innerWidth - 32, 260) + 'px;z-index:9999;background:var(--bg-primary);padding:12px;border:1px solid var(--border);border-radius:8px;display:flex;flex-direction:column;gap:2px' }));
                 box.innerHTML = '<button class="btn btn-quiet template-cat-btn" aria-pressed="true" data-cat="a">security</button><button class="btn btn-quiet template-cat-btn" aria-pressed="false" data-cat="b">devops team</button><button class="btn btn-quiet template-item-btn" data-name="x">code reviewer</button><button class="btn btn-quiet template-item-btn" data-name="y">api tester</button>'; return true; })()`);
             const m = await ev(`(() => { const info = sel => [...document.querySelectorAll(sel)].map(b => { const cs = getComputedStyle(b), r = b.getBoundingClientRect(), p = b.parentElement.getBoundingClientRect(); return { cls: b.className, w: Math.round(r.width), full: Math.round(p.width - 24 - 2), h: Math.round(r.height), bg: cs.backgroundColor, color: cs.color, align: cs.textAlign, cap: cs.textTransform, border: cs.borderTopColor }; }); return { cat: info('#tpl-probe .template-cat-btn'), item: info('#tpl-probe .template-item-btn') }; })()`);

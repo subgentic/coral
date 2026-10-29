@@ -13,6 +13,7 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Runtime, ev, PRELOAD, install } = await connect();
@@ -22,7 +23,7 @@ const BASE = require('./test_base').BASE;
         await Page.navigate({ url: BASE });
         await Page.loadEventFired();
         await install();
-        await ev(`window.__coralReady.startup('liveList', 'settings')`);
+        await coralReady(ev, 'startup', 'liveList', 'settings');
 
         // Set up: modules, a seeded random generator, the fixture list.
         await ev(`(async () => {
@@ -153,7 +154,7 @@ const BASE = require('./test_base').BASE;
         await Page.navigate({ url: BASE + (BASE.includes('?') ? '&' : '?') + 'nomorph=1' });
         await Page.loadEventFired();
         await install();
-        await ev(`window.__coralReady.startup('liveList', 'settings')`);
+        await coralReady(ev, 'startup', 'liveList', 'settings');
         const url = await ev(`(async () => {
             const st = window.__coralStatic || '/static/';
             const morph = await import(st + 'dom_morph.js'); const ws = await import(st + 'websocket.js'); const render = await import(st + 'render.js');

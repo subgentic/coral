@@ -7,6 +7,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 const STUB = `(() => { const R = window.fetch; const json = b => Promise.resolve(new Response(JSON.stringify(b), { headers: { 'content-type': 'application/json' } }));
     window.fetch = (u, o) => { const url = String(u && u.url || u);
@@ -25,7 +26,7 @@ const STUB = `(() => { const R = window.fetch; const json = b => Promise.resolve
         await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile });
         await Emulation.setTouchEmulationEnabled({ enabled: mobile });
         await Page.navigate({ url: BASE + url }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+        await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
     };
 const GROUP_OF = { 'By provider': 'Provider', 'By model': 'Model', 'By thinking level': 'Thinking level', 'By team': 'Team', 'By agent': 'Agent', 'By branch': 'Branch', 'By task': 'Task' }; // the groupings are Overview's Group by (#9236), not sidebar entries
     const choose = async (label, want) => {
@@ -66,7 +67,7 @@ const GROUP_OF = { 'By provider': 'Provider', 'By model': 'Model', 'By thinking 
         await waitFor(`location.pathname === '/analytics/branch' && document.getElementById('cost-view-title').textContent === 'Overview'`, 'the tab comes back on its page and path', 8000);
         // a reload
         await Page.navigate({ url: BASE + '/analytics/branch' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+        await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
         await waitFor(`document.getElementById('cost-view-title') && document.getElementById('cost-view-title').textContent === 'Overview'`, 'a reload keeps the page', 10000);
         // an agent's page is under By agent
         await ev(`window.switchNavTab('tokens'); true`);
@@ -80,7 +81,7 @@ const GROUP_OF = { 'By provider': 'Provider', 'By model': 'Model', 'By thinking 
         await waitFor(`document.getElementById('mobile-analytics-list').getClientRects().length > 0 && document.getElementById('cost-page').getClientRects().length === 0`, 'back is the list', 6000);
         assert.equal(await path(), '/analytics', 'phone: the list is /analytics');
         await Page.navigate({ url: BASE + '/analytics' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+        await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
         // /analytics on a phone opens on Overview itself (#10064); the way back is the list
         await waitFor(`document.getElementById('cost-view-title') && document.getElementById('cost-view-title').textContent === 'Overview' && document.getElementById('cost-page').getClientRects().length > 0`, '/analytics on a phone opens Overview', 10000);
         await ev(`document.querySelector('.cost-phone-back').click(); true`);

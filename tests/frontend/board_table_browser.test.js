@@ -14,22 +14,22 @@ const BASE = require('./test_base').BASE;
     const B = 'tbl-' + Date.now().toString(36);
     const api = (m, p, body) => ev(`fetch(${JSON.stringify(p)}, { method: ${JSON.stringify(m)}, headers: { 'Content-Type': 'application/json' }, body: ${JSON.stringify(JSON.stringify(body))} }).then(async r => ({ status: r.status, body: await r.json().catch(() => null) }))`);
     const shot = async n => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(`${d}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
-    const { settle } = require('./helpers/wait').bind(ev);
+    const { settle, coralReady } = require('./helpers/wait').bind(ev);
     const post = async (who, content, extra = {}) => { const r = await api('POST', `/api/board/${B}/messages`, { subscriber_id: who, content, ...extra }); assert.equal(r.status, 200, `${who} posts: ${JSON.stringify(r)}`); return r.body.id || (r.body.message && r.body.message.id); };
     const ROWS = `[...document.querySelectorAll('#mb-messages > .mb-message')]`;
     const open = async (w, h, mobile, theme, view = 'table', path = `/team/${B}/messages`) => {
         await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile });
         await Emulation.setTouchEmulationEnabled({ enabled: mobile });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady();
         await ev(`(async () => { const sc = await import((window.__coralStatic || '/static/') + 'settings_core.js'); sc.clearCustomThemeVars(); sc.applyTheme(${JSON.stringify(theme)}); try { localStorage.setItem('coral.board.view', ${JSON.stringify(view)}); } catch {} return true; })()`);
-        await Page.navigate({ url: BASE + path }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: BASE + path }); await Page.loadEventFired(); await install(); await coralReady();
         await waitFor(`document.querySelectorAll('#mb-messages > .mb-message').length >= 6`, 'the board rows', 15000);
         await settle(400);
     };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady();
         for (const [id, t] of [['Orchestrator', 'Orchestrator'], ['QA Engineer', 'QA Engineer'], ['Backend Dev', 'Backend Dev'], ['Lead Developer', 'Lead Developer']]) assert.equal((await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: id, job_title: t, session_name: id + '-s' })).status, 200);
         const firstId = await post('QA Engineer', 'Review of the Inbox patch: approved with two small follow-ups for the empty states. @Orchestrator #7740');
         const qid = await post('Lead Developer', 'Question for @Backend Dev: should group posts reach members, or only the ones they tag?\n\nToday a plain read returns tagged messages.\n\n- the read includes the group\'s posts\n- group posts stay tagged-only\n\nI lean to the second. #7757', { ask: true });

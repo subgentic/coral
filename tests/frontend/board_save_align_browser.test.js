@@ -4,6 +4,7 @@
 // through agent_view_harness.js against the isolated dev server.
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 const S = `(window.__coralStatic || '/static/')`;
 
 (async () => {
@@ -17,7 +18,7 @@ const S = `(window.__coralStatic || '/static/')`;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled(mobile ? { enabled: true, maxTouchPoints: 5 } : { enabled: false });
             await Emulation.setEmulatedMedia({ features: mobile ? [{ name: 'pointer', value: 'coarse' }, { name: 'hover', value: 'none' }] : [] });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.then(() => true)`);
+            await coralReady(ev);
             const r = await ev(`(async () => { ${font ? `document.documentElement.style.fontSize = '${font}';` : ''}
                 const m = await import(${S} + 'saved_marks.js'); const host = document.createElement('div'); host.id = 'align-probe'; host.style.cssText = 'position:fixed;left:20px;top:80px;width:' + Math.min(innerWidth - 40, 700) + 'px;z-index:99999;background:var(--bg-primary)';
                 host.innerHTML = '<div class="mb-message mb-message-first board-msg-left" role="listitem"><div class="mb-message-header"><span class="mb-agent-name">Frontend Dev</span><span class="message-time">12:34</span>' + m.BOARD_SAVE_BUTTON('team-a', 'team-a', '2026-10-24T12:34:00Z', 'Frontend Dev') + '<button class="mb-delete-msg-btn" aria-label="Delete the message">&times;</button><button class="mb-msg-more" aria-label="Actions for the message">&hellip;</button></div><div class="mb-message-body">Hello</div></div>';

@@ -5,6 +5,7 @@ const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const { guardSettings } = require('./helpers/settings_guard');
+const { coralReady } = require('./helpers/wait');
 
 const uid = n => '0000' + String(n).padStart(4, '0') + '-0000-4000-8000-000000000000';
 const SESSIONS = Array.from({ length: 6 }, (_, i) => {
@@ -23,7 +24,7 @@ const SESSIONS = Array.from({ length: 6 }, (_, i) => {
             const at = `at ${w}px: `;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.startup('liveList', 'settings')`);
+            await coralReady(ev, 'startup', 'liveList', 'settings');
             await ev(`(async () => { const st = window.__coralStatic || '/static/'; const ws = await import(st + 'websocket.js'); const render = await import(st + 'render.js'); const { state } = await import(st + 'state.js');
                 if (state.coralWs) { state.coralWs.onclose = null; state.coralWs.onmessage = null; try { state.coralWs.close(); } catch {} }
                 localStorage.clear(); state.hub = false; window.__T = { ws, render, state };

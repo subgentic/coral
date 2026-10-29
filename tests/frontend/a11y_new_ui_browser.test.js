@@ -62,7 +62,7 @@ const LABELS = ['Feels like a slideshow', "Doesn't show the game", 'Tone/story i
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired();
         await ev(`localStorage.clear(); true`);
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await require('./helpers/wait').coralReady(ev);
         await installAudit(ev); await setTheme(ev, view.theme);
         await ev(stubFetch(HEX, MD));
     };

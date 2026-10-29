@@ -11,12 +11,12 @@ const VIEWS = ['provider', 'model', 'thinking', 'team', 'agent', 'branch', 'call
 
 (async () => {
     const { client, Page, Emulation, ev, PRELOAD, install } = await connect();
-    const { settle } = require('./helpers/wait').bind(ev);
+    const { settle, coralReady } = require('./helpers/wait').bind(ev);
     const S = scenarios();
     const shot = async n => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; require('node:fs').mkdirSync(d, { recursive: true }); require('node:fs').writeFileSync(`${d}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     const open = async (w, h, mobile) => {
         await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady();
         await ev(`window.switchNavTab('tokens'); true`); await settle(1500);
     };
     const view = async key => { await ev(`(() => { const g = ({ provider: 'Provider', model: 'Model', thinking: 'Thinking level', team: 'Team', agent: 'Agent', branch: 'Branch', task: 'Task' })[${JSON.stringify(key)}]; const b = g ? [...document.querySelectorAll('#cost-group-bar .eff-seg-btn')].find(x => x.textContent === g) : document.querySelector('#cost-nav-list .row-btn[data-view="${key}"]'); if (b) b.click(); return !!b; })()`); await settle(900); }; // a grouping is Overview's Group by (#9236)

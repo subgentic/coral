@@ -6,6 +6,7 @@ const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
 const { clearSaved } = require('./helpers/saved_cleanup');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -15,9 +16,9 @@ const BASE = require('./test_base').BASE;
     const open = async (w, mobile) => {
         await Emulation.setDeviceMetricsOverride({ width: w, height: mobile ? 844 : 800, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await ev(`localStorage.setItem('coral.board.view', 'chat'); (async () => { await fetch('/api/board/${board}/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'qa', job_title: 'QA', session_name: 'qa-s' }) }); for (const c of ['first message', 'second message']) await fetch('/api/board/${board}/messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'qa', as: 'QA', content: c }) }); return true; })()`); // the chat view: this suite is about the chat rows' own "..." (the table's actions are board_table_browser's)
-        await Page.navigate({ url: `${BASE}/team/${board}/messages` }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: `${BASE}/team/${board}/messages` }); await Page.loadEventFired(); await install(); await coralReady(ev);
         await waitFor(`document.querySelectorAll('#mb-messages .mb-message').length >= 2 && !!document.querySelector('#mb-tools .list-bar-bar')`, 'the board and its tools', 15000);
     };
     try {

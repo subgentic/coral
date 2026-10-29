@@ -5,6 +5,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -29,7 +30,7 @@ const BASE = require('./test_base').BASE;
             const check = (ok, msg) => { if (!ok) problems.push(`${w}: ${msg}`); };
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.startup('liveList', 'settings')`);
+            await coralReady(ev, 'startup', 'liveList', 'settings');
             await ev(`window.openAutomationsFolder('jobs'); true`);
             await waitFor(`document.querySelectorAll('#group-table-view button.dt-primary').length === 2`, `${w}: the two jobs`, 10000);
             await new Promise(r => setTimeout(r, 400)); // sleep-ok: the toolbar draws

@@ -47,7 +47,7 @@ const BASE = require('./test_base').BASE;
         assert.equal(await waiting(), 1, 'a later request of the same agent is its own');
         // asleep for another reason than Coral's stop (an operator's Sleep): the words do not say Coral restarted
         await ev(`window.T.state.liveSessions.find(s => s.session_id === 'asker-id').asked_before_restart.after_restart = false; window.selectLiveSession('asker', 'claude', 'asker-id', 'local'); true`);
-        await ev(`window.__coralReady.agentSelected('asker-id').then(() => window.T.render.renderLiveSessions(window.T.state.liveSessions))`);
+        await require('./helpers/wait').coralReady(ev, 'agentSelected', 'asker-id'); await ev(`window.T.render.renderLiveSessions(window.T.state.liveSessions); true`);
         await new Promise(r => setTimeout(r, 500)); // sleep-ok: the chat bar is drawn
         assert.equal(await ev(`document.getElementById('sleeping-composer-asked-text').textContent`), 'Asked before it went to sleep: Wants to know: and the font?', 'not "before Coral restarted" when Coral did not stop');
         console.log('PASS asked before restart: Needs you, the chat with Restart and Dismiss, dismissed per request');

@@ -5,6 +5,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 const DAYS = Array.from({ length: 7 }, (_, i) => new Date(Date.UTC(2026, 9, 19 + i)).toISOString()); // 2026-10-19T00:00:00.000Z ... 2026-10-25
 const usUtc = iso => new Date(iso).toLocaleDateString('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric' });
@@ -26,7 +27,7 @@ const STUB = `(() => { const R = window.fetch; const json = b => Promise.resolve
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 820, deviceScaleFactor: 1, mobile: false });
         for (const tz of ['America/Los_Angeles', 'Pacific/Auckland', 'UTC']) {
             await Emulation.setTimezoneOverride({ timezoneId: tz });
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
             await ev(`window.switchNavTab('tokens'); true`);
             await waitFor(`!!document.getElementById('cost-time-range')`, `${tz}: the range select`, 10000);
             await ev(`(() => { const s = document.getElementById('cost-time-range'); s.value = 'month'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);

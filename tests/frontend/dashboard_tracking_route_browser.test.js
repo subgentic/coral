@@ -5,6 +5,7 @@
 // nothing reaches an analytics service). Drives Chrome over CDP.
 const CDP = require('chrome-remote-interface');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 const ORIGIN = new URL(BASE).origin;
 // the only props each event may carry: a new prop (a session id, a name, text) fails here until it is reviewed and added
@@ -43,7 +44,7 @@ const ALLOWED_PROPS = { dashboard_ready: ['page_id'], dashboard_active_day: [], 
 
         await load(false);
         await waitFor(`!!window.__coralReady`, 'the page');
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await waitFor(`window.__sent.some(s => /tracking\\/event/.test(s[1]) && /dashboard_ready/.test(s[3]))`, 'dashboard_ready');
         await ev(`(async () => { const m = await import(${S} + 'dashboard_analytics.js'); m.dashboardPromptRequested(); return true; })()`);
         await waitFor(`window.__sent.some(s => /prompt_submit_requested/.test(s[3]))`, 'prompt_submit_requested');

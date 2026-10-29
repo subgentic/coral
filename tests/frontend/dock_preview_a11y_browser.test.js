@@ -11,7 +11,7 @@ const BASE = require('./test_base').BASE;
 const board = 'preview-a11y-' + Date.now().toString(36);
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect(); const Input = client.Input;
-    const { settle } = require('./helpers/wait').bind(ev);
+    const { settle, coralReady } = require('./helpers/wait').bind(ev);
     const shot = async n => { const d = process.env.CORAL_SCREENSHOT_DIR || (process.env.RUNNER_TEMP && path.join(process.env.RUNNER_TEMP, 'out')); if (!d) return; fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(path.join(d, n + '.png'), Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     const key = async (k, code, vk, extra = {}) => { await Input.dispatchKeyEvent({ type: 'keyDown', key: k, code, windowsVirtualKeyCode: vk, ...extra }); await Input.dispatchKeyEvent({ type: 'keyUp', key: k, code, windowsVirtualKeyCode: vk }); await settle(150); };
     const enter = () => key('Enter', 'Enter', 13, { text: '\r', unmodifiedText: '\r' });
@@ -20,7 +20,7 @@ const board = 'preview-a11y-' + Date.now().toString(36);
     const focusName = () => ev(`(() => { const a = document.activeElement; return a ? { tag: a.tagName.toLowerCase(), label: a.getAttribute('aria-label') || a.textContent.trim().slice(0, 60), inPreview: !!a.closest('#preview-pane') } : null; })()`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady();
         await api('POST', `/api/board/${board}/subscribe`, { subscriber_id: 'Boss', job_title: 'Orchestrator' });
         const g = await api('POST', `/api/board/${board}/goals`, { subscriber_id: 'Boss', title: 'Walk the new screens', outcome: 'x', done_when: 'y' });
         const goalId = g.body.id || (g.body.goal && g.body.goal.id);
@@ -28,7 +28,7 @@ const board = 'preview-a11y-' + Date.now().toString(36);
         for (const [tag, w, h, mobile] of [['1280', 1280, 900, false], ['390', 390, 844, true]]) {
             const at = `${tag}: `, min = mobile ? 44 : 24;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady('startup', 'liveList', 'liveListLoaded', 'settings');
             await openBoardTasksTab({ ev, waitFor }, board);
             await waitFor(`document.querySelectorAll('#board-task-list .board-task-item').length >= 3`, 'the task list', 10000); await settle(300);
             // a row says the word on the screen and not the number

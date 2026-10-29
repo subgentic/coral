@@ -3,6 +3,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, ev, sleep, PRELOAD, install } = await connect();
@@ -10,7 +11,7 @@ const BASE = require('./test_base').BASE;
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Page.navigate({ url: BASE }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+        await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
         const loaded = await ev(`import(${S} + 'import_once.js').then(m => !!m.loadedModule('./board_chat.js'))`);
         assert.equal(loaded, false, 'board_chat.js has not loaded yet on a fresh page');
         await ev(`window.__boardReqs = []; const f = window.fetch; window.fetch = (u, o) => { if (/\\/api\\/board\\/race-team\\//.test(String(u && u.url || u))) window.__boardReqs.push(String(u)); return f(u, o); }; true`);

@@ -16,13 +16,13 @@ const TEAM = `qa-a11y-pass-${Date.now() % 100000}`;
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
-    const { settle } = require('./helpers/wait').bind(ev);
+    const { settle, coralReady } = require('./helpers/wait').bind(ev);
     const S = scenarios();
     const shot = async n => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; require('node:fs').mkdirSync(d, { recursive: true }); require('node:fs').writeFileSync(`${d}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Page.addScriptToEvaluateOnNewDocument({ source: DATA_WORLD });
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady();
         await ev(`window.switchNavTab('tokens'); true`); await settle(1500);
         const view = async key => { await ev(`(() => { const g = ({ provider: 'Provider', model: 'Model', thinking: 'Thinking level', team: 'Team', agent: 'Agent', branch: 'Branch', task: 'Task' })[${JSON.stringify(key)}]; const b = g ? [...document.querySelectorAll('#cost-group-bar .eff-seg-btn')].find(x => x.textContent === g) : document.querySelector('#cost-nav-list .row-btn[data-view="${key}"]'); if (b) b.click(); return !!b; })()`); await settle(900); }; // a grouping is Overview's Group by (#9236)
         await S.run('a phone: an agent name in a By agent row is a 44 px target', async () => {
@@ -40,7 +40,7 @@ const TEAM = `qa-a11y-pass-${Date.now() % 100000}`;
             assert.ok(big.backBottom <= big.titleTop + 1, 'at 200% the title is under the way back: ' + JSON.stringify(big)); assert.ok(big.titleWidth > 200, 'and has the width of the screen, not a word a line: ' + JSON.stringify(big));
         });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false }); await Emulation.setTouchEmulationEnabled({ enabled: false });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`); await installTP(ev);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(); await installTP(ev);
         await seed(ev, TEAM); await openTeam(ev, waitFor, TEAM).catch(() => {}); await goTab(ev, settle, 'Goals'); await settle(800);
         await ev(`(() => { const b = [...document.querySelectorAll('[role=tabpanel]:not([hidden]) button')].find(x => /Explore goals/.test(x.textContent)); if (b) b.click(); return !!b; })()`);
         await S.run("the agent dock's divider is drawn in forced colors (ButtonText) and in Highlight while it is dragged", async () => {

@@ -9,6 +9,7 @@ const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const { setTheme, installAudit, auditRegion } = require('./helpers/contrast');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 const KEYS = [['Esc', 'Escape', 'Escape'], ['Tab', 'Tab', 'Tab'], ['Ctrl-C', 'C-c', 'Ctrl-C, interrupt'], ['←', 'Left', 'Left arrow'], ['↑', 'Up', 'Up arrow'], ['↓', 'Down', 'Down arrow'], ['→', 'Right', 'Right arrow'], ['Enter', 'Enter', 'Enter'], ['|', '|', 'Pipe'], ['~', '~', 'Tilde'], ['/', '/', 'Slash'], ['-', '-', 'Dash']];
 const STUB = `(() => { const real = window.fetch; window.__keys = [];
@@ -29,7 +30,7 @@ const STUB = `(() => { const real = window.fetch; window.__keys = [];
         const load = async (w, h, mobile) => {
             await size(w, h, mobile); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`); await ev(STUB);
+            await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings'); await ev(STUB);
             await ev(`window.__m.add('ak', 'A', 6, { sleeping: false, session_id: 'ak-sid' }); window._coralSetLiveSessions(Object.values(window.__m.agents).map(a => window.__m.entry(a))); localStorage.setItem('coral-live-view-mode', 'chat'); localStorage.removeItem('coral-agent-keys'); true`);
             await select('ak');
             await waitFor(`window.__rendered && window.__rendered().length >= 3`, 'the chat', 15000);
@@ -172,7 +173,7 @@ const STUB = `(() => { const real = window.fetch; window.__keys = [];
             assert.equal(await ev(q('#terminal-key-bar')), null, at + 'a new visit starts closed');
             await ev(`localStorage.setItem('coral-live-view-mode', 'chat'); true`);
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`); await ev(STUB);
+            await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings'); await ev(STUB);
             await ev(`window.__m.add('ak', 'A', 6, { sleeping: false, session_id: 'ak-sid' }); window._coralSetLiveSessions(Object.values(window.__m.agents).map(a => window.__m.entry(a))); true`);
             await select('ak'); await waitFor(`window.__rendered && window.__rendered().length >= 3`, 'the chat after a reload', 15000);
             await ev(`document.getElementById('model-chip-bar').hidden = false; document.querySelector('[aria-label="Terminal view"]').click(); true`);

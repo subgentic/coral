@@ -1,6 +1,7 @@
 // #9337: the sidebar's background poll of a board's status sends the last answer's validator and, on a 304, keeps the data it has (no body, no parse); a forced
 // refresh (the team view's open, Refresh) always asks for the whole status. Drives Chrome over CDP through agent_view_harness.js with the status stubbed.
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, sleep, PRELOAD, install } = await connect();
@@ -12,7 +13,7 @@ const { connect } = require('./agent_view_harness');
         await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await ev(`(() => {
             window.__seen = []; const real = window.fetch;
             window.fetch = (u, o = {}) => {

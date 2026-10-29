@@ -4,6 +4,7 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 const call = (id, label) => [{ type: 'assistant', text: '', tool_uses: [{ name: 'Bash', tool_use_id: id, input_summary: label, description: label }] }, { type: 'tool_result', tool_use_id: id, tool_name: 'Bash', content: 'ok' }];
 const NOTICE = "You have 2 unread messages on the message board. Run 'coral-board read' to see them.";
@@ -20,7 +21,7 @@ const pages = [turn(1, 'first'), turn(2, 'second')];
         await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await ev(`import((window.__coralStatic || '/static/') + 'live_chat.js').then(m => { const b = document.createElement('div'); b.id = 'tt-box'; b.className = 'chat-messages chat-prose';
             b.style.cssText = 'position:fixed;left:0;top:0;width:100%;height:100%;overflow:auto;background:var(--bg-primary);z-index:99999;padding:12px';
             document.body.appendChild(b); const more = document.createElement('button'); more.type = 'button'; more.className = 'btn load-more-btn'; more.textContent = 'Load older messages'; b.appendChild(more);

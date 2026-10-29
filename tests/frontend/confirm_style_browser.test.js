@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 const CASES = [ // key, title, message, options, class, the button's words
     ['danger-delete-workflow', 'Delete workflow', 'Delete workflow "nightly-build"? This will also delete all run history.', { label: 'Delete workflow', danger: true }, 'btn-danger', 'Delete workflow'],
@@ -24,7 +25,7 @@ const CASES = [ // key, title, message, options, class, the button's words
             const at = `at ${w}px: `;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+            await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
             const colours = {};
             for (const [key, title, message, opts, cls, words] of CASES) {
                 await ev(`window.showConfirmModal(${JSON.stringify(title)}, ${JSON.stringify(message)}, () => {}, undefined, ${JSON.stringify(opts)}); true`);

@@ -3,6 +3,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, sleep, PRELOAD, install } = await connect();
@@ -17,7 +18,7 @@ const BASE = require('./test_base').BASE;
                 if (url.pathname === '/api/sessions/history/counts') return json({ all: 3, group: 0, notes: 0, active: 0, starred: 0, archived: 0, by_agent_type: { claude: 3 }, tags: [] });
                 if (url.pathname === '/api/sessions/history') return json({ sessions: [0, 1, 2].map(chat), total: 3, page: 1, page_size: 50 });
                 return R(u, o); }; return true; })()`);
-        await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+        await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
         await ev(`window.switchNavTab('hub-inbox'); true`);
         await waitFor(`!!document.getElementById('inbox-search')`, 'the Inbox', 10000);
         await ev(`import(${MOD} + 'inbox_tab.js').then(m => m.selectInboxTab('chats')).then(() => true)`);

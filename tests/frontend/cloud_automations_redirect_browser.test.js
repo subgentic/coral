@@ -4,6 +4,7 @@
 const assert = require('node:assert/strict');
 const { safePaused } = require('./helpers/paused');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -15,7 +16,7 @@ const { connect } = require('./agent_view_harness');
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 820, deviceScaleFactor: 1, mobile: false });
         // the control: a local dashboard shows the screen for /jobs
-        await Page.navigate({ url: process.env.CORAL_TEST_URL + '/jobs' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: process.env.CORAL_TEST_URL + '/jobs' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         await waitFor(`location.pathname.startsWith('/automations')`, 'a local dashboard rewrites /jobs to Automations', 10000);
         let w = await where();
         assert.deepEqual([w.boot, w.tab, w.screen], ['local', 'automations', true], 'local: the Automations screen, its folders drawn (so the check that none is drawn on the Hub is not dead) ' + JSON.stringify(w));

@@ -3,6 +3,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 const QUESTIONS = { overview: 'What am I spending?', 'per-commit': 'What did each commit cost?', 'task-time': 'How long do tasks take?', calls: 'Which calls does the work make?', model: 'What am I spending?' };
 
@@ -14,7 +15,7 @@ const QUESTIONS = { overview: 'What am I spending?', 'per-commit': 'What did eac
         for (const [w, h, mobile] of [[1280, 900, false], [390, 844, true]]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+            await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
             await ev(`window.switchNavTab('tokens'); true`);
             await waitFor(`!!document.getElementById('cost-view-title')`, `${w}: the page`, 10000);
             for (const [key, question] of Object.entries(QUESTIONS)) {

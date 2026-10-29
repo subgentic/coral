@@ -5,6 +5,7 @@
 // Drives Chrome over CDP through agent_view_harness.js against the isolated dev server.
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 const HOOKS = { question: 'Hooks need review: 3 hooks are new or changed', options: [
     { n: 1, label: 'Review hooks', selected: true, action: 'select' }, { n: 2, label: 'Trust all and continue', action: 'select' }, { n: 3, label: 'Continue without trusting', action: 'select' }] };
@@ -20,7 +21,7 @@ const HOOKS = { question: 'Hooks need review: 3 hooks are new or changed', optio
             const tag = `${w}px`;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.then(() => true)`);
+            await coralReady(ev);
 
             console.log(`${tag}: the agent's chat while Codex asks about the hooks`);
             // the stand-in terminal: the chat reply of the Codex agent carries the hooks question until it is answered; a send is refused as the server refuses it

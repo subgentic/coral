@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { setTheme, installAudit, auditRegion } = require('./helpers/contrast');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -24,7 +25,7 @@ const BASE = require('./test_base').BASE;
             await Emulation.setTouchEmulationEnabled({ enabled: view.phone });
             await Emulation.setEmulatedMedia({ features: [{ name: 'prefers-color-scheme', value: theme }] });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.then(() => true)`); await installAudit(ev); await setTheme(ev, theme);
+            await coralReady(ev); await installAudit(ev); await setTheme(ev, theme);
             await ev(`fetch('/api/board/${board}/messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'qa-5491', as: 'QA', content: 'hello' }) }).then(r => r.status)`);
             await ev(`fetch('/api/board/${board}/resume', { method: 'POST' }).then(r => r.status)`);
             await ev(`window.__m.add('icons-bot', 'A', 4, { sleeping: false, board_project: ${JSON.stringify(board)} }); true`); await new Promise(r => setTimeout(r, 600)); // sleep-ok: the agent list draws over a few frames

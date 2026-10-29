@@ -4,6 +4,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { DATA_WORLD } = require('./helpers/census_world');
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -23,7 +24,7 @@ const { DATA_WORLD } = require('./helpers/census_world');
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Page.addScriptToEvaluateOnNewDocument({ source: DATA_WORLD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+        await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
         await ev(`window.switchNavTab('tokens'); true`);
         await waitFor(`!!document.querySelector('#cost-spend-chart svg polygon')`, 'the spend chart');
         const fits = (p, tag) => {
@@ -54,7 +55,7 @@ const { DATA_WORLD } = require('./helpers/census_world');
         // drawn while its view is hidden (the page is not Overview: the card has no width, the chart takes its 600 px fallback), then shown: it is drawn again at the card's width, not left at 600 (#7719 item 2)
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
         const loaded = Page.loadEventFired(); await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await loaded; await install();
-        await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+        await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
         await ev(`window.switchNavTab('tokens'); true`);
         await ev(`import((window.__coralStatic || '/static/') + 'analytics_views.js').then(m => { m.selectView('model'); return true; })`); // a phone opens on Overview now (#10064): another page hides the card while its chart is drawn
         await waitFor(`!!document.querySelector('#cost-spend-chart svg polygon')`, 'the spend chart');

@@ -4,6 +4,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 const CASES = [
     ['not_confirmed', "The agent didn't confirm your message: it may not have been sent. Check its terminal before sending it again.", /did not confirm your message/i],
@@ -19,7 +20,7 @@ const CASES = [
         for (const [w, h, mobile] of [[1280, 800, false], [390, 844, true]]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.then(() => true)`);
+            await coralReady(ev);
             await ev(`window.__m.add('err-bot', 'A', 1, { sleeping: false, session_id: 'err-sid' }); true`);
             await ev(`window.selectLiveSession('err-bot', 'claude', 'err-sid', 'local'); true`);
             await waitFor(`!!document.getElementById('composer-error')`, 'the composer', 8000);

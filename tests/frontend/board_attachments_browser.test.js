@@ -6,6 +6,7 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { setTheme, installAudit, auditRegion } = require('./helpers/contrast');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 const H1 = '1'.repeat(64), H2 = '2'.repeat(64), H3 = '3'.repeat(64);
 
@@ -52,7 +53,7 @@ const H1 = '1'.repeat(64), H2 = '2'.repeat(64), H3 = '3'.repeat(64);
             await Emulation.setTouchEmulationEnabled({ enabled: view.phone });
             await Emulation.setEmulatedMedia({ features: [{ name: 'prefers-color-scheme', value: theme }] });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.then(() => true)`); await installAudit(ev); await setTheme(ev, theme);
+            await coralReady(ev); await installAudit(ev); await setTheme(ev, theme);
             await ev(`(() => { const R = window.fetch; window.fetch = (u, o = {}) => { const p = new URL(String(u && u.url || u), location.origin);
                 if (p.pathname === '/api/board/${board}/messages/all') return Promise.resolve(new Response(JSON.stringify({ messages: ${JSON.stringify(MESSAGES)}, total: 4, before_count: 0 }), { status: 200, headers: { 'content-type': 'application/json' } }));
                 return R(u, o); }; return true; })()`);

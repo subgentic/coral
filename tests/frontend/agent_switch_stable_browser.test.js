@@ -4,7 +4,7 @@
 // installed before the page loads. Run against an isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
-const { framesJs } = require('./helpers/wait');
+const { framesJs, coralReady } = require('./helpers/wait');
 
 const COUNTERS = `(() => {
     const S = window.__soak = { intervals: new Set(), timeouts: new Set(), listeners: new Map(), ws: [], obs: [] };
@@ -38,7 +38,7 @@ const COUNTERS = `(() => {
         await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await ev(`localStorage.setItem('coral-live-view-mode', 'chat'); for (let i = 0; i < 8; i++) window.__m.add('stab-' + i, 'S' + i + '_', 30, { sleeping: false }); true`);
         await sleep(800); // sleep-ok: a round's async work has no single completion event
         const select = i => ev(`window.selectLiveSession('stab-${i % 8}', 'claude', 'stab-${i % 8}-id', 'local'); true`);

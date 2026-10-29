@@ -2,6 +2,7 @@
 // line with a toggle that shows the whole text; a short one has no toggle. Never a bubble from "You". Drives the real dashboard over CDP.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 const LONG = "[Task #4300 completed by QA Engineer] Outcome: success. Live smoke of the release: all four cases pass.\nScreenshots are in the artifact below.";
 
@@ -12,7 +13,7 @@ const LONG = "[Task #4300 completed by QA Engineer] Outcome: success. Live smoke
         await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 900, height: 700, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await ev(`import((window.__coralStatic || '/static/') + 'live_chat.js').then(m => { window.__lc = m; return true; })`);
         await ev(`(() => { const b = document.createElement('div'); b.id = 'rf-box'; b.className = 'chat-messages chat-prose';
             b.style.cssText = 'position:absolute;left:0;top:0;width:860px;height:600px;overflow:auto;background:var(--bg-primary);z-index:99999;padding:12px'; document.body.appendChild(b); return true; })()`);

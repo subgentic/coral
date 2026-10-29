@@ -2,6 +2,7 @@
 // open or focused group is open and stays open, (3) a tool run split across a page boundary next to a .work-rollup bar is one group.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 const call = (id, label) => [{ type: 'assistant', text: '', tool_uses: [{ name: 'Bash', tool_use_id: id, input_summary: label, description: label }] }, { type: 'tool_result', tool_use_id: id, tool_name: 'Bash', content: 'ok' }];
 const NOTICE = "You have 2 unread messages on the message board. Run 'coral-board read' to see them.";
@@ -15,7 +16,7 @@ const turn = (n, text) => [{ type: 'user', content: NOTICE }, { type: 'assistant
         await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 900, height: 700, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await ev(`import((window.__coralStatic || '/static/') + 'live_chat.js').then(m => { window.__lc = m; return true; })`);
         const vis = sel => ev(`(() => { const el = document.querySelector(${JSON.stringify(sel)}); return !!el && el.checkVisibility({ checkVisibilityCSS: true }); })()`);
         // A fresh transcript box under the id chat find searches (the dashboard's own is in a hidden view).

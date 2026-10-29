@@ -2,6 +2,7 @@
 // drawn from the real modules with the server's answers stubbed in the page. At 390 px (a phone) and 1280 px. Drives Chrome over CDP through agent_view_harness.js.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 const WF = { id: 7, name: 'nightly-build', description: '', enabled: true, steps: [{ name: 'Build', type: 'shell', command: 'make' }], max_duration_s: 300, created_at: '2026-10-27T10:00:00Z' };
 const JOB = { id: 5, name: 'Every night', description: '', enabled: false, workflow_id: 7, cron_expr: '0 2 * * *', timezone: 'UTC', next_fire_at: '2026-10-29T02:00:00Z', created_at: '2026-10-27T10:00:00Z', last_run: null };
@@ -30,7 +31,7 @@ const STUB = `(() => {
             const tag = `${w} px`;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled(mobile ? { enabled: true, maxTouchPoints: 5 } : { enabled: false });
             await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+            await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
             await ev(`window.openAutomationsFolder('jobs'); true`);
             await waitFor(`[...document.querySelectorAll('#group-table-view tbody tr[data-key] .dt-primary')].some(c => c.textContent.includes('Every night'))`, `${tag}: the job row`, 10000);
             // (1) a run a job started: it says which job and the way back is that job
@@ -60,7 +61,7 @@ const STUB = `(() => {
             if (!overlap(runNow, runBtn)) problems.push(`${tag}: the job's Run now sits where the workflow's Run does (${JSON.stringify([runNow, runBtn])})`);
             // (2) a run's page is open at its own address (a reopened app), the person goes to another tab and comes back, or taps the Automations tab again on a phone: the folder's list, not the last run's page (pinned: this held when it was measured, #10476)
             await Page.navigate({ url: process.env.CORAL_TEST_URL + '/automations/workflows/7/runs/31' }); await Page.loadEventFired(); await install(); // the run's own address, as a reopened app or a shared link has it
-            await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+            await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
             await waitFor(`!!document.querySelector('#wf-run-detail .wf-run-title')`, `${tag}: the run page again`, 10000);
             if (!mobile) await ev(`window.switchNavTab('agents'); true`); // on a phone the Automations tab is tapped again from the run's page
             await ev(`window.switchNavTab('automations'); true`);

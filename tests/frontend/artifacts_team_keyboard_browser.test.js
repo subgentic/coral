@@ -6,6 +6,7 @@
 // Run against an isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 const HEX = n => String(n).repeat(64).slice(0, 64);
 
@@ -22,7 +23,7 @@ const HEX = n => String(n).repeat(64).slice(0, 64);
         await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         const team = 'kb-team-' + Date.now();
         await ev(`(() => { const R = window.fetch; window.__calls = []; window.__kept = new Set(); window.__artifacts = [${[1, 2, 3].map(i => JSON.stringify(ART(i))).join(',')}];
             const json = (b, s = 200) => Promise.resolve(new Response(JSON.stringify(b), { status: s, headers: { 'content-type': 'application/json' } }));

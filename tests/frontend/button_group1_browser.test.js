@@ -4,6 +4,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 const S = (id, name, extra) => ({ session_id: id, name, agent_type: 'claude', working_directory: '/tmp/proj', sleeping: false, ...extra });
 const SESSIONS = [S('a-orc', 'orc-1', { board_project: 'alpha', display_name: 'Orchestrator', working_directory: '/tmp/alpha' }), S('f-1', 'folder-a', { display_name: 'Solo One', working_directory: '/tmp/folder-a' }), S('f-2', 'folder-b', { display_name: 'Solo Two', working_directory: '/tmp/folder-b' })];
@@ -18,7 +19,7 @@ const SESSIONS = [S('a-orc', 'orc-1', { board_project: 'alpha', display_name: 'O
         for (const [w, h, mobile] of [[1280, 900, false], [390, 844, true]]) {
             const at = `at ${w}px: `;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled(mobile ? { enabled: true, maxTouchPoints: 5 } : { enabled: false });
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
             await ev(`(() => { localStorage.removeItem('coral_collapsed_groups'); window.switchNavTab('agents'); window._coralSetLiveSessions(${JSON.stringify(SESSIONS)}); return true; })()`);
             await waitFor(`document.querySelectorAll('.folder-copy-btn').length >= 1 && document.querySelectorAll('.session-group-item .sidebar-kebab-btn').length >= 1`, `${at}the agent list`, 15000);
             // the header and macro buttons, from their real markup, in a visible probe (the session pages and the composer need a live session)

@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const { scenarios } = require('./helpers/team_page');
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -15,7 +16,7 @@ const { scenarios } = require('./helpers/team_page');
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [label, w, h, mobile] of [['1280 px', 1280, 900, false], ['390 px', 390, 844, true]]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
-            await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+            await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
             const bot = 'note-bot-' + (mobile ? 'm' : 'd');
             await ev(`window.__m.add(${JSON.stringify(bot)}, 'A', 3, { sleeping: false }); true`);
             await waitFor(`(window.__qaState.liveSessions || []).some(s => s.name === ${JSON.stringify(bot)})`, 'the agent', 10000);

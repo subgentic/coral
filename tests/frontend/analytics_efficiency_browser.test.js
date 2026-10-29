@@ -6,6 +6,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 const TPC = { metric: 'tokens_per_commit', range: '24h', min_sample: 10, total: { n: 171 }, average: { value: 304000, usual: 301000 }, unmeasured: ['gemini'], groups: [
     { key: 'sonnet', label: 'claude-sonnet-5-5', provider: 'claude', value: 268000, n: 61, tokens: 16300000, cost_usd_per_unit: 2.2 }, { key: 'opus', label: 'claude-opus-5-5', provider: 'claude', value: 412000, n: 38, tokens: 15700000, cost_usd_per_unit: 6.8 },
@@ -25,7 +26,7 @@ const TT = { metric: 'task_time', range: '24h', min_sample: 10, total: { n: 260 
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [label, w, h, mobile] of [['1280', 1280, 900, false], ['390', 390, 844, true]]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
             await ev(`try { for (const k of Object.keys(localStorage)) if (k.includes('coral-eff-group')) localStorage.removeItem(k); } catch {} true`); // the 1280 pass's choice (Model) is remembered: the 390 pass starts at All
             await ev(`(() => { window.__effReads = []; const R = window.fetch.bind(window);
                 window.fetch = (u, o = {}) => { const url = new URL(String(u), location.origin);

@@ -4,6 +4,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -13,7 +14,7 @@ const BASE = require('./test_base').BASE;
         for (const [w, h, mobile] of [[1280, 800, false], [390, 844, true]]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+            await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
             await ev(`(() => { const real = window.fetch; const json = b => Promise.resolve(new Response(JSON.stringify(b), { headers: { 'content-type': 'application/json' } }));
                 window.fetch = (u, o = {}) => { const p = new URL(String(u), location.href); if (p.pathname === '/api/system/cli-check' && p.searchParams.has('binary')) { const type = p.searchParams.get('type'); return json(type === 'agy' ? { found: false } : { found: true, version: 'v1.' + type }); } return real(u, o); }; return true; })()`);
             await ev(`(async () => { await window.showSettingsModal('agents'); return true; })()`); await waitFor(`!!document.getElementById('settings-cli-path-agy')`, `${w}: Settings, Agents`, 8000);

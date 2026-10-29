@@ -7,6 +7,7 @@ const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const { setTheme, installAudit, auditRegion } = require('./helpers/contrast');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -20,7 +21,7 @@ const BASE = require('./test_base').BASE;
             await Emulation.setDeviceMetricsOverride({ width: w, height: 900, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Emulation.setEmulatedMedia({ features: [{ name: 'prefers-color-scheme', value: theme }] });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.then(() => true)`); await installAudit(ev); await setTheme(ev, theme);
+            await coralReady(ev); await installAudit(ev); await setTheme(ev, theme);
             await ev(`(() => { const R = window.fetch; window.__cloud = { configured: true, state: 'idle', hub_url: 'https://app.coralhub.dev', max_mode: 'view', max_mode_saved: false, allow_hub_auto_accept: true, offer_at_launch: true };
                 const json = (b, status = 200) => Promise.resolve(new Response(JSON.stringify(b), { status, headers: { 'content-type': 'application/json' } }));
                 window.fetch = (u, o = {}) => { const p = new URL(String(u), location.href).pathname; if (!p.startsWith('/api/cloud/')) return R(u, o); return json({ ...window.__cloud }); }; return true; })()`);

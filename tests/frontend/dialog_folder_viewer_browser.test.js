@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 const MD_HEX = 'b'.repeat(64);
 const MD = '# Report title\n\nSome **bold** text.\n\n## A second heading\n\n- one\n- two\n';
 
@@ -17,7 +18,7 @@ const MD = '# Report title\n\nSome **bold** text.\n\n## A second heading\n\n- on
         for (const [w, h, mobile] of [[1280, 800, false], [390, 844, true]]) {
             const at = `at ${w}px: `;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
             // 1. the viewer: no X, Close at the foot
             await ev(`(() => { const R = window.fetch.bind(window); window.fetch = (u, o) => { if (String(u && u.url || u).includes('/api/artifacts/${MD_HEX}')) return Promise.resolve(new Response(${JSON.stringify(MD)}, { headers: { 'Content-Type': 'text/markdown; charset=utf-8', 'Content-Disposition': 'attachment; filename="report.md"' } })); return R(u, o); }; return true; })()`);
             await ev(`(async () => { const u = await import((window.__coralStatic || '/static/') + 'utils.js'); const b = await import((window.__coralStatic || '/static/') + 'board_artifacts.js'); const box = document.createElement('div'); box.id = 'qa-9489'; box.style.cssText = 'position:fixed;left:8px;top:8px;z-index:5'; box.innerHTML = '<div class="mb-message-body">' + u.renderMarkdown('[report.md](coral://artifacts/${MD_HEX})') + '</div>'; document.body.appendChild(box); b.resolveBoardArtifacts(box, 'local'); return true; })()`);

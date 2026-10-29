@@ -6,7 +6,7 @@ const path = require('node:path');
 const { connect } = require('./agent_view_harness');
 const { STUB, HEX } = require('./helpers/comments_scale');
 const { setTheme } = require('./helpers/contrast');
-const { framesJs } = require('./helpers/wait');
+const { framesJs, coralReady } = require('./helpers/wait');
 const BASE = require('./test_base').BASE;
 const CONTENT = '# Release notes\n\nThe document should have room to read.\n\nSelect this passage to add a comment.\n';
 const COMMENTS = [
@@ -28,7 +28,7 @@ const COMMENTS = [
         await Emulation.setDeviceMetricsOverride({width,height:900,deviceScaleFactor:1,mobile:width===390});
         await Emulation.setTouchEmulationEnabled({enabled:width===390});
         await Page.navigate({url:BASE});await Page.loadEventFired();await install();
-        await ev(`window.__coralReady.then(()=>true)`);await setTheme(ev,theme);
+        await coralReady(ev);await setTheme(ev,theme);
         await ev(`(async()=>{window.BL=(await import(${S}+'safe_storage.js')).browserLocal;${clear?"window.BL.remove('coral-artifact-comments-open');":''}window.PP=await import(${S}+'preview_pane.js');const st=(await import(${S}+'state.js')).state;st.currentSession={type:'live',name:'fixture',session_id:'comments-fixture',agent_type:'claude'};(await import(${S}+'utils.js')).showView('live-session-view');window.PP.setPreviewSession('comments-fixture');})()`);
         await ev(STUB({filename:'release-notes.md',content:CONTENT,mediaType:'text/markdown',comments}));
         await open();

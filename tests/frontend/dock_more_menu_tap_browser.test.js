@@ -2,6 +2,7 @@
 // what a finger or a click at its own centre reaches (document.elementFromPoint), at 375 x 667 and 390 x 844, with the tab row scrolled so its edge fade is on (data-more, which makes the row a mask: #9377). Drives Chrome over CDP through agent_view_harness.js.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -13,7 +14,7 @@ const { connect } = require('./agent_view_harness');
             const check = (ok, msg) => { if (!ok) problems.push(`${w}: ${msg}`); };
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
             await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.startup('liveList', 'settings')`);
+            await coralReady(ev, 'startup', 'liveList', 'settings');
             await ev(`T.state.liveSessions = ${JSON.stringify([base])}; T.render.renderLiveSessions(T.state.liveSessions); window.selectLiveSession('coral-go', 'claude', 'o1'); window.toggleAgenticPanel && window.toggleAgenticPanel(true); true`);
             await waitFor(`!!document.getElementById('agentic-tab-more') && document.getElementById('agentic-tab-more').getClientRects().length > 0`, `${w}: the dock's More tab`, 10000);
             await new Promise(r => setTimeout(r, 500)); // sleep-ok: the dock draws

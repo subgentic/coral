@@ -10,6 +10,7 @@ const path = require('node:path');
 const { connect } = require('./agent_view_harness');
 const { setTheme, installAudit, auditRegion } = require('./helpers/contrast');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 const HEX = 'd'.repeat(64);
 const MD = ['# Migration plan', '', '## Steps', '', '1. Add the new columns behind a flag and backfill in batches of 500 rows.', '2. Switch reads to the new columns.', '', '## Risks', '', 'The backfill takes a write lock on large databases, so it must run off-peak.', '', 'Add a flag. Then wait. Add a flag again at the end.'].join('\n');
 
@@ -65,7 +66,7 @@ const MD = ['# Migration plan', '', '## Steps', '', '1. Add the new columns behi
         await Emulation.setTouchEmulationEnabled({ enabled: mobile });
         await Emulation.setEmulatedMedia({ features: [{ name: 'prefers-color-scheme', value: theme }] });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await ev(`try { localStorage.removeItem('coral-artifact-comments-open'); } catch {} true`); // each view starts as a new viewer: nothing remembered
         await installAudit(ev); await setTheme(ev, theme);
     };

@@ -6,6 +6,7 @@
 // and groups joined later (they fold into a closed bar, show in an open one, and a reply splits the run). Set ROLLUP_SHOT_DIR to save screenshots.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 const call = (id, name, label) => [{ type: 'assistant', text: '', tool_uses: [{ name, tool_use_id: id, input_summary: label, description: label }] }, { type: 'tool_result', tool_use_id: id, tool_name: name, content: 'ok' }];
 const NOTICE = "You have 2 unread messages on the message board. Run 'coral-board read' to see them.";
@@ -28,7 +29,7 @@ const segments = [
         await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 900, height: 700, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await ev(`import((window.__coralStatic || '/static/') + 'live_chat.js').then(m => {
             window.__lc = m;
             const box = document.createElement('div'); box.id = 'ru-box'; box.className = 'chat-messages chat-prose';

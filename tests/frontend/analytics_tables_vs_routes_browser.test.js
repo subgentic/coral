@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 const AGENTS = [
     { session_id: 's1', agent_name: 'Backend Dev', board_name: 'team-x', folder: 'coral', working_dir: '/w/coral', requests: 1234, input_tokens: 1234567, output_tokens: 999, cache_read_tokens: 999400, cache_write_tokens: 0, cost_usd: 12.345, first_seen: '2026-10-20T10:00:00Z', last_seen: '2026-10-20T12:05:00Z', stopped_at: '2026-10-20T12:05:00Z' },
@@ -38,7 +39,7 @@ const STUB = `(() => { const R = window.fetch; const json = b => Promise.resolve
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Page.addScriptToEvaluateOnNewDocument({ source: STUB });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         await ev(`try { for (const k of Object.keys(localStorage)) if (k.includes('coral-eff-group')) localStorage.removeItem(k); } catch {} window.switchNavTab('tokens'); true`);
         await waitFor(`!!document.querySelector('#cost-group-bar .eff-seg-btn')`, 'the Analytics page', 10000);
         const table = sel => ev(`(() => { const t = document.querySelector(${JSON.stringify(sel)} + ' table'); if (!t) return null; const vis = e => e.getClientRects().length > 0; const heads = [...t.querySelectorAll('thead th')].filter(vis).map(h => h.textContent.replace(/[\\u2195\\u2191\\u2193]/g, '').trim());

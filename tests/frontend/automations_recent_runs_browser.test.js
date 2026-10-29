@@ -52,7 +52,7 @@ const STUB = `(() => {
 
 (async () => {
     const { Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
-    const { settle } = require('./helpers/wait').bind(ev);
+    const { settle, coralReady } = require('./helpers/wait').bind(ev);
     const shot = require('./helpers/scene_shots')(Page, 'automations-recent');
     const themed = async (name, w) => { for (const theme of ['dark', 'light']) { await setTheme(ev, theme); await settle(150); await shot(`${name}-${theme}-${w}`); } await setTheme(ev, 'dark'); };
     const rows = () => ev(`[...document.querySelectorAll('#group-table-view tbody tr[data-key]')].map(tr => tr.querySelector('.dt-primary').textContent.trim().replace(/^Not opened: /, '') + '|' + (tr.querySelector('.chip:not(.dt-tag)') || {}).textContent + '|' + (tr.querySelector('.automations-unread') ? 'unread' : 'read'))`);
@@ -65,7 +65,7 @@ const STUB = `(() => {
             const at = `${w}px: `;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+            await coralReady('startup', 'liveList', 'liveListLoaded', 'settings');
             await ev(`try { for (const k of Object.keys(localStorage)) if (k.startsWith('coral-automations-')) localStorage.removeItem(k); } catch {} true`);
             await ev(`window.openAutomationsFolder('recent'); true`);
             await waitFor(`document.querySelectorAll('#group-table-view tbody tr[data-key]').length === 5`, `${at}the five runs in Recent runs`, 10000);

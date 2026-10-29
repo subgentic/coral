@@ -14,7 +14,7 @@ const BUNDLE = { exists: true, team_name: TEAM, created_at: '2026-10-25T05:00:00
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
-    const { settle } = require('./helpers/wait').bind(ev);
+    const { settle, coralReady } = require('./helpers/wait').bind(ev);
     const S = scenarios();
     const stub = () => ev(`(() => { const R = window.fetch.bind(window); const j = (b) => Promise.resolve(new Response(JSON.stringify(b), { status: 200, headers: { 'Content-Type': 'application/json' } }));
         const items = [{ id: ${JSON.stringify(HEX)}, name: 'Design review.txt', media_type: 'text/plain', size: 1800, task_id: 11, task_title: 'Review', created_at: new Date(Date.now() - 7 * 60000).toISOString(), uri: 'coral://artifacts/${HEX}', available: true, source: 'completion', provenance: 'uploaded', produced_by: 'Worker A' }];
@@ -42,7 +42,7 @@ const BUNDLE = { exists: true, team_name: TEAM, created_at: '2026-10-25T05:00:00
     const toggle = (scope) => `document.querySelector(${JSON.stringify(scope + ' .details-toggle')})`;
     const open = async (w, h, mobile) => {
         await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`); await installTP(ev);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(); await installTP(ev);
         await ev(`localStorage.removeItem('coral-details-open'); true`);
         await seed(ev, TEAM); await stub();
         if (mobile) await ev(`window.syncMobileAgentList && window.syncMobileAgentList(); true`);

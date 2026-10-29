@@ -6,6 +6,7 @@ const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 const BOARD = 'kb-up-' + Date.now().toString(36);
 
 (async () => {
@@ -18,7 +19,7 @@ const BOARD = 'kb-up-' + Date.now().toString(36);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         await post('/subscribe', { subscriber_id: 'Boss', job_title: 'Orchestrator' });
         for (let i = 1; i <= 14; i++) await post('/messages', { subscriber_id: 'Boss', content: `Message number ${i} on the team board with a few more words so that it is a line of text.` });
         await ev(`window.openTeamPage(${JSON.stringify(BOARD)}, { tab: 'messages' }).then(() => true)`);

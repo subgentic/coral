@@ -3,6 +3,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, PRELOAD, install } = await connect();
@@ -11,7 +12,7 @@ const BASE = require('./test_base').BASE;
         for (const [w, h, mobile] of [[1280, 900, false], [390, 844, true]]) {
             const at = `at ${w}px: `;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile });
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
             const m = await ev(`(() => { const out = {}; const host = document.body.appendChild(Object.assign(document.createElement('div'), { id: 'dlg-probes', style: 'position:fixed;left:0;top:0;visibility:hidden' }));
                 for (const k of ['confirm', 'form', 'flow']) { const d = document.createElement('div'); d.className = 'modal-content dlg-' + k; host.append(d); out[k] = Math.round(d.getBoundingClientRect().width); }
                 const dd = document.createElement('dialog'); dd.className = 'dlg-confirm'; dd.setAttribute('open', ''); host.append(dd); out.dialog = Math.round(dd.getBoundingClientRect().width);

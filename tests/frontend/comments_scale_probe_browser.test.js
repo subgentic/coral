@@ -7,7 +7,7 @@
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const { fixture, STUB } = require('./helpers/comments_scale');
-const { framesJs } = require('./helpers/wait');
+const { framesJs, coralReady } = require('./helpers/wait');
 const BASE = require('./test_base').BASE;
 
 if (!process.env.COMMENTS_PROBE) { console.log('comments_scale_probe: skipped (set COMMENTS_PROBE=1 to measure)'); process.exit(0); }
@@ -31,7 +31,7 @@ if (!process.env.COMMENTS_PROBE) { console.log('comments_scale_probe: skipped (s
             await Emulation.setDeviceMetricsOverride({ width: view.w, height: view.h, deviceScaleFactor: 1, mobile: view.mobile });
             await Emulation.setTouchEmulationEnabled({ enabled: view.mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.then(() => true)`);
+            await coralReady(ev);
             await ev(OBS);
             await ev(STUB(fx));
             const r = {};

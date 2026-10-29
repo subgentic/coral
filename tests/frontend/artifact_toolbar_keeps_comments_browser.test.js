@@ -3,6 +3,7 @@
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const { STUB, HEX } = require('./helpers/comments_scale');
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, sleep, PRELOAD, install } = await connect();
@@ -14,7 +15,7 @@ const { STUB, HEX } = require('./helpers/comments_scale');
             const tag = `${w}px`;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+            await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
             await ev(`window.__m.add('tb-agent', 'T', 3, { sleeping: false }); window.selectLiveSession('tb-agent', 'claude', 'tb-agent-id', 'local'); true`); await sleep(800); // sleep-ok: the selection settles
             await ev(`import((window.__coralStatic || '/static/') + 'state.js').then(m => { m.state.selectedTeam = 'tb-team'; return true; })`);
             await ev(STUB({ filename: 'release-notes.md', content: '# Release notes\n\nThe build is green.\n', mediaType: 'text/markdown', comments: [{ id: 1, parent_id: null, anchor: { whole: true }, body: 'Please check.', author: { kind: 'owner', issuer: 'local', subject: 'Operator' }, created_at: '2026-10-22T00:00:00Z' }] }));

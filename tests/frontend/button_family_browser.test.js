@@ -4,6 +4,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -15,7 +16,7 @@ const BASE = require('./test_base').BASE;
             const at = `at ${w}px: `;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile });
             await Emulation.setTouchEmulationEnabled(mobile ? { enabled: true, maxTouchPoints: 5 } : { enabled: false });
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
             await ev(`(() => { let h = document.getElementById('bf-host'); if (h) h.remove(); h = document.body.appendChild(Object.assign(document.createElement('div'), { id: 'bf-host', style: 'position:fixed;inset:0;z-index:50;background:var(--bg-primary);padding:24px;display:flex;flex-direction:column;gap:16px;align-items:flex-start' }));
                 const row = (id, html) => { const r = document.createElement('div'); r.id = id; r.style.cssText = 'display:flex;gap:12px;flex-wrap:wrap;align-items:center'; r.innerHTML = html; h.append(r); };
                 row('bf-main', '<button class="btn" id="bf-secondary">Secondary</button><button class="btn btn-primary" id="bf-primary">Primary</button><button class="btn btn-quiet" id="bf-quiet">Quiet</button><button class="btn btn-danger" id="bf-danger">Danger</button><button class="btn btn-small" id="bf-small">Small</button><button class="btn" id="bf-off" disabled>Disabled</button>');

@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 // The Automations pages on a phone, from the Mobile Beta Tester's pass (#10476): a run a job started links back to its job and says "Run by job <name>" (not a way back to the workflow); reopening Automations lands on the list, not the last run page; the pages are
 // drawn from the real modules with the server's answers stubbed in the page. At 390 px (a phone) and 1280 px. Drives Chrome over CDP through agent_view_harness.js.
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 const WF = { id: 7, name: 'nightly-build', description: '', enabled: true, steps: [{ name: 'Build', type: 'shell', command: 'make' }], max_duration_s: 300, created_at: '2026-10-27T10:00:00Z' };
 const JOB = { id: 5, name: 'Every night', description: '', enabled: false, workflow_id: 7, cron_expr: '0 2 * * *', timezone: 'UTC', next_fire_at: '2026-10-29T02:00:00Z', created_at: '2026-10-27T10:00:00Z', last_run: null };
@@ -36,7 +37,7 @@ const STUB = `(() => {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Page.addScriptToEvaluateOnNewDocument({ source: STUB });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+        await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
         const focusOn = sel => ev(`(() => { const e = [...document.querySelectorAll(${JSON.stringify(sel)})].find(b => b.getClientRects().length); if (e) e.focus(); return !!e; })()`);
         // a job's row: Enter opens the job and the keyboard is on its name
         await ev(`window.openAutomationsFolder('jobs'); true`);

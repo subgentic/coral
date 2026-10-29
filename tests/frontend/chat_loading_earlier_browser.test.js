@@ -4,6 +4,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 const mk = (from, n) => Array.from({ length: n }, (_, i) => (from + i) % 2 === 0 ? { type: 'user', content: `Question number ${from + i}` } : { type: 'assistant', text: `Answer number ${from + i}` });
 
@@ -13,7 +14,7 @@ const mk = (from, n) => Array.from({ length: n }, (_, i) => (from + i) % 2 === 0
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 700, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.startup('liveList', 'settings')`);
+        await coralReady(ev, 'startup', 'liveList', 'settings');
         await ev(`(async () => {
             const st = window.__coralStatic || '/static/';
             const T = window.T = { state: (await import(st + 'state.js')).state, chat: await import(st + 'live_chat.js') };

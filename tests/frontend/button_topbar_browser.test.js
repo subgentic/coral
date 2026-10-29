@@ -3,6 +3,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -14,7 +15,7 @@ const BASE = require('./test_base').BASE;
         for (const [w, h, mobile] of [[1280, 900, false], [390, 844, true]]) {
             const at = `at ${w}px: `;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled(mobile ? { enabled: true, maxTouchPoints: 5 } : { enabled: false });
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
             const m = await ev(`(() => { const info = sel => [...document.querySelectorAll(sel)].map(b => { const cs = getComputedStyle(b), r = b.getBoundingClientRect(); return { cls: b.className, shown: b.getClientRects().length > 0, w: Math.round(r.width), h: Math.round(r.height), bg: cs.backgroundColor, border: cs.borderTopWidth }; });
                 return { bar: info('.top-bar-actions .top-bar-btn:not(.hub-indicator)'), rail: info('.sidebar-rail-btn'), menu: info('#top-menu-btn') }; })()`);
             for (const b of m.bar.concat(m.rail)) assert.ok(/\bbtn\b/.test(b.cls) && /\bbtn-quiet\b/.test(b.cls) && /\bbtn-icon\b/.test(b.cls), `${at}an icon button of the family: ${b.cls}`);

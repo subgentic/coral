@@ -3,6 +3,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 const SESSIONS = [
     { session_id: 'bbbbbbbb-0001', title: 'Planning chat', display_name: 'Lead', agent_name: 'Lead', source_type: 'codex', last_timestamp: '2026-10-03T10:00:00Z', duration_sec: 120 },
@@ -14,7 +15,7 @@ const SESSIONS = [
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         await ev(`window.switchNavTab('history'); Promise.all([import((window.__coralStatic||'/static/')+'sidebar.js'), import((window.__coralStatic||'/static/')+'view_switch.js')]).then(([sb, vs]) => { sb.showSidebarPane('history'); vs.showView('chats-empty-view'); document.body.setAttribute('data-nav-tab', 'history'); return true; })`); // a local Coral's Chats are the Inbox's folders (#7776): the hub still draws this list, so the suite shows its pane the way the hub's Chats tab does
         await ev(`import((window.__coralStatic||'/static/')+'history_list.js').then(m => { m.renderHistorySessions(${JSON.stringify(SESSIONS)}, 2, 1, 50); return true; })`);
         await waitFor(`document.querySelectorAll('#history-sessions-list li:not(.session-group-header)').length === 2 && document.querySelector('#history-sessions-list .chat-row-title .chip')`, 'the chat rows with their badges', 10000);

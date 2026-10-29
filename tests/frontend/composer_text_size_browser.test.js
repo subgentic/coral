@@ -3,6 +3,7 @@
 // the placeholder as laid out at the box's own width and font. Run against an isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -19,7 +20,7 @@ const { connect } = require('./agent_view_harness');
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile });
             await Emulation.setTouchEmulationEnabled(mobile ? { enabled: true, maxTouchPoints: 5 } : { enabled: false });
             await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.then(() => true)`);
+            await coralReady(ev);
             await ev(`localStorage.setItem('coral-live-view-mode', 'chat'); window.__m.add('a-bot-with-a-rather-long-name-here', 'A', 4, { sleeping: false }); true`); await sleep(800); // sleep-ok: the layout re-flows over a few frames; no completion event
             await ev(`window.selectLiveSession('a-bot-with-a-rather-long-name-here', 'claude', 'a-bot-with-a-rather-long-name-here-id', 'local'); true`);
             await waitFor(`!!document.getElementById('command-input') && document.getElementById('command-input').offsetHeight > 0`, 'the composer', 8000);

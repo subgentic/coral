@@ -2,6 +2,7 @@
 // are one tap away behind the way back to the list, and a link to a page (/analytics/<page>) still opens that page. A wide screen is unchanged: the list beside Overview. 390 and 1280 px; isolated dev server over CDP.
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, sleep, PRELOAD, install } = await connect();
@@ -16,7 +17,7 @@ const BASE = require('./test_base').BASE;
             const tag = `${w}px`;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+            await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
             await ev(`window.switchNavTab('tokens'); true`);
             await waitFor(`!!document.getElementById('cost-nav-list')`, 'the analytics list', 10000);
             await sleep(900); // sleep-ok: the page draws over several reads

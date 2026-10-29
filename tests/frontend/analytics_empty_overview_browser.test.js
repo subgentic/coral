@@ -3,6 +3,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -11,7 +12,7 @@ const BASE = require('./test_base').BASE;
         for (const [w, h, mobile] of [[1280, 800, false], [390, 844, true]]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+            await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
             await ev(`window.switchNavTab('tokens'); true`);
             if (!mobile) { // a phone opens on Overview itself (#10064); a wide screen picks it from the list
                 await waitFor(`document.querySelector('#cost-nav-list .row-btn[data-view="overview"]')?.getClientRects().length > 0`, 'the Analytics view list', 10000);

@@ -12,7 +12,7 @@ const BASE = require('./test_base').BASE;
     const { Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const shot = require('./helpers/scene_shots')(Page, 'automations-jobs'); // the scenes UI/UX looks at: the folder and a job's page, at both widths in both themes (written when the gate asks for shots)
     const themed = async (name, w) => { for (const theme of ['dark', 'light']) { await setTheme(ev, theme); await settle(150); await shot(`${name}-${theme}-${w}`); } await setTheme(ev, 'dark'); };
-    const { settle } = require('./helpers/wait').bind(ev);
+    const { settle, coralReady } = require('./helpers/wait').bind(ev);
     const STUB = `(() => {
         const real = window.fetch; const json = (o, status) => Promise.resolve(new Response(JSON.stringify(o), { status: status || 200, headers: { 'Content-Type': 'application/json' } }));
         const ago = h => new Date(Date.now() - h * 3600000).toISOString(), inn = h => new Date(Date.now() + h * 3600000).toISOString();
@@ -44,7 +44,7 @@ const BASE = require('./test_base').BASE;
             const at = `${w}px: `;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.startup('liveList', 'settings')`);
+            await coralReady('startup', 'liveList', 'settings');
             await ev(`try { for (const k of Object.keys(localStorage)) if (k.startsWith('coral-automations-')) localStorage.removeItem(k); } catch {} true`);
             await ev(`document.getElementById('nav-tab-automations').click(); true`); // the tab's own click (its action must know the tab), not the page function
             await waitFor(`document.querySelectorAll('#group-table-view button.dt-primary').length === 3`, `${at}the three jobs in the folder's table`, 10000);
@@ -109,10 +109,10 @@ const BASE = require('./test_base').BASE;
             assert.equal(await ev(`document.activeElement && document.activeElement.textContent.trim()`), 'summarize-the-day', `${at}the keyboard is back on the row the job came from`);
 
             // addresses
-            await Page.navigate({ url: BASE + '/automations/jobs/1' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+            await Page.navigate({ url: BASE + '/automations/jobs/1' }); await Page.loadEventFired(); await install(); await coralReady('startup', 'liveList', 'liveListLoaded', 'settings');
             await waitFor(`!!document.querySelector('#scheduler-detail .sched-header')`, `${at}a job's address opens its page`, 10000);
             assert.equal(await ev(`document.querySelector('#scheduler-detail .sched-header h2').textContent`), 'nightly-build-job');
-            await Page.navigate({ url: BASE + '/jobs' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+            await Page.navigate({ url: BASE + '/jobs' }); await Page.loadEventFired(); await install(); await coralReady('startup', 'liveList', 'liveListLoaded', 'settings');
             await waitFor(`location.pathname === '/automations/jobs' && document.querySelectorAll('#group-table-view button.dt-primary').length === 3`, `${at}/jobs opens the Jobs folder`, 10000);
             assert.equal(await ev(vis('#scheduler-detail .sched-header')), false, `${at}and no job's page`);
             assert.equal(await ev(`document.documentElement.scrollWidth <= window.innerWidth`), true, `${at}nothing wider than the screen`);

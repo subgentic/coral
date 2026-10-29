@@ -13,7 +13,7 @@ const DIR = '/work/crew';
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
-    const { settle } = require('./helpers/wait').bind(ev);
+    const { settle, coralReady } = require('./helpers/wait').bind(ev);
     const OPEN = `(() => { const m = document.getElementById('launch-modal'); return !!m && getComputedStyle(m).display !== 'none'; })()`; // the dialog's markup is lazy: not there until it is first asked for
     const stage = () => ev(`document.getElementById('launch-step-agent').dataset.stage`);
     const modalOpen = () => ev(`getComputedStyle(document.getElementById('launch-modal')).display !== 'none'`);
@@ -25,7 +25,7 @@ const DIR = '/work/crew';
         for (const [label, w, h, mobile] of [['1280 px', 1280, 800, false], ['390 px', 390, 844, true]]) {
             console.log(label);
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`); await installTP(ev);
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(); await installTP(ev);
             await seed(ev, TEAM);
             await ev(`(() => { window.__launches = []; const real = window.fetch; const json = (b, status = 200) => Promise.resolve(new Response(JSON.stringify(b), { status, headers: { 'content-type': 'application/json' } }));
                 window.fetch = (u, o = {}) => { const p = new URL(String(u), location.href), m = o.method || 'GET';

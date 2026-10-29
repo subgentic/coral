@@ -39,7 +39,7 @@ const STUB = `(() => {
     const { Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const shot = require('./helpers/scene_shots')(Page, 'automations-attention'); // Running now with its rows and Failed with a job and a workflow, at both widths in both themes
     const themed = async (name, w) => { for (const theme of ['dark', 'light']) { await setTheme(ev, theme); await settle(150); await shot(`${name}-${theme}-${w}`); } await setTheme(ev, 'dark'); };
-    const { settle } = require('./helpers/wait').bind(ev);
+    const { settle, coralReady } = require('./helpers/wait').bind(ev);
     const rows = () => ev(`[...document.querySelectorAll('#group-table-view tbody tr[data-key]')].map(tr => tr.querySelector('.dt-primary').textContent.trim() + '|' + (tr.querySelector('.dt-tag') || {}).textContent)`);
     const pathname = () => ev(`location.pathname`);
     const folderWords = mobile => ev(mobile ? `[...document.querySelectorAll('#group-table-view .view-list-select option')].map(o => o.textContent.trim())` : `[...document.querySelectorAll('.view-list-item')].map(b => b.textContent.trim().replace(/\\s+/g, ' '))`);
@@ -50,7 +50,7 @@ const STUB = `(() => {
             const at = `${w}px: `;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+            await coralReady('startup', 'liveList', 'liveListLoaded', 'settings');
             await ev(`try { for (const k of Object.keys(localStorage)) if (k.startsWith('coral-automations-')) localStorage.removeItem(k); } catch {} true`);
             await ev(`window.openAutomationsFolder('failed'); true`);
             await waitFor(`document.querySelectorAll('#group-table-view tbody tr[data-key]').length === 2`, `${at}the two failures in the Failed folder`, 10000);

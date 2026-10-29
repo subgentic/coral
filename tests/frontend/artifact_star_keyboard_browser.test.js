@@ -7,6 +7,7 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { axName } = require('./helpers/ax_tree');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 const WORLD = `(() => {
     const real = window.fetch; window.__ta = []; window.__star = [];
@@ -52,7 +53,7 @@ const WORLD = `(() => {
             const check = (ok, msg) => { if (!ok) problems.push(`${label}: ${msg}`); };
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.then(() => true)`);
+            await coralReady(ev);
             await ev(`localStorage.removeItem('coral.inbox.tab'); localStorage.removeItem('coral-team-artifacts-filters:@inbox'); ${WORLD}`);
             await ev(`window.switchNavTab('hub-inbox'); true`);
             if (!mobile) { await waitFor(`!!document.querySelector('[data-view-list="inbox-folders"] .view-list-item[data-key="artifacts"]')`, 'the Artifacts folder', 10000); await ev(`document.querySelector('[data-view-list="inbox-folders"] .view-list-item[data-key="artifacts"]').click(); true`); }
