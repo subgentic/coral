@@ -68,3 +68,13 @@ coral-go/Users*.coral/*
 !/coral-go/cmd/*/coral-*.go
 /coral-go/cmd/*/launch-coral
 /coral-go/cmd/*/mock-agent
+
+# scratch test output a run leaves in a folder's root (a worktree's, a package's): never to be committed. Narrow on purpose: tests keep fixture logs (testdata), so *.log is not ignored repo-wide;
+# a committed *.log outside testdata fails coral-go/internal/repohygiene instead.
+/go-*.log
+/gotest-*.log
+/gotest-*.done
+/browser-*.log
+/coral-go/go-*.log
+/coral-go/gotest-*.log
+/coral-go/gotest-*.done
