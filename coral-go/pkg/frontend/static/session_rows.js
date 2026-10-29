@@ -13,7 +13,7 @@ import { instructionsOffered } from './agent_instructions_offer.js';
 import { redrawLiveList } from './list_hooks.js';
 import { state } from './state.js';
 import { skippedOf } from './waiting.js';
-import { modelName, typeName } from './model_labels.js';
+import { modelName, typeName, sessionLevel } from './model_labels.js';
 import { terminalGoneChip } from './terminal_gone.js';
 import { hooksMissingChip, piHooksChip } from './hooks_missing.js';
 import { browserLocal } from './safe_storage.js';
@@ -424,9 +424,16 @@ const previewOf = (s, identity) => {
 };
 const _shortAgo = sec => (sec === null || sec === undefined ? '' : sec < 60 ? 'now' : sec < 3600 ? `${Math.floor(sec / 60)}m` : sec < 86400 ? `${Math.floor(sec / 3600)}h` : `${Math.floor(sec / 86400)}d`);
 
+/** The Show model line: "Opus 4.1 · High" (#11063, the operator): the model, then the level on record (the newest turn's, else the one it was started with: the chat bar's rule), or the model alone when none is. */
+function modelWithLevel(s) {
+    const name = modelName(s.agent_type, s.model, sessionServer(s));
+    if (!name) return '';
+    const level = sessionLevel(s);
+    return level ? `${name} · ${level.name}` : name;
+}
 function rowLinesHtml(s) {
     const line = (cls, text) => text ? `<div class="${cls}">${escapeHtml(text)}</div>` : '';
-    return line('session-line2', isRowLineShown('summary') && sessionGoalText(s)) + line('session-model', isRowLineShown('model') && s.agent_type !== 'terminal' && modelName(s.agent_type, s.model, sessionServer(s)));
+    return line('session-line2', isRowLineShown('summary') && sessionGoalText(s)) + line('session-model', isRowLineShown('model') && s.agent_type !== 'terminal' && modelWithLevel(s));
 }
 
 /** 'Show server' (setting show_session_server): unset = on with 2+ servers, off with one. */
