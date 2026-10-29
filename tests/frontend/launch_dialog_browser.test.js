@@ -76,7 +76,7 @@ const BASE = require('./test_base').BASE;
         await ev(`window.showAddAgentToBoard('crew', '/work/board'); true`);
         await waitFor(`getComputedStyle(document.getElementById('launch-modal')).display !== 'none' && document.getElementById('launch-step-agent').dataset.stage === 'persona'`, 'the dialog, at the persona');
         assert.equal(await ev(`document.getElementById('launch-agent-title-text').textContent`), 'Add agent to crew');
-        assert.match(await ev(`document.getElementById('launch-stage-sub').textContent`), /^Step 1 of 2: Persona\. In \/work\/board/);
+        assert.match(await ev(`document.getElementById('launch-stage-sub').textContent`), /^Step 1 of 2: Persona, all optional$/);
         await ev(`{ const n = document.getElementById('launch-agent-name-input'); n.value = 'Bo'; n.dispatchEvent(new Event('input', { bubbles: true })); } window._launchStage('next'); true`);
         await waitFor(`document.getElementById('launch-step-agent').dataset.stage === 'agent'`, 'the agent step');
         await ev(`window.launchSession(); true`);

@@ -147,3 +147,6 @@
 /* A folder field's row (.dir-input-row: the input and its Browse button, the one row of New agent, New team and Open folder, #9489) fills the control's column; the input takes what Browse leaves. */
 .sv-control .dir-input-row { width: 100%; }
 .sv-control .dir-input-row input { width: auto; min-width: 0; }
+
+/* The New agent persona step says "all optional" once, in its title (#10835): no tag on each field */
+#launch-modal[data-all-optional] .sv-optional { display: none; }

@@ -23,18 +23,16 @@ export function agentStatus(text) {
 /** Word the name field for what the dialog is doing: a new agent's optional name, or a team member's role (Add member and Edit member save a role, so it is Required). */
 export function setAgentNameMode(member) {
     _nameView?.clearErrors();
-    const hint = document.getElementById('launch-persona-hint'); // the line above says what the persona fills: the name, or the role of a member
-    if (hint) hint.textContent = `It fills in the ${member ? 'role' : 'name'} and prompt.`;
     _nameView?.retext('name', member
         ? { label: 'Role', help: 'The role this member has on the team.', required: true, optional: false, requiredMessage: 'A member needs a role' }
-        : { label: 'Name', help: 'Choose a persona above and its name goes here, or type your own.', required: false, optional: true });
+        : { label: 'Name', help: '', required: false, optional: true });
 }
 
 function mount(modal) {
     const nameHost = modal.querySelector('#agent-name-host');
     if (nameHost && !_nameView) {
         _nameView = mountSettingsView(nameHost, { mode: 'form', fields: [
-            { key: 'name', type: 'text', id: 'launch-agent-name-input', label: 'Name', placeholder: 'e.g. QA Engineer, Frontend Dev', messageAsIs: true, optional: true, help: 'Choose a persona above and its name goes here, or type your own.', helpTextClass: 'launch-name-help' },
+            { key: 'name', type: 'text', id: 'launch-agent-name-input', label: 'Name', placeholder: 'e.g. QA Engineer, Frontend Dev', messageAsIs: true, optional: true },
         ] });
     }
     const nameInput = document.getElementById('launch-agent-name-input');

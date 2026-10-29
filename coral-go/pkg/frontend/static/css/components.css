@@ -4118,3 +4118,6 @@ dialog.team-link-dialog::backdrop { background: rgba(var(--black-rgb), 0.5); }
 .jump-option[aria-selected="true"] { background: var(--bg-hover); }
 .skip-link { position: absolute; left: -9999px; top: 0; }
 .skip-link:focus-visible { position: static; display: block; padding: 6px 12px; color: var(--link-text); } /* the accent is 4.44:1 on the light sidebar; the link colour is 5.9:1 or more (a11y_dashboard, v2.0.3) */
+
+/* The persona step says "all optional" once, in its title (#10835): no tag on each field */
+#launch-modal[data-all-optional] .launch-optional { display: none; }

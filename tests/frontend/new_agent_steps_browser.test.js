@@ -84,9 +84,9 @@ const BASE = require('./test_base').BASE;
         });
         await S.run('step 1 footer: Cancel leftmost, Next rightmost, one row', async () => { await reopen(); await setFolder('/work/payments-app'); await footerOrder(N.next, 'step 1'); });
 
-        await S.run('step 2 is "Step 2 of 3: Persona. In /work/payments-app": persona first, then Name, then the Instructions for this agent, with Back, Cancel and Next and no tabs', async () => {
+        await S.run('step 2 is "Step 2 of 3: Persona, all optional": persona first, then Name, then the Instructions for this agent, with Back, Cancel and Next and no tabs', async () => {
             await reopen(); await toStep(2);
-            assert.match(await stepLine(ev), /^Step 2 of 3: Persona\. In \/work\/payments-app/);
+            assert.match(await stepLine(ev), /^Step 2 of 3: Persona, all optional$/);
             const y = await ev(`(() => { const f = (s, rx) => { const e = window.__na.find(s, rx); return e ? window.__na.box(e).y : null; }; return { persona: f('select', ${N.persona}), name: f('input', ${N.name}), prompt: f('textarea', ${N.prompt}) }; })()`);
             for (const k of ['persona', 'name', 'prompt']) assert.notEqual(y[k], null, `${k} is on step 2`);
             assert.ok(y.persona < y.name && y.name < y.prompt, `the order is Persona, Name, Instructions for this agent (y ${JSON.stringify(y)})`);
@@ -95,15 +95,14 @@ const BASE = require('./test_base').BASE;
             assert.ok(!(await has('button', N.launch)), 'Launch is only on step 3 (the approved plan)');
             await footerOrder(N.next, 'step 2');
         });
-        await S.run('step 2: a persona fills the name and the prompt, Blank leaves them for typing, and the two static lines say so', async () => {
+        await S.run('step 2: a persona fills the name and the prompt, Blank leaves them for typing, and no static line says so (#10835)', async () => {
             const pick = (rx) => ev(`(() => { const s = window.__na.find('select', ${N.persona}); const o = [...s.options].find(o => ${rx}.test(o.textContent)); if (!o) return false; s.value = o.value; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
             assert.ok(await pick(/^Blank/i), 'a Blank option first in the persona select');
-            assert.match(await ev(`window.__na.dialog().textContent.replace(/\\s+/g, ' ')`), /Choose a persona above and its name goes here, or type your own\./);
+            assert.doesNotMatch(await ev(`window.__na.dialog().textContent.replace(/\\s+/g, ' ')`), /Choose a persona above|It fills in the name and prompt/); // the two static lines are gone (#10835)
             const name = await ev(`(() => { const s = window.__na.find('select', ${N.persona}); const o = [...s.options].find(o => !/^Blank/i.test(o.textContent) && o.value !== ''); if (!o) return null; s.value = o.value; s.dispatchEvent(new Event('change', { bubbles: true })); return o.textContent.trim(); })()`);
             assert.ok(name, 'at least one persona to choose');
             await waitFor(`window.__na.find('input', ${N.name}).value.length > 0 && window.__na.find('textarea', ${N.prompt}).value.length > 0`, 'the persona fills the name and the prompt', 4000);
-            assert.match(await ev(`window.__na.dialog().textContent.replace(/\\s+/g, ' ')`), /Filled from the persona\. Change it if you want a different name\./);
-            assert.match(await ev(`window.__na.dialog().textContent.replace(/\\s+/g, ' ')`), /It fills in the name and prompt\./);
+            assert.doesNotMatch(await ev(`window.__na.dialog().textContent.replace(/\\s+/g, ' ')`), /Filled from the persona|It fills in the name and prompt/);
         });
         await S.run('step 2: the recap above the buttons names the agent once there is a name', async () => {
             const r = await ev(`(() => { const d = window.__na.dialog(); const t = d.textContent.replace(/\\s+/g, ' '); return t; })()`);

@@ -36,11 +36,12 @@ export function setLaunchStage(stage) {
     if (!step) return;
     step.dataset.stage = stage;
     const modal = document.getElementById("launch-modal");
-    if (modal) modal.setAttribute('data-agent-stage', stage);
-    const n = stages.indexOf(stage) + 1, total = stages.length, dir = (document.getElementById("launch-dir")?.value || '').trim();
-    const sub = `Step ${n} of ${total}: ${STAGE_NAMES[stage]}${stage !== 'folder' && dir ? '. In ' + dir : ''}`;
+    if (modal) { modal.setAttribute('data-agent-stage', stage); modal.toggleAttribute('data-all-optional', stage === 'persona' && !launch.member); }
+    const n = stages.indexOf(stage) + 1, total = stages.length;
+    const allOptional = stage === 'persona' && !launch.member; // a member's role is required: its step is not "all optional"
+    const sub = `Step ${n} of ${total}: ${STAGE_NAMES[stage]}${allOptional ? ', all optional' : ''}`; // the folder is said once, in the footer's recap (#10835)
     const subEl = document.getElementById("launch-stage-sub");
-    if (subEl) { subEl.textContent = ''; if (stage !== 'folder' && dir) { subEl.append(`Step ${n} of ${total}: ${STAGE_NAMES[stage]}. In `); const b = document.createElement('b'); b.textContent = dir; subEl.append(b); } else subEl.textContent = sub; }
+    if (subEl) subEl.textContent = sub;
     const back = document.getElementById("launch-agent-back"), next = document.getElementById("launch-agent-next"), go = document.getElementById("launch-agent-go"), save = document.getElementById("launch-agent-save");
     if (back) back.hidden = stage === stages[0];
     if (next) next.hidden = stage === 'agent';

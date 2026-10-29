@@ -182,20 +182,13 @@ function _selectAgentPreset(name) {
             capabilities: persona.capabilities,
         });
         if (nameInput) nameInput.value = persona.name;
-        _nameHelp(true);
     } else {
         setAgentConfig('launch-agent-acf', {
             agentType: _settingsFor(_effectiveServer(launch.server)).default_agent_type || current.agentType,
         });
         if (nameInput) nameInput.value = '';
-        _nameHelp(false);
     }
 }
 
-// The line under Name says where the name came from: one line either way, so nothing on the page moves (#7391).
-function _nameHelp(filled) {
-    const el = document.querySelector('.launch-name-help');
-    if (el) el.textContent = filled ? 'Filled from the persona. Change it if you want a different name.' : 'Choose a persona above and its name goes here, or type your own.';
-}
 
 export { _initAgentPresets, _selectAgentPreset };

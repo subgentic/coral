@@ -57,7 +57,7 @@ const DIR = '/work/crew';
             await ev(`(() => { const b = document.createElement('button'); b.id = 'qa-team-add'; b.type = 'button'; b.dataset.onClick = 'team-add-agent'; b.dataset.board = ${JSON.stringify(TEAM)}; b.dataset.dir = ${JSON.stringify(DIR)}; document.body.append(b); b.click(); return true; })()`);
             await waitFor(`${OPEN} && document.getElementById('launch-step-agent').dataset.stage === 'persona'`, `${label}: the dialog from the dropdown, on the persona step`);
             assert.equal(await title(), `Add agent to ${TEAM}`);
-            assert.match(await sub(), new RegExp(`^Step 1 of 2: Persona\\. In ${DIR}`), `${label}: two steps, the folder is the team's`);
+            assert.match(await sub(), /^Step 1 of 2: Persona, all optional$/, `${label}: two steps, the folder is in the footer, not the title`);
             assert.equal(await vis('launch-agent-back'), false, `${label}: nothing is before the persona step`);
             assert.equal(await vis('launch-agent-next'), true);
             assert.equal(await ev(`getComputedStyle(document.querySelector('#launch-step-agent .launch-back-btn')).display`), 'none', `${label}: no way back to the chooser`);
