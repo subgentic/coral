@@ -406,6 +406,9 @@ func finishScript(withAgents bool) string {
 	p("rm -rf /var/lib/cloud/instance/user-data.txt* /var/lib/cloud/instance/cloud-config.txt /var/lib/cloud/instance/scripts /var/lib/cloud/instance/vendor-data*")
 	p("rm -rf /var/lib/cloud/instances/*/user-data.txt* /var/lib/cloud/instances/*/cloud-config.txt /var/lib/cloud/instances/*/scripts /var/lib/cloud/instances/*/vendor-data*")
 	p("rm -f /var/lib/cloud/seed/nocloud*/user-data /var/lib/cloud/seed/nocloud*/meta-data")
+	p("# cloud-init's pickled copy of the instance data, its instance-data JSON under /run, and the rotated logs hold the user-data too. Not a full cloud-init reset: a reboot would then run the user-data again and open SSH.")
+	p("rm -f /var/lib/cloud/instance/obj.pkl /var/lib/cloud/instances/*/obj.pkl /var/lib/cloud/data/instance-data*.json /run/cloud-init/instance-data*.json /run/cloud-init/combined-cloud-config.json")
+	p("rm -f /var/log/cloud-init.log.* /var/log/cloud-init-output.log.* /var/log/cloud-init*.log.*")
 	p("for f in /var/log/cloud-init.log /var/log/cloud-init-output.log; do [ -f \"$f\" ] && : > \"$f\"; done")
 	p("systemctl enable coral.service 2>/dev/null || true")
 	if withAgents {
