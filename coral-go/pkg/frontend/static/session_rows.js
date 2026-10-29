@@ -324,7 +324,7 @@ export function _renderSessionItem(s, groupName, isCompact, collapsed, teamDefau
         data-group="${escapeAttr(groupName)}"
         ${clickHandler}>
         <span class="drag-grip" title="Drag to reorder">&#x2630;</span>
-        <div class="session-info" data-status="${escapeAttr(stateInfo.label)}">
+        <div class="session-info">
             <div class="session-name-row">
                 <span class="session-dot ${dotClass}${ctxHigh ? ' ctx-high' : ''}" aria-hidden="true"></span>
                 <span class="session-label list-row-title${nameTail ? ' session-label-split' : ''}"><span class="session-label-name${s.agent_type === 'terminal' ? ' is-terminal' : ''}"${agentNameColor(s) ? ` style="--agent-name-color:${agentNameColor(s)}"` : ''}>${nameTail ? `<span class="sln-head">${escapeHtml(nameHead)}</span><span class="sln-tail">${escapeHtml(nameTail)}</span>` : escapeHtml(displayLabel)}</span>${nameTail ? `<span class="session-label-tags">${reminderTag}${typeTag}${dirChip}</span>` : `${reminderTag}${typeTag}${dirChip}`}</span>${autoAcceptChip(s)}${terminalGoneChip(s)}${hooksMissingChip(s)}
@@ -332,6 +332,7 @@ export function _renderSessionItem(s, groupName, isCompact, collapsed, teamDefau
                 ${stale ? '' : waitingBadge + heldChip}
                 ${stale ? '' : kebabMenu}
             </div>
+            <span class="session-status-line">${escapeHtml(stateInfo.label)}</span>
             ${rowLinesHtml(s)}
         </div>
         <div class="session-tooltip"></div>

@@ -766,8 +766,8 @@
 
     /* A card that needs the Operator has no amber border or glow of its own (#5123): its flashing dot and the state chip carry it. */
     #mobile-session-list .session-group-item .chip.session-state-pill { display: none; } /* a state is a sentence under the name, not a pill (#10691) */
-    #mobile-session-list .session-info::after { content: attr(data-status); display: block; margin-left: var(--row-dot-block); font-size: var(--fs-md); font-weight: var(--fw-regular); color: var(--text-secondary); } /* one muted line, in sentence case: "Needs input", "Working" */
-    #mobile-session-list .session-group-item.needs-attention .session-info::after { color: var(--warning); }
+    #mobile-session-list .session-status-line { display: block; margin-left: var(--row-dot-block); font-size: var(--fs-md); font-weight: var(--fw-regular); color: var(--text-secondary); } /* one muted line, in sentence case: "Needs input", "Working"; a real span, so a screen reader and find-in-page have it (#10801) */
+    #mobile-session-list .session-group-item.needs-attention .session-status-line { color: var(--warning); }
     #mobile-session-list .sleeping-summary-row, #mobile-session-list .sleeping-summary-label { font-style: normal; } /* no italics in the list */
     #mobile-session-list .session-line2, #mobile-session-list .session-model { padding-left: 0; margin-left: var(--row-dot-block); } /* Show summary and Show model start under the name, where the status line does (#10872): the sidebar's 18 px indent is 6 px short of the phone row's grid */
 

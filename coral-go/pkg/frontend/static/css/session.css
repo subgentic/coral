@@ -1791,3 +1791,6 @@ body .terminal-header { flex-wrap: wrap; height: auto; min-height: 36px; row-gap
 
 /* Show summary and Show model (#10816): one quiet line each, only when on */
 .session-line2, .session-model { padding-left: 18px; font-size: var(--fs-sm); color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* The agent row's status sentence (#10801): the phone's list shows it as the row's second line (mobile.css); the sidebar says it with the state pill, so it is not drawn there. */
+.session-status-line { display: none; }
