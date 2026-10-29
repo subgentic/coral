@@ -149,7 +149,10 @@ async function openTab({ contextId, width, height, mobile, fakeHubView = false, 
         await waitFor(`typeof window.selectLiveSession === 'function' && typeof window.setLiveViewMode === 'function'`, 'the dashboard');
     };
     // Leave the dashboard before closing: a closing tab loses its emulated size (#3422 test notes).
+    // The sockets are closed first: a tab that is going away can lose its emulated phone (the pointer and the size) a moment before the navigation ends, and on a Linux runner the dashboard then fit itself as a desktop window and set the shared pane (68x8,
+    // 60x5) while the NEXT step's tab was waiting to see it still 80x24: the step 12 red of the tmux leg (#10771). A closed socket sends nothing, and the page does not get to reconnect before it is gone.
     const close = async () => {
+        try { await ev(`window.__closing = true; (window.__termSockets || []).forEach(w => { try { w.close(); } catch {} }); true`); } catch {}
         try { await Page.navigate({ url: 'about:blank' }); await Page.loadEventFired(); } catch {}
         try { const c = await browserClient(); await c.Target.closeTarget({ targetId }); await c.close(); } catch {}
         try { await client.close(); } catch {}
