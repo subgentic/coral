@@ -20,7 +20,8 @@ const { connect } = require('./agent_view_harness');
         assert.equal(await ev(`[...document.getElementById('settings-theme').options].find(o => o.textContent === 'Dark (custom)').value`), 'custom:Dark');
         console.log('2. a CLI path field says it wants a full path');
         const ph = await ev(`['claude', 'codex', 'agy', 'pi'].map(t => document.getElementById('settings-cli-path-' + t).placeholder)`);
-        for (const [i, t] of ['claude', 'codex', 'agy', 'pi'].entries()) assert.ok(ph[i].startsWith(`Full path, e.g. /usr/local/bin/${t}`), `${t}: ${ph[i]}`);
+        const win = await ev(`/^win/i.test(navigator.userAgentData?.platform || navigator.platform || '')`); // a Windows path on Windows (#10787)
+        for (const [i, t] of ['claude', 'codex', 'agy', 'pi'].entries()) assert.ok(ph[i].startsWith(`Full path, e.g. ${win ? `C:\\Program Files\\${t}\\${t}.exe` : `/usr/local/bin/${t}`}`), `${t}: ${ph[i]}`);
         console.log('3. Close with a change not saved opens the Discard dialog on the first click');
         await ev(`(() => { const s = document.getElementById('settings-theme'); s.value = 'light'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
         const at = await ev(`(() => { const b = document.getElementById('settings-cancel-btn').getBoundingClientRect(); return { x: Math.round(b.left + b.width / 2), y: Math.round(b.top + b.height / 2) }; })()`);

@@ -13,7 +13,9 @@ const BASE = require('./test_base').BASE;
         await ev(`window.showSettingsModal(); true`);
         await waitFor(`!!document.getElementById('settings-cli-path-agy')`, 'the CLI path fields', 15000);
         const got = await ev(`Object.fromEntries(['claude', 'codex', 'agy', 'pi'].map(t => [t, document.getElementById('settings-cli-path-' + t).placeholder]))`);
-        assert.deepEqual(got, { claude: 'Full path, e.g. /usr/local/bin/claude', codex: 'Full path, e.g. /usr/local/bin/codex', agy: 'Full path, e.g. /usr/local/bin/agy (Antigravity)', pi: 'Full path, e.g. /usr/local/bin/pi (the Pi coding agent)' }, 'each field names its program: ' + JSON.stringify(got));
+        const win = await ev(`/^win/i.test(navigator.userAgentData?.platform || navigator.platform || '')`); // the example is a Windows path on Windows (#10787): the platform the page reports decides which one is expected
+        const eg = t => win ? `C:\\Program Files\\${t}\\${t}.exe` : `/usr/local/bin/${t}`;
+        assert.deepEqual(got, { claude: `Full path, e.g. ${eg('claude')}`, codex: `Full path, e.g. ${eg('codex')}`, agy: `Full path, e.g. ${eg('agy')} (Antigravity)`, pi: `Full path, e.g. ${eg('pi')} (the Pi coding agent)` }, 'each field names its program: ' + JSON.stringify(got));
         console.log('PASS the CLI path placeholders name their program');
     } finally { await client.close(); }
 })().catch(e => { console.error(e.message); process.exit(1); });
