@@ -13,7 +13,6 @@ import (
 var (
 	_ Network       = (*DigitalOcean)(nil)
 	_ NetworkLister = (*DigitalOcean)(nil)
-	_ KeyRemover    = (*DigitalOcean)(nil)
 )
 
 // uuidRe is a DigitalOcean VPC or firewall id.
@@ -179,12 +178,4 @@ func (d *DigitalOcean) ListFirewalls(ctx context.Context) ([]Firewall, error) {
 		}
 	}
 	return all, nil
-}
-
-// DeleteSSHKey removes an ssh key the launch registered (DELETE /account/keys/{id}); one already gone is ErrNotFound.
-func (d *DigitalOcean) DeleteSSHKey(ctx context.Context, id string) error {
-	if !keyRe.MatchString(id) {
-		return errors.New("digitalocean: the id is not an ssh key id or fingerprint")
-	}
-	return d.do(ctx, "delete an ssh key", http.MethodDelete, "/account/keys/"+id, nil, nil, nil)
 }

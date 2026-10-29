@@ -178,6 +178,13 @@ func Launch(ctx context.Context, o Options, d Deps) (*Result, error) {
 	boot, err := d.Bootstrap.Bootstrap(ctx, BootRequest{Instance: running, Keys: keys, Out: d.Out, Mint: func(ctx context.Context) (string, error) { // the credential is minted inside, after the handshake
 		c, err := d.Hub.Mint(ctx, o.Name)
 		minted = minted || err == nil
+		if err == nil { // the id of the credential (not the credential) goes to the state file AT ONCE: a crash between here and the end still leaves `coral machine delete` able to revoke the machine's Hub identity by it (#10944)
+			if h, ok := d.Hub.(credentialIDer); ok {
+				if id := h.CredentialID(o.Name); id != "" {
+					ls.set(func(r *Record) { r.CredentialID = id }, d.Out)
+				}
+			}
+		}
 		return c, err
 	}})
 	if err != nil {
@@ -197,11 +204,6 @@ func Launch(ctx context.Context, o Options, d Deps) (*Result, error) {
 	label := boot.Label
 	if label == "" {
 		label = o.Name
-	}
-	if h, ok := d.Hub.(credentialIDer); ok { // the id of the credential (not the credential) goes to the state file: `delete` revokes the machine's Hub identity by it
-		if id := h.CredentialID(o.Name); id != "" {
-			ls.set(func(r *Record) { r.CredentialID = id }, d.Out)
-		}
 	}
 	if net != nil { // closeDoor: the credential is delivered, so nothing is allowed in at the cloud firewall (the machine closes its own SSH too)
 		cctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)

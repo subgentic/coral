@@ -152,14 +152,6 @@ func TestCreateMakesTheDropletInTheVPC(t *testing.T) {
 	assert.Error(t, err)
 }
 
-func TestDeleteSSHKeyIsByIdOrFingerprint(t *testing.T) {
-	s, d := newStub(t, func(w http.ResponseWriter, r *http.Request, _ []byte) { w.WriteHeader(http.StatusNoContent) })
-	require.NoError(t, d.DeleteSSHKey(t.Context(), "ab:cd:ef:01"))
-	assert.Equal(t, "DELETE", s.requests[0].Method)
-	assert.Equal(t, "/account/keys/ab:cd:ef:01", s.requests[0].Path)
-	assert.Error(t, d.DeleteSSHKey(t.Context(), "../account"))
-}
-
 func TestFirewallSource(t *testing.T) {
 	for _, ok := range []string{"203.0.113.7", "203.0.113.0/24", "2001:db8::1", "2001:db8::/48"} {
 		_, err := firewallSource(ok)

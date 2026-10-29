@@ -3,6 +3,7 @@ package machinelaunch
 import (
 	"context"
 	"errors"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -174,4 +175,68 @@ func TestLaunchWarnsWhenTheFirewallWillNotClose(t *testing.T) {
 	require.NotNil(t, res)
 	assert.Contains(t, out.String(), "WARNING: could not close the cloud firewall")
 	assert.Contains(t, out.String(), "coral machine delete coral-1")
+}
+
+// midBoot is a bootstrap that mints and then looks at the state file before it returns: what a crash right after the mint would leave.
+type midBoot struct {
+	st      *State
+	name    string
+	seen    Record
+	fail    error
+	started bool
+}
+
+func (b *midBoot) Bootstrap(ctx context.Context, req BootRequest) (BootResult, error) {
+	b.started = true
+	if _, err := req.Mint(ctx); err != nil {
+		return BootResult{}, err
+	}
+	b.seen, _ = b.st.Get(b.name) // the state at the moment after the mint, before anything else happens
+	if b.fail != nil {
+		return BootResult{}, b.fail
+	}
+	return BootResult{State: "connected", Label: b.name}, nil
+}
+
+// #10944: the credential's id is in the state file right after the mint, so a crash between the mint and the end still lets `coral machine delete` revoke the machine's Hub identity.
+func TestLaunchWritesTheCredentialIdToTheStateFileRightAfterTheMint(t *testing.T) {
+	p, h := newIso(), &stubHub{}
+	o, d, st, _ := isoSetup(t, p, h)
+	d.Hub = idHub{h, "5b6c0f2e-0000-4000-8000-000000000001"}
+	mb := &midBoot{st: st, name: o.Name}
+	d.Bootstrap = mb
+	_, err := Launch(t.Context(), o, d)
+	require.NoError(t, err)
+	assert.Equal(t, "5b6c0f2e-0000-4000-8000-000000000001", mb.seen.CredentialID, "already there when the mint returned")
+	assert.Equal(t, "42", mb.seen.DropletID)
+
+	// a failure after the mint that cannot remove everything keeps the record, with the credential id, for delete to revoke by
+	p2, h2 := newIso(), &stubHub{}
+	p2.cloud.failOn["DeleteFirewall:fw-2"] = errors.New("provider hiccup")
+	o2, d2, st2, _ := isoSetup(t, p2, h2)
+	d2.Hub = idHub{h2, "5b6c0f2e-0000-4000-8000-000000000002"}
+	d2.Bootstrap = &midBoot{st: st2, name: o2.Name, fail: errors.New("the machine did not take its credential")}
+	_, err = Launch(t.Context(), o2, d2)
+	require.Error(t, err)
+	rec, ok := st2.Get(o2.Name)
+	require.True(t, ok, "the record stays: something could not be removed")
+	assert.Equal(t, "5b6c0f2e-0000-4000-8000-000000000002", rec.CredentialID, "and it names the credential, so delete can revoke it")
+}
+
+// #10944 (INFO): an ssh key the person gave with --ssh-key is theirs. A launch passes it to the provider and never records it, and delete has no way to remove a key.
+func TestLaunchNeverRecordsAnSSHKeyThePersonGave(t *testing.T) {
+	p, h := newIso(), &stubHub{}
+	o, d, st, _ := isoSetup(t, p, h)
+	o.SSHKeys = []string{"ab:cd:ef:01:23"}
+	_, err := Launch(t.Context(), o, d)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"ab:cd:ef:01:23"}, p.stubProvider.spec.SSHKeys, "it reaches the provider, for the droplet")
+	raw, err := os.ReadFile(st.path)
+	require.NoError(t, err)
+	assert.NotContains(t, string(raw), "ab:cd:ef:01:23", "and is nowhere in the state file")
+	assert.NotContains(t, string(raw), "ssh", "which has no field for a key")
+	_, canDeleteKeys := interface{}(p.cloud).(interface {
+		DeleteSSHKey(context.Context, string) error
+	})
+	assert.False(t, canDeleteKeys, "no provider here can delete an ssh key: delete removes the instance, the firewall and the VPC only")
 }

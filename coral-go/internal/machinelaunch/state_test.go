@@ -15,7 +15,7 @@ import (
 )
 
 func goodRecord(name string) Record {
-	return Record{Name: name, Provider: "digitalocean", Region: "nyc3", LaunchTag: "coral-launch-0123456789ab", DropletID: "4242", VPCID: vpcUUID, FirewallID: fwUUID, SSHKeyID: "ab:cd:ef:01", CredentialID: "5b6c0f2e-0000-4000-8000-000000000001", Created: time.Date(2026, 10, 29, 10, 0, 0, 0, time.UTC)}
+	return Record{Name: name, Provider: "digitalocean", Region: "nyc3", LaunchTag: "coral-launch-0123456789ab", DropletID: "4242", VPCID: vpcUUID, FirewallID: fwUUID, CredentialID: "5b6c0f2e-0000-4000-8000-000000000001", Created: time.Date(2026, 10, 29, 10, 0, 0, 0, time.UTC)}
 }
 
 // The file is 0600 in a 0700 folder, holds ids, and survives a reopen.
@@ -60,8 +60,8 @@ func TestStateFileRefusesAnythingThatIsNotAnId(t *testing.T) {
 		"a provider token as an id":     func(r *Record) { r.DropletID = "dop_v1_abcdef0123456789" },
 		"a bootstrap credential":        func(r *Record) { r.CredentialID = "chb_0123456789abcdef" },
 		"a destroy credential":          func(r *Record) { r.CredentialID = "chd_0123456789abcdef" },
-		"a Hub key":                     func(r *Record) { r.SSHKeyID = "chk_0123" },
-		"a private key":                 func(r *Record) { r.SSHKeyID = "-----BEGIN OPENSSH PRIVATE KEY-----" },
+		"a Hub key":                     func(r *Record) { r.CredentialID = "chk_0123" },
+		"a private key":                 func(r *Record) { r.FirewallID = "-----BEGIN OPENSSH PRIVATE KEY-----" },
 		"an id with a slash":            func(r *Record) { r.VPCID = "a/b" },
 		"an id with a space":            func(r *Record) { r.FirewallID = "a b" },
 		"a name that is not a hostname": func(r *Record) { r.Name = "Not A Host" },
