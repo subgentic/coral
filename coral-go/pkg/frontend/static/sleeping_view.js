@@ -8,7 +8,7 @@ import { importOnce } from './import_once.js';
 import { state } from './state.js';
 import { resolveSessionIdentity } from './session_state.js';
 import { askedBefore, dismissAsked, askedWords } from './asked_before_restart.js';
-import { isStartFailed, startFailedText } from './start_failed.js';
+import { isStartFailed, startFailedSentence } from './start_failed.js';
 
 const lastState = new Map(); // session_id -> the words its state last had, to say a change once (#6213)
 let stateFlip = false;
@@ -61,7 +61,7 @@ export function applySleepingView(sleeping, { manageInput = true, archived } = {
     const hint = document.getElementById('sleeping-composer-hint');
     if (hint) { const words = ended ? 'Wake continues this conversation; Restart starts a fresh session with new settings.' : ''; if (hint.textContent !== words) hint.textContent = words; hint.hidden = !ended; }
     if (text) {
-        const next = archived ? 'This agent is archived' : failedStart ? startFailedText(who, row) : gone ? "This agent's terminal is gone" : ended ? endedText : 'This agent is sleeping';
+        const next = archived ? 'This agent is archived' : failedStart ? `${who} ${startFailedSentence(row)}` : gone ? "This agent's terminal is gone" : ended ? endedText : 'This agent is sleeping';
         if (text.textContent !== next) text.textContent = next; // a status line: written only when it changes, so it is announced once
     }
     // What it asked before Coral restarted (#10368): its CLI is gone, so the words, with Restart (below) and Dismiss; written only when they change, so a status is announced once.

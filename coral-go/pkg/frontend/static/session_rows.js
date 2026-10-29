@@ -381,8 +381,9 @@ export function _renderAgentListWithSubgroups(agents, teamDefaultDir, isCompact,
     // An agent asleep because its terminal is gone stays in view with its "Terminal gone" chip
     // (#3344), not folded into the "N sleeping agents" row: it needs a Restart, not a nap.
     // One whose CLI exited stays in view too, with an "Ended" chip (#6058), and one whose start was refused for its CLI with a "Failed to start" chip (#353).
-    const awake = agents.filter(s => !s.sleeping || isGoneAsleep(s) || isExitedAsleep(s) || isStartFailed(s));
-    const sleeping = agents.filter(s => s.sleeping && !isGoneAsleep(s) && !isExitedAsleep(s) && !isStartFailed(s));
+    const stays = s => isGoneAsleep(s) || isExitedAsleep(s) || isStartFailed(s);
+    const awake = agents.filter(s => !s.sleeping || stays(s));
+    const sleeping = agents.filter(s => s.sleeping && !stays(s));
 
     // One flat list: an agent's folder is shown in the header bar, not as
     // sidebar sub-groups.

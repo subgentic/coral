@@ -63,7 +63,7 @@ export function terminalGoneChip(s) {
     const failed = isStartFailed(s);
     if (!ended && !failed && !isTerminalGone(s)) return '';
     const word = failed ? 'Failed to start' : ended ? 'Ended' : 'Terminal gone';
-    const title = failed ? "This agent could not start: its CLI is missing. Click to restart it once Settings > CLI paths is fixed." : ended ? "This agent's CLI exited. Click to restart it." : "This agent's terminal is gone. Click to restart it.";
+    const title = failed ? "Its CLI is missing or can't be run. Click to restart once that is fixed." : ended ? "This agent's CLI exited. Click to restart it." : "This agent's terminal is gone. Click to restart it.";
     return `<button type="button" class="terminal-gone-chip" title="${title}"`
         + `${ended || failed ? ` aria-label="${word}. Restart"` : ''} data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type || '')}" data-session-id="${escapeAttr(s.session_id)}">${word}</button>`;
 }

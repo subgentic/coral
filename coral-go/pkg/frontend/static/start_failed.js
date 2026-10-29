@@ -3,8 +3,7 @@
    sentence as text (textContent, never markup), after the agent's own name, so the server and the page cannot say different things. */
 
 const REASONS = new Set(['cli_missing', 'cli_untrusted_mount', 'cli_path_unusable']);
-const MAX_WORDS = 300;
-const FALLBACK = 'failed to start: its CLI is missing or can’t be run. Set its path in Settings > CLI paths.';
+const FALLBACK = 'failed to start: its CLI is missing or can’t be run.';
 
 /** True for a sleeping, not archived agent whose start was refused for its CLI. */
 export function isStartFailed(row) {
@@ -14,10 +13,5 @@ export function isStartFailed(row) {
 /** The sentence for a failed-start row: the server's, bounded, or a plain one when an older server sent none. */
 export function startFailedSentence(row) {
     const t = row && typeof row.start_failure_text === 'string' ? row.start_failure_text.trim() : '';
-    return (t || FALLBACK).slice(0, MAX_WORDS);
-}
-
-/** "<who> failed to start: ..." for the composer's status line. */
-export function startFailedText(who, row) {
-    return `${who} ${startFailedSentence(row)}`;
+    return (t || FALLBACK).slice(0, 300);
 }
