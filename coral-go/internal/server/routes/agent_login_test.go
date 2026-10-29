@@ -272,3 +272,44 @@ func TestAgyQuotaNoticeFromTheLiveScreen(t *testing.T) {
 	// Nothing about a quota: no notice.
 	assert.Empty(t, h.usageLimitText(at.Agy, "", "", map[string]any{"recent_lines": []string{"● Done.", "", "> ", "? for shortcuts      Gemini 3.8 Flash · high"}}))
 }
+
+// #11084: Pi signed in with a Claude plan is refused with a 400 ("Third-party apps now draw from your extra usage"). The lines are the operator's screenshot of the Pi pane, wrapped at the pane's width: a hyphenated
+// word ("Third-" / "party") and the sentence are cut across lines.
+var piExtraUsagePane = []string{
+	"> hello",
+	"",
+	"Error: 400",
+	`{"type":"error","error":{"type":"invalid_request_error","message":"Third-`,
+	"party apps now draw from your extra usage, not your plan limits. Add more",
+	"at claude.ai/settings/usage and keep",
+	`going."},"request_id":"req_011CgX6UD8Z6cAfMi1MWibgE"}`,
+	"",
+}
+
+func TestPiExtraUsageNotice(t *testing.T) {
+	got := piLimitText(map[string]any{"recent_lines": piExtraUsagePane})
+	assert.Contains(t, got, "claude.ai/settings/usage", "it names the three ways forward: extra usage, an API key, another provider")
+	assert.Contains(t, got, "ANTHROPIC_API_KEY")
+	assert.Contains(t, got, "--model provider/id")
+	assert.NotContains(t, got, "request_id", "plain words, not Pi's raw JSON")
+	assert.NotContains(t, got, "{")
+	assert.LessOrEqual(t, len(piExtraUsageNotice), maxCLIText, "the cap must not cut an option off")
+	assert.Equal(t, piExtraUsageNotice, got)
+
+	// Wrapped at another width the same words are found.
+	wide := []string{"Error: 400", `{"type":"error","error":{"type":"invalid_request_error","message":"Third-party apps now draw from your extra usage, not your plan limits. Add more at claude.ai/settings/usage and keep going."},"request_id":"req_x"}`}
+	assert.NotEmpty(t, piLimitText(map[string]any{"recent_lines": wide}))
+
+	// Not for other errors, an idle Pi, or the words quoted in the middle of a long scrollback.
+	assert.Empty(t, piLimitText(map[string]any{"recent_lines": []string{"Error: 400", `{"error":{"message":"max_tokens: too large"}}`}}))
+	assert.Empty(t, piLimitText(map[string]any{"recent_lines": []string{"> hello", "Hi! How can I help?"}}))
+	assert.Empty(t, piLimitText(map[string]any{}))
+	old := append(append([]string{}, piExtraUsagePane...), strings.Split(strings.Repeat("more output\n", piLimitLines), "\n")...)
+	assert.Empty(t, piLimitText(map[string]any{"recent_lines": old}), "scrolled away once Pi runs again")
+}
+
+func TestUsageLimitTextForPi(t *testing.T) {
+	h := &SessionsHandler{}
+	assert.NotEmpty(t, h.usageLimitText(at.Pi, "sid", "/w", map[string]any{"recent_lines": piExtraUsagePane}))
+	assert.Empty(t, h.usageLimitText(at.Pi, "sid", "/w", map[string]any{"recent_lines": []string{"all fine"}}))
+}

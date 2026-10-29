@@ -156,8 +156,45 @@ func (h *SessionsHandler) usageLimitText(agentType, sessionID, workingDir string
 		return codexLimitText(logInfo)
 	case at.Agy, at.Antigravity, at.Gemini:
 		return h.agyLimitText(sessionID, workingDir, logInfo)
+	case at.Pi:
+		return piLimitText(logInfo)
 	}
 	return ""
+}
+
+// piExtraUsageRe: the 400 Anthropic gives a third-party app signed in with a Claude plan, as Pi prints it (#11084): "Third-party apps now draw from your extra usage, not your plan limits. Add more at
+// claude.ai/settings/usage and keep going." Pi's pane wraps it, so the lines are joined first (piJoinLines) and the match allows the hyphen of "Third-party" to be cut.
+var piExtraUsageRe = regexp.MustCompile(`(?i)third-?\s*party apps now draw from your extra usage`)
+
+// piLimitLines: only the terminal's last lines count; the error scrolls away once Pi runs again. The raw error is up to five lines at a narrow width.
+const piLimitLines = 10
+
+// piExtraUsageNotice is what the person is told instead of Pi's raw JSON: why, and the three ways forward.
+const piExtraUsageNotice = "Pi can't use this Claude login: Anthropic bills third-party apps to extra usage, and none is added. Add some at claude.ai/settings/usage, use an Anthropic API key (ANTHROPIC_API_KEY, or /login in Pi), or pick another provider (--model provider/id, or Settings > Custom models)."
+
+// piLimitText is the notice for Pi's extra-usage refusal, or "": the exact error in the last lines of its terminal, never any text that merely mentions extra usage.
+func piLimitText(logInfo map[string]any) string {
+	lines, _ := logInfo["recent_lines"].([]string)
+	if len(lines) > piLimitLines {
+		lines = lines[len(lines)-piLimitLines:]
+	}
+	if piExtraUsageRe.MatchString(piJoinLines(lines)) {
+		return capCLIText(piExtraUsageNotice)
+	}
+	return ""
+}
+
+// piJoinLines joins a wrapped terminal's lines back into text: a line that ends in a hyphen continues in the next without a space ("Third-" + "party"), any other gets one.
+func piJoinLines(lines []string) string {
+	var b strings.Builder
+	for _, l := range lines {
+		l = strings.TrimRight(l, " \t")
+		b.WriteString(l)
+		if !strings.HasSuffix(l, "-") {
+			b.WriteByte(' ')
+		}
+	}
+	return b.String()
 }
 
 // agyLimitRe: Antigravity's rate-limit, resource-exhausted and quota messages, from real 1.4.2 CLI output.
