@@ -133,7 +133,8 @@ async function sendRelaunch(go, later) {
         dialog.querySelector('.modal-actions').insertBefore(a, go); go.hidden = true; a.focus();
         return;
     }
-    say(reasonText(res.code)); // a sentence that Coral did not say why for a reason this build does not know; never the server's own words
+    const a = mk('a', 'update-download-fallback', `Download Coral ${current.staged.version} yourself`); a.href = `${RELEASES_URL}/releases/latest`; a.target = '_blank'; a.rel = 'noopener'; // a failure ends with something to do: Update again (the button is back), or this
+    say(reasonText(res.code)).append(' ', a); // a sentence that Coral did not say why for a reason this build does not know; never the server's own words
 }
 
 /** Waits for the new Coral (#10834): the server is down while it installs; when it answers as the new version the page reloads and update_ui.js says "Coral is now X" there. Gives up after four minutes (the note above says what to do). */

@@ -25,6 +25,13 @@ const BASE = require('./test_base').BASE;
         await ev(`window.__st = { ...window.__st, installed: '9.9.9', state: 'none', staged: null }; document.querySelectorAll('.toast').forEach(e => e.remove()); import(${S} + 'update_ui.js').then(m => m.refreshUpdateStatus()).then(() => true)`);
         await waitFor(`/Coral is now 9\\.9\\.9/.test(document.body.innerText)`, 'the Coral is now line', 6000);
         assert.equal(await ev(`sessionStorage.getItem('coral-updated-to')`), null, 'said once');
+        // a refused install ends with something to do: the button is back and a download link says so
+        await ev(`window.__st = ${JSON.stringify(READY)}; (() => { const R = window.fetch; window.fetch = (u, o) => String(u).endsWith('/relaunch-local') ? Promise.resolve(new Response(JSON.stringify({ code: 'updater_not_started' }), { status: 500, headers: { 'Content-Type': 'application/json' } })) : R(u, o); })(); import(${S} + 'update_ui.js').then(async m => { await m.refreshUpdateStatus(); const d = await import(${S} + 'update_dialog.js'); d.openUpdateDialog(m.getUpdateStatus()); return true; })`);
+        await waitFor(`!!document.querySelector('#update-confirm-modal .update-go')`, 'the confirmation again', 6000);
+        await ev(`document.querySelector('#update-confirm-modal .update-go').click(); true`);
+        await waitFor(`!!document.querySelector('#update-confirm-modal .update-error')`, 'the refusal', 6000);
+        const f = await ev(`(() => { const e = document.querySelector('#update-confirm-modal .update-error'); const a = e.querySelector('a'); return { text: e.textContent, href: a && a.href, again: !document.querySelector('#update-confirm-modal .update-go').disabled }; })()`);
+        assert.ok(/Download Coral 9\.9\.9 yourself/.test(f.text) && /github\.com\/subgentic\/coral\/releases\/latest$/.test(f.href) && f.again, 'a failure has the way on: ' + JSON.stringify(f));
         console.log('PASS');
     } finally { try { await client.close(); } catch (e) {} }
 })().catch(e => { console.error(e); process.exit(1); });
