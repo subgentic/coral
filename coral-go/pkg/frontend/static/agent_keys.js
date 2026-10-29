@@ -12,7 +12,7 @@ import { setAttr, setText } from './dom_write.js';
 import { sendRawKeys } from './controls.js';
 import { browserLocal } from './safe_storage.js';
 import { setTerminalKeysOpen } from './terminal_statusbar.js';
-import { cancelHeldForStop, hasHeldForStop } from './held_sends.js';
+import { cancelHeldForStop, hasHeldForStop, forgetSendGrace } from './held_sends.js';
 
 const $ = id => document.getElementById(id);
 const STOP_AGAIN_MS = 3000;
@@ -158,6 +158,7 @@ async function stopAgent(silentFail) {
     const back = sid && hasHeldForStop(sid) ? await cancelHeldForStop(sid) : 0;
     const sent = await sendRawKeys(['Escape'], { silent: true });
     if (sent === false) { endStopping(silentFail); return false; }
+    forgetSendGrace(sid); // the Escape went: a message just sent is no longer in flight for the Working row (#11052)
     stoppedNote = back ? `${back === 1 ? 'The message' : `${back} messages`} that waited ${back === 1 ? 'was' : 'were'} not sent: back in the box.` : '';
     return true;
 }

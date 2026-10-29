@@ -149,6 +149,11 @@ async function cancelQueued(sid, heldId, quiet = false) {
     } catch (err) { cancelling.delete(own); showToast('Could not cancel the queued message. Check the connection.', true); }
 }
 
+/** Stop was pressed for this agent: a message just sent is not in flight for the Working row any more (its 90 s grace for "nothing back yet" is forgotten), so the row goes with the agent's own state when the agent stops (#11052: it went on counting after Stop). */
+export function forgetSendGrace(sessionId) {
+    if (sessionId && state.lastSendAt) state.lastSendAt.delete(sessionId);
+}
+
 /** Stop (#10673): this device's held messages are dropped before the agent's question is dismissed (or they would be typed to an agent that was told to stop), and their texts go back into the box together. Returns how many came back. */
 export async function cancelHeldForStop(sid) {
     const mine = queued.get(sid) ? [...queued.get(sid).values()].filter(i => i.mine && !i.sending) : [];
