@@ -121,6 +121,8 @@ Routing and identity record for one session ID (used by the popout). `sessionID`
 
 `state` is `active`, `sleeping`, `finished` or `not_found`. `tmux_session` is `null` unless the session is awake. The full record also carries `working_directory`, `display_name`, `board_project`, `icon`, `status`, `first_prompt` and the turn-state fields of the list rows.
 
+Each row of the live list also has `last_message`: `{role, text, at}` of the newest message with text in the agent's transcript (the first 140 characters, redacted; `null` when there is none). A `role` of `user` is what the person last said to that agent, which is person text: an agent's own token gets `last_message` as `null` for a user-role message on every row it may read (as for `held_messages` and `pending_sends`) and keeps an `assistant`-role one; the Operator and the dashboard get both.
+
 ---
 
 ### GET `/api/sessions/resolve`
