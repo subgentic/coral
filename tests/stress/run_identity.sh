@@ -408,7 +408,7 @@ if [[ $STRICT == 1 ]]; then
     [[ $c == 401 ]] && grep -q session_token_required <<<"$b" && pass "STRICT: an agent-tool call with no token is refused (401 session_token_required)" || fail "STRICT: untokened call answered $c $b"
     # ...and the real coral-board from an agent-marked shell whose token was removed: refused, never Operator.
     st0=$(rjson 'd.get("refused",{}).get("session_token_required",0)')
-    out=$(env -i "${WIN_ENV[@]}" PATH="$PATH" HOME="$(NP "$TMP/h")" USERPROFILE="$(NP "$TMP/h")" CORAL_DATA_DIR="$(NP "$DATA")" CORAL_URL="$BASE" CORAL_SESSION_NAME="stripped-agent" CORAL_SUBSCRIBER_ID="Operator" "$BIN/coral-board" post "stripped token probe" 2>&1) && rc=0 || rc=$?
+    out=$(env -i ${WIN_ENV[@]+"${WIN_ENV[@]}"} PATH="$PATH" HOME="$(NP "$TMP/h")" USERPROFILE="$(NP "$TMP/h")" CORAL_DATA_DIR="$(NP "$DATA")" CORAL_URL="$BASE" CORAL_SESSION_NAME="stripped-agent" CORAL_SUBSCRIBER_ID="Operator" "$BIN/coral-board" post "stripped token probe" 2>&1) && rc=0 || rc=$?
     EXP_TOKEN=$((EXP_TOKEN + 1))
     st1=$(rjson 'd.get("refused",{}).get("session_token_required",0)')
     # The SERVER must have refused it (the counter moved), not merely coral-board failing for another reason.
@@ -419,9 +419,9 @@ if [[ $STRICT == 1 ]]; then
     fi
 
     # A human at a normal shell (no agent markers) signs with the CLI token and acts as the Operator.
-    out=$(env -i "${WIN_ENV[@]}" PATH="$PATH" HOME="$(NP "$TMP/h")" USERPROFILE="$(NP "$TMP/h")" CORAL_DATA_DIR="$(NP "$DATA")" CORAL_URL="$BASE" "$BIN/coral-board" join id-team-1 --as Operator 2>&1) && rc=0 || rc=$?
+    out=$(env -i ${WIN_ENV[@]+"${WIN_ENV[@]}"} PATH="$PATH" HOME="$(NP "$TMP/h")" USERPROFILE="$(NP "$TMP/h")" CORAL_DATA_DIR="$(NP "$DATA")" CORAL_URL="$BASE" "$BIN/coral-board" join id-team-1 --as Operator 2>&1) && rc=0 || rc=$?
     if [[ $rc -eq 0 ]]; then
-        out2=$(env -i "${WIN_ENV[@]}" PATH="$PATH" HOME="$(NP "$TMP/h")" USERPROFILE="$(NP "$TMP/h")" CORAL_DATA_DIR="$(NP "$DATA")" CORAL_URL="$BASE" "$BIN/coral-board" post "operator from a plain shell" 2>&1) && rc2=0 || rc2=$?
+        out2=$(env -i ${WIN_ENV[@]+"${WIN_ENV[@]}"} PATH="$PATH" HOME="$(NP "$TMP/h")" USERPROFILE="$(NP "$TMP/h")" CORAL_DATA_DIR="$(NP "$DATA")" CORAL_URL="$BASE" "$BIN/coral-board" post "operator from a plain shell" 2>&1) && rc2=0 || rc2=$?
         if [[ $rc2 -eq 0 ]] && api GET "/api/board/id-team-1/messages/all" | grep -q "operator from a plain shell"; then
             pass "STRICT: coral-board from a plain shell signs with the CLI token and posts as the Operator"
         else
@@ -500,6 +500,151 @@ if [[ $STRICT != 1 ]]; then
     for route in "PUT /api/settings" "POST /api/workflows/runs/{runID}/kill" "POST /api/tasks/runs/{runID}/kill" "POST /api/sessions/launch"; do grep -qF "$route" <<<"$rj" || miss="$miss [$route]"; done
     [[ -z "$miss" ]] && pass "an agent's settings change, run kills and launch are recorded in agent_operator_calls (log only in default mode)" || fail "not recorded in agent_operator_calls:$miss"
 fi
+
+
+# ── #11013: an agent's token reaches only the board it was launched on (join AND launch) ──────────────────
+# Real stand-in agents with their real session tokens and the real coral-board. Checks (default and --strict):
+#   launch    an agent of team A launching onto team B's board or the Operator's board, through launch and launch-team: refused
+#             403 forbidden_for_agent, no session made; onto its own board works, as an Orchestrator starting a teammate
+#   exact     two boards with one label: an agent is admitted only to the board it was launched on, by its exact key, refused for the
+#             other and for an upper-case key; a restart and a wake keep it able to rejoin its own board
+#   variants  a join of another team's board with a trailing slash, doubled slashes, Subscribe, SUBSCRIBE, an escaped letter in
+#             'subscribe' and in the board key, and a query: none is a 200, none leaves a seat; and coral-board join itself: exit 5
+#   listing   a launch by another team's board NAME answers 409 without describing that board to the agent
+live_json() { api GET /api/sessions/live | python3 -c 'import sys,json
+d=json.load(sys.stdin); d=d.get("sessions",d) if isinstance(d,dict) else d
+print(json.dumps(d))'; }
+live_count() { live_json | python3 -c 'import sys,json; print(len(json.load(sys.stdin)))'; }
+# '<name> <session_id>' of the live agents whose board key is $1
+agents_on() { live_json | python3 -c 'import sys,json
+for s in json.load(sys.stdin):
+    if s.get("board_project")==sys.argv[1]: print(s["name"], s["session_id"])' "$1"; }
+token_of() { sed -n 's/^CORAL_SESSION_TOKEN=//p' "$DUMP/$1.env" 2>/dev/null | head -1; }
+sess_of() { sed -n 's/^CORAL_SESSION_NAME=//p' "$DUMP/$1.env" 2>/dev/null | head -1; }
+tok_post() { # tok_post <token> <method> <path> [body] -> "<status> <body>"
+    local tok=$1 m=$2 path=$3 body=${4:-}
+    curl -s -m 20 -w ' HTTP%{http_code}' -X "$m" "$BASE$path" -H "Content-Type: application/json" -H "X-Coral-Session-Token: $tok" -A "coral-board/test" ${body:+-d "$body"}
+}
+upper() { printf '%s' "$1" | tr '[:lower:]' '[:upper:]'; }   # bash 3.2 (macOS) has no ${x^^}
+role_of() { python3 -c "import sys,json;d=json.load(open(sys.argv[1]));print(d.get('job_title',''))" "$(NP "$DATA/board_state_$(sess_of "$1").json")" 2>/dev/null; } # the role/subscriber name an agent joined as
+seated() { api GET "/api/board/$1/subscribers" | grep -c -F "$2" || true; } # seats on board $1 whose session name is $2
+section_11013() {
+    set +e   # every check below reports its own result: one failing step must not end the run (it is how this section shows the hole on a build that has it)
+    wait_sessions_ready || log "no live agent has its dump yet"
+    local line
+    line=$(live_json | python3 -c 'import sys,json
+d=json.load(sys.stdin)
+a=[s for s in d if str(s.get("board_label",""))=="id-team-1" and (s.get("display_name") or "")=="Orchestrator"]
+b=[s for s in d if str(s.get("board_label",""))=="id-team-2"]
+print(a[0]["session_id"], a[0]["board_project"], b[0]["board_project"]) if a and b else print("")')
+    if [[ -z "$line" ]]; then fail "#11013: no Orchestrator of id-team-1 and agent of id-team-2 to probe with"; set -e; return; fi
+    local osid own other otok osess
+    read -r osid own other <<<"$line"
+    otok=$(token_of "$osid"); osess=$(sess_of "$osid")
+    [[ -n "$otok" && -n "$osess" ]] || { fail "#11013: the Orchestrator's dump has no token"; set -e; return; }
+    local opsid
+    opsid=$(api POST /api/board/id-ops/subscribe -d '{"subscriber_id":"Operator","job_title":"Operator"}' | python3 -c 'import sys,json; print(json.load(sys.stdin).get("project",""))' 2>/dev/null || true)
+    [[ -n "$opsid" ]] || opsid=id-ops
+
+    # launch ---------------------------------------------------------------------------
+    local before after out ok=1
+    before=$(live_count)
+    for target in "$other" "$opsid"; do
+        out=$(tok_post "$otok" POST /api/sessions/launch "{\"working_dir\":\"$(NP "$TMP/w")\",\"agent_type\":\"claude\",\"board_id\":\"$target\",\"display_name\":\"Intruder\",\"prompt\":\"x\"}")
+        [[ "$out" == *forbidden_for_agent*HTTP403 ]] || { fail "#11013 launch onto $target by an agent answered: ${out:0:160}"; ok=0; }
+        out=$(tok_post "$otok" POST /api/sessions/launch-team "{\"working_dir\":\"$(NP "$TMP/w")\",\"board_id\":\"$target\",\"agents\":[{\"agent_type\":\"claude\",\"name\":\"Intruder\",\"prompt\":\"x\"}]}")
+        [[ "$out" == *forbidden_for_agent*HTTP403 ]] || { fail "#11013 team launch onto $target by an agent answered: ${out:0:160}"; ok=0; }
+    done
+    sleep 1; after=$(live_count)
+    [[ $after -eq $before ]] || { fail "#11013: a refused launch still made a session ($before -> $after)"; ok=0; }
+    [[ $(seated "$other" Intruder) -eq 0 && $(seated "$opsid" Intruder) -eq 0 ]] || { fail "#11013: a refused launch seated an agent"; ok=0; }
+    [[ $ok == 1 ]] && pass "#11013: an agent's launch and team launch onto another team's board and the Operator's are refused (403 forbidden_for_agent), no session made, no seat"
+    out=$(tok_post "$otok" POST /api/sessions/launch "{\"working_dir\":\"$(NP "$TMP/w")\",\"agent_type\":\"claude\",\"board_id\":\"$own\",\"display_name\":\"Mate\",\"prompt\":\"x\"}")
+    [[ "$out" == *HTTP200 && "$out" == *'"ok":true'* ]] && pass "#11013: an Orchestrator starting a teammate on its own board works" || fail "#11013: the Orchestrator's launch on its own board answered: ${out:0:200}"
+
+    # listing --------------------------------------------------------------------------
+    out=$(tok_post "$otok" POST /api/sessions/launch "{\"working_dir\":\"$(NP "$TMP/w")\",\"agent_type\":\"claude\",\"board_name\":\"id-team-2\",\"prompt\":\"x\"}")
+    if [[ "$out" == *board_name_exists*HTTP409 && "$out" != *"$other"* && "$out" != *live_agents* ]]; then
+        pass "#11013: a launch by another team's board name answers 409 without describing that board (no id, no counts)"
+    else
+        fail "#11013: the 409 for another team's board name: ${out:0:240}"
+    fi
+
+    # exact match: two boards with one label ----------------------------------------------
+    local t
+    for t in 1 2; do
+        api POST /api/sessions/launch-team -d "{\"board_name\":\"id-twin\",\"new_board\":true,\"working_dir\":\"$(NP "$TMP/w")\",\"agents\":[{\"agent_type\":\"claude\",\"name\":\"Twin $t\",\"prompt\":\"x\"}]}" >/dev/null
+    done
+    local twins; twins=$(live_json | python3 -c 'import sys,json
+print(" ".join(sorted({s["board_project"] for s in json.load(sys.stdin) if str(s.get("board_label",""))=="id-twin"})))')
+    local b1 b2; read -r b1 b2 <<<"$twins"
+    if [[ -z "$b1" || -z "$b2" ]]; then fail "#11013: two boards labelled id-twin were not made ($twins)"; else
+        local s1 s2 k1 k2 n1 n2
+        read -r _ s1 <<<"$(agents_on "$b1" | head -1)"; read -r _ s2 <<<"$(agents_on "$b2" | head -1)"
+        wait_until 40 "the twin agents' tokens" bash -c "grep -q '^CORAL_SESSION_TOKEN=' '$DUMP/$s1.env' 2>/dev/null && grep -q '^CORAL_SESSION_TOKEN=' '$DUMP/$s2.env' 2>/dev/null" || true
+        k1=$(token_of "$s1"); n1=$(sess_of "$s1"); local r1 r1keep; r1=$(role_of "$s1"); r1keep=$r1
+        ok=1
+        out=$(tok_post "$k1" POST "/api/board/$b1/subscribe" "{\"subscriber_id\":\"$r1\",\"job_title\":\"$r1\",\"session_name\":\"$n1\"}"); [[ "$out" == *HTTP200 ]] || { fail "#11013 exact: the agent could not rejoin its own board $b1: ${out:0:160}"; ok=0; }
+        for other_key in "$b2" "$(upper "$b1")" "$(upper "$b2")"; do
+            out=$(tok_post "$k1" POST "/api/board/$other_key/subscribe" "{\"subscriber_id\":\"$r1\",\"job_title\":\"$r1\",\"session_name\":\"$n1\"}")
+            [[ "$out" == *HTTP200 ]] && { fail "#11013 exact: the agent was admitted to $other_key (its own board is $b1)"; ok=0; }
+        done
+        [[ $(seated "$b2" "$n1") -eq 0 ]] || { fail "#11013 exact: a seat was made on the other twin board"; ok=0; }
+        [[ $ok == 1 ]] && pass "#11013 exact: of two boards labelled id-twin the agent is admitted only to its own by exact key, refused for the other and for upper-case keys"
+        # a restart and a wake keep it able to rejoin its own board (the live row carries the board over)
+        local nm1; read -r nm1 _ <<<"$(agents_on "$b1" | head -1)"
+        api POST "/api/sessions/live/$nm1/restart" -d "{\"session_id\":\"$s1\",\"agent_type\":\"claude\"}" >/dev/null
+        local ns1=""
+        local end=$((SECONDS + 60))
+        while (( SECONDS < end )); do
+            read -r _ ns1 <<<"$(agents_on "$b1" | head -1)"
+            [[ -n "$ns1" ]] && grep -q '^CORAL_SESSION_TOKEN=' "$DUMP/$ns1.env" 2>/dev/null && break
+            sleep 1
+        done
+        k1=$(token_of "$ns1"); n1=$(sess_of "$ns1"); r1=$(role_of "$ns1" || true); r1=${r1:-$r1keep}
+        out=$(tok_post "$k1" POST "/api/board/$b1/subscribe" "{\"subscriber_id\":\"$r1\",\"job_title\":\"$r1\",\"session_name\":\"$n1\"}")
+        [[ "$out" == *HTTP200 ]] && pass "#11013 exact: after a restart the agent still rejoins its own board" || fail "#11013 exact: after a restart the rejoin answered: ${out:0:160}"
+        out=$(tok_post "$k1" POST "/api/board/$b2/subscribe" "{\"subscriber_id\":\"$r1\",\"job_title\":\"$r1\",\"session_name\":\"$n1\"}")
+        [[ "$out" == *HTTP200 ]] && fail "#11013 exact: after a restart the agent was admitted to the other twin board" || pass "#11013 exact: after a restart the other twin board is still refused"
+        api POST "/api/sessions/live/$ns1/sleep" -d '{}' >/dev/null; sleep 2
+        api POST "/api/sessions/live/$ns1/wake" -d '{}' >/dev/null
+        local wk=""; end=$((SECONDS + 60))
+        while (( SECONDS < end )); do
+            wk=$(token_of "$ns1"); [[ -n "$wk" && "$wk" != "$k1" ]] && break; sleep 1
+        done
+        out=$(tok_post "${wk:-$k1}" POST "/api/board/$b1/subscribe" "{\"subscriber_id\":\"$r1\",\"job_title\":\"$r1\",\"session_name\":\"$n1\"}")
+        [[ "$out" == *HTTP200 ]] && pass "#11013 exact: after a wake the agent still rejoins its own board" || fail "#11013 exact: after a wake the rejoin answered: ${out:0:160}"
+    fi
+
+    # variants and the real CLI ----------------------------------------------------------
+    ok=1; local path
+    local ptok="$otok" pname="$osess" prole; prole=$(role_of "$osid")   # the agent's OWN subscriber name: a join under another name is refused for that, which would hide the board gate
+    for path in "/api/board/$other/subscribe" "/api/board/$other/subscribe/" "/api/board//$other/subscribe" "/api/board/$other//subscribe" "/api/board/$other/Subscribe" \
+                "/api/board/$other/SUBSCRIBE" "/api/board/$other/%73ubscribe" "/api/board/$(printf '%%%02x' "'${other:0:1}")${other:1}/subscribe" "/api/board/$other/subscribe?x=1" "/api/board/$(upper "$other")/subscribe"; do
+        out=$(tok_post "$ptok" POST "$path" "{\"subscriber_id\":\"$prole\",\"job_title\":\"$prole\",\"session_name\":\"$pname\"}")
+        [[ "$out" == *HTTP200 ]] && { fail "#11013 variant $path was a 200"; ok=0; }
+    done
+    [[ $(seated "$other" "$pname") -eq 0 ]] || { fail "#11013 variants left a seat on $other"; ok=0; }
+    [[ $ok == 1 ]] && pass "#11013: joins of another team's board by path variants (slashes, case, escapes, a query) are never a 200 and leave no seat"
+    # the real coral-board from the agent's own environment: its own board is admitted, another team's is exit 5 with the Operator's words
+    local state="$DATA/board_state_$osess.json" role
+    role=$(python3 -c "import sys,json;d=json.load(open(sys.argv[1]));print(d.get('job_title',''))" "$(NP "$state")" 2>/dev/null || true)
+    local cli=(env -i ${WIN_ENV[@]+${WIN_ENV[@]+"${WIN_ENV[@]}"}} PATH="$PATH" HOME="$(NP "$TMP/h")" USERPROFILE="$(NP "$TMP/h")" CORAL_DATA_DIR="$(NP "$DATA")" CORAL_URL="$BASE" CORAL_SESSION_TOKEN="$otok" CORAL_SESSION_NAME="$osess" CORAL_SUBSCRIBER_ID="$role" "$BIN/coral-board")
+    cp "$state" "$TMP/state.keep" 2>/dev/null || true
+    out=$("${cli[@]}" join "$own" --as "$role" 2>&1) && rc=0 || rc=$?
+    [[ $rc -eq 0 ]] && pass "#11013: coral-board join of the agent's own board works from its own environment (exit 0)" || fail "#11013: coral-board join of its own board: rc=$rc ${out:0:200}"
+    cp "$TMP/state.keep" "$state" 2>/dev/null || true
+    out=$("${cli[@]}" join "$other" --as "$role" 2>&1) && rc=0 || rc=$?
+    cp "$TMP/state.keep" "$state" 2>/dev/null || true
+    if [[ $rc -eq 5 && "$out" == *"can join only the board it was launched on"* && "$out" == *"the Operator can seat it there"* ]]; then
+        pass "#11013: coral-board join of another team's board exits 5 with the words for the Operator"
+    else
+        fail "#11013: coral-board join of another team's board: rc=$rc ${out:0:240}"
+    fi
+    [[ $(seated "$other" "$osess") -eq 0 ]] && pass "#11013: ...and left no seat on that board" || fail "#11013: the CLI join left a seat on another team's board"
+    set -e
+}
+section_11013
 
 log "What strict mode would refuse, by caller, tool and route (#3418; this script's own curl calls are local_other curl):"
 report | python3 -c '
