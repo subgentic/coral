@@ -310,3 +310,58 @@ func messageFTSChunkForTest(n int) func() {
 	messageFTSChunk = n
 	return func() { messageFTSChunk = old }
 }
+
+// A message deleted while the index is still being built (its chunk already indexed, the triggers not yet made) must not leave its words
+// in the index: the integrity check finds them without a row to match (#10831: "fts5: corruption found reading blob" on a CI machine
+// that deleted messages as the build ran).
+func TestMessageSearchIndexBuildsWhileMessagesAreDeleted(t *testing.T) {
+	s := ftsStoreWithMessages(t, ftsTexts, 600)
+	ctx := context.Background()
+	defer messageFTSChunkForTest(25)() // many chunks, so the deletes land between them
+	var wg sync.WaitGroup
+	stop := make(chan struct{})
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for id := int64(1); id <= 600; id += 3 {
+			select {
+			case <-stop:
+				return
+			default:
+			}
+			_, _ = s.DeleteMessage(ctx, "proj", id)
+			// an edit of another message, the same way: its old words must leave the index and its new words enter it
+			_, _ = s.db.ExecContext(ctx, `UPDATE board_messages SET content = ? WHERE id = ?`, fmt.Sprintf("edited during the build %d", id), id+1)
+			time.Sleep(200 * time.Microsecond)
+		}
+	}()
+	require.NoError(t, s.BuildMessageSearchIndex(ctx))
+	close(stop)
+	wg.Wait()
+	_, err := s.db.ExecContext(ctx, `INSERT INTO `+messageFTSTable+`(`+messageFTSTable+`, rank) VALUES ('integrity-check', 1)`)
+	require.NoError(t, err, "a message deleted during the build is not left in the index")
+}
+
+// An index built before the watermark existed (a meta table without upto, the three triggers) is complete as it was: opening it must not
+// rebuild it.
+func TestMessageIndexBuiltBeforeTheWatermarkIsComplete(t *testing.T) {
+	s := ftsStoreWithMessages(t, ftsTexts, 20)
+	ctx := context.Background()
+	require.NoError(t, s.BuildMessageSearchIndex(ctx))
+	require.True(t, s.messageIndexComplete(ctx))
+	// what an older build left: the triggers without a guard (stood in for here by do-nothing ones with the same names) and a meta table without upto
+	for _, q := range []string{
+		`DROP TRIGGER board_messages_fts_ai`, `DROP TRIGGER board_messages_fts_ad`, `DROP TRIGGER board_messages_fts_au`,
+		`ALTER TABLE ` + messageFTSMeta + ` DROP COLUMN upto`,
+		`CREATE TRIGGER board_messages_fts_ai AFTER INSERT ON board_messages BEGIN SELECT 1; END`,
+		`CREATE TRIGGER board_messages_fts_ad AFTER DELETE ON board_messages BEGIN SELECT 1; END`,
+		`CREATE TRIGGER board_messages_fts_au AFTER UPDATE OF content ON board_messages BEGIN SELECT 1; END`,
+	} {
+		_, err := s.db.ExecContext(ctx, q)
+		require.NoError(t, err, q)
+	}
+	require.True(t, s.messageIndexComplete(ctx), "no watermark column: the triggers alone say it is complete")
+	_, err := s.db.ExecContext(ctx, `ALTER TABLE `+messageFTSMeta+` ADD COLUMN upto INTEGER NOT NULL DEFAULT 0`)
+	require.NoError(t, err)
+	require.False(t, s.messageIndexComplete(ctx), "a watermark that has not reached the end: a build that was interrupted")
+}
