@@ -587,7 +587,7 @@ print(" ".join(sorted({s["board_project"] for s in json.load(sys.stdin) if str(s
         out=$(tok_post "$k1" POST "/api/board/$b1/subscribe" "{\"subscriber_id\":\"$r1\",\"job_title\":\"$r1\",\"session_name\":\"$n1\"}"); [[ "$out" == *HTTP200 ]] || { fail "#11013 exact: the agent could not rejoin its own board $b1: ${out:0:160}"; ok=0; }
         for other_key in "$b2" "$(upper "$b1")" "$(upper "$b2")"; do
             out=$(tok_post "$k1" POST "/api/board/$other_key/subscribe" "{\"subscriber_id\":\"$r1\",\"job_title\":\"$r1\",\"session_name\":\"$n1\"}")
-            [[ "$out" == *HTTP200 ]] && { fail "#11013 exact: the agent was admitted to $other_key (its own board is $b1)"; ok=0; }
+            [[ "$out" == *HTTP403 ]] || { fail "#11013 exact: a join of $other_key (its own board is $b1) answered ${out: -7}, want HTTP403: ${out:0:120}"; ok=0; }
         done
         [[ $(seated "$b2" "$n1") -eq 0 ]] || { fail "#11013 exact: a seat was made on the other twin board"; ok=0; }
         [[ $ok == 1 ]] && pass "#11013 exact: of two boards labelled id-twin the agent is admitted only to its own by exact key, refused for the other and for upper-case keys"
@@ -605,7 +605,7 @@ print(" ".join(sorted({s["board_project"] for s in json.load(sys.stdin) if str(s
         out=$(tok_post "$k1" POST "/api/board/$b1/subscribe" "{\"subscriber_id\":\"$r1\",\"job_title\":\"$r1\",\"session_name\":\"$n1\"}")
         [[ "$out" == *HTTP200 ]] && pass "#11013 exact: after a restart the agent still rejoins its own board" || fail "#11013 exact: after a restart the rejoin answered: ${out:0:160}"
         out=$(tok_post "$k1" POST "/api/board/$b2/subscribe" "{\"subscriber_id\":\"$r1\",\"job_title\":\"$r1\",\"session_name\":\"$n1\"}")
-        [[ "$out" == *HTTP200 ]] && fail "#11013 exact: after a restart the agent was admitted to the other twin board" || pass "#11013 exact: after a restart the other twin board is still refused"
+        [[ "$out" == *HTTP403 && "$out" == *identity_mismatch* ]] && pass "#11013 exact: after a restart the other twin board is still refused (403 identity_mismatch)" || fail "#11013 exact: after a restart the other twin board answered ${out: -7}, want HTTP403 identity_mismatch: ${out:0:120}"
         api POST "/api/sessions/live/$ns1/sleep" -d '{}' >/dev/null; sleep 2
         api POST "/api/sessions/live/$ns1/wake" -d '{}' >/dev/null
         local wk=""; end=$((SECONDS + 60))
@@ -617,12 +617,18 @@ print(" ".join(sorted({s["board_project"] for s in json.load(sys.stdin) if str(s
     fi
 
     # variants and the real CLI ----------------------------------------------------------
-    ok=1; local path
+    ok=1; local path want
     local ptok="$otok" pname="$osess" prole; prole=$(role_of "$osid")   # the agent's OWN subscriber name: a join under another name is refused for that, which would hide the board gate
+    local pbody="{\"subscriber_id\":\"$prole\",\"job_title\":\"$prole\",\"session_name\":\"$pname\"}"
+    # positive control, same token and body: its OWN board answers 200, so a refusal below is the board gate and not a bad token, body or a down server
+    out=$(tok_post "$ptok" POST "/api/board/$own/subscribe" "$pbody")
+    [[ "$out" == *HTTP200 ]] && pass "#11013 variants: the control (the same token joining its own board) answers 200" || { fail "#11013 variants: the positive control answered ${out: -7}: ${out:0:160}"; ok=0; }
     for path in "/api/board/$other/subscribe" "/api/board/$other/subscribe/" "/api/board//$other/subscribe" "/api/board/$other//subscribe" "/api/board/$other/Subscribe" \
                 "/api/board/$other/SUBSCRIBE" "/api/board/$other/%73ubscribe" "/api/board/$(printf '%%%02x' "'${other:0:1}")${other:1}/subscribe" "/api/board/$other/subscribe?x=1" "/api/board/$(upper "$other")/subscribe"; do
-        out=$(tok_post "$ptok" POST "$path" "{\"subscriber_id\":\"$prole\",\"job_title\":\"$prole\",\"session_name\":\"$pname\"}")
-        [[ "$out" == *HTTP200 ]] && { fail "#11013 variant $path was a 200"; ok=0; }
+        want=403   # the gate refuses every form that reaches a board route; only a doubled slash BEFORE the board is not a board route at all
+        [[ "$path" == "/api/board//$other/subscribe" ]] && want=404
+        out=$(tok_post "$ptok" POST "$path" "$pbody")
+        [[ "$out" == *HTTP$want ]] || { fail "#11013 variant $path answered ${out: -7}, want HTTP$want: ${out:0:140}"; ok=0; }
     done
     [[ $(seated "$other" "$pname") -eq 0 ]] || { fail "#11013 variants left a seat on $other"; ok=0; }
     [[ $ok == 1 ]] && pass "#11013: joins of another team's board by path variants (slashes, case, escapes, a query) are never a 200 and leave no seat"

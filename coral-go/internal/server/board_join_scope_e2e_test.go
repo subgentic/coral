@@ -245,6 +245,15 @@ func TestAgentTokenJoinVariantsAreNeverAdmitted(t *testing.T) {
 	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: sid, AgentType: "claude", AgentName: "dev", WorkingDir: "/w", BoardName: &boardA}))
 	tok, err := srv.db.MintSessionToken(ctx, sid, name)
 	require.NoError(t, err)
+	{ // the positive control: the same token and body join its OWN board, so the refusals below are the board gate and not a bad token or body
+		req, _ := http.NewRequest("POST", ts.URL+"/api/board/team-a/subscribe", strings.NewReader(`{"subscriber_id":"Dev","job_title":"Dev","session_name":"`+name+`"}`))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set(store.SessionTokenHeader, tok)
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		resp.Body.Close()
+		require.Equal(t, http.StatusOK, resp.StatusCode, "the control: its own board")
+	}
 	for _, path := range []string{"/api/board/team-b/subscribe", "/api/board/team-b/subscribe/", "/api/board//team-b/subscribe", "/api/board/team-b//subscribe",
 		"/api/board/team-b/Subscribe", "/api/board/team-b/SUBSCRIBE", "/api/board/team-b/%73ubscribe", "/api/board/%74eam-b/subscribe", "/api/board/team-b/subscribe?x=1", "/api/board/TEAM-B/subscribe"} {
 		req, _ := http.NewRequest("POST", ts.URL+path, strings.NewReader(`{"subscriber_id":"Dev","job_title":"Dev","session_name":"`+name+`"}`))
@@ -253,7 +262,11 @@ func TestAgentTokenJoinVariantsAreNeverAdmitted(t *testing.T) {
 		resp, err := http.DefaultClient.Do(req)
 		require.NoError(t, err, path)
 		resp.Body.Close()
-		assert.NotEqual(t, http.StatusOK, resp.StatusCode, "%s must not be a join", path)
+		want := http.StatusForbidden // the gate refuses every form that reaches a board route; a doubled slash before the board is not one
+		if path == "/api/board//team-b/subscribe" {
+			want = http.StatusNotFound
+		}
+		assert.Equal(t, want, resp.StatusCode, "%s must be refused with %d, not a join and not a 5xx", path, want)
 		sub, err := bs.SessionSubscription(ctx, "team-b", name)
 		require.NoError(t, err)
 		assert.Nil(t, sub, "%s: no seat on team-b", path)
