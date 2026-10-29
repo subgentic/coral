@@ -2,6 +2,8 @@ package ptymanager
 
 import (
 	"context"
+	"path/filepath"
+	"strings"
 
 	"github.com/subgentic/coral/internal/tmux"
 )
@@ -19,8 +21,8 @@ type AgentCandidate struct {
 	// Script is the absolute script path of `interpreter script ...` (see ScriptIsCLI): only for the bulk match, never shown, logged or kept.
 	Script string `json:"-"`
 	// AcknowledgeNested, on a candidate passed to RecordAgent, is the Operator's "I know this is the agent, not something I started by hand" for a program under a nested shell.
-	AcknowledgeNested bool `json:"-"`
-	Image string `json:"-"`
+	AcknowledgeNested bool   `json:"-"`
+	Image             string `json:"-"`
 	// CLIPath, on a candidate passed to RecordAgent, is the session's resolved CLI path (see AgentRecorder.AgentCandidate).
 	CLIPath string `json:"-"`
 }
@@ -51,7 +53,12 @@ func fromTmux(c tmux.Candidate) AgentCandidate {
 	if interpreterName(image) != "" {
 		args = tmux.ProgramArgs(c.PID) // read for one comparison (ScriptIsCLI) and dropped
 	}
-	return AgentCandidate{PID: c.PID, Start: c.Start, Program: c.Program, Under: c.Under, Image: image, Script: interpreterScript(image, args)}
+	// The name shown is the image's, not ps's command name: a process can rename itself (prctl, perl's $0) to look like the agent, and the Operator decides from this name.
+	program := c.Program
+	if image != "" {
+		program = filepath.Base(strings.ReplaceAll(image, "\\", "/"))
+	}
+	return AgentCandidate{PID: c.PID, Start: c.Start, Program: program, Under: c.Under, Image: image, Script: interpreterScript(image, args)}
 }
 
 // AgentCandidate implements AgentRecorder for tmux.

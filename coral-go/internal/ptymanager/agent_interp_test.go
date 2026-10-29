@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/subgentic/coral/internal/tmux"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -83,4 +85,17 @@ func TestScriptIsCLI(t *testing.T) {
 	assert.False(t, ScriptIsCLI("/usr/bin/node", "", cliReal), "no script")
 	assert.False(t, ScriptIsCLI("/usr/bin/node", cliReal, ""), "no resolved CLI")
 	assert.False(t, ScriptIsCLI("/usr/bin/node", filepath.Join(dir, "my"), filepath.Join(dir, "my cli.js")), "the half of a path with a space (macOS ps splits on blanks)")
+}
+
+// The program name shown to the Operator (and in the bulk reason) is the image's, not ps's command name: a process can rename itself to look like the agent (perl's $0, prctl).
+func TestTheCandidatesProgramNameComesFromTheImageNotTheRenamedComm(t *testing.T) {
+	c := fromTmux(tmux.Candidate{AgentProc: tmux.AgentProc{PID: os.Getpid(), Start: "s"}, Program: "node /home/u/claude"}) // what a renamed process reports
+	image := tmux.ProgramImage(os.Getpid())
+	if image == "" {
+		assert.Equal(t, "node /home/u/claude", c.Program, "no image can be read here: ps's name is all there is")
+		return
+	}
+	assert.Equal(t, filepath.Base(image), c.Program)
+	assert.Equal(t, image, c.Image)
+	assert.NotContains(t, c.Program, "node /home")
 }
