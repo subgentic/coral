@@ -14,6 +14,9 @@ import (
 // immediate delivery.
 var coralOrigin = regexp.MustCompile(`terminalinput\.Coral\b|\bDeliverNow\(`)
 
+// aliasedTerminalInput matches an import of the terminalinput package under a name of its own (or a dot or blank import).
+var aliasedTerminalInput = regexp.MustCompile(`(?m)^\s*(?:import\s+)?(?:[A-Za-z_][A-Za-z0-9_]*|\.|_)\s+"github\.com/subgentic/coral/internal/terminalinput"`)
+
 // coralOriginFiles are the only product files (paths from coral-go/) that may use coralOrigin, each with why it is safe. A file that
 // types as Coral and is not here fails TestOnlyListedFilesTypeAsCoral: its text must come from a typed builder in a package census
 // (TestTypedNoticeCensus) and its calls be listed there (TestEveryTypedSenderIsInTheCensus) before it is added (the coral-go-team's
@@ -44,10 +47,16 @@ func TestOnlyListedFilesTypeAsCoral(t *testing.T) {
 			if err != nil {
 				return err
 			}
+			rel, _ := filepath.Rel(root, p)
+			rel = filepath.ToSlash(rel)
+			// An import of terminalinput under another name (ti "…/terminalinput", or a dot import) would hide terminalinput.Coral from the
+			// text match: the package is always imported by its own name (the coral-go-team's Security on #221).
+			if aliasedTerminalInput.Match(b) {
+				t.Errorf("%s imports terminalinput under another name: import it plainly, so this census can see what it types", rel)
+			}
 			for _, line := range strings.Split(string(b), "\n") {
 				if code := strings.TrimSpace(line); !strings.HasPrefix(code, "//") && coralOrigin.MatchString(code) {
-					rel, _ := filepath.Rel(root, p)
-					found = append(found, filepath.ToSlash(rel))
+					found = append(found, rel)
 					break
 				}
 			}
