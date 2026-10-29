@@ -20,7 +20,9 @@ const (
 	// never moves it and a real asset does. Raise it deliberately, with the reason in the commit, when a real asset needs the room.
 	// 5.25 MiB (5,505,024 bytes) since Goal #61's artifact roll-up; the tree has grown into it, so a feature trims as much as it adds (#10594 and #10623 collapsed the indentation inside templates: 18 KB). About 19 KB of room over what ships
 	// 5.34 MiB (5,603,328 bytes) since the operator's approval (Oct 28, #10690): 96 KiB more, room for #10019's docs pictures, #10049, #10376 and #10558.
-	staticBudget = 5<<20 + 352<<10
+	// 5.41 MiB (5,668,864 bytes) since the operator's approval (Oct 29, #11058's raise): 64 KiB more. The v2.0.6 tree is at 5,592,908 bytes (10,420 free) with the agent search levels UI (the Search chip and the Search access
+	// dialog, #11053: about 7 KB) and the phone chat screen in it, and the queued work (the one-row header, the keyboard fix, the Inbox Goals and Artifacts folders, Board history, #11063's model line: 1.5 KB) is more than that room.
+	staticBudget = 5<<20 + 416<<10
 	// fileBudget is the most one embedded file may hold (the CodeMirror bundle, the largest, is ~1 MB).
 	fileBudget = 1536 << 10
 )
