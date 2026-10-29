@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 const RULE = 'Ask another agent for work with coral-board post --assign or task add --follow-up; plain posts are for questions, decisions, heads-ups and status.';
 const TEAM = 'asks-' + Date.now().toString(36);
@@ -20,7 +21,7 @@ const TEAM = 'asks-' + Date.now().toString(36);
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         assert.ok((await api('POST', '/subscribe', { subscriber_id: 'Boss', job_title: 'Orchestrator', session_name: 'boss-session' })).status < 300);
 
         console.log('1. the switch is there, off for a team that never set it, with one line of help');

@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -15,14 +16,14 @@ const BASE = require('./test_base').BASE;
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Emulation.setFocusEmulationEnabled({ enabled: true });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         for (const [id, t] of [['Boss', 'Orchestrator'], ['dev-1', 'Developer']]) assert.equal((await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: id, job_title: t, session_name: id + '-s' })).status, 200);
         const goal = async (title, state) => { const r = await api('POST', `/api/board/${B}/goals`, { subscriber_id: 'Operator', title, ...(state ? { state } : {}) }); assert.equal(r.status, 201, JSON.stringify(r)); return r.json.id; };
         const g1 = await goal('Ship the new installer'), g2 = await goal('Fix the flaky suites');
         const t1 = (await api('POST', `/api/board/${B}/tasks`, { subscriber_id: 'Boss', title: 'Build the installer', priority: 'high', goal_id: g1 })); assert.equal(t1.status, 201, JSON.stringify(t1));
         const t2 = (await api('POST', `/api/board/${B}/tasks`, { subscriber_id: 'Boss', title: 'Write the docs', priority: 'low' })); assert.equal(t2.status, 201);
         // the board's Tasks tab is an agent's on that board (the board's page has no side panel, #7457)
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         await ev(`window.__m.add('goal-agent', 'G', 1, { sleeping: false, board_project: ${JSON.stringify(B)} }); true`);
         await waitFor(`(window.__qaState.liveSessions || []).some(s => s.name === 'goal-agent')`, 'the agent', 8000);
         await ev(`window.selectLiveSession('goal-agent', 'claude', 'goal-agent-id', 'local'); true`);

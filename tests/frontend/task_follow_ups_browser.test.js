@@ -6,6 +6,7 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const { removeBoards } = require('./helpers/board_cleanup');
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -17,7 +18,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+        await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
         for (const [id, jt] of [['orch', 'Orchestrator'], ['dev', 'Developer']]) assert.equal((await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: id, job_title: jt, session_name: id + '-s' })).status, 200);
         const goal = (await api('POST', `/api/board/${B}/goals`, { subscriber_id: 'Operator', title: 'Follow-ups stay visible', outcome: 'A goal says what is left of its follow-ups.', done_when: 'Nothing is open.' })).body.id;
         const mk = async (title, extra = {}) => (await api('POST', `/api/board/${B}/tasks`, { title, body: 'Text of ' + title, created_by: 'orch', priority: 'medium', goal_id: goal, ...extra })).body.id;
@@ -36,7 +37,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         await stub(0);
         for (const [label, w, h, mobile] of [['1280 px', 1280, 800, false], ['390 px', 390, 844, true]]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`); await stub(0);
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings'); await stub(0);
             await ev(`window.openTeamPage(${JSON.stringify(B)}, { tab: 'tasks', item: ${parent} }); true`);
             await waitFor(`!!document.querySelector('.team-task-followups')`, `${label}: the follow-ups`, 10000);
             const s = await section(); await shot(`follow-ups-${mobile ? 390 : 1280}`);
@@ -65,7 +66,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
                 if (open === 2) await shot(`goal-follow-ups-${mobile ? 390 : 1280}`);
                 await ev(`window.closeTeamPage && window.closeTeamPage(); true`);
                 await ev(`try { localStorage.removeItem('coral-last-place'); } catch (e) {} true`); // the dashboard reopens the place the person left (#10057): the goal page would come back before this step's stub is in
-                await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+                await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
             }
         }
     } finally { await removeBoards(ev, [B]); await client.close(); }

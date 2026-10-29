@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -13,7 +14,7 @@ const BASE = require('./test_base').BASE;
     const theme = t => ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'settings_core.js'); m.clearCustomThemeVars(); m.applyTheme('${t}'); return true; })()`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         assert.ok((await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: 'orch', job_title: 'Orchestrator', session_name: 'o-s' })).status < 300);
         const g = await api('POST', `/api/board/${B}/goals`, { subscriber_id: 'Operator', title: 'Tabs goal', outcome: 'One strip', done_when: 'Both look alike' }); assert.equal(g.status, 201);
         const G = g.body.id;
@@ -23,7 +24,7 @@ const BASE = require('./test_base').BASE;
             const at = `at ${w}px: `;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile });
             await Emulation.setTouchEmulationEnabled(mobile ? { enabled: true, maxTouchPoints: 5 } : { enabled: false });
-            await Page.navigate({ url: BASE + `/team/${B}/goals/${G}` }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+            await Page.navigate({ url: BASE + `/team/${B}/goals/${G}` }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
             await waitFor(`!!document.querySelector('#team-panel-goals #goal-tab-tasks') && !!document.querySelector('#team-tabs .tab[aria-selected=true]')`, 'the tab strips', 20000);
             const m = await ev(`(() => { const g = el => { const cs = getComputedStyle(el), r = el.getBoundingClientRect(); return { cls: el.className, h: Math.round(r.height), size: cs.fontSize, weight: cs.fontWeight, color: cs.color, line: cs.borderBottomWidth + ' ' + cs.borderBottomColor }; };
                 const acc = (() => { const t = document.createElement('i'); t.style.color = 'var(--accent)'; document.body.append(t); const c = getComputedStyle(t).color; t.remove(); return c; })();

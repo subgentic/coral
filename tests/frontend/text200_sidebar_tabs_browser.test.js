@@ -45,7 +45,7 @@ const BROKEN = `(() => { const c = document.createElement('canvas').getContext('
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
-    const { settle } = require('./helpers/wait').bind(ev);
+    const { settle, coralReady } = require('./helpers/wait').bind(ev);
     const shot = require('./helpers/scene_shots')(Page, 'text200-sidebar');
     const problems = [];
     try {
@@ -54,7 +54,7 @@ const BROKEN = `(() => { const c = document.createElement('canvas').getContext('
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled(mobile ? { enabled: true, maxTouchPoints: 5 } : { enabled: false });
             let safe = 0; // a phone's safe area under the page (the home bar): emulated where Chrome can, the bar must leave it free
             try { await Emulation.setSafeAreaInsetsOverride({ insets: { bottom: mobile ? 34 : 0 } }); safe = mobile ? 34 : 0; } catch { safe = 0; }
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady();
             await setTheme(ev, theme);
             await ev(`document.documentElement.style.fontSize = '${font}px'; true`);
             for (const [name, tab, prep, open] of [['Chats', 'history', HISTORY, null], ['Jobs', 'automations', null, null], ['Jobs, one job open', 'automations', null, `document.querySelector('#group-table-view tbody tr[data-key] .dt-primary').click()`], ['Workflows', 'automations', `window.openAutomationsFolder('workflows')`, null], ['Workflows, one workflow open', 'automations', `window.openAutomationsFolder('workflows')`, `document.querySelector('#group-table-view tbody tr[data-key] .dt-primary').click()`], ['Inbox', 'hub-inbox', null, null], ['Inbox, Tasks list', 'hub-inbox', null, OPEN_TASKS], ['Inbox, one task open', 'hub-inbox', null, OPEN_TASKS], ['Inbox, the Saved table', 'hub-inbox', null, `document.querySelector('.sidebar-pane[data-pane="hub-inbox"] .view-list-item[data-key="saved"]').click()`], ['Docs', 'docs', null, null], ['Docs, one topic open', 'docs', null, `document.querySelector('#docs-nav-list .row-btn').click()`]]) {

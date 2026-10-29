@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -15,7 +16,7 @@ const BASE = require('./test_base').BASE;
             console.log(`${w} px`);
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.startup('liveList', 'settings')`);
+            await coralReady(ev, 'startup', 'liveList', 'settings');
             const call = (m, p, body) => ev(`fetch('/api/board/${TEAM}/${p}', { method: ${JSON.stringify(m)}, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(${JSON.stringify(body)}) }).then(r => r.status)`);
             assert.ok(await call('POST', 'subscribe', { subscriber_id: 'Boss', job_title: 'Orchestrator', session_name: 'boss-session' }) < 300);
             if (!mobile) assert.equal(await call('POST', 'working-mode/presets', { id: 'mine', name: 'Mine', instructions: 'My way.', subscriber_id: 'Boss' }), 201);

@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install, select } = await connect();
@@ -17,7 +18,7 @@ const BASE = require('./test_base').BASE;
             const at = `${label}: `;
             await size(w, h, touch); await Emulation.setTouchEmulationEnabled({ enabled: touch });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.then(() => true)`);
+            await coralReady(ev);
             await ev(`window.__m.add('kb-a', 'A', 4, { sleeping: false }); true`); await select('kb-a');
             await ev(`window.setLiveViewMode('terminal'); true`);
             await waitFor(`window.__vis('#terminal-statusbar')`, 'the terminal view', 8000);

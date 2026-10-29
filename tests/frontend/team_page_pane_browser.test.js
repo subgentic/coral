@@ -15,7 +15,7 @@ const HEX = 'a'.repeat(64);
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
-    const { settle } = require('./helpers/wait').bind(ev);
+    const { settle, coralReady } = require('./helpers/wait').bind(ev);
     const S = scenarios();
     const stub = () => ev(`(() => { const R = window.fetch.bind(window); const j = (b, s = 200) => Promise.resolve(new Response(JSON.stringify(b), { status: s, headers: { 'Content-Type': 'application/json' } }));
         window.fetch = (u, o = {}) => { const url = new URL(String(u), location.origin);
@@ -32,7 +32,7 @@ const HEX = 'a'.repeat(64);
         for (const [label, w, h, mobile] of VIEWS) {
             console.log(label);
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`); await installTP(ev);
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(); await installTP(ev);
             await seed(ev, TEAM); await stub();
             if (mobile) await ev(`window.syncMobileAgentList && window.syncMobileAgentList(); true`);
             await openTeam(ev, waitFor, TEAM).catch(() => {});

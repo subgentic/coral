@@ -6,6 +6,7 @@
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 if (!process.env.PERF_PROBE) { console.log('startup_weight_probe: skipped (set PERF_PROBE=1 to measure)'); process.exit(0); }
 const settle = ms => new Promise(r => setTimeout(r, ms)); // sleep-ok: the page's own startup timers have no event to wait for
 const median = a => { if (!a.length) return null; const s = [...a].sort((x, y) => x - y); return Math.round(((s[(s.length - 1) >> 1] + s[s.length >> 1]) / 2) * 10) / 10; };
@@ -26,7 +27,7 @@ const median = a => { if (!a.length) return null; const s = [...a].sort((x, y) =
             await Tracing.start({ categories: 'devtools.timeline,v8,disabled-by-default-v8.compile,toplevel', transferMode: 'ReportEvents' });
             const t0 = Date.now();
             await Page.navigate({ url: BASE }); await Page.loadEventFired();
-            await ev(`window.__coralReady.startup('liveList')`);
+            await coralReady(ev, 'startup', 'liveList');
             const wall = Date.now() - t0;
             const m = await metrics();
             await new Promise(async res => { Tracing.tracingComplete(() => res()); await Tracing.end(); });
@@ -42,7 +43,7 @@ const median = a => { if (!a.length) return null; const s = [...a].sort((x, y) =
             await Emulation.setCPUThrottlingRate({ rate: 1 });
             await Page.navigate({ url: 'about:blank' });
             await Profiler.enable(); await Profiler.startPreciseCoverage({ callCount: false, detailed: false });
-            await Page.navigate({ url: BASE }); await Page.loadEventFired(); await ev(`window.__coralReady.startup('liveList')`);
+            await Page.navigate({ url: BASE }); await Page.loadEventFired(); await coralReady(ev, 'startup', 'liveList');
             await settle(1500);
             const { result } = await Profiler.takePreciseCoverage();
             const src = {};

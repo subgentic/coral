@@ -12,7 +12,7 @@ const TEAM = `qa-mention-${Date.now() % 100000}`;
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
-    const { settle } = require('./helpers/wait').bind(ev);
+    const { settle, coralReady } = require('./helpers/wait').bind(ev);
     const S = scenarios();
     const box = `window.__tp.find('textarea', /^Message the team$/i)`;
     const type = (text) => ev(`(() => { const b = ${box}; b.focus(); b.value = ${JSON.stringify(text)}; b.selectionStart = b.selectionEnd = b.value.length; b.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
@@ -23,7 +23,7 @@ const TEAM = `qa-mention-${Date.now() % 100000}`;
         for (const [label, w, h, mobile] of VIEWS) {
             console.log(label);
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`); await installTP(ev);
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(); await installTP(ev);
             await seed(ev, TEAM);
             if (mobile) await ev(`window.syncMobileAgentList && window.syncMobileAgentList(); true`);
             await ev(`(() => { const R = window.fetch.bind(window); window.fetch = (u, o = {}) => { const url = new URL(String(u), location.origin);

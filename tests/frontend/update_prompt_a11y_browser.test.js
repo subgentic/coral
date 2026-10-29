@@ -7,6 +7,7 @@ const { connect } = require('./agent_view_harness');
 const { DATA_WORLD, UPDATE_STAGED, CLOUD_LINKED } = require('./helpers/census_world');
 const { showUpdateReady, UPDATE_DIALOG_UP } = require('./helpers/phone_targets');
 const { watch, clear, log, said } = require('./helpers/announce_census');
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -21,7 +22,7 @@ const { watch, clear, log, said } = require('./helpers/announce_census');
             await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
             await ev(`localStorage.clear(); true`);
             await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+            await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
             await ev(`window.switchNavTab('agents'); true`);
             const status = () => ({ ...UPDATE_STAGED, staged: { ...UPDATE_STAGED.staged, version: `1.4.${++version}` } }); // the notice is said once per version
 

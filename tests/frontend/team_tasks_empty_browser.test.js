@@ -9,11 +9,11 @@ const TEAM = `qa-empty-tasks-${Date.now() % 100000}`;
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
-    const { settle } = require('./helpers/wait').bind(ev);
+    const { settle, coralReady } = require('./helpers/wait').bind(ev);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`); await installTP(ev);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(); await installTP(ev);
         const live = names => ev(`(() => { window.__m.agents = {}; for (const [i, n] of ${JSON.stringify(names)}.entries()) window.__m.add(n, 'A', 1, { sleeping: false, session_id: 'sid-' + (i + 1), board_project: ${JSON.stringify(TEAM)} }); window.__LIVE = Object.values(window.__m.agents).map(x => window.__m.entry(x)); T.state.liveSessions = window.__LIVE; T.render.renderLiveSessions(window.__LIVE); return true; })()`);
         await live(['Backend Dev']); // a fresh team: its board exists, one agent and no task in it
         await post(ev, `/api/board/${TEAM}/subscribe`, { subscriber_id: 'Operator', job_title: 'Operator' });

@@ -5,6 +5,7 @@
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 const S = `(window.__coralStatic || '/static/')`;
 
 (async () => {
@@ -28,7 +29,7 @@ const S = `(window.__coralStatic || '/static/')`;
                 const tag = `${w} px, ${pct}% text`;
                 await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile: true });
                 await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-                await ev(`window.__coralReady.then(() => true)`);
+                await coralReady(ev);
                 await ev(`localStorage.clear(); localStorage.setItem('coral-live-view-mode', 'chat'); ${font ? `document.documentElement.style.fontSize = '${font}';` : ''} window.__m.add('dk-a', 'A', 3, { sleeping: false, agent_type: 'claude', session_id: 'dk-id' }); true`);
                 await sleep(500); // sleep-ok: the first live list renders from several answers; no single completion event
                 await ev(`window.selectLiveSession('dk-a', 'claude', 'dk-id', 'local'); true`);
@@ -52,7 +53,7 @@ const S = `(window.__coralStatic || '/static/')`;
         console.log('the bar itself, at 390 px');
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await ev(`localStorage.clear(); window.__copied = null; navigator.clipboard.writeText = t => { window.__copied = t; return Promise.resolve(); }; true`);
         const bar = () => ev(`(() => { const d = document.getElementById('worktree-dock'); if (!d || d.hidden) return null; const q = s => d.querySelector(s);
             return { title: (q('.worktree-dock-title') || {}).textContent, buttons: [...d.querySelectorAll('.worktree-dock-line button')].map(b => b.textContent), open: (q('.worktree-dock-details') || {}).getAttribute && q('.worktree-dock-details').getAttribute('aria-expanded'), bodyHidden: q('.worktree-dock-body').hidden,
@@ -90,7 +91,7 @@ const S = `(window.__coralStatic || '/static/')`;
         await Emulation.setEmulatedMedia({ features: [] }); await Emulation.setTouchEmulationEnabled({ enabled: false });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await ev(`import(${S} + 'worktree_notice.js').then(m => { m.showWorktreeNotice(${JSON.stringify(WT(1))}, 'team'); return true; })`);
         await waitFor(`!!document.querySelector('#worktree-dock:not([hidden])')`, 'the bar', 4000);
         const pair = await ev(`(() => { const t = document.querySelector('#worktree-dock .worktree-dock-title').getBoundingClientRect(), b = document.querySelector('#worktree-dock .worktree-dock-line button').getBoundingClientRect(), d = document.getElementById('worktree-dock').getBoundingClientRect(); return { gap: Math.round(b.left - t.right), barW: Math.round(d.width), titleLeft: Math.round(t.left - d.left) }; })()`);

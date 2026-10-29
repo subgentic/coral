@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { openBoardTasksTab } = require('./helpers/board_tasks_tab');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 const S = `(window.__coralStatic || '/static/')`;
 
 (async () => {
@@ -16,7 +17,7 @@ const S = `(window.__coralStatic || '/static/')`;
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+        await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
         for (const [id, jt] of [['orch', 'Orchestrator'], ['fe', 'Frontend Dev'], ['qa', 'QA Engineer']]) await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: id, job_title: jt, session_name: id + '-s' });
         const mk = async (title, assigned, priority) => { const r = await api('POST', `/api/board/${B}/tasks`, { title, body: 'Details for ' + title, assigned_to: assigned, created_by: 'orch', priority }); assert.ok(r.status < 300, JSON.stringify(r)); return r.body.id || r.body.task.id; };
         const t1 = await mk('Build the Goals view', 'fe', 'high'), t2 = await mk('Review the Goals view', 'qa', 'medium'); await mk('Write the agent doc text', 'orch', 'low'); const t4 = await mk('Fix the flaky suite', 'fe', 'medium');
@@ -28,7 +29,7 @@ const S = `(window.__coralStatic || '/static/')`;
             const tag = `${w} px${font ? ', 200% text' : ''}`;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled(mobile ? { enabled: true, maxTouchPoints: 5 } : { enabled: false });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+            await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
             if (font) await ev(`document.documentElement.style.fontSize = '${font}'; true`);
             await openBoardTasksTab({ ev, waitFor }, B); await sleep(600); // sleep-ok: layout settles after the panel draws
             await waitFor(`document.querySelectorAll('#agentic-panel-tasks .board-task-item:not(.board-task-header)').length === 4`, 'four tasks', 12000); await sleep(400); // sleep-ok: layout settles after the panel draws

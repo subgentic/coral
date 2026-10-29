@@ -6,6 +6,7 @@ const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 const SHARED = 'coral://artifacts/' + 'c'.repeat(64);
 
 (async () => {
@@ -16,7 +17,7 @@ const SHARED = 'coral://artifacts/' + 'c'.repeat(64);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+        await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
         for (const [sid, jt] of [['orch', 'Orchestrator'], ['be', 'Backend Dev']]) assert.ok((await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: sid, job_title: jt, session_name: sid + '-s' })).status < 300);
         const ids = [];
         for (const title of ['Write the report', 'A task with nothing attached', 'Draw the diagram']) { const m = await api('POST', `/api/board/${B}/tasks`, { title, body: 'x', assigned_to: 'be', created_by: 'orch', priority: 'high' }); assert.ok(m.status < 300, JSON.stringify(m)); ids.push(m.body.id); }
@@ -30,7 +31,7 @@ const SHARED = 'coral://artifacts/' + 'c'.repeat(64);
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile });
             await Emulation.setTouchEmulationEnabled(mobile ? { enabled: true, maxTouchPoints: 5 } : { enabled: false });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+            await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
             await ev(`window.openTeamPage(${JSON.stringify(B)}, { tab: 'tasks' }); true`);
             await waitFor(`!!document.querySelector('#team-panel-tasks .goals-chip[data-filter="all"]')`, 'the All filter', 15000);
             await ev(`document.querySelector('#team-panel-tasks .goals-chip[data-filter="all"]').click(); true`); // the two completed tasks are in All

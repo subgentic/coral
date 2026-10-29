@@ -3,6 +3,7 @@
 // elsewhere leaves it there. At 1280 and 640 px. Drives Chrome over CDP through agent_view_harness.js; the real showToast.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, PRELOAD, install } = await connect();
@@ -15,7 +16,7 @@ const { connect } = require('./agent_view_harness');
             const check = (ok, msg) => { if (!ok) problems.push(`${w}: ${msg}`); };
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile: false });
             await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.then(() => true)`);
+            await coralReady(ev);
             await ev(`document.getElementById('kb-from')?.remove(); const b = document.body.appendChild(Object.assign(document.createElement('button'), { id: 'kb-from', textContent: 'where the keyboard was' })); b.style.cssText = 'position:fixed;left:8px;top:8px;z-index:99999'; true`);
             const show = (action, duration) => ev(`import(${S} + 'notifications.js').then(m => { m.showToast('Get an alert when an agent needs you?', false, ${duration === undefined ? 'undefined' : duration}, ${action ? `{ action: { label: 'Turn on alerts', onClick: () => {} } }` : '{}'}); return true; })`);
             const cameFrom = sel => ev(`(() => { document.getElementById('kb-from').focus(); const t = document.querySelector(${JSON.stringify(sel)}); t.focus(); return document.activeElement === t; })()`);

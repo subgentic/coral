@@ -7,13 +7,13 @@ const BASE = require('./test_base').BASE;
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const shot = require('./helpers/scene_shots')(Page, 'toolbar-edges');
-    const { settle } = require('./helpers/wait').bind(ev); // the live list and the views draw from several answers: settle waits for the layout to stop moving
+    const { settle, coralReady } = require('./helpers/wait').bind(ev); // the live list and the views draw from several answers: settle waits for the layout to stop moving
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [w, h, mobile] of [[1280, 900, false], [390, 844, true]]) {
             const at = `at ${w}px: `;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled(mobile ? { enabled: true, maxTouchPoints: 5 } : { enabled: false });
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.startup('liveList', 'settings')`);
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady('startup', 'liveList', 'settings');
             await ev(`(() => { window.__m.add('a1', 'Alpha agent', 2, {}); window._coralSetLiveSessions(Object.values(window.__m.agents).map(a => window.__m.entry(a))); return true; })()`); await settle(900);
             if (!mobile) {
                 const icon = await ev(`(() => { const i = document.querySelector('.sidebar-header[data-header="agents"] .sidebar-search-icon'); return !!i && getComputedStyle(i).display !== 'none' && i.getClientRects().length > 0; })()`);

@@ -6,6 +6,7 @@ const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -19,7 +20,7 @@ const BASE = require('./test_base').BASE;
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+        await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
         for (const [sid, jt] of [['orch', 'Orchestrator'], ['be', 'Backend Dev']]) assert.ok((await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: sid, job_title: jt, session_name: sid + '-s' })).status < 300);
         const g = await api('POST', `/api/board/${B}/goals`, { subscriber_id: 'Operator', title: 'Ship it', outcome: 'o', done_when: 'd' }); assert.equal(g.status, 201, JSON.stringify(g));
         const done = async (title, arts, goalId) => { const t = await api('POST', `/api/board/${B}/tasks`, { title, body: 'x', assigned_to: 'be', created_by: 'orch', priority: 'medium', goal_id: goalId }); assert.ok(t.status < 300, JSON.stringify(t)); const id = t.body.id;
@@ -100,7 +101,7 @@ const BASE = require('./test_base').BASE;
         await pick('ta-goal', ''); await pick('ta-group', 'task');
         await waitFor(`document.querySelectorAll('#team-panel-artifacts tr.dt-group').length === 3`, 'grouped again', 8000);
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+        await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
         await ev(`window.openTeamPage(${JSON.stringify(B)}, { tab: 'artifacts' }); true`);
         await waitFor(`document.querySelectorAll('#team-panel-artifacts tr.dt-group').length === 3`, 'still grouped by task after a reload', 15000);
         console.log('   ✓');

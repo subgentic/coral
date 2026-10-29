@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const { safePaused } = require('./helpers/paused');
 const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -26,7 +27,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
 
         // Local: Save preset shows, Reset shows once a built-in is overridden.
-        await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         assert.equal(await ev(`JSON.parse(document.getElementById('coral-boot').textContent).mode`), 'local');
         for (const [id, title] of [['Boss', 'Orchestrator'], ['Dev One', 'Developer']]) {
             const r = await ev(`fetch('/api/board/${TEAM}/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: ${JSON.stringify(id)}, job_title: ${JSON.stringify(title)}, session_name: ${JSON.stringify(id.toLowerCase().replace(' ', '-') + '-session')} }) }).then(r => r.status)`);

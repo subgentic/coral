@@ -6,6 +6,7 @@ const { connect } = require('./agent_view_harness');
 const { install: installTP, seed, openTeam } = require('./helpers/team_page');
 const { removeBoards } = require('./helpers/board_cleanup');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 const TEAM = 'status-follow-' + Date.now().toString(36);
 
 (async () => {
@@ -14,7 +15,7 @@ const TEAM = 'status-follow-' + Date.now().toString(36);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true, maxTouchPoints: 5 });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         await installTP(ev); await seed(ev, TEAM);
         await ev(`window.syncMobileAgentList && window.syncMobileAgentList(); true`);
         await ev(`window.__av = ['idle', 'idle', 'unknown']; { const real = window.fetch; window.fetch = (u, o = {}) => { const p = new URL(String(u), location.href).pathname;

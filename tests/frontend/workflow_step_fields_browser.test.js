@@ -6,6 +6,7 @@
 // Run against an isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 const STEPS = [
     { name: 'build', type: 'shell', command: 'make build', timeout_s: 900, continue_on_failure: true, hooks: { on_failure: [{ type: 'notify' }] }, future_field: { kept: 1 } },
@@ -20,7 +21,7 @@ const WF = { id: 41, name: 'Nightly', description: 'd', repo_path: '/tmp/repo', 
         await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await ev(`(() => { const R = window.fetch; window.__puts = [];
             const json = b => Promise.resolve(new Response(JSON.stringify(b), { headers: { 'content-type': 'application/json' } }));
             window.fetch = (u, o = {}) => { const p = new URL(String(u && u.url || u), location.origin).pathname; const m = (o.method || 'GET').toUpperCase();

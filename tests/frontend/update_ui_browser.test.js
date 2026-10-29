@@ -52,7 +52,7 @@ const upToDate = { ...idle, not_ready_reason: 'up_to_date' }; // what the server
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired();
         await ev(`localStorage.clear(); true`);
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await require('./helpers/wait').coralReady(ev);
         if (flag) await ev(`import((window.__coralStatic || '/static/') + 'update_flag.js').then(m => { m.setUpdatesEnabled(true); return true; })`); // the server's `enabled` is what turns the UI on; the suite stands for a server that says so
         await installAudit(ev); await setTheme(ev, view.theme);
         await ev(STUB);

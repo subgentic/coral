@@ -4,6 +4,7 @@
 // Drives Chrome over CDP through agent_view_harness.js.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -14,7 +15,7 @@ const { connect } = require('./agent_view_harness');
             const check = (ok, msg) => { if (!ok) problems.push(`${w}x${h}: ${msg}`); };
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true, maxTouchPoints: 5 });
             await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.startup('liveList', 'settings')`);
+            await coralReady(ev, 'startup', 'liveList', 'settings');
             await ev(`(async () => { const sb = await import((window.__coralStatic || '/static/') + 'server_base.js'); window.__m.add('Boss', 'm', 3, { sleeping: false, session_id: 'b1', board_project: 'board-7f3a9c' }); window.__m.add('Worker', 'm', 3, { sleeping: false, session_id: 'w1', board_project: 'board-7f3a9c' }); window.__m.add('Solo', 'm', 3, { sleeping: false, session_id: 's1' }); T.state.liveSessions = Object.values(window.__m.agents).map(a => window.__m.entry(a)); sb.noteBoardLabel('local', 'board-7f3a9c', 'Release team'); T.render.renderLiveSessions(T.state.liveSessions); return true; })()`);
             await waitFor(`!!document.querySelector('.session-group-item') && !!document.querySelector('.group-chevron')`, `${w}: the list`, 10000);
             await new Promise(r => setTimeout(r, 500)); // sleep-ok: the list settles

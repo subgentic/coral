@@ -6,13 +6,14 @@ const fs = require('node:fs'), path = require('node:path');
 const { removeBoards } = require('./helpers/board_cleanup');
 const { setTheme } = require('./helpers/contrast');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 const board = 'task-line-' + Date.now().toString(36);
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const failures = [];
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         const api = (p, body) => ev(`fetch(${JSON.stringify(p)}, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: ${JSON.stringify(JSON.stringify(body))} }).then(async r => ({ status: r.status, body: await r.json().catch(() => ({})) }))`);
         assert.equal((await api(`/api/board/${board}/subscribe`, { subscriber_id: 'Boss', job_title: 'Orchestrator' })).status, 200);
         const goal = await api(`/api/board/${board}/goals`, { title: 'A goal with a long title that used to be a second line', outcome: 'x', subscriber_id: 'Operator' });
@@ -21,7 +22,7 @@ const board = 'task-line-' + Date.now().toString(36);
             try {
                 await Emulation.setDeviceMetricsOverride({ width, height: 900, deviceScaleFactor: 1, mobile: width === 390 });
                 await Emulation.setTouchEmulationEnabled({ enabled: width === 390 });
-                await Page.navigate({ url: `${BASE}/team/${board}/tasks` }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+                await Page.navigate({ url: `${BASE}/team/${board}/tasks` }); await Page.loadEventFired(); await install(); await coralReady(ev);
                 await waitFor(`document.querySelectorAll('#team-panel-tasks tbody tr').length >= 3`, 'the task rows', 15000);
                 if (narrow) await ev(`(() => { const b = document.querySelector('#team-panel-tasks .dt-box'); b.parentElement.style.width = '520px'; b.style.width = '520px'; return true; })()`);
                 await waitFor(`document.querySelector('#team-panel-tasks .dt-box').classList.contains('dt-folded')`, 'the folded table', 8000);

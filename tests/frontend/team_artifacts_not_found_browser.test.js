@@ -9,7 +9,7 @@ const ITEMS = ['plan.md'].map((name, i) => ({ name, media_type: 'text/markdown',
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
-    const { settle } = require('./helpers/wait').bind(ev);
+    const { settle, coralReady } = require('./helpers/wait').bind(ev);
     const results = [];
     const check = (label, cond, detail) => { results.push(!!cond); console.log(`[${cond ? 'PASS' : 'FAIL'}] ${label}${detail !== undefined ? ' - ' + detail : ''}`); };
     try {
@@ -17,7 +17,7 @@ const ITEMS = ['plan.md'].map((name, i) => ({ name, media_type: 'text/markdown',
         for (const [label, w, h, mobile] of [['1280', 1280, 900, false], ['390', 390, 844, true]]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.then(() => true)`);
+            await coralReady();
             await ev(`(() => { const R = window.fetch; const json = (b, status = 200) => Promise.resolve(new Response(JSON.stringify(b), { status, headers: { 'content-type': 'application/json' } }));
                 window.fetch = (u, o = {}) => { const url = new URL(String(u), location.origin);
                     if (url.pathname === '/api/board/no-such-team/artifacts') return json({ error: 'No team named no-such-team', code: 'board_not_found' }, 404);

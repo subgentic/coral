@@ -3,6 +3,7 @@
 // 390 px and 1280 px, against a real board on the isolated dev server (the board is removed again). Drives Chrome over CDP through agent_view_harness.js.
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, sleep, PRELOAD, install } = await connect();
@@ -21,7 +22,7 @@ const BASE = require('./test_base').BASE;
             const tag = `${w}px`;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+            await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
             if (w === 390) { await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: 'orch', job_title: 'Orchestrator', session_name: 'orch-s' }); }
             const id = await mk(`Write the hello note ${w}`);
             await ev(`Promise.all([import(${S} + 'nav.js')]).then(([n]) => n.go({ view: 'inbox-tasks', sub: 'tasks', id: ${JSON.stringify(B)}, item: ${id} })).then(() => true)`);

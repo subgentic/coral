@@ -4,6 +4,7 @@
 // isolated dev server (its Sign-in-off notice is on). Drives Chrome over CDP through agent_view_harness.js.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, PRELOAD, install } = await connect();
@@ -13,7 +14,7 @@ const { connect } = require('./agent_view_harness');
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1366, height: 768, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.startup('liveList', 'settings')`);
+        await coralReady(ev, 'startup', 'liveList', 'settings');
         await new Promise(r => setTimeout(r, 1200)); // sleep-ok: the page's own start-up notices are drawn after the first answers
         const loud = await ev(`[...document.querySelectorAll('[role=alert]')].filter(e => { const cs = getComputedStyle(e); return e.getClientRects().length > 0 && cs.visibility !== 'hidden' && !e.closest('[hidden], [aria-hidden=true]') && e.textContent.replace(/\\s+/g, ' ').trim().length > 0; }).map(e => (e.id || e.className) + ': ' + e.textContent.replace(/\\s+/g, ' ').trim().slice(0, 50))`);
         check(loud.length === 0, `no alert with words is on screen at page start: ${JSON.stringify(loud)}`);

@@ -3,6 +3,7 @@
 // view, and comes back when they type. On the real xterm with a fake terminal socket. Run against an isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -22,7 +23,7 @@ const { connect } = require('./agent_view_harness');
     const open = async (w, h) => {
         await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile: w < 700 });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await ev(`localStorage.setItem('coral-live-view-mode', 'terminal'); window.__m.add('cur-bot', 'A', 3, { sleeping: false }); (async () => { const x = await import((window.__coralStatic || '/static/') + 'xterm_renderer.js'); window.__term = x.getTerminal; window.__stateMod = await import((window.__coralStatic || '/static/') + 'state.js'); })(); true`);
         await sleep(700); // sleep-ok: layout settles over a few frames; there is no completion event
         await ev(`window.selectLiveSession('cur-bot', 'claude', 'cur-bot-id', 'local'); window.setLiveViewMode('terminal'); true`);

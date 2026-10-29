@@ -11,7 +11,7 @@ const TEAM = `qa-consist-${Date.now() % 100000}`;
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
-    const { settle } = require('./helpers/wait').bind(ev);
+    const { settle, coralReady } = require('./helpers/wait').bind(ev);
     const S = scenarios();
     const shot = async n => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; require('node:fs').mkdirSync(d, { recursive: true }); require('node:fs').writeFileSync(`${d}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     // Where a tab's first row starts, from the page edge of its panel and from the bottom of the tab strip: its search box, or its chips.
@@ -26,7 +26,7 @@ const TEAM = `qa-consist-${Date.now() % 100000}`;
         for (const [label, w, h, mobile] of VIEWS) {
             console.log(label);
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`); await installTP(ev);
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(); await installTP(ev);
             await seed(ev, TEAM);
             if (mobile) await ev(`window.syncMobileAgentList && window.syncMobileAgentList(); true`);
             await openTeam(ev, waitFor, TEAM).catch(() => {});

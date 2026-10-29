@@ -10,6 +10,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 const MIB = 1024 ** 2;
 
@@ -22,7 +23,7 @@ const MIB = 1024 ** 2;
         await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await ev(`(() => { const R = window.fetch; window.__posts = []; window.__logs = { files: 31, bytes: ${181 * MIB}, ended: { count: 12, bytes: ${45 * MIB} } }; window.__next = null; window.__down = false;
             window.fetch = (u, o = {}) => { const p = new URL(String(u), location.origin).pathname; const m = (o.method || 'GET').toUpperCase(); const json = (b, s = 200) => Promise.resolve(new Response(JSON.stringify(b), { status: s, headers: { 'content-type': 'application/json' } }));
                 if (p === '/api/system/terminal-logs' && m === 'GET') return window.__down ? json({ error: 'x' }, 503) : json(window.__logs);

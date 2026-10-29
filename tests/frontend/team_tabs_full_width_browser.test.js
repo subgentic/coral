@@ -11,12 +11,12 @@ const TEAM = `qa-width-${Date.now() % 100000}`;
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
-    const { settle } = require('./helpers/wait').bind(ev);
+    const { settle, coralReady } = require('./helpers/wait').bind(ev);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const w of [1280, 1600, 1920]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: 900, deviceScaleFactor: 1, mobile: false });
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`); await installTP(ev);
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(); await installTP(ev);
             await seed(ev, TEAM);
             // the Artifacts tab with a paged list: 100 of 163 (the server's answer, stubbed)
             await ev(`(() => { const R = window.fetch; const items = Array.from({ length: 163 }, (_, i) => ({ name: 'report-' + String(i).padStart(3, '0') + '.md', media_type: 'text/markdown', size: 2048 + i, task_id: 100 + i, task_title: 'Task ' + i, produced_by: 'w-agent', created_at: new Date(Date.UTC(2026, 9, 10, 12, 0, 0) - i * 60000).toISOString(), uri: 'coral://artifacts/' + String(i).padStart(64, 'a') }));

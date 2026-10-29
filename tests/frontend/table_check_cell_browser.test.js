@@ -3,6 +3,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -15,7 +16,7 @@ const BASE = require('./test_base').BASE;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile });
             await Emulation.setTouchEmulationEnabled(mobile ? { enabled: true, maxTouchPoints: 5 } : { enabled: false });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.then(() => true)`);
+            await coralReady(ev);
             await ev(`(async () => { const DT = await import(${S} + 'data_table.js'); let h = document.getElementById('chk-host'); if (h) h.remove(); h = document.body.appendChild(Object.assign(document.createElement('div'), { id: 'chk-host', style: 'position:fixed;inset:0;z-index:50;background:var(--bg-primary);padding:24px' }));
                 const rows = [1, 2, 3].map(i => ({ id: 'r' + i, name: 'file-' + i + '.txt' }));
                 const t = DT.dataTable({ label: 'Files', oneLine: true, selectable: true, rows, rowKey: r => r.id, rowName: r => r.name, columns: [{ key: 'name', label: 'Name', primary: true, width: 'grow', cell: r => DT.primaryButton(r.name) }, { key: 'size', label: 'Size', width: '5rem', cell: r => '12 KB' }] });

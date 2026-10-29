@@ -6,6 +6,7 @@ const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const { setTheme, installAudit, auditRegion } = require('./helpers/contrast');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 const KEYS = [['Esc', 'Escape', 'Escape'], ['Tab', 'Tab', 'Tab'], ['Ctrl-C', 'C-c', 'Ctrl-C, interrupt'], ['←', 'Left', 'Left arrow'], ['↑', 'Up', 'Up arrow'], ['↓', 'Down', 'Down arrow'], ['→', 'Right', 'Right arrow'], ['Enter', 'Enter', 'Enter'], ['|', '|', 'Pipe'], ['~', '~', 'Tilde'], ['/', '/', 'Slash'], ['-', '-', 'Dash']];
 const STUB = `(() => { const real = window.fetch; window.__keys = [];
@@ -21,7 +22,7 @@ const STUB = `(() => { const real = window.fetch; window.__keys = [];
             const at = `at ${w}px: `;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 2, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.then(() => true)`); await ev(STUB);
+            await coralReady(ev); await ev(STUB);
             await ev(`localStorage.setItem('coral-live-view-mode', 'chat'); localStorage.removeItem('coral-agent-keys'); window.__m.add('tk-a', 'A', 4, { sleeping: false }); true`);
             await select('tk-a');
             await ev(`window.setLiveViewMode('chat'); true`);

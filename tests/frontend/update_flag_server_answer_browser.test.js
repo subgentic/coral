@@ -4,6 +4,7 @@
 // Not covered here: a dashboard served through Coral Hub (it never asks; update_flag.js returns false before any request).
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 const STATUS = { enabled: true, relaunch_available: true, installed: '1.4.155', state: 'none', not_ready_reason: 'up_to_date' };
 const stub = (status, body, raw) => `(() => { window.__asks = 0; const R = window.fetch;
@@ -19,7 +20,7 @@ const stub = (status, body, raw) => `(() => { window.__asks = 0; const R = windo
         const load = async (source) => {
             const { identifier } = await Page.addScriptToEvaluateOnNewDocument({ source });
             await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.then(() => true)`);
+            await coralReady(ev);
             return identifier;
         };
         const flag = () => ev(`import(${S} + 'update_flag.js').then(m => m.loadUpdatesFlag().then(on => ({ on, now: m.updatesUiOn() })))`);

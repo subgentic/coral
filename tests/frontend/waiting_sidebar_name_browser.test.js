@@ -6,6 +6,7 @@ const path = require('node:path');
 const { connect } = require('./agent_view_harness');
 const { setTheme } = require('./helpers/contrast');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 const NAME = 'Senior Backend Reliability Engineer for the Tunnel Subsystem';
 
 (async () => {
@@ -17,7 +18,7 @@ const NAME = 'Senior Backend Reliability Engineer for the Tunnel Subsystem';
             await Emulation.setDeviceMetricsOverride({ width, height: 900, deviceScaleFactor: 1, mobile: width === 390 });
             await Emulation.setTouchEmulationEnabled({ enabled: width === 390 });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.startup('liveList', 'settings')`);
+            await coralReady(ev, 'startup', 'liveList', 'settings');
             await ev(`(async () => {
                 const st = window.__coralStatic || '/static/';
                 const ws = await import(st + 'websocket.js'), render = await import(st + 'render.js'), { state } = await import(st + 'state.js');
