@@ -144,3 +144,18 @@ func TestSearchAccessLog_Retention(t *testing.T) {
 	require.NoError(t, s.db.GetContext(ctx, &n, `SELECT COUNT(*) FROM search_access_log`))
 	assert.Equal(t, SearchAccessMaxRows, n)
 }
+
+// A member row is made at own whatever the caller's struct carries: a launch from a template, a clone or an import never brings a level with it (#11048).
+func TestSearchReach_ANewMemberRowStartsAtOwn(t *testing.T) {
+	s := NewTeamStore(openTestDB(t))
+	ctx := context.Background()
+	tm, err := s.CreateTeam(ctx, &Team{Name: "b-clone", ConfigJSON: `{}`})
+	require.NoError(t, err)
+	sid := "sid-clone"
+	m, err := s.CreateTeamMember(ctx, &TeamMember{TeamID: tm.ID, AgentName: "Dev", AgentConfigJSON: `{"search_reach":"operator"}`, SearchReach: "all", SessionID: &sid})
+	require.NoError(t, err)
+	got, err := s.SearchReachForSession(ctx, sid)
+	require.NoError(t, err)
+	assert.Equal(t, "own", got, "neither the struct's level nor one in the agent config is read")
+	assert.Equal(t, "own", m.SearchReach, "and the row the caller gets back says so")
+}

@@ -192,6 +192,7 @@ func (s *TeamStore) DeleteTeam(ctx context.Context, teamID int64) error {
 func (s *TeamStore) CreateTeamMember(ctx context.Context, m *TeamMember) (*TeamMember, error) {
 	now := NowUTC()
 	m.CreatedAt = now
+	m.SearchReach = SearchReachOwn // a new row is at own whatever the caller carried: only the Operator's route raises it (#11048)
 	if m.Status == "" {
 		m.Status = "active"
 	}
