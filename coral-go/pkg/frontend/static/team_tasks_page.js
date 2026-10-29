@@ -207,7 +207,7 @@ const rowsNow = () => (TF.isQuery(model.filters) ? model.q.rows : model.rows);
 
 // The Open view also keeps a task that finished today, so what an agent just did is not behind Show all (#10604): its result is the first thing a person looks for.
 const sameDay = iso => { const d = new Date(iso), n = new Date(); return !Number.isNaN(d.getTime()) && d.getFullYear() === n.getFullYear() && d.getMonth() === n.getMonth() && d.getDate() === n.getDate(); };
-const doneToday = t => bucket(t) === 'done' && !!t.completed_at && sameDay(t.completed_at);
+const doneToday = t => bucket(t) === 'done' && t.status === 'completed' && !!t.completed_at && sameDay(t.completed_at); // a task that was done, not one cancelled or skipped (also Done, status skipped): it has no result to look for, and the person who cancelled it expects it gone from Open
 
 const counts = () => {
     const c = { open: 0, all: 0, queued: 0, active: 0, blocked: 0, review: 0, needs_review: 0, done: 0 };

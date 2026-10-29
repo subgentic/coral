@@ -21,22 +21,29 @@ const B = 'done-today-' + Date.now().toString(36);
                 assert.ok(t.status < 300); const id = t.body.id || t.body.task.id;
                 assert.ok((await post('/tasks/claim', { subscriber_id: 'Boss', task_id: id })).status < 300);
                 assert.ok((await post(`/tasks/${id}/complete`, { subscriber_id: 'Boss', message: 'done', outcome: 'success' })).status < 300);
+                // a task cancelled today is Done too, but has no result to look for: it leaves the Open view (tasks_bulk, v2.0.4)
+                const c = await post('/tasks', { title: 'Cancelled a moment ago', body: 'x', created_by: 'Boss', priority: 'medium' });
+                assert.ok(c.status < 300); const cid = c.body.id || c.body.task.id;
+                assert.ok((await post(`/tasks/${cid}/cancel`, { subscriber_id: 'Boss' })).status < 300, 'the task is cancelled');
             }
             await ev(`window.openTeamPage(${JSON.stringify(B)}, { tab: 'tasks' }); true`);
             await waitFor(`document.querySelectorAll('#team-panel-tasks tbody tr.dt-row').length >= 3`, `${w}: the tasks`, 20000);
+            await waitFor(`!/Loading tasks/.test(document.getElementById('team-panel-tasks').textContent) && document.querySelector('#team-panel-tasks [data-filter="open"][aria-pressed="true"], #team-panel-tasks .goals-chip[aria-pressed="true"]')`, `${w}: the tasks are drawn and a view is chosen`, 20000);
             const titles = () => ev(`[...document.querySelectorAll('#team-panel-tasks tbody tr.dt-row')].map(r => r.textContent.replace(/\\s+/g, ' ').trim())`);
             const pill = key => ev(`(() => { const b = [...document.querySelectorAll('#team-panel-tasks [data-filter="${key}"], #team-panel-tasks button')].find(x => x.dataset.filter === ${JSON.stringify(key)} || new RegExp('^' + ${JSON.stringify(key)}, 'i').test(x.textContent.trim())); return b ? { text: b.textContent.replace(/\\s+/g, ' ').trim(), pressed: b.getAttribute('aria-pressed') ?? b.getAttribute('aria-selected') } : null; })()`);
             let rows = await titles();
-            assert.equal(rows.length, 3, `${w}: the default (Open) view shows the two open tasks and the one finished today: ${JSON.stringify(rows)}`);
+            assert.equal(rows.length, 3, `${w}: the default (Open) view shows the two open tasks and the one finished today, not the one cancelled today: ${JSON.stringify(rows)}`);
+            assert.ok(!rows.some(r => r.includes('Cancelled a moment ago')), `${w}: a task cancelled today is not in the default view: ${JSON.stringify(rows)}`);
             assert.ok(rows.some(r => r.includes('Finished a moment ago')), `${w}: the task finished today is in the default view, not behind Show all`);
             const open = await pill('open');
             assert.match(open.text, /Open\s*3/, `${w}: the Open count is what the table under it shows: ${JSON.stringify(open)}`);
             await ev(`[...document.querySelectorAll('#team-panel-tasks button')].find(b => b.dataset.filter === 'done').click(); true`);
-            await waitFor(`document.querySelectorAll('#team-panel-tasks tbody tr.dt-row').length === 1`, `${w}: the Done view`, 5000);
+            await waitFor(`document.querySelectorAll('#team-panel-tasks tbody tr.dt-row').length === 2`, `${w}: the Done view`, 5000);
             rows = await titles();
-            assert.ok(rows.length === 1 && rows[0].includes('Finished a moment ago'), `${w}: Done shows only the finished one: ${JSON.stringify(rows)}`);
+            assert.ok(rows.length === 2 && rows.some(r => r.includes('Finished a moment ago')) && rows.some(r => r.includes('Cancelled a moment ago')), `${w}: Done shows the finished one and the cancelled one: ${JSON.stringify(rows)}`);
             await ev(`[...document.querySelectorAll('#team-panel-tasks button')].find(b => b.dataset.filter === 'all').click(); true`);
-            await waitFor(`document.querySelectorAll('#team-panel-tasks tbody tr.dt-row').length === 3`, `${w}: the All view`, 5000);
+            await waitFor(`document.querySelectorAll('#team-panel-tasks tbody tr.dt-row').length === 4`, `${w}: the All view`, 5000);
+            await ev(`[...document.querySelectorAll('#team-panel-tasks button')].find(b => b.dataset.filter === 'open').click(); true`); // the page remembers the view a person chose: the next width starts on the default (Open) again
         }
         console.log('\nPASS the Open view keeps a task finished today');
     } finally { await removeBoards(ev, [B]).catch(() => {}); await client.close(); }
