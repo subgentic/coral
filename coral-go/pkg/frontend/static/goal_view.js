@@ -1,7 +1,7 @@
 // One goal's detail view, shared by the team Goals list and other page hosts.
 import { openTask } from './task_navigation.js';
 import { boardFetch, keyLabel, isCloud } from './server_base.js';
-import { OPERATOR_ID } from './utils.js';
+import { OPERATOR_ID, copyText, showToast } from './utils.js';
 import { browserLocal } from './safe_storage.js';
 import { whenText } from './when_text.js';
 import { toTaskPage, toGoal, errorOf } from './goals_adapter.js';
@@ -142,6 +142,10 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
         foldWayBack(main, '.goals-back', '.goals-detail-title');
         const line = el('div', 'goals-detail-line'); line.append(stateChip(g));
         const meta = W.driverLine(g.driver, whenText(g.updatedAt)); if (meta) line.append(el('span', 'goal-card-meta', meta));
+        // A small quiet button at the end of the detail line (#11004, Goal #153): copies one line to paste to an agent, which then runs `coral-board goal brief` to read the goal's open tasks and artifacts
+        const copyBtn = btn('btn btn-quiet btn-small goal-copy-agent', 'Copy for an agent', () => { copyText(W.agentBriefLine(g)).then(ok => showToast(ok ? 'Copied: paste it to an agent' : 'Could not copy', !ok)); });
+        copyBtn.title = 'Copies a line to paste to an agent: it runs coral-board goal brief for this goal';
+        line.append(copyBtn);
         main.append(line);
         if (g.outcome || g.doneWhen) {
             const dl = el('dl', 'facts goals-facts');

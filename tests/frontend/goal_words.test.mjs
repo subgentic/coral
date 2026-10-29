@@ -51,5 +51,12 @@ assert.equal(W.closedAsText('done', 0), 'Closed as done.'); assert.equal(W.close
 assert.equal(W.allDoneLine(3), 'All 3 tasks are done.'); assert.equal(W.allDoneLine(1), 'All 1 task is done.'); assert.equal(W.allDoneAsk('X works'), 'Done when: X works. Is that true?'); assert.equal(W.allDoneAsk(''), 'Is that true?');
 assert.equal(W.isOpenGoal({ state: 'blocked' }), true); assert.equal(W.isClosedGoal({ state: 'dropped' }), true); assert.equal(W.isOpenGoal({ state: 'done' }), false);
 assert.equal(W.allDoneSaid(3, 'Ship it'), 'All 3 tasks of Ship it are done'); assert.equal(W.allDoneSaid(1, 'A'), 'All 1 task of A is done'); assert.equal(W.closeReasonHint, '300 characters at most.');
+// #11004: the line "Copy for an agent" copies
+assert.equal(W.agentBriefLine({ id: 65, title: 'Fast, reliable releases' }), 'Goal #65 (Fast, reliable releases): run coral-board goal brief 65');
+assert.equal(W.agentBriefLine({ id: 7, title: '' }), 'Goal #7: run coral-board goal brief 7', 'no title: no empty brackets');
+assert.equal(W.agentBriefLine({ id: 8, title: 'a\n  b\tc' }), 'Goal #8 (a b c): run coral-board goal brief 8', 'lines and runs of spaces joined');
+const longLine = W.agentBriefLine({ id: 9, title: 'x'.repeat(200) });
+assert.ok(longLine.includes('\u2026') && longLine.length < 130, 'a long title is cut: ' + longLine.length);
+assert.ok(longLine.endsWith(': run coral-board goal brief 9'), 'the command is never cut');
 console.log('goal_words: ok');
 assert.equal(W.noGoalRowText(1), '1 task has no goal'); assert.equal(W.noGoalRowText(4), '4 tasks have no goal');

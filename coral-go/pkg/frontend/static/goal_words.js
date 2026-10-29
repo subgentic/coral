@@ -147,3 +147,11 @@ export const notYetSaid = 'Hidden until a task is added.';
 export const closeReasonHint = '300 characters at most.';
 /** Said once, politely, when the all-done strip first appears for a goal. */
 export const allDoneSaid = (n, title) => `All ${n} ${n === 1 ? 'task' : 'tasks'} of ${title} ${n === 1 ? 'is' : 'are'} done`;
+
+/** The line the goal page's "Copy for an agent" copies (#11004): the goal's number and title, and the command that briefs an agent on it. The title is cut at 80 characters and its lines joined. */
+export function agentBriefLine(goal) {
+    const id = goal && goal.id;
+    const title = String((goal && goal.title) || '').replace(/\s+/g, ' ').trim();
+    const shown = title.length > 80 ? title.slice(0, 79).trimEnd() + '\u2026' : title;
+    return `Goal #${id}${shown ? ` (${shown})` : ''}: run coral-board goal brief ${id}`;
+}
