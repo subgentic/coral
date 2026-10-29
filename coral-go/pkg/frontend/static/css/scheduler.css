@@ -65,6 +65,7 @@
 .sched-time { width: 8rem; }
 .sched-days { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
 .sched-day { min-width: 3rem; }
+@media (max-width: 767px) { .sched-days { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); } .sched-day { min-width: 0; } } /* Mon to Sun in even columns, not 3, 3 and Sun alone (#11015) */
 
 .sched-custom-row {
     margin-bottom: 6px;

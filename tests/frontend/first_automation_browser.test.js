@@ -49,7 +49,7 @@ const S = `(window.__coralStatic || '/static/')`;
         await waitFor(`/morning-motivation/.test(document.querySelector('#scheduler-detail h2')?.textContent || '')`, 'the off job', 8000);
         const off = await ev(`(() => { const dts = [...document.querySelectorAll('#scheduler-detail dt')].map(e => e.textContent.trim()); return { dts, status: document.querySelector('#scheduler-detail .sched-status-line').textContent.trim(), bar: [...document.querySelectorAll('#scheduler-detail .sched-actions > .btn')].map(b => b.textContent.trim()) }; })()`);
         assert.ok(!off.dts.includes('Next'), 'no Next while it is turned off: ' + JSON.stringify(off));
-        assert.ok(off.dts.includes('Turned off') && /^Turned off/.test(off.status), 'the page says Turned off: ' + JSON.stringify(off));
+        assert.ok(/^Turned off/.test(off.status) && !off.dts.includes('Turned off'), 'the page says Turned off once, in its status line, not again as a fact (#11015): ' + JSON.stringify(off));
         assert.ok(off.bar.includes('Turn on'), 'and the way back is Turn on: ' + JSON.stringify(off));
         console.log('\nPASS first automation: See result, Resume this chat, Turn off, Next hidden when off, own job first');
     } finally { await client.close(); }

@@ -764,6 +764,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
     border-bottom: 1px solid var(--border);
 }
 
+@media (max-width: 767px) { #launch-agent-remove { flex: 1 1 100%; } #launch-agent-move-up, #launch-agent-move-down { flex: 1 1 calc(50% - 4px); } } /* Edit member's own row of Move up and Move down, and Remove on one of its own, not wrapped off to the right (#11015) */
 .launch-modal-step > .modal-actions {
     position: sticky;
     bottom: -24px;

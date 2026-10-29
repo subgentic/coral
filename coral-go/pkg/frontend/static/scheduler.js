@@ -221,7 +221,7 @@ function renderJobDetail(job, runs, workflowRuns, runsTotal, workflowRunsTotal) 
             <dt>Schedule</dt><dd title="${escapeAttr(job.cron_expr)}">${escapeHtml(cronWords(job.cron_expr))}${escapeHtml(zoneNote(job.timezone))}</dd>
             ${job.enabled
                 ? (job.next_fire_at ? `<dt>Next</dt><dd title="${escapeAttr(awayWords(job.next_fire_at))}">${escapeHtml(atWords(job.next_fire_at))} your time</dd>` : '<dt>Next</dt><dd>not scheduled</dd>')
-                : `<dt>${job.paused_reason ? 'Paused' : 'Turned off'}</dt><dd>${job.paused_reason ? `${escapeHtml(job.paused_reason)}. Fix the cause, then turn it on to resume.` : 'Turn it on to run it on schedule.'}</dd>`}
+                : (job.paused_reason ? `<dt>Paused</dt><dd>${escapeHtml(job.paused_reason)}. Fix the cause, then turn it on to resume.</dd>` : '')} ${/* turned off is said once, in the status line; a fact that said it again with "Turn it on" under it read oddly (#11015) */ ''}
             <dt>Does</dt><dd>${doesHtml}</dd>
             ${job.repo_path ? `<dt>Folder</dt><dd><span class="sched-path">${escapeHtml(job.repo_path)}</span></dd>` : ''}
         </dl>
