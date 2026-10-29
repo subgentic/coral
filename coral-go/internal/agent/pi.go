@@ -234,6 +234,10 @@ func (a *PiAgent) LaunchCommand(params LaunchParams) (string, error) {
 			parts = append(parts, "--continue")
 		}
 	}
+	// Coral's extension (#11093): state, tool activity and the handshake reach the dashboard through it. It is not --no-extensions: the person's own extensions load as they do.
+	if ext := piExtensionFile(files, params.SessionID); ext != "" {
+		parts = append(parts, "-e", ext)
+	}
 
 	// Pass through user flags, dropping ones Pi doesn't understand
 	unsupportedFlags := map[string]bool{

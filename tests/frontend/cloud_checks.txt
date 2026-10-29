@@ -259,3 +259,4 @@ node cli_verify_words.test.mjs
 node run_cloud_checks.test.mjs
 node board_cleanup_retry.test.js
 node history_group_name.test.mjs
+node pi_extension.test.mjs
