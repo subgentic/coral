@@ -54,6 +54,7 @@ func lsrRows(t *testing.T, h *SessionsHandler, old, full bool) string {
 			delete(r, "live_permission_mode") // new in #5951: the old implementation has no such field
 			delete(r, "terminal")             // new in 159 (which terminal the agent runs on): the old implementation has no such field; live_terminal_field_test.go pins it through the route
 			delete(r, "asked_before_restart") // new in #10368 (what a sleeping agent asked before Coral restarted): the old implementation has no such field; asked_before_restart_test.go pins it through the list
+			delete(r, "last_message")         // new in #11097 (the newest message of the transcript, for the phone list): the old implementation has no such field; last_message_e2e_test.go pins it through the list
 		}
 	}
 	b, merr := json.Marshal(rows)
