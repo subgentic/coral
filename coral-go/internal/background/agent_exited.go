@@ -39,7 +39,9 @@ func skipIfAgentExited(ctx context.Context, rt any, logger *slog.Logger, name, w
 	exited, fg := ptymanager.AgentExited(ctx, rt, name, "", "")
 	if !exited {
 		exitLogged.Delete(name)
-		return false
+		// Not exited, but the foreground of its terminal may not be the agent: notices go only to the recorded agent process (#389).
+		blocked, _ := ptymanager.NoticeBlocked(ctx, rt, name, "", "", what)
+		return blocked
 	}
 	if _, already := exitLogged.LoadOrStore(name, true); !already && logger != nil {
 		logger.Warn("agent CLI has exited; not typing into its shell", "session", name, "foreground", fg, "skipped", what)

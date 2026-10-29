@@ -18,7 +18,7 @@ import (
 
 // errAgentExited is returned for automated input to an agent whose CLI has
 // exited and left its terminal at a plain shell prompt (#3219).
-var errAgentExited = errors.New("the agent has exited; its terminal is a plain shell, so nothing was typed")
+var errAgentExited = errors.New("nothing was typed: the agent has exited (its terminal is a plain shell), or its terminal is not running the agent")
 
 // exitLogged holds the sessions whose skipped automated input was already logged.
 var exitLogged sync.Map
@@ -71,7 +71,9 @@ func automatedInputBlocked(ctx context.Context, term any, name, agentType, sessi
 	exited, fg := ptymanager.AgentExited(ctx, term, name, agentType, sessionID)
 	if !exited {
 		exitLogged.Delete(key)
-		return false
+		// The agent has not exited, but the foreground of its terminal may not be the agent either (a shell or program a person started): notices go only to the recorded agent process (#389).
+		blocked, _ := ptymanager.NoticeBlocked(ctx, term, name, agentType, sessionID, what)
+		return blocked
 	}
 	if _, already := exitLogged.LoadOrStore(key, true); !already {
 		slog.Warn("agent CLI has exited; not typing into its shell", "session", name, "foreground", fg, "skipped", what)

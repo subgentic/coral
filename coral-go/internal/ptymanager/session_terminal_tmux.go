@@ -75,12 +75,20 @@ func (t *TmuxSessionTerminal) SendRawInput(ctx context.Context, o terminalinput.
 // SendQuietLaunchToTarget is SendToTarget for an agent's launch line: always handed over as a script that erases the screen and scrollback first (#5911).
 func (t *TmuxSessionTerminal) SendQuietLaunchToTarget(ctx context.Context, o terminalinput.Origin, target, command string) error {
 	ForgetSession(target) // as SendToTarget
-	return t.client.SendQuietLaunchToTarget(ctx, o, target, command)
+	err := t.client.SendQuietLaunchToTarget(ctx, o, target, command)
+	if err == nil {
+		t.client.AdoptAgentAfterLaunch(sessionOfTarget(target), target) // the agent's process is recorded when it appears (#389)
+	}
+	return err
 }
 
 func (t *TmuxSessionTerminal) SendToTarget(ctx context.Context, o terminalinput.Origin, target, command string) error {
 	ForgetSession(target) // what Coral remembers of the old process is not true of a new one
-	return t.client.SendKeysToTarget(ctx, o, target, command)
+	err := t.client.SendKeysToTarget(ctx, o, target, command)
+	if err == nil {
+		t.client.AdoptAgentAfterLaunch(sessionOfTarget(target), target) // the agent's process is recorded when it appears (#389)
+	}
+	return err
 }
 
 func (t *TmuxSessionTerminal) SendTerminalInput(ctx context.Context, o terminalinput.Origin, target, data string) error {
