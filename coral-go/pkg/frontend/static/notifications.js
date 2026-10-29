@@ -222,8 +222,9 @@ function placeNotices() {
     const listTitle = document.querySelector(".mobile-list-title"); // the phone's list title (Agents) is not covered either (Mobile tester, #10052)
     const teamHead = document.getElementById("team-page-head"); // nor is a team page's header, its name and status ("Team demo is awake" sat over both, #10359)
     const teamTabs = document.getElementById("team-tabs-row"); // nor is its tab strip (Goals, Agents, Tasks, Artifacts): a toast over it hid the tabs until it left (#11026)
+    const goalHead = document.querySelector(".goal-back-row, .goals-back"), goalTitle = document.querySelector(".goals-detail-title"); // a goal's page: its way back and its title are not covered either (#11034)
     const bottomOf = e => (e && e.getClientRects().length ? Math.round(e.getBoundingClientRect().bottom) : 0);
-    const headBottom = Math.max(bottomOf(head), bottomOf(listTitle), bottomOf(teamHead), bottomOf(teamTabs));
+    const headBottom = Math.max(bottomOf(head), bottomOf(listTitle), bottomOf(teamHead), bottomOf(teamTabs), bottomOf(goalHead), bottomOf(goalTitle));
     let topPx = Math.max(bar ? Math.round(bar.getBoundingClientRect().bottom) : 0, banner ? Math.round(banner.getBoundingClientRect().bottom) : 0, headBottom, 0) + 8;
     // A text field just under that line (the list's filter box), or a phone list's view picker (the button naming the folder: "Needs you", #10525), is not covered either (#10458): the column starts below it. Only a field the card would reach is looked at, so a form further down never moves it.
     const shown = document.getElementById("notices");
