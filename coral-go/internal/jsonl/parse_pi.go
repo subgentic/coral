@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/subgentic/coral/internal/safefs"
 	"github.com/subgentic/coral/internal/transcriptlink"
@@ -47,8 +49,12 @@ func parsePiEntry(entry map[string]any, toolUseNames map[string]string) []map[st
 	return nil
 }
 
+// piMaxText is the most of one message's text or one command the chat takes (about 1 MB; a tool's output, a write and thinking are cut at 10 KB): what an agent wrote into its session file is not a way to
+// make the chat huge.
+const piMaxText = 1 << 20
+
 func piUserTurn(text, timestamp string) []map[string]any {
-	text = strings.TrimSpace(text)
+	text = truncate(strings.TrimSpace(text), piMaxText)
 	if text == "" || isSystemInjected(text) {
 		return nil
 	}
@@ -111,7 +117,7 @@ func piAssistantTurn(msg map[string]any, timestamp string, toolUseNames map[stri
 			isError = true
 		}
 	}
-	joined := strings.Join(text, "\n\n")
+	joined := truncate(strings.Join(text, "\n\n"), piMaxText)
 	if joined == "" && len(thinking) == 0 && len(toolUses) == 0 {
 		return nil
 	}
@@ -139,7 +145,7 @@ func piToolUse(b map[string]any, toolUseNames map[string]string) map[string]any 
 	switch name {
 	case "bash", "powershell":
 		if cmd := str("command"); cmd != "" {
-			entry["command"] = cmd
+			entry["command"] = truncate(cmd, piMaxText)
 			summary = truncate(cmd, 200)
 		}
 	case "write":
@@ -212,8 +218,19 @@ func piToolResult(msg map[string]any, timestamp string, toolUseNames map[string]
 	}}
 }
 
+// piWalkMissTTL is how long a session with no file in Pi's own sessions folder is not looked for again: the walk of that folder is not repeated on every poll of every Pi agent.
+const piWalkMissTTL = 5 * time.Second
+
+var (
+	piWalkMu   sync.Mutex
+	piWalkMiss = map[string]time.Time{}
+	piWalkNow  = time.Now
+	piWalkHook func() // a test counts the walks
+)
+
 // resolvePiTranscript is the file of a Coral Pi session: the newest .jsonl in <data dir>/pi-sessions/<session id>/ (Coral's launch gives Pi that folder with --session-dir, and /new starts another
-// file in it), else a file with the session id in its name under Pi's own sessions folder. "" when there is none yet.
+// file in it), else a file with the session id in its name under Pi's own sessions folder. The session's folder must be a real folder: a link there (the agent can write in pi-sessions) is refused.
+// "" when there is none yet.
 func resolvePiTranscript(sessionID string) string {
 	if !transcriptlink.IsSessionID(sessionID) { // joined into a path and matched in file names
 		return ""
@@ -223,12 +240,30 @@ func resolvePiTranscript(sessionID string) string {
 	if dataDir == "" {
 		dataDir = filepath.Join(home, ".coral")
 	}
-	if matches, err := filepath.Glob(filepath.Join(dataDir, "pi-sessions", sessionID, "*.jsonl")); err == nil && len(matches) > 0 {
-		return newestFile(matches)
+	dir := filepath.Join(dataDir, "pi-sessions", sessionID)
+	if fi, err := os.Lstat(filepath.Dir(dir)); err == nil && !fi.IsDir() { // pi-sessions itself is Coral's folder, never a link
+		return ""
+	}
+	if fi, err := os.Lstat(dir); err == nil {
+		if !fi.IsDir() { // a link, a file: not the folder Coral made
+			return ""
+		}
+		if matches, err := filepath.Glob(filepath.Join(dir, "*.jsonl")); err == nil && len(matches) > 0 {
+			return newestFile(matches)
+		}
+	}
+	piWalkMu.Lock()
+	missedAt, missed := piWalkMiss[sessionID]
+	piWalkMu.Unlock()
+	if missed && piWalkNow().Sub(missedAt) < piWalkMissTTL {
+		return ""
 	}
 	base := filepath.Join(os.Getenv("PI_CODING_AGENT_DIR"), "sessions")
 	if os.Getenv("PI_CODING_AGENT_DIR") == "" {
 		base = filepath.Join(home, ".pi", "agent", "sessions")
+	}
+	if piWalkHook != nil {
+		piWalkHook()
 	}
 	var found []string
 	_ = filepath.WalkDir(base, func(path string, d os.DirEntry, err error) error {
@@ -237,9 +272,16 @@ func resolvePiTranscript(sessionID string) string {
 		}
 		return nil
 	})
+	piWalkMu.Lock()
+	defer piWalkMu.Unlock()
 	if len(found) == 0 {
+		if len(piWalkMiss) > 4096 { // sessions that ended
+			piWalkMiss = map[string]time.Time{}
+		}
+		piWalkMiss[sessionID] = piWalkNow()
 		return ""
 	}
+	delete(piWalkMiss, sessionID)
 	sort.Strings(found)
 	return newestFile(found)
 }

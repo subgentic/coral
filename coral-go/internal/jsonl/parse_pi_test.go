@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -128,4 +129,75 @@ func TestPiToolCallsAndResultsPairUp(t *testing.T) {
 	require.NotNil(t, write)
 	assert.Contains(t, write["input_summary"], "/work/FIXTURE-", "a write call shows its file")
 	assert.Contains(t, write["write_content"], "FIXTURE-WRITE-")
+}
+
+// #11091 (Security's SHOULDs on #11088): the session's folder is only ever its own real folder. A pi-sessions/<id> that is a link (the agent can write in pi-sessions) is refused, not followed to
+// another folder's transcript.
+func TestPiSessionFolderThatIsALinkIsRefused(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("CORAL_DATA_DIR", dir)
+	t.Setenv("PI_CODING_AGENT_DIR", filepath.Join(dir, "no-pi-home"))
+	elsewhere := filepath.Join(dir, "elsewhere")
+	require.NoError(t, os.MkdirAll(elsewhere, 0o700))
+	fixture, err := os.ReadFile(filepath.Join("testdata", "pi-1.4.0", "session.jsonl"))
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(filepath.Join(elsewhere, "2026-10-29T19-44-35-010Z_01a18931-58c2-74fc-8a74-bed622970705.jsonl"), fixture, 0o600))
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, "pi-sessions"), 0o700))
+	if err := os.Symlink(elsewhere, filepath.Join(dir, "pi-sessions", piTestSession)); err != nil {
+		t.Skip("no symlinks here: " + err.Error())
+	}
+	assert.Equal(t, "", resolvePiTranscript(piTestSession), "a linked session folder is not the session's own")
+	assert.Empty(t, readPi(t, piTestSession), "and nothing of it reaches the chat")
+
+	// pi-sessions itself as a link to a folder that holds a real session folder.
+	require.NoError(t, os.Remove(filepath.Join(dir, "pi-sessions", piTestSession)))
+	require.NoError(t, os.Remove(filepath.Join(dir, "pi-sessions")))
+	real := filepath.Join(dir, "real-sessions")
+	require.NoError(t, os.MkdirAll(filepath.Join(real, piTestSession), 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(real, piTestSession, "a.jsonl"), fixture, 0o600))
+	require.NoError(t, os.Symlink(real, filepath.Join(dir, "pi-sessions")))
+	assert.Equal(t, "", resolvePiTranscript(piTestSession), "pi-sessions as a link is refused too")
+}
+
+// The fallback walk of Pi's own sessions folder is not repeated on every poll for a session that has none there: a miss is remembered for a few seconds.
+func TestPiFallbackWalkMissIsRemembered(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("CORAL_DATA_DIR", dir)
+	t.Setenv("PI_CODING_AGENT_DIR", filepath.Join(dir, "pi-home"))
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, "pi-home", "sessions", "--x--"), 0o700))
+	walks := 0
+	piWalkHook = func() { walks++ }
+	now := time.Unix(1_800_000_000, 0)
+	piWalkNow = func() time.Time { return now }
+	t.Cleanup(func() { piWalkHook, piWalkNow = nil, time.Now })
+	const sid = "11111111-2222-4333-8444-555555555555"
+	assert.Equal(t, "", resolvePiTranscript(sid))
+	assert.Equal(t, "", resolvePiTranscript(sid))
+	assert.Equal(t, 1, walks, "the second look within the window does not walk again")
+	now = now.Add(piWalkMissTTL + time.Second)
+	assert.Equal(t, "", resolvePiTranscript(sid))
+	assert.Equal(t, 2, walks, "after the window it looks again")
+	// A file that appears is found as soon as the window has passed.
+	f := filepath.Join(dir, "pi-home", "sessions", "--x--", "2026-10-29T19-44-35-010Z_"+sid+".jsonl")
+	require.NoError(t, os.WriteFile(f, []byte(`{"type":"session"}`+"\n"), 0o600))
+	now = now.Add(piWalkMissTTL + time.Second)
+	assert.Equal(t, f, resolvePiTranscript(sid))
+}
+
+// One message's text and one command are cut at about 1 MB, as a write's content is cut at 10 KB: a transcript line the agent made is not a way to make the chat huge.
+func TestPiTextAndCommandAreCapped(t *testing.T) {
+	big := strings.Repeat("x", 3<<20)
+	names := map[string]string{}
+	user := parsePiEntry(map[string]any{"type": "message", "message": map[string]any{"role": "user", "content": big}}, names)
+	require.Len(t, user, 1)
+	assert.LessOrEqual(t, len(user[0]["content"].(string)), piMaxText+64)
+	asst := parsePiEntry(map[string]any{"type": "message", "message": map[string]any{"role": "assistant", "content": []any{
+		map[string]any{"type": "text", "text": big},
+		map[string]any{"type": "toolCall", "id": "c1", "name": "bash", "arguments": map[string]any{"command": big}},
+	}}}, names)
+	require.Len(t, asst, 1)
+	assert.LessOrEqual(t, len(asst[0]["text"].(string)), piMaxText+64)
+	tu := asst[0]["tool_uses"].([]map[string]any)
+	assert.LessOrEqual(t, len(tu[0]["command"].(string)), piMaxText+64)
+	assert.LessOrEqual(t, len(tu[0]["input_summary"].(string)), 1000)
 }
