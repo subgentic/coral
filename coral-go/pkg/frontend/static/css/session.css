@@ -1788,3 +1788,6 @@ body .terminal-header { flex-wrap: wrap; height: auto; min-height: 36px; row-gap
     .agent-phone-details .facts { padding-bottom: var(--space-md); }
     .agent-phone-details .facts dd { overflow-wrap: anywhere; }
 }
+
+/* Show summary and Show model (#10816): one quiet line each, only when on */
+.session-line2, .session-model { padding-left: 18px; font-size: var(--fs-sm); color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

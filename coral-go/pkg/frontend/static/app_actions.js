@@ -6,7 +6,7 @@ import { state } from './state.js';
 import { loadLiveSessions } from './api.js';
 import { restartSession, restartStage, hideRestartModal, confirmRestart, editGoal, refreshGoal } from './controls.js';
 import { selectLiveSession, selectHistorySession, editAndResubmit, renameAgent, editInstructions, setAgentIcon, toggleChatFlag } from './sessions.js';
-import { RESET_LOG_NOTE, toggleGroupCollapse, killGroup, killBoard, toggleTeamSleep, toggleAgentSleep, toggleAgentArchive, toggleArchivedSection, shareAgentTeam, saveTeamFromSidebar, killSessionDirect, showInfoDirect, attachDirect, restartDirect, restartSameDirect, showConfirmModal, hideConfirmModal, showPromptModal, hidePromptModal, showAlertModal, hideAlertModal, copyFolderPath, moveGroupUp, moveGroupDown, toggleGroupByTeam, expandSleepingGroup, setBoardAccentColor, moveSessionUp, moveSessionDown, showTeamTokenUsage, distillTeamKnowledge, filterLiveAgents, syncDisplayMenu, agentSearchKey, toggleShowServer, toggleGroupByServer, groupHeaderKey, teamHeaderKey } from './render.js';
+import { RESET_LOG_NOTE, toggleGroupCollapse, killGroup, killBoard, toggleTeamSleep, toggleAgentSleep, toggleAgentArchive, toggleArchivedSection, shareAgentTeam, saveTeamFromSidebar, killSessionDirect, showInfoDirect, attachDirect, restartDirect, restartSameDirect, showConfirmModal, hideConfirmModal, showPromptModal, hidePromptModal, showAlertModal, hideAlertModal, copyFolderPath, moveGroupUp, moveGroupDown, toggleGroupByTeam, expandSleepingGroup, setBoardAccentColor, moveSessionUp, moveSessionDown, showTeamTokenUsage, distillTeamKnowledge, filterLiveAgents, syncDisplayMenu, agentSearchKey, toggleShowServer, toggleGroupByServer, toggleRowLine, groupHeaderKey, teamHeaderKey } from './render.js';
 import { WHAT_STAYS_RESET } from './agent_words.js';
 import { toggleBrowser, browserNavigateTo, browserNavigateUp, browserSelectRecent, browserUse } from './browser.js';
 import { toggleAgenticPanel, toggleSidebarRail, focusSidebarSearch } from './sidebar.js';
@@ -171,6 +171,7 @@ registerActions({
     'display-panel-toggle': el => toggleDisplayPanel(el),
     'display-panel-key': (el, event) => displayPanelKey(event),
     'toggle-show-server': () => window.toggleShowServer(),
+    'toggle-row-line': el => window.toggleRowLine(el.dataset.displayInput),
     'toggle-group-by-server': () => window.toggleGroupByServer(),
 });
 
@@ -397,7 +398,7 @@ Object.assign(window, {
     toggleSidebarKebab, closeSidebarKebabs,
     // render (sidebar actions)
     filterLiveAgents, agentSearchKey, syncDisplayMenu,
-    toggleShowServer, toggleGroupByServer,
+    toggleShowServer, toggleGroupByServer, toggleRowLine,
     toggleGroupCollapse, groupHeaderKey, teamHeaderKey, killGroup, moveGroupUp, moveGroupDown,
     copyFolderPath, killBoard, setBoardAccentColor, resetTeam,
     moveSessionUp, moveSessionDown,

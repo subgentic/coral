@@ -47,7 +47,7 @@ import { UPDOWN, W, dirOf, menu, withAgent, withBoard } from './action_helpers.j
 export { KILL_LOG_NOTE, KILL_LOG_NOTE_MANY, RESET_LOG_NOTE, attachDirect, killSessionDirect, restartDirect, restartSameDirect, showInfoDirect, toggleAgentArchive, toggleAgentSleep } from './agent_actions.js';
 export { copyFolderPath, hideAlertModal, hidePromptModal, showAlertModal, showPromptModal } from './prompt_modals.js';
 export { killBoard, killGroup, saveTeamFromSidebar, shareAgentTeam, toggleTeamSleep } from './team_actions.js';
-export { expandSleepingGroup, toggleGroupByServer, toggleGroupByTeam, toggleShowServer } from './list_display_settings.js';
+export { expandSleepingGroup, toggleGroupByServer, toggleGroupByTeam, toggleShowServer, toggleRowLine } from './list_display_settings.js';
 export { renderHistoryChat, renderHistoryNodes, renderHistorySessions } from './history_list.js';
 export { updateSessionBranch, updateSessionFolder, updateSessionModel, updateSessionStatus, updateSessionSummary, updateWaitingIndicator } from './session_header_updates.js';
 export { distillTeamKnowledge, showTeamTokenUsage, updateHistoryTokenUsage, updateTokenUsage } from './token_usage_ui.js';

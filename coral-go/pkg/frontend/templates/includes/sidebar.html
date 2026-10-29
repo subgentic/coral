@@ -115,6 +115,8 @@
                     {{ if ne . "automations" }}{{ if ne . "docs" }}{{ if ne . "tokens" }}<div class="list-display-panel" id="{{ if eq . "agents" }}display-panel{{ else }}display-panel-{{ . }}{{ end }}" data-display-panel role="group" aria-label="Display options" data-on-keydown="display-panel-key" hidden>
                         {{ if eq . "agents" }}<div class="agent-list-bar" id="agent-list-bar" hidden></div>
                     <div class="list-display-options">
+                        <label class="list-display-option" data-display-row="summary"><input type="checkbox" id="display-show-summary" data-display-input="summary" data-on-change="toggle-row-line"> Show summary</label>
+                        <label class="list-display-option" data-display-row="model"><input type="checkbox" id="display-show-model" data-display-input="model" data-on-change="toggle-row-line"> Show model</label>
                         <label class="list-display-option" id="display-show-server-row" data-display-row="server" hidden><input type="checkbox" id="display-show-server" data-display-input="server" data-on-change="toggle-show-server"> Show server</label>
                         <label class="list-display-option" id="display-group-by-server-row" data-display-row="group" hidden><input type="checkbox" id="display-group-by-server" data-display-input="group" data-on-change="toggle-group-by-server"> Group by server</label>
                     </div>

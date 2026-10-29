@@ -22,6 +22,11 @@ const GOAL_LINE_MAX = 140;
     return flat.slice(0, max - 1).trimEnd() + '\u2026';
 }
 
+/** Goal text for a session row: summary, else the first user prompt (Show summary, #10816). */
+ export function sessionGoalText(s) {
+    return s ? oneLine(s.summary || s.first_prompt || '') : '';
+}
+
 /**
  * Stable identity source for a session, or '' when there is none.
  * Chain: display_name -> auto_name (D8, transcript-derived, write-once) ->

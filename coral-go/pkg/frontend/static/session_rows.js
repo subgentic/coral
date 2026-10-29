@@ -1,5 +1,5 @@
 /* Moved out of render.js as it was (#3795): no behaviour change. */
-import { getDotClass, resolveSessionIdentity, sessionStateInfo, sessionUnreadCount } from './session_state.js';
+import { getDotClass, resolveSessionIdentity, sessionGoalText, sessionStateInfo, sessionUnreadCount } from './session_state.js';
 import { _saveSessionOrder } from './list_order.js';
 import { MORE_DOTS_SVG, escapeHtml, escapeAttr, agentNameColor } from './utils.js';
 import { autoAcceptChip, autoAcceptMenuItem } from './auto_accept.js';
@@ -11,7 +11,7 @@ import { instructionsOffered } from './agent_instructions_offer.js';
 import { redrawLiveList } from './list_hooks.js';
 import { state } from './state.js';
 import { skippedOf } from './waiting.js';
-import { typeName } from './model_labels.js';
+import { modelName, typeName } from './model_labels.js';
 import { terminalGoneChip } from './terminal_gone.js';
 import { hooksMissingChip } from './hooks_missing.js';
 import { browserLocal } from './safe_storage.js';
@@ -328,6 +328,7 @@ export function _renderSessionItem(s, groupName, isCompact, collapsed, teamDefau
                 ${stale ? '' : waitingBadge + heldChip}
                 ${stale ? '' : kebabMenu}
             </div>
+            ${rowLinesHtml(s)}
         </div>
         <div class="session-tooltip"></div>
     </li>`;
@@ -373,6 +374,19 @@ export function _renderAgentListWithSubgroups(agents, teamDefaultDir, isCompact,
     return html;
 }
 
+/** Show summary and Show model (#10816, after ce1946c0c): off unless on, kept per viewer; each adds one line. */
+const ROW_LINE_KEY = { summary: 'coral-show-summary', model: 'coral-show-model' };
+export function isRowLineShown(part) {
+    try { return browserLocal.get(ROW_LINE_KEY[part]) === 'true'; } catch { return false; }
+}
+export function setRowLineShown(part, on) {
+    try { browserLocal.set(ROW_LINE_KEY[part], on ? 'true' : 'false'); } catch { /* per-viewer only */ }
+}
+function rowLinesHtml(s) {
+    const line = (cls, text) => text ? `<div class="${cls}">${escapeHtml(text)}</div>` : '';
+    return line('session-line2', isRowLineShown('summary') && sessionGoalText(s)) + line('session-model', isRowLineShown('model') && s.agent_type !== 'terminal' && modelName(s.agent_type, s.model, sessionServer(s)));
+}
+
 /** 'Show server' (setting show_session_server): unset = on with 2+ servers, off with one. */
  export function isServerShownOnRows() {
     const v = String(state.settings?.show_session_server ?? '').toLowerCase();
@@ -393,8 +407,8 @@ export function _renderAgentListWithSubgroups(agents, teamDefaultDir, isCompact,
  *  page (and of a long chat) each time (#4985). */
  export function syncDisplayMenu() {
     const n = serversShown().length;
-    const checked = { server: isServerShownOnRows(), group: isGroupedByServer() };
-    const offered = { server: n >= 1, group: n >= 2 };
+    const checked = { summary: isRowLineShown('summary'), model: isRowLineShown('model'), server: isServerShownOnRows(), group: isGroupedByServer() };
+    const offered = { summary: true, model: true, server: n >= 1, group: n >= 2 };
     for (const header of [...document.getElementsByClassName('sidebar-header'), ...document.getElementsByClassName('mobile-list-header')]) {
         for (const input of header.querySelectorAll('[data-display-input]')) setChecked(input, checked[input.dataset.displayInput] === true);
         for (const row of header.querySelectorAll('[data-display-row]')) setHidden(row, !offered[row.dataset.displayRow]);

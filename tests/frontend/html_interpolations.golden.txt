@@ -231,6 +231,7 @@
 1	markdown.js	HL_MARK
 2	message_board.js	p.message_count
 1	message_board.js	p.subscriber_count
+1	mobile.js	['summary', 'model'].map(k => switchRow({ label: `Show ${k}`, labelClass: 'list-display-option', labelAttrs: `
 1	mobile.js	switchRow({ label: 'Group by server', labelClass: 'list-display-option', labelAttrs: ' data-display-row="group
 1	mobile.js	switchRow({ label: 'Show server', labelClass: 'list-display-option', labelAttrs: ' data-display-row="server" h
 1	model_chip.js	checked
@@ -316,6 +317,7 @@
 1	session_rows.js	autoAcceptChip(s)
 1	session_rows.js	autoAcceptMenuItem(s)
 1	session_rows.js	clickHandler
+1	session_rows.js	cls
 1	session_rows.js	collapsedClass
 1	session_rows.js	compactClass
 1	session_rows.js	dirChip
@@ -325,6 +327,7 @@
 1	session_rows.js	nameTail ? `<span class="session-label-tags">${reminderTag}${typeTag}${dirChip}</span>` : `${reminderTag}${typ
 1	session_rows.js	pillKind
 1	session_rows.js	reminderTag
+1	session_rows.js	rowLinesHtml(s)
 1	session_rows.js	sleepingClass
 1	session_rows.js	stale ? '' : kebabMenu
 1	session_rows.js	stale ? '' : waitingBadge + heldChip
