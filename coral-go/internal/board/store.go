@@ -45,7 +45,8 @@ type Store struct {
 	stmts                   *hotStmts      // the hot fixed queries, prepared (#4463); nil: unprepared
 	msgIndex                atomic.Int32   // the message search index's state (message_fts.go): off, building, ready
 	msgIndexStop            atomic.Pointer[context.CancelFunc]
-	msgIndexAnswers         atomic.Int64 // searches the index answered (tests check it is used)
+	msgIndexCheckStop       atomic.Pointer[context.CancelFunc] // the check of a complete index after open (message_fts.go)
+	msgIndexAnswers         atomic.Int64                       // searches the index answered (tests check it is used)
 }
 
 func isInMemoryPath(dbPath string) bool {
@@ -190,6 +191,9 @@ func newStore(dbPath, key string, schemaDone bool) (*Store, error) {
 func (s *Store) Close() error {
 	if stop := s.msgIndexStop.Swap(nil); stop != nil {
 		(*stop)() // a build in progress ends
+	}
+	if stop := s.msgIndexCheckStop.Swap(nil); stop != nil {
+		(*stop)() // so does a check
 	}
 	// The prepared statements first: each holds its pool connections' statements.
 	firstErr := s.stmts.close()

@@ -108,6 +108,7 @@ func (s *Store) applyMessageSearchIndexSetting() {
 		}
 		if s.messageIndexComplete(ctx) {
 			s.msgIndex.Store(messageIndexReady)
+			s.startMessageSearchIndexCheck()
 			return
 		}
 		s.startMessageSearchIndexBuildIfRoom(ctx)
@@ -442,4 +443,66 @@ func (s *Store) queryTextViaIndex(ctx context.Context, q *MessageQuery, where []
 		return nil, false, err
 	}
 	return res, true, nil
+}
+
+// An index the pre-#10831 build race damaged (a message deleted or edited after its chunk was indexed, before the triggers existed) is
+// not an error to a search: it answers, and silently misses the messages whose words changed (#10905, Security's INFO on #10831). A
+// complete index is therefore checked once, a little after open, with FTS5's own integrity check, and rebuilt on a mismatch.
+//
+// The check reads the index and the messages once, on the writer's connection, which no write can interleave with (the read pool's check
+// reports damage on a database that is only being written, #4735): so it is bounded. A board of more than messageIndexCheckMaxMessages
+// messages is not checked (it says so once in the log), and the check waits messageIndexCheckDelay after open so the start's own work is
+// not slowed. A repair is said once in the log and nowhere else: a search reads every message until the new index is ready.
+var (
+	messageIndexCheckDelay       = 2 * time.Minute
+	messageIndexCheckMaxMessages = int64(500000)
+)
+
+func (s *Store) startMessageSearchIndexCheck() {
+	ctx, cancel := context.WithCancel(context.Background())
+	if old := s.msgIndexCheckStop.Swap(&cancel); old != nil {
+		(*old)()
+	}
+	go func() {
+		defer safego.Recover("board/message_fts:check")
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(messageIndexCheckDelay):
+		}
+		if _, err := s.CheckMessageSearchIndex(ctx); err != nil && ctx.Err() == nil {
+			log.Printf("board: checking the message search index: %v", err)
+		}
+	}()
+}
+
+// CheckMessageSearchIndex checks a complete message search index against the messages and, when they do not match, drops it and builds it
+// again, returning when the new one is ready. repaired says it did. A board over messageIndexCheckMaxMessages is left alone.
+func (s *Store) CheckMessageSearchIndex(ctx context.Context) (repaired bool, err error) {
+	if s.msgIndex.Load() != messageIndexReady {
+		return false, nil
+	}
+	var n int64
+	if err := s.db.GetContext(ctx, &n, `SELECT COUNT(*) FROM board_messages`); err != nil {
+		return false, err
+	}
+	if n > messageIndexCheckMaxMessages {
+		log.Printf("board: not checking the message search index: %d messages is over the %d the check is limited to", n, messageIndexCheckMaxMessages)
+		return false, nil
+	}
+	_, err = s.db.ExecContext(ctx, `INSERT INTO `+messageFTSTable+`(`+messageFTSTable+`, rank) VALUES ('integrity-check', 1)`)
+	if err == nil {
+		return false, nil
+	}
+	if e := strings.ToLower(err.Error()); !strings.Contains(e, "malformed") && !strings.Contains(e, "corrupt") {
+		return false, err // busy, closed, cancelled: not damage
+	}
+	log.Printf("board: the message search index does not match the messages (%v); building it again. Nothing is lost: a search reads every message until it is ready", err)
+	if _, err := s.DisableMessageSearchIndex(ctx, false); err != nil {
+		return false, err
+	}
+	if err := s.BuildMessageSearchIndex(ctx); err != nil {
+		return false, err
+	}
+	return true, nil
 }
