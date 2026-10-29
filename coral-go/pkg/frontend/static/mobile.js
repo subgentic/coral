@@ -443,7 +443,8 @@ function _initKeyboardDetection() {
     });
 
     window.addEventListener('resize', () => {
-        if (!document.body.classList.contains('keyboard-open')) {
+        // A page Chrome resizes for the keyboard (interactive-widget=resizes-content, #11060) gets this event with the shorter height before the visual viewport's own: a shrink of more than 100 px is the keyboard, not a new size
+        if (!document.body.classList.contains('keyboard-open') && visibleHeight() > initialHeight - 100) {
             initialHeight = visibleHeight();
         }
         updateViewportHeight();

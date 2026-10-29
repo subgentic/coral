@@ -8,7 +8,7 @@
     <!-- Apply theme before any rendering to prevent flash of wrong theme -->
     <script src="{{ $base }}theme_init.js"></script>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content"><!-- Chrome on Android resizes the page itself when the keyboard opens (the composer sits on top of it, #11060); iOS Safari ignores it and mobile.js follows the visual viewport -->
     <title>Coral</title>
     <link rel="icon" type="image/png" href="{{ $base }}favicon.png">
     <link rel="manifest" href="{{ $base }}manifest.json">
