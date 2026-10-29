@@ -91,5 +91,7 @@ log "Running goals integration on $BASE_URL ($CORAL_TEST_BACKEND)..."
 for round in $(seq 1 "$REPEAT"); do
     (( REPEAT == 1 )) || log "Round $round/$REPEAT"
     python3 "$SCRIPT_DIR/goals_integration.py" "$BASE_URL" "$(coral_test_native_path "$TMPDIR_GOALS")" "$CORAL_TEST_EXE" "$CORAL_TEST_BACKEND" "$(coral_test_native_path "$CORAL_TEST_HOME")" "r$round"
+    read -r p f < "$TMPDIR_GOALS/goals-counts"; ROUND_PASS=$(( ${ROUND_PASS:-0} + p ))
 done
+echo "$ROUND_PASS 0" > "$TMPDIR_GOALS/goals-counts"  # the runner's totals add up every round
 coral_test_sandbox_check

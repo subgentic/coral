@@ -3,6 +3,15 @@
 # Stress test for the Coral board task system.
 # Tests task creation, claiming, completion, and listing.
 #
+#   bash tests/stress/run.sh                          this board stress test
+#   bash tests/stress/run.sh --identity [--strict]    session tokens and impersonation (run_identity.sh)
+#   bash tests/stress/run.sh --kill-all               folder Kill all in the real dashboard
+#   bash tests/stress/run.sh --goals [--repeat N]     goals integration, incl. `coral-board goal brief` by a mock agent (Goal #153)
+#   bash tests/stress/run.sh --send-after-restart [--repeat N]
+#                                                     send after a Coral restart, a wake and a due board nudge (Goal #133, #10996)
+#   --repeat N runs that suite N times back to back on one server. For the browser suites the same is
+#   `node tests/frontend/run_cdp_suites.mjs --only <suite> --stress --runs N --shards 1`.
+#
 set -euo pipefail
 export CORAL_TELEMETRY_DISABLED=1 # our own runs send no usage events (#4936)
 # Clears an agent shell's identity and production links (and documents: never run bare 'tmux' here).
@@ -21,8 +30,24 @@ if [[ "${1:-}" == "--identity" ]]; then
 elif [[ "${1:-}" == "--kill-all" ]]; then
     # Folder Kill all with real agents in the real dashboard (#3053/#3058); its own server and port.
     exec bash "$SCRIPT_DIR/run_kill_all.sh"
+elif [[ "${1:-}" == "--goals" || "${1:-}" == "--send-after-restart" ]]; then
+    # --goals: goals integration with mock agents and the real coral-board (run_goals.sh), including Goal #153's
+    #   `coral-board goal brief` run by an agent with every reference form (#11029).
+    # --send-after-restart: restart Coral, then send as the dashboard composer does, after a wake and while a board
+    #   nudge is due: 200, delivered, no `session target mismatch`, no `not_submitted` (run_send_after_restart.sh, Goal #133).
+    # Either takes --repeat N: the same suite N times back to back on ONE server (each round has its own boards; the
+    #   send check restarts Coral each round), e.g.  bash tests/stress/run.sh --goals --repeat 10
+    # Each runs its own private server; CORAL_TEST_PORT picks the port (8493 / 8494 by default).
+    runner="run_goals.sh"; [[ "$1" == "--send-after-restart" ]] && runner="run_send_after_restart.sh"
+    if [[ "${2:-}" == "--repeat" ]]; then
+        [[ "${3:-}" =~ ^[0-9]+$ ]] || { echo "Usage: $0 $1 [--repeat N]" >&2; exit 2; }
+        export CORAL_TEST_REPEAT="$3"
+    elif [[ $# -gt 1 ]]; then
+        echo "Usage: $0 $1 [--repeat N]" >&2; exit 2
+    fi
+    exec bash "$SCRIPT_DIR/$runner"
 elif [[ $# -gt 0 ]]; then
-    echo "Usage: $0 [--kill-all | --identity [--strict]]" >&2
+    echo "Usage: $0 [--kill-all | --identity [--strict] | --goals [--repeat N] | --send-after-restart [--repeat N]]" >&2
     exit 2
 fi
 HOST="127.0.0.1"
