@@ -64,8 +64,8 @@ export function wireShortcuts() {
         if (e.defaultPrevented || e.isComposing) return;
         // The keys people know from VS Code and GoLand (#10579, #10677), from the page and the message box, never in a terminal or with a dialog open: Cmd on a Mac, Ctrl elsewhere (a Mac's Ctrl+B, F, K, P are its text-cursor keys).
         // Browsers keep Ctrl+Tab, Cmd+T, W, N, L and 1-9, so the next agent and team are Alt/Option+Down and Up; Firefox keeps Ctrl+Shift+P (a private window) on Windows and Linux, so F1 opens the command list there too.
-        const cmd = onMac() ? e.metaKey && !e.ctrlKey : e.ctrlKey && !e.metaKey, k = e.key.toLowerCase(), live = !dialogOpen() && !e.target.closest?.('.xterm');
-        const to = f => { if (live) { e.preventDefault(); f(); } }, open = as => to(() => importOnce('./jump_to.js').then(m => m.openJumpTo(as)));
+        const cmd = onMac() ? e.metaKey && !e.ctrlKey : e.ctrlKey && !e.metaKey, k = e.key.toLowerCase(), live = () => !dialogOpen() && !e.target.closest?.('.xterm'); // looked up only once a shortcut matches: not on every key typed (perf_budgets: no page-wide lookup per keystroke)
+        const to = f => { if (live()) { e.preventDefault(); f(); } }, open = as => to(() => importOnce('./jump_to.js').then(m => m.openJumpTo(as)));
         if (cmd && !e.altKey && !e.shiftKey && (k === 'k' || k === 'p')) return open('jump');
         if ((cmd && !e.altKey && e.shiftKey && k === 'p') || (e.key === 'F1' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey)) return open('commands');
         if (cmd && !e.altKey && !e.shiftKey && k === ',') return to(() => window.showSettingsModal());
