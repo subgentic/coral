@@ -1,11 +1,13 @@
 #cloud-config
-# A Coral machine, made by `coral machine launch`. It holds one secret: the Coral Hub one-time credential in the last step, single use and short-lived.
-# Nothing here opens an inbound port: the machine connects out to Coral Hub.
+# A Coral machine, made by `coral machine launch`. It holds NO secret of the person's and no Hub credential: that arrives over SSH, after the launcher has checked this machine's host key.
+# The one inbound port is SSH, for the launch's own key only, until the launcher is done (or 20min have passed).
 users:
   - name: coral
     gecos: Coral
     shell: /bin/bash
-    lock_passwd: true # no password and no sudo, and no ssh key is added
+    lock_passwd: true # no password and no sudo
+    ssh_authorized_keys: # the launch's own public key: the only way in, removed when the launcher is done
+      - no-port-forwarding,no-agent-forwarding,no-X11-forwarding ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOpKbGPinFIKvvVQexMuxfmVR3auvr57kkIe6mkURtIs
 package_update: true
 packages:
   - ca-certificates
@@ -37,6 +39,70 @@ write_files:
 
       [Install]
       WantedBy=multi-user.target
+  - path: /etc/ssh/sshd_config.d/10-coral-bootstrap.conf
+    owner: root:root
+    permissions: '0644'
+    content: |
+      # Coral machine bootstrap: the launcher's one key, as coral, for the length of the launch.
+      PasswordAuthentication no
+      KbdInteractiveAuthentication no
+      PermitRootLogin no
+      PubkeyAuthentication yes
+      AllowUsers coral
+      AllowTcpForwarding no
+      AllowAgentForwarding no
+      X11Forwarding no
+      MaxAuthTries 2
+      LoginGraceTime 30
+  - path: /etc/systemd/system/coral-bootstrap.path
+    owner: root:root
+    permissions: '0644'
+    content: |
+      [Unit]
+      Description=Start Coral when the launcher has delivered its one-time credential
+
+      [Path]
+      PathExists=/run/coral/bootstrap.d/credential
+      Unit=coral.service
+
+      [Install]
+      WantedBy=multi-user.target
+  - path: /etc/systemd/system/coral-finish.path
+    owner: root:root
+    permissions: '0644'
+    content: |
+      [Unit]
+      Description=Close the bootstrap SSH access when the launcher is done
+
+      [Path]
+      PathExists=/run/coral/bootstrap.d/done
+      Unit=coral-finish.service
+
+      [Install]
+      WantedBy=multi-user.target
+  - path: /etc/systemd/system/coral-finish.service
+    owner: root:root
+    permissions: '0644'
+    content: |
+      [Unit]
+      Description=Close the bootstrap SSH access and finish setting up Coral
+
+      [Service]
+      Type=oneshot
+      ExecStart=/usr/local/sbin/coral-machine-finish
+  - path: /etc/systemd/system/coral-finish.timer
+    owner: root:root
+    permissions: '0644'
+    content: |
+      [Unit]
+      Description=Close the bootstrap SSH access if the launcher never finishes
+
+      [Timer]
+      OnActiveSec=20min
+      Unit=coral-finish.service
+
+      [Install]
+      WantedBy=timers.target
   - path: /usr/local/sbin/coral-machine-setup
     owner: root:root
     permissions: '0700'
@@ -64,6 +130,26 @@ write_files:
       sha256sum -c expected.sum
       tar -xzf "$tarball" -C /usr/local/bin/
       test -x /usr/local/bin/coral
+  - path: /usr/local/sbin/coral-machine-finish
+    owner: root:root
+    permissions: '0700'
+    content: |
+      #!/bin/sh
+      # The end of the bootstrap window: no SSH any more, and nothing left that could open it again (a reboot, a cloud-init re-run, a snapshot restore). Safe to run twice.
+      # sshd is stopped AND masked, port 22 is closed, the host keys and the launch key are deleted, and so are cloud-init's own copies of the user-data (the provider keeps its copy: the key in it is dead).
+      systemctl disable --now ssh.socket ssh.service sshd.service 2>/dev/null || true
+      systemctl mask ssh.socket ssh.service sshd.service 2>/dev/null || true
+      ufw --force delete allow 22/tcp >/dev/null 2>&1 || true
+      rm -f /home/coral/.ssh/authorized_keys /etc/ssh/ssh_host_*_key /etc/ssh/ssh_host_*_key.pub
+      rm -f /etc/ssh/sshd_config.d/10-coral-bootstrap.conf
+      rm -rf /var/lib/cloud/instance/user-data.txt* /var/lib/cloud/instance/cloud-config.txt /var/lib/cloud/instance/scripts /var/lib/cloud/instance/vendor-data*
+      rm -rf /var/lib/cloud/instances/*/user-data.txt* /var/lib/cloud/instances/*/cloud-config.txt /var/lib/cloud/instances/*/scripts /var/lib/cloud/instances/*/vendor-data*
+      rm -f /var/lib/cloud/seed/nocloud*/user-data /var/lib/cloud/seed/nocloud*/meta-data
+      for f in /var/log/cloud-init.log /var/log/cloud-init-output.log; do [ -f "$f" ] && : > "$f"; done
+      systemctl enable coral.service 2>/dev/null || true
+      # after Coral is up and has redeemed its credential: the agent CLIs (slow, and not needed to enroll)
+      if systemctl is-active --quiet coral.service; then /usr/local/sbin/coral-machine-agents || true; fi
+      exit 0
   - path: /usr/local/sbin/coral-machine-agents
     owner: root:root
     permissions: '0700'
@@ -86,6 +172,7 @@ write_files:
 runcmd:
   - [ ufw, default, deny, incoming ]
   - [ ufw, default, allow, outgoing ]
+  - [ ufw, allow, from, '203.0.113.9', to, any, port, '22', proto, tcp ] # SSH, for the launcher's address only: closed again by coral-machine-finish
   - [ ufw, --force, enable ]
   - |
     (
@@ -93,12 +180,7 @@ runcmd:
       /usr/local/sbin/coral-machine-setup
       install -d -m 0755 -o root -g root /run/coral
       install -d -m 0700 -o coral -g coral /run/coral/bootstrap.d
-      (umask 077; printf '%s' 'chb_TESTCREDENTIAL0123456789abcdefghij' > /run/coral/bootstrap.d/credential)
-      chown coral:coral /run/coral/bootstrap.d/credential
-      chmod 0600 /run/coral/bootstrap.d/credential
       systemctl daemon-reload
-      systemctl enable --now coral.service
+      systemctl reload ssh || systemctl restart ssh || true
+      systemctl enable --now coral-bootstrap.path coral-finish.path coral-finish.timer
     )
-  - |
-    # after Coral is up and has redeemed its credential: the agent CLIs (slow, and not needed to enroll)
-    if systemctl is-active --quiet coral.service; then /usr/local/sbin/coral-machine-agents; fi

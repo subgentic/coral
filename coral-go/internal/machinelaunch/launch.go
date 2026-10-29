@@ -22,6 +22,7 @@ type Options struct {
 	SSHKeys []string // provider ids or fingerprints; none by default
 	Yes     bool     // skip the confirm prompt (and only that)
 	HubURL  string   // the Hub's origin, printed as the place to approve the machine
+	SSHFrom string   // the address SSH is open to on the machine (shown in the confirm); the user-data builder is given the same one
 	Wait    time.Duration
 	// RetryListAfter is how long a launch whose create timed out waits before it looks once more for a machine it may have made (a provider's list can lag the create); 0 is 5 seconds.
 	RetryListAfter time.Duration
@@ -31,8 +32,12 @@ type Options struct {
 type Deps struct {
 	Provider Provider
 	Hub      Minter
-	// UserData makes the cloud-init user-data for a credential (BuildUserData with the rest of its spec closed over): the credential goes into it and nowhere else.
-	UserData func(credential string) (string, error)
+	// Keys makes the launch's own keys; nil is NewBootKeys. A test gives it fixed ones.
+	Keys func() (*BootKeys, error)
+	// UserData makes the cloud-init user-data for a launch's keys (BuildUserData with the rest of its spec closed over). It carries the keys' PUBLIC login half and the host key the machine presents, and never a credential.
+	UserData func(keys *BootKeys) (string, error)
+	// Bootstrap hands the machine the Hub's credential over SSH once it runs, after the pinned handshake (an SSHBootstrap).
+	Bootstrap Bootstrapper
 	// Confirm shows the summary and asks; nil means no one can be asked, so only Options.Yes goes on.
 	Confirm func(summary string) (bool, error)
 	Out     io.Writer
@@ -40,7 +45,8 @@ type Deps struct {
 
 // Result is a machine that was launched.
 type Result struct {
-	Instance Instance
+	Instance   Instance
+	Enrollment BootResult // what the machine's own Coral said once it had the credential
 }
 
 // ErrDeclined is a person who said no at the confirm.
@@ -50,15 +56,14 @@ var nameShape = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,62})$`)
 
 const defaultWait = 5 * time.Minute
 
-// placeholderCredential stands in for the credential while the user-data is only being checked.
-const placeholderCredential = "chb_placeholder-not-a-credential"
-
-// Launch makes one machine (the joint note's slice 2): it checks the provider token, shows what it will cost and asks, mints a one-time credential labelled with the machine's name, creates the instance
-// with that credential in its user-data, waits for the INSTANCE (the Hub's side is not read: the key cannot list anything and the machine lands pending until the person keeps it), and tells the person
-// where to approve it. An instance it created is deleted again when anything after the create fails or the caller cancels. Nothing it prints holds a token or the credential.
+// Launch makes one machine (the joint note's slice 2, changed by #10917): it checks the provider token, shows what it will cost and asks, makes the launch's own keys, creates the instance with user-data that
+// holds NO credential, waits for the INSTANCE to run, connects over SSH with the machine's host key pinned, and only then mints a one-time credential labelled with the machine's name and writes it to the machine
+// on standard input; the machine's own Coral is asked whether it enrolled (the Hub's side is not read: the key cannot list anything and the machine lands pending until the person keeps it), and the person is told
+// where to approve it. An instance it created is deleted again when anything after the create fails (an SSH host key that is not the pin included, which is never retried) or the caller cancels. Nothing it prints
+// holds a token or the credential.
 func Launch(ctx context.Context, o Options, d Deps) (*Result, error) {
-	if d.Provider == nil || d.Hub == nil || d.UserData == nil || d.Out == nil {
-		return nil, errors.New("launch is missing a provider, a Hub client, a user-data builder or an output")
+	if d.Provider == nil || d.Hub == nil || d.UserData == nil || d.Bootstrap == nil || d.Out == nil {
+		return nil, errors.New("launch is missing a provider, a Hub client, a user-data builder, a bootstrap or an output")
 	}
 	if !nameShape.MatchString(o.Name) {
 		return nil, errors.New("the machine name must be 1 to 63 of a-z, 0-9 and hyphen, not starting with a hyphen")
@@ -85,8 +90,10 @@ func Launch(ctx context.Context, o Options, d Deps) (*Result, error) {
 		}
 		return nil, fmt.Errorf("could not read the price of %s: %w", o.Size, err)
 	}
-	summary := fmt.Sprintf("Create machine %q on %s: size %s in %s, about $%.4f an hour ($%.2f a month) until you delete it. It runs Coral and joins Coral Hub as a pending machine you approve there.",
-		o.Name, p.Name(), o.Size, o.Region, price.HourlyUSD, price.MonthlyUSD)
+	summary := fmt.Sprintf("Create machine %q on %s: size %s in %s, about $%.4f an hour ($%.2f a month) until you delete it. It runs Coral and joins Coral Hub as a pending machine you approve there. "+
+		"Coral Hub's credential is never put in the machine's user-data: it is sent over SSH once the machine's host key matches the one this launch made. A single-use SSH host key and this launch's public login key "+
+		"do sit in the user-data, which the provider keeps readable; the key stops working when setup finishes (SSH is closed and the key deleted on the machine). Until then SSH accepts only %s.",
+		o.Name, p.Name(), o.Size, o.Region, price.HourlyUSD, price.MonthlyUSD, sshFromWords(o.SSHFrom))
 	if !o.Yes {
 		if d.Confirm == nil {
 			return nil, errors.New("no one can be asked to confirm: pass --yes to go on without asking")
@@ -102,24 +109,25 @@ func Launch(ctx context.Context, o Options, d Deps) (*Result, error) {
 		fmt.Fprintln(d.Out, summary)
 	}
 
-	// The user-data is tried with a placeholder first: a builder that fails must not have burned a credential.
-	if _, err := d.UserData(placeholderCredential); err != nil {
+	newKeys := d.Keys
+	if newKeys == nil {
+		newKeys = NewBootKeys
+	}
+	keys, err := newKeys()
+	if err != nil {
 		return nil, err
 	}
+	defer keys.Destroy() // the launch's keys live in memory for the length of the launch
 	launchTag, err := newLaunchTag()
 	if err != nil {
 		return nil, err
 	}
-	credential, err := d.Hub.Mint(ctx, o.Name) // minted only now: it lives five minutes from here
-	if err != nil {
-		return nil, err
-	}
-	userData, err := d.UserData(credential)
+	userData, err := d.UserData(keys) // nothing is made at the provider before the user-data is known good
 	if err != nil {
 		return nil, err
 	}
 	inst, err := p.Create(ctx, Spec{Name: o.Name, Region: o.Region, Size: o.Size, Image: o.Image, Tags: []string{Tag, launchTag}, UserData: userData, SSHKeys: o.SSHKeys})
-	userData, credential = "", "" // not kept past the call
+	userData = "" // not kept past the call
 	if err != nil {
 		// A create that failed on the way (transport error, timeout, Ctrl-C) may still have made the machine: one with this launch's tag and name is deleted.
 		return nil, fmt.Errorf("could not create the machine: %w%s", err, cleanupAfterFailedCreate(p, launchTag, d.Out, err, retryAfter(o)))
@@ -136,8 +144,25 @@ func Launch(ctx context.Context, o Options, d Deps) (*Result, error) {
 		}
 		return nil, fmt.Errorf("the machine did not come up: %w%s", err, note)
 	}
-	fmt.Fprintf(d.Out, "Launched %s at %s. It is pending in Coral Hub: open %s, find %q and press Keep to approve it.\n", running.Name, running.IPv4, o.HubURL, o.Name)
-	return &Result{Instance: running}, nil
+	fmt.Fprintf(d.Out, "The machine is running at %s; connecting over SSH with its pinned host key ...\n", running.IPv4)
+	boot, err := d.Bootstrap.Bootstrap(ctx, BootRequest{Instance: running, Keys: keys, Out: d.Out, Mint: func(ctx context.Context) (string, error) { return d.Hub.Mint(ctx, o.Name) }}) // the credential is minted inside, after the handshake
+	if err != nil {
+		note := cleanup(p, inst.ID, d.Out)
+		switch {
+		case errors.Is(err, ErrHostKeyMismatch):
+			return nil, fmt.Errorf("%w; it was not retried%s", err, note)
+		case ctx.Err() != nil:
+			return nil, fmt.Errorf("interrupted while setting the machine up: %w%s", err, note)
+		default:
+			return nil, fmt.Errorf("the machine did not take its credential: %w%s", err, note)
+		}
+	}
+	label := boot.Label
+	if label == "" {
+		label = o.Name
+	}
+	fmt.Fprintf(d.Out, "Launched %s at %s; its Coral reports %s. It is pending in Coral Hub: open %s, find %q and press Keep to approve it.\n", running.Name, running.IPv4, boot.State, o.HubURL, label)
+	return &Result{Instance: running, Enrollment: boot}, nil
 }
 
 // cleanup deletes the instance a failed launch made, on its own short deadline (the caller's context may be the thing that ended), and says how that went in a sentence for the error.
@@ -213,4 +238,12 @@ func deleteTagged(l Lister, p Provider, launchTag string, out io.Writer) (note s
 		}
 	}
 	return note, found, true
+}
+
+// sshFromWords is the address SSH is open to, for the confirm.
+func sshFromWords(v string) string {
+	if v == "" {
+		return "the address of this computer"
+	}
+	return v
 }
