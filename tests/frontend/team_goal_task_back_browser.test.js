@@ -23,11 +23,7 @@ const BASE = require('./test_base').BASE;
         const t = await api('POST', `/api/board/${B}/tasks`, { title: TASK, body: 'x', created_by: 'orch', priority: 'medium', assigned_to: 'Operator', goal_id: G }); assert.ok(t.status < 300, JSON.stringify(t));
         const T = t.body.id || t.body.task.id;
         const goalUrl = `/team/${B}/goals/${G}`, taskUrl = `/team/${B}/tasks/${T}`;
-        for (const [w, h, mobile] of [[1280, 900, false], [390, 844, true]]) {
-            const at = `at ${w}px: `;
-            await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile });
-            await Emulation.setTouchEmulationEnabled(mobile ? { enabled: true, maxTouchPoints: 5 } : { enabled: false });
-            console.log(`${at}a task opened from the goal goes Back to the goal`);
+        const openTaskFromGoal = async (goalUrl, taskUrl, T) => {
             await load(goalUrl);
             await waitFor(`document.querySelector('#team-panel-goals #goals-detail-title')?.textContent === ${JSON.stringify(TITLE)}`, 'the goal', 15000);
             await waitFor(`!!document.querySelector('#team-panel-goals .goal-list .dt-primary[data-task-id="${T}"]')`, 'the goal\'s task row', 15000);
@@ -35,6 +31,13 @@ const BASE = require('./test_base').BASE;
             await waitFor(`!![...document.querySelectorAll('#team-panel-goals .goal-detail-pane button')].find(b => b.textContent.trim() === 'Open task page')`, 'the preview with its Open task page', 15000);
             await ev(`[...document.querySelectorAll('#team-panel-goals .goal-detail-pane button')].find(b => b.textContent.trim() === 'Open task page').click(); true`);
             await waitFor(`location.pathname === ${JSON.stringify(taskUrl)} && document.querySelector('#team-panel-item .team-task-page')?.textContent.includes(${JSON.stringify(TASK)})`, 'the task', 15000);
+        };
+        for (const [w, h, mobile] of [[1280, 900, false], [390, 844, true]]) {
+            const at = `at ${w}px: `;
+            await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile });
+            await Emulation.setTouchEmulationEnabled(mobile ? { enabled: true, maxTouchPoints: 5 } : { enabled: false });
+            console.log(`${at}a task opened from the goal goes Back to the goal`);
+            await openTaskFromGoal(goalUrl, taskUrl, T);
             assert.equal(await backText(), '\u2190 ' + TITLE, at + 'the Back says the goal');
             await shot(`team-goal-task-landing-${w}`);
             await ev(`document.querySelector('#team-panel-item .goals-back').click(); true`);
@@ -42,6 +45,15 @@ const BASE = require('./test_base').BASE;
             await waitFor(`document.activeElement?.dataset?.taskId === '${T}'`, at + 'the keyboard is on the task\'s row (the Tasks button on a phone), never the heading', 8000);
             assert.equal(await ev(`document.activeElement?.id === 'goals-detail-title'`), false, at + 'not the heading');
             await shot(`team-goal-task-back-${w}`);
+            console.log('   \u2713');
+
+            console.log(`${at}a focus the person moved elsewhere after Back is left alone (#10955)`);
+            await openTaskFromGoal(goalUrl, taskUrl, T);
+            await ev(`document.querySelector('#team-panel-item .goals-back').click(); true`);
+            await waitFor(`document.activeElement?.dataset?.taskId === '${T}'`, at + 'the row is focused first', 8000);
+            await ev(`document.getElementById('team-tab-goals').focus(); true`); // the person moves on while the goal's list may still be drawn again
+            await new Promise(r => setTimeout(r, 1500)); // sleep-ok: the row is re-focused for up to 8 s after Back while the list redraws; a focus that stays through 1.5 s of those 50 ms checks is the proof
+            assert.equal(await ev(`document.activeElement?.id`), 'team-tab-goals', at + 'the tab strip keeps the focus, the row does not take it back');
             console.log('   \u2713');
 
             console.log(`${at}a task opened by address keeps the Tasks list`);
