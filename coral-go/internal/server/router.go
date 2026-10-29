@@ -372,6 +372,7 @@ func (s *Server) registerSessions(r *chi.Mux, h *routeHandlers) {
 
 	// Agent session history search & context (coral-agent history search / context)
 	r.Get("/api/agent/history/search", sessHandler.SearchAgentHistory)
+	r.Get("/api/agent/board/search", sessHandler.SearchAgentBoard)
 	r.Get("/api/agent/history/context", sessHandler.GetAgentHistoryContext)
 	r.Get("/api/sessions/live/{name}/history/search", sessHandler.SearchAgentHistoryForLive)
 	r.Get("/api/sessions/live/{name}/history/context", sessHandler.GetAgentHistoryContextForLive)

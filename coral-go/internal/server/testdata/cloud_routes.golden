@@ -37,6 +37,7 @@ GET /api/agent-docs never
 GET /api/agent-docs/all never
 GET /api/agent-docs/{name} never
 GET /api/agent-models view
+GET /api/agent/board/search never
 GET /api/agent/history/context never
 GET /api/agent/history/search never
 GET /api/agent/tasks never
