@@ -54,3 +54,9 @@ console.log('PASS job_words');
 assert.match(w.RUNS_WHILE_OPEN, /^only while Coral is running on this computer\./);
 assert.match(w.RUNS_WHILE_OPEN, /missed while Coral was off happens once when it starts again, unless the job was edited or turned on after it was due\.$/);
 console.log('job_words: when it runs ok');
+// the New job preview says "Runs Mondays at 09:00": a day keeps its capital (#10908: it said "Runs mondays")
+assert.equal(w.runsWords('Mondays at 09:00'), 'Runs Mondays at 09:00');
+assert.equal(w.runsWords('Every day at 14:30'), 'Runs every day at 14:30');
+assert.equal(w.runsWords('Weekdays at 18:30'), 'Runs weekdays at 18:30');
+assert.equal(w.runsWords('Every hour'), 'Runs every hour');
+console.log('job_words: runs words ok');

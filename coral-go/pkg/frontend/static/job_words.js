@@ -10,6 +10,12 @@ export const localZone = () => { try { return Intl.DateTimeFormat().resolvedOpti
 /** " (Europe/Berlin)" for a zone that is not the person's own, "" for theirs: one zone on the page, named only when it differs. */
 export const zoneNote = tz => (tz && tz !== localZone() ? ` (${tz})` : '');
 
+/** "Mondays at 09:00" -> "Runs Mondays at 09:00": a day's or month's name keeps its capital after "Runs" (it was "Runs mondays", #10908); the other schedule words start lower case. */
+export function runsWords(words) {
+    const w = String(words || '');
+    return 'Runs ' + (/^(Sundays|Mondays|Tuesdays|Wednesdays|Thursdays|Fridays|Saturdays|January|February|March|April|May|June|July|August|September|October|November|December)\b/.test(w) ? w : w.charAt(0).toLowerCase() + w.slice(1));
+}
+
 export function cronWords(expr) {
     const e = String(expr || '').trim();
     const f = e.split(/\s+/);
