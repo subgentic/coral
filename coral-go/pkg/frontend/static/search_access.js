@@ -13,6 +13,8 @@ export const LEVELS = [
     ['operator', 'All + operator history', 'also your own boards and your own Claude/Codex conversations on this computer'],
 ];
 const WORD = { team: 'team', all: 'all teams', operator: 'all + operator history' };
+/** A name written by an agent or a person, as plain visible text: control and bidi characters become spaces, one line, 60 characters at most (the same class as desktop_notify.js's safeName). */
+const visibleName = v => { const t = String(v == null ? '' : v).replace(/[\u0000-\u001f\u007f-\u009f\u061c\u200b-\u200f\u202a-\u202e\u2060-\u2064\u2066-\u2069\ufeff]/g, ' ').replace(/\s+/g, ' ').trim(); return t.length > 60 ? t.slice(0, 59) + '\u2026' : t; };
 const mk = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 
 /** The chip of a level above "own" (null at "own": no chip); the top level is drawn as a warning. */
@@ -33,9 +35,9 @@ export async function readSearchLevels(team) {
 
 /** One line of the access log: a raise (who, from and to) or a read above own (the level asked, the outcome, how many results); never any text. */
 const logLine = (r, withAgent) => {
-    const who = withAgent ? `${r.agent}: ` : '';
+    const who = withAgent ? `${visibleName(r.agent)}: ` : '';
     const n = Number(r.results) || 0;
-    const what = r.kind === 'raise' ? `${r.set_by || 'Operator'} changed it from ${r.from_level} to ${r.to_level}` : `read at ${r.to_level}, ${r.outcome === 'refused' ? 'refused' : `${n} result${n === 1 ? '' : 's'}`}`;
+    const what = r.kind === 'raise' ? `${visibleName(r.set_by) || 'Operator'} changed it from ${r.from_level} to ${r.to_level}` : `read at ${r.to_level}, ${r.outcome === 'refused' ? 'refused' : `${n} result${n === 1 ? '' : 's'}`}`;
     return `${whenText(r.at)} \u00b7 ${who}${what}`;
 };
 /** The "Recent access" part of the dialog: this agent's newest rows, and a "Show all" that widens it to the whole log (every agent). Nothing is drawn when the log cannot be read. */
@@ -46,7 +48,7 @@ function mountAccessLog(host, member) {
     box.append(head, list, all); host.append(box);
     fetch('/api/search-access/log?limit=100').then(r => r.ok ? r.json() : null).then(d => {
         if (!d || !Array.isArray(d.rows) || !box.isConnected) return;
-        const mine = d.rows.filter(r => r.agent === member.name);
+        const mine = d.rows.filter(r => r.agent === member.name && (!member.team || r.team === member.team)); // this member of this team: another team's agent of the same name is not shown here
         const draw = every => {
             const rows = every ? d.rows.slice(0, 20) : mine.slice(0, 5);
             list.replaceChildren(...rows.map(r => mk('li', null, logLine(r, every))));
@@ -74,7 +76,7 @@ export function openSearchAccess(member, opts = {}) {
     close();
     const readOnly = opts.readOnly ?? isCloud(); // the raise route is the Operator's on this computer alone
     let level = member.level;
-    const title = mk('h3', null, `Search access: ${member.name}`); title.id = 'search-access-title';
+    const title = mk('h3', null, `Search access: ${visibleName(member.name)}`); title.id = 'search-access-title';
     const err = mk('div', 'field-error'); err.setAttribute('role', 'alert'); err.hidden = true;
     const acts = mk('div', 'modal-actions modal-footer');
     const cancel = mk('button', 'btn', readOnly ? 'Close' : 'Cancel'); cancel.type = 'button'; cancel.addEventListener('click', close);
@@ -115,7 +117,7 @@ export function openSearchAccess(member, opts = {}) {
         dialog.firstChild.append(title);
     };
     const confirmStep = () => { // the top level asks again, in this dialog
-        const h = mk('h3', null, `Let ${member.name} search your chat history?`); h.id = 'search-access-title';
+        const h = mk('h3', null, `Let ${visibleName(member.name)} search your chat history?`); h.id = 'search-access-title';
         const body = mk('div', 'modal-body search-access-body'); body.append(mk('p', null, 'It will be able to read your own boards and your own Claude/Codex conversations on this computer, not only its team’s. You can lower this any time.'), err);
         const back = mk('button', 'btn', 'Back'); back.type = 'button'; back.addEventListener('click', () => { first(); });
         const allow = mk('button', 'btn btn-danger', 'Allow all history'); allow.type = 'button'; allow.addEventListener('click', () => save(true));
