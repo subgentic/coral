@@ -50,6 +50,7 @@ const (
 type Env struct {
 	Home      string
 	CodexHome string // "" means <Home>/.codex
+	PiDir     string // Pi's own folder (PI_CODING_AGENT_DIR): "" means <Home>/.pi/agent
 }
 
 // List returns the MCP servers agentType has configured for folder (the agent's working directory; "" reads the user scope only).
@@ -63,6 +64,8 @@ func List(env Env, agentType, folder string) Result {
 		all = readCodex(env, folder)
 	case "gemini":
 		all = readGemini(env, folder)
+	case "pi":
+		all = readPi(env, folder)
 	default:
 		res.Supported = false
 		res.Reason = "Coral does not read this CLI's MCP configuration yet"
@@ -284,4 +287,79 @@ func readCodex(env Env, folder string) []Server {
 		read(filepath.Join(folder, ".codex", "config.toml"), ScopeProject)
 	}
 	return out
+}
+
+// piServer is the part of a Pi mcp.json entry that is decoded: the transport words, whether a command or a URL is there, and the enabled switch. The environment, headers, arguments, cwd, OAuth
+// settings, description and the values of command and URL are skipped by the decoder and never held.
+type piServer struct {
+	Type    string          `json:"type"`
+	Command json.RawMessage `json:"command"`
+	URL     json.RawMessage `json:"url"`
+	Enabled *bool           `json:"enabled"`
+}
+
+// defines reports whether the entry is a server of its own (it names a command, a URL or a type) and not only settings for the user-level server of the same name.
+func (s piServer) defines() bool {
+	return present(s.Command) || present(s.URL) || strings.TrimSpace(s.Type) != ""
+}
+
+// piMCPFile reads the mcpServers of one Pi mcp.json: name -> entry, an entry that is not an object being an entry with nothing set.
+func piMCPFile(path string) map[string]piServer {
+	b := readFile(path)
+	if b == nil {
+		return nil
+	}
+	var f struct {
+		MCPServers map[string]json.RawMessage `json:"mcpServers"`
+	}
+	if json.Unmarshal(b, &f) != nil {
+		return nil
+	}
+	out := make(map[string]piServer, len(f.MCPServers))
+	for name, raw := range f.MCPServers {
+		var s piServer
+		if json.Unmarshal(raw, &s) != nil {
+			s = piServer{}
+		}
+		out[name] = s
+	}
+	return out
+}
+
+// readPi reads Pi 1.4.0's MCP configuration (docs mcp.md): ~/.pi/agent/mcp.json (or <PI_CODING_AGENT_DIR>/mcp.json) for the user and <folder>/.pi/mcp.json for the project. A project entry with no
+// command, URL or type only changes the settings of the user-level server of the same name (here: enabled). A server with enabled: false is kept in the file but not connected, so it is not listed.
+// Pi connects a project's servers only after the person trusts that folder; that decision is not read here, so a project server is listed as the project's own.
+func readPi(env Env, folder string) []Server {
+	piDir := env.PiDir
+	if piDir == "" {
+		piDir = filepath.Join(env.Home, ".pi", "agent")
+	}
+	user := piMCPFile(filepath.Join(piDir, "mcp.json"))
+	var project map[string]piServer
+	if folder != "" {
+		project = piMCPFile(filepath.Join(folder, ".pi", "mcp.json"))
+	}
+	listed := func(s piServer) bool { return s.Enabled == nil || *s.Enabled }
+	var out []Server
+	for name, s := range user {
+		if o, ok := project[name]; ok && !o.defines() && o.Enabled != nil {
+			s.Enabled = o.Enabled // the project's switch for the user's server
+		}
+		if n := cleanName(name); n != "" && listed(s) {
+			out = append(out, Server{Name: n, Transport: piTransport(s), Scope: ScopeUser})
+		}
+	}
+	for name, s := range project {
+		if !s.defines() {
+			continue // settings for a user-level server, handled above
+		}
+		if n := cleanName(name); n != "" && listed(s) {
+			out = append(out, Server{Name: n, Transport: piTransport(s), Scope: ScopeProject})
+		}
+	}
+	return out
+}
+
+func piTransport(s piServer) string {
+	return transportOf(jsonServer{Type: s.Type, Command: s.Command, URL: s.URL}, false)
 }

@@ -12,6 +12,7 @@ const (
 	ToolTmux   = "tmux"
 	ToolClaude = "claude"
 	ToolCodex  = "codex"
+	ToolPi     = "pi"
 
 	PrereqAvailable   = "available"    // found, and its version probe (if any) succeeded
 	PrereqMissing     = "missing"      // not found
@@ -29,7 +30,7 @@ const (
 
 func init() {
 	eventSpecs[EventPrerequisiteCheck] = map[string]propSpec{
-		"tool":   enum(ToolTmux, ToolClaude, ToolCodex),
+		"tool":   enum(ToolTmux, ToolClaude, ToolCodex, ToolPi),
 		"status": enum(PrereqAvailable, PrereqMissing, PrereqProbeFailed, PrereqTimeout, PrereqSignedIn, PrereqSignedOut),
 		"source": enum(SourceSystemStatus, SourceCLICheck, SourceCLIRecheck, SourceSettingsCheck, SourceLaunchProbe),
 	}

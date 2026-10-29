@@ -10,10 +10,10 @@ import (
 	"github.com/subgentic/coral/internal/mcpview"
 )
 
-// mcpEnvSource is where an agent's CLI configuration lives: the person's home and CODEX_HOME (a test seam: tests give a temporary home and never read the real one).
+// mcpEnvSource is where an agent's CLI configuration lives: the person's home and CODEX_HOME (PI_CODING_AGENT_DIR for Pi; a test seam: tests give a temporary home and never read the real one).
 var mcpEnvSource = func() mcpview.Env {
 	home, _ := os.UserHomeDir()
-	return mcpview.Env{Home: home, CodexHome: os.Getenv("CODEX_HOME")}
+	return mcpview.Env{Home: home, CodexHome: os.Getenv("CODEX_HOME"), PiDir: os.Getenv("PI_CODING_AGENT_DIR")}
 }
 
 // AgentMCPServers lists the MCP servers an agent has configured (#9769): name, transport and scope, read from its CLI's own configuration for its working folder, read-only. Coral does not configure

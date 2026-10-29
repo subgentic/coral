@@ -125,7 +125,7 @@ func TestNothingConfiguredAndUnreadableFilesAreEmptyNotErrors(t *testing.T) {
 }
 
 func TestOtherCLIsAreNotReadAndSaySo(t *testing.T) {
-	for _, cli := range []string{"agy", "antigravity", "pi", "terminal", ""} {
+	for _, cli := range []string{"agy", "antigravity", "terminal", ""} {
 		res := List(Env{Home: t.TempDir()}, cli, "")
 		assert.False(t, res.Supported, cli)
 		assert.NotEmpty(t, res.Reason, cli)

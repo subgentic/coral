@@ -126,7 +126,7 @@ var (
 	slugProp    = propSpec{kind: kindSlug}
 	versionProp = propSpec{kind: kindVersion}
 	boolProp    = propSpec{kind: kindBool}
-	providerEnu = enum("claude", "codex", "gemini", "other", "mixed")
+	providerEnu = enum("claude", "codex", "gemini", "pi", "other", "mixed")
 	backendEnu  = enum("tmux", "pty", "unknown")
 	kindEnu     = enum(KindAgent, KindTeam)
 	failureEnu  = enum(FailInvalidRequest, FailUnsupportedOption, FailLimitReached, FailWorkdirUnavailable,
@@ -176,7 +176,7 @@ var eventSpecs = map[string]map[string]propSpec{
 	EventEULAAccepted:      {"source": enum(EULASourceDialog, EULASourceLegacy, EULASourceHub)},
 	EventDashboardSignedIn: {"via": enum(SignInApp, SignInLink, SignInKey, SignInPassword)},
 	EventFirstMessageSent:  {"via": enum(MessageViaComposerHTTP, MessageViaComposerWS, MessageViaTerminal, MessageViaLaunchPrompt)},
-	EventFirstAgentReply:   {"provider": enum("claude", "codex", "gemini", "other"), "seconds_to_reply": intRange(0, replySeconds), "outcome": enum(ReplyOK, ReplyError)},
+	EventFirstAgentReply:   {"provider": enum("claude", "codex", "gemini", "pi", "other"), "seconds_to_reply": intRange(0, replySeconds), "outcome": enum(ReplyOK, ReplyError)},
 
 	EventUpdateNoticeShown: {"to_version": versionProp, "source": enum(UpdateSourceDashboard, UpdateSourceTray), "channel": enum(UpdateChannelApproved, UpdateChannelAgentic)},
 	EventUpdateOfferOpened: {"to_version": versionProp, "source": enum(UpdateSourceDashboard, UpdateSourceTray), "channel": enum(UpdateChannelApproved, UpdateChannelAgentic), "method": enum(UpdateMethodDownloadLink)},
@@ -285,7 +285,7 @@ func ProviderFor(agentType string) string {
 	switch t {
 	case "":
 		return "claude"
-	case "claude", "codex", "gemini":
+	case "claude", "codex", "gemini", "pi":
 		return t
 	}
 	return "other"

@@ -263,6 +263,8 @@ func prerequisiteTool(agentType string) string {
 		return tracking.ToolClaude
 	case "codex":
 		return tracking.ToolCodex
+	case "pi":
+		return tracking.ToolPi
 	}
 	return ""
 }

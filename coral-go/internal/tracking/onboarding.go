@@ -80,7 +80,7 @@ func TrackFirstAgentReply(provider string, took time.Duration, outcome string) {
 	if took < 0 || secs > replySeconds {
 		return
 	}
-	if provider != "claude" && provider != "codex" && provider != "gemini" {
+	if provider != "claude" && provider != "codex" && provider != "gemini" && provider != "pi" {
 		provider = "other"
 	}
 	props := map[string]string{"provider": provider, "seconds_to_reply": strconv.Itoa(secs), "outcome": outcome}
