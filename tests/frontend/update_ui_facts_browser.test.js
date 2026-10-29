@@ -133,7 +133,7 @@ const idle = (over = {}) => ({ enabled: true, relaunch_available: true, installe
             await settle(200);
             await ev(`document.querySelector('#update-confirm-modal .update-go').click(); true`);
             await waitFor(`!!document.querySelector('#update-confirm-modal .update-note')`, `${kind || 'unknown'}: the note`, 6000);
-            const note = await ev(`document.querySelector('#update-confirm-modal .update-note').textContent`);
+            const note = await ev(`document.querySelector('#update-confirm-modal .update-note:not(.update-updating)').textContent`); // the Updating line (#10834) is its own
             check(`${kind || '(no kind)'}: "${note}"; "Not now?" is gone once it is sent`, want.test(note) && !/reconnects when Coral is back/.test(note) && (await ev(`!document.querySelector('#update-confirm-modal .update-later-note')`)));
             await ev(`document.querySelector('#update-confirm-modal .update-later').click(); true`); await settle(100);
         }

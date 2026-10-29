@@ -23,3 +23,6 @@ export function loadUpdatesFlag() {
     }
     return probe;
 }
+
+/** Set when a person starts an update (the version it goes to); the page that comes back says "Coral is now X" and clears it (#10834). */
+export const UPDATED_KEY = 'coral-updated-to';

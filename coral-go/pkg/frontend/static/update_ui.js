@@ -7,7 +7,8 @@ import { importOnce } from './import_once.js';
 import { browserLocal, browserSession } from './safe_storage.js';
 import { pollEvery } from './overload.js';
 const { RESUME_KEY, actName, ageTier, canStart, fetchUpdateStatus, installsLocally, notAvailable, requestCheckNow, rollbackText, serverHas } = await importOnce('./update_api.js'); // lazy modules load the others they need through importOnce, so a failed load is retried
-import { updatesUiOn } from './update_flag.js';
+import { updatesUiOn, UPDATED_KEY } from './update_flag.js';
+import { showToast } from './utils.js';
 
 const POLL_MS = 10 * 60 * 1000;
 const DISMISSED_KEY = 'coral-update-fail-dismissed';
@@ -123,7 +124,15 @@ function clearReady(box) {
     box.querySelector('.update-ready-acts').hidden = true;
 }
 
-function notify() { renderPill(); renderBanner(); renderReadyNotice(); }
+/** The page that comes back after an update the person started says so, once (#10834). */
+function renderUpdated() {
+    const to = browserSession.get(UPDATED_KEY);
+    if (!to || !status || String(status.installed).replace(/^v/, '') !== to.replace(/^v/, '')) return;
+    browserSession.remove(UPDATED_KEY);
+    showToast(`Coral is now ${to}.`);
+}
+
+function notify() { renderPill(); renderBanner(); renderReadyNotice(); renderUpdated(); }
 
 export async function refreshUpdateStatus() {
     status = await fetchUpdateStatus();

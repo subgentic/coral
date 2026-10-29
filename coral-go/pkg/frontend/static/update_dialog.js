@@ -6,6 +6,8 @@ import { attachDialogFocus } from './dialog_focus.js';
 import { browserSession } from './safe_storage.js';
 import { importOnce } from './import_once.js';
 
+import { UPDATED_KEY } from './update_flag.js';
+import { pollEvery } from './overload.js';
 const { RESUME_KEY, RELEASES_REPO, RELEASES_URL, ACT_INSTALL, ACT_RELAUNCH, releaseNotesUrl, installsLocally, reasonText, requestInstall, requestRelaunch } = await importOnce('./update_api.js');
 
 // What happens after Relaunch, by how this Coral was installed (the docs' per-platform table): none of it promises that this page comes back by itself
@@ -101,7 +103,9 @@ async function sendRelaunch(go, later) {
         const body = dialog.querySelector('.modal-body');
         const p = mk('p', 'update-note', win ? AFTER.msi : AFTER[current.installKind] || AFTER_DEFAULT); p.setAttribute('role', 'status');
         body.querySelector('.update-later-note')?.remove(); // sent: "Not now?" no longer applies
-        body.append(p); later.textContent = 'Close'; later.disabled = false; go.hidden = true;
+        const to = current.staged.version;
+        body.append(mk('p', 'update-note update-updating', `Updating Coral to ${to}. It quits, installs and starts again, usually in under a minute. This page comes back by itself.`), p);
+        watchUpdate(to); later.textContent = 'Close'; later.disabled = false; go.hidden = true;
         return;
     }
     if (res.status === 409 && res.code === 'stale_ack' && res.relaunch) {
@@ -130,6 +134,17 @@ async function sendRelaunch(go, later) {
         return;
     }
     say(reasonText(res.code)); // a sentence that Coral did not say why for a reason this build does not know; never the server's own words
+}
+
+/** Waits for the new Coral (#10834): the server is down while it installs; when it answers as the new version the page reloads and update_ui.js says "Coral is now X" there. Gives up after four minutes (the note above says what to do). */
+const bare = v => String(v).replace(/^v/, '');
+function watchUpdate(to) {
+    browserSession.set(UPDATED_KEY, to);
+    const until = Date.now() + 240000;
+    const t = pollEvery(async () => {
+        if (Date.now() > until) return clearInterval(t);
+        try { const r = await fetch('/api/system/update', { cache: 'no-store' }); if (r.ok && bare((await r.json()).installed) === bare(to)) { clearInterval(t); location.reload(); } } catch { /* down while it installs */ }
+    }, 3000, { whenHidden: true });
 }
 
 function close() { if (dialog) dialog.style.display = 'none'; } // display-ok: modal_chrome (Escape, the Tab trap) and dialog_focus read a .modal's display, as for every dialog
