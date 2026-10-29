@@ -9,6 +9,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/subgentic/coral/internal/coralnames"
+	"github.com/subgentic/coral/internal/safefs"
 	"github.com/subgentic/coral/internal/store"
 )
 
@@ -40,24 +41,34 @@ func (h *SessionsHandler) SetTeamHomeFolder(w http.ResponseWriter, r *http.Reque
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "working_dir": dir, "applies": "next start"})
 }
 
-// validTeamHomeFolder is the cleaned folder, or the words that say why it is refused: it is absolute, exists and is a directory; a worktree team's
-// folder stays inside Coral's worktrees folder, as resurrect checks (#10815).
+// ownWorktree reports whether real (a folder with its links resolved) is this team's own worktree: <worktrees folder>/<the team's name>, as the launch made it. Any other folder in the worktrees folder
+// is another team's or a job run's, and removing this team would remove it (#10860).
+func ownWorktree(coralDir string, team *store.Team, real string) bool {
+	root, err := safefs.Resolve(coralnames.WorktreesRoot(coralDir))
+	return err == nil && real == filepath.Join(root, team.Name)
+}
+
+// validTeamHomeFolder is the folder with its links resolved (what is stored: a link swapped later is not followed to somewhere else), or the words that say why it is refused: it is absolute, exists and
+// is a directory; a worktree team's folder is its own worktree, nothing else (#10815, #10860).
 func validTeamHomeFolder(coralDir string, team *store.Team, dir string) (string, string) {
 	if dir == "" || !filepath.IsAbs(dir) {
 		return "", "The folder must be an absolute path."
 	}
-	dir = filepath.Clean(dir)
-	info, err := os.Stat(dir)
+	real, err := safefs.Resolve(filepath.Clean(dir))
+	if err != nil {
+		return "", "That folder does not exist."
+	}
+	info, err := os.Stat(real)
 	if err != nil {
 		return "", "That folder does not exist."
 	}
 	if !info.IsDir() {
 		return "", "That path is not a folder."
 	}
-	if team.IsWorktree == 1 && !coralnames.InWorktreesRoot(coralDir, dir) {
-		return "", "This team works in a worktree: its folder must be inside Coral's worktrees folder."
+	if team.IsWorktree == 1 && !ownWorktree(coralDir, team, real) {
+		return "", "This team works in its own worktree: its folder cannot be another folder."
 	}
-	return dir, ""
+	return real, ""
 }
 
 // teamHomeFolder is the folder the team of a session says its agents start in, or "" when the session is on no team, the team has none, or the folder
@@ -78,8 +89,16 @@ func (h *SessionsHandler) teamHomeFolder(ctx context.Context, ls *store.LiveSess
 	if team == nil || team.WorkingDir == "" {
 		return ""
 	}
-	if info, err := os.Stat(team.WorkingDir); err != nil || !info.IsDir() {
+	// Resolved again now, not trusted from when it was stored: a folder swapped for a link to somewhere else is followed to where it really is, and a worktree team's must still be its own worktree (#10860).
+	real, err := safefs.Resolve(team.WorkingDir)
+	if err != nil {
 		return ""
 	}
-	return team.WorkingDir
+	if info, err := os.Stat(real); err != nil || !info.IsDir() {
+		return ""
+	}
+	if team.IsWorktree == 1 && !ownWorktree(h.cfg.CoralDir(), team, real) {
+		return ""
+	}
+	return real
 }

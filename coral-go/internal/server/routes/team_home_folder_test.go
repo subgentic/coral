@@ -36,6 +36,14 @@ func putHomeFolder(t *testing.T, base, team, dir string) (int, string) {
 	return resp.StatusCode, b.String()
 }
 
+// homeReal is dir with its links resolved: a temp folder is itself behind a link on macOS, and the folder a team stores is the resolved one.
+func homeReal(t *testing.T, dir string) string {
+	t.Helper()
+	real, err := filepath.EvalSymlinks(dir)
+	require.NoError(t, err)
+	return real
+}
+
 func homeJSONString(s string) string { return `"` + strings.ReplaceAll(s, `\`, `\\`) + `"` }
 
 func homeFolderServer(t *testing.T) (*httptest.Server, *SessionsHandler, *mockSessionTerminal, *store.SessionStore, *store.TeamStore) {
@@ -70,28 +78,87 @@ func TestSetTeamHomeFolderValidatesTheFolder(t *testing.T) {
 	code, body := putHomeFolder(t, srv.URL, "coral-hub", good+"/../"+filepath.Base(good))
 	require.Equal(t, http.StatusOK, code, body)
 	got, _ := ts.GetTeam(ctx, "coral-hub")
-	assert.Equal(t, filepath.Clean(good), got.WorkingDir, "stored cleaned")
+	assert.Equal(t, homeReal(t, good), got.WorkingDir, "stored cleaned, with its links resolved")
 	assert.Equal(t, team.ID, got.ID)
 
 	code, _ = putHomeFolder(t, srv.URL, "no-such-team", good)
 	assert.Equal(t, http.StatusNotFound, code)
 }
 
-// A worktree team's folder stays inside Coral's worktrees folder, as resurrect checks.
-func TestSetTeamHomeFolderKeepsAWorktreeTeamInTheWorktreesFolder(t *testing.T) {
+// A worktree team's folder is its own worktree and nothing else: another team's or a job run's worktree in the same folder would be removed with this team (#10860).
+func TestSetTeamHomeFolderKeepsAWorktreeTeamInItsOwnWorktree(t *testing.T) {
 	srv, handler, _, _, ts := homeFolderServer(t)
 	ctx := context.Background()
-	inRoot := filepath.Join(handler.cfg.CoralDir(), "worktrees", "wt-team")
-	require.NoError(t, os.MkdirAll(inRoot, 0o755))
-	_, err := ts.CreateTeam(ctx, &store.Team{Name: "wt", ConfigJSON: "{}", WorkingDir: inRoot, IsWorktree: 1})
+	root := filepath.Join(handler.cfg.CoralDir(), "worktrees")
+	own, another := filepath.Join(root, "wt"), filepath.Join(root, "other-team")
+	for _, d := range []string{own, another} {
+		require.NoError(t, os.MkdirAll(d, 0o755))
+	}
+	_, err := ts.CreateTeam(ctx, &store.Team{Name: "wt", ConfigJSON: "{}", WorkingDir: own, IsWorktree: 1})
 	require.NoError(t, err)
 
 	code, body := putHomeFolder(t, srv.URL, "wt", t.TempDir())
 	assert.Equal(t, http.StatusBadRequest, code, "outside the worktrees folder: "+body)
-	other := filepath.Join(handler.cfg.CoralDir(), "worktrees", "wt-other")
-	require.NoError(t, os.MkdirAll(other, 0o755))
-	code, body = putHomeFolder(t, srv.URL, "wt", other)
-	assert.Equal(t, http.StatusOK, code, body)
+	code, body = putHomeFolder(t, srv.URL, "wt", another)
+	assert.Equal(t, http.StatusBadRequest, code, "another team's worktree in the same folder: "+body)
+	got, _ := ts.GetTeam(ctx, "wt")
+	assert.Equal(t, own, got.WorkingDir, "a refused folder changes nothing")
+	code, body = putHomeFolder(t, srv.URL, "wt", own)
+	assert.Equal(t, http.StatusOK, code, "its own worktree: "+body)
+}
+
+// Links are resolved before the checks: a link in the worktrees folder that points elsewhere is not the team's worktree, and a link to a folder is stored as the folder it is (#10860).
+func TestSetTeamHomeFolderResolvesLinks(t *testing.T) {
+	srv, handler, _, _, ts := homeFolderServer(t)
+	ctx := context.Background()
+	root := filepath.Join(handler.cfg.CoralDir(), "worktrees")
+	require.NoError(t, os.MkdirAll(root, 0o755))
+	elsewhere := t.TempDir()
+	require.NoError(t, os.Symlink(elsewhere, filepath.Join(root, "wt"))) // the team's own name, but a link out
+	_, err := ts.CreateTeam(ctx, &store.Team{Name: "wt", ConfigJSON: "{}", WorkingDir: filepath.Join(root, "wt"), IsWorktree: 1})
+	require.NoError(t, err)
+	code, body := putHomeFolder(t, srv.URL, "wt", filepath.Join(root, "wt"))
+	assert.Equal(t, http.StatusBadRequest, code, "a link out of the worktrees folder is not its own worktree: "+body)
+
+	target := t.TempDir()
+	link := filepath.Join(t.TempDir(), "link-to-folder")
+	require.NoError(t, os.Symlink(target, link))
+	_, err = ts.CreateTeam(ctx, &store.Team{Name: "plain", ConfigJSON: "{}", WorkingDir: t.TempDir()})
+	require.NoError(t, err)
+	code, body = putHomeFolder(t, srv.URL, "plain", link)
+	require.Equal(t, http.StatusOK, code, body)
+	got, _ := ts.GetTeam(ctx, "plain")
+	assert.Equal(t, homeReal(t, target), got.WorkingDir, "stored as the folder the link points at")
+	assert.NotEqual(t, link, got.WorkingDir)
+
+	dangling := filepath.Join(t.TempDir(), "dangling")
+	require.NoError(t, os.Symlink(filepath.Join(t.TempDir(), "gone"), dangling))
+	code, _ = putHomeFolder(t, srv.URL, "plain", dangling)
+	assert.Equal(t, http.StatusBadRequest, code, "a link to nothing is not a folder")
+}
+
+// At wake the folder is resolved again: a worktree team's folder swapped for a link elsewhere is not followed, the member keeps its own folder; and a folder stored by a plain path that has since
+// become a link starts the member where the link really goes, not where the stored text says.
+func TestWakeResolvesTheTeamsFolderAgain(t *testing.T) {
+	srv, handler, terminal, ss, ts := homeFolderServer(t)
+	ctx := context.Background()
+	root := filepath.Join(handler.cfg.CoralDir(), "worktrees")
+	require.NoError(t, os.MkdirAll(root, 0o755))
+	own := t.TempDir()
+	elsewhere := t.TempDir()
+	team, err := ts.CreateTeam(ctx, &store.Team{Name: "wt", ConfigJSON: "{}", WorkingDir: filepath.Join(root, "wt"), IsWorktree: 1})
+	require.NoError(t, err)
+	require.NoError(t, os.Symlink(elsewhere, filepath.Join(root, "wt"))) // the worktree was swapped for a link out
+	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: homeSID, AgentType: "claude", AgentName: "m", WorkingDir: own, IsSleeping: 1}))
+	require.NoError(t, ss.SetTeamID(ctx, homeSID, team.ID))
+	resp, err := http.Post(srv.URL+"/api/sessions/live/"+homeSID+"/wake", "application/json", strings.NewReader("{}"))
+	require.NoError(t, err)
+	resp.Body.Close()
+	terminal.mu.Lock()
+	pane := terminal.sessions[naming.SessionName("claude", homeSID)]
+	terminal.mu.Unlock()
+	require.NotNil(t, pane)
+	assert.Equal(t, own, pane.CurrentPath, "not started in the folder the link points to")
 }
 
 // Only the Operator: an agent's token is refused before the handler (the route is in operatorOnlyRoutes), a caller with no token reaches it.
@@ -143,10 +210,10 @@ func TestWakeStartsATeamMemberInTheTeamsHomeFolder(t *testing.T) {
 	pane := terminal.sessions[naming.SessionName("claude", homeSID)]
 	terminal.mu.Unlock()
 	require.NotNil(t, pane, "the member was started")
-	assert.Equal(t, newDir, pane.CurrentPath, "in the team's home folder, not the folder it last ran in")
+	assert.Equal(t, homeReal(t, newDir), pane.CurrentPath, "in the team's home folder, not the folder it last ran in")
 	ls, err := ss.GetLiveSession(ctx, homeSID)
 	require.NoError(t, err)
-	assert.Equal(t, newDir, ls.WorkingDir, "the row follows")
+	assert.Equal(t, homeReal(t, newDir), ls.WorkingDir, "the row follows")
 	assert.Equal(t, "coral-hub", ls.AgentName, "its name is stored, never the folder's")
 }
 
@@ -192,5 +259,26 @@ func TestRestartStartsATeamMemberInTheTeamsHomeFolder(t *testing.T) {
 
 	term.mu.Lock()
 	defer term.mu.Unlock()
-	assert.Equal(t, []string{teamDir}, term.restartDirs, "the pane was respawned in the team's home folder, not where it was")
+	assert.Equal(t, []string{homeReal(t, teamDir)}, term.restartDirs, "the pane was respawned in the team's home folder, not where it was")
+}
+
+// A team folder stored as a plain path that has since become a link starts the member where the link really goes, not where the stored text says (#10860).
+func TestWakeFollowsALinkedTeamFolderToWhereItReallyIs(t *testing.T) {
+	srv, _, terminal, ss, ts := homeFolderServer(t)
+	ctx := context.Background()
+	target := t.TempDir()
+	link := filepath.Join(t.TempDir(), "team-home")
+	require.NoError(t, os.Symlink(target, link))
+	team, err := ts.CreateTeam(ctx, &store.Team{Name: "linked", ConfigJSON: "{}", WorkingDir: link})
+	require.NoError(t, err)
+	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: homeSID, AgentType: "claude", AgentName: "m", WorkingDir: t.TempDir(), IsSleeping: 1}))
+	require.NoError(t, ss.SetTeamID(ctx, homeSID, team.ID))
+	resp, err := http.Post(srv.URL+"/api/sessions/live/"+homeSID+"/wake", "application/json", strings.NewReader("{}"))
+	require.NoError(t, err)
+	resp.Body.Close()
+	terminal.mu.Lock()
+	pane := terminal.sessions[naming.SessionName("claude", homeSID)]
+	terminal.mu.Unlock()
+	require.NotNil(t, pane)
+	assert.Equal(t, homeReal(t, target), pane.CurrentPath, "where the link really goes, never the link's own path")
 }
