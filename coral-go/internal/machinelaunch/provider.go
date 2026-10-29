@@ -10,6 +10,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 )
 
 // Tag marks every instance this tool makes, so listing and deleting find only what it created.
@@ -34,17 +35,20 @@ type Spec struct {
 	Tags     []string // always includes Tag (Create adds it)
 	UserData string   // the cloud-init user-data (BuildUserData)
 	SSHKeys  []string // provider ids or fingerprints of ssh keys to install; none by default
+	VPCID    string   // the VPC to make the instance in (Network.CreateVPC); "" is the provider's default network
 }
 
 // Instance is a machine at a provider.
 type Instance struct {
-	ID     string
-	Name   string
-	Status Status
-	IPv4   string // the public IPv4 once it is running, else ""
-	Region string
-	Size   string
-	Tags   []string
+	ID      string
+	Name    string
+	Status  Status
+	IPv4    string // the public IPv4 once it is running, else ""
+	Region  string
+	Size    string
+	Tags    []string
+	VPCID   string    // the VPC it is in, when the provider says
+	Created time.Time // when it was made, when the provider says (a prune's age)
 }
 
 // Price is what an instance costs, from the provider's own size list (for the confirm before anything is created).
