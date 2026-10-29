@@ -34,7 +34,7 @@ const { connect } = require('./agent_view_harness');
             assert.equal(await ev(`document.activeElement === ${btn}`), true, `${what}: focus is back on the button`);
             await key('Enter', 'Enter', 13, '\r'); assert.ok(await openMenu(), `${what}: it opens again`);
             await key('End', 'End', 35);
-            if (/team/i.test(what)) assert.match((await active()).label, /^More/, `${what}: End lands on More, the last item that is shown (the group under it is hidden until it is opened, #10619): ` + JSON.stringify(await active()));
+            if (/team/i.test(what)) assert.match((await active()).label, /^Delete team/, `${what}: End lands on Delete team, the last item that is shown: the last group (what cannot be undone, #10282, #10318) sits under More and Sleep Team and is shown (the group under More is hidden until it is opened, #10619): ` + JSON.stringify(await active()));
             await key('Tab', 'Tab', 9); // Tab walks the items (the design, keyboard_flows); out of the last one it closes the menu
             assert.equal(await openMenu(), null, `${what}: Tab out of the last item leaves the menu closed`);
             assert.equal(await ev(`${btn}.getAttribute('aria-expanded')`), 'false', `${what}: and the button says closed after Tab`);
