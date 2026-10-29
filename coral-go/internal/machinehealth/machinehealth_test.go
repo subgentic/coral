@@ -37,8 +37,9 @@ func TestClassify(t *testing.T) {
 	}{
 		{"all fine", healthy(), fast, true, "ok", ""},
 		{"no watchdog, all fine", healthy(), Responsiveness{}, false, "ok", ""},
-		{"load per core over 1", with(func(h *Health) { h.Host.Load1PerCore = 1.2 }), fast, true, "busy", "cpu"},
-		{"load per core exactly 1", with(func(h *Health) { h.Host.Load1PerCore = 1.0 }), fast, true, "ok", ""},
+		{"high load per core alone is not busy", with(func(h *Health) { h.Host.Load1PerCore = 9 }), fast, true, "ok", ""},
+		{"high load per core with no watchdog is not busy", with(func(h *Health) { h.Host.Load1PerCore = 9 }), Responsiveness{}, false, "ok", ""},
+		{"probe p95 exactly 500 ms", healthy(), Responsiveness{Last: 100 * time.Millisecond, P95: 500 * time.Millisecond}, true, "ok", ""},
 		{"probe p95 over 500 ms", healthy(), Responsiveness{Last: 100 * time.Millisecond, P95: 600 * time.Millisecond}, true, "busy", "cpu"},
 		{"memory under 10%", with(func(h *Health) { h.Host.MemAvailable = gb }), fast, true, "busy", "memory"},
 		{"disk under 5%", with(func(h *Health) { h.Disk = Disk{FreeBytes: 20 * gb, TotalBytes: 500 * gb} }), fast, true, "busy", "disk"},
@@ -48,7 +49,7 @@ func TestClassify(t *testing.T) {
 		{"a stall 90 s ago is over", healthy(), Responsiveness{Last: 20 * time.Millisecond, LastSlow: now.Add(-90 * time.Second)}, true, "ok", ""},
 		{"stall beats disk, memory and cpu", with(func(h *Health) { h.Disk.FreeBytes = gb; h.Host.MemAvailable = 0; h.Host.Load1PerCore = 9 }), Responsiveness{Last: 3 * time.Second}, true, "stalled", "stall"},
 		{"disk beats memory and cpu", with(func(h *Health) { h.Disk.FreeBytes = gb; h.Host.MemAvailable = 0; h.Host.Load1PerCore = 9 }), fast, true, "busy", "disk"},
-		{"memory beats cpu", with(func(h *Health) { h.Host.MemAvailable = 0; h.Host.Load1PerCore = 9 }), fast, true, "busy", "memory"},
+		{"memory beats cpu", with(func(h *Health) { h.Host.MemAvailable = 0 }), Responsiveness{Last: 100 * time.Millisecond, P95: 600 * time.Millisecond}, true, "busy", "memory"},
 		{"unknown memory and disk do not count", with(func(h *Health) { h.Host.MemTotal = 0; h.Disk = Disk{} }), fast, true, "ok", ""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

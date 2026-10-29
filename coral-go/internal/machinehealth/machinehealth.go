@@ -78,7 +78,6 @@ type Source struct {
 
 // Thresholds (the operator's, #3444).
 const (
-	busyLoadPerCore  = 1.0
 	busyMemFraction  = 0.10
 	busyProbeP95     = 500 * time.Millisecond
 	busyDiskFraction = 0.05
@@ -250,7 +249,8 @@ func (s *Sampler) Sample(ctx context.Context) Health {
 }
 
 // classify applies the thresholds. Several can apply at once: stall comes first, then disk,
-// memory and CPU (a slow health probe counts as CPU).
+// memory and CPU. CPU busy means Coral's own health probe is slow (p95 over busyProbeP95), not
+// that the 1-minute load average is high: that lags and flags an idle machine.
 func classify(h Health, r Responsiveness, haveR bool, now time.Time) (status, reason string) {
 	if haveR && (r.Last > stalledLastProbe || (!r.LastSlow.IsZero() && now.Sub(r.LastSlow) < stalledWithin)) {
 		return "stalled", "stall"
@@ -261,7 +261,7 @@ func classify(h Health, r Responsiveness, haveR bool, now time.Time) (status, re
 	if h.Host.MemTotal > 0 && float64(h.Host.MemAvailable) < busyMemFraction*float64(h.Host.MemTotal) {
 		return "busy", "memory"
 	}
-	if h.Host.Load1PerCore > busyLoadPerCore || (haveR && r.P95 > busyProbeP95) {
+	if haveR && r.P95 > busyProbeP95 {
 		return "busy", "cpu"
 	}
 	return "ok", ""
