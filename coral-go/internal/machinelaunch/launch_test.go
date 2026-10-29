@@ -636,3 +636,108 @@ func TestNoCodeTrustsAHostKeyItDidNotPin(t *testing.T) {
 		}
 	}
 }
+
+// A launch that fails after the credential was minted revokes it, and says whether that worked; one that failed before the mint has nothing to revoke; one that succeeded keeps it.
+func TestLaunchRevokesTheMintedCredentialOnFailureAfterTheMint(t *testing.T) {
+	for name, tc := range map[string]struct {
+		revokeErr error
+		want      string
+	}{"revoked": {nil, "the Coral Hub credential was revoked"}, "could not": {errors.New("HTTP 503"), "could NOT be revoked"}} {
+		p, base := &stubProvider{}, &stubHub{}
+		h := &revokeRecorder{stubHub: base, err: tc.revokeErr}
+		o, d, out, srv := setupWith(t, p, base)
+		d.Hub = h
+		srv.mu.Lock()
+		srv.status = "State:     retrying\n"
+		srv.mu.Unlock()
+		d.Bootstrap = &SSHBootstrap{Addr: d.Bootstrap.(*SSHBootstrap).Addr, Window: time.Second, Every: 10 * time.Millisecond, EnrollWait: 80 * time.Millisecond}
+		_, err := Launch(context.Background(), o, d)
+		if err == nil || !strings.Contains(err.Error(), tc.want) || len(h.revoked) != 1 || h.revoked[0] != "coral-1" || !strings.Contains(out.String(), "Coral Hub credential for") {
+			t.Fatalf("%s: err %v, revoked %v, out %s", name, err, h.revoked, out.String())
+		}
+		if strings.Contains(err.Error(), launchTestCredential) || strings.Contains(out.String(), launchTestCredential) {
+			t.Fatalf("%s: the credential leaked", name)
+		}
+	}
+	// a mismatch fails before the mint: nothing to revoke, and no revoke is attempted
+	p, base := &stubProvider{}, &stubHub{}
+	h := &revokeRecorder{stubHub: base}
+	o, d, _, _ := setupWith(t, p, base)
+	d.Hub = h
+	other, _ := NewBootKeys()
+	impostor := startStubSSH(t, hostSigner(t, other), nil)
+	d.Bootstrap = &SSHBootstrap{Addr: func(Instance) string { return impostor.addr }, Window: time.Second, Every: 10 * time.Millisecond}
+	if _, err := Launch(context.Background(), o, d); err == nil || len(h.revoked) != 0 {
+		t.Fatalf("a failure before the mint revokes nothing: %v, revoked %v", err, h.revoked)
+	}
+	// a success keeps the credential
+	p, base = &stubProvider{}, &stubHub{}
+	h = &revokeRecorder{stubHub: base}
+	o, d, _, _ = setupWith(t, p, base)
+	d.Hub = h
+	if _, err := Launch(context.Background(), o, d); err != nil || len(h.revoked) != 0 {
+		t.Fatalf("a launch that worked revokes nothing: %v %v", err, h.revoked)
+	}
+	// no revoker at all: the failure says it could not be revoked from here
+	p, base = &stubProvider{}, &stubHub{}
+	o, d, _, srv := setupWith(t, p, base)
+	srv.mu.Lock()
+	srv.status = "State:     retrying\n"
+	srv.mu.Unlock()
+	d.Bootstrap = &SSHBootstrap{Addr: d.Bootstrap.(*SSHBootstrap).Addr, Window: time.Second, Every: 10 * time.Millisecond, EnrollWait: 80 * time.Millisecond}
+	if _, err := Launch(context.Background(), o, d); err == nil || !strings.Contains(err.Error(), "could NOT be revoked from here") {
+		t.Fatalf("no revoker: %v", err)
+	}
+}
+
+// revokeRecorder is a Hub that records its Revoke calls.
+type revokeRecorder struct {
+	*stubHub
+	revoked []string
+	err     error
+}
+
+func (r *revokeRecorder) Revoke(_ context.Context, label string) error {
+	r.revoked = append(r.revoked, label)
+	return r.err
+}
+
+// A machine whose Coral says only "connecting" is not "Launched": the line says it reported connecting and what to do.
+func TestLaunchSaysReportedConnectingNotLaunched(t *testing.T) {
+	p, h := &stubProvider{}, &stubHub{}
+	o, d, out, srv := setupWith(t, p, h)
+	srv.mu.Lock()
+	srv.status = "State:     connecting\nServer:    coral-1\n"
+	srv.mu.Unlock()
+	res, err := Launch(context.Background(), o, d)
+	if err != nil || res.Enrollment.State != "connecting" {
+		t.Fatalf("%v %+v", err, res)
+	}
+	if !strings.Contains(out.String(), "reported connecting") || strings.Contains(out.String(), "Launched") {
+		t.Fatalf("the final line: %s", out.String())
+	}
+	// connected still says Launched
+	p, h = &stubProvider{}, &stubHub{}
+	o, d, out, _ = setupWith(t, p, h)
+	if _, err := Launch(context.Background(), o, d); err != nil || !strings.Contains(out.String(), "Launched coral-1") || strings.Contains(out.String(), "reported connecting") {
+		t.Fatalf("connected: %v %s", err, out.String())
+	}
+}
+
+// The confirmation says where the SSH address came from when it was looked up, and nothing about a lookup when the person gave it.
+func TestLaunchConfirmSaysTheSSHAddressLookup(t *testing.T) {
+	var summary string
+	for lookup, want := range map[string]bool{"api.ipify.org": true, "": false} {
+		p, h := &stubProvider{}, &stubHub{}
+		o, d, _ := setup(p, h)
+		o.SSHFromLookup = lookup
+		d.Confirm = func(s string) (bool, error) { summary = s; return true, nil }
+		o.Yes = false
+		if _, err := Launch(context.Background(), o, d); err != nil {
+			t.Fatal(err)
+		}
+		if got := strings.Contains(summary, "looked up at api.ipify.org"); got != want {
+			t.Errorf("lookup %q: summary %s", lookup, summary)
+		}
+	}
+}

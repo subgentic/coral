@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 const goodKey = "chk_abcdefgh12345678"
@@ -110,5 +111,103 @@ func TestMintFollowsNoRedirectAndDropsTransportDetail(t *testing.T) {
 	down := &HubClient{BaseURL: "http://127.0.0.1:1", Key: goodKey}
 	if _, err := down.Mint(context.Background(), "coral-1"); err == nil || strings.Contains(err.Error(), "127.0.0.1") || !strings.Contains(err.Error(), "could not reach") {
 		t.Fatalf("an unreachable Hub: %v", err)
+	}
+}
+
+const (
+	testCredID  = "123e4567-e89b-12d3-a456-426614174000"
+	testDestroy = "chd_destroycredential0123456789"
+)
+
+// Revoke (the shape is coral-hub's description of the route, assumed until Lead's HubRevoker): POST /api/bootstrap/credentials/{id}/revoke with the destroy credential as the one Bearer header, no body, no Origin.
+func TestRevokeSendsTheDestroyCredentialAndNothingElse(t *testing.T) {
+	var method, path, auth, origin, cookie string
+	var bodyLen int64
+	var calls int
+	h, _ := hubServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/bootstrap/credentials" {
+			w.WriteHeader(http.StatusCreated)
+			_, _ = w.Write([]byte(`{"credential":"chb_0123456789abcdef","id":"` + testCredID + `","destroy_credential":"` + testDestroy + `"}`))
+			return
+		}
+		calls++
+		method, path, auth, origin, cookie, bodyLen = r.Method, r.URL.Path, r.Header.Get("Authorization"), r.Header.Get("Origin"), r.Header.Get("Cookie"), r.ContentLength
+		_, _ = w.Write([]byte(`{"ok":true}`))
+	})
+	if _, err := h.Mint(context.Background(), "coral-1"); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.Revoke(context.Background(), "coral-1"); err != nil {
+		t.Fatalf("revoke: %v", err)
+	}
+	if method != "POST" || path != "/api/bootstrap/credentials/"+testCredID+"/revoke" || auth != "Bearer "+testDestroy || origin != "" || cookie != "" || bodyLen > 0 || calls != 1 {
+		t.Fatalf("request: %s %s auth %q origin %q cookie %q body %d calls %d", method, path, auth, origin, cookie, bodyLen, calls)
+	}
+	if strings.Contains(auth, goodKey) {
+		t.Fatal("the automation key must not be what revokes")
+	}
+}
+
+func TestRevokeWithNothingMintedOrNoIdentityIsRefusedLocally(t *testing.T) {
+	var hits int
+	h, _ := hubServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/bootstrap/credentials" {
+			w.WriteHeader(http.StatusCreated)
+			_, _ = w.Write([]byte(`{"credential":"chb_0123456789abcdef"}`)) // a Hub that sends no id and no destroy credential
+			return
+		}
+		hits++
+	})
+	if err := h.Revoke(context.Background(), "never-minted"); !errors.Is(err, ErrNothingToRevoke) {
+		t.Fatalf("nothing minted: %v", err)
+	}
+	if _, err := h.Mint(context.Background(), "coral-1"); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.Revoke(context.Background(), "coral-1"); !errors.Is(err, ErrNothingToRevoke) || hits != 0 {
+		t.Fatalf("no id: %v, hits %d", err, hits)
+	}
+}
+
+func TestRevokeRetriesWhatMayPassAndSaysTheStatusOfAnythingElse(t *testing.T) {
+	cases := []struct {
+		name     string
+		statuses []int
+		wantErr  string
+		calls    int
+	}{
+		{"idempotent: ok straight away", []int{200}, "", 1},
+		{"429 then 200", []int{429, 200}, "", 2},
+		{"503 twice then 200", []int{503, 503, 200}, "", 3},
+		{"429 for good", []int{429, 429, 429, 429}, "HTTP 429", 3},
+		{"404 is not retried", []int{404}, "HTTP 404", 1},
+		{"401 is not retried", []int{401}, "", 1},
+	}
+	for _, c := range cases {
+		var calls int
+		h, _ := hubServer(t, func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path == "/api/bootstrap/credentials" {
+				w.WriteHeader(http.StatusCreated)
+				_, _ = w.Write([]byte(`{"credential":"chb_0123456789abcdef","id":"` + testCredID + `","destroy_credential":"` + testDestroy + `"}`))
+				return
+			}
+			st := c.statuses[min(calls, len(c.statuses)-1)]
+			calls++
+			w.WriteHeader(st)
+			_, _ = w.Write([]byte(`{"error":"x chd_leak ` + testDestroy + `"}`))
+		})
+		h.RevokeEvery = time.Millisecond
+		_, _ = h.Mint(context.Background(), "coral-1")
+		err := h.Revoke(context.Background(), "coral-1")
+		if c.name == "401 is not retried" {
+			if err == nil || calls != 1 {
+				t.Errorf("%s: %v calls %d", c.name, err, calls)
+			}
+		} else if (c.wantErr == "") != (err == nil) || (err != nil && !strings.Contains(err.Error(), c.wantErr)) || calls != c.calls {
+			t.Errorf("%s: err %v, calls %d (want %d)", c.name, err, calls, c.calls)
+		}
+		if err != nil && (strings.Contains(err.Error(), testDestroy) || strings.Contains(err.Error(), "chd_")) {
+			t.Errorf("%s: the error holds the destroy credential: %v", c.name, err)
+		}
 	}
 }

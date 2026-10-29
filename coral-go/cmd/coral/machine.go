@@ -173,12 +173,13 @@ func runMachine(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	source := *sshFrom
+	source, lookup := *sshFrom, ""
 	if source == "" {
 		var derr error
 		if source, derr = detectSSHSource(ctx); derr != nil {
 			return fail("%v", derr)
 		}
+		lookup = publicIPHost()
 	}
 	deps := machinelaunch.Deps{
 		Provider: p, Hub: hub, Out: stdout, Bootstrap: newMachineBootstrap(),
@@ -197,7 +198,7 @@ func runMachine(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	}
 
 	_, err = machinelaunch.Launch(ctx, machinelaunch.Options{
-		Name: machine, Region: *region, Size: *size, Image: *image, SSHKeys: sshKeys, Yes: *yes, HubURL: *hubURL, SSHFrom: source,
+		Name: machine, Region: *region, Size: *size, Image: *image, SSHKeys: sshKeys, Yes: *yes, HubURL: *hubURL, SSHFrom: source, SSHFromLookup: lookup,
 	}, deps)
 	switch {
 	case err == nil:

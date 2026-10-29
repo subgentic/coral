@@ -6,6 +6,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -27,6 +28,15 @@ var newMachineBootstrap = func() machinelaunch.Bootstrapper { return &machinelau
 
 // publicIPEndpoint answers with this computer's public address as plain text over TLS (the address SSH on the machine is opened to, unless --allow-ssh-from names one).
 var publicIPEndpoint = "https://api.ipify.org"
+
+// publicIPHost is the host the lookup goes to, for the confirmation to name.
+func publicIPHost() string {
+	u, err := url.Parse(publicIPEndpoint)
+	if err != nil {
+		return publicIPEndpoint
+	}
+	return u.Host
+}
 
 // detectSSHSource is the address SSH on the machine should accept: this computer's, from a TLS endpoint. A failure says to name one.
 var detectSSHSource = func(ctx context.Context) (string, error) {
