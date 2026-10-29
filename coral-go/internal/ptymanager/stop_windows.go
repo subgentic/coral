@@ -3,6 +3,7 @@
 package ptymanager
 
 import (
+	"fmt"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
@@ -61,7 +62,9 @@ func hasChildProcesses(pid int) (bool, error) {
 // runsNonShell says whether any process under pid (its children, theirs, and so on, from one snapshot of the process list) is
 // something other than a shell (powershell, pwsh, cmd): a program is running there. Nested shells alone (a person typed "cmd" at
 // the prompt an exited agent left, #378) are still a bare prompt, which would run typed text as a command. A process whose image
-// can't be read counts as a program. A parent pid Windows has reused can only add processes, so it errs toward "running".
+// can't be read counts as a program. A process is taken as a child only when it started after its parent: Windows reuses pids,
+// and a process left by an earlier owner of the parent's pid is not under it. The walk visits each pid once and stops at
+// maxShellTreeDepth levels, where what is left counts as a program.
 func runsNonShell(pid int) (bool, error) {
 	snap, err := windows.CreateToolhelp32Snapshot(windows.TH32CS_SNAPPROCESS, 0)
 	if err != nil {
@@ -82,21 +85,54 @@ func runsNonShell(pid int) (bool, error) {
 			break
 		}
 	}
+	rootStart, ok := processStart(pid)
+	if !ok {
+		return false, fmt.Errorf("read process %d", pid)
+	}
+	type node struct {
+		pid   int
+		start int64
+		depth int
+	}
 	seen := map[int]bool{pid: true}
-	queue := append([]int(nil), children[pid]...)
+	queue := []node{{pid, rootStart, 0}}
 	for len(queue) > 0 {
-		c := queue[0]
+		n := queue[0]
 		queue = queue[1:]
-		if seen[c] {
-			continue
+		for _, c := range children[n.pid] {
+			if seen[c] {
+				continue
+			}
+			start, ok := processStart(c)
+			if ok && start < n.start {
+				continue // an earlier owner's process: this pid was reused
+			}
+			seen[c] = true
+			image, imageOK := processImage(c)
+			if !ok || !imageOK || !isShellImage(image) || n.depth+1 >= maxShellTreeDepth {
+				return true, nil
+			}
+			queue = append(queue, node{c, start, n.depth + 1})
 		}
-		seen[c] = true
-		if image, ok := processImage(c); !ok || !isShellImage(image) {
-			return true, nil
-		}
-		queue = append(queue, children[c]...)
 	}
 	return false, nil
+}
+
+// maxShellTreeDepth bounds runsNonShell's walk: shells nested this deep are not a person at a prompt.
+const maxShellTreeDepth = 16
+
+// processStart is when a process started (its creation time, in 100 ns units); ok is false when it can't be read.
+func processStart(pid int) (int64, bool) {
+	h, err := windows.OpenProcess(windows.PROCESS_QUERY_LIMITED_INFORMATION, false, uint32(pid))
+	if err != nil {
+		return 0, false
+	}
+	defer windows.CloseHandle(h)
+	var created, exited, kernel, user windows.Filetime
+	if err := windows.GetProcessTimes(h, &created, &exited, &kernel, &user); err != nil {
+		return 0, false
+	}
+	return int64(created.HighDateTime)<<32 | int64(created.LowDateTime), true
 }
 
 // rootIsShell says whether the process the terminal started is a known shell (powershell, pwsh, cmd), read from the process's own
