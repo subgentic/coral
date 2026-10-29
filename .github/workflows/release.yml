@@ -350,11 +350,13 @@ jobs:
           wix extension add WixToolset.UI.wixext/5.0.2
           $version = $env:REF_NAME -replace "^v", ""
           if (-not ($version -match "^\d+\.\d+\.\d+")) { $version = "0.0.0" }
+          . tools\msi_version.ps1
+          $msiVersion = ConvertTo-MsiVersion $version   # the MSI carries X.Y.Z only: an -rc build must not look newer than every release (#365)
           $binDir = (Resolve-Path "dist\windows\bin").Path
           $buildDir = (Resolve-Path "dist\windows").Path
           Copy-Item "tools\license.rtf" $buildDir
           $msiPath = Join-Path $buildDir "Coral-$version-x64.msi"
-          wix build tools\coral.wxs -arch x64 -ext WixToolset.UI.wixext -d "Version=$version" -d "BinDir=$binDir" -d "BuildDir=$buildDir" -o $msiPath
+          wix build tools\coral.wxs -arch x64 -ext WixToolset.UI.wixext -d "Version=$msiVersion" -d "BinDir=$binDir" -d "BuildDir=$buildDir" -o $msiPath
           echo "MSI_PATH=$msiPath" >> $env:GITHUB_ENV
           echo "VERSION=$version" >> $env:GITHUB_ENV
 

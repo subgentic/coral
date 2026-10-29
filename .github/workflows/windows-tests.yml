@@ -296,11 +296,13 @@ jobs:
           wix extension add WixToolset.UI.wixext/5.0.2
           if ($LASTEXITCODE -ne 0) { throw "wix extension add failed" }
           $version = "0.0.0-ci"
+          . tools\msi_version.ps1
+          $msiVersion = ConvertTo-MsiVersion $version   # as release.yml: the MSI carries X.Y.Z only (#365)
           $binDir = (Resolve-Path "dist\windows\bin").Path
           $buildDir = (Resolve-Path "dist\windows").Path
           Copy-Item "tools\license.rtf" $buildDir
           $msiPath = Join-Path $buildDir "Coral-$version-x64.msi"
-          wix build tools\coral.wxs -arch x64 -ext WixToolset.UI.wixext -d "Version=$version" -d "BinDir=$binDir" -d "BuildDir=$buildDir" -o $msiPath
+          wix build tools\coral.wxs -arch x64 -ext WixToolset.UI.wixext -d "Version=$msiVersion" -d "BinDir=$binDir" -d "BuildDir=$buildDir" -o $msiPath
           if ($LASTEXITCODE -ne 0) { throw "wix build failed" }
           echo "MSI_PATH=$msiPath" >> $env:GITHUB_ENV
       - name: Smoke test the portable package (the release's own script, with a stand-in agent; and the MSI when it was built)
