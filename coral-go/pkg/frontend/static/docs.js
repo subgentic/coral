@@ -11,7 +11,7 @@ import { isPhoneLayout } from './phone_layout.js';
 import { foldWayBack } from './way_back.js';
 import { importOnce } from './import_once.js';
 import { loadStyles } from './lazy_styles.js';
-await Promise.all([loadStyles('content_table.css'), loadStyles('docs.css')]); // the page's rules are not in the start's stylesheet: they arrive before it is drawn or shown (#10706)
+await loadStyles('docs.css'); // the page's rules are not in the start's stylesheet: they arrive before it is drawn or shown (#10706)
 import { menuMove } from './menu_keys.js';
 import { takeDocsAnswer } from './docs_answer.js';
 
