@@ -33,7 +33,9 @@ function fitWords() {
     if (!crowded()) { if (row.hasAttribute('data-active-word')) row.removeAttribute('data-active-word'); return; }
     row.removeAttribute('data-words'); // not all on one line, or a word clipped in its tab: icons alone
     // ...but the open tab still says its word when that fits, whichever tab is open (#9999: eight icons and a newcomer guessing which one is Artifacts): each tab is tried as the open one
-    const fits = tabs.every(b => { b.setAttribute('data-probe', ''); const ok = !crowded(); b.removeAttribute('data-probe'); return ok; });
+    // each tab on its own (#10876): one whose word does not fit at the panel's narrowest (Artifacts) does not take the word from Files; a tab that fits is marked, and the marked open one says its word
+    const fit = tabs.map(b => { b.setAttribute('data-probe', ''); const ok = !crowded(); b.removeAttribute('data-probe'); if (b.hasAttribute('data-word-ok') !== ok) b.toggleAttribute('data-word-ok', ok); return ok; });
+    const fits = fit.some(Boolean);
     if (fits !== row.hasAttribute('data-active-word')) { if (fits) row.setAttribute('data-active-word', ''); else row.removeAttribute('data-active-word'); }
 }
 
