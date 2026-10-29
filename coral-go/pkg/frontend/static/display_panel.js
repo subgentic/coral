@@ -31,7 +31,8 @@ export function syncDisplayPanels() {
     const open = isDisplayPanelOpen();
     for (const h of allHeaders()) {
         for (const b of h.querySelectorAll('[data-display-button]')) setAttr(b, 'aria-expanded', open);
-        for (const p of h.querySelectorAll('[data-display-panel]')) setHidden(p, !open);
+        const gone = h.querySelector('[data-display-button]')?.hidden === true; // a tab with no Display button has no panel: the Inbox's Saved filters do not stay open under Needs you (#10817)
+        for (const p of h.querySelectorAll('[data-display-panel]')) setHidden(p, !open || gone);
     }
 }
 

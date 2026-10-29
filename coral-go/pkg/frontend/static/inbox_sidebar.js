@@ -26,6 +26,7 @@ import { browserLocal } from './safe_storage.js';
 import { resolveSessionIdentity, sessionStateInfo } from './session_state.js';
 import { pollEvery } from './overload.js';
 import { setHidden } from './dom_write.js';
+import { syncDisplayPanels } from './display_panel.js';
 import { onViewShown } from './view_switch.js';
 import { importOnce } from './import_once.js';
 import { onInboxHooks, setInboxCount, askOf } from './inbox_tab.js';
@@ -642,7 +643,7 @@ function setGroup(key, { auto = false } = {}) {
         input.disabled = nativeInbox() && !!HUB_FRAMES[key]; // a Hub page has its own search
     }
     const btn = document.querySelector('.sidebar-pane[data-pane="hub-inbox"] [data-display-button]');
-    if (btn) setHidden(btn, key !== 'saved');
+    if (btn) { setHidden(btn, key !== 'saved'); syncDisplayPanels(); }
     const rail = $('sidebar-rail-search');
     if (rail && document.body.getAttribute('data-nav-tab') === 'hub-inbox') { rail.title = g.search; rail.setAttribute('aria-label', g.search); }
     if (was !== key) renderInboxNav(true);
