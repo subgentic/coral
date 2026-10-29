@@ -78,7 +78,8 @@ func isOrchestratorSubscriber(sub *board.Subscriber, subscriberID string) bool {
 	return false
 }
 
-func (h *BoardHandler) notifyOrchestratorsTaskCompleted(ctx context.Context, project, subscriberID string, task *board.Task, msg string) {
+// The typed notice names the task, who completed it and the outcome; the message the worker wrote is read with coral-board task detail (typedCompletedNotice).
+func (h *BoardHandler) notifyOrchestratorsTaskCompleted(ctx context.Context, project, subscriberID string, task *board.Task, by string) {
 	if h.terminal == nil || task == nil {
 		return
 	}
@@ -87,8 +88,7 @@ func (h *BoardHandler) notifyOrchestratorsTaskCompleted(ctx context.Context, pro
 		slog.Warn("list subscribers for completion notification failed", "project", project, "task_id", task.ID, "error", err)
 		return
 	}
-	// Same form as the board post; the chat view shows it as a Coral notice.
-	notification := fmt.Sprintf("[Task #%d completed by %s] %s", task.ID, subscriberID, msg)
+	notification := typedCompletedNotice(task.ID, by, task.Workflow.Outcome)
 	for i := range subs {
 		sub := &subs[i]
 		if sub.SubscriberID == subscriberID || sub.SessionName == "" || !isOrchestratorSubscriber(sub, sub.SubscriberID) {
@@ -131,6 +131,7 @@ func (h *BoardHandler) notifyOrchestratorOfCancelledDependency(ctx context.Conte
 		}
 		msg := fmt.Sprintf("[Task #%d stalled] %s depends on cancelled task #%d (%s); its %s dependency cannot be satisfied. Update or rewire the task.", task.ID, h.noticeText(ctx, task.BoardID, task.Title), cancelled.ID, h.noticeText(ctx, task.BoardID, cancelled.Title), condition)
 		h.postNotice(ctx, task.BoardID, "@Orchestrator "+msg)
+		typed := typedStalledNotice(task.ID, task.Title, cancelled.ID, cancelled.Title, condition)
 		if h.terminal == nil {
 			continue
 		}
@@ -144,7 +145,7 @@ func (h *BoardHandler) notifyOrchestratorOfCancelledDependency(ctx context.Conte
 			if sub.SubscriberID == subscriberID || sub.SessionName == "" || !isOrchestratorSubscriber(sub, sub.SubscriberID) {
 				continue
 			}
-			if err := h.sendAutomated(ctx, task.BoardID, sub.SessionName, msg); err != nil {
+			if err := h.sendAutomated(ctx, task.BoardID, sub.SessionName, typed); err != nil {
 				slog.Warn("failed to notify orchestrator of stalled task", "orchestrator", sub.SubscriberID, "session", sub.SessionName, "task_id", task.ID, "error", err)
 			}
 		}
@@ -208,20 +209,13 @@ func (h *BoardHandler) NudgeTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	title := oneLineTitle(task.Title)
-	if rs := []rune(title); len(rs) > 120 {
-		title = string(rs[:119]) + "…"
-	}
 	var text string
 	switch task.Status {
 	case "pending":
-		if hasActive, _ := h.bs.HasActiveTaskForAssignee(ctx, project, assignee, task.ID); hasActive {
-			text = fmt.Sprintf("[Task #%d reminder] %s — assigned to you and waiting; claim it with 'coral-board task claim %d' when your current task is done.", task.ID, title, task.ID)
-		} else {
-			text = fmt.Sprintf("[Task #%d reminder] %s — assigned to you and waiting. Run 'coral-board task claim %d' to start.", task.ID, title, task.ID)
-		}
+		hasActive, _ := h.bs.HasActiveTaskForAssignee(ctx, project, assignee, task.ID)
+		text = typedTaskReminder(task.ID, task.Title, task.Status, hasActive)
 	case "in_progress":
-		text = fmt.Sprintf("[Task #%d reminder] %s — still in progress. Continue it, or run 'coral-board task complete %d' when it's done.", task.ID, title, task.ID)
+		text = typedTaskReminder(task.ID, task.Title, task.Status, false)
 	default:
 		errBadRequest(w, fmt.Sprintf("Task #%d is %s; only pending and in-progress tasks can be nudged", task.ID, task.Status))
 		return
@@ -312,7 +306,7 @@ func (h *BoardHandler) RemindTask(w http.ResponseWriter, r *http.Request) {
 				if current.Parked(time.Now()) {
 					continue // parked: no reminder while it is (#4175 step 3)
 				}
-				_ = h.sendTaskNudge(ctx, project, *current.AssignedTo, fmt.Sprintf("[Task #%d reminder] %s — periodic reminder; run 'coral-board task current' or 'coral-board task claim'.", current.ID, oneLineTitle(current.Title)))
+				_ = h.sendTaskNudge(ctx, project, *current.AssignedTo, typedPeriodicReminder(current.ID, current.Title))
 			case <-ctx.Done():
 				return
 			}

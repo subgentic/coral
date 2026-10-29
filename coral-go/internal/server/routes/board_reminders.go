@@ -269,7 +269,7 @@ func (h *BoardHandler) startSubscriberReminder(project, subscriber, message stri
 					fire.Unlock()
 					return
 				}
-				err := h.sendTaskNudge(ctx, project, subscriber, "[Coral reminder] "+message)
+				err := h.sendTaskNudge(ctx, project, subscriber, typedBoardReminder(message))
 				fire.Unlock()
 				if err != nil {
 					return

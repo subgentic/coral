@@ -459,7 +459,8 @@ func (n *BoardNotifier) nudgeAgent(ctx context.Context, pass *notifyPass, a Agen
 	nudge := nudgeText(sub.Project, unread, health)
 	if !health && latestID > 0 { // the newest unread message is from another board: the nudge says how to answer it (#9054)
 		if m, merr := n.boardStore.GetMessageByID(ctx, sub.Project, latestID); merr == nil && m != nil && m.ReplyWith != "" {
-			nudge += fmt.Sprintf(" Message #%d is from another board. %s", m.ID, m.ReplyWith)
+			// By reference: the reply line names the sender's board, which that board chose, so it is shown by coral-board read, never typed (goal #7).
+			nudge += fmt.Sprintf(" Message #%d is from another board; 'coral-board read' shows how to answer it.", m.ID)
 		}
 	}
 	// A nudge about a message that tags the agent is a mention: typed in mid-turn when the
@@ -572,7 +573,7 @@ func nudgeText(project string, unread int, health bool) string {
 		plural = ""
 	}
 	if health {
-		return fmt.Sprintf("[Coral health check] Team health check for %s: %d unread message%s include a health-monitor summary. Review team status, assignments, progress, and blockers, then run 'coral-board read' to see the authoritative full content.", project, unread, plural)
+		return fmt.Sprintf("[Coral health check] Team health check for %s: %d unread message%s include a health-monitor summary. Review team status, assignments, progress, and blockers, then run 'coral-board read' to see the authoritative full content.", board.TypedLabel(project), unread, plural)
 	}
 	return board.NudgeText(unread)
 }

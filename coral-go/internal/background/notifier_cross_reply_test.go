@@ -36,7 +36,9 @@ func TestNudgeForAMessageFromAnotherBoardSaysHowToAnswerIt(t *testing.T) {
 	text := rt.sent[0].text
 	assert.Contains(t, text, "coral-board read")
 	assert.Contains(t, text, "is from another board")
-	assert.Contains(t, text, `Reply with: coral-board send --board src --reply-to `+strconv.FormatInt(inbound.ID, 10)+` "..."`)
+	// By reference (goal #7): the sender's board name is shown by coral-board read, never typed.
+	assert.Contains(t, text, "Message #"+strconv.FormatInt(inbound.ID, 10)+" is from another board; 'coral-board read' shows how to answer it.")
+	assert.NotContains(t, text, "Reply with:")
 	assert.NotContains(t, text, "\n", "one line")
 
 	// an ordinary message: the plain nudge
