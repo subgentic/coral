@@ -3,6 +3,7 @@
 // that it has focus, the order has no tabindex above 0, and each dialog takes focus in, keeps Tab and Shift+Tab inside, closes on Escape and gives focus back to what opened it. The scenes are the desktop
 // contrast census's; ALLOW_KEYBOARD is empty. KEYBOARD_REPORT=<file> writes the findings to that file instead of failing.
 const assert = require('node:assert/strict');
+const fs = require('node:fs'), os = require('node:os'), path = require('node:path'), { execFileSync } = require('./helpers/child_process');
 const { connect } = require('./agent_view_harness');
 const { launchStandIn } = require('./helpers/stand_in_agent');
 const { guardSettings } = require('./helpers/settings_guard');
@@ -21,7 +22,7 @@ const BUBBLES = [{ type: 'user', content: 'Is the build green?', key: 'c1', time
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
-    const guard = await guardSettings(); let standIn = null;
+    const guard = await guardSettings(); let standIn = null, work = null;
     const results = [];
     const found = [];
     const sc = async (name, setup, { expect } = {}) => {
@@ -39,7 +40,10 @@ const BUBBLES = [{ type: 'user', content: 'Is the build green?', key: 'c1', time
     const tap = sel => tapSel(ev, sel);
     const load = async () => { await Page.navigate({ url: 'about:blank' }); await Page.loadEventFired(); await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.startup('liveList', 'settings')`); };
     try {
-        standIn = await launchStandIn(httpJson, { displayName: 'Census Agent' });
+        // The agent's folder is the Files list of the terminal view, and that list is the git changes of the folder's repository. The runner's tmp dir can sit inside a repository (epoch's does): Chrome's profile files and coral.log are then
+        // changed files that arrive during the Tab walk, and each is a control no press reached (#10924, red on epoch). So the agent works in a folder that is its own repository, with one file in it, whatever the tmp dir is inside.
+        work = fs.mkdtempSync(path.join(os.tmpdir(), 'coral-census-k-')); execFileSync('git', ['init', '-q', work]); fs.writeFileSync(path.join(work, 'notes.txt'), 'x\n');
+        standIn = await launchStandIn(httpJson, { displayName: 'Census Agent', workingDir: work });
         await httpJson('POST', `/api/board/${TEAM}/subscribe`, { subscriber_id: 'Boss', job_title: 'Orchestrator', session_name: 'boss-session' });
         for (const m of ['Please check the release notes.', 'Then post the summary.']) await httpJson('POST', `/api/board/${TEAM}/messages`, { subscriber_id: 'Boss', content: m });
         for (const [title, priority] of [['Ship the release notes', 'high'], ['Check the migration', 'medium'], ['Tidy the changelog', 'low']]) await httpJson('POST', `/api/board/${TEAM}/tasks`, { subscriber_id: 'Boss', title, body: 'A task for the census.', priority, assignee: 'Boss' });
@@ -265,7 +269,7 @@ const BUBBLES = [{ type: 'user', content: 'Is the build green?', key: 'c1', time
         await load(); await ev(`window.switchNavTab('agents'); true`);
         await ev(STUB({ filename: 'release-notes.md', content: '# Release notes\n\nThe build is green.\n', mediaType: 'text/markdown', comments: [] }));
         await dlg('dialog: artifact viewer', { opener: '[data-on-click="m-go-home"]', open: () => ev(`import(${S} + 'artifact_viewer.js').then(m => m.openArtifactViewer('${HEX}', { filename: 'release-notes.md' })).then(() => true)`) });
-    } finally { await httpJson('DELETE', `/api/board/${TEAM}`).catch(() => {}); if (standIn) await standIn.stop().catch(() => {}); await guard.restore().catch(() => {}); await client.close(); }
+    } finally { await httpJson('DELETE', `/api/board/${TEAM}`).catch(() => {}); if (standIn) await standIn.stop().catch(() => {}); if (work) fs.rmSync(work, { recursive: true, force: true }); await guard.restore().catch(() => {}); await client.close(); }
     const bad = results.filter(r => r.error).map(r => `${r.name}: the scene did not open (${r.error})`).concat(found, required(results, requiredScenes('keyboard')));
     if (process.env.KEYBOARD_REPORT) { require('node:fs').writeFileSync(process.env.KEYBOARD_REPORT, results.map(r => `${r.name}: ${r.error || r.stops + ' stops'}${process.env.KEYBOARD_PATHS ? '\n    ' + r.path : ''}`).join('\n') + '\n--\n' + bad.join('\n') + '\n'); process.exit(0); }
     assert.deepEqual(bad, [], 'keyboard-only problems on a desktop:\n  ' + bad.join('\n  '));
