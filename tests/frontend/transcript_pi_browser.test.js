@@ -51,7 +51,7 @@ async function run() {
 
   const C = `document.getElementById('live-history-messages')`;
   // The chat opens on the newest page of messages: the fixture has 38, so load the older pages first (the "load more" button at the top).
-  for (let i = 0; i < 10; i++) { const more = await ev(`(() => { const b = document.querySelector('#live-history-messages .load-more-btn'); if (!b) return false; b.click(); return true; })()`); if (!more) break; await sleep(400); }
+  for (let i = 0; i < 10; i++) { const more = await ev(`(() => { const b = document.querySelector('#live-history-messages .load-more-btn'); if (!b) return false; b.click(); return true; })()`); if (!more) break; await sleep(400); /* sleep-ok: the interval of a bounded loop that clicks Load more until the button is gone */ }
   const text = () => ev(`${C}.innerText`);
   const userTurns = () => ev(`Array.from(${C}.querySelectorAll('.human .message-text')).map(e => e.innerText.trim())`);
 
@@ -65,7 +65,7 @@ async function run() {
 
   // Open every work group: the tool calls with their commands and outputs.
   await ev(`${C}.querySelectorAll('.work-group').forEach(g => { g.open = true; }); true`);
-  await sleep(150);
+  for (let i = 0; i < 30; i++) { if (await ev(`!!${C}.querySelector('.tool-card-command, .tool-card-output')`)) break; await sleep(100); } // the opened groups have drawn their cards
   const calls = await ev(`Array.from(${C}.querySelectorAll('.tool-call')).map(d => ({ id: d.dataset.toolUseId || null, name: d.querySelector('.tool-call-name').getAttribute('data-tool') || d.querySelector('.tool-call-name').textContent,
       command: (d.querySelector('.tool-card-command')||{}).textContent || null, output: (d.querySelector('.tool-card-output')||{}).textContent || null }))`);
   check('the Pi tool calls show as tool rows', calls.length >= 12, String(calls.length));
@@ -80,7 +80,7 @@ async function run() {
   append({ type: 'message', id: 'ffff0001', parentId: null, timestamp: '2026-10-29T20:00:00.000Z', message: { role: 'user', content: [{ type: 'text', text: 'FIXTURE-USER-LIVE question' }], timestamp: 1793306400000 } },
          { type: 'message', id: 'ffff0002', parentId: 'ffff0001', timestamp: '2026-10-29T20:00:02.000Z', message: { role: 'assistant', content: [{ type: 'text', text: 'FIXTURE-ASSISTANT-LIVE answer' }], api: 'openai-responses', provider: 'openai', model: 'gpt-6-luna', usage: { input: 1, output: 1, cacheRead: 0, cacheWrite: 0, totalTokens: 2, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } }, stopReason: 'stop', timestamp: 1793306402000 } });
   let live = '';
-  for (let i = 0; i < 40; i++) { live = await text(); if (live.includes('FIXTURE-ASSISTANT-LIVE answer')) break; await sleep(250); }
+  for (let i = 0; i < 40; i++) { live = await text(); if (live.includes('FIXTURE-ASSISTANT-LIVE answer')) break; await sleep(250); /* sleep-ok: the interval of a bounded loop that waits for the live answer to be drawn */ }
   check('a turn written while the chat is open appears', live.includes('FIXTURE-USER-LIVE question') && live.includes('FIXTURE-ASSISTANT-LIVE answer'));
 
   await client.close();
