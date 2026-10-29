@@ -177,13 +177,13 @@ func (h *SessionsHandler) startAgentCLI(ctx context.Context, team, agentType, ta
 		d = g
 	}
 	if d <= 0 {
-		return sendLaunchCommand(ctx, h.terminal, target, cmd)
+		return sendLaunchCommand(h.withLaunchCLI(ctx, agentType), h.terminal, target, cmd)
 	}
 	log.Printf("[launch] %s: its start is typed in %s (the team's starts are spaced)", target, d.Round(100*time.Millisecond))
 	h.teamSlot(d, func() {
 		bg, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
-		if err := sendLaunchCommand(bg, h.terminal, target, cmd); err != nil {
+		if err := sendLaunchCommand(h.withLaunchCLI(bg, agentType), h.terminal, target, cmd); err != nil {
 			log.Printf("[launch] %s: the spaced start failed: %v", target, err)
 		}
 	})

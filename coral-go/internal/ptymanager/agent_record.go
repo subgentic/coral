@@ -19,11 +19,13 @@ type AgentCandidate struct {
 	Program string `json:"program"`
 	// Under is the nested shell the program runs inside ("" for a direct child of the terminal's shell). Recording such a program needs the Operator's explicit acknowledgement.
 	Under string `json:"under"`
+	// Launched: the program was reached through Coral's recognised launcher cmd for the session's CLI, so it is that CLI's own process (node behind claude.cmd): bulk records it though its image is not the CLI file.
+	Launched bool `json:"-"`
 	// Script is the absolute script path of `interpreter script ...` (see ScriptIsCLI): only for the bulk match, never shown, logged or kept.
 	Script string `json:"-"`
+	Image  string `json:"-"`
 	// AcknowledgeNested, on a candidate passed to RecordAgent, is the Operator's "I know this is the agent, not something I started by hand" for a program under a nested shell.
-	AcknowledgeNested bool   `json:"-"`
-	Image             string `json:"-"`
+	AcknowledgeNested bool `json:"-"`
 	// Folder is the image's folder, cleaned and capped (visibleName), shown next to Program so the Operator sees WHERE the program is from. Unidentified: the image could not be read; Program then says so, recording needs the acknowledgement, and bulk leaves it.
 	Folder       string `json:"folder"`
 	Unidentified bool   `json:"unidentified"`

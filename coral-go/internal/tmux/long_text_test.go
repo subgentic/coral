@@ -100,7 +100,7 @@ func TestOnlyLaunchPathsWrapACommand(t *testing.T) {
 	root := filepath.Join("..", "..")
 	invocations := map[string]int{}
 	sendKeysToTarget := map[string]int{}
-	callRe := regexp.MustCompile(`\bcommandInvocation\(`)
+	callRe := regexp.MustCompile(`\bcommand(?:Invocation|Handoff)\(`) // commandHandoff is commandInvocation that also returns the script's path
 	sendRe := regexp.MustCompile(`\.SendKeysToTarget\(`)
 	quietRe := regexp.MustCompile(`\.SendQuietLaunchToTarget\(`)
 	quiet := map[string]int{}
