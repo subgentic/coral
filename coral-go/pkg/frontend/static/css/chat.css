@@ -1227,7 +1227,7 @@ h3.cni-question { margin-bottom: 4px; } /* a heading with its text under it (#30
 .cni-link:hover:not(:disabled) {
     color: var(--text-primary);
 }
-@media (max-width: 600px) { .cni-link { min-height: 44px; } }
+@media (max-width: 600px) { .cni-link { min-height: 44px; min-width: 44px; } }
 .cni-hint {
     color: var(--text-muted);
 }
