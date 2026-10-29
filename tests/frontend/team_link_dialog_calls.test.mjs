@@ -17,5 +17,9 @@ assert.ok(!/['"`]\/api\/[^'"`]*['"`]\s*\+|\+\s*['"`]\/api\//.test(code), 'a path
 for (const m of code.matchAll(/\$\{([^}]*)\}/g)) if (!/^encodeURIComponent\(/.test(m[1].trim()) && /\/api\//.test(code.slice(Math.max(0, m.index - 80), m.index))) assert.fail('a substitution in a path that is not encodeURIComponent: ' + m[1]);
 assert.ok(!/innerHTML|insertAdjacentHTML|outerHTML|document\.write|\.on[a-z]+\s*=(?!=)/.test(code), 'text only, no inline handlers');
 const flag = fs.readFileSync(path.join(st, 'team_link_flag.js'), 'utf8').split('\n').filter(l => !/^\s*(\/\/|\/?\*)/.test(l)).join('\n');
-assert.deepEqual([...flag.matchAll(/['"`](\/api\/[^'"`]*)['"`]/g)].map(m => m[1]), ['/api/account', '/api/servers']);
+// the flag reads /api/servers itself and the account through the page's one read (account_info.js, #11106), which names /api/account and nothing else
+assert.deepEqual([...flag.matchAll(/['"`](\/api\/[^'"`]*)['"`]/g)].map(m => m[1]), ['/api/servers']);
+assert.ok(/import \{ readAccount \} from '\.\/account_info\.js'/.test(flag), 'the flag takes the account from the shared read');
+const acct = fs.readFileSync(path.join(st, 'account_info.js'), 'utf8').split('\n').filter(l => !/^\s*(\/\/|\/?\*)/.test(l)).join('\n');
+assert.deepEqual([...acct.matchAll(/['"`](\/api\/[^'"`]*)['"`]/g)].map(m => m[1]), ['/api/account']);
 console.log('team_link_dialog_calls: ok');

@@ -140,6 +140,8 @@ node remote_browse.test.mjs
 node overload.test.mjs
 node team_availability_polling.test.mjs
 node team_folder_pick.test.mjs
+node account_nav.test.mjs
+node topbar_contract.test.mjs
 node team_artifacts_copy_link.test.mjs
 node shared_images.test.mjs
 node board_keyset_paging.test.mjs

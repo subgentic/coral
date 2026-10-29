@@ -2,6 +2,7 @@
  * team_link_dialog of GET /api/account, a strict boolean read once at load, as artifacts_tab.js reads artifacts_frame. Anything else (false, absent, not a boolean, an error) is off: no item. And the item is
  * for a team only when that team's computer is one of the viewer's OWN: its server id is in the viewer's GET /api/servers (a share grantee viewing someone else's machine has no such row), read once with
  * the flag; a failed read offers nothing. The answers let the list draw the item, so the list is redrawn once when they arrive. Never throws. */
+import { readAccount } from './account_info.js';
 import { redrawLiveList, teamLinkState, teamLinkOffered } from './list_hooks.js';
 
 export { teamLinkOffered }; // the answer the team menu reads lives in list_hooks.js (a startup module); this module, loaded on first use, only fills it
@@ -9,8 +10,8 @@ export { teamLinkOffered }; // the answer the team menu reads lives in list_hook
 export async function initTeamLinkFlag() {
     let value = false, ids = new Set();
     try {
-        const r = await fetch('/api/account', { headers: { Accept: 'application/json' } });
-        if (r.ok) { const d = await r.json(); value = !!d && d.team_link_dialog === true; }
+        const d = await readAccount(); // the page's one read of /api/account (account_info.js)
+        value = !!d && d.team_link_dialog === true;
         if (value) {
             const s = await fetch('/api/servers', { headers: { Accept: 'application/json' } });
             if (s.ok) { const d = await s.json(); const rows = Array.isArray(d) ? d : (d && Array.isArray(d.servers) ? d.servers : []); ids = new Set(rows.filter(x => x && typeof x.id === 'string').map(x => x.id)); }

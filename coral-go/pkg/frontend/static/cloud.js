@@ -8,6 +8,8 @@
 import { importOnce } from './import_once.js';
 import { state } from './state.js';
 import { isCloud, nativeInbox } from './server_base.js';
+import { readAccount, accountNavEntries, ACCOUNT_NAV } from './account_info.js';
+import { MENU_KEYS, menuMove } from './menu_keys.js';
 import { filterSettingsPayload, settingsErrorMessage } from './cloud_settings.js';
 import { signOutThisBrowser } from './local_store.js';
 import { OUTCOME_UNKNOWN_LINE, isOutcomeUnknown } from './outcome_unknown.js';
@@ -179,22 +181,42 @@ export function installCloudFetch() {
 
 const signOut = signOutThisBrowser; // drafts, pending messages, recent folders, stars and panel requests go before the session does (#3681, #4164)
 
+const navLink = ([text, href]) => h('a', { className: 'menu-item overflow-menu-item', role: 'menuitem', href, text, ...(href === '/usage' ? { id: 'cloud-account-usage' } : {}) });
+
 function buildAccountMenu(email) {
+    // The hub's own pages, on this origin (the dashboard is served by the hub): plain links, same tab. Until the account answers (and for an older Hub, or a failed read) the entries are Account (coral-go#1) and Saved for later (the hub's roll-up of every machine's saved messages, #4596).
+    const defaults = [navLink(ACCOUNT_NAV.account), navLink(ACCOUNT_NAV.saved)];
+    const signOutBtn = h('button', { type: 'button', className: 'menu-item overflow-menu-item', role: 'menuitem', text: 'Sign out', onclick: signOut });
     const menu = h('div', { className: 'menu cloud-account-menu', id: 'cloud-account-menu', hidden: true, role: 'menu' },
         h('div', { className: 'cloud-account-email', text: email, title: email }),
         h('button', { type: 'button', className: 'menu-item overflow-menu-item', role: 'menuitem', text: 'Servers', onclick: () => { setOpen(false); importOnce('./servers.js', 'the server list').then(m => m.showServersModal(), () => {}); } }),
-        // The hub's own pages, on this origin (the dashboard is served by the hub): plain links, same tab. Account is coral-go#1, Saved for later the hub's roll-up of every machine's saved messages (#4596).
-        h('a', { className: 'menu-item overflow-menu-item', role: 'menuitem', href: '/account', text: 'Account' }),
-        h('a', { className: 'menu-item overflow-menu-item', role: 'menuitem', href: '/saved', text: 'Saved for later' }),
-        h('button', { type: 'button', className: 'menu-item overflow-menu-item', role: 'menuitem', text: 'Sign out', onclick: signOut }),
+        ...defaults, signOutBtn,
     );
-    const setOpen = open => { menu.hidden = !open; btn.setAttribute('aria-expanded', open ? 'true' : 'false'); };
+    const items = () => [...menu.querySelectorAll('[role="menuitem"]')];
+    const setOpen = (open, focus = true) => {
+        menu.hidden = !open; btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+        if (open) items()[0]?.focus(); // opened: the focus lands on the first item
+        else if (focus && menu.contains(document.activeElement)) btn.focus(); // closed from inside: back to the button
+    };
     const btn = h('button', {
         type: 'button', className: 'btn btn-quiet btn-icon btn-small top-bar-btn cloud-account-btn', title: email, 'aria-label': 'Account menu', 'aria-haspopup': 'menu', 'aria-expanded': 'false',
         onclick: e => { e.stopPropagation(); setOpen(menu.hidden); },
     }, h('span', { className: 'material-icons top-bar-icon', 'aria-hidden': 'true', text: 'account_circle' }));
-    document.addEventListener('click', () => setOpen(false));
-    document.addEventListener('keydown', e => { if (e.key === 'Escape') setOpen(false); });
+    document.addEventListener('click', () => setOpen(false, false));
+    document.addEventListener('keydown', e => { if (e.key === 'Escape' && !menu.hidden) { setOpen(false); } });
+    menu.addEventListener('keydown', e => { // the one menu keyboard (menu_keys.js): Up and Down wrap, Home and End
+        if (!MENU_KEYS.has(e.key)) return;
+        const list = items(), to = menuMove(e.key, list.length, list.indexOf(document.activeElement));
+        if (to < 0) return;
+        e.preventDefault(); list[to].focus();
+    });
+    btn.addEventListener('keydown', e => { if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && menu.hidden) { e.preventDefault(); setOpen(true); } });
+    // What the Hub says this account may use: one read of /api/account for the page (account_info.js). A failed read, or an answer with no `nav`, changes nothing.
+    readAccount().then(d => {
+        const entries = accountNavEntries(d && d.nav);
+        if (entries) { defaults.forEach(a => a.remove()); signOutBtn.before(...entries.map(navLink)); return; }
+        if (d && d.analytics_tab === true) defaults[1].after(navLink(ACCOUNT_NAV.usage)); // an older Hub that names no `nav` but has the rolled-up Analytics (#11018): Usage after Saved for later, as before
+    });
     return h('div', { className: 'cloud-account-wrapper' }, btn, menu);
 }
 
@@ -211,8 +233,6 @@ export async function initCloud() {
     state.account = { email: s.email };
     const actions = document.querySelector('.top-bar-actions');
     if (actions && !document.getElementById('cloud-account-menu')) actions.append(buildAccountMenu(s.email));
-    // The hub's rolled-up Analytics (#11018): "Usage", a plain link to /usage after Saved for later, only when GET /api/account says analytics_tab === true (a strict boolean, as artifacts_frame is read); anything else adds no item
-    fetch('/api/account', { headers: { Accept: 'application/json' } }).then(r => r.ok ? r.json() : null).then(d => { const saved = d && d.analytics_tab === true && document.querySelector('#cloud-account-menu a[href="/saved"]'); if (saved) saved.after(h('a', { className: 'menu-item overflow-menu-item', role: 'menuitem', href: '/usage', text: 'Usage', id: 'cloud-account-usage' })); }).catch(() => {});
     importOnce('./artifacts_tab.js').then(m => m.initArtifactsTab()).catch(() => {}); // not waited for: the Artifacts tab appears when the account says it has one (#6236)
     importOnce('./team_link_flag.js').then(m => m.initTeamLinkFlag()).catch(() => {}); // not waited for: "Link team..." appears in a team's menu when the account says so (#9888)
     return true;
