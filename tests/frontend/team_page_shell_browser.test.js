@@ -15,13 +15,15 @@ const TEAM = `qa-team-${Date.now() % 100000}`;
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const { settle } = require('./helpers/wait').bind(ev);
     const S = scenarios();
-    const same = (a, b, what) => { assert.ok(a && b, `${what}: the header and the tab strip are there`); for (const part of ['h1', 'tabs']) { assert.ok(a[part] && b[part], `${what}: the ${part} is there`); for (const k of ['x', 'y', 'w', 'h']) assert.ok(Math.abs(a[part][k] - b[part][k]) <= 0.5, `${what}: the ${part} ${k} moved from ${a[part][k]} to ${b[part][k]}`); } };
+    let phone = false; // a phone's More button names the open tab behind it (Board, Knowledge: #10759), so the strip beside it is as wide as the button leaves it: its width is the one thing that moves there (#10903)
+    const same = (a, b, what) => { assert.ok(a && b, `${what}: the header and the tab strip are there`); for (const part of ['h1', 'tabs']) { assert.ok(a[part] && b[part], `${what}: the ${part} is there`); for (const k of (phone && part === 'tabs' ? ['x', 'y', 'h'] : ['x', 'y', 'w', 'h'])) assert.ok(Math.abs(a[part][k] - b[part][k]) <= 0.5, `${what}: the ${part} ${k} moved from ${a[part][k]} to ${b[part][k]}`); } };
     const key = async k => { await ev(`(() => { const e = document.activeElement; e.dispatchEvent(new KeyboardEvent('keydown', { key: ${JSON.stringify(k)}, bubbles: true, cancelable: true })); return true; })()`); await settle(200); };
     const activeTab = () => ev(`(() => { const t = window.__tp.allTabs().find(x => x.getAttribute('aria-selected') === 'true'); return t ? window.__tp.tabLabel(t) : ''; })()`);
     const focusedTab = () => ev(`(() => { const e = document.activeElement; return e && e.getAttribute('role') === 'tab' ? window.__tp.tabLabel(e) : ''; })()`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [label, w, h, mobile] of VIEWS) {
+            phone = mobile;
             console.log(label);
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`); await installTP(ev);

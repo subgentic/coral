@@ -33,7 +33,8 @@ const BOX = `window.__tp.find('textarea, input[type=text], [role=textbox]', /^Me
                 assert.ok(await ev(`/A message for the team page suites\\./.test(window.__na.text(window.__tp.page()))`), 'the seeded message is shown');
                 assert.ok(await ev(`!!${BOX}`), 'a text box named Message the team');
                 assert.ok(await ev(`!!window.__tp.find('button', /^Send$/i)`), 'a button named Send');
-                const now = await rect(ev); for (const part of ['h1', 'tabs']) for (const k of ['x', 'y', 'w', 'h']) assert.ok(Math.abs(base[part][k] - now[part][k]) <= 0.5, `the ${part} ${k} moved on Messages (${base[part][k]} to ${now[part][k]})`);
+                const now = await rect(ev); for (const part of ['h1', 'tabs']) for (const k of (mobile && part === 'tabs' ? ['x', 'y', 'h'] : ['x', 'y', 'w', 'h'])) assert.ok( // a phone's More names the open tab (Board, #10759): the strip beside it is as wide as the button leaves it, so its width is the one thing that moves there (#10903)
+                Math.abs(base[part][k] - now[part][k]) <= 0.5, `the ${part} ${k} moved on Messages (${base[part][k]} to ${now[part][k]})`);
             });
             if (w >= 1280) await S.run(`${label}: the Board table fills the pane (its right edge meets the pane's), as the other tabs do (#8504)`, async () => {
                 const g = await ev(`(() => { const t = document.querySelector('#mb-messages'), p = document.querySelector('#mb-board'); if (!t || !p) return null; const a = t.getBoundingClientRect(), b = p.getBoundingClientRect(); return { table: Math.round(a.right), pane: Math.round(b.right), left: Math.round(a.left - b.left), cls: t.className }; })()`);
