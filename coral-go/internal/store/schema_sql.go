@@ -463,6 +463,22 @@ CREATE TABLE IF NOT EXISTS team_members (
 
 CREATE INDEX IF NOT EXISTS idx_team_members_team ON team_members(team_id, status);
 
+-- What an agent's chat search may reach (#11048): own (its one board), team, all, operator. Only the Operator raises it; kind 'raise' rows record the change, 'read' rows a search above own (counts, never text).
+CREATE TABLE IF NOT EXISTS search_access_log (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    kind       TEXT NOT NULL,
+    team       TEXT NOT NULL DEFAULT '',
+    agent      TEXT NOT NULL DEFAULT '',
+    from_level TEXT NOT NULL DEFAULT '',
+    to_level   TEXT NOT NULL DEFAULT '',
+    set_by     TEXT NOT NULL DEFAULT '',
+    via        TEXT NOT NULL DEFAULT '',
+    outcome    TEXT NOT NULL DEFAULT '',
+    results    INTEGER NOT NULL DEFAULT 0,
+    at         TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_search_access_log_at ON search_access_log(at);
+
 -- Subagents launched by a main agent. Kept separate from live_sessions: a
 -- subagent is not a Coral-managed agent (no tmux session, board, or prompt),
 -- it is work a main agent delegated. session_id is the relational tie back to
