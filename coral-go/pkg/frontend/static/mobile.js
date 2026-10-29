@@ -117,7 +117,14 @@ function _listHeader(agentList) {
     header = document.createElement('div');
     header.className = 'mobile-list-header';
     header.innerHTML = `
+            <button class="btn btn-quiet btn-icon phone-menu-btn" type="button" data-on-click="m-top-menu" data-hamburger aria-haspopup="menu" aria-expanded="false" aria-controls="nav-more-menu" aria-label="Menu"><span class="material-icons" aria-hidden="true">menu</span></button>
+            <button class="phone-account-btn" type="button" data-on-click="m-top-menu" data-hamburger data-account aria-haspopup="menu" aria-expanded="false" aria-controls="nav-more-menu" aria-label="Account and more"><span class="material-icons" aria-hidden="true">account_circle</span></button>
+            <span class="phone-break" aria-hidden="true"></span>
             <h2 class="mobile-list-title">Agents</h2>
+            <div class="phone-chips" role="group" aria-label="Show">
+                <button class="chip phone-chip phone-chip-need" type="button" data-phone-chip="needs_input" data-on-click="phone-home-filter" aria-pressed="false" hidden></button>
+                <button class="chip phone-chip" type="button" data-phone-chip="working" data-on-click="phone-home-filter" aria-pressed="false" hidden></button>
+            </div>
             <button class="btn btn-quiet btn-icon sidebar-collapse-btn" type="button" data-display-button data-on-click="display-panel-toggle" aria-expanded="false" aria-controls="mobile-display-panel" title="Display options" aria-label="Display options">
                 <span class="material-icons" style="font-size:var(--icon-size)" aria-hidden="true">notes</span><span class="display-dot" data-display-badge hidden></span>
             </button>
@@ -127,7 +134,7 @@ function _listHeader(agentList) {
             </button>
             <button class="btn btn-small btn-primary" data-on-click="launch-show">New</button>
             <div class="mobile-search-row" id="mobile-search-row">
-                <input type="search" class="field field-search sidebar-search-input mobile-search-input" placeholder="Search agents" autocomplete="off" aria-label="Search agents" data-on-input="agent-search-filter" data-on-keydown="agent-search-key">
+                <input type="search" class="field field-search sidebar-search-input mobile-search-input" placeholder="Search agents and messages" autocomplete="off" aria-label="Search agents and messages" data-on-input="agent-search-filter" data-on-keydown="agent-search-key">
             </div>
             <span class="sr-only" role="status" aria-live="polite" data-agent-list-live></span>
             <div class="list-display-panel" id="mobile-display-panel" data-display-panel role="group" aria-label="Display options" data-on-keydown="display-panel-key" hidden>

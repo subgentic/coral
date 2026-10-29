@@ -269,7 +269,7 @@ module.exports = part => (async () => {
                 await ev(`import(${S} + 'utils.js').then(m => { m.showToast('Saved to the board.', false, 60000); m.showToast('Could not reach the agent.', true, 60000); m.showToast('Upload failed.', true, 60000, { action: { label: 'Retry', onClick() {} } }); return true; })`);
             }, { min: 3, expect: `document.querySelectorAll('.toast').length >= 3` });
             await ev(`document.querySelectorAll('.toast').forEach(t => t.remove()); true`);
-            await sc('settings menu', async () => { await tap('#top-menu-btn'); }, { min: 6, expect: `!document.getElementById('nav-more-menu').hidden && !!document.querySelector('#nav-more-menu [data-on-click="m-close-top-bar-settings-then-show-settings-modal"]')` }); // the hamburger's menu holds Settings (#9021)
+            await sc('settings menu', async () => { await tap((await ev(`document.getElementById('top-menu-btn').getClientRects().length ? '#top-menu-btn' : '.phone-menu-btn'`))); }, { min: 6, expect: `!document.getElementById('nav-more-menu').hidden && !!document.querySelector('#nav-more-menu [data-on-click="m-close-top-bar-settings-then-show-settings-modal"]')` }); // the hamburger's menu holds Settings (#9021)
             await ev(`document.body.click(); true`);
         }
     } finally { await httpJson('DELETE', `/api/board/${TEAM}`).catch(() => {}); if (standIn) await standIn.stop().catch(() => {}); await guard.restore().catch(() => {}); await client.close(); }

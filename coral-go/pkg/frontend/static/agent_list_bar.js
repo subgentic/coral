@@ -1,7 +1,7 @@
 /* The agent list's filters and sort on the shared list bar (#4744 stage 3, Search everywhere): State, Board and Machine, a Sort, the count and the chips, under the list's own search box in the
  * sidebar and on the phone's Agents page (one bar each, in step). The search text stays the list's own (agent_filter.js); everything here works on the feed the dashboard already holds. */
 import { buildListBar } from './list_bar.js';
-import { STATES, STATE_LABEL, SORTS, SORT_LABEL, EMPTY, makeModel, comparator } from './agent_list_filters.js';
+import { STATES, STATE_LABEL, SORTS, SORT_LABEL, EMPTY, makeModel, comparator, stateGroup } from './agent_list_filters.js';
 import { getAgentFilter, getListFilters, setListFilters, setListComparator } from './agent_filter.js';
 import { presentationSessionState, resolveSessionIdentity } from './session_state.js';
 import { sessionServer, sessionTeamKey, keyLabel, LOCAL_SERVER } from './server_base.js';
@@ -9,7 +9,7 @@ import { serverLabel } from './launch_server.js';
 import { state } from './state.js';
 import { redrawLiveList } from './list_hooks.js';
 import { syncDisplayPanels, inListHeaders, isDisplayPanelOpen, DISPLAY_PANEL_OPEN } from './display_panel.js';
-import { setData, setHidden, setAttr } from './dom_write.js';
+import { setData, setHidden, setAttr, setText } from './dom_write.js';
 
 const HOSTS = [['agent-list-bar', 'al'], ['mobile-agent-list-bar', 'alm']]; // the sidebar's and the phone's
 const bars = new Map(); // host element -> its bar
@@ -70,8 +70,22 @@ function announceCount() {
 }
 document.addEventListener(DISPLAY_PANEL_OPEN, () => { if (lastArgs) { sigs.clear(); syncAgentListBars(...lastArgs); } });
 
+/** The phone's two chips over the list (#11096): "N need you" and "N working" are counts of the feed and filters of the list (the State filter, pressed while on); a chip with no agent is not drawn. */
+function syncPhoneChips(sessions, f) {
+    const counts = { needs_input: 0, working: 0 };
+    for (const s of sessions) { const g = stateGroup(presentationSessionState(s)); if (g in counts) counts[g]++; }
+    for (const chip of document.querySelectorAll('[data-phone-chip]')) {
+        const key = chip.dataset.phoneChip, n = counts[key], on = f.state === key;
+        setHidden(chip, !n && !on);
+        setText(chip, key === 'needs_input' ? `${n} need you` : `${n} working`);
+        setAttr(chip, 'aria-pressed', String(on));
+    }
+}
+export function toggleStateChip(key) { const f = getListFilters(); setListFilters({ ...f, state: f.state === key ? '' : key }); redrawLiveList(); }
+
 export function syncAgentListBars(sessions, matched) {
     lastArgs = [sessions, matched];
+    syncPhoneChips(sessions, getListFilters());
     const boards = [...new Set(sessions.map(s => sessionTeamKey(s)).filter(Boolean))].sort((a, b) => keyLabel(a).localeCompare(keyLabel(b)));
     const machines = [...new Set(sessions.map(s => sessionServer(s)))];
     const f = getListFilters();

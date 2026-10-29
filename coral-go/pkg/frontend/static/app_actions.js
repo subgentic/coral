@@ -174,6 +174,7 @@ registerActions({
     'agent-search-key': (el, event) => window.agentSearchKey(event),
     'groups-toggle-all': el => { const kind = el.closest('.sidebar-pane')?.dataset.pane; if (kind && kind !== 'agents') toggleAllGroupFolds(kind); else toggleAllGroups(); }, // each tab's header folds its own groups (#7443)
     'display-panel-toggle': el => toggleDisplayPanel(el),
+    'phone-home-filter': el => { importOnce('./agent_list_bar.js').then(m => m.toggleStateChip(el.dataset.phoneChip)); }, // the phone Agents page's chips (#11096)
     'display-panel-key': (el, event) => displayPanelKey(event),
     'toggle-show-server': () => window.toggleShowServer(),
     'toggle-row-line': el => window.toggleRowLine(el.dataset.displayInput),

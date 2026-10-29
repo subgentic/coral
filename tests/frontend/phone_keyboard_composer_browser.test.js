@@ -28,6 +28,7 @@ const FAKE_VV = `(() => { const real = window.visualViewport; const t = new Even
         const open = async (h, top) => { await ev(`(() => { const m = document.querySelector('#live-history-messages .chat-bubble:last-child') || [...document.querySelectorAll('.chat-bubble')].pop(); let e = m; while (e && e.scrollHeight <= e.clientHeight + 1) e = e.parentElement; if (e) e.scrollTop = e.scrollHeight; return true; })()`); await ev(`document.getElementById('command-input').focus(); window.__kb(${h}, ${top}); true`); await waitFor(`Math.round(document.body.getBoundingClientRect().height) <= ${h} + 1`, `the page follows a ${h} px viewport`, 4000); };
         for (const [h, top] of [[520, 0], [520, 120]]) { // a keyboard of 324 px; the second as Android scrolls the visual viewport to the caret
             await open(h, top);
+            await waitFor(`(() => { const bs = [...document.querySelectorAll('.chat-bubble')]; const m = bs[bs.length - 1]; if (!m) return false; let e = m; while (e && e.scrollHeight <= e.clientHeight + 1) e = e.parentElement; if (e) e.scrollTop = e.scrollHeight; return m.getBoundingClientRect().bottom <= document.getElementById('command-pane').getBoundingClientRect().top + 1; })()`, `${h}/${top}: the last message is above the composer`, 4000);
             g = await geo();
             const inside = b => b && b.t >= g.visible[0] - 1 && b.b <= g.visible[1] + 1;
             assert.ok(inside(g.pane), `${h}/${top}: the whole composer is inside the visible viewport: ` + JSON.stringify(g));

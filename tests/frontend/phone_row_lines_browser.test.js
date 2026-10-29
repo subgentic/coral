@@ -22,9 +22,9 @@ const { connect } = require('./agent_view_harness');
             return ev(`(() => { const rows = [...document.querySelectorAll('#mobile-session-list .session-group-item')]; const de = document.documentElement;
                 const left = e => e ? Math.round(e.getBoundingClientRect().left * 10) / 10 : null;
                 const textLeft = e => { if (!e) return null; const r = document.createRange(); r.selectNodeContents(e); const b = r.getClientRects()[0]; return b ? Math.round(b.left * 10) / 10 : null; };
-                return { rows: rows.map(li => { const info = li.querySelector('.session-info'), s = li.querySelector('.session-line2'), m = li.querySelector('.session-model'), name = li.querySelector('.session-label-name') || li.querySelector('.session-label');
+                return { rows: rows.map(li => { const info = li.querySelector('.session-info'), s = li.querySelector('.session-preview'), m = li.querySelector('.session-model'), name = li.querySelector('.session-label-name') || li.querySelector('.session-label');
                     const ss = s && getComputedStyle(s), cs = getComputedStyle(info, '::after'), lr = li.getBoundingClientRect(), sr = s && s.getBoundingClientRect();
-                    return { name: textLeft(name), summary: textLeft(s), model: textLeft(m), statusMargin: cs.marginLeft, infoLeft: left(info), nameBoxLeft: left(name), overflow: ss ? ss.textOverflow + '/' + ss.overflow + '/' + ss.whiteSpace : null, summaryFits: sr ? sr.right <= lr.right + 0.5 : null, clipped: s ? s.scrollWidth > s.clientWidth : null, border: getComputedStyle(li).borderBottomWidth + ' ' + getComputedStyle(li, '::after').height, h: Math.round(lr.height) }; }),
+                    return { name: textLeft(name), summary: textLeft(s), model: textLeft(m), statusMargin: cs.marginLeft, infoLeft: left(info), nameBoxLeft: left(name), overflow: ss ? ss.overflow + '/' + ss.webkitLineClamp : null, summaryFits: sr ? sr.right <= lr.right + 0.5 : null, clipped: s ? s.scrollHeight > s.clientHeight : null, border: getComputedStyle(li).borderBottomWidth + ' ' + getComputedStyle(li, '::after').height, h: Math.round(lr.height) }; }),
                     pageH: de.scrollHeight - innerHeight, pageW: de.scrollWidth - innerWidth, bodyScrolls: document.scrollingElement.scrollHeight > innerHeight + 1 }; })()`);
         };
         const off = await draw('false', 'false');
@@ -37,7 +37,7 @@ const { connect } = require('./agent_view_harness');
             if (!r.summaryFits) problems.push(`row ${i}: the summary runs past the row`);
         }
         const long = on.rows[0];
-        if (!/^ellipsis\/hidden\/nowrap$/.test(long.overflow) || !long.clipped) problems.push(`the long summary does not end in an ellipsis inside the row: ${long.overflow}, clipped ${long.clipped}`);
+        if (!/^hidden\/2$/.test(long.overflow) || !long.clipped) problems.push(`the long summary does not end in an ellipsis after two lines inside the card (the preview, #11096): ${long.overflow}, clipped ${long.clipped}`);
         if (on.pageW > 0) problems.push(`the page is ${on.pageW} px wider than the screen`);
         if (on.bodyScrolls && !off.bodyScrolls) problems.push('the page itself scrolls with both lines on (a page scrollbar), it did not with both off');
         for (const [i, r] of on.rows.entries()) if (r.border !== off.rows[i].border) problems.push(`row ${i}: its divider changed with the lines on: ${off.rows[i].border} to ${r.border}`);

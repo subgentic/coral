@@ -2,6 +2,8 @@
 import { getDotClass, resolveSessionIdentity, sessionGoalText, sessionStateInfo, sessionUnreadCount } from './session_state.js';
 import { _saveSessionOrder } from './list_order.js';
 import { MORE_DOTS_SVG, escapeHtml, escapeAttr, agentNameColor } from './utils.js';
+import { getAgentColor } from './agent_colors.js';
+import { _getBoardColor } from './board_accents.js';
 import { autoAcceptChip, autoAcceptMenuItem } from './auto_accept.js';
 import { getCachedAgentAvailability } from './team_availability.js';
 import { isGoneAsleep, isExitedAsleep } from './terminal_gone.js';
@@ -317,6 +319,7 @@ export function _renderSessionItem(s, groupName, isCompact, collapsed, teamDefau
         + (unreadCount > 0 ? `, ${unreadCount} unread` : '')
         + (heldChip ? ', message held' : ''); // the row's one chip says it in words: the name says it too (QA Engineer, #9723)
     const stuckClass = stateInfo.key === 'stuck' ? ' is-stuck' : '';
+    const avatar = avatarOf(s, identity, groupName);
     return `<li class="session-group-item list-row${isActive ? ' active list-row-current' : ''}${compactClass}${collapsedClass}${sleepingClass}${attentionClass}${stuckClass}${staleClass}"
         draggable="${stale ? 'false' : 'true'}"${stale ? ` aria-disabled="true" title="${escapeAttr(staleReason(s))}"` : ''}
         data-state="${escapeAttr(stateInfo.key)}"
@@ -327,15 +330,18 @@ export function _renderSessionItem(s, groupName, isCompact, collapsed, teamDefau
         data-group="${escapeAttr(groupName)}"
         ${clickHandler}>
         <span class="drag-grip" title="Drag to reorder">&#x2630;</span>
+        <span class="session-avatar" aria-hidden="true" style="--avatar:${escapeAttr(avatar.color)}">${escapeHtml(avatar.initial)}</span>
         <div class="session-info">
             <div class="session-name-row">
                 <span class="session-dot ${dotClass}${ctxHigh ? ' ctx-high' : ''}" aria-hidden="true"></span>
                 <span class="session-label list-row-title${nameTail ? ' session-label-split' : ''}"><span class="session-label-name${s.agent_type === 'terminal' ? ' is-terminal' : ''}"${agentNameColor(s) ? ` style="--agent-name-color:${agentNameColor(s)}"` : ''}>${nameTail ? `<span class="sln-head">${escapeHtml(nameHead)}</span><span class="sln-tail">${escapeHtml(nameTail)}</span>` : escapeHtml(displayLabel)}</span>${nameTail ? `<span class="session-label-tags">${reminderTag}${typeTag}${dirChip}</span>` : `${reminderTag}${typeTag}${dirChip}`}</span>${autoAcceptChip(s)}${terminalGoneChip(s)}${hooksMissingChip(s)}
                 <span class="session-name-spacer"></span>
+                <span class="session-time" aria-hidden="true">${escapeHtml(_shortAgo(s.staleness_seconds))}</span>
                 ${stale ? '' : waitingBadge + heldChip + sleepChip + wakeBtn}
                 ${stale ? '' : kebabMenu}
             </div>
             <span class="session-status-line">${escapeHtml(stateInfo.label)}</span>
+            <span class="session-preview" aria-hidden="true">${escapeHtml(sessionGoalText(s) || 'No messages yet')}</span>
             ${rowLinesHtml(s)}
         </div>
         <div class="session-tooltip"></div>
@@ -405,6 +411,13 @@ export function isRowLineShown(part) {
 export function setRowLineShown(part, on) {
     try { browserLocal.set(ROW_LINE_KEY[part], on ? 'true' : 'false'); } catch { /* per-viewer only */ }
 }
+/** A phone's card (#11096, the Google Chat look): the avatar's initial and its colour (the team's own colour, else one per team, else one per CLI), the short time since the agent last did anything, and the preview line (the goal summary until the last message is a field of the row). Drawn by the phone's styles only; hidden on every wider screen. */
+const avatarOf = (s, identity, groupName) => {
+    const team = sessionTeamKey(s) || groupName || '';
+    return { color: (team && _getBoardColor(team)) || getAgentColor(team ? `team:${team}` : `cli:${s.agent_type || ''}`), initial: (Array.from(String(identity || '?'))[0] || '?').toUpperCase() };
+};
+const _shortAgo = sec => (sec === null || sec === undefined ? '' : sec < 60 ? 'now' : sec < 3600 ? `${Math.floor(sec / 60)}m` : sec < 86400 ? `${Math.floor(sec / 3600)}h` : `${Math.floor(sec / 86400)}d`);
+
 function rowLinesHtml(s) {
     const line = (cls, text) => text ? `<div class="${cls}">${escapeHtml(text)}</div>` : '';
     return line('session-line2', isRowLineShown('summary') && sessionGoalText(s)) + line('session-model', isRowLineShown('model') && s.agent_type !== 'terminal' && modelName(s.agent_type, s.model, sessionServer(s)));

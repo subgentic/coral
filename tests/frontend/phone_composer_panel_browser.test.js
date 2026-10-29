@@ -17,6 +17,8 @@ const S = `(window.__coralStatic || '/static/')`;
         console.log('1. one side-panel toggle: the agent bar\'s while an agent is on screen');
         await ev(`window.__m.add('pc-a', 'A', 3, { sleeping: false, session_id: 'pc-a-id' }); window.selectLiveSession('pc-a', 'claude', 'pc-a-id', 'local'); true`);
         await waitFor(`document.querySelector('#mobile-send-btn')?.getClientRects().length > 0`, 'the agent view', 10000);
+        await ev(`document.getElementById('agent-bar-more').click(); true`); // under 640 px the panel toggle is on the line under the row, behind ⋯ (#11056)
+        await waitFor(`document.getElementById('popout-panel-toggle-btn').getBoundingClientRect().width > 0`, 'the toggle under the row', 4000);
         assert.equal(await shown('#popout-panel-toggle-btn'), true, 'the agent bar has the toggle');
         assert.equal(await shown('#panel-toggle-btn'), false, 'and the top bar\'s is gone');
         const toggles = await ev(`[...document.querySelectorAll('#panel-toggle-btn, #popout-panel-toggle-btn, .session-panel-toggle-btn')].filter(e => e.getClientRects().length > 0).length`);

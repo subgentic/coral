@@ -1348,3 +1348,54 @@
     body.live-session-active:not(.popout-mode) #popout-panel-toggle-btn { display: none !important; } /* its id sets display: flex !important (above) */
     body.live-session-active:not(.popout-mode) .terminal-header[data-more] #popout-panel-toggle-btn { display: flex !important; order: 5; }
 }
+
+/* ── The phone's Agents page in Google Chat's style (#11096, slice A; the operator: "for the mobile ui, let's go more Google chat") ───────────────────────────────────────────────────────────────────────
+   Under 601 px the page's top bar is the list header's first row: the menu button, a round search pill and the account button; then the title with two chips ("N need you", "N working"); then the agents as cards: a round
+   avatar (the team's colour, the agent's initial) with the state as a dot on its corner, the name, the short time at the right and a two-line preview (the goal until the last message is a field of the row). No borders, soft
+   surfaces. Wider screens keep the sidebar's row (the avatar, the time and the preview are drawn by this block only). */
+.session-avatar, .session-time, .session-preview, .phone-menu-btn, .phone-account-btn, .phone-break, .phone-chips { display: none; }
+@media (max-width: 300px) { body.live-session-active:not(.popout-mode) .terminal-header { flex-wrap: wrap; } } /* a phone at 200% zoom is 195 px wide: the row wraps before ⋯ is cut off (phone_layout) */
+@media (max-width: 600px) {
+    body.agent-home-active header.top-bar { display: none; }
+    body.agent-home-active { --top-bar-height: env(safe-area-inset-top, 0px); }
+    #mobile-agent-list .mobile-list-header { padding: calc(8px + env(safe-area-inset-top, 0px)) 8px 4px; gap: 4px 8px; flex-wrap: wrap; justify-content: flex-start; align-items: center; }
+    #mobile-agent-list .phone-menu-btn, #mobile-agent-list .phone-account-btn { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 44px; height: 44px; min-width: 44px; padding: 0; border-radius: 50%; }
+    #mobile-agent-list .phone-menu-btn { order: 0; }
+    #mobile-agent-list .mobile-search-row { order: 1; flex: 1 1 0; min-width: 0; }
+    #mobile-agent-list .phone-account-btn { order: 2; border: 0; background: none; color: var(--text-secondary); cursor: pointer; }
+    #mobile-agent-list .phone-account-btn .material-icons { font-size: var(--icon-size); }
+    #mobile-agent-list .phone-break { order: 3; display: block; flex: 0 0 100%; height: 0; }
+    #mobile-agent-list .mobile-list-header .mobile-search-input { height: 48px; border-radius: 24px; border: 0; background: var(--bg-secondary); padding: 0 18px; font-size: var(--fs-lg); }
+    #mobile-agent-list .mobile-list-title { order: 4; font-size: var(--fs-2xl); font-weight: var(--fw-regular); margin: 0 auto 0 8px; }
+    #mobile-agent-list .phone-chips { order: 5; display: flex; gap: 8px; flex: 0 1 auto; min-width: 0; }
+    #mobile-agent-list .phone-chip { min-height: 44px; height: auto; padding: 0 14px; border: 0; border-radius: 18px; background: var(--bg-hover); color: var(--text-primary); font-size: var(--fs-md); white-space: nowrap; cursor: pointer; }
+    #mobile-agent-list .phone-chip[hidden] { display: none; }
+    #mobile-agent-list .phone-chip-need { background: rgba(var(--fx-yellow-rgb), 0.18); color: var(--warning); }
+    #mobile-agent-list .phone-chip[aria-pressed="true"] { box-shadow: inset 0 0 0 2px currentColor; }
+    #mobile-agent-list .mobile-list-header > .btn-small, #mobile-agent-list .mobile-list-header > .sidebar-collapse-btn { order: 7; }
+    #mobile-agent-list .mobile-list-header > .sidebar-collapse-btn[data-display-button] { order: 6; margin-left: auto; } /* Display options, the groups' toggle and New share the line under the title, at its right */
+
+    /* the cards */
+    #mobile-session-list { padding: 0 8px 96px; }
+    #mobile-session-list .session-group-item, #mobile-session-list > .session-group-item {
+        position: relative; display: grid; grid-template-columns: 48px minmax(0, 1fr); column-gap: 12px; align-items: start;
+        margin: 0 0 3px; padding: 14px 12px !important; min-height: 76px; border: 0; border-radius: 14px; background: var(--bg-secondary); box-shadow: none;
+    }
+    #mobile-session-list .session-group-item.active { background: var(--bg-hover); box-shadow: none; }
+    #mobile-session-list .session-avatar { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 50%; background: color-mix(in srgb, var(--avatar, var(--accent)) 62%, rgb(var(--black-rgb))); color: var(--text-on-accent); font-size: var(--fs-xl); font-weight: var(--fw-medium); }
+    #mobile-session-list .session-info { min-width: 0; }
+    #mobile-session-list .session-dot { position: absolute; left: 46px; top: 48px; width: 16px; height: 16px; margin: 0; border: 3px solid var(--bg-secondary); box-sizing: border-box; }
+    #mobile-session-list .session-name-row { display: flex; align-items: baseline; gap: 8px; min-height: 0; }
+    #mobile-session-list .session-label { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: var(--fs-xl); font-weight: var(--fw-regular); }
+    #mobile-session-list .session-label-name, #mobile-session-list .session-label .sln-head, #mobile-session-list .session-label .sln-tail { color: var(--agent-name-color, var(--text-primary)); font-weight: inherit; } /* the name in the card's ink, bold when the agent needs you */
+    #mobile-session-list .session-name-spacer { display: none; }
+    #mobile-session-list .session-time { display: block; flex: none; font-size: var(--fs-md); color: var(--text-secondary); white-space: nowrap; }
+    #mobile-session-list .session-status-line { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); margin: 0; } /* still text for a screen reader and find-in-page: the dot and the preview are what the card shows */
+    #mobile-session-list .session-preview { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-top: 2px; padding-right: 28px; font-size: var(--fs-lg); color: var(--text-secondary); overflow-wrap: anywhere; }
+    #mobile-session-list .session-line2 { display: none; } /* the preview is the summary here */
+    #mobile-session-list .session-model { margin-left: 0; padding-left: 0; font-size: var(--fs-md); }
+    #mobile-session-list .session-group-item.needs-attention .session-label { font-weight: var(--fw-strong); }
+    #mobile-session-list .session-group-item.needs-attention .session-preview { color: var(--text-primary); }
+    #mobile-session-list .session-group-item.needs-attention .session-time { color: var(--accent); font-weight: var(--fw-medium); }
+    #mobile-session-list .session-group-item .sidebar-kebab-wrapper { position: absolute; right: 2px; bottom: 2px; }
+}

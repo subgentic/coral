@@ -20,7 +20,7 @@ const { connect } = require('./agent_view_harness');
     ];
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
-        for (const [label, w, h, mobile, root, rowH] of [['1280', 1280, 800, false, '#live-sessions-list', [34, 38]], ['390', 390, 844, true, '#mobile-session-list', [55, 57]]]) {
+        for (const [label, w, h, mobile, root, rowH] of [['1280', 1280, 800, false, '#live-sessions-list', [34, 38]], ['390', 390, 844, true, '#mobile-session-list', [72, 100]]]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
             await ev(`(async () => { T.state.liveSessions = ${JSON.stringify(ROWS)}; T.render.renderLiveSessions(T.state.liveSessions); return true; })()`);
@@ -35,7 +35,7 @@ const { connect } = require('./agent_view_harness');
             }
             const by = id => rows.find(r => r.id === id);
             for (const r of rows) {
-                assert.ok(r.h >= rowH[0] && r.h <= rowH[1], `${label}: ${r.id} is one line, ${rowH[0]} to ${rowH[1]} px (${r.h}) ${JSON.stringify(r)}`);
+                assert.ok(r.h >= rowH[0] && r.h <= rowH[1], `${label}: ${r.id} is one row (a card on a phone, #11096), ${rowH[0]} to ${rowH[1]} px (${r.h}) ${JSON.stringify(r)}`);
                 assert.deepEqual(r.extra, [], `${label}: ${r.id} has no goal, model, branch, held or phone-card line ${JSON.stringify(r)}`);
                 assert.ok(r.dot && r.chips.length <= (mobile ? 0 : 1), `${label}: ${r.id} is a dot, a name and at most one chip ${JSON.stringify(r)}`);
                 assert.ok([400, 600].includes(Number(r.weight)), `${label}: the name is the sidebar row style, 400 (600 on the current agent), nothing bolder (${r.weight}; #9926)`);
