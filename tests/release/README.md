@@ -86,3 +86,8 @@ Items: 1 download (sha256 against `SHA256SUMS.txt`, every program of `commands.t
 then, only with `--throwaway-machine` or on a GitHub-hosted runner: 5 apply (the person's request installs TO and Coral comes back from its run record), 6 install (`coral --version`, `coral-update` and every
 program byte for byte TO's own tarball), 7 tmux (the agent's session and pane process survive), 8 settled. Needs Linux (amd64 or arm64), curl, python3, tar and sha256sum, and go or `PERSON_CALL=` a built
 `internal/updater/testrig/cmd/person-call`. Run once on an arm64 VM: v2.0.0 to itself (items 1 to 3, 4 to 8 skipped as designed) and v1.4.168 to v2.0.0 (all eight PASS).
+
+
+## msi_version_test.ps1: the version the MSI carries
+
+`powershell -NoProfile -ExecutionPolicy Bypass -File tests/release/msi_version_test.ps1` is a unit test of `ConvertTo-MsiVersion` in `tools/msi_version.ps1` (#365): the MSI's ProductVersion is the three numbers at the front of the tag (`1.4.167-rc1`, `1.4.167-dev` and `1.4.167` all carry `1.4.167`; `0.0.0-ci` carries `0.0.0`), and anything that is not X.Y.Z with an optional `-suffix` or `+suffix`, or does not fit Windows Installer's limits (major and minor to 255, build to 65535), is refused. It needs no msiexec, no build and no installed Coral.
