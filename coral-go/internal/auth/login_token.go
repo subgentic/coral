@@ -214,6 +214,7 @@ func (ks *KeyStore) handleLoginToken(w http.ResponseWriter, r *http.Request) boo
 	q := r.URL.Query()
 	q.Del(LoginTokenParam)
 	q.Del(AppClientParam)
+	q.Del(linkRetryParam)
 	target := (&url.URL{Path: r.URL.Path, RawPath: r.URL.RawPath, RawQuery: q.Encode()}).String()
 	// One leading "/": "//host/..." (or "/\host", which browsers read the same) would be
 	// another host (Security, #3532).
