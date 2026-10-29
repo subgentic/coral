@@ -136,6 +136,11 @@ func adoptAfterLaunch(session string, findShell func(context.Context) (int, erro
 }
 
 // agentOption is the tmux session option the recorded process is kept in, "<pid> <start>".
+//
+// It is NOT authentication. A program inside the pane (or anything the same user runs) can set it, as it can type into the pane itself. What it can do is name one process, and that
+// only matters when the process is the pane's current foreground program: the check (decideNotice) compares the named pid and start time with what the pane runs now, so naming
+// another program of the pane makes Coral type notices into a program that is already in the pane's foreground, which gains nothing over typing into it. It cannot make Coral type
+// into another pane, and it cannot make a hand-started program an agent unless that program is the pane's only foreground program at that moment.
 const agentOption = "@coral_agent"
 
 func (c *Client) persistAgentProc(ctx context.Context, session string, p AgentProc) {
