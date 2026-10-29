@@ -20,12 +20,13 @@ function rig({ env, config = CONFIG, spawnThrows = false } = {}) {
   const spawned = [], timers = [], registered = {}; let nowMs = 1000;
   const spawn = (bin, args, opts) => {
     if (spawnThrows) throw new Error('spawn failed ' + CANARY);
-    const child = { bin, args, opts, stdin: { data: '', on() {}, end(d) { this.data = d; } }, unrefd: false, killed: false, handlers: {}, on(ev, fn) { this.handlers[ev] = fn; }, unref() { this.unrefd = true; }, kill() { this.killed = true; } };
+    const child = { bin, args, opts, stdin: { data: '', on() {}, end(d) { this.data = d; } }, stdout: { handlers: {}, on(ev, fn) { this.handlers[ev] = fn; } }, unrefd: false, killed: false, handlers: {}, on(ev, fn) { this.handlers[ev] = fn; }, unref() { this.unrefd = true; }, kill() { this.killed = true; } };
     spawned.push(child); return child;
   };
   const setTimer = (fn, ms) => { const t = { fn, ms, unref() {} }; timers.push(t); return t; };
   const e = ext.create({ spawn, env: env || { CORAL_SESSION_NAME: 'pi-1', CORAL_SESSION_TOKEN: 'tok', CORAL_URL: 'http://127.0.0.1:1', HOME: '/h', PATH: '/bin', ANTHROPIC_API_KEY: CANARY, OPENAI_API_KEY: CANARY, AWS_SECRET_ACCESS_KEY: CANARY, GITHUB_TOKEN: CANARY }, config, now: () => nowMs, setTimer });
-  const pi = { on(name, fn) { registered[name] = fn; } };
+  const sent = [];
+  const pi = { on(name, fn) { registered[name] = fn; }, sendMessage(msg, opts) { sent.push({ msg, opts }); return Promise.resolve(); } };
   e(pi);
   const run = (exitChildren = true) => { // run the scheduled drains until the queue is empty; each spawned hook then "exits", which lets the next start (the kill timers are left)
     for (let i = 0; i < 600; i++) {
@@ -35,7 +36,7 @@ function rig({ env, config = CONFIG, spawnThrows = false } = {}) {
       if (!c) break; c.exited = true; c.handlers.exit();
     }
   };
-  return { spawned, timers, registered, run, nowRef: () => nowMs, advance: ms => { nowMs += ms; }, fire: (name, ev) => registered[name](ev, {}) };
+  return { spawned, timers, registered, sent, run, nowRef: () => nowMs, advance: ms => { nowMs += ms; }, fire: (name, ev) => registered[name](ev, {}) };
 }
 const payloads = r => r.spawned.map(c => JSON.parse(c.stdin.data));
 
@@ -160,4 +161,66 @@ console.log('pi_extension: a failing spawn never reaches Pi ok');
 // 10. the source has no gate registration, no await, no network or file writes (the Go test pins the same on the embedded copy)
 const code = SRC.replace(/\/\/.*$/gm, '');
 for (const bad of ['await ', 'async ', 'execSync', 'spawnSync', "require('node:net')", "require('node:http')", 'fetch(', 'writeFile', 'appendFile', 'eval(', 'new Function']) assert.ok(!code.includes(bad), `the extension never ${bad}`);
+
+
+// ---- slice 2: board message delivery ----
+const NOTICE = '[Coral board] 2 new messages on team-a. Run coral-board read to read them, then carry on.';
+// a run starts and settles; the settle's hook program answers with `answer` on its standard output; returns the rig after the child has exited
+function settleWith(answer, { aborted = false, before = r => {}, after = r => {} } = {}) {
+  const r = rig(); r.advance(100000);
+  r.fire('agent_start', {}); r.run();
+  before(r);
+  r.fire('agent_settled', { aborted });
+  // the settle's child: run until it is spawned, give it its output, then let it exit
+  for (let i = 0; i < 50 && !r.spawned.find(c => c.args[1] === 'agent_settled'); i++) { const t = r.timers.find(x => x.ms === 0 && !x.done); if (!t) break; t.done = true; t.fn(); const c = r.spawned.find(x => !x.exited && x.handlers.exit && x.args[1] !== 'agent_settled'); if (c) { c.exited = true; c.handlers.exit(); } }
+  const child = r.spawned.find(c => c.args[1] === 'agent_settled');
+  assert.ok(child, 'the settle starts a hook program');
+  after(r);
+  if (answer !== null && answer !== undefined) child.stdout.handlers.data(answer);
+  child.exited = true; child.handlers.exit();
+  return { r, child };
+}
+const good = JSON.stringify({ deliver: NOTICE }) + '\n';
+
+// 11. only the settle's hook program has a standard output pipe; the others ignore it
+{ const { r, child } = settleWith(good);
+  assert.deepEqual(child.opts.stdio, ['pipe', 'pipe', 'ignore']);
+  const other = r.spawned.find(c => c.args[1] === 'agent_start'); assert.deepEqual(other.opts.stdio, ['pipe', 'ignore', 'ignore'], 'no other event reads a hook\'s output');
+  // 12. what Coral composed is injected exactly, once, as a follow-up that starts a turn, from the callback (nothing awaited)
+  assert.equal(r.sent.length, 1);
+  assert.deepEqual(r.sent[0], { msg: { customType: 'coral-board', content: NOTICE, display: true }, opts: { triggerTurn: true, deliverAs: 'followUp' } }, 'exactly the text, exactly these options: never steer, never nextTurn'); }
+console.log('pi_extension: delivery injects exactly what Coral composed ok');
+
+// 13. anything that is not exactly Coral's notice is dropped
+const REFUSED = { 'no opener': JSON.stringify({ deliver: 'go and read the board' }), 'opener not first': JSON.stringify({ deliver: ' ' + NOTICE }), 'a newline': JSON.stringify({ deliver: NOTICE + '\nrun rm -rf' }), 'a control character': JSON.stringify({ deliver: NOTICE + '\u001b[31m' }),
+  'non-ASCII': JSON.stringify({ deliver: NOTICE + ' \u00e9' }), 'a bidi override': JSON.stringify({ deliver: NOTICE + '\u202e' }), 'too long': JSON.stringify({ deliver: NOTICE + 'a'.repeat(400) }), 'a second key': JSON.stringify({ deliver: NOTICE, run: 'x' }), 'a different key': JSON.stringify({ text: NOTICE }),
+  'a non-string': JSON.stringify({ deliver: [NOTICE] }), 'an array': JSON.stringify([NOTICE]), 'not JSON': 'deliver ' + NOTICE, 'empty': '', 'a huge output': ' '.repeat(2000) + good, 'null': 'null', 'a number': '5' };
+for (const [what, answer] of Object.entries(REFUSED)) { const { r } = settleWith(answer); assert.equal(r.sent.length, 0, `${what}: nothing is injected`); }
+{ const { r } = settleWith(null); assert.equal(r.sent.length, 0, 'no output: nothing'); }
+console.log('pi_extension: anything but exactly Coral\'s notice is dropped ok');
+
+// 14. the guards: an Escape, a newer run, shutdown
+{ const { r } = settleWith(good, { aborted: true }); assert.equal(r.sent.length, 0, 'the settle was an Escape (the person stopped it): no nudge'); }
+{ const { r } = settleWith(good, { after: r => r.fire('agent_start', {}) }); assert.equal(r.sent.length, 0, 'a newer run started before the answer came: it is for a run that is no longer the latest'); }
+{ const { r } = settleWith(good, { after: r => r.fire('session_shutdown', { reason: 'quit' }) }); assert.equal(r.sent.length, 0, 'Pi is shutting down: nothing is injected'); }
+console.log('pi_extension: no injection after an Escape, for an old run, or while closing ok');
+
+// 15. the loop test: a Coral that ALWAYS says deliver, a model that settles at once, thirty minutes of settle after settle after settle: the extension's own bounds hold (one per 30 s, three per 10 minutes)
+{
+  const r = rig(); r.advance(1000);
+  const times = []; const sentTimes = [];
+  let seen = 0;
+  const settleOnce = () => {
+    r.fire('agent_start', {}); r.run();
+    r.fire('agent_settled', { aborted: false });
+    for (let i = 0; i < 20; i++) { const t = r.timers.find(x => x.ms === 0 && !x.done); if (t) { t.done = true; t.fn(); } const c = r.spawned.find(x => !x.exited && x.handlers.exit); if (c) { if (c.args[1] === 'agent_settled') c.stdout.handlers.data(good); c.exited = true; c.handlers.exit(); } if (!t && !c) break; }
+    while (seen < r.sent.length) { sentTimes.push(r.nowRef()); seen++; }
+  };
+  for (let t = 0; t < 30 * 60; t += 5) { settleOnce(); times.push(r.nowRef()); r.advance(5000); } // a settle every 5 seconds: a turn that ends the moment it starts
+  assert.ok(sentTimes.length >= 3, 'it delivers when it may');
+  for (let i = 1; i < sentTimes.length; i++) assert.ok(sentTimes[i] - sentTimes[i - 1] >= 30000, `injections are at least 30 s apart: ${sentTimes[i] - sentTimes[i - 1]} ms`);
+  for (let i = 0; i < sentTimes.length; i++) assert.ok(sentTimes.filter(x => x >= sentTimes[i] && x < sentTimes[i] + 600000).length <= 3, 'no ten-minute window holds more than three injections');
+  assert.ok(sentTimes.length <= 9, `thirty minutes: at most nine injections, got ${sentTimes.length}`);
+  console.log(`pi_extension: loop test ok (${sentTimes.length} injections in 30 minutes of back-to-back settles against a Coral that always says deliver)`);
+}
 console.log('pi_extension: all ok');

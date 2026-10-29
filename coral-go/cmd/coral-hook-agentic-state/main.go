@@ -120,6 +120,11 @@ func handle(d map[string]any, opts hookArgs, agyModel, agyConversation string) {
 		forwardTokenUsage(base, agentName, sessionID, d)
 	}
 
+	if hookType == "Stop" && opts.piEvent == "Stop" {
+		// A Pi agent's turn has settled (agent_settled, not the Stop a shutdown event carries): ask Coral whether it has board messages to hand over, and say so to the extension on standard output (pi_delivery.go).
+		piHandoff(base, agentName, os.Stdout)
+	}
+
 	hooks.DebugLog(fmt.Sprintf("DONE: agent=%s event_type=%s", agentName, event["event_type"]))
 }
 

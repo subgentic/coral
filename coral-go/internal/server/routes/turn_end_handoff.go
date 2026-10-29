@@ -9,6 +9,7 @@ import (
 	"time"
 
 	at "github.com/subgentic/coral/internal/agenttypes"
+	boardpkg "github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/ptymanager"
 	setreg "github.com/subgentic/coral/internal/settings"
 )
@@ -45,7 +46,7 @@ func (h *SessionsHandler) TurnEndHandoff(w http.ResponseWriter, r *http.Request)
 	}
 	ctx := r.Context()
 	ls, err := h.ss.GetLiveSession(ctx, owner.SessionID)
-	if err != nil || ls == nil || ls.AgentType != at.Claude || ls.BoardName == nil || *ls.BoardName == "" || h.bs == nil {
+	if err != nil || ls == nil || (ls.AgentType != at.Claude && ls.AgentType != at.Pi) || ls.BoardName == nil || *ls.BoardName == "" || h.bs == nil {
 		writeJSON(w, http.StatusOK, none)
 		return
 	}
@@ -93,6 +94,12 @@ func (h *SessionsHandler) TurnEndHandoff(w http.ResponseWriter, r *http.Request)
 		plural = ""
 	}
 	slog.Info("turn-end hand-off: the agent goes on with its board messages", "session", owner.SessionName, "board", board, "unread", unread)
+	if ls.AgentType == at.Pi {
+		// A Pi agent (#11107 slice 2): the same decision (token, board, setting, person-send hold, unread, window, urgency), and a text COMPOSED HERE, with a fixed opener and the board's name through TypedLabel, never a
+		// message's words. Coral's extension passes it on and injects exactly it, or nothing (Pi gives an injected message to the model as a user message: the opener is what marks it).
+		writeJSON(w, http.StatusOK, map[string]any{"handoff": true, "reason": "New board messages", "context": boardpkg.PiBoardNotice(unread, board)})
+		return
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"handoff": true,
 		// Claude shows the reason as "Stop hook error: <reason>" whatever it says

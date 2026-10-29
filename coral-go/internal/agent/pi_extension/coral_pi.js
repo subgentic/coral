@@ -9,6 +9,10 @@
 //   - start anything but the one hook program (an argument array, no shell, the path a JSON string written by Coral), or pass it anything but the variables Coral listed (an allow-list, never Pi's whole environment,
 //     so no provider key reaches a child);
 //   - write a file, open a socket, or load other code.
+// Board messages (slice 2): when a run settles, the hook program asks Coral whether the agent has board messages and writes ONE line of JSON, {"deliver":"<text>"}, to its standard output. The text is COMPOSED BY CORAL
+// (a fixed opener, a count and a board name made fit): this file composes nothing. It checks the text once more (one key, printable ASCII, 300 characters, starts with the opener) and injects exactly it, or nothing, with
+// pi.sendMessage as a follow-up that starts a turn (Pi gives it to the model as a user message, so the opener is what marks it as Coral's). Only for a run that settled normally (not an Escape), only while that run is
+// still the latest, never while Pi is shutting down, and at most one injection every 30 s and three every 10 minutes (the server has its own bounds; this one does not trust it).
 // It does nothing at all when Coral did not launch Pi (no CORAL_SESSION_NAME), or when Coral's configuration is missing.
 
 // Coral replaces the comment below with its configuration (a JSON object: hookBin, envNames) when it writes this file for a launch.
@@ -20,6 +24,12 @@ const QUEUE_MAX = 64;      // events waiting for a spawn: the oldest is dropped 
 const TOOL_EVERY_MS = 250; // at most one tool event a quarter second: a tool call is two spawns otherwise, and Windows is slow to start a process
 const CHILD_MS = 3000;     // a hook that has not ended by then is killed
 const SAFE_NAME = /^[\x20-\x7e]{1,200}$/;
+const NOTICE_OPENER = '[Coral board] ';        // the fixed start of what Coral hands over (board.PiNoticeOpener)
+const NOTICE_MAX = 300;                         // its longest, in characters
+const NOTICE_TEXT = /^[\x20-\x7e]+$/;           // printable ASCII, one line
+const STDOUT_MAX = 1024;                        // what is read of a hook's standard output
+const INJECT_EVERY_MS = 30 * 1000;              // at most one injection this often
+const INJECT_WINDOW_MS = 10 * 60 * 1000, INJECT_PER_WINDOW = 3; // and three in this window
 
 const num = v => (typeof v === 'number' && Number.isFinite(v) && v >= 0 && v < 1e12) ? v : undefined;
 const name = (v, max) => (typeof v === 'string' && SAFE_NAME.test(v)) ? v.slice(0, max) : undefined;
@@ -31,10 +41,14 @@ function create(deps) {
   const queue = []; let sending = false; let lastTool = -Infinity;
   const usage = { input: 0, output: 0, cost: 0, turns: 0, model: undefined, seen: false };
   let running = false; // an agent run has started and not settled
+  let runs = 0;        // how many runs have started: a settle's delivery is for the latest run only
+  let closing = false; // Pi is shutting down
+  let piRef = null;
+  const injected = []; // when each injection was made
 
-  function send(event, payload) {
+  function send(event, payload, more) {
     if (queue.length >= QUEUE_MAX) queue.shift();
-    queue.push({ event, payload });
+    queue.push({ event, payload, ...(more || {}) });
     if (!sending) { sending = true; setTimer(drain, 0); }
   }
   // One hook program at a time, in the order the events happened: independent processes would race (a late "agent started" after "agent settled" would leave the agent Working). Nothing waits for it on Pi's path:
@@ -42,14 +56,33 @@ function create(deps) {
   // is dealt with in ONE hook process (shutdownNow): whatever Stop had not been sent, with its usage, and the session's end, posted by that one program in that order.
   function start(item, then) {
     let finished = false;
-    const next = () => { if (!finished) { finished = true; if (then) then(); } };
+    let out = ''; let outBytes = 0;
+    const next = () => { if (!finished) { finished = true; try { if (item.collect) deliver(item, out); } catch (e) { /* never into Pi */ } if (then) then(); } };
     try {
-      const child = spawn(config.hookBin, ['--pi', item.event, '--hooks-rev', String(config.rev || 1)], { detached: true, stdio: ['pipe', 'ignore', 'ignore'], env: childEnv(), windowsHide: true, shell: false });
+      const child = spawn(config.hookBin, ['--pi', item.event, '--hooks-rev', String(config.rev || 1)], { detached: true, stdio: ['pipe', item.collect ? 'pipe' : 'ignore', 'ignore'], env: childEnv(), windowsHide: true, shell: false });
       child.on('error', next); child.on('exit', next);
+      if (item.collect && child.stdout) { child.stdout.on('error', () => {}); child.stdout.on('data', c => { if (outBytes < STDOUT_MAX) { out += String(c).slice(0, STDOUT_MAX - outBytes); outBytes = out.length; } else { out = ''; outBytes = STDOUT_MAX + 1; } }); }
       if (child.stdin) { child.stdin.on('error', () => {}); child.stdin.end(JSON.stringify(item.payload)); }
       const t = setTimer(() => { try { child.kill(); } catch (e) { /* gone already */ } next(); }, CHILD_MS); if (t && t.unref) t.unref();
       child.unref();
     } catch (e) { /* never into Pi */ next(); }
+  }
+  // What a hook program wrote for a settled run: injected only when it is exactly Coral's notice and every guard holds.
+  function deliver(item, raw) {
+    if (!piRef || closing || item.aborted || item.run !== runs) return; // an Escape, a newer run, or the end: nothing is injected
+    if (!raw || raw.length > STDOUT_MAX) return;
+    let parsed; try { parsed = JSON.parse(raw); } catch (e) { return; }
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return;
+    const keys = Object.keys(parsed);
+    const text = parsed.deliver;
+    if (keys.length !== 1 || keys[0] !== 'deliver' || typeof text !== 'string') return;
+    if (text.length > NOTICE_MAX || !text.startsWith(NOTICE_OPENER) || !NOTICE_TEXT.test(text)) return;
+    const t = now();
+    while (injected.length && t - injected[0] >= INJECT_WINDOW_MS) injected.shift();
+    if (injected.length >= INJECT_PER_WINDOW || (injected.length && t - injected[injected.length - 1] < INJECT_EVERY_MS)) return;
+    injected.push(t);
+    const r = piRef.sendMessage({ customType: 'coral-board', content: text, display: true }, { triggerTurn: true, deliverAs: 'followUp' });
+    if (r && typeof r.catch === 'function') r.catch(() => {});
   }
   function drain() {
     const item = queue.shift();
@@ -81,6 +114,7 @@ function create(deps) {
   // The process ends with the extension: ONE event carries the last of it (a Stop that was not sent yet, with its usage) and the session's end; the program posts Stop, then SessionEnd, in this order, in one process.
   // Everything still queued is superseded by it (display only), except a queued agent_settled, whose payload it takes over.
   const shutdownNow = e => {
+    closing = true;
     let settled = null;
     for (const q of queue) if (q.event === 'agent_settled') settled = q.payload;
     queue.length = 0;
@@ -94,15 +128,16 @@ function create(deps) {
   };
   const handlers = {
     session_start: e => send('session_start', { reason: name(e && e.reason, 20) }),
-    agent_start: () => { running = true; send('agent_start', {}); },
+    agent_start: () => { running = true; runs += 1; send('agent_start', {}); },
     tool_execution_start: e => tool('tool_execution_start', e, {}),
     tool_execution_end: e => tool('tool_execution_end', e, { is_error: !!(e && e.isError) }),
     agent_end: e => noteUsage(e),
-    agent_settled: e => { running = false; send('agent_settled', settledPayload(e)); },
+    agent_settled: e => { running = false; const p = settledPayload(e); send('agent_settled', p, { collect: true, run: runs, aborted: p.aborted }); },
     session_shutdown: e => shutdownNow(e),
   };
   return function register(pi) {
     if (!active) return;
+    piRef = pi;
     for (const ev of EVENTS) {
       try { pi.on(ev, (event) => { try { handlers[ev](event); } catch (e) { /* never into Pi */ } return undefined; }); } catch (e) { /* an event this Pi does not know */ }
     }
