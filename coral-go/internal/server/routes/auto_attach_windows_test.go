@@ -4,13 +4,14 @@ package routes
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/subgentic/coral/internal/consoletest"
 )
 
 // #3615: auto-attach's weak sites W7, W8 and W9 (#3598, #3601), run on Windows.
@@ -18,7 +19,7 @@ import (
 // mklinkJ makes a directory junction link -> target (no privilege needed, unlike a symlink).
 func mklinkJ(t *testing.T, link, target string) {
 	t.Helper()
-	out, err := exec.Command("cmd", "/c", "mklink", "/J", link, target).CombinedOutput()
+	out, err := consoletest.HiddenCommand("cmd", "/c", "mklink", "/J", link, target).CombinedOutput()
 	require.NoError(t, err, "mklink /J: %s", out)
 }
 

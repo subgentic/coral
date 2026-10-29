@@ -4,12 +4,13 @@ package background
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/subgentic/coral/internal/consoletest"
 )
 
 func fakeGit(t *testing.T) (root string) {
@@ -119,7 +120,7 @@ func TestStepsRunExternalCommandsWithOnlyGitCmdOnPath(t *testing.T) {
 	// System32 follows Git\cmd as on a real machine: its find, sort and timeout must not shadow the POSIX ones.
 	sys32 := filepath.Join(os.Getenv("SystemRoot"), "System32")
 	env := withShellDirs([]string{"PATH=" + filepath.Join(filepath.Dir(filepath.Dir(filepath.Dir(sh))), "cmd") + ";" + sys32}, sh)
-	cmd := exec.Command(sh, "-c", "uname -s && echo hi | cat && find . -maxdepth 0 -name . && printf 'a\nb\n' | sort -r | head -1")
+	cmd := consoletest.HiddenCommand(sh, "-c", "uname -s && echo hi | cat && find . -maxdepth 0 -name . && printf 'a\nb\n' | sort -r | head -1")
 	cmd.Env = env
 	out, err := cmd.CombinedOutput()
 	require.NoError(t, err, string(out))

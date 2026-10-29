@@ -7,6 +7,7 @@ import (
 
 	"go.uber.org/goleak"
 
+	"github.com/subgentic/coral/internal/consoletest"
 	"github.com/subgentic/coral/internal/testleak"
 	"github.com/subgentic/coral/internal/testtemp"
 )
@@ -17,7 +18,7 @@ func TestMain(m *testing.M) {
 	os.Setenv("CORAL_BOARD_SEARCH_INDEX", "off")
 	gitQueryTimeout = 2 * time.Minute // a loaded test machine must not turn a slow git start into a failed test (#10713)
 	cleanupTemp := testtemp.Use()     // a private temp, home and data folder for this package (#356)
-	code := m.Run()
+	code := consoletest.Guard(m)
 	// Tests that type through the real input gate leave a send held, so its process-wide retry loop is
 	// asleep (2 s) when a short run ends: stop it before the check.
 	testtemp.Exit(cleanupTemp, testleak.Check(code,

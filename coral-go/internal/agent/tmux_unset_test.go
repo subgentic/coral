@@ -1,13 +1,14 @@
 package agent
 
 import (
-	"os/exec"
 	"runtime"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/subgentic/coral/internal/consoletest"
 )
 
 // #3635 (A): every POSIX launch unsets TMUX and TMUX_PANE, so the agent and the commands it
@@ -23,7 +24,7 @@ func TestLaunchPrefixUnsetsTmux(t *testing.T) {
 	} {
 		pre := coralEnvPrefix(p)
 		assert.Contains(t, pre, "TMUX TMUX_PANE", pre)
-		cmd := exec.Command("/bin/sh", "-c", pre+" env")
+		cmd := consoletest.HiddenCommand("/bin/sh", "-c", pre+" env")
 		cmd.Env = []string{"PATH=/usr/bin:/bin", "TMUX=/private/coral/tmux.sock,123,0", "TMUX_PANE=%3"}
 		out, err := cmd.CombinedOutput()
 		require.NoError(t, err, string(out))

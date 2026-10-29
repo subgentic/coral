@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"testing"
 	"time"
@@ -14,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/subgentic/coral/internal/agent"
+	"github.com/subgentic/coral/internal/consoletest"
 	"github.com/subgentic/coral/internal/logsafe"
 	"github.com/subgentic/coral/internal/ptymanager"
 	"github.com/subgentic/coral/internal/store"
@@ -141,7 +141,7 @@ func exitGitRepo(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
 	for _, args := range [][]string{{"init", "-q", "-b", "main"}, {"-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-q", "--allow-empty", "-m", "first"}} {
-		cmd := exec.Command("git", args...)
+		cmd := consoletest.HiddenCommand("git", args...)
 		cmd.Dir = dir
 		out, err := cmd.CombinedOutput()
 		require.NoError(t, err, string(out))
@@ -244,7 +244,7 @@ func TestRunInARepositoryWithNoCommitsSaysWhatToDo(t *testing.T) {
 	e := newExitEnv(t, "exit-nocommits")
 	e.launch(t, func(context.Context) error { launched = true; return nil })
 	empty := t.TempDir()
-	require.NoError(t, exec.Command("git", "-C", empty, "init", "-q").Run())
+	require.NoError(t, consoletest.HiddenCommand("git", "-C", empty, "init", "-q").Run())
 	e.s.launchAndWatch(e.runID, store.ScheduledJob{AgentType: "claude"}, runConfig{repoPath: empty, createWorktree: true})
 	r := e.run(t)
 	assert.Equal(t, "failed", r.Status)
@@ -263,7 +263,7 @@ func TestRunWorktreeIsKeptWhenTheJobKeepsIt(t *testing.T) {
 	require.Equal(t, "completed", e.run(t).Status)
 	_, err := os.Stat(e.dir)
 	require.NoError(t, err, "the worktree is kept")
-	out, err := exec.Command("git", "-C", repo, "branch", "--list", fmt.Sprintf("coral/job-run-%d", e.runID)).Output()
+	out, err := consoletest.HiddenCommand("git", "-C", repo, "branch", "--list", fmt.Sprintf("coral/job-run-%d", e.runID)).Output()
 	require.NoError(t, err)
 	require.Contains(t, string(out), fmt.Sprintf("coral/job-run-%d", e.runID), "and its branch")
 }
@@ -275,7 +275,7 @@ func TestRunWorktreeInARepositoryNotOnMain(t *testing.T) {
 		e := newExitEnv(t, "exit-notmain-"+base)
 		repo := t.TempDir()
 		for _, args := range [][]string{{"init", "-q", "-b", "master"}, {"-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-q", "--allow-empty", "-m", "first"}} {
-			cmd := exec.Command("git", args...)
+			cmd := consoletest.HiddenCommand("git", args...)
 			cmd.Dir = repo
 			out, err := cmd.CombinedOutput()
 			require.NoError(t, err, string(out))
@@ -298,7 +298,7 @@ func TestRunWorktreeWithUnsavedWorkIsKept(t *testing.T) {
 	})
 	e.s.launchAndWatch(e.runID, store.ScheduledJob{AgentType: "claude"}, runConfig{repoPath: repo, createWorktree: true, cleanupWorktree: true})
 	assert.FileExists(t, filepath.Join(e.dir, "unsaved.txt"), "the work is not deleted")
-	out, err := exec.Command("git", "-C", repo, "branch", "--list", "coral/job-run-*").CombinedOutput()
+	out, err := consoletest.HiddenCommand("git", "-C", repo, "branch", "--list", "coral/job-run-*").CombinedOutput()
 	require.NoError(t, err, string(out))
 	assert.Contains(t, string(out), "coral/job-run-", "its branch stays too")
 }
@@ -332,7 +332,7 @@ func TestRunWithoutAWorktreeNeverRemovesTheJobsOwnCheckout(t *testing.T) {
 	e := newExitEnv(t, "exit-own-checkout")
 	main := exitGitRepo(t)
 	own := filepath.Join(t.TempDir(), "feature")
-	out, err := exec.Command("git", "-C", main, "worktree", "add", "-b", "feature", "--", own, "main").CombinedOutput()
+	out, err := consoletest.HiddenCommand("git", "-C", main, "worktree", "add", "-b", "feature", "--", own, "main").CombinedOutput()
 	require.NoError(t, err, string(out))
 	e.launch(t, func(context.Context) error { return nil })
 	e.s.launchAndWatch(e.runID, store.ScheduledJob{AgentType: "claude"}, runConfig{repoPath: own, createWorktree: false, cleanupWorktree: true})

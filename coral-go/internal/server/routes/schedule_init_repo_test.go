@@ -9,6 +9,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/subgentic/coral/internal/consoletest"
 )
 
 // #10276: a plain folder, or a repository with no commit, is made a repository a job can run in when the person agrees: git init when needed, then one empty first commit.
@@ -18,7 +20,7 @@ func TestInitJobRepoMakesAFolderAJobCanRunIn(t *testing.T) {
 	}
 	srv, _ := scheduleTestServer(t)
 	commits := func(dir string) string {
-		out, _ := exec.Command("git", "-C", dir, "rev-list", "--count", "HEAD").Output()
+		out, _ := consoletest.HiddenCommand("git", "-C", dir, "rev-list", "--count", "HEAD").Output()
 		return strings.TrimSpace(string(out))
 	}
 	job := func(repo string) map[string]any {
@@ -41,7 +43,7 @@ func TestInitJobRepoMakesAFolderAJobCanRunIn(t *testing.T) {
 	assert.Equal(t, http.StatusOK, code, "the job can now be saved: %v", body)
 
 	empty := t.TempDir()
-	require.NoError(t, exec.Command("git", "init", "-q", empty).Run()) // a repository with no commit yet
+	require.NoError(t, consoletest.HiddenCommand("git", "init", "-q", empty).Run()) // a repository with no commit yet
 	code, body = sendJSON(t, http.MethodPost, srv.URL+"/api/scheduled/jobs", job(empty))
 	assert.Equal(t, http.StatusBadRequest, code)
 	assert.Contains(t, body["error"], "has no commit yet")

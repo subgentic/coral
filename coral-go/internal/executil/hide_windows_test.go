@@ -35,7 +35,7 @@ func TestHideHelperProcess(t *testing.T) {
 		fmt.Printf("probe-output window=%v\n", hwnd != 0)
 		os.Exit(0)
 	case "parent-hidden", "parent-plain": // the Coral-like server, with no console
-		cmd := exec.CommandContext(context.Background(), os.Args[0], "-test.run=^TestHideHelperProcess$")
+		cmd := exec.CommandContext(context.Background(), os.Args[0], "-test.run=^TestHideHelperProcess$") // consoletest:allow this is the experiment: the plain child must get the console HideWindow prevents
 		cmd.Env = append(os.Environ(), hideModeEnv+"=probe")
 		if os.Getenv(hideModeEnv) == "parent-hidden" {
 			HideWindow(cmd)
@@ -53,7 +53,7 @@ func TestHideHelperProcess(t *testing.T) {
 // runDetachedParent starts the Coral-like parent with DETACHED_PROCESS and returns the probe's report.
 func runDetachedParent(t *testing.T, mode string) string {
 	t.Helper()
-	cmd := exec.Command(os.Args[0], "-test.run=^TestHideHelperProcess$")
+	cmd := exec.Command(os.Args[0], "-test.run=^TestHideHelperProcess$") // consoletest:allow DETACHED_PROCESS below: the parent has no console and no window
 	cmd.Env = append(os.Environ(), hideModeEnv+"="+mode)
 	cmd.SysProcAttr = &syscall.SysProcAttr{CreationFlags: detachedProcess}
 	done := make(chan struct{})

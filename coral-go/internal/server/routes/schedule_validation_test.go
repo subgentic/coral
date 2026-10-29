@@ -17,6 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/subgentic/coral/internal/config"
+	"github.com/subgentic/coral/internal/consoletest"
 	"github.com/subgentic/coral/internal/store"
 	"github.com/subgentic/coral/internal/store/storetest"
 )
@@ -45,8 +46,8 @@ func gitRepo(t *testing.T) string {
 		t.Skip("git not installed")
 	}
 	dir := t.TempDir()
-	require.NoError(t, exec.Command("git", "init", "-q", "-b", "main", dir).Run())
-	require.NoError(t, exec.Command("git", "-C", dir, "-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-q", "--allow-empty", "-m", "init").Run()) // a job needs a first commit to branch from (#10276)
+	require.NoError(t, consoletest.HiddenCommand("git", "init", "-q", "-b", "main", dir).Run())
+	require.NoError(t, consoletest.HiddenCommand("git", "-C", dir, "-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-q", "--allow-empty", "-m", "init").Run()) // a job needs a first commit to branch from (#10276)
 	return dir
 }
 

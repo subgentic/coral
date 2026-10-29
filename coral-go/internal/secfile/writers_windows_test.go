@@ -4,7 +4,6 @@ package secfile
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -14,6 +13,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/windows"
+
+	"github.com/subgentic/coral/internal/consoletest"
 )
 
 // H5: a folder only an administrator can change (the system folder, as Program Files) has no
@@ -35,7 +36,7 @@ func TestWriters(t *testing.T) {
 	ps := `$d = Get-Item -LiteralPath $env:D; $a = $d.GetAccessControl('Access'); ` +
 		`$r = New-Object Security.AccessControl.FileSystemAccessRule((New-Object Security.Principal.SecurityIdentifier('S-1-1-0')), 'Modify', 'ContainerInherit,ObjectInherit', 'None', 'Allow'); ` +
 		`$a.AddAccessRule($r); $d.SetAccessControl($a)`
-	cmd := exec.Command("powershell.exe", "-NoProfile", "-NonInteractive", "-Command", ps)
+	cmd := consoletest.HiddenCommand("powershell.exe", "-NoProfile", "-NonInteractive", "-Command", ps)
 	cmd.Env = append(os.Environ(), "D="+open)
 	out, err := cmd.CombinedOutput()
 	require.NoError(t, err, "%s", out)
@@ -53,7 +54,7 @@ func grantFolder(t *testing.T, dir, sid, rights, inherit string) {
 	ps := `$d = Get-Item -LiteralPath $env:D; $a = $d.GetAccessControl('Access'); ` +
 		`$r = New-Object Security.AccessControl.FileSystemAccessRule((New-Object Security.Principal.SecurityIdentifier($env:S)), $env:R, $env:I, 'None', 'Allow'); ` +
 		`$a.AddAccessRule($r); $d.SetAccessControl($a)`
-	cmd := exec.Command("powershell.exe", "-NoProfile", "-NonInteractive", "-Command", ps)
+	cmd := consoletest.HiddenCommand("powershell.exe", "-NoProfile", "-NonInteractive", "-Command", ps)
 	cmd.Env = append(os.Environ(), "D="+dir, "S="+sid, "R="+rights, "I="+inherit)
 	out, err := cmd.CombinedOutput()
 	require.NoError(t, err, "%s", out)

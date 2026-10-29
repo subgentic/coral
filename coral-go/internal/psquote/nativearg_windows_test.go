@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/subgentic/coral/internal/consoletest"
 	"github.com/subgentic/coral/internal/testtemp"
 )
 
@@ -97,7 +98,7 @@ func roundTrip(t *testing.T, ps string, program, cases []string) {
 	}
 	file := filepath.Join(t.TempDir(), "args.ps1")
 	require.NoError(t, os.WriteFile(file, []byte(script.String()), 0o600))
-	cmd := exec.Command(ps, "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", file)
+	cmd := consoletest.HiddenCommand(ps, "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", file)
 	cmd.Env = append(os.Environ(), argvEchoEnv+"=1")
 	out, err := cmd.CombinedOutput()
 	require.NoError(t, err, "%s", out)

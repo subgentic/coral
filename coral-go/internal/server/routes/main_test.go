@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/subgentic/coral/internal/consoletest"
 	"github.com/subgentic/coral/internal/secfile/secfiletest"
 	"github.com/subgentic/coral/internal/testleak"
 	"github.com/subgentic/coral/internal/testtemp"
@@ -38,7 +39,7 @@ func TestMain(m *testing.M) {
 	// package's time (#83); and what is in %TEMP% (a foreign ACL entry added by a Codex sandbox, leftovers) can't reach the tests (#28).
 	cleanupTemp := secfiletest.UsePrivateTemp()
 	before := packageArtifactFiles()
-	code := m.Run()
+	code := consoletest.Guard(m)
 	cleanupTemp()
 	// A test whose Config has no data folder writes artifacts and diffs under "artifacts" here,
 	// in the package folder, shared by every test in the run (#3566: the hourly upload cap then

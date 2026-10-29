@@ -3,7 +3,6 @@ package background
 import (
 	"context"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"testing"
 	"time"
@@ -11,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/subgentic/coral/internal/consoletest"
 	"github.com/subgentic/coral/internal/store"
 	"github.com/subgentic/coral/internal/store/storetest"
 )
@@ -23,7 +23,7 @@ func TestGitPollerRecordsTheAuthorAndTheCheckoutsIdentityAsHashes(t *testing.T) 
 	runGit(t, repo, "config", "user.email", "operator@example.invalid")
 	require.NoError(t, os.WriteFile(filepath.Join(repo, "a.txt"), []byte("one\n"), 0o600))
 	runGit(t, repo, "add", ".")
-	cmd := exec.Command("git", "-C", repo, "commit", "-q", "-m", "Pipe | in the subject", "--author=Backend Dev <backend-dev@example.invalid>")
+	cmd := consoletest.HiddenCommand("git", "-C", repo, "commit", "-q", "-m", "Pipe | in the subject", "--author=Backend Dev <backend-dev@example.invalid>")
 	cmd.Env = append(os.Environ(), "GIT_COMMITTER_NAME=Backend Dev", "GIT_COMMITTER_EMAIL=backend-dev@example.invalid")
 	out, err := cmd.CombinedOutput()
 	require.NoError(t, err, string(out))
@@ -65,7 +65,7 @@ func TestAGitSubjectWithTheFieldSeparatorCannotFillTheAuthorFields(t *testing.T)
 	runGit(t, repo, "init", "-q", "-b", "main")
 	require.NoError(t, os.WriteFile(filepath.Join(repo, "a.txt"), []byte("one\n"), 0o600))
 	runGit(t, repo, "add", ".")
-	cmd := exec.Command("git", "-C", repo, "commit", "-q", "-m", "x\x1fForged Author\x1fforged@example.invalid\x1fmore", "--author=Backend Dev <backend-dev@example.invalid>")
+	cmd := consoletest.HiddenCommand("git", "-C", repo, "commit", "-q", "-m", "x\x1fForged Author\x1fforged@example.invalid\x1fmore", "--author=Backend Dev <backend-dev@example.invalid>")
 	cmd.Env = append(os.Environ(), "GIT_COMMITTER_NAME=Backend Dev", "GIT_COMMITTER_EMAIL=backend-dev@example.invalid")
 	out, err := cmd.CombinedOutput()
 	require.NoError(t, err, string(out))

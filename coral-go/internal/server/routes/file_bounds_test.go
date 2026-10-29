@@ -17,6 +17,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/subgentic/coral/internal/consoletest"
 	"github.com/subgentic/coral/internal/gitutil"
 	"github.com/subgentic/coral/internal/linktest"
 	"github.com/subgentic/coral/internal/store"
@@ -55,7 +56,7 @@ func newBoundsEnvLinks(t *testing.T, links bool) *boundsEnv {
 	t.Setenv("USERPROFILE", home) // os.UserHomeDir on Windows
 	t.Setenv("CORAL_PROJECT_ROOTS", "")
 	require.NoError(t, os.MkdirAll(filepath.Join(repo, "app"), 0o755))
-	require.NoError(t, exec.Command("git", "init", "-q", repo).Run())
+	require.NoError(t, consoletest.HiddenCommand("git", "init", "-q", repo).Run())
 	write := func(p, s string) {
 		require.NoError(t, os.MkdirAll(filepath.Dir(p), 0o755))
 		require.NoError(t, os.WriteFile(p, []byte(s), 0o644))
@@ -398,7 +399,7 @@ func TestHomeRootedSessionsAndHistoriesAreRefusedWhenStrict(t *testing.T) {
 	// but the denylist's complement to a strict caller.
 	require.NoError(t, os.WriteFile(filepath.Join(e.home, ".zsh_history"), []byte("export TOKEN=1"), 0o644))
 	require.NoError(t, os.WriteFile(filepath.Join(e.home, "notes.txt"), []byte("my notes"), 0o644))
-	require.NoError(t, exec.Command("git", "init", "-q", e.home).Run())
+	require.NoError(t, consoletest.HiddenCommand("git", "init", "-q", e.home).Run())
 	_, handler, _, ss := func() (*httptest.Server, *SessionsHandler, *mockSessionTerminal, *store.SessionStore) {
 		return setupSessionsTestServer(t)
 	}()
@@ -497,7 +498,7 @@ func TestSensitivePathAgentCredentials(t *testing.T) {
 // A token in a remote URL lives in .git/config; no caller reads or lists the .git directory.
 func TestGitDirectoryIsNeverServed(t *testing.T) {
 	e := newBoundsEnv(t)
-	require.NoError(t, exec.Command("git", "-C", e.repo, "remote", "add", "origin", "https://user:ghp_SECRETTOKEN@github.com/x/y.git").Run())
+	require.NoError(t, consoletest.HiddenCommand("git", "-C", e.repo, "remote", "add", "origin", "https://user:ghp_SECRETTOKEN@github.com/x/y.git").Run())
 	for _, k := range []kind{kindTunnel, kindCurl, kindBearer, kindCrossSite, kindForgedFetch, kindDashboard} {
 		for _, fp := range []string{".git/config", ".GIT/config", ".Git/HEAD", "./.git/config", filepath.Join(e.repo, ".git", "config"), ".git/hooks/pre-commit.sample"} {
 			code, body := e.doAs("GET", fc, url.Values{"filepath": {fp}, "session_id": {"fb-1"}}, "", k)
@@ -580,7 +581,7 @@ func TestSaveFileContentStaysInTheTree(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(hooks, "post-checkout"), []byte("#!/bin/sh\n"), 0o755))
 	linktest.Symlink(t, hooks, filepath.Join(e.repo, "tools-link"))
 	linktest.Symlink(t, filepath.Join(hooks, "post-checkout"), filepath.Join(e.repo, "notes-link"))
-	require.NoError(t, exec.Command("git", "-C", e.repo, "config", "core.hooksPath", "ci/hooks").Run())
+	require.NoError(t, consoletest.HiddenCommand("git", "-C", e.repo, "config", "core.hooksPath", "ci/hooks").Run())
 	for _, fp := range []string{"tools-link/pre-commit", "notes-link", ".GIT/hooks/pre-push", ".Git/config", ".husky/pre-commit", "ci/hooks/pre-commit", "CI/Hooks/pre-commit", "sub/.git"} {
 		assert.Equal(t, 403, put("claude-fb", "fb-1", fp, kindTunnel), fp)
 	}
@@ -605,7 +606,7 @@ func TestDiffRoutesBoundEveryNonDashboardCaller(t *testing.T) {
 	e := newBoundsEnv(t)
 	git := func(args ...string) {
 		t.Helper()
-		cmd := exec.Command("git", append([]string{"-C", e.repo}, args...)...)
+		cmd := consoletest.HiddenCommand("git", append([]string{"-C", e.repo}, args...)...)
 		cmd.Env = append(os.Environ(), "GIT_CONFIG_NOSYSTEM=1", "HOME="+e.home)
 		out, err := cmd.CombinedOutput()
 		require.NoError(t, err, "git %v: %s", args, out)
@@ -661,7 +662,7 @@ func TestCoreWorktreeCannotWidenTheRoot(t *testing.T) {
 	e := newBoundsEnv(t)
 	elsewhere := filepath.Join(e.base, "outdir") // holds inner.txt; unrelated to the session
 	workdir := filepath.Join(e.repo, "app")
-	require.NoError(t, exec.Command("git", "-C", e.repo, "config", "core.worktree", elsewhere).Run())
+	require.NoError(t, consoletest.HiddenCommand("git", "-C", e.repo, "config", "core.worktree", elsewhere).Run())
 	// The precondition: git really does report the unrelated folder.
 	realElsewhere, _ := filepath.EvalSymlinks(elsewhere)
 	got := gitutil.ResolveGitRoot(context.Background(), workdir)
@@ -678,7 +679,7 @@ func TestCoreWorktreeCannotWidenTheRoot(t *testing.T) {
 	assert.NotContains(t, body, "inner")
 
 	// A real parent repository and a child repository still count.
-	require.NoError(t, exec.Command("git", "-C", e.repo, "config", "--unset", "core.worktree").Run())
+	require.NoError(t, consoletest.HiddenCommand("git", "-C", e.repo, "config", "--unset", "core.worktree").Run())
 	realRepo, _ := filepath.EvalSymlinks(e.repo)
 	realRoot, _ := filepath.EvalSymlinks(trustedGitRoot(context.Background(), workdir))
 	assert.Equal(t, realRepo, realRoot, "the repository workdir is in")
@@ -691,12 +692,12 @@ func TestTrustedGitRootNeedsARealRepository(t *testing.T) {
 	e := newBoundsEnv(t)
 	workdir := filepath.Join(e.repo, "app")
 	// e.base holds the repository and other folders, and has no .git of its own.
-	require.NoError(t, exec.Command("git", "-C", e.repo, "config", "core.worktree", e.base).Run())
+	require.NoError(t, consoletest.HiddenCommand("git", "-C", e.repo, "config", "core.worktree", e.base).Run())
 	realBase, _ := filepath.EvalSymlinks(e.base)
 	gotGit, _ := filepath.EvalSymlinks(gitutil.ResolveGitRoot(context.Background(), workdir))
 	require.Equal(t, realBase, gotGit, "git reports the forged parent")
 	assert.Equal(t, workdir, trustedGitRoot(context.Background(), workdir), "a parent that isn't a repository falls back to the workdir")
-	require.NoError(t, exec.Command("git", "-C", e.repo, "config", "--unset", "core.worktree").Run())
+	require.NoError(t, consoletest.HiddenCommand("git", "-C", e.repo, "config", "--unset", "core.worktree").Run())
 
 	// A real parent repository (its own .git folder) still counts.
 	realRepo, _ := filepath.EvalSymlinks(e.repo)
@@ -706,7 +707,7 @@ func TestTrustedGitRootNeedsARealRepository(t *testing.T) {
 	// A worktree, whose .git is a gitdir FILE, still counts.
 	run := func(args ...string) {
 		t.Helper()
-		cmd := exec.Command("git", append([]string{"-C", e.repo}, args...)...)
+		cmd := consoletest.HiddenCommand("git", append([]string{"-C", e.repo}, args...)...)
 		cmd.Env = append(os.Environ(), "GIT_CONFIG_NOSYSTEM=1", "HOME="+e.home, "GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@example.invalid", "GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@example.invalid")
 		out, err := cmd.CombinedOutput()
 		require.NoError(t, err, "git %v: %s", args, out)

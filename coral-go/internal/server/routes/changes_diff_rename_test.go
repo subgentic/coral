@@ -2,12 +2,13 @@ package routes
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/subgentic/coral/internal/consoletest"
 )
 
 // QA, #3555 review: a tracked secret file renamed to an ordinary name, with an edit,
@@ -15,7 +16,7 @@ import (
 func TestQARenameFromHiddenPath(t *testing.T) {
 	dir := t.TempDir()
 	run := func(args ...string) {
-		cmd := exec.Command("git", append([]string{"-C", dir, "-c", "user.email=qa@example.test", "-c", "user.name=qa"}, args...)...)
+		cmd := consoletest.HiddenCommand("git", append([]string{"-C", dir, "-c", "user.email=qa@example.test", "-c", "user.name=qa"}, args...)...)
 		out, err := cmd.CombinedOutput()
 		require.NoError(t, err, string(out))
 	}
@@ -31,7 +32,7 @@ func TestQARenameFromHiddenPath(t *testing.T) {
 	run("mv", ".env", "config.txt")
 	lines[10] = "API_TOKEN_LINE_K=changed"
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "config.txt"), []byte(strings.Join(lines, "\n")+"\n"), 0o644))
-	out, err := exec.Command("git", "-C", dir, "diff", "--binary", "HEAD", "--").Output()
+	out, err := consoletest.HiddenCommand("git", "-C", dir, "diff", "--binary", "HEAD", "--").Output()
 	require.NoError(t, err)
 	t.Logf("raw diff header: %q", strings.SplitN(string(out), "\n", 5)[:4])
 	got := string(filterPatch(out))

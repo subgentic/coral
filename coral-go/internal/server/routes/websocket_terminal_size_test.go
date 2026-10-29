@@ -2,7 +2,6 @@ package routes
 
 import (
 	"fmt"
-	"os/exec"
 	"strings"
 	"testing"
 	"time"
@@ -10,12 +9,14 @@ import (
 	"github.com/coder/websocket"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/subgentic/coral/internal/consoletest"
 )
 
 // tmuxPaneSize reads the pane's size straight from tmux on the test socket.
 func tmuxPaneSize(t *testing.T, socket, name string) (int, int) {
 	t.Helper()
-	out, err := exec.Command("tmux", "-S", socket, "display-message", "-p", "-t", "="+name+":", "#{pane_width} #{pane_height}").Output()
+	out, err := consoletest.HiddenCommand("tmux", "-S", socket, "display-message", "-p", "-t", "="+name+":", "#{pane_width} #{pane_height}").Output()
 	require.NoError(t, err)
 	var cols, rows int
 	_, err = fmt.Sscanf(strings.TrimSpace(string(out)), "%d %d", &cols, &rows)
@@ -67,7 +68,7 @@ func TestWSTerminal_ReportsThePaneSize(t *testing.T) {
 	assert.Equal(t, [2]int{97, 31}, [2]int{cols, rows}, "tmux has the size")
 
 	// A resize made elsewhere is reported too (checked every terminalSizeEvery).
-	require.NoError(t, exec.Command("tmux", "-S", client.SocketPath, "resize-window", "-t", "="+tmuxName+":", "-x", "143", "-y", "37").Run())
+	require.NoError(t, consoletest.HiddenCommand("tmux", "-S", client.SocketPath, "resize-window", "-t", "="+tmuxName+":", "-x", "143", "-y", "37").Run())
 	other := readWSFrame(t, ctx, conn, terminalSizeEvery+4*time.Second, sizeFrame(143, 37))
 	require.NotNil(t, other, "a resize by another client reaches this viewer")
 	assert.Nil(t, other["seq"], "a change made elsewhere answers nothing")
@@ -106,7 +107,7 @@ func TestWSTerminal_FirstSizeIsFreshAfterAResizeElsewhere(t *testing.T) {
 	tmuxName := spawnTestSession(t, backend, "size-fresh", "d0e1f2a3-1111-4222-8333-444455556666", "")
 	_, _, err := backend.PaneSize(tmuxName) // the shared pane list now has the old size
 	require.NoError(t, err)
-	require.NoError(t, exec.Command("tmux", "-S", client.SocketPath, "resize-window", "-t", "="+tmuxName+":", "-x", "91", "-y", "29").Run())
+	require.NoError(t, consoletest.HiddenCommand("tmux", "-S", client.SocketPath, "resize-window", "-t", "="+tmuxName+":", "-x", "91", "-y", "29").Run())
 
 	conn, ctx, cancel := dialTerminalWS(t, server, tmuxName)
 	defer cancel()

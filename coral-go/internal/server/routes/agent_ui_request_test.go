@@ -18,6 +18,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/require"
 	"github.com/subgentic/coral/internal/config"
+	"github.com/subgentic/coral/internal/consoletest"
 	"github.com/subgentic/coral/internal/naming"
 	"github.com/subgentic/coral/internal/ptymanager"
 	"github.com/subgentic/coral/internal/store"
@@ -186,7 +187,7 @@ console.log(JSON.stringify({ coral: ctx.isCoralNudge(msg), health: ctx.isCoralHe
 	// The classifier moved out of live_chat.js with the pending messages (#3837); its functions are exports there.
 	chat, err := filepath.Abs("../../../pkg/frontend/static/pending_messages.js")
 	require.NoError(t, err)
-	out, err := exec.Command(node, "-e", script, chat, msgPath).CombinedOutput()
+	out, err := consoletest.HiddenCommand(node, "-e", script, chat, msgPath).CombinedOutput()
 	require.NoError(t, err, string(out))
 	var got struct{ Coral, Health, PlainUser bool }
 	require.NoError(t, json.Unmarshal(bytes.TrimSpace(out), &got), string(out))

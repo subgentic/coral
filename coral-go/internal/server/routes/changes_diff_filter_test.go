@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -19,6 +18,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/subgentic/coral/internal/board/boardtest"
+	"github.com/subgentic/coral/internal/consoletest"
 	"github.com/subgentic/coral/internal/secfile/secfiletest"
 )
 
@@ -70,7 +70,7 @@ func diffRepo(t *testing.T) string {
 	repo, err := filepath.EvalSymlinks(t.TempDir())
 	require.NoError(t, err)
 	run := func(args ...string) {
-		cmd := exec.Command("git", append([]string{"-C", repo}, args...)...)
+		cmd := consoletest.HiddenCommand("git", append([]string{"-C", repo}, args...)...)
 		cmd.Env = append(os.Environ(), "GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@example.test", "GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@example.test")
 		out, err := cmd.CombinedOutput()
 		require.NoError(t, err, string(out))
@@ -143,9 +143,9 @@ func TestGeneratePersistedDiffCap(t *testing.T) {
 	for i := 0; i < 45; i++ {
 		require.NoError(t, os.WriteFile(filepath.Join(repo, fmt.Sprintf("f%02d.txt", i)), []byte("start\n"), 0o644))
 	}
-	cmd := exec.Command("git", "-C", repo, "add", ".")
+	cmd := consoletest.HiddenCommand("git", "-C", repo, "add", ".")
 	require.NoError(t, cmd.Run())
-	cmd = exec.Command("git", "-C", repo, "-c", "user.name=t", "-c", "user.email=t@example.test", "commit", "-q", "-m", "files")
+	cmd = consoletest.HiddenCommand("git", "-C", repo, "-c", "user.name=t", "-c", "user.email=t@example.test", "commit", "-q", "-m", "files")
 	require.NoError(t, cmd.Run())
 	line := strings.Repeat("z", 99) + "\n"
 	for i := 0; i < 45; i++ {
@@ -343,7 +343,7 @@ func TestGeneratePersistedDiffManyNewFiles(t *testing.T) {
 	indexAfter, err := os.ReadFile(filepath.Join(repo, ".git", "index"))
 	require.NoError(t, err)
 	assert.Equal(t, indexBefore, indexAfter, "the new files are added to a copy of the index, never to the real one")
-	status, err := exec.Command("git", "-C", repo, "status", "--porcelain", "--", "gen/f0000.txt").Output()
+	status, err := consoletest.HiddenCommand("git", "-C", repo, "status", "--porcelain", "--", "gen/f0000.txt").Output()
 	require.NoError(t, err)
 	assert.Equal(t, "?? gen/f0000.txt\n", string(status), "still untracked")
 }
@@ -400,7 +400,7 @@ func TestGeneratePersistedDiffOfARepoWithNoCommit(t *testing.T) {
 	repo, err := filepath.EvalSymlinks(t.TempDir())
 	require.NoError(t, err)
 	run := func(args ...string) {
-		out, err := exec.Command("git", append([]string{"-C", repo}, args...)...).CombinedOutput()
+		out, err := consoletest.HiddenCommand("git", append([]string{"-C", repo}, args...)...).CombinedOutput()
 		require.NoError(t, err, string(out))
 	}
 	run("init", "-q")

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sync"
 	"testing"
@@ -13,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/subgentic/coral/internal/consoletest"
 	"github.com/subgentic/coral/internal/store"
 )
 
@@ -315,7 +315,7 @@ func TestWorktreeOfARunFinishedOnItsTurnGoesOnlyWhenCleanAndTheAgentIsGone(t *te
 		_, err := e.ss.UpdateScheduledJob(ctx, e.runOf(t, id).JobID, map[string]interface{}{"repo_path": repo, "cleanup_worktree": 1})
 		require.NoError(t, err)
 		wt := filepath.Join(e.s.worktreeRoot, fmt.Sprintf("job-run-%d-%s", id, filepath.Base(repo)))
-		out, err := exec.Command("git", "-C", repo, "worktree", "add", "-b", fmt.Sprintf("coral/job-run-%d", id), "--", wt, "main").CombinedOutput()
+		out, err := consoletest.HiddenCommand("git", "-C", repo, "worktree", "add", "-b", fmt.Sprintf("coral/job-run-%d", id), "--", wt, "main").CombinedOutput()
 		require.NoError(t, err, string(out))
 		require.NoError(t, e.ss.UpdateScheduledRun(ctx, id, map[string]interface{}{"worktree_path": wt}))
 		if c.dirty {

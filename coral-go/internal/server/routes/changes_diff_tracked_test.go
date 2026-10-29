@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -13,6 +12,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/subgentic/coral/internal/consoletest"
 )
 
 // QA's #245 review: the tracked changes come first and are never cut for new files. A modified tracked file that sorts after
@@ -21,7 +22,7 @@ func TestPersistedDiffKeepsTrackedChangesBeforeNewFiles(t *testing.T) {
 	_, h, _, _ := setupSessionsTestServer(t)
 	repo := diffRepo(t)
 	run := func(args ...string) {
-		cmd := exec.Command("git", append([]string{"-C", repo}, args...)...)
+		cmd := consoletest.HiddenCommand("git", append([]string{"-C", repo}, args...)...)
 		cmd.Env = append(os.Environ(), "GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@example.test", "GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@example.test")
 		out, err := cmd.CombinedOutput()
 		require.NoError(t, err, string(out))

@@ -3,19 +3,20 @@ package background
 import (
 	"context"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/subgentic/coral/internal/consoletest"
 )
 
 // #3558: the poller records a remote URL without the credential embedded in it.
 func TestQueryGitStripsRemoteCredentials(t *testing.T) {
 	repo := t.TempDir()
 	run := func(args ...string) {
-		cmd := exec.Command("git", append([]string{"-C", repo, "-c", "user.email=t@example.test", "-c", "user.name=t"}, args...)...)
+		cmd := consoletest.HiddenCommand("git", append([]string{"-C", repo, "-c", "user.email=t@example.test", "-c", "user.name=t"}, args...)...)
 		out, err := cmd.CombinedOutput()
 		require.NoError(t, err, string(out))
 	}
@@ -33,9 +34,9 @@ func TestQueryGitStripsRemoteCredentials(t *testing.T) {
 // #3558 SHOULD 1: the repo name a PR check uses never carries a credential either.
 func TestGetRepoFromWorkdirStripsCredentials(t *testing.T) {
 	repo := t.TempDir()
-	out, err := exec.Command("git", "-C", repo, "init", "-q").CombinedOutput()
+	out, err := consoletest.HiddenCommand("git", "-C", repo, "init", "-q").CombinedOutput()
 	require.NoError(t, err, string(out))
-	out, err = exec.Command("git", "-C", repo, "remote", "add", "origin", "https://user:ghp_SECRET3558@git.example.test/org/repo.git?t=X").CombinedOutput()
+	out, err = consoletest.HiddenCommand("git", "-C", repo, "remote", "add", "origin", "https://user:ghp_SECRET3558@git.example.test/org/repo.git?t=X").CombinedOutput()
 	require.NoError(t, err, string(out))
 	assert.Equal(t, "https://git.example.test/org/repo", getRepoFromWorkdir(context.Background(), repo))
 }
