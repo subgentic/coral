@@ -101,6 +101,14 @@ const BASE = require('./test_base').BASE;
             await waitFor(`document.getElementById('selection-pause-badge').getBoundingClientRect().width > 0`, `${w}: the chip`, 4000);
             g = await geo();
             assert.ok(g.chipShown && g.chipTop >= g.headerBottom - 1, `${w}: the "Updates paused" chip is under the header, not over its text: ` + JSON.stringify(g));
+            { // overlaps no header control or text, and the header keeps its height with the chip showing (#11085)
+                const chipBox = await ev(`(() => { const b = document.getElementById('selection-pause-badge').getBoundingClientRect(); return { l: Math.round(b.left), t: Math.round(b.top), r: Math.round(b.right), b: Math.round(b.bottom) }; })()`);
+                const hdrNow = await rects();
+                for (const [n, b] of hdrNow.shown) assert.ok(!overlap(b, chipBox), `${w}: the chip overlaps no header part (${n}): ` + JSON.stringify({ chipBox, b }));
+                await ev(`document.getElementById('selection-pause-badge').style.display = 'none'; true`);
+                const hdrOff = await rects();
+                assert.equal(hdrNow.header.b - hdrNow.header.t, hdrOff.header.b - hdrOff.header.t, `${w}: the header keeps its height with the chip showing`);
+            }
         }
         console.log('PASS the phone agent page is one row');
     } finally { await client.close(); }
