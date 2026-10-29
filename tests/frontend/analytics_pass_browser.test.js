@@ -28,7 +28,7 @@ const BASE = require('./test_base').BASE;
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         // 1. nothing counted: the zeros come with what is counted
         await open({ input_tokens: 0, output_tokens: 0, cost_usd: 0, num_requests: 0 });
-        await waitFor(`!document.getElementById('cost-counts-note').hidden`, 'the counts note', 8000);
+        await waitFor(`!document.getElementById('cost-counts-note').hidden && document.getElementById('cost-counts-note').textContent !== ''`, 'the counts note and its sentence (the Overview un-hid the note before the data came, #10979)', 8000);
         assert.equal(await ev(`document.getElementById('cost-counts-note').textContent`), 'Nothing counted in this range. Spend counts the agents Coral has run; a chat you ran outside Coral is not included.');
         await open({ input_tokens: 10, output_tokens: 20, cost_usd: 4, num_requests: 3 });
         await waitFor(`document.getElementById('cost-total-cost').textContent === '$4.00'`, 'the range\'s cost', 8000);
@@ -53,6 +53,9 @@ const BASE = require('./test_base').BASE;
         await open({ input_tokens: 10, output_tokens: 20, cost_usd: 4, num_requests: 0 });
         await waitFor(`document.getElementById('cost-total-cost').textContent === '$4.00'`, 'the cost', 8000);
         assert.equal(await ev(`document.getElementById('cost-counts-note').hidden`), true, 'a cost with no request count has no "Nothing counted" note');
+        // and an empty note is not drawn as an empty box when the Overview opens again (#10979: the view switcher un-hid it whatever it had to say)
+        await ev(`(async () => { const v = await import((window.__coralStatic || '/static/') + 'analytics_views.js'); v.selectView('agent'); v.selectView('overview'); return true; })()`);
+        assert.equal(await ev(`(() => { const n = document.getElementById('cost-counts-note'); return n.hidden || n.getClientRects().length === 0; })()`), true, 'the note with nothing to say is not an empty box on the Overview');
         // 3. an empty range says to try a longer one, except the longest
         await open({ input_tokens: 0, output_tokens: 0, cost_usd: 0, num_requests: 0 });
         const empty = () => ev(`document.getElementById('cost-dashboard-view').textContent`);

@@ -98,7 +98,7 @@ export function selectView(key, { focus = false, fromHistory = false } = {}) {
         el.dataset.view = v.key;
         if (isPhoneLayout()) el.setAttribute('data-phone-item', ''); else el.removeAttribute('data-phone-item');
     }
-    for (const sec of document.querySelectorAll('#cost-dashboard-view [data-cview]')) sec.hidden = sec.dataset.cview !== v.key;
+    for (const sec of document.querySelectorAll('#cost-dashboard-view [data-cview]')) sec.hidden = sec.dataset.cview !== v.key || sec.dataset.empty === '1'; // a section with nothing to say (data-empty, the "Nothing counted" note) is not drawn as an empty box when its view opens (#10979)
     setText(document.getElementById('cost-view-title'), v.under && v.key !== 'agent-detail' ? 'Overview' : v.label); // a grouping is Overview with a grouping chosen
     const asked = document.getElementById('cost-view-question'), qv = v.under && v.key !== 'agent-detail' ? VIEWS.find(x => x.key === v.under) : v; // a grouping keeps Overview's question; one agent's page names its own
     if (asked) { setText(asked, v.key === 'agent-detail' ? '' : (qv.question || '')); asked.hidden = !asked.textContent; }
