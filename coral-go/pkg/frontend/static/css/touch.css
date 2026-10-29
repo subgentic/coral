@@ -67,6 +67,8 @@
     /* Save for later (#4510) sits beside the 44 px Copy, not on it; both are always shown on touch. */
     .chat-prose.chat-messages .chat-bubble .chat-save-btn { right: calc(var(--control-touch-height) - 4px); }
     .chat-prose.chat-messages .chat-bubble.human .chat-save-btn { right: -4px; }
+    .chat-prose.chat-messages .chat-bubble.assistant .chat-msg-menu-btn { right: calc(var(--control-touch-height) + var(--chat-ib) + 4px); } /* the menu and the time follow the 44 px Save, which this block moved (#10904: the menu sat over Save, the time wrapped in 29 px) */
+    .chat-prose.chat-messages .chat-bubble.assistant > .message-time { right: calc(var(--control-touch-height) + 2 * var(--chat-ib) + 8px); }
     .chat-bubble button.chat-save-btn { right: calc(var(--control-touch-height) - 4px); opacity: 1; } /* button.: as specific as chat.css's hidden rule (#9494), or Save stays at 0 on a touch screen */
     /* The 44 px Save and Copy hang under a message (45 px with their gap): the message's own bottom margin (22 px) plus the 24 px they need, so they sit in the gap and not over the next message. */
     .chat-prose.chat-messages .chat-bubble.assistant, .chat-prose.chat-messages .chat-bubble.human { margin-bottom: 46px; }

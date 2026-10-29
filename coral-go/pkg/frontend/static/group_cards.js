@@ -140,7 +140,7 @@ function _renderFolderGroup(groupName, groupSessions) {
     let html = '';
         const sorted = _sortByOrder(groupSessions);
         const isMulti = sorted.length > 1;
-        const countBadge = ` <span class="session-group-count">${sorted.length}</span>`; void isMulti;
+        const countBadge = ` <span class="session-group-count">${sorted.filter(s => !s.sleeping).length}</span>`; void isMulti;
         const collapsed = _isGroupCollapsed(groupName);
         const groupDirRaw = sorted[0]?.working_directory || pinPathForKey(groupName);
         const groupKebab = `<div class="sidebar-kebab-wrapper group-kebab">
@@ -196,7 +196,7 @@ function _renderFolderFirstGroup(groupName, groupSessions) {
     let html = '';
         const sorted = _sortByOrder(groupSessions);
         const isMulti = sorted.length > 1;
-        const countBadge = ` <span class="session-group-count">${sorted.length}</span>`; void isMulti;
+        const countBadge = ` <span class="session-group-count">${sorted.filter(s => !s.sleeping).length}</span>`; void isMulti;
         const collapsed = _isGroupCollapsed(groupName);
         const groupDirRaw = sorted[0]?.working_directory || pinPathForKey(groupName);
         const groupKebab = `<div class="sidebar-kebab-wrapper group-kebab">
