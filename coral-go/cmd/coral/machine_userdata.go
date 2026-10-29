@@ -14,8 +14,8 @@ import (
 
 // machineUserData makes the cloud-init user-data for one launch: the launch's public login key, the address SSH accepts, the Coral release to install, the cap the machine announces, the Hub it joins and the agent
 // CLIs (claude@V, codex@V, pi@V, agy@sha256:...). It carries no Hub credential (#10917: that goes over SSH). It is the one seam between this command and the user-data builder (machinelaunch.BuildUserData); a test replaces it.
-var machineUserData = func(keys *machinelaunch.BootKeys, sshFrom, maxMode, coralVersion, hubURL string, agents []string) (string, error) {
-	spec := machinelaunch.UserDataSpec{AllowSSHFrom: sshFrom, MaxMode: maxMode, CoralVersion: coralVersion, HubURL: hubURL, Agents: agents}
+var machineUserData = func(keys *machinelaunch.BootKeys, sshFrom, maxMode, coralVersion string, digests machinelaunch.ReleaseDigests, hubURL string, agents []string) (string, error) {
+	spec := machinelaunch.UserDataSpec{AllowSSHFrom: sshFrom, MaxMode: maxMode, CoralVersion: coralVersion, CoralDigests: digests, HubURL: hubURL, Agents: agents}
 	if err := keys.FillUserData(&spec); err != nil {
 		return "", err
 	}

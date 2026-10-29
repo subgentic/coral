@@ -225,7 +225,7 @@ func setupWith(t *testing.T, p *stubProvider, h *stubHub) (Options, Deps, *bytes
 	d := Deps{Provider: p, Hub: h, Out: out,
 		Keys: func() (*BootKeys, error) { return keys, nil },
 		UserData: func(k *BootKeys) (string, error) {
-			spec := UserDataSpec{AllowSSHFrom: "203.0.113.9", CoralVersion: "2.0.3"}
+			spec := UserDataSpec{AllowSSHFrom: "203.0.113.9", CoralVersion: "2.0.3", CoralDigests: ReleaseDigests{AMD64: strings.Repeat("1a", 32), ARM64: strings.Repeat("2b", 32)}}
 			if err := k.FillUserData(&spec); err != nil {
 				return "", err
 			}

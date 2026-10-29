@@ -3,6 +3,8 @@ package machinelaunch
 import (
 	"bytes"
 	"crypto/ed25519"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/pem"
 	"os"
 	"os/exec"
@@ -41,9 +43,14 @@ func testHostKey() (string, string) {
 	return string(marshalHostKey(priv)), strings.TrimSpace(string(ssh.MarshalAuthorizedKey(pub)))
 }
 
+// testDigests are two fixed digests for the golden (not a real release's).
+func testDigests() ReleaseDigests {
+	return ReleaseDigests{AMD64: strings.Repeat("1a", 32), ARM64: strings.Repeat("2b", 32)}
+}
+
 func goldenSpec() UserDataSpec {
 	priv, pub := testHostKey()
-	return UserDataSpec{ClientPublicKey: testClientKey(), HostPrivateKey: priv, HostPublicKey: pub, AllowSSHFrom: "203.0.113.9", MaxMode: "launch", CoralVersion: "2.0.3", Agents: []string{"claude@2.0.0", "codex@0.1.0", "agy@sha256:" + strings.Repeat("ab", 32)}}
+	return UserDataSpec{ClientPublicKey: testClientKey(), HostPrivateKey: priv, HostPublicKey: pub, AllowSSHFrom: "203.0.113.9", MaxMode: "launch", CoralVersion: "2.0.3", CoralDigests: testDigests(), Agents: []string{"claude@2.0.0", "codex@0.1.0", "agy@sha256:" + strings.Repeat("ab", 32)}}
 }
 
 func TestUserDataMatchesItsGolden(t *testing.T) {
@@ -85,10 +92,13 @@ func TestUserDataSaysWhatItMustAlwaysSay(t *testing.T) {
 	assert.Contains(t, got, "[ ufw, allow, from, '203.0.113.9', to, any, port, '22', proto, tcp ]", "SSH is open to the launcher's address only")
 	assert.NotContains(t, got, "[ ufw, allow, 22/tcp ]", "never open to everyone")
 	assert.Contains(t, got, "[ ufw, --force, enable ]")
-	// the Coral release is verified before it is installed
-	assert.Contains(t, got, "sha256sum -c expected.sum")
-	assert.Less(t, strings.Index(got, "sha256sum -c expected.sum"), strings.Index(got, "tar -xzf"), "checksum before extraction")
-	assert.Contains(t, got, "SHA256SUMS.txt does not list $tarball exactly once")
+	// the Coral release is verified before it is installed, against the digest the launcher pinned: nothing fetched on the machine decides it (#10919)
+	assert.Contains(t, got, "x86_64) arch=amd64; want="+strings.Repeat("1a", 32))
+	assert.Contains(t, got, "aarch64) arch=arm64; want="+strings.Repeat("2b", 32))
+	assert.Contains(t, got, `echo "${want}  ${tarball}" | sha256sum -c -`)
+	assert.Less(t, strings.Index(got, "sha256sum -c -"), strings.Index(got, "tar -xzf"), "checksum before extraction")
+	assert.NotContains(t, got, "SHA256SUMS", "no checksum list is fetched on the machine")
+	assert.NotContains(t, got, "expected.sum")
 	assert.Contains(t, got, "--proto '=https' --tlsv1.2")
 	assert.Contains(t, got, "https://github.com/subgentic/coral/releases/download/v${version}")
 	assert.Contains(t, got, "set -eu", "it stops at the first failure")
@@ -172,7 +182,7 @@ func fileOf(t *testing.T, doc map[string]any, path string) string {
 func TestUserDataOfARealLaunchHoldsOnlyTheHostPrivateKeyAndTheLoginPublicKey(t *testing.T) {
 	keys, err := NewBootKeys()
 	require.NoError(t, err)
-	spec := UserDataSpec{AllowSSHFrom: "203.0.113.9", CoralVersion: "2.0.3"}
+	spec := UserDataSpec{AllowSSHFrom: "203.0.113.9", CoralVersion: "2.0.3", CoralDigests: testDigests()}
 	require.NoError(t, keys.FillUserData(&spec))
 	got, err := BuildUserData(spec)
 	require.NoError(t, err)
@@ -207,7 +217,7 @@ func TestALoginKeyCommentIsDropped(t *testing.T) {
 
 func TestTheDefaultsAreTheSafeOnes(t *testing.T) {
 	hp, hu := testHostKey()
-	got, err := BuildUserData(UserDataSpec{ClientPublicKey: testClientKey(), HostPrivateKey: hp, HostPublicKey: hu, AllowSSHFrom: "203.0.113.9", CoralVersion: "2.0.3"})
+	got, err := BuildUserData(UserDataSpec{ClientPublicKey: testClientKey(), HostPrivateKey: hp, HostPublicKey: hu, AllowSSHFrom: "203.0.113.9", CoralVersion: "2.0.3", CoralDigests: testDigests()})
 	require.NoError(t, err)
 	assert.Contains(t, got, "--cloud-max-mode view", "an empty cap is view")
 	assert.NotContains(t, got, "npm install", "no agents unless named")
@@ -230,6 +240,11 @@ func TestNothingACallerPassesCanBecomeShell(t *testing.T) {
 		"a host public key of another key":  func(s *UserDataSpec) { s.HostPublicKey = testClientKey() },
 		"a host public key with options":    func(s *UserDataSpec) { s.HostPublicKey = "command=\"id\" " + s.HostPublicKey },
 		"a host key pair with no public":    func(s *UserDataSpec) { s.HostPublicKey = "" },
+		"no coral digests":                  func(s *UserDataSpec) { s.CoralDigests = ReleaseDigests{} },
+		"one coral digest only":             func(s *UserDataSpec) { s.CoralDigests.ARM64 = "" },
+		"a digest in capitals":              func(s *UserDataSpec) { s.CoralDigests.AMD64 = strings.Repeat("AB", 32) },
+		"a digest too short":                func(s *UserDataSpec) { s.CoralDigests.AMD64 = "abcd" },
+		"a digest with a command":           func(s *UserDataSpec) { s.CoralDigests.AMD64 = strings.Repeat("ab", 31) + "a; rm -rf /" },
 		"no ssh source":                     func(s *UserDataSpec) { s.AllowSSHFrom = "" },
 		"every address":                     func(s *UserDataSpec) { s.AllowSSHFrom = "0.0.0.0" },
 		"every address as a CIDR":           func(s *UserDataSpec) { s.AllowSSHFrom = "0.0.0.0/0" },
@@ -319,4 +334,50 @@ func TestTheHostKeyFileIsReadByOpenSSH(t *testing.T) {
 	want, _, _, _, err := ssh.ParseAuthorizedKey([]byte(pub))
 	require.NoError(t, err)
 	assert.Equal(t, want.Marshal(), got.Marshal(), "the public half ssh-keygen derives is the pinned one")
+}
+
+// The setup script run for real, with curl and tar stubbed: a download whose SHA-256 is the pinned one is extracted; any other is not, and the script stops there (a digest mismatch aborts, #10919).
+func TestTheSetupScriptAbortsOnADigestMismatch(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("needs sh")
+	}
+	sh, err := exec.LookPath("sh")
+	if err != nil {
+		t.Skip("no sh")
+	}
+	run := func(content string, pinned ReleaseDigests) (extracted bool, output string) {
+		dir := t.TempDir()
+		bin := filepath.Join(dir, "bin")
+		require.NoError(t, os.MkdirAll(bin, 0o755))
+		fixture := filepath.Join(dir, "fixture")
+		require.NoError(t, os.WriteFile(fixture, []byte(content), 0o644))
+		marker := filepath.Join(dir, "extracted")
+		stub := func(name, body string) {
+			require.NoError(t, os.WriteFile(filepath.Join(bin, name), []byte("#!/bin/sh\n"+body+"\n"), 0o755))
+		}
+		stub("curl", `while [ $# -gt 0 ]; do if [ "$1" = -o ]; then cp '`+fixture+`' "$2"; fi; shift; done`) // writes the fixture where -o says
+		stub("tar", "touch '"+marker+"'")
+		if _, e1 := os.Stat("/usr/bin/sha256sum"); e1 != nil {
+			if _, e2 := os.Stat("/bin/sha256sum"); e2 != nil {
+				stub("sha256sum", `exec /usr/bin/shasum -a 256 "$@"`) // a Mac has shasum, not sha256sum
+			}
+		}
+		stub("uname", "echo x86_64") // the amd64 line of the script, whatever this computer is
+		script := filepath.Join(dir, "setup.sh")
+		require.NoError(t, os.WriteFile(script, []byte(setupScript("2.0.3", pinned)), 0o755))
+		cmd := exec.Command(sh, script)
+		cmd.Env = []string{"PATH=" + bin + ":/usr/bin:/bin", "HOME=" + dir, "TMPDIR=" + dir}
+		out, _ := cmd.CombinedOutput() // it ends at the last check (no /usr/local/bin/coral here): only whether tar ran matters
+		_, statErr := os.Stat(marker)
+		return statErr == nil, string(out)
+	}
+	good := "a tarball the launcher pinned"
+	sum := sha256.Sum256([]byte(good))
+	hexSum := hex.EncodeToString(sum[:])
+	pin := ReleaseDigests{AMD64: hexSum, ARM64: strings.Repeat("0", 64)}
+	extracted, out := run(good, pin)
+	assert.True(t, extracted, "a download that is the pinned one is extracted: "+out)
+	extracted, out = run(good+" swapped", pin)
+	assert.False(t, extracted, "a swapped download is never extracted: "+out)
+	assert.Contains(t, out, "FAILED", "and the checksum says so")
 }
