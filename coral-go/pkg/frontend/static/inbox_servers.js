@@ -35,7 +35,12 @@ export async function readInboxArtifacts(params, filters = {}, signal) {
         if (prior?.cursor) query.set('cursor', prior.cursor);
         else query.set('offset', String(prior?.offset || 0));
         const response = await serverFetch(server, `/api/team-artifacts?${query}`, { signal });
-        if (!response.ok) throw new Error(`${serverLabel(server)} artifacts could not be read (${response.status}).`);
+        if (!response.ok) {
+            const body = response.status === 403 ? await response.clone().json().catch(() => ({})) : {};
+            const error = new Error(`${serverLabel(server)} artifacts could not be read (${response.status}).`);
+            if (response.status === 403 && (body.code === 'owner_only' || body.error === 'owner_only')) error.code = 'owner_only'; // the Hub's answer for a grantee: View plus owner-only (#11071)
+            throw error;
+        }
         const data = await response.json();
         if (!Array.isArray(data.artifacts)) throw new Error('Unable to load artifacts: unexpected response.');
         return { ...data, server, artifacts: data.artifacts.map(row => ({ ...row, server, board_id: identityKey(server, row.board_id) })),

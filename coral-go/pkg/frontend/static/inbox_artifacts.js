@@ -20,6 +20,10 @@ let onCount = () => {};
 /** The folder's count in the sidebar: what the teams hold before any filter. */
 export const artifactCount = () => count;
 
+/** Whether this person was told owner_only (the Hub's answer to a grantee: team artifacts are View plus owner-only): the Hub-served Inbox then has no Artifacts folder, and no error is shown (#11071). */
+let ownerOnly = false;
+export const artifactsOwnerOnly = () => ownerOnly;
+
 /** Read the count without drawing the page (the Inbox was opened): a request for one row, at most one in 30 seconds and one at a time. The Artifacts list tells the
  *  folder its own count whenever it reads (hooks below), which is the "refreshed on change". */
 export function refreshArtifactCount(done) {
@@ -31,7 +35,9 @@ export function refreshArtifactCount(done) {
             const d = await readInboxArtifacts(new URLSearchParams({limit:'1'}));
             countAt = Date.now();
             if (Number.isSafeInteger(d.all) && d.all !== count) { count = d.all; onCount(); }
-        } catch { /* the count stays as it was */ }
+        } catch (e) {
+            if (e && e.code === 'owner_only' && !ownerOnly) { ownerOnly = true; onCount(); } // hide the folder; every other failure leaves the count as it was
+        }
     })().finally(() => { counting = null; });
     return counting;
 }

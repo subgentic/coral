@@ -58,9 +58,9 @@ const { waitingText } = await importOnce('./waiting_text.js'); // a lazy module 
 
 const $ = id => document.getElementById(id);
 /** The Hub-served dashboard's own Inbox (Goal #100, nativeInbox()): Needs you, Tasks and Saved are the Hub's own pages, drawn in the centre in a frame at the constant addresses below (the addresses coral-hub gave on the board, Oct 27);
- *  the chat folders are native. Goals and Artifacts are read from a Coral that has them, so nothing here asks the Hub for them. */
+ *  the chat folders are native, and so are Goals (GET /api/goals, a View route of every online computer) and Artifacts (GET /api/team-artifacts: a View route the Hub answers owner_only for a grantee, who then has no Artifacts folder, #11071). */
 const HUB_FRAMES = { needs: '/inbox/hub/needs', tasks: '/inbox/hub/tasks', saved: '/inbox/hub/saved' };
-const GROUPS = nativeInbox() ? [{ key: 'needs', label: 'Needs you', frame: HUB_FRAMES.needs }, { key: 'tasks', label: 'Tasks', frame: HUB_FRAMES.tasks }, { key: 'saved', label: 'Saved for later', frame: HUB_FRAMES.saved }].map(g => ({ ...g, search: 'Search the Inbox', short: 'Search' })) : [
+const GROUPS = nativeInbox() ? [{ key: 'needs', label: 'Needs you', frame: HUB_FRAMES.needs }, { key: 'tasks', label: 'Tasks', frame: HUB_FRAMES.tasks }, { key: 'goals', label: 'Goals' }, { key: 'artifacts', label: 'Artifacts' }, { key: 'saved', label: 'Saved for later', frame: HUB_FRAMES.saved }].map(g => ({ ...g, search: g.frame ? 'Search the Inbox' : g.key === 'goals' ? 'Search goals' : 'Search artifacts', short: 'Search' })) : [
     { key: 'needs', label: 'Needs you', search: 'Search needs you', short: 'Search' },
     { key: 'tasks', label: 'Tasks', search: 'Search tasks', short: 'Search' },
     { key: 'goals', label: 'Goals', search: 'Search goals', short: 'Search' }, // the open goals of every team the person runs (GET /api/goals): the team page's goal row plus a Team column (#7776)
@@ -360,7 +360,7 @@ const boardSection = () => (isPhoneLayout() && boardList.length ? [{ title: 'Boa
 /** What the folder list shows as current: on a phone an open board is its own entry of the Boards group (the folder it belongs to elsewhere is Board history). */
 const navCurrent = () => (isPhoneLayout() && page?.kind === BOARDS_SUB ? BOARD_ITEM + page.project : pageGroup());
 const FOLDER_TIPS = { needs: 'Agents waiting for you: a question, a permission or a review', tasks: 'Tasks assigned to you', goals: 'The open goals of your teams', saved: 'Messages you saved for later', artifacts: 'Files agents shared' }; // one line each (#10074)
-const folderSections = () => (nativeInbox() ? [{ title: 'Needs attention', items: GROUPS.map(g => ({ key: g.key, label: g.label })) }, ...CH.chatSections(), ...boardSection()] : [{ title: 'Needs attention', items: [
+const folderSections = () => (nativeInbox() ? [{ title: 'Needs attention', items: GROUPS.filter(g => g.key !== 'artifacts' || !IA.artifactsOwnerOnly()).map(g => ({ key: g.key, label: g.label, count: g.key === 'goals' || g.key === 'artifacts' ? countOf(g.key) : undefined })) }, ...CH.chatSections(), ...boardSection()] : [{ title: 'Needs attention', items: [
     { key: 'needs', label: 'Needs you', count: countOf('needs'), alert: true }, { key: 'tasks', label: 'Tasks', count: countOf('tasks') },
     { key: 'goals', label: 'Goals', count: countOf('goals') },
     { key: 'saved', label: 'Saved', count: countOf('saved') }] },
@@ -800,7 +800,10 @@ export async function showInbox({ folder = '', quiet = false } = {}) {
     renderInboxNav(true);
     CH.loadChatCounts(() => renderInboxNav(true));
     refreshBoards(); // the phone drawer's Boards group
-    if (!nativeInbox()) { // the Hub-served Inbox has the chat folders only: no request for what it does not draw
+    if (nativeInbox()) { // the Hub-served Inbox draws the chat folders, Goals and Artifacts: Needs you, Tasks and Saved are the Hub's own framed pages (no request for them)
+        refreshGoals();
+        IA.refreshArtifactCount(() => renderInboxNav(true));
+    } else {
         refreshTasks();
         refreshReviews(true);
         refreshRuns(true);
