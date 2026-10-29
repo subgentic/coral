@@ -277,6 +277,18 @@ func sshLookupWords(lookup string) string {
 	return " (this computer's address, looked up at " + lookup + ", a service outside Coral that sees this computer's address; pass --allow-ssh-from to skip the lookup)"
 }
 
+// expiryWords says when the minted credential stops working, from the Hub's own expires_at when the Hub client has it; otherwise only that it expires (no number of minutes is guessed).
+func expiryWords(d Deps, label string) string {
+	if e, ok := d.Hub.(interface {
+		ExpiresAt(string) (time.Time, bool)
+	}); ok {
+		if t, known := e.ExpiresAt(label); known {
+			return "it expires at " + t.UTC().Format("15:04:05Z") + " on its own"
+		}
+	}
+	return "it expires on its own"
+}
+
 // revokeMinted revokes the credential this launch minted, on its own short deadline, and says how that went in a sentence for the error and a line for the person.
 func revokeMinted(d Deps, label string) string {
 	r := d.Revoker
@@ -284,14 +296,14 @@ func revokeMinted(d Deps, label string) string {
 		r, _ = d.Hub.(Revoker)
 	}
 	if r == nil {
-		fmt.Fprintf(d.Out, "The Coral Hub credential for %q could not be revoked from here: it expires on its own within five minutes; revoke the machine in Coral Hub if it enrolled.\n", label)
-		return "; the Coral Hub credential could NOT be revoked from here (it expires within five minutes)"
+		fmt.Fprintf(d.Out, "The Coral Hub credential for %q could not be revoked from here: %s; revoke the machine in Coral Hub if it enrolled.\n", label, expiryWords(d, label))
+		return "; the Coral Hub credential could NOT be revoked from here (" + expiryWords(d, label) + ")"
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	if err := r.Revoke(ctx, label); err != nil {
-		fmt.Fprintf(d.Out, "The Coral Hub credential for %q could NOT be revoked (%v): it expires within five minutes; if the machine enrolled, revoke it in Coral Hub.\n", label, err)
-		return "; the Coral Hub credential could NOT be revoked (it expires within five minutes; if the machine enrolled, revoke it in Coral Hub)"
+		fmt.Fprintf(d.Out, "The Coral Hub credential for %q could NOT be revoked (%v): %s; if the machine enrolled, revoke it in Coral Hub.\n", label, err, expiryWords(d, label))
+		return "; the Coral Hub credential could NOT be revoked (" + expiryWords(d, label) + "; if the machine enrolled, revoke it in Coral Hub)"
 	}
 	fmt.Fprintf(d.Out, "The Coral Hub credential for %q was revoked.\n", label)
 	return "; the Coral Hub credential was revoked"

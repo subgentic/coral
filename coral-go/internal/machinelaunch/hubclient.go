@@ -26,7 +26,7 @@ type Minter interface {
 // only mint credentials for its own account and only for the adapters ticked when it was made; it reads and lists nothing. It never follows a redirect (the key must not travel to another host).
 type HubClient struct {
 	mu     sync.Mutex
-	minted map[string]string // label -> the credential id the Hub answered with, so a failed launch can revoke it (Revoke)
+	minted map[string]mintedCredential // label -> what the Hub answered with, so a failed launch can revoke it (Revoke) and say when it expires (ExpiresAt)
 
 	BaseURL string // the Hub's origin (https; plain http only for a loopback address, for tests)
 	Key     string // the chk_ automation key (from a 0600 file, memory only)
@@ -62,7 +62,11 @@ func (e *HubError) Error() string {
 	case e.Status == http.StatusConflict && e.Code == "terms_reconsent_required":
 		return "Coral Hub needs the current terms accepted again: accept them in Coral Hub, then run this again"
 	case e.Status == http.StatusTooManyRequests:
-		return "Coral Hub says too many credentials were made just now: wait a few minutes and run this again"
+		return "Coral Hub says too many credentials were made just now (30 a minute for an account): wait a minute and run this again"
+	case e.Status == http.StatusConflict && e.Code == "live_limit_reached":
+		return "Coral Hub says this account has as many machine credentials outstanding as it may (5 for this kind): delete or approve a pending machine, or wait for one to expire, then run this again"
+	case e.Status == http.StatusConflict && e.Code == "adapter_capacity_reached":
+		return "Coral Hub says it cannot take another machine of this kind right now: run this again later, or ask coral-hub; this is not retried"
 	case e.Code != "":
 		return fmt.Sprintf("Coral Hub refused the request (HTTP %d, %s)", e.Status, e.Code)
 	}
@@ -96,14 +100,14 @@ func (h *HubClient) Mint(ctx context.Context, label string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	// A droplet mints as the "generic" (bearer-only) adapter: provider_scope is for aws and gcp and a 400 for the others, and external_id only for persistent bearer-only machines, which these are not. ttl_minutes is 1 to 5.
 	body, _ := json.Marshal(struct {
-		Adapter       string `json:"adapter"`
-		ProviderScope string `json:"provider_scope"`
-		Label         string `json:"label"`
-		Persistence   string `json:"persistence"`
-		TTLMinutes    int    `json:"ttl_minutes"`
-		AcceptTerms   string `json:"accept_terms"`
-	}{"generic", "digitalocean", label, "ephemeral", 5, h.TermsVersion})
+		Adapter     string `json:"adapter"`
+		Label       string `json:"label"`
+		Persistence string `json:"persistence"`
+		TTLMinutes  int    `json:"ttl_minutes"`
+		AcceptTerms string `json:"accept_terms"`
+	}{"generic", label, "ephemeral", 5, h.TermsVersion})
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
 	if err != nil {
 		return "", errors.New("could not make the request to Coral Hub")
@@ -127,6 +131,7 @@ func (h *HubClient) Mint(ctx context.Context, label string) (string, error) {
 	var answer struct {
 		Credential string `json:"credential"`
 		ID         string `json:"credential_id"` // the credential's id (a UUID): what the revoke names
+		ExpiresAt  string `json:"expires_at"`
 		Error      string `json:"error"`
 	}
 	_ = json.Unmarshal(raw, &answer)
@@ -142,9 +147,10 @@ func (h *HubClient) Mint(ctx context.Context, label string) (string, error) {
 	}
 	h.mu.Lock()
 	if h.minted == nil {
-		h.minted = map[string]string{}
+		h.minted = map[string]mintedCredential{}
 	}
-	h.minted[label] = answer.ID
+	exp, _ := time.Parse(time.RFC3339, answer.ExpiresAt)
+	h.minted[label] = mintedCredential{ID: answer.ID, Expires: exp}
 	h.mu.Unlock()
 	return answer.Credential, nil
 }
@@ -153,6 +159,20 @@ var (
 	credentialIDShape = regexp.MustCompile(`^[0-9a-fA-F-]{32,40}$`)
 	destroyShape      = regexp.MustCompile(`^chd_[A-Za-z0-9_\-]{8,500}$`)
 )
+
+// mintedCredential is what the mint answer says about the credential: its id (a UUID) and when it expires.
+type mintedCredential struct {
+	ID      string
+	Expires time.Time
+}
+
+// ExpiresAt is when the credential minted for label expires, from the Hub's own answer (never a fixed number of minutes), and whether it said.
+func (h *HubClient) ExpiresAt(label string) (time.Time, bool) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	m, ok := h.minted[label]
+	return m.Expires, ok && !m.Expires.IsZero()
+}
 
 // Errors a revoke answers with before it asks the Hub anything.
 var (
@@ -170,7 +190,8 @@ func (h *HubClient) Revoke(ctx context.Context, label string) error {
 		return ErrNoDestroyKey
 	}
 	h.mu.Lock()
-	id, ok := h.minted[label]
+	m, ok := h.minted[label]
+	id := m.ID
 	h.mu.Unlock()
 	if !ok || !credentialIDShape.MatchString(id) {
 		return ErrNothingToRevoke
