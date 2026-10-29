@@ -94,11 +94,20 @@ func OpenState(path string) (*State, error) {
 	if path == "" {
 		return nil, errors.New("no state file path")
 	}
-	s := &State{path: path, recs: map[string]Record{}}
+	recs, err := readStateFile(path)
+	if err != nil {
+		return nil, err
+	}
+	return &State{path: path, recs: recs}, nil
+}
+
+// readStateFile reads and checks the file; a file that is not there is an empty state.
+func readStateFile(path string) (map[string]Record, error) {
+	recs := map[string]Record{}
 	fi, err := os.Lstat(path)
 	switch {
 	case errors.Is(err, os.ErrNotExist):
-		return s, nil
+		return recs, nil
 	case err != nil:
 		return nil, fmt.Errorf("%w: %s cannot be checked", ErrUnsafeStateFile, path)
 	case !fi.Mode().IsRegular():
@@ -123,9 +132,34 @@ func OpenState(path string) (*State, error) {
 		if err := r.Validate(); err != nil {
 			return nil, fmt.Errorf("%w: %s: %v", ErrUnsafeStateFile, path, err)
 		}
-		s.recs[r.Name] = r
+		recs[r.Name] = r
 	}
-	return s, nil
+	return recs, nil
+}
+
+// update changes the file under an exclusive lock on its own lock file: it reads the file again inside the lock (another launch may have written since this State was opened), applies f and writes. Two launches
+// at once cannot drop each other's record (#10944, Security's SHOULD A).
+func (s *State) update(f func(recs map[string]Record)) error {
+	if err := os.MkdirAll(filepath.Dir(s.path), 0o700); err != nil {
+		return fmt.Errorf("could not make the folder of the state file: %w", err)
+	}
+	unlock, err := lockFile(s.path + ".lock")
+	if err != nil {
+		return err
+	}
+	defer unlock()
+	fresh, err := readStateFile(s.path)
+	if err != nil {
+		return err
+	}
+	f(fresh)
+	if err := saveStateFile(s.path, fresh); err != nil {
+		return err
+	}
+	s.mu.Lock()
+	s.recs = fresh
+	s.mu.Unlock()
+	return nil
 }
 
 // Records are the machines in the file, by name.
@@ -153,45 +187,22 @@ func (s *State) Put(r Record) error {
 	if err := r.Validate(); err != nil {
 		return fmt.Errorf("not written to the state file: %w", err)
 	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	prev, had := s.recs[r.Name]
-	s.recs[r.Name] = r
-	if err := s.saveLocked(); err != nil {
-		if had {
-			s.recs[r.Name] = prev
-		} else {
-			delete(s.recs, r.Name)
-		}
-		return err
-	}
-	return nil
+	return s.update(func(recs map[string]Record) { recs[r.Name] = r })
 }
 
 // Remove drops a machine's record (one that is not there is fine) and writes the file.
 func (s *State) Remove(name string) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	prev, had := s.recs[name]
-	if !had {
-		return nil
-	}
-	delete(s.recs, name)
-	if err := s.saveLocked(); err != nil {
-		s.recs[name] = prev
-		return err
-	}
-	return nil
+	return s.update(func(recs map[string]Record) { delete(recs, name) })
 }
 
-// saveLocked writes the whole file through a private temporary file in the same folder and a rename, so a crash leaves the old file or the new one, never half of one. The folder is made 0700.
-func (s *State) saveLocked() error {
-	dir := filepath.Dir(s.path)
+// saveStateFile writes the whole file through a private temporary file in the same folder and a rename, so a crash leaves the old file or the new one, never half of one. The folder is made 0700.
+func saveStateFile(path string, recs map[string]Record) error {
+	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return fmt.Errorf("could not make the folder of the state file: %w", err)
 	}
-	f := stateFile{Version: stateVersion, Machines: make([]Record, 0, len(s.recs))}
-	for _, r := range s.recs {
+	f := stateFile{Version: stateVersion, Machines: make([]Record, 0, len(recs))}
+	for _, r := range recs {
 		f.Machines = append(f.Machines, r)
 	}
 	sort.Slice(f.Machines, func(i, j int) bool { return f.Machines[i].Name < f.Machines[j].Name })
@@ -220,5 +231,5 @@ func (s *State) saveLocked() error {
 	if err := tmp.Close(); err != nil {
 		return err
 	}
-	return os.Rename(tmpName, s.path)
+	return os.Rename(tmpName, path)
 }

@@ -1,10 +1,12 @@
 package machinelaunch
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -43,7 +45,11 @@ func TestStateFileIsPrivateAndHoldsIdsOnly(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, "4242", r.DropletID)
 	entries, _ := os.ReadDir(filepath.Dir(path))
-	assert.Len(t, entries, 1, "no temporary file is left behind")
+	var names []string
+	for _, e := range entries {
+		names = append(names, e.Name())
+	}
+	assert.ElementsMatch(t, []string{"machines.json", "machines.json.lock"}, names, "the file and its lock, and no temporary file is left behind")
 }
 
 // Nothing that is not an id goes in, however it got there.
@@ -122,4 +128,39 @@ func TestStatePutReplacesAndRemoveIsIdempotent(t *testing.T) {
 	again, err := OpenState(s.path)
 	require.NoError(t, err)
 	assert.Empty(t, again.Records())
+}
+
+// Two launches at once cannot drop each other's record (#10944): each opens the file on its own (so each starts from the same stale copy), and every Put reads the file again under the lock.
+func TestStateFileSurvivesTwoLaunchesAtOnce(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "machines.json")
+	const launches, each = 4, 15
+	var wg sync.WaitGroup
+	for l := 0; l < launches; l++ {
+		st, err := OpenState(path) // every launch opens the (empty) file before any has written
+		require.NoError(t, err)
+		wg.Add(1)
+		go func(l int, st *State) {
+			defer wg.Done()
+			for i := 0; i < each; i++ {
+				assert.NoError(t, st.Put(goodRecord(fmt.Sprintf("m%d-%d", l, i))))
+			}
+		}(l, st)
+	}
+	wg.Wait()
+	again, err := OpenState(path)
+	require.NoError(t, err)
+	assert.Len(t, again.Records(), launches*each, "every record of every launch is in the file")
+
+	// and a removal by one launch does not bring back, or take away, what another wrote
+	a, _ := OpenState(path)
+	b, _ := OpenState(path)
+	require.NoError(t, a.Remove("m0-0"))
+	require.NoError(t, b.Put(goodRecord("late")))
+	final, err := OpenState(path)
+	require.NoError(t, err)
+	_, hasRemoved := final.Get("m0-0")
+	_, hasLate := final.Get("late")
+	assert.False(t, hasRemoved)
+	assert.True(t, hasLate)
+	assert.Len(t, final.Records(), launches*each)
 }
