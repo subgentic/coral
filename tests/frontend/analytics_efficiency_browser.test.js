@@ -33,7 +33,9 @@ const TT = { metric: 'task_time', range: '24h', min_sample: 10, total: { n: 260 
                     return R(u, o); }; return true; })()`);
             await ev(`window.switchNavTab('tokens'); true`);
             await waitFor(`!!document.querySelector('#cost-nav-list .row-btn[data-view="per-commit"]') || !!document.querySelector('#cost-dashboard-view')`, `${label}: the Analytics page`, 10000);
-            const open = view => ev(`(() => { const b = document.querySelector('#cost-nav-list .row-btn[data-view="${view}"]'); if (b) b.click(); return !!b; })()`);
+            // Click the view's row until its page is on screen: a click that lands before the page's actions are registered (a slow machine, the Analytics modules still loading) does nothing, and the page stayed hidden (#11040: every 390 px run on epoch)
+            const SECTION = { 'per-commit': 'cost-spend-section', 'task-time': 'cost-task-time-section' };
+            const open = async view => { for (let i = 0; i < 24; i++) { await ev(`(() => { const b = document.querySelector('#cost-nav-list .row-btn[data-view="${view}"]'); if (b) b.click(); return !!b; })()`); if (await ev(`(() => { const s = document.getElementById(${JSON.stringify(SECTION[view] || '')}); return !!s && !s.hidden && s.getClientRects().length > 0; })()`)) return true; await new Promise(r => setTimeout(r, 400)); } return false; }; // sleep-ok: a click is asked again until it took
             await run(`${label}: Tokens per commit has a Group by switch, All first and shown`, async () => {
                 await open('per-commit');
                 await waitFor(`!!document.querySelector('#cost-spend-section .eff-switch')`, 'the switch', 8000);
