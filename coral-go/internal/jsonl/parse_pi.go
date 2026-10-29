@@ -1,6 +1,8 @@
 package jsonl
 
 import (
+	"bufio"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"sort"
@@ -31,7 +33,13 @@ func parsePiEntry(entry map[string]any, toolUseNames map[string]string) []map[st
 		case "user":
 			return piUserTurn(piBlocksText(msg["content"]), timestamp)
 		case "assistant":
-			return piAssistantTurn(msg, timestamp, toolUseNames)
+			out := piAssistantTurn(msg, timestamp, toolUseNames)
+			if stop, _ := msg["stopReason"].(string); stop == "aborted" {
+				// The person pressed Stop (Esc) mid-turn: Pi ends the turn with stopReason "aborted" and errorMessage "Operation aborted". Claude records the same as a user text
+				// "[Request interrupted by user]", which the chat shows as an interrupt and ends the working row on: the same text here, after whatever Pi had said (#11092).
+				out = append(out, map[string]any{"type": "user", "timestamp": timestamp, "content": "[Request interrupted by user]"})
+			}
+			return out
 		case "toolResult":
 			return piToolResult(msg, timestamp, toolUseNames)
 		case "bashExecution":
@@ -295,4 +303,56 @@ func openPiTranscript(path string) (*os.File, error) {
 	defer root.Close() // the file stays open
 	f, _, err := root.Open(filepath.Base(path))
 	return f, err
+}
+
+// piErrorTailBytes is how much of the end of a Pi session file is looked at for its last turn: an error is the last thing in the file, so the end is enough.
+const piErrorTailBytes = 256 << 10
+
+// PiLastError is the provider's error for the last turn of a Pi session, or "": the errorMessage of the newest assistant message (Pi 1.4.0 writes it with stopReason "error" when a model request
+// fails: a refused account, an unsupported model, a rate limit), only while nothing came after it: a later user message (a retry) or a successful assistant message ends it (#11092).
+func PiLastError(sessionID string) string {
+	path := resolvePiTranscript(sessionID)
+	if path == "" {
+		return ""
+	}
+	f, err := openPiTranscript(path)
+	if err != nil {
+		return ""
+	}
+	defer f.Close()
+	info, err := f.Stat()
+	if err != nil {
+		return ""
+	}
+	if start := info.Size() - piErrorTailBytes; start > 0 {
+		if _, err := f.Seek(start, 0); err != nil {
+			return ""
+		}
+	}
+	last := ""
+	sc := bufio.NewScanner(f)
+	sc.Buffer(make([]byte, 0, 64<<10), 4<<20)
+	for sc.Scan() {
+		var entry struct {
+			Type    string `json:"type"`
+			Message struct {
+				Role         string `json:"role"`
+				StopReason   string `json:"stopReason"`
+				ErrorMessage string `json:"errorMessage"`
+			} `json:"message"`
+		}
+		if json.Unmarshal(sc.Bytes(), &entry) != nil || entry.Type != "message" {
+			continue // also the first, cut line of a tail read
+		}
+		switch entry.Message.Role {
+		case "assistant":
+			last = ""
+			if entry.Message.StopReason == "error" { // "aborted" is the person's own Stop (errorMessage "Operation aborted"), not a failure
+				last = entry.Message.ErrorMessage
+			} // a successful assistant message clears it
+		case "user":
+			last = "" // a new question: the retry is under way, and fails again with an error of its own
+		}
+	}
+	return last
 }

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	at "github.com/subgentic/coral/internal/agenttypes"
+	"github.com/subgentic/coral/internal/jsonl"
 	"github.com/subgentic/coral/internal/ptymanager"
 	"github.com/subgentic/coral/internal/sessionstate"
 	"github.com/subgentic/coral/internal/store"
@@ -157,7 +158,10 @@ func (h *SessionsHandler) usageLimitText(agentType, sessionID, workingDir string
 	case at.Agy, at.Antigravity, at.Gemini:
 		return h.agyLimitText(sessionID, workingDir, logInfo)
 	case at.Pi:
-		return piLimitText(logInfo)
+		if t := piLimitText(logInfo); t != "" {
+			return t // the extra-usage refusal has its own plain words and the three ways forward
+		}
+		return piProviderErrorText(sessionID)
 	}
 	return ""
 }
@@ -182,6 +186,38 @@ func piLimitText(logInfo map[string]any) string {
 		return capCLIText(piExtraUsageNotice)
 	}
 	return ""
+}
+
+// piProviderErrorText is the notice for any other provider error on Pi's last turn: the errorMessage Pi 1.4.0 wrote on its newest assistant message (#11092), in plain words. A JSON body
+// the provider sent ({"error":{"message":"..."}}) is replaced by its message, so the person reads the reason and not the braces; text with no JSON is shown as Pi wrote it, cut at the cap.
+func piProviderErrorText(sessionID string) string {
+	raw := strings.TrimSpace(jsonl.PiLastError(sessionID))
+	if raw == "" {
+		return ""
+	}
+	reason, status := raw, ""
+	if i := strings.Index(raw, "{"); i > 0 {
+		status = strings.TrimSpace(strings.TrimRight(raw[:i], ": "))
+		var body struct {
+			Message string `json:"message"`
+			Error   struct {
+				Message string `json:"message"`
+			} `json:"error"`
+		}
+		if json.Unmarshal([]byte(raw[i:]), &body) == nil {
+			if body.Error.Message != "" {
+				reason = body.Error.Message
+			} else if body.Message != "" {
+				reason = body.Message
+			}
+		}
+	}
+	reason = strings.Join(strings.Fields(reason), " ")
+	text := "Pi's last request failed: " + reason
+	if status != "" && status != reason {
+		text += " (" + status + ")"
+	}
+	return capCLIText(text)
 }
 
 // piJoinLines joins a wrapped terminal's lines back into text: a line that ends in a hyphen continues in the next without a space ("Third-" + "party"), any other gets one.
