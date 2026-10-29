@@ -91,6 +91,12 @@ Commands:
                                you up via terminal notification. STOP after wait.
                                'coral-board help wait' has the options
   leave                        Unsubscribe from board
+  leave --board <board> --as <name>
+                               The Operator only: remove the seat <name> from <board>
+                               (not for an agent's terminal)
+  seats --foreign [--json]     The Operator only: the seats of agents launched on
+                               another board than the one they sit on, with the
+                               command that removes each (not for an agent's terminal)
   delete                       Delete board and messages (Operator only)
   export [--output FILE] [--format json|markdown|html] [--merge FILE]
                                Export chat (auto-detects format from extension)
@@ -226,6 +232,12 @@ Commands:
                                you up via terminal notification. STOP after wait.
                                'coral-board help wait' has the options
   leave                        Unsubscribe from board
+  leave --board <board> --as <name>
+                               The Operator only: remove the seat <name> from <board>
+                               (not for an agent's terminal)
+  seats --foreign [--json]     The Operator only: the seats of agents launched on
+                               another board than the one they sit on, with the
+                               command that removes each (not for an agent's terminal)
   delete                       Delete board and messages (Operator only)
   export [--output FILE] [--format json|markdown|html] [--merge FILE]
                                Export chat (auto-detects format from extension)
@@ -362,6 +374,12 @@ Commands:
                                you up via terminal notification. STOP after wait.
                                'coral-board help wait' has the options
   leave                        Unsubscribe from board
+  leave --board <board> --as <name>
+                               The Operator only: remove the seat <name> from <board>
+                               (not for an agent's terminal)
+  seats --foreign [--json]     The Operator only: the seats of agents launched on
+                               another board than the one they sit on, with the
+                               command that removes each (not for an agent's terminal)
   delete                       Delete board and messages (Operator only)
   export [--output FILE] [--format json|markdown|html] [--merge FILE]
                                Export chat (auto-detects format from extension)

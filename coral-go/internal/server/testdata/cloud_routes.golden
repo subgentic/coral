@@ -12,6 +12,7 @@ DELETE /api/board/{project}/cross-team-links never
 DELETE /api/board/{project}/groups/{groupID}/members/{sessionID} never
 DELETE /api/board/{project}/messages/{messageID} launch
 DELETE /api/board/{project}/reminder interact
+DELETE /api/board/{project}/seats/{subscriberID} never
 DELETE /api/board/{project}/subscribe never
 DELETE /api/board/{project}/tasks/{taskID}/park never
 DELETE /api/board/{project}/tasks/{taskID}/reminder interact
@@ -61,6 +62,7 @@ GET /api/auth/hub-signin never
 GET /api/auth/sessions never
 GET /api/auth/setup-code never
 GET /api/auth/setup-code/show never
+GET /api/board-seats/foreign never
 GET /api/board/projects view
 GET /api/board/remotes never
 GET /api/board/remotes/proxy/{remoteServer}/projects never

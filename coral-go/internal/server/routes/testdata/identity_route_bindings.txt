@@ -6,6 +6,7 @@ DELETE /api/board/{project}/cross-team-links | board-claims +token-session | ope
 DELETE /api/board/{project}/groups/{groupID}/members/{sessionID} | board-claims | operator-only
 DELETE /api/board/{project}/messages/{messageID} | board-claims | operator-only
 DELETE /api/board/{project}/reminder | board-claims
+DELETE /api/board/{project}/seats/{subscriberID} | board-claims | operator-only
 DELETE /api/board/{project}/subscribe | board-claims
 DELETE /api/board/{project}/tasks/{taskID}/park | board-claims +token-session
 DELETE /api/board/{project}/tasks/{taskID}/reminder | board-claims

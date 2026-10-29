@@ -120,6 +120,8 @@ func (s *Server) registerBoardMessageRoutes(r chi.Router, boardHandler *routes.B
 	r.Get("/api/system/message-search-index", boardHandler.MessageSearchIndexStatus) // Settings: the board message search index, on by default (#9685)
 	r.Post("/api/board/{project}/subscribe", boardHandler.Subscribe)
 	r.Delete("/api/board/{project}/subscribe", boardHandler.Unsubscribe)
+	r.Delete("/api/board/{project}/seats/{subscriberID}", boardHandler.RemoveSeat) // the Operator removes a seat (#11112); never through the Hub
+	r.Get("/api/board-seats/foreign", boardHandler.ListForeignSeats)               // the seats of agents launched on another board (#11112)
 	r.Post("/api/board/{project}/messages", boardHandler.PostMessage)
 	r.Get("/api/board/{project}/messages", boardHandler.ReadMessages)
 	r.Get("/api/board/{project}/messages/all", boardHandler.ListAllMessages)

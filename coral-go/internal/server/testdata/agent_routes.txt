@@ -74,6 +74,8 @@ b GET /api/board/remotes/proxy/{remoteServer}/{project}/messages/all
 b GET /api/board/remotes/proxy/{remoteServer}/{project}/messages/check
 b GET /api/board/remotes/proxy/{remoteServer}/{project}/subscribers
 b GET /api/board/tasks
+b DELETE /api/board/{project}/seats/{subscriberID}
+b GET /api/board-seats/foreign
 c GET /api/board/{project}
 a GET /api/board/{project}/artifacts
 b GET /api/board/{project}/cross-team-candidates

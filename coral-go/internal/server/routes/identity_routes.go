@@ -274,6 +274,8 @@ var operatorOnlyRoutes = map[string]string{
 	"GET /api/token-usage/turns":                         "list the turns of a window of token usage (names agents)",
 	"GET /api/goals/metrics":                             "read the goal generator's metrics (every session's goal text)", // #5041
 	"GET /api/system/identity-report":                    "read the identity report (every session's calls and mismatches)",
+	"DELETE /api/board/{project}/seats/{subscriberID}":   "remove a seat from a board",
+	"GET /api/board-seats/foreign":                       "list the board seats of agents launched on another board",
 	"GET /api/board/tasks":                               "list the tasks of every board",
 	"GET /api/goals":                                     "list the goals of every board",
 	"GET /api/team-artifacts":                            "list the artifacts of every team",

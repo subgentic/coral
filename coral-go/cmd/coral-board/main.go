@@ -87,7 +87,16 @@ func main() {
 	case "reviewer":
 		cmdReviewer(os.Args[2:])
 	case "leave":
+		if len(os.Args) > 2 { // --board and --as: the Operator removes another's seat (#11112)
+			if err := runLeaveAs(os.Args[2:], os.Stdout); err != nil {
+				fmt.Fprintln(os.Stderr, err)
+				clierr.Exit1()
+			}
+			break
+		}
 		cmdLeave()
+	case "seats":
+		cmdSeats()
 	case "delete":
 		cmdDelete()
 	case "export":
@@ -221,6 +230,12 @@ Commands:
                                you up via terminal notification. STOP after wait.
                                'coral-board help wait' has the options
   leave                        Unsubscribe from board
+  leave --board <board> --as <name>
+                               The Operator only: remove the seat <name> from <board>
+                               (not for an agent's terminal)
+  seats --foreign [--json]     The Operator only: the seats of agents launched on
+                               another board than the one they sit on, with the
+                               command that removes each (not for an agent's terminal)
   delete                       Delete board and messages (Operator only)
   export [--output FILE] [--format json|markdown|html] [--merge FILE]
                                Export chat (auto-detects format from extension)
