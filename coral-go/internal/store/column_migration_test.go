@@ -21,7 +21,7 @@ func TestColumnMigrationsAddEveryColumnOnceFromAnyOlderDatabase(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	columns := func(db *DB, table string) map[string]int {
+	columns := func(t *testing.T, db *DB, table string) map[string]int {
 		var rows []struct {
 			Name string `db:"name"`
 		}
@@ -44,7 +44,7 @@ func TestColumnMigrationsAddEveryColumnOnceFromAnyOlderDatabase(t *testing.T) {
 			db, err = OpenWithKey(ctx, p, "")
 			require.NoError(t, err, "open %d", i)
 			for _, m := range columnMigrations {
-				assert.Equal(t, 1, columns(db, m.table)[m.column], "open %d: %s.%s", i, m.table, m.column)
+				assert.Equal(t, 1, columns(t, db, m.table)[m.column], "open %d: %s.%s", i, m.table, m.column)
 			}
 			require.NoError(t, db.Close())
 		}
@@ -54,10 +54,11 @@ func TestColumnMigrationsAddEveryColumnOnceFromAnyOlderDatabase(t *testing.T) {
 		return err == nil // a column SQLite will not drop (an index or a constraint uses it) stays: the test still opens it
 	}
 
-	t.Run("a database made before all of them", func(t *testing.T) { check(t, dropColumn) })
+	t.Run("a database made before all of them", func(t *testing.T) { t.Parallel(); check(t, dropColumn) }) // each database is its own file, so the subtests run together
 	for _, only := range columnMigrations {
 		only := [2]string{only.table, only.column}
 		t.Run("a database missing only "+only[0]+"."+only[1], func(t *testing.T) {
+			t.Parallel()
 			check(t, func(db *DB, c [2]string) bool { return c == only && dropColumn(db, c) })
 		})
 	}

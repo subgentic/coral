@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -55,110 +56,125 @@ func TestCodexLaunchCommandAgreesWithBefore4845(t *testing.T) {
 		"-a=untrusted", "--approval-mode", "on-request", "--approval-mode=untrusted", "--ask-for-approval", "--ask-for-approval=untrusted", "on-failure", "--sandbox", "read-only", "--sandbox=workspace-write",
 		"--settings", "--session-id", "--resume", "--model", "o3", "--search", "-c", "model=\"gpt-5\""}
 	capSets := [][]string{nil, {CapWebAccess}, {CapShell}, {CapShell, CapFileRead, CapFileWrite, CapGitWrite}, {CapFileRead}, {CapShell, CapWebAccess}}
+	var mu sync.Mutex
 	counts := map[string]int{}
-	for seed := int64(1); seed <= 2000; seed++ {
-		rng := rand.New(rand.NewSource(seed))
-		p := LaunchParams{
-			SessionID:      fmt.Sprintf("4845%04d-0000-4000-8000-000000000001", seed%10000),
-			SessionName:    "codex-4845",
-			ProtocolPath:   []string{"", proto, empty, "/nonexistent/protocol.md"}[rng.Intn(4)],
-			CLIPath:        []string{"", "/usr/bin/true", "codex"}[rng.Intn(3)],
-			BoardName:      []string{"", "team"}[rng.Intn(2)],
-			Role:           []string{"", "Developer", "Orchestrator"}[rng.Intn(3)],
-			Prompt:         []string{"", "do the work", "--dangerously-skip-permissions"}[rng.Intn(3)],
-			BoardType:      []string{"", "coding"}[rng.Intn(2)],
-			PermissionMode: []string{"", "default", "auto", "dontAsk", "acceptEdits", "plan", "bypassPermissions", "weird"}[rng.Intn(8)],
-			CoralDir:       "/tmp/coral-4845",
-			CoralHost:      "127.0.0.1",
-			CoralPort:      8450,
-		}
-		if rng.Intn(4) == 0 {
-			p.ResumeSessionID = "019a0000-4845-7000-8000-00000000000" + fmt.Sprint(rng.Intn(10))
-		}
-		if allow := capSets[rng.Intn(len(capSets))]; allow != nil {
-			p.Capabilities = &Capabilities{Allow: allow}
-			if rng.Intn(4) == 0 {
-				p.Capabilities.Deny = []string{"Bash(rm:*)"}
-			}
-		}
-		for k := rng.Intn(5); k > 0; k-- {
-			p.Flags = append(p.Flags, flagWords[rng.Intn(len(flagWords))])
-		}
-		want, werr := a.launchCommandBefore4845(p)
-		got, gerr := a.LaunchCommand(p)
-		// #5925 adds Coral networking to autonomous workspace launches; its policy
-		// and precedence have separate tests. Compare the pre-existing behavior here.
-		got = strings.ReplaceAll(got, " -c sandbox_workspace_write.network_access=true", "")
-		label := fmt.Sprintf("seed %d %+v", seed, p)
-		require.Equal(t, werr == nil, gerr == nil, label)
-		files := func(cmd string) []string {
-			var out []string
-			for _, path := range codexTempFile.FindAllString(cmd, -1) {
-				b, err := os.ReadFile(path)
-				out = append(out, fmt.Sprintf("%s: %q %v", codexTempFile.ReplaceAllString(filepath.Base(path), "<f>"), b, err == nil))
-			}
-			return out
-		}
-		require.Equal(t, files(want), files(got), label)
-		require.Equal(t, codexTempFile.ReplaceAllString(want, "<tmp>"), codexTempFile.ReplaceAllString(got, "<tmp>"), label)
+	// The seeds run together, in blocks of 100: each launch has its own session id and writes its own temporary files.
+	t.Run("seeds", func(t *testing.T) { // returns when every block has ended
+		for first := int64(1); first <= 2000; first += 100 {
+			t.Run(fmt.Sprintf("seeds %d-%d", first, first+99), func(t *testing.T) {
+				t.Parallel()
+				local := map[string]int{}
+				for seed := first; seed < first+100; seed++ {
+					rng := rand.New(rand.NewSource(seed))
+					p := LaunchParams{
+						SessionID:      fmt.Sprintf("4845%04d-0000-4000-8000-000000000001", seed%10000),
+						SessionName:    "codex-4845",
+						ProtocolPath:   []string{"", proto, empty, "/nonexistent/protocol.md"}[rng.Intn(4)],
+						CLIPath:        []string{"", "/usr/bin/true", "codex"}[rng.Intn(3)],
+						BoardName:      []string{"", "team"}[rng.Intn(2)],
+						Role:           []string{"", "Developer", "Orchestrator"}[rng.Intn(3)],
+						Prompt:         []string{"", "do the work", "--dangerously-skip-permissions"}[rng.Intn(3)],
+						BoardType:      []string{"", "coding"}[rng.Intn(2)],
+						PermissionMode: []string{"", "default", "auto", "dontAsk", "acceptEdits", "plan", "bypassPermissions", "weird"}[rng.Intn(8)],
+						CoralDir:       "/tmp/coral-4845",
+						CoralHost:      "127.0.0.1",
+						CoralPort:      8450,
+					}
+					if rng.Intn(4) == 0 {
+						p.ResumeSessionID = "019a0000-4845-7000-8000-00000000000" + fmt.Sprint(rng.Intn(10))
+					}
+					if allow := capSets[rng.Intn(len(capSets))]; allow != nil {
+						p.Capabilities = &Capabilities{Allow: allow}
+						if rng.Intn(4) == 0 {
+							p.Capabilities.Deny = []string{"Bash(rm:*)"}
+						}
+					}
+					for k := rng.Intn(5); k > 0; k-- {
+						p.Flags = append(p.Flags, flagWords[rng.Intn(len(flagWords))])
+					}
+					want, werr := a.launchCommandBefore4845(p)
+					got, gerr := a.LaunchCommand(p)
+					// #5925 adds Coral networking to autonomous workspace launches; its policy
+					// and precedence have separate tests. Compare the pre-existing behavior here.
+					got = strings.ReplaceAll(got, " -c sandbox_workspace_write.network_access=true", "")
+					label := fmt.Sprintf("seed %d %+v", seed, p)
+					require.Equal(t, werr == nil, gerr == nil, label)
+					files := func(cmd string) []string {
+						var out []string
+						for _, path := range codexTempFile.FindAllString(cmd, -1) {
+							b, err := os.ReadFile(path)
+							out = append(out, fmt.Sprintf("%s: %q %v", codexTempFile.ReplaceAllString(filepath.Base(path), "<f>"), b, err == nil))
+						}
+						return out
+					}
+					require.Equal(t, files(want), files(got), label)
+					require.Equal(t, codexTempFile.ReplaceAllString(want, "<tmp>"), codexTempFile.ReplaceAllString(got, "<tmp>"), label)
 
-		c := got
-		has := func(s string) bool { return strings.Contains(c, s) }
-		if p.ResumeSessionID != "" && has(" resume ") {
-			counts["a resume"]++
-		}
-		if has("developer_instructions") {
-			counts["developer instructions"]++
-		}
-		if has("codex_prompt") {
-			counts["an action prompt"]++
-		}
-		if perms := TranslateToCodexPermissions(p.Capabilities); perms != nil {
-			switch {
-			case p.PermissionMode == "bypassPermissions" && has("--dangerously-bypass-approvals-and-sandbox"):
-				counts["bypass from an explicit mode"]++
-			case perms.FullAuto:
-				counts["full auto from capabilities"]++
-			case perms.SandboxMode != "" || perms.ApprovalPolicy != "":
-				counts["sandbox and approval from caps"]++
-			}
-			if perms.Search && has("--search") {
-				counts["web search"]++
-			}
-		}
-		flags := strings.Join(p.Flags, " ")
-		if p.Capabilities.IsEmpty() && strings.Contains(flags, "--permission-mode") {
-			counts["permission mode from a flag"]++
-		}
-		if p.Capabilities.IsEmpty() && !strings.Contains(flags, "--permission-mode") && !strings.Contains(flags, "-a") && !strings.Contains(flags, "--sandbox") &&
-			!strings.Contains(flags, "--dangerously") && !strings.Contains(flags, "--full-auto") && !strings.Contains(flags, "--approval-mode") {
-			if p.PermissionMode != "" && p.PermissionMode != "default" && p.PermissionMode != "weird" {
-				counts["permission mode from the launch"]++
-			}
-		}
-		if strings.Contains(flags, "untrusted") && has("on-request") {
-			counts["untrusted normalized"]++
-		}
-		for _, f := range []string{"--settings", "--session-id", "--resume"} {
-			for _, g := range p.Flags {
-				if g == f {
-					counts["a Claude-only flag dropped"]++
+					c := got
+					has := func(s string) bool { return strings.Contains(c, s) }
+					if p.ResumeSessionID != "" && has(" resume ") {
+						local["a resume"]++
+					}
+					if has("developer_instructions") {
+						local["developer instructions"]++
+					}
+					if has("codex_prompt") {
+						local["an action prompt"]++
+					}
+					if perms := TranslateToCodexPermissions(p.Capabilities); perms != nil {
+						switch {
+						case p.PermissionMode == "bypassPermissions" && has("--dangerously-bypass-approvals-and-sandbox"):
+							local["bypass from an explicit mode"]++
+						case perms.FullAuto:
+							local["full auto from capabilities"]++
+						case perms.SandboxMode != "" || perms.ApprovalPolicy != "":
+							local["sandbox and approval from caps"]++
+						}
+						if perms.Search && has("--search") {
+							local["web search"]++
+						}
+					}
+					flags := strings.Join(p.Flags, " ")
+					if p.Capabilities.IsEmpty() && strings.Contains(flags, "--permission-mode") {
+						local["permission mode from a flag"]++
+					}
+					if p.Capabilities.IsEmpty() && !strings.Contains(flags, "--permission-mode") && !strings.Contains(flags, "-a") && !strings.Contains(flags, "--sandbox") &&
+						!strings.Contains(flags, "--dangerously") && !strings.Contains(flags, "--full-auto") && !strings.Contains(flags, "--approval-mode") {
+						if p.PermissionMode != "" && p.PermissionMode != "default" && p.PermissionMode != "weird" {
+							local["permission mode from the launch"]++
+						}
+					}
+					if strings.Contains(flags, "untrusted") && has("on-request") {
+						local["untrusted normalized"]++
+					}
+					for _, f := range []string{"--settings", "--session-id", "--resume"} {
+						for _, g := range p.Flags {
+							if g == f {
+								local["a Claude-only flag dropped"]++
+							}
+						}
+					}
+					for _, f := range p.Flags {
+						if (f == "--model" || f == "--search" || f == "-c") && has(f) {
+							local["a user flag passed through"]++
+							break
+						}
+					}
+					if !p.Capabilities.IsEmpty() && strings.Contains(flags, "--dangerously-skip-permissions") {
+						local["a skip flag after a permission"]++
+					}
+					if len(p.Flags) > 0 && p.Flags[len(p.Flags)-1] == "-a" {
+						local["a value-less -a passed as is"]++
+					}
 				}
-			}
+				mu.Lock()
+				defer mu.Unlock()
+				for k, v := range local {
+					counts[k] += v
+				}
+			})
 		}
-		for _, f := range p.Flags {
-			if (f == "--model" || f == "--search" || f == "-c") && has(f) {
-				counts["a user flag passed through"]++
-				break
-			}
-		}
-		if !p.Capabilities.IsEmpty() && strings.Contains(flags, "--dangerously-skip-permissions") {
-			counts["a skip flag after a permission"]++
-		}
-		if len(p.Flags) > 0 && p.Flags[len(p.Flags)-1] == "-a" {
-			counts["a value-less -a passed as is"]++
-		}
-	}
+	})
 	t.Logf("compared, per outcome: %v", counts)
 	for name, floor := range codexLaunchOutcomes {
 		require.GreaterOrEqual(t, counts[name], floor, "%q went (almost) unexercised", name)
