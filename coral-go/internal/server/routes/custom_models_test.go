@@ -65,7 +65,7 @@ func TestCustomModelsRoundTripWithTheLimitsSettingsValidatesAgainst(t *testing.T
 	assert.Equal(t, []any{"low", "medium", "high", "xhigh", "max"}, efforts["claude"])
 	assert.Equal(t, []any{"minimal", "low", "medium", "high", "xhigh"}, efforts["codex"])
 	assert.Equal(t, []any{"low", "medium", "high", "xhigh", "max"}, efforts["agy"])
-	assert.Equal(t, []any{}, efforts["pi"], "Pi takes no levels (not installed to check)")
+	assert.Equal(t, []any{"off", "minimal", "low", "medium", "high", "xhigh", "max"}, efforts["pi"], "Pi takes --thinking (pi --help, #11091)")
 
 	code, out := putCustom(t, h, `{"models":[{"family":"claude","value":"global-opus-5-5","display_name":" Global  Opus ","efforts":["low","high"]},{"family":"codex","value":"gpt-x"}]}`)
 	require.Equal(t, http.StatusOK, code, out)
@@ -95,7 +95,7 @@ func TestCustomModelsAreValidatedAsAWholeAndNothingChangesOnAnError(t *testing.T
 		`{"models":[{"family":"claude","value":"a b"}]}`:                                                               {0, "claude", "value"},
 		`{"models":[{"family":"gemini","value":"a"}]}`:                                                                 {0, "gemini", "family"},
 		`{"models":[{"family":"claude","value":"a","efforts":["turbo"]}]}`:                                             {0, "claude", "efforts"},
-		`{"models":[{"family":"pi","value":"a","efforts":["low"]}]}`:                                                   {0, "pi", "efforts"},
+		`{"models":[{"family":"pi","value":"a","efforts":["turbo"]}]}`:                                                 {0, "pi", "efforts"},
 		`{"models":[{"family":"claude","value":"a"},{"family":"claude","value":"b"},{"family":"claude","value":"a"}]}`: {2, "claude", "value"},
 	} {
 		code, out := putCustom(t, h, body)

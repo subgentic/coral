@@ -46,6 +46,7 @@ type sessionCache struct {
 	codexState  codexTurnCache
 	agyState    agyTurnCache
 	claudeState claudeTurnCache
+	piState     piTurnCache
 }
 
 // claudeTurnCache tracks the latest end of a turn in a Claude transcript (#3481).
@@ -58,6 +59,19 @@ type claudeTurnCache struct {
 	effort  string         // the newest assistant entry's effort: the thinking level that turn ran at (#4969)
 	turnAt  time.Time      // when that assistant entry was written (#6225)
 	apiErr  ClaudeAPIError // the latest message, when it is an API error (#3830)
+}
+
+// piTurnCache is what the Pi turn reader holds of a Pi session file (#11091): the newest turn event (a turn going on is "prompt_submit", its end "stop"), the model and thinking level the chips show,
+// and when the newest assistant message was written.
+type piTurnCache struct {
+	transcriptReadState
+	event    string
+	at       time.Time
+	active   bool
+	activity bool
+	model    string
+	effort   string
+	turnAt   time.Time
 }
 
 type codexTurnCache struct {

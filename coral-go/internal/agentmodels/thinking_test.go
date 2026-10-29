@@ -12,7 +12,6 @@ func TestThinkingLevelsAndArgs(t *testing.T) {
 	assert.Equal(t, []string{"low", "medium", "high", "xhigh", "max"}, ThinkingLevels("agy"), "agy --help documents --effort")
 	assert.Equal(t, ThinkingLevels("agy"), ThinkingLevels("antigravity"))
 	assert.Nil(t, ThinkingLevels("gemini"), "a type with no documented flag takes no level")
-	assert.Nil(t, ThinkingLevels("pi"), "Pi is not installed to check")
 	got := ThinkingLevels("claude")
 	got[0], got[len(got)-1] = "bogus", "bogus"
 	_ = append(got, "extra")
@@ -38,7 +37,6 @@ func TestThinkingLevelsAndArgs(t *testing.T) {
 	assert.Equal(t, []string{"--effort", "max"}, ThinkingArgs("agy", "max"))
 	assert.Nil(t, ThinkingArgs("codex", "max"), "a level the CLI's own list does not have is never a flag")
 	assert.Nil(t, ThinkingArgs("gemini", "high"), "no levels for a CLI that has none")
-	assert.Nil(t, ThinkingArgs("pi", "high"), "Pi is not installed to check")
 }
 
 func TestStripThinkingFlags(t *testing.T) {
@@ -59,4 +57,18 @@ func TestStripThinkingFlags(t *testing.T) {
 	for _, c := range cases {
 		assert.Equal(t, c.want, StripThinkingFlags(c.in), "%v", c.in)
 	}
+}
+
+// #11091 (row 8 of the Pi gap table): Pi takes its thinking level at launch as --thinking <level> (pi --help: off, minimal, low, medium, high, xhigh, max).
+func TestPiThinkingLevelIsPassedAsTheThinkingFlag(t *testing.T) {
+	assert.Equal(t, []string{"off", "minimal", "low", "medium", "high", "xhigh", "max"}, ThinkingLevels("pi"))
+	assert.True(t, ValidThinking("pi", "high"))
+	assert.False(t, ValidThinking("pi", "extreme"))
+	assert.Equal(t, []string{"--thinking", "high"}, ThinkingArgs("pi", "high"))
+	assert.Nil(t, ThinkingArgs("pi", ""), "the CLI's own default is no flag")
+	assert.Nil(t, ThinkingArgs("pi", "high; rm -rf"), "only the allowlist's own constant reaches the command line")
+	// A restart puts back the level it was asked to start with, never two.
+	assert.Equal(t, []string{"--model", "x"}, StripThinkingFlags([]string{"--thinking", "low", "--model", "x"}))
+	assert.Equal(t, []string{"--model", "x"}, StripThinkingFlags([]string{"--model", "x", "--thinking=low"}))
+	assert.Equal(t, []string{"--no-skills"}, StripThinkingFlags([]string{"--thinking", "--no-skills"}), "a bare --thinking must not eat the flag after it")
 }

@@ -7,16 +7,21 @@ import "strings"
 // here: others are added as each is checked by hand.
 //
 //   - claude: --effort low|medium|high|xhigh|max (claude --help).
+//
 //   - agy (also antigravity): --effort low|medium|high|xhigh|max (agy --help says "Reasoning effort for the current CLI session").
+//
 //   - codex: the config override -c model_reasoning_effort=<level> (codex --help documents -c key=value; the key and the levels minimal, low, medium, high and xhigh are the
 //     ones its own config reads). The live /effort switch is Claude's only: the others take the level at launch.
 //
-// Gemini is not listed (its CLI has no such option) and Pi is not installed to check: a provider with no levels takes none.
+//   - pi: --thinking off|minimal|low|medium|high|xhigh|max (pi --help, Pi 1.4.0, #11091).
+//
+// Gemini is not listed (its CLI has no such option): a provider with no levels takes none.
 var thinkingLevels = map[string][]string{
 	"claude":      {"low", "medium", "high", "xhigh", "max"},
 	"agy":         {"low", "medium", "high", "xhigh", "max"},
 	"antigravity": {"low", "medium", "high", "xhigh", "max"},
 	"codex":       {"minimal", "low", "medium", "high", "xhigh"},
+	"pi":          {"off", "minimal", "low", "medium", "high", "xhigh", "max"},
 }
 
 // ThinkingLevels returns the levels Coral passes to agentType's CLI, nil when that type has none yet. The slice is a copy: a caller that changes it (a sort, an append) cannot change what the server accepts.
@@ -58,6 +63,8 @@ func ThinkingArgs(agentType, level string) []string {
 		return []string{"--effort", level}
 	case "codex":
 		return []string{"-c", codexEffortKey + "=" + level}
+	case "pi":
+		return []string{"--thinking", level}
 	}
 	return nil
 }
@@ -71,13 +78,13 @@ func StripThinkingFlags(flags []string) []string {
 	out := make([]string, 0, len(flags))
 	for i := 0; i < len(flags); i++ {
 		f := flags[i]
-		if f == "--effort" {
+		if f == "--effort" || f == "--thinking" { // --thinking is Pi's
 			if i+1 < len(flags) && !strings.HasPrefix(flags[i+1], "-") {
 				i++ // its value; a following flag is not a value and stays (a bare --effort must not eat --dangerously-skip-permissions or the like)
 			}
 			continue
 		}
-		if strings.HasPrefix(f, "--effort=") {
+		if strings.HasPrefix(f, "--effort=") || strings.HasPrefix(f, "--thinking=") {
 			continue
 		}
 		if f == "-c" && i+1 < len(flags) && strings.HasPrefix(flags[i+1], codexEffortKey+"=") {

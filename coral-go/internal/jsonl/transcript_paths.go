@@ -331,6 +331,9 @@ func openTranscript(path, agentType string) (*os.File, error) {
 // openTranscriptFile opens path, through transcriptlink.OpenRollout when it is inside Codex's
 // sessions folder.
 func openTranscriptFile(path string) (*os.File, error) {
+	if filepath.Base(filepath.Dir(filepath.Dir(path))) == "pi-sessions" { // a Pi session's file, in a folder the agent can write: through a root, never a link
+		return openPiTranscript(path)
+	}
 	if transcriptlink.InCodexSessions(path) {
 		return transcriptlink.OpenRollout(path)
 	}

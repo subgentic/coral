@@ -481,6 +481,8 @@ func (h *SessionsHandler) warmTranscript(agent AgentInfo) {
 			h.jsonl.ReadCodexTurnEvent(agent.SessionID, agent.WorkingDir)
 		case at.Agy, at.Antigravity, at.Gemini:
 			h.jsonl.ReadAgyTurnEvent(agent.SessionID, agent.WorkingDir)
+		case at.Pi:
+			h.jsonl.ReadPiTurn(agent.SessionID, agent.WorkingDir)
 		}
 		h.jsonl.FirstUserPrompt(agent.SessionID, agent.WorkingDir, agent.AgentType)
 		<-h.transcriptWarmSem
