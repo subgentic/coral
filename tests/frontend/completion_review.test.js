@@ -7,7 +7,7 @@ const source = fs.readFileSync(path.join(__dirname, '../../coral-go/pkg/frontend
 const start = source.indexOf('function _taskDetailHeadHtml('); // the detail is built by helpers (#4702): from the first of them to the end of _taskDetailHtml
 const end = source.length; // the helpers run to the end of task_detail_html.js (moved out of tasks.js, #4996)
 const escape = value => String(value ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
-const context = vm.createContext({ escapeHtml: escape, escapeAttr: escape, _priorityRank: {}, formatTaskDate: String, _verifyLine: () => '', whenWords: String }); // the detail's verification line (#4564) is drawn by tasks.js; none of these tasks has one
+const context = vm.createContext({ escapeHtml: escape, escapeAttr: escape, _priorityRank: {}, formatTaskDate: String, _verifyLine: () => '', whenWords: String, visibleName: n => String(n == null ? '' : n) }); // the detail's verification line (#4564) is drawn by tasks.js; none of these tasks has one
 vm.runInContext(fs.readFileSync(path.join(__dirname, '../../coral-go/pkg/frontend/static/review_pool.js'), 'utf8').replaceAll('export ', ''), context);
 vm.runInContext(source.slice(start, end).replaceAll('export function', 'function'), context);
 const candidate = { submitted_by: '<img src=x>', submitted_at: 'now', proposed_outcome: 'success', reason: 'Review <pending>', message: '<script>bad()</script>', artifacts: [{ name: 'build', content: '<img onerror=bad()>', revision: 'rev-42' }] };
