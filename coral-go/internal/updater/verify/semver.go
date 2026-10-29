@@ -23,13 +23,14 @@ func ParseVersion(s string) ([3]int, error) {
 	return out, nil
 }
 
-// NotNewer reports whether staged (a plain X.Y.Z, as a staged release always is) is NOT newer than installed: older or equal. The installed version may carry a "v" and a prerelease or build
-// suffix (1.4.167-rc1): its release is newer than it, and an earlier core is older. A version that does not parse says nothing (false), so nothing is dropped on a guess.
+// NotNewer reports whether staged (a plain X.Y.Z, as a staged release always is) is NOT newer than installed: older or equal. The installed version may carry a "v" and a prerelease suffix
+// (1.4.167-rc1): its release is newer than it, and an earlier core is older. A version that does not parse (build metadata "+x" included: Coral's versions have none) says nothing (false),
+// so nothing is dropped on a guess. updatecheck.NotNewer (the server's) answers the same on every row of one shared table.
 func NotNewer(staged, installed string) bool {
 	core := strings.TrimPrefix(installed, "v")
 	pre := false
-	if i := strings.IndexAny(core, "-+"); i >= 0 {
-		pre = core[i] == '-'
+	if i := strings.Index(core, "-"); i >= 0 {
+		pre = true
 		core = core[:i]
 	}
 	c, err := CompareVersions(staged, core)
