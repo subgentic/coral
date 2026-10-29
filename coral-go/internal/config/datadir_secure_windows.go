@@ -14,6 +14,9 @@ import (
 	"golang.org/x/sys/windows"
 )
 
+// errUntrustedMountPoint is ERROR_UNTRUSTED_MOUNT_POINT, the refusal of a junction Windows will not traverse (build 26300 and later).
+const errUntrustedMountPoint syscall.Errno = 448
+
 // secureExistingDataDir makes an existing data folder that other accounts can use private to this user (G2A, #96):
 //
 //   - it acts only when the folder's access list has an allow entry for anyone but this user, SYSTEM and Administrators
@@ -25,9 +28,6 @@ import (
 //     another account on an old file does not survive; links and junctions inside it are skipped and never entered.
 //
 // The returned text says what was done, for the log and the dashboard. A folder nobody else can use returns "".
-// errUntrustedMountPoint is ERROR_UNTRUSTED_MOUNT_POINT, the refusal of a junction Windows will not traverse (build 26300 and later).
-const errUntrustedMountPoint syscall.Errno = 448
-
 func secureExistingDataDir(dir string) (string, error) {
 	// A link's own list says nothing about the folder it points to: read the target's (through a handle that follows the link), and
 	// never change it.
