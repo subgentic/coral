@@ -5,6 +5,7 @@ const fs = require('node:fs'), path = require('node:path');
 const { connect } = require('./agent_view_harness');
 const { setTheme } = require('./helpers/contrast');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 const HEX = n => n.toString(16).padStart(2, '0').repeat(32);
 const TEAM = 'aa-team-' + Date.now().toString(36);
 const DATA = ['a-very-long-artifact-filename-that-must-end-in-an-ellipsis.txt', 'bravo.pdf', 'charlie.txt'].map((name, i) => ({ id: HEX(i + 1), name, media_type: ['image/png', 'application/pdf', 'text/plain', 'application/zip', 'image/png', 'text/markdown', 'text/plain'][i], size: (i + 1) * 300,
@@ -46,7 +47,7 @@ const STUB = `(() => {
   for (const width of [1280,390]) { try {
    await Emulation.setDeviceMetricsOverride({width,height:900,deviceScaleFactor:1,mobile:width===390});
    await Emulation.setTouchEmulationEnabled({enabled:width===390});
-   await Page.navigate({url:BASE+'/'});await Page.loadEventFired();await install();await ev(`window.__coralReady.then(()=>true)`);await ev(STUB);
+   await Page.navigate({url:BASE+'/'});await Page.loadEventFired();await install();await coralReady(ev);await ev(STUB);
    await ev(`(async()=>{const S=window.__coralStatic||'/static/';const {state}=await import(S+'state.js');const files=await import(S+'changed_files.js');const {showView}=await import(S+'utils.js');state.currentSession={type:'live',name:'aa-agent',session_id:'aa-1',board_project:${JSON.stringify(TEAM)}};showView('live-session-view');const side=document.getElementById('agentic-state');side.classList.remove('collapsed');files.initFileSearch();files.syncFilesViewerSession();return true;})()`);
    await ev(`(()=>{const side=document.getElementById('agentic-state');if(innerWidth<=767&&side.getBoundingClientRect().width===0)(document.getElementById('popout-panel-toggle-btn')||document.getElementById('panel-toggle-btn')).click();window.switchAgenticTab('artifacts','top');return true;})()`);
    await waitFor(`document.querySelectorAll('#agentic-panel-artifacts tbody tr').length===3`,'artifact rows');

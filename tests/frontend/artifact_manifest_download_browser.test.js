@@ -4,6 +4,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 const S = `(window.__coralStatic || '/static/')`;
 const ONE = 'a'.repeat(64), MANY = 'b'.repeat(64), PNG = 'c'.repeat(64), TXT = 'd'.repeat(64), SECOND = 'e'.repeat(64);
 
@@ -12,7 +13,7 @@ const ONE = 'a'.repeat(64), MANY = 'b'.repeat(64), PNG = 'c'.repeat(64), TXT = '
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1400, height: 900, deviceScaleFactor: 1, mobile: false });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         await ev(`(() => {
             const real = window.fetch;
             const manifest = list => JSON.stringify(list.map(([name, hex, media_type]) => ({ name, uri: 'coral://artifacts/' + hex, media_type })));

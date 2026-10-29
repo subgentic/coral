@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 (async () => {
  const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
  const B = 'own-tasks-' + Date.now().toString(36);
@@ -27,7 +28,7 @@ const BASE = require('./test_base').BASE;
   await Page.enable();await Page.addScriptToEvaluateOnNewDocument({source:PRELOAD});
   await Emulation.setDeviceMetricsOverride({width:1280,height:900,deviceScaleFactor:1,mobile:false});
   await Page.navigate({url:BASE+'/'});await Page.loadEventFired();await install();
-  await ev(`window.__coralReady.startup('liveList','liveListLoaded','settings')`);
+  await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
   for (const [id,title] of [['Lead','Orchestrator'],['WorkerA','Backend'],['WorkerB','Reviewer'],['WorkerC','QA']]) assert.equal((await api('POST',`/api/board/${B}/subscribe`,{subscriber_id:id,job_title:title,session_name:id+'-session'})).status,200);
   const mk = async(title,id)=>{const r=await api('POST',`/api/board/${B}/tasks`,{title,assigned_to:id,created_by:'Operator'});assert.equal(r.status,201);return r.body.id;};
   await mk('Alpha owned','WorkerA');

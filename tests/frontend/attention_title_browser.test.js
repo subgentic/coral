@@ -2,6 +2,7 @@
 // opt-in a desktop alert per kind. A visible tab changes nothing. Run against an isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -11,7 +12,7 @@ const { connect } = require('./agent_view_harness');
         await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await ev(`window.__m.add('alpha', 'A', 6, { sleeping: false }); window.__m.add('beta', 'B', 6, { sleeping: false }); true`);
         // The browser opted in to desktop alerts; the page can be made hidden by the test.
         await ev(`(() => { window.__notes = []; function N(t, o) { this.title = t; this.opts = o; window.__notes.push(this); this.close = () => {}; } N.permission = 'granted'; window.Notification = N;

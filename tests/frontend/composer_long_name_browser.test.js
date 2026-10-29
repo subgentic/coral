@@ -2,7 +2,7 @@
 // text no longer carries "you can type now" (Send's own title says a message is held). 390 px and 1280 px, a starting agent with a 60-character name and one with a short name.
 // Drives Chrome over CDP through agent_view_harness.js against the isolated dev server, as first_run_status_words_browser does.
 const { connect } = require('./agent_view_harness');
-const { framesJs } = require('./helpers/wait');
+const { framesJs, coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, sleep, PRELOAD, install } = await connect();
@@ -17,7 +17,7 @@ const { framesJs } = require('./helpers/wait');
             const tag = `${w} px`;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.then(() => true)`);
+            await coralReady(ev);
             const words = await ev(`(async () => { const ss = await import(${S} + 'session_state.js');
                 return { longStart: ss.startingPlaceholder(${JSON.stringify(LONG)}), longMsg: ss.commandPlaceholder(${JSON.stringify(LONG)}, 'claude'), shortStart: ss.startingPlaceholder('Backend Dev'), shortMsg: ss.commandPlaceholder('Backend Dev', 'claude'), edge: ss.startingPlaceholder('x'.repeat(24)), over: ss.startingPlaceholder('x'.repeat(25)) }; })()`);
             if (mobile) check(`${tag}: the phone's box holds about 16 characters beside its buttons: "Starting…" and "Message…", whatever the name`, words.longStart === 'Starting\u2026' && words.longMsg === 'Message\u2026' && words.shortStart === 'Starting\u2026' && words.shortMsg === 'Message\u2026', JSON.stringify(words));

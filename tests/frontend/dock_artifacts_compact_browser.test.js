@@ -64,7 +64,7 @@ const STUB = `(() => {
         await Emulation.setTouchEmulationEnabled({ enabled: view.phone });
         await Emulation.setEmulatedMedia({ features: [{ name: 'prefers-color-scheme', value: view.theme }] });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`); await ev(`localStorage.clear(); true`);
+        await require('./helpers/wait').coralReady(ev); await ev(`localStorage.clear(); true`);
         await installAudit(ev); await setTheme(ev, view.theme);
         await ev(STUB);
     };

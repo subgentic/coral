@@ -9,6 +9,7 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const { TOUCH_AREA } = require('./helpers/touch_area');
+const { coralReady } = require('./helpers/wait');
 
 const FILES = [
     { filepath: 'docs/guide.md', status: 'D', additions: 0, deletions: 3 }, { filepath: 'internal/store/store_test.go', status: 'A', additions: 9, deletions: 0 },
@@ -27,7 +28,7 @@ const ROOT = '/work/demo/projects/queue-service';
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await ev(`(() => { const orig = window.fetch; const json = b => Promise.resolve(new Response(JSON.stringify(b), { headers: { 'content-type': 'application/json' } }));
             window.fetch = (url, opts = {}) => { const u = String(url && url.url || url);
                 if (/\\/api\\/sessions\\/live\\/[^/]+\\/files\\?/.test(u)) return json({ files: ${JSON.stringify(FILES)}, diff_mode: 'previous_commit' });

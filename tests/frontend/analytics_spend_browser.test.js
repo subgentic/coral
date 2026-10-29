@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const sceneShots = require('./helpers/scene_shots');
+const { coralReady } = require('./helpers/wait');
 const TEAM = 'coral-go-team';
 const FIX = { board: TEAM, range_hours: 24, generated_at: '2026-10-25T10:00:00Z',
     tokens: { window: { input: 2000000, output: 1100000, cache_read: 61000000, cache_write: null }, usual: { input: 6000000, output: 3000000, cache_read: 90000000, cache_write: null } },
@@ -28,7 +29,7 @@ const FIX = { board: TEAM, range_hours: 24, generated_at: '2026-10-25T10:00:00Z'
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         await ev(`(() => { window.__spendReq = []; window.__spendPaths = []; window.__spend = ${JSON.stringify(FIX)}; window.__spendStatus = 200; const R = window.fetch.bind(window);
             window.fetch = (u, o = {}) => { const url = new URL(String(u), location.origin);
                 if (/\\/api\\/(?:remote\\/[^/]+\\/api\\/)?board\\/[^/]+\\/spend$/.test(url.pathname)) { window.__spendReq.push(url.search); window.__spendPaths.push(url.pathname); return Promise.resolve(new Response(JSON.stringify(window.__spend), { status: window.__spendStatus, headers: { 'Content-Type': 'application/json' } })); }

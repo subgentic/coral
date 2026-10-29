@@ -10,6 +10,7 @@ const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const GOLDEN = path.join(__dirname, 'fixtures', 'create_terminal_golden.json');
 const sha = t => require('node:crypto').createHash('sha256').update(t).digest('hex');
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -18,7 +19,7 @@ const sha = t => require('node:crypto').createHash('sha256').update(t).digest('h
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.startup('liveList', 'settings')`);
+        await coralReady(ev, 'startup', 'liveList', 'settings');
         await ev(`(async () => {
             const st = window.__coralStatic || '/static/';
             const T = window.T = { state: (await import(st + 'state.js')).state, x: await import(st + 'xterm_renderer.js') };

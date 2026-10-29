@@ -3,6 +3,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 const AGENTS = [
     { session_id: 'u1', agent_name: 'a2', folder: 'a2', board_name: 'team-x', requests: 12, input_tokens: 4000, output_tokens: 700, cache_read_tokens: 0, cache_write_tokens: 0, cost_usd: 1.5, first_seen: '2026-10-28T08:00:00Z', last_seen: '2026-10-28T09:00:00Z', is_live: true },
@@ -28,7 +29,7 @@ const LIVE = [
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`); await stub();
+        await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings'); await stub();
         await ev(`import(${MOD} + 'state.js').then(m => { m.state.liveSessions = ${JSON.stringify(LIVE)}; return true; })`);
         await ev(`window.switchNavTab('tokens'); true`);
         await ev(`import(${MOD} + 'analytics_views.js').then(m => { m.selectView('agent'); return true; })`);

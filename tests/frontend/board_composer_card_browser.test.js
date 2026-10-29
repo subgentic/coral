@@ -7,6 +7,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -22,7 +23,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         await Emulation.setDeviceMetricsOverride({ width, height, deviceScaleFactor: 2, mobile });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
         await ev(`localStorage.setItem('coral-theme', '${theme}'); document.documentElement.setAttribute('data-theme', '${theme}'); true`);
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await ev(`(async () => { for (const c of ['Plan for the release', 'Looks good, shipping it']) await fetch('/api/board/${board}/messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'card', as: 'QA', content: c }) }); return true; })()`);
         await ev(`window.__m.add('card-agent', 'A', 3, { sleeping: false, board_project: ${JSON.stringify(board)} }); true`);
         await new Promise(r => setTimeout(r, 600)); // sleep-ok: the first live list renders from several answers; no single completion event

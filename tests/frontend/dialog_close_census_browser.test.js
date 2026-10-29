@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 const MODAL = id => ({ root: `#${id}`, isOpen: `(() => { const m = document.getElementById('${id}'); return !!m && getComputedStyle(m).display !== 'none'; })()` });
 const DIALOGS = {
@@ -51,7 +52,7 @@ const REAL = {
     const fresh = async () => {
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.startup('liveList', 'settings')`);
+        await coralReady(ev, 'startup', 'liveList', 'settings');
         await ev(`(() => { window.__M = f => import((window.__coralStatic || '/static/') + f); const t = document.createElement('button'); t.id = 'opener'; /* z-index 5: above the sidebar's pinned New Agent footer (2) that sits in this corner (#6159) */ t.textContent = 'opener'; t.style.cssText = 'position:fixed;left:4px;bottom:4px;z-index:5'; document.body.append(t); })(); true`);
     };
     // The control a person would press to close it WITHOUT the close X (#9456 took the X out of every dialog; #9473 pins that each can still be dismissed): a visible button in the dialog's footer or actions (not its header, never the

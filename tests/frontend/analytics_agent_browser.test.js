@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const { setTheme } = require('./helpers/contrast');
+const { coralReady } = require('./helpers/wait');
 
 const AGENTS = [{ session_id: 'a1', agent_name: 'Frontend Dev', board_name: 'coral-go-team', folder: 'coral', requests: 120, input_tokens: 40000, output_tokens: 7000, cache_read_tokens: 360000, cache_write_tokens: 900, cost_usd: 24, first_seen: '2026-10-21T05:00:00Z', last_seen: '2026-10-21T06:00:00Z' },
     { session_id: 'a2', agent_name: 'QA Engineer', board_name: 'coral-go-team', folder: 'coral', requests: 4, input_tokens: 900, output_tokens: 90, cache_read_tokens: 0, cache_write_tokens: 0, cost_usd: 0.6, first_seen: '2026-10-21T05:00:00Z', last_seen: '2026-10-21T05:30:00Z' }];
@@ -35,7 +36,7 @@ const CALLS = Array.from({ length: 24 }, (_, h) => ({ bucket: hourIso(23 - h), c
         await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
         await Emulation.setEmulatedMedia({ features: mobile ? [{ name: 'pointer', value: 'coarse' }, { name: 'hover', value: 'none' }] : [] });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`); await stub();
+        await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings'); await stub();
         await ev(`window.switchNavTab('tokens'); true`); await view('agent');
         await waitFor(`document.querySelectorAll('#cost-by-agent tbody tr').length === 2`, 'the agents', 15000);
     };

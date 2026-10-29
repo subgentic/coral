@@ -4,6 +4,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -13,7 +14,7 @@ const BASE = require('./test_base').BASE;
         await Page.addScriptToEvaluateOnNewDocument({ source: `window.__m.add('qa-orch', 'x', 4, { sleeping: false, session_id: 'sid-instr-1' }); window.__m.add('qa-term', 'x', 2, { sleeping: false, session_id: 'sid-instr-2', agent_type: 'terminal' });` }); // the mock list has them from the first load
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.startup('liveList', 'settings')`);
+        await coralReady(ev, 'startup', 'liveList', 'settings');
         await ev(`(() => { const R = window.fetch; window.__puts = []; window.__putAnswer = { status: 200, body: { ok: true, applies: 'at the next restart' } };
             window.fetch = (u, o = {}) => { const url = new URL(String(u), location.origin); if (/\\/instructions$/.test(url.pathname) && (o.method || 'GET') === 'PUT') { window.__puts.push({ path: url.pathname, body: JSON.parse(o.body) }); return Promise.resolve(new Response(JSON.stringify(window.__putAnswer.body), { status: window.__putAnswer.status, headers: { 'Content-Type': 'application/json' } })); } return R(u, o); }; return true; })()`);
         const row = sid => `document.querySelector('#live-sessions-list li[data-session-id="${sid}"]')`;
