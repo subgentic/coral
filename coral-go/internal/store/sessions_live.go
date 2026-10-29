@@ -434,13 +434,14 @@ func (s *SessionStore) ReplaceLiveSession(ctx context.Context, oldSessionID stri
 		now := nowUTC()
 		_, err = tx.ExecContext(ctx,
 			`INSERT OR REPLACE INTO live_sessions
-			 (session_id, agent_type, agent_name, working_dir, display_name, resume_from_id, flags, is_job, prompt, board_name, board_server, backend, icon, name_color, is_sleeping, board_type, capabilities, model, thinking, context_window, tools, pid, status, created_at, list_at, permission_mode)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?)`,
+			 (session_id, agent_type, agent_name, working_dir, display_name, resume_from_id, flags, is_job, prompt, board_name, board_server, backend, icon, name_color, is_sleeping, board_type, capabilities, model, thinking, context_window, tools, pid, status, created_at, list_at, permission_mode, team_id)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, COALESCE(?, (SELECT team_id FROM live_sessions WHERE session_id = ?)))`,
 			newSession.SessionID, newSession.AgentType, newSession.AgentName,
 			newSession.WorkingDir, newSession.DisplayName, newSession.ResumeFromID,
 			newSession.Flags, newSession.IsJob, newSession.Prompt, newSession.BoardName,
 			newSession.BoardServer, newSession.Backend, newSession.Icon, newSession.NameColor, newSession.IsSleeping, newSession.BoardType,
-			newSession.Capabilities, newSession.Model, newSession.Thinking, newSession.ContextWindow, newSession.Tools, newSession.PID, now, listAt, newSession.PermissionMode)
+			newSession.Capabilities, newSession.Model, newSession.Thinking, newSession.ContextWindow, newSession.Tools, newSession.PID, now, listAt, newSession.PermissionMode,
+			newSession.TeamID, oldSessionID) // the team follows the agent to its new row (#11048)
 		return err
 	})
 }
