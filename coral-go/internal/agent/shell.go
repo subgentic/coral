@@ -81,33 +81,81 @@ func isCmdShell(shell string) bool { return shellBase(shell) == "cmd" }
 // AppBundleBinDir returns the directory containing hook binaries if the
 // current executable is running from a macOS .app bundle or a similar
 // packaged install. Returns empty string if not in a bundle.
-func appBundleBinDir() string {
-	exe, err := os.Executable()
+func appBundleBinDir() string { return appBundleBinDirFor(thisExecutable) }
+
+// exeResolver is this process's own executable with its symlinks resolved (os.Executable, then EvalSymlinks), remembered once it has resolved. Resolving walks every parent
+// folder of the path, and the hook-folder code asked on every launch (a test binary: 18,000 times a run, each walk logged to the go test cache and re-checked on every
+// cached run). Only a success is remembered. A caller that finds the remembered folder no longer holds what it looked for (a package manager replaced the binary and moved the
+// symlink) calls drop and resolves fresh, once.
+type exeResolver struct {
+	exe  func() (string, error)
+	mu   sync.Mutex
+	path string
+	ok   bool
+}
+
+var thisExecutable = &exeResolver{exe: os.Executable}
+
+// get returns the real path of the executable, and whether it came from the memory.
+func (r *exeResolver) get() (path string, remembered bool, err error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.ok {
+		return r.path, true, nil
+	}
+	exe, err := r.exe()
 	if err != nil {
-		return ""
+		return "", false, err
 	}
 	exe, err = filepath.EvalSymlinks(exe)
 	if err != nil {
-		return ""
+		return "", false, err
 	}
-	dir := filepath.Dir(exe)
+	r.path, r.ok = exe, true
+	return exe, false, nil
+}
 
-	// macOS .app bundle: .../Coral.app/Contents/MacOS/coral
-	if strings.Contains(dir, ".app"+string(os.PathSeparator)+"Contents"+string(os.PathSeparator)+"MacOS") ||
-		strings.HasSuffix(dir, ".app/Contents/MacOS") {
-		return dir
-	}
+// drop forgets the remembered path, so the next get resolves again.
+func (r *exeResolver) drop() {
+	r.mu.Lock()
+	r.ok = false
+	r.mu.Unlock()
+}
 
-	// Windows/Linux installed: check if hook binaries exist alongside the executable
-	hookPath := filepath.Join(dir, "coral-hook-agentic-state")
-	if runtime.GOOS == "windows" {
-		hookPath += ".exe"
-	}
-	if _, err := os.Stat(hookPath); err == nil {
-		return dir
-	}
+// appBundleBinDirFor is appBundleBinDir for the executable r resolves. A remembered folder is checked by the stat of the hook binary on every call, as before; if that stat
+// fails, the memory is dropped and the path resolved fresh, once.
+func appBundleBinDirFor(r *exeResolver) string {
+	for {
+		exe, remembered, err := r.get()
+		if err != nil {
+			return ""
+		}
+		dir := filepath.Dir(exe)
 
-	return ""
+		// macOS .app bundle: .../Coral.app/Contents/MacOS/coral
+		if strings.Contains(dir, ".app"+string(os.PathSeparator)+"Contents"+string(os.PathSeparator)+"MacOS") ||
+			strings.HasSuffix(dir, ".app/Contents/MacOS") {
+			// A bundle moved or replaced while Coral runs: the remembered folder is checked (one stat), and forgotten if it is gone.
+			if _, err := os.Stat(dir); err == nil || !remembered {
+				return dir
+			}
+			r.drop()
+			continue
+		}
+
+		// Windows/Linux installed: check if hook binaries exist alongside the executable
+		hookPath := filepath.Join(dir, "coral-hook-agentic-state")
+		if runtime.GOOS == "windows" {
+			hookPath += ".exe"
+		}
+		if _, err := os.Stat(hookPath); err == nil {
+			return dir
+		}
+		if !remembered {
+			return ""
+		}
+		r.drop()
+	}
 }
 
 // HookDirEnv names the folder agents get Coral's tools from (coral-board and the
@@ -162,12 +210,8 @@ func CoralToolsSource() (dir, source string) {
 	if d := appBundleBinDir(); d != "" {
 		return d, "this build"
 	}
-	if exe, err := os.Executable(); err == nil {
-		if exe, err = filepath.EvalSymlinks(exe); err == nil {
-			if _, err := os.Stat(filepath.Join(filepath.Dir(exe), "coral-board")); err == nil {
-				return filepath.Dir(exe), "this build (coral-board only)"
-			}
-		}
+	if d := boardOnlyDirFor(thisExecutable); d != "" {
+		return d, "this build (coral-board only)"
 	}
 	if installedFallback.Load() {
 		if _, err := os.Stat(filepath.Join(installedToolsDir, "coral-board")); err == nil {
@@ -175,6 +219,23 @@ func CoralToolsSource() (dir, source string) {
 		}
 	}
 	return "", ""
+}
+
+// boardOnlyDirFor is the folder of the executable r resolves, if coral-board is in it; a remembered folder without it is forgotten and resolved fresh, once.
+func boardOnlyDirFor(r *exeResolver) string {
+	for {
+		exe, remembered, err := r.get()
+		if err != nil {
+			return ""
+		}
+		if _, err := os.Stat(filepath.Join(filepath.Dir(exe), "coral-board")); err == nil {
+			return filepath.Dir(exe)
+		}
+		if !remembered {
+			return ""
+		}
+		r.drop()
+	}
 }
 
 // singleQuote wraps s in single quotes unconditionally, escaping any embedded

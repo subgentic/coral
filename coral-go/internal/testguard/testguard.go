@@ -87,6 +87,10 @@ func comparable(path string) string {
 	return p
 }
 
+// resolvedPaths remembers the real path of each path that existed when it was resolved. The guard asks about the same few folders (the person's data folder and home) on
+// every check, and each resolve walks all their parents; those walks are what the go test cache re-checks on every cached run of a package.
+var resolvedPaths sync.Map
+
 // realPath is path made absolute with symlinks resolved. A path that does
 // not exist yet (a socket or database about to be created) is resolved
 // through its nearest existing ancestor.
@@ -95,10 +99,17 @@ func realPath(path string) string {
 	if abs, err := filepath.Abs(p); err == nil {
 		p = abs
 	}
+	if known, ok := resolvedPaths.Load(p); ok {
+		return known.(string)
+	}
 	var rest []string
 	for cur := p; ; {
 		if resolved, err := filepath.EvalSymlinks(cur); err == nil {
-			return filepath.Join(append([]string{resolved}, rest...)...)
+			out := filepath.Join(append([]string{resolved}, rest...)...)
+			if len(rest) == 0 { // the whole path exists: remember it (a path resolved through an ancestor may become a link later, so it is not)
+				resolvedPaths.Store(p, out)
+			}
+			return out
 		}
 		parent := filepath.Dir(cur)
 		if parent == cur {
