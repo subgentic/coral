@@ -143,7 +143,7 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
         const line = el('div', 'goals-detail-line'); line.append(stateChip(g));
         const meta = W.driverLine(g.driver, whenText(g.updatedAt)); if (meta) line.append(el('span', 'goal-card-meta', meta));
         // A small quiet button at the end of the detail line (#11004, Goal #153): copies one line to paste to an agent, which then runs `coral-board goal brief` to read the goal's open tasks and artifacts
-        const copyBtn = btn('btn btn-quiet btn-small goal-copy-agent', 'Copy for an agent', () => { copyText(W.agentBriefLine(g)).then(ok => showToast(ok ? 'Copied: paste it to an agent' : 'Could not copy', !ok)); });
+        const copyBtn = btn('btn btn-small goal-copy-agent', 'Copy for an agent', () => { copyText(W.agentBriefLine(g)).then(ok => showToast(ok ? 'Copied: paste it to an agent' : 'Could not copy', !ok)); });
         copyBtn.title = 'Copies a line to paste to an agent: it runs coral-board goal brief for this goal';
         line.append(copyBtn);
         main.append(line);
@@ -164,7 +164,7 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
             link.setAttribute('aria-label', `${noun}: show them in the Tasks tab`);
             if ((g.state === 'done' || g.state === 'dropped') && openLeft) progress.append(document.createTextNode(`${g.state === 'done' ? 'Done' : 'Dropped'}, `), link, document.createTextNode(' left open')); // a closed goal's tasks are not "0 of 1 done" beside Done (#10717)
             else progress.append(document.createTextNode(`${doneOf(g.rollup)} of `), link, document.createTextNode(' done'));
-        } else progress.textContent = 'No tasks yet';
+        } else progress.hidden = true; // the tasks list below says "No tasks yet" once (#11027: it was said twice)
         main.append(progress);
         if (total) main.append(rollupBar(g.rollup));
         main.append(el('p', 'goals-note goals-updating', rowsAgree(g) ? '' : 'Updating…')); // the column says it too, and is aria-busy
