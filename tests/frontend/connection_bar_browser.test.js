@@ -39,12 +39,23 @@ const { safePaused } = require('./helpers/paused');
             if (await bar()) assert.equal((await bar()).text, 'Back online', `${w}: says Back online`);
             await waitFor(`!document.getElementById('connection-bar')`, `${w}: Back online goes by itself`, { timeout: 9000 });
             // the browser goes offline (DevTools' Offline keeps the open socket): the same bar after the same few seconds, and Back online after
-            await client.Network.enable(); await client.Network.emulateNetworkConditions({ offline: true, latency: 0, downloadThroughput: -1, uploadThroughput: -1 });
+            // The browser's own online and offline events are what the page listens for. The runner's private loopback-only network namespace (#3466, Linux) starts Chrome with navigator.onLine already false, and DevTools' Offline then
+            // neither changes it nor sends an event (measured on epoch: onLine false before, during and after, no event; with CDP_NETNS=0 it is true, then false with "offline", then true with "online"). So the event the browser did not
+            // send is sent by the test, after waiting for the real one (#10940).
+            await ev(`window.__netEv = []; addEventListener('offline', () => window.__netEv.push('offline')); addEventListener('online', () => window.__netEv.push('online')); true`);
+            const browserGoes = async on => {
+                await client.Network.emulateNetworkConditions({ offline: !on, latency: 0, downloadThroughput: -1, uploadThroughput: -1 });
+                await new Promise(r => setTimeout(r, 500)); // sleep-ok: the browser's own event, when it sends one
+                const type = on ? 'online' : 'offline';
+                if (!(await ev(`window.__netEv.includes('${type}')`))) await ev(`dispatchEvent(new Event('${type}')); true`);
+                await ev(`window.__netEv.length = 0; true`);
+            };
+            await client.Network.enable(); await browserGoes(false);
             await new Promise(r => setTimeout(r, 1000)); // sleep-ok: one second in, nothing is said yet
             assert.equal(await bar(), null, `${w}: offline for a second says nothing`);
             await waitFor(`!!document.getElementById('connection-bar')`, `${w}: the bar after the browser went offline`, { timeout: 9000 });
             assert.equal((await bar()).text, 'No connection, retrying', `${w}: offline says the same words`);
-            await client.Network.emulateNetworkConditions({ offline: false, latency: 0, downloadThroughput: -1, uploadThroughput: -1 });
+            await browserGoes(true);
             await waitFor(`(document.getElementById('connection-bar') || {}).textContent === 'Back online' || !document.getElementById('connection-bar')`, `${w}: back online after offline`, { timeout: 10000 });
             await waitFor(`!document.getElementById('connection-bar')`, `${w}: Back online goes by itself after offline`, { timeout: 9000 });
             if (w === 1280) { // the feed comes back while connection_bar.js is still loading (#10500): the bar must not appear, with nothing to take it away
