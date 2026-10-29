@@ -13,6 +13,10 @@
     {"staged": "2.0.1", "installed": "dev", "notNewer": false, "why": "an unknown version says nothing"},
     {"staged": "2.0.1", "installed": "", "notNewer": false, "why": "no version says nothing"},
     {"staged": "nonsense", "installed": "2.0.3", "notNewer": false, "why": "a staged version that is not a version says nothing"},
+    {"staged": "2.0.4-rc1", "installed": "2.0.4", "notNewer": true, "why": "a prerelease is older than its release"},
+    {"staged": "v2.0.4", "installed": "2.0.4", "notNewer": true, "why": "a v on the staged one"},
+    {"staged": "2.0.4-rc2", "installed": "2.0.4-rc1", "notNewer": false, "why": "a later prerelease"},
+    {"staged": "2.0.4-rc1", "installed": "2.0.4-rc2", "notNewer": true, "why": "an earlier prerelease"},
     {"staged": "10.0.0", "installed": "9.9.9", "notNewer": false, "why": "numbers, not text"},
     {"staged": "9.9.9", "installed": "10.0.0", "notNewer": true, "why": "numbers, not text"}
   ]
