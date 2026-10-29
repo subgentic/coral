@@ -117,7 +117,7 @@ function closeMenu() {
 function openMenu(btn) {
     const menu = document.getElementById('nav-more-menu');
     if (!menu) return;
-    const hamburger = btn.id === 'top-menu-btn';
+    const hamburger = btn.id === 'top-menu-btn' || btn.hasAttribute('data-hamburger'); // the agent row's menu button is the same menu (#11056)
     const all = hamburger || btn.hasAttribute('data-nav-all');
     const items = all ? availableTabs() : _more;
     if (!items.length) return;
@@ -180,7 +180,7 @@ function layoutSelect() {
         hamburger.setAttribute('aria-label', (words ? `${words}, menu` : 'Menu') + (waits ? `, ${waits}` : '')); // its name has the words it shows: the open view first (#9116)
         if (hamburger.hasAttribute('data-waiting') !== !!waits) hamburger.toggleAttribute('data-waiting', !!waits);
     }
-    if (_menuFor && (_menuFor.id === 'nav-select' && !isPhone() || _menuFor.id === 'top-menu-btn' && !window.matchMedia('(max-width: 639px)').matches)) closeMenu();
+    if (_menuFor && (_menuFor.id === 'nav-select' && !isPhone() || (_menuFor.id === 'top-menu-btn' || _menuFor.id === 'agent-bar-menu') && !window.matchMedia('(max-width: 639px)').matches)) closeMenu();
 }
 
 let _scheduled = 0;

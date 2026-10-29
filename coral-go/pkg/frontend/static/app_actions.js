@@ -188,6 +188,7 @@ registerActions({
     'goal-edit': () => window.editGoal(),
     'live-view-mode': el => { if (el.dataset.mode === 'chat' || el.dataset.mode === 'terminal') window.setLiveViewMode(el.dataset.mode); },
     'chat-find-toggle': () => window.toggleChatFind(),
+    'agent-bar-more': el => { const d = document.getElementById('agent-phone-details'), h = el.closest('.terminal-header'), open = el.getAttribute('aria-expanded') !== 'true'; el.setAttribute('aria-expanded', String(open)); if (h) h.toggleAttribute('data-more', open); if (d) d.open = open; }, // a phone's agent row (#11056): the controls that do not fit the one row, and the Details, open under it
     'agentic-panel-toggle': el => (el.dataset.open === '0' ? window.toggleAgenticPanel(false) : window.toggleAgenticPanel()),
     'agentic-tab': el => { if (AGENTIC_TABS.has(el.dataset.tab)) window.switchAgenticTab(el.dataset.tab, 'top'); },
     'session-restart': () => window.restartSession(),

@@ -35,6 +35,8 @@
                             <div class="terminal-header">
                                 <div class="terminal-header-left" id="popout-header-identity" aria-live="polite">
                                     <!-- A phone's way back to the agent list (#9999): the page's own header is hidden there, so the arrow lives in this one -->
+                                    <!-- Under 640 px the page's top bar is hidden while an agent is open and its menu button is the first thing of this row (#11056, the operator: one row) -->
+                                    <button class="btn btn-quiet btn-icon terminal-header-btn agent-bar-menu" id="agent-bar-menu" type="button" data-on-click="m-top-menu" data-hamburger aria-haspopup="menu" aria-expanded="false" aria-controls="nav-more-menu" aria-label="Menu"><span class="material-icons" aria-hidden="true">menu</span></button>
                                     <button class="btn btn-quiet btn-icon terminal-header-btn terminal-back-btn" type="button" data-on-click="mobile-back" title="Agents" aria-label="Agents"><span aria-hidden="true">&larr;</span></button>
                                     <span class="terminal-status-dot" id="terminal-status-dot"></span><span class="terminal-status-word" id="terminal-status-word" aria-hidden="true"></span><!-- a phone's word for the dot (#10885): real text, so find-in-page and zoom see it; the dot carries the name for a screen reader, so this is not read twice -->
                                     <span class="terminal-identity" id="terminal-header-identity" tabindex="0">
@@ -75,6 +77,7 @@
                                         <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1.5" y="2.5" width="13" height="11" rx="1.5"/><path d="M10 2.5v11"/></svg>
                                     </button>
                                     <!-- View toggle: raw terminal vs. rendered chat transcript, the last of the header's actions, at the far right after Search and Pop out (#9927, the operator) -->
+                                    <button class="btn btn-quiet btn-icon terminal-header-btn agent-bar-more" id="agent-bar-more" type="button" data-on-click="agent-bar-more" aria-expanded="false" aria-controls="agent-phone-details" title="More: Search, Panel, folder, branch, model" aria-label="More about this agent"><svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="3" cy="8" r="1.5"/><circle cx="8" cy="8" r="1.5"/><circle cx="13" cy="8" r="1.5"/></svg></button>
                                     <div class="live-view-toggle" role="group" aria-label="Center view">
                                         <button type="button" class="live-view-toggle-btn active" id="live-view-btn-chat" data-on-click="live-view-mode" data-mode="chat" aria-pressed="true" title="Chat view: read and send messages" aria-label="Chat view">
                                             <span class="material-icons" aria-hidden="true">chat</span><span>Chat</span>

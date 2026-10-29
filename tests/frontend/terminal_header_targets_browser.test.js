@@ -21,6 +21,7 @@ const BASE = require('./test_base').BASE;
             await ev(`window.setLiveViewMode('terminal'); true`);
             await waitFor(`window.__vis('#terminal-statusbar')`, 'the terminal view', 8000);
             const SEL = ['#terminal-fit-width-btn', '#popout-panel-toggle-btn', '#live-view-btn-chat', '#live-view-btn-terminal', '.attach-image-btn', '.mobile-send-btn', '.mobile-send-options-btn'];
+            await ev(`(() => { const m = document.getElementById('agent-bar-more'); if (m && getComputedStyle(m).display !== 'none' && m.getAttribute('aria-expanded') !== 'true') m.click(); return true; })()`); // under 640 px the panel and Fit width are on the line under the row, behind ⋯ (#11056)
             // Fit width shows when the pane is wider than the window: it is made to show, and measured in the same turn (the page hides it again when it measures the pane)
             const boxes = await ev(`(() => { const f = document.getElementById('terminal-fit-width-btn'); if (f) f.hidden = false; return ${JSON.stringify(SEL)}.map(s => { const e = document.querySelector(s); if (!e || !e.checkVisibility()) return { s, missing: true }; const b = e.getBoundingClientRect(); return { s, w: Math.round(b.width), h: Math.round(b.height), l: Math.round(b.left), t: Math.round(b.top), r: Math.round(b.right), b: Math.round(b.bottom) }; }); })()`);
             const missing = boxes.filter(x => x.missing).map(x => x.s);

@@ -86,7 +86,7 @@ module.exports = part => (async () => {
                 await tap('#options-chip-menu [data-options-open="model"]');
             }, { min: 10, expect: `!document.getElementById('model-chip-menu').hidden` });
             await ev(`document.body.click(); true`);
-            await sc('chat: find bar', async () => { await tap('#chat-find-btn'); await waitFor(`!document.querySelector('.chat-find-bar').hidden`, 'find bar', 5000); }, { min: 12, expect: `document.querySelector('.chat-find-input').getClientRects().length > 0` });
+            await sc('chat: find bar', async () => { if (await ev(`getComputedStyle(document.getElementById('agent-bar-more')).display !== 'none'`)) await tap('#agent-bar-more'); await tap('#chat-find-btn'); await waitFor(`!document.querySelector('.chat-find-bar').hidden`, 'find bar', 5000); }, { min: 12, expect: `document.querySelector('.chat-find-input').getClientRects().length > 0` });
             await tap('.chat-find-close');
             await sc('terminal view', async () => { await tap('#live-view-btn-terminal'); }, { min: 8, expect: `document.getElementById('live-view-btn-terminal').getAttribute('aria-pressed') === 'true' || document.getElementById('live-view-btn-terminal').classList.contains('active')` });
             await sc('terminal view: key bar', async () => { await ev(`window.closeSendMenu(); document.getElementById('keys-chip').click(); true`); await waitFor(`!!document.getElementById('terminal-key-bar') && document.getElementById('terminal-key-bar').getClientRects().length > 0`, 'the terminal key bar', 10000); }, { min: 11, expect: `document.querySelectorAll('#terminal-key-bar .tkb-key').length === 12` });
