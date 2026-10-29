@@ -432,3 +432,7 @@ coral-agent history context <ancestor_session_id> 14
 coral-agent history search "api key" --json
 ```
 
+### Search access (levels)
+
+By default a search reads only YOUR OWN chats (your session and its resumed ancestors) and your own board. `--team` (your teammates' chats and your team's boards), `--all` (every chat and board Coral launched) and `--operator-history` (also the Operator's own CLI history on disk, which `--all` leaves out) ask for a wider reach on purpose; no flag is always your own, whatever level you have. Each needs the Operator to have raised this agent's **Search access** in the dashboard (own < team < all < operator); an agent cannot raise it, nor use a teammate's. A request above your level is refused (HTTP 403, `search_reach_refused`, exit 5) with the level it needs: relay that to the Operator as it is. `history context <session> <idx> --team` reads a teammate's session the same way. Searches above your own are limited per agent and logged (who, level and a count, never the text).
+
