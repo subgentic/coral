@@ -138,6 +138,8 @@
     #docs-view:not([data-phone-item]) .docs-page { display: none; }
     #docs-view[data-phone-item] #mobile-docs-list { display: none; }
     #docs-view .docs-phone-back { display: inline-flex; align-items: center; min-height: var(--control-touch-height, 44px); }
+    #docs-content .phone-title-row { position: sticky; top: 0; z-index: 2; background: var(--bg-primary); } /* the way back stays on screen down a long answer (#10908) */
+    #docs-content :is(h1, h2, h3, h4, h5, [id]) { scroll-margin-top: 72px; } /* a heading or link jumped to is not hidden under it */
     #docs-back { display: none; } /* a phone has its own back, to the list */
     #mobile-docs-list .sidebar-hide-btn { display: none; } /* the page is the whole screen: there is no column to hide */
     #mobile-docs-list .sidebar-header { padding: 12px; }
