@@ -197,7 +197,7 @@ func TestSendUsageErrorsSayWhatToDo(t *testing.T) {
 		"a missing message, local":          {[]string{"--board", "beta"}, []string{"usage: coral-board send --board", "A message is required", "--file", "stdin"}},
 		"a missing message, address":        {[]string{"--address", "homelab/qa"}, []string{"usage: coral-board send --address", "--attach", "A message is required"}},
 		"--address with --board":            {[]string{"--address", "homelab/qa", "--board", "beta", "hi"}, []string{"can't be combined"}},
-		"--reply-to without --address":      {[]string{"--board", "beta", "--reply-to", "3", "hi"}, []string{"go with --address"}},
+		"--reply-to not a number":           {[]string{"--board", "beta", "--reply-to", "x", "hi"}, []string{"takes a message id"}}, // main lets --reply-to go with --board (#9054)
 	} {
 		err := runSend(tc.args, id, &bytes.Buffer{})
 		if err == nil || clierr.KindOf(err) != clierr.Usage {
