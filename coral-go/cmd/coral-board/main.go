@@ -69,6 +69,8 @@ func main() {
 		cmdPost()
 	case "read":
 		cmdRead()
+	case "search":
+		cmdSearch()
 	case "check":
 		cmdCheck()
 	case "projects":
@@ -182,6 +184,10 @@ Commands:
   queue [--json]               The merge queue: approved tasks whose patches have not landed
   health ack <id>              Mark a health-check item handled: the item that ends
                                with [ack <id>] (orchestrator or Operator)
+  search "<text>" [--from NAME] [--mentions NAME] [--since T] [--until T] [--sort newest|oldest] [--limit N] [--cursor C] [--json]
+                               Search the messages of your own board (the one you were launched on), oldest posts
+                               included; a hit's context is: read --id <id>. --team, --all and --operator-history
+                               ask for a wider reach and are refused unless the Operator raised your search access
   peek "<agent>" [--lines N]   Peek at agent's terminal (orchestrator only)
   waiting "<agent>"            List what waits for an agent: its unread board messages and the last send not typed
                                (the Operator, or an Orchestrator for the agents of its own team)

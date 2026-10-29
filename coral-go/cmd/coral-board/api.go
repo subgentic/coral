@@ -153,10 +153,15 @@ func apiCallRaw(method, path string, body any) ([]byte, int, error) {
 // apiCallRawTimeout is apiCallRaw with its own timeout (a message relayed to another
 // Coral can take up to about 30 s: the hub waits up to 20 s for the target, #3489).
 func apiCallRawTimeout(method, path string, body any, timeout time.Duration) ([]byte, int, error) {
+	return apiCallRawAt("/api/board", method, path, body, timeout)
+}
+
+// apiCallRawAt is apiCallRawTimeout for a route under another prefix of the server's API (the agent routes, "/api/agent": #11005).
+func apiCallRawAt(prefix, method, path string, body any, timeout time.Duration) ([]byte, int, error) {
 	timeout = clierr.Timeout(timeout) // CORAL_TIMEOUT, when set, replaces the command's own
 	client := &http.Client{Timeout: timeout}
 	var lastErr error
-	for i, endpoint := range requestURLs(serverURL + "/api/board" + path) {
+	for i, endpoint := range requestURLs(serverURL + prefix + path) {
 		if i > 0 && !retryLoopbackTransport(method, lastErr) {
 			break
 		}
