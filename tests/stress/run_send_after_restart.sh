@@ -99,7 +99,7 @@ stop_server() {
     SERVER_PID=""
 }
 driver() {
-    python3 "$SCRIPT_DIR/send_after_restart.py" "$1" "$BASE_URL" "$(coral_test_native_path "$TMPDIR_SR")" "$CORAL_TEST_EXE" "$CORAL_TEST_BACKEND" "$(coral_test_native_path "$CORAL_TEST_HOME")" "$2"
+    python3 "$SCRIPT_DIR/send_after_restart.py" "$1" "$BASE_URL" "$(coral_test_native_path "$TMPDIR_SR")" "$CORAL_TEST_EXE" "$CORAL_TEST_BACKEND" "$(coral_test_native_path "$CORAL_TEST_HOME")" "$2" "${3:-}"
 }
 for round in $(seq 1 "$REPEAT"); do
     [[ -n "$SERVER_PID" ]] || start_server  # round 2 on continues on the server round 1 left running
@@ -107,6 +107,7 @@ for round in $(seq 1 "$REPEAT"); do
     driver before "r$round"
     log "Restarting Coral (same data dir)..."
     stop_server
+    driver diverge "r$round" "$CORAL_DATA_DIR/sessions.db"
     start_server
     log "Round $round/$REPEAT: send after the restart..."
     driver after "r$round"

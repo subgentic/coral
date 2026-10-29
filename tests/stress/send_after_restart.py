@@ -1,7 +1,10 @@
 """Driver for run_send_after_restart.sh (Goal #133, #10996): a person's send through the composer's route after Coral restarts.
 
-Two phases, with the shell restarting the server between them (the agents' terminals survive it):
+Three phases, with the shell stopping the server after `before` and starting it again before `after` (the agents' terminals survive):
   before  launch a team of two mock agents, send once to each, save who they are
+  diverge (server stopped) give Sender a stored agent_name that is not its terminal's folder name, the state a terminal re-adopted
+          after a restart is in (#10813: the list named it by the folder, the send compared the stored name: 400 session target
+          mismatch). Written in sessions.db, as Backend Dev named the way to force it.
   after   Coral is a new process: send to each as the dashboard's composer does, sleep and wake one and send again,
           and send while a board nudge is due. Every send must come back 200 and land in the agent's terminal:
           no `session target mismatch` (#10813) and no `not_submitted`.
@@ -21,6 +24,7 @@ import urllib.parse
 import urllib.request
 
 phase, url, folder, suffix, backend, home, tag = sys.argv[1:8]
+STORED_NAME = "Stored-" + tag
 root = Path(folder)
 state_file = root / f"send-restart-{tag}.json"
 cookie = ""
@@ -132,7 +136,16 @@ def mock_ready(session_id):
 
 state = {}
 try:
-    if phase == "before":
+    if phase == "diverge":
+        import sqlite3
+        state = json.loads(state_file.read_text())
+        db = sqlite3.connect(sys.argv[8])  # the isolated server's sessions.db, passed by the runner
+        changed = db.execute("UPDATE live_sessions SET agent_name = ? WHERE session_id = ?",
+                             (STORED_NAME, state["agents"]["Sender"]["session_id"])).rowcount
+        db.commit()
+        db.close()
+        check("Sender's stored agent_name now differs from its terminal's folder name", changed == 1)
+    elif phase == "before":
         assert api("PUT", "/api/settings", {"cli_path_claude": str(root / ("mock-agent" + suffix))})["ok"]
         launch = api("POST", "/api/sessions/launch-team", {
             "board_name": "send-restart-" + tag, "working_dir": str(root / "work"), "agent_type": "claude",
@@ -152,6 +165,8 @@ try:
         for who, s in state["agents"].items():
             check(f"after the restart, {who} is still a live row", row(s["session_id"])["session_id"] == s["session_id"])
             delivered(f"after the restart, a send to {who}", s["session_id"], f"after-restart {who} {tag}")
+        check("the live list names Sender by its stored name, not its terminal's folder (#10813)", row(sender["session_id"])["name"] == STORED_NAME,
+              row(sender["session_id"])["name"])
         # Sleep and wake: the row is the same session, and its next send is not refused for a name or type that changed.
         check("the sender goes to sleep", api("POST", f"/api/sessions/live/{sender['session_id']}/sleep", {})["sleeping"])
         api("POST", f"/api/sessions/live/{sender['session_id']}/wake", {})
