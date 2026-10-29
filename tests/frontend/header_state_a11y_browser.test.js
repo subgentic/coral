@@ -9,7 +9,7 @@ const { connect } = require('./agent_view_harness');
     const { Accessibility, DOM } = client;
     const ok = name => console.log(`   ✓ ${name}`);
     const dot = () => ev(`(() => { const d = document.getElementById('terminal-status-dot'); const h = document.querySelector('#live-session-view .terminal-header');
-        return { cls: d.className, title: d.title, role: d.getAttribute('role'), label: d.getAttribute('aria-label'), noWordElement: !document.getElementById('terminal-state-word'), headerText: h.textContent.replace(/\\s+/g, ' ') }; })()`);
+        return { cls: d.className, title: d.title, role: d.getAttribute('role'), label: d.getAttribute('aria-label'), noWordElement: !document.getElementById('terminal-state-word'), headerText: (c => { const x = c.querySelector('#agent-phone-details'); if (x) x.remove(); return c.textContent.replace(/\\s+/g, ' '); })(h.cloneNode(true)) }; })()`); // the Details card is the header's child, but its facts are not the header's row (#11056)
     try {
         await Page.enable();
         await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });

@@ -33,11 +33,11 @@
                     <div class="live-left-column">
                         <div id="capture-wrapper" class="capture-wrapper">
                             <div class="terminal-header">
-                                <div class="terminal-header-left" id="popout-header-identity" aria-live="polite">
+                                <!-- Under 640 px the page's top bar is hidden while an agent is open and its menu button is the first thing of this row (#11056, the operator: one row) -->
+                                <button class="btn btn-quiet btn-icon terminal-header-btn agent-bar-menu" id="agent-bar-menu" type="button" data-on-click="m-top-menu" data-hamburger aria-haspopup="menu" aria-expanded="false" aria-controls="nav-more-menu" aria-label="Menu"><span class="material-icons" aria-hidden="true">menu</span></button>
+                                                                <div class="terminal-header-left" id="popout-header-identity" aria-live="polite">
                                     <!-- A phone's way back to the agent list (#9999): the page's own header is hidden there, so the arrow lives in this one -->
-                                    <!-- Under 640 px the page's top bar is hidden while an agent is open and its menu button is the first thing of this row (#11056, the operator: one row) -->
-                                    <button class="btn btn-quiet btn-icon terminal-header-btn agent-bar-menu" id="agent-bar-menu" type="button" data-on-click="m-top-menu" data-hamburger aria-haspopup="menu" aria-expanded="false" aria-controls="nav-more-menu" aria-label="Menu"><span class="material-icons" aria-hidden="true">menu</span></button>
-                                    <button class="btn btn-quiet btn-icon terminal-header-btn terminal-back-btn" type="button" data-on-click="mobile-back" title="Agents" aria-label="Agents"><span aria-hidden="true">&larr;</span></button>
+<button class="btn btn-quiet btn-icon terminal-header-btn terminal-back-btn" type="button" data-on-click="mobile-back" title="Agents" aria-label="Agents"><span aria-hidden="true">&larr;</span></button>
                                     <span class="terminal-status-dot" id="terminal-status-dot"></span><span class="terminal-status-word" id="terminal-status-word" aria-hidden="true"></span><!-- a phone's word for the dot (#10885): real text, so find-in-page and zoom see it; the dot carries the name for a screen reader, so this is not read twice -->
                                     <span class="terminal-identity" id="terminal-header-identity" tabindex="0">
                                         <span class="terminal-session-label" id="terminal-header-label"></span>

@@ -84,7 +84,7 @@ const { removeBoards, removeTeams } = require('./helpers/board_cleanup');
         check('a remote agent shows its server', m.server.text === 'build-box' && m.team.text === 'infra' && m.server.whole, JSON.stringify(m));
 
         m = await scene(`{ board_project: 'a-very-long-team-name-that-will-never-fit-in-a-phone-header-at-all', server: 'build-box' }`);
-        check('a long team name is cut short (ellipsis) and stays inside the header', m.team.shown && !m.team.whole && m.team.inside, JSON.stringify(m.team));
+        check('a long team name stays inside the header (it takes at most two lines in the one-row header, #11056)', m.team.shown && m.team.inside, JSON.stringify(m.team));
         check('...while the server stays whole', m.server.shown && m.server.whole && m.server.inside, JSON.stringify(m.server));
         check('the full text is in the title', /a-very-long-team-name/.test(m.title) && /build-box/.test(m.title), m.title);
 
