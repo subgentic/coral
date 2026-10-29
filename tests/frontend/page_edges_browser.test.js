@@ -32,6 +32,7 @@ const EMPTY = `(() => { const vis = e => e && e.getClientRects().length && getCo
             edges[name] = await ev(TITLE); ok(edges[name], `${name} has a title`);
             await shot('1280-' + name);
             if (['tasks', 'artifacts', 'jobs', 'workflows'].includes(name)) {
+                if (name === 'tasks' || name === 'artifacts') await waitFor(`(${EMPTY}).line !== null && (${EMPTY}).hint !== null`, `${name}: the empty state is drawn (its line and its hint)`, 10000); // right after another suite the folder's table answers late: read the empty state once it is there
                 const e = await ev(EMPTY);
                 if (e.line) ok(Math.abs(e.left - edges[name].left) <= 1, `${name}: the empty state's words start at the title's edge (${e.left} and ${edges[name].left})`);
                 if (name === 'tasks' || name === 'artifacts') ok(e.hint, `${name}: the empty state says what fills it (${JSON.stringify(e)})`);
