@@ -5,12 +5,15 @@ package main
 import (
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/windows"
+
+	"github.com/subgentic/coral/internal/installrestart"
 )
 
 // A tray is a coral-tray whose command line could be read and is not its server child's (--server-child, in either flag form); a process
@@ -79,6 +82,7 @@ func TestAProcessIsReadFromItsHandle(t *testing.T) {
 // The log reaches its file with no standard error: Windows Installer starts the GUI helper without one, and a write to it fails (Security
 // on #155: a MultiWriter with stderr stopped there, and every helper log stayed empty).
 func TestTheLogReachesItsFileWithNoStandardError(t *testing.T) {
+	notElevated(t) // this path is the unelevated run's: TEMP. A CI runner is an administrator, so the token is not left to chance.
 	dir := t.TempDir()
 	t.Setenv("TMP", dir)
 	t.Setenv("TEMP", dir)
@@ -100,4 +104,60 @@ func TestTheLogReachesItsFileWithNoStandardError(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, string(b), "(elevated: ")
 	assert.Contains(t, string(b), "a later line")
+}
+
+// notElevated makes this run's token read as not elevated for the test.
+func notElevated(t *testing.T) { elevated(t, false) }
+
+func elevated(t *testing.T, is bool) {
+	t.Helper()
+	old := processElevated
+	processElevated = func() bool { return is }
+	t.Cleanup(func() { processElevated = old })
+}
+
+// An ELEVATED run never logs into TEMP (the user's, where a link can be planted): its log is created new in the opened, plain mark folder, and TEMP stays empty (Security
+// on #155). With no usable folder there is no log, never a fallback to TEMP.
+func TestAnElevatedRunLogsInTheMarkFolderNeverInTemp(t *testing.T) {
+	elevated(t, true)
+	temp := t.TempDir()
+	t.Setenv("TMP", temp)
+	t.Setenv("TEMP", temp)
+	mark := filepath.Join(t.TempDir(), "Coral")
+	t.Cleanup(installrestart.SetFolderForTest(mark))
+	stderr := os.Stderr
+	t.Cleanup(func() { log.SetOutput(stderr) })
+
+	closeLog := openLog()
+	log.Printf("an elevated line")
+	closeLog()
+
+	logs, err := filepath.Glob(filepath.Join(mark, "coral-msi-helper-*.log"))
+	require.NoError(t, err)
+	require.Len(t, logs, 1, "the log is in the mark folder")
+	b, err := os.ReadFile(logs[0])
+	require.NoError(t, err)
+	assert.Contains(t, string(b), "(elevated: true)")
+	assert.Contains(t, string(b), "an elevated line")
+	inTemp, _ := filepath.Glob(filepath.Join(temp, "coral-msi-helper-*.log"))
+	assert.Empty(t, inTemp, "and nothing is written to TEMP")
+
+	// a mark folder that is a junction: no log at all, and still nothing in TEMP
+	target := t.TempDir()
+	link := filepath.Join(t.TempDir(), "Coral")
+	out, cerr := exec.Command("cmd", "/c", "mklink", "/J", link, target).CombinedOutput()
+	require.NoError(t, cerr, "mklink /J: %s", out)
+	t.Cleanup(installrestart.SetFolderForTest(link))
+	closeLog = openLog()
+	log.Printf("not logged")
+	closeLog()
+	assert.Empty(t, mustGlob(t, filepath.Join(target, "*")), "nothing was created through the junction")
+	assert.Empty(t, mustGlob(t, filepath.Join(temp, "coral-msi-helper-*.log")), "no fallback to TEMP")
+}
+
+func mustGlob(t *testing.T, pattern string) []string {
+	t.Helper()
+	m, err := filepath.Glob(pattern)
+	require.NoError(t, err)
+	return m
 }
