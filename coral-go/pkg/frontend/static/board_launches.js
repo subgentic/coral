@@ -2,7 +2,7 @@
 import { importOnce } from './import_once.js';
 import { state } from './state.js';
 import { showToast } from './utils.js';
-import { splitKey, isHub, normServer, LOCAL_SERVER, keyLabel } from './server_base.js';
+import { splitKey, isHub, normServer, LOCAL_SERVER, keyLabel, teamFetch, pickTeamFolder } from './server_base.js';
 import { serverLabel, bareBoardName } from './launch_server.js';
 const { launch } = await importOnce('./launch_state.js');
 const { _effectiveServer, _loadServerSettings, _settingsFor } = await importOnce('./launch_models.js');
@@ -15,14 +15,25 @@ const { _launchBlocked, _launchOn, _onServerSuffix, _refreshAfterLaunch } = awai
 // working directory shown belongs to that server.
 // Add agent is New Agent's own dialog with the team (or the folder) preset (#7778, launch_dialog.js showAddAgentFlow): persona, Next, the agent with its permissions.
 
+/** The team's home folder (#10815) from its own record, '' when it has none or cannot be read (a team of a computer that is away, a board that is not a launched team). */
+async function _teamHomeFolder(boardName) {
+    try {
+        const r = await teamFetch(boardName, n => `/api/teams/detail/${encodeURIComponent(n)}`);
+        const d = r.ok ? await r.json() : null;
+        return d && typeof d.working_dir === 'string' ? d.working_dir : '';
+    } catch { return ''; }
+}
+
 export async function showAddAgentToBoard(boardName, workDir) {
     const { showAddAgentFlow } = await importOnce('./launch_dialog.js');
+    workDir = pickTeamFolder(await _teamHomeFolder(boardName), [{ working_directory: workDir }]); // the home folder first, then the folder the row offered (a session that has one) (#11083)
     showAddAgentFlow({ board: boardName, workDir, server: splitKey(boardName).server });
 }
 
 // ── Launch Terminal to Board ─────────────────────────────────────────────
 
 export async function launchTerminalToBoard(boardName, workDir) {
+    workDir = pickTeamFolder(await _teamHomeFolder(boardName), [{ working_directory: workDir }]); // as Add agent (#11083)
     const server = _effectiveServer(splitKey(boardName).server);
     if (_launchBlocked(server)) return;
     const board = bareBoardName(boardName);

@@ -312,6 +312,14 @@ export function teamWorkDir(sessions, teamKey) {
     return s ? s.working_directory : '';
 }
 
+/** The folder Add agent and Add terminal start a team's agent in (#11083): the team's home folder (#10815) if one is set, else the first of its sessions that has a working directory (a terminal, a finished or a stale row may have none, and the first row of the list is not the only one to ask), else ''. */
+export function pickTeamFolder(home, sessions) {
+    const h = String(home || '').trim();
+    if (h) return h;
+    const s = (sessions || []).find(x => x && x.working_directory);
+    return s ? s.working_directory : '';
+}
+
 /** The team key of a waiting agent's goal: the session's own team (qualified for another server), else the goal's board; '' when neither. */
 export function goalTeamKey(s) {
     return sessionTeamKey(s) || String((s && s.goal && s.goal.board) || '');
