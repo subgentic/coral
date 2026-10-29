@@ -47,7 +47,8 @@
     .goals-detail-col { border: none; padding: 0; background: none; }
     .goals-back { display: inline-flex; align-items: center; min-width: 44px; }
     .goals-chip, .goals-dialog .btn, .goals-new, .goals-failed .btn, .empty-state .btn { min-height: var(--control-touch-height, 44px); }
-    .goals-dialog { width: 100vw; height: 100dvh; max-width: none; max-height: none; border-radius: 0; margin: 0; }
+    dialog.goals-dialog { --dlg-max: 100vw; width: 100vw; height: 100dvh; max-width: none; max-height: none; border-radius: 0; margin: 0; } /* the shared dialog rule caps max-width at var(--dlg-max) !important: a phone's sheet takes the whole width (#11027: it was 371 px) */
+    .goals-form h3 { padding-bottom: 12px; border-bottom: 1px solid var(--border); } /* the title is a bar with a rule under it, as the other phone dialogs' */
     .goals-field input, .goals-field select { min-height: var(--control-touch-height, 44px); }
     .goals-page.goals-open .goals-require { display: none; } /* an open goal is a screen of its own, the back row first (UI/UX #7113) */
 }
