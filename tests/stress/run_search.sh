@@ -13,7 +13,13 @@
 #   restart    an agent restarted and an agent woken in the middle of a loop of searches: no other team's canary in
 #              any answer; the old token is refused and the new one searches
 #   log        100 back-to-back searches grow the server log by a bounded amount and the log holds no canary
-# Later phases of #11005 (the levels, the history search, the limits) add their checks to this runner.
+#   levels     (#11048) the 4x4 matrix: every level (own, team, all, operator), set by the Operator's route, against
+#              every flag (none, --team, --all, --operator-history), for the board search and the chat history
+#              search: allowed exactly when the flag is not above the level, else exit 5 naming the level needed and
+#              no data; each allowed reach returns the right canaries (team: its own team's only; all: every board)
+#   identity   (levels) an agent token calling the set route or reading the access log is refused; a teammate at
+#              'own' does not borrow another's level; setting 'operator' needs confirm; the access log has the raises
+#              and the reads above own and no text; a loop of refused requests reaches the rate limit (429)
 #
 # Usage:  tests/stress/run_search.sh      (or: tests/stress/run.sh --search)
 #   CORAL_SEARCH_PORT (default 8477), KEEP_TEST_DATA=1
@@ -207,6 +213,98 @@ if [[ -n "$NS1" ]]; then
     out=$(as_agent "$NS1" search CANARY) || true
     [[ "$out" == *"$CAN1"* ]] && no_foreign "$out" $ALLCAN && pass "wake: the woken agent searches its own board with its new token, no foreign canary" || fail "wake: search after wake: ${out:0:240}"
 else fail "restart: the restarted agent never came back"; NS1="$S1"; fi
+
+# ── levels (#11048): the 4x4 matrix, set by the Operator's route ───────────────────────────────────────────
+as_agent_cli() {
+    local sid=$1; shift
+    env -i PATH="$PATH" HOME="$(NP "$TMP/h")" USERPROFILE="$(NP "$TMP/h")" CORAL_DATA_DIR="$(NP "$DATA")" CORAL_URL="$BASE" \
+        CORAL_SESSION_TOKEN="$(token_of "$sid")" CORAL_SESSION_NAME="$(sess_of "$sid")" CORAL_SUBSCRIBER_ID="$(role_of "$sid")" "$BIN/coral-agent" "$@" 2>&1
+}
+# the id of the team member row a session is on (members[].id of the team detail), looking under each name given
+member_of() {
+    local sid=$1 n; shift
+    for n in "$@"; do
+        api GET "/api/teams/detail/$n" | python3 -c 'import sys,json
+try: d=json.load(sys.stdin)
+except Exception: sys.exit(0)
+for m in d.get("members") or []:
+    if m.get("session_id")==sys.argv[1]: print(m["id"]); break' "$sid" | head -1 | grep . && return 0
+    done
+    return 1
+}
+set_level() { api PUT "/api/team-members/$1/search-access" -d "{\"level\":\"$2\"$( [[ $2 == operator ]] && echo ',"confirm":"operator"' )}"; }
+rank() { case "$1" in own|"") echo 0;; team) echo 1;; all) echo 2;; operator) echo 3;; esac; }
+LV_SID="${NS1:-$S1}"
+LV_MEMBER=$(member_of "$LV_SID" "$K1" srch-team-1 || true)
+DEV1=$(agent_of srch-team-1 "Dev 1"); DEV1_MEMBER=$(member_of "$DEV1" "$K1" srch-team-1 || true)
+if [[ -z "$LV_MEMBER" || -z "$DEV1_MEMBER" ]]; then fail "levels: no team member row for the agents ($LV_MEMBER / $DEV1_MEMBER)"; else
+    out=$(api GET "/api/teams/detail/$K1" || true)
+    [[ "$out" == *'"search_reach":"own"'* ]] && pass "levels: every member row starts at 'own'" || fail "levels: team detail has no search_reach: ${out:0:200}"
+    # the new SET route: the Operator's, a bad level is 400, 'operator' needs confirm, an unknown member is 404
+    c=$(curl -s -m 10 -o /dev/null -w "%{http_code}" $COOKIE_ARGS -X PUT "$BASE/api/team-members/$LV_MEMBER/search-access" -H "Content-Type: application/json" -d '{"level":"operator"}'); [[ $c == 400 ]] && pass "levels: 'operator' without the confirm is 400" || fail "levels: operator without confirm answered $c"
+    c=$(curl -s -m 10 -o /dev/null -w "%{http_code}" $COOKIE_ARGS -X PUT "$BASE/api/team-members/$LV_MEMBER/search-access" -H "Content-Type: application/json" -d '{"level":"root"}'); [[ $c == 400 ]] && pass "levels: an unknown level is 400" || fail "levels: root answered $c"
+    c=$(curl -s -m 10 -o /dev/null -w "%{http_code}" $COOKIE_ARGS -X PUT "$BASE/api/team-members/99999999/search-access" -H "Content-Type: application/json" -d '{"level":"team"}'); [[ $c == 404 ]] && pass "levels: a member id that is not there is 404" || fail "levels: unknown member answered $c"
+    bad=0
+    for level in own team all operator; do
+        out=$(set_level "$LV_MEMBER" "$level"); [[ "$out" == *'"ok":true'* ]] || { fail "levels: could not set $level: ${out:0:160}"; bad=1; continue; }
+        for flag in none --team --all --operator-history; do
+            want=$(rank "$level"); case "$flag" in none) need=0;; --team) need=1;; --all) need=2;; --operator-history) need=3;; esac
+            fa=(); [[ $flag != none ]] && fa=("$flag")
+            # the board search
+            out=$(as_agent "$LV_SID" search CANARY ${fa[@]+"${fa[@]}"}) && rc=0 || rc=$?
+            if (( need <= want )); then
+                if (( need >= 2 )); then okc=$([[ "$out" == *"$CAN1"* && "$out" == *"$CAN2"* && "$out" == *"$CANOPS"* ]] && echo y || echo n)
+                else okc=$([[ "$out" == *"$CAN1"* ]] && no_foreign "$out" $ALLCAN && echo y || echo n); fi
+                [[ $rc -eq 0 && $okc == y ]] || { fail "levels: board search at $level with $flag: rc=$rc ${out:0:200}"; bad=1; }
+            else
+                [[ $rc -eq 5 && "$out" == *"search access is '$level'"* ]] && no_foreign "$out" $CAN1 $ALLCAN || { fail "levels: board search at $level with $flag should be refused (exit 5, no data): rc=$rc ${out:0:200}"; bad=1; }
+            fi
+            # the chat history search (the stand-in agents have no transcripts: the check is the door, not the text)
+            out=$(as_agent_cli "$LV_SID" history search zebra ${fa[@]+"${fa[@]}"}) && rc=0 || rc=$?
+            if (( need <= want )); then [[ $rc -eq 0 ]] || { fail "levels: history search at $level with $flag: rc=$rc ${out:0:200}"; bad=1; }
+            else [[ $rc -eq 5 && "$out" == *"search access is '$level'"* ]] || { fail "levels: history search at $level with $flag should be refused (exit 5): rc=$rc ${out:0:200}"; bad=1; }; fi
+        done
+    done
+    (( bad == 0 )) && pass "levels: the 4x4 matrix (own, team, all, operator x none, --team, --all, --operator-history) for the board search and the history search"
+    # a teammate at 'own' does not borrow the level of the agent beside it
+    set_level "$LV_MEMBER" all >/dev/null
+    out=$(as_agent "$DEV1" search CANARY --all) && rc=0 || rc=$?
+    [[ $rc -eq 5 ]] && no_foreign "$out" $CAN1 $ALLCAN && pass "levels: a teammate at 'own' does not borrow another agent's 'all'" || fail "levels: teammate borrowed a level: rc=$rc ${out:0:200}"
+    # an agent token cannot raise a level, its own or anyone's, nor read the log
+    tokL=$(token_of "$LV_SID")
+    for m in "$LV_MEMBER" "$DEV1_MEMBER"; do
+        c=$(curl -s -m 10 -o "$TMP/esc.out" -w "%{http_code}" -X PUT -H "X-Coral-Session-Token: $tokL" -H "Content-Type: application/json" -A "coral-board/test" "$BASE/api/team-members/$m/search-access" -d '{"level":"all","confirm":"operator"}')
+        [[ $c == 403 ]] && pass "identity: an agent token cannot set member $m's level (403)" || fail "identity: agent token set member $m: $c $(head -c 120 "$TMP/esc.out")"
+    done
+    got=$(api GET "/api/teams/detail/$K1" | python3 -c 'import sys,json
+d=json.load(sys.stdin)
+print(",".join(m["agent_name"]+"="+m["search_reach"] for m in d.get("members") or []))')
+    [[ "$got" == *"=all"* && "$got" == *"=own"* ]] && pass "identity: after the refused escalations the levels are the Operator's ($got)" || fail "identity: levels now $got"
+    c=$(curl -s -m 10 -o /dev/null -w "%{http_code}" -H "X-Coral-Session-Token: $tokL" -A "coral-board/test" "$BASE/api/search-access/log"); [[ $c == 403 ]] && pass "identity: an agent token cannot read the access log (403)" || fail "identity: agent read the log: $c"
+    c=$(curl -s -m 10 -o /dev/null -w "%{http_code}" -X PUT -H "Content-Type: application/json" -A "coral-board/test" "$BASE/api/team-members/$LV_MEMBER/search-access" -d '{"level":"all"}'); [[ $c == 401 || $c == 403 ]] && pass "identity: no token and no sign-in cannot set a level ($c)" || fail "identity: anonymous set answered $c"
+    c=$(curl -s -m 10 -o /dev/null -w "%{http_code}" -X PUT -H "X-Coral-Session-Token: not-a-token" -H "Content-Type: application/json" -A "coral-board/test" "$BASE/api/team-members/$LV_MEMBER/search-access" -d '{"level":"all"}'); [[ $c == 401 || $c == 403 ]] && pass "identity: a wrong token cannot set a level ($c)" || fail "identity: wrong-token set answered $c"
+    # the access log: the raises and the reads above own, no text
+    out=$(api GET "/api/search-access/log?limit=1000")
+    python3 - "$out" <<'PY' && pass "levels: the access log has the raises and the reads above own, with no query or result text" || fail "levels: access log: ${out:0:300}"
+import sys, json
+rows = json.loads(sys.argv[1])["rows"]
+kinds = {r["kind"] for r in rows}
+assert {"raise", "read"} <= kinds, kinds
+text = json.dumps(rows)
+assert "CANARY" not in text and "zebra" not in text and "old decision" not in text
+assert any(r["outcome"] == "refused" for r in rows if r["kind"] == "read")
+PY
+    # a restart keeps the level, and a loop of refused requests reaches the rate limit (refusals count)
+    set_level "$DEV1_MEMBER" own >/dev/null
+    c429=0
+    for i in $(seq 1 45); do
+        c=$(curl -s -m 10 -o /dev/null -w "%{http_code}" -H "X-Coral-Session-Token: $(token_of "$DEV1")" -A "coral-board/test" "$BASE/api/agent/board/search?q=CANARY&reach=all")
+        [[ $c == 429 ]] && c429=$((c429 + 1))
+    done
+    (( c429 > 0 )) && pass "levels: a loop of refused requests reaches the rate limit (429 on $c429 of 45)" || fail "levels: 45 refused requests never answered 429"
+    c=$(curl -s -m 10 -o /dev/null -w "%{http_code}" -H "X-Coral-Session-Token: $(token_of "$DEV1")" -A "coral-board/test" "$BASE/api/agent/board/search?q=CANARY"); [[ $c == 200 ]] && pass "levels: a read at 'own' is not limited" || fail "levels: own read after the limit answered $c"
+    set_level "$LV_MEMBER" own >/dev/null
+fi
 
 # ── log bounds: bounded growth, no message text ──────────────────────────────────────────────────────────
 before=$(wc -c < "$TMP/server.log" | tr -d ' ')
