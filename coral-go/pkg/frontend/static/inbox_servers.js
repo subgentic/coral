@@ -17,6 +17,13 @@ export function syncServerField(bar) {
 }
 export const serverColumns = () => multipleServers() ? [{ key: 'server', label: 'Server', sort: true, sortValue: row => serverLabel(serverOf(row)), line: 2, cell: row => serverLabel(serverOf(row)) }] : [];
 
+/** The computers that answered 403 owner_only to the artifacts list: this person is a grantee there. Kept for the session, per computer: no later read asks them again. */
+const ownerOnly = new Set();
+const emptyArtifacts = server => ({ server, artifacts: [], teams: [], all: 0, total: 0, offset: 0, cursor: '', done: true });
+const isOwnerOnlyAnswer = async response => { const body = await response.clone().json().catch(() => ({})); return body.code === 'owner_only' || body.error === 'owner_only'; };
+/** True when there is at least one online computer and every one of them refused: the Hub-served Inbox then has no Artifacts folder. With one that allows it, the folder lists that computer's artifacts. */
+export const artifactsOwnerOnlyEverywhere = () => { const sources = inboxSources(); return sources.length > 0 && sources.every(server => ownerOnly.has(server)); };
+
 /** Each source owns its cursor. Never send one machine's cursor or team key to another. */
 export async function readInboxArtifacts(params, filters = {}, signal) {
     let cursors = {};
@@ -30,17 +37,14 @@ export async function readInboxArtifacts(params, filters = {}, signal) {
     const results = await Promise.all(sources.map(async server => {
         const prior = cursors[server];
         if (prior?.done) return { ...prior, server, artifacts: [] };
+        if (ownerOnly.has(server)) return emptyArtifacts(server);
         const query = new URLSearchParams(params); query.delete('cursor');
         if (team) query.set('team', team.name);
         if (prior?.cursor) query.set('cursor', prior.cursor);
         else query.set('offset', String(prior?.offset || 0));
         const response = await serverFetch(server, `/api/team-artifacts?${query}`, { signal });
-        if (!response.ok) {
-            const body = response.status === 403 ? await response.clone().json().catch(() => ({})) : {};
-            const error = new Error(`${serverLabel(server)} artifacts could not be read (${response.status}).`);
-            if (response.status === 403 && (body.code === 'owner_only' || body.error === 'owner_only')) error.code = 'owner_only'; // the Hub's answer for a grantee: View plus owner-only (#11071)
-            throw error;
-        }
+        if (response.status === 403 && await isOwnerOnlyAnswer(response)) { ownerOnly.add(server); return emptyArtifacts(server); } // a grantee on that computer: its artifacts are View plus owner-only, so it adds none and is not asked again this session (#11071)
+        if (!response.ok) throw new Error(`${serverLabel(server)} artifacts could not be read (${response.status}).`);
         const data = await response.json();
         if (!Array.isArray(data.artifacts)) throw new Error('Unable to load artifacts: unexpected response.');
         return { ...data, server, artifacts: data.artifacts.map(row => ({ ...row, server, board_id: identityKey(server, row.board_id) })),

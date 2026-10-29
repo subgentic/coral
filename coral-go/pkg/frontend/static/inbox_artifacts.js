@@ -1,4 +1,4 @@
-import { readInboxArtifacts } from './inbox_servers.js';
+import { readInboxArtifacts, artifactsOwnerOnlyEverywhere } from './inbox_servers.js';
 import { teamLabel } from './server_status.js';
 /* The Inbox's Artifacts folder (Goal #62): every file the agents of every team made, in one list, as the team page's Artifacts tab draws it (team_artifacts_page.js, its search, Filters and
  * table) with a Team filter and column, and the document in a pane on the page's right: a click on a row opens it there and the list stays. The server merges the teams (GET /api/team-artifacts);
@@ -20,9 +20,8 @@ let onCount = () => {};
 /** The folder's count in the sidebar: what the teams hold before any filter. */
 export const artifactCount = () => count;
 
-/** Whether this person was told owner_only (the Hub's answer to a grantee: team artifacts are View plus owner-only): the Hub-served Inbox then has no Artifacts folder, and no error is shown (#11071). */
-let ownerOnly = false;
-export const artifactsOwnerOnly = () => ownerOnly;
+/** Whether every online computer refused with owner_only (the Hub's answer to a grantee): the Hub-served Inbox then has no Artifacts folder, and no error is shown. One computer that allows it keeps the folder (#11071). */
+export const artifactsOwnerOnly = () => artifactsOwnerOnlyEverywhere();
 
 /** Read the count without drawing the page (the Inbox was opened): a request for one row, at most one in 30 seconds and one at a time. The Artifacts list tells the
  *  folder its own count whenever it reads (hooks below), which is the "refreshed on change". */
@@ -32,12 +31,13 @@ export function refreshArtifactCount(done) {
     if (counting) return counting;
     counting = (async () => {
         try {
+            const hidden = artifactsOwnerOnly();
             const d = await readInboxArtifacts(new URLSearchParams({limit:'1'}));
             countAt = Date.now();
-            if (Number.isSafeInteger(d.all) && d.all !== count) { count = d.all; onCount(); }
-        } catch (e) {
-            if (e && e.code === 'owner_only' && !ownerOnly) { ownerOnly = true; onCount(); } // hide the folder; every other failure leaves the count as it was
-        }
+            let changed = hidden !== artifactsOwnerOnly(); // the folder went (every computer refused)
+            if (Number.isSafeInteger(d.all) && d.all !== count) { count = d.all; changed = true; }
+            if (changed) onCount();
+        } catch { /* the count stays as it was */ }
     })().finally(() => { counting = null; });
     return counting;
 }

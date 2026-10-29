@@ -390,6 +390,7 @@ function noteFolder(key) {
 function renderInboxNav(force = false) {
     const list = $('inbox-nav-list');
     if (!list) return;
+    if (group === 'artifacts' && nativeInbox() && IA.artifactsOwnerOnly()) setGroup('needs', { auto: true }); // the Artifacts folder on screen (or kept from last time) is gone for a grantee: Needs you, not an empty page (#11071)
     const here = navCurrent(), sections = folderSections();
     // what the tables show is part of the key too: the folder list is drawn from the counts, but the table on screen is refreshed (refreshGroupTable below) only when a row of it changed
     const needs = needsRows(), tk = taskRows(), sv = saved.savedView().shown.map(saved.savedItemFacts);

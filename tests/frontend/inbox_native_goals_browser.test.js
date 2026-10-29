@@ -34,15 +34,28 @@ const { FOLDER_ROWS } = require('./helpers/folder_rows');
             await waitFor(`document.getElementById('group-table-view') && document.getElementById('group-table-view').textContent.includes(${JSON.stringify(name)})`, name + ' is listed', 10000);
         }
 
-        console.log('4. a grantee: owner_only hides Artifacts, keeps Goals, and shows no error');
-        await ev(`window.__artifactsOwnerOnly = true; true`);
+        console.log('4. one computer allows (m1), one refuses (m2): the folder lists m1\'s artifacts only, and m2 is asked once');
         await ev(`localStorage.removeItem('coral.inbox.tab'); true`);
+        await Page.addScriptToEvaluateOnNewDocument({ source: `window.__artifactsOwnerOnly = ['m2'];` });
         await open();
-        await ev(`window.__artifactsOwnerOnly = true; window.switchNavTab('hub-inbox'); true`);
+        await ev(`window.switchNavTab('hub-inbox'); true`);
+        await waitFor(`(${FOLDER_ROWS}).some(w => /^Artifacts1$/.test(w))`, 'Artifacts counts m1 only: ' + JSON.stringify(await ev(FOLDER_ROWS)), 10000);
+        await ev(`import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab('artifacts')).then(() => true)`);
+        await waitFor(`document.getElementById('group-table-view') && document.getElementById('group-table-view').textContent.includes('report-m1.md')`, 'm1\'s artifact is listed', 10000);
+        assert.equal(await ev(`document.getElementById('group-table-view').textContent.includes('report-m2.md')`), false, 'm2 refused: none of its artifacts');
+        await ev(`import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab('goals')).then(() => import((window.__coralStatic || '/static/') + 'inbox_tab.js')).then(m => m.selectInboxTab('artifacts')).then(() => true)`);
+        assert.equal(await ev(`window.__remoteRequests.filter(r => r.server === 'm2' && r.path === '/api/team-artifacts').length`), 1, 'the computer that refused is asked once for the session');
+        assert.equal(await ev(`(${FOLDER_ROWS}).some(w => /^Artifacts/.test(w))`), true, 'the folder stays while one computer allows it');
+
+        console.log('5. a grantee on every computer: no Artifacts folder, a kept Artifacts tab falls back to Needs you, no error');
+        await Page.addScriptToEvaluateOnNewDocument({ source: `window.__artifactsOwnerOnly = true; try { localStorage.setItem('coral.inbox.tab', 'artifacts'); } catch (e) {}` });
+        await open();
+        await ev(`window.switchNavTab('hub-inbox'); true`);
         await waitFor(`(${FOLDER_ROWS}).some(w => /^Goals\\d*$/.test(w))`, 'Goals is still listed', 10000);
         await waitFor(`window.__remoteRequests.some(r => r.path === '/api/team-artifacts')`, 'Artifacts was asked for', 10000);
-        await waitFor(`!(${FOLDER_ROWS}).some(w => /^Artifacts\\d*$/.test(w))`, 'no Artifacts folder for a grantee: ' + JSON.stringify(await ev(FOLDER_ROWS)), 10000);
+        await waitFor(`!(${FOLDER_ROWS}).some(w => /^Artifacts/.test(w))`, 'no Artifacts folder for a grantee: ' + JSON.stringify(await ev(FOLDER_ROWS)), 10000);
+        await waitFor(`localStorage.getItem('coral.inbox.tab') !== 'artifacts' || !!document.querySelector('#inbox-nav-list .active, #inbox-nav-list [aria-current]')`, 'the folder on screen is no longer Artifacts', 10000);
         assert.equal(await ev(`/could not be read|owner_only|error/i.test(document.getElementById('toast-container')?.textContent || '') || !!document.querySelector('.toast-error')`), false, 'no error is shown');
-        console.log('PASS native Inbox: Goals for everyone, Artifacts for the owner');
+        console.log('PASS native Inbox: Goals for everyone, Artifacts where a computer allows them');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
