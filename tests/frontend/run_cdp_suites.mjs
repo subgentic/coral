@@ -92,6 +92,7 @@ import { classifySuites, problems } from './suites.mjs';
 import { loadDurations, orderLongestFirst, partsByDuration } from './suite_order.mjs';
 import { failingOutput } from './failing_output.mjs';
 import { suiteTimeoutS } from './suite_timeout.mjs';
+import { shardDirName } from './shard_dir.mjs';
 import { pruneOldRunFolders, liveRunFolders, KEEP_RUNS, KEEP_HOURS } from './helpers/run_folders.mjs';
 import { sqliteAvailable, sqliteExec } from './helpers/sqlite.js';
 import { redactEvidence as redactEvidenceText } from './helpers/redact_evidence.mjs';
@@ -465,6 +466,7 @@ async function throttlePages(cdpPort, rate) {
   return client;
 }
 
+const shardDirs = new Set(); // the folder names startShard has used in this run (shard_dir.mjs)
 const allLogs = []; // every shard's Coral log, including shards that were replaced
 
 // startShard starts one isolated Coral server and one headless Chrome. Each shard has its own data dir,
@@ -472,7 +474,7 @@ const allLogs = []; // every shard's Coral log, including shards that were repla
 // replacements of shard n (after a timeout or a dead process), so each start gets fresh directories.
 async function startShard(n, gen = 0, strict = false, backend = MAIN_BACKEND) {
   await ensureRunDir();
-  const dir = path.join(tmp, `shard${n}${gen ? `-${gen}` : ''}`);
+  const dir = path.join(tmp, shardDirName(n, gen, shardDirs));
   fs.mkdirSync(dir, { recursive: true });
   const port = await freePort();
   const data = path.join(dir, 'data'); fs.mkdirSync(data);
@@ -971,7 +973,7 @@ try {
     shardsUp.push(await startShard(shards + 1, 0, true));
     await runOnce(1);
   }
-} catch (e) { console.error(`runner error (a shard could not be replaced?): ${e.message}`); process.exit(2); }
+} catch (e) { console.error(`runner error in the ${phase ? phase.replace(/: $/, '') : 'main'} phase (a shard could not be started or replaced?): ${e.message}\nFAIL: the suites of this phase and of the phases after it did NOT run`); process.exit(2); }
 const elapsed = ((Date.now() - runStarted) / 1000).toFixed(1);
 results.sort((a, b) => a.test.localeCompare(b.test) || a.run - b.run);
 fs.mkdirSync(tmp, { recursive: true }); // it may have been removed during the run (#3727)
