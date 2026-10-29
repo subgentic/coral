@@ -49,6 +49,15 @@ const BASE = require('./test_base').BASE;
             assert.ok(g.calInside && g.spInside, `${w}: both are inside the card ${JSON.stringify(g)}`);
         }
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
+        // a read that arrives while another view is open does not un-hide the Overview's note (#10988); coming back shows it again
+        await open({ input_tokens: 0, output_tokens: 0, cost_usd: 0, num_requests: 0 });
+        await waitFor(`!document.getElementById('cost-counts-note').hidden && document.getElementById('cost-counts-note').textContent !== ''`, 'the note on the Overview', 8000);
+        await ev(`(async () => { const v = await import((window.__coralStatic || '/static/') + 'analytics_views.js'); v.selectView('agent'); const c = await import((window.__coralStatic || '/static/') + 'cost_dashboard.js'); window.__asks0 = window.__summaryAsks.length; await c._refreshCostDashboard({ force: true }); return true; })()`);
+        await waitFor(`window.__summaryAsks.length > window.__asks0`, 'a read while By agent is open', 8000);
+        await new Promise(r => setTimeout(r, 500)); // sleep-ok: the answer is drawn
+        assert.equal(await ev(`document.getElementById('cost-counts-note').hidden`), true, 'a read while another view is open leaves the Overview\'s note hidden');
+        await ev(`(async () => { (await import((window.__coralStatic || '/static/') + 'analytics_views.js')).selectView('overview'); return true; })()`);
+        assert.equal(await ev(`document.getElementById('cost-counts-note').hidden`), false, 'the note is back when the Overview is');
         // the note never sits beside a total: money or tokens counted with no request recorded
         await open({ input_tokens: 10, output_tokens: 20, cost_usd: 4, num_requests: 0 });
         await waitFor(`document.getElementById('cost-total-cost').textContent === '$4.00'`, 'the cost', 8000);
