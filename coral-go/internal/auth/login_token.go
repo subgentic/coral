@@ -210,15 +210,15 @@ func (ks *KeyStore) handleLoginToken(w http.ResponseWriter, r *http.Request) boo
 		writeLinkUsed(w)
 		return true
 	}
-	if viaRelay {
-		log.Printf("[auth] a sign-in link was opened through WSL's localhost relay (which Windows user is behind it can't be told): accepted, single use")
-	}
 	session, err := ks.NewSessionRotating(r, SessionByLink, false)
 	if err != nil {
 		http.Error(w, "could not start a session", http.StatusInternalServerError)
 		return true
 	}
 	ks.setSessionCookie(w, r, session, false)
+	if viaRelay {
+		log.Printf("[auth] a sign-in link was opened through WSL's localhost relay (which Windows user is behind it can't be told): accepted, single use")
+	}
 	// The same page without the token (a relative URL: never another host), its path exactly as
 	// sent: the dashboard's pages carry names in the path, and a decoded one would change what the
 	// link means (%40 would read as the @server marker, %2F as a segment; #3532).
