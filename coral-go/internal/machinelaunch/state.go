@@ -28,7 +28,6 @@ type Record struct {
 	DropletID    string    `json:"droplet_id,omitempty"`
 	VPCID        string    `json:"vpc_id,omitempty"`
 	FirewallID   string    `json:"firewall_id,omitempty"`
-	SSHKeyID     string    `json:"ssh_key_id,omitempty"`
 	CredentialID string    `json:"credential_id,omitempty"` // the id the Hub returned at mint (not the credential): what `delete` revokes the machine's identity by
 	Created      time.Time `json:"created"`
 }
@@ -62,7 +61,7 @@ func (r Record) Validate() error {
 	if !launchTagRe.MatchString(r.LaunchTag) {
 		return errors.New("the launch tag is not one this tool makes")
 	}
-	for name, v := range map[string]string{"droplet": r.DropletID, "VPC": r.VPCID, "firewall": r.FirewallID, "ssh key": r.SSHKeyID, "credential": r.CredentialID} {
+	for name, v := range map[string]string{"droplet": r.DropletID, "VPC": r.VPCID, "firewall": r.FirewallID, "credential": r.CredentialID} {
 		if v == "" {
 			continue
 		}

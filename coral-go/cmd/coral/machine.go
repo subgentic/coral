@@ -158,9 +158,11 @@ func runMachine(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if err != nil {
 		return fail("%v", err)
 	}
-	if *statePath == "" {
+	defaultState := *statePath == ""
+	if defaultState {
 		*statePath = defaultMachineStatePath()
 	}
+	tightenStateFolder(*statePath, defaultState, stderr)
 	launchState, err := machinelaunch.OpenState(*statePath)
 	if err != nil {
 		return fail("%v", err)

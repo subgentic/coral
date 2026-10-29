@@ -79,11 +79,11 @@ func removeVPC(p Provider, id string, within, every time.Duration, out io.Writer
 
 // IDs are the pieces of one machine, by id, as a state record names them.
 type IDs struct {
-	DropletID, VPCID, FirewallID, SSHKeyID string
+	DropletID, VPCID, FirewallID string
 }
 
 func (r Record) IDs() IDs {
-	return IDs{DropletID: r.DropletID, VPCID: r.VPCID, FirewallID: r.FirewallID, SSHKeyID: r.SSHKeyID}
+	return IDs{DropletID: r.DropletID, VPCID: r.VPCID, FirewallID: r.FirewallID}
 }
 
 // Remaining is what Teardown could not remove.
@@ -94,7 +94,7 @@ type Remaining struct {
 
 // Empty reports whether everything named was removed.
 func (r Remaining) Empty() bool {
-	return r.DropletID == "" && r.VPCID == "" && r.FirewallID == "" && r.SSHKeyID == ""
+	return r.DropletID == "" && r.VPCID == "" && r.FirewallID == ""
 }
 
 // Tuning is the waits of a teardown; tests shorten them.
@@ -116,7 +116,7 @@ func (t Tuning) vpcEvery() time.Duration {
 	return 3 * time.Second
 }
 
-// Teardown removes what ids name, in the order the provider needs: the instance, then the firewall, then the VPC (which waits for the instance to leave), then the ssh key. Something already gone is fine.
+// Teardown removes what ids name, in the order the provider needs: the instance, then the firewall, then the VPC (which waits for the instance to leave). An ssh key the person gave (--ssh-key) is theirs: it is never recorded and never deleted here. Something already gone is fine.
 // done is called with the ids still left after each step, so a state file keeps what a crash would otherwise lose. Each step is tried whatever the one before did.
 func Teardown(ctx context.Context, p Provider, ids IDs, tune Tuning, out io.Writer, done func(IDs)) Remaining {
 	left := ids
@@ -159,9 +159,6 @@ func Teardown(ctx context.Context, p Provider, ids IDs, tune Tuning, out io.Writ
 		}, func(i *IDs) { i.VPCID = "" })
 	} else if ids.FirewallID != "" || ids.VPCID != "" {
 		errs = append(errs, ErrNoNetwork)
-	}
-	if k, ok := p.(KeyRemover); ok {
-		step(ids.SSHKeyID, "ssh key", k.DeleteSSHKey, func(i *IDs) { i.SSHKeyID = "" })
 	}
 	return Remaining{IDs: left, Errs: errs}
 }
@@ -216,7 +213,7 @@ func Delete(ctx context.Context, name string, d ManageDeps) (*DeleteReport, erro
 		}
 		rep.Reconstruct = true
 	}
-	if rec.DropletID == "" && rec.VPCID == "" && rec.FirewallID == "" && rec.SSHKeyID == "" {
+	if rec.DropletID == "" && rec.VPCID == "" && rec.FirewallID == "" {
 		return nil, fmt.Errorf("no machine named %q (not in the state file, and %s has none with this tool's tag)", name, d.Provider.Name())
 	}
 	rep.Found = true
@@ -244,7 +241,7 @@ func Delete(ctx context.Context, name string, d ManageDeps) (*DeleteReport, erro
 		if !inState {
 			return
 		}
-		rec.DropletID, rec.VPCID, rec.FirewallID, rec.SSHKeyID = left.DropletID, left.VPCID, left.FirewallID, left.SSHKeyID
+		rec.DropletID, rec.VPCID, rec.FirewallID = left.DropletID, left.VPCID, left.FirewallID
 		_ = d.State.Put(rec) // a step done is written down: a second run skips it
 	})
 	if rep.Remaining.Empty() && len(rep.Remaining.Errs) == 0 {

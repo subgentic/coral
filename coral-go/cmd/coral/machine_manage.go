@@ -11,6 +11,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 	"syscall"
@@ -22,7 +23,7 @@ import (
 )
 
 // coral machine list|delete|prune (#10918, coral-hub's request 3). They talk to the provider with the same token file a launch uses and read the 0600 state file the launches write (ids only: no
-// secret). `delete` revokes the machine's Hub identity first, with the automation key's destroy credential from --hub-destroy-file, then removes the instance, its firewall, its VPC and its ssh key; it can be
+// secret). `delete` revokes the machine's Hub identity first, with the automation key's destroy credential from --hub-destroy-file, then removes the instance, its firewall and its VPC; it can be
 // run again. `prune` finds what a crashed or forgotten launch left, by this tool's tag and names, lists it and asks once. Nothing is torn down on a timer and no delete-capable token goes on a machine.
 //
 // Exit codes: 0 done, 1 something was not done (a refusal from the provider or the Hub, a declined confirm, a piece that could not be removed), 2 a usage problem or a secret file that is not safe to read, 130 interrupted.
@@ -43,6 +44,22 @@ func machineManageUsage(w io.Writer) {
 // defaultMachineStatePath is the state file: machines.json in Coral's data folder (0700), which the launches write and these commands read.
 func defaultMachineStatePath() string {
 	return filepath.Join(config.ResolveCoralDir(""), "machines.json")
+}
+
+// tightenStateFolder makes the folder of the DEFAULT state file private (0700) when it already exists with looser permissions and is ours: the file is 0600 but a folder others can list tells them a machine
+// was launched (#10944, Security's INFO). A folder the person chose with --state-file is left as it is (it may be a shared one): it is said, not changed.
+func tightenStateFolder(path string, isDefault bool, warn io.Writer) {
+	dir := filepath.Dir(path)
+	fi, err := os.Stat(dir)
+	if err != nil || !fi.IsDir() || fi.Mode().Perm()&0o077 == 0 || runtime.GOOS == "windows" {
+		return
+	}
+	if isDefault {
+		if os.Chmod(dir, fi.Mode().Perm()&^0o077) == nil {
+			return
+		}
+	}
+	fmt.Fprintf(warn, "coral machine: warning: %s can be read by others (mode %o): the state file in it is private, but its name is not. Run chmod 700 on the folder.\n", dir, fi.Mode().Perm())
 }
 
 var olderThanRe = regexp.MustCompile(`^([0-9]{1,5})d$`)
@@ -128,6 +145,7 @@ func runMachineManage(sub string, args []string, stdin io.Reader, stdout, stderr
 	if path == "" {
 		path = defaultMachineStatePath()
 	}
+	tightenStateFolder(path, *statePath == "", stderr)
 	st, err := machinelaunch.OpenState(path)
 	if err != nil {
 		return fail("%v", err)
@@ -209,7 +227,7 @@ func runMachineManage(sub string, args []string, stdin io.Reader, stdout, stderr
 		if d.Confirm == nil {
 			return fail("no one can be asked to confirm: pass --yes to go on without asking")
 		}
-		summary := fmt.Sprintf("Delete machine %q at %s: its instance, firewall, private network and ssh key, and the state file's record. It cannot be undone.", name, p.Name())
+		summary := fmt.Sprintf("Delete machine %q at %s: its instance, firewall and private network, and the state file's record. It cannot be undone.", name, p.Name())
 		if rec, ok := st.Get(name); !ok {
 			summary += " The state file does not know it: it is found at the provider by its name and this tool's tag."
 		} else if rec.CredentialID != "" && revoker != nil {

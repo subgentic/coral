@@ -22,7 +22,6 @@ type fakeCloud struct {
 	drops    map[string]Instance // by id
 	vpcs     map[string]VPC
 	fws      map[string]Firewall
-	keys     map[string]bool
 	order    *[]string        // when set, every call is also logged here, to be read beside another recorder (the Hub's revoke)
 	failOn   map[string]error // "DeleteFirewall:fw-1" -> error (once, then it works)
 	vpcBusy  int              // DeleteVPC answers ErrInUse this many times first
@@ -32,7 +31,7 @@ type fakeCloud struct {
 }
 
 func newFake() *fakeCloud {
-	return &fakeCloud{drops: map[string]Instance{}, vpcs: map[string]VPC{}, fws: map[string]Firewall{}, keys: map[string]bool{}, failOn: map[string]error{}, hourly: 0.0119}
+	return &fakeCloud{drops: map[string]Instance{}, vpcs: map[string]VPC{}, fws: map[string]Firewall{}, failOn: map[string]error{}, hourly: 0.0119}
 }
 
 var (
@@ -40,7 +39,6 @@ var (
 	_ Lister        = (*fakeCloud)(nil)
 	_ Network       = (*fakeCloud)(nil)
 	_ NetworkLister = (*fakeCloud)(nil)
-	_ KeyRemover    = (*fakeCloud)(nil)
 )
 
 func (f *fakeCloud) log(s string) {
@@ -191,19 +189,6 @@ func (f *fakeCloud) ListFirewalls(context.Context) ([]Firewall, error) {
 	}
 	return out, nil
 }
-func (f *fakeCloud) DeleteSSHKey(_ context.Context, id string) error {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	f.log("DeleteSSHKey:" + id)
-	if err := f.fail("DeleteSSHKey"); err != nil {
-		return err
-	}
-	if !f.keys[id] {
-		return ErrNotFound
-	}
-	delete(f.keys, id)
-	return nil
-}
 
 type fakeRevoker struct {
 	log *[]string
@@ -259,19 +244,18 @@ func TestCreateNetworkRefusesAProviderWithoutOneAndSSHToTheWorld(t *testing.T) {
 
 // ---- teardown
 
-func TestTeardownRemovesTheInstanceFirstThenFirewallThenTheVPCThenTheKey(t *testing.T) {
+func TestTeardownRemovesTheInstanceFirstThenFirewallThenTheVPC(t *testing.T) {
 	f := newFake()
-	f.keys["k1"] = true
 	f.drops["1"] = Instance{ID: "1", Name: "m1", Tags: []string{Tag}}
 	f.fws["fw-1"], f.vpcs["vpc-1"] = Firewall{ID: "fw-1"}, VPC{ID: "vpc-1"}
 	f.vpcBusy = 2 // the instance is still leaving: the VPC says so twice
 	var progress []IDs
-	left := Teardown(t.Context(), f, IDs{DropletID: "1", FirewallID: "fw-1", VPCID: "vpc-1", SSHKeyID: "k1"}, quick(), &bytes.Buffer{}, func(i IDs) { progress = append(progress, i) })
+	left := Teardown(t.Context(), f, IDs{DropletID: "1", FirewallID: "fw-1", VPCID: "vpc-1"}, quick(), &bytes.Buffer{}, func(i IDs) { progress = append(progress, i) })
 	assert.True(t, left.Empty())
-	assert.Equal(t, []string{"Delete:1", "DeleteFirewall:fw-1", "DeleteVPC:vpc-1", "DeleteVPC:vpc-1", "DeleteVPC:vpc-1", "DeleteSSHKey:k1"}, f.calls, "instance, firewall, then the VPC (retried while it has a member), then the key")
-	require.Len(t, progress, 4, "the ids still left are reported after each step, for the state file")
-	assert.Equal(t, IDs{VPCID: "vpc-1", SSHKeyID: "k1", FirewallID: "fw-1"}, progress[0])
-	assert.Equal(t, IDs{}, progress[3])
+	assert.Equal(t, []string{"Delete:1", "DeleteFirewall:fw-1", "DeleteVPC:vpc-1", "DeleteVPC:vpc-1", "DeleteVPC:vpc-1"}, f.calls, "instance, firewall, then the VPC (retried while it has a member)")
+	require.Len(t, progress, 3, "the ids still left are reported after each step, for the state file")
+	assert.Equal(t, IDs{VPCID: "vpc-1", FirewallID: "fw-1"}, progress[0])
+	assert.Equal(t, IDs{}, progress[2])
 }
 
 func TestTeardownTriesEveryStepWhateverTheOneBeforeDidAndReportsWhatIsLeft(t *testing.T) {
@@ -297,10 +281,9 @@ func record(name string, f *fakeCloud) Record {
 	vpc, _ := f.CreateVPC(context.Background(), VPCName(name), "nyc3")
 	fw, _ := f.CreateFirewall(context.Background(), FirewallSpec{Name: FirewallName(name), Tag: "coral-launch-0123456789ab"})
 	f.drops["77"] = Instance{ID: "77", Name: name, Tags: []string{Tag, "coral-launch-0123456789ab"}, Region: "nyc3", Size: "s-1vcpu-1gb", Created: time.Now().Add(-72 * time.Hour)}
-	f.keys["ab:cd"] = true
 	f.calls = nil
 	r := goodRecord(name)
-	r.DropletID, r.VPCID, r.FirewallID, r.SSHKeyID = "77", vpc.ID, fw.ID, "ab:cd"
+	r.DropletID, r.VPCID, r.FirewallID = "77", vpc.ID, fw.ID
 	return r
 }
 
@@ -314,15 +297,14 @@ func TestDeleteRevokesTheHubIdentityBeforeItDestroysAnything(t *testing.T) {
 	rep, err := Delete(t.Context(), "m1", ManageDeps{Provider: f, Revoker: rev, State: st, Out: &bytes.Buffer{}, Tune: quick()})
 	require.NoError(t, err)
 	assert.True(t, rep.Revoked)
-	assert.Equal(t, []string{"Revoke:5b6c0f2e-0000-4000-8000-000000000001", "Delete:77", "DeleteFirewall:fw-2", "DeleteVPC:vpc-1", "DeleteSSHKey:ab:cd"}, order,
-		"the Hub identity is revoked first (by the credential id the state file holds), then the instance, the firewall, the VPC and the key")
+	assert.Equal(t, []string{"Revoke:5b6c0f2e-0000-4000-8000-000000000001", "Delete:77", "DeleteFirewall:fw-2", "DeleteVPC:vpc-1"}, order,
+		"the Hub identity is revoked first (by the credential id the state file holds), then the instance, the firewall and the VPC")
 	assert.True(t, rep.RecordGone)
 	_, ok := st.Get("m1")
 	assert.False(t, ok, "the record is gone when everything is")
 	assert.Empty(t, f.drops)
 	assert.Empty(t, f.vpcs)
 	assert.Empty(t, f.fws)
-	assert.Empty(t, f.keys)
 }
 
 // A revoke that fails stops the delete before anything is destroyed (the machine could stay enrolled); the person can choose to go on.

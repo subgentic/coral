@@ -53,11 +53,6 @@ type NetworkLister interface {
 	ListFirewalls(ctx context.Context) ([]Firewall, error)
 }
 
-// KeyRemover is implemented by a provider that holds the ephemeral SSH key a launch registered: delete removes it.
-type KeyRemover interface {
-	DeleteSSHKey(ctx context.Context, id string) error
-}
-
 // ErrInUse is a provider's answer to removing a network that still has a member.
 var ErrInUse = errors.New("still in use")
 

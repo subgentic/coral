@@ -248,3 +248,39 @@ func TestMachineEgressFilesWritesTheBlocksFiles(t *testing.T) {
 		t.Fatalf("a folder is needed")
 	}
 }
+
+// #10944 (INFO): the folder of the DEFAULT state file is made private when it exists with looser permissions; a folder the person chose is only warned about.
+func TestMachineTightensTheDefaultStateFolderAndOnlyWarnsAboutAChosenOne(t *testing.T) {
+	args, _, _, statePath, _ := manageFixture(t)
+	dataDir := os.Getenv("CORAL_DATA_DIR")
+	if err := os.MkdirAll(dataDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(dataDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	var out, errb bytes.Buffer
+	code := runMachine([]string{"list", "--provider", "digitalocean", "--token-file", args[3]}, strings.NewReader(""), &out, &errb) // the default state path, in the data folder
+	if code != 0 {
+		t.Fatalf("exit %d: %s %s", code, out.String(), errb.String())
+	}
+	if fi, _ := os.Stat(dataDir); fi.Mode().Perm() != 0o700 {
+		t.Fatalf("the default state folder was made private: %v", fi.Mode().Perm())
+	}
+
+	chosen := filepath.Dir(statePath)
+	if err := os.Chmod(chosen, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	errb.Reset()
+	code = runMachine(append([]string{"list"}, args...), strings.NewReader(""), &out, &errb)
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, errb.String())
+	}
+	if fi, _ := os.Stat(chosen); fi.Mode().Perm() != 0o755 {
+		t.Fatalf("a folder the person chose is left as it is: %v", fi.Mode().Perm())
+	}
+	if !strings.Contains(errb.String(), "can be read by others") {
+		t.Fatalf("and is said: %q", errb.String())
+	}
+}
