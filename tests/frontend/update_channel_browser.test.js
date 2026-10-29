@@ -125,7 +125,7 @@ const agenticSt = { ...base, channel: 'agentic', approved: { version: '1.4.142',
         }
         // 5. the toast, once (desktop dark)
         await load(views[0], agenticSt);
-        await ev(`window.hideSettingsModal && window.hideSettingsModal(); window.__ch.check = { available: true, latest: '1.4.143', current: '1.4.141', channel: 'agentic', approved: false, release_url: 'https://github.com/subgentic/coral/releases/tag/v1.4.143', release_notes: '- one\\n- two' }; Promise.resolve(window.checkForUpdates(true)).then(() => true)`);
+        await ev(`window.__ch.status = null; window.hideSettingsModal && window.hideSettingsModal(); window.__ch.check = { available: true, latest: '1.4.143', current: '1.4.141', channel: 'agentic', approved: false, release_url: 'https://github.com/subgentic/coral/releases/tag/v1.4.143', release_notes: '- one\\n- two' }; Promise.resolve(window.checkForUpdates(true)).then(() => true)`);
         await waitFor(`!!document.getElementById('update-toast')`, 'the toast', 6000);
         let t = await ev(`document.getElementById('update-toast').innerText.replace(/\\s+/g, ' ')`);
         check(`the Agentic toast says the channel and "Not yet approved" (${t})`, /Coral v1\.4\.143 available \(Agentic channel\)/.test(t) && /Not yet approved\./.test(t));

@@ -5,6 +5,7 @@ import { registerActions, textOf } from './actions.js';
 import { browserLocal } from './safe_storage.js';
 import { reportUpdate } from './dashboard_analytics.js';
 import { noticeColumn, announceNotice } from './notifications.js';
+import { importOnce } from './import_once.js';
 
 /**
  * Fetch update info from the backend and show a toast if a new version is available.
@@ -30,7 +31,9 @@ export async function checkForUpdates(force = false) {
             if (dismissed === data.latest) return;
         }
 
-        showUpdateToast(data);
+        const inApp = await inAppPath();
+        if (inApp === 'ready') return; // the top bar's Update and relaunch and its ready notice are the way: no second, worse one (GitHub's download page)
+        showUpdateToast(data, inApp === 'coming');
     } catch (_e) {
         if (force) showToast("Could not check for updates.");
     }
@@ -45,7 +48,19 @@ export function dismissUpdateToast(version) {
     if (toast) toast.remove();
 }
 
-function showUpdateToast(data) {
+/** How this Coral will take the update: 'ready' (downloaded, checked, the top bar offers it), 'coming' (it updates itself; the download is not here yet), or '' (it cannot, so GitHub's page is the way). */
+async function inAppPath() {
+    try {
+        const { fetchUpdateStatus, canStart } = await importOnce('./update_api.js');
+        const { relaunchOffered } = await importOnce('./update_ui.js');
+        const s = await fetchUpdateStatus();
+        if (!s || !s.enabled) return '';
+        if (relaunchOffered(s) && canStart(s)) return 'ready';
+        return s.installKind === 'homebrew' || s.installKind === 'unwritable' || s.relaunch.reason === 'unsupported_install' || s.notReady === 'unsupported_install' ? '' : 'coming';
+    } catch { return ''; }
+}
+
+function showUpdateToast(data, coming = false) {
     // Remove any existing toast
     const existing = document.getElementById("update-toast");
     if (existing) existing.remove();
@@ -66,7 +81,7 @@ function showUpdateToast(data) {
         }
     }
 
-    const downloadBtn = data.release_url
+    const downloadBtn = coming ? '<p class="update-toast-coming">Coral is getting it ready and will ask before it installs.</p>' : data.release_url
         ? `<a href="${escapeAttr(data.release_url)}" target="_blank" rel="noopener" class="update-toast-download" data-on-click="update-download" data-version="${escapeAttr(data.latest)}" data-channel="${escapeAttr(data.channel === "agentic" ? "agentic" : "approved")}">Download v${escapeHtml(data.latest)}</a>`
         : "";
 
