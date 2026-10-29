@@ -2,13 +2,12 @@
  * know how to say is shown as it is, never guessed. */
 
 const pad = (n) => String(n).padStart(2, '0');
-/** The 24 h times in a sentence ("Every day at 09:00. Next: today 09:00."), said in the person's own clock: the New job form's time field shows 09:00 AM where their locale is 12 h, and its words said 09:00 (#10961). A 24 h locale keeps the words as they are. */
-export function inPersonsClock(text, locale) {
+/** A time of day in the person's own clock, in every place a job's time is said (#10961, #10978: the job form's time field shows 09:00 AM where their locale is 12 h, and the words said 09:00): 12 h with AM or PM where the locale uses it, 24 h with two digits where it does not. */
+export function clock(h, m, locale) {
     try {
         const h12 = new Intl.DateTimeFormat(locale, { hour: 'numeric' }).resolvedOptions().hour12;
-        if (!h12) return String(text);
-        return String(text).replace(/\b([01]\d|2[0-3]):([0-5]\d)\b/g, (_, h, m) => new Date(2000, 0, 1, +h, +m).toLocaleTimeString(locale, { hour: 'numeric', minute: '2-digit' }));
-    } catch { return String(text); }
+        return new Date(2000, 0, 1, +h, +m).toLocaleTimeString(locale, { hour: h12 ? 'numeric' : '2-digit', minute: '2-digit' });
+    } catch { return `${pad(h)}:${pad(m)}`; }
 }
 const DAYS = ['Sundays', 'Mondays', 'Tuesdays', 'Wednesdays', 'Thursdays', 'Fridays', 'Saturdays'];
 
@@ -37,13 +36,13 @@ export function cronWords(expr) {
     m = /^\*\/(\d+)$/.exec(hour);
     if (m && num(min) && dom === '*' && mon === '*' && dow === '*') return `Every ${m[1]} hours${min === '0' ? '' : ` at :${pad(min)}`}`;
     if (num(min) && num(hour) && dom === '*' && mon === '*') {
-        const at = `${pad(hour)}:${pad(min)}`;
+        const at = clock(hour, min);
         if (dow === '*') return `Every day at ${at}`;
         if (dow === '1-5') return `Weekdays at ${at}`;
         if (dow === '0,6' || dow === '6,0') return `Weekends at ${at}`;
         if (num(dow) && +dow <= 7) return `${DAYS[+dow % 7]} at ${at}`;
     }
-    if (num(min) && num(hour) && num(dom) && mon === '*' && dow === '*') return `Monthly on day ${dom} at ${pad(hour)}:${pad(min)}`;
+    if (num(min) && num(hour) && num(dom) && mon === '*' && dow === '*') return `Monthly on day ${dom} at ${clock(hour, min)}`;
     return generalCronWords(f) || `Schedule: ${e}`;
 }
 
@@ -71,12 +70,12 @@ function generalCronWords(f) {
     const parts = [];
     // the time of day
     const nums = x => x.items && x.items.every(([, b]) => b === undefined) ? x.items.map(([a]) => a) : null; // plain numbers only (no ranges)
-    const times = M.items && H.items && nums(M) && nums(H) && nums(M).length * nums(H).length <= 8 ? nums(H).flatMap(h => nums(M).map(m => `${pad(h)}:${pad(m)}`)) : null;
+    const times = M.items && H.items && nums(M) && nums(H) && nums(M).length * nums(H).length <= 8 ? nums(H).flatMap(h => nums(M).map(m => clock(h, m))) : null;
     if (times) parts.push(`At ${listWords(times)}`); // "At 09:00, 12:00 and 18:00"
     else {
         parts.push(M.any ? 'Every minute' : M.step ? `Every ${M.step} minutes` : `At minute${M.items.length > 1 || M.items[0][1] !== undefined ? 's' : ''} ${listWords(itemWords(M.items, a => String(a), (a, b) => `${a} to ${b}`))}`);
         if (H.step) parts.push(`every ${H.step} hours`);
-        else if (H.items) parts.push(`from ${listWords(itemWords(H.items, a => `${pad(a)}:00 to ${pad(a)}:59`, (a, b) => `${pad(a)}:00 to ${pad(b)}:59`))}`.replace(/^from (.+ and .+)$/, 'during $1'));
+        else if (H.items) parts.push(`from ${listWords(itemWords(H.items, a => `${clock(a, 0)} to ${clock(a, 59)}`, (a, b) => `${clock(a, 0)} to ${clock(b, 59)}`))}`.replace(/^from (.+ and .+)$/, 'during $1'));
     }
     // the days. robfig/cron v3 (internal/background/cron.go): when BOTH the day of the month and the weekday are restricted (not "*" and not a "*/n" step) the schedule fires when EITHER matches, so the words say "or"
     const restricted = x => !!x.items;
@@ -107,7 +106,7 @@ function generalCronWords(f) {
 export function atWords(iso, now = new Date()) {
     const t = new Date(iso);
     if (!iso || isNaN(t)) return '';
-    const hm = `${pad(t.getHours())}:${pad(t.getMinutes())}`;
+    const hm = clock(t.getHours(), t.getMinutes());
     const day = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
     const dd = Math.round((day(t) - day(now)) / 86400000);
     return dd === 0 ? `today ${hm}` : dd === 1 ? `tomorrow ${hm}` : `${t.toLocaleDateString([], { month: 'short', day: 'numeric' })} ${hm}`;
@@ -125,7 +124,7 @@ export function awayWords(iso, now = new Date()) {
 export function whenWords(iso, now = new Date()) {
     const t = new Date(iso);
     if (!iso || isNaN(t)) return '';
-    const hm = `${pad(t.getHours())}:${pad(t.getMinutes())}`;
+    const hm = clock(t.getHours(), t.getMinutes());
     const day = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
     const dd = Math.round((day(now) - day(t)) / 86400000);
     return dd === 0 ? `today ${hm}` : dd === 1 ? `yesterday ${hm}` : `${t.toLocaleDateString([], { month: 'short', day: 'numeric' })} ${hm}`;
