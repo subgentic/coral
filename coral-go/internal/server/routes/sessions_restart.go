@@ -169,7 +169,7 @@ func (h *SessionsHandler) restartResolve(ctx context.Context, name string, req r
 	// Sessions joined through the board API may have no board_name in the
 	// session store. Resolve their subscription before renaming the terminal.
 	if h.bs != nil && req.SessionID != "" {
-		sub, err := h.bs.GetSubscriptionBySessionName(ctx, naming.SessionName(p.oldAgentType(), req.SessionID))
+		sub, err := h.launchSeat(ctx, p.stored, naming.SessionName(p.oldAgentType(), req.SessionID))
 		if err != nil {
 			return nil, func(w http.ResponseWriter) { errInternalServer(w, err.Error()) }
 		}
@@ -517,6 +517,18 @@ func (h *SessionsHandler) endOldTerminal(name string) error {
 		return k.KillWithin(name, h.restartGrace())
 	}
 	return h.backend.Kill(name)
+}
+
+// launchSeat is the seat a restart or a resume carries to the new session: the one on the board the live row was launched on. Before, it was the session's NEWEST seat, so an agent the Operator had also seated on
+// another board came back from a restart on that board, as that seat's member, with its live row and command-line state moved there (found by tests/stress/run_search.sh, #11005). A session with no recorded
+// board (it joined through the board API) keeps the newest seat.
+func (h *SessionsHandler) launchSeat(ctx context.Context, stored *store.LiveSession, sessionName string) (*board.Subscriber, error) {
+	if stored != nil && stored.BoardName != nil && *stored.BoardName != "" {
+		if sub, err := h.bs.SessionSubscription(ctx, *stored.BoardName, sessionName); err != nil || sub != nil {
+			return sub, err
+		}
+	}
+	return h.bs.GetSubscriptionBySessionName(ctx, sessionName)
 }
 
 func (p *restartPlan) folderName() string { return filepath.Base(strings.TrimRight(p.workdir, "/")) }

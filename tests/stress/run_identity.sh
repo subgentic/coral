@@ -616,6 +616,38 @@ print(" ".join(sorted({s["board_project"] for s in json.load(sys.stdin) if str(s
         [[ "$out" == *HTTP200 ]] && pass "#11013 exact: after a wake the agent still rejoins its own board" || fail "#11013 exact: after a wake the rejoin answered: ${out:0:160}"
     fi
 
+    # a seat the Operator makes on another board does not move the agent: after a restart its live row board, its seat, its
+    # command-line state and its own-reach board are still its launch board (a restart used to take the board of its NEWEST seat)
+    if [[ -n "$b1" && -n "$b2" && -n "${ns1:-}" ]]; then
+        local moved_name moved_old moved_new tries
+        moved_old=$ns1; moved_name=$(sess_of "$moved_old")
+        api POST "/api/board/$b2/subscribe" -d "{\"subscriber_id\":\"Seated Guest\",\"job_title\":\"Guest\",\"session_name\":\"$moved_name\"}" >/dev/null
+        sleep 2   # a seat's time has a one second resolution: the Operator's seat must be the newer
+        local lname; lname=$(live_json | python3 -c 'import sys,json
+for s in json.load(sys.stdin):
+    if s["session_id"]==sys.argv[1]: print(s["name"])' "$moved_old")
+        local envs_before; envs_before=$(ls "$DUMP"/*.env 2>/dev/null | tr '\n' ' ')
+        api POST "/api/sessions/live/$lname/restart" -d "{\"session_id\":\"$moved_old\",\"agent_type\":\"claude\"}" >/dev/null
+        moved_new=""; end=$((SECONDS + 60))
+        while (( SECONDS < end )); do
+            for f in "$DUMP"/*.env; do [[ " $envs_before " != *" $f "* ]] && grep -q '^CORAL_SESSION_TOKEN=' "$f" 2>/dev/null && moved_new=$(basename "$f" .env); done
+            [[ -n "$moved_new" ]] && break; sleep 1
+        done
+        if [[ -z "$moved_new" ]]; then fail "#11013 restart: the restarted agent never came back"; else
+            local nname newboard state_project okr=1
+            nname=$(sess_of "$moved_new")
+            newboard=$(live_json | python3 -c 'import sys,json
+for s in json.load(sys.stdin):
+    if s["session_id"]==sys.argv[1]: print(s.get("board_project",""))' "$moved_new")
+            state_project=$(python3 -c "import sys,json;print(json.load(open(sys.argv[1])).get('project',''))" "$(NP "$DATA/board_state_$nname.json")" 2>/dev/null || true)
+            [[ "$newboard" == "$b1" ]] || { fail "#11013 restart: the restarted agent's live row board is '$newboard', want its launch board $b1"; okr=0; }
+            [[ $(seated "$b1" "$nname") -ge 1 ]] || { fail "#11013 restart: the restarted agent holds no seat on its launch board"; okr=0; }
+            [[ $(seated "$b2" "$nname") -eq 0 ]] || { fail "#11013 restart: the restarted agent was seated on the Operator's other board"; okr=0; }
+            [[ "$state_project" == "$b1" ]] || { fail "#11013 restart: its command-line state names '$state_project', want $b1"; okr=0; }
+            [[ $okr == 1 ]] && pass "#11013 restart: seated elsewhere by the Operator, then restarted: the agent's live row, seat and command-line state are still its launch board"
+        fi
+    fi
+
     # variants and the real CLI ----------------------------------------------------------
     ok=1; local path want
     local ptok="$otok" pname="$osess" prole; prole=$(role_of "$osid")   # the agent's OWN subscriber name: a join under another name is refused for that, which would hide the board gate

@@ -333,7 +333,7 @@ func (h *SessionsHandler) sendAutoWakeNotice(ctx context.Context, ls store.LiveS
 	if boardName == "" || h.bs == nil {
 		return
 	}
-	sub, err := h.bs.GetSubscriptionBySessionName(ctx, naming.SessionName(ls.AgentType, ls.SessionID))
+	sub, err := h.launchSeat(ctx, &ls, naming.SessionName(ls.AgentType, ls.SessionID)) // the seat on the board it was launched on, whose title the notice names
 	if err != nil || sub == nil {
 		return
 	}

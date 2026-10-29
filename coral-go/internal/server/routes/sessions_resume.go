@@ -186,7 +186,7 @@ func (h *SessionsHandler) resumeResolve(ctx context.Context, name string, body *
 		if ls.AgentType != "" {
 			storedAgentType = ls.AgentType
 		}
-		p.subscription, _ = h.bs.GetSubscriptionBySessionName(ctx, naming.SessionName(storedAgentType, targetSID))
+		p.subscription, _ = h.launchSeat(ctx, ls, naming.SessionName(storedAgentType, targetSID))
 	}
 	return p, nil
 }
