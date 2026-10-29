@@ -7,7 +7,7 @@ const BASE = require('./test_base').BASE;
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
-    const CHECK = { available: true, latest: '9.9.9', current: '1.0.0', release_url: 'https://github.com/subgentic/coral/releases/latest', release_notes: '- Something new' };
+    const CHECK = { available: true, latest: '9.9.9', current: '1.0.0', release_url: 'https://github.com/subgentic/coral/releases/latest', release_notes: '- Something `new` in the list (#10735, #10787)' };
     const READY = { enabled: true, installed: '1.0.0', state: 'staged', staged: { version: '9.9.9', staged_at: new Date().toISOString(), days_ready: 0, verified: true }, relaunch: { available: true, reason: '', restarts: [], ack: 'a' } };
     const COMING = { enabled: true, installed: '1.0.0', state: 'none', not_ready_reason: 'not_promoted', relaunch: { available: false, reason: 'nothing_staged', restarts: [] } };
     const BREW = { ...COMING, install_kind: 'homebrew', upgrade_command: 'brew upgrade coral' };
@@ -27,6 +27,7 @@ const BASE = require('./test_base').BASE;
         assert.equal(await run(READY), null, 'ready: no second notice with a GitHub link');
         const coming = await run(COMING);
         assert.ok(coming && !coming.download && /will ask before it installs/.test(coming.text), 'coming: no Download link, it says Coral will ask: ' + JSON.stringify(coming));
+        assert.ok(coming && /Something new in the list/.test(coming.text) && !/#\d|`/.test(coming.text), 'the notes are plain words: no task numbers, no backticks: ' + JSON.stringify(coming));
         for (const [name, st] of [['off', OFF], ['homebrew', BREW]]) { const t = await run(st); assert.ok(t && t.download, `${name}: the Download link stays: ` + JSON.stringify(t)); }
         console.log('PASS');
     } finally { try { await client.close(); } catch (e) {} }

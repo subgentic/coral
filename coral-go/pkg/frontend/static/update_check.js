@@ -73,7 +73,7 @@ function showUpdateToast(data, coming = false) {
             .map(l => l.trim())
             .filter(l => l.startsWith("- ") || l.startsWith("* "));
         const items = lines.slice(0, 5).map(l => {
-            const text = l.replace(/^[-*]\s*/, "");
+            const text = l.replace(/^[-*]\s*/, "").replace(/`/g, "").replace(/\s*\(?#\d+(, #\d+)*\)?/g, "").trim(); // plain words: no task numbers, no markup marks
             return `<li>${escapeHtml(text)}</li>`;
         });
         if (items.length) {

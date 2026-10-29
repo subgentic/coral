@@ -153,8 +153,8 @@ export const rollbackText = (reason) => (Object.hasOwn(ROLLBACK_TEXT, reason) ? 
 export function foundText(s) {
     switch (s.checkedResult) {
         case 'up_to_date': return 'Up to date.';
-        case 'not_promoted': return s.newest ? `${s.newest} is out. Coral will take it once it is promoted.` : 'A newer release is out. Coral will take it once it is promoted.';
-        case 'rate_limited': return "GitHub's limit on requests from this network address was reached. Coral checks again when it is over.";
+        case 'not_promoted': return s.newest ? `${s.newest} is out. Coral will have it ready soon.` : 'A newer release is out. Coral will have it ready soon.';
+        case 'rate_limited': return 'Too many checks from this network. Coral checks again later.';
         case 'failed': return 'The check could not finish. Coral tries again later.';
         default: return '';
     }
@@ -166,7 +166,7 @@ export function notReadyText(s) {
         case 'up_to_date': return { title: 'Coral is up to date', sub: `You are on ${s.installed}.` };
         case 'not_promoted': return { title: s.latest ? `Coral ${s.latest} is out` : 'A newer Coral is out', sub: 'Coral will download and check it once it is ready. Installing it is up to you.' };
         case 'backoff': return { title: 'Nothing to install right now', sub: 'Coral will check again later.' };
-        case 'rate_limited': return { title: 'Coral could not check for updates', sub: "GitHub limits how many anonymous requests one network address may make, and this one reached it. Coral will check again when the limit is over. Nothing was changed." };
+        case 'rate_limited': return { title: 'Coral could not check for updates', sub: 'Too many checks from this network. Coral will try again later. Nothing was changed.' };
         case 'check_failed': return { title: 'Coral could not check for updates', sub: 'It will try again later. Nothing was changed.' };
         case 'not_checked': return { title: 'Coral has not checked for updates yet', sub: `You are on ${s.installed}.` };
         case 'switch_off': return { title: 'Automatic update checks are off', sub: 'Turn on "Check for updates automatically" in Settings > Updates to have updates downloaded and kept ready.' };
