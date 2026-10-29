@@ -34,6 +34,7 @@ package peercred
 
 import (
 	"bufio"
+	"context"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -57,8 +58,21 @@ var procNet = "/proc/net"
 // xnu's private structs). SameUser then answers unsupported, never a guess.
 var ErrLayout = errors.New("peercred: the kernel's socket table has an unknown layout")
 
-// ownerCheck is ownerIsMe (a test seam).
+// ownerCheck is ownerIsMe (a test seam). accepted is when the server accepted the connection, or the zero time when that is not known.
 var ownerCheck = ownerIsMe
+
+type acceptedKey struct{}
+
+// WithAccepted records, in a connection's context, when the server accepted it (http.Server.ConnContext), for AttributeAt: a transitional socket row (Windows) counts as the client's only
+// if its process was created before that (#385).
+func WithAccepted(ctx context.Context, t time.Time) context.Context {
+	return context.WithValue(ctx, acceptedKey{}, t)
+}
+
+func acceptedAt(ctx context.Context) time.Time {
+	t, _ := ctx.Value(acceptedKey{}).(time.Time)
+	return t
+}
 
 // ErrNotFound: no live socket row for the connection.
 var ErrNotFound = errors.New("peercred: no socket row for the connection")
@@ -208,6 +222,11 @@ var retryWait = 20 * time.Millisecond
 // answer is Self; anything that can't be told is Unattributed, never a guess. err says why for
 // Unattributed (and for a layout this build doesn't know).
 func Attribute(client, server netip.AddrPort) (Verdict, error) {
+	return AttributeAt(client, server, time.Time{})
+}
+
+// AttributeAt is Attribute for a connection the server accepted at accepted (the zero time: not known, and then a transitional row never counts).
+func AttributeAt(client, server netip.AddrPort, accepted time.Time) (Verdict, error) {
 	if !Supported {
 		return Unsupported, nil
 	}
@@ -218,7 +237,7 @@ func Attribute(client, server netip.AddrPort) (Verdict, error) {
 			time.Sleep(retryWait)
 		}
 		var me bool
-		if me, err = ownerCheck(client, server); err == nil {
+		if me, err = ownerCheck(client, server, accepted); err == nil {
 			if me {
 				return Self, nil
 			}
@@ -257,7 +276,7 @@ func SameUser(r *http.Request) (same, supported bool) {
 	if !client.Addr().Unmap().IsLoopback() {
 		return false, false // not a local request: not this package's question
 	}
-	switch v, err := Attribute(client, server); v {
+	switch v, err := AttributeAt(client, server, acceptedAt(r.Context())); v {
 	case Self:
 		return true, true
 	case Unsupported:

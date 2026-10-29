@@ -12,6 +12,7 @@ import (
 	"net/http/httptest"
 	"net/netip"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -49,12 +50,17 @@ func TestOwnerIsMeRealLoopback(t *testing.T) {
 			// What a server sees: the client is the remote end of its accepted socket.
 			client := unmap(netip.MustParseAddrPort(sc.RemoteAddr().String()))
 			server := unmap(netip.MustParseAddrPort(sc.LocalAddr().String()))
-			me, err := ownerIsMe(client, server)
+			me, err := ownerIsMe(client, server, time.Time{})
 			require.NoError(t, err)
 			assert.True(t, me)
 
+			// An accept time changes nothing for a live row (and on Linux and macOS nothing at all: the accept time is read only by the Windows transitional-row rule, #385).
+			me2, err := ownerIsMe(client, server, time.Now())
+			require.NoError(t, err)
+			assert.Equal(t, me, me2, "the same answer with and without an accept time")
+
 			// The server's own socket is the other way round: not the client's row.
-			_, err = ownerIsMe(server, netip.AddrPortFrom(server.Addr(), 1))
+			_, err = ownerIsMe(server, netip.AddrPortFrom(server.Addr(), 1), time.Time{})
 			assert.True(t, errors.Is(err, ErrNotFound), "%v", err)
 		})
 	}
