@@ -41,6 +41,10 @@ const BASE = require('./test_base').BASE;
             assert.ok(fit.visible && !fit.clipped && fit.cellW >= fit.btnW, `${w}: the answer buttons are whole inside their column ${JSON.stringify(fit)}`);
             if (!mobile) assert.ok(fit.cellW >= 100, `${w}: the Answer column has room for its buttons (about 110 px): ${JSON.stringify(fit)}`);
             if (mobile) assert.ok(await ev(`[...document.querySelectorAll('#group-table-view .inbox-answer')].every(b => b.getBoundingClientRect().height >= 44 && b.getBoundingClientRect().width >= 44 && b.getBoundingClientRect().right <= innerWidth)`), '390: each is a 44 px target in both directions and on the screen');
+            if (mobile) { // the choices of a phone row are a full-width pair, not a small indented one (#10874: a destructive prompt deserves room)
+                const g = await ev(`(() => { const bs = [...document.querySelectorAll('#group-table-view .inbox-answer')].map(b => b.getBoundingClientRect()), row = document.querySelector('#group-table-view .inbox-answers').getBoundingClientRect(); return { left: Math.round(bs[0].left), right: Math.round(bs[bs.length - 1].right), rowW: Math.round(row.width), vw: innerWidth }; })()`);
+                assert.ok(g.left <= 28 && g.right >= g.vw - 28, '390: the pair spans the row, no 56 px indent: ' + JSON.stringify(g));
+            }
             if (mobile) { // a toast is not drawn over the folder picker of the phone's list (#10525)
                 await ev(`import((window.__coralStatic || '/static/') + 'utils.js').then(m => m.showToast('A notice for the Inbox', false, 60000)); true`);
                 await waitFor(`!!document.querySelector('#notices .toast')`, '390: a toast', 5000);

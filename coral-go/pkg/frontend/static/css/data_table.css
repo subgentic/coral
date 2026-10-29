@@ -506,7 +506,8 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 /* A Needs you row's answer buttons (#10400): the card's own choices, 44 px on a phone. */
 .inbox-answers { display: inline-flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .inbox-answered { color: var(--text-secondary); }
-@media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) { .inbox-answers .inbox-answer { min-height: var(--control-touch-height, 44px); min-width: var(--control-touch-height, 44px); } }
+@media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) { .inbox-answers .inbox-answer { flex: 1 1 0; min-height: var(--control-touch-height, 44px); min-width: var(--control-touch-height, 44px); } }
 .dt-mail-cell:has(> .inbox-answers) { flex-wrap: wrap; }
 .dt-mail-cell > .inbox-answers { flex: 1 1 100%; padding: 0 12px 8px 56px; } /* under the mail line, in line with its text */
-.dt-mail-cell > .inbox-answers:empty { display: none; } /* no choices read (yet): no padded empty line under the row, which made it 64 px, not the one line of 56 */
+.dt-mail-cell > .inbox-answers:empty { display: none; }
+@media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) { .dt-mail-cell > .inbox-answers { padding-left: 0; padding-right: 0; } } /* a phone's choices have no indent (#10874) */ /* no choices read (yet): no padded empty line under the row, which made it 64 px, not the one line of 56 */
