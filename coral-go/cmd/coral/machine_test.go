@@ -45,6 +45,7 @@ func (s *machineStubProvider) Delete(_ context.Context, id string) error {
 }
 
 type machineStubHub struct {
+	destroyKey string // the chd_ the command gave the Hub client
 	labels     []string
 	credential string // "" is the default one
 }
@@ -96,7 +97,7 @@ func machineFixture(t *testing.T) (tokenFile, keyFile string, p *machineStubProv
 		p.token = token
 		return p, nil
 	}
-	newMachineHub = func(baseURL, key, terms string) machinelaunch.Minter { return h }
+	newMachineHub = func(baseURL, key, destroyKey, terms string) machinelaunch.Minter { h.destroyKey = destroyKey; return h }
 	machineUserData = func(keys *machinelaunch.BootKeys, sshFrom, maxMode, version string, digests machinelaunch.ReleaseDigests, hubURL string, agents []string) (string, error) {
 		return "#cloud-config\n# " + sshFrom + " " + maxMode + " " + version + " " + strings.Join(agents, ",") + " " + digests.AMD64 + "\n", nil
 	}
@@ -285,6 +286,41 @@ func TestMachineLaunchPinsTheCoralDigest(t *testing.T) {
 	given := base("9.9.9", "--coral-sha256-amd64", strings.Repeat("ab", 32), "--coral-sha256-arm64", strings.Repeat("cd", 32))
 	if code := runMachine(given, strings.NewReader(""), &out, &errb); code != 0 || !strings.Contains(p.spec.UserData, strings.Repeat("ab", 32)) {
 		t.Fatalf("a version with the person's digests is launched with them: exit %d %s", code, errb.String())
+	}
+}
+
+// --hub-destroy-file is optional: given, the chd_ reaches the Hub client (never the user-data or the output); an unsafe file is refused before any call; none at all launches as before.
+func TestMachineLaunchHubDestroyFile(t *testing.T) {
+	tf, kf, p, h := machineFixture(t)
+	dir := t.TempDir()
+	good, loose := filepath.Join(dir, "destroy"), filepath.Join(dir, "loose")
+	if err := os.WriteFile(good, []byte("chd_DESTROYCREDENTIAL0123\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(loose, []byte("chd_LOOSEDESTROY0123456789"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	_ = os.Chmod(loose, 0o644)
+	base := []string{"launch", "--provider", "digitalocean", "--token-file", tf, "--hub-key-file", kf, "--hub-url", "https://hub.example", "--coral-version", "2.0.3", "--yes"}
+	var out, errb bytes.Buffer
+	if code := runMachine(append(append([]string{}, base...), "--hub-destroy-file", good), strings.NewReader(""), &out, &errb); code != 0 || h.destroyKey != "chd_DESTROYCREDENTIAL0123" {
+		t.Fatalf("exit %d, key %q: %s", code, h.destroyKey, errb.String())
+	}
+	if strings.Contains(out.String()+errb.String()+p.spec.UserData, "DESTROYCREDENTIAL") {
+		t.Fatal("the destroy credential reached the output or the user-data")
+	}
+	calls := len(p.calls)
+	out.Reset()
+	errb.Reset()
+	if code := runMachine(append(append([]string{}, base...), "--hub-destroy-file", loose), strings.NewReader(""), &out, &errb); code != 2 || len(p.calls) != calls || strings.Contains(errb.String(), "LOOSEDESTROY") {
+		t.Fatalf("an unsafe file is refused before any call: exit %d, %s", code, errb.String())
+	}
+	if code := runMachine(append(append([]string{}, base...), "--hub-destroy-file", "-", "--token-file", "-"), strings.NewReader("x"), &out, &errb); code != 2 {
+		t.Fatalf("two files from standard input: exit %d", code)
+	}
+	h.destroyKey = "unset"
+	if code := runMachine(base, strings.NewReader(""), &out, &errb); code != 0 || h.destroyKey != "" {
+		t.Fatalf("without the file the launch goes on with none: exit %d, key %q", code, h.destroyKey)
 	}
 }
 

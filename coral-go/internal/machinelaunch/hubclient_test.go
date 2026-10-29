@@ -119,6 +119,9 @@ const (
 	testDestroy = "chd_destroycredential0123456789"
 )
 
+// mintAnswer is the Hub's mint answer: the credential and its id, never a destroy credential (that belongs to the automation key).
+const mintAnswer = `{"credential":"chb_0123456789abcdef","credential_id":"` + testCredID + `","adapter":"generic","persistence":"ephemeral"}`
+
 // Revoke (the shape is coral-hub's description of the route, assumed until Lead's HubRevoker): POST /api/bootstrap/credentials/{id}/revoke with the destroy credential as the one Bearer header, no body, no Origin.
 func TestRevokeSendsTheDestroyCredentialAndNothingElse(t *testing.T) {
 	var method, path, auth, origin, cookie string
@@ -127,13 +130,14 @@ func TestRevokeSendsTheDestroyCredentialAndNothingElse(t *testing.T) {
 	h, _ := hubServer(t, func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/bootstrap/credentials" {
 			w.WriteHeader(http.StatusCreated)
-			_, _ = w.Write([]byte(`{"credential":"chb_0123456789abcdef","id":"` + testCredID + `","destroy_credential":"` + testDestroy + `"}`))
+			_, _ = w.Write([]byte(mintAnswer))
 			return
 		}
 		calls++
 		method, path, auth, origin, cookie, bodyLen = r.Method, r.URL.Path, r.Header.Get("Authorization"), r.Header.Get("Origin"), r.Header.Get("Cookie"), r.ContentLength
 		_, _ = w.Write([]byte(`{"ok":true}`))
 	})
+	h.DestroyKey = testDestroy
 	if _, err := h.Mint(context.Background(), "coral-1"); err != nil {
 		t.Fatal(err)
 	}
@@ -148,16 +152,20 @@ func TestRevokeSendsTheDestroyCredentialAndNothingElse(t *testing.T) {
 	}
 }
 
-func TestRevokeWithNothingMintedOrNoIdentityIsRefusedLocally(t *testing.T) {
+func TestRevokeWithNothingMintedOrNoIdOrNoDestroyKeyIsRefusedLocally(t *testing.T) {
 	var hits int
 	h, _ := hubServer(t, func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/bootstrap/credentials" {
 			w.WriteHeader(http.StatusCreated)
-			_, _ = w.Write([]byte(`{"credential":"chb_0123456789abcdef"}`)) // a Hub that sends no id and no destroy credential
+			_, _ = w.Write([]byte(`{"credential":"chb_0123456789abcdef"}`)) // a Hub that sends no credential id
 			return
 		}
 		hits++
 	})
+	if err := h.Revoke(context.Background(), "never-minted"); !errors.Is(err, ErrNoDestroyKey) {
+		t.Fatalf("no destroy key: %v", err)
+	}
+	h.DestroyKey = testDestroy
 	if err := h.Revoke(context.Background(), "never-minted"); !errors.Is(err, ErrNothingToRevoke) {
 		t.Fatalf("nothing minted: %v", err)
 	}
@@ -166,6 +174,10 @@ func TestRevokeWithNothingMintedOrNoIdentityIsRefusedLocally(t *testing.T) {
 	}
 	if err := h.Revoke(context.Background(), "coral-1"); !errors.Is(err, ErrNothingToRevoke) || hits != 0 {
 		t.Fatalf("no id: %v, hits %d", err, hits)
+	}
+	h.DestroyKey = "chk_notadestroykey0123456789" // the automation key is not the destroy credential
+	if err := h.Revoke(context.Background(), "coral-1"); !errors.Is(err, ErrNoDestroyKey) || hits != 0 {
+		t.Fatalf("a chk_ is not a chd_: %v, hits %d", err, hits)
 	}
 }
 
@@ -188,7 +200,7 @@ func TestRevokeRetriesWhatMayPassAndSaysTheStatusOfAnythingElse(t *testing.T) {
 		h, _ := hubServer(t, func(w http.ResponseWriter, r *http.Request) {
 			if r.URL.Path == "/api/bootstrap/credentials" {
 				w.WriteHeader(http.StatusCreated)
-				_, _ = w.Write([]byte(`{"credential":"chb_0123456789abcdef","id":"` + testCredID + `","destroy_credential":"` + testDestroy + `"}`))
+				_, _ = w.Write([]byte(mintAnswer))
 				return
 			}
 			st := c.statuses[min(calls, len(c.statuses)-1)]
@@ -197,6 +209,7 @@ func TestRevokeRetriesWhatMayPassAndSaysTheStatusOfAnythingElse(t *testing.T) {
 			_, _ = w.Write([]byte(`{"error":"x chd_leak ` + testDestroy + `"}`))
 		})
 		h.RevokeEvery = time.Millisecond
+		h.DestroyKey = testDestroy
 		_, _ = h.Mint(context.Background(), "coral-1")
 		err := h.Revoke(context.Background(), "coral-1")
 		if c.name == "401 is not retried" {

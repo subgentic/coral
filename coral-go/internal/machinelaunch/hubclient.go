@@ -26,19 +26,18 @@ type Minter interface {
 // only mint credentials for its own account and only for the adapters ticked when it was made; it reads and lists nothing. It never follows a redirect (the key must not travel to another host).
 type HubClient struct {
 	mu     sync.Mutex
-	minted map[string]mintedCredential // label -> what the Hub answered with, so a failed launch can revoke it (Revoke)
+	minted map[string]string // label -> the credential id the Hub answered with, so a failed launch can revoke it (Revoke)
 
-	BaseURL      string       // the Hub's origin (https; plain http only for a loopback address, for tests)
-	Key          string       // the chk_ automation key (from a 0600 file, memory only)
+	BaseURL string // the Hub's origin (https; plain http only for a loopback address, for tests)
+	Key     string // the chk_ automation key (from a 0600 file, memory only)
+	// DestroyKey is the automation key's chd_ (from the optional 0600 --hub-destroy-file, memory only): the one credential that revokes what the key minted. It is never in a mint answer. "" means a launch that fails
+	// after the mint cannot revoke the credential, and says so.
+	DestroyKey   string
 	TermsVersion string       // the terms version the person accepted when the key was made; the Hub checks it
 	HTTP         *http.Client // nil: a client with a 30 second timeout that follows no redirect
 	// RevokeEvery is the pause between tries of a revoke the Hub answered 429 or 503 to (0: 2 seconds).
 	RevokeEvery time.Duration
 }
-
-// mintedCredential is what the Hub's mint answer says about the credential's identity: its id, and the destroy credential (chd_) that revokes it. ASSUMED shape (coral-hub's note, relayed on the board): "id" and
-// "destroy_credential" in the mint answer; a Hub that does not send them leaves the credential unrevocable from here, and a failed launch says so.
-type mintedCredential struct{ ID, Destroy string }
 
 var (
 	keyShape     = regexp.MustCompile(`^chk_[A-Za-z0-9_\-]{8,200}$`)
@@ -127,8 +126,7 @@ func (h *HubClient) Mint(ctx context.Context, label string) (string, error) {
 	raw, _ := io.ReadAll(io.LimitReader(resp.Body, maxHubAnswer))
 	var answer struct {
 		Credential string `json:"credential"`
-		ID         string `json:"id"`
-		Destroy    string `json:"destroy_credential"`
+		ID         string `json:"credential_id"` // the credential's id (a UUID): what the revoke names
 		Error      string `json:"error"`
 	}
 	_ = json.Unmarshal(raw, &answer)
@@ -144,9 +142,9 @@ func (h *HubClient) Mint(ctx context.Context, label string) (string, error) {
 	}
 	h.mu.Lock()
 	if h.minted == nil {
-		h.minted = map[string]mintedCredential{}
+		h.minted = map[string]string{}
 	}
-	h.minted[label] = mintedCredential{ID: answer.ID, Destroy: answer.Destroy}
+	h.minted[label] = answer.ID
 	h.mu.Unlock()
 	return answer.Credential, nil
 }
@@ -156,17 +154,25 @@ var (
 	destroyShape      = regexp.MustCompile(`^chd_[A-Za-z0-9_\-]{8,500}$`)
 )
 
-// ErrNothingToRevoke is a Revoke for a label this client never minted a revocable credential for.
-var ErrNothingToRevoke = errors.New("this launch has no revocable credential (the Hub did not send its id and destroy credential)")
+// Errors a revoke answers with before it asks the Hub anything.
+var (
+	// ErrNothingToRevoke is a Revoke for a label this client never minted a credential with an id for.
+	ErrNothingToRevoke = errors.New("this launch has no credential id to revoke (the Hub did not send one)")
+	// ErrNoDestroyKey is a Revoke with no chd_ to revoke with: pass --hub-destroy-file next time, or revoke the machine in Coral Hub.
+	ErrNoDestroyKey = errors.New("no destroy credential was given (--hub-destroy-file), so it cannot be revoked from here")
+)
 
-// Revoke revokes the credential minted for label: POST /api/bootstrap/credentials/{id}/revoke with the destroy credential (chd_) as the one Bearer header, no body, no Origin. It ends the identity enrolled from the
-// credential, or expires it if it was never redeemed; an already ended one is also a success (the Hub's route is idempotent). 429 and 503 are tried again a few times (they may pass); anything else is an error that
-// holds the status only. ASSUMED from coral-hub's description of the route (board, 09:50 and its 09:54 corrections), until Lead's HubRevoker (#10918) replaces it.
+// Revoke revokes the credential minted for label: POST /api/bootstrap/credentials/{credential_id}/revoke with the automation key's destroy credential (chd_, DestroyKey) as the one Bearer header, no body, no Origin.
+// It ends the identity enrolled from the credential, or expires it if it was never redeemed; an already ended one is also a success (the Hub's route is idempotent). 429 and 503 are tried again a few times (they
+// may pass); anything else is an error that holds the status only. From coral-hub's description of the route and of the mint answer (board, 09:50, 09:54, 10:00).
 func (h *HubClient) Revoke(ctx context.Context, label string) error {
+	if !destroyShape.MatchString(h.DestroyKey) {
+		return ErrNoDestroyKey
+	}
 	h.mu.Lock()
-	m, ok := h.minted[label]
+	id, ok := h.minted[label]
 	h.mu.Unlock()
-	if !ok || !credentialIDShape.MatchString(m.ID) || !destroyShape.MatchString(m.Destroy) {
+	if !ok || !credentialIDShape.MatchString(id) {
 		return ErrNothingToRevoke
 	}
 	base, err := h.endpoint()
@@ -185,11 +191,11 @@ func (h *HubClient) Revoke(ctx context.Context, label string) error {
 	c.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
 	var last *RevokeError
 	for attempt := 0; attempt < 3; attempt++ {
-		req, err := http.NewRequestWithContext(ctx, http.MethodPost, base+"/"+m.ID+"/revoke", nil)
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, base+"/"+id+"/revoke", nil)
 		if err != nil {
 			return errors.New("could not make the revoke request to Coral Hub")
 		}
-		req.Header.Set("Authorization", "Bearer "+m.Destroy)
+		req.Header.Set("Authorization", "Bearer "+h.DestroyKey)
 		req.Header.Set("Accept", "application/json")
 		req.Header.Set("User-Agent", "coral-machine-launch")
 		resp, err := c.Do(req)
