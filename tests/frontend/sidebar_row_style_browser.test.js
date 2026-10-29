@@ -37,7 +37,11 @@ const SESSIONS = Array.from({ length: 4 }, (_, i) => { const n = i + 1; return {
             await ev(`document.documentElement.setAttribute('data-theme', '${theme}'); true`);
             const secondary = await tok('--text-secondary'), primary = await tok('--text-primary');
             for (const [name, l] of Object.entries(lists)) {
-                await ev(`${l.go}; true`); await sleep(700); // sleep-ok: the page behind the tab is drawn
+                await ev(`${l.go}; true`);
+                // the page behind the tab is drawn: a row at rest, and the current row (Agents: a plain row to mark current)
+                const shown = `[...document.querySelectorAll(${JSON.stringify(l.row)})].filter(e => e.getClientRects().length)`;
+                await waitFor(name === 'Agents' ? `${shown}.some(${l.rest}) && !!document.querySelector('#live-sessions-list li.session-group-item:not(.sleeping):not(.needs-attention)')`
+                    : `${shown}.some(${l.rest}) && ${shown}.some(${l.cur})`, `${theme} ${name}: its rows drawn`, 8000);
                 if (name === 'Agents') await ev(`document.querySelector('#live-sessions-list li.session-group-item:not(.sleeping):not(.needs-attention)').classList.add('active', 'list-row-current'); true`); // the current agent, as the list marks it
                 const rest = await look(l.row, l.label, l.rest), cur = await look(l.row, l.label, name === 'Agents' ? 'e => e.classList.contains("active")' : l.cur);
                 const at = `${theme} ${name}: `;
