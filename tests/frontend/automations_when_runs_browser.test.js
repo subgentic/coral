@@ -33,8 +33,9 @@ const BASE = require('./test_base').BASE;
         await ev(`document.querySelector('#scheduler-detail .back-link, #scheduler-detail .sched-back')?.click(); true`);
         await ev(`(window.openJobForm || window.showJobModal || (() => {}))(); true`);
         await ev(`document.querySelector('[data-on-click="job-new"]')?.click(); true`);
-        await waitFor(`!!document.querySelector('.sched-when-note')`, 'the form\'s note', 8000);
-        assert.equal(await ev(`document.querySelector('.sched-when-note').textContent.trim()`), 'Runs only while Coral is running on this computer. A run missed while Coral was off happens once when it starts again, unless the job was edited or turned on after it was due.', 'the form says when it runs');
+        // wait for the New job form's own choice: the job page's note has the same class and words (scheduler.js), so waiting on the note alone passes at once, before job_form.js has opened the modal
+        await waitFor(`document.querySelectorAll('#job-type-toggle .job-type-btn').length === 2`, 'the New job form\'s choice', 8000);
+        assert.equal(await ev(`document.querySelector('.sched-when-note:not(#scheduler-detail *)').textContent.trim()`), 'Runs only while Coral is running on this computer. A run missed while Coral was off happens once when it starts again, unless the job was edited or turned on after it was due.', 'the form says when it runs');
         // the first choice (#10515 point 3): what the job does, in a verb
         assert.deepEqual(await ev(`[...document.querySelectorAll('.job-type-btn')].map(b => b.lastChild.textContent.trim())`), ['Run a prompt', 'Run a workflow'], 'the choice reads Run a prompt / Run a workflow');
         console.log('PASS automations_when_runs');
