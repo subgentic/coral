@@ -44,6 +44,16 @@ func takeInstallMark() {
 	}
 }
 
+// takeLaunchPending takes the elevated installer's launch-pending mark (task #380) and reports whether it was fresh: the installer's
+// Finish button meant this start to come from Explorer, unelevated.
+func takeLaunchPending() bool {
+	if installrestart.TakeLaunchPending(time.Now()) {
+		log.Printf("[TRAY] started after an elevated installer's Launch Coral: its launch-pending mark is taken")
+		return true
+	}
+	return false
+}
+
 // guardTrayWindow keeps a posted WM_ENDSESSION from the tray icon's window, whose library would end the tray on any (internal/endsession).
 func guardTrayWindow() {
 	if err := endsession.Guard("SystrayClass"); err != nil {
