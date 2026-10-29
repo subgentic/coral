@@ -732,6 +732,7 @@
     }
 
     /* Option A (#10691, the operator): the phone's list is the sidebar's row at a thumb's size. A team or folder header is the sidebar's: chevron, name, count, menu, no card around it. */
+    #mobile-session-list .session-team-group > .board-card-header .group-kebab, #mobile-agent-list .session-team-group > .board-card-header .group-kebab { margin-right: -8px; } /* the team card is inset 8 px from the list's edge: its menu sits in the server's and folder's column, as the desktop's does (session.css; #10691 took the card away, #10902 server_menu) */
     #mobile-session-list .session-group-header {
         min-height: var(--control-touch-height, 44px);
         padding: 6px 12px !important;
