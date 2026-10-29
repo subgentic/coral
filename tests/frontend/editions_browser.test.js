@@ -367,7 +367,7 @@ async function run() {
             // ── The home section ──
             await showHome(mobile);
             let hm = await home();
-            check(`${label}: home section under the launch cards: Coral Hub and Run your own hub`, hm.shown && hm.below && JSON.stringify(hm.items) === '["Coral Hub","Run your own hub"]', JSON.stringify(hm));
+            check(`${label}: home section under the launch cards: Coral Hub, Mobile QR code (#10736) and Run your own hub`, hm.shown && hm.below && JSON.stringify(hm.items) === '["Coral Hub","Mobile QR code","Run your own hub"]', JSON.stringify(hm));
             await click('#editions-home [data-editions="home-hub"]');
             check(`${label}: home Coral Hub opens Connect to Coral Hub`, ((await screen()) || {}).title === 'Connect to Coral Hub');
             await click('#editions-modal [data-editions="skip"]');
