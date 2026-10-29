@@ -431,7 +431,7 @@ func TestGeneratePersistedDiffBinaryChanges(t *testing.T) {
 	_, h, _, _ := setupSessionsTestServer(t)
 	repo := diffRepo(t)
 	run := func(args ...string) {
-		cmd := exec.Command("git", append([]string{"-C", repo}, args...)...)
+		cmd := consoletest.HiddenCommand("git", append([]string{"-C", repo}, args...)...)
 		cmd.Env = append(os.Environ(), "GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@example.test", "GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@example.test")
 		out, err := cmd.CombinedOutput()
 		require.NoError(t, err, string(out))
