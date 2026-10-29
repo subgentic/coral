@@ -2,6 +2,7 @@ package routes
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -65,6 +66,21 @@ func (o *IdentityObserver) checkBoard(r *http.Request, owner *store.SessionToken
 		}
 		if there != nil {
 			sub = there
+		}
+	}
+	// Joining is the one board request an agent may make on a board it is not on (acrossBoards), but only on a board it belongs to (#11013): a token that could join ANY board could then read, post and see
+	// the tasks of any team's or the Operator's board.
+	if r.Method == http.MethodPost && tail == "subscribe" {
+		may, jerr := o.mayJoinBoard(r.Context(), owner, project, sub)
+		if jerr != nil {
+			return nil, "", jerr
+		}
+		if !may {
+			expected := notSubscribed
+			if sub != nil {
+				expected = sub.Project
+			}
+			note(o.mismatch(r, owner, mismatchCrossBoard, expected, project, "project"))
 		}
 	}
 	if sub == nil {
@@ -192,3 +208,30 @@ var errBoardBodyUnreadable = errors.New("board request body could not be read")
 type errBody struct{ err error }
 
 func (e *errBody) Read([]byte) (int, error) { return 0, e.err }
+
+// mayJoinBoard reports whether the agent whose token this is may join (subscribe to) the board: one it already holds a seat on (current: checkBoard has chosen its seat there; a restart's join), the board its live row was launched on, or the board of
+// its team row (a team's board is named for the team). Nothing else: not a board named in the request, another team's, the Operator's, or one only a cross-team link reaches (a link carries messages, it does
+// not seat an agent on the other board). The Operator's own join (the dashboard, the command line outside an agent) and the launch path are not agent tokens and never come here (#11013). A lookup that fails is
+// an error, never a yes.
+func (o *IdentityObserver) mayJoinBoard(ctx context.Context, owner *store.SessionTokenOwner, project string, current *board.Subscriber) (bool, error) {
+	if current != nil && current.Project == project {
+		return true, nil
+	}
+	ls, err := store.NewSessionStore(o.db).GetLiveSession(ctx, owner.SessionID)
+	if err != nil || ls == nil {
+		return false, err
+	}
+	if ls.BoardName != nil && *ls.BoardName != "" && strings.EqualFold(*ls.BoardName, project) {
+		return true, nil
+	}
+	if ls.TeamID != nil {
+		team, err := store.NewTeamStore(o.db).GetTeamByID(ctx, *ls.TeamID)
+		if err != nil {
+			return false, err
+		}
+		if team != nil && strings.EqualFold(team.Name, project) {
+			return true, nil
+		}
+	}
+	return false, nil
+}

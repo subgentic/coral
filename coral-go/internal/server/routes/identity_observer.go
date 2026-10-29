@@ -247,6 +247,11 @@ func (o *IdentityObserver) Middleware(next http.Handler) http.Handler {
 				return
 			}
 			if m != nil {
+				if m.Kind == mismatchCrossBoard && m.Field == "project" && r.Method == http.MethodPost && strings.HasSuffix(strings.TrimRight(r.URL.Path, "/"), "/subscribe") {
+					o.refuse(w, http.StatusForbidden, "identity_mismatch",
+						"An agent can join only the board it was launched on (its team's board), not "+strconv.Quote(m.Claimed)+": the Operator can seat it there, from the dashboard or the command line outside an agent ("+m.Kind+")")
+					return
+				}
 				o.refuse(w, http.StatusForbidden, "identity_mismatch",
 					"This agent can't act as "+strconv.Quote(m.Claimed)+" ("+m.Field+"): its session is "+strconv.Quote(m.Expected)+" ("+m.Kind+")")
 				return

@@ -59,8 +59,10 @@ func TestIdentityLayerDecidesTheActor(t *testing.T) {
 	require.NoError(t, err)
 	token, err := db.MintSessionToken(ctx, "sid-dev", "claude-dev")
 	require.NoError(t, err)
-	loose, err := db.MintSessionToken(ctx, "sid-loose", "claude-loose") // a session on no board
+	loose, err := db.MintSessionToken(ctx, "sid-loose", "claude-loose") // a session on no board yet, launched on p (#11013: an agent may join only the board it was launched on)
 	require.NoError(t, err)
+	launchedOnP := "p"
+	require.NoError(t, store.NewSessionStore(db).RegisterLiveSession(ctx, &store.LiveSession{SessionID: "sid-loose", AgentType: "claude", AgentName: "loose", WorkingDir: "/w", BoardName: &launchedOnP}))
 
 	cookie := false
 	o := NewIdentityObserver(db, bh.bs, func(*http.Request) bool { return cookie })
@@ -244,8 +246,10 @@ func TestJoiningTokenOutsideSubscribeIsRefusedAndCounted(t *testing.T) {
 	require.NoError(t, err)
 	member, err := db.MintSessionToken(ctx, "sid-dev", "claude-dev")
 	require.NoError(t, err)
-	joining, err := db.MintSessionToken(ctx, "sid-new", "claude-new") // on no board
+	joining, err := db.MintSessionToken(ctx, "sid-new", "claude-new") // on no board yet, launched on p (#11013)
 	require.NoError(t, err)
+	launchedOnP := "p"
+	require.NoError(t, store.NewSessionStore(db).RegisterLiveSession(ctx, &store.LiveSession{SessionID: "sid-new", AgentType: "claude", AgentName: "new", WorkingDir: "/w", BoardName: &launchedOnP}))
 
 	o := NewIdentityObserver(db, bh.bs, func(*http.Request) bool { return false })
 	ok := func(http.ResponseWriter, *http.Request) {}

@@ -127,7 +127,8 @@ func TestIdentityBindingOnAgentRoutes(t *testing.T) {
 	// under a new name, but never act as the Operator or as a subscriber another session
 	// holds (before, it skipped every board check).
 	sidC := "cccccccc-3512-0000-0000-00000000000c"
-	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: sidC, AgentType: "claude", AgentName: "agent-cccc", WorkingDir: "/tmp/cccc"}))
+	launchedOn := "b3495"
+	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: sidC, AgentType: "claude", AgentName: "agent-cccc", WorkingDir: "/tmp/cccc", BoardName: &launchedOn})) // launched on b3495: it may join that board and no other (#11013)
 	tokC, err := srv.db.MintSessionToken(ctx, sidC, "claude-"+sidC)
 	require.NoError(t, err)
 	asC := http.Header{store.SessionTokenHeader: {tokC}}

@@ -9,6 +9,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/subgentic/coral/internal/store"
 )
 
 // Messages, subscribe, leave, reads, waits, peek and reminders read the actor (#4255 commit 5, the
@@ -96,6 +98,8 @@ func TestMemberRoutesAttributeToTheActor(t *testing.T) {
 	// A joining agent: a session on no board, naming no session at all, joins from its own.
 	// (The token is minted in the harness observer's own store.)
 	joining := a.mintToken(t, "new", "sid-new", "claude-new")
+	launchedOn := "team" // launched on this board: an agent may join only that one (#11013)
+	require.NoError(t, store.NewSessionStore(a.db).RegisterLiveSession(ctx, &store.LiveSession{SessionID: "sid-new", AgentType: "claude", AgentName: "new", WorkingDir: "/w", BoardName: &launchedOn}))
 	code, body = a.callBodyWithToken(joining, "POST", "/api/board/team/subscribe", `{"subscriber_id":"New One","job_title":"Developer"}`)
 	require.Equal(t, http.StatusOK, code, body)
 	sub, err := a.bh.bs.GetProjectSubscription(ctx, "team", "New One")

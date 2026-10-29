@@ -43,7 +43,10 @@ func TestAgentActsOnlyOnItsOwnBoards(t *testing.T) {
 	_, err = bh.bs.PostMessage(ctx, "team-b", "Security Reviewer", "team-b's own business", nil)
 	require.NoError(t, err)
 	aOrch, aSec, two := mint("sid-a-orch", "claude-a-orch"), mint("sid-a-sec", "claude-a-sec"), mint("sid-two", "claude-two")
-	loner := mint("sid-loner", "claude-loner") // a token, never joined
+	loner := mint("sid-loner", "claude-loner")          // a token, never joined
+	launched := mint("sid-launched", "claude-launched") // a token, never joined, but launched on team-d (its live row says so)
+	launchedOn := "team-d"
+	require.NoError(t, store.NewSessionStore(db).RegisterLiveSession(ctx, &store.LiveSession{SessionID: "sid-launched", AgentType: "claude", AgentName: "launched", WorkingDir: "/w", BoardName: &launchedOn}))
 
 	o := NewIdentityObserver(db, bh.bs, func(*http.Request) bool { return false })
 	reached := []string{}
@@ -73,8 +76,7 @@ func TestAgentActsOnlyOnItsOwnBoards(t *testing.T) {
 		{"its own board", "GET", "/api/board/team-a/messages/all", "", aSec},
 		{"a cross-team send to another board", "POST", "/api/board/team-b/external-messages",
 			`{"from_board":"team-a","subscriber_id":"Orchestrator","session_name":"claude-a-orch","content":"hello"}`, aOrch},
-		{"joining another board", "POST", "/api/board/team-d/subscribe", `{"subscriber_id":"Security Reviewer","session_name":"claude-a-sec"}`, aSec},
-		{"an agent never on a board joins one", "POST", "/api/board/team-d/subscribe", `{"subscriber_id":"New","session_name":"claude-loner"}`, loner},
+		{"joining the board it was launched on", "POST", "/api/board/team-d/subscribe", `{"subscriber_id":"New","session_name":"claude-launched"}`, launched},
 		{"one of its two boards, as its role there", "GET", "/api/board/team-c/messages?subscriber_id=Lead", "", two},
 		{"the other of its two boards, as its role there", "POST", "/api/board/team-a/messages", `{"subscriber_id":"Dev","content":"x"}`, two},
 		{"the board list", "GET", "/api/board/projects", "", aSec},
@@ -88,6 +90,9 @@ func TestAgentActsOnlyOnItsOwnBoards(t *testing.T) {
 		name, method, target, body string
 		hdr                        map[string]string
 	}{
+		{"joining another board (#11013: only the board it was launched on)", "POST", "/api/board/team-d/subscribe", `{"subscriber_id":"Security Reviewer","session_name":"claude-a-sec"}`, aSec},
+		{"an agent never on a board, launched on none, joins one", "POST", "/api/board/team-d/subscribe", `{"subscriber_id":"New","session_name":"claude-loner"}`, loner},
+		{"an agent launched on one board joins another", "POST", "/api/board/team-b/subscribe", `{"subscriber_id":"New","session_name":"claude-launched"}`, launched},
 		{"another team's messages", "GET", "/api/board/team-b/messages/all", "", aSec},
 		{"another team's messages by id", "GET", "/api/board/team-b/messages/all?id=1", "", aSec},
 		{"another team's unread, as its namesake", "GET", "/api/board/team-b/messages?subscriber_id=Security+Reviewer&all=true", "", aSec},
