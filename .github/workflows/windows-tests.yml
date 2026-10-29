@@ -19,6 +19,7 @@ on:
       - "tests/frontend/**"
       - "tests/release/**"
       - "tools/coral.wxs"
+      - "tools/msi_version.ps1"
       - "installers/**"
       - ".github/workflows/windows-tests.yml"
       - ".github/workflows/release.yml"
@@ -29,6 +30,7 @@ on:
       - "tests/frontend/**"
       - "tests/release/**"
       - "tools/coral.wxs"
+      - "tools/msi_version.ps1"
       - "installers/**"
       - ".github/workflows/windows-tests.yml"
       - ".github/workflows/release.yml"
@@ -194,6 +196,10 @@ jobs:
       - name: Census - this build and release.yml's build the same programs with the same tags
         shell: bash
         run: python3 tests/release/windows_build_census_test.py
+      # The MSI carries X.Y.Z only, whatever the tag's suffix (#365): the unit test of tools/msi_version.ps1, which needs no msiexec.
+      - name: The version the MSI carries
+        shell: pwsh
+        run: tests/release/msi_version_test.ps1
       # The MSI is built and installed only when the installer changed (#5886): tools/coral.wxs, its art and licence text, installers/,
       # or the smoke script that checks it. The base is the pull request's base, the push's previous head, or main (a ci/ branch run
       # by hand); a base that cannot be found counts as changed, so a check that can't tell runs.
