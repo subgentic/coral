@@ -49,7 +49,7 @@ const BASE = require('./test_base').BASE;
     assert.equal(elementsExist.statusFound, true, 'remote access status element must exist');
     assert.equal(elementsExist.helpFound, true, 'telemetry help element must exist');
     assert.equal(elementsExist.telemetryDescribed, 1, 'telemetry is described by one element: its sentence');
-    assert.match(elementsExist.remoteSentence, /Lets other devices use Coral as you do/, 'remote access is described by its sentence first (settings_view, #8219)');
+    assert.match(elementsExist.remoteSentence, /Lets other devices control agents and read files as you do; unencrypted unless TLS is on/, 'remote access is described by its sentence first (settings_view, #8219)');
     assert.equal(elementsExist.remoteAria, 'settings-remote-access-status net-remote-note', 'then the state, then what a pending change does (#6619)');
     assert.equal(elementsExist.statusRole, 'status', 'status role="status"');
 
