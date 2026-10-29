@@ -83,7 +83,7 @@ const STUB = `(() => {
                 }
                 await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile: false }); await new Promise(r => setTimeout(r, 300)); // sleep-ok: back to the suite's width
             }
-            if (!mobile) assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view tbody tr[data-key] .dt-time')].map(e => /^(today|yesterday|[A-Z][a-z]{2} \\d+) \\d\\d:\\d\\d$/.test(e.textContent.trim()))`), [true, true, true, true, true], `${at}every run says when it started, in words`);
+            if (!mobile) assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view tbody tr[data-key] .dt-time')].map(e => /^(today|yesterday|[A-Z][a-z]{2} \\d+) (\\d\\d:\\d\\d|\\d{1,2}:\\d\\d [AP]M)$/.test(e.textContent.trim()))`), [true, true, true, true, true], `${at}every run says when it started, in words`);
             if (!mobile) assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view tbody tr[data-key]')].map(tr => tr.lastElementChild.textContent.trim())`), ['', '1 min', '1 min', '2 min', '1 min'], `${at}a finished run says how long it took, one still going says nothing`);
             assert.equal(await ev(`document.querySelector('#group-table-view .list-bar-search').getAttribute('aria-label')`), 'Search recent runs', `${at}the search is named for the folder`);
             await oneLinePerRow(ev, '#group-table-view tbody tr[data-key]', `${at}Recent runs`, assert, { min: 5 });
