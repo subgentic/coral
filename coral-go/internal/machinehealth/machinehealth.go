@@ -110,6 +110,7 @@ type Sampler struct {
 	// CPU time seen at the previous sample, to turn cumulative seconds into % over the interval.
 	prevAt     time.Time
 	prevSelf   float64
+	prevSelfOK bool // prevSelf is a reading, not the zero of a read that failed
 	prevAgents map[int32]float64
 }
 
@@ -180,13 +181,17 @@ func (s *Sampler) Sample(ctx context.Context) Health {
 	var h Health
 
 	// Coral itself.
-	if cpu, rss, ok := procUsage(ctx, int32(os.Getpid())); ok {
+	selfMeasured := false // Coral's CPU is a reading over the interval: this read worked and so did the one it is compared with
+	cpu, rss, ok := procUsage(ctx, int32(os.Getpid()))
+	if ok {
 		if !first && elapsed > 0 {
 			h.Coral.CPUPercent = percent(cpu-s.prevSelf, elapsed)
+			selfMeasured = s.prevSelfOK
 		}
 		s.prevSelf = cpu
 		h.Coral.RSSBytes = rss
 	}
+	s.prevSelfOK = ok
 
 	// The agents: every process under their roots.
 	var roots []int
@@ -199,6 +204,7 @@ func (s *Sampler) Sample(ctx context.Context) Health {
 		h.Agents.Count = len(roots)
 	}
 	agentCPU := map[int32]float64{}
+	agentsRead := 0 // agent processes read now that were also read last time: the ones whose CPU is a reading
 	if len(roots) > 0 {
 		var cpuDelta float64
 		for _, pid := range descendants(ctx, roots) {
@@ -209,6 +215,7 @@ func (s *Sampler) Sample(ctx context.Context) Health {
 			agentCPU[pid] = cpu
 			if prev, ok := s.prevAgents[pid]; ok && cpu >= prev {
 				cpuDelta += cpu - prev
+				agentsRead++
 			}
 			h.Agents.RSSBytes += rss
 		}
@@ -242,7 +249,7 @@ func (s *Sampler) Sample(ctx context.Context) Health {
 	if haveR {
 		h.ResponsivenessMS = int64(math.Round(float64(r.Last) / float64(time.Millisecond)))
 	}
-	h.cpuMeasured = !first && elapsed > 0
+	h.cpuMeasured = cpuMeasured(!first && elapsed > 0, selfMeasured, len(roots), agentsRead)
 	h.Status, h.Reason = classify(h, r, haveR, now)
 	h.BusyBy = busyBy(h)
 
@@ -270,6 +277,12 @@ func classify(h Health, r Responsiveness, haveR bool, now time.Time) (status, re
 		return "busy", "cpu"
 	}
 	return "ok", ""
+}
+
+// cpuMeasured says whether a sample's CPU figures are readings: there was an earlier sample to compare with, Coral's own usage was read now and then, and, when there are agents, at least one agent process
+// was read both times. A read that fails leaves its figure at 0, which is "uses nothing" and not "unknown": without this a failed read would blame a busy cpu on other programs (#10887, QA Reviewer 2).
+func cpuMeasured(haveInterval, selfMeasured bool, agentRoots, agentsRead int) bool {
+	return haveInterval && selfMeasured && (agentRoots == 0 || agentsRead > 0)
 }
 
 // othersShare is the part of the host's cores Coral and its agents may use for a slow probe to be put down to other programs: under a tenth. Between that and heavy use nobody is named.
