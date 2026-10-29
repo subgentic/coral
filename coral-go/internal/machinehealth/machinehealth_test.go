@@ -175,6 +175,46 @@ func TestBusyBy(t *testing.T) {
 	}
 }
 
+// A CPU figure is a reading only when it was read: a read that fails leaves 0 behind, which would say "uses nothing" and blame a busy cpu on other programs (#10887, QA Reviewer 2).
+func TestCPUMeasured(t *testing.T) {
+	for _, tc := range []struct {
+		name                       string
+		haveInterval, selfMeasured bool
+		roots, agentsRead          int
+		want                       bool
+	}{
+		{"Coral and no agents, both read", true, true, 0, 0, true},
+		{"Coral and agents, both read", true, true, 3, 2, true},
+		{"the first sample has nothing to compare with", false, true, 0, 0, false},
+		{"Coral's own read failed", true, false, 0, 0, false},
+		{"Coral's own read failed, agents read", true, false, 3, 3, false},
+		{"agents present but none could be read", true, true, 3, 0, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, cpuMeasured(tc.haveInterval, tc.selfMeasured, tc.roots, tc.agentsRead))
+		})
+	}
+}
+
+// Through a real sampler: with an agent whose process cannot be read (it is not there), the second sample is not measured, so a busy cpu names nobody; with no agents it is.
+func TestSampleNamesNobodyWhenTheAgentsCannotBeRead(t *testing.T) {
+	ctx := context.Background()
+	sample := func(roots []int) Health {
+		s := New(Source{DataDir: t.TempDir(), AgentPIDs: func() []int { return roots }})
+		s.Sample(ctx)
+		time.Sleep(20 * time.Millisecond) // sleep-ok: the interval a CPU figure is read over
+		h := s.Sample(ctx)
+		h.Status, h.Reason = "busy", "cpu"
+		return h
+	}
+	none := sample(nil)
+	assert.True(t, none.cpuMeasured, "no agents: the second sample is measured")
+	assert.Equal(t, "others", busyBy(none), "and an idle Coral on a busy cpu names the others")
+	gone := sample([]int{2147483000}) // a process that is not there: nothing of it can be read
+	assert.False(t, gone.cpuMeasured, "an agent that cannot be read: not measured")
+	assert.Equal(t, "", busyBy(gone), "so nobody is named")
+}
+
 // One sample walks the process table once; at one sample per Interval (15 s) it must cost well
 // under 1% of a core: a sample under 150 ms of CPU.
 func BenchmarkSample(b *testing.B) {
