@@ -7,7 +7,7 @@ const BASE = require('./test_base').BASE;
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
-    const after = () => ev(`(() => { const d = document.getElementById('terminal-status-dot'); return { content: getComputedStyle(d, '::after').content, word: d.getAttribute('data-word'), label: d.getAttribute('aria-label'), w: Math.round(d.getBoundingClientRect().width) }; })()`);
+    const word = () => ev(`(() => { const d = document.getElementById('terminal-status-dot'), w = document.getElementById('terminal-status-word'); return { text: w.textContent, shown: getComputedStyle(w).display !== 'none' && w.getClientRects().length > 0, dotLabel: d.getAttribute('aria-label'), hidden: w.getAttribute('aria-hidden'), generated: getComputedStyle(d, '::after').content }; })()`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [w, h, mobile] of [[390, 844, true], [1280, 800, false]]) {
@@ -15,11 +15,11 @@ const BASE = require('./test_base').BASE;
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
             await ev(`window.__m.add('hdr', 'A', 3, { sleeping: false }); true`); await settle(ev, 600); // sleep-ok: the list renders
             await ev(`window.selectLiveSession('hdr', 'claude', 'hdr-id', 'local'); true`);
-            await waitFor(`!!document.getElementById('terminal-status-dot') && !!document.getElementById('terminal-status-dot').getAttribute('data-word')`, `${w}: the dot has its word`, 8000);
-            const a = await after();
-            assert.ok(a.word && a.label, `${w}: the dot is named: ` + JSON.stringify(a));
-            if (mobile) assert.equal(a.content, `"${a.word}"`, '390: the word is beside the dot: ' + JSON.stringify(a));
-            else assert.ok(a.content === 'none' || a.content === 'normal', '1280: no word beside the dot: ' + JSON.stringify(a));
+            await waitFor(`!!document.getElementById('terminal-status-word') && document.getElementById('terminal-status-word').textContent.length > 0`, `${w}: the word is written`, 8000);
+            const a = await word();
+            assert.ok(a.dotLabel && a.generated !== '"Ready"', `${w}: the dot keeps its name and the word is not generated content: ` + JSON.stringify(a));
+            assert.equal(a.hidden, 'true', `${w}: the dot is what a screen reader reads, so the word is not read twice`);
+            assert.equal(a.shown, mobile, `${w}: the word is ${mobile ? 'beside the dot' : 'not shown'}: ` + JSON.stringify(a));
         }
         console.log('PASS');
     } finally { try { await client.close(); } catch (e) {} }

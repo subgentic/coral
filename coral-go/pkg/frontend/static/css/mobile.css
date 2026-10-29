@@ -1322,5 +1322,6 @@
     .group-table-view > .inbox-frame { flex: 1 1 auto; width: 100%; min-height: 0; border: 0; border-radius: 0; }
 }
 
-/* The chat header's status dot says its state in a word on a phone, where a hollow circle alone meant nothing (#10885) */
-@media (max-width: 767px) { #terminal-status-dot { display: inline-flex; align-items: center; gap: 6px; } #terminal-status-dot::after { content: attr(data-word); font-size: var(--fs-sm); color: var(--text-secondary); white-space: nowrap; } }
+/* The chat header's status dot has its state in a word beside it on a phone, where a hollow circle alone meant nothing (#10885); real text, hidden elsewhere */
+.terminal-status-word { display: none; }
+@media (max-width: 767px) { .terminal-status-word { display: inline; margin: 0 6px 0 4px; font-size: var(--fs-sm); color: var(--text-secondary); white-space: nowrap; } }

@@ -36,7 +36,7 @@
                                 <div class="terminal-header-left" id="popout-header-identity" aria-live="polite">
                                     <!-- A phone's way back to the agent list (#9999): the page's own header is hidden there, so the arrow lives in this one -->
                                     <button class="btn btn-quiet btn-icon terminal-header-btn terminal-back-btn" type="button" data-on-click="mobile-back" title="Agents" aria-label="Agents"><span aria-hidden="true">&larr;</span></button>
-                                    <span class="terminal-status-dot" id="terminal-status-dot"></span>
+                                    <span class="terminal-status-dot" id="terminal-status-dot"></span><span class="terminal-status-word" id="terminal-status-word" aria-hidden="true"></span><!-- a phone's word for the dot (#10885): real text, so find-in-page and zoom see it; the dot carries the name for a screen reader, so this is not read twice -->
                                     <span class="terminal-identity" id="terminal-header-identity" tabindex="0">
                                         <span class="terminal-session-label" id="terminal-header-label"></span>
                                         <!-- The agent's team, and its server on a hub with remotes (#3653): header_context.js -->
