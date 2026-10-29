@@ -27,6 +27,9 @@ if [[ "${1:-}" == "--identity" ]]; then
     # Identity (#3387, #3418): session tokens, attribution, impersonation, sign-in links, scale; --identity --strict
     # runs the same with --strict-local-auth (phase 2).
     exec bash "$SCRIPT_DIR/run_identity.sh" "${2:-}"
+elif [[ "${1:-}" == "--search" ]]; then
+    # Agent search (#11005): board search at the own reach, the doors around it, identity, reach, restart and wake, log bounds; strict.
+    exec bash "$SCRIPT_DIR/run_search.sh"
 elif [[ "${1:-}" == "--kill-all" ]]; then
     # Folder Kill all with real agents in the real dashboard (#3053/#3058); its own server and port.
     exec bash "$SCRIPT_DIR/run_kill_all.sh"
@@ -47,7 +50,7 @@ elif [[ "${1:-}" == "--goals" || "${1:-}" == "--send-after-restart" ]]; then
     fi
     exec bash "$SCRIPT_DIR/$runner"
 elif [[ $# -gt 0 ]]; then
-    echo "Usage: $0 [--kill-all | --identity [--strict] | --goals [--repeat N] | --send-after-restart [--repeat N]]" >&2
+    echo "Usage: $0 [--kill-all | --search | --identity [--strict] | --goals [--repeat N] | --send-after-restart [--repeat N]]" >&2
     exit 2
 fi
 HOST="127.0.0.1"
