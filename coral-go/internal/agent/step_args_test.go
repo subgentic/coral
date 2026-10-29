@@ -71,7 +71,7 @@ func TestAStepPromptThatLooksLikeAnOptionIsThePrompt(t *testing.T) {
 // (.pi extensions and settings) are not trusted (--no-approve): a step runs in a checkout that may not be the operator's, and nobody is there to answer a trust question. A configured --approve cannot undo it.
 func TestPiStepRunsOneShotWithoutTrustingTheRepository(t *testing.T) {
 	args, stdin := StepPrintArgs("pi", []string{"--flag", "--approve", "-a", "--session", "x", "--continue"}, []string{"--model", "anthropic/m"}, "do it")
-	assert.Equal(t, []string{"--print", "--no-session", "--no-approve", "--model", "anthropic/m", "--flag", "do it"}, args)
+	assert.Equal(t, []string{"--print", "--model", "anthropic/m", "--flag", "--no-session", "--no-approve", "do it"}, args)
 	assert.Equal(t, "", stdin)
 
 	args, _ = StepPrintArgs("pi", nil, nil, "-x leading dash")
@@ -100,4 +100,26 @@ func TestUnattendedFlagsForPi(t *testing.T) {
 	in := []string{"--approve"}
 	_ = UnattendedFlags("pi", in)
 	assert.Equal(t, []string{"--approve"}, in, "the caller's slice is not changed")
+}
+
+// Security's SHOULDs on #11105: the flags that would undo a step are dropped in every form (name=value, a short-flag bundle holding a, c or r), and --no-session and --no-approve come LAST so that a flag
+// that slipped past cannot be the one that wins.
+func TestPiStepFlagsDropEveryFormOfTheTrustAndSessionFlags(t *testing.T) {
+	args, _ := StepPrintArgs("pi", []string{"--session-dir=/x", "--approve=true", "--session=a", "--session-id=b", "--fork=c", "--continue=1", "--resume=1", "--keep"}, nil, "p")
+	assert.Equal(t, []string{"--print", "--keep", "--no-session", "--no-approve", "p"}, args, "the name=value forms")
+
+	args, _ = StepPrintArgs("pi", []string{"-ac", "-ra", "-nr", "-abc", "-A", "-C", "-R", "-p", "-nt", "--keep"}, nil, "p")
+	assert.Equal(t, []string{"--print", "-p", "-nt", "--keep", "--no-session", "--no-approve", "p"}, args, "any short bundle with an a, c or r goes (Pi's own -p and -nt stay)")
+
+	args, _ = StepPrintArgs("pi", []string{"--no-approve", "--no-session", "--keep"}, []string{"--model", "m"}, "p")
+	require.GreaterOrEqual(t, len(args), 3)
+	assert.Equal(t, []string{"--no-session", "--no-approve", "p"}, args[len(args)-3:], "last, once")
+	assert.Equal(t, 1, strings.Count(strings.Join(args, " "), "--no-approve"))
+	assert.Equal(t, 1, strings.Count(strings.Join(args, " "), "--no-session"))
+}
+
+func TestUnattendedFlagsDropEveryFormOfApproveAndKeepNoApproveLast(t *testing.T) {
+	assert.Equal(t, []string{"--keep", "--no-approve"}, UnattendedFlags("pi", []string{"--approve=yes", "-ac", "-a", "--keep"}))
+	assert.Equal(t, []string{"--keep", "--no-approve"}, UnattendedFlags("pi", []string{"--no-approve", "--keep"}), "--no-approve last, once")
+	assert.Equal(t, []string{"-p", "--no-approve"}, UnattendedFlags("pi", []string{"-p", "-nc"}), "a bundle holding a c is dropped")
 }

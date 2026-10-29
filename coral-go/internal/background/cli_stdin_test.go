@@ -136,5 +136,5 @@ func TestWorkflowPiStepRunsOneShotWithItsTools(t *testing.T) {
 	require.NoError(t, runner.executeAgentPrint(context.Background(), 1, StepDef{Name: "s"}, testStepFiles(t), t.TempDir(), os.Environ(), cfg, "summarize the board", nil, &StepResult{}))
 	raw, err := os.ReadFile(argsFile)
 	require.NoError(t, err)
-	assert.Equal(t, []string{"--print", "--no-session", "--no-approve", "--model", "anthropic/m", "--thinking", "high", "--tools", "read,bash", "summarize the board"}, strings.Split(strings.TrimSpace(string(raw)), "\n"))
+	assert.Equal(t, []string{"--print", "--model", "anthropic/m", "--thinking", "high", "--tools", "read,bash", "--no-session", "--no-approve", "summarize the board"}, strings.Split(strings.TrimSpace(string(raw)), "\n"))
 }
