@@ -11,6 +11,7 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const { execFileSync } = require('./child_process');
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
@@ -31,8 +32,13 @@ process.on('beforeExit', async () => { for (const stop of [...PENDING]) await st
 // suites' own JSON helpers do. It returns {sid, name, token, launch, ms, diag, stop}; token is
 // '' when it never came, and diag then explains why. Always call stop() (in a finally): it
 // kills the session, restores cli_path_claude and removes the script's folder.
-async function launchStandIn(api, { workingDir = os.tmpdir(), displayName = 'Stand-in Agent', deadlineMs = TOKEN_DEADLINE_MS } = {}) {
+async function launchStandIn(api, { workingDir = '', displayName = 'Stand-in Agent', deadlineMs = TOKEN_DEADLINE_MS } = {}) {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'coral-standin-'));
+    // The agent's folder is what its Files list shows (the git changes of the folder's repository). The runner's tmp dir is not a folder to give it: on epoch it sits inside a repository, so Chrome's profile files and coral.log are
+    // changed files that arrive and go while a census walks the list, each a button no press reached or a name used twice (#10959, #10924). Unless the suite names its own folder, the agent gets one that is its own repository with a
+    // file in it, removed with the stand-in.
+    let ownDir = '';
+    if (!workingDir) { ownDir = fs.mkdtempSync(path.join(os.tmpdir(), 'coral-standin-work-')); execFileSync('git', ['init', '-q', ownDir]); fs.writeFileSync(path.join(ownDir, 'notes.txt'), 'x\n'); workingDir = ownDir; }
     const tokenFile = path.join(dir, 'token');
     const ranFile = path.join(dir, 'ran');
     const WIN = process.platform === 'win32';
@@ -85,6 +91,7 @@ async function launchStandIn(api, { workingDir = os.tmpdir(), displayName = 'Sta
         const cur = (((await api('GET', '/api/settings').catch(() => ({}))).data || {}).settings || {}).cli_path_claude || '';
         if (!LIVE.size && OURS.has(cur) && ORIGINAL) await api('PUT', '/api/settings', { cli_path_claude: ORIGINAL }).catch(() => {});
         fs.rmSync(dir, { recursive: true, force: true });
+        if (ownDir) fs.rmSync(ownDir, { recursive: true, force: true });
     };
 
     PENDING.add(stop);
