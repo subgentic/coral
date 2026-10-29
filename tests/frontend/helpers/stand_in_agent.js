@@ -38,7 +38,7 @@ async function launchStandIn(api, { workingDir = '', displayName = 'Stand-in Age
     // changed files that arrive and go while a census walks the list, each a button no press reached or a name used twice (#10959, #10924). Unless the suite names its own folder, the agent gets one that is its own repository with a
     // file in it, removed with the stand-in.
     let ownDir = '';
-    if (!workingDir) { ownDir = fs.mkdtempSync(path.join(os.tmpdir(), 'coral-standin-work-')); execFileSync('git', ['init', '-q', ownDir]); fs.writeFileSync(path.join(ownDir, 'notes.txt'), 'x\n'); workingDir = ownDir; }
+    if (!workingDir) { ownDir = fs.mkdtempSync(path.join(os.tmpdir(), 'w-')); execFileSync('git', ['init', '-q', ownDir]); fs.writeFileSync(path.join(ownDir, 'notes.txt'), 'x\n'); workingDir = ownDir; }
     const tokenFile = path.join(dir, 'token');
     const ranFile = path.join(dir, 'ran');
     const WIN = process.platform === 'win32';
