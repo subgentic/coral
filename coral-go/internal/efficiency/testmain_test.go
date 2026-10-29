@@ -1,4 +1,4 @@
-package testguard
+package efficiency
 
 import (
 	"os"
