@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/subgentic/coral/internal/agent"
+	"github.com/subgentic/coral/internal/logsafe"
 	"github.com/subgentic/coral/internal/ptymanager"
 	"github.com/subgentic/coral/internal/store"
 )
@@ -312,7 +313,8 @@ func TestRunWithAMissingBaseBranchSaysSoPlainly(t *testing.T) {
 	r := e.run(t)
 	assert.Equal(t, "failed", r.Status)
 	require.NotNil(t, r.ErrorMsg)
-	assert.Equal(t, "The base branch release does not exist in "+repo+". Its branches: main.", *r.ErrorMsg)
+	// The run keeps the home folder as "~" (#10021): on Windows the test's repo is under it, in %TEMP%.
+	assert.Equal(t, logsafe.HomeInText("The base branch release does not exist in "+repo+". Its branches: main."), *r.ErrorMsg)
 	require.NotNil(t, r.ErrorCode)
 	assert.Equal(t, "base_branch_missing", *r.ErrorCode)
 	assert.False(t, launched)
