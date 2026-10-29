@@ -6,7 +6,7 @@
    "length": 62315
   },
   "desktop: folder first": {
-   "sha256": "d9e7cab3ed07642e7a30fe3fcc71428b3f8cb1756a12e9feda3ebf99d0d10521",
+   "sha256": "7e8babec8fd91f575468e348a697b036b28466526003678dd71733727dcf9cf4",
    "length": 122450
   },
   "desktop: team first, sleeping and archived open": {
@@ -18,7 +18,7 @@
    "length": 60758
   },
   "desktop: folder first, a folder collapsed": {
-   "sha256": "e4b8b0e5c5de0e31ce8590eaac89b6c7aac11f0dff8703767239624975227ed3",
+   "sha256": "b43b75aa4edfff8f0689fabca071c5603a2e256bc6dd888a163d6c01695a2d4c",
    "length": 120874
   },
   "desktop: hub, servers shown": {
@@ -30,7 +30,7 @@
    "length": 93347
   },
   "desktop: hub, grouped by server, folder first": {
-   "sha256": "6e2092d8904438892ea98e5e9b10b95fd473d389837100677a85115716a14aa4",
+   "sha256": "b1aa74f1334764ccc30cdd9d50071d2819dfb1a510d25997088a7b5877173f71",
    "length": 158058
   },
   "desktop: a search": {
@@ -46,7 +46,7 @@
    "length": 62315
   },
   "phone: folder first": {
-   "sha256": "d9e7cab3ed07642e7a30fe3fcc71428b3f8cb1756a12e9feda3ebf99d0d10521",
+   "sha256": "7e8babec8fd91f575468e348a697b036b28466526003678dd71733727dcf9cf4",
    "length": 122450
   },
   "phone: team first, sleeping and archived open": {
@@ -58,7 +58,7 @@
    "length": 60758
   },
   "phone: folder first, a folder collapsed": {
-   "sha256": "e4b8b0e5c5de0e31ce8590eaac89b6c7aac11f0dff8703767239624975227ed3",
+   "sha256": "b43b75aa4edfff8f0689fabca071c5603a2e256bc6dd888a163d6c01695a2d4c",
    "length": 120874
   },
   "phone: hub, servers shown": {
@@ -70,7 +70,7 @@
    "length": 93347
   },
   "phone: hub, grouped by server, folder first": {
-   "sha256": "6e2092d8904438892ea98e5e9b10b95fd473d389837100677a85115716a14aa4",
+   "sha256": "b1aa74f1334764ccc30cdd9d50071d2819dfb1a510d25997088a7b5877173f71",
    "length": 158058
   },
   "phone: a search": {
