@@ -8,6 +8,7 @@ const BASE = require('./test_base').BASE;
 const CASES = [
     ['not_confirmed', "The agent didn't confirm your message: it may not have been sent. Check its terminal before sending it again.", /did not confirm your message/i],
     ['not_submitted', "Your message is in the agent's input box but wasn't submitted. Send it again to submit it, or press Enter in its terminal.", /input box but was not sent/i],
+    ['agent_mid_turn', "Your message is in the agent's input box, but the agent is in the middle of its turn and has not taken it yet. Send it again once the agent is done, or press Enter in its terminal.", /in the middle of its turn and had not taken it/i], // #10992
     ['', "The answer was sent, but the agent's prompt is still open. Check the terminal.", /answer was sent, but the agent still shows the question/i],
 ];
 

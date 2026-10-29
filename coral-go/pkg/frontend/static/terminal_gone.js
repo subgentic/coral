@@ -105,6 +105,7 @@ function terminalErrorWords(message, code) {
     const m = String(message || '');
     if (code === 'not_confirmed' || /did not confirm|didn't confirm/i.test(m)) return `The agent did not confirm your message, so it may not have arrived.${TERMINAL_HELP}`;
     if (code === 'not_submitted' || /wasn't submitted|not submitted/i.test(m)) return `Your message is in the agent's input box but was not sent. Send it again, or use the buttons.${TERMINAL_HELP}`;
+    if (code === 'agent_mid_turn') return `Your message is in the agent's input box, but the agent was in the middle of its turn and had not taken it. Send it again once it is done, or use the buttons.${TERMINAL_HELP}`; // #10992
     if (/prompt is still open/i.test(m)) return `Your answer was sent, but the agent still shows the question.${TERMINAL_HELP}`;
     return '';
 }

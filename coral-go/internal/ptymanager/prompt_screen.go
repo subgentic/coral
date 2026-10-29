@@ -465,3 +465,18 @@ func (m *PTYBackend) liveScreen(name string) *vtscreen.Screen {
 	}
 	return s.screen
 }
+
+// turnBusyRe is what a CLI draws on its status line while a turn or one of its hooks runs: "esc to interrupt" (Claude's and Codex's), and Claude's "running Stop hook" and the like.
+var turnBusyRe = regexp.MustCompile(`(?i)\besc to interrupt\b|\brunning (?:stop|userpromptsubmit|pretooluse|posttooluse|subagentstop|precompact|sessionstart) hooks?\b`)
+
+// turnBusyLines is how many lines from the bottom of the screen are looked at: the status line is near the input box, and the conversation above may say these words as text.
+const turnBusyLines = 8
+
+// TurnBusyOnScreen reports whether the bottom of the screen shows the agent in the middle of a turn or running a hook. Its input is not taken then, whatever Enter is pressed (#10992). False for an unknown screen.
+func TurnBusyOnScreen(screen string) bool {
+	lines := strings.Split(strings.TrimRight(screen, "\n \t"), "\n")
+	if len(lines) > turnBusyLines {
+		lines = lines[len(lines)-turnBusyLines:]
+	}
+	return turnBusyRe.MatchString(strings.Join(lines, "\n"))
+}

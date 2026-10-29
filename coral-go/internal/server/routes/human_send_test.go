@@ -475,6 +475,60 @@ func TestHumanSendIsSubmittedOrSaysSo(t *testing.T) {
 			assert.Equal(t, defaultHumanSendTimings.ExtraEnters, enters)
 		})
 	}
+	// #10992: a Claude that goes from turn to turn (its Stop hook hands it the next board message) did not take a person's Enter for seconds: the three Enters were spent inside that window and the send said
+	// "not submitted" (the operator's "deploy" to the coral-hub Orchestrator), though the message was taken a moment later. While the screen shows a turn or a hook running, the Enter is pressed again, bounded.
+	working := func(screen string) string { // the status line Claude draws while a turn or a hook runs, above the box that holds the text
+		return strings.Replace(screen, "\n─", "\n✶ Contemplating… (running Stop hook · 4s)\n─", 1)
+	}
+	t.Run("claude: an Enter ignored while the agent is mid-turn is pressed again until it is taken", func(t *testing.T) {
+		h := setup(t, "claude", true)
+		h.gate.set(func(tm *humanSendTimings) { tm.BusyEnterBudget = 2 * time.Second })
+		h.term.show(claude(""))
+		h.term.onType = func(text string) { h.term.show(working(claude(text))) } // the text lands and stays: the agent is between turns
+		var n int
+		h.term.onEnter = func() {
+			n++
+			if n >= defaultHumanSendTimings.ExtraEnters+3 { // taken only after more Enters than the usual three
+				h.term.show(working(claude("")))
+				h.submit()
+			}
+		}
+		rec := h.send("deploy")
+		assert.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+		typed, enters := h.term.counts()
+		assert.Equal(t, []string{"deploy"}, typed, "typed once, never again")
+		assert.Equal(t, defaultHumanSendTimings.ExtraEnters+3, enters)
+	})
+	t.Run("claude: an agent that stays mid-turn past the budget: the answer says so, not 'not submitted'", func(t *testing.T) {
+		h := setup(t, "claude", true)
+		h.gate.set(func(tm *humanSendTimings) { tm.BusyEnterBudget = 300 * time.Millisecond })
+		h.term.show(claude(""))
+		h.term.onType = func(text string) { h.term.show(working(claude(text))) }
+		start := time.Now()
+		rec := h.send("deploy")
+		assert.Equal(t, http.StatusConflict, rec.Code, rec.Body.String())
+		assert.Equal(t, "agent_mid_turn", code(rec))
+		assert.Contains(t, rec.Body.String(), "middle of its turn")
+		assert.Less(t, time.Since(start), 3*time.Second, "bounded by the budget")
+		_, enters := h.term.counts()
+		assert.Greater(t, enters, defaultHumanSendTimings.ExtraEnters, "Enter was pressed past the usual three while the agent stayed mid-turn")
+		var out map[string]any
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &out))
+		assert.Equal(t, false, out["not_sent"], "the text is in the box: it may still be sent")
+		// like a message left in the box, it blocks a second message until it is dealt with
+		h.term.onType = func(string) { h.submit() }
+		assert.Equal(t, "box_not_empty", code(h.send("another")), "the leftover is remembered")
+	})
+	t.Run("claude: a ready screen is not mid-turn: the usual three Enters, then not submitted", func(t *testing.T) {
+		h := setup(t, "claude", true)
+		h.gate.set(func(tm *humanSendTimings) { tm.BusyEnterBudget = 2 * time.Second })
+		h.term.show(claude(""))
+		h.term.onType = func(text string) { h.term.show(claude(text)) }
+		rec := h.send("stuck")
+		assert.Equal(t, "not_submitted", code(rec))
+		_, enters := h.term.counts()
+		assert.Equal(t, defaultHumanSendTimings.ExtraEnters, enters)
+	})
 	t.Run("a command to an agent still starting whose keystrokes are lost: never typed again, not confirmed", func(t *testing.T) {
 		h := setup(t, "codex", false)
 		h.term.show(codexReady(t, ""))
