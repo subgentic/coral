@@ -34,8 +34,8 @@ var (
 		}
 		return nil, fmt.Errorf("unknown provider %q: digitalocean is the one this version knows", name)
 	}
-	newMachineHub = func(baseURL, key, terms string) machinelaunch.Minter {
-		return &machinelaunch.HubClient{BaseURL: baseURL, Key: key, TermsVersion: terms}
+	newMachineHub = func(baseURL, key, destroyKey, terms string) machinelaunch.Minter {
+		return &machinelaunch.HubClient{BaseURL: baseURL, Key: key, DestroyKey: destroyKey, TermsVersion: terms}
 	}
 )
 
@@ -47,7 +47,7 @@ func (l *listFlag) String() string     { return strings.Join(*l, ",") }
 func (l *listFlag) Set(v string) error { *l = append(*l, v); return nil }
 
 func machineUsage(w io.Writer) {
-	fmt.Fprintln(w, "usage: coral machine launch --provider digitalocean --token-file <path|-> --hub-key-file <path|-> [--hub-url https://app.coralhub.dev]")
+	fmt.Fprintln(w, "usage: coral machine launch --provider digitalocean --token-file <path|-> --hub-key-file <path|-> [--hub-destroy-file <path|->] [--hub-url https://app.coralhub.dev]")
 	fmt.Fprintln(w, "         [--name NAME] [--region nyc3] [--size s-2vcpu-4gb] [--image SLUG] [--ssh-key ID]... [--agents claude@VERSION,codex@VERSION,pi@VERSION,agy@sha256:HEX]")
 	fmt.Fprintln(w, "         [--max-mode view|interact|launch (default view)] [--coral-version VERSION [--coral-sha256-amd64 HEX --coral-sha256-arm64 HEX]] [--allow-ssh-from ADDRESS] [--yes]")
 }
@@ -62,6 +62,7 @@ func runMachine(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	provider := fs.String("provider", "", "the cloud provider: digitalocean")
 	tokenFile := fs.String("token-file", "", "file with the provider's API token (mode 0600), or - for standard input")
 	keyFile := fs.String("hub-key-file", "", "file with your Coral Hub automation key (chk_..., mode 0600), or - for standard input")
+	destroyFile := fs.String("hub-destroy-file", "", "file with the automation key's destroy credential (chd_..., mode 0600), made with the key: lets a launch that fails after the credential was minted revoke it (optional; without it a failed launch tells you to revoke in Coral Hub)")
 	hubURL := fs.String("hub-url", config.TierDefaultCloudURL, "the Coral Hub origin (https)")
 	name := fs.String("name", "", "the machine's name (default coral- and six random characters)")
 	region := fs.String("region", "nyc3", "the provider's region slug")
@@ -94,8 +95,14 @@ func runMachine(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		machineUsage(stderr)
 		return 2
 	}
-	if *tokenFile == "-" && *keyFile == "-" {
-		return fail("only one of --token-file and --hub-key-file can read standard input")
+	stdinReaders := 0
+	for _, f := range []string{*tokenFile, *keyFile, *destroyFile} {
+		if f == "-" {
+			stdinReaders++
+		}
+	}
+	if stdinReaders > 1 {
+		return fail("only one of --token-file, --hub-key-file and --hub-destroy-file can read standard input")
 	}
 	if *hubURL == "" {
 		return fail("this build has no default Coral Hub: pass --hub-url")
@@ -162,6 +169,12 @@ func runMachine(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if err != nil {
 		return fail("the Coral Hub key: %v", err)
 	}
+	destroyKey := ""
+	if *destroyFile != "" {
+		if destroyKey, err = machinelaunch.ReadSecretFile(*destroyFile, stdin); err != nil {
+			return fail("the Coral Hub destroy credential: %v", err)
+		}
+	}
 	p, err := newMachineProvider(*provider, token)
 	if err != nil {
 		return fail("%v", err)
@@ -169,7 +182,7 @@ func runMachine(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if *hubURL != config.TierDefaultCloudURL {
 		fmt.Fprintf(stderr, "coral machine launch: warning: %s is not this build's Coral Hub (%s): the Hub key is sent there.\n", *hubURL, config.TierDefaultCloudURL)
 	}
-	hub := newMachineHub(*hubURL, key, license.EULAVersion)
+	hub := newMachineHub(*hubURL, key, destroyKey, license.EULAVersion)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
