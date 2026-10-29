@@ -185,19 +185,20 @@ func TestPiFallbackWalkMissIsRemembered(t *testing.T) {
 }
 
 // One message's text and one command are cut at about 1 MB, as a write's content is cut at 10 KB: a transcript line the agent made is not a way to make the chat huge.
+// The bound is the literal 1 MB (plus a marker), not the constant under test: changing piMaxText must fail this.
 func TestPiTextAndCommandAreCapped(t *testing.T) {
 	big := strings.Repeat("x", 3<<20)
 	names := map[string]string{}
 	user := parsePiEntry(map[string]any{"type": "message", "message": map[string]any{"role": "user", "content": big}}, names)
 	require.Len(t, user, 1)
-	assert.LessOrEqual(t, len(user[0]["content"].(string)), piMaxText+64)
+	assert.LessOrEqual(t, len(user[0]["content"].(string)), (1<<20)+64)
 	asst := parsePiEntry(map[string]any{"type": "message", "message": map[string]any{"role": "assistant", "content": []any{
 		map[string]any{"type": "text", "text": big},
 		map[string]any{"type": "toolCall", "id": "c1", "name": "bash", "arguments": map[string]any{"command": big}},
 	}}}, names)
 	require.Len(t, asst, 1)
-	assert.LessOrEqual(t, len(asst[0]["text"].(string)), piMaxText+64)
+	assert.LessOrEqual(t, len(asst[0]["text"].(string)), (1<<20)+64)
 	tu := asst[0]["tool_uses"].([]map[string]any)
-	assert.LessOrEqual(t, len(tu[0]["command"].(string)), piMaxText+64)
+	assert.LessOrEqual(t, len(tu[0]["command"].(string)), (1<<20)+64)
 	assert.LessOrEqual(t, len(tu[0]["input_summary"].(string)), 1000)
 }
