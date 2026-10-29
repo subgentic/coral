@@ -244,3 +244,23 @@ func TestAClaudeUpdateLineUnderTheStatusLineKeepsTheInputBox(t *testing.T) {
 		assert.False(t, open, "%s: no prompt is open (%s)", name, why)
 	}
 }
+
+func TestTurnBusyOnScreen(t *testing.T) {
+	pad := strings.Repeat("conversation line\n", 12)
+	box := "─────\n❯ deploy\n─────\n  ⏵⏵ bypass permissions on\n"
+	for name, tc := range map[string]struct {
+		screen string
+		want   bool
+	}{
+		"claude's spinner line above the box":      {pad + "✶ Contemplating… (esc to interrupt)\n" + box, true},
+		"claude running its Stop hook":             {pad + "✻ Brewing… (running Stop hook · 4s)\n" + box, true},
+		"running a UserPromptSubmit hook":          {pad + "✽ Pouncing… (running UserPromptSubmit hook · 0s)\n" + box, true},
+		"codex working":                            {pad + "• Working (12s • esc to interrupt)\n› ask\n", true},
+		"a ready screen":                           {pad + box, false},
+		"the words far up in the conversation":     {"the agent printed: esc to interrupt\n" + pad + pad + box, false},
+		"trailing blank lines do not push it away": {pad + "✶ Thinking… (esc to interrupt)\n" + box + strings.Repeat("\n", 30), true},
+		"empty": {"", false},
+	} {
+		assert.Equal(t, tc.want, TurnBusyOnScreen(tc.screen), name)
+	}
+}

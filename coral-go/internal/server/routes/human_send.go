@@ -63,6 +63,9 @@ type humanSendTimings struct {
 	EnterWait time.Duration
 	// Enters pressed again at most, after the send's own.
 	ExtraEnters int
+	// How long, from the typing, Enter is pressed again while the screen shows the agent in the middle of a turn or a hook (its input is not taken then): past ExtraEnters, bounded (#10992). The dashboard waits
+	// 20 s for a send's answer, so this and the typing stay under it.
+	BusyEnterBudget time.Duration
 	// How long a message never seen in the box waits for the agent's event before it is typed again, or not confirmed.
 	ConfirmWait time.Duration
 	// How much longer a slow CLI command (/compact: it runs for seconds before its screen or its transcript shows anything) is waited for after ConfirmWait, looking for any sign it ran (#6258).
@@ -80,6 +83,7 @@ var defaultHumanSendTimings = humanSendTimings{
 	PollEvery:         150 * time.Millisecond,
 	EnterWait:         600 * time.Millisecond,
 	ExtraEnters:       3,
+	BusyEnterBudget:   15 * time.Second,
 	ConfirmWait:       2500 * time.Millisecond,
 	SlowCommandWait:   12 * time.Second, // the confirm wait and this together stay under the 20 s the dashboard waits for a composer send's answer
 	AttachConfirmWait: 6 * time.Second,
@@ -200,6 +204,7 @@ func (e *errHumanSend) Error() string { return e.text }
 
 var (
 	errSendNotReady     = &errHumanSend{"agent_not_ready", "The agent isn't ready for messages yet: your message was not sent. Try again in a moment."}
+	errSendMidTurn      = &errHumanSend{"agent_mid_turn", "Your message is in the agent's input box, but the agent is in the middle of its turn and has not taken it yet. Send it again once the agent is done, or press Enter in its terminal."}
 	errSendNotSubmit    = &errHumanSend{"not_submitted", "Your message is in the agent's input box but wasn't submitted. Send it again to submit it, or press Enter in its terminal."}
 	errSendNotConfirmed = &errHumanSend{"not_confirmed", "The agent didn't confirm your message: it may not have been sent. Check its terminal before sending it again."}
 	// An agent whose hook programs are gone (the app it started from was replaced) takes the message but cannot say so: said plainly, not as "may not have been sent" (#6089).
@@ -246,7 +251,7 @@ func (h *SessionsHandler) deliverHumanSend(ctx context.Context, name, agentType,
 			h.hints.noteSlash(sessionID) // a command like /model may open a dialog that sends no hook event: the chat reads this screen for a prompt for a while (#5488)
 		}
 		switch {
-		case err == errSendNotSubmit:
+		case err == errSendNotSubmit || err == errSendMidTurn:
 			h.sendGate.setLeftover(key, ptymanager.MarkOf(text))
 		case err == nil && lo.Of(text):
 			h.sendGate.setLeftover(key, ptymanager.BoxMark{}) // the leftover itself, submitted now
@@ -384,9 +389,19 @@ func (h *SessionsHandler) deliverHumanSend(ctx context.Context, name, agentType,
 		if time.Since(enteredAt) < tm.EnterWait {
 			continue
 		}
-		if !canEnter || extra >= tm.ExtraEnters {
+		stuck := !canEnter || extra >= tm.ExtraEnters
+		// The agent does not take input in the middle of a turn or a hook (a Claude whose Stop hook hands it the next board message goes from turn to turn): the usual few Enters are spent inside that window and the message is
+		// taken a moment later (#10992). While the screen shows it, Enter is pressed again, until the budget from the typing is over.
+		midTurn := canEnter && ptymanager.TurnBusyOnScreen(screen)
+		if stuck && midTurn && time.Since(typedAt) < tm.BusyEnterBudget {
+			stuck = false
+		}
+		if stuck {
 			if h.promptSubmittedAfter(ctx, sessionID, base) {
 				return nil
+			}
+			if midTurn {
+				return errSendMidTurn
 			}
 			return errSendNotSubmit
 		}
@@ -524,7 +539,7 @@ func humanSendError(err error) (int, map[string]any, bool) {
 	if !errors.As(err, &e) {
 		return 0, nil, false
 	}
-	return 409, map[string]any{"error": e.text, "code": e.code, "not_sent": e.code != "not_submitted" && e.code != "hooks_unreachable"}, true
+	return 409, map[string]any{"error": e.text, "code": e.code, "not_sent": e.code != "not_submitted" && e.code != "agent_mid_turn" && e.code != "hooks_unreachable"}, true
 }
 
 // transcriptMark is how many messages the agent's own transcript held before a message was typed (#6089): the transcript is a signal that does not depend on the agent's hooks.
