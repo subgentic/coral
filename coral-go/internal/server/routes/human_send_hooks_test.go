@@ -34,6 +34,11 @@ type hookHarness struct {
 }
 
 func setupHooksGone(t *testing.T, hookDir string) hookHarness {
+	return setupHooksGoneWith(t, hookDir, true)
+}
+
+// setupHooksGoneWith is setupHooksGone for an agent that has started (sent an event) or has sent none.
+func setupHooksGoneWith(t *testing.T, hookDir string, started bool) hookHarness {
 	t.Helper()
 	_, handler, mock, ss := setupSessionsTestServer(t)
 	sid := "eeeeeeee-6089-4000-8000-000000000001"
@@ -42,8 +47,10 @@ func setupHooksGone(t *testing.T, hookDir string) hookHarness {
 	ctx := context.Background()
 	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: sid, AgentType: "codex", AgentName: "chat", WorkingDir: "/tmp/project"}))
 	require.NoError(t, ss.SetHookDir(ctx, sid, hookDir))
-	_, err := handler.ts.InsertAgentEvent(ctx, &store.AgentEvent{AgentName: name, SessionID: &sid, EventType: "stop", Summary: "stop"}) // it has started: the hooks worked once
-	require.NoError(t, err)
+	if started {
+		_, err := handler.ts.InsertAgentEvent(ctx, &store.AgentEvent{AgentName: name, SessionID: &sid, EventType: "stop", Summary: "stop"}) // it has started: the hooks worked once
+		require.NoError(t, err)
+	}
 	term := &agentTerm{mockSessionTerminal: mock}
 	handler.terminal = term
 	handler.sendGate.set(func(tm *humanSendTimings) {
@@ -115,6 +122,23 @@ func TestHumanSendWithGoneHooks(t *testing.T) {
 		assert.Contains(t, msg, "reopen Coral or restart the agent")
 		assert.NotContains(t, msg, "may not have been sent")
 		assert.Equal(t, false, res.body["not_sent"], "it may well have arrived: the composer does not take it back")
+	})
+	t.Run("nothing confirms it: the message is typed exactly once, never again (#318)", func(t *testing.T) {
+		for _, tc := range []struct {
+			name   string
+			events bool // the agent has started (sent an event) before its hooks went
+		}{{"an agent that had started", true}, {"an agent that had sent no event", false}} {
+			t.Run(tc.name, func(t *testing.T) {
+				h := setupHooksGoneWith(t, goneDir(t), tc.events)
+				h.term.show(codexReady(t, ""))
+				typed := 0
+				h.term.onType = func(text string) { typed++; h.term.show(codexReady(t, "")) } // taken, the box is empty again, and no event comes
+				code, res := run(h, "ship it")
+				assert.Equal(t, http.StatusConflict, code)
+				assert.Equal(t, "hooks_unreachable", res.code)
+				assert.Equal(t, 1, typed, "typed once: with the hooks gone an empty box is also what a taken message looks like")
+			})
+		}
 	})
 	t.Run("the screen echo confirms it", func(t *testing.T) {
 		h := setupHooksGone(t, goneDir(t))
