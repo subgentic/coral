@@ -1,5 +1,113 @@
 # Release Notes
 
+## v2.0.5 — typed board notices carry only fixed words, an agent stays on its own team's board, a held hand-off waits for the turn's end, a send to a busy agent keeps trying, and a sleeping agent is a row
+
+### Changes
+
+#### What you will notice first
+
+- **Typed board notices carry only fixed words** (#210): the notices Coral types into an agent's terminal start with a fixed word and hold no free text a shell would act on. A completion's message, a message wait's preview, a question reminder's question and the sender's board name on a cross-board reply are no longer typed: the notice names the task, who completed it and the outcome as one of a fixed set of words, and says `coral-board task detail N`. A short label that stays (a task title, a subscriber, a board) keeps only letters, digits, spaces and . , : _ - / and is cut at 80 characters; the team health check is typed under a fixed "[Coral health check]" opener. This closes the typed-notice issue.
+  - **For team owners:** a task title or board name with other characters (quotes, brackets, symbols) shows those characters as spaces in a notice typed into a terminal (a title is also cut at 80 characters there). The board, the dashboard and `coral-board` still show the title as written. To see a completed task's message, an agent runs `coral-board task detail N`.
+- **An agent can start agents only on its own team's board.** (#11013) A launch or team launch by an agent onto another team's or the Operator's board is refused, and a join (subscribe) by an agent is admitted only on a board it already holds a seat on or the board its live row was launched on. The Operator, the dashboard and the command line outside an agent are unchanged.
+- **An agent's restart keeps it on the board it was launched on.** (#11013) A restart or a resume carries the seat on the launch board, not the newest seat, and never moves the agent to another board's seat; an agent that has left its own launch seat is re-seated on its recorded board.
+- **A board's list of candidates is no longer shown to every agent** (#11013): when a launch by a board name matches more than one board (a 409), an agent sees only the board it was launched on; the Operator sees every candidate. The list names an agent's board by its live row.
+- **A held hand-off arrives at the agent's next turn end, or with the notifier's 15-minute reminder, not 60 s later.** (#11012) The turn-end hand-off fires at most once per 60 s per agent (#10996), so an agent flooded with board messages is not sent from turn to turn without a pause. A message that @mentions the agent on its own board, or one from the Operator, goes at once; a copy from another board waits a 10 s floor and a plain message the whole window; the held messages stay unread.
+- **A send to a mid-turn agent keeps trying and says what happened** (#10992, #10996): while the screen shows the agent in the middle of a turn or running a hook (a Claude going from turn to turn on its Stop hook), your send keeps pressing Enter for up to 15 s; if the agent never takes it, the answer is `agent_mid_turn` ("the agent is in the middle of its turn and has not taken it yet"), not `not_submitted`. While your send is in flight, or its text may still be in the agent's box, Coral's own typing (a board nudge) and the turn-end hand-off keep away from that agent.
+- **A sleeping agent is a normal row** (#10062): after a restart an asleep agent is a row, not an italic "1 sleeping agent" line. Up to three asleep in a team stay rows after the awake ones, with a quiet Sleeping chip ("Asleep since Coral restarted" when Coral stopped it) and a Wake button that takes the chip's place at a hover or the keyboard (always on touch). Four or more in a team fold into the summary as before. The team header's agent count is the awake agents (#10892), and a folder header counts the awake agents, as the team's does (#10904).
+- **A goal can be briefed to an agent** (#11004): `coral-board goal brief <goal> [--json]` prints the goal's fields, its open tasks only, and every artifact its tasks hold as coral:// links; it takes 65, #65, goal #65 or the goal page's link. A goal's page has a quiet "Copy for an agent" button that copies "Goal #65 (Title): run coral-board goal brief 65".
+- **Every time Coral says follows your own clock** (#10978, #10961): jobs, the New job schedule sentence and its Next: preview, and the task page's "Submitted by" and "Released by" times use your 12 h or 24 h clock ("9:00 AM" where the time field shows 09:00 AM; a 24 h locale keeps 09:00).
+- **Stop ends the chat's Working row with the agent** (#11052): Stop forgets the 90 s "nothing back yet" wait after a message just sent, so when the agent stops and goes idle the row goes too instead of counting on.
+
+#### Sidebar and agent list
+
+- **Delete team is in the sidebar's team menu** (#10318): the same in-page dialog as the team page's, and a team deleted from it leaves the page where it is; a failed load of the board's code says so with the usual toast. What cannot be undone is a separated last group with room above it in the agent row and team menus (#10282).
+- **With two or more teams, chat rows and notices that name an agent name its team** (#10134); a chat row in All chats names its agent's team, so two teams' Orchestrators are two rows (#10592).
+- **A folder row shows how many files its agents changed**, and keeps its place when an agent in it starts (#10386).
+- **The hover card and the open agent's header say how old the goal is** ("Goal, 25 min ago") (#10123): the goal is refreshed at most every 30 minutes, so it can be stale.
+- **The Agents tab's Status column fits "Task assigned, idle"**, and the filter chip for an idle agent with a task says "Has a task" (#10603).
+- **Team page header button is "Actions"** (#10942), so the page has one "More".
+- **An agent's standing instructions are shown where the agent is**, and saved personas can be renamed and deleted (#10285).
+
+#### Chat and the message box
+
+- **A message sent while the agent works says it waits for the agent to finish** (#10673): Stop greys and says "Stopping" at once, then says the agent stopped and what became of held messages.
+- **A sent message's menu has "Edit as a new message"** (#10533): the text goes in the box to change and send; a reply's menu stays Copy and Save.
+- **A code block in a chat shows Copy at rest, a Wrap lines toggle, and says when a line scrolls sideways** (#10533). Find in conversation (Ctrl/Cmd+F) works in the Inbox's past-chat view too.
+- **Ctrl+` goes back to the chat from a focused terminal too** (#10749).
+- **A sent message that is not yet in the transcript is legible** (#10636): its bubble is no longer drawn at 60% opacity; placeholders are the secondary text colour.
+- **A board row shows your words as typed** (#10597): an underscore inside a word (snake_case, a file name) and a ">" or "~" that is not Markdown stay.
+- **A task result links inline only a Coral store file** (#10629) (coral://artifacts/<id>), never a web address, and a name only when it looks like a file: "the" and "run" are never links.
+- **After a Needs you answer the empty list says what went through** (#10720): "Answered: Red for <agent>." for five minutes.
+- **Search All chats also matches the agent's name** (#10873): "Backend Dev", "Back" and "backend" find Backend Dev's chat.
+- **Open full board view from an agent's dock Board tab** has "Back to <agent>" on the team page, returning to that agent with its Board tab (#10703).
+
+#### Search, Docs and Files
+
+- **The Docs search ranks a hit by where the word sits** (title, heading, step, code last), and the snippet shows the best place, not the first (#10303, #10907): "sleep" no longer shows a /bin/sleep line, and a single newcomer's word (permission, continue, resume, sleep) puts the How do I...? answer first.
+- **Using the Dashboard has pictures again** (#10019): an agent row's hover card, Display options, and the agent header; the three pictures are small palette PNGs.
+- **A message search index a past build race left stale is found and built again, by itself**, a little after open (#10905, #10913): the repair checks the disk for room first and looks at "index wanted" again before it rebuilds.
+- **Files in plain words** (#10386, #10930): "Since this branch began", "Uncommitted changes (you are on the main branch)", and a legend for new, deleted and changed, as the list's own first line; "Compared with the main branch" does not name main or master, as the server compares with either.
+
+#### Analytics and Machine health
+
+- **Analytics says when its figures were read** (#10740): "Updated 14:05:32" on every successful read, every 15 s, where it said "Live".
+- **Cumulative spend does not say "Not enough data yet" while Total cost is above zero** (#10740): with one interval it says all the spend so far is in one interval and the total above is complete.
+- **Cost rows that round to the same cents show more precision** (#10740): $1.2312 and $1.2349 show as $1.231 and $1.235, then four decimals; the running-total chart's money axis has no repeated tick, and two lines that end within a cent keep their end labels apart.
+- **Analytics > Cost by team names a team by its label**, not its board id (#10936); By agent no longer shows the Overview's "Nothing counted" note (#10988).
+- **Machine health says who a busy CPU belongs to** (#10887): the server's `busy_by` ("others") comes from its own CPU reading, and the page's words follow it, not the lagging load average; it names the others only when Coral's and the agents' CPU were actually read.
+- **Settings > Usage analytics** (#10698, #10705): the visible line is "Anonymous product events only, no prompts."; the full list of what is never sent is behind Learn more.
+
+#### Automations, New project and Settings
+
+- **New job** (#10908, #10961): the schedule sentence keeps a day's name capital ("Runs Mondays at 09:00"); folder fields say "A folder on the computer running Coral." on New agent, New project step 1 and the job form; the Browse panel wraps the whole current path.
+- **New project** (#10660, #10908, #10693, #10652): a short notice that the AI-generated team is ready sits under the step line and goes by itself after 8 s; the button reads "Generate team"; step 1 ties the words once; step 3 says "The team starts with the settings shown here."; the form's error line is said once for a screen reader; Escape or Cancel in Describe your team gives the keyboard back to its button.
+- **Set a password** (#10892, #10930, #10720): the paragraph says what you have without a password; "Not now" on a browser from another computer is kept for the session; after Set password on a phone the keyboard stays down and the toast is one line, "Password set. Other computers can sign in."
+- **A bar says no password is set, on a phone too** (#10061): it stays while no password is set (amber, with a Set a password button) even with sign-in on; with remote access on it says that other devices sign in with the setup code.
+- **Open folder** (#10572): the "Type a folder, or Browse to one." line goes as soon as the box holds a folder; the mobile QR dialog says what it is for; the home page's footer links say they open outside Coral, and a Coral Hub strip hidden with its X can be shown again by a Show Coral Hub button; Run your own hub ends in a Close button, a copy box with the hub's command and a pointer to Remote access in Settings.
+- **Settings > Agents > Verify All** (#10693): the keyboard stays on the button while it checks, and each CLI's verdict is said when it arrives; the folder browsers' up button is named "Go up one folder".
+- **The Coral Hub account menu has a "Usage" link** (#11018) to the hub's /usage (its rolled-up Analytics), shown only when the hub says it has one.
+
+#### Phone
+
+- **Chat header on a phone: the status dot has its state as a word beside it** (Ready, Working, Idle...) (#10885, #11034); it is written as text only at 600 px and under, not in a wider header or the pop-out.
+- **Needs you on a phone: Yes and No are a full-width pair of 44 px targets** (#10874); a question's choices stay visible on a phone turned sideways, in a compact card (#10388).
+- **A phone turned sideways** (#10388): the agent's header folds away while the message box is focused; a dialog's header and footer are slim so New agent step 2, Settings and Set a password keep their body.
+- **A touch screen** (#10388): no desktop hover tooltips (a tap leaves the pointer hovering), and Stop sits 16 px apart from Send options so a mis-tap does not stop an agent.
+- **Code block** (#11026, #11034): Wrap and Copy are 44 px targets with the "Scrolls sideways" hint on a row of their own above the code, at 200% text too.
+- **Toasts** (#11026, #11034): on a phone the toast column starts below a team page's tab strip and below a goal page's way back, so Copied no longer covers Goals or "← Goals".
+- **Chats** (#10738): Star says "Starred" or "Star removed", Archive says "Archived. Find it under Archived." with an Undo; an archived chat has no green running dot; "Edit & Resubmit" opens inside the bubble's foot.
+- **Smaller phone fixes**: the chat's reply footer menu and time sit left of the 44 px Save (#10904); the 2 px of sideways overflow in a phone chat is removed (#10923); Docs keeps the way back at the top down a long answer (#10908); the Team Board's Send button no longer overhangs the border (#10942); the New goal dialog is full width with a title bar (#11027); Goal page says "No tasks yet" once (#11027); the no-password banner keeps a readable column at 200% text (#11026); the team Actions menu's board actions are plain rows, Edit member's Move up and Move down share a row, New job's Weekly days sit in even columns, and a turned-off job's page says "Turned off" once (#11015).
+
+#### Light theme and accessibility
+
+- **Light theme** (#10209, #10694, #10636): plain code in Docs is the text colour (1.2:1 became 14:1); the launch dialog's type cards have a 3:1 edge; cards, tiles, chart boxes and table boxes are white with a soft shadow.
+- **Side panel tabs are measured each on their own** (#10876), so the open Files tab keeps its word when Artifacts would not fit as the open one.
+
+### Security
+
+- **An agent could, before this release, seat itself or an agent it started on another team's board.** Coral does not remove such seats itself. The Operator can remove one with the API: `DELETE /api/board/<board>/subscribe` with `{"subscriber_id": "<the seat's name>"}` (the board's subscriber list, `GET /api/board/<board>/subscribers`, shows each seat's name and session).
+  - An agent's session token binds it to its own board. Strict local auth (the default) makes Coral require a credential for every request from this computer; with `--strict-local-auth=false` a request that carries no token is not checked, so any program on this computer can act as any agent.
+- Typed board notices carry only fixed words (#210): see the first item under Changes. Every call that types text into an agent's terminal is listed in a census test, so a new one fails until its text comes from a safe builder.
+
+### Hub notice
+
+Route and wire changes in this release, from the handlers and the agent docs:
+
+- **`POST /api/board/{board}/subscribe`** (#11013): an agent's token is admitted only on a board it already holds a seat on or the board its live row was launched on; anything else answers 403 `identity_mismatch` with words for the Operator. The code is not new; the route now uses it for a join. The Operator's own join is unchanged.
+- **`POST /api/sessions/launch` and `POST /api/sessions/launch-team`** (#11013): an agent's token launching onto another board answers 403 `forbidden_for_agent` ("An agent can start agents only on its own team's board, not another team's or the Operator's"); an answer of 503 `identity_unavailable` when Coral cannot check which board the agent belongs to. The 409 that lists candidate boards lists to an agent token only the board it was launched on. A restart or a resume keeps the launch-board seat.
+- **A person's send to a mid-turn agent** (#10992): answers 409 `code: agent_mid_turn` (and `not_sent` stays false) instead of `not_submitted` when the agent never took the text.
+- **`coral-board goal brief <goal> [--json]`** (#11004): a new CLI command, read-only; no new route.
+- **`GET /api/sessions/live` rows carry `summary_at`** (#10123): when the goal line was written (the newest goal event's time; null without a goal).
+- **Analytics by team rows carry `board_label`** (#10936), and the `machine_health` object the dashboard's WebSocket sends carries `busy_by` (only when the status is busy on the CPU; the value is `others`) (#10887).
+- **The Coral Hub account menu's Usage item** (#11018) is shown only when `GET /api/account` says `analytics_tab` is true; no item for false, a missing field, an error, a non-boolean, or on a local Coral.
+
+### Internal
+
+- Typed-notice census tests (`internal/typedcensus`, `TestTypedNoticeCensus`, `TestEveryTypedSenderIsInTheCensus`, a module-wide census of `terminalinput`) check every typed builder, with a hostile label, against PowerShell's own parser (#210, #221).
+- `tests/stress/run_identity.sh` checks #11013 end to end on an isolated server, with `--strict`; new `run.sh --goals` and `--send-after-restart` runners, each with `--repeat N` (#11029).
+- `test:cloud` runs the lines of `tests/frontend/cloud_checks.txt` through `run_cloud_checks.mjs`, because Windows refuses a command line over 8,191 characters (#11042).
+- Stale or load-sensitive tests and goldens brought up to date for intended changes, with the census's pinned-bar rule made direction-aware, and the page-weight appJs baseline 368,077 -> 376,832 bytes for 610 lines of source growth (#10955, #10940, #10925, #10975, #11003, #11031, #11040, #11043, #11061, #11062, #11064, #11067, #10701).
+
 ## v2.0.4 — the chat stays put, Display options are back, a thumb-sized phone Agents tab, a clearer update, and a team home folder
 
 ### Changes
