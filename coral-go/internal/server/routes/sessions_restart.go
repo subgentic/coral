@@ -188,7 +188,7 @@ func (h *SessionsHandler) restartResolve(ctx context.Context, name string, req r
 	} else if p.stored != nil {
 		preflightModel = strings.TrimSpace(ptr.Value(p.stored.Model))
 	}
-	if err := validateAgentModel(p.agentType, preflightModel); err != nil {
+	if err := h.checkAgentModel(ctx, p.agentType, preflightModel); err != nil {
 		return nil, func(w http.ResponseWriter) { errBadRequest(w, err.Error()) }
 	}
 	if req.Thinking != nil && !agentmodels.ValidThinking(p.agentType, strings.TrimSpace(*req.Thinking)) {

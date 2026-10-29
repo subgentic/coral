@@ -38,6 +38,8 @@ import (
 
 // SessionsHandler handles all live session API endpoints.
 type SessionsHandler struct {
+	// piModelCheck says a Pi model is not one Pi lists (#11105); nil until the server wires it.
+	piModelCheck func(ctx context.Context, model string) string
 	// searchRate is the per-member rate limit of the agent search, refusals counted (#11048).
 	searchRate             searchGuard
 	codexPermissionMu      sync.Mutex // orders Codex hook completion with deferred request promotion

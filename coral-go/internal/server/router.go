@@ -210,6 +210,7 @@ func (s *Server) newRouteHandlers() *routeHandlers {
 	routes.ProtectDataDir(s.cfg.CoralDir())
 	sysHandler := routes.NewSystemHandler(s.db, s.cfg)
 	s.sysHandler = sysHandler
+	sessHandler.SetPiModelCheck(sysHandler.PiModelProblem) // a Pi model that Pi does not list is said so at launch (#11105)
 	sysHandler.SetTerminal(s.terminal)
 	if s.boardStore != nil {
 		sysHandler.SetBoardAuthor(func(ctx context.Context, project string, id int64) (string, bool, error) {
