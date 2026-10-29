@@ -37,6 +37,7 @@ func TestJunctionOutOfTheRepositoryIsRefusedEverywhere(t *testing.T) {
 	if traversable {
 		assert.NoError(t, resolveErr, "safefs.Resolve of a file under the junction")
 	} else {
+		assert.ErrorIs(t, resolveErr, safefs.ErrOutside, "safefs answers the named refusal for a junction Windows refuses: %v", resolveErr)
 		assert.True(t, linktest.UntrustedMountPoint(resolveErr), "Windows refuses the junction in safefs.Resolve: %v", resolveErr)
 	}
 	realOut, err := safefs.Resolve(outdir)

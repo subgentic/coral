@@ -69,7 +69,7 @@ func TestWindowsJunctionOutIsRefused(t *testing.T) {
 		if traversable {
 			assert.ErrorIs(t, err, ErrOutside, "Within sees the junction: %s", p)
 		} else {
-			assert.True(t, linktest.UntrustedMountPoint(err), "Windows refuses the junction in Within(%s): %v", p, err)
+			refusedByWindows(t, err, "Windows refuses the junction in Within(%s): %v", p, err)
 		}
 	}
 	realOut, err := Resolve(out)
@@ -77,7 +77,7 @@ func TestWindowsJunctionOutIsRefused(t *testing.T) {
 	if !traversable {
 		for _, p := range []string{filepath.Join(root, "junc"), filepath.Join(root, "junc", "secret.txt"), filepath.Join(root, "junc", "missing.txt")} {
 			got, err := Resolve(p)
-			assert.True(t, linktest.UntrustedMountPoint(err), "Windows refuses the junction in Resolve(%s): %v", p, err)
+			refusedByWindows(t, err, "Windows refuses the junction in Resolve(%s): %v", p, err)
 			assert.Empty(t, got, "a refused Resolve names no place")
 		}
 		secretIntact(t, out, secret)
@@ -110,7 +110,7 @@ func TestWindowsJunctionWithinTheRootResolves(t *testing.T) {
 	} {
 		rel, err := Within(root, p)
 		if !traversable {
-			assert.True(t, linktest.UntrustedMountPoint(err), "Windows refuses the junction in Within(%s): %v", p, err)
+			refusedByWindows(t, err, "Windows refuses the junction in Within(%s): %v", p, err)
 			continue
 		}
 		require.NoError(t, err, p)
@@ -265,4 +265,12 @@ func TestWindowsNamesThatAreNotLocal(t *testing.T) {
 	assert.Equal(t, "x", string(b), "the file and its streams are unchanged")
 	entries, _ := os.ReadDir(root)
 	assert.Len(t, entries, 1, "nothing new in the root")
+}
+
+// refusedByWindows: on a build that refuses to traverse a junction (untrusted mount point, error 448) safefs answers the named refusal ErrOutside, and the system's own error stays
+// in the chain. The raw 448 alone is no longer enough: a caller that asks errors.Is(err, ErrOutside) gets its answer on every Windows.
+func refusedByWindows(t *testing.T, err error, msgAndArgs ...any) {
+	t.Helper()
+	assert.ErrorIs(t, err, ErrOutside, msgAndArgs...)
+	assert.True(t, linktest.UntrustedMountPoint(err), msgAndArgs...)
 }
