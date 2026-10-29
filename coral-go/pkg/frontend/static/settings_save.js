@@ -17,15 +17,17 @@ const { readSettingsForm, formKey, payloadNow, changedSince, refreshUnsavedNote,
 const { showConfirmModal } = await importOnce('./confirm_dialog.js'); // lazy like this file (import_hygiene)
 const { settingsAtOpen, setSettingsAtOpen, setFormAtOpen, setPayloadAtOpen } = await importOnce('./settings_snapshots.js'); // lazy like settings_dialog.js: a lazy module is loaded through importOnce (import_hygiene)
 
-/** Close Settings. With a change not saved yet it asks first (Close, Cancel, Escape and the backdrop all come here, #10526); force === true closes without asking (after a Save, or on the way to another dialog). */
-export function hideSettingsModal(force) {
+/** Close Settings. With a change not saved yet it asks first (Close, Cancel, Escape and the backdrop all come here, #10526); force === true closes without asking (after a Save, or on the way to another dialog).
+ *  onClosed runs once Settings has closed: at once, or after Discard changes (never after Keep editing): what the person was on their way to when they closed it, a link into Docs (#10906). */
+export function hideSettingsModal(force, onClosed) {
     if (force !== true && unsavedFields()) { // decided at once: a Close with nothing changed still closes in the same turn
-        showConfirmModal('Discard unsaved changes?', 'Settings you changed have not been saved.', () => hideSettingsModal(true), undefined, { label: 'Discard changes', cancelLabel: 'Keep editing', danger: true });
+        showConfirmModal('Discard unsaved changes?', 'Settings you changed have not been saved.', () => hideSettingsModal(true, onClosed), undefined, { label: 'Discard changes', cancelLabel: 'Keep editing', danger: true });
         return;
     }
     document.getElementById("settings-modal").style.display = "none";
     restoreSavedTheme().catch(() => {}); // a theme previewed in the dialog and not saved goes back to the saved one (#10481)
     if (!isCloud()) importOnce('./custom_models.js').then(m => m.discardCustomModels()).catch(() => {}); // unsaved custom models are dropped with the dialog (#5480)
+    if (typeof onClosed === 'function') onClosed();
 }
 
 /** Sends the payload (nothing, when nothing changed) and takes it into state.settings and the privacy status. Returns true when there was nothing to save; throws when the server refuses. */
