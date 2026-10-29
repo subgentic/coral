@@ -90,6 +90,32 @@ func AdoptedAgentProc(session string) (AgentProc, bool) {
 // AdoptAgentAfterLaunch starts the watch of a pane after a launch line was typed into it: the session's agent process is recorded when it appears. target is the pane (session or
 // session.pane); session is the key the notices are checked by.
 func (c *Client) AdoptAgentAfterLaunch(session, target string) {
+	c.run(context.Background(), "set-option", "-u", "-t", session, agentOption) // a new launch: what was kept of the old process is not true of the new one
+	adoptAfterLaunch(session, func(ctx context.Context) (int, error) {
+		out, err := c.DisplayMessage(ctx, target, "#{pane_pid}")
+		if err != nil {
+			return 0, err
+		}
+		return strconv.Atoi(strings.TrimSpace(out))
+	}, func(ctx context.Context, p AgentProc) { c.persistAgentProc(ctx, session, p) })
+}
+
+// AdoptAgentForShell is AdoptAgentAfterLaunch for a pseudo-terminal whose shell pid is known (the Unix PTY backend): there is no tmux session to keep the record in, and a Coral restart ends
+// the pseudo-terminal's sessions anyway.
+func AdoptAgentForShell(session string, shell int) {
+	adoptAfterLaunch(session, func(context.Context) (int, error) { return shell, nil }, nil)
+}
+
+// NoticeVerdictForShell is the verdict for a pseudo-terminal whose shell pid is known, from the record in memory only.
+func NoticeVerdictForShell(session string, shell int) (NoticeVerdict, error) {
+	procs, err := readProcTable()
+	if err != nil {
+		return NoticeVerdict{}, fmt.Errorf("read process table: %w", err)
+	}
+	return noticeVerdict(procs, shell, session, nil), nil
+}
+
+func adoptAfterLaunch(session string, findShell func(context.Context) (int, error), persist func(context.Context, AgentProc)) {
 	agentRecs.Lock()
 	r := agentRecs.m[session]
 	if r == nil {
@@ -106,8 +132,7 @@ func (c *Client) AdoptAgentAfterLaunch(session, target string) {
 	r.adopted, r.proc, r.adopting = false, AgentProc{}, true
 	watches.Add(1)
 	agentRecs.Unlock()
-	c.run(context.Background(), "set-option", "-u", "-t", session, agentOption) // a new launch: what was kept of the old process is not true of the new one
-	safego.Go("tmux-adopt-agent", func() { defer watches.Done(); defer cancel(); c.watchForAgent(ctx, session, target, gen) })
+	safego.Go("tmux-adopt-agent", func() { defer watches.Done(); defer cancel(); watchForAgent(ctx, session, findShell, persist, gen) })
 }
 
 // agentOption is the tmux session option the recorded process is kept in, "<pid> <start>".
@@ -133,7 +158,7 @@ func (c *Client) loadAgentProc(ctx context.Context, agentName, agentType, sessio
 	return AgentProc{PID: pid, Start: start}, true
 }
 
-func (c *Client) watchForAgent(ctx context.Context, session, target string, gen int) {
+func watchForAgent(ctx context.Context, session string, findShell func(context.Context) (int, error), persist func(context.Context, AgentProc), gen int) {
 	finish := func(p AgentProc, got bool, why string) {
 		agentRecs.Lock()
 		r := agentRecs.m[session]
@@ -148,7 +173,9 @@ func (c *Client) watchForAgent(ctx context.Context, session, target string, gen 
 		agentRecs.Unlock()
 		if got {
 			slog.Info("recorded the agent's process", "session", session, "pid", p.PID, "start", p.Start)
-			c.persistAgentProc(ctx, session, p) // outside the lock: it runs tmux
+			if persist != nil {
+				persist(ctx, p) // outside the lock: it runs tmux
+			}
 		} else {
 			slog.Warn("did not record the agent's process: board notices stay off until it is recorded (Wake it, or restart the agent)", "session", session, "why", why)
 		}
@@ -170,13 +197,13 @@ func (c *Client) watchForAgent(ctx context.Context, session, target string, gen 
 			return
 		}
 		if shell == 0 {
-			out, err := c.DisplayMessage(ctx, target, "#{pane_pid}")
-			if err != nil {
-				return // the pane is gone
-			}
-			if shell, err = strconv.Atoi(strings.TrimSpace(out)); err != nil {
+			var err error
+			if shell, err = findShell(ctx); err != nil {
 				shell = 0
-				continue
+				if ctx.Err() != nil {
+					return
+				}
+				return // the pane is gone, or its pid is not a number
 			}
 		}
 		procs, err := readProcTableMaxAge(100 * time.Millisecond)

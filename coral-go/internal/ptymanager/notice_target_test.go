@@ -41,9 +41,28 @@ func TestNoticeBlockedFollowsTheTerminalsVerdict(t *testing.T) {
 	assert.False(t, ok, "a launch moments ago is not shown as a pause")
 
 	blocked, _ = NoticeBlocked(ctx, fakeNoticeTerm{known: false}, name, "claude", "", "board message")
-	assert.False(t, blocked, "a terminal that cannot tell blocks nothing")
-	blocked, _ = NoticeBlocked(ctx, struct{}{}, name, "claude", "", "board message")
-	assert.False(t, blocked, "a terminal without the check blocks nothing (ConPTY, until its half)")
+	assert.True(t, blocked, "a terminal that cannot tell fails closed: nothing is typed")
+}
+
+// A real terminal or runtime without the check fails closed, so a future backend cannot silently type everywhere; only a test fake that says so is exempt.
+type exemptFake struct{}
+
+func (exemptFake) NoticeCheckNotApplicable() {}
+
+func TestNoticeBlockedFailsClosedWithoutTheCheckUnlessATestFakeSaysSo(t *testing.T) {
+	ctx := context.Background()
+	const name = "claude-6a1b2c3d-4e5f-4061-8a7b-9c0d1e2f3a4c"
+	t.Cleanup(func() { clearSkipped(name) })
+	blocked, why := NoticeBlocked(ctx, struct{}{}, name, "claude", "", "board nudge")
+	assert.True(t, blocked, "a backend without the check types nothing")
+	assert.Contains(t, why, "cannot say")
+	blocked, _ = NoticeBlocked(ctx, exemptFake{}, name, "claude", "", "board nudge")
+	assert.False(t, blocked, "a test fake that says so is exempt")
+	off := true
+	noticeCheckOverride.Store(&off)
+	t.Cleanup(func() { noticeCheckOverride.Store(nil) })
+	blocked, _ = NoticeBlocked(ctx, struct{}{}, name, "claude", "", "board nudge")
+	assert.False(t, blocked, "CORAL_NOTICE_TARGET_CHECK=off restores the earlier rule")
 }
 
 func TestNoticeBlockedOffSwitch(t *testing.T) {

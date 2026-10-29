@@ -79,6 +79,10 @@ func init() {
 	})
 }
 
+// NoticeCheckExempt is implemented by test fakes only, to say that the notice check does not apply to them: a real terminal or runtime that cannot say whether its foreground is the agent
+// types nothing (NoticeBlocked fails closed), so a future backend cannot silently type everywhere.
+type NoticeCheckExempt interface{ NoticeCheckNotApplicable() }
+
 // NoticeBlocked reports whether a board notice (a nudge, a notification, a task or agent UI notice: any automated text) must not be typed into the agent's terminal because its
 // foreground program is not the recorded agent process. It logs once per cause, and records the skip for the dashboard (SkipNotAgent). A terminal agent is handled elsewhere; a terminal
 // that cannot tell blocks nothing.
@@ -88,12 +92,25 @@ func NoticeBlocked(ctx context.Context, term any, name, agentType, sessionID, wh
 	}
 	c, ok := term.(NoticeTargetChecker)
 	if !ok {
-		return false, ""
+		if _, fake := term.(NoticeCheckExempt); fake {
+			return false, ""
+		}
+		// A real terminal or runtime without the check cannot say whether the foreground is the agent: fail closed.
+		return noticePaused(name, what, "this terminal cannot say whether it is running the agent", false)
 	}
 	allowed, wait, why, known := c.AgentNoticeTarget(ctx, name, agentType, sessionID)
-	if !known || allowed {
+	if allowed {
 		return false, ""
 	}
+	if !known {
+		// It cannot tell (the pane is gone, the process table could not be read, or the platform does not record the agent): nothing is typed.
+		return noticePaused(name, what, "this terminal cannot say whether it is running the agent", false)
+	}
+	return noticePaused(name, what, why, wait)
+}
+
+// noticePaused records and logs a withheld notice (once per cause) and answers "blocked". wait: the agent's process is still being recorded, which is not shown as a pause.
+func noticePaused(name, what, why string, wait bool) (bool, string) {
 	if !wait { // a launch moments ago is not a pause worth showing
 		if _, seen := noticeLogged.LoadOrStore(name+"\x00"+why, true); !seen {
 			slog.Warn("board notices paused: not typing into a terminal that is not running the agent", "session", name, "why", why, "skipped", what)

@@ -11,7 +11,10 @@ import (
 
 // Every runtime this package types through must answer the notice check, or the nudge, the scheduler's prompt and the other automated senders of this package type into a terminal whose
 // foreground is not the agent (QA's #389 reruns: a board_notifier nudge was typed into a person's cat and a nested cmd while the routes' notices were withheld).
-var _ ptymanager.NoticeTargetChecker = (*TmuxRuntime)(nil)
+var (
+	_ ptymanager.NoticeTargetChecker = (*TmuxRuntime)(nil)
+	_ ptymanager.NoticeTargetChecker = (*PTYRuntime)(nil)
+)
 
 // noticeRuntime is a runtime whose agent has not exited but whose terminal's foreground is not the agent.
 type noticeRuntime struct {
