@@ -157,6 +157,8 @@ func uploadArtifactTags(serverURL, file, name, mediaType, sid, newVersionOf, tas
 	if err := refuseSignInLinkIn("an artifact name or tag", append([]string{name}, tags...)...); err != nil {
 		return err
 	}
+	// Its contents: a warning only, and the upload goes ahead.
+	warnSignInLinkInFile(file, stderr)
 	f, err := os.Open(file) // streamed to Coral, not read into memory (#3553)
 	if err != nil {
 		return err
