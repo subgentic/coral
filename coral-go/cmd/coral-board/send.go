@@ -97,6 +97,9 @@ func runSend(args []string, id sendIdentity, out io.Writer) error {
 			return err
 		}
 	}
+	if err := refuseSignInLink("send", message); err != nil { // another board's members read it too
+		return err
+	}
 	if address != "" {
 		if target != "" || to != "" {
 			return fmt.Errorf("--address can't be combined with --board or --to")
