@@ -17,6 +17,13 @@ const S = `(window.__coralStatic || '/static/')`;
     const scene = async (name, run, { must = [], forbid = [] } = {}) => {
         await clear(ev);
         try { await run(); } catch (e) { scenes.push({ name, entries: [] }); found.push(`${name}: the scene did not run (${String(e && e.message || e).slice(0, 160)})`); return; }
+        // Each announcement the scene must make is waited for (up to 10 s: on a slow or throttled machine it lands after the scene's own
+        // pauses, #376), then the quiet window catches a second one; the counts below stay exact, so "announced twice" still fails.
+        for (const until = Date.now() + 10000; must.length && Date.now() < until;) {
+            const now = await log(ev);
+            if (must.every(([re, , count = 1]) => said(now, re).length >= count)) break;
+            await wait(200); // sleep-ok: polling the live-region log for what the scene must announce
+        }
         await wait(600); // sleep-ok: the last announcement lands
         const entries = await log(ev);
         scenes.push({ name, entries });
