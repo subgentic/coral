@@ -9,7 +9,7 @@
 // Run against an isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
-const { settle } = require('./helpers/wait');
+const { settle, coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -19,7 +19,7 @@ const { settle } = require('./helpers/wait');
     const load = async (w, h, mobile = false) => {
         await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await ev(`localStorage.setItem('coral-live-view-mode', 'chat'); window.__m.add('docs-bot', 'A', 6, { sleeping: false }); window.__m.add('api-worker', 'B', 3, { sleeping: false }); true`);
         await settle(ev, 600); // sleep-ok: the first live list renders from several answers; there is no single completion event
     };

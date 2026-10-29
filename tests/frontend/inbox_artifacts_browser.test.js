@@ -10,6 +10,7 @@ const { SIZING } = require('./helpers/table_sizing');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const { ROW_WORDS } = require('./helpers/folder_rows');
+const { coralReady } = require('./helpers/wait');
 
 const hex = n => String(n).padStart(64, '0');
 const WORLD = `(() => {
@@ -56,7 +57,7 @@ const WORLD = `(() => {
             console.log(label);
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.then(() => true)`);
+            await coralReady(ev);
             await ev(`localStorage.removeItem('coral.inbox.tab'); localStorage.removeItem('coral-team-artifacts-filters:@inbox'); ${WORLD}`);
             await ev(`window.switchNavTab('hub-inbox'); true`);
             if (!mobile) {

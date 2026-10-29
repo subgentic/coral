@@ -3,6 +3,7 @@
 // network (CDP Network.emulateNetworkConditions: every request waits 900 ms) against the isolated dev server, with a bundled page (the lazy modules are separate requests).
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 const SLOW = { offline: false, latency: 900, downloadThroughput: 200 * 1024, uploadThroughput: 200 * 1024 };
 
 (async () => {
@@ -16,7 +17,7 @@ const SLOW = { offline: false, latency: 900, downloadThroughput: 200 * 1024, upl
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         // a control that runs the task-open action, as an agent's own task row does (its dialog is a lazy module; a board's task opens the team page, tested by team-name-open below), in a list that is on the page
         await ev(`(() => { const row = document.createElement('div'); row.id = 'lb-row'; row.className = 'task-row'; row.dataset.onClick = 'task-open'; row.dataset.taskId = '1'; row.dataset.kind = 'agent'; row.textContent = 'a task'; row.tabIndex = 0; document.body.appendChild(row);
             window.__flicker = []; new MutationObserver(() => { const r = document.getElementById('lb-row'); window.__flicker.push(r.hasAttribute('aria-busy') ? 'busy' : 'idle'); }).observe(document.getElementById('lb-row'), { attributes: true, attributeFilter: ['aria-busy'] }); return true; })()`);

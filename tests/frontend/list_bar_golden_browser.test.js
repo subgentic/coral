@@ -9,6 +9,7 @@ const path = require('node:path');
 const { connect } = require('./agent_view_harness');
 const GOLDEN = path.join(__dirname, 'fixtures', 'list_bar_golden.json');
 const sha = t => require('node:crypto').createHash('sha256').update(t).digest('hex');
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -17,7 +18,7 @@ const sha = t => require('node:crypto').createHash('sha256').update(t).digest('h
         await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1200, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await ev(`(async () => { const base = window.__coralStatic || '/static/'; const m = await import(base + 'team_artifact_bar.js'); const host = document.createElement('div'); host.id = 'bar-host'; document.body.append(host);
             window.__calls = []; window.__bar = m.buildBar(f => { window.__calls.push(JSON.stringify(f)); }); host.append(window.__bar.node); return true; })()`);
         const snap = async name => ev(`(() => { const a = document.activeElement; return { html: (() => { const c = window.__bar.node.cloneNode(true); c.querySelectorAll('.list-bar-live').forEach(n => n.remove()); return c.outerHTML; })(), calls: window.__calls.splice(0).join(' ; '), focus: a && window.__bar.node.contains(a) && a.getClientRects().length ? (a.id || a.className) : (a === document.body || (a && window.__bar.node.contains(a)) ? 'body' : 'elsewhere'), // a focused control that was just hidden counts as body: the browser lets go of it a moment later

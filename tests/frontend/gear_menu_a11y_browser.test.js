@@ -4,6 +4,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { axNodes } = require('./helpers/ax_tree');
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -15,7 +16,7 @@ const { axNodes } = require('./helpers/ax_tree');
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.startup('liveList', 'settings')`);
+        await coralReady(ev, 'startup', 'liveList', 'settings');
         const btnState = async () => { const t = await tree(); const b = t.find(n => n.role && n.role.value === 'button' && n.name && n.name.value === 'Settings menu'); return b ? { haspopup: prop(b, 'hasPopup'), expanded: prop(b, 'expanded') } : null; };
         let b = await btnState();
         check(b && b.haspopup === 'menu', `the Settings menu button has a menu popup in the tree: ${JSON.stringify(b)}`);

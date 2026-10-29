@@ -7,6 +7,7 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { safePaused } = require('./helpers/paused');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 const STUB = `(() => {
     const real = window.fetch; const json = o => Promise.resolve(new Response(JSON.stringify(o), { status: 200, headers: { 'Content-Type': 'application/json' } }));
@@ -35,7 +36,7 @@ const STUB = `(() => {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             held.length = 0; hold = true;
             await Page.navigate({ url: BASE + '/chats/aaaaaa1' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+            await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
             await waitFor(`document.getElementById('history-session-view') && document.getElementById('history-session-view').checkVisibility() && document.getElementById('history-back').checkVisibility()`, `${label}: the chat opens by its address, with its way back`, 15000);
             assert.equal(await ev(`document.getElementById('history-back').textContent`), '\u2190 All chats', `${label}: the way back names the Inbox folder`);
             const deadline = Date.now() + 4000;

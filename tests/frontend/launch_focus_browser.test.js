@@ -3,6 +3,7 @@
 // agent was opening it stays there. _openLaunched is what Launch calls once the agent is in the list. At 1280 and 640 px. Drives Chrome over CDP through agent_view_harness.js.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -15,7 +16,7 @@ const { connect } = require('./agent_view_harness');
             const check = (ok, msg) => { if (!ok) problems.push(`${w}: ${msg}`); };
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile: false });
             await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.startup('liveList', 'settings')`);
+            await coralReady(ev, 'startup', 'liveList', 'settings');
             await ev(`(() => { document.getElementById('kb-opener')?.remove(); const b = document.body.appendChild(Object.assign(document.createElement('button'), { id: 'kb-opener', textContent: 'New agent' })); b.style.cssText = 'position:fixed;left:8px;top:8px;z-index:99999'; return true; })()`);
             for (const [label, setup, want] of [
                 ['the keyboard is on the button that opened the dialog', `document.getElementById('kb-opener').focus()`, 'textarea#command-input'],

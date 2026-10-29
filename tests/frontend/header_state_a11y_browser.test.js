@@ -3,6 +3,7 @@
 // so a screen reader reads the state once (from the dot, in the accessibility tree). Run against an isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, sleep, PRELOAD, install } = await connect();
@@ -15,7 +16,7 @@ const { connect } = require('./agent_view_harness');
         await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await ev(`window.__m.add('dot-bot', 'A', 2, { sleeping: false, session_id: 'dot-sid' }); true`);
         await sleep(600); // sleep-ok: the first live list renders from several answers; no single completion event
         await ev(`window.selectLiveSession('dot-bot', 'claude', 'dot-sid', 'local'); true`);

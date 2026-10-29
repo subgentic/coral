@@ -3,6 +3,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 const S = `(window.__coralStatic || '/static/')`;
 
 (async () => {
@@ -25,7 +26,7 @@ const S = `(window.__coralStatic || '/static/')`;
             };
             return true; })()`;
         await Page.addScriptToEvaluateOnNewDocument({ source: STUB });
-        await Page.navigate({ url: BASE + '/automations/jobs' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: BASE + '/automations/jobs' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 2`, 'the two jobs', 10000);
         // 4. what a person made comes first
         assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view tbody tr .dt-primary')].map(b => b.textContent.trim())`), ['weekday-summary', 'morning-motivation'], 'the person\'s own job is above the seeded example');
