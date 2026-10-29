@@ -13,6 +13,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/httputil"
 	"github.com/subgentic/coral/internal/store"
 )
@@ -127,8 +128,15 @@ func (h *SessionsHandler) searchBoards(r *http.Request, c searchCaller, launchKe
 	if err != nil {
 		return nil, err
 	}
+	marked, err := h.bs.BoardKeysOfKind(ctx, board.BoardKindJob) // a board a job used, marked when it was used: still out when the run's live row is gone (#11076)
+	if err != nil {
+		return nil, err
+	}
 	skip := map[string]bool{launchKey: true}
 	for _, k := range excluded {
+		skip[k] = true
+	}
+	for _, k := range marked {
 		skip[k] = true
 	}
 	for _, k := range more {

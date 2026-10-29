@@ -296,6 +296,37 @@ text = json.dumps(rows)
 assert "CANARY" not in text and "zebra" not in text and "old decision" not in text
 assert any(r["outcome"] == "refused" for r in rows if r["kind"] == "read")
 PY
+    # a finished job's board (#11076): a job's agent uses a board through the API (that marks the board), the run is killed (its live row is gone), and no level reads the board, the Operator's own included
+    JOBC="CANARY-finishedjob-$RANDOM$RANDOM"
+    JB=$(api POST /api/board/srch-jobboard/subscribe -d '{"subscriber_id":"Operator","job_title":"Operator"}' | python3 -c 'import sys,json; print(json.load(sys.stdin).get("project",""))' 2>/dev/null || true)
+    operator_post "${JB:-srch-jobboard}" "$JOBC the old decision"
+    jresp=$(api POST /api/scheduled/jobs -d "{\"name\":\"srch-job\",\"cron_expr\":\"0 3 * * *\",\"repo_path\":\"$(NP "$TMP/w")\",\"agent_type\":\"claude\",\"prompt\":\"x\",\"enabled\":0,\"no_worktree\":1}")
+    jid=$(python3 -c 'import sys,json; print(json.loads(sys.argv[1]).get("id",""))' "$jresp" 2>/dev/null || true)
+    jsid=""
+    if [[ -n "$jid" && -n "$JB" ]]; then
+        api POST "/api/scheduled/jobs/$jid/run" -d '{}' >/dev/null
+        end=$((SECONDS + 60))
+        while (( SECONDS < end )); do
+            jsid=$(api GET "/api/scheduled/jobs/$jid/runs" | python3 -c 'import sys,json
+d=json.load(sys.stdin); runs=d.get("runs",d) if isinstance(d,dict) else d
+print((runs[0].get("session_id") or "") if runs else "")' 2>/dev/null || true)
+            [[ -n "$jsid" ]] && grep -q '^CORAL_SESSION_TOKEN=' "$DUMP/$jsid.env" 2>/dev/null && break
+            sleep 1
+        done
+    fi
+    if [[ -n "$jsid" ]] && grep -q '^CORAL_SESSION_TOKEN=' "$DUMP/$jsid.env" 2>/dev/null; then
+        api POST "/api/board/$JB/subscribe" -d "{\"subscriber_id\":\"Job Agent\",\"job_title\":\"Job\",\"session_name\":\"$(sess_of "$jsid")\"}" >/dev/null
+        c=$(curl -s -m 10 -o /dev/null -w "%{http_code}" -H "X-Coral-Session-Token: $(token_of "$jsid")" -H "Content-Type: application/json" -A "coral-board/test" -X POST "$BASE/api/board/$JB/messages" -d '{"subscriber_id":"Job Agent","content":"job note"}')
+        jn=$(live_json | python3 -c 'import sys,json
+for s in json.load(sys.stdin):
+    if s["session_id"]==sys.argv[1]: print(s["name"])' "$jsid")
+        [[ -n "$jn" ]] && api POST "/api/sessions/live/$jn/kill" -d '{}' >/dev/null
+        sleep 2
+        set_level "$LV_MEMBER" operator >/dev/null
+        out=$(as_agent "$LV_SID" search CANARY --operator-history) || true
+        if [[ "$c" == 200 && "$out" == *"$CANOPS"* && "$out" != *"$JOBC"* ]]; then pass "levels: a finished job's board (marked when the job used it) is not read at 'operator', where the Operator's own board is"; else fail "levels: finished job's board: post=$c ${out:0:300}"; fi
+        set_level "$LV_MEMBER" own >/dev/null
+    else fail "levels: the job's agent never started (job $jid, session $jsid, created: ${jresp:0:200})"; fi
     # a restart keeps the level, and a loop of refused requests reaches the rate limit (refusals count)
     set_level "$DEV1_MEMBER" own >/dev/null
     c429=0

@@ -56,6 +56,8 @@ func (s *Store) ensureBoardsSchema(ctx context.Context) error {
 	`); err != nil {
 		return err
 	}
+	// A board a job's agent used is "job" (#11076); ADD COLUMN fails with "duplicate column" on every open after the first, which is expected.
+	_, _ = s.db.ExecContext(ctx, `ALTER TABLE boards ADD COLUMN kind TEXT NOT NULL DEFAULT ''`)
 	// Every board that exists today becomes a row whose id and label are its name. Idempotent:
 	// rows already there are kept (a rename survives a restart).
 	if _, err := s.db.ExecContext(ctx, adoptBoardsSQL); err != nil {

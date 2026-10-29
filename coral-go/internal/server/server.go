@@ -113,6 +113,11 @@ func NewWithKey(cfg *config.Config, db *store.DB, backend ptymanager.TerminalBac
 	}
 	if boardStore != nil && db != nil {
 		boardStore.SetSessionsDB(db.Reader())
+		if n, err := boardStore.BackfillJobBoards(context.Background()); err != nil { // boards past job runs used are marked, so no search level reads them (#11076)
+			log.Printf("[boards] marking the boards job runs used failed: %v", err)
+		} else if n > 0 {
+			log.Printf("[boards] marked %d boards job runs used", n)
+		}
 	}
 	if boardStore != nil {
 		agent.SetBoardGoalsBrief(boardGoalsPromptBlock(boardStore)) // an agent's board system prompt lists the board's open goals (#7296)

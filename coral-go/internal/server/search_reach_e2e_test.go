@@ -59,6 +59,28 @@ func TestSearchReachLevelsOnBoardSearch(t *testing.T) {
 	}
 	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: "eeeeeeee-1148-4000-8000-0000000000c1", AgentType: "claude", AgentName: "nightly", WorkingDir: "/w", BoardName: ptrTo(boardOf["job"]), IsJob: 1}))
 	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: "eeeeeeee-1148-4000-8000-0000000000c2", AgentType: "claude", AgentName: "remote", WorkingDir: "/w", BoardName: ptrTo(boardOf["relay"]), BoardServer: ptrTo("https://other.example")}))
+	// Two boards whose jobs are FINISHED (no live row any more): one a past run's, found by the backfill from the runs table; one a job's agent used through the API, marked the moment it was used (#11076).
+	for _, n := range []string{"finished", "srcmark"} {
+		b, err := bs.CreateBoard(ctx, n, "Operator")
+		require.NoError(t, err)
+		boardOf[n] = b.ID
+		_, err = bs.Subscribe(ctx, b.ID, "Lead-"+n, "Lead", "", nil, "all")
+		require.NoError(t, err)
+		_, err = bs.PostMessage(ctx, b.ID, "Lead-"+n, "CANARY-"+strings.ToUpper(n)+" the old decision", nil)
+		require.NoError(t, err)
+	}
+	const finishedSid, markSid = "eeeeeeee-1148-4000-8000-0000000000d1", "eeeeeeee-1148-4000-8000-0000000000d2"
+	_, err = bs.Subscribe(ctx, boardOf["finished"], "Nightly", "Nightly", "claude-"+finishedSid, nil, "all") // its run ended: a runs row, a member name, no live row
+	require.NoError(t, err)
+	_, err = srv.db.ExecContext(ctx, `INSERT INTO scheduled_jobs (name, cron_expr, repo_path, prompt, enabled, created_at, updated_at) VALUES ('nightly', '0 3 * * *', '/w', 'p', 0, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')`)
+	require.NoError(t, err)
+	_, err = srv.db.ExecContext(ctx, `INSERT INTO scheduled_runs (job_id, session_id, status, scheduled_at, created_at) VALUES ((SELECT id FROM scheduled_jobs LIMIT 1), ?, 'completed', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')`, finishedSid)
+	require.NoError(t, err)
+	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: markSid, AgentType: "claude", AgentName: "job2", WorkingDir: "/w", BoardName: ptrTo(boardOf["srcmark"]), IsJob: 1}))
+	markTok, err := srv.db.MintSessionToken(ctx, markSid, "claude-"+markSid)
+	require.NoError(t, err)
+	_, err = bs.Subscribe(ctx, boardOf["srcmark"], "Job2", "Job2", "claude-"+markSid, nil, "all")
+	require.NoError(t, err)
 	agentOn := func(tm *store.Team, board, sid, name string) string {
 		session := "claude-" + sid
 		require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: sid, AgentType: "claude", AgentName: name, WorkingDir: "/w", BoardName: &board}))
@@ -114,6 +136,14 @@ func TestSearchReachLevelsOnBoardSearch(t *testing.T) {
 		}
 		return do("PUT", setPath, "", body+"}")
 	}
+
+	// The job's agent uses its board (a post), which marks the board as a job's; then its run ends.
+	code, _, raw0 := do("POST", "/api/board/"+boardOf["srcmark"]+"/messages", markTok, `{"subscriber_id":"Job2","content":"job note"}`)
+	require.Equal(t, http.StatusOK, code, raw0)
+	_, err = srv.db.ExecContext(ctx, `DELETE FROM live_sessions WHERE session_id = ?`, markSid)
+	require.NoError(t, err)
+	_, err = srv.boardStore.BackfillJobBoards(ctx)
+	require.NoError(t, err)
 
 	t.Run("every member starts at own, and the team detail says so", func(t *testing.T) {
 		code, out, raw := do("GET", "/api/teams/detail/"+url.PathEscape(team.Name), "", "")
@@ -184,7 +214,7 @@ func TestSearchReachLevelsOnBoardSearch(t *testing.T) {
 		for _, c := range []string{"CANARY-ALPHA", "CANARY-BETA"} {
 			assert.Contains(t, raw, c)
 		}
-		for _, c := range []string{"CANARY-OPS", "CANARY-TRAP", "CANARY-JOB", "CANARY-RELAY"} {
+		for _, c := range []string{"CANARY-OPS", "CANARY-TRAP", "CANARY-JOB", "CANARY-RELAY", "CANARY-FINISHED", "CANARY-SRCMARK"} {
 			assert.NotContains(t, raw, c, "all: team-launched boards only, not %s", c)
 		}
 		code, out, raw := search(tokDev, "operator")
@@ -197,8 +227,8 @@ func TestSearchReachLevelsOnBoardSearch(t *testing.T) {
 		for _, c := range []string{"CANARY-ALPHA", "CANARY-BETA", "CANARY-OPS", "CANARY-TRAP"} {
 			assert.Contains(t, raw, c, "operator adds the boards with no team row")
 		}
-		for _, c := range []string{"CANARY-JOB", "CANARY-RELAY"} {
-			assert.NotContains(t, raw, c, "a job's board and a relayed board are out at every level")
+		for _, c := range []string{"CANARY-JOB", "CANARY-RELAY", "CANARY-FINISHED", "CANARY-SRCMARK"} {
+			assert.NotContains(t, raw, c, "a job's board (a finished run's too) and a relayed board are out at every level")
 		}
 	})
 	t.Run("a member id that is not there is a 404, and the level is read from the caller's row, never from a name", func(t *testing.T) {
