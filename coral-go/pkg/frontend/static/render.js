@@ -430,6 +430,8 @@ function _wireListKeyboard(container) {
 
 
 registerActions({
+    // The page's first stop for the keyboard (#290): the main area, without changing the address (a '#main-stage' href would be read as a route).
+    'skip-to-main': (el, event) => { event.preventDefault(); document.getElementById('main-stage')?.focus(); },
     'skip-to-message': (el, event) => { event.preventDefault(); const box = document.getElementById('command-input'); if (box?.getClientRects().length) box.focus(); else showToast('Open an agent first.'); }, // the sidebar's skip link (#10579)
     'agent-search-clear': () => { const i = document.getElementById('agent-search-input'); if (i) { i.value = ''; i.focus(); } filterLiveAgents(''); },
     'agent-filters-clear': () => { setListFilters(_NO_LIST_FILTERS); redrawLiveList(); },
