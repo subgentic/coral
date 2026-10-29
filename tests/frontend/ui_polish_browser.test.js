@@ -35,9 +35,10 @@ const SESSIONS = [{ session_id: 'f-1', name: LONG, display_name: 'Solo', agent_t
         assert.ok(skip.height >= 44, 'a touch target of at least 44 px: ' + skip.height);
         assert.ok(skip.focusedMain, 'activating it focuses the main area');
         assert.ok(skip.sameAddress, 'without changing the address (the hash is a route)');
-        assert.equal(await ev(`document.querySelector('.skip-main').getBoundingClientRect().bottom <= 0`), false, 'still shown while focused');
-        await ev(`document.getElementById('main-stage').blur(); true`);
-        assert.equal(await ev(`document.querySelector('.skip-main').getBoundingClientRect().bottom <= 0`), true, 'and off screen without the focus');
+        // activating it moved the focus to the main area, so the link has hidden itself again
+        assert.equal(await ev(`document.querySelector('.skip-main').getBoundingClientRect().bottom <= 0`), true, 'off screen once the focus has moved on');
+        assert.equal(await ev(`(() => { const a = document.querySelector('.skip-main'); a.focus(); return a.getBoundingClientRect().bottom > 0; })()`), true, 'shown again when it has the focus');
+        await ev(`document.querySelector('.skip-main').blur(); true`);
 
         console.log('a shortened path keeps its end, on Windows too');
         const paths = await ev(`(async () => { const m = await import(${STATIC} + 'session_state.js'); return {
