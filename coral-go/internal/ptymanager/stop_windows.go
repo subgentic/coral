@@ -4,9 +4,13 @@ package ptymanager
 
 import (
 	"fmt"
+	"path/filepath"
+	"strings"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
+
+	"github.com/subgentic/coral/internal/tmux"
 )
 
 // newKillJob puts the process the terminal started into a job object that ends every process in it when the job is
@@ -60,7 +64,8 @@ func hasChildProcesses(pid int) (bool, error) {
 }
 
 // runsNonShell says whether any process under pid (its children, theirs, and so on, from one snapshot of the process list) is
-// something other than a shell (powershell, pwsh, cmd): a program is running there. Nested shells alone (a person typed "cmd" at
+// something other than a shell (powershell, pwsh, cmd, and the shells the Unix check knows, tmux.IsShellCommand: bash, sh, zsh, nu
+// and the rest, so git-bash at the prompt counts as one) or a console host: a program is running there. Nested shells alone (a person typed "cmd" at
 // the prompt an exited agent left, #378) are still a bare prompt, which would run typed text as a command. A process whose image
 // can't be read counts as a program. A process is taken as a child only when it started after its parent: Windows reuses pids,
 // and a process left by an earlier owner of the parent's pid is not under it. The walk visits each pid once and stops at
@@ -109,13 +114,26 @@ func runsNonShell(pid int) (bool, error) {
 			}
 			seen[c] = true
 			image, imageOK := processImage(c)
-			if !ok || !imageOK || !isShellImage(image) || n.depth+1 >= maxShellTreeDepth {
+			if imageOK && consoleHostImage(image) {
+				continue // the console host of a program's own console, not a program the person runs (#205 review)
+			}
+			if !ok || !imageOK || !tmux.IsShellCommand(image) || n.depth+1 >= maxShellTreeDepth {
 				return true, nil
 			}
 			queue = append(queue, node{c, start, n.depth + 1})
 		}
 	}
 	return false, nil
+}
+
+// consoleHostImage says whether an image is Windows' console host (conhost.exe, or OpenConsole.exe, Windows Terminal's), which a
+// console program can have as a child: it is not a program the person runs.
+func consoleHostImage(image string) bool {
+	switch strings.ToLower(filepath.Base(image)) {
+	case "conhost.exe", "openconsole.exe":
+		return true
+	}
+	return false
 }
 
 // maxShellTreeDepth bounds runsNonShell's walk: shells nested this deep are not a person at a prompt.

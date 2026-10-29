@@ -3,6 +3,8 @@
 package ptymanager
 
 import (
+	"os/exec"
+	"strings"
 	"testing"
 	"time"
 
@@ -79,4 +81,33 @@ func TestWindowsShellIdleANestedShellIsStillABarePrompt(t *testing.T) {
 	require.NoError(t, b.SendInput(terminalinput.Unclassified, name, []byte("ping -n 6 127.0.0.1"+EnterKey)))
 	require.Eventually(t, func() bool { idle, _, ok := b.ShellIdle(name); return ok && !idle }, 20*time.Second, 200*time.Millisecond, "a program in the nested shell is busy")
 	require.Eventually(t, func() bool { idle, _, ok := b.ShellIdle(name); return ok && idle }, 20*time.Second, 200*time.Millisecond, "and a bare prompt again once it ends")
+}
+
+// #205 review: a console host under the shell is not a program the person runs, and the nested shells the Unix check knows (git-bash's
+// bash, sh, zsh) are a bare prompt as cmd and PowerShell are. A program in git-bash is busy.
+func TestWindowsShellIdleCountsGitBashAsAShellAndIgnoresConsoleHosts(t *testing.T) {
+	for _, image := range []string{`C:\Windows\System32\conhost.exe`, `C:\Program Files\WindowsApps\Microsoft.WindowsTerminal\OpenConsole.exe`, `CONHOST.EXE`} {
+		assert.True(t, consoleHostImage(image), image)
+	}
+	for _, image := range []string{`C:\Windows\System32\cmd.exe`, `C:\x\node.exe`, `conhost.exe.bak`} {
+		assert.False(t, consoleHostImage(image), image)
+	}
+
+	bash, err := exec.LookPath("bash.exe")
+	if err != nil || !strings.Contains(strings.ToLower(bash), `\git\`) {
+		t.Skip("no git-bash on PATH")
+	}
+	naming.SetDefaultLogDir(t.TempDir())
+	b := NewPTYBackend()
+	t.Cleanup(func() { _ = b.Close() })
+	name := "claude-205-gitbash"
+	require.NoError(t, b.Spawn(name, "claude", t.TempDir(), "0381", "powershell.exe -NoProfile", 120, 40))
+	require.Eventually(t, func() bool { idle, _, ok := b.ShellIdle(name); return ok && idle }, 20*time.Second, 200*time.Millisecond, "a bare PowerShell")
+	require.NoError(t, b.SendInput(terminalinput.Unclassified, name, []byte("& '"+bash+"' --norc"+EnterKey)))
+	time.Sleep(3 * time.Second) // bash starts
+	idle, _, ok := b.ShellIdle(name)
+	require.True(t, ok)
+	assert.True(t, idle, "git-bash at the prompt, nothing else running: a bare prompt")
+	require.NoError(t, b.SendInput(terminalinput.Unclassified, name, []byte("sleep 6"+EnterKey)))
+	require.Eventually(t, func() bool { idle, _, ok := b.ShellIdle(name); return ok && !idle }, 20*time.Second, 200*time.Millisecond, "a program in git-bash is busy")
 }
