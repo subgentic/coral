@@ -211,6 +211,8 @@ export async function initCloud() {
     state.account = { email: s.email };
     const actions = document.querySelector('.top-bar-actions');
     if (actions && !document.getElementById('cloud-account-menu')) actions.append(buildAccountMenu(s.email));
+    // The hub's rolled-up Analytics (#11018): "Usage", a plain link to /usage after Saved for later, only when GET /api/account says analytics_tab === true (a strict boolean, as artifacts_frame is read); anything else adds no item
+    fetch('/api/account', { headers: { Accept: 'application/json' } }).then(r => r.ok ? r.json() : null).then(d => { const saved = d && d.analytics_tab === true && document.querySelector('#cloud-account-menu a[href="/saved"]'); if (saved) saved.after(h('a', { className: 'menu-item overflow-menu-item', role: 'menuitem', href: '/usage', text: 'Usage', id: 'cloud-account-usage' })); }).catch(() => {});
     importOnce('./artifacts_tab.js').then(m => m.initArtifactsTab()).catch(() => {}); // not waited for: the Artifacts tab appears when the account says it has one (#6236)
     importOnce('./team_link_flag.js').then(m => m.initTeamLinkFlag()).catch(() => {}); // not waited for: "Link team..." appears in a team's menu when the account says so (#9888)
     return true;
