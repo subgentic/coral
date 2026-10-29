@@ -9,7 +9,7 @@ import { formatTokens, formatCost } from './format.js';
 import { getCachedAgentAvailability } from './team_availability.js';
 import { isGoneAsleep } from './terminal_gone.js';
 import { keyLabel, sessionTeamKey } from './server_base.js';
-import { setClassName, setTitle, setAttr, setText } from './dom_write.js';
+import { setClassName, setTitle, setAttr } from './dom_write.js';
 
 /* ── Session identity ───────────────────────────────────────────────── */
 const GOAL_LINE_MAX = 140;
@@ -211,13 +211,6 @@ export function terminalDotClass(s) {
 
 /** The agent header's status dot (#4327, from the #4276 audit): its class, its tip and its accessible name all say the state in the sidebar's
  *  words, so it is not colour only. The header draws only the dot (the operator, #9927): there is no word beside it. */
-const STATE_WORD = { your_turn: 'Ready', task_idle: 'Idle', waiting_on: 'Waiting', check_terminal: 'Check' }; // the long labels, in a word that fits a phone's header
-// The state word is text only on a phone's chat header (<= 600 px, #10885 item 10): everywhere else the header draws only the dot (the operator, #9927), and its text carries no word. It follows the width, lazily: no listener before the first dot is drawn.
-let _phoneWord = null;
-function paintStateWord(word) {
-    if (!_phoneWord) { _phoneWord = matchMedia('(max-width: 600px)'); _phoneWord.addEventListener('change', () => { const w = document.getElementById('terminal-status-word'); if (w) paintStateWord(w); }); }
-    setText(word, _phoneWord.matches ? word.dataset.word || '' : '');
-}
 export function applyTerminalDot(dot, s) {
     if (!dot) return;
     const info = sessionStateInfo(s || {});
@@ -225,8 +218,6 @@ export function applyTerminalDot(dot, s) {
     setTitle(dot, info.label);
     setAttr(dot, 'role', 'img');
     setAttr(dot, 'aria-label', info.label);
-    const word = document.getElementById('terminal-status-word'); // a phone's header says it beside the dot (#10885: a hollow circle with no label)
-    if (word) { setAttr(word, 'data-word', STATE_WORD[info.key] || info.label); paintStateWord(word); }
     // Stop (Escape) has something to stop only while the agent works, asks or is stuck: in the chat view it is hidden otherwise (#7065); the terminal's Esc key stays
     setAttr(document.getElementById('command-pane'), 'data-can-stop', ['working', 'needs_input', 'check_terminal', 'stuck'].includes(info.key) ? 'true' : 'false');
 }

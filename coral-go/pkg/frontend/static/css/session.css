@@ -1781,7 +1781,6 @@ body .terminal-header { flex-wrap: wrap; height: auto; min-height: 36px; row-gap
 .agent-bar-more { display: none; } /* offered up to 1100 px while there are details, and on a phone (below) */
 @media (min-width: 640px) { .terminal-header:has(#agent-phone-details[hidden]) .agent-bar-more { display: none !important; } } /* a computer's header offers it only while there is something behind it; a phone's also holds Search and the panel (mobile.css) */
 .live-pills-stack > .selection-pause-badge { position: static; opacity: 0.9; } /* under the header with the other pills, not over its branch name */
-#live-session-view:has(#live-history-messages > .chat-empty) .agent-phone-details { display: none; } /* a fresh chat (nothing said yet, the 'Say hello' line is up) has no Details bar above the first message: a collapsed bar with nothing under it looked empty (Mobile tester, #10041); it is back with the first message */
 .agent-phone-details .facts { padding-bottom: var(--space-md); }
 .agent-phone-details .facts dd { overflow-wrap: anywhere; }
 @media (max-height: 500px) { .agent-phone-details { display: none !important; } }

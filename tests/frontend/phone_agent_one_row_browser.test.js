@@ -12,10 +12,10 @@ const BASE = require('./test_base').BASE;
         await Emulation.setDeviceMetricsOverride({ width: w, height: 844, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
         await ev(`window.__coralReady.then(() => true)`);
-        await ev(`document.documentElement.style.fontSize = '${fs}px'; window.__m.add('orchestrator', 'A', 12, { sleeping: false, session_id: 'o-id', board_project: 'coral-hub' }); true`);
-        await waitFor(`(window.__qaState.liveSessions || []).some(s => s.name === 'orchestrator')`, 'the agent', 10000);
-        await ev(`window.selectLiveSession('orchestrator', 'claude', 'o-id', 'local'); true`);
-        await waitFor(`document.getElementById('terminal-header-label')?.textContent === 'orchestrator' && document.querySelector('.terminal-header').getClientRects().length > 0`, `${w}@${fs}: the agent's header`, 10000);
+        await ev(`document.documentElement.style.fontSize = '${fs}px'; window.__m.add('orchestrator-with-a-long-name', 'A', 12, { sleeping: false, session_id: 'o-id', board_project: 'a-team-with-a-long-name' }); true`);
+        await waitFor(`(window.__qaState.liveSessions || []).some(s => s.name === 'orchestrator-with-a-long-name')`, 'the agent', 10000);
+        await ev(`window.selectLiveSession('orchestrator-with-a-long-name', 'claude', 'o-id', 'local'); true`);
+        await waitFor(`document.getElementById('terminal-header-label')?.textContent === 'orchestrator-with-a-long-name' && document.querySelector('.terminal-header').getClientRects().length > 0`, `${w}@${fs}: the agent's header`, 10000);
         await waitFor(`document.querySelector('#live-session-view .terminal-header').getBoundingClientRect().height > 30`, `${w}@${fs}: the row has its height`, 4000);
         await sleep(400); // sleep-ok: the row settles over frames after the first draw
     };
@@ -37,10 +37,12 @@ const BASE = require('./test_base').BASE;
             const names = m.shown.map(s => s[0]);
             for (const n of ['agent-bar-menu', 'back', 'terminal-header-identity', 'live-view-btn-chat', 'live-view-btn-terminal', 'agent-bar-more']) assert.ok(names.includes(n), `${fs}: ${n} is in the row: ` + JSON.stringify(m.shown));
             for (const [n, b] of m.shown) if (/menu|back|live-view|more/.test(n)) assert.ok(b.r - b.l >= 43 && b.b - b.t >= 43, `${fs}: ${n} is a 44 px target: ` + JSON.stringify(b));
+            { // ONE row at both text sizes, a long name and a long team too: no control wraps under another (the Mobile Beta Tester: 91 px, then three rows)
+                const tops = m.shown.filter(s => /menu|back|live-view-btn-chat|more/.test(s[0])).map(s => (s[1].t + s[1].b) / 2);
+                assert.ok(Math.max(...tops) - Math.min(...tops) <= 2, `${fs}: one centre line, the menu, back, switch and ⋯ on one row: ` + JSON.stringify(m.shown));
+            }
             if (fs === 16) {
                 assert.ok(m.header.b - m.header.t <= 60, `100%: the row is about 56 px: ` + JSON.stringify(m.header));
-                const tops = m.shown.filter(s => /menu|back|live-view-btn-chat|more/.test(s[0])).map(s => (s[1].t + s[1].b) / 2);
-                assert.ok(Math.max(...tops) - Math.min(...tops) <= 2, `100%: one centre line: ` + JSON.stringify(m.shown));
                 assert.ok(m.under && m.under.inView && !m.under.inHeader && !m.under.inDetails, `100%: the chat starts right under the row: ` + JSON.stringify(m.under));
                 assert.ok(m.detailsH <= 1, `100%: Details is closed under the row: ${m.detailsH}`);
             }
@@ -85,6 +87,13 @@ const BASE = require('./test_base').BASE;
         assert.equal(g.detailsPos, 'absolute', '1000: the Details are a card over the chat: ' + JSON.stringify(g));
         assert.ok(g.paneTop === before && Math.abs(g.detailsTop - g.headerBottom) <= 2, `1000: opening them moves nothing under the header: ` + JSON.stringify(g));
         await ev(`document.getElementById('agent-bar-more').click(); true`);
+        // a chat with nothing said yet (the Mobile Beta Tester's server): ⋯ still opens the card
+        await ev(`window.__m.add('empty-chat', 'E', 0, { sleeping: false, session_id: 'e-id', board_project: 'a-team' }); true`);
+        await waitFor(`(window.__qaState.liveSessions || []).some(s => s.name === 'empty-chat')`, '1000: the empty chat agent', 10000);
+        await ev(`window.selectLiveSession('empty-chat', 'claude', 'e-id', 'local'); true`);
+        await waitFor(`document.getElementById('terminal-header-label')?.textContent === 'empty-chat' && getComputedStyle(document.getElementById('agent-bar-more')).display !== 'none'`, '1000: ⋯ for the empty chat', 10000);
+        await ev(`(() => { const m = document.getElementById('agent-bar-more'); if (m.getAttribute('aria-expanded') !== 'true') m.click(); return true; })()`);
+        await waitFor(`document.getElementById('agent-phone-details').open && getComputedStyle(document.getElementById('agent-phone-details')).display !== 'none'`, '1000: ⋯ opens the card even in a chat with nothing said yet', 4000);
         // the paused chip: under the header, over none of its text
         for (const [w, mobile] of [[1000, false], [390, true]]) {
             if (w === 390) await open(390, 16, true);

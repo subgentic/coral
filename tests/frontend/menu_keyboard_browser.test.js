@@ -12,6 +12,7 @@ const BASE = require('./test_base').BASE;
     const { settle } = require('./helpers/wait').bind(ev);
     const vis = sel => `[...document.querySelectorAll(${JSON.stringify(sel)})].filter(e => e.getClientRects().length > 0 && e.getBoundingClientRect().width > 0)`;
     const shot = async name => { const dir = process.env.CORAL_SCREENSHOT_DIR || (process.env.RUNNER_TEMP && path.join(process.env.RUNNER_TEMP, 'out')); if (!dir) return; fs.mkdirSync(dir, { recursive: true }); for (const theme of ['light', 'dark']) { await setTheme(ev, theme); fs.writeFileSync(path.join(dir, `${name}-${theme}.png`), Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); } await setTheme(ev, 'dark'); };
+    let HB = 'top-menu-btn'; // the hamburger on screen: under 640 px, while an agent is open, it is the agent row's own menu button (#11056)
     const open = async width => {
         await Emulation.setDeviceMetricsOverride({ width, height: 844, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
@@ -19,6 +20,7 @@ const BASE = require('./test_base').BASE;
         await waitFor(`(window.__qaState.liveSessions || []).some(s => s.name === 'Orchestrator')`, 'the agent', 8000);
         await ev(`window.selectLiveSession('Orchestrator', 'claude', 'Orchestrator-id', 'local'); true`);
         await waitFor(`!!document.getElementById('command-input') && document.getElementById('command-input').getClientRects().length > 0`, 'the composer', 12000);
+        HB = await ev(`getComputedStyle(document.getElementById('agent-bar-menu')).display !== 'none' ? 'agent-bar-menu' : 'top-menu-btn'`);
     };
     // an Enter keyDown without its text does not activate a button: it carries '\r' (#9116)
     const press = async (key, vk) => { await client.Input.dispatchKeyEvent({ type: 'keyDown', key, code: key, windowsVirtualKeyCode: vk, ...(key === 'Enter' ? { text: '\r', unmodifiedText: '\r' } : {}) }); await client.Input.dispatchKeyEvent({ type: 'keyUp', key, code: key, windowsVirtualKeyCode: vk }); await settle(120); };
@@ -29,8 +31,8 @@ const BASE = require('./test_base').BASE;
         // 1. the phone hamburger: its name says the view, and it has a menu keyboard (#9116)
         try {
             await open(390);
-            assert.equal(await ev(`document.getElementById('top-menu-btn').getAttribute('aria-label')`), 'Agents, menu', 'the hamburger is named by the view it shows');
-            await ev(`document.getElementById('top-menu-btn').focus(); true`);
+            assert.equal(await ev(`document.getElementById('${HB}').getAttribute('aria-label')`), 'Agents, menu', 'the hamburger is named by the view it shows');
+            await ev(`document.getElementById('${HB}').focus(); true`);
             await press('ArrowDown', KEYS.ArrowDown);
             await waitFor(`!document.getElementById('nav-more-menu').hidden`, 'ArrowDown on the button opens the menu', 4000);
             const first = await active(); const items = await ev(`[...document.querySelectorAll('#nav-more-menu .nav-more-item')].filter(i => i.getClientRects().length).map(i => i.lastElementChild.textContent.trim())`);
@@ -45,18 +47,18 @@ const BASE = require('./test_base').BASE;
             await press('Home', KEYS.Home); assert.equal(await active(), items[0], 'Home goes to the first');
             await press('Escape', KEYS.Escape);
             await waitFor(`document.getElementById('nav-more-menu').hidden`, 'Escape closes it', 4000);
-            assert.equal(await active(), 'top-menu-btn', 'Escape puts the focus back on the button');
+            assert.equal(await active(), HB, 'Escape puts the focus back on the button');
             // ArrowUp on the closed button opens it on the last entry
             await press('ArrowUp', KEYS.ArrowUp); await waitFor(`!document.getElementById('nav-more-menu').hidden`, 'ArrowUp opens it', 4000);
             assert.equal(await active(), items.at(-1), 'ArrowUp on the button opens the menu on its last entry');
             await press('Escape', KEYS.Escape);
             // a choice: Inbox. The menu closes, the focus goes back to the button, which now names Inbox
-            await ev(`document.getElementById('top-menu-btn').click(); true`); await waitFor(`!document.getElementById('nav-more-menu').hidden`, 'the menu', 4000);
+            await ev(`document.getElementById('${HB}').click(); true`); await waitFor(`!document.getElementById('nav-more-menu').hidden`, 'the menu', 4000);
             await ev(`[...document.querySelectorAll('#nav-more-menu .nav-more-item')].find(i => i.lastElementChild.textContent.trim() === 'Inbox').focus(); true`);
             await press('Enter', 13);
             await waitFor(`document.getElementById('top-menu-label').textContent === 'Inbox' && document.getElementById('nav-more-menu').hidden`, 'Inbox opens and the menu closes', 6000);
-            assert.equal(await active(), 'top-menu-btn', 'choosing an entry puts the focus back on the button');
-            assert.equal(await ev(`document.getElementById('top-menu-btn').getAttribute('aria-label')`), 'Inbox, menu', 'and the button now names Inbox');
+            assert.equal(await active(), 'top-menu-btn', 'choosing an entry (the view changes, the agent page goes) puts the focus on the top bar\'s button');
+            assert.equal(await ev(`document.getElementById('${HB}').getAttribute('aria-label')`), 'Inbox, menu', 'and the button now names Inbox');
             console.log('PASS 390: the hamburger is named by its view and has a menu keyboard');
         } catch (e) { failures.push('390 hamburger: ' + e.message); console.error(failures.at(-1)); }
         // 2. the composer's chevron: state, role, keyboard (#9116)
