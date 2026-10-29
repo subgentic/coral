@@ -7,7 +7,7 @@ import { showToast } from './utils.js';
 import { postJson } from './api.js';
 import { importOnce } from './import_once.js';
 import { pollEvery } from './overload.js';
-import { browserLocal } from './safe_storage.js';
+import { browserLocal, browserSession } from './safe_storage.js';
 
 // The pure rules are a lazy module of their own (a lazily loaded module may only statically import startup modules).
 const { passwordProblem, strengthOf } = await importOnce('./password_rules.js');
@@ -79,6 +79,7 @@ export function errorText(res, fallback) {
 // ── The one-time prompt ──────────────────────────────────────────────────────────────────────────────
 
 const _notNowGet = () => { try { return browserLocal.get(NOT_NOW_KEY) === '1'; } catch { return false; } };
+const _laterGet = () => { try { return browserSession.get(NOT_NOW_KEY) === '1'; } catch { return false; } }; // this tab's session: a browser on another computer is asked again in a new session, not on every page load (#10930)
 const _notNowSet = () => { try { browserLocal.set(NOT_NOW_KEY, '1'); } catch { /* private mode: asked again, harmless */ } };
 
 /** GET /api/system/auth-status, or null when it cannot be read. */
@@ -95,7 +96,7 @@ export async function maybePromptSetPassword() {
     if (document.getElementById('set-password-modal')) return;
     const st = await authStatus();
     if (!st || st.authenticated === false || st.password_set !== false) return;
-    if (st.local === true && _notNowGet()) return;
+    if ((st.local === true && _notNowGet()) || _laterGet()) return;
     showSetPasswordModal({ local: st.local === true });
 }
 
@@ -164,7 +165,7 @@ export function showSetPasswordModal({ local = false } = {}) {
         if (back) back.focus();
         document.dispatchEvent(new CustomEvent('coral:password-prompt-closed'));
     };
-    const notNow = () => { if (local) _notNowSet(); close(); };
+    const notNow = () => { if (local) _notNowSet(); else try { browserSession.set(NOT_NOW_KEY, '1'); } catch { /* asked again: harmless */ } close(); };
     const onKey = e => {
         if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); notNow(); return; }
         if (e.key !== 'Tab') return;
