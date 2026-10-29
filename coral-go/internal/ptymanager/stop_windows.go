@@ -145,21 +145,38 @@ func shellNamed(image string) bool {
 	return tmux.IsShellCommand(image) || strings.EqualFold(filepath.Base(image), "wsl.exe")
 }
 
-// verifiedWindowsShell says whether an image is Windows PowerShell, PowerShell 7 or cmd at its own install place: under the Windows
-// folder (System32, SysWOW64, WindowsPowerShell), or PowerShell 7 under Program Files\PowerShell. Compared cleaned and case-folded, by
-// prefix. Any other shell-named image is a shell of unknown contents (shellTree).
+// verifiedWindowsShell says whether an image is Windows PowerShell, PowerShell 7 or cmd in its own fixed folder, never merely somewhere
+// under the Windows folder (C:\Windows\Temp is writable by ordinary users, Security on #216):
+//   - powershell.exe: System32\WindowsPowerShell\v1.0 or SysWOW64\WindowsPowerShell\v1.0 (and System32 or SysWOW64 themselves);
+//   - cmd.exe: System32 or SysWOW64;
+//   - pwsh.exe: Program Files\PowerShell\<version>.
+//
+// Compared cleaned and case-folded, folder by folder. Any other shell-named image is a shell of unknown contents (shellTree).
 func verifiedWindowsShell(image string) bool {
 	p := strings.ToLower(filepath.Clean(image))
-	switch filepath.Base(p) {
-	case "powershell.exe", "cmd.exe", "pwsh.exe":
-	default:
+	dir, base := filepath.Dir(p), filepath.Base(p)
+	in := func(dirs ...string) bool {
+		for _, d := range dirs {
+			if dir == strings.ToLower(filepath.Clean(d)) {
+				return true
+			}
+		}
 		return false
 	}
-	if win, err := windows.GetSystemWindowsDirectory(); err == nil && strings.HasPrefix(p, strings.ToLower(filepath.Clean(win))+`\`) {
-		return filepath.Base(p) != "pwsh.exe"
-	}
-	if pf, err := windows.KnownFolderPath(windows.FOLDERID_ProgramFiles, 0); err == nil && strings.HasPrefix(p, strings.ToLower(filepath.Join(pf, "PowerShell"))+`\`) {
-		return filepath.Base(p) == "pwsh.exe"
+	switch base {
+	case "powershell.exe", "cmd.exe":
+		win, err := windows.GetSystemWindowsDirectory()
+		if err != nil {
+			return false
+		}
+		sys32, wow64 := filepath.Join(win, "System32"), filepath.Join(win, "SysWOW64")
+		if base == "cmd.exe" {
+			return in(sys32, wow64)
+		}
+		return in(sys32, wow64, filepath.Join(sys32, "WindowsPowerShell", "v1.0"), filepath.Join(wow64, "WindowsPowerShell", "v1.0"))
+	case "pwsh.exe":
+		pf, err := windows.KnownFolderPath(windows.FOLDERID_ProgramFiles, 0)
+		return err == nil && filepath.Dir(dir) == strings.ToLower(filepath.Join(pf, "PowerShell"))
 	}
 	return false
 }

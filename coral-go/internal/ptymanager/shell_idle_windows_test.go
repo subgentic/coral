@@ -157,6 +157,9 @@ func TestWindowsShellsAreMatchedByPlace(t *testing.T) {
 		filepath.Join(win, "System32", "bash.exe"), filepath.Join(win, "System32", "wsl.exe"), filepath.Join(pf, "Git", "bin", "bash.exe"),
 		filepath.Join(pf, "Git", "usr", "bin", "bash.exe"), `C:\msys64\usr\bin\zsh.exe`, `C:\cygwin64\bin\sh.exe`, `C:\tools\cmd.exe`,
 		`C:\Users\x\scoop\apps\pwsh\current\pwsh.exe`, filepath.Join(win, "System32", "pwsh.exe"),
+		// a program renamed like a shell in a user-writable place under the Windows folder (Security on #216)
+		filepath.Join(win, "Temp", "cmd.exe"), filepath.Join(win, "Temp", "powershell.exe"), filepath.Join(win, "System32", "Tasks", "cmd.exe"),
+		filepath.Join(pf, "PowerShell", "7", "sub", "pwsh.exe"),
 	} {
 		assert.False(t, verifiedWindowsShell(image), image)
 		assert.True(t, shellNamed(image), "%s is named like a shell: unknown contents", image)
