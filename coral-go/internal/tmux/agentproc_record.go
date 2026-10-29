@@ -16,6 +16,9 @@ import (
 type Candidate struct {
 	AgentProc
 	Program string // the process name ps reports (a path on macOS)
+	// Under is the name of the nested shell the program runs inside ("" for a direct child of the pane's shell). A program under a nested shell is what the notice check exists to stop,
+	// so recording it needs the Operator's explicit acknowledgement, and the bulk action never records it.
+	Under string
 }
 
 // ErrCandidateChanged: the foreground program is not the one that was shown (it ended, another started, or there is not exactly one).
@@ -26,7 +29,7 @@ var ErrNoCandidate = errors.New("there is no single foreground program in the ag
 
 // candidateOf is the single foreground program below the pane's shell, or the reason there is none.
 func candidateOf(t *procTable, shell int) (Candidate, string) {
-	progs, deep := programsBelow(t, shell)
+	progs, deep := programsBelowUnder(t, shell)
 	switch {
 	case deep:
 		return Candidate{}, "the terminal's shells are nested too deep to read"
@@ -35,8 +38,8 @@ func candidateOf(t *procTable, shell int) (Candidate, string) {
 	case len(progs) > 1:
 		return Candidate{}, "several programs are in the foreground of the terminal"
 	}
-	e := t.byPID[progs[0]]
-	return Candidate{AgentProc: AgentProc{PID: progs[0], Start: e.start}, Program: e.comm}, ""
+	e := t.byPID[progs[0].pid]
+	return Candidate{AgentProc: AgentProc{PID: progs[0].pid, Start: e.start}, Program: e.comm, Under: progs[0].under}, ""
 }
 
 // recordCandidate records want as the session's agent when it is still exactly the one foreground program.

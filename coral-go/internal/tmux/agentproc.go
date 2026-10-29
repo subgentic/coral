@@ -235,12 +235,18 @@ func watchForAgent(ctx context.Context, session string, findShell func(context.C
 // nestedShellWalk bounds the walks below a pane's shell.
 const nestedShellWalk = nestedShellDepth
 
-// programsBelow lists the foreground programs (a '+' in ps state, not shells) below the pane's shell, walking through the shells in between: the top ones, not their own children
+// fgProg is a foreground program below the pane's shell and the shell it runs inside: under is the name of the first shell on the way ("" for a direct child of the pane's shell).
+type fgProg struct {
+	pid   int
+	under string
+}
+
+// programsBelowUnder lists the foreground programs (a '+' in ps state, not shells) below the pane's shell, walking through the shells in between: the top ones, not their own children
 // (an agent's tools run in its foreground group too, and are its). deep is true when the walk hit its depth bound.
-func programsBelow(t *procTable, shell int) (progs []int, deep bool) {
+func programsBelowUnder(t *procTable, shell int) (progs []fgProg, deep bool) {
 	seen := map[int]bool{}
-	var walk func(pid, depth int)
-	walk = func(pid, depth int) {
+	var walk func(pid, depth int, under string)
+	walk = func(pid, depth int, under string) {
 		if seen[pid] {
 			return
 		}
@@ -252,13 +258,26 @@ func programsBelow(t *procTable, shell int) (progs []int, deep bool) {
 		for _, c := range t.children[pid] {
 			e := t.byPID[c]
 			if IsShellCommand(e.comm) {
-				walk(c, depth+1)
+				u := under
+				if u == "" {
+					u = ProgramBase(e.comm)
+				}
+				walk(c, depth+1, u)
 			} else if strings.Contains(e.stat, "+") {
-				progs = append(progs, c)
+				progs = append(progs, fgProg{c, under})
 			}
 		}
 	}
-	walk(shell, 0)
+	walk(shell, 0, "")
+	return progs, deep
+}
+
+// programsBelow is programsBelowUnder's pids.
+func programsBelow(t *procTable, shell int) (progs []int, deep bool) {
+	list, deep := programsBelowUnder(t, shell)
+	for _, p := range list {
+		progs = append(progs, p.pid)
+	}
 	return progs, deep
 }
 

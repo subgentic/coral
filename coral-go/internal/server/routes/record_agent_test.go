@@ -185,3 +185,42 @@ func TestBulkRecordRecordsTheAgentsWhoseProgramIsTheirCLIAndListsTheRest(t *test
 	assert.Empty(t, out["recorded"])
 	assert.Len(t, out["left"], 1)
 }
+
+// A program that runs inside a nested shell is recorded only on the Operator's explicit acknowledgement; a direct child needs the plain confirm; bulk never records the nested one.
+func TestRecordingAProgramUnderANestedShellNeedsTheAcknowledgement(t *testing.T) {
+	srv, term, ss, nameA, nameB := recordFixture(t)
+	settings, err := ss.GetSettingsForCLI(context.Background())
+	require.NoError(t, err)
+	term.paused[nameA], term.paused[nameB] = true, true
+	// A is under a nested bash, and its image equals the resolved CLI (a hand-started copy of the real CLI); B is a direct child.
+	term.cand[nameA] = ptymanager.AgentCandidate{PID: 100, Start: "s1", Program: "claude", Under: "bash", Image: settings["cli_path_claude"]}
+	term.cand[nameB] = ptymanager.AgentCandidate{PID: 200, Start: "s2", Program: "codex", Image: settings["cli_path_codex"]}
+
+	out := getRecordJSON(t, srv+"/api/sessions/live/"+recordSIDa+"/agent-candidate")
+	cand, _ := out["candidate"].(map[string]any)
+	require.NotNil(t, cand)
+	assert.Equal(t, "bash", cand["under"], "the dashboard is told which shell the program runs inside")
+
+	code, body := postRecordJSON(t, srv+"/api/sessions/live/"+recordSIDa+"/record-agent", map[string]any{"pid": 100, "start": "s1"})
+	assert.Equal(t, http.StatusBadRequest, code, "without the acknowledgement")
+	assert.Equal(t, "acknowledge_nested", body["code"])
+	assert.Equal(t, "bash", body["under"])
+	assert.NotContains(t, term.recorded, nameA, "nothing was recorded")
+
+	// The bulk action never records it, even though its image is the CLI; the direct child is recorded.
+	code, bulk := postRecordJSON(t, srv+"/api/sessions/record-agents", map[string]any{})
+	require.Equal(t, http.StatusOK, code)
+	recorded, _ := bulk["recorded"].([]any)
+	left, _ := bulk["left"].([]any)
+	require.Len(t, recorded, 1)
+	assert.Equal(t, nameB, recorded[0].(map[string]any)["session"], "the direct child with the CLI's image")
+	require.Len(t, left, 1)
+	assert.Equal(t, nameA, left[0].(map[string]any)["session"])
+	assert.Contains(t, left[0].(map[string]any)["reason"], "needs the button")
+	assert.NotContains(t, term.recorded, nameA)
+
+	// With the acknowledgement the Operator's request records it.
+	code, _ = postRecordJSON(t, srv+"/api/sessions/live/"+recordSIDa+"/record-agent", map[string]any{"pid": 100, "start": "s1", "acknowledge_nested": true})
+	assert.Equal(t, http.StatusOK, code)
+	assert.Equal(t, 100, term.recorded[nameA].PID)
+}

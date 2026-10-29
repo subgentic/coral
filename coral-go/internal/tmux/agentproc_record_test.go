@@ -63,3 +63,27 @@ func TestProgramBase(t *testing.T) {
 	assert.Equal(t, "claude.exe", ProgramBase(`C:\Users\x\claude.exe`))
 	assert.Equal(t, "claude", ProgramBase("claude"))
 }
+
+// Under: the nested shell on the way to the program ("" for a direct child of the pane's shell).
+func TestCandidateUnderNamesTheNestedShell(t *testing.T) {
+	direct, why := candidateOf(table("  600     1 Ss   "+t0+" -zsh", "  700   600 S+   "+t1+" claude"), 600)
+	assert.Empty(t, why)
+	assert.Empty(t, direct.Under, "a direct child of the pane's shell")
+
+	nested, why := candidateOf(table("  600     1 Ss   "+t0+" -zsh", "  710   600 S    "+t2+" bash", "  711   710 S+   "+t2+" claude"), 600)
+	assert.Empty(t, why)
+	assert.Equal(t, "bash", nested.Under, "a hand-started copy of the CLI inside a bash")
+
+	deeper, _ := candidateOf(table("  600     1 Ss   "+t0+" -zsh", "  710   600 S    "+t2+" bash", "  711   710 S    "+t2+" /bin/zsh", "  712   711 S+   "+t2+" claude"), 600)
+	assert.Equal(t, "bash", deeper.Under, "the first shell on the way")
+
+	got, err := recordCandidate(table("  600     1 Ss   "+t0+" -zsh", "  710   600 S    "+t2+" bash", "  711   710 S+   "+t2+" claude"), 600, "claude-under", AgentProc{PID: 711, Start: t2})
+	assert.NoError(t, err)
+	assert.Equal(t, "bash", got.Under, "the record reports where the program ran, for the log")
+	t.Cleanup(func() {
+		ForgetAgentProc("claude-under")
+		agentRecs.Lock()
+		delete(agentRecs.m, "claude-under")
+		agentRecs.Unlock()
+	})
+}

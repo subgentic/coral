@@ -82,6 +82,8 @@ func (h *SessionsHandler) RecordAgent(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		PID   int    `json:"pid"`
 		Start string `json:"start"`
+		// AcknowledgeNested: the Operator ticked "I know this is the agent, not something I started by hand" for a program running inside a nested shell.
+		AcknowledgeNested bool `json:"acknowledge_nested"`
 	}
 	if err := decodeJSON(r, &body); err != nil || body.PID <= 0 || body.Start == "" {
 		errBadRequest(w, "pid and start (as the agent-candidate answer gave them) are required")
@@ -92,10 +94,20 @@ func (h *SessionsHandler) RecordAgent(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusUnprocessableEntity, map[string]any{"ok": false, "code": "not_supported", "error": "this terminal cannot record an agent"})
 		return
 	}
+	// A program running inside a nested shell is what the notice check exists to stop: it is recorded only on the Operator's explicit acknowledgement (Security on #391).
+	under := ""
+	if cur, _, cerr := rec.AgentCandidate(r.Context(), name, ls.AgentType, ls.SessionID); cerr == nil && cur.PID == body.PID {
+		under = cur.Under
+	}
+	if under != "" && !body.AcknowledgeNested {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "code": "acknowledge_nested", "under": under,
+			"error": "this program is running inside " + under + ", a shell started in the terminal, not directly in the agent's terminal: acknowledge it to record it"})
+		return
+	}
 	got, err := rec.RecordAgent(r.Context(), name, ls.AgentType, ls.SessionID, ptymanager.AgentCandidate{PID: body.PID, Start: body.Start})
 	switch {
 	case err == nil:
-		slog.Info("the Operator recorded an agent's process", "session", name, "pid", got.PID, "program", got.Program)
+		slog.Info("the Operator recorded an agent's process", "session", name, "pid", got.PID, "program", got.Program, "under_nested_shell", under, "acknowledged", body.AcknowledgeNested)
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "pid": got.PID, "program": got.Program})
 	case errors.Is(err, ptymanager.ErrCandidateChanged), errors.Is(err, ptymanager.ErrNoCandidate):
 		slog.Warn("the Operator's record of an agent's process was refused: the foreground changed", "session", name, "pid", body.PID, "error", err)
@@ -153,6 +165,11 @@ func (h *SessionsHandler) RecordAgents(w http.ResponseWriter, r *http.Request) {
 			continue
 		case why != "":
 			left = append(left, leftAgent{name, why})
+			continue
+		}
+		if cand.Under != "" {
+			// A hand-started copy of the real CLI is still not this session's agent: a program under a nested shell is never recorded in bulk.
+			left = append(left, leftAgent{name, "needs the button: the program runs inside " + cand.Under + ", a shell started in the terminal"})
 			continue
 		}
 		cli, lerr := agent.LaunchCLI(settings, ls.AgentType)

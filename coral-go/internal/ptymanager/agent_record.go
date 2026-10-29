@@ -14,7 +14,9 @@ type AgentCandidate struct {
 	PID     int    `json:"pid"`
 	Start   string `json:"start"`
 	Program string `json:"program"`
-	Image   string `json:"-"`
+	// Under is the nested shell the program runs inside ("" for a direct child of the terminal's shell). Recording such a program needs the Operator's explicit acknowledgement.
+	Under string `json:"under"`
+	Image string `json:"-"`
 }
 
 // ErrCandidateChanged and ErrNoCandidate are tmux's: the foreground program is not the one shown / there is not exactly one.
@@ -32,7 +34,7 @@ type AgentRecorder interface {
 }
 
 func fromTmux(c tmux.Candidate) AgentCandidate {
-	return AgentCandidate{PID: c.PID, Start: c.Start, Program: c.Program, Image: tmux.ProgramImage(c.PID)}
+	return AgentCandidate{PID: c.PID, Start: c.Start, Program: c.Program, Under: c.Under, Image: tmux.ProgramImage(c.PID)}
 }
 
 // AgentCandidate implements AgentRecorder for tmux.
