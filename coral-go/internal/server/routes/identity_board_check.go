@@ -209,29 +209,26 @@ type errBody struct{ err error }
 
 func (e *errBody) Read([]byte) (int, error) { return 0, e.err }
 
-// mayJoinBoard reports whether the agent whose token this is may join (subscribe to) the board: one it already holds a seat on (current: checkBoard has chosen its seat there; a restart's join), the board its live row was launched on, or the board of
-// its team row (a team's board is named for the team). Nothing else: not a board named in the request, another team's, the Operator's, or one only a cross-team link reaches (a link carries messages, it does
-// not seat an agent on the other board). The Operator's own join (the dashboard, the command line outside an agent) and the launch path are not agent tokens and never come here (#11013). A lookup that fails is
-// an error, never a yes.
+// mayJoinBoard reports whether the agent whose token this is may join (subscribe to) the board: one it already holds a seat on (current: checkBoard has chosen its seat there; a restart's join), or the board
+// its live row was launched on. Nothing else: not a board named in the request, another team's, the Operator's, or one only a cross-team link reaches (a link carries messages, it does not seat an agent on
+// the other board). The live row's board is written only when a session is launched (a new session id, by the server's launch paths, and carried over by a restart), so it is the one place that records where
+// the agent belongs; a team row records no board key (its name is a label, which two boards can share), so it adds nothing and is not read. The comparison is exact, as a board key is everywhere else. The
+// Operator's own join (the dashboard, the command line outside an agent) and the launch path are not agent tokens and never come here (#11013). A lookup that fails is an error, never a yes.
 func (o *IdentityObserver) mayJoinBoard(ctx context.Context, owner *store.SessionTokenOwner, project string, current *board.Subscriber) (bool, error) {
 	if current != nil && current.Project == project {
 		return true, nil
 	}
-	ls, err := store.NewSessionStore(o.db).GetLiveSession(ctx, owner.SessionID)
+	return sessionLaunchedOnBoard(ctx, store.NewSessionStore(o.db), owner.SessionID, project)
+}
+
+// sessionLaunchedOnBoard reports whether the session's live row records boardKey (exactly) as the board it was launched on. No row, or no recorded board, is a plain no; a failed read is an error.
+func sessionLaunchedOnBoard(ctx context.Context, ss *store.SessionStore, sessionID, boardKey string) (bool, error) {
+	if sessionID == "" || boardKey == "" {
+		return false, nil
+	}
+	ls, err := ss.GetLiveSession(ctx, sessionID)
 	if err != nil || ls == nil {
 		return false, err
 	}
-	if ls.BoardName != nil && *ls.BoardName != "" && strings.EqualFold(*ls.BoardName, project) {
-		return true, nil
-	}
-	if ls.TeamID != nil {
-		team, err := store.NewTeamStore(o.db).GetTeamByID(ctx, *ls.TeamID)
-		if err != nil {
-			return false, err
-		}
-		if team != nil && strings.EqualFold(team.Name, project) {
-			return true, nil
-		}
-	}
-	return false, nil
+	return ls.BoardName != nil && *ls.BoardName == boardKey, nil
 }

@@ -93,17 +93,17 @@ func TestAgentTokenCannotSubscribeToAnotherBoard(t *testing.T) {
 		assert.Equal(t, http.StatusOK, code, "its live row names team-a: the seat is made again: %v", out)
 		assert.True(t, subscribed("team-a", name))
 	})
-	t.Run("a session whose only link to the board is its team row may join it", func(t *testing.T) {
+	t.Run("a team row alone does not admit a join: it records no board key, only a name that two boards can share", func(t *testing.T) {
 		sid2 := "aaaaaaaa-1101-4000-8000-000000000002"
 		name2 := "claude-" + sid2
 		require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: sid2, AgentType: "claude", AgentName: "dev2", WorkingDir: "/w"}))
 		require.NoError(t, ss.SetTeamID(ctx, sid2, teamA.ID))
 		tok2, err := srv.db.MintSessionToken(ctx, sid2, name2)
 		require.NoError(t, err)
-		code, out := join("team-a", "Dev2", name2, tok2)
-		assert.Equal(t, http.StatusOK, code, "%v", out)
-		code, out = join("team-b", "Dev2", name2, tok2)
-		assert.Equal(t, http.StatusForbidden, code, "but not another board: %v", out)
+		for _, board := range []string{"team-a", "team-b"} {
+			code, out := join(board, "Dev2", name2, tok2)
+			assert.Equal(t, http.StatusForbidden, code, "%s: %v", board, out)
+		}
 	})
 	t.Run("a session whose only link to the board is the board its live row was launched on may join it", func(t *testing.T) {
 		sid4 := "aaaaaaaa-1101-4000-8000-000000000004"
@@ -142,4 +142,120 @@ func TestAgentTokenCannotSubscribeToAnotherBoard(t *testing.T) {
 		code, out := join("team-b", "Helper", "claude-aaaaaaaa-1101-4000-8000-000000000009", "")
 		assert.Equal(t, http.StatusOK, code, "the dashboard or the command line outside an agent: %v", out)
 	})
+}
+
+// #11013, Security's MUST on round 1: the launch route is the same door with a launch in front. POST /api/sessions/launch (and launch-team) is agent-reachable, and its only gate for the board was
+// "an agent may launch onto a board its OWNER owns" (mayLaunchOnto), which is every board on a one-operator Coral: the new session is seated on that board by the server's launch path, with its own token.
+// For an agent token the board must be the agent's own (its live row's board, recorded when it was launched).
+func TestAgentTokenCannotLaunchOntoAnotherBoard(t *testing.T) {
+	srv, ts, dir := strictServer(t, false)
+	ctx := context.Background()
+	ss := store.NewSessionStore(srv.db)
+	bs := srv.boardStore
+	a, err := bs.CreateBoard(ctx, "team-a", "Operator")
+	require.NoError(t, err)
+	b, err := bs.CreateBoard(ctx, "team-b", "Operator")
+	require.NoError(t, err)
+	ops, err := bs.CreateBoard(ctx, "ops", "Operator")
+	require.NoError(t, err)
+	sid := "bbbbbbbb-1101-4000-8000-000000000001"
+	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: sid, AgentType: "claude", AgentName: "dev", WorkingDir: "/w", BoardName: &a.ID}))
+	tok, err := srv.db.MintSessionToken(ctx, sid, "claude-"+sid)
+	require.NoError(t, err)
+	_, err = bs.Subscribe(ctx, a.ID, "Dev", "Orchestrator", "claude-"+sid, nil, "all")
+	require.NoError(t, err)
+	work := strictWorkDir(t, dir)
+	liveCount := func() int {
+		all, err := ss.GetAllLiveSessions(ctx)
+		require.NoError(t, err)
+		return len(all)
+	}
+	post := func(path string, body map[string]any, token string) (int, map[string]any) {
+		raw, _ := json.Marshal(body)
+		req, _ := http.NewRequest("POST", ts.URL+path, strings.NewReader(string(raw)))
+		req.Header.Set("Content-Type", "application/json")
+		if token != "" {
+			req.Header.Set(store.SessionTokenHeader, token)
+		}
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		b, _ := io.ReadAll(resp.Body)
+		var out map[string]any
+		_ = json.Unmarshal(b, &out)
+		return resp.StatusCode, out
+	}
+	launch := func(board string, token string) (int, map[string]any) {
+		return post("/api/sessions/launch", map[string]any{"working_dir": work, "agent_type": "terminal", "board_id": board, "display_name": "helper"}, token)
+	}
+
+	t.Run("another team's board and the Operator's are refused, and nothing is started", func(t *testing.T) {
+		before := liveCount()
+		for _, foreign := range []string{b.ID, ops.ID} {
+			code, out := launch(foreign, tok)
+			assert.Equal(t, http.StatusForbidden, code, "%s: %v", foreign, out)
+			assert.Equal(t, "forbidden_for_agent", out["code"], foreign)
+		}
+		assert.Equal(t, before, liveCount(), "no session was made")
+		subs, err := bs.ListSubscribers(ctx, b.ID)
+		require.NoError(t, err)
+		for _, s := range subs {
+			assert.NotEqual(t, "helper", s.JobTitle, "no seat on team-b")
+		}
+	})
+	t.Run("a team launch onto another board is refused the same way", func(t *testing.T) {
+		code, out := post("/api/sessions/launch-team", map[string]any{"working_dir": work, "agent_type": "terminal", "board_id": b.ID,
+			"agents": []map[string]any{{"name": "helper", "role": "Dev"}}}, tok)
+		assert.Equal(t, http.StatusForbidden, code, "%v", out)
+		assert.Contains(t, out["message"], "its own team's board", "refused by the board gate, not by something else: %v", out)
+	})
+	t.Run("its own board still works", func(t *testing.T) {
+		code, out := launch(a.ID, tok)
+		assert.Equal(t, http.StatusOK, code, "an agent starts agents on its own team: %v", out)
+		assert.Equal(t, a.ID, out["board_id"])
+	})
+	t.Run("an agent with no recorded board starts agents on no existing board", func(t *testing.T) {
+		sid2 := "bbbbbbbb-1101-4000-8000-000000000002"
+		require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: sid2, AgentType: "claude", AgentName: "solo", WorkingDir: "/w"}))
+		tok2, err := srv.db.MintSessionToken(ctx, sid2, "claude-"+sid2)
+		require.NoError(t, err)
+		code, out := launch(a.ID, tok2)
+		assert.Equal(t, http.StatusForbidden, code, "%v", out)
+	})
+	t.Run("the Operator's launch onto any board is unchanged", func(t *testing.T) {
+		code, out := launch(b.ID, "")
+		assert.Equal(t, http.StatusOK, code, "%v", out)
+	})
+}
+
+// Security's SHOULD (c): the join variants a path-matching gate could miss. A trailing slash, a doubled slash, another case and an escaped letter in 'subscribe' are never an admitted join on a board the
+// agent was not launched on, whatever the router makes of them.
+func TestAgentTokenJoinVariantsAreNeverAdmitted(t *testing.T) {
+	srv, ts, _ := strictServer(t, false)
+	ctx := context.Background()
+	ss := store.NewSessionStore(srv.db)
+	bs := srv.boardStore
+	for _, b := range []string{"team-a", "team-b"} {
+		_, err := bs.Subscribe(ctx, b, "Lead-"+b, "Lead", "", nil, "all")
+		require.NoError(t, err)
+	}
+	sid := "cccccccc-1101-4000-8000-000000000001"
+	name := "claude-" + sid
+	boardA := "team-a"
+	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: sid, AgentType: "claude", AgentName: "dev", WorkingDir: "/w", BoardName: &boardA}))
+	tok, err := srv.db.MintSessionToken(ctx, sid, name)
+	require.NoError(t, err)
+	for _, path := range []string{"/api/board/team-b/subscribe", "/api/board/team-b/subscribe/", "/api/board//team-b/subscribe", "/api/board/team-b//subscribe",
+		"/api/board/team-b/Subscribe", "/api/board/team-b/SUBSCRIBE", "/api/board/team-b/%73ubscribe", "/api/board/%74eam-b/subscribe", "/api/board/team-b/subscribe?x=1", "/api/board/TEAM-B/subscribe"} {
+		req, _ := http.NewRequest("POST", ts.URL+path, strings.NewReader(`{"subscriber_id":"Dev","job_title":"Dev","session_name":"`+name+`"}`))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set(store.SessionTokenHeader, tok)
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err, path)
+		resp.Body.Close()
+		assert.NotEqual(t, http.StatusOK, resp.StatusCode, "%s must not be a join", path)
+		sub, err := bs.SessionSubscription(ctx, "team-b", name)
+		require.NoError(t, err)
+		assert.Nil(t, sub, "%s: no seat on team-b", path)
+	}
 }

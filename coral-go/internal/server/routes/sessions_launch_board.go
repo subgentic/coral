@@ -206,6 +206,19 @@ func (h *SessionsHandler) launchBoardCreated(w http.ResponseWriter, r *http.Requ
 			writeJSON(w, http.StatusForbidden, map[string]string{"error": "forbidden_for_agent", "code": "forbidden_for_agent", "message": "An agent can start agents only on teams of its own owner"})
 			return "", false, false
 		}
+		// An agent's launch seats the new agent on the board with its own token, so it must be the agent's own board (#11013): the owner test above is true of every board on a one-operator Coral, which let an
+		// agent start an agent on another team's or the Operator's board and read it through that one.
+		if sid, isAgent := agentSessionOf(r); isAgent {
+			own, oerr := sessionLaunchedOnBoard(ctx, h.ss, sid, b.ID)
+			if oerr != nil {
+				writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "identity_unavailable", "code": "identity_unavailable", "message": "Coral couldn't check which board this agent belongs to just now; try again"})
+				return "", false, false
+			}
+			if !own {
+				writeJSON(w, http.StatusForbidden, map[string]string{"error": "forbidden_for_agent", "code": "forbidden_for_agent", "message": "An agent can start agents only on its own team's board, not another team's or the Operator's"})
+				return "", false, false
+			}
+		}
 		return b.ID, false, true
 	}
 	boardName = strings.TrimSpace(boardName)
