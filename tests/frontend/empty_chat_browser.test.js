@@ -2,6 +2,7 @@
 //  - idle: a title and a hint ("Type below to start."); a role=status block, sized in rem
 //  - not started: the "Waiting in the terminal" card already says it, so no empty state shows under it (nothing to add)
 //  - asleep: it says so and points at waking it
+//  - archived: it says archived and nothing about sleep or Wake (#10784)
 //  - the words are written once: a later refresh does not rewrite them (a screen reader is not told again)
 //  - the first message replaces it
 // Drives Chrome over CDP through agent_view_harness.js; run_cdp_suites.mjs finds CDP suites by that name.
@@ -29,7 +30,7 @@ const BASE = require('./test_base').BASE;
         };
         const words = () => ev(`(() => { const e = document.querySelector('#live-history-messages > .chat-empty'); return e ? { role: e.getAttribute('role'), title: (e.querySelector('.chat-empty-title') || {}).textContent || '', hint: (e.querySelector('.chat-empty-hint') || {}).textContent || '', size: getComputedStyle(e).fontSize } : null; })()`);
         const open = async (name, patch) => {
-            await ev(`window.__m.add('${name}', '${name}', 0, { sleeping: ${patch.sleeping ? 'true' : 'false'} }); { const r = window.T.state.liveSessions.find(x => x.session_id === '${name}-id'); if (r) r.staleness_seconds = ${patch.fresh || patch.old ? 'null' : '5'}; ${patch.age !== undefined ? 'r.created_at = new Date(Date.now() - ' + patch.age + ' * 1000).toISOString();' : ''} } true`); // the CLI has written output (5 s ago) unless this one is a just-launched agent with none (#6058)
+            await ev(`window.__m.add('${name}', '${name}', 0, { sleeping: ${patch.sleeping ? 'true' : 'false'}, archived: ${patch.archived ? 'true' : 'false'} }); { const r = window.T.state.liveSessions.find(x => x.session_id === '${name}-id'); if (r) r.staleness_seconds = ${patch.fresh || patch.old ? 'null' : '5'}; ${patch.age !== undefined ? 'r.created_at = new Date(Date.now() - ' + patch.age + ' * 1000).toISOString();' : ''} } true`); // the CLI has written output (5 s ago) unless this one is a just-launched agent with none (#6058)
             await ev(`{ const r = window.T.state.liveSessions.find(x => x.session_id === '${name}-id'); if (r) { r.working_directory = '/home/u/work-dir'; ${patch.mode ? `r.permission_mode = '${patch.mode}';` : ''} ${patch.live ? `r.live_permission_mode = '${patch.live}';` : ''} ${patch.type ? `r.agent_type = '${patch.type}';` : ''} } } true`);
             await ev(`window.selectLiveSession('${name}', '${patch.type || 'claude'}', '${name}-id', 'local'); true`);
             await waitFor(`!!document.querySelector('#live-history-messages > .chat-empty')`, `the empty state of ${name}`, 8000);
@@ -86,6 +87,12 @@ const BASE = require('./test_base').BASE;
         await waitFor(`(document.querySelector('#live-history-messages > .chat-empty .chat-empty-title') || {}).textContent === 'This agent is asleep'`, 'the asleep words', 8000);
         assert.match((await words()).hint, /Wake below/);
         await shot('asleep');
+
+        console.log('3b. An archived agent says archived only: not asleep, and no Wake to use (#10784)');
+        await open('ec-arch', { archived: true });
+        await waitFor(`(document.querySelector('#live-history-messages > .chat-empty .chat-empty-title') || {}).textContent === 'This agent is archived'`, 'the archived words', 8000);
+        const arch = await words();
+        assert.doesNotMatch(arch.title + ' ' + arch.hint, /asleep|sleeping|Wake/i, 'nothing about sleeping or waking: ' + JSON.stringify(arch));
 
         console.log('4. At 200% text the words grow with the root size');
         await ev(`document.documentElement.style.fontSize = '32px'; true`);

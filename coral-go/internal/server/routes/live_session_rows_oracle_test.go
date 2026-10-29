@@ -591,6 +591,9 @@ func (h *SessionsHandler) liveSessionRowsBefore4713(r *http.Request, trace *phas
 		if ls.DisplayName != nil {
 			dn = *ls.DisplayName
 		}
+		if names, _ := h.ss.GetDisplayNames(ctx, []string{ls.SessionID}); names[ls.SessionID] != "" { // #10784: the one deliberate difference from v1.4.92, a renamed agent's name while it sleeps
+			dn = names[ls.SessionID]
+		}
 		boardSub := boardSubs[naming.SessionName(ls.AgentType, ls.SessionID)]
 		if boardSub != nil {
 			bp = boardSub.Project

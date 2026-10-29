@@ -531,6 +531,42 @@ func TestSessionsList_SleepingSessionContextIsExplicitNull(t *testing.T) {
 	assert.Nil(t, contextPct)
 }
 
+// An agent renamed while it ran shows the new name when it sleeps and when it is archived, in the list and in its board title:
+// a rename is saved in the session's meta, and the live row keeps the name the agent was launched with (#10784).
+func TestSessionsList_AsleepAndArchivedRowsCarryTheCurrentDisplayName(t *testing.T) {
+	server, _, _, ss := setupSessionsTestServer(t)
+	ctx := context.Background()
+	alpha := "Alpha"
+	for _, tc := range []struct {
+		sid      string
+		archived bool
+	}{{"00000000-0000-4000-8000-0000000000a1", false}, {"00000000-0000-4000-8000-0000000000a2", true}} {
+		require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: tc.sid, AgentType: "claude", AgentName: "proj", WorkingDir: "/tmp/proj", DisplayName: &alpha, IsSleeping: 1, CreatedAt: "2026-01-01T00:00:00Z"}))
+		if tc.archived {
+			require.NoError(t, ss.SetSessionArchived(ctx, tc.sid, true))
+		}
+		require.NoError(t, ss.SetDisplayName(ctx, tc.sid, "Writer")) // the rename
+	}
+	// a third that was never renamed keeps the stored name
+	plain := "00000000-0000-4000-8000-0000000000a3"
+	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: plain, AgentType: "claude", AgentName: "proj3", WorkingDir: "/tmp/proj3", DisplayName: &alpha, IsSleeping: 1, CreatedAt: "2026-01-01T00:00:00Z"}))
+
+	resp, err := http.Get(server.URL + "/api/sessions/live")
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	var sessions []map[string]any
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&sessions))
+	require.Len(t, sessions, 3)
+	for _, row := range sessions {
+		want := "Writer"
+		if row["session_id"] == plain {
+			want = "Alpha"
+		}
+		assert.Equal(t, want, row["display_name"], "%v (archived %v)", row["session_id"], row["archived"])
+		assert.Equal(t, want, row["board_job_title"], "%v", row["session_id"])
+	}
+}
+
 // A runtime session whose DB row is already marked stopped is an orphan and
 // must not be listed as a live agent (it would otherwise appear with a stale
 // display name in whatever group its working directory happens to match).

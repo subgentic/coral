@@ -583,6 +583,18 @@ func (h *SessionsHandler) sleepingRows(allLive []store.LiveSession, liveSIDs map
 	if len(asleepIDs) > 0 && h.ts != nil {
 		asleepEvents, _ = h.ts.GetSessionStateEvents(context.Background(), asleepIDs)
 	}
+	// A rename is saved in the session's meta, not in the live row, which keeps the name the agent was launched with: an asleep or archived
+	// row is named by the meta first, as an awake row is, or a renamed agent showed its old name until it woke (#10784).
+	var sleepingIDs []string
+	for _, ls := range allLive {
+		if ls.IsSleeping == 1 && !liveSIDs[ls.SessionID] {
+			sleepingIDs = append(sleepingIDs, ls.SessionID)
+		}
+	}
+	renamed := map[string]string{}
+	if len(sleepingIDs) > 0 {
+		renamed, _ = h.ss.GetDisplayNames(context.Background(), sleepingIDs)
+	}
 	for _, ls := range allLive {
 		if ls.IsSleeping != 1 || liveSIDs[ls.SessionID] {
 			continue
@@ -593,6 +605,9 @@ func (h *SessionsHandler) sleepingRows(allLive []store.LiveSession, liveSIDs map
 		}
 		if ls.DisplayName != nil {
 			dn = *ls.DisplayName
+		}
+		if n := renamed[ls.SessionID]; n != "" {
+			dn = n
 		}
 		boardSub := boardSubs[naming.SessionName(ls.AgentType, ls.SessionID)]
 		if boardSub != nil {

@@ -71,7 +71,8 @@ function emptyStateWords(session) {
     if (row && readyAt.get(row.session_id) > 0 && Date.now() - readyAt.get(row.session_id) < READY_MS && deriveSessionState(row) !== "sleeping") return ["Ready", `${cli} is up. Type below to start.`];
     if (isStarting(row) && deriveSessionState(row) === "idle") return [`Waiting for ${cli} to start`, "Its first screen is not up yet. You can type below once it is."];
     switch (deriveSessionState(row)) {
-        case 'sleeping': return row.sleep_reason === 'agent_exited' ? ["This agent has ended", "Its CLI exited. Use Restart below to start it again."] : ["This agent is asleep", "Use Wake below to chat with it."];
+        case 'sleeping': if (row.archived) return ["This agent is archived", ""]; // archived says archived only: the bar above has Unarchive; 'asleep, use Wake' is not what it is (#10784)
+            return row.sleep_reason === 'agent_exited' ? ["This agent has ended", "Its CLI exited. Use Restart below to start it again."] : ["This agent is asleep", "Use Wake below to chat with it."];
         default: return ["Say hello to your agent", [worksIn(row), "Type below to start."].filter(Boolean).join(' ')];
     }
 }
