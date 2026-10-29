@@ -111,7 +111,7 @@ func machineFixture(t *testing.T) (tokenFile, keyFile string, p *machineStubProv
 		p.token = token
 		return p, nil
 	}
-	newMachineHub = func(baseURL, key, destroyKey, terms string) machinelaunch.Minter { h.destroyKey = destroyKey; return h }
+	newMachineHub = func(baseURL, key, destroyKey string) machinelaunch.Minter { h.destroyKey = destroyKey; return h }
 	machineUserData = func(keys *machinelaunch.BootKeys, sshFrom, maxMode, version string, digests machinelaunch.ReleaseDigests, hubURL string, agents []string) (string, error) {
 		return "#cloud-config\n# " + sshFrom + " " + maxMode + " " + version + " " + strings.Join(agents, ",") + " " + digests.AMD64 + "\n", nil
 	}
