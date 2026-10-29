@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/url"
@@ -8,20 +9,22 @@ import (
 	"strings"
 
 	"github.com/subgentic/coral/internal/board"
+	"github.com/subgentic/coral/internal/store"
 )
 
 // agentBoardSearchParams are the parameters GET /api/agent/board/search takes: the dashboard search's (without for_subscriber, which is a viewer's switch), the reach, and the session the caller names (checked
 // against its token like every agent history call). Anything else is a 400 naming it.
 var agentBoardSearchParams = map[string]bool{"q": true, "from": true, "mentions": true, "since": true, "until": true, "sort": true, "limit": true, "cursor": true, "reach": true, "session_id": true}
 
-// refuseSearchReach answers a reach the agent was not given with 403 search_reach_refused and no data (#11005): never a quiet narrowing to what it may read. Until the operator-set levels exist (a later phase of
-// #11005) every agent searches at "own", so the words say it is not available rather than pointing at a control that is not there yet.
-func refuseSearchReach(w http.ResponseWriter, requested string) {
+// refuseSearchReach answers a reach above the agent's level with 403 search_reach_refused and no data (#11005, #11048): never a quiet narrowing to what it may read. It names the level the agent has, the level the
+// request needs and where the Operator raises it.
+func refuseSearchReach(w http.ResponseWriter, level, requested string) {
 	writeJSON(w, http.StatusForbidden, map[string]any{
-		"error":     "Refused: this agent's search access is 'own', its own board. Searching beyond it (--" + flagOfReach(requested) + ") is not available yet.",
+		"error":     "Refused: this agent's search access is '" + level + "'; --" + flagOfReach(requested) + " needs '" + requested + "'. The Operator raises it in the dashboard (the agent's Search access control); an agent cannot.",
 		"code":      "search_reach_refused",
-		"level":     "own",
+		"level":     level,
 		"requested": requested,
+		"needed":    requested,
 	})
 }
 
@@ -56,13 +59,24 @@ func (h *SessionsHandler) SearchAgentBoard(w http.ResponseWriter, r *http.Reques
 	if !ok {
 		return
 	}
-	switch reach := strings.ToLower(strings.TrimSpace(vals.Get("reach"))); reach {
-	case "", "own":
-	case "team", "all", "operator":
-		refuseSearchReach(w, reach)
-		return
-	default:
+	requested := strings.ToLower(strings.TrimSpace(vals.Get("reach")))
+	if requested == "" {
+		requested = store.SearchReachOwn
+	}
+	if store.SearchReachRank(requested) < 0 {
 		errBadRequest(w, "reach must be own, team, all or operator")
+		return
+	}
+	who := h.searchWho(r, sessionID)
+	if !h.searchRate.allow(who.key) { // refusals count: a loop that probes the levels is slowed like one that reads
+		w.Header().Set("Retry-After", "60")
+		writeJSON(w, http.StatusTooManyRequests, map[string]any{"error": "Too many searches from this agent: wait a minute and try again.", "code": "search_rate_limited"})
+		return
+	}
+	level := who.level
+	if store.SearchReachRank(requested) > store.SearchReachRank(level) {
+		h.logSearchRead(r, who, requested, "refused", 0)
+		refuseSearchReach(w, level, requested)
 		return
 	}
 	if h.bs == nil || h.ss == nil {
@@ -79,6 +93,7 @@ func (h *SessionsHandler) SearchAgentBoard(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	boardKey := *ls.BoardName
+	boards, all := h.searchBoards(r, who, boardKey, requested)
 	q, err := board.ParseMessageQuery(board.MessageQueryParams{
 		Q: vals["q"], From: vals["from"], Mentions: vals["mentions"], Since: vals["since"], Until: vals["until"], Sort: vals["sort"], Limit: vals["limit"], Cursor: vals["cursor"],
 	})
@@ -91,12 +106,31 @@ func (h *SessionsHandler) SearchAgentBoard(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	q.Project = boardKey // the key the launch recorded, used exactly: nothing the request names picks the board
+	q.Boards, q.AllBoards = boards, all
 	res, err := h.bs.QueryMessages(r.Context(), q)
 	if err != nil {
 		errInternalServer(w, "could not search the messages")
 		return
 	}
-	out := map[string]any{"messages": res.Messages, "total": res.Total, "limit": q.Limit, "board": boardKey, "reach": "own"}
+	// The response is capped (searchResponseCap): a page that is over it is read again with a smaller limit, so the cursor still points at the first message not returned.
+	for q.Limit > 1 {
+		raw, _ := json.Marshal(res.Messages)
+		if len(raw) <= searchResponseCap {
+			break
+		}
+		q.Limit = len(res.Messages) / 2
+		if q.Limit < 1 {
+			q.Limit = 1
+		}
+		if res, err = h.bs.QueryMessages(r.Context(), q); err != nil {
+			errInternalServer(w, "could not search the messages")
+			return
+		}
+	}
+	if requested != store.SearchReachOwn {
+		h.logSearchRead(r, who, requested, "ok", int(res.Total))
+	}
+	out := map[string]any{"messages": res.Messages, "total": res.Total, "limit": q.Limit, "board": boardKey, "reach": requested}
 	if res.NextCursor != "" {
 		out["next_cursor"] = res.NextCursor
 	}

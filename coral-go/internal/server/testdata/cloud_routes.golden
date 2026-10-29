@@ -122,6 +122,7 @@ GET /api/scheduled/jobs view
 GET /api/scheduled/jobs/{jobID} view
 GET /api/scheduled/jobs/{jobID}/runs view
 GET /api/scheduled/runs/recent view
+GET /api/search-access/log never
 GET /api/session-artifacts view
 GET /api/sessions/history view
 GET /api/sessions/history/counts view
@@ -442,6 +443,7 @@ PUT /api/system/terminal-backend never
 PUT /api/system/update/settings never
 PUT /api/teams/detail/{name}/home-folder never
 PUT /api/teams/detail/{name}/knowledge/{agentName} never
+PUT /api/teams/detail/{name}/members/{agent}/search-access never
 PUT /api/themes/{name} never
 PUT /api/views/{id} never
 PUT /api/workflows/{workflowID} never

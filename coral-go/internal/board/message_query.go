@@ -51,6 +51,8 @@ type MessageQueryParams struct {
 // Shown (what a viewer sees of a text: the match is made on it; nil is the text as stored).
 type MessageQuery struct {
 	Project       string
+	Boards        []string // when not nil, the boards (by key) searched instead of Project; an empty set searches nothing (#11048, set by the server, never read from a request)
+	AllBoards     bool     // every board (#11048, the Operator's level 'all'); wins over Boards
 	Text          string   // lower-cased; empty: no text search
 	From          []string // lower-cased sender ids or names
 	Mentions      string   // lower-cased: messages that tag this member
@@ -262,8 +264,7 @@ func (s *Store) QueryMessages(ctx context.Context, q *MessageQuery) (*MessageQue
 			allowed[id] = true
 		}
 	}
-	where := []string{"m.project = ?"}
-	args := []any{q.Project}
+	where, args := q.boardWhere()
 	if q.Since != "" {
 		where = append(where, "m.created_at >= ?")
 		args = append(args, q.Since)
@@ -460,4 +461,22 @@ func (q *MessageQuery) matches(m Message, mentionID, mentionTitle string, number
 		return false
 	}
 	return true
+}
+
+// boardWhere is the board part of the query's WHERE: every board, the set Boards names, or the one Project.
+func (q *MessageQuery) boardWhere() ([]string, []any) {
+	switch {
+	case q.AllBoards:
+		return []string{"1 = 1"}, nil
+	case q.Boards != nil:
+		if len(q.Boards) == 0 {
+			return []string{"1 = 0"}, nil
+		}
+		args := make([]any, len(q.Boards))
+		for i, b := range q.Boards {
+			args[i] = b
+		}
+		return []string{"m.project IN (?" + strings.Repeat(",?", len(q.Boards)-1) + ")"}, args
+	}
+	return []string{"m.project = ?"}, []any{q.Project}
 }

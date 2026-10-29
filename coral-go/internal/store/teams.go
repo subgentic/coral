@@ -43,6 +43,8 @@ type TeamMember struct {
 	Status          string  `db:"status" json:"status"`
 	CreatedAt       string  `db:"created_at" json:"created_at"`
 	StoppedAt       *string `db:"stopped_at" json:"stopped_at,omitempty"`
+	// How far this agent's chat search reaches (own, team, all, operator): only the Operator sets it, through SetSearchReach (#11048).
+	SearchReach string `db:"search_reach" json:"search_reach"`
 
 	// Computed fields
 	AgentConfig json.RawMessage `db:"-" json:"agent_config,omitempty"`
@@ -105,7 +107,7 @@ func (s *TeamStore) GetTeam(ctx context.Context, name string) (*Team, error) {
 
 	var members []TeamMember
 	err = s.db.SelectContext(ctx, &members,
-		`SELECT id, team_id, agent_name, agent_config_json, session_id, status, created_at, stopped_at
+		`SELECT id, team_id, agent_name, agent_config_json, session_id, status, created_at, stopped_at, search_reach
 		 FROM team_members WHERE team_id = ? ORDER BY id`, t.ID)
 	if err != nil {
 		return nil, err
@@ -228,7 +230,7 @@ func (s *TeamStore) UpdateMemberStatus(ctx context.Context, memberID int64, stat
 func (s *TeamStore) GetActiveMembers(ctx context.Context, teamID int64) ([]TeamMember, error) {
 	var members []TeamMember
 	err := s.db.SelectContext(ctx, &members,
-		`SELECT id, team_id, agent_name, agent_config_json, session_id, status, created_at, stopped_at
+		`SELECT id, team_id, agent_name, agent_config_json, session_id, status, created_at, stopped_at, search_reach
 		 FROM team_members WHERE team_id = ? AND status = 'active' ORDER BY id`, teamID)
 	for i := range members {
 		members[i].HydrateConfig()
@@ -240,7 +242,7 @@ func (s *TeamStore) GetActiveMembers(ctx context.Context, teamID int64) ([]TeamM
 func (s *TeamStore) getSleepingMembers(ctx context.Context, teamID int64) ([]TeamMember, error) {
 	var members []TeamMember
 	err := s.db.SelectContext(ctx, &members,
-		`SELECT id, team_id, agent_name, agent_config_json, session_id, status, created_at, stopped_at
+		`SELECT id, team_id, agent_name, agent_config_json, session_id, status, created_at, stopped_at, search_reach
 		 FROM team_members WHERE team_id = ? AND status = 'sleeping' ORDER BY id`, teamID)
 	for i := range members {
 		members[i].HydrateConfig()
@@ -253,7 +255,7 @@ func (s *TeamStore) getSleepingMembers(ctx context.Context, teamID int64) ([]Tea
 func (s *TeamStore) GetMembersForResurrect(ctx context.Context, teamID int64) ([]TeamMember, error) {
 	var members []TeamMember
 	err := s.db.SelectContext(ctx, &members,
-		`SELECT m.id, m.team_id, m.agent_name, m.agent_config_json, m.session_id, m.status, m.created_at, m.stopped_at
+		`SELECT m.id, m.team_id, m.agent_name, m.agent_config_json, m.session_id, m.status, m.created_at, m.stopped_at, m.search_reach
 		 FROM team_members m
 		 JOIN teams t ON t.id = m.team_id
 		 WHERE m.team_id = ? AND m.status = 'stopped' AND m.stopped_at = t.stopped_at
@@ -324,7 +326,7 @@ func (s *TeamStore) StopTeam(ctx context.Context, teamID int64) error {
 func (s *TeamStore) GetMemberBySessionID(ctx context.Context, sessionID string) (*TeamMember, error) {
 	var m TeamMember
 	err := s.db.GetContext(ctx, &m,
-		`SELECT id, team_id, agent_name, agent_config_json, session_id, status, created_at, stopped_at
+		`SELECT id, team_id, agent_name, agent_config_json, session_id, status, created_at, stopped_at, search_reach
 		 FROM team_members WHERE session_id = ?`, sessionID)
 	if err == sql.ErrNoRows {
 		return nil, nil

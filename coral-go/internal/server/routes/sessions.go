@@ -37,6 +37,8 @@ import (
 
 // SessionsHandler handles all live session API endpoints.
 type SessionsHandler struct {
+	// searchRate is the per-member rate limit of the agent search, refusals counted (#11048).
+	searchRate             searchGuard
 	codexPermissionMu      sync.Mutex // orders Codex hook completion with deferred request promotion
 	codexPermissionWatches sync.Map   // sanitized, unconfirmed Codex approval candidates (#8471)
 	// artifactNudge reminds an agent that published a claude.ai artifact to make a Coral one (#6583); nil: never.
