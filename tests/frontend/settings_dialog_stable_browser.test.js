@@ -106,9 +106,10 @@ const SCALE = new Set(['16/700', '17/700', '14/600', '14/400', '13/500', '13/400
                 at[g] = await ev(`(() => { const r = e => { const b = document.querySelector(e).getBoundingClientRect(); return [Math.round(b.left), Math.round(b.top), Math.round(b.width), Math.round(b.height)]; }; return { dialog: r('.settings-modal-content'), header: r('#settings-modal .modal-header'), footer: r('#settings-modal .modal-footer') }; })()`);
             }
             if (process.env.CORAL_SCREENSHOT_DIR) for (const g of ['agents', 'terminal']) { await ev(`(() => { const s = document.querySelector('#settings-modal .settings-group-pick select'); if (s && getComputedStyle(s).display !== 'none') { s.value = ${JSON.stringify(g)}; s.dispatchEvent(new Event('change', { bubbles: true })); } else document.getElementById('settings-tab-${g}').click(); return true; })()`); await ev(framesJs(3)); require('node:fs').writeFileSync(require('node:path').join(process.env.CORAL_SCREENSHOT_DIR, `settings-${label.replace(/[^a-z0-9]+/gi, '-')}-${g}.png`), Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); }
-            const first = at[groups[0]];
+            // a phone opens on the section list, which keeps the dialog's title; once a section is open its header is folded into the way back (Mobile pass 40, 1b580aec2: the title is not said twice), so the sections are compared with each other, not with the list the first one starts on
+            const compared = useSelect || /200%/.test(label) ? groups.slice(1) : groups, first = at[compared[0]];
             assert.ok(groups.length >= 7, `${label}: the sections: ${groups.join(', ')}`);
-            for (const g of groups) assert.deepEqual(at[g], first, `${label}: ${g}: the dialog, its header and footer are where they are on every other section`);
+            for (const g of compared) assert.deepEqual(at[g], first, `${label}: ${g}: the dialog, its header and footer are where they are on every other section`);
             assert.ok(first.dialog[0] + first.dialog[2] <= w + 1 && first.dialog[1] + first.dialog[3] <= h + 1, `${label}: the dialog is inside the window: ${JSON.stringify(first.dialog)}`);
             if (report) console.log(label, JSON.stringify(first));
         };
