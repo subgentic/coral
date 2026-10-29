@@ -183,6 +183,7 @@ var joinSites = map[string]joinEntry{
 	"internal/jsonl/transcript_paths.go\tresolveAgyTranscriptFromHistory":                    {1, joinID, "transcriptlink.IsSessionID or safefs.IsSafeID before the join"},
 	"internal/jsonl/transcript_paths.go\tresolveAgyTranscriptMode":                           {3, joinID, "transcriptlink.IsSessionID or safefs.IsSafeID before the join"},
 	"internal/jsonl/transcript_paths.go\tresolveClaudeTranscript":                            {2, joinID, "transcriptlink.IsSessionID or safefs.IsSafeID before the join"},
+	"internal/jsonl/parse_pi.go\tresolvePiTranscript":                                        {1, joinID, "transcriptlink.IsSessionID checks the id before the join (the first lines of the function; the one join is <data dir>/pi-sessions/<id>/*.jsonl); the search under Pi's own sessions folder only compares the id with the names a walk found (strings.Contains), it joins nothing with it"},
 	"internal/jsonl/transcript_paths.go\tresolveCodexTranscriptCtx":                          {1, joinID, "the glob's name holds the session id, which transcriptlink.IsSessionID checked to be a canonical UUID before anything else (the first lines of the function)"},
 	"internal/naming/naming.go\tLogFile":                                                     {1, joinID, "transcriptlink.IsSessionID or safefs.IsSafeID before the join"},
 	"internal/peercred/peercred.go\tlookup":                                                  {1, joinOwn, "a fixed or program-made name in its own folder"},
