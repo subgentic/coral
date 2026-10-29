@@ -91,7 +91,7 @@ func (h *SessionsHandler) launchSession(ctx context.Context, spec launchSpec) (_
 			}
 		}()
 	}
-	if err := h.checkAgentModel(ctx, agentType, spec.Model); err != nil {
+	if err := h.checkAgentModel(ctx, agentType, spec.Model, spec.Flags); err != nil {
 		return nil, err
 	}
 	if !agentmodels.ValidThinking(agentType, spec.Thinking) {

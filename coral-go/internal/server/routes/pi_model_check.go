@@ -2,7 +2,7 @@ package routes
 
 import (
 	"context"
-	"errors"
+	"net/http"
 	"strings"
 
 	"github.com/subgentic/coral/internal/agentmodels"
@@ -46,15 +46,44 @@ func (h *SessionsHandler) SetPiModelCheck(f func(ctx context.Context, model stri
 	h.piModelCheck = f
 }
 
-// checkAgentModel is validateAgentModel plus the Pi list check.
-func (h *SessionsHandler) checkAgentModel(ctx context.Context, agentType, model string) error {
+// modelRefusedError is a model Pi does not list: a request error (400, code unknown_pi_model, field model), never a server fault.
+type modelRefusedError struct{ msg string }
+
+func (e *modelRefusedError) Error() string { return e.msg }
+
+// piModelFlagValues are the models named in a Pi flags list: the value after --model, or --model=<value>. --models (a list of patterns for Ctrl+P cycling) is not a model.
+func piModelFlagValues(flags []string) []string {
+	var out []string
+	for i := 0; i < len(flags); i++ {
+		switch f := flags[i]; {
+		case f == "--model":
+			if i+1 < len(flags) {
+				out = append(out, flags[i+1])
+				i++
+			}
+		case strings.HasPrefix(f, "--model="):
+			out = append(out, strings.TrimPrefix(f, "--model="))
+		}
+	}
+	return out
+}
+
+// checkAgentModel is validateAgentModel plus the Pi list check, for the model field and for any --model in the flags.
+func (h *SessionsHandler) checkAgentModel(ctx context.Context, agentType, model string, flags []string) error {
 	if err := validateAgentModel(agentType, model); err != nil {
 		return err
 	}
 	if agentType == "pi" && h.piModelCheck != nil {
-		if msg := h.piModelCheck(ctx, model); msg != "" {
-			return errors.New(msg)
+		for _, m := range append([]string{model}, piModelFlagValues(flags)...) {
+			if msg := h.piModelCheck(ctx, m); msg != "" {
+				return &modelRefusedError{msg: msg}
+			}
 		}
 	}
 	return nil
+}
+
+// writeModelRefused answers a modelRefusedError: 400, the sentence, code unknown_pi_model and field model.
+func writeModelRefused(w http.ResponseWriter, err *modelRefusedError) {
+	writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.msg, "code": "unknown_pi_model", "field": "model"})
 }

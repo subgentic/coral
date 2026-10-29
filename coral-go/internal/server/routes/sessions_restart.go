@@ -188,7 +188,11 @@ func (h *SessionsHandler) restartResolve(ctx context.Context, name string, req r
 	} else if p.stored != nil {
 		preflightModel = strings.TrimSpace(ptr.Value(p.stored.Model))
 	}
-	if err := h.checkAgentModel(ctx, p.agentType, preflightModel); err != nil {
+	if err := h.checkAgentModel(ctx, p.agentType, preflightModel, strings.Fields(req.ExtraFlags)); err != nil {
+		var refused *modelRefusedError
+		if errors.As(err, &refused) {
+			return nil, func(w http.ResponseWriter) { writeModelRefused(w, refused) }
+		}
 		return nil, func(w http.ResponseWriter) { errBadRequest(w, err.Error()) }
 	}
 	if req.Thinking != nil && !agentmodels.ValidThinking(p.agentType, strings.TrimSpace(*req.Thinking)) {
