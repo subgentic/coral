@@ -145,6 +145,15 @@ func TestCheckDataPathPanicsInsideTheSourceTree(t *testing.T) {
 	if panics(t.TempDir()) {
 		t.Error("a temp folder was refused")
 	}
+	// An in-memory SQLite database has no file: ":memory:" resolves to a relative name in the package folder, but nothing is written there.
+	for _, p := range []string{":memory:", "file::memory:?cache=shared", "file:x?mode=memory&cache=shared"} {
+		if panics(p) {
+			t.Errorf("an in-memory database name was refused: %q", p)
+		}
+	}
+	if !panics("file:x.db?mode=rwc") && !panics("x.db") {
+		t.Error("a database FILE name in the package folder is not refused")
+	}
 	if panics(filepath.Join(filepath.Dir(root), "elsewhere")) {
 		t.Error("a sibling of the module folder was refused")
 	}

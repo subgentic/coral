@@ -51,7 +51,7 @@ var enabled = InTest
 // CheckDataPath panics if this is a test binary and path is, or is inside,
 // the user's real ~/.coral directory. Outside tests it does nothing.
 func CheckDataPath(path string) {
-	if path == "" || !enabled() {
+	if path == "" || !enabled() || inMemoryDB(path) {
 		return
 	}
 	if dir, ok := protected(path); ok {
@@ -63,6 +63,11 @@ func CheckDataPath(path string) {
 			"writes into the package folder (api_key, messageboard.db, themes) and every test that scans the tree then sees the files "+
 			"(go's test cache re-checks them): pass a t.TempDir() (cfg.UseCoralDir(t.TempDir())) instead", path, root))
 	}
+}
+
+// inMemoryDB: a SQLite name for a database that has no file (":memory:", "file::memory:?cache=shared", "file:x?mode=memory"): nothing is written anywhere, so the path checks do not apply.
+func inMemoryDB(name string) bool {
+	return name == ":memory:" || strings.HasPrefix(name, "file::memory:") || (strings.HasPrefix(name, "file:") && strings.Contains(name, "mode=memory"))
 }
 
 // sourceTree is the module's source folder: the nearest parent of the test's working directory (a test runs in its package's folder) that
