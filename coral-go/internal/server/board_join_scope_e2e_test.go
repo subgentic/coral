@@ -325,6 +325,19 @@ func TestAgentTokenIsNotListedOtherTeamsBoardsInA409(t *testing.T) {
 			assert.NotContains(t, raw, secret, "the other team's board with that label is not")
 		}
 	})
+	t.Run("a seat the Operator made on another board does not list it: the agent's board is its live row's", func(t *testing.T) {
+		_, err := bs.Subscribe(ctx, b.ID, "Dev-seated", "Dev", "claude-"+sid, nil, "all") // the Operator seats this session on team-b
+		require.NoError(t, err)
+		_, err = bs.Subscribe(ctx, s2.ID, "Dev-seated", "Dev", "claude-"+sid, nil, "all") // and on the other board labelled "shared"
+		require.NoError(t, err)
+		code, raw, _ := call("POST", "/api/sessions/launch", launchBody("team-b"), tok)
+		assert.Equal(t, http.StatusConflict, code, raw)
+		assert.NotContains(t, raw, b.ID, "its seat on team-b does not make team-b its board")
+		code, raw, _ = call("POST", "/api/board/shared/external-messages", `{}`, tok)
+		assert.Equal(t, http.StatusConflict, code, raw)
+		assert.Contains(t, raw, s1.ID, "its own board")
+		assert.NotContains(t, raw, s2.ID, "its seat on the other board with that label does not list it")
+	})
 	t.Run("the Operator still sees every candidate", func(t *testing.T) {
 		code, raw, _ := call("POST", "/api/sessions/launch", launchBody("team-b"), "")
 		assert.Equal(t, http.StatusConflict, code, raw)

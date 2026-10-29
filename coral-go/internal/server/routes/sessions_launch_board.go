@@ -251,7 +251,7 @@ func (h *SessionsHandler) launchBoardCreated(w http.ResponseWriter, r *http.Requ
 	}
 	if len(existing) > 0 && !newBoard {
 		// Next to the member count, how many of the board's agents are running (#3543).
-		cands := boardCandidates(r, h.bs, existing)
+		cands := boardCandidates(r, h.bs, h.ss, existing)
 		live := h.liveSessionNames(ctx)
 		for _, c := range cands {
 			c["live_agents"] = h.liveAgentsOn(ctx, c["board_id"].(string), live)

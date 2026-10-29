@@ -10,6 +10,7 @@ import (
 	"sync/atomic"
 
 	"github.com/subgentic/coral/internal/board"
+	"github.com/subgentic/coral/internal/store"
 )
 
 // boardStaticRoutes are /api/board/<segment> routes that aren't a board.
@@ -79,7 +80,7 @@ func resolveBoard(r *http.Request, bs *board.Store, key string) (string, []board
 // under the name rule). A key that can't be a board id in a URL ("." , "..", control or
 // bidi characters) is refused. Mounted after the identity middleware, so only an
 // authenticated caller ever sees the candidates.
-func BoardKeyResolver(bs *board.Store) func(http.Handler) http.Handler {
+func BoardKeyResolver(bs *board.Store, ss *store.SessionStore) func(http.Handler) http.Handler {
 	const prefix = "/api/board/"
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -123,7 +124,7 @@ func BoardKeyResolver(bs *board.Store) func(http.Handler) http.Handler {
 			case errors.Is(err, board.ErrAmbiguousBoard):
 				writeJSON(w, http.StatusConflict, map[string]any{"error": "ambiguous_board", "code": "ambiguous_board",
 					"message":    "More than one board is named \"" + key + "\": use its id",
-					"candidates": boardCandidates(r, bs, candidates)})
+					"candidates": boardCandidates(r, bs, ss, candidates)})
 				return
 			}
 			next.ServeHTTP(w, r)
@@ -133,17 +134,18 @@ func BoardKeyResolver(bs *board.Store) func(http.Handler) http.Handler {
 
 // boardCandidates describes boards for a 409 answer (ambiguous_board, board_name_exists).
 //
-// An agent's token is told only about the boards it holds a seat on (#11013, Security's round 2): the answer carries each board's id, label, creation time and member count (and, for a launch, how many of its agents are live), and a name that
-// matches another team's board would otherwise hand those to any agent that guesses the name. The Operator, the dashboard and the command line see every candidate.
-func boardCandidates(r *http.Request, bs *board.Store, boards []board.Board) []map[string]any {
+// An agent's token is told only about the board it was launched on (#11013, Security's round 2): the answer carries each board's id, label, creation time and member count (and, for a launch, how many of its
+// agents are live), and a name that matches another team's board would otherwise hand those to any agent that guesses the name. The agent's board is its live row's board, the one rule launch, join and search use;
+// a seat the Operator made on another board does not list it. The Operator, the dashboard and the command line see every candidate.
+func boardCandidates(r *http.Request, bs *board.Store, ss *store.SessionStore, boards []board.Board) []map[string]any {
 	out := make([]map[string]any, 0, len(boards))
 	owner, isAgent := VerifiedSession(r.Context())
 	for _, b := range boards {
 		if isAgent {
-			if owner == nil {
+			if owner == nil || ss == nil {
 				continue
 			}
-			if sub, err := bs.SessionSubscription(r.Context(), b.ID, owner.SessionName); err != nil || sub == nil {
+			if own, err := sessionLaunchedOnBoard(r.Context(), ss, owner.SessionID, b.ID); err != nil || !own {
 				continue
 			}
 		}
