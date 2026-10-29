@@ -28,12 +28,19 @@ try {
   const bin = path.join(tmp, 'bin'), ready = path.join(tmp, 'ready'), marker = path.join(tmp, 'REAL_CLI_WAS_CALLED');
   fs.mkdirSync(bin);
   writeStub(bin, 'claude', ready, marker);
-  const run = () => spawnSync('claude', ['--version'], { env: { ...process.env, PATH: bin + path.delimiter + process.env.PATH }, shell: process.platform === 'win32' });
-  assert.equal(run().status, 1, 'the stand-in exits 1: the real CLI never runs');
+  const run = args => spawnSync('claude', args, { env: { ...process.env, PATH: bin + path.delimiter + process.env.PATH }, shell: process.platform === 'win32' });
+  assert.equal(run(['--version']).status, 1, 'the stand-in exits 1: the real CLI never runs');
   assert.ok(!fs.existsSync(marker), 'not recorded before the shard is ready');
   fs.writeFileSync(ready, '');
-  assert.equal(run().status, 1);
-  assert.match(fs.readFileSync(marker, 'utf8'), /^claude --version/, 'recorded once ready: the run fails on it');
+  assert.equal(run(['--version']).status, 1);
+  assert.match(fs.readFileSync(marker, 'utf8'), /^claude/, 'recorded once ready: the run fails on it');
+  if (process.platform === 'win32') {
+    // An argument cmd.exe would act on is not put on its command line: no file is made, and the line holds only the name.
+    const made = path.join(tmp, 'made-by-an-argument');
+    run([`"x" ^& echo hi ^> "${made}"`, 'a1']);
+    assert.ok(!fs.existsSync(made), 'an argument is never run by cmd.exe');
+    assert.deepEqual(fs.readFileSync(marker, 'utf8').trim().split(/\r?\n/), ['claude was called', 'claude was called']);
+  }
 
   // The end check: a folder named after the run, or a line of the history naming it, since the run started; never an older one.
   const profile = { trees: [path.join(tmp, 'p', '.claude')], files: [path.join(tmp, 'p', 'history.txt')] };

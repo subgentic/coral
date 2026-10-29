@@ -34,8 +34,9 @@ export function profileEnv(hostHome, platform = process.platform) {
 export function writeStub(binDir, cli, readyPath, marker, platform = process.platform) {
   fs.writeFileSync(path.join(binDir, cli),
     `#!/bin/sh\n[ -e "${readyPath}" ] && printf '%s %s\\n' "${cli}" "$*" >> "${marker}"\nexit 1\n`, { mode: 0o755 });
+  // Only the program's name: its arguments, put on a cmd.exe command line, would be run by it (an unquoted & | >) or redirected.
   if (platform === 'win32') {
-    fs.writeFileSync(path.join(binDir, cli + '.cmd'), `@echo off\r\nif exist "${readyPath}" echo ${cli} %*>> "${marker}"\r\nexit /b 1\r\n`);
+    fs.writeFileSync(path.join(binDir, cli + '.cmd'), `@echo off\r\nif exist "${readyPath}" (echo ${cli} was called)>> "${marker}"\r\nexit /b 1\r\n`);
   }
 }
 
