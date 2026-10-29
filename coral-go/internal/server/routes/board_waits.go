@@ -213,18 +213,14 @@ func (h *BoardHandler) resolveMessageWaits(project, senderID, content string) {
 	if err != nil || len(resolved) == 0 {
 		return
 	}
-	preview := content
-	if len(preview) > 60 {
-		preview = preview[:57] + "..."
-	}
 	for _, w := range resolved {
 		sessionName := w.SessionName
 		if sub, err := h.bs.GetProjectSubscription(ctx, project, w.SubscriberID); err == nil && sub != nil && sub.SessionName != "" {
 			sessionName = sub.SessionName
 		}
 		if h.terminal != nil && sessionName != "" {
-			// The sender is quoted like the preview (#3376); sendAutomated keeps it one line.
-			nudge := fmt.Sprintf("[Wait resolved] %q posted on '%s': %q. Run 'coral-board read' to see the message.", senderID, project, preview)
+			// No preview: the message is read on the board (typedMessageWaitResolved, goal #7).
+			nudge := typedMessageWaitResolved(senderID, project)
 			if err := h.sendAutomated(ctx, project, sessionName, nudge); err != nil {
 				slog.Warn("failed to nudge waiting agent", "subscriber", w.SubscriberID, "session", sessionName, "error", err)
 			}
@@ -244,7 +240,7 @@ func (h *BoardHandler) resolveTaskWaits(project string, taskID int64, taskTitle,
 			sessionName = sub.SessionName
 		}
 		if h.terminal != nil && sessionName != "" {
-			nudge := fmt.Sprintf("[Wait resolved] Task #%d (%s) is now %s. Run 'coral-board task detail %d' to review.", taskID, taskTitle, event, taskID)
+			nudge := typedTaskWaitResolved(taskID, taskTitle, event)
 			if err := h.sendAutomated(ctx, project, sessionName, nudge); err != nil {
 				slog.Warn("failed to nudge waiting agent", "subscriber", w.SubscriberID, "session", sessionName, "error", err)
 			}

@@ -447,8 +447,7 @@ func oneLineTitle(title string) string {
 }
 
 func claimPrompt(t *store.AgentTask) string {
-	title := oneLineTitle(t.Title)
-	return fmt.Sprintf("You have a new task in Coral (#%d: %s). Claim it with `coral-agent task claim` to see the details, then run `coral-agent task complete %d` when it's done.", t.ID, title, t.ID)
+	return typedClaimPrompt(t.ID, t.Title) // typed into the agent's terminal (goal #7)
 }
 
 // notifyTaskCreated types the claim prompt into the agent's terminal.

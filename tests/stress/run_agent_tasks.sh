@@ -212,10 +212,10 @@ T2=$(create_task "$NAME_A" "$SID_A" "Write engine tests" "Cover ties and forfeit
 T3=$(create_task "$NAME_A" "$SID_A" $'Fix the\nlogin form' "" true)
 ID1=$(echo "$T1" | jget "d['id']"); ID2=$(echo "$T2" | jget "d['id']"); ID3=$(echo "$T3" | jget "d['id']")
 N1=$(echo "$T1" | jget "d.get('notified','')")
-check "the create response returns the prompt it sent" '[[ "$N1" == "You have a new task in Coral (#$ID1: Add a battle log). Claim it with \`coral-agent task claim\` to see the details, then run \`coral-agent task complete $ID1\` when it'"'"'s done." ]]' "$N1"
-check "task 1's claim prompt reached the agent's terminal" 'wait_for_input "$NAME_A" "$SID_A" "[mock-agent] input: You have a new task in Coral (#$ID1: Add a battle log). Claim it with \`coral-agent task claim\`"'
-check "task 2's claim prompt reached the agent's terminal" 'wait_for_input "$NAME_A" "$SID_A" "[mock-agent] input: You have a new task in Coral (#$ID2: Write engine tests)"'
-check "a multi-line title is stored and sent as one line" 'wait_for_input "$NAME_A" "$SID_A" "[mock-agent] input: You have a new task in Coral (#$ID3: Fix the login form)"'
+check "the create response returns the prompt it sent" '[[ "$N1" == "You have a new task in Coral, #$ID1: Add a battle log. Claim it with '"'"'coral-agent task claim'"'"' to see the details, then run '"'"'coral-agent task complete $ID1'"'"' when it'"'"'s done." ]]' "$N1"
+check "task 1's claim prompt reached the agent's terminal" 'wait_for_input "$NAME_A" "$SID_A" "[mock-agent] input: You have a new task in Coral, #$ID1: Add a battle log. Claim it with"'
+check "task 2's claim prompt reached the agent's terminal" 'wait_for_input "$NAME_A" "$SID_A" "[mock-agent] input: You have a new task in Coral, #$ID2: Write engine tests"'
+check "a multi-line title is stored and sent as one line" 'wait_for_input "$NAME_A" "$SID_A" "[mock-agent] input: You have a new task in Coral, #$ID3: Fix the login form"'
 check "the task details are not typed into the agent (they come with the claim)" '! capture "$NAME_A" "$SID_A" | grep -q "Cover ties and forfeits"'
 
 # ── Test 3: without notify nothing is typed ──────────────────────────

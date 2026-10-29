@@ -77,7 +77,7 @@ func TestBoardNoticesReachOnlyThatBoardsSessions(t *testing.T) {
 	// The completion notice goes to team-a's orchestrators.
 	task, err := h.bs.CreateTask(ctx, "team-a", "Ship #3857", "", "medium", "Orchestrator")
 	require.NoError(t, err)
-	h.notifyOrchestratorsTaskCompleted(ctx, "team-a", "Security Reviewer", task, "approved")
+	h.notifyOrchestratorsTaskCompleted(ctx, "team-a", "Security Reviewer", task, "Security Reviewer")
 	require.Len(t, term.sentTo(orchA), 1)
 	assert.Contains(t, term.sentTo(orchA)[0], "completed by Security Reviewer")
 	quietB("completion notice")

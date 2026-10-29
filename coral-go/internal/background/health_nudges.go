@@ -106,9 +106,9 @@ func claimNudgeText(id int64) string {
 
 func mentionRenudgeText(sender string, n int, since time.Time) string {
 	if n == 1 {
-		return fmt.Sprintf("[Coral] %s mentioned you at %s and has no answer yet. Run 'coral-board read'.", sender, since.Format("15:04"))
+		return fmt.Sprintf("[Coral] %s mentioned you at %s and has no answer yet. Run 'coral-board read'.", board.TypedLabel(sender), since.Format("15:04"))
 	}
-	return fmt.Sprintf("[Coral] %s mentioned you %d times since %s and has no answer yet. Run 'coral-board read'.", sender, n, since.Format("15:04"))
+	return fmt.Sprintf("[Coral] %s mentioned you %d times since %s and has no answer yet. Run 'coral-board read'.", board.TypedLabel(sender), n, since.Format("15:04"))
 }
 
 func statusNudgeText(id int64, minutes int) string {
@@ -406,10 +406,11 @@ func (h *HealthNudges) renudgeMentions(ctx context.Context, project, orch string
 	}
 }
 
-// askReminderText is the one reminder a member gets for a question: who asked, how long ago, what, and how to answer it so it is seen as an answer.
-func askReminderText(asker string, minutes int, id int64, text string) string {
-	return fmt.Sprintf("[Coral] %s asked you a question %d min ago and has no answer from you yet (message #%d): \"%s\". Answer with: coral-board post --reply-to %d \"...\"",
-		teamhealth.Name(asker), minutes, id, teamhealth.StoredText(text, nil), id)
+// askReminderText is the one reminder a member gets for a question: who asked, how long ago, which message, and how to answer it so it
+// is seen as an answer. The question itself is not typed: it is read on the board (goal #7).
+func askReminderText(asker string, minutes int, id int64) string {
+	return fmt.Sprintf("[Coral] %s asked you a question %d min ago and has no answer from you yet, message #%d. Run 'coral-board read' to see it, and answer with: coral-board post --reply-to %d \"...\"",
+		board.TypedLabel(teamhealth.Name(asker)), minutes, id, id)
 }
 
 // remindAsks reminds each member who still owes an answer to a question (post --ask) asked at least AfterMin ago, once per question and member (#7794). The reminder is delivered as any
@@ -450,7 +451,7 @@ func (h *HealthNudges) remindAsks(ctx context.Context, project string, bySession
 		if !r.take(ctx, ruleAskReminder, o.Member, time.Minute) {
 			continue
 		}
-		if sendUnlessBlocked(ctx, h.limit, h.deliver, a, "health-ask:"+project, askReminderText(o.Asker, int(now.Sub(o.At).Minutes()), o.MessageID, o.Content)) != nil {
+		if sendUnlessBlocked(ctx, h.limit, h.deliver, a, "health-ask:"+project, askReminderText(o.Asker, int(now.Sub(o.At).Minutes()), o.MessageID)) != nil {
 			continue
 		}
 		_ = h.store.RecordHealthAction(ctx, project, ruleAskReminder+"-msg", key, now)

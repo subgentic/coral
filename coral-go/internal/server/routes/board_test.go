@@ -799,7 +799,8 @@ func TestBoardCompleteTask_NotifiesOrchestrator(t *testing.T) {
 
 	require.Eventually(t, func() bool {
 		for _, cmd := range terminal.sentCommands() {
-			if strings.Contains(cmd, "[Task #1 completed by Backend Dev]") && strings.Contains(cmd, "Outcome: success") && strings.Contains(cmd, "Implement API") {
+			// The message is not typed (goal #7): the notice says where to read it.
+			if strings.Contains(cmd, "[Task #1 completed by Backend Dev]") && strings.Contains(cmd, "Outcome: success") && strings.Contains(cmd, "'coral-board task detail 1'") {
 				return true
 			}
 		}

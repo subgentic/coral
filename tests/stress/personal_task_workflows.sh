@@ -21,7 +21,7 @@ cat >"$TMPDIR_AT/personal-build.json" <<'JSON'
 JSON
 personal complete "$PB" --artifacts "$TMPDIR_AT/personal-build.json" >/dev/null
 check "personal completion immediately unlocks dependent" '[[ $(personal_status "$PT") == pending && $(personal_status "$PR") == blocked ]]'
-check "unblocked personal task sends a terminal notification" 'wait_for_input "$NAME_A" "$SID_A" "[mock-agent] input: You have a new task in Coral (#$PT: Personal test)"'
+check "unblocked personal task sends a terminal notification" 'wait_for_input "$NAME_A" "$SID_A" "[mock-agent] input: You have a new task in Coral, #$PT: Personal test"'
 OUT=$(personal claim "$PT")
 check "personal task consumes exact upstream revision" 'echo "$OUT" | grep -q "personal-rev-1"'
 cat >"$TMPDIR_AT/personal-report.json" <<'JSON'
