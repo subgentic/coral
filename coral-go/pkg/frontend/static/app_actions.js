@@ -53,7 +53,7 @@ registerActions({
     'mb-export': () => boardPage()?.showExportBoardModal(),
     'mb-pause': () => boardPage()?.toggleBoardPause(),
     'mb-delete-board': () => boardPage()?.deleteMessageBoardProject(),
-    'team-delete': el => { const b = el.dataset.board; if (b) importOnce('./message_board.js').then(mod => mod.deleteTeam(b)).catch(() => {}); }, // the sidebar's team menu (#10318): the board's code loads here, the board's page may not be open
+    'team-delete': el => { const b = el.dataset.board; if (b) importOnce('./message_board.js', 'the board').then(mod => mod.deleteTeam(b)).catch(() => {}); }, // the sidebar's team menu (#10318): the board's code loads here, the board's page may not be open; a failed load says so with importOnce's toast (the label), not silently
     'mb-post': () => boardPage()?.postBoardMessage(),
     // Enter sends, Shift+Enter is a new line.
     'mb-post-key': (el, event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); boardPage()?.postBoardMessage(); } },
