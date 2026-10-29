@@ -110,7 +110,8 @@ func (s *SessionStore) ListSessionsPaged(ctx context.Context, params SessionList
 type sessionListSQL struct {
 	from, where, order string
 	args               []interface{}
-	searching          bool // a full-text search is joined in: the rows can carry a snippet
+	searching          bool            // a full-text search is joined in: the rows can carry a snippet
+	names              *sessionListSQL // a search's second part: the chats whose agent name has the search in it (#10873); read first, and the text part leaves them out
 }
 
 // sessionListQuery turns the list's filters into SQL: a full-text search (ordered by rank), the dates, the
@@ -118,9 +119,10 @@ type sessionListSQL struct {
 func sessionListQuery(params SessionListParams) sessionListSQL {
 	q := sessionListSQL{from: "session_index si LEFT JOIN chat_flags cf ON cf.session_id = si.session_id", order: "si.last_timestamp DESC"}
 	var whereClauses []string
+	var args []interface{}
 	where := func(clause string, arg interface{}) {
 		whereClauses = append(whereClauses, clause)
-		q.args = append(q.args, arg)
+		args = append(args, arg)
 	}
 	where(archivedChatSQL("si.session_id")+" = ?", params.Archived)
 	if params.Starred {
@@ -131,14 +133,6 @@ func sessionListQuery(params SessionListParams) sessionListSQL {
 	}
 	if params.WithNotes {
 		where(notesChatSQL("si.session_id")+" = ?", true)
-	}
-	if params.Search != "" {
-		if safeQ := sanitizeFTSQuery(params.Search, params.FTSMode); safeQ != "" {
-			q.from += " JOIN session_fts fts ON fts.session_id = si.session_id"
-			where("session_fts MATCH ?", safeQ)
-			q.order = "rank"
-			q.searching = true
-		}
 	}
 	if params.DateFrom != "" {
 		where("si.last_timestamp >= ?", params.DateFrom+"T00:00:00")
@@ -167,9 +161,34 @@ func sessionListQuery(params SessionListParams) sessionListSQL {
 	if params.AgentName != "" {
 		where("si.agent_name = ?", params.AgentName)
 	}
-	if len(whereClauses) > 0 {
-		q.where = " WHERE " + strings.Join(whereClauses, " AND ")
+	join := func(clauses []string) string {
+		if len(clauses) == 0 {
+			return ""
+		}
+		return " WHERE " + strings.Join(clauses, " AND ")
 	}
+	q.where, q.args = join(whereClauses), args
+	if params.Search == "" {
+		return q
+	}
+	safeQ := sanitizeFTSQuery(params.Search, params.FTSMode)
+	if safeQ == "" { // a search of only characters that are not words (a bare "*") filters nothing, as before
+		return q
+	}
+	// A search matches the chat's text (FTS5, ranked, with its snippet) or the agent's name, any part of it in any case (#10873: the Agent column shows the name, the index holds only the text).
+	// Two parts, not one query: MATCH cannot sit beside an OR, and joining the text hits on as a subquery made a common word 300 times slower. The text part is the plain inner join it always was, leaving out
+	// the chats the name part has; the name part is the few chats of the agent, read first (no snippet, newest first). A page is the name part's rows, then the text part's.
+	nameLike := "(LOWER(COALESCE(si.agent_name, '')) LIKE ? ESCAPE '\\' OR LOWER(COALESCE(si.display_name, '')) LIKE ? ESCAPE '\\')"
+	like := "%" + escapeLike(strings.ToLower(strings.TrimSpace(params.Search))) + "%"
+	names := sessionListSQL{from: q.from, order: q.order}
+	names.where = join(append(append([]string{}, whereClauses...), nameLike))
+	names.args = append(append([]interface{}{}, args...), like, like)
+	q.names = &names
+	q.from += " JOIN session_fts fts ON fts.session_id = si.session_id"
+	q.where = join(append(append([]string{}, whereClauses...), "session_fts MATCH ?", "NOT "+nameLike))
+	q.args = append(append(append([]interface{}{}, args...), safeQ), like, like)
+	q.order = "rank"
+	q.searching = true
 	return q
 }
 
@@ -191,17 +210,61 @@ type sessionPageRow struct {
 	Snippet          string  `db:"snippet"`
 }
 
-// pageSessions counts the sessions the query matches and reads the requested page of them.
+// pageSessions counts the sessions the query matches and reads the requested page of them: with a search that also names agents, the page is the name part's rows and then the text part's (#10873).
 func (s *SessionStore) pageSessions(ctx context.Context, q sessionListSQL, params SessionListParams) (int, []sessionPageRow, error) {
-	countSQL, countArgs, err := sqlx.In(fmt.Sprintf("SELECT COUNT(*) FROM %s%s", q.from, q.where), q.args...)
+	offset := (params.Page - 1) * params.PageSize
+	if q.names == nil {
+		total, err := s.countSessions(ctx, q)
+		if err != nil {
+			return 0, nil, err
+		}
+		rows, err := s.readSessions(ctx, q, params.PageSize, offset)
+		return total, rows, err
+	}
+	nameTotal, err := s.countSessions(ctx, *q.names)
 	if err != nil {
 		return 0, nil, err
 	}
-	var total int
-	if err := s.reader().GetContext(ctx, &total, countSQL, countArgs...); err != nil {
+	textTotal, err := s.countSessions(ctx, q)
+	if err != nil {
 		return 0, nil, err
 	}
-	offset := (params.Page - 1) * params.PageSize
+	var rows []sessionPageRow
+	if offset < nameTotal {
+		part, err := s.readSessions(ctx, *q.names, params.PageSize, offset)
+		if err != nil {
+			return 0, nil, err
+		}
+		rows = part
+	}
+	if left := params.PageSize - len(rows); left > 0 {
+		textOffset := offset - nameTotal
+		if textOffset < 0 {
+			textOffset = 0
+		}
+		part, err := s.readSessions(ctx, q, left, textOffset)
+		if err != nil {
+			return 0, nil, err
+		}
+		rows = append(rows, part...)
+	}
+	return nameTotal + textTotal, rows, nil
+}
+
+func (s *SessionStore) countSessions(ctx context.Context, q sessionListSQL) (int, error) {
+	countSQL, countArgs, err := sqlx.In(fmt.Sprintf("SELECT COUNT(*) FROM %s%s", q.from, q.where), q.args...)
+	if err != nil {
+		return 0, err
+	}
+	var total int
+	if err := s.reader().GetContext(ctx, &total, countSQL, countArgs...); err != nil {
+		return 0, err
+	}
+	return total, nil
+}
+
+// readSessions reads limit rows of the query from offset on.
+func (s *SessionStore) readSessions(ctx context.Context, q sessionListSQL, limit, offset int) ([]sessionPageRow, error) {
 	selectFields := `si.session_id, si.source_type, si.source_file,
 		si.first_timestamp, si.last_timestamp, si.message_count, si.display_summary, si.first_user_message,
 		si.agent_name, si.display_name, COALESCE(cf.starred,0) AS starred, ` + archivedChatSQL("si.session_id") + ` AS archived, ` + activeChatSQL("si.session_id", "si.source_type") + ` AS active`
@@ -212,15 +275,15 @@ func (s *SessionStore) pageSessions(ctx context.Context, q sessionListSQL, param
 		selectFields += `, '' AS snippet`
 	}
 	query, pageArgs, err := sqlx.In(fmt.Sprintf("SELECT %s FROM %s%s ORDER BY %s LIMIT ? OFFSET ?", selectFields, q.from, q.where, q.order),
-		append(q.args, params.PageSize, offset)...)
+		append(append([]interface{}{}, q.args...), limit, offset)...)
 	if err != nil {
-		return 0, nil, err
+		return nil, err
 	}
 	var rows []sessionPageRow
 	if err := s.reader().SelectContext(ctx, &rows, query, pageArgs...); err != nil {
-		return 0, nil, err
+		return nil, err
 	}
-	return total, rows, nil
+	return rows, nil
 }
 
 // sessionListExtras is what a list page shows beyond session_index, per session id: notes, tags, the latest git
@@ -611,4 +674,9 @@ func oneLine(s string, max int) string {
 		b.WriteRune(r)
 	}
 	return strings.TrimSpace(b.String())
+}
+
+// escapeLike makes s literal inside a LIKE pattern (with ESCAPE '\'): a search for "100%" or "a_b" means those characters.
+func escapeLike(s string) string {
+	return strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(s)
 }
