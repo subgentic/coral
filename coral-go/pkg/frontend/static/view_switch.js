@@ -83,7 +83,9 @@ export function showView(activeId) {
     const layout = document.querySelector('.layout');
     if (layout) layout.classList.toggle('sidebar-hidden', FULL_WIDTH_VIEWS.has(activeId) && !(activeId === 'inbox-view' && !isCloud())); // the Inbox has its pane except as the hub's frame (#7472)
     document.body.classList.toggle('live-session-active', activeId === 'live-session-view');
-    document.body.classList.toggle('agent-home-active', activeId === 'mobile-agent-list'); // the phone's Agents page has its own top bar in its header (#11096)
+    document.body.classList.toggle('agent-home-active', activeId === 'mobile-agent-list');
+    document.body.classList.toggle('phone-nav-on', activeId === 'mobile-agent-list' || activeId === 'inbox-view'); // the phone's floating nav is on these two pages (#11116)
+    for (const it of document.querySelectorAll('.phone-nav-slot[data-phone-nav]')) { const on = (it.dataset.phoneNav === 'nav-agents' && activeId === 'mobile-agent-list') || (it.dataset.phoneNav === 'nav-inbox' && activeId === 'inbox-view'); it.classList.toggle('active', on); if (on) it.setAttribute('aria-current', 'page'); else it.removeAttribute('aria-current'); } // the phone's Agents page has its own top bar in its header (#11096)
     // Which CLI the agent page on screen is, for the lines that are about one CLI only (the "Claude is not signed in" line, #6070): its type, or "remote" for an agent on another computer or seen through
     // Coral Hub (this computer's CLI says nothing about it); empty off an agent's page. Plain CSS reads it, so no listener is needed at startup.
     const open = activeId === 'live-session-view' ? state.currentSession : null;

@@ -130,9 +130,15 @@ function openMenu(btn) {
     } else menu.replaceChildren(...items.map(makeItem));
     menu.hidden = false;
     const r = btn.getBoundingClientRect();
-    menu.style.top = Math.round(r.bottom + 6) + 'px';
-    menu.style.bottom = 'auto';
-    menu.style.maxHeight = Math.max(120, window.innerHeight - Math.round(r.bottom + 6) - 8) + 'px'; // never taller than the room under its button: on a short phone the last item (Sign out) was 30 px off the screen (#10767); .nav-more-menu scrolls
+    if (btn.hasAttribute('data-menu-up')) { // the phone's floating nav (#11116): the menu opens above its button, never taller than the room over it
+        menu.style.top = 'auto';
+        menu.style.bottom = Math.round(window.innerHeight - r.top + 6) + 'px';
+        menu.style.maxHeight = Math.max(120, Math.round(r.top - 6) - 8) + 'px';
+    } else {
+        menu.style.top = Math.round(r.bottom + 6) + 'px';
+        menu.style.bottom = 'auto';
+        menu.style.maxHeight = Math.max(120, window.innerHeight - Math.round(r.bottom + 6) - 8) + 'px'; // never taller than the room under its button: on a short phone the last item (Sign out) was 30 px off the screen (#10767); .nav-more-menu scrolls
+    }
     if (all) { menu.style.left = '8px'; menu.style.right = '8px'; }
     else { menu.style.left = 'auto'; menu.style.right = Math.max(8, window.innerWidth - r.right) + 'px'; }
     btn.setAttribute('aria-expanded', 'true');

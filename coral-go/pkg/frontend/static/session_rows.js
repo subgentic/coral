@@ -341,7 +341,7 @@ export function _renderSessionItem(s, groupName, isCompact, collapsed, teamDefau
                 ${stale ? '' : kebabMenu}
             </div>
             <span class="session-status-line">${escapeHtml(stateInfo.label)}</span>
-            <span class="session-preview" aria-hidden="true">${escapeHtml(sessionGoalText(s) || 'No messages yet')}</span>
+            <span class="session-preview" aria-hidden="true">${escapeHtml(previewOf(s, identity))}</span>
             ${rowLinesHtml(s)}
         </div>
         <div class="session-tooltip"></div>
@@ -415,6 +415,12 @@ export function setRowLineShown(part, on) {
 const avatarOf = (s, identity, groupName) => {
     const team = sessionTeamKey(s) || groupName || '';
     return { color: (team && _getBoardColor(team)) || getAgentColor(team ? `team:${team}` : `cli:${s.agent_type || ''}`), initial: (Array.from(String(identity || '?'))[0] || '?').toUpperCase() };
+};
+/** The card's preview line (#11116, slice B): the agent's last message as "You: ..." (the person's words) or "<Name>: ..." (the agent's), from the live row's last_message {role, text, at} (text redacted and cut at 140 characters by the server); a row without one shows the goal, else "No messages yet". The server sends no person's text to an agent's token, so such a row is the goal's. */
+const previewOf = (s, identity) => {
+    const lm = s.last_message, text = lm && typeof lm.text === 'string' ? lm.text.replace(/\s+/g, ' ').trim() : '';
+    if (text) return `${lm.role === 'user' ? 'You' : identity}: ${text}`;
+    return sessionGoalText(s) || 'No messages yet';
 };
 const _shortAgo = sec => (sec === null || sec === undefined ? '' : sec < 60 ? 'now' : sec < 3600 ? `${Math.floor(sec / 60)}m` : sec < 86400 ? `${Math.floor(sec / 3600)}h` : `${Math.floor(sec / 86400)}d`);
 

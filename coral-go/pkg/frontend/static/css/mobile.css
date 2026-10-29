@@ -1358,7 +1358,7 @@
 @media (max-width: 600px) {
     body.agent-home-active header.top-bar { display: none; }
     body.agent-home-active { --top-bar-height: env(safe-area-inset-top, 0px); }
-    #mobile-agent-list .mobile-list-header { padding: calc(8px + env(safe-area-inset-top, 0px)) 8px 4px; gap: 4px 8px; flex-wrap: wrap; justify-content: flex-start; align-items: center; }
+    #mobile-agent-list .mobile-list-header { padding: calc(8px + env(safe-area-inset-top, 0px)) 8px 4px; gap: 4px; flex-wrap: wrap; justify-content: flex-start; align-items: center; }
     #mobile-agent-list .phone-menu-btn, #mobile-agent-list .phone-account-btn { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 44px; height: 44px; min-width: 44px; padding: 0; border-radius: 50%; }
     #mobile-agent-list .phone-menu-btn { order: 0; }
     #mobile-agent-list .mobile-search-row { order: 1; flex: 1 1 0; min-width: 0; }
@@ -1367,8 +1367,8 @@
     #mobile-agent-list .phone-break { order: 3; display: block; flex: 0 0 100%; height: 0; }
     #mobile-agent-list .mobile-list-header .mobile-search-input { height: 48px; border-radius: 24px; border: 0; background: var(--bg-secondary); padding: 0 18px; font-size: var(--fs-lg); }
     #mobile-agent-list .mobile-list-title { order: 4; font-size: var(--fs-2xl); font-weight: var(--fw-regular); margin: 0 auto 0 8px; }
-    #mobile-agent-list .phone-chips { order: 5; display: flex; gap: 8px; flex: 0 1 auto; min-width: 0; }
-    #mobile-agent-list .phone-chip { min-height: 44px; height: auto; padding: 0 14px; border: 0; border-radius: 18px; background: var(--bg-hover); color: var(--text-primary); font-size: var(--fs-md); white-space: nowrap; cursor: pointer; }
+    #mobile-agent-list .phone-chips { order: 5; display: flex; gap: 6px; flex: 0 1 auto; min-width: 0; }
+    #mobile-agent-list .phone-chip { min-height: 44px; height: auto; padding: 0 12px; border: 0; border-radius: 18px; background: var(--bg-hover); color: var(--text-primary); font-size: var(--fs-md); white-space: nowrap; cursor: pointer; }
     #mobile-agent-list .phone-chip[hidden] { display: none; }
     #mobile-agent-list .phone-chip-need { background: rgba(var(--fx-yellow-rgb), 0.18); color: var(--warning); }
     #mobile-agent-list .phone-chip[aria-pressed="true"] { box-shadow: inset 0 0 0 2px currentColor; }
@@ -1376,7 +1376,7 @@
     #mobile-agent-list .mobile-list-header > .sidebar-collapse-btn[data-display-button] { order: 6; margin-left: auto; } /* Display options, the groups' toggle and New share the line under the title, at its right */
 
     /* the cards */
-    #mobile-session-list { padding: 0 8px 96px; }
+    #mobile-session-list { padding: 0 8px 112px; } /* room under the floating nav and the + (96 px of them) */
     #mobile-session-list .session-group-item, #mobile-session-list > .session-group-item {
         position: relative; display: grid; grid-template-columns: 48px minmax(0, 1fr); column-gap: 12px; align-items: start;
         margin: 0 0 3px; padding: 14px 12px !important; min-height: 76px; border: 0; border-radius: 14px; background: var(--bg-secondary); box-shadow: none;
@@ -1398,4 +1398,31 @@
     #mobile-session-list .session-group-item.needs-attention .session-preview { color: var(--text-primary); }
     #mobile-session-list .session-group-item.needs-attention .session-time { color: var(--accent); font-weight: var(--fw-medium); }
     #mobile-session-list .session-group-item .sidebar-kebab-wrapper { position: absolute; right: 2px; bottom: 2px; }
+}
+
+/* ── The phone's floating nav and + (#11116, slice C of the Google Chat style) ───────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   Home, Inbox (with the waiting count), Tasks and More are a pill 18 px above the bottom; the + is a separate rounded button at the right and opens New agent and New team. Under 601 px, on the Agents page and the Inbox, and not
+   while the keyboard is up (the + only on the Agents page). The lists keep room under them (96 px). */
+.phone-nav, .phone-fab, .phone-fab-menu { display: none; }
+@media (max-width: 600px) {
+    body.phone-nav-on:not(.keyboard-open):not(.popout-mode) .phone-nav { position: fixed; left: 14px; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); z-index: 40; display: flex; align-items: center; justify-content: space-around; gap: 2px; width: 268px; height: 64px; padding: 0 6px; border-radius: 32px; background: var(--bg-secondary); box-shadow: 0 2px 14px rgba(var(--black-rgb), 0.22); }
+    .phone-nav-slot { position: relative; display: grid; place-items: center; flex: none; width: 56px; height: 44px; padding: 0; border: 0; border-radius: 22px; background: none; color: var(--text-primary); cursor: pointer; }
+    .phone-nav-slot.active { background: var(--bg-hover); }
+    .phone-nav-slot svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .phone-nav-slot[data-phone-nav="nav-more"] svg { fill: currentColor; stroke: none; }
+    .phone-nav-badge { position: absolute; top: 0; right: 6px; background: var(--warning); color: var(--bg-primary); }
+    .phone-nav-badge[hidden] { display: none; }
+    body.agent-home-active:not(.keyboard-open):not(.popout-mode) .phone-fab { position: fixed; right: 16px; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); z-index: 40; display: grid; place-items: center; width: 64px; height: 64px; padding: 0; border: 0; border-radius: 20px; background: var(--accent); color: var(--text-on-accent); box-shadow: 0 2px 14px rgba(var(--black-rgb), 0.22); cursor: pointer; }
+    .phone-fab svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; }
+    body:has(#inbox-view[data-phone-item]) .phone-nav { display: none; } /* a task or a message opened in the Inbox is a page of its own: the nav goes while it is open */
+    body.agent-home-active:has(#mobile-agent-list .empty-launch) .phone-fab { display: none; } /* an empty page has its own New agent button */
+    body.agent-home-active .phone-fab-menu:not([hidden]) { position: fixed; right: 16px; bottom: calc(92px + env(safe-area-inset-bottom, 0px)); z-index: 41; display: flex; flex-direction: column; min-width: 180px; }
+}
+
+@media (max-width: 600px) {
+    #mobile-agent-list { overflow-x: hidden; } /* a 1 px overflow drew a horizontal scrollbar, a grey strip under the page (the Mobile Beta Tester, #11116) */
+    #mobile-agent-list .mobile-list-header > .btn-small.btn-primary { display: none; } /* New is in the + menu (the title row stays one row with both chips) */
+    #mobile-session-list .session-dot::before { content: none; } /* the sleeping moon was a clipped dark crescent in a 16 px badge */
+    #mobile-session-list .session-dot.your-turn, #mobile-session-list .session-dot.sleeping { background: var(--text-muted); box-shadow: none; }
+    #mobile-session-list .session-dot.your-turn { background: var(--bg-secondary); box-shadow: inset 0 0 0 2px var(--text-primary); }
 }

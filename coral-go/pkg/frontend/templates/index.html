@@ -397,6 +397,19 @@
 
     {{ template "includes/modals.html" . }}
 
+    <!-- The phone's floating navigation (#11116, the Google Chat style): a pill with Home (the agents), Inbox (the waiting count on it), Tasks and More (the rest of the menu), and a separate + that opens New agent and New team. Phone width, the Agents page and the Inbox only (mobile.css); hidden while the keyboard is up. -->
+    <nav class="phone-nav" id="phone-nav" aria-label="Main">
+        <button type="button" class="phone-nav-slot" data-phone-nav="nav-agents" data-on-click="phone-nav" data-arg="nav-agents" aria-label="Home, the agents" title="Home"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11l8-7 8 7v9h-5v-6H9v6H4z"/></svg></button>
+        <button type="button" class="phone-nav-slot" data-phone-nav="nav-inbox" data-on-click="phone-nav" data-arg="nav-inbox" aria-label="Go to Inbox" title="Inbox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 13l2-8h12l2 8v6H4zM4 13h5l1 2h4l1-2h5"/></svg><span class="chip chip-count phone-nav-badge" id="phone-nav-inbox-badge" hidden></span></button>
+        <button type="button" class="phone-nav-slot" data-phone-nav="nav-tasks" data-on-click="phone-nav" data-arg="nav-tasks" aria-label="Go to Tasks" title="Tasks"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="6" rx="2"/><rect x="4" y="14" width="16" height="6" rx="2"/></svg></button>
+        <button type="button" class="phone-nav-slot" data-phone-nav="nav-more" data-on-click="m-top-menu" data-hamburger data-account data-menu-up aria-haspopup="menu" aria-expanded="false" aria-controls="nav-more-menu" aria-label="More pages" title="More pages"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg></button>
+    </nav>
+    <button type="button" class="phone-fab" id="phone-fab" data-on-click="phone-fab" aria-haspopup="menu" aria-expanded="false" aria-controls="phone-fab-menu" aria-label="New" title="New"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+    <div id="phone-fab-menu" class="menu phone-fab-menu" role="menu" aria-label="New" hidden>
+        <button type="button" class="menu-item overflow-menu-item" role="menuitem" data-on-click="phone-fab-new" data-arg="agent">New agent</button>
+        <button type="button" class="menu-item overflow-menu-item" role="menuitem" data-on-click="phone-fab-new" data-arg="team">New team</button>
+    </div>
+
     <!-- Mobile Bottom Tab Bar (3 tabs: Agents, Chat, Board) -->
     <nav class="mobile-tab-bar" role="tablist" aria-label="Mobile navigation">
         <button class="mobile-tab active" data-tab="agents" data-on-click="m-switch-mobile-tab" data-arg="agents">

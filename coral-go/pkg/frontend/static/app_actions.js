@@ -189,6 +189,18 @@ registerActions({
     'goal-edit': () => window.editGoal(),
     'live-view-mode': el => { if (el.dataset.mode === 'chat' || el.dataset.mode === 'terminal') window.setLiveViewMode(el.dataset.mode); },
     'chat-find-toggle': () => window.toggleChatFind(),
+    'phone-nav': el => { // the phone's floating nav (#11116): Home, Inbox, Tasks (More opens the menu: m-top-menu)
+        const arg = el.dataset.arg;
+        if (arg === 'nav-agents') window.switchNavTab('agents');
+        else { window.switchNavTab('hub-inbox'); if (arg === 'nav-tasks') importOnce('./inbox_tab.js').then(m => m.selectInboxTab('tasks')); }
+    },
+    'phone-fab': (el, event) => { // the + : New agent, New team (the menu is drawn above it)
+        event.stopPropagation();
+        const menu = document.getElementById('phone-fab-menu'), open = menu.hidden;
+        menu.hidden = !open; el.setAttribute('aria-expanded', String(open));
+        if (open) { menu.querySelector('[role=menuitem]')?.focus(); document.addEventListener('click', () => { menu.hidden = true; el.setAttribute('aria-expanded', 'false'); }, { once: true }); }
+    },
+    'phone-fab-new': el => { const menu = document.getElementById('phone-fab-menu'); menu.hidden = true; document.getElementById('phone-fab').setAttribute('aria-expanded', 'false'); window.showLaunchModal(); window._selectLaunchType(el.dataset.arg); },
     'agent-bar-more': el => { const d = document.getElementById('agent-phone-details'), h = el.closest('.terminal-header'), open = el.getAttribute('aria-expanded') !== 'true'; el.setAttribute('aria-expanded', String(open)); if (h) h.toggleAttribute('data-more', open); if (d) d.open = open; }, // a phone's agent row (#11056): the controls that do not fit the one row, and the Details, open under it
     'agentic-panel-toggle': el => (el.dataset.open === '0' ? window.toggleAgenticPanel(false) : window.toggleAgenticPanel()),
     'agentic-tab': el => { if (AGENTIC_TABS.has(el.dataset.tab)) window.switchAgenticTab(el.dataset.tab, 'top'); },
