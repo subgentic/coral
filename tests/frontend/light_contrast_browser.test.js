@@ -16,6 +16,7 @@ const BASE = require('./test_base').BASE;
         await setTheme(ev, 'light');
         // 1. a Docs code block: its plain text and every token colour against the block
         await ev(`import((window.__coralStatic || '/static/') + 'vendor_loader.js').then(m => m.loadHighlight()).then(() => true)`); // highlight.js's own style sheet (github-dark), as a page that has shown code has it
+        await ev(`import((window.__coralStatic || '/static/') + 'lazy_styles.js').then(m => m.loadStyles('docs.css')).then(() => true)`); // the Docs page's rules arrive with the Docs page since #10706 (03edcc26a), not with the start's stylesheet
         // the Docs page's own rules style `.docs-content pre`; its code, as highlight.js writes it, in a box of the page's colours
         await ev(`(() => { document.getElementById('cc-box')?.remove(); const b = document.createElement('div'); b.id = 'cc-box'; b.className = 'docs-content'; b.style.cssText = 'position:fixed;left:0;top:0;width:800px;height:300px;overflow:auto;background:var(--bg-primary);z-index:99999;padding:12px';
             b.innerHTML = '<pre><code class="hljs language-bash"><span class="hljs-comment"># a script you run yourself</span>\\nNAME=$(coral agent name)\\nQuick safety check: Is <span class="hljs-keyword">this</span> a project you created?\\ncurl -s <span class="hljs-string">"http://localhost:8420/api"</span> -X POST <span class="hljs-attr">--data</span> <span class="hljs-number">42</span></code></pre>'; document.body.appendChild(b); return true; })()`);

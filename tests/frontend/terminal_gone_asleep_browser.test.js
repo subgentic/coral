@@ -30,7 +30,8 @@ const BASE = require('./test_base').BASE;
             const info = id => { const e = r(id); return e ? { chip: !!e.querySelector('.terminal-gone-chip'), text: e.textContent.replace(/\\s+/g, ' '), aria: e.getAttribute('aria-label') || '' } : null; };
             return { gone: info('gone-a-id'), nap: info('nap-b-id'), arch: info('arch-c-id') }; })()`);
         assert.ok(rows.gone, 'the gone agent is in view, not folded into the sleeping row: ' + JSON.stringify(rows));
-        assert.equal(rows.nap, null, 'a plain sleeping agent stays folded into "1 sleeping agent"');
+        // Since #10062 (e6e1c67a9) up to three sleeping agents of a group are rows, not a folded line: a plain sleeper is a row too, with no Terminal gone chip.
+        assert.ok(rows.nap && rows.nap.chip === false && /Sleeping/.test(rows.nap.aria), 'a plain sleeping agent is a row without the Terminal gone chip: ' + JSON.stringify(rows.nap));
         assert.equal(rows.gone.chip, true, 'the gone agent has the Terminal gone chip');
         assert.equal(!!(rows.arch && rows.arch.chip), false, 'an archived agent does not, whatever the reason');
         const labels = await ev(`(async () => { const r = await import((window.__coralStatic||'/static/') + 'render.js');
