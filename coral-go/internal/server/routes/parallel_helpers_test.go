@@ -1,8 +1,13 @@
 package routes
 
 import (
+	"os"
+	"path/filepath"
 	"runtime"
 	"sync"
+	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 // #4852: the old-against-new oracles are the slowest tests of this package (a hundred seconds of the whole run). Their units of work (a seed, a
@@ -44,4 +49,29 @@ func parallelFor(n int, fn func(i int) bool) {
 	}
 	close(next)
 	wg.Wait()
+}
+
+// writeFilesParallel writes n files, file i at path(i) with content, from testWorkers goroutines (#359: a file costs about 3 ms on Windows and the tests that need thousands of them spent
+// 8 to 15 s each writing them one after another). The folders are made as needed; the first error fails the test, on the test's own goroutine.
+func writeFilesParallel(t *testing.T, n int, path func(i int) string, content []byte) {
+	t.Helper()
+	var mu sync.Mutex
+	var first error
+	parallelFor(n, func(i int) bool {
+		p := path(i)
+		err := os.MkdirAll(filepath.Dir(p), 0o755)
+		if err == nil {
+			err = os.WriteFile(p, content, 0o644)
+		}
+		if err != nil {
+			mu.Lock()
+			if first == nil {
+				first = err
+			}
+			mu.Unlock()
+			return false
+		}
+		return true
+	})
+	require.NoError(t, first)
 }

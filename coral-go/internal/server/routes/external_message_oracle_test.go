@@ -60,9 +60,22 @@ var externalMessageOutcomes = map[string]int{
 func TestPostExternalMessageAgreesWithBefore4838(t *testing.T) {
 	t.Parallel() // no shared state: these ran one after another (#5622)
 	counts := map[string]int{}
-	for seed := int64(1); seed <= 40; seed++ {
-		runExternalMessageOracle(t, seed, counts)
-	}
+	var countsMu sync.Mutex
+	// Each seed has its own handlers, boards and clock, so the 40 seeds run together (#359: 17 s one after another), inside one group so the floors are read after every seed has finished.
+	t.Run("seeds", func(t *testing.T) {
+		for seed := int64(1); seed <= 40; seed++ {
+			t.Run(strconv.FormatInt(seed, 10), func(t *testing.T) {
+				t.Parallel()
+				mine := map[string]int{}
+				runExternalMessageOracle(t, seed, mine)
+				countsMu.Lock()
+				for k, v := range mine {
+					counts[k] += v
+				}
+				countsMu.Unlock()
+			})
+		}
+	})
 	t.Logf("compared, per outcome: %v", counts)
 	for name, floor := range externalMessageOutcomes {
 		require.GreaterOrEqual(t, counts[name], floor, "%q went (almost) unexercised", name)

@@ -81,9 +81,23 @@ func TestPostRelayMessageAgreesWithBefore4756(t *testing.T) {
 	prevEnforced := identityActorEnforced()
 	t.Cleanup(func() { setIdentityActorEnforced(prevEnforced) })
 	counts := map[string]int{}
-	for seed := int64(1); seed <= 60; seed++ {
-		t.Run(fmt.Sprint(seed), func(t *testing.T) { runRelayOracle(t, seed, counts) })
-	}
+	var countsMu sync.Mutex
+	// The 60 seeds share nothing but the process-wide enforce flag (oracleEnforceFlagMu holds it for one request on each side), so they run together, as the update-task oracle's do (#359:
+	// 14 s one after another); the parent test waits for them all before it checks the floors.
+	t.Run("seeds", func(t *testing.T) {
+		for seed := int64(1); seed <= 60; seed++ {
+			t.Run(fmt.Sprint(seed), func(t *testing.T) {
+				t.Parallel()
+				mine := map[string]int{}
+				runRelayOracle(t, seed, mine)
+				countsMu.Lock()
+				for k, v := range mine {
+					counts[k] += v
+				}
+				countsMu.Unlock()
+			})
+		}
+	})
 	t.Logf("compared, per outcome: %v", counts)
 	for name, floor := range relayOutcomes {
 		require.GreaterOrEqual(t, counts[name], floor, "%q went (almost) unexercised", name)
@@ -316,6 +330,7 @@ func runRelayOracle(t *testing.T, seed int64, counts map[string]int) {
 		var results [2]result
 		for i, s := range sides {
 			step = &relayStep{msg: answer, failAt: failAt, noFiles: noFiles}
+			oracleEnforceFlagMu.Lock() // the enforce flag is the process's: set, serve and let the background work finish under one hold
 			setIdentityActorEnforced(enforced)
 			if noRelay {
 				s.h.SetRelay(nil)
@@ -337,6 +352,7 @@ func runRelayOracle(t *testing.T, seed int64, counts map[string]int) {
 			rec := httptest.NewRecorder()
 			s.mux.ServeHTTP(rec, req)
 			s.h.WaitBackground()
+			oracleEnforceFlagMu.Unlock()
 			if noRelay {
 				st := step
 				s.h.SetRelay(func(_ context.Context, path string, raw []byte) (tunnel.RelayResponse, error) {

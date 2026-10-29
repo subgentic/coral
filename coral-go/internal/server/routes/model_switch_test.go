@@ -295,8 +295,9 @@ func TestSwitchModelRefusedByTheCLIOrNotConfirmed(t *testing.T) {
 	})
 	t.Run("an old /model entry does not confirm a new one", func(t *testing.T) {
 		r := newSwitchRig(t, "claude")
+		r.h.modelSwitches.allowance = 50 * time.Millisecond // this rig's handler only, before any switch starts
 		r.localCommand(t, "/model", "x", "Set model to `Old` and saved")
-		time.Sleep(1100 * time.Millisecond) // sleep-ok: the stale entry must be older than the command by more than the clock allowance
+		time.Sleep(110 * time.Millisecond) // sleep-ok: the stale entry must be older than the command by more than the (test-shortened) clock allowance
 		_, _ = r.post(t, map[string]any{"model": "claude-sonnet-5-5"})
 		sw := r.waitState(t, switchFailed)
 		assert.Contains(t, sw.Message, "did not confirm")
@@ -742,4 +743,13 @@ func TestAConfirmedSwitchStaysConfirmedAcrossARestartAndAWake(t *testing.T) {
 	r.assistant(t, "high")
 	r.row(t) // the list reads the transcript
 	assert.Equal(t, "high", r.row(t)["thinking_actual"], "a turn recorded after the setting is the transcript's")
+}
+
+// #359: the allowance is a field only so one test can shorten it on its own handler; its product value is one second.
+func TestSwitchClockAllowanceDefaultIsOneSecond(t *testing.T) {
+	var tr modelSwitchTracker
+	assert.Equal(t, time.Second, defaultSwitchClockAllowance)
+	assert.Equal(t, defaultSwitchClockAllowance, tr.clockAllowance(), "a tracker nobody set uses the product value")
+	tr.allowance = 50 * time.Millisecond
+	assert.Equal(t, 50*time.Millisecond, tr.clockAllowance())
 }
