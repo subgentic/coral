@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/store"
 	"github.com/subgentic/coral/internal/typedcensus"
 )
@@ -30,6 +31,7 @@ func TestTypedNoticeCensus(t *testing.T) {
 		typedcensus.C("artifact reminder", claudeArtifactNudgeText, claudeArtifactNudgeText),
 		typedcensus.C("agent UI action", uiActionPrompt(7, "panel-1", 3), uiActionPrompt(7, "panel-1", 3)),
 		typedcensus.C("review pool", reviewPoolNudge, reviewPoolNudge),
+		typedcensus.C("send now", board.NudgeText(3), board.NudgeText(1)),
 	}
 	typedcensus.Run(t, cases)
 }
@@ -68,5 +70,10 @@ func TestEveryTypedSenderIsInTheCensus(t *testing.T) {
 		typedcensus.S("claude_artifact_nudge.go", `text, what)`, 1, "the nudger's deliver: forwards claudeArtifactNudgeText"),
 		typedcensus.S("claude_artifact_nudge.go", `claudeArtifactNudgeText`, 1, "census: artifact reminder"),
 		typedcensus.S("review_pool.go", `reviewPoolNudge`, 1, "census"),
+		typedcensus.S("agent_exited.go", `term.SendInput(ctx, terminalinput.Coral, name, text, agentType, sessionID)`, 1, "deliverAutomated's own send: types the text of its callers, listed here"),
+		typedcensus.S("sessions_input.go", `body.Command, body.AgentType`, 1, "exception: POST /send by a caller that is not a person (an agent's tool, a script): the caller's own words, through the gate and its exited-pane guard; who may send is checked before"),
+		typedcensus.S("sessions_input.go", `"/keys"`, 1, "exception: POST /keys by a caller that is not a person: the caller's own keys, through the gate"),
+		typedcensus.S("sessions_waiting.go", `ptymanager.DeliverNow(`, 1, "Send now: board.NudgeText (census)"),
+		typedcensus.S("sessions_waiting.go", `name, text, ls.AgentType`, 1, "Send now's send: board.NudgeText (census)"),
 	})
 }

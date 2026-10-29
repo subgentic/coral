@@ -51,6 +51,7 @@ func TestTheCrossBoardHintNamesNoBoard(t *testing.T) {
 // fails here until its text comes from a census builder and it is listed.
 func TestEveryTypedSenderIsInTheCensus(t *testing.T) {
 	typedcensus.CheckSites(t, ".", []typedcensus.Site{
+		typedcensus.S("agent_exited.go", `rt.SendInput(ctx, terminalinput.Coral, name, text)`, 1, "deliverAutomatedIfWanted's own send: types the text of its callers, listed here"),
 		typedcensus.S("agent_exited.go", `text, what, requireInputBox, mention, nil)`, 1, "deliverAutomated: forwards the text of the callers listed here"),
 		typedcensus.S("board_health.go", `typedHealth(text), "health check"`, 1, "the monitor's deliver: everything it types goes through typedHealth (census: team health check, health line)"),
 		typedcensus.S("board_health.go", `"health-check:"+project, text)`, 1, "the check, through the monitor's deliver (typedHealth)"),
