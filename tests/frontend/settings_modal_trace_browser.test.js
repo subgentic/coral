@@ -73,7 +73,7 @@ const SCEN = [
                 const A = ${JSON.stringify(answers)};
                 window.__inflight = 0; // requests the dialog has started and not yet finished (the data-ready signal)
                 window.fetch = (u, o = {}) => {
-                    const url = String(u), p = new URL(url, location.href).pathname; if (p !== '/api/system/auto-wake' && p !== '/api/scheduled/jobs') window.__fetched.push(((o.method) || 'GET').toUpperCase() + ' ' + p); // the page's own polls come when they come, not from the dialog: they are left out of the fetches (auto-wake; the Automations job list, which scheduler.js reads at start and every 30 s: a slow Windows runner had it land inside the dialog's window, #11043)
+                    const url = String(u), p = new URL(url, location.href).pathname; if (!['/api/system/auto-wake', '/api/scheduled/jobs', '/api/workflows'].includes(p)) window.__fetched.push(((o.method) || 'GET').toUpperCase() + ' ' + p); // the page's own polls come when they come, not from the dialog: they are left out of the fetches (auto-wake; the Automations job list and the workflow list, which scheduler.js reads at start and every 30 s: a slow Windows runner had them land inside the dialog's window, #11043; the Windows run of win-proof-1 listed GET /api/workflows)
                     let pr;
                     if (p === '/api/system/privacy') pr = A.privacy === 500 ? json({}, 500) : json({ remote_access_enabled: true, debug_input_log: true, bind_host: '127.0.0.1' });
                     else if (p === '/api/themes') pr = A.themes === 500 ? json({}, 500) : json({ themes: A.themes ? [{ name: 'Mine' }, { name: 'Other' }] : [] });
