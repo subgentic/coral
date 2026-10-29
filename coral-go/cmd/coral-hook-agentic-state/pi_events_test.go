@@ -176,3 +176,19 @@ func copyMap(m map[string]any) map[string]any {
 	}
 	return out
 }
+
+// Security's SHOULD on slice 1b: the internal _pi_stop key is read only for a --pi invocation. A payload of another CLI that carries the key posts exactly what it posts without it.
+func TestPiStopKeyIsIgnoredOutsideAPiInvocation(t *testing.T) {
+	plain := map[string]any{"hook_event_name": "PostToolUse", "tool_name": "Bash", "tool_use_id": "toolu_1", "tool_input": map[string]any{"command": "ls"}}
+	with := copyMap(plain)
+	with["_pi_stop"] = map[string]any{"hook_event_name": "Stop", "reason": "end_turn", "total_input_tokens": 99.0}
+	for _, cli := range []string{"claude", "codex", "agy", "pi"} {
+		want := runFlow(t, flowRun{cli: cli, stdin: flowPayload(t, copyMap(plain))})
+		got := runFlow(t, flowRun{cli: cli, stdin: flowPayload(t, copyMap(with))})
+		assert.Equal(t, want, got, cli+": a payload with _pi_stop but no --pi posts what it posts without it (no extra Stop, no token usage)")
+	}
+	// and with --pi, the key a payload sends is not what the program reads: only the extension's own fields are (fromPi builds _pi_stop itself from "stop")
+	fromPayload := runFlow(t, flowRun{cli: "pi", args: []string{"--pi", "session_shutdown"}, stdin: flowPayload(t, map[string]any{"reason": "quit", "_pi_stop": map[string]any{"hook_event_name": "Stop", "total_input_tokens": 99.0}})})
+	only := runFlow(t, flowRun{cli: "pi", args: []string{"--pi", "session_shutdown"}, stdin: flowPayload(t, map[string]any{"reason": "quit"})})
+	assert.Equal(t, only, fromPayload, "a Pi payload cannot hand the program a Stop of its own making: _pi_stop is not an allow-listed key")
+}

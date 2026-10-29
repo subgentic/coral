@@ -47,19 +47,21 @@ func main() {
 		}
 	}
 
+	var piStop map[string]any // the Stop a Pi shutdown event carries (fromPi's _pi_stop): read only for a --pi invocation, never from any other payload
 	if opts.piEvent != "" {
 		var ok bool
 		if d, ok = fromPi(d, opts.piEvent); !ok { // only the allow-listed keys are read: nothing else in the payload reaches a post
 			hooks.DebugLog("AGENTIC_STATE PI_SKIPPED")
 			return
 		}
+		piStop, _ = d["_pi_stop"].(map[string]any)
+		delete(d, "_pi_stop")
 	} else if len(os.Args) > 1 && contains(os.Args[1:], "--pi") {
 		return // --pi named an event Coral does not record
 	}
 
-	if stop, _ := d["_pi_stop"].(map[string]any); stop != nil {
-		delete(d, "_pi_stop")
-		handle(stop, opts, agyModel, agyConversation) // Pi's last event carries the Stop that has not been sent: Stop, then SessionEnd, in this order, in this one process (#11107 slice 1b)
+	if piStop != nil {
+		handle(piStop, opts, agyModel, agyConversation) // Pi's last event carries the Stop that has not been sent: Stop, then SessionEnd, in this order, in this one process (#11107 slice 1b)
 	}
 	handle(d, opts, agyModel, agyConversation)
 }
