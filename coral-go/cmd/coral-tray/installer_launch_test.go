@@ -59,16 +59,27 @@ func TestMSILaunchHasOneActionPerElevation(t *testing.T) {
 		actions[string(m[1])] = string(m[2])
 	}
 	conditions := map[string]string{} // action -> its Finish condition
-	for _, m := range regexp.MustCompile(`<Publish Dialog="ExitDialog" Control="Finish" Event="DoAction" Value="([^"]+)"\s+Condition="([^"]*)"`).FindAllSubmatch(wxs, -1) {
-		conditions[string(m[1])] = string(m[2])
+	order := map[string]string{}      // action -> its Order on Finish ("" when it has none)
+	for _, m := range regexp.MustCompile(`<Publish Dialog="ExitDialog" Control="Finish" Event="DoAction" Value="([^"]+)"(?:\s+Order="(\d+)")?\s+Condition="([^"]*)"`).FindAllSubmatch(wxs, -1) {
+		conditions[string(m[1])] = string(m[3])
+		order[string(m[1])] = string(m[2])
 	}
-	assert.Len(t, conditions, 2, "two launch actions on Finish: one per elevation")
+	assert.Len(t, conditions, 3, "on Finish: the launch for a normal installer; for an elevated one, the launch-pending mark (#380), then the launch")
 	assert.Equal(t, "&quot;[INSTALLFOLDER]coral-tray.exe&quot; --"+installerLaunchFlag, actions["LaunchCoral"])
 	assert.Equal(t, "&quot;[WindowsFolder]explorer.exe&quot; &quot;[INSTALLFOLDER]coral-tray.exe&quot;", actions["LaunchCoralUnelevated"],
 		"explorer.exe by its full path, never searched for")
 	const common = `WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 AND NOT Installed AND NOT REMOVE~=&quot;ALL&quot;`
 	assert.Equal(t, common+" AND NOT MsiRunningElevated", conditions["LaunchCoral"])
 	assert.Equal(t, common+" AND MsiRunningElevated", conditions["LaunchCoralUnelevated"])
+	// #380: the mark is written first, so a tray that Explorer starts finds it (Order 1 before 2)
+	assert.Equal(t, common+" AND MsiRunningElevated", conditions["MarkLaunchPending"])
+	assert.Equal(t, "1", order["MarkLaunchPending"])
+	assert.Equal(t, "2", order["LaunchCoralUnelevated"])
+	mark := regexp.MustCompile(`<CustomAction Id="MarkLaunchPending"[^>]*/>`).Find(wxs)
+	require.NotNil(t, mark)
+	assert.Contains(t, string(mark), `BinaryRef="CoralMsiHelper"`)
+	assert.Contains(t, string(mark), `ExeCommand="launch-pending --product &quot;$(var.InstallFolderName)&quot;"`)
+	assert.Contains(t, string(mark), `Execute="immediate"`, "in the client, as the person")
 	for _, id := range []string{"LaunchCoral", "LaunchCoralUnelevated"} {
 		ca := regexp.MustCompile(`<CustomAction Id="` + id + `"[^>]*/>`).Find(wxs)
 		require.NotNil(t, ca, id)
@@ -129,4 +140,21 @@ func TestEveryStartOfCoralTakesTheInstallMark(t *testing.T) {
 	require.NotNil(t, m, "main takes the mark on every start, not only with the from-installer flag")
 	assert.Less(t, regexp.MustCompile(`takeInstallMark\(\)`).FindIndex(src)[0], regexp.MustCompile(`installerLaunchRefused\(`).FindIndex(src)[0],
 		"taken before an elevated from-installer start is refused, as before")
+}
+
+// #380: a fresh launch-pending mark makes an elevated start of coral-tray refuse, as the from-installer flag does: the elevated installer
+// meant this start to be Explorer's, unelevated. Without the mark, or unelevated, nothing changes.
+func TestALaunchPendingMarkRefusesAnElevatedStart(t *testing.T) {
+	yes, no := func() bool { return true }, func() bool { return false }
+	refused := func(fromInstaller, launchPending bool, elevated func() bool) bool {
+		return installerLaunchRefused(fromInstaller || launchPending, elevated)
+	}
+	assert.True(t, refused(false, true, yes), "elevated, with a fresh mark: refused")
+	assert.False(t, refused(false, true, no), "unelevated, as Explorer starts it: goes on")
+	assert.False(t, refused(false, false, yes), "elevated with no mark (Run as administrator, the person's choice): goes on")
+
+	src, err := os.ReadFile("main.go")
+	require.NoError(t, err)
+	assert.Regexp(t, `launchPending = takeLaunchPending\(\)`, string(src))
+	assert.Regexp(t, `installerLaunchRefused\(\*fromInstaller \|\| launchPending, processElevated\)`, string(src))
 }

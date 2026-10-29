@@ -343,3 +343,25 @@ func TestARefusedFolderSaysWhyInTheLog(t *testing.T) {
 	assert.Contains(t, logs.String(), `D:\OneDrive\Local\Coral`)
 	assert.Contains(t, logs.String(), "OneDrive")
 }
+
+// #230's launch-pending mark has the same rules (the helper may write it elevated): never through a link in the folder's place or at its name, in the opened folder,
+// and fresh once.
+func TestTheLaunchPendingMarkNeverGoesThroughALink(t *testing.T) {
+	dir := inTemp(t)
+	target := t.TempDir()
+	junction(t, dir, target)
+	assert.Error(t, MarkLaunchPending(linkNow), "a junction where the folder should be")
+	assert.Empty(t, entries(t, target), "nothing was created in its target")
+	require.NoError(t, os.Remove(dir))
+
+	require.NoError(t, os.MkdirAll(dir, 0o700))
+	name := filepath.Join(dir, launchPendingName)
+	linktest.Each(t, name, func(t *testing.T, p linktest.Planted) {
+		require.NoError(t, MarkLaunchPending(linkNow))
+		b, err := os.ReadFile(name)
+		require.NoError(t, err)
+		assert.Equal(t, linkNow.Format(time.RFC3339)+"\n", string(b), "a new file, the link was removed as itself")
+		assert.True(t, TakeLaunchPending(linkNow.Add(time.Minute)), "fresh within two minutes, once")
+		assert.False(t, TakeLaunchPending(linkNow.Add(time.Minute)))
+	})
+}
