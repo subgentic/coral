@@ -129,11 +129,25 @@ func (s *Store) messageIndexExists(ctx context.Context) bool {
 	return n > 0
 }
 
-// messageIndexComplete: the triggers are the last thing a build creates, so their presence says the index holds every message.
+// messageIndexDone is the watermark of a finished build: the index holds every message with an id up to it.
+const messageIndexDone = int64(1) << 62
+
+// messageIndexComplete: the build's last step moves the watermark (board_message_fts_meta.upto) to messageIndexDone, so the three triggers and
+// that value say the index holds every message. An index built before the watermark existed has no such column: its triggers were the last
+// thing it created, so theirs alone say so.
 func (s *Store) messageIndexComplete(ctx context.Context) bool {
 	var n int
 	_ = s.db.GetContext(ctx, &n, `SELECT COUNT(*) FROM sqlite_master WHERE type = 'trigger' AND name IN ('board_messages_fts_ai', 'board_messages_fts_ad', 'board_messages_fts_au')`)
-	return n == 3
+	if n != 3 {
+		return false
+	}
+	var hasMark int
+	_ = s.db.GetContext(ctx, &hasMark, `SELECT COUNT(*) FROM pragma_table_info('`+messageFTSMeta+`') WHERE name = 'upto'`)
+	if hasMark == 0 {
+		return true
+	}
+	var upto int64
+	return s.db.GetContext(ctx, &upto, `SELECT upto FROM `+messageFTSMeta+` WHERE id = 1`) == nil && upto >= messageIndexDone
 }
 
 // messageIndexFreeSpace is the free space of a folder's disk: a variable for a test.
@@ -217,14 +231,22 @@ func (s *Store) buildMessageSearchIndex(ctx context.Context) error {
 		s.msgIndex.Store(messageIndexReady)
 		return nil
 	}
-	// A partial index from an interrupted build is dropped and begun again: its triggers do not exist, so nothing depends on it.
-	for _, q := range []string{
+	// A partial index from an interrupted build is dropped and begun again, its triggers with it.
+	//
+	// The triggers are made first, but guarded by the watermark: each acts only on a message whose id is at or below board_message_fts_meta.upto,
+	// the ids the chunks have indexed so far (0 to begin with). A message deleted or edited after its chunk was indexed takes its words out of
+	// the index; one above the watermark was never indexed, so a 'delete' for it would take out words that are not there, and the index would
+	// be damaged (#10831: "fts5: corruption found reading blob"). A message posted above the watermark is indexed by a later chunk.
+	for _, q := range append([]string{
+		`DROP TRIGGER IF EXISTS board_messages_fts_ai`,
+		`DROP TRIGGER IF EXISTS board_messages_fts_ad`,
+		`DROP TRIGGER IF EXISTS board_messages_fts_au`,
 		`DROP TABLE IF EXISTS ` + messageFTSTable,
 		`DROP TABLE IF EXISTS ` + messageFTSMeta,
 		`CREATE VIRTUAL TABLE ` + messageFTSTable + ` USING fts5(content, content='board_messages', content_rowid='id', tokenize='trigram', detail=none)`,
-		`CREATE TABLE ` + messageFTSMeta + ` (id INTEGER PRIMARY KEY CHECK (id = 1), nul INTEGER NOT NULL, ik INTEGER NOT NULL)`,
-		`INSERT INTO ` + messageFTSMeta + ` (id, nul, ik) VALUES (1, 0, 0)`,
-	} {
+		`CREATE TABLE ` + messageFTSMeta + ` (id INTEGER PRIMARY KEY CHECK (id = 1), nul INTEGER NOT NULL, ik INTEGER NOT NULL, upto INTEGER NOT NULL DEFAULT 0)`,
+		`INSERT INTO ` + messageFTSMeta + ` (id, nul, ik, upto) VALUES (1, 0, 0, 0)`,
+	}, messageFTSTriggers...) {
 		if _, err := s.db.ExecContext(ctx, q); err != nil {
 			return fmt.Errorf("%s: %w", firstWords(q), err)
 		}
@@ -249,20 +271,15 @@ func (s *Store) buildMessageSearchIndex(ctx context.Context) error {
 		case <-time.After(2 * time.Millisecond): // the writer is free for a post between chunks
 		}
 	}
-	// The last step is one short transaction: the messages posted while the chunks ran are indexed, and the triggers that keep the index in
-	// step are created, with no message able to arrive in between (the writer is one connection).
+	// The last step is one short transaction: the messages posted while the chunks ran are indexed and the watermark moves past every id, so
+	// the triggers keep the index in step from then on, with no message able to arrive in between (the writer is one connection).
 	tx, err := s.db.BeginTxx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
-	if err := indexRangeTx(ctx, tx, last, 1<<62); err != nil {
+	if err := indexRangeTx(ctx, tx, last, messageIndexDone); err != nil {
 		return err
-	}
-	for _, q := range messageFTSTriggers {
-		if _, err := tx.ExecContext(ctx, q); err != nil {
-			return fmt.Errorf("%s: %w", firstWords(q), err)
-		}
 	}
 	if err := tx.Commit(); err != nil {
 		return err
@@ -301,21 +318,23 @@ func indexRangeTx(ctx context.Context, tx *sqlx.Tx, after, upTo int64) error {
 	if _, err := tx.ExecContext(ctx, `INSERT INTO `+messageFTSTable+`(rowid, content) SELECT id, content FROM board_messages WHERE id > ? AND id <= ?`, after, upTo); err != nil {
 		return err
 	}
+	// The chunk's messages are indexed and counted, and the watermark moves to its last id, in the same transaction: a delete or an edit
+	// sees either none of it or all of it.
 	_, err := tx.ExecContext(ctx, `UPDATE `+messageFTSMeta+` SET nul = nul + (SELECT COUNT(*) FROM board_messages WHERE id > ? AND id <= ? AND `+fmt.Sprintf(messageNulSQL, "content")+`),
-		ik = ik + (SELECT COUNT(*) FROM board_messages WHERE id > ? AND id <= ? AND `+fmt.Sprintf(messageIkSQL, "content")+`)`, after, upTo, after, upTo)
+		ik = ik + (SELECT COUNT(*) FROM board_messages WHERE id > ? AND id <= ? AND `+fmt.Sprintf(messageIkSQL, "content")+`), upto = ?`, after, upTo, after, upTo, upTo)
 	return err
 }
 
 var messageFTSTriggers = []string{
-	`CREATE TRIGGER board_messages_fts_ai AFTER INSERT ON board_messages BEGIN
+	`CREATE TRIGGER board_messages_fts_ai AFTER INSERT ON board_messages WHEN new.id <= (SELECT upto FROM ` + messageFTSMeta + ` WHERE id = 1) BEGIN
 		INSERT INTO ` + messageFTSTable + `(rowid, content) VALUES (new.id, new.content);
 		UPDATE ` + messageFTSMeta + ` SET nul = nul + ` + fmt.Sprintf(messageNulSQL, "new.content") + `, ik = ik + ` + fmt.Sprintf(messageIkSQL, "new.content") + `;
 	END`,
-	`CREATE TRIGGER board_messages_fts_ad AFTER DELETE ON board_messages BEGIN
+	`CREATE TRIGGER board_messages_fts_ad AFTER DELETE ON board_messages WHEN old.id <= (SELECT upto FROM ` + messageFTSMeta + ` WHERE id = 1) BEGIN
 		INSERT INTO ` + messageFTSTable + `(` + messageFTSTable + `, rowid, content) VALUES ('delete', old.id, old.content);
 		UPDATE ` + messageFTSMeta + ` SET nul = nul - ` + fmt.Sprintf(messageNulSQL, "old.content") + `, ik = ik - ` + fmt.Sprintf(messageIkSQL, "old.content") + `;
 	END`,
-	`CREATE TRIGGER board_messages_fts_au AFTER UPDATE OF content ON board_messages BEGIN
+	`CREATE TRIGGER board_messages_fts_au AFTER UPDATE OF content ON board_messages WHEN old.id <= (SELECT upto FROM ` + messageFTSMeta + ` WHERE id = 1) BEGIN
 		INSERT INTO ` + messageFTSTable + `(` + messageFTSTable + `, rowid, content) VALUES ('delete', old.id, old.content);
 		INSERT INTO ` + messageFTSTable + `(rowid, content) VALUES (new.id, new.content);
 		UPDATE ` + messageFTSMeta + ` SET nul = nul - ` + fmt.Sprintf(messageNulSQL, "old.content") + ` + ` + fmt.Sprintf(messageNulSQL, "new.content") + `, ik = ik - ` + fmt.Sprintf(messageIkSQL, "old.content") + ` + ` + fmt.Sprintf(messageIkSQL, "new.content") + `;
