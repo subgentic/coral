@@ -15,8 +15,20 @@ import (
 	"github.com/subgentic/coral/internal/mediatype"
 )
 
-// shareFileBucket is the hourly upload bucket of files the person shares from the Files tab (their own, apart from any agent's).
+// shareFileBucket is the hourly upload bucket of files the person shares from the Files tab on this computer (their own, apart from any agent's).
 const shareFileBucket = "owner:share-file"
+
+// shareFileHubBucket is the prefix of the windows of files shared through Coral Hub: one per hub account ("owner:share-file-hub:hub-user-<8 hex>", or "owner:share-file-hub:" when the hub sent none), each with
+// half the allowance (windowLimits), so a grantee cannot use up the owner's own window or another grantee's (#10855, coral-hub Security).
+const shareFileHubBucket = "owner:share-file-hub:"
+
+// shareBucket is the window a share counts in: the owner's own, or the one of the hub account that made the request.
+func shareBucket(via uploadVia) string {
+	if !via.Hub {
+		return shareFileBucket
+	}
+	return shareFileHubBucket + via.User
+}
 
 // ShareFileArtifact stores a file of the agent's working tree as an artifact owned by the person and answers with its link.
 // POST /api/sessions/live/{name}/share-file?filepath=...&session_id=...
@@ -62,15 +74,17 @@ func (h *SessionsHandler) ShareFileArtifact(w http.ResponseWriter, r *http.Reque
 		content = cleaned
 	}
 	st := storeFor(coralDir)
-	if ok, retry := st.admitUpload(shareFileBucket); !ok {
+	via := hubViaOf(r)
+	bucket := shareBucket(via)
+	if ok, retry := st.admitUpload(bucket); !ok {
 		artifactHourlyLimited(w, retry, fmt.Sprintf("the hourly limit for shared files is used up; try again in %s", retry.Round(time.Minute)))
 		return
 	}
-	if !st.chargeUpload(shareFileBucket, int64(len(content))) {
+	if !st.chargeUpload(bucket, int64(len(content))) {
 		artifactHourlyLimited(w, 0, "the hourly size limit for shared files is used up; try again later")
 		return
 	}
-	id, meta, err := storeArtifactVia(coralDir, sessionID, fileName, mt, uploadedByOwner, "", "", content)
+	id, meta, err := storeArtifactVia(coralDir, sessionID, fileName, mt, uploadedByOwner, "", via.User, content) // the hub account that shared it is on the record, as for a pasted image (#6088)
 	if errors.Is(err, errStoreFull) {
 		b, _, max := st.size()
 		artifactRefusal(w, http.StatusRequestEntityTooLarge, "artifact_quota", "store",

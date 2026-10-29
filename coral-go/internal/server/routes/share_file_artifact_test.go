@@ -17,6 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/subgentic/coral/internal/store"
+	"github.com/subgentic/coral/pkg/tunnel"
 )
 
 // #10269: Share as artifact on a Files row or an open diff stores that file as an artifact the person owns and answers with its link; the file is read under the bounds of the file viewer.
@@ -120,4 +121,59 @@ func TestShareFileArtifactLimits(t *testing.T) {
 		require.Equal(t, http.StatusOK, resp.StatusCode, "share %d", i)
 	}
 	t.Fatalf("the hourly limit of %d shared files was never reached", uploadWindowCount)
+}
+
+// #10855 (coral-hub Security): a share through Coral Hub counts in the window of the hub account that made it, with half the allowance, so a grantee never uses up the owner's own window or another
+// grantee's; and the upload record names that account instead of leaving the share looking like the owner's alone.
+func TestShareFileArtifactBucketsAndRecordsByCaller(t *testing.T) {
+	_, handler, terminal, ss := setupSessionsTestServer(t)
+	router := chi.NewRouter()
+	router.Post("/api/sessions/live/{name}/share-file", handler.ShareFileArtifact)
+	server := httptest.NewServer(router)
+	t.Cleanup(server.Close)
+	work := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(work, "note.txt"), []byte("hi\n"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(work, "alices.txt"), []byte("from a grantee\n"), 0o644))
+	const sid = "00000000-0000-0000-0000-000000030269"
+	name := "claude-" + sid
+	terminal.addSession(name, work)
+	require.NoError(t, ss.RegisterLiveSession(context.Background(), &store.LiveSession{SessionID: sid, AgentType: "claude", AgentName: name, WorkingDir: work}))
+	const alice, bob = "hub-user-aaaaaaaa", "hub-user-bbbbbbbb"
+	share := func(hubUser string, fp ...string) *http.Response {
+		file := "note.txt"
+		if len(fp) > 0 {
+			file = fp[0]
+		}
+		req, err := http.NewRequest(http.MethodPost, server.URL+"/api/sessions/live/"+name+"/share-file?session_id="+sid+"&filepath="+file, strings.NewReader(""))
+		require.NoError(t, err)
+		if hubUser != "" {
+			req.Header.Set(tunnel.ViaHeader, "1")
+			req.Header.Set(tunnel.HubUserHeader, hubUser)
+		}
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		resp.Body.Close()
+		return resp
+	}
+
+	// the record names the account that shared the file (a file of its own, so no later share of the same bytes rewrites the record)
+	require.Equal(t, http.StatusOK, share(alice, "alices.txt").StatusCode)
+	matches, err := filepath.Glob(filepath.Join(handler.cfg.CoralDir(), "artifacts", "uploads", "*", "*.json"))
+	require.NoError(t, err)
+	var recorded []string
+	for _, m := range matches {
+		b, err := os.ReadFile(m)
+		require.NoError(t, err)
+		recorded = append(recorded, string(b))
+	}
+	require.NotEmpty(t, recorded, "the share left an upload record")
+	assert.Contains(t, strings.Join(recorded, "\n"), alice, "the record names the grantee who shared it")
+
+	half := uploadWindowCount / 2
+	for i := 1; i < half; i++ { // alice's file above was her first
+		require.Equal(t, http.StatusOK, share(alice).StatusCode, "alice's share %d is within her half allowance", i)
+	}
+	assert.Equal(t, http.StatusTooManyRequests, share(alice).StatusCode, "alice used up her window")
+	assert.Equal(t, http.StatusOK, share(bob).StatusCode, "another grantee has a window of her own")
+	assert.Equal(t, http.StatusOK, share("").StatusCode, "so has the owner on this computer: a grantee cannot use up the owner's quota")
 }

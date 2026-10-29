@@ -19,10 +19,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/subgentic/coral/internal/cloud"
 	"github.com/subgentic/coral/internal/safefs"
 	"github.com/subgentic/coral/internal/uploads"
-	"github.com/subgentic/coral/pkg/tunnel"
 )
 
 var (
@@ -191,11 +189,8 @@ func UploadFile(w http.ResponseWriter, r *http.Request) {
 	if !safefs.IsSafeID(sid) {
 		sid = ""
 	}
-	via := uploadVia{Hub: cloud.Tunneled(r)}
+	via := hubViaOf(r) // the hub account (hub-user-<8 hex>), never a name or an email; the connector forwards it on this route only (#6088)
 	if via.Hub {
-		if u := r.Header.Get(tunnel.HubUserHeader); tunnel.ValidHubUser(u) { // the hub account (hub-user-<8 hex>), never a name or an email; the connector forwards it on this route only (#6088)
-			via.User = u
-		}
 		slog.Info("image uploaded through Coral Hub", "hub_user", via.User, "bytes", len(content))
 	}
 	if art, why, retryAt := shareUploadedImage(r.Context(), uploadCoralDir, sid, orDefault(filename, safeName), ext, content, via); art != nil {

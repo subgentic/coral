@@ -9,11 +9,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 	"time"
 
 	"github.com/subgentic/coral/internal/board"
+	"github.com/subgentic/coral/internal/cloud"
 	"github.com/subgentic/coral/internal/diskguard"
+	"github.com/subgentic/coral/pkg/tunnel"
 )
 
 // dashboardUploadBucket is the hourly window these artifacts count in (artifact_store.go admitUpload): the same limits as an agent's, in a bucket of its own so neither can use up the
@@ -29,6 +32,17 @@ const dashboardHubBucket = "dashboard-hub:"
 type uploadVia struct {
 	Hub  bool
 	User string
+}
+
+// hubViaOf says whether a request came through Coral Hub, and from which account: the tunnel-stamped header (hub-user-<8 hex>), never a name or an email.
+func hubViaOf(r *http.Request) uploadVia {
+	via := uploadVia{Hub: cloud.Tunneled(r)}
+	if via.Hub {
+		if u := r.Header.Get(tunnel.HubUserHeader); tunnel.ValidHubUser(u) {
+			via.User = u
+		}
+	}
+	return via
 }
 
 func (v uploadVia) bucket() string {

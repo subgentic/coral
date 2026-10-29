@@ -192,7 +192,7 @@ func (s *artifactStore) chargeUpload(key string, n int64) bool {
 // windowLimits are the uploads and bytes a window key may use in an hour: the full allowance, or half of it for an image sent through Coral Hub (#6088), so one hub account can never
 // use up the allowance of this computer's own dashboard (its key is dashboardUploadBucket).
 func windowLimits(key string) (count int, bytes int64) {
-	if strings.HasPrefix(key, dashboardHubBucket) {
+	if strings.HasPrefix(key, dashboardHubBucket) || strings.HasPrefix(key, shareFileHubBucket) {
 		return uploadWindowCount / 2, uploadWindowBytes / 2
 	}
 	return uploadWindowCount, uploadWindowBytes
