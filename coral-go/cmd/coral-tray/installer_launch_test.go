@@ -114,3 +114,19 @@ func TestTheElevatedInstallerNoteSaysWhyAndWhatToDo(t *testing.T) {
 	assert.NotEmpty(t, elevatedInstallerNoteTitle)
 	assert.Less(t, len(elevatedInstallerNote), 300, "a message box, not a page")
 }
+
+// #155 (the Orchestrator's gap 3): after an elevated install Explorer starts coral-tray with no flag, so a mark taken only with the
+// from-installer flag stayed behind, and a later quiet install's helper `start` would have started a Coral the person had quit. Every
+// start of Coral takes the mark; a --stop and the tray's server child are not starts.
+func TestEveryStartOfCoralTakesTheInstallMark(t *testing.T) {
+	assert.True(t, startTakesInstallMark(false, false), "a start, with or without the from-installer flag")
+	assert.False(t, startTakesInstallMark(true, false), "a --stop")
+	assert.False(t, startTakesInstallMark(false, true), "the tray's server child")
+
+	src, err := os.ReadFile("main.go")
+	require.NoError(t, err)
+	m := regexp.MustCompile(`if (startTakesInstallMark\(\*stop, \*serverChild\)) \{\s*takeInstallMark\(\)`).FindSubmatch(src)
+	require.NotNil(t, m, "main takes the mark on every start, not only with the from-installer flag")
+	assert.Less(t, regexp.MustCompile(`takeInstallMark\(\)`).FindIndex(src)[0], regexp.MustCompile(`installerLaunchRefused\(`).FindIndex(src)[0],
+		"taken before an elevated from-installer start is refused, as before")
+}

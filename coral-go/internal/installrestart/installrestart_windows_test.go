@@ -88,3 +88,13 @@ func TestMarkRefusesAFolderThatIsNotAPlainFolder(t *testing.T) {
 	require.NoError(t, os.WriteFile(dir, []byte("x"), 0o600))
 	assert.Error(t, Mark(time.Now()))
 }
+
+// #155: the sequence the tray's every-start take (cmd/coral-tray startTakesInstallMark) is for. An install closes Coral (Mark), Coral is
+// started again some way (Take), the person quits it, and a later quiet install that did not close Coral starts nothing.
+func TestAMarkTakenByAnyStartStartsNothingLater(t *testing.T) {
+	inTemp(t)
+	now := time.Date(2026, 10, 29, 9, 0, 0, 0, time.UTC)
+	require.NoError(t, Mark(now))
+	assert.True(t, Take(now.Add(time.Minute)), "Coral started after the install: by Explorer, the Start Menu or Launch Coral")
+	assert.False(t, Take(now.Add(10*time.Minute)), "a later quiet install's helper start finds no mark, so the Coral the person quit stays quit")
+}
