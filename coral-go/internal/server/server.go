@@ -700,6 +700,24 @@ func markWelcomePending(db *store.DB) {
 	}
 }
 
+// seedNewInstallDiffMode stores 'Since my last commit' (uncommitted) as the compare mode of a
+// new install (#10806). An install that has run before keeps what it had: with no stored value
+// that is the branch point, so the server default stays branch_point and only this seed, which runs
+// before the demo workflow and the first-launch screen are marked, moves a new one. A previous
+// start left demo_workflows_seeded, welcome_pending or welcome_choice behind; a value the user
+// stored is never replaced.
+func seedNewInstallDiffMode(db *store.DB) {
+	if db == nil {
+		return
+	}
+	if _, err := db.Exec(`INSERT INTO user_settings (key, value)
+		SELECT 'git_diff_mode', 'uncommitted'
+		WHERE NOT EXISTS (SELECT 1 FROM user_settings WHERE key IN ('demo_workflows_seeded', 'welcome_pending', 'welcome_choice', 'git_diff_mode'))
+		ON CONFLICT(key) DO NOTHING`); err != nil {
+		log.Printf("new install compare mode: %v", err)
+	}
+}
+
 // envTrue reports whether the environment variable is set to 1 or true.
 func envTrue(name string) bool {
 	switch strings.ToLower(strings.TrimSpace(os.Getenv(name))) {

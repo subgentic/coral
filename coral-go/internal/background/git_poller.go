@@ -58,6 +58,11 @@ type GitPoller struct {
 	// do on a timer at all.
 	intervalFn func() time.Duration
 
+	// diffModeFn, when set, names the comparison the Files panel is in (git_diff_mode),
+	// re-read every pass: the poller caches the changed-files list for that mode. Nil
+	// or empty is the branch point.
+	diffModeFn func() string
+
 	// failing holds the folders whose git query failed (most often not a repository: the
 	// soak's folders logged a warning every 2 minutes, #4098), and when to try each again.
 	// PollOnce runs on the poller's own goroutine only.
@@ -137,6 +142,19 @@ func (p *GitPoller) SetIdentityHasher(h store.IdentityHasher) { p.identityHash =
 // SetIntervalFn supplies a user-configured poll interval, re-read before every
 // wait. Return a non-positive duration to pause polling.
 func (p *GitPoller) SetIntervalFn(fn func() time.Duration) { p.intervalFn = fn }
+
+// SetDiffModeFn supplies the user's compare mode, re-read every pass.
+func (p *GitPoller) SetDiffModeFn(fn func() string) { p.diffModeFn = fn }
+
+// diffMode is the compare mode the cached list is computed and stored for.
+func (p *GitPoller) diffMode() string {
+	if p.diffModeFn != nil {
+		if m := p.diffModeFn(); m != "" {
+			return m
+		}
+	}
+	return "branch_point"
+}
 
 // nextWait returns how long to wait before the next pass, and whether that
 // pass should actually poll. A paused poller still wakes periodically so it
@@ -274,7 +292,8 @@ func (p *GitPoller) pollDir(ctx context.Context, workdir string, dirAgents []Age
 	p.logger.Debug("git query", "workdir", logsafe.Dir(workdir), "branch", gitInfo.Branch, "duration_ms", queryDur.Milliseconds())
 
 	filesStart := time.Now()
-	changedFiles, err := queryChangedFilesFrom(ctx, workdir, gitInfo.status, gitInfo.statusErr)
+	mode := p.diffMode()
+	changedFiles, err := queryChangedFilesFrom(ctx, workdir, mode, gitInfo.status, gitInfo.statusErr)
 	filesDur := time.Since(filesStart)
 	if err != nil {
 		p.logger.Warn("git changed files query failed; clearing cached list", "workdir", logsafe.Dir(workdir), "duration_ms", filesDur.Milliseconds(), "error", err)
@@ -287,7 +306,7 @@ func (p *GitPoller) pollDir(ctx context.Context, workdir string, dirAgents []Age
 		p.logger.Warn("capping changed files", "workdir", logsafe.Dir(workdir), "agents", len(dirAgents), "total", len(changedFiles), "cap", maxChangedFiles)
 		changedFiles = changedFiles[:maxChangedFiles]
 	}
-	filesHash := hashChangedFiles(workdir, changedFiles)
+	filesHash := hashChangedFiles(workdir, mode, changedFiles)
 
 	// Look up PR number for non-default branches
 	prNumber := 0
@@ -303,7 +322,7 @@ func (p *GitPoller) pollDir(ctx context.Context, workdir string, dirAgents []Age
 		}
 		key := writtenKey(agent.AgentName, snap.SessionID)
 		seen[key] = true
-		p.writeChangedFiles(ctx, key, agent.AgentName, workdir, changedFiles, snap.SessionID, filesHash)
+		p.writeChangedFiles(ctx, key, agent.AgentName, workdir, mode, changedFiles, snap.SessionID, filesHash)
 	}
 	p.logger.Debug("git db writes", "workdir", logsafe.Dir(workdir), "agents", len(dirAgents), "duration_ms", time.Since(dbStart).Milliseconds())
 
@@ -351,9 +370,9 @@ func writtenKey(agentName string, sessionID *string) string {
 }
 
 // hashChangedFiles fingerprints a changed-file list as it would be stored.
-func hashChangedFiles(workdir string, files []store.ChangedFile) [sha256.Size]byte {
+func hashChangedFiles(workdir, mode string, files []store.ChangedFile) [sha256.Size]byte {
 	h := sha256.New()
-	fmt.Fprintf(h, "%s\x00%d\x00", workdir, len(files))
+	fmt.Fprintf(h, "%s\x00%s\x00%d\x00", workdir, mode, len(files))
 	for _, f := range files {
 		fmt.Fprintf(h, "%s\x00%d\x00%d\x00%s\x00", f.Filepath, f.Additions, f.Deletions, f.Status)
 	}
@@ -365,9 +384,9 @@ func hashChangedFiles(workdir string, files []store.ChangedFile) [sha256.Size]by
 // writeChangedFiles stores an agent's changed-file list. When it is the list
 // this poller wrote last time and the cache still holds exactly that write,
 // only its recorded_at is refreshed; otherwise the list is replaced.
-func (p *GitPoller) writeChangedFiles(ctx context.Context, key, agentName, workdir string, files []store.ChangedFile, sessionID *string, hash [sha256.Size]byte) {
+func (p *GitPoller) writeChangedFiles(ctx context.Context, key, agentName, workdir, mode string, files []store.ChangedFile, sessionID *string, hash [sha256.Size]byte) {
 	if prev, ok := p.written[key]; ok && prev.hash == hash {
-		stamp, touched, err := p.store.TouchChangedFiles(ctx, agentName, sessionID, "branch_point", prev.stamp, prev.count)
+		stamp, touched, err := p.store.TouchChangedFiles(ctx, agentName, sessionID, mode, prev.stamp, prev.count)
 		if err != nil {
 			p.logger.Warn("refresh changed files failed", "agent", agentName, "error", err)
 		}
@@ -376,7 +395,7 @@ func (p *GitPoller) writeChangedFiles(ctx context.Context, key, agentName, workd
 			return
 		}
 	}
-	stamp, err := p.store.ReplaceChangedFilesStamped(ctx, agentName, workdir, files, sessionID, "branch_point")
+	stamp, err := p.store.ReplaceChangedFilesStamped(ctx, agentName, workdir, files, sessionID, mode)
 	if err != nil {
 		delete(p.written, key)
 		p.logger.Warn("replace changed files failed", "agent", agentName, "error", err)
@@ -523,18 +542,23 @@ func queryChangedFiles(ctx context.Context, workdir string) ([]store.ChangedFile
 	ctx, cancel := context.WithTimeout(ctx, gitQueryTimeout)
 	defer cancel()
 	out, err := gitutil.Command(ctx, workdir, "status", "--porcelain", "-z", "--untracked-files=normal").Output()
-	return queryChangedFilesFrom(ctx, workdir, out, err)
+	return queryChangedFilesFrom(ctx, workdir, "", out, err)
 }
 
 // queryChangedFilesFrom lists the files changed since the diff base, with status (the output
 // of 'git status --porcelain -z --untracked-files=normal', or statusErr) for the untracked ones.
-func queryChangedFilesFrom(ctx context.Context, workdir string, status []byte, statusErr error) ([]store.ChangedFile, error) {
+func queryChangedFilesFrom(ctx context.Context, workdir, mode string, status []byte, statusErr error) ([]store.ChangedFile, error) {
 	ctx, cancel := context.WithTimeout(ctx, gitQueryTimeout)
 	defer cancel()
 	logger := slog.Default().With("service", "git_poller", "workdir", workdir)
 
 	t0 := time.Now()
-	base := gitutil.GetDiffBase(ctx, workdir, "") // uses default branch_point mode
+	if mode == "branch_point" {
+		mode = ""
+	}
+	withTree := gitutil.IncludesWorkingTree(mode)
+	refs := gitutil.DiffRefs(ctx, workdir, mode)
+	base := refs[0]
 	logger.Debug("git diff base", "base", base, "duration_ms", time.Since(t0).Milliseconds())
 
 	t1 := time.Now()
@@ -548,7 +572,7 @@ func queryChangedFilesFrom(ctx context.Context, workdir string, status []byte, s
 	// -z: NUL-terminated records with raw paths. Without it git quotes names
 	// containing non-ASCII bytes (e.g. macOS screenshots' U+202F) with octal
 	// escapes, which then never match a file on disk.
-	out, err := gitutil.Command(ctx, workdir, "diff", base, "--numstat", "-z").Output()
+	out, err := gitutil.Command(ctx, workdir, append(append([]string{"diff"}, refs...), "--numstat", "-z")...).Output()
 	if err != nil {
 		// A timeout or git failure: the list would be incomplete.
 		return nil, fmt.Errorf("git diff %s --numstat: %w", base, err)
@@ -590,7 +614,7 @@ func queryChangedFilesFrom(ctx context.Context, workdir string, status []byte, s
 	if statusErr != nil {
 		return nil, fmt.Errorf("git status --porcelain: %w", statusErr)
 	}
-	if entries := statusEntries(status); len(entries) > 0 {
+	if entries := statusEntries(status); withTree && len(entries) > 0 { // the last commit alone has no working-tree status or new files
 		// New files' line counts are read inside the working tree, held open once per pass.
 		countRoot, rootErr := safefs.OpenRoot(workdir)
 		if rootErr != nil {

@@ -24,18 +24,15 @@ import (
 )
 
 // filesCacheFloor is how long a changed-files list stays fresh when nothing
-// refreshes it in the background: a diff mode the git poller does not
-// compute, or polling turned off.
+// refreshes it in the background: polling turned off.
 const filesCacheFloor = 30 * time.Second
 
 // filesCacheMaxAge is how old a cached changed-files list may be before the
-// Files handler recomputes it. The git poller rewrites only the branch_point
-// list, every git_poll_interval_s, so that list stays fresh for two poll
-// intervals; any other list was written by a refresh and is kept briefly.
-func (h *SessionsHandler) filesCacheMaxAge(ctx context.Context, diffMode string) time.Duration {
-	if diffMode != "branch_point" {
-		return filesCacheFloor
-	}
+// Files handler recomputes it. The git poller rewrites the list for the
+// compare mode in force, every git_poll_interval_s, so it stays fresh for two poll
+// intervals in every mode. A list the poller has not rewritten since the mode changed
+// is as old as its last write, so it is recomputed.
+func (h *SessionsHandler) filesCacheMaxAge(ctx context.Context) time.Duration {
 	settings, _ := h.ss.GetSettings(ctx)
 	interval := background.GitPollInterval(settings, h.cfg.GitPollerIntervalS)
 	if interval <= 0 {
@@ -84,7 +81,7 @@ func (h *SessionsHandler) Files(w http.ResponseWriter, r *http.Request) {
 	}
 
 	files, found, err := h.gs.GetChangedFiles(r.Context(), name, sidPtr, diffMode)
-	if err == nil && found && filesCacheFresh(files, h.filesCacheMaxAge(r.Context(), diffMode), time.Now()) {
+	if err == nil && found && filesCacheFresh(files, h.filesCacheMaxAge(r.Context()), time.Now()) {
 		out := map[string]any{"agent_name": name, "files": hubVisibleFiles(r, files), "diff_mode": diffMode}
 		if workdir := h.resolveGitRoot(agentCtx(r), name, "", ptr.Value(sidPtr)); workdir != "" {
 			out["compare"] = map[string]any{"mode": diffMode, "label": gitutil.CompareLabel(r.Context(), workdir, diffMode)}

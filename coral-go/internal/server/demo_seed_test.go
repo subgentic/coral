@@ -95,6 +95,42 @@ func TestWelcomePendingOnFirstLaunchOnly(t *testing.T) {
 	}
 }
 
+// A new install starts on 'Since my last commit' (uncommitted); one that has run before and never saved a
+// compare mode keeps the branch point, and a mode the user saved is never replaced (#10806).
+func TestNewInstallStartsOnUncommittedExistingKeepsItsMode(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		seed string // rows an earlier start or the user left behind
+		want string // stored git_diff_mode after start; "" is none, so the server default (branch_point) applies
+	}{
+		{"new install", "", "uncommitted"},
+		{"existing install, demo seeded", `INSERT INTO user_settings (key, value) VALUES ('demo_workflows_seeded', '1')`, ""},
+		{"existing install, welcome chosen", `INSERT INTO user_settings (key, value) VALUES ('welcome_choice', 'coral')`, ""},
+		{"saved mode is kept", `INSERT INTO user_settings (key, value) VALUES ('git_diff_mode', 'main_head')`, "main_head"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := newE2EConfig(t, t.TempDir())
+			db, err := storetest.Open(t, cfg.DBPath)
+			require.NoError(t, err)
+			t.Cleanup(func() { db.Close() })
+			if tc.seed != "" {
+				_, err := db.Exec(tc.seed)
+				require.NoError(t, err)
+			}
+			stack := newTermStack(t)
+			newTestServer(t, cfg, db, stack.backend, stack.terminal)
+			var got string
+			_ = db.GetContext(context.Background(), &got, `SELECT value FROM user_settings WHERE key = 'git_diff_mode'`)
+			assert.Equal(t, tc.want, got)
+			// A restart keeps the answer: the seeds the first start left behind say it is no longer new.
+			newTestServer(t, cfg, db, stack.backend, stack.terminal)
+			var again string
+			_ = db.GetContext(context.Background(), &again, `SELECT value FROM user_settings WHERE key = 'git_diff_mode'`)
+			assert.Equal(t, tc.want, again)
+		})
+	}
+}
+
 // The seeded workflow's last step shows its message as a notification. A workflow step has no agent session token and a curl to
 // /api/notifications with no credential, or with the API key, is a 401 (the route takes an agent's token or the Operator): the step
 // runs coral-agent notify, which signs the request as the Operator (#9363). This runs the step's own shell command with a stand-in

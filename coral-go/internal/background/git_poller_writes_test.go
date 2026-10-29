@@ -94,6 +94,60 @@ func TestGitPollerSkipsUnchangedListsAndSharesRepoScans(t *testing.T) {
 	require.Len(t, p.written, 1)
 }
 
+// The poller caches the list for the compare mode in force, not only branch_point, so the Files route
+// can serve it in every mode (#10806).
+func TestGitPollerCachesTheCompareModeInForce(t *testing.T) {
+	repo := t.TempDir()
+	runGit(t, repo, "init", "-q", "-b", "main")
+	require.NoError(t, os.WriteFile(filepath.Join(repo, "a.txt"), []byte("one\n"), 0o644))
+	runGit(t, repo, "add", ".")
+	runGit(t, repo, "commit", "-q", "-m", "first")
+	require.NoError(t, os.WriteFile(filepath.Join(repo, "b.txt"), []byte("two\n"), 0o644))
+	runGit(t, repo, "add", ".")
+	runGit(t, repo, "commit", "-q", "-m", "second")
+	require.NoError(t, os.WriteFile(filepath.Join(repo, "a.txt"), []byte("one\nedited\n"), 0o644)) // uncommitted
+	require.NoError(t, os.WriteFile(filepath.Join(repo, "new.txt"), []byte("untracked\n"), 0o644)) // untracked
+
+	db, err := storetest.Open(t, filepath.Join(t.TempDir(), "sessions.db"))
+	require.NoError(t, err)
+	t.Cleanup(func() { db.Close() })
+	gs := store.NewGitStore(db)
+	p := NewGitPoller(gs, nil, time.Minute)
+	p.SetDiscoverFn(func(context.Context) ([]AgentInfo, error) {
+		return []AgentInfo{{AgentName: "agent", AgentType: "claude", SessionID: "s1", WorkingDirectory: repo}}, nil
+	})
+	mode := "uncommitted"
+	p.SetDiffModeFn(func() string { return mode })
+	ctx := context.Background()
+	sid := "s1"
+	names := func(m string) []string {
+		t.Helper()
+		files, found, err := gs.GetChangedFiles(ctx, "", &sid, m)
+		require.NoError(t, err)
+		require.True(t, found, m)
+		var out []string
+		for _, f := range files {
+			out = append(out, f.Filepath)
+		}
+		return out
+	}
+
+	require.NoError(t, p.PollOnce(ctx))
+	require.ElementsMatch(t, []string{"a.txt", "new.txt"}, names("uncommitted"), "the mode in force is what is cached")
+	_, found, err := gs.GetChangedFiles(ctx, "", &sid, "branch_point")
+	require.NoError(t, err)
+	require.False(t, found, "and not the branch point beside it")
+
+	mode = "last_commit"
+	require.NoError(t, p.PollOnce(ctx))
+	require.Equal(t, []string{"b.txt"}, names("last_commit"), "the last commit alone: no working-tree edit, no untracked file")
+	require.ElementsMatch(t, []string{"a.txt", "new.txt"}, names("uncommitted"), "the other mode's rows are left as they were")
+
+	mode = "previous_commit"
+	require.NoError(t, p.PollOnce(ctx))
+	require.ElementsMatch(t, []string{"a.txt", "b.txt", "new.txt"}, names("previous_commit"))
+}
+
 func TestPRCacheExpiry(t *testing.T) {
 	require.Equal(t, 2*time.Minute, prCacheExpiry(0, 2*time.Minute), "no PR yet: recheck every interval")
 	require.Equal(t, prCacheTTL, prCacheExpiry(42, 2*time.Minute))

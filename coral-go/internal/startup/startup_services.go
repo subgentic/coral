@@ -206,6 +206,13 @@ func startIndexingServices(ctx context.Context, cfg *config.Config, srv *server.
 	gitPoller.SetIntervalFn(func() time.Duration {
 		return gitPollInterval(ctx, sessStore, cfg.GitPollerIntervalS)
 	})
+	gitPoller.SetDiffModeFn(func() string {
+		settings, err := sessStore.GetSettings(ctx)
+		if err != nil {
+			return ""
+		}
+		return setreg.Enum(settings, setreg.GitDiffMode)
+	})
 	safeGo(ctx, "git_poller", func() { gitPoller.Run(ctx) })
 
 	// Session indexer

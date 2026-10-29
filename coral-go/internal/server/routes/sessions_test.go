@@ -3134,15 +3134,17 @@ func TestFilesCacheMaxAge(t *testing.T) {
 	_, handler, _, ss := setupSessionsTestServer(t)
 	ctx := context.Background()
 	handler.cfg.GitPollerIntervalS = 120
-	assert.Equal(t, 4*time.Minute, handler.filesCacheMaxAge(ctx, "branch_point"), "two default poll intervals")
-	assert.Equal(t, filesCacheFloor, handler.filesCacheMaxAge(ctx, "previous_commit"), "the poller never refreshes other modes")
+	assert.Equal(t, 4*time.Minute, handler.filesCacheMaxAge(ctx), "two default poll intervals, whatever the compare mode: the poller refreshes the one in force")
+
+	require.NoError(t, ss.SetSetting(ctx, "git_diff_mode", "uncommitted"))
+	assert.Equal(t, 4*time.Minute, handler.filesCacheMaxAge(ctx), "the poller refreshes the mode in force, so no mode is kept for the floor only")
 
 	require.NoError(t, ss.SetSetting(ctx, "git_poll_interval_s", "5"))
-	assert.Equal(t, filesCacheFloor, handler.filesCacheMaxAge(ctx, "branch_point"), "2 x the 15 s minimum")
+	assert.Equal(t, filesCacheFloor, handler.filesCacheMaxAge(ctx), "2 x the 15 s minimum")
 	require.NoError(t, ss.SetSetting(ctx, "git_poll_interval_s", "600"))
-	assert.Equal(t, 20*time.Minute, handler.filesCacheMaxAge(ctx, "branch_point"))
+	assert.Equal(t, 20*time.Minute, handler.filesCacheMaxAge(ctx))
 	require.NoError(t, ss.SetSetting(ctx, "git_poll_interval_s", "0"))
-	assert.Equal(t, filesCacheFloor, handler.filesCacheMaxAge(ctx, "branch_point"), "polling off")
+	assert.Equal(t, filesCacheFloor, handler.filesCacheMaxAge(ctx), "polling off")
 }
 
 func TestFilesCacheFresh(t *testing.T) {
