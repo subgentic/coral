@@ -736,7 +736,7 @@
     #mobile-session-list .session-group-header {
         min-height: var(--control-touch-height, 44px);
         padding: 6px 12px !important;
-        margin: 8px 0 0;
+        margin: 8px 0 4px; /* the 4 px under a header is the room the row below needs at 200% text (#10902: hub census overlap; #10691 had dropped it) */
         border-radius: 0;
         background: none;
     }
