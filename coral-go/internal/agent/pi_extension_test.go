@@ -67,7 +67,7 @@ func TestPiLaunchStartsPiWithCoralsExtension(t *testing.T) {
 	require.NoError(t, json.Unmarshal([]byte(cfgText[1]), &cfg))
 	assert.Equal(t, hook, cfg.HookBin)
 	assert.Equal(t, piHookEnvNames, cfg.EnvNames)
-	assert.Equal(t, piExtensionRev, cfg.Rev)
+	assert.Equal(t, PiExtensionRev, cfg.Rev)
 	assert.Equal(t, strings.Replace(piExtensionSource, piConfigPlaceholder, cfgText[1], 1), src, "the file is the embedded source and the configuration, nothing else")
 }
 

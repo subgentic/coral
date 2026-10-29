@@ -13,6 +13,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
@@ -232,4 +233,67 @@ func TestHooksStatusListsAgentsWhoseHookProgramsAreGone(t *testing.T) {
 		assert.Equal(t, "missing", a.Status)
 	}
 	assert.Equal(t, []string{"claude-gone", "codex-gone"}, names, "awake agents of any type whose tools folder is gone; none that are fine, unrecorded or asleep")
+}
+
+// #11107: a Pi agent's hooks are the extension Coral starts it with, and its first hook event is the handshake. A launch is no proof, so the status says so only for an agent Coral launched in this server run
+// that has been silent for a minute; it never lists what it cannot be sure of, and it never touches the agent's state.
+func TestHooksStatusListsPiAgentsWhoseExtensionNeverReported(t *testing.T) {
+	r := newWakeRig(t)
+	ctx := context.Background()
+	reg := func(sid, name, agentType string) {
+		t.Helper()
+		team := "t1"
+		require.NoError(t, r.ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: sid, AgentName: name, AgentType: agentType, WorkingDir: t.TempDir(), BoardName: &team}))
+	}
+	const silent, fresh, said, restarted, unknown, asleep, other = "bbbbbbbb-11107-4000-8000-000000000001", "bbbbbbbb-11107-4000-8000-000000000002", "bbbbbbbb-11107-4000-8000-000000000003", "bbbbbbbb-11107-4000-8000-000000000004", "bbbbbbbb-11107-4000-8000-000000000005", "bbbbbbbb-11107-4000-8000-000000000006", "bbbbbbbb-11107-4000-8000-000000000007"
+	reg(silent, "silent", "pi")
+	reg(fresh, "fresh", "pi")
+	reg(said, "said", "pi")
+	reg(restarted, "restarted", "pi")
+	reg(unknown, "unknown", "pi")
+	reg(asleep, "asleep", "pi")
+	reg(other, "claude", "claude")
+	require.NoError(t, r.ss.SetSessionSleeping(ctx, asleep, true))
+	now := time.Now()
+	r.h.piLaunchedAt.Store(silent, now.Add(-2*time.Minute))
+	r.h.piLaunchedAt.Store(fresh, now.Add(-10*time.Second))
+	r.h.piLaunchedAt.Store(said, now.Add(-2*time.Minute))
+	r.h.hooksRev.Store(said, agent.PiExtensionRev) // its first event carried the revision
+	r.h.piLaunchedAt.Store(restarted, now.Add(-2*time.Minute))
+	r.h.piLaunchedAt.Store(asleep, now.Add(-2*time.Minute))
+	// unknown: an agent started before this server run has no launch time
+
+	sessions, err := r.ss.GetAllLiveSessions(ctx)
+	require.NoError(t, err)
+	var names []string
+	for _, a := range r.h.piHooksInactive(sessions, now) {
+		names = append(names, a.Name+":"+a.Status)
+	}
+	assert.ElementsMatch(t, []string{"silent:inactive", "restarted:inactive"}, names, "only a Pi agent launched in this server run and silent for a minute; one that said it, one that is fresh, one with no launch time, a sleeping one and another CLI are not listed")
+
+	// A restart or wake starts the clock again and forgets what an earlier run of the session said.
+	r.h.hooksRev.Store(restarted, agent.PiExtensionRev)
+	r.h.noteLaunchedHooks(ctx, restarted, "pi")
+	_, said2 := r.h.hooksRev.Load(restarted)
+	assert.False(t, said2, "a launch forgets the earlier handshake: only an event from the new run counts")
+	var after []string
+	for _, a := range r.h.piHooksInactive(sessions, now.Add(30*time.Second)) {
+		after = append(after, a.Name)
+	}
+	assert.NotContains(t, after, "restarted", "its clock restarted at the launch: not yet a minute")
+	var later []string
+	for _, a := range r.h.piHooksInactive(sessions, now.Add(2*time.Minute)) {
+		later = append(later, a.Name)
+	}
+	assert.Contains(t, later, "restarted", "a minute after the new launch with no event, it is listed again")
+
+	// The route lists them next to the other statuses.
+	req := httptest.NewRequest("GET", "/api/system/hooks-status", nil)
+	w := httptest.NewRecorder()
+	r.h.HooksStatus(w, req)
+	var body struct {
+		PiInactive []hooksAgent `json:"pi_inactive"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &body))
+	assert.NotNil(t, body.PiInactive, "the field is always there (an empty list at none)")
 }

@@ -59,15 +59,15 @@ func piExtensionContent(hookBin string) string {
 	if hookBin == "" || sha256Hex(piExtensionSource) != piExtensionDigest || strings.Count(piExtensionSource, piConfigPlaceholder) != 1 {
 		return ""
 	}
-	cfg, err := json.Marshal(map[string]any{"hookBin": hookBin, "envNames": piHookEnvNames, "rev": piExtensionRev})
+	cfg, err := json.Marshal(map[string]any{"hookBin": hookBin, "envNames": piHookEnvNames, "rev": PiExtensionRev})
 	if err != nil {
 		return ""
 	}
 	return strings.Replace(piExtensionSource, piConfigPlaceholder, string(cfg), 1)
 }
 
-// piExtensionRev is the extension's interface revision (the handshake reports it).
-const piExtensionRev = 1
+// PiExtensionRev is the extension's interface revision: every hook event it posts carries it (--hooks-rev), which is the handshake the server reads (routes/hooks_status.go).
+const PiExtensionRev = 1
 
 func sha256Hex(s string) string {
 	sum := sha256.Sum256([]byte(s))

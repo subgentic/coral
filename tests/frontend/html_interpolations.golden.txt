@@ -328,6 +328,7 @@
 1	session_rows.js	hooksMissingChip(s)
 2	session_rows.js	label
 1	session_rows.js	nameTail ? `<span class="session-label-tags">${reminderTag}${typeTag}${dirChip}</span>` : `${reminderTag}${typ
+1	session_rows.js	piHooksChip(s)
 1	session_rows.js	pillKind
 1	session_rows.js	reminderTag
 1	session_rows.js	rowLinesHtml(s)

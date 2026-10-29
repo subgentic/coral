@@ -131,6 +131,8 @@ type SessionsHandler struct {
 	// (session id → revision, #3655 F3). In memory: until a session's next event after a
 	// restart it is unknown, and the gate takes the screen rule (the safe side).
 	hooksRev sync.Map
+	// piLaunchedAt is when Coral started each Pi agent in this server run (session id → time.Time): the Pi extension's handshake is its first hook event, so a Pi agent with none a minute after its launch is listed as not active (hooks_status.go, #11107).
+	piLaunchedAt sync.Map
 	// liveModes is the permission mode each Claude session's CLI reported with its latest hook event (session id → one of the six words, live_permission_mode.go). In memory: until a session's
 	// next event after a restart it is unknown and the dashboard reads the CLI's mode line instead.
 	liveModes sync.Map
