@@ -282,7 +282,10 @@ async function run() {
 
     // ── B. Real isolated terminal session ─────────────────────────────────
     console.log('\n── B. real session');
-    const launch = await httpJson('POST', '/api/sessions/launch', { working_dir: require('node:os').tmpdir(), agent_type: 'terminal', display_name: 'Popout QA' });
+    // The terminal's folder is its own git repository, not the runner's tmp dir: the popout's Files list is that folder's changes, and the tmp dir can sit inside a repository (epoch's does), where the settings file Coral writes for the
+    // session (named with its id) and Chrome's profile files are changed files, so the id showed in the page's text and attributes (#10975).
+    const workDir = require('node:fs').mkdtempSync(path.join(require('node:os').tmpdir(), 'coral-popout-work-')); require('./helpers/child_process').execFileSync('git', ['init', '-q', workDir]); require('node:fs').writeFileSync(path.join(workDir, 'notes.txt'), 'x\n');
+    const launch = await httpJson('POST', '/api/sessions/launch', { working_dir: workDir, agent_type: 'terminal', display_name: 'Popout QA' });
     const sid = launch.data && launch.data.session_id; const sname = launch.data && launch.data.session_name;
     check('B launch isolated terminal session', !!sid && UUID_RE.test(sid), JSON.stringify({ sid, sname, status: launch.status }));
     if (!sid) throw new Error('cannot launch a terminal session on the isolated server');
@@ -683,6 +686,7 @@ async function run() {
 run().then(() => {
     const failed = results.filter(r => r.verdict === 'FAIL');
     console.log(`\n${results.length - failed.length}/${results.length} checks passed`);
+    try { require('node:fs').rmSync(workDir, { recursive: true, force: true }); } catch { /* gone already */ }
     process.exit(failed.length ? 1 : 0);
 }).catch(err => {
     console.error('HARNESS ERROR:', err);
