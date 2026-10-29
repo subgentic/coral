@@ -1,3 +1,4 @@
+// cdp-timeout: 300 (2,100 seeded messages and the scenes after them: past the runner's 120 s on epoch's slower machine, where it ran out of time with the dark 1280 scenes done; #10947)
 // The board table on a real-shaped board (#8047, goal #33): 2,100 messages over six days from fourteen senders (long ones with code blocks and tables, reply chains, mentions, asks, task tags, gaps where messages were
 // deleted), posted through the real board API of the isolated server (the times then spread over the six days in its database), so paging, search (its FTS index) and the poll read the real server. The team Board at 1280 px
 // (dark) and 390 px (light), then the dock's Board tab at 420 px: paging up loads the earlier days in order under their day lines, opening and closing a row keeps the scroll, a search counts and steps across
@@ -10,6 +11,7 @@ const CDP = require('chrome-remote-interface');
 const BASE = require('./test_base').BASE;
 const { sqliteExec } = require('./helpers/sqlite'); // the sqlite3 tool when there is one, else Node's own SQLite: a Windows machine has no sqlite3 (#8797)
 const { removeBoards } = require('./helpers/board_cleanup');
+const OWN_BUDGET_MS = Number(process.env.CORAL_SEEDED_BUDGET_MS) || 270000; // under the cdp-timeout above: the suite stops itself, cleaned up, before the runner would kill it (a killed suite cannot delete its board: each timed-out attempt left one, #10947)
 
 const B = 'seeded-8047-' + (Date.now() % 100000);
 const TOTAL = 2100, DAYS = 6, NEEDLE = 'zebra-needle';
@@ -36,6 +38,11 @@ const spec = (i) => {
     const { Page, Runtime, Emulation, Performance, HeapProfiler, Input } = client;
     const ev = async expression => { const r = await Runtime.evaluate({ expression, returnByValue: true, awaitPromise: true }); if (r.exceptionDetails) throw new Error(JSON.stringify(r.exceptionDetails).slice(0, 500)); return r.result.value; };
     const { waitFor, coralReady, settle } = require('./helpers/wait').bind(ev);
+    // Its board is deleted on every way out: the end of the run, a failure, its own time running out, and the runner's SIGTERM or Ctrl-C. (SIGKILL cannot be caught: that is what the budget is for.)
+    let cleaned = null;
+    const cleanUp = () => (cleaned ||= removeBoards(ev, [B]).catch(() => {}).then(() => client.close().catch(() => {})));
+    const watchdog = setTimeout(() => { console.error(`board_table_seeded: its own time (${OWN_BUDGET_MS / 1000} s) ran out: its board is deleted and the run stops`); cleanUp().then(() => process.exit(1)); }, OWN_BUDGET_MS);
+    for (const sig of ['SIGTERM', 'SIGINT']) process.on(sig, () => { cleanUp().then(() => process.exit(130)); });
     const S = `(window.__coralStatic || '/static/')`;
     const shot = async n => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(`${d}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     const api = (m, p, body) => ev(`fetch(${JSON.stringify(p)}, { method: ${JSON.stringify(m)}, headers: { 'Content-Type': 'application/json' }, body: ${JSON.stringify(JSON.stringify(body))} }).then(r => r.status)`);
@@ -238,5 +245,5 @@ const spec = (i) => {
             await shot(`seeded-${tag}-end`);
         }
         console.log('PASS the board table on a real-shaped board');
-    } finally { await removeBoards(ev, [B]).catch(() => {}); await client.close(); }
+    } finally { clearTimeout(watchdog); await cleanUp(); }
 })().catch(e => { console.error(e); process.exit(1); });
