@@ -408,3 +408,11 @@
 .inbox-starred-artifacts > h3 { margin-bottom: 0.5rem; }
 
 .detail-note { margin: 0; padding: 6px 16px 0; font-size: var(--fs-sm); color: var(--text-secondary); } /* what Star and Keep each do, above the buttons (#10539) */
+
+/* The Search access dialog (#11053): one radio row per level, its name and what it reads under it; 44 px rows on a phone. */
+.search-access-levels { display: grid; gap: var(--space-xs); }
+.search-access-level { display: flex; gap: var(--space-md); align-items: flex-start; padding: var(--space-xs) 0; min-height: var(--table-touch); cursor: pointer; }
+.search-access-level input { display: inline-block; width: auto; flex: none; margin: var(--space-xs) 0 0; } /* a dialog's input is the full width: a radio is its own size */
+.search-access-text { display: grid; min-width: 0; overflow-wrap: anywhere; }
+.search-access-word { font-weight: var(--fw-medium); color: var(--text-primary); }
+.search-access-reads, .search-access-note { color: var(--text-secondary); font-size: var(--fs-md); }
