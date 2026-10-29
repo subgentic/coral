@@ -39,7 +39,7 @@ const { coralReady } = require('./helpers/wait');
             // the routes, answered here: one candidate, then a record that succeeds; later a 409 and a bulk answer
             await ev(`window.__calls = []; window.__answer = { record: 200 }; window.__realFetch = window.__realFetch || window.fetch; window.fetch = (u, o) => { const s = String(u), json = (b, st = 200) => Promise.resolve(new Response(JSON.stringify(b), { status: st, headers: { 'Content-Type': 'application/json' } }));
                 if (s.includes('/agent-candidate')) { window.__calls.push({ u: s }); return json({ ok: true, paused: true, reason: 'not the recorded agent', candidate: window.__noCandidate ? null : { pid: 4242, start: 'opaque-start-1', program: 'node', under: window.__under || '' }, why_not: window.__noCandidate ? 'several foreground programs' : '' }); }
-                if (s.includes('/record-agent')) { window.__calls.push({ u: s, body: o && o.body }); return window.__answer.record === 409 ? json({ ok: false, code: 'changed', error: 'the foreground program is no longer that process' }, 409) : json({ ok: true, pid: 4242, program: 'node' }); }
+                if (s.includes('/record-agent') && !s.includes('/record-agents')) { window.__calls.push({ u: s, body: o && o.body }); return window.__answer.record === 409 ? json({ ok: false, code: 'changed', error: 'the foreground program is no longer that process' }, 409) : json({ ok: true, pid: 4242, program: 'node' }); }
                 if (s.includes('/record-agents')) { window.__calls.push({ u: s, method: o && o.method }); return json({ ok: true, recorded: [{ session: 'claude-a', pid: 1, program: 'claude' }], left: [{ session: 'codex-b', reason: 'ambiguous: the program is node, which runs a script; record it with the button' }] }); }
                 return window.__realFetch(u, o); }; true`);
             const toastSeen = re => waitFor(`[...document.querySelectorAll('.toast, [role=status], [role=alert]')].some(t => ${re}.test(t.textContent))`, `${tag}: the toast ${re}`, 5000);
@@ -79,7 +79,7 @@ const { coralReady } = require('./helpers/wait');
             const nrec = await ev(`window.__calls.find(c => /record-agent$/.test(c.u))`);
             check(`${tag}: ticked, it records with acknowledge_nested`, JSON.stringify(JSON.parse(nrec.body)) === JSON.stringify({ pid: 4242, start: 'opaque-start-1', acknowledge_nested: true }), JSON.stringify(nrec));
             await ev(`window.__under = ''; true`);
-            const plainAgain = await ev(`(async () => { const m = await import(${S} + 'confirm_dialog.js'); m.showConfirmModal('t', 'm', () => {}, undefined, { label: 'X' }); const r = { box: !!document.getElementById('confirm-modal-ack'), disabled: document.getElementById('confirm-modal-yes').disabled }; m.hideConfirmModal(); return r; })()`);
+            const plainAgain = await ev(`(() => { window.showConfirmModal('t', 'm', () => {}, undefined, { label: 'X', danger: false }); const r = { box: !!document.getElementById('confirm-modal-ack'), disabled: document.getElementById('confirm-modal-yes').disabled }; window.hideConfirmModal(); return r; })()`);
             check(`${tag}: the next question asks with no box and its button enabled`, !plainAgain.box && !plainAgain.disabled, JSON.stringify(plainAgain));
 
             await ev(`window.__calls = []; document.getElementById('composer-waiting-record-all').click(); true`);

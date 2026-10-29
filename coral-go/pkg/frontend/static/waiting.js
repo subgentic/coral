@@ -173,7 +173,7 @@ async function recordAgent() {
         const c = r.candidate;
         const name = String(s.display_name || s.name || 'this agent');
         showConfirmModal('Record as agent', recordConfirmText(c, name), acknowledged => postRecord(s, c, acknowledged), undefined,
-            c.under ? { label: 'Record', acknowledge: NESTED_ACK } : { label: 'Record' });
+            c.under ? { label: 'Record', danger: false, acknowledge: NESTED_ACK } : { label: 'Record', danger: false }); // recording loses nothing: it ends a pause
     } catch (e) {
         showToast('The agent could not be read: ' + (e && e.message ? e.message : 'the server did not answer.'));
     } finally { busy = false; }
