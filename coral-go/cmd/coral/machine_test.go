@@ -44,6 +44,19 @@ func (s *machineStubProvider) Delete(_ context.Context, id string) error {
 	return nil
 }
 
+// The network a launch makes (#10918): a stub that makes nothing and says nothing, so these tests keep their own call lists.
+func (s *machineStubProvider) CreateVPC(_ context.Context, name, region string) (machinelaunch.VPC, error) {
+	return machinelaunch.VPC{ID: "vpc-stub", Name: name, Region: region}, nil
+}
+func (s *machineStubProvider) DeleteVPC(context.Context, string) error { return nil }
+func (s *machineStubProvider) CreateFirewall(_ context.Context, sp machinelaunch.FirewallSpec) (machinelaunch.Firewall, error) {
+	return machinelaunch.Firewall{ID: "fw-stub", Name: sp.Name, Tag: sp.Tag}, nil
+}
+func (s *machineStubProvider) CloseFirewall(context.Context, machinelaunch.Firewall) error {
+	return nil
+}
+func (s *machineStubProvider) DeleteFirewall(context.Context, string) error { return nil }
+
 type machineStubHub struct {
 	destroyKey string // the chd_ the command gave the Hub client
 	labels     []string
@@ -78,6 +91,7 @@ var machineBoot *machineStubBoot
 func machineFixture(t *testing.T) (tokenFile, keyFile string, p *machineStubProvider, h *machineStubHub) {
 	t.Helper()
 	dir := t.TempDir()
+	t.Setenv("CORAL_DATA_DIR", filepath.Join(dir, "coral-data")) // the state file of a launch goes in Coral's data folder: never the real one (#10918)
 	tokenFile, keyFile = filepath.Join(dir, "token"), filepath.Join(dir, "key")
 	if err := os.WriteFile(tokenFile, []byte("dop_v1_COMMANDTOKEN\n"), 0o600); err != nil {
 		t.Fatal(err)

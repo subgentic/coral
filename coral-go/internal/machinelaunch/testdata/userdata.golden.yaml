@@ -25,6 +25,7 @@ packages:
   - ca-certificates
   - curl
   - git
+  - nftables
   - tmux
   - ufw
 write_files:
@@ -34,8 +35,9 @@ write_files:
     content: |
       [Unit]
       Description=Coral
-      After=network-online.target
+      After=network-online.target coral-egress.service
       Wants=network-online.target
+      Requires=coral-egress.service
 
       [Service]
       User=coral
@@ -116,6 +118,55 @@ write_files:
 
       [Install]
       WantedBy=timers.target
+  - path: /etc/coral/egress.nft
+    owner: root:root
+    permissions: '0600'
+    content: |
+      # Coral machine: every non-root user is stopped from the cloud's metadata service and the private ranges (loopback is not listed, so local resolvers keep working).
+      table inet coral_egress
+      delete table inet coral_egress
+      table inet coral_egress {
+      	chain output {
+      		type filter hook output priority -10; policy accept;
+      		meta skuid != 0 ip daddr { 169.254.0.0/16, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 100.64.0.0/10 } counter reject with icmp type admin-prohibited
+      		meta skuid != 0 ip6 daddr { fe80::/10, fc00::/7 } counter reject with icmpv6 type admin-prohibited
+      	}
+      }
+  - path: /etc/systemd/system/coral-egress.service
+    owner: root:root
+    permissions: '0644'
+    content: |
+      [Unit]
+      Description=Coral: block the metadata service and the private ranges for every non-root user
+      DefaultDependencies=no
+      Wants=network-pre.target
+      Before=network-pre.target coral.service
+      After=local-fs.target
+
+      [Service]
+      Type=oneshot
+      RemainAfterExit=yes
+      ExecStart=/usr/sbin/nft -f /etc/coral/egress.nft
+      ExecStartPost=/usr/local/sbin/coral-egress-check
+
+      [Install]
+      WantedBy=sysinit.target
+  - path: /usr/local/sbin/coral-egress-check
+    owner: root:root
+    permissions: '0700'
+    content: |
+      #!/bin/sh
+      set -eu
+      rules=$(/usr/sbin/nft list table inet coral_egress)
+      [ "$(printf '%s\n' "$rules" | grep -c 'meta skuid != 0')" -ge 2 ] || { echo "coral-egress: the egress rules are not loaded" >&2; exit 1; }
+      # a resolver inside a blocked range would make every lookup of a non-root user (Coral's own too) fail
+      resolvers=$(cat /run/systemd/resolve/resolv.conf /etc/resolv.conf 2>/dev/null | awk '$1 == "nameserver" { print $2 }' | grep -v '^127\.' | sort -u || true)
+      for ns in $resolvers; do
+        case "$ns" in
+          169.254.*|10.*|192.168.*|100.6[4-9].*|100.[7-9][0-9].*|100.1[01][0-9].*|100.12[0-7].*|172.1[6-9].*|172.2[0-9].*|172.3[01].*|fe[89ab]*:*|fc*:*|fd*:*)
+            echo "coral-egress: the DNS resolver $ns is inside a blocked range: lookups of every non-root user would fail" >&2; exit 1 ;;
+        esac
+      done
   - path: /usr/local/sbin/coral-machine-setup
     owner: root:root
     permissions: '0700'
@@ -183,6 +234,8 @@ write_files:
       runuser -u coral -- bash "$installer"
       rm -f "$installer"
 runcmd:
+  - [ systemctl, daemon-reload ]
+  - [ systemctl, enable, --now, coral-egress.service ] # the egress block, before anything else: coral.service Requires it, so Coral never starts without it
   - [ ufw, default, deny, incoming ]
   - [ ufw, default, allow, outgoing ]
   - [ ufw, allow, from, '203.0.113.9', to, any, port, '22', proto, tcp ] # SSH, for the launcher's address only: closed again by coral-machine-finish

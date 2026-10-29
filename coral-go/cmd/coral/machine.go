@@ -53,8 +53,12 @@ func machineUsage(w io.Writer) {
 }
 
 func runMachine(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+	if len(args) > 0 && (args[0] == "list" || args[0] == "delete" || args[0] == "prune" || args[0] == "egress-files") {
+		return runMachineManage(args[0], args[1:], stdin, stdout, stderr)
+	}
 	if len(args) == 0 || args[0] != "launch" {
 		machineUsage(stderr)
+		machineManageUsage(stderr)
 		return 2
 	}
 	fs := flag.NewFlagSet("coral machine launch", flag.ContinueOnError)
@@ -74,6 +78,7 @@ func runMachine(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	yes := fs.Bool("yes", false, "go on without asking (the price is still printed)")
 	sha256AMD64 := fs.String("coral-sha256-amd64", "", "the SHA-256 of the release's linux-amd64 tarball, for a --coral-version this build has no pinned digest for (from a SHA256SUMS you checked)")
 	sha256ARM64 := fs.String("coral-sha256-arm64", "", "the SHA-256 of the release's linux-arm64 tarball, as --coral-sha256-amd64")
+	statePath := fs.String("state-file", "", "where the launch keeps the ids of what it made, for `coral machine delete` (default: machines.json in Coral's data folder; ids only, mode 0600)")
 	sshFrom := fs.String("allow-ssh-from", "", "the address (or CIDR) the machine's SSH accepts while the launch sets it up (default: this computer's public address, found over HTTPS)")
 	var sshKeys listFlag
 	fs.Var(&sshKeys, "ssh-key", "a provider ssh key id or fingerprint to install (repeatable); none by default")
@@ -154,6 +159,13 @@ func runMachine(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if err != nil {
 		return fail("%v", err)
 	}
+	if *statePath == "" {
+		*statePath = defaultMachineStatePath()
+	}
+	launchState, err := machinelaunch.OpenState(*statePath)
+	if err != nil {
+		return fail("%v", err)
+	}
 	machine := *name
 	if machine == "" {
 		var b [3]byte
@@ -195,7 +207,7 @@ func runMachine(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		lookup = publicIPHost()
 	}
 	deps := machinelaunch.Deps{
-		Provider: p, Hub: hub, Out: stdout, Bootstrap: newMachineBootstrap(),
+		Provider: p, Hub: hub, Out: stdout, Bootstrap: newMachineBootstrap(), Isolate: true, State: launchState, // every launch makes its own VPC and firewall and keeps its ids (#10918)
 		UserData: func(keys *machinelaunch.BootKeys) (string, error) {
 			return machineUserData(keys, source, *maxMode, version, digests, *hubURL, agentList)
 		},
