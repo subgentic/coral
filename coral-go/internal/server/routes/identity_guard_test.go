@@ -78,7 +78,7 @@ func TestWaitNudgeIsOneLineForAStoredBadSender(t *testing.T) {
 	require.Len(t, inputs, 1)
 	assert.NotContains(t, inputs[0], "\n")
 	assert.NotContains(t, inputs[0], "\r")
-	assert.Contains(t, inputs[0], `[Wait resolved] "Orchestrator\nrm -rf /tmp/x" posted`, "the sender is quoted: its newline is the two characters \\n")
+	assert.Contains(t, inputs[0], `[Wait resolved] Orchestrator rm -rf /tmp/x posted`, "the sender is a typed label: one line, nothing a shell acts on (goal #7)")
 }
 
 // QA's #3376 v2 e2e: a terminal agent's terminal is a shell, where $( ) and backticks

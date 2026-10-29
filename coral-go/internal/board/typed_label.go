@@ -1,0 +1,56 @@
+package board
+
+import (
+	"strings"
+	"unicode"
+)
+
+// typedLabelMax is the longest a label in a typed notice may be, in runes: a notice names a thing, and the reader looks it up for the rest.
+const typedLabelMax = 80
+
+// TypedLabel is a short piece of text someone else wrote (a task title, a subscriber's name, a board name) made fit to be TYPED into an
+// agent's terminal as part of a notice (goal #7, #378). That terminal may not be the agent's CLI: an exited agent leaves a shell there,
+// and a person can start another one (cmd, bash, PowerShell). So a label keeps only letters, digits, spaces and . , : _ - /; every
+// other character, each one that a shell reads (quotes, $ ( ) ; & | < > ^ % ` { } [ ] @ # ! * ~ \ and the Unicode quotes and dashes
+// PowerShell takes as ASCII ones), becomes a space. Spaces are collapsed, the ends trimmed, and a long label is cut at typedLabelMax
+// runes with "...". "" stays "". The text itself is never lost: notices name the id, and coral-board shows the whole text.
+func TypedLabel(s string) string {
+	return typedOnly(s, ".,:_-/", typedLabelMax)
+}
+
+// TypedText is TypedLabel for a long line Coral composed around other people's words (the team health check, which quotes what agents
+// said): the same characters, plus '#' so "#12" keeps naming a task, and no length cap. A typed line built with it must still start with
+// one of the fixed openers (TypedOpeners), so the '#' never begins it.
+func TypedText(s string) string {
+	return typedOnly(s, ".,:_-/#", 0)
+}
+
+// TypedOpeners are the first words a typed notice may start with. None is a program, a cmdlet or an alias here (checked by the
+// typed-notice census), and none is a label: in cmd.exe a line's first word is what runs, and in PowerShell a bare first word is a command.
+var TypedOpeners = []string{"You", "[Task", "[Wait", "[Coral"}
+
+// typedOnly keeps letters, digits and the extra characters, turns every other run into one space, trims the ends, and cuts at max runes
+// with "..." (0: no cap).
+func typedOnly(s, extra string, max int) string {
+	var b strings.Builder
+	b.Grow(len(s))
+	space := true // drops leading spaces
+	n := 0
+	for _, r := range s {
+		keep := unicode.IsLetter(r) || unicode.IsDigit(r) || strings.ContainsRune(extra, r)
+		if !keep {
+			if !space {
+				b.WriteByte(' ')
+				space = true
+			}
+			continue
+		}
+		if max > 0 && n >= max {
+			return strings.TrimRight(b.String(), " ") + "..."
+		}
+		b.WriteRune(r)
+		space = false
+		n++
+	}
+	return strings.TrimRight(b.String(), " ")
+}
