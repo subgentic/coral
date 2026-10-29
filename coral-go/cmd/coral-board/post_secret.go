@@ -1,23 +1,35 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
-	"strings"
+	"os"
+
+	"github.com/subgentic/coral/internal/clierr"
+	"github.com/subgentic/coral/internal/signinguard"
 )
 
-// loginTokenParam is the query parameter of a sign-in link (auth.LoginTokenParam, kept equal by
-// TestTheRefusedParamIsTheSignInLinksOwn; coral-board doesn't link the auth package).
-const loginTokenParam = "login_token"
-
-// refuseSignInLink refuses a message that carries a sign-in link's token: "login_token=" in any case, or
-// URL-encoded as "login_token%3D". A board message is read by every member and kept, so a link pasted
-// into one (with a command's whole output) works for anyone who reads it before it lapses. It refuses
-// rather than redacts, so the sender sees what happened and posts only the result lines.
+// refuseSignInLink refuses a post or send whose message carries a sign-in link's token (signinguard), from
+// the arguments, --file or stdin alike: a board message is read by every member and kept. A guard against
+// accidents (a command's whole output pasted into a post), not a leak filter.
 func refuseSignInLink(cmdName, message string) error {
-	m := strings.ToLower(message)
-	if strings.Contains(m, loginTokenParam+"=") || strings.Contains(m, loginTokenParam+"%3d") {
-		return fmt.Errorf("error: refusing a message that contains a sign-in link (%s=): anyone who reads the board could sign in with it.\n"+
-			"Nothing was posted. Post only the result lines: write them to a file and use coral-board %s --file <file>, never a command's whole output.", loginTokenParam, cmdName)
+	if signinguard.Contains(message) {
+		return signinguard.Refusal("a message", "Post only the result lines: write them to a file and use coral-board "+cmdName+" --file <file>, never a command's whole output.")
 	}
 	return nil
+}
+
+// refuseSignInLinkInBody is the same check on every request body coral-board sends: task and goal text,
+// titles, notes, reviews and answers alike, so a command with no check of its own still can't put a link
+// where members read it. It exits 1, having sent nothing.
+func refuseSignInLinkInBody(body any) {
+	if body == nil {
+		return
+	}
+	data, err := json.Marshal(body)
+	if err != nil || !signinguard.Contains(string(data)) {
+		return
+	}
+	fmt.Fprintln(os.Stderr, signinguard.Refusal("this command's text", "Send only the result lines, never a command's whole output."))
+	clierr.Exit1()
 }

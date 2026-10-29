@@ -126,6 +126,7 @@ func waitingTarget(project, target string) (name, agentType, sessionID string) {
 }
 
 func waitingCall(method, u string, body any, into any) {
+	refuseSignInLinkInBody(body)
 	var r *bytes.Reader
 	if body != nil {
 		b, _ := json.Marshal(body)
