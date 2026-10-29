@@ -717,7 +717,7 @@ func (s *SessionStore) IndexedSessionItems(ctx context.Context) ([]SessionLineag
 	var rows []SessionIndex
 	err := s.db.SelectContext(ctx, &rows,
 		`SELECT session_id, source_type, source_file, first_timestamp, last_timestamp, message_count, display_summary, agent_name, display_name, indexed_at, file_mtime
-		 FROM session_index WHERE session_id NOT IN (SELECT session_id FROM live_sessions) ORDER BY last_timestamp DESC LIMIT ?`, MaxReachSessions)
+		 FROM session_index WHERE session_id NOT IN (SELECT session_id FROM live_sessions) ORDER BY last_timestamp DESC, rowid LIMIT ?`, MaxReachSessions)
 	if err != nil {
 		return nil, err
 	}

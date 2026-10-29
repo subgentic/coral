@@ -13,6 +13,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/subgentic/coral/internal/httputil"
 	"github.com/subgentic/coral/internal/store"
 )
 
@@ -141,11 +142,11 @@ func (h *SessionsHandler) SetMemberSearchAccess(w http.ResponseWriter, r *http.R
 	}
 	level := strings.ToLower(strings.TrimSpace(body.Level))
 	if store.SearchReachRank(level) < 0 {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "level must be own, team, all or operator", "field": "level"})
+		errBadRequest(w, "level must be own, team, all or operator")
 		return
 	}
 	if level == store.SearchReachOperator && body.Confirm != "operator" {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Giving an agent the Operator's own CLI history needs confirm: \"operator\".", "code": "confirm_required", "field": "confirm"})
+		writeError(w, http.StatusBadRequest, "confirm_required", "Giving an agent the Operator's own CLI history needs confirm: \"operator\".")
 		return
 	}
 	if h.teamStore == nil {
@@ -209,8 +210,7 @@ func (h *SessionsHandler) gateSearchReach(w http.ResponseWriter, r *http.Request
 	}
 	c = h.searchWho(r, sessionID)
 	if requested != store.SearchReachOwn && !h.searchRate.allow(c.key) { // a search above own, or a refused one, is counted: a loop that probes the levels is slowed like one that reads; reads at own are the agent's own
-		w.Header().Set("Retry-After", "60")
-		writeJSON(w, http.StatusTooManyRequests, map[string]any{"error": "Too many searches from this agent: wait a minute and try again.", "code": "search_rate_limited"})
+		httputil.WriteActionLimit(w, 60, "search_rate_limited", "Too many searches from this agent: wait a minute and try again.")
 		return c, requested, false
 	}
 	if store.SearchReachRank(requested) > store.SearchReachRank(c.level) {
