@@ -20,7 +20,7 @@ import { importOnce } from './import_once.js';
 const STATUS = new Map([['ok', 'OK'], ['busy', 'Busy'], ['stalled', 'Stalled']]);
 const REASON = new Map([['cpu', 'CPU'], ['memory', 'memory'], ['disk', 'disk'], ['stall', 'not answering']]);
 // The schema's top-level fields (#3444): nothing else is kept from a feed message.
-const FIELDS = new Set(['status', 'reason', 'responsiveness_ms', 'coral', 'agents', 'host', 'disk']);
+const FIELDS = new Set(['status', 'reason', 'busy_by', 'responsiveness_ms', 'coral', 'agents', 'host', 'disk']);
 
 // Only the schema's fields of an object, as a fresh plain object.
 function known(obj) {
@@ -65,15 +65,13 @@ export function applyMachineHealth(msg) {
     return h && typeof h.status === 'string' && STATUS.has(h.status) ? h.status : 'unknown';
 }
 
-/** Busy on the processor, but not by Coral or its agents (#9955): the host's load is over its limit while Coral and the agents use under a quarter of the cores that load stands for. It is other programs, not a fault of Coral. */
+/** Busy on the processor, but not by Coral or its agents (#9955): the server says so (busy_by "others", #10887), from its own CPU reading of Coral and the agents against the host's cores. The words follow the server, never the host's
+ *  load average, which lags: with no busy_by (an older Coral, or a sample that could not tell) nobody is named and it stays "Busy (CPU)". */
  function busyByOthers(h) {
-    if (healthStatus(h) !== 'busy' || !h || h.reason !== 'cpu') return false;
-    const c = num(h.coral && h.coral.cpu_percent), a = num(h.agents && h.agents.cpu_percent), per = num(h.host && h.host.load1_per_core), n = num(h.host && h.host.cpu_count);
-    if (c === null || a === null || per === null || !n) return false;
-    return (c + a) / 100 < 0.25 * per * n;
+    return healthStatus(h) === 'busy' && !!h && h.reason === 'cpu' && h.busy_by === 'others';
 }
 
-/** One line for the status, e.g. "Busy (CPU)", "OK", "Unknown"; "Busy (other programs)" when the load is not Coral's. */
+/** One line for the status, e.g. "Busy (CPU)", "OK", "Unknown"; "Busy (other programs)" when the server says the load is not Coral's (busy_by). */
  function healthStatusText(h) {
     const s = healthStatus(h);
     if (s === 'unknown') return 'Unknown';

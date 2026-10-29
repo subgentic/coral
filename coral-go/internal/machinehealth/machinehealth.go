@@ -25,13 +25,16 @@ import (
 
 // Health is one sample, in the shape the feeds carry it (machine_health).
 type Health struct {
-	Status           string `json:"status"`           // ok | busy | stalled
-	Reason           string `json:"reason,omitempty"` // cpu | memory | disk | stall, only when not ok
+	Status           string `json:"status"`            // ok | busy | stalled
+	Reason           string `json:"reason,omitempty"`  // cpu | memory | disk | stall, only when not ok
+	BusyBy           string `json:"busy_by,omitempty"` // "others" when the status is busy on cpu and Coral and its agents used little of it, from this sample's own CPU readings; absent when it is not known (#10887)
 	ResponsivenessMS int64  `json:"responsiveness_ms"`
 	Coral            Proc   `json:"coral"`
 	Agents           Agents `json:"agents"`
 	Host             Host   `json:"host"`
 	Disk             Disk   `json:"disk"`
+
+	cpuMeasured bool // Coral's and the agents' CPU are measured over an interval (not the first sample, which has no earlier reading to compare with)
 }
 
 // Proc is a process (or a set of them): CPU as % of one core over the interval, resident bytes.
@@ -239,7 +242,9 @@ func (s *Sampler) Sample(ctx context.Context) Health {
 	if haveR {
 		h.ResponsivenessMS = int64(math.Round(float64(r.Last) / float64(time.Millisecond)))
 	}
+	h.cpuMeasured = !first && elapsed > 0
 	h.Status, h.Reason = classify(h, r, haveR, now)
+	h.BusyBy = busyBy(h)
 
 	s.mu.Lock()
 	cp := h
@@ -265,6 +270,21 @@ func classify(h Health, r Responsiveness, haveR bool, now time.Time) (status, re
 		return "busy", "cpu"
 	}
 	return "ok", ""
+}
+
+// othersShare is the part of the host's cores Coral and its agents may use for a slow probe to be put down to other programs: under a tenth. Between that and heavy use nobody is named.
+const othersShare = 0.10
+
+// busyBy says who the cpu busy is, only when this sample knows: "others" when Coral's and the agents' measured CPU together is under a tenth of the host's cores, "" otherwise (not busy on cpu, no CPU
+// reading yet, or Coral and the agents use enough of it that the slowness may be theirs). The words on the page follow this, not the host's load average, which lags (#10887, after #10761).
+func busyBy(h Health) string {
+	if h.Status != "busy" || h.Reason != "cpu" || !h.cpuMeasured || h.Host.CPUCount <= 0 {
+		return ""
+	}
+	if h.Coral.CPUPercent+h.Agents.CPUPercent < othersShare*100*float64(h.Host.CPUCount) {
+		return "others"
+	}
+	return ""
 }
 
 // cpuSeconds is a process's user plus system CPU time so far.
