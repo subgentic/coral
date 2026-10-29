@@ -135,7 +135,7 @@ async function sendRelaunch(go, later) {
     }
     say(reasonText(res.code)); // a sentence that Coral did not say why for a reason this build does not know; never the server's own words
     if (!['busy', 'too_soon', 'relaunch_fleet_busy', 'fleet_busy', 'mode_too_low', 'network', 'applying'].includes(res.code)) { // a failure that trying again will not clear ends with something to do: the button is back, and the release page
-        const a = mk('a', 'update-download-fallback', `Download Coral ${current.staged.version} yourself`); a.href = `${RELEASES_URL}/releases/latest`; a.target = '_blank'; a.rel = 'noopener';
+        const a = mk('a', 'update-download-fallback', `Download Coral ${current.staged.version} yourself`); a.href = releaseNotesUrl(current.staged.version) || `${RELEASES_URL}/releases/latest`; a.target = '_blank'; a.rel = 'noopener';
         const row = mk('p', 'update-note'); row.append(a); body.append(row);
     }
 }

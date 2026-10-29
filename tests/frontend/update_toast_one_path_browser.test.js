@@ -12,6 +12,7 @@ const BASE = require('./test_base').BASE;
     const COMING = { enabled: true, installed: '1.0.0', state: 'none', not_ready_reason: 'not_promoted', relaunch: { available: false, reason: 'nothing_staged', restarts: [] } };
     const BREW = { ...COMING, install_kind: 'homebrew', upgrade_command: 'brew upgrade coral' };
     const OFF = { enabled: false };
+    const PERMANENT = ['no_run_record', 'install_not_supported', 'updates_off', 'unsupported_platform', 'install_unavailable', 'max_mode', 'already_relaunched', 'not_verified'].map(r => [`permanent: ${r}`, { ...COMING, relaunch: { available: false, reason: r, restarts: [] } }]);
     const SWITCH_OFF = { ...COMING, not_ready_reason: 'switch_off' }; // automatic checks are off: nothing is on its way
     const APPLY_OFF = { ...COMING, relaunch: { available: false, reason: 'apply_not_enabled', restarts: [] } }; // installing from here is not turned on
     const toast = () => ev(`(() => { const t = document.getElementById('update-toast'); return t ? { text: t.innerText.replace(/\\s+/g, ' ').trim(), download: !!t.querySelector('.update-toast-download') } : null; })()`);
@@ -30,7 +31,7 @@ const BASE = require('./test_base').BASE;
         const coming = await run(COMING);
         assert.ok(coming && !coming.download && /will ask before it installs/.test(coming.text), 'coming: no Download link, it says Coral will ask: ' + JSON.stringify(coming));
         assert.ok(coming && /Something new in the list/.test(coming.text) && !/#\d|`/.test(coming.text), 'the notes are plain words: no task numbers, no backticks: ' + JSON.stringify(coming));
-        for (const [name, st] of [['off', OFF], ['homebrew', BREW], ['automatic checks off', SWITCH_OFF], ['apply not enabled', APPLY_OFF]]) { const t = await run(st); assert.ok(t && t.download, `${name}: the Download link stays: ` + JSON.stringify(t)); }
+        for (const [name, st] of [['off', OFF], ['homebrew', BREW], ['automatic checks off', SWITCH_OFF], ['apply not enabled', APPLY_OFF], ...PERMANENT]) { const t = await run(st); assert.ok(t && t.download, `${name}: the Download link stays: ` + JSON.stringify(t)); }
         console.log('PASS');
     } finally { try { await client.close(); } catch (e) {} }
 })().catch(e => { console.error(e); process.exit(1); });

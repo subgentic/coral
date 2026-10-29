@@ -56,7 +56,8 @@ async function inAppPath() {
         const s = await fetchUpdateStatus();
         if (!s || !s.enabled) return '';
         if (relaunchOffered(s) && canStart(s)) return 'ready';
-        return s.installKind === 'homebrew' || s.installKind === 'unwritable' || ['unsupported_install', 'apply_not_enabled', 'switch_off'].includes(s.relaunch.reason) || ['unsupported_install', 'switch_off'].includes(s.notReady) ? '' : 'coming'; // only an update that is really on its way is promised
+        const why = s.relaunch.reason; // promise only what is surely on its way: nothing is wrong with this install and the update just is not ready; any permanent reason keeps the Download link
+        return s.installKind !== 'homebrew' && s.installKind !== 'unwritable' && (!why || why === 'nothing_staged') && ['not_promoted', 'backoff', 'rate_limited', 'check_failed', 'not_checked', 'applying'].includes(s.notReady) ? 'coming' : '';
     } catch { return ''; }
 }
 

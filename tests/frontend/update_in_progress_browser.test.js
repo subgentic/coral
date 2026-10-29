@@ -40,7 +40,7 @@ const BASE = require('./test_base').BASE;
         await ev(`document.querySelector('#update-confirm-modal .update-go').click(); true`);
         await waitFor(`!!document.querySelector('#update-confirm-modal .update-error')`, 'the refusal', 6000);
         const f = await ev(`(() => { const e = document.querySelector('#update-confirm-modal .update-error'); const a = document.querySelector('#update-confirm-modal .update-download-fallback'); return { text: e.textContent + ' ' + (a ? a.textContent : ''), href: a && a.href, again: !document.querySelector('#update-confirm-modal .update-go').disabled }; })()`);
-        assert.ok(/Download Coral 9\.9\.9 yourself/.test(f.text) && /github\.com\/subgentic\/coral\/releases\/latest$/.test(f.href) && f.again, 'a failure has the way on: ' + JSON.stringify(f));
+        assert.ok(/Download Coral 9\.9\.9 yourself/.test(f.text) && /github\.com\/subgentic\/coral\/releases\/tag\/v9\.9\.9$/.test(f.href) && f.again, 'a failure has the way on: ' + JSON.stringify(f));
         console.log('PASS');
     } finally { try { await client.close(); } catch (e) {} }
 })().catch(e => { console.error(e); process.exit(1); });
