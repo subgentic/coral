@@ -38,7 +38,7 @@ const { coralReady } = require('./helpers/wait');
 
             // the routes, answered here: one candidate, then a record that succeeds; later a 409 and a bulk answer
             await ev(`window.__calls = []; window.__answer = { record: 200 }; window.__realFetch = window.__realFetch || window.fetch; window.fetch = (u, o) => { const s = String(u), json = (b, st = 200) => Promise.resolve(new Response(JSON.stringify(b), { status: st, headers: { 'Content-Type': 'application/json' } }));
-                if (s.includes('/agent-candidate')) { window.__calls.push({ u: s }); return json({ ok: true, paused: true, reason: 'not the recorded agent', candidate: window.__noCandidate ? null : { pid: 4242, start: 'opaque-start-1', program: 'node' }, why_not: window.__noCandidate ? 'several foreground programs' : '' }); }
+                if (s.includes('/agent-candidate')) { window.__calls.push({ u: s }); return json({ ok: true, paused: true, reason: 'not the recorded agent', candidate: window.__noCandidate ? null : { pid: 4242, start: 'opaque-start-1', program: 'node', under: window.__under || '' }, why_not: window.__noCandidate ? 'several foreground programs' : '' }); }
                 if (s.includes('/record-agent')) { window.__calls.push({ u: s, body: o && o.body }); return window.__answer.record === 409 ? json({ ok: false, code: 'changed', error: 'the foreground program is no longer that process' }, 409) : json({ ok: true, pid: 4242, program: 'node' }); }
                 if (s.includes('/record-agents')) { window.__calls.push({ u: s, method: o && o.method }); return json({ ok: true, recorded: [{ session: 'claude-a', pid: 1, program: 'claude' }], left: [{ session: 'codex-b', reason: 'ambiguous: the program is node, which runs a script; record it with the button' }] }); }
                 return window.__realFetch(u, o); }; true`);
@@ -51,7 +51,7 @@ const { coralReady } = require('./helpers/wait');
             await ev(`document.getElementById('confirm-modal-yes').click(); true`);
             await waitFor(`window.__calls.some(c => /record-agent$/.test(c.u))`, `${tag}: the record request`, 5000);
             const rec = await ev(`window.__calls.find(c => /record-agent$/.test(c.u))`);
-            check(`${tag}: it records exactly what it was offered: the pid and the start, unchanged`, JSON.stringify(JSON.parse(rec.body)) === JSON.stringify({ pid: 4242, start: 'opaque-start-1' }) && /\/api\/sessions\/live\/rec-agent-id\/record-agent$/.test(rec.u), JSON.stringify(rec));
+            check(`${tag}: it records exactly what it was offered: the pid and the start, unchanged, and no acknowledge_nested for a direct child`, JSON.stringify(JSON.parse(rec.body)) === JSON.stringify({ pid: 4242, start: 'opaque-start-1' }) && /\/api\/sessions\/live\/rec-agent-id\/record-agent$/.test(rec.u), JSON.stringify(rec));
             await toastSeen(/Recorded node as the agent/);
             check(`${tag}: and says so`, true);
 
@@ -65,6 +65,22 @@ const { coralReady } = require('./helpers/wait');
             await toastSeen(/Nothing to record: several foreground programs/);
             check(`${tag}: with no single candidate it asks nothing and says why`, !(await ev(`window.__calls.some(c => /record-agent$/.test(c.u))`)));
             await ev(`window.__noCandidate = false; true`);
+
+            // Security's rule: a program inside a nested shell is said plainly, and recorded only with a separate box ticked
+            await ev(`window.__calls = []; window.__answer.record = 200; window.__under = 'bash'; document.getElementById('composer-waiting-record').click(); true`);
+            await waitFor(`/running inside bash/.test(document.getElementById('confirm-modal-message').textContent) && getComputedStyle(document.getElementById('confirm-modal')).display !== 'none'`, `${tag}: the nested confirm`, 5000);
+            const nested = await ev(`(() => { const box = document.querySelector('#confirm-modal-ack input'); return { msg: document.getElementById('confirm-modal-message').textContent, ack: (document.getElementById('confirm-modal-ack') || {}).textContent || '', ticked: box ? box.checked : null, disabled: document.getElementById('confirm-modal-yes').disabled }; })()`);
+            check(`${tag}: inside a nested shell: the confirm says where it runs, the box is there and unticked, and Record waits for it`, /This program is running inside bash, a shell started in the terminal, not directly in the agent's terminal\./.test(nested.msg) && /I know this is the agent, not something I started by hand/.test(nested.ack) && nested.ticked === false && nested.disabled === true, JSON.stringify(nested));
+            await ev(`document.getElementById('confirm-modal-yes').click(); true`);
+            check(`${tag}: Record with the box unticked sends nothing`, !(await ev(`window.__calls.some(c => /record-agent$/.test(c.u))`)));
+            await ev(`(() => { const box = document.querySelector('#confirm-modal-ack input'); box.click(); return true; })()`);
+            await ev(`document.getElementById('confirm-modal-yes').click(); true`);
+            await waitFor(`window.__calls.some(c => /record-agent$/.test(c.u))`, `${tag}: the nested record`, 5000);
+            const nrec = await ev(`window.__calls.find(c => /record-agent$/.test(c.u))`);
+            check(`${tag}: ticked, it records with acknowledge_nested`, JSON.stringify(JSON.parse(nrec.body)) === JSON.stringify({ pid: 4242, start: 'opaque-start-1', acknowledge_nested: true }), JSON.stringify(nrec));
+            await ev(`window.__under = ''; true`);
+            const plainAgain = await ev(`(async () => { const m = await import(${S} + 'confirm_dialog.js'); m.showConfirmModal('t', 'm', () => {}, undefined, { label: 'X' }); const r = { box: !!document.getElementById('confirm-modal-ack'), disabled: document.getElementById('confirm-modal-yes').disabled }; m.hideConfirmModal(); return r; })()`);
+            check(`${tag}: the next question asks with no box and its button enabled`, !plainAgain.box && !plainAgain.disabled, JSON.stringify(plainAgain));
 
             await ev(`window.__calls = []; document.getElementById('composer-waiting-record-all').click(); true`);
             await toastSeen(/Recorded 1 agent\. Left paused: codex-b \(ambiguous/);

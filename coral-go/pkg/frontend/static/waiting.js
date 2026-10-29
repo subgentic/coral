@@ -139,8 +139,13 @@ async function sendNow() {
 
 /** What Record as agent asks before it records (Backend Dev's wording, #391). Program and pid are the server's; the name is the row's. */
 export function recordConfirmText(c, agentName) {
-    return `Record ${String(c.program || 'the program')} (pid ${Number(c.pid)}) as ${agentName}'s agent? Coral will then type board notices into it.`;
+    const base = `Record ${String(c.program || 'the program')} (pid ${Number(c.pid)}) as ${agentName}'s agent? Coral will then type board notices into it.`;
+    // A program inside a shell started in the terminal (Security's rule on #391): said plainly, and recorded only with the box ticked.
+    return c.under ? `${base} This program is running inside ${String(c.under)}, a shell started in the terminal, not directly in the agent's terminal.` : base;
 }
+
+/** The box a nested candidate needs ticked before it is recorded (#391). */
+export const NESTED_ACK = "I know this is the agent, not something I started by hand";
 
 /** What is said after Record for all agents, from the server's answer: how many were recorded, and each one left paused with why. */
 export function recordAllText(r) {
@@ -167,16 +172,19 @@ async function recordAgent() {
         if (!r.candidate) { showToast(`Nothing to record: ${String(r.why_not || 'no single program runs in the terminal')}.`); return; }
         const c = r.candidate;
         const name = String(s.display_name || s.name || 'this agent');
-        showConfirmModal('Record as agent', recordConfirmText(c, name), () => postRecord(s, c), undefined, { label: 'Record' });
+        showConfirmModal('Record as agent', recordConfirmText(c, name), acknowledged => postRecord(s, c, acknowledged), undefined,
+            c.under ? { label: 'Record', acknowledge: NESTED_ACK } : { label: 'Record' });
     } catch (e) {
         showToast('The agent could not be read: ' + (e && e.message ? e.message : 'the server did not answer.'));
     } finally { busy = false; }
 }
 
-async function postRecord(s, c) {
+async function postRecord(s, c, acknowledged) {
+    const body = { pid: Number(c.pid), start: String(c.start || '') };
+    if (c.under && acknowledged) body.acknowledge_nested = true; // only with the box ticked, and only for a nested candidate
     try {
         const resp = await serverFetch(currentServer(), recordUrl(s, 'record-agent'), {
-            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pid: Number(c.pid), start: String(c.start || '') }),
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
         });
         if (resp.status === 409) { showToast('The program in the terminal changed: nothing was recorded. Read it again.'); return; }
         if (!resp.ok) { showToast(await responseErrorText(resp, currentServer(), `Not recorded (HTTP ${resp.status}).`)); return; }
