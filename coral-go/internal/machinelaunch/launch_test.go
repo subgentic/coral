@@ -225,7 +225,11 @@ func setupWith(t *testing.T, p *stubProvider, h *stubHub) (Options, Deps, *bytes
 	d := Deps{Provider: p, Hub: h, Out: out,
 		Keys: func() (*BootKeys, error) { return keys, nil },
 		UserData: func(k *BootKeys) (string, error) {
-			return BuildUserData(UserDataSpec{ClientPublicKey: k.ClientPublic, AllowSSHFrom: "203.0.113.9", CoralVersion: "2.0.3"})
+			spec := UserDataSpec{AllowSSHFrom: "203.0.113.9", CoralVersion: "2.0.3"}
+			if err := k.FillUserData(&spec); err != nil {
+				return "", err
+			}
+			return BuildUserData(spec)
 		},
 		Bootstrap: &SSHBootstrap{Addr: func(Instance) string { return srv.addr }, Window: 2 * time.Second, Every: 10 * time.Millisecond, EnrollWait: 2 * time.Second},
 		Confirm:   func(string) (bool, error) { return true, nil }}

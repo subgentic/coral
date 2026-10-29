@@ -201,7 +201,11 @@ func TestMachineLaunchWarnsWhenTheHubIsNotThisBuildsDefault(t *testing.T) {
 func TestMachineLaunchBuildsTheRealUserDataWithNoCredential(t *testing.T) {
 	tf, kf, p, h := machineFixture(t)
 	machineUserData = func(keys *machinelaunch.BootKeys, sshFrom, maxMode, version, hubURL string, agents []string) (string, error) {
-		return machinelaunch.BuildUserData(machinelaunch.UserDataSpec{ClientPublicKey: keys.ClientPublic, AllowSSHFrom: sshFrom, MaxMode: maxMode, CoralVersion: version, HubURL: hubURL, Agents: agents})
+		spec := machinelaunch.UserDataSpec{AllowSSHFrom: sshFrom, MaxMode: maxMode, CoralVersion: version, HubURL: hubURL, Agents: agents}
+		if err := keys.FillUserData(&spec); err != nil {
+			return "", err
+		}
+		return machinelaunch.BuildUserData(spec)
 	}
 	h.credential = "chb_REALCREDENTIAL0123456789"
 	var out, errb bytes.Buffer
@@ -214,7 +218,10 @@ func TestMachineLaunchBuildsTheRealUserDataWithNoCredential(t *testing.T) {
 	if machineBoot.credential != "chb_REALCREDENTIAL0123456789" {
 		t.Fatalf("the credential reaches the bootstrap, not the user-data: %q", machineBoot.credential)
 	}
-	for _, secret := range []string{"chb_", "REALCREDENTIAL", "COMMANDTOKEN", "COMMANDKEY", "PRIVATE KEY"} {
+	if n := strings.Count(p.spec.UserData, "PRIVATE KEY-----\n"); n != 2 { // the begin and the end line of the one block: the single-use host key
+		t.Fatalf("the user-data has %d private-key lines, want the host key's two", n)
+	}
+	for _, secret := range []string{"chb_", "REALCREDENTIAL", "COMMANDTOKEN", "COMMANDKEY"} {
 		if strings.Contains(p.spec.UserData, secret) {
 			t.Fatalf("the user-data holds %s", secret)
 		}
