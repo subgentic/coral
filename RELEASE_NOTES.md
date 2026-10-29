@@ -1,5 +1,79 @@
 # Release Notes
 
+## v2.0.4 — the chat stays put, Display options are back, a thumb-sized phone Agents tab, a clearer update, and a team home folder
+
+### Changes
+
+#### What you will notice first
+
+- **The chat stops jumping** (#10846, #10851): a chat that is at the bottom stays at the bottom when the Working row appears, grows its "Still working" line and goes away (it was left 36 px short, then moved 63 px, or 88 on a phone, at 30 s and again when the row went), and when a row changes height after it is drawn: a late image, a restyled code block, the needs-input card.
+- **Agent list Display options are back** (#10816): Show summary and Show model return, off by default so a row stays one line.
+- **The phone's Agents tab is the sidebar's row at a thumb's size** (#10691, #10872, #10801): the title is "Agents", a team or folder header has no card, an agent is one 56 px row with its status dot, its name and one muted status line ("Needs input · Permission"). The status line is real text, so screen readers and find-in-page get it. Show summary and Show model start under the name.
+- **Updates have one path and say only what is true** (#10834, #10854, #10867): when Coral takes the update itself the notice no longer sends you to GitHub's download page; while it installs the dialog says "Updating Coral to X" and, if you leave the page open, it reloads when the new Coral answers, then says "Coral is now X" once; a refused install that trying again will not fix ends with the button back and a "Download Coral X yourself" link to that release; the words lose "pty", "promoted" and "anonymous requests". The notice promises only what is on its way (#10854, #10867; with automatic checks off, the Download link stays).
+- **A team's home folder is a setting** (#10815, #10860): Team settings > Workflow. Only the Operator changes it. Wake, restart and resurrect start in it; a running agent stays where it is until its next start, and if the folder is gone or no longer valid, the agent keeps its own folder. Links are resolved when it is set and again at wake, and a worktree team's folder is its own worktree and nothing else.
+- **Sending to a coral-hub team's agent works again** (#10813): a send to a session whose name the page holds out of date is retried once with the list's name and then said in words; the live list names a row by its stored agent name, not the recovered terminal's folder.
+- **A renamed agent keeps its new name while asleep or archived** (#10784).
+- **How do I...? answers three more questions** (#10765): Continue an old chat, Give an agent a file, What the permission modes allow. Learn more beside Default permission mode closes Settings first (asking about unsaved changes) and opens the answer in Docs at its heading (#10906). Don't ask and Bypass permissions say what they mean on Antigravity, Gemini and Pi (the same as Auto there), and the Resume dialog's Resume in row is named.
+- **Saved diffs stop carrying whole binary files** (#10811, #10812): a saved diff no longer includes the contents of binary files; with cleanup of old data on, Coral also shrinks the saved diffs of closed work and sweeps unused diff objects, so old diffs that held binary files are trimmed by themselves.
+- **No more false "Database damage"** (#10831): before the dashboard says the message board's database is damaged, the integrity check is confirmed on the board's own connection. If search misses a recently edited board message, or the dashboard reports damage in the message board, turn the message search index off and on again in Settings to rebuild it; nothing is lost.
+- **The message search no longer breaks its own index** (#10831): building the search index while messages are deleted or edited no longer damages it.
+- **Typing is no longer slow** (#10901): typing makes no page-wide lookup any more; the shortcut handler checks whether a dialog is open only once a shortcut actually matches.
+
+#### Sidebar and agent list
+
+- **The sidebar's sleeping-agents line loses its Wake button** (#10814): the words after "after Coral restarted" stay; each agent wakes from its own row.
+- **An awake agent's row menu leads with Rename, Sleep and Archive** (#10785): Restart, Set icon and Session info are under More; Auto-accept is a switch; the Sleep dialog names the agent and says what stops and what stays.
+- **Long lists on a phone** (#10319): a folder of agents shows its first 5 and "Show N more" (N counts what is hidden; the open agent stays in view; Show fewer folds it); the Inbox's chat folders say how many they hold when nothing is unread.
+- **The team chevron is a 44 px target at 600 px and under** (#10792).
+- **The team page's phone tab row names the open tab behind More** (#10759): "Board" or "Knowledge" on the More button.
+
+#### Team and board
+
+- **The Tasks tab keeps a task that finished today** (#10604): the result is not behind Show all; a cancelled or skipped task leaves the Open list.
+- **A goal whose tasks are all done says so on its row** (#10604): "All tasks done: close the goal?" with a Close that goes straight to the close dialog; a goal you said Not yet to is quiet on its Goals-tab row too (#10692).
+- **Back from a task opened from a goal keeps the keyboard on that task's row** (#10946): the focus no longer falls to the page when the goal's list is drawn again.
+- **The Board's task-queue lines say who did what** (#10604, #10722): "#1 created; Boss took #1; Boss finished #1"; a Task #N created line opens the task and the agent's `coral-board task claim` text is not shown to the person.
+- **Your own posts say "You"** (#10718): the team header's Stop button says "Stop agents".
+- **Open task #N from a board message opens the task in the side preview** beside the agent (#10685).
+- **The team form has one Edit button per member** (#10836, #10868): Remove from team is inside Edit member, which also has Move up and Move down so a touch-only person can reorder; Alt+ArrowUp/Down still reorders, said politely.
+- **Close goal chooses nothing for you when tasks are open** (#10717): Close stays off until Done or Dropped; a goal closed with open tasks says "Done, 1 task left open".
+- **New project step 3 and New agent step 2** (#10719, #10835): each tab of step 3's side list has a short plain tip; New agent's Persona step goes from 44 to 36 words.
+
+#### Automations and Analytics
+
+- **Automations say when a job runs, as the scheduler does** (#10515): only while Coral is running on this computer; a run missed while it was off is caught up once when Coral starts again, unless the job was edited or turned on after it was due; New job opens on Run a prompt (Run a prompt / Run a workflow); a job's page keeps its four facts and says when it runs in a line under them.
+- **Needs you counts finished runs** (#10515): "3 runs finished since you looked. See them", opening Recent runs; a run that passed is not a row, a failed one stays in Needs you.
+- **Automations' counts follow a run when it ends** (#10734): the folders no longer lag the job page by seconds.
+- **A folder that is not a git repo is one button** (#10783): "Make it a git repo", and after you agree the job is created; the confirmation says "Nothing in the folder is changed. Then the job is created."
+- **Analytics** (#10521): says what spend counts when a range has nothing counted, never a bare zero; Total cost first, with Today and This month under it; no "try a longer range" on the longest range; Tool and API calls sit under Advanced and the 14-day keep is said in the range's words.
+
+#### Settings, Files, Home and Docs
+
+- **Files compare options say what a person means** (#10741, #10806): Since my last commit, In my last commit, Since I branched, Last commit + uncommitted, Compared with main; stored values unchanged. A new install starts on Since my last commit; an existing install keeps its mode.
+- **Settings** (#10735, #10787): CLI path fields ask for a full path; a saved theme named like a built-in shows as "Dark (custom)"; the CLI path example is a Windows path on Windows.
+- **Home and Docs** (#10736): Home offers the Mobile QR code beside Coral Hub; Docs with no topic open says "Pick a topic" or "Pick a result".
+- **Machine status says Busy only when Coral itself is slow** (#10761): "Busy (cpu)" shows while Coral's own check is responding slowly, not on the computer's slow-moving load average. Known limit: the words "Busy (other programs)" still follow the load average in this release.
+- **Servers page and four small phone fixes** (#10763, #10902): 16 px side gutters like the other pages; the Servers bar sits at the foot of the page, a team's menu lines up with the folders' menus, a group header keeps its 4 px of room at 200% text, and "Task #N" links in a board message are 44 px wide.
+- **Toasts leave** (#10797): one with an action goes after it is used or 30 s, any older one when the page changes; a no-team file in the Inbox's Artifacts names its agent.
+- **Saved's filters stay on Saved** (#10817): and a Display panel whose button is hidden is hidden too.
+- **More shortcuts** (#10677): Cmd/Ctrl+P or K Jump to (now also teams and goals), Cmd/Ctrl+Shift+P or F1 the command list, Cmd/Ctrl+B the sidebar, Cmd/Ctrl+Shift+F Search all chats, Ctrl+` the agent's terminal, Alt/Option+Down and Up the next and previous agent.
+- **Share as artifact through Coral Hub** (#10855): each Hub account has its own hourly limit (half the allowance) and is named on the upload record.
+- **A few words for screen readers** (#10863): the New job time field is named by its At label, and How do I...? links Troubleshooting once.
+
+### Hub notice
+
+Route and wire changes in this release, from the route census files, the tunnel code and the handlers:
+
+- **`PUT /api/teams/detail/{name}/home-folder`** (class `never`: the Operator only; an agent's token and Coral Hub cannot) (#10815, #10860): body `working_dir`, an absolute folder; the answer is `ok`, `working_dir` (the stored folder, with its links resolved) and `applies: "next start"` (a running agent keeps its folder until its next start); a refused folder answers 400 with `field: working_dir`.
+- **`POST /api/sessions/live/{name}/share-file`** (#10855): through Coral Hub it now counts in its own hourly limit for each hub account (half the allowance), and the upload record names that account, as for a pasted image. The connector now stamps the account; an older connector, or a hub that sends none, keeps the shared Hub limit.
+- **Other changes to existing routes**: the live list's name for a row is the stored agent name (#10813), and an asleep or archived row's `display_name` follows a rename (#10784); a send to a session whose name or type does not match answers 400 with `code: session_target_mismatch`, and the dashboard retries once with the list's name (#10813); a new install's `diff_mode` defaults to `uncommitted`, an existing install keeps its mode (#10806); the diff routes no longer include binary patches (#10811).
+
+### Internal
+
+- The Docs and Analytics stylesheets (and the list one for the Inbox and Automations) are requested when those pages open, not at start; the shared table style stays at start because chat, subagent and preview tables use it (#10706). The start's CSS is about 1 KB smaller.
+- The static size budget rises 96 KiB to 5,603,328 bytes (#10690); later asks for a little more were folded into that one number.
+- Stale or load-sensitive tests and goldens brought up to date, with a runner fix so the strict-local-auth phase can start its shards (#10827, #10870, #10899, #10900, #10901, #10902, #10925, #10943, #10945, #10947, #10952).
+
 ## v2.0.3 — a first run that explains itself: a new agent that tells you what is missing, question and permission cards that say what is asked, alerts when you are away, a phone panel and a sign-in page that say how to get in, a New agent that keeps the Default mode you picked, plainer words everywhere, artifact stars and short links, and links between your own teams
 
 ### Changes
