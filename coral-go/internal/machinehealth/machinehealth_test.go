@@ -207,10 +207,13 @@ func TestSampleNamesNobodyWhenTheAgentsCannotBeRead(t *testing.T) {
 		h.Status, h.Reason = "busy", "cpu"
 		return h
 	}
-	none := sample(nil)
+	// What this test is about is whether the sample is a reading, not how much CPU the test binary happened to use in a 20 ms window: Windows counts a process's CPU in ticks of about 15.6 ms, so one tick in that
+	// window is "78% of a core" and busyBy rightly stops naming the others (and a loaded Linux runner can do the same). The figures are set to idle after the sample; busyBy's own threshold is TestBusyBy's.
+	idle := func(h Health) Health { h.Coral.CPUPercent, h.Agents.CPUPercent = 0, 0; return h }
+	none := idle(sample(nil))
 	assert.True(t, none.cpuMeasured, "no agents: the second sample is measured")
 	assert.Equal(t, "others", busyBy(none), "and an idle Coral on a busy cpu names the others")
-	gone := sample([]int{2147483000}) // a process that is not there: nothing of it can be read
+	gone := idle(sample([]int{2147483000})) // a process that is not there: nothing of it can be read
 	assert.False(t, gone.cpuMeasured, "an agent that cannot be read: not measured")
 	assert.Equal(t, "", busyBy(gone), "so nobody is named")
 }
