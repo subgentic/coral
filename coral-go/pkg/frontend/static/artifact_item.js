@@ -48,7 +48,7 @@ export function typeText(item) {
     return mime.startsWith('text/') ? 'Text' : 'File';
 }
 export const createdText = (item) => { const d = item.created_at ? new Date(item.created_at) : null; return d && !Number.isNaN(d.getTime()) ? d.toLocaleString() : ''; };
-export const taskText = (item) => (item.task_id ? `#${item.task_id}${item.task_title ? ' ' + item.task_title : ''}` : 'No task');
+export const taskText = (item) => { const title = visibleName(item.task_title); return item.task_id ? `#${item.task_id}${title ? ' ' + title : ''}` : 'No task'; }; // a task's title is a person's text (Security on #220)
 
 /** The artifact's text: Markdown through the strict renderer (raw HTML shown as text, then the sanitizer), anything else as plain text. */
 export function renderText(host, content, path) {

@@ -11,7 +11,7 @@ const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install, select } = await connect();
-    const HEX = 'a1'.repeat(32), HOSTILE = 'b2'.repeat(32), NONAME = 'c3'.repeat(32);
+    const HEX = 'a1'.repeat(32), HOSTILE = 'b2'.repeat(32), NONAME = 'c3'.repeat(32), MANIFEST = 'd4'.repeat(32);
     try {
         await Page.enable();
         await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
@@ -23,6 +23,8 @@ const { coralReady } = require('./helpers/wait');
             const names = { ${JSON.stringify(HEX)}: 'Ñotas 日本語.txt', ${JSON.stringify(HOSTILE)}: '<img src=x onerror=alert(1)>\\u202efdp.exe', ${JSON.stringify(NONAME)}: '' };
             window.fetch = (u, o = {}) => { const url = new URL(String(u), location.origin); const m = /^\\/api\\/artifacts\\/([0-9a-f]{64})\\/meta$/.exec(url.pathname);
                 if (m && m[1] in names) return Promise.resolve(json(names[m[1]] ? { digest: m[1], name: names[m[1]] } : { digest: m[1] }));
+                // a manifest whose entry names carry a bidi override (Security on #220)
+                if (url.pathname === '/api/artifacts/' + ${JSON.stringify(MANIFEST)}) return Promise.resolve(json([{ name: 'one\\u202egnp.exe', uri: 'coral://artifacts/' + ${JSON.stringify(HEX)}, media_type: 'image/png' }, { name: 'two\\u200b.txt', uri: 'coral://artifacts/' + ${JSON.stringify(NONAME)} }]));
                 if (url.pathname === '/api/agents/models') return Promise.resolve(json({ agent_type: 'claude', models: [{ value: 'claude-opus-5-5', display_name: 'Opus 5.5', efforts: ['low', 'high'] }], thinking: ['low', 'high'] }));
                 return R(u, o); };
             return true; })()`);
@@ -74,6 +76,29 @@ const { coralReady } = require('./helpers/wait');
             return host.textContent; })()`);
         assert.ok(chip.includes('invoicefdp.exe') && !/[\u202a-\u202e\u2066-\u2069]/.test(chip), 'the chip shows the name without the override: ' + JSON.stringify(chip));
         assert.deepEqual(more, ['abcdefgh.md', 'reportfdp.exe', 'zerowidth.txt', 'Plan \u2014 artifact'], JSON.stringify(more));
+        // Security on #220, the last round: every other place that shows an uploader's name. The viewer's title, a manifest's entries
+        // (and their download names), a task's title in tooltips, a chat attachment chip; the starred list and the preview pane read
+        // the same names through visibleName (their rows are module state, checked in source below).
+        const shown = await ev(`(async () => {
+            const v = await import(${S} + 'artifact_viewer.js'); v.openArtifactViewer(${JSON.stringify(NONAME)}, { filename: 'invoice\\u202efdp.exe' });
+            const title = document.querySelector('.artifact-viewer-title').textContent;
+            const p = await import(${S} + 'artifact_preview.js'); const host = document.createElement('div'); document.body.appendChild(host);
+            await p.renderArtifact(host, 'coral://artifacts/' + ${JSON.stringify(MANIFEST)}, { filename: 'm.json', mediaType: 'application/json' }, { isStale: () => false, setMeta() {} });
+            const entries = [...host.querySelectorAll('.artifact-manifest-name')].map(e => e.textContent);
+            const downloads = [...host.querySelectorAll('.artifact-manifest-download')].map(a => a.getAttribute('download'));
+            host.remove();
+            const it = await import(${S} + 'artifact_item.js');
+            const c = await import(${S} + 'chat_messages.js'); const box = document.createElement('div');
+            c.renderMessage({ type: 'user', content: 'see the file', attachments: [{ name: 'photo\\u202egnp.exe' }] }, box);
+            return { title, entries, downloads, task: it.taskText({ task_id: 3, task_title: 'Plan\\u202e x' }), chip: (box.querySelector('.chat-attachment-chip') || {}).textContent || '' }; })()`);
+        assert.equal(shown.title, 'invoicefdp.exe', 'the viewer title: ' + JSON.stringify(shown));
+        assert.deepEqual(shown.entries, ['onegnp.exe', 'two.txt'], 'a manifest entry: ' + JSON.stringify(shown));
+        assert.deepEqual(shown.downloads, ['onegnp.exe', 'two.txt'], 'and its download name: ' + JSON.stringify(shown));
+        assert.equal(shown.task, '#3 Plan x', 'a task title in a tooltip');
+        assert.ok(shown.chip.startsWith('photognp.exe'), 'a chat attachment chip: ' + JSON.stringify(shown.chip));
+        const fs = require('node:fs'), path = require('node:path'), src = f => fs.readFileSync(path.join(__dirname, '..', '..', 'coral-go', 'pkg', 'frontend', 'static', f), 'utf8');
+        assert.match(src('mailbox_starred_artifacts.js'), /const name = visibleName\(r\.name\)/, 'the starred list shows names through visibleName');
+        assert.match(src('preview_pane.js'), /visibleName\(tab\.options\.filename\)/, 'the preview pane shows names through visibleName');
         // a later render of the same body uses the name at once
         assert.match(await ev(`(async () => (await import(${S} + 'board_message_text.js')).renderBoardMessageBody({ id: 97002, content: 'again coral://artifacts/${HEX}' }))()`), /Ñotas 日本語\.txt/);
         const inbox = await ev(`(async () => { const p = await (await import(${S} + 'inbox_coral.js')).artifactLinkPolicy('see coral://artifacts/${HEX}'); return p('coral://artifacts/${HEX}'); })()`);

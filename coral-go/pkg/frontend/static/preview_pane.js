@@ -22,6 +22,7 @@ import { importOnce } from './import_once.js';
 import { createPreviewLayout } from './preview_layout.js';
 import { createPreviewEditor } from './preview_editor.js';
 import { _fileName, _renderContentView } from './preview_content.js';
+import { visibleName } from './artifact_names.js';
 
 const ICON_MAP = {
     javascript: '{ }', typescript: '{ }', jsx: '{ }', tsx: '{ }',
@@ -40,7 +41,7 @@ function _fileIcon(tab) {
 
 function _tabTitle(tab) {
     if (tab.kind === 'task') return tab.title || `Task ${tab.taskId}`;
-    if (tab.kind === 'artifact') return tab.title || tab.options.filename || 'Artifact';
+    if (tab.kind === 'artifact') return tab.title || visibleName(tab.options.filename) || 'Artifact'; // the uploader's text (Security on #220)
     if (tab.kind === 'chat-image') return tab.filepath; // the image's label (its name in the chat)
     return _fileName(tab.filepath);
 }
@@ -94,7 +95,7 @@ function _renderTabs() {
     let html = '';
     for (const tab of _tabs) {
         const active = tab.id === _activeId ? ' active' : '';
-        const title = tab.kind === 'artifact' ? (tab.options.filename || tab.filepath) : tab.filepath;
+        const title = tab.kind === 'artifact' ? (visibleName(tab.options.filename) || tab.filepath) : tab.filepath;
         const preview = tab.pinned ? '' : ' preview';
         html += `<div class="preview-tab${active}${preview}" data-tab-id="${escapeAttr(tab.id)}" title="${tab.pinned ? '' : 'Preview — double-click to pin'}">
             <span class="preview-tab-icon">${_fileIcon(tab)}</span>
@@ -153,12 +154,13 @@ function _renderToolbar(tab) {
         const dlUrl = src ? (src.externalURL ? src.url : serverUrl(src.url, src.server)) : '';
         // A manifest (a JSON list of files): Download is its one file by its own name, not the .json (#9925); with several files the toolbar has none (each row has its own).
         const mf = tab.manifestDownload; // undefined: the kind is not known yet (no link: a manifest's own would save its .json, #9941); false: a manifest of several files; null: any other artifact; an object: the manifest's one file
-        const dlHref = mf ? mf.url : dlUrl, dlName = mf ? mf.name : (tab.options.filename || '');
+        const dlHref = mf ? mf.url : dlUrl, dlName = mf ? mf.name : visibleName(tab.options.filename);
         const link = src && (src.externalURL || mf !== undefined) && mf !== false
             ? `<a class="team-artifacts-action" href="${escapeAttr(dlHref)}" ${src.externalURL ? 'target="_blank" rel="noopener noreferrer"' : `download="${escapeAttr(dlName)}" data-artifact-download="${escapeAttr(dlHref)}" data-artifact-name="${escapeAttr(dlName)}"`}>${src.externalURL ? 'Open link' : 'Download'}</a>`
             : '';
         const kept = [...bar.children].filter(n => n.classList.contains('ac-toggle') || n.classList.contains('artifact-tags')); // the Comments toggle and the tag editor were appended after the first draw (_render): a redraw (the kind became known, #9941) must not drop them
-        bar.innerHTML = `<span class="preview-toolbar-path" title="${escapeAttr(tab.options.filename || tab.filepath)}">${escapeHtml(tab.options.filename || 'Artifact preview')}</span>
+        const shownName = visibleName(tab.options.filename);
+        bar.innerHTML = `<span class="preview-toolbar-path" title="${escapeAttr(shownName || tab.filepath)}">${escapeHtml(shownName || 'Artifact preview')}</span>
             <div class="inline-preview-actions">${link}</div>`;
         bar.append(...kept);
         wireDownloads(bar);

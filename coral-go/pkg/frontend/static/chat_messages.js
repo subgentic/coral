@@ -11,6 +11,7 @@ import { chatAgentAdapter } from './chat_agents.js';
 import { SAVE_BUTTON } from './saved_marks.js';
 import { messageTimeHtml } from './message_time.js';
 import { getToolIcon, renderToolCard, renderQuestionCard } from './chat_tool_cards.js';
+import { visibleName } from './artifact_names.js';
 
 // Agent replies carry a copy button that copies the reply's markdown as the
 // agent wrote it (not the rendered text).
@@ -47,7 +48,7 @@ function isCoralDelivery(msg) {
 // from an upload by the file's name (chat_thumbs.js, #5028, #5032).
 function attachmentChips(attachments) {
     const chips = (Array.isArray(attachments) ? attachments : []).filter(a => a && a.name).map(a =>
-        `<span class="chip chip-tag chat-attachment-chip">${escapeHtml(a.name)}${a.file ? ` <span class="chat-attachment-file">${escapeHtml(a.file)}</span>` : ""}</span>${thumbHtml(a)}`);
+        `<span class="chip chip-tag chat-attachment-chip">${escapeHtml(visibleName(a.name))}${a.file ? ` <span class="chat-attachment-file">${escapeHtml(a.file)}</span>` : ""}</span>${thumbHtml(a)}`);
     return chips.length ? `<div class="chat-attachments">${chips.join("")}</div>` : "";
 }
 
