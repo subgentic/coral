@@ -98,7 +98,7 @@ func TestEveryIndexerRedactsItsSummaryAndStampsTheVersion(t *testing.T) {
 	check("gemini", gs)
 
 	pi := filepath.Join(dir, "pi.jsonl")
-	require.NoError(t, os.WriteFile(pi, []byte(`{"type":"session","id":"pi-6207"}`+"\n"+`{"type":"message","role":"user","content":"`+pad+`","timestamp":"2026-10-23T00:00:00Z"}`+"\n"), 0o644))
+	require.NoError(t, os.WriteFile(pi, []byte(`{"type":"session","id":"pi-6207"}`+"\n"+`{"type":"message","timestamp":"2026-10-23T00:00:00Z","message":{"role":"user","content":[{"type":"text","text":"`+pad+`"}]}}`+"\n"), 0o644))
 	ps, err := parsePiSession(pi, 1)
 	require.NoError(t, err)
 	check("pi", ps)

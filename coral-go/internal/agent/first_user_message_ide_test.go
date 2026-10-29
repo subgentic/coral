@@ -80,7 +80,7 @@ func TestEachIndexerKeepsTheTypedTextAfterIDEContext(t *testing.T) {
 	assert.Equal(t, typed, gs.FirstUserMessage, "gemini")
 
 	pi := filepath.Join(dir, "pi.jsonl")
-	require.NoError(t, os.WriteFile(pi, []byte(`{"type":"session","id":"pi-6268"}`+"\n"+`{"type":"message","role":"user","content":"`+ideOpened+` `+typed+`","timestamp":"2026-10-23T00:00:00Z"}`+"\n"), 0o644))
+	require.NoError(t, os.WriteFile(pi, []byte(`{"type":"session","id":"pi-6268"}`+"\n"+`{"type":"message","timestamp":"2026-10-23T00:00:00Z","message":{"role":"user","content":[{"type":"text","text":"`+ideOpened+` `+typed+`"}]}}`+"\n"), 0o644))
 	ps, err := parsePiSession(pi, 1)
 	require.NoError(t, err)
 	require.NotNil(t, ps)
@@ -134,7 +134,7 @@ func TestEachIndexerDropsIDEContextAfterTheTypedText(t *testing.T) {
 	assert.Equal(t, typed, gs.FirstUserMessage, "gemini")
 
 	pi := filepath.Join(dir, "pi.jsonl")
-	require.NoError(t, os.WriteFile(pi, []byte(`{"type":"session","id":"pi-6278"}`+"\n"+`{"type":"message","role":"user","content":"`+typed+` <ide_selection>x</ide_selection>","timestamp":"2026-10-23T00:00:00Z"}`+"\n"), 0o644))
+	require.NoError(t, os.WriteFile(pi, []byte(`{"type":"session","id":"pi-6278"}`+"\n"+`{"type":"message","timestamp":"2026-10-23T00:00:00Z","message":{"role":"user","content":[{"type":"text","text":"`+typed+` <ide_selection>x</ide_selection>"}]}}`+"\n"), 0o644))
 	ps, err := parsePiSession(pi, 1)
 	require.NoError(t, err)
 	require.NotNil(t, ps)

@@ -18,12 +18,17 @@ type PiAgent struct{}
 func (a *PiAgent) AgentType() string    { return at.Pi }
 func (a *PiAgent) SupportsResume() bool { return true }
 
+// HistoryBasePath is where Coral keeps the sessions of the Pi agents it launched: <data dir>/pi-sessions/<Coral session id>/ (Pi runs with --session-dir there, pi.go LaunchCommand). A Pi started by hand
+// keeps its sessions in ~/.pi/agent/sessions and is not Coral's to list (#11092).
 func (a *PiAgent) HistoryBasePath() string {
-	if v := os.Getenv("PI_CODING_AGENT_DIR"); v != "" {
-		return filepath.Join(v, "sessions")
+	if v := os.Getenv("CORAL_DATA_DIR"); v != "" {
+		return filepath.Join(v, "pi-sessions")
 	}
 	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".pi", "agent", "sessions")
+	if home == "" {
+		return ""
+	}
+	return filepath.Join(home, ".coral", "pi-sessions")
 }
 
 func (a *PiAgent) HistoryGlobPattern() string { return "*/*.jsonl" }
@@ -64,6 +69,25 @@ func (a *PiAgent) ExtractSessions(basePath string, knownMtimes map[string]float6
 	return sessions, nil
 }
 
+// piContentText is the text of a Pi message: its content is a string, or a list of blocks of which the text ones are what was said (thinking, tool calls and tool arguments are not).
+func piContentText(content any) string {
+	switch c := content.(type) {
+	case string:
+		return c
+	case []any:
+		var parts []string
+		for _, b := range c {
+			if m, ok := b.(map[string]any); ok && m["type"] == "text" {
+				if t, _ := m["text"].(string); t != "" {
+					parts = append(parts, t)
+				}
+			}
+		}
+		return strings.Join(parts, "\n")
+	}
+	return ""
+}
+
 func parsePiSession(fpath string, mtime float64) (*IndexedSession, error) {
 	f, err := openHistoryFile(fpath) // regular file, never a link or FIFO (#3601, W21)
 	if err != nil {
@@ -94,6 +118,19 @@ func parsePiSession(fpath string, mtime float64) (*IndexedSession, error) {
 				sessionID = id
 			}
 		case "message":
+			// Pi 1.4.0 writes {"type":"message","message":{"role","content":[blocks]}}. An older flat entry (role and content beside the type) is read the same way.
+			msg, _ := entry["message"].(map[string]any)
+			if msg == nil {
+				msg = entry
+			}
+			role, _ := msg["role"].(string)
+			if role != "user" && role != "assistant" {
+				break // a system prompt, a tool result and a shell run are not what either side said
+			}
+			text := piContentText(msg["content"])
+			if role == "assistant" && text == "" {
+				break // a turn of tool calls or thinking only: nothing to read or search
+			}
 			msgCount++
 			ts, _ := entry["timestamp"].(string)
 			if ts != "" {
@@ -103,23 +140,24 @@ func parsePiSession(fpath string, mtime float64) (*IndexedSession, error) {
 				tsCopy := ts
 				lastTS = &tsCopy
 			}
-			content, _ := entry["content"].(string)
-			fts.Add(content)
-			if firstMsg == "" {
-				if role, _ := entry["role"].(string); role == "user" {
-					if t, ok := typedText(content); ok {
+			fts.Add(text)
+			if role == "user" && text != "" {
+				if firstMsg == "" {
+					if t, ok := typedText(text); ok {
 						firstMsg = clipFirstMessage(t)
 					}
 				}
-			}
-			if summary == "" {
-				if role, _ := entry["role"].(string); role == "user" && content != "" {
-					summary = redactedCut(content, 200)
+				if summary == "" {
+					summary = redactedCut(text, 200)
 				}
 			}
 		}
 	}
 
+	// A Coral-launched Pi keeps its file in pi-sessions/<Coral session id>/: that folder's name is the id the live row, the chat and the token poller use, so the history row has it too.
+	if dir := filepath.Base(filepath.Dir(fpath)); IsResumeID(at.Pi, dir) {
+		sessionID = dir
+	}
 	if sessionID == "" {
 		base := filepath.Base(fpath)
 		sessionID = strings.TrimSuffix(base, ".jsonl")
