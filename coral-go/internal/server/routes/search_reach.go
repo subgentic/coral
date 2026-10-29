@@ -1,9 +1,11 @@
 package routes
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -24,7 +26,7 @@ const (
 	searchLogPruneN   = 50
 )
 
-// searchGuard is the per-member rate limit and the pace of the access log's pruning. Its zero value is ready to use.
+// searchGuard is the per-member rate limit of searches above own (refusals included) and the pace of the access log's pruning. Its zero value is ready to use.
 type searchGuard struct {
 	mu   sync.Mutex
 	hits map[string][]time.Time
@@ -192,4 +194,102 @@ func (h *SessionsHandler) SearchAccessLog(w http.ResponseWriter, r *http.Request
 		rows = []store.SearchAccessRow{}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"rows": rows})
+}
+
+// gateSearchReach is the check every agent search makes before it reads: the level asked (the reach parameter: none is own), the caller's own row, the per-member rate limit (a refusal counts), and a refusal
+// that names the level needed. It has answered the request when ok is false.
+func (h *SessionsHandler) gateSearchReach(w http.ResponseWriter, r *http.Request, sessionID string, vals url.Values) (c searchCaller, requested string, ok bool) {
+	requested = strings.ToLower(strings.TrimSpace(vals.Get("reach")))
+	if requested == "" {
+		requested = store.SearchReachOwn
+	}
+	if store.SearchReachRank(requested) < 0 {
+		errBadRequest(w, "reach must be own, team, all or operator")
+		return c, requested, false
+	}
+	c = h.searchWho(r, sessionID)
+	if requested != store.SearchReachOwn && !h.searchRate.allow(c.key) { // a search above own, or a refused one, is counted: a loop that probes the levels is slowed like one that reads; reads at own are the agent's own
+		w.Header().Set("Retry-After", "60")
+		writeJSON(w, http.StatusTooManyRequests, map[string]any{"error": "Too many searches from this agent: wait a minute and try again.", "code": "search_rate_limited"})
+		return c, requested, false
+	}
+	if store.SearchReachRank(requested) > store.SearchReachRank(c.level) {
+		h.logSearchRead(r, c, requested, "refused", 0)
+		refuseSearchReach(w, c.level, requested)
+		return c, requested, false
+	}
+	return c, requested, true
+}
+
+// historyReachSessions are the sessions a chat history search at a level reads, by session id: the caller's own lineage first, then (team) every session of its team's members and their ancestors, (all) every
+// session Coral launched, (operator) also the sessions Coral only found on disk. Each other session is read as it is (a live one as a running session), never marked current.
+func (h *SessionsHandler) historyReachSessions(ctx context.Context, sessionID string, c searchCaller, level string) ([]store.SessionLineageItem, bool, error) {
+	ancestry, err := h.ss.GetSessionAncestry(ctx, sessionID)
+	if err != nil {
+		return nil, false, err
+	}
+	seen := map[string]bool{}
+	out := make([]store.SessionLineageItem, 0, len(ancestry))
+	for _, it := range ancestry {
+		seen[it.SessionID] = true
+		out = append(out, it)
+	}
+	truncated := false
+	addLineage := func(ids []string) error {
+		for _, id := range ids {
+			if seen[id] {
+				continue
+			}
+			if len(out) >= store.MaxReachSessions {
+				truncated = true
+				return nil
+			}
+			lin, err := h.ss.GetSessionAncestry(ctx, id)
+			if err != nil {
+				return err
+			}
+			for _, it := range lin {
+				if seen[it.SessionID] {
+					continue
+				}
+				seen[it.SessionID] = true
+				it.IsCurrent = false // only the caller's own session is current
+				out = append(out, it)
+			}
+		}
+		return nil
+	}
+	switch level {
+	case store.SearchReachTeam:
+		if c.teamName != "" {
+			ids, err := h.ss.SessionIDsOfTeam(ctx, c.teamName)
+			if err != nil {
+				return nil, false, err
+			}
+			if err := addLineage(ids); err != nil {
+				return nil, false, err
+			}
+		}
+	case store.SearchReachAll, store.SearchReachOperator:
+		ids, err := h.ss.LaunchedSessionIDs(ctx)
+		if err != nil {
+			return nil, false, err
+		}
+		if err := addLineage(ids); err != nil {
+			return nil, false, err
+		}
+		if level == store.SearchReachOperator {
+			items, err := h.ss.IndexedSessionItems(ctx)
+			if err != nil {
+				return nil, false, err
+			}
+			for _, it := range items {
+				if !seen[it.SessionID] && len(out) < store.MaxReachSessions {
+					seen[it.SessionID] = true
+					out = append(out, it)
+				}
+			}
+		}
+	}
+	return out, truncated, nil
 }

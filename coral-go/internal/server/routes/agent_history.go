@@ -91,15 +91,45 @@ func (h *SessionsHandler) SearchAgentHistory(w http.ResponseWriter, r *http.Requ
 		refused(w)
 		return
 	}
-	sessions, refused := h.historySearchSessions(r.Context(), sessionID, p)
-	if refused != nil {
-		refused(w)
+	who, requested, ok := h.gateSearchReach(w, r, sessionID, q)
+	if !ok {
 		return
+	}
+	var sessions []store.SessionLineageItem
+	truncated := false
+	if requested == store.SearchReachOwn {
+		sessions, refused = h.historySearchSessions(r.Context(), sessionID, p)
+		if refused != nil {
+			refused(w)
+			return
+		}
+	} else {
+		var err error
+		if sessions, truncated, err = h.historyReachSessions(r.Context(), sessionID, who, requested); err != nil {
+			errInternalServer(w, err.Error())
+			return
+		}
+		if len(sessions) == 0 {
+			errNotFound(w, "Unknown session; run this from inside a Coral agent")
+			return
+		}
+		if p.targetSessionID != "" {
+			var one []store.SessionLineageItem
+			for _, it := range sessions {
+				if it.SessionID == p.targetSessionID {
+					one = append(one, it)
+				}
+			}
+			if len(one) == 0 {
+				errForbidden(w, "Unauthorized: session is not within this agent's search reach ("+requested+")")
+				return
+			}
+			sessions = one
+		}
 	}
 	phrases, terms := parseSearchQuery(p.query)
 	var allMatches []AgentHistoryMatch
 	var sessionsSearched []SessionSearchStatus
-	truncated := false
 	for _, item := range sessions {
 		room := maxHistoryMatches - len(allMatches)
 		if room <= 0 { // the cap is reached: the sessions left are not read
@@ -116,6 +146,9 @@ func (h *SessionsHandler) SearchAgentHistory(w http.ResponseWriter, r *http.Requ
 	}
 	sortHistoryMatches(allMatches)
 	results, hasMore := pageHistoryMatches(allMatches, p.offset, p.limit)
+	if requested != store.SearchReachOwn {
+		h.logSearchRead(r, who, requested, "ok", len(allMatches))
+	}
 	writeJSON(w, http.StatusOK, AgentHistorySearchResponse{
 		Query:            p.query,
 		Status:           historySearchStatus(sessionsSearched),
@@ -333,8 +366,18 @@ func (h *SessionsHandler) GetAgentHistoryContext(w http.ResponseWriter, r *http.
 		window = 10
 	}
 
-	// Authenticate caller session and verify target session is within proven lineage
-	ancestry, err := h.ss.GetSessionAncestry(r.Context(), sessionID)
+	// Authenticate caller session and verify target session is within proven lineage, or within the reach its level gives it (#11048)
+	who, requested, ok := h.gateSearchReach(w, r, sessionID, q)
+	if !ok {
+		return
+	}
+	var ancestry []store.SessionLineageItem
+	if requested == store.SearchReachOwn {
+		ancestry, err = h.ss.GetSessionAncestry(r.Context(), sessionID)
+	} else {
+		ancestry, _, err = h.historyReachSessions(r.Context(), sessionID, who, requested)
+		h.logSearchRead(r, who, requested, "ok", 0)
+	}
 	if err != nil {
 		errInternalServer(w, err.Error())
 		return
@@ -452,7 +495,7 @@ func (h *SessionsHandler) loadSessionMessages(ctx context.Context, item store.Se
 		agentType = "claude"
 	}
 
-	if item.IsCurrent {
+	if item.IsCurrent || item.LiveRead {
 		var messages []map[string]any
 		if item.SessionID != "" {
 			messages, _ = h.jsonl.ReadAllMessagesForLiveContext(context.Background(), item.SessionID, item.WorkingDir, agentType)

@@ -242,6 +242,7 @@ func TestSearchReachRateLimitCountsRefusals(t *testing.T) {
 		}
 	}
 	assert.True(t, limited, "refusals count: a loop of refused requests reaches the limit")
+	assert.Equal(t, http.StatusOK, get(tok1, "q=x"), "a read at own is the agent's own and is not limited")
 
 	// The limit is the member's, not the token's: a new token for the same member (a restart) is still limited.
 	sid2 := "eeeeeeee-1148-4000-8000-0000000000b2"
@@ -250,5 +251,5 @@ func TestSearchReachRateLimitCountsRefusals(t *testing.T) {
 	require.NoError(t, ts2.UpdateMemberStatus(ctx, tm.ID, "active", &sid2))
 	tok2, err := srv.db.MintSessionToken(ctx, sid2, "claude-"+sid2)
 	require.NoError(t, err)
-	assert.Equal(t, http.StatusTooManyRequests, get(tok2, "q=x"), "a fresh token does not reset the member's count")
+	assert.Equal(t, http.StatusTooManyRequests, get(tok2, "q=x&reach=all"), "a fresh token does not reset the member's count")
 }

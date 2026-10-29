@@ -59,24 +59,8 @@ func (h *SessionsHandler) SearchAgentBoard(w http.ResponseWriter, r *http.Reques
 	if !ok {
 		return
 	}
-	requested := strings.ToLower(strings.TrimSpace(vals.Get("reach")))
-	if requested == "" {
-		requested = store.SearchReachOwn
-	}
-	if store.SearchReachRank(requested) < 0 {
-		errBadRequest(w, "reach must be own, team, all or operator")
-		return
-	}
-	who := h.searchWho(r, sessionID)
-	if !h.searchRate.allow(who.key) { // refusals count: a loop that probes the levels is slowed like one that reads
-		w.Header().Set("Retry-After", "60")
-		writeJSON(w, http.StatusTooManyRequests, map[string]any{"error": "Too many searches from this agent: wait a minute and try again.", "code": "search_rate_limited"})
-		return
-	}
-	level := who.level
-	if store.SearchReachRank(requested) > store.SearchReachRank(level) {
-		h.logSearchRead(r, who, requested, "refused", 0)
-		refuseSearchReach(w, level, requested)
+	who, requested, ok := h.gateSearchReach(w, r, sessionID, vals)
+	if !ok {
 		return
 	}
 	if h.bs == nil || h.ss == nil {
