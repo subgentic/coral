@@ -223,7 +223,7 @@ func TestLastMessage_ReadsOnlyWhatWasAppended(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, "what next", m.Text)
 	assert.Equal(t, "user", m.Role)
-	assert.LessOrEqual(t, bytesRead, int64(len(add)), "only the appended line was read")
+	assert.LessOrEqual(t, bytesRead, int64(len(add)+lastMessageAnchor), "only the appended line was read, and the anchor bytes before it")
 
 	// An append that holds no message (a tool call alone) leaves the last message as it was.
 	toolOnly := `{"type":"assistant","timestamp":"2026-10-29T10:01:00.000Z","message":{"content":[{"type":"tool_use","id":"t","name":"Bash","input":{"command":"ls"}}]}}` + "\n"
@@ -232,7 +232,7 @@ func TestLastMessage_ReadsOnlyWhatWasAppended(t *testing.T) {
 	m, ok = r.LastMessage(sid, "", at.Claude)
 	require.True(t, ok)
 	assert.Equal(t, "what next", m.Text, "nothing new to say: the last message stays")
-	assert.LessOrEqual(t, bytesRead, int64(len(toolOnly)))
+	assert.LessOrEqual(t, bytesRead, int64(len(toolOnly)+lastMessageAnchor))
 
 	// A line still being written (no newline yet) is not read as a message, and is read whole once it ends.
 	half := line("assistant", "half written")
@@ -243,7 +243,7 @@ func TestLastMessage_ReadsOnlyWhatWasAppended(t *testing.T) {
 	appendLines(half[len(half)/2:])
 	m, _ = r.LastMessage(sid, "", at.Claude)
 	assert.Equal(t, "half written", m.Text)
-	assert.LessOrEqual(t, bytesRead, int64(2*len(half)), "the part line and the rest, not the tail")
+	assert.LessOrEqual(t, bytesRead, int64(2*len(half)+2*lastMessageAnchor), "the part line and the rest, not the tail")
 
 	// A file that shrank (replaced) is read again from its end.
 	require.NoError(t, os.WriteFile(path, []byte(line("user", "a fresh start")), 0o644))

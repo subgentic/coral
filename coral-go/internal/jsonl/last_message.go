@@ -13,6 +13,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/subgentic/coral/internal/agent"
+	at "github.com/subgentic/coral/internal/agenttypes"
 	"github.com/subgentic/coral/internal/transcriptlink"
 )
 
@@ -55,8 +56,12 @@ type lastMessageEntry struct {
 	read     bool
 	msg      LastMessage
 	ok       bool
-	lineEnd  int64 // where the last complete line the reader has taken ends: the next read starts here (#11123)
+	lineEnd  int64  // where the last complete line the reader has taken ends: the next read starts here (#11123)
+	anchor   []byte // the last bytes before lineEnd (at most lastMessageAnchor): an append is trusted only when the file still has them there, so a file rewritten or replaced in place is read afresh
 }
+
+// lastMessageAnchor is how many bytes before the read position are kept to tell an appended file from a rewritten one.
+const lastMessageAnchor = 64
 
 // LastMessage is the newest message with text of a session's transcript, cached by the file's size and modification time: a list that polls every few seconds reads a file again only when it changed,
 // and then only its end. ok is false when the session has no transcript or no message yet.
@@ -87,6 +92,13 @@ func (r *SessionReader) LastMessage(sessionID, workingDir, agentType string) (La
 			return LastMessage{}, false
 		}
 	}
+	if agentType == at.Pi {
+		// Pi's /new starts another file in the session's folder: the newest file is looked for again on every read (a glob of that one folder, and the walk of Pi's own folder behind its own miss cache), and a
+		// new one is read from its start (#11123, QA).
+		if np := resolveTranscriptPathMode(sessionID, workingDir, agentType, true); np != "" && np != e.path {
+			e.path, e.read = np, false
+		}
+	}
 	fi, err := os.Stat(e.path)
 	if err != nil || !fi.Mode().IsRegular() {
 		e.path, e.read = "", false
@@ -95,69 +107,89 @@ func (r *SessionReader) LastMessage(sessionID, workingDir, agentType string) (La
 	if e.read && fi.Size() == e.size && fi.ModTime().UnixNano() == e.mtime {
 		return e.msg, e.ok
 	}
-	if e.read && fi.Size() >= e.lineEnd && fi.Size() >= e.size {
-		// The file grew: only what was appended is read (from the end of the last complete line, at most lastMessageTailMax of it), and when it holds no message the one found before is still the last.
-		if m, ok, end := readAppendedMessage(e.path, agentType, e.lineEnd, fi.Size()); ok {
-			e.msg, e.ok = m, true
-			e.lineEnd = end
-		} else {
-			e.lineEnd = end
+	appended := false
+	if e.read && fi.Size() > e.size && fi.Size() >= e.lineEnd {
+		// The file grew (strictly: the same size with another time is a rewrite): only what was appended is read, from the end of the last complete line, at most lastMessageTailMax of it; when it holds no
+		// message the one found before is still the last. It is an append only when the bytes just before where the read starts are still the ones read last time (a file replaced or rewritten in place, even
+		// to a longer one, has others there): then the tail is read afresh.
+		if m, ok, end, anchor, same := readAppendedMessage(e.path, agentType, e.lineEnd, fi.Size(), e.anchor); same {
+			appended = true
+			if ok {
+				e.msg, e.ok = m, true
+			}
+			e.lineEnd, e.anchor = end, anchor
 		}
-	} else {
-		e.msg, e.ok, e.lineEnd = readLastMessage(e.path, agentType, fi.Size())
+	}
+	if !appended {
+		e.msg, e.ok, e.lineEnd, e.anchor = readLastMessage(e.path, agentType, fi.Size())
 	}
 	e.size, e.mtime, e.read = fi.Size(), fi.ModTime().UnixNano(), true
 	return e.msg, e.ok
 }
 
-// readAppendedMessage reads the bytes from from to size (the newest lastMessageTailMax of them when there are more) and returns the newest message with text in their complete lines, and where the last
-// complete line ends. A line still being written (no newline yet) is left for the next read.
-func readAppendedMessage(path, agentType string, from, size int64) (m LastMessage, ok bool, lineEnd int64) {
+// readAppendedMessage reads the bytes from from to size (the newest lastMessageTailMax of them when there are more), together with the anchor bytes before from, and returns the newest message with text in
+// the complete lines after from, where the last complete line ends and the new anchor. same is false when the anchor is no longer what the file has there: the file is not the one that was read.
+func readAppendedMessage(path, agentType string, from, size int64, anchor []byte) (m LastMessage, ok bool, lineEnd int64, newAnchor []byte, same bool) {
 	f, err := openTranscript(path, agentType)
 	if err != nil {
-		return LastMessage{}, false, from
+		return LastMessage{}, false, from, anchor, false
 	}
 	defer f.Close()
-	start := from
+	start := from - int64(len(anchor))
 	partial := false
-	if size-start > lastMessageTailMax { // more was written than is worth reading: its end
+	if size-from > lastMessageTailMax { // more was written than is worth reading: its end, and no anchor to check
 		start, partial = size-lastMessageTailMax, true
 	}
 	buf := make([]byte, size-start)
 	got, err := f.ReadAt(buf, start)
 	if err != nil && err != io.EOF {
-		return LastMessage{}, false, from
+		return LastMessage{}, false, from, anchor, false
 	}
 	lastMessageBytes.Add(int64(got))
 	if lastMessageReadHook != nil {
 		lastMessageReadHook(int64(got))
 	}
 	buf = buf[:got]
-	if partial { // began inside a line
+	if !partial {
+		if len(buf) < len(anchor) || !bytes.Equal(buf[:len(anchor)], anchor) {
+			return LastMessage{}, false, from, anchor, false
+		}
+		buf, start = buf[len(anchor):], from
+	} else { // began inside a line
 		if i := bytes.IndexByte(buf, '\n'); i >= 0 {
 			start += int64(i) + 1
 			buf = buf[i+1:]
 		} else {
-			return LastMessage{}, false, size
+			return LastMessage{}, false, size, nil, true
 		}
 	}
 	nl := bytes.LastIndexByte(buf, '\n')
 	if nl < 0 {
-		return LastMessage{}, false, start // only a line still being written
+		return LastMessage{}, false, start, anchor, true // only a line still being written
 	}
 	complete := buf[:nl+1]
 	m, ok = lastMessageIn(complete, agentType)
-	return m, ok, start + int64(nl) + 1
+	lineEnd = start + int64(nl) + 1
+	// the new anchor: the last bytes before lineEnd, from what was read (the old anchor's bytes too when little was added)
+	whole := append(append([]byte{}, anchor...), complete...)
+	if partial {
+		whole = complete
+	}
+	if len(whole) > lastMessageAnchor {
+		whole = whole[len(whole)-lastMessageAnchor:]
+	}
+	return m, ok, lineEnd, append([]byte{}, whole...), true
 }
 
 // readLastMessage reads the end of the file, widening it while the last message is not in what was read.
-func readLastMessage(path, agentType string, size int64) (LastMessage, bool, int64) {
+func readLastMessage(path, agentType string, size int64) (LastMessage, bool, int64, []byte) {
 	f, err := openTranscript(path, agentType)
 	if err != nil {
-		return LastMessage{}, false, 0
+		return LastMessage{}, false, 0, nil
 	}
 	defer f.Close()
 	lineEnd := size
+	var anchor []byte
 	for n := int64(lastMessageTail); ; n *= 4 {
 		if n > size {
 			n = size
@@ -165,7 +197,7 @@ func readLastMessage(path, agentType string, size int64) (LastMessage, bool, int
 		buf := make([]byte, n)
 		got, err := f.ReadAt(buf, size-n)
 		if err != nil && err != io.EOF {
-			return LastMessage{}, false, 0
+			return LastMessage{}, false, 0, nil
 		}
 		lastMessageBytes.Add(int64(got))
 		if lastMessageReadHook != nil {
@@ -176,6 +208,12 @@ func readLastMessage(path, agentType string, size int64) (LastMessage, bool, int
 			lineEnd = size - n + int64(nl) + 1
 			buf = buf[:nl+1]
 		}
+		if a := buf; len(a) > 0 && lineEnd == size-n+int64(len(a)) { // the bytes just before lineEnd, for the next append's check
+			if len(a) > lastMessageAnchor {
+				a = a[len(a)-lastMessageAnchor:]
+			}
+			anchor = append([]byte{}, a...)
+		}
 		if size-n > 0 { // the read began inside a line: what is left of it is not one
 			if i := bytes.IndexByte(buf, '\n'); i >= 0 {
 				buf = buf[i+1:]
@@ -184,10 +222,10 @@ func readLastMessage(path, agentType string, size int64) (LastMessage, bool, int
 			}
 		}
 		if m, ok := lastMessageIn(buf, agentType); ok {
-			return m, true, lineEnd
+			return m, true, lineEnd, anchor
 		}
 		if n >= size || n >= lastMessageTailMax {
-			return LastMessage{}, false, lineEnd
+			return LastMessage{}, false, lineEnd, anchor
 		}
 	}
 }
