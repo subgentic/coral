@@ -179,13 +179,14 @@ func (ks *KeyStore) handleLoginToken(w http.ResponseWriter, r *http.Request) boo
 	// Another account on this computer may have seen the link (an opener's argv is visible in
 	// ps): it can't use it. Checked before the token is used, so the owner's link still works
 	// (#3970, Security's #3967 finding 1).
+	viaRelay := false // opened through WSL's localhost relay (#396): the outcome is logged after the token is tried, not before
 	if ks.peerUser != nil {
 		same, supported := ks.peerUser(r)
 		switch {
 		case supported && !same && ks.peerRelay != nil && ks.peerRelay(r):
 			// WSL's localhost relay (#396): a browser on Windows reaches a WSL Coral through it, and which Windows user is behind it can't be told. The link is a single-use secret the
 			// opener already holds, so it is accepted here (and only here); it is spent below like any other, and the session is an ordinary one. The link itself is not logged.
-			log.Printf("[auth] a sign-in link was opened through WSL's localhost relay (which Windows user is behind it can't be told): accepted, single use")
+			viaRelay = true
 		case supported && !same:
 			// Whose connection it is could not be told (the socket table can lag a connection by a moment): say "try again", and do not use the link up. A socket that is
 			// positively another user's, and a link still undecided after linkRetryMax tries, get the final answer (#385).
@@ -203,8 +204,14 @@ func (ks *KeyStore) handleLoginToken(w http.ResponseWriter, r *http.Request) boo
 		}
 	}
 	if !ks.consumeLoginToken(token) {
+		if viaRelay {
+			log.Printf("[auth] a sign-in link opened through WSL's localhost relay was used or expired: refused")
+		}
 		writeLinkUsed(w)
 		return true
+	}
+	if viaRelay {
+		log.Printf("[auth] a sign-in link was opened through WSL's localhost relay (which Windows user is behind it can't be told): accepted, single use")
 	}
 	session, err := ks.NewSessionRotating(r, SessionByLink, false)
 	if err != nil {

@@ -267,7 +267,10 @@ func TestLoginTokenAcceptsWSLsLocalhostRelayOnce(t *testing.T) {
 	require.NotEmpty(t, cookies, "an ordinary session cookie")
 	assert.Contains(t, logs.String(), "WSL's localhost relay")
 	assert.NotContains(t, logs.String(), tok, "the link is never logged")
+	assert.Equal(t, 1, strings.Count(logs.String(), "accepted, single use"))
 	assert.Equal(t, http.StatusForbidden, get(tok).Code, "single use: the second time it is spent")
+	assert.Equal(t, 1, strings.Count(logs.String(), "accepted, single use"), "the spent second open is not logged as accepted")
+	assert.Equal(t, 1, strings.Count(logs.String(), "was used or expired: refused"), "it says it was used")
 
 	relay = false
 	tok2, _ := ks.MintLoginToken()
@@ -277,4 +280,5 @@ func TestLoginTokenAcceptsWSLsLocalhostRelayOnce(t *testing.T) {
 	assert.Contains(t, logs.String(), "opened by another user")
 	ks.SetPeerUser(func(*http.Request) (bool, bool) { return true, true })
 	assert.Equal(t, http.StatusFound, get(tok2).Code, "and the link still works for its owner")
+	assert.Equal(t, 1, strings.Count(logs.String(), "accepted, single use"), "only the relay's open is logged as accepted: not another user's refused one, and not the owner's own")
 }
