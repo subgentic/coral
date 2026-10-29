@@ -32,5 +32,7 @@ func TestTypedLabel(t *testing.T) {
 func TestTypedText(t *testing.T) {
 	assert.Equal(t, "Waiting: Backend Dev on #12 said calc", TypedText(`Waiting: Backend Dev on #12 (said "$(calc)")`))
 	assert.Equal(t, 300, len(TypedText(strings.Repeat("a", 300))))
+	// modifier letters (Lm) go: Windows may best-fit them to ASCII punctuation
+	assert.Equal(t, "it s x y", TypedLabel("it\u02bcs x\u02c6y"))
 	assert.Equal(t, typedTextMax+3, len([]rune(TypedText(strings.Repeat("a", 2000)))), "cut at the cap, with ...")
 }

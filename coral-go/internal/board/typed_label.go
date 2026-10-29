@@ -33,6 +33,12 @@ const typedTextMax = 600
 // typed-notice census), and none is a label: in cmd.exe a line's first word is what runs, and in PowerShell a bare first word is a command.
 var TypedOpeners = []string{"You", "[Task", "[Wait", "[Coral"}
 
+// typedLetter is a letter a label keeps: upper, lower, title case and other letters (Lu, Ll, Lt, Lo), not the modifier letters (Lm),
+// some of which Windows best-fits to ASCII punctuation (an apostrophe, a caret) when a console reads them (the coral-go-team's Security on #210).
+func typedLetter(r rune) bool {
+	return unicode.In(r, unicode.Lu, unicode.Ll, unicode.Lt, unicode.Lo)
+}
+
 // typedOnly keeps letters, digits and the extra characters, turns every other run into one space, trims the ends, and cuts at max runes
 // with "..." (0: no cap).
 func typedOnly(s, extra string, max int) string {
@@ -41,7 +47,7 @@ func typedOnly(s, extra string, max int) string {
 	space := true // drops leading spaces
 	n := 0
 	for _, r := range s {
-		keep := unicode.IsLetter(r) || unicode.IsDigit(r) || strings.ContainsRune(extra, r)
+		keep := typedLetter(r) || unicode.IsDigit(r) || strings.ContainsRune(extra, r)
 		if !keep {
 			if !space {
 				b.WriteByte(' ')
