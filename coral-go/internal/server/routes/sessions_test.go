@@ -479,6 +479,29 @@ func TestSessionsList_WithSessions(t *testing.T) {
 	assert.Len(t, sessions, 2)
 }
 
+// A terminal recovered after a restart is named from its folder, here the home folder. The list still names the row by what is
+// stored, so the dashboard's send, which posts that name, passes the target check instead of "session target mismatch" (#10813).
+func TestSessionsList_NamesARowByItsStoredNameNotTheTerminalsFolder(t *testing.T) {
+	server, handler, terminal, ss := setupSessionsTestServer(t)
+	ctx := context.Background()
+	sid := "6682ebdf-65a4-4396-8ef3-26ead8208b8a"
+	home := t.TempDir() + "/cknorowski"
+	require.NoError(t, os.MkdirAll(home, 0o755))
+	terminal.addSession("claude-"+sid, home)
+	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: sid, AgentType: "claude", AgentName: "coral-hub", WorkingDir: home}))
+
+	resp, err := http.Get(server.URL + "/api/sessions/live")
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	var sessions []map[string]any
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&sessions))
+	require.Len(t, sessions, 1)
+	assert.Equal(t, "coral-hub", sessions[0]["name"], "the stored name, not the terminal folder's")
+
+	_, status, msg := handler.validateExactLiveTarget(ctx, sessions[0]["name"].(string), sessions[0]["agent_type"].(string), sid, false)
+	assert.Zero(t, status, msg, "what the list names is what a send is checked against")
+}
+
 func TestSessionsList_SleepingSessionContextIsExplicitNull(t *testing.T) {
 	server, _, _, ss := setupSessionsTestServer(t)
 

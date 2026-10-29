@@ -249,6 +249,7 @@ type liveIndex struct {
 	createdAt          map[string]string
 	boardNames         map[string][2]string
 	extras             map[string]liveExtra
+	names              map[string]string // the stored agent name of each session: the name a send, an action or a chat read is checked against (#10813)
 	launchPath         map[string]string // the stored launch path of each session ("pty": through the terminal backend; "tmux": the legacy direct tmux path)
 }
 
@@ -256,12 +257,13 @@ type liveIndex struct {
 // erase team names and other identity metadata).
 func newLiveIndex(allLive []store.LiveSession) liveIndex {
 	lv := liveIndex{sleeping: map[string]bool{}, archived: map[string]bool{}, afterRestart: map[string]bool{}, createdAt: map[string]string{},
-		boardNames: map[string][2]string{}, extras: map[string]liveExtra{}, launchPath: map[string]string{}}
+		boardNames: map[string][2]string{}, extras: map[string]liveExtra{}, launchPath: map[string]string{}, names: map[string]string{}}
 	for _, session := range allLive {
 		lv.sleeping[session.SessionID] = session.IsSleeping == 1
 		lv.archived[session.SessionID] = session.IsArchived == 1
 		lv.afterRestart[session.SessionID] = sleepReason(session) == store.SleepReasonCoralStopped
 		lv.launchPath[session.SessionID] = ptr.Value(session.Backend)
+		lv.names[session.SessionID] = session.AgentName
 		// Launch times, used to bound how long after launch a stalled start is
 		// reported. See agentNeverStarted.
 		lv.createdAt[session.SessionID] = session.CreatedAt
@@ -273,6 +275,17 @@ func newLiveIndex(allLive []store.LiveSession) liveIndex {
 		}
 	}
 	return lv
+}
+
+// listedName is the name a row carries: the stored agent name, which is what the target checks of a send and of every
+// per-session action compare against. The terminal's own name is only the fallback for a session with no stored row: a
+// terminal recovered after a restart is named from its folder (the home folder, not the team's), and a row that said so
+// was refused as "session target mismatch" (#10813).
+func listedName(stored, terminal string) string {
+	if stored != "" {
+		return stored
+	}
+	return terminal
 }
 
 // listData is the batch-read enrichment for the awake agents' rows (never nil maps).
@@ -465,7 +478,7 @@ func (h *SessionsHandler) agentRow(trace *phaseTrace, agent AgentInfo, lv liveIn
 	// what a sleeping agent had open when it went away: {text, kind, at}, nil for any other (#10368)
 	askedBefore := askedBeforeRestart(d.stateEvents[sid], lv.sleeping[sid], lv.archived[sid], lv.afterRestart[sid])
 	entry := map[string]any{
-		"name":                  agent.AgentName,
+		"name":                  listedName(lv.names[sid], agent.AgentName),
 		"agent_type":            agent.AgentType,
 		"session_id":            sid,
 		"tmux_session":          agent.TmuxSession,

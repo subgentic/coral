@@ -213,7 +213,9 @@ func (h *SessionsHandler) validateExactLiveTarget(ctx context.Context, name, age
 		nameMatches = nameMatches || name == naming.SessionName(ls.AgentType, ls.SessionID)
 	}
 	if agentType != ls.AgentType || !nameMatches {
-		return nil, http.StatusBadRequest, "session target mismatch"
+		// Which field differed, for the log: the person only sees the refusal (#10813). Session id, field names and the types only.
+		slog.Warn("session target mismatch", "session_id", sessionID, "type_differs", agentType != ls.AgentType, "name_differs", !nameMatches, "route_name", name, "stored_name", ls.AgentName, "request_type", agentType, "stored_type", ls.AgentType)
+		return nil, http.StatusBadRequest, errSessionTargetMismatch
 	}
 	return ls, 0, ""
 }
@@ -223,10 +225,18 @@ func (h *SessionsHandler) validateExactLiveTarget(ctx context.Context, name, age
 // hub a 404 reads as a route refusal.
 const errSessionIDRequired = "session_id and agent_type are required"
 
+// errSessionTargetMismatch is the message for a request whose agent type or name is not the stored one of the session it names.
+// It carries the code session_target_mismatch: a dashboard that holds an old name or type (an agent restarted or renamed since its
+// list was read) reads the list again and sends once more, or says so in words (#10813).
+const errSessionTargetMismatch = "session target mismatch"
+
 func writeExactTargetError(w http.ResponseWriter, status int, message string) {
 	body := map[string]string{"error": message}
 	if message == errSessionIDRequired {
 		body["code"] = "session_id_required"
+	}
+	if message == errSessionTargetMismatch {
+		body["code"] = "session_target_mismatch"
 	}
 	writeJSON(w, status, body)
 }

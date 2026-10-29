@@ -19,6 +19,8 @@ import { resolveSessionIdentity } from './session_state.js';
 import { agentWords, WHAT_STAYS_KILL } from './agent_words.js';
 import './sleeping_view.js';
 import { hubBlocked } from './hub_access.js';
+import { loadLiveSessions } from './api.js';
+
 import './image_attach.js';
 import { attachmentsLead, sentToastText } from './shared_images.js';
 import './lazy_panels.js';
@@ -34,6 +36,26 @@ import { killLiveSession, dropKilledRows } from './kill_live.js';
 import { MODES, modeFromFooterText, pressesFor } from './mode_cycle.js';
 import { _getXtermModule, sleepingBlocked } from './control_runtime.js';
 import { activeUploadPromisesBySession, getPendingAttachments, clearAttachments, openImagePicker, removeAttachment, openAttachment } from './image_composer.js';
+
+/** What the composer says when the server still refuses the target after the list was read again: the page's view of this agent is out of date (#10813). */
+export const TARGET_CHANGED_MESSAGE = 'This agent was restarted or renamed, so your message was not sent. Reload the page, then send it again.';
+
+/** True when a send was refused because the name or type sent is not the session's stored one (the server's code session_target_mismatch). */
+export async function _isTargetMismatch(resp) {
+    if (resp.status !== 400) return false;
+    try { const b = await resp.clone().json(); return !!b && b.code === 'session_target_mismatch'; } catch { return false; }
+}
+
+/** The session's row in a fresh list that differs from the name and type just sent, or null when the list cannot be read, no longer has it, or still says the same.
+ *  A read already under way when the refusal came may be older than the restart, so the list is read a second time before giving up. */
+export async function _refetchedTarget(sessionId, server, sentName, sentType) {
+    for (let i = 0; i < 2; i++) {
+        try { await loadLiveSessions(); } catch { return null; }
+        const row = (state.liveSessions || []).find(s => s && s.session_id === sessionId && sessionServer(s) === server);
+        if (row && (row.name !== sentName || row.agent_type !== sentType)) return row;
+    }
+    return null;
+}
 export { getPendingAttachments, initImageDrop, uploadAndInsertImage, renderAttachments, removeAttachment } from './image_composer.js';
 export { restartSession, restartStage, hideRestartModal, confirmRestart } from './restart_flow.js';
 /* Quick actions, command sending, mode toggling, and session controls */
@@ -159,16 +181,23 @@ export async function sendCommand({ nudge = false } = {}) {
             if (!input.value && state.currentSession && state.currentSession.session_id === sentSessionId) { input.value = textPart; const k = sessionKey(targetSession); if (k) saveSessionDraft(k, textPart); }
         };
         try {
-            const resp = await serverFetch(sessionServer(targetSession), `/api/sessions/live/${encodeURIComponent(targetSessionName)}/send`, {
+            const post = (name, type) => serverFetch(sessionServer(targetSession), `/api/sessions/live/${encodeURIComponent(name)}/send`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ command, agent_type: targetAgentType, session_id: sentSessionId }),
+                body: JSON.stringify({ command, agent_type: type, session_id: sentSessionId }),
             });
+            let resp = await post(targetSessionName, targetAgentType);
+            // The name or type this page holds is no longer the stored one (the agent was restarted or renamed since the list was read): read the list again and send once more with what it now says (#10813).
+            if (!resp.ok && await _isTargetMismatch(resp)) {
+                const fresh = await _refetchedTarget(sentSessionId, sessionServer(targetSession), targetSessionName, targetAgentType);
+                if (fresh) resp = await post(fresh.name, fresh.agent_type);
+            }
             if (!resp.ok) {
                 notSent();
                 // Plain text naming the server; never the raw response (#3151). The draft stays.
                 // Said under the composer (#3218); a gone terminal also marks the agent and offers Restart.
-                const { text, code, exited } = await responseError(resp, sessionServer(targetSession), `The message was not sent (HTTP ${resp.status}).`);
+                const { text: errText, code, exited } = await responseError(resp, sessionServer(targetSession), `The message was not sent (HTTP ${resp.status}).`);
+                const text = code === 'session_target_mismatch' ? TARGET_CHANGED_MESSAGE : errText; // never the bare 'session target mismatch'
                 reportSendError(targetSession, text, code, exited);
                 console.error("Send failed:", resp.status);
                 return;

@@ -384,10 +384,12 @@ func (h *SessionsHandler) liveSessionRowsBefore4713(r *http.Request, trace *phas
 		ContextWindow int
 	}
 	liveExtras := make(map[string]liveExtra) // session_id -> extra fields
+	storedNames := make(map[string]string)   // session_id -> the stored agent name (#10813: a row is named by it, not by the terminal's folder)
 	trace.begin("db_live_session_extras")
 	// Use the authoritative snapshot already read above. A second, ignored
 	// query failure used to erase team names and other identity metadata.
 	for _, session := range allLive {
+		storedNames[session.SessionID] = session.AgentName
 		if session.BoardName != nil {
 			liveBoardNames[session.SessionID] = [2]string{*session.BoardName, ptr.Value(session.DisplayName)}
 		}
@@ -484,7 +486,7 @@ func (h *SessionsHandler) liveSessionRowsBefore4713(r *http.Request, trace *phas
 			trace.agentDetail("first_prompt", sid, time.Since(promptStarted))
 		}
 		entry := map[string]any{
-			"name":                  agent.AgentName,
+			"name":                  listedName(storedNames[sid], agent.AgentName), // #10813: the one deliberate difference from v1.4.92
 			"agent_type":            agent.AgentType,
 			"session_id":            sid,
 			"tmux_session":          agent.TmuxSession,
