@@ -8,8 +8,10 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { guardSettings } = require('./helpers/settings_guard');
 
 (async () => {
+    const guard = await guardSettings(); // the suite saves a template (saved_team_templates): it is put back (#11000, a leak in CI)
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const S = `(window.__coralStatic || '/static/')`;
     try {
@@ -112,5 +114,5 @@ const BASE = require('./test_base').BASE;
         assert.match(kept, /Not kept: the goal, tasks, notes and chats\.$/);
         await ev(`window._hideSaveTemplateModal(); window.hideLaunchModal(); true`);
         console.log('\nAll team-template sharing checks passed');
-    } finally { await client.close(); }
+    } finally { await guard.restore().catch(() => {}); await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

@@ -147,7 +147,9 @@ const REPLY = "Hi! I'm mock-agent, a stand-in for a real agent, so this reply is
         console.log('PASS the new user path: ' + timeline.map(([n, ms]) => `${n.split('.')[0]} ${ms} ms`).join(', '));
     } finally {
         for (const s of sessions) { if (s) await api('POST', `/api/sessions/live/${encodeURIComponent(s.session_name || s.name)}/kill`, { session_id: s.id, agent_type: 'claude' }).catch(() => {}); }
-        await removeTeams(ev, [TEAM]).catch(() => {}); await removeBoards(ev, [TEAM]).catch(() => {});
+        // The team the wizard launches is stored under its board's own id (b-...), not the name typed in the form: the sessions know it (#11000, a leak in CI: 1 team and 3 members left).
+        const boards = [...new Set([TEAM, ...sessions.map(s => s && s.board).filter(Boolean)])];
+        await removeTeams(ev, boards).catch(() => {}); await removeBoards(ev, boards).catch(() => {});
         if (originalCli) await api('PUT', '/api/settings', { cli_path_claude: originalCli }).catch(() => {});
         for (const d of dirs.concat(wrapperDir ? [wrapperDir] : [])) { try { fs.rmSync(d, { recursive: true, force: true }); } catch { /* gone */ } }
         await client.close();
