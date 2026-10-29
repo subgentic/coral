@@ -7,6 +7,7 @@ import { showToast } from './utils.js';
 import { serverFetch, currentServer } from './server_base.js';
 import { responseErrorText } from './server_status.js';
 import { whenText } from './when_text.js';
+import { showConfirmModal } from './confirm_dialog.js';
 
 /** A safe non-negative integer from a row's board_unread. */
 export function waitingCount(row) {
@@ -21,11 +22,19 @@ export function skippedOf(row) {
     return { why: k.why, what: typeof k.what === 'string' ? k.what : '' };
 }
 
-/** The agent view's line: '' when no board message waits (a skipped send alone says nothing here). */
+/** Whether Coral pauses this agent's board notices because the program in its terminal is not the agent it recorded (#391: since the
+ *  notice-target check, an agent that was running before the update is paused until it is recorded, woken or restarted). */
+export function noticesPaused(row) {
+    const k = skippedOf(row);
+    return !!k && /^notices paused\b/i.test(k.why);
+}
+
+/** The agent view's line: '' when no board message waits and its notices are not paused (another skipped send alone says nothing here). */
 export function waitingText(row) {
     if (!row || row.sleeping) return '';
     const n = waitingCount(row);
-    return n > 0 ? `${n} team message${n === 1 ? ' waits' : 's wait'} for this agent` : ''; // short on purpose (#10036): why it waits, the list and the actions are behind Options
+    if (n > 0) return `${n} team message${n === 1 ? ' waits' : 's wait'} for this agent`; // short on purpose (#10036): why it waits, the list and the actions are behind Options
+    return noticesPaused(row) ? 'Board notices are paused for this agent' : '';
 }
 
 /** What is said after a Send now, from the server's answer. */
@@ -49,6 +58,11 @@ export function syncWaitingNotice(row) {
     const send = document.getElementById('composer-waiting-send');
     const canSend = on && waitingCount(row) > 0;
     if (send && send.hidden === canSend) send.hidden = !canSend;
+    const paused = on && noticesPaused(row); // Record as agent and Record for all agents, the Operator's way to end the pause (#391)
+    for (const id of ['composer-waiting-record', 'composer-waiting-record-all']) {
+        const b = document.getElementById(id);
+        if (b && b.hidden === paused) b.hidden = !paused;
+    }
     if (!on) closeList();
 }
 
@@ -123,7 +137,73 @@ async function sendNow() {
     } finally { busy = false; }
 }
 
+/** What Record as agent asks before it records (Backend Dev's wording, #391). Program and pid are the server's; the name is the row's. */
+export function recordConfirmText(c, agentName) {
+    return `Record ${String(c.program || 'the program')} (pid ${Number(c.pid)}) as ${agentName}'s agent? Coral will then type board notices into it.`;
+}
+
+/** What is said after Record for all agents, from the server's answer: how many were recorded, and each one left paused with why. */
+export function recordAllText(r) {
+    const done = Array.isArray(r && r.recorded) ? r.recorded.length : 0;
+    const left = Array.isArray(r && r.left) ? r.left : [];
+    let t = `Recorded ${done} agent${done === 1 ? '' : 's'}.`;
+    if (left.length) t += ` Left paused: ${left.map(l => `${String(l.session || '')} (${String(l.reason || 'no reason given')})`).join('; ')}.`;
+    return t;
+}
+
+const recordUrl = (s, tail) => `/api/sessions/live/${encodeURIComponent(s.session_id)}/${tail}`;
+
+/** Record as agent (#391): read the one candidate the server offers, ask, and record it with the start it gave; a candidate that changed
+ *  meanwhile (409) records nothing, and the button reads again. */
+async function recordAgent() {
+    const s = state.currentSession;
+    if (!s || busy) return;
+    busy = true;
+    try {
+        const resp = await serverFetch(currentServer(), recordUrl(s, 'agent-candidate'));
+        if (!resp.ok) { showToast(await responseErrorText(resp, currentServer(), `The agent could not be read (HTTP ${resp.status}).`)); return; }
+        const r = await resp.json();
+        if (!r.paused) { showToast('Board notices already go to this agent.'); return; }
+        if (!r.candidate) { showToast(`Nothing to record: ${String(r.why_not || 'no single program runs in the terminal')}.`); return; }
+        const c = r.candidate;
+        const name = String(s.display_name || s.name || 'this agent');
+        showConfirmModal('Record as agent', recordConfirmText(c, name), () => postRecord(s, c), undefined, { label: 'Record' });
+    } catch (e) {
+        showToast('The agent could not be read: ' + (e && e.message ? e.message : 'the server did not answer.'));
+    } finally { busy = false; }
+}
+
+async function postRecord(s, c) {
+    try {
+        const resp = await serverFetch(currentServer(), recordUrl(s, 'record-agent'), {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pid: Number(c.pid), start: String(c.start || '') }),
+        });
+        if (resp.status === 409) { showToast('The program in the terminal changed: nothing was recorded. Read it again.'); return; }
+        if (!resp.ok) { showToast(await responseErrorText(resp, currentServer(), `Not recorded (HTTP ${resp.status}).`)); return; }
+        const r = await resp.json();
+        showToast(`Recorded ${String(r.program || c.program || 'the program')} as the agent: board notices go to it again.`);
+    } catch (e) {
+        showToast('Not recorded: ' + (e && e.message ? e.message : 'the server did not answer.'));
+    }
+}
+
+/** Record for all agents (#391, after an update): the server records every agent whose program is its resolved CLI and leaves the rest
+ *  paused, each with why; nothing is guessed. */
+async function recordAllAgents() {
+    if (busy) return;
+    busy = true;
+    try {
+        const resp = await serverFetch(currentServer(), '/api/sessions/record-agents', { method: 'POST' });
+        if (!resp.ok) { showToast(await responseErrorText(resp, currentServer(), `Not recorded (HTTP ${resp.status}).`)); return; }
+        showToast(recordAllText(await resp.json()));
+    } catch (e) {
+        showToast('Not recorded: ' + (e && e.message ? e.message : 'the server did not answer.'));
+    } finally { busy = false; }
+}
+
 registerActions({
     'waiting-toggle': () => toggleList(),
     'waiting-send-now': () => sendNow(),
+    'agent-record': () => recordAgent(),
+    'agent-record-all': () => recordAllAgents(),
 });
