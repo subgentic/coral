@@ -9,10 +9,16 @@ import (
 
 	"github.com/subgentic/coral/internal/secfile/secfiletest"
 	"github.com/subgentic/coral/internal/testleak"
+	"github.com/subgentic/coral/internal/testshard"
 	"github.com/subgentic/coral/internal/tmux"
 )
 
 func TestMain(m *testing.M) {
+	// tools/go_test_shard.py runs the package as several processes, each with its share of the tests (#350).
+	if err := testshard.Apply(); err != nil {
+		fmt.Fprintln(os.Stderr, "FAIL:", err)
+		os.Exit(2)
+	}
 	// The terminal tests drive shells, which need no 300ms between a command
 	// and its Enter (production keeps it for agent TUIs).
 	tmux.SetSendKeysSettleForTest(20 * time.Millisecond)

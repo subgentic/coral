@@ -82,7 +82,21 @@ jobs:
           done
           echo "go test (${TAGS:-default tags}), shard $SHARD: ${#pkgs[@]} of ${#all[@]} packages"
           [ "${#pkgs[@]}" -gt 0 ] || { echo "::error::an empty shard"; exit 1; }
-          go test -count=1 -p 4 -timeout 45m ${TAGS:+-tags "$TAGS"} "${pkgs[@]}"
+          if [ "$SHARD" = routes ]; then
+            # routes' 2,200 tests run one after another in a single process (about 20 minutes here); the same tests split over four processes
+            # of this runner (#350), and the script fails when a test did not run exactly once.
+            # The tests with a wall-clock bound (the slow-input guards of the shell-risk reading) run first and alone, in a quiet process: the bound holds
+            # unchanged, and four processes sharing the CPU can't trip it. The script fails when one of these names no longer exists.
+            python3 ../tools/go_test_shard.py --shards 4 --timeout 45m ${TAGS:+--tags "$TAGS"} \
+              --alone TestShellRiskDeepNestingIsAnsweredInOnePass \
+              --alone TestShellRiskWrapperRecursionIsMemoizedPerRun \
+              --alone TestShellRiskNestedShellWrappersAreBoundedInTime \
+              --alone TestShellRiskNestedLaunchersAreBounded \
+              --alone TestShellRiskNestedSubstitutionIsBoundedInTime \
+              "${pkgs[0]}"
+          else
+            go test -count=1 -p 4 -timeout 45m ${TAGS:+-tags "$TAGS"} "${pkgs[@]}"
+          fi
 
   # The updater's relaunch fixture build (#6290): the tests that only exist under -tags relaunchfixture (the full relaunch path over the fixture, the build
   # flavor and the guard that keeps the fixture out of a release) are run by the gate, not just written. Same trust and runner as the jobs above.
