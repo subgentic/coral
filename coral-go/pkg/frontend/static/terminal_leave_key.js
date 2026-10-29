@@ -12,6 +12,11 @@ export function leaveKeyWords(windows = isWindows()) {
     return windows ? 'Ctrl+] or Ctrl+Shift+Enter' : 'Ctrl+Shift+Escape, Ctrl+] or Ctrl+Shift+Enter';
 }
 
+/** Whether a keydown is Ctrl+` (any layout: the key by its place), the shortcut list's "the agent's terminal, and back to its chat". In the terminal the page takes it, and the terminal does not send it to the agent (#10749). */
+export function isTerminalToggleKey(ev) {
+    return !!ev && ev.type === 'keydown' && ev.ctrlKey && !ev.shiftKey && !ev.altKey && !ev.metaKey && ev.code === 'Backquote';
+}
+
 /** Whether a keydown is one of the leave keys. Escape is not one: the agent CLIs use it (Esc stops a turn, Esc Esc goes back to edit a message). */
 export function isLeaveKey(ev) {
     if (!ev || ev.type !== 'keydown') return false;
