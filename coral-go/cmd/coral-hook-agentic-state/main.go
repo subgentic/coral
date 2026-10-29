@@ -47,6 +47,16 @@ func main() {
 		}
 	}
 
+	if opts.piEvent != "" {
+		var ok bool
+		if d, ok = fromPi(d, opts.piEvent); !ok { // only the allow-listed keys are read: nothing else in the payload reaches a post
+			hooks.DebugLog("AGENTIC_STATE PI_SKIPPED")
+			return
+		}
+	} else if len(os.Args) > 1 && contains(os.Args[1:], "--pi") {
+		return // --pi named an event Coral does not record
+	}
+
 	hookType := hookTypeOf(d)
 	hooks.DebugLog(fmt.Sprintf("AGENTIC_STATE INPUT: hook_type=%s argv=%v", hooks.LogID(hookType), os.Args[1:]))
 
@@ -237,6 +247,7 @@ func claudePermissionMode(d map[string]any) string {
 type hookArgs struct {
 	sessionClear bool   // --session-clear: a /clear
 	agyEvent     string // --agy <event>: an Antigravity hook
+	piEvent      string // --pi <event>: Coral's Pi extension (pi_events.go); only an event of piEventNames
 	hooksRev     int    // --hooks-rev N: the hook set's revision (#3655 F3); 0 when absent or not a positive number
 }
 
@@ -248,6 +259,8 @@ func parseArgs(args []string) hookArgs {
 			o.sessionClear = true
 		case arg == "--agy" && i+1 < len(args):
 			o.agyEvent = args[i+1]
+		case arg == "--pi" && i+1 < len(args):
+			o.piEvent = piEventNames[args[i+1]]
 		case arg == "--hooks-rev" && i+1 < len(args):
 			if n, err := strconv.Atoi(args[i+1]); err == nil && n > 0 {
 				o.hooksRev = n
@@ -964,4 +977,13 @@ func withDetail(detail map[string]any, key string, val any) map[string]any {
 	}
 	detail[key] = val
 	return detail
+}
+
+func contains(list []string, want string) bool {
+	for _, x := range list {
+		if x == want {
+			return true
+		}
+	}
+	return false
 }
