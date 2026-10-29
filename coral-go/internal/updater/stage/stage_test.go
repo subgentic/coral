@@ -676,6 +676,24 @@ func TestAStagedReleaseThatIsNotNewerThanTheInstalledOneIsDropped(t *testing.T) 
 	assert.Equal(t, "1.4.130", e.state().Stage.Staged)
 }
 
+// The delete keeps the strict name check: a staged version that is not a plain X.Y.Z (a hand-edited state file) is dropped from the state, but no folder is removed for it.
+func TestTheDropRemovesFilesOnlyForAPlainVersionName(t *testing.T) {
+	e := newEnv(t, "1.4.130")
+	dir := filepath.Join(e.data, UpdatesDir)
+	require.NoError(t, verify.EnsureDir(dir))
+	for _, name := range []string{"v1.4.120", "1.4.120-rc1", "1.4.120"} {
+		require.NoError(t, os.MkdirAll(filepath.Join(dir, StagingDir, name), 0o700))
+	}
+	require.NoError(t, verify.SaveState(dir, verify.State{Stage: &verify.StageState{Staged: "v1.4.120", Version: "1.4.140", NextAttempt: e.now.Add(time.Hour).Format(time.RFC3339), ErrorKind: KindRateLimit}}))
+	assert.Equal(t, ResultBackoff, e.check().Result)
+	assert.Empty(t, e.state().Stage.Staged, "no longer offered")
+	assert.ElementsMatch(t, []string{"v1.4.120", "1.4.120-rc1", "1.4.120"}, e.stagedVersions(), "no folder was removed for a name that is not a plain version")
+
+	require.NoError(t, verify.SaveState(dir, verify.State{Stage: &verify.StageState{Staged: "1.4.120", Version: "1.4.140", NextAttempt: e.now.Add(time.Hour).Format(time.RFC3339), ErrorKind: KindRateLimit}}))
+	assert.Equal(t, ResultBackoff, e.check().Result)
+	assert.ElementsMatch(t, []string{"v1.4.120", "1.4.120-rc1"}, e.stagedVersions(), "the plain name's folder is removed, and only that one")
+}
+
 func TestDropStaleStageLeavesUnparsedVersionsAlone(t *testing.T) {
 	st := verify.State{Stage: &verify.StageState{Staged: "1.4.120"}}
 	assert.Equal(t, "", dropStaleStage(&st, "dev"), "an installed version that is not a version says nothing")
