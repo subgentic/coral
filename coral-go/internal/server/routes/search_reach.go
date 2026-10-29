@@ -14,7 +14,7 @@ import (
 	"github.com/subgentic/coral/internal/store"
 )
 
-// How far an agent's chat search reaches (#11048): the level is on the agent's team member row, only the Operator raises it (PUT .../search-access, an operator-only route), and every search above own is
+// How far an agent's chat search reaches (#11048): the level is on the agent's team member row, only the Operator raises it (PUT /api/team-members/{memberID}/search-access, an operator-only route), and every search above own is
 // checked against the CALLER's own row. A teammate's level does not lend, and the level is not in anything an agent or a template can write.
 const (
 	// searchResponseCap bounds one search response (256 KiB of messages).
@@ -126,7 +126,7 @@ func (h *SessionsHandler) logSearchRead(r *http.Request, c searchCaller, request
 	}
 }
 
-// SetMemberSearchAccess is PUT /api/teams/detail/{name}/members/{agent}/search-access {"level": "own|team|all|operator", "confirm": "operator"}. The Operator's alone (operatorOnlyRoutes, and never through the
+// SetMemberSearchAccess is PUT /api/team-members/{memberID}/search-access {"level": "own|team|all|operator", "confirm": "operator"}. The Operator's alone (operatorOnlyRoutes, and never through the
 // Hub): the raise is logged in the same step. Setting "operator" needs "confirm": "operator", so the Operator's own CLI history is never reached by a slip of a control.
 func (h *SessionsHandler) SetMemberSearchAccess(w http.ResponseWriter, r *http.Request) {
 	var body struct {
@@ -150,8 +150,12 @@ func (h *SessionsHandler) SetMemberSearchAccess(w http.ResponseWriter, r *http.R
 		errInternalServer(w, "teams are not available")
 		return
 	}
-	team, agent := chi.URLParam(r, "name"), chi.URLParam(r, "agent")
-	from, err := h.teamStore.SetSearchReach(r.Context(), team, agent, level, "operator", "dashboard")
+	memberID, err := strconv.ParseInt(chi.URLParam(r, "memberID"), 10, 64)
+	if err != nil || memberID < 1 {
+		errBadRequest(w, "memberID must be the member's id (members[].id of the team detail)")
+		return
+	}
+	from, err := h.teamStore.SetSearchReach(r.Context(), memberID, level, "operator", "dashboard")
 	if errors.Is(err, sql.ErrNoRows) {
 		errNotFound(w, "that team has no such member")
 		return
@@ -161,7 +165,7 @@ func (h *SessionsHandler) SetMemberSearchAccess(w http.ResponseWriter, r *http.R
 		return
 	}
 	_ = h.teamStore.PruneSearchAccess(r.Context())
-	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "team": team, "agent": agent, "from": from, "level": level})
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "member_id": memberID, "from": from, "level": level})
 }
 
 // SearchAccessLog is GET /api/search-access/log?limit=: the raises and the reads above own, newest first (no text). The Operator's.

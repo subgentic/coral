@@ -441,9 +441,9 @@ PUT /api/system/hub-operator never
 PUT /api/system/identity-actor never
 PUT /api/system/terminal-backend never
 PUT /api/system/update/settings never
+PUT /api/team-members/{memberID}/search-access never
 PUT /api/teams/detail/{name}/home-folder never
 PUT /api/teams/detail/{name}/knowledge/{agentName} never
-PUT /api/teams/detail/{name}/members/{agent}/search-access never
 PUT /api/themes/{name} never
 PUT /api/views/{id} never
 PUT /api/workflows/{workflowID} never

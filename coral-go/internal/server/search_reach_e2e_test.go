@@ -81,7 +81,11 @@ func TestSearchReachLevelsOnBoardSearch(t *testing.T) {
 		}
 		return do("GET", "/api/agent/board/search?"+v.Encode(), tok, "")
 	}
-	setPath := "/api/teams/detail/" + url.PathEscape(team.Name) + "/members/Dev/search-access"
+	devM, _ := ts2.GetMemberBySessionID(ctx, "eeeeeeee-1148-4000-8000-00000000000a")
+	peerM, _ := ts2.GetMemberBySessionID(ctx, "eeeeeeee-1148-4000-8000-00000000000b")
+	require.NotNil(t, devM)
+	require.NotNil(t, peerM)
+	setPath := fmt.Sprintf("/api/team-members/%d/search-access", devM.ID)
 	set := func(level, confirm string) (int, map[string]any, string) {
 		body := fmt.Sprintf(`{"level":%q`, level)
 		if confirm != "" {
@@ -116,7 +120,7 @@ func TestSearchReachLevelsOnBoardSearch(t *testing.T) {
 			code, _, raw := do("PUT", setPath, tok, `{"level":"all","confirm":"operator"}`)
 			assert.Equal(t, http.StatusForbidden, code, raw)
 		}
-		code, _, raw := do("PUT", "/api/teams/detail/"+url.PathEscape(team.Name)+"/members/Peer/search-access", tokDev, `{"level":"team"}`)
+		code, _, raw := do("PUT", fmt.Sprintf("/api/team-members/%d/search-access", peerM.ID), tokDev, `{"level":"team"}`)
 		assert.Equal(t, http.StatusForbidden, code, raw)
 		_, out, _ := search(tokDev, "team")
 		assert.Equal(t, "own", out["level"], "nothing changed")
@@ -163,6 +167,14 @@ func TestSearchReachLevelsOnBoardSearch(t *testing.T) {
 		assert.Equal(t, "operator", out["needed"])
 		code, _, raw = set("operator", "operator")
 		require.Equal(t, http.StatusOK, code, raw)
+	})
+	t.Run("a member id that is not there is a 404, and the level is read from the caller's row, never from a name", func(t *testing.T) {
+		code, _, raw := do("PUT", "/api/team-members/999999/search-access", "", `{"level":"team"}`)
+		assert.Equal(t, http.StatusNotFound, code, raw)
+		code, _, _ = do("PUT", "/api/team-members/abc/search-access", "", `{"level":"team"}`)
+		assert.Equal(t, http.StatusBadRequest, code)
+		got, _ := ts2.SearchReachForSession(ctx, "eeeeeeee-1148-4000-8000-00000000000b")
+		assert.Equal(t, "own", got, "the teammate's level is its own row's")
 	})
 	t.Run("a level follows the member through a restart, which gives it a new session id", func(t *testing.T) {
 		tm, _ := ts2.GetMemberBySessionID(ctx, "eeeeeeee-1148-4000-8000-00000000000a")

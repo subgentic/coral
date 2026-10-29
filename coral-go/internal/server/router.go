@@ -516,7 +516,7 @@ func (s *Server) registerSystem(r *chi.Mux, h *routeHandlers) {
 	r.Delete("/api/teams/detail/{name}", teamsHandler.DeleteTeam)
 	r.Post("/api/teams/detail/{name}/resurrect", sessHandler.ResurrectTeam)
 	r.Put("/api/teams/detail/{name}/home-folder", sessHandler.SetTeamHomeFolder)
-	r.Put("/api/teams/detail/{name}/members/{agent}/search-access", sessHandler.SetMemberSearchAccess)
+	r.Put("/api/team-members/{memberID}/search-access", sessHandler.SetMemberSearchAccess)
 	r.Get("/api/search-access/log", sessHandler.SearchAccessLog)
 
 	// Worktrees Coral made and kept (#6736)

@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
 	"time"
 )
 
@@ -74,8 +73,9 @@ func (s *TeamStore) SearchReachForSession(ctx context.Context, sessionID string)
 	return level, nil
 }
 
-// SetSearchReach sets the level of a team's member and logs the change in the same transaction. It returns the level it replaced.
-func (s *TeamStore) SetSearchReach(ctx context.Context, team, agent, level, setBy, via string) (string, error) {
+// SetSearchReach sets the level of one member row, by the row's id (never reused, so a team deleted and made again under the same name is not reached by a stale id), and logs the change in the same
+// transaction. It returns the level it replaced; sql.ErrNoRows when there is no such member.
+func (s *TeamStore) SetSearchReach(ctx context.Context, memberID int64, level, setBy, via string) (string, error) {
 	if SearchReachRank(level) < 0 {
 		return "", ErrInvalidSearchReach
 	}
@@ -84,18 +84,13 @@ func (s *TeamStore) SetSearchReach(ctx context.Context, team, agent, level, setB
 		return "", err
 	}
 	defer tx.Rollback()
-	var id int64
-	var from string
+	var team, agent, from string
 	err = tx.QueryRowxContext(ctx,
-		`SELECT m.id, m.search_reach FROM team_members m JOIN teams t ON t.id = m.team_id
-		 WHERE t.name = ? AND m.agent_name = ? ORDER BY m.id DESC LIMIT 1`, team, agent).Scan(&id, &from)
-	if errors.Is(err, sql.ErrNoRows) {
-		return "", fmt.Errorf("no member %q on %q: %w", agent, team, sql.ErrNoRows)
-	}
+		`SELECT t.name, m.agent_name, m.search_reach FROM team_members m JOIN teams t ON t.id = m.team_id WHERE m.id = ?`, memberID).Scan(&team, &agent, &from)
 	if err != nil {
 		return "", err
 	}
-	if _, err := tx.ExecContext(ctx, `UPDATE team_members SET search_reach = ? WHERE id = ?`, level, id); err != nil {
+	if _, err := tx.ExecContext(ctx, `UPDATE team_members SET search_reach = ? WHERE id = ?`, level, memberID); err != nil {
 		return "", err
 	}
 	if _, err := tx.ExecContext(ctx,

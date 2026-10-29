@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"testing"
 	"time"
@@ -42,9 +43,9 @@ func TestSearchReach_DefaultsToOwn(t *testing.T) {
 func TestSearchReach_SetLogsTheRaiseAndFollowsTheSession(t *testing.T) {
 	s := NewTeamStore(openTestDB(t))
 	ctx := context.Background()
-	seatMember(t, s, "b-one", "Dev", "sid-1")
+	m := seatMember(t, s, "b-one", "Dev", "sid-1")
 
-	from, err := s.SetSearchReach(ctx, "b-one", "Dev", "team", "operator", "dashboard")
+	from, err := s.SetSearchReach(ctx, m.ID, "team", "operator", "dashboard")
 	require.NoError(t, err)
 	assert.Equal(t, "own", from)
 
@@ -64,12 +65,12 @@ func TestSearchReach_SetLogsTheRaiseAndFollowsTheSession(t *testing.T) {
 func TestSearchReach_RejectsUnknownLevelAndMember(t *testing.T) {
 	s := NewTeamStore(openTestDB(t))
 	ctx := context.Background()
-	seatMember(t, s, "b-one", "Dev", "sid-1")
+	m := seatMember(t, s, "b-one", "Dev", "sid-1")
 
-	_, err := s.SetSearchReach(ctx, "b-one", "Dev", "root", "operator", "dashboard")
+	_, err := s.SetSearchReach(ctx, m.ID, "root", "operator", "dashboard")
 	assert.ErrorIs(t, err, ErrInvalidSearchReach)
-	_, err = s.SetSearchReach(ctx, "b-one", "Ghost", "team", "operator", "dashboard")
-	assert.Error(t, err)
+	_, err = s.SetSearchReach(ctx, m.ID+999, "team", "operator", "dashboard")
+	assert.ErrorIs(t, err, sql.ErrNoRows)
 
 	got, _ := s.SearchReachForSession(ctx, "sid-1")
 	assert.Equal(t, "own", got)
@@ -77,11 +78,29 @@ func TestSearchReach_RejectsUnknownLevelAndMember(t *testing.T) {
 	assert.Empty(t, rows, "a refused change leaves no log row")
 }
 
+// A team deleted and made again under the same name is a different team: the old member's id reaches nothing, and the new same-named member is untouched.
+func TestSearchReach_AStaleMemberIDDoesNotReachANewTeamOfTheSameName(t *testing.T) {
+	s := NewTeamStore(openTestDB(t))
+	ctx := context.Background()
+	old := seatMember(t, s, "b-one", "Dev", "sid-old")
+	tm, err := s.GetTeam(ctx, "b-one")
+	require.NoError(t, err)
+	require.NoError(t, s.UpdateTeamStatus(ctx, tm.ID, "stopped")) // only a stopped team is deleted
+	require.NoError(t, s.DeleteTeam(ctx, tm.ID))
+	fresh := seatMember(t, s, "b-one", "Dev", "sid-new")
+	require.NotEqual(t, old.ID, fresh.ID)
+
+	_, err = s.SetSearchReach(ctx, old.ID, "all", "operator", "dashboard")
+	assert.ErrorIs(t, err, sql.ErrNoRows)
+	got, _ := s.SearchReachForSession(ctx, "sid-new")
+	assert.Equal(t, "own", got)
+}
+
 func TestSearchReach_ResetToOwn(t *testing.T) {
 	s := NewTeamStore(openTestDB(t))
 	ctx := context.Background()
 	m := seatMember(t, s, "b-one", "Dev", "sid-1")
-	_, err := s.SetSearchReach(ctx, "b-one", "Dev", "all", "operator", "dashboard")
+	_, err := s.SetSearchReach(ctx, m.ID, "all", "operator", "dashboard")
 	require.NoError(t, err)
 
 	require.NoError(t, s.ResetSearchReach(ctx, m.TeamID))
