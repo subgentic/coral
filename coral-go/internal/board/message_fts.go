@@ -497,12 +497,31 @@ func (s *Store) CheckMessageSearchIndex(ctx context.Context) (repaired bool, err
 	if e := strings.ToLower(err.Error()); !strings.Contains(e, "malformed") && !strings.Contains(e, "corrupt") {
 		return false, err // busy, closed, cancelled: not damage
 	}
+	// The same room check as every other build (#10913): the old index is dropped only when the disk has room for the new one, else it stays,
+	// stale, and a search keeps answering as it did; said once (the check runs once per open).
+	if low, need, free := s.diskTooFullForIndex(ctx); low {
+		log.Printf("board: the message search index does not match the messages (%v), but it is not rebuilt: %d MiB free on the disk of the board file, and a new one wants %d MiB (twice the text of the messages); the next start tries again", err, free>>20, need>>20)
+		return false, nil
+	}
+	if messageIndexBeforeRepair != nil {
+		messageIndexBeforeRepair()
+	}
+	// Read again, just before the rebuild: an Operator who turned the index off while the check ran does not see it come back (#10913).
+	if s.msgIndex.Load() != messageIndexReady || !messageSearchIndexWanted() || ctx.Err() != nil {
+		return false, nil
+	}
 	log.Printf("board: the message search index does not match the messages (%v); building it again. Nothing is lost: a search reads every message until it is ready", err)
 	if _, err := s.DisableMessageSearchIndex(ctx, false); err != nil {
 		return false, err
+	}
+	if !messageSearchIndexWanted() || ctx.Err() != nil { // turned off between the drop and the build: it stays off
+		return false, nil
 	}
 	if err := s.BuildMessageSearchIndex(ctx); err != nil {
 		return false, err
 	}
 	return true, nil
 }
+
+// messageIndexBeforeRepair is a test seam: called after the check found damage and the room is there, before the rebuild's last look at the setting.
+var messageIndexBeforeRepair func()

@@ -372,6 +372,7 @@ func TestMessageSearchIndexIsRepairedWhenItDoesNotMatchTheMessages(t *testing.T)
 	s := ftsStoreWithMessages(t, ftsTexts, 60)
 	ctx := context.Background()
 	require.NoError(t, s.BuildMessageSearchIndex(ctx))
+	t.Setenv(messageSearchIndexEnv, "on") // the repair looks at the setting just before it rebuilds
 	healthy, err := s.CheckMessageSearchIndex(ctx)
 	require.NoError(t, err)
 	require.False(t, healthy, "a healthy index is left as it is")
@@ -403,6 +404,7 @@ func TestMessageSearchIndexCheckLeavesABigBoardAlone(t *testing.T) {
 	s := ftsStoreWithMessages(t, ftsTexts, 30)
 	ctx := context.Background()
 	require.NoError(t, s.BuildMessageSearchIndex(ctx))
+	t.Setenv(messageSearchIndexEnv, "on") // the repair looks at the setting just before it rebuilds
 	old := messageIndexCheckMaxMessages
 	messageIndexCheckMaxMessages = 10
 	defer func() { messageIndexCheckMaxMessages = old }()
@@ -447,4 +449,63 @@ func TestMessageSearchIndexIsCheckedAfterOpen(t *testing.T) {
 		a, b := queryBoth(t, s, MessageQueryParams{Q: []string{"heron"}, Limit: []string{"50"}})
 		return b.Total == 1 && a.Total == 1
 	}, 10*time.Second, 50*time.Millisecond, "the check after open rebuilt the index: the edited word is found through it")
+}
+
+// #10913: the repair looks at the disk first, as every build does. Without the room for a new index the stale one stays (a search answers
+// as it did) and nothing is dropped.
+func TestMessageSearchIndexRepairNeedsRoomOnTheDisk(t *testing.T) {
+	t.Setenv(messageSearchIndexEnv, "on")
+	path := filepath.Join(t.TempDir(), "board_room.db")
+	s, err := NewStoreWithKey(path, "")
+	require.NoError(t, err)
+	defer s.Close()
+	ctx := context.Background()
+	_, err = sub(s, ctx, "proj", "dev", "Backend Dev")
+	require.NoError(t, err)
+	for i := 0; i < 40; i++ {
+		_, err := s.PostMessage(ctx, "proj", "dev", fmt.Sprintf("%s #%d", ftsTexts[i%len(ftsTexts)], i), nil)
+		require.NoError(t, err)
+	}
+	require.NoError(t, s.BuildMessageSearchIndex(ctx))
+	for _, q := range []string{`DROP TRIGGER board_messages_fts_au`, `UPDATE board_messages SET content = 'edited later: ibis' WHERE id = 5`, messageFTSTriggers[2]} {
+		_, err := s.db.ExecContext(ctx, q)
+		require.NoError(t, err)
+	}
+	old := messageIndexFreeSpace
+	messageIndexFreeSpace = func(string) (uint64, error) { return 1 << 10, nil } // 1 KiB free
+	defer func() { messageIndexFreeSpace = old }()
+	repaired, err := s.CheckMessageSearchIndex(ctx)
+	require.NoError(t, err)
+	require.False(t, repaired, "no room: not rebuilt")
+	require.Equal(t, "ready", s.MessageSearchIndexState(), "the old index stays in place")
+	require.True(t, s.messageIndexComplete(ctx), "and is not dropped")
+	a, b := queryBoth(t, s, MessageQueryParams{Q: []string{"ibis"}, Limit: []string{"50"}})
+	require.NotEqual(t, b.Total, a.Total, "still the stale one: it keeps answering as it did")
+
+	messageIndexFreeSpace = old
+	repaired, err = s.CheckMessageSearchIndex(ctx)
+	require.NoError(t, err)
+	require.True(t, repaired, "with room, the next check rebuilds it")
+}
+
+// #10913: an Operator who turns the index off while the check is running does not see it come back.
+func TestMessageSearchIndexTurnedOffDuringTheCheckStaysOff(t *testing.T) {
+	t.Setenv(messageSearchIndexEnv, "on")
+	s := ftsStoreWithMessages(t, ftsTexts, 40)
+	ctx := context.Background()
+	require.NoError(t, s.BuildMessageSearchIndex(ctx))
+	for _, q := range []string{`DROP TRIGGER board_messages_fts_au`, `UPDATE board_messages SET content = 'edited later: kiwi' WHERE id = 5`, messageFTSTriggers[2]} {
+		_, err := s.db.ExecContext(ctx, q)
+		require.NoError(t, err)
+	}
+	messageIndexBeforeRepair = func() { // the Operator turns the index off now: the setting and the store's state, as Settings does
+		t.Setenv(messageSearchIndexEnv, "off")
+		_, _ = s.DisableMessageSearchIndex(ctx, false)
+	}
+	defer func() { messageIndexBeforeRepair = nil }()
+	repaired, err := s.CheckMessageSearchIndex(ctx)
+	require.NoError(t, err)
+	require.False(t, repaired, "turned off: not rebuilt")
+	require.Equal(t, "off", s.MessageSearchIndexState())
+	require.False(t, s.messageIndexExists(ctx), "and no index table came back")
 }
