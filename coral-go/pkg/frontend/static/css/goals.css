@@ -28,6 +28,7 @@
 .goals-sub { margin: 8px 0 0; font-size: var(--fs-md); color: var(--text-secondary); }
 .goals-detail-title { margin: 0; font-size: var(--fs-2xl); overflow-wrap: anywhere; font-weight: var(--fw-title); }
 .goals-detail-line { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.goals-detail-line .goal-copy-agent { margin: 0; } /* .btn-small's 20 px side margin put it 20 px in from the line's other items (#11034) */
 
 
 .goals-failed { display: flex; gap: 8px; padding: 12px; border: 1px dashed var(--border-light); border-radius: var(--radius-lg); color: var(--text-secondary); flex-direction: row; flex-wrap: wrap; align-items: center; border-style: solid; border-color: var(--error); }
