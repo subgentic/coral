@@ -16,7 +16,6 @@ import (
 	"syscall"
 
 	"github.com/subgentic/coral/internal/config"
-	"github.com/subgentic/coral/internal/license"
 	"github.com/subgentic/coral/internal/machinelaunch"
 )
 
@@ -34,8 +33,8 @@ var (
 		}
 		return nil, fmt.Errorf("unknown provider %q: digitalocean is the one this version knows", name)
 	}
-	newMachineHub = func(baseURL, key, destroyKey, terms string) machinelaunch.Minter {
-		return &machinelaunch.HubClient{BaseURL: baseURL, Key: key, DestroyKey: destroyKey, TermsVersion: terms}
+	newMachineHub = func(baseURL, key, destroyKey string) machinelaunch.Minter {
+		return &machinelaunch.HubClient{BaseURL: baseURL, Key: key, DestroyKey: destroyKey}
 	}
 )
 
@@ -194,7 +193,7 @@ func runMachine(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if *hubURL != config.TierDefaultCloudURL {
 		fmt.Fprintf(stderr, "coral machine launch: warning: %s is not this build's Coral Hub (%s): the Hub key is sent there.\n", *hubURL, config.TierDefaultCloudURL)
 	}
-	hub := newMachineHub(*hubURL, key, destroyKey, license.EULAVersion)
+	hub := newMachineHub(*hubURL, key, destroyKey)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()

@@ -32,9 +32,8 @@ type HubClient struct {
 	Key     string // the chk_ automation key (from a 0600 file, memory only)
 	// DestroyKey is the automation key's chd_ (from the optional 0600 --hub-destroy-file, memory only): the one credential that revokes what the key minted. It is never in a mint answer. "" means a launch that fails
 	// after the mint cannot revoke the credential, and says so.
-	DestroyKey   string
-	TermsVersion string       // the terms version the person accepted when the key was made; the Hub checks it
-	HTTP         *http.Client // nil: a client with a 30 second timeout that follows no redirect
+	DestroyKey string
+	HTTP       *http.Client // nil: a client with a 30 second timeout that follows no redirect
 	// RevokeEvery is the pause between tries of a revoke the Hub answered 429 or 503 to (0: 2 seconds).
 	RevokeEvery time.Duration
 }
@@ -60,7 +59,7 @@ func (e *HubError) Error() string {
 	case e.Status == http.StatusUnauthorized || e.Status == http.StatusForbidden:
 		return "Coral Hub did not accept the key (it may be wrong, expired, or not allowed to make machine credentials): make a new key in Coral Hub"
 	case e.Status == http.StatusConflict && e.Code == "terms_reconsent_required":
-		return "Coral Hub needs the current terms accepted again: accept them in Coral Hub, then run this again"
+		return "Coral Hub's terms changed: create a new automation key in Coral Hub (browser, fresh sign-in) and save it again; this is not retried"
 	case e.Status == http.StatusTooManyRequests:
 		return "Coral Hub says too many credentials were made just now (30 a minute for an account): wait a minute and run this again"
 	case e.Status == http.StatusConflict && e.Code == "live_limit_reached":
@@ -106,8 +105,7 @@ func (h *HubClient) Mint(ctx context.Context, label string) (string, error) {
 		Label       string `json:"label"`
 		Persistence string `json:"persistence"`
 		TTLMinutes  int    `json:"ttl_minutes"`
-		AcceptTerms string `json:"accept_terms"`
-	}{"generic", label, "ephemeral", 5, h.TermsVersion})
+	}{"generic", label, "ephemeral", 5}) // no accept_terms: the key accepted the terms when it was made, and the Hub ignores it for a chk_ key
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
 	if err != nil {
 		return "", errors.New("could not make the request to Coral Hub")

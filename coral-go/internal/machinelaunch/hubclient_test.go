@@ -17,7 +17,7 @@ func hubServer(t *testing.T, handler http.HandlerFunc) (*HubClient, *httptest.Se
 	t.Helper()
 	srv := httptest.NewServer(handler)
 	t.Cleanup(srv.Close)
-	return &HubClient{BaseURL: srv.URL, Key: goodKey, TermsVersion: "2.0.2"}, srv
+	return &HubClient{BaseURL: srv.URL, Key: goodKey}, srv
 }
 
 func TestMintSendsTheNotesRequestAndReturnsTheCredential(t *testing.T) {
@@ -36,7 +36,10 @@ func TestMintSendsTheNotesRequestAndReturnsTheCredential(t *testing.T) {
 	if method != "POST" || path != "/api/bootstrap/credentials" || auth != "Bearer "+goodKey || ctype != "application/json" {
 		t.Fatalf("request: %s %s %q %q", method, path, auth, ctype)
 	}
-	want := map[string]any{"adapter": "generic", "label": "coral-1", "persistence": "ephemeral", "ttl_minutes": float64(5), "accept_terms": "2.0.2"}
+	want := map[string]any{"adapter": "generic", "label": "coral-1", "persistence": "ephemeral", "ttl_minutes": float64(5)}
+	if _, has := got["accept_terms"]; has {
+		t.Error("accept_terms is not sent: the key accepted the terms when it was made")
+	}
 	if _, has := got["provider_scope"]; has {
 		t.Error("provider_scope is for aws and gcp: the Hub answers a generic mint that has it with a 400")
 	}
@@ -58,7 +61,7 @@ func TestMintSaysRefusalsInItsOwnWordsAndNeverLeaksTheKey(t *testing.T) {
 	}{
 		{401, `{"error":"bad key chk_abcdefgh12345678"}`, "did not accept the key"},
 		{403, `{}`, "did not accept the key"},
-		{409, `{"error":"terms_reconsent_required"}`, "terms accepted again"},
+		{409, `{"error":"terms_reconsent_required"}`, "create a new automation key in Coral Hub (browser, fresh sign-in) and save it again"},
 		{429, `{"error":"rate_limited"}`, "too many credentials"},
 		{409, `{"error":"live_limit_reached"}`, "as many machine credentials outstanding as it may"},
 		{409, `{"error":"adapter_capacity_reached"}`, "this is not retried"},
