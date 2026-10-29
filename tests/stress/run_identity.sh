@@ -648,6 +648,43 @@ for s in json.load(sys.stdin):
         fi
     fi
 
+    # the agent LEAVES its own launch board with the real coral-board while it still holds a leftover seat on another board (the old hole's, or the
+    # Operator's), then restarts: the newest seat of the other board must not become its board; it comes back on its launch board and is re-seated there
+    if [[ -n "${moved_new:-}" && -n "$b1" && -n "$b2" ]]; then
+        local l_old l_name l_role l_tok okl=1
+        l_old=$moved_new; l_name=$(sess_of "$l_old"); l_role=$(role_of "$l_old"); l_tok=$(token_of "$l_old")
+        api POST "/api/board/$b2/subscribe" -d "{\"subscriber_id\":\"Leftover Seat\",\"job_title\":\"Guest\",\"session_name\":\"$l_name\"}" >/dev/null
+        sleep 2
+        out=$(env -i ${WIN_ENV[@]+"${WIN_ENV[@]}"} PATH="$PATH" HOME="$(NP "$TMP/h")" USERPROFILE="$(NP "$TMP/h")" CORAL_DATA_DIR="$(NP "$DATA")" CORAL_URL="$BASE" CORAL_SESSION_TOKEN="$l_tok" CORAL_SESSION_NAME="$l_name" CORAL_SUBSCRIBER_ID="$l_role" "$BIN/coral-board" leave 2>&1) && rc=0 || rc=$?
+        if [[ $rc -eq 0 && "$out" == *Left* && $(seated "$b1" "$l_name") -eq 0 ]]; then
+            local lname2; lname2=$(live_json | python3 -c 'import sys,json
+for s in json.load(sys.stdin):
+    if s["session_id"]==sys.argv[1]: print(s["name"])' "$l_old")
+            local envs_before2; envs_before2=$(ls "$DUMP"/*.env 2>/dev/null | tr '\n' ' ')
+            api POST "/api/sessions/live/$lname2/restart" -d "{\"session_id\":\"$l_old\",\"agent_type\":\"claude\"}" >/dev/null
+            local l_new=""; end=$((SECONDS + 60))
+            while (( SECONDS < end )); do
+                for f in "$DUMP"/*.env; do [[ " $envs_before2 " != *" $f "* ]] && grep -q '^CORAL_SESSION_TOKEN=' "$f" 2>/dev/null && l_new=$(basename "$f" .env); done
+                [[ -n "$l_new" ]] && break; sleep 1
+            done
+            if [[ -z "$l_new" ]]; then fail "#11013 leave then restart: the restarted agent never came back"; else
+                local l_nname l_board l_state
+                l_nname=$(sess_of "$l_new")
+                l_board=$(live_json | python3 -c 'import sys,json
+for s in json.load(sys.stdin):
+    if s["session_id"]==sys.argv[1]: print(s.get("board_project",""))' "$l_new")
+                l_state=$(python3 -c "import sys,json;print(json.load(open(sys.argv[1])).get('project',''))" "$(NP "$DATA/board_state_$l_nname.json")" 2>/dev/null || true)
+                [[ "$l_board" == "$b1" ]] || { fail "#11013 leave then restart: the live row board is '$l_board', want its launch board $b1"; okl=0; }
+                [[ $(seated "$b1" "$l_nname") -ge 1 ]] || { fail "#11013 leave then restart: it was not re-seated on its launch board"; okl=0; }
+                [[ $(seated "$b2" "$l_nname") -eq 0 ]] || { fail "#11013 leave then restart: it was seated on the other board"; okl=0; }
+                [[ "$l_state" == "$b1" ]] || { fail "#11013 leave then restart: its command-line state names '$l_state', want $b1"; okl=0; }
+                [[ $okl == 1 ]] && pass "#11013 leave then restart: after the real coral-board leave on its launch board, with a leftover seat elsewhere, a restart brings the agent back on its launch board and seats it there, none on the other board"
+            fi
+        else
+            fail "#11013 leave then restart: coral-board leave rc=$rc ${out:0:140} (seat left on the launch board: $(seated "$b1" "$l_name"))"
+        fi
+    fi
+
     # variants and the real CLI ----------------------------------------------------------
     ok=1; local path want
     local ptok="$otok" pname="$osess" prole; prole=$(role_of "$osid")   # the agent's OWN subscriber name: a join under another name is refused for that, which would hide the board gate
