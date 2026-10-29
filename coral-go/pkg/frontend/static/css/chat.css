@@ -1589,3 +1589,6 @@ h3.cni-question { margin-bottom: 4px; } /* a heading with its text under it (#30
 /* A restarted agent's earlier conversation stays above the new one, quieter, with a line where the new one starts (#10297). */
 .chat-earlier { opacity: 0.7; }
 .chat-earlier-line { margin: var(--space-md) 0; padding-top: var(--space-sm); border-top: 1px solid var(--border); color: var(--text-muted); text-align: center; }
+
+/* The Copy button hangs 4 px past its bubble (right: -4px), which on a phone, where the scroller's side padding is 12 px, made the scroller 2 px wider than its box and drew a 16 px horizontal scrollbar: the dim strip above the composer (#10923). 4 px more room on the right takes the overflow away instead of hiding it, so a wide code block or table still scrolls inside itself. */
+@media (max-width: 767px) { #live-history-messages.chat-messages.chat-prose { padding-right: 16px; } }
