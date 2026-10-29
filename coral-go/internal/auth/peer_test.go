@@ -56,6 +56,64 @@ func TestConnContextFailsClosedOnAddressesItCannotRead(t *testing.T) {
 	assert.Equal(t, 1, asked, "asked once per connection")
 }
 
+// #385: only a positive identity is kept for a connection. An unattributed answer is not final: a later request on the same connection asks again (not more often than
+// unattributedRetryEvery, and unattributedTries times at most), fails closed meanwhile, and a Self answer is then kept; it is never inherited by another connection.
+func TestAnUnattributedConnectionIsAskedAgainAndOnlyAPositiveIdentityIsKept(t *testing.T) {
+	answers := []peercred.Verdict{peercred.Unattributed, peercred.Unattributed, peercred.Self}
+	asked := 0
+	t.Cleanup(SetPeerAttribution(func(netip.AddrPort, netip.AddrPort) (peercred.Verdict, error) {
+		v := answers[min(asked, len(answers)-1)]
+		asked++
+		return v, nil
+	}))
+	req := func(cp context.Context) *http.Request {
+		r := httptest.NewRequest("GET", "/api/x", nil).WithContext(cp)
+		r.RemoteAddr = "127.0.0.1:50000"
+		return r
+	}
+	ctx := ConnContext(context.Background(), tcpConn{})
+	assert.Equal(t, PeerUnattributed, PeerReason(req(ctx)), "unattributed: fail closed")
+	assert.Equal(t, PeerUnattributed, PeerReason(req(ctx)), "asked a moment ago: still closed, and not asked again")
+	assert.Equal(t, 1, asked)
+	time.Sleep(unattributedRetryEvery + 20*time.Millisecond)
+	assert.Equal(t, PeerUnattributed, PeerReason(req(ctx)), "asked again: still unattributed")
+	assert.Equal(t, 2, asked)
+	time.Sleep(unattributedRetryEvery + 20*time.Millisecond)
+	assert.Equal(t, "", PeerReason(req(ctx)), "the table caught up: Coral's own user")
+	assert.Equal(t, 3, asked)
+	assert.Equal(t, "", PeerReason(req(ctx)))
+	assert.Equal(t, 3, asked, "a positive identity is kept for the connection")
+
+	other := ConnContext(context.Background(), tcpConn{})
+	asked = 0
+	answers = []peercred.Verdict{peercred.Unattributed}
+	assert.Equal(t, PeerUnattributed, PeerReason(req(other)), "another connection does not inherit the allowed one")
+}
+
+// A positively-other-user answer is final too, and is never asked again; an unattributed connection stops being asked after unattributedTries.
+func TestAPositiveOtherUserIsFinalAndTheRetriesAreBounded(t *testing.T) {
+	verdict := peercred.OtherUser
+	asked := 0
+	t.Cleanup(SetPeerAttribution(func(netip.AddrPort, netip.AddrPort) (peercred.Verdict, error) { asked++; return verdict, nil }))
+	req := func(cp context.Context) *http.Request {
+		r := httptest.NewRequest("GET", "/api/x", nil).WithContext(cp)
+		r.RemoteAddr = "127.0.0.1:50000"
+		return r
+	}
+	ctx := ConnContext(context.Background(), tcpConn{})
+	assert.Equal(t, PeerOtherUser, PeerReason(req(ctx)))
+	assert.Equal(t, PeerOtherUser, PeerReason(req(ctx)))
+	assert.Equal(t, 1, asked, "final")
+
+	verdict, asked = peercred.Unattributed, 0
+	ctx = ConnContext(context.Background(), tcpConn{})
+	for i := 0; i < unattributedTries+3; i++ {
+		assert.Equal(t, PeerUnattributed, PeerReason(req(ctx)))
+		time.Sleep(unattributedRetryEvery + 10*time.Millisecond)
+	}
+	assert.Equal(t, unattributedTries, asked, "asked a bounded number of times, then fail closed")
+}
+
 type stringAddr string
 
 func (a stringAddr) Network() string { return "wrapped" }

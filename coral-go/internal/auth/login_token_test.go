@@ -178,6 +178,7 @@ func TestASignInLinkWhoseOpenerCouldNotBeToldIsRetriedNotUsedUp(t *testing.T) {
 	rec = get("/?login_token=" + tok + "&link_retry=1")
 	assert.Equal(t, http.StatusFound, rec.Code, "the link worked on the retry")
 	assert.NotContains(t, rec.Header().Get("Location"), "link_retry", "the retry counter does not stay in the address")
+	assert.Equal(t, http.StatusForbidden, get("/?login_token="+tok).Code, "a link that WAS opened is used up: the answer for a used link is unchanged")
 
 	same = false
 	tok, err = ks.MintLoginToken()
