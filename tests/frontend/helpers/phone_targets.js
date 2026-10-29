@@ -137,6 +137,10 @@ const SCALE = `(() => {
         if (a.contains(c) || c.contains(a)) continue;
         const inside = (x, y) => x.left >= y.left - 1 && x.right <= y.right + 1 && x.top >= y.top - 1 && x.bottom <= y.bottom + 1;
         if (inside(ab, cb) || inside(cb, ab)) continue;
+        // a row under a pinned foot (position sticky or fixed) of the scroller it sits in is not an overlap when scrolling clears it: the list ends above the foot, and a longer list or a wider font only moves how far down that is (#11003)
+        const pinned = x => { for (let p = x; p && p !== document.body; p = p.parentElement) { const pos = getComputedStyle(p).position; if (pos === 'sticky' || pos === 'fixed') return p; } return null; };
+        const scrollerOf = x => { for (let p = x.parentElement; p && p !== document.body; p = p.parentElement) { if (/(auto|scroll)/.test(getComputedStyle(p).overflowY) && p.scrollHeight > p.clientHeight + 1) return p; } return null; };
+        { const pa = pinned(a), pc = pinned(c); if ((pa && !pc) || (pc && !pa)) { const row = pa ? c : a, foot = pa || pc, sc = scrollerOf(row); const ov = Math.min(ab.bottom, cb.bottom) - Math.max(ab.top, cb.top); if (sc && sc.contains(foot) && sc.scrollHeight - sc.clientHeight - sc.scrollTop >= ov) continue; } }
         const layer = x => x.closest('[role=menu], [role=listbox], [role=dialog], dialog, [aria-modal=true], [class*="-menu"]:not(.overflow-menu-item), [class*=dropdown], [popover], .toast, .modal'); // a menu, list or dialog is meant to lie over the page
         if (layer(a) !== layer(c)) continue;
         const w = Math.min(ab.right, cb.right) - Math.max(ab.left, cb.left), h = Math.min(ab.bottom, cb.bottom) - Math.max(ab.top, cb.top);
