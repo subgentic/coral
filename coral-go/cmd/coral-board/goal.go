@@ -24,6 +24,7 @@ Subcommands:
   add "title" [--outcome "what is true when done"] [--done-when "a check a person can make"] [--state active|proposed] [--driver "Agent Name"]
   list [--state open|all|proposed,active,blocked,done,dropped] [--json]    Goals still open by default
   show <id> [--json]               A goal, its fields, how its tasks stand and the tasks
+  brief <goal> [--json]            To brief an agent: the goal's fields, its OPEN tasks only, and every artifact its tasks hold (coral:// links); <goal> is 65, #65, "goal #65" or the goal page's link
   update <id> [--title T] [--outcome T] [--done-when T] [--state proposed|active|blocked] [--driver NAME | --driver ""]
               [--blocked-on "the reason"]
                                    A goal that is blocked needs --blocked-on, a plain reason (a goal does not wait on a person: a task or an agent does)
@@ -58,6 +59,8 @@ func cmdGoal() {
 		cmdGoalList(st, args)
 	case "show":
 		cmdGoalShow(st, args)
+	case "brief":
+		cmdGoalBrief(st, args)
 	case "update":
 		cmdGoalUpdate(st, args)
 	case "close":

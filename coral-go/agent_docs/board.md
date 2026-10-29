@@ -679,6 +679,7 @@ A goal has a `title`, an optional `outcome` (what is true when it is done) and `
 coral-board goal add "title" [--outcome "..."] [--done-when "..."] [--state active|proposed] [--driver "Agent Name"]
 coral-board goal list [--state open|all|proposed,active,blocked,done,dropped] [--json]    # open goals by default
 coral-board goal show <id> [--json]                  # the goal, how its tasks stand, and the tasks
+coral-board goal brief <goal> [--json]               # to brief yourself on a goal: its fields, its OPEN tasks only, and every artifact its tasks hold (coral:// links). <goal> is 65, #65, goal #65 or the goal page's link
 coral-board goal update <id> [--title T] [--outcome T] [--done-when T] [--state proposed|active|blocked] [--driver NAME | --driver ""]
             [--blocked-on T]    # a blocked goal needs --blocked-on, a plain reason
 coral-board goal close <id> --reason "why" [--state done|dropped]    # its open tasks are left as they are and counted
@@ -688,6 +689,8 @@ coral-board task list --goal <id>                    # one goal's tasks
 ```
 
 **What an agent does with the goals** (#7296). The board system prompt an agent gets at launch lists the board's open goals (up to five) with what makes each one done (an agent starts already subscribed and never runs `join`); `coral-board read` prints the same block once when the board's goals changed since that agent last heard (the board's goals list carries a change counter, `seq`, the one the feed's `goals_brief` has); `coral-board join` prints it too, and `coral-board task add` with no `--goal` names the goals again in one line and says how to link the task. So: when a task serves a goal, link it when you add it (`task add "title" --goal <id>`) or after (`task goal <task> <goal>`): the goal's progress is made of its tasks, and a task that serves no goal is the one the person cannot place. When you are an orchestrator and a goal cannot move for a reason (a missing access, a conflict, a dependency), do not only post a message: set the goal blocked with `goal update <id> --state blocked --blocked-on "the reason"`, so it shows as blocked on the Goals page; set it active again when the reason is gone. (A goal does not wait on a person: a task can wait on one, and so can an agent.) A worker agent that sees a goal blocked or stale says so to the orchestrator (a board message naming the goal number); it does not change the goal.
+
+When the Operator points you at a goal ("read goal #65", or a pasted line from the goal page's "Copy for an agent"), run `coral-board goal brief 65` first: it lists what is open and links what the goal's tasks produced, where `goal show` lists every task, done ones too.
 
 `goal update` is how a goal's state is kept true (blocked, active again); close it with `goal close`, never by deleting (there is no delete). The Operator or an active registered Orchestrator may write a goal and link a task to one (`task goal`, `PUT .../tasks/{id}/goal`; only planners create a shared task, so its creator is one); a worker agent cannot change a goal's state. `GET .../tasks?goal=<id>` pages like the task list (`limit`, `cursor`; oldest first, `next_cursor` empty on the last page; the totals are the goal's), and `goal show` and `task list --goal` follow it to the end.
 

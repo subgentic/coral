@@ -51,6 +51,8 @@ func checkKnownFlags(args []string) error {
 			spec = clihelp.FlagSpec{Bools: []string{"--json"}, Values: []string{"--state"}}
 		case "show":
 			spec = clihelp.FlagSpec{Bools: []string{"--json"}, Positional: 1}
+		case "brief":
+			spec = clihelp.FlagSpec{Bools: []string{"--json"}, Positional: 2} // "goal #65" may arrive as two words
 		case "add":
 			spec = clihelp.FlagSpec{Values: []string{"--outcome", "--done-when", "--state", "--driver"}, Positional: 1}
 		case "update":
