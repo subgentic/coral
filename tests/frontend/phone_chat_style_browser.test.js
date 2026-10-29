@@ -26,7 +26,7 @@ const BASE = require('./test_base').BASE;
             const t = `390@${fs} ${theme}`, b = await bub();
             assert.ok(b.a.bg !== 'rgba(0, 0, 0, 0)' && b.a.radius >= 16 && b.a.l <= 16 && b.a.w <= b.vw * 0.95, `${t}: the agent's words are a neutral rounded bubble at the left: ` + JSON.stringify(b.a));
             assert.ok(b.h.bg !== 'rgba(0, 0, 0, 0)' && b.h.bg !== b.a.bg && b.h.radius >= 16 && b.h.r >= b.vw - 24 && b.h.w <= b.vw * 0.87, `${t}: the person's words are a tinted rounded bubble at the right: ` + JSON.stringify(b.h));
-            assert.ok(b.ta.radius >= 24 && b.ta.h >= 48 && b.ta.bg !== 'rgba(0, 0, 0, 0)', `${t}: the text box is a pill: ` + JSON.stringify(b.ta));
+            assert.ok(b.ta.radius >= 24 && b.ta.h >= 48 && b.ta.h <= 56 * (fs / 16) && b.ta.bg !== 'rgba(0, 0, 0, 0)', `${t}: the text box is a pill, one line high with no text (it was 98 px with an empty second line): ` + JSON.stringify(b.ta));
             assert.ok(b.send.shown && b.send.w >= 44 && b.send.h >= 44 && /^(50%|[2-9]\d+px)/.test(b.send.radius), `${t}: Send is a round 44 px button: ` + JSON.stringify(b.send));
             await ev(`document.querySelector('.mobile-send-btn').classList.add('is-stop'); true`);
             const stop = await ev(`(() => { const s = document.querySelector('.mobile-send-btn'), b = s.getBoundingClientRect(); return { w: Math.round(b.width), h: Math.round(b.height), radius: getComputedStyle(s).borderTopLeftRadius }; })()`);

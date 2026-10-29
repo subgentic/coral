@@ -1428,10 +1428,15 @@
     #mobile-session-list .session-dot.your-turn { background: var(--bg-secondary); box-shadow: inset 0 0 0 2px var(--text-primary); }
 }
 
-/* The phone's composer in Google Chat's language (#11128, slice D): a pill for the text and a round Send (Stop is round too), on top of the one-row header. 44 px and more everywhere; the keyboard rule (#11060) and Stop's behaviour are as they were. */
+/* The phone's composer in Google Chat's language (#11128, slice D): a pill for the text, one line high until the text wraps (the rows="3" default is overridden by its height), and a round Send (Stop is round too), on top of the one-row header. 44 px and more everywhere; the keyboard rule (#11060) and Stop's behaviour are as they were. */
 @media (max-width: 600px) {
-    .command-pane textarea { min-height: 3rem !important; padding: 12px 18px; border-radius: 26px; background: var(--bg-secondary); }
+    .command-pane textarea { height: 3rem; min-height: 3rem !important; padding: 12px 18px; border-radius: 26px; background: var(--bg-secondary); }
     .command-pane .mobile-send-btn { border-radius: 50%; }
     .command-pane .mobile-send-btn.is-stop { border-radius: 50%; }
     .command-pane .mobile-send-more > button { border-radius: 50%; }
+}
+
+@media (max-width: 600px) {
+    .settings-tab-name[data-sub] { display: flex; flex-direction: column; align-items: flex-start; }
+    .settings-tab-name[data-sub]::after { content: attr(data-sub); font-size: var(--fs-md); font-weight: var(--fw-regular); color: var(--text-secondary); } /* the group's list row says what is inside, so Theme is found under General (#11128) */
 }

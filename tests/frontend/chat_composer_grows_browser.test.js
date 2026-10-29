@@ -21,7 +21,7 @@ const { connect } = require('./agent_view_harness');
             const at = async n => { await ev(`(() => { const i = document.getElementById('command-input'); i.focus(); i.value = ${JSON.stringify(Array.from({ length: n }, (_, k) => 'line ' + (k + 1)).join('\n'))}; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`); await new Promise(r => setTimeout(r, 300)); /* sleep-ok: the box follows its text */ return ev(`(() => { const i = document.getElementById('command-input'); return { h: Math.round(i.getBoundingClientRect().height), lh: parseFloat(getComputedStyle(i).lineHeight) || 24, scrolls: i.scrollHeight > i.clientHeight + 1 }; })()`); };
             const c1 = await at(1), c3 = await at(3), c4 = await at(4), c5 = await at(5), c9 = await at(9);
             const check = (ok, msg) => { if (!ok) problems.push(`${h} px high: ${msg}`); };
-            check(c1.h === c3.h, `one to three lines keep the three-line box: ${JSON.stringify([c1, c3])}`);
+            check(c1.h <= 56 && c3.h >= c1.h + 2 * c1.lh - 2, `a phone's box is one line high and grows a line at a time (the pill, #11128; it kept a three-line box, #10281): ${JSON.stringify([c1, c3])}`);
             check(c5.h >= c3.h + c5.lh, `five lines grow the box beyond the three-line one: ${JSON.stringify([c3, c5])}`);
             check(c4.h > c3.h && c4.h <= c5.h, `four lines are between: ${JSON.stringify([c3, c4, c5])}`);
             check(c9.h <= c5.h + c9.lh && c9.h <= Math.round(h * 0.4) + 1, `nine lines stop at about five lines and 40% of the screen, then scroll: ${JSON.stringify([c5, c9])}`);
