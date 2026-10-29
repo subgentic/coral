@@ -311,7 +311,7 @@ func TestDeleteRevokesTheHubIdentityBeforeItDestroysAnything(t *testing.T) {
 	var order []string
 	f.order = &order
 	rev := &fakeRevoker{log: &order}
-	rep, err := Delete(t.Context(), "m1", ManageDeps{Provider: f, Revoker: rev, State: st, Out: &bytes.Buffer{}, Tune: quick()})
+	rep, err := Delete(t.Context(), "m1", ManageDeps{Provider: f, IdentityRevoker: rev, State: st, Out: &bytes.Buffer{}, Tune: quick()})
 	require.NoError(t, err)
 	assert.True(t, rep.Revoked)
 	assert.Equal(t, []string{"Revoke:5b6c0f2e-0000-4000-8000-000000000001", "Delete:77", "DeleteFirewall:fw-2", "DeleteVPC:vpc-1", "DeleteSSHKey:ab:cd"}, order,
@@ -330,9 +330,9 @@ func TestDeleteStopsWhenTheRevokeFailsUnlessTheyChooseToGoOn(t *testing.T) {
 	f := newFake()
 	st := stateAt(t)
 	require.NoError(t, st.Put(record("m1", f)))
-	rev := &fakeRevoker{err: &RevokeError{Kind: RevokeNotConfigured, Status: 503}}
+	rev := &fakeRevoker{err: &IdentityRevokeError{Kind: RevokeNotConfigured, Status: 503}}
 	var out bytes.Buffer
-	rep, err := Delete(t.Context(), "m1", ManageDeps{Provider: f, Revoker: rev, State: st, Out: &out, Tune: quick()})
+	rep, err := Delete(t.Context(), "m1", ManageDeps{Provider: f, IdentityRevoker: rev, State: st, Out: &out, Tune: quick()})
 	require.ErrorIs(t, err, ErrRevokeFailed)
 	assert.Contains(t, err.Error(), "NOT revoked")
 	assert.Empty(t, f.calls, "nothing was destroyed")
@@ -340,7 +340,7 @@ func TestDeleteStopsWhenTheRevokeFailsUnlessTheyChooseToGoOn(t *testing.T) {
 	_, ok := st.Get("m1")
 	assert.True(t, ok, "the record stays")
 
-	rep, err = Delete(t.Context(), "m1", ManageDeps{Provider: f, Revoker: rev, State: st, Out: &out, Tune: quick(), ContinueIfRevokeFails: true})
+	rep, err = Delete(t.Context(), "m1", ManageDeps{Provider: f, IdentityRevoker: rev, State: st, Out: &out, Tune: quick(), ContinueIfRevokeFails: true})
 	require.NoError(t, err)
 	assert.False(t, rep.Revoked)
 	assert.Contains(t, rep.RevokeNote, "NOT revoked", "and it says so")
@@ -353,7 +353,7 @@ func TestDeleteGoesOnWhenTheHubDoesNotKnowTheCredentialAndSaysWhenItWasNotAsked(
 	f := newFake()
 	st := stateAt(t)
 	require.NoError(t, st.Put(record("m1", f)))
-	rep, err := Delete(t.Context(), "m1", ManageDeps{Provider: f, Revoker: &fakeRevoker{err: &RevokeError{Kind: RevokeNotFound, Status: 404}}, State: st, Out: &bytes.Buffer{}, Tune: quick()})
+	rep, err := Delete(t.Context(), "m1", ManageDeps{Provider: f, IdentityRevoker: &fakeRevoker{err: &IdentityRevokeError{Kind: RevokeNotFound, Status: 404}}, State: st, Out: &bytes.Buffer{}, Tune: quick()})
 	require.NoError(t, err)
 	assert.Contains(t, strings.ToLower(rep.RevokeNote), "not revoked")
 

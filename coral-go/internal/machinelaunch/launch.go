@@ -42,6 +42,11 @@ type Deps struct {
 	Bootstrap Bootstrapper
 	// Revoker revokes a credential this launch minted when the launch fails after the mint; nil uses Hub when it can (HubClient does).
 	Revoker Revoker
+	// Isolate makes the launch's own VPC and cloud firewall (SSH in from Options.SSHFrom only, until the credential is delivered) and puts the machine in them (#10918). The command line always sets it; a
+	// provider that cannot is refused.
+	Isolate bool
+	// State, when set, is the state file the launch writes its ids to as they come into being (nil: none).
+	State *State
 	// Confirm shows the summary and asks; nil means no one can be asked, so only Options.Yes goes on.
 	Confirm func(summary string) (bool, error)
 	Out     io.Writer
@@ -103,6 +108,9 @@ func Launch(ctx context.Context, o Options, d Deps) (*Result, error) {
 		"Coral Hub's credential is never put in the machine's user-data: it is sent over SSH once the machine's host key matches the one this launch made. A single-use SSH host key and this launch's public login key "+
 		"do sit in the user-data, which the provider keeps readable; the key stops working when setup finishes (SSH is closed and the key deleted on the machine). Until then SSH accepts only %s%s.",
 		o.Name, p.Name(), o.Size, o.Region, price.HourlyUSD, price.MonthlyUSD, sshFromWords(o.SSHFrom), sshLookupWords(o.SSHFromLookup))
+	if d.Isolate {
+		summary += " " + isolationWords(o.SSHFrom)
+	}
 	if !o.Yes {
 		if d.Confirm == nil {
 			return nil, errors.New("no one can be asked to confirm: pass --yes to go on without asking")
@@ -135,19 +143,31 @@ func Launch(ctx context.Context, o Options, d Deps) (*Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	inst, err := p.Create(ctx, Spec{Name: o.Name, Region: o.Region, Size: o.Size, Image: o.Image, Tags: []string{Tag, launchTag}, UserData: userData, SSHKeys: o.SSHKeys})
-	userData = "" // not kept past the call
-	if err != nil {
-		// A create that failed on the way (transport error, timeout, Ctrl-C) may still have made the machine: one with this launch's tag and name is deleted.
-		return nil, fmt.Errorf("could not create the machine: %w%s", err, cleanupAfterFailedCreate(p, launchTag, d.Out, err, retryAfter(o)))
+	ls := newLaunchState(d.State, o, p.Name(), launchTag)
+	var net *Net
+	spec := Spec{Name: o.Name, Region: o.Region, Size: o.Size, Image: o.Image, Tags: []string{Tag, launchTag}, UserData: userData, SSHKeys: o.SSHKeys}
+	if d.Isolate { // createNetwork: the machine is made inside its own VPC and firewall, never before them
+		if net, err = CreateNetwork(ctx, p, o.Name, o.Region, launchTag, []string{o.SSHFrom}, d.Out); err != nil {
+			return nil, err
+		}
+		spec.VPCID = net.VPC.ID
+		ls.set(func(r *Record) { r.VPCID, r.FirewallID = net.VPC.ID, net.Firewall.ID }, d.Out)
 	}
+	inst, err := p.Create(ctx, spec)
+	userData, spec.UserData = "", "" // not kept past the call
+	if err != nil {
+		// A create that failed on the way (transport error, timeout, Ctrl-C) may still have made the machine: one with this launch's tag and name is deleted, then its network.
+		note := cleanupAfterFailedCreate(p, launchTag, d.Out, err, retryAfter(o))
+		return nil, fmt.Errorf("could not create the machine: %w%s%s", err, note, teardownNetworkOnly(p, net, ls, d.Out))
+	}
+	ls.set(func(r *Record) { r.DropletID = inst.ID }, d.Out)
 	fmt.Fprintf(d.Out, "Created %s (%s); waiting for it to run ...\n", inst.Name, inst.ID)
 
 	wctx, cancel := context.WithTimeout(ctx, wait)
 	defer cancel()
 	running, err := p.WaitRunning(wctx, inst.ID)
 	if err != nil {
-		note := cleanup(p, inst.ID, d.Out)
+		note := teardownLaunch(p, inst.ID, net, ls, d.Out)
 		if errors.Is(wctx.Err(), context.DeadlineExceeded) && ctx.Err() == nil {
 			return nil, fmt.Errorf("the machine was not running within %s%s", wait, note)
 		}
@@ -161,7 +181,7 @@ func Launch(ctx context.Context, o Options, d Deps) (*Result, error) {
 		return c, err
 	}})
 	if err != nil {
-		note := cleanup(p, inst.ID, d.Out)
+		note := teardownLaunch(p, inst.ID, net, ls, d.Out)
 		if minted { // a credential that was minted and not used up must not stay valid at the Hub (Security's SHOULD 2 on #10917)
 			note += revokeMinted(d, o.Name)
 		}
@@ -177,6 +197,20 @@ func Launch(ctx context.Context, o Options, d Deps) (*Result, error) {
 	label := boot.Label
 	if label == "" {
 		label = o.Name
+	}
+	if h, ok := d.Hub.(credentialIDer); ok { // the id of the credential (not the credential) goes to the state file: `delete` revokes the machine's Hub identity by it
+		if id := h.CredentialID(o.Name); id != "" {
+			ls.set(func(r *Record) { r.CredentialID = id }, d.Out)
+		}
+	}
+	if net != nil { // closeDoor: the credential is delivered, so nothing is allowed in at the cloud firewall (the machine closes its own SSH too)
+		cctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		if err := CloseDoor(cctx, p, net.Firewall); err != nil {
+			fmt.Fprintf(d.Out, "WARNING: could not close the cloud firewall's SSH rule (%v): the machine closes SSH itself, but close the rule yourself at %s or delete the machine with `coral machine delete %s`.\n", err, p.Name(), o.Name)
+		} else {
+			fmt.Fprintln(d.Out, "Closed the cloud firewall: nothing is allowed in.")
+		}
+		cancel()
 	}
 	if boot.State == "connected" {
 		fmt.Fprintf(d.Out, "Launched %s at %s; its Coral is connected to Coral Hub. It is pending there: open %s, find %q and press Keep to approve it.\n", running.Name, running.IPv4, o.HubURL, label)

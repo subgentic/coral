@@ -166,6 +166,13 @@ type mintedCredential struct {
 	Expires time.Time
 }
 
+// CredentialID is the id the Hub returned with the credential minted for label (not the credential: the id is what a revoke names), or "" when none was minted. The state file keeps it (#10918).
+func (h *HubClient) CredentialID(label string) string {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.minted[label].ID
+}
+
 // ExpiresAt is when the credential minted for label expires, from the Hub's own answer (never a fixed number of minutes), and whether it said.
 func (h *HubClient) ExpiresAt(label string) (time.Time, bool) {
 	h.mu.Lock()

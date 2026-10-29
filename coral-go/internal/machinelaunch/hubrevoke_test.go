@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var _ Revoker = (*HubRevoker)(nil)
+var _ IdentityRevoker = (*HubRevoker)(nil)
 
 const (
 	testChd = "chd_TESTDESTROY0123456789abcdef"
@@ -91,7 +91,7 @@ func TestRevokeIsIdempotentAndSaysEachRefusalPlainly(t *testing.T) {
 	} {
 		h := &hubStub{answers: []func(http.ResponseWriter){answer(c.status, c.body)}}
 		err := h.serve(t).Revoke(t.Context(), testCID)
-		var re *RevokeError
+		var re *IdentityRevokeError
 		require.ErrorAs(t, err, &re, c.name)
 		assert.Equal(t, c.kind, re.Kind, c.name)
 		assert.Contains(t, err.Error(), c.words, c.name)
@@ -131,7 +131,7 @@ func TestRevokeRetriesRateLimitsAndTransient503s(t *testing.T) {
 	r2 := h2.serve(t)
 	r2.MaxTries = 3
 	err := r2.Revoke(t.Context(), testCID)
-	var re *RevokeError
+	var re *IdentityRevokeError
 	require.ErrorAs(t, err, &re)
 	assert.Equal(t, RevokeRateLimited, re.Kind)
 	assert.Len(t, h2.seen, 3, "it stopped after the tries")
@@ -145,7 +145,7 @@ func TestRevokeSendsTheKeyToTheHubOnly(t *testing.T) {
 	defer other.Close()
 	h := &hubStub{redirect: other.URL + "/steal", answers: []func(http.ResponseWriter){answer(200, ``)}}
 	err := h.serve(t).Revoke(t.Context(), testCID)
-	var re *RevokeError
+	var re *IdentityRevokeError
 	require.ErrorAs(t, err, &re, "a 302 is an answer this tool does not understand, not a place to go")
 	assert.Equal(t, RevokeRefused, re.Kind)
 

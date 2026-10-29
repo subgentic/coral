@@ -97,7 +97,7 @@ func (d *DigitalOcean) CreateFirewall(ctx context.Context, spec FirewallSpec) (F
 		return Firewall{}, errors.New("digitalocean: the firewall's tag has characters DigitalOcean does not take")
 	}
 	for _, s := range spec.SSHFrom {
-		if err := ValidSSHSource(s); err != nil {
+		if _, err := firewallSource(s); err != nil {
 			return Firewall{}, fmt.Errorf("digitalocean: %w", err)
 		}
 	}

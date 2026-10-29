@@ -12,14 +12,14 @@ import (
 	"time"
 )
 
-// Revoker ends a machine's identity at Coral Hub (#10918, coral-hub's request 3): `coral machine delete` calls it BEFORE it destroys the droplet, so the machine cannot enroll or stay enrolled after
+// IdentityRevoker ends a machine's identity at Coral Hub (#10918, coral-hub's request 3): `coral machine delete` calls it BEFORE it destroys the droplet, so the machine cannot enroll or stay enrolled after
 // it is gone.
-type Revoker interface {
+type IdentityRevoker interface {
 	// Revoke revokes the identity enrolled from a credential (its id, which the Hub returned at mint), or expires the credential when it was never redeemed. Revoking what is already revoked is not an error.
 	Revoke(ctx context.Context, credentialID string) error
 }
 
-// HubRevoker is the Revoker for Coral Hub, from coral-hub's own description of the route (their Lead's read of internal/bootstrapapi/destroy.go, relayed on the board at 09:50 and 09:54 on 2026-10-29; THE
+// HubRevoker is the IdentityRevoker for Coral Hub, from coral-hub's own description of the route (their Lead's read of internal/bootstrapapi/destroy.go, relayed on the board at 09:50 and 09:54 on 2026-10-29; THE
 // ROUTE IS DARK IN PRODUCTION until their operator enables it, and the details below are ASSUMED until they confirm them to us):
 //
 //	POST /api/bootstrap/credentials/{credential_id}/revoke
@@ -59,13 +59,13 @@ const (
 	RevokeRefused                         // any other answer
 )
 
-// RevokeError is a failed revoke, said in this tool's words (never the key, never the body).
-type RevokeError struct {
+// IdentityRevokeError is a failed revoke, said in this tool's words (never the key, never the body).
+type IdentityRevokeError struct {
 	Kind   RevokeKind
 	Status int
 }
 
-func (e *RevokeError) Error() string {
+func (e *IdentityRevokeError) Error() string {
 	switch e.Kind {
 	case RevokeUnauthorized:
 		return "Coral Hub did not accept the destroy credential (it may be wrong, or its automation key was revoked): the machine's Hub identity was NOT revoked"
@@ -120,7 +120,7 @@ func (r *HubRevoker) Revoke(ctx context.Context, id string) error {
 	}
 	c := *client
 	c.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse } // the destroy credential goes to this host and no other
-	var last *RevokeError
+	var last *IdentityRevokeError
 	for attempt := 1; attempt <= tries; attempt++ {
 		req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, nil)
 		if err != nil {
@@ -135,7 +135,7 @@ func (r *HubRevoker) Revoke(ctx context.Context, id string) error {
 			if ctx.Err() != nil {
 				return ctx.Err()
 			}
-			last, wait = &RevokeError{Kind: RevokeTransport}, time.Duration(attempt)*2*time.Second // the error text of a transport failure may hold the URL: dropped
+			last, wait = &IdentityRevokeError{Kind: RevokeTransport}, time.Duration(attempt)*2*time.Second // the error text of a transport failure may hold the URL: dropped
 		default:
 			raw, _ := io.ReadAll(io.LimitReader(resp.Body, maxHubAnswer))
 			resp.Body.Close()
@@ -143,19 +143,19 @@ func (r *HubRevoker) Revoke(ctx context.Context, id string) error {
 			case http.StatusOK:
 				return nil
 			case http.StatusUnauthorized:
-				return &RevokeError{Kind: RevokeUnauthorized, Status: resp.StatusCode}
+				return &IdentityRevokeError{Kind: RevokeUnauthorized, Status: resp.StatusCode}
 			case http.StatusNotFound:
-				return &RevokeError{Kind: RevokeNotFound, Status: resp.StatusCode}
+				return &IdentityRevokeError{Kind: RevokeNotFound, Status: resp.StatusCode}
 			case http.StatusTooManyRequests:
-				last, wait = &RevokeError{Kind: RevokeRateLimited, Status: resp.StatusCode}, retryAfter429(resp.Header.Get("Retry-After"))
+				last, wait = &IdentityRevokeError{Kind: RevokeRateLimited, Status: resp.StatusCode}, retryAfter429(resp.Header.Get("Retry-After"))
 			case http.StatusServiceUnavailable:
 				kind := RevokeUnavailable
 				if strings.Contains(string(raw), "machine_revocation_unavailable") {
 					kind = RevokeNotConfigured
 				}
-				last, wait = &RevokeError{Kind: kind, Status: resp.StatusCode}, time.Duration(attempt)*2*time.Second
+				last, wait = &IdentityRevokeError{Kind: kind, Status: resp.StatusCode}, time.Duration(attempt)*2*time.Second
 			default:
-				return &RevokeError{Kind: RevokeRefused, Status: resp.StatusCode}
+				return &IdentityRevokeError{Kind: RevokeRefused, Status: resp.StatusCode}
 			}
 		}
 		if attempt == tries {
