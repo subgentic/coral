@@ -55,3 +55,28 @@ func TestWindowsShellIdleADirectProgramIsNotIdle(t *testing.T) {
 		assert.False(t, idle, "a direct program is not a bare shell (root %q)", shell)
 	}
 }
+
+// #378, seen live: a person typed "cmd" at the bare PowerShell an exited agent left, and a task notice typed into that cmd ran the
+// command after its '&'. Nested shells with nothing else running are still a bare prompt; a program in the nested shell is busy.
+func TestWindowsShellIdleANestedShellIsStillABarePrompt(t *testing.T) {
+	naming.SetDefaultLogDir(t.TempDir())
+	b := NewPTYBackend()
+	t.Cleanup(func() { _ = b.Close() })
+	name := "claude-378-nested"
+	require.NoError(t, b.Spawn(name, "claude", t.TempDir(), "0380", "powershell.exe -NoProfile", 120, 40))
+	require.Eventually(t, func() bool { idle, _, ok := b.ShellIdle(name); return ok && idle }, 20*time.Second, 200*time.Millisecond, "a bare PowerShell")
+
+	require.NoError(t, b.SendInput(terminalinput.Unclassified, name, []byte("cmd"+EnterKey)))
+	require.NoError(t, b.SendInput(terminalinput.Unclassified, name, []byte("powershell -NoProfile"+EnterKey)))
+	time.Sleep(3 * time.Second) // the two shells start
+	for i := 0; i < 5; i++ {
+		idle, _, ok := b.ShellIdle(name)
+		require.True(t, ok)
+		assert.True(t, idle, "PowerShell in cmd in PowerShell, nothing else: a bare prompt")
+		time.Sleep(200 * time.Millisecond)
+	}
+
+	require.NoError(t, b.SendInput(terminalinput.Unclassified, name, []byte("ping -n 6 127.0.0.1"+EnterKey)))
+	require.Eventually(t, func() bool { idle, _, ok := b.ShellIdle(name); return ok && !idle }, 20*time.Second, 200*time.Millisecond, "a program in the nested shell is busy")
+	require.Eventually(t, func() bool { idle, _, ok := b.ShellIdle(name); return ok && idle }, 20*time.Second, 200*time.Millisecond, "and a bare prompt again once it ends")
+}

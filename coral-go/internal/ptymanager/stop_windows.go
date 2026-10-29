@@ -58,6 +58,47 @@ func hasChildProcesses(pid int) (bool, error) {
 	}
 }
 
+// runsNonShell says whether any process under pid (its children, theirs, and so on, from one snapshot of the process list) is
+// something other than a shell (powershell, pwsh, cmd): a program is running there. Nested shells alone (a person typed "cmd" at
+// the prompt an exited agent left, #378) are still a bare prompt, which would run typed text as a command. A process whose image
+// can't be read counts as a program. A parent pid Windows has reused can only add processes, so it errs toward "running".
+func runsNonShell(pid int) (bool, error) {
+	snap, err := windows.CreateToolhelp32Snapshot(windows.TH32CS_SNAPPROCESS, 0)
+	if err != nil {
+		return false, err
+	}
+	defer windows.CloseHandle(snap)
+	children := map[int][]int{}
+	var e windows.ProcessEntry32
+	e.Size = uint32(unsafe.Sizeof(e))
+	if err := windows.Process32First(snap, &e); err != nil {
+		return false, err
+	}
+	for {
+		if p, c := int(e.ParentProcessID), int(e.ProcessID); p != c {
+			children[p] = append(children[p], c)
+		}
+		if err := windows.Process32Next(snap, &e); err != nil {
+			break
+		}
+	}
+	seen := map[int]bool{pid: true}
+	queue := append([]int(nil), children[pid]...)
+	for len(queue) > 0 {
+		c := queue[0]
+		queue = queue[1:]
+		if seen[c] {
+			continue
+		}
+		seen[c] = true
+		if image, ok := processImage(c); !ok || !isShellImage(image) {
+			return true, nil
+		}
+		queue = append(queue, children[c]...)
+	}
+	return false, nil
+}
+
 // rootIsShell says whether the process the terminal started is a known shell (powershell, pwsh, cmd), read from the process's own
 // executable path through its handle, never from the command line text. Any failure, or a process that is gone, is "no": the polite stop
 // then types nothing (#5665).
