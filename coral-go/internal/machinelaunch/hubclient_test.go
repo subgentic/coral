@@ -193,15 +193,16 @@ func TestRevokeRetriesWhatMayPassAndSaysTheStatusOfAnythingElse(t *testing.T) {
 	cases := []struct {
 		name     string
 		statuses []int
-		wantErr  string
+		wantKind RevokeKind
+		wantOK   bool
 		calls    int
 	}{
-		{"idempotent: ok straight away", []int{200}, "", 1},
-		{"429 then 200", []int{429, 200}, "", 2},
-		{"503 twice then 200", []int{503, 503, 200}, "", 3},
-		{"429 for good", []int{429, 429, 429, 429}, "HTTP 429", 3},
-		{"404 is not retried", []int{404}, "HTTP 404", 1},
-		{"401 is not retried", []int{401}, "", 1},
+		{"idempotent: ok straight away", []int{200}, 0, true, 1},
+		{"429 then 200", []int{429, 200}, 0, true, 2},
+		{"503 twice then 200", []int{503, 503, 200}, 0, true, 3},
+		{"429 for good", []int{429}, RevokeRateLimited, false, 5},
+		{"404 is not retried", []int{404}, RevokeNotFound, false, 1},
+		{"401 is not retried", []int{401}, RevokeUnauthorized, false, 1},
 	}
 	for _, c := range cases {
 		var calls int
@@ -216,16 +217,21 @@ func TestRevokeRetriesWhatMayPassAndSaysTheStatusOfAnythingElse(t *testing.T) {
 			w.WriteHeader(st)
 			_, _ = w.Write([]byte(`{"error":"x chd_leak ` + testDestroy + `"}`))
 		})
-		h.RevokeEvery = time.Millisecond
 		h.DestroyKey = testDestroy
+		h.RevokeSleep = func(context.Context, time.Duration) error { return nil } // no waiting in a test
 		_, _ = h.Mint(context.Background(), "coral-1")
 		err := h.Revoke(context.Background(), "coral-1")
-		if c.name == "401 is not retried" {
-			if err == nil || calls != 1 {
-				t.Errorf("%s: %v calls %d", c.name, err, calls)
+		var re *IdentityRevokeError
+		switch {
+		case c.wantOK:
+			if err != nil {
+				t.Errorf("%s: %v", c.name, err)
 			}
-		} else if (c.wantErr == "") != (err == nil) || (err != nil && !strings.Contains(err.Error(), c.wantErr)) || calls != c.calls {
-			t.Errorf("%s: err %v, calls %d (want %d)", c.name, err, calls, c.calls)
+		case !errors.As(err, &re) || re.Kind != c.wantKind:
+			t.Errorf("%s: err %v", c.name, err)
+		}
+		if calls != c.calls {
+			t.Errorf("%s: %d calls, want %d", c.name, calls, c.calls)
 		}
 		if err != nil && (strings.Contains(err.Error(), testDestroy) || strings.Contains(err.Error(), "chd_")) {
 			t.Errorf("%s: the error holds the destroy credential: %v", c.name, err)

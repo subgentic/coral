@@ -34,8 +34,8 @@ type HubClient struct {
 	// after the mint cannot revoke the credential, and says so.
 	DestroyKey string
 	HTTP       *http.Client // nil: a client with a 30 second timeout that follows no redirect
-	// RevokeEvery is the pause between tries of a revoke the Hub answered 429 or 503 to (0: 2 seconds).
-	RevokeEvery time.Duration
+	// RevokeSleep waits between the tries of a revoke the Hub answered 429 or 503 to; nil waits for real. A test gives its own.
+	RevokeSleep func(ctx context.Context, d time.Duration) error
 }
 
 var (
@@ -187,73 +187,15 @@ var (
 	ErrNoDestroyKey = errors.New("no destroy credential was given (--hub-destroy-file), so it cannot be revoked from here")
 )
 
-// Revoke revokes the credential minted for label: POST /api/bootstrap/credentials/{credential_id}/revoke with the automation key's destroy credential (chd_, DestroyKey) as the one Bearer header, no body, no Origin.
-// It ends the identity enrolled from the credential, or expires it if it was never redeemed; an already ended one is also a success (the Hub's route is idempotent). 429 and 503 are tried again a few times (they
-// may pass); anything else is an error that holds the status only. From coral-hub's description of the route and of the mint answer (board, 09:50, 09:54, 10:00).
+// Revoke revokes the credential minted for label, for a launch that failed after the mint: it names the credential id the mint answered with and delegates the request to HubRevoker (the one copy of the route: its
+// retries, its typed errors, and what it says to a person). A Revoke with no destroy credential, or for a label with no credential id, is refused here without asking the Hub anything.
 func (h *HubClient) Revoke(ctx context.Context, label string) error {
 	if !destroyShape.MatchString(h.DestroyKey) {
 		return ErrNoDestroyKey
 	}
-	h.mu.Lock()
-	m, ok := h.minted[label]
-	id := m.ID
-	h.mu.Unlock()
-	if !ok || !credentialIDShape.MatchString(id) {
+	id := h.CredentialID(label)
+	if !credentialIDShape.MatchString(id) {
 		return ErrNothingToRevoke
 	}
-	base, err := h.endpoint()
-	if err != nil {
-		return err
-	}
-	every := h.RevokeEvery
-	if every <= 0 {
-		every = 2 * time.Second
-	}
-	client := h.HTTP
-	if client == nil {
-		client = &http.Client{Timeout: 30 * time.Second}
-	}
-	c := *client
-	c.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
-	var last *RevokeError
-	for attempt := 0; attempt < 3; attempt++ {
-		req, err := http.NewRequestWithContext(ctx, http.MethodPost, base+"/"+id+"/revoke", nil)
-		if err != nil {
-			return errors.New("could not make the revoke request to Coral Hub")
-		}
-		req.Header.Set("Authorization", "Bearer "+h.DestroyKey)
-		req.Header.Set("Accept", "application/json")
-		req.Header.Set("User-Agent", "coral-machine-launch")
-		resp, err := c.Do(req)
-		if err != nil {
-			last = &RevokeError{}
-		} else {
-			_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, maxHubAnswer))
-			resp.Body.Close()
-			switch {
-			case resp.StatusCode == http.StatusOK:
-				return nil
-			case resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode == http.StatusServiceUnavailable:
-				last = &RevokeError{Status: resp.StatusCode}
-			default:
-				return &RevokeError{Status: resp.StatusCode}
-			}
-		}
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(every):
-		}
-	}
-	return last
-}
-
-// RevokeError is Coral Hub's answer to a revoke that did not succeed, in this tool's words: the status only, never the body and never the destroy credential.
-type RevokeError struct{ Status int }
-
-func (e *RevokeError) Error() string {
-	if e.Status == 0 {
-		return "could not reach Coral Hub to revoke it"
-	}
-	return fmt.Sprintf("Coral Hub did not revoke it (HTTP %d)", e.Status)
+	return (&HubRevoker{BaseURL: h.BaseURL, DestroyKey: h.DestroyKey, HTTP: h.HTTP, Sleep: h.RevokeSleep}).Revoke(ctx, id)
 }
