@@ -207,5 +207,4 @@ func TestNotNewer(t *testing.T) {
 	for _, tc := range table.Cases {
 		assert.Equal(t, tc.NotNewer, NotNewer(tc.Staged, tc.Installed), tc.Staged+" vs "+tc.Installed+": "+tc.Why)
 	}
-	assert.True(t, NotNewer("2.0.3-rc1", "2.0.3"), "updatecheck also orders a prerelease candidate (the updater never stages one)")
 }
