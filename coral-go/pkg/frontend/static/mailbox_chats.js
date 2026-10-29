@@ -1,5 +1,5 @@
 import { inboxSources, serverColumns, multipleServers, serverLabel, serverOf } from './inbox_servers.js';
-import { serverFetch, isCloud, nativeInbox, sessionServer } from './server_base.js';
+import { serverFetch, isCloud, nativeInbox, sessionServer, identityKey, keyLabel, hasBoardLabel } from './server_base.js';
 /* The mailbox's chat folders (#7776, UI/UX's mock #7773): All chats, Board history, With notes, Starred, Active now and Archived; by CLI (Claude, Codex, Antigravity, Pi); and the chat tags. One chat is one line of
  * the one table (data_table.js): the chat's title, the agent, when it last spoke (and the server with more than one): one line per chat (#8961); the days are its dividers, the list grows as it is read (the footer scrolls into view),
  * and the folders' counts come from one grouped read (GET /api/sessions/history/counts). A chat is starred or archived with its own two quiet buttons (PATCH /api/sessions/history/{id}/flags: only the person).
@@ -197,7 +197,11 @@ function dayOf(iso, now = new Date()) {
     return `${MONTHS[d.getMonth()]} ${d.getDate()}${d.getFullYear() !== now.getFullYear() ? `, ${d.getFullYear()}` : ''}`;
 }
 const stampOf = (s) => s.last_timestamp || s.updated_at || '';
-const name = (s) => (isGroup(s) ? (s.title || String(s.session_id).replace(/^board:/, '')) : (s.display_name || s.agent_name || ''));
+/** A board's name as people read it (#11070): the page's registry name for that board key (the sidebar's, and the BOARDS filter's), else the row's own board_label, else its title, else the key. A team-launched
+ *  board's key and title are an id (b-guj2uyancw); this folder's rows are built here, not by the Chats page's history_list.js, so the label has to be asked for here too. */
+const groupKey = (s) => s.title || String(s.session_id).replace(/^board:/, '');
+const groupName = (s) => { const key = identityKey(s.server, groupKey(s)); return hasBoardLabel(key) || !s.board_label ? keyLabel(key) : String(s.board_label); };
+const name = (s) => (isGroup(s) ? groupName(s) : (s.display_name || s.agent_name || ''));
 /** The agent of a chat with its team after it ("Orchestrator · alpha"): two teams' agents of one role are two chats the person can tell apart (#10592). A chat of an agent on no team, or of a session with no live record, is just its name. */
 const agentLabel = (s) => { const n = name(s); return !isGroup(s) && n && s.board_name ? `${n} · ${s.board_name}` : n; };
 
