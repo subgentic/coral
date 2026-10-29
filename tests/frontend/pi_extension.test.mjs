@@ -20,17 +20,22 @@ function rig({ env, config = CONFIG, spawnThrows = false } = {}) {
   const spawned = [], timers = [], registered = {}; let nowMs = 1000;
   const spawn = (bin, args, opts) => {
     if (spawnThrows) throw new Error('spawn failed ' + CANARY);
-    const child = { bin, args, opts, stdin: { data: '', on() {}, end(d) { this.data = d; } }, unrefd: false, killed: false, on() {}, unref() { this.unrefd = true; }, kill() { this.killed = true; } };
+    const child = { bin, args, opts, stdin: { data: '', on() {}, end(d) { this.data = d; } }, unrefd: false, killed: false, handlers: {}, on(ev, fn) { this.handlers[ev] = fn; }, unref() { this.unrefd = true; }, kill() { this.killed = true; } };
     spawned.push(child); return child;
   };
   const setTimer = (fn, ms) => { const t = { fn, ms, unref() {} }; timers.push(t); return t; };
   const e = ext.create({ spawn, env: env || { CORAL_SESSION_NAME: 'pi-1', CORAL_SESSION_TOKEN: 'tok', CORAL_URL: 'http://127.0.0.1:1', HOME: '/h', PATH: '/bin', ANTHROPIC_API_KEY: CANARY, OPENAI_API_KEY: CANARY, AWS_SECRET_ACCESS_KEY: CANARY, GITHUB_TOKEN: CANARY }, config, now: () => nowMs, setTimer });
   const pi = { on(name, fn) { registered[name] = fn; } };
   e(pi);
-  const run = () => { // run the scheduled drains until the queue is empty (the kill timers are left)
-    for (let i = 0; i < 400; i++) { const t = timers.find(x => x.ms === 0 && !x.done); if (!t) break; t.done = true; t.fn(); }
+  const run = (exitChildren = true) => { // run the scheduled drains until the queue is empty; each spawned hook then "exits", which lets the next start (the kill timers are left)
+    for (let i = 0; i < 600; i++) {
+      const t = timers.find(x => x.ms === 0 && !x.done);
+      if (t) { t.done = true; t.fn(); continue; }
+      const c = exitChildren ? spawned.find(x => !x.exited && x.handlers.exit) : null;
+      if (!c) break; c.exited = true; c.handlers.exit();
+    }
   };
-  return { spawned, timers, registered, run, advance: ms => { nowMs += ms; }, fire: (name, ev) => registered[name](ev, {}) };
+  return { spawned, timers, registered, run, nowRef: () => nowMs, advance: ms => { nowMs += ms; }, fire: (name, ev) => registered[name](ev, {}) };
 }
 const payloads = r => r.spawned.map(c => JSON.parse(c.stdin.data));
 
@@ -48,11 +53,12 @@ for (const gate of ['tool_call', 'tool_result', 'input', 'before_agent_start', '
 console.log('pi_extension: notification events only ok');
 
 // 3. every handler returns undefined, never a promise, and starts nothing in the handler (the spawn is scheduled): nothing on Pi's path
-for (const name of ext.EVENTS) {
+for (const name of ext.EVENTS.filter(n => n !== 'session_shutdown')) {
   const ret = r.registered[name]({ toolName: 'bash', toolCallId: 'c1', reason: 'startup', aborted: false, messages: [] }, {});
   assert.equal(ret, undefined, `${name} returns undefined`);
 }
-assert.equal(r.spawned.length, 0, 'a handler starts nothing itself: it schedules');
+assert.equal(r.spawned.length, 0, 'a handler starts nothing itself: it schedules (only session_shutdown flushes, the process is ending)');
+assert.equal(r.registered.session_shutdown({ reason: 'quit' }, {}), undefined, 'session_shutdown returns undefined too');
 // hostile events do not throw
 for (const name of ext.EVENTS) for (const ev of [undefined, null, 5, 'x', { messages: 'no' }, { messages: [null, 1, { role: 'assistant', usage: 'x' }] }, { toolName: {}, toolCallId: [] }]) assert.equal(r.registered[name](ev), undefined);
 console.log('pi_extension: returns undefined, schedules, never throws ok');
@@ -108,6 +114,25 @@ assert.equal(q.spawned.length, 2);
 q.fire('agent_start', {}); q.fire('agent_settled', {}); q.run();
 assert.equal(q.spawned.length, 4, 'state events always go');
 console.log('pi_extension: tool events rate limited ok');
+
+// 7b. one hook program at a time, in the order the events happened; the next starts when the last has ended, a hook that never ends is killed and the queue goes on
+const o = rig();
+o.fire('agent_start', {}); o.fire('agent_settled', { aborted: false }); o.fire('tool_execution_end', { toolName: 'ls' });
+o.run(false); // nothing has exited yet
+assert.equal(o.spawned.length, 1, 'one at a time: the second waits for the first');
+o.spawned[0].handlers.exit(); o.run(false);
+assert.equal(o.spawned.length, 2);
+o.timers.filter(x => x.ms === 3000)[1].fn(); // the second never ends: its kill timer ends it
+o.run(false);
+assert.ok(o.spawned[1].killed, 'killed');
+assert.equal(o.spawned.length, 3, 'and the queue goes on');
+assert.deepEqual(o.spawned.map(c => c.args[1]), ['agent_start', 'agent_settled', 'tool_execution_end'], 'in order');
+// shutdown: the process is ending with the extension, so what is still queued is started at once, in order
+const z = rig(); z.advance(5000);
+z.fire('agent_start', {}); z.fire('agent_settled', { aborted: false }); z.fire('session_shutdown', { reason: 'quit' });
+assert.equal(z.spawned.length, 3, 'at shutdown the whole queue is started without waiting');
+assert.deepEqual(z.spawned.map(c => c.args[1]), ['agent_start', 'agent_settled', 'session_shutdown']);
+console.log('pi_extension: one at a time, in order, a hung hook killed ok');
 
 // 8. the queue is bounded; the oldest goes
 const b = rig();

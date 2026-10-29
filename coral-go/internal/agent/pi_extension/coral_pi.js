@@ -36,18 +36,26 @@ function create(deps) {
     queue.push({ event, payload });
     if (!sending) { sending = true; setTimer(drain, 0); }
   }
+  // One hook program at a time, in the order the events happened: independent processes would race (a late "agent started" after "agent settled" would leave the agent Working). Nothing waits for it on Pi's path:
+  // the next one starts when the last has ended, and a hook that has not ended by CHILD_MS is killed and the queue goes on. When Pi is shutting down the process ends with its extension, so whatever is still queued
+  // is started at once (flush): the last events, a Stop and the session's end, must not be lost to the order.
+  function start(item, then) {
+    let finished = false;
+    const next = () => { if (!finished) { finished = true; if (then) then(); } };
+    try {
+      const child = spawn(config.hookBin, ['--pi', item.event], { detached: true, stdio: ['pipe', 'ignore', 'ignore'], env: childEnv(), windowsHide: true, shell: false });
+      child.on('error', next); child.on('exit', next);
+      if (child.stdin) { child.stdin.on('error', () => {}); child.stdin.end(JSON.stringify(item.payload)); }
+      const t = setTimer(() => { try { child.kill(); } catch (e) { /* gone already */ } next(); }, CHILD_MS); if (t && t.unref) t.unref();
+      child.unref();
+    } catch (e) { /* never into Pi */ next(); }
+  }
   function drain() {
     const item = queue.shift();
     if (!item) { sending = false; return; }
-    try {
-      const child = spawn(config.hookBin, ['--pi', item.event], { detached: true, stdio: ['pipe', 'ignore', 'ignore'], env: childEnv(), windowsHide: true, shell: false });
-      child.on('error', () => {});
-      if (child.stdin) { child.stdin.on('error', () => {}); child.stdin.end(JSON.stringify(item.payload)); }
-      const t = setTimer(() => { try { child.kill(); } catch (e) { /* gone already */ } }, CHILD_MS); if (t && t.unref) t.unref();
-      child.unref();
-    } catch (e) { /* never into Pi */ }
-    setTimer(drain, 0);
+    start(item, () => setTimer(drain, 0));
   }
+  function flush() { while (queue.length) start(queue.shift(), null); }
   const tool = (event, e, extra) => {
     const t = now(); if (t - lastTool < TOOL_EVERY_MS) return; lastTool = t;
     const toolName = name(e && e.toolName, 60); if (!toolName) return;
@@ -76,7 +84,7 @@ function create(deps) {
       usage.input = usage.output = usage.cost = usage.turns = 0; usage.model = undefined; usage.seen = false;
       send('agent_settled', p);
     },
-    session_shutdown: e => send('session_shutdown', { reason: name(e && e.reason, 20) }),
+    session_shutdown: e => { send('session_shutdown', { reason: name(e && e.reason, 20) }); flush(); },
   };
   return function register(pi) {
     if (!active) return;
