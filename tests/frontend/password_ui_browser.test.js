@@ -79,8 +79,11 @@ const BASE = require('./test_base').BASE;
             await ui.maybePromptSetPassword(); await waitFor(() => $('set-password-modal'), 'remote prompt');
             document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));   // Escape is Not now
             out.flagAfterRemoteNotNow = localStorage.getItem('coral-password-not-now');
-            await ui.maybePromptSetPassword(); await waitFor(() => $('set-password-modal'), 'remote asked again');
-            out.remoteAskedAgain = true;
+            await ui.maybePromptSetPassword(); await sleep(50);
+            out.remoteAskedAgain = !!$('set-password-modal'); // not again in this session (#10930: it came back on every page load); a new session asks again
+            sessionStorage.removeItem('coral-password-not-now');
+            await ui.maybePromptSetPassword(); await waitFor(() => $('set-password-modal'), 'remote asked in a new session');
+            out.remoteAskedNewSession = true;
             // 409: a password already exists -> closes quietly; 429 shows the server's words and stays open
             reply['/api/auth/password/set'] = { status: 409, body: { code: 'password_set', error: 'A password is already set' } };
             type('set-password-new', 'x'); type('set-password-confirm', 'x'); submit();
@@ -163,7 +166,7 @@ const BASE = require('./test_base').BASE;
         assert.match(out.mismatchErr, /do not match/); assert.equal(out.callsAfterMismatch, 0, 'nothing is sent for a mismatch');
         assert.deepEqual(out.setCall, { url: '/api/auth/password/set', body: { password: '  a b  ' } }, 'sent exactly as typed, spaces kept');
         assert.equal(out.flagAfterLocalNotNow, '1', 'Not now is final on this computer'); assert.equal(out.promptAfterLocalNotNow, false);
-        assert.equal(out.flagAfterRemoteNotNow, null, 'from another computer Not now is not remembered'); assert.ok(out.remoteAskedAgain);
+        assert.equal(out.flagAfterRemoteNotNow, null, 'from another computer Not now is not kept for good'); assert.equal(out.remoteAskedAgain, false, 'but it is kept for this session: the prompt does not come back on every page load (#10930)'); assert.ok(out.remoteAskedNewSession, 'and a new session asks again');
         assert.ok(out.closedOn409);
         assert.equal(out.err429, 'Too many attempts. Try again in 30 s.'); assert.ok(out.saveEnabledAfter429);
         assert.equal(out.promptWhen, undefined, 'no prompt when signed out or a password is set: ' + out.promptWhen);
