@@ -138,8 +138,8 @@ body.panel-dragging .agentic-state {
 .agentic-tab-word { display: none; white-space: nowrap; }
 .agentic-state-tabs[data-words] .agentic-tab-word { display: inline; }
 .agentic-state-tabs[data-words] { flex-wrap: nowrap; } /* with the words on the row never wraps: when they do not fit, dock_tabs.js takes them off (the row scrolls past its width for that one look); a tab that gets its count could otherwise wrap the row and the header would jump 35 px for the look it takes to measure (#9420) */
-.agentic-state-tabs[data-active-word] .agentic-tab.active .agentic-tab-word, .agentic-state-tabs .agentic-tab[data-probe] .agentic-tab-word { display: inline; } /* icons alone, but the open tab says its word when that fits (dock_tabs.js tries each tab as the open one, #9999) */
-.agentic-state-tabs[data-active-word] .agentic-tab.active, .agentic-state-tabs .agentic-tab[data-probe] { flex: 0 0 auto; gap: 4px; padding-inline: 8px; font-size: var(--fs-base); } /* the open tab is as wide as its word and the icons share what is left */
+.agentic-state-tabs[data-active-word] .agentic-tab.active[data-word-ok] .agentic-tab-word, .agentic-state-tabs .agentic-tab[data-probe] .agentic-tab-word { display: inline; } /* icons alone, but the open tab says its word when that fits (dock_tabs.js tries each tab as the open one, #9999) */
+.agentic-state-tabs[data-active-word] .agentic-tab.active[data-word-ok], .agentic-state-tabs .agentic-tab[data-probe] { flex: 0 0 auto; gap: 4px; padding-inline: 8px; font-size: var(--fs-base); } /* the open tab is as wide as its word and the icons share what is left */
 .agentic-tab.active .agentic-tab-word { color: var(--text-primary); } /* the accent on the light panel is 4.44:1 at 12 px, under AA: the icon and the underline carry the accent, the word is the page's text colour */
 .agentic-state-tabs[data-words] .agentic-tab { flex: 1 0 auto; /* a tab is never narrower than its word: the row wraps, the check sees it and drops the words */ padding-inline: 3px; gap: 3px; font-size: var(--fs-base); }
 .agentic-state-tabs[data-words] .agentic-tab .material-icons { font-size: var(--fs-xl); }
