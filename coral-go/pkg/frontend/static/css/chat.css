@@ -1547,7 +1547,7 @@ h3.cni-question { margin-bottom: 4px; } /* a heading with its text under it (#30
     .code-block .code-copy-btn { width: 44px; height: 44px; }
     .code-block .code-wrap-btn { height: 44px; min-width: 44px; right: 56px; } /* a 44 px target beside the 44 px Copy (6 px in, 6 px between), not 26 px high and 10 px over it (#10533, phone_targets_census_b at 200% text) */
     .chat-bubble .message-text .code-block, .chat-prose.chat-messages .chat-bubble .message-text .code-block { padding-top: 56px; } /* the buttons and the hint have a row of their own above the code (6 + 44 + 6): they covered a short block's code (#11026, Mobile Beta Tester) */
-    .code-block .code-scroll-hint { left: 2px; right: auto; top: 18px; }
+    .code-block .code-scroll-hint { left: 2px; right: auto; top: 6px; height: 44px; display: flex; align-items: center; max-width: 38%; line-height: 1.1; } /* it wraps in its 38% of the row, so at 200% text it ends before the Wrap button instead of running under it (#11034) */
 }
 
 /* An image pasted in the dashboard is an artifact (#5284): the button that removes its shared copy sits beside its thumbnail, and the notice that says Coral Hub viewers can see it. */
