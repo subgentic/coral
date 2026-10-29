@@ -128,7 +128,7 @@ async function run() {
         // generous timeout, not a swallowed one — a never-settling list is a bug to surface, not to race past).
         await waitStable(`[...document.querySelectorAll('#live-sessions-list .session-group-item, #mobile-session-list .session-group-item')].map(li => li.dataset.sessionId + ':' + li.getAttribute('data-state')).join()`, 'the fixture rows', 300, { timeout: 10000 });
     };
-    const ROWS = (listId) => `(() => Object.fromEntries(Array.from(document.querySelectorAll('#${listId} .session-group-item')).map(li => {
+    const ROWS = (listId) => `(() => { document.querySelectorAll('#${listId} .folder-more-row .row-btn[aria-expanded="false"]').forEach(b => b.click()); /* a folder shows its first 5 (#10319): open every fold so each agent has its row */ return Object.fromEntries(Array.from(document.querySelectorAll('#${listId} .session-group-item')).map(li => {
         const q = s => li.querySelector(s); const dot = q('.session-dot'); const dcs = dot ? getComputedStyle(dot) : null; const name = q('.session-label');
         const range = document.createRange(); range.selectNodeContents(name); const rects = range.getClientRects(); const nx = rects.length ? rects[0].left : null;
         const pills = Array.from(li.querySelectorAll('.session-state-pill')).map(p => ({ text: p.textContent.trim(), cls: p.className, transform: getComputedStyle(p).textTransform }));
@@ -136,7 +136,7 @@ async function run() {
         return [li.dataset.sessionId, { state: li.getAttribute('data-state'), aria: li.getAttribute('aria-label'), dotCls: dot ? dot.className : null, dotHidden: dcs ? dcs.visibility === 'hidden' : null, dotBg: dcs ? dcs.backgroundColor : null, dotAnim: dcs ? dcs.animationName : null, dotGlyph: dot ? getComputedStyle(dot, '::before').content : null, dotTitle: dot ? dot.getAttribute('title') : null, dotRing: dcs ? dcs.boxShadow : null, rowBg: getComputedStyle(li).backgroundColor,
             pills, ctxPill: q('.session-ctx-pill') ? q('.session-ctx-pill').textContent.trim() : null, attention: li.classList.contains('needs-attention'), isStuck: li.classList.contains('is-stuck'), done: li.classList.contains('session-done'),
             unread: chip ? { text: chip.textContent.trim(), title: chip.getAttribute('title'), shown: getComputedStyle(chip).display !== 'none' } : null, mobileChip: mchip ? mchip.textContent.trim() : null, banner: q('.session-mobile-banner') ? q('.session-mobile-banner').textContent.trim() : null,
-            nameX: nx, h: li.getBoundingClientRect().height, labelDecoration: getComputedStyle(name).textDecorationLine }]; })))()`;
+            nameX: nx, h: li.getBoundingClientRect().height, labelDecoration: getComputedStyle(name).textDecorationLine }]; })); })()`;
     const TOASTS = `document.querySelectorAll('.notification-toast').length`;
 
     const guard = await require('./helpers/settings_guard').guardSettings(); // the settings this suite changes are put back in its finally (#4849)
