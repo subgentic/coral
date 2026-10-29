@@ -159,3 +159,61 @@ func TestTurnEndHandoffWaitsForAPersonsSend(t *testing.T) {
 	ptymanager.NotePersonTextInBox(sid, false)
 	assert.Equal(t, true, ask()["handoff"], "nothing of a person's is pending: the hand-off goes")
 }
+
+// #10996 (a): the hand-off fires at most once per window per agent, so an agent that is flooded with board messages is not sent from turn to turn without a pause (a person's send could not land, #10992). A message that
+// @mentions the agent, or is from the Operator, hands off at once; everything else waits for the window, as the notifier's reminder does.
+func TestTurnEndHandoffIsOncePerWindowExceptAMentionOrTheOperator(t *testing.T) {
+	server, h, _, ss := setupSessionsTestServer(t)
+	ctx := context.Background()
+	sid := "eeeeeeee-0996-1a00-0000-000000000001"
+	name := "claude-" + sid
+	board := "team-0996a"
+	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: sid, AgentType: "claude", AgentName: "echo", WorkingDir: "/w", BoardName: &board}))
+	tok := agentToken(t, h, sid, name)
+	_, err := h.bs.Subscribe(ctx, board, "Orch", "Orchestrator", name, nil, "all") // an Orchestrator is told of every message; a worker only of its mentions
+	require.NoError(t, err)
+	_, err = h.bs.Subscribe(ctx, board, "Lead", "Lead", "", nil, "all")
+	require.NoError(t, err)
+	h.handoffs.setEvery(300 * time.Millisecond)
+	ask := func() bool {
+		req, _ := http.NewRequest("POST", server.URL+"/api/sessions/live/echo/turn-end", strings.NewReader(`{}`))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set(store.SessionTokenHeader, tok)
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		var out map[string]any
+		_ = json.NewDecoder(resp.Body).Decode(&out)
+		return out["handoff"] == true
+	}
+	read := func() { // what the agent's `coral-board read` does: its unread, mentions included, are read
+		_, err := h.bs.ReadMessages(ctx, board, "Orch", 100)
+		require.NoError(t, err)
+	}
+	post := func(who, text string) {
+		_, err := h.bs.PostMessage(ctx, board, who, text, nil)
+		require.NoError(t, err)
+	}
+
+	assert.False(t, ask(), "nothing unread: the turn ends")
+	post("Lead", "fyi the build is green")
+	assert.True(t, ask(), "the first hand-off goes at once")
+	post("Lead", "fyi the second build is green")
+	assert.False(t, ask(), "another plain message inside the window waits")
+	assert.False(t, ask(), "and still waits")
+
+	read()
+	post("Lead", "@Orch please look at #12 now")
+	assert.True(t, ask(), "a message that @mentions the agent hands off at once, inside the window")
+	read()
+
+	post("Lead", "fyi a third thing")
+	assert.False(t, ask(), "plain again: inside the window it waits")
+	post("Operator", "stop what you are doing")
+	assert.True(t, ask(), "the Operator's message hands off at once")
+	read()
+
+	post("Lead", "fyi a fourth thing")
+	time.Sleep(400 * time.Millisecond) // sleep-ok: the window is wall-clock time
+	assert.True(t, ask(), "past the window the held messages are handed over")
+}

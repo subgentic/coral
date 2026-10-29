@@ -95,6 +95,7 @@ type SessionsHandler struct {
 	subagents   *store.SubagentStore
 	gs          *store.GitStore
 	bs          *board.Store
+	handoffs    handoffLimiter // when each agent was last handed its board messages at its turn's end (#10996)
 	cfg         *config.Config
 	terminal    ptymanager.SessionTerminal
 	jsonl       *jsonl.SessionReader

@@ -138,6 +138,11 @@ func (s *Store) HasUnreadMention(ctx context.Context, project, subscriberID stri
 	return id > 0, err
 }
 
+// HasUnreadOperatorMessage reports whether the subscriber has an unread message from the Operator (#10996: the turn-end hand-off does not hold one back).
+func (s *Store) HasUnreadOperatorMessage(ctx context.Context, project, subscriberID string) (bool, error) {
+	return s.hasUnreadSenderMessage(ctx, project, subscriberID, OperatorName, false)
+}
+
 func (s *Store) HasUnreadNonHealthMessage(ctx context.Context, project, subscriberID string) (bool, error) {
 	return s.hasUnreadSenderMessage(ctx, project, subscriberID, "Coral Health Monitor", true)
 }

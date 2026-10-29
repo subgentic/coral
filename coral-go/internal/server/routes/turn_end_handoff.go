@@ -1,9 +1,12 @@
 package routes
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"net/http"
+	"sync"
+	"time"
 
 	at "github.com/subgentic/coral/internal/agenttypes"
 	"github.com/subgentic/coral/internal/ptymanager"
@@ -63,6 +66,14 @@ func (h *SessionsHandler) TurnEndHandoff(w http.ResponseWriter, r *http.Request)
 		writeJSON(w, http.StatusOK, none)
 		return
 	}
+	// At most one hand-off per window per agent, so an agent flooded with board messages is not sent from turn to turn without a pause (#10996 (a)): what waits is handed over when the window is over, or by the
+	// notifier's reminder. A message that @mentions the agent, or is from the Operator, goes at once; a check that fails counts as one (today's behaviour).
+	if !h.handoffs.due(owner.SessionID) && !h.handoffUrgent(ctx, owner.SessionName) {
+		slog.Info("turn-end hand-off held: one per window", "session", owner.SessionName, "unread", unread)
+		writeJSON(w, http.StatusOK, none)
+		return
+	}
+	h.handoffs.mark(owner.SessionID)
 	// A nudge typed during a turn is not an acknowledgement: Claude may end
 	// without acting on it (#8557). Unread messages still need a hand-off now,
 	// rather than waiting for the notifier's reminder window. An actual board
@@ -80,4 +91,52 @@ func (h *SessionsHandler) TurnEndHandoff(w http.ResponseWriter, r *http.Request)
 		"reason":  "New board messages",
 		"context": fmt.Sprintf("Coral board: %d new message%s on %s. Run coral-board read to read them, then carry on.", unread, plural, board),
 	})
+}
+
+// TurnEndHandoffEvery is the least time between two hand-offs to one agent (#10996 (a)): an agent flooded with board messages (cross-board copies that `coral-board read` does not clear) was sent from turn to turn
+// with no pause, and a person's send could not land in it (#10992). A message that @mentions the agent, or is from the Operator, is not held by it.
+const TurnEndHandoffEvery = 60 * time.Second
+
+// handoffLimiter remembers when each agent was last handed over. Its zero value is ready.
+type handoffLimiter struct {
+	mu    sync.Mutex
+	last  map[string]time.Time
+	every time.Duration // a test's own window; zero: TurnEndHandoffEvery
+}
+
+func (l *handoffLimiter) setEvery(d time.Duration) { l.mu.Lock(); l.every = d; l.mu.Unlock() }
+
+// due reports whether the agent may be handed over now: it never was, or the window since the last one is over.
+func (l *handoffLimiter) due(sessionID string) bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	every := l.every
+	if every == 0 {
+		every = TurnEndHandoffEvery
+	}
+	at, ok := l.last[sessionID]
+	return !ok || time.Since(at) >= every
+}
+
+// mark records a hand-off to the agent now.
+func (l *handoffLimiter) mark(sessionID string) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.last == nil {
+		l.last = map[string]time.Time{}
+	}
+	l.last[sessionID] = time.Now()
+}
+
+// handoffUrgent reports whether the agent's unread messages include one that @mentions it or is from the Operator.
+func (h *SessionsHandler) handoffUrgent(ctx context.Context, sessionName string) bool {
+	sub, err := h.bs.GetSubscriptionBySessionName(ctx, sessionName)
+	if err != nil || sub == nil {
+		return true
+	}
+	if mention, err := h.bs.HasUnreadMention(ctx, sub.Project, sub.SubscriberID); err != nil || mention {
+		return true
+	}
+	op, err := h.bs.HasUnreadOperatorMessage(ctx, sub.Project, sub.SubscriberID)
+	return err != nil || op
 }
