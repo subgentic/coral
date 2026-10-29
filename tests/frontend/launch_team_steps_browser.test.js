@@ -175,7 +175,7 @@ const BASE = require('./test_base').BASE;
         await ev(`{ const n = document.getElementById('team-board-name'); n.value = 'p'; n.dispatchEvent(new Event('input', { bubbles: true })); const d = document.getElementById('launch-team-dir'); d.value = '/x'; d.dispatchEvent(new Event('input', { bubbles: true })); } true`);
         await click('#launch-team-next'); assert.equal(await step(), 'members');
         await pick('Coding Team');
-        const phone = await ev(`(() => { const o = document.querySelector('#team-agents-list .team-agent-open').getBoundingClientRect(), m = document.querySelector('#team-agents-list .team-agent-menu-btn').getBoundingClientRect(); return [o.height >= 43.5, m.height >= 43.5 && m.width >= 43.5, document.documentElement.scrollWidth <= innerWidth]; })()`);
+        const phone = await ev(`(() => { const o = document.querySelector('#team-agents-list .team-agent-open').getBoundingClientRect(), m = document.querySelector('#team-agents-list .team-agent-edit-btn').getBoundingClientRect(); return [o.height >= 43.5, m.height >= 43.5 && m.width >= 43.5, document.documentElement.scrollWidth <= innerWidth]; })()`);
         assert.deepEqual(phone, [true, true, true]);
         await Emulation.clearDeviceMetricsOverride();
         console.log('launch_team_steps: ok');

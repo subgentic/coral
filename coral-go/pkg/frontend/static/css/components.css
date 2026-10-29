@@ -3957,7 +3957,7 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 .team-template-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; margin: 0 0 14px; } /* wraps: the Describe your team button beside the template list left the list 26 px wide at 200% text on a phone (#10524) */
 .team-template-pick { flex: 1 1 12rem; min-width: min(12rem, 100%); }
 .team-template-pick select { width: 100%; }
-.team-more-wrap, .team-agent-more { position: relative; flex: none; }
+.team-more-wrap { position: relative; flex: none; }
 .team-allworkers { margin: 0 0 14px; }
 .team-allworkers[hidden] { display: none; }
 .team-allworkers select { min-width: 0; max-width: 100%; width: min(12em, 100%); }
@@ -3978,13 +3978,13 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 .team-agent-row.drag-over { background: var(--bg-hover); }
 .team-agent-open { flex: 1; min-width: 0; display: grid; grid-template-columns: minmax(0, 16rem) minmax(0, 1fr) auto; align-items: center; gap: 12px; min-height: 44px; padding: 8px 6px; background: none; border: 0; border-radius: var(--radius-md); color: inherit; font: inherit; text-align: left; cursor: pointer; }
 .team-agent-open:hover { background: var(--bg-hover); }
-.team-agent-open:focus-visible, .team-agent-menu-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.team-agent-row > .btn { flex: none; margin: 0 6px 0 0; } /* the one Edit button at a member row's end (#10836) */
+.team-agent-edit-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .team-agent-role-name { font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--text-primary); overflow-wrap: anywhere; }
 .team-agent-badge { margin-left: 8px; border: 1px solid var(--accent); color: var(--link-text); white-space: nowrap; }
 .team-agent-badge[hidden] { display: none; }
 .team-agent-summary { color: var(--text-secondary); font-size: var(--fs-sm); overflow-wrap: anywhere; }
 .team-agent-summary b { color: var(--text-primary); font-weight: var(--fw-strong); }
-.team-agent-chev { color: var(--text-secondary); font-size: var(--fs-2xl); }
 .team-menu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 6; min-width: min(12rem, calc(100vw - 3rem)); max-width: calc(100vw - 3rem); } /* where it sits and how wide: what it looks like is the one menu's (.menu, layout.css) */
 .team-menu.team-menu-up { top: auto; bottom: calc(100% + 4px); }
 .team-menu-item { overflow-wrap: anywhere; white-space: normal; } /* at 200% text an item wraps inside the menu, the menu never wider than the screen: the dialog's scroll box clipped its left edge (#8678) */

@@ -165,6 +165,7 @@
                     <button class="btn btn-primary" id="launch-agent-next" data-on-click="m-agent-step" data-arg="next">Next</button>
                     <button class="btn btn-primary" id="launch-agent-go" data-on-click="m-launch-session">Launch</button>
                     <button class="btn btn-primary" id="launch-agent-save" data-on-click="m-save-team-member" hidden>Save member</button>
+                    <button class="btn btn-quiet btn-danger" id="launch-agent-remove" data-on-click="team-agent-remove" hidden>Remove from team</button>
                     <p id="launch-stage-live" class="sr-only" role="status"></p>
                 </div>
             </div>
@@ -270,6 +271,7 @@
                             </select>
                         </div>
                         <p class="team-agents-count" id="team-agents-count" aria-live="polite"></p>
+                        <p class="sr-only" id="team-agents-live" role="status"></p>
                         <div class="team-agents-container">
                             <div id="team-agents-list" class="team-agents-list" role="list" aria-label="Team members"></div>
                             <p class="empty-state empty-state-tight">No members yet. Pick a template above, or add members one by one.</p>

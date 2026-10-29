@@ -65,13 +65,16 @@ const BASE = require('./test_base').BASE;
         assert.deepEqual(await hint(), ['', false]);
         await ev(`window._addTeamAgent('Zed', 'Does the zed work.'); true`);
         let rows = await teamRows(); assert.equal(rows[rows.length - 1], 'Zed');
-        const moves = () => ev(`[...document.querySelectorAll('#team-agents-list .team-agent-row')].map(r => [r.querySelector('[data-dir=up]').disabled, r.querySelector('[data-dir=down]').disabled].join(''))`);
-        const m = await moves(); assert.equal(m[0][0], 't', 'the first cannot move up'); assert.equal(m[m.length - 1].endsWith('true'), true, 'the last cannot move down');
-        await ev(`document.querySelector('#team-agents-list .team-agent-row:last-child [data-dir=up]').click(); true`);
+        const altKey = (sel, key) => ev(`document.querySelector(${JSON.stringify(sel)}).dispatchEvent(new KeyboardEvent('keydown', { key: '${key}', altKey: true, bubbles: true, cancelable: true })); true`); // Alt+Arrow on a row: the Move buttons went (#10836)
+        const before = await teamRows();
+        await altKey('#team-agents-list .team-agent-row:first-child', 'ArrowUp'); assert.deepEqual(await teamRows(), before, 'the first cannot move up');
+        await altKey('#team-agents-list .team-agent-row:last-child', 'ArrowDown'); assert.deepEqual(await teamRows(), before, 'the last cannot move down');
+        await altKey('#team-agents-list .team-agent-row:last-child', 'ArrowUp');
         const moved = await teamRows(); assert.equal(moved[moved.length - 2], 'Zed', 'Zed moved up: ' + JSON.stringify(moved));
-        await ev(`document.querySelector('#team-agents-list .team-agent-row:nth-last-child(2) [data-dir=down]').click(); true`);
+        await altKey('#team-agents-list .team-agent-row:nth-last-child(2)', 'ArrowDown');
         assert.equal((await teamRows()).pop(), 'Zed', 'and down again');
-        await ev(`[...document.querySelectorAll('#team-agents-list .team-agent-row')].find(r => r.querySelector('.team-agent-role-name').textContent === 'Zed').querySelector('.team-agent-remove').click(); true`);
+        await ev(`import((window.__coralStatic || '/static/') + 'team_dialogs.js').then(m => m._removeTeamAgent([...document.querySelectorAll('#team-agents-list .team-agent-row')].find(r => r.querySelector('.team-agent-role-name').textContent === 'Zed'))); true`); // Remove is in the Edit member dialog (#10836)
+        await waitFor(`![...document.querySelectorAll('#team-agents-list .team-agent-role-name')].some(e => e.textContent === 'Zed')`, 'removed', 3000);
         assert.equal((await teamRows()).includes('Zed'), false, 'removed');
 
         console.log('The git check shows the worktree option for a repository only');

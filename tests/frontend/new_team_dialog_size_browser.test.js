@@ -1,5 +1,5 @@
 // The New team dialog never moves or resizes (#7407; UI/UX's final v4 doc ad146b3a, section 2 and the shared rules): one size for every step, every step-3 tab, with and without a template, with the worktree option on,
-// with the remote address open, with the More menu or a member's actions menu open, and the Edit member dialog (and each of its tabs) is the same size and place. Desktop: 960 px wide and the smaller of 720 px and the
+// with the remote address open, with the More menu open, and the Edit member dialog (and each of its tabs) is the same size and place. Desktop: 960 px wide and the smaller of 720 px and the
 // screen minus 32 high; phone: a full-height sheet. Measured at 1280x800, 390x844 and 390x844 at 200% text. Written failing-first by QA (#7415); controls by role and name (helpers/new_team.js). Isolated dev server.
 const assert = require('node:assert/strict');
 const { execFileSync } = require('./helpers/child_process.js');
@@ -51,15 +51,13 @@ const VIEWS = [['1280x800', 1280, 800, false, false], ['390x844', 390, 844, true
                 await ev(`window.__nt.find(window.__nt.dlg(${N.team}), 'input', /worktree/i).click(); true`); await settle(300); same(r1, await t.rect(), 'the worktree ticked with its base branch');
                 await ev(`window.hideLaunchModal(); T.state.servers = []; T.state.hub = false; T.state.cloud = false; true`);
             });
-            await S.run(`${label}: the More menu and a member's actions menu open without resizing the dialog, and the Edit member dialog (every tab) is the same rectangle as New team`, async () => {
+            await S.run(`${label}: the More menu opens without resizing the dialog, and the Edit member dialog (every tab) is the same rectangle as New team`, async () => {
                 await openNewTeam(ev, waitFor); await settle(300); const r0 = await t.rect();
                 await t.to(2, { template: /Coding|\(\d+ members\)/ }); await settle(400); same(r0, await t.rect(), 'step 2 with a template');
                 await t.click('button', /^More/i); await settle(250); same(r0, await t.rect(), 'More menu open');
                 await ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); true`); await settle(200);
                 const role = (await ev(`window.__nt.roles(window.__nt.dlg(${N.team}))`))[1];
-                await ev(`(() => { const b = [...window.__nt.dlg(${N.team}).querySelectorAll('button')].find(x => window.__na.name(x) === 'Actions for ' + ${JSON.stringify(role)}); b.click(); return true; })()`); await settle(250); same(r0, await t.rect(), 'an actions menu open');
-                await ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); true`); await settle(200);
-                await ev(`(() => { const b = window.__nt.rows(window.__nt.dlg(${N.team})).find(x => window.__na.name(x).startsWith('Edit ' + ${JSON.stringify(role)} + ': ')); b.click(); return true; })()`);
+                await ev(`(() => { const b = window.__nt.rows(window.__nt.dlg(${N.team})).find(x => window.__na.name(x) === 'Edit ' + ${JSON.stringify(role)}); b.click(); return true; })()`);
                 await waitFor(`!!window.__nt.dlg(${N.member})`, 'Edit member opens', 5000); await settle(300);
                 const m0 = await ev(`window.__na.box(window.__nt.panel(window.__nt.dlg(${N.member})))`); same(r0, m0, 'Edit member vs New team');
                 const mem = M(ev, waitFor);

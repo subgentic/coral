@@ -1,6 +1,6 @@
 // New team is three steps (the team launch redesign, #7407; UI/UX's final v4 doc ad146b3a, mockup 25717f66), written failing-first by QA (#7415): 1 Name and where it launches (Team name and Folder required in words and
 // aria-required, Recent: chips, Machine only with several machines with "Another computer's address..." as its last entry revealing the address, the git worktree with its base branch only for a git folder), 2 Members
-// (Start from a template with its More menu, quiet read-only member rows named "Edit <role>: <provider>, <model>", "Gets the first task" on the first, an actions menu per row, Add member, Undo after Remove), 3 Start and
+// (Start from a template with its More menu, quiet read-only member rows named "Edit <role>", "Gets the first task" on the first, one Edit button per row, Add member, Undo after Remove), 3 Start and
 // team settings (a tablist Start, Workflow, Health check, Messaging; recap; Launch team). Cancel leftmost and the primary rightmost; Next says why it is off. Controls by role and name (helpers/new_team.js). 1280 px.
 const assert = require('node:assert/strict');
 const { execFileSync } = require('./helpers/child_process.js');
@@ -104,33 +104,28 @@ const BASE = require('./test_base').BASE;
             for (const want of [/Import a template/i, /Import from a folder/i, /Save this team as a template/i]) assert.ok(items.some(x => want.test(x)), `${want} in ${JSON.stringify(items)}`);
             await ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); true`); await settle(150);
         });
-        await S.run('step 2: a template fills the members as quiet read-only rows named "Edit <role>: <provider>, <model>", "Gets the first task" on the first only', async () => {
+        await S.run('step 2: a template fills the members as quiet read-only rows named "Edit <role>", "Gets the first task" on the first only', async () => {
             assert.ok(await t.pick(N.template, /Coding|\(\d+ members\)/), 'a template to choose');
             await waitFor(`window.__nt.rows(window.__nt.dlg(${N.team})).length >= 2`, 'the template fills the members', 5000);
-            const rows = await ev(`window.__nt.rows(window.__nt.dlg(${N.team})).map(b => ({ name: window.__na.name(b), text: window.__na.text(b), inputs: b.querySelectorAll('input, select, textarea').length }))`);
-            for (const r of rows) { assert.match(r.name, /^Edit .+: .+, .+/, `row name: ${r.name}`); assert.equal(r.inputs, 0, `${r.name}: nothing to type or choose in a row`); }
+            const rows = await ev(`window.__nt.rows(window.__nt.dlg(${N.team})).map(b => ({ name: window.__na.name(b), text: window.__na.text(b.closest('.team-agent-row')), inputs: [...b.closest('.team-agent-row').querySelectorAll('input, select, textarea')].filter(window.__na.vis).length }))`);
+            for (const r of rows) { assert.match(r.name, /^Edit .+$/, `row name: ${r.name}`); assert.equal(r.inputs, 0, `${r.name}: nothing to type or choose in a row`); }
             assert.equal(rows.filter(r => /Gets the first task/.test(r.text)).length, 1, 'exactly one row says "Gets the first task"');
             assert.match(rows[0].text, /Gets the first task/, 'and it is the first');
-            assert.match(rows[0].name, /^Edit Orchestrator: /, 'the template\'s first member is the Orchestrator');
+            assert.match(rows[0].name, /^Edit Orchestrator$/, 'the template\'s first member is the Orchestrator');
         });
-        await S.run('step 2: each row has an "Actions for <role>" menu button (aria-haspopup, aria-expanded) with Edit member, Move up, Move down, Remove; the first has no Move up, and the Orchestrator has no Remove', async () => {
+        await S.run('step 2: each row has one Edit button (no menu, no Move buttons); Edit member holds Remove from team, and the Orchestrator has none (#10836)', async () => {
             const roles = await ev(`window.__nt.roles(window.__nt.dlg(${N.team}))`);
-            const open = async (role) => { await ev(`(() => { const d = window.__nt.dlg(${N.team}); const b = [...d.querySelectorAll('button')].find(x => window.__na.name(x) === ${JSON.stringify('Actions for ' + '')} + ${JSON.stringify(role)}); if (!b) return false; b.click(); return true; })()`); await settle(150); return names('[role=menuitem]'); };
-            const btn = await ev(`(() => { const d = window.__nt.dlg(${N.team}); const b = [...d.querySelectorAll('button')].find(x => window.__na.name(x) === 'Actions for ' + ${JSON.stringify(roles[0])}); return b ? { popup: b.getAttribute('aria-haspopup'), expanded: b.getAttribute('aria-expanded') } : null; })()`);
-            assert.ok(btn, 'an Actions for <role> button on the first row'); assert.ok(btn.popup, 'aria-haspopup'); assert.equal(btn.expanded, 'false');
-            let items = await open(roles[0]);
-            assert.ok(items.includes('Edit member') && items.includes('Move down'), `first row menu: ${JSON.stringify(items)}`);
-            assert.ok(!items.includes('Move up'), 'the first member cannot move up'); assert.ok(!items.includes('Remove'), 'the Orchestrator cannot be removed');
-            await ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); true`); await settle(150);
-            items = await open(roles[roles.length - 1]);
-            for (const w of ['Edit member', 'Move up', 'Remove']) assert.ok(items.includes(w), `${w} in ${JSON.stringify(items)}`);
-            await ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); true`); await settle(150);
+            const info = await ev(`window.__nt.rows(window.__nt.dlg(${N.team})).map(b => ({ n: [...b.closest('.team-agent-row').querySelectorAll('button')].filter(window.__na.vis).length, popup: b.getAttribute('aria-haspopup') }))`);
+            assert.ok(info.every(i => i.n === 1 && !i.popup), `one button each: ${JSON.stringify(info)}`);
+            const removeShown = async role => { await ev(`window.__nt.rows(window.__nt.dlg(${N.team})).find(b => window.__na.name(b) === 'Edit ' + ${JSON.stringify(role)}).click(); true`); await settle(400); const shown = await ev(`document.getElementById('launch-agent-remove').getClientRects().length > 0`); await ev(`document.getElementById('launch-agent-cancel').click(); true`); await settle(300); return shown; };
+            assert.equal(await removeShown(roles[0]), false, 'the Orchestrator cannot be removed');
+            assert.equal(await removeShown(roles[roles.length - 1]), true, 'the last member has Remove from team in Edit member');
         });
         await S.run('step 2: Remove takes a member away and an Undo line brings it back (said in the polite status)', async () => {
             const before = await ev(`window.__nt.roles(window.__nt.dlg(${N.team}))`);
             const last = before[before.length - 1];
-            await ev(`(() => { const d = window.__nt.dlg(${N.team}); [...d.querySelectorAll('button')].find(x => window.__na.name(x) === 'Actions for ' + ${JSON.stringify(last)}).click(); return true; })()`); await settle(150);
-            await ev(`[...window.__nt.dlg(${N.team}).querySelectorAll('[role=menuitem]')].find(x => window.__na.name(x) === 'Remove').click(); true`); await settle(250);
+            await ev(`window.__nt.rows(window.__nt.dlg(${N.team})).find(b => window.__na.name(b) === 'Edit ' + ${JSON.stringify(last)}).click(); true`); await settle(400);
+            await ev(`document.getElementById('launch-agent-remove').click(); true`); await settle(300);
             assert.equal((await ev(`window.__nt.roles(window.__nt.dlg(${N.team}))`)).length, before.length - 1, 'one member fewer');
             assert.ok(await t.has('button', /^Undo/i), 'an Undo button');
             assert.match(await ev(`[...window.__nt.dlg(${N.team}).querySelectorAll('[aria-live=polite],[role=status]')].map(e => window.__na.text(e)).join(' | ')`), new RegExp('Removed|Undo', 'i'), 'the polite status says it');

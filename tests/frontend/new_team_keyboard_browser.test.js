@@ -1,5 +1,5 @@
 // New team and Edit member by keyboard and screen reader (#7407; UI/UX's final v4 doc ad146b3a, section 4), written failing-first by QA (#7415): both dialogs are modal and named, Enter in the name or folder is Next
-// (and does nothing while one is missing), each step is said once in a polite status, step 3's tabs and Edit member's tabs are real tabs (one tab stop, arrows, Home and End), a member row is one button named with its role,
+// (and does nothing while one is missing), each step is said once in a polite status, step 3's tabs and Edit member's tabs are real tabs (one tab stop, arrows, Home and End), a member row is one button named Edit <role> (#10836: no actions menu),
 // provider and model, the actions button has aria-haspopup and aria-expanded and its menu is a menu (arrows move, Escape closes and the focus goes back to the button), Escape in Edit member closes it and returns the
 // focus to the row that opened it, Tab stays inside the top dialog, Mode is a radiogroup with arrow keys, every control of every step and tab has an accessible name. 1280 px, isolated dev server.
 const assert = require('node:assert/strict');
@@ -16,7 +16,7 @@ const BASE = require('./test_base').BASE;
     const key = async (k, mods = 0) => { const [vk, text] = KEYS[k]; for (const type of ['keyDown', 'keyUp']) await Input.dispatchKeyEvent({ type, key: k, code: k === ' ' ? 'Space' : k, windowsVirtualKeyCode: vk, modifiers: mods, ...(type === 'keyDown' && text ? { text } : {}) }); await settle(120); };
     const insideTop = () => ev(`(() => { const a = document.activeElement; const m = window.__nt.dlg(${N.member}); const d = m || window.__nt.dlg(${N.team}); return { inside: !!(d && a && d.contains(a)), name: a ? (window.__na.name(a) || a.tagName) : '' }; })()`);
     const unnamed = within => ev(`(() => { const d = window.__nt.dlg(${within}); return [...d.querySelectorAll('button, input, select, textarea, [role=radio], [role=tab], [role=menuitem], summary')].filter(window.__na.vis).filter(e => e.type !== 'hidden' && !window.__na.name(e)).map(e => e.tagName.toLowerCase() + (e.className ? '.' + String(e.className).split(' ')[0] : '')); })()`);
-    const focusRow = role => ev(`(() => { const b = window.__nt.rows(window.__nt.dlg(${N.team})).find(x => window.__na.name(x).startsWith('Edit ' + ${JSON.stringify(role)} + ': ')); b.focus(); return document.activeElement === b; })()`);
+    const focusRow = role => ev(`(() => { const b = window.__nt.rows(window.__nt.dlg(${N.team})).find(x => window.__na.name(x) === 'Edit ' + ${JSON.stringify(role)}); b.focus(); return document.activeElement === b; })()`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
@@ -59,16 +59,14 @@ const BASE = require('./test_base').BASE;
             for (const n of N.tabs) { await ev(`[...window.__nt.dlg(${N.team}).querySelectorAll('[role=tab]')].find(x => window.__na.name(x) === ${JSON.stringify(n)}).click(); true`); await settle(250); assert.deepEqual(await unnamed(N.team), [], `step 3, ${n}: unnamed controls`); }
             await t.click('button', N.back); await t.step(2); assert.deepEqual(await unnamed(N.team), [], 'step 2: unnamed controls');
         });
-        await S.run('a member row is one button named "Edit <role>: <provider>, <model>"; its Actions button has aria-haspopup and toggles aria-expanded; the menu is a menu', async () => {
+        await S.run('a member row is one button named "Edit <role>", described by its provider and model, with no menu; Alt+ArrowDown moves it and says so; Escape in Edit member returns the focus to it (#10836)', async () => {
             const role = (await ev(`window.__nt.roles(window.__nt.dlg(${N.team}))`))[1];
-            const st = () => ev(`(() => { const b = [...window.__nt.dlg(${N.team}).querySelectorAll('button')].find(x => window.__na.name(x) === 'Actions for ' + ${JSON.stringify(role)}); return b ? { popup: b.getAttribute('aria-haspopup'), exp: b.getAttribute('aria-expanded'), menu: [...window.__nt.dlg(${N.team}).querySelectorAll('[role=menu]')].some(window.__na.vis) } : null; })()`);
-            let s = await st(); assert.ok(s, 'an Actions for <role> button'); assert.ok(s.popup); assert.equal(s.exp, 'false');
-            await ev(`[...window.__nt.dlg(${N.team}).querySelectorAll('button')].find(x => window.__na.name(x) === 'Actions for ' + ${JSON.stringify(role)}).focus(); true`); await key('Enter'); await settle(200);
-            s = await st(); assert.equal(s.exp, 'true'); assert.ok(s.menu, 'a role=menu'); assert.ok((await insideTop()).inside);
-            assert.match((await insideTop()).name, /Edit member|Move|Remove|Actions/, 'focus moved into the menu or stayed on its button');
-            await key('ArrowDown'); const first = (await insideTop()).name; await key('ArrowDown'); const second = (await insideTop()).name; assert.notEqual(first, second, 'ArrowDown moves between the menu items');
-            await key('Escape'); await settle(200); s = await st(); assert.equal(s.exp, 'false', 'Escape closes the menu'); assert.ok(!s.menu);
-            assert.equal((await insideTop()).name, 'Actions for ' + role, 'focus returns to the Actions button'); assert.ok(await ev(`!!window.__nt.dlg(${N.team})`), 'the New team dialog stays open');
+            const st = () => ev(`(() => { const d = window.__nt.dlg(${N.team}); const b = window.__nt.rows(d).find(x => window.__na.name(x) === 'Edit ' + ${JSON.stringify(role)}); const r = b.closest('.team-agent-row'); return b ? { popup: b.getAttribute('aria-haspopup'), desc: (document.getElementById(b.getAttribute('aria-describedby')) || {}).textContent || '', buttons: [...r.querySelectorAll('button')].filter(window.__na.vis).length, menus: [...d.querySelectorAll('[role=menu]')].some(window.__na.vis) } : null; })()`);
+            const s = await st(); assert.ok(s, 'an Edit <role> button'); assert.equal(s.popup, null, 'no menu on it'); assert.equal(s.buttons, 1, 'the row has one button'); assert.ok(!s.menus, 'no role=menu'); assert.match(s.desc, /.+ · .+/, 'described by its provider and model: ' + s.desc);
+            assert.ok(await focusRow(role), 'the row takes focus');
+            await ev(`document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', altKey: true, bubbles: true, cancelable: true })); true`); await settle(200);
+            assert.equal((await insideTop()).name, 'Edit ' + role, 'the focus stays on the moved row\'s button');
+            assert.match(await ev(`document.getElementById('team-agents-live').textContent`), new RegExp('^Moved ' + role + ' to \\d+ of \\d+$'), 'said politely');
         });
         await S.run('Enter on a member row opens Edit member (modal, named); Escape closes it and the focus returns to that row; the dialog behind stays', async () => {
             const role = (await ev(`window.__nt.roles(window.__nt.dlg(${N.team}))`))[1];
@@ -78,7 +76,7 @@ const BASE = require('./test_base').BASE;
             assert.ok((await insideTop()).inside, 'focus is inside Edit member');
             await key('Escape'); await waitFor(`!window.__nt.dlg(${N.member})`, 'Escape closes Edit member', 4000); await settle(200);
             assert.ok(await ev(`!!window.__nt.dlg(${N.team})`), 'New team is still open');
-            assert.match((await insideTop()).name, new RegExp('^Edit ' + role.replace(/[^\w]/g, '.') + ': '), 'focus is back on the row that opened it');
+            assert.match((await insideTop()).name, new RegExp('^Edit ' + role.replace(/[^\w]/g, '.') + '$'), 'focus is back on the row that opened it');
         });
         await S.run('Edit member: the tabs Agent, Permissions, Advanced of the settings are real tabs with the arrow keys, the persona page before them is named; every control of each tab is named; Mode is a radiogroup with arrow keys; Tab stays inside it', async () => {
             const role = (await ev(`window.__nt.roles(window.__nt.dlg(${N.team}))`))[1];

@@ -53,7 +53,7 @@ const BASE = require('./test_base').BASE;
         assert.ok(next.members === 'none' && !/Orchestrator/.test(next.recap), 'Next goes on from the sample: ' + JSON.stringify(next));
         await ev(`document.getElementById('launch-team-back') ? document.getElementById('launch-team-back').click() : null; true`); await settle(400);
         // until something is edited
-        await ev(`document.querySelector('#team-agents-list [data-on-click="team-agent-remove"], #team-agents-list .team-agent-remove') ? document.querySelector('#team-agents-list [data-on-click="team-agent-remove"], #team-agents-list .team-agent-remove').click() : document.querySelector('#team-panel-members button[data-on-click="m-add-team-agent"], #team-panel-members #team-add-member').click(); true`);
+        await ev(`document.querySelector('#team-agents-list .team-agent-edit-btn, #team-panel-members #team-add-member').click(); true`); // editing a member (its Edit button; Remove is in that dialog now, #10836) is an edit
         await settle(300);
         assert.equal(await ev(`(() => { const n = document.getElementById('team-drafted-note'); return !n || n.hidden || !n.checkVisibility({ checkVisibilityCSS: true }); })()`), true, 'the note goes once the draft is edited');
         console.log('PASS Describe your team goes straight to the draft');

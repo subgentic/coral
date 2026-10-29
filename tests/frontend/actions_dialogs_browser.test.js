@@ -93,12 +93,12 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
             list.innerHTML = ''; window._addTeamAgent('Alpha'); window._addTeamAgent('Beta');
             const names = () => [...list.querySelectorAll('.team-agent-row')].map(r => r.querySelector('.team-agent-name, [class*="name"]')?.textContent.trim() || r.dataset.name || r.textContent.trim().slice(0, 12));
             const before = names();
-            list.querySelector('.team-agent-row [data-on-click="team-agent-move"][data-dir="down"]').click();
+            list.querySelector('.team-agent-row').dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', altKey: true, bubbles: true, cancelable: true })); // Alt+ArrowDown (the Move buttons went, #10836)
             const moved = names();
             const opened = []; const keepOpen = window.showTeamAgentModal; window.showTeamAgentModal = r => opened.push(!!r && r.classList.contains('team-agent-row'));
             list.querySelector('[data-on-click="team-agent-edit"]').click();
             window.showTeamAgentModal = keepOpen;
-            list.querySelector('[data-on-click="team-agent-remove"]').click();
+            (await import((window.__coralStatic || '/static/') + 'team_dialogs.js'))._removeTeamAgent(list.querySelector('.team-agent-row')); // Remove is in the Edit member dialog now (#10836)
             const left = list.querySelectorAll('.team-agent-row').length;
             const inline = [...document.querySelectorAll('#team-agents-list *')].flatMap(el => [...el.attributes].filter(a => /^on/i.test(a.name)).map(a => el.className + ' ' + a.name));
             list.innerHTML = '';

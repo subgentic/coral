@@ -1,13 +1,13 @@
 // What the New team dialog and its Edit member dialog (the team launch redesign, #7407; UI/UX's final v4 doc ad146b3a and mockup 25717f66) are looked up by in the new_team_* suites: role and accessible name, never an id or
 // a class. Builds on helpers/new_agent.js (its __na has the name, text, vis and box functions); install(ev) adds window.__nt: dlg(rx) is the visible role=dialog whose name matches, find(dlg, selector, rx) the visible
-// control in it, rows(dlg) the member rows (the buttons named "Edit <role>: <provider>, <model>"), roles(dlg) their role names in order.
+// control in it, rows(dlg) the member rows (the one button of each, named "Edit <role>" and described by "<provider>, <model>"), roles(dlg) their role names in order.
 const na = require('./new_agent');
 const SOURCE = `(() => {
     const A = window.__na;
     const dlg = rx => [...document.querySelectorAll('[role=dialog]')].filter(A.vis).find(d => rx.test(A.name(d))) || null;
     const find = (d, sel, rx) => d ? [...d.querySelectorAll(sel)].filter(A.vis).find(e => rx.test(A.name(e))) || null : null;
-    const rows = d => d ? [...d.querySelectorAll('button')].filter(A.vis).filter(b => /^Edit .+: /.test(A.name(b)) && !/^Edit member/.test(A.name(b))) : [];
-    const roles = d => rows(d).map(b => A.name(b).replace(/^Edit /, '').replace(/: .*$/, ''));
+    const rows = d => d ? [...d.querySelectorAll('.team-agent-row .team-agent-edit-btn')].filter(A.vis) : []; // a row's one button, "Edit <role>" (its provider and model are its description, #10836)
+    const roles = d => rows(d).map(b => A.name(b).replace(/^Edit /, ''));
     const panel = d => { if (!d) return null; const r = d.getBoundingClientRect(); const full = r.width >= innerWidth - 1 && r.height >= innerHeight - 1; const c = full ? [...d.children].find(e => A.vis(e) && e.getBoundingClientRect().width > 100) : null; return c || d; };
     const buttons = d => d ? [...d.querySelectorAll('button')].filter(A.vis).map(b => ({ name: A.name(b), ...A.box(b), disabled: b.disabled, ariaDisabled: b.getAttribute('aria-disabled') })) : [];
     const tablist = d => d ? [...d.querySelectorAll('[role=tablist]')].filter(A.vis)[0] || null : null; // the visible one: the Launch dialog holds New agent's step 3 tablist too, hidden

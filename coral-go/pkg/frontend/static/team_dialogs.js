@@ -79,8 +79,7 @@ function _updateTeamAgentSummary(row) {
     const roleEl = row.querySelector('.team-agent-role-name');
     if (roleEl) roleEl.textContent = name;
     const summaryText = parts.map(p => p[0]).join(', ');
-    row.querySelector('.team-agent-open')?.setAttribute('aria-label', `Edit ${name}: ${summaryText}`);
-    row.querySelector('.team-agent-menu-btn')?.setAttribute('aria-label', `Actions for ${name}`);
+    row.querySelector('.team-agent-edit-btn')?.setAttribute('aria-label', `Edit ${name}`); // the row's one button; the summary is its description (aria-describedby)
 }
 
 /** The things that follow the list of members: each row's summary, the badge on the one that gets the first task, the Orchestrator's own limits, the buttons of the ends, the line above the list, and the gate. */
@@ -91,10 +90,6 @@ function _syncTeamMembers() {
         const orch = isOrchestrator(rowRole(row));
         const badge = row.querySelector('.team-agent-badge'); if (badge) badge.hidden = row !== lead;
         row.dataset.orchestrator = orch ? '1' : '';
-        const up = row.querySelector('[data-dir="up"]'), down = row.querySelector('[data-dir="down"]'), rm = row.querySelector('.team-agent-remove');
-        if (up) { up.disabled = i === 0; up.hidden = orch; } // the Orchestrator does not move up (#7407)
-        if (down) down.disabled = i === rows.length - 1;
-        if (rm) rm.hidden = orch; // and is not removed: renaming its role is the way out
     });
     const empty = document.querySelector('#team-panel-members .empty-state.empty-state-tight'); if (empty) empty.hidden = rows.length > 0;
     const count = document.getElementById('team-agents-count');
@@ -193,7 +188,7 @@ function _undoTeamAgentRemoval() {
     r.list.insertBefore(r.row, r.next && r.next.parentElement === r.list ? r.next : null);
     _clearTeamUndo();
     _syncTeamMembers();
-    r.row.querySelector('.team-agent-open')?.focus();
+    r.row.querySelector('.team-agent-edit-btn')?.focus();
 }
 
 // Next needs what this step needs; on a step that is not met, it says so where the person looks (the field, or the line that says what is missing) and does not go on.
@@ -247,10 +242,18 @@ function _leaveMember() {
     showTeamStep(back);
 }
 
+/** Remove from team, in the Edit member dialog (#10836): back to the team form, then the member is removed aside for Undo as before. The Orchestrator is not removed. */
+function _removeMemberFromDialog() {
+    const row = launch.member?.row;
+    if (!row || isOrchestrator(rowRole(row))) return;
+    _leaveMember();
+    _removeTeamAgent(row);
+}
+
 function cancelTeamMember() {
     const row = launch.member?.row;
     _leaveMember();
-    (row?.querySelector('.team-agent-open') || document.querySelector('#launch-step-team .team-add-agent-btn'))?.focus();
+    (row?.querySelector('.team-agent-edit-btn') || document.querySelector('#launch-step-team .team-add-agent-btn'))?.focus();
 }
 window.cancelTeamMember = cancelTeamMember;
 
@@ -279,7 +282,7 @@ function saveTeamAgentFromModal() {
     }
     _leaveMember();
     _syncTeamMembers(); // a rename can make or lose the Orchestrator
-    (opener || document.querySelector('#team-agents-list .team-agent-row:last-child'))?.querySelector('.team-agent-open')?.focus();
+    (opener || document.querySelector('#team-agents-list .team-agent-row:last-child'))?.querySelector('.team-agent-edit-btn')?.focus();
 }
 window.saveTeamAgentFromModal = saveTeamAgentFromModal;
 
@@ -484,7 +487,7 @@ function _addTeamAgent(defaultName, defaultPrompt, defaultCapabilities, defaultA
     launch.teamAgentCounter++;
     const idx = launch.teamAgentCounter;
     const acfId = `team-agent-acf-${idx}`;
-    const menuId = `team-agent-menu-${idx}`;
+    const sumId = `team-agent-summary-${idx}`;
     const list = document.getElementById("team-agents-list");
     const row = document.createElement("div");
     row.className = "team-agent-row";
@@ -494,22 +497,13 @@ function _addTeamAgent(defaultName, defaultPrompt, defaultCapabilities, defaultA
     row.dataset.acfId = acfId;
     if (!defaultAgentType) row.dataset.followsTeamType = '1';
 
-    // A member is one quiet row, read-only: its role and one summary line. The row opens the Edit member dialog; its actions are behind the button at its end. The form that holds the member's values is kept (hidden) in the row.
+    // A member is one quiet row, read-only: its role and one summary line. The row opens the Edit member dialog, and so does the one Edit button at its end (Remove is in that dialog; Alt+Up/Down on the row's button reorders, as dragging does, #10836). The form that holds the member's values is kept (hidden) in the row.
     row.innerHTML = `
-        <button type="button" class="team-agent-open" data-on-click="team-agent-edit">
+        <div class="team-agent-open">
             <span class="team-agent-main"><span class="team-agent-role-name">${escapeHtml(defaultName || 'New member')}</span><span class="chip team-agent-badge" hidden>Gets the first task</span></span>
-            <span class="team-agent-summary"></span>
-            <svg class="team-agent-chev" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3l5 5-5 5"/></svg>
-        </button>
-        <div class="team-agent-more">
-            <button type="button" class="btn btn-icon team-agent-menu-btn" aria-haspopup="menu" aria-expanded="false" aria-controls="${escapeAttr(menuId)}" data-on-click="team-menu"><svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="3" cy="8" r="1.5"/><circle cx="8" cy="8" r="1.5"/><circle cx="13" cy="8" r="1.5"/></svg></button>
-            <div class="menu team-menu" id="${escapeAttr(menuId)}" role="menu" hidden>
-                <button type="button" role="menuitem" class="menu-item team-menu-item" data-on-click="team-agent-edit">Edit member</button>
-                <button type="button" role="menuitem" class="menu-item team-menu-item" data-on-click="team-agent-move" data-dir="up">Move up</button>
-                <button type="button" role="menuitem" class="menu-item team-menu-item" data-on-click="team-agent-move" data-dir="down">Move down</button>
-                <button type="button" role="menuitem" class="menu-item team-menu-item team-agent-remove" data-on-click="team-agent-remove">Remove</button>
-            </div>
+            <span class="team-agent-summary" id="${escapeAttr(sumId)}"></span>
         </div>
+        <button type="button" class="btn team-agent-edit-btn" data-on-click="team-agent-edit" aria-describedby="${escapeAttr(sumId)}">Edit</button>
         <div class="team-agent-form" hidden><div id="${escapeAttr(acfId)}"></div></div>
     `;
     if (top) list.prepend(row); else list.appendChild(row);
@@ -529,6 +523,16 @@ function _addTeamAgent(defaultName, defaultPrompt, defaultCapabilities, defaultA
         showName: true,
         showAutoPermissions: true,
         value: acfValue,
+    });
+
+    // The row's text opens Edit member for a click; a keyboard has the Edit button for the same (so no tab stop of its own)
+    row.addEventListener('click', (e) => { if (e.target.closest('.team-agent-open')) window.showTeamAgentModal(row); });
+
+    // A keyboard way to reorder besides dragging (WCAG 2.5.7, #10836): Alt+ArrowUp / Alt+ArrowDown on the row's button
+    row.addEventListener('keydown', (e) => {
+        if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
+        e.preventDefault();
+        _moveTeamAgent(row, e.key === 'ArrowUp' ? -1 : 1, { say: true });
     });
 
     // Drag-and-drop reorder handlers
@@ -572,18 +576,20 @@ function _addTeamAgent(defaultName, defaultPrompt, defaultCapabilities, defaultA
     return row;
 }
 
-// Move a member up or down (from its actions menu).
-function _moveTeamAgent(btn, direction) {
-    const row = btn.closest('.team-agent-row');
+// Move a member up or down (Alt+Arrow on its row, #10836); said politely: "Moved QA Engineer to 2 of 5". The Orchestrator does not move up (#7407).
+function _moveTeamAgent(rowOrBtn, direction, { say = false } = {}) {
+    const row = rowOrBtn.closest?.('.team-agent-row');
     if (!row) return;
     const list = row.parentElement;
-    if (direction === -1 && row.previousElementSibling) {
+    if (direction === -1 && row.previousElementSibling && !isOrchestrator(rowRole(row))) {
         list.insertBefore(row, row.previousElementSibling);
     } else if (direction === 1 && row.nextElementSibling) {
         list.insertBefore(row.nextElementSibling, row);
-    }
+    } else return;
     _syncTeamMembers();
-    row.querySelector('.team-agent-menu-btn')?.focus();
+    row.querySelector('.team-agent-edit-btn')?.focus();
+    const live = document.getElementById('team-agents-live');
+    if (say && live) { const rows = teamRows(); live.textContent = `Moved ${rowRole(row) || 'member'} to ${rows.indexOf(row) + 1} of ${rows.length}`; }
 }
 
 window._addTeamAgent = (name, prompt) => {
@@ -595,7 +601,7 @@ function _addOrchestrator() {
     if (hasOrchestrator()) return;
     const prompt = _findPersona('Orchestrator')?.prompt || BUILTIN_TEAM_TEMPLATES[0].agents.find(a => a.name === 'Orchestrator')?.prompt || '';
     const row = _addTeamAgent('Orchestrator', prompt, null, '', '', '', { reveal: true, top: true });
-    row?.querySelector('.team-agent-open')?.focus();
+    row?.querySelector('.team-agent-edit-btn')?.focus();
 }
 
 /** The template select: Blank team clears the members, a template replaces them (as loading a template always did). */
@@ -847,4 +853,4 @@ async function _openLaunchedTeam(server, boardName, goal, agents, seen, boardSet
 }
 window.launchTeam = launchTeam;
 
-export { _openLaunchedTeam, _addTeamAgent, _applyACFPresetFor, _checkTeamGitDir, _initTeamForm, _loadExistingTeamBoards, _moveTeamAgent, _renderTeamTemplateSelector, _syncTemplateMenu, _removeTeamAgent, _undoTeamAgentRemoval, _syncTeamMembers, _pickTeamTemplate, _setAllWorkers, _addOrchestrator, teamStepMove };
+export { _openLaunchedTeam, _addTeamAgent, _applyACFPresetFor, _checkTeamGitDir, _initTeamForm, _loadExistingTeamBoards, _moveTeamAgent, _removeMemberFromDialog, _renderTeamTemplateSelector, _syncTemplateMenu, _removeTeamAgent, _undoTeamAgentRemoval, _syncTeamMembers, _pickTeamTemplate, _setAllWorkers, _addOrchestrator, teamStepMove };

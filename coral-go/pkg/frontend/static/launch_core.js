@@ -47,6 +47,8 @@ export function setLaunchStage(stage) {
     if (next) next.hidden = stage === 'agent';
     if (go) go.hidden = !!launch.member || !(stage === 'agent' || launchFlags.launchFromAnyStep); // a member is saved into the team form, not launched (#7861)
     if (save) save.hidden = !launch.member || stage !== 'agent';
+    const rm = document.getElementById("launch-agent-remove");
+    if (rm) rm.hidden = !launch.member?.row || stage !== 'agent' || String(launch.member.value?.name || '').trim().toLowerCase() === 'orchestrator'; // Edit member only; the Orchestrator is not removed (#10836)
     const recap = document.getElementById("launch-recap");
     if (recap) recap.hidden = stage === 'folder' || !!launch.member;
     const live = document.getElementById("launch-stage-live");

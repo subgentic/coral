@@ -106,9 +106,9 @@ const UNDERSIZED = `(() => {
         await waitFor(`!!document.querySelector('#team-agents-list .team-agent-row')`, 'the team dialog with its member rows');
         const teamSmall = await ev(UNDERSIZED);
         assert.deepEqual(teamSmall, [], 'phone 390, Agent Team dialog: every control, the rows\' buttons too, is at least 44x44: ' + JSON.stringify(teamSmall));
-        const cardButtons = await ev(`[...document.querySelectorAll('#team-agents-list .team-agent-row:first-child > button, #team-agents-list .team-agent-row:first-child .team-agent-menu-btn')].map(b => { const r = b.getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; })`);
-        assert.equal(cardButtons.length, 2, 'a row has its open button and its actions button');
-        assert.ok(cardButtons.every(z => z[0] >= 44 && z[1] >= 44), 'both are at least 44 px: ' + JSON.stringify(cardButtons));
+        const cardButtons = await ev(`[...document.querySelectorAll('#team-agents-list .team-agent-row:first-child button')].filter(b => b.getClientRects().length).map(b => { const r = b.getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; })`);
+        assert.equal(cardButtons.length, 1, 'a row has one button, Edit (#10836)');
+        assert.ok(cardButtons.every(z => z[0] >= 44 && z[1] >= 44), 'Edit is at least 44 px: ' + JSON.stringify(cardButtons));
         const gap = await ev(`(() => { const b = document.querySelector('#launch-step-team .launch-back-btn').getBoundingClientRect(), t = document.getElementById('launch-team-title-text').getBoundingClientRect(); return Math.round(t.left - b.right); })()`);
         assert.ok(gap >= 6, 'the Back arrow\'s focus ring has room before the title: ' + gap + ' px');
         await ev(`window.hideLaunchModal(); true`);

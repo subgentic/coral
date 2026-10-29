@@ -1,8 +1,8 @@
 // #3770 (from the #3735 sweep): two controls that did nothing and said nothing.
 //  - Send with an empty box: the box takes focus and flashes once (class empty-send-nudge, which ends by itself); with text, or
 //    with an attachment waiting, there is no nudge and the send goes ahead.
-//  - The team launcher's Move up on the first agent card and Move down on the last are disabled, and follow the order as cards
-//    are added, moved and removed.
+//  - The team launcher's members move with Alt+ArrowUp / Alt+ArrowDown (the Move buttons went, #10836): the first cannot move up, the last cannot move down, and the order follows cards
+//    as they are added, moved and removed.
 // Drives Chrome over CDP through agent_view_harness.js; run_cdp_suites.mjs finds CDP suites by that name.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -41,22 +41,22 @@ const BASE = require('./test_base').BASE;
         assert.equal(await nudged(), false, 'no nudge when there is text to send');
         console.log('   ✓ empty: focused and flashed, flash ends; Enter quiet; with text no flash');
 
-        console.log('2. The team launcher\'s Move up on the first card and Move down on the last are disabled');
+        console.log('2. The team launcher\'s members move with Alt+ArrowUp / Alt+ArrowDown on a row (no Move buttons, #10836), and follow the order as cards are added, moved and removed');
         await ev(`(async () => { await import((window.__coralStatic || '/static/') + 'modals.js'); const el = document.getElementById('team-agents-list'); el.innerHTML = ''; for (const n of ['One', 'Two', 'Three']) window._addTeamAgent(n, 'prompt ' + n); return true; })()`);
-        const moves = () => ev(`[...document.querySelectorAll('#team-agents-list > .team-agent-row')].map(r => [r.querySelector('.team-agent-role-name').textContent, r.querySelector('[data-dir=up]').disabled, r.querySelector('[data-dir=down]').disabled])`);
-        await waitFor(`document.querySelectorAll('#team-agents-list > .team-agent-row').length === 3 && document.querySelector('#team-agents-list > .team-agent-row [data-dir=up]').disabled`, 'the end buttons to settle', 4000);
-        assert.deepEqual(await moves(), [['One', true, false], ['Two', false, false], ['Three', false, true]], 'first: no up; last: no down');
-        await ev(`document.querySelectorAll('#team-agents-list > .team-agent-row')[0].querySelector('[data-dir=down]').click(); true`);
+        const order = () => ev(`[...document.querySelectorAll('#team-agents-list > .team-agent-row .team-agent-role-name')].map(e => e.textContent)`);
+        const altKey = (i, key) => ev(`document.querySelectorAll('#team-agents-list > .team-agent-row')[${i}].dispatchEvent(new KeyboardEvent('keydown', { key: '${key}', altKey: true, bubbles: true, cancelable: true })); true`);
+        await waitFor(`document.querySelectorAll('#team-agents-list > .team-agent-row').length === 3`, 'the cards', 4000);
+        assert.deepEqual(await ev(`document.querySelectorAll('#team-agents-list [data-dir]').length`), 0, 'no Move up / Move down buttons');
+        assert.deepEqual(await order(), ['One', 'Two', 'Three']);
+        await altKey(0, 'ArrowUp'); assert.deepEqual(await order(), ['One', 'Two', 'Three'], 'the first card cannot move up');
+        await altKey(2, 'ArrowDown'); assert.deepEqual(await order(), ['One', 'Two', 'Three'], 'the last card cannot move down');
+        await altKey(0, 'ArrowDown');
         await waitFor(`document.querySelector('#team-agents-list > .team-agent-row .team-agent-role-name').textContent === 'Two'`, 'the move', 3000);
-        await waitFor(`document.querySelectorAll('#team-agents-list > .team-agent-row')[0].querySelector('[data-dir=up]').disabled && !document.querySelectorAll('#team-agents-list > .team-agent-row')[1].querySelector('[data-dir=up]').disabled`, 'the buttons to follow the move', 3000);
-        assert.deepEqual(await moves(), [['Two', true, false], ['One', false, false], ['Three', false, true]], 'after Move down on the first card, the ends follow');
-        await ev(`document.querySelectorAll('#team-agents-list > .team-agent-row')[2].querySelector('.team-agent-remove').click(); true`);
-        await waitFor(`document.querySelectorAll('#team-agents-list > .team-agent-row').length === 2 && document.querySelectorAll('#team-agents-list > .team-agent-row')[1].querySelector('[data-dir=down]').disabled`, 'the new last card to lose Move down', 3000);
-        assert.deepEqual(await moves(), [['Two', true, false], ['One', false, true]], 'after removing the last card');
-        await ev(`document.querySelectorAll('#team-agents-list > .team-agent-row')[1].querySelector('.team-agent-remove').click(); true`);
-        await waitFor(`document.querySelectorAll('#team-agents-list > .team-agent-row').length === 1 && document.querySelector('#team-agents-list [data-dir=down]').disabled`, 'a single card', 3000);
-        assert.deepEqual(await moves(), [['Two', true, true]], 'one card cannot move either way');
-        console.log('   ✓ ends disabled, and they follow add, move and remove');
+        assert.deepEqual(await order(), ['Two', 'One', 'Three'], 'after Alt+ArrowDown on the first card');
+        await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'team_dialogs.js'); m._removeTeamAgent(document.querySelectorAll('#team-agents-list > .team-agent-row')[2]); return true; })()`);
+        await waitFor(`document.querySelectorAll('#team-agents-list > .team-agent-row').length === 2`, 'the removal', 3000);
+        assert.deepEqual(await order(), ['Two', 'One'], 'after removing the last card');
+        console.log('   ✓ Alt+Arrow reorders, the ends stay put, and the order follows add, move and remove');
 
         console.log('\nAll empty-send and team-move checks passed');
     } finally {

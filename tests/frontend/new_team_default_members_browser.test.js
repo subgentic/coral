@@ -25,14 +25,14 @@ const BASE = require('./test_base').BASE;
         assert.equal(await ev(`document.getElementById('team-orchestrator-line').hidden`), true, 'the "Add an Orchestrator" notice is not there: the team has one');
         assert.equal(await ev(`getComputedStyle(document.querySelector('#team-agents-list').parentElement.querySelector('.empty-state')).display`), 'none', 'and "No members yet" is not said');
         assert.equal(await ev(`document.querySelectorAll('#team-agents-list > *').length`), 3, 'three member rows');
-        assert.equal(await ev(`[...document.querySelectorAll('#team-agents-list > *')].every(r => r.querySelector('.team-agent-menu-btn'))`), true, 'each member has its menu (Remove is in it)');
+        assert.equal(await ev(`[...document.querySelectorAll('#team-agents-list > *')].every(r => r.querySelector('.team-agent-edit-btn'))`), true, 'each member has its Edit button (Remove is in the Edit member dialog, #10836)');
         await shot('new-team-default-members');
         // the Lead Developer and the QA Engineer are removable; the Orchestrator has no Remove (the team's gate: new_team_steps), it is renamed or the team starts without by Back
-        const menuItems = async n => { await ev(`document.querySelectorAll('#team-agents-list > *')[${n}].querySelector('.team-agent-menu-btn').click(); true`); await settle(200); return ev(`[...window.__nt.dlg(${require('./helpers/new_team').N.team}).querySelectorAll('[role=menuitem]')].filter(window.__na.vis).map(x => window.__na.name(x))`); };
-        assert.ok(!(await menuItems(0)).includes('Remove'), 'the Orchestrator has no Remove, as before');
-        await ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); true`); await settle(200);
-        assert.ok((await menuItems(1)).includes('Remove'), 'the Lead Developer can be removed');
-        await ev(`[...window.__nt.dlg(${require('./helpers/new_team').N.team}).querySelectorAll('[role=menuitem]')].find(x => window.__na.name(x) === 'Remove').click(); true`); await settle(300);
+        const editHasRemove = async n => { await ev(`document.querySelectorAll('#team-agents-list > *')[${n}].querySelector('.team-agent-edit-btn').click(); true`); await settle(400); return ev(`document.getElementById('launch-agent-remove').getClientRects().length > 0`); };
+        const cancelEdit = async () => { await ev(`document.getElementById('launch-agent-cancel').click(); true`); await settle(300); };
+        assert.equal(await editHasRemove(0), false, 'the Orchestrator has no Remove, as before'); await cancelEdit();
+        assert.equal(await editHasRemove(1), true, 'the Lead Developer can be removed (Remove from team, in the Edit member dialog)');
+        await ev(`document.getElementById('launch-agent-remove').click(); true`); await settle(300);
         assert.deepEqual(await roles(), ['Orchestrator', 'QA Engineer'], 'Remove takes the member out');
         assert.match(await chosen(), /^Default team \(2 members\)$/, 'the choice says how many members there are now (#10052)');
         // Blank team clears them and says so; the Default team choice brings the three back

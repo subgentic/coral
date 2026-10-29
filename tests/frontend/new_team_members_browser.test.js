@@ -12,11 +12,11 @@ const BASE = require('./test_base').BASE;
     const { settle } = require('./helpers/wait').bind(ev);
     const S = scenarios(); const t = T(ev, waitFor); const mem = M(ev, waitFor);
     const roles = () => ev(`window.__nt.roles(window.__nt.dlg(${N.team}))`);
-    const rowText = role => ev(`(() => { const b = window.__nt.rows(window.__nt.dlg(${N.team})).find(x => window.__na.name(x).startsWith(${JSON.stringify('Edit ' + '')} + ${JSON.stringify(role)} + ': ')); return b ? window.__na.text(b) : null; })()`);
+    const rowText = role => ev(`(() => { const b = window.__nt.rows(window.__nt.dlg(${N.team})).find(x => window.__na.name(x) === ${JSON.stringify('Edit ' + role)}); return b ? window.__na.text(b.closest('.team-agent-row')) : null; })()`);
     const nextOff = () => ev(`(() => { const b = window.__nt.find(window.__nt.dlg(${N.team}), 'button', ${N.next}); return !!b && (b.disabled || b.getAttribute('aria-disabled') === 'true'); })()`);
     const pressNext = async () => { await t.click('button', N.next); await settle(150); return ev(`(() => { const r = document.getElementById('team-recap'); const a = document.activeElement; return { said: r.textContent.trim(), red: r.classList.contains('launch-recap-error'), focus: a && a.id, step: /Step 2 of 3/.test(window.__na.text(window.__nt.dlg(${N.team}))) }; })()`); };
     const why = () => ev(`(() => { const d = window.__nt.dlg(${N.team}); const b = window.__nt.find(d, 'button', ${N.next}); const dd = (b.getAttribute('aria-describedby') || '').split(/\\s+/).map(i => (document.getElementById(i) || {}).textContent || '').join(' ').trim(); const live = [...d.querySelectorAll('[aria-live=polite],[role=status]')].map(e => window.__na.text(e)).join(' | '); return dd + ' || ' + live; })()`);
-    const openRow = async role => { await ev(`(() => { const b = window.__nt.rows(window.__nt.dlg(${N.team})).find(x => window.__na.name(x).startsWith('Edit ' + ${JSON.stringify(role)} + ': ')); b.click(); return true; })()`); await waitFor(`!!window.__nt.dlg(${N.member})`, `the Edit member dialog for ${role}`, 5000); };
+    const openRow = async role => { await ev(`(() => { const b = window.__nt.rows(window.__nt.dlg(${N.team})).find(x => window.__na.name(x) === 'Edit ' + ${JSON.stringify(role)}); b.click(); return true; })()`); await waitFor(`!!window.__nt.dlg(${N.member})`, `the Edit member dialog for ${role}`, 5000); };
     const mtab = name => (name === 'Persona' ? mem.toPersona() : mem.section(name)); // Persona is the page before the settings (#7861)
     const setRole = v => mem.setRole(v);
     const setProvider = async name => { // a select or a radiogroup, as the build draws it
