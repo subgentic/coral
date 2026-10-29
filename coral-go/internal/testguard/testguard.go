@@ -58,6 +58,44 @@ func CheckDataPath(path string) {
 		panic(fmt.Sprintf("testguard: test resolved %q inside the real Coral data directory %s; "+
 			"pass a t.TempDir() (or set CORAL_DATA_DIR / CORAL_TMUX_SOCKET) instead", path, dir))
 	}
+	if root, ok := inSourceTree(path); ok {
+		panic(fmt.Sprintf("testguard: test resolved %q inside the source tree %s; a Config or store with no data folder "+
+			"writes into the package folder (api_key, messageboard.db, themes) and every test that scans the tree then sees the files "+
+			"(go's test cache re-checks them): pass a t.TempDir() (cfg.UseCoralDir(t.TempDir())) instead", path, root))
+	}
+}
+
+// sourceTree is the module's source folder: the nearest parent of the test's working directory (a test runs in its package's folder) that
+// holds go.mod, or "" when there is none.
+var sourceTree = sync.OnceValue(func() string {
+	wd, err := os.Getwd()
+	if err != nil {
+		return ""
+	}
+	for dir := wd; ; {
+		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
+			return dir
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return ""
+		}
+		dir = parent
+	}
+})
+
+// inSourceTree reports whether path is, or is inside, the module's source folder. A relative path counts from the working directory, which is a
+// folder of the source tree: the "" data folder a Config falls back to is exactly that.
+func inSourceTree(path string) (string, bool) {
+	root := sourceTree()
+	if root == "" {
+		return "", false
+	}
+	p, cd := comparable(path), comparable(root)
+	if p == cd || strings.HasPrefix(p, cd+string(filepath.Separator)) {
+		return root, true
+	}
+	return "", false
 }
 
 func protected(path string) (string, bool) {

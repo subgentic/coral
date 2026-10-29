@@ -124,3 +124,33 @@ func TestProtectedInResolvesSymlinksAndCase(t *testing.T) {
 		}
 	}
 }
+
+// A data path inside the module's source tree fails the test at the call: that is how a Config with no data folder wrote api_key, messageboard.db and themes into
+// cmd/coral for months, and made the go test cache miss for every package that scans the tree.
+func TestCheckDataPathPanicsInsideTheSourceTree(t *testing.T) {
+	panics := func(p string) (did bool) {
+		defer func() { did = recover() != nil }()
+		CheckDataPath(p)
+		return false
+	}
+	root := sourceTree()
+	if root == "" {
+		t.Fatal("the test runs inside the module: no go.mod found above the working directory")
+	}
+	for _, p := range []string{root, filepath.Join(root, "cmd", "coral"), filepath.Join(root, "internal", "x", "api_key"), "."} {
+		if !panics(p) {
+			t.Errorf("a data path in the source tree did not fail the test: %q", p)
+		}
+	}
+	if panics(t.TempDir()) {
+		t.Error("a temp folder was refused")
+	}
+	if panics(filepath.Join(filepath.Dir(root), "elsewhere")) {
+		t.Error("a sibling of the module folder was refused")
+	}
+	defer func(f func() bool) { enabled = f }(enabled)
+	enabled = func() bool { return false }
+	if panics(root) {
+		t.Error("the guard is not inert outside tests")
+	}
+}
