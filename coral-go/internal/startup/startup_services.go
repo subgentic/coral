@@ -351,10 +351,12 @@ func startMaintenanceServices(ctx context.Context, db *store.DB, cfg *config.Con
 	// PRAGMA quick_check on both databases, once, a minute after start (#4157): damage is
 	// logged and shown on the dashboard; nothing is repaired or deleted.
 	integrityTargets := map[string]*sqlx.DB{"sessions.db": db.Reader()}
+	integrityConfirm := map[string]*sqlx.DB{"sessions.db": db.DB}
 	if bs := srv.BoardStore(); bs != nil {
 		integrityTargets["messageboard.db"] = bs.Reader()
+		integrityConfirm["messageboard.db"] = bs.Writer() // its message search index is read across commits too: a busy board reported "fts5: corruption" on a sound file (#10831)
 	}
-	dbIntegrity := background.NewDBIntegrity(integrityTargets).ConfirmOn(map[string]*sqlx.DB{"sessions.db": db.DB}) // a problem is checked again with writes paused (#4735)
+	dbIntegrity := background.NewDBIntegrity(integrityTargets).ConfirmOn(integrityConfirm) // a problem is checked again with writes paused (#4735)
 	safego.Go("db_integrity", func() { dbIntegrity.Run(ctx) })
 
 	// A pty Coral wakes the agents that were running when it last stopped (#3636): one pass per

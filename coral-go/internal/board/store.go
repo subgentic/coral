@@ -64,6 +64,12 @@ func (s *Store) Reader() *sqlx.DB {
 	return s.reader()
 }
 
+// Writer returns the board database's single writing connection: no write runs beside a statement on it. The integrity check confirms a
+// problem the read pool reports on it before the dashboard says "damaged" (#10831).
+func (s *Store) Writer() *sqlx.DB {
+	return s.db
+}
+
 // ReaderStats returns statistics for the read pool (or writer pool if in-memory).
 func (s *Store) ReaderStats() sql.DBStats {
 	return s.reader().Stats()

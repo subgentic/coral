@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 	_ "modernc.org/sqlite"
 
+	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/store"
 )
 
@@ -167,6 +168,52 @@ func TestDBIntegrityDoesNotAlarmWhileTheIndexerWrites(t *testing.T) {
 	}
 	if falseReports == 0 {
 		t.Skip("the read pool did not report the false damage in 40 tries")
+	}
+}
+
+// #10831: the message board's search index is read across commits by quick_check too. While messages are posted and deleted, the read
+// pool reports "fts5: corruption found reading blob N" on a sound messageboard.db (the CI machines' CDP runs did, a minute after start, and
+// the dashboard showed "Database damage" over the page); the check confirmed on the board's writer connection does not warn.
+func TestDBIntegrityDoesNotAlarmWhileTheBoardIsWritten(t *testing.T) {
+	resetIntegrity(t)
+	ctx := context.Background()
+	bs, err := board.NewStoreWithKey(filepath.Join(t.TempDir(), "messageboard.db"), "")
+	require.NoError(t, err)
+	defer bs.Close()
+	_, err = bs.Subscribe(ctx, "proj", "dev", "Backend Dev", "tmux-dev", nil, "")
+	require.NoError(t, err)
+	require.NoError(t, bs.BuildMessageSearchIndex(ctx))
+	for i := 0; i < 600; i++ {
+		_, err := bs.PostMessage(ctx, "proj", "dev", fmt.Sprintf("seed message %d with some words to index and a number %d", i, i*7919), nil)
+		require.NoError(t, err)
+	}
+	var stop atomic.Bool
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() { // the board in use: messages posted, and every third one deleted again
+		defer wg.Done()
+		for i := 0; !stop.Load(); i++ {
+			m, err := bs.PostMessage(ctx, "proj", "dev", fmt.Sprintf("live message %d about a deploy and a review %d", i, i*104729), nil)
+			if err == nil && i%3 == 0 {
+				_, _ = bs.DeleteMessage(ctx, "proj", m.ID)
+			}
+		}
+	}()
+	defer func() { stop.Store(true); wg.Wait() }()
+	falseReports := 0
+	for try := 0; try < 60; try++ {
+		if problems, err := QuickCheck(ctx, bs.Reader()); err == nil && len(problems) > 0 {
+			falseReports++
+			resetIntegrity(t)
+			NewDBIntegrity(map[string]*sqlx.DB{"messageboard.db": bs.Reader()}).ConfirmOn(map[string]*sqlx.DB{"messageboard.db": bs.Writer()}).RunOnce(ctx)
+			require.Empty(t, DatabaseWarning(), "the writer's check found nothing wrong: no notice (the read pool said %v)", problems)
+			if falseReports >= 3 {
+				break
+			}
+		}
+	}
+	if falseReports == 0 {
+		t.Skip("the read pool did not report the false damage in 60 tries")
 	}
 }
 
