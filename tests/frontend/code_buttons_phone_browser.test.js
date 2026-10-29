@@ -12,11 +12,14 @@ const BASE = require('./test_base').BASE;
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
         for (const fs of ['', '32px']) {
             const r = await ev(`(() => { document.documentElement.style.fontSize = ${JSON.stringify(fs)}; document.getElementById('zz-code')?.remove(); const w = document.createElement('div'); w.id = 'zz-code'; w.className = 'chat-messages chat-prose'; w.style.cssText = 'position:fixed;left:0;top:100px;width:360px;z-index:9999;background:#000';
-                w.innerHTML = '<div class="code-block" style="position:relative;min-height:80px"><pre><code>const x = 1;</code></pre><span class="code-scroll-hint" hidden>Scrolls sideways</span><button type="button" class="code-wrap-btn" title="Wrap long lines" aria-label="Wrap lines" aria-pressed="false">Wrap</button><button type="button" class="code-copy-btn" title="Copy code" aria-label="Copy code"><span class="material-icons" aria-hidden="true">content_copy</span></button></div>'; document.body.append(w);
-                const a = w.querySelector('.code-wrap-btn').getBoundingClientRect(), b = w.querySelector('.code-copy-btn').getBoundingClientRect(); const ox = Math.min(a.right, b.right) - Math.max(a.left, b.left), oy = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
-                return { wrap: [Math.round(a.width), Math.round(a.height)], copy: [Math.round(b.width), Math.round(b.height)], overlap: ox > 1 && oy > 1 }; })()`);
+                w.innerHTML = '<div class="chat-bubble assistant"><div class="message-text"><div class="code-block"><pre><code>const x = \\'a very long line that would sit under the buttons\\';</code></pre><span class="code-scroll-hint">Scrolls sideways</span><button type="button" class="code-wrap-btn" title="Wrap long lines" aria-label="Wrap lines" aria-pressed="false">Wrap</button><button type="button" class="code-copy-btn" title="Copy code" aria-label="Copy code"><span class="material-icons" aria-hidden="true">content_copy</span></button></div></div></div>'; document.body.append(w);
+                const R = q => w.querySelector(q).getBoundingClientRect(), a = R('.code-wrap-btn'), b = R('.code-copy-btn'), h = R('.code-scroll-hint'), pre = R('pre');
+                const hit = (x, y) => Math.min(x.right, y.right) - Math.max(x.left, y.left) > 1 && Math.min(x.bottom, y.bottom) - Math.max(x.top, y.top) > 1;
+                return { wrap: [Math.round(a.width), Math.round(a.height)], copy: [Math.round(b.width), Math.round(b.height)], overlap: hit(a, b), onCode: hit(a, pre) || hit(b, pre) || hit(h, pre), hintOnButtons: hit(h, a) || hit(h, b) }; })()`);
             assert.ok(r.wrap[1] >= 44 && r.wrap[0] >= 44 && r.copy[0] >= 44 && r.copy[1] >= 44, `text ${fs || '100%'}: both are 44 px targets: ` + JSON.stringify(r));
             assert.equal(r.overlap, false, `text ${fs || '100%'}: Wrap and Copy do not overlap: ` + JSON.stringify(r));
+            assert.equal(r.onCode, false, `text ${fs || '100%'}: the buttons and the hint have their own row and cover no code (#11026): ` + JSON.stringify(r));
+            assert.equal(r.hintOnButtons, false, `text ${fs || '100%'}: the hint does not cover a button: ` + JSON.stringify(r));
         }
         console.log('PASS');
     } finally { try { await client.close(); } catch (e) {} }
