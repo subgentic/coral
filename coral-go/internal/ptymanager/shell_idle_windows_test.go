@@ -3,11 +3,14 @@
 package ptymanager
 
 import (
+	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+	"unsafe"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -114,8 +117,58 @@ func TestWindowsShellIdleCountsGitBashAsAShellAndIgnoresConsoleHosts(t *testing.
 	idle, _, ok := b.ShellIdle(name)
 	require.True(t, ok)
 	assert.True(t, idle, "git-bash at the prompt, nothing else running: a bare prompt")
-	// The comment takes the Enter key's CR: git-bash started from PowerShell may read its input as a stream, not a terminal, and would
-	// then pass 6 and a CR to sleep, which exits at once (the pane is then rightly idle, and the test would prove nothing).
-	require.NoError(t, b.SendInput(terminalinput.Unclassified, name, []byte("sleep 6 #"+EnterKey)))
-	require.Eventually(t, func() bool { idle, _, ok := b.ShellIdle(name); return ok && !idle }, 20*time.Second, 200*time.Millisecond, "a program in git-bash is busy")
+	// A program that is surely running when the test asserts busy (Security on #205): sleep starts, and only then the marker file is made;
+	// "wait" keeps the program in the foreground, and its exit removes nothing the test needs. The trailing comment takes the Enter key's CR:
+	// git-bash started from PowerShell may read its input as a stream, not a terminal, and would otherwise pass 8 and a CR to sleep, which
+	// exits at once.
+	marker := filepath.ToSlash(filepath.Join(t.TempDir(), "sleeping"))
+	require.NoError(t, b.SendInput(terminalinput.Unclassified, name, []byte("sleep 8 & echo started > '"+marker+"'; wait #"+EnterKey)))
+	require.Eventually(t, func() bool { _, err := os.Stat(marker); return err == nil }, 15*time.Second, 100*time.Millisecond, "sleep started in git-bash")
+	idle, _, ok = b.ShellIdle(name)
+	require.True(t, ok)
+	if idle {
+		t.Logf("git-bash's process tree while sleep runs: %s", processTreeOf(b, name))
+	}
+	assert.False(t, idle, "a program in git-bash is busy")
+	require.Eventually(t, func() bool { idle, _, ok := b.ShellIdle(name); return ok && idle }, 20*time.Second, 200*time.Millisecond, "a bare prompt again once sleep has exited")
+}
+
+// processTreeOf is the session's root and every process under it, image by image, for a failure's message.
+func processTreeOf(b *PTYBackend, name string) string {
+	b.mu.RLock()
+	s, ok := b.sessions[name]
+	b.mu.RUnlock()
+	if !ok {
+		return "(no session)"
+	}
+	wp, ok := s.proc.(*windowsPTY)
+	if !ok {
+		return "(not a ConPTY session)"
+	}
+	snap, err := windows.CreateToolhelp32Snapshot(windows.TH32CS_SNAPPROCESS, 0)
+	if err != nil {
+		return err.Error()
+	}
+	defer windows.CloseHandle(snap)
+	children := map[uint32][]windows.ProcessEntry32{}
+	var e windows.ProcessEntry32
+	e.Size = uint32(unsafe.Sizeof(e))
+	for err := windows.Process32First(snap, &e); err == nil; err = windows.Process32Next(snap, &e) {
+		children[e.ParentProcessID] = append(children[e.ParentProcessID], e)
+	}
+	var out []string
+	var walk func(pid uint32, depth int)
+	walk = func(pid uint32, depth int) {
+		for _, c := range children[pid] {
+			if depth > 8 {
+				return
+			}
+			out = append(out, fmt.Sprintf("%s%s(%d)", strings.Repeat(">", depth+1), windows.UTF16ToString(c.ExeFile[:]), c.ProcessID))
+			walk(c.ProcessID, depth+1)
+		}
+	}
+	root := uint32(wp.cpty.Pid())
+	out = append(out, fmt.Sprintf("root(%d)", root))
+	walk(root, 0)
+	return strings.Join(out, " ")
 }
