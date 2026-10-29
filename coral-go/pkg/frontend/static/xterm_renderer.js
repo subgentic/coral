@@ -1,7 +1,7 @@
 /* xterm.js terminal renderer — streams raw ANSI output via WebSocket */
 
 import { terminalFontFor, DESKTOP_FONT, isPhoneViewer } from './terminal_font.js';
-import { isLeaveKey } from './terminal_leave_key.js';
+import { isLeaveKey, isTerminalToggleKey } from './terminal_leave_key.js';
 import { setTerminalFocused, setTerminalSize, setTerminalState } from './terminal_statusbar.js';
 import { state } from './state.js';
 import { markRestarting, currentIsRestarting, showRestartingOverlay, hideSessionOverlay } from './session_overlay.js';
@@ -707,6 +707,7 @@ export function createTerminal(containerEl) {
             terminal.blur();
             return false;
         }
+        if (isTerminalToggleKey(ev)) return false; // Ctrl+` is the page's, from the terminal too: it is not typed to the agent, and the page's own handler takes it (shortcuts.js, #10749)
         return true;
     });
 

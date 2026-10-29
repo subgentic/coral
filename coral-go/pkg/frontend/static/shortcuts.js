@@ -3,12 +3,13 @@
 import { importOnce } from './import_once.js';
 import { state } from './state.js';
 import { sessionTeamKey } from './server_base.js';
+import { isTerminalToggleKey } from './terminal_leave_key.js';
 
 // The list is the one place that names the keys, in the person's own: a Mac shows Cmd and Option, any other computer Ctrl and Alt (#10579).
 export const shortcutList = (mac = onMac()) => {
     const c = mac ? 'Cmd+' : 'Ctrl+', o = mac ? 'Option' : 'Alt';
     return [[mac ? 'Cmd+Option+N' : 'Alt+N', 'New agent'], [`${c}P or ${c}K`, 'Jump to an agent, chat, team or goal'], [`${c}Shift+P or F1`, 'The command list'], [`${c},`, 'Settings'], [`${c}B`, 'Show or hide the sidebar'],
-        [`${c}Shift+F`, 'Search all chats'], ['/', 'Search agents'], [`${o}+Down or Up`, 'Next or previous agent'], [`${o}+Shift+Down or Up`, 'Next or previous team'], ['Ctrl+`', "The agent's terminal, and back to its chat"],
+        [`${c}Shift+F`, 'Search all chats'], ['/', 'Search agents'], [`${o}+Down or Up`, 'Next or previous agent'], [`${o}+Shift+Down or Up`, 'Next or previous team'], ['Ctrl+`', "The agent's terminal, and back to its chat (from the terminal too)"],
         ['?', 'Show these shortcuts'], ['Enter', 'Send a message'], ['Shift+Enter', 'A new line in a message'], ['Escape', 'Stop a reply (empty message box); close a dialog or menu'], [`${c}F`, 'Find in a chat']];
 };
 
@@ -44,7 +45,9 @@ export function searchAllChats() {
 function toggleTerminal() {
     const term = document.getElementById('live-view-btn-terminal'), chat = document.getElementById('live-view-btn-chat');
     if (!term || !term.getClientRects().length) return;
-    (term.classList.contains('active') ? chat : term).click();
+    const back = term.classList.contains('active');
+    (back ? chat : term).click();
+    if (back) document.getElementById('command-input')?.focus(); // from the terminal the focus was in it: the chat's message box takes it, so the next key is typed there and not into a terminal that is no longer shown (#10749)
 }
 
 /** The next or previous agent of the list, as it is drawn (Alt/Option+Down and Up), and the next or previous team. */
@@ -71,7 +74,10 @@ export function wireShortcuts() {
         if (cmd && !e.altKey && !e.shiftKey && k === ',') return to(() => window.showSettingsModal());
         if (cmd && !e.altKey && !e.shiftKey && k === 'b') return to(() => window.toggleSidebarRail());
         if (cmd && !e.altKey && e.shiftKey && k === 'f') return to(searchAllChats);
-        if (e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey && e.code === 'Backquote') return to(toggleTerminal);
+        if (isTerminalToggleKey(e)) { // the one page shortcut that also works from the terminal: it is the way back to the chat, and the terminal does not send it on (xterm_renderer.js)
+            if (!dialogOpen()) { e.preventDefault(); toggleTerminal(); }
+            return;
+        }
         if (e.altKey && !e.ctrlKey && !e.metaKey && (e.key === 'ArrowDown' || e.key === 'ArrowUp') && !typing(e.target)) return to(() => (e.shiftKey ? moveTeam : moveAgent)(e.key === 'ArrowDown' ? 1 : -1));
         if (e.altKey && (e.ctrlKey !== e.metaKey) && !e.shiftKey && e.code === 'KeyN' && onMac()) { // Cmd+Option+N (the key a Mac's list shows) and Ctrl+Option+N // Ctrl+Option+N: on a Mac the one way from the message box, since Option+N there is the tilde dead key (#10253); from a terminal or a dialog it does nothing, as Alt+N
             if (dialogOpen() || (typing(e.target) && !inMessageBox(e.target))) return;
