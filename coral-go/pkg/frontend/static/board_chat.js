@@ -1,4 +1,5 @@
 import { openTask } from './task_navigation.js';
+import { authorLabel } from './board_author.js';
 /* Moved out of render.js as it was (#3795): no behaviour change. */
 import { formatHourMinute } from './format.js';
 import { morphHtml } from './dom_morph.js';
@@ -382,7 +383,7 @@ function _renderBoardPanelMessages(msgsEl, scrollToBottom) {
             ${parts.toggle}
             <div class="mb-message-header">
                 ${checkbox}
-                <span class="mb-agent-name">${m.icon ? escapeHtml(m.icon) + ' ' : ''}${escapeHtml(agent)}</span>
+                <span class="mb-agent-name">${m.icon ? escapeHtml(m.icon) + ' ' : ''}${escapeHtml(authorLabel(m, agent))}</span>
                 ${externalMessageBadge(m)}${hubUserBadge(m)}${askBadge(m)}
                 <span class="mb-message-time">${_formatTime(m.created_at)}</span>
             </div>

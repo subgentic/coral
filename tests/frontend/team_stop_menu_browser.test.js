@@ -35,6 +35,7 @@ const BOARD = 'stop-menu-' + Date.now().toString(36);
             const host = mobile ? '#team-page-more-menu' : '#team-page-stop-menu';
             if (mobile) check(await ev(`document.getElementById('team-page-stop').getClientRects().length === 0`), 'a phone has no Stop button, its header has one button: More');
             else check(await ev(`document.getElementById('team-page-stop').getClientRects().length > 0`), 'the header has a Stop button');
+            if (!mobile) check(await ev(`document.getElementById('team-page-stop').textContent.trim()`) === 'Stop agents', 'the header\'s Stop button says what it stops: Stop agents (#10718)');
             // open the menu
             await ev(`document.getElementById('${mobile ? 'team-page-more' : 'team-page-stop'}').click(); true`);
             await new Promise(r => setTimeout(r, 300)); // sleep-ok: the menu opens

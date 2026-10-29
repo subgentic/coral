@@ -5,6 +5,7 @@ import { isBusyStatus, busyRetryingText, machineOf, afterPause } from './overloa
 import { isCloud, keyLabel } from './server_base.js';
 import { nameSaveButton, aboutRow, BOARD_SAVE_BUTTON } from './saved_marks.js';
 import { renderTaskQueueRun, groupTaskQueueRuns } from './board_system_lines.js';
+import { authorLabel } from './board_author.js';
 import { getAgentColor, isOperatorId, OPERATOR_ID, escapeAttr, boardMessageColorStyle, escapeHtml, externalMessageBadge, replyWithHtml, hubUserBadge, askBadge, renderBoardMessageBody } from './utils.js';
 const { isSelectMode, isSelected } = await importOnce('./board_export.js'); // a part of the board page's group: loaded with it
 import { rowParts, toggleRow, revealRow, sameDay, dayDividerHtml, refreshReplies } from './board_table.js';
@@ -172,7 +173,7 @@ function renderBoardItem(item, prev) {
             ${parts.toggle}
             <div class="mb-message-header">
                 ${checkbox}
-                <span class="mb-agent-name">${m.icon ? escapeHtml(m.icon) + ' ' : ''}${escapeHtml(agent)}</span>
+                <span class="mb-agent-name">${m.icon ? escapeHtml(m.icon) + ' ' : ''}${escapeHtml(authorLabel(m, agent))}</span>
                 ${externalMessageBadge(m)}${hubUserBadge(m)}${askBadge(m)}
                 ${messageTimeHtml(m.created_at)}
                 ${BOARD_SAVE_BUTTON(bs.currentProject || '', keyLabel(bs.currentProject || ''), String(m.created_at || ''), String(m.job_title || m.subscriber_id || ''))}

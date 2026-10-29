@@ -3,6 +3,7 @@
  * choices (Table or Chat, remembered per viewer; which rows are open, kept while messages arrive and dropped when the team changes) and the controls (the Table | Chat switch, the pills). The
  * chat view is the same rows with the head hidden, so every board action, the poll, Select and Export work in both. Pure string builders and small DOM helpers: no board state in here. */
 import { escapeHtml, escapeAttr } from './html_escape.js';
+import { authorLabel } from './board_author.js';
 import { askBadge, mentionedNames } from './board_message_text.js';
 import { browserLocal } from './safe_storage.js';
 import { registerActions, withId, textOf } from './actions.js';
@@ -149,11 +150,12 @@ export function rowParts(m, { agent, timeHtml, moreLabel, replyName = '', self =
     const snippet = snippetOf(m.content);
     const chips = chipsOf(m, tags);
     const tagHtml = layoutChips(chips, { all: true });
-    const initial = Array.from(String(agent || '?'))[0] || '?';
+    const who = authorLabel(m, agent);
+    const initial = Array.from(String(who || '?'))[0] || '?';
     return {
         bodyId: `${idp}-${Number(m.id)}`, // each surface its own ids: the team page and the dock can show the same message at once
         classes: `${open ? ' mb-open' : ''}${tags.ask ? ' mb-q' : ''}${tags.mine ? ' mb-mine' : ''}${replyName ? ' mb-is-reply' : ''}`,
-        toggle: `<button type="button" class="mb-row-toggle" data-on-click="mb-row-toggle" aria-expanded="${escapeAttr(String(open))}" aria-controls="${escapeAttr(idp)}-${Number(m.id)}"><span class="mb-row-chev" aria-hidden="true"></span><span class="mb-row-avatar" style="--mb-avatar:${escapeAttr(avatarColor(agent))}" aria-hidden="true">${escapeHtml(initial.toUpperCase())}</span><span class="mb-row-who" title="${escapeAttr(agent)}">${escapeHtml(agent)}</span><span class="mb-row-snippet">${escapeHtml(snippet)}</span><span class="mb-row-tags" data-chips="${escapeAttr(JSON.stringify(chips))}">${layoutChips(chips)}</span>${timeHtml}</button>`,
+        toggle: `<button type="button" class="mb-row-toggle" data-on-click="mb-row-toggle" aria-expanded="${escapeAttr(String(open))}" aria-controls="${escapeAttr(idp)}-${Number(m.id)}"><span class="mb-row-chev" aria-hidden="true"></span><span class="mb-row-avatar" style="--mb-avatar:${escapeAttr(avatarColor(agent))}" aria-hidden="true">${escapeHtml(initial.toUpperCase())}</span><span class="mb-row-who" title="${escapeAttr(who)}">${escapeHtml(who)}</span><span class="mb-row-snippet">${escapeHtml(snippet)}</span><span class="mb-row-tags" data-chips="${escapeAttr(JSON.stringify(chips))}">${layoutChips(chips)}</span>${timeHtml}</button>`,
         tagsOpen: open ? openParts(m.id, agent, moreLabel, more, tagHtml).tagsOpen : '',
         actions: open ? openParts(m.id, agent, moreLabel, more, tagHtml).actions : '',
         attrs: more ? ` data-more="${escapeAttr(moreLabel)}"` : '', // what an opened row needs to build its actions (a collapsed row has none: a long board is a lot of rows)
