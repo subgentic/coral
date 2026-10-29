@@ -74,6 +74,9 @@ type piTurnCache struct {
 	model    string
 	effort   string
 	turnAt   time.Time
+	// the tool calls the session made, from its toolCall blocks (#11105): by tool name and by hour ("2006-01-02T15")
+	toolByTool map[string]int
+	toolByHour map[string]int
 }
 
 type codexTurnCache struct {

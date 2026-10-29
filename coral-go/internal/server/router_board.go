@@ -179,7 +179,7 @@ func (s *Server) registerBoardTaskRoutes(r chi.Router, boardHandler *routes.Boar
 	r.Put("/api/board/{project}/working-mode/presets/{presetID}", boardHandler.SaveWorkflowPreset)
 	r.Post("/api/board/{project}/working-mode/presets/{presetID}/reset", boardHandler.ResetWorkflowPreset)
 	r.Get("/api/board/{project}/tasks", boardHandler.ListTasks)
-	r.Get("/api/board/{project}/spend", routes.NewSpendHandler(s.db, s.boardStore).Spend) // the Analytics view: tokens, commits on main, tool calls and task times (#7525); never through the Hub
+	r.Get("/api/board/{project}/spend", spendHandler(s).Spend) // the Analytics view: tokens, commits on main, tool calls and task times (#7525); never through the Hub
 	// the Analytics view's tokens per commit and task time, grouped (#8915); never through Coral Hub
 	r.Get("/api/analytics/efficiency", routes.NewEfficiencyHandler(s.db, s.boardStore).Efficiency)
 	// Goals (#7087): board text, written by the Operator or an orchestrator, readable like tasks.
@@ -247,4 +247,13 @@ func (s *Server) registerOneShotTasks(r *chi.Mux) {
 	// are retired. Keep the historical proxy store read-only for cost reports.
 	historicalProxyStore := proxy.NewStore(s.db.DB)
 	tasksHandler.SetProxyStore(historicalProxyStore)
+}
+
+// spendHandler is the Analytics read, sharing the sessions handler's transcript reader (a Pi agent's tool calls are counted from its session file, #11105).
+func spendHandler(s *Server) *routes.SpendHandler {
+	h := routes.NewSpendHandler(s.db, s.boardStore)
+	if s.sessHandler != nil {
+		h.SetSessionReader(s.sessHandler.SessionReader())
+	}
+	return h
 }

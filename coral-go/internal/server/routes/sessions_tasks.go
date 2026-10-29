@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	at "github.com/subgentic/coral/internal/agenttypes"
 	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/ptr"
 	"github.com/subgentic/coral/internal/ptymanager"
@@ -628,6 +630,9 @@ func (h *SessionsHandler) EventCounts(w http.ResponseWriter, r *http.Request) {
 	if err != nil || counts == nil {
 		counts = []store.ToolCount{}
 	}
+	if len(counts) == 0 && sidPtr != nil {
+		counts = h.piToolCounts(r.Context(), *sidPtr) // a Pi agent records no events: its calls are counted from its session file (#11105)
+	}
 	writeJSON(w, http.StatusOK, counts)
 }
 
@@ -740,4 +745,27 @@ func (h *SessionsHandler) RecordTokenUsage(w http.ResponseWriter, r *http.Reques
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+// piToolCounts is how many times each tool was called by a Pi session, most first (ties by name), from its session file; empty for any other session.
+func (h *SessionsHandler) piToolCounts(ctx context.Context, sessionID string) []store.ToolCount {
+	out := []store.ToolCount{}
+	if h.ss == nil || h.jsonl == nil {
+		return out
+	}
+	ls, err := h.ss.GetLiveSession(ctx, sessionID)
+	if err != nil || ls == nil || ls.AgentType != at.Pi {
+		return out
+	}
+	byTool, _ := h.jsonl.PiToolStats(sessionID, ls.WorkingDir)
+	for name, n := range byTool {
+		out = append(out, store.ToolCount{ToolName: name, Count: n})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Count != out[j].Count {
+			return out[i].Count > out[j].Count
+		}
+		return out[i].ToolName < out[j].ToolName
+	})
+	return out
 }

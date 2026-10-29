@@ -189,7 +189,7 @@ func TestSpendEachCLIHasItsOwnTokenAndToolSource(t *testing.T) {
 	}{
 		{spA, agenttypes.Claude, "Claude agent", true, true, true},
 		{spB, agenttypes.Codex, "Codex agent", true, true, true},
-		{spC, agenttypes.Pi, "Pi agent", true, false, true},
+		{spC, agenttypes.Pi, "Pi agent", true, true, true}, // its tool calls are counted from its session file (#11105): the events written here are not, and there is no file, so 0
 		{spD, agenttypes.Agy, "Agy agent", true, true, true},
 		{spE, agenttypes.Gemini, "Gemini agent", false, false, true},
 		{spF, agenttypes.Terminal, "Terminal agent", false, false, true},
@@ -211,7 +211,9 @@ func TestSpendEachCLIHasItsOwnTokenAndToolSource(t *testing.T) {
 		} else {
 			assert.Nil(t, row["tokens"], a.typ+": not measured, never zero")
 		}
-		if a.tools {
+		if a.typ == agenttypes.Pi {
+			assert.EqualValues(t, 0, row["tool_calls"], "pi: measured from its file, not from events: no file, no calls")
+		} else if a.tools {
 			assert.EqualValues(t, 2, row["tool_calls"], a.typ)
 		} else {
 			assert.Nil(t, row["tool_calls"], a.typ+": the events it wrote are not counted")
@@ -220,7 +222,7 @@ func TestSpendEachCLIHasItsOwnTokenAndToolSource(t *testing.T) {
 	assert.EqualValues(t, 4, out["measured_agents"], "Claude, Codex, Pi, agy")
 	assert.EqualValues(t, 6, out["of_agents"])
 	tools := out["tool_calls"].(map[string]any)
-	assert.EqualValues(t, 3, tools["measured_agents"], "Claude, Codex, agy")
+	assert.EqualValues(t, 4, tools["measured_agents"], "Claude, Codex, agy and Pi (from its file)")
 	assert.EqualValues(t, 6, tools["window"], "two events each of the three with a source")
 	assert.EqualValues(t, 6, tools["of_agents"])
 }

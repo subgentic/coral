@@ -129,3 +129,40 @@ func TestPiModelAndThinkingChips(t *testing.T) {
 	assert.Equal(t, "low", r.TranscriptThinking(sid))
 	_ = strings.TrimSpace
 }
+
+// #11105 (row 11): the tool calls a Pi session made, counted from its toolCall blocks: per tool and per hour (the hour of the assistant message that made them). Read incrementally with the turn state.
+func TestPiToolStatsCountToolCallBlocks(t *testing.T) {
+	fixture, err := os.ReadFile(filepath.Join("testdata", "pi-1.4.0", "session.jsonl"))
+	require.NoError(t, err)
+	piFixtureHome(t, piTestSession, fixture)
+	r := NewSessionReader()
+	byTool, byHour := r.PiToolStats(piTestSession, "/work/pi-project")
+	assert.Equal(t, map[string]int{"bash": 12, "write": 2, "read": 1}, byTool)
+	total := 0
+	for hour, n := range byHour {
+		assert.Regexp(t, `^\d{4}-\d{2}-\d{2}T\d{2}$`, hour, "the hour bucket the analytics use")
+		total += n
+	}
+	assert.Equal(t, 15, total)
+
+	// An appended call is counted once, the counts are copies the caller may keep, and an unchanged file adds nothing.
+	path := filepath.Join(os.Getenv("CORAL_DATA_DIR"), "pi-sessions", piTestSession)
+	files, _ := filepath.Glob(filepath.Join(path, "*.jsonl"))
+	require.Len(t, files, 1)
+	f, err := os.OpenFile(files[0], os.O_APPEND|os.O_WRONLY, 0o600)
+	require.NoError(t, err)
+	_, err = f.WriteString(`{"type":"message","id":"zz","parentId":null,"timestamp":"2026-10-30T03:15:00.000Z","message":{"role":"assistant","content":[{"type":"toolCall","id":"c99","name":"edit","arguments":{"path":"/x"}},{"type":"text","text":"x"}],"stopReason":"toolUse"}}` + "\n")
+	require.NoError(t, err)
+	require.NoError(t, f.Close())
+	byTool2, byHour2 := r.PiToolStats(piTestSession, "/work/pi-project")
+	assert.Equal(t, 1, byTool2["edit"])
+	assert.Equal(t, 12, byTool2["bash"])
+	assert.Equal(t, 1, byHour2["2026-10-30T03"])
+	assert.NotContains(t, byTool, "edit", "the first answer is a copy")
+	byTool3, _ := r.PiToolStats(piTestSession, "/work/pi-project")
+	assert.Equal(t, byTool2, byTool3, "nothing new: nothing added")
+
+	nobody, none := NewSessionReader().PiToolStats("11111111-2222-4333-8444-555555555555", "/w")
+	assert.Empty(t, nobody)
+	assert.Empty(t, none)
+}

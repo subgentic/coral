@@ -3,10 +3,12 @@ package routes
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -19,6 +21,7 @@ import (
 	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/board/boardtest"
 	"github.com/subgentic/coral/internal/gitutil"
+	"github.com/subgentic/coral/internal/jsonl"
 	"github.com/subgentic/coral/internal/store"
 	"github.com/subgentic/coral/internal/store/storetest"
 )
@@ -305,4 +308,53 @@ func TestSpendMeasuresTheTokensOfTheCLIsTheTokenPollerReads(t *testing.T) {
 	for _, typ := range []string{agenttypes.Gemini, agenttypes.Terminal} {
 		assert.False(t, tokenSources[typ], typ)
 	}
+}
+
+// #11105 (row 11): a Pi agent's tool calls are counted from the toolCall blocks of its session file (it has no hooks to record them): in the window, the usual and its own row, like the other agents', and a
+// call outside the window is not counted.
+func TestSpendCountsAPiAgentsToolCallsFromItsSessionFile(t *testing.T) {
+	assert.True(t, toolSources[agenttypes.Pi])
+	rig := newSpendRig(t)
+	rig.h.reader = jsonl.NewSessionReader()
+	ctx := context.Background()
+	piSID := "eeeeeeee-7525-4000-8000-000000000005"
+	name, bn := "Pi Dev", rig.board
+	require.NoError(t, store.NewSessionStore(rig.h.db).RegisterLiveSession(ctx, &store.LiveSession{SessionID: piSID, AgentType: agenttypes.Pi, AgentName: "folder-pi", WorkingDir: rig.repo, DisplayName: &name, BoardName: &bn}))
+	dataDir := t.TempDir()
+	t.Setenv("CORAL_DATA_DIR", dataDir)
+	sd := filepath.Join(dataDir, "pi-sessions", piSID)
+	require.NoError(t, os.MkdirAll(sd, 0o700))
+	call := func(ts string, tools ...string) string {
+		blocks := ""
+		for i, tl := range tools {
+			if i > 0 {
+				blocks += ","
+			}
+			blocks += fmt.Sprintf(`{"type":"toolCall","id":"c%d","name":%q,"arguments":{}}`, i, tl)
+		}
+		return fmt.Sprintf(`{"type":"message","id":"a","parentId":null,"timestamp":%q,"message":{"role":"assistant","content":[%s],"stopReason":"toolUse"}}`, ts, blocks)
+	}
+	lines := []string{
+		call("2026-10-25T09:15:00.000Z", "bash", "read"), // the window
+		call("2026-10-25T10:05:00.000Z", "write"),        // the window
+		call("2026-10-20T10:00:00.000Z", "bash"),         // the usual
+		call("2026-10-26T10:00:00.000Z", "bash"),         // after the window: never
+	}
+	require.NoError(t, os.WriteFile(filepath.Join(sd, "2026-10-25T08-00-00-000Z_x.jsonl"), []byte(strings.Join(lines, "\n")+"\n"), 0o600))
+
+	code, out := rig.get(t, "/api/board/"+rig.board+"/spend?range=24h")
+	require.Equal(t, http.StatusOK, code)
+	tools := out["tool_calls"].(map[string]any)
+	assert.EqualValues(t, 4+3, tools["window"], "Claude's three and Codex's one, and Pi's three")
+	assert.EqualValues(t, 1+1, tools["usual"])
+	assert.EqualValues(t, 3, tools["measured_agents"])
+	var pi map[string]any
+	for _, a := range out["agents"].([]any) {
+		if m := a.(map[string]any); m["name"] == "Pi Dev" {
+			pi = m
+		}
+	}
+	require.NotNil(t, pi)
+	assert.Equal(t, true, pi["tool_calls_measured"])
+	assert.EqualValues(t, 3, pi["tool_calls"])
 }

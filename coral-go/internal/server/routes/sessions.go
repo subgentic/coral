@@ -787,3 +787,6 @@ func lastMessageRow(h *SessionsHandler, sessionID, workingDir, agentType string,
 	}
 	return nil
 }
+
+// SessionReader is the transcript reader this handler uses: other handlers that read the same session files (the spend read) share it, so a file is parsed once.
+func (h *SessionsHandler) SessionReader() *jsonl.SessionReader { return h.jsonl }
