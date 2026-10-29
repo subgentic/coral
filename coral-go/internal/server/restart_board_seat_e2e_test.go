@@ -78,3 +78,66 @@ func TestRestartKeepsTheLaunchBoardWhenTheOperatorSeatedTheAgentElsewhere(t *tes
 	require.NoError(t, json.Unmarshal(raw, &state))
 	assert.Equal(t, home, state.Project, "its command-line state points at the launch board, not the Operator's other seat")
 }
+
+// Security's round 2: the same restart for an agent that has REMOVED its own seat on the launch board while it still holds a seat elsewhere (a leftover of the old subscribe hole, or the Operator's). The newest
+// seat of another board must not become its board: it comes back on the board it was launched on, with no seat added elsewhere.
+func TestRestartDoesNotFallBackToAnotherBoardsSeatWhenTheLaunchSeatIsGone(t *testing.T) {
+	srv, ts, dir := strictServer(t, false)
+	ctx := context.Background()
+	ss := store.NewSessionStore(srv.db)
+	bs := srv.boardStore
+	work := strictWorkDir(t, dir)
+	do := func(method, path, body string) (int, map[string]any) {
+		req, _ := http.NewRequest(method, ts.URL+path, strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		raw, _ := io.ReadAll(resp.Body)
+		var out map[string]any
+		_ = json.Unmarshal(raw, &out)
+		return resp.StatusCode, out
+	}
+	code, out := do("POST", "/api/sessions/launch", `{"working_dir":"`+work+`","agent_type":"terminal","board_name":"rs2-home","display_name":"leaver"}`)
+	require.Equal(t, http.StatusOK, code, out)
+	home, _ := out["board_id"].(string)
+	sid, _ := out["session_id"].(string)
+	name, _ := out["session_name"].(string)
+	away, err := bs.CreateBoard(ctx, "rs2-away", "Operator")
+	require.NoError(t, err)
+	time.Sleep(1100 * time.Millisecond) // sleep-ok: subscribed_at has a one second resolution: the foreign seat must be the newer
+	_, err = bs.Subscribe(ctx, away.ID, "Leftover Seat", "Guest", name, nil, "all")
+	require.NoError(t, err)
+	mine, err := bs.SessionSubscription(ctx, home, name)
+	require.NoError(t, err)
+	require.NotNil(t, mine, "the launch seat")
+	_, err = bs.Unsubscribe(ctx, home, mine.SubscriberID) // what `coral-board unsubscribe` does
+	require.NoError(t, err)
+
+	code, out = do("POST", "/api/sessions/live/"+name+"/restart", `{"session_id":"`+sid+`","agent_type":"terminal"}`)
+	require.Equal(t, http.StatusOK, code, out)
+	newSID, _ := out["session_id"].(string)
+	require.NotEmpty(t, newSID, "%v", out)
+	newName := "terminal-" + newSID
+	if v, ok := out["session_name"].(string); ok && v != "" {
+		newName = v
+	}
+	live, err := ss.GetLiveSession(ctx, newSID)
+	require.NoError(t, err)
+	require.NotNil(t, live)
+	require.NotNil(t, live.BoardName)
+	assert.Equal(t, home, *live.BoardName, "it comes back on the board it was launched on, not on the leftover seat's board")
+	seatAway, err := bs.SessionSubscription(ctx, away.ID, newName)
+	require.NoError(t, err)
+	assert.Nil(t, seatAway, "no seat was added on the other board")
+	if raw, rerr := os.ReadFile(filepath.Join(srv.cfg.CoralDir(), "board_state_"+newName+".json")); rerr == nil {
+		var state struct {
+			Project string `json:"project"`
+		}
+		require.NoError(t, json.Unmarshal(raw, &state))
+		assert.Equal(t, home, state.Project, "its command-line state is the launch board's")
+	}
+	seatHome, err := bs.SessionSubscription(ctx, home, newName)
+	require.NoError(t, err)
+	assert.NotNil(t, seatHome, "and the launch re-seats it on its recorded board")
+}

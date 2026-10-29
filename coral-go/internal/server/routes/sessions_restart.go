@@ -519,14 +519,14 @@ func (h *SessionsHandler) endOldTerminal(name string) error {
 	return h.backend.Kill(name)
 }
 
-// launchSeat is the seat a restart or a resume carries to the new session: the one on the board the live row was launched on. Before, it was the session's NEWEST seat, so an agent the Operator had also seated on
-// another board came back from a restart on that board, as that seat's member, with its live row and command-line state moved there (found by tests/stress/run_search.sh, #11005). A session with no recorded
-// board (it joined through the board API) keeps the newest seat.
+// launchSeat is the seat a restart, a resume and the auto-wake notice take: the one on the board the live row was launched on, and never another board's. Before, it was the session's NEWEST seat, so an agent the
+// Operator (or the old subscribe hole) had also seated on another board came back from a restart on that board, as that seat's member, with its live row and command-line state moved there (found by
+// tests/stress/run_search.sh, #11005). With a recorded board the answer is that board's seat or none: an agent that holds no seat there (it removed it, or never had one) is NOT given the newest seat of some other
+// board, because that would make the foreign board its launch board for good; with no seat the restart re-seats it on the recorded board. Only a session with NO recorded board (it joined through the board API)
+// keeps the newest seat.
 func (h *SessionsHandler) launchSeat(ctx context.Context, stored *store.LiveSession, sessionName string) (*board.Subscriber, error) {
 	if stored != nil && stored.BoardName != nil && *stored.BoardName != "" {
-		if sub, err := h.bs.SessionSubscription(ctx, *stored.BoardName, sessionName); err != nil || sub != nil {
-			return sub, err
-		}
+		return h.bs.SessionSubscription(ctx, *stored.BoardName, sessionName)
 	}
 	return h.bs.GetSubscriptionBySessionName(ctx, sessionName)
 }
