@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/subgentic/coral/internal/background"
 	"github.com/subgentic/coral/internal/coralnames"
 	"github.com/subgentic/coral/internal/safefs"
 	"github.com/subgentic/coral/internal/store"
@@ -44,6 +45,10 @@ func (h *SessionsHandler) SetTeamHomeFolder(w http.ResponseWriter, r *http.Reque
 // ownWorktree reports whether real (a folder with its links resolved) is this team's own worktree: <worktrees folder>/<the team's name>, as the launch made it. Any other folder in the worktrees folder
 // is another team's or a job run's, and removing this team would remove it (#10860).
 func ownWorktree(coralDir string, team *store.Team, real string) bool {
+	// The name is checked first: a separator or dot-dot would make <root>/../x or <root>/a/b "its own worktree" (#10957); a refused name answers false, the safe answer.
+	if !background.ValidKnowledgeTeam(team.Name) {
+		return false
+	}
 	root, err := safefs.Resolve(coralnames.WorktreesRoot(coralDir))
 	return err == nil && real == filepath.Join(root, team.Name)
 }

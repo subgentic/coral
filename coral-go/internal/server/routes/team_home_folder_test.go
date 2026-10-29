@@ -15,6 +15,7 @@ import (
 
 	"github.com/subgentic/coral/internal/naming"
 	"github.com/subgentic/coral/internal/ptr"
+	"github.com/subgentic/coral/internal/safefs"
 	"github.com/subgentic/coral/internal/store"
 	"github.com/subgentic/coral/internal/store/storetest"
 )
@@ -281,4 +282,24 @@ func TestWakeFollowsALinkedTeamFolderToWhereItReallyIs(t *testing.T) {
 	terminal.mu.Unlock()
 	require.NotNil(t, pane)
 	assert.Equal(t, homeReal(t, target), pane.CurrentPath, "where the link really goes, never the link's own path")
+}
+
+// A team's name is one folder name: a name with a separator or dot-dot never makes a folder outside the worktrees folder, or deeper in it, the team's own worktree (#10957, the safefs join census).
+func TestOwnWorktreeTakesOnlyAOneElementTeamName(t *testing.T) {
+	coralDir := t.TempDir()
+	root := filepath.Join(coralDir, "worktrees")
+	require.NoError(t, os.MkdirAll(filepath.Join(root, "a", "b"), 0o755))
+	require.NoError(t, os.MkdirAll(filepath.Join(coralDir, "x"), 0o755))
+	real, err := safefs.Resolve(root)
+	require.NoError(t, err)
+	assert.True(t, ownWorktree(coralDir, &store.Team{Name: "a"}, filepath.Join(real, "a")), "a plain name")
+	for name, folder := range map[string]string{
+		"../x": filepath.Join(filepath.Dir(real), "x"), // outside the worktrees folder
+		"a/b":  filepath.Join(real, "a", "b"),          // deeper than one element
+		"..":   filepath.Dir(real),
+		".":    real,
+		"":     real,
+	} {
+		assert.False(t, ownWorktree(coralDir, &store.Team{Name: name}, folder), "team name %q", name)
+	}
 }
