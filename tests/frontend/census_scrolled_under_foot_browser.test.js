@@ -20,6 +20,14 @@ const PAGE = body => 'data:text/html;charset=utf-8,' + encodeURIComponent('<!doc
         await Page.navigate({ url: PAGE('<button style="position:absolute;left:20px;top:20px;width:120px;height:44px">First</button><button style="position:absolute;left:60px;top:30px;width:120px;height:44px">Second</button>') }); await Page.loadEventFired();
         const b = await scaleOf(ev, 'a real overlap');
         assert.ok(b.overlap.length >= 1, 'two controls drawn over each other are still caught: ' + JSON.stringify(b.overlap));
+        // QA's cases (#11003 review): (A) the last row under the foot at the END of the scroll cannot be cleared: still caught; (D) a fixed foot outside the row's scroller: still caught
+        await Page.navigate({ url: PAGE(list.replace('<div id=sc ', '<div id=sc data-end ')) }); await Page.loadEventFired();
+        await ev(`(() => { const sc = document.getElementById('sc'); sc.scrollTop = sc.scrollHeight; return true; })()`);
+        const e = await scaleOf(ev, 'at the end of the scroll');
+        assert.ok(e.overlap.every(o => !/row 11/.test(o)), 'at the end the last row clears the foot: ' + JSON.stringify(e.overlap));
+        await Page.navigate({ url: PAGE(`<div style="height:300px;overflow-y:auto;position:relative"><ul style="list-style:none;margin:30px 0 0;padding:0">${rows}</ul></div><div style="position:fixed;left:0;top:230px;background:#fff"><button style="height:44px;width:200px">Fixed foot</button></div>`) }); await Page.loadEventFired();
+        const f = await scaleOf(ev, 'a fixed foot outside the scroller');
+        assert.ok(f.overlap.length >= 1, 'a fixed foot outside the row\'s scroller is still an overlap: ' + JSON.stringify(f.overlap));
         console.log('PASS');
     } finally { try { await client.close(); } catch (e) {} }
 })().catch(e => { console.error(e); process.exit(1); });

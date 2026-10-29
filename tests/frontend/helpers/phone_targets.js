@@ -140,7 +140,10 @@ const SCALE = `(() => {
         // a row under a pinned foot (position sticky or fixed) of the scroller it sits in is not an overlap when scrolling clears it: the list ends above the foot, and a longer list or a wider font only moves how far down that is (#11003)
         const pinned = x => { for (let p = x; p && p !== document.body; p = p.parentElement) { const pos = getComputedStyle(p).position; if (pos === 'sticky' || pos === 'fixed') return p; } return null; };
         const scrollerOf = x => { for (let p = x.parentElement; p && p !== document.body; p = p.parentElement) { if (/(auto|scroll)/.test(getComputedStyle(p).overflowY) && p.scrollHeight > p.clientHeight + 1) return p; } return null; };
-        { const pa = pinned(a), pc = pinned(c); if ((pa && !pc) || (pc && !pa)) { const row = pa ? c : a, foot = pa || pc, sc = scrollerOf(row); const ov = Math.min(ab.bottom, cb.bottom) - Math.max(ab.top, cb.top); if (sc && sc.contains(foot) && sc.scrollHeight - sc.clientHeight - sc.scrollTop >= ov) continue; } }
+        { const pa = pinned(a), pc = pinned(c); if ((pa && !pc) || (pc && !pa)) { const row = pa ? c : a, foot = pa || pc, sc = scrollerOf(row); const ov = Math.min(ab.bottom, cb.bottom) - Math.max(ab.top, cb.top);
+            // which edge the bar is pinned to decides which way scrolling clears the row: a foot (bottom set, top auto) is cleared by scrolling down, a head (top set, bottom auto) by scrolling up; one pinned both ways or neither is an overlap
+            const fs = getComputedStyle(foot), atBottom = fs.bottom !== 'auto' && fs.top === 'auto', atTop = fs.top !== 'auto' && fs.bottom === 'auto';
+            if (sc && sc.contains(foot) && ((atBottom && sc.scrollHeight - sc.clientHeight - sc.scrollTop >= ov) || (atTop && sc.scrollTop >= ov))) continue; } }
         const layer = x => x.closest('[role=menu], [role=listbox], [role=dialog], dialog, [aria-modal=true], [class*="-menu"]:not(.overflow-menu-item), [class*=dropdown], [popover], .toast, .modal'); // a menu, list or dialog is meant to lie over the page
         if (layer(a) !== layer(c)) continue;
         const w = Math.min(ab.right, cb.right) - Math.max(ab.left, cb.left), h = Math.min(ab.bottom, cb.bottom) - Math.max(ab.top, cb.top);
