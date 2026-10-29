@@ -14,6 +14,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -47,9 +48,23 @@ func startedByGoTest(args []string) bool {
 	return false
 }
 
+// privateBase is where the private folder is made: the system temp folder, except on Unix, where it is /tmp when that is a folder.
+// The tests make Unix sockets below their temp folder (tmux's, peercred's, the board relay's), and a socket's path is limited to 104
+// bytes on macOS and 108 on Linux. macOS's own temp folder (/var/folders/xx/.../T/) takes about 50 of them before the private folder
+// adds its own (the coral-go-team's dry run on #177: "File name too long" in internal/tmux).
+func privateBase() string {
+	if runtime.GOOS == "windows" {
+		return ""
+	}
+	if fi, err := os.Stat("/tmp"); err == nil && fi.IsDir() {
+		return "/tmp"
+	}
+	return ""
+}
+
 func setup() (cleanup func()) {
 	pinGoTool()
-	dir, err := os.MkdirTemp("", "ct-")
+	dir, err := os.MkdirTemp(privateBase(), "ct-")
 	if err != nil {
 		return func() {}
 	}
