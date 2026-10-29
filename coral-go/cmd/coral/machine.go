@@ -191,7 +191,11 @@ func runMachine(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return fail("%v", err)
 	}
 	if *hubURL != config.TierDefaultCloudURL {
-		fmt.Fprintf(stderr, "coral machine launch: warning: %s is not this build's Coral Hub (%s): the Hub key is sent there.\n", *hubURL, config.TierDefaultCloudURL)
+		sent := "the Hub key is"
+		if destroyKey != "" {
+			sent = "the Hub key and the destroy credential are"
+		}
+		fmt.Fprintf(stderr, "coral machine launch: warning: %s is not this build's Coral Hub (%s): %s sent there.\n", *hubURL, config.TierDefaultCloudURL, sent)
 	}
 	hub := newMachineHub(*hubURL, key, destroyKey)
 

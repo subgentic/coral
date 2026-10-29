@@ -303,6 +303,24 @@ func TestMachineLaunchPinsTheCoralDigest(t *testing.T) {
 	}
 }
 
+// The warning for a Hub that is not this build's names every secret that goes there: the destroy credential too when one was given.
+func TestMachineLaunchWarningNamesTheDestroyCredentialToo(t *testing.T) {
+	tf, kf, _, _ := machineFixture(t)
+	destroy := filepath.Join(t.TempDir(), "destroy")
+	if err := os.WriteFile(destroy, []byte("chd_DESTROYCREDENTIAL0123\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	base := []string{"launch", "--provider", "digitalocean", "--token-file", tf, "--hub-key-file", kf, "--hub-url", "https://hub.example", "--coral-version", "2.0.3", "--yes"}
+	var out, errb bytes.Buffer
+	if code := runMachine(base, strings.NewReader(""), &out, &errb); code != 0 || !strings.Contains(errb.String(), "the Hub key is sent there") || strings.Contains(errb.String(), "destroy credential") {
+		t.Fatalf("exit %d: %s", code, errb.String())
+	}
+	errb.Reset()
+	if code := runMachine(append(append([]string{}, base...), "--hub-destroy-file", destroy), strings.NewReader(""), &out, &errb); code != 0 || !strings.Contains(errb.String(), "the Hub key and the destroy credential are sent there") || strings.Contains(errb.String(), "DESTROYCREDENTIAL") {
+		t.Fatalf("exit %d: %s", code, errb.String())
+	}
+}
+
 // --hub-destroy-file is optional: given, the chd_ reaches the Hub client (never the user-data or the output); an unsafe file is refused before any call; none at all launches as before.
 func TestMachineLaunchHubDestroyFile(t *testing.T) {
 	tf, kf, p, h := machineFixture(t)
