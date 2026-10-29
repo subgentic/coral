@@ -488,7 +488,7 @@
     },
     {
       "name": "boards",
-      "sql": "CREATE TABLE boards (\n\t\t\tid         TEXT PRIMARY KEY,\n\t\t\tlabel      TEXT NOT NULL,\n\t\t\tcreated_at TEXT NOT NULL,\n\t\t\tcreated_by TEXT NOT NULL DEFAULT ''\n\t\t, cross_team_id TEXT, board_uid TEXT)",
+      "sql": "CREATE TABLE boards (\n\t\t\tid         TEXT PRIMARY KEY,\n\t\t\tlabel      TEXT NOT NULL,\n\t\t\tcreated_at TEXT NOT NULL,\n\t\t\tcreated_by TEXT NOT NULL DEFAULT ''\n\t\t, kind TEXT NOT NULL DEFAULT '', cross_team_id TEXT, board_uid TEXT)",
       "tbl_name": "boards",
       "type": "table"
     },
@@ -3926,6 +3926,15 @@
         },
         {
           "cid": 4,
+          "dflt_value": "''",
+          "hidden": 0,
+          "name": "kind",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 5,
           "dflt_value": null,
           "hidden": 0,
           "name": "cross_team_id",
@@ -3934,7 +3943,7 @@
           "type": "TEXT"
         },
         {
-          "cid": 5,
+          "cid": 6,
           "dflt_value": null,
           "hidden": 0,
           "name": "board_uid",
@@ -3947,7 +3956,7 @@
         {
           "columns": [
             {
-              "cid": 5,
+              "cid": 6,
               "coll": "BINARY",
               "desc": 0,
               "key": 1,
@@ -3972,7 +3981,7 @@
         {
           "columns": [
             {
-              "cid": 4,
+              "cid": 5,
               "coll": "BINARY",
               "desc": 0,
               "key": 1,
