@@ -17,6 +17,9 @@ import (
 // errUntrustedMountPoint is ERROR_UNTRUSTED_MOUNT_POINT, the refusal of a junction Windows will not traverse (build 26300 and later).
 const errUntrustedMountPoint syscall.Errno = 448
 
+// untrustedMountRefusal reports whether err is Windows refusing to traverse a junction on the way to a path (error 448).
+func untrustedMountRefusal(err error) bool { return errors.Is(err, errUntrustedMountPoint) }
+
 // secureExistingDataDir makes an existing data folder that other accounts can use private to this user (G2A, #96):
 //
 //   - it acts only when the folder's access list has an allow entry for anyone but this user, SYSTEM and Administrators

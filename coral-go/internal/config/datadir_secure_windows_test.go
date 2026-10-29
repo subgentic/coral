@@ -226,3 +226,31 @@ func TestFolderTheInstallerMadeWithOnlyTheEulaMarkerIsTightened(t *testing.T) {
 	assert.Empty(t, readersOf(t, dir), "the folder is private now")
 	assert.Empty(t, readersOf(t, filepath.Join(dir, ".eula-accepted")))
 }
+
+// A data folder whose path goes through a junction (the folder itself is not the link), existing or new: where Windows follows the junction it is used as any folder; where it
+// refuses (build 26300 and later: untrusted mount point) EnsureDataDir answers the named refusal with the way out, not the system's bare error (#350). Either way nothing is
+// created through the junction.
+func TestDataFolderBehindAJunctionIsRefusedByNameWhereWindowsWillNotOpenIt(t *testing.T) {
+	root := t.TempDir()
+	target := filepath.Join(root, "target")
+	require.NoError(t, os.MkdirAll(filepath.Join(target, "coral"), 0o700))
+	link := filepath.Join(root, "junc")
+	out, err := exec.Command("cmd", "/c", "mklink", "/J", link, target).CombinedOutput()
+	require.NoError(t, err, string(out))
+	traversable := linktest.JunctionsTraversable(t)
+	t.Logf("junctions can be followed here: %v", traversable)
+	for _, name := range []string{"coral", "newfolder"} { // an existing folder behind the junction, and one that does not exist yet
+		err := EnsureDataDir(filepath.Join(link, name))
+		if traversable {
+			assert.NotErrorIs(t, err, ErrDataDirBehindJunction, name)
+			continue
+		}
+		require.ErrorIs(t, err, ErrDataDirBehindJunction, name)
+		assert.Contains(t, err.Error(), "CORAL_DATA_DIR", "it says what to do")
+		assert.True(t, linktest.UntrustedMountPoint(err), "the system's own error stays in the chain: %v", err)
+	}
+	if !traversable {
+		_, statErr := os.Stat(filepath.Join(target, "newfolder"))
+		assert.True(t, os.IsNotExist(statErr), "nothing was created behind the junction")
+	}
+}
