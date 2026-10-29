@@ -77,7 +77,7 @@ const HOLD = `(() => {
 
         console.log('2. The terminal socket: a composer_send refused with not_sent false is kept the same way');
         await ev(`(async () => { window.__fakeTerminal = true; const x = await import((window.__coralStatic || '/static/') + 'xterm_renderer.js'); const s = (await import((window.__coralStatic || '/static/') + 'state.js')).state.currentSession;
-            x.connectTerminalWs(s.tmux_session || s.name, s.agent_type, s.session_id, 'local'); return true; })()`);
+            window.connectTerminalWs(s.tmux_session || s.name, s.agent_type, s.session_id, 'local'); return true; })()`);
         await waitFor(`window.__ws && window.__ws.readyState === 1`, 'the fake terminal socket open');
         await type('run the tests');
         await ev(`window.sendCommand(); true`);
