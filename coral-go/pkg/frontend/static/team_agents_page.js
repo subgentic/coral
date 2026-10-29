@@ -173,7 +173,7 @@ function draw() {
     const ended = data.agents.filter(a => a.availability === 'offline').length; // the tab lists every member, the sidebar only the live ones: this says why they differ (#8271)
     const archived = data.agents.filter(a => a.availability === 'archived').length, live = data.agents.length - archived; // the same rule as the tab's badge and the sidebar group: an archived agent is told apart, not counted (#10369)
     body.append(el('p', 'goals-note team-agents-count', `${live} agent${live === 1 ? '' : 's'}${ended ? `, ${ended} ended` : ''}${archived ? `, +${archived} archived` : ''}`));
-    const rows = visibleAgents();
+    const rows = visibleAgents(), searchShown = [...model.levels.values()].some(l => l && l.level && l.level !== 'own');
     body.append(DT.dataTable({
         label: `Agents, ${rows.length}`, rows, rowKey: ag => ag.subscriber_id || ag.session_id || ag.name, state: agentsTableState,
         open: (ag, tr) => hooks.openAgent?.(ag, tr.querySelector('.dt-primary')),
@@ -183,7 +183,7 @@ function draw() {
             { key: 'status', label: 'Status', line: 2, width: '11rem', dropAt: 28, sort: true, sortValue: statusWord, cell: ag => DT.chip(statusWord(ag), CLASS[ag.availability]) },
             { key: 'doing', label: 'Doing', line: 2, width: '18rem', dropAt: 52, sort: true, sortValue: doingOf, cell: ag => { const t = doingOf(ag), span = el('span', null, t); if (t) span.title = t; return span; } }, // one line a row (Goal #79): the whole line is the tooltip
             { key: 'provider', label: 'Provider', line: 2, width: '6rem', dropAt: 36, tone: 'tertiary', sort: true, sortValue: providerOf, cell: providerOf },
-            { key: 'search', label: 'Search', line: 2, width: '12rem', dropAt: 44, tone: 'tertiary', cell: ag => searchChip((model.levels.get(ag.name) || {}).level) || '' }, // only above "own": an empty column is not drawn
+            ...(searchShown ? [{ key: 'search', label: 'Search', line: 2, width: '12rem', dropAt: 44, tone: 'tertiary', cell: ag => searchChip((model.levels.get(ag.name) || {}).level) || '' }] : []), // a column only while some member is above "own": an empty one was drawn, clipped at the right edge of a phone's table as a stray "…" (#11128)
             { key: 'chat', label: 'Chat', line: 1, width: '7rem', cell: chatButton },
         ], oneLine: true, sortBar: false,
     }).el);

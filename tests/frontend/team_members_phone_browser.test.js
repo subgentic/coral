@@ -18,7 +18,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
             await ev(`document.documentElement.style.fontSize = '${fs}px'; window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
             await ev(`(async () => { const real = window.fetch; window.fetch = async (u, o) => { const r = await real(u, o); if (!/\\/api\\/board\\/[^/]+\\/status/.test(String(u)) || !r.ok) return r; const j = await r.clone().json().catch(() => null); if (!j || !Array.isArray(j.agents)) return r; j.agents.forEach(a => { a.availability = 'available'; a.agent_type = 'claude'; }); return new Response(JSON.stringify(j), { status: 200, headers: { 'Content-Type': 'application/json' } }); };
-                const { state } = await import((window.__coralStatic || '/static/') + 'state.js'); state.liveSessions = ['orch-s', 'lead-s', 'qa-s'].map((n, i) => ({ name: n, session_id: 'sid' + i, agent_type: 'claude', board_project: ${JSON.stringify(B)}, display_name: ['Orchestrator', 'Lead Developer', 'QA Engineer'][i] })); return true; })()`);
+                const { state } = await import((window.__coralStatic || '/static/') + 'state.js'); state.liveSessions = ['orch', 'lead', 'qa'].map((n, i) => ({ name: n, session_id: 'sid' + i, agent_type: 'claude', board_project: ${JSON.stringify(B)}, display_name: ['Orchestrator', 'Lead Developer', 'QA Engineer'][i] })); return true; })()`);
             await ev(`window.openTeamPage(${JSON.stringify(B)}, { tab: 'agents' }); true`);
             await waitFor(`document.querySelectorAll('#team-panel-agents .dt-table tbody tr').length >= 3`, `${fs}: the three members`, 15000);
             await new Promise(r => setTimeout(r, 500)); // sleep-ok: the table settles after its first draw
@@ -29,6 +29,8 @@ const { removeBoards } = require('./helpers/board_cleanup');
             console.log(`   ${fs}: ` + JSON.stringify(m));
             { const d = process.env.CORAL_SCREENSHOT_DIR; if (d) { require('node:fs').mkdirSync(d, { recursive: true }); require('node:fs').writeFileSync(`${d}/members-${fs}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); } }
             assert.deepEqual(m.cut, [], `${fs}: no name is cut: ` + JSON.stringify(m));
+            assert.equal(await ev(`!!document.querySelector('#team-panel-agents thead th[data-key="search"]')`), false, `${fs}: no Search column while every member is at own (an empty one was clipped at the table's edge as a stray "…")`);
+            assert.equal(await ev(`[...document.querySelectorAll('#team-panel-agents .team-open-chat')].length`) > 0, true, `${fs}: the Chat column is there`);
             assert.ok(m.cellsRight <= m.boxRight + 1 && m.scroll <= 1 && m.page <= 0, `${fs}: the table fits the screen (no cell past its box, nothing scrolls sideways): ` + JSON.stringify(m));
         }
         console.log('PASS the Members table keeps every name whole and fits a phone at 100% and 200% text');
