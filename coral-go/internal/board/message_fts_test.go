@@ -365,3 +365,86 @@ func TestMessageIndexBuiltBeforeTheWatermarkIsComplete(t *testing.T) {
 	require.NoError(t, err)
 	require.False(t, s.messageIndexComplete(ctx), "a watermark that has not reached the end: a build that was interrupted")
 }
+
+// #10905: an index the old build race left stale (a message edited after its chunk was indexed, no trigger to say so) answers a search
+// and misses the edited words; the check after open finds it and builds it again, and the words are found.
+func TestMessageSearchIndexIsRepairedWhenItDoesNotMatchTheMessages(t *testing.T) {
+	s := ftsStoreWithMessages(t, ftsTexts, 60)
+	ctx := context.Background()
+	require.NoError(t, s.BuildMessageSearchIndex(ctx))
+	healthy, err := s.CheckMessageSearchIndex(ctx)
+	require.NoError(t, err)
+	require.False(t, healthy, "a healthy index is left as it is")
+
+	// the old race's damage: the content changes with no trigger to tell the index
+	_, err = s.db.ExecContext(ctx, `DROP TRIGGER board_messages_fts_au`)
+	require.NoError(t, err)
+	_, err = s.db.ExecContext(ctx, `UPDATE board_messages SET content = 'rewritten after it was indexed: flamingo' WHERE id = 7`)
+	require.NoError(t, err)
+	_, err = s.db.ExecContext(ctx, messageFTSTriggers[2])
+	require.NoError(t, err)
+	a, b := queryBoth(t, s, MessageQueryParams{Q: []string{"flamingo"}, Limit: []string{"50"}})
+	require.Equal(t, 1, b.Total, "the scan finds the edited message")
+	require.NotEqual(t, b.Total, a.Total, "the stale index silently misses it: this is the damage")
+
+	repaired, err := s.CheckMessageSearchIndex(ctx)
+	require.NoError(t, err)
+	require.True(t, repaired, "the check finds the mismatch and builds the index again")
+	require.Equal(t, "ready", s.MessageSearchIndexState())
+	before := answered(s)
+	a, b = queryBoth(t, s, MessageQueryParams{Q: []string{"flamingo"}, Limit: []string{"50"}})
+	require.Equal(t, b, a, "the rebuilt index finds what the scan finds")
+	require.Equal(t, 1, a.Total)
+	require.Greater(t, answered(s), before, "and the index is the one that answered")
+}
+
+// The check is bounded: a board over the limit is not read at all, whatever state its index is in.
+func TestMessageSearchIndexCheckLeavesABigBoardAlone(t *testing.T) {
+	s := ftsStoreWithMessages(t, ftsTexts, 30)
+	ctx := context.Background()
+	require.NoError(t, s.BuildMessageSearchIndex(ctx))
+	old := messageIndexCheckMaxMessages
+	messageIndexCheckMaxMessages = 10
+	defer func() { messageIndexCheckMaxMessages = old }()
+	_, err := s.db.ExecContext(ctx, `DROP TRIGGER board_messages_fts_au`)
+	require.NoError(t, err)
+	_, err = s.db.ExecContext(ctx, `UPDATE board_messages SET content = 'changed quietly: pelican' WHERE id = 3`)
+	require.NoError(t, err)
+	repaired, err := s.CheckMessageSearchIndex(ctx)
+	require.NoError(t, err)
+	require.False(t, repaired, "over the limit: not checked, so not repaired")
+}
+
+// On open, a complete index is checked after messageIndexCheckDelay without anyone asking: a store opened on a stale index finds the
+// edited words a moment later.
+func TestMessageSearchIndexIsCheckedAfterOpen(t *testing.T) {
+	t.Setenv(messageSearchIndexEnv, "on") // a store builds or finds its index at open only when the setting is on
+	path := filepath.Join(t.TempDir(), "board_check.db")
+	s, err := NewStoreWithKey(path, "")
+	require.NoError(t, err)
+	ctx := context.Background()
+	_, err = sub(s, ctx, "proj", "dev", "Backend Dev")
+	require.NoError(t, err)
+	for i := 0; i < 40; i++ {
+		_, err := s.PostMessage(ctx, "proj", "dev", fmt.Sprintf("%s #%d", ftsTexts[i%len(ftsTexts)], i), nil)
+		require.NoError(t, err)
+	}
+	require.NoError(t, s.BuildMessageSearchIndex(ctx))
+	for _, q := range []string{`DROP TRIGGER board_messages_fts_au`, `UPDATE board_messages SET content = 'edited later: heron' WHERE id = 5`, messageFTSTriggers[2]} {
+		_, err := s.db.ExecContext(ctx, q)
+		require.NoError(t, err)
+	}
+	require.NoError(t, s.Close())
+
+	defer func(d time.Duration) { messageIndexCheckDelay = d }(messageIndexCheckDelay)
+	messageIndexCheckDelay = 400 * time.Millisecond
+	s, err = NewStoreWithKey(path, "")
+	require.NoError(t, err)
+	defer s.Close()
+	a, b := queryBoth(t, s, MessageQueryParams{Q: []string{"heron"}, Limit: []string{"50"}})
+	require.NotEqual(t, b.Total, a.Total, "just after open the stale index still misses the edited word (the check has not run yet)")
+	require.Eventually(t, func() bool {
+		a, b := queryBoth(t, s, MessageQueryParams{Q: []string{"heron"}, Limit: []string{"50"}})
+		return b.Total == 1 && a.Total == 1
+	}, 10*time.Second, 50*time.Millisecond, "the check after open rebuilt the index: the edited word is found through it")
+}
