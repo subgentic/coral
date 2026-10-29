@@ -131,7 +131,15 @@ func finalPath(dir string) string {
 // a random name is created, never opened (Security on #335). The first line says whether this run's token is elevated.
 func openLog() func() {
 	log.SetFlags(log.LstdFlags)
-	f, err := os.CreateTemp(os.TempDir(), "coral-msi-helper-*.log")
+	var f *os.File
+	var err error
+	if windows.GetCurrentProcessToken().IsElevated() {
+		// An elevated run never writes into TEMP (the user's, a folder where a link can be planted): the log is created new in the opened, plain mark folder (#155
+		// review). No such folder, no log: never a fallback to TEMP.
+		f, err = installrestart.CreateLog("coral-msi-helper")
+	} else {
+		f, err = os.CreateTemp(os.TempDir(), "coral-msi-helper-*.log")
+	}
 	if err != nil {
 		return func() {}
 	}
