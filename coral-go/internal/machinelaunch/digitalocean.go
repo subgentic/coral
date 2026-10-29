@@ -39,6 +39,8 @@ const (
 	maxTransientRetry = 5        // consecutive 429 or 5xx answers WaitRunning rides out
 )
 
+func regexpMust(p string) *regexp.Regexp { return regexp.MustCompile(p) }
+
 var (
 	hostNameRe = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$`)
 	slugRe     = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{0,63}$`)
@@ -256,11 +258,16 @@ type doDroplet struct {
 			Type string `json:"type"`
 		} `json:"v4"`
 	} `json:"networks"`
-	Tags []string `json:"tags"`
+	Tags      []string `json:"tags"`
+	VPCUUID   string   `json:"vpc_uuid"`
+	CreatedAt string   `json:"created_at"`
 }
 
 func (dr doDroplet) instance() Instance {
-	in := Instance{ID: dr.ID.String(), Name: dr.Name, Region: dr.Region.Slug, Size: dr.SizeSlug, Tags: dr.Tags}
+	in := Instance{ID: dr.ID.String(), Name: dr.Name, Region: dr.Region.Slug, Size: dr.SizeSlug, Tags: dr.Tags, VPCID: dr.VPCUUID}
+	if t, err := time.Parse(time.RFC3339, dr.CreatedAt); err == nil {
+		in.Created = t
+	}
 	switch dr.Status {
 	case "new":
 		in.Status = StatusPending
@@ -317,6 +324,12 @@ func (d *DigitalOcean) Create(ctx context.Context, spec Spec) (Instance, error) 
 	body := map[string]any{
 		"name": spec.Name, "region": spec.Region, "size": spec.Size, "image": image,
 		"ssh_keys": keys, "backups": false, "ipv6": false, "monitoring": false, "tags": tags, "user_data": spec.UserData,
+	}
+	if spec.VPCID != "" {
+		if !doUUIDRe.MatchString(spec.VPCID) {
+			return Instance{}, errors.New("digitalocean: the VPC is not a VPC id")
+		}
+		body["vpc_uuid"] = spec.VPCID
 	}
 	var out struct {
 		Droplet doDroplet `json:"droplet"`
