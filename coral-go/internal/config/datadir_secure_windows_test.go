@@ -235,7 +235,7 @@ func TestDataFolderBehindAJunctionIsRefusedByNameWhereWindowsWillNotOpenIt(t *te
 	target := filepath.Join(root, "target")
 	require.NoError(t, os.MkdirAll(filepath.Join(target, "coral"), 0o700))
 	link := filepath.Join(root, "junc")
-	out, err := exec.Command("cmd", "/c", "mklink", "/J", link, target).CombinedOutput()
+	out, err := consoletest.HiddenCommand("cmd", "/c", "mklink", "/J", link, target).CombinedOutput()
 	require.NoError(t, err, string(out))
 	traversable := linktest.JunctionsTraversable(t)
 	t.Logf("junctions can be followed here: %v", traversable)
