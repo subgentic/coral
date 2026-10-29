@@ -244,7 +244,7 @@ export function renderAgentPage(host, agent, ctx) {
         bar.append(b);
     }
     const session = sessionOf(agent), reach = model.levels.get(agent.name);
-    if (reach) { const c = searchChip(reach.level); if (c) line.append(c); const b = btn('btn', 'Search access\u2026', null); b.setAttribute('aria-label', `Search access for ${agent.name}`); b.addEventListener('click', () => openSearchAccess({ name: agent.name, ...reach }, { opener: b, onChanged: () => load().then(() => renderAgentPage(host, agent, ctx)) })); bar.append(b); }
+    if (reach) { const c = searchChip(reach.level); if (c) line.append(c); const b = btn('btn', 'Search access\u2026', null); b.setAttribute('aria-label', `Search access for ${agent.name}`); b.addEventListener('click', () => openSearchAccess({ name: agent.name, team: model.team, ...reach }, { opener: b, onChanged: () => load().then(() => renderAgentPage(host, agent, ctx)) })); bar.append(b); }
     if (session) bar.append(btn('btn', 'Open chat', () => openChat(session)));
     if (agent.reminder) {
         const id = agent.subscriber_id || agent.name;

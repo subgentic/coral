@@ -3,6 +3,7 @@
  * asks again in the same dialog (focus on Back) before it is saved. The dialog is a native <dialog> like the Remind dialog: Escape closes it, the focus goes back to the button that opened it. */
 import { teamFetch, isCloud } from './server_base.js';
 import { importOnce } from './import_once.js';
+import { whenText } from './when_text.js';
 const { stateChip } = await importOnce('./team_table.js');
 
 export const LEVELS = [
@@ -28,6 +29,34 @@ export async function readSearchLevels(team) {
         for (const m of (d && d.members) || []) if (m && m.agent_name && Number.isFinite(m.id)) out.set(m.agent_name, { id: m.id, level: m.search_reach || 'own' });
     } catch { /* no levels: no chip and no control */ }
     return out;
+}
+
+/** One line of the access log: a raise (who, from and to) or a read above own (the level asked, the outcome, how many results); never any text. */
+const logLine = (r, withAgent) => {
+    const who = withAgent ? `${r.agent}: ` : '';
+    const n = Number(r.results) || 0;
+    const what = r.kind === 'raise' ? `${r.set_by || 'Operator'} changed it from ${r.from_level} to ${r.to_level}` : `read at ${r.to_level}, ${r.outcome === 'refused' ? 'refused' : `${n} result${n === 1 ? '' : 's'}`}`;
+    return `${whenText(r.at)} \u00b7 ${who}${what}`;
+};
+/** The "Recent access" part of the dialog: this agent's newest rows, and a "Show all" that widens it to the whole log (every agent). Nothing is drawn when the log cannot be read. */
+function mountAccessLog(host, member) {
+    const box = mk('div', 'search-access-log'); box.hidden = true;
+    const head = mk('p', 'search-access-note search-access-log-head', 'Recent access'), list = mk('ul', 'search-access-log-list');
+    const all = mk('button', 'btn btn-small search-access-log-all', 'Show all'); all.type = 'button';
+    box.append(head, list, all); host.append(box);
+    fetch('/api/search-access/log?limit=100').then(r => r.ok ? r.json() : null).then(d => {
+        if (!d || !Array.isArray(d.rows) || !box.isConnected) return;
+        const mine = d.rows.filter(r => r.agent === member.name);
+        const draw = every => {
+            const rows = every ? d.rows.slice(0, 20) : mine.slice(0, 5);
+            list.replaceChildren(...rows.map(r => mk('li', null, logLine(r, every))));
+            if (!rows.length) list.append(mk('li', null, 'Nothing above "own" yet.'));
+            all.hidden = every || d.rows.length <= mine.slice(0, 5).length;
+            head.textContent = every ? 'Recent access, every agent' : 'Recent access';
+        };
+        all.addEventListener('click', () => draw(true));
+        draw(false); box.hidden = false;
+    }, () => {});
 }
 
 let dialog = null;
@@ -75,7 +104,8 @@ export function openSearchAccess(member, opts = {}) {
                 const text = mk('span', 'search-access-text'); text.append(mk('span', 'search-access-word', word), mk('span', 'search-access-reads', reads));
                 row.append(radio, text); list.append(row);
             }
-            body.append(list, mk('p', 'search-access-note', 'Changes are logged (who, when, level; never the text). A cloned or imported member starts at "own".'));
+            body.append(list); mountAccessLog(body, member);
+            body.append(mk('p', 'search-access-note', 'Changes are logged (who, when, level; never the text). A cloned or imported member starts at "own".'));
         }
         body.append(err);
         acts.replaceChildren(cancel);

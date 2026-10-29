@@ -416,3 +416,5 @@
 .search-access-text { display: grid; min-width: 0; overflow-wrap: anywhere; }
 .search-access-word { font-weight: var(--fw-medium); color: var(--text-primary); }
 .search-access-reads, .search-access-note { color: var(--text-secondary); font-size: var(--fs-md); }
+.search-access-log { margin-top: var(--space-md); }
+.search-access-log-list { margin: 0; padding-left: var(--space-xl); color: var(--text-secondary); font-size: var(--fs-md); }

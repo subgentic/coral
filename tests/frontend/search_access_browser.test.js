@@ -13,6 +13,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         const json = (o, status) => Promise.resolve(new Response(JSON.stringify(o), { status: status || 200, headers: { 'Content-Type': 'application/json' } }));
         window.fetch = (u, o) => { const url = String(u), method = (o && o.method) || 'GET';
             if (method === 'GET' && /\\/api\\/teams\\/detail\\/[^/?]+$/.test(url)) return json({ name: ${JSON.stringify(B)}, members: Object.keys(window.__levels).map((n, i) => ({ id: 10 + i, agent_name: n, search_reach: window.__levels[n] })) });
+            if (method === 'GET' && /\\/api\\/search-access\\/log/.test(url)) return json({ rows: [{ id: 4, kind: 'read', team: 't', agent: 'orch', to_level: 'team', outcome: 'ok', results: 3, at: new Date().toISOString() }, { id: 3, kind: 'read', team: 't', agent: 'lead', to_level: 'all', outcome: 'refused', results: 0, at: new Date().toISOString() }, { id: 2, kind: 'raise', team: 't', agent: 'orch', from_level: 'own', to_level: 'team', set_by: 'operator', via: 'dashboard', at: new Date().toISOString() }] });
             const m = url.match(/\\/api\\/team-members\\/(\\d+)\\/search-access$/);
             if (method === 'PUT' && m) { const b = JSON.parse(o.body); window.__puts.push({ id: Number(m[1]), ...b }); if (b.level === 'operator' && b.confirm !== 'operator') return json({ error: 'confirm', code: 'confirm_required' }, 400);
                 window.__levels[['orch', 'lead', 'qa'][Number(m[1]) - 10]] = b.level; return json({ ok: true, member_id: Number(m[1]), level: b.level }); }
@@ -42,6 +43,10 @@ const { removeBoards } = require('./helpers/board_cleanup');
             assert.deepEqual(radios, ['own*', 'team', 'all', 'operator'], `${w}: the four levels, own checked`);
             assert.ok(await dlg(`/also your own boards and your own Claude\\/Codex conversations on this computer/.test(d.textContent)`), `${w}: the top level's line`);
             assert.ok(await dlg(`/cloned or imported member starts at "own"/.test(d.textContent)`), `${w}: the dialog says a clone or import starts at own`);
+            await waitFor(`document.querySelectorAll('#search-access-dialog .search-access-log-list li').length === 2`, `${w}: the log shows this agent's two rows`, 4000);
+            assert.ok(await dlg(`/read at team, 3 results/.test(d.textContent) && /changed it from own to team/.test(d.textContent) && !/refused/.test(d.querySelector('.search-access-log-list').textContent)`), `${w}: a read says the level and the count, a raise says from and to; another agent's row is not here`);
+            await ev(`document.querySelector('#search-access-dialog .search-access-log-all').click(); true`);
+            assert.ok(await dlg(`d.querySelectorAll('.search-access-log-list li').length === 3 && /lead: read at all, refused/.test(d.textContent)`), `${w}: Show all lists every agent's rows`);
             const fits = await dlg(`(() => { const r = d.getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth && r.bottom <= innerHeight && document.documentElement.scrollWidth <= innerWidth + 1; })()`);
             assert.ok(fits, `${w}: the dialog fits the screen`);
             { const d = process.env.CORAL_SCREENSHOT_DIR; if (d) { require('node:fs').mkdirSync(d, { recursive: true }); require('node:fs').writeFileSync(`${d}/search-access-${w}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); } }
