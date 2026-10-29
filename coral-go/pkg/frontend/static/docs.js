@@ -300,7 +300,7 @@ function openAtAnswer(content) {
     const want = takeDocsAnswer();
     if (!want) return;
     const h = [...content.querySelectorAll('h2, h3')].find(e => e.textContent.trim() === want);
-    if (h) { h.scrollIntoView({ block: 'start' }); sayDocs(`Showing ${want}`); }
+    if (h) { h.tabIndex = -1; h.focus({ preventScroll: true }); h.scrollIntoView({ block: 'start' }); sayDocs(`Showing ${want}`); } // the answer's heading takes the focus: the link that was pressed is gone with the page it was on (#10906)
 }
 
 const plainWords = t => String(t).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();

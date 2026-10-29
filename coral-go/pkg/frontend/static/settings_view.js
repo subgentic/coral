@@ -27,6 +27,7 @@
 import { browserLocal } from './safe_storage.js';
 import { storeKey } from './local_store.js';
 import { wantDocsAnswer } from './docs_answer.js';
+import { closeDialog } from './modal_chrome.js';
 
 import { initSectionDialog, showSection, markSectionError } from './section_dialog.js'; // the nav: the shared sectioned shell (loaded at startup with this module: the Settings dialog's rows are drawn from it the moment its markup is built)
 
@@ -139,7 +140,20 @@ export function mountSettingsView(host, spec) {
     /** The Learn more that is a link into Docs (help.docs: { topic, answer }): the answer is Docs', not a box behind Settings (#10765). A plain click goes through the router (a[data-route]); the answer's heading is remembered for the page to open at. */
     function learnDocs(help, field) {
         const a = node('a', 'sv-learn', 'Learn more'); a.href = `/docs/${encodeURIComponent(help.docs.topic)}`; a.setAttribute('data-route', ''); a.setAttribute('aria-label', `Learn more about ${help.about || field.label}, in Docs`);
-        a.addEventListener('click', () => wantDocsAnswer(help.docs.answer));
+        a.addEventListener('click', e => {
+            wantDocsAnswer(help.docs.answer);
+            // A link out of a dialog closes the dialog first: the answer opens in Docs under it otherwise, and it looks as if nothing happened (#10906). Settings closes through a lazy function and asks about unsaved
+            // changes first: the link waits for it, and follows once the dialog is gone (while the question is up it stays, and the person presses it again after answering).
+            const dlg = a.closest('.modal');
+            if (!dlg || a.dataset.afterClose) return;
+            e.preventDefault();
+            Promise.resolve(dlg.id === 'settings-modal' ? window.hideSettingsModal?.() : closeDialog(dlg)).then(() => {
+                if (dlg.isConnected && getComputedStyle(dlg).display !== 'none') return;
+                a.dataset.afterClose = '1';
+                a.click(); // the router takes it now, with nothing over the page it opens
+                delete a.dataset.afterClose;
+            });
+        });
         return a;
     }
 
