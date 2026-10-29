@@ -62,6 +62,9 @@ var notAStarter = map[string]string{
 	// Reads run_cdp_suites.mjs as text to check that it takes each suite's limit from suite_timeout.mjs; runs no process at all.
 	"tests/frontend/suite_timeout.test.mjs": "reads the cdp runner's source for a string (the name run_cdp_suites matches startsCoral); starts no Coral",
 
+	// Checks the words of the goal page's "Copy for an agent" line; the line it asserts ("run coral-board goal brief 65") names the coral-board command and starts nothing.
+	"tests/frontend/goal_words.test.mjs": "imports goal_words.js and compares strings, one of which names the coral-board command (it matches startsCoral); starts no Coral",
+
 	// Checks the words of the phone dialog; the text "/coral setup-code/" is a regular expression it asserts is absent, not a command.
 	"tests/frontend/mobile_words.test.mjs": "imports mobile_words.js and checks its strings; '/coral setup-code/' is a regex pattern in an assertion (it matches startsCoral), starts no Coral",
 
