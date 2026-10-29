@@ -43,6 +43,7 @@ const BASE = require('./test_base').BASE;
         // 1. normal motion: the page loops, and no dot has a ring
         // Say so: a Windows runner has Settings > Accessibility > Animation effects off, which makes the browser's own answer "reduce" before this test emulates anything.
         await Emulation.setEmulatedMedia({ features: [{ name: 'prefers-reduced-motion', value: 'no-preference' }] });
+        await ev(`import((window.__coralStatic || '/static/') + 'lazy_styles.js').then(m => m.loadStyles('cost_dashboard.css')).then(() => true)`); // the cost Live dot's rules arrive with the Analytics page since #10706 (lazy stylesheet): the specimen needs them loaded, as the page has them once it is open
         await specimens(); await notices(); await sleep(600); // sleep-ok: an animation's first frames; there is no event for "started"
         const normal = await looping();
         const loops = new Set(normal.map(x => x.split(' @ ')[0]));
