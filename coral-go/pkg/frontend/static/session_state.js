@@ -226,7 +226,7 @@ export function applyTerminalDot(dot, s) {
     setAttr(dot, 'role', 'img');
     setAttr(dot, 'aria-label', info.label);
     const word = document.getElementById('terminal-status-word'); // a phone's header says it beside the dot (#10885: a hollow circle with no label)
-    if (word) { word.dataset.word = STATE_WORD[info.key] || info.label; paintStateWord(word); }
+    if (word) { setAttr(word, 'data-word', STATE_WORD[info.key] || info.label); paintStateWord(word); }
     // Stop (Escape) has something to stop only while the agent works, asks or is stuck: in the chat view it is hidden otherwise (#7065); the terminal's Esc key stays
     setAttr(document.getElementById('command-pane'), 'data-can-stop', ['working', 'needs_input', 'check_terminal', 'stuck'].includes(info.key) ? 'true' : 'false');
 }
