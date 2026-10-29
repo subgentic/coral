@@ -1,6 +1,6 @@
 // The chat's text does not jump (#10846, the operator: "a lot of jumping of the text up and down"). Pinned at the bottom, the chat stays at the bottom when the Working row appears, grows its "Still working" line (30 s),
 // a message arrives and the row goes: it was left 36 px short when the row appeared and moved 63 px (88 on a phone) at 30 s and again when the row went. Scrolled up, the message being read moves no more than 2 px while
-// messages (text, tool calls, a code block) arrive and the Working row comes, grows and goes. 1280 and 390 px, a real chat page (the agent's transcript is served by an in-page mock).
+// messages (text, tool calls, a code block) arrive, the Working row comes, grows and goes, an image loads late, a block changes height, and the needs-input card comes and goes. Pinned, also: a message is Sending, Sent and lands. 1280 and 390 px, a real chat page (the agent's transcript is served by an in-page mock).
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
@@ -25,8 +25,15 @@ const { framesJs } = require('./helpers/wait');
     const scrollToDist = d => ev(`(async () => { const c = ${C}; c.scrollTop = c.scrollHeight - c.clientHeight - ${d}; c.dispatchEvent(new Event('scroll')); await new Promise(r => setTimeout(r, 250)); return true; })()`); // sleep-ok: the scroll handlers run
     const stamp = () => ev(`(() => { const c = ${C}, cr = c.getBoundingClientRect(); c.querySelectorAll('[data-qa]').forEach(e => delete e.dataset.qa); const el = [...c.querySelectorAll('.chat-bubble')].find(e => e.getBoundingClientRect().top > cr.top + 40 && e.getBoundingClientRect().top < cr.bottom - 40); el.dataset.qa = 'A'; return Math.round(el.getBoundingClientRect().top - cr.top); })()`);
     const off = () => ev(`(() => { const c = ${C}, e = c.querySelector('[data-qa="A"]'); return e ? Math.round(e.getBoundingClientRect().top - c.getBoundingClientRect().top) : null; })()`);
+    const SVG = `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='600' height='400'><rect width='600' height='400' fill='%23888'/></svg>`;
+    const lateImage = () => ev(`(async () => { const b = [...${C}.querySelectorAll('.chat-bubble')].pop(); const img = new Image(); img.style.maxWidth = '100%'; b.appendChild(img); await new Promise(res => { img.onload = res; img.onerror = res; img.src = ${JSON.stringify(SVG)}; }); await ${frames}; return true; })()`);
+    const lateCode = () => ev(`(async () => { const pre = [...${C}.querySelectorAll('pre')].pop(); pre.style.padding = '48px 12px'; await ${frames}; return true; })()`); // what a highlighter that arrives late does to a block's height
+    const sendMessage = text => ev(`(async () => { const i = document.getElementById('command-input'); i.value = ${JSON.stringify(text)}; i.dispatchEvent(new Event('input', { bubbles: true })); window.sendCommand(); await ${frames}; return true; })()`);
+    const settleSent = () => ev(`(async () => { await new Promise(r => setTimeout(r, 400)); await ${frames}; return true; })()`); // sleep-ok: the mock's send answers after 300 ms
+    const needsInput = on => ev(`(async () => { const m = await import(${S} + 'needs_input_card.js'); const st = T.state; const row = st.liveSessions.find(x => x.session_id === st.currentSession.session_id) || (st.liveSessions[0] = { session_id: st.currentSession.session_id, name: 'jl', agent_type: 'claude' }); Object.assign(row, { waiting_for_input: ${on}, waiting_summary: ${on} ? 'Notification: Claude is asking' : null }); m.syncNeedsInputCard(${C}, st.currentSession); await ${frames}; return true; })()`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
+        await Page.addScriptToEvaluateOnNewDocument({ source: `(() => { const prev = window.fetch; window.fetch = (u, o = {}) => /\\/api\\/sessions\\/live\\/jl\\/send$/.test(String(u)) && (o.method || 'GET').toUpperCase() === 'POST' ? new Promise(r => setTimeout(() => r(new Response('{"ok":true}', { status: 200, headers: { 'content-type': 'application/json' } })), 300)) : prev(u, o); })();` });
         for (const [w, h, mobile] of [[1280, 900, false], [390, 844, true]]) {
             const at = `${w} px: `;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
@@ -44,6 +51,13 @@ const { framesJs } = require('./helpers/wait');
             await pinned('a tool call arrives', () => add('tool', 2));
             await pinned('a code block arrives', () => add('code', 1));
             await setWorking(false); await pinned('the Working row goes', async () => {});
+            await add('code', 1); await pinned('a late-loading image arrives', lateImage);
+            await pinned('a code block changes height after it is drawn', lateCode);
+            await sendMessage('a message from the reader'); await pinned('a message is Sending', async () => {});
+            await settleSent(); await pinned('the message is Sent', async () => {});
+            await add('text', 1); await pinned('the Sent message lands in the transcript', async () => {});
+            await needsInput(true); await pinned('the needs-input card appears', async () => {});
+            await needsInput(false); await pinned('the needs-input card goes', async () => {});
 
             // scrolled up: the message being read stays where it is
             await scrollToDist(450);
@@ -55,6 +69,11 @@ const { framesJs } = require('./helpers/wait');
             await setWorking(true); await held('the Working row appears');
             await still(); await held('the "Still working" line shows');
             await setWorking(false); await held('the Working row goes');
+            await lateImage(); await held('a late-loading image arrives');
+            await lateCode(); await held('a code block changes height after it is drawn');
+            // (sending a message takes the chat to the bottom on purpose, so there is no reading case for Sending and Sent)
+            await needsInput(true); await held('the needs-input card appears');
+            await needsInput(false); await held('the needs-input card goes');
         }
     } finally { await client.close(); }
     assert.deepEqual(problems, [], 'the chat jumped:\n  ' + problems.join('\n  '));

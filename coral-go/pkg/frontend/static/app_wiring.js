@@ -102,6 +102,17 @@ export function wireComposer() {
     wireShortcuts();
 }
 
+/** A chat pinned to the bottom stays there when a row of it changes height after it was drawn (#10851): an image that loads late, a block that is restyled, the needs-input card, a pending row. Every row is watched, and the pane itself;
+ *  a reader who has scrolled up is not touched (the browser's own scroll anchoring holds their place). */
+function keepChatPinned(container) {
+    if (typeof ResizeObserver === 'undefined') return;
+    const pin = () => { if (state.autoScroll) container.scrollTop = container.scrollHeight; };
+    const ro = new ResizeObserver(pin);
+    ro.observe(container);
+    for (const row of container.children) ro.observe(row);
+    new MutationObserver(changes => { for (const c of changes) for (const n of c.addedNodes) if (n.nodeType === 1) ro.observe(n); pin(); }).observe(container, { childList: true });
+}
+
 /** Scroll tracking of the capture pane and the live history, and pausing capture updates while text in the terminal pane is selected. */
 export function wirePaneScroll() {
     // Auto-scroll detection for capture pane and live history
@@ -116,6 +127,7 @@ export function wirePaneScroll() {
             const { scrollTop, scrollHeight, clientHeight } = liveHistory;
             state.autoScroll = (scrollHeight - scrollTop - clientHeight) < 50;
         });
+        keepChatPinned(liveHistory);
     }
 
     // Pause capture updates while user is selecting text inside the terminal pane
