@@ -26,7 +26,10 @@
     Version="$(var.Version)"
     UpgradeCode="B8F2E3A1-7C4D-4E5F-9A1B-2C3D4E5F6A7B">
 
+    <!-- The MSI's version is the tag's X.Y.Z (tools/msi_version.ps1), so an -rc build and its final release carry the same one (#365): AllowSameVersionUpgrades lets the
+         final replace the rc, and rc2 replace rc1. Without it the MSI refuses them as "a newer version is already installed". -->
     <MajorUpgrade
+      AllowSameVersionUpgrades="yes"
       DowngradeErrorMessage="A newer version of $(var.ProductName) is already installed." />
 
     <MediaTemplate EmbedCab="yes" />

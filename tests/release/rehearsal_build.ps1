@@ -48,7 +48,9 @@ function Build-RehearsalRelease([string]$root, [string]$Work, [string]$version, 
     } finally { Pop-Location }
     $msi = Join-Path $Work "Coral-$version-x64.msi"
     Copy-Item (Join-Path $root 'tools\license.rtf') $Work -Force
-    wix build (Join-Path $root 'tools\coral.wxs') -arch x64 -ext WixToolset.UI.wixext -d "Version=$version" -d "BinDir=$bin" -d "BuildDir=$Work" -o $msi
+    . (Join-Path $root 'tools\msi_version.ps1')
+    $msiVersion = ConvertTo-MsiVersion $version
+    wix build (Join-Path $root 'tools\coral.wxs') -arch x64 -ext WixToolset.UI.wixext -d "Version=$msiVersion" -d "BinDir=$bin" -d "BuildDir=$Work" -o $msi
     if ($LASTEXITCODE -ne 0) { throw "wix build $version failed" }
     $script:builtMsi = $msi # not a return value: the native commands above write to the function's output too
 }

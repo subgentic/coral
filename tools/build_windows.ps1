@@ -128,6 +128,8 @@ if (-not (Test-Path $WixSrc)) {
 }
 
 $MsiPath = Join-Path $BuildDir "Coral-$Version-x64.msi"
+. (Join-Path $PSScriptRoot "msi_version.ps1")
+$MsiVersion = ConvertTo-MsiVersion $Version   # the MSI carries X.Y.Z only (#365)
 
 # Copy license RTF for WiX UI dialog
 $LicenseSrc = Join-Path $RepoRoot "tools\license.rtf"
@@ -138,7 +140,7 @@ if (Test-Path $LicenseSrc) {
 wix build $WixSrc `
     -arch x64 `
     -ext WixToolset.UI.wixext `
-    -d "Version=$Version" `
+    -d "Version=$MsiVersion" `
     -d "BinDir=$BinDir" `
     -d "BuildDir=$BuildDir" `
     -o $MsiPath
