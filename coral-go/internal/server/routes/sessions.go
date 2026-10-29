@@ -743,6 +743,9 @@ var ErrStillInOldTmux = errors.New("this agent is still running in Coral's old t
 // lastMessageSource is a session's newest message as the jsonl reader has it.
 type lastMessageSource = jsonl.LastMessage
 
+// lastMessageEnabled is a test seam (the load measurement of #11123 compares the list with and without last_message); always true in the server.
+var lastMessageEnabled = true
+
 // lastMessageMaxChars is the text a row carries of its last message: the first 140 characters.
 const lastMessageMaxChars = 140
 
@@ -766,7 +769,7 @@ func lastMessageField(m *lastMessageSource, _ bool) map[string]any {
 
 // lastMessageOf reads a session's last message (cached by its file, see jsonl.LastMessage); nil when it has none.
 func (h *SessionsHandler) lastMessageOf(sessionID, workingDir, agentType string) map[string]any {
-	if h.jsonl == nil || sessionID == "" {
+	if !lastMessageEnabled || h.jsonl == nil || sessionID == "" {
 		return nil
 	}
 	m, ok := h.jsonl.LastMessage(sessionID, workingDir, agentType)
@@ -781,7 +784,7 @@ func lastMessageRow(h *SessionsHandler, sessionID, workingDir, agentType string,
 	if !skipExpensive {
 		return h.lastMessageOf(sessionID, workingDir, agentType)
 	}
-	if h.jsonl == nil {
+	if !lastMessageEnabled || h.jsonl == nil {
 		return nil
 	}
 	if m, ok := h.jsonl.CachedLastMessage(sessionID); ok {

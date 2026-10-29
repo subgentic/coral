@@ -180,3 +180,85 @@ func TestLastMessage_FiftySessionsCost(t *testing.T) {
 	assert.Zero(t, bytesRead, "the second pass reads nothing")
 	t.Logf("50 sessions: first pass %v (%d bytes budget), cached pass %v", first, 50*lastMessageTail, time.Since(start))
 }
+
+// #11123: a changed file is read from where the last read ended, not from its tail again: what a poll reads follows what the agent wrote, however long the file and however big its last line.
+func TestLastMessage_ReadsOnlyWhatWasAppended(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("CLAUDE_PROJECTS_DIR", dir)
+	sid := "11111111-0000-4000-8000-000000000005"
+	project := filepath.Join(dir, "proj")
+	require.NoError(t, os.MkdirAll(project, 0o755))
+	path := filepath.Join(project, sid+".jsonl")
+	line := func(role, text string) string {
+		if role == "user" {
+			return `{"type":"user","timestamp":"2026-10-29T10:00:00.000Z","message":{"content":"` + text + `"}}` + "\n"
+		}
+		return `{"type":"assistant","timestamp":"2026-10-29T10:00:01.000Z","message":{"content":[{"type":"text","text":"` + text + `"}]}}` + "\n"
+	}
+	var seed strings.Builder
+	for i := 0; i < 5000; i++ { // about 600 KB
+		seed.WriteString(line("assistant", fmt.Sprintf("old %d padded to make the line a realistic length for a transcript entry", i)))
+	}
+	require.NoError(t, os.WriteFile(path, []byte(seed.String()), 0o644))
+	var bytesRead int64
+	lastMessageReadHook = func(n int64) { bytesRead += n }
+	t.Cleanup(func() { lastMessageReadHook = nil })
+	r := NewSessionReader()
+	_, ok := r.LastMessage(sid, "", at.Claude)
+	require.True(t, ok)
+
+	appendLines := func(s string) {
+		f, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0o644)
+		require.NoError(t, err)
+		_, err = f.WriteString(s)
+		require.NoError(t, err)
+		require.NoError(t, f.Close())
+		future := time.Now().Add(time.Second)
+		require.NoError(t, os.Chtimes(path, future, future))
+	}
+	add := line("user", "what next")
+	bytesRead = 0
+	appendLines(add)
+	m, ok := r.LastMessage(sid, "", at.Claude)
+	require.True(t, ok)
+	assert.Equal(t, "what next", m.Text)
+	assert.Equal(t, "user", m.Role)
+	assert.LessOrEqual(t, bytesRead, int64(len(add)), "only the appended line was read")
+
+	// An append that holds no message (a tool call alone) leaves the last message as it was.
+	toolOnly := `{"type":"assistant","timestamp":"2026-10-29T10:01:00.000Z","message":{"content":[{"type":"tool_use","id":"t","name":"Bash","input":{"command":"ls"}}]}}` + "\n"
+	bytesRead = 0
+	appendLines(toolOnly)
+	m, ok = r.LastMessage(sid, "", at.Claude)
+	require.True(t, ok)
+	assert.Equal(t, "what next", m.Text, "nothing new to say: the last message stays")
+	assert.LessOrEqual(t, bytesRead, int64(len(toolOnly)))
+
+	// A line still being written (no newline yet) is not read as a message, and is read whole once it ends.
+	half := line("assistant", "half written")
+	bytesRead = 0
+	appendLines(half[:len(half)/2])
+	m, _ = r.LastMessage(sid, "", at.Claude)
+	assert.Equal(t, "what next", m.Text)
+	appendLines(half[len(half)/2:])
+	m, _ = r.LastMessage(sid, "", at.Claude)
+	assert.Equal(t, "half written", m.Text)
+	assert.LessOrEqual(t, bytesRead, int64(2*len(half)), "the part line and the rest, not the tail")
+
+	// A file that shrank (replaced) is read again from its end.
+	require.NoError(t, os.WriteFile(path, []byte(line("user", "a fresh start")), 0o644))
+	future := time.Now().Add(2 * time.Second)
+	require.NoError(t, os.Chtimes(path, future, future))
+	m, ok = r.LastMessage(sid, "", at.Claude)
+	require.True(t, ok)
+	assert.Equal(t, "a fresh start", m.Text)
+
+	// A huge appended chunk is bounded: at most lastMessageTailMax is read, from its end.
+	bytesRead = 0
+	big := strings.Repeat(line("assistant", "filler filler filler filler filler filler filler"), 200000) // about 20 MB
+	appendLines(big + line("user", "the very last"))
+	m, ok = r.LastMessage(sid, "", at.Claude)
+	require.True(t, ok)
+	assert.Equal(t, "the very last", m.Text)
+	assert.LessOrEqual(t, bytesRead, int64(lastMessageTailMax)+int64(lastMessageTail), "never more than the bound")
+}

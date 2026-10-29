@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 	"unicode"
 	"unicode/utf8"
@@ -35,6 +36,12 @@ const (
 	lastMessagePathTTL  = 5 * time.Second
 )
 
+// lastMessageBytes counts the bytes every LastMessage read has taken since the process started (LastMessageBytesRead): a load measurement takes the difference over a poll.
+var lastMessageBytes atomic.Int64
+
+// LastMessageBytesRead is how many bytes the last-message tail reads have taken in all.
+func LastMessageBytesRead() int64 { return lastMessageBytes.Load() }
+
 // lastMessageReadHook is a test seam: it is told how many bytes a read took.
 var lastMessageReadHook func(n int64)
 
@@ -48,6 +55,7 @@ type lastMessageEntry struct {
 	read     bool
 	msg      LastMessage
 	ok       bool
+	lineEnd  int64 // where the last complete line the reader has taken ends: the next read starts here (#11123)
 }
 
 // LastMessage is the newest message with text of a session's transcript, cached by the file's size and modification time: a list that polls every few seconds reads a file again only when it changed,
@@ -87,18 +95,69 @@ func (r *SessionReader) LastMessage(sessionID, workingDir, agentType string) (La
 	if e.read && fi.Size() == e.size && fi.ModTime().UnixNano() == e.mtime {
 		return e.msg, e.ok
 	}
-	e.msg, e.ok = readLastMessage(e.path, agentType, fi.Size())
+	if e.read && fi.Size() >= e.lineEnd && fi.Size() >= e.size {
+		// The file grew: only what was appended is read (from the end of the last complete line, at most lastMessageTailMax of it), and when it holds no message the one found before is still the last.
+		if m, ok, end := readAppendedMessage(e.path, agentType, e.lineEnd, fi.Size()); ok {
+			e.msg, e.ok = m, true
+			e.lineEnd = end
+		} else {
+			e.lineEnd = end
+		}
+	} else {
+		e.msg, e.ok, e.lineEnd = readLastMessage(e.path, agentType, fi.Size())
+	}
 	e.size, e.mtime, e.read = fi.Size(), fi.ModTime().UnixNano(), true
 	return e.msg, e.ok
 }
 
-// readLastMessage reads the end of the file, widening it while the last message is not in what was read.
-func readLastMessage(path, agentType string, size int64) (LastMessage, bool) {
+// readAppendedMessage reads the bytes from from to size (the newest lastMessageTailMax of them when there are more) and returns the newest message with text in their complete lines, and where the last
+// complete line ends. A line still being written (no newline yet) is left for the next read.
+func readAppendedMessage(path, agentType string, from, size int64) (m LastMessage, ok bool, lineEnd int64) {
 	f, err := openTranscript(path, agentType)
 	if err != nil {
-		return LastMessage{}, false
+		return LastMessage{}, false, from
 	}
 	defer f.Close()
+	start := from
+	partial := false
+	if size-start > lastMessageTailMax { // more was written than is worth reading: its end
+		start, partial = size-lastMessageTailMax, true
+	}
+	buf := make([]byte, size-start)
+	got, err := f.ReadAt(buf, start)
+	if err != nil && err != io.EOF {
+		return LastMessage{}, false, from
+	}
+	lastMessageBytes.Add(int64(got))
+	if lastMessageReadHook != nil {
+		lastMessageReadHook(int64(got))
+	}
+	buf = buf[:got]
+	if partial { // began inside a line
+		if i := bytes.IndexByte(buf, '\n'); i >= 0 {
+			start += int64(i) + 1
+			buf = buf[i+1:]
+		} else {
+			return LastMessage{}, false, size
+		}
+	}
+	nl := bytes.LastIndexByte(buf, '\n')
+	if nl < 0 {
+		return LastMessage{}, false, start // only a line still being written
+	}
+	complete := buf[:nl+1]
+	m, ok = lastMessageIn(complete, agentType)
+	return m, ok, start + int64(nl) + 1
+}
+
+// readLastMessage reads the end of the file, widening it while the last message is not in what was read.
+func readLastMessage(path, agentType string, size int64) (LastMessage, bool, int64) {
+	f, err := openTranscript(path, agentType)
+	if err != nil {
+		return LastMessage{}, false, 0
+	}
+	defer f.Close()
+	lineEnd := size
 	for n := int64(lastMessageTail); ; n *= 4 {
 		if n > size {
 			n = size
@@ -106,12 +165,17 @@ func readLastMessage(path, agentType string, size int64) (LastMessage, bool) {
 		buf := make([]byte, n)
 		got, err := f.ReadAt(buf, size-n)
 		if err != nil && err != io.EOF {
-			return LastMessage{}, false
+			return LastMessage{}, false, 0
 		}
+		lastMessageBytes.Add(int64(got))
 		if lastMessageReadHook != nil {
 			lastMessageReadHook(int64(got))
 		}
 		buf = buf[:got]
+		if nl := bytes.LastIndexByte(buf, '\n'); nl >= 0 && nl < len(buf)-1 { // a last line still being written is not read, and the next read starts at it
+			lineEnd = size - n + int64(nl) + 1
+			buf = buf[:nl+1]
+		}
 		if size-n > 0 { // the read began inside a line: what is left of it is not one
 			if i := bytes.IndexByte(buf, '\n'); i >= 0 {
 				buf = buf[i+1:]
@@ -120,10 +184,10 @@ func readLastMessage(path, agentType string, size int64) (LastMessage, bool) {
 			}
 		}
 		if m, ok := lastMessageIn(buf, agentType); ok {
-			return m, true
+			return m, true, lineEnd
 		}
 		if n >= size || n >= lastMessageTailMax {
-			return LastMessage{}, false
+			return LastMessage{}, false, lineEnd
 		}
 	}
 }
