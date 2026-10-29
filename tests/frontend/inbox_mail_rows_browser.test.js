@@ -8,6 +8,7 @@ const path = require('node:path');
 const { connect } = require('./agent_view_harness');
 const { INBOX_WORLD } = require('./helpers/inbox_world');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 const iso = ms => new Date(Date.now() - ms).toISOString();
 const AGENTS = [
@@ -27,7 +28,7 @@ const AGENTS = [
         for (const [w, h, mobile] of [[1280, 820, false], [390, 844, true], [412, 915, true], [360, 780, true]]) {
             const at = `${w}px: `;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
             await ev(INBOX_WORLD);
             await ev(`(async () => { const { state } = await import((window.__coralStatic || '/static/') + 'state.js'); const m = await import((window.__coralStatic || '/static/') + 'inbox_tab.js'); state.liveSessions = ${JSON.stringify(AGENTS)}; m.updateInboxTab(); return true; })()`);
             await ev(`localStorage.removeItem('coral.inbox.tab'); window.switchNavTab('hub-inbox'); true`);

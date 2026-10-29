@@ -4,6 +4,7 @@
 // (typed, then disposed: onChange is never called). Run against an isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -12,7 +13,7 @@ const { connect } = require('./agent_view_harness');
         await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1200, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await ev(`(async () => { const base = window.__coralStatic || '/static/'; window.__LB = await import(base + 'list_bar.js'); window.__F = await import(base + 'task_filters.js'); return true; })()`);
         const spec = extra => `({ idp: 'zz', noun: 'cat', label: 'x', searchLabel: 'x', placeholder: 'x', sorts: null, fields: [], model: { EMPTY: { q: '' }, clean: f => ({ q: String((f && f.q) || '') }), chips: f => (f.q ? [{ key: 'q', label: f.q }] : []), isFiltered: f => !!f.q, without: (f, k) => ({ ...f, [k]: '' }) }, ...${extra} })`;
         const count = (extra, f, counts) => ev(`(() => { const bar = window.__LB.buildListBar(${spec(extra)}, () => {}); document.body.append(bar.node); bar.set(${JSON.stringify(f)}, ${JSON.stringify(counts)}); const t = bar.node.querySelector('.list-bar-count').textContent; bar.dispose(); return t; })()`);

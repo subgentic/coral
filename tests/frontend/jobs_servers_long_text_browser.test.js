@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const { swapTheme } = require('./helpers/theme');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 const REASON = 'git worktree add failed: the destination /work/builds/release-candidate-for-the-next-long-running-deployment already exists and is not an empty directory. Remove the stale checkout before retrying this scheduled build.';
 const NAME = 'Production build server for the release candidate integration and packaging team in the west region';
 (async () => {
@@ -26,7 +27,7 @@ const NAME = 'Production build server for the release candidate integration and 
             await Emulation.setDeviceMetricsOverride({width,height:900,deviceScaleFactor:1,mobile:width===390});
             await Emulation.setTouchEmulationEnabled({enabled:width===390});
             await Page.navigate({url:BASE+'/'}); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+            await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
             await ev(`(async()=>{ const real=window.fetch; const J=o=>Promise.resolve(new Response(JSON.stringify(o),{headers:{'Content-Type':'application/json'}}));
                 const run={id:1,status:'failed',error_msg:${JSON.stringify(REASON)},started_at:'2026-10-25T12:00:00Z',finished_at:'2026-10-25T12:01:00Z'};
                 const job={id:1,name:'Release packaging',job_type:'prompt',agent_type:'claude',enabled:1,cron_expr:'0 2 * * *',timezone:'UTC',repo_path:'/work/repo',prompt:'Build the release',max_duration_s:3600,last_run:run};

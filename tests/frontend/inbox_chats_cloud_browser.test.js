@@ -4,6 +4,7 @@
 const assert = require('node:assert/strict');
 const { safePaused } = require('./helpers/paused');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 const SESSIONS = [1, 2, 3].map(i => ({ session_id: 'chat-00' + i, display_name: 'Agent ' + i, agent_type: 'claude', title: 'Chat number ' + i, summary: 'First words ' + i, last_timestamp: new Date(Date.now() - i * 3600000).toISOString(), starred: false, archived: false, active: false }));
 
@@ -31,7 +32,7 @@ const SESSIONS = [1, 2, 3].map(i => ({ session_id: 'chat-00' + i, display_name: 
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
         // the control: a local dashboard has the select buttons
-        await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         assert.equal(await ev(DRAW), 3, 'three chats');
         let p = await probe();
         assert.deepEqual([p.boot, p.rows, p.leads], ['local', 3, 3], 'local: three mail rows, each avatar a select button ' + JSON.stringify(p));

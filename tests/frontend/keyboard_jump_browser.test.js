@@ -4,6 +4,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -14,7 +15,7 @@ const BASE = require('./test_base').BASE;
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         await ev(`(() => { const R = window.fetch; window.__opened = [];
             window.fetch = (u, o) => { const url = new URL(String(u && u.url || u), location.origin);
                 if (url.pathname === '/api/sessions/history' && url.searchParams.get('q')) return Promise.resolve(new Response(JSON.stringify({ sessions: !/release/.test(url.searchParams.get('q')) ? [] : [{ session_id: 'chat-0001', title: 'Release notes chat', agent_name: 'Orchestrator' }], total: 1 }), { status: 200, headers: { 'content-type': 'application/json' } }));

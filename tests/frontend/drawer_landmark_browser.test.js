@@ -5,6 +5,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { axNodes } = require('./helpers/ax_tree');
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, PRELOAD, install } = await connect();
@@ -19,7 +20,7 @@ const { axNodes } = require('./helpers/ax_tree');
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile: false });
             await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
             await ev(`localStorage.setItem('coral-sidebar-collapsed-rail', '0'); true`);
-            await ev(`window.__coralReady.startup('liveList', 'settings')`);
+            await coralReady(ev, 'startup', 'liveList', 'settings');
             for (const tab of Object.keys(NAMES)) {
                 await ev(`window.switchNavTab(${JSON.stringify(tab)}); true`); await new Promise(r => setTimeout(r, 700)); // sleep-ok: the tab draws
                 if (w < 1024) {
@@ -37,7 +38,7 @@ const { axNodes } = require('./helpers/ax_tree');
         // every top tab gives the sidebar a name (#10489, from #10452's review): a tab not in the fixed list takes its own title, never the name the last tab left
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.startup('liveList', 'settings')`);
+        await coralReady(ev, 'startup', 'liveList', 'settings');
         const tabs = await ev(`[...document.querySelectorAll('.top-nav-tab[data-arg]')].map(b => ({ tab: b.dataset.arg, title: b.dataset.label || b.textContent.trim() }))`);
         check(tabs.length >= 5, `the census sees the top tabs: ${JSON.stringify(tabs)}`);
         const extra = [{ tab: 'zz-new-tab', title: 'A New Tab' }]; // a tab added later, not in the fixed list: the button is made here, the way the next one will be

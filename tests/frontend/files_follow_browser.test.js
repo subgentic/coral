@@ -2,6 +2,7 @@
 // it is working: the list is read again when that count moves or the turn ends, once for a burst of rows, and not for a row that says nothing new. Drives Chrome over CDP against the isolated dev server.
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, ev, waitFor, PRELOAD, install } = await connect();
@@ -11,7 +12,7 @@ const BASE = require('./test_base').BASE;
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.startup('liveList', 'settings')`);
+        await coralReady(ev, 'startup', 'liveList', 'settings');
         await ev(`window.__coralFilesWatchMs = 1e9; true`); // the panel's own watch (#10485) has its own test: here the reads are the follow's alone
         await ev(`(() => { const R = window.fetch; window.__filesReads = 0;
             window.fetch = (u, o) => { const url = new URL(String(u), location.href);

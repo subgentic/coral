@@ -14,7 +14,7 @@ const COUNTS = { all: 2, group: 1, notes: 0, starred: 1, active: 0, archived: 1,
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
-    const { settle } = require('./helpers/wait').bind(ev);
+    const { settle, coralReady } = require('./helpers/wait').bind(ev);
     const results = [];
     const check = (label, cond, detail) => { results.push(!!cond); console.log(`[${cond ? 'PASS' : 'FAIL'}] ${label}${detail !== undefined ? ' - ' + detail : ''}`); };
     const emptyLine = () => ev(`(document.querySelector('.dt-empty, .list-empty, .empty-state') || {}).textContent || document.body.innerText.match(/Search failed|Loading chats|No chat matches/)?.[0] || ''`);
@@ -29,7 +29,7 @@ const COUNTS = { all: 2, group: 1, notes: 0, starred: 1, active: 0, archived: 1,
         for (const [label, w, h, mobile] of [['1280', 1280, 800, false], ['390', 390, 844, true]]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.startup('liveList', 'settings')`);
+            await coralReady('startup', 'liveList', 'settings');
             await ev(`try { for (const k of Object.keys(localStorage)) if (k.startsWith('coral-inbox-chats-filters')) localStorage.removeItem(k); } catch {} true`);
             await ev(`(() => { const R = window.fetch; window.__hist = [];
                 window.fetch = (u, o) => { const url = new URL(String(u), location.href), json = (b, status = 200) => Promise.resolve(new Response(JSON.stringify(b), { status, headers: { 'Content-Type': 'application/json' } }));

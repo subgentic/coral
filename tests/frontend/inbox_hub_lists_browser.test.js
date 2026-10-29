@@ -2,6 +2,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 (async () => {
     const {client,Page,Emulation,ev,waitFor,PRELOAD,install}=await connect();
     try {
@@ -9,7 +10,7 @@ const BASE = require('./test_base').BASE;
         for(const width of [1280,390]){
             await Emulation.setDeviceMetricsOverride({width,height:900,deviceScaleFactor:1,mobile:width===390});
             await Page.navigate({url:BASE+'/'});await Page.loadEventFired();await install();
-            await ev(`window.__coralReady.startup('liveList','liveListLoaded','settings')`);
+            await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
             await ev(`(async()=>{
                 const {state}=await import((window.__coralStatic||'/static/')+'state.js');
                 state.hub=true;state.servers=[{id:'local',status:'online'},{id:'box-2',status:'online'},{id:'down',status:'offline'}];

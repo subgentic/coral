@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const { setupHubWorld, BASE } = require('./helpers/hub_world');
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor } = await connect();
@@ -16,7 +17,7 @@ const { setupHubWorld, BASE } = require('./helpers/hub_world');
             await setupHubWorld({ client, Page, Emulation, width: w, height: h, mobile });
             await Page.navigate({ url: BASE + '/board/@m1/same-team' }); await Page.loadEventFired();
             await waitFor(`typeof window.switchNavTab === 'function' && !!window.__coralReady`, 'the dashboard');
-            await ev(`window.__coralReady.startup('liveList', 'settings')`);
+            await coralReady(ev, 'startup', 'liveList', 'settings');
             await waitFor(`location.pathname === '/team/@m1/same-team/board'`, 'the board link opens the team page Messages tab', 15000);
             await waitFor(`document.querySelectorAll('#mb-messages .mb-message, #mb-messages tr').length >= 3`, 'the board rows', 15000);
             const page = await ev(`(() => { const vis = e => !!e && e.checkVisibility();

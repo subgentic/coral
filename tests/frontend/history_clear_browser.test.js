@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const { BASE } = require('./test_base');
-const { framesJs } = require('./helpers/wait');
+const { framesJs, coralReady } = require('./helpers/wait');
 const { setTheme } = require('./helpers/contrast');
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -34,7 +34,7 @@ const { setTheme } = require('./helpers/contrast');
         })()`});
         for(const width of [1280,390]) for(const theme of ['dark','light']) {
             await Emulation.setDeviceMetricsOverride({width,height:900,deviceScaleFactor:1,mobile:width<=767});
-            await Page.navigate({url:BASE+'/chats'});await Page.loadEventFired();await install();await ev(`window.__coralReady.then(()=>true)`);await require('./helpers/hub_chats').showHubChats(ev);await setTheme(ev,theme);
+            await Page.navigate({url:BASE+'/chats'});await Page.loadEventFired();await install();await coralReady(ev);await require('./helpers/hub_chats').showHubChats(ev);await setTheme(ev,theme);
             await waitFor(`document.getElementById('history-sessions-list').checkVisibility() && document.getElementById('history-sessions-list').textContent.includes('Restored history row')`,'initial history list');
             await ev(`(() => { const b = document.querySelector('[data-pane="history"] [data-display-button]'); if (b.getAttribute('aria-expanded') !== 'true') b.click(); })();document.querySelector('[data-chat-type="agent"]').click();true`);
             await input('needle');await waitFor(`document.querySelector('.chat-search-hit')?.checkVisibility()`,'search result');await shot(`${width}-${theme}-search`);
@@ -57,7 +57,7 @@ const { setTheme } = require('./helpers/contrast');
             console.log('PASS '+width+' '+theme+': Clear filters, empty input, pending success/failure, newer query and empty list');
         }
         // Clear can also win before the first lazy import's continuation runs.
-        await Page.navigate({url:BASE+'/chats'});await Page.loadEventFired();await install();await ev(`window.__coralReady.then(()=>true)`);await require('./helpers/hub_chats').showHubChats(ev);
+        await Page.navigate({url:BASE+'/chats'});await Page.loadEventFired();await install();await coralReady(ev);await require('./helpers/hub_chats').showHubChats(ev);
         assert.equal(await ev(`import((window.__coralStatic||'/static/')+'lazy_panels.js').then(m=>m.loadChatSearch.module===null)`),true,'search is still lazy at initial Chats load');
         await ev(`(async()=>{const base=window.__coralStatic||'/static/';const f=await import(base+'history_filters.js'),s=await import(base+'search_filters.js');s.filterState.q='cancel-before-import';document.getElementById('history-search').value=s.filterState.q;window.__firstSearch=f.loadHistoryFiltered();document.querySelector('.hf-clear-btn').click();await window.__firstSearch;})()`);
         assert.ok(await ev(restored),'Clear before module load completes restores list');

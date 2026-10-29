@@ -3,6 +3,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 const ID = '3f2a9c1e-1111-4222-8333-444455556666';
 
 (async () => {
@@ -22,7 +23,7 @@ const ID = '3f2a9c1e-1111-4222-8333-444455556666';
             return true; })()` });
         for (const [w, h, mobile] of [[390, 844, true], [1280, 900, false]]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile, maxTouchPoints: 5 });
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
             await ev(`window.selectHistorySession(${JSON.stringify(ID)}).then(() => true)`);
             await waitFor(`document.getElementById('history-session-view').getClientRects().length > 0 && document.getElementById('htu-cost').textContent !== '—'`, `${w}: the chat and its usage`, 10000);
             const shown = () => ev(`document.getElementById('history-token-usage').getClientRects().length > 0`);

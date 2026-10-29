@@ -17,6 +17,7 @@ const { INBOX_WORLD } = require('./inbox_world');
 const { STUB, HEX } = require('./comments_scale');
 const { DATA_WORLD, httpJson, UPDATE_STAGED, CLOUD_LINKED, CLOUD_IDLE, CLOUD_WAITING } = require('./census_world');
 const BASE = require('../test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 const TEAM = 'census-d-' + Date.now().toString(36);
 const S = `(window.__coralStatic || '/static/')`;
 const BUBBLES = [{ type: 'user', content: 'Is the build green?', key: 'c1', timestamp: '2026-10-19T00:00:00Z' }, { type: 'assistant', text: 'Yes. **All 12 checks pass.**\n\n- the unit tests\n- the lint\n\n`go test ./...` is clean, see [the run](https://example.com/run/1).\n\n```sh\ngo build ./...\n```', key: 'c2', timestamp: '2026-10-19T00:00:05Z' }];
@@ -28,7 +29,7 @@ module.exports = part => (async () => {
     const results = [];
     const sc = (name, setup, opts) => scene(ev, results, name, setup, { contrastOnly: true, ...opts });
     const tap = sel => tapSel(ev, sel);
-    const load = async () => { await Page.navigate({ url: 'about:blank' }); await Page.loadEventFired(); await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.startup('liveList', 'settings')`); };
+    const load = async () => { await Page.navigate({ url: 'about:blank' }); await Page.loadEventFired(); await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'settings'); };
     try {
         standIn = await launchStandIn(httpJson, { displayName: 'Census Agent' });
         await httpJson('POST', `/api/board/${TEAM}/subscribe`, { subscriber_id: 'Boss', job_title: 'Orchestrator', session_name: 'boss-session' });

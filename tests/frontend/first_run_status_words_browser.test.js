@@ -1,6 +1,7 @@
 // A new person's first screens say what is going on (#6382, first-run report #6370 items 3, 6, 11): a brand-new agent's composer says "Starting <agent>" in its box and Send says why a message may wait (from the row's own `starting`, #6381), and goes back to its own words once the CLI has written something; the Team view's "?" button has a name and "No signal yet" says what it waits for (a remote agent keeps its own reason); Analytics shows no list of Coral's
 // own /api routes until an agent has really used a tool. Drives Chrome over CDP through agent_view_harness.js against the isolated dev server.
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, sleep, PRELOAD, install } = await connect();
@@ -12,7 +13,7 @@ const { connect } = require('./agent_view_harness');
         await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
 
         console.log('1. The composer of a starting agent');
         const words = await ev(`(async () => {

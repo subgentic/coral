@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 const S = `(window.__coralStatic || '/static/')`;
 
 (async () => {
@@ -30,7 +31,7 @@ const S = `(window.__coralStatic || '/static/')`;
             return true;
         })()`;
         await Page.addScriptToEvaluateOnNewDocument({ source: STUB });
-        await Page.navigate({ url: BASE + '/automations/jobs' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: BASE + '/automations/jobs' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 3`, 'the three jobs', 10000);
         const rows = await ev(`[...document.querySelectorAll('#group-table-view tbody tr')].map(r => [r.querySelector('.dt-primary')?.textContent.trim(), !!r.querySelector('.dt-name-example .dt-tag')])`);
         assert.deepEqual(rows.sort(), [['morning-motivation', true], ['my-nightly', false], ['my-report', false]], 'the seeded example is tagged; the person\'s own jobs are not, even one described Example report for Acme: ' + JSON.stringify(rows));

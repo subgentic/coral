@@ -17,7 +17,7 @@ const BUNDLE = { exists: true, team_name: TEAM, created_at: '2026-10-25T05:00:00
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
-    const { settle } = require('./helpers/wait').bind(ev);
+    const { settle, coralReady } = require('./helpers/wait').bind(ev);
     const S = scenarios();
     const stub = () => ev(`(() => { window.__bundle = ${JSON.stringify(BUNDLE)}; const R = window.fetch.bind(window); const j = (b) => Promise.resolve(new Response(JSON.stringify(b), { status: 200, headers: { 'Content-Type': 'application/json' } }));
         window.fetch = (u, o = {}) => { const url = new URL(String(u), location.origin); const m = String((o && o.method) || 'GET').toUpperCase();
@@ -33,7 +33,7 @@ const BUNDLE = { exists: true, team_name: TEAM, created_at: '2026-10-25T05:00:00
     const drag = async (dx) => { const r = await ev(`(() => { const b = document.querySelector('.detail-grip').getBoundingClientRect(); return { x: Math.round(b.left + b.width / 2), y: Math.round(b.top + 200) }; })()`); const I = client.Input; await I.dispatchMouseEvent({ type: 'mouseMoved', x: r.x, y: r.y }); await I.dispatchMouseEvent({ type: 'mousePressed', x: r.x, y: r.y, button: 'left', clickCount: 1 }); await I.dispatchMouseEvent({ type: 'mouseMoved', x: r.x + dx, y: r.y, button: 'left' }); await I.dispatchMouseEvent({ type: 'mouseReleased', x: r.x + dx, y: r.y, button: 'left', clickCount: 1 }); };
     const open = async (w, h, mobile) => {
         await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`); await installTP(ev);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(); await installTP(ev);
         await ev(`localStorage.removeItem('coral-detail-width'); true`);
         await seed(ev, TEAM); await stub();
         if (mobile) await ev(`window.syncMobileAgentList && window.syncMobileAgentList(); true`);

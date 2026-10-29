@@ -21,6 +21,7 @@ const { INBOX_WORLD } = require('./inbox_world');
 const { DATA_WORLD, httpJson, UPDATE_STAGED, CLOUD_LINKED, CLOUD_IDLE, CLOUD_WAITING } = require('./census_world');
 
 const VERSIONS = require('./artifact_versions_stub');
+const { coralReady } = require('./helpers/wait');
 module.exports = part => (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     if (process.env.SCALE_SHOT_DIR) useScaleShot(async name => require('node:fs').writeFileSync(`${process.env.SCALE_SHOT_DIR}/${name.replace(/[^a-z0-9]+/gi, '-')}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64'))); // SCALE_SHOT_DIR=<dir>: a picture of each scene with 200% findings
@@ -32,7 +33,7 @@ module.exports = part => (async () => {
     const settleJob = () => new Promise(r => setTimeout(r, 800)); // sleep-ok: a selected job's detail draws
     const tap = sel => tapSel(ev, sel);
     const click = js => ev(`(${js}) ; true`);
-    const load = async () => { await Page.navigate({ url: 'about:blank' }); await Page.loadEventFired(); await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`); };
+    const load = async () => { await Page.navigate({ url: 'about:blank' }); await Page.loadEventFired(); await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings'); };
     try {
         standIn = await launchStandIn(httpJson, { displayName: 'Census Agent' });
         await httpJson('POST', `/api/board/${TEAM}/subscribe`, { subscriber_id: 'Boss', job_title: 'Orchestrator', session_name: 'boss-session' });

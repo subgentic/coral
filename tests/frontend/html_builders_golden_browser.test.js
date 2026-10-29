@@ -7,6 +7,7 @@ const path = require('node:path');
 const { connect } = require('./agent_view_harness');
 const { compareGolden } = require('./helpers/builder_golden');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 const GOLDEN = path.join(__dirname, 'fixtures', 'html_builders_golden.json');
 const HEX = c => c.repeat(64);
 
@@ -20,7 +21,7 @@ const HEX = c => c.repeat(64);
         await Emulation.setTimezoneOverride({ timezoneId: 'UTC' });
         await Emulation.setLocaleOverride({ locale: 'en-US' });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
 
         const TEAM = 'golden-team';
         await ev(`(() => { const R = window.fetch; const json = (b, s = 200) => Promise.resolve(new Response(JSON.stringify(b), { status: s, headers: { 'content-type': 'application/json' } })); // the answers the cases below do not stub themselves are empty

@@ -6,6 +6,7 @@ const path = require('node:path');
 const { connect } = require('./agent_view_harness');
 const { INBOX_WORLD } = require('./helpers/inbox_world');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -18,7 +19,7 @@ const BASE = require('./test_base').BASE;
             const at = `${w}px: `;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             const load = async () => {
-                await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+                await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
                 await ev(INBOX_WORLD);
                 await ev(`window.switchNavTab('hub-inbox'); true`);
                 await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m => m.selectInboxTab('tasks')).then(() => true)`);

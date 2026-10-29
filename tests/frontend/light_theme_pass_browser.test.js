@@ -7,6 +7,7 @@ const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const { setTheme, installAudit, auditRegion } = require('./helpers/contrast');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 const FIREWALL = 'Windows Firewall lets other computers reach Coral on every port, more than it needs. Coral never makes firewall rules: Windows made these when someone clicked Allow on its prompt. To limit each rule to Private networks, open PowerShell as an administrator and run:\n- Coral (C:\\Coral\\coral.exe) on the Public profile, for every port:\nSet-NetFirewallRule -Name \'TCP Query User{26C1}C:\\Coral\\coral.exe\' -Profile Private\nOr, to remove the rule instead:\nRemove-NetFirewallRule -Name \'TCP Query User{26C1}C:\\Coral\\coral.exe\'';
 const SECURITY = 'Coral\'s data folder C:\\Users\\someone\\.coral can be read by Users. It holds the API key, the command-line token and the databases. Move the folder (CORAL_DATA_DIR) to one only you can read, or remove those groups from its permissions (Properties > Security).';
@@ -20,7 +21,7 @@ const DATABASE = 'The sessions database is damaged (page 12 is corrupt). Stop Co
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Emulation.setFocusEmulationEnabled({ enabled: true });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`); await installAudit(ev);
+        await coralReady(ev); await installAudit(ev);
         await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'update_check.js'); m.showSecurityWarning(${JSON.stringify(SECURITY)}); m.showFirewallWarning(${JSON.stringify(FIREWALL)}); m.showDatabaseWarning(${JSON.stringify(DATABASE)}); return true; })()`);
         await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'session_state.js'); const tip = document.createElement('div'); tip.className = 'session-tooltip'; tip.id = 'lt-tip'; tip.style.cssText = 'display:block;left:40px;top:60px';
             tip.innerHTML = m.buildSessionTooltip({ name: 'lt', session_id: 'lt', agent_type: 'claude', model: 'claude-opus-4-1', thinking_actual: 'high', thinking: 'medium', summary: 'Work the queue', status: 'Reading', branch: 'main', staleness_seconds: 30, working_directory: '/work/x', token_usage: {} });

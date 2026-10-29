@@ -6,6 +6,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 const LINE = "Coral's docs for agents: run `coral-agent docs` to list the topics, `coral-agent docs <topic>` to read one (`coral-agent docs all` prints everything).";
 
@@ -18,7 +19,7 @@ const LINE = "Coral's docs for agents: run `coral-agent docs` to list the topics
             const loaded = Page.loadEventFired();
             await Page.navigate({ url: BASE + path });
             await loaded;
-            await ev(`window.__coralReady.then(() => true)`);
+            await coralReady(ev);
             // on a phone the list is the first screen and the page (with its button) is the one after: the button has no box until the document is open (#docs-view[data-phone-item]), so wait for its box, not only for the view
             await waitFor(`!!document.getElementById('docs-copy-agent-line') && getComputedStyle(document.getElementById('docs-view')).display !== 'none' && document.getElementById('docs-copy-agent-line').getBoundingClientRect().height > 0`, 'the Docs page and its button laid out', 15000);
         };

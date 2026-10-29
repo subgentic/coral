@@ -3,7 +3,7 @@
 // the same tick as the switch to the Inbox tab, on a cold page, three times. Run against an isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
-const { framesJs } = require('./helpers/wait');
+const { framesJs, coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -12,7 +12,7 @@ const { framesJs } = require('./helpers/wait');
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
         for (let i = 1; i <= 3; i++) {
             await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.then(() => true)`);
+            await coralReady(ev);
             await ev(`window.__m.add('gamma', 'G', 6, { sleeping: false }); true`);
             await ev(`window.switchNavTab('hub-inbox'); window.selectLiveSession('gamma', 'claude', 'gamma-id', 'local'); true`);
             await waitFor(`window.__qaState.currentSession && window.__qaState.currentSession.name === 'gamma'`, `run ${i}: the agent to be selected`);

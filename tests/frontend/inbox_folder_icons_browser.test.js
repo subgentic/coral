@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { setTheme } = require('./helpers/contrast');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 const ICONS = { needs: 'notifications', tasks: 'checklist', goals: 'flag', saved: 'saved-bookmark', artifacts: 'inventory_2', chats: 'chat_bubble_outline', 'chats-group': 'forum', 'chats-notes': 'edit_note', 'chats-starred': 'star', 'chats-active': 'bolt', 'chats-archived': 'folder' };
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -15,7 +16,7 @@ const ICONS = { needs: 'notifications', tasks: 'checklist', goals: 'flag', saved
             await Emulation.setDeviceMetricsOverride({ width, height: width === 390 ? 844 : 1400, deviceScaleFactor: 1, mobile: width === 390 });
             await Emulation.setTouchEmulationEnabled({ enabled: width === 390 });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+            await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
             await setTheme(ev, theme);
             await ev(`document.documentElement.style.fontSize = '${font}px'; window.switchNavTab('hub-inbox'); true`);
             await waitFor(`document.querySelector('.sidebar-pane[data-pane="hub-inbox"] .view-list-item[data-key="chats-cli-pi"]')`, `${label}: all Inbox folders`, 10000);

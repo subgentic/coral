@@ -4,6 +4,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 const TASK = { id: 11, board_id: 'team-a', board_label: 'team-a', title: 'Review the release plan', priority: 'high', status: 'pending', created_by: 'Orchestrator', created_at: new Date().toISOString(), updated_at: new Date().toISOString(), revision: 1 };
 const STUB = `(() => { const real = window.fetch; const J = (b, s) => Promise.resolve(new Response(JSON.stringify(b), { status: s || 200, headers: { 'Content-Type': 'application/json' } }));
@@ -24,7 +25,7 @@ const STUB = `(() => { const real = window.fetch; const J = (b, s) => Promise.re
     const items = () => ev(`[...document.querySelectorAll('#qa-thread-host .ibx-thread-item')].map(li => ({ who: li.querySelector('.ibx-thread-who').textContent, text: li.querySelector('.ibx-thread-text').textContent.trim(), mine: li.classList.contains('ibx-thread-mine'), title: !!li.querySelector('.ibx-thread-who').title }))`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Page.addScriptToEvaluateOnNewDocument({ source: STUB });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
 
         console.log('the old mount (no single-item page): no thread, no read of the conversation');
         await mount(`{ load: true, region: false }`, 'qa-old-host');

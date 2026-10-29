@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 const LONG = 'worktree-agent-a1b2c3d4e5f60718/feature/calm-the-dashboard-remove-dot-rings-and-honour-reduced-motion';
 const SHORT = 'fix/header';
@@ -22,7 +23,7 @@ const SHORT = 'fix/header';
     const open = async (w, mobile) => {
         await Emulation.setDeviceMetricsOverride({ width: w, height: 900, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await ev(`(() => { const entry = window.__m.entry.bind(window.__m); window.__m.entry = a => ({ ...entry(a), model: 'claude-opus-4-1-20250805', branch: ${JSON.stringify(LONG)}, repo_name: '' });
             window.__m.add('hb-agent', 'A', 4, { sleeping: false, session_id: 'hb-sid' }); return true; })()`);
         await waitFor(`(window.__qaState.liveSessions || []).some(s => s.session_id === 'hb-sid')`, 'the agent', 8000);

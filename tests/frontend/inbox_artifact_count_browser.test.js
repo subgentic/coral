@@ -3,6 +3,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -10,7 +11,7 @@ const BASE = require('./test_base').BASE;
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
         await ev(`(() => { window.__counts = []; const real = window.fetch; window.fetch = function (u, o) { const url = typeof u === 'string' ? u : u.url; if (/\\/api\\/team-artifacts\\?[^#]*limit=1(&|$)/.test(url)) window.__counts.push(url); return real.apply(this, arguments); }; return true; })()`);
         const asks = () => ev(`window.__counts.length`);
         const open = async folder => { await ev(`window.switchNavTab('hub-inbox'); import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab(${JSON.stringify(folder)})).then(() => true)`); await new Promise(r => setTimeout(r, 600)); }; // sleep-ok: the folder draws and its reads settle
@@ -40,7 +41,7 @@ const BASE = require('./test_base').BASE;
         console.log('   ✓');
 
         console.log('4. Two asks at once are one read (the read in flight is shared)');
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
         await ev(`(() => { window.__counts = []; const real = window.fetch; window.fetch = function (u, o) { const url = typeof u === 'string' ? u : u.url; if (/\\/api\\/team-artifacts\\?[^#]*limit=1(&|$)/.test(url)) { window.__counts.push(url); return new Promise(r => setTimeout(r, 500)).then(() => real.apply(this, arguments)); } return real.apply(this, arguments); }; return true; })()`); // sleep-ok: a slow read keeps the first ask in flight while the second comes
         await ev(`import(${S} + 'inbox_artifacts.js').then(m => Promise.all([m.refreshArtifactCount(), m.refreshArtifactCount(), m.refreshArtifactCount()])).then(() => true)`);
         assert.equal(await asks(), 1, 'three asks while the first is in flight: one read');

@@ -5,6 +5,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 const VIEW = 'View only through Coral Hub';
 
 (async () => {
@@ -17,7 +18,7 @@ const VIEW = 'View only through Coral Hub';
             window.T.render.renderLiveSessions(window.T.state.liveSessions); window.__ha = await import((window.__coralStatic || '/static/') + 'hub_access.js');
             window.__cp = await import((window.__coralStatic || '/static/') + 'composer_placeholder.js'); return true; })()`);
         const box = () => ev(`(() => { const i = document.getElementById('command-input'); return { disabled: i.disabled, placeholder: i.placeholder }; })()`);
-        const select = async (name, sid) => { await ev(`window.selectLiveSession(${JSON.stringify(name)}, 'claude', ${JSON.stringify(sid)}, 'local')`); await ev(`window.__coralReady.agentSelected(${JSON.stringify(sid)}).then(() => true)`); };
+        const select = async (name, sid) => { await ev(`window.selectLiveSession(${JSON.stringify(name)}, 'claude', ${JSON.stringify(sid)}, 'local')`); await coralReady(ev, 'agentSelected', sid); };
         const readOnly = on => ev(`window.__ha.setHubReadOnly(window.T.state.currentSession, ${on ? `{ hub: 'view', effective: 'view', limitedBy: 'hub', label: 'box' }` : 'null'}); true`);
 
         console.log('1. a normal session has the normal placeholder');

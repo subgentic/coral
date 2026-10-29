@@ -6,6 +6,7 @@ const fs = require('node:fs'), path = require('node:path');
 const { setTheme } = require('./helpers/contrast');
 const { axName } = require('./helpers/ax_tree');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -20,7 +21,7 @@ const BASE = require('./test_base').BASE;
     const open = async (w, mobile, folder) => {
         await Emulation.setDeviceMetricsOverride({ width: w, height: 800, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled(mobile ? { enabled: true, maxTouchPoints: 5 } : { enabled: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`); await stub();
+        await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings'); await stub();
         await ev(`window.switchNavTab('hub-inbox'); true`);
         await ev(`import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab(${JSON.stringify(folder)})).then(() => true)`);
         await waitFor(`document.querySelectorAll('#group-table-view .dt-table tbody tr:not(.dt-group)').length >= 1`, 'the chats', 15000);

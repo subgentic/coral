@@ -6,20 +6,21 @@ const { openBoardTasksTab } = require('./helpers/board_tasks_tab');
 const { removeBoards } = require('./helpers/board_cleanup');
 const { setTheme } = require('./helpers/contrast');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 const board = 'task-preview-' + Date.now().toString(36);
 (async()=>{
  const {client,Page,Emulation,ev,waitFor,PRELOAD,install}=await connect();
  const failures=[];
  try{
   await Page.enable();await Page.addScriptToEvaluateOnNewDocument({source:PRELOAD});
-  await Page.navigate({url:BASE+'/'});await Page.loadEventFired();await install();await ev(`window.__coralReady.then(()=>true)`);
+  await Page.navigate({url:BASE+'/'});await Page.loadEventFired();await install();await coralReady(ev);
   const api=(m,p,b)=>ev(`fetch(${JSON.stringify(p)},{method:${JSON.stringify(m)},headers:{'Content-Type':'application/json'},body:${JSON.stringify(JSON.stringify(b))}}).then(r=>r.status)`);
   assert.equal(await api('POST',`/api/board/${board}/subscribe`,{subscriber_id:'Boss',job_title:'Orchestrator'}),200);
   for(let i=1;i<=20;i++)assert.equal(await api('POST',`/api/board/${board}/tasks`,{subscriber_id:'Boss',title:'Preview task '+i,body:'Task description '+i,priority:'medium',assigned_to:'Boss'}),201);
   for(const width of [1280,390]){try{
    await Emulation.setDeviceMetricsOverride({width,height:900,deviceScaleFactor:1,mobile:width===390});
    await Emulation.setTouchEmulationEnabled({enabled:width===390});
-   await Page.navigate({url:BASE+'/'});await Page.loadEventFired();await install();await ev(`window.__coralReady.then(()=>true)`);
+   await Page.navigate({url:BASE+'/'});await Page.loadEventFired();await install();await coralReady(ev);
    await openBoardTasksTab({ev,waitFor},board);
    await waitFor(`document.querySelectorAll('#board-task-list .board-task-item').length>=2`,'task list');
    const before=await ev(`(()=>{const r=[...document.querySelectorAll('#board-task-list .board-task-item')].at(-1);r.querySelector('.board-task-name').scrollIntoView({block:'nearest'});window.__previewOpener=r;return {url:location.pathname,title:r.querySelector('.board-task-name').textContent,scroll:document.getElementById('agentic-panel-tasks').scrollTop};})()`);

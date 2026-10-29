@@ -4,6 +4,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 const BUDGET = { chooser: 52, /* the title "New agent or project" (#7064) and the four description lines the type cards say again (#9253, the Operator): 10 + 9 + 10 + 11 words */ folder: 30, persona: 81, agent: 59 }; // the three New Agent steps as the design words them (#7391): measured at 1280 px (the phone shows fewer). Step 1's 30 includes the 10-word "Next: the persona, then model and permissions. All have defaults." line (UI/UX cut it from 20), the step header, the screen-reader reason for Next and the Recent: label
 
@@ -20,7 +21,7 @@ const BUDGET = { chooser: 52, /* the title "New agent or project" (#7064) and th
             const tag = `${w}px`;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.then(() => true)`);
+            await coralReady(ev);
             await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'launch_server.js'); localStorage.removeItem(m.recentDirsKey('local')); return true; })()`); // an earlier suite's folders would add the Recent: row to the count
             await ev(`(async () => { await window.showLaunchModal(); return true; })()`);
             await waitFor(`getComputedStyle(document.getElementById('launch-step-chooser')).display !== 'none'`, `${tag}: the chooser`, 8000);

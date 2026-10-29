@@ -4,6 +4,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 const SID = '0b2f6c1e-3d4a-4b5c-8d6e-000000010256';
 const NAME = 'claude-' + SID;
@@ -31,7 +32,7 @@ const RECENT = [
         for (const [w, h, mobile] of [[1280, 800, false], [390, 844, true]]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`); await stub();
+            await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings'); await stub();
             await load();
             let p = await panel();
             assert.deepEqual(p.rows.map(r => r.path), ['out/report.md', 'data.csv', 'old-notes.txt'], `${w}: newest first: ${JSON.stringify(p)}`);

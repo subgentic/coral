@@ -6,6 +6,7 @@ const path = require('node:path');
 const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const team = 'review-inbox-' + Date.now().toString(36), failures = [];
@@ -18,7 +19,7 @@ const BASE = require('./test_base').BASE;
                 await Emulation.setDeviceMetricsOverride({width,height:900,deviceScaleFactor:1,mobile:width===390});
                 await Emulation.setTouchEmulationEnabled({enabled:width===390});
                 await Page.navigate({url:BASE+'/'}); await Page.loadEventFired(); await install();
-                await ev(`window.__coralReady.startup('liveList','liveListLoaded','settings')`);
+                await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
                 assert.equal(await ev(`fetch('/api/board/${team}/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({subscriber_id:'Review Writer',job_title:'Writer'})}).then(r=>r.status)`),200);
                 // Mock only artifact storage; the team exists through the real board API.
                 await ev(`(() => {

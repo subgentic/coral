@@ -10,7 +10,7 @@ const TEAM = `qa-paths-${Date.now() % 100000}`;
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
-    const { settle } = require('./helpers/wait').bind(ev);
+    const { settle, coralReady } = require('./helpers/wait').bind(ev);
     const results = [];
     const check = (label, cond, detail) => { results.push(!!cond); console.log(`[${cond ? 'PASS' : 'FAIL'}] ${label}${detail !== undefined ? ' - ' + detail : ''}`); };
     const path = () => ev(`location.pathname`);
@@ -20,7 +20,7 @@ const TEAM = `qa-paths-${Date.now() % 100000}`;
     const pickFolder = (key, mobile) => mobile
         ? ev(`(() => { const s = document.querySelector('.view-list select'); s.value = ${JSON.stringify(key)}; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`)
         : ev(`document.querySelector('.view-list-item[data-key="${key}"]').click(); true`);
-    const load = async url => { await Page.navigate({ url: BASE + url }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`); };
+    const load = async url => { await Page.navigate({ url: BASE + url }); await Page.loadEventFired(); await install(); await coralReady(); };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [label, w, h, mobile] of [['1280', 1280, 800, false], ['390', 390, 844, true]]) {
@@ -73,7 +73,7 @@ const TEAM = `qa-paths-${Date.now() % 100000}`;
             await installTP(ev); await seed(ev, TEAM); await openTeam(ev, waitFor, TEAM);
             await goTab(ev, settle, 'Board'); await settle(500);
             check(`${label}: the team's Board tab is /team/<team>/board`, (await path()) === `/team/${TEAM}/board`, await path());
-            await ev(`location.reload(); true`); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`); await installTP(ev);
+            await ev(`location.reload(); true`); await Page.loadEventFired(); await install(); await coralReady(); await installTP(ev);
             await waitFor(`!!document.querySelector('#team-panel-messages') && !document.querySelector('#team-panel-messages').hidden`, 'the Board tab after a reload', 10000);
             check(`${label}: a reload of /team/<team>/board opens the Board tab`, (await path()) === `/team/${TEAM}/board`, await path());
             await load(`/team/${TEAM}/messages`);

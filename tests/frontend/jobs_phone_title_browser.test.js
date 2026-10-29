@@ -4,13 +4,14 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { DATA_WORLD } = require('./helpers/census_world');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Page.addScriptToEvaluateOnNewDocument({ source: DATA_WORLD });
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         await ev(`window.switchNavTab('automations'); true`);
         await waitFor(`!!document.querySelector('#group-table-view button.dt-primary') && document.getElementById('group-table-view').getClientRects().length > 0`, 'the Jobs folder', 10000);
         const m = await ev(`(() => { const head = document.querySelector('#group-table-view .inbox-folder-head'), sel = document.querySelector('#group-table-view .view-list-select'), top = document.getElementById('group-table-view').getBoundingClientRect().top, bar = document.querySelector('#group-table-view .list-bar-search-row');

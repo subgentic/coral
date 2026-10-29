@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -12,10 +13,10 @@ const BASE = require('./test_base').BASE;
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         assert.equal(await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: 'Orchestrator', job_title: 'Orchestrator', session_name: 'o-s' }), 200);
         assert.equal(await api('POST', `/api/board/${B}/messages`, { subscriber_id: 'Orchestrator', content: 'hello' }), 200);
-        await Page.navigate({ url: `${BASE}/board/${B}` }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: `${BASE}/board/${B}` }); await Page.loadEventFired(); await install(); await coralReady(ev);
         await waitFor(`document.querySelectorAll('#mb-messages .mb-message').length >= 1 && !!document.querySelector('.list-bar-search')`, 'the board and its search bar', 15000);
         const fonts = await ev(`(() => { const f = e => getComputedStyle(e).fontFamily; const q = s => document.querySelector(s); return { body: f(document.body), search: f(q('.list-bar-search')), filters: f(q('.list-bar-filter-btn')), last: f([...document.querySelectorAll('.list-bar-filter-btn')].pop()) }; })()`);
         for (const k of ['search', 'filters', 'last']) assert.equal(fonts[k], fonts.body, `${k} is drawn in the app's font: ${JSON.stringify(fonts)}`);

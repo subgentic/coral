@@ -2,6 +2,7 @@
 // and nothing is left unhandled; the next click, with the connection back, opens the form. 1280 px, isolated dev server over CDP: the module's request is blocked, then allowed.
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, sleep, PRELOAD, install } = await connect();
@@ -13,7 +14,7 @@ const BASE = require('./test_base').BASE;
         await client.Network.enable();
         await client.Network.setBlockedURLs({ urls: ['*job_form*'] });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+        await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
         await ev(`window.__unhandled = 0; window.addEventListener('unhandledrejection', () => { window.__unhandled++; }); true`);
         await ev(`window.showJobModal(); true`);
         await waitFor(`/Could not load the job form/.test(document.body.innerText)`, 'the failure toast', 8000);

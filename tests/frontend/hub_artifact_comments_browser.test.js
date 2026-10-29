@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { STUB, HEX } = require('./helpers/comments_scale');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 const CONTENT = '# Plan\n\nThe backfill commits one batch at a time.\n';
 const FX = { filename: 'plan.md', content: CONTENT, size: CONTENT.length, mediaType: 'text/markdown', comments: [
@@ -18,7 +19,7 @@ const FX = { filename: 'plan.md', content: CONTENT, size: CONTENT.length, mediaT
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await ev(STUB(FX));
         // every request URL, in order, on top of the stub
         await ev(`(() => { const inner = window.fetch; window.__urls = []; window.fetch = (u, o) => { window.__urls.push(((o && o.method) || 'GET') + ' ' + String(u)); return inner(u, o); }; return true; })()`);

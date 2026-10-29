@@ -4,6 +4,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -26,7 +27,7 @@ const BASE = require('./test_base').BASE;
             const tag = `${w}px`;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.then(() => true)`);
+            await coralReady(ev);
             await ev(`(async () => { const m = await import(${S} + 'launch_models.js'); return true; })()`);
             // Claude and Antigravity missing, Codex and Pi installed, nothing ever chosen: Codex and Pi first, Codex selected
             await stub(['codex', 'pi']);

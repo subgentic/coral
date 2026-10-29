@@ -6,6 +6,7 @@ const { connect } = require('./agent_view_harness');
 const { guardSettings } = require('./helpers/settings_guard');
 const { install: installNA, N: NA, openNewAgent } = require('./helpers/new_agent');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const guard = await guardSettings();
@@ -16,7 +17,7 @@ const BASE = require('./test_base').BASE;
         for (const [w, h, mobile] of [[1280, 800, false], [390, 844, true]]) {
             const check = (ok, msg) => { if (!ok) problems.push(`${w}: ${msg}`); };
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`); await installNA(ev);
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev); await installNA(ev);
             const good = await ev(`fetch('/api/settings').then(r => r.json()).then(d => d.settings.cli_path_claude || '')`);
             // The CLI check is stubbed: missing until the real Settings save has gone through, found after it (what saving a right path does on a real machine)
             await ev(`window.__cliFound = false; const real = window.fetch; window.fetch = async (u, o = {}) => { const p = new URL(String(u), location.href); if (p.pathname === '/api/agents/models') return new Response(JSON.stringify(window.__cliFound ? { agent_type: p.searchParams.get('type'), models: [{ value: 'claude-opus-5-5', display_name: 'Claude Opus 5.5' }], refreshing: false } : { agent_type: p.searchParams.get('type'), models: [{ value: 'claude-opus-5-5', display_name: 'Claude Opus 5.5' }], error: 'the CLI is not installed, or not where Settings > CLI paths says' }), { status: 200, headers: { 'Content-Type': 'application/json' } }); if (p.pathname === '/api/system/cli-check') return new Response(JSON.stringify(window.__cliFound ? { found: true, version: '1', status: 'available', agent_type: p.searchParams.get('type') } : { found: false, status: 'missing', agent_type: p.searchParams.get('type') }), { status: 200, headers: { 'Content-Type': 'application/json' } }); const r = await real(u, o); if (p.pathname === '/api/settings' && (o.method || 'GET').toUpperCase() === 'PUT' && r.ok) setTimeout(() => { window.__cliFound = true; }, 400); return r; }; true`); // found 400 ms after the save answers, as a check that ran at the save's own moment would not see

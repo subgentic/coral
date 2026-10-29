@@ -5,7 +5,7 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
-const { settle } = require('./helpers/wait');
+const { settle, coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, sleep, PRELOAD, install } = await connect();
@@ -17,7 +17,7 @@ const { settle } = require('./helpers/wait');
         await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await ev(`window.__m.add(${JSON.stringify(NAME)}, 'A', 60, { sleeping: false, session_id: 'h200-sid', board_project: 'coral-go-team' }); true`);
         await settle(ev, 600); // sleep-ok: the first live list renders from several answers; no single completion event
         await ev(`window.selectLiveSession(${JSON.stringify(NAME)}, 'claude', 'h200-sid', 'local'); true`);

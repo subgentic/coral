@@ -5,6 +5,7 @@ const sceneShots = require('./helpers/scene_shots');
 const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -13,7 +14,7 @@ const BASE = require('./test_base').BASE;
     const shot = sceneShots(Page); // beside the gate's uploaded output in CI, CORAL_SCREENSHOT_DIR locally
     const short = t => { const c = [...t.replace(/\s+/g, ' ').trim()]; return c.length > 24 ? c.slice(0, 23).join('') + '\u2026' : c.join(''); }; // the Back word: a title cut at 24 characters
     const backText = () => ev(`document.querySelector('#inbox-page .goals-back').textContent.trim()`);
-    const load = async url => { await Page.navigate({ url: BASE + url }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`); };
+    const load = async url => { await Page.navigate({ url: BASE + url }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings'); };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await load('/');

@@ -6,7 +6,7 @@
 // GET), the "not called in cloud mode" list of the plan, and, once the Inbox stops asking the Hub itself for a Chats history it does not have (the plan's risk 1: inboxSources() lists 'local'), that no unproxied history read is made.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
-const { nextFrame } = require('./helpers/wait');
+const { nextFrame, coralReady } = require('./helpers/wait');
 const { connect } = require('./agent_view_harness');
 const { setupHubWorld, BASE } = require('./helpers/hub_world');
 
@@ -45,7 +45,7 @@ const norm = p => p.replace(/^\/api\/remote\/[^/]+/, '').replace(/\/sessions\/hi
     const open = async (url) => {
         await Page.navigate({ url: BASE + url }); await Page.loadEventFired();
         await waitFor(`typeof window.switchNavTab === 'function' && !!window.__coralReady`, 'the dashboard');
-        await ev(`window.__coralReady.startup('liveList', 'settings')`);
+        await coralReady(ev, 'startup', 'liveList', 'settings');
     };
     // the requests as a set of "METHOD path ?keys", the page's own chrome left out and a computer's id replaced
     const shape = reqs => reqs.map(r => { const proxied = /^\/api\/remote\//.test(r.p), p = norm(r.p); return { proxied, m: r.m, p, keys: r.keys, chrome: !proxied && `${r.m} ${p}` in CHROME }; });

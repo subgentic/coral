@@ -7,14 +7,14 @@ const BASE = require('./test_base').BASE;
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const { Input } = client;
-    const { settle } = require('./helpers/wait').bind(ev);
+    const { settle, coralReady } = require('./helpers/wait').bind(ev);
     const key = (k, extra = {}) => Input.dispatchKeyEvent({ type: 'keyDown', key: k, ...extra }).then(() => Input.dispatchKeyEvent({ type: 'keyUp', key: k, ...extra }));
     const newAgentOpen = () => ev(`(() => { const d = document.getElementById('launch-step-agent'); return !!d && getComputedStyle(d).display !== 'none' && d.getClientRects().length > 0; })()`);
     const listOpen = () => ev(`(() => { const m = document.getElementById('alert-modal'); return !!m && getComputedStyle(m).display !== 'none' && /Keyboard shortcuts/.test(document.getElementById('alert-modal-title').textContent) ? document.getElementById('alert-modal-message').textContent : null; })()`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady();
         assert.match(await ev(`document.querySelector('.sidebar-new-btn-full').title`), /Alt\+N/, 'the New agent button says its key');
         // ? in the page lists the shortcuts
         await ev(`document.activeElement && document.activeElement.blur(); true`);

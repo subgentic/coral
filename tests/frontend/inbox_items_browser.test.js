@@ -6,6 +6,7 @@ const path = require('node:path');
 const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const board = 'inbox-items-2f0x-' + Date.now().toString(36), title = 'Read this task in the Inbox';
@@ -13,7 +14,7 @@ const BASE = require('./test_base').BASE;
     const api = (method, url, body) => ev(`fetch(${JSON.stringify(url)}, {method:${JSON.stringify(method)},headers:{'Content-Type':'application/json'},body:${JSON.stringify(JSON.stringify(body))}}).then(async r=>({status:r.status,body:await r.json()}))`);
     const load = async url => {
         await Page.navigate({url:BASE+url}); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.startup('liveList','liveListLoaded','settings')`);
+        await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
         await ev(`(() => { const s=document.createElement('style'); s.textContent='*, *::before, *::after { transition: none !important; animation: none !important; }'; document.head.append(s); return true; })()`);
     };
     const folder = async key => {

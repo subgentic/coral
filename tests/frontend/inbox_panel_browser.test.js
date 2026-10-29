@@ -10,6 +10,7 @@ const { OPEN_INBOX_SAVED } = require('./helpers/open_inbox_saved');
 const { connect } = require('./agent_view_harness');
 const { setTheme, installAudit, auditRegion } = require('./helpers/contrast');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 const STUB = `(() => {
     const real = window.fetch; window.__reqs = []; window.__pwn = undefined;
@@ -110,7 +111,7 @@ const STUB = `(() => {
         await Emulation.setDeviceMetricsOverride({ width: w, height: 900, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
         await Emulation.setEmulatedMedia({ features: [{ name: 'prefers-color-scheme', value: theme }] });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await installAudit(ev); await setTheme(ev, theme);
         await ev(STUB);
         // The component is mounted the way Coral Hub mounts it (the list, no option; #7472 keeps that unchanged): the mounted instance of inbox_coral.js in its host, which this suite shows in the page

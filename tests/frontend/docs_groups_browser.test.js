@@ -2,6 +2,7 @@
 // "For developers", not in Getting started; Getting started has the newcomer pages only. Against the real docs of the isolated dev server, 1280 px.
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, sleep, PRELOAD, install } = await connect();
@@ -11,7 +12,7 @@ const BASE = require('./test_base').BASE;
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 820, deviceScaleFactor: 1, mobile: false });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         await ev(`window.switchNavTab('docs'); true`);
         await waitFor(`document.querySelectorAll('#docs-nav-list [data-doc]').length > 10`, 'the topics', 12000);
         const groups = await ev(`(() => { const out = []; let cur = null; for (const li of document.querySelectorAll('#docs-nav-list > li')) { const h = li.querySelector('.group-header-label, .group-title, h3, [data-group]'); const btn = li.querySelector('[data-doc]'); if (btn) { if (cur) cur.docs.push(btn.dataset.doc); } else { cur = { label: li.textContent.replace(/\\s+/g, ' ').trim(), docs: [] }; out.push(cur); } } return out; })()`);

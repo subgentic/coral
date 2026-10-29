@@ -3,13 +3,14 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         await waitFor(`!!document.getElementById('inbox-nav-list')`, 'the Inbox side list', 8000);
         assert.equal(await ev(`!!document.querySelector('.inbox-nav-hint') || !!document.getElementById('inbox-new-chat') || /Agents is for chatting|New chat/.test(document.querySelector('[data-pane="hub-inbox"]').textContent)`), false, 'the Inbox side list has no hint line and no New chat button');
         assert.equal(await ev(`document.getElementById('btn-resume-session').textContent.trim()`), 'Continue this chat', 'the chat page\'s Resume button says Continue this chat');

@@ -9,6 +9,7 @@ const SHOT_DIR = process.env.CORAL_SCREENSHOT_DIR || path.join(process.env.RUNNE
 const { connect } = require('./agent_view_harness');
 const { assertPinnedBar } = require('./helpers/pinned_bar');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 const S = `(window.__coralStatic || '/static/')`;
 
 (async () => {
@@ -44,7 +45,7 @@ const S = `(window.__coralStatic || '/static/')`;
             await Emulation.setTimezoneOverride({ timezoneId: 'America/New_York' }); // the zone is named only when it differs from the viewer's (zoneNote): the jobs are UTC, so the viewer is not, whatever machine runs this (CI's browser is UTC)
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.startup('liveList', 'settings')`);
+            await coralReady(ev, 'startup', 'liveList', 'settings');
             await ev(`window.switchNavTab('automations'); true`);
             await waitFor(`document.querySelectorAll('#group-table-view tbody tr[data-key]').length === 3`, `${at}: the three jobs listed at once`, 8000);
 

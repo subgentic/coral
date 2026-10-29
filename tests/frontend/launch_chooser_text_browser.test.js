@@ -3,6 +3,7 @@
 // Drives Chrome over CDP against the isolated dev server.
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 const WORDS = {
     'New agent': 'One agent in a folder you choose.',
@@ -20,7 +21,7 @@ const WORDS = {
         for (const [label, w, h, mobile] of [['1280', 1280, 800, false], ['390', 390, 844, true]]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.startup('liveList', 'settings')`);
+            await coralReady(ev, 'startup', 'liveList', 'settings');
             await ev(`window.showLaunchModal(); true`);
             await waitFor(`!!document.getElementById('launch-modal') && getComputedStyle(document.getElementById('launch-modal')).display !== 'none' && document.querySelectorAll('#launch-step-chooser .launch-type-card').length >= 4`, 'the chooser', 10000);
             const cards = await ev(`[...document.querySelectorAll('#launch-step-chooser .launch-type-card')].filter(c => c.getClientRects().length).map(c => { const r = c.getBoundingClientRect(), d = c.querySelector('.launch-type-desc'), dr = d && d.getBoundingClientRect();

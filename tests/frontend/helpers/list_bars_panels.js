@@ -3,6 +3,7 @@
 // team_artifacts_search, agent_list_filters, activity_search, history_events_search, servers_search, inbox_local), cut to what is needed to show the bar.
 'use strict';
 const { launchStandIn } = require('./stand_in_agent');
+const { coralReady } = require('./wait');
 
 const uid = n => '0000' + String(n).padStart(4, '0') + '-0000-4000-8000-000000000000';
 const hex = i => i.toString(16).padStart(20, '0');
@@ -14,7 +15,7 @@ async function fresh(ctx) {
     await ctx.Page.navigate({ url: ctx.BASE + '/' });
     await loaded;
     await ctx.install();
-    await ctx.ev(`window.__coralReady.then(() => true)`);
+    await coralReady(ctx.ev);
 }
 const api = (ctx, method, path, body) => ctx.ev(`fetch(${JSON.stringify(path)}, { method: ${JSON.stringify(method)}, headers: { 'Content-Type': 'application/json' }, body: ${body ? JSON.stringify(JSON.stringify(body)) : 'undefined'} }).then(async r => ({ status: r.status, body: await r.json().catch(() => ({})) }))`);
 const pick = (ctx, sel, value) => ctx.ev(`(() => { const s = document.querySelector(${JSON.stringify(sel)}); s.value = ${JSON.stringify(value)}; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);

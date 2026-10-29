@@ -5,6 +5,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 const S = (id, name, extra) => ({ session_id: id, name, agent_type: 'claude', working_directory: '/tmp/proj', sleeping: false, ...extra });
 // the sleeping team's agent is listed first: with no saved order the awake team must still come before it
@@ -32,7 +33,7 @@ const SESSIONS = [
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         await ev(`(() => { localStorage.removeItem('coral_collapsed_groups'); localStorage.removeItem('coral-group-by-team'); window.switchNavTab('agents'); window._coralSetLiveSessions(${JSON.stringify(SESSIONS)}); return true; })()`);
         await waitFor(`document.querySelectorAll('.session-board-card').length >= 4`, 'the cards', 10000);
 
