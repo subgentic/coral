@@ -333,7 +333,6 @@
 1	session_rows.js	stuckClass
 1	session_rows.js	terminalGoneChip(s)
 1	session_rows.js	typeTag
-1	session_rows.js	wake
 1	session_state.js	gs.ahead
 1	session_state.js	gs.behind
 1	session_state.js	gs.dirty

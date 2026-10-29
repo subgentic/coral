@@ -421,12 +421,6 @@ summary.sidebar-kebab-btn::-webkit-details-marker { display: none; }
     font-style: italic;
 }
 
-/* Wake, on the folded row of agents asleep after a restart (#10057): at the row's right, not the 20px sidebar button margin */
-.sleeping-summary-row .sleeping-wake {
-    margin: 0 0 0 auto;
-    flex-shrink: 0;
-}
-
 /* Archived section (#3030): one collapsed row at the bottom of the list. */
 .session-list .archived-summary-row {
     margin-top: 10px;

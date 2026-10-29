@@ -469,10 +469,6 @@ registerActions({
     'team-name-open': el => { const b = textOf(el.dataset.board); if (b) window.openTeamPage(b); },
     'group-chevron': (el, event) => { event.stopPropagation(); const g = textOf(el.dataset.group); if (g) window.toggleGroupCollapse(g); },
     'group-sleeping-expand': el => { const g = textOf(el.dataset.group); if (g) window.expandSleepingGroup(g); },
-    'wake-restarted': async (el, event) => { // Wake on the folded row of agents Coral put to sleep when it restarted (#10057): wakes those, one after the other, and leaves the row's own expand alone
-        event.stopPropagation();
-        for (const id of textOf(el.dataset.ids).split(',')) { const s = id && (state.liveSessions || []).find(x => x.session_id === id); if (s) await window.toggleAgentSleep(s.name, s.agent_type, s.session_id, 'wake'); }
-    },
     'archived-toggle': () => window.toggleArchivedSection(),
     'folder-tag': menu(el => { const g = textOf(el.dataset.group); if (g) window.showFolderTagDropdown(g, el.closest('.session-group-header')); }),
     'folder-add-agent': menu(el => { const d = dirOf(el); if (d) W('showAddStandaloneAgent')(d, textOf(el.dataset.server) || ''); }),
