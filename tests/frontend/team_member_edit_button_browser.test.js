@@ -1,6 +1,7 @@
 // A team member's row has one button, Edit <name>, at its end (#10836, the operator): no chevron and no "..." menu, Edit and the row open the Edit member dialog, Remove from team is in that dialog (Undo as before),
 // Move up and Move down are gone and Alt+ArrowUp / Alt+ArrowDown on the focused row reorder it, said politely. 1280 and 390 px; the Orchestrator keeps its rules (not removed, not moved up). Isolated dev server over CDP.
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 
@@ -46,6 +47,29 @@ const BASE = require('./test_base').BASE;
             await ev(`document.querySelectorAll('#team-agents-list .team-agent-row')[0].querySelector('button').focus(); true`);
             await key('ArrowUp');
             assert.equal((await roles())[0], 'Orchestrator', `${w}: the first row stays first`);
+            // Move up / Move down in Edit member (#10868): a single-pointer way to reorder, for touch; the dialog stays open, it is said politely, the order is the form's
+            const tap = async sel => { const r = await ev(`(() => { const b = document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect(); return [b.left + b.width / 2, b.top + b.height / 2]; })()`); if (mobile) await client.Input.synthesizeTapGesture({ x: r[0], y: r[1] }); else await ev(`document.querySelector(${JSON.stringify(sel)}).click(); true`); };
+            await ev(`document.querySelectorAll('#team-agents-list .team-agent-row')[1].querySelector('button').click(); true`);
+            await waitFor(`document.getElementById('launch-agent-title-text').textContent === 'Edit member' && document.getElementById('launch-agent-move-down').getClientRects().length > 0`, `${w}: Edit member has Move down`, 5000);
+            const mv = await ev(`['up', 'down'].map(d => { const b = document.getElementById('launch-agent-move-' + d), r = b.getBoundingClientRect(); return { text: b.textContent.trim(), disabled: b.disabled, shown: b.getClientRects().length > 0, h: Math.round(r.height), w: Math.round(r.width) }; })`);
+            assert.deepEqual(mv.map(m => [m.text, m.disabled, m.shown]), [['Move up', false, true], ['Move down', false, true]], `${w}: Move up and Move down are in Edit member`);
+            if (mobile) assert.ok(mv.every(m => m.h >= 44), `${w}: 44 px: ${JSON.stringify(mv)}`);
+            if (process.env.CORAL_SCREENSHOT_DIR) { fs.mkdirSync(process.env.CORAL_SCREENSHOT_DIR, { recursive: true }); fs.writeFileSync(`${process.env.CORAL_SCREENSHOT_DIR}/edit-member-${w}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); }
+            const over = await ev(`(() => { const a = document.querySelector('#launch-step-agent .modal-actions'); return a.scrollWidth > a.clientWidth + 1 || document.documentElement.scrollWidth > innerWidth; })()`);
+            assert.equal(over, false, `${w}: Edit member's buttons fit without sideways scroll`);
+            await tap('#launch-agent-move-down');
+            await waitFor(`document.querySelectorAll('#team-agents-list .team-agent-role-name')[2].textContent === 'Lead Developer'`, `${w}: Move down moved the member`, 3000);
+            assert.match(await ev(`document.getElementById('launch-stage-live').textContent`), /^Moved Lead Developer to 3 of \d+$/, `${w}: said politely`);
+            assert.equal(await ev(`document.getElementById('launch-agent-title-text').textContent`), 'Edit member', `${w}: the dialog stays open`);
+            await tap('#launch-agent-move-up');
+            await waitFor(`document.querySelectorAll('#team-agents-list .team-agent-role-name')[1].textContent === 'Lead Developer'`, `${w}: Move up moved it back`, 3000);
+            await ev(`document.getElementById('launch-agent-cancel').click(); true`);
+            await waitFor(`!document.getElementById('launch-modal').hasAttribute('data-member')`, `${w}: closed`, 5000);
+            await ev(`document.querySelectorAll('#team-agents-list .team-agent-row')[0].querySelector('button').click(); true`);
+            await waitFor(`document.getElementById('launch-agent-title-text').textContent === 'Edit member' && document.getElementById('launch-agent-move-down').getClientRects().length > 0`, `${w}: Edit member of the Orchestrator`, 5000);
+            assert.deepEqual(await ev(`['up', 'down'].map(d => document.getElementById('launch-agent-move-' + d).disabled)`), [true, false], `${w}: the Orchestrator does not move up, as before`);
+            await ev(`document.getElementById('launch-agent-cancel').click(); true`);
+            await waitFor(`!document.getElementById('launch-modal').hasAttribute('data-member')`, `${w}: closed again`, 5000);
             // Edit and the row open the dialog; Remove from team is in it
             await ev(`document.querySelectorAll('#team-agents-list .team-agent-row')[2].querySelector('button').click(); true`);
             await waitFor(`document.getElementById('launch-agent-title-text').textContent === 'Edit member' && document.getElementById('launch-agent-save').getClientRects().length > 0`, `${w}: Edit opens Edit member`, 5000);

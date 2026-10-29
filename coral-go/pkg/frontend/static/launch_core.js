@@ -49,6 +49,7 @@ export function setLaunchStage(stage) {
     if (save) save.hidden = !launch.member || stage !== 'agent';
     const rm = document.getElementById("launch-agent-remove");
     if (rm) rm.hidden = !launch.member?.row || stage !== 'agent' || String(launch.member.value?.name || '').trim().toLowerCase() === 'orchestrator'; // Edit member only; the Orchestrator is not removed (#10836)
+    for (const id of ['launch-agent-move-up', 'launch-agent-move-down']) { const mv = document.getElementById(id); if (mv) mv.hidden = !launch.member?.row || stage !== 'agent'; } // a single-pointer way to reorder besides dragging and Alt+Arrow, for touch (#10868)
     const recap = document.getElementById("launch-recap");
     if (recap) recap.hidden = stage === 'folder' || !!launch.member;
     const live = document.getElementById("launch-stage-live");

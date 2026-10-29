@@ -229,6 +229,7 @@ function showTeamAgentModal(row = null, { role = '' } = {}) {
     if (dialog && getComputedStyle(dialog).display === 'none') { dialog.style.display = 'flex'; launch.mode = 'team'; _showLaunchStep('team'); } // display-ok: the member is a step of the Launch dialog, which is open when a person is in the team form; opened as it is when something else asks (the team form is kept, not reset)
     launch.member = { row, returnTo: currentTeamStep(), value: acfValue };
     window._selectLaunchType('agent');
+    _syncMemberMoveButtons();
 }
 window.showTeamAgentModal = showTeamAgentModal;
 
@@ -577,7 +578,7 @@ function _addTeamAgent(defaultName, defaultPrompt, defaultCapabilities, defaultA
 }
 
 // Move a member up or down (Alt+Arrow on its row, #10836); said politely: "Moved QA Engineer to 2 of 5". The Orchestrator does not move up (#7407).
-function _moveTeamAgent(rowOrBtn, direction, { say = false } = {}) {
+function _moveTeamAgent(rowOrBtn, direction, { say = false, focus = true, liveId = 'team-agents-live' } = {}) {
     const row = rowOrBtn.closest?.('.team-agent-row');
     if (!row) return;
     const list = row.parentElement;
@@ -587,9 +588,26 @@ function _moveTeamAgent(rowOrBtn, direction, { say = false } = {}) {
         list.insertBefore(row.nextElementSibling, row);
     } else return;
     _syncTeamMembers();
-    row.querySelector('.team-agent-edit-btn')?.focus();
-    const live = document.getElementById('team-agents-live');
+    if (focus) row.querySelector('.team-agent-edit-btn')?.focus();
+    const live = document.getElementById(liveId);
     if (say && live) { const rows = teamRows(); live.textContent = `Moved ${rowRole(row) || 'member'} to ${rows.indexOf(row) + 1} of ${rows.length}`; }
+}
+
+/** Move up / Move down in the Edit member dialog (#10868): the same move as Alt+Arrow, for a touch-only person; the dialog stays open so it can be pressed again, and it is said as "Moved X to N of M". */
+function _syncMemberMoveButtons() {
+    const row = launch.member?.row, up = document.getElementById('launch-agent-move-up'), down = document.getElementById('launch-agent-move-down');
+    if (!row || !up || !down) return;
+    const rows = teamRows(), i = rows.indexOf(row);
+    up.disabled = i <= 0 || isOrchestrator(rowRole(row)); // the Orchestrator does not move up (#7407)
+    down.disabled = i < 0 || i === rows.length - 1;
+}
+function _moveMemberFromDialog(direction) {
+    const row = launch.member?.row;
+    if (!row) return;
+    _moveTeamAgent(row, direction, { say: true, focus: false, liveId: 'launch-stage-live' });
+    _syncMemberMoveButtons();
+    const a = document.activeElement;
+    if (a && a.disabled) document.getElementById(direction === -1 ? 'launch-agent-move-down' : 'launch-agent-move-up')?.focus(); // the button that was pressed is off at the end: the other one takes the focus
 }
 
 window._addTeamAgent = (name, prompt) => {
@@ -853,4 +871,4 @@ async function _openLaunchedTeam(server, boardName, goal, agents, seen, boardSet
 }
 window.launchTeam = launchTeam;
 
-export { _openLaunchedTeam, _addTeamAgent, _applyACFPresetFor, _checkTeamGitDir, _initTeamForm, _loadExistingTeamBoards, _moveTeamAgent, _removeMemberFromDialog, _renderTeamTemplateSelector, _syncTemplateMenu, _removeTeamAgent, _undoTeamAgentRemoval, _syncTeamMembers, _pickTeamTemplate, _setAllWorkers, _addOrchestrator, teamStepMove };
+export { _openLaunchedTeam, _addTeamAgent, _applyACFPresetFor, _checkTeamGitDir, _initTeamForm, _loadExistingTeamBoards, _moveTeamAgent, _removeMemberFromDialog, _moveMemberFromDialog, _renderTeamTemplateSelector, _syncTemplateMenu, _removeTeamAgent, _undoTeamAgentRemoval, _syncTeamMembers, _pickTeamTemplate, _setAllWorkers, _addOrchestrator, teamStepMove };

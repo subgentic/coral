@@ -64,6 +64,7 @@ registerActions({
     'perm-mode-describe': el => window._updatePermModeDescription(el),
     'perms-toggle': el => { const t = tokenOf(el.dataset.target); if (t) _togglePermissions(t); },
     'team-agent-edit': (el, event) => { event.stopPropagation(); const r = teamRow(el); if (r) window.showTeamAgentModal(r); },
+    'team-agent-move': el => { if (el.dataset.dir === 'up' || el.dataset.dir === 'down') teamDialogs._moveMemberFromDialog(el.dataset.dir === 'up' ? -1 : 1); }, // Move up / Move down in the Edit member dialog (#10868)
     'team-agent-remove': () => teamDialogs._removeMemberFromDialog(), // Remove from team, in the Edit member dialog (#10836)
     'team-agent-undo': () => teamDialogs._undoTeamAgentRemoval(),
     'team-step-next': () => teamDialogs.teamStepMove(1),
