@@ -137,13 +137,17 @@ async function sendNow() {
     } finally { busy = false; }
 }
 
-/** Text from the server or a row reduced to one plain line for the confirm: control, format and bidi characters dropped, blanks collapsed,
- *  capped with an ellipsis (the server's own caps: 64 for a name, 120 for a folder). A folder keeps its tail, the part nearest the file,
- *  behind a leading ellipsis (Security's #4850). */
+// The characters that hide or reorder text: the same list as visibleName's UNSAFE in artifact_names.js (#220), plus the line and
+// paragraph separators. Whichever of #220 and this PR merges second imports visibleName instead, so there is one list. Escapes only.
+const HIDDEN = /[\u0000-\u001f\u007f-\u009f\u00ad\u034f\u061c\u180e\u200b-\u200f\u202a-\u202e\u2060-\u206f\ufe00-\ufe0f\ufeff\u{E0000}-\u{E007F}\u{E0100}-\u{E01EF}\u2028\u2029]/gu;
+
+/** Text from the server or a row reduced to one plain line for the confirm: hidden characters (HIDDEN) dropped, blanks collapsed, and
+ *  cut on characters (never inside a surrogate pair) with an ellipsis (the server's caps: 64 for a name, 120 for a folder). A folder keeps
+ *  its tail, the part nearest the file, behind a leading ellipsis (Security's #4850). */
 function plain(v, max, tail = false) {
-    const s = String(v == null ? '' : v).replace(/[\u0000-\u001f\u007f-\u009f\u00ad\u061c\u180e\u200b-\u200f\u2028-\u202e\u2060-\u2064\u2066-\u206f\ufeff]/g, '').replace(/\s+/g, ' ').trim();
-    if (s.length <= max) return s;
-    return tail ? '…' + s.slice(s.length - (max - 1)) : s.slice(0, max - 1) + '…';
+    const chars = [...String(v == null ? '' : v).replace(HIDDEN, '').replace(/\s+/g, ' ').trim()];
+    if (chars.length <= max) return chars.join('');
+    return tail ? '…' + chars.slice(chars.length - (max - 1)).join('') : chars.slice(0, max - 1).join('') + '…';
 }
 
 /** Whether recording this candidate needs the box ticked: a program inside a nested shell, or one whose image can't be read (Security's

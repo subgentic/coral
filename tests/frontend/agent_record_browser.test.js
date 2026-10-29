@@ -92,6 +92,14 @@ const { coralReady } = require('./helpers/wait');
                 where.msg.startsWith('Record perl (pid 4242), from …d') && folderShown.length === 120 && folderShown.startsWith('…') && folderShown.endsWith('/node_modules/bin') && !/[\u0000-\u001f\u202a-\u202e]/.test(where.msg) && !where.box, JSON.stringify({ ...where, folderLen: folderShown.length }));
             await ev(`window.hideConfirmModal(); true`);
 
+            // the cut counts characters, so a name of 70 emoji is cut to 63 and the ellipsis, never inside a surrogate pair
+            await ev(`window.__cand = { program: String.fromCodePoint(0x1F600).repeat(70), folder: '' }; window.__calls = []; document.getElementById('composer-waiting-record').click(); true`);
+            await waitFor(`/^Record ./.test(document.getElementById('confirm-modal-message').textContent) && /pid 4242/.test(document.getElementById('confirm-modal-message').textContent) && getComputedStyle(document.getElementById('confirm-modal')).display !== 'none'`, `${tag}: the confirm with a long name`, 5000);
+            const cut = await ev(`(() => { const m = document.getElementById('confirm-modal-message').textContent; const name = m.slice('Record '.length, m.indexOf(' (pid')); const smile = String.fromCodePoint(0x1F600);
+                return { chars: [...name].length, last: name.endsWith('…'), allSmiles: [...name.slice(0, -1)].every(c => c === smile), lone: /(?:[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF]))|(?:(?<![\\uD800-\\uDBFF])[\\uDC00-\\uDFFF])/.test(name) }; })()`);
+            check(`${tag}: a long name is cut on characters: 63 whole emoji and the ellipsis, no lone surrogate`, cut.chars === 64 && cut.last && cut.allSmiles && !cut.lone, JSON.stringify(cut));
+            await ev(`window.hideConfirmModal(); true`);
+
             // an image Coral can't read: said so, and recorded only with the box ticked, as acknowledge_nested
             await ev(`window.__cand = { program: 'an unknown program (pid 4242)', folder: '', unidentified: true }; window.__calls = []; document.getElementById('composer-waiting-record').click(); true`);
             await waitFor(`/unknown program/.test(document.getElementById('confirm-modal-message').textContent) && getComputedStyle(document.getElementById('confirm-modal')).display !== 'none'`, `${tag}: the unidentified confirm`, 5000);
