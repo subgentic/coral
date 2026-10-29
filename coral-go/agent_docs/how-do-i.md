@@ -82,7 +82,6 @@ New agents use it unless you choose a model when you launch them.
 
 - [Quickstart](quickstart.md) — install, start the server and launch your first agent.
 - [Using the dashboard](using-the-dashboard.md) — models, the agent list, the Inbox.
-- [Troubleshooting](troubleshooting.md) — when something does not start.
 
 ## Still stuck?
 
