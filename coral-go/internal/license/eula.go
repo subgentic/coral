@@ -43,11 +43,12 @@ var eulaMarkerPath = func() string {
 //	accepted
 //	version=2026-03-26
 //	sha256=c1997b07…
-//	source=dialog|legacy|hub
+//	source=dialog|legacy|hub|installer
 //	rewritten_at=<RFC3339>   (a legacy marker's rewrite only)
 //
 // Before versions were recorded the marker held just "accepted" (written by the
-// terms dialog, and by the Windows installer after showing tools/license.rtf).
+// terms dialog, and by the Windows installer after showing tools/license.rtf,
+// which since #345 writes source=installer through coral-msi-helper eula).
 // Every text such a marker could have been written after is today's text
 // (verified from git history: one EULAText since the marker was introduced, and
 // license.rtf equal to it, pinned by TestInstallerTermsMatchEULAText), so a legacy
@@ -134,6 +135,19 @@ func MigrateLegacyEULAMarker() {
 // WriteEULAMarker records that the user accepted the current terms in Coral's
 // own terms dialog.
 func WriteEULAMarker() error { return writeEULAMarker("dialog") }
+
+// WriteInstallerEULAMarker records that the person accepted the terms on the
+// Windows installer's license page (tools/license.rtf, this text: pinned by
+// TestInstallerTermsMatchEULAText), source "installer". A marker that already
+// records the current terms (the dialog's, the Hub's) is kept as it is.
+func WriteInstallerEULAMarker() error {
+	if IsEULAAccepted() {
+		if m, _ := readEULAMarker(); !m.Legacy {
+			return nil
+		}
+	}
+	return writeEULAMarker("installer")
+}
 
 // RecordHubTermsAcceptance records the acceptance the Coral Hub confirmed when a
 // machine enrolled: only when the Hub's terms_accepted is exactly this binary's

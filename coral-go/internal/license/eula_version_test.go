@@ -186,3 +186,29 @@ func normalizeTerms(s string) string {
 	}
 	return strings.Join(lines, "\n")
 }
+
+// The Windows installer's license page records its acceptance (coral-msi-helper eula, #345): source=installer, with this version and digest.
+// A marker that already records these terms is kept as it is; a legacy one, or one for other terms, is replaced.
+func TestTheInstallerRecordsItsAcceptance(t *testing.T) {
+	marker := markerAt(t)
+	want := "accepted\nversion=" + EULAVersion + "\nsha256=" + terms.EULADigest() + "\nsource=installer\n"
+	require(t, WriteInstallerEULAMarker())
+	if data, _ := os.ReadFile(marker); string(data) != want || !IsEULAAccepted() {
+		t.Fatalf("no marker: %q, want %q", data, want)
+	}
+
+	require(t, WriteEULAMarker())
+	dialog, _ := os.ReadFile(marker)
+	require(t, WriteInstallerEULAMarker())
+	if data, _ := os.ReadFile(marker); string(data) != string(dialog) {
+		t.Fatalf("the dialog's marker was rewritten: %q", data)
+	}
+
+	for _, old := range []string{"accepted\n", "accepted\nversion=2000-01-01\nsha256=00\nsource=dialog\n"} {
+		writeMarker(t, marker, old)
+		require(t, WriteInstallerEULAMarker())
+		if data, _ := os.ReadFile(marker); string(data) != want {
+			t.Fatalf("after %q: %q, want %q", old, data, want)
+		}
+	}
+}

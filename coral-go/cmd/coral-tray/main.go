@@ -74,6 +74,9 @@ func main() {
 	}
 
 	// Before the tray spawns its background process, which would inherit this elevated token.
+	if *fromInstaller {
+		takeInstallMark() // the install's restart is this start, whether or not it goes on (#335)
+	}
 	if installerLaunchRefused(*fromInstaller, processElevated) {
 		fmt.Println("Coral was not started: the installer was run as administrator, and Coral does not start elevated. Open Coral from the Start Menu.")
 		showElevatedInstallerNote() // this is a program with no console: say it where the person is looking
@@ -290,6 +293,16 @@ func startWindowAtLaunch(noBrowser, loginItem bool, running func() bool, showWin
 	}
 }
 
+// quit ends the tray at Coral's own request (the menu, a signal, the update, the installer's helper). The systray library also runs onExit
+// when Windows closes its window (Restart Manager for an installer, the end of the session) without ending its loop: onExit tells the two
+// apart by quitAsked (#335).
+var quitAsked atomic.Bool
+
+func quit() {
+	quitAsked.Store(true)
+	systray.Quit()
+}
+
 // startServerChild starts Coral's server as the child the tray supervises (#4163): restarted after a crash with backoff, stopped after a crash loop, never restarted after a clean stop. It returns the supervisor, the status the menu shows and the function that stops the server.
 func startServerChild(exe, host string, port int, backendType string) (*supervisor, *trayStatus, func()) {
 	sup := newSupervisor(exe, append([]string{"--server-child", "--port", strconv.Itoa(port), "--backend", backendType}, hostArgs(host)...), log.Writer())
@@ -300,7 +313,7 @@ func startServerChild(exe, host string, port int, backendType string) (*supervis
 	// The local "Install update" started the updater and the server quit (#166): end the dashboard window and the tray, so nothing runs from the install folder.
 	sup.onQuitForUpdate = func() {
 		killCoralApp()
-		systray.Quit()
+		quit()
 	}
 	ready, err := sup.start()
 	if err != nil {
@@ -390,6 +403,14 @@ func runForeground(host string, port int, noBrowser, debugMode bool, backendType
 	onShowWindowSignal(func() {
 		go func() { defer safego.Recover("coral-tray/main:showWindowSignal"); showWindow() }()
 	})
+	// The installer is about to replace Coral's files (#335): Quit the normal way, as the menu's Quit does (agents marked to wake), with no note.
+	onQuitForInstallSignal(func() {
+		go func() {
+			defer safego.Recover("coral-tray/main:quitForInstall")
+			log.Printf("[TRAY] the installer asked Coral to close")
+			quitKeepingAgentsPlace(url, dataDir, killCoralApp, stopServer, func(string) {}, quit)
+		}()
+	})
 	startWindowAtLaunch(noBrowser, loginItemLaunch(), status.running, showWindow)
 
 	// Check for updates in background
@@ -402,7 +423,9 @@ func runForeground(host string, port int, noBrowser, debugMode bool, backendType
 	killOrphanedCoralApp(cfg.CoralDir())
 
 	// Run systray (blocks until quit)
+	var exitOnce sync.Once
 	systray.Run(func() {
+		guardTrayWindow() // the icon's window exists now (#335)
 		systray.SetTemplateIcon(iconData, iconData)
 		systray.SetTitle("")
 		systray.SetTooltip("Coral Dashboard")
@@ -513,33 +536,44 @@ func runForeground(host string, port int, noBrowser, debugMode bool, backendType
 						killCoralApp()
 						stopServer()
 						beeep.Notify("Coral", fmt.Sprintf("Shut down %d agent(s) and dashboard server.", killed), "")
-						systray.Quit()
+						quit()
 					}()
 				case <-mQuit.ClickedCh:
 					if exitItemsFor(runtime.GOOS, runningBackend.Load().(string), 0, true).oneExit {
 						// On the built-in terminal Quit stops the server the normal way, with no kill: each running agent is marked and wakes next time (#6131). Ending one for good is its own Kill.
 						go func() {
 							defer safego.Recover("coral-tray/main:quitKeepsAgentsPlace")
-							quitKeepingAgentsPlace(url, dataDir, killCoralApp, stopServer, func(m string) { beeep.Notify("Coral", m, "") }, systray.Quit)
+							quitKeepingAgentsPlace(url, dataDir, killCoralApp, stopServer, func(m string) { beeep.Notify("Coral", m, "") }, quit)
 						}()
 						continue
 					}
 					killCoralApp()
 					stopServer()
-					systray.Quit()
+					quit()
 				case <-ctx.Done():
 					stopServer()
-					systray.Quit()
+					quit()
 					return
 				}
 			}
 		}()
 	}, func() {
 		// onExit — kill coral-app subprocess and stop the server. The server writes its queued
-		// request metrics as it stops.
-		killCoralApp()
-		stopServer()
-		log.Println("coral-tray exited")
+		// request metrics as it stops. Once: Windows can run it again as the window goes.
+		exitOnce.Do(func() {
+			closedBySystem := !quitAsked.Load()
+			if closedBySystem {
+				log.Printf("[TRAY] Windows asked Coral to close (an installer's Restart Manager, or the end of the session)")
+				onSystemClose()
+			}
+			killCoralApp()
+			stopServer()
+			log.Println("coral-tray exited")
+			if closedBySystem && runtime.GOOS == "windows" {
+				// The library ran this from WM_ENDSESSION and keeps its message loop going: end it, so this process exits and frees its files (#335).
+				go systray.Quit()
+			}
+		})
 	})
 }
 
