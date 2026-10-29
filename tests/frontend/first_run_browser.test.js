@@ -31,7 +31,7 @@ const freePort = () => new Promise((res, rej) => { const s = net.createServer();
 
 // A fresh install: its own data folder, HOME, stand-in folder and project folder under one short temp dir.
 async function freshServer(standIn) {
-    const root = fs.mkdtempSync(path.join('/tmp', 'coral-firstrun-'));
+    const root = fs.mkdtempSync(path.join(require('./helpers/tmp_root'), 'coral-firstrun-'));
     const dirs = { root, home: path.join(root, 'home'), data: path.join(root, 'data'), bin: path.join(root, 'bin'), work: path.join(root, 'project') };
     for (const d of [dirs.home, dirs.data, dirs.bin, dirs.work]) fs.mkdirSync(d);
     const ran = path.join(root, 'ran'), got = path.join(root, 'got');

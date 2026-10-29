@@ -29,7 +29,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms)); // sleep-ok: server sta
 const freePort = () => new Promise((res, rej) => { const s = net.createServer(); s.listen(0, '127.0.0.1', () => { const p = s.address().port; s.close(() => res(p)); }); s.on('error', rej); });
 
 async function freshServer() {
-    const root = require('node:fs').mkdtempSync(path.join('/tmp', 'coral-walk-'));
+    const root = require('node:fs').mkdtempSync(path.join(require('./helpers/tmp_root'), 'coral-walk-'));
     const dirs = { root, home: path.join(root, 'home'), data: path.join(root, 'data'), bin: path.join(root, 'bin'), work: path.join(root, 'project'), teamWork: path.join(root, 'team-project') };
     for (const d of [dirs.home, dirs.data, dirs.bin, dirs.work, dirs.teamWork]) fs.mkdirSync(d);
     const got = path.join(root, 'got');
