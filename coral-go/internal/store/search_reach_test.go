@@ -4,6 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"io/fs"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -96,28 +100,18 @@ func TestSearchReach_AStaleMemberIDDoesNotReachANewTeamOfTheSameName(t *testing.
 	assert.Equal(t, "own", got)
 }
 
-func TestSearchReach_ResetToOwn(t *testing.T) {
-	s := NewTeamStore(openTestDB(t))
-	ctx := context.Background()
-	m := seatMember(t, s, "b-one", "Dev", "sid-1")
-	_, err := s.SetSearchReach(ctx, m.ID, "all", "operator", "dashboard")
-	require.NoError(t, err)
-
-	require.NoError(t, s.ResetSearchReach(ctx, m.TeamID))
-	got, _ := s.SearchReachForSession(ctx, "sid-1")
-	assert.Equal(t, "own", got)
-}
-
 func TestSearchAccessLog_ReadRowsCarryNoText(t *testing.T) {
 	s := NewTeamStore(openTestDB(t))
 	ctx := context.Background()
-	require.NoError(t, s.LogSearchRead(ctx, "b-one", "Dev", "team", "ok", 3))
+	require.NoError(t, s.LogSearchRead(ctx, "b-one", "Dev", "team", "ok", "board-search", "b-one", 3))
 	rows, err := s.ListSearchAccess(ctx, 10)
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
 	assert.Equal(t, "read", rows[0].Kind)
 	assert.Equal(t, "team", rows[0].ToLevel)
 	assert.Equal(t, 3, rows[0].Results)
+	assert.Equal(t, "board-search", rows[0].Action)
+	assert.Equal(t, "b-one", rows[0].Target)
 }
 
 func TestSearchAccessLog_Retention(t *testing.T) {
@@ -128,7 +122,7 @@ func TestSearchAccessLog_Retention(t *testing.T) {
 	_, err := s.db.ExecContext(ctx,
 		`INSERT INTO search_access_log (kind, team, agent, from_level, to_level, outcome, results, at) VALUES ('read','b','A','','team','ok',0,?)`, old)
 	require.NoError(t, err)
-	require.NoError(t, s.LogSearchRead(ctx, "b", "A", "team", "ok", 1))
+	require.NoError(t, s.LogSearchRead(ctx, "b", "A", "team", "ok", "board-search", "b", 1))
 	require.NoError(t, s.PruneSearchAccess(ctx))
 	rows, _ := s.ListSearchAccess(ctx, 100)
 	assert.Len(t, rows, 1, "a row older than 90 days is gone")
@@ -158,4 +152,21 @@ func TestSearchReach_ANewMemberRowStartsAtOwn(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "own", got, "neither the struct's level nor one in the agent config is read")
 	assert.Equal(t, "own", m.SearchReach, "and the row the caller gets back says so")
+}
+
+// Only CreateTeamMember makes a member row, so no restore, copy or import path can carry a level in (#11048, Security's SHOULD b).
+func TestSearchReach_OnlyCreateTeamMemberInsertsMemberRows(t *testing.T) {
+	var inserts []string
+	require.NoError(t, filepath.WalkDir("..", func(path string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return err
+		}
+		raw, rerr := os.ReadFile(path)
+		require.NoError(t, rerr)
+		if strings.Contains(strings.ToLower(string(raw)), "into team_members") {
+			inserts = append(inserts, filepath.ToSlash(path))
+		}
+		return nil
+	}))
+	assert.Equal(t, []string{"../store/teams.go"}, inserts, "a new path that inserts team_members rows must start them at own (and be added here after review)")
 }

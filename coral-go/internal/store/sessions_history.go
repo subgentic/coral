@@ -606,6 +606,7 @@ func (s *SessionStore) GetSessionAncestry(ctx context.Context, sessionID string)
 				DisplayName:  ancLS.DisplayName,
 				ResumeFromID: ancLS.ResumeFromID,
 				IsCurrent:    false,
+				LiveRead:     true,
 			}
 			if idx, _ := s.GetIndexedSession(ctx, ancLS.SessionID); idx != nil {
 				item.SourceFile = idx.SourceFile
@@ -696,13 +697,37 @@ func escapeLike(s string) string {
 // How many sessions a search above own reads at most, per set (#11048): a level widens the set, never the cost of one request without bound.
 const MaxReachSessions = 500
 
-// SessionIDsOfTeam are the sessions of a team's members, past and present (a stopped member's last session too), newest member row first.
-func (s *SessionStore) SessionIDsOfTeam(ctx context.Context, teamName string) ([]string, error) {
+// SessionIDsOfTeam are the sessions of a team's members, past and present (a stopped member's last session too), newest member row first. The team is its row id: a team's NAME is a label, not a key (#11048).
+func (s *SessionStore) SessionIDsOfTeam(ctx context.Context, teamID int64) ([]string, error) {
 	var ids []string
 	err := s.db.SelectContext(ctx, &ids,
-		`SELECT m.session_id FROM team_members m JOIN teams t ON t.id = m.team_id
-		 WHERE t.name = ? AND m.session_id IS NOT NULL AND m.session_id != '' ORDER BY m.id DESC LIMIT ?`, teamName, MaxReachSessions)
+		`SELECT session_id FROM team_members WHERE team_id = ? AND session_id IS NOT NULL AND session_id != '' ORDER BY id DESC LIMIT ?`, teamID, MaxReachSessions)
 	return ids, err
+}
+
+// teamBoardWhere is a live row that launched on a board of a team Coral launched: a team, a launch board, no job and no remote server.
+const teamBoardWhere = `board_name IS NOT NULL AND board_name != '' AND is_job = 0 AND COALESCE(board_server, '') = ''`
+
+// TeamBoardKeys are the boards the members of one team were launched on, by board KEY (the live rows' board_name, joined by team_id): never the team's name (#11048).
+func (s *SessionStore) TeamBoardKeys(ctx context.Context, teamID int64) ([]string, error) {
+	var keys []string
+	err := s.db.SelectContext(ctx, &keys, `SELECT DISTINCT board_name FROM live_sessions WHERE team_id = ? AND `+teamBoardWhere, teamID)
+	return keys, err
+}
+
+// LaunchedTeamBoardKeys are the boards of every team Coral launched, by key: the launch board of some team member.
+func (s *SessionStore) LaunchedTeamBoardKeys(ctx context.Context) ([]string, error) {
+	var keys []string
+	err := s.db.SelectContext(ctx, &keys, `SELECT DISTINCT board_name FROM live_sessions WHERE team_id IS NOT NULL AND team_id > 0 AND `+teamBoardWhere)
+	return keys, err
+}
+
+// JobAndRelayedBoardKeys are the boards a job runs on or a remote (relayed) server's agent joined: no search level reads them.
+func (s *SessionStore) JobAndRelayedBoardKeys(ctx context.Context) ([]string, error) {
+	var keys []string
+	err := s.db.SelectContext(ctx, &keys,
+		`SELECT DISTINCT board_name FROM live_sessions WHERE board_name IS NOT NULL AND board_name != '' AND (is_job = 1 OR COALESCE(board_server, '') != '')`)
+	return keys, err
 }
 
 // LaunchedSessionIDs are the sessions Coral launched that it still has a row for (teams, solo agents, jobs), newest first.

@@ -63,6 +63,7 @@ func TestAgentHistoryReachLevels(t *testing.T) {
 		}
 		m, err := ts.CreateTeamMember(ctx, &store.TeamMember{TeamID: tm.ID, AgentName: agent, AgentConfigJSON: `{}`, SessionID: &sid})
 		require.NoError(t, err)
+		require.NoError(t, env.ss.SetTeamID(ctx, sid, tm.ID))
 		return m
 	}
 	devM := mk("team-a", "dev", dev)

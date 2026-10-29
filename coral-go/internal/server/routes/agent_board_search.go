@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/subgentic/coral/internal/board"
@@ -77,7 +78,11 @@ func (h *SessionsHandler) SearchAgentBoard(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	boardKey := *ls.BoardName
-	boards, all := h.searchBoards(r, who, boardKey, requested)
+	boards, err := h.searchBoards(r, who, boardKey, requested)
+	if err != nil {
+		errInternalServer(w, "could not work out the boards this search reaches")
+		return
+	}
 	q, err := board.ParseMessageQuery(board.MessageQueryParams{
 		Q: vals["q"], From: vals["from"], Mentions: vals["mentions"], Since: vals["since"], Until: vals["until"], Sort: vals["sort"], Limit: vals["limit"], Cursor: vals["cursor"],
 	})
@@ -90,18 +95,22 @@ func (h *SessionsHandler) SearchAgentBoard(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	q.Project = boardKey // the key the launch recorded, used exactly: nothing the request names picks the board
-	q.Boards, q.AllBoards = boards, all
+	if requested != store.SearchReachOwn {
+		q.Boards = boards
+	}
 	res, err := h.bs.QueryMessages(r.Context(), q)
 	if err != nil {
 		errInternalServer(w, "could not search the messages")
 		return
 	}
 	// The response is capped (searchResponseCap): a page that is over it is read again with a smaller limit, so the cursor still points at the first message not returned.
+	capped := false
 	for q.Limit > 1 {
 		raw, _ := json.Marshal(res.Messages)
 		if len(raw) <= searchResponseCap {
 			break
 		}
+		capped = true
 		q.Limit = len(res.Messages) / 2
 		if q.Limit < 1 {
 			q.Limit = 1
@@ -112,7 +121,7 @@ func (h *SessionsHandler) SearchAgentBoard(w http.ResponseWriter, r *http.Reques
 		}
 	}
 	if requested != store.SearchReachOwn {
-		h.logSearchRead(r, who, requested, "ok", int(res.Total))
+		h.logSearchRead(r, who, requested, "ok", "board-search", boardTargets(boards), int(res.Total))
 	}
 	out := map[string]any{"messages": res.Messages, "total": res.Total, "limit": q.Limit, "board": boardKey, "reach": requested}
 	if res.NextCursor != "" {
@@ -121,8 +130,16 @@ func (h *SessionsHandler) SearchAgentBoard(w http.ResponseWriter, r *http.Reques
 	if res.PrevCursor != "" {
 		out["prev_cursor"] = res.PrevCursor
 	}
-	if res.Truncated {
+	if res.Truncated || capped {
 		out["truncated"] = true
 	}
 	writeJSON(w, http.StatusOK, out)
+}
+
+// boardTargets is the boards a search reached, for the access log: their keys (never their text), or a count when there are many.
+func boardTargets(keys []string) string {
+	if len(keys) > 10 {
+		return strconv.Itoa(len(keys)) + " boards"
+	}
+	return strings.Join(keys, ",")
 }

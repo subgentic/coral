@@ -467,6 +467,8 @@ CREATE INDEX IF NOT EXISTS idx_team_members_team ON team_members(team_id, status
 CREATE TABLE IF NOT EXISTS search_access_log (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     kind       TEXT NOT NULL,
+    action     TEXT NOT NULL DEFAULT '',
+    target     TEXT NOT NULL DEFAULT '',
     team       TEXT NOT NULL DEFAULT '',
     agent      TEXT NOT NULL DEFAULT '',
     from_level TEXT NOT NULL DEFAULT '',

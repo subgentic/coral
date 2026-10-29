@@ -70,48 +70,78 @@ func (g *searchGuard) pruneDue() bool {
 	return g.logs%searchLogPruneN == 0
 }
 
-// searchCaller is who a search is for: the member row the caller's session is on, its level, and the key its rate limit is counted under.
+// searchCaller is who a search is for: the member row the caller's session is on, its level, its team (by row id) and the key its rate limit is counted under.
 type searchCaller struct {
-	key, team, agent, level, teamName string
+	key, team, agent, level string
+	teamID                  int64
 }
 
+// searchWho reads the caller's member row once (the newest of its session) and trusts it only when the live row agrees on the team (team_id): a member row the live row does not confirm is "own", no team.
 func (h *SessionsHandler) searchWho(r *http.Request, sessionID string) searchCaller {
 	c := searchCaller{key: "session:" + sessionID, level: store.SearchReachOwn}
-	if h.teamStore == nil {
+	if h.teamStore == nil || h.ss == nil {
 		return c
 	}
-	m, err := h.teamStore.GetMemberBySessionID(r.Context(), sessionID)
+	m, err := h.teamStore.SearchMemberBySession(r.Context(), sessionID)
 	if err != nil || m == nil {
 		return c
 	}
-	c.agent = m.AgentName
-	if store.SearchReachRank(m.SearchReach) >= 0 {
-		c.level = m.SearchReach
+	ls, err := h.ss.GetLiveSession(r.Context(), sessionID)
+	if err != nil || ls == nil || ls.TeamID == nil || *ls.TeamID != m.TeamID {
+		return c
 	}
-	if t, err := h.teamStore.GetTeamByID(r.Context(), m.TeamID); err == nil && t != nil {
-		c.team, c.teamName = t.Name, t.Name
-		c.key = "member:" + t.Name + "/" + m.AgentName
+	t, err := h.teamStore.GetTeamByID(r.Context(), m.TeamID)
+	if err != nil || t == nil {
+		return c
 	}
+	c.agent, c.level, c.teamID, c.team = m.AgentName, m.SearchReach, t.ID, t.Name
+	c.key = "member:" + strconv.FormatInt(t.ID, 10) + "/" + m.AgentName
 	return c
 }
 
-// searchBoards is the board set of a level, by key: own is the one launch board (nil, false: the query's Project), team adds the boards of the caller's team, all and operator are every board.
-func (h *SessionsHandler) searchBoards(r *http.Request, c searchCaller, launchKey, level string) ([]string, bool) {
+// searchBoards is the board set of a level, by board KEY, always an explicit set (never "every board"): own is the caller's launch board; team adds the launch boards of its team's members (the live rows' boards,
+// joined by team_id: never the team's name); all is the boards of every team Coral launched; operator adds the boards no team owns (the Operator's own, ad hoc ones). A job's board and a relayed (remote)
+// board are in no level but the caller's own.
+func (h *SessionsHandler) searchBoards(r *http.Request, c searchCaller, launchKey, level string) ([]string, error) {
+	ctx := r.Context()
+	var more []string
+	var err error
 	switch level {
 	case store.SearchReachTeam:
-		set := []string{launchKey}
-		if c.teamName != "" && c.teamName != launchKey {
-			set = append(set, c.teamName)
+		if c.teamID > 0 {
+			more, err = h.ss.TeamBoardKeys(ctx, c.teamID)
 		}
-		return set, false
-	case store.SearchReachAll, store.SearchReachOperator:
-		return nil, true
+	case store.SearchReachAll:
+		more, err = h.ss.LaunchedTeamBoardKeys(ctx)
+	case store.SearchReachOperator:
+		more, err = h.bs.BoardKeys(ctx)
 	}
-	return nil, false
+	if err != nil {
+		return nil, err
+	}
+	out := []string{launchKey}
+	if len(more) == 0 {
+		return out, nil
+	}
+	excluded, err := h.ss.JobAndRelayedBoardKeys(ctx)
+	if err != nil {
+		return nil, err
+	}
+	skip := map[string]bool{launchKey: true}
+	for _, k := range excluded {
+		skip[k] = true
+	}
+	for _, k := range more {
+		if k != "" && !skip[k] {
+			skip[k] = true
+			out = append(out, k)
+		}
+	}
+	return out, nil
 }
 
-// logSearchRead records a search above own (who, the level asked, the outcome, a count): never the query and never a result.
-func (h *SessionsHandler) logSearchRead(r *http.Request, c searchCaller, requested, outcome string, results int) {
+// logSearchRead records a read above own: who, the level asked, the outcome, what it was and what it touched (board keys or a session id), and a count: never the query and never a result.
+func (h *SessionsHandler) logSearchRead(r *http.Request, c searchCaller, requested, outcome, action, target string, results int) {
 	if h.teamStore == nil {
 		return
 	}
@@ -123,7 +153,7 @@ func (h *SessionsHandler) logSearchRead(r *http.Request, c searchCaller, request
 	if agent == "" {
 		agent = "-"
 	}
-	_ = h.teamStore.LogSearchRead(r.Context(), team, agent, requested, outcome, results)
+	_ = h.teamStore.LogSearchRead(r.Context(), team, agent, requested, outcome, action, target, results)
 	if h.searchRate.pruneDue() {
 		_ = h.teamStore.PruneSearchAccess(r.Context())
 	}
@@ -214,7 +244,7 @@ func (h *SessionsHandler) gateSearchReach(w http.ResponseWriter, r *http.Request
 		return c, requested, false
 	}
 	if store.SearchReachRank(requested) > store.SearchReachRank(c.level) {
-		h.logSearchRead(r, c, requested, "refused", 0)
+		h.logSearchRead(r, c, requested, "refused", searchAction(r.URL.Path), "", 0)
 		refuseSearchReach(w, c.level, requested)
 		return c, requested, false
 	}
@@ -252,6 +282,9 @@ func (h *SessionsHandler) historyReachSessions(ctx context.Context, sessionID st
 				if seen[it.SessionID] {
 					continue
 				}
+				if level != store.SearchReachOperator && !it.LiveRead {
+					continue // team and all read what Coral has a live row for: an ancestor it only found on disk is the Operator's CLI history
+				}
 				seen[it.SessionID] = true
 				it.IsCurrent = false // only the caller's own session is current
 				out = append(out, it)
@@ -261,8 +294,8 @@ func (h *SessionsHandler) historyReachSessions(ctx context.Context, sessionID st
 	}
 	switch level {
 	case store.SearchReachTeam:
-		if c.teamName != "" {
-			ids, err := h.ss.SessionIDsOfTeam(ctx, c.teamName)
+		if c.teamID > 0 {
+			ids, err := h.ss.SessionIDsOfTeam(ctx, c.teamID)
 			if err != nil {
 				return nil, false, err
 			}
@@ -292,4 +325,15 @@ func (h *SessionsHandler) historyReachSessions(ctx context.Context, sessionID st
 		}
 	}
 	return out, truncated, nil
+}
+
+// searchAction names a search endpoint for the access log.
+func searchAction(path string) string {
+	switch {
+	case strings.HasSuffix(path, "/board/search"):
+		return "board-search"
+	case strings.HasSuffix(path, "/history/context"):
+		return "history-context"
+	}
+	return "history-search"
 }

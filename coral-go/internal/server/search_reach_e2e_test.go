@@ -26,6 +26,7 @@ func TestSearchReachLevelsOnBoardSearch(t *testing.T) {
 	ts2 := store.NewTeamStore(srv.db)
 	bs := srv.boardStore
 
+	ptrTo := func(v string) *string { return &v }
 	boardOf := map[string]string{}
 	for _, n := range []string{"alpha", "beta", "ops"} {
 		b, err := bs.CreateBoard(ctx, n, "Operator")
@@ -36,23 +37,43 @@ func TestSearchReachLevelsOnBoardSearch(t *testing.T) {
 		_, err = bs.PostMessage(ctx, b.ID, "Lead-"+n, "CANARY-"+strings.ToUpper(n)+" the old decision", nil)
 		require.NoError(t, err)
 	}
-	// A team whose name is its board's key, with two members: Dev (the caller) and Peer.
-	team, err := ts2.CreateTeam(ctx, &store.Team{Name: boardOf["alpha"], ConfigJSON: `{}`})
+	// Two teams NAMED by labels (never by their boards' keys), each with a member whose live row says its launch board and team. Around them: a legacy board whose KEY is team alpha's name and belongs to nobody
+	// (the trap: a team's name is not a board key), a job's board and a relayed (remote) board, which no level reaches, and the Operator's own board, which only 'operator' does.
+	const alphaName = "alpha-team-label"
+	team, err := ts2.CreateTeam(ctx, &store.Team{Name: alphaName, ConfigJSON: `{}`})
 	require.NoError(t, err)
-	agent := func(sid, name string) string {
+	teamB, err := ts2.CreateTeam(ctx, &store.Team{Name: "beta-team-label", ConfigJSON: `{}`})
+	require.NoError(t, err)
+	_, err = bs.Subscribe(ctx, alphaName, "Squatter", "Member", "", nil, "all") // a board whose key is the word alpha-team-label
+	require.NoError(t, err)
+	_, err = bs.PostMessage(ctx, alphaName, "Squatter", "CANARY-TRAP the old decision", nil)
+	require.NoError(t, err)
+	for _, n := range []string{"job", "relay"} {
+		b, err := bs.CreateBoard(ctx, n, "Operator")
+		require.NoError(t, err)
+		boardOf[n] = b.ID
+		_, err = bs.Subscribe(ctx, b.ID, "Lead-"+n, "Lead", "", nil, "all")
+		require.NoError(t, err)
+		_, err = bs.PostMessage(ctx, b.ID, "Lead-"+n, "CANARY-"+strings.ToUpper(n)+" the old decision", nil)
+		require.NoError(t, err)
+	}
+	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: "eeeeeeee-1148-4000-8000-0000000000c1", AgentType: "claude", AgentName: "nightly", WorkingDir: "/w", BoardName: ptrTo(boardOf["job"]), IsJob: 1}))
+	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: "eeeeeeee-1148-4000-8000-0000000000c2", AgentType: "claude", AgentName: "remote", WorkingDir: "/w", BoardName: ptrTo(boardOf["relay"]), BoardServer: ptrTo("https://other.example")}))
+	agentOn := func(tm *store.Team, board, sid, name string) string {
 		session := "claude-" + sid
-		bk := boardOf["alpha"]
-		require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: sid, AgentType: "claude", AgentName: name, WorkingDir: "/w", BoardName: &bk}))
+		require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: sid, AgentType: "claude", AgentName: name, WorkingDir: "/w", BoardName: &board}))
+		require.NoError(t, ss.SetTeamID(ctx, sid, tm.ID))
 		tok, err := srv.db.MintSessionToken(ctx, sid, session)
 		require.NoError(t, err)
-		_, err = bs.Subscribe(ctx, bk, name+"-"+sid[:4], name, session, nil, "all")
+		_, err = bs.Subscribe(ctx, board, name+"-"+sid[:4], name, session, nil, "all")
 		require.NoError(t, err)
-		_, err = ts2.CreateTeamMember(ctx, &store.TeamMember{TeamID: team.ID, AgentName: name, AgentConfigJSON: `{}`, SessionID: &sid})
+		_, err = ts2.CreateTeamMember(ctx, &store.TeamMember{TeamID: tm.ID, AgentName: name, AgentConfigJSON: `{}`, SessionID: &sid})
 		require.NoError(t, err)
 		return tok
 	}
-	tokDev := agent("eeeeeeee-1148-4000-8000-00000000000a", "Dev")
-	_ = agent("eeeeeeee-1148-4000-8000-00000000000b", "Peer")
+	tokDev := agentOn(team, boardOf["alpha"], "eeeeeeee-1148-4000-8000-00000000000a", "Dev")
+	_ = agentOn(team, boardOf["alpha"], "eeeeeeee-1148-4000-8000-00000000000b", "Peer")
+	_ = agentOn(teamB, boardOf["beta"], "eeeeeeee-1148-4000-8000-0000000000b0", "Beta")
 
 	do := func(method, path, tok, body string) (int, map[string]any, string) {
 		var rd io.Reader
@@ -134,8 +155,9 @@ func TestSearchReachLevelsOnBoardSearch(t *testing.T) {
 		require.Equal(t, http.StatusOK, code, raw)
 		assert.Equal(t, "team", out["reach"])
 		assert.Contains(t, raw, "CANARY-ALPHA")
-		assert.NotContains(t, raw, "CANARY-BETA")
-		assert.NotContains(t, raw, "CANARY-OPS")
+		for _, c := range []string{"CANARY-BETA", "CANARY-OPS", "CANARY-TRAP", "CANARY-JOB", "CANARY-RELAY"} {
+			assert.NotContains(t, raw, c, "team: the boards its members were launched on, by key: not %s (a board whose key is the team's NAME is not its board)", c)
+		}
 		code, out, raw = search(tokDev, "all")
 		assert.Equal(t, http.StatusForbidden, code, raw)
 		assert.Equal(t, "team", out["level"])
@@ -154,19 +176,30 @@ func TestSearchReachLevelsOnBoardSearch(t *testing.T) {
 		got, _ := ts2.SearchReachForSession(ctx, "eeeeeeee-1148-4000-8000-00000000000a")
 		assert.Equal(t, "team", got, "a refused change leaves the level")
 	})
-	t.Run("all reads every board, the Operator's too; operator-history is a level above", func(t *testing.T) {
+	t.Run("all reads the boards of teams Coral launched; operator adds the boards no team owns; a job's and a relayed board are never read", func(t *testing.T) {
 		code, _, raw := set("all", "")
 		require.Equal(t, http.StatusOK, code, raw)
 		code, _, raw = search(tokDev, "all")
 		require.Equal(t, http.StatusOK, code, raw)
-		for _, c := range []string{"CANARY-ALPHA", "CANARY-BETA", "CANARY-OPS"} {
+		for _, c := range []string{"CANARY-ALPHA", "CANARY-BETA"} {
 			assert.Contains(t, raw, c)
+		}
+		for _, c := range []string{"CANARY-OPS", "CANARY-TRAP", "CANARY-JOB", "CANARY-RELAY"} {
+			assert.NotContains(t, raw, c, "all: team-launched boards only, not %s", c)
 		}
 		code, out, raw := search(tokDev, "operator")
 		assert.Equal(t, http.StatusForbidden, code, raw)
 		assert.Equal(t, "operator", out["needed"])
 		code, _, raw = set("operator", "operator")
 		require.Equal(t, http.StatusOK, code, raw)
+		code, _, raw = search(tokDev, "operator")
+		require.Equal(t, http.StatusOK, code, raw)
+		for _, c := range []string{"CANARY-ALPHA", "CANARY-BETA", "CANARY-OPS", "CANARY-TRAP"} {
+			assert.Contains(t, raw, c, "operator adds the boards with no team row")
+		}
+		for _, c := range []string{"CANARY-JOB", "CANARY-RELAY"} {
+			assert.NotContains(t, raw, c, "a job's board and a relayed board are out at every level")
+		}
 	})
 	t.Run("a member id that is not there is a 404, and the level is read from the caller's row, never from a name", func(t *testing.T) {
 		code, _, raw := do("PUT", "/api/team-members/999999/search-access", "", `{"level":"team"}`)
@@ -195,6 +228,14 @@ func TestSearchReachLevelsOnBoardSearch(t *testing.T) {
 		}
 		assert.GreaterOrEqual(t, kinds["raise"], 3)
 		assert.GreaterOrEqual(t, kinds["read"], 2)
+		sawTarget := false
+		for _, r := range rows {
+			m := r.(map[string]any)
+			if m["kind"] == "read" && m["outcome"] == "ok" && m["action"] == "board-search" && strings.Contains(fmt.Sprint(m["target"]), boardOf["alpha"]) {
+				sawTarget = true
+			}
+		}
+		assert.True(t, sawTarget, "a read says what it was and which boards it touched, by key")
 		assert.NotContains(t, raw, "old decision", "no query text")
 		assert.NotContains(t, raw, "CANARY", "no result text")
 		code, _, _ = do("GET", "/api/search-access/log", tokDev, "")
@@ -216,6 +257,7 @@ func TestSearchReachRateLimitCountsRefusals(t *testing.T) {
 	mk := func(sid string) string {
 		bk := b.ID
 		require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: sid, AgentType: "claude", AgentName: "Dev", WorkingDir: "/w", BoardName: &bk}))
+		require.NoError(t, ss.SetTeamID(ctx, sid, team.ID))
 		tok, err := srv.db.MintSessionToken(ctx, sid, "claude-"+sid)
 		require.NoError(t, err)
 		_, err = bs.Subscribe(ctx, bk, "Dev", "Dev", "claude-"+sid, nil, "all")
@@ -247,6 +289,7 @@ func TestSearchReachRateLimitCountsRefusals(t *testing.T) {
 	// The limit is the member's, not the token's: a new token for the same member (a restart) is still limited.
 	sid2 := "eeeeeeee-1148-4000-8000-0000000000b2"
 	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: sid2, AgentType: "claude", AgentName: "Dev", WorkingDir: "/w", BoardName: &b.ID}))
+	require.NoError(t, ss.SetTeamID(ctx, sid2, team.ID))
 	tm, _ := ts2.GetMemberBySessionID(ctx, sid1)
 	require.NoError(t, ts2.UpdateMemberStatus(ctx, tm.ID, "active", &sid2))
 	tok2, err := srv.db.MintSessionToken(ctx, sid2, "claude-"+sid2)

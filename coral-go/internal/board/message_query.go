@@ -51,8 +51,7 @@ type MessageQueryParams struct {
 // Shown (what a viewer sees of a text: the match is made on it; nil is the text as stored).
 type MessageQuery struct {
 	Project       string
-	Boards        []string // when not nil, the boards (by key) searched instead of Project; an empty set searches nothing (#11048, set by the server, never read from a request)
-	AllBoards     bool     // every board (#11048, the Operator's level 'all'); wins over Boards
+	Boards        []string // when not nil, the boards (by key) searched instead of Project; an empty set searches nothing (#11048, set by the server from a level, never read from a request)
 	Text          string   // lower-cased; empty: no text search
 	From          []string // lower-cased sender ids or names
 	Mentions      string   // lower-cased: messages that tag this member
@@ -463,11 +462,9 @@ func (q *MessageQuery) matches(m Message, mentionID, mentionTitle string, number
 	return true
 }
 
-// boardWhere is the board part of the query's WHERE: every board, the set Boards names, or the one Project.
+// boardWhere is the board part of the query's WHERE: the set Boards names, or the one Project.
 func (q *MessageQuery) boardWhere() ([]string, []any) {
 	switch {
-	case q.AllBoards:
-		return []string{"1 = 1"}, nil
 	case q.Boards != nil:
 		if len(q.Boards) == 0 {
 			return []string{"1 = 0"}, nil

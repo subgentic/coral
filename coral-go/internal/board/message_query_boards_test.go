@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// #11048: a search reaches one board (Project), a set of boards by key (Boards), or every board (AllBoards).
+// #11048: a search reaches one board (Project) or a set of boards by key (Boards); there is no "every board".
 func TestQueryMessagesBoardSets(t *testing.T) {
 	s := testStore(t)
 	ctx := context.Background()
@@ -43,12 +43,7 @@ func TestQueryMessagesBoardSets(t *testing.T) {
 	assert.Contains(t, set, "in three")
 	assert.NotContains(t, set, "in two", "a board outside the set is not searched")
 
-	all := run(func(q *MessageQuery) { q.AllBoards = true })
-	for _, n := range []string{"in one", "in two", "in three"} {
-		assert.Contains(t, all, n)
-	}
-
-	// An empty set with no AllBoards searches nothing, never everything.
+	// An empty set searches nothing, never everything.
 	none := run(func(q *MessageQuery) { q.Boards = []string{} })
 	assert.Equal(t, "", none)
 }

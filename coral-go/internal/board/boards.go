@@ -164,6 +164,13 @@ func (s *Store) ensureBoardRow(ctx context.Context, key string) {
 	_, _ = s.db.ExecContext(ctx, `INSERT OR IGNORE INTO boards (id, label, created_at) VALUES (?, ?, ?)`, key, key, nowUTC())
 }
 
+// BoardKeys are the keys of every board that has a row.
+func (s *Store) BoardKeys(ctx context.Context) ([]string, error) {
+	var keys []string
+	err := s.reader().SelectContext(ctx, &keys, `SELECT id FROM boards`)
+	return keys, err
+}
+
 // GetBoard returns the board with this exact id.
 func (s *Store) GetBoard(ctx context.Context, id string) (*Board, error) {
 	var b Board

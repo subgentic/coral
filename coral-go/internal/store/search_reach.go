@@ -40,8 +40,11 @@ func SearchReachRank(level string) int {
 
 // SearchAccessRow is one row of the access log. It never carries a query or a result.
 type SearchAccessRow struct {
-	ID        int64  `db:"id" json:"id"`
-	Kind      string `db:"kind" json:"kind"`
+	ID   int64  `db:"id" json:"id"`
+	Kind string `db:"kind" json:"kind"`
+	// Action is what a read was (board-search, history-search, history-context) and Target what it touched (the board keys searched, or the session read): never the query and never a result.
+	Action    string `db:"action" json:"action"`
+	Target    string `db:"target" json:"target"`
 	Team      string `db:"team" json:"team"`
 	Agent     string `db:"agent" json:"agent"`
 	FromLevel string `db:"from_level" json:"from_level"`
@@ -51,6 +54,26 @@ type SearchAccessRow struct {
 	Outcome   string `db:"outcome" json:"outcome"`
 	Results   int    `db:"results" json:"results"`
 	At        string `db:"at" json:"at"`
+}
+
+// SearchMemberBySession is the member row a search is checked against: the newest row of the session (the one SearchReachForSession reads), or nil.
+func (s *TeamStore) SearchMemberBySession(ctx context.Context, sessionID string) (*TeamMember, error) {
+	if sessionID == "" {
+		return nil, nil
+	}
+	var m TeamMember
+	err := s.db.GetContext(ctx, &m,
+		`SELECT id, team_id, agent_name, agent_config_json, session_id, status, created_at, stopped_at, search_reach FROM team_members WHERE session_id = ? ORDER BY id DESC LIMIT 1`, sessionID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if SearchReachRank(m.SearchReach) < 0 {
+		m.SearchReach = SearchReachOwn
+	}
+	return &m, nil
 }
 
 // SearchReachForSession is the level of the member row the session is on; own when there is none.
@@ -104,17 +127,14 @@ func (s *TeamStore) SetSearchReach(ctx context.Context, memberID int64, level, s
 	return from, nil
 }
 
-// ResetSearchReach puts every member of a team back to own (a clone or an import starts there).
-func (s *TeamStore) ResetSearchReach(ctx context.Context, teamID int64) error {
-	_, err := s.db.ExecContext(ctx, `UPDATE team_members SET search_reach = 'own' WHERE team_id = ?`, teamID)
-	return err
-}
-
-// LogSearchRead records a search above own: who, at what level, the outcome and a count. No text.
-func (s *TeamStore) LogSearchRead(ctx context.Context, team, agent, level, outcome string, results int) error {
+// LogSearchRead records a read above own: who, at what level, the outcome, what it was (action) and what it touched (target: board keys or a session id), and a count. No text.
+func (s *TeamStore) LogSearchRead(ctx context.Context, team, agent, level, outcome, action, target string, results int) error {
+	if len(target) > 400 {
+		target = target[:400]
+	}
 	_, err := s.db.ExecContext(ctx,
-		`INSERT INTO search_access_log (kind, team, agent, to_level, outcome, results, at) VALUES ('read', ?, ?, ?, ?, ?, ?)`,
-		team, agent, level, outcome, results, NowUTC())
+		`INSERT INTO search_access_log (kind, action, target, team, agent, to_level, outcome, results, at) VALUES ('read', ?, ?, ?, ?, ?, ?, ?, ?)`,
+		action, target, team, agent, level, outcome, results, NowUTC())
 	return err
 }
 
@@ -122,7 +142,7 @@ func (s *TeamStore) LogSearchRead(ctx context.Context, team, agent, level, outco
 func (s *TeamStore) ListSearchAccess(ctx context.Context, limit int) ([]SearchAccessRow, error) {
 	var rows []SearchAccessRow
 	err := s.db.SelectContext(ctx, &rows,
-		`SELECT id, kind, team, agent, from_level, to_level, set_by, via, outcome, results, at
+		`SELECT id, kind, action, target, team, agent, from_level, to_level, set_by, via, outcome, results, at
 		 FROM search_access_log ORDER BY id DESC LIMIT ?`, limit)
 	return rows, err
 }

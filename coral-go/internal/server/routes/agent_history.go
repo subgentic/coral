@@ -147,7 +147,7 @@ func (h *SessionsHandler) SearchAgentHistory(w http.ResponseWriter, r *http.Requ
 	sortHistoryMatches(allMatches)
 	results, hasMore := pageHistoryMatches(allMatches, p.offset, p.limit)
 	if requested != store.SearchReachOwn {
-		h.logSearchRead(r, who, requested, "ok", len(allMatches))
+		h.logSearchRead(r, who, requested, "ok", "history-search", strconv.Itoa(len(sessions))+" sessions", len(allMatches))
 	}
 	writeJSON(w, http.StatusOK, AgentHistorySearchResponse{
 		Query:            p.query,
@@ -376,7 +376,7 @@ func (h *SessionsHandler) GetAgentHistoryContext(w http.ResponseWriter, r *http.
 		ancestry, err = h.ss.GetSessionAncestry(r.Context(), sessionID)
 	} else {
 		ancestry, _, err = h.historyReachSessions(r.Context(), sessionID, who, requested)
-		h.logSearchRead(r, who, requested, "ok", 0)
+		h.logSearchRead(r, who, requested, "ok", "history-context", targetSessionID, 0)
 	}
 	if err != nil {
 		errInternalServer(w, err.Error())

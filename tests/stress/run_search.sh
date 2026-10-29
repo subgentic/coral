@@ -16,7 +16,8 @@
 #   levels     (#11048) the 4x4 matrix: every level (own, team, all, operator), set by the Operator's route, against
 #              every flag (none, --team, --all, --operator-history), for the board search and the chat history
 #              search: allowed exactly when the flag is not above the level, else exit 5 naming the level needed and
-#              no data; each allowed reach returns the right canaries (team: its own team's only; all: every board)
+#              no data; each allowed reach returns the right canaries (team: its own team's only; all: every team's
+#              board but not the Operator's own; operator: that board too)
 #   identity   (levels) an agent token calling the set route or reading the access log is refused; a teammate at
 #              'own' does not borrow another's level; setting 'operator' needs confirm; the access log has the raises
 #              and the reads above own and no text; a loop of refused requests reaches the rate limit (429)
@@ -253,7 +254,8 @@ if [[ -z "$LV_MEMBER" || -z "$DEV1_MEMBER" ]]; then fail "levels: no team member
             # the board search
             out=$(as_agent "$LV_SID" search CANARY ${fa[@]+"${fa[@]}"}) && rc=0 || rc=$?
             if (( need <= want )); then
-                if (( need >= 2 )); then okc=$([[ "$out" == *"$CAN1"* && "$out" == *"$CAN2"* && "$out" == *"$CANOPS"* ]] && echo y || echo n)
+                if (( need == 3 )); then okc=$([[ "$out" == *"$CAN1"* && "$out" == *"$CAN2"* && "$out" == *"$CAN3"* && "$out" == *"$CANOPS"* ]] && echo y || echo n)   # operator: every team's board and the boards no team owns
+                elif (( need == 2 )); then okc=$([[ "$out" == *"$CAN1"* && "$out" == *"$CAN2"* && "$out" == *"$CAN3"* && "$out" != *"$CANOPS"* ]] && echo y || echo n)   # all: the boards of teams Coral launched, not the Operator's own
                 else okc=$([[ "$out" == *"$CAN1"* ]] && no_foreign "$out" $ALLCAN && echo y || echo n); fi
                 [[ $rc -eq 0 && $okc == y ]] || { fail "levels: board search at $level with $flag: rc=$rc ${out:0:200}"; bad=1; }
             else
