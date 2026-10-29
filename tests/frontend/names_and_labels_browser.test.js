@@ -62,6 +62,13 @@ const { coralReady } = require('./helpers/wait');
         const clean = await ev(`(async () => { const n = await import(${S} + 'artifact_names.js');
             return ['https://bank.example/login', 'www.example.com', 'WWW.Example.org', 'Security update: open http://x', 're\\u00adport\\u{E0041}\\u{E0042}.md', 'notes 2.txt'].map(v => n.cleanArtifactName(v)); })()`);
         assert.deepEqual(clean, ['', '', '', '', 'report.md', 'notes 2.txt'], JSON.stringify(clean));
+        // Security on #220: the grapheme joiner, the Mongolian vowel separator, the deprecated format controls and the variation
+        // selectors go too; and the Artifacts tab's names (readableName) are cleaned at that choke point, not only the links
+        const more = await ev(`(async () => { const n = await import(${S} + 'artifact_names.js'); const it = await import(${S} + 'artifact_item.js');
+            return [n.cleanArtifactName('a\\u034fb\\u180ec\\u206ad\\u206fe\\ufe00f\\ufe0fg\\u{E0100}h\\u{E01EF}.md'),
+                it.readableName({ name: 'report\\u202efdp.exe' }), it.readableName({ name: 'zero\\u200bwidth\\u2066.txt' }),
+                it.readableName({ name: '', task_title: 'Plan\\u202e' })]; })()`);
+        assert.deepEqual(more, ['abcdefgh.md', 'reportfdp.exe', 'zerowidth.txt', 'Plan — artifact'], JSON.stringify(more));
         // a later render of the same body uses the name at once
         assert.match(await ev(`(async () => (await import(${S} + 'board_message_text.js')).renderBoardMessageBody({ id: 97002, content: 'again coral://artifacts/${HEX}' }))()`), /Ñotas 日本語\.txt/);
         const inbox = await ev(`(async () => { const p = await (await import(${S} + 'inbox_coral.js')).artifactLinkPolicy('see coral://artifacts/${HEX}'); return p('coral://artifacts/${HEX}'); })()`);

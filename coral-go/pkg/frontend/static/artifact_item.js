@@ -3,6 +3,7 @@
 import { serverUrl, artifactPath, splitKey } from './server_base.js';
 import { importOnce } from './import_once.js';
 import { renderMarkdownStrict, highlightCodeIn, escapeHtml } from './utils.js';
+import { visibleName } from './artifact_names.js';
 const { inlineArtifactPath } = await importOnce('./artifact_paths.js');
 
 export const HEX_RE = /^[a-f0-9]{64}$/;
@@ -12,9 +13,11 @@ export const itemKey = (item) => managedHex(item) || `${item.source || ''}|${ite
 export const isUnverified = (item) => item.provenance === 'unverified';
 
 export function readableName(item) {
-    const name = String(item.name || '').trim();
+    // An uploader's text: without the characters that hide or reorder it ("report.pdf" that ends ".exe"), as the links show it (Security on #220).
+    const name = visibleName(item.name);
     if (name && !/^(?:coral:\/\/artifacts\/)?[a-f0-9]{64}(?:\.[a-z0-9]+)?$/i.test(name)) return name;
-    if (item.task_title) return `${item.task_title} — artifact`;
+    const title = visibleName(item.task_title);
+    if (title) return `${title} — artifact`;
     return item.task_id ? `Task #${item.task_id} artifact` : 'Uploaded artifact';
 }
 
