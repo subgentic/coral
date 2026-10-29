@@ -45,7 +45,9 @@ const { removeBoards, removeTeams } = require('./helpers/board_cleanup');
         const sess = live.find(s => s.session_id === qa.session_id);
         assert.ok(sess && sess.archived === true && sess.sleeping === true, 'the server lists it archived and asleep: ' + JSON.stringify(sess && { archived: sess.archived, sleeping: sess.sleeping }));
         // Inbox > Archived counts the agent too (it has no chat yet), and its row opens the agent (#10654)
-        const counts = (await api('GET', '/api/sessions/history/counts')).data || {};
+        // The counts are read from the history index, which takes the archive a moment after the sessions list does (CI's first attempt read all: 1 at once, #11000, then passed): wait for them to agree, not for a single read.
+        let counts = {};
+        for (let i = 0; i < 40; i++) { counts = (await api('GET', '/api/sessions/history/counts')).data || {}; if (counts.archived === 1 && counts.all === 0) break; await new Promise(r => setTimeout(r, 250)); } // sleep-ok: the history index catches up
         assert.equal(counts.archived, 1, 'Archived is 1 in the counts, not 0: ' + JSON.stringify(counts));
         assert.equal(counts.all, 0, 'and the agent is not an All chats row');
         await ev(`import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab('chats-archived')).then(() => true)`);
