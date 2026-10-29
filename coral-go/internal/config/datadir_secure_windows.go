@@ -3,11 +3,13 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"github.com/subgentic/coral/internal/winuser"
 	"io/fs"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	"golang.org/x/sys/windows"
 )
@@ -23,6 +25,9 @@ import (
 //     another account on an old file does not survive; links and junctions inside it are skipped and never entered.
 //
 // The returned text says what was done, for the log and the dashboard. A folder nobody else can use returns "".
+// errUntrustedMountPoint is ERROR_UNTRUSTED_MOUNT_POINT, the refusal of a junction Windows will not traverse (build 26300 and later).
+const errUntrustedMountPoint syscall.Errno = 448
+
 func secureExistingDataDir(dir string) (string, error) {
 	// A link's own list says nothing about the folder it points to: read the target's (through a handle that follows the link), and
 	// never change it.
@@ -32,10 +37,14 @@ func secureExistingDataDir(dir string) (string, error) {
 		readers = linkedDirBroadReaders
 	}
 	groups, err := readers(dir)
+	const linkWhy = "it is a link or junction, and changing its permissions would change the folder it points to"
+	if linked && errors.Is(err, errUntrustedMountPoint) {
+		// Windows 11 build 26300+ will not open what a junction a non-administrator made points to: the folder behind it cannot be shown to be private, so it is refused as a link is.
+		return "", sharedDataDirError(dir, []string{"an account Coral cannot tell (Windows will not open this junction: untrusted mount point)"}, linkWhy)
+	}
 	if err != nil || len(groups) == 0 {
 		return "", nil // unreadable list: DataDirWarning reports it; nothing certain to change
 	}
-	const linkWhy = "it is a link or junction, and changing its permissions would change the folder it points to"
 	if linked {
 		return "", sharedDataDirError(dir, groups, linkWhy)
 	}

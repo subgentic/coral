@@ -31,16 +31,21 @@ func EnsureDataDir(dir string) error {
 	if dir == "" {
 		return errors.New("no data folder")
 	}
-	_, err := os.Lstat(dir)
+	fi, err := os.Lstat(dir)
 	existed := err == nil
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return err
 	}
-	if err := os.MkdirAll(dir, 0o700); err != nil {
-		return err
-	}
 	if !existed {
+		if err := os.MkdirAll(dir, 0o700); err != nil {
+			return err
+		}
 		return protectDataDir(dir)
+	}
+	// An existing folder is not made again: MkdirAll follows a link, and on a Windows that refuses to traverse a junction (untrusted mount point) it came back as a raw mkdir
+	// error instead of the refusal below. Only a file in the folder's place is an error here.
+	if !fi.IsDir() && fi.Mode()&(os.ModeSymlink|os.ModeIrregular) == 0 {
+		return fmt.Errorf("the data folder %s is not a folder", dir)
 	}
 	notice, err := secureExistingDataDir(dir)
 	if err != nil {

@@ -145,18 +145,11 @@ func TestDataFolderLinksAreNeverFollowed(t *testing.T) {
 	require.NoError(t, err, string(out))
 	t.Cleanup(func() { SetAllowSharedDataDir(false); setDataDirNotice("") })
 	err = EnsureDataDir(link)
-	if linktest.JunctionsTraversable(t) {
-		t.Log("a data folder that is a junction is refused by: Coral (ErrSharedDataDir)")
-		require.ErrorIs(t, err, ErrSharedDataDir)
-		assert.Contains(t, err.Error(), "link or junction")
-	} else {
-		// Build 26300 and later: Windows will not open anything through a junction ("untrusted mount point"), so the data folder never opens; it is refused, by
-		// the system, before Coral reads its ACL (the error says only that the folder can't be made, #350).
-		t.Log("a data folder that is a junction is refused by: Windows (untrusted mount point)")
-		require.Error(t, err)
-		_, statErr := os.Stat(filepath.Join(link, "sessions.db"))
-		assert.True(t, linktest.UntrustedMountPoint(statErr), "Windows refuses the junction: %v", statErr)
-	}
+	// Refused by name on every Windows (#350): where junctions can be followed Coral reads the target's list and refuses it as shared; where Windows will not open
+	// the target (build 26300 and later: untrusted mount point), the folder behind it cannot be shown to be private, so it is refused the same way.
+	t.Logf("junctions can be followed here: %v", linktest.JunctionsTraversable(t))
+	require.ErrorIs(t, err, ErrSharedDataDir)
+	assert.Contains(t, err.Error(), "link or junction")
 	assert.NotEmpty(t, readersOf(t, outside), "the target keeps its list")
 }
 
