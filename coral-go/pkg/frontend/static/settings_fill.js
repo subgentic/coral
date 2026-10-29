@@ -136,7 +136,7 @@ export async function _fillThemeSelect(s) {
         try {
             const resp = await fetch("/api/themes");
             const data = await resp.json();
-            customThemes = (data.themes || []).filter(t => !['dark', 'light', 'system'].includes(String(t && t.name).toLowerCase())); // a saved theme named like a built-in one is not a second copy of it (#10735)
+            customThemes = data.themes || [];
         } catch (_) {}
 
         // Build options: built-in first, then custom
@@ -147,7 +147,7 @@ export async function _fillThemeSelect(s) {
             options += `<option disabled>──────────</option>`;
             for (const t of customThemes) {
                 const name = escapeAttr(t.name);
-                const label = escapeHtml(t.name);
+                const label = escapeHtml(['dark', 'light', 'system'].includes(String(t.name).toLowerCase()) ? `${t.name} (custom)` : t.name); // a saved theme named like a built-in one stays pickable and deletable: it says which it is (#10787)
                 options += `<option value="custom:${escapeAttr(name)}">${label}</option>`;
             }
         }

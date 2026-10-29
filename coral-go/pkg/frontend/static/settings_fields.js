@@ -92,7 +92,7 @@ const moreOnly = (text, more) => ({ text: '', more: more ? `${text} ${more}` : t
 
 // One CLI path row: the path (mono, spell check off) with the verify result cli_dialogs.js writes under it.
 const CLI_NAMES = { agy: ' (Antigravity)', pi: ' (the Pi coding agent)' }; // what the program is where the command's name does not say (#10481, Beta); the field asks for its full path (#10735)
-const cliPath = (type, label) => ({ key: `cli_path_${type}`, type: 'path', id: `settings-cli-path-${type}`, label: `${label} CLI path`, placeholder: `Full path, e.g. /usr/local/bin/${type}${CLI_NAMES[type] || ''}`, live: [`cli-result-${type}`], setup: el => el.classList.add('settings-mono-input') });
+const cliPath = (type, label) => ({ key: `cli_path_${type}`, type: 'path', id: `settings-cli-path-${type}`, label: `${label} CLI path`, placeholder: `Full path, e.g. ${/^win/i.test(navigator.userAgentData?.platform || navigator.platform) ? `C:\\Program Files\\${type}\\${type}.exe` : `/usr/local/bin/${type}`}${CLI_NAMES[type] || ''}`, live: [`cli-result-${type}`], setup: el => el.classList.add('settings-mono-input') });
 
 const AGENTS_FIELDS = host => [
     { key: 'default_models', type: 'heading', id: 'settings-agents-models', label: 'Default models', help: 'Pick one, or type any model id.' },
