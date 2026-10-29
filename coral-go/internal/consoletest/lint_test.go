@@ -34,7 +34,7 @@ func TestWindowsTestsStartConsoleProgramsHidden(t *testing.T) {
 			if ok, err := ctxt.MatchFile(dir, name); err != nil || !ok {
 				continue // not compiled on Windows
 			}
-			f, err := parser.ParseFile(fset, filepath.Join(dir, name), nil, 0)
+			f, err := parser.ParseFile(fset, filepath.Join(dir, name), nil, parser.ParseComments)
 			if err != nil {
 				t.Fatalf("%s/%s: %v", pkg, name, err)
 			}
