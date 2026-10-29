@@ -58,7 +58,7 @@ const BASE = require('./test_base').BASE;
         const ph = await ev(`${ROWS}.map(r => { const l = r.querySelector('.session-label'), t = r.querySelector('.sln-tail'); const lr = l.getBoundingClientRect(), tr = t ? t.getBoundingClientRect() : null; return { display: getComputedStyle(l).display, tailIn: tr ? tr.width > 0 && tr.right <= lr.right + 1 : null, sideways: document.documentElement.scrollWidth - document.documentElement.clientWidth }; })`);
         assert.ok(ph.length === NAMES.length && ph.every(p => p.sideways <= 0 && (p.tailIn === null || p.tailIn)), JSON.stringify(ph));
         const box = await ev(`(() => { const i = document.querySelector('#mobile-search-row input'); const r = i && i.getBoundingClientRect(); return i ? { h: Math.round(r.height), w: Math.round(r.width), label: i.getAttribute('aria-label'), type: i.type, inside: r.left >= 0 && r.right <= innerWidth, shown: r.width > 0 } : null; })()`);
-        assert.ok(box && box.shown && box.h >= 44 && box.label === 'Search agents' && box.type === 'search' && box.inside, 'the Agents page has a visible Search agents box that is a 44 px target: ' + JSON.stringify(box));
+        assert.ok(box && box.shown && box.h >= 44 && /^Search agents/.test(box.label) && box.type === 'search' && box.inside, 'the Agents page has a visible Search agents box that is a 44 px target: ' + JSON.stringify(box));
 
         console.log('3. The phone search filters the list, Escape clears it');
         await ev(`document.querySelector('#mobile-search-row input').focus(); true`);

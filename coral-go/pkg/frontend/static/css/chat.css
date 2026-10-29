@@ -943,6 +943,7 @@ body:has(.model-chip-menu:not([hidden])) .chat-jump-latest-btn { visibility: hid
 .chat-system.open .chat-system-toggle .material-icons {
     transform: rotate(180deg);
 }
+@media (pointer: coarse), (max-width: 767px) { .chat-system-toggle { align-items: center; justify-content: center; min-width: var(--control-touch-height, 44px); min-height: var(--control-touch-height, 44px); margin: -14px -8px -14px 0; } } /* a 44 px target (it was 16 px), without making the reminder's line taller (#11128) */
 /* Open: the whole reminder, wrapped, in a rounded box instead of a one-line pill. */
 .chat-system.open {
     align-items: flex-start;
@@ -1648,4 +1649,14 @@ h3.cni-question { margin-bottom: 4px; } /* a heading with its text under it (#30
     .chat-needs-input .cni-options { margin: 0 0 6px; }
     .chat-needs-input .cni-options.cni-options-stacked { flex-direction: row; flex-wrap: wrap; align-items: stretch; gap: 8px; }
     .chat-needs-input .cni-options.cni-options-stacked .cni-answer:not(.btn):not(.cni-link) { flex: 1 1 8rem; width: auto; }
+}
+
+/* ── The phone's chat in Google Chat's language (#11128, slice D): rounded bubbles, yours in the accent's tint on the right, the agent's neutral on the left, 600 px and below ─────────────────────────────────────────
+   The tool steps keep their quiet dashed row; the composer's pill and round Send are in mobile.css. Wider screens keep the reading column (the agent's words as plain prose). */
+@media (max-width: 600px) {
+    .chat-prose.chat-messages .chat-bubble.assistant { background: var(--bg-secondary); border-radius: 20px 20px 20px 6px; padding: 10px 12px; margin: 0 auto 10px 0; max-width: 94%; }
+    .chat-prose.chat-messages .chat-bubble.human { background: color-mix(in srgb, var(--accent) 16%, var(--bg-primary)); border-radius: 20px 20px 6px 20px; padding: 10px 14px; margin: 14px 0 10px auto; max-width: 86%; }
+    .chat-prose.chat-messages > .chat-bubble.human { margin-right: 0; }
+    .chat-prose.chat-messages .chat-bubble.assistant .message-text .code-block { margin-inline: -4px; } /* a code card keeps its width inside the bubble: Wrap, Copy and the hint share its row (code_buttons_phone at 200% text) */
+    .chat-prose.chat-messages .chat-bubble.human .pending-label, .chat-prose.chat-messages .chat-bubble.human .message-text, .chat-prose.chat-messages .chat-bubble.human p { color: var(--text-primary); } /* the ink on the tint: 4.5:1 (the pending message's Sent was 3.99) */
 }

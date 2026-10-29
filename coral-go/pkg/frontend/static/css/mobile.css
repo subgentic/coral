@@ -1396,7 +1396,7 @@
     #mobile-session-list .session-model { margin-left: 0; padding-left: 0; font-size: var(--fs-md); }
     #mobile-session-list .session-group-item.needs-attention .session-label { font-weight: var(--fw-strong); }
     #mobile-session-list .session-group-item.needs-attention .session-preview { color: var(--text-primary); }
-    #mobile-session-list .session-group-item.needs-attention .session-time { color: var(--accent); font-weight: var(--fw-medium); }
+    #mobile-session-list .session-group-item.needs-attention .session-time { color: color-mix(in srgb, var(--accent) 78%, rgb(var(--black-rgb))); font-weight: var(--fw-medium); } /* 4.5:1 on the card (the plain accent was 4.44) */
     #mobile-session-list .session-group-item .sidebar-kebab-wrapper { position: absolute; right: 2px; bottom: 2px; }
 }
 
@@ -1414,6 +1414,7 @@
     .phone-nav-badge[hidden] { display: none; }
     body.agent-home-active:not(.keyboard-open):not(.popout-mode) .phone-fab { position: fixed; right: 16px; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); z-index: 40; display: grid; place-items: center; width: 64px; height: 64px; padding: 0; border: 0; border-radius: 20px; background: var(--accent); color: var(--text-on-accent); box-shadow: 0 2px 14px rgba(var(--black-rgb), 0.22); cursor: pointer; }
     .phone-fab svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; }
+    body.phone-nav-on #mobile-agent-list { padding-bottom: 112px; } /* the empty page's cards scroll clear of the nav too (the Mobile Beta Tester, #11116) */
     body:has(#inbox-view[data-phone-item]) .phone-nav { display: none; } /* a task or a message opened in the Inbox is a page of its own: the nav goes while it is open */
     body.agent-home-active:has(#mobile-agent-list .empty-launch) .phone-fab { display: none; } /* an empty page has its own New agent button */
     body.agent-home-active .phone-fab-menu:not([hidden]) { position: fixed; right: 16px; bottom: calc(92px + env(safe-area-inset-bottom, 0px)); z-index: 41; display: flex; flex-direction: column; min-width: 180px; }
@@ -1425,4 +1426,12 @@
     #mobile-session-list .session-dot::before { content: none; } /* the sleeping moon was a clipped dark crescent in a 16 px badge */
     #mobile-session-list .session-dot.your-turn, #mobile-session-list .session-dot.sleeping { background: var(--text-muted); box-shadow: none; }
     #mobile-session-list .session-dot.your-turn { background: var(--bg-secondary); box-shadow: inset 0 0 0 2px var(--text-primary); }
+}
+
+/* The phone's composer in Google Chat's language (#11128, slice D): a pill for the text and a round Send (Stop is round too), on top of the one-row header. 44 px and more everywhere; the keyboard rule (#11060) and Stop's behaviour are as they were. */
+@media (max-width: 600px) {
+    .command-pane textarea { min-height: 3rem !important; padding: 12px 18px; border-radius: 26px; background: var(--bg-secondary); }
+    .command-pane .mobile-send-btn { border-radius: 50%; }
+    .command-pane .mobile-send-btn.is-stop { border-radius: 50%; }
+    .command-pane .mobile-send-more > button { border-radius: 50%; }
 }

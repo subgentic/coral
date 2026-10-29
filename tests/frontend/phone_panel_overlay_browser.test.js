@@ -62,9 +62,11 @@ const BASE = require('./test_base').BASE;
                 await ev(`(() => { const b = document.querySelector('header.top-bar'); b.dataset.qaH = b.style.height; b.style.setProperty('height', (b.getBoundingClientRect().height + 30) + 'px', 'important'); return true; })()`);
                 await sleep(300);
                 const g = await measure();
+                if (m.barBottom > 0) { // an agent's page has no top bar under 640 px (its row is the header, #11056): nothing to grow
                 assert.ok(g.barBottom > m.barBottom, `the header grew (${m.barBottom} → ${g.barBottom})`);
                 assert.ok(g.panelTop >= g.barBottom - 1, `${label}: after the header grew, the panel still starts below it (panel ${g.panelTop}, bar ${g.barBottom})`);
                 assert.deepEqual(g.covered, [], `${label}: no tab covered after the header grew`);
+                }
                 await ev(`(() => { const b = document.querySelector('header.top-bar'); b.style.removeProperty('height'); if (b.dataset.qaH) b.style.height = b.dataset.qaH; return true; })()`);
                 await sleep(300);
                 const r = await measure();

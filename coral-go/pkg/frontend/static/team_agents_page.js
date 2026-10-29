@@ -5,7 +5,7 @@
 import { importOnce } from './import_once.js';
 import { foldWayBack } from './way_back.js';
 import { state } from './state.js';
-import { boardFetch, inTeam, keyLabel } from './server_base.js';
+import { boardFetch, inTeam, keyLabel, isCloud } from './server_base.js';
 import { pollEvery } from './overload.js';
 import { OPERATOR_ID } from './utils.js';
 import { refreshTeamAvailability, remindAgent, stopAgentReminder } from './team_availability.js';
@@ -100,6 +100,25 @@ const askRemind = (agent, opener) => openRemindDialog(agent.name, { opener, onSe
 
 /** The agent's chat: its live session, local or a Hub computer's; null when it has none (an ended agent, a terminal). */
 const openChat = (session) => { window.switchNavTab?.('agents'); window.selectLiveSession?.(session.name, session.agent_type, session.session_id, session.server, { focusChat: true }); };
+
+/** "Remove from this board" (#11112, the Operator's clean-up of a leftover seat): DELETE /api/board/{team}/seats/{subscriber}, after a confirm. The agent keeps running; it just has no seat on this board. The route is the Operator's alone and never goes through the Hub, so the button is not drawn there. */
+function removeSeatButton(agent, ctx) {
+    const b = btn('btn btn-danger', 'Remove from this board', null);
+    b.setAttribute('aria-label', `Remove ${agent.name} from this board`);
+    b.addEventListener('click', async () => {
+        const { showConfirmModal } = await importOnce('./confirm_dialog.js');
+        const { showToast } = await importOnce('./utils.js');
+        showConfirmModal('Remove from this board', `Take ${agent.name}'s seat off ${keyLabel(model.team)}? It stops getting this board's messages and tasks and can no longer post to it. The agent itself keeps running.`, async () => {
+            try {
+                const r = await boardFetch(model.team, `/seats/${encodeURIComponent(agent.subscriber_id)}`, { method: 'DELETE' });
+                if (!r.ok) { const d = await r.json().catch(() => ({})); showToast(d.error || `Could not remove ${agent.name} from the board`, true); return; }
+                showToast(`${agent.name} was removed from the board`);
+                await load(); ctx.onBack();
+            } catch { showToast(`Could not remove ${agent.name} from the board`, true); }
+        }, null, { label: 'Remove seat', danger: true });
+    });
+    return b;
+}
 
 function chatButton(agent) {
     const session = agent.availability !== 'offline' && agent.agent_type !== 'terminal' ? sessionOf(agent) : null;
@@ -245,6 +264,7 @@ export function renderAgentPage(host, agent, ctx) {
     }
     const session = sessionOf(agent), reach = model.levels.get(agent.name);
     if (reach) { const c = searchChip(reach.level); if (c) line.append(c); const b = btn('btn', 'Search access\u2026', null); b.setAttribute('aria-label', `Search access for ${agent.name}`); b.addEventListener('click', () => openSearchAccess({ name: agent.name, team: model.team, ...reach }, { opener: b, onChanged: () => load().then(() => renderAgentPage(host, agent, ctx)) })); bar.append(b); }
+    if (!isCloud() && !String(model.team).startsWith('@') && agent.subscriber_id) bar.append(removeSeatButton(agent, ctx)); // the Operator takes a seat off the board (#11112): on this computer only, never through the Hub
     if (session) bar.append(btn('btn', 'Open chat', () => openChat(session)));
     if (agent.reminder) {
         const id = agent.subscriber_id || agent.name;

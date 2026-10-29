@@ -1853,6 +1853,7 @@ body.panel-dragging .agentic-state {
 .board-rename-form[hidden] { display: none; }
 .board-rename-form label { font-size: var(--fs-base); color: var(--text-secondary); }
 .board-rename-form input { min-width: 0; flex: 1 1 140px; }
+@media (max-width: 600px) { .team-home-folder-form label { flex: 1 0 100%; } .team-home-folder-form input, .team-home-folder-form .btn { min-height: var(--control-touch-height, 44px); } } /* the label has its own line over the box, not squeezed beside an empty one (#11128) */
 .board-rename-error { flex-basis: 100%; margin: 0; font-size: var(--fs-base); color: var(--error); }
 .board-rename-error:empty { display: none; }
 .board-rename-note { flex-basis: 100%; margin: 0; font-size: var(--fs-base); color: var(--text-secondary); }
