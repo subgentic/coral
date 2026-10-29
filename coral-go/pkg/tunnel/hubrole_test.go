@@ -261,6 +261,12 @@ func TestStampUploaderTakesTheAccountFromTheStreamOnly(t *testing.T) {
 		{"an account that is not a hub user id is not stamped", http.MethodPost, UploadPath, "alice@example.com", forged, ""},
 		{"a too-long value is not stamped", http.MethodPost, UploadPath, "hub-user-0a1b2c3d00", "", ""},
 		{"another route is left alone", http.MethodPost, "/api/upload/shot.png", acct, "", ""},
+		{"share-file gets the account too (#10855)", http.MethodPost, "/api/sessions/live/claude-0a1b/share-file", acct, forged, acct},
+		{"a share-file with no account on the stream has none", http.MethodPost, "/api/sessions/live/claude-0a1b/share-file", "", forged, ""},
+		{"share-file by another method is left alone", http.MethodGet, "/api/sessions/live/claude-0a1b/share-file", acct, "", ""},
+		{"a path that only ends in share-file is left alone", http.MethodPost, "/api/sessions/live/a/b/share-file", acct, "", ""},
+		{"share-file with no agent is left alone", http.MethodPost, "/api/sessions/live//share-file", acct, "", ""},
+		{"another route under the sessions is left alone", http.MethodPost, "/api/sessions/live/claude-0a1b/send", acct, "", ""},
 		{"another method is left alone", http.MethodGet, UploadPath, acct, "", ""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -269,11 +275,7 @@ func TestStampUploaderTakesTheAccountFromTheStreamOnly(t *testing.T) {
 				out.Set(HubUserHeader, tc.carried)
 			}
 			stampUploader(out, Header{HubUser: tc.stream}, tc.method, tc.path)
-			if tc.method == http.MethodPost && tc.path == UploadPath {
-				assert.Equal(t, tc.want, out.Get(HubUserHeader))
-			} else {
-				assert.Equal(t, tc.carried, out.Get(HubUserHeader), "untouched")
-			}
+			assert.Equal(t, tc.want, out.Get(HubUserHeader)) // want is what the header holds afterwards: the stream's account, nothing, or (a route left alone) what the request carried
 		})
 	}
 }
@@ -315,9 +317,13 @@ func TestTheUploadsHubAccountReachesTheServerFromTheStreamOnly(t *testing.T) {
 	do(http.MethodPost, UploadPath, user, forged)
 	do(http.MethodPost, UploadPath, WithHubTier(ctx, "launch"), forged)
 	do(http.MethodGet, "/api/health", user, forged)
+	do(http.MethodPost, "/api/sessions/live/claude-0a1b/share-file", user, forged) // #10855: Share as artifact is counted and recorded per account, so it gets the stream's account too
+	do(http.MethodPost, "/api/sessions/live/claude-0a1b/share-file", WithHubTier(ctx, "launch"), forged)
 	mu.Lock()
 	defer mu.Unlock()
-	require.Len(t, got, 4)
+	require.Len(t, got, 6)
+	assert.Equal(t, []string{"hub-user-0a1b2c3d"}, got[4].Values(HubUserHeader), "share-file: the stream's account replaces the forged copies")
+	assert.Empty(t, got[5].Values(HubUserHeader), "share-file with no account on the stream: none")
 	assert.Equal(t, []string{"hub-user-0a1b2c3d"}, got[0].Values(HubUserHeader))
 	assert.Equal(t, []string{"hub-user-0a1b2c3d"}, got[1].Values(HubUserHeader), "the stream's account replaces any the request carried")
 	assert.Empty(t, got[2].Values(HubUserHeader), "no account on the stream: none, and the carried copies are gone")

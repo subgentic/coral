@@ -3,6 +3,7 @@ package tunnel
 import (
 	"context"
 	"net/http"
+	"strings"
 )
 
 // The owner marker (#5280 for the update routes, #5307 for the owner's configuration, #5575 and #5572 for artifacts and the cross-team switches). Which routes carry it is ownerroutes.go:
@@ -66,11 +67,33 @@ func stampRole(out http.Header, h Header, method, decodedPath string) {
 // UploadPath is the image upload of the dashboard's composer (the Add image button, a paste, a drop).
 const UploadPath = "/api/upload"
 
-// stampUploader sets HubUserHeader on a POST to UploadPath from the stream's own HubUser field (#6088), the account Coral Hub says is behind the request: the upload record and the log line name it,
-// and its hourly share is its own. Whatever the request carried under that name is removed first, so only the stream's value can reach the handler, and a stream with no valid account (a connector
-// older than the field, or a hub that did not send one) leaves the header unset. Any other route and method is untouched here: scrub has already dropped the header from them.
+// ShareFileSuffix ends the path of Share as artifact: POST /api/sessions/live/{name}/share-file turns one file of an agent's folder into an artifact (#10269).
+const ShareFileSuffix = "/share-file"
+
+const liveSessionsPrefix = "/api/sessions/live/"
+
+// isUploaderRoute reports whether a request stores an artifact the hub account behind it should be named on and counted for: the image upload, and Share as artifact (#10855: its hourly window is per account,
+// and its upload record names the account). The share path has exactly one segment, the agent's, between the prefix and the suffix.
+func isUploaderRoute(method, decodedPath string) bool {
+	if method != http.MethodPost {
+		return false
+	}
+	if decodedPath == UploadPath {
+		return true
+	}
+	rest, ok := strings.CutPrefix(decodedPath, liveSessionsPrefix)
+	if !ok {
+		return false
+	}
+	name, tail, found := strings.Cut(rest, "/")
+	return found && name != "" && "/"+tail == ShareFileSuffix
+}
+
+// stampUploader sets HubUserHeader on a POST to UploadPath, or to a session's share-file, from the stream's own HubUser field (#6088, #10855), the account Coral Hub says is behind the request: the upload
+// record and the log line name it, and its hourly share is its own. Whatever the request carried under that name is removed first, so only the stream's value can reach the handler, and a stream with
+// no valid account (a connector older than the field, or a hub that did not send one) leaves the header unset. Any other route and method is untouched here: scrub has already dropped the header from them.
 func stampUploader(out http.Header, h Header, method, decodedPath string) {
-	if method != http.MethodPost || decodedPath != UploadPath {
+	if !isUploaderRoute(method, decodedPath) {
 		return
 	}
 	out.Del(HubUserHeader)
