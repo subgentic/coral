@@ -72,3 +72,6 @@ func typedTaskWaitResolved(taskID int64, title, event string) string {
 func typedClaimPrompt(taskID int64, title string) string {
 	return fmt.Sprintf("You have a new task in Coral, #%d: %s. Claim it with 'coral-agent task claim' to see the details, then run 'coral-agent task complete %d' when it's done.", taskID, board.TypedLabel(title), taskID)
 }
+
+// reviewPoolNudge tells a reviewer that a review waits in the pool for one of their areas.
+const reviewPoolNudge = "[Coral review pool] A review is waiting. Run 'coral-board task claim' to take the oldest one that matches your areas."

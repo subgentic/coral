@@ -28,8 +28,9 @@ func TestTypedLabel(t *testing.T) {
 	assert.LessOrEqual(t, len([]rune(long)), typedLabelMax+3)
 }
 
-// TypedText is the same set plus '#', with no cap: the team health check keeps naming "#12".
+// TypedText is the same set plus '#', cut at typedTextMax: the team health check keeps naming "#12".
 func TestTypedText(t *testing.T) {
 	assert.Equal(t, "Waiting: Backend Dev on #12 said calc", TypedText(`Waiting: Backend Dev on #12 (said "$(calc)")`))
-	assert.Equal(t, 300, len(TypedText(strings.Repeat("a", 300))), "no cap")
+	assert.Equal(t, 300, len(TypedText(strings.Repeat("a", 300))))
+	assert.Equal(t, typedTextMax+3, len([]rune(TypedText(strings.Repeat("a", 2000)))), "cut at the cap, with ...")
 }

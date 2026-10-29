@@ -19,11 +19,15 @@ func TypedLabel(s string) string {
 }
 
 // TypedText is TypedLabel for a long line Coral composed around other people's words (the team health check, which quotes what agents
-// said): the same characters, plus '#' so "#12" keeps naming a task, and no length cap. A typed line built with it must still start with
-// one of the fixed openers (TypedOpeners), so the '#' never begins it.
+// said): the same characters, plus '#' so "#12" keeps naming a task, cut at typedTextMax runes. A typed line built with it must still
+// start with one of the fixed openers (TypedOpeners), so the '#' never begins it.
 func TypedText(s string) string {
-	return typedOnly(s, ".,:_-/#", 0)
+	return typedOnly(s, ".,:_-/#", typedTextMax)
 }
+
+// typedTextMax is the longest a composed typed line's text may be, in runes (Security on goal #7): the health check's full text is for
+// the board, the typed line only has to say what to look at.
+const typedTextMax = 600
 
 // TypedOpeners are the first words a typed notice may start with. None is a program, a cmdlet or an alias here (checked by the
 // typed-notice census), and none is a label: in cmd.exe a line's first word is what runs, and in PowerShell a bare first word is a command.

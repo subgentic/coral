@@ -11,6 +11,8 @@ import (
 	"syscall"
 	"testing"
 
+	"golang.org/x/sys/windows"
+
 	"github.com/subgentic/coral/internal/board"
 )
 
@@ -32,9 +34,14 @@ $found = @($lines.openers | Where-Object { Get-Command -Name $_ -ErrorAction Sil
 
 func checkPowerShell(t *testing.T, cases []Case) {
 	t.Helper()
-	ps, err := exec.LookPath("powershell.exe")
+	// Windows PowerShell by its place in the system folder, never found on PATH (Security on goal #7).
+	sys, err := windows.GetSystemDirectory()
 	if err != nil {
-		t.Log("no powershell.exe: the PowerShell parse check is skipped")
+		t.Fatalf("the system folder: %v", err)
+	}
+	ps := filepath.Join(sys, "WindowsPowerShell", "v1.0", "powershell.exe")
+	if _, err := os.Stat(ps); err != nil {
+		t.Log("no Windows PowerShell: the PowerShell parse check is skipped")
 		return
 	}
 	dir := t.TempDir()
