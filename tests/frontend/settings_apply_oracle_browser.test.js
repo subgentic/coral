@@ -7,7 +7,7 @@
 const assert = require('node:assert/strict');
 const path = require('node:path');
 const { connect } = require('./agent_view_harness');
-const { framesJs } = require('./helpers/wait');
+const { framesJs, coralReady } = require('./helpers/wait');
 const { compareGolden } = require('./helpers/builder_golden');
 const BASE = require('./test_base').BASE;
 const GOLDEN = path.join(__dirname, 'fixtures', 'settings_apply_oracle.json');
@@ -82,7 +82,7 @@ const CASES = [
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await ev(`(async () => { const st = ${S};
             window.ST = (await import(st + 'state.js')).state; window.MD = await import(st + 'modals.js'); window.SD = await import(st + 'settings_dialog.js'); window.XT = await import(st + 'xterm_renderer.js'); window.LM = await import(st + 'launch_models.js');
             await (await import(st + 'vendor_loader.js')).loadXterm();

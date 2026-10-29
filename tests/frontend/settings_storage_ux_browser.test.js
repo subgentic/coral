@@ -8,6 +8,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 const GIB = 1024 ** 3;
 
@@ -23,7 +24,7 @@ const GIB = 1024 ** 3;
         await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await ev(`(() => { const R = window.fetch; window.__puts = []; window.__prunes = []; window.__store = ${JSON.stringify(storeBody({ bytes: 4 * GIB, objects: 120, max: 10 * GIB }))}; window.__down = false; window.__hold = null; window.__dry = null; window.__run = null;
             window.fetch = (u, o = {}) => { const url = new URL(String(u), location.origin); const p = url.pathname; const m = (o.method || 'GET').toUpperCase(); const json = (b, s = 200) => Promise.resolve(new Response(JSON.stringify(b), { status: s, headers: { 'content-type': 'application/json' } }));
                 if (p === '/api/system/artifact-store' && m === 'GET') {

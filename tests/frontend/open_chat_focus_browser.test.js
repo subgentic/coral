@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { axName } = require('./helpers/ax_tree');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 const S = `(window.__coralStatic || '/static/')`;
 
 (async () => {
@@ -13,7 +14,7 @@ const S = `(window.__coralStatic || '/static/')`;
         for (const [label, w, h, mobile] of [['1280 px, a mouse', 1280, 820, false], ['390 px, a phone', 390, 844, true]]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled(mobile ? { enabled: true, maxTouchPoints: 5 } : { enabled: false });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.then(() => true)`);
+            await coralReady(ev);
             await ev(`window.__m.add('focus-a', 'P', 4, { sleeping: false, session_id: 'focus-a-id' }); true`);
             await ev(`document.body.focus(); Promise.resolve(window.selectLiveSession('focus-a', 'claude', 'focus-a-id', undefined, { focusChat: true })).then(() => true)`);
             await waitFor(`getComputedStyle(document.getElementById('live-session-view')).display !== 'none'`, label + ': the chat shows', 8000);

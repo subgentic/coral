@@ -3,6 +3,7 @@
 // Run against an isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 const MIB = 1024 ** 2;
 
@@ -13,7 +14,7 @@ const MIB = 1024 ** 2;
         await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await ev(`(() => { const R = window.fetch; window.__idx = { setting: 'on', available: true, state: 'ready', size_bytes: ${12 * MIB} }; window.__down = false;
             window.fetch = (u, o = {}) => { const p = new URL(String(u), location.origin).pathname; const m = (o.method || 'GET').toUpperCase();
                 if (p === '/api/system/message-search-index' && m === 'GET') return Promise.resolve(new Response(JSON.stringify(window.__down ? { error: 'x' } : window.__idx), { status: window.__down ? 503 : 200, headers: { 'Content-Type': 'application/json' } }));

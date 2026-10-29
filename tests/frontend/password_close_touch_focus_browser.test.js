@@ -3,6 +3,7 @@
 // Drives Chrome over CDP through agent_view_harness.js.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -15,7 +16,7 @@ const { connect } = require('./agent_view_harness');
                 const check = (ok, msg) => { if (!ok) problems.push(`${w}, ${closeBy}: ${msg}`); };
                 await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile: touch }); await Emulation.setTouchEmulationEnabled({ enabled: touch });
                 await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-                await ev(`window.__coralReady.startup('liveList', 'settings')`);
+                await coralReady(ev, 'startup', 'liveList', 'settings');
                 await ev(`document.activeElement && document.activeElement.blur(); import((window.__coralStatic || '/static/') + 'password_ui.js').then(m => { m.showSetPasswordModal({ local: true }); return true; })`);
                 await waitFor(`!!document.getElementById('set-password-modal')`, `${w}: the dialog`, 8000);
                 await new Promise(r => setTimeout(r, 400)); // sleep-ok: the dialog draws

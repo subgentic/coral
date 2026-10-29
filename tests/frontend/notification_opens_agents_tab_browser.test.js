@@ -4,6 +4,7 @@
 // Run against an isolated dev server; set NOTIF_SHOT_DIR to save a screenshot after the Inbox toast.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 const TABS = ['hub-inbox', 'servers', 'automations']; // Chats are the Inbox's folders on a local Coral (#7776)
 
@@ -13,7 +14,7 @@ const TABS = ['hub-inbox', 'servers', 'automations']; // Chats are the Inbox's f
     const open = async (width, height, mobile) => {
         await Emulation.setDeviceMetricsOverride({ width, height, deviceScaleFactor: 1, mobile });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await ev(`window.__m.add('alpha', 'A', 6, { sleeping: false }); window.__m.add('beta', 'B', 6, { sleeping: false }); window.__m.add('gamma', 'G', 6, { sleeping: false }); true`);
     };
     // The page's own feed message: the first one only records who is waiting; a later one raises the toast.

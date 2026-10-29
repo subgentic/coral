@@ -14,7 +14,7 @@ const AGENT_KEYS = ['name', 'prompt', 'icon', 'capabilities', 'agent_type', 'mod
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
-    const { settle } = require('./helpers/wait').bind(ev);
+    const { settle, coralReady } = require('./helpers/wait').bind(ev);
     const S = scenarios(); const t = T(ev, waitFor);
     const tab = async n => { await ev(`(() => { const d = window.__nt.dlg(${N.team}); const x = [...d.querySelectorAll('[role=tab]')].filter(window.__na.vis).find(e => window.__na.name(e) === ${JSON.stringify(n)}); if (x) { x.click(); return true; } const s = window.__nt.find(d, 'select', ${N.section}); const o = [...s.options].find(o => o.textContent.trim() === ${JSON.stringify(n)}); s.value = o.value; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`); await settle(250); };
     const check = (rx, on) => ev(`(() => { const e = window.__nt.find(window.__nt.dlg(${N.team}), 'input', ${rx}); if (!e || e.type !== 'checkbox') return false; if (e.checked !== ${on}) e.click(); return e.checked === ${on}; })()`);
@@ -28,7 +28,7 @@ const AGENT_KEYS = ['name', 'prompt', 'icon', 'capabilities', 'agent_type', 'mod
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`); await installNT(ev); await stubModels(ev);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(); await installNT(ev); await stubModels(ev);
         await ev(`localStorage.setItem('coral-recent-dirs', JSON.stringify(['/work/payments-app'])); true`);
         await install_stub(200);
         await openNewTeam(ev, waitFor);

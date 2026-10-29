@@ -5,6 +5,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, sleep, PRELOAD, install } = await connect();
@@ -15,7 +16,7 @@ const BASE = require('./test_base').BASE;
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 700, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await ev(`(async () => { for (let i = 1; i <= 3; i++) window.__m.add('rb' + i, 'R' + i, 3, { sleeping: false, agent_type: 'claude', session_id: 'rb-' + i, server: 'box-b', board_project: 'team-x' });
             const ws = await import((window.__coralStatic || '/static/') + 'websocket.js'); ws.handleCoralMessage({ type: 'coral_diff', changed: [], servers: [{ id: 'box-b', label: 'box-b.lan', status: 'unreachable' }] });
             T.state.liveSessions.forEach(s => { s.stale = true; }); T.render.renderLiveSessions(T.state.liveSessions); return true; })()`);

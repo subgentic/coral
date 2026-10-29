@@ -14,7 +14,7 @@ const { SCAN } = require('./helpers/phone_scan');
     // settle(ms): wait for the layout to stop moving before a scan measures its geometry (#4768). One shared copy
     // in helpers/wait.js; it is no worse than the old fixed settle-sleeps (caps at ms, never throws) and usually
     // far faster. The panels and dialogs fill over frames with no completion event, so the scans below settle first.
-    const { settle } = require('./helpers/wait').bind(ev);
+    const { settle, coralReady } = require('./helpers/wait').bind(ev);
 const { removeBoards } = require('./helpers/board_cleanup');
     const board = 'phone-layout-' + Date.now();
     const problems = [];
@@ -46,7 +46,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
             await Emulation.setDeviceMetricsOverride({ width: w, height: 800, deviceScaleFactor: 1, mobile: true });
             await Emulation.setTouchEmulationEnabled({ enabled: true, maxTouchPoints: 5 });
             await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.then(() => true)`);
+            await coralReady();
             await ev(`(async () => { for (const c of ['hello team', 'a longer second message with some words']) await fetch('/api/board/${board}/messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'pl', as: 'QA', content: c }) });
                 localStorage.setItem('coral-live-view-mode', 'chat'); window.__m.add('phone-bot-with-a-long-name', 'A', 8, { sleeping: false, board_project: '${board}' }); window.__m.add('second-bot', 'B', 5, { sleeping: true }); return true; })()`);
             await settle(900);
@@ -90,7 +90,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
             await Emulation.setDeviceMetricsOverride({ width: w, height: 800, deviceScaleFactor: 1, mobile: true });
             await Emulation.setTouchEmulationEnabled({ enabled: true, maxTouchPoints: 5 });
             await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.then(() => true)`);
+            await coralReady();
             const now = new Date().toISOString();
             await ev(`localStorage.setItem('coral-live-view-mode', 'chat'); window.__m.add('phone-bot-with-a-long-name', 'A', 8, { sleeping: false }); window.__m.add('sleepy-bot', 'B', 5, { sleeping: true }); window.__m.add('archived-bot', 'C', 3, { archived: true }); true`); await settle(900);
             tag = '375 extra';

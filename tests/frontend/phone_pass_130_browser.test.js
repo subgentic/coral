@@ -56,7 +56,7 @@ const LONG_WAIT = "⏳ This agent hasn't done anything yet — check the termina
     const load = async (w, theme) => {
         await view(w, theme);
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`); await installAudit(ev); await setTheme(ev, theme);
+        await require('./helpers/wait').coralReady(ev); await installAudit(ev); await setTheme(ev, theme);
     };
     const team = 'p130-' + Date.now().toString(36);
     try {

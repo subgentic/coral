@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const { BASE } = require('./test_base');
-const { framesJs } = require('./helpers/wait');
+const { framesJs, coralReady } = require('./helpers/wait');
 const { setTheme, installAudit, auditRegion } = require('./helpers/contrast');
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -24,7 +24,7 @@ const { setTheme, installAudit, auditRegion } = require('./helpers/contrast');
                 return original(u,o);
             };
         })()` });
-        await size(390); await Page.navigate({ url: BASE + '/chats' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(()=>true)`); await require('./helpers/hub_chats').showHubChats(ev);
+        await size(390); await Page.navigate({ url: BASE + '/chats' }); await Page.loadEventFired(); await install(); await coralReady(ev); await require('./helpers/hub_chats').showHubChats(ev);
         await waitFor(`document.getElementById('history-sessions-list').textContent.includes('Phone history example')`, 'fixture history');
         await installAudit(ev);
         for (const theme of ['dark', 'light']) {
@@ -68,7 +68,7 @@ const { setTheme, installAudit, auditRegion } = require('./helpers/contrast');
         await waitFor(`document.getElementById('history-search').checkVisibility()`, 'keyboard returns to Chats');
         assert.ok(await ev(`location.pathname==='/chats' && document.getElementById('history-search').value==='needle'`),'query preserved on return'); // the focus on Search, browser Back and Forward are the hub's Chats list (#7776): a local Coral's way back is the Inbox folder
         await Page.addScriptToEvaluateOnNewDocument({ source: 'window.__historyEmpty=true;' });
-        await Page.navigate({url:BASE+'/chats'}); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(()=>true)`); await require('./helpers/hub_chats').showHubChats(ev);
+        await Page.navigate({url:BASE+'/chats'}); await Page.loadEventFired(); await install(); await coralReady(ev); await require('./helpers/hub_chats').showHubChats(ev);
         await waitFor(`document.getElementById('history-sessions-list').checkVisibility() && document.getElementById('history-sessions-list').textContent.includes('No history found')`, 'empty history');
         for (const theme of ['dark','light']) { await setTheme(ev,theme); await shot(`${theme}-390-empty`); }
         console.log('PASS phone History list, search, advanced filters, same-node resize, hit navigation, keyboard return, browser Back/Forward, empty state, both themes');

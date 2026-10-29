@@ -4,6 +4,7 @@
 // after a sort and after the record changes; never on this hub's own row (it has no key and no page); its words are only a tooltip and the button's name, never markup. 1280, 700 and 390 px.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 const W = 'the key crosses the network unencrypted; use https or a tunnel';
 const MATRIX = [
@@ -38,7 +39,7 @@ const SHOWS = ['lan', 'unreach', 'unauth', 'offline', 'xss', 'legacy', 'long'];
         const open = async (w, h, mobile) => {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.then(() => true)`);
+            await coralReady(ev);
             await ev(`(async () => { const s = await import((window.__coralStatic || '/static/') + 'state.js'); s.state.hub = true; s.state.servers = window.__list; s.state.liveSessions = []; return true; })()`);
             await ev(`window.switchNavTab('servers'); true`);
             await waitFor(`!!document.querySelector('tr[data-key="lan"]')`, 'the servers table');

@@ -6,7 +6,7 @@ const { connect } = require('./agent_view_harness');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
-    const { settle } = require('./helpers/wait').bind(ev);
+    const { settle, coralReady } = require('./helpers/wait').bind(ev);
     const probe = () => ev(`(() => {
         const learns = [...document.querySelectorAll('.sv-learn')].filter(b => b.getClientRects().length);
         const bad = []; let considered = 0, takenByOwn = 0;
@@ -33,7 +33,7 @@ const { connect } = require('./agent_view_harness');
         const out = []; let considered = 0;
         for (const [label, w, h, mobile, zoom] of [['1280', 1280, 1000, false, ''], ['1280-200', 1280, 1000, false, '200%'], ['390', 390, 844, true, ''], ['390-200', 390, 844, true, '200%']]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
-            await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+            await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install(); await coralReady();
             await ev(`window.__coral.buildAllLazy(); window.showSettingsModal(); true`);
             await waitFor(`!!document.getElementById('settings-tab-network')`, 'the Settings dialog', { timeout: 8000 });
             if (zoom) await ev(`document.documentElement.style.fontSize = ${JSON.stringify(zoom)}; true`);
@@ -55,7 +55,7 @@ const { connect } = require('./agent_view_harness');
         try {
             for (const [label, w, h, mobile, zoom] of [['team 1280', 1280, 1000, false, ''], ['team 1280-200', 1280, 1000, false, '200%'], ['team 390-200', 390, 844, true, '200%']]) {
                 await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
-                await Page.navigate({ url: `${process.env.CORAL_TEST_URL}/team/${B}/goals` }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+                await Page.navigate({ url: `${process.env.CORAL_TEST_URL}/team/${B}/goals` }); await Page.loadEventFired(); await install(); await coralReady();
                 await waitFor(`typeof window.showTeamWorkingModeWorkspace === 'function' && !!document.getElementById('team-page-settings')`, 'the team page', { timeout: 15000 });
                 await ev(`window.showTeamWorkingModeWorkspace(${JSON.stringify(B)}); true`);
                 await waitFor(`document.querySelectorAll('#team-panel-settings .sv-learn').length > 0`, 'the team settings Learn more buttons', { timeout: 15000 });

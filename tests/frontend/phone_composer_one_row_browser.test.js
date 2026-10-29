@@ -9,7 +9,7 @@ const BASE = require('./test_base').BASE;
 const S = `(window.__coralStatic || '/static/')`;
 const fs = require('node:fs');
 const { swapTheme } = require('./helpers/theme');
-const { nextFrame } = require('./helpers/wait');
+const { nextFrame, coralReady } = require('./helpers/wait');
 const SHOTS = process.env.PHONE_COMPOSER_SHOTS;
 
 (async () => {
@@ -19,7 +19,7 @@ const SHOTS = process.env.PHONE_COMPOSER_SHOTS;
     const open = async (width, height, mobile) => {
         await Emulation.setDeviceMetricsOverride({ width, height, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await ev(`window.__m.add('pc-a', 'A', 3, { sleeping: false, session_id: 'pc-a-id' }); window.selectLiveSession('pc-a', 'claude', 'pc-a-id', 'local'); true`);
         await waitFor(`document.querySelector('#mobile-send-btn')?.getClientRects().length > 0 || document.querySelector('#command-input')?.getClientRects().length > 0`, 'the agent view', 10000);
         await ev(`(async () => { const m = await import(${S} + 'model_chip.js'); m.updateModelChip({ session_id: 'pc-a-id', agent_type: 'claude', model: '', thinking: '', thinking_actual: '' }, 'local'); return true; })()`);

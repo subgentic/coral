@@ -3,6 +3,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, PRELOAD, install } = await connect();
@@ -10,7 +11,7 @@ const BASE = require('./test_base').BASE;
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [name, w, h, touch] of [['phone', 390, 844, true], ['desktop', 1280, 800, false]]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile: touch }); await Emulation.setTouchEmulationEnabled({ enabled: touch });
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
             const r = await ev(`(() => { const host = document.createElement('div'); host.style.cssText = 'position:fixed;left:0;top:60px;width:100%;z-index:99999;background:var(--bg-primary)'; host.innerHTML =
                 '<div class="tabs history-tabs"><button class="tab history-tab-btn">Summary</button><button class="tab history-tab-btn">Chat</button></div>' +
                 '<div class="mb-message"><div class="mb-message-header"><span class="mb-agent-name">Operator</span><button class="mb-save-btn" aria-label="Save"><svg viewBox="0 0 16 16"><path d="M3 2h10v12l-5-3-5 3z"/></svg></button><button class="mb-delete-msg-btn" aria-label="Delete">&times;</button><button class="mb-msg-more" aria-label="Actions">&hellip;</button></div></div>';

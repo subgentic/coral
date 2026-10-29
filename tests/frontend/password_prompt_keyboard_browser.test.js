@@ -2,6 +2,7 @@
 // stays); (2) closing it (Not now, Escape) gives the keyboard to a control on the page behind it (Home's first one), not the body. Real keys (Tab, Escape). Drives Chrome over CDP through agent_view_harness.js.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -17,7 +18,7 @@ const { connect } = require('./agent_view_harness');
             for (const closeBy of ['Not now', 'Escape']) {
                 await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile: false });
                 await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-                await ev(`window.__coralReady.startup('liveList', 'settings')`);
+                await coralReady(ev, 'startup', 'liveList', 'settings');
                 if (font) await ev(`document.documentElement.style.fontSize = ${JSON.stringify(font)}; true`);
                 await ev(`document.activeElement && document.activeElement.blur(); import((window.__coralStatic || '/static/') + 'password_ui.js').then(m => { m.showSetPasswordModal({ local: true }); return true; })`);
                 await waitFor(`!!document.getElementById('set-password-modal')`, `${label}: the dialog`, 8000);

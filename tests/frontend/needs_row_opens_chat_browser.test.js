@@ -3,6 +3,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -10,7 +11,7 @@ const BASE = require('./test_base').BASE;
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await ev(`localStorage.removeItem('coral.inbox.tab'); localStorage.setItem('coral-live-view-mode', 'terminal'); true`); // Terminal is the last view chosen
         await ev(`window.__pwn = undefined; window.__ask = { 'd2-id': 'Wants to run: rm -rf build', 'ev-id': '<img src=x onerror=window.__pwn=1>' }; true`); // the second agent's ask is HTML an agent wrote (#10192)
         await ev(`(() => { const entry = window.__m.entry.bind(window.__m); window.__m.entry = a => ({ ...entry(a), board_job_title: 'QA Engineer', waiting_for_input: true, waiting_kind: 'permission', waiting_summary: window.__ask[a.session_id] });

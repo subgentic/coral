@@ -7,6 +7,7 @@ const { connect } = require('./agent_view_harness');
 const { safePaused } = require('./helpers/paused');
 const { scene, tap: tapSel, problems, required, useThemeSetter } = require('./helpers/phone_targets');
 const { BASE } = require('./test_base');
+const { coralReady } = require('./helpers/wait');
 const HOST = new URL(BASE).host;
 const CSP = ["default-src 'self'", "script-src 'self'", "style-src 'self'", "style-src-attr 'unsafe-inline'", "font-src 'self'", "img-src 'self' data: blob:", `connect-src 'self' ws://${HOST}`, "object-src 'none'", "base-uri 'none'", "form-action 'self'", "frame-ancestors 'none'"].join('; ');
 
@@ -64,7 +65,7 @@ const CSP = ["default-src 'self'", "script-src 'self'", "style-src 'self'", "sty
    };
   })();`});
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired();
-        await waitFor(`typeof window.switchNavTab==='function' && !!window.__coralReady`, 'dashboard'); await ev(`window.__coralReady.startup('liveList','settings')`);
+        await waitFor(`typeof window.switchNavTab==='function' && !!window.__coralReady`, 'dashboard'); await coralReady(ev, 'startup', 'liveList', 'settings');
         const menu = async () => { await ev(`document.getElementById('nav-select').click();true`); await waitFor(`!document.getElementById('nav-more-menu').hidden`, 'phone nav'); };
         const pick = async arg => { await menu(); await ev(`document.querySelector('#nav-more-menu [data-arg="${arg}"]').click();true`); };
         await sc('hub: home', async () => { await waitFor(`document.querySelectorAll('button, a[href]').length > 5`, 'home'); }, { min: 4, expect: `document.querySelectorAll('li.server-group-header[data-server-group] .session-group-count').length >= 2` }); // the agents under their computers, each with its count after the name (#6241)
@@ -100,7 +101,7 @@ const CSP = ["default-src 'self'", "script-src 'self'", "style-src 'self'", "sty
         // no computer connected (#6351): the home is one "Connect your first computer" panel with its link
         await Page.addScriptToEvaluateOnNewDocument({ source: 'window.__noComputers = true;' });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired();
-        await waitFor(`typeof window.switchNavTab==='function' && !!window.__coralReady`, 'dashboard'); await ev(`window.__coralReady.startup('liveList','settings')`);
+        await waitFor(`typeof window.switchNavTab==='function' && !!window.__coralReady`, 'dashboard'); await coralReady(ev, 'startup', 'liveList', 'settings');
         await sc('hub: home, no computer connected', async () => { await waitFor(`/Connect your first computer/.test(document.body.textContent) && !!document.querySelector('a[href="/machines/add"]')`, 'the connect panel', 10000); }, { min: 2, expect: `[...document.querySelectorAll('a[href="/machines/add"]')].some(a => a.getClientRects().length > 0)` });
     } finally { await client.close(); }
     const bad = problems(results).concat(required(results, ['hub: toasts', 'hub: home', 'hub: home, no computer connected', 'hub: nav menu', 'hub: chats list', 'hub: search results', 'hub: search, advanced filters', 'hub: search finds nothing', 'hub: chat transcript', 'hub: chat tab notes', 'hub: chat tab commits', 'hub: boards list', 'hub: board', 'hub: servers', 'hub: inbox', 'hub: artifacts', 'hub: docs', 'hub: account menu', 'hub: settings general', 'hub: launch']));

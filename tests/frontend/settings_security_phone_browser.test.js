@@ -4,6 +4,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -13,7 +14,7 @@ const BASE = require('./test_base').BASE;
         for (const font of ['', '32px']) {
             await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true, maxTouchPoints: 5 });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.then(() => true)`);
+            await coralReady(ev);
             if (font) await ev(`document.documentElement.style.fontSize = '${font}'; true`);
             await ev(`window.showSettingsModal('security'); true`);
             await waitFor(`!!document.getElementById('settings-telemetry-install-id') && document.getElementById('settings-telemetry-install-id').getClientRects().length > 0`, 'the Security pane', 8000);

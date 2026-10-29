@@ -9,6 +9,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { safePaused } = require('./helpers/paused');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 const BASE = require('./test_base').BASE;
 
 const remotes = n => Array.from({ length: n }, (_, i) => ({ id: 'm' + (i + 1), label: 'machine-' + (i + 1) + (i === 6 ? ' (build)' : ''), url: 'http://10.0.0.' + (i + 11) + ':8420', status: i % 4 === 3 ? 'unreachable' : 'online' }));
@@ -58,7 +59,8 @@ const hubRows = n => remotes(n).map(s => ({ id: s.id, label: s.label, online: s.
             await Emulation.setDeviceMetricsOverride({ width: w, height: 900, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             const blank = Page.loadEventFired(); await Page.navigate({ url: 'about:blank' }); await blank;
             const loaded = Page.loadEventFired(); await Page.navigate({ url: BASE + '/' }); await loaded; await install();
-            await ev(`window.__coralReady.then(() => { window.__stub = true; return true; })`);
+            await coralReady(ev);
+            await ev(`window.__stub = true; true`);
         };
         const showLocal = n => ev(`(async () => { window.__servers = ${JSON.stringify([{ id: 'local', label: 'studio', local: true, status: 'online' }, ...remotes(8)].slice(0, n + 1))}; const base = (window.__coralStatic || '/static/');
             const s = await import(base + 'state.js'); s.state.hub = true; s.state.servers = window.__servers; const t = await import(base + 'servers_tab.js'); t.updateServersTabVisibility(); return true; })()`);

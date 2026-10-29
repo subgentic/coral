@@ -7,6 +7,7 @@
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 const fixture = n => `(() => {
   const mock = window.__m; const teams = Math.ceil(${n} / 8);
@@ -50,7 +51,7 @@ if (!process.env.SCALE_PROBE) { console.log('scale_probe: skipped (set SCALE_PRO
         await Page.navigate({ url: 'about:blank' }); await sleep(300); // sleep-ok: a measurement window; the page is meant to be left alone
         const m0 = await metrics(); const t0 = Date.now();
         await Page.navigate({ url: BASE }); await Page.loadEventFired();
-        await ev(`window.__coralReady.startup('liveList')`);
+        await coralReady(ev, 'startup', 'liveList');
         const m1 = await metrics();
         const nav = await ev(`(() => { const nv = performance.getEntriesByType('navigation')[0]; return { dcl: Math.round(nv.domContentLoadedEventEnd), listAt: window.__firstList, longtasks: window.__longtasks.length, longMs: window.__longtasks.reduce((s, x) => s + x.d, 0), maxLong: Math.max(0, ...window.__longtasks.map(x => x.d)) }; })()`);
         await install();

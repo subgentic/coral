@@ -5,6 +5,7 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 const WARNING = 'the key crosses the network unencrypted; use https or a tunnel';
 const REFUSED = 'URL must be https: the API key would cross the network unencrypted (another computer on a private network, or this one, can be registered with allow_private)';
@@ -35,7 +36,7 @@ const SERVERS = [
                 return R(u, o); }; })();` });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await ev(`(async () => { const s = await import((window.__coralStatic || '/static/') + 'state.js'); s.state.hub = true; s.state.servers = ${JSON.stringify(SERVERS)}; return true; })()`);
         await ev(`window.switchNavTab('servers'); true`);
         await waitFor(`!!document.querySelector('#server-row-lan')`, 'the servers list');

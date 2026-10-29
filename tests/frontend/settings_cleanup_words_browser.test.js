@@ -4,6 +4,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -12,7 +13,7 @@ const BASE = require('./test_base').BASE;
         for (const [w, h, mobile] of [[1280, 900, false], [390, 844, true]]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled(mobile ? { enabled: true, maxTouchPoints: 5 } : { enabled: false });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.then(() => true)`);
+            await coralReady(ev);
             await ev(`window.showSettingsModal('cleanup').then(() => true)`); // the dialog is shown at the end of this, after awaited requests: the retention field's loaded flag can come first, and its labels have no boxes until the dialog is shown (Windows CI, #7282)
             await waitFor(`document.getElementById('settings-modal').getClientRects().length > 0`, 'the settings dialog shown', 10000);
             await waitFor(`document.getElementById('settings-retention-enabled') && document.getElementById('settings-retention-enabled').dataset.loaded === '1'`, 'automatic cleanup loaded', 10000);
