@@ -216,13 +216,8 @@ func startIndexingServices(ctx context.Context, cfg *config.Config, srv *server.
 	safeGo(ctx, "git_poller", func() { gitPoller.Run(ctx) })
 
 	// Session indexer
-	scanners := []agent.HistoryScanner{
-		&agent.ClaudeAgent{},
-		&agent.AgyAgent{},
-		&agent.CodexAgent{},
-	}
 	indexer := background.NewSessionIndexer(
-		sessStore, scanners,
+		sessStore, historyScanners(),
 		time.Duration(cfg.IndexerIntervalS)*time.Second,
 		time.Duration(cfg.IndexerStartupDelayS)*time.Second,
 	)
@@ -529,4 +524,15 @@ func resolveBackend(flagValue, saved, goos string) (backend string, forced bool)
 // without regard to case (#5128).
 func boardHealthMonitorEnabled(settings map[string]string) bool {
 	return setreg.Bool(settings, setreg.BoardHealthMonitor)
+}
+
+// historyScanners are the agent CLIs whose conversations the History indexer reads. Pi was written (pi.go ExtractSessions, #11092) and never listed here, so its chats were never indexed: a Pi agent had no row in
+// History, no summary and no search (found by the Pi acceptance run, #11122).
+func historyScanners() []agent.HistoryScanner {
+	return []agent.HistoryScanner{
+		&agent.ClaudeAgent{},
+		&agent.AgyAgent{},
+		&agent.CodexAgent{},
+		&agent.PiAgent{},
+	}
 }
