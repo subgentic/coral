@@ -15,8 +15,8 @@ export async function loadAllTags(forHistory = false) {
         const resp = await (forHistory ? historyFetch("/api/tags") : fetch("/api/tags"));
         allTags = await resp.json();
     } catch (e) {
-        if (e.name === 'AbortError') return null;
-        if (e.code !== 'no_computers') console.error("Failed to load tags:", e); // a Hub with no computer online has no tags yet: empty, not an error (#11073)
+        if (e?.name === 'AbortError') return null;
+        if (e?.code !== 'no_computers') console.error("Failed to load tags:", e); // a Hub with no computer online has no tags yet: empty, not an error (#11073)
         allTags = [];
     }
     // Expose cache for cross-module access (folder_tags.js)

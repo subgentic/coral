@@ -151,8 +151,8 @@ export async function loadHistorySessionsPaged(page = 1, pageSize = 50) {
         renderHistorySessions(sessions, data.total, data.page, data.page_size);
         return data;
     } catch (e) {
-        if (e.name === 'AbortError') return;
-        if (e.code !== 'no_computers') console.error("Failed to load paged history sessions:", e); // no computer online: the empty list below says so (#11073)
+        if (e?.name === 'AbortError') return;
+        if (e?.code !== 'no_computers') console.error("Failed to load paged history sessions:", e); // no computer online: the empty list below says so (#11073)
         if (isCloud()) {
             renderHistorySessions([], 0, page, pageSize);
             const empty = document.querySelector('#history-sessions-list .empty-state');
