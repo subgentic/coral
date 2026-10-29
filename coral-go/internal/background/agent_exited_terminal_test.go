@@ -11,5 +11,6 @@ import (
 // whose terminal is a shell.
 func TestSkipIfAgentExitedSkipsTerminalAgents(t *testing.T) {
 	assert.True(t, skipIfAgentExited(context.Background(), nil, nil, "terminal-11111111-2222-3333-4444-555555555555", "board nudge"))
-	assert.False(t, skipIfAgentExited(context.Background(), nil, nil, "claude-11111111-2222-3333-4444-555555555555", "board nudge"))
+	assert.False(t, skipIfAgentExited(context.Background(), &mockRuntime{}, nil, "claude-11111111-2222-3333-4444-555555555555", "board nudge"), "a test fake that is exempt from the notice check")
+	assert.True(t, skipIfAgentExited(context.Background(), nil, nil, "claude-11111111-2222-3333-4444-555555555555", "board nudge"), "no runtime says nothing about the foreground: fail closed")
 }
