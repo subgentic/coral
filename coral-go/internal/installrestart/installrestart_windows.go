@@ -15,6 +15,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -32,9 +33,10 @@ const fileName = "restart-after-install"
 
 // Win32 constants x/sys/windows does not name: FILE_ADD_FILE (a directory right), and the flags of GetFinalPathNameByHandle.
 const (
-	fileAddFile        = 0x2
-	fileNameNormalized = 0x0
-	volumeNameDOS      = 0x0
+	fileAddFile         = 0x2
+	fileAddSubdirectory = 0x4
+	fileNameNormalized  = 0x0
+	volumeNameDOS       = 0x0
 )
 
 // ErrNotPlainFolder: the mark's folder is a link or a junction, or is reached through one, or is not a folder.
@@ -95,7 +97,7 @@ func openPlainFolder(dir string) (*plainFolder, error) {
 	if err != nil {
 		return nil, err
 	}
-	h, err := windows.CreateFile(p, windows.FILE_LIST_DIRECTORY|fileAddFile|windows.FILE_TRAVERSE|windows.FILE_READ_ATTRIBUTES|windows.SYNCHRONIZE,
+	h, err := windows.CreateFile(p, windows.FILE_LIST_DIRECTORY|fileAddFile|fileAddSubdirectory|windows.FILE_TRAVERSE|windows.FILE_READ_ATTRIBUTES|windows.SYNCHRONIZE,
 		windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE, nil, windows.OPEN_EXISTING, windows.FILE_FLAG_BACKUP_SEMANTICS|windows.FILE_FLAG_OPEN_REPARSE_POINT, 0)
 	if err != nil {
 		return nil, err
@@ -108,15 +110,50 @@ func openPlainFolder(dir string) (*plainFolder, error) {
 	}
 	if info.FileAttributes&windows.FILE_ATTRIBUTE_REPARSE_POINT != 0 || info.FileAttributes&windows.FILE_ATTRIBUTE_DIRECTORY == 0 {
 		d.Close()
+		log.Printf("installrestart: the folder %s is a link or not a folder: refused, so Coral will not be started again by the installer", dir)
 		return nil, ErrNotPlainFolder
 	}
 	// An ancestor that is a link: the handle's final path is where the folder really is, which then is not where it was asked for.
 	final, err := finalPathOf(h)
 	if err != nil || !sameFolder(final, longPath(dir)) {
 		d.Close()
+		// One line that explains "Coral did not restart after the install": the folder is reached through a link (a redirected profile, OneDrive, a network folder).
+		log.Printf("installrestart: the folder %s is really %s (a redirected profile, OneDrive, a network folder or a link above it): refused, so Coral will not be started again by the installer", dir, final)
 		return nil, ErrNotPlainFolder
 	}
 	return d, nil
+}
+
+// makeFolder makes dir when it is missing, through the same handle code as everything else: each missing level is created relative to its parent, and the parent is
+// opened as a plain folder first (a link or a path through one is refused), so an elevated helper cannot create an empty folder behind a link. An existing plain folder is
+// left as it is; anything that exists and is not a plain folder is refused, never "made".
+func makeFolder(dir string) error {
+	dir = filepath.Clean(dir)
+	d, err := openPlainFolder(dir)
+	if err == nil {
+		d.Close()
+		return nil
+	}
+	if !notFound(err) {
+		return err
+	}
+	parent := filepath.Dir(dir)
+	if parent == dir {
+		return err
+	}
+	if err := makeFolder(parent); err != nil {
+		return err
+	}
+	p, err := openPlainFolder(parent)
+	if err != nil {
+		return err
+	}
+	defer p.Close()
+	h, err := p.openChild(filepath.Base(dir), windows.FILE_LIST_DIRECTORY|windows.FILE_READ_ATTRIBUTES, windows.FILE_OPEN_IF, windows.FILE_DIRECTORY_FILE)
+	if err != nil {
+		return err
+	}
+	return windows.CloseHandle(h)
 }
 
 // sameFolder: the handle's final path (\\?\ form) is the path the folder was asked for, case aside. A different one means an ancestor is a link.
@@ -211,7 +248,7 @@ func Mark(now time.Time) error {
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(dir, 0o700); err != nil {
+	if err := makeFolder(dir); err != nil {
 		return err
 	}
 	d, err := openPlainFolder(dir)
@@ -262,7 +299,7 @@ func CreateLog(prefix string) (*os.File, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := os.MkdirAll(dir, 0o700); err != nil {
+	if err := makeFolder(dir); err != nil {
 		return nil, err
 	}
 	d, err := openPlainFolder(dir)

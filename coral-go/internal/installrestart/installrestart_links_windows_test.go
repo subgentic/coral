@@ -3,9 +3,11 @@
 package installrestart
 
 import (
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -263,4 +265,81 @@ func TestTheElevatedLogIsCreatedNewInThePlainFolder(t *testing.T) {
 	// and the same through openPlainFolder directly (some builds fail MkdirAll first)
 	_, err = openPlainFolder(dir2)
 	assert.ErrorIs(t, err, ErrNotPlainFolder)
+}
+
+// A real junction is refused by its reparse flag ALONE: with the final-path check stubbed to agree (it returns the path that was asked for), the junction's own handle still
+// says reparse point, so the second check is not what saves it.
+func TestAJunctionIsRefusedByTheReparseFlagAlone(t *testing.T) {
+	target := t.TempDir()
+	link := filepath.Join(t.TempDir(), "Coral")
+	junction(t, link, target)
+	old := finalPathOf
+	finalPathOf = func(windows.Handle) (string, error) { return `\\?\` + link, nil } // agrees with the asked path
+	t.Cleanup(func() { finalPathOf = old })
+	d, err := openPlainFolder(link)
+	if err == nil {
+		d.Close()
+	}
+	assert.ErrorIs(t, err, ErrNotPlainFolder)
+}
+
+// (4a) The folder is made through the handle code, not os.MkdirAll: missing levels are created one at a time, each below a parent opened as a plain folder, so an elevated
+// helper cannot create an empty folder behind a link; an existing plain folder is left as it is.
+func TestTheFolderIsMadeThroughTheHandleCode(t *testing.T) {
+	root := t.TempDir()
+	dir := filepath.Join(root, "a", "b", "Coral")
+	require.NoError(t, makeFolder(dir))
+	fi, err := os.Stat(dir)
+	require.NoError(t, err)
+	assert.True(t, fi.IsDir())
+	require.NoError(t, makeFolder(dir), "an existing plain folder is fine")
+
+	old := folder
+	folder = func() (string, error) { return filepath.Join(root, "x", "y", "Coral"), nil }
+	t.Cleanup(func() { folder = old })
+	require.NoError(t, Mark(linkNow), "a missing profile chain is made")
+	assert.FileExists(t, filepath.Join(root, "x", "y", "Coral", fileName))
+
+	// behind a junction: nothing is created in the target, whatever this build does with the junction
+	real := t.TempDir()
+	via := filepath.Join(t.TempDir(), "Local")
+	junction(t, via, real)
+	assert.Error(t, makeFolder(filepath.Join(via, "Coral")))
+	assert.Empty(t, entries(t, real), "nothing was created behind the junction")
+
+	// a file where a folder level should be, and a junction as the folder itself, are refused, not "made"
+	file := filepath.Join(root, "afile")
+	require.NoError(t, os.WriteFile(file, []byte("x"), 0o600))
+	assert.Error(t, makeFolder(filepath.Join(file, "Coral")))
+	asJunction := filepath.Join(t.TempDir(), "Coral")
+	target := t.TempDir()
+	junction(t, asJunction, target)
+	assert.ErrorIs(t, makeFolder(asJunction), ErrNotPlainFolder)
+	assert.Empty(t, entries(t, target))
+}
+
+// (4b) A refusal says why in one line, so "Coral did not restart after the install" can be explained from the helper's log.
+func TestARefusedFolderSaysWhyInTheLog(t *testing.T) {
+	var logs strings.Builder
+	log.SetOutput(&logs)
+	t.Cleanup(func() { log.SetOutput(os.Stderr) })
+
+	target := t.TempDir()
+	link := filepath.Join(t.TempDir(), "Coral")
+	junction(t, link, target)
+	_, err := openPlainFolder(link)
+	assert.ErrorIs(t, err, ErrNotPlainFolder)
+	assert.Contains(t, logs.String(), "is a link or not a folder")
+
+	logs.Reset()
+	plain := filepath.Join(t.TempDir(), "Coral")
+	require.NoError(t, os.MkdirAll(plain, 0o700))
+	old := finalPathOf
+	finalPathOf = func(windows.Handle) (string, error) { return `\\?\D:\OneDrive\Local\Coral`, nil }
+	t.Cleanup(func() { finalPathOf = old })
+	_, err = openPlainFolder(plain)
+	assert.ErrorIs(t, err, ErrNotPlainFolder)
+	assert.Contains(t, logs.String(), "is really")
+	assert.Contains(t, logs.String(), `D:\OneDrive\Local\Coral`)
+	assert.Contains(t, logs.String(), "OneDrive")
 }
