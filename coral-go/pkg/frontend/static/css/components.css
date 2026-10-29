@@ -1743,9 +1743,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
     font-size: var(--fs-base);
     font-family: var(--font-mono);
     color: var(--text-secondary);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    overflow-wrap: anywhere; /* the whole path, wrapped: it was cut at the end with an ellipsis (#10961) */
 }
 
 .dir-browser-list {
