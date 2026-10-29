@@ -38,7 +38,7 @@ const { coralReady } = require('./helpers/wait');
 
             // the routes, answered here: one candidate, then a record that succeeds; later a 409 and a bulk answer
             await ev(`window.__calls = []; window.__answer = { record: 200 }; window.__realFetch = window.__realFetch || window.fetch; window.fetch = (u, o) => { const s = String(u), json = (b, st = 200) => Promise.resolve(new Response(JSON.stringify(b), { status: st, headers: { 'Content-Type': 'application/json' } }));
-                if (s.includes('/agent-candidate')) { window.__calls.push({ u: s }); return json({ ok: true, paused: true, reason: 'not the recorded agent', candidate: window.__noCandidate ? null : { pid: 4242, start: 'opaque-start-1', program: 'node', under: window.__under || '' }, why_not: window.__noCandidate ? 'several foreground programs' : '' }); }
+                if (s.includes('/agent-candidate')) { window.__calls.push({ u: s }); return json({ ok: true, paused: true, reason: 'not the recorded agent', candidate: window.__noCandidate ? null : { pid: 4242, start: 'opaque-start-1', program: 'node', under: window.__under || '', folder: '', unidentified: false, ...(window.__cand || {}) }, why_not: window.__noCandidate ? 'several foreground programs' : '' }); }
                 if (s.includes('/record-agent') && !s.includes('/record-agents')) { window.__calls.push({ u: s, body: o && o.body }); return window.__answer.record === 409 ? json({ ok: false, code: 'changed', error: 'the foreground program is no longer that process' }, 409) : json({ ok: true, pid: 4242, program: 'node' }); }
                 if (s.includes('/record-agents')) { window.__calls.push({ u: s, method: o && o.method }); return json({ ok: true, recorded: [{ session: 'claude-a', pid: 1, program: 'claude' }], left: [{ session: 'codex-b', reason: 'ambiguous: the program is node, which runs a script; record it with the button' }] }); }
                 return window.__realFetch(u, o); }; true`);
@@ -81,6 +81,28 @@ const { coralReady } = require('./helpers/wait');
             await ev(`window.__under = ''; true`);
             const plainAgain = await ev(`(() => { window.showConfirmModal('t', 'm', () => {}, undefined, { label: 'X', danger: false }); const r = { box: !!document.getElementById('confirm-modal-ack'), disabled: document.getElementById('confirm-modal-yes').disabled }; window.hideConfirmModal(); return r; })()`);
             check(`${tag}: the next question asks with no box and its button enabled`, !plainAgain.box && !plainAgain.disabled, JSON.stringify(plainAgain));
+
+            // Security's #4835: the name is the image's and the folder is shown next to it, both cleaned of bidi and control characters and capped
+            await ev(`(() => { const rlo = String.fromCharCode(0x202e), nl = String.fromCharCode(10); window.__cand = { program: 'pe' + rlo + 'rl', folder: '/tmp/' + nl + 'd'.repeat(200) + '/node_modules/bin' }; return true; })()`);
+            await ev(`window.__calls = []; document.getElementById('composer-waiting-record').click(); true`);
+            await waitFor(`/Record perl/.test(document.getElementById('confirm-modal-message').textContent) && getComputedStyle(document.getElementById('confirm-modal')).display !== 'none'`, `${tag}: the confirm with a folder`, 5000);
+            const where = await ev(`({ msg: document.getElementById('confirm-modal-message').textContent, box: !!document.getElementById('confirm-modal-ack') })`);
+            const folderShown = (where.msg.match(/, from (.*?), as /) || [])[1] || '';
+            check(`${tag}: the confirm names the image and its folder, cleaned (no bidi or line break) and the folder capped at 120 keeping its tail behind a leading ellipsis; no box for a direct child`,
+                where.msg.startsWith('Record perl (pid 4242), from …d') && folderShown.length === 120 && folderShown.startsWith('…') && folderShown.endsWith('/node_modules/bin') && !/[\u0000-\u001f\u202a-\u202e]/.test(where.msg) && !where.box, JSON.stringify({ ...where, folderLen: folderShown.length }));
+            await ev(`window.hideConfirmModal(); true`);
+
+            // an image Coral can't read: said so, and recorded only with the box ticked, as acknowledge_nested
+            await ev(`window.__cand = { program: 'an unknown program (pid 4242)', folder: '', unidentified: true }; window.__calls = []; document.getElementById('composer-waiting-record').click(); true`);
+            await waitFor(`/unknown program/.test(document.getElementById('confirm-modal-message').textContent) && getComputedStyle(document.getElementById('confirm-modal')).display !== 'none'`, `${tag}: the unidentified confirm`, 5000);
+            const unk = await ev(`(() => { const box = document.querySelector('#confirm-modal-ack input'); return { msg: document.getElementById('confirm-modal-message').textContent, ticked: box ? box.checked : null, disabled: document.getElementById('confirm-modal-yes').disabled }; })()`);
+            check(`${tag}: an unidentified program: the confirm says Coral could not read it, the box is there and unticked, and Record waits for it`,
+                unk.msg === "Record an unknown program (pid 4242) as Backend Dev's agent? Coral will then type board notices into it. Coral could not read which file this program runs." && unk.ticked === false && unk.disabled === true, JSON.stringify(unk));
+            await ev(`document.querySelector('#confirm-modal-ack input').click(); document.getElementById('confirm-modal-yes').click(); true`);
+            await waitFor(`window.__calls.some(c => /record-agent$/.test(c.u))`, `${tag}: the unidentified record`, 5000);
+            const urec = await ev(`window.__calls.find(c => /record-agent$/.test(c.u))`);
+            check(`${tag}: ticked, it records with acknowledge_nested`, JSON.stringify(JSON.parse(urec.body)) === JSON.stringify({ pid: 4242, start: 'opaque-start-1', acknowledge_nested: true }), JSON.stringify(urec));
+            await ev(`window.__cand = null; true`);
 
             await ev(`window.__calls = []; document.getElementById('composer-waiting-record-all').click(); true`);
             await toastSeen(/Recorded 1 agent\. Left paused: codex-b \(ambiguous/);

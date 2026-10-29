@@ -137,14 +137,33 @@ async function sendNow() {
     } finally { busy = false; }
 }
 
-/** What Record as agent asks before it records (Backend Dev's wording, #391). Program and pid are the server's; the name is the row's. */
-export function recordConfirmText(c, agentName) {
-    const base = `Record ${String(c.program || 'the program')} (pid ${Number(c.pid)}) as ${agentName}'s agent? Coral will then type board notices into it.`;
-    // A program inside a shell started in the terminal (Security's rule on #391): said plainly, and recorded only with the box ticked.
-    return c.under ? `${base} This program is running inside ${String(c.under)}, a shell started in the terminal, not directly in the agent's terminal.` : base;
+/** Text from the server or a row reduced to one plain line for the confirm: control, format and bidi characters dropped, blanks collapsed,
+ *  capped with an ellipsis (the server's own caps: 64 for a name, 120 for a folder). A folder keeps its tail, the part nearest the file,
+ *  behind a leading ellipsis (Security's #4850). */
+function plain(v, max, tail = false) {
+    const s = String(v == null ? '' : v).replace(/[\u0000-\u001f\u007f-\u009f\u00ad\u061c\u180e\u200b-\u200f\u2028-\u202e\u2060-\u2064\u2066-\u206f\ufeff]/g, '').replace(/\s+/g, ' ').trim();
+    if (s.length <= max) return s;
+    return tail ? '…' + s.slice(s.length - (max - 1)) : s.slice(0, max - 1) + '…';
 }
 
-/** The box a nested candidate needs ticked before it is recorded (#391). */
+/** Whether recording this candidate needs the box ticked: a program inside a nested shell, or one whose image can't be read (Security's
+ *  rules on #391). */
+export const needsAck = c => !!(c && (c.under || c.unidentified));
+
+/** What Record as agent asks before it records (Backend Dev's wording, #391). The program's name and folder come from its image, through
+ *  the server; the name is the row's. */
+export function recordConfirmText(c, agentName) {
+    const who = plain(agentName, 64) || 'this agent';
+    const tail = `as ${who}'s agent? Coral will then type board notices into it.`;
+    // An image Coral can't read: no name to show, so it says so (the server's "an unknown program (pid N)"), and the box is needed.
+    if (c.unidentified) return `Record an unknown program (pid ${Number(c.pid)}) ${tail} Coral could not read which file this program runs.`;
+    const folder = plain(c.folder, 120, true);
+    const base = `Record ${plain(c.program, 64) || 'the program'} (pid ${Number(c.pid)})${folder ? `, from ${folder},` : ''} ${tail}`;
+    // A program inside a shell started in the terminal: said plainly, and recorded only with the box ticked.
+    return c.under ? `${base} This program is running inside ${plain(c.under, 64)}, a shell started in the terminal, not directly in the agent's terminal.` : base;
+}
+
+/** The box a nested or unidentified candidate needs ticked before it is recorded (#391). */
 export const NESTED_ACK = "I know this is the agent, not something I started by hand";
 
 /** What is said after Record for all agents, from the server's answer: how many were recorded, and each one left paused with why. */
@@ -152,7 +171,7 @@ export function recordAllText(r) {
     const done = Array.isArray(r && r.recorded) ? r.recorded.length : 0;
     const left = Array.isArray(r && r.left) ? r.left : [];
     let t = `Recorded ${done} agent${done === 1 ? '' : 's'}.`;
-    if (left.length) t += ` Left paused: ${left.map(l => `${String(l.session || '')} (${String(l.reason || 'no reason given')})`).join('; ')}.`;
+    if (left.length) t += ` Left paused: ${left.map(l => `${plain(l.session, 64)} (${plain(l.reason, 200) || 'no reason given'})`).join('; ')}.`;
     return t;
 }
 
@@ -173,7 +192,7 @@ async function recordAgent() {
         const c = r.candidate;
         const name = String(s.display_name || s.name || 'this agent');
         showConfirmModal('Record as agent', recordConfirmText(c, name), acknowledged => postRecord(s, c, acknowledged), undefined,
-            c.under ? { label: 'Record', danger: false, acknowledge: NESTED_ACK } : { label: 'Record', danger: false }); // recording loses nothing: it ends a pause
+            needsAck(c) ? { label: 'Record', danger: false, acknowledge: NESTED_ACK } : { label: 'Record', danger: false }); // recording loses nothing: it ends a pause
     } catch (e) {
         showToast('The agent could not be read: ' + (e && e.message ? e.message : 'the server did not answer.'));
     } finally { busy = false; }
@@ -181,7 +200,7 @@ async function recordAgent() {
 
 async function postRecord(s, c, acknowledged) {
     const body = { pid: Number(c.pid), start: String(c.start || '') };
-    if (c.under && acknowledged) body.acknowledge_nested = true; // only with the box ticked, and only for a nested candidate
+    if (needsAck(c) && acknowledged) body.acknowledge_nested = true; // only with the box ticked, and only for a candidate that needs it
     try {
         const resp = await serverFetch(currentServer(), recordUrl(s, 'record-agent'), {
             method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
@@ -189,7 +208,7 @@ async function postRecord(s, c, acknowledged) {
         if (resp.status === 409) { showToast('The program in the terminal changed: nothing was recorded. Read it again.'); return; }
         if (!resp.ok) { showToast(await responseErrorText(resp, currentServer(), `Not recorded (HTTP ${resp.status}).`)); return; }
         const r = await resp.json();
-        showToast(`Recorded ${String(r.program || c.program || 'the program')} as the agent: board notices go to it again.`);
+        showToast(`Recorded ${plain(r.program || c.program, 64) || 'the program'} as the agent: board notices go to it again.`);
     } catch (e) {
         showToast('Not recorded: ' + (e && e.message ? e.message : 'the server did not answer.'));
     }
