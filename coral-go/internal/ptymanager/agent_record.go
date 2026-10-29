@@ -18,6 +18,8 @@ type AgentCandidate struct {
 	Under string `json:"under"`
 	// Script is the absolute script path of `interpreter script ...` (see ScriptIsCLI): only for the bulk match, never shown, logged or kept.
 	Script string `json:"-"`
+	// AcknowledgeNested, on a candidate passed to RecordAgent, is the Operator's "I know this is the agent, not something I started by hand" for a program under a nested shell.
+	AcknowledgeNested bool `json:"-"`
 	Image string `json:"-"`
 	// CLIPath, on a candidate passed to RecordAgent, is the session's resolved CLI path (see AgentRecorder.AgentCandidate).
 	CLIPath string `json:"-"`
@@ -27,7 +29,12 @@ type AgentCandidate struct {
 var (
 	ErrCandidateChanged = tmux.ErrCandidateChanged
 	ErrNoCandidate      = tmux.ErrNoCandidate
+	// ErrNeedsAcknowledgement: a program under a nested shell, recorded without the Operator's acknowledgement (the check is part of the record itself).
+	ErrNeedsAcknowledgement = tmux.ErrNeedsAcknowledgement
 )
+
+// NeedsAcknowledgementError is ErrNeedsAcknowledgement with the nested shell's name.
+type NeedsAcknowledgementError = tmux.NeedsAcknowledgementError
 
 // AgentRecorder is implemented by terminals that can name and record an agent's single foreground program (tmux, the PTY backend).
 type AgentRecorder interface {
@@ -58,7 +65,7 @@ func (t *TmuxSessionTerminal) AgentCandidate(ctx context.Context, name, agentTyp
 
 // RecordAgent implements AgentRecorder for tmux.
 func (t *TmuxSessionTerminal) RecordAgent(ctx context.Context, name, agentType, sessionID string, want AgentCandidate) (AgentCandidate, error) {
-	c, err := t.client.RecordAgent(ctx, name, agentType, sessionID, tmux.AgentProc{PID: want.PID, Start: want.Start})
+	c, err := t.client.RecordAgent(ctx, name, agentType, sessionID, tmux.AgentProc{PID: want.PID, Start: want.Start}, want.AcknowledgeNested)
 	if err != nil {
 		return AgentCandidate{}, err
 	}
@@ -126,7 +133,7 @@ func (m *PTYBackend) RecordAgent(name string, want AgentCandidate) (AgentCandida
 	if !can {
 		return AgentCandidate{}, ErrNoCandidate
 	}
-	c, err := tmux.RecordAgentForShell(name, sp.ShellPID(), tmux.AgentProc{PID: want.PID, Start: want.Start})
+	c, err := tmux.RecordAgentForShell(name, sp.ShellPID(), tmux.AgentProc{PID: want.PID, Start: want.Start}, want.AcknowledgeNested)
 	if err != nil {
 		return AgentCandidate{}, err
 	}

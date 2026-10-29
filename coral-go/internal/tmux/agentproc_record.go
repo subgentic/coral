@@ -25,6 +25,18 @@ type Candidate struct {
 var ErrCandidateChanged = errors.New("the foreground program is no longer that process")
 
 // ErrNoCandidate: there is no single foreground program to record.
+// ErrNeedsAcknowledgement: the program runs inside a nested shell (Under != ""), and the request did not carry the Operator's acknowledgement. Checked in the record's own table read, the one that
+// checks pid and start, so a program that moved under a nested shell since the Operator was shown it is refused (Security on #391).
+var ErrNeedsAcknowledgement = errors.New("the program runs inside a nested shell and needs the Operator's acknowledgement")
+
+// NeedsAcknowledgementError is ErrNeedsAcknowledgement with the nested shell's name.
+type NeedsAcknowledgementError struct{ Under string }
+
+func (e *NeedsAcknowledgementError) Error() string {
+	return ErrNeedsAcknowledgement.Error() + " (" + e.Under + ")"
+}
+func (e *NeedsAcknowledgementError) Is(target error) bool { return target == ErrNeedsAcknowledgement }
+
 var ErrNoCandidate = errors.New("there is no single foreground program in the agent's terminal")
 
 // candidateOf is the single foreground program below the pane's shell, or the reason there is none.
@@ -43,13 +55,16 @@ func candidateOf(t *procTable, shell int) (Candidate, string) {
 }
 
 // recordCandidate records want as the session's agent when it is still exactly the one foreground program.
-func recordCandidate(t *procTable, shell int, session string, want AgentProc) (Candidate, error) {
+func recordCandidate(t *procTable, shell int, session string, want AgentProc, acknowledged bool) (Candidate, error) {
 	got, why := candidateOf(t, shell)
 	if why != "" {
 		return Candidate{}, fmt.Errorf("%w: %s", ErrNoCandidate, why)
 	}
 	if got.AgentProc != want || want.PID <= 0 || want.Start == "" {
 		return Candidate{}, ErrCandidateChanged
+	}
+	if got.Under != "" && !acknowledged {
+		return Candidate{}, &NeedsAcknowledgementError{Under: got.Under}
 	}
 	agentRecs.Lock()
 	r := agentRecs.m[session]
@@ -82,7 +97,7 @@ func (c *Client) AgentCandidate(ctx context.Context, agentName, agentType, sessi
 }
 
 // RecordAgent records want as the pane's agent process, in memory and in the tmux session (so a Coral restart re-checks it).
-func (c *Client) RecordAgent(ctx context.Context, agentName, agentType, sessionID string, want AgentProc) (Candidate, error) {
+func (c *Client) RecordAgent(ctx context.Context, agentName, agentType, sessionID string, want AgentProc, acknowledged bool) (Candidate, error) {
 	shell, err := c.agentShellPID(ctx, agentName, agentType, sessionID)
 	if err != nil {
 		return Candidate{}, err
@@ -91,7 +106,7 @@ func (c *Client) RecordAgent(ctx context.Context, agentName, agentType, sessionI
 	if err != nil {
 		return Candidate{}, fmt.Errorf("read process table: %w", err)
 	}
-	got, err := recordCandidate(procs, shell, agentName, want)
+	got, err := recordCandidate(procs, shell, agentName, want, acknowledged)
 	if err != nil {
 		return Candidate{}, err
 	}
@@ -110,12 +125,12 @@ func CandidateForShell(shell int) (Candidate, string, error) {
 	return cand, why, nil
 }
 
-func RecordAgentForShell(session string, shell int, want AgentProc) (Candidate, error) {
+func RecordAgentForShell(session string, shell int, want AgentProc, acknowledged bool) (Candidate, error) {
 	procs, err := readProcTableFresh()
 	if err != nil {
 		return Candidate{}, fmt.Errorf("read process table: %w", err)
 	}
-	got, err := recordCandidate(procs, shell, session, want)
+	got, err := recordCandidate(procs, shell, session, want, acknowledged)
 	if err == nil {
 		slog.Info("recorded the agent's process by the Operator's request", "session", session, "pid", got.PID, "program", got.Program)
 	}

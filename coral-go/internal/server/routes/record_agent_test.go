@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"os"
 	"testing"
@@ -25,6 +26,7 @@ type recordTerminal struct {
 	why      map[string]string                    // by session name: why there is no single program
 	recorded map[string]ptymanager.AgentCandidate
 	paused   map[string]bool
+	readErr  map[string]error // by session name: the record's own read of the terminal fails
 }
 
 func (r *recordTerminal) AgentNoticeTarget(_ context.Context, name, _, _ string) (bool, bool, string, bool) {
@@ -43,11 +45,17 @@ func (r *recordTerminal) AgentCandidate(_ context.Context, name, _, _, _ string)
 
 func (r *recordTerminal) RecordAgent(_ context.Context, name, _, _ string, want ptymanager.AgentCandidate) (ptymanager.AgentCandidate, error) {
 	cur := r.cand[name]
+	if err := r.readErr[name]; err != nil {
+		return ptymanager.AgentCandidate{}, err
+	}
 	if r.why[name] != "" {
 		return ptymanager.AgentCandidate{}, ptymanager.ErrNoCandidate
 	}
 	if cur.PID != want.PID || cur.Start != want.Start {
 		return ptymanager.AgentCandidate{}, ptymanager.ErrCandidateChanged
+	}
+	if cur.Under != "" && !want.AcknowledgeNested { // the real terminals check this in the same read as pid and start
+		return ptymanager.AgentCandidate{}, &ptymanager.NeedsAcknowledgementError{Under: cur.Under}
 	}
 	r.recorded[name] = cur
 	r.paused[name] = false
@@ -252,4 +260,37 @@ func TestBulkRecordsAnInterpreterRunningExactlyTheCLI(t *testing.T) {
 	_, out = postRecordJSON(t, srv+"/api/sessions/record-agents", map[string]any{})
 	assert.Empty(t, out["recorded"])
 	assert.NotContains(t, term.recorded, nameB)
+}
+
+// The acknowledgement is checked in the record itself, not in an earlier read (Security on #391).
+func TestTheAcknowledgementIsCheckedAtomicallyInTheRecord(t *testing.T) {
+	srv, term, _, nameA, nameB := recordFixture(t)
+	term.paused[nameA], term.paused[nameB] = true, true
+	term.cand[nameA] = ptymanager.AgentCandidate{PID: 100, Start: "s1", Program: "claude", Image: "/x/claude"}
+	term.readErr = map[string]error{}
+
+	// The Operator is shown a direct child; before the record the same process moves under a nested shell: refused without the tick, nothing recorded.
+	shown := getRecordJSON(t, srv+"/api/sessions/live/"+recordSIDa+"/agent-candidate")
+	cand, _ := shown["candidate"].(map[string]any)
+	require.Equal(t, "", cand["under"])
+	term.cand[nameA] = ptymanager.AgentCandidate{PID: 100, Start: "s1", Program: "claude", Under: "bash", Image: "/x/claude"}
+	code, out := postRecordJSON(t, srv+"/api/sessions/live/"+recordSIDa+"/record-agent", map[string]any{"pid": 100, "start": "s1"})
+	assert.Equal(t, http.StatusBadRequest, code)
+	assert.Equal(t, "acknowledge_nested", out["code"])
+	assert.Equal(t, "bash", out["under"])
+	assert.NotContains(t, term.recorded, nameA)
+
+	// A failing read answers an error and records nothing, with or without the tick.
+	term.readErr[nameA] = errors.New("the process table could not be read")
+	for _, ack := range []bool{false, true} {
+		code, _ = postRecordJSON(t, srv+"/api/sessions/live/"+recordSIDa+"/record-agent", map[string]any{"pid": 100, "start": "s1", "acknowledge_nested": ack})
+		assert.Equal(t, http.StatusInternalServerError, code)
+		assert.NotContains(t, term.recorded, nameA)
+	}
+	delete(term.readErr, nameA)
+
+	// With the tick it records; bulk, which never ticks, leaves a program that moved under a nested shell.
+	code, _ = postRecordJSON(t, srv+"/api/sessions/live/"+recordSIDa+"/record-agent", map[string]any{"pid": 100, "start": "s1", "acknowledge_nested": true})
+	assert.Equal(t, http.StatusOK, code)
+	assert.Contains(t, term.recorded, nameA)
 }

@@ -29,20 +29,20 @@ func TestRecordCandidateRecordsOnlyWhatWasShown(t *testing.T) {
 	forget := func() { agentRecs.Lock(); delete(agentRecs.m, session); agentRecs.Unlock() }
 	pane := table("  600     1 Ss   "+t0+" -zsh", "  700   600 S+   "+t1+" node")
 
-	_, err := recordCandidate(pane, 600, session, AgentProc{PID: 701, Start: t1})
+	_, err := recordCandidate(pane, 600, session, AgentProc{PID: 701, Start: t1}, true)
 	assert.ErrorIs(t, err, ErrCandidateChanged, "another pid than the one shown")
-	_, err = recordCandidate(pane, 600, session, AgentProc{PID: 700, Start: t2})
+	_, err = recordCandidate(pane, 600, session, AgentProc{PID: 700, Start: t2}, true)
 	assert.ErrorIs(t, err, ErrCandidateChanged, "a recycled pid: another start time")
-	_, err = recordCandidate(pane, 600, session, AgentProc{})
+	_, err = recordCandidate(pane, 600, session, AgentProc{}, true)
 	assert.ErrorIs(t, err, ErrCandidateChanged, "nothing shown")
 	_, ok := AdoptedAgentProc(session)
 	assert.False(t, ok, "none of the refused requests recorded anything")
 
 	two := table("  600     1 Ss   "+t0+" -zsh", "  700   600 S+   "+t1+" node", "  701   600 S+   "+t1+" bash-tool")
-	_, err = recordCandidate(two, 600, session, AgentProc{PID: 700, Start: t1})
+	_, err = recordCandidate(two, 600, session, AgentProc{PID: 700, Start: t1}, true)
 	assert.ErrorIs(t, err, ErrNoCandidate, "two foreground programs: nothing is guessed")
 
-	got, err := recordCandidate(pane, 600, session, AgentProc{PID: 700, Start: t1})
+	got, err := recordCandidate(pane, 600, session, AgentProc{PID: 700, Start: t1}, true)
 	assert.NoError(t, err)
 	assert.Equal(t, "node", got.Program)
 	rec, ok := AdoptedAgentProc(session)
@@ -53,7 +53,7 @@ func TestRecordCandidateRecordsOnlyWhatWasShown(t *testing.T) {
 	// A nested shell's program is not the one recorded: the record names the pane's foreground program only.
 	forget()
 	nested := table("  600     1 Ss   "+t0+" -zsh", "  710   600 S    "+t2+" bash", "  711   710 S+   "+t2+" sleep")
-	got, err = recordCandidate(nested, 600, session, AgentProc{PID: 711, Start: t2})
+	got, err = recordCandidate(nested, 600, session, AgentProc{PID: 711, Start: t2}, true)
 	assert.NoError(t, err, "the Operator may name the program in a nested shell: it is the single foreground program")
 	assert.Equal(t, "sleep", got.Program)
 }
@@ -77,13 +77,40 @@ func TestCandidateUnderNamesTheNestedShell(t *testing.T) {
 	deeper, _ := candidateOf(table("  600     1 Ss   "+t0+" -zsh", "  710   600 S    "+t2+" bash", "  711   710 S    "+t2+" /bin/zsh", "  712   711 S+   "+t2+" claude"), 600)
 	assert.Equal(t, "bash", deeper.Under, "the first shell on the way")
 
-	got, err := recordCandidate(table("  600     1 Ss   "+t0+" -zsh", "  710   600 S    "+t2+" bash", "  711   710 S+   "+t2+" claude"), 600, "claude-under", AgentProc{PID: 711, Start: t2})
+	got, err := recordCandidate(table("  600     1 Ss   "+t0+" -zsh", "  710   600 S    "+t2+" bash", "  711   710 S+   "+t2+" claude"), 600, "claude-under", AgentProc{PID: 711, Start: t2}, true)
 	assert.NoError(t, err)
 	assert.Equal(t, "bash", got.Under, "the record reports where the program ran, for the log")
 	t.Cleanup(func() {
 		ForgetAgentProc("claude-under")
 		agentRecs.Lock()
 		delete(agentRecs.m, "claude-under")
+		agentRecs.Unlock()
+	})
+}
+
+// The acknowledgement is part of the record: a program under a nested shell is refused in the same table read that checks pid and start, unless acknowledged.
+func TestRecordCandidateRefusesANestedProgramWithoutTheAcknowledgement(t *testing.T) {
+	const session = "claude-ack"
+	t.Cleanup(func() { ForgetAgentProc(session); agentRecs.Lock(); delete(agentRecs.m, session); agentRecs.Unlock() })
+	nested := table("  600     1 Ss   "+t0+" -zsh", "  710   600 S    "+t2+" bash", "  711   710 S+   "+t2+" claude")
+	_, err := recordCandidate(nested, 600, session, AgentProc{PID: 711, Start: t2}, false)
+	assert.ErrorIs(t, err, ErrNeedsAcknowledgement)
+	var need *NeedsAcknowledgementError
+	if assert.ErrorAs(t, err, &need) {
+		assert.Equal(t, "bash", need.Under)
+	}
+	_, ok := AdoptedAgentProc(session)
+	assert.False(t, ok, "nothing was recorded")
+	_, err = recordCandidate(nested, 600, session, AgentProc{PID: 711, Start: t2}, true)
+	assert.NoError(t, err)
+
+	direct := table("  600     1 Ss   "+t0+" -zsh", "  700   600 S+   "+t1+" claude")
+	_, err = recordCandidate(direct, 600, "claude-ack-direct", AgentProc{PID: 700, Start: t1}, false)
+	assert.NoError(t, err, "a direct child needs no tick")
+	t.Cleanup(func() {
+		ForgetAgentProc("claude-ack-direct")
+		agentRecs.Lock()
+		delete(agentRecs.m, "claude-ack-direct")
 		agentRecs.Unlock()
 	})
 }
