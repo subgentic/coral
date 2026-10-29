@@ -25,6 +25,8 @@ const EMPTY = `(() => { const vis = e => e && e.getClientRects().length && getCo
     const open = async (path, ready) => { await Page.navigate({ url: BASE + path }); await Page.loadEventFired(); await install(); await waitFor(ready || `(${TITLE}) !== null`, 'the screen ' + path, 15000); };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
+        // the Artifacts folder is measured empty: the server this runs on holds whatever the suites before it left (CI: 'artifacts: the empty state ... {left:null,line:null,hint:null}' only after earlier suites of the part), so its list is answered empty here
+        await Page.addScriptToEvaluateOnNewDocument({ source: `(() => { const f = window.fetch; window.fetch = function (u, o) { try { if (new URL(String(u && u.url || u), location.href).pathname === '/api/team-artifacts') return Promise.resolve(new Response(JSON.stringify({ artifacts: [], teams: [], all: 0, total: 0, tag_counts: {}, has_more: false, next_cursor: '' }), { status: 200, headers: { 'Content-Type': 'application/json' } })); } catch (e) { /* not a URL: asked as it is */ } return f.apply(this, arguments); }; })();` });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
         const edges = {};
         for (const [name, path] of [['tasks', '/inbox/tasks'], ['artifacts', '/inbox/artifacts'], ['jobs', '/automations/jobs'], ['workflows', '/automations/workflows'], ['analytics', '/analytics'], ['docs', '/docs']]) {
