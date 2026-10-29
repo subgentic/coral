@@ -26,7 +26,7 @@ const PENDING_TTL_MS = 15 * 60 * 1000;
 const UNANSWERED_TTL_MS = 24 * 60 * 60 * 1000; // a message the agent never answered because its CLI ended stays, marked, for a day (#10439)
 const pendingAlive = (p, now) => now - (p.at || 0) < (p.unanswered ? UNANSWERED_TTL_MS : PENDING_TTL_MS);
 const STORAGE_KEY_PENDING = "coral-pending-messages";
-const pendingBySession = new Map(); // session_id -> [{ id, text, at, queued, sending }]
+const pendingBySession = new Map(); // session_id -> [{ id, text, at, queued, sending, unconfirmed }]
 let pendingSeq = 0;
 const recentUserEntriesBySession = new Map();
 
@@ -266,18 +266,20 @@ export function syncSendsFromRow(row) {
     }
 }
 
-/** The server said the send at sentAt was submitted: its bubble says Sent (or Queued) from now on (#4587). */
-export function confirmPendingMessage(sessionId, sentAt) {
+/** The server said the send at sentAt was submitted: its bubble says Sent (or Queued) from now on (#4587). With unconfirmed, the server could not confirm it though it may well have arrived (not_sent: false, #318):
+ *  the bubble stays, as "Sent, not confirmed", and nothing is put back in the box. */
+export function confirmPendingMessage(sessionId, sentAt, unconfirmed) {
     const p = (pendingBySession.get(sessionId) || []).find(x => x.at === sentAt);
     if (!p || !p.sending) return;
     p.sending = false;
+    if (unconfirmed) p.unconfirmed = true;
     savePendingToStorage();
     const container = document.getElementById("live-history-messages");
     if (container && state.currentSession && state.currentSession.session_id === sessionId) {
         syncPendingBubbles(container, sessionId);
         syncWorkingIndicator(container, state.currentSession); // the Sent bubble moves to the end: Working goes back below it
     }
-    announceSend(sessionId, p.queued ? "Message queued" : "Message sent");
+    announceSend(sessionId, unconfirmed ? "Message sent, but not confirmed" : p.queued ? "Message queued" : "Message sent");
 }
 
 /** Withdraw the pending bubble of a send that was refused (its terminal was gone, #3218). announce: false when the caller says what happened itself (the error under the composer, a hold). */
@@ -458,12 +460,14 @@ export function syncPendingBubbles(container, sessionId) {
     const list = (pendingBySession.get(sessionId) || []).filter(p => pendingAlive(p, now));
     pendingBySession.set(sessionId, list);
     savePendingToStorage();
-    const sent = syncPendingGroup(container, "pending-sent", list.filter(p => !p.queued && !p.sending && !p.unanswered), "Sent");
-    const queued = syncPendingGroup(container, "pending-queued", list.filter(p => p.queued && !p.sending && !p.unanswered), "Waiting for the agent to finish");
+    const plain = list.filter(p => !p.unconfirmed);
+    const sent = syncPendingGroup(container, "pending-sent", plain.filter(p => !p.queued && !p.sending && !p.unanswered), "Sent");
+    const unconfirmed = syncPendingGroup(container, "pending-unconfirmed", list.filter(p => p.unconfirmed && !p.unanswered), "Sent, not confirmed");
+    const queued = syncPendingGroup(container, "pending-queued", plain.filter(p => p.queued && !p.sending && !p.unanswered), "Waiting for the agent to finish");
     const sending = syncPendingGroup(container, "pending-sending", list.filter(p => p.sending && !p.unanswered), "Sending…");
     const unanswered = syncPendingGroup(container, "pending-unanswered", list.filter(p => p.unanswered), "Not answered");
-    // Always last, below any newly rendered messages: not answered (the agent ended), sent, then queued, then the ones still sending
-    for (const wrap of [unanswered, sent, queued, sending]) {
+    // Always last, below any newly rendered messages: not answered (the agent ended), sent, the unconfirmed, then queued, then the ones still sending
+    for (const wrap of [unanswered, sent, unconfirmed, queued, sending]) {
         if (wrap && container.lastElementChild !== wrap) container.appendChild(wrap);
     }
 }
