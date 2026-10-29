@@ -65,9 +65,30 @@ func CheckDataPath(path string) {
 	}
 }
 
-// inMemoryDB: a SQLite name for a database that has no file (":memory:", "file::memory:?cache=shared", "file:x?mode=memory"): nothing is written anywhere, so the path checks do not apply.
+// inMemoryDB: a SQLite name for a database that has no file: ":memory:", "file::memory:" (alone or followed by "?" and parameters), or a "file:" URI whose query holds the exact
+// parameter mode=memory. Nothing is written anywhere, so the path checks do not apply. Narrow on purpose: a file that merely starts or contains such text ("file::memory:evil.db",
+// "file:mode=memory.db", "file:x.db#mode=memory") is a real file in the package folder and must reach the source-tree check. SQLite reads mode= only from the query.
 func inMemoryDB(name string) bool {
-	return name == ":memory:" || strings.HasPrefix(name, "file::memory:") || (strings.HasPrefix(name, "file:") && strings.Contains(name, "mode=memory"))
+	if name == ":memory:" {
+		return true
+	}
+	rest, ok := strings.CutPrefix(name, "file:")
+	if !ok {
+		return false
+	}
+	path, query, hasQuery := strings.Cut(rest, "?")
+	if path == ":memory:" {
+		return true // "file::memory:" alone or followed by "?"
+	}
+	if !hasQuery {
+		return false
+	}
+	for _, param := range strings.Split(query, "&") {
+		if param == "mode=memory" {
+			return true
+		}
+	}
+	return false
 }
 
 // sourceTree is the module's source folder: the nearest parent of the test's working directory (a test runs in its package's folder) that
