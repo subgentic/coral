@@ -114,6 +114,8 @@ func TestWindowsShellIdleCountsGitBashAsAShellAndIgnoresConsoleHosts(t *testing.
 	idle, _, ok := b.ShellIdle(name)
 	require.True(t, ok)
 	assert.True(t, idle, "git-bash at the prompt, nothing else running: a bare prompt")
-	require.NoError(t, b.SendInput(terminalinput.Unclassified, name, []byte("sleep 6"+EnterKey)))
+	// The comment takes the Enter key's CR: git-bash started from PowerShell may read its input as a stream, not a terminal, and would
+	// then pass 6 and a CR to sleep, which exits at once (the pane is then rightly idle, and the test would prove nothing).
+	require.NoError(t, b.SendInput(terminalinput.Unclassified, name, []byte("sleep 6 #"+EnterKey)))
 	require.Eventually(t, func() bool { idle, _, ok := b.ShellIdle(name); return ok && !idle }, 20*time.Second, 200*time.Millisecond, "a program in git-bash is busy")
 }
