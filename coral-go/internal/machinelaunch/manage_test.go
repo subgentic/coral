@@ -454,7 +454,7 @@ func TestPruneRemovesOnlyOldOrphansAfterOneConfirmation(t *testing.T) {
 	require.NoError(t, st.Put(mine))
 	var asked []string
 	d := ManageDeps{Provider: f, State: st, Out: &bytes.Buffer{}, Tune: quick(), Confirm: func(s string) (bool, error) { asked = append(asked, s); return false, nil }}
-	rep, err := Prune(t.Context(), 24*time.Hour, false, d)
+	rep, err := Prune(t.Context(), PruneOptions{OlderThan: 24 * time.Hour, IncludeUnknown: true}, d)
 	assert.ErrorIs(t, err, ErrDeclined)
 	require.Len(t, asked, 1, "one confirmation lists everything")
 	assert.Contains(t, asked[0], "orphan:")
@@ -466,7 +466,7 @@ func TestPruneRemovesOnlyOldOrphansAfterOneConfirmation(t *testing.T) {
 	assert.Len(t, rep.Items, 1)
 
 	d.Confirm = func(string) (bool, error) { return true, nil }
-	rep, err = Prune(t.Context(), 24*time.Hour, false, d)
+	rep, err = Prune(t.Context(), PruneOptions{OlderThan: 24 * time.Hour, IncludeUnknown: true}, d)
 	require.NoError(t, err)
 	assert.Equal(t, []string{"orphan"}, rep.Removed)
 	assert.NotContains(t, f.drops, "1")
@@ -474,11 +474,11 @@ func TestPruneRemovesOnlyOldOrphansAfterOneConfirmation(t *testing.T) {
 	assert.Empty(t, f.fws)
 	assert.Len(t, f.drops, 3)
 
-	_, err = Prune(t.Context(), 0, false, d)
+	_, err = Prune(t.Context(), PruneOptions{IncludeUnknown: true}, d)
 	assert.Error(t, err, "an age is required")
 	d.Confirm = nil
 	f.drops["5"] = Instance{ID: "5", Name: "again", Tags: []string{Tag}, Created: time.Now().Add(-72 * time.Hour)}
-	_, err = Prune(t.Context(), 24*time.Hour, false, d)
+	_, err = Prune(t.Context(), PruneOptions{OlderThan: 24 * time.Hour, IncludeUnknown: true}, d)
 	assert.Error(t, err, "no one to ask and no --yes: nothing is removed")
 	assert.Contains(t, f.drops, "5")
 }
@@ -494,16 +494,38 @@ func TestPruneTakesStaleRecordsAndOrphanNetworksOnlyAsAsked(t *testing.T) {
 	f.vpcs["vpc-lone"] = VPC{ID: "vpc-lone", Name: VPCName("lonely")}
 	f.vpcs["vpc-team"] = VPC{ID: "vpc-team", Name: "the-teams-own"}
 	d := ManageDeps{Provider: f, State: st, Out: &bytes.Buffer{}, Tune: quick(), Confirm: func(string) (bool, error) { return true, nil }}
-	rep, err := Prune(t.Context(), 24*time.Hour, false, d)
+	rep, err := Prune(t.Context(), PruneOptions{OlderThan: 24 * time.Hour, IncludeUnknown: true}, d)
 	require.NoError(t, err)
 	assert.Equal(t, []string{"stale"}, rep.Removed, "a record whose instance is gone, with its leftover network")
 	_, ok := st.Get("stale")
 	assert.False(t, ok)
 	assert.Contains(t, f.vpcs, "vpc-lone", "an orphan network is not taken unless asked: it has no age")
 
-	rep, err = Prune(t.Context(), 24*time.Hour, true, d)
+	rep, err = Prune(t.Context(), PruneOptions{OlderThan: 24 * time.Hour, IncludeUnknown: true, IncludeNetworks: true}, d)
 	require.NoError(t, err)
 	assert.Equal(t, []string{"lonely"}, rep.Removed)
 	assert.NotContains(t, f.vpcs, "vpc-lone")
 	assert.Contains(t, f.vpcs, "vpc-team", "a VPC without this tool's name is never touched")
+}
+
+// SHOULD B (#10944): a machine with this tool's tag that THIS state file does not know is not taken unless the person says so: the tag proves this tool made it, not this state file.
+func TestPruneLeavesUnknownTaggedMachinesAloneUnlessAsked(t *testing.T) {
+	f := newFake()
+	st := stateAt(t)
+	f.drops["1"] = Instance{ID: "1", Name: "someone-elses", Tags: []string{Tag}, Created: time.Now().Add(-300 * time.Hour)}
+	var out bytes.Buffer
+	asked := 0
+	d := ManageDeps{Provider: f, State: st, Out: &out, Tune: quick(), Confirm: func(string) (bool, error) { asked++; return true, nil }}
+	rep, err := Prune(t.Context(), PruneOptions{OlderThan: 24 * time.Hour}, d)
+	require.NoError(t, err)
+	assert.Empty(t, rep.Items, "not taken by default")
+	assert.Zero(t, asked, "so there was nothing to confirm")
+	assert.Contains(t, f.drops, "1", "and it is still there")
+	assert.Contains(t, out.String(), "--include-unknown", "but it is said, with how to take it")
+	assert.Contains(t, out.String(), "1 instance(s)")
+
+	rep, err = Prune(t.Context(), PruneOptions{OlderThan: 24 * time.Hour, IncludeUnknown: true}, d)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"someone-elses"}, rep.Removed)
+	assert.NotContains(t, f.drops, "1")
 }

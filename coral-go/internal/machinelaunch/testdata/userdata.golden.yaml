@@ -147,26 +147,49 @@ write_files:
       Type=oneshot
       RemainAfterExit=yes
       ExecStart=/usr/sbin/nft -f /etc/coral/egress.nft
-      ExecStartPost=/usr/local/sbin/coral-egress-check
+      ExecStartPost=/usr/local/sbin/coral-egress-check rules
 
       [Install]
       WantedBy=sysinit.target
+  - path: /etc/systemd/system/coral-egress-resolvers.service
+    owner: root:root
+    permissions: '0644'
+    content: |
+      [Unit]
+      Description=Coral: check the DNS resolvers are outside the blocked ranges
+      Wants=network-online.target
+      After=network-online.target coral-egress.service
+
+      [Service]
+      Type=oneshot
+      ExecStart=/usr/local/sbin/coral-egress-check resolvers
+
+      [Install]
+      WantedBy=multi-user.target
   - path: /usr/local/sbin/coral-egress-check
     owner: root:root
     permissions: '0700'
     content: |
       #!/bin/sh
       set -eu
-      rules=$(/usr/sbin/nft list table inet coral_egress)
-      [ "$(printf '%s\n' "$rules" | grep -c 'meta skuid != 0')" -ge 2 ] || { echo "coral-egress: the egress rules are not loaded" >&2; exit 1; }
-      # a resolver inside a blocked range would make every lookup of a non-root user (Coral's own too) fail
-      resolvers=$(cat /run/systemd/resolve/resolv.conf /etc/resolv.conf 2>/dev/null | awk '$1 == "nameserver" { print $2 }' | grep -v '^127\.' | sort -u || true)
-      for ns in $resolvers; do
-        case "$ns" in
-          169.254.*|10.*|192.168.*|100.6[4-9].*|100.[7-9][0-9].*|100.1[01][0-9].*|100.12[0-7].*|172.1[6-9].*|172.2[0-9].*|172.3[01].*|fe[89ab]*:*|fc*:*|fd*:*)
-            echo "coral-egress: the DNS resolver $ns is inside a blocked range: lookups of every non-root user would fail" >&2; exit 1 ;;
-        esac
-      done
+      mode="${1:-rules}"
+      case "$mode" in
+      rules)
+        rules=$(/usr/sbin/nft list table inet coral_egress) || { echo "coral-egress: the egress table is not loaded" >&2; exit 1; }
+        [ "$(printf '%s\n' "$rules" | grep -c 'meta skuid != 0')" -ge 2 ] || { echo "coral-egress: the egress rules are not loaded" >&2; exit 1; }
+        ;;
+      resolvers)
+        # a resolver inside a blocked range would make every lookup of a non-root user (Coral's own too) fail: said in the journal, never a failed boot
+        resolvers=$(cat /run/systemd/resolve/resolv.conf /etc/resolv.conf 2>/dev/null | awk '$1 == "nameserver" { print $2 }' | grep -v '^127\.' | sort -u || true)
+        for ns in $resolvers; do
+          case "$ns" in
+            169.254.*|10.*|192.168.*|100.6[4-9].*|100.[7-9][0-9].*|100.1[01][0-9].*|100.12[0-7].*|172.1[6-9].*|172.2[0-9].*|172.3[01].*|fe[89ab]*:*|fc*:*|fd*:*)
+              echo "coral-egress: the DNS resolver $ns is inside a blocked range: lookups of every non-root user would fail" >&2 ;;
+          esac
+        done
+        ;;
+      *) echo "usage: coral-egress-check rules|resolvers" >&2; exit 2 ;;
+      esac
   - path: /usr/local/sbin/coral-machine-setup
     owner: root:root
     permissions: '0700'
@@ -236,6 +259,7 @@ write_files:
 runcmd:
   - [ systemctl, daemon-reload ]
   - [ systemctl, enable, --now, coral-egress.service ] # the egress block, before anything else: coral.service Requires it, so Coral never starts without it
+  - [ systemctl, enable, --now, --no-block, coral-egress-resolvers.service ] # the resolver check, once the network is online: it only reports
   - [ ufw, default, deny, incoming ]
   - [ ufw, default, allow, outgoing ]
   - [ ufw, allow, from, '203.0.113.9', to, any, port, '22', proto, tcp ] # SSH, for the launcher's address only: closed again by coral-machine-finish

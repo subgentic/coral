@@ -237,6 +237,7 @@ func BuildUserData(spec UserDataSpec) (string, error) {
 	w("runcmd:")
 	w("  - [ systemctl, daemon-reload ]")
 	w("  - [ systemctl, enable, --now, %s ] # the egress block, before anything else: coral.service Requires it, so Coral never starts without it", egressUnitName)
+	w("  - [ systemctl, enable, --now, --no-block, %s ] # the resolver check, once the network is online: it only reports", egressResolvName)
 	w("  - [ ufw, default, deny, incoming ]")
 	w("  - [ ufw, default, allow, outgoing ]")
 	w("  - [ ufw, allow, from, '%s', to, any, port, '22', proto, tcp ] # SSH, for the launcher's address only: closed again by coral-machine-finish", sshFrom)

@@ -54,7 +54,8 @@ func TestEgressUnitIsOrderedBeforeTheNetworkAndCoral(t *testing.T) {
 	assert.Contains(t, u, "DefaultDependencies=no")
 	assert.Contains(t, u, "WantedBy=sysinit.target")
 	assert.Contains(t, u, "ExecStart=/usr/sbin/nft -f /etc/coral/egress.nft")
-	assert.Contains(t, u, "ExecStartPost=/usr/local/sbin/coral-egress-check")
+	assert.Contains(t, u, "ExecStartPost=/usr/local/sbin/coral-egress-check rules", "the boot check is the rules only: it fails the unit")
+	assert.NotContains(t, u, "resolvers", "the resolvers are checked later, once the network is online")
 	assert.Contains(t, u, "Type=oneshot")
 }
 
@@ -66,35 +67,62 @@ func TestEgressSummaryNamesWhatAndWho(t *testing.T) {
 	}
 }
 
-// The check script: it fails when a resolver is inside a blocked range and passes for a public one (run for real with a fake nft and a fake resolv.conf).
-func TestEgressCheckScriptRefusesAResolverInABlockedRange(t *testing.T) {
+// The resolver unit runs after the network is online, and only reports.
+func TestEgressResolversUnitRunsAfterNetworkOnline(t *testing.T) {
+	u := EgressResolversUnit()
+	assert.Contains(t, u, "After=network-online.target coral-egress.service")
+	assert.Contains(t, u, "Wants=network-online.target")
+	assert.Contains(t, u, "ExecStart=/usr/local/sbin/coral-egress-check resolvers")
+	assert.Contains(t, u, "WantedBy=multi-user.target")
+}
+
+// The check script, run for real with a fake nft and a fake resolv.conf. "rules" fails when the table is not there; "resolvers" SAYS when a resolver is inside a blocked range and never fails (a boot must not
+// depend on it: #10944 SHOULD C).
+func TestEgressCheckScriptModes(t *testing.T) {
 	if _, err := exec.LookPath("sh"); err != nil {
 		t.Skip("no sh")
 	}
 	dir := t.TempDir()
-	// a fake nft that lists the table with both rules
 	require.NoError(t, os.MkdirAll(filepath.Join(dir, "usr", "sbin"), 0o755))
-	script := EgressCheckScript()
-	script = strings.ReplaceAll(script, "/usr/sbin/nft", filepath.Join(dir, "usr", "sbin", "nft"))
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "usr", "sbin", "nft"), []byte("#!/bin/sh\nprintf 'meta skuid != 0 ip daddr x reject\\nmeta skuid != 0 ip6 daddr y reject\\n'\n"), 0o755))
-	run := func(resolvers string) (string, error) {
+	nft := filepath.Join(dir, "usr", "sbin", "nft")
+	script := strings.ReplaceAll(EgressCheckScript(), "/usr/sbin/nft", nft)
+	run := func(mode, resolvers string, rulesLoaded bool) (string, error) {
+		body := "#!/bin/sh\nexit 1\n"
+		if rulesLoaded {
+			body = "#!/bin/sh\nprintf 'meta skuid != 0 ip daddr x reject\\nmeta skuid != 0 ip6 daddr y reject\\n'\n"
+		}
+		require.NoError(t, os.WriteFile(nft, []byte(body), 0o755))
 		resolv := filepath.Join(dir, "resolv.conf")
 		require.NoError(t, os.WriteFile(resolv, []byte(resolvers), 0o644))
 		s := strings.ReplaceAll(script, "/run/systemd/resolve/resolv.conf /etc/resolv.conf", resolv)
 		path := filepath.Join(dir, "check.sh")
 		require.NoError(t, os.WriteFile(path, []byte(s), 0o755))
-		out, err := exec.Command("sh", path).CombinedOutput()
+		out, err := exec.Command("sh", path, mode).CombinedOutput()
 		return string(out), err
 	}
-	_, err := run("nameserver 127.0.0.53\nnameserver 67.207.67.2\nnameserver 67.207.67.3\n")
-	assert.NoError(t, err, "public resolvers and the local stub pass")
+	// rules: fatal
+	_, err := run("rules", "", true)
+	assert.NoError(t, err, "the table is there")
+	out, err := run("rules", "", false)
+	assert.Error(t, err, "the table is not: the unit fails")
+	assert.Contains(t, out, "not loaded")
+	// the default mode is rules
+	body := "#!/bin/sh\nexit 1\n"
+	require.NoError(t, os.WriteFile(nft, []byte(body), 0o755))
+	// resolvers: report only
+	_, err = run("resolvers", "nameserver 127.0.0.53\nnameserver 67.207.67.2\n", false)
+	assert.NoError(t, err, "public resolvers and the local stub: nothing said, and the rules are not looked at")
 	for _, bad := range []string{"10.116.0.2", "169.254.169.253", "172.17.0.2", "192.168.1.1", "100.100.0.1"} {
-		out, err := run("nameserver " + bad + "\n")
-		assert.Error(t, err, "resolver %s is inside a blocked range", bad)
-		assert.Contains(t, out, "inside a blocked range")
+		out, err := run("resolvers", "nameserver "+bad+"\n", false)
+		assert.NoError(t, err, "a resolver in a blocked range is said, never a failed boot: %s", bad)
+		assert.Contains(t, out, "inside a blocked range", bad)
+		assert.Contains(t, out, bad)
 	}
-	out, err := run("nameserver 172.32.0.1\nnameserver 100.128.0.1\n")
-	assert.NoError(t, err, "just outside 172.16/12 and 100.64/10 is public: %s", out)
+	out, err = run("resolvers", "nameserver 172.32.0.1\nnameserver 100.128.0.1\n", false)
+	assert.NoError(t, err)
+	assert.NotContains(t, out, "blocked range", "just outside 172.16/12 and 100.64/10 is public")
+	_, err = run("other", "", true)
+	assert.Error(t, err, "an unknown mode is a usage error")
 }
 
 // A real nft reads the ruleset (when one is installed here and may check without privileges): the syntax is right.
@@ -116,7 +144,7 @@ func TestEgressRulesetIsValidNftables(t *testing.T) {
 func TestUserDataCarriesTheEgressBlockAndCoralRequiresIt(t *testing.T) {
 	ud, err := BuildUserData(goldenSpec())
 	require.NoError(t, err)
-	for _, path := range []string{"/etc/coral/egress.nft", "/etc/systemd/system/coral-egress.service", "/usr/local/sbin/coral-egress-check"} {
+	for _, path := range []string{"/etc/coral/egress.nft", "/etc/systemd/system/coral-egress.service", "/etc/systemd/system/coral-egress-resolvers.service", "/usr/local/sbin/coral-egress-check"} {
 		assert.Contains(t, ud, "path: "+path)
 	}
 	assert.Contains(t, ud, "meta skuid != 0 ip daddr { 169.254.0.0/16")
@@ -130,5 +158,6 @@ func TestUserDataCarriesTheEgressBlockAndCoralRequiresIt(t *testing.T) {
 	require.True(t, enable > 0 && ufw > 0 && setup > 0)
 	assert.Less(t, enable, ufw, "the block is loaded before the host firewall and before anything is installed")
 	assert.Less(t, enable, setup)
+	assert.Contains(t, runcmd, "enable, --now, --no-block, coral-egress-resolvers.service", "the resolver check is enabled too, without holding the setup for the network")
 	assert.NotContains(t, ud, "chb_", "and the user-data still holds no credential")
 }

@@ -85,13 +85,24 @@ type PruneReport struct {
 	Failed  []string
 }
 
+// PruneOptions choose what a prune may take.
+type PruneOptions struct {
+	OlderThan time.Duration // how old an instance or a record must be (required)
+	// IncludeUnknown takes instances with this tool's tag that the state file does not know. Without it they are only counted and said: a tag proves a machine was made by this tool, not by THIS state file (a second
+	// computer, another account's launch, a state file that was lost), so removing one is an explicit choice (#10944, Security's SHOULD B).
+	IncludeUnknown bool
+	// IncludeNetworks also takes a VPC or firewall with this tool's names that has no instance and no record.
+	IncludeNetworks bool
+}
+
 // Prune finds what a crashed or forgotten launch left, by this tool's tag and names, and removes it after ONE confirmation that lists it all:
-//   - an instance with the tool's tag that is at least olderThan old and that the state file does not know (an orphan; one the state file knows is a machine you launched and is left alone), with its network by name;
+//   - with IncludeUnknown, an instance with the tool's tag that is at least OlderThan old and that the state file does not know (an orphan; one the state file knows is a machine you launched and is left alone), with its network by name;
 //   - a state record at least olderThan old whose instance the provider no longer has (its leftover network is removed, the record dropped);
 //   - with includeNetworks, a VPC or firewall with the tool's name prefix whose machine has no instance and no record (these carry no age, so they are only taken when you say so).
 //
 // Nothing the person did not launch with this tool is touched: everything is matched by the tool's tag and names. A prune cannot revoke a Hub identity (it has no credential id for an orphan): say so.
-func Prune(ctx context.Context, olderThan time.Duration, includeNetworks bool, d ManageDeps) (*PruneReport, error) {
+func Prune(ctx context.Context, o PruneOptions, d ManageDeps) (*PruneReport, error) {
+	olderThan, includeNetworks := o.OlderThan, o.IncludeNetworks
 	if olderThan <= 0 {
 		return nil, errors.New("--older-than is needed: how old a machine must be before it is an orphan")
 	}
@@ -134,6 +145,7 @@ func Prune(ctx context.Context, olderThan time.Duration, includeNetworks bool, d
 		return
 	}
 	var items []PruneItem
+	unknown := 0
 	taken := map[string]bool{}
 	for _, in := range all {
 		if !slices.Contains(in.Tags, Tag) || in.Created.IsZero() || in.Created.After(cutoff) {
@@ -141,6 +153,10 @@ func Prune(ctx context.Context, olderThan time.Duration, includeNetworks bool, d
 		}
 		if _, known := d.State.Get(in.Name); known {
 			continue // launched by this person, and still theirs
+		}
+		if !o.IncludeUnknown {
+			unknown++ // tagged by this tool but not in this state file: said, not taken
+			continue
 		}
 		vpc, fw := netIDs(in.Name)
 		items = append(items, PruneItem{Name: in.Name, Why: fmt.Sprintf("an instance made %s ago that the state file does not know", age(d.now().Sub(in.Created))), IDs: IDs{DropletID: in.ID, VPCID: vpc, FirewallID: fw}})
@@ -184,6 +200,9 @@ func Prune(ctx context.Context, olderThan time.Duration, includeNetworks bool, d
 		}
 	}
 	rep := &PruneReport{Items: items}
+	if unknown > 0 {
+		fmt.Fprintf(d.Out, "%d instance(s) at %s carry this tool's tag, are old enough and are not in this state file: they may belong to another computer or to a state file that was lost, so they are left alone. Pass --include-unknown to take them.\n", unknown, d.Provider.Name())
+	}
 	if len(items) == 0 {
 		fmt.Fprintln(d.Out, "Nothing to prune.")
 		return rep, nil
