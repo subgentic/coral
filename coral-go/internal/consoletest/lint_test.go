@@ -50,12 +50,12 @@ func TestWindowsTestsStartConsoleProgramsHidden(t *testing.T) {
 			if execName == "" {
 				continue
 			}
-			allowed := map[int]bool{} // lines with a "consoletest:allow <reason>" comment, and the line below it
+			allowed := map[int]bool{} // lines with a trailing "consoletest:allow <reason>" comment: it covers its own line only
 			for _, cg := range f.Comments {
 				for _, c := range cg.List {
 					if strings.Contains(c.Text, "consoletest:allow ") {
 						line := fset.Position(c.Pos()).Line
-						allowed[line], allowed[line+1] = true, true
+						allowed[line] = true
 					}
 				}
 			}
