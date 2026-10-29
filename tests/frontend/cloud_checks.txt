@@ -254,3 +254,4 @@ node goal_age.test.mjs
 node mobile_words.test.mjs
 node cli_verify_words.test.mjs
 node run_cloud_checks.test.mjs
+node board_cleanup_retry.test.js
