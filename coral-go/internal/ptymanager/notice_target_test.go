@@ -47,9 +47,9 @@ func TestNoticeBlockedFollowsTheTerminalsVerdict(t *testing.T) {
 }
 
 func TestNoticeBlockedOffSwitch(t *testing.T) {
-	prev := noticeCheckOff
-	t.Cleanup(func() { noticeCheckOff = prev })
-	noticeCheckOff = func() bool { return true }
+	off := true
+	noticeCheckOverride.Store(&off)
+	t.Cleanup(func() { noticeCheckOverride.Store(nil) })
 	blocked, _ := NoticeBlocked(context.Background(), fakeNoticeTerm{known: true, why: "foreground"}, "claude-6a1b2c3d-4e5f-4061-8a7b-9c0d1e2f3a4b", "claude", "", "board message")
 	assert.False(t, blocked, "CORAL_NOTICE_TARGET_CHECK=off restores the earlier rule")
 }

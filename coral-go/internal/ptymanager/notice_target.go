@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"os"
 	"sync"
+	"sync/atomic"
 )
 
 // Board notices are typed only into the session's recorded agent CLI process (#389). "The agent's shell is not idle" is not enough: a nested shell, a program in it, or a CLI started
@@ -19,6 +20,40 @@ type NoticeTargetChecker interface {
 	// AgentNoticeTarget: ok is whether a notice may be typed now, wait that the agent's process is still being recorded (a launch moments ago), why the reason when not ok.
 	// known is false when it cannot tell (the terminal is gone, or the platform cannot say), which blocks nothing.
 	AgentNoticeTarget(ctx context.Context, name, agentType, sessionID string) (ok, wait bool, why string, known bool)
+}
+
+// watchStoppers end the watches for a launched agent's process, per backend (tmux, ConPTY): each registers one at init.
+var (
+	watchStopMu   sync.Mutex
+	watchStoppers []func()
+)
+
+func registerWatchStopper(f func()) {
+	watchStopMu.Lock()
+	defer watchStopMu.Unlock()
+	watchStoppers = append(watchStoppers, f)
+}
+
+// StopAgentWatches ends every running watch for an agent's process and waits for them: they are bounded but outlive the test or the server that started them. The TestMains call it before
+// the goroutine check.
+func StopAgentWatches() {
+	watchStopMu.Lock()
+	fs := append([]func(){}, watchStoppers...)
+	watchStopMu.Unlock()
+	for _, f := range fs {
+		f()
+	}
+}
+
+// noticeCheckOverride is a test seam: a test stores a value to override the environment's (a goroutine may be reading it, so it is atomic).
+var noticeCheckOverride atomic.Pointer[bool]
+
+// noticeCheckIsOff is whether the check is off now: the test override, else the environment's.
+func noticeCheckIsOff() bool {
+	if o := noticeCheckOverride.Load(); o != nil {
+		return *o
+	}
+	return noticeCheckOff()
 }
 
 // noticeCheckOff: CORAL_NOTICE_TARGET_CHECK=off restores the earlier rule (a notice is typed unless the agent has exited) for the first release. Read once, logged at first use.
@@ -48,7 +83,7 @@ func init() {
 // foreground program is not the recorded agent process. It logs once per cause, and records the skip for the dashboard (SkipNotAgent). A terminal agent is handled elsewhere; a terminal
 // that cannot tell blocks nothing.
 func NoticeBlocked(ctx context.Context, term any, name, agentType, sessionID, what string) (blocked bool, why string) {
-	if noticeCheckOff() || IsTerminalAgent(name, agentType) {
+	if noticeCheckIsOff() || IsTerminalAgent(name, agentType) {
 		return false, ""
 	}
 	c, ok := term.(NoticeTargetChecker)

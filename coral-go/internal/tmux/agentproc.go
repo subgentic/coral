@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -18,9 +17,10 @@ import (
 // recorded as the session's agent CLI, by pid AND start time, is alive and is the foreground program of the pane's shell.
 //
 // Adoption: when Coral types a launch line (launch, wake, resume) it watches the pane's shell for a bounded window; the one foreground non-shell program that appears and stays
-// (the launch script's own short-lived commands do not stay) is recorded. None, or more than one, adopts nothing. After a Coral restart, or when the CLI replaced itself, the one
-// place an image is read is readopt: the single foreground program must look like an agent CLI AND carry this session's CORAL_SESSION_NAME in its environment, which a CLI started by
-// hand in the pane does not; where the environment cannot be read nothing is adopted.
+// (the launch script's own short-lived commands do not stay) is recorded. None, or more than one, adopts nothing. The record is also kept in the tmux session (the user option
+// @coral_agent, "<pid> <start>"), which outlives a Coral restart: after a restart the exact process is re-checked (alive, same start time), never guessed from what the pane runs now.
+// A CLI that is replaced by a new process (not an exec, which keeps the pid) is not recorded again: notices stay paused, visibly, until a Wake. Nothing is read from a process's
+// environment: Coral's launch line exports CORAL_SESSION_NAME into the pane's shell, so every later program there carries it and it proves nothing.
 
 // AgentProc names one process for good: its pid and the start time ps reports for it (a recycled pid has another).
 type AgentProc struct {
@@ -39,7 +39,23 @@ type agentRec struct {
 	proc     AgentProc
 	adopted  bool
 	adopting bool
-	gen      int // a newer launch line supersedes the watch of an older one
+	gen      int                // a newer launch line supersedes the watch of an older one
+	stop     context.CancelFunc // ends the watch of this launch
+}
+
+// watches counts the running watches, so StopAgentWatches (tests, shutdown) can end them and wait.
+var watches sync.WaitGroup
+
+// StopAgentWatches ends every running watch for an agent's process and waits for them: the watches are bounded (adoptWindow) but outlive the test or the server that started them.
+func StopAgentWatches() {
+	agentRecs.Lock()
+	for _, r := range agentRecs.m {
+		if r.stop != nil {
+			r.stop()
+		}
+	}
+	agentRecs.Unlock()
+	watches.Wait()
 }
 
 var agentRecs = struct {
@@ -54,6 +70,10 @@ func ForgetAgentProc(session string) {
 	if r, ok := agentRecs.m[session]; ok {
 		r.gen++ // a watch of the old launch sees it changed and ends
 		r.proc, r.adopted, r.adopting = AgentProc{}, false, false
+		if r.stop != nil {
+			r.stop()
+			r.stop = nil
+		}
 	}
 }
 
@@ -78,25 +98,57 @@ func (c *Client) AdoptAgentAfterLaunch(session, target string) {
 	}
 	r.gen++
 	gen := r.gen
+	if r.stop != nil {
+		r.stop() // the watch of an older launch ends
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), adoptWindow+10*time.Second)
+	r.stop = cancel
 	r.adopted, r.proc, r.adopting = false, AgentProc{}, true
+	watches.Add(1)
 	agentRecs.Unlock()
-	safego.Go("tmux-adopt-agent", func() { c.watchForAgent(session, target, gen) })
+	c.run(context.Background(), "set-option", "-u", "-t", session, agentOption) // a new launch: what was kept of the old process is not true of the new one
+	safego.Go("tmux-adopt-agent", func() { defer watches.Done(); defer cancel(); c.watchForAgent(ctx, session, target, gen) })
 }
 
-func (c *Client) watchForAgent(session, target string, gen int) {
-	ctx, cancel := context.WithTimeout(context.Background(), adoptWindow+10*time.Second)
-	defer cancel()
+// agentOption is the tmux session option the recorded process is kept in, "<pid> <start>".
+const agentOption = "@coral_agent"
+
+func (c *Client) persistAgentProc(ctx context.Context, session string, p AgentProc) {
+	if _, err := c.run(ctx, "set-option", "-t", session, agentOption, strconv.Itoa(p.PID)+" "+p.Start); err != nil {
+		slog.Warn("could not keep the agent's process in the tmux session: after a Coral restart notices stay paused until a Wake", "session", session, "error", err)
+	}
+}
+
+// loadAgentProc is the process kept in the tmux session by persistAgentProc, if any.
+func (c *Client) loadAgentProc(ctx context.Context, agentName, agentType, sessionID string) (AgentProc, bool) {
+	out, err := c.DisplayForAgent(ctx, agentName, agentType, sessionID, "#{"+agentOption+"}")
+	if err != nil {
+		return AgentProc{}, false
+	}
+	pidText, start, ok := strings.Cut(strings.TrimSpace(out), " ")
+	pid, perr := strconv.Atoi(pidText)
+	if !ok || perr != nil || pid <= 0 || start == "" {
+		return AgentProc{}, false
+	}
+	return AgentProc{PID: pid, Start: start}, true
+}
+
+func (c *Client) watchForAgent(ctx context.Context, session, target string, gen int) {
 	finish := func(p AgentProc, got bool, why string) {
 		agentRecs.Lock()
-		defer agentRecs.Unlock()
 		r := agentRecs.m[session]
 		if r == nil || r.gen != gen {
+			agentRecs.Unlock()
 			return // a newer launch line, or the session ended
 		}
 		r.adopting = false
 		if got {
 			r.proc, r.adopted = p, true
+		}
+		agentRecs.Unlock()
+		if got {
 			slog.Info("recorded the agent's process", "session", session, "pid", p.PID, "start", p.Start)
+			c.persistAgentProc(ctx, session, p) // outside the lock: it runs tmux
 		} else {
 			slog.Warn("did not record the agent's process: board notices stay off until it is recorded (Wake it, or restart the agent)", "session", session, "why", why)
 		}
@@ -104,7 +156,12 @@ func (c *Client) watchForAgent(session, target string, gen int) {
 	var shell int
 	var last AgentProc
 	var since time.Time
-	for deadline := time.Now().Add(adoptWindow); time.Now().Before(deadline); time.Sleep(adoptEvery) {
+	for deadline := time.Now().Add(adoptWindow); time.Now().Before(deadline); {
+		select {
+		case <-ctx.Done():
+			return // StopAgentWatches, a newer launch, or the session ended
+		case <-time.After(adoptEvery):
+		}
 		agentRecs.Lock()
 		r := agentRecs.m[session]
 		current := r != nil && r.gen == gen
@@ -203,33 +260,6 @@ func decideNotice(t *procTable, shell int, rec AgentProc) NoticeVerdict {
 	return NoticeVerdict{OK: true}
 }
 
-// agentImages are the process names an agent CLI runs as: the CLIs themselves and the interpreters their npm shims run under. Only readopt reads it.
-var agentImages = map[string]bool{
-	"claude": true, "codex": true, "agy": true, "gemini": true, "pi": true,
-	"node": true, "bun": true, "deno": true,
-}
-
-func looksLikeAgentImage(comm string) bool {
-	n := strings.ToLower(strings.TrimSpace(comm))
-	return agentImages[strings.TrimSuffix(filepath.Base(n), ".exe")]
-}
-
-// readopt records the pane's single foreground program as the session's agent when it looks like an agent CLI AND its environment carries this session's CORAL_SESSION_NAME. It is
-// the only place an image is read (after a Coral restart, or when the CLI replaced itself). procEnvHasSession is false where the environment cannot be read.
-func readopt(t *procTable, shell int, session string) (AgentProc, bool) {
-	cand, ok := adoptCandidate(t, shell)
-	if !ok {
-		return AgentProc{}, false
-	}
-	if !looksLikeAgentImage(t.byPID[cand.PID].comm) || !procEnvCheck(cand.PID, session) {
-		return AgentProc{}, false
-	}
-	return cand, true
-}
-
-// procEnvCheck is procEnvHasSession (a test seam).
-var procEnvCheck = procEnvHasSession
-
 // AgentNoticeVerdict says whether a board notice may be typed into the agent's pane now. It returns ErrTerminalGone when the pane is gone.
 func (c *Client) AgentNoticeVerdict(ctx context.Context, agentName, agentType, sessionID string) (NoticeVerdict, error) {
 	shell, err := c.agentShellPID(ctx, agentName, agentType, sessionID)
@@ -240,10 +270,11 @@ func (c *Client) AgentNoticeVerdict(ctx context.Context, agentName, agentType, s
 	if err != nil {
 		return NoticeVerdict{}, fmt.Errorf("read process table: %w", err)
 	}
-	return noticeVerdict(procs, shell, agentName), nil
+	return noticeVerdict(procs, shell, agentName, func() (AgentProc, bool) { return c.loadAgentProc(ctx, agentName, agentType, sessionID) }), nil
 }
 
-func noticeVerdict(procs *procTable, shell int, session string) NoticeVerdict {
+// noticeVerdict is the answer for a session. load reads the process kept in the tmux session (nil: none): used when Coral has nothing in memory (it restarted), to re-check that exact process.
+func noticeVerdict(procs *procTable, shell int, session string, load func() (AgentProc, bool)) NoticeVerdict {
 	agentRecs.Lock()
 	r := agentRecs.m[session]
 	var rec AgentProc
@@ -261,22 +292,27 @@ func noticeVerdict(procs *procTable, shell int, session string) NoticeVerdict {
 			return v
 		}
 	}
-	// Nothing recorded (a Coral restart), or the recorded process is gone (the CLI replaced itself): the environment evidence decides.
-	if p, ok := readopt(procs, shell, session); ok {
-		agentRecs.Lock()
-		if r := agentRecs.m[session]; r == nil || !r.adopting {
-			if r == nil {
-				r = &agentRec{}
-				agentRecs.m[session] = r
-			}
-			r.proc, r.adopted = p, true
-		}
-		agentRecs.Unlock()
-		slog.Info("recorded the agent's process again", "session", session, "pid", p.PID, "start", p.Start)
-		return decideNotice(procs, shell, p)
-	}
-	if adopted {
+	if adopted { // the recorded process is gone (the CLI was replaced, or it exited): paused until a Wake records the new one
 		return NoticeVerdict{Reason: ReasonGone}
+	}
+	// Nothing in memory (a Coral restart): the process kept in the tmux session is checked, that exact one, never guessed from what the pane runs now.
+	if load != nil {
+		if kept, ok := load(); ok {
+			v := decideNotice(procs, shell, kept)
+			if v.Reason != ReasonGone {
+				agentRecs.Lock()
+				if r := agentRecs.m[session]; r == nil || !r.adopting {
+					if r == nil {
+						r = &agentRec{}
+						agentRecs.m[session] = r
+					}
+					r.proc, r.adopted = kept, true
+				}
+				agentRecs.Unlock()
+				slog.Info("took up the agent's process kept in the tmux session", "session", session, "pid", kept.PID, "start", kept.Start)
+			}
+			return v
+		}
 	}
 	return NoticeVerdict{Reason: ReasonNotRecorded}
 }

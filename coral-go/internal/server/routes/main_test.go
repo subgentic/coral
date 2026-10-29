@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/subgentic/coral/internal/consoletest"
+	"github.com/subgentic/coral/internal/ptymanager"
 	"github.com/subgentic/coral/internal/secfile/secfiletest"
 	"github.com/subgentic/coral/internal/testleak"
 	"github.com/subgentic/coral/internal/testtemp"
@@ -63,6 +64,7 @@ func TestMain(m *testing.M) {
 			code = 1
 		}
 	}
+	ptymanager.StopAgentWatches()                     // the watches for a launched agent's process are bounded but outlive the test that started them (#389)
 	testtemp.Exit(cleanupWorld, testleak.Check(code)) // no goroutine left running (#4167)
 }
 

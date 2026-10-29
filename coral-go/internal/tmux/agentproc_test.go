@@ -105,83 +105,79 @@ func TestAdoptCandidateIsOnlyASingleForegroundProgram(t *testing.T) {
 	assert.Equal(t, 711, p.PID)
 }
 
-// After a Coral restart, or when the CLI replaced itself: the one place an image is read, and it needs the session's own environment too.
-func TestReadoptNeedsAnAgentImageAndTheSessionsEnvironment(t *testing.T) {
-	prev := procEnvCheck
-	t.Cleanup(func() { procEnvCheck = prev })
-	const session = "claude-aaaa"
-	pane := func(extra ...string) *procTable {
-		return table(append([]string{"  600     1 Ss   " + t0 + " -zsh"}, extra...)...)
-	}
-	envHas := map[int]string{}
-	procEnvCheck = func(pid int, s string) bool { return envHas[pid] == s }
+// After a Coral restart the exact process kept in the tmux session is re-checked (#389): same pid, same start time, alive, below the pane's shell. Nothing is adopted from an image or an
+// environment: the launch line exports CORAL_SESSION_NAME into the pane's shell, so a hand-started program carries it too.
+func TestNoticeVerdictAfterARestartRechecksTheKeptProcess(t *testing.T) {
+	const session = "claude-restart"
+	t.Cleanup(func() { ForgetAgentProc(session); agentRecs.Lock(); delete(agentRecs.m, session); agentRecs.Unlock() })
+	kept := func(p AgentProc) func() (AgentProc, bool) { return func() (AgentProc, bool) { return p, true } }
+	none := func() (AgentProc, bool) { return AgentProc{}, false }
+	forget := func() { agentRecs.Lock(); delete(agentRecs.m, session); agentRecs.Unlock() }
 
-	envHas[700] = session
-	p, ok := readopt(pane("  700   600 S+   "+t1+" claude"), 600, session)
-	assert.True(t, ok, "an agent image with this session's environment")
-	assert.Equal(t, AgentProc{PID: 700, Start: t1}, p)
-	_, ok = readopt(pane("  700   600 S+   "+t1+" node"), 600, session)
-	assert.True(t, ok, "node behind an npm shim")
+	running := table("  600     1 Ss   "+t0+" -zsh", "  700   600 S+   "+t1+" claude")
+	forget()
+	v := noticeVerdict(running, 600, session, kept(AgentProc{PID: 700, Start: t1}))
+	assert.True(t, v.OK, "the kept process is alive with the same start time and is the foreground program: re-adopted")
+	got, ok := AdoptedAgentProc(session)
+	assert.True(t, ok)
+	assert.Equal(t, AgentProc{PID: 700, Start: t1}, got)
 
-	envHas[700] = "claude-bbbb"
-	_, ok = readopt(pane("  700   600 S+   "+t1+" claude"), 600, session)
-	assert.False(t, ok, "a hand-started claude-named program (another or no session in its environment) is not adopted")
-	delete(envHas, 700)
-	_, ok = readopt(pane("  700   600 S+   "+t1+" claude"), 600, session)
-	assert.False(t, ok, "an environment that cannot be read adopts nothing")
+	forget()
+	v = noticeVerdict(running, 600, session, kept(AgentProc{PID: 700, Start: t2}))
+	assert.False(t, v.OK, "a recycled pid (another start time) is not the kept process")
+	assert.Equal(t, ReasonGone, v.Reason)
+	_, ok = AdoptedAgentProc(session)
+	assert.False(t, ok, "nothing is adopted from it")
 
-	envHas[700] = session
-	_, ok = readopt(pane("  700   600 S+   "+t1+" sleep"), 600, session)
-	assert.False(t, ok, "the environment alone is not enough: the image must look like an agent CLI")
-	envHas[701] = session
-	_, ok = readopt(pane("  700   600 S+   "+t1+" claude", "  701   600 S+   "+t1+" claude"), 600, session)
-	assert.False(t, ok, "two candidates adopt nothing")
-	_, ok = readopt(pane("  710   600 S    "+t0+" bash", "  711   710 S+   "+t1+" claude"), 600, session)
-	assert.False(t, ok, "(711 has no environment entry)")
+	forget()
+	v = noticeVerdict(running, 600, session, none)
+	assert.False(t, v.OK, "nothing kept (a hand-started program, whatever its name or environment): not adopted")
+	assert.Equal(t, ReasonNotRecorded, v.Reason)
+	_, ok = AdoptedAgentProc(session)
+	assert.False(t, ok)
+
+	forget()
+	handStarted := table("  600     1 Ss   "+t0+" -zsh", "  700   600 S    "+t1+" claude", "  710   600 S    "+t2+" bash", "  711   710 S+   "+t2+" node")
+	v = noticeVerdict(handStarted, 600, session, kept(AgentProc{PID: 700, Start: t1}))
+	assert.False(t, v.OK, "the kept agent is alive but a program in a nested shell is in the foreground: not typed")
+	assert.Equal(t, ReasonForeground, v.Reason)
+
+	forget()
+	gone := table("  600     1 Ss+  " + t0 + " -zsh")
+	assert.Equal(t, ReasonGone, noticeVerdict(gone, 600, session, kept(AgentProc{PID: 700, Start: t1})).Reason, "the kept process has ended")
 }
 
 func TestNoticeVerdictFollowsTheRecord(t *testing.T) {
-	prev := procEnvCheck
-	t.Cleanup(func() {
-		procEnvCheck = prev
-		ForgetAgentProc("claude-v")
-		agentRecs.Lock()
-		delete(agentRecs.m, "claude-v")
-		agentRecs.Unlock()
-	})
-	procEnvCheck = func(int, string) bool { return false }
 	const session = "claude-v"
+	t.Cleanup(func() { ForgetAgentProc(session); agentRecs.Lock(); delete(agentRecs.m, session); agentRecs.Unlock() })
+	none := func() (AgentProc, bool) { return AgentProc{}, false }
 	running := table("  600     1 Ss   "+t0+" -zsh", "  700   600 S+   "+t1+" claude")
 
-	v := noticeVerdict(running, 600, session)
+	v := noticeVerdict(running, 600, session, none)
 	assert.False(t, v.OK)
-	assert.Equal(t, ReasonNotRecorded, v.Reason, "nothing recorded and no environment evidence: not typed")
+	assert.Equal(t, ReasonNotRecorded, v.Reason, "nothing recorded and nothing kept: not typed")
 
 	agentRecs.Lock()
 	agentRecs.m[session] = &agentRec{adopting: true}
 	agentRecs.Unlock()
-	v = noticeVerdict(running, 600, session)
+	v = noticeVerdict(running, 600, session, none)
 	assert.True(t, v.Wait, "the launch is moments old: wait")
 	assert.Equal(t, ReasonAdopting, v.Reason)
 
 	agentRecs.Lock()
 	agentRecs.m[session] = &agentRec{proc: AgentProc{PID: 700, Start: t1}, adopted: true}
 	agentRecs.Unlock()
-	assert.True(t, noticeVerdict(running, 600, session).OK, "the recorded process is the foreground program")
+	assert.True(t, noticeVerdict(running, 600, session, none).OK, "the recorded process is the foreground program")
 
 	nested := table("  600     1 Ss   "+t0+" -zsh", "  700   600 S    "+t1+" claude", "  710   600 S    "+t2+" bash", "  711   710 S+   "+t2+" sleep")
-	assert.Equal(t, ReasonForeground, noticeVerdict(nested, 600, session).Reason, "a program in a nested shell keeps notices off")
+	assert.Equal(t, ReasonForeground, noticeVerdict(nested, 600, session, none).Reason, "a program in a nested shell keeps notices off")
 
 	gone := table("  600     1 Ss+  " + t0 + " -zsh")
-	assert.Equal(t, ReasonGone, noticeVerdict(gone, 600, session).Reason)
+	assert.Equal(t, ReasonGone, noticeVerdict(gone, 600, session, none).Reason)
 
-	// The CLI replaced itself (a new process with this session's environment): recorded again, and then allowed.
-	procEnvCheck = func(pid int, s string) bool { return pid == 800 && s == session }
+	// The CLI was replaced by a new process: not recorded again; paused, visibly, until a Wake.
 	replaced := table("  600     1 Ss   "+t0+" -zsh", "  800   600 S+   "+t2+" claude")
-	assert.True(t, noticeVerdict(replaced, 600, session).OK)
-	got, ok := AdoptedAgentProc(session)
-	assert.True(t, ok)
-	assert.Equal(t, AgentProc{PID: 800, Start: t2}, got)
+	assert.Equal(t, ReasonGone, noticeVerdict(replaced, 600, session, none).Reason)
 }
 
 // On a real tmux pane: the launch line's process is recorded, notices are allowed while it is the foreground program, and not once something else is.
@@ -207,6 +203,13 @@ func TestAdoptAgentAfterLaunchOnARealPane(t *testing.T) {
 	c.AdoptAgentAfterLaunch(name, name+".0")
 	require.Eventually(t, func() bool { _, ok := AdoptedAgentProc(name); return ok }, shellWait, 50*time.Millisecond, "the agent's process was never recorded")
 	assert.True(t, verdict().OK, "the recorded process is the foreground program")
+
+	// The record is kept in the tmux session, which outlives a Coral restart: with nothing in memory, that exact process is re-checked and taken up again.
+	require.Eventually(t, func() bool { _, ok := c.loadAgentProc(ctx, name, "claude", sid); return ok }, shellWait, 25*time.Millisecond, "the record was never kept in the tmux session")
+	ForgetAgentProc(name) // what a restart does to Coral's memory
+	_, inMemory := AdoptedAgentProc(name)
+	assert.False(t, inMemory)
+	assert.True(t, verdict().OK, "after a restart the kept process is re-checked and taken up")
 
 	// It ends: the shell is back at its prompt; a program a person starts then is not the agent.
 	require.NoError(t, c.SendRawKeys(ctx, terminalinput.Unclassified, name, []string{"C-c"}, "claude", sid))

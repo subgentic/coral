@@ -59,5 +59,6 @@ func TestMain(m *testing.M) {
 			code = 1
 		}
 	}
+	StopAgentWatches()                               // the watches for a launched agent's process are bounded but outlive the test that started them (#389)
 	testtemp.Exit(cleanupTemp, testleak.Check(code)) // no goroutine left running (#4167)
 }
