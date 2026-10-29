@@ -173,14 +173,13 @@ func TestShellIdleFreshLookIsLimitedPerPidPerSecond(t *testing.T) {
 	assert.Equal(t, int64(1), procTableRuns.Load()-before, "one fresh ps run for five checks of a pid that is not there")
 }
 
-// #387 (the Unix half of #378): a shell a person starts at an exited agent's prompt is a bare prompt, not a program. Only a foreground descendant that is not a shell makes the pane busy.
-// The tables have the shape ps shows with job control: the innermost interactive shell at its prompt is in the terminal's foreground ('+'), and a shell that waits for a command, or runs one,
-// is not (the command is, its process group); so a nested bash running sleep has NO '+' and the sleep has one.
-func TestShellIdleNestedShellsAreABarePrompt(t *testing.T) {
+// #387/#388 (Security's three answers): ShellRunning is a foreground non-shell program that is a direct child of the pane's shell, the agent; ShellBare is a prompt with nothing in it;
+// ShellNested is any shell below the pane's shell that the terminal is in, whatever runs in it: not the agent, so nothing is typed as a notice and no launch line either. The tables have the
+// shape ps shows with job control: the innermost interactive shell at its prompt is in the foreground ('+'), a shell that waits for a command, or runs one, is not (the command is).
+func TestShellStateThreeAnswers(t *testing.T) {
 	prev := procTableLast
 	t.Cleanup(func() { procTableMu.Lock(); procTableLast = prev; procTableMu.Unlock() })
-	// chain: the pane's shell 600, then n shells each started in the previous one. The innermost has the foreground ('+') only when it is at its prompt (below == ""); with a program
-	// below it (below is its ps line, parented on the innermost shell) no shell has it.
+	// chain: the pane's shell 600, then n shells each started in the previous one; the innermost has the foreground only when it is at its prompt (below == "").
 	chain := func(n int, below string) string {
 		out := "  600     1 Ss+  -zsh\n"
 		if n > 0 || below != "" {
@@ -199,24 +198,25 @@ func TestShellIdleNestedShellsAreABarePrompt(t *testing.T) {
 		return out
 	}
 	for _, tc := range []struct {
-		name string
-		ps   string
-		idle bool
+		name  string
+		ps    string
+		state ShellState
 	}{
-		{"the pane's shell alone", chain(0, ""), true},
-		{"a bash a person started, at its prompt", chain(1, ""), true},
-		{"a bash in a bash in a bash, at the prompt", chain(3, ""), true},
-		{"the agent CLI is running", "  600     1 Ss   -zsh\n  601   600 S+   claude\n", false},
-		{"sleep running in a nested bash (the bash has no +, the sleep has)", chain(1, "S+   sleep"), false},
-		{"a program two shells deep", chain(2, "S+   node"), false},
-		{"a CLI started by a wrapper script (bash with +, then node with +)", "  600     1 Ss   -zsh\n  601   600 S+   bash\n  602   601 S+   node\n", false},
-		{"a background job of a nested bash at its prompt is not the agent", chain(1, "") + "  700   601 S    sleep\n", true},
-		{"a background job under the pane's shell, nested bash at its prompt", chain(1, "") + "  700   600 S    sleep\n", true},
-		{"a stopped program in the foreground is still a program", chain(1, "T+   vim"), false},
-		{"a background job beside a program in a nested bash: busy", chain(1, "S+   sleep") + "  701   601 S    sleep\n", false},
-		{"a nested bash without + and nothing below it (a background shell)", "  600     1 Ss+  -zsh\n  601   600 S    bash\n", true},
-		{"too many shells deep to walk: busy", chain(nestedShellDepth+3, ""), false},
-		{"exactly as deep as the bound: still walked", chain(nestedShellDepth, ""), true},
+		{"the pane's shell alone", chain(0, ""), ShellBare},
+		{"a bash a person started, at its prompt", chain(1, ""), ShellNested},
+		{"a bash in a bash in a bash, at the prompt", chain(3, ""), ShellNested},
+		{"the agent CLI is a direct foreground child", "  600     1 Ss   -zsh\n  601   600 S+   claude\n", ShellRunning},
+		{"sleep running in a nested bash (the bash has no +, the sleep has): not the agent", chain(1, "S+   sleep"), ShellNested},
+		{"a program two shells deep: not the agent", chain(2, "S+   node"), ShellNested},
+		{"a CLI started by a wrapper script (bash with +, then node): nested, as Security noted, #389 closes it", "  600     1 Ss   -zsh\n  601   600 S+   bash\n  602   601 S+   node\n", ShellNested},
+		{"a background job of a nested bash at its prompt", chain(1, "") + "  700   601 S    sleep\n", ShellNested},
+		{"a background job under the pane's shell, nested bash at its prompt", chain(1, "") + "  700   600 S    sleep\n", ShellNested},
+		{"a stopped program in the foreground of a nested bash", chain(1, "T+   vim"), ShellNested},
+		{"the agent running its own bash tool is still the agent", "  600     1 Ss   -zsh\n  601   600 S+   claude\n  602   601 S+   bash\n  603   602 S+   sleep\n", ShellRunning},
+		{"a direct foreground program wins over a nested shell beside it", "  600     1 Ss   -zsh\n  601   600 S+   claude\n  602   600 S    bash\n", ShellRunning},
+		{"a nested bash without + and nothing below it (a background shell)", "  600     1 Ss+  -zsh\n  601   600 S    bash\n", ShellBare},
+		{"a background job of the pane's shell alone", "  600     1 Ss+  -zsh\n  601   600 S    sleep\n", ShellBare},
+		{"too many shells deep to walk: nested", chain(nestedShellDepth+3, "S+   sleep"), ShellNested},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			tb := parseProcTable(tc.ps)
@@ -224,17 +224,22 @@ func TestShellIdleNestedShellsAreABarePrompt(t *testing.T) {
 			procTableMu.Lock()
 			procTableLast = tb
 			procTableMu.Unlock()
+			state, nested := classifyShell(tb, 600)
+			assert.Equal(t, tc.state, state)
+			assert.Equal(t, tc.state == ShellNested, nested != "", "the nested shell is named when there is one")
 			idle, shell, err := ShellIdle(600)
 			require.NoError(t, err)
-			assert.Equal(t, tc.idle, idle)
+			assert.Equal(t, tc.state != ShellRunning, idle, "ShellIdle: only the agent running is not idle")
 			assert.Equal(t, "-zsh", shell)
+			name, err := NestedShellOf(600)
+			require.NoError(t, err)
+			assert.Equal(t, nested, name)
 		})
 	}
 	// A loop in the table (never real) ends the walk instead of hanging it.
 	loop := parseProcTable("  600     1 Ss   -zsh\n  601   600 S    bash\n")
 	loop.children[601] = append(loop.children[601], 600)
-	assert.NotPanics(t, func() { foregroundProgramBelow(loop, 600, 0) })
-
+	assert.NotPanics(t, func() { classifyShell(loop, 600) })
 	// The terminal's process is the agent itself (exec'd, not a shell): not idle, with or without children.
 	tb := parseProcTable("  600     1 Ss+  claude\n")
 	tb.at = time.Now()
@@ -271,8 +276,22 @@ func TestAgentShellIdleANestedBashIsABarePrompt(t *testing.T) {
 	require.True(t, ok)
 	assert.True(t, idle, "a bash a person started is a bare prompt, not the agent")
 
+	nested, err := c.NestedShell(ctx, name, "claude", sid)
+	require.NoError(t, err)
+	assert.Equal(t, "bash", nested, "the nested shell is named (a launch line is refused with it)")
+
+	// A program in the nested bash is not the agent either: still "not the agent" (nothing typed), and still named.
 	require.NoError(t, c.SendKeysToTarget(ctx, terminalinput.Unclassified, name+".0", "sleep 30"))
-	require.Eventually(t, func() bool { v, ok := state(); return ok && !v }, shellWait, 25*time.Millisecond, "a program in the nested bash keeps the pane busy")
+	require.Eventually(t, func() bool {
+		out, _ := exec.Command("pgrep", "-x", "sleep").Output()
+		return strings.TrimSpace(string(out)) != ""
+	}, shellWait, 25*time.Millisecond, "the sleep never started")
+	time.Sleep(500 * time.Millisecond) // sleep-ok: a negative proof; the pane must still read as not the agent after the sleep has had time to be wrongly counted
+	idle, ok = state()
+	require.True(t, ok)
+	assert.True(t, idle, "a program in a nested bash is not the agent: nothing is typed")
+	nested, err = c.NestedShell(ctx, name, "claude", sid)
+	require.NoError(t, err)
+	assert.Equal(t, "bash", nested)
 	require.NoError(t, c.SendRawKeys(ctx, terminalinput.Unclassified, name, []string{"C-c"}, "claude", sid))
-	require.Eventually(t, func() bool { v, ok := state(); return ok && v }, shellWait, 25*time.Millisecond, "back at the nested bash's prompt: idle")
 }

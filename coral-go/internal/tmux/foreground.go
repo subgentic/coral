@@ -61,40 +61,101 @@ func ShellIdle(pid int) (idle bool, shell string, err error) {
 	if !IsShellCommand(shell) {
 		return false, shell, nil // the terminal's process is the agent itself (it was exec'd)
 	}
-	// Busy only if a program is in the foreground of the terminal (a '+' in its ps state) below the shell. A background job ('sleep &') left after the CLI exited is not the
-	// agent (#3268). A shell a person started at the prompt (bash inside the pane's zsh) is in the foreground too, but it is a bare prompt, not a program: only a foreground
-	// descendant that is not a shell makes the pane busy (#387, the Unix half of #378).
-	if foregroundProgramBelow(procs, pid, 0) {
-		return false, shell, nil
-	}
-	return true, shell, nil
+	state, _ := classifyShell(procs, pid)
+	// Three answers (Security on #387/#388): ShellRunning is the agent (a foreground non-shell program that is a direct child of the pane's shell); ShellBare is a prompt with nothing
+	// in it; ShellNested is a shell a person started, whatever runs under it. For ShellIdle both of the last two are "not the agent": nothing is typed as a notice. The launch-line
+	// paths tell them apart (NestedShell): a bare prompt gets its launch line, a nested shell is "a shell of unknown contents" and gets none.
+	return state != ShellRunning, shell, nil
 }
 
-// nestedShellDepth bounds the walk below the pane's shell (a shell inside a shell inside ...). A deeper tree is not walked to the end and counts as busy: a program may be below it.
+// ShellState is what is in the foreground of an agent's pane.
+type ShellState int
+
+const (
+	ShellBare    ShellState = iota // the pane's shell at its prompt: the agent CLI has exited
+	ShellRunning                   // a foreground non-shell program is a direct child of the pane's shell: the agent
+	ShellNested                    // a shell below the pane's shell that the terminal is in (at its prompt, or running a command): not the agent, whatever runs in it
+)
+
+// NestedShell is the name of the nested shell in the agent's pane (ShellNested), "" when the pane is not in one.
+func (c *Client) NestedShell(ctx context.Context, agentName, agentType, sessionID string) (string, error) {
+	pid, err := c.agentShellPID(ctx, agentName, agentType, sessionID)
+	if err != nil {
+		return "", err
+	}
+	return NestedShellOf(pid)
+}
+
+// NestedShellOf is NestedShell for a shell pid (also the Unix pseudo-terminal's).
+func NestedShellOf(pid int) (string, error) {
+	procs, err := readProcTable()
+	if err != nil {
+		return "", fmt.Errorf("read process %d: %w", pid, err)
+	}
+	if _, ok := procs.byPID[pid]; !ok || !IsShellCommand(procs.byPID[pid].comm) {
+		return "", nil
+	}
+	if state, nested := classifyShell(procs, pid); state == ShellNested {
+		return nested, nil
+	}
+	return "", nil
+}
+
+// nestedShellDepth bounds the walk below the pane's shell (a shell inside a shell inside ...). A deeper tree is not walked to the end and counts as a nested shell.
 const nestedShellDepth = 8
 
-// foregroundProgramBelow reports whether a foreground program runs below pid. Job control puts a command a shell runs in the terminal's foreground process group and leaves the shell
-// itself out of it, so a nested bash running `sleep` has no '+' in its ps state (only the sleep has), and a nested bash at its prompt has one. So every shell child is walked into,
-// whatever its '+'; a child that is not a shell counts only with a '+' (a background job is not the agent, #3268). A shell with no foreground program below it is a bare prompt,
-// however many shells deep. The walk is bounded in depth and visits each process once.
-func foregroundProgramBelow(t *procTable, pid, depth int) bool {
-	return foregroundProgramBelowSeen(t, pid, depth, map[int]bool{})
+// classifyShell tells what is in the foreground of the shell pid. A foreground non-shell DIRECT child is the agent (ShellRunning), whatever else there is. Otherwise any shell reached
+// through shells alone (never through a program: an agent's own bash tool is below the agent) that the terminal is in, at its prompt ('+') or running a command (a foreground program
+// below it), is ShellNested, whatever runs under it. A background job, or a shell with neither, is not in the foreground and is nothing.
+func classifyShell(t *procTable, pid int) (ShellState, string) {
+	for _, c := range t.children[pid] {
+		e := t.byPID[c]
+		if !IsShellCommand(e.comm) && strings.Contains(e.stat, "+") {
+			return ShellRunning, ""
+		}
+	}
+	if sh := nestedShellBelow(t, pid, 0, map[int]bool{}); sh != "" {
+		return ShellNested, sh
+	}
+	return ShellBare, ""
 }
 
-func foregroundProgramBelowSeen(t *procTable, pid, depth int, seen map[int]bool) bool {
-	if depth > nestedShellDepth || seen[pid] {
-		return depth > nestedShellDepth // a loop in the table (never real) is not walked twice; too deep is busy
+// nestedShellBelow is the name of the first shell below pid (through shells) that the terminal is in; "" when none. A walk that gets deeper than the bound names "shell".
+func nestedShellBelow(t *procTable, pid, depth int, seen map[int]bool) string {
+	if seen[pid] {
+		return ""
 	}
 	seen[pid] = true
+	if depth > nestedShellDepth {
+		return "shell"
+	}
+	for _, c := range t.children[pid] {
+		e := t.byPID[c]
+		if !IsShellCommand(e.comm) {
+			continue
+		}
+		if strings.Contains(e.stat, "+") || programBelowShells(t, c, depth+1, seen) {
+			return e.comm
+		}
+		if sh := nestedShellBelow(t, c, depth+1, seen); sh != "" {
+			return sh
+		}
+	}
+	return ""
+}
+
+// programBelowShells: a foreground non-shell program below pid, through shells alone.
+func programBelowShells(t *procTable, pid, depth int, seen map[int]bool) bool {
+	if depth > nestedShellDepth {
+		return true
+	}
 	for _, c := range t.children[pid] {
 		e := t.byPID[c]
 		if IsShellCommand(e.comm) {
-			if foregroundProgramBelowSeen(t, c, depth+1, seen) {
+			if programBelowShells(t, c, depth+1, seen) {
 				return true
 			}
-			continue
-		}
-		if strings.Contains(e.stat, "+") {
+		} else if strings.Contains(e.stat, "+") {
 			return true
 		}
 	}
@@ -205,18 +266,27 @@ func parseProcTable(out string) *procTable {
 // prompt (ShellIdle on the pane's shell). It returns ErrTerminalGone when the
 // pane is gone.
 func (c *Client) AgentShellIdle(ctx context.Context, agentName, agentType, sessionID string) (bool, string, error) {
-	if st, ok := c.agentPaneState(ctx, agentName, agentType, sessionID); ok && st.pid > 0 {
-		return ShellIdle(st.pid) // the shared pane list (#3847)
-	}
-	out, err := c.DisplayForAgent(ctx, agentName, agentType, sessionID, "#{pane_pid}")
+	pid, err := c.agentShellPID(ctx, agentName, agentType, sessionID)
 	if err != nil {
 		return false, "", err
 	}
+	return ShellIdle(pid)
+}
+
+// agentShellPID is the pid of the agent's pane's shell: from the shared pane list when it has the pane (#3847), else from tmux.
+func (c *Client) agentShellPID(ctx context.Context, agentName, agentType, sessionID string) (int, error) {
+	if st, ok := c.agentPaneState(ctx, agentName, agentType, sessionID); ok && st.pid > 0 {
+		return st.pid, nil
+	}
+	out, err := c.DisplayForAgent(ctx, agentName, agentType, sessionID, "#{pane_pid}")
+	if err != nil {
+		return 0, err
+	}
 	pid, err := strconv.Atoi(strings.TrimSpace(out))
 	if err != nil {
-		return false, "", fmt.Errorf("invalid pane pid %q: %w", out, err)
+		return 0, fmt.Errorf("invalid pane pid %q: %w", out, err)
 	}
-	return ShellIdle(pid)
+	return pid, nil
 }
 
 // foregroundIsShell says whether the program in the foreground of the pane is a plain shell (pane_current_command).

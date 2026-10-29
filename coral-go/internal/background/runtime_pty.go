@@ -107,7 +107,8 @@ func (r *PTYRuntime) AgentShellIdle(_ context.Context, name, _, _ string) (bool,
 	return r.backend.ShellIdle(name)
 }
 
-// AgentUnknownShell names a shell of unknown contents in the agent's terminal, for ptymanager.AgentExitedForLaunch (Security on #216).
+// AgentUnknownShell names a shell of unknown contents in the agent's terminal (Windows: git-bash, WSL) or a shell a person started below the agent's shell (Unix), for
+// ptymanager.AgentExitedForLaunch (Security on #216, #387).
 func (r *PTYRuntime) AgentUnknownShell(_ context.Context, name, _, _ string) (string, bool) {
 	return r.backend.OtherShell(name)
 }

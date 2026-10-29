@@ -59,6 +59,15 @@ func (t *TmuxSessionTerminal) AgentShellIdle(ctx context.Context, name, agentTyp
 	return idle, shell, true
 }
 
+// AgentUnknownShell implements UnknownShellChecker for the PTY backend (Unix).
+func (p *PTYSessionTerminal) AgentUnknownShell(_ context.Context, name, _, sessionID string) (string, bool) {
+	key, err := p.keyFor(name, sessionID)
+	if err != nil {
+		return "", false
+	}
+	return p.backend.OtherShell(key)
+}
+
 // AgentShellIdle implements ShellIdleChecker for the PTY backend.
 func (p *PTYSessionTerminal) AgentShellIdle(_ context.Context, name, _, sessionID string) (bool, string, bool) {
 	key, err := p.keyFor(name, sessionID)
@@ -68,8 +77,8 @@ func (p *PTYSessionTerminal) AgentShellIdle(_ context.Context, name, _, sessionI
 	return p.backend.ShellIdle(key)
 }
 
-// UnknownShellChecker is implemented by terminals that can name a shell of unknown contents in an agent's terminal: a shell other than a
-// verified PowerShell or cmd (git-bash's bash, WSL), with no program seen beside it. What runs inside it can't be seen (Security on #216).
+// UnknownShellChecker is implemented by terminals that can name a shell of unknown contents in an agent's terminal: on Windows a shell other than a verified PowerShell or cmd with no
+// program seen beside it (git-bash, WSL), on Unix a shell a person started below the pane's shell. What runs in it is not the agent (Security on #216, #387).
 type UnknownShellChecker interface {
 	AgentUnknownShell(ctx context.Context, name, agentType, sessionID string) (shell string, ok bool)
 }
@@ -108,11 +117,11 @@ func AgentExitedForLaunch(ctx context.Context, term any, name, agentType, sessio
 	return true, fg, ""
 }
 
-// AgentUnknownShell implements UnknownShellChecker for the PTY backend.
-func (p *PTYSessionTerminal) AgentUnknownShell(_ context.Context, name, _, sessionID string) (string, bool) {
-	key, err := p.keyFor(name, sessionID)
+// AgentUnknownShell implements UnknownShellChecker for tmux: the shell a person started below the pane's shell (tmux.ShellNested).
+func (t *TmuxSessionTerminal) AgentUnknownShell(ctx context.Context, name, agentType, sessionID string) (string, bool) {
+	sh, err := t.client.NestedShell(ctx, name, agentType, sessionID)
 	if err != nil {
 		return "", false
 	}
-	return p.backend.OtherShell(key)
+	return sh, true
 }
