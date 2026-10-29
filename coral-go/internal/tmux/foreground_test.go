@@ -174,13 +174,27 @@ func TestShellIdleFreshLookIsLimitedPerPidPerSecond(t *testing.T) {
 }
 
 // #387 (the Unix half of #378): a shell a person starts at an exited agent's prompt is a bare prompt, not a program. Only a foreground descendant that is not a shell makes the pane busy.
+// The tables have the shape ps shows with job control: the innermost interactive shell at its prompt is in the terminal's foreground ('+'), and a shell that waits for a command, or runs one,
+// is not (the command is, its process group); so a nested bash running sleep has NO '+' and the sleep has one.
 func TestShellIdleNestedShellsAreABarePrompt(t *testing.T) {
 	prev := procTableLast
 	t.Cleanup(func() { procTableMu.Lock(); procTableLast = prev; procTableMu.Unlock() })
-	chain := func(n int) string { // the pane's shell 600, then n shells each in the foreground of the previous one
+	// chain: the pane's shell 600, then n shells each started in the previous one. The innermost has the foreground ('+') only when it is at its prompt (below == ""); with a program
+	// below it (below is its ps line, parented on the innermost shell) no shell has it.
+	chain := func(n int, below string) string {
 		out := "  600     1 Ss+  -zsh\n"
+		if n > 0 || below != "" {
+			out = "  600     1 Ss   -zsh\n"
+		}
 		for i := 1; i <= n; i++ {
-			out += fmt.Sprintf("  %d   %d S+   bash\n", 600+i, 600+i-1)
+			stat := "S"
+			if i == n && below == "" {
+				stat = "S+"
+			}
+			out += fmt.Sprintf("  %d   %d %-4s bash\n", 600+i, 600+i-1, stat)
+		}
+		if below != "" {
+			out += fmt.Sprintf("  700   %d %s\n", 600+n, below)
 		}
 		return out
 	}
@@ -189,18 +203,20 @@ func TestShellIdleNestedShellsAreABarePrompt(t *testing.T) {
 		ps   string
 		idle bool
 	}{
-		{"the pane's shell alone", "  600     1 Ss+  -zsh\n", true},
-		{"a bash a person started", chain(1), true},
-		{"a bash in a bash in a bash", chain(3), true},
-		{"the agent CLI is running", "  600     1 Ss+  -zsh\n  601   600 S+   claude\n", false},
-		{"a program in a nested bash", chain(1) + "  700   601 S+   sleep\n", false},
-		{"a program two shells deep", chain(2) + "  700   602 S+   node\n", false},
-		{"a CLI started by a wrapper script (bash, then node)", "  600     1 Ss+  -zsh\n  601   600 S+   bash\n  602   601 S+   node\n", false},
-		{"a background job in a nested bash is not the agent", chain(1) + "  700   601 S    sleep\n", true},
-		{"a background job under the pane's shell, nested bash at its prompt", chain(1) + "  700   600 S    sleep\n", true},
-		{"a stopped program in the foreground is still a program", chain(1) + "  700   601 T+   vim\n", false},
-		{"too many shells deep to walk: busy", chain(nestedShellDepth + 3), false},
-		{"exactly as deep as the bound: still walked", chain(nestedShellDepth), true},
+		{"the pane's shell alone", chain(0, ""), true},
+		{"a bash a person started, at its prompt", chain(1, ""), true},
+		{"a bash in a bash in a bash, at the prompt", chain(3, ""), true},
+		{"the agent CLI is running", "  600     1 Ss   -zsh\n  601   600 S+   claude\n", false},
+		{"sleep running in a nested bash (the bash has no +, the sleep has)", chain(1, "S+   sleep"), false},
+		{"a program two shells deep", chain(2, "S+   node"), false},
+		{"a CLI started by a wrapper script (bash with +, then node with +)", "  600     1 Ss   -zsh\n  601   600 S+   bash\n  602   601 S+   node\n", false},
+		{"a background job of a nested bash at its prompt is not the agent", chain(1, "") + "  700   601 S    sleep\n", true},
+		{"a background job under the pane's shell, nested bash at its prompt", chain(1, "") + "  700   600 S    sleep\n", true},
+		{"a stopped program in the foreground is still a program", chain(1, "T+   vim"), false},
+		{"a background job beside a program in a nested bash: busy", chain(1, "S+   sleep") + "  701   601 S    sleep\n", false},
+		{"a nested bash without + and nothing below it (a background shell)", "  600     1 Ss+  -zsh\n  601   600 S    bash\n", true},
+		{"too many shells deep to walk: busy", chain(nestedShellDepth+3, ""), false},
+		{"exactly as deep as the bound: still walked", chain(nestedShellDepth, ""), true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			tb := parseProcTable(tc.ps)
@@ -214,6 +230,11 @@ func TestShellIdleNestedShellsAreABarePrompt(t *testing.T) {
 			assert.Equal(t, "-zsh", shell)
 		})
 	}
+	// A loop in the table (never real) ends the walk instead of hanging it.
+	loop := parseProcTable("  600     1 Ss   -zsh\n  601   600 S    bash\n")
+	loop.children[601] = append(loop.children[601], 600)
+	assert.NotPanics(t, func() { foregroundProgramBelow(loop, 600, 0) })
+
 	// The terminal's process is the agent itself (exec'd, not a shell): not idle, with or without children.
 	tb := parseProcTable("  600     1 Ss+  claude\n")
 	tb.at = time.Now()

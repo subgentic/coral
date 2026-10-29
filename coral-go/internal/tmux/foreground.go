@@ -73,18 +73,28 @@ func ShellIdle(pid int) (idle bool, shell string, err error) {
 // nestedShellDepth bounds the walk below the pane's shell (a shell inside a shell inside ...). A deeper tree is not walked to the end and counts as busy: a program may be below it.
 const nestedShellDepth = 8
 
-// foregroundProgramBelow reports whether a foreground process below pid is a program: a foreground child that is not a shell, or one below a foreground shell of a shell.
-// A shell with no foreground child is a bare prompt, however many shells deep.
+// foregroundProgramBelow reports whether a foreground program runs below pid. Job control puts a command a shell runs in the terminal's foreground process group and leaves the shell
+// itself out of it, so a nested bash running `sleep` has no '+' in its ps state (only the sleep has), and a nested bash at its prompt has one. So every shell child is walked into,
+// whatever its '+'; a child that is not a shell counts only with a '+' (a background job is not the agent, #3268). A shell with no foreground program below it is a bare prompt,
+// however many shells deep. The walk is bounded in depth and visits each process once.
 func foregroundProgramBelow(t *procTable, pid, depth int) bool {
-	if depth > nestedShellDepth {
-		return true
+	return foregroundProgramBelowSeen(t, pid, depth, map[int]bool{})
+}
+
+func foregroundProgramBelowSeen(t *procTable, pid, depth int, seen map[int]bool) bool {
+	if depth > nestedShellDepth || seen[pid] {
+		return depth > nestedShellDepth // a loop in the table (never real) is not walked twice; too deep is busy
 	}
+	seen[pid] = true
 	for _, c := range t.children[pid] {
 		e := t.byPID[c]
-		if !strings.Contains(e.stat, "+") {
+		if IsShellCommand(e.comm) {
+			if foregroundProgramBelowSeen(t, c, depth+1, seen) {
+				return true
+			}
 			continue
 		}
-		if !IsShellCommand(e.comm) || foregroundProgramBelow(t, c, depth+1) {
+		if strings.Contains(e.stat, "+") {
 			return true
 		}
 	}
