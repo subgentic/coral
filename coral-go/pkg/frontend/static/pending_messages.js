@@ -493,13 +493,21 @@ function workingElapsedText(secs) {
     return `${Math.floor(secs / 60)} min ${String(secs % 60).padStart(2, "0")} s`;
 }
 
+/** A chat pinned to the bottom stays pinned when the Working row at its tail comes, grows or goes (#10846): it was left short of the bottom when the row came, and the text moved up and down by the row's height at 30 s and when it went. A reader who has scrolled up is not touched: the row is below them. */
+function keepPinned(container) {
+    if (state.autoScroll && container.isConnected) container.scrollTop = container.scrollHeight;
+}
+
 /** One second of the Working row: the quiet digits from 5 s; at 30 s the "Still working" line with its terminal link and one polite status; then a status once a minute. A row that left the page stops its own timer. */
 export function tickWorking(el) {
     if (!el.isConnected) { clearInterval(el._tick); return; }
     const secs = Math.max(0, Math.floor((Date.now() - Number(el.dataset.since)) / 1000));
     el.querySelector(".chat-working-time").textContent = secs >= 5 ? ` · ${workingElapsedText(secs)}` : "";
     if (secs < 30) return;
-    el.querySelector(".chat-working-still").hidden = false;
+    const stillLine = el.querySelector(".chat-working-still");
+    const grew = stillLine.hidden;
+    stillLine.hidden = false;
+    if (grew) keepPinned(el.parentElement);
     const live = el.querySelector(".chat-working-live");
     const minutes = Math.floor(secs / 60);
     const said = secs >= 60 ? `Still working, ${minutes} ${minutes === 1 ? "minute" : "minutes"}` : "Still working, 30 seconds";
@@ -510,7 +518,7 @@ export function syncWorkingIndicator(container, session) {
     let el = container.querySelector(":scope > .chat-working");
     // A card asking for input replaces the Working row
     if (!agentIsWorking(session) || container.querySelector(":scope > .chat-needs-input")) {
-        if (el) { clearInterval(el._tick); el.remove(); if (!container.querySelector(":scope > .chat-needs-input")) flushReply(session.session_id); } // the turn is over: the reply is said once
+        if (el) { clearInterval(el._tick); el.remove(); keepPinned(container); if (!container.querySelector(":scope > .chat-needs-input")) flushReply(session.session_id); } // the turn is over: the reply is said once
         return;
     }
     if (!el) {
@@ -533,4 +541,5 @@ export function syncWorkingIndicator(container, session) {
     } else if (container.lastElementChild !== el) {
         container.appendChild(el);
     }
+    keepPinned(container);
 }
