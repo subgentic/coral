@@ -162,7 +162,7 @@ function buildStop() {
 
 function buildMore() {
     const host = $('team-page-actions');
-    const b = el('button', 'btn team-page-more', 'More'); b.type = 'button'; b.id = 'team-page-more'; b.setAttribute('aria-expanded', 'false'); b.setAttribute('aria-controls', 'team-page-more-menu');
+    const b = el('button', 'btn team-page-more', 'Actions'); b.type = 'button'; b.id = 'team-page-more'; b.setAttribute('aria-expanded', 'false'); b.setAttribute('aria-controls', 'team-page-more-menu');
     const menu = el('div', 'menu team-more-menu'); menu.id = 'team-page-more-menu'; menu.hidden = true; menu.setAttribute('aria-label', 'More team actions');
     const add = el('button', 'menu-item team-more-add', 'Add agent'); add.type = 'button'; add.id = 'team-page-more-add'; // a phone's header has one button: More, with Add agent first, then Settings
     add.addEventListener('click', () => { window.showAddAgentToBoard?.(S.team, teamDir()); });

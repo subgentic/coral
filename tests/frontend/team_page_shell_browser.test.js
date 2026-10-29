@@ -1,4 +1,4 @@
-// The team page's shell (#7453, stage 1; UI/UX's team page doc 7aa984fe and mock 896e13f3): a team's row opens the page on Goals; the header holds the team's name and ONE status and the buttons Add agent and More;
+// The team page's shell (#7453, stage 1; UI/UX's team page doc 7aa984fe and mock 896e13f3): a team's row opens the page on Goals; the header holds the team's name and ONE status and the buttons Add agent and Actions;
 // a tablist named Team has Goals, Messages, Tasks, Agents, Artifacts, Knowledge (Settings is a popout button, #8853) (counts in the names); Left/Right/Home/End move between the tabs; and the header and the tab strip are at the same pixels
 // on every tab and on a goal's page and a task's page, at 1280, 1024 and 390 px. Written failing-first by QA (#7466): controls by role and accessible name (helpers/team_page.js), never an id or a class.
 // Isolated dev server.
@@ -34,12 +34,12 @@ const TEAM = `qa-team-${Date.now() % 100000}`;
                 assert.equal(await activeTab(), 'Goals', 'the page opens on Goals');
                 assert.ok(await ev(`window.__tp.tablist() !== null`), 'a tablist named Team');
             });
-            await S.run(`${label}: the header has ONE status (a button or text) and the buttons Add agent and More, and the h1 starts with the team's name`, async () => {
+            await S.run(`${label}: the header has ONE status (a button or text) and the buttons Add agent and Actions, and the h1 starts with the team's name`, async () => {
                 if (mobile) { await ev(`document.getElementById('team-page-more').click(); true`); await settle(250); } // a phone's header has ONE button, More, with Add agent as its first item (UI/UX, #7453 round 1)
-                const r = await ev(`(() => { const t = window.__tp; const h = t.h1(); const status = h ? [...h.querySelectorAll('*')].map(e => window.__na.text(e)).filter(x => /need attention|all well|running|working|idle/i.test(x)) : []; return { h1: h ? window.__na.text(h) : '', add: !!t.find('button', /^Add agent$/i), more: !!t.find('button', /^More/i), statuses: [...new Set(status)] }; })()`);
+                const r = await ev(`(() => { const t = window.__tp; const h = t.h1(); const status = h ? [...h.querySelectorAll('*')].map(e => window.__na.text(e)).filter(x => /need attention|all well|running|working|idle/i.test(x)) : []; return { h1: h ? window.__na.text(h) : '', add: !!t.find('button', /^Add agent$/i), more: !!t.find('button', /^Actions$/i), statuses: [...new Set(status)] }; })()`);
                 if (mobile) { await ev(`document.getElementById('team-page-more').click(); true`); await settle(150); } // close it again
                 assert.ok(r.h1.startsWith(TEAM), `the h1 starts with the team name (got ${JSON.stringify(r.h1)})`);
-                assert.ok(r.add, 'a button named Add agent'); assert.ok(r.more, 'a button named More');
+                assert.ok(r.add, 'a button named Add agent'); assert.ok(r.more, 'a button named Actions (the header\'s was More: the tab strip has one too, #10942)');
                 assert.ok(r.statuses.length <= 1, `one status in the header, not ${r.statuses.length}: ${JSON.stringify(r.statuses)}`);
             });
             await S.run(`${label}: the tablist named Team has the six tabs in order, each name carrying its count where it has one`, async () => {
