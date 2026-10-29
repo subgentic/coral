@@ -81,3 +81,6 @@ func isOpener(word string) bool {
 	}
 	return false
 }
+
+// C is a Case: a typed notice's name, its line with plain labels, and its line with Hostile in every label.
+func C(name, plain, hostile string) Case { return Case{Name: name, Plain: plain, Hostile: hostile} }

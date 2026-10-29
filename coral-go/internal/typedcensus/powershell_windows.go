@@ -26,7 +26,7 @@ $out = foreach ($l in $lines.lines) {
   $ast = [System.Management.Automation.Language.Parser]::ParseInput($l, [ref]$tok, [ref]$err)
   $cmds = @($ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.CommandAst] }, $true) | ForEach-Object { [string]$_.GetCommandName() })
   $subs = @($ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.SubExpressionAst] -or $n -is [System.Management.Automation.Language.ScriptBlockExpressionAst] -or $n -is [System.Management.Automation.Language.InvokeMemberExpressionAst] -or $n -is [System.Management.Automation.Language.ParenExpressionAst] -or $n -is [System.Management.Automation.Language.ArrayExpressionAst] }, $true)).Count
-  [pscustomobject]@{ line = $l; commands = $cmds; subs = $subs }
+  [pscustomobject]@{ line = $l; commands = $cmds; subs = $subs; errors = @($err).Count }
 }
 $found = @($lines.openers | Where-Object { Get-Command -Name $_ -ErrorAction SilentlyContinue })
 [pscustomobject]@{ results = @($out); openers = $found } | ConvertTo-Json -Depth 5 -Compress
@@ -68,6 +68,7 @@ func checkPowerShell(t *testing.T, cases []Case) {
 			Line     string   `json:"line"`
 			Commands []string `json:"commands"`
 			Subs     int      `json:"subs"`
+			Errors   int      `json:"errors"`
 		} `json:"results"`
 		Openers []string `json:"openers"`
 	}
@@ -75,8 +76,10 @@ func checkPowerShell(t *testing.T, cases []Case) {
 		t.Fatalf("the PowerShell parse check's answer: %v: %s", err, out)
 	}
 	for _, r := range got.Results {
+		// A line PowerShell cannot parse is rejected whole and runs nothing (its partial tree may still name words as commands);
+		// a line it parses runs every command in it, so each must be the opener.
 		for _, c := range r.Commands {
-			if c != "" && !isOpener(c) {
+			if r.Errors == 0 && c != "" && !isOpener(c) {
 				t.Errorf("PowerShell would run the command %q in the typed line %q", c, r.Line)
 			}
 		}
