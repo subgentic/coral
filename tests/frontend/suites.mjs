@@ -6,10 +6,10 @@
 //          *_browser.test.js/mjs, or one that uses chrome-remote-interface.
 //   server run_cdp_suites.mjs too (it gets the same isolated server), for suites that drive the server
 //          without Chrome. Listed by name in SERVER_SUITES below.
-//   node   npm run test:cloud: plain node, no server. Listed by name in package.json's test:cloud script.
+//   node   npm run test:cloud: plain node, no server. Listed by name in cloud_checks.txt (run by run_cloud_checks.mjs).
 //
 // classifySuites reports the files that match no runner (unclassified), more than one (conflicts), and
-// names listed in test:cloud or SERVER_SUITES with no such file (missing). run_cdp_suites.mjs refuses to
+// names listed in cloud_checks.txt or SERVER_SUITES with no such file (missing). run_cdp_suites.mjs refuses to
 // run, and suite_census.test.mjs (part of test:cloud) fails, while any of them is non-empty.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -19,10 +19,10 @@ export const SERVER_SUITES = ['agent_task_cli.test.js'];
 const TEST_FILE = /\.test\.(js|mjs)$/;
 const BROWSER_NAME = /_browser\.test\.(js|mjs)$/;
 
-// nodeSuites returns the files test:cloud runs ("node <file>" entries).
+// nodeSuites returns the files test:cloud runs ("node <file>" lines of cloud_checks.txt).
 export function nodeSuites(dir) {
-  const pkg = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'));
-  return [...(pkg.scripts['test:cloud'] || '').matchAll(/(?:^|\s)node\s+(\S+\.test\.(?:js|mjs))/g)].map(m => m[1]);
+  const text = fs.readFileSync(path.join(dir, 'cloud_checks.txt'), 'utf8');
+  return [...text.matchAll(/^\s*node\s+(\S+\.test\.(?:js|mjs))\s*$/gm)].map(m => m[1]);
 }
 
 export function classifySuites(dir) {
@@ -50,7 +50,7 @@ export function classifySuites(dir) {
 export function problems(c) {
   const lines = [];
   for (const f of c.unclassified) {
-    lines.push(`unclassified: ${f} — name it *_browser.test.js (CDP), add it to test:cloud in package.json (plain node), or to SERVER_SUITES in suites.mjs (needs the server, not Chrome)`);
+    lines.push(`unclassified: ${f} — name it *_browser.test.js (CDP), add a "node <file>" line to cloud_checks.txt (plain node), or to SERVER_SUITES in suites.mjs (needs the server, not Chrome)`);
   }
   for (const f of c.conflicts) lines.push(`in more than one runner: ${f}`);
   for (const f of c.missing) lines.push(`listed but no such file: ${f}`);

@@ -18,7 +18,7 @@ assert.ok(c.cdp.length > 0 && c.node.includes('suite_census.test.mjs'));
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'suite-census-'));
 try {
   const write = (f, s = '') => fs.writeFileSync(path.join(tmp, f), s);
-  write('package.json', JSON.stringify({ scripts: { 'test:cloud': 'npm run lint && node plain.test.js && node both_browser.test.js && node gone.test.mjs' } }));
+  write('cloud_checks.txt', '# a comment\nnpm run lint\nnode plain.test.js\nnode both_browser.test.js\nnode gone.test.mjs\n');
   write('plain.test.js');
   write('named_browser.test.mjs');
   // Split so this file itself doesn't contain the phrase (it would then count as a CDP suite too).

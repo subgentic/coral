@@ -1,0 +1,61 @@
+suites: 1147 CDP (1112 named *_browser), 1 server-only, 250 node (npm run test:cloud)
+building coral (dev) and its tools ...
+Synced agent_docs → static/agent_docs (38 files)
+coral http://127.0.0.1:55568  chrome cdp :56243  tmp /var/folders/x6/cfzdf6d96g56ytb84gy8bzdw0000gn/T/coral-cdp-DfigG1/shard1
+
+queue: longest first (6 of 20 suites have a recorded duration in suite_durations.json)
+running 20 of 1148 suites (--only auth_banner_large_text,census_scrolled_under_foot,census_sticky_header,code_buttons_phone,first_automation,folder_count_agrees,folder_field_words,goal_copy_for_agent,goal_new_dialog_phone,goal_no_tasks_once,hub_usage_item,launch_inline_errors,new_team_generated_banner,phone_leftovers_layout,toast_team_tabs,startup_sequence_golden,settings_modal_trace,html_builders,live_list)
+PASS    settings_modal_trace_browser.test.js  (11.9s)
+PASS    live_list_parallel_browser.test.js  (2.9s)
+PASS    auth_banner_large_text_browser.test.js  (1.1s)
+PASS    census_scrolled_under_foot_browser.test.js  (1.9s)
+PASS    census_sticky_header_browser.test.js  (0.8s)
+PASS    code_buttons_phone_browser.test.js  (0.4s)
+PASS    first_automation_browser.test.js  (0.7s)
+PASS    folder_count_agrees_browser.test.js  (1.0s)
+PASS    folder_field_words_browser.test.js  (0.8s)
+PASS    goal_copy_for_agent_browser.test.js  (1.4s)
+PASS    goal_new_dialog_phone_browser.test.js  (1.2s)
+PASS    goal_no_tasks_once_browser.test.js  (1.3s)
+PASS    hub_usage_item_browser.test.js  (6.8s)
+RETRY live_list_golden_browser.test.js  (exit=1 after 1.5s)
+  [runner] replacing shard 1 (before a retry)
+coral http://127.0.0.1:62709  chrome cdp :62989  tmp /var/folders/x6/cfzdf6d96g56ytb84gy8bzdw0000gn/T/coral-cdp-DfigG1/shard1-1
+FAIL    live_list_golden_browser.test.js  (2.8s, 2 attempts)  exit=1
+      AssertionError [ERR_ASSERTION]: desktop: folder first: the list's markup changed (now 122450 characters, was 122450; CORAL_UPDATE_GOLDEN=1 on the earlier commit and this one, then diff the two lists)
+          at /private/tmp/claude-501/-Users-cknorowski-Software-coral-coral-go/ba1e7db2-1c63-db8c-1540-862373255348/scratchpad/wt-main/tests/frontend/live_list_golden_browser.test.js:100:20
+          at process.processTicksAndRejections (node:internal/process/task_queues:103:5) {
+        generatedMessage: false,
+        code: 'ERR_ASSERTION',
+        actual: undefined,
+        expected: undefined,
+        operator: 'fail',
+        diff: 'simple'
+      }
+      AssertionError [ERR_ASSERTION]: desktop: folder first: the list's markup changed (now 122450 characters, was 122450; CORAL_UPDATE_GOLDEN=1 on the earlier commit and this one, then diff the two lists)
+          at /private/tmp/claude-501/-Users-cknorowski-Software-coral-coral-go/ba1e7db2-1c63-db8c-1540-862373255348/scratchpad/wt-main/tests/frontend/live_list_golden_browser.test.js:100:20
+          at process.processTicksAndRejections (node:internal/process/task_queues:103:5) {
+        generatedMessage: false,
+        code: 'ERR_ASSERTION',
+        actual: undefined,
+        expected: undefined,
+        operator: 'fail',
+        diff: 'simple'
+      }
+PASS    new_team_generated_banner_browser.test.js  (9.0s)
+PASS    phone_leftovers_layout_browser.test.js  (1.5s)
+PASS    toast_team_tabs_browser.test.js  (3.8s)
+PASS    html_builders_golden_browser.test.js  (0.6s)
+PASS    launch_inline_errors_browser.test.js  (0.9s)
+RETRY startup_sequence_golden_browser.test.js  (exit=1 after 0.3s)
+  [runner] replacing shard 1 (before a retry)
+coral http://127.0.0.1:51141  chrome cdp :51184  tmp /var/folders/x6/cfzdf6d96g56ytb84gy8bzdw0000gn/T/coral-cdp-DfigG1/shard1-2
+FLAKY   startup_sequence_golden_browser.test.js  (0.6s, 2 attempts)
+      2 handler 2 (start to end, in order): changed at offset 1776 (now 14002 chars, was 13400):
+          now: "item.agentic-more-item,button.menu-item.agentic-more-item -\nmutation now attr #agentic-tab-files data-probe=\nmutation now attr #agentic-tab-files data-probe=\nmutation now attr #age"
+          was: "item.agentic-more-item,button.menu-item.agentic-more-item -\nlisten document:coral:dock-changed\nlisten div.tabs.tabs-icons.agentic-state-tabs:scroll\nlisten MediaQueryList:change\nlis"
+
+18/20 suites passed in 90.9s, 1 FLAKY (passed only on a retry; not counted as passed), 1 FAILED
+FLAKY: startup_sequence_golden_browser.test.js
+FAILED: live_list_golden_browser.test.js
+results: /var/folders/x6/cfzdf6d96g56ytb84gy8bzdw0000gn/T/coral-cdp-DfigG1/results.json  coral logs: /var/folders/x6/cfzdf6d96g56ytb84gy8bzdw0000gn/T/coral-cdp-DfigG1/shard1/coral.log /var/folders/x6/cfzdf6d96g56ytb84gy8bzdw0000gn/T/coral-cdp-DfigG1/shard1-1/coral.log /var/folders/x6/cfzdf6d96g56ytb84gy8bzdw0000gn/T/coral-cdp-DfigG1/shard1-2/coral.log

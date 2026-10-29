@@ -1,0 +1,164 @@
+# github.com/subgentic/coral/cmd/coral-tray.test
+ld: warning: ignoring duplicate libraries: '-lobjc'
+ok  	github.com/subgentic/coral/cmd/coral	101.346s
+ok  	github.com/subgentic/coral/cmd/coral-agent	17.171s
+ok  	github.com/subgentic/coral/cmd/coral-board	30.184s
+?   	github.com/subgentic/coral/cmd/coral-coordination-report	[no test files]
+ok  	github.com/subgentic/coral/cmd/coral-hook-agentic-state	11.082s
+?   	github.com/subgentic/coral/cmd/coral-hook-message-check	[no test files]
+?   	github.com/subgentic/coral/cmd/coral-hook-session-start	[no test files]
+ok  	github.com/subgentic/coral/cmd/coral-hook-task-sync	3.389s
+ok  	github.com/subgentic/coral/cmd/coral-shadow-report	3.167s
+ok  	github.com/subgentic/coral/cmd/coral-tray	47.639s
+ok  	github.com/subgentic/coral/cmd/coral-update	0.841s
+ok  	github.com/subgentic/coral/cmd/launch-coral	15.443s
+ok  	github.com/subgentic/coral/cmd/mock-agent	2.193s
+ok  	github.com/subgentic/coral/internal/agent	38.202s
+ok  	github.com/subgentic/coral/internal/agentenv	0.207s
+ok  	github.com/subgentic/coral/internal/agentmemory	0.496s
+ok  	github.com/subgentic/coral/internal/agentmodels	5.504s
+ok  	github.com/subgentic/coral/internal/agentprio	3.769s
+ok  	github.com/subgentic/coral/internal/agentsignin	23.960s
+ok  	github.com/subgentic/coral/internal/agenttypes	0.113s
+ok  	github.com/subgentic/coral/internal/appdownload	0.193s
+ok  	github.com/subgentic/coral/internal/apptoken	0.172s
+ok  	github.com/subgentic/coral/internal/auth	53.011s
+ok  	github.com/subgentic/coral/internal/backendchoice	0.185s
+ok  	github.com/subgentic/coral/internal/background	230.346s
+ok  	github.com/subgentic/coral/internal/board	244.699s
+?   	github.com/subgentic/coral/internal/board/boardtest	[no test files]
+ok  	github.com/subgentic/coral/internal/claudeartifact	0.138s
+ok  	github.com/subgentic/coral/internal/claudestub	29.653s
+ok  	github.com/subgentic/coral/internal/cliauth	0.500s
+ok  	github.com/subgentic/coral/internal/clierr	0.359s
+ok  	github.com/subgentic/coral/internal/clihelp	0.132s
+ok  	github.com/subgentic/coral/internal/clitext	0.150s
+ok  	github.com/subgentic/coral/internal/cloud	21.244s
+ok  	github.com/subgentic/coral/internal/cmdhandoff	0.537s
+ok  	github.com/subgentic/coral/internal/config	0.588s
+ok  	github.com/subgentic/coral/internal/coordination	0.259s
+ok  	github.com/subgentic/coral/internal/coralnames	3.747s
+ok  	github.com/subgentic/coral/internal/dbcrypt	1.111s
+?   	github.com/subgentic/coral/internal/decodelimit	[no test files]
+ok  	github.com/subgentic/coral/internal/diskguard	0.153s
+ok  	github.com/subgentic/coral/internal/dllpreload	0.111s
+ok  	github.com/subgentic/coral/internal/efficiency	0.231s
+ok  	github.com/subgentic/coral/internal/eulatext	0.132s
+ok  	github.com/subgentic/coral/internal/executil	0.599s
+ok  	github.com/subgentic/coral/internal/firewall	0.140s
+ok  	github.com/subgentic/coral/internal/fsreplace	0.486s
+ok  	github.com/subgentic/coral/internal/gitutil	32.320s
+ok  	github.com/subgentic/coral/internal/hooks	5.205s
+ok  	github.com/subgentic/coral/internal/httputil	5.591s
+ok  	github.com/subgentic/coral/internal/inputlog	0.452s
+ok  	github.com/subgentic/coral/internal/jsonl	18.899s
+ok  	github.com/subgentic/coral/internal/landedcommits	7.453s
+ok  	github.com/subgentic/coral/internal/license	0.265s
+ok  	github.com/subgentic/coral/internal/linktest	4.165s
+ok  	github.com/subgentic/coral/internal/logdedupe	0.142s
+?   	github.com/subgentic/coral/internal/logexit	[no test files]
+ok  	github.com/subgentic/coral/internal/loginlink	4.927s
+ok  	github.com/subgentic/coral/internal/logparse	0.284s
+ok  	github.com/subgentic/coral/internal/logrotate	0.166s
+ok  	github.com/subgentic/coral/internal/logsafe	3.412s
+ok  	github.com/subgentic/coral/internal/machinehealth	0.589s
+ok  	github.com/subgentic/coral/internal/mcpview	0.279s
+ok  	github.com/subgentic/coral/internal/mediatype	0.100s
+ok  	github.com/subgentic/coral/internal/naming	0.106s
+ok  	github.com/subgentic/coral/internal/peercred	0.358s
+?   	github.com/subgentic/coral/internal/proxy	[no test files]
+ok  	github.com/subgentic/coral/internal/psquote	0.147s
+ok  	github.com/subgentic/coral/internal/ptr	0.101s
+ok  	github.com/subgentic/coral/internal/ptymanager	123.357s
+ok  	github.com/subgentic/coral/internal/querypage	0.176s
+ok  	github.com/subgentic/coral/internal/safefs	0.788s
+ok  	github.com/subgentic/coral/internal/safego	0.741s
+ok  	github.com/subgentic/coral/internal/secfile	7.619s
+?   	github.com/subgentic/coral/internal/secfile/secfiletest	[no test files]
+ok  	github.com/subgentic/coral/internal/secrets	220.592s
+ok  	github.com/subgentic/coral/internal/secrets/hubharness	46.025s
+ok  	github.com/subgentic/coral/internal/server	206.850s
+ok  	github.com/subgentic/coral/internal/server/routes	449.110s
+ok  	github.com/subgentic/coral/internal/serverproof	0.599s
+ok  	github.com/subgentic/coral/internal/sessionstate	3.070s
+ok  	github.com/subgentic/coral/internal/settings	1.032s
+ok  	github.com/subgentic/coral/internal/stallwatch	0.816s
+ok  	github.com/subgentic/coral/internal/startup	94.737s
+?   	github.com/subgentic/coral/internal/startup/locktest	[no test files]
+ok  	github.com/subgentic/coral/internal/store	164.938s
+ok  	github.com/subgentic/coral/internal/store/storetest	2.546s
+ok  	github.com/subgentic/coral/internal/stripstatic	15.929s
+ok  	github.com/subgentic/coral/internal/subagent	0.272s
+ok  	github.com/subgentic/coral/internal/taskcli	0.148s
+ok  	github.com/subgentic/coral/internal/teamhealth	0.641s
+ok  	github.com/subgentic/coral/internal/terminalinput	3.020s
+ok  	github.com/subgentic/coral/internal/testguard	20.426s
+?   	github.com/subgentic/coral/internal/testleak	[no test files]
+ok  	github.com/subgentic/coral/internal/thinkinglevel	0.154s
+ok  	github.com/subgentic/coral/internal/tmux	82.857s
+?   	github.com/subgentic/coral/internal/tools/routeshapes	[no test files]
+2026/10/29 08:40:20 [tracking] delivery failure: event=installation_active_week status=500 detail=
+--- FAIL: TestCIRunnersThatStartCoralDisableTelemetry (0.23s)
+    ci_telemetry_census_test.go:155: tests/frontend/goal_words.test.mjs starts a Coral but does not assign CORAL_TELEMETRY_DISABLED a true value on a non-comment line (add it, or if it does not start a sender, add it to notAStarter with a reason)
+2026/10/29 08:40:21 [tracking] delivery failure: event=session_launched status=503 detail=
+2026/10/29 08:40:21 [tracking] delivery failure: event=session_launched status=429 detail=
+2026/10/29 08:40:21 [tracking] delivery failure: event=session_launched status=500 detail=
+2026/10/29 08:40:21 [tracking] delivery failure: event=session_launched status=500 detail=
+2026/10/29 08:40:21 [tracking] delivery failure: event=session_launched status=500 detail=
+2026/10/29 08:40:21 [tracking] delivery failure: event=session_launched status=400 detail=
+2026/10/29 08:40:21 [tracking] delivery failure: event=session_launched status=503 detail=
+2026/10/29 08:40:21 [tracking] delivery failure: event=session_launched status=503 detail=
+2026/10/29 08:40:21 [tracking] delivery failure: event=first_agent_launched status=500 detail=
+2026/10/29 08:40:21 [tracking] delivery failure: event=first_agent_launched status=500 detail=
+2026/10/29 08:40:21 [tracking] delivery failure: event=first_agent_launched status=500 detail=
+2026/10/29 08:40:21 [tracking] delivery failure: event=dashboard_active_day status=500 detail=
+2026/10/29 08:40:21 [tracking] delivery failure: event=dashboard_active_day status=500 detail=
+2026/10/29 08:40:21 [tracking] delivery failure: event=dashboard_active_day status=500 detail=
+2026/10/29 08:40:21 [tracking] delivery failure: event=first_task_completed status=500 detail=
+2026/10/29 08:40:21 [tracking] delivery failure: event=first_task_completed status=500 detail=
+2026/10/29 08:40:21 [tracking] delivery failure: event=first_task_completed status=500 detail=
+2026/10/29 08:40:21 [tracking] delivery failure: event=first_task_completed status=500 detail=
+2026/10/29 08:40:21 [tracking] delivery failure: event=first_task_completed status=500 detail=
+2026/10/29 08:40:21 [tracking] delivery failure: event=first_task_completed status=500 detail=
+2026/10/29 08:40:21 [tracking] delivery failure: event=first_agent_launched status=500 detail=
+2026/10/29 08:40:21 [tracking] delivery failure: event=first_agent_launched status=500 detail=
+2026/10/29 08:40:21 [tracking] delivery failure: event=first_agent_launched status=500 detail=
+2026/10/29 08:40:21 [tracking] delivery failure: event=test_event status=500 detail=through a link
+2026/10/29 08:40:21 [tracking] delivery failure: event=test_event status=500 detail=through a link
+2026/10/29 08:40:21 [tracking] delivery failure: event=eula_accepted status=500 detail=
+2026/10/29 08:40:22 [tracking] delivery failure: event=eula_accepted status=500 detail=
+2026/10/29 08:40:24 [tracking] delivery failure: event=eula_accepted status=500 detail=
+2026/10/29 08:40:24 [tracking] delivery failure: event=app_opened status=500 detail=
+2026/10/29 08:40:24 [tracking] delivery failure: event=app_opened status=500 detail=
+2026/10/29 08:40:26 [tracking] delivery failure: event=app_opened status=500 detail=
+2026/10/29 08:40:31 [tracking] delivery failure: event=session_launched status=0 detail=Post "https://us.i.posthog.com/capture/": context deadline exceeded (Client.Timeout exceeded while awaiting headers)
+2026/10/29 08:40:37 [tracking] delivery failure: event=session_launched status=0 detail=Post "https://us.i.posthog.com/capture/": context deadline exceeded (Client.Timeout exceeded while awaiting headers)
+2026/10/29 08:40:44 [tracking] delivery failure: event=session_launched status=0 detail=Post "https://us.i.posthog.com/capture/": context deadline exceeded (Client.Timeout exceeded while awaiting headers)
+FAIL
+FAIL	github.com/subgentic/coral/internal/tracking	24.021s
+ok  	github.com/subgentic/coral/internal/transcriptlink	0.302s
+ok  	github.com/subgentic/coral/internal/typedcensus	0.605s
+ok  	github.com/subgentic/coral/internal/updatecheck	1.006s
+ok  	github.com/subgentic/coral/internal/updater/apply	5.402s
+ok  	github.com/subgentic/coral/internal/updater/install	0.360s
+ok  	github.com/subgentic/coral/internal/updater/runrecord	0.174s
+ok  	github.com/subgentic/coral/internal/updater/stage	11.214s
+?   	github.com/subgentic/coral/internal/updater/status	[no test files]
+ok  	github.com/subgentic/coral/internal/updater/testrig	34.483s
+?   	github.com/subgentic/coral/internal/updater/testrig/cmd/person-call	[no test files]
+ok  	github.com/subgentic/coral/internal/updater/trigger	0.605s
+ok  	github.com/subgentic/coral/internal/updater/verify	5.496s
+ok  	github.com/subgentic/coral/internal/uploads	0.478s
+ok  	github.com/subgentic/coral/internal/vtscreen	7.322s
+ok  	github.com/subgentic/coral/internal/windowmark	0.153s
+ok  	github.com/subgentic/coral/internal/winshell	0.173s
+?   	github.com/subgentic/coral/internal/winuser	[no test files]
+ok  	github.com/subgentic/coral/pkg/frontend	52.675s
+ok  	github.com/subgentic/coral/pkg/hubproxy	80.297s
+ok  	github.com/subgentic/coral/pkg/license	0.167s
+ok  	github.com/subgentic/coral/pkg/redact	17.785s
+ok  	github.com/subgentic/coral/pkg/redact/betterleaks	20.985s
+ok  	github.com/subgentic/coral/pkg/secretbox	0.285s
+ok  	github.com/subgentic/coral/pkg/tunnel	211.314s
+?   	github.com/subgentic/coral/tools/strip-static	[no test files]
+FAIL
