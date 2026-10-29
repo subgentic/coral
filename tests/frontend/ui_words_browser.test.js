@@ -48,14 +48,14 @@ const BASE = require('./test_base').BASE;
             await shot(`words-confirm-${w}`);
             await ev(`document.querySelector('#confirm-modal .modal-actions .btn:not(#confirm-modal-yes)').click(); true`);
         }
-        // the agent row's one chip on the phone's list, drawn: sentence case (an agent that needs you; the other states are the dot's)
+        // the agent row's status on the phone's list, drawn: sentence case, not upper-cased (an agent that needs you; the phone has no chip since #10691, the state is the row's second line)
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
         await ev(`window.switchNavTab('agents'); window._coralSetLiveSessions([{ session_id: 'i1', name: 'idle-1', agent_type: 'claude', working_directory: '/tmp/x', sleeping: false, display_name: 'Idle One', model: 'claude-opus-5-5', summary: 'Waiting for work', waiting_for_input: true }]); true`);
-        await waitFor(`!!document.querySelector('#mobile-session-list .session-state-pill') && document.querySelector('#mobile-session-list .session-state-pill').getClientRects().length > 0`, 'the phone row chip, drawn', 8000);
-        const chip = await ev(`(() => { const c = document.querySelector('#mobile-session-list .session-state-pill'); return { text: c.textContent.trim(), transform: getComputedStyle(c).textTransform }; })()`);
-        assert.equal(chip.transform, 'none', 'the row chip is not upper-cased: ' + JSON.stringify(chip));
+        await waitFor(`!!document.querySelector('#mobile-session-list .session-status-line') && document.querySelector('#mobile-session-list .session-status-line').getClientRects().length > 0`, 'the phone row status line, drawn', 8000);
+        const chip = await ev(`(() => { const c = document.querySelector('#mobile-session-list .session-status-line'); return { text: c.textContent.trim(), transform: getComputedStyle(c).textTransform }; })()`);
+        assert.equal(chip.transform, 'none', 'the row status is not upper-cased: ' + JSON.stringify(chip));
         assert.match(chip.text, /^[A-Z][a-z]/, 'its words are sentence case: ' + JSON.stringify(chip));
         await shot('words-phone-card-390');
-        console.log('PASS ui words: create buttons without a plus, no Close X and Cancel closes, a sentence-case confirm title and phone row chip');
+        console.log('PASS ui words: create buttons without a plus, no Close X and Cancel closes, a sentence-case confirm title and phone row status');
     } finally { await removeBoards(ev, [B]).catch(() => {}); await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
