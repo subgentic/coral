@@ -41,7 +41,7 @@ New agents use it unless you choose a model when you launch them.
 
 1. Open the **Inbox**, then **All chats**, and find the chat (the answer above, Find an old chat, says how).
 2. Press **Continue this chat**: the round play button at the end of the chat's row, or the **Continue this chat** button on the chat's own page. The chat opens first.
-3. The **Resume session** dialog asks which **Working Directory** to start in. It fills in the folder the chat ran in, and says so under the box. Keep it, or press **Browse** to pick another folder and **Use this folder**: the dialog warns that the files the chat was using may not be found there. If the chat belonged to a team, **Rejoin board** puts the agent back on its message board.
+3. The **Resume session** dialog asks which **Working Directory** to start in. It fills in the folder the chat ran in, and says so under the box. Keep it, or press **Browse** to pick another folder and **Use this folder**: the dialog warns that the files the chat was using may not be found there. **Resume in** picks how much the agent may do without asking (the last answer on this page lists each one): the chat keeps what it ran with, the note under the folder says which, and you can pick another or the saved default. If the chat belonged to a team, **Rejoin board** puts the agent back on its message board.
 4. Press **Resume**. A live agent starts in that folder and picks the conversation up where it stopped; the old chat stays as it was.
 
 ## Give an agent a file
@@ -58,8 +58,8 @@ New agents use it unless you choose a model when you launch them.
 - **Plan:** reads only. Best for exploring a codebase before changing it.
 - **Accept edits:** reads, edits files and runs common file commands (mkdir, touch, mv, cp). Best for iterating on code you are reviewing. Codex does not have it.
 - **Auto:** everything, but what that means depends on the CLI. **Claude** checks each action for safety. **Codex** runs in a workspace sandbox that never asks, with the network on. **Antigravity** and **Gemini** have no prompts and no safety checks. **Pi** has no permission prompts at all: it always acts on its own.
-- **Bypass permissions:** everything except protected paths, with the safety checks off. Only for isolated containers and virtual machines.
-- **Don't ask:** only tools you approved ahead of time. Best for locked-down CI and scripts. Codex does not have it: its Auto is the same launch.
+- **Bypass permissions:** everything except protected paths, with the safety checks off. Only for isolated containers and virtual machines. On **Antigravity**, **Gemini** and **Pi** it means what Auto means there: no prompts and no safety checks (Pi always acts on its own).
+- **Don't ask:** only tools you approved ahead of time. Best for locked-down CI and scripts. Codex does not have it: its Auto is the same launch. On **Antigravity**, **Gemini** and **Pi** it means what Auto means there: no prompts and no safety checks (Pi always acts on its own).
 
 **Not set** starts a new agent in Auto and a new team member in Default. With such a default, an orchestrator's launches of other agents are refused until you pick Default or start them yourself.
 

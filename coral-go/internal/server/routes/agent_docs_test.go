@@ -282,6 +282,8 @@ func TestHowDoIAnswersContinueAFileAndThePermissionModes(t *testing.T) {
 	for _, cli := range []string{"**Claude**", "**Codex**", "**Antigravity**", "**Gemini**", "**Pi**"} {
 		assert.Contains(t, text, cli, "Auto says where the CLIs differ")
 	}
+	assert.Contains(t, text, "**Resume in**", "the Resume dialog's mode row is named")
+	assert.GreaterOrEqual(t, strings.Count(text, "On **Antigravity**, **Gemini** and **Pi** it means what Auto means there"), 2, "Bypass permissions and Don't ask say what they mean on the CLIs with no checks")
 	static := filepath.Join("..", "..", "..", "pkg", "frontend")
 	read := func(rel ...string) string {
 		b, err := os.ReadFile(filepath.Join(append([]string{static}, rel...)...))
@@ -291,7 +293,7 @@ func TestHowDoIAnswersContinueAFileAndThePermissionModes(t *testing.T) {
 	chats, composer, modals, history, fields, modes := read("static", "mailbox_chats.js"), read("templates", "includes", "views", "live_session.html"), read("templates", "includes", "modals.html"), read("templates", "includes", "views", "history_session.html"), read("static", "settings_fields.js"), read("static", "permission_flags.js")
 	for want, src := range map[string]string{
 		"Continue this chat": chats, ">Continue this chat</button>": history, // the row's play button and the chat page's button
-		"Resume session": modals, "Working Directory": modals, "Use this folder": modals, "Rejoin board": modals, // the dialog the button opens
+		"Resume session": modals, "Working Directory": modals, "Use this folder": modals, "Rejoin board": modals, "Resume in": modals, // the dialog the button opens
 		"type @ for a file in this folder": composer, "Attach an image": composer, // the message box's corner button
 		"Not set (Auto)": fields, "Bypass permissions": fields, "Don't ask": fields, // the Settings select the answer is about
 		"Pi has no permission prompts": modes, "Workspace sandbox": modes, // the per-CLI facts of Auto
