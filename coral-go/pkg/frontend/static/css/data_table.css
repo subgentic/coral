@@ -500,7 +500,7 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 }
 
 /* A job or workflow Coral added as an example: its name and an Example tag on one line (#10001). */
-.dt-name-example { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; min-width: 0; }
+.dt-name-example { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; min-width: 0; padding: 4px 0; } /* a cell has no vertical padding: the badge under the name sat on the row's border (#11051) */
 .dt-name-example .dt-primary { min-width: min(100%, 7rem); flex: 0 1 auto; width: auto; } /* the badge goes under the name when there is no room beside it: a 148 px cell kept the name 49 px, a letter a line (#10475, the Mobile Beta Tester's measure) */
 
 /* A Needs you row's answer buttons (#10400): the card's own choices, 44 px on a phone. */

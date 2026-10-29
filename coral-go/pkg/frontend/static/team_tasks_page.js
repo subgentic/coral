@@ -287,6 +287,10 @@ function watch() {
     watching = true;
     pollEvery(refresh, 15000);
     window.addEventListener('focus', refresh);
+    document.addEventListener('coral:task-created', e => { // a task made from this page's New task is in the list at once, not at the next read
+        if (!root || !root.isConnected || !model.project || (e.detail && e.detail.project !== model.project)) return;
+        (TF.isQuery(model.filters) ? loadQuery({ quiet: true }) : loadTasks());
+    });
     document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
 }
 

@@ -163,6 +163,7 @@ async function submitValues(values) {
         hideCreateTaskModal();
         if (_created) await _created();
         else await loadBoardTasks(boardProject);
+        document.dispatchEvent(new CustomEvent('coral:task-created', { detail: { project: boardProject } })); // the team's Tasks page reads its own list again (it is not the dock's)
         showToast('Task created');
     } catch (e) {
         view.fold(true); // server validation can name a workflow or prerequisite field; keep all of them visible

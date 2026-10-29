@@ -110,7 +110,8 @@ export function toggleAgentSleep(name, agentType, sessionId, action) {
                 if (!sleeping) s.archived = false; // waking unarchives (#3030)
             }
             redrawLiveList();
-            showToast(sleeping ? `"${name}" is now sleeping` : `"${name}" is awake`);
+            const who = (s && s.display_name) || name; // the agent's name, not its folder ("home")
+            showToast(sleeping ? `"${who}" is now sleeping` : `"${who}" is awake`);
             return true;
         } catch (e) {
             showToast('Failed to toggle agent sleep', true);
