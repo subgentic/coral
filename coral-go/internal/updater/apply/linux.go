@@ -259,7 +259,7 @@ func (l *Linux) exec(ctx context.Context, env []string, name string, args ...str
 	}
 	cctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-	cmd := exec.CommandContext(cctx, name, args...)
+	cmd := exec.CommandContext(cctx, name, args...) // consoletest:allow the Linux apply (systemd, ps): never run on Windows
 	cmd.Env = env
 	var out bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &out
