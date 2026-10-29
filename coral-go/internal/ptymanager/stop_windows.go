@@ -62,15 +62,22 @@ func hasChildProcesses(pid int) (bool, error) {
 // executable path through its handle, never from the command line text. Any failure, or a process that is gone, is "no": the polite stop
 // then types nothing (#5665).
 func rootIsShell(pid int) bool {
+	image, ok := processImage(pid)
+	return ok && isShellImage(image)
+}
+
+// processImage is the full path of a process's executable, read through its handle; ok is false when it can't be read
+// (the process is gone, or another user's).
+func processImage(pid int) (string, bool) {
 	h, err := windows.OpenProcess(windows.PROCESS_QUERY_LIMITED_INFORMATION, false, uint32(pid))
 	if err != nil {
-		return false
+		return "", false
 	}
 	defer windows.CloseHandle(h)
 	buf := make([]uint16, windows.MAX_PATH*2)
 	n := uint32(len(buf))
 	if err := windows.QueryFullProcessImageName(h, 0, &buf[0], &n); err != nil {
-		return false
+		return "", false
 	}
-	return isShellImage(windows.UTF16ToString(buf[:n]))
+	return windows.UTF16ToString(buf[:n]), true
 }
