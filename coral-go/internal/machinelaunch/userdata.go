@@ -33,6 +33,9 @@ type UserDataSpec struct {
 	MaxMode string
 	// CoralVersion is the release to install, x.y.z (no "v"). Required.
 	CoralVersion string
+	// CoralDigests are the SHA-256 digests of that release's Linux tarballs, pinned by the CLI (PinnedReleaseDigests) or given by the person. The machine checks its download against these and nothing it fetches
+	// itself (#10919). Required.
+	CoralDigests ReleaseDigests
 	// Agents are the agent CLIs to install: "name@version" for the npm-installed ones (claude, codex, pi), which must be pinned; "agy@sha256:<64 hex>" for Antigravity's installer, which takes no
 	// version: the installer script is fetched to a file, checked against that SHA-256 and only then run, and it runs only when this says so. Every installer fetched on the machine is pinned this
 	// way, none is piped into a shell. The names come from the one table of CLIs (internal/agent).
@@ -155,6 +158,9 @@ func BuildUserData(spec UserDataSpec) (string, error) {
 	if !versionRe.MatchString(spec.CoralVersion) {
 		return "", fmt.Errorf("the Coral version %q is not x.y.z", spec.CoralVersion)
 	}
+	if err := spec.CoralDigests.Valid(); err != nil {
+		return "", err
+	}
 	hub := spec.HubURL
 	if hub == "" {
 		hub = DefaultHubURL
@@ -220,7 +226,7 @@ func BuildUserData(spec UserDataSpec) (string, error) {
 	emitFile("/etc/systemd/system/coral-finish.path", "0644", finishPathUnit())
 	emitFile("/etc/systemd/system/coral-finish.service", "0644", finishServiceUnit())
 	emitFile("/etc/systemd/system/coral-finish.timer", "0644", finishTimerUnit())
-	emitFile("/usr/local/sbin/coral-machine-setup", "0700", setupScript(spec.CoralVersion))
+	emitFile("/usr/local/sbin/coral-machine-setup", "0700", setupScript(spec.CoralVersion, spec.CoralDigests))
 	emitFile("/usr/local/sbin/coral-machine-finish", "0700", finishScript(len(agents) > 0))
 	if len(agents) > 0 {
 		emitFile("/usr/local/sbin/coral-machine-agents", "0700", agentsScript(agents))
@@ -434,18 +440,19 @@ WantedBy=multi-user.target
 `, hub, mode)
 }
 
-// setupScript installs the Coral release and stops at the first failure. The tarball is installed only after its SHA-256 matches the one line of the release's SHA256SUMS.txt that names it.
-func setupScript(version string) string {
+// setupScript installs the Coral release and stops at the first failure. The tarball is installed only after its SHA-256 matches the digest the launcher pinned for this release and architecture and passed in here: no
+// checksum list is fetched on the machine, so there is nothing for a swapped download to agree with (#10919).
+func setupScript(version string, digests ReleaseDigests) string {
 	var s strings.Builder
 	p := func(format string, a ...any) { fmt.Fprintf(&s, format+"\n", a...) }
 	p("#!/bin/sh")
-	p("# Installs the Coral release, checked against its SHA256SUMS.txt. Stops at the first failure: set -eu.")
+	p("# Installs the Coral release, checked against the digest pinned in the launcher. Stops at the first failure: set -eu.")
 	p("set -eu")
 	p("")
 	p("# The Coral release for this machine, verified before it is installed.")
 	p("case \"$(uname -m)\" in")
-	p("  x86_64) arch=amd64 ;;")
-	p("  aarch64) arch=arm64 ;;")
+	p("  x86_64) arch=amd64; want=%s ;;", digests.AMD64)
+	p("  aarch64) arch=arm64; want=%s ;;", digests.ARM64)
 	p("  *) echo \"coral-machine-setup: no Coral release for $(uname -m)\" >&2; exit 1 ;;")
 	p("esac")
 	p("version=%s", version)
@@ -455,10 +462,7 @@ func setupScript(version string) string {
 	p("trap 'rm -rf \"$work\"' EXIT")
 	p("cd \"$work\"")
 	p("curl -fsSL --proto '=https' --tlsv1.2 -o \"$tarball\" \"$base/$tarball\"")
-	p("curl -fsSL --proto '=https' --tlsv1.2 -o SHA256SUMS.txt \"$base/SHA256SUMS.txt\"")
-	p("grep -E \"^[0-9a-f]{64} [ *]${tarball}\\$\" SHA256SUMS.txt > expected.sum")
-	p("[ \"$(wc -l < expected.sum)\" -eq 1 ] || { echo \"coral-machine-setup: SHA256SUMS.txt does not list $tarball exactly once\" >&2; exit 1; }")
-	p("sha256sum -c expected.sum")
+	p("echo \"${want}  ${tarball}\" | sha256sum -c -")
 	p("tar -xzf \"$tarball\" -C /usr/local/bin/")
 	p("test -x /usr/local/bin/coral")
 	return s.String()

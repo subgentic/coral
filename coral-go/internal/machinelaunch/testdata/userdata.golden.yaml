@@ -121,13 +121,13 @@ write_files:
     permissions: '0700'
     content: |
       #!/bin/sh
-      # Installs the Coral release, checked against its SHA256SUMS.txt. Stops at the first failure: set -eu.
+      # Installs the Coral release, checked against the digest pinned in the launcher. Stops at the first failure: set -eu.
       set -eu
 
       # The Coral release for this machine, verified before it is installed.
       case "$(uname -m)" in
-        x86_64) arch=amd64 ;;
-        aarch64) arch=arm64 ;;
+        x86_64) arch=amd64; want=1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a ;;
+        aarch64) arch=arm64; want=2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b ;;
         *) echo "coral-machine-setup: no Coral release for $(uname -m)" >&2; exit 1 ;;
       esac
       version=2.0.3
@@ -137,10 +137,7 @@ write_files:
       trap 'rm -rf "$work"' EXIT
       cd "$work"
       curl -fsSL --proto '=https' --tlsv1.2 -o "$tarball" "$base/$tarball"
-      curl -fsSL --proto '=https' --tlsv1.2 -o SHA256SUMS.txt "$base/SHA256SUMS.txt"
-      grep -E "^[0-9a-f]{64} [ *]${tarball}\$" SHA256SUMS.txt > expected.sum
-      [ "$(wc -l < expected.sum)" -eq 1 ] || { echo "coral-machine-setup: SHA256SUMS.txt does not list $tarball exactly once" >&2; exit 1; }
-      sha256sum -c expected.sum
+      echo "${want}  ${tarball}" | sha256sum -c -
       tar -xzf "$tarball" -C /usr/local/bin/
       test -x /usr/local/bin/coral
   - path: /usr/local/sbin/coral-machine-finish

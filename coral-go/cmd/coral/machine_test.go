@@ -97,8 +97,8 @@ func machineFixture(t *testing.T) (tokenFile, keyFile string, p *machineStubProv
 		return p, nil
 	}
 	newMachineHub = func(baseURL, key, terms string) machinelaunch.Minter { return h }
-	machineUserData = func(keys *machinelaunch.BootKeys, sshFrom, maxMode, version, hubURL string, agents []string) (string, error) {
-		return "#cloud-config\n# " + sshFrom + " " + maxMode + " " + version + " " + strings.Join(agents, ",") + "\n", nil
+	machineUserData = func(keys *machinelaunch.BootKeys, sshFrom, maxMode, version string, digests machinelaunch.ReleaseDigests, hubURL string, agents []string) (string, error) {
+		return "#cloud-config\n# " + sshFrom + " " + maxMode + " " + version + " " + strings.Join(agents, ",") + " " + digests.AMD64 + "\n", nil
 	}
 	t.Cleanup(func() {
 		newMachineProvider, newMachineHub, machineUserData, newMachineBootstrap, detectSSHSource = oldP, oldH, oldU, oldB, oldD
@@ -200,8 +200,8 @@ func TestMachineLaunchWarnsWhenTheHubIsNotThisBuildsDefault(t *testing.T) {
 // no Hub key and no private key, and carries the launch's public login key and the address SSH accepts; a pinned agy installer and the npm CLIs are accepted.
 func TestMachineLaunchBuildsTheRealUserDataWithNoCredential(t *testing.T) {
 	tf, kf, p, h := machineFixture(t)
-	machineUserData = func(keys *machinelaunch.BootKeys, sshFrom, maxMode, version, hubURL string, agents []string) (string, error) {
-		spec := machinelaunch.UserDataSpec{AllowSSHFrom: sshFrom, MaxMode: maxMode, CoralVersion: version, HubURL: hubURL, Agents: agents}
+	machineUserData = func(keys *machinelaunch.BootKeys, sshFrom, maxMode, version string, digests machinelaunch.ReleaseDigests, hubURL string, agents []string) (string, error) {
+		spec := machinelaunch.UserDataSpec{AllowSSHFrom: sshFrom, MaxMode: maxMode, CoralVersion: version, CoralDigests: digests, HubURL: hubURL, Agents: agents}
 		if err := keys.FillUserData(&spec); err != nil {
 			return "", err
 		}
@@ -251,6 +251,40 @@ func TestMachineLaunchMaxModeDefaultsToView(t *testing.T) {
 	machineUsage(&help)
 	if !strings.Contains(help.String(), "default view") {
 		t.Errorf("the usage says the default: %s", help.String())
+	}
+}
+
+// The Coral download is checked against a digest the CLI pins, or one the person gives for a version it does not pin; a version with neither is refused before anything is read or made (#10919).
+func TestMachineLaunchPinsTheCoralDigest(t *testing.T) {
+	tf, kf, p, h := machineFixture(t)
+	base := func(version string, extra ...string) []string {
+		return append([]string{"launch", "--provider", "digitalocean", "--token-file", tf, "--hub-key-file", kf, "--hub-url", "https://hub.example", "--coral-version", version, "--yes"}, extra...)
+	}
+	pinned, _ := machinelaunch.PinnedReleaseDigests("2.0.3")
+	var out, errb bytes.Buffer
+	if code := runMachine(base("2.0.3"), strings.NewReader(""), &out, &errb); code != 0 || !strings.Contains(p.spec.UserData, pinned.AMD64) {
+		t.Fatalf("a pinned version uses its pinned digest: exit %d %s / %s", code, errb.String(), p.spec.UserData)
+	}
+	calls := len(p.calls)
+	for name, args := range map[string][]string{
+		"a version with no pinned digest and none given": base("9.9.9"),
+		"one digest only":          base("9.9.9", "--coral-sha256-amd64", strings.Repeat("ab", 32)),
+		"a digest that is not hex": base("9.9.9", "--coral-sha256-amd64", "zz", "--coral-sha256-arm64", "zz"),
+	} {
+		out.Reset()
+		errb.Reset()
+		if code := runMachine(args, strings.NewReader(""), &out, &errb); code != 2 {
+			t.Errorf("%s: exit %d (%s)", name, code, errb.String())
+		}
+	}
+	if len(p.calls) != calls || len(h.labels) != 1 {
+		t.Fatalf("a refused version made calls: %v %v", p.calls, h.labels)
+	}
+	out.Reset()
+	errb.Reset()
+	given := base("9.9.9", "--coral-sha256-amd64", strings.Repeat("ab", 32), "--coral-sha256-arm64", strings.Repeat("cd", 32))
+	if code := runMachine(given, strings.NewReader(""), &out, &errb); code != 0 || !strings.Contains(p.spec.UserData, strings.Repeat("ab", 32)) {
+		t.Fatalf("a version with the person's digests is launched with them: exit %d %s", code, errb.String())
 	}
 }
 

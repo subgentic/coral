@@ -49,7 +49,7 @@ func (l *listFlag) Set(v string) error { *l = append(*l, v); return nil }
 func machineUsage(w io.Writer) {
 	fmt.Fprintln(w, "usage: coral machine launch --provider digitalocean --token-file <path|-> --hub-key-file <path|-> [--hub-url https://app.coralhub.dev]")
 	fmt.Fprintln(w, "         [--name NAME] [--region nyc3] [--size s-2vcpu-4gb] [--image SLUG] [--ssh-key ID]... [--agents claude@VERSION,codex@VERSION,pi@VERSION,agy@sha256:HEX]")
-	fmt.Fprintln(w, "         [--max-mode view|interact|launch (default view)] [--coral-version VERSION] [--allow-ssh-from ADDRESS] [--yes]")
+	fmt.Fprintln(w, "         [--max-mode view|interact|launch (default view)] [--coral-version VERSION [--coral-sha256-amd64 HEX --coral-sha256-arm64 HEX]] [--allow-ssh-from ADDRESS] [--yes]")
 }
 
 func runMachine(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
@@ -71,6 +71,8 @@ func runMachine(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	maxMode := fs.String("max-mode", "view", "the most Coral Hub may do on the machine: view (the default), interact or launch: interact and launch are asked for explicitly")
 	coralVersion := fs.String("coral-version", "", "the Coral release to install (default: this binary's version)")
 	yes := fs.Bool("yes", false, "go on without asking (the price is still printed)")
+	sha256AMD64 := fs.String("coral-sha256-amd64", "", "the SHA-256 of the release's linux-amd64 tarball, for a --coral-version this build has no pinned digest for (from a SHA256SUMS you checked)")
+	sha256ARM64 := fs.String("coral-sha256-arm64", "", "the SHA-256 of the release's linux-arm64 tarball, as --coral-sha256-amd64")
 	sshFrom := fs.String("allow-ssh-from", "", "the address (or CIDR) the machine's SSH accepts while the launch sets it up (default: this computer's public address, found over HTTPS)")
 	var sshKeys listFlag
 	fs.Var(&sshKeys, "ssh-key", "a provider ssh key id or fingerprint to install (repeatable); none by default")
@@ -118,6 +120,16 @@ func runMachine(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			agentList = append(agentList, a)
 		}
 	}
+	digests, ok := machinelaunch.PinnedReleaseDigests(version)
+	if *sha256AMD64 != "" || *sha256ARM64 != "" {
+		digests, ok = machinelaunch.ReleaseDigests{AMD64: *sha256AMD64, ARM64: *sha256ARM64}, true // the person's own, from a list they checked: used instead of a pinned one
+	}
+	if !ok {
+		return fail("this build has no pinned digest for Coral %s: pass --coral-sha256-amd64 and --coral-sha256-arm64, the two Linux lines of that release's SHA256SUMS.txt (check the file first), or launch a version this build pins", version)
+	}
+	if err := digests.Valid(); err != nil {
+		return fail("--coral-sha256-amd64 and --coral-sha256-arm64: %v", err)
+	}
 	checkKeys, err := machinelaunch.NewBootKeys()
 	if err != nil {
 		return fail("%v", err)
@@ -130,7 +142,7 @@ func runMachine(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		}
 		checkSource, *sshFrom = v, v
 	}
-	_, err = machineUserData(checkKeys, checkSource, *maxMode, version, *hubURL, agentList) // the flags are checked by the builder before any secret is read or any call is made
+	_, err = machineUserData(checkKeys, checkSource, *maxMode, version, digests, *hubURL, agentList) // the flags are checked by the builder before any secret is read or any call is made
 	checkKeys.Destroy()
 	if err != nil {
 		return fail("%v", err)
@@ -171,7 +183,7 @@ func runMachine(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	deps := machinelaunch.Deps{
 		Provider: p, Hub: hub, Out: stdout, Bootstrap: newMachineBootstrap(),
 		UserData: func(keys *machinelaunch.BootKeys) (string, error) {
-			return machineUserData(keys, source, *maxMode, version, *hubURL, agentList)
+			return machineUserData(keys, source, *maxMode, version, digests, *hubURL, agentList)
 		},
 	}
 	if f, ok := stdin.(*os.File); ok && isTerminal(f) && *tokenFile != "-" && *keyFile != "-" {
