@@ -157,7 +157,7 @@ const BASE = require('./test_base').BASE;
         assert.doesNotMatch(out.lead1 + out.lead2, /nothing changed|now asks browsers/);
         assert.deepEqual(out.weak, { level: 'weak', disabled: false }, 'the meter advises and never blocks');
         assert.equal(out.meterEmpty, 'hidden', 'no strength bar is drawn before anything is typed (#9971), though its space is kept so Confirm does not move when typing starts (#10281)'); assert.equal(out.meterTyped, 'visible', 'the bar shows once something is typed');
-        assert.equal(out.notNowNote, 'Not now: the Coral app, the tray and the coral open command still let you in here, and nothing else can reach Coral. A password adds sign-in from any browser and from other devices (Settings, Security and privacy).', 'the prompt says what Not now leaves you with, in words that read');
+        assert.equal(out.notNowNote, 'Without one, the Coral app, the tray and the coral open command still let you in here, and nothing else can reach Coral. A password adds sign-in from any browser and from other devices (Settings, Security and privacy).', 'the prompt says what no password leaves you with, and the paragraph does not open with the button\'s name (#10892)');
         assert.ok(out.noteGap >= 8, 'room between that line and the Password label (' + out.noteGap + ' px)'); assert.equal(out.notNowInView, true, 'Not now is within the screen')
         assert.equal(out.emptyErr, 'Enter a password.'); assert.equal(out.callsAfterEmpty, 0);
         assert.match(out.mismatchErr, /do not match/); assert.equal(out.callsAfterMismatch, 0, 'nothing is sent for a mismatch');

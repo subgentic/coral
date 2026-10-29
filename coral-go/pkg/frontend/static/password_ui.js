@@ -123,7 +123,7 @@ export function showSetPasswordModal({ local = false } = {}) {
     const body = el('div', 'modal-body');
     // One wording for everyone (a new install and an upgrade alike): what the password is for. The server has no first-run marker, and nobody needs "nothing changed here" (#6010).
     body.append(el('p', 'pw-lead', 'Choose a password to open Coral in a browser. The Coral app and the tray open without it.'));
-    body.append(el('p', 'pw-note pw-not-now', 'Not now: the Coral app, the tray and the coral open command still let you in here, and nothing else can reach Coral. A password adds sign-in from any browser and from other devices (Settings, Security and privacy).'));
+    body.append(el('p', 'pw-note pw-not-now', 'Without one, the Coral app, the tray and the coral open command still let you in here, and nothing else can reach Coral. A password adds sign-in from any browser and from other devices (Settings, Security and privacy).'));
     const form = el('form', 'pw-form'); form.autocomplete = 'on'; form.id = 'set-password-form';
     const pw = passwordField({ id: 'set-password-new', label: 'Password', autocomplete: 'new-password', name: 'new-password' });
     pw.input.setAttribute('aria-describedby', 'set-password-strength');
