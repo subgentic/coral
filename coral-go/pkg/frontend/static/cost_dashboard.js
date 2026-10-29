@@ -356,7 +356,7 @@ export async function _refreshCostDashboard({ force = false } = {}) {
             _setText('cost-total-cost', formatCost(t.cost_usd || 0, { zeroAsTwo: true }));
             const none = document.getElementById('cost-counts-note'); // nothing in this range: say what is counted, never a bare 0 (#10521)
             const nothing = !(t.num_requests > 0 || t.cost_usd > 0 || t.input_tokens > 0 || t.output_tokens > 0); // nothing at all: a total of money or tokens beside the note would contradict it
-            if (none) { none.textContent = nothing ? COUNTS_NOTE : ''; none.hidden = !nothing; }
+            if (none) { none.textContent = nothing ? COUNTS_NOTE : ''; if (nothing) delete none.dataset.empty; else none.dataset.empty = '1'; none.hidden = !nothing || state.analyticsView !== 'overview'; } // a read that arrives while another view is open leaves the Overview's note hidden (#10988) // data-empty: the view switcher (analytics_views.js) leaves a note with nothing to say hidden, as it un-hid it with the Overview (#10979)
             _flashLiveIndicator(); // the figures were read: say when
             _costTotal = t.cost_usd || 0;
 
