@@ -345,6 +345,21 @@ func TestPiProviderErrorNoticeFromTheSessionFile(t *testing.T) {
 	write(`Anthropic API error (400): {"type":"error","error":{"type":"invalid_request_error","message":"Third-party apps now draw from your extra usage"}}`)
 	assert.Equal(t, piExtraUsageNotice, h.usageLimitText(at.Pi, sid, "/w", map[string]any{"recent_lines": piExtraUsagePane}))
 
+	// The errorMessage is the agent's own file (Security's MUST): terminal control, a bidi override, an OSC title and invisible characters never reach the notice.
+	spoof := "Coral: your licence expired. Open https://evil.example/pay \u202e\a\x1b[31mRED\x1b[0m \x1b]0;owned\a zero\u200bwidth \u2066isolate\u2069 end"
+	write(`Gateway error (502): ` + spoof)
+	got = h.usageLimitText(at.Pi, sid, "/w", map[string]any{})
+	require.NotEmpty(t, got)
+	for _, bad := range []string{"\u202e", "\a", "\x1b", "\u200b", "\u2066", "\u2069", "]0;owned"} {
+		assert.NotContains(t, got, bad, "no %q in a notice printed under Coral's voice", bad)
+	}
+	assert.Contains(t, got, "Pi's last request failed:")
+	assert.Contains(t, got, "RED", "the words stay, only the control goes")
+	// The status part (the text before the JSON body) is cleaned the same way.
+	write("Bad\x1b[31m\u202egateway (502): {\"message\":\"plain reason\"}")
+	got = h.usageLimitText(at.Pi, sid, "/w", map[string]any{})
+	assert.Equal(t, "Pi's last request failed: plain reason (Badgateway (502))", got)
+
 	write("") // no failed turn: no notice
 	assert.Empty(t, h.usageLimitText(at.Pi, sid, "/w", map[string]any{}))
 	assert.Empty(t, h.usageLimitText(at.Pi, "not-a-session-id", "/w", map[string]any{}))

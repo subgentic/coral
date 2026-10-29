@@ -9,6 +9,7 @@ import (
 	"time"
 
 	at "github.com/subgentic/coral/internal/agenttypes"
+	"github.com/subgentic/coral/internal/clitext"
 	"github.com/subgentic/coral/internal/jsonl"
 	"github.com/subgentic/coral/internal/ptymanager"
 	"github.com/subgentic/coral/internal/sessionstate"
@@ -212,7 +213,13 @@ func piProviderErrorText(sessionID string) string {
 			}
 		}
 	}
-	reason = strings.Join(strings.Fields(reason), " ")
+	// The errorMessage is the agent's own file: a terminal escape, a bidi override or an invisible character in it would be printed under Coral's voice wherever the notice shows. Both parts
+	// go through the name cleaner (controls, escape sequences, bidi and every format character, one line) before they are built into the sentence (Security's MUST on #11092).
+	reason = clitext.CleanName(reason)
+	status = clitext.CleanName(status)
+	if reason == "" {
+		return ""
+	}
 	text := "Pi's last request failed: " + reason
 	if status != "" && status != reason {
 		text += " (" + status + ")"
