@@ -61,15 +61,34 @@ func ShellIdle(pid int) (idle bool, shell string, err error) {
 	if !IsShellCommand(shell) {
 		return false, shell, nil // the terminal's process is the agent itself (it was exec'd)
 	}
-	// Children: busy only if one of them is in the foreground of the terminal (a '+' in
-	// its ps state). A background job ('sleep &') left after the CLI exited is not the
-	// agent (#3268).
-	for _, c := range procs.children[pid] {
-		if strings.Contains(procs.byPID[c].stat, "+") {
-			return false, shell, nil
-		}
+	// Busy only if a program is in the foreground of the terminal (a '+' in its ps state) below the shell. A background job ('sleep &') left after the CLI exited is not the
+	// agent (#3268). A shell a person started at the prompt (bash inside the pane's zsh) is in the foreground too, but it is a bare prompt, not a program: only a foreground
+	// descendant that is not a shell makes the pane busy (#387, the Unix half of #378).
+	if foregroundProgramBelow(procs, pid, 0) {
+		return false, shell, nil
 	}
 	return true, shell, nil
+}
+
+// nestedShellDepth bounds the walk below the pane's shell (a shell inside a shell inside ...). A deeper tree is not walked to the end and counts as busy: a program may be below it.
+const nestedShellDepth = 8
+
+// foregroundProgramBelow reports whether a foreground process below pid is a program: a foreground child that is not a shell, or one below a foreground shell of a shell.
+// A shell with no foreground child is a bare prompt, however many shells deep.
+func foregroundProgramBelow(t *procTable, pid, depth int) bool {
+	if depth > nestedShellDepth {
+		return true
+	}
+	for _, c := range t.children[pid] {
+		e := t.byPID[c]
+		if !strings.Contains(e.stat, "+") {
+			continue
+		}
+		if !IsShellCommand(e.comm) || foregroundProgramBelow(t, c, depth+1) {
+			return true
+		}
+	}
+	return false
 }
 
 type procEntry struct {

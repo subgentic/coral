@@ -3,6 +3,7 @@ package tmux
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"strings"
@@ -170,4 +171,87 @@ func TestShellIdleFreshLookIsLimitedPerPidPerSecond(t *testing.T) {
 		require.ErrorContains(t, err, "no such process")
 	}
 	assert.Equal(t, int64(1), procTableRuns.Load()-before, "one fresh ps run for five checks of a pid that is not there")
+}
+
+// #387 (the Unix half of #378): a shell a person starts at an exited agent's prompt is a bare prompt, not a program. Only a foreground descendant that is not a shell makes the pane busy.
+func TestShellIdleNestedShellsAreABarePrompt(t *testing.T) {
+	prev := procTableLast
+	t.Cleanup(func() { procTableMu.Lock(); procTableLast = prev; procTableMu.Unlock() })
+	chain := func(n int) string { // the pane's shell 600, then n shells each in the foreground of the previous one
+		out := "  600     1 Ss+  -zsh\n"
+		for i := 1; i <= n; i++ {
+			out += fmt.Sprintf("  %d   %d S+   bash\n", 600+i, 600+i-1)
+		}
+		return out
+	}
+	for _, tc := range []struct {
+		name string
+		ps   string
+		idle bool
+	}{
+		{"the pane's shell alone", "  600     1 Ss+  -zsh\n", true},
+		{"a bash a person started", chain(1), true},
+		{"a bash in a bash in a bash", chain(3), true},
+		{"the agent CLI is running", "  600     1 Ss+  -zsh\n  601   600 S+   claude\n", false},
+		{"a program in a nested bash", chain(1) + "  700   601 S+   sleep\n", false},
+		{"a program two shells deep", chain(2) + "  700   602 S+   node\n", false},
+		{"a CLI started by a wrapper script (bash, then node)", "  600     1 Ss+  -zsh\n  601   600 S+   bash\n  602   601 S+   node\n", false},
+		{"a background job in a nested bash is not the agent", chain(1) + "  700   601 S    sleep\n", true},
+		{"a background job under the pane's shell, nested bash at its prompt", chain(1) + "  700   600 S    sleep\n", true},
+		{"a stopped program in the foreground is still a program", chain(1) + "  700   601 T+   vim\n", false},
+		{"too many shells deep to walk: busy", chain(nestedShellDepth + 3), false},
+		{"exactly as deep as the bound: still walked", chain(nestedShellDepth), true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			tb := parseProcTable(tc.ps)
+			tb.at = time.Now()
+			procTableMu.Lock()
+			procTableLast = tb
+			procTableMu.Unlock()
+			idle, shell, err := ShellIdle(600)
+			require.NoError(t, err)
+			assert.Equal(t, tc.idle, idle)
+			assert.Equal(t, "-zsh", shell)
+		})
+	}
+	// The terminal's process is the agent itself (exec'd, not a shell): not idle, with or without children.
+	tb := parseProcTable("  600     1 Ss+  claude\n")
+	tb.at = time.Now()
+	procTableMu.Lock()
+	procTableLast = tb
+	procTableMu.Unlock()
+	idle, _, err := ShellIdle(600)
+	require.NoError(t, err)
+	assert.False(t, idle)
+}
+
+// #387 on a real tmux pane: a bash started at the prompt is a bare prompt; a program in it is busy; Ctrl-C and the program is gone, idle again.
+func TestAgentShellIdleANestedBashIsABarePrompt(t *testing.T) {
+	c := newTestClient(t)
+	ctx := context.Background()
+	const sid = "6d8f0b32-4c5e-4071-9b2c-0e3f4a5b6c71"
+	name := "claude-" + sid
+	createTestSession(t, c, name, t.TempDir())
+	state := func() (bool, bool) {
+		v, _, err := c.AgentShellIdle(ctx, name, "claude", sid)
+		return v, err == nil
+	}
+	require.Eventually(t, func() bool { v, ok := state(); return ok && v }, shellWait, 25*time.Millisecond)
+
+	require.NoError(t, c.SendKeysToTarget(ctx, terminalinput.Unclassified, name+".0", "bash --norc --noprofile"))
+	pid, err := c.DisplayMessage(ctx, name+".0", "#{pane_pid}")
+	require.NoError(t, err)
+	require.Eventually(t, func() bool { // the nested bash exists under the pane's shell
+		out, _ := exec.Command("pgrep", "-P", strings.TrimSpace(pid), "bash").Output()
+		return strings.TrimSpace(string(out)) != ""
+	}, shellWait, 25*time.Millisecond, "the nested bash never started")
+	time.Sleep(500 * time.Millisecond) // sleep-ok: a negative proof; the pane must still read as idle after the nested bash has had time to be wrongly counted
+	idle, ok := state()
+	require.True(t, ok)
+	assert.True(t, idle, "a bash a person started is a bare prompt, not the agent")
+
+	require.NoError(t, c.SendKeysToTarget(ctx, terminalinput.Unclassified, name+".0", "sleep 30"))
+	require.Eventually(t, func() bool { v, ok := state(); return ok && !v }, shellWait, 25*time.Millisecond, "a program in the nested bash keeps the pane busy")
+	require.NoError(t, c.SendRawKeys(ctx, terminalinput.Unclassified, name, []string{"C-c"}, "claude", sid))
+	require.Eventually(t, func() bool { v, ok := state(); return ok && v }, shellWait, 25*time.Millisecond, "back at the nested bash's prompt: idle")
 }
