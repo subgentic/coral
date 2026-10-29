@@ -11,6 +11,7 @@ import { isPhoneLayout } from './phone_layout.js';
 import { foldWayBack } from './way_back.js';
 import { importOnce } from './import_once.js';
 import { menuMove } from './menu_keys.js';
+import { takeDocsAnswer } from './docs_answer.js';
 
 const DT = await importOnce('./data_table.js');
 const docTableStates = new Map();
@@ -283,12 +284,21 @@ export async function selectDoc(name, { noteRoute = true, focusHeading = false }
     const h1 = content.querySelector('h1');
     if (acted && h1) { h1.tabIndex = -1; h1.focus(); } // the new page's heading takes the focus (the link they pressed is gone with the old page)
     if (docsQuery) openAtHit(content, name); // a search found this topic: the page opens at the sentence it found (#10484)
+    else openAtAnswer(content);
 
     // Highlight code blocks once highlight.js has loaded (they show plain until
     // then, and stay plain if it cannot load).
     const blocks = content.querySelectorAll('pre code');
     if (blocks.length) loadHighlight().then(h => blocks.forEach(b => { if (b.isConnected) h.highlightElement(b); }), () => {});
 
+}
+
+/** A link into Docs that names an answer (Settings' Learn more, #10765): the page opens at that heading, once. */
+function openAtAnswer(content) {
+    const want = takeDocsAnswer();
+    if (!want) return;
+    const h = [...content.querySelectorAll('h2, h3')].find(e => e.textContent.trim() === want);
+    if (h) { h.scrollIntoView({ block: 'start' }); sayDocs(`Showing ${want}`); }
 }
 
 const plainWords = t => String(t).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();

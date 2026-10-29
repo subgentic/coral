@@ -37,6 +37,32 @@ New agents use it unless you choose a model when you launch them.
 2. Type words you remember in **Search chats** at the top of the list. Press **Star** on a chat you will want again: it is in the **Starred** folder after that.
 3. Typing in the Agents list's search offers **Search all chats** for the same words.
 
+## Continue an old chat
+
+1. Open the **Inbox**, then **All chats**, and find the chat (the answer above, Find an old chat, says how).
+2. Press **Continue this chat**: the round play button at the end of the chat's row, or the **Continue this chat** button on the chat's own page. The chat opens first.
+3. The **Resume session** dialog asks which **Working Directory** to start in. It fills in the folder the chat ran in, and says so under the box. Keep it, or press **Browse** to pick another folder and **Use this folder**: the dialog warns that the files the chat was using may not be found there. If the chat belonged to a team, **Rejoin board** puts the agent back on its message board.
+4. Press **Resume**. A live agent starts in that folder and picks the conversation up where it stopped; the old chat stays as it was.
+
+## Give an agent a file
+
+- **A file in its folder:** in the message box, type **@** and the start of the file's name. A list of the files in the agent's folder opens; pick one and its path is put in your message, so the agent knows which file you mean. In a folder with many files, keep typing to narrow the list.
+- **A picture:** press the picture button in the corner of the message box (**Attach an image**), or paste an image into the box. On a phone the button offers the Photo Library, Take Photo and Browse. A small chip shows the picture before you send. The agent is given a link to it, not your computer's path.
+- A sleeping agent cannot be given anything: **Wake** it first.
+
+## What the permission modes allow
+
+**Default permission mode** in **Settings**, **Agents** is the mode new agents start in. You can also pick a mode for one agent when you launch it. One line each:
+
+- **Default:** asks before acting. Each CLI's own normal mode. For Codex it asks before every action and cannot reach Coral from its sandbox, so use Auto for a team member.
+- **Plan:** reads only. Best for exploring a codebase before changing it.
+- **Accept edits:** reads, edits files and runs common file commands (mkdir, touch, mv, cp). Best for iterating on code you are reviewing. Codex does not have it.
+- **Auto:** everything, but what that means depends on the CLI. **Claude** checks each action for safety. **Codex** runs in a workspace sandbox that never asks, with the network on. **Antigravity** and **Gemini** have no prompts and no safety checks. **Pi** has no permission prompts at all: it always acts on its own.
+- **Bypass permissions:** everything except protected paths, with the safety checks off. Only for isolated containers and virtual machines.
+- **Don't ask:** only tools you approved ahead of time. Best for locked-down CI and scripts. Codex does not have it: its Auto is the same launch.
+
+**Not set** starts a new agent in Auto and a new team member in Default. With such a default, an orchestrator's launches of other agents are refused until you pick Default or start them yourself.
+
 ## Open Coral on your phone
 
 1. On Home, click **Mobile QR code** (at the bottom of the page). The **Use on your phone** dialog opens.

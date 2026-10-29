@@ -1,5 +1,5 @@
-// Settings > Agents says what the default permission mode means once (#10266 point 2, Mobile pass 18): under the select is the line for the chosen mode; the contrast of Default, Auto and Not set is behind
-// the row's "More" and is not a second visible line saying the same thing. 390 and 1280 px. Real isolated server; the settings guard puts the shard's settings back.
+// Settings > Agents says what the default permission mode means once (#10266 point 2, Mobile pass 18): under the select is the line for the chosen mode; the contrast of Default, Auto and Not set is in Docs
+// (the row's Learn more is a link to the How do I answer, #10765) and is not a second visible line saying the same thing. 390 and 1280 px. Real isolated server; the settings guard puts the shard's settings back.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
@@ -19,10 +19,11 @@ const BASE = require('./test_base').BASE;
             const r = await ev(`(() => { const row = document.getElementById('settings-permission-mode').closest('.settings-row, .sv-row');
                 const vis = e => e.getClientRects().length > 0 && getComputedStyle(e).visibility !== 'hidden';
                 const lines = [...row.querySelectorAll('.sv-help, .perm-mode-desc, .perm-mode-compare, .settings-hint')].filter(vis).map(e => e.textContent.trim()).filter(Boolean);
-                return { lines, compare: !!row.querySelector('.perm-mode-compare'), all: row.textContent.replace(/\\s+/g, ' ') }; })()`);
+                return { lines, compare: !!row.querySelector('.perm-mode-compare'), docs: (row.querySelector('a.sv-learn') || {}).href || '', inPlace: !!row.querySelector('button.sv-learn, .sv-more') }; })()`);
             assert.equal(r.compare, false, `${w}: no second line comparing the three modes under the select: ${JSON.stringify(r.lines)}`);
             assert.ok(r.lines.some(l => /Auto/.test(l)), `${w}: the chosen mode's line is there: ${JSON.stringify(r.lines)}`);
-            assert.match(r.all, /Default asks before acting; Auto acts on its own; Not set starts a new agent in Auto and a new team member in Default\./, `${w}: the contrast is one click away, in the row's More`);
+            assert.match(r.docs, /\/docs\/how-do-i$/, `${w}: the contrast is one click away, in Docs (Learn more is a link to the How do I answer, #10765)`);
+            assert.equal(r.inPlace, false, `${w}: and not a second box behind Settings`);
         }
         console.log('PASS Settings > Agents: the permission meaning is said once, the contrast is behind More, at 1280 and 390');
     } finally { await client.close(); await guard.restore?.(); }

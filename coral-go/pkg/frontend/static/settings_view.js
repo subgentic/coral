@@ -26,6 +26,7 @@
  * Events on the host: 'sv-dirty' { dirty }, 'sv-group' { id }, 'sv-saved' { changes }. */
 import { browserLocal } from './safe_storage.js';
 import { storeKey } from './local_store.js';
+import { wantDocsAnswer } from './docs_answer.js';
 
 import { initSectionDialog, showSection, markSectionError } from './section_dialog.js'; // the nav: the shared sectioned shell (loaded at startup with this module: the Settings dialog's rows are drawn from it the moment its markup is built)
 
@@ -135,6 +136,13 @@ export function mountSettingsView(host, spec) {
         return { node: input, input, get, set: v => { input.value = v === undefined || v === null ? '' : String(v); }, focus: () => input.focus(), disable: on => { input.disabled = on; } };
     }
 
+    /** The Learn more that is a link into Docs (help.docs: { topic, answer }): the answer is Docs', not a box behind Settings (#10765). A plain click goes through the router (a[data-route]); the answer's heading is remembered for the page to open at. */
+    function learnDocs(help, field) {
+        const a = node('a', 'sv-learn', 'Learn more'); a.href = `/docs/${encodeURIComponent(help.docs.topic)}`; a.setAttribute('data-route', ''); a.setAttribute('aria-label', `Learn more about ${help.about || field.label}, in Docs`);
+        a.addEventListener('click', () => wantDocsAnswer(help.docs.answer));
+        return a;
+    }
+
     /** The Learn more of a help text: a button that opens the long part in place (named after what it is about, for the screen reader: "Learn more about working modes"). */
     function learnMore(help, field, id) {
         const more = node('div', 'sv-more'); more.id = `${id}-m`; more.hidden = true; more.append(...paragraphs(help.more));
@@ -172,12 +180,14 @@ export function mountSettingsView(host, spec) {
         let helpEl = null, descId = null; // descId: the sentence alone describes the control (the Learn more beside it would read the label out again, "Learn more about <label>")
         if (help && help.text) helpBits.push(help.text);
         if (field.apply === 'now') helpBits.push('Applies immediately.');
-        if (helpBits.length || (help && help.more)) {
+        if (helpBits.length || (help && (help.more || help.docs))) {
             helpEl = node(helpBits.length ? 'p' : 'span', helpBits.length ? 'sv-help' : 'sv-help sv-help-inline'); helpEl.id = `${id}-h`; // no sentence: the Learn more follows the label on its line
             const sentence = node('span', `sv-help-text${field.helpTextClass ? ' ' + field.helpTextClass : ''}`, helpBits.join(' ')); // helpTextClass: a class the caller's own code finds the sentence by
             if (helpBits.length) { sentence.id = `${id}-ht`; descId = sentence.id; }
             helpEl.append(sentence);
-            if (help && help.more) {
+            if (help && help.docs) {
+                helpEl.append(' ', learnDocs(help, field)); text.append(helpEl);
+            } else if (help && help.more) {
                 const { btn, more } = learnMore(help, field, id);
                 helpEl.append(' ', btn); text.append(helpEl, more);
             } else text.append(helpEl);

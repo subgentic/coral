@@ -267,6 +267,40 @@ func TestHowDoIAnswersThreeMoreQuestions(t *testing.T) {
 	}
 }
 
+// #10765 (Desktop #10764): How do I...? also answers how to continue an old chat, give an agent a file, and what the permission modes allow; each step names a control the dashboard really has, and Settings'
+// Learn more beside Default permission mode points at the last one.
+func TestHowDoIAnswersContinueAFileAndThePermissionModes(t *testing.T) {
+	b, err := os.ReadFile(filepath.Join("..", "..", "..", "agent_docs", "how-do-i.md"))
+	require.NoError(t, err)
+	text := strings.ReplaceAll(string(b), "\r\n", "\n")
+	for _, heading := range []string{"## Continue an old chat", "## Give an agent a file", "## What the permission modes allow"} {
+		assert.Contains(t, text, heading)
+	}
+	for _, mode := range []string{"**Default:**", "**Plan:**", "**Accept edits:**", "**Auto:**", "**Bypass permissions:**", "**Don't ask:**"} {
+		assert.Contains(t, text, mode, "one line for each mode")
+	}
+	for _, cli := range []string{"**Claude**", "**Codex**", "**Antigravity**", "**Gemini**", "**Pi**"} {
+		assert.Contains(t, text, cli, "Auto says where the CLIs differ")
+	}
+	static := filepath.Join("..", "..", "..", "pkg", "frontend")
+	read := func(rel ...string) string {
+		b, err := os.ReadFile(filepath.Join(append([]string{static}, rel...)...))
+		require.NoError(t, err, rel)
+		return string(b)
+	}
+	chats, composer, modals, history, fields, modes := read("static", "mailbox_chats.js"), read("templates", "includes", "views", "live_session.html"), read("templates", "includes", "modals.html"), read("templates", "includes", "views", "history_session.html"), read("static", "settings_fields.js"), read("static", "permission_flags.js")
+	for want, src := range map[string]string{
+		"Continue this chat": chats, ">Continue this chat</button>": history, // the row's play button and the chat page's button
+		"Resume session": modals, "Working Directory": modals, "Use this folder": modals, "Rejoin board": modals, // the dialog the button opens
+		"type @ for a file in this folder": composer, "Attach an image": composer, // the message box's corner button
+		"Not set (Auto)": fields, "Bypass permissions": fields, "Don't ask": fields, // the Settings select the answer is about
+		"Pi has no permission prompts": modes, "Workspace sandbox": modes, // the per-CLI facts of Auto
+	} {
+		assert.Contains(t, src, want, "the dashboard has what the answer names: "+want)
+	}
+	assert.Contains(t, fields, "docs: { topic: 'how-do-i', answer: 'What the permission modes allow' }", "Learn more beside Default permission mode opens that answer in Docs")
+}
+
 // #10605 and #10595: the launch choice is New project, not New team: no shipped agent doc names the old button.
 func TestAgentDocsNameNewProjectNotNewTeam(t *testing.T) {
 	entries, err := os.ReadDir(filepath.Join("..", "..", "..", "agent_docs"))
