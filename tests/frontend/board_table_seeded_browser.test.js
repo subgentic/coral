@@ -227,7 +227,7 @@ const spec = (i) => {
             const dOpen = await ev(`(() => { const o = ${DB}.querySelector(':scope > .mb-message.mb-open'); return o ? Number(o.dataset.messageId) : null; })()`);
             assert.ok(dOpen, 'a dock row at the bottom is open');
             const dNew = await ev(`fetch('/api/board/${B}/messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'orchestrator', content: 'A live message for the dock while a row is open.' }) }).then(r => r.json()).then(j => j.id || j.message.id)`);
-            await waitFor(`${DB}.querySelector(':scope > .mb-message[data-message-id="${dNew}"]')`, 'the live message in the dock', { timeout: 20000 });
+            await waitFor(`${DB}.querySelector(':scope > .mb-message[data-message-id="${dNew}"]')`, 'the live message in the dock', { timeout: 45000 }); // the dock's board poll beats every 3 s while its page is on screen and every 30 s while it is not (board_chat.js agentView: 30000): the wait outlasts one slow beat, or a loaded machine lands just after one and 20 s is not enough (#10831)
             assert.ok(await ev(`${DB}.querySelector(':scope > .mb-message[data-message-id="${dOpen}"]').classList.contains('mb-open') && !${DB}.querySelector(':scope > .mb-message[data-message-id="${dNew}"]').classList.contains('mb-open')`), 'the open dock row stayed open; the new one is a closed row');
             await dorder('after a live message');
             for (let k = 0; k < 12; k++) { await ev(`${DB}.scrollTop = 0; true`); await settle(250); await ev(`${DB}.scrollTop = ${DB}.scrollHeight; true`); await settle(150); }
