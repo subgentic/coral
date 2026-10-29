@@ -28,9 +28,16 @@ function toastMs(text, error) {
 }
 
 // A toast about one page is not shown on the next (#10797): a route change takes the older ones away.
-if (typeof document !== "undefined" && typeof document.addEventListener === "function") document.addEventListener("coral:route-changed", () => { for (const t of document.querySelectorAll("#toast-host .toast")) if (Date.now() - Number(t.dataset.at) > 1500) t.querySelector(".toast-close")?.click(); }); // one shown a moment ago is about the page that is opening (a job created, then its page)
+// The listener is added by the first toast, not at start: the start's list of listeners (startup_sequence_golden) stays as it was.
+let leaveOnRoute = false;
+function leaveOnRouteChange() {
+    if (leaveOnRoute || typeof document === "undefined" || typeof document.addEventListener !== "function") return;
+    leaveOnRoute = true;
+    document.addEventListener("coral:route-changed", () => { for (const t of document.querySelectorAll("#toast-host .toast")) if (Date.now() - Number(t.dataset.at) > 1500) t.querySelector(".toast-close")?.click(); }); // one shown a moment ago is about the page that is opening (a job created, then its page)
+}
 
 export function showToast(message, isError = false, duration, opts = {}) {
+    leaveOnRouteChange();
     const error = !!isError;
     const group = opts.group && opts.group.key ? opts.group : null;
     const folded = group && [...toastHost().querySelectorAll(".toast[data-group]")].find(t => t.dataset.group === group.key);
