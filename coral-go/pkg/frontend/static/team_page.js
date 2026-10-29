@@ -419,9 +419,17 @@ async function openAgentPage(agent) {
 
 /** After Back from a task opened from a goal: the keyboard is on that task's row in the goal's column (on a phone, where the column is the next screen, on the Tasks button), never the heading (#7404, #8898). Waits for the goal to be drawn again. */
 async function focusGoalTask(id) {
-    for (let i = 0; i < 80; i++) {
+    // The goal's list is drawn again once or twice as its data arrives (on a slow machine or a slow Hub that is seconds after the first draw), and a row that had the focus is gone with its draw: the focus falls to the page.
+    // So the row is focused when it first shows and again whenever the focus has fallen to the page, until it has held for half a second (#10946, red on epoch). A person who moved the focus elsewhere is left alone.
+    let heldSince = -1;
+    for (let i = 0; i < 160; i++) {
         const target = document.querySelector(`#team-panel-goals .goal-list .dt-primary[data-task-id="${Number(id)}"]`);
-        if (target && S.tab === 'goals') { target.focus(); return; }
+        if (target && S.tab === 'goals') {
+            const on = document.activeElement;
+            if (on === target) { if (heldSince < 0) heldSince = i; if (i - heldSince >= 10) return; }
+            else if (heldSince < 0 || !on || on === document.body) { target.focus(); heldSince = document.activeElement === target ? i : -1; }
+            else return;
+        }
         await new Promise(r => setTimeout(r, 50));
     }
 }
