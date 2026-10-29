@@ -371,10 +371,10 @@ async function run() {
         check('diff without first_prompt keeps header identity', afterDiff.header === 'coral-go', afterDiff.header);
         check('diff without first_prompt keeps terminal label identity', afterDiff.term === 'coral-go', afterDiff.term);
         check('diff without first_prompt keeps its placeholder', /^Message coral-go/.test(afterDiff.placeholder), afterDiff.placeholder);
-        // sid-c went to sleep above, and sleeping agents collapse behind the "N sleeping"
-        // summary row, so its row is not in the list; every other row keeps its place.
-        const ORDER_AWAKE = ORDER.split(',').filter(id => id !== 'sid-c').join(',');
-        check('diff does not reorder sessions', afterDiff.order === ORDER_AWAKE, afterDiff.order);
+        // sid-c went to sleep above. A sleeping agent is a row after the awake ones of its group (up to three asleep stay rows, #10062), so sid-c moves to the end of its group
+        // (after sid-g); every other row keeps its place.
+        const ORDER_ASLEEP = 'sid-a,sid-b,sid-d,sid-g,sid-c,sid-e,sid-f';
+        check('diff does not reorder sessions', afterDiff.order === ORDER_ASLEEP, afterDiff.order);
 
         // display_name / summary updates in a diff must still win.
         await evalInPage(`window._coralHandleWsMessage({ type: 'coral_diff', changed: [
