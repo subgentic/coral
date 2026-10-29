@@ -280,8 +280,8 @@ export function confirmPendingMessage(sessionId, sentAt) {
     announceSend(sessionId, p.queued ? "Message queued" : "Message sent");
 }
 
-/** Withdraw the pending bubble of a send that was refused (its terminal was gone, #3218). */
-export function removePendingMessage(sessionId, sentAt) {
+/** Withdraw the pending bubble of a send that was refused (its terminal was gone, #3218). announce: false when the caller says what happened itself (the error under the composer, a hold). */
+export function removePendingMessage(sessionId, sentAt, { announce = true } = {}) {
     const list = pendingBySession.get(sessionId);
     const i = list ? list.findIndex(p => p.at === sentAt) : -1;
     if (i < 0) return;
@@ -293,8 +293,15 @@ export function removePendingMessage(sessionId, sentAt) {
         syncPendingBubbles(container, sessionId);
         syncWorkingIndicator(container, state.currentSession);
     }
+    // A caller that says what happened itself passes announce: false (#352): the status is then cleared without a word (an emptied region says nothing), so it does not stay at "Sending message".
+    if (!announce) { announceSend(sessionId, ""); return; }
     // The error under the composer (an alert) says why, a moment after this: say it here only when that did not appear (one failure, one announcement, #6213).
-    setTimeout(() => { if (document.getElementById("composer-error")?.hidden !== false) announceSend(sessionId, "Message not sent, your text is back in the box"); }, 50);
+    setTimeout(() => { if (document.getElementById("composer-error")?.hidden !== false) announceNotSent(sessionId); }, 50);
+}
+
+/** Say that a send was refused and its text is back in the box: for a caller that withdrew the message with announce: false and had no error under the composer to show (#352). */
+export function announceNotSent(sessionId) {
+    announceSend(sessionId, "Message not sent, your text is back in the box");
 }
 
 // An interrupt ends the current work; Claude Code then submits whatever was

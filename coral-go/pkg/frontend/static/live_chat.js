@@ -40,7 +40,7 @@ import { prefetchTerminal } from './live_view_mode.js';
 export { clearKeptChatPages } from './chat_kept_pages.js';
 export { renderTranscript } from './chat_messages.js';
 export { initCommandInputAutosize } from './command_autosize.js';
-export { addPendingMessage, confirmPendingMessage, loadPendingFromStorage, removePendingMessage } from './pending_messages.js';
+export { addPendingMessage, confirmPendingMessage, loadPendingFromStorage, removePendingMessage, announceNotSent } from './pending_messages.js';
 export { linkifyRefs } from './chat_bubbles.js';
 export { refreshLiveHistory, chatHasOlder, loadMoreHistory, jumpToLiveMessage, stopLiveHistoryPoll, resetLiveHistory } from './live_history.js';
 export { getLiveViewMode, clearViewOverride, effectiveLiveViewMode, applyLiveViewMode, terminalPrefetch, setLiveViewMode, showTerminalView, showChatView } from './live_view_mode.js';
