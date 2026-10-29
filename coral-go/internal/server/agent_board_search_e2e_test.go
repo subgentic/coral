@@ -142,6 +142,14 @@ func TestAgentBoardSearchIsTheAgentsOwnLaunchBoardByKey(t *testing.T) {
 		code, _, _ := search(tokA, url.Values{"q": {"x"}, "reach": {"everything"}})
 		assert.Equal(t, http.StatusBadRequest, code, "an unknown reach is a bad request, not a quiet narrowing")
 	})
+	t.Run("no query parameter names a board or a member: board, project, subscriber_id and for_subscriber are each a 400 and carry no foreign canary", func(t *testing.T) {
+		for param, value := range map[string]string{"board": b.ID, "project": b.ID, "subscriber_id": "Lead-B", "for_subscriber": "Lead-B", "board_id": b.ID, "team": "team-b"} {
+			code, _, raw := search(tokA, url.Values{"q": {"CANARY"}, param: {value}})
+			assert.Equal(t, http.StatusBadRequest, code, "%s=%s: %s", param, value, raw)
+			assert.NotContains(t, raw, "CANARY-B", "%s: no foreign canary", param)
+			assert.Contains(t, strings.ToLower(raw), param, "%s: the refusal names it", param)
+		}
+	})
 	t.Run("who is asking is the token's session, never a claim", func(t *testing.T) {
 		code, _, _ := search("", url.Values{"q": {"CANARY"}})
 		assert.NotEqual(t, http.StatusOK, code, "no token: nothing")
