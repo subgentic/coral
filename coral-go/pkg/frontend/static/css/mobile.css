@@ -1321,3 +1321,6 @@
     .group-table-view:has(> .inbox-frame) > .group-table-head { position: absolute; width: 1px; height: 1px; min-height: 0; max-height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; } /* the folder button names the page, so no heading is drawn under it; the heading stays in the page for a screen reader (#9660, as #9631) */
     .group-table-view > .inbox-frame { flex: 1 1 auto; width: 100%; min-height: 0; border: 0; border-radius: 0; }
 }
+
+/* The chat header's status dot says its state in a word on a phone, where a hollow circle alone meant nothing (#10885) */
+@media (max-width: 767px) { #terminal-status-dot { display: inline-flex; align-items: center; gap: 6px; } #terminal-status-dot::after { content: attr(data-word); font-size: var(--fs-sm); color: var(--text-secondary); white-space: nowrap; } }
