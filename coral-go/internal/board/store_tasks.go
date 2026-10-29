@@ -132,7 +132,7 @@ func (s *Store) CreateTaskWithOpts(ctx context.Context, project, title, body, pr
 	if err != nil {
 		return nil, err
 	}
-	result, err := s.db.ExecContext(ctx,
+	result, err := s.execEnsuringBoard(ctx, project,
 		`INSERT INTO board_tasks (board_id, title, body, status, priority, created_by, assigned_to, created_at, goal_id, remote_board_uid, remote_goal_uid, request_id, request_server, request_board, initial_instructions)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		project, title, bodyPtr, initialStatus, priority, createdBy, assignPtr, now, goalID, remoteBoard, remoteGoal, requestID, requestServer, requestBoard, w.Instructions)
@@ -140,7 +140,6 @@ func (s *Store) CreateTaskWithOpts(ctx context.Context, project, title, body, pr
 		return nil, err
 	}
 	taskID, _ := result.LastInsertId()
-	s.ensureBoardRow(ctx, project)
 	// Keep new tasks unclaimable until configuration and dependencies are stored.
 	if err := saveWorkflow(ctx, s.db, taskID, w); err != nil {
 		return nil, err

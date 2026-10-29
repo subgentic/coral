@@ -36,7 +36,7 @@ func (s *Store) Subscribe(ctx context.Context, project, subscriberID, jobTitle, 
 	}
 
 	// session_id mirrors subscriber_id so UNIQUE(project, session_id) enforces subscriber uniqueness.
-	_, err := s.db.ExecContext(ctx,
+	_, err := s.execEnsuringBoard(ctx, project,
 		`INSERT INTO board_subscribers (project, session_id, subscriber_id, session_name, job_title, origin_server, receive_mode, last_read_id, subscribed_at, is_active, can_peek, session_joined_at)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
 		 ON CONFLICT(project, session_id) DO UPDATE SET
@@ -53,9 +53,6 @@ func (s *Store) Subscribe(ctx context.Context, project, subscriberID, jobTitle, 
 		     is_active = 1,
 		     can_peek = excluded.can_peek`,
 		project, subscriberID, subscriberID, sessionName, jobTitle, originServer, receiveMode, carryForwardCursor, now, peekFlag, now)
-	if err == nil {
-		s.ensureBoardRow(ctx, project)
-	}
 	s.subscribersChanged()
 	if err != nil {
 		return nil, err

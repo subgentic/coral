@@ -96,14 +96,13 @@ func (s *Store) insertMessage(ctx context.Context, project, subscriberID, conten
 	if hubUser != "" {
 		hubUserVal = &hubUser
 	}
-	result, err := s.db.ExecContext(ctx,
+	result, err := s.execEnsuringBoard(ctx, project,
 		"INSERT INTO board_messages (project, session_id, subscriber_id, content, target_group_id, created_at, origin, hub_user, is_system, task_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
 		project, subscriberID, subscriberID, content, targetGroupID, now, originVal, hubUserVal, system, taskID)
 	if err != nil {
 		return nil, err
 	}
 	id, _ := result.LastInsertId()
-	s.ensureBoardRow(ctx, project)
 	msg := &Message{ID: id, Project: project, SubscriberID: subscriberID, Content: content, CreatedAt: now, Origin: originVal, HubUser: hubUserVal, IsSystem: system, TaskID: taskID}
 	if targetGroupID != nil {
 		msg.TargetGroupID = targetGroupID

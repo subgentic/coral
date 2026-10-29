@@ -171,9 +171,8 @@ func (s *Store) CreateGoal(ctx context.Context, board string, in GoalInput) (*Go
 	if err != nil {
 		return nil, err
 	}
-	s.ensureBoardRow(ctx, board)
 	now := nowUTC()
-	res, err := s.db.ExecContext(ctx, `INSERT INTO board_goals (goal_uid, board_id, title, outcome, done_when, state, driver, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+	res, err := s.execEnsuringBoard(ctx, board, `INSERT INTO board_goals (goal_uid, board_id, title, outcome, done_when, state, driver, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		uuid.NewString(), board, title, outcome, doneWhen, state, driver, createdBy, now, now)
 	if err != nil {
 		return nil, err

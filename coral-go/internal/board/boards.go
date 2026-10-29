@@ -125,6 +125,36 @@ func UsableBoardKey(key string) bool {
 	return true
 }
 
+// betweenContentAndBoardRow is a test seam (nil in production): it runs after a message, subscriber, task or goal is written and before the board's own row is recorded, the gap a DELETE of the board
+// could land in (#11007).
+var betweenContentAndBoardRow func()
+
+// execEnsuringBoard runs one INSERT of a board's content (a message, a subscriber, a task, a goal) and records the board's row in the same transaction. The board database has one writer, so a DELETE of the
+// board runs before both or after both: it can no longer land between them and leave the row of a board it just deleted, with nothing in it (#11007).
+func (s *Store) execEnsuringBoard(ctx context.Context, key, query string, args ...any) (sql.Result, error) {
+	tx, err := s.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	res, err := tx.ExecContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	if h := betweenContentAndBoardRow; h != nil {
+		h()
+	}
+	if key != "" {
+		if _, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO boards (id, label, created_at) VALUES (?, ?, ?)`, key, key, nowUTC()); err != nil {
+			return nil, err
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return res, nil
+}
+
 // ensureBoardRow records key as a board (id = label = key) the first time anything uses it,
 // as a subscribe, a message or a task did before boards had rows.
 func (s *Store) ensureBoardRow(ctx context.Context, key string) {
