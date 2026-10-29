@@ -19,7 +19,8 @@ const (
 	// and every other file as it is, with the agent docs `make` syncs into static/agent_docs. It is 5.49 MB today (the source tree is 8.21 MB: comments and indentation are not shipped), so a comment
 	// never moves it and a real asset does. Raise it deliberately, with the reason in the commit, when a real asset needs the room.
 	// 5.25 MiB (5,505,024 bytes) since Goal #61's artifact roll-up; the tree has grown into it, so a feature trims as much as it adds (#10594 and #10623 collapsed the indentation inside templates: 18 KB). About 19 KB of room over what ships
-	staticBudget = 5<<20 + 256<<10
+	// 5.34 MiB (5,603,328 bytes) since the operator's approval (Oct 28, #10690): 96 KiB more, room for #10019's docs pictures, #10049, #10376 and #10558.
+	staticBudget = 5<<20 + 352<<10
 	// fileBudget is the most one embedded file may hold (the CodeMirror bundle, the largest, is ~1 MB).
 	fileBudget = 1536 << 10
 )
