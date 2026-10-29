@@ -32,7 +32,7 @@ const STUB = `(() => {
             await ev(`window.__coralReady.then(() => true)`); await ev(STUB);
             await ev(`window.showJobModal().then(() => true)`); // the form loads on first use (#10218): showJobModal answers once it is open
             await waitFor(`document.querySelectorAll('#job-modal-workflow option').length === 2`, 'the workflow list', 8000);
-            await waitFor(`/Runs every day at 09:00/.test(document.getElementById('cron-preview').textContent)`, 'the preview', 8000);
+            await waitFor(`/Runs every day at (09:00|9:00 AM)/.test(document.getElementById('cron-preview').textContent)`, 'the preview', 8000);
             await ev(`document.querySelector('.job-type-btn[data-type="workflow"]').click(); true`); // the dialog opens on Run a prompt, the first choice (#10515): this pass is the workflow form's
             await installAudit(ev);
 
@@ -44,7 +44,8 @@ const STUB = `(() => {
             assert.deepEqual(labels, ['Type|', 'Name|req', 'When|req', 'Workflow|req'], at + 'labels, in order (When right after Name, #9965), with Required in words: ' + JSON.stringify(labels));
             assert.deepEqual(await ev(`[...document.querySelectorAll('.sched-preset')].map(b => b.textContent.trim())`), ['Every N minutes', 'Every N hours', 'Daily at', 'Weekly on', 'Advanced'], at + 'the schedule is picked: minutes, hours, daily, weekly; the cron box is Advanced');
             const prev = await ev(`document.getElementById('cron-preview').textContent`);
-            assert.match(prev, /^Runs every day at 09:00\. Next: (today|tomorrow) 09:00\.$/, at + 'the preview is one sentence, in the person\'s own zone (no zone named): ' + prev);
+            assert.match(prev, /^Runs every day at (09:00|9:00 AM)\. Next: (today|tomorrow) (09:00|9:00 AM)\.$/, at + 'the preview is one sentence, in the person\'s own zone (no zone named): ' + prev);
+            { const h12 = await ev(`new Intl.DateTimeFormat(undefined, { hour: 'numeric' }).resolvedOptions().hour12`); assert.equal(/ AM\b/.test(prev), !!h12, at + 'the preview says the time in the person\'s own clock, as the time field shows it (#10961): ' + prev); }
             assert.equal(await ev(`document.getElementById('cron-preview').getAttribute('role')`), 'status');
             assert.equal(await ev(`document.getElementById('job-modal-more').open`), false, at + 'More options starts closed');
             await ev(`document.querySelector('.sched-preset:nth-child(3)').click(); true`);
@@ -57,7 +58,7 @@ const STUB = `(() => {
             const pat = await ev(`(() => { const m = document.querySelector('#job-modal .modal-content').getBoundingClientRect(), f = document.getElementById('job-modal-submit').getBoundingClientRect(); return { hasX: !!document.querySelector('#job-modal .modal-close-btn'), btnRight: Math.round(m.right - f.right) }; })()`);
             assert.equal(pat.hasX, false, at + 'New job has no Close X');
             assert.ok(pat.btnRight <= 40, at + 'the buttons are at the bottom right: ' + JSON.stringify(pat));
-            await waitFor(`/every day at 09:00/.test(document.getElementById('cron-preview').textContent)`, 'daily preview', 8000);
+            await waitFor(`/every day at (09:00|9:00 AM)/.test(document.getElementById('cron-preview').textContent)`, 'daily preview', 8000);
             await shot(`job-form-${w}`);
 
             // 2. contrast, both themes
@@ -92,7 +93,7 @@ const STUB = `(() => {
             assert.equal(await cronOf(), '30 7 * * 1', at + 'weekly starts with Monday');
             await ev(`document.querySelector('.sched-day[data-day="3"]').click(); true`);
             assert.equal(await cronOf(), '30 7 * * 1,3', at + 'Monday and Wednesday at 07:30');
-            await waitFor(`/^Runs at 07:30, Mondays and Wednesdays\\./.test(document.getElementById('cron-preview').textContent)`, 'the weekly sentence', 8000);
+            await waitFor(`/^Runs at (07:30|7:30 AM), Mondays and Wednesdays\\./.test(document.getElementById('cron-preview').textContent)`, 'the weekly sentence', 8000);
             assert.equal(await ev(`document.getElementById('job-modal-timezone').value`), 'Europe/Berlin', at + 'the zone is the person\'s own by default');
             await shot(`job-form-weekly-${w}`);
 
@@ -104,7 +105,7 @@ const STUB = `(() => {
             await waitFor(`/not a schedule Coral can read/.test(document.getElementById('cron-preview').textContent)`, 'a bad schedule in words', 8000);
             await shot(`job-form-custom-${w}`);
             await type('#job-modal-cron', '0 5 * * 1,3');
-            await waitFor(`/Runs at 05:00, Mondays and Wednesdays\\./.test(document.getElementById('cron-preview').textContent)`, 'a less common shape is said in words (#6956)', 8000);
+            await waitFor(`/Runs at (05:00|5:00 AM), Mondays and Wednesdays\\./.test(document.getElementById('cron-preview').textContent)`, 'a less common shape is said in words (#6956)', 8000);
 
             // 5. More options: time limit and zone in words
             await ev(`document.querySelector('#job-modal-more > summary').click(); true`);

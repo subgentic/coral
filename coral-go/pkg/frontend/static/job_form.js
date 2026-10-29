@@ -5,7 +5,7 @@ import { mountSettingsView } from './settings_view.js';
 import { ensureBuilt } from './lazy_dom.js';
 import { escapeHtml, showToast } from './utils.js';
 import { changedFields, NOTHING_TO_SAVE } from './settings_diff.js';
-import { cronWords, atWords, localZone, zoneNote, RUNS_WHILE_OPEN, runsWords } from './job_words.js';
+import { cronWords, atWords, localZone, zoneNote, RUNS_WHILE_OPEN, runsWords, inPersonsClock } from './job_words.js';
 import { importOnce } from './import_once.js';
 import { joinBrowse } from './dir_row.js';
 const { DAYS, MINUTE_STEPS, HOUR_STEPS, composeCron, parseCron } = await importOnce('./cron_picker.js'); // this form loads on first use (#10218), and so do the pieces only it uses
@@ -94,7 +94,7 @@ export function previewWords(expr, tz, nextIso) {
     const runs = words.startsWith('Schedule:') ? `Runs on the schedule ${expr}` : runsWords(words);
     const other = zoneNote(tz);
     const next = nextIso ? ` Next: ${atWords(nextIso)}${other ? ', your time' : ''}.` : '';
-    return `${runs}${other}.${next}`;
+    return inPersonsClock(`${runs}${other}.${next}`);
 }
 
 let checkSeq = 0;

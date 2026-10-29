@@ -2,6 +2,14 @@
  * know how to say is shown as it is, never guessed. */
 
 const pad = (n) => String(n).padStart(2, '0');
+/** The 24 h times in a sentence ("Every day at 09:00. Next: today 09:00."), said in the person's own clock: the New job form's time field shows 09:00 AM where their locale is 12 h, and its words said 09:00 (#10961). A 24 h locale keeps the words as they are. */
+export function inPersonsClock(text, locale) {
+    try {
+        const h12 = new Intl.DateTimeFormat(locale, { hour: 'numeric' }).resolvedOptions().hour12;
+        if (!h12) return String(text);
+        return String(text).replace(/\b([01]\d|2[0-3]):([0-5]\d)\b/g, (_, h, m) => new Date(2000, 0, 1, +h, +m).toLocaleTimeString(locale, { hour: 'numeric', minute: '2-digit' }));
+    } catch { return String(text); }
+}
 const DAYS = ['Sundays', 'Mondays', 'Tuesdays', 'Wednesdays', 'Thursdays', 'Fridays', 'Saturdays'];
 
 /** "0 2 * * *" -> "Every day at 02:00"; the five-field cron the scheduler takes. Unknown shapes come back as `Schedule: <expr>` so nothing is lost. */
