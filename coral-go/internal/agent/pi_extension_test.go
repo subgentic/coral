@@ -96,7 +96,7 @@ func TestPiExtensionDigestIsPinnedAndCheckedBeforeUse(t *testing.T) {
 
 // A hook program whose path holds quotes, a newline, a line separator or a comment end stays a JSON string: the file is still the same code with a different literal.
 func TestPiExtensionConfigNeverBecomesCode(t *testing.T) {
-	for _, path := range []string{`/tmp/a"b`, "/tmp/a\nb", "/tmp/a b", "/tmp/*/ evil(); /*", `/tmp/a\"; process.exit(1); //`, "/tmp/</script>"} {
+	for _, path := range []string{`/tmp/a"b`, "/tmp/a\nb", "/tmp/a\u2028b", "/tmp/*/ evil(); /*", `/tmp/a\"; process.exit(1); //`, "/tmp/</script>"} {
 		src := piExtensionContent(path)
 		require.NotEmpty(t, src, path)
 		m := regexp.MustCompile(`(?m)^const CONFIG = (\{.*\});$`).FindStringSubmatch(src)
