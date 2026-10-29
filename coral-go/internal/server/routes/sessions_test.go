@@ -2563,6 +2563,10 @@ func setupSessionsTestServerWithConfig(t *testing.T, cfg *config.Config) (*httpt
 
 	terminal := newMockTerminal()
 	handler := NewSessionsHandler(db, cfg, nil, terminal, bs)
+	// A respawned pane is not waited for (the handler's own paneSettle, #6991, which the resume oracle already sets): the product gives it 500 ms, and every restart, resume and team test that
+	// respawns a pane paid that for nothing against a mock terminal. A test about the settle sets handler.paneSettle itself (#359).
+	noSettle := time.Duration(0)
+	handler.paneSettle = &noSettle
 	ss := store.NewSessionStore(db)
 	// Every launch test built on this helper resolves its agent CLI from a stub, not from a real binary on PATH (#4615):
 	// the v1.4.89 pre-push failed on a Mac without codex. A restart/resume never LookPaths, so those paths keep emitting
