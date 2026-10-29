@@ -234,6 +234,26 @@ func TestMachineLaunchBuildsTheRealUserDataWithNoCredential(t *testing.T) {
 	}
 }
 
+// The machine's cap defaults to view: interact and launch are explicit opt-ins (coral-hub Lead's read on the launch design, #10919).
+func TestMachineLaunchMaxModeDefaultsToView(t *testing.T) {
+	tf, kf, p, _ := machineFixture(t)
+	base := []string{"launch", "--provider", "digitalocean", "--token-file", tf, "--hub-key-file", kf, "--hub-url", "https://hub.example", "--coral-version", "2.0.3", "--yes"}
+	for want, extra := range map[string][]string{"view": nil, "interact": {"--max-mode", "interact"}, "launch": {"--max-mode", "launch"}} {
+		var out, errb bytes.Buffer
+		if code := runMachine(append(append([]string{}, base...), extra...), strings.NewReader(""), &out, &errb); code != 0 {
+			t.Fatalf("%s: exit %d: %s", want, code, errb.String())
+		}
+		if !strings.Contains(p.spec.UserData, " "+want+" 2.0.3") {
+			t.Errorf("max mode %s: the user-data says %q", want, p.spec.UserData)
+		}
+	}
+	var help bytes.Buffer
+	machineUsage(&help)
+	if !strings.Contains(help.String(), "default view") {
+		t.Errorf("the usage says the default: %s", help.String())
+	}
+}
+
 // --allow-ssh-from is checked before anything is read or made: an address that is every address, or not an address, is refused.
 func TestMachineLaunchRefusesABadSSHSourceBeforeAnyCall(t *testing.T) {
 	tf, kf, p, h := machineFixture(t)

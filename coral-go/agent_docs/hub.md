@@ -191,7 +191,7 @@ Rules Coral keeps:
 
 ```sh
 coral machine launch --provider digitalocean --token-file ~/.do-token --hub-key-file ~/.coralhub-key \
-    --agents claude@VERSION,codex@VERSION --max-mode launch [--name N] [--region nyc3] [--size s-2vcpu-4gb] [--allow-ssh-from ADDRESS] [--yes]
+    --agents claude@VERSION,codex@VERSION [--max-mode view|interact|launch] [--name N] [--region nyc3] [--size s-2vcpu-4gb] [--allow-ssh-from ADDRESS] [--yes]
 ```
 
 - **Secrets come from files only.** `--token-file` is the provider's API token and `--hub-key-file` your Coral Hub automation key (`chk_...`, made in Coral Hub in a browser): each file must be yours, mode 0600, one link, no symlink, at most 4096 bytes; `-` reads one of them from standard input. Neither is ever taken from the command line or the environment, printed, logged, or sent anywhere but its own service; the Hub never sees the provider token.
@@ -200,6 +200,7 @@ coral machine launch --provider digitalocean --token-file ~/.do-token --hub-key-
 - **A launch that fails or is interrupted deletes the machine it made** (and says so, or says that it could not and the id to delete). A machine costs money until it is deleted.
 - **It deletes only what it made.** Every machine carries the tag `coral-machine` and a tag of its own launch (`coral-launch-` and 12 random hex digits). A clean-up after a failed or interrupted create lists by those two tags and deletes by id, never by a name or a pattern; a launch makes one machine.
 - **Make the token with the narrowest scope:** create, read and delete droplets (and read sizes), nothing else, and delete it when you are done. `--hub-url` other than this build's Coral Hub prints a warning, because the Hub key is sent there.
+- **`--max-mode`** is the most Coral Hub may do on the machine: **`view` is the default**; `interact` and `launch` are explicit opt-ins, because a machine that can launch agents can run code.
 - **`--agents`** names the agent CLIs to install: `claude`, `codex` and `pi` each need `@VERSION` (nothing is installed unpinned that can be pinned); `agy` (Antigravity) is opt-in and only as `agy@sha256:<64 hex>`, the SHA-256 of the installer script you checked: it is fetched to a file on the machine, checked against that hash and only then run (an unpinned installer is refused; nothing is piped into a shell). **`--max-mode`** is the most Coral Hub may do on the machine (`launch` by default; the owner can lower it in Coral Hub). `--coral-version` defaults to this command's own version; a development build must give it.
 - Exit codes: 0 launched; 1 not launched (declined, refused by the provider or the Hub, or the machine did not come up); 2 a usage problem or a secret file that is not safe to read; 130 interrupted.
 

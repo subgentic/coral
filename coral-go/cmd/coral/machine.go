@@ -49,7 +49,7 @@ func (l *listFlag) Set(v string) error { *l = append(*l, v); return nil }
 func machineUsage(w io.Writer) {
 	fmt.Fprintln(w, "usage: coral machine launch --provider digitalocean --token-file <path|-> --hub-key-file <path|-> [--hub-url https://app.coralhub.dev]")
 	fmt.Fprintln(w, "         [--name NAME] [--region nyc3] [--size s-2vcpu-4gb] [--image SLUG] [--ssh-key ID]... [--agents claude@VERSION,codex@VERSION,pi@VERSION,agy@sha256:HEX]")
-	fmt.Fprintln(w, "         [--max-mode view|interact|launch] [--coral-version VERSION] [--allow-ssh-from ADDRESS] [--yes]")
+	fmt.Fprintln(w, "         [--max-mode view|interact|launch (default view)] [--coral-version VERSION] [--allow-ssh-from ADDRESS] [--yes]")
 }
 
 func runMachine(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
@@ -68,7 +68,7 @@ func runMachine(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	size := fs.String("size", "s-2vcpu-4gb", "the provider's size slug")
 	image := fs.String("image", "", "the provider's image slug (default: the provider's Ubuntu LTS)")
 	agents := fs.String("agents", "", "agent CLIs to install: claude, codex and pi, each pinned as NAME@VERSION; agy (Antigravity) only as agy@sha256:HEX, the SHA-256 of the installer script you checked")
-	maxMode := fs.String("max-mode", "launch", "the most Coral Hub may do on the machine: view, interact or launch")
+	maxMode := fs.String("max-mode", "view", "the most Coral Hub may do on the machine: view (the default), interact or launch: interact and launch are asked for explicitly")
 	coralVersion := fs.String("coral-version", "", "the Coral release to install (default: this binary's version)")
 	yes := fs.Bool("yes", false, "go on without asking (the price is still printed)")
 	sshFrom := fs.String("allow-ssh-from", "", "the address (or CIDR) the machine's SSH accepts while the launch sets it up (default: this computer's public address, found over HTTPS)")
