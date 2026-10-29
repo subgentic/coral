@@ -150,7 +150,10 @@ func Check(ctx context.Context, cfg Config) Result {
 	if dropped := dropStaleStage(&st, cfg.Installed); dropped != "" {
 		log.Printf("[update] the staged release %s is not newer than the installed %s: dropped", dropped, cfg.Installed)
 		_ = verify.SaveState(dir, st)
-		_ = os.RemoveAll(filepath.Join(dir, StagingDir, dropped))
+		// The files go only for a plain X.Y.Z name, as before: the name is read from the state file, and the delete keeps the strict check that a staged folder's name always had.
+		if _, perr := verify.ParseVersion(dropped); perr == nil {
+			_ = os.RemoveAll(filepath.Join(dir, StagingDir, dropped))
+		}
 	}
 	if s := st.Stage; s != nil && s.NextAttempt != "" {
 		if next, perr := time.Parse(time.RFC3339, s.NextAttempt); perr == nil && now.Before(next) {
