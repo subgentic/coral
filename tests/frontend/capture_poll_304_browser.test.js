@@ -115,8 +115,6 @@ async function httpJson(method, path, body) {
             const api = await import((window.__coralStatic || '/static/') + 'api.js');
             const tasks = await import((window.__coralStatic || '/static/') + 'tasks.js');
             const { state } = await import((window.__coralStatic || '/static/') + 'state.js');
-            await api.loadLiveSessions(); // the list changes now and then (the terminal agent's own state settles a few seconds after its typing; on a loaded machine that lands between the page's load and this one): this first load is the 200 that
-            // takes the new validator, the next two are the ones measured, back to back (#10924, red on epoch)
             await api.loadLiveSessions();
             const n1 = state.liveSessions.length;
             state.liveSessions.forEach(s => { s.__mutated = true; }); // a caller changing what it got
@@ -126,16 +124,26 @@ async function httpJson(method, path, body) {
             await tasks.loadBoardTasks('poll-304-board');
             return { n1, n2: state.liveSessions.length, fresh, tasks: (state.currentBoardTasks || []).length };
         })()`);
-        for (let i = 0; i < 40 && other.length < 5; i++) await new Promise(r => setTimeout(r, 50)); // sleep-ok: CDP network events trail the page
-        const live = other.filter(o => o.url === '/api/sessions/live').map(o => o.status).slice(-2); // the two measured loads, not the one that took the validator
+        for (let i = 0; i < 40 && !other.some(o => /\/tasks\?/.test(o.url) && o.status === 304); i++) await new Promise(r => setTimeout(r, 50)); // sleep-ok: CDP network events trail the page
         const bt = other.filter(o => /\/tasks\?/.test(o.url)).map(o => o.status);
-        // Both measured loads carry the validator the first load took.
-        assert.deepEqual(live, [304, 304], `the live list, unchanged since the page loaded it: 304s (${JSON.stringify(other)})`);
+        // The live list is measured on this test's own validator key, with its own fetch recording its own answers: the page's polls of the
+        // same list, and a list that changes while the terminal agent's state settles, are neither counted nor shared (#11050; red on epoch
+        // when the page's poll and the test's loads were counted together). Unchanged means 304: two in a row within a few tries.
+        const probe = await ev(`(async () => {
+            const sb = await import((window.__coralStatic || '/static/') + 'server_base.js');
+            const seen = [];
+            const load = async () => (await sb.fetchValidated('capture-poll-304 probe', h => fetch('/api/sessions/live', { headers: h }).then(r => { seen.push(r.status); return r; }))).notModified;
+            await load(); // takes the validator
+            let streak = 0, tries = 0;
+            while (streak < 2 && tries < 12) { streak = (await load()) ? streak + 1 : 0; tries++; }
+            return { seen, streak, tries };
+        })()`);
+        assert.equal(probe.streak, 2, `the live list, unchanged: two 304s in a row on the test's own loads (${JSON.stringify(probe)})`);
         assert.deepEqual(bt, [200, 304], `the board's tasks: then 304 (${JSON.stringify(other)})`);
         assert.equal(lists.n2, lists.n1, 'the same list after the 304');
         assert.equal(lists.fresh, true, 'a 304 hands back a fresh copy, not the objects a caller changed');
         assert.equal(lists.tasks, 1, 'the board\'s task is still shown');
-        console.log(`   ✓ live list ${live.join(' → ')}, board tasks ${bt.join(' → ')}, fresh copies`);
+        console.log(`   ✓ live list ${probe.seen.join(' → ')}, board tasks ${bt.join(' → ')}, fresh copies`);
 
         console.log('\nAll capture poll 304 checks passed');
     } finally {
