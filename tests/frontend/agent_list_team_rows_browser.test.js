@@ -1,5 +1,5 @@
 // #5237 (operator) wanted the branch and model lines of "Show branches" and "Show model" in a team group's rows too; since #9686 (slice B, UI/UX #9358) no agent row draws them, anywhere: a row is one line (the dot, the name, at most one chip) and
-// the switches are gone, so this suite now pins the same promise the other way: the four rows of a team group are the same one line as every other row, with no goal, model or branch line and no Display switch for them, and what the lines said (the
+// the switches are gone, so this suite now pins the same promise the other way: the four rows of a team group are the same one line as every other row, with no goal, model or branch line (Show summary and Show model are off by default again, #10816, and add a line only when on) and no Display switch for the others, and what the lines said (the
 // branch, the model) is in the row's hover tip for every agent that has it and for none that has not. Drives Chrome over CDP through agent_view_harness.js against the isolated dev server.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -33,7 +33,7 @@ const { connect } = require('./agent_view_harness');
                 const name = (li.dataset.name || li.querySelector('.session-label')?.textContent || '').trim();
                 out[name] = { h: Math.round(li.getBoundingClientRect().height), lines: ['.session-model', '.session-worktree-line', '.session-goal', '.session-activity-text'].filter(q => li.querySelector(q) && li.querySelector(q).getClientRects().length), chips: [...li.querySelectorAll('.session-state-pill')].map(c => c.textContent.trim()) };
             }
-            const switches = ['model', 'branches', 'provider', 'thinking', 'summaries'].filter(k => document.querySelector(${JSON.stringify(list(view))} + ' [data-display-input="' + k + '"]'));
+            const switches = ['branches', 'provider', 'thinking'].filter(k => document.querySelector(${JSON.stringify(list(view))} + ' [data-display-input="' + k + '"]'));
             return { rows: out, switches, hint: !!root.querySelector('[data-display-hint]:not([hidden])'), overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth };
         })()`);
         const tip = name => ev(`String(window.buildSessionTooltip(T.state.liveSessions.find(s => s.name === ${JSON.stringify(name)}))).replace(/<[^>]+>/g, ' ').replace(/\\s+/g, ' ')`);
@@ -56,7 +56,7 @@ const { connect } = require('./agent_view_harness');
                 assert.ok(r.chips.length <= 1, `${view.name}: ${name} has at most one chip: ${JSON.stringify(r.chips)}`);
             }
             assert.deepEqual(Object.keys(s.rows).length, 4);
-            assert.deepEqual(s.switches, [], `${view.name}: the Display panel has no switch for the removed lines: ${JSON.stringify(s.switches)}`);
+            assert.deepEqual(s.switches, [], `${view.name}: the Display panel has no switch for the removed lines (Show summary and Show model came back, #10816, off by default: agent_list_show_lines_browser): ${JSON.stringify(s.switches)}`);
             assert.equal(s.hint, false, `${view.name}: and no hint about agents with no model or branch`);
             assert.equal(s.overflow <= 0, true, `${view.name}: no horizontal overflow: ${s.overflow}`);
             const [wt, shared, nogit, bare] = [await tip('wt-agent'), await tip('shared-agent'), await tip('nogit-agent'), await tip('bare-agent')];

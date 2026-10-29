@@ -45,9 +45,9 @@ const NAME = 'Senior Backend Reliability Engineer for the Tunnel Subsystem';
                     assert.ok(facts.firstVisible, 'name beginning remains visible: ' + JSON.stringify(facts));
                     assert.equal(facts.ellipsis, 'ellipsis'); assert.equal(facts.whiteSpace, 'nowrap');
                     // an agent row is one line, the dot, the name and at most one chip (#9686): a waiting agent's chip is DRAWN at every width, whole and not over the name; on a phone it sits on the line, not below
-                    assert.ok(facts.tag && facts.tagWhole && !facts.overlap && !facts.overflow, 'whole tag and no overlap: ' + JSON.stringify(facts));
+                    if (width === 390) assert.match(facts.aria, /, Needs input \u00b7 Permission$/, 'on a phone the status is the row\'s own muted second line, not a chip (Option A, #10691), and the row is named with it: ' + JSON.stringify(facts));
+                    else assert.ok(facts.tag && facts.tagWhole && !facts.overlap && !facts.overflow, 'whole tag and no overlap: ' + JSON.stringify(facts));
                     if (narrow) assert.ok(facts.tagBelow, 'tag below name in narrow layout: ' + JSON.stringify(facts));
-                    if (width === 390) assert.ok(!facts.tagBelow, 'on a phone the chip is on the name\'s line: ' + JSON.stringify(facts));
                 } catch (error) { failures.push(at + ': ' + error.message); }
                 const dir = process.env.CORAL_SCREENSHOT_DIR || (process.env.RUNNER_TEMP ? path.join(process.env.RUNNER_TEMP, 'out', 'shots-8268') : '');
                 if (dir) { fs.mkdirSync(dir, { recursive: true }); fs.writeFileSync(path.join(dir, `waiting-name-${at}.png`), Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); }
