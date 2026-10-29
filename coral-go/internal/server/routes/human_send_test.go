@@ -359,6 +359,27 @@ func TestHumanSendIsSubmittedOrSaysSo(t *testing.T) {
 		rec := h.send("second")
 		assert.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 	})
+	// #10996 (c): a person's send marks its agent for Coral's own typing and the turn-end hand-off: in flight while it is delivered, and while its text may still be in the box after a refusal.
+	claudeScreen := func(inBox string) string {
+		ready := claudeUnnumbered(t, "ready.txt")
+		const placeholder = "❯\u00a0Try \"fix typecheck errors\"" // Claude draws a no-break space after its ❯
+		require.Contains(t, ready, placeholder)
+		return strings.Replace(ready, placeholder, "❯\u00a0"+inBox, 1)
+	}
+	t.Run("a person's send marks the agent while it is delivered, and after a refusal while its text may be in the box", func(t *testing.T) {
+		h := setup(t, "claude", true)
+		h.term.show(claudeScreen(""))
+		var during bool
+		h.term.onType = func(text string) { during = ptymanager.PersonSendActive(h.sid); h.submit() }
+		assert.Equal(t, http.StatusOK, h.send("hello").Code)
+		assert.True(t, during, "marked while it is being typed")
+		assert.False(t, ptymanager.PersonSendActive(h.sid), "submitted: no longer marked")
+
+		h.term.onType = func(text string) { h.term.show(claudeScreen(text)) } // its Enters do nothing: left in the box
+		assert.Equal(t, "not_submitted", code(h.send("stuck")))
+		assert.True(t, ptymanager.PersonSendActive(h.sid), "refused with its text in the box: still marked, so Coral types nothing after it")
+		ptymanager.NotePersonTextInBox(h.sid, false)
+	})
 	t.Run("claude: submitted by its own Enter: no Enter more", func(t *testing.T) {
 		h := setup(t, "claude", true)
 		ready := claudeUnnumbered(t, "ready.txt")

@@ -242,8 +242,18 @@ func (h *SessionsHandler) deliverHumanSend(ctx context.Context, name, agentType,
 		return err
 	}
 	defer leave()
+	// While this send is delivered, and after it if its text is left in the box, Coral's own typing and the turn-end hand-off keep away from the agent (#10996): they would start a turn, or type into the box,
+	// that the person's Enter competes with (#10992).
+	endMark := ptymanager.BeginPersonSend(sessionID)
+	defer endMark()
 	lo := h.sendGate.leftover(key)
 	defer func() {
+		switch {
+		case err == errSendNotSubmit || err == errSendMidTurn:
+			ptymanager.NotePersonTextInBox(sessionID, true)
+		case err == nil, err == errSendNotConfirmed, err == errSendHooksGone:
+			ptymanager.NotePersonTextInBox(sessionID, false)
+		}
 		if err == nil {
 			ptymanager.NoteOperatorText(name, text) // the chat page then knows this turn is a person's, not a notice by its words (#5482)
 		}

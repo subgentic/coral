@@ -123,3 +123,39 @@ func TestTurnEndHandoffAfterARealTypedNudge(t *testing.T) {
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
 	assert.Equal(t, true, out["handoff"], "the board remains unread despite the typed nudge: hand off now")
 }
+
+// #10996 (c): while a person's send to the agent is in flight, or its text may still be in the agent's box, the hand-off does not start the agent's next turn: the person's Enter would be competing with it
+// (#10992). It does once the send is over.
+func TestTurnEndHandoffWaitsForAPersonsSend(t *testing.T) {
+	server, h, _, ss := setupSessionsTestServer(t)
+	ctx := context.Background()
+	sid := "eeeeeeee-0996-1c00-0000-000000000001"
+	name := "claude-" + sid
+	board := "team-0996c"
+	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: sid, AgentType: "claude", AgentName: "echo", WorkingDir: "/w", BoardName: &board}))
+	tok := agentToken(t, h, sid, name)
+	_, err := h.bs.Subscribe(ctx, board, "Worker", "Worker", name, nil, "all")
+	require.NoError(t, err)
+	_, err = h.bs.Subscribe(ctx, board, "Lead", "Lead", "", nil, "all")
+	require.NoError(t, err)
+	_, err = h.bs.PostMessage(ctx, board, "Lead", "@Worker please review #12", nil)
+	require.NoError(t, err)
+	ask := func() map[string]any {
+		req, _ := http.NewRequest("POST", server.URL+"/api/sessions/live/echo/turn-end", strings.NewReader(`{}`))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set(store.SessionTokenHeader, tok)
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		var out map[string]any
+		_ = json.NewDecoder(resp.Body).Decode(&out)
+		return out
+	}
+	end := ptymanager.BeginPersonSend(sid)
+	assert.Equal(t, false, ask()["handoff"], "a person's send is in flight: no hand-off")
+	end()
+	ptymanager.NotePersonTextInBox(sid, true)
+	assert.Equal(t, false, ask()["handoff"], "its text is still in the box: no hand-off")
+	ptymanager.NotePersonTextInBox(sid, false)
+	assert.Equal(t, true, ask()["handoff"], "nothing of a person's is pending: the hand-off goes")
+}

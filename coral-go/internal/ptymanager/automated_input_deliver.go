@@ -36,6 +36,11 @@ func DeliverAutomated(ctx context.Context, in AutomatedInput) (Delivery, error) 
 	}
 	unlock := gate.lockSession(in.Name)
 	defer unlock()
+	if !in.force && PersonSendActive(in.SessionID) {
+		// A person's send to this agent is in flight, or its text may still be in the box: Coral's text would start a turn or join theirs (#10996). Nothing is typed and nothing is recorded (nothing was withheld
+		// from the person's view); the caller asks again on its next pass.
+		return Skipped, nil
+	}
 	if in.Ready != nil {
 		if err := in.Ready(ctx); err != nil {
 			return Sent, err

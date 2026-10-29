@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	at "github.com/subgentic/coral/internal/agenttypes"
+	"github.com/subgentic/coral/internal/ptymanager"
 	setreg "github.com/subgentic/coral/internal/settings"
 )
 
@@ -46,6 +47,12 @@ func (h *SessionsHandler) TurnEndHandoff(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	if settings, _ := h.ss.GetSettings(ctx); setreg.Enum(settings, TurnEndHandoffSetting) == "off" {
+		writeJSON(w, http.StatusOK, none)
+		return
+	}
+	if ptymanager.PersonSendActive(owner.SessionID) {
+		// A person's send to this agent is in flight, or its text may still be in the box: a hand-off starts the agent's next turn, and the person's Enter would compete with it (#10996, #10992). The messages stay
+		// unread: the notifier's reminder, or the next turn's end, hands them over.
 		writeJSON(w, http.StatusOK, none)
 		return
 	}
