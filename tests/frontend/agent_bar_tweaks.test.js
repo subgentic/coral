@@ -460,6 +460,8 @@ async function run() {
         await evalInPage(`window.__newSessionPayload = { name: 'coral-go', agent_type: 'claude', session_id: 'sid-new', display_name: '', summary: '', first_prompt: '/repo/coral-go/.github/workflows/release.yml audit this', context_pct: 5, working_directory: '/repo/coral-go' };
             window._coralHandleWsMessage({ type: 'coral_diff', changed: [window.__newSessionPayload] }); true`);
         await nextFrame();
+        await evalInPage(`document.querySelectorAll('#live-sessions-list .folder-more-row .row-btn[aria-expanded="false"]').forEach(b => b.click()); true`); // a folder shows its first 5 (#10319): the sixth agent of /repo/coral-go is behind Show 1 more
+        await nextFrame();
         const rowNew = await evalInPage(`(() => { const li = document.querySelector('#live-sessions-list [data-session-id="sid-new"]'); return li ? { label: li.querySelector('.session-label').textContent.trim(), aria: li.getAttribute('aria-label'), count: window._coralGetLiveSessions().length } : null; })()`);
         check('new session via diff renders intact (path prompt -> Agent identity)', rowNew && rowNew.label === 'coral-go · Claude' && /^coral-go, Claude, /.test(rowNew.aria || '') && rowNew.count === SESSIONS.length + 1, JSON.stringify(rowNew));
         check('new session merge does not alias incoming payload', await evalInPage(`window._coralGetLiveSessions().find(s => s.session_id === 'sid-new') !== window.__newSessionPayload`));
@@ -586,13 +588,13 @@ async function run() {
             const list = document.getElementById('mobile-session-list');
             if (!list) return { list: false };
             const li = list.querySelector('[data-session-id="sid-c"]');
-            const chips = [...li.querySelectorAll('.chip')].filter(c => c.getClientRects().length > 0).map(c => c.textContent.trim());
-            return { list: true, height: Math.round(li.getBoundingClientRect().height), chips, extra: [...li.querySelectorAll('.session-goal, .session-goal-empty, .session-mobile-banner-row, .session-mobile-meta, .session-ctx-pill')].map(e => e.className), viewport: innerWidth,
+            const chips = [...li.querySelectorAll('.chip')].filter(c => c.getClientRects().length > 0).map(c => c.textContent.trim()), st = li.querySelector('.session-status-line');
+            return { list: true, status: st && st.getClientRects().length > 0 ? st.textContent.trim() : null, height: Math.round(li.getBoundingClientRect().height), chips, extra: [...li.querySelectorAll('.session-goal, .session-goal-empty, .session-mobile-banner-row, .session-mobile-meta, .session-ctx-pill')].map(e => e.className), viewport: innerWidth,
                      over: list.scrollWidth - list.clientWidth };
         })()`);
         check('mobile clone list rendered at 390px', mobile.list && mobile.viewport === 390, JSON.stringify(mobile));
-        check('mobile card is one 44 px line, nothing sideways', mobile.height >= 43 && mobile.height <= 46 && mobile.over <= 1, JSON.stringify(mobile));
-        check('mobile card: a Check terminal agent has its one chip drawn, and no goal, banner, meta or context pill', mobile.chips.length === 1 && /Check terminal/.test(mobile.chips[0]) && mobile.extra.length === 0, JSON.stringify(mobile));
+        check('mobile card is one 56 px row (Option A, #10691), nothing sideways', mobile.height >= 55 && mobile.height <= 57 && mobile.over <= 1, JSON.stringify(mobile));
+        check('mobile card: a Check terminal agent has its status line drawn (no chip on a phone, #10691), and no goal, banner, meta or context pill', mobile.chips.length === 0 && mobile.status === 'Check terminal' && mobile.extra.length === 0, JSON.stringify(mobile));
         // Back to desktop; the desktop rules must still hide the mobile rows.
         await Emulation.setDeviceMetricsOverride({ width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
         await evalInPage(`window.dispatchEvent(new Event('resize')); true`);
