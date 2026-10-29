@@ -35,13 +35,13 @@ const { connect } = require('./agent_view_harness');
         }
         ok('the name and the tip follow a state change from the live feed (Working, Needs input, Stuck)');
 
-        // no screen draws a word: not a touch screen at 900 px, not a phone
+        // no wider screen draws a word: not a touch screen at 900 px. A phone's chat header (<= 600 px) says the state in a word beside the dot (#10885 item 10): header_status_word_browser owns that, so 390 px is not asked here
         await Emulation.setTouchEmulationEnabled({ enabled: true, maxTouchPoints: 5 });
-        for (const w of [900, 390]) {
+        for (const w of [900]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: 800, deviceScaleFactor: 1, mobile: true }); await sleep(400); // sleep-ok: layout settles after the emulation change
             const x = await dot(); assert.ok(x.noWordElement && !x.headerText.includes(x.label), `${w} px: no word beside the dot`);
         }
-        ok('no word beside the dot on a touch screen at 900 px or on a phone');
+        ok('no word beside the dot on a touch screen at 900 px');
 
         // the accessibility tree: the dot is one image named for the state, the word is not exposed
         await DOM.enable(); await Accessibility.enable();

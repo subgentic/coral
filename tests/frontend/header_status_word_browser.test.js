@@ -15,7 +15,8 @@ const BASE = require('./test_base').BASE;
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
             await ev(`window.__m.add('hdr', 'A', 3, { sleeping: false }); true`); await settle(ev, 600); // sleep-ok: the list renders
             await ev(`window.selectLiveSession('hdr', 'claude', 'hdr-id', 'local'); true`);
-            await waitFor(`!!document.getElementById('terminal-status-word') && document.getElementById('terminal-status-word').textContent.length > 0`, `${w}: the word is written`, 8000);
+            await waitFor(`!!document.getElementById('terminal-status-word') && !!document.getElementById('terminal-status-word').dataset.word`, `${w}: the word is known`, 8000); // written as text at <= 600 px only (#11065): a wider header's text has no word
+            assert.equal(await ev(`document.getElementById('terminal-status-word').textContent.length > 0`), mobile, `${w}: the word is text ${mobile ? 'on a phone' : 'nowhere else'}`);
             const a = await word();
             assert.ok(a.dotLabel && a.generated !== '"Ready"', `${w}: the dot keeps its name and the word is not generated content: ` + JSON.stringify(a));
             assert.equal(a.hidden, 'true', `${w}: the dot is what a screen reader reads, so the word is not read twice`);
