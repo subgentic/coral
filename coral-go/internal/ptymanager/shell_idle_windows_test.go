@@ -88,6 +88,36 @@ func TestWindowsShellIdleANestedShellIsStillABarePrompt(t *testing.T) {
 	require.Eventually(t, func() bool { idle, _, ok := b.ShellIdle(name); return ok && idle }, 20*time.Second, 200*time.Millisecond, "and a bare prompt again once it ends")
 }
 
+// #216 (the Orchestrator's narrower rule, after Security on #388): a shell of unknown contents covers what runs under it. A cmd.exe copied
+// out of System32 is one (by place), and the ping it runs DOES show in Windows' process list under it; the pane still reads as a shell of
+// unknown contents (notices withheld, no launch line), not as busy. The real cmd running the same ping stays busy (the agent's route:
+// powershell, the claude.cmd shim's cmd, node), as TestWindowsShellIdleANestedShellIsStillABarePrompt shows.
+func TestWindowsShellIdleAProgramUnderAnUnknownShellIsTheShells(t *testing.T) {
+	win, err := windows.GetSystemWindowsDirectory()
+	require.NoError(t, err)
+	src, err := os.ReadFile(filepath.Join(win, "System32", "cmd.exe"))
+	require.NoError(t, err)
+	copied := filepath.Join(t.TempDir(), "cmd.exe")
+	require.NoError(t, os.WriteFile(copied, src, 0o755))
+
+	naming.SetDefaultLogDir(t.TempDir())
+	b := NewPTYBackend()
+	t.Cleanup(func() { _ = b.Close() })
+	name := "claude-216-unknown"
+	require.NoError(t, b.Spawn(name, "claude", t.TempDir(), "0382", "powershell.exe -NoProfile", 120, 40))
+	require.Eventually(t, func() bool { idle, _, ok := b.ShellIdle(name); return ok && idle }, 20*time.Second, 200*time.Millisecond, "a bare PowerShell")
+
+	require.NoError(t, b.SendInput(terminalinput.Unclassified, name, []byte("& '"+copied+"' /c ping -n 10 127.0.0.1"+EnterKey)))
+	require.Eventually(t, func() bool { sh, ok := b.OtherShell(name); return ok && sh == "cmd" }, 15*time.Second, 100*time.Millisecond, "the copied cmd is a shell of unknown contents")
+	for i := 0; i < 5; i++ { // ping runs for about 9 s
+		idle, shell, ok := b.ShellIdle(name)
+		require.True(t, ok)
+		assert.True(t, idle, "a program under an unknown shell is that shell's: notices withheld (tree: %s)", processTreeOf(b, name))
+		assert.Equal(t, "cmd", shell)
+		time.Sleep(300 * time.Millisecond)
+	}
+}
+
 // #205 review: a console host under the shell is not a program the person runs, and the nested shells the Unix check knows (git-bash's
 // bash, sh, zsh) are a bare prompt as cmd and PowerShell are. A program in git-bash cannot be seen from Windows, so it is one too.
 func TestWindowsShellIdleCountsGitBashAsAShellAndIgnoresConsoleHosts(t *testing.T) {

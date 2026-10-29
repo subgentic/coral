@@ -72,7 +72,9 @@ func hasChildProcesses(pid int) (bool, error) {
 //
 // A process is taken as a child only when it started after its parent: Windows reuses pids, and a process left by an earlier owner of
 // the parent's pid is not under it. The walk visits each pid once and stops at maxShellTreeDepth levels, where what is left counts as a
-// program. A program seen anywhere wins over a shell of unknown contents: it is what runs in the pane.
+// program. A shell of unknown contents covers everything under it: a program below it (WSL's processes, a Cygwin child that does show)
+// is that shell's, not the agent's, so it leaves the pane "unknown contents" and notices are withheld (Security on #216). A program
+// that is under no such shell (the agent: powershell, its script, the claude.cmd shim's cmd, node) is busy, as before.
 func shellTree(pid int) (busy bool, other string, err error) {
 	snap, err := windows.CreateToolhelp32Snapshot(windows.TH32CS_SNAPPROCESS, 0)
 	if err != nil {
@@ -101,9 +103,10 @@ func shellTree(pid int) (busy bool, other string, err error) {
 		pid   int
 		start int64
 		depth int
+		under string // the shell of unknown contents this node is under ("" for none)
 	}
 	seen := map[int]bool{pid: true}
-	queue := []node{{pid, rootStart, 0}}
+	queue := []node{{pid, rootStart, 0, ""}}
 	for len(queue) > 0 {
 		n := queue[0]
 		queue = queue[1:]
@@ -120,17 +123,24 @@ func shellTree(pid int) (busy bool, other string, err error) {
 			if imageOK && consoleHostImage(image) {
 				continue // the console host of a program's own console, not a program the person runs (#205 review)
 			}
-			if !ok || !imageOK || n.depth+1 >= maxShellTreeDepth {
-				return true, "", nil
-			}
+			isProgram := !ok || !imageOK || n.depth+1 >= maxShellTreeDepth
 			switch {
+			case isProgram && n.under != "", !isProgram && !verifiedWindowsShell(image) && !shellNamed(image) && n.under != "":
+				continue // the unknown shell's own: the pane stays "unknown contents"
+			case isProgram:
+				return true, "", nil
 			case verifiedWindowsShell(image):
-				queue = append(queue, node{c, start, n.depth + 1})
+				queue = append(queue, node{c, start, n.depth + 1, n.under})
 			case shellNamed(image):
+				name := strings.TrimSuffix(strings.ToLower(filepath.Base(image)), ".exe")
 				if other == "" {
-					other = strings.TrimSuffix(strings.ToLower(filepath.Base(image)), ".exe")
+					other = name
 				}
-				queue = append(queue, node{c, start, n.depth + 1}) // a program it shows under it (some shells' children do appear) still wins
+				under := n.under
+				if under == "" {
+					under = name
+				}
+				queue = append(queue, node{c, start, n.depth + 1, under})
 			default:
 				return true, "", nil
 			}
