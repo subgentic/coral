@@ -210,14 +210,21 @@ const HOVER_CARD_DELAY_MS = 800; // how long the pointer rests on an agent row b
 function openRowMenuIdentity(list) {
     const menu = [...list.querySelectorAll('.sidebar-kebab-menu[data-lazy-menu]')].find(m => m.style.display !== 'none');
     const li = menu && menu.closest('.session-group-item');
-    return li ? { sid: li.dataset.sessionId || '', server: li.dataset.server || '', name: li.dataset.name || '' } : null;
+    if (!li) return null;
+    const items = [...menu.querySelectorAll('.overflow-menu-item')];
+    return { sid: li.dataset.sessionId || '', server: li.dataset.server || '', name: li.dataset.name || '', focused: items.indexOf(document.activeElement) };
 }
+/** Opens the noted row's menu again; true when the keyboard focus was on one of its items and is back on the same item (a row that is gone, or hidden by a filter, gets no menu). */
 function reopenRowMenu(list, was) {
-    if (!was) return;
+    if (!was) return false;
     const li = [...list.querySelectorAll('.session-group-item')].find(r => (r.dataset.sessionId || '') === was.sid && (r.dataset.server || '') === was.server && (r.dataset.name || '') === was.name);
     const menu = li && li.querySelector('.sidebar-kebab-menu[data-lazy-menu]');
     const btn = menu && menu.previousElementSibling;
-    if (btn && menu.style.display === 'none') window.toggleSidebarKebab(btn);
+    if (!btn) return false;
+    if (menu.style.display === 'none') window.toggleSidebarKebab(btn);
+    const item = was.focused >= 0 ? menu.querySelectorAll('.overflow-menu-item')[was.focused] : null;
+    item?.focus({ preventScroll: true });
+    return !!item && document.activeElement === item;
 }
 
 // Puts the markup in the list and wires what is new: tooltips, drag and drop, team token usage, the keyboard focus the redraw took, and the phone's page.
@@ -227,13 +234,14 @@ function _applyListHtml(list, html, focusedSid, focusedInMenu) {
     _lastListHtml = html;
     const openMenuRow = openRowMenuIdentity(list);
     const added = morphHtml(list, html);
-    reopenRowMenu(list, openMenuRow);
+    if (reopenRowMenu(list, openMenuRow)) focusedInMenu = false; // the focus is on the menu item again: the row-level restore below leaves it
 
     // Attach hover listeners for fixed-position tooltips (new rows only)
     for (const item of _within(added, ".session-group-item")) {
         const tip = item.querySelector(".session-tooltip");
         if (!tip) continue;
         const show = () => {
+            if ([...item.querySelectorAll('.sidebar-kebab-menu')].some(m => m.style.display !== 'none')) return; // the pointer's rest timer ran out after a click on the kebab opened the menu: no card beside it (#10786)
             // Built when the pointer (or the keyboard) comes, from the session as it is now: a row carries an empty tooltip until then (#4497; the table was built for every row on every render).
             const sess = _rowSession(item), label = item.querySelector('.session-label');
             if (sess) tip.innerHTML = buildSessionTooltip(sess, { nameCut: !!label && [label, ...label.querySelectorAll('*')].some(e => e.scrollWidth > e.clientWidth + 1), inTeam: !!item.closest('.session-board-card') });
