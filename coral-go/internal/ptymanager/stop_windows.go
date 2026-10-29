@@ -126,14 +126,16 @@ func runsNonShell(pid int) (bool, error) {
 	return false, nil
 }
 
-// consoleHostImage says whether an image is Windows' console host (conhost.exe, or OpenConsole.exe, Windows Terminal's), which a
-// console program can have as a child: it is not a program the person runs.
+// consoleHostImage says whether an image is Windows' console host, which a console program can have as a child and is not a program the
+// person runs: conhost.exe in the Windows System32 folder, or Windows Terminal's OpenConsole.exe in its installed package folder. By full
+// path, never the base name alone, so a program that only takes the name is still a program (Security on #205).
 func consoleHostImage(image string) bool {
-	switch strings.ToLower(filepath.Base(image)) {
-	case "conhost.exe", "openconsole.exe":
+	p := strings.ToLower(filepath.Clean(image))
+	if win, err := windows.GetSystemWindowsDirectory(); err == nil && p == strings.ToLower(filepath.Join(win, "System32", "conhost.exe")) {
 		return true
 	}
-	return false
+	dir, base := filepath.Split(p)
+	return base == "openconsole.exe" && strings.Contains(dir, `\windowsapps\microsoft.windowsterminal`)
 }
 
 // maxShellTreeDepth bounds runsNonShell's walk: shells nested this deep are not a person at a prompt.

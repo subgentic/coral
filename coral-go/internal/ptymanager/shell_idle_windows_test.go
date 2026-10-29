@@ -4,12 +4,14 @@ package ptymanager
 
 import (
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sys/windows"
 
 	"github.com/subgentic/coral/internal/naming"
 	"github.com/subgentic/coral/internal/terminalinput"
@@ -86,10 +88,14 @@ func TestWindowsShellIdleANestedShellIsStillABarePrompt(t *testing.T) {
 // #205 review: a console host under the shell is not a program the person runs, and the nested shells the Unix check knows (git-bash's
 // bash, sh, zsh) are a bare prompt as cmd and PowerShell are. A program in git-bash is busy.
 func TestWindowsShellIdleCountsGitBashAsAShellAndIgnoresConsoleHosts(t *testing.T) {
-	for _, image := range []string{`C:\Windows\System32\conhost.exe`, `C:\Program Files\WindowsApps\Microsoft.WindowsTerminal\OpenConsole.exe`, `CONHOST.EXE`} {
+	win, err := windows.GetSystemWindowsDirectory()
+	require.NoError(t, err)
+	for _, image := range []string{filepath.Join(win, "System32", "conhost.exe"), strings.ToUpper(filepath.Join(win, "System32", "conhost.exe")),
+		`C:\Program Files\WindowsApps\Microsoft.WindowsTerminal_1.22.11141.0_x64__8wekyb3d8bbwe\OpenConsole.exe`} {
 		assert.True(t, consoleHostImage(image), image)
 	}
-	for _, image := range []string{`C:\Windows\System32\cmd.exe`, `C:\x\node.exe`, `conhost.exe.bak`} {
+	// a program that only takes a console host's name is still a program
+	for _, image := range []string{`C:\Users\x\conhost.exe`, `conhost.exe`, `D:\tools\OpenConsole.exe`, filepath.Join(win, "System32", "cmd.exe"), `C:\x\node.exe`} {
 		assert.False(t, consoleHostImage(image), image)
 	}
 
