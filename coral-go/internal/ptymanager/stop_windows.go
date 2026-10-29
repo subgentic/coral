@@ -63,24 +63,27 @@ func hasChildProcesses(pid int) (bool, error) {
 	}
 }
 
-// runsNonShell says whether any process under pid (its children, theirs, and so on, from one snapshot of the process list) is
-// something other than a shell (powershell, pwsh, cmd, and the shells the Unix check knows, tmux.IsShellCommand: bash, sh, zsh, nu
-// and the rest, so git-bash at the prompt counts as one) or a console host: a program is running there. Nested shells alone (a person typed "cmd" at
-// the prompt an exited agent left, #378) are still a bare prompt, which would run typed text as a command. A process whose image
-// can't be read counts as a program. A process is taken as a child only when it started after its parent: Windows reuses pids,
-// and a process left by an earlier owner of the parent's pid is not under it. The walk visits each pid once and stops at
-// maxShellTreeDepth levels, where what is left counts as a program.
-func runsNonShell(pid int) (bool, error) {
+// shellTree reads what runs under pid (its children, theirs, and so on, from one snapshot of the process list), for ShellIdle:
+//   - busy: a program runs there (an image that is not a shell, or one that can't be read): the agent, or a job the person left;
+//   - other: no program was seen, but a shell other than a verified Windows PowerShell or cmd was (git-bash's bash, WSL's bash.exe or
+//     wsl.exe, an MSYS2, Cygwin or Scoop shell, a pwsh at an unknown place). What runs inside such a shell can't be seen from Windows
+//     (git-bash's children don't appear under it, measured), so the pane is "a shell of unknown contents" (Security on #216);
+//   - neither: only PowerShell and cmd, nested or not, and console hosts: a bare prompt.
+//
+// A process is taken as a child only when it started after its parent: Windows reuses pids, and a process left by an earlier owner of
+// the parent's pid is not under it. The walk visits each pid once and stops at maxShellTreeDepth levels, where what is left counts as a
+// program. A program seen anywhere wins over a shell of unknown contents: it is what runs in the pane.
+func shellTree(pid int) (busy bool, other string, err error) {
 	snap, err := windows.CreateToolhelp32Snapshot(windows.TH32CS_SNAPPROCESS, 0)
 	if err != nil {
-		return false, err
+		return false, "", err
 	}
 	defer windows.CloseHandle(snap)
 	children := map[int][]int{}
 	var e windows.ProcessEntry32
 	e.Size = uint32(unsafe.Sizeof(e))
 	if err := windows.Process32First(snap, &e); err != nil {
-		return false, err
+		return false, "", err
 	}
 	for {
 		if p, c := int(e.ParentProcessID), int(e.ProcessID); p != c {
@@ -92,7 +95,7 @@ func runsNonShell(pid int) (bool, error) {
 	}
 	rootStart, ok := processStart(pid)
 	if !ok {
-		return false, fmt.Errorf("read process %d", pid)
+		return false, "", fmt.Errorf("read process %d", pid)
 	}
 	type node struct {
 		pid   int
@@ -117,28 +120,66 @@ func runsNonShell(pid int) (bool, error) {
 			if imageOK && consoleHostImage(image) {
 				continue // the console host of a program's own console, not a program the person runs (#205 review)
 			}
-			if !ok || !imageOK || !tmux.IsShellCommand(image) || n.depth+1 >= maxShellTreeDepth {
-				return true, nil
+			if !ok || !imageOK || n.depth+1 >= maxShellTreeDepth {
+				return true, "", nil
 			}
-			queue = append(queue, node{c, start, n.depth + 1})
+			switch {
+			case verifiedWindowsShell(image):
+				queue = append(queue, node{c, start, n.depth + 1})
+			case shellNamed(image):
+				if other == "" {
+					other = strings.TrimSuffix(strings.ToLower(filepath.Base(image)), ".exe")
+				}
+				queue = append(queue, node{c, start, n.depth + 1}) // a program it shows under it (some shells' children do appear) still wins
+			default:
+				return true, "", nil
+			}
 		}
 	}
-	return false, nil
+	return false, other, nil
+}
+
+// shellNamed says whether an image is named like a shell: the shells the Unix check knows (tmux.IsShellCommand: bash, sh, zsh, fish, nu
+// and the rest, powershell, pwsh and cmd too) and wsl.exe, WSL's launcher. Where it is decides nothing here: verifiedWindowsShell does.
+func shellNamed(image string) bool {
+	return tmux.IsShellCommand(image) || strings.EqualFold(filepath.Base(image), "wsl.exe")
+}
+
+// verifiedWindowsShell says whether an image is Windows PowerShell, PowerShell 7 or cmd at its own install place: under the Windows
+// folder (System32, SysWOW64, WindowsPowerShell), or PowerShell 7 under Program Files\PowerShell. Compared cleaned and case-folded, by
+// prefix. Any other shell-named image is a shell of unknown contents (shellTree).
+func verifiedWindowsShell(image string) bool {
+	p := strings.ToLower(filepath.Clean(image))
+	switch filepath.Base(p) {
+	case "powershell.exe", "cmd.exe", "pwsh.exe":
+	default:
+		return false
+	}
+	if win, err := windows.GetSystemWindowsDirectory(); err == nil && strings.HasPrefix(p, strings.ToLower(filepath.Clean(win))+`\`) {
+		return filepath.Base(p) != "pwsh.exe"
+	}
+	if pf, err := windows.KnownFolderPath(windows.FOLDERID_ProgramFiles, 0); err == nil && strings.HasPrefix(p, strings.ToLower(filepath.Join(pf, "PowerShell"))+`\`) {
+		return filepath.Base(p) == "pwsh.exe"
+	}
+	return false
 }
 
 // consoleHostImage says whether an image is Windows' console host, which a console program can have as a child and is not a program the
-// person runs: conhost.exe in the Windows System32 folder, or Windows Terminal's OpenConsole.exe in its installed package folder. By full
-// path, never the base name alone, so a program that only takes the name is still a program (Security on #205).
+// person runs: conhost.exe in the Windows System32 folder, or Windows Terminal's OpenConsole.exe under Program Files\WindowsApps// Microsoft.WindowsTerminal*. By full path, compared cleaned and case-folded, the Terminal's by prefix: a program that only takes the name
+// is still a program (Security on #205, #216).
 func consoleHostImage(image string) bool {
 	p := strings.ToLower(filepath.Clean(image))
 	if win, err := windows.GetSystemWindowsDirectory(); err == nil && p == strings.ToLower(filepath.Join(win, "System32", "conhost.exe")) {
 		return true
 	}
-	dir, base := filepath.Split(p)
-	return base == "openconsole.exe" && strings.Contains(dir, `\windowsapps\microsoft.windowsterminal`)
+	if filepath.Base(p) != "openconsole.exe" {
+		return false
+	}
+	pf, err := windows.KnownFolderPath(windows.FOLDERID_ProgramFiles, 0)
+	return err == nil && strings.HasPrefix(p, strings.ToLower(filepath.Join(pf, "WindowsApps", "Microsoft.WindowsTerminal")))
 }
 
-// maxShellTreeDepth bounds runsNonShell's walk: shells nested this deep are not a person at a prompt.
+// maxShellTreeDepth bounds shellTree's walk: shells nested this deep are not a person at a prompt.
 const maxShellTreeDepth = 16
 
 // processStart is when a process started (its creation time, in 100 ns units); ok is false when it can't be read.

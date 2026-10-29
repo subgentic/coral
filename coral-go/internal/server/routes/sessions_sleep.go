@@ -263,7 +263,11 @@ func (h *SessionsHandler) WakeSession(w http.ResponseWriter, r *http.Request) {
 		h.boardHandler.SetPaused(bn, false)
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "sleeping": false})
+	reply := map[string]any{"ok": true, "sleeping": false}
+	if note := takeWakeNote(sess.SessionID); note != "" {
+		reply["note"] = note // its launch line was not typed into a shell of unknown contents (Security on #216)
+	}
+	writeJSON(w, http.StatusOK, reply)
 }
 
 // ArchiveSession archives an agent: a running agent is put to sleep first

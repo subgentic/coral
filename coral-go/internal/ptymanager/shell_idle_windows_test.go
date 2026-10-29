@@ -133,6 +133,41 @@ func TestWindowsShellIdleCountsGitBashAsAShellAndIgnoresConsoleHosts(t *testing.
 	require.True(t, ok)
 	t.Logf("git-bash's process tree while sleep runs: %s", processTreeOf(b, name))
 	assert.True(t, idle, "a program in git-bash cannot be seen from Windows: the pane reads as a bare prompt, and nothing is typed into it")
+	// #216: it is a shell of unknown contents, so no launch line is typed into it either (AgentExitedForLaunch)
+	sh, ok := b.OtherShell(name)
+	require.True(t, ok)
+	assert.Equal(t, "bash", sh, "the walk sees bash.exe under the root and names it")
+}
+
+// #216 (Security): shells are matched by place, not name. Windows PowerShell and cmd under the Windows folder and PowerShell 7 under
+// Program Files\PowerShell are verified shells (a bare prompt); any other shell-named image (WSL's System32\bash.exe, wsl.exe, git-bash,
+// MSYS2, Cygwin, a pwsh elsewhere) is a shell of unknown contents; anything else is a program.
+func TestWindowsShellsAreMatchedByPlace(t *testing.T) {
+	win, err := windows.GetSystemWindowsDirectory()
+	require.NoError(t, err)
+	pf, err := windows.KnownFolderPath(windows.FOLDERID_ProgramFiles, 0)
+	require.NoError(t, err)
+	for _, image := range []string{
+		filepath.Join(win, "System32", "WindowsPowerShell", "v1.0", "powershell.exe"), filepath.Join(win, "System32", "cmd.exe"),
+		filepath.Join(win, "SysWOW64", "cmd.exe"), filepath.Join(pf, "PowerShell", "7", "pwsh.exe"), strings.ToUpper(filepath.Join(win, "System32", "cmd.exe")),
+	} {
+		assert.True(t, verifiedWindowsShell(image), image)
+	}
+	for _, image := range []string{
+		filepath.Join(win, "System32", "bash.exe"), filepath.Join(win, "System32", "wsl.exe"), filepath.Join(pf, "Git", "bin", "bash.exe"),
+		filepath.Join(pf, "Git", "usr", "bin", "bash.exe"), `C:\msys64\usr\bin\zsh.exe`, `C:\cygwin64\bin\sh.exe`, `C:\tools\cmd.exe`,
+		`C:\Users\x\scoop\apps\pwsh\current\pwsh.exe`, filepath.Join(win, "System32", "pwsh.exe"),
+	} {
+		assert.False(t, verifiedWindowsShell(image), image)
+		assert.True(t, shellNamed(image), "%s is named like a shell: unknown contents", image)
+	}
+	for _, image := range []string{`C:\Program Files\nodejs\node.exe`, `C:\x\claude.exe`, filepath.Join(win, "System32", "PING.EXE")} {
+		assert.False(t, verifiedWindowsShell(image), image)
+		assert.False(t, shellNamed(image), "%s is a program", image)
+	}
+	// the Terminal's console host by prefix only
+	assert.True(t, consoleHostImage(filepath.Join(pf, "WindowsApps", "Microsoft.WindowsTerminal_1.22.11141.0_x64__8wekyb3d8bbwe", "OpenConsole.exe")))
+	assert.False(t, consoleHostImage(`D:\x\WindowsApps\Microsoft.WindowsTerminal_1\OpenConsole.exe`), "a look-alike folder elsewhere")
 }
 
 // processTreeOf is the session's root and every process under it, image by image, for a failure's message.

@@ -7,6 +7,7 @@ import (
 	"log"
 	"log/slog"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/subgentic/coral/internal/agent"
@@ -187,7 +188,14 @@ func (h *SessionsHandler) startWake(ctx context.Context, ls *store.LiveSession, 
 	// The terminal is there but the agent CLI exited from it, leaving a plain shell (#3219):
 	// resume the agent in that shell, as launch does, instead of only clearing the flag.
 	if alreadyRunning && ls.AgentType != at.Terminal && h.terminal != nil {
-		if exited, fg := ptymanager.AgentExited(ctx, h.terminal, sessionName, ls.AgentType, ls.SessionID); exited {
+		exited, fg, refusal := ptymanager.AgentExitedForLaunch(ctx, h.terminal, sessionName, ls.AgentType, ls.SessionID)
+		if refusal != "" {
+			// A shell of unknown contents (git-bash, WSL) in the agent's terminal: its launch line is not typed into it, the sleeping flag is
+			// cleared as for a running terminal, and the person is told why (Security on #216).
+			log.Printf("[wake] session=%s: %s", sessionName, refusal)
+			h.noteWake(ls.SessionID, refusal)
+		}
+		if exited {
 			cmd, err := launchCommand(agentImpl, launchParams)
 			if err != nil {
 				return err
@@ -265,4 +273,21 @@ func (h *SessionsHandler) finishWake(ctx context.Context, ls *store.LiveSession,
 	if boardName != "" {
 		h.setupBoardAndPrompt(ls.SessionID, sessionName, ls.AgentType, boardName, displayName)
 	}
+}
+
+// wakeNotes holds, per session id, what a wake had to tell the person and the wake's own reply has not said yet (a launch line not typed
+// into a shell of unknown contents, Security on #216).
+var wakeNotes sync.Map
+
+// noteWake keeps what the wake of session sid has to tell the person, for the reply (takeWakeNote).
+func (h *SessionsHandler) noteWake(sid, note string) { wakeNotes.Store(sid, note) }
+
+// takeWakeNote is what the wake of sid had to tell, once; "" when nothing.
+func takeWakeNote(sid string) string {
+	if v, ok := wakeNotes.LoadAndDelete(sid); ok {
+		if s, ok := v.(string); ok {
+			return s
+		}
+	}
+	return ""
 }

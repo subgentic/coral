@@ -280,7 +280,7 @@ func (l *AgentLauncher) SendPrompt(ctx context.Context, sessionID, sessionName, 
 		return ctx.Err()
 	}
 	for deadline := time.Now().Add(promptStartWait); ; {
-		exited, _ := ptymanager.AgentExited(ctx, l.runtime, sessionName, agentType, sessionID)
+		exited, _, _ := ptymanager.AgentExitedForLaunch(ctx, l.runtime, sessionName, agentType, sessionID) // the prompt's own delivery still withholds it from such a shell
 		if !exited {
 			break
 		}
