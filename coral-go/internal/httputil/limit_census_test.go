@@ -29,7 +29,7 @@ var tooManyRequestsSites = map[string]struct {
 	"internal/cloud/signin.go":                          {1, "client side: the Hub sign-in check reads Coral Hub's busy 429 as transient, like no answer (#3966)"},
 	"internal/tracking/posthog.go":                      {2, "client side: retries the analytics service's 429 (and says so in a comment)"},
 	"cmd/coral/cloud_connect.go":                        {1, "client side: the CLI reads Coral Hub's 429"},
-	"internal/machinelaunch/hubclient.go":               {2, "client side: the mint's 429 is said in words, and the revoke retries one (Retry-After), never writes one (#10917)"},
+	"internal/machinelaunch/hubclient.go":               {1, "client side: the mint's 429 is said in words (the revoke is HubRevoker's, below), never writes one (#10917)"},
 	"internal/machinelaunch/hubrevoke.go":               {1, "client side: the destroy-credential revoke reads coral-hub's two 429 limits, waits what Retry-After says (at most two minutes) and tries again, never writes one (#10918)"},
 	"internal/machinelaunch/digitalocean.go":            {2, "client side: the provider reads DigitalOcean's 429 (a message with its Retry-After, and a transient answer a poll rides out), never writes one (#9973)"},
 	"cmd/coral-board/send.go":                           {1, "client side: coral-board reads a relayed send's 429 to suggest a retry (#3489)"},
