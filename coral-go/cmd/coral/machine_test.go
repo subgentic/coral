@@ -288,6 +288,21 @@ func TestMachineLaunchPinsTheCoralDigest(t *testing.T) {
 	}
 }
 
+// The confirmation says the SSH address was looked up at api.ipify.org when the person did not give one, and says nothing of a lookup when they did.
+func TestMachineLaunchSaysWhereTheSSHAddressCameFrom(t *testing.T) {
+	tf, kf, _, _ := machineFixture(t)
+	base := []string{"launch", "--provider", "digitalocean", "--token-file", tf, "--hub-key-file", kf, "--hub-url", "https://hub.example", "--coral-version", "2.0.3", "--yes"}
+	var out, errb bytes.Buffer
+	if code := runMachine(base, strings.NewReader(""), &out, &errb); code != 0 || !strings.Contains(out.String(), "looked up at api.ipify.org") {
+		t.Fatalf("exit %d: %s / %s", code, out.String(), errb.String())
+	}
+	out.Reset()
+	errb.Reset()
+	if code := runMachine(append(append([]string{}, base...), "--allow-ssh-from", "198.51.100.7"), strings.NewReader(""), &out, &errb); code != 0 || strings.Contains(out.String(), "looked up") {
+		t.Fatalf("exit %d: %s / %s", code, out.String(), errb.String())
+	}
+}
+
 // --allow-ssh-from is checked before anything is read or made: an address that is every address, or not an address, is refused.
 func TestMachineLaunchRefusesABadSSHSourceBeforeAnyCall(t *testing.T) {
 	tf, kf, p, h := machineFixture(t)

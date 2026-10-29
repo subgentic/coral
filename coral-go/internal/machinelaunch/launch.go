@@ -23,7 +23,9 @@ type Options struct {
 	Yes     bool     // skip the confirm prompt (and only that)
 	HubURL  string   // the Hub's origin, printed as the place to approve the machine
 	SSHFrom string   // the address SSH is open to on the machine (shown in the confirm); the user-data builder is given the same one
-	Wait    time.Duration
+	// SSHFromLookup is where SSHFrom was looked up when the person did not give it ("api.ipify.org"); "" when they gave it. The confirm says so: the lookup tells that service this computer's address.
+	SSHFromLookup string
+	Wait          time.Duration
 	// RetryListAfter is how long a launch whose create timed out waits before it looks once more for a machine it may have made (a provider's list can lag the create); 0 is 5 seconds.
 	RetryListAfter time.Duration
 }
@@ -38,9 +40,16 @@ type Deps struct {
 	UserData func(keys *BootKeys) (string, error)
 	// Bootstrap hands the machine the Hub's credential over SSH once it runs, after the pinned handshake (an SSHBootstrap).
 	Bootstrap Bootstrapper
+	// Revoker revokes a credential this launch minted when the launch fails after the mint; nil uses Hub when it can (HubClient does).
+	Revoker Revoker
 	// Confirm shows the summary and asks; nil means no one can be asked, so only Options.Yes goes on.
 	Confirm func(summary string) (bool, error)
 	Out     io.Writer
+}
+
+// Revoker revokes the credential minted for a machine's label (and the identity enrolled from it, if it was redeemed).
+type Revoker interface {
+	Revoke(ctx context.Context, label string) error
 }
 
 // Result is a machine that was launched.
@@ -92,8 +101,8 @@ func Launch(ctx context.Context, o Options, d Deps) (*Result, error) {
 	}
 	summary := fmt.Sprintf("Create machine %q on %s: size %s in %s, about $%.4f an hour ($%.2f a month) until you delete it. It runs Coral and joins Coral Hub as a pending machine you approve there. "+
 		"Coral Hub's credential is never put in the machine's user-data: it is sent over SSH once the machine's host key matches the one this launch made. A single-use SSH host key and this launch's public login key "+
-		"do sit in the user-data, which the provider keeps readable; the key stops working when setup finishes (SSH is closed and the key deleted on the machine). Until then SSH accepts only %s.",
-		o.Name, p.Name(), o.Size, o.Region, price.HourlyUSD, price.MonthlyUSD, sshFromWords(o.SSHFrom))
+		"do sit in the user-data, which the provider keeps readable; the key stops working when setup finishes (SSH is closed and the key deleted on the machine). Until then SSH accepts only %s%s.",
+		o.Name, p.Name(), o.Size, o.Region, price.HourlyUSD, price.MonthlyUSD, sshFromWords(o.SSHFrom), sshLookupWords(o.SSHFromLookup))
 	if !o.Yes {
 		if d.Confirm == nil {
 			return nil, errors.New("no one can be asked to confirm: pass --yes to go on without asking")
@@ -145,9 +154,17 @@ func Launch(ctx context.Context, o Options, d Deps) (*Result, error) {
 		return nil, fmt.Errorf("the machine did not come up: %w%s", err, note)
 	}
 	fmt.Fprintf(d.Out, "The machine is running at %s; connecting over SSH with its pinned host key ...\n", running.IPv4)
-	boot, err := d.Bootstrap.Bootstrap(ctx, BootRequest{Instance: running, Keys: keys, Out: d.Out, Mint: func(ctx context.Context) (string, error) { return d.Hub.Mint(ctx, o.Name) }}) // the credential is minted inside, after the handshake
+	minted := false
+	boot, err := d.Bootstrap.Bootstrap(ctx, BootRequest{Instance: running, Keys: keys, Out: d.Out, Mint: func(ctx context.Context) (string, error) { // the credential is minted inside, after the handshake
+		c, err := d.Hub.Mint(ctx, o.Name)
+		minted = minted || err == nil
+		return c, err
+	}})
 	if err != nil {
 		note := cleanup(p, inst.ID, d.Out)
+		if minted { // a credential that was minted and not used up must not stay valid at the Hub (Security's SHOULD 2 on #10917)
+			note += revokeMinted(d, o.Name)
+		}
 		switch {
 		case errors.Is(err, ErrHostKeyMismatch):
 			return nil, fmt.Errorf("%w; it was not retried%s", err, note)
@@ -161,7 +178,11 @@ func Launch(ctx context.Context, o Options, d Deps) (*Result, error) {
 	if label == "" {
 		label = o.Name
 	}
-	fmt.Fprintf(d.Out, "Launched %s at %s; its Coral reports %s. It is pending in Coral Hub: open %s, find %q and press Keep to approve it.\n", running.Name, running.IPv4, boot.State, o.HubURL, label)
+	if boot.State == "connected" {
+		fmt.Fprintf(d.Out, "Launched %s at %s; its Coral is connected to Coral Hub. It is pending there: open %s, find %q and press Keep to approve it.\n", running.Name, running.IPv4, o.HubURL, label)
+	} else { // only "connecting": the machine has not confirmed that it reached the Hub, and this says so rather than "Launched"
+		fmt.Fprintf(d.Out, "The machine %s at %s reported connecting to Coral Hub, and has not confirmed it yet. Open %s and look for %q: if it is pending there, press Keep to approve it; if it does not show up in a few minutes, delete the machine.\n", running.Name, running.IPv4, o.HubURL, label)
+	}
 	return &Result{Instance: running, Enrollment: boot}, nil
 }
 
@@ -246,4 +267,32 @@ func sshFromWords(v string) string {
 		return "the address of this computer"
 	}
 	return v
+}
+
+// sshLookupWords says where the SSH address came from when the person did not give it.
+func sshLookupWords(lookup string) string {
+	if lookup == "" {
+		return ""
+	}
+	return " (this computer's address, looked up at " + lookup + ", a service outside Coral that sees this computer's address; pass --allow-ssh-from to skip the lookup)"
+}
+
+// revokeMinted revokes the credential this launch minted, on its own short deadline, and says how that went in a sentence for the error and a line for the person.
+func revokeMinted(d Deps, label string) string {
+	r := d.Revoker
+	if r == nil {
+		r, _ = d.Hub.(Revoker)
+	}
+	if r == nil {
+		fmt.Fprintf(d.Out, "The Coral Hub credential for %q could not be revoked from here: it expires on its own within five minutes; revoke the machine in Coral Hub if it enrolled.\n", label)
+		return "; the Coral Hub credential could NOT be revoked from here (it expires within five minutes)"
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if err := r.Revoke(ctx, label); err != nil {
+		fmt.Fprintf(d.Out, "The Coral Hub credential for %q could NOT be revoked (%v): it expires within five minutes; if the machine enrolled, revoke it in Coral Hub.\n", label, err)
+		return "; the Coral Hub credential could NOT be revoked (it expires within five minutes; if the machine enrolled, revoke it in Coral Hub)"
+	}
+	fmt.Fprintf(d.Out, "The Coral Hub credential for %q was revoked.\n", label)
+	return "; the Coral Hub credential was revoked"
 }
