@@ -2,26 +2,31 @@ package machinelaunch
 
 import (
 	"fmt"
+	"net"
 	"regexp"
 	"strings"
+
+	"golang.org/x/crypto/ssh"
 
 	"github.com/subgentic/coral/internal/agent"
 	at "github.com/subgentic/coral/internal/agenttypes"
 )
 
-// The instance's cloud-init user-data (#9973, design note #9934 section 3): a stock Ubuntu LTS image, no image of ours. In order: a user `coral` with no password and no sudo; the few packages Coral
-// needs; the firewall (deny incoming: the machine connects OUT to Coral Hub, so no port is open); the Coral release for the pinned version with its SHA-256 checked against the release's
-// SHA256SUMS.txt before anything is installed; the Hub's one-time credential written to tmpfs (0600, owned by coral, in a folder only coral reads); and the Coral service as coral, on loopback only.
-// That is ONE shell step that stops at the first failure, so Coral never starts, and the credential is never written, if a download or a checksum fails. The credential's TTL is short (minutes, from
-// the mint), so everything slow comes AFTER Coral has started and redeemed it: the agent CLIs (node, npm and the pinned installs) are a second step that runs only once the service is active.
+// The instance's cloud-init user-data (#9973, design note #9934 section 3): a stock Ubuntu LTS image, no image of ours. In order: a user `coral` with no password and no sudo, reachable over SSH by ONE public
+// key only (the launch's own, made for it and thrown away after); the few packages Coral needs; the firewall (deny incoming but SSH for the launch: the machine connects OUT to Coral Hub); the Coral release for the
+// pinned version with its SHA-256 checked against the release's SHA256SUMS.txt before anything is installed; and the Coral service as coral, on loopback only, which starts only when the launcher has put the Hub's
+// one-time credential in its tmpfs file. That is ONE shell step that stops at the first failure, so Coral never starts if a download or a checksum fails.
 //
-// The credential is the only secret in it, it appears once, and it is short-lived and single-use (the Hub's half). Every value that goes into a command is checked against a pattern first: nothing a
-// caller passes is ever quoted into the shell, it is refused unless it is already safe.
+// It holds NO credential and no secret of the person's (#10917, coral-hub Security's ruling: user-data stays readable from the droplet's metadata service for the droplet's whole life): the Hub's one-time credential
+// is written to /run/coral/bootstrap.d/credential over SSH, standard input, AFTER the launcher has checked the droplet's host key against a pin it made in advance, and never touches user-data, a command line or a
+// log. When the launcher is done (or after bootstrapWindow if it never comes), a root step stops sshd, closes port 22 and removes the host key and the launch key, enables Coral for the next boot and installs the
+// agent CLIs (slow, and not needed to enroll). Every value that goes into a command is checked against a pattern first: nothing a caller passes is ever quoted into the shell, it is refused unless it is already safe.
 
 // UserDataSpec is what BuildUserData needs.
 type UserDataSpec struct {
-	// Credential is the Hub's one-time bootstrap credential (chb_...). Never logged.
-	Credential string
+	// ClientPublicKey is the launch's own SSH public key (an ed25519 authorized_keys line): the only key that can log in as coral, made for this launch and discarded with it. The matching private key never
+	// leaves the launcher. There is no Hub credential here: it goes over SSH (#10917).
+	ClientPublicKey string
 	// MaxMode is the most Coral Hub may do on the machine: view, interact or launch. Empty is view.
 	MaxMode string
 	// CoralVersion is the release to install, x.y.z (no "v"). Required.
@@ -30,6 +35,8 @@ type UserDataSpec struct {
 	// version: the installer script is fetched to a file, checked against that SHA-256 and only then run, and it runs only when this says so. Every installer fetched on the machine is pinned this
 	// way, none is piped into a shell. The names come from the one table of CLIs (internal/agent).
 	Agents []string
+	// AllowSSHFrom is the address (an IP or a CIDR) the one open port, SSH, accepts connections from: the launcher's. It does not replace the host-key pin; it narrows who can even try (coral-hub Security).
+	AllowSSHFrom string
 	// HubURL is Coral Hub's origin, https only. Empty is the production Coral Hub.
 	HubURL string
 }
@@ -45,8 +52,10 @@ var (
 	installerRe = regexp.MustCompile(`^https://[a-z0-9]([a-z0-9.-]{0,60}[a-z0-9])?(/[A-Za-z0-9._-]{1,64}){1,6}$`)
 )
 
+// bootstrapWindow is how long the machine waits for its launcher before it closes SSH and goes on without one (a launch that died between the create and the end of its delivery).
+const bootstrapWindow = "20min"
+
 var (
-	credentialRe = regexp.MustCompile(`^chb_[A-Za-z0-9_-]{16,256}$`)
 	versionRe    = regexp.MustCompile(`^[0-9]{1,4}\.[0-9]{1,4}\.[0-9]{1,4}$`)
 	pinRe        = regexp.MustCompile(`^[0-9]{1,4}\.[0-9]{1,4}\.[0-9]{1,4}(-[0-9A-Za-z.]{1,40})?$`)
 	hubURLRe     = regexp.MustCompile(`^https://[a-z0-9]([a-z0-9.-]{0,80}[a-z0-9])?(:[0-9]{1,5})?$`)
@@ -124,8 +133,9 @@ func resolveAgents(entries []string) ([]agentInstall, error) {
 
 // BuildUserData returns the cloud-init user-data for spec, or the first thing wrong with it.
 func BuildUserData(spec UserDataSpec) (string, error) {
-	if !credentialRe.MatchString(spec.Credential) {
-		return "", fmt.Errorf("the credential is not a Coral Hub bootstrap credential (chb_...)")
+	clientKey, err := canonicalClientKey(spec.ClientPublicKey)
+	if err != nil {
+		return "", err
 	}
 	mode := spec.MaxMode
 	if mode == "" {
@@ -146,6 +156,10 @@ func BuildUserData(spec UserDataSpec) (string, error) {
 	if !hubURLRe.MatchString(hub) {
 		return "", fmt.Errorf("the Coral Hub URL is not an https origin")
 	}
+	sshFrom, err := canonicalSSHSource(spec.AllowSSHFrom)
+	if err != nil {
+		return "", err
+	}
 	agents, err := resolveAgents(spec.Agents)
 	if err != nil {
 		return "", err
@@ -154,34 +168,25 @@ func BuildUserData(spec UserDataSpec) (string, error) {
 	var b strings.Builder
 	w := func(format string, a ...any) { fmt.Fprintf(&b, format+"\n", a...) }
 	w("#cloud-config")
-	w("# A Coral machine, made by `coral machine launch`. It holds one secret: the Coral Hub one-time credential in the last step, single use and short-lived.")
-	w("# Nothing here opens an inbound port: the machine connects out to Coral Hub.")
+	w("# A Coral machine, made by `coral machine launch`. It holds NO secret of the person's and no Hub credential: that arrives over SSH, after the launcher has checked this machine's host key.")
+	w("# The one inbound port is SSH, for the launch's own key only, until the launcher is done (or %s have passed).", bootstrapWindow)
 	w("users:")
 	w("  - name: coral")
 	w("    gecos: Coral")
 	w("    shell: /bin/bash")
-	w("    lock_passwd: true # no password and no sudo, and no ssh key is added")
+	w("    lock_passwd: true # no password and no sudo")
+	w("    ssh_authorized_keys: # the launch's own public key: the only way in, removed when the launcher is done")
+	w("      - %s %s", clientKeyOptions, clientKey)
 	w("package_update: true")
 	w("packages:")
 	for _, p := range []string{"ca-certificates", "curl", "git", "tmux", "ufw"} { // node and npm are installed with the agent CLIs, after Coral has redeemed its credential
 		w("  - %s", p)
 	}
 	w("write_files:")
-	w("  - path: /etc/systemd/system/coral.service")
-	w("    owner: root:root")
-	w("    permissions: '0644'")
-	w("    content: |")
-	for _, l := range strings.Split(strings.TrimRight(serviceUnit(hub, mode), "\n"), "\n") {
-		if l == "" {
-			w("")
-			continue
-		}
-		w("      %s", l)
-	}
-	emitScript := func(path, content string) {
+	emitFile := func(path, perm, content string) {
 		w("  - path: %s", path)
 		w("    owner: root:root")
-		w("    permissions: '0700'")
+		w("    permissions: '%s'", perm)
 		w("    content: |")
 		for _, l := range strings.Split(strings.TrimRight(content, "\n"), "\n") {
 			if l == "" {
@@ -191,13 +196,21 @@ func BuildUserData(spec UserDataSpec) (string, error) {
 			w("      %s", l)
 		}
 	}
-	emitScript("/usr/local/sbin/coral-machine-setup", setupScript(spec.CoralVersion))
+	emitFile("/etc/systemd/system/coral.service", "0644", serviceUnit(hub, mode))
+	emitFile("/etc/ssh/sshd_config.d/10-coral-bootstrap.conf", "0644", sshdConfig())
+	emitFile("/etc/systemd/system/coral-bootstrap.path", "0644", bootstrapPathUnit())
+	emitFile("/etc/systemd/system/coral-finish.path", "0644", finishPathUnit())
+	emitFile("/etc/systemd/system/coral-finish.service", "0644", finishServiceUnit())
+	emitFile("/etc/systemd/system/coral-finish.timer", "0644", finishTimerUnit())
+	emitFile("/usr/local/sbin/coral-machine-setup", "0700", setupScript(spec.CoralVersion))
+	emitFile("/usr/local/sbin/coral-machine-finish", "0700", finishScript(len(agents) > 0))
 	if len(agents) > 0 {
-		emitScript("/usr/local/sbin/coral-machine-agents", agentsScript(agents))
+		emitFile("/usr/local/sbin/coral-machine-agents", "0700", agentsScript(agents))
 	}
 	w("runcmd:")
 	w("  - [ ufw, default, deny, incoming ]")
 	w("  - [ ufw, default, allow, outgoing ]")
+	w("  - [ ufw, allow, from, '%s', to, any, port, '22', proto, tcp ] # SSH, for the launcher's address only: closed again by coral-machine-finish", sshFrom)
 	w("  - [ ufw, --force, enable ]")
 	w("  - |")
 	w("    (")
@@ -205,18 +218,148 @@ func BuildUserData(spec UserDataSpec) (string, error) {
 	w("      /usr/local/sbin/coral-machine-setup")
 	w("      install -d -m 0755 -o root -g root /run/coral")
 	w("      install -d -m 0700 -o coral -g coral /run/coral/bootstrap.d")
-	w("      (umask 077; printf '%%s' '%s' > /run/coral/bootstrap.d/credential)", spec.Credential)
-	w("      chown coral:coral /run/coral/bootstrap.d/credential")
-	w("      chmod 0600 /run/coral/bootstrap.d/credential")
 	w("      systemctl daemon-reload")
-	w("      systemctl enable --now coral.service")
+	w("      systemctl reload ssh || systemctl restart ssh || true")
+	w("      systemctl enable --now coral-bootstrap.path coral-finish.path coral-finish.timer")
 	w("    )")
-	if len(agents) > 0 {
-		w("  - |")
-		w("    # after Coral is up and has redeemed its credential: the agent CLIs (slow, and not needed to enroll)")
-		w("    if systemctl is-active --quiet coral.service; then /usr/local/sbin/coral-machine-agents; fi")
-	}
 	return b.String(), nil
+}
+
+// clientKeyOptions limits the launch key to a session: nothing forwarded, nothing tunnelled (Security's condition E on #10917).
+const clientKeyOptions = "no-port-forwarding,no-agent-forwarding,no-X11-forwarding"
+
+// ValidSSHSource checks an address for SSH to be opened to (one IP or CIDR, never every address) and returns it canonical: for the command to refuse a bad --allow-ssh-from before anything is read or made.
+func ValidSSHSource(v string) (string, error) { return canonicalSSHSource(v) }
+
+// canonicalSSHSource checks the address SSH may be reached from is one IP or one CIDR (never "any", and nothing that could be shell) and returns it in its canonical form.
+func canonicalSSHSource(v string) (string, error) {
+	v = strings.TrimSpace(v)
+	if v == "" {
+		return "", fmt.Errorf("the address the launcher reaches SSH from is needed (--allow-ssh-from)")
+	}
+	if ip := net.ParseIP(v); ip != nil {
+		if ip.IsUnspecified() {
+			return "", fmt.Errorf("the SSH source address is not an address")
+		}
+		return ip.String(), nil
+	}
+	ip, n, err := net.ParseCIDR(v)
+	if err != nil || ip.IsUnspecified() {
+		return "", fmt.Errorf("the SSH source %q is not an IP address or a CIDR", v)
+	}
+	if ones, _ := n.Mask.Size(); ones == 0 {
+		return "", fmt.Errorf("the SSH source %q would be every address", v)
+	}
+	return n.String(), nil
+}
+
+// canonicalClientKey checks the launch's SSH public key is one ed25519 key and nothing else (no options, no second line, no comment to carry anything) and returns it in its one canonical form.
+func canonicalClientKey(line string) (string, error) {
+	if strings.ContainsAny(line, "\r\n") && strings.TrimSpace(line) != strings.Trim(line, "\r\n ") {
+		return "", fmt.Errorf("the launch key is not one public key")
+	}
+	pub, _, opts, rest, err := ssh.ParseAuthorizedKey([]byte(line))
+	if err != nil || len(opts) != 0 || len(strings.TrimSpace(string(rest))) != 0 {
+		return "", fmt.Errorf("the launch key is not one ssh public key")
+	}
+	if pub.Type() != ssh.KeyAlgoED25519 {
+		return "", fmt.Errorf("the launch key is not an ed25519 key")
+	}
+	return strings.TrimSpace(string(ssh.MarshalAuthorizedKey(pub))), nil
+}
+
+// sshdConfig is the sshd drop-in for the bootstrap window: key only, coral only, nothing forwarded.
+func sshdConfig() string {
+	return `# Coral machine bootstrap: the launcher's one key, as coral, for the length of the launch.
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+PermitRootLogin no
+PubkeyAuthentication yes
+AllowUsers coral
+AllowTcpForwarding no
+AllowAgentForwarding no
+X11Forwarding no
+MaxAuthTries 2
+LoginGraceTime 30
+`
+}
+
+// bootstrapPathUnit starts Coral when the credential file appears: not before, so Coral never runs, or looks for a credential, until the launcher has delivered one.
+func bootstrapPathUnit() string {
+	return `[Unit]
+Description=Start Coral when the launcher has delivered its one-time credential
+
+[Path]
+PathExists=/run/coral/bootstrap.d/credential
+Unit=coral.service
+
+[Install]
+WantedBy=multi-user.target
+`
+}
+
+// finishPathUnit runs the finish step when the launcher says it is done (the file "done" in the bootstrap folder).
+func finishPathUnit() string {
+	return `[Unit]
+Description=Close the bootstrap SSH access when the launcher is done
+
+[Path]
+PathExists=/run/coral/bootstrap.d/done
+Unit=coral-finish.service
+
+[Install]
+WantedBy=multi-user.target
+`
+}
+
+func finishServiceUnit() string {
+	return `[Unit]
+Description=Close the bootstrap SSH access and finish setting up Coral
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/coral-machine-finish
+`
+}
+
+// finishTimerUnit closes SSH on its own if the launcher never comes back.
+func finishTimerUnit() string {
+	return fmt.Sprintf(`[Unit]
+Description=Close the bootstrap SSH access if the launcher never finishes
+
+[Timer]
+OnActiveSec=%s
+Unit=coral-finish.service
+
+[Install]
+WantedBy=timers.target
+`, bootstrapWindow)
+}
+
+// finishScript is the root step that ends the bootstrap window: sshd stopped and kept off, port 22 closed, the launch key and the host keys removed, Coral enabled for the next boot, and then the agent CLIs
+// (when there are any and Coral is up). It can run twice (the timer after the launcher) and never fails the machine.
+func finishScript(withAgents bool) string {
+	var s strings.Builder
+	p := func(format string, a ...any) { fmt.Fprintf(&s, format+"\n", a...) }
+	p("#!/bin/sh")
+	p("# The end of the bootstrap window: no SSH any more, and nothing left that could open it again (a reboot, a cloud-init re-run, a snapshot restore). Safe to run twice.")
+	p("# sshd is stopped AND masked, port 22 is closed, the host keys and the launch key are deleted, and so are cloud-init's own copies of the user-data (the provider keeps its copy: the key in it is dead).")
+	p("systemctl disable --now ssh.socket ssh.service sshd.service 2>/dev/null || true")
+	p("systemctl mask ssh.socket ssh.service sshd.service 2>/dev/null || true")
+	p("ufw --force delete allow 22/tcp >/dev/null 2>&1 || true")
+	p("rm -f /home/coral/.ssh/authorized_keys /etc/ssh/ssh_host_*_key /etc/ssh/ssh_host_*_key.pub")
+	p("rm -f /etc/ssh/sshd_config.d/10-coral-bootstrap.conf")
+	p("rm -rf /var/lib/cloud/instance/user-data.txt* /var/lib/cloud/instance/cloud-config.txt /var/lib/cloud/instance/scripts /var/lib/cloud/instance/vendor-data*")
+	p("rm -rf /var/lib/cloud/instances/*/user-data.txt* /var/lib/cloud/instances/*/cloud-config.txt /var/lib/cloud/instances/*/scripts /var/lib/cloud/instances/*/vendor-data*")
+	p("rm -f /var/lib/cloud/seed/nocloud*/user-data /var/lib/cloud/seed/nocloud*/meta-data")
+	p("for f in /var/log/cloud-init.log /var/log/cloud-init-output.log; do [ -f \"$f\" ] && : > \"$f\"; done")
+	p("systemctl enable coral.service 2>/dev/null || true")
+	if withAgents {
+		p("# after Coral is up and has redeemed its credential: the agent CLIs (slow, and not needed to enroll)")
+		p("if systemctl is-active --quiet coral.service; then /usr/local/sbin/coral-machine-agents || true; fi")
+	}
+	p("exit 0")
+	return s.String()
 }
 
 // serviceUnit is the systemd unit: Coral as coral, on loopback only (no --remote), connecting out to the Hub with the cap the launch chose.

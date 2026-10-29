@@ -49,7 +49,7 @@ func (l *listFlag) Set(v string) error { *l = append(*l, v); return nil }
 func machineUsage(w io.Writer) {
 	fmt.Fprintln(w, "usage: coral machine launch --provider digitalocean --token-file <path|-> --hub-key-file <path|-> [--hub-url https://app.coralhub.dev]")
 	fmt.Fprintln(w, "         [--name NAME] [--region nyc3] [--size s-2vcpu-4gb] [--image SLUG] [--ssh-key ID]... [--agents claude@VERSION,codex@VERSION,pi@VERSION,agy@sha256:HEX]")
-	fmt.Fprintln(w, "         [--max-mode view|interact|launch] [--coral-version VERSION] [--yes]")
+	fmt.Fprintln(w, "         [--max-mode view|interact|launch] [--coral-version VERSION] [--allow-ssh-from ADDRESS] [--yes]")
 }
 
 func runMachine(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
@@ -71,6 +71,7 @@ func runMachine(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	maxMode := fs.String("max-mode", "launch", "the most Coral Hub may do on the machine: view, interact or launch")
 	coralVersion := fs.String("coral-version", "", "the Coral release to install (default: this binary's version)")
 	yes := fs.Bool("yes", false, "go on without asking (the price is still printed)")
+	sshFrom := fs.String("allow-ssh-from", "", "the address (or CIDR) the machine's SSH accepts while the launch sets it up (default: this computer's public address, found over HTTPS)")
 	var sshKeys listFlag
 	fs.Var(&sshKeys, "ssh-key", "a provider ssh key id or fingerprint to install (repeatable); none by default")
 	if err := fs.Parse(args[1:]); err != nil {
@@ -117,7 +118,21 @@ func runMachine(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			agentList = append(agentList, a)
 		}
 	}
-	if _, err := machineUserData(checkCredential, *maxMode, version, *hubURL, agentList); err != nil { // the flags are checked by the builder before any secret is read or any call is made
+	checkKeys, err := machinelaunch.NewBootKeys()
+	if err != nil {
+		return fail("%v", err)
+	}
+	checkSource := "203.0.113.1" // documentation address: only the other flags are being checked
+	if *sshFrom != "" {
+		v, verr := machinelaunch.ValidSSHSource(*sshFrom) // refused before any secret is read or any call is made
+		if verr != nil {
+			return fail("--allow-ssh-from: %v", verr)
+		}
+		checkSource, *sshFrom = v, v
+	}
+	_, err = machineUserData(checkKeys, checkSource, *maxMode, version, *hubURL, agentList) // the flags are checked by the builder before any secret is read or any call is made
+	checkKeys.Destroy()
+	if err != nil {
 		return fail("%v", err)
 	}
 	machine := *name
@@ -144,10 +159,19 @@ func runMachine(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	}
 	hub := newMachineHub(*hubURL, key, license.EULAVersion)
 
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	source := *sshFrom
+	if source == "" {
+		var derr error
+		if source, derr = detectSSHSource(ctx); derr != nil {
+			return fail("%v", derr)
+		}
+	}
 	deps := machinelaunch.Deps{
-		Provider: p, Hub: hub, Out: stdout,
-		UserData: func(credential string) (string, error) {
-			return machineUserData(credential, *maxMode, version, *hubURL, agentList)
+		Provider: p, Hub: hub, Out: stdout, Bootstrap: newMachineBootstrap(),
+		UserData: func(keys *machinelaunch.BootKeys) (string, error) {
+			return machineUserData(keys, source, *maxMode, version, *hubURL, agentList)
 		},
 	}
 	if f, ok := stdin.(*os.File); ok && isTerminal(f) && *tokenFile != "-" && *keyFile != "-" {
@@ -160,10 +184,8 @@ func runMachine(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		}
 	}
 
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
 	_, err = machinelaunch.Launch(ctx, machinelaunch.Options{
-		Name: machine, Region: *region, Size: *size, Image: *image, SSHKeys: sshKeys, Yes: *yes, HubURL: *hubURL,
+		Name: machine, Region: *region, Size: *size, Image: *image, SSHKeys: sshKeys, Yes: *yes, HubURL: *hubURL, SSHFrom: source,
 	}, deps)
 	switch {
 	case err == nil:

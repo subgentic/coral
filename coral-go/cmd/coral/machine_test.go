@@ -57,6 +57,23 @@ func (h *machineStubHub) Mint(_ context.Context, label string) (string, error) {
 	return "chb_COMMANDCREDENTIAL0123", nil
 }
 
+// machineStubBoot is the machine's side of the bootstrap: it asks for the credential the way the SSH bootstrap does (after the "handshake"), and records it.
+type machineStubBoot struct {
+	req        machinelaunch.BootRequest
+	credential string
+	called     bool
+}
+
+func (b *machineStubBoot) Bootstrap(ctx context.Context, req machinelaunch.BootRequest) (machinelaunch.BootResult, error) {
+	b.called, b.req = true, req
+	cred, err := req.Mint(ctx)
+	b.credential = cred
+	return machinelaunch.BootResult{State: "connected", Label: "label-from-the-machine"}, err
+}
+
+// machineBoot is the bootstrap stub of the current test's fixture.
+var machineBoot *machineStubBoot
+
 func machineFixture(t *testing.T) (tokenFile, keyFile string, p *machineStubProvider, h *machineStubHub) {
 	t.Helper()
 	dir := t.TempDir()
@@ -68,7 +85,10 @@ func machineFixture(t *testing.T) (tokenFile, keyFile string, p *machineStubProv
 		t.Fatal(err)
 	}
 	p, h = &machineStubProvider{}, &machineStubHub{}
-	oldP, oldH, oldU := newMachineProvider, newMachineHub, machineUserData
+	oldP, oldH, oldU, oldB, oldD := newMachineProvider, newMachineHub, machineUserData, newMachineBootstrap, detectSSHSource
+	machineBoot = &machineStubBoot{}
+	newMachineBootstrap = func() machinelaunch.Bootstrapper { return machineBoot }
+	detectSSHSource = func(context.Context) (string, error) { return "203.0.113.5", nil }
 	newMachineProvider = func(name, token string) (machinelaunch.Provider, error) {
 		if name != "digitalocean" {
 			return nil, errors.New("unknown provider")
@@ -77,10 +97,12 @@ func machineFixture(t *testing.T) (tokenFile, keyFile string, p *machineStubProv
 		return p, nil
 	}
 	newMachineHub = func(baseURL, key, terms string) machinelaunch.Minter { return h }
-	machineUserData = func(credential, maxMode, version, hubURL string, agents []string) (string, error) {
-		return "#cloud-config\n# " + credential + " " + maxMode + " " + version + " " + strings.Join(agents, ",") + "\n", nil
+	machineUserData = func(keys *machinelaunch.BootKeys, sshFrom, maxMode, version, hubURL string, agents []string) (string, error) {
+		return "#cloud-config\n# " + sshFrom + " " + maxMode + " " + version + " " + strings.Join(agents, ",") + "\n", nil
 	}
-	t.Cleanup(func() { newMachineProvider, newMachineHub, machineUserData = oldP, oldH, oldU })
+	t.Cleanup(func() {
+		newMachineProvider, newMachineHub, machineUserData, newMachineBootstrap, detectSSHSource = oldP, oldH, oldU, oldB, oldD
+	})
 	return
 }
 
@@ -95,7 +117,7 @@ func TestMachineLaunchHappyPathWiresTheFlagsAndKeepsSecretsOut(t *testing.T) {
 	if p.token != "dop_v1_COMMANDTOKEN" || len(h.labels) != 1 || h.labels[0] != "coral-x1" {
 		t.Fatalf("token %q labels %v", p.token, h.labels)
 	}
-	if p.spec.Region != "ams3" || p.spec.Size != "s-1vcpu-2gb" || len(p.spec.SSHKeys) != 1 || !strings.Contains(p.spec.UserData, "interact 2.0.3 claude@2.1.0,codex@0.9.1") {
+	if p.spec.Region != "ams3" || p.spec.Size != "s-1vcpu-2gb" || len(p.spec.SSHKeys) != 1 || !strings.Contains(p.spec.UserData, "203.0.113.5 interact 2.0.3 claude@2.1.0,codex@0.9.1") {
 		t.Fatalf("spec %+v", p.spec)
 	}
 	for _, s := range []string{"COMMANDTOKEN", "COMMANDKEY", "COMMANDCREDENTIAL"} {
@@ -174,27 +196,61 @@ func TestMachineLaunchWarnsWhenTheHubIsNotThisBuildsDefault(t *testing.T) {
 	}
 }
 
-// TestMachineLaunchBuildsTheRealUserDataWithTheCredentialOnce runs the command with the real user-data builder: the credential is in the user-data exactly once, the provider token and the Hub key never, and a pinned
-// agy installer and the npm CLIs are accepted.
-func TestMachineLaunchBuildsTheRealUserDataWithTheCredentialOnce(t *testing.T) {
+// TestMachineLaunchBuildsTheRealUserDataWithNoCredential runs the command with the real user-data builder: the user-data holds no Hub credential (it is minted after the pinned handshake and goes over SSH), no provider token,
+// no Hub key and no private key, and carries the launch's public login key and the address SSH accepts; a pinned agy installer and the npm CLIs are accepted.
+func TestMachineLaunchBuildsTheRealUserDataWithNoCredential(t *testing.T) {
 	tf, kf, p, h := machineFixture(t)
-	machineUserData = func(credential, maxMode, version, hubURL string, agents []string) (string, error) {
-		return machinelaunch.BuildUserData(machinelaunch.UserDataSpec{Credential: credential, MaxMode: maxMode, CoralVersion: version, HubURL: hubURL, Agents: agents})
+	machineUserData = func(keys *machinelaunch.BootKeys, sshFrom, maxMode, version, hubURL string, agents []string) (string, error) {
+		return machinelaunch.BuildUserData(machinelaunch.UserDataSpec{ClientPublicKey: keys.ClientPublic, AllowSSHFrom: sshFrom, MaxMode: maxMode, CoralVersion: version, HubURL: hubURL, Agents: agents})
 	}
 	h.credential = "chb_REALCREDENTIAL0123456789"
 	var out, errb bytes.Buffer
 	pin := "agy@sha256:" + strings.Repeat("ab", 32)
 	code := runMachine([]string{"launch", "--provider", "digitalocean", "--token-file", tf, "--hub-key-file", kf, "--hub-url", "https://hub.example", "--coral-version", "2.0.3",
-		"--agents", "claude@2.1.0," + pin, "--yes"}, strings.NewReader(""), &out, &errb)
+		"--agents", "claude@2.1.0," + pin, "--allow-ssh-from", "198.51.100.7", "--yes"}, strings.NewReader(""), &out, &errb)
 	if code != 0 {
 		t.Fatalf("exit %d: %s / %s", code, out.String(), errb.String())
 	}
-	if n := strings.Count(p.spec.UserData, "chb_REALCREDENTIAL0123456789"); n != 1 {
-		t.Fatalf("the credential is in the user-data %d times", n)
+	if machineBoot.credential != "chb_REALCREDENTIAL0123456789" {
+		t.Fatalf("the credential reaches the bootstrap, not the user-data: %q", machineBoot.credential)
 	}
-	for _, secret := range []string{"COMMANDTOKEN", "COMMANDKEY"} {
+	for _, secret := range []string{"chb_", "REALCREDENTIAL", "COMMANDTOKEN", "COMMANDKEY", "PRIVATE KEY"} {
 		if strings.Contains(p.spec.UserData, secret) {
 			t.Fatalf("the user-data holds %s", secret)
 		}
+	}
+	if !strings.Contains(p.spec.UserData, "from, '198.51.100.7', to, any, port, '22'") || !strings.Contains(p.spec.UserData, "ssh-ed25519 ") {
+		t.Fatalf("the user-data names the SSH source and carries the login key:\n%s", p.spec.UserData)
+	}
+	if !strings.Contains(out.String(), "single-use SSH host key") {
+		t.Fatalf("the confirmation says what sits in the user-data: %s", out.String())
+	}
+}
+
+// --allow-ssh-from is checked before anything is read or made: an address that is every address, or not an address, is refused.
+func TestMachineLaunchRefusesABadSSHSourceBeforeAnyCall(t *testing.T) {
+	tf, kf, p, h := machineFixture(t)
+	for _, bad := range []string{"0.0.0.0", "0.0.0.0/0", "example.com", "1.2.3.4; reboot"} {
+		var out, errb bytes.Buffer
+		code := runMachine([]string{"launch", "--provider", "digitalocean", "--token-file", tf, "--hub-key-file", kf, "--hub-url", "https://hub.example", "--coral-version", "2.0.3", "--allow-ssh-from", bad, "--yes"}, strings.NewReader(""), &out, &errb)
+		if code != 2 {
+			t.Errorf("%q: exit %d", bad, code)
+		}
+	}
+	if len(p.calls) != 0 || len(h.labels) != 0 {
+		t.Fatalf("a refused flag made calls: %v %v", p.calls, h.labels)
+	}
+}
+
+// With no --allow-ssh-from the address is looked up; a lookup that fails says to name one, and nothing is made.
+func TestMachineLaunchNeedsAnSSHSourceItCanFind(t *testing.T) {
+	tf, kf, p, h := machineFixture(t)
+	detectSSHSource = func(context.Context) (string, error) {
+		return "", errors.New("could not find this computer's public address: pass --allow-ssh-from ADDRESS")
+	}
+	var out, errb bytes.Buffer
+	code := runMachine([]string{"launch", "--provider", "digitalocean", "--token-file", tf, "--hub-key-file", kf, "--hub-url", "https://hub.example", "--coral-version", "2.0.3", "--yes"}, strings.NewReader(""), &out, &errb)
+	if code != 2 || !strings.Contains(errb.String(), "--allow-ssh-from") || len(p.calls) != 0 || len(h.labels) != 0 {
+		t.Fatalf("exit %d: %s, calls %v", code, errb.String(), p.calls)
 	}
 }
