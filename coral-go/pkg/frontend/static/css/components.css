@@ -2712,7 +2712,7 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 .mb-post-send-btn { flex: none; }
 
 @media (pointer: coarse), (max-width: 767px) {
-    .mb-post-card { padding: 3px 3px 3px 16px; align-items: center; } .mb-post-send-btn { border-radius: 19px; } /* the card's 22 px end curve less its 3 px padding: the Send's corners stay inside the card (#10942 item 10) */
+    .mb-post-card { padding: 3px 3px 3px 16px; align-items: center; } .mb-post-card > .btn-icon { border-radius: 19px; } /* the card's 22 px end curve less its 3 px padding: the Send's corners stay inside the card (#10942 item 10) */
     .mb-post-input { min-height: var(--control-touch-height, 44px); box-sizing: border-box; padding: 10px 0; max-height: min(40vh, calc(5lh + 20px)); } /* about five lines, then it scrolls: the messages keep the room above the keyboard (#10088) */
 }
 
