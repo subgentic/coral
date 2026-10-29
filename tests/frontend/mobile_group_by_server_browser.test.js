@@ -1,6 +1,6 @@
 // The agent list's ≡ display menu on a phone (#3991). Its "Group by server" and "Show server" options lived only in the sidebar header,
 // which is hidden below 768 px, so a phone could not group the list by server at all. The phone's list header now has the same menu.
-// At 390 px with two servers: the menu button is there (44 px target), it offers Show server and Group by server (the other five display switches went with the one-line row, #9686),
+// At 390 px with two servers: the menu button is there (44 px target), it offers Show summary, Show model (#10816), Show server and Group by server (the other switches went with the one-line row, #9686),
 // ticking Group by server groups the phone's list under the two servers and the menu stays open, unticking puts it back; with one
 // server there is no Group by server; the menu fits the screen. Run against an isolated dev server.
 const assert = require('node:assert/strict');
@@ -43,7 +43,7 @@ const { connect } = require('./agent_view_harness');
         assert.deepEqual(v.dupIds, [], 'no id appears twice (the sidebar keeps its ids)');
         await ev(`(() => { const b = document.querySelector('#mobile-agent-list [data-display-button]'); if (b.getAttribute('aria-expanded') !== 'true') b.click(); return true; })()`);
         v = await view();
-        assert.deepEqual(v.rows.map(r => [r.text, r.shown]), [['Show server', true], ['Group by server', true]], 'Show server and Group by server are offered with two servers');
+        assert.deepEqual(v.rows.map(r => [r.text, r.shown]), [['Show summary', true], ['Show model', true], ['Show server', true], ['Group by server', true]], 'Show summary, Show model, Show server and Group by server are offered with two servers');
         assert.equal(v.panelFits, true, 'the menu panel fits the 390 px screen');
         assert.equal(v.overflow, 0, 'no horizontal overflow');
         assert.equal(v.headers.length, 0, 'not grouped to begin with');
