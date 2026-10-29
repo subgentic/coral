@@ -73,7 +73,7 @@ const { coralReady } = require('./helpers/wait');
             host.innerHTML = b.messageAttachmentsHtml({ external: { direction: 'inbound', server_id: 'other', attachments: [{ id: ${JSON.stringify(HEX)}, name: 'invoice\\u202efdp.exe', media_type: 'application/octet-stream', size: 10 }] } });
             return host.textContent; })()`);
         assert.ok(chip.includes('invoicefdp.exe') && !/[\u202a-\u202e\u2066-\u2069]/.test(chip), 'the chip shows the name without the override: ' + JSON.stringify(chip));
-        assert.deepEqual(more, ['abcdefgh.md', 'reportfdp.exe', 'zerowidth.txt', 'Plan— artifact'], JSON.stringify(more));
+        assert.deepEqual(more, ['abcdefgh.md', 'reportfdp.exe', 'zerowidth.txt', 'Plan \u2014 artifact'], JSON.stringify(more));
         // a later render of the same body uses the name at once
         assert.match(await ev(`(async () => (await import(${S} + 'board_message_text.js')).renderBoardMessageBody({ id: 97002, content: 'again coral://artifacts/${HEX}' }))()`), /Ñotas 日本語\.txt/);
         const inbox = await ev(`(async () => { const p = await (await import(${S} + 'inbox_coral.js')).artifactLinkPolicy('see coral://artifacts/${HEX}'); return p('coral://artifacts/${HEX}'); })()`);
