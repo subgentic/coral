@@ -56,7 +56,7 @@ async function inAppPath() {
         const s = await fetchUpdateStatus();
         if (!s || !s.enabled) return '';
         if (relaunchOffered(s) && canStart(s)) return 'ready';
-        return s.installKind === 'homebrew' || s.installKind === 'unwritable' || s.relaunch.reason === 'unsupported_install' || s.notReady === 'unsupported_install' ? '' : 'coming';
+        return s.installKind === 'homebrew' || s.installKind === 'unwritable' || ['unsupported_install', 'apply_not_enabled', 'switch_off'].includes(s.relaunch.reason) || ['unsupported_install', 'switch_off'].includes(s.notReady) ? '' : 'coming'; // only an update that is really on its way is promised
     } catch { return ''; }
 }
 

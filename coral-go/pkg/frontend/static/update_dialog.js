@@ -104,7 +104,7 @@ async function sendRelaunch(go, later) {
         const p = mk('p', 'update-note', win ? AFTER.msi : AFTER[current.installKind] || AFTER_DEFAULT); p.setAttribute('role', 'status');
         body.querySelector('.update-later-note')?.remove(); // sent: "Not now?" no longer applies
         const to = current.staged.version;
-        body.append(mk('p', 'update-note update-updating', `Updating Coral to ${to}. It quits, installs and starts again, usually in under a minute. This page comes back by itself.`), p);
+        body.append(mk('p', 'update-note update-updating', `Updating Coral to ${to}. This page reloads when the new Coral answers.`), p);
         watchUpdate(to); later.textContent = 'Close'; later.disabled = false; go.hidden = true;
         return;
     }
@@ -133,8 +133,11 @@ async function sendRelaunch(go, later) {
         dialog.querySelector('.modal-actions').insertBefore(a, go); go.hidden = true; a.focus();
         return;
     }
-    const a = mk('a', 'update-download-fallback', `Download Coral ${current.staged.version} yourself`); a.href = `${RELEASES_URL}/releases/latest`; a.target = '_blank'; a.rel = 'noopener'; // a failure ends with something to do: Update again (the button is back), or this
-    say(reasonText(res.code)).append(' ', a); // a sentence that Coral did not say why for a reason this build does not know; never the server's own words
+    say(reasonText(res.code)); // a sentence that Coral did not say why for a reason this build does not know; never the server's own words
+    if (!['busy', 'too_soon', 'relaunch_fleet_busy', 'fleet_busy', 'mode_too_low', 'network', 'applying'].includes(res.code)) { // a failure that trying again will not clear ends with something to do: the button is back, and the release page
+        const a = mk('a', 'update-download-fallback', `Download Coral ${current.staged.version} yourself`); a.href = `${RELEASES_URL}/releases/latest`; a.target = '_blank'; a.rel = 'noopener';
+        const row = mk('p', 'update-note'); row.append(a); body.append(row);
+    }
 }
 
 /** Waits for the new Coral (#10834): the server is down while it installs; when it answers as the new version the page reloads and update_ui.js says "Coral is now X" there. Gives up after four minutes (the note above says what to do). */
