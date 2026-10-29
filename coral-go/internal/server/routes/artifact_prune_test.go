@@ -456,6 +456,34 @@ func TestRetentionIsOffUntilTheOperatorOptsIn(t *testing.T) {
 	assert.Equal(t, "off", tick(rig.now.Add(30*time.Hour)))
 }
 
+// #10812: a retention run also rewrites a closed task's stored diff through the filter, so a diff saved before it (binary hunks) is trimmed on its own; an open task's is left alone.
+func TestRetentionShrinksClosedDiffs(t *testing.T) {
+	rig := newPruneRig(t)
+	secfiletest.OwnerOnlyDir(t, rig.coralDir)
+	ctx := context.Background()
+	old := []byte("diff --git a/main.go b/main.go\n--- a/main.go\n+++ b/main.go\n@@ -1 +1 @@\n-a\n+b\n" +
+		"diff --git a/shot.png b/shot.png\nnew file mode 100644\nGIT binary patch\nliteral 3\nKcmZ?wbN~PV\n\n")
+	closed := rig.task("completed", 0, old)
+	open := rig.task("in_progress", 0, old)
+	set := func(k, v string) { require.NoError(t, rig.h.ss.SetSetting(ctx, k, v)) }
+	set(RetentionDaysSetting, "7")
+	set(RetentionKindsSetting, "objects") // not diffs: the shrink is not a deletion, so the kinds do not gate it
+	_, state := rig.h.retentionTick(ctx, rig.now)
+	require.Equal(t, "waiting", state, "turned on: waits for the acknowledgement")
+	set(RetentionAckAtKey, rig.now.Add(time.Hour).UTC().Format(time.RFC3339))
+	rep, state := rig.h.retentionTick(ctx, rig.now.Add(2*time.Hour))
+	require.Equal(t, "ran", state)
+	require.NotNil(t, rep)
+	got, err := os.ReadFile(rig.taskDiff(closed))
+	require.NoError(t, err)
+	assert.Contains(t, string(got), "diff --git a/main.go b/main.go", "the text change stays")
+	assert.NotContains(t, string(got), "GIT binary patch")
+	still, err := os.ReadFile(rig.taskDiff(open))
+	require.NoError(t, err)
+	assert.Equal(t, old, still, "the open task's diff is untouched")
+	assert.Equal(t, 1, rep.Removed, "the run counts the one diff it shrank")
+}
+
 func TestPrunePerRunCap(t *testing.T) {
 	rig := newPruneRig(t)
 	a := rig.object(strings.Repeat("a", 100), "s1", 30*24*time.Hour)

@@ -144,6 +144,17 @@ func (h *SessionsHandler) retentionTick(ctx context.Context, now time.Time) (*pr
 		slog.Warn("[artifacts] retention: nothing removed this run", "error", err)
 		return nil, "failed"
 	}
+	// Closed diffs are also rewritten through the stored-diff filter (#10812), so one saved before it (a binary file's whole bytes, a secret) is trimmed
+	// without the Operator running 'coral artifacts prune --shrink'. It deletes no diff and no object, so it needs no kind or age.
+	if srep, serr := h.runPrune(ctx, pruneOptions{Shrink: true, MaxBytes: retentionRunCap, Now: now}); serr != nil {
+		slog.Warn("[artifacts] retention: stored diffs not shrunk this run", "error", serr)
+	} else {
+		rep.Freed += srep.Freed
+		rep.Removed += srep.Removed
+		rep.Skipped += srep.Skipped
+		rep.Errors += srep.Errors
+		rep.Capped = rep.Capped || srep.Capped
+	}
 	last, _ := json.Marshal(map[string]any{"at": now.UTC().Format(time.RFC3339), "freed": rep.Freed, "removed": rep.Removed,
 		"skipped": rep.Skipped, "errors": rep.Errors, "capped": rep.Capped})
 	_ = h.ss.SetSetting(ctx, RetentionLastKey, string(last))

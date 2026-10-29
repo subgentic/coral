@@ -317,6 +317,10 @@ func (h *SessionsHandler) shrinkDiffs(ctx context.Context, o pruneOptions, diffs
 		return others <= 0
 	}
 	for _, d := range diffs {
+		if o.MaxBytes > 0 && rep.Freed >= o.MaxBytes {
+			rep.Capped = true // retention's per-run cap, as the other kinds stop at it
+			break
+		}
 		if d.bytes > pruneDiffReadLimit {
 			rep.Errors++
 			continue
