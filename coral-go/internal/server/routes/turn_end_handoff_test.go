@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/ptymanager"
 	"github.com/subgentic/coral/internal/store"
 )
@@ -216,4 +217,70 @@ func TestTurnEndHandoffIsOncePerWindowExceptAMentionOrTheOperator(t *testing.T) 
 	post("Lead", "fyi a fourth thing")
 	time.Sleep(400 * time.Millisecond) // sleep-ok: the window is wall-clock time
 	assert.True(t, ask(), "past the window the held messages are handed over")
+}
+
+// #11012: a copy from another board is posted with its recipients' @mentions, so it always read as a mention and the window never held a flood of them (and an agent on another board could keep a target in
+// hand-offs with no pause). A mention is urgent only when it is local; a cross-board copy waits the short floor, a plain one the whole window; a local @mention and the Operator's message still go at once.
+func TestTurnEndHandoffACrossBoardMentionIsNotUrgent(t *testing.T) {
+	server, h, _, ss := setupSessionsTestServer(t)
+	ctx := context.Background()
+	sid := "eeeeeeee-0996-1d00-0000-000000000001"
+	name := "claude-" + sid
+	board := "team-11012"
+	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: sid, AgentType: "claude", AgentName: "echo", WorkingDir: "/w", BoardName: &board}))
+	tok := agentToken(t, h, sid, name)
+	_, err := h.bs.Subscribe(ctx, board, "Orch", "Orchestrator", name, nil, "all")
+	require.NoError(t, err)
+	_, err = h.bs.Subscribe(ctx, board, "Lead", "Lead", "", nil, "all")
+	require.NoError(t, err)
+	h.handoffs.setEvery(2 * time.Second)
+	h.handoffs.setExternalFloor(250 * time.Millisecond)
+	ask := func() bool {
+		req, _ := http.NewRequest("POST", server.URL+"/api/sessions/live/echo/turn-end", strings.NewReader(`{}`))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set(store.SessionTokenHeader, tok)
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		var out map[string]any
+		_ = json.NewDecoder(resp.Body).Decode(&out)
+		return out["handoff"] == true
+	}
+	read := func() {
+		_, err := h.bs.ReadMessages(ctx, board, "Orch", 100)
+		require.NoError(t, err)
+	}
+	cross := func(text string, mentions ...string) {
+		_, _, err := h.bs.PostCrossTeamMessage(ctx, crossTeamPost(board, text, mentions))
+		require.NoError(t, err)
+	}
+	assert.False(t, ask(), "nothing unread")
+	_, err = h.bs.PostMessage(ctx, board, "Lead", "fyi the build is green", nil)
+	require.NoError(t, err)
+	assert.True(t, ask(), "the first hand-off goes at once")
+	read()
+
+	cross("please act on this now", "Orch")
+	assert.False(t, ask(), "a cross-board copy that @mentions the agent is held inside the floor")
+	assert.False(t, ask(), "and still held")
+	time.Sleep(300 * time.Millisecond) // sleep-ok: the floor is wall-clock time
+	assert.True(t, ask(), "past the floor it is handed over, well inside the window")
+	read()
+
+	cross("a plain copy with no mention")
+	time.Sleep(300 * time.Millisecond) // sleep-ok: past the floor
+	assert.False(t, ask(), "a cross-board copy that mentions nobody waits the whole window")
+	read()
+
+	_, err = h.bs.PostMessage(ctx, board, "Lead", "@Orch urgent local thing", nil)
+	require.NoError(t, err)
+	assert.True(t, ask(), "a local @mention goes at once, inside the floor and the window")
+	read()
+	_, err = h.bs.PostMessage(ctx, board, "Operator", "stop", nil)
+	require.NoError(t, err)
+	assert.True(t, ask(), "the Operator's message goes at once")
+}
+
+func crossTeamPost(target, text string, mentions []string) board.CrossTeamPost {
+	return board.CrossTeamPost{Origin: board.MessageOrigin{Board: "other-team", Sender: "Boss", SenderRole: "Orchestrator", TargetBoard: target}, Mentions: mentions, Content: text}
 }

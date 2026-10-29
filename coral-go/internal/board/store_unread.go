@@ -121,6 +121,16 @@ func (s *Store) HasUnreadHealthMessage(ctx context.Context, project, subscriberI
 // mention in mid-turn and holds a routine nudge until the turn ends). Its receive mode doesn't
 // matter: an agent that receives everything is still mentioned by a message that tags it.
 func (s *Store) HasUnreadMention(ctx context.Context, project, subscriberID string) (bool, error) {
+	return s.hasUnreadMention(ctx, project, subscriberID, "")
+}
+
+// HasUnreadLocalMention is HasUnreadMention for the messages written on this board: not the copies another board sent (their envelope, external_json, is set). A cross-board copy is posted with its
+// recipients' @mentions, so it always mentions them; only a local mention is one the turn-end hand-off treats as urgent (#11012).
+func (s *Store) HasUnreadLocalMention(ctx context.Context, project, subscriberID string) (bool, error) {
+	return s.hasUnreadMention(ctx, project, subscriberID, " AND COALESCE(m.external_json,'')=''")
+}
+
+func (s *Store) hasUnreadMention(ctx context.Context, project, subscriberID, extraWhere string) (bool, error) {
 	var sub struct {
 		LastReadID int64  `db:"last_read_id"`
 		JobTitle   string `db:"job_title"`
@@ -133,7 +143,7 @@ func (s *Store) HasUnreadMention(ctx context.Context, project, subscriberID stri
 	}
 	from := max(sub.LastReadID, s.unreadFloor(ctx, project)) // within the unread window (#3875)
 	id, err := s.confirmedMention(ctx, project, subscriberID, sub.JobTitle,
-		"m.project=? AND m.id>? AND m.subscriber_id!=? AND m.subscriber_id!='Coral Task Queue'",
+		"m.project=? AND m.id>? AND m.subscriber_id!=? AND m.subscriber_id!='Coral Task Queue'"+extraWhere,
 		[]interface{}{project, from, subscriberID}, from, false)
 	return id > 0, err
 }
