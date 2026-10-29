@@ -23,7 +23,7 @@ const SESSIONS = [];
 for (let i = 0; i < 30; i++) {
     const team = i < 10 ? 'team-a' : i < 20 ? 'team-b' : i < 25 ? 'team-c' : null;
     SESSIONS.push(agent(i, { board_project: team, board_job_title: team ? 'Role ' + i : undefined, name: team || 'proj',
-        sleeping: i % 7 === 3, archived: i === 28 || i === 29 }));
+        sleeping: i % 7 === 3 || (i >= 7 && i < 10), archived: i === 28 || i === 29 })); // team-a has four asleep (3, 7, 8, 9): up to three asleep in a group are rows after the awake ones, four or more fold into the 'N sleeping' line this suite expands (#10062)
 }
 
 // The list comes from this fixture only: /api/sessions/live answers it and the live feed socket never opens.
