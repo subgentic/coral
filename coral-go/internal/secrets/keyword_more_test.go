@@ -15,6 +15,7 @@ import (
 
 // Round four (#5212): ten shapes, 2000 random values each, none may come back, as text and as a JSON reply; the name stays where there is one; what is not a secret is left alone.
 func TestRoundFourShapesAreRedacted(t *testing.T) {
+	t.Parallel() // pure and read-only on the redactor: runs after the timing tests, together (#354)
 	require.NoError(t, Init())
 	shapes := []struct {
 		name   string
@@ -102,6 +103,7 @@ func TestRoundFourLeavesOrdinaryTextAlone(t *testing.T) {
 
 // Ordinary text does not change: the repository's own documents and sources (tests and fixtures aside, which hold secrets on purpose) have nothing for the round-four pass to find.
 func TestRoundFourFindsNothingInTheRepositorysOwnText(t *testing.T) {
+	t.Parallel() // pure and read-only on the redactor: runs after the timing tests, together (#354)
 	var found []string
 	n := 0
 	_ = filepath.Walk(filepath.Join("..", ".."), func(path string, info os.FileInfo, err error) error {

@@ -43,6 +43,7 @@ func shapes3() []shape {
 }
 
 func TestKeywordRound3ValuesAreRedacted(t *testing.T) {
+	t.Parallel() // pure and read-only on the redactor: runs after the timing tests, together (#354)
 	require.NoError(t, Init())
 	for _, sh := range shapes3() {
 		t.Run(sh.name, func(t *testing.T) {

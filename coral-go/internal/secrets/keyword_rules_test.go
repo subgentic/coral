@@ -90,6 +90,7 @@ func miss(t *testing.T, text, secret string) bool {
 }
 
 func TestKeywordValuesAreRedactedWhateverTheirEntropy(t *testing.T) {
+	t.Parallel() // pure and read-only on the redactor: runs after the timing tests, together (#354)
 	require.NoError(t, Init())
 	for _, sh := range shapes() {
 		t.Run(sh.name, func(t *testing.T) {

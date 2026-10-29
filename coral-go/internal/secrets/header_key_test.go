@@ -71,6 +71,7 @@ func TestHeaderKeyRuleLeavesOrdinaryTextAlone(t *testing.T) {
 
 // Ordinary text does not change: the repository's own documents and sources have no header key but a few test fixtures (a bogus X-Coral-Session-Token among them), so the rule finds nothing else in them.
 func TestHeaderKeyRuleFindsNothingInTheRepositorysOwnText(t *testing.T) {
+	t.Parallel() // pure and read-only on the redactor: runs after the timing tests, together (#354)
 	var found []string
 	root := filepath.Join("..", "..")
 	_ = filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
@@ -117,6 +118,7 @@ func headerKeyRuleIndex() int {
 // #5263: the floor is 8 for a key-named header (coral-hub's layer reads 8 for key and token), so "X-Service-Key: <10 characters>" is no longer shown. 2000 samples per header name, values of 8 to 15
 // characters that are not a plain word (a digit is always in them), in four frames; the generic X-...-Key, -Token and -Secret names are covered as well as the listed ones.
 func TestAHeaderNamedKeyOfEightToFifteenCharactersIsRedacted(t *testing.T) {
+	t.Parallel() // pure and read-only on the redactor: runs after the timing tests, together (#354)
 	require.NoError(t, Init())
 	names := append(append([]string{}, headerNames...), "X-Service-Key", "X-Custom-Auth-Token", "x-internal-secret", "X-Foo-Bar-Baz-Token", "X-Tenant-Api-Key", "X-Session-Token")
 	frames := []string{"%s: %s", `curl -H '%s: %s' https://api.example.test/v1`, `{"headers": {"%s": "%s"}}`, "GET /v1/things HTTP/1.1\nHost: api.example.test\n%s: %s\nAccept: */*\n"}
