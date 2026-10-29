@@ -49,7 +49,7 @@ func describeImage(pid int, image string) (program, folder string, unidentified 
 		return fmt.Sprintf("an unknown program (pid %d)", pid), "", true
 	}
 	img := strings.ReplaceAll(image, "\\", "/")
-	return visibleName(path.Base(img), 64), visibleName(path.Dir(img), 120), false
+	return visibleName(path.Base(img), 64), visibleTail(path.Dir(img), 120), false
 }
 
 // AgentRecorder is implemented by terminals that can name and record an agent's single foreground program (tmux, the PTY backend).

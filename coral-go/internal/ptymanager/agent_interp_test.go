@@ -114,8 +114,10 @@ func TestDescribeImageShowsACleanedCappedFolder(t *testing.T) {
 	for _, bad := range []string{"‮", "​", "\x1b", "\n"} {
 		assert.NotContains(t, folder, bad)
 	}
-	_, folder, _ = describeImage(7, "/"+strings.Repeat("a", 500)+"/x")
+	_, folder, _ = describeImage(7, "/"+strings.Repeat("a", 500)+"/team-b/work/x")
 	assert.LessOrEqual(t, len([]rune(folder)), 121, "capped, with an ellipsis")
+	assert.True(t, strings.HasPrefix(folder, "…"), "the cut is at the start")
+	assert.True(t, strings.HasSuffix(folder, "/team-b/work"), "the end of the path, which tells two folders apart, is kept")
 	p, _, _ := describeImage(7, "/x/"+strings.Repeat("b", 500))
 	assert.LessOrEqual(t, len([]rune(p)), 65)
 }
@@ -124,5 +126,7 @@ func TestVisibleName(t *testing.T) {
 	assert.Equal(t, "a b", visibleName("a \t\n b", 10))
 	assert.Equal(t, "abc", visibleName("a‮b​c\x00", 10))
 	assert.Equal(t, "abcd…", visibleName("abcdefgh", 4))
+	assert.Equal(t, "…efgh", visibleTail("abcdefgh", 4))
+	assert.Equal(t, "abc", visibleTail("abc", 4))
 	assert.Equal(t, "", visibleName("    ", 10))
 }
