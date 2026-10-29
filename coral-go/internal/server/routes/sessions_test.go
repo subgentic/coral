@@ -86,6 +86,7 @@ type mockSessionTerminal struct {
 	raw              map[string][]string               // keys sent with SendRawInput
 	origins          map[string][]terminalinput.Origin // the origin of each SendInput and SendRawInput, in order (#5715)
 	killSessionCalls []string
+	restartDirs      []string // the folder each RestartPane respawned the pane in (#10815)
 	sendErr          error
 	gone             bool                // the agent's own terminal is gone: writes fail with ErrTerminalGone (#3211)
 	onCapture        func(name string)   // called (unlocked) after each capture, e.g. to change the screen
@@ -308,7 +309,10 @@ func (m *mockSessionTerminal) KillSessionOnly(_ context.Context, name, _, _ stri
 	return nil
 }
 
-func (m *mockSessionTerminal) RestartPane(ctx context.Context, _, _ string) error {
+func (m *mockSessionTerminal) RestartPane(ctx context.Context, _, dir string) error {
+	m.mu.Lock()
+	m.restartDirs = append(m.restartDirs, dir)
+	m.mu.Unlock()
 	return m.step(ctx, "RestartPane")
 }
 func (m *mockSessionTerminal) RenameSession(ctx context.Context, oldName, newName string) error {

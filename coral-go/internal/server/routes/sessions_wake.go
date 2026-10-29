@@ -19,7 +19,17 @@ import (
 
 func (h *SessionsHandler) wakeExistingSession(ctx context.Context, ls *store.LiveSession) (err error) {
 	launched := false // the agent CLI was started again: it loaded the current hook set
+	// A team's agents start in the team's home folder, which the Operator may have changed since this one last ran (#10815): the wake uses it and the row follows once it has started.
+	movedTo := ""
+	if dir := h.teamHomeFolder(ctx, ls); dir != "" && dir != ls.WorkingDir {
+		moved := *ls
+		moved.WorkingDir = dir
+		ls, movedTo = &moved, dir
+	}
 	defer func() {
+		if err == nil && launched && movedTo != "" {
+			_ = h.ss.SetLiveWorkingDir(ctx, ls.SessionID, movedTo)
+		}
 		if err == nil && launched {
 			h.noteLaunchedHooks(ctx, ls.SessionID, ls.AgentType)
 			_ = h.ss.StampSessionSettings(ctx, ls.SessionID) // the CLI now runs with the stored model and level: turns the transcript recorded before are older than them (#6225)

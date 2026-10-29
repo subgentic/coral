@@ -455,6 +455,7 @@ b PUT /api/system/hub-mode
 b PUT /api/system/codex-trust-hooks
 b PUT /api/system/hub-operator
 b PUT /api/system/terminal-backend
+b PUT /api/teams/detail/{name}/home-folder
 b PUT /api/teams/detail/{name}/knowledge/{agentName}
 b PUT /api/themes/{name}
 b PUT /api/views/{id}

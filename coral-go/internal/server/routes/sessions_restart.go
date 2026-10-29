@@ -221,6 +221,9 @@ func (h *SessionsHandler) restartResolve(ctx context.Context, name string, req r
 	// Find the terminal before anything is touched.
 	if p.fresh != nil {
 		p.workdir = p.fresh.WorkingDir
+		if dir := h.teamHomeFolder(ctx, p.stored); dir != "" { // a team's agent restarts in the team's home folder (#10815)
+			p.workdir = dir
+		}
 		p.usePTY = h.restartsOnPTY(p.fresh)
 		return p, nil
 	}
@@ -232,6 +235,9 @@ func (h *SessionsHandler) restartResolve(ctx context.Context, name string, req r
 		return nil, func(w http.ResponseWriter) { errNotFound(w, "Pane not found") }
 	}
 	p.pane, p.workdir = pane, pane.CurrentPath
+	if dir := h.teamHomeFolder(ctx, p.stored); dir != "" { // not the folder its terminal happens to be in: after a crash that is where the terminal was recovered (#10813, #10815)
+		p.workdir = dir
+	}
 	// A live agent restarts on the backend it runs on: a pty one in a new pty terminal (pty has no rename, and a
 	// tmux-style "<name>:0.0" target names no pty session, #4767).
 	p.usePTY = h.restartsOnPTY(p.stored)
@@ -453,7 +459,7 @@ func (h *SessionsHandler) restartTerminal(ctx context.Context, p *restartPlan) (
 	} else {
 		// Close old pipe-pane, respawn, rename
 		h.terminal.StopLogging(ctx, p.pane.Target)
-		if err := h.terminal.RestartPane(ctx, p.pane.Target, p.pane.CurrentPath); err != nil {
+		if err := h.terminal.RestartPane(ctx, p.pane.Target, p.workdir); err != nil {
 			return "", fail(err.Error())
 		}
 		if err := h.terminal.RenameSession(ctx, p.pane.SessionName, p.newSessionName); err != nil {

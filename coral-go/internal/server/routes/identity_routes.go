@@ -294,6 +294,7 @@ var operatorOnlyRoutes = map[string]string{
 	"GET /api/scheduled/jobs/{jobID}/runs":                      "list a scheduled job's runs",
 	"GET /api/scheduled/runs/recent":                            "list every scheduled run",
 	"DELETE /api/teams/detail/{name}":                           "delete a team",
+	"PUT /api/teams/detail/{name}/home-folder":                  "change the folder a team's agents start in",
 	"POST /api/teams/generate":                                  "generate a team",
 	"PUT /api/settings/git-diff-mode":                           "change the diff mode",
 	"POST /api/pinned-folders":                                  "pin a folder (the file browser's bounds)",

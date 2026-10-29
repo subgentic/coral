@@ -651,6 +651,12 @@ func (s *SessionStore) SetSessionArchived(ctx context.Context, sessionID string,
 	})
 }
 
+// SetLiveWorkingDir records the folder a session now starts in (a team's home folder changed, #10815).
+func (s *SessionStore) SetLiveWorkingDir(ctx context.Context, sessionID, dir string) error {
+	_, err := s.db.ExecContext(ctx, "UPDATE live_sessions SET working_dir = ? WHERE session_id = ?", dir, sessionID)
+	return err
+}
+
 // IsSessionArchived reports whether an active live session is archived.
 func (s *SessionStore) IsSessionArchived(ctx context.Context, sessionID string) (bool, error) {
 	var archived bool

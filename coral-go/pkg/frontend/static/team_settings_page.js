@@ -101,6 +101,8 @@ function settingsGroups(st) {
         { id: 'workflow', label: 'Workflow', icon: 'account_tree', hint: 'How agents work on this team.', fields: [
             { key: 'board_name', type: 'custom', label: 'Board name', help: 'Only the label changes: its agents, tasks and history stay.',
                 render: slot => { slot.append(boardRenameControl(st.team, { onRenamed: () => { document.getElementById('team-page-title') && importOnce('./team_page.js').then(m => m.refreshTeamHeader?.()).catch(() => {}); importOnce('./render.js').then(m => m.scheduleLiveSessionsRender()); } })); } },
+            { key: 'home_folder', type: 'custom', label: 'Home folder', help: 'Where the team\'s agents start. Only the Operator on this computer can change it.',
+                render: slot => { importOnce('./team_home_folder.js').then(m => slot.append(m.teamHomeFolderControl(st.team, { canChange: answeredLocally(st.team) }))).catch(() => { slot.textContent = 'The home folder could not be shown.'; }); } },
             { key: 'mode', type: 'select', label: 'Working mode', id: 'tsr-mode',
                 help: { text: 'Instructions are saved with each task when it is first claimed.', about: 'working modes', more: 'Tasks already claimed keep their instructions. This setting gives guidance; it does not create worktrees by itself.' },
                 options: async () => { await st.dataReady.catch(() => {}); return st.modeOptions(); } },

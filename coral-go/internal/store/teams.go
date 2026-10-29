@@ -166,6 +166,12 @@ func (s *TeamStore) UpdateTeamStatus(ctx context.Context, teamID int64, status s
 	return err
 }
 
+// UpdateTeamWorkingDir sets the team's home folder: where its members next start (launch, wake, resurrect, restart). Running agents are not moved.
+func (s *TeamStore) UpdateTeamWorkingDir(ctx context.Context, teamID int64, dir string) error {
+	_, err := s.db.ExecContext(ctx, "UPDATE teams SET working_dir = ?, updated_at = ? WHERE id = ?", dir, NowUTC(), teamID)
+	return err
+}
+
 // DeleteTeam deletes a stopped team and its members (CASCADE).
 func (s *TeamStore) DeleteTeam(ctx context.Context, teamID int64) error {
 	result, err := s.db.ExecContext(ctx,

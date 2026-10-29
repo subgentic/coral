@@ -514,6 +514,7 @@ func (s *Server) registerSystem(r *chi.Mux, h *routeHandlers) {
 	r.Get("/api/teams/detail/{name}", teamsHandler.GetTeam)
 	r.Delete("/api/teams/detail/{name}", teamsHandler.DeleteTeam)
 	r.Post("/api/teams/detail/{name}/resurrect", sessHandler.ResurrectTeam)
+	r.Put("/api/teams/detail/{name}/home-folder", sessHandler.SetTeamHomeFolder)
 
 	// Worktrees Coral made and kept (#6736)
 	worktreesHandler := routes.NewWorktreesHandler(s.db, s.cfg)
