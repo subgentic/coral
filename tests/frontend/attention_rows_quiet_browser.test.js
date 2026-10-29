@@ -32,6 +32,7 @@ const { setTheme, installAudit, auditRegion } = require('./helpers/contrast');
             await ev(`(async () => { T.state.liveSessions = ${JSON.stringify(ROWS)}; T.render.renderLiveSessions(T.state.liveSessions); return true; })()`);
             const root = v.mobile ? '#mobile-session-list' : '#live-sessions-list';
             await ev(`document.getElementById('__notrans')?.remove(); true`); // setTheme switches animations off for the audit: the dot's own flash is checked with them on
+            await ev(`[...document.querySelectorAll('${root} button')].find(b => /^Show \\d+ more/.test(b.textContent.trim()))?.click(); true`); // a folder of more than five shows its first five and 'Show 1 more', at every width (#10319, e6221e1f9): the six states are all drawn once it is opened
             await waitFor(`document.querySelectorAll('${root} .session-group-item').length >= 6`, `${v.name}: the rows`, 5000);
             const s = await ev(`(() => {
                 const root = document.querySelector('${root}');
@@ -53,7 +54,11 @@ const { setTheme, installAudit, auditRegion } = require('./helpers/contrast');
                 if (!v.mobile) assert.equal(s.rows[id].bg, transparent, `${v.name}: the ${id} row has no wash (${s.rows[id].bg})`);
                 else assert.equal(s.rows[id].border, s.rows['r6'].border, `${v.name}: the ${id} card has the border of a quiet card, no amber one (${s.rows[id].border} against ${s.rows['r6'].border})`);
             }
-            { // the row's one chip is the same on a phone and a desktop (#9686: no phone banner, no second status chip): neutral surface, hairline, no ring, the words say the state
+            if (v.mobile) { // the phone's state is a sentence under the name, not a pill (#10691, Option A, 151265077): the row's name says it ("Needs input · Permission"), and no pill is drawn
+                const st = await ev(`Object.fromEntries(['r2', 'r3', 'r4', 'r5'].map(id => { const e = document.querySelector('${root} [data-session-id="' + id + '"]'), p = e.querySelector('.session-state-pill'); return [id, { label: e.getAttribute('aria-label'), pill: p ? getComputedStyle(p).display : 'none' }]; }))`);
+                assert.ok(['Needs input', 'Needs input', 'Check terminal', 'Stuck'].every((w, i) => st['r' + (i + 2)].label.includes(w)), `${v.name}: each row says which state it is: ` + JSON.stringify(st));
+                assert.ok(['r2', 'r3', 'r4', 'r5'].every(id => st[id].pill === 'none'), `${v.name}: and no pill is drawn on a phone: ` + JSON.stringify(st));
+            } else { // the row's one chip is the same on a phone and a desktop (#9686: no phone banner, no second status chip): neutral surface, hairline, no ring, the words say the state
                 for (const id of ['r2', 'r3', 'r4', 'r5']) {
                     const p = s.pills[id];
                     assert.ok(p && p.shown, `${v.name}: ${id} has its state pill`);
@@ -73,10 +78,12 @@ const { setTheme, installAudit, auditRegion } = require('./helpers/contrast');
             const still = await ev(`(() => { const e = document.querySelector('${root} [data-session-id="r2"] .session-dot'); return e.getAnimations().every(a => a.effect.getTiming().iterations !== Infinity); })()`);
             assert.equal(still, true, `${v.name}: the dot stops with reduced motion`);
             // Every pill's text is readable: 4.5:1 in this theme.
-            const sel = ['.session-state-pill'];
-            const audit = await auditRegion(ev, sel.map(x => root + ' ' + x));
-            assert.deepEqual(audit.fails, [], `${v.name}: contrast of the state pills: ` + JSON.stringify(audit.fails));
-            assert.ok(audit.checked >= 3, `${v.name}: the audit looked at the pills (${audit.checked})`);
+            if (!v.mobile) { // the phone has no pill to audit (its status line is the row's own text, audited with the phone rows)
+                const sel = ['.session-state-pill'];
+                const audit = await auditRegion(ev, sel.map(x => root + ' ' + x));
+                assert.deepEqual(audit.fails, [], `${v.name}: contrast of the state pills: ` + JSON.stringify(audit.fails));
+                assert.ok(audit.checked >= 3, `${v.name}: the audit looked at the pills (${audit.checked})`);
+            }
         }
         console.log('attention_rows_quiet: ok');
         await client.close();
