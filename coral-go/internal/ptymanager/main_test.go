@@ -3,6 +3,7 @@ package ptymanager
 import (
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -48,6 +49,15 @@ func TestMain(m *testing.M) {
 	// The tests drive shells, which need no 300ms between a command and its
 	// Enter (production keeps it for agent TUIs).
 	tmux.SetSendKeysSettleForTest(20 * time.Millisecond)
+	consoles := startConsoleTripwire()
 	code := m.Run()
+	// No test may open a console window on the person's desktop (#381): a console program started outside a pseudo console without
+	// hiddenCommand is handed to the default terminal, which shows it.
+	if opened := consoles(); len(opened) > 0 {
+		fmt.Fprintf(os.Stderr, "FAIL: a test opened a console window: %s (start console programs with hiddenCommand)\n", strings.Join(opened, "; "))
+		if code == 0 {
+			code = 1
+		}
+	}
 	testtemp.Exit(cleanupTemp, testleak.Check(code)) // no goroutine left running (#4167)
 }

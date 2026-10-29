@@ -51,7 +51,7 @@ func powerShellForTest(t *testing.T) string {
 
 func runPowerShell(t *testing.T, ps, script string) string {
 	t.Helper()
-	out, err := exec.Command(ps, "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", script).CombinedOutput()
+	out, err := hiddenCommand(ps, "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", script).CombinedOutput()
 	if err != nil {
 		t.Fatalf("powershell failed: %v\n%s", err, out)
 	}

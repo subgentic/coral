@@ -4,7 +4,6 @@ package ptymanager
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -27,7 +26,7 @@ func TestWindowsCommandHandoffWithAnApostropheInThePath(t *testing.T) {
 	defer cleanup()
 	require.True(t, strings.Contains(inv, "O''Brien"), inv)
 
-	out, err := exec.Command("powershell", "-NoProfile", "-NonInteractive", "-Command", inv).CombinedOutput()
+	out, err := hiddenCommand("powershell", "-NoProfile", "-NonInteractive", "-Command", inv).CombinedOutput()
 	require.NoError(t, err, "%s", out)
 	assert.Contains(t, string(out), "coral-handoff-ok")
 	entries, err := os.ReadDir(tmp)

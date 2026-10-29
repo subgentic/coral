@@ -60,7 +60,7 @@ func TestCodexLaunchScriptPassesItsArgumentsThroughWindowsPowerShell(t *testing.
 	inv, cleanup, err := commandInvocation(line, false)
 	require.NoError(t, err)
 	defer cleanup()
-	cmd := exec.Command(ps, "-NoProfile", "-NonInteractive", "-Command", inv)
+	cmd := hiddenCommand(ps, "-NoProfile", "-NonInteractive", "-Command", inv)
 	cmd.Env = append(os.Environ(), argvEchoEnv+"=1")
 	out, err := cmd.CombinedOutput()
 	require.NoError(t, err, "%s", out)
