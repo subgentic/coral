@@ -475,7 +475,7 @@ async function startShard(n, gen = 0, strict = false, backend = MAIN_BACKEND) {
   const dir = path.join(tmp, `shard${n}${gen ? `-${gen}` : ''}`);
   fs.mkdirSync(dir, { recursive: true });
   const port = await freePort();
-  const data = path.join(dir, 'data'); fs.mkdirSync(data);
+  const data = path.join(dir, 'data'); fs.mkdirSync(data, { mode: 0o700 }); // private, as Coral makes its own data folder: a default-mode folder is tightened at startup and the page then shows a 'Security warning' toast over the suites (#10831)
   // This shard's stub dir + ready flag (#4354): stubs record only after readyPath exists, which is written
   // once cli_path has been PUT below. readyPath does not exist yet, so the server-startup window is not counted.
   const stubBin = path.join(dir, 'stub-bin');

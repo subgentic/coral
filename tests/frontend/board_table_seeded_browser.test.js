@@ -11,6 +11,7 @@ const BASE = require('./test_base').BASE;
 const { sqliteExec } = require('./helpers/sqlite'); // the sqlite3 tool when there is one, else Node's own SQLite: a Windows machine has no sqlite3 (#8797)
 const { removeBoards } = require('./helpers/board_cleanup');
 
+const ftsCheck = (label) => { try { sqliteExec(require('node:path').join(process.env.CORAL_TEST_DATA_DIR, 'messageboard.db'), "PRAGMA busy_timeout=20000;\nINSERT INTO board_messages_fts(board_messages_fts, rank) VALUES('integrity-check', 1);"); console.log('FTSDIAG ok after ' + label); } catch (e) { console.log('FTSDIAG CORRUPT after ' + label + ': ' + String(e.message || e).split('\n')[0]); } };
 const B = 'seeded-8047-' + (Date.now() % 100000);
 const TOTAL = 2100, DAYS = 6, NEEDLE = 'zebra-needle';
 const SENDERS = [['orchestrator', 'Orchestrator'], ['qa-1', 'QA Engineer'], ['be-1', 'Backend Dev'], ['fe-1', 'Frontend Dev'], ['fe-teams', 'Frontend Dev Teams UI'], ['sec-win', 'Security Reviewer Windows'],
@@ -77,16 +78,19 @@ const spec = (i) => {
                 ids.push(j.id || (j.message && j.message.id));
             }
             return { ids, bad: bad.slice(0, 5), nbad: bad.length }; })()`);
+        ftsCheck('the posts');
         assert.equal(seed.nbad, 0, 'every post was accepted: ' + JSON.stringify(seed.bad));
         const postedIds = seed.ids;
         assert.ok(postedIds.every(Number.isInteger), 'every post has an id');
         const deleted = new Set();
         for (let i = 29; i <= TOTAL; i += 29) { const st = await ev(`fetch('/api/board/${B}/messages/${postedIds[i - 1]}', { method: 'DELETE' }).then(r => r.status)`); assert.ok(st < 300, 'deleting message ' + i + ': ' + st); deleted.add(i); }
+        ftsCheck('the deletes');
         const dataDir = process.env.CORAL_TEST_DATA_DIR;
         assert.ok(dataDir, 'the runner gives the isolated data directory (CORAL_TEST_DATA_DIR)');
         const stamp = i => new Date(END - (TOTAL - i) * STEP).toISOString();
         const sql = ['PRAGMA busy_timeout=20000;', 'BEGIN;', ...postedIds.map((id, k) => `UPDATE board_messages SET created_at='${stamp(k + 1)}' WHERE id=${id};`), 'COMMIT;'].join('\n');
         sqliteExec(require('node:path').join(dataDir, 'messageboard.db'), sql);
+        ftsCheck('the timestamp UPDATE');
         const kept = postedIds.filter((id, k) => !deleted.has(k + 1));
         const TOTAL_LEFT = kept.length;
         const needleIds = [...NEEDLE_AT].map(i => postedIds[i - 1]).sort((a, b) => b - a);
