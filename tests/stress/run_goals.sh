@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Goals integration: private server, mock agents, real coral-board CLI. No model calls.
+#   CORAL_TEST_REPEAT=N runs the whole driver N times back to back on this one server (each round has its own boards).
 # Requires Go, Python 3.9+, Node, curl, and tmux (or CORAL_TEST_BACKEND=pty).
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -7,6 +8,8 @@ source "$SCRIPT_DIR/../lib/agent_env.sh"
 source "$SCRIPT_DIR/../lib/backend.sh"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 PORT="${CORAL_TEST_PORT:-8493}"
+REPEAT="${CORAL_TEST_REPEAT:-1}"
+[[ "$REPEAT" =~ ^[0-9]+$ ]] && (( 10#$REPEAT >= 1 )) || { echo "ERROR: CORAL_TEST_REPEAT is a number from 1." >&2; exit 2; }
 if [[ ! "$PORT" =~ ^[0-9]+$ ]] || (( 10#$PORT < 1 || 10#$PORT > 65535 || 10#$PORT == 8420 )); then
     echo "ERROR: use a valid non-production port, never 8420." >&2
     exit 2
@@ -85,5 +88,8 @@ LINK=$("$TMPDIR_GOALS/coral${CORAL_TEST_EXE}" open --print --url "$BASE_URL" --h
 command curl -sS --max-time 10 -o /dev/null -c "$JAR" "$LINK"
 unset LINK
 log "Running goals integration on $BASE_URL ($CORAL_TEST_BACKEND)..."
-python3 "$SCRIPT_DIR/goals_integration.py" "$BASE_URL" "$(coral_test_native_path "$TMPDIR_GOALS")" "$CORAL_TEST_EXE" "$CORAL_TEST_BACKEND" "$(coral_test_native_path "$CORAL_TEST_HOME")"
+for round in $(seq 1 "$REPEAT"); do
+    (( REPEAT == 1 )) || log "Round $round/$REPEAT"
+    python3 "$SCRIPT_DIR/goals_integration.py" "$BASE_URL" "$(coral_test_native_path "$TMPDIR_GOALS")" "$CORAL_TEST_EXE" "$CORAL_TEST_BACKEND" "$(coral_test_native_path "$CORAL_TEST_HOME")" "r$round"
+done
 coral_test_sandbox_check

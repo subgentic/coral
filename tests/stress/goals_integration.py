@@ -13,7 +13,9 @@ import urllib.parse
 import urllib.request
 
 
-url, folder, suffix, backend, home = sys.argv[1:]
+url, folder, suffix, backend, home = sys.argv[1:6]
+# A round tag (CORAL_TEST_REPEAT, run_goals.sh) keeps the boards of one round apart from the last one on the same server.
+round_tag = ("-" + sys.argv[6]) if len(sys.argv) > 6 else ""
 root = Path(folder)
 # curl writes HttpOnly cookies with a #HttpOnly_ prefix. Python 3.9's
 # MozillaCookieJar treats those as comments, so read this private Netscape jar.
@@ -142,7 +144,7 @@ try:
     check("mock CLI configured", api("PUT", "/api/settings", {
         "cli_path_claude": str(root / ("mock-agent" + suffix))})["ok"])
     launch = api("POST", "/api/sessions/launch-team", {
-        "board_name": "goals-integration", "working_dir": str(root / "work"),
+        "board_name": "goals-integration" + round_tag, "working_dir": str(root / "work"),
         "agent_type": "claude", "backend": backend,
         "agents": [{"name": role, "prompt": "Mock goals integration fixture"}
                    for role in ("Orchestrator", "Worker", "Tester", "Driver")]})
@@ -335,7 +337,7 @@ try:
 
     # GET /api/goals reads every board's goals in one call, paged by a cursor bound to its filters (#7260).
     second = api("POST", "/api/sessions/launch-team", {
-        "board_name": "goals-integration-b", "working_dir": str(root / "work"),
+        "board_name": "goals-integration-b" + round_tag, "working_dir": str(root / "work"),
         "agent_type": "claude", "backend": backend,
         "agents": [{"name": "Orchestrator", "prompt": "Mock goals integration fixture, second board"}]})
     board_b = second["board"]
@@ -371,11 +373,12 @@ try:
     b_ids, _, _ = walk(base_b + "/goals", "state=" + ALL_STATES, 50)
     union = sorted(a_ids + b_ids)
     check("the two boards' goal ids do not collide", len(set(a_ids) & set(b_ids)) == 0 and len(a_ids) > 10 and len(b_ids) == 6)
-    got, rows, pages = walk("/api/goals", "state=" + ALL_STATES, 7)
+    both = "&board=" + urllib.parse.quote(board) + "&board=" + urllib.parse.quote(board_b)  # only this round's two boards
+    got, rows, pages = walk("/api/goals", "state=" + ALL_STATES + both, 7)
     check("GET /api/goals at 7 a page gives every goal of both boards once, oldest first",
           got == union and len(set(got)) == len(got) and pages == -(-len(union) // 7))
     check("each goal carries its board and a rollup", {r["board_id"] for r in rows} == {board, board_b} and all("rollup" in r for r in rows))
-    got1, _, pages1 = walk("/api/goals", "state=" + ALL_STATES, 1)
+    got1, _, pages1 = walk("/api/goals", "state=" + ALL_STATES + both, 1)
     check("one goal a page reaches every goal", got1 == union and pages1 == len(union))
     gotA, rowsA, _ = walk("/api/goals", "state=" + ALL_STATES + "&board=" + urllib.parse.quote(board), 9)
     check("board= names one board", gotA == sorted(a_ids) and {r["board_id"] for r in rowsA} == {board})
@@ -383,7 +386,7 @@ try:
     check("two board= values give both boards", gotAB == union)
     gotNone, _, _ = walk("/api/goals", "state=" + ALL_STATES + "&board=no-such-board", 9)
     check("a board that does not exist adds nothing", gotNone == [])
-    done_rows = [g for g in api("GET", "/api/goals?state=done&limit=200")["goals"]]
+    done_rows = [g for g in api("GET", "/api/goals?state=done&limit=200" + both)["goals"]]
     check("state=done gives the closed goals of both boards",
           closed_b in [g["id"] for g in done_rows] and closed_by_agent not in [g["id"] for g in done_rows]
           and {g["board_id"] for g in done_rows} == {board, board_b})
