@@ -97,6 +97,7 @@ import { pruneOldRunFolders, liveRunFolders, KEEP_RUNS, KEEP_HOURS } from './hel
 import { sqliteAvailable, sqliteExec } from './helpers/sqlite.js';
 import { redactEvidence as redactEvidenceText } from './helpers/redact_evidence.mjs';
 import { snapshot as serverSnapshot, diff as serverDiff, rowLeaks, restoreSettings, leftovers, cleanup as cleanupLeftovers } from './helpers/server_state.mjs';
+import { profileEnv, profileLeaks, writeStub } from './sandbox_profile.mjs';
 
 // Linux: the run goes in a private network namespace with only loopback (#3466). Chrome cancels
 // every request in flight, even to 127.0.0.1, when the host's addresses change (ERR_NETWORK_CHANGED;
@@ -281,6 +282,7 @@ function sweepLeftovers() {
 }
 sweepLeftovers();
 
+const runStart = Date.now(); // #375: what in the operator's profile changed since, and names this run's folder, is a leak
 const tmp = fs.mkdtempSync(path.join(tempRoot, 'coral-cdp-'));
 // Old run folders (#6967): a run that did not pass keeps its folder for diagnosis and nothing removed them (38 GB in three days). Keep the newest CORAL_CDP_KEEP_RUNS (10) and any from the last
 // CORAL_CDP_KEEP_HOURS (24) hours; remove the rest, but never this run's own or one a live runner's file names.
@@ -320,8 +322,7 @@ const MOCK_AGENT = path.join(tmp, 'mock-agent' + EXE);
 function writeStubs(binDir, readyPath) {
   fs.mkdirSync(binDir, { recursive: true });
   for (const cli of CLI_TYPES) {
-    fs.writeFileSync(path.join(binDir, cli),
-      `#!/bin/sh\n[ -e "${readyPath}" ] && printf '%s %s\\n' "${cli}" "$*" >> "${STUB_MARKER}"\nexit 1\n`, { mode: 0o755 });
+    writeStub(binDir, cli, readyPath, STUB_MARKER);
   }
 }
 const REAL_CLAUDE_PROJECTS = path.join(os.homedir(), '.claude', 'projects');
@@ -504,7 +505,9 @@ async function startShard(n, gen = 0, strict = false, backend = MAIN_BACKEND) {
   // On Windows the mode means nothing: the file inherits its folder's access list, which Coral refuses for a password ("CORAL_INITIAL_PASSWORD_FILE not used"), so every
   // suite met the first-run "Set a password" prompt (#3948) over its page (93 of the 481 suites failed there). Owner only, as Coral asks.
   ownerOnlyOnWindows(pwFile, false);
-  const serverEnv = { ...testEnv, CORAL_TEST_HOOKS: '1', CORAL_DATA_DIR: data, HOME: hostHome, CORAL_INITIAL_PASSWORD_FILE: pwFile,
+  // profileEnv (#375): HOME and, on Windows, USERPROFILE, HOMEDRIVE/HOMEPATH, APPDATA and LOCALAPPDATA are the shard's home, so the
+  // server, its agents and their PowerShell never read or write the operator's profile (run.sh sets USERPROFILE too).
+  const serverEnv = { ...testEnv, CORAL_TEST_HOOKS: '1', CORAL_DATA_DIR: data, ...profileEnv(hostHome), CORAL_INITIAL_PASSWORD_FILE: pwFile,
     PATH: stubBin + path.delimiter + (testEnv.PATH || process.env.PATH || '') };  // #4354: this shard's stub CLI first on PATH
   for (const k of HOST_DATA_VARS) delete serverEnv[k];
   // CDP_EVIDENCE_DIR (a Windows CI run sets it): at a suite's timeout the runner captures what was stuck before it kills it (captureTimeoutEvidence), including the test
@@ -1031,6 +1034,8 @@ try {
   }
   const added = (() => { try { return fs.readdirSync(REAL_CLAUDE_PROJECTS).filter(n => !claudeBaseline.has(n)); } catch { return []; } })();
   if (added.length) { console.error('FAIL (#4354): new entries under the real ~/.claude/projects:\n    ' + added.join('\n    ')); sandboxOk = false; }
+  const reached = profileLeaks(path.basename(tmp), runStart);
+  if (reached.length) { console.error('FAIL (#375): the operator\'s profile names this run\'s folder:\n    ' + reached.join('\n    ')); sandboxOk = false; }
 } catch (e) { console.error(`#4354 sandbox check error: ${e.message}`); sandboxOk = false; }
 if (!sandboxOk && !exitCode) exitCode = 1;
 
