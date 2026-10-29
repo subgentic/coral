@@ -55,7 +55,7 @@ func (m *BoardHealthMonitor) SetAgents(ts *store.TaskStore, rt AgentRuntime, dis
 	m.signal = hookSignal(ts)
 	m.limit = screenLimit(rt)
 	m.deliver = func(ctx context.Context, a AgentInfo, _ string, text string) error {
-		_, err := deliverAutomated(ctx, rt, m.logger, naming.SessionName(a.AgentType, a.SessionID), a.AgentType, a.SessionID, board.OneLine(text), "health check", false, false)
+		_, err := deliverAutomated(ctx, rt, m.logger, naming.SessionName(a.AgentType, a.SessionID), a.AgentType, a.SessionID, typedHealth(text), "health check", false, false) // what reaches a terminal is the typed form (goal #7)
 		return err
 	}
 }
@@ -143,7 +143,7 @@ func (m *BoardHealthMonitor) checkProject(ctx context.Context, project string, b
 	if err != nil || (items == 0 && !hs.AllClear) {
 		return
 	}
-	if err := sendUnlessBlocked(ctx, m.limit, m.deliver, rcptAgent, "health-check:"+project, typedHealthCheck(text)); err != nil {
+	if err := sendUnlessBlocked(ctx, m.limit, m.deliver, rcptAgent, "health-check:"+project, text); err != nil {
 		m.logger.Warn("health check delivery failed", "project", project, "error", err)
 		return
 	}

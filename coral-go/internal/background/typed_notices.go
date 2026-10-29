@@ -21,3 +21,13 @@ func typedHealthCheck(text string) string {
 func typedHealthLine(detail string) string {
 	return "[Coral health] " + board.TypedText(detail)
 }
+
+// typedHealth is what the health monitor's deliver types: a line to a member keeps its "[Coral health]" opener; anything else is the
+// team health check. Done in the deliver itself, the one place the monitor's text reaches a terminal, so what the check composed (and
+// records as shown) is unchanged.
+func typedHealth(text string) string {
+	if detail, ok := strings.CutPrefix(text, "[Coral health] "); ok {
+		return typedHealthLine(detail)
+	}
+	return typedHealthCheck(text)
+}

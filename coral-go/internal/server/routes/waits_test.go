@@ -155,7 +155,8 @@ func TestBoardWaitRoutes_MessageResolutionNotifiesTerminal(t *testing.T) {
 	allInputs := strings.Join(inputs, "\n")
 	assert.Contains(t, allInputs, "[Wait resolved]")
 	assert.Contains(t, allInputs, "Orchestrator")
-	assert.Contains(t, allInputs, "Design approved")
+	assert.NotContains(t, allInputs, "Design approved", "the message itself is read on the board, never typed (goal #7)")
+	assert.Contains(t, allInputs, "Run 'coral-board read' to see the message.")
 }
 
 func TestBoardWaitRoutes_TaskResolutionNotifiesTerminal(t *testing.T) {

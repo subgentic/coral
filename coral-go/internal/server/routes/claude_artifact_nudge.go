@@ -23,7 +23,7 @@ import (
 // repeats from someone else's post, or one the Operator posted, reminds nobody.
 
 // claudeArtifactNudgeText is the reminder: one line, fixed.
-const claudeArtifactNudgeText = "You published a claude.ai artifact. Make it a Coral artifact instead: run 'coral-agent artifact upload FILE' and post the coral:// link on the board. This is a reminder only; Coral did nothing for you."
+const claudeArtifactNudgeText = "You published a claude.ai artifact. Make it a Coral artifact instead: run 'coral-agent artifact upload FILE' and post the coral:// link on the board. This is a reminder only: Coral did nothing for you." // no ';': in PowerShell it starts a second command, here `coral` (goal #7)
 
 const claudeArtifactToolName = "Artifact"
 

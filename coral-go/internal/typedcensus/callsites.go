@@ -63,3 +63,8 @@ func CheckSites(t *testing.T, dir string, sites []Site) {
 		}
 	}
 }
+
+// S is a Site: the file, the fragment its call's line holds, how many calls have it, and why it is safe.
+func S(file, fragment string, count int, why string) Site {
+	return Site{File: file, Fragment: fragment, Count: count, Why: why}
+}
