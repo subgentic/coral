@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 import re
+import shlex
 import subprocess
 import sys
 import threading
@@ -57,7 +58,7 @@ def api(method, path, body=None, expected=(200,)):
     return value
 
 
-def cli(role, *args, ok=True):
+def agent_env(role):
     agent = agents[role]
     env = dict(os.environ, HOME=home, USERPROFILE=home, CORAL_URL=url,
                CORAL_TELEMETRY_DISABLED="1",
@@ -65,8 +66,12 @@ def cli(role, *args, ok=True):
                CORAL_SESSION_TOKEN=agent["token"])
     for name in ("TMUX", "TMUX_PANE", "CORAL_PORT", "CORAL_SESSION_AUTH_FILE"):
         env.pop(name, None)
+    return env
+
+
+def cli(role, *args, ok=True):
     result = subprocess.run([str(root / ("coral-board" + suffix)), *map(str, args)],
-                            env=env, capture_output=True, text=True, timeout=20)
+                            env=agent_env(role), capture_output=True, text=True, timeout=20)
     if ok:
         assert result.returncode == 0, f"CLI {' '.join(map(str, args))}: {result.stderr}"
         return result.stdout
@@ -398,6 +403,72 @@ try:
     except urllib.error.HTTPError as error:
         agent_code = error.code
     check("an agent's token is refused the all-boards read", agent_code in (401, 403))
+
+    # --- Goal #153 (#11004): `coral-board goal brief` run by a mock agent, every way a person names a goal.
+    brief_goal = goal("Brief fixture goal", "--outcome", "an agent can be briefed", "--done-when", "the brief reads right")
+    done_task = task("Brief done task", "--goal", brief_goal, "--assignee", "Worker")
+    open_task = task("Brief open task", "--goal", brief_goal, "--assignee", "Tester")
+    blocked_task = task("Brief blocked task", "--goal", brief_goal, "--assignee", "Tester",
+                        "--blocked-by", json.dumps([open_task]))
+    cli("Worker", "task", "claim", done_task)
+    (root / "brief-artifact.json").write_text(json.dumps(
+        [{"name": "brief-report", "content": "the report an agent should be pointed at"}]))
+    cli("Worker", "task", "complete", done_task, "--artifacts", str(root / "brief-artifact.json"), "--message", "done")
+    check("the done task is completed", api("GET", base + f"/tasks/{done_task}")["status"] == "completed")
+    other_goal_id = goal("Brief other goal")  # open work of another goal must not leak into this brief
+    task("Brief other goal task", "--goal", other_goal_id)
+
+    def brief_rows(text):
+        head, _, rest = text.partition("Open tasks:")
+        listed = rest.partition("Artifacts (")[0]
+        return sorted(map(int, re.findall(r"^\s+#(\d+)\s", listed, re.MULTILINE))), rest
+
+    page = f"{url}/team/{urllib.parse.quote(board, safe='')}/goals/{brief_goal}"
+    for form in (str(brief_goal), f"#{brief_goal}", f"goal #{brief_goal}", page, page + "/", f"{page}?tab=tasks#top"):
+        out = cli("Worker", "goal", "brief", form)
+        ids, rest = brief_rows(out)
+        check(f"brief {form!r}: names the goal and its outcome",
+              f"Goal #{brief_goal}: Brief fixture goal" in out and "an agent can be briefed" in out)
+        check(f"brief {form!r}: the open and the blocked task, never the done one",
+              ids == sorted([open_task, blocked_task]) and f"#{done_task} " not in rest.partition("Artifacts (")[0])
+        check(f"brief {form!r}: the done task's artifact is linked",
+              re.search(rf"#{done_task}\s+coral://\S+\s+brief-report", out) is not None)
+        check(f"brief {form!r}: no other goal's task",
+              "Brief other goal task" not in out)
+    two_words = cli("Worker", "goal", "brief", "goal", f"#{brief_goal}")
+    check("brief with the reference as two arguments reads the same goal", f"Goal #{brief_goal}:" in two_words)
+    as_json = json.loads(cli("Worker", "goal", "brief", str(brief_goal), "--json"))
+    check("brief --json counts the tasks, the open ones and the artifact",
+          as_json["counts"] == {"tasks": 3, "open_tasks": 2, "artifacts": 1}
+          and as_json["artifacts"][0]["uri"].startswith("coral://"))
+
+    # The line the goal page's "Copy for an agent" button copies runs as it is (its command, word for word).
+    static = Path(__file__).resolve().parents[2] / "coral-go" / "pkg" / "frontend" / "static"
+    copied = subprocess.run(["node", "--input-type=module", "-e",
+                             "import {agentBriefLine} from " + json.dumps((static / "goal_words.js").as_uri()) +
+                             "; process.stdout.write(agentBriefLine({id: " + str(brief_goal) +
+                             ", title: 'Brief fixture goal'}))"],
+                            capture_output=True, text=True, timeout=20)
+    assert copied.returncode == 0, copied.stderr
+    line = copied.stdout
+    check("the copied line names the goal and carries the command", line.startswith(f"Goal #{brief_goal} (Brief fixture goal): run ")
+          and "coral-board goal brief" in line)
+    command = shlex.split(line.partition(": run ")[2])
+    check("the copied command starts with coral-board", command[0] == "coral-board")
+    ran = subprocess.run([str(root / ("coral-board" + suffix)), *command[1:]], env=agent_env("Worker"),
+                         capture_output=True, text=True, timeout=20)
+    check("the copied command runs as it is and briefs the goal",
+          ran.returncode == 0 and f"Goal #{brief_goal}: Brief fixture goal" in ran.stdout)
+
+    # Another team's goal is not an agent's to read, by number's board or by the other team's page link.
+    foreign = json.loads(cli("Orchestrator on the second board", "goal", "list", "--json"))
+    foreign_goal = foreign[0]["id"] if foreign else api("GET", base_b + "/goals?state=" + ALL_STATES)["goals"][0]["id"]
+    refused_link = cli("Worker", "goal", "brief", f"{url}/team/{urllib.parse.quote(board_b, safe='')}/goals/{foreign_goal}", ok=False)
+    check("another team's goal link is refused: exit 5, identity_mismatch, nothing of the goal printed",
+          refused_link.returncode == 5 and "identity_mismatch" in refused_link.stderr
+          and not refused_link.stdout.strip())
+    missing = cli("Worker", "goal", "brief", "999999", ok=False)
+    check("a goal that does not exist is exit 6", missing.returncode == 6)
 
     driver = agents["Driver"]
     check("driver put to sleep", api("POST", "/api/sessions/live/" + driver["session_id"] + "/sleep", {})["sleeping"])
