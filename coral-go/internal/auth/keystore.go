@@ -72,7 +72,10 @@ type KeyStore struct {
 	signedOut map[string]time.Time
 	// peerUser is the peer-user check (#3970): a sign-in link opened by another OS user of this
 	// computer is refused. nil, or "unsupported", keeps today's behaviour.
-	peerUser    func(*http.Request) (same, supported bool)
+	peerUser func(*http.Request) (same, supported bool)
+	// peerUnknown says whether a request the peerUser check refused was refused only because its owner could not be told (not because it is positively another user's): such a
+	// sign-in link is answered "try again" and not used up (#385). nil: every refusal is final.
+	peerUnknown func(*http.Request) bool
 	unknownPeer sync.Once
 }
 

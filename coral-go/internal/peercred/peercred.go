@@ -268,6 +268,25 @@ func SameUser(r *http.Request) (same, supported bool) {
 	return false, true
 }
 
+// OwnerUnknown reports whether the owner of r's loopback client socket could not be told (Attribute's Unattributed, asked afresh): a "try again", as distinct from a socket that
+// is positively another user's. False where the system can't be asked, or r is not a loopback TCP request (#385).
+func OwnerUnknown(r *http.Request) bool {
+	if !Supported {
+		return false
+	}
+	client, err := netip.ParseAddrPort(r.RemoteAddr)
+	if err != nil || !client.Addr().Unmap().IsLoopback() {
+		return false
+	}
+	la, _ := r.Context().Value(http.LocalAddrContextKey).(net.Addr)
+	tcp, ok := la.(*net.TCPAddr)
+	if !ok || tcp == nil {
+		return false
+	}
+	v, _ := Attribute(client, tcp.AddrPort())
+	return v == Unattributed
+}
+
 var layoutOnce sync.Once
 
 // logLayoutOnce says, once per process, that the kernel's socket table has a layout this

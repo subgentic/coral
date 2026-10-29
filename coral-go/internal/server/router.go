@@ -18,6 +18,7 @@ import (
 	"github.com/subgentic/coral/internal/config"
 	"github.com/subgentic/coral/internal/httputil"
 	"github.com/subgentic/coral/internal/logexit"
+	"github.com/subgentic/coral/internal/peercred"
 	"github.com/subgentic/coral/internal/ptymanager"
 	"github.com/subgentic/coral/internal/server/routes"
 	"github.com/subgentic/coral/internal/serverproof"
@@ -173,7 +174,8 @@ func (s *Server) registerAuth(r *chi.Mux) {
 		return s.cloudHandler.SameUser(r)
 	}
 	authRoutes.SetPeerUser(peerUser)
-	s.keyStore.SetPeerUser(peerUser) // a sign-in link opened by another OS user is refused (#3970)
+	s.keyStore.SetPeerUser(peerUser)                                                                                   // a sign-in link opened by another OS user is refused (#3970)
+	s.keyStore.SetPeerUnknown(func(r *http.Request) bool { return s.cloudHandler != nil && peercred.OwnerUnknown(r) }) // ... but one whose opener could not be told is retried, not used up (#385)
 	r.Post("/auth/password", authRoutes.SignInWithPassword)
 	r.Post("/auth/password/create", authRoutes.CreatePassword)
 	r.Get("/api/auth/setup-code", authRoutes.GetSetupCode)

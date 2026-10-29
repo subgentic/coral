@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -143,6 +144,49 @@ func TestLoginTokenRefusesAnotherUser(t *testing.T) {
 		assert.Equal(t, http.StatusFound, get(tok).Code, "unsupported: as before")
 	}
 	assert.Equal(t, 1, strings.Count(logs.String(), "can't tell which user"), "logged once")
+}
+
+// #385: a sign-in link whose opener could not be attributed yet (the socket table can lag a connection) is answered "try again" and is NOT used up; a socket that is positively
+// another user's, and a link still unattributed after linkRetryMax tries, get the final 403.
+func TestASignInLinkWhoseOpenerCouldNotBeToldIsRetriedNotUsedUp(t *testing.T) {
+	ks, err := NewKeyStore(t.TempDir())
+	require.NoError(t, err)
+	h := Middleware(ks)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(299) }))
+	get := func(target string) *httptest.ResponseRecorder {
+		r := httptest.NewRequest("GET", target, nil)
+		r.RemoteAddr = "127.0.0.1:1234"
+		r.Host = "localhost:8420"
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, r)
+		return rec
+	}
+	same, unknown := false, true
+	ks.SetPeerUser(func(*http.Request) (bool, bool) { return same, true })
+	ks.SetPeerUnknown(func(*http.Request) bool { return unknown })
+	tok, err := ks.MintLoginToken()
+	require.NoError(t, err)
+
+	rec := get("/?login_token=" + tok)
+	assert.Equal(t, http.StatusServiceUnavailable, rec.Code, "could not tell: try again")
+	assert.Equal(t, "1", rec.Header().Get("Retry-After"))
+	assert.Empty(t, rec.Result().Cookies())
+	assert.Contains(t, rec.Body.String(), `http-equiv="refresh"`)
+	assert.Contains(t, rec.Body.String(), "link_retry=1", "the page opens the same link again, counting")
+	assert.Contains(t, rec.Body.String(), "login_token="+tok, "the same link: it was not used up")
+
+	same = true // the table caught up
+	rec = get("/?login_token=" + tok + "&link_retry=1")
+	assert.Equal(t, http.StatusFound, rec.Code, "the link worked on the retry")
+	assert.NotContains(t, rec.Header().Get("Location"), "link_retry", "the retry counter does not stay in the address")
+
+	same = false
+	tok, err = ks.MintLoginToken()
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusForbidden, get("/?login_token="+tok+"&link_retry="+strconv.Itoa(linkRetryMax)).Code, "still unattributed after the last try: final")
+	unknown = false
+	assert.Equal(t, http.StatusForbidden, get("/?login_token="+tok).Code, "positively another user's: final at once")
+	same = true
+	assert.Equal(t, http.StatusFound, get("/?login_token="+tok).Code, "and the owner's link still works after all of that")
 }
 
 // #6100: the Coral app opens its sign-in link with coral_client=app, and the session that link makes is named "Coral app on ..." on the Sessions
