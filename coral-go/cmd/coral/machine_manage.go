@@ -36,7 +36,7 @@ func machineManageUsage(w io.Writer) {
 	fmt.Fprintln(w, "usage: coral machine list   --provider digitalocean --token-file <path|-> [--state-file PATH]")
 	fmt.Fprintln(w, "       coral machine delete NAME --provider digitalocean --token-file <path|-> [--hub-destroy-file <path|->] [--hub-url https://app.coralhub.dev]")
 	fmt.Fprintln(w, "         [--continue-if-revoke-fails] [--state-file PATH] [--yes]")
-	fmt.Fprintln(w, "       coral machine prune --older-than 24h|7d --provider digitalocean --token-file <path|-> [--include-networks] [--state-file PATH] [--yes]")
+	fmt.Fprintln(w, "       coral machine prune --older-than 24h|7d --provider digitalocean --token-file <path|-> [--include-unknown] [--include-networks] [--state-file PATH] [--yes]")
 	fmt.Fprintln(w, "       coral machine egress-files --dir DIR   (writes the machine's egress-block files, for tools/machine-egress-check.sh)")
 }
 
@@ -71,7 +71,7 @@ func runMachineManage(sub string, args []string, stdin io.Reader, stdout, stderr
 	statePath := fs.String("state-file", "", "the state file the launches write (default: machines.json in Coral's data folder)")
 	yes := fs.Bool("yes", false, "go on without asking")
 	var destroyFile, hubURL *string
-	var continueRevoke, includeNetworks *bool
+	var continueRevoke, includeNetworks, includeUnknown *bool
 	var olderThan *string
 	switch sub {
 	case "delete":
@@ -80,6 +80,7 @@ func runMachineManage(sub string, args []string, stdin io.Reader, stdout, stderr
 		continueRevoke = fs.Bool("continue-if-revoke-fails", false, "destroy the machine even if its Hub identity could not be revoked (it is still said, and it still has to be removed in Coral Hub)")
 	case "prune":
 		olderThan = fs.String("older-than", "", "how old an instance must be to count as an orphan: 90m, 24h or 7d (required)")
+		includeUnknown = fs.Bool("include-unknown", false, "also take instances with this tool's tag that the state file does not know (they may belong to another computer or a lost state file: by default they are only counted)")
 		includeNetworks = fs.Bool("include-networks", false, "also take private networks and firewalls with this tool's names that have no instance and no record (they carry no age)")
 	}
 	// flags and the machine name may come in either order: the name is the one argument that is not a flag
@@ -234,7 +235,7 @@ func runMachineManage(sub string, args []string, stdin io.Reader, stdout, stderr
 		if d.Confirm == nil {
 			return fail("no one can be asked to confirm: pass --yes to go on without asking")
 		}
-		rep, err := machinelaunch.Prune(ctx, age, *includeNetworks, d)
+		rep, err := machinelaunch.Prune(ctx, machinelaunch.PruneOptions{OlderThan: age, IncludeUnknown: *includeUnknown, IncludeNetworks: *includeNetworks}, d)
 		if err == nil && rep != nil && len(rep.Removed) > 0 {
 			fmt.Fprintf(stdout, "Removed: %s.\n", strings.Join(rep.Removed, ", "))
 		}

@@ -50,7 +50,7 @@ func commands() []command {
 				"coral machine launch --provider digitalocean --token-file <path|-> --hub-key-file <path|-> [--name N] [--region R] [--size S] [--agents claude@VERSION,...] [--max-mode launch] [--yes]",
 				"coral machine list --provider digitalocean --token-file <path|->",
 				"coral machine delete NAME --provider digitalocean --token-file <path|-> [--hub-destroy-file <path|->] [--yes]",
-				"coral machine prune --older-than 7d --provider digitalocean --token-file <path|-> [--include-networks] [--yes]",
+				"coral machine prune --older-than 7d --provider digitalocean --token-file <path|-> [--include-unknown] [--include-networks] [--yes]",
 			}
 		}},
 		{"auto-accept", "turn auto-accept off for every agent at once", func() []string {

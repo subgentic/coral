@@ -11,7 +11,7 @@ import (
 //
 // The rule is scoped by user id (skuid != 0), not by program, on the output chain, loaded by a unit that runs before the network is configured and before coral.service can start, and that coral.service
 // Requires: a machine where the rule did not load does not start Coral. A non-root user cannot change it (it has no sudo on these machines). Loopback is not in the lists, so systemd-resolved's 127.0.0.53
-// keeps answering. A check after the load reads the machine's DNS resolvers and fails if one is inside a blocked range (Coral's own lookups would fail).
+// keeps answering. A check after the load makes sure the table is there and fails the unit if not. The DNS resolvers are checked a second time after network-online.target (a DHCP resolver is not known when the rules load), and that check only says what is wrong in the journal: a resolver inside a blocked range would make a non-root user's lookups fail, which is visible, and it must not take the machine down (#10944, Security's SHOULD C).
 //
 // It stops the metadata service and the private ranges being read; it does not stop an agent using the machine as a proxy to the public internet: that is the CLI permissions' job, as on any machine.
 
@@ -21,6 +21,8 @@ const (
 	egressUnitPath   = "/etc/systemd/system/coral-egress.service"
 	egressCheckPath  = "/usr/local/sbin/coral-egress-check"
 	egressUnitName   = "coral-egress.service"
+	egressResolvPath = "/etc/systemd/system/coral-egress-resolvers.service"
+	egressResolvName = "coral-egress-resolvers.service"
 	egressTableName  = "coral_egress"
 	egressRulePrio   = -10
 	egressMetadataV4 = "169.254.169.254"
@@ -67,27 +69,52 @@ After=local-fs.target
 Type=oneshot
 RemainAfterExit=yes
 ExecStart=/usr/sbin/nft -f %s
-ExecStartPost=%s
+ExecStartPost=%s rules
 
 [Install]
 WantedBy=sysinit.target
 `, egressRulesPath, egressCheckPath)
 }
 
-// EgressCheckScript runs after the load, as root: the table is there with both of its rules, and none of the machine's DNS resolvers is inside a blocked range. It says what is wrong on standard error (the journal).
+// EgressResolversUnit runs the resolver check once the network is online, when DHCP has told the machine its resolvers. It only reports: a failed check is a line in the journal, never a failed boot.
+func EgressResolversUnit() string {
+	return fmt.Sprintf(`[Unit]
+Description=Coral: check the DNS resolvers are outside the blocked ranges
+Wants=network-online.target
+After=network-online.target %s
+
+[Service]
+Type=oneshot
+ExecStart=%s resolvers
+
+[Install]
+WantedBy=multi-user.target
+`, egressUnitName, egressCheckPath)
+}
+
+// EgressCheckScript is the check, run as root. "rules" (after the load, fatal): the table is there with both of its rules. "resolvers" (after network-online.target, report only): none of the machine's DNS
+// resolvers is inside a blocked range; it says what is wrong on standard error (the journal) and exits 0 either way.
 func EgressCheckScript() string {
 	return fmt.Sprintf(`#!/bin/sh
 set -eu
-rules=$(/usr/sbin/nft list table inet %[1]s)
-[ "$(printf '%%s\n' "$rules" | grep -c 'meta skuid != 0')" -ge 2 ] || { echo "coral-egress: the egress rules are not loaded" >&2; exit 1; }
-# a resolver inside a blocked range would make every lookup of a non-root user (Coral's own too) fail
-resolvers=$(cat /run/systemd/resolve/resolv.conf /etc/resolv.conf 2>/dev/null | awk '$1 == "nameserver" { print $2 }' | grep -v '^127\.' | sort -u || true)
-for ns in $resolvers; do
-  case "$ns" in
-    169.254.*|10.*|192.168.*|100.6[4-9].*|100.[7-9][0-9].*|100.1[01][0-9].*|100.12[0-7].*|172.1[6-9].*|172.2[0-9].*|172.3[01].*|fe[89ab]*:*|fc*:*|fd*:*)
-      echo "coral-egress: the DNS resolver $ns is inside a blocked range: lookups of every non-root user would fail" >&2; exit 1 ;;
-  esac
-done
+mode="${1:-rules}"
+case "$mode" in
+rules)
+  rules=$(/usr/sbin/nft list table inet %[1]s) || { echo "coral-egress: the egress table is not loaded" >&2; exit 1; }
+  [ "$(printf '%%s\n' "$rules" | grep -c 'meta skuid != 0')" -ge 2 ] || { echo "coral-egress: the egress rules are not loaded" >&2; exit 1; }
+  ;;
+resolvers)
+  # a resolver inside a blocked range would make every lookup of a non-root user (Coral's own too) fail: said in the journal, never a failed boot
+  resolvers=$(cat /run/systemd/resolve/resolv.conf /etc/resolv.conf 2>/dev/null | awk '$1 == "nameserver" { print $2 }' | grep -v '^127\.' | sort -u || true)
+  for ns in $resolvers; do
+    case "$ns" in
+      169.254.*|10.*|192.168.*|100.6[4-9].*|100.[7-9][0-9].*|100.1[01][0-9].*|100.12[0-7].*|172.1[6-9].*|172.2[0-9].*|172.3[01].*|fe[89ab]*:*|fc*:*|fd*:*)
+        echo "coral-egress: the DNS resolver $ns is inside a blocked range: lookups of every non-root user would fail" >&2 ;;
+    esac
+  done
+  ;;
+*) echo "usage: coral-egress-check rules|resolvers" >&2; exit 2 ;;
+esac
 `, egressTableName)
 }
 
@@ -103,6 +130,7 @@ func EgressFiles() []EgressFile {
 	return []EgressFile{
 		{egressRulesPath, "0600", EgressRuleset()},
 		{egressUnitPath, "0644", EgressUnit()},
+		{egressResolvPath, "0644", EgressResolversUnit()},
 		{egressCheckPath, "0700", EgressCheckScript()},
 	}
 }

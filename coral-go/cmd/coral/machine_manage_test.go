@@ -192,6 +192,10 @@ func TestMachinePruneNeedsAnAgeAndRemovesOrphansAfterConfirmation(t *testing.T) 
 		t.Fatalf("nothing was removed yet: %v", p.log)
 	}
 	code, out, errb := runManage(append([]string{"prune", "--older-than", "2d", "--yes"}, args...)...)
+	if code != 0 || len(p.log) != 0 || !strings.Contains(out, "--include-unknown") {
+		t.Fatalf("without --include-unknown an instance the state file does not know is said and left alone: exit %d log %v out %s %s", code, p.log, out, errb)
+	}
+	code, out, errb = runManage(append([]string{"prune", "--older-than", "2d", "--yes", "--include-unknown"}, args...)...)
 	got := strings.Join(p.log, ",")
 	if code != 0 || got != "delete:90" || !strings.Contains(out, "Removed: orphan") {
 		t.Fatalf("only the old orphan, not the machine in the state file: exit %d log %s out %s %s", code, got, out, errb)

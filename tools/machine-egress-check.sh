@@ -28,12 +28,14 @@ ok()   { echo "PASS  $*"; }
 bad()  { echo "FAIL  $*"; fails=$((fails+1)); }
 
 if [ "$after" = 0 ]; then
-  [ -n "$dir" ] && [ -f "$dir/egress.nft" ] && [ -f "$dir/coral-egress.service" ] && [ -f "$dir/coral-egress-check" ] || { echo "usage: $0 DIR [--vpc-address ADDR]   (DIR from 'coral machine egress-files --dir DIR')" >&2; exit 2; }
+  [ -n "$dir" ] && [ -f "$dir/egress.nft" ] && [ -f "$dir/coral-egress.service" ] && [ -f "$dir/coral-egress-resolvers.service" ] && [ -f "$dir/coral-egress-check" ] || { echo "usage: $0 DIR [--vpc-address ADDR]   (DIR from 'coral machine egress-files --dir DIR')" >&2; exit 2; }
   install -d -m 0755 /etc/coral
   install -m 0600 "$dir/egress.nft" /etc/coral/egress.nft
   install -m 0644 "$dir/coral-egress.service" /etc/systemd/system/coral-egress.service
+  install -m 0644 "$dir/coral-egress-resolvers.service" /etc/systemd/system/coral-egress-resolvers.service
   install -m 0700 "$dir/coral-egress-check" /usr/local/sbin/coral-egress-check
   systemctl daemon-reload
+  systemctl enable coral-egress-resolvers.service
   systemctl enable --now coral-egress.service || bad "the unit did not start: $(journalctl -u coral-egress.service -n 5 --no-pager 2>/dev/null)"
 fi
 
@@ -62,7 +64,10 @@ if as_user curl -sS -m 10 -o /dev/null https://api.digitalocean.com/v2/ 2>/dev/n
 as_user getent hosts api.digitalocean.com >/dev/null && ok "a non-root user resolves names" || bad "a non-root user cannot resolve names"
 
 # 4. the resolvers are public (the unit's own check)
-/usr/local/sbin/coral-egress-check && ok "the unit's own check (rules loaded, no resolver in a blocked range) passes" || bad "the unit's own check fails"
+/usr/local/sbin/coral-egress-check rules && ok "the unit's own rules check passes" || bad "the unit's own rules check fails"
+resolver_say=$(/usr/local/sbin/coral-egress-check resolvers 2>&1)
+[ -z "$resolver_say" ] && ok "no DNS resolver is inside a blocked range (checked now, with the network online)" || bad "$resolver_say"
+systemctl is-enabled --quiet coral-egress-resolvers.service && ok "the resolver check is enabled for every boot (after network-online.target)" || bad "the resolver check is not enabled"
 
 if [ "$after" = 0 ]; then echo; echo "Now reboot (sudo reboot) and run: sudo $0 --after-reboot${vpc:+ --vpc-address $vpc}"; fi
 echo; [ "$fails" = 0 ] && echo "ALL CHECKS PASSED" || echo "$fails CHECK(S) FAILED"
