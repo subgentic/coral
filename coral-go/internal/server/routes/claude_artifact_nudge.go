@@ -22,8 +22,8 @@ import (
 // with its Stop event). One reminder per artifact: a publish by the artifact's page (url, else file), a link by its id across the whole board, so a link an agent
 // repeats from someone else's post, or one the Operator posted, reminds nobody.
 
-// claudeArtifactNudgeText is the reminder: one line, fixed.
-const claudeArtifactNudgeText = "You published a claude.ai artifact. Make it a Coral artifact instead: run 'coral-agent artifact upload FILE' and post the coral:// link on the board. This is a reminder only: Coral did nothing for you." // no ';': in PowerShell it starts a second command, here `coral` (goal #7)
+// claudeArtifactNudgeText is the reminder: one line, fixed. It has no ';', which in PowerShell starts a second command (here coral, goal #7).
+const claudeArtifactNudgeText = "You published a claude.ai artifact. Make it a Coral artifact instead: run 'coral-agent artifact upload FILE' and post the coral:// link on the board. This is a reminder only: Coral did nothing for you."
 
 const claudeArtifactToolName = "Artifact"
 
