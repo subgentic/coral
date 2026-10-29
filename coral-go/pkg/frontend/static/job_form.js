@@ -7,7 +7,7 @@ import { escapeHtml, showToast } from './utils.js';
 import { changedFields, NOTHING_TO_SAVE } from './settings_diff.js';
 import { cronWords, atWords, localZone, zoneNote, RUNS_WHILE_OPEN, runsWords } from './job_words.js';
 import { importOnce } from './import_once.js';
-import { joinBrowse } from './dir_row.js';
+import { joinBrowse, FOLDER_ON_THIS_COMPUTER } from './dir_row.js';
 const { DAYS, MINUTE_STEPS, HOUR_STEPS, composeCron, parseCron } = await importOnce('./cron_picker.js'); // this form loads on first use (#10218), and so do the pieces only it uses
 const { limitSeconds, limitParts } = await importOnce('./time_limit.js');
 
@@ -238,7 +238,7 @@ function jobFields(host) {
                 slot.append(el('span', '', 'No workflows yet.'), ' ', b);
             },
         },
-        { key: 'repo_path', type: 'path', id: 'job-modal-repo', label: 'Folder', required: true, requiredMessage: 'Choose a folder: type a path, or use Browse.', messageAsIs: true, placeholder: 'Choose a folder', help: 'The folder the agent works in: a git folder with at least one commit.', default: '', attrs: { 'data-coral-root': host.dataset.coralRoot || '' }, visibleWhen: prompt,
+        { key: 'repo_path', type: 'path', id: 'job-modal-repo', label: 'Folder', required: true, requiredMessage: 'Choose a folder: type a path, or use Browse.', messageAsIs: true, placeholder: 'Choose a folder', help: `${FOLDER_ON_THIS_COMPUTER} The agent works in it: a git folder with at least one commit.`, default: '', attrs: { 'data-coral-root': host.dataset.coralRoot || '' }, visibleWhen: prompt,
             live: [{ id: 'btn-browse-job', wide: true, describes: false }, { id: 'dir-browser-job', wide: true, describes: false }] }, // Browse and its folder list, as New agent has them (#10276)
         {
             key: 'repo_offer', type: 'notice', visibleWhen: v => prompt(v) && !!repoOffer,

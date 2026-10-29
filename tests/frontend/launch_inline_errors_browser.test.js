@@ -51,7 +51,7 @@ const BASE = require('./test_base').BASE;
         assert.deepEqual(await ev(`(() => { const f = document.getElementById('launch-dir'), e = f.closest('.sv-row').querySelector('.sv-error'); const l = document.querySelector('label[for="launch-dir"]'); return { inLabel: l.contains(e), nameHasError: l.textContent.includes(e.textContent) }; })()`), { inLabel: false, nameHasError: false }, 'the line is after the label, so it is not part of the field name');
         await ev(`document.getElementById('launch-dir').value = '/x'; document.getElementById('launch-dir').dispatchEvent(new Event('input', { bubbles: true })); true`);
         f = await formLine(); assert.equal(f.text, null, 'cleared by the edit'); assert.equal(f.invalid, null);
-        assert.equal(await ev(`document.getElementById('launch-dir').getAttribute('aria-describedby')`), null, 'and the description with it');
+        assert.equal(await ev(`(() => { const f = document.getElementById('launch-dir'), e = f.closest('.sv-row').querySelector('.sv-error'); return (f.getAttribute('aria-describedby') || '').split(' ').includes(e.id); })()`), false, 'and the error is no longer the field\'s description (its help line, "A folder on the computer running Coral.", stays: #10961)');
 
         console.log('2. A folder the server does not find: its message and the way out');
         await ev(`window.__answer = { status: 400, body: { error: 'directory not found: /nonexistent/path/x', field: 'working_dir' } }; document.getElementById('launch-dir').value = '/nonexistent/path/x'; window.launchSession(); true`);

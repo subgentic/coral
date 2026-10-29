@@ -2,7 +2,7 @@
  * the address of another computer, and a git worktree with its base branch. The pieces other modules fill (the name's notice, Browse, the recent folders, the folder list) stay in the page
  * under their ids and are moved under their field (field.live); the fields keep their ids, so the rest of the dialog reads them as before. Step 3 is its own page (team_launch_settings.js). */
 import { mountSettingsView } from './settings_view.js';
-import { joinBrowse } from './dir_row.js';
+import { joinBrowse, FOLDER_ON_THIS_COMPUTER } from './dir_row.js';
 import { boardNameProblem } from './utils.js';
 import { onBuilt } from './lazy_dom.js';
 
@@ -58,7 +58,7 @@ function mount(modal) {
         { key: 'name', type: 'text', id: 'team-board-name', label: 'Team name', required: true, requiredMessage: 'Team name is required', messageAsIs: true, placeholder: 'e.g. auth-feature, sprint-42',
             help: "A project is a team of agents working on one board. Letters, digits, - and _.", attrs: { maxlength: '64' }, live: ['team-board-name-hint'],
             validate: v => boardNameProblem(String(v || '').trim()), setup: e => e.setAttribute('data-on-input', 'm-validate-team-name') },
-        { key: 'dir', type: 'path', id: 'launch-team-dir', label: 'Folder', required: true, requiredMessage: 'Choose a folder for the team', messageAsIs: true, placeholder: 'Choose a folder', attrs: { 'data-coral-root': root },
+        { key: 'dir', type: 'path', id: 'launch-team-dir', label: 'Folder', help: FOLDER_ON_THIS_COMPUTER, required: true, requiredMessage: 'Choose a folder for the team', messageAsIs: true, placeholder: 'Choose a folder', attrs: { 'data-coral-root': root },
             live: [{ id: 'btn-browse-team', wide: true, describes: false }, { id: 'launch-team-dir-recents', wide: true, describes: false }, { id: 'dir-browser-team', wide: true, describes: false }] },
         { key: 'server', type: 'text', id: 'team-board-server', label: "Another computer's address", placeholder: 'e.g. http://remote-machine:8420' },
         { key: 'worktree', type: 'toggle', id: 'launch-team-worktree', label: 'Launch in a git worktree', default: false, help: 'The team works on its own branch in an isolated copy of the repository.' },

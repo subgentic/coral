@@ -2,7 +2,7 @@
  * modules fill stay in the page under their ids and are moved under the field (field.live); the field keeps its id (launch-dir), so the rest of the dialog reads it as before. The later steps (persona, provider and
  * the agent's sections) are their own modules. */
 import { mountSettingsView } from './settings_view.js';
-import { joinBrowse } from './dir_row.js';
+import { joinBrowse, FOLDER_ON_THIS_COMPUTER } from './dir_row.js';
 import { onBuilt } from './lazy_dom.js';
 
 let _view = null;
@@ -41,7 +41,7 @@ function mount(modal) {
     if (!host || _view) return;
     const root = host.dataset.coralRoot || '';
     const fields = [
-        { key: 'dir', type: 'path', id: 'launch-dir', label: 'Folder', help: 'A folder on the computer running Coral.', required: true, requiredMessage: 'Choose a folder: type a path, or use Browse.', messageAsIs: true, placeholder: 'Choose a folder', attrs: { 'data-coral-root': root },
+        { key: 'dir', type: 'path', id: 'launch-dir', label: 'Folder', help: FOLDER_ON_THIS_COMPUTER, required: true, requiredMessage: 'Choose a folder: type a path, or use Browse.', messageAsIs: true, placeholder: 'Choose a folder', attrs: { 'data-coral-root': root },
             live: [{ id: 'btn-browse', wide: true, describes: false }, { id: 'launch-dir-recents', wide: true, describes: false }, { id: 'launch-dir-hint', describes: false }, { id: 'launch-dir-note', describes: false }, { id: 'dir-browser', wide: true, describes: false }] },
     ];
     _view = mountSettingsView(host, { mode: 'form', fields });
