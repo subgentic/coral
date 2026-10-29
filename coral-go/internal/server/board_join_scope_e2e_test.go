@@ -259,3 +259,80 @@ func TestAgentTokenJoinVariantsAreNeverAdmitted(t *testing.T) {
 		assert.Nil(t, sub, "%s: no seat on team-b", path)
 	}
 }
+
+// #11013, Security's round 2: the 409 answers that list boards (board_name_exists on a launch, ambiguous_board on a shared label) described every matching board to ANY authenticated caller: its id, label, created time and
+// member count, and for a launch how many of its agents are live. For an agent token that is another team's board id and size, handed to it by guessing a name. An agent is told only about boards it holds a seat on.
+func TestAgentTokenIsNotListedOtherTeamsBoardsInA409(t *testing.T) {
+	srv, ts, dir := strictServer(t, false)
+	ctx := context.Background()
+	ss := store.NewSessionStore(srv.db)
+	bs := srv.boardStore
+	a, err := bs.CreateBoard(ctx, "team-a", "Operator")
+	require.NoError(t, err)
+	b, err := bs.CreateBoard(ctx, "team-b", "Operator")
+	require.NoError(t, err)
+	_, err = bs.Subscribe(ctx, b.ID, "Secret Member", "Secret Role", "", nil, "all")
+	require.NoError(t, err)
+	// Two boards share the label "shared": one is the agent's own, one another team's.
+	s1, err := bs.CreateBoard(ctx, "shared", "Operator")
+	require.NoError(t, err)
+	s2, err := bs.CreateBoard(ctx, "shared", "Operator")
+	require.NoError(t, err)
+	_, err = bs.Subscribe(ctx, s2.ID, "Other Roster", "Other Role", "", nil, "all")
+	require.NoError(t, err)
+	sid := "dddddddd-1101-4000-8000-000000000001"
+	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: sid, AgentType: "claude", AgentName: "dev", WorkingDir: "/w", BoardName: &s1.ID}))
+	tok, err := srv.db.MintSessionToken(ctx, sid, "claude-"+sid)
+	require.NoError(t, err)
+	_, err = bs.Subscribe(ctx, s1.ID, "Dev", "Orchestrator", "claude-"+sid, nil, "all")
+	require.NoError(t, err)
+	work := strictWorkDir(t, dir)
+	_ = a
+
+	call := func(method, path, body, token string) (int, string, map[string]any) {
+		req, _ := http.NewRequest(method, ts.URL+path, strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		if token != "" {
+			req.Header.Set(store.SessionTokenHeader, token)
+		}
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		raw, _ := io.ReadAll(resp.Body)
+		var out map[string]any
+		_ = json.Unmarshal(raw, &out)
+		return resp.StatusCode, string(raw), out
+	}
+	launchBody := func(name string) string {
+		raw, _ := json.Marshal(map[string]any{"working_dir": work, "agent_type": "terminal", "board_name": name, "display_name": "helper"})
+		return string(raw)
+	}
+
+	t.Run("a launch by another team's board name says the name is taken and describes nothing", func(t *testing.T) {
+		code, raw, out := call("POST", "/api/sessions/launch", launchBody("team-b"), tok)
+		assert.Equal(t, http.StatusConflict, code, raw)
+		assert.Equal(t, "board_name_exists", out["code"], raw)
+		for _, secret := range []string{b.ID, "Secret Member", "Secret Role", "live_agents"} {
+			assert.NotContains(t, raw, secret, "another team's board is not described to an agent")
+		}
+	})
+	t.Run("a shared label names the agent's own board and no other", func(t *testing.T) {
+		code, raw, out := call("POST", "/api/board/shared/external-messages", `{}`, tok) // a route an agent may reach on a board it is not on: the label resolves before the handler
+		assert.Equal(t, http.StatusConflict, code, raw)
+		assert.Equal(t, "ambiguous_board", out["code"], raw)
+		assert.Contains(t, raw, s1.ID, "its own board is listed")
+		for _, secret := range []string{s2.ID, "Other Roster", "Other Role"} {
+			assert.NotContains(t, raw, secret, "the other team's board with that label is not")
+		}
+	})
+	t.Run("the Operator still sees every candidate", func(t *testing.T) {
+		code, raw, _ := call("POST", "/api/sessions/launch", launchBody("team-b"), "")
+		assert.Equal(t, http.StatusConflict, code, raw)
+		assert.Contains(t, raw, b.ID)
+		assert.Contains(t, raw, "live_agents")
+		code, raw, _ = call("POST", "/api/board/shared/external-messages", `{}`, "")
+		assert.Equal(t, http.StatusConflict, code, raw)
+		assert.Contains(t, raw, s1.ID)
+		assert.Contains(t, raw, s2.ID)
+	})
+}

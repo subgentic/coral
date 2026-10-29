@@ -132,9 +132,21 @@ func BoardKeyResolver(bs *board.Store) func(http.Handler) http.Handler {
 }
 
 // boardCandidates describes boards for a 409 answer (ambiguous_board, board_name_exists).
+//
+// An agent's token is told only about the boards it holds a seat on (#11013, Security's round 2): the answer carries each board's id, label, creation time and member count (and, for a launch, how many of its agents are live), and a name that
+// matches another team's board would otherwise hand those to any agent that guesses the name. The Operator, the dashboard and the command line see every candidate.
 func boardCandidates(r *http.Request, bs *board.Store, boards []board.Board) []map[string]any {
 	out := make([]map[string]any, 0, len(boards))
+	owner, isAgent := VerifiedSession(r.Context())
 	for _, b := range boards {
+		if isAgent {
+			if owner == nil {
+				continue
+			}
+			if sub, err := bs.SessionSubscription(r.Context(), b.ID, owner.SessionName); err != nil || sub == nil {
+				continue
+			}
+		}
 		out = append(out, map[string]any{"board_id": b.ID, "board_label": b.Label, "created_at": b.CreatedAt, "members": bs.BoardMembers(r.Context(), b.ID)})
 	}
 	return out
