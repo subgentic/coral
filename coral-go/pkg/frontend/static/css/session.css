@@ -1774,9 +1774,12 @@ body .terminal-header { flex-wrap: wrap; height: auto; min-height: 36px; row-gap
 /* The Details disclosure (#9686, #9837): the folder, branch, model, thinking level and context of the open agent, under the header at every width. The header itself is the state, the name,
    the branch, the buttons and the view toggle; the folder is the hover and focus tip on the name. A phone turned sideways (44 px of its 390 would be a summary) and a raised keyboard (the Keys bar
    closed for lack of room, terminal_keyboard) do without it. */
+/* #11056 (the operator: "Details takes up too much of the screen"): at every width Details has no row of its own. Its button is the header's ⋯, and the facts open as a card over the chat, under the header's right end,
+   so nothing under it moves. It is a child of the header, which is its containing block. */
+.terminal-header { position: relative; }
 .agent-phone-details { display: none; }
-.agent-phone-details:not([hidden]) { display: block; padding: 0 var(--space-lg); border-bottom: 1px solid var(--border); }
-.agent-phone-details > summary { min-height: var(--control-touch-height); display: flex; align-items: center; }
+.agent-phone-details > summary { display: none; }
+.live-pills-stack > .selection-pause-badge { position: static; opacity: 0.9; } /* under the header with the other pills, not over its branch name */
 #live-session-view:has(#live-history-messages > .chat-empty) .agent-phone-details { display: none; } /* a fresh chat (nothing said yet, the 'Say hello' line is up) has no Details bar above the first message: a collapsed bar with nothing under it looked empty (Mobile tester, #10041); it is back with the first message */
 .agent-phone-details .facts { padding-bottom: var(--space-md); }
 .agent-phone-details .facts dd { overflow-wrap: anywhere; }
@@ -1788,8 +1791,9 @@ body .terminal-header { flex-wrap: wrap; height: auto; min-height: 36px; row-gap
 .terminal-identity:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: var(--radius-xs); }
 @media (max-width: 767px), (pointer: coarse) { .terminal-header-left .terminal-identity { min-height: var(--control-touch-height); min-width: var(--control-touch-height); justify-content: center; } } /* the name is a stop of the keyboard (it opens the folder's tip): a touch target on a phone, as every control is (phone_layout, phone_light_sweep) */
 @media (max-width: 1100px) and (min-height: 501px) { /* not a phone turned sideways: 44 px of its 390 would be a summary, and with the keyboard up the Keys bar closed for lack of room (terminal_keyboard) */
-    .agent-phone-details:not([hidden]) { display: block; padding: 0 var(--space-lg); border-bottom: 1px solid var(--border); }
-    .agent-phone-details > summary { min-height: var(--control-touch-height); display: flex; align-items: center; }
+    .agent-bar-more { display: inline-flex; align-items: center; justify-content: center; }
+    .terminal-header:has(#agent-phone-details[hidden]) .agent-bar-more { display: none; } /* offered only while there is something behind it (a phone's also holds Search and the panel: mobile.css) */
+    .agent-phone-details[open]:not([hidden]) { display: block; position: absolute; top: 100%; right: var(--space-lg); z-index: 25; width: min(26rem, calc(100% - 2 * var(--space-lg))); padding: 0 var(--space-lg); background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius-md); box-shadow: 0 6px 20px rgba(var(--black-rgb), 0.35); } /* a card over the chat, not a row of its own (#11056) */
     .agent-phone-details .facts { padding-bottom: var(--space-md); }
     .agent-phone-details .facts dd { overflow-wrap: anywhere; }
 }

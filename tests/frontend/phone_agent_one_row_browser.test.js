@@ -69,10 +69,30 @@ const BASE = require('./test_base').BASE;
             assert.ok(m.more.length === 0 && !m.detailsOpen, `${fs}: ⋯ again puts them away`);
             console.log(`   390@${fs}: ok`);
         }
-        // a computer is as it was
-        await open(1280, 16, false);
-        const d = await ev(`({ top: getComputedStyle(document.querySelector('header.top-bar')).display, menu: getComputedStyle(document.getElementById('agent-bar-menu')).display, more: getComputedStyle(document.getElementById('agent-bar-more')).display })`);
-        assert.deepEqual(d, { top: 'flex', menu: 'none', more: 'none' }, '1280: the top bar is there and the phone row\'s buttons are not');
+        // a computer: the top bar stays, the header is its one row and Details has no row of its own (the operator, #11056): ⋯ opens the facts as a card over the chat, nothing under it moves, and the paused chip overlaps no header text
+        await open(1000, 16, false); // the Details are offered up to 1100 px: wider, the header holds the branch and the folder is the name's tip
+        const d = await ev(`({ top: getComputedStyle(document.querySelector('header.top-bar')).display, menu: getComputedStyle(document.getElementById('agent-bar-menu')).display })`);
+        assert.deepEqual(d, { top: 'flex', menu: 'none' }, '1000: the top bar is there and the phone row\'s menu button is not');
+        const geo = () => ev(`(() => { const h = document.querySelector('#live-session-view .terminal-header').getBoundingClientRect(), p = document.getElementById('pane-capture').getBoundingClientRect(), det = document.getElementById('agent-phone-details'), c = det.getBoundingClientRect(), more = document.getElementById('agent-bar-more'), chip = document.getElementById('selection-pause-badge');
+            const cb = chip.getBoundingClientRect(); return { headerBottom: Math.round(h.bottom), headerH: Math.round(h.height), paneTop: Math.round(p.top), detailsPos: getComputedStyle(det).position, detailsShown: getComputedStyle(det).display !== 'none', detailsTop: Math.round(c.top), detailsBottom: Math.round(c.bottom), moreShown: getComputedStyle(more).display !== 'none', chipTop: Math.round(cb.top), chipShown: getComputedStyle(chip).display !== 'none' }; })()`);
+        let g = await geo();
+        assert.ok(g.moreShown, `1000: ⋯ is in the header while there are details: ` + JSON.stringify(g));
+        assert.ok(!g.detailsShown && g.paneTop - g.headerBottom <= 8, `1000: Details has no row: the chat starts within 8 px of the header's bottom: ` + JSON.stringify(g));
+        const before = g.paneTop;
+        await ev(`document.getElementById('agent-bar-more').click(); true`);
+        await waitFor(`document.getElementById('agent-phone-details').open && getComputedStyle(document.getElementById('agent-phone-details')).display !== 'none'`, '1000: ⋯ opens the Details', 4000);
+        g = await geo();
+        assert.equal(g.detailsPos, 'absolute', '1000: the Details are a card over the chat: ' + JSON.stringify(g));
+        assert.ok(g.paneTop === before && Math.abs(g.detailsTop - g.headerBottom) <= 2, `1000: opening them moves nothing under the header: ` + JSON.stringify(g));
+        await ev(`document.getElementById('agent-bar-more').click(); true`);
+        // the paused chip: under the header, over none of its text
+        for (const [w, mobile] of [[1000, false], [390, true]]) {
+            if (w === 390) await open(390, 16, true);
+            await ev(`document.getElementById('selection-pause-badge').style.display = ''; true`);
+            await waitFor(`document.getElementById('selection-pause-badge').getBoundingClientRect().width > 0`, `${w}: the chip`, 4000);
+            g = await geo();
+            assert.ok(g.chipShown && g.chipTop >= g.headerBottom - 1, `${w}: the "Updates paused" chip is under the header, not over its text: ` + JSON.stringify(g));
+        }
         console.log('PASS the phone agent page is one row');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

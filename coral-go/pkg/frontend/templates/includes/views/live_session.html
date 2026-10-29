@@ -77,7 +77,7 @@
                                         <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1.5" y="2.5" width="13" height="11" rx="1.5"/><path d="M10 2.5v11"/></svg>
                                     </button>
                                     <!-- View toggle: raw terminal vs. rendered chat transcript, the last of the header's actions, at the far right after Search and Pop out (#9927, the operator) -->
-                                    <button class="btn btn-quiet btn-icon terminal-header-btn agent-bar-more" id="agent-bar-more" type="button" data-on-click="agent-bar-more" aria-expanded="false" aria-controls="agent-phone-details" title="More: Search, Panel, folder, branch, model" aria-label="More about this agent"><svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="3" cy="8" r="1.5"/><circle cx="8" cy="8" r="1.5"/><circle cx="13" cy="8" r="1.5"/></svg></button>
+                                    <button class="btn btn-quiet btn-icon btn-xs terminal-header-btn agent-bar-more" id="agent-bar-more" type="button" data-on-click="agent-bar-more" aria-expanded="false" aria-controls="agent-phone-details" title="More: Search, Panel, folder, branch, model" aria-label="More about this agent"><svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="3" cy="8" r="1.5"/><circle cx="8" cy="8" r="1.5"/><circle cx="13" cy="8" r="1.5"/></svg></button>
                                     <div class="live-view-toggle" role="group" aria-label="Center view">
                                         <button type="button" class="live-view-toggle-btn active" id="live-view-btn-chat" data-on-click="live-view-mode" data-mode="chat" aria-pressed="true" title="Chat view: read and send messages" aria-label="Chat view">
                                             <span class="material-icons" aria-hidden="true">chat</span><span>Chat</span>
@@ -87,7 +87,6 @@
                                         </button>
                                     </div>
                                 </div>
-                            </div>
                             <!-- A phone's header has no room for the folder, the branch, the model and its thinking level (the agent row is one line, #9686): one tap on Details shows them (session_header_updates.js fills it). -->
                             <details class="disclosure agent-phone-details" id="agent-phone-details" hidden>
                                 <summary>Details</summary>
@@ -99,6 +98,7 @@
                                     <div class="facts-row" hidden><dt>Context</dt><dd id="apd-context"></dd></div>
                                 </dl>
                             </details>
+                            </div>
                             <!-- Notices over the top of the agent view (#5287): pills under the terminal header that take no layout space and show after a delay
                                  (dom_write.setPill). The agent's server is unreachable (#3151): hub_access.syncUnreachableBanner. The agent is waiting: session_header_updates. -->
                             <div class="live-pills">
@@ -106,6 +106,8 @@
                                      inside are plain blocks and their text is what the stack announces when one shows. -->
                                 <div class="live-pills-stack" role="status" aria-live="polite">
                                     <div id="server-unreachable-banner" class="notice notice-warn notice-float server-unreachable-banner" hidden></div>
+                                    <!-- under the header, in the pills' stack: it was drawn over the header's branch name (#11056) -->
+                                    <div id="selection-pause-badge" class="chip selection-pause-badge" role="status" aria-live="polite" style="display:none">Updates paused — text selected</div>
                                     <div id="waiting-banner" class="notice notice-warn notice-float notice-center notice-compact waiting-banner" hidden>Agent is waiting for input</div>
                                 </div>
                             </div>
@@ -172,7 +174,6 @@
                                     <a class="btn btn-secondary" id="popout-open-dashboard" href="/">Open Coral</a>
                                 </div>
                             </div>
-                            <div id="selection-pause-badge" class="chip selection-pause-badge" role="status" aria-live="polite" style="display:none">Updates paused — text selected</div>
                             <div id="xterm-disconnected-badge" class="chip xterm-disconnected-badge" role="status" aria-live="assertive">Disconnected — reconnecting...</div>
                         </div>
 

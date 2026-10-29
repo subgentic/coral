@@ -1329,7 +1329,7 @@
 /* A phone's agent page: the top bar and the agent's header are ONE row (#11056, the operator: "the hamburger menu and the agent toolbar should be one line"). Under 640 px, while an agent is open, the page's top bar is hidden and its menu
    button is the first of this row: ☰, ←, the dot and the name (the team under it), the Chat/Terminal switch and ⋯. Search, the panel, the branch and the rest of what the header holds, and the Details (folder, model, context), are behind ⋯,
    on a line under the row. The row wraps rather than overlap at large text. */
-.agent-bar-menu, .agent-bar-more { display: none; }
+.agent-bar-menu { display: none; }
 @media (max-width: 639px) {
     body.live-session-active:not(.popout-mode) { --top-bar-height: env(safe-area-inset-top, 0px); } /* no bar: the side panel and the sidebar start under the notch's band, over the row */
     body.live-session-active:not(.popout-mode) header.top-bar { display: none; }
@@ -1337,7 +1337,7 @@
     body.live-session-active:not(.popout-mode) .terminal-header-left { flex: 1 1 0; min-width: 0; flex-wrap: nowrap; gap: var(--space-xs); order: 1; }
     body.live-session-active:not(.popout-mode) .terminal-header-actions { display: contents; }
     body.live-session-active:not(.popout-mode) .agent-bar-menu, body.live-session-active:not(.popout-mode) .agent-bar-more { display: inline-flex; align-items: center; justify-content: center; flex: none; min-width: 44px; min-height: 44px; }
-    body.live-session-active:not(.popout-mode) .terminal-status-word, body.live-session-active:not(.popout-mode) .terminal-state-pill { display: none; } /* the row has the dot (it is an image named with the state, aria-label) and the name; the word is aria-hidden and was beside the dot (#10885) */
+    body.live-session-active:not(.popout-mode) .terminal-state-pill { display: none; } /* the state word stays beside the dot on a phone (#10885 item 10): the row is the dot, the word and the name */
     body.live-session-active:not(.popout-mode) .terminal-identity { display: flex; flex-direction: column; justify-content: center; flex: 1 1 0; min-width: 0; }
     body.live-session-active:not(.popout-mode) .terminal-session-label, body.live-session-active:not(.popout-mode) .terminal-session-context { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-left: 0; }
     body.live-session-active:not(.popout-mode) .terminal-header .live-view-toggle { order: 2; margin-left: 0; }
@@ -1347,5 +1347,4 @@
     body.live-session-active:not(.popout-mode) .terminal-header[data-more] .terminal-header-actions > :not(.live-view-toggle):not(.agent-bar-more):not([hidden]):not([style*="display: none"]):not([style*="display:none"]):not(.terminal-branch) { display: inline-flex !important; order: 5; } /* what a mode hid stays hidden */
     body.live-session-active:not(.popout-mode) #popout-panel-toggle-btn { display: none !important; } /* its id sets display: flex !important (above) */
     body.live-session-active:not(.popout-mode) .terminal-header[data-more] #popout-panel-toggle-btn { display: flex !important; order: 5; }
-    body.live-session-active:not(.popout-mode) .agent-phone-details > summary { display: none; } /* ⋯ opens it */
 }
