@@ -455,7 +455,7 @@ async function _createFile(filePath) {
 // What each comparison lists, in the words of what it shows (#10054): "vs HEAD~1" and "vs merge-base" named refs and not the list, and on main listed only uncommitted changes. The server says what the
 // comparison is in this repository too (compare.label): where that differs from the option (the branch point on main is HEAD), the panel shows it beside the choice.
 const _diffModes = ['uncommitted', 'last_commit', 'branch_point', 'previous_commit', 'main_head'];
-const _diffModeLabels = { uncommitted: 'Since my last commit', last_commit: 'In my last commit', branch_point: 'Since I branched', previous_commit: 'Last commit + uncommitted', main_head: 'Compared with main' };
+const _diffModeLabels = { uncommitted: 'Since my last commit', last_commit: 'In my last commit', branch_point: 'Since I branched', previous_commit: 'Last commit + uncommitted', main_head: 'Compared with the main branch' };
 let _compareLabel = '';
 
 // On the hub the comparison base is the machine's own setting: it is read from the files response and changed through the one
