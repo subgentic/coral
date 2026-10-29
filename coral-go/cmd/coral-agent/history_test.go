@@ -136,3 +136,38 @@ func TestCLIHistoryContext_MockServer(t *testing.T) {
 	assert.Equal(t, "5", requestedIndex)
 	assert.Equal(t, "3", requestedWindow)
 }
+
+// #11048: --team, --all and --operator-history ask for a wider reach on purpose; they are sent as reach, never swallow the query that follows, and the flag with no value on it is own.
+func TestCLIHistoryReachFlags(t *testing.T) {
+	var searchReach, searchQuery, ctxReach []string
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query()
+		switch r.URL.Path {
+		case "/api/agent/history/search":
+			searchReach = append(searchReach, q.Get("reach"))
+			searchQuery = append(searchQuery, q.Get("query"))
+			json.NewEncoder(w).Encode(map[string]any{"query": q.Get("query"), "status": "complete", "results": []any{}, "sessions_searched": []any{}})
+		case "/api/agent/history/context":
+			ctxReach = append(ctxReach, q.Get("reach"))
+			json.NewEncoder(w).Encode(map[string]any{"session_id": "s", "target_index": 0, "total_messages": 1, "window": 2, "messages": []any{}})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer ts.Close()
+	origURL := serverURL
+	serverURL = ts.URL
+	defer func() { serverURL = origURL }()
+	t.Setenv("TMUX", "")
+	t.Setenv("CORAL_SESSION_NAME", "claude-00000000-0000-4000-8000-0000000000a1")
+
+	cmdHistorySearch([]string{"zebra"})
+	cmdHistorySearch([]string{"--team", "zebra"})
+	cmdHistorySearch([]string{"zebra", "--all"})
+	cmdHistorySearch([]string{"--operator-history", "zebra", "stripes"})
+	assert.Equal(t, []string{"", "team", "all", "operator"}, searchReach)
+	assert.Equal(t, []string{"zebra", "zebra", "zebra", "zebra stripes"}, searchQuery, "a reach flag does not take the query as its value")
+
+	cmdHistoryContext([]string{"--team", "other-session", "3"})
+	assert.Equal(t, []string{"team"}, ctxReach)
+}
