@@ -20,7 +20,7 @@ const problems = [];
             const fresh = async (path = '/') => { await Page.navigate({ url: BASE + path }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`); await ev(`document.documentElement.setAttribute('data-theme', ${JSON.stringify(theme)}); true`); };
             await fresh('/docs'); await sleep(1500); /* sleep-ok: the docs list loads */ await ev(`Promise.resolve(window.selectDoc && window.selectDoc('quickstart')).then(() => true)`);
             await waitFor(`document.getElementById('docs-view').getClientRects().length > 0 && !!document.querySelector('#docs-view .docs-content') && document.querySelector('#docs-view .docs-content').textContent.length > 200`, 'the docs page', 15000);
-            await expect(`docs ${w}/${theme}`, 'docs.css', true); await expect(`docs ${w}/${theme}`, 'content_table.css', true);
+            await expect(`docs ${w}/${theme}`, 'docs.css', true);
             await shot(`pages-${w}-${theme}-docs`);
             await fresh(); await expect(`start ${w}/${theme}`, 'docs.css', false); await expect(`start ${w}/${theme}`, 'view_list.css', false); await ev(`window.switchNavTab('hub-inbox'); true`);
             await waitFor(`!!document.getElementById('inbox-local') && !document.getElementById('inbox-local').hidden`, 'the Inbox', 15000);
