@@ -1388,6 +1388,7 @@
     #mobile-session-list .session-name-row { display: flex; align-items: baseline; gap: 8px; min-height: 0; }
     #mobile-session-list .session-label { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: var(--fs-xl); font-weight: var(--fw-regular); }
     #mobile-session-list .session-label-name, #mobile-session-list .session-label .sln-head, #mobile-session-list .session-label .sln-tail { color: var(--agent-name-color, var(--text-primary)); font-weight: inherit; } /* the name in the card's ink, bold when the agent needs you */
+    #mobile-session-list .session-label-name { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; } /* the name itself ends in an ellipsis inside the card at 320 px (mobile_text_sizes) */
     #mobile-session-list .session-name-spacer { display: none; }
     #mobile-session-list .session-time { display: block; flex: none; font-size: var(--fs-md); color: var(--text-secondary); white-space: nowrap; }
     #mobile-session-list .session-status-line { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); margin: 0; } /* still text for a screen reader and find-in-page: the dot and the preview are what the card shows */
