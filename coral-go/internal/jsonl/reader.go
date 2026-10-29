@@ -22,6 +22,8 @@ type SessionReader struct {
 	mu           sync.Mutex
 	cache        map[string]*sessionCache
 	firstPrompts map[string]*firstPromptCache
+	lastMu       sync.Mutex
+	lastMessages map[string]*lastMessageEntry // each session's newest message, by session id (#11097)
 }
 
 type sessionCache struct {

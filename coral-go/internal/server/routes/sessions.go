@@ -30,6 +30,7 @@ import (
 	"github.com/subgentic/coral/internal/ptr"
 	"github.com/subgentic/coral/internal/ptymanager"
 	"github.com/subgentic/coral/internal/safego"
+	"github.com/subgentic/coral/internal/secrets"
 	setreg "github.com/subgentic/coral/internal/settings"
 	"github.com/subgentic/coral/internal/store"
 	"github.com/subgentic/coral/internal/tmux"
@@ -734,3 +735,53 @@ func addContextUsage(entry map[string]any, model *string, turnContext int) {
 // ErrStillInOldTmux is a wake on a pty Coral of an agent still running in Coral's old tmux
 // server (#3634): ending it first (Settings, or the Agents tab's banner) avoids a second copy.
 var ErrStillInOldTmux = errors.New("this agent is still running in Coral's old tmux server; end the agents left there first, then wake it")
+
+// lastMessageSource is a session's newest message as the jsonl reader has it.
+type lastMessageSource = jsonl.LastMessage
+
+// lastMessageMaxChars is the text a row carries of its last message: the first 140 characters.
+const lastMessageMaxChars = 140
+
+// lastMessageField is a live row's last_message (#11097): {role, text, at}, with the text redacted as an excerpt is and cut at the first 140 characters, or nil when there is no message. The Hub's own
+// redaction still applies on the way out of the tunnel, as it does to first_prompt.
+func lastMessageField(m *lastMessageSource, _ bool) map[string]any {
+	if m == nil || m.Text == "" {
+		return nil
+	}
+	text := m.Text
+	if out, err := secrets.Redactor().Text([]byte(text)); err == nil {
+		text = string(out)
+	} else {
+		return nil // a text that cannot be checked is not passed on
+	}
+	if r := []rune(text); len(r) > lastMessageMaxChars {
+		text = string(r[:lastMessageMaxChars])
+	}
+	return map[string]any{"role": m.Role, "text": text, "at": m.At}
+}
+
+// lastMessageOf reads a session's last message (cached by its file, see jsonl.LastMessage); nil when it has none.
+func (h *SessionsHandler) lastMessageOf(sessionID, workingDir, agentType string) map[string]any {
+	if h.jsonl == nil || sessionID == "" {
+		return nil
+	}
+	m, ok := h.jsonl.LastMessage(sessionID, workingDir, agentType)
+	if !ok {
+		return nil
+	}
+	return lastMessageField(&m, false)
+}
+
+// lastMessageRow is lastMessageOf for a live row: on a first paint that skips the expensive reads (skipExpensive) only what an earlier read cached is used, so the list answers without opening a file.
+func lastMessageRow(h *SessionsHandler, sessionID, workingDir, agentType string, skipExpensive bool) map[string]any {
+	if !skipExpensive {
+		return h.lastMessageOf(sessionID, workingDir, agentType)
+	}
+	if h.jsonl == nil {
+		return nil
+	}
+	if m, ok := h.jsonl.CachedLastMessage(sessionID); ok {
+		return lastMessageField(&m, false)
+	}
+	return nil
+}

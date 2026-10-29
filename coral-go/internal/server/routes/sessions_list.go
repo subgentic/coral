@@ -533,6 +533,7 @@ func (h *SessionsHandler) agentRow(trace *phaseTrace, agent AgentInfo, lv liveIn
 		"sleeping":              lv.sleeping[sid],
 		"archived":              lv.archived[sid],
 		"first_prompt":          firstPrompt,
+		"last_message":          lastMessageRow(h, sid, agent.WorkingDir, agent.AgentType, skipExpensive), // {role, text, at} of the newest message, null at none (#11097)
 		"enrichment_pending":    skipExpensive && !sleeping,
 	}
 	withDisplayActivityHint(entry, displayHint, displayHintAt)
@@ -662,6 +663,7 @@ func (h *SessionsHandler) sleepingRows(allLive []store.LiveSession, liveSIDs map
 			"archived":              ls.IsArchived == 1,
 			"sleep_reason":          sleepReason(ls),
 			"first_prompt":          h.sleepingFirstPrompt(ls),
+			"last_message":          h.lastMessageOf(ls.SessionID, ls.WorkingDir, ls.AgentType),
 		}
 		withDisplayActivityHint(entry, nil, nil)
 		// Include prompt, model, and capabilities for sleeping sessions too
