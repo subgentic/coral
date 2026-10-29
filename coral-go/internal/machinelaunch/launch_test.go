@@ -658,6 +658,9 @@ func TestLaunchRevokesTheMintedCredentialOnFailureAfterTheMint(t *testing.T) {
 		if strings.Contains(err.Error(), launchTestCredential) || strings.Contains(out.String(), launchTestCredential) {
 			t.Fatalf("%s: the credential leaked", name)
 		}
+		if name == "could not" && (!strings.Contains(err.Error(), "it expires at 10:05:30Z on its own") || strings.Contains(err.Error(), "five minutes")) {
+			t.Fatalf("the failure says when it expires from the Hub's answer, not a fixed time: %v", err)
+		}
 	}
 	// a mismatch fails before the mint: nothing to revoke, and no revoke is attempted
 	p, base := &stubProvider{}, &stubHub{}
@@ -685,7 +688,7 @@ func TestLaunchRevokesTheMintedCredentialOnFailureAfterTheMint(t *testing.T) {
 	srv.status = "State:     retrying\n"
 	srv.mu.Unlock()
 	d.Bootstrap = &SSHBootstrap{Addr: d.Bootstrap.(*SSHBootstrap).Addr, Window: time.Second, Every: 10 * time.Millisecond, EnrollWait: 80 * time.Millisecond}
-	if _, err := Launch(context.Background(), o, d); err == nil || !strings.Contains(err.Error(), "could NOT be revoked from here") {
+	if _, err := Launch(context.Background(), o, d); err == nil || !strings.Contains(err.Error(), "could NOT be revoked from here") || strings.Contains(err.Error(), "five minutes") {
 		t.Fatalf("no revoker: %v", err)
 	}
 }
@@ -695,6 +698,11 @@ type revokeRecorder struct {
 	*stubHub
 	revoked []string
 	err     error
+}
+
+// ExpiresAt is when the stub's credential stops working (the Hub's own word).
+func (r *revokeRecorder) ExpiresAt(string) (time.Time, bool) {
+	return time.Date(2026, 10, 29, 10, 5, 30, 0, time.UTC), true
 }
 
 func (r *revokeRecorder) Revoke(_ context.Context, label string) error {

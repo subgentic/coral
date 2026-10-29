@@ -36,7 +36,10 @@ func TestMintSendsTheNotesRequestAndReturnsTheCredential(t *testing.T) {
 	if method != "POST" || path != "/api/bootstrap/credentials" || auth != "Bearer "+goodKey || ctype != "application/json" {
 		t.Fatalf("request: %s %s %q %q", method, path, auth, ctype)
 	}
-	want := map[string]any{"adapter": "generic", "provider_scope": "digitalocean", "label": "coral-1", "persistence": "ephemeral", "ttl_minutes": float64(5), "accept_terms": "2.0.2"}
+	want := map[string]any{"adapter": "generic", "label": "coral-1", "persistence": "ephemeral", "ttl_minutes": float64(5), "accept_terms": "2.0.2"}
+	if _, has := got["provider_scope"]; has {
+		t.Error("provider_scope is for aws and gcp: the Hub answers a generic mint that has it with a 400")
+	}
 	for k, v := range want {
 		if got[k] != v {
 			t.Errorf("%s = %v, want %v", k, got[k], v)
@@ -57,6 +60,8 @@ func TestMintSaysRefusalsInItsOwnWordsAndNeverLeaksTheKey(t *testing.T) {
 		{403, `{}`, "did not accept the key"},
 		{409, `{"error":"terms_reconsent_required"}`, "terms accepted again"},
 		{429, `{"error":"rate_limited"}`, "too many credentials"},
+		{409, `{"error":"live_limit_reached"}`, "as many machine credentials outstanding as it may"},
+		{409, `{"error":"adapter_capacity_reached"}`, "this is not retried"},
 		{500, `{"error":"boom"}`, "HTTP 500, boom"},
 		{500, `{"error":"Contains SPACES and chk_abcdefgh12345678"}`, "HTTP 500)"},
 	}
@@ -222,5 +227,31 @@ func TestRevokeRetriesWhatMayPassAndSaysTheStatusOfAnythingElse(t *testing.T) {
 		if err != nil && (strings.Contains(err.Error(), testDestroy) || strings.Contains(err.Error(), "chd_")) {
 			t.Errorf("%s: the error holds the destroy credential: %v", c.name, err)
 		}
+	}
+}
+
+// The mint answer's expires_at is kept, and ExpiresAt gives it: a failed launch says when the credential stops working from the Hub's own word.
+func TestMintKeepsTheHubsExpiryAndAnswerWithoutOneSaysNothingGuessed(t *testing.T) {
+	var withExpiry bool
+	h, _ := hubServer(t, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusCreated)
+		if withExpiry {
+			_, _ = w.Write([]byte(`{"credential":"chb_0123456789abcdef","credential_id":"` + testCredID + `","expires_at":"2026-10-29T10:05:30Z"}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"credential":"chb_0123456789abcdef","credential_id":"` + testCredID + `"}`))
+	})
+	withExpiry = true
+	_, _ = h.Mint(context.Background(), "coral-1")
+	if at, ok := h.ExpiresAt("coral-1"); !ok || at.UTC().Format(time.RFC3339) != "2026-10-29T10:05:30Z" {
+		t.Fatalf("expiry: %v %v", at, ok)
+	}
+	withExpiry = false
+	_, _ = h.Mint(context.Background(), "coral-2")
+	if _, ok := h.ExpiresAt("coral-2"); ok {
+		t.Fatal("an answer with no expires_at has no expiry")
+	}
+	if _, ok := h.ExpiresAt("never"); ok {
+		t.Fatal("nothing minted has none")
 	}
 }
