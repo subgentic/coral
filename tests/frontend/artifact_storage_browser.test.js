@@ -55,7 +55,8 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
         await until(`(document.getElementById('settings-storage-result') || {}).textContent === 'Nothing to do.'`, 'the shrink check');
         { const t = await ev(`document.getElementById('settings-storage-result').textContent`); check('Shrink with no stored diffs: nothing to do', t === 'Nothing to do.', JSON.stringify(t)); }
         await ev(`window.fetch = window.__realFetch; true`); // the real answers for what follows
-        await ev(`window.hideSettingsModal && window.hideSettingsModal(); true`);
+        // forced: the checks above typed into the prune fields, and a plain close then asks 'Discard unsaved changes?' in the shared confirm dialog, which Settings stays open behind and the review check below mistook for its own
+        await ev(`window.hideSettingsModal && window.hideSettingsModal(true); true`);
 
         // Automatic cleanup: turned on, it waits for a review.
         const put = await ev(`fetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ artifact_retention_days: 30, artifact_retention_kinds: 'diffs' }) }).then(r => r.status)`);
@@ -73,7 +74,7 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
         await until(`document.getElementById('settings-retention-review').hidden`, 'the wait cleared');
         const started = await ev(`({ status: document.getElementById('settings-retention-status').innerText, review: !document.getElementById('settings-retention-review').hidden })`);
         check('starting it clears the wait', !started.review && /^On \(30 days\)\./.test(started.status), JSON.stringify(started));
-        await ev(`window.hideSettingsModal && window.hideSettingsModal(); true`);
+        await ev(`window.hideSettingsModal && window.hideSettingsModal(true); true`);
         await ev(`fetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ artifact_retention_days: 0 }) }).then(r => r.status)`);
 
         // Keep, from the agent's Artifacts tab.
