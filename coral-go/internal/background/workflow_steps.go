@@ -352,7 +352,11 @@ func (wr *WorkflowRunner) executeAgentPrint(ctx context.Context, runID int64, st
 			return fmt.Errorf("step %q: the model %w", step.Name, merr)
 		}
 		var in string
-		args, in = agent.StepPrintArgs(agentCfg.AgentType, agentCfg.Flags, modelArgs, prompt)
+		stepFlags := agentCfg.Flags
+		if agentCfg.AgentType == at.Pi { // the step's configured tool allowlist (#11105); Claude takes its own through PrintArgs
+			stepFlags = append(append([]string{}, stepFlags...), agent.PiToolFlags(agentCfg.Tools)...)
+		}
+		args, in = agent.StepPrintArgs(agentCfg.AgentType, stepFlags, modelArgs, prompt)
 		if in != "" {
 			stdin = strings.NewReader(in)
 		}
@@ -438,7 +442,7 @@ func (wr *WorkflowRunner) executeAgentInteractive(ctx context.Context, runID int
 		return fmt.Errorf("step %q: the model %w", step.Name, merr)
 	}
 	flags := append([]string{}, modelArgs...)
-	flags = append(flags, agentCfg.Flags...)
+	flags = append(flags, agent.UnattendedFlags(agentCfg.AgentType, agentCfg.Flags)...)
 
 	displayName := fmt.Sprintf("workflow-run-%d-step-%s", runID, step.Name)
 	launchResult, err := wr.launcher.LaunchAgent(

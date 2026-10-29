@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/subgentic/coral/internal/agent"
 	at "github.com/subgentic/coral/internal/agenttypes"
 	"github.com/subgentic/coral/internal/store"
 )
@@ -115,4 +116,25 @@ func TestWorkflowPrintStepOnUnverifiedCLIFailsClearly(t *testing.T) {
 	assert.Contains(t, err.Error(), "aren't supported for codex yet")
 	assert.Equal(t, "", PrintStepError(at.Claude))
 	assert.Contains(t, PrintStepError("nope"), "unknown agent_type")
+}
+
+// #11105 (row 12): a workflow step on Pi runs `pi --print --no-session --no-approve [model] [flags] [--tools ...] <prompt>`: one-shot, nothing kept, the repository's Pi files not trusted, the configured tool
+// allowlist given as --tools (a name that is not plain is dropped) and an --approve in the flags dropped. Run against a fake pi that records its arguments.
+func TestWorkflowPiStepRunsOneShotWithItsTools(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("shell-script fake binary")
+	}
+	db := setupTestDB(t)
+	t.Setenv("HOME", t.TempDir())
+	dir := t.TempDir()
+	argsFile := filepath.Join(dir, "args")
+	pi := filepath.Join(dir, "pi-fake")
+	require.NoError(t, os.WriteFile(pi, []byte("#!/bin/sh\nprintf '%s\\n' \"$@\" > '"+argsFile+"'\necho done\n"), 0o755))
+	require.NoError(t, store.NewSessionStore(db).SetSetting(context.Background(), agent.CLIPathSettingKey(at.Pi), pi))
+	runner := NewWorkflowRunner(store.NewWorkflowStore(db), nil, nil, nil, nil, t.TempDir(), "localhost", 8420)
+	cfg := &AgentStepConfig{AgentType: at.Pi, Model: "anthropic/m", Flags: []string{"--approve", "--thinking", "high"}, Tools: []string{"read", "bash", "--evil", "a b"}}
+	require.NoError(t, runner.executeAgentPrint(context.Background(), 1, StepDef{Name: "s"}, testStepFiles(t), t.TempDir(), os.Environ(), cfg, "summarize the board", nil, &StepResult{}))
+	raw, err := os.ReadFile(argsFile)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"--print", "--no-session", "--no-approve", "--model", "anthropic/m", "--thinking", "high", "--tools", "read,bash", "summarize the board"}, strings.Split(strings.TrimSpace(string(raw)), "\n"))
 }

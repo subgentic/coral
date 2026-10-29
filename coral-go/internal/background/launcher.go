@@ -302,7 +302,7 @@ func (l *AgentLauncher) startPromptDelivery(ctx context.Context, sessionID, sess
 // It integrates agent launching with the scheduler's job/run lifecycle.
 func (l *AgentLauncher) BuildSchedulerLaunchFn(schedStore *store.ScheduleStore) func(ctx context.Context, job store.ScheduledJob, runID int64) error {
 	return func(ctx context.Context, job store.ScheduledJob, runID int64) error {
-		flagsList := strings.Fields(job.Flags)
+		flagsList := jobLaunchFlags(job)
 
 		result, err := l.LaunchAgent(ctx, job.RepoPath, job.AgentType, job.Name,
 			"", flagsList, true, job.Prompt, "", "")
@@ -395,4 +395,9 @@ func recordCLIVersion(ss *store.SessionStore, sessionID, agentType string) {
 			slog.Warn("could not record the agent's CLI version", "session_id", sessionID, "error", err)
 		}
 	}
+}
+
+// jobLaunchFlags are a scheduled job's flags for its agent: its configured ones, and for Pi --no-approve (a job asks nobody to trust the repository's Pi files, #11105) with an --approve dropped.
+func jobLaunchFlags(job store.ScheduledJob) []string {
+	return agent.UnattendedFlags(job.AgentType, strings.Fields(job.Flags))
 }
