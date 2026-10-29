@@ -115,3 +115,27 @@ func TestWritersDoesNotWaitForASlowAccountLookup(t *testing.T) {
 		return err == nil && slices.Contains(who, `CORP\slow`)
 	}, 5*time.Second, 20*time.Millisecond)
 }
+
+// #307's copy note: an account is named once, its ways of changing the folder together. A temp folder of this user's is held
+// by this user as its owner, by an entry of its own and through its parent (also this user's), which read
+// "this user (the owner), this user, this user (the owner, through the parent folder)" in the tools-folder warning.
+func TestWritersNamesEachAccountOnce(t *testing.T) {
+	parent := t.TempDir()
+	dir := filepath.Join(parent, "tools")
+	require.NoError(t, os.Mkdir(dir, 0o700))
+	who, err := Writers(dir)
+	require.NoError(t, err)
+	var mine []string
+	for _, w := range who {
+		if strings.HasPrefix(w, "this user") {
+			mine = append(mine, w)
+		}
+	}
+	assert.Len(t, mine, 1, "this user is named once: %q", who)
+
+	everyone := []writer{{nil, []string{"the owner"}}, {nil, nil}, {nil, []string{"the owner", "through the parent folder"}}, {nil, []string{"through the parent folder"}}}
+	got := mergeWays([]string{"this user", "this user", "this user", `DOMAIN\bob`}, everyone)
+	assert.Equal(t, []string{"this user (the owner, through the parent folder)", `DOMAIN\bob (through the parent folder)`}, got)
+	assert.Equal(t, []string{"Everyone"}, mergeWays([]string{"Everyone"}, []writer{{nil, nil}}), "an entry of its own has no parenthesis")
+	assert.Empty(t, mergeWays(nil, nil))
+}
