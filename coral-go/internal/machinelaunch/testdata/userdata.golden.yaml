@@ -8,6 +8,18 @@ users:
     lock_passwd: true # no password and no sudo
     ssh_authorized_keys: # the launch's own public key: the only way in, removed when the launcher is done
       - no-port-forwarding,no-agent-forwarding,no-X11-forwarding ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOpKbGPinFIKvvVQexMuxfmVR3auvr57kkIe6mkURtIs
+ssh_deletekeys: true # the machine's own host keys are replaced by the one this launch pinned
+ssh_genkeytypes: []
+ssh_keys: # the single-use host key pair the launcher pinned: the one secret here, dead once setup finishes (coral-machine-finish)
+  ed25519_private: |
+    -----BEGIN OPENSSH PRIVATE KEY-----
+    b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtz
+    c2gtZWQyNTUxOQAAACD9FyQ4WqDHW2T7eM1gL6HZkf3r92sTxY7XAurINen2GAAA
+    AIgAAAAAAAAAAAAAAAtzc2gtZWQyNTUxOQAAACD9FyQ4WqDHW2T7eM1gL6HZkf3r
+    92sTxY7XAurINen2GAAAAEAJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJ
+    Cf0XJDhaoMdbZPt4zWAvodmR/ev3axPFjtcC6sg16fYYAAAAAAECAwQF
+    -----END OPENSSH PRIVATE KEY-----
+  ed25519_public: ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIP0XJDhaoMdbZPt4zWAvodmR/ev3axPFjtcC6sg16fYY
 package_update: true
 packages:
   - ca-certificates
@@ -44,6 +56,7 @@ write_files:
     permissions: '0644'
     content: |
       # Coral machine bootstrap: the launcher's one key, as coral, for the length of the launch.
+      HostKey /etc/ssh/ssh_host_ed25519_key
       PasswordAuthentication no
       KbdInteractiveAuthentication no
       PermitRootLogin no

@@ -1,6 +1,8 @@
 package machinelaunch
 
 import (
+	"bytes"
+	"crypto/ed25519"
 	"fmt"
 	"net"
 	"regexp"
@@ -35,6 +37,10 @@ type UserDataSpec struct {
 	// version: the installer script is fetched to a file, checked against that SHA-256 and only then run, and it runs only when this says so. Every installer fetched on the machine is pinned this
 	// way, none is piped into a shell. The names come from the one table of CLIs (internal/agent).
 	Agents []string
+	// HostPrivateKey and HostPublicKey are the SINGLE-USE ed25519 host key pair the machine presents, which the launcher pinned in advance (coral-hub Security's ruling on #10917: sshd needs the private half, and the
+	// provider has no console output to read a machine-made key from). It is the one secret in the user-data: it proves the machine's identity to the launcher for the length of the launch, and the finish step on the
+	// machine stops and masks sshd and deletes it. HostPrivateKey is the OpenSSH PEM, HostPublicKey its authorized_keys line; they must be one pair.
+	HostPrivateKey, HostPublicKey string
 	// AllowSSHFrom is the address (an IP or a CIDR) the one open port, SSH, accepts connections from: the launcher's. It does not replace the host-key pin; it narrows who can even try (coral-hub Security).
 	AllowSSHFrom string
 	// HubURL is Coral Hub's origin, https only. Empty is the production Coral Hub.
@@ -156,6 +162,10 @@ func BuildUserData(spec UserDataSpec) (string, error) {
 	if !hubURLRe.MatchString(hub) {
 		return "", fmt.Errorf("the Coral Hub URL is not an https origin")
 	}
+	hostPEM, hostPub, err := canonicalHostKey(spec.HostPrivateKey, spec.HostPublicKey)
+	if err != nil {
+		return "", err
+	}
 	sshFrom, err := canonicalSSHSource(spec.AllowSSHFrom)
 	if err != nil {
 		return "", err
@@ -177,6 +187,14 @@ func BuildUserData(spec UserDataSpec) (string, error) {
 	w("    lock_passwd: true # no password and no sudo")
 	w("    ssh_authorized_keys: # the launch's own public key: the only way in, removed when the launcher is done")
 	w("      - %s %s", clientKeyOptions, clientKey)
+	w("ssh_deletekeys: true # the machine's own host keys are replaced by the one this launch pinned")
+	w("ssh_genkeytypes: []")
+	w("ssh_keys: # the single-use host key pair the launcher pinned: the one secret here, dead once setup finishes (coral-machine-finish)")
+	w("  ed25519_private: |")
+	for _, l := range strings.Split(strings.TrimRight(hostPEM, "\n"), "\n") {
+		w("    %s", l)
+	}
+	w("  ed25519_public: %s", hostPub)
 	w("package_update: true")
 	w("packages:")
 	for _, p := range []string{"ca-certificates", "curl", "git", "tmux", "ufw"} { // node and npm are installed with the agent CLIs, after Coral has redeemed its credential
@@ -231,6 +249,35 @@ const clientKeyOptions = "no-port-forwarding,no-agent-forwarding,no-X11-forwardi
 // ValidSSHSource checks an address for SSH to be opened to (one IP or CIDR, never every address) and returns it canonical: for the command to refuse a bad --allow-ssh-from before anything is read or made.
 func ValidSSHSource(v string) (string, error) { return canonicalSSHSource(v) }
 
+// canonicalHostKey checks the host key pair is one ed25519 OpenSSH private key with no passphrase and the public line of that same key, and returns the PEM and the canonical public line.
+func canonicalHostKey(privPEM, pubLine string) (string, string, error) {
+	if strings.TrimSpace(privPEM) == "" || strings.TrimSpace(pubLine) == "" {
+		return "", "", fmt.Errorf("the launch's SSH host key pair is needed")
+	}
+	raw, err := ssh.ParseRawPrivateKey([]byte(privPEM))
+	if err != nil {
+		return "", "", fmt.Errorf("the launch's SSH host key is not a private key")
+	}
+	var priv ed25519.PrivateKey
+	switch k := raw.(type) {
+	case *ed25519.PrivateKey:
+		priv = *k
+	case ed25519.PrivateKey:
+		priv = k
+	default:
+		return "", "", fmt.Errorf("the launch's SSH host key is not an ed25519 key")
+	}
+	signerPub, err := ssh.NewPublicKey(priv.Public())
+	if err != nil {
+		return "", "", err
+	}
+	given, _, opts, rest, err := ssh.ParseAuthorizedKey([]byte(pubLine))
+	if err != nil || len(opts) != 0 || len(strings.TrimSpace(string(rest))) != 0 || !bytes.Equal(given.Marshal(), signerPub.Marshal()) {
+		return "", "", fmt.Errorf("the launch's SSH host public key is not the public half of its private key")
+	}
+	return string(marshalHostKey(priv)), strings.TrimSpace(string(ssh.MarshalAuthorizedKey(signerPub))), nil
+}
+
 // canonicalSSHSource checks the address SSH may be reached from is one IP or one CIDR (never "any", and nothing that could be shell) and returns it in its canonical form.
 func canonicalSSHSource(v string) (string, error) {
 	v = strings.TrimSpace(v)
@@ -271,6 +318,7 @@ func canonicalClientKey(line string) (string, error) {
 // sshdConfig is the sshd drop-in for the bootstrap window: key only, coral only, nothing forwarded.
 func sshdConfig() string {
 	return `# Coral machine bootstrap: the launcher's one key, as coral, for the length of the launch.
+HostKey /etc/ssh/ssh_host_ed25519_key
 PasswordAuthentication no
 KbdInteractiveAuthentication no
 PermitRootLogin no

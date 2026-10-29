@@ -3,6 +3,7 @@ package machinelaunch
 import (
 	"bytes"
 	"crypto/ed25519"
+	"encoding/pem"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -30,8 +31,19 @@ func testClientKey() string {
 	return strings.TrimSpace(string(ssh.MarshalAuthorizedKey(k)))
 }
 
+// testHostKey is a fixed ed25519 host key pair (from a seed of nines): its private PEM and public line.
+func testHostKey() (string, string) {
+	priv := ed25519.NewKeyFromSeed(bytes.Repeat([]byte{9}, 32))
+	pub, err := ssh.NewPublicKey(priv.Public())
+	if err != nil {
+		panic(err)
+	}
+	return string(marshalHostKey(priv)), strings.TrimSpace(string(ssh.MarshalAuthorizedKey(pub)))
+}
+
 func goldenSpec() UserDataSpec {
-	return UserDataSpec{ClientPublicKey: testClientKey(), AllowSSHFrom: "203.0.113.9", MaxMode: "launch", CoralVersion: "2.0.3", Agents: []string{"claude@2.0.0", "codex@0.1.0", "agy@sha256:" + strings.Repeat("ab", 32)}}
+	priv, pub := testHostKey()
+	return UserDataSpec{ClientPublicKey: testClientKey(), HostPrivateKey: priv, HostPublicKey: pub, AllowSSHFrom: "203.0.113.9", MaxMode: "launch", CoralVersion: "2.0.3", Agents: []string{"claude@2.0.0", "codex@0.1.0", "agy@sha256:" + strings.Repeat("ab", 32)}}
 }
 
 func TestUserDataMatchesItsGolden(t *testing.T) {
@@ -83,7 +95,16 @@ func TestUserDataSaysWhatItMustAlwaysSay(t *testing.T) {
 	// no credential, anywhere (#10917, coral-hub Security): it goes over SSH, on standard input, to /run/coral/bootstrap.d/credential after the pin matched
 	assert.NotContains(t, got, "chb_", "no Hub credential")
 	assert.NotContains(t, got, "printf '%s'", "nothing writes a secret from the user-data")
-	assert.NotContains(t, got, "BEGIN OPENSSH PRIVATE KEY", "no private key in this commit's user-data")
+	// the one secret: exactly ONE ed25519 host key pair (Security's condition F); no other private key, no provider token
+	assert.Equal(t, 1, strings.Count(got, "BEGIN OPENSSH PRIVATE KEY"), "exactly one private key block: the host key")
+	assert.Equal(t, 1, strings.Count(got, "ed25519_private:"))
+	assert.Equal(t, 1, strings.Count(got, "ed25519_public:"))
+	assert.NotContains(t, got, "rsa_private", "no other key type")
+	assert.NotContains(t, got, "ecdsa_private")
+	assert.NotContains(t, got, "dop_v1_", "no provider token")
+	assert.NotContains(t, got, "chk_", "no Hub key")
+	assert.Contains(t, got, "ssh_deletekeys: true")
+	assert.Contains(t, got, "HostKey /etc/ssh/ssh_host_ed25519_key", "sshd presents only that key")
 	assert.NotContains(t, got, "set -x", "no shell tracing")
 	assert.NotContains(t, got, "set -o xtrace")
 	assert.Contains(t, got, "install -d -m 0700 -o coral -g coral /run/coral/bootstrap.d", "the folder the credential goes in: only coral reads it")
@@ -147,6 +168,35 @@ func fileOf(t *testing.T, doc map[string]any, path string) string {
 }
 
 // A comment on the login key is dropped, never carried into the user-data.
+// The canary scan: the user-data of a real launch holds the host private key and the login PUBLIC key, and nothing else that is secret (coral-hub Security): one private key block, and it is the host key.
+func TestUserDataOfARealLaunchHoldsOnlyTheHostPrivateKeyAndTheLoginPublicKey(t *testing.T) {
+	keys, err := NewBootKeys()
+	require.NoError(t, err)
+	spec := UserDataSpec{AllowSSHFrom: "203.0.113.9", CoralVersion: "2.0.3"}
+	require.NoError(t, keys.FillUserData(&spec))
+	got, err := BuildUserData(spec)
+	require.NoError(t, err)
+	var blocks []*pem.Block
+	rest := []byte(strings.ReplaceAll(got, "\n    ", "\n"))
+	for {
+		var b *pem.Block
+		b, rest = pem.Decode(rest)
+		if b == nil {
+			break
+		}
+		blocks = append(blocks, b)
+	}
+	require.Len(t, blocks, 1, "one private key block in the user-data")
+	raw, err := ssh.ParseRawPrivateKey(pem.EncodeToMemory(blocks[0]))
+	require.NoError(t, err)
+	host, ok := raw.(*ed25519.PrivateKey)
+	require.True(t, ok)
+	assert.True(t, bytes.Equal(*host, keys.hostPriv), "and it is the host key, never the login key")
+	assert.Contains(t, got, keys.ClientPublic, "the login key is there as a public key")
+	assert.NotContains(t, got, "chb_")
+	assert.NotContains(t, got, "dop_v1_")
+}
+
 func TestALoginKeyCommentIsDropped(t *testing.T) {
 	s := goldenSpec()
 	s.ClientPublicKey = testClientKey() + " ZZINJECT'; id; '"
@@ -156,7 +206,8 @@ func TestALoginKeyCommentIsDropped(t *testing.T) {
 }
 
 func TestTheDefaultsAreTheSafeOnes(t *testing.T) {
-	got, err := BuildUserData(UserDataSpec{ClientPublicKey: testClientKey(), AllowSSHFrom: "203.0.113.9", CoralVersion: "2.0.3"})
+	hp, hu := testHostKey()
+	got, err := BuildUserData(UserDataSpec{ClientPublicKey: testClientKey(), HostPrivateKey: hp, HostPublicKey: hu, AllowSSHFrom: "203.0.113.9", CoralVersion: "2.0.3"})
 	require.NoError(t, err)
 	assert.Contains(t, got, "--cloud-max-mode view", "an empty cap is view")
 	assert.NotContains(t, got, "npm install", "no agents unless named")
@@ -168,10 +219,17 @@ func TestTheDefaultsAreTheSafeOnes(t *testing.T) {
 func TestNothingACallerPassesCanBecomeShell(t *testing.T) {
 	ok := goldenSpec()
 	bad := map[string]func(*UserDataSpec){
-		"no login key":                      func(s *UserDataSpec) { s.ClientPublicKey = "" },
-		"a login key that is not a key":     func(s *UserDataSpec) { s.ClientPublicKey = "ssh-ed25519 AAAA not-a-key" },
-		"a login key with options":          func(s *UserDataSpec) { s.ClientPublicKey = "command=\"/bin/sh\" " + testClientKey() },
-		"a login key and a second line":     func(s *UserDataSpec) { s.ClientPublicKey = testClientKey() + "\n" + testClientKey() },
+		"no login key":                  func(s *UserDataSpec) { s.ClientPublicKey = "" },
+		"a login key that is not a key": func(s *UserDataSpec) { s.ClientPublicKey = "ssh-ed25519 AAAA not-a-key" },
+		"a login key with options":      func(s *UserDataSpec) { s.ClientPublicKey = "command=\"/bin/sh\" " + testClientKey() },
+		"a login key and a second line": func(s *UserDataSpec) { s.ClientPublicKey = testClientKey() + "\n" + testClientKey() },
+		"no host key":                   func(s *UserDataSpec) { s.HostPrivateKey, s.HostPublicKey = "", "" },
+		"a host private key that is junk": func(s *UserDataSpec) {
+			s.HostPrivateKey = "-----BEGIN OPENSSH PRIVATE KEY-----\nnot a key\n-----END OPENSSH PRIVATE KEY-----\n"
+		},
+		"a host public key of another key":  func(s *UserDataSpec) { s.HostPublicKey = testClientKey() },
+		"a host public key with options":    func(s *UserDataSpec) { s.HostPublicKey = "command=\"id\" " + s.HostPublicKey },
+		"a host key pair with no public":    func(s *UserDataSpec) { s.HostPublicKey = "" },
 		"no ssh source":                     func(s *UserDataSpec) { s.AllowSSHFrom = "" },
 		"every address":                     func(s *UserDataSpec) { s.AllowSSHFrom = "0.0.0.0" },
 		"every address as a CIDR":           func(s *UserDataSpec) { s.AllowSSHFrom = "0.0.0.0/0" },
@@ -243,4 +301,22 @@ func TestTheSetupScriptIsValidShellAndTheRepoMatchesTheUpdater(t *testing.T) {
 		}
 	}
 	assert.Equal(t, 4, checked, "the setup script, the agents script, the Coral step and the agents step")
+}
+
+// The hand-written OpenSSH key format is the one sshd reads: ssh-keygen derives the public key from it, and it is the pinned one.
+func TestTheHostKeyFileIsReadByOpenSSH(t *testing.T) {
+	kg, err := exec.LookPath("ssh-keygen")
+	if err != nil {
+		t.Skip("no ssh-keygen")
+	}
+	priv, pub := testHostKey()
+	f := filepath.Join(t.TempDir(), "host_key")
+	require.NoError(t, os.WriteFile(f, []byte(priv), 0o600))
+	out, err := exec.Command(kg, "-y", "-f", f).Output()
+	require.NoError(t, err, "ssh-keygen reads the key")
+	got, _, _, _, err := ssh.ParseAuthorizedKey(out)
+	require.NoError(t, err)
+	want, _, _, _, err := ssh.ParseAuthorizedKey([]byte(pub))
+	require.NoError(t, err)
+	assert.Equal(t, want.Marshal(), got.Marshal(), "the public half ssh-keygen derives is the pinned one")
 }

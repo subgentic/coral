@@ -5,6 +5,8 @@ import (
 	"context"
 	"crypto/ed25519"
 	"crypto/rand"
+	"encoding/binary"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"io"
@@ -53,6 +55,39 @@ func NewBootKeys() (*BootKeys, error) {
 		hostPriv:     hpriv,
 		HostPublic:   hostPub,
 	}, nil
+}
+
+// FillUserData puts the launch's keys into a user-data spec: the login key's PUBLIC half, and the host key pair the machine is told to present (the pin). The login key's private half never leaves the launcher.
+func (k *BootKeys) FillUserData(s *UserDataSpec) error {
+	s.ClientPublicKey = k.ClientPublic
+	s.HostPrivateKey = string(marshalHostKey(k.hostPriv))
+	s.HostPublicKey = strings.TrimSpace(string(ssh.MarshalAuthorizedKey(k.HostPublic)))
+	return nil
+}
+
+// marshalHostKey is an ed25519 private key in the OpenSSH format sshd reads, PEM-armoured, with no passphrase. It is written here (the format is a few lines) so that the same key always gives the same text:
+// ssh.MarshalPrivateKey puts a random check value in it, which would make the user-data golden differ on every run.
+func marshalHostKey(priv ed25519.PrivateKey) []byte {
+	pub := []byte(priv.Public().(ed25519.PublicKey))
+	str := func(b []byte) []byte { return append(binary.BigEndian.AppendUint32(nil, uint32(len(b))), b...) }
+	blob := append(str([]byte(ssh.KeyAlgoED25519)), str(pub)...)
+	var priv1 []byte
+	priv1 = binary.BigEndian.AppendUint32(priv1, 0) // the two check words: equal, as they must be; a fixed value is as good as a random one for a key with no passphrase
+	priv1 = binary.BigEndian.AppendUint32(priv1, 0)
+	priv1 = append(priv1, blob...)
+	priv1 = append(priv1, str([]byte(priv))...) // 64 bytes: the seed and the public key
+	priv1 = append(priv1, str(nil)...)          // no comment
+	for i := byte(1); len(priv1)%8 != 0; i++ {
+		priv1 = append(priv1, i)
+	}
+	out := []byte("openssh-key-v1\x00")
+	out = append(out, str([]byte("none"))...) // cipher
+	out = append(out, str([]byte("none"))...) // kdf
+	out = append(out, str(nil)...)            // kdf options
+	out = binary.BigEndian.AppendUint32(out, 1)
+	out = append(out, str(blob)...)
+	out = append(out, str(priv1)...)
+	return pem.EncodeToMemory(&pem.Block{Type: "OPENSSH PRIVATE KEY", Bytes: out})
 }
 
 // Destroy overwrites the private halves. A launch calls it when it is done with them.
