@@ -1,29 +1,31 @@
 package verify
 
 import (
+	"encoding/json"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-// #395: a staged release that is not newer than the installed version is dropped; what does not parse is left alone.
+// #395: a staged release that is not newer than the installed version is dropped; what does not parse is left alone. The table is the one updatecheck.NotNewer (the server's) is tested
+// with: the two functions must agree on every row.
 func TestNotNewer(t *testing.T) {
-	for _, tc := range []struct {
-		staged, installed string
-		want              bool
-	}{
-		{"2.0.1", "2.0.3", true},      // lower
-		{"2.0.3", "2.0.3", true},      // equal
-		{"2.0.4", "2.0.3", false},     // higher
-		{"2.0.3", "2.0.3-rc1", false}, // the release is newer than its prerelease
-		{"2.0.3", "2.0.4-rc1", true},  // lower than a later prerelease
-		{"2.0.4", "2.0.4-rc1", false},
-		{"2.0.3", "v2.0.3", true},       // a "v" on the installed one
-		{"2.0.3", "2.0.3+build5", true}, // build metadata is not a prerelease
-		{"2.0.1", "dev", false},         // nothing is dropped on a guess
-		{"2.0.1", "", false},
-		{"2.0.3-rc1", "2.0.3", false}, // a staged release is a plain X.Y.Z: anything else is left alone
-	} {
-		assert.Equal(t, tc.want, NotNewer(tc.staged, tc.installed), tc.staged+" vs "+tc.installed)
+	b, err := os.ReadFile(filepath.Join("..", "..", "updatecheck", "testdata", "not_newer_cases.json"))
+	require.NoError(t, err)
+	var table struct {
+		Cases []struct {
+			Staged, Installed string
+			NotNewer          bool
+			Why               string
+		}
 	}
+	require.NoError(t, json.Unmarshal(b, &table))
+	require.NotEmpty(t, table.Cases)
+	for _, tc := range table.Cases {
+		assert.Equal(t, tc.NotNewer, NotNewer(tc.Staged, tc.Installed), tc.Staged+" vs "+tc.Installed+": "+tc.Why)
+	}
+	assert.False(t, NotNewer("2.0.3-rc1", "2.0.3"), "a staged release is a plain X.Y.Z: anything else is left alone")
 }
