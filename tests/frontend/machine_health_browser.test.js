@@ -36,7 +36,7 @@ const HEALTH = {
         return { status: c.querySelector('.machine-health-status').textContent, dot: dot.className, label: dot.getAttribute('aria-label'),
             rows: Object.fromEntries([...c.querySelectorAll('dt')].map(dt => [dt.textContent, dt.nextElementSibling.textContent])) };
     })()`);
-    const IDLE = { status: 'busy', reason: 'cpu', responsiveness_ms: 0, coral: { cpu_percent: 0, rss_bytes: 438 * 1024 ** 2 }, agents: { count: 0, cpu_percent: 0, rss_bytes: 0 },
+    const IDLE = { status: 'busy', reason: 'cpu', busy_by: 'others', responsiveness_ms: 0, coral: { cpu_percent: 0, rss_bytes: 438 * 1024 ** 2 }, agents: { count: 0, cpu_percent: 0, rss_bytes: 0 },
         host: { load1_per_core: 1.71, cpu_count: 18, mem_total: 64 * GB, mem_available: 27 * GB }, disk: { free_bytes: 356 * GB, total_bytes: 926 * GB } }; // an idle Coral on a busy computer (Beta Tester, #9955)
     const send = msg => ev(`(async () => { ${ws}.handleCoralMessage(${JSON.stringify(msg)}); return true; })()`);
     // The server's own coral_updates on /ws/coral, counted as they arrive. The real server's
@@ -117,6 +117,16 @@ const HEALTH = {
         assert.equal(others.amber, false, 'neutral, not the amber of a warning about Coral');
         await send({ type: 'coral_update', sessions: [], active_runs: [], machine_health: HEALTH });
         assert.equal((await card()).status, 'Busy (CPU)', 'when Coral and the agents are the load it stays Busy (CPU)');
+        // #10887: the words follow the server, not the host's load: the same idle Coral and the same high load, but the server did not say who (an older Coral, or a sample with no CPU reading yet), names nobody
+        const { busy_by: _unsaid, ...undecided } = IDLE;
+        await send({ type: 'coral_update', sessions: [], active_runs: [], machine_health: undecided });
+        c = await card();
+        assert.equal(c.status, 'Busy (CPU)', 'no busy_by: nobody is named, whatever the load says');
+        assert.equal(await ev(`!!document.querySelector('#machine-health-local .machine-health-card .machine-health-others')`), false, 'and there is no line about other programs');
+        // and it is not the load that names them: busy_by with a load under the old limit still says it
+        await send({ type: 'coral_update', sessions: [], active_runs: [], machine_health: { ...IDLE, host: { ...IDLE.host, load1_per_core: 0.2 } } });
+        assert.equal((await card()).status, 'Busy (other programs)', 'busy_by "others" is enough: the load average is not asked');
+        await send({ type: 'coral_update', sessions: [], active_runs: [], machine_health: HEALTH });
         console.log('   ✓ Busy (other programs)');
 
         console.log('3. coral_diff merges; null removes a field');

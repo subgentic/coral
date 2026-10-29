@@ -151,6 +151,30 @@ func TestHealthJSONIsNumbersOnly(t *testing.T) {
 	}, keys, "the agreed schema, nothing more")
 }
 
+// busy_by names the others only when the busy is on cpu, this sample measured Coral's and the agents' CPU, and they used under a tenth of the host's cores (#10887).
+func TestBusyBy(t *testing.T) {
+	busy := func(coral, agents float64, cpus int, measured bool) Health {
+		return Health{Status: "busy", Reason: "cpu", Coral: Proc{CPUPercent: coral}, Agents: Agents{CPUPercent: agents}, Host: Host{CPUCount: cpus}, cpuMeasured: measured}
+	}
+	for _, tc := range []struct {
+		name string
+		h    Health
+		want string
+	}{
+		{"idle Coral on a busy computer", busy(0.5, 0, 8, true), "others"},
+		{"just under a tenth of the cores", busy(30, 49, 8, true), "others"}, // 79% of 800%
+		{"a tenth of the cores or more is nobody's to name", busy(40, 40, 8, true), ""},
+		{"the agents are the load", busy(3, 400, 8, true), ""},
+		{"no CPU reading yet: not known", busy(0, 0, 8, false), ""},
+		{"no core count: not known", busy(0, 0, 0, true), ""},
+		{"memory busy is not about the processor", Health{Status: "busy", Reason: "memory", cpuMeasured: true, Host: Host{CPUCount: 8}}, ""},
+		{"ok has no one to name", Health{Status: "ok", cpuMeasured: true, Host: Host{CPUCount: 8}}, ""},
+		{"stalled has no one to name", Health{Status: "stalled", Reason: "stall", cpuMeasured: true, Host: Host{CPUCount: 8}}, ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) { assert.Equal(t, tc.want, busyBy(tc.h)) })
+	}
+}
+
 // One sample walks the process table once; at one sample per Interval (15 s) it must cost well
 // under 1% of a core: a sample under 150 ms of CPU.
 func BenchmarkSample(b *testing.B) {
