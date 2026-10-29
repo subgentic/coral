@@ -38,6 +38,10 @@ func TestDeletedBoardRowDoesNotComeBack(t *testing.T) {
 	}{
 		{"a message", func(key string) error { _, err := s.PostMessage(ctx, key, "Lead", "hello", nil); return err }},
 		{"a subscribe", func(key string) error { _, err := s.Subscribe(ctx, key, "Dev", "Dev", "", nil, "all"); return err }},
+		{"a goal", func(key string) error {
+			_, err := s.CreateGoal(ctx, key, GoalInput{Title: "a goal", Outcome: "o", DoneWhen: "d", CreatedBy: "Lead"})
+			return err
+		}},
 		{"a task", func(key string) error { _, err := s.CreateTask(ctx, key, "a task", "", "medium", "Lead"); return err }},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -55,7 +59,7 @@ func TestDeletedBoardRowDoesNotComeBack(t *testing.T) {
 			}
 			assert.Equal(t, 0, boardRows(b.ID), "the board is gone after its delete, whichever step of the write it landed in")
 			var rows int
-			require.NoError(t, s.db.GetContext(ctx, &rows, `SELECT (SELECT COUNT(*) FROM board_messages WHERE project = ?) + (SELECT COUNT(*) FROM board_tasks WHERE board_id = ?) + (SELECT COUNT(*) FROM board_subscribers WHERE project = ?)`, b.ID, b.ID, b.ID))
+			require.NoError(t, s.db.GetContext(ctx, &rows, `SELECT (SELECT COUNT(*) FROM board_messages WHERE project = ?) + (SELECT COUNT(*) FROM board_tasks WHERE board_id = ?) + (SELECT COUNT(*) FROM board_subscribers WHERE project = ?) + (SELECT COUNT(*) FROM board_goals WHERE board_id = ?)`, b.ID, b.ID, b.ID, b.ID))
 			assert.Equal(t, 0, rows, "and nothing of it is left behind")
 		})
 	}

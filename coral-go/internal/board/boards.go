@@ -157,15 +157,6 @@ func (s *Store) execEnsuringBoard(ctx context.Context, key, query string, args .
 	return res, nil
 }
 
-// ensureBoardRow records key as a board (id = label = key) the first time anything uses it,
-// as a subscribe, a message or a task did before boards had rows.
-func (s *Store) ensureBoardRow(ctx context.Context, key string) {
-	if key == "" {
-		return
-	}
-	_, _ = s.db.ExecContext(ctx, `INSERT OR IGNORE INTO boards (id, label, created_at) VALUES (?, ?, ?)`, key, key, nowUTC())
-}
-
 // BoardKeys are the keys of every board that has a row.
 func (s *Store) BoardKeys(ctx context.Context) ([]string, error) {
 	var keys []string
