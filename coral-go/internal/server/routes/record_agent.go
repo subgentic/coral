@@ -33,6 +33,19 @@ func (h *SessionsHandler) agentTarget(w http.ResponseWriter, r *http.Request) (*
 	return ls, naming.SessionName(ls.AgentType, ls.SessionID), true
 }
 
+// resolvedCLI is the session's resolved CLI path ("" when it cannot be resolved).
+func (h *SessionsHandler) resolvedCLI(ctx context.Context, agentType string) string {
+	settings, err := h.launchSettings(ctx)
+	if err != nil {
+		return ""
+	}
+	cli, err := agent.LaunchCLI(settings, agentType)
+	if err != nil {
+		return ""
+	}
+	return cli
+}
+
 // noticesPaused is whether board notices are withheld from the terminal now, and why. A terminal that cannot say is not "paused" here: a record cannot fix it.
 func (h *SessionsHandler) noticesPaused(ctx context.Context, ls *store.LiveSession, name string) (paused bool, reason string) {
 	if h.terminal == nil || ls.AgentType == at.Terminal {
@@ -56,7 +69,7 @@ func (h *SessionsHandler) AgentCandidate(w http.ResponseWriter, r *http.Request)
 	out := map[string]any{"ok": true, "paused": paused, "reason": reason, "candidate": nil, "why_not": ""}
 	if paused {
 		if rec, can := h.terminal.(ptymanager.AgentRecorder); can {
-			cand, why, err := rec.AgentCandidate(ctx, name, ls.AgentType, ls.SessionID)
+			cand, why, err := rec.AgentCandidate(ctx, name, ls.AgentType, ls.SessionID, h.resolvedCLI(ctx, ls.AgentType))
 			switch {
 			case err != nil:
 				out["why_not"] = "the terminal could not be read"
@@ -96,7 +109,8 @@ func (h *SessionsHandler) RecordAgent(w http.ResponseWriter, r *http.Request) {
 	}
 	// A program running inside a nested shell is what the notice check exists to stop: it is recorded only on the Operator's explicit acknowledgement (Security on #391).
 	under := ""
-	if cur, _, cerr := rec.AgentCandidate(r.Context(), name, ls.AgentType, ls.SessionID); cerr == nil && cur.PID == body.PID {
+	cliPath := h.resolvedCLI(r.Context(), ls.AgentType)
+	if cur, _, cerr := rec.AgentCandidate(r.Context(), name, ls.AgentType, ls.SessionID, cliPath); cerr == nil && cur.PID == body.PID {
 		under = cur.Under
 	}
 	if under != "" && !body.AcknowledgeNested {
@@ -104,7 +118,7 @@ func (h *SessionsHandler) RecordAgent(w http.ResponseWriter, r *http.Request) {
 			"error": "this program is running inside " + under + ", a shell started in the terminal, not directly in the agent's terminal: acknowledge it to record it"})
 		return
 	}
-	got, err := rec.RecordAgent(r.Context(), name, ls.AgentType, ls.SessionID, ptymanager.AgentCandidate{PID: body.PID, Start: body.Start})
+	got, err := rec.RecordAgent(r.Context(), name, ls.AgentType, ls.SessionID, ptymanager.AgentCandidate{PID: body.PID, Start: body.Start, CLIPath: cliPath})
 	switch {
 	case err == nil:
 		slog.Info("the Operator recorded an agent's process", "session", name, "pid", got.PID, "program", got.Program, "under_nested_shell", under, "acknowledged", body.AcknowledgeNested)
@@ -158,7 +172,11 @@ func (h *SessionsHandler) RecordAgents(w http.ResponseWriter, r *http.Request) {
 		if paused, _ := h.noticesPaused(ctx, ls, name); !paused || ls.IsSleeping == 1 {
 			continue // notices already go (or the agent sleeps): nothing to record
 		}
-		cand, why, cerr := rec.AgentCandidate(ctx, name, ls.AgentType, ls.SessionID)
+		cli, lerr := agent.LaunchCLI(settings, ls.AgentType)
+		if lerr != nil {
+			cli = ""
+		}
+		cand, why, cerr := rec.AgentCandidate(ctx, name, ls.AgentType, ls.SessionID, cli)
 		switch {
 		case cerr != nil:
 			left = append(left, leftAgent{name, "the terminal could not be read"})
@@ -172,8 +190,7 @@ func (h *SessionsHandler) RecordAgents(w http.ResponseWriter, r *http.Request) {
 			left = append(left, leftAgent{name, "needs the button: the program runs inside " + cand.Under + ", a shell started in the terminal"})
 			continue
 		}
-		cli, lerr := agent.LaunchCLI(settings, ls.AgentType)
-		if lerr != nil || cli == "" {
+		if cli == "" {
 			left = append(left, leftAgent{name, "the agent's CLI could not be resolved"})
 			continue
 		}
@@ -181,6 +198,7 @@ func (h *SessionsHandler) RecordAgents(w http.ResponseWriter, r *http.Request) {
 			left = append(left, leftAgent{name, "ambiguous: the program is " + programName(cand) + ", not the resolved CLI (a script run by an interpreter, or a wrapper): record it with the button"})
 			continue
 		}
+		cand.CLIPath = cli
 		got, rerr := rec.RecordAgent(ctx, name, ls.AgentType, ls.SessionID, cand)
 		if rerr != nil {
 			left = append(left, leftAgent{name, "the foreground changed while recording"})

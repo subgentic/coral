@@ -17,6 +17,8 @@ type AgentCandidate struct {
 	// Under is the nested shell the program runs inside ("" for a direct child of the terminal's shell). Recording such a program needs the Operator's explicit acknowledgement.
 	Under string `json:"under"`
 	Image string `json:"-"`
+	// CLIPath, on a candidate passed to RecordAgent, is the session's resolved CLI path (see AgentRecorder.AgentCandidate).
+	CLIPath string `json:"-"`
 }
 
 // ErrCandidateChanged and ErrNoCandidate are tmux's: the foreground program is not the one shown / there is not exactly one.
@@ -27,8 +29,9 @@ var (
 
 // AgentRecorder is implemented by terminals that can name and record an agent's single foreground program (tmux, the PTY backend).
 type AgentRecorder interface {
-	// AgentCandidate: the single foreground program, or why not (why is "" when there is one).
-	AgentCandidate(ctx context.Context, name, agentType, sessionID string) (cand AgentCandidate, why string, err error)
+	// AgentCandidate: the single foreground program, or why not (why is "" when there is one). cliPath is the session's resolved CLI path (or ""): on Windows the cmd that runs it
+	// (claude.cmd) is the agent's own launcher, not a nested shell, and the candidate's Under says so.
+	AgentCandidate(ctx context.Context, name, agentType, sessionID, cliPath string) (cand AgentCandidate, why string, err error)
 	// RecordAgent records want when it is still exactly the one foreground program; ErrCandidateChanged / ErrNoCandidate otherwise.
 	RecordAgent(ctx context.Context, name, agentType, sessionID string, want AgentCandidate) (AgentCandidate, error)
 }
@@ -38,7 +41,7 @@ func fromTmux(c tmux.Candidate) AgentCandidate {
 }
 
 // AgentCandidate implements AgentRecorder for tmux.
-func (t *TmuxSessionTerminal) AgentCandidate(ctx context.Context, name, agentType, sessionID string) (AgentCandidate, string, error) {
+func (t *TmuxSessionTerminal) AgentCandidate(ctx context.Context, name, agentType, sessionID, _ string) (AgentCandidate, string, error) {
 	c, why, err := t.client.AgentCandidate(ctx, name, agentType, sessionID)
 	if err != nil || why != "" {
 		return AgentCandidate{}, why, err
@@ -56,12 +59,12 @@ func (t *TmuxSessionTerminal) RecordAgent(ctx context.Context, name, agentType, 
 }
 
 // AgentCandidate implements AgentRecorder for the PTY backend.
-func (p *PTYSessionTerminal) AgentCandidate(_ context.Context, name, _, sessionID string) (AgentCandidate, string, error) {
+func (p *PTYSessionTerminal) AgentCandidate(_ context.Context, name, _, sessionID, cliPath string) (AgentCandidate, string, error) {
 	key, err := p.keyFor(name, sessionID)
 	if err != nil {
 		return AgentCandidate{}, "", err
 	}
-	return p.backend.AgentCandidate(key)
+	return p.backend.AgentCandidate(key, cliPath)
 }
 
 // RecordAgent implements AgentRecorder for the PTY backend.
@@ -75,12 +78,12 @@ func (p *PTYSessionTerminal) RecordAgent(_ context.Context, name, _, sessionID s
 
 // agentRecordProc is implemented by pseudo-terminals that name and record the agent themselves (Windows ConPTY); a Unix pseudo-terminal names its shell pid (shellPIDReporter).
 type agentRecordProc interface {
-	AgentCandidate() (cand AgentCandidate, why string, err error)
+	AgentCandidate(cliPath string) (cand AgentCandidate, why string, err error)
 	RecordAgent(want AgentCandidate) (AgentCandidate, error)
 }
 
 // AgentCandidate is the single foreground program of a session's terminal. A gone session or a backend that cannot say is ErrTerminalGone / ErrNoCandidate.
-func (m *PTYBackend) AgentCandidate(name string) (AgentCandidate, string, error) {
+func (m *PTYBackend) AgentCandidate(name, cliPath string) (AgentCandidate, string, error) {
 	m.mu.RLock()
 	s, found := m.sessions[name]
 	m.mu.RUnlock()
@@ -88,7 +91,7 @@ func (m *PTYBackend) AgentCandidate(name string) (AgentCandidate, string, error)
 		return AgentCandidate{}, "", ErrTerminalGone
 	}
 	if r, can := s.proc.(agentRecordProc); can {
-		return r.AgentCandidate()
+		return r.AgentCandidate(cliPath)
 	}
 	sp, can := s.proc.(shellPIDReporter)
 	if !can {

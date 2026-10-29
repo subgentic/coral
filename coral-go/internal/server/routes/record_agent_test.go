@@ -33,7 +33,7 @@ func (r *recordTerminal) AgentNoticeTarget(_ context.Context, name, _, _ string)
 	return true, false, "", true
 }
 
-func (r *recordTerminal) AgentCandidate(_ context.Context, name, _, _ string) (ptymanager.AgentCandidate, string, error) {
+func (r *recordTerminal) AgentCandidate(_ context.Context, name, _, _, _ string) (ptymanager.AgentCandidate, string, error) {
 	if w := r.why[name]; w != "" {
 		return ptymanager.AgentCandidate{}, w, nil
 	}
