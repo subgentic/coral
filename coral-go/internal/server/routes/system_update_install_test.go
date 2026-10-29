@@ -53,6 +53,35 @@ func TestInstallUpdateIsLocalPersonOnly(t *testing.T) {
 	}
 	reset := func() { launched, quit, launchErr, preErr = 0, 0, nil, nil; h.installing = 0 }
 
+	// #395: a staged release that is not newer than the running one is never installed, and the page is told why.
+	t.Run("a staged release that is not newer than the running Coral is refused as not_newer", func(t *testing.T) {
+		for _, tc := range []struct{ staged, installed string }{
+			{"2.0.1", "2.0.3"},     // lower
+			{"2.0.3", "2.0.3"},     // equal
+			{"2.0.3", "2.0.4-rc1"}, // lower than a prerelease of a later version
+			{"2.0.3", "v2.0.3"},    // equal, with a "v"
+		} {
+			reset()
+			h.installedVersion = func() string { return tc.installed }
+			h.stagedUpdate = func(context.Context) (string, error) { return tc.staged, nil }
+			rec := req("", nil)
+			assert.Equal(t, http.StatusConflict, rec.Code, tc.staged+" vs "+tc.installed)
+			assert.Contains(t, rec.Body.String(), "not_newer", tc.staged+" vs "+tc.installed)
+			assert.Equal(t, [2]int{0, 0}, [2]int{launched, quit}, "nothing was started: "+tc.staged+" vs "+tc.installed)
+		}
+		for _, tc := range []struct{ staged, installed string }{
+			{"2.0.4", "2.0.3"},     // higher
+			{"2.0.3", "2.0.3-rc1"}, // a release is above a prerelease of the same version
+			{"1.5.0", "dev"},       // a build with no version is never blocked by this check
+		} {
+			reset()
+			h.installedVersion = func() string { return tc.installed }
+			h.stagedUpdate = func(context.Context) (string, error) { return tc.staged, nil }
+			assert.Equal(t, http.StatusAccepted, req("", nil).Code, tc.staged+" vs "+tc.installed)
+		}
+		h.installedVersion = nil
+		h.stagedUpdate = func(context.Context) (string, error) { return "1.5.0", nil }
+	})
 	t.Run("the dashboard on this computer starts the updater, then quits", func(t *testing.T) {
 		reset()
 		rec := req("", nil)

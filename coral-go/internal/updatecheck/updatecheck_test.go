@@ -188,3 +188,27 @@ func TestLatestRefusesAReplyThatIsNotThisRepositorysRelease(t *testing.T) {
 		assert.Error(t, err, name)
 	}
 }
+
+// #395: a staged release that is not newer than the running Coral is not an update.
+func TestNotNewer(t *testing.T) {
+	for _, tc := range []struct {
+		candidate, current string
+		want               bool
+	}{
+		{"2.0.1", "2.0.3", true},      // lower
+		{"2.0.3", "2.0.3", true},      // equal
+		{"2.0.4", "2.0.3", false},     // higher
+		{"2.0.3", "2.0.3-rc1", false}, // a release is newer than a prerelease of itself
+		{"2.0.3-rc1", "2.0.3", true},  // a prerelease is older than its release
+		{"2.0.3", "2.0.4-rc1", true},  // lower than a later prerelease
+		{"2.0.4", "2.0.4-rc1", false},
+		{"2.0.4-rc2", "2.0.4-rc1", false},
+		{"2.0.4-rc1", "2.0.4-rc2", true},
+		{"v2.0.1", "2.0.3", true}, // with a "v"
+		{"2.0.1", "dev", false},   // an unknown version says nothing
+		{"2.0.1", "", false},
+		{"nonsense", "2.0.3", false},
+	} {
+		assert.Equal(t, tc.want, NotNewer(tc.candidate, tc.current), tc.candidate+" vs "+tc.current)
+	}
+}

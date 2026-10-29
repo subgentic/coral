@@ -130,7 +130,7 @@ func collectStatus(getenv func(string) string, dataDir string, now time.Time) st
 		out.LastFailure = &statusFail{Version: ver(f.Version), Stage: word(f.Stage), Reason: text(f.Reason), At: timeText(f.At)}
 	}
 	if s := st.Stage; s != nil {
-		if s.Staged != "" {
+		if s.Staged != "" && !verify.NotNewer(s.Staged, config.Version) { // a release staged before a newer one was installed is not "ready to install" (#395)
 			out.Staged = &statusStage{Version: ver(s.Staged), StagedAt: timeText(s.StagedAt), Source: verify.Repo} // staged means it passed verification: the source is the pinned repository
 		}
 		if until := timeText(s.NextAttempt); until != "" {

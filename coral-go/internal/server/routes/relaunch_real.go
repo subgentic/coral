@@ -164,7 +164,7 @@ func recordFrom(out status.Out, st relaunchState, now time.Time) UpdaterRecord {
 		rec.InstallKind = i.Kind
 		rec.Supported = i.Unsupported == "" && i.Writable
 	}
-	if s := out.Staged; s != nil && updateVersionRe.MatchString(s.Version) {
+	if s := out.Staged; s != nil && updateVersionRe.MatchString(s.Version) && !updatecheck.NotNewer(s.Version, out.Installed) { // a staged release that is not newer than the installed one is not an update (#395)
 		rec.State = updStaged
 		rec.Staged = &StagedUpdate{Version: s.Version, StagedAt: parseTime(s.StagedAt), Verified: true, Source: s.Source}
 		rec.Latest = s.Version
