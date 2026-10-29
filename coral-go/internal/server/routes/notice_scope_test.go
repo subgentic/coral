@@ -117,7 +117,7 @@ func TestBoardNoticesReachOnlyThatBoardsSessions(t *testing.T) {
 	resp.Body.Close()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	require.Eventually(t, func() bool { return len(term.sentTo(reviewerB)) == 1 }, 5*time.Second, 20*time.Millisecond)
-	assert.Contains(t, term.sentTo(reviewerB)[0], "'team-b'")
+	assert.Contains(t, term.sentTo(reviewerB)[0], "posted on team-b.") // the board, as a typed label (goal #7)
 	h.WaitBackground()
 	assert.Len(t, term.sentTo(reviewerA), before, "team-a's reviewer got nothing from team-b")
 }

@@ -303,7 +303,7 @@ func (m *BoardHealthMonitor) nudgeMember(ctx context.Context, project, orch stri
 	for _, s := range subs {
 		if board.SameIdentity(s.SubscriberID, who) {
 			if a, live := bySession[s.SessionName]; live {
-				if err := sendUnlessBlocked(ctx, m.limit, m.deliver, a, key+project, typedHealthLine(detail)); err != nil {
+				if err := sendUnlessBlocked(ctx, m.limit, m.deliver, a, key+project, "[Coral health] "+detail); err != nil {
 					m.logger.Warn("health check delivery failed", "check", key, "project", project, "error", err)
 				}
 			}

@@ -46,6 +46,7 @@ func typedOnly(s, extra string, max int) string {
 			if !space {
 				b.WriteByte(' ')
 				space = true
+				n++ // the cap counts every rune written
 			}
 			continue
 		}
