@@ -76,6 +76,14 @@ func Newer(latest, current string) bool {
 	return ok1 && ok2 && compare(l, c) > 0
 }
 
+// NotNewer reports whether candidate is a version that is NOT newer than current: older or equal, both parsing as versions (a prerelease of a version is older than the version, as in Newer).
+// A version that doesn't parse says nothing here (false), so a build whose version is "dev" or unknown never has an update dropped by this.
+func NotNewer(candidate, current string) bool {
+	l, ok1 := parse(candidate)
+	c, ok2 := parse(current)
+	return ok1 && ok2 && compare(l, c) <= 0
+}
+
 // Available is Latest, then Newer against current: the version to offer, or "".
 func Available(ctx context.Context, apiURL, current string) (string, error) {
 	latest, err := Latest(ctx, apiURL)

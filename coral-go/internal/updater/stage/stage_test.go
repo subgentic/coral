@@ -630,3 +630,60 @@ func TestAResultHoldsNoPathURLOrHash(t *testing.T) {
 		}
 	}
 }
+
+// #395: a release staged before a newer one was installed (by hand) is not "ready to install" any more.
+func TestAStagedReleaseThatIsNotNewerThanTheInstalledOneIsDropped(t *testing.T) {
+	seed := func(e *env, stage verify.StageState) {
+		dir := filepath.Join(e.data, UpdatesDir)
+		require.NoError(t, verify.EnsureDir(dir))
+		require.NoError(t, os.MkdirAll(filepath.Join(dir, StagingDir, stage.Staged), 0o700))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, StagingDir, stage.Staged, "pkg"), []byte("x"), 0o600))
+		require.NoError(t, verify.SaveState(dir, verify.State{Stage: &stage}))
+	}
+	for _, tc := range []struct{ staged, installed string }{
+		{"1.4.120", "1.4.130"}, // lower: the live case (2.0.1 staged, 2.0.3 installed)
+		{"1.4.130", "1.4.130"}, // equal
+	} {
+		// a rate-limit back-off is waiting (the live case's last result was rate_limited at the manifest): the drop happens before the back-off returns
+		e := newEnv(t, tc.installed)
+		seed(e, verify.StageState{Staged: tc.staged, StagedAt: e.now.Format(time.RFC3339), Version: "1.4.140", Attempts: 1, ErrorKind: KindRateLimit, NextAttempt: e.now.Add(time.Hour).Format(time.RFC3339)})
+		res := e.check()
+		assert.Equal(t, ResultBackoff, res.Result, tc.staged)
+		st := e.state()
+		require.NotNil(t, st.Stage, "the back-off for another release stays")
+		assert.Empty(t, st.Stage.Staged, tc.staged+": no longer staged")
+		assert.Empty(t, st.Stage.StagedAt)
+		assert.Equal(t, "1.4.140", st.Stage.Version)
+		assert.Empty(t, e.stagedVersions(), "its files are removed")
+		_, err := LoadStaged(e.data)
+		assert.Error(t, err, "nothing is ready to install")
+
+		// no back-off: the check finds nothing newer and the stage is gone too
+		e = newEnv(t, tc.installed)
+		seed(e, verify.StageState{Staged: tc.staged, StagedAt: e.now.Format(time.RFC3339)})
+		assert.Equal(t, ResultUpToDate, e.check().Result)
+		assert.Nil(t, e.state().Stage, tc.staged)
+		assert.Empty(t, e.stagedVersions())
+	}
+
+	// a newer staged release stays (and is not re-downloaded: it is already there)
+	e := newEnv(t, "1.4.125")
+	require.Equal(t, ResultStaged, e.check().Result)
+	require.NotNil(t, e.state().Stage)
+	assert.Equal(t, "1.4.130", e.state().Stage.Staged)
+	assert.Equal(t, []string{"1.4.130"}, e.stagedVersions())
+	assert.Equal(t, ResultAlreadyStaged, e.check().Result)
+	assert.Equal(t, "1.4.130", e.state().Stage.Staged)
+}
+
+func TestDropStaleStageLeavesUnparsedVersionsAlone(t *testing.T) {
+	st := verify.State{Stage: &verify.StageState{Staged: "1.4.120"}}
+	assert.Equal(t, "", dropStaleStage(&st, "dev"), "an installed version that is not a version says nothing")
+	assert.NotNil(t, st.Stage)
+	assert.Equal(t, "", dropStaleStage(&verify.State{}, "1.4.130"))
+	st = verify.State{Stage: &verify.StageState{Staged: "1.4.131"}}
+	assert.Equal(t, "", dropStaleStage(&st, "1.4.130"), "a newer one stays")
+	st = verify.State{Stage: &verify.StageState{Staged: "1.4.129"}}
+	assert.Equal(t, "1.4.129", dropStaleStage(&st, "1.4.130-rc1"), "lower than a prerelease of a later core too")
+	assert.Nil(t, st.Stage)
+}
