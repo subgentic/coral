@@ -31,7 +31,8 @@ const { removeBoards } = require('./helpers/board_cleanup');
             assert.ok(m.goal === 0 || m.goal >= m.ch16 - 1, `${w}: the Goal is at least 16 characters or has gone: ` + JSON.stringify(m));
             if (m.goal) assert.ok(m.task >= m.goal * 1.4 && m.task <= m.goal * 2.8, `${w}: the Task and the Goal share the room about 2 to 1: ` + JSON.stringify(m));
             assert.ok(m.state <= 130 && m.who <= 130 && m.updated <= 130, `${w}: the short columns stay short: ` + JSON.stringify(m));
-            if (w >= 1024) assert.ok(m.goal > 0, `${w}: the Goal is still drawn at ${w}: ` + JSON.stringify(m));
+            // the Goal is drawn at 1024 and up unless the Task and the Goal would not both fit: a dropped Goal leaves all the room to the Task, so Task < 24 ch + 16 ch says there was none (the short columns are 3 px wider on Linux fonts: 378 px of room against 380 there, 384 on a Mac, #10925)
+            if (w >= 1024) assert.ok(m.goal > 0 || m.task < m.ch24 + m.ch16, `${w}: the Goal is still drawn at ${w}, unless there is no room for a 24-character Task and a 16-character Goal: ` + JSON.stringify(m));
             { const d = process.env.CORAL_SCREENSHOT_DIR; if (d) { require('node:fs').mkdirSync(d, { recursive: true }); require('node:fs').writeFileSync(`${d}/tasks-sizing-${w}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); } }
             console.log(`   ${w}: ok ${JSON.stringify(m)}`);
         }
