@@ -16,6 +16,8 @@ type AgentCandidate struct {
 	Program string `json:"program"`
 	// Under is the nested shell the program runs inside ("" for a direct child of the terminal's shell). Recording such a program needs the Operator's explicit acknowledgement.
 	Under string `json:"under"`
+	// Script is the absolute script path of `interpreter script ...` (see ScriptIsCLI): only for the bulk match, never shown, logged or kept.
+	Script string `json:"-"`
 	Image string `json:"-"`
 	// CLIPath, on a candidate passed to RecordAgent, is the session's resolved CLI path (see AgentRecorder.AgentCandidate).
 	CLIPath string `json:"-"`
@@ -37,7 +39,12 @@ type AgentRecorder interface {
 }
 
 func fromTmux(c tmux.Candidate) AgentCandidate {
-	return AgentCandidate{PID: c.PID, Start: c.Start, Program: c.Program, Under: c.Under, Image: tmux.ProgramImage(c.PID)}
+	image := tmux.ProgramImage(c.PID)
+	var args []string
+	if interpreterName(image) != "" {
+		args = tmux.ProgramArgs(c.PID) // read for one comparison (ScriptIsCLI) and dropped
+	}
+	return AgentCandidate{PID: c.PID, Start: c.Start, Program: c.Program, Under: c.Under, Image: image, Script: interpreterScript(image, args)}
 }
 
 // AgentCandidate implements AgentRecorder for tmux.

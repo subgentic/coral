@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"os"
 	"testing"
 
 	"github.com/go-chi/chi/v5"
@@ -223,4 +224,32 @@ func TestRecordingAProgramUnderANestedShellNeedsTheAcknowledgement(t *testing.T)
 	code, _ = postRecordJSON(t, srv+"/api/sessions/live/"+recordSIDa+"/record-agent", map[string]any{"pid": 100, "start": "s1", "acknowledge_nested": true})
 	assert.Equal(t, http.StatusOK, code)
 	assert.Equal(t, 100, term.recorded[nameA].PID)
+}
+
+// #391, Unix: after an update, an npm-installed CLI runs as `node <script>`. Bulk records it only when the IMAGE is an interpreter and the script is exactly the resolved CLI file.
+func TestBulkRecordsAnInterpreterRunningExactlyTheCLI(t *testing.T) {
+	srv, term, ss, nameA, nameB := recordFixture(t)
+	settings, err := ss.GetSettingsForCLI(context.Background())
+	require.NoError(t, err)
+	cli := settings["cli_path_claude"]
+	require.NoError(t, os.WriteFile(cli, []byte("#!/usr/bin/env node\n"), 0o755))
+	term.paused[nameA], term.paused[nameB] = true, true
+	term.cand[nameA] = ptymanager.AgentCandidate{PID: 100, Start: "s1", Program: "node", Image: "/usr/bin/node", Script: cli}
+	term.cand[nameB] = ptymanager.AgentCandidate{PID: 200, Start: "s2", Program: "node", Image: "/usr/bin/node", Script: cli + ".other"}
+
+	code, out := postRecordJSON(t, srv+"/api/sessions/record-agents", map[string]any{})
+	require.Equal(t, http.StatusOK, code)
+	recorded, _ := out["recorded"].([]any)
+	require.Len(t, recorded, 1)
+	assert.Equal(t, nameA, recorded[0].(map[string]any)["session"])
+	assert.NotContains(t, term.recorded, nameB, "another script")
+
+	// A non-interpreter image never matches, whatever its (rewritable) command line said; a nested shell's program is never bulk-recorded.
+	term.cand[nameB] = ptymanager.AgentCandidate{PID: 300, Start: "s3", Program: "bash", Image: "/bin/bash", Script: cli}
+	_, out = postRecordJSON(t, srv+"/api/sessions/record-agents", map[string]any{})
+	assert.Empty(t, out["recorded"])
+	term.cand[nameB] = ptymanager.AgentCandidate{PID: 400, Start: "s4", Program: "node", Image: "/usr/bin/node", Script: cli, Under: "bash"}
+	_, out = postRecordJSON(t, srv+"/api/sessions/record-agents", map[string]any{})
+	assert.Empty(t, out["recorded"])
+	assert.NotContains(t, term.recorded, nameB)
 }

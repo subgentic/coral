@@ -146,7 +146,7 @@ type leftAgent struct {
 }
 
 // RecordAgents: POST /api/sessions/record-agents (Operator only), after an update. Every agent whose notices are paused and whose single foreground program is its resolved CLI is
-// recorded. The match is the program's image path against the resolved CLI path; anything else (a script run by node, a wrapper, two programs, an unreadable image) is left paused
+// recorded. The match is the program's image path against the resolved CLI path, or an interpreter (node, bun, deno) running exactly the CLI file (the npm bin: for the one-time update of already-running agents); anything else (a script run by node, a wrapper, two programs, an unreadable image) is left paused
 // and listed.
 func (h *SessionsHandler) RecordAgents(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
@@ -194,7 +194,7 @@ func (h *SessionsHandler) RecordAgents(w http.ResponseWriter, r *http.Request) {
 			left = append(left, leftAgent{name, "the agent's CLI could not be resolved"})
 			continue
 		}
-		if !sameImage(cand.Image, cli) {
+		if !sameImage(cand.Image, cli) && !ptymanager.ScriptIsCLI(cand.Image, cand.Script, cli) {
 			left = append(left, leftAgent{name, "ambiguous: the program is " + programName(cand) + ", not the resolved CLI (a script run by an interpreter, or a wrapper): record it with the button"})
 			continue
 		}
