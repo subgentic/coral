@@ -3,14 +3,24 @@
 // Package installrestart remembers, across an MSI install, that Coral was running when the installer closed it (#335), so the installer
 // starts it again afterwards, and only then. It is one small file in this user's %LOCALAPPDATA%\Coral, written when Coral is closed for the
 // install and taken (read and removed) after it; a mark older than MaxAge is for no install running now and starts nothing.
+//
+// The installer's helper may run ELEVATED while the folder belongs to the user, who can put a link where it expects a folder or a file. So
+// nothing here walks a path twice: the folder is opened ONCE, as itself (never what a link in its place points at), refused if it is a link
+// or is reached through one, and held open without delete sharing (so it cannot be renamed or replaced while it is in use); every read,
+// remove and create then happens relative to that handle, and a link that has the mark's name is opened and removed as itself.
 package installrestart
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
+	"unsafe"
 
 	"golang.org/x/sys/windows"
 )
@@ -20,19 +30,182 @@ const MaxAge = 30 * time.Minute
 
 const fileName = "restart-after-install"
 
-// folder is this user's %LOCALAPPDATA%\Coral: Windows' known folder for the user, not the LOCALAPPDATA variable (which an installer's process
-// may not carry over); Windows may still expand %USERPROFILE% in it. A variable so a test can put it elsewhere.
+// Win32 constants x/sys/windows does not name: FILE_ADD_FILE (a directory right), and the flags of GetFinalPathNameByHandle.
+const (
+	fileAddFile        = 0x2
+	fileNameNormalized = 0x0
+	volumeNameDOS      = 0x0
+)
+
+// ErrNotPlainFolder: the mark's folder is a link or a junction, or is reached through one, or is not a folder.
+var ErrNotPlainFolder = errors.New("the mark's folder is not a plain folder (a link, a junction, or reached through one)")
+
+// folder is this user's %LOCALAPPDATA%\<the product's folder name>: Windows' known folder for the user, not the LOCALAPPDATA variable (which an
+// installer's process may not carry over); Windows may still expand %USERPROFILE% in it. The name follows the product the program belongs to
+// (see productFolderName), so the tray and the installer's helper of one install agree on it, and another product's install (the rehearsal's
+// "Coral Rehearsal") never reads or writes the live Coral's folder. A variable so a test can put it elsewhere.
 var folder = func() (string, error) {
+	exe, err := os.Executable()
+	if err != nil {
+		return "", err
+	}
+	return folderFor(exe)
+}
+
+// folderFor is the mark's folder for a program at exe.
+func folderFor(exe string) (string, error) {
 	local, err := windows.KnownFolderPath(windows.FOLDERID_LocalAppData, windows.KF_FLAG_DONT_VERIFY) // Mark makes it when missing
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(local, "Coral"), nil
+	return folderUnder(local, exe), nil
 }
 
-// Mark records that Coral was closed for an install, now. The installer's helper may write it with an elevated token, so no link is followed:
-// the folder must be a plain folder (not a link or a junction), and the file is created new after removing whatever has its name (a link is
-// removed as itself); if something takes the name again in between, the create fails rather than write through it (Security on #335).
+// folderUnder is the mark's folder below the user's Local AppData folder local, for a program at exe.
+func folderUnder(local, exe string) string { return filepath.Join(local, productFolderName(exe)) }
+
+// productNameRe is the folder name of a product's install: "Coral", or "Coral" and one more word ("Coral Rehearsal").
+var productNameRe = regexp.MustCompile(`^Coral( [A-Za-z0-9]{1,24})?$`)
+
+// productFolderName is the name of the folder the program at exe was installed in when that is a Coral product's ("Coral Rehearsal"), else "Coral": the
+// live product, and a program run from anywhere else (a build, a portable copy). The installer's helper and the tray sit in the same install folder,
+// so they get the same name.
+func productFolderName(exe string) string {
+	if name := filepath.Base(filepath.Dir(exe)); productNameRe.MatchString(name) {
+		return name
+	}
+	return "Coral"
+}
+
+// afterFolderOpen runs once the folder is open and checked, before anything is done in it (a hook for a test, which tries to swap the folder
+// then).
+var afterFolderOpen = func() {}
+
+// plainFolder is the opened folder: a handle to the directory itself.
+type plainFolder struct{ h windows.Handle }
+
+func (d *plainFolder) Close() { _ = windows.CloseHandle(d.h) }
+
+// openPlainFolder opens dir as itself and returns it only if it is a plain directory reached by no link. FILE_FLAG_OPEN_REPARSE_POINT opens a
+// junction or symlink in dir's place as the link, not its target; the handle's own attributes then say whether it is one; its final path says
+// whether an ancestor is one. Sharing excludes delete and rename, so the folder cannot be swapped while the handle is held.
+func openPlainFolder(dir string) (*plainFolder, error) {
+	dir = filepath.Clean(dir)
+	p, err := windows.UTF16PtrFromString(dir)
+	if err != nil {
+		return nil, err
+	}
+	h, err := windows.CreateFile(p, windows.FILE_LIST_DIRECTORY|fileAddFile|windows.FILE_TRAVERSE|windows.FILE_READ_ATTRIBUTES|windows.SYNCHRONIZE,
+		windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE, nil, windows.OPEN_EXISTING, windows.FILE_FLAG_BACKUP_SEMANTICS|windows.FILE_FLAG_OPEN_REPARSE_POINT, 0)
+	if err != nil {
+		return nil, err
+	}
+	d := &plainFolder{h: h}
+	var info windows.ByHandleFileInformation
+	if err := windows.GetFileInformationByHandle(h, &info); err != nil {
+		d.Close()
+		return nil, err
+	}
+	if info.FileAttributes&windows.FILE_ATTRIBUTE_REPARSE_POINT != 0 || info.FileAttributes&windows.FILE_ATTRIBUTE_DIRECTORY == 0 {
+		d.Close()
+		return nil, ErrNotPlainFolder
+	}
+	// An ancestor that is a link: the handle's final path is where the folder really is, which then is not where it was asked for.
+	final, err := finalPathOf(h)
+	if err != nil || !sameFolder(final, longPath(dir)) {
+		d.Close()
+		return nil, ErrNotPlainFolder
+	}
+	return d, nil
+}
+
+// sameFolder: the handle's final path (\\?\ form) is the path the folder was asked for, case aside. A different one means an ancestor is a link.
+func sameFolder(final, asked string) bool {
+	return strings.EqualFold(strings.TrimPrefix(final, `\\?\`), strings.TrimPrefix(asked, `\\?\`))
+}
+
+// finalPathOf is finalPath (a test seam: a build that refuses to walk a junction ancestor cannot show the check being used).
+var finalPathOf = finalPath
+
+func finalPath(h windows.Handle) (string, error) {
+	buf := make([]uint16, 1024)
+	n, err := windows.GetFinalPathNameByHandle(h, &buf[0], uint32(len(buf)), fileNameNormalized|volumeNameDOS)
+	if err != nil {
+		return "", err
+	}
+	if int(n) > len(buf) {
+		return "", errors.New("the folder's final path is too long")
+	}
+	return windows.UTF16ToString(buf[:n]), nil
+}
+
+// longPath is dir with 8.3 short names expanded (the known folder is normally long already); dir itself when it cannot be.
+func longPath(dir string) string {
+	in, err := windows.UTF16PtrFromString(dir)
+	if err != nil {
+		return dir
+	}
+	buf := make([]uint16, 1024)
+	n, err := windows.GetLongPathName(in, &buf[0], uint32(len(buf)))
+	if err != nil || n == 0 || int(n) > len(buf) {
+		return dir
+	}
+	return windows.UTF16ToString(buf[:n])
+}
+
+// openChild opens the name below the folder, relative to its handle. A link with that name is opened as itself (FILE_OPEN_REPARSE_POINT), never
+// followed. name is a plain file name.
+func (d *plainFolder) openChild(name string, access, disposition, options uint32) (windows.Handle, error) {
+	if name == "" || name == "." || name == ".." || strings.ContainsAny(name, `\/:`) {
+		return 0, errors.New("not a plain file name")
+	}
+	us, err := windows.NewNTUnicodeString(name)
+	if err != nil {
+		return 0, err
+	}
+	oa := windows.OBJECT_ATTRIBUTES{RootDirectory: d.h, ObjectName: us, Attributes: windows.OBJ_CASE_INSENSITIVE}
+	oa.Length = uint32(unsafe.Sizeof(oa))
+	var h windows.Handle
+	var iosb windows.IO_STATUS_BLOCK
+	if err := windows.NtCreateFile(&h, access|windows.SYNCHRONIZE, &oa, &iosb, nil, windows.FILE_ATTRIBUTE_NORMAL,
+		windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE|windows.FILE_SHARE_DELETE, disposition,
+		options|windows.FILE_OPEN_REPARSE_POINT|windows.FILE_SYNCHRONOUS_IO_NONALERT, 0, 0); err != nil {
+		return 0, err
+	}
+	return h, nil
+}
+
+// notFound: the name (or its folder) is not there.
+func notFound(err error) bool {
+	switch err {
+	case windows.STATUS_OBJECT_NAME_NOT_FOUND, windows.STATUS_OBJECT_PATH_NOT_FOUND, windows.STATUS_NO_SUCH_FILE:
+		return true
+	}
+	return errors.Is(err, os.ErrNotExist) || errors.Is(err, windows.ERROR_FILE_NOT_FOUND) || errors.Is(err, windows.ERROR_PATH_NOT_FOUND)
+}
+
+// deleteHandle marks the open file (or the link itself) for deletion.
+func deleteHandle(h windows.Handle) error {
+	disp := struct{ DeleteFile byte }{1}
+	return windows.SetFileInformationByHandle(h, windows.FileDispositionInfo, (*byte)(unsafe.Pointer(&disp)), uint32(unsafe.Sizeof(disp)))
+}
+
+// remove deletes what has the mark's name in the folder, as itself (a link is removed, never its target). Nothing there is no error.
+func (d *plainFolder) remove(name string) error {
+	h, err := d.openChild(name, windows.DELETE|windows.FILE_READ_ATTRIBUTES, windows.FILE_OPEN, 0)
+	if err != nil {
+		if notFound(err) {
+			return nil
+		}
+		return err
+	}
+	defer windows.CloseHandle(h)
+	return deleteHandle(h)
+}
+
+// Mark records that Coral was closed for an install, now. The folder is opened once as a plain folder (ErrNotPlainFolder otherwise); the
+// file with the mark's name, if any, is removed as itself, and the mark is created new in that folder, so if something takes the name again
+// in between the create fails rather than write through it (Security on #335).
 func Mark(now time.Time) error {
 	dir, err := folder()
 	if err != nil {
@@ -41,19 +214,20 @@ func Mark(now time.Time) error {
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return err
 	}
-	if fi, err := os.Lstat(dir); err != nil {
-		return err
-	} else if !fi.IsDir() {
-		return errors.New("the mark's folder is not a plain folder")
-	}
-	p := filepath.Join(dir, fileName)
-	if err := os.Remove(p); err != nil && !errors.Is(err, os.ErrNotExist) {
-		return err
-	}
-	f, err := os.OpenFile(p, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
+	d, err := openPlainFolder(dir)
 	if err != nil {
 		return err
 	}
+	defer d.Close()
+	afterFolderOpen()
+	if err := d.remove(fileName); err != nil {
+		return err
+	}
+	h, err := d.openChild(fileName, windows.FILE_WRITE_DATA|windows.FILE_READ_ATTRIBUTES, windows.FILE_CREATE, windows.FILE_NON_DIRECTORY_FILE)
+	if err != nil {
+		return err
+	}
+	f := os.NewFile(uintptr(h), fileName)
 	_, err = f.WriteString(now.UTC().Format(time.RFC3339) + "\n")
 	if cerr := f.Close(); err == nil {
 		err = cerr
@@ -62,32 +236,86 @@ func Mark(now time.Time) error {
 }
 
 // Discard removes the mark, if there is one, without reading it: Coral is being uninstalled, so there is nothing to start again (#345: Restart
-// Manager closing the tray for an uninstall made it mark). A link that has the mark's name is removed as itself.
+// Manager closing the tray for an uninstall made it mark). A link that has the mark's name is removed as itself. A folder that is not a plain
+// folder is left alone (ErrNotPlainFolder).
 func Discard() error {
 	dir, err := folder()
 	if err != nil {
 		return err
 	}
-	if err := os.Remove(filepath.Join(dir, fileName)); err != nil && !errors.Is(err, os.ErrNotExist) {
+	d, err := openPlainFolder(dir)
+	if err != nil {
+		if notFound(err) {
+			return nil
+		}
 		return err
 	}
-	return nil
+	defer d.Close()
+	return d.remove(fileName)
 }
 
+// CreateLog creates a new log file named <prefix>-<random>.log in the mark's folder and returns it, for an ELEVATED program that must not log into the user's
+// TEMP (a folder the user controls, where it would be made to write through a link): the folder is opened once as a plain folder and the file is created
+// new relative to it, exclusively, so nothing is followed and nothing existing is opened. A folder that is not a plain folder is ErrNotPlainFolder.
+func CreateLog(prefix string) (*os.File, error) {
+	dir, err := folder()
+	if err != nil {
+		return nil, err
+	}
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return nil, err
+	}
+	d, err := openPlainFolder(dir)
+	if err != nil {
+		return nil, err
+	}
+	defer d.Close()
+	var rnd [8]byte
+	if _, err := rand.Read(rnd[:]); err != nil {
+		return nil, err
+	}
+	name := prefix + "-" + hex.EncodeToString(rnd[:]) + ".log"
+	h, err := d.openChild(name, windows.FILE_WRITE_DATA|windows.FILE_APPEND_DATA|windows.FILE_READ_ATTRIBUTES, windows.FILE_CREATE, windows.FILE_NON_DIRECTORY_FILE)
+	if err != nil {
+		return nil, err
+	}
+	return os.NewFile(uintptr(h), name), nil
+}
+
+// maxMarkBytes bounds what Take reads: a mark is one RFC 3339 line.
+const maxMarkBytes = 256
+
 // Take removes the mark and reports whether it was there and recent (written within MaxAge before now, never after it). A missing,
-// unreadable or stale mark is false; the file goes in every case, so it starts Coral once at most.
+// unreadable or stale mark is false; the file goes in every case, so it starts Coral once at most. A folder that is not a plain folder is not
+// touched, and starts nothing; a link with the mark's name is removed as itself and starts nothing.
 func Take(now time.Time) bool {
 	dir, err := folder()
 	if err != nil {
 		return false
 	}
-	p := filepath.Join(dir, fileName)
-	b, err := os.ReadFile(p)
-	if errors.Is(err, os.ErrNotExist) {
+	d, err := openPlainFolder(dir)
+	if err != nil {
 		return false
 	}
-	_ = os.Remove(p)
+	defer d.Close()
+	h, err := d.openChild(fileName, windows.FILE_READ_DATA|windows.DELETE|windows.FILE_READ_ATTRIBUTES, windows.FILE_OPEN, windows.FILE_NON_DIRECTORY_FILE)
 	if err != nil {
+		if !notFound(err) {
+			_ = d.remove(fileName) // a directory or a link with the name: gone as itself, and nothing starts
+		}
+		return false
+	}
+	var info windows.ByHandleFileInformation
+	isLink := windows.GetFileInformationByHandle(h, &info) != nil || info.FileAttributes&windows.FILE_ATTRIBUTE_REPARSE_POINT != 0
+	var b []byte
+	var rerr error
+	f := os.NewFile(uintptr(h), fileName)
+	if !isLink {
+		b, rerr = io.ReadAll(io.LimitReader(f, maxMarkBytes))
+	}
+	_ = deleteHandle(h)
+	_ = f.Close()
+	if isLink || rerr != nil {
 		return false
 	}
 	at, err := time.Parse(time.RFC3339, strings.TrimSpace(string(b)))
