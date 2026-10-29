@@ -332,6 +332,7 @@ func (h *HistoryHandler) boardHistoryRows(r *http.Request, searchQ, dateFrom, da
 		rows = append(rows, map[string]any{
 			"session_id":        fmt.Sprintf("board:%s", p.Project),
 			"title":             p.Project,
+			"board_label":       p.BoardLabel, // the board's display name: the title is its key, which for a team-launched board is an id (#11070)
 			"type":              "group",
 			"source_type":       "board",
 			"summary":           fmt.Sprintf("%d messages, %d participants", p.MessageCount, p.SubscriberCount),

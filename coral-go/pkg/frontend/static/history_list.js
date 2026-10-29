@@ -1,6 +1,6 @@
 /* The Chats list and a history transcript (moved out of render.js, #4996; no behaviour change). */
 import { historyServer } from './history_source.js';
-import { identityKey } from './server_base.js';
+import { identityKey, keyLabel, hasBoardLabel } from './server_base.js';
 import { state } from './state.js';
 import { scrollBehavior } from './motion.js';
 import { escapeHtml, escapeAttr } from './utils.js';
@@ -43,12 +43,20 @@ export function chatWhen(iso, durationSec, now = new Date()) {
     return { day: whenText(iso, now), iso: d.toISOString(), full: d.toLocaleString(), ran: ranFor(durationSec) };
 }
 
+/** A group chat's (board's) name as people read it: the label the sidebar uses for that board key, else the row's own board_label, else its title, else the key (#11070: Board history showed team-launched boards by their id,
+ *  b-wvvnbdjqjb, because the row's title was empty and the board-label registry was never asked). The key itself (board-open, the active row) stays the title or id. */
+export function groupChatKeyName(s) { return s.title || String(s.session_id || '').replace(/^board:/, ''); }
+export function groupChatName(s) {
+    const key = identityKey(historyServer(), groupChatKeyName(s));
+    return hasBoardLabel(key) || !s.board_label ? keyLabel(key) : String(s.board_label); // the page's registry first (the sidebar's name, with its twin-label tag); the row's own label when the page has not met the board
+}
+
 /** One chat's row in the list. */
 function chatRowHtml(s) {
     const isGroup = s.type === 'group' || (s.session_id && s.session_id.startsWith('board:'));
     if (isGroup) {
-        const projectName = s.title || s.session_id.replace(/^board:/, '');
-        const label = projectName;
+        const projectName = groupChatKeyName(s);
+        const label = groupChatName(s);
         const isActive = state.currentSession && state.currentSession.type === "board" && state.currentSession.name === projectName;
         const gwhen = chatWhen(s.updated_at, null);
         const gWhenTag = gwhen ? `<span class="session-time"><time datetime="${escapeAttr(gwhen.iso)}" title="${escapeAttr(gwhen.full)}">${escapeHtml(gwhen.day)}</time></span>` : '';
@@ -148,9 +156,9 @@ function redrawHistoryGroups() {
 
 function chatTableRow(s) {
     if (isGroupChat(s)) {
-        const name = s.title || s.session_id.replace(/^board:/, '');
+        const name = groupChatKeyName(s);
         const when = chatWhen(s.updated_at, null);
-        return { title: name, action: 'board-open', data: { board: identityKey(historyServer(), name) }, cells: ['Group chat', when ? when.day : '', ''] };
+        return { title: groupChatName(s), action: 'board-open', data: { board: identityKey(historyServer(), name) }, cells: ['Group chat', when ? when.day : '', ''] };
     }
     const when = chatWhen(s.last_timestamp, s.duration_sec);
     return { title: historyLabel(s), action: 'history-open', data: { 'session-id': s.session_id }, cells: [s.display_name || s.agent_name || '', when ? when.day : '', when ? when.ran.replace(/^ran /, '') : ''] };
