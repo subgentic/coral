@@ -4,7 +4,7 @@
 // the job fails at once with "Claude is not signed in" (#5469, the operator's rule). Nothing here tries to sign in, and nothing waits for a person.
 //
 // The check is the CLI's own non-interactive status command: "claude auth status --json" (signed out: loggedIn false and exit 1) and "codex login status" (exit 1 when
-// signed out). It runs with no stdin and no terminal, from the temp folder, under a deadline. Antigravity (agy), Gemini and Pi have no such command, so they are not
+// signed out). It runs with no stdin and no terminal, from the temp folder, under a deadline. Pi has "pi auth check --provider <the provider it starts on> --json" (#11105). Antigravity (agy) and Gemini have no such command, so they are not
 // checked (Supports reports it). An answer that cannot be read (an old CLI without the command, output with no loggedIn) is Unknown and the caller goes on as before, because a
 // CLI that cannot be asked must not be locked out for good. A check that does not answer within its deadline is TimedOut: the job is still skipped (a second claude must not start
 // behind whatever the first is waiting on), but with its own sentence and code, "Claude did not answer the sign-in check" and signin_check_timeout, never "not signed in":
@@ -22,6 +22,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -97,22 +98,28 @@ func displayName(agentType string) string {
 		return "Claude"
 	case "codex":
 		return "Codex"
+	case "pi":
+		return "Pi"
 	}
 	return agentType
 }
 
 // spec is how one CLI is asked.
 type spec struct {
-	args  []string
-	state func(out, errOut []byte, runErr error) State
+	args []string
+	// argsFn, when set, gives the arguments instead: some CLIs are asked about something that has to be looked up first (Pi: which provider it starts on). false means there is nothing to ask about, and
+	// no process is started.
+	argsFn func() ([]string, bool)
+	state  func(out, errOut []byte, runErr error) State
 }
 
 var specs = map[string]spec{
 	"claude": {args: []string{"auth", "status", "--json"}, state: claudeState},
 	"codex":  {args: []string{"login", "status"}, state: codexState},
+	"pi":     {argsFn: piStatusArgs, state: piState},
 }
 
-// Supports reports whether agentType has a non-interactive way to tell whether it is signed in. agy, gemini and pi do not, and are never checked.
+// Supports reports whether agentType has a non-interactive way to tell whether it is signed in. agy and gemini do not, and are never checked.
 func Supports(agentType string) bool {
 	_, ok := specs[agentType]
 	return ok
@@ -210,9 +217,16 @@ func CheckIn(ctx context.Context, agentType, bin, dir string) State {
 	if agentType == "claude" && credentialedOutsideLogin() {
 		return Unknown // signed in by an API key, a token, a key helper or a cloud provider: no login to ask about, and none to refuse
 	}
+	args := sp.args
+	if sp.argsFn != nil {
+		var ok bool
+		if args, ok = sp.argsFn(); !ok {
+			return Unknown
+		}
+	}
 	cctx, cancel := context.WithTimeout(ctx, effectiveCheckTimeout())
 	defer cancel()
-	cmd := executil.Command(cctx, bin, sp.args...)
+	cmd := executil.Command(cctx, bin, args...)
 	cmd.Stdin = nil // the null device: a prompt gets end of input
 	cmd.Dir = os.TempDir()
 	if dir != "" {
@@ -447,4 +461,55 @@ func credentialedOutsideLogin() bool {
 		}
 	}
 	return false
+}
+
+// piProviderR is what a provider name looks like (Pi's: groq, openai-codex, amazon-bedrock, github-copilot): a word that cannot be taken for a flag or a path.
+var piProviderR = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$`)
+
+// piStatusArgs is "auth check --provider <p> --json" for the provider Pi starts on, the defaultProvider of its settings (PI_CODING_AGENT_DIR, else ~/.pi/agent). Pi's check needs a provider, so with none
+// there is nothing to ask. Never --credentials: the answer holds no secret.
+func piStatusArgs() ([]string, bool) {
+	dir := os.Getenv("PI_CODING_AGENT_DIR")
+	if dir == "" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return nil, false
+		}
+		dir = filepath.Join(home, ".pi", "agent")
+	}
+	f, err := os.Open(filepath.Join(dir, "settings.json"))
+	if err != nil {
+		return nil, false
+	}
+	defer f.Close()
+	var v struct {
+		DefaultProvider any `json:"defaultProvider"`
+	}
+	if json.NewDecoder(io.LimitReader(f, 1<<20)).Decode(&v) != nil {
+		return nil, false
+	}
+	p, ok := v.DefaultProvider.(string)
+	if !ok || !piProviderR.MatchString(p) {
+		return nil, false
+	}
+	return []string{"auth", "check", "--provider", p, "--json"}, true
+}
+
+// piState reads "pi auth check --json": {"status":"ready"|"not_ready","reason":...}. Ready is signed in; not_ready for credentials_not_configured is signed out. Any other not_ready (provider_not_found: a
+// provider the settings name that Pi does not know), text, or a failure is Unknown: the check cannot tell, and a job must not be refused for it.
+func piState(out, _ []byte, _ error) State {
+	var v struct {
+		Status string `json:"status"`
+		Reason string `json:"reason"`
+	}
+	if json.Unmarshal(bytes.TrimSpace(out), &v) != nil {
+		return Unknown
+	}
+	switch {
+	case v.Status == "ready":
+		return SignedIn
+	case v.Status == "not_ready" && v.Reason == "credentials_not_configured":
+		return SignedOut
+	}
+	return Unknown
 }
