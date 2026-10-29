@@ -18,7 +18,7 @@ const BASE = require('./test_base').BASE;
             states: Object.fromEntries([...document.querySelectorAll('#team-start-host .settings-tab')].map(b => [b.querySelector('.settings-tab-name').firstChild.textContent, b.querySelector('.menu-item-state')?.textContent])),
             names: [...document.querySelectorAll('#team-start-host .settings-tab')].map(b => b.getAttribute('aria-label')) }))()`);
         let r = await read();
-        assert.equal(r.lead, 'Everything on this step is optional. Launch team starts with what you see.');
+        assert.equal(r.lead, 'Everything on this step is optional. The team starts with the settings shown here.');
         // the template the helper picks names a working mode: Workflow says it (None when the team has none)
         const mode = await ev(`(() => { const s = [...document.querySelectorAll('#team-start-host select')].find(x => [...x.options].some(o => o.textContent.trim() === 'Worktrees')); return s.options[s.selectedIndex].textContent.trim(); })()`);
         assert.deepEqual(r.states, { Start: 'none', Workflow: mode === 'None' ? 'none' : mode, 'Health check': 'off', Messaging: 'off' }, JSON.stringify(r));

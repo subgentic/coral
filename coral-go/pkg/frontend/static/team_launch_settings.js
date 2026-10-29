@@ -93,7 +93,7 @@ export function mountTeamLaunchSettings() {
     });
     // the line above the open pane, inside the scrolling panes (the host lays its view out as a row: a sibling would take a column of it)
     const lead = document.createElement('p'); lead.className = 'team-start-lead';
-    lead.textContent = 'Everything on this step is optional. Launch team starts with what you see.';
+    lead.textContent = 'Everything on this step is optional. The team starts with the settings shown here.';
     host.querySelector('.settings-panes')?.prepend(lead);
     host.addEventListener('input', syncMenuStates); host.addEventListener('change', syncMenuStates);
     _view.ready.then(syncMenuStates);
