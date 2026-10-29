@@ -54,8 +54,8 @@ func (r *recordTerminal) RecordAgent(_ context.Context, name, _, _ string, want 
 	if cur.PID != want.PID || cur.Start != want.Start {
 		return ptymanager.AgentCandidate{}, ptymanager.ErrCandidateChanged
 	}
-	if cur.Under != "" && !want.AcknowledgeNested { // the real terminals check this in the same read as pid and start
-		return ptymanager.AgentCandidate{}, &ptymanager.NeedsAcknowledgementError{Under: cur.Under}
+	if (cur.Under != "" || cur.Unidentified) && !want.AcknowledgeNested { // the real terminals check this in the same read as pid and start
+		return ptymanager.AgentCandidate{}, &ptymanager.NeedsAcknowledgementError{Under: cur.Under, Unidentified: cur.Unidentified}
 	}
 	r.recorded[name] = cur
 	r.paused[name] = false
@@ -290,6 +290,36 @@ func TestTheAcknowledgementIsCheckedAtomicallyInTheRecord(t *testing.T) {
 	delete(term.readErr, nameA)
 
 	// With the tick it records; bulk, which never ticks, leaves a program that moved under a nested shell.
+	code, _ = postRecordJSON(t, srv+"/api/sessions/live/"+recordSIDa+"/record-agent", map[string]any{"pid": 100, "start": "s1", "acknowledge_nested": true})
+	assert.Equal(t, http.StatusOK, code)
+	assert.Contains(t, term.recorded, nameA)
+}
+
+// A program whose image cannot be read cannot be told from anything: recording it needs the acknowledgement, and bulk leaves it listed (Security on #391).
+func TestAnUnidentifiedProgramNeedsTheAcknowledgementAndBulkLeavesIt(t *testing.T) {
+	srv, term, ss, nameA, nameB := recordFixture(t)
+	settings, err := ss.GetSettingsForCLI(context.Background())
+	require.NoError(t, err)
+	term.paused[nameA], term.paused[nameB] = true, true
+	// A's name matches the CLI's but its image is unreadable; Launched and a script would otherwise let bulk take it.
+	term.cand[nameA] = ptymanager.AgentCandidate{PID: 100, Start: "s1", Program: "an unknown program (pid 100)", Unidentified: true, Script: settings["cli_path_claude"]}
+	term.cand[nameB] = ptymanager.AgentCandidate{PID: 200, Start: "s2", Program: "claude", Image: settings["cli_path_codex"]}
+
+	_, out := postRecordJSON(t, srv+"/api/sessions/record-agents", map[string]any{})
+	recorded, _ := out["recorded"].([]any)
+	require.Len(t, recorded, 1)
+	assert.Equal(t, nameB, recorded[0].(map[string]any)["session"])
+	left, _ := out["left"].([]any)
+	require.Len(t, left, 1)
+	assert.Contains(t, left[0].(map[string]any)["reason"], "could not be identified")
+	assert.NotContains(t, term.recorded, nameA)
+
+	code, out := postRecordJSON(t, srv+"/api/sessions/live/"+recordSIDa+"/record-agent", map[string]any{"pid": 100, "start": "s1"})
+	assert.Equal(t, http.StatusBadRequest, code)
+	assert.Equal(t, "acknowledge_nested", out["code"])
+	assert.Equal(t, true, out["unidentified"])
+	assert.Contains(t, out["error"], "could not be identified")
+	assert.NotContains(t, term.recorded, nameA)
 	code, _ = postRecordJSON(t, srv+"/api/sessions/live/"+recordSIDa+"/record-agent", map[string]any{"pid": 100, "start": "s1", "acknowledge_nested": true})
 	assert.Equal(t, http.StatusOK, code)
 	assert.Contains(t, term.recorded, nameA)

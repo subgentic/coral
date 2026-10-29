@@ -3,6 +3,7 @@ package ptymanager
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/subgentic/coral/internal/tmux"
@@ -87,15 +88,41 @@ func TestScriptIsCLI(t *testing.T) {
 	assert.False(t, ScriptIsCLI("/usr/bin/node", filepath.Join(dir, "my"), filepath.Join(dir, "my cli.js")), "the half of a path with a space (macOS ps splits on blanks)")
 }
 
-// The program name shown to the Operator (and in the bulk reason) is the image's, not ps's command name: a process can rename itself to look like the agent (perl's $0, prctl).
+// The program name and folder shown to the Operator come from the image, never from ps's (renamable) command name; with no readable image the candidate says so.
 func TestTheCandidatesProgramNameComesFromTheImageNotTheRenamedComm(t *testing.T) {
 	c := fromTmux(tmux.Candidate{AgentProc: tmux.AgentProc{PID: os.Getpid(), Start: "s"}, Program: "node /home/u/claude"}) // what a renamed process reports
-	image := tmux.ProgramImage(os.Getpid())
-	if image == "" {
-		assert.Equal(t, "node /home/u/claude", c.Program, "no image can be read here: ps's name is all there is")
-		return
+	if image := tmux.ProgramImage(os.Getpid()); image != "" {
+		assert.Equal(t, filepath.Base(image), c.Program)
+		assert.Equal(t, image, c.Image)
+		assert.False(t, c.Unidentified)
+		assert.NotEmpty(t, c.Folder)
 	}
-	assert.Equal(t, filepath.Base(image), c.Program)
-	assert.Equal(t, image, c.Image)
 	assert.NotContains(t, c.Program, "node /home")
+
+	gone := fromTmux(tmux.Candidate{AgentProc: tmux.AgentProc{PID: 0x7ffffff0, Start: "s"}, Program: "claude"}) // a pid with no readable image
+	assert.Equal(t, "an unknown program (pid 2147483632)", gone.Program, "no fallback to ps's name")
+	assert.True(t, gone.Unidentified)
+	assert.Empty(t, gone.Folder)
+}
+
+func TestDescribeImageShowsACleanedCappedFolder(t *testing.T) {
+	program, folder, unidentified := describeImage(7, "/opt/tools/perl")
+	assert.Equal(t, "perl", program)
+	assert.Equal(t, "/opt/tools", folder)
+	assert.False(t, unidentified)
+	_, folder, _ = describeImage(7, "/opt/‮evil​/\x1b[31mred\n/x")
+	for _, bad := range []string{"‮", "​", "\x1b", "\n"} {
+		assert.NotContains(t, folder, bad)
+	}
+	_, folder, _ = describeImage(7, "/"+strings.Repeat("a", 500)+"/x")
+	assert.LessOrEqual(t, len([]rune(folder)), 121, "capped, with an ellipsis")
+	p, _, _ := describeImage(7, "/x/"+strings.Repeat("b", 500))
+	assert.LessOrEqual(t, len([]rune(p)), 65)
+}
+
+func TestVisibleName(t *testing.T) {
+	assert.Equal(t, "a b", visibleName("a \t\n b", 10))
+	assert.Equal(t, "abc", visibleName("a‮b​c\x00", 10))
+	assert.Equal(t, "abcd…", visibleName("abcdefgh", 4))
+	assert.Equal(t, "", visibleName("    ", 10))
 }

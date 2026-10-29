@@ -117,12 +117,15 @@ func (h *SessionsHandler) RecordAgent(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "pid": got.PID, "program": got.Program})
 	case errors.Is(err, ptymanager.ErrNeedsAcknowledgement):
 		var need *ptymanager.NeedsAcknowledgementError
-		under := ""
+		under, unidentified := "", false
 		if errors.As(err, &need) {
-			under = need.Under
+			under, unidentified = need.Under, need.Unidentified
 		}
-		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "code": "acknowledge_nested", "under": under,
-			"error": "this program is running inside " + under + ", a shell started in the terminal, not directly in the agent's terminal: acknowledge it to record it"})
+		msg := "this program is running inside " + under + ", a shell started in the terminal, not directly in the agent's terminal: acknowledge it to record it"
+		if under == "" {
+			msg = "this program could not be identified (its image cannot be read): acknowledge it to record it"
+		}
+		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "code": "acknowledge_nested", "under": under, "unidentified": unidentified, "error": msg})
 	case errors.Is(err, ptymanager.ErrCandidateChanged), errors.Is(err, ptymanager.ErrNoCandidate):
 		slog.Warn("the Operator's record of an agent's process was refused: the foreground changed", "session", name, "pid", body.PID, "error", err)
 		writeJSON(w, http.StatusConflict, map[string]any{"ok": false, "code": "changed", "error": "the foreground program is no longer that process"})
@@ -183,6 +186,10 @@ func (h *SessionsHandler) RecordAgents(w http.ResponseWriter, r *http.Request) {
 			continue
 		case why != "":
 			left = append(left, leftAgent{name, why})
+			continue
+		}
+		if cand.Unidentified || cand.Image == "" {
+			left = append(left, leftAgent{name, "needs the button: the program could not be identified (its image cannot be read)"})
 			continue
 		}
 		if cand.Under != "" {

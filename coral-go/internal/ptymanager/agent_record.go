@@ -2,7 +2,8 @@ package ptymanager
 
 import (
 	"context"
-	"path/filepath"
+	"fmt"
+	"path"
 	"strings"
 
 	"github.com/subgentic/coral/internal/tmux"
@@ -23,6 +24,9 @@ type AgentCandidate struct {
 	// AcknowledgeNested, on a candidate passed to RecordAgent, is the Operator's "I know this is the agent, not something I started by hand" for a program under a nested shell.
 	AcknowledgeNested bool   `json:"-"`
 	Image             string `json:"-"`
+	// Folder is the image's folder, cleaned and capped (visibleName), shown next to Program so the Operator sees WHERE the program is from. Unidentified: the image could not be read; Program then says so, recording needs the acknowledgement, and bulk leaves it.
+	Folder       string `json:"folder"`
+	Unidentified bool   `json:"unidentified"`
 	// CLIPath, on a candidate passed to RecordAgent, is the session's resolved CLI path (see AgentRecorder.AgentCandidate).
 	CLIPath string `json:"-"`
 }
@@ -37,6 +41,16 @@ var (
 
 // NeedsAcknowledgementError is ErrNeedsAcknowledgement with the nested shell's name.
 type NeedsAcknowledgementError = tmux.NeedsAcknowledgementError
+
+// describeImage is what the Operator is shown of a program: the image's base name and folder, cleaned and capped. A process can rename itself (prctl, perl's $0) to look like the agent, so ps's
+// command name is never used; with no readable image the program is "an unknown program (pid N)" and unidentified is true.
+func describeImage(pid int, image string) (program, folder string, unidentified bool) {
+	if image == "" {
+		return fmt.Sprintf("an unknown program (pid %d)", pid), "", true
+	}
+	img := strings.ReplaceAll(image, "\\", "/")
+	return visibleName(path.Base(img), 64), visibleName(path.Dir(img), 120), false
+}
 
 // AgentRecorder is implemented by terminals that can name and record an agent's single foreground program (tmux, the PTY backend).
 type AgentRecorder interface {
@@ -53,12 +67,8 @@ func fromTmux(c tmux.Candidate) AgentCandidate {
 	if interpreterName(image) != "" {
 		args = tmux.ProgramArgs(c.PID) // read for one comparison (ScriptIsCLI) and dropped
 	}
-	// The name shown is the image's, not ps's command name: a process can rename itself (prctl, perl's $0) to look like the agent, and the Operator decides from this name.
-	program := c.Program
-	if image != "" {
-		program = filepath.Base(strings.ReplaceAll(image, "\\", "/"))
-	}
-	return AgentCandidate{PID: c.PID, Start: c.Start, Program: program, Under: c.Under, Image: image, Script: interpreterScript(image, args)}
+	program, folder, unidentified := describeImage(c.PID, image)
+	return AgentCandidate{PID: c.PID, Start: c.Start, Program: program, Folder: folder, Unidentified: unidentified, Under: c.Under, Image: image, Script: interpreterScript(image, args)}
 }
 
 // AgentCandidate implements AgentRecorder for tmux.

@@ -30,7 +30,10 @@ var ErrCandidateChanged = errors.New("the foreground program is no longer that p
 var ErrNeedsAcknowledgement = errors.New("the program runs inside a nested shell and needs the Operator's acknowledgement")
 
 // NeedsAcknowledgementError is ErrNeedsAcknowledgement with the nested shell's name.
-type NeedsAcknowledgementError struct{ Under string }
+type NeedsAcknowledgementError struct {
+	Under        string
+	Unidentified bool // the program's image could not be read
+}
 
 func (e *NeedsAcknowledgementError) Error() string {
 	return ErrNeedsAcknowledgement.Error() + " (" + e.Under + ")"
@@ -55,7 +58,7 @@ func candidateOf(t *procTable, shell int) (Candidate, string) {
 }
 
 // recordCandidate records want as the session's agent when it is still exactly the one foreground program.
-func recordCandidate(t *procTable, shell int, session string, want AgentProc, acknowledged bool) (Candidate, error) {
+func recordCandidate(t *procTable, shell int, session string, want AgentProc, acknowledged, imageKnown bool) (Candidate, error) {
 	got, why := candidateOf(t, shell)
 	if why != "" {
 		return Candidate{}, fmt.Errorf("%w: %s", ErrNoCandidate, why)
@@ -63,8 +66,8 @@ func recordCandidate(t *procTable, shell int, session string, want AgentProc, ac
 	if got.AgentProc != want || want.PID <= 0 || want.Start == "" {
 		return Candidate{}, ErrCandidateChanged
 	}
-	if got.Under != "" && !acknowledged {
-		return Candidate{}, &NeedsAcknowledgementError{Under: got.Under}
+	if (got.Under != "" || !imageKnown) && !acknowledged { // a nested shell's program, or one whose image cannot be read (it cannot be told from anything)
+		return Candidate{}, &NeedsAcknowledgementError{Under: got.Under, Unidentified: !imageKnown}
 	}
 	agentRecs.Lock()
 	r := agentRecs.m[session]
@@ -106,7 +109,7 @@ func (c *Client) RecordAgent(ctx context.Context, agentName, agentType, sessionI
 	if err != nil {
 		return Candidate{}, fmt.Errorf("read process table: %w", err)
 	}
-	got, err := recordCandidate(procs, shell, agentName, want, acknowledged)
+	got, err := recordCandidate(procs, shell, agentName, want, acknowledged, ProgramImage(want.PID) != "")
 	if err != nil {
 		return Candidate{}, err
 	}
@@ -130,7 +133,7 @@ func RecordAgentForShell(session string, shell int, want AgentProc, acknowledged
 	if err != nil {
 		return Candidate{}, fmt.Errorf("read process table: %w", err)
 	}
-	got, err := recordCandidate(procs, shell, session, want, acknowledged)
+	got, err := recordCandidate(procs, shell, session, want, acknowledged, ProgramImage(want.PID) != "")
 	if err == nil {
 		slog.Info("recorded the agent's process by the Operator's request", "session", session, "pid", got.PID, "program", got.Program)
 	}
