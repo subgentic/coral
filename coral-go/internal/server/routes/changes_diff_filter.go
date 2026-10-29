@@ -198,7 +198,7 @@ func safeDiff(diff []byte) []byte {
 // counted in a note. The notes come first, so the cap never cuts one off.
 func (h *SessionsHandler) generatePersistedDiff(ctx context.Context, workdir string) ([]byte, error) {
 	diffMode := h.getDiffMode(ctx)
-	tracked, err := gitOutput(ctx, workdir, append(append([]string{"diff", "--binary"}, gitutil.DiffRefs(ctx, workdir, diffMode)...), "--")...)
+	tracked, err := gitOutput(ctx, workdir, append(append([]string{"diff"}, gitutil.DiffRefs(ctx, workdir, diffMode)...), "--")...)
 	if err != nil {
 		return nil, err
 	}
@@ -301,7 +301,7 @@ func diffNewFiles(ctx context.Context, workdir string, files []string) ([]byte, 
 	if err := add.Run(); err != nil {
 		return nil, fmt.Errorf("git add --intent-to-add: %w: %s", err, strings.TrimSpace(stderr.String()))
 	}
-	cmd := gitutil.Command(ctx, workdir, "diff", "--binary", "--")
+	cmd := gitutil.Command(ctx, workdir, "diff", "--")
 	cmd.Env = append(cmd.Env, env...)
 	stderr.Reset()
 	cmd.Stderr = &stderr

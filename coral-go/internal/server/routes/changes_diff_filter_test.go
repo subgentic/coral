@@ -423,3 +423,44 @@ func TestGeneratePersistedDiffOfARepoWithNoCommit(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, string(b), "+package main")
 }
+
+// #10811: a tracked binary file that changed (a screenshot) and a big untracked one leave a stored diff of notes, never the file's
+// bytes, and the text change beside them is kept. The persisted diff asks git for no binary content at all (no --binary), so the
+// bytes are not even read into memory first: a 69 MB stored diff of screenshots filled the operator's ~/.coral.
+func TestGeneratePersistedDiffBinaryChanges(t *testing.T) {
+	_, h, _, _ := setupSessionsTestServer(t)
+	repo := diffRepo(t)
+	run := func(args ...string) {
+		cmd := exec.Command("git", append([]string{"-C", repo}, args...)...)
+		cmd.Env = append(os.Environ(), "GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@example.test", "GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@example.test")
+		out, err := cmd.CombinedOutput()
+		require.NoError(t, err, string(out))
+	}
+	noisy := func(n int, seed byte) []byte { // does not compress, has NULs: a real screenshot's shape
+		b := make([]byte, n)
+		x := uint32(seed) + 1
+		for i := range b {
+			x = x*1664525 + 1013904223
+			b[i] = byte(x >> 24)
+		}
+		b[0], b[1], b[2], b[3] = 0x89, 'P', 'N', 'G'
+		b[10] = 0
+		return b
+	}
+	require.NoError(t, os.WriteFile(filepath.Join(repo, "tracked.png"), noisy(2<<20, 1), 0o644))
+	run("add", ".")
+	run("commit", "-q", "-m", "a screenshot")
+	require.NoError(t, os.WriteFile(filepath.Join(repo, "tracked.png"), noisy(6<<20, 2), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(repo, "main.go"), []byte("package main\n\nfunc main() {}\n"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(repo, "Screenshot 2026-09-28 at 5.55.51 PM.png"), noisy(20<<20, 3), 0o644))
+
+	diff, err := h.generatePersistedDiff(context.Background(), repo)
+	require.NoError(t, err)
+	out := string(diff)
+	assert.Less(t, len(diff), 4096, "notes and the text change, not the images")
+	assert.Contains(t, out, `changes to "tracked.png" not shown (binary file)`)
+	assert.Contains(t, out, `new file "Screenshot 2026-09-28 at 5.55.51 PM.png"`)
+	assert.Contains(t, out, "+func main() {}", "the text change is kept")
+	assert.NotContains(t, out, "GIT binary patch")
+	assert.NotContains(t, out, "literal ")
+}
