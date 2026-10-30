@@ -80,6 +80,7 @@
 // command line still names that run's temp directory, so a reused pid is never hit.
 // Never run bare 'tmux' from an agent shell: $TMUX there points at production Coral's ~/.coral/tmux.sock.
 import { execFileSync, spawn, spawnSync } from './helpers/child_process.js';
+import { listCoralTrays, newInstalledTrays, programDirs } from './installed_tray_guard.mjs';
 // The browser password every test server starts with (a throwaway; never printed or logged).
 const TEST_PASSWORD = 'coral-cdp-suites-test-password';
 import { createRequire } from 'node:module';
@@ -183,7 +184,11 @@ const CROSS_SUITES = [
 ];
 const TMUX_SUITES = [...TMUX_ONLY_SUITES, ...CROSS_SUITES];
 const MAIN_BACKEND = process.env.CORAL_BACKEND || 'default';
-const tmuxShard = tmuxOnly || (!flag('--no-tmux') && !only && !stress && !flag('--sequences') && !part);
+// Windows has no tmux backend: coral refuses --backend tmux there (backendchoice, #304), so the tmux phase would stop a full run before its
+// strict phase, sequences and end-of-run checks. There a full run adds no tmux phase, --sequences runs on the default backend, and --tmux is refused.
+const NO_TMUX_HERE = process.platform === 'win32';
+if (tmuxOnly && NO_TMUX_HERE) { console.error('--tmux: Coral has no tmux backend on Windows, so there is nothing to run'); process.exit(2); }
+const tmuxShard = !NO_TMUX_HERE && (tmuxOnly || (!flag('--no-tmux') && !only && !stress && !flag('--sequences') && !part));
 const strictShard = strictOnly || (!flag('--no-strict') && !tmuxOnly && !only && !stress && !flag('--sequences') && !part);
 const PROD_PORT = 8420;
 const chromePath = arg('--chrome', process.env.CHROME || [
@@ -618,9 +623,12 @@ async function stopShard(shard) {
 
 // Shards start one after another: freePort() releases the port before coral binds it, so two shards
 // starting at once could be handed the same port. Each shard also waits for coral's own "bound" log line.
+// #5293: the installed Coral's trays before the run, so a run that starts the installed coral-tray.exe fails (installed_tray_guard.mjs).
+let trayListError = '';
+const trayBaseline = (() => { try { return listCoralTrays(); } catch (e) { trayListError = e.message; return []; } })();
 const shardsUp = [];
 try {
-  for (let i = 1; i <= shards; i++) shardsUp.push(await startShard(i, 0, strictOnly, tmuxOnly || sequencesOnly ? 'tmux' : MAIN_BACKEND));
+  for (let i = 1; i <= shards; i++) shardsUp.push(await startShard(i, 0, strictOnly, tmuxOnly || (sequencesOnly && !NO_TMUX_HERE) ? 'tmux' : MAIN_BACKEND));
 } catch (e) { console.error(e.message); process.exit(2); }
 console.log('');
 
@@ -1032,6 +1040,17 @@ try {
   const added = (() => { try { return fs.readdirSync(REAL_CLAUDE_PROJECTS).filter(n => !claudeBaseline.has(n)); } catch { return []; } })();
   if (added.length) { console.error('FAIL (#4354): new entries under the real ~/.claude/projects:\n    ' + added.join('\n    ')); sandboxOk = false; }
 } catch (e) { console.error(`#4354 sandbox check error: ${e.message}`); sandboxOk = false; }
+// #5293: the run must not have started the INSTALLED Coral (a tray under Program Files that was not running before). Fails closed when the
+// list could not be read before or after the run.
+try {
+  if (trayListError) throw new Error(trayListError);
+  const started = newInstalledTrays(trayBaseline, listCoralTrays(), programDirs());
+  if (started.length) {
+    console.error('FAIL (#5293): the run started the installed Coral; these are left running (stop them by PID once read):\n    ' +
+      started.map(p => `${p.pid} ${p.command || p.path}`).join('\n    '));
+    sandboxOk = false;
+  }
+} catch (e) { console.error(`#5293 installed-tray check error: ${e.message}`); sandboxOk = false; }
 if (!sandboxOk && !exitCode) exitCode = 1;
 
 allPassed = results.every(r => r.status === 'pass') && !leaks.length && sandboxOk;
