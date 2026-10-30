@@ -138,6 +138,19 @@ const STATES = {
         // the Agents page has no top bar under 601 px (its header is its first row, #11096): the hub's state is a dot on the account button there, with its words; the other pages keep the indicator
         const dot = await ev(`(() => { const a = document.querySelector('#mobile-agent-list .phone-account-btn'); if (!a || !a.getClientRects().length) return null; return { state: document.body.getAttribute('data-hub-state'), after: getComputedStyle(a, '::after').content, words: (document.getElementById('phone-hub-state') || {}).textContent }; })()`);
         check('the Agents page shows the hub state as a dot on the account button, named in words', dot && dot.state === 'connected' && dot.after === '""' && /connected/.test(dot.words || ''), JSON.stringify(dot));
+        // each state sets the dot (its own colour) and fills the hidden words; no state (not enrolled) draws no dot and clears the words
+        const seen = {};
+        for (const [name, want, rx] of [['connected', 'connected', /connected/i], ['connecting', 'connecting', /connecting|reconnecting/i], ['revoked', 'disconnected', /disconnected/i]]) { // revoked: the hub refused the token, a disconnected state
+            await show(name);
+            const d = await ev(`(() => { const a = document.querySelector('#mobile-agent-list .phone-account-btn'); const cs = getComputedStyle(a, '::after'); return { state: document.body.getAttribute('data-hub-state'), after: cs.content, bg: cs.backgroundColor, words: (document.getElementById('phone-hub-state') || {}).textContent }; })()`);
+            check(`the Agents page's dot for ${name}: set, drawn and named in words`, d.state === want && d.after === '""' && rx.test(d.words || ''), JSON.stringify(d));
+            seen[want] = d.bg;
+        }
+        check('the three states draw three different dot colours (green, muted, amber)', new Set(Object.values(seen)).size === Object.keys(seen).length && Object.keys(seen).length === 3, JSON.stringify(seen));
+        await show('off');
+        const gone = await ev(`({ state: document.body.getAttribute('data-hub-state'), after: getComputedStyle(document.querySelector('#mobile-agent-list .phone-account-btn'), '::after').content, words: (document.getElementById('phone-hub-state') || {}).textContent })`);
+        check('not enrolled (or loading): no dot and no words', gone.state === null && gone.after === 'none' && !gone.words, JSON.stringify(gone));
+        await show('connected');
         await ev(`window.switchNavTab('hub-inbox'); true`);
         await new Promise(r => setTimeout(r, 400)); // sleep-ok: the page changes over a frame
         const phone = await ev(`(() => { const b = document.getElementById('hub-indicator'); const r = b.getBoundingClientRect();
