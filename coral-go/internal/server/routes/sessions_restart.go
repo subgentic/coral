@@ -96,6 +96,7 @@ func (h *SessionsHandler) Restart(w http.ResponseWriter, r *http.Request) {
 	}
 	plan.restartSettings()
 	if plan.stored != nil {
+		h.touch(r, plan.stored.SessionID, board.TouchRestart)                                                  // the Operator restarted an agent by hand (#11225)
 		h.modelSwitches.end(plan.stored.SessionID, "The agent was restarted before the change was confirmed.") // #6219
 	}
 	cmd, fail := h.restartCommand(ctx, plan)

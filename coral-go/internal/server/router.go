@@ -18,6 +18,7 @@ import (
 	"github.com/subgentic/coral/internal/config"
 	"github.com/subgentic/coral/internal/httputil"
 	"github.com/subgentic/coral/internal/logexit"
+	"github.com/subgentic/coral/internal/operatortouch"
 	"github.com/subgentic/coral/internal/ptymanager"
 	"github.com/subgentic/coral/internal/server/routes"
 	"github.com/subgentic/coral/internal/serverproof"
@@ -207,6 +208,25 @@ func (s *Server) newRouteHandlers() *routeHandlers {
 	runTagStore := store.NewSessionStore(s.db)
 	ptymanager.SetRunTagLookup(func(sessionID string) string { return runTagStore.RunTagOf(context.Background(), sessionID) })
 	s.sessHandler = sessHandler
+	// The Operator's touches of agents are counted for the Analytics tab (#11225): which session, what kind, never what was typed. The terminal's person path, the answer, stop, wake and restart routes
+	// and the Operator's task approval write them; a session that is on no board is not recorded.
+	if s.boardStore != nil {
+		ss := store.NewSessionStore(s.db)
+		touches := operatortouch.New(s.boardStore, func(ctx context.Context, sessionID string) (string, string, bool) {
+			ls, err := ss.GetLiveSession(ctx, sessionID)
+			if err != nil || ls == nil || ls.BoardName == nil || *ls.BoardName == "" {
+				return "", "", false
+			}
+			agent := ls.AgentName
+			if ls.DisplayName != nil && *ls.DisplayName != "" {
+				agent = *ls.DisplayName
+			}
+			return *ls.BoardName, agent, agent != ""
+		})
+		sessHandler.SetTouches(touches)
+		s.touches = touches
+		terminalinput.SetPersonSink(touches.TypedTo)
+	}
 	// Coral's own data folder (wherever --home or CORAL_DATA_DIR put it) is never served by Browse or a file read (#4531).
 	routes.ProtectDataDir(s.cfg.CoralDir())
 	sysHandler := routes.NewSystemHandler(s.db, s.cfg)
@@ -465,6 +485,10 @@ func (s *Server) registerCloud(r *chi.Mux) {
 	s.goBackground(upd.RunBackgroundChecks)                            // returns at once while the feature is off
 	upd.Idle, upd.InFlight, upd.LastPerson, upd.Work = s.sessHandler.UpdateIdleReason, ptymanager.AutomatedInputInFlight, terminalinput.LastPersonInput, background.BusyWork
 	s.goBackground(upd.RunAutoInstall) // install a verified update once Coral has been idle (#11170); returns at once without an updater
+	if s.boardStore != nil {
+		touchPrune := background.NewOperatorTouchPrune(s.boardStore)
+		s.goBackground(func(ctx context.Context) { _ = touchPrune.Run(ctx) }) // touches older than 90 days (#11225)
+	}
 	// the goal events the feed names are pruned to the newest thousand per board (#7355)
 	if s.boardStore != nil {
 		prune := background.NewGoalEventsPrune(s.boardStore)
