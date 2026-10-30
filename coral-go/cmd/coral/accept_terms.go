@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"strings"
-
 )
 
 // runAcceptTerms is `coral accept-terms` (#11370): the self-hosted hub, on a computer it sets Coral up on over SSH, passes the acceptance its owner gave in the setup dialog. It is not in the
