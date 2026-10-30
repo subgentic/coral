@@ -24,7 +24,7 @@ const BASE = require('./test_base').BASE;
             await ev(`document.getElementById('model-chip-bar').hidden = false; true`); // the chips show once the agent's model is known: here they are made to show
             const closed = await boxes();
             assert.equal(closed.cls, false, at + 'no keyboard: nothing compact');
-            assert.ok(closed.banner && closed.status && (w > 767 || closed.input >= 60), at + 'the banner, the status bar and the message box are as they were: ' + JSON.stringify(closed));
+            assert.ok(closed.banner && closed.status && (w > 767 || closed.input >= 44), at + 'the banner, the status bar and the message box are as they were (the box is the approved Google-Chat phone composer: a one-line pill, 48 px, not the old three lines, so it is a 44 px target and no more): ' + JSON.stringify(closed));
             if (touch) await ev(`(() => { const c = document.getElementById('keys-chip'); if (c.getAttribute('aria-pressed') !== 'true') c.click(); return true; })()`); // the key bar is closed until the Keys chip opens it (#8745): open it before the keyboard goes up
             await size(w, kb, touch);
             await new Promise(r => setTimeout(r, 700)); // sleep-ok: the viewport change reaches the page's resize listener
@@ -60,7 +60,7 @@ const BASE = require('./test_base').BASE;
             await new Promise(r => setTimeout(r, 700)); // sleep-ok: the viewport change reaches the page's resize listener
             const back = await boxes();
             assert.equal(back.cls, false, at + 'the keyboard closed: the layout is back');
-            assert.ok(back.banner && back.status && (w < 640 || back.chips) && back.input >= 60, // under 640 px the chips are items of the send chevron's menu (#9021), the bar has no height
+            assert.ok(back.banner && back.status && (w < 640 || back.chips) && back.input >= (w < 640 ? 44 : 60), // a phone's box is the approved one-line pill (48 px), a wider window's keeps its three lines; under 640 px the chips are items of the send chevron's menu (#9021), the bar has no height
                 at + 'everything is back: ' + JSON.stringify(back));
         }
         console.log('PASS terminal keyboard: the terminal keeps room while the phone keyboard is open');

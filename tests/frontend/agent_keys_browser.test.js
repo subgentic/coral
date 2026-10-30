@@ -77,7 +77,7 @@ const STUB = `(() => { const real = window.fetch; window.__keys = [];
             assert.ok(st.stop && st.label === 'Stop the agent' && st.action === 'cmd-stop', at + 'a working agent and an empty box: Stop: ' + JSON.stringify(st));
             assert.ok(st.w >= 44 && st.h >= 44, at + 'Stop is a 44 px target');
             assert.ok(st.gap >= 8, at + `Stop is at least 8 px from the team button (${st.gap}px)`);
-            assert.ok(st.radius < st.w / 2 - 4, at + `Stop is a rounded square, not the neighbour's circle (radius ${st.radius}px)`);
+            assert.ok(st.radius >= st.w / 2 - 1, at + `Stop is a round button like Send (the approved Google-Chat phone composer: a one-line pill with a round Send and Stop; Stop is told apart by its label, its is-stop class and its stop icon, not by a different outline): radius ${st.radius}px of ${st.w}px`);
             await shot(`agent-keys-stop-${w}`);
             // typing brings Send back, clearing brings Stop back
             await ev(`{ const i = document.getElementById('command-input'); i.value = 'next, please'; i.dispatchEvent(new Event('input', { bubbles: true })); } true`); await sleep(150); // sleep-ok: the layout, the status frame or the 3 s Stop hold settles; there is no completion event
