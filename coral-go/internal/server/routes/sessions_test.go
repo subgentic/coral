@@ -1729,11 +1729,12 @@ func TestSessionsRestartInfersStoredAgentTypeWhenOmitted(t *testing.T) {
 	agent.UntrustedMountDir = func(string) (string, bool) { return "", false }
 	t.Cleanup(func() { agent.UntrustedMountDir = oldMount })
 	// This test asserts the restart emits the real agent binary as the command word (launchedAs below). The helper stubs
-	// cli_path for every type (#4615); clear the two it checks so the restart line carries the bare binary name. A restart
-	// never LookPaths or execs the CLI, so it needs no real binary on PATH.
+	// cli_path for every type (#4615); clear the two it checks so the restart line carries the CLI found on PATH. A restart
+	// looks the CLI up and never execs it, and it is refused when there is none (#353).
 	for _, ct := range []string{"codex", "claude"} {
 		require.NoError(t, ss.SetSetting(ctx, "cli_path_"+ct, ""))
 	}
+	cliOnlyOnPath(t, "codex") // a restart finds the CLI and runs it by that path; with none it is refused (#353)
 	wd := t.TempDir()
 	ss.RegisterLiveSession(ctx, &store.LiveSession{
 		AgentName: "codex-sleepy", AgentType: "codex", WorkingDir: wd,
