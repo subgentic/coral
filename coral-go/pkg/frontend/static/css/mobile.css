@@ -1462,3 +1462,7 @@
     .session-list .sidebar-kebab-btn, .group-kebab .sidebar-kebab-btn { width: var(--control-touch-height, 44px); min-width: var(--control-touch-height, 44px); height: var(--control-touch-height, 44px); min-height: var(--control-touch-height, 44px); margin-block: 0; }
     .session-list .sidebar-kebab-btn::after, .group-kebab .sidebar-kebab-btn::after { inset: 0; }
 }
+
+@media (max-width: 600px) {
+    body:has(:is(#inbox-view, #scheduler-view, #workflows-view, #docs-view, #cost-dashboard-view)[data-phone-item]:not([style*="display: none"])) header.top-bar { display: none; } /* an item opened is a drill-down: its own bar (the arrow and the title) replaces the page's pill (#11239 slice B) */
+}

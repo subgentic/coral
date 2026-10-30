@@ -154,7 +154,7 @@ const BASE = require('./test_base').BASE;
 
         console.log('10. Phone: one-line rows (the avatar is the sender), the tags with the open message, 44 px targets');
         for (const theme of ['dark', 'light']) {
-            await open(390, 844, true, theme, 'table');
+            await open(390, 640, true, theme, 'table'); // 640 px high: the board's box is taller without the page pill (#11239 slice B), and the fixture's messages must overflow it for a row to be scrolled under the day line
             const p = await ev(`(() => ({ rows: ${ROWS}.map(r => { const h = r.querySelector(':scope > .mb-row-toggle'), s = h.querySelector('.mb-row-snippet'), lh = parseFloat(getComputedStyle(s).lineHeight) || 16; return { h: Math.round(h.getBoundingClientRect().height), lines: Math.round(s.getBoundingClientRect().height / lh), tags: [...h.querySelectorAll('.mb-row-tags > *')].filter(x => x.getClientRects().length).length }; }), sideways: document.documentElement.scrollWidth > innerWidth + 1, pitch: (() => { const rs = ${ROWS}.map(r => r.getBoundingClientRect()); return rs.slice(1).map((r, i) => Math.round(r.top - rs[i].top)); })(), rowH: ${ROWS}.map(r => Math.round(r.getBoundingClientRect().height)), gap: getComputedStyle(document.getElementById('mb-messages')).rowGap }))()`);
             assert.ok(p.pitch.every(x => x >= 44 && x <= 46) && p.rowH.every(x => x <= 46), `${theme}: one 44 px line and its hairline, the next row at once: a pitch of 45 px at most, no padding or margin round the row (the pitch, the row boxes, the gap, the toggles): ${JSON.stringify([p.pitch, p.rowH, p.gap, p.rows.map(r => r.h)])}`);
             assert.ok(p.rows.every(r => r.h >= 44 && r.h <= 48 && r.lines <= 1 && r.tags <= 1), `${theme}: one line, 44 px, nothing on the folded row but an open question's dot: ` + JSON.stringify(p.rows));
@@ -170,8 +170,9 @@ const BASE = require('./test_base').BASE;
             await shot(`board-table-open-390-${theme}`);
             // The open row's tags are not under the sticky day line: a row opened while its top is scrolled under the line is brought into view with 8 px or more below the line.
             await ev(`document.querySelectorAll('#mb-messages > .mb-message')[1].querySelector('.mb-row-toggle').click(); true`); await settle(200);
-            await ev(`(() => { const box = document.getElementById('mb-messages'), r = document.querySelectorAll('#mb-messages > .mb-message')[1]; box.scrollTop = r.offsetTop - box.offsetTop + 12; return true; })()`); await settle(200);
+            await ev(`(() => { const box = document.getElementById('mb-messages'), r = document.querySelectorAll('#mb-messages > .mb-message')[1]; box.scrollTo({ top: r.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop + 12, behavior: 'instant' }); /* by the boxes' own rects, and instant: the board scrolls smoothly, and an animated scroll still running when the row is opened moved the row after the product had measured it */ return true; })()`); await settle(200);
             await ev(`document.querySelectorAll('#mb-messages > .mb-message')[1].querySelector('.mb-row-toggle').click(); true`); await settle(300);
+            await settle(300);
             const under = await ev(`(() => { const r = document.querySelectorAll('#mb-messages > .mb-message')[1], d = document.querySelector('#mb-messages > .mb-day').getBoundingClientRect(); return { open: r.classList.contains('mb-open'), gap: Math.round(r.getBoundingClientRect().top - d.bottom) }; })()`);
             assert.ok(under.open && under.gap >= 8, `${theme}: the opened row starts 8 px or more below the day line: ` + JSON.stringify(under));
             await shot(`board-table-open-below-day-390-${theme}`);
