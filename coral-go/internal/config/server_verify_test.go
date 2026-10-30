@@ -119,7 +119,7 @@ func TestARecordedAddressThatIsNotLoopbackIsNeverAsked(t *testing.T) {
 func TestLocalServerURLIgnoresAStaleRecord(t *testing.T) {
 	l := newListener(t, 200, `{"status":"ok","version":"2.0.7","instance_id":"`+goodID+`"}`)
 	t.Setenv("CORAL_DATA_DIR", record(t, deadPID(t), l.srv.URL, goodID))
-	assert.Equal(t, "http://localhost:"+fmt.Sprint(DefaultPort), LocalServerURL())
+	assert.Equal(t, scratchDefault(t), LocalServerURL())
 	t.Setenv("CORAL_DATA_DIR", record(t, os.Getpid(), l.srv.URL, goodID))
 	assert.Equal(t, l.srv.URL, LocalServerURL())
 }

@@ -3,7 +3,6 @@ package config
 import (
 	"os"
 	"path/filepath"
-	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -35,7 +34,7 @@ func TestTheRecordedAddressIsRead(t *testing.T) {
 
 // No lock (Coral not running here, or it stopped and emptied the file): the platform's default port, 8450 on Windows, 8420 elsewhere.
 func TestLocalServerURLFallsBackToThePlatformDefaultPort(t *testing.T) {
-	want := "http://localhost:" + strconv.Itoa(DefaultPort)
+	want := scratchDefault(t) // the platform's default address, here a scratch Coral: the real default port is never asked
 	dir := t.TempDir()
 	t.Setenv("CORAL_DATA_DIR", dir)
 	assert.Equal(t, want, LocalServerURL(), "no lock file")
@@ -47,7 +46,7 @@ func TestLocalServerURLFallsBackToThePlatformDefaultPort(t *testing.T) {
 
 // A lock that names an address that is not this computer's is ignored: a command never sends its token to it.
 func TestLocalServerURLIgnoresAnAddressThatIsNotLoopback(t *testing.T) {
-	want := "http://localhost:" + strconv.Itoa(DefaultPort)
+	want := scratchDefault(t)
 	for _, body := range []string{
 		"1\nhttp://example.com:8450\n", "1\nhttp://192.168.1.5:8450\n", "1\nhttp://127.0.0.1.example.com:8450\n",
 		"1\nhttp://user:pw@127.0.0.1:8450\n", "1\nhttp://127.0.0.1:8450/admin\n", "1\nftp://127.0.0.1:21\n", "1\nhttp://127.0.0.1\n", "1\njavascript:alert(1)\n",

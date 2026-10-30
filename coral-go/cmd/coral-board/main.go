@@ -15,6 +15,9 @@ import (
 
 var serverURL = "http://localhost:8420"
 
+// serverURLErr is why no Coral could be found from a plain terminal (config.LocalServer); a command that needs the server stops with it.
+var serverURLErr error
+
 // rawOutput is --raw: print what the server sent byte for byte. Otherwise every reply is cleaned
 // of terminal control first (#3580): board posts, task text and another agent's screen are
 // written by agents, and an escape sequence in them could rewrite or hide what the terminal
@@ -24,7 +27,9 @@ var rawOutput bool
 func init() {
 	serverURL = endpointFromEnv(os.Getenv("CORAL_URL"), os.Getenv("CORAL_HOST"), os.Getenv("CORAL_PORT"))
 	if os.Getenv("CORAL_URL") == "" && os.Getenv("CORAL_HOST") == "" && os.Getenv("CORAL_PORT") == "" {
-		serverURL = config.LocalServerURL() // a plain terminal: the running server's recorded address, else the platform's default port (8450 on Windows)
+		// a plain terminal: the running server's recorded address, else the platform's default port (8450 on Windows), only if it answers as a Coral;
+		// otherwise the command stops with the reason (serverURLErr, checked in main) and sends nothing anywhere.
+		serverURL, serverURLErr = config.LocalServer()
 	}
 }
 
@@ -59,6 +64,11 @@ func main() {
 			fmt.Fprintln(os.Stderr, u)
 		}
 		os.Exit(2)
+	}
+
+	if serverURLErr != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", serverURLErr)
+		clierr.Exit1()
 	}
 
 	cmd := os.Args[1]

@@ -1,6 +1,7 @@
 package config
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -56,6 +57,52 @@ var instanceIDShape = regexp.MustCompile(`^[0-9a-f]{32}$`)
 // healthTimeout bounds the one question VerifiedServer asks.
 const healthTimeout = 2 * time.Second
 
+// defaultServerURL is where a command goes when no usable record names the Coral: this platform's default port. A variable so a test can point it at a scratch server.
+var defaultServerURL = "http://localhost:" + strconv.Itoa(DefaultPort)
+
+type healthAnswer struct {
+	Status     string `json:"status"`
+	Version    string `json:"version"`
+	InstanceID string `json:"instance_id"`
+}
+
+// askHealth asks addr (a loopback address) /api/health and returns the answer if it is a 200 JSON one. It sends no credential and follows no redirect. For an https
+// address the certificate is not verified: a Coral with TLS on a non-default port uses a certificate of its own that nothing here could check, and nothing is sent that
+// a listener could misuse; the instance id in the answer, not the certificate, is the identity (a record without one is the weaker check VerifiedServer says).
+func askHealth(addr string) (healthAnswer, bool) {
+	var h healthAnswer
+	tr, ok := http.DefaultTransport.(*http.Transport)
+	if !ok {
+		return h, false
+	}
+	tr = tr.Clone() // keeps the default transport's dial hook (the tests' guard against reaching a live Coral)
+	if u, err := url.Parse(addr); err == nil && u.Scheme == "https" && localServerURL(addr) {
+		tr.TLSClientConfig = &tls.Config{InsecureSkipVerify: true} //nolint:gosec // loopback only, no credential sent, identity is the instance id
+	}
+	client := &http.Client{Timeout: healthTimeout, Transport: tr, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	defer tr.CloseIdleConnections()
+	resp, err := client.Get(strings.TrimRight(addr, "/") + "/api/health")
+	if err != nil {
+		return h, false
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return h, false
+	}
+	if err := json.NewDecoder(io.LimitReader(resp.Body, 4096)).Decode(&h); err != nil || h.Status != "ok" {
+		return h, false
+	}
+	return h, true
+}
+
+// answersAs is whether h is the answer of the Coral a record names: its instance id, or for a record without one (an older server wrote it) a version.
+func (h healthAnswer) answersAs(id string) bool {
+	if id != "" {
+		return h.InstanceID == id
+	}
+	return h.Version != ""
+}
+
 // VerifiedServer is the address of the Coral server recorded for coralDir, only if that record is still true: the recorded process is running, and the address answers
 // /api/health as THAT server (the instance id in the answer is the one in the record). A record left by a server that crashed names a port something else may hold by now,
 // and a command that sent its credentials there would hand them to it: so the question is asked first, with no credential, and "" is returned unless it is answered as
@@ -66,41 +113,48 @@ func VerifiedServer(coralDir string) string {
 	if addr == "" || !processAlive(pid) {
 		return ""
 	}
-	client := &http.Client{Timeout: healthTimeout, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
-	resp, err := client.Get(strings.TrimRight(addr, "/") + "/api/health")
-	if err != nil {
-		return ""
+	if h, ok := askHealth(addr); ok && h.answersAs(id) {
+		return addr
 	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return ""
-	}
-	var h struct {
-		Status     string `json:"status"`
-		Version    string `json:"version"`
-		InstanceID string `json:"instance_id"`
-	}
-	if err := json.NewDecoder(io.LimitReader(resp.Body, 4096)).Decode(&h); err != nil || h.Status != "ok" {
-		return ""
-	}
-	if id != "" {
-		if h.InstanceID != id {
-			return ""
-		}
-	} else if h.Version == "" {
-		return ""
-	}
-	return addr
+	return ""
 }
 
-// LocalServerURL is where a command typed with no CORAL_URL, CORAL_HOST or CORAL_PORT finds this computer's Coral: the address the server for the data folder
-// (CORAL_DATA_DIR, else ~/.coral) recorded in its lock file, so a Coral on another port is found, and only then the platform's default port (8450 on Windows, 8420
-// elsewhere). The recorded address is only ever a loopback one (RecordedServer), so the command never sends its token anywhere else.
-func LocalServerURL() string {
-	if addr := VerifiedServer(ResolveCoralDir("")); addr != "" {
-		return strings.TrimRight(addr, "/")
+// ResolveServer is where a command typed with nothing saying where Coral is reaches it: ResolveServerAt with this platform's default port as the fallback.
+func ResolveServer(coralDir string) (string, error) {
+	return ResolveServerAt(coralDir, defaultServerURL)
+}
+
+// ResolveServerAt is the address for coralDir's Coral, or an error that says what to do; it never hands back an address that has not answered as a Coral.
+//   - a record whose process runs and whose address answers as that Coral: the recorded address;
+//   - a record whose process runs but whose address does not answer as it: an ERROR, not fallback. The Coral is up somewhere, and the default port may be something else;
+//   - no record, or one whose process is gone: fallback, but only if it answers /api/health with status ok and a version (no credential is sent to find out); else an error.
+func ResolveServerAt(coralDir, fallback string) (string, error) {
+	pid, addr, id := RecordedInstance(coralDir)
+	if addr != "" && processAlive(pid) {
+		if h, ok := askHealth(addr); ok && h.answersAs(id) {
+			return addr, nil
+		}
+		return "", fmt.Errorf("Coral is running on this data folder (PID %d) and recorded %s, but that address did not answer as this Coral. "+
+			"Restart Coral, or set CORAL_URL to its address", pid, addr)
 	}
-	return "http://localhost:" + strconv.Itoa(DefaultPort)
+	if h, ok := askHealth(fallback); ok && h.Version != "" {
+		return fallback, nil
+	}
+	return "", fmt.Errorf("no Coral answered at %s. Start Coral, or set CORAL_URL to the address of the one you mean", fallback)
+}
+
+// LocalServer is where a command typed with no CORAL_URL, CORAL_HOST or CORAL_PORT finds this computer's Coral: ResolveServer for the data folder (CORAL_DATA_DIR, else ~/.coral).
+// The recorded address is only ever a loopback one (RecordedServer), so the command never sends its token anywhere else.
+func LocalServer() (string, error) { return ResolveServer(ResolveCoralDir("")) }
+
+// LocalServerURL is LocalServer for a caller that has no way to report an error: "" when there is no Coral to reach (a request to it then fails at once).
+func LocalServerURL() string {
+	addr, err := LocalServer()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		return ""
+	}
+	return strings.TrimRight(addr, "/")
 }
 
 // localServerURL: an http(s) URL with no credentials, path or query, whose host is localhost or a loopback IP.

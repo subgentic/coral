@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/subgentic/coral/internal/config"
-	"github.com/subgentic/coral/internal/hooks"
 )
 
 // #235: with nothing set, the commands look for Coral on the port the server itself listens on by default (8450 on Windows, where
@@ -23,8 +22,9 @@ func TestTheCommandsDefaultIsTheServersPort(t *testing.T) {
 	t.Setenv("CORAL_PORT", "")
 	t.Setenv("CORAL_DATA_DIR", t.TempDir())
 	server := config.Load()
-	assert.Equal(t, "http://localhost:"+strconv.Itoa(server.Port), hooks.CoralBase())
-	assert.Equal(t, hooks.CoralBase(), defaultCoralURL())
+	assert.Equal(t, "http://localhost:"+strconv.Itoa(server.Port), defaultCoralURL())
+	assert.Equal(t, "http://localhost:"+strconv.Itoa(config.DefaultPort), defaultCoralURL())
+	// Nothing recorded and nothing named: a command no longer assumes the default port is a Coral (hooks.CoralBase is tested against a scratch server below).
 }
 
 // The commands find the running server of their data folder from the address it recorded in its lock file, before the default;
@@ -34,7 +34,12 @@ func TestTheCommandsFindTheRunningServerOfTheirDataFolder(t *testing.T) {
 	t.Setenv("CORAL_PORT", "")
 	dir := t.TempDir()
 	t.Setenv("CORAL_DATA_DIR", dir)
-	def := defaultCoralURL()
+	// The default a command falls back to, here a scratch Coral: the real default port is never asked.
+	defSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"status":"ok","version":"test"}`))
+	}))
+	t.Cleanup(defSrv.Close)
+	def := defSrv.URL
 	parse := func(args ...string) (*flag.FlagSet, *string, *string) {
 		fs := flag.NewFlagSet("t", flag.ContinueOnError)
 		base := fs.String("url", def, "")
@@ -62,8 +67,11 @@ func TestTheCommandsFindTheRunningServerOfTheirDataFolder(t *testing.T) {
 	assert.Equal(t, coral.URL, runningServerURL(fs, *base, *home), "the recorded address, verified")
 	record(dir, "4242\n"+coral.URL+"\n")
 	assert.Equal(t, def, runningServerURL(fs, *base, *home), "a record whose process is not running is not taken")
-	record(dir, live+"\nhttp://localhost:8476\n")
-	assert.Equal(t, def, runningServerURL(fs, *base, *home), "an address that does not answer is not taken")
+	// A live process whose recorded address does not answer is an error, not the default (the Coral is up somewhere the record does not lead to).
+	record(dir, live+"\n"+closedLoopbackURL(t)+"\n")
+	got, err := resolveServerURL(fs, *base, *home)
+	assert.Empty(t, got)
+	assert.ErrorContains(t, err, "did not answer as this Coral")
 
 	other := t.TempDir()
 	record(other, live+"\n"+coral.URL+"\n")
@@ -83,4 +91,13 @@ func TestTheCommandsFindTheRunningServerOfTheirDataFolder(t *testing.T) {
 		record(dir, "4242\n"+bad+"\n")
 		assert.Equal(t, def, runningServerURL(fs, *base, *home), "%s is not taken", bad)
 	}
+}
+
+// closedLoopbackURL is a loopback address nothing listens on.
+func closedLoopbackURL(t *testing.T) string {
+	t.Helper()
+	srv := httptest.NewServer(http.NotFoundHandler())
+	u := srv.URL
+	srv.Close()
+	return u
 }
