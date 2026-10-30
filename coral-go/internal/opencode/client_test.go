@@ -189,3 +189,54 @@ func TestAFrameOverTheLimitIsDroppedAndTheStreamGoesOn(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []string{"ses_one", "ses_two", "ses_three"}, got)
 }
+
+func TestAllMessagesReadsNewestFirstAndStopsAtItsByteBudget(t *testing.T) {
+	old := maxAllBytes
+	maxAllBytes = 1500 << 10 // 15 messages of 100 KB
+	defer func() { maxAllBytes = old }()
+	var requests []string
+	page := func(from int, next string) string {
+		var items []string
+		for i := from; i < from+10; i++ { // newest first: m0 is the newest
+			items = append(items, fmt.Sprintf(`{"id":"m%d","type":"assistant","text":%q}`, i, strings.Repeat("x", 100<<10)))
+		}
+		return fmt.Sprintf(`{"items":[%s],"next":%q}`, strings.Join(items, ","), next)
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests = append(requests, r.URL.Query().Get("cursor"))
+		switch r.URL.Query().Get("cursor") {
+		case "":
+			fmt.Fprint(w, page(0, "c2"))
+		case "c2":
+			fmt.Fprint(w, page(10, "c3"))
+		default:
+			fmt.Fprint(w, page(20, ""))
+		}
+	}))
+	defer srv.Close()
+	c, err := New(srv.URL, "pw")
+	require.NoError(t, err)
+	got, err := c.AllMessages(context.Background(), "ses_abc123")
+	require.NoError(t, err)
+	total := 0
+	for _, m := range got {
+		total += len(m.Text)
+	}
+	assert.LessOrEqual(t, total, 1500<<10, "the text kept stays under the budget")
+	require.Len(t, got, 15)
+	assert.Equal(t, "m14", got[0].ID, "oldest first among those kept")
+	assert.Equal(t, "m0", got[14].ID, "and the newest is kept")
+	assert.Equal(t, []string{"", "c2"}, requests, "the third page was never asked for")
+}
+
+func TestOneMessageIsCutAtItsLimit(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintf(w, `{"items":[{"id":"big","type":"assistant","text":%q}]}`, strings.Repeat("y", 500<<10))
+	}))
+	defer srv.Close()
+	c, _ := New(srv.URL, "pw")
+	got, err := c.AllMessages(context.Background(), "ses_abc123")
+	require.NoError(t, err)
+	require.Len(t, got, 1)
+	assert.Len(t, got[0].Text, maxMessageBytes)
+}

@@ -329,3 +329,51 @@ func TestTheLastMessageSkipsWhatCoralTypedAndATurnOfToolsAlone(t *testing.T) {
 	msg, _ := m.AgentLastMessage("agent-1")
 	assert.Equal(t, "the build passes now", msg.Text)
 }
+
+func TestAResumedAgentShowsItsChatAndLastMessageBeforeAnyEvent(t *testing.T) {
+	cfg, _ := stubConfig(t) // no events file: the stream says nothing, as after a Coral restart
+	m := NewManager(cfg)
+	defer m.Close()
+	_, err := m.Ensure(context.Background(), "agent-1", "")
+	require.NoError(t, err)
+	_, ok, _ := m.AgentMessages(context.Background(), "agent-1")
+	assert.False(t, ok, "before the stored session is known there is nothing to show")
+
+	m.UseSession("agent-1", "../not-a-session")
+	_, ok, _ = m.AgentMessages(context.Background(), "agent-1")
+	assert.False(t, ok, "an id that is not a session id is ignored")
+
+	m.UseSession("agent-1", "ses_abc123")
+	msgs, ok, err := m.AgentMessages(context.Background(), "agent-1")
+	require.NoError(t, err)
+	require.True(t, ok, "the old messages are there with no event")
+	require.Len(t, msgs, 1)
+	assert.Equal(t, "hello from the stand-in", msgs[0].Text)
+	waitFor(t, "the last message", func() bool { _, ok := m.AgentLastMessage("agent-1"); return ok })
+	_, _, turnKnown := m.AgentTurn("agent-1")
+	assert.False(t, turnKnown, "and no turn state was made up: that waits for the stream")
+}
+
+func TestAStreamOfTextDeltasCausesNoMoreThanOneReReadOfTheHistory(t *testing.T) {
+	cfg, _ := stubConfig(t)
+	m := NewManager(cfg)
+	defer m.Close()
+	_, err := m.Ensure(context.Background(), "agent-1", "")
+	require.NoError(t, err)
+	m.UseSession("agent-1", "ses_abc123")
+	_, ok, err := m.AgentMessages(context.Background(), "agent-1")
+	require.NoError(t, err)
+	require.True(t, ok)
+	g := m.servers["agent-1"]
+	for i := 0; i < 50; i++ { // a delta frame: the loop bumps the version for it
+		g.mu.Lock()
+		g.version++
+		g.mu.Unlock()
+		_, _, err := m.AgentMessages(context.Background(), "agent-1")
+		require.NoError(t, err)
+	}
+	g.mu.Lock()
+	reads := g.reads
+	g.mu.Unlock()
+	assert.Equal(t, 1, reads, "fifty events inside the interval: the history was read once, not fifty times")
+}

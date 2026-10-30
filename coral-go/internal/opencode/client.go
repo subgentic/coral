@@ -242,26 +242,43 @@ func (c *Client) LastMessageSkipping(ctx context.Context, sessionID string, skip
 	return Message{}, false, nil
 }
 
-// maxAllMessages bounds what AllMessages reads: a session longer than this shows its newest messages only.
-const maxAllMessages = 5000
+// What AllMessages keeps in memory: a session longer than maxAllMessages, or holding more than maxAllBytes of text, shows its newest messages only, and one message is cut at maxMessageBytes.
+const (
+	maxAllMessages  = 5000
+	maxMessageBytes = 200 << 10
+)
 
-// AllMessages is a session's messages, oldest first, read a page at a time (at most maxAllMessages: the newest when there are more).
+// maxAllBytes is a variable so a test can use a small budget.
+var maxAllBytes = 16 << 20
+
+// AllMessages is a session's messages, oldest first. It reads NEWEST first, a page at a time, and stops when it has maxAllMessages or maxAllBytes of text: the newest are what is kept, and a long session is never
+// read whole.
 func (c *Client) AllMessages(ctx context.Context, sessionID string) ([]Message, error) {
-	var all []Message
-	cursor := ""
+	var newest []Message
+	bytes, cursor := 0, ""
+read:
 	for pages := 0; pages < 100; pages++ {
-		p, err := c.Messages(ctx, sessionID, MessagesOpts{Limit: 100, Cursor: cursor})
+		p, err := c.Messages(ctx, sessionID, MessagesOpts{Desc: true, Limit: 100, Cursor: cursor})
 		if err != nil {
 			return nil, err
 		}
-		all = append(all, p.Messages...)
+		for _, m := range p.Messages {
+			if len(m.Text) > maxMessageBytes {
+				m.Text = strings.ToValidUTF8(m.Text[:maxMessageBytes], "")
+			}
+			if len(newest) >= maxAllMessages || bytes+len(m.Text) > maxAllBytes {
+				break read
+			}
+			bytes += len(m.Text)
+			newest = append(newest, m)
+		}
 		if p.Next == "" || p.Next == cursor || len(p.Messages) == 0 {
 			break
 		}
 		cursor = p.Next
 	}
-	if len(all) > maxAllMessages {
-		all = all[len(all)-maxAllMessages:]
+	for i, j := 0, len(newest)-1; i < j; i, j = i+1, j-1 {
+		newest[i], newest[j] = newest[j], newest[i]
 	}
-	return all, nil
+	return newest, nil
 }

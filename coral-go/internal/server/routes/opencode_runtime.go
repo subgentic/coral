@@ -19,6 +19,7 @@ type OpencodeRuntime interface {
 	Ensure(ctx context.Context, key, bin string) (*opencode.Server, error)
 	AgentTurn(key string) (opencode.State, time.Time, bool)
 	AgentMessages(ctx context.Context, key string) ([]opencode.Message, bool, error)
+	UseSession(key, session string)
 	AgentLastMessage(key string) (opencode.Message, bool)
 	Stop(key string)
 }
@@ -42,6 +43,7 @@ func (h *SessionsHandler) launchCommand(ctx context.Context, ag agent.Agent, p a
 			return "", err
 		}
 		p.OpencodeURL, p.OpencodePasswordFile = srv.URL, file
+		h.useResumedSession(p)
 	}
 	return launchCommand(ag, p)
 }
@@ -122,4 +124,11 @@ func opencodeTime(at string) string {
 		return time.UnixMilli(ms).UTC().Format(time.RFC3339Nano)
 	}
 	return at
+}
+
+// useResumedSession gives the manager the opencode session a resumed agent is picking up, so its chat and last message are there at once: after a Coral restart the stream has said nothing yet.
+func (h *SessionsHandler) useResumedSession(p agent.LaunchParams) {
+	if h.opencode != nil && agent.IsOpencodeSessionID(p.ResumeSessionID) {
+		h.opencode.UseSession(p.SessionID, p.ResumeSessionID)
+	}
 }

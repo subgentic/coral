@@ -27,6 +27,7 @@ type fakeOpencode struct {
 	haveLast bool
 	msgs     []opencode.Message
 	haveMsgs bool
+	used     []string
 }
 
 func (f *fakeOpencode) Ensure(context.Context, string, string) (*opencode.Server, error) {
@@ -38,6 +39,7 @@ func (f *fakeOpencode) AgentTurn(string) (opencode.State, time.Time, bool) {
 func (f *fakeOpencode) AgentMessages(context.Context, string) ([]opencode.Message, bool, error) {
 	return f.msgs, f.haveMsgs, nil
 }
+func (f *fakeOpencode) UseSession(key, session string) { f.used = append(f.used, key+"="+session) }
 func (f *fakeOpencode) AgentLastMessage(string) (opencode.Message, bool) {
 	return f.last, f.haveLast
 }
@@ -159,4 +161,13 @@ func TestAnOpencodeLastMessageIsNotCutBeforeItIsRedacted(t *testing.T) {
 	assert.Equal(t, strings.TrimSpace(long), m.Text, "whole: lastMessageField redacts it and only then shows its first characters")
 	got := lastMessageRow(h, "sid", "/w", at.Opencode, true, false)
 	assert.Len(t, []rune(got["text"].(string)), 140)
+}
+
+func TestAResumedOpencodeAgentIsGivenItsStoredSessionAndOnlyAValidOne(t *testing.T) {
+	f := &fakeOpencode{}
+	h := &SessionsHandler{opencode: f}
+	h.useResumedSession(agent.LaunchParams{SessionID: "sid", ResumeSessionID: "ses_abc123"})
+	h.useResumedSession(agent.LaunchParams{SessionID: "sid", ResumeSessionID: "../../etc/passwd"})
+	h.useResumedSession(agent.LaunchParams{SessionID: "sid"})
+	assert.Equal(t, []string{"sid=ses_abc123"}, f.used, "a fresh agent and an id that is not a session id are not passed on")
 }

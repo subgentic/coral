@@ -32,16 +32,20 @@ type starting struct{ done chan struct{} }
 type managed struct {
 	srv    *Server
 	cancel context.CancelFunc
-	done   chan struct{} // closed when the event loop has returned
-	since  time.Time     // when the server came up
+	done   chan struct{}   // closed when the event loop has returned
+	since  time.Time       // when the server came up
+	lctx   context.Context // the event loop's: what ends with the server
 
 	mu      sync.Mutex
 	tracker *Tracker
 	at      map[string]time.Time // when each session last changed state
 
-	version    int // counts the events of the agent's sessions: what a cached read of the history was made at
+	session    string // the opencode session the agent was resumed with: known before the stream names any
+	version    int    // counts the events of the agent's sessions: what a cached read of the history was made at
 	msgs       []Message
 	msgsAt     int        // the version msgs was read at; -1 when never
+	msgsReadAt time.Time  // when the history was last read
+	reads      int        // how many times it was read (a test counts them)
 	msgsMu     sync.Mutex // one read of the history at a time
 	last       Message    // the newest message of the agent's newest session, as read when a turn last ended
 	haveLast   bool
@@ -125,9 +129,8 @@ func (m *Manager) start(ctx context.Context, key, bin string) (*managed, error) 
 		return nil, err
 	}
 	g := &managed{srv: srv, since: time.Now(), done: make(chan struct{}), tracker: NewTracker(), at: map[string]time.Time{}, msgsAt: -1}
-	var lctx context.Context
-	lctx, g.cancel = context.WithCancel(context.Background()) // not ctx: the loop lives as long as the server
-	go g.loop(lctx, m.SkipLast)
+	g.lctx, g.cancel = context.WithCancel(context.Background()) // not ctx: the loop lives as long as the server
+	go g.loop(g.lctx, m.SkipLast)
 	return g, nil
 }
 
@@ -169,6 +172,32 @@ func (m *Manager) AgentTurn(key string) (state State, at time.Time, ok bool) {
 	return state, at, ok
 }
 
+// UseSession tells the manager which opencode session an agent was resumed with, so its history and last message are there at once, before its server has said anything (a Coral restart loses the stream's
+// state, not the session). An id that is not an opencode session id, or an agent with no server, does nothing.
+func (m *Manager) UseSession(key, session string) {
+	if !validSessionID(session) {
+		return
+	}
+	m.mu.Lock()
+	g := m.servers[key]
+	m.mu.Unlock()
+	if g == nil {
+		return
+	}
+	c, err := g.srv.Client()
+	if err != nil {
+		return
+	}
+	g.mu.Lock()
+	g.session = session
+	g.version++
+	g.refreshLast(g.lctx, c, session, m.SkipLast)
+	g.mu.Unlock()
+}
+
+// rereadEvery is the least time between two reads of an agent's history: a model streaming text sends an event for every few words, and the chat must not read the whole session for each.
+var rereadEvery = 3 * time.Second
+
 // lastKeptRunes bounds the text of the kept last message; the route redacts it and shows its first characters.
 const lastKeptRunes = 20000
 
@@ -204,13 +233,19 @@ func (m *Manager) AgentMessages(ctx context.Context, key string) (msgs []Message
 			session, newest = s, t
 		}
 	}
+	if session == "" {
+		session = g.session // a resumed agent: its stored session, before any event
+	}
 	version, have, cached := g.version, g.msgsAt, g.msgs
 	g.mu.Unlock()
 	if session == "" {
 		return nil, false, nil
 	}
-	if have == version {
-		return cached, true, nil
+	g.mu.Lock()
+	readAt := g.msgsReadAt
+	g.mu.Unlock()
+	if have == version || (have != -1 && time.Since(readAt) < rereadEvery) {
+		return cached, true, nil // nothing new, or read lately: a stream of text deltas is not a read for each
 	}
 	c, err := g.srv.Client()
 	if err != nil {
@@ -223,7 +258,8 @@ func (m *Manager) AgentMessages(ctx context.Context, key string) (msgs []Message
 		return nil, false, err
 	}
 	g.mu.Lock()
-	g.msgs, g.msgsAt = all, version
+	g.msgs, g.msgsAt, g.msgsReadAt = all, version, time.Now()
+	g.reads++
 	g.mu.Unlock()
 	return all, true, nil
 }
