@@ -32,6 +32,8 @@ var (
 	ErrRemoteNotFound = errors.New("remote server not found")
 	// ErrRemoteExists is returned when adding a duplicate id.
 	ErrRemoteExists = errors.New("remote server already exists")
+	// ErrRemoteTransport is an edit that does not fit how the server is reached (a URL for a server reached over SSH).
+	ErrRemoteTransport = errors.New("this server is reached over SSH and has no URL")
 	// ErrKeyUnreadable wraps any failure to obtain or use the master key or to
 	// decrypt a stored key. Callers map it to status key_unreadable.
 	ErrKeyUnreadable = errors.New("stored remote key is unreadable")
@@ -63,7 +65,18 @@ type RemoteServer struct {
 	// KeyRenewSince is when Coral made its data folder private while this server's key was stored in it (UTC); nil when it never was,
 	// or a different key has been entered since. Settings > Servers shows it until then.
 	KeyRenewSince *string `json:"key_renew_since,omitempty" db:"key_renew_since"`
+	// Transport is "http" (reached by its URL) or "ssh" (reached over the owner's SSH session, #11370). The three after it are set only for ssh and never leave the hub in JSON but the target.
+	Transport  string `json:"transport" db:"transport"`
+	SSHTarget  string `json:"ssh_target,omitempty" db:"ssh_target"`
+	RemotePort int    `json:"-" db:"remote_port"`
+	InstanceID string `json:"-" db:"instance_id"`
 }
+
+// The transports of a registered server.
+const (
+	RemoteTransportHTTP = "http"
+	RemoteTransportSSH  = "ssh"
+)
 
 // RemoteServerStore manages the remote_servers table. API keys are encrypted
 // with a master key that lives outside the database (see internal/secretbox).
@@ -157,6 +170,57 @@ func (s *RemoteServerStore) Add(ctx context.Context, id, label, url, apiKey stri
 	return s.Get(ctx, id)
 }
 
+// AddSSH registers a server the provisioner set up and reaches over SSH (#11370). It is the ONLY way a row gets the ssh transport. The id must be new: an existing id is ErrRemoteExists and nothing
+// of it is touched, and a remote whose instance id is already registered under another id is ErrRemoteInstanceExists (the same machine is not added twice, and a re-run never replaces a key).
+func (s *RemoteServerStore) AddSSH(ctx context.Context, id, label, sshTarget string, remotePort int, instanceID, apiKey string) (*RemoteServer, error) {
+	if err := ValidateRemoteID(id); err != nil {
+		return nil, err
+	}
+	if instanceID == "" || remotePort < 1 || remotePort > 65535 || sshTarget == "" || apiKey == "" {
+		return nil, errors.New("an SSH server needs a target, a port, an instance id and a key")
+	}
+	if other, err := s.FindByInstance(ctx, instanceID); err != nil {
+		return nil, err
+	} else if other != "" {
+		return nil, ErrRemoteInstanceExists
+	}
+	box, err := s.getBox(ctx, true, false)
+	if err != nil {
+		return nil, err
+	}
+	env, err := box.Seal(id, []byte(apiKey))
+	if err != nil {
+		return nil, err
+	}
+	_, err = s.db.ExecContext(ctx,
+		`INSERT INTO remote_servers (id, label, url, api_key, allow_private, status, created_at, transport, ssh_target, remote_port, instance_id)
+		 VALUES (?, ?, ?, ?, 0, ?, ?, 'ssh', ?, ?, ?)`,
+		id, label, "ssh://"+sshTarget, env, RemoteStatusUnknown, nowUTC(), sshTarget, remotePort, instanceID)
+	if err != nil {
+		if strings.Contains(err.Error(), "UNIQUE") || strings.Contains(err.Error(), "PRIMARY KEY") {
+			return nil, ErrRemoteExists
+		}
+		return nil, err
+	}
+	return s.Get(ctx, id)
+}
+
+// ErrRemoteInstanceExists is a remote machine that is already registered (by its instance id) under another id.
+var ErrRemoteInstanceExists = errors.New("this remote Coral is already registered")
+
+// FindByInstance returns the id of the server registered with this instance id, or "".
+func (s *RemoteServerStore) FindByInstance(ctx context.Context, instanceID string) (string, error) {
+	if instanceID == "" {
+		return "", nil
+	}
+	var id string
+	err := s.db.GetContext(ctx, &id, "SELECT id FROM remote_servers WHERE instance_id = ?", instanceID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil
+	}
+	return id, err
+}
+
 // RemoteServerUpdate holds optional edits; nil fields are left unchanged.
 // APIKey is write-only: setting it re-encrypts it, which also recovers a
 // server whose stored key was unreadable.
@@ -178,6 +242,9 @@ func (s *RemoteServerStore) Update(ctx context.Context, id string, u RemoteServe
 		}
 	}
 	if u.URL != nil {
+		if cur, _ := s.Get(ctx, id); cur != nil && cur.Transport != RemoteTransportHTTP {
+			return nil, ErrRemoteTransport // a server reached over SSH has no URL to edit: it would turn into a direct one
+		}
 		if _, err := s.db.ExecContext(ctx, "UPDATE remote_servers SET url = ?, status = ?, last_error = NULL WHERE id = ?",
 			strings.TrimRight(*u.URL, "/"), RemoteStatusUnknown, id); err != nil {
 			return nil, err
@@ -239,7 +306,7 @@ func (s *RemoteServerStore) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
-const remoteCols = "id, label, url, allow_private, status, created_at, last_seen, last_error, key_renew_since"
+const remoteCols = "id, label, url, allow_private, status, created_at, last_seen, last_error, key_renew_since, transport, ssh_target, remote_port, instance_id"
 
 // Get returns one server (without its key). Status is key_unreadable when the
 // stored key cannot be decrypted.
