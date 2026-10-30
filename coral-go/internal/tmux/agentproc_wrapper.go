@@ -4,6 +4,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 )
 
 // A wrapper script that is the resolved CLI (#408). A CLI that is a `#!/bin/sh` script runs as a SHELL by name (macOS ps shows `sh`, Linux the script's name): the walk below the pane's
@@ -19,6 +20,122 @@ var (
 	programImage = ProgramImage
 )
 
+// evalSymlinks resolves a path (a test replaces it with one that blocks; no production code assigns it). On a network mount that has stopped answering it can wait for minutes, so
+// wrapperIsCLI never calls it directly.
+var evalSymlinks = filepath.EvalSymlinks
+
+// resolveTimeout bounds one resolution: the notice check runs it once per candidate shell, and a notice must not wait on a mount. A resolution that does not finish in time is "not recognised"
+// (the fail-safe answer: notices wait for a record). 2 s is the bound the macOS cwd read (lsof) has too. (A test shortens it; no production code assigns it.)
+var resolveTimeout = 2 * time.Second
+
+// resolveRetryDelay is how long a path whose resolution timed out is not tried again: its answer is "not recognised" at once, without a goroutine, until the delay is over or the stuck
+// call answers.
+var resolveRetryDelay = 30 * time.Second
+
+// maxStuckResolves bounds the script-path resolutions in flight. A call that is stuck cannot be cancelled, so it keeps its goroutine until the mount answers; once this many are stuck, a
+// new one is refused at once ("not recognised") instead of adding another. The resolved CLI never competes for these slots (see cliResolved).
+const maxStuckResolves = 4
+
+// resolveCall is one resolution in flight; everyone who asks for the same path while it runs waits for it, none starts another.
+type resolveCall struct {
+	done   chan struct{}
+	path   string // set before done is closed
+	err    error
+	capped bool // counted against maxStuckResolves
+}
+
+var resolves = struct {
+	sync.Mutex
+	inFlight map[string]*resolveCall
+	gaveUp   map[string]time.Time // a path whose resolution timed out -> when it may be tried again
+}{inFlight: map[string]*resolveCall{}, gaveUp: map[string]time.Time{}}
+
+// resolvesInFlight is the number of resolutions running now (tests).
+func resolvesInFlight() int {
+	resolves.Lock()
+	defer resolves.Unlock()
+	return len(resolves.inFlight)
+}
+
+// resolveWithin is evalSymlinks(path) bounded by resolveTimeout; ok is false when it failed, timed out, was tried and timed out less than resolveRetryDelay ago, or (capped) too many
+// others are still stuck. Two asks for one path share one call. capped is false for the resolved CLI, which must not be refused because script paths are stuck.
+func resolveWithin(path string, capped bool) (resolved string, ok bool) {
+	resolves.Lock()
+	if until, waiting := resolves.gaveUp[path]; waiting { // before joining a call that is still stuck: a caller that timed out must not make every later one wait the bound again
+		if time.Now().Before(until) {
+			resolves.Unlock()
+			return "", false // timed out a moment ago: not tried again yet
+		}
+		delete(resolves.gaveUp, path)
+	}
+	call := resolves.inFlight[path]
+	if call == nil {
+		if capped {
+			n := 0
+			for _, c := range resolves.inFlight {
+				if c.capped {
+					n++
+				}
+			}
+			if n >= maxStuckResolves {
+				resolves.Unlock()
+				return "", false
+			}
+		}
+		call = &resolveCall{done: make(chan struct{}), capped: capped}
+		resolves.inFlight[path] = call
+		go func() {
+			p, err := evalSymlinks(path)
+			resolves.Lock()
+			delete(resolves.inFlight, path)
+			delete(resolves.gaveUp, path) // it answered
+			resolves.Unlock()
+			call.path, call.err = p, err
+			close(call.done)
+		}()
+	}
+	resolves.Unlock()
+	timer := time.NewTimer(resolveTimeout)
+	defer timer.Stop()
+	select {
+	case <-call.done:
+		return call.path, call.err == nil
+	case <-timer.C:
+		resolves.Lock()
+		if resolves.inFlight[path] == call { // still stuck
+			resolves.gaveUp[path] = time.Now().Add(resolveRetryDelay)
+		}
+		resolves.Unlock()
+		return "", false
+	}
+}
+
+// cliResolved keeps the resolved form of each CLI path that was noted (NoteLaunchCLI, Record as agent), so the CLI is resolved once when the row is written and not at every notice
+// check; it is resolved again only when a row with that path is written again.
+var cliResolved = struct {
+	sync.Mutex
+	m map[string]string
+}{m: map[string]string{}}
+
+// resolveCLI is the resolved form of cli (symlinks followed), from the cache when it has it; ok is false when it cannot be resolved in time (nothing is cached then).
+func resolveCLI(cli string, fresh bool) (string, bool) {
+	if !fresh {
+		cliResolved.Lock()
+		got, have := cliResolved.m[cli]
+		cliResolved.Unlock()
+		if have {
+			return got, true
+		}
+	}
+	got, ok := resolveWithin(cli, false)
+	if ok {
+		cliResolved.Lock()
+		cliResolved.m[cli] = got
+		cliResolved.Unlock()
+	}
+	return got, ok
+}
+
 // wrapperIsCLI is the check for a shell pid: its argument vector is [shell, script, ...] with no flag before the script, and the script (made absolute with the process's own working
 // directory when it is relative, as `./stub.sh` is) is the same file as cli by realpath. nil when cli is unknown, which recognises nothing. The arguments are compared and dropped. On
 // macOS ps joins the arguments with blanks, so a script path with a blank in it is split and is never matched (the person records it with the button).
@@ -26,8 +143,8 @@ func wrapperIsCLI(cli string) func(pid int) bool {
 	if cli == "" {
 		return nil
 	}
-	want, err := filepath.EvalSymlinks(cli)
-	if err != nil {
+	want, ok := resolveCLI(cli, false)
+	if !ok {
 		return nil
 	}
 	want = filepath.Clean(want)
@@ -50,8 +167,8 @@ func wrapperIsCLI(cli string) func(pid int) bool {
 			}
 			script = filepath.Join(cwd, script)
 		}
-		got, err := filepath.EvalSymlinks(script)
-		return err == nil && filepath.Clean(got) == want
+		got, ok := resolveWithin(script, true)
+		return ok && filepath.Clean(got) == want
 	}
 }
 
@@ -91,6 +208,9 @@ func NoteLaunchCLI(session, cli string) {
 		launchCLIs.m[session] = cli
 	}
 	launchCLIs.Unlock()
+	if cli != "" {
+		resolveCLI(cli, true) // the row is written: resolved now, once, so no notice check has to
+	}
 	cliStore.Lock()
 	save := cliStore.save
 	cliStore.Unlock()
