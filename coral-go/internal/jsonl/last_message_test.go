@@ -311,3 +311,28 @@ func TestLastMessage_ASessionThatHasNotStartedKeepsItsMissFiveSeconds(t *testing
 	_, ok = r.LastMessageOf(sid, "", at.Claude, false)
 	assert.True(t, ok, "6 s on: found")
 }
+
+// #11354: a hook event says the CLI is running: the remembered miss of a session that had not reported an event is forgotten, so its first reply is found at the next read, not after 5 s.
+func TestLastMessage_AHookEventClearsTheRememberedMiss(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("CLAUDE_PROJECTS_DIR", dir)
+	sid := "11111111-0000-4000-8000-000000000013"
+	project := filepath.Join(dir, "proj")
+	require.NoError(t, os.MkdirAll(project, 0o755))
+	now := time.Now()
+	lastMessageNow = func() time.Time { return now }
+	t.Cleanup(func() { lastMessageNow = time.Now })
+	r := NewSessionReader()
+	_, ok := r.LastMessageOf(sid, "", at.Claude, false)
+	require.False(t, ok)
+	line := `{"type":"assistant","timestamp":"2026-10-29T10:00:05.000Z","message":{"content":[{"type":"text","text":"First reply."}]}}` + "\n"
+	require.NoError(t, os.WriteFile(filepath.Join(project, sid+".jsonl"), []byte(line), 0o644))
+	now = now.Add(time.Second)
+	_, ok = r.LastMessageOf(sid, "", at.Claude, false)
+	require.False(t, ok, "the miss stands for 5 s")
+	r.ForgetLastMessageMiss(sid)
+	m, ok := r.LastMessageOf(sid, "", at.Claude, false)
+	require.True(t, ok, "a hook event forgot it")
+	assert.Equal(t, "First reply.", m.Text)
+	r.ForgetLastMessageMiss("11111111-0000-4000-8000-0000000000ff") // a session never asked about: nothing to forget, no panic
+}

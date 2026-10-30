@@ -551,6 +551,7 @@ func (h *SessionsHandler) CreateEvent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.notePendingToolEvent(body.SessionID, body.EventType, body.ToolUseID)
+	h.noteEventForLastMessage(body.SessionID, body.EventType)
 	if hasToken {
 		h.noteFunnelEvent(r.Context(), body.SessionID, agentType, body.EventType, body.DetailJSON, created)
 	}

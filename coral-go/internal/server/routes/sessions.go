@@ -795,6 +795,23 @@ func lastMessageRow(h *SessionsHandler, sessionID, workingDir, agentType string,
 	return nil
 }
 
+// noteEventForLastMessage is what an agent's hook event means for its row's last_message (#11354): the CLI is running, so a transcript it has not written yet is looked for at the next read, not after the
+// remembered miss; and the end of a turn (stop) of a session whose row has no last message yet sends the list at once, once for the session, so the first reply is on the row within a build, not at the next tick.
+func (h *SessionsHandler) noteEventForLastMessage(sessionID, eventType string) {
+	if h.jsonl == nil || sessionID == "" {
+		return
+	}
+	h.jsonl.ForgetLastMessageMiss(sessionID)
+	if eventType == "stop" {
+		if _, has := h.jsonl.CachedLastMessage(sessionID); !has && firstStopKicked.add(sessionID) { // once for a session: an agent with no transcript at all does not send the list at every turn
+			h.kickWS()
+		}
+	}
+}
+
+// firstStopKicked remembers the sessions whose first stop has sent the list (bounded, as refusedEventSenders is).
+var firstStopKicked = &onceSet{max: 10000}
+
 // SessionReader is the transcript reader this handler uses: other handlers that read the same session files (the spend read) share it, so a file is parsed once.
 func (h *SessionsHandler) SessionReader() *jsonl.SessionReader { return h.jsonl }
 
