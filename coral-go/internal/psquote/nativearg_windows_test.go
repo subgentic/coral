@@ -13,6 +13,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/subgentic/coral/internal/testtemp"
 )
 
 // argvEchoEnv makes this test binary print each argument it got, as the C runtime and Go
@@ -27,7 +29,8 @@ func TestMain(m *testing.M) {
 		fmt.Print("--\n")
 		os.Exit(0)
 	}
-	os.Exit(m.Run())
+	cleanupTemp := testtemp.Use() // a private temp, home and data folder for this package (#356)
+	testtemp.Exit(cleanupTemp, m.Run())
 }
 
 // Each string goes through a script run by Windows PowerShell 5.1, as Coral's launch line
