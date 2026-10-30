@@ -11,13 +11,16 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
 	"syscall"
 	"time"
 
+	"github.com/subgentic/coral/internal/agentenv"
 	"github.com/subgentic/coral/internal/executil"
+	"github.com/subgentic/coral/internal/secfile"
 )
 
 // ServeArgs are the arguments that start an opencode server for Coral on a loopback port (`opencode serve --hostname 127.0.0.1 --port <port>`, confirmed on v2.2.4 by Pi Tester, #11364); the password comes in
@@ -26,44 +29,40 @@ func ServeArgs(port int) []string {
 	return []string{"serve", "--hostname", "127.0.0.1", "--port", strconv.Itoa(port)}
 }
 
-// Config is how Coral runs its opencode server.
+// Config is how Coral runs an opencode server.
 type Config struct {
-	Bin     string // the opencode executable
-	DataDir string // Coral's own folder for it (<Coral data dir>/opencode): its XDG folders, its database and its credentials live here and nowhere else
+	Bin     string // the opencode executable, as it is exec'd
+	DataDir string // Coral's own folder for opencode (<Coral data dir>/opencode): the XDG folders, its database and its credentials are here and nowhere else
 	Args    func(port int) []string
-	Ready   time.Duration // how long to wait for the port to answer (default 20 s)
+	Ready   time.Duration // how long one attempt waits for the server to answer an authenticated call (default 20 s)
+
+	pickPort func() (int, error) // a test's way to make a port race
 }
 
-// Server is the one opencode server Coral runs for its data scope. It is never the person's own opencode background service: its database and its credentials are Coral's folder's, and it listens on a
-// loopback port behind a password only Coral and the agents it launches know.
+// Server is one opencode server Coral runs for ONE agent: its own port and its own password, so what one agent's tools can reach is that agent's server and no other's (Security, #11364). Its database, and with it
+// the sessions a resume needs, is Coral's folder's, shared by the servers of Coral's agents and never the person's own opencode or its background service.
 type Server struct {
 	URL      string
 	password string
 	cmd      *exec.Cmd
-	pidFile  string
+	dir      string // this server's own folder: its pid record and its password file
 	done     chan struct{}
 }
 
-// PasswordEnv is the environment entry an opencode client of this server needs (OPENCODE_PASSWORD=...): for the pane's environment, never for argv, a log or a file.
-func (s *Server) PasswordEnv() string { return "OPENCODE_PASSWORD=" + s.password }
+// keyRe is what an agent's key may be (its Coral session id): it names a folder.
+var keyRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$`)
 
-// PasswordFile writes the password to a private file in Coral's folder for the server (0600, the owner's alone) and returns its path: the agent's pane reads OPENCODE_PASSWORD from it, so the secret is never in
-// the line typed into the pane. The file is written again at each start, with the new password.
-func (s *Server) PasswordFile() (string, error) {
-	p := filepath.Join(filepath.Dir(s.pidFile), "password")
-	if err := os.WriteFile(p, []byte(s.password), 0o600); err != nil {
-		return "", err
-	}
-	return p, nil
-}
+// PasswordEnv is the environment entry an opencode client of this server needs (OPENCODE_PASSWORD=...): for the pane's environment, never for argv, a log or a pid file.
+func (s *Server) PasswordEnv() string { return "OPENCODE_PASSWORD=" + s.password }
 
 // Client is a client of the server.
 func (s *Server) Client() (*Client, error) { return New(s.URL, s.password) }
 
-// isolatedEnv is the environment of the server: the person's own environment, except every OPENCODE_ name (the person's own server, password and database settings) and the XDG folders, which are Coral's.
-func isolatedEnv(inherited []string, dataDir, password string) []string {
+// serverEnv is the environment of the server: the one an agent gets (agentenv.Filter: Coral's own variables, tokens, keys and the identity of whatever started Coral are not passed on), without any OPENCODE_ or XDG_
+// name of the person's own, plus only what opencode needs: the password and Coral's XDG folders.
+func serverEnv(inherited []string, dataDir, password string) []string {
 	var env []string
-	for _, kv := range inherited {
+	for _, kv := range agentenv.Filter(inherited) {
 		name, _, _ := strings.Cut(kv, "=")
 		if strings.HasPrefix(strings.ToUpper(name), "OPENCODE_") || strings.HasPrefix(name, "XDG_") {
 			continue
@@ -88,15 +87,56 @@ func freeLoopbackPort() (int, error) {
 	return l.Addr().(*net.TCPAddr).Port, nil
 }
 
+// pidRecord is what Coral keeps of a server it started, to stop it after a crash: the pid and the port, the exact command it was started with and when the process began: never the password.
 type pidRecord struct {
-	PID  int `json:"pid"`
-	Port int `json:"port"`
+	PID     int    `json:"pid"`
+	Port    int    `json:"port"`
+	Command string `json:"command"` // the executable and arguments as exec'd, joined by one space
+	Started string `json:"started"` // ps's start time of the process
 }
 
-// Start runs the server and returns when its port answers. A server a previous Coral left running (its pid file) is stopped first, by that pid.
-func Start(ctx context.Context, cfg Config) (*Server, error) {
-	if cfg.Bin == "" || cfg.DataDir == "" {
-		return nil, errors.New("opencode: a binary and a data folder are needed")
+// writePrivate writes data to path as a private file nobody can have planted a link at: a new file in the same folder created exclusively (no following of a link, mode 0600), then renamed over path.
+func writePrivate(path string, data []byte) error {
+	raw := make([]byte, 6)
+	if _, err := rand.Read(raw); err != nil {
+		return err
+	}
+	tmp := path + "." + hex.EncodeToString(raw) + ".tmp"
+	f, err := secfile.OpenNoFollow(tmp, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	if err != nil {
+		return err
+	}
+	if _, err := f.Write(data); err != nil {
+		f.Close()
+		os.Remove(tmp)
+		return err
+	}
+	if err := f.Close(); err != nil {
+		os.Remove(tmp)
+		return err
+	}
+	if err := os.Rename(tmp, path); err != nil {
+		os.Remove(tmp)
+		return err
+	}
+	return nil
+}
+
+// PasswordFile writes the password to a private file in this server's own folder (0600, the owner's alone) and returns its path: the agent's pane reads OPENCODE_PASSWORD from it, so the secret is never in the
+// line typed into the pane.
+func (s *Server) PasswordFile() (string, error) {
+	p := filepath.Join(s.dir, "password")
+	return p, writePrivate(p, []byte(s.password))
+}
+
+// startAttempts is how many ports one Start tries before it gives up.
+const startAttempts = 3
+
+// Start runs the opencode server of the agent key and returns when it answers an authenticated call. A server a previous Coral left running for that key is stopped first (the exact command and start time match
+// required). A port another process took between the choosing and the listening is not trusted: the child must be alive and answer with this server's password, or the next port is tried.
+func Start(ctx context.Context, cfg Config, key string) (*Server, error) {
+	if cfg.Bin == "" || cfg.DataDir == "" || !keyRe.MatchString(key) {
+		return nil, errors.New("opencode: a binary, a data folder and an agent key are needed")
 	}
 	if cfg.Args == nil {
 		cfg.Args = ServeArgs
@@ -104,50 +144,100 @@ func Start(ctx context.Context, cfg Config) (*Server, error) {
 	if cfg.Ready <= 0 {
 		cfg.Ready = 20 * time.Second
 	}
-	for _, d := range []string{"", "config", "data", "cache", "state"} {
-		if err := os.MkdirAll(filepath.Join(cfg.DataDir, d), 0o700); err != nil {
+	if cfg.pickPort == nil {
+		cfg.pickPort = freeLoopbackPort
+	}
+	dir := filepath.Join(cfg.DataDir, "servers", key)
+	for _, d := range []string{cfg.DataDir, filepath.Join(cfg.DataDir, "servers"), dir, filepath.Join(cfg.DataDir, "config"), filepath.Join(cfg.DataDir, "data"), filepath.Join(cfg.DataDir, "cache"), filepath.Join(cfg.DataDir, "state")} {
+		if err := os.MkdirAll(d, 0o700); err != nil {
 			return nil, err
 		}
 	}
-	pidFile := filepath.Join(cfg.DataDir, "server.json")
-	stopLeftOver(pidFile)
-	port, err := freeLoopbackPort()
-	if err != nil {
-		return nil, err
+	stopLeftOver(filepath.Join(dir, "server.json"))
+	var lastErr error
+	for attempt := 0; attempt < startAttempts; attempt++ {
+		port, err := cfg.pickPort()
+		if err != nil {
+			return nil, err
+		}
+		s, err := startOn(ctx, cfg, dir, port)
+		if err == nil {
+			return s, nil
+		}
+		lastErr = err
+		if ctx.Err() != nil {
+			break
+		}
 	}
+	return nil, lastErr
+}
+
+func startOn(ctx context.Context, cfg Config, dir string, port int) (*Server, error) {
 	raw := make([]byte, 32)
 	if _, err := rand.Read(raw); err != nil {
 		return nil, err
 	}
 	password := hex.EncodeToString(raw)
-	cmd := executil.Command(context.Background(), cfg.Bin, cfg.Args(port)...) // not ctx: the server outlives one request
+	args := cfg.Args(port)
+	cmd := executil.Command(context.Background(), cfg.Bin, args...) // not ctx: the server outlives one request
 	cmd.Dir = cfg.DataDir
-	cmd.Env = isolatedEnv(os.Environ(), cfg.DataDir, password)
+	cmd.Env = serverEnv(os.Environ(), cfg.DataDir, password)
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("opencode: could not start the server: %w", err)
 	}
-	s := &Server{URL: "http://127.0.0.1:" + strconv.Itoa(port), password: password, cmd: cmd, pidFile: pidFile, done: make(chan struct{})}
+	s := &Server{URL: "http://127.0.0.1:" + strconv.Itoa(port), password: password, cmd: cmd, dir: dir, done: make(chan struct{})}
 	go func() { _ = cmd.Wait(); close(s.done) }()
-	rec, _ := json.Marshal(pidRecord{PID: cmd.Process.Pid, Port: port}) // the pid and the port: never the password
-	_ = os.WriteFile(pidFile, rec, 0o600)
+	pidFile := filepath.Join(dir, "server.json")
+	rec, _ := json.Marshal(pidRecord{PID: cmd.Process.Pid, Port: port, Command: strings.Join(append([]string{cfg.Bin}, args...), " "), Started: processStart(cmd.Process.Pid)})
+	_ = writePrivate(pidFile, rec)
+	fail := func(err error) (*Server, error) {
+		s.Stop()
+		return nil, err
+	}
+	c, err := s.Client()
+	if err != nil {
+		return fail(err)
+	}
 	deadline := time.Now().Add(cfg.Ready)
 	for {
-		if c, err := net.DialTimeout("tcp", "127.0.0.1:"+strconv.Itoa(port), 200*time.Millisecond); err == nil {
-			c.Close()
-			return s, nil
-		}
 		select {
 		case <-s.done:
 			_ = os.Remove(pidFile)
 			return nil, errors.New("opencode: the server exited before it answered")
 		case <-ctx.Done():
-			s.Stop()
-			return nil, ctx.Err()
-		case <-time.After(50 * time.Millisecond):
+			return fail(ctx.Err())
+		default:
+		}
+		actx, cancel := context.WithTimeout(ctx, time.Second)
+		status, err := c.ping(actx)
+		cancel()
+		switch {
+		case err == nil && status == 200:
+			// It is alive and took this server's password: and a wrong one is refused, which a stranger's open server would not do, and the child is still running (one that could not listen has exited).
+			if bad, berr := New(s.URL, "not-"+password); berr == nil {
+				bctx, bcancel := context.WithTimeout(ctx, time.Second)
+				bstatus, perr := bad.ping(bctx)
+				bcancel()
+				select {
+				case <-s.done:
+					_ = os.Remove(pidFile)
+					return nil, errors.New("opencode: the server exited before it answered")
+				default:
+				}
+				if perr == nil && (bstatus == 401 || bstatus == 403) {
+					return s, nil
+				}
+			}
+			return fail(errors.New("opencode: the port answers, but not as the server that was started"))
+		case err == nil && (status == 401 || status == 403):
+			return fail(errors.New("opencode: another server answers on this port"))
 		}
 		if time.Now().After(deadline) {
-			s.Stop()
-			return nil, errors.New("opencode: the server did not answer in time")
+			return fail(errors.New("opencode: the server did not answer in time"))
+		}
+		select {
+		case <-s.done:
+		case <-time.After(50 * time.Millisecond):
 		}
 	}
 }
@@ -164,10 +254,11 @@ func (s *Server) Stop() {
 		_ = s.cmd.Process.Kill()
 		<-s.done
 	}
-	_ = os.Remove(s.pidFile)
+	_ = os.Remove(filepath.Join(s.dir, "server.json"))
 }
 
-// stopLeftOver stops the server a previous Coral recorded, by its pid, if that process is still there.
+// stopLeftOver stops the server a previous Coral recorded, if that process is still there: its pid must show, by ps, the exact command that was recorded and the start time that was recorded. A pid that is
+// another process now (a restart reused it) is never signalled.
 func stopLeftOver(pidFile string) {
 	b, err := os.ReadFile(pidFile)
 	if err != nil {
@@ -175,26 +266,38 @@ func stopLeftOver(pidFile string) {
 	}
 	defer os.Remove(pidFile)
 	var rec pidRecord
-	if json.Unmarshal(b, &rec) != nil || rec.PID <= 1 {
+	if json.Unmarshal(b, &rec) != nil || rec.PID <= 1 || rec.Command == "" || rec.Started == "" {
 		return
 	}
-	if !isOurServer(rec.PID, rec.Port) {
-		return // the pid is another process now (a restart reused it): never signalled
+	if !isRecordedServer(rec) {
+		return
 	}
 	if p, err := os.FindProcess(rec.PID); err == nil {
 		_ = p.Signal(syscall.SIGTERM)
 	}
 }
 
-// isOurServer reports whether pid is still the server that was started on port: its command line (ps) names that port. Where ps is not there (Windows) it says no and nothing is signalled.
-func isOurServer(pid, port int) bool {
+// isRecordedServer reports whether rec.PID is still the process that was recorded: its command line (ps) is exactly the recorded command and it began when the record says. Where ps is not there (Windows) it
+// says no and nothing is signalled.
+func isRecordedServer(rec pidRecord) bool {
 	if runtime.GOOS == "windows" {
 		return false
 	}
-	out, err := exec.Command("ps", "-o", "args=", "-p", strconv.Itoa(pid)).Output()
-	if err != nil {
+	out, err := exec.Command("ps", "-o", "args=", "-p", strconv.Itoa(rec.PID)).Output()
+	if err != nil || strings.TrimSpace(string(out)) != rec.Command {
 		return false
 	}
-	args := string(out)
-	return strings.Contains(args, "serve") && strings.Contains(args, strconv.Itoa(port))
+	return processStart(rec.PID) == rec.Started
+}
+
+// processStart is ps's start time of pid ("" where ps is not there or the process is not).
+func processStart(pid int) string {
+	if runtime.GOOS == "windows" {
+		return ""
+	}
+	out, err := exec.Command("ps", "-o", "lstart=", "-p", strconv.Itoa(pid)).Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(out))
 }

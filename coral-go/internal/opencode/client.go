@@ -209,6 +209,19 @@ func (c *Client) Messages(ctx context.Context, sessionID string, opts MessagesOp
 	return page, nil
 }
 
+// ping asks the server one authenticated question (GET /api/session) and reports the status it answers: 200 is a server that took this client's password.
+func (c *Client) ping(ctx context.Context) (int, error) {
+	q := url.Values{}
+	q.Set("limit", "1")
+	resp, err := c.get(ctx, "/api/session", q, "application/json")
+	if err != nil {
+		return 0, err
+	}
+	defer resp.Body.Close()
+	io.Copy(io.Discard, io.LimitReader(resp.Body, 1<<16))
+	return resp.StatusCode, nil
+}
+
 // LastMessage is the newest message with text of a session: one page, newest first, the first of it with text (the row's last_message of #11097).
 func (c *Client) LastMessage(ctx context.Context, sessionID string) (Message, bool, error) {
 	p, err := c.Messages(ctx, sessionID, MessagesOpts{Desc: true, Limit: 20})
