@@ -55,7 +55,7 @@ const STUB = `(() => {
     const { settle, coralReady } = require('./helpers/wait').bind(ev);
     const shot = require('./helpers/scene_shots')(Page, 'automations-recent');
     const themed = async (name, w) => { for (const theme of ['dark', 'light']) { await setTheme(ev, theme); await settle(150); await shot(`${name}-${theme}-${w}`); } await setTheme(ev, 'dark'); };
-    const rows = () => ev(`[...document.querySelectorAll('#group-table-view tbody tr[data-key]')].map(tr => tr.querySelector('.dt-primary').textContent.trim().replace(/^Not opened: /, '') + '|' + (tr.querySelector('.chip:not(.dt-tag)') || {}).textContent + '|' + (tr.querySelector('.automations-unread') ? 'unread' : 'read'))`);
+    const rows = () => ev(`[...document.querySelectorAll('#group-table-view tbody tr[data-key]')].map(tr => tr.querySelector('.dt-primary').textContent.trim().replace(/^Not opened: /, '') + '|' + (tr.querySelector('.state-label') || {}).textContent + '|' + (tr.querySelector('.automations-unread') ? 'unread' : 'read'))`);
     const folderWords = mobile => ev(mobile ? `[...document.querySelectorAll('#group-table-view .view-list-select option')].map(o => o.textContent.trim())` : `[...document.querySelectorAll('.view-list-item')].map(b => b.textContent.trim().replace(/\\s+/g, ' '))`);
     const pathname = () => ev(`location.pathname`);
     const S = `(window.__coralStatic || '/static/')`;
