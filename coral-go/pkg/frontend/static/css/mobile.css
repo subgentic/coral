@@ -1456,3 +1456,9 @@
     body[data-phone-fab="automations"] .automations-create, body[data-phone-fab="automations"] .automations-act { display: none; } /* the + at the bottom right makes a job or a workflow: the toolbar's create buttons are not drawn (#11239 slice A) */
     body:has(#scheduler-view[data-phone-item]) .phone-nav, body:has(#scheduler-view[data-phone-item]) .phone-fab, body:has(#workflows-view[data-phone-item]) .phone-nav, body:has(#workflows-view[data-phone-item]) .phone-fab { display: none; } /* a job or a workflow opened is a page of its own (a drill-down): no nav and no + over its footer */
 }
+
+/* The Home list's per-row and per-team ⋯ is a 44 px button on a phone (#11281), not a 24 px box with a hidden hit area: the rows are 44 px high already */
+@media (max-width: 599px) {
+    .session-list .sidebar-kebab-btn, .group-kebab .sidebar-kebab-btn { width: var(--control-touch-height, 44px); min-width: var(--control-touch-height, 44px); height: var(--control-touch-height, 44px); min-height: var(--control-touch-height, 44px); margin-block: 0; }
+    .session-list .sidebar-kebab-btn::after, .group-kebab .sidebar-kebab-btn::after { inset: 0; }
+}

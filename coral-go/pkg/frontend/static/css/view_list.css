@@ -72,3 +72,5 @@
     .view-list .vl-tab { display: inline-flex; align-items: center; justify-content: center; gap: 6px; flex: none; width: auto; min-width: var(--control-touch-height, 44px); min-height: var(--control-touch-height, 44px); height: auto; padding: 0 14px; border-radius: 0; background: none; border: 0; border-bottom: 3px solid transparent; color: var(--text-secondary); font-weight: var(--fw-medium); white-space: nowrap; }
     .view-list .vl-tab.view-list-current { color: var(--text-primary); border-bottom-color: var(--accent); font-weight: var(--fw-strong); box-shadow: none; }
 }
+
+.vl-panel { display: contents; } /* the phone's tab panel (#11281) wraps what is under the strip and draws no box of its own */

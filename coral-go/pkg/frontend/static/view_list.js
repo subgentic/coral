@@ -3,7 +3,7 @@
  * An item is a button (a view is not a link); the current one says aria-current and is marked by a bar and weight, not by colour alone; a view that is not built yet is disabled and says "soon" in words.
  * A colour dot (a tag's colour) is a hex colour only. Text is set with textContent only.
  *
- *   build({ id, label, sections, current, onPick, drawer })  -> the element (the column and the select; with `drawer`, the column and, on a phone, a drawer opened by a button that names the current view, in place of the select: the Inbox's, #9545)
+ *   build({ id, label, sections, current, onPick, drawer, tabs })  -> the element (the column and the select; with `tabs` the nav is a tab list (role=tablist, tab, aria-selected, aria-controls the page's panel `<id>-panel`) for the phone's strip, #11281; with `drawer`, the column and, on a phone, a drawer opened by a button that names the current view, in place of the select: the Inbox's, #9545)
  *   sections: [{ title?, items: [{ key, label, count?, unread?, total?, alert?, dot?, icon?, soon? }] }]      unread: the number is the unread count (its name says "3 unread", its tooltip "N in all" from total)      onPick(key) is not called for a disabled item; a section's title is also the select's group label
  *   update(root, { sections, current })               -> draws the same element again with new counts or another current view; the keyboard stays on the item it was on */
 import { loadStyles } from './lazy_styles.js';
@@ -27,6 +27,7 @@ function folderIcon(name) {
 
 function draw(root, { sections, current }) {
     const nav = root.querySelector('.view-list-nav'), select = root.querySelector('.view-list-select'), trigger = root.querySelector('.view-list-trigger');
+    if (root._tabs) { nav.setAttribute('role', 'tablist'); nav.setAttribute('aria-orientation', 'horizontal'); }
     const held = nav.contains(document.activeElement) ? document.activeElement.dataset.key : null;
     nav.replaceChildren(); select?.replaceChildren();
     for (const sec of sections) {
@@ -49,6 +50,7 @@ function draw(root, { sections, current }) {
             else if (total != null) b.append(el('span', 'view-list-count', total));
             else if (it.count != null) b.append(el('span', it.alert && Number(it.count) > 0 ? 'view-list-count view-list-alert' : it.unread ? 'view-list-count view-list-new' : 'view-list-count', it.count)); // alert: the one count that is a red pill (Needs you), and only while it is above 0; every other count stays quiet
             if (it.key === current) { b.setAttribute('aria-current', 'true'); b.classList.add('view-list-current', 'list-row-current'); }
+            if (root._tabs) { b.setAttribute('role', 'tab'); b.id = `${root.dataset.viewList}-tab-${it.key}`; b.setAttribute('aria-selected', it.key === current ? 'true' : 'false'); b.setAttribute('aria-controls', `${root.dataset.viewList}-panel`); } // the phone's strip is a tab list: the page's content under it is its panel (sidebar_groups.js)
             nav.append(b);
             if (it.key === current && trigger) { // the drawer's button: what is open, and how many
                 const chevron = el('span', 'material-icons view-list-trigger-icon', 'expand_more'); chevron.setAttribute('aria-hidden', 'true'); // a chevron after the name (it opens a list), not a hamburger
@@ -116,8 +118,8 @@ function wireDrawer(root, nav) {
     return close;
 }
 
-export function build({ id, label, sections, current, onPick, drawer = false }) {
-    const root = el('div', drawer ? 'view-list view-list-drawer' : 'view-list'); root.dataset.viewList = id;
+export function build({ id, label, sections, current, onPick, drawer = false, tabs = false }) {
+    const root = el('div', drawer ? 'view-list view-list-drawer' : 'view-list'); root.dataset.viewList = id; root._tabs = tabs;
     const nav = el('nav', 'view-list-nav'); nav.setAttribute('aria-label', label);
     const select = drawer ? null : el('select', 'field view-list-select'); if (select) select.setAttribute('aria-label', label);
     root.append(nav); if (select) root.append(select);

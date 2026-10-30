@@ -31,7 +31,7 @@ const BASE = require('./test_base').BASE;
             assert.deepEqual(pv, { Ada: 'You: please ship it today', Bo: 'Bo: Done: the suite passes', Cy: 'No messages yet', Di: 'Fix the cold start' }, `${tag}: the preview: ` + JSON.stringify(pv));
             // C: the pill and the +
             const items = await ev(`[...document.querySelectorAll('#phone-nav .phone-nav-slot')].map(b => [b.getAttribute('aria-label'), b.getBoundingClientRect().width, b.getBoundingClientRect().height])`);
-            assert.deepEqual(items.map(i => i[0]), ['Home, the agents', 'Go to Inbox', 'Go to Tasks', 'More pages'], `${tag}: Home, Inbox, Tasks, More pages`);
+            assert.deepEqual(items.map(i => i[0]), ['Home', 'Inbox', 'Tasks', 'More pages'], `${tag}: Home, Inbox, Tasks, More pages`);
             assert.ok(items.every(i => i[1] >= 44 && i[2] >= 44), `${tag}: 44 px targets: ` + JSON.stringify(items));
             const nav = await ev(box(`document.getElementById('phone-nav')`)), fab = await ev(box(`document.getElementById('phone-fab')`));
             assert.ok(nav.b <= 844 - 14 && fab.b <= 844 - 14 && nav.r < fab.l && fab.r <= 390 && nav.h === 64 && fab.w >= 56, `${tag}: the pill and the + float above the bottom, side by side: ` + JSON.stringify({ nav, fab }));

@@ -178,7 +178,11 @@ function drawTable() {
         host.innerHTML = html; host.dataset.drawn = drawn; // a redraw of what is there would drop the focus from a row the keyboard is on
         if (bar?.node) host.prepend(bar.node);
         if (folderPage) folderHead(bar.node, folderPage);
-        if (lead) host.prepend(lead.node());
+        if (lead) { // a phone: the strip is a tab list and everything under it is its panel (#11281); the panel adds no box (display: contents)
+            const strip = lead.node(), panel = document.createElement('div'); panel.className = 'vl-panel'; panel.id = `${strip.dataset.viewList}-panel`; panel.setAttribute('role', 'tabpanel');
+            const tab = strip.querySelector('[role="tab"][aria-selected="true"]'); if (tab) panel.setAttribute('aria-labelledby', tab.id);
+            panel.append(...host.childNodes); host.replaceChildren(strip, panel);
+        }
         const slots = host.querySelectorAll('.group-table-node'); // one per table that draws its own rows (and has some), in order
         let k = 0;
         for (const x of tables) if (x.node && (x.rows.length || !x.empty)) slots[k++]?.replaceWith(x.node());
