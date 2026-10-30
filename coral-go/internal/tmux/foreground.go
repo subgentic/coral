@@ -163,10 +163,13 @@ func programBelowShells(t *procTable, pid, depth int, seen map[int]bool) bool {
 }
 
 type procEntry struct {
-	ppid int
-	stat string
-	comm string
+	ppid  int
+	stat  string
+	comm  string
+	start string // ps lstart ("Wed Oct 29 13:46:00 2026"): with the pid it names one process for good, "" when the table has none (#389)
 }
+
+var weekdays = map[string]bool{"Mon": true, "Tue": true, "Wed": true, "Thu": true, "Fri": true, "Sat": true, "Sun": true}
 
 type procTable struct {
 	byPID    map[int]procEntry
@@ -228,7 +231,7 @@ func readProcTableMaxAge(maxAge time.Duration) (*procTable, error) {
 		return t, nil
 	}
 	procTableRuns.Add(1)
-	out, err := executil.Output(psTimeout, "ps", "-A", "-o", "pid=,ppid=,stat=,comm=")
+	out, err := executil.Output(psTimeout, "ps", "-A", "-o", "pid=,ppid=,stat=,lstart=,comm=")
 	if err != nil {
 		return nil, err
 	}
@@ -238,8 +241,8 @@ func readProcTableMaxAge(maxAge time.Duration) (*procTable, error) {
 	return t, nil
 }
 
-// parseProcTable reads 'ps -A -o pid=,ppid=,stat=,comm=': the command is the rest of the
-// line (a macOS command is a path, which may hold spaces).
+// parseProcTable reads 'ps -A -o pid=,ppid=,stat=,lstart=,comm=' (or the same without lstart): the start time is the five words after the state when the
+// first of them is a weekday, and the command is the rest of the line (a macOS command is a path, which may hold spaces).
 func parseProcTable(out string) *procTable {
 	t := &procTable{byPID: map[int]procEntry{}, children: map[int][]int{}}
 	for _, line := range strings.Split(out, "\n") {
@@ -252,11 +255,15 @@ func parseProcTable(out string) *procTable {
 		if err1 != nil || err2 != nil {
 			continue
 		}
+		skip, start := 3, "" // past pid, ppid and stat
+		if len(f) >= 9 && weekdays[f[3]] {
+			skip, start = 8, strings.Join(f[3:8], " ") // ... and the five words of lstart
+		}
 		rest := strings.TrimLeft(line, " \t")
-		for k := 0; k < 3; k++ { // past pid, ppid and stat
+		for k := 0; k < skip; k++ {
 			rest = strings.TrimLeft(rest[strings.IndexAny(rest, " \t"):], " \t")
 		}
-		t.byPID[pid] = procEntry{ppid: ppid, stat: f[2], comm: strings.TrimSpace(rest)}
+		t.byPID[pid] = procEntry{ppid: ppid, stat: f[2], comm: strings.TrimSpace(rest), start: start}
 		t.children[ppid] = append(t.children[ppid], pid)
 	}
 	return t

@@ -166,6 +166,7 @@ GET /api/sessions/live/{name}/subagents view
 GET /api/sessions/live/{name}/subagents/{subagentID} view
 GET /api/sessions/live/{name}/tasks view
 GET /api/sessions/live/{name}/waiting never
+GET /api/sessions/live/{sessionID}/agent-candidate never
 GET /api/sessions/resolve never
 GET /api/sessions/{sessionID}/changes view
 GET /api/sessions/{sessionID}/changes.diff view
@@ -375,10 +376,12 @@ POST /api/sessions/live/{name}/token-usage never
 POST /api/sessions/live/{name}/turn-end never
 POST /api/sessions/live/{name}/waiting/send never
 POST /api/sessions/live/{sessionID}/archive interact
+POST /api/sessions/live/{sessionID}/record-agent never
 POST /api/sessions/live/{sessionID}/refresh-hooks launch
 POST /api/sessions/live/{sessionID}/sleep launch
 POST /api/sessions/live/{sessionID}/unarchive interact
 POST /api/sessions/live/{sessionID}/wake launch
+POST /api/sessions/record-agents never
 POST /api/system/api-key/regenerate never
 POST /api/system/auto-wake/dismiss never
 POST /api/system/login-token never
