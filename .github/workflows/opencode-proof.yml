@@ -52,13 +52,13 @@ jobs:
             fi
             sleep 0.2
           done
-          wait "$runner" 2>/dev/null
-          code=$?
+          code=0
+          wait "$runner" 2>/dev/null || code=$?   # a failing test run must not end this script before it reports
           echo "exit code: $code"
           echo "processes: before $before, highest seen $max, extra $((max - before))"
           echo "--- last lines of the test output"
           tail -n 25 "$RUNNER_TEMP/opencode.log"
-          grep -c '^=== RUN' "$RUNNER_TEMP/opencode.log" | sed 's/^/tests run: /'
+          echo "tests run: $(grep -c '^=== RUN' "$RUNNER_TEMP/opencode.log" || true)"
           [ "$tripped" -eq 0 ] || { echo "the watchdog tripped"; exit 1; }
           [ "$code" -eq 0 ] || exit 1
           [ $((max - before)) -le 60 ] || { echo "too many extra processes"; exit 1; }
