@@ -327,3 +327,14 @@ func TestARestartFromAnUnregisteredFolderNeedsThisUpdaterThere(t *testing.T) {
 	assert.True(t, restartFromMarker(data, reg+string(filepath.Separator)))
 	assert.Equal(t, []string{own, reg}, *started)
 }
+
+// What the check does NOT do, written down (Security's probe on #241): a same-user planter who copies this updater beside a coral-tray.exe of their own gets that tray started. The
+// check stops a stray or damaged marker; it is not a defence against someone who can already write the marker and run programs as this user.
+func TestARestartFromAFolderWithACopyOfTheUpdaterStartsWhateverTrayIsThere(t *testing.T) {
+	started := fakeStart(t, nil)
+	planted := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(planted, "coral-tray.exe"), []byte("a program of the planter's choosing"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(planted, "coral-update.exe"), []byte(thisUpdater), 0o755)) // a copy of the running updater
+	assert.True(t, restartFromMarker(t.TempDir(), planted), "known limit: the check shows a copy of this updater, not an install")
+	assert.Equal(t, []string{planted}, *started)
+}

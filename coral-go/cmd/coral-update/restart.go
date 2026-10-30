@@ -64,9 +64,10 @@ func restartFromMarker(dataDir, dir string) bool {
 		// is used as it is only for the install it was added for (#5946): a portable copy's server, or no registered product.
 		dir = reg
 	default:
-		// Not the registered install, and the marker is a file this user can write: Coral is started from that folder only if it is the install this updater belongs to, which
-		// a coral-update.exe in it with this program's own bytes shows (the dashboard's copy is a copy of the server's own updater). Any other folder is a failure said in
-		// the answer, so a planted marker cannot make the updater start a program of its choosing.
+		// Not the registered install, and the marker is a file this user can write: Coral is started from that folder only if it holds a coral-update.exe with this program's own
+		// bytes (the dashboard's copy is a copy of the server's own updater, so a portable server's folder does). Any other folder is a failure said in the answer.
+		// This is a guard against a stray or damaged marker, NOT against a same-user planter: anyone who can write a marker can also copy coral-update.exe beside a coral-tray.exe of
+		// their own, or run that program directly. It proves the folder holds a copy of this updater, not that it is an install. (No Authenticode binding: Coral's builds are not signed.)
 		if !hasThisUpdater(dir) {
 			return false
 		}
