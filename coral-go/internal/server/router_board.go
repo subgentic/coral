@@ -24,7 +24,7 @@ func (s *Server) registerBoard(r *chi.Mux, h *routeHandlers) {
 func (s *Server) registerBoardRemotes(r *chi.Mux) {
 	// Board remotes
 	brHandler := routes.NewBoardRemotesHandler(s.db, s.cfg)
-	r.Post("/api/board/remotes", brHandler.AddSubscription)
+	r.With(routes.RefuseSignInLink).Post("/api/board/remotes", brHandler.AddSubscription)
 	r.Delete("/api/board/remotes", brHandler.RemoveSubscription)
 	r.Get("/api/board/remotes", brHandler.ListSubscriptions)
 	r.Get("/api/board/remotes/proxy/{remoteServer}/projects", brHandler.ProxyProjects)
@@ -118,7 +118,7 @@ func (s *Server) registerBoardAPI(r *chi.Mux, boardHandler *routes.BoardHandler,
 func (s *Server) registerBoardMessageRoutes(r chi.Router, boardHandler *routes.BoardHandler) {
 	r.Get("/api/board/projects", boardHandler.ListProjects)
 	r.Get("/api/system/message-search-index", boardHandler.MessageSearchIndexStatus) // Settings: the board message search index, on by default (#9685)
-	r.Post("/api/board/{project}/subscribe", boardHandler.Subscribe)
+	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/subscribe", boardHandler.Subscribe)
 	r.Delete("/api/board/{project}/subscribe", boardHandler.Unsubscribe)
 	r.Delete("/api/board/{project}/seats/{subscriberID}", boardHandler.RemoveSeat) // the Operator removes a seat (#11112); never through the Hub
 	r.Get("/api/board-seats/foreign", boardHandler.ListForeignSeats)               // the seats of agents launched on another board (#11112)
@@ -135,9 +135,9 @@ func (s *Server) registerBoardMessageRoutes(r chi.Router, boardHandler *routes.B
 	r.Post("/api/board/{project}/resume", boardHandler.ResumeBoard)
 	r.Get("/api/board/{project}/paused", boardHandler.GetPaused)
 	r.Get("/api/board/{project}/settings", boardHandler.GetBoardSettings)
-	r.Put("/api/board/{project}/settings", boardHandler.UpdateBoardSettings)
+	r.With(routes.RefuseSignInLink).Put("/api/board/{project}/settings", boardHandler.UpdateBoardSettings)
 	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/external-messages", boardHandler.PostExternalMessage)
-	r.Post("/api/board/{project}/external-artifacts", boardHandler.PostExternalArtifact)
+	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/external-artifacts", boardHandler.PostExternalArtifact)
 	// To another Coral through Coral Hub (#3489); this computer only (not in the tunnel's table).
 	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/relay-messages", boardHandler.PostRelayMessage)
 	r.Get("/api/board/{project}/relay-targets", boardHandler.ListRelayTargets)
@@ -152,12 +152,12 @@ func (s *Server) registerBoardMessageRoutes(r chi.Router, boardHandler *routes.B
 	r.Post("/api/board/{project}/cross-team/files/disable", boardHandler.HubCrossTeamFilesDisable)
 	r.Delete("/api/board/{project}", boardHandler.DeleteBoard)
 	r.Get("/api/board/{project}", boardHandler.GetBoardInfo)
-	r.Patch("/api/board/{project}", boardHandler.RenameBoard)
+	r.With(routes.RefuseSignInLink).Patch("/api/board/{project}", boardHandler.RenameBoard)
 	r.Get("/api/board/{project}/groups", boardHandler.ListGroups)
 	r.Get("/api/board/{project}/groups/{groupID}/members", boardHandler.ListGroupMembers)
-	r.Post("/api/board/{project}/groups/{groupID}/members", boardHandler.AddGroupMember)
+	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/groups/{groupID}/members", boardHandler.AddGroupMember)
 	r.Delete("/api/board/{project}/groups/{groupID}/members/{sessionID}", boardHandler.RemoveGroupMember)
-	r.Post("/api/board/{project}/waits", boardHandler.RegisterWait)
+	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/waits", boardHandler.RegisterWait)
 	r.Get("/api/board/{project}/waits", boardHandler.GetActiveWait)
 	r.Delete("/api/board/{project}/waits", boardHandler.CancelWait)
 	r.Get("/api/board/{project}/waits/poll", boardHandler.PollWait)
@@ -169,16 +169,16 @@ func (s *Server) registerBoardTaskRoutes(r chi.Router, boardHandler *routes.Boar
 	// Board tasks (per-project)
 	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/tasks", boardHandler.CreateTask)
 	r.Get("/api/board/{project}/working-mode", boardHandler.GetWorkingMode)
-	r.Put("/api/board/{project}/working-mode", boardHandler.SetWorkingMode)
+	r.With(routes.RefuseSignInLink).Put("/api/board/{project}/working-mode", boardHandler.SetWorkingMode)
 	r.Get("/api/board/{project}/cross-team-state", boardHandler.GetCrossTeamState)
-	r.Get("/api/board/{project}/cross-team-links", boardHandler.ListLocalLinks)      // #9893: the links between this computer's teams: the Operator's, never through Coral Hub
-	r.Post("/api/board/{project}/cross-team-links", boardHandler.AddLocalLinks)      // #9893
-	r.Delete("/api/board/{project}/cross-team-links", boardHandler.RemoveLocalLinks) // #9893
+	r.Get("/api/board/{project}/cross-team-links", boardHandler.ListLocalLinks)                               // #9893: the links between this computer's teams: the Operator's, never through Coral Hub
+	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/cross-team-links", boardHandler.AddLocalLinks) // #9893
+	r.Delete("/api/board/{project}/cross-team-links", boardHandler.RemoveLocalLinks)                          // #9893
 	r.Get("/api/board/{project}/cross-team-candidates", boardHandler.GetCrossTeamCandidates)
 	r.Get("/api/board/{project}/settings/log", boardHandler.GetCrossTeamLog)
 	r.Get("/api/board/{project}/working-mode/presets", boardHandler.ListWorkflowPresets)
-	r.Post("/api/board/{project}/working-mode/presets", boardHandler.SaveWorkflowPreset)
-	r.Put("/api/board/{project}/working-mode/presets/{presetID}", boardHandler.SaveWorkflowPreset)
+	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/working-mode/presets", boardHandler.SaveWorkflowPreset)
+	r.With(routes.RefuseSignInLink).Put("/api/board/{project}/working-mode/presets/{presetID}", boardHandler.SaveWorkflowPreset)
 	r.Post("/api/board/{project}/working-mode/presets/{presetID}/reset", boardHandler.ResetWorkflowPreset)
 	r.Get("/api/board/{project}/tasks", boardHandler.ListTasks)
 	r.Get("/api/board/{project}/spend", spendHandler(s).Spend) // the Analytics view: tokens, commits on main, tool calls and task times (#7525); never through the Hub
@@ -204,27 +204,27 @@ func (s *Server) registerBoardTaskRoutes(r chi.Router, boardHandler *routes.Boar
 	r.Get("/api/board/{project}/tasks/{taskID}/history", boardHandler.TaskHistory)
 	r.Get("/api/board/{project}/tasks/{taskID}/artifact-content", boardHandler.TeamArtifactContent)
 	r.Get("/api/board/{project}/artifacts", boardHandler.ListTeamArtifacts)
-	r.Put("/api/board/{project}/artifacts/{id}/tags", boardHandler.SetArtifactTags)                          // the Operator's and the team owner's (#8583); no tunnel row
-	r.Put("/api/board/{project}/subscribers/{subscriberID}/review-settings", boardHandler.SetReviewSettings) // an agent's Reviews only switch and areas: the Operator's (#8957); no tunnel row
+	r.With(routes.RefuseSignInLink).Put("/api/board/{project}/artifacts/{id}/tags", boardHandler.SetArtifactTags)                          // the Operator's and the team owner's (#8583); no tunnel row
+	r.With(routes.RefuseSignInLink).Put("/api/board/{project}/subscribers/{subscriberID}/review-settings", boardHandler.SetReviewSettings) // an agent's Reviews only switch and areas: the Operator's (#8957); no tunnel row
 	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/tasks/{taskID}/complete", boardHandler.CompleteTaskByID)
 	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/tasks/{taskID}/submit-review", boardHandler.SubmitCompletionReview)
 	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/tasks/{taskID}/release-review", boardHandler.ReleaseCompletionReview)
-	r.Post("/api/board/{project}/tasks/{taskID}/review", boardHandler.DelegateReview)                               // #3725
-	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/tasks/{taskID}/approve", boardHandler.ApproveReview) // #3725
-	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/tasks/{taskID}/reject", boardHandler.RejectReview)   // #3725
-	r.Post("/api/board/{project}/tasks/{taskID}/attach", boardHandler.AttachPatches)                                // the merge queue (#5689)
-	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/tasks/{taskID}/send-back", boardHandler.SendBack)    // the merge queue (#5689)
-	r.Post("/api/board/{project}/tasks/{taskID}/mark-landed", boardHandler.MarkLanded)                              // the merge queue (#5689)
-	r.Get("/api/board/{project}/queue", boardHandler.MergeQueue)                                                    // the merge queue (#5689)
+	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/tasks/{taskID}/review", boardHandler.DelegateReview)  // #3725
+	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/tasks/{taskID}/approve", boardHandler.ApproveReview)  // #3725
+	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/tasks/{taskID}/reject", boardHandler.RejectReview)    // #3725
+	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/tasks/{taskID}/attach", boardHandler.AttachPatches)   // the merge queue (#5689)
+	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/tasks/{taskID}/send-back", boardHandler.SendBack)     // the merge queue (#5689)
+	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/tasks/{taskID}/mark-landed", boardHandler.MarkLanded) // the merge queue (#5689)
+	r.Get("/api/board/{project}/queue", boardHandler.MergeQueue)                                                     // the merge queue (#5689)
 	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/tasks/{taskID}/cancel", boardHandler.CancelTaskByID)
 	r.With(routes.RefuseSignInLink).Patch("/api/board/{project}/tasks/{taskID}", boardHandler.UpdateTask)
 	r.With(routes.RefuseSignInLink).Patch("/api/board/{project}/tasks/{taskID}/amend", boardHandler.AmendTask)
-	r.Post("/api/board/{project}/tasks/{taskID}/reassign", boardHandler.ReassignTask)
+	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/tasks/{taskID}/reassign", boardHandler.ReassignTask)
 	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/tasks/{taskID}/nudge", boardHandler.NudgeTask)
 	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/tasks/{taskID}/reply", boardHandler.ReplyToTask) // a message linked to the task, the creator mentioned (#5463)
 	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/tasks/{taskID}/park", boardHandler.ParkTask)
 	r.Delete("/api/board/{project}/tasks/{taskID}/park", boardHandler.ParkTask)
-	r.Post("/api/board/{project}/health/ack", boardHandler.AckHealthItem)
+	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/health/ack", boardHandler.AckHealthItem)
 	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/tasks/{taskID}/reminder", boardHandler.RemindTask)
 	r.Delete("/api/board/{project}/tasks/{taskID}/reminder", boardHandler.RemindTask)
 	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/reminder", boardHandler.RemindSubscriber)

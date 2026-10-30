@@ -46,6 +46,7 @@ func TestABoardWriteWithASignInLinkIsRefused(t *testing.T) {
 		"after the first JSON value":   `{"content":"ok"} {"content":"login_token=` + secretToken + `"}`,
 		"in a goal's done-when":        `{"title":"g","done_when":"a link login_token=` + secretToken + ` works"}`,
 		"in a notification's sentence": `{"title":"t","message":"open login_token=` + secretToken + `"}`,
+		"inside another parameter":     `{"content":"http://127.0.0.1:8420/x?next=%2F%3Flogin_token%253D` + secretToken + `"}`,
 	} {
 		t.Run(name, func(t *testing.T) {
 			rec, got := guardCall(t, body)
@@ -67,6 +68,7 @@ func TestABoardWriteWithoutASignInLinkPassesUnchanged(t *testing.T) {
 		`{"content":"login token= is two words","n":12345678901234567890}`,
 		`{"content":"login_tokens are gone"}`,
 		`not json at all`,
+		`{"content":"100% done, login_token not written, a stray %zz and %2"}`,
 		``,
 	} {
 		rec, got := guardCall(t, body)

@@ -5,18 +5,41 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"reflect"
 	"strings"
 	"testing"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/subgentic/coral/internal/server/routes"
 )
 
-// signInGuardedRoutes are the board routes whose body is text other people read: each refuses a sign-in link's token (routes.RefuseSignInLink,
-// the server side of #232). A route added to this list must be registered with r.With(routes.RefuseSignInLink) in router_board.go; the test fails otherwise.
+// signInGuardedRoutes are the write routes whose body can carry text a person typed: each refuses a sign-in link's token (routes.RefuseSignInLink,
+// the server side of #232). A route added to this list must be registered with r.With(routes.RefuseSignInLink); the test fails otherwise.
 var signInGuardedRoutes = []string{
 	"POST /api/notifications",
+	"POST /api/saved",
+	"PATCH /api/saved/{id}",
+	"POST /api/board/remotes",
+	"POST /api/board/{project}/subscribe",
+	"PUT /api/board/{project}/settings",
+	"POST /api/board/{project}/external-artifacts",
+	"PATCH /api/board/{project}",
+	"POST /api/board/{project}/groups/{groupID}/members",
+	"POST /api/board/{project}/waits",
+	"PUT /api/board/{project}/working-mode",
+	"POST /api/board/{project}/cross-team-links",
+	"POST /api/board/{project}/working-mode/presets",
+	"PUT /api/board/{project}/working-mode/presets/{presetID}",
+	"PUT /api/board/{project}/artifacts/{id}/tags",
+	"PUT /api/board/{project}/subscribers/{subscriberID}/review-settings",
+	"POST /api/board/{project}/tasks/{taskID}/review",
+	"POST /api/board/{project}/tasks/{taskID}/attach",
+	"POST /api/board/{project}/tasks/{taskID}/mark-landed",
+	"POST /api/board/{project}/tasks/{taskID}/reassign",
+	"POST /api/board/{project}/health/ack",
 	"POST /api/board/{project}/messages",
 	"POST /api/board/{project}/external-messages",
 	"POST /api/board/{project}/relay-messages",
@@ -71,7 +94,8 @@ func TestTheBoardRoutesRefuseASignInLinkFromAnyClient(t *testing.T) {
 	for _, rt := range signInGuardedRoutes {
 		require.True(t, served[rt], "%s is not a served route", rt)
 		method, pattern, _ := strings.Cut(rt, " ")
-		path := strings.NewReplacer("{project}", "team", "{taskID}", "1", "{goalID}", "1", "{requestID}", "1").Replace(pattern)
+		path := strings.NewReplacer("{project}", "team", "{taskID}", "1", "{goalID}", "1", "{requestID}", "1", "{presetID}", "1", "{id}", "1",
+			"{subscriberID}", "Lead", "{groupID}", "1").Replace(pattern)
 		code, out, raw := do(method, path, tainted)
 		assert.Equal(t, http.StatusBadRequest, code, "%s: %s", rt, raw)
 		assert.Equal(t, "sign_in_link", out["code"], rt)
@@ -86,4 +110,76 @@ func TestTheBoardRoutesRefuseASignInLinkFromAnyClient(t *testing.T) {
 	require.Equal(t, http.StatusOK, code)
 	assert.Contains(t, all, "the result: 3 passed")
 	assert.NotContains(t, all, token, "a refused post was stored")
+}
+
+// writeRoutesWithoutTheGuard are the write routes left without routes.RefuseSignInLink, each with why: their body carries no text a person
+// typed. A new write route under these prefixes fails TestEveryWriteRouteIsGuardedOrSaysWhyNot until it is guarded or listed here.
+var writeRoutesWithoutTheGuard = map[string]string{
+	"DELETE /api/saved/{id}":                                           "a delete by id: no text is kept",
+	"DELETE /api/board/remotes":                                        "a delete: no text is kept",
+	"DELETE /api/board/{project}":                                      "a delete: no text is kept",
+	"DELETE /api/board/{project}/subscribe":                            "a delete: no text is kept",
+	"DELETE /api/board/{project}/messages/{messageID}":                 "a delete by id: no text is kept",
+	"DELETE /api/board/{project}/groups/{groupID}/members/{sessionID}": "a delete by id: no text is kept",
+	"DELETE /api/board/{project}/waits":                                "a delete: no text is kept",
+	"DELETE /api/board/{project}/cross-team-links":                     "a delete: no text is kept",
+	"DELETE /api/board/{project}/tasks/{taskID}/park":                  "a delete by id: no text is kept",
+	"DELETE /api/board/{project}/tasks/{taskID}/reminder":              "a delete by id: no text is kept",
+	"DELETE /api/board/{project}/reminder":                             "a delete: no text is kept",
+	"POST /api/board/{project}/messages/mark-read":                     "ids only (subscriber_id, from_id, through_id)",
+	"POST /api/board/{project}/pause":                                  "a switch: no text",
+	"POST /api/board/{project}/resume":                                 "a switch: no text",
+	"POST /api/board/{project}/cross-team/enable":                      "a switch: no text",
+	"POST /api/board/{project}/cross-team/disable":                     "a switch: no text",
+	"POST /api/board/{project}/cross-team/files/enable":                "a switch: no text",
+	"POST /api/board/{project}/cross-team/files/disable":               "a switch: no text",
+	"POST /api/board/{project}/working-mode/presets/{presetID}/reset":  "a reset to the default: no text",
+	"PUT /api/board/{project}/tasks/{taskID}/goal":                     "ids only (goal_id)",
+	"POST /api/board/{project}/tasks/claim":                            "ids only (subscriber_id, task_id)",
+	"POST /api/board/{project}/tasks/current":                          "ids only (subscriber_id)",
+	"POST /api/board/{project}/tasks/{taskID}/publish":                 "ids only (subscriber_id)",
+	"POST /api/tasks/run":                                              "a one-shot task's prompt for an agent: not kept on a board",
+	"POST /api/tasks/runs/{runID}/kill":                                "ids only",
+}
+
+// Every write route under the board, saved-item, notification and one-shot task prefixes either refuses a sign-in link (routes.RefuseSignInLink
+// as its middleware) or is listed in writeRoutesWithoutTheGuard with why; the two lists agree with what the router serves.
+func TestEveryWriteRouteIsGuardedOrSaysWhyNot(t *testing.T) {
+	srv, _, _ := strictServer(t, false)
+	guard := reflect.ValueOf(routes.RefuseSignInLink).Pointer()
+	served := map[string]bool{}
+	require.NoError(t, chi.Walk(srv.Router(), func(method, route string, _ http.Handler, mws ...func(http.Handler) http.Handler) error {
+		switch method {
+		case http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete:
+		default:
+			return nil
+		}
+		if !strings.HasPrefix(route, "/api/board/") && !strings.HasPrefix(route, "/api/saved") && route != "/api/notifications" && !strings.HasPrefix(route, "/api/tasks/") {
+			return nil
+		}
+		key := method + " " + route
+		served[key] = true
+		guarded := false
+		for _, mw := range mws {
+			if reflect.ValueOf(mw).Pointer() == guard {
+				guarded = true
+			}
+		}
+		why, listed := writeRoutesWithoutTheGuard[key]
+		switch {
+		case guarded && listed:
+			t.Errorf("%s is guarded but listed as not (%s)", key, why)
+		case !guarded && !listed:
+			t.Errorf("%s has no sign-in link guard and no reason in writeRoutesWithoutTheGuard: guard it (r.With(routes.RefuseSignInLink)) or say why its body carries no text", key)
+		}
+		return nil
+	}))
+	for key := range writeRoutesWithoutTheGuard {
+		assert.True(t, served[key], "%s is listed but not served", key)
+	}
+	for _, key := range signInGuardedRoutes {
+		if strings.HasPrefix(key, "POST /api/") || strings.HasPrefix(key, "PUT /api/") || strings.HasPrefix(key, "PATCH /api/") {
+			assert.True(t, served[key], "%s is in signInGuardedRoutes but not served", key)
+		}
+	}
 }

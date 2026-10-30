@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/subgentic/coral/internal/signinguard"
 )
@@ -49,7 +50,7 @@ func RefuseSignInLink(next http.Handler) http.Handler {
 
 // carriesSignInLink reports whether body carries a sign-in link's token: in its text, or in any JSON string or key once decoded.
 func carriesSignInLink(body []byte) bool {
-	if signinguard.Contains(string(body)) {
+	if hasSignInLink(string(body)) {
 		return true
 	}
 	dec := json.NewDecoder(bytes.NewReader(body))
@@ -64,7 +65,7 @@ func carriesSignInLink(body []byte) bool {
 func jsonCarriesSignInLink(v any) bool {
 	switch x := v.(type) {
 	case string:
-		return signinguard.Contains(x)
+		return hasSignInLink(x)
 	case []any:
 		for _, e := range x {
 			if jsonCarriesSignInLink(e) {
@@ -73,10 +74,47 @@ func jsonCarriesSignInLink(v any) bool {
 		}
 	case map[string]any:
 		for k, e := range x {
-			if signinguard.Contains(k) || jsonCarriesSignInLink(e) {
+			if hasSignInLink(k) || jsonCarriesSignInLink(e) {
 				return true
 			}
 		}
 	}
 	return false
+}
+
+// hasSignInLink is signinguard's rule on text, and on the text once more with its percent-escapes decoded: a link carried inside another
+// parameter (next=%2F%3Flogin_token%253D...) is escaped twice, and signinguard itself only reads the parameter written plainly or once escaped.
+func hasSignInLink(text string) bool {
+	return signinguard.Contains(text) || signinguard.Contains(percentDecoded(text))
+}
+
+// percentDecoded is text with each %XX escape decoded once; anything else, a stray % included, is kept as it is.
+func percentDecoded(text string) string {
+	if !strings.Contains(text, "%") {
+		return text
+	}
+	var b strings.Builder
+	b.Grow(len(text))
+	for i := 0; i < len(text); i++ {
+		if text[i] == '%' && i+2 < len(text) && linkHexDigit(text[i+1]) && linkHexDigit(text[i+2]) {
+			b.WriteByte(linkHexValue(text[i+1])<<4 | linkHexValue(text[i+2]))
+			i += 2
+			continue
+		}
+		b.WriteByte(text[i])
+	}
+	return b.String()
+}
+
+func linkHexDigit(c byte) bool { return '0' <= c && c <= '9' || 'a' <= c && c <= 'f' || 'A' <= c && c <= 'F' }
+
+func linkHexValue(c byte) byte {
+	switch {
+	case '0' <= c && c <= '9':
+		return c - '0'
+	case 'a' <= c && c <= 'f':
+		return c - 'a' + 10
+	default:
+		return c - 'A' + 10
+	}
 }
