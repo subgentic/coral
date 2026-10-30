@@ -69,3 +69,32 @@ func TestAutoAcceptOffNeverSendsUnsigned(t *testing.T) {
 	assert.Contains(t, errb.String(), dir)
 	assert.Contains(t, errb.String(), "could not prove")
 }
+
+// A command-line token that is there but cannot be used (here empty; on Windows also one whose access list lets other accounts in) is said so, and NOTHING is sent: the
+// silent unsigned request it used to make was only refused by Coral, with no word of why.
+func TestAutoAcceptOffWithAnUnusableTokenSendsNothingAndSaysWhy(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, cliauth.TokenFile), nil, 0o600))
+	t.Setenv("CORAL_DATA_DIR", dir)
+	for _, k := range []string{"CORAL_SESSION_NAME", "CORAL_SESSION_ID", "CORAL_SESSION_TOKEN", "CORAL_SUBSCRIBER_ID"} {
+		t.Setenv(k, "")
+	}
+	var calls int
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		_, _ = w.Write([]byte(`{"stopped":1}`))
+	}))
+	defer srv.Close()
+	var out, errb bytes.Buffer
+	assert.Equal(t, 1, runAutoAccept([]string{"off", "--all", "--url", srv.URL}, &out, &errb))
+	assert.Zero(t, calls, "nothing was sent")
+	assert.Contains(t, errb.String(), "not private to this user")
+	assert.Contains(t, errb.String(), "restart Coral to rewrite it")
+	assert.Contains(t, errb.String(), dir)
+
+	// No token file at all (Coral never wrote one here) is not this case: the command goes on as before.
+	require.NoError(t, os.Remove(filepath.Join(dir, cliauth.TokenFile)))
+	errb.Reset()
+	assert.Equal(t, 0, runAutoAccept([]string{"off", "--all", "--url", srv.URL}, &out, &errb))
+	assert.Equal(t, 1, calls)
+}

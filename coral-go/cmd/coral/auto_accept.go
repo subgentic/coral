@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -50,8 +51,18 @@ func runAutoAccept(args []string, stdout, stderr io.Writer) int {
 	// prove it knows that token gets nothing, and the error says which folder was used.
 	client := &http.Client{Timeout: clierr.Timeout(15 * time.Second)}
 	dir := cliauth.DataDir()
-	if tok, terr := cliauth.ReadToken(dir); terr == nil && !cliauth.InsideAgentSession() {
-		client.Transport = cliauth.Transport{Base: http.DefaultTransport, Token: tok, Dir: dir}
+	if !cliauth.InsideAgentSession() {
+		tok, terr := cliauth.ReadToken(dir)
+		switch {
+		case terr == nil:
+			client.Transport = cliauth.Transport{Base: http.DefaultTransport, Token: tok, Dir: dir}
+		case tokenFileExists(dir):
+			// The token is there but cannot be used (its access list lets other accounts in, or it is damaged): an unsigned request would only be refused, and says nothing
+			// about why. Say so, and send nothing.
+			fmt.Fprintf(stderr, "coral auto-accept: the command-line token in %s is not private to this user, or is damaged (%v). "+
+				"Fix its access list or restart Coral to rewrite it. Nothing was sent.\n", dir, terr)
+			return 1
+		}
 	}
 	resp, err := send(client)
 	if err != nil {
@@ -115,4 +126,10 @@ func subcommand(args []string) (int, bool) {
 		return unknownCommand(os.Stderr, args[0]), true
 	}
 	return 0, false
+}
+
+// tokenFileExists is whether the command-line token's file is in dir at all (as opposed to Coral never having written one there).
+func tokenFileExists(dir string) bool {
+	_, err := os.Lstat(filepath.Join(dir, cliauth.TokenFile))
+	return err == nil
 }
