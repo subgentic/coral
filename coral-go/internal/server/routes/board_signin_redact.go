@@ -10,9 +10,15 @@ import (
 	"strconv"
 )
 
-// signInValue is a sign-in link's parameter and its value: login_token= (or its escape %3D, or %253D one level further), then the value up to
-// the next & # " ' < > or white space.
-var signInValue = regexp.MustCompile(`(?i)(login_token(?:=|%3d|%253d))[^&#"'<> ` + "\t\r\n" + `]*`)
+// signInValue is a sign-in link's parameter and its value: login_token= (or its escape %3D, or %253D one level further), then the value, at
+// least one character, up to the next & # " ' < > ) ] } , ; backslash or white space.
+var signInValue = regexp.MustCompile(`(?i)(login_token(?:=|%3d|%253d))` + valueChars + `+`)
+
+// valueChars is one character of a value: anything but its stop set.
+const valueChars = `[^&#"'<>)\]},;\\ ` + "\t\r\n" + `]`
+
+// bareParam is the parameter with no value after it (at the end, or before a stop character): nothing to redact, and not a link.
+var bareParam = regexp.MustCompile(`(?i)login_token(?:=|%3d|%253d)(?:$|[&#"'<>)\]},;\\ ` + "\t\r\n" + `])`)
 
 // redactedValue replaces the value.
 const redactedValue = "<removed>"
@@ -87,10 +93,10 @@ func redactJSON(v any) any {
 
 // redactText replaces the value of each sign-in link's parameter in text: written plainly, escaped once (%3D) or twice (%253D), the depth
 // the refusal reads to (hasSignInLink). The parameter's name stays, followed by <removed>. Text that still carries a link once those are
-// replaced (a name with an escaped letter: login%5Ftoken=, %6Cogin_token=) is replaced whole.
+// replaced (a name with an escaped letter: login%5Ftoken=, %6Cogin_token=) is replaced whole. A parameter with no value is left as it is.
 func redactText(s string) string {
 	out := signInValue.ReplaceAllString(s, "${1}"+redactedValue)
-	if hasSignInLink(redactedForm.ReplaceAllString(out, "")) {
+	if hasSignInLink(bareParam.ReplaceAllString(redactedForm.ReplaceAllString(out, ""), "")) {
 		return redactedValue
 	}
 	return out

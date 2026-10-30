@@ -100,3 +100,19 @@ func TestAHookReportWithAnEscapedLetterInTheNameLosesTheWholeString(t *testing.T
 		assert.Equal(t, "Bash", v["tool_name"], "%s: the other fields are kept", name)
 	}
 }
+
+// A value ends at ) ] } , ; or a backslash as well as at & # quotes and white space: what follows it in the text is kept.
+func TestARedactedValueStopsAtTheCharactersAroundIt(t *testing.T) {
+	for _, stop := range []string{")", "]", "}", ",", ";", `\`, "&", " "} {
+		in := "(see login_token=" + secretToken + stop + "after"
+		got := redactText(in)
+		assert.Equal(t, "(see login_token=<removed>"+stop+"after", got, "stop %q", stop)
+	}
+}
+
+// A parameter with no value is left as it is: there is nothing to remove, and the text is kept whole.
+func TestAParameterWithNoValueIsLeftAsItIs(t *testing.T) {
+	for _, in := range []string{"login_token=", "set login_token= to a link", "login_token=&next=1", "(login_token=)", "login_token%3D"} {
+		assert.Equal(t, in, redactText(in), in)
+	}
+}
