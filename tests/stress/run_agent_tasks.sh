@@ -354,6 +354,9 @@ source "$SCRIPT_DIR/agent_task_workflows.sh"
 # ── Test 14: FIFO claimability honors cancellation, dependencies, and ownership ──
 
 log "Test 14: FIFO claimability skips terminal/blocked rows and honors assigned work..."
+operator_seat claim-regressions "$SESS_A" Builder Builder  # the Operator seats them: an agent's own join of another board is refused (#11013)
+operator_seat claim-regressions "$SESS_B" Tester Tester
+operator_seat claim-regressions "$SESS_PLANNER" Orchestrator Orchestrator
 builder join claim-regressions --as Builder >/dev/null
 tester join claim-regressions --as Tester >/dev/null
 planner join claim-regressions --as Orchestrator >/dev/null
