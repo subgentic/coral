@@ -97,18 +97,28 @@ func RemoveMarker(dataDir string) { _ = os.Remove(markerPath(dataDir)) }
 
 // Consume reads the marker and deletes it, whatever it holds, so it is good for one apply only. It is an error (and the apply must not ask Windows anything) when there is
 // none, when it is not a plain file this user owns, when it is damaged or older than MarkerTTL (now is the clock).
-func Consume(dataDir string, now time.Time) (Marker, error) {
+func Consume(dataDir string, now time.Time) (Marker, error) { return readMarker(dataDir, now, true) }
+
+// Peek reads the marker with Consume's checks and leaves it where it is: for the updater's gate, which decides whether this run may go on before the apply consumes
+// the marker. It never deletes (a damaged marker is left for Consume to remove).
+func Peek(dataDir string, now time.Time) (Marker, error) { return readMarker(dataDir, now, false) }
+
+func readMarker(dataDir string, now time.Time, consume bool) (Marker, error) {
 	p := markerPath(dataDir)
 	f, err := secfile.OpenNoFollow(p, os.O_RDONLY, 0)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return Marker{}, ErrNoMarker
 		}
-		_ = os.Remove(p)
+		if consume {
+			_ = os.Remove(p)
+		}
 		return Marker{}, fmt.Errorf("%w: %v", ErrMarkerInvalid, err)
 	}
 	defer f.Close()
-	defer os.Remove(p) // one apply only, whatever it finds
+	if consume {
+		defer os.Remove(p) // one apply only, whatever it finds
+	}
 	if fi, err := f.Stat(); err != nil || !fi.Mode().IsRegular() {
 		return Marker{}, ErrMarkerInvalid
 	}

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/subgentic/coral/internal/config"
+	"github.com/subgentic/coral/internal/safefs"
 	"github.com/subgentic/coral/internal/updater/apply"
 	"github.com/subgentic/coral/internal/updater/trigger"
 )
@@ -51,11 +52,16 @@ func restartAfterNothing(dataDir string, now time.Time) (attempted, ok bool) {
 
 // restartFromMarker starts Coral from dir (a marker already consumed); a folder with no coral-tray.exe in it is a failure said in the answer.
 func restartFromMarker(dataDir, dir string) bool {
-	if dir == "" { // an older server's marker, a late or damaged one: where Windows Installer put Coral
-		reg, err := registeredInstall()
-		if err != nil {
+	reg, regErr := registeredInstall()
+	switch {
+	case dir == "": // an older server's marker, a late or damaged one: where Windows Installer put Coral
+		if regErr != nil {
 			return false
 		}
+		dir = reg
+	case regErr == nil && sameFinalFolder(dir, reg):
+		// The marker names the registered install: start it by Windows Installer's own spelling of the folder, not the marker's (a short name, or a link to it). The marker's folder
+		// is used as it is only for the install it was added for (#5946): a portable copy's server, or no registered product.
 		dir = reg
 	}
 	if !filepath.IsAbs(dir) {
@@ -89,4 +95,14 @@ func dataDirForRestart() string { return config.ResolveCoralDir("") }
 func restartAfterNothingFailed() bool {
 	attempted, ok := restartAfterNothing(dataDirForRestart(), time.Now())
 	return attempted && !ok
+}
+
+// sameFinalFolder says whether a and b are one folder once links and short names are resolved.
+func sameFinalFolder(a, b string) bool {
+	ra, err := safefs.Resolve(a)
+	if err != nil {
+		return false
+	}
+	rb, err := safefs.Resolve(b)
+	return err == nil && sameFolder(ra, rb)
 }

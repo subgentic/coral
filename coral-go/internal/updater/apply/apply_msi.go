@@ -241,6 +241,13 @@ func RunMSI(ctx context.Context, mc MSIConfig) Result {
 		startOld(ctx, m, install, &res)
 		return res
 	}
+	// failNoted is fail for the stops that wrote nothing in the history: the person has to be able to see, in the updater's history, that an install was tried and stopped
+	// there (the ones below that already note their own reason call fail).
+	failNoted := func(stageName string) Result {
+		cfg.history(&st, cfg.Installed, staged.Version, "failed", stageName)
+		_ = verify.SaveState(dir, st)
+		return fail(stageName)
+	}
 
 	// 3: the whole chain again, from the staged files (strictly newer than the installed version: I).
 	rec, err := stage.Reverify(cfg.Verifier, cfg.Pins, staged, cfg.Asset, st, cfg.Installed, now, cfg.MaxPkg)
@@ -249,13 +256,13 @@ func RunMSI(ctx context.Context, mc MSIConfig) Result {
 		if errors.As(err, &f) {
 			return refuse(f.Stage, f)
 		}
-		return fail("reverify")
+		return failNoted("reverify")
 	}
 
 	// 4: the copy everything else uses, held from here until msiexec has finished with it.
 	work := filepath.Join(dir, "apply-msi")
 	if err := freshDir(work); err != nil {
-		return fail("work_folder")
+		return failNoted("work_folder")
 	}
 	defer os.RemoveAll(work)
 	pkg, err := copyVerified(staged.PackagePath, rec, work, cfg.MaxPkg)
@@ -264,7 +271,7 @@ func RunMSI(ctx context.Context, mc MSIConfig) Result {
 		if errors.As(err, &f) {
 			return refuse(f.Stage, f)
 		}
-		return fail("copy")
+		return failNoted("copy")
 	}
 	held, err := m.Hold(pkg, rec.PackageSHA256)
 	if err != nil {
@@ -299,7 +306,7 @@ func RunMSI(ctx context.Context, mc MSIConfig) Result {
 	}
 	if err := writeMSIJournal(dir, msiJournal{Phase: "installing", From: cfg.Installed, To: rec.Version, Product: product, Record: rec, StartedAt: now}); err != nil {
 		closeHeld()
-		return fail("journal")
+		return failNoted("journal")
 	}
 	code, err := m.Msiexec(ctx, msiInstallArgs(held.Path(), filepath.Join(dir, "msi-install.log"))...)
 	closeHeld()
@@ -325,7 +332,7 @@ func RunMSI(ctx context.Context, mc MSIConfig) Result {
 		return fail("timeout")
 	case err != nil:
 		removeMSIJournal(dir)
-		return fail("msiexec")
+		return failNoted("msiexec")
 	case msiDeclined(code):
 		removeMSIJournal(dir)
 		cfg.history(&st, cfg.Installed, rec.Version, ResultDeclined, "consent")

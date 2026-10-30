@@ -16,6 +16,7 @@ import (
 
 	"github.com/subgentic/coral/internal/config"
 	"github.com/subgentic/coral/internal/updater/stage"
+	"github.com/subgentic/coral/internal/updater/status"
 	"github.com/subgentic/coral/internal/updater/verify"
 )
 
@@ -119,14 +120,25 @@ func run(args []string, getenv func(string) string, stdout io.Writer) int {
 		return 0
 	}
 	// An install a package manager owns (Homebrew's cask) is never staged or applied: the same classifier the status and the apply use says so before any network or any trusted root.
-	if i := installProbe(); i != nil && i.Unsupported != "" {
-		print(stdout, output{Result: "unsupported_install", Installed: config.Version, FailedStage: i.Unsupported})
+	dataDir := config.ResolveCoralDir("")
+	probe := installProbe
+	if args[0] == "apply" {
+		// The dashboard runs the apply from a copy in <data>/updates/apply, not from the install folder: that copy is judged by the click's marker and its own bytes (applyProbe).
+		probe = func() *status.Install { return applyProbe(dataDir) }
+	}
+	if i := probe(); i != nil && i.Unsupported != "" {
+		out := output{Result: "unsupported_install", Installed: config.Version, FailedStage: i.Unsupported}
+		if args[0] == "apply" { // a click made the server quit for this run (when there was one): Coral is started again, and the answer is kept
+			out.RestartFailed = restartAfterNothingFailed()
+			printApply(stdout, dataDir, out)
+			return 0
+		}
+		print(stdout, out)
 		return 0
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), checkTimeout)
 	defer cancel()
 	// The Sigstore trusted root, through TUF from the embedded starting root, refreshed at most daily (#5303).
-	dataDir := config.ResolveCoralDir("")
 	trust, source, err := verify.LoadTrust(ctx, filepath.Join(dataDir, stage.UpdatesDir, "tuf"))
 	if err != nil {
 		print(stdout, trustedRootFailed(args[0]))
