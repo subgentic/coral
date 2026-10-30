@@ -21,7 +21,7 @@ const { INBOX_WORLD } = require('./inbox_world');
 const { DATA_WORLD, httpJson, UPDATE_STAGED, CLOUD_LINKED, CLOUD_IDLE, CLOUD_WAITING } = require('./census_world');
 
 const VERSIONS = require('./artifact_versions_stub');
-const { coralReady } = require('./helpers/wait');
+const { coralReady } = require('./wait');
 module.exports = part => (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     if (process.env.SCALE_SHOT_DIR) useScaleShot(async name => require('node:fs').writeFileSync(`${process.env.SCALE_SHOT_DIR}/${name.replace(/[^a-z0-9]+/gi, '-')}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64'))); // SCALE_SHOT_DIR=<dir>: a picture of each scene with 200% findings
