@@ -69,7 +69,9 @@ const BASE = require('./test_base').BASE;
         await waitFor(`(window.__qaState.liveSessions || []).length >= 2`, 'two agents', 8000).catch(() => {});
         await openAgent();
         await ev(`document.getElementById('launch-dir').focus(); true`); await type('/tmp/shop-app'); await press('Enter', 13);
-        const name = await ev(`document.getElementById('launch-agent-name-input').value`);
+        const field = await ev(`({ value: document.getElementById('launch-agent-name-input').value, placeholder: document.getElementById('launch-agent-name-input').placeholder })`);
+        const name = field.placeholder;
+        assert.equal(field.value, '', 'the suggestion is a placeholder, not a value: Save as persona still needs a typed name');
         assert.match(name, /^Agent \d+$/, 'an empty name is offered a role-like one, not the folder\'s: ' + JSON.stringify(name));
         assert.notEqual(name, 'Agent 1', 'the number is not one a live agent has');
         await ev(`window._launchStage('folder'); true`); await settle(200);
@@ -77,6 +79,13 @@ const BASE = require('./test_base').BASE;
         await ev(`window._launchStage('persona'); true`); await settle(200);
         assert.equal(await ev(`document.getElementById('launch-agent-name-input').value`), 'Reviewer', 'a name typed is kept');
         await close();
+        // the suggestion is what the agent is called when the field stays empty
+        await openAgent();
+        await ev(`document.getElementById('launch-dir').focus(); true`); await type('/tmp/nux-11289-agent'); await press('Enter', 13);
+        const suggested = await ev(`document.getElementById('launch-agent-name-input').placeholder`);
+        await ev(`window.__launchBodies = []; const f = window.fetch; window.fetch = (u, o) => { if (/\\/api\\/sessions\\/launch\\b/.test(String(u && u.url || u)) && o && o.body) window.__launchBodies.push(String(o.body)); return f.call(window, u, o); }; window.launchSession(); true`);
+        await waitFor(`window.__launchBodies.length > 0`, 'the launch request', 10000);
+        assert.equal(JSON.parse(await ev(`window.__launchBodies[0]`)).display_name, suggested, 'the agent is launched under the suggestion when the field is empty, not the folder\'s name');
         console.log('PASS New agent wizard: Escape closes the picker only, Enter advances, the team is one click from the first step, an agent is offered a role-like name');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

@@ -65,13 +65,13 @@ export function wireEnterAdvances(step) {
     });
 }
 
-/** A suggested role-like name for an agent whose name is left empty: Agent 1, Agent 2 (the next number not taken by a live agent), so a folder's agents are told apart and the folder stays the context line (#11289). */
+/** A suggested role-like name for an agent whose name is left empty: Agent 1, Agent 2 (the next number not taken by a live agent), shown as the field's placeholder and used at launch when the field is empty; Save as persona still needs a typed name. The folder stays the context line (#11289). */
 export function suggestAgentName(input) {
-    if (!input || input.value.trim() || input.dataset.suggestWired === 'off') return;
+    if (!input || input.value.trim()) return;
     const taken = new Set((state.liveSessions || []).map(x => String(x.display_name || x.name || '').trim().toLowerCase()));
     let n = 1; while (taken.has(`agent ${n}`)) n++;
-    input.value = `Agent ${n}`; input.dataset.suggested = '1';
-    input.dispatchEvent(new Event('input', { bubbles: true }));
+    if (input.dataset.ownPlaceholder === undefined) input.dataset.ownPlaceholder = input.placeholder;
+    input.dataset.suggestedName = `Agent ${n}`; input.placeholder = `Agent ${n}`;
 }
 
 function _selectLaunchType(type) {
@@ -158,7 +158,7 @@ export function showLaunchModal(server, lock = false) {
 
     // Reset agent form
     const agentNameInput = document.getElementById("launch-agent-name-input");
-    if (agentNameInput) agentNameInput.value = "";
+    if (agentNameInput) { agentNameInput.value = ""; delete agentNameInput.dataset.suggestedName; if (agentNameInput.dataset.ownPlaceholder !== undefined) agentNameInput.placeholder = agentNameInput.dataset.ownPlaceholder; } // a new dialog: no suggestion yet (#11289)
     document.getElementById("launch-board-name").value = "";
     document.getElementById("launch-board-server").value = "";
     const agentBoardSelect = document.getElementById("launch-board-select");
@@ -452,7 +452,7 @@ export async function launchSession() {
         dir = document.getElementById("launch-dir").value.trim();
         const config = getAgentConfig('launch-agent-acf');
         type = config.agentType || 'claude';
-        agentName = document.getElementById("launch-agent-name-input")?.value.trim() || config.name;
+        agentName = document.getElementById("launch-agent-name-input")?.value.trim() || document.getElementById("launch-agent-name-input")?.dataset.suggestedName || config.name;
         flagsStr = config.flags;
         permPick = config.permissionMode;
         backend = document.getElementById("launch-backend")?.value;
