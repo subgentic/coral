@@ -336,3 +336,51 @@ func TestGoalUpdateRefusesTheRemovedDecisionFlags(t *testing.T) {
 	assert.NotContains(t, res.stdout, "--decision")
 	assert.NotContains(t, res.stdout, "--if-silent")
 }
+
+// #11247: task add --self --goal N makes a task for the caller alone. It needs a goal and no other assignee; the title may come before or after the switch; a repeat of an open title says nothing was created.
+func TestTaskAddSelfNeedsAGoalAndSendsSelf(t *testing.T) {
+	gs := newGoalServer(t)
+	gs.setReply("POST /api/board/team/tasks", `{"id":31,"assigned_to":"Dev"}`)
+	count := func() int {
+		n := 0
+		for _, r := range gs.requests() {
+			if strings.HasPrefix(r, "POST /api/board/team/tasks") {
+				n++
+			}
+		}
+		return n
+	}
+	for _, args := range [][]string{
+		{"task", "add", "UI review: v2.0.7", "--self"},                            // no goal
+		{"task", "add", "UI review: v2.0.7", "--self", "--goal", "0"},             // a goal that is not one
+		{"task", "add", "UI review", "--self", "--goal", "3", "--assignee", "QA"}, // another assignee
+		{"task", "add", "UI review", "--self", "--goal", "3", "--goal-from", "9"},
+	} {
+		res := goalRun(t, gs, args...)
+		assert.NotEqual(t, 0, res.code, args)
+	}
+	assert.Zero(t, count(), "nothing is sent for a request the CLI refuses")
+
+	res := goalRun(t, gs, "task", "add", "--self", "UI review: v2.0.7", "--goal", "3") // the switch before the title
+	require.Equal(t, 0, res.code, res.stderr)
+	assert.Contains(t, res.stdout, "Created Task #31")
+	var posts []string
+	for _, r := range gs.requests() {
+		if strings.HasPrefix(r, "POST /api/board/team/tasks") {
+			posts = append(posts, r)
+		}
+	}
+	require.Len(t, posts, 1)
+	b := bodyOf(t, posts[0])
+	assert.Equal(t, true, b["self"])
+	assert.Equal(t, float64(3), b["goal_id"])
+	assert.Equal(t, "UI review: v2.0.7", b["title"])
+	assert.NotContains(t, b, "assigned_to", "the server assigns it to the caller")
+
+	// a repeat of an open title: the server answers the existing task, and the CLI says nothing was created
+	gs.setReply("POST /api/board/team/tasks", `{"id":31,"assigned_to":"Dev","existing":true}`)
+	res = goalRun(t, gs, "task", "add", "UI review: v2.0.7", "--self", "--goal", "3")
+	require.Equal(t, 0, res.code, res.stderr)
+	assert.Contains(t, res.stdout, "already open and yours")
+	assert.NotContains(t, res.stdout, "Created")
+}

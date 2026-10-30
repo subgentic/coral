@@ -23,6 +23,9 @@ func cmdTaskAdd(st *boardState, args []string) {
 	for i := 0; i < len(args); i++ {
 		if strings.HasPrefix(args[i], "-") {
 			reordered = append(reordered, args[i])
+			if args[i] == "--self" || args[i] == "-self" {
+				continue // a switch: the word after it is the title, not its value
+			}
 			if i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
 				reordered = append(reordered, args[i+1])
 				i++ // skip flag value
@@ -48,6 +51,7 @@ func cmdTaskAdd(st *boardState, args []string) {
 	retryOf := fs.Int64("retry-of", 0, "Finished task ID this new task retries")
 	goal := fs.Int64("goal", 0, "The goal of this board the task serves")
 	followUp := fs.Int64("follow-up", 0, "Make this a follow-up of that task: it takes the task's goal, reviewers and assignee unless you give your own")
+	self := fs.Bool("self", false, "Make the task for yourself: it is assigned to you and needs --goal; a repeat of an open title returns that task, and at most 5 can be open (#11247)")
 	goalFrom := fs.Int64("goal-from", 0, "Accept this goal request another team sent: the task is made already linked to its goal (write your own title and body; the request text is not copied)")
 	clihelp.ParseFlags(fs, reordered, func() string { return commandUsage(os.Args[1], os.Args[2:]) })
 	goalGiven := false
@@ -73,10 +77,29 @@ func cmdTaskAdd(st *boardState, args []string) {
 		}
 	}
 
+	if *self {
+		// A task for yourself alone (#11247): an agent opens its own work, with a goal, without an orchestrator. It can never name another assignee.
+		if *assignee != "" && !strings.EqualFold(strings.TrimSpace(*assignee), subscriberID) {
+			fmt.Fprintln(os.Stderr, "--self makes a task for you alone: leave out --assignee (or ask the orchestrator for a task for someone else)")
+			clierr.Exit1()
+		}
+		if !goalGiven || *goal <= 0 {
+			fmt.Fprintln(os.Stderr, "--self needs --goal N: say which goal of this board the task serves (coral-board goal list)")
+			clierr.Exit1()
+		}
+		if *goalFrom > 0 {
+			fmt.Fprintln(os.Stderr, "--self cannot be used with --goal-from")
+			clierr.Exit1()
+		}
+		*assignee = ""
+	}
 	reqBody := map[string]any{
 		"title":         title,
 		"priority":      *priority,
 		"subscriber_id": subscriberID,
+	}
+	if *self {
+		reqBody["self"] = true
 	}
 	if *taskBody != "" {
 		reqBody["body"] = *taskBody
@@ -150,6 +173,10 @@ func cmdTaskAdd(st *boardState, args []string) {
 	var task map[string]any
 	json.Unmarshal(data, &task)
 	id := task["id"]
+	if existing, _ := task["existing"].(bool); *self && existing { // a repeat of an open title of yours: the existing task, nothing new
+		fmt.Printf("Task #%.0f: %s is already open and yours: nothing was created.\n", id, title)
+		return
+	}
 	fmt.Printf("Created Task #%.0f: %s\n", id, title)
 	if *followUp > 0 {
 		fmt.Printf("  A follow-up of task #%d (it is listed there).\n", *followUp)
