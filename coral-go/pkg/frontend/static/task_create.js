@@ -57,6 +57,7 @@ function taskView(modal) {
         mode: 'form', fields: taskFields(),
         form: { submit: 'Create', submitId: 'create-task-submit', cancel: 'Cancel', barHost: footer, onSubmit: submitValues, onCancel: hideCreateTaskModal },
     });
+    modal.querySelector('#create-task-bar-back')?.addEventListener('click', hideCreateTaskModal); // a phone's form screen has its ← in the bar (it is not drawn on a wide screen)
     return view;
 }
 

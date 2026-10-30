@@ -222,7 +222,7 @@ function openCreate() {
     const where = el('p', 'goals-note', `Created on this board: ${keyLabel(model.project)}`);
     const go = btn('btn btn-primary', 'Create goal'); go.type = 'submit';
     const cancel = btn('btn', 'Cancel', () => dlg.close());
-    const head = el('div', 'goals-form-head'), back = btn('goals-form-back', null, () => dlg.close()); back.setAttribute('aria-label', 'Cancel'); back.title = 'Cancel'; back.append(Object.assign(el('span', null, '\u2190'), {})); back.firstChild.setAttribute('aria-hidden', 'true'); head.append(back, title); // a phone's form screen: ← and the title in a bar, the fields under it, the actions pinned at the bottom (#11236, #11239 slice C)
+    const head = el('div', 'goals-form-head'), back = btn('goals-form-back', null, () => dlg.close()); back.setAttribute('aria-label', 'Back'); back.title = 'Back'; back.append(Object.assign(el('span', null, '\u2190'), {})); back.firstChild.setAttribute('aria-hidden', 'true'); head.append(back, title); // a phone's form screen: ← and the title in a bar, the fields under it, the actions pinned at the bottom (#11236, #11239 slice C)
     const body = el('div', 'goals-form-body'); body.append(field('Title (required)', t, 'goal-new-title'), field('Done when (optional): what a person can check', d, 'goal-new-done'), field('Driver (optional)', dr, 'goal-new-driver'), driverNote, where, err);
     form.append(head, body, el('div', 'goals-actions'));
     form.querySelector('.goals-actions').append(cancel, go);
