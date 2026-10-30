@@ -1,4 +1,4 @@
-// The "Your AI-generated team is ready" line is a passing notice, not a fixture of the dialog (#10660, Mobile pass 38): at 390 px it sat in the title's row, wrapped "New project" onto two lines, and stayed for a minute
+// The "Your AI-generated team is ready" line is a passing notice, not a fixture of the dialog (#10660, Mobile pass 38): at 390 px it sat in the title's row, wrapped "New team" onto two lines, and stayed for a minute
 // and more. It sits under the step line, never on the title, and goes by itself after a few seconds (the Members note says the same words and stays). The dialog is the real one with a draft handed to it by Try a
 // sample; the isolated dev server. Drives Chrome over CDP through agent_view_harness.js.
 const assert = require('node:assert/strict');

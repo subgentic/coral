@@ -53,11 +53,11 @@ const { coralReady } = require('./helpers/wait');
             const s = await dirState('launch-dir');
             assert.ok(!/first-agent/.test(s.value) && !s.note, 'no folder is chosen for them: ' + JSON.stringify(s));
         });
-        await S.run('New project: the folder is ~/Coral/first-team with the same line', async () => {
+        await S.run('New team: the folder is ~/Coral/first-team with the same line', async () => {
             await ev(`window.hideLaunchModal && window.hideLaunchModal(); true`);
             await clearRecents();
             await ev(`(async () => { await window.showLaunchModal(); window._selectLaunchType('team'); return true; })()`);
-            await waitFor(`!!document.getElementById('launch-team-dir') && document.getElementById('launch-team-dir').getClientRects().length > 0`, 'New project step 1', 8000);
+            await waitFor(`!!document.getElementById('launch-team-dir') && document.getElementById('launch-team-dir').getClientRects().length > 0`, 'New team step 1', 8000);
             const s = await dirState('launch-team-dir');
             assert.ok(/[\\/]Coral[\\/]first-team$/.test(s.value) && s.note && s.described, JSON.stringify(s));
         });
