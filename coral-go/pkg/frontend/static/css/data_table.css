@@ -410,6 +410,7 @@
 .dt-box .dt-mail-open.dt-primary, .dt-box .dt-mail-open { display: flex; width: auto; overflow: visible; white-space: normal; flex: 1; align-items: center; gap: 8px; min-width: 0; min-height: calc(var(--table-touch) + 12px); margin: 0; padding: 0 12px 0 4px; border: 0; background: none; color: var(--table-primary-color); font: inherit; font-feature-settings: "calt" 0; text-align: left; text-decoration: none; cursor: pointer; } /* the font shorthand resets the feature settings: a name like 2x4 is read as written, as every .dt-primary is */
 .dt-mail-more { position: relative; flex: none; display: flex; align-items: center; } /* a row's ⋯ (#137104): the row's own control beside its button, never inside it */
 .dt-mail-more-toggle { flex: none; width: var(--table-touch); min-height: var(--table-touch); }
+.dt-mail-more-gap { flex: none; width: var(--table-touch); } /* the room of a ⋯ on a row that has none, in a list where another has one */
 .dt-mail-menu { position: absolute; right: 8px; top: calc(100% - 8px); z-index: 30; }
 .dt-mail-open:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .dt-mail-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }

@@ -61,6 +61,20 @@ const AGENTS = [
             assert.ok(trig && trig.n >= 4 && trig.h >= 44 && trig.line === '3px' && trig.curColor !== trig.restColor, at + 'the folders are a strip of tabs: the open one underlined, the others plain: ' + JSON.stringify(trig));
             for (let i = 0; i < r.length; i++) { const ax = await axName(client, `[data-axp="${i}"]`), x = await ev(`document.querySelector('[data-axp="${i}"] .dt-mail-snippet').textContent.trim()`); assert.ok(ax && ax.name.includes(`, ${x}`), at + `a Needs you row's button says what the agent asks, as Chrome computes it (#9747): "${ax && ax.name}" lacks "${x}"`); }
             assert.equal(await ev(`document.documentElement.scrollWidth <= document.documentElement.clientWidth`), true, at + 'no sideways scroll');
+            // #137104: a list with a ⋯ on any row reserves its 44 px on every row, so the times line up; a list with none reserves nothing
+            const reseed = list => ev(`(async () => { const { state } = await import((window.__coralStatic || '/static/') + 'state.js'); const m = await import((window.__coralStatic || '/static/') + 'inbox_tab.js'); state.liveSessions = ${JSON.stringify(list)}; m.updateInboxTab(); return true; })()`);
+            const rights = () => ev(`[...document.querySelectorAll('${T} tr.dt-mailed')].map(tr => ({ title: tr.querySelector('.dt-mail-title').textContent, more: !!tr.querySelector('.dt-mail-more'), gap: !!tr.querySelector('.dt-mail-more-gap'), right: Math.round(tr.getBoundingClientRect().right - tr.querySelector('.dt-mail-time').getBoundingClientRect().right) }))`);
+            const signIn = { ...AGENTS[1], name: 'ag-three', session_id: '00000003-0000-4000-8000-000000000003', display_name: 'Agent Three', waiting_kind: 'login', waiting_summary: 'Sign in', board_project: 'team-c' };
+            await reseed([AGENTS[0], signIn]);
+            await waitFor(`document.querySelectorAll('${T} tr.dt-mailed').length === 2`, at + 'a ⋯ row and a row without one', 8000);
+            let al = await rights();
+            assert.ok(al.length === 2 && al.filter(x => x.more).length === 1 && al.filter(x => x.gap).length === 1 && new Set(al.map(x => x.right)).size === 1, at + 'a row without a ⋯ keeps its room, so the times line up: ' + JSON.stringify(al));
+            await reseed([signIn]);
+            await waitFor(`document.querySelectorAll('${T} tr.dt-mailed').length === 1`, at + 'a list with no ⋯', 8000);
+            al = await rights();
+            assert.ok(al.length === 1 && !al[0].more && !al[0].gap && al[0].right <= 16, at + 'a list with no ⋯ reserves nothing: ' + JSON.stringify(al));
+            await reseed(AGENTS);
+            await waitFor(`document.querySelectorAll('${T} tr.dt-mailed').length === 2`, at + 'the two waiting agents again', 8000);
             // the marker's `since` is in the future: every seeded task counts as read, so the plain row is measured
             const readAs = since => ev(`localStorage.setItem('coral.inbox.read.v1', JSON.stringify({ since: ${since}, items: {} })); true`);
             const showTasks = async n => { await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`); await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m => m.selectInboxTab('tasks')).then(() => true)`); await waitFor(`document.querySelectorAll('${T} tr.dt-mailed').length === 3`, at + n, 10000); };
