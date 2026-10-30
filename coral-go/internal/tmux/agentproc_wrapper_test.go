@@ -215,3 +215,75 @@ func TestRecordAsAgentRecordsAWrapperThatIsTheCLI(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, AgentProc{PID: 700, Start: t1}, got)
 }
+
+// The WHOLE gate (#408, the coral-go-team's live macOS run): a notice passes two checks, "has the agent exited" (ShellIdle, which decides a foreground shell is a nested one) and the recorded
+// process (decideNotice). The wrapper must pass BOTH; before this only the second knew it. The table is served to ShellIdle as the process table of the moment.
+func serveTable(t *testing.T, tb *procTable) {
+	t.Helper()
+	procTableMu.Lock()
+	old := procTableLast
+	procTableLast = tb
+	procTableMu.Unlock()
+	t.Cleanup(func() { procTableMu.Lock(); procTableLast = old; procTableMu.Unlock() })
+}
+
+func gate(t *testing.T, tb *procTable, rec AgentProc, cli string) (exited, nested bool, notice NoticeVerdict) {
+	t.Helper()
+	serveTable(t, tb)
+	agent := wrapperIsCLI(cli)
+	idle, _, err := ShellIdle(600, agent)
+	require.NoError(t, err)
+	sh, err := NestedShellOf(600, agent)
+	require.NoError(t, err)
+	return idle, sh != "", decideNotice(tb, 600, rec, agent)
+}
+
+func TestTheWrapperPassesTheWholeGateAndAPersonsShellScriptDoesNot(t *testing.T) {
+	dir, cli := wrapperFixture(t)
+	other := filepath.Join(dir, "other-script.sh")
+	require.NoError(t, os.WriteFile(other, []byte("#!/bin/sh\n"), 0o755))
+	rec := AgentProc{PID: 700, Start: t1}
+	pane := table("  600     1 Ss   "+t0+" -zsh", "  700   600 S+   "+t1+" /bin/sh")
+
+	// the wrapper, absolute and relative (the live macOS shape): not exited, not nested, notice OK
+	withArgs(t, map[int][]string{700: {"/bin/sh", cli}}, nil)
+	exited, nested, notice := gate(t, pane, rec, cli)
+	assert.False(t, exited, "the agent has not exited: the wrapper is the agent")
+	assert.False(t, nested, "and it is not a nested shell")
+	assert.True(t, notice.OK)
+	withArgs(t, map[int][]string{700: {"/bin/sh", "./oldstub.sh"}}, map[int]string{700: dir})
+	exited, nested, notice = gate(t, pane, rec, cli)
+	assert.False(t, exited)
+	assert.False(t, nested)
+	assert.True(t, notice.OK)
+
+	// a person's `sh other-script.sh` is a nested shell through the WHOLE gate: exited-looking (nothing is the agent), nested, no notice. No name test, no "has a script argument" test.
+	withArgs(t, map[int][]string{700: {"sh", other}}, nil)
+	exited, nested, notice = gate(t, pane, rec, cli)
+	assert.True(t, exited, "not the agent: the pane reads as back at a shell")
+	assert.True(t, nested, "a shell a person started")
+	assert.False(t, notice.OK)
+
+	// the same with no resolved CLI known: nothing is recognised, so nothing is the agent
+	withArgs(t, map[int][]string{700: {"/bin/sh", cli}}, nil)
+	exited, nested, notice = gate(t, pane, rec, "")
+	assert.True(t, exited)
+	assert.True(t, nested)
+	assert.False(t, notice.OK)
+
+	// an interactive bash, and the wrapper after `exec bash -i`
+	for _, args := range [][]string{{"bash"}, {"bash", "-i"}, {"sh", "-c", cli}, {"sh", "-x", cli}} {
+		withArgs(t, map[int][]string{700: args}, nil)
+		exited, nested, notice = gate(t, pane, rec, cli)
+		assert.True(t, exited, "%v", args)
+		assert.True(t, nested, "%v", args)
+		assert.False(t, notice.OK, "%v", args)
+	}
+
+	// a wrapper that has exited leaves the bare prompt: exited, not nested, nothing recorded alive
+	bare := table("  600     1 Ss+  " + t0 + " -zsh")
+	exited, nested, notice = gate(t, bare, rec, cli)
+	assert.True(t, exited)
+	assert.False(t, nested)
+	assert.False(t, notice.OK)
+}

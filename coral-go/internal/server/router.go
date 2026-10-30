@@ -31,9 +31,9 @@ import (
 	"github.com/subgentic/coral/internal/sshprov"
 	"github.com/subgentic/coral/internal/store"
 	"github.com/subgentic/coral/internal/terminalinput"
+	"github.com/subgentic/coral/internal/tmux"
 	"github.com/subgentic/coral/internal/tracking"
 	"github.com/subgentic/coral/pkg/hubowner"
-	"github.com/subgentic/coral/internal/tmux"
 )
 
 // The router is built in this order; registration and wiring order are as they were in one
