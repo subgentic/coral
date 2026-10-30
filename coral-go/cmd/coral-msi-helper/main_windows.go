@@ -56,7 +56,17 @@ func main() {
 	closeLog := openLog(product)
 	defer closeLog()
 	if len(os.Args) < 2 {
-		log.Printf("usage: coral-msi-helper stop --folder DIR... | start | eula")
+		log.Printf("usage: coral-msi-helper stop --product NAME --folder DIR... | start --product NAME | eula --product NAME | launch-pending --product NAME")
+		return
+	}
+	if os.Args[1] == "launch-pending" {
+		// The Finish button of an ELEVATED installer, just before it hands coral-tray to Explorer (LaunchCoralUnelevated, task #380): a
+		// tray that then starts elevated anyway finds this fresh mark and starts nothing.
+		if len(os.Args) != 2 && !(len(os.Args) == 4 && os.Args[2] == "--product") {
+			log.Printf("launch-pending: bad arguments")
+			return
+		}
+		markLaunchPending(product)
 		return
 	}
 	if os.Args[1] == "eula" {
@@ -133,10 +143,11 @@ var processElevated = func() bool { return windows.GetCurrentProcessToken().IsEl
 
 // The mark operations and the elevated log, by product (variables so a test can point them at a test folder or record them).
 var (
-	createLog  = installrestart.CreateLogFor
-	markFor    = installrestart.MarkFor
-	takeFor    = installrestart.TakeFor
-	discardFor = installrestart.DiscardFor
+	createLog            = installrestart.CreateLogFor
+	markFor              = installrestart.MarkFor
+	takeFor              = installrestart.TakeFor
+	discardFor           = installrestart.DiscardFor
+	markLaunchPendingFor = installrestart.MarkLaunchPendingFor
 )
 
 // markRestart, takeRestart and discardRestart are the helper's only touches of a mark, each in the folder of the product it was told. With no valid
@@ -148,6 +159,16 @@ func markRestart(product string) {
 	}
 	if err := markFor(product, time.Now()); err != nil {
 		log.Printf("stop: Coral won't be started again after the install: %v", err)
+	}
+}
+
+func markLaunchPending(product string) {
+	if product == "" {
+		log.Printf("launch-pending: no valid --product: no launch-pending mark is written")
+		return
+	}
+	if err := markLaunchPendingFor(product, time.Now()); err != nil {
+		log.Printf("launch-pending: %v", err)
 	}
 }
 
