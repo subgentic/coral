@@ -5,13 +5,13 @@ package routes
 import (
 	"net/http/httptest"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/subgentic/coral/internal/consoletest"
 	"github.com/subgentic/coral/internal/linktest"
 	"github.com/subgentic/coral/internal/safefs"
 )
@@ -25,7 +25,7 @@ func TestJunctionOutOfTheRepositoryIsRefusedEverywhere(t *testing.T) {
 	outdir := filepath.Join(e.base, "outdir")
 	require.NoError(t, os.WriteFile(filepath.Join(outdir, "j.txt"), []byte("junction-secret"), 0o644))
 	junc := filepath.Join(e.repo, "app", "juncdir")
-	out, err := exec.Command("cmd", "/c", "mklink", "/J", junc, outdir).CombinedOutput()
+	out, err := consoletest.HiddenCommand("cmd", "/c", "mklink", "/J", junc, outdir).CombinedOutput()
 	require.NoError(t, err, "mklink /J: %s", out)
 
 	// The helpers every route uses. Where Windows lets a program open a file through a junction, Coral's layer decides (realPath follows it, and the checks say outside);

@@ -5,7 +5,6 @@ package safefs
 import (
 	"io/fs"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -14,6 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/subgentic/coral/internal/consoletest"
 	"github.com/subgentic/coral/internal/linktest"
 )
 
@@ -22,7 +22,7 @@ import (
 // junction makes a directory junction link -> target (no privilege needed, unlike a symlink).
 func junction(t *testing.T, link, target string) {
 	t.Helper()
-	out, err := exec.Command("cmd", "/c", "mklink", "/J", link, target).CombinedOutput()
+	out, err := consoletest.HiddenCommand("cmd", "/c", "mklink", "/J", link, target).CombinedOutput()
 	require.NoError(t, err, "mklink /J: %s", out)
 }
 

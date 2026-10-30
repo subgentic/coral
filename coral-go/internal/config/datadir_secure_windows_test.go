@@ -3,9 +3,9 @@
 package config
 
 import (
+	"github.com/subgentic/coral/internal/consoletest"
 	"github.com/subgentic/coral/internal/winuser"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -23,7 +23,7 @@ func usersCanRead(t *testing.T, dir string) {
 	t.Helper()
 	me, err := winuser.CurrentSID()
 	require.NoError(t, err)
-	out, err := exec.Command("icacls", dir, "/inheritance:r", "/grant:r", "*"+me.String()+":(OI)(CI)F", "/grant:r", "*S-1-5-18:(OI)(CI)F",
+	out, err := consoletest.HiddenCommand("icacls", dir, "/inheritance:r", "/grant:r", "*"+me.String()+":(OI)(CI)F", "/grant:r", "*S-1-5-18:(OI)(CI)F",
 		"/grant:r", "*S-1-5-32-545:(OI)(CI)RX").CombinedOutput()
 	require.NoError(t, err, string(out))
 }
@@ -49,7 +49,7 @@ func TestExistingDataFolderOthersCanReadIsTightened(t *testing.T) {
 	// A file with an EXPLICIT entry for Users, which a change to the folder's list would not remove.
 	explicit := filepath.Join(dir, "api-key")
 	require.NoError(t, os.WriteFile(explicit, []byte("secret"), 0o600))
-	out, err := exec.Command("icacls", explicit, "/inheritance:d", "/grant", "*S-1-5-32-545:R").CombinedOutput()
+	out, err := consoletest.HiddenCommand("icacls", explicit, "/inheritance:d", "/grant", "*S-1-5-32-545:R").CombinedOutput()
 	require.NoError(t, err, string(out))
 	require.NotEmpty(t, readersOf(t, explicit))
 
@@ -130,7 +130,7 @@ func TestDataFolderLinksAreNeverFollowed(t *testing.T) {
 	require.NoError(t, os.Mkdir(dir, 0o700))
 	usersCanRead(t, dir)
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "sessions.db"), []byte("db"), 0o600)) // Coral's own folder (a folder that is not is refused, #5698)
-	out, err := exec.Command("cmd", "/c", "mklink", "/J", filepath.Join(dir, "link"), outside).CombinedOutput()
+	out, err := consoletest.HiddenCommand("cmd", "/c", "mklink", "/J", filepath.Join(dir, "link"), outside).CombinedOutput()
 	require.NoError(t, err, string(out))
 
 	require.NoError(t, EnsureDataDir(dir))
@@ -141,7 +141,7 @@ func TestDataFolderLinksAreNeverFollowed(t *testing.T) {
 
 	// The data folder is itself a junction to a shared folder: refused, not changed.
 	link := filepath.Join(root, "datalink")
-	out, err = exec.Command("cmd", "/c", "mklink", "/J", link, outside).CombinedOutput()
+	out, err = consoletest.HiddenCommand("cmd", "/c", "mklink", "/J", link, outside).CombinedOutput()
 	require.NoError(t, err, string(out))
 	t.Cleanup(func() { SetAllowSharedDataDir(false); setDataDirNotice("") })
 	err = EnsureDataDir(link)
@@ -167,12 +167,12 @@ func TestExistingDataFolderGrantingOtherAccountsIsTightened(t *testing.T) {
 	require.NoError(t, os.Mkdir(dir, 0o700))
 	// "Guest" stands for a named account; "Backup Operators" for a custom group.
 	for _, who := range []string{"Guest", "Backup Operators"} {
-		out, err := exec.Command("icacls", dir, "/grant", who+":(OI)(CI)R").CombinedOutput()
+		out, err := consoletest.HiddenCommand("icacls", dir, "/grant", who+":(OI)(CI)R").CombinedOutput()
 		require.NoError(t, err, string(out))
 	}
 	old := filepath.Join(dir, "old.db")
 	require.NoError(t, os.WriteFile(old, []byte("x"), 0o600))
-	out, err := exec.Command("icacls", old, "/inheritance:d", "/grant", "Guest:R").CombinedOutput()
+	out, err := consoletest.HiddenCommand("icacls", old, "/inheritance:d", "/grant", "Guest:R").CombinedOutput()
 	require.NoError(t, err, string(out))
 	got := readersOf(t, dir)
 	require.Len(t, got, 2, got)
@@ -189,7 +189,7 @@ func TestDataFolderWithOnlyAdministratorsIsLeftAlone(t *testing.T) {
 	setDataDirNotice("")
 	dir := filepath.Join(privateRoot(t), "coral")
 	require.NoError(t, os.Mkdir(dir, 0o700))
-	out, err := exec.Command("icacls", dir, "/grant", "*S-1-5-32-544:(OI)(CI)F").CombinedOutput()
+	out, err := consoletest.HiddenCommand("icacls", dir, "/grant", "*S-1-5-32-544:(OI)(CI)F").CombinedOutput()
 	require.NoError(t, err, string(out))
 	require.NoError(t, EnsureDataDir(dir))
 	assert.Empty(t, DataDirWarning(dir))

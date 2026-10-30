@@ -3,13 +3,14 @@ package routes
 import (
 	"context"
 	"encoding/json"
-	"os/exec"
 	"testing"
 	"time"
 
 	"github.com/coder/websocket"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/subgentic/coral/internal/consoletest"
 )
 
 // readWSTypes reads frames until a JSON frame of type stop arrives, the socket
@@ -47,7 +48,7 @@ func readWSTypes(t *testing.T, ctx context.Context, conn *websocket.Conn, stop s
 
 func killTmuxSession(t *testing.T, socket, name string) {
 	t.Helper()
-	require.NoError(t, exec.Command("tmux", "-S", socket, "kill-session", "-t", "="+name).Run())
+	require.NoError(t, consoletest.HiddenCommand("tmux", "-S", socket, "kill-session", "-t", "="+name).Run())
 }
 
 // waitTerminalStreamLive returns once the server has attached the socket to the

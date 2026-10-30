@@ -39,7 +39,8 @@ func TestStartDirLeavesShortPathsAlone(t *testing.T) {
 	got, err = StartDir(d)
 	require.NoError(t, err)
 	assert.Equal(t, d, got)
-	c := exec.Command("cmd.exe", "/c", "echo ok")
+	c := exec.Command("cmd.exe", "/c", "echo ok") // consoletest:allow hidden on the next line
+	HideWindow(c)
 	c.Dir = got
 	assert.NoError(t, c.Run(), "the longest accepted folder starts a program")
 }
@@ -68,7 +69,8 @@ func TestStartDirTooLongGivesTheShortPathOrAPlainError(t *testing.T) {
 	require.NoError(t, err, "the volume has 8.3 names: the short path is used")
 	assert.Equal(t, short, got)
 	assert.Less(t, len(got), len(d))
-	c := exec.Command("cmd.exe", "/c", "echo ok")
+	c := exec.Command("cmd.exe", "/c", "echo ok") // consoletest:allow hidden on the next line
+	HideWindow(c)
 	c.Dir = got
 	assert.NoError(t, c.Run(), "the short path starts a program")
 }

@@ -17,6 +17,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/subgentic/coral/internal/consoletest"
 	"github.com/subgentic/coral/internal/store"
 )
 
@@ -30,7 +31,7 @@ func TestResolvePathTakesWindowsFileURLs(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "my repo")
 	app := filepath.Join(root, "app dir")
 	require.NoError(t, os.MkdirAll(app, 0o755))
-	require.NoError(t, exec.Command("git", "init", "-q", root).Run())
+	require.NoError(t, consoletest.HiddenCommand("git", "init", "-q", root).Run())
 	main := filepath.Join(app, "main.go")
 	require.NoError(t, os.WriteFile(main, []byte("package main"), 0o644))
 	ss.RegisterLiveSession(context.Background(), &store.LiveSession{AgentName: "claude-fileurl", AgentType: "claude", WorkingDir: app, SessionID: "fileurl-1"})

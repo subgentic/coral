@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sync"
 	"testing"
@@ -13,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/subgentic/coral/internal/consoletest"
 	"github.com/subgentic/coral/internal/store"
 )
 
@@ -195,7 +195,7 @@ func TestTheWorktreeOfARunSettledAtStartupIsRemovedWithoutForce(t *testing.T) {
 		_, err := e.ss.UpdateScheduledJob(ctx, jobID, map[string]interface{}{"repo_path": repo, "cleanup_worktree": 1})
 		require.NoError(t, err)
 		wt := filepath.Join(e.s.worktreeRoot, fmt.Sprintf("job-run-%d-%s", id, filepath.Base(repo)))
-		out, err := exec.Command("git", "-C", repo, "worktree", "add", "-b", fmt.Sprintf("coral/job-run-%d", id), "--", wt, "main").CombinedOutput()
+		out, err := consoletest.HiddenCommand("git", "-C", repo, "worktree", "add", "-b", fmt.Sprintf("coral/job-run-%d", id), "--", wt, "main").CombinedOutput()
 		require.NoError(t, err, string(out))
 		require.NoError(t, e.ss.UpdateScheduledRun(ctx, id, map[string]interface{}{"worktree_path": wt}))
 		if dirty {
@@ -210,7 +210,7 @@ func TestTheWorktreeOfARunSettledAtStartupIsRemovedWithoutForce(t *testing.T) {
 			continue
 		}
 		assert.NoDirExists(t, wt, "a clean worktree goes")
-		branches, err := exec.Command("git", "-C", repo, "branch", "--list", fmt.Sprintf("coral/job-run-%d", id)).CombinedOutput()
+		branches, err := consoletest.HiddenCommand("git", "-C", repo, "branch", "--list", fmt.Sprintf("coral/job-run-%d", id)).CombinedOutput()
 		require.NoError(t, err)
 		assert.Empty(t, string(branches), "with its empty branch")
 	}
@@ -237,7 +237,7 @@ func TestASettledRunNeverRemovesAnotherLinkedCheckoutOfTheRepository(t *testing.
 	e, _ := restartEnv(t, "left-linked")
 	repo := exitGitRepo(t)
 	own := filepath.Join(t.TempDir(), "feature") // a normal `git worktree add ../feature`
-	out, err := exec.Command("git", "-C", repo, "worktree", "add", "-b", "feature", "--", own, "main").CombinedOutput()
+	out, err := consoletest.HiddenCommand("git", "-C", repo, "worktree", "add", "-b", "feature", "--", own, "main").CombinedOutput()
 	require.NoError(t, err, string(out))
 	id := e.leftRun(t, time.Minute, "sid-linked")
 	_, err = e.ss.UpdateScheduledJob(ctx, e.runOf(t, id).JobID, map[string]interface{}{"repo_path": repo, "cleanup_worktree": 1})
@@ -248,10 +248,10 @@ func TestASettledRunNeverRemovesAnotherLinkedCheckoutOfTheRepository(t *testing.
 
 	assert.Equal(t, "completed", e.runOf(t, id).Status, "the run is settled")
 	assert.DirExists(t, own, "the person's linked checkout is not removed")
-	list, err := exec.Command("git", "-C", repo, "worktree", "list").CombinedOutput()
+	list, err := consoletest.HiddenCommand("git", "-C", repo, "worktree", "list").CombinedOutput()
 	require.NoError(t, err)
 	assert.Contains(t, string(list), "feature", "and still registered")
-	branches, err := exec.Command("git", "-C", repo, "branch", "--list", "feature").CombinedOutput()
+	branches, err := consoletest.HiddenCommand("git", "-C", repo, "branch", "--list", "feature").CombinedOutput()
 	require.NoError(t, err)
 	assert.Contains(t, string(branches), "feature", "with its branch")
 }

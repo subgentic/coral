@@ -29,6 +29,7 @@ import (
 	"github.com/subgentic/coral/internal/auth"
 	"github.com/subgentic/coral/internal/board/boardtest"
 	"github.com/subgentic/coral/internal/config"
+	"github.com/subgentic/coral/internal/consoletest"
 	"github.com/subgentic/coral/internal/executil"
 	"github.com/subgentic/coral/internal/ptr"
 	"github.com/subgentic/coral/internal/ptymanager"
@@ -1085,7 +1086,7 @@ func TestSessionsChangesDiff_ReturnsTrackedAndUntrackedChanges(t *testing.T) {
 
 	runGit := func(args ...string) {
 		t.Helper()
-		cmd := exec.Command("git", append([]string{"-C", repo}, args...)...)
+		cmd := consoletest.HiddenCommand("git", append([]string{"-C", repo}, args...)...)
 		out, err := cmd.CombinedOutput()
 		require.NoError(t, err, "%s", out)
 	}
@@ -1243,7 +1244,7 @@ func TestSessionsKill_PersistsChangesBeforeTermination(t *testing.T) {
 
 	runGit := func(args ...string) {
 		t.Helper()
-		cmd := exec.Command("git", append([]string{"-C", repo}, args...)...)
+		cmd := consoletest.HiddenCommand("git", append([]string{"-C", repo}, args...)...)
 		out, err := cmd.CombinedOutput()
 		require.NoError(t, err, "%s", out)
 	}
@@ -1535,7 +1536,7 @@ func TestSessionsResolvePath(t *testing.T) {
 	root := filepath.Join(base, "repo")
 	app := filepath.Join(root, "app")
 	require.NoError(t, os.MkdirAll(app, 0o755))
-	require.NoError(t, exec.Command("git", "init", "-q", root).Run())
+	require.NoError(t, consoletest.HiddenCommand("git", "init", "-q", root).Run())
 	require.NoError(t, os.WriteFile(filepath.Join(root, "README.md"), []byte("hi"), 0o644))
 	require.NoError(t, os.WriteFile(filepath.Join(app, "main.go"), []byte("package main"), 0o644))
 	require.NoError(t, os.WriteFile(filepath.Join(base, "outside.txt"), []byte("secret"), 0o644))
@@ -1639,7 +1640,7 @@ func TestSessionsResolvePathSuffix(t *testing.T) {
 		require.NoError(t, os.WriteFile(filepath.Join(root, f), []byte("x"), 0o644))
 	}
 	require.NoError(t, os.WriteFile(filepath.Join(root, ".gitignore"), []byte("build/\n"), 0o644))
-	require.NoError(t, exec.Command("git", "init", "-q", root).Run())
+	require.NoError(t, consoletest.HiddenCommand("git", "init", "-q", root).Run())
 	ss.RegisterLiveSession(context.Background(), &store.LiveSession{AgentName: "claude-suffix", AgentType: "claude", WorkingDir: wd, SessionID: "suffix-1"})
 
 	resolve := func(ref string) (int, string) {
@@ -2137,7 +2138,7 @@ func TestSessionsRawImage(t *testing.T) {
 	server, _, _, ss := setupSessionsTestServer(t)
 	root := t.TempDir()
 	git := func(args ...string) {
-		cmd := exec.Command("git", append([]string{"-C", root, "-c", "user.email=t@t", "-c", "user.name=t"}, args...)...)
+		cmd := consoletest.HiddenCommand("git", append([]string{"-C", root, "-c", "user.email=t@t", "-c", "user.name=t"}, args...)...)
 		out, err := cmd.CombinedOutput()
 		require.NoError(t, err, string(out))
 	}
@@ -2215,7 +2216,7 @@ func TestSessionsOpenInEditor(t *testing.T) {
 	base := t.TempDir()
 	root := filepath.Join(base, "repo")
 	require.NoError(t, os.MkdirAll(root, 0o755))
-	require.NoError(t, exec.Command("git", "init", "-q", root).Run())
+	require.NoError(t, consoletest.HiddenCommand("git", "init", "-q", root).Run())
 	require.NoError(t, os.WriteFile(filepath.Join(root, "main.go"), []byte("package main"), 0o644))
 	require.NoError(t, os.WriteFile(filepath.Join(base, "outside.txt"), []byte("secret"), 0o644))
 	ss.RegisterLiveSession(context.Background(), &store.LiveSession{AgentName: "claude-editor", AgentType: "claude", WorkingDir: root, SessionID: "editor-1"})
@@ -3141,7 +3142,7 @@ func gitRepoWithOneChange(t *testing.T) string {
 	dir := t.TempDir()
 	run := func(args ...string) {
 		t.Helper()
-		cmd := exec.Command("git", append([]string{"-C", dir, "-c", "user.email=t@t", "-c", "user.name=t", "-c", "commit.gpgsign=false"}, args...)...)
+		cmd := consoletest.HiddenCommand("git", append([]string{"-C", dir, "-c", "user.email=t@t", "-c", "user.name=t", "-c", "commit.gpgsign=false"}, args...)...)
 		out, err := cmd.CombinedOutput()
 		require.NoError(t, err, string(out))
 	}
@@ -3423,7 +3424,7 @@ func TestSessionsKill_ChangesArtifactOutsideGitAndOnFailure(t *testing.T) {
 	assert.Empty(t, result["changes_artifact_error"], "a folder that isn't a checkout is not an error")
 
 	broken := t.TempDir()
-	out, err := exec.Command("git", "-C", broken, "init").CombinedOutput()
+	out, err := consoletest.HiddenCommand("git", "-C", broken, "init").CombinedOutput()
 	require.NoError(t, err, "%s", out)
 	require.NoError(t, os.WriteFile(filepath.Join(broken, ".git", "index"), []byte("not an index"), 0644))
 	result = kill(broken, "00000000-0000-0000-0000-000000000352")

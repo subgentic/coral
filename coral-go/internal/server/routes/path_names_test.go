@@ -3,7 +3,6 @@ package routes
 import (
 	"encoding/json"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -12,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/subgentic/coral/internal/config"
+	"github.com/subgentic/coral/internal/consoletest"
 )
 
 // #5305: an id read from a file in the data folder, or a name from a request, is one folder name before it is joined onto a folder. "../../x" never leaves it.
@@ -66,7 +66,7 @@ func TestATeamWorktreeFolderIsOneName(t *testing.T) {
 	work := t.TempDir()
 	// A real repository with a commit, so a name that is let through would make a worktree outside the folder.
 	for _, args := range [][]string{{"init", "-q", "-b", "main"}, {"-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-q", "--allow-empty", "-m", "x"}} {
-		cmd := exec.Command("git", args...)
+		cmd := consoletest.HiddenCommand("git", args...)
 		cmd.Dir = work
 		out, err := cmd.CombinedOutput()
 		require.NoError(t, err, string(out))

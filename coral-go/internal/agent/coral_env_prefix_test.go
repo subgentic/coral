@@ -2,7 +2,6 @@ package agent
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -10,6 +9,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/subgentic/coral/internal/consoletest"
 )
 
 // #3421: whatever environment the pane's shell has (a Coral test server started from an
@@ -36,7 +37,7 @@ func TestLaunchLineOverridesAnInheritedCoralEnvironment(t *testing.T) {
 		p := LaunchParams{SessionID: "11111111-2222-3333-4444-555555555555", SessionName: "claude-own", Role: "Backend Dev",
 			CLIPath: stub, CoralPort: 8583, CoralHost: "127.0.0.1", CoralDir: "/tmp/own-data"}
 		line := buildLaunch(ag, p)
-		cmd := exec.Command("/bin/sh", "-c", line)
+		cmd := consoletest.HiddenCommand("/bin/sh", "-c", line)
 		cmd.Env = hostile
 		b, err := cmd.CombinedOutput()
 		require.NoError(t, err, "%s: %s", name, b)
@@ -57,7 +58,7 @@ func TestLaunchLineOverridesAnInheritedCoralEnvironment(t *testing.T) {
 	// A launch that knows no role or name still never keeps the inherited identity.
 	os.Remove(out)
 	line := buildLaunch((&ClaudeAgent{}), LaunchParams{SessionID: "22222222-2222-3333-4444-555555555555", CLIPath: stub})
-	cmd := exec.Command("/bin/sh", "-c", line)
+	cmd := consoletest.HiddenCommand("/bin/sh", "-c", line)
 	cmd.Env = hostile
 	b, err := cmd.CombinedOutput()
 	require.NoError(t, err, string(b))

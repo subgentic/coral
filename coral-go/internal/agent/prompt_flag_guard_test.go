@@ -13,6 +13,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/subgentic/coral/internal/consoletest"
 )
 
 const argvPrinterSource = `package main
@@ -62,7 +64,7 @@ func argvPrinter(t *testing.T) string {
 		if argvPrinterErr = os.WriteFile(src, []byte(argvPrinterSource), 0o644); argvPrinterErr != nil {
 			return
 		}
-		cmd := exec.Command("go", "build", "-o", argvPrinterPath, src)
+		cmd := consoletest.HiddenCommand("go", "build", "-o", argvPrinterPath, src)
 		cmd.Dir = dir
 		cmd.Env = append(os.Environ(), "GO111MODULE=off")
 		if out, err := cmd.CombinedOutput(); err != nil {
@@ -84,10 +86,10 @@ func runLaunchLine(t *testing.T, line string) {
 		if err != nil {
 			t.Skip("no Windows PowerShell")
 		}
-		cmd = exec.Command(ps, "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", line)
+		cmd = consoletest.HiddenCommand(ps, "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", line)
 		cmd.Dir = t.TempDir() // a folder of its own: see psquote_roundtrip_windows_test.go
 	} else {
-		cmd = exec.Command("/bin/sh", "-c", line)
+		cmd = consoletest.HiddenCommand("/bin/sh", "-c", line)
 	}
 	out, err := cmd.CombinedOutput()
 	require.NoError(t, err, "%s\n%s", line, out)

@@ -7,7 +7,6 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -16,6 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/subgentic/coral/internal/consoletest"
 	"github.com/subgentic/coral/internal/store"
 )
 
@@ -28,7 +28,7 @@ func TestFileAndDiffReadsNeedTheSessionOfTheAgentNamed(t *testing.T) {
 		dir := t.TempDir()
 		require.NoError(t, os.WriteFile(filepath.Join(dir, file), []byte(text), 0o644))
 		for _, args := range [][]string{{"init", "-q"}, {"add", "."}, {"-c", "user.name=t", "-c", "user.email=t@example.invalid", "commit", "-qm", "x"}} {
-			cmd := exec.Command("git", append([]string{"-C", dir}, args...)...)
+			cmd := consoletest.HiddenCommand("git", append([]string{"-C", dir}, args...)...)
 			if out, err := cmd.CombinedOutput(); err != nil {
 				t.Skipf("git is not usable here: %v %s", err, out)
 			}

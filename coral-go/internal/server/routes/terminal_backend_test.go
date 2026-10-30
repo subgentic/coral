@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -16,6 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/subgentic/coral/internal/consoletest"
 	"github.com/subgentic/coral/internal/linktest"
 	"github.com/subgentic/coral/internal/store"
 	"github.com/subgentic/coral/internal/store/storetest"
@@ -155,14 +155,14 @@ func TestEndLeftoverTmuxAgentsTouchesOnlyCoralsAgents(t *testing.T) {
 	other := filepath.Join(dataDir, "other.sock")
 	run := func(sock string, args ...string) {
 		t.Helper()
-		cmd := exec.Command(bin, append([]string{"-S", sock}, args...)...)
+		cmd := consoletest.HiddenCommand(bin, append([]string{"-S", sock}, args...)...)
 		cmd.Env = append(os.Environ(), "TMUX=")
 		out, err := cmd.CombinedOutput()
 		require.NoError(t, err, string(out))
 	}
 	t.Cleanup(func() {
 		for _, s := range []string{private, other} {
-			exec.Command(bin, "-S", s, "kill-server").Run()
+			consoletest.HiddenCommand(bin, "-S", s, "kill-server").Run()
 		}
 	})
 	a1 := "claude-0b2f6c1e-3d4a-4b5c-8d6e-7f8091a2b3c4"
@@ -182,7 +182,7 @@ func TestEndLeftoverTmuxAgentsTouchesOnlyCoralsAgents(t *testing.T) {
 	assert.JSONEq(t, `{"ended":2,"left":0}`, rec.Body.String())
 
 	list := func(sock string) string {
-		out, _ := exec.Command(bin, "-S", sock, "list-sessions", "-F", "#{session_name}").CombinedOutput()
+		out, _ := consoletest.HiddenCommand(bin, "-S", sock, "list-sessions", "-F", "#{session_name}").CombinedOutput()
 		return string(out)
 	}
 	assert.Equal(t, "decoy\n", list(private), "the decoy on Coral's server is left alone")
@@ -200,11 +200,11 @@ func TestEndLeftoverRefusesASymlinkedSocket(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { os.RemoveAll(dataDir) })
 	target := filepath.Join(dataDir, "elsewhere.sock")
-	start := exec.Command(bin, "-S", target, "new-session", "-d", "-s", "claude-11111111-2222-4333-8444-555555555555", "sleep 600")
+	start := consoletest.HiddenCommand(bin, "-S", target, "new-session", "-d", "-s", "claude-11111111-2222-4333-8444-555555555555", "sleep 600")
 	start.Env = append(os.Environ(), "TMUX=")
 	out, err := start.CombinedOutput()
 	require.NoError(t, err, string(out))
-	t.Cleanup(func() { exec.Command(bin, "-S", target, "kill-server").Run() })
+	t.Cleanup(func() { consoletest.HiddenCommand(bin, "-S", target, "kill-server").Run() })
 	linktest.Symlink(t, target, tmux.PrivateSocketPath(dataDir))
 
 	assert.Empty(t, tmux.PrivateAgentSessions(context.Background(), tmux.PrivateSocketPath(dataDir)))
@@ -213,7 +213,7 @@ func TestEndLeftoverRefusesASymlinkedSocket(t *testing.T) {
 	rec := b.req("POST", "/api/system/terminal-backend/end-leftover", `{}`, "dashboard")
 	require.Equal(t, 200, rec.Code, rec.Body.String())
 	assert.JSONEq(t, `{"ended":0,"left":0}`, rec.Body.String())
-	ls, _ := exec.Command(bin, "-S", target, "list-sessions", "-F", "#{session_name}").CombinedOutput()
+	ls, _ := consoletest.HiddenCommand(bin, "-S", target, "list-sessions", "-F", "#{session_name}").CombinedOutput()
 	assert.Contains(t, string(ls), "claude-11111111-2222-4333-8444-555555555555", "the server behind the link is untouched")
 }
 
@@ -263,12 +263,12 @@ func TestTerminalBackendKeepsTmuxWhileAgentsAreInIt(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { os.RemoveAll(dataDir) })
 	private := tmux.PrivateSocketPath(dataDir)
-	t.Cleanup(func() { exec.Command(bin, "-S", private, "kill-server").Run() })
+	t.Cleanup(func() { consoletest.HiddenCommand(bin, "-S", private, "kill-server").Run() })
 	b := newBackendRig(t, dataDir)
 	get := func() string { return b.req("GET", "/api/system/terminal-backend", "", "dashboard").Body.String() }
 	assert.Contains(t, get(), `"restart_required":true`, "tmux running, none in it: the next start runs pty")
 
-	cmd := exec.Command(bin, "-S", private, "new-session", "-d", "-s", "claude-0b2f6c1e-3d4a-4b5c-8d6e-7f8091a2b3c4", "sleep 600")
+	cmd := consoletest.HiddenCommand(bin, "-S", private, "new-session", "-d", "-s", "claude-0b2f6c1e-3d4a-4b5c-8d6e-7f8091a2b3c4", "sleep 600")
 	cmd.Env = append(os.Environ(), "TMUX=")
 	out, err := cmd.CombinedOutput()
 	require.NoError(t, err, string(out))

@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -21,13 +20,14 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/subgentic/coral/internal/config"
+	"github.com/subgentic/coral/internal/consoletest"
 )
 
 func repoOn(t *testing.T, branch string, commit bool) (string, func(args ...string) string) {
 	t.Helper()
 	repo := t.TempDir()
 	git := func(args ...string) string {
-		out, err := exec.Command("git", append([]string{"-C", repo, "-c", "user.email=t@t", "-c", "user.name=t"}, args...)...).CombinedOutput()
+		out, err := consoletest.HiddenCommand("git", append([]string{"-C", repo, "-c", "user.email=t@t", "-c", "user.name=t"}, args...)...).CombinedOutput()
 		require.NoError(t, err, string(out))
 		return string(out)
 	}

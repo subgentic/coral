@@ -28,7 +28,7 @@ func TestWithNoCwdSearchSetsTheVariableOnceWhateverItsCase(t *testing.T) {
 	assert.Equal(t, []string{"A=1", "B=2", NoCwdSearchEnv}, got, "the old value is replaced, not doubled")
 	assert.Equal(t, []string{NoCwdSearchEnv}, WithNoCwdSearch(nil))
 
-	cmd := exec.Command("x")
+	cmd := exec.Command("x") // consoletest:allow never started
 	NoCwdSearch(cmd)
 	assert.Contains(t, cmd.Env, NoCwdSearchEnv, "a command with no environment of its own gets this process's, plus the variable")
 	assert.Greater(t, len(cmd.Env), 1)
@@ -49,7 +49,8 @@ func TestAPlantedProgramInTheWorkingFolderDoesNotRunWithNoCwdSearch(t *testing.T
 
 	run := func(harden bool) bool {
 		_ = os.Remove(marker)
-		cmd := exec.Command(claude)
+		cmd := exec.Command(claude) // consoletest:allow hidden on the next line
+		HideWindow(cmd)
 		cmd.Dir = repo
 		cmd.Env = withoutNoCwd(os.Environ()) // this test process may itself run under the variable (Coral gives it to its agents): the baseline needs it absent
 		if harden {

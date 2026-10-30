@@ -19,6 +19,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/subgentic/coral/internal/config"
+	"github.com/subgentic/coral/internal/consoletest"
 	"github.com/subgentic/coral/internal/naming"
 	"github.com/subgentic/coral/internal/ptymanager"
 	"github.com/subgentic/coral/internal/store/storetest"
@@ -47,11 +48,11 @@ func newTerminalTestTmuxBackend(t *testing.T) (*ptymanager.TmuxBackend, *tmux.Cl
 	// On its OWN socket: kill-server returns before that server has exited, and the first
 	// new-session on the same socket could reach the dying server ("server exited unexpectedly").
 	smoke := sock + ".smoke"
-	if out, err := exec.Command("tmux", "-S", smoke, "new-session", "-d", "-s", "coral-smoke", "sleep 1").CombinedOutput(); err != nil {
-		exec.Command("tmux", "-S", smoke, "kill-server").Run()
+	if out, err := consoletest.HiddenCommand("tmux", "-S", smoke, "new-session", "-d", "-s", "coral-smoke", "sleep 1").CombinedOutput(); err != nil {
+		consoletest.HiddenCommand("tmux", "-S", smoke, "kill-server").Run()
 		t.Skipf("tmux cannot create sessions in this environment: %v (output: %s)", err, strings.TrimSpace(string(out)))
 	}
-	exec.Command("tmux", "-S", smoke, "kill-server").Run()
+	consoletest.HiddenCommand("tmux", "-S", smoke, "kill-server").Run()
 
 	client := tmux.NewClient(t.TempDir())
 	client.SocketPath = sock
@@ -64,7 +65,7 @@ func newTerminalTestTmuxBackend(t *testing.T) (*ptymanager.TmuxBackend, *tmux.Cl
 	t.Cleanup(func() { backend.Close() })
 
 	t.Cleanup(func() {
-		exec.Command("tmux", "-S", sock, "kill-server").Run()
+		consoletest.HiddenCommand("tmux", "-S", sock, "kill-server").Run()
 	})
 
 	return backend, client
@@ -137,7 +138,7 @@ func waitForForegroundCommand(t *testing.T, socket, session, command string) {
 	t.Helper()
 	deadline := time.Now().Add(15 * time.Second)
 	for time.Now().Before(deadline) {
-		out, err := exec.Command("tmux", "-S", socket, "display-message", "-p", "-t", session, "#{pane_current_command}").Output()
+		out, err := consoletest.HiddenCommand("tmux", "-S", socket, "display-message", "-p", "-t", session, "#{pane_current_command}").Output()
 		if err == nil && strings.TrimSpace(string(out)) == command {
 			return
 		}

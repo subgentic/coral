@@ -13,10 +13,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/subgentic/coral/internal/consoletest"
 	"github.com/subgentic/coral/internal/secfile/secfiletest"
 )
 
-// agy runs each hook as exec.Command("cmd", "/c", command): Go's quoting turns a " into \",
+// agy runs each hook as consoletest.HiddenCommand("cmd", "/c", command): Go's quoting turns a " into \",
 // which cmd.exe doesn't read, so a hook command quoting its path fails. ResolveCmdHookCommand
 // names the tool by its absolute path without quotes, and the command runs the tools folder's
 // hook, not a decoy of the same name in the agent's folder or first on PATH (#3660).
@@ -77,7 +78,7 @@ func TestCmdHookCommandRunsUnderAgysCmd(t *testing.T) {
 // runAsAgy runs a hook command the way agy does, from the agent's folder with that folder first
 // on PATH.
 func runAsAgy(work, command string) (string, error) {
-	c := exec.Command("cmd", "/c", command)
+	c := consoletest.HiddenCommand("cmd", "/c", command)
 	c.Dir = work
 	c.Env = append(os.Environ(), hookEchoEnv+"=1", "PATH="+work+string(os.PathListSeparator)+os.Getenv("PATH"))
 	out, err := c.CombinedOutput()
@@ -160,7 +161,7 @@ func TestPowerShellHookCommandRunsUnderCodexsPowerShell(t *testing.T) {
 			require.True(t, ok)
 			assert.True(t, strings.HasPrefix(cmd, "& '"), cmd)
 			run := func(command string) string {
-				c := exec.Command(ps, "-NoProfile", "-NonInteractive", "-Command", command)
+				c := consoletest.HiddenCommand(ps, "-NoProfile", "-NonInteractive", "-Command", command)
 				c.Dir = work
 				c.Env = append(os.Environ(), hookEchoEnv+"=1", "PATH="+work+string(os.PathListSeparator)+os.Getenv("PATH"))
 				out, err := c.CombinedOutput()

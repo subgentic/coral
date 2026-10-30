@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -21,6 +20,7 @@ import (
 	"github.com/subgentic/coral/internal/board/boardtest"
 	"github.com/subgentic/coral/internal/cloud"
 	"github.com/subgentic/coral/internal/config"
+	"github.com/subgentic/coral/internal/consoletest"
 	"github.com/subgentic/coral/internal/store"
 	"github.com/subgentic/coral/internal/store/storetest"
 	"github.com/subgentic/coral/pkg/tunnel"
@@ -288,7 +288,7 @@ func TestTunnelChatPostIsTheHubUser(t *testing.T) {
 func hubTestGitRepo(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
-	out, err := exec.Command("git", "-C", dir, "init", "-q").CombinedOutput()
+	out, err := consoletest.HiddenCommand("git", "-C", dir, "init", "-q").CombinedOutput()
 	require.NoError(t, err, string(out))
 	return dir
 }

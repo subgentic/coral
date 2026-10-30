@@ -3,7 +3,6 @@ package agent
 import (
 	"bytes"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -11,6 +10,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/subgentic/coral/internal/consoletest"
 )
 
 // #36 (Security's W1): a workflow step's prompt (earlier steps' output, board text) that starts like an option
@@ -26,7 +27,7 @@ func TestAStepPromptThatLooksLikeAnOptionIsThePrompt(t *testing.T) {
 			n++
 			argvFile := filepath.Join(dir, agentType+"-"+strconv.Itoa(n)+".argv")
 			args, stdin := StepPrintArgs(agentType, []string{"--flag-from-config"}, []string{"--model", "m1"}, prompt)
-			cmd := exec.Command(printer, args...)
+			cmd := consoletest.HiddenCommand(printer, args...)
 			cmd.Env = append(os.Environ(), "ARGV_OUT="+argvFile)
 			if stdin != "" {
 				cmd.Stdin = strings.NewReader(stdin)

@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/subgentic/coral/internal/config"
+	"github.com/subgentic/coral/internal/consoletest"
 	"github.com/subgentic/coral/internal/naming"
 	"github.com/subgentic/coral/internal/ptymanager"
 	"github.com/subgentic/coral/internal/store"
@@ -79,15 +80,15 @@ func TestALaunchOnATmuxCoralIsOnTmuxAndSaysSo(t *testing.T) {
 	t.Cleanup(func() { os.RemoveAll(dataDir) })
 	sock := filepath.Join(dataDir, "t.sock")
 	smoke := sock + ".smoke"
-	if out, err := exec.Command("tmux", "-S", smoke, "new-session", "-d", "-s", "coral-smoke", "sleep 1").CombinedOutput(); err != nil {
-		exec.Command("tmux", "-S", smoke, "kill-server").Run()
+	if out, err := consoletest.HiddenCommand("tmux", "-S", smoke, "new-session", "-d", "-s", "coral-smoke", "sleep 1").CombinedOutput(); err != nil {
+		consoletest.HiddenCommand("tmux", "-S", smoke, "kill-server").Run()
 		t.Skipf("tmux cannot create sessions here: %v (%s)", err, strings.TrimSpace(string(out)))
 	}
-	exec.Command("tmux", "-S", smoke, "kill-server").Run()
+	consoletest.HiddenCommand("tmux", "-S", smoke, "kill-server").Run()
 	client := tmux.NewClient(dataDir)
 	client.SocketPath = sock
 	client.FallbackToDefault = false
-	t.Cleanup(func() { exec.Command("tmux", "-S", sock, "kill-server").Run() })
+	t.Cleanup(func() { consoletest.HiddenCommand("tmux", "-S", sock, "kill-server").Run() })
 
 	cfg := config.Load(dataDir)
 	cfg.LogDir = filepath.Join(dataDir, "logs")
