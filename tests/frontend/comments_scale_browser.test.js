@@ -7,7 +7,10 @@ const { fixture, STUB } = require('./helpers/comments_scale');
 const { framesJs } = require('./helpers/wait');
 const BASE = require('./test_base').BASE;
 
-const OPEN_MS = 2500, CLICK_MS = 1000, POST_MS = 1500, SELECT_MS = 1500;
+// Under --stress the runner slows every page's CPU by CDP_CPU_THROTTLE (4 by default) and the budgets, which are wall-clock times, grow with it (#352: the open took 7.5 to 7.9 s at
+// cpu-throttle 4, on main too); an ordinary run has no throttle and keeps the budgets as they are.
+const SCALE = Math.min(8, Math.max(1, Number(process.env.CDP_CPU_THROTTLE) || 1)); // missing, empty or not a number: 1; at most 8
+const OPEN_MS = 2500 * SCALE, CLICK_MS = 1000 * SCALE, POST_MS = 1500 * SCALE, SELECT_MS = 1500 * SCALE;
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const S = `(window.__coralStatic || '/static/')`;

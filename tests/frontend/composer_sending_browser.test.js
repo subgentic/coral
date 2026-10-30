@@ -125,6 +125,8 @@ const HOLD = `(() => {
         await waitFor(`window.__hold.send.length === 1`, 'the third send');
         await answer(409, { error: "The agent isn't ready for messages yet: your message was not sent. Try again in a moment.", code: 'agent_not_ready', not_sent: true });
         await waitFor(`document.getElementById('command-input').value === 'third message'`, 'the text back');
+        // the text comes back before the answer is read and the send is done: the reason under the box is its last step, and a send made before it is ignored as a double click (#352: the fourth send never went at cpu-throttle 4)
+        await waitFor(`!document.getElementById('composer-error').hidden && /isn't ready/.test(document.getElementById('composer-error').textContent)`, 'the reason under the box');
         assert.deepEqual((await pending()).map(p => p.text), ['first message']);
 
         console.log('A reload while a message is sending: it does not come back as Sent');
