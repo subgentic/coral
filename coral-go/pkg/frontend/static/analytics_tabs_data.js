@@ -76,6 +76,18 @@ export function fmtCount(n) {
     return String(Math.round(n));
 }
 export const fmtMetric = (metric, v) => (metric === 'cost' ? fmtMoney(v) : fmtCount(v));
+/** What a figure says when the read did not carry it: never 0 and never a dash (a 0 and a figure that was not recorded would look the same). */
+export const NOT_RECORDED = 'not recorded yet';
+export const countWords = (v) => (v == null ? NOT_RECORDED : String(v));
+/** A wait (`which`: median_s or slowest_s) of a set of asks: not recorded when the read had no asks field, and a plain sentence when there were none, or none answered. */
+export function waitWords(asks, which) {
+    if (!asks) return NOT_RECORDED;
+    if (!asks.asked) return 'No asks';
+    if (!asks.answered || asks[which] == null) return 'No answer yet';
+    return fmtWait(asks[which]);
+}
+/** n per task: not recorded when either figure is missing, a sentence when no task was done. */
+export const perTaskWords = (n, tasks) => (n == null || tasks == null ? NOT_RECORDED : tasks > 0 ? (n / tasks).toFixed(1) : 'No tasks done');
 export function fmtWait(s) {
     if (!Number.isFinite(s)) return '—';
     if (s < 90) return `${Math.round(s)} s`;
@@ -88,12 +100,13 @@ export function fmtWait(s) {
 export function operatorModel(activity) {
     const a = activity || {}, touches = a.touches || null;
     const days = (a.days || []).map(d => ({ day: d.day, label: dayLabel(d.day), values: { posts: d.operator || 0, ...(touches ? touchDay(touches, d.day) : {}) } }));
+    const posts = Array.isArray(a.days) ? days.reduce((n, d) => n + d.values.posts, 0) : null; // a read with no days has not recorded the posts
     const kinds = [{ key: 'posts', name: 'Board posts by the Operator', recorded: true }, ...(touches ? ['typed', 'answer', 'approve', 'wake', 'restart', 'stop'].map(k => ({ key: k, name: KIND_NAMES[k], recorded: true })) : [])];
     const sumTouches = days.reduce((n, d) => n + Object.values(d.values).reduce((x, v) => x + v, 0), 0);
     const agents = (a.agents || []).map(g => ({ name: g.name, toOperator: g.to_operator || 0, asks: g.asks_operator || 0, ...(touches ? touchAgent(touches, g.name) : {}) }))
         .map(g => ({ ...g, need: g.toOperator + g.asks + (g.touches || 0) })).filter(g => g.need > 0).sort((x, y) => y.need - x.need || x.name.localeCompare(y.name));
-    const done = Number(a.tasks_done) || 0;
-    return { days, kinds, touches: sumTouches, tasksDone: done, perTask: done > 0 ? sumTouches / done : null, asks: a.operator_asks || { asked: 0, answered: 0, median_s: null, slowest_s: null }, agents, recorded: !!touches, hub: touches && touches.sources ? Number(touches.sources.hub) || 0 : 0, truncated: !!a.truncated };
+    const done = a.tasks_done == null ? null : Number(a.tasks_done) || 0;
+    return { days, kinds, posts, touches: sumTouches, tasksDone: done, perTask: done > 0 ? sumTouches / done : null, asks: a.operator_asks || null, agents, recorded: !!touches, hub: touches && touches.sources ? Number(touches.sources.hub) || 0 : 0, truncated: !!a.truncated };
 }
 const KIND_NAMES = { typed: 'Typed to an agent', answer: 'Answers to a question or prompt', approve: 'Approvals', wake: 'Wakes', restart: 'Restarts', stop: 'Stops' };
 function touchDay(t, day) { const d = (t.days || []).find(x => x.day === day) || {}; const o = {}; for (const k of Object.keys(KIND_NAMES)) o[k] = Number(d[k]) || 0; return o; }
@@ -112,6 +125,6 @@ export function commModel(activity, { limit = 10 } = {}) {
     const days = (a.days || []).map(d => ({ day: d.day, label: dayLabel(d.day), values: { posts: d.posts || 0, cross: d.cross || 0, automated: d.automated || 0 } }));
     const agents = (a.agents || []).map(g => ({ name: g.name, sent: g.sent || 0, received: g.received || 0 })).sort((x, y) => y.sent - x.sent || x.name.localeCompare(y.name));
     const tasks = Array.isArray(a.task_messages) ? a.task_messages : null; // the per-task counts the recording will add: null is "not recorded yet"
-    const done = Number(a.tasks_done) || 0, msgs = Number(a.agent_posts) || 0;
-    return { names, cells, days, agents, tasks, kpis: { agent: msgs, automated: a.automated_posts || 0, cross: a.cross_posts || 0, perTask: done > 0 ? msgs / done : null, assigned: a.assigned || 0, asks: a.asks || { asked: 0, answered: 0, median_s: null }, busiest: edges[0] || null, tasksDone: done }, truncated: !!a.truncated, empty: !msgs && !(a.cross_posts || 0) };
+    const done = a.tasks_done == null ? null : Number(a.tasks_done) || 0, msgs = a.agent_posts == null ? null : Number(a.agent_posts) || 0;
+    return { names, cells, days, agents, tasks, kpis: { agent: msgs, automated: a.automated_posts == null ? null : a.automated_posts, cross: a.cross_posts == null ? null : a.cross_posts, assigned: a.assigned == null ? null : a.assigned, asks: a.asks || null, busiest: edges[0] || null, tasksDone: done }, truncated: !!a.truncated, empty: !msgs && !(a.cross_posts || 0) && a.agent_posts != null };
 }

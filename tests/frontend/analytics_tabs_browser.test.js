@@ -116,9 +116,10 @@ const TURNS = [{ timestamp: day(7) + 'T14:12:00.000Z', model: 'claude-fable-5-1'
                 await ev(`window.__activity = ${JSON.stringify(ACTIVITY)}; (async () => { const m = await import((window.__coralStatic || '/static/') + 'cost_dashboard.js'); await m._refreshCostDashboard({ force: true }); return true; })()`);
                 await waitFor(`/not recorded|added with the recording/.test(document.getElementById('cost-comm').textContent)`, 'back', 8000);
             });
-            await run(`${at}: a table that scrolls says so${phone ? ', and its rows are 44 px' : ''}`, async () => {
-                const r = await ev(`(() => { const f = document.querySelector('#cost-comm .atab-tframe'); const hint = f.querySelector('.atab-hint'); return { hint: getComputedStyle(hint).display, rows: [...f.querySelectorAll('tbody tr')].map(t => Math.round(t.getBoundingClientRect().height)) }; })()`);
-                if (phone) { assert.equal(r.hint, 'block'); assert.ok(r.rows.length && r.rows.every(h => h >= 44), JSON.stringify(r.rows)); }
+            await run(`${at}: the table's scroll hint matches whether it overflows${phone ? ', and its rows are 44 px' : ''}`, async () => {
+                const r = await ev(`(() => { const f = document.querySelector('#cost-comm .atab-tframe'); const over = [f, ...f.querySelectorAll('*')].some(e => e.scrollWidth > e.clientWidth + 1 && /auto|scroll/.test(getComputedStyle(e).overflowX)); return { over, hidden: f.querySelector('.atab-hint').hidden, rows: [...f.querySelectorAll('tbody tr')].map(t => Math.round(t.getBoundingClientRect().height)) }; })()`);
+                assert.equal(r.hidden, !r.over, 'the hint is shown only when the table overflows: ' + JSON.stringify(r));
+                if (phone) assert.ok(r.rows.length && r.rows.every(h => h >= 44), JSON.stringify(r.rows));
                 assert.ok(r.rows.length >= 5, 'the agents are rows');
             });
             await shot(`communication-${w}-${theme}`);
@@ -134,6 +135,33 @@ const TURNS = [{ timestamp: day(7) + 'T14:12:00.000Z', model: 'claude-fable-5-1'
             await waitFor(`/visible to the owner of this Coral only/.test(document.getElementById('cost-comm').textContent)`, 'the guest line on Communication', 8000);
             await open('usage'); assert.ok(await ev(`document.querySelectorAll('#cost-usage .atab-kpi').length`) >= 6);
             await ev(`window.__activityStatus = 200; true`);
+        });
+        await run('a figure the reply lacks says "not recorded yet" and a recorded zero stays 0 (Operator and Team communication)', async () => {
+            const refresh = `(async () => { const m = await import((window.__coralStatic || '/static/') + 'cost_dashboard.js'); await m._refreshCostDashboard({ force: true }); return true; })()`;
+            const kpis = (id) => ev(`Object.fromEntries([...document.querySelectorAll('#${id} .atab-kpi')].map(k => [k.querySelector('.atab-kpi-k').textContent, k.querySelector('.atab-kpi-v').textContent]))`);
+            await ev(`window.__activity = (({ operator_asks, asks, tasks_done, assigned, days, ...rest }) => rest)(${JSON.stringify(ACTIVITY)}); true`);
+            await open('operator'); await ev(refresh);
+            await waitFor(`/not recorded yet/.test((document.querySelector('#cost-operator .atab-kpi-v') || {}).textContent || '')`, 'the missing fields', 8000);
+            let k = await kpis('cost-operator');
+            for (const name of ['Operator board posts', 'Posts per task done', 'Asks to the Operator', 'Median wait for an answer', 'Slowest wait']) assert.equal(k[name], 'not recorded yet', name + ': ' + JSON.stringify(k));
+            await open('comm'); await ev(refresh);
+            await waitFor(`/not recorded yet/.test(document.getElementById('cost-comm').textContent)`, 'the missing fields on Communication', 8000);
+            k = await kpis('cost-comm');
+            assert.equal(k['Tasks handed to another agent'], 'not recorded yet', JSON.stringify(k)); assert.equal(k['Median reply to an ask'], 'not recorded yet'); assert.equal(k['Per task done'], 'not recorded yet');
+            assert.ok(!/(^|\s)—(\s|$)/.test(await text('#cost-comm .atab-kpis')), 'no bare dash stands for a missing figure');
+            await ev(`window.__activity = { ...${JSON.stringify(ACTIVITY)}, operator_asks: { asked: 0, answered: 0, median_s: null, slowest_s: null }, tasks_done: 0, assigned: 0 }; true`);
+            await open('operator'); await ev(refresh);
+            await waitFor(`/No asks/.test(document.getElementById('cost-operator').textContent)`, 'recorded zeros', 8000);
+            k = await kpis('cost-operator');
+            assert.equal(k['Asks to the Operator'], '0', 'a recorded zero is a 0'); assert.equal(k['Median wait for an answer'], 'No asks'); assert.equal(k['Posts per task done'], 'No tasks done');
+            await ev(`window.__activity = ${JSON.stringify(ACTIVITY)}; true`); await ev(refresh);
+        });
+        await run('the scroll hint shows only while a table really overflows, and follows a resize', async () => {
+            await open('comm'); await waitFor(`document.querySelector('#cost-comm .atab-tframe')`, 'a table', 8000);
+            const rows = await ev(`[...document.querySelectorAll('#cost-comm .atab-tframe')].map(f => { const over = [f, ...f.querySelectorAll('*')].some(e => e.scrollWidth > e.clientWidth + 1 && /auto|scroll/.test(getComputedStyle(e).overflowX)); return [over, f.querySelector('.atab-hint').hidden]; })`);
+            for (const [over, hidden] of rows) assert.equal(hidden, !over, 'the hint matches the overflow: ' + JSON.stringify(rows));
+            await ev(`(() => { const f = document.querySelector('#cost-comm .atab-tframe'); const box = [f, ...f.querySelectorAll('*')].find(e => /auto|scroll/.test(getComputedStyle(e).overflowX)); const wide = document.createElement('div'); wide.style.width = '4000px'; wide.style.height = '1px'; box.append(wide); f.style.width = '600px'; return true; })()`);
+            await waitFor(`document.querySelector('#cost-comm .atab-tframe .atab-hint').hidden === false`, 'the hint once the table overflows', 6000);
         });
         await run('the reads are bounded: Usage asks for a daily series of twice the period, activity names its team and range', async () => {
             const reqs = await ev(`window.__reqs`);
