@@ -67,10 +67,19 @@ function statusPill(status) {
 
 /** The server's warning for a registered server (a plain-http URL at an address that is not this computer: the API key crosses the network
  *  unencrypted), as an icon and words, not only a colour: "Warning: The key crosses the network unencrypted; use https or a tunnel." */
-function warningHtml(text, cls = '') {
-    const t = String(text || '').trim();
-    if (!t) return '';
-    return `<div class="servers-row-warn ${cls}"><span class="material-icons" aria-hidden="true">warning</span><span><b>Warning:</b> ${escHtml(t.charAt(0).toUpperCase() + t.slice(1))}${/[.!?]$/.test(t) ? '' : '.'}</span></div>`;
+function warningHtml(s, cls = '') {
+    if (!s || !String(s.warning || '').trim()) return '';
+    // only a place for the words, by the server's id: fillWarnings writes them as text once the markup is in the page
+    return `<div class="servers-row-warn ${cls}" data-warning-for="${escHtml(s.id)}"><span class="material-icons" aria-hidden="true">warning</span><span><b>Warning:</b> <span class="servers-warn-text"></span></span></div>`;
+}
+/** The server's warning words, as text (textContent), into each place warningHtml left: never parsed as markup. */
+function fillWarnings(root) {
+    for (const w of root.querySelectorAll('[data-warning-for]')) {
+        const s = _servers.find(x => x.id === w.dataset.warningFor);
+        const t = String((s && s.warning) || '').trim();
+        const out = w.querySelector('.servers-warn-text');
+        if (out) out.textContent = t ? `${t.charAt(0).toUpperCase() + t.slice(1)}${/[.!?]$/.test(t) ? '' : '.'}` : '';
+    }
 }
 
 /** What the registry and the live list know about a remote server, as one object. */
@@ -184,7 +193,7 @@ function pageHtml(s) {
             ${factHtml('Agents', escHtml(agentsText(agents)))}
             ${factHtml('Last seen', escHtml(contact))}
         </dl>
-        ${warningHtml(s.warning)}
+        ${warningHtml(s)}
         ${below ? `<div class="servers-row-hint server-below-minimum">${escHtml(below)}</div>` : ''}
         ${attention}
         <div class="item-bar servers-page-bar">${bar}</div>
@@ -197,7 +206,7 @@ function formHtml() {
     const title = adding ? 'Add server' : `Edit ${escHtml(cur.label || cur.id || '')}`;
     return `<div class="servers-form" id="servers-form">
         <h4>${title}</h4>
-        ${adding ? '' : warningHtml((_servers.find(x => x.id === _editing) || {}).warning)}
+        ${adding ? '' : warningHtml(_servers.find(x => x.id === _editing))}
         <div id="servers-form-host"></div>
     </div>`;
 }
@@ -255,6 +264,7 @@ function render() {
     m.innerHTML = `${_open && page ? '' : '<div class="servers-intro"><p class="servers-intro-line">Servers whose agents and teams appear in this hub.</p><details class="servers-intro-more"><summary>About API keys</summary><p>The hub stores each server\'s API key (encrypted); a key grants full control of that server.</p></details></div>'}
             ${_loadError ? `<div class="servers-form-error" role="alert">${escHtml(_loadError)}</div>` : ''}
             ${body}`;
+    fillWarnings(m);
     const slot = m.querySelector('#servers-table-slot');
     if (slot) slot.replaceWith(serversTable(local, remotes));
     const title = document.getElementById('servers-tab-title');

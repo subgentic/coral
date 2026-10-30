@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	"github.com/subgentic/coral/internal/agent"
+	"github.com/subgentic/coral/internal/config"
 	"github.com/subgentic/coral/internal/secfile"
 	"github.com/subgentic/coral/internal/store"
 )
@@ -35,6 +36,15 @@ func setupSessionTokens(db *store.DB, coralDir string) {
 	// stays on the list it inherited (its files are protected one by one below).
 	if err := secfile.ProtectDir(dir); err != nil {
 		log.Printf("[security] could not make the session token folder %s private: %v", logsafe.Path(dir), err)
+	}
+	if config.DataDirMadePrivate(coralDir) {
+		// A start that made the data folder private renews the agents' tokens: every token from before is revoked, and the sweep below
+		// removes their files.
+		if n, err := db.RevokeAllSessionTokens(context.Background()); err != nil {
+			log.Printf("[security] could not revoke the agents' session tokens after making the data folder private: %v", err)
+		} else {
+			log.Printf("[security] revoked %d agent session tokens from before: the data folder was open to other accounts", n)
+		}
 	}
 	sweepSessionTokenFiles(db, dir)
 	agent.SessionTokenMinter = func(sessionID, sessionName string) string {

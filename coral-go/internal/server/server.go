@@ -171,6 +171,9 @@ func NewWithKey(cfg *config.Config, db *store.DB, backend ptymanager.TerminalBac
 		keyStore.SetSessionBackend(store.NewBrowserSessions(db))
 		keyStore.ApplyRevokeMarker()
 	}
+	// A data folder this start made private: the API key is renewed (signing out the browser sign-ins above) and the notice says what is
+	// left for the person (open_datadir.go).
+	replaceAfterOpenDataDir(context.Background(), cfg.CoralDir(), keyStore, db)
 	if p := os.Getenv("CORAL_INITIAL_PASSWORD_FILE"); p != "" {
 		keyStore.ApplyInitialPasswordFile(p)
 	}
