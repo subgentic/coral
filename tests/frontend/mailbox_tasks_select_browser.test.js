@@ -31,6 +31,37 @@ const sceneShots = require('./helpers/scene_shots');
                 await ev(`document.documentElement.setAttribute('data-theme', ${JSON.stringify(theme)}); true`);
                 await waitFor(`document.querySelector('#group-table-view .dt-box').classList.contains('dt-folded') === ${width===390}`, 'table layout settled');
                 await shot(`${width}-${theme}`);
+                if (width === 1280) { // the State column is the state's word in the state's colour: no pill, no dot, no fill, and 4.5:1 or more in each state (the Operator, #11189)
+                    const st = await ev(`(() => { const lum = c => { const [r, g, b] = c.match(/[\\d.]+/g).slice(0, 3).map(Number).map(v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+                        const td = document.querySelector('.dt-table tbody tr td[data-key=state], .dt-table tbody tr td:nth-child(2)'), cell = td.firstElementChild; const cs = getComputedStyle(cell);
+                        const bgOf = e => { for (let n = e; n; n = n.parentElement) { const c = getComputedStyle(n).backgroundColor; if (c && !/rgba\\(.*, 0\\)$/.test(c) && c !== 'transparent') return c; } return getComputedStyle(document.body).backgroundColor; };
+                        const bg = bgOf(td), ratios = {}; for (const k of ['queued', 'active', 'blocked', 'done']) { const p = document.createElement('span'); p.className = 'dt-state goal-state-task-' + k; p.textContent = k; td.append(p); ratios[k] = Math.round(((a, b) => (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05))(lum(getComputedStyle(p).color), lum(bg)) * 100) / 100; p.remove(); }
+                        return { cls: cell.className, text: cell.textContent.trim(), dot: !!td.querySelector('.goal-dot'), border: cs.borderTopWidth, bg: cs.backgroundColor, radius: cs.borderTopLeftRadius, ratios }; })()`);
+                    assert.ok(/dt-state/.test(st.cls) && !/chip/.test(st.cls) && !st.dot && st.border === '0px' && /rgba\(0, 0, 0, 0\)|transparent/.test(st.bg) && st.text, `${width} ${theme}: the state is plain text, no pill, dot or fill: ` + JSON.stringify(st));
+                    assert.ok(Object.values(st.ratios).every(r => r >= 4.5), `${width} ${theme}: every state's text holds 4.5:1 on the row: ` + JSON.stringify(st.ratios));
+                    { // and on every kind of row: rest, open (aria-current, the row's hover background), selected and quiet, in this theme (QA Reviewer 2 on #11189: Queued was 4.40:1 on the open row, #11210)
+                        const rows = await ev(`(() => { const P = c => { const n = c.match(/[\\d.]+/g).map(Number), k = c.startsWith('color(') ? 255 : 1; return [n[0] * k, n[1] * k, n[2] * k, c.includes('/') || n.length > 3 ? n[3] : 1]; };
+                            const lum = a => { const [r, g, b] = a.slice(0, 3).map(v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+                            const page = P(getComputedStyle(document.body).backgroundColor), over = (f, b) => [0, 1, 2].map(i => f[i] * f[3] + b[i] * (1 - f[3])).concat(1), ratio = (fg, bg) => { const a = lum(fg), b = lum(bg); return Math.round(((Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05)) * 100) / 100; };
+                            const trs = [...document.querySelectorAll('.dt-table tbody tr.dt-row')], out = {}; const kinds = { rest: () => {}, open: tr => tr.setAttribute('aria-current', 'true'), selected: tr => tr.classList.add('dt-selected'), quiet: tr => tr.classList.add('dt-quiet') };
+                            for (const [k, set] of Object.entries(kinds)) { const tr = trs[0], was = [tr.getAttribute('aria-current'), tr.className]; set(tr); const td = tr.children[1], bgc = getComputedStyle(td).backgroundColor, bg = over(P(bgc), page), ratios = {};
+                                for (const c of ['queued', 'active', 'blocked', 'done']) { const p = document.createElement('span'); p.className = 'dt-state goal-state-task-' + c; p.textContent = c; td.append(p); ratios[c] = ratio(over(P(getComputedStyle(p).color), bg), bg); p.remove(); }
+                                const sec = tr.querySelector('.dt-tone-secondary, .dt-subtitle'); if (sec) ratios.secondaryCell = ratio(over(P(getComputedStyle(sec).color), bg), bg);
+                                out[k] = { bg: bgc, ratios }; tr.removeAttribute('aria-current'); if (was[0]) tr.setAttribute('aria-current', was[0]); tr.className = was[1]; }
+                            return out; })()`);
+                        for (const [k, v] of Object.entries(rows)) assert.ok(Object.values(v.ratios).every(r => r >= 4.5), `${width} ${theme}: on the ${k} row (${v.bg}) every state colour and the secondary cells hold 4.5:1: ` + JSON.stringify(v.ratios));
+                    }
+                }
+                if (width === 1280) for (const fs of [16, 32]) { // the select column keeps its 44 px at any text size: the box is inside the table's border with the table's own inner padding, level with its row's text, and the chip is not cut (the Operator: "the checkboxes are outside the line", #11160)
+                    await ev(`document.documentElement.style.fontSize = '${fs}px'; true`);
+                    const g = await ev(`(() => { const box = document.querySelector('#group-table-view .dt-box'), b = box.getBoundingClientRect(), bw = parseFloat(getComputedStyle(box).borderLeftWidth), pad = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--table-pad-x')) || 12; const R = e => e.getBoundingClientRect(); const rows = [...document.querySelectorAll('.dt-table thead tr, .dt-table tbody tr.dt-row')].map(tr => { const cell = tr.children[0], inp = cell.querySelector('input'), next = tr.children[1], lead = next.querySelector('button, .chip, span, *') || next; const c = R(cell), i = R(inp), n = R(next), l = R(lead); return { inset: Math.round((i.left - b.left - bw) * 10) / 10, cellW: Math.round(c.width), dy: Math.round(((i.top + i.bottom) / 2 - (l.top + l.bottom) / 2) * 10) / 10, gap: Math.round((l.left - i.right) * 10) / 10, clipped: l.right > n.right + 0.5, inLeft: i.left >= c.left - 0.5 && i.right <= c.right + 0.5 }; }); return { pad, rows }; })()`);
+                    const at = `${fs}px ${theme}: `;
+                    assert.ok(g.rows.length >= 4 && g.rows.every(r => r.cellW >= 44 && r.inLeft), at + 'the select cell keeps its 44 px and holds the box: ' + JSON.stringify(g));
+                    assert.ok(g.rows.every(r => r.inset >= g.pad - 1), at + `each checkbox is inside the table's border by the table's own padding (${g.pad} px): ` + JSON.stringify(g));
+                    assert.ok(g.rows.every(r => Math.abs(r.dy) <= 1.5 && !r.clipped), at + 'the header and every row share a centre line with their first cell, nothing is clipped: ' + JSON.stringify(g));
+                    assert.ok(new Set(g.rows.map(r => r.inset)).size === 1, at + 'the header box and the rows\' boxes are in one column: ' + JSON.stringify(g));
+                    await ev(`document.documentElement.style.fontSize = ''; true`);
+                }
             }
         }
         await Emulation.setDeviceMetricsOverride({ width:1280, height:800, deviceScaleFactor:1, mobile:false });

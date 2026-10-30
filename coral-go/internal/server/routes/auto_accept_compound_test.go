@@ -1,6 +1,8 @@
 package routes
 
 import (
+	"fmt"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -69,7 +71,12 @@ func TestShellRiskReadsEveryCompoundForm(t *testing.T) {
 			if f.name == "backticks" && strings.Contains(safe, ">") {
 				continue // the separator reading has always taken the closing backtick for part of the file name (an over-block, never a miss)
 			}
-			assert.Empty(t, shellRisk(strings.Replace(f.tmpl, "%s", safe, 1), wd), "%s: %s", f.name, safe)
+			full := strings.Replace(f.tmpl, "%s", safe, 1)
+			holds := map[string]string{}
+			if strings.HasPrefix(f.name, "case") { // Windows reads a case arm's ")" as a bracket it can't pair: held (windowsLayerHolds)
+				holds[full] = "its brackets can't be read"
+			}
+			assertOrdinaryPasses(t, shellRisk(full, wd), full, holds, f.name)
 		}
 	}
 }
@@ -190,6 +197,33 @@ func raceSlowdown() time.Duration {
 	return 1
 }
 
+// memoBound is the clock bound of the 65 KB nested-wrapper test (1 s). On Windows shellRisk also reads the command a second time as PowerShell and cmd do (winVerbRisk), so one
+// pass is about twice the work: measured alone, on a quiet process, on main, the test takes 1.0 s to 1.4 s there (QA 1.10 s, 1.11 s, 1.38 s), a red run that caches nothing (#350).
+// It is 3 s there. That is the only bound widened: the work itself is asserted by counting (assertWrapperWork), and every other bound keeps its value.
+func memoBound() time.Duration {
+	if runtime.GOOS == "windows" {
+		return 3 * time.Second * raceSlowdown()
+	}
+	return time.Second * raceSlowdown()
+}
+
+// assertOnePass asserts, by counting and not by the clock, that a command is judged in one evaluation (no inner command is judged again) and that what the parser
+// printed of it stays inside the budget of four times its own length: "one pass" is the work done, which a loaded machine does not change (#350).
+func assertOnePass(t *testing.T, cmd, wd, format string, args ...any) {
+	t.Helper()
+	r := newRiskRun()
+	r.from(cmd, wd, wd)
+	assert.Equal(t, 1, r.evals, "judged once: "+fmt.Sprintf(format, args...))
+	leaves, status := readLeaves(cmd)
+	if status == leavesRead {
+		printed := 0
+		for _, l := range leaves {
+			printed += len(l)
+		}
+		assert.LessOrEqual(t, printed, leafBudget(cmd), "the leaves are inside the budget: "+fmt.Sprintf(format, args...))
+	}
+}
+
 func TestShellRiskDeepNestingIsAnsweredInOnePass(t *testing.T) {
 	wd := t.TempDir()
 	for _, n := range []int{50, 500, 4000, 20000} {
@@ -198,6 +232,7 @@ func TestShellRiskDeepNestingIsAnsweredInOnePass(t *testing.T) {
 		why := shellRisk(cmd, wd)
 		took := time.Since(start)
 		assert.Less(t, took, 2*time.Second*raceSlowdown(), "%d nested $( ) took %s", n, took)
+		assertOnePass(t, cmd, wd, "%d nested $( )", n)
 		if n >= 4000 {
 			assert.Equal(t, "it is nested too deeply to check", why, "%d deep is not read, and asks", n)
 		}
@@ -218,6 +253,7 @@ func TestShellRiskDeepNestingIsAnsweredInOnePass(t *testing.T) {
 		start := time.Now()
 		_ = shellRisk(cmd, wd)
 		assert.Less(t, time.Since(start), 2*time.Second*raceSlowdown(), name)
+		assertOnePass(t, cmd, wd, "%s", name)
 	}
 }
 
@@ -233,6 +269,16 @@ func TestLeafBudgetIsFourTimesTheCommandAndAMargin(t *testing.T) {
 }
 
 // QA's round 2 (#7086): each of the three readings judged a bash -c inner command again, so a wrapper in a wrapper cost three reads per level. A run judges each distinct command once.
+// assertWrapperWork asserts by counting that the work on nested wrappers is memoized and bounded: every command is judged once (a judging per entry of the memo, so none twice)
+// and no more than limit commands are judged. Without the memo the count is exponential in the depth (about 2.5 times per level, QA #7096), so a regression is far over any limit.
+func assertWrapperWork(t *testing.T, cmd, wd string, depth, limit int) {
+	t.Helper()
+	r := newRiskRun()
+	r.from(cmd, wd, wd)
+	assert.Equal(t, len(r.memo), r.evals, "depth %d: each command judged once", depth)
+	assert.LessOrEqual(t, r.evals, limit, "depth %d: commands judged", depth)
+}
+
 func TestShellRiskWrapperRecursionIsMemoizedPerRun(t *testing.T) {
 	wd := t.TempDir()
 	dq := strings.NewReplacer(`\`, `\\`, `"`, `\"`, "$", `\$`)
@@ -243,14 +289,16 @@ func TestShellRiskWrapperRecursionIsMemoizedPerRun(t *testing.T) {
 		}
 		start := time.Now()
 		why := shellRisk(cmd, wd)
-		assert.Less(t, time.Since(start), time.Second*raceSlowdown(), "bash -c nested %d deep (%d bytes)", depth, len(cmd))
+		assert.Less(t, time.Since(start), memoBound(), "bash -c nested %d deep (%d bytes)", depth, len(cmd))
 		assert.Empty(t, why, "an ordinary command in wrappers is not risky")
+		assertWrapperWork(t, cmd, wd, depth, depth*depth)
 		// A risky command at the bottom of the same wrappers is still found.
 		deep := "rm -rf /etc"
 		for d := 0; d < depth; d++ {
 			deep = "bash -c \"" + dq.Replace(deep) + "\""
 		}
 		assert.Contains(t, shellRisk(deep, wd), "deletes recursively", "depth %d", depth)
+		assertWrapperWork(t, deep, wd, depth, 2*depth+2) // found at the first level that holds it: the wrappers above it are read once each
 	}
 	// The same inner command judged from two directories in one run is judged twice: the answer depends on where it runs.
 	assert.Empty(t, shellRisk("bash -c 'rm -rf x'", wd))

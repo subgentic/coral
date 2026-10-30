@@ -26,7 +26,7 @@ const board = 'task-line-' + Date.now().toString(36);
                 if (narrow) await ev(`(() => { const b = document.querySelector('#team-panel-tasks .dt-box'); b.parentElement.style.width = '520px'; b.style.width = '520px'; return true; })()`);
                 await waitFor(`document.querySelector('#team-panel-tasks .dt-box').classList.contains('dt-folded')`, 'the folded table', 8000);
                 const rows = await ev(`[...document.querySelectorAll('#team-panel-tasks tbody tr')].map(r => { const v = e => !!e && e.getClientRects().length > 0, rect = e => { const b = e && e.getBoundingClientRect(); return b ? { x: b.x, mid: b.y + b.height / 2, w: b.width, h: b.height } : null; };
-                    const chip = r.querySelector('.dt-chip'), title = r.querySelector('button.dt-primary'), av = r.querySelector('.dt-avatar'); const row = r.getBoundingClientRect();
+                    const chip = r.querySelector('.dt-state'), title = r.querySelector('button.dt-primary'), av = r.querySelector('.dt-avatar'); const row = r.getBoundingClientRect();
                     const extras = ['.dt-id', '.dt-subtitle', 'td[data-key="goal"]', 'td[data-key="updated"]', 'td[data-key="files"]', 'button.dt-files'].filter(s => [...r.querySelectorAll(s)].some(v));
                     return { chip: v(chip) && rect(chip), title: v(title) && rect(title), av: v(av) && rect(av), h: Math.round(row.height), extras, ellipsis: title ? getComputedStyle(title).textOverflow : '', nowrap: title ? getComputedStyle(title).whiteSpace : '', cut: !!title && title.scrollWidth > title.clientWidth, scrolls: r.closest('.dt-box').scrollWidth - r.closest('.dt-box').clientWidth }; })`);
                 for (const r of rows) {

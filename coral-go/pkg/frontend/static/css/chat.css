@@ -489,6 +489,7 @@
 
 /* ── Center Chat View (Terminal/Chat toggle) ───────────────── */
 
+.terminal-header-actions .live-view-switch, .terminal-header-actions .live-view-switch-menu { display: none; } /* a phone's one switch and its menu twin (mobile.css shows them, #11187) */
 .live-view-toggle[hidden] {
     display: none; /* plain terminals: no transcript, no toggle */
 }

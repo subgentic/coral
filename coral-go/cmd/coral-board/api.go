@@ -123,6 +123,9 @@ var boardClient *http.Client // nil: a 10 s client (or CORAL_TIMEOUT), made per 
 
 // getBoard does a GET to a /api/board path and returns the cleaned body, erroring on a transport
 // failure or a non-2xx status (#3589), so a refused read is never printed as "no messages".
+// boardPaused is whether the last getBoard answer said the board is paused: an empty list then is not "nothing new" (#11198).
+var boardPaused bool
+
 func getBoard(path string) ([]byte, error) {
 	client, wait := boardClient, clierr.Timeout(10*time.Second)
 	if client == nil {
@@ -135,6 +138,7 @@ func getBoard(path string) ([]byte, error) {
 		return nil, clierr.CannotReach(redactedServerURL(), err, wait)
 	}
 	defer resp.Body.Close()
+	boardPaused = resp.Header.Get("X-Coral-Board-Paused") == "true"
 	data, _ := clitext.ReadReply(resp.Body, rawOutput)
 	var result map[string]any
 	json.Unmarshal(data, &result) // a list reply leaves result empty, but then the status is 2xx

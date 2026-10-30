@@ -18,7 +18,10 @@ import (
 // transport or a Clone of it are covered; a test talks to an httptest server
 // instead.
 func init() {
-	if !enabled() {
+	// InTest, not enabled (InTestRun): package init runs before go test registers its flags, so InTestRun is false here in every test binary
+	// and nothing would be guarded. What this does only protects (no TMUX, no dial to the live server), so a shipped binary that a launcher
+	// starts with a -test.* argument loses nothing it should have (#214).
+	if !InTest() {
 		return
 	}
 	os.Unsetenv("TMUX")

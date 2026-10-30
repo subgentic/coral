@@ -13,6 +13,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/subgentic/coral/internal/linktest"
 )
 
 // #3615: the Windows paths Security flagged as compile-only, run on Windows CI.
@@ -58,13 +60,29 @@ func TestWindowsJunctionOutIsRefused(t *testing.T) {
 	assert.Error(t, r.MkdirAll(`junc\made`, 0o755))
 	secretIntact(t, out, secret)
 
-	// Within and Resolve follow the junction: filepath.EvalSymlinks alone doesn't (#3615).
+	// Within and Resolve follow the junction: filepath.EvalSymlinks alone doesn't (#3615). On a Windows that refuses to traverse a junction at all (build 26300 and
+	// later: "untrusted mount point") the system refuses first, so the refusal is the system's: every one of these is an error, and nothing reads or writes (#350).
+	traversable := linktest.JunctionsTraversable(t)
+	t.Logf("a junction out of the root is refused by: %s", map[bool]string{true: "Coral (safefs: ErrOutside)", false: "Windows (untrusted mount point)"}[traversable])
 	for _, p := range []string{`junc\secret.txt`, `junc\new.txt`, "junc", filepath.Join(root, "junc", "secret.txt")} {
 		_, err = Within(root, p)
-		assert.ErrorIs(t, err, ErrOutside, "Within sees the junction: %s", p)
+		if traversable {
+			assert.ErrorIs(t, err, ErrOutside, "Within sees the junction: %s", p)
+		} else {
+			assert.True(t, linktest.UntrustedMountPoint(err), "Windows refuses the junction in Within(%s): %v", p, err)
+		}
 	}
 	realOut, err := Resolve(out)
 	require.NoError(t, err)
+	if !traversable {
+		for _, p := range []string{filepath.Join(root, "junc"), filepath.Join(root, "junc", "secret.txt"), filepath.Join(root, "junc", "missing.txt")} {
+			got, err := Resolve(p)
+			assert.True(t, linktest.UntrustedMountPoint(err), "Windows refuses the junction in Resolve(%s): %v", p, err)
+			assert.Empty(t, got, "a refused Resolve names no place")
+		}
+		secretIntact(t, out, secret)
+		return
+	}
 	got, err := Resolve(filepath.Join(root, "junc"))
 	require.NoError(t, err)
 	assert.Equal(t, realOut, got, "Resolve follows the junction")
@@ -83,12 +101,18 @@ func TestWindowsJunctionWithinTheRootResolves(t *testing.T) {
 	root := t.TempDir()
 	require.NoError(t, os.Mkdir(filepath.Join(root, "real"), 0o755))
 	junction(t, filepath.Join(root, "alias"), filepath.Join(root, "real"))
+	traversable := linktest.JunctionsTraversable(t)
+	t.Logf("a junction inside the root is followed by: %s", map[bool]string{true: "Coral (safefs)", false: "nobody: Windows refuses every junction (untrusted mount point), so it is refused, never followed"}[traversable])
 	for p, want := range map[string]string{
 		`alias\x.txt`:          `real\x.txt`,
 		`alias\new\deeper.txt`: `real\new\deeper.txt`,
 		"alias":                "real",
 	} {
 		rel, err := Within(root, p)
+		if !traversable {
+			assert.True(t, linktest.UntrustedMountPoint(err), "Windows refuses the junction in Within(%s): %v", p, err)
+			continue
+		}
 		require.NoError(t, err, p)
 		assert.Equal(t, want, rel, p)
 	}
@@ -96,6 +120,13 @@ func TestWindowsJunctionWithinTheRootResolves(t *testing.T) {
 	outer := filepath.Join(t.TempDir(), "root-alias")
 	junction(t, outer, root)
 	rel, err := Within(outer, `real\x.txt`)
+	if !traversable {
+		// safefs words it "the root folder doesn't exist"; the cause is the system's, shown by opening the root itself.
+		assert.Error(t, err, "a root given through a junction is refused")
+		_, statErr := os.Stat(filepath.Join(outer, "real"))
+		assert.True(t, linktest.UntrustedMountPoint(statErr), "Windows refuses a root given through a junction: %v", statErr)
+		return
+	}
 	require.NoError(t, err)
 	assert.Equal(t, `real\x.txt`, rel)
 }

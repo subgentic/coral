@@ -36,7 +36,9 @@ func TestCmdHookCommandRunsUnderAgysCmd(t *testing.T) {
 
 			cmd, ok := ResolveCmdHookCommand("coral-hook-agentic-state --agy PreToolUse")
 			assert.NotContains(t, cmd, `"`, "cmd.exe can't read Go's escaped quotes")
-			assert.True(t, strings.HasSuffix(cmd, " --agy PreToolUse"), cmd)
+			if ok {
+				assert.True(t, strings.HasSuffix(cmd, " --agy PreToolUse"), cmd)
+			}
 			// The quoted form fails exactly as the operator saw.
 			out, err := runAsAgy(work, ResolveHookCommand("coral-hook-agentic-state --agy PreToolUse"))
 			require.Error(t, err, "%s", out)
@@ -52,7 +54,8 @@ func TestCmdHookCommandRunsUnderAgysCmd(t *testing.T) {
 				// quoted path.
 				assert.False(t, ok)
 				assert.Empty(t, cmd)
-				t.Skip("no 8.3 short names on this volume")
+				t.Logf("no 8.3 short names on this volume (%s): the refusal above is the whole check here", tools)
+				return // nothing to run: a volume without short names gets no command, which is what was asserted (#350: not a skip, so the package's result caches)
 			default:
 				want := filepath.ToSlash(shortPathName(tools)) + "/coral-hook-agentic-state.exe --agy PreToolUse"
 				assert.True(t, ok)

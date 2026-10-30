@@ -158,6 +158,8 @@ func startBackgroundServices(ctx context.Context, db *store.DB, cfg *config.Conf
 	wfRunner := background.NewWorkflowRunner(wfStore, launcher, agentRT, nil, nil, cfg.CoralDir(), cfg.AgentHost(), cfg.Port)
 	srv.SetWorkflowRunner(wfRunner)
 	scheduler.SetWorkflowRunner(wfRunner, wfStore)
+	background.RegisterBusyProbe("workflow run", wfRunner.RunningCount) // the update that installs when Coral is idle waits for them (#11170)
+	background.RegisterBusyProbe("scheduled run", scheduler.RunningCount)
 
 	log.Printf("Started 8 background services + workflow runner (git poller, indexer, scheduler, board notifier, remote board poller, batch summarizer, session reconciler, token poller)")
 	return wfRunner, scheduler
@@ -257,7 +259,11 @@ func startBoardServices(ctx context.Context, cfg *config.Config, srv *server.Ser
 	boardNotifier.SetDiscoverFn(discoverFn)
 	if bh := srv.BoardHandler(); bh != nil {
 		boardNotifier.SetIsPausedFn(bh.IsPaused)
-		boardNotifier.SetLiftSleepPauseFn(bh.LiftSleepPause) // a board sleep paused, with an awake agent on it, is resumed by the notifier (#11182)
+		boardNotifier.SetSleepingFn(func(ctx context.Context, sessionID string) bool {
+			ls, err := sessStore.GetLiveSession(ctx, sessionID)
+			return err == nil && ls != nil && ls.IsSleeping == 1
+		})
+		boardNotifier.SetLiftSleepPauseFn(bh.LiftSleepPauseSeenAwake) // a board sleep paused, with an awake agent on it, is resumed by the notifier (#11182)
 		bh.SetNotifyFn(boardNotifier.NotifyBoard)
 	}
 	// Seeded before its first pass, but not before the server serves: on a long board

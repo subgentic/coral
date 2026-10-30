@@ -28,6 +28,30 @@ func ParseVersion(s string) ([3]int, error) {
 // than its own prerelease). A version that does not parse (build metadata "+x" included: Coral's versions have none) says nothing (false), so nothing is dropped on a guess.
 func NotNewer(staged, installed string) bool { return semverorder.NotNewer(staged, installed) }
 
+// ParseInstalled says whether s is the version of a Coral build that is installed: a release (1.4.123) or a prerelease of one (2.0.5-rc1), the versions Coral's own builds carry, in
+// the order semverorder gives them (a release is above its own prerelease). No leading v, no build metadata. A STAGED version is never a prerelease (ParseVersion).
+func ParseInstalled(s string) bool {
+	if strings.HasPrefix(s, "v") {
+		return false
+	}
+	_, ok := semverorder.Parse(s)
+	return ok
+}
+
+// CompareToInstalled is -1, 0 or 1 for a staged release against the installed version: the staged one must be a release (X.Y.Z), the installed one may be a prerelease of it
+// (so a 0.0.1-rc1 install is offered 0.0.1, which is above it, and is not offered 0.0.1-rc1's own older releases). Either not parsing is an error.
+func CompareToInstalled(staged, installed string) (int, error) {
+	if _, err := ParseVersion(staged); err != nil {
+		return 0, err
+	}
+	if !ParseInstalled(installed) {
+		return 0, fmt.Errorf("installed version %q is not a Coral version", installed)
+	}
+	a, _ := semverorder.Parse(staged)
+	b, _ := semverorder.Parse(installed)
+	return semverorder.Compare(a, b), nil
+}
+
 // CompareVersions is -1, 0 or 1; both must parse.
 func CompareVersions(a, b string) (int, error) {
 	x, err := ParseVersion(a)

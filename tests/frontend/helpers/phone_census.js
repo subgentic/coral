@@ -31,6 +31,7 @@ module.exports = part => (async () => {
     const sc = (name, setup, opts) => scene(ev, results, name, setup, opts && opts.min ? { ...opts, min: Math.max(1, opts.min - TOP_ROW_FEWER) } : opts);
     const settleJob = () => new Promise(r => setTimeout(r, 800)); // sleep-ok: a selected job's detail draws
     const tap = sel => tapSel(ev, sel);
+    const tapSwitch = async () => tap('#' + await ev(`['live-view-switch', 'live-view-switch-menu'].find(i => document.getElementById(i) && document.getElementById(i).checkVisibility()) || 'live-view-switch'`)); // a phone's one Chat/Terminal switch: the icon in the row, or the line under the dots while they are open (#11187)
     const click = js => ev(`(${js}) ; true`);
     const load = async () => { await Page.navigate({ url: 'about:blank' }); await Page.loadEventFired(); await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`); };
     try {
@@ -88,11 +89,11 @@ module.exports = part => (async () => {
             await ev(`document.body.click(); true`);
             await sc('chat: find bar', async () => { if (await ev(`getComputedStyle(document.getElementById('agent-bar-more')).display !== 'none' && document.getElementById('agent-bar-more').getAttribute('aria-expanded') !== 'true'`)) await tap('#agent-bar-more'); await tap('#chat-find-btn'); await waitFor(`!!document.querySelector('.chat-find-bar') && !document.querySelector('.chat-find-bar').hidden`, 'find bar', 5000); }, { min: 12, expect: `document.querySelector('.chat-find-input').getClientRects().length > 0` });
             await tap('.chat-find-close');
-            await sc('terminal view', async () => { await tap('#live-view-btn-terminal'); }, { min: 8, expect: `document.getElementById('live-view-btn-terminal').getAttribute('aria-pressed') === 'true' || document.getElementById('live-view-btn-terminal').classList.contains('active')` });
+            await sc('terminal view', async () => { await tapSwitch(); }, { min: 8, expect: `document.getElementById('live-view-btn-terminal').getAttribute('aria-pressed') === 'true' || document.getElementById('live-view-btn-terminal').classList.contains('active')` });
             await sc('terminal view: key bar', async () => { await ev(`window.closeSendMenu(); document.getElementById('keys-chip').click(); true`); await waitFor(`!!document.getElementById('terminal-key-bar') && document.getElementById('terminal-key-bar').getClientRects().length > 0`, 'the terminal key bar', 10000); }, { min: 11, expect: `document.querySelectorAll('#terminal-key-bar .tkb-key').length === 12` });
             await sc('terminal view: Copy screen', async () => { await waitFor(`!!document.getElementById('terminal-copy-screen-btn') && document.getElementById('terminal-copy-screen-btn').getClientRects().length > 0`, 'the Copy screen button', 10000); }, { min: 8, expect: `document.getElementById('terminal-copy-screen-btn').getAttribute('aria-label') === 'Copy screen'` });
             await sc('terminal view: header and composer controls', async () => { await waitFor(`document.getElementById('popout-panel-toggle-btn').getClientRects().length > 0`, 'the header buttons', 10000); }, { min: 5, expect: `document.querySelector('.attach-image-btn').getClientRects().length > 0 && document.querySelector('.mobile-send-btn').getClientRects().length > 0` });
-            await tap('#live-view-btn-chat');
+            await tapSwitch();
             await tap('#popout-panel-toggle-btn'); await waitFor(`document.querySelector('.agentic-state-tabs').getClientRects().length > 0`, 'side panel', 8000);
             for (const tab of await ev(`[...document.querySelectorAll('.agentic-state-tabs .agentic-tab[data-tab]')].filter(e => e.getClientRects().length).map(e => e.dataset.tab)`)) await sc(`side panel: ${tab}`, async () => { await tap(`.agentic-state-tabs [data-tab="${tab}"]`); }, { min: 12, expect: `document.querySelector('.agentic-state-tabs [data-tab="${tab}"]').classList.contains('active')` });
             await sc('side panel: customize tabs', async () => { await tap('[aria-label="Customize tabs"]'); }, { min: 12, expect: `!!document.getElementById('tab-customize-title') && document.getElementById('tab-customize-title').getClientRects().length > 0` });

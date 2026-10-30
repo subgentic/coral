@@ -13,6 +13,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/windows"
+
+	"github.com/subgentic/coral/internal/linktest"
 )
 
 // usersCanRead makes dir's list the way a folder on a drive root looks: this user, SYSTEM and BUILTIN\Users with read, and what is
@@ -143,8 +145,18 @@ func TestDataFolderLinksAreNeverFollowed(t *testing.T) {
 	require.NoError(t, err, string(out))
 	t.Cleanup(func() { SetAllowSharedDataDir(false); setDataDirNotice("") })
 	err = EnsureDataDir(link)
-	require.ErrorIs(t, err, ErrSharedDataDir)
-	assert.Contains(t, err.Error(), "link or junction")
+	if linktest.JunctionsTraversable(t) {
+		t.Log("a data folder that is a junction is refused by: Coral (ErrSharedDataDir)")
+		require.ErrorIs(t, err, ErrSharedDataDir)
+		assert.Contains(t, err.Error(), "link or junction")
+	} else {
+		// Build 26300 and later: Windows will not open anything through a junction ("untrusted mount point"), so the data folder never opens; it is refused, by
+		// the system, before Coral reads its ACL (the error says only that the folder can't be made, #350).
+		t.Log("a data folder that is a junction is refused by: Windows (untrusted mount point)")
+		require.Error(t, err)
+		_, statErr := os.Stat(filepath.Join(link, "sessions.db"))
+		assert.True(t, linktest.UntrustedMountPoint(statErr), "Windows refuses the junction: %v", statErr)
+	}
 	assert.NotEmpty(t, readersOf(t, outside), "the target keeps its list")
 }
 

@@ -95,6 +95,7 @@ type typedMemo struct {
 	text  string
 	paste bool
 	at    time.Time // when Coral typed it: a paste placeholder is Coral's own only for a short while after
+	blind bool      // it went to an agent whose box Coral cannot read: nothing says it was taken (#11165)
 }
 
 type inputGate struct {
@@ -130,6 +131,16 @@ func (g *inputGate) noteTyped(name, text string, paste bool) {
 	g.lastTyped[name] = typedMemo{text: squeeze(text), paste: paste, at: g.now()}
 }
 
+// markBlind notes that the text just typed to name went to a box that cannot be read.
+func (g *inputGate) markBlind(name string) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if m, ok := g.lastTyped[name]; ok {
+		m.blind = true
+		g.lastTyped[name] = m
+	}
+}
+
 func (g *inputGate) typedFor(name string) (typedMemo, bool) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
@@ -141,4 +152,20 @@ func (g *inputGate) forgetTyped(name string) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	delete(g.lastTyped, name)
+}
+
+// AutomatedInputInFlight reports whether Coral is typing automated text into any agent right now (a send holds its session's lock for the look, the paste and the Enter). The update that
+// installs when Coral is idle waits for it to be false (#11170).
+func AutomatedInputInFlight() bool {
+	busy := false
+	gate.sending.Range(func(_, v any) bool {
+		mu := v.(*sync.Mutex)
+		if !mu.TryLock() {
+			busy = true
+			return false
+		}
+		mu.Unlock()
+		return true
+	})
+	return busy
 }

@@ -70,6 +70,7 @@ type relaunchState struct {
 	To              string    `json:"to,omitempty"`
 	Operation       string    `json:"operation,omitempty"`
 	By              string    `json:"by,omitempty"`
+	Source          string    `json:"source,omitempty"` // local, hub or auto: who asked for the attempt (the hub_* names above are older than the idle install, #11170)
 	// Failed is a relaunch that ended without an update and without the updater saying why: it never got ready, or it ended first (#5982). Reason is a fixed word.
 	Failed *relaunchFailure `json:"failed,omitempty"`
 }
@@ -316,7 +317,12 @@ func (u *realUpdater) Apply(ctx context.Context, by string) (string, error) {
 		return "", err
 	}
 	now := u.clock()
-	st := relaunchState{HubRelaunched: rec.Staged.Version, LastHubRelaunch: now, StartedAt: now, From: rec.Installed, To: rec.Staged.Version, Operation: op, By: by}
+	st := relaunchState{Source: relaunchSource(by), LastHubRelaunch: now, StartedAt: now, From: rec.Installed, To: rec.Staged.Version, Operation: op, By: by}
+	if st.Source == "hub" {
+		// Once per version is the Hub's rule: only an attempt a Hub owner asked for marks the version as relaunched from the Hub. An automatic install (or a person's click) that did not finish left it
+		// marked, and the owner's relaunch of the same update was refused as already done (QA's #11196). The spacing (LastHubRelaunch) is every source's.
+		st.HubRelaunched = rec.Staged.Version
+	}
 	if err := u.saveState(st); err != nil {
 		u.mu.Unlock()
 		return "", err

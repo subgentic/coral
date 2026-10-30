@@ -187,6 +187,7 @@ registerActions({
     'mobile-back': () => window.mobileBack(),
     'goal-refresh': () => window.refreshGoal(),
     'goal-edit': () => window.editGoal(),
+    'live-view-switch': () => { const t = document.getElementById('live-view-btn-terminal'); window.setLiveViewMode(t && t.classList.contains('active') ? 'chat' : 'terminal'); }, // a phone's one switch: the view it is not on (#11187)
     'live-view-mode': el => { if (el.dataset.mode === 'chat' || el.dataset.mode === 'terminal') window.setLiveViewMode(el.dataset.mode); },
     'chat-find-toggle': () => window.toggleChatFind(),
     'phone-nav': el => { // the phone's floating nav (#11116): Home, Inbox, Tasks (More opens the menu: m-top-menu)

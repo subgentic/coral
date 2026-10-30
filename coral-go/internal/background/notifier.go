@@ -24,7 +24,8 @@ type BoardNotifier struct {
 	logger       *slog.Logger
 	discoverFn   func(ctx context.Context) ([]AgentInfo, error)
 	isPausedFn   func(project string) bool
-	liftSleepFn  func(project string) bool // lifts a pause that sleep put on the board (not a person's), true when it did (#11182)
+	sleepingFn   func(ctx context.Context, sessionID string) bool // whether the session's row says it is sleeping: a Sleep team marks it before it pauses the board, so the lift never acts on a sleeping agent (#11204)
+	liftSleepFn  func(project string, seenAwake time.Time) bool   // lifts a pause that sleep put on the board (not a person's) unless it was made after seenAwake; true when it did (#11182, #11204)
 	pauseLogMu   sync.Mutex
 	pauseLogged  map[string]bool // boards a skipped nudge was already logged for, until they are resumed
 	notifiedMu   sync.Mutex
@@ -82,8 +83,15 @@ func (n *BoardNotifier) SetDiscoverFn(fn func(ctx context.Context) ([]AgentInfo,
 	n.discoverFn = fn
 }
 
+// SetSleepingFn gives the notifier the way to ask whether an agent's session row says it is sleeping.
+func (n *BoardNotifier) SetSleepingFn(fn func(ctx context.Context, sessionID string) bool) {
+	n.sleepingFn = fn
+}
+
 // SetLiftSleepPauseFn gives the notifier the way to end a sleep pause: it nudges an agent that is awake, and a board that sleep paused with an awake agent on it is not paused (#11182).
-func (n *BoardNotifier) SetLiftSleepPauseFn(fn func(project string) bool) { n.liftSleepFn = fn }
+func (n *BoardNotifier) SetLiftSleepPauseFn(fn func(project string, seenAwake time.Time) bool) {
+	n.liftSleepFn = fn
+}
 
 // SetIsPausedFn sets a function to check if a board project is paused.
 func (n *BoardNotifier) SetIsPausedFn(fn func(project string) bool) {
@@ -231,12 +239,13 @@ func (n *BoardNotifier) discover(ctx context.Context, reuse bool) (agents []Agen
 		return agents, true, nil
 	}
 	n.discMu.Unlock()
+	began := n.now() // the agents were seen awake no later than when the discovery ended and no earlier than it began: the start is the safe side for a pause made while it ran (#11204)
 	agents, err = n.discoverFn(ctx)
 	if err != nil {
 		return nil, false, err
 	}
 	n.discMu.Lock()
-	n.discAgents, n.discAt = agents, n.now()
+	n.discAgents, n.discAt = agents, began
 	n.discMu.Unlock()
 	return agents, false, nil
 }
@@ -253,6 +262,7 @@ type notifyPass struct {
 	batch  map[string]board.SessionUnread // nil: look each agent up
 	cached bool
 	fresh  map[string]bool
+	seenAt time.Time // when the agents of this pass were discovered awake: a pause made after it is not undone by what they were seen doing (#11204)
 }
 
 // runPassWith is a notification pass over the agents on boards (every board when nil). A scoped
@@ -285,7 +295,10 @@ func (n *BoardNotifier) runPassWith(ctx context.Context, boards map[string]bool,
 		n.logger.Warn("batched unread counts failed; counting one agent at a time", "error", batchErr)
 		batch = nil
 	}
-	pass := &notifyPass{batch: batch, cached: cached}
+	n.discMu.Lock()
+	seen := n.discAt
+	n.discMu.Unlock()
+	pass := &notifyPass{batch: batch, cached: cached, seenAt: seen}
 
 	liveSessions := make(map[string]bool)
 	for _, a := range agents {
@@ -422,7 +435,7 @@ func (n *BoardNotifier) nudgeAgent(ctx context.Context, pass *notifyPass, a Agen
 		return
 	}
 	// Skip agents on paused/sleeping boards
-	if n.isPausedFn != nil && sub.Project != "" && n.isPausedFn(sub.Project) && n.liftSleepFn != nil && n.liftSleepFn(sub.Project) {
+	if n.isPausedFn != nil && sub.Project != "" && n.isPausedFn(sub.Project) && n.liftSleepFn != nil && !n.agentSleeping(ctx, a.SessionID) && n.liftSleepFn(sub.Project, pass.seenAt) {
 		// This agent is awake and the pause is sleep's: the board is resumed here whatever left it paused (a restart, a wake path that did not lift it), and the nudge goes out (#11182).
 		n.logger.Info("resumed a board that sleep had paused: one of its agents is awake", "project", sub.Project, "subscriber_id", subscriberID)
 	}
@@ -651,4 +664,10 @@ func (n *BoardNotifier) clearPausedNote(project string) {
 	n.pauseLogMu.Lock()
 	delete(n.pauseLogged, project)
 	n.pauseLogMu.Unlock()
+}
+
+// agentSleeping is whether the agent's session row says it is sleeping. A Sleep team marks its agents sleeping before it pauses the board, so a lift on a sighting that began after the pause (which the
+// pause time cannot refuse) still never acts for an agent that was put to sleep (QA's #11204 round 2).
+func (n *BoardNotifier) agentSleeping(ctx context.Context, sessionID string) bool {
+	return n.sleepingFn != nil && sessionID != "" && n.sleepingFn(ctx, sessionID)
 }

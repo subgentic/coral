@@ -65,6 +65,10 @@ var notAStarter = map[string]string{
 	// Checks the words of the goal page's "Copy for an agent" line; the line it asserts ("run coral-board goal brief 65") names the coral-board command and starts nothing.
 	"tests/frontend/goal_words.test.mjs": "imports goal_words.js and compares strings, one of which names the coral-board command (it matches startsCoral); starts no Coral",
 
+	// Pi's board-notice tests (#11107 slice 2): the notice they assert ("Run coral-board read to read them") names the coral-board command (it matches startsCoral); neither runs a Coral. One drives the extension with fake child processes, the other runs real Pi against a stand-in Coral (a bare HTTP server of its own) and the hook program: no Coral that could send.
+	"tests/frontend/pi_extension.test.mjs": "drives the Pi extension with fake child processes and asserts the notice text, which names the coral-board command (it matches startsCoral); starts no Coral",
+	"tests/pi/pi_delivery_e2e.mjs":         "runs real Pi with the hook program against a stand-in Coral (its own HTTP server); the notice it asserts names the coral-board command (it matches startsCoral); starts no Coral",
+
 	// Checks the words of the phone dialog; the text "/coral setup-code/" is a regular expression it asserts is absent, not a command.
 	"tests/frontend/mobile_words.test.mjs": "imports mobile_words.js and checks its strings; '/coral setup-code/' is a regex pattern in an assertion (it matches startsCoral), starts no Coral",
 

@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -28,10 +29,18 @@ func installFolder(t *testing.T) string {
 func fakeStart(t *testing.T, err error) *[]string {
 	t.Helper()
 	var started []string
-	oldStart, oldOS := startCoralFrom, restartGOOS
-	startCoralFrom = func(_, dir string) error { started = append(started, dir); return err }
+	oldStart, oldOS, oldReg := startCoralFrom, restartGOOS, registeredInstall
+	registeredInstall = func() (string, error) { return "", os.ErrNotExist } // no registered Coral unless the test says one (registered)
+	startCoralFrom = func(_, dir string) error {
+		// A test may only name a folder of its own (the temp folder): never the person's installed Coral (QA's extra trays).
+		if !strings.HasPrefix(strings.ToLower(filepath.Clean(dir)), strings.ToLower(filepath.Clean(os.TempDir()))) {
+			t.Errorf("a test started Coral from %s, which is not in the temp folder", dir)
+		}
+		started = append(started, dir)
+		return err
+	}
 	restartGOOS = "windows"
-	t.Cleanup(func() { startCoralFrom, restartGOOS = oldStart, oldOS })
+	t.Cleanup(func() { startCoralFrom, restartGOOS, registeredInstall = oldStart, oldOS, oldReg })
 	return &started
 }
 

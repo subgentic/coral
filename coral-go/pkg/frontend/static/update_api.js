@@ -4,7 +4,7 @@
  * The status, as the server sends it:
  *   { enabled, installed, state: none|staged|applying|failed,
  *     staged: { version, staged_at, days_ready, verified },
- *     relaunch: { available, reason, hub_allowed, restarts: [{ session_id, name, state, resumes? }], tmux_agents_restart, ack },
+ *     relaunch: { available, reason, hub_allowed, restarts: [{ session_id, name, state, after?, resumes? }], wake_cap?, tmux_agents_restart, ack },
  *     last_result: { at, from, to, result: relaunched|refused|failed_rolled_back, by },
  *     checked_at?, install_kind? (homebrew|unsupported), upgrade_command?, auto? }
  * The fields marked ? are not in the design yet; the UI treats each as absent when it is not sent. */
@@ -72,6 +72,8 @@ export function normalizeStatus(raw) {
         latest: VERSION_RE.test(str(raw.latest)) ? raw.latest : '',
         rollback: raw.last_rollback && typeof raw.last_rollback === 'object' ? { at: str(raw.last_rollback.at), from: str(raw.last_rollback.from), to: str(raw.last_rollback.to), reason: ROLLBACK_REASONS.includes(raw.last_rollback.reason) ? raw.last_rollback.reason : 'other', restartFailed: raw.last_rollback.restart_failed === true } : null,
         auto: typeof raw.auto === 'boolean' ? raw.auto : null,
+        // Install when idle (#11170): the server's own word for what the rule is doing (state and a reason in words); an older server sends none and nothing about it is drawn.
+        autoInstall: raw.auto_install && typeof raw.auto_install === 'object' && AUTO_INSTALL_STATES.includes(raw.auto_install.state) ? { on: raw.auto_install.on === true, state: raw.auto_install.state, reason: str(raw.auto_install.reason).slice(0, 200), retryAt: str(raw.auto_install.retry_at) } : null,
         source: raw.staged && SOURCE_RE.test(str(raw.staged.source)) ? raw.staged.source : '', // staged.source: the repository the staged update came from, sent by the server only for a verified update (#6292); anything but owner/name is ignored
         // Release channels (#5558; the server's #5557): the fields are optional, an older server sends none and the pane then draws no channel group.
         hubRelaunch: raw.relaunch_available === true, // #7343: Coral Hub's relaunch exists in this build; without it Settings draws no Hub row
@@ -85,11 +87,17 @@ export function normalizeStatus(raw) {
     };
 }
 
+// What happens to an agent after the restart (the server's `after`, from auto_wake's own rule): one of these, or '' when the server does not say. An older server's `resumes` stands in for it.
+const AFTER = new Set(['wakes', 'asks', 'stays_asleep', 'new_conversation', 'new_terminal']);
+const afterOf = (a) => AFTER.has(str(a && a.after)) ? a.after : a && a.resumes === true ? 'wakes' : a && a.resumes === false ? 'new_conversation' : '';
+
 function normalizeRelaunch(r) {
+    const cap = Number(r.wake_cap);
     return {
         available: r.available === true,
         reason: str(r.reason),
-        restarts: (Array.isArray(r.restarts) ? r.restarts : []).map((a) => ({ sessionId: str(a && a.session_id), name: str(a && a.name), state: str(a && a.state), resumes: a && typeof a.resumes === 'boolean' ? a.resumes : null })),
+        restarts: (Array.isArray(r.restarts) ? r.restarts : []).map((a) => ({ sessionId: str(a && a.session_id), name: str(a && a.name), state: str(a && a.state), after: afterOf(a) })),
+        wakeCap: Number.isInteger(cap) && cap >= 1 && cap <= 50 ? cap : 0, // auto_wake_cap's own range; 0 when not sent
         tmuxRestart: r.tmux_agents_restart === true,
         ack: str(r.ack),
     };
@@ -233,6 +241,23 @@ export async function savePrefs({ auto }, was = {}) {
         const resp = await fetch(ROUTES.prefs, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ auto: !!auto }) });
         if (!resp.ok) throw new Error('Could not save the update settings.');
     }
+}
+
+const AUTO_INSTALL_STATES = ['off', 'waiting', 'soon', 'backoff', 'started', 'none'];
+
+/** Save "Install updates automatically when idle" (an ordinary setting: PUT /api/settings { update_auto_install }). */
+export async function saveAutoInstall(on) {
+    const resp = await fetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ update_auto_install: !!on }) });
+    if (!resp.ok) throw new Error('Could not save the update settings.');
+}
+
+/** What the control says about the install that Coral does by itself when it is idle (#11170): a short phrase for the control and a sentence for its name; nothing when the rule is off or not drawn by this server. */
+export function idleInstallWords(s) {
+    const a = s && s.autoInstall;
+    if (!a || !a.on) return { short: '', long: '' };
+    if (a.state === 'waiting' || a.state === 'soon') return { short: 'installs when idle', long: `Coral installs it by itself when it is idle.${a.reason ? ` Waiting: ${a.reason}.` : ''}` };
+    if (a.state === 'backoff') return { short: 'not installed', long: `Coral tried to install it by itself and it did not finish. ${a.reason}` };
+    return { short: '', long: '' };
 }
 
 /** Save the update channel (an ordinary setting: PUT /api/settings { update_channel }); throws with the server's reason when it refuses. */

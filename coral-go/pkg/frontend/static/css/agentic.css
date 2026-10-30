@@ -1761,6 +1761,11 @@ body.panel-dragging .agentic-state {
 .artifact-linked-status { margin: 0; padding: 10px 12px; font-size: var(--fs-base); color: var(--text-secondary); }
 .artifact-linked-notice { margin: 0; } /* a .notice-bar: where it sits only */
 .artifact-linked-preview iframe { flex: 1; min-height: 240px; width: 100%; border: 0; background: #fff; }
+/* The HTML preview fills what is under its banner (#11163, the Operator's shot of Knowledge): the host is a column that lets the preview grow (a percent height of an auto-height parent was nothing, so the frame was the banner plus its 240 px floor and the lower half of the dialog was empty), and the document scrolls inside the frame to its end. */
+.artifact-viewer-content:has(.artifact-linked-preview) { height: 88vh; }
+.artifact-viewer-body:has(> .artifact-linked-preview), .detail-doc:has(> .artifact-linked-preview) { display: flex; flex-direction: column; }
+.detail-doc:has(> .artifact-linked-preview) { flex: 1 1 auto; min-height: 0; }
+.artifact-viewer-body > .artifact-linked-preview, .detail-doc > .artifact-linked-preview { flex: 1 1 auto; height: auto; min-height: 0; }
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
     .team-artifacts-action { box-sizing: border-box; padding-top: var(--space-lg); }
 }

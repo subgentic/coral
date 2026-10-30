@@ -6,7 +6,7 @@ import { importOnce } from './import_once.js';
 import { copyText, showToast } from './utils.js';
 import { isCloud } from './server_base.js';
 import { mountSettingsView } from './settings_view.js'; // the pane's rows (a startup module: the Settings rows draw from it)
-const { actName, releaseNotesUrl, RELEASES_REPO, ageTier, canStart, installsLocally, notAvailable, reasonText, notReadyText, foundText, fetchHubRelaunch, requestCheckNow, savePrefs, saveChannel, serverHas } = await importOnce('./update_api.js');
+const { actName, releaseNotesUrl, RELEASES_REPO, ageTier, canStart, installsLocally, notAvailable, reasonText, notReadyText, foundText, fetchHubRelaunch, requestCheckNow, savePrefs, saveChannel, saveAutoInstall, serverHas } = await importOnce('./update_api.js');
 const { HUB_RELAUNCH_ON, HUB_RELAUNCH_OFF, HUB_RELAUNCH_WINDOWS } = await importOnce('./update_words.js');
 const { failureNotice, getUpdateStatus, refreshUpdateStatus, relaunchOffered } = await importOnce('./update_ui.js');
 
@@ -163,6 +163,13 @@ export async function showUpdatesPane() {
             help: unmanaged ? reason : { text: 'Downloads in the background and checks the release is genuine.', more: `${how} Only the latest releases of Coral's own GitHub repository are used.` },
         });
     }
+    // Install when idle (#11170): the Operator's decision, on by default. Not drawn where the install asks a person (Windows) or where updates are managed elsewhere, or when this server does not send the facts.
+    if (!isCloud() && serverHas.autoPref && s.autoInstall && !unmanaged && !windowsInstall(s)) {
+        fields.push({
+            key: 'auto_install', type: 'toggle', id: 'settings-update-auto-install', label: 'Install updates automatically when idle', default: s.autoInstall.on,
+            help: { text: 'Installs a downloaded, checked update by itself once Coral has been idle for a few minutes.', more: 'Idle means no agent is working, Coral is typing nothing into an agent and nobody has typed in the dashboard lately. Coral restarts itself the way Update and relaunch does; agents running in tmux keep running. If an automatic install fails, Coral starts the old version again, says why, and tries once a day at most. Off: only Update and relaunch installs.' },
+        });
+    }
     // The Coral Hub relaunch switch lives in Settings > Network and Hub (with the rest of what the hub may do here); this pane only says where it is
     if (!isCloud() && hubOn !== null && !unmanaged && s.hubRelaunch) { // Coral Hub's relaunch exists in this build (#7343)
         fields.push({
@@ -203,6 +210,8 @@ export async function applyUpdatePrefs() {
     let saved = false;
     const auto = document.getElementById('settings-update-auto');
     if (auto && !auto.disabled && auto.checked !== (s.auto !== false)) { await savePrefs({ auto: auto.checked }, { auto: s.auto }); saved = true; }
+    const autoInstall = document.getElementById('settings-update-auto-install');
+    if (autoInstall && !autoInstall.disabled && s.autoInstall && autoInstall.checked !== s.autoInstall.on) { await saveAutoInstall(autoInstall.checked); saved = true; }
     const picked = document.querySelector('input[name="update-channel"]:checked');
     const channelChanged = !!(s.hasChannel && picked && picked.value !== s.channel);
     if (channelChanged) { await saveChannel(picked.value); saved = true; }

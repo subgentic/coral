@@ -30,8 +30,9 @@ const { axName } = require('./helpers/ax_tree');
             await ev(`document.querySelector('#live-session-view .terminal-header').scrollIntoView(); const first = [...document.querySelectorAll('#live-session-view .terminal-header [tabindex="0"], #live-session-view .terminal-header button')].find(e => e.getClientRects().length > 0); first.focus(); true`);
             const seq = [await act()]; for (let i = 0; i < 9; i++) { await key('Tab'); const a = await act(); seq.push(a); if (!a.inHeader) break; }
             const names = seq.filter(a => a.inHeader).map(a => a.id || a.label);
-            const idxId = names.indexOf('terminal-header-identity'), idxChat = names.indexOf('live-view-btn-chat'), idxTerm = names.indexOf('live-view-btn-terminal');
-            check(idxId >= 0 && idxChat > idxId && idxTerm === idxChat + 1, `Tab goes the name, then the Chat and Terminal toggle (the first of the actions): ${JSON.stringify(names)}`);
+            const idxId = names.indexOf('terminal-header-identity'), idxChat = names.indexOf('live-view-btn-chat'), idxTerm = names.indexOf('live-view-btn-terminal'), idxSwitch = names.indexOf('live-view-switch'), idxMore = names.indexOf('agent-bar-more');
+            if (mobile) check(idxId >= 0 && idxSwitch > idxId && idxMore === idxSwitch + 1, `Tab goes the name, then the one Chat/Terminal switch, then the dots, as they are drawn left to right: ${JSON.stringify(names)}`);
+            else check(idxId >= 0 && idxChat > idxId && idxTerm === idxChat + 1, `Tab goes the name, then the Chat and Terminal toggle (the first of the actions): ${JSON.stringify(names)}`);
             // the folder: a tip on the name's keyboard focus, dismissed with Escape, and said to a screen reader
             await key('Shift'); await ev(`document.getElementById('terminal-header-identity').focus(); true`); await new Promise(r => setTimeout(r, 120)); // sleep-ok: a key press first, so the focus is a keyboard focus (focus-visible)
             const onName = (await act()).id === 'terminal-header-identity';
@@ -41,14 +42,22 @@ const { axName } = require('./helpers/ax_tree');
                 await ev(`document.activeElement.setAttribute('data-axp', 'x'); true`); const ax = await axName(client, '[data-axp="x"]');
                 check(!!ax && (ax.description || '').includes(FOLDER), `a screen reader is told the folder (the name's description), the tip is not heard: ${JSON.stringify(ax)}`);
                 await key('Escape'); check(await tip() === 'none', `Escape dismisses the tip (WCAG 1.4.13): ${await tip()}`); check((await act()).id === 'terminal-header-identity', 'and the keyboard stays on the name');
-                await ev(`document.getElementById('live-view-btn-chat').focus(); true`); await key('Shift'); await ev(`document.getElementById('terminal-header-identity').focus(); true`); await new Promise(r => setTimeout(r, 120)); check(JSON.stringify(await tip()) === JSON.stringify(`"${FOLDER}"`), `the tip is back when the keyboard returns to the name: ${await tip()}`); // sleep-ok: the focus returns to the name
+                await ev(`document.getElementById(${JSON.stringify(mobile ? 'live-view-switch' : 'live-view-btn-chat')}).focus(); true`); await key('Shift'); await ev(`document.getElementById('terminal-header-identity').focus(); true`); await new Promise(r => setTimeout(r, 120)); check(JSON.stringify(await tip()) === JSON.stringify(`"${FOLDER}"`), `the tip is back when the keyboard returns to the name: ${await tip()}`); // sleep-ok: the focus returns to the name
             }
             // the view toggle: Tab, Space and Enter switch the view, aria-pressed says which, the keyboard stays
+            if (mobile) { // a phone's one switch (#11187): Enter shows the terminal and the button now says Show chat; Space goes back; the keyboard stays on it
+                await ev(`document.getElementById('live-view-switch').focus(); true`); await key('Enter');
+                check(await ev(`document.getElementById('live-view-switch').getAttribute('aria-label') === 'Show chat' && document.getElementById('live-view-switch').querySelector('.material-icons').textContent === 'chat' && document.getElementById('live-view-btn-terminal').classList.contains('active')`), 'Enter on the switch shows the terminal and the label and icon follow (Show chat)');
+                check((await act()).id === 'live-view-switch', 'and the keyboard stays on the switch');
+                await key(' ');
+                check(await ev(`document.getElementById('live-view-switch').getAttribute('aria-label') === 'Show terminal' && document.getElementById('live-view-btn-chat').classList.contains('active')`), 'Space on the switch goes back to the chat (Show terminal)');
+            } else {
             await ev(`document.getElementById('live-view-btn-terminal').focus(); true`); await key('Enter');
             check(await ev(`document.getElementById('live-view-btn-terminal').getAttribute('aria-pressed') === 'true' && document.getElementById('live-view-btn-chat').getAttribute('aria-pressed') === 'false'`), 'Enter on Terminal switches the view and aria-pressed says so');
             check((await act()).id === 'live-view-btn-terminal', 'and the keyboard stays on the toggle');
             await ev(`document.getElementById('live-view-btn-chat').focus(); true`); await key(' ');
             check(await ev(`document.getElementById('live-view-btn-chat').getAttribute('aria-pressed') === 'true'`), 'Space on Chat switches back');
+            }
             // Details at every width
             const det = await ev(`(() => { const d = document.getElementById('agent-phone-details'), m = document.getElementById('agent-bar-more'); return d && !d.hidden && m && m.getClientRects().length > 0; })()`);
             check(det === await ev(`innerWidth <= 1100 && innerHeight > 500`), 'the Details are one button in the header row up to 1100 px (⋯, #11056), and not offered wider');

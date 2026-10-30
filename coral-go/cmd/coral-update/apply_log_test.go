@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -27,7 +28,9 @@ func TestTheApplyKeepsItsAnswerInTheUpdatesFolder(t *testing.T) {
 	assert.Contains(t, lines[1], `"result":"relaunched"`)
 	fi, err := os.Stat(filepath.Join(data, "updates", "apply.log"))
 	require.NoError(t, err)
-	assert.Zero(t, fi.Mode().Perm()&0o077, "not readable by others")
+	if runtime.GOOS != "windows" { // Windows has no Unix permission bits (Stat reports 0o666 for a plain file); who may read it there is the ACL of the data folder
+		assert.Zero(t, fi.Mode().Perm()&0o077, "not readable by others")
+	}
 
 	// Large: it starts again.
 	require.NoError(t, os.WriteFile(filepath.Join(data, "updates", "apply.log"), bytes.Repeat([]byte("x"), applyLogMax+1), 0o600))

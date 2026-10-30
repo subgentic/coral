@@ -52,7 +52,7 @@ func NewUpdateRelaunchHandler(ss *store.SessionStore, dataDir string, backend fu
 				if l.DisplayName != nil && *l.DisplayName != "" {
 					name = *l.DisplayName
 				}
-				out = append(out, RestartAgent{SessionID: l.SessionID, Name: name, State: "working"})
+				out = append(out, RestartAgent{SessionID: l.SessionID, Name: name, State: "working", AgentType: l.AgentType})
 			}
 			return out, nil
 		},

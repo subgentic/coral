@@ -18,6 +18,10 @@ import (
 // #6290: nothing installs an update without a person's yes. The ways to start an install are counted here, over every Go file that is not a test: the program run with the
 // word apply, the server's Updater.Apply (the relaunch) and the Windows trigger's Launch (the "Install update" route). Each may be called from one place, the handler that
 // takes the person's yes, so an idle, on-quit or at-start install cannot be added without this test failing and a reviewer reading the new site.
+//
+// The Operator decided on 2026-10-29 (#11170) that Coral installs a verified update by itself once it has been idle, a setting on by default (update_auto_install): that is the one
+// site below without a click (system_update_autoinstall.go, which waits for no agent working, no automated input and no one typing, and does not run on Windows). It is the one
+// exception, listed so that a second one still fails this test.
 func TestOnlyTheTwoRoutesThatTakeAYesCanStartAnInstall(t *testing.T) {
 	root := filepath.Join("..", "..", "..")
 	var found []string
@@ -70,10 +74,11 @@ func TestOnlyTheTwoRoutesThatTakeAYesCanStartAnInstall(t *testing.T) {
 	}))
 	sort.Strings(found)
 	assert.Equal(t, []string{
-		"internal/server/routes/relaunch_real.go exec apply",             // the relaunch's updater start, reached only through Updater.Apply below
-		"internal/server/routes/system_update_install.go trigger.Launch", // the Windows "Install update": Operator only, local only, a fresh POST
-		"internal/server/routes/system_update_relaunch.go Updater.Apply", // the relaunch: an acknowledgement token the person's click fetched, a person or the Hub's owner
-		"internal/updater/trigger/launch_windows.go exec apply",          // trigger.Launch's own start of the program
+		"internal/server/routes/relaunch_real.go exec apply",                // the relaunch's updater start, reached only through Updater.Apply below
+		"internal/server/routes/system_update_autoinstall.go Updater.Apply", // install when idle (#11170): the Operator's decision, a setting on by default; never on Windows, never while an agent works
+		"internal/server/routes/system_update_install.go trigger.Launch",    // the Windows "Install update": Operator only, local only, a fresh POST
+		"internal/server/routes/system_update_relaunch.go Updater.Apply",    // the relaunch: an acknowledgement token the person's click fetched, a person or the Hub's owner
+		"internal/updater/trigger/launch_windows.go exec apply",             // trigger.Launch's own start of the program
 	}, found, "a new way to start an install: it must take a person's yes first, and this list and the audit (#6290) change with it")
 }
 
