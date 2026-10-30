@@ -1,5 +1,4 @@
-// The phone Inbox's folders are a drawer, not a select (#9545, UI/UX's spec #9529): a 44 px button names the open folder and its count; it opens the column over the page, 86 percent of the width and at most
-// 320 px, 44 px rows, a scrim behind; a folder, the scrim and Escape close it and the focus goes back to the button. A desktop keeps its column and shows no button. Isolated dev server, the Inbox's census world.
+// The phone Inbox's folders were a drawer (#9545) and are now the ONE tab strip (#11236, #11239 slice A): a strip of 44 px text tabs, the open folder underlined with its count, Right and Left moving between tabs, a tap opening a folder. A desktop keeps its column and shows no tab strip. Isolated dev server, the Inbox's census world.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -32,35 +31,18 @@ const BASE = require('./test_base').BASE;
                 console.log('PASS ' + at + 'the desktop keeps its column');
                 continue;
             }
-            assert.ok(!s.select, at + 'no select on a phone ' + JSON.stringify(s));
-            assert.ok(s.trigger && s.trigger.h >= 44 && /^(?:[a-z_]+)?Tasks\s*3\s*expand_more$/.test(s.trigger.text) && s.trigger.expanded === 'false', at + 'a 44 px button names the open folder and its count ' + JSON.stringify(s.trigger));
-            assert.match(s.trigger.label, /^Tasks, 3\. Open the folders$/, at + 'and says what it does');
-            assert.ok(!s.nav && !s.scrim, at + 'closed: no column and no scrim ' + JSON.stringify(s));
-            await ev(`document.querySelector('${T} .view-list-trigger').click(); true`);
-            await waitFor(`!!document.querySelector('${T} .view-list-nav') && document.querySelector('${T} .view-list-nav').getClientRects().length > 0`, at + 'the drawer opens', 4000);
-            s = await state();
-            assert.ok(s.nav && s.scrim && s.trigger.expanded === 'true', at + 'open: the column and the scrim ' + JSON.stringify(s));
-            assert.ok(s.nav.left === 0 && s.nav.w <= 320 && Math.abs(s.nav.w - Math.min(320, Math.round(w * 0.86))) <= 2, at + 'from the left, 86 percent of the width, at most 320 px ' + JSON.stringify(s.nav));
-            assert.ok(s.nav.items.length >= 4 && s.nav.items.every(x => x >= 44), at + 'every folder is a 44 px row ' + JSON.stringify(s.nav.items));
-            assert.deepEqual(s.nav.current, ['tasks'], at + 'the open folder is marked');
-            assert.equal(s.focus, 'nav', at + 'the focus is in the drawer');
-            await shot(`inbox-drawer-open-${w}`);
-            await ev(`document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); true`);
-            s = await state();
-            assert.ok(!s.nav && !s.scrim && s.focus === 'trigger', at + 'Escape closes it and the focus goes back to the button ' + JSON.stringify(s));
-            await ev(`document.querySelector('${T} .view-list-trigger').click(); true`);
-            await waitFor(`document.querySelector('${T} .view-list-scrim').getClientRects().length > 0`, at + 'open again', 4000);
-            await ev(`document.querySelector('${T} .view-list-scrim').click(); true`);
-            s = await state();
-            assert.ok(!s.nav && !s.scrim && s.focus === 'trigger', at + 'the scrim closes it ' + JSON.stringify(s));
-            await ev(`document.querySelector('${T} .view-list-trigger').click(); true`);
-            await waitFor(`document.querySelector('${T} .view-list-nav').getClientRects().length > 0`, at + 'open for a folder', 4000);
+            // The phone's folders are the ONE tab strip (#11236, #11239 slice A): 44 px text tabs under the bar, the open folder underlined with its count inside, no select, no drawer button, no scrim.
+            assert.ok(!s.select && !s.trigger && !s.scrim, at + 'no select, no drawer button and no scrim on a phone ' + JSON.stringify(s));
+            const tabs = await ev(`(() => { const nav = document.querySelector('${T} .view-list-nav'), cs = getComputedStyle(nav); const t = [...nav.querySelectorAll('.view-list-item')].filter(b => b.getClientRects().length); const cur = t.find(b => b.getAttribute('aria-current') === 'true');
+                return { row: cs.flexDirection === 'row', h: t.map(b => Math.round(b.getBoundingClientRect().height)), cur: cur && cur.dataset.key, curText: cur && cur.innerText.replace(/\\s+/g, ' ').trim(), underline: cur && getComputedStyle(cur).borderBottomWidth, dbg: cur && (cur.outerHTML.slice(0, 260) + '|' + getComputedStyle(cur).display + '|' + getComputedStyle(cur).flexDirection + '|' + Math.round(cur.getBoundingClientRect().width)), label: cur && cur.getAttribute('aria-label') }; })()`);
+            assert.ok(tabs.row && tabs.h.length >= 4 && tabs.h.every(h => h >= 44) && tabs.cur === 'tasks' && /^Tasks\s*3$/.test(tabs.curText) && tabs.underline === '3px' && tabs.label === 'Tasks, 3', at + 'the folders are a strip of 44 px tabs; the open one is underlined and says its count ' + JSON.stringify(tabs));
+            await ev(`document.querySelector('${T} .view-list-item[data-key="tasks"]').focus(); document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })); true`);
+            const moved = await ev(`document.activeElement.dataset.key`);
+            assert.notEqual(moved, 'tasks', at + 'Right arrow moves the keyboard to the next tab: ' + moved);
             await ev(`document.querySelector('${T} .view-list-item[data-key="needs"]').click(); true`);
-            await waitFor(`(document.querySelector('${T} .view-list-trigger-name') || {}).textContent === 'Needs you'`, at + 'a folder opens its list', 8000);
-            s = await state();
-            assert.ok(!s.nav && !s.scrim && /^(?:[a-z_]+)?Needs you/.test(s.trigger.text), at + 'and the drawer is closed, the button names Needs you ' + JSON.stringify(s));
+            await waitFor(`document.querySelector('${T} .view-list-item[data-key="needs"]')?.getAttribute('aria-current') === 'true'`, at + 'a tab opens its list', 8000);
             assert.equal(await ev(`document.documentElement.scrollWidth <= document.documentElement.clientWidth`), true, at + 'no sideways scroll');
-            console.log('PASS ' + at + 'the drawer');
+            console.log('PASS ' + at + 'the tab strip');
         }
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });
