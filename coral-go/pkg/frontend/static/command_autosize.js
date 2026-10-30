@@ -22,7 +22,7 @@ function fitPlaceholder(input) {
     input.style.removeProperty("--ph-scale");
     if (input.value || !input.placeholder || input.clientWidth < 40) return;   // not laid out yet: nothing to measure
     const cs = getComputedStyle(input);
-    // A word of the placeholder wider than the box broke inside itself ("Messag / e"): the placeholder's size is scaled down, as far as the box needs and no further (never below 60 percent), until its widest word
+    // A word of the placeholder wider than the box broke inside itself ("Messag / e"): the placeholder's size is scaled down, as far as the box needs and no further (never below 55 percent), until its widest word
     // fits; the placeholder wraps only at spaces then, whatever the word, the box or the text size (#6971; the CSS reads --ph-scale on a phone's layout).
     const room = input.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
     const ruler = document.createElement("span");
@@ -31,7 +31,7 @@ function fitPlaceholder(input) {
     let widest = 0;
     for (const word of input.placeholder.split(/\s+/)) { if (!word) continue; ruler.textContent = word; widest = Math.max(widest, ruler.getBoundingClientRect().width); }
     ruler.remove();
-    const scale = widest > room && widest > 0 ? Math.max(0.6, Math.floor((room / widest) * 100) / 100) : 1;
+    const scale = widest > room && widest > 0 ? Math.max(0.55, Math.floor((room / widest) * 100) / 100) : 1;
     if (scale < 1) input.style.setProperty("--ph-scale", String(scale));
     const pad = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom) + parseFloat(cs.borderTopWidth) + parseFloat(cs.borderBottomWidth);
     const probe = document.createElement("div");
