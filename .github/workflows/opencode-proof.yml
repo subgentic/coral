@@ -56,6 +56,8 @@ jobs:
           wait "$runner" 2>/dev/null || code=$?   # a failing test run must not end this script before it reports
           echo "exit code: $code"
           echo "processes: before $before, highest seen $max, extra $((max - before))"
+          echo "--- every test's result"
+          grep -E '^(--- |FAIL|ok|PASS|panic)' "$RUNNER_TEMP/opencode.log" || true
           echo "--- last lines of the test output"
           tail -n 25 "$RUNNER_TEMP/opencode.log"
           echo "tests run: $(grep -c '^=== RUN' "$RUNNER_TEMP/opencode.log" || true)"
