@@ -1431,7 +1431,7 @@
 
 /* The phone's composer in Google Chat's language (#11128, slice D): a pill for the text, one line high until the text wraps (the rows="3" default is overridden by its height), and a round Send (Stop is round too), on top of the one-row header. 44 px and more everywhere; the keyboard rule (#11060) and Stop's behaviour are as they were. */
 @media (max-width: 600px) {
-    .command-pane textarea { height: 3rem; min-height: 3rem !important; padding: 12px 18px; border-radius: 26px; background: var(--bg-secondary); }
+    .command-pane textarea { height: 3rem; min-height: 3rem !important; padding: calc(0.75rem - 1px) 18px; border-radius: 26px; background: var(--bg-secondary); } /* the 1 px border is inside the 3rem: the padding gives it back, so the line fits the box and nothing scrolls */
     .command-pane .mobile-send-btn { border-radius: 50%; }
     .command-pane .mobile-send-btn.is-stop { border-radius: 50%; }
     .command-pane .mobile-send-more > button { border-radius: 50%; }

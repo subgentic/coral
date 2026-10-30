@@ -46,6 +46,9 @@ function fitPlaceholder(input) {
     }
 }
 
+/** The box's top and bottom border, which a border-box height holds and scrollHeight does not. */
+const borderY = (input) => { const cs = getComputedStyle(input); return (parseFloat(cs.borderTopWidth) || 0) + (parseFloat(cs.borderBottomWidth) || 0); };
+
 export function autosizeCommandInput() {
     const input = document.getElementById("command-input");
     if (!input) return;
@@ -60,7 +63,7 @@ export function autosizeCommandInput() {
         // A phone's box is three lines tall and grows with the text to the CSS cap (about five lines), then scrolls (#10281); with no text it keeps its three lines.
         if (input.offsetParent && !desktopComposer.matches) {
             input.style.height = "0px";
-            const need = input.scrollHeight;
+            const need = input.scrollHeight + borderY(input);
             input.style.height = "";
             if (need > input.offsetHeight + 0.5) input.style.height = `${need}px`;
         }
@@ -68,7 +71,7 @@ export function autosizeCommandInput() {
     }
     // Collapse first so scrollHeight measures the text, not the old height
     input.style.height = "0px";
-    input.style.height = input.scrollHeight + "px";
+    input.style.height = (input.scrollHeight + borderY(input)) + "px"; // scrollHeight leaves out the border a border-box height includes: without it the box was 2 px short of its text
     if (input.offsetHeight === before) return;
     if (document.getElementById("capture-wrapper")?.classList.contains("chat-mode")) {
         // Keep the newest reply in view as the box grows
