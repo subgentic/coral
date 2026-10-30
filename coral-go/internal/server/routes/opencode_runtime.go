@@ -3,6 +3,7 @@ package routes
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 type OpencodeRuntime interface {
 	Ensure(ctx context.Context, key, bin string) (*opencode.Server, error)
 	AgentTurn(key string) (opencode.State, time.Time, bool)
+	AgentMessages(ctx context.Context, key string) ([]opencode.Message, bool, error)
 	AgentLastMessage(key string) (opencode.Message, bool)
 	Stop(key string)
 }
@@ -92,9 +94,32 @@ func (h *SessionsHandler) opencodeLastMessage(sessionID string) (jsonl.LastMessa
 	if !ok {
 		return jsonl.LastMessage{}, false
 	}
-	text := strings.Join(strings.Fields(m.Text), " ") // one line, as the transcript readers give it
-	if r := []rune(text); len(r) > 600 {
-		text = string(r[:600])
+	// one line, as the transcript readers give it; not cut here: lastMessageField redacts it and then shows its first characters, so a secret is never cut in two before it is looked for
+	return jsonl.LastMessage{Role: m.Role, Text: strings.Join(strings.Fields(m.Text), " "), At: m.At}, true
+}
+
+// opencodeTranscript is an opencode agent's chat: its newest session's messages from its server, in the shape the chat reads (what was said, by the person and by the agent; tool rows are not kept by the API's
+// message list). Empty, not an error, when the agent has no server or no session yet: the chat shows a new agent's empty history.
+func (h *SessionsHandler) opencodeTranscript(ctx context.Context, sessionID string) *jsonl.Transcript {
+	var out []map[string]any
+	if h.opencode != nil {
+		if msgs, ok, err := h.opencode.AgentMessages(ctx, sessionID); err == nil && ok {
+			for _, m := range msgs {
+				entry := map[string]any{"type": m.Role, "timestamp": opencodeTime(m.At), "content": m.Text}
+				if m.Role == "assistant" {
+					entry["text"], entry["tool_uses"] = m.Text, []map[string]any{}
+				}
+				out = append(out, entry)
+			}
+		}
 	}
-	return jsonl.LastMessage{Role: m.Role, Text: text, At: m.At}, true
+	return jsonl.NewMemoryTranscript(out)
+}
+
+// opencodeTime is a message's time as RFC 3339: the server may send epoch milliseconds, which the chat does not read.
+func opencodeTime(at string) string {
+	if ms, err := strconv.ParseInt(at, 10, 64); err == nil && ms > 0 {
+		return time.UnixMilli(ms).UTC().Format(time.RFC3339Nano)
+	}
+	return at
 }

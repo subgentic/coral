@@ -108,6 +108,11 @@ func runStub() {
 			http.Error(w, "no", http.StatusUnauthorized)
 			return
 		}
+		if f := os.Getenv(messagesFileVar); f != "" {
+			b, _ := os.ReadFile(f)
+			w.Write(b)
+			return
+		}
 		fmt.Fprint(w, `{"items":[{"id":"m1","type":"assistant","text":"hello from the stand-in"}]}`)
 	})
 	if frames := os.Getenv(eventsFileVar); frames != "" {
@@ -134,6 +139,8 @@ func runStub() {
 }
 
 // envFileVar names where the stand-in writes the environment it saw. Not a CORAL_, OPENCODE_ or XDG_ name: the server's environment filter keeps nothing of those, and this must reach the stand-in.
+const messagesFileVar = "STANDIN_MESSAGES_FOR_TESTS" // a file the stand-in answers the messages route with, newest first
+
 const listenDelayVar = "STANDIN_LISTEN_DELAY_MS_FOR_TESTS"
 
 const eventsFileVar = "STANDIN_EVENTS_FOR_TESTS" // a file of SSE frames the stand-in sends on /api/event, then holds the stream open

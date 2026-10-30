@@ -25,6 +25,8 @@ type fakeOpencode struct {
 	stopped  []string
 	last     opencode.Message
 	haveLast bool
+	msgs     []opencode.Message
+	haveMsgs bool
 }
 
 func (f *fakeOpencode) Ensure(context.Context, string, string) (*opencode.Server, error) {
@@ -32,6 +34,9 @@ func (f *fakeOpencode) Ensure(context.Context, string, string) (*opencode.Server
 }
 func (f *fakeOpencode) AgentTurn(string) (opencode.State, time.Time, bool) {
 	return f.state, f.at, f.known
+}
+func (f *fakeOpencode) AgentMessages(context.Context, string) ([]opencode.Message, bool, error) {
+	return f.msgs, f.haveMsgs, nil
 }
 func (f *fakeOpencode) AgentLastMessage(string) (opencode.Message, bool) {
 	return f.last, f.haveLast
@@ -125,4 +130,33 @@ func TestAnOpencodeAgentsLastMessageIsWhatItsServerGaveAndIsRedactedLikeAnyOther
 	}
 	h.opencode = &fakeOpencode{}
 	assert.Nil(t, lastMessageRow(h, "sid", "/w", at.Opencode, false, false), "no turn has ended yet: no message")
+}
+
+func TestAnOpencodeAgentsChatIsItsServersMessagesInTheShapeTheChatReads(t *testing.T) {
+	h := &SessionsHandler{opencode: &fakeOpencode{haveMsgs: true, msgs: []opencode.Message{
+		{Role: "user", Text: "fix the build", At: "1761862800000"},
+		{Role: "assistant", Text: "done", At: "2026-10-30T22:00:00Z"},
+	}}}
+	tr := h.opencodeTranscript(context.Background(), "sid")
+	require.Equal(t, 2, tr.Total)
+	all := tr.All(context.Background())
+	assert.Equal(t, "user", all[0]["type"])
+	assert.Equal(t, "fix the build", all[0]["content"])
+	assert.Equal(t, "2025-10-30T22:20:00Z", all[0]["timestamp"], "epoch milliseconds become a time the chat reads")
+	assert.Equal(t, "assistant", all[1]["type"])
+	assert.Equal(t, "done", all[1]["text"])
+	h.opencode = &fakeOpencode{}
+	assert.Equal(t, 0, h.opencodeTranscript(context.Background(), "sid").Total, "no history yet is an empty chat, not an error")
+	h.opencode = nil
+	assert.Equal(t, 0, h.opencodeTranscript(context.Background(), "sid").Total)
+}
+
+func TestAnOpencodeLastMessageIsNotCutBeforeItIsRedacted(t *testing.T) {
+	long := strings.Repeat("word ", 200) // 1000 characters
+	h := &SessionsHandler{opencode: &fakeOpencode{last: opencode.Message{Role: "assistant", Text: long}, haveLast: true}}
+	m, ok := h.opencodeLastMessage("sid")
+	require.True(t, ok)
+	assert.Equal(t, strings.TrimSpace(long), m.Text, "whole: lastMessageField redacts it and only then shows its first characters")
+	got := lastMessageRow(h, "sid", "/w", at.Opencode, true, false)
+	assert.Len(t, []rune(got["text"].(string)), 140)
 }

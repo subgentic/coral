@@ -19,6 +19,9 @@ type Manager struct {
 	reapStop chan struct{} // closed by Close: the reaper ends
 	reapDone chan struct{}
 
+	// SkipLast says a message is not one the list shows as the last (what Coral typed into the agent); nil skips none. Set before the first Ensure.
+	SkipLast func(Message) bool
+
 	beforeStop func() // a test's hook: runs while a key is reserved for its server's stop
 }
 
@@ -36,7 +39,11 @@ type managed struct {
 	tracker *Tracker
 	at      map[string]time.Time // when each session last changed state
 
-	last       Message // the newest message of the agent's newest session, as read when a turn last ended
+	version    int // counts the events of the agent's sessions: what a cached read of the history was made at
+	msgs       []Message
+	msgsAt     int        // the version msgs was read at; -1 when never
+	msgsMu     sync.Mutex // one read of the history at a time
+	last       Message    // the newest message of the agent's newest session, as read when a turn last ended
 	haveLast   bool
 	refreshing bool // a read of it is under way: one at a time
 }
@@ -117,10 +124,10 @@ func (m *Manager) start(ctx context.Context, key, bin string) (*managed, error) 
 	if err != nil {
 		return nil, err
 	}
-	g := &managed{srv: srv, since: time.Now(), done: make(chan struct{}), tracker: NewTracker(), at: map[string]time.Time{}}
+	g := &managed{srv: srv, since: time.Now(), done: make(chan struct{}), tracker: NewTracker(), at: map[string]time.Time{}, msgsAt: -1}
 	var lctx context.Context
 	lctx, g.cancel = context.WithCancel(context.Background()) // not ctx: the loop lives as long as the server
-	go g.loop(lctx)
+	go g.loop(lctx, m.SkipLast)
 	return g, nil
 }
 
@@ -162,6 +169,9 @@ func (m *Manager) AgentTurn(key string) (state State, at time.Time, ok bool) {
 	return state, at, ok
 }
 
+// lastKeptRunes bounds the text of the kept last message; the route redacts it and shows its first characters.
+const lastKeptRunes = 20000
+
 // AgentLastMessage is the newest message the agent's server has given, read when a turn ended and kept: a session list asks for it on every row, so it never reaches the server itself. ok is false until a turn has ended.
 func (m *Manager) AgentLastMessage(key string) (Message, bool) {
 	m.mu.Lock()
@@ -175,8 +185,51 @@ func (m *Manager) AgentLastMessage(key string) (Message, bool) {
 	return g.last, g.haveLast
 }
 
+// AgentMessages is the history of the agent's newest session, oldest first, read through its server's message API. It is read again only when the event stream has said something since the last read, so a chat
+// that polls every second costs the server nothing while the agent is idle. ok is false when the agent has no server or its stream has not named a session yet.
+func (m *Manager) AgentMessages(ctx context.Context, key string) (msgs []Message, ok bool, err error) {
+	m.mu.Lock()
+	g := m.servers[key]
+	m.mu.Unlock()
+	if g == nil {
+		return nil, false, nil
+	}
+	g.msgsMu.Lock()
+	defer g.msgsMu.Unlock()
+	g.mu.Lock()
+	var session string
+	var newest time.Time
+	for s, t := range g.at {
+		if session == "" || t.After(newest) {
+			session, newest = s, t
+		}
+	}
+	version, have, cached := g.version, g.msgsAt, g.msgs
+	g.mu.Unlock()
+	if session == "" {
+		return nil, false, nil
+	}
+	if have == version {
+		return cached, true, nil
+	}
+	c, err := g.srv.Client()
+	if err != nil {
+		return nil, false, err
+	}
+	rctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+	all, err := c.AllMessages(rctx, session)
+	if err != nil {
+		return nil, false, err
+	}
+	g.mu.Lock()
+	g.msgs, g.msgsAt = all, version
+	g.mu.Unlock()
+	return all, true, nil
+}
+
 // refreshLast reads a session's last message in the background (one read at a time; a turn that ends while one runs is read by the next end). The caller holds g.mu.
-func (g *managed) refreshLast(ctx context.Context, c *Client, session string) {
+func (g *managed) refreshLast(ctx context.Context, c *Client, session string, skip func(Message) bool) {
 	if g.refreshing {
 		return
 	}
@@ -184,11 +237,14 @@ func (g *managed) refreshLast(ctx context.Context, c *Client, session string) {
 	go func() {
 		rctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 		defer cancel()
-		m, ok, err := c.LastMessage(rctx, session)
+		m, ok, err := c.LastMessageSkipping(rctx, session, skip)
 		g.mu.Lock()
 		defer g.mu.Unlock()
 		g.refreshing = false
 		if err == nil && ok {
+			if r := []rune(m.Text); len(r) > lastKeptRunes { // far past what a row shows: it is redacted before it is cut to that
+				m.Text = string(r[:lastKeptRunes])
+			}
 			g.last, g.haveLast = m, true
 		}
 	}()
@@ -309,7 +365,7 @@ func (g *managed) stop() {
 }
 
 // loop reads the event stream until ctx ends. When the stream drops, what it said may be stale: every state is forgotten (Reset) and the stream is read again after a growing pause.
-func (g *managed) loop(ctx context.Context) {
+func (g *managed) loop(ctx context.Context, skip func(Message) bool) {
 	defer close(g.done)
 	c, err := g.srv.Client()
 	if err != nil {
@@ -321,10 +377,11 @@ func (g *managed) loop(ctx context.Context) {
 		_ = c.Events(ctx, func(e Event) {
 			g.mu.Lock()
 			defer g.mu.Unlock()
+			g.version++
 			if session, to, moved := g.tracker.Apply(e); moved {
 				g.at[session] = time.Now()
 				if to == StateIdle || to == StateFailed { // a turn ended: its reply is the new last message
-					g.refreshLast(ctx, c, session)
+					g.refreshLast(ctx, c, session, skip)
 				}
 			}
 		})

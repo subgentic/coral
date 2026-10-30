@@ -224,9 +224,44 @@ func (c *Client) ping(ctx context.Context) (int, error) {
 
 // LastMessage is the newest message with text of a session: one page, newest first, the first of it with text (the row's last_message of #11097).
 func (c *Client) LastMessage(ctx context.Context, sessionID string) (Message, bool, error) {
+	return c.LastMessageSkipping(ctx, sessionID, nil)
+}
+
+// LastMessageSkipping is LastMessage past the messages skip says are not what was said (what Coral itself typed into the agent). A message with no text, a tool call or result alone, is never one: the page
+// parser drops it.
+func (c *Client) LastMessageSkipping(ctx context.Context, sessionID string, skip func(Message) bool) (Message, bool, error) {
 	p, err := c.Messages(ctx, sessionID, MessagesOpts{Desc: true, Limit: 20})
-	if err != nil || len(p.Messages) == 0 {
+	if err != nil {
 		return Message{}, false, err
 	}
-	return p.Messages[0], true, nil
+	for _, m := range p.Messages {
+		if skip == nil || !skip(m) {
+			return m, true, nil
+		}
+	}
+	return Message{}, false, nil
+}
+
+// maxAllMessages bounds what AllMessages reads: a session longer than this shows its newest messages only.
+const maxAllMessages = 5000
+
+// AllMessages is a session's messages, oldest first, read a page at a time (at most maxAllMessages: the newest when there are more).
+func (c *Client) AllMessages(ctx context.Context, sessionID string) ([]Message, error) {
+	var all []Message
+	cursor := ""
+	for pages := 0; pages < 100; pages++ {
+		p, err := c.Messages(ctx, sessionID, MessagesOpts{Limit: 100, Cursor: cursor})
+		if err != nil {
+			return nil, err
+		}
+		all = append(all, p.Messages...)
+		if p.Next == "" || p.Next == cursor || len(p.Messages) == 0 {
+			break
+		}
+		cursor = p.Next
+	}
+	if len(all) > maxAllMessages {
+		all = all[len(all)-maxAllMessages:]
+	}
+	return all, nil
 }

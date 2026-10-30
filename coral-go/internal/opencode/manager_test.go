@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -281,4 +282,50 @@ func TestTheReaperStopsOnlyTheServerItJudgedNotOneStartedForTheSameAgentMeanwhil
 	got, err := m.Ensure(context.Background(), "agent-1", "")
 	require.NoError(t, err)
 	assert.Same(t, fresh, got)
+}
+
+func TestAnAgentsHistoryIsItsNewestSessionsMessagesFromItsServer(t *testing.T) {
+	cfg, _ := stubConfig(t)
+	frames := filepath.Join(t.TempDir(), "frames")
+	require.NoError(t, os.WriteFile(frames, []byte("event: session.execution.started\ndata: {\"sessionID\":\"ses_abc123\"}\n\n"), 0o600))
+	t.Setenv(eventsFileVar, frames)
+	m := NewManager(cfg)
+	defer m.Close()
+	_, ok, err := m.AgentMessages(context.Background(), "agent-1")
+	require.NoError(t, err)
+	assert.False(t, ok, "no server, no history")
+	_, err = m.Ensure(context.Background(), "agent-1", "")
+	require.NoError(t, err)
+	waitFor(t, "a session to be named", func() bool { _, _, ok := m.AgentTurn("agent-1"); return ok })
+	msgs, ok, err := m.AgentMessages(context.Background(), "agent-1")
+	require.NoError(t, err)
+	require.True(t, ok)
+	require.Len(t, msgs, 1)
+	assert.Equal(t, "hello from the stand-in", msgs[0].Text)
+	again, ok, err := m.AgentMessages(context.Background(), "agent-1")
+	require.NoError(t, err)
+	assert.True(t, ok)
+	assert.Equal(t, msgs, again, "an unchanged stream is answered from what was read")
+}
+
+func TestTheLastMessageSkipsWhatCoralTypedAndATurnOfToolsAlone(t *testing.T) {
+	cfg, _ := stubConfig(t)
+	frames := filepath.Join(t.TempDir(), "frames")
+	require.NoError(t, os.WriteFile(frames, []byte("event: session.execution.succeeded\ndata: {\"sessionID\":\"ses_abc123\"}\n\n"), 0o600))
+	msgs := filepath.Join(t.TempDir(), "messages")
+	// newest first: Coral's nudge, a turn of tool calls with no text, then what the agent really said
+	require.NoError(t, os.WriteFile(msgs, []byte(`{"items":[
+		{"id":"m3","type":"user","text":"You have 2 unread messages on the message board. Run coral-board read."},
+		{"id":"m2","type":"assistant","content":[{"type":"tool","text":""}]},
+		{"id":"m1","type":"assistant","text":"the build passes now"}]}`), 0o600))
+	t.Setenv(eventsFileVar, frames)
+	t.Setenv(messagesFileVar, msgs)
+	m := NewManager(cfg)
+	m.SkipLast = func(msg Message) bool { return msg.Role == "user" && strings.HasPrefix(msg.Text, "You have 2 unread") }
+	defer m.Close()
+	_, err := m.Ensure(context.Background(), "agent-1", "")
+	require.NoError(t, err)
+	waitFor(t, "the last message", func() bool { _, ok := m.AgentLastMessage("agent-1"); return ok })
+	msg, _ := m.AgentLastMessage("agent-1")
+	assert.Equal(t, "the build passes now", msg.Text)
 }

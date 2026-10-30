@@ -503,3 +503,8 @@ func lockOldRead(ctx context.Context, path string) (release func(), ok bool) {
 		}
 	}
 }
+
+// NewMemoryTranscript is a view of messages that are already in memory (an agent that keeps no transcript file, whose history comes through its server's API): the whole of it is the window.
+func NewMemoryTranscript(messages []map[string]any) *Transcript {
+	return &Transcript{Window: messages, Total: len(messages)}
+}
