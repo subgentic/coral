@@ -208,7 +208,8 @@ export async function sendCommand({ nudge = false } = {}) {
                 const { text: errText, code, exited } = await responseError(resp, sessionServer(targetSession), `The message was not sent (HTTP ${resp.status}).`);
                 const text = code === 'session_target_mismatch' ? TARGET_CHANGED_MESSAGE : errText; // never the bare 'session target mismatch'
                 if (!reportSendError(targetSession, text, code, exited)) announceNotSent(sentSessionId);
-                console.error("Send failed:", resp.status);
+                // The refusal is already said under the composer: a 409 (held, or a dialog to answer) is expected, not an error (#290).
+                (resp.status === 409 ? console.debug : console.error)("Send failed:", resp.status);
                 return;
             }
             const result = await resp.json();

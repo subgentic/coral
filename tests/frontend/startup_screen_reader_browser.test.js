@@ -20,11 +20,13 @@ const { connect } = require('./agent_view_harness');
         check(await ev(`(() => { const b = document.getElementById('local-auth-banner'); return !b || b.hidden || b.getClientRects().length === 0 || /Sign-in is off/.test(b.textContent); })()`), 'the Sign-in notice still says it (as a note)');
         await ev(`document.activeElement && document.activeElement.blur(); window.scrollTo(0, 0); true`);
         const tabs = [];
-        for (let i = 0; i < 3; i++) {
+        for (let i = 0; i < 4; i++) {
             await client.Input.dispatchKeyEvent({ type: 'rawKeyDown', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 }); await client.Input.dispatchKeyEvent({ type: 'keyUp', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 });
             tabs.push(await ev(`(() => { const a = document.activeElement; return a ? (a.getAttribute('aria-label') || a.textContent.replace(/\\s+/g, ' ').trim()).replace(/,.*$/, '').slice(0, 24) : 'body'; })()`));
         }
-        check(JSON.stringify(tabs) === JSON.stringify(['Agents', 'Inbox', 'Automations']), `the first Tab stops are the top navigation: ${JSON.stringify(tabs)}`);
+        // A skip link may come first (#219): its whole job is to be the first Tab stop. After it, the top navigation, as before.
+        const nav = tabs[0] === 'Skip to main content' ? tabs.slice(1, 4) : tabs.slice(0, 3);
+        check(JSON.stringify(nav) === JSON.stringify(['Agents', 'Inbox', 'Automations']), `the first Tab stops are the top navigation, after a skip link if there is one: ${JSON.stringify(tabs)}`);
         // the page start was quiet, but a later change is heard: when the notice appears after the first read, its sentence is announced once
         check(!/Sign-in is off/.test(await ev(`(document.getElementById('notice-live') || {}).textContent || ''`)), 'the start itself said nothing of it');
         await ev(`document.getElementById('local-auth-banner').hidden = true; import((window.__coralStatic || '/static/') + 'local_auth_banner.js').then(m => m.checkLocalAuthBanner()).then(() => true)`);

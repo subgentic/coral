@@ -568,6 +568,11 @@ body.panel-dragging .sidebar {
     overflow: hidden;
 }
 
+/* The skip link, the first thing Tab reaches (#290): off screen until it has the keyboard focus, then a 44 px target over the top bar. */
+.skip-main { position: absolute; left: 8px; top: -56px; z-index: 1000; display: inline-flex; align-items: center; box-sizing: border-box; min-height: 44px; padding: 8px 14px; border-radius: var(--radius-lg); background: var(--bg-secondary); color: var(--link-text); border: 2px solid var(--accent); font-size: var(--fs-lg); text-decoration: none; }
+.skip-main:focus { top: 8px; }
+#main-stage:focus { outline: none; } /* focused only by the skip link: the area itself is not a control */
+
 .main-stage {
     flex: 1 1 0;
     min-width: 0;
