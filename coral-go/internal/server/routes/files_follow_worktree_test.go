@@ -228,3 +228,32 @@ func TestOnlyTheDashboardIsFollowedIntoAWorktree(t *testing.T) {
 		assert.Nil(t, body["worktree"], "%s: and no worktree is named", name)
 	}
 }
+
+// A name and a session id that do not belong together give no worktree (Security's #137549): the panel of agent A cannot be made to follow agent B's worktree by naming B's session, and a Hub viewer
+// cannot ask about a session the URL does not name.
+func TestAMismatchedNameAndSessionGiveNoWorktree(t *testing.T) {
+	r := newFollowRig(t, true)
+	const otherSid = "00000000-0000-0000-0000-0000000b1351"
+	otherName := "claude-" + otherSid
+	require.NoError(t, r.handler.ss.RegisterLiveSession(context.Background(), &store.LiveSession{SessionID: otherSid, AgentType: "claude", AgentName: "other", WorkingDir: r.launch}))
+	b, _ := json.Marshal(map[string]any{"file_path": filepath.Join(r.worktree, "work.txt")})
+	dj, tool, sid := string(b), "Edit", otherSid
+	_, err := r.handler.ts.InsertAgentEvent(context.Background(), &store.AgentEvent{AgentName: "other", SessionID: &sid, EventType: "tool_use", ToolName: &tool, Summary: "Ran: Edit", DetailJSON: &dj})
+	require.NoError(t, err)
+
+	get := func(urlName, session string) map[string]any {
+		req, err := http.NewRequest(http.MethodGet, r.server.URL+"/api/sessions/live/"+urlName+"/files?session_id="+session+"&worktree=follow", nil)
+		require.NoError(t, err)
+		req.Header.Set("Origin", r.server.URL)
+		req.Header.Set("Sec-Fetch-Site", "same-origin")
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		var body map[string]any
+		_ = json.NewDecoder(resp.Body).Decode(&body)
+		return body
+	}
+	assert.NotNil(t, get(otherName, otherSid)["worktree"], "the session named by its own URL is followed")
+	assert.Nil(t, get(r.name, otherSid)["worktree"], "agent A's URL with agent B's session id follows nothing")
+	assert.Nil(t, get(otherName, r.sid)["worktree"], "nor the other way round")
+}

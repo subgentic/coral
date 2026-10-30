@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/subgentic/coral/internal/naming"
 	"github.com/subgentic/coral/internal/safefs"
 	"github.com/subgentic/coral/internal/store"
 )
@@ -58,9 +59,16 @@ var rootCache sync.Map // folder -> rootCacheEntry: the git work tree of a folde
 
 // activeWorktree is the worktree the session's agent has most recently worked in, when that is not its launch folder.
 func (h *SessionsHandler) activeWorktree(ctx context.Context, name, sessionID, launchDir string) (followedWorktree, bool) {
-	if sessionID == "" || h.ts == nil {
+	if sessionID == "" || h.ts == nil || h.ss == nil {
 		return followedWorktree{}, false
 	}
+	// The name and the session id must belong together (Security's #137549): the panel of agent A is not made to follow agent B's worktree by naming B's session, and a viewer through Coral Hub cannot ask
+	// about a session the URL does not name. From here on it is the live row's own session id.
+	live, err := h.ss.GetLiveSession(ctx, sessionID)
+	if err != nil || live == nil || (live.AgentName != name && naming.SessionName(live.AgentType, live.SessionID) != name) {
+		return followedWorktree{}, false
+	}
+	sessionID = live.SessionID
 	events, err := h.ts.ListAgentEvents(ctx, "", followEvents, &sessionID) // newest first; by session alone: an event's agent_name is the live row's, which the panel's URL (the tmux session name) is not
 	if err != nil {
 		return followedWorktree{}, false
