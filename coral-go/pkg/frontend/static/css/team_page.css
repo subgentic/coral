@@ -424,10 +424,10 @@
 .team-bar-back, .team-more-dots { display: none; }
 @media (max-width: 600px) {
     body.team-page-active header.top-bar { display: none; }
-    .team-page-head { grid-template-columns: 44px minmax(0, 1fr) 44px; grid-template-rows: auto auto; align-items: center; padding: 0 4px; min-height: 56px; gap: 0 4px; border-bottom: 1px solid var(--border); }
+    .team-page-head { align-content: center; row-gap: 0; grid-template-columns: 44px minmax(0, 1fr) 44px; grid-template-rows: auto auto; align-items: center; padding: 0 4px; min-height: 56px; gap: 0 4px; border-bottom: 1px solid var(--border); }
     .team-bar-back { display: grid; grid-column: 1; grid-row: 1 / span 2; place-items: center; width: var(--control-touch-height, 44px); height: var(--control-touch-height, 44px); padding: 0; border: 0; border-radius: 22px; background: none; color: var(--text-primary); cursor: pointer; }
     .team-page-title { grid-column: 2; grid-row: 1; font-size: var(--fs-xl); font-weight: var(--fw-strong); line-height: var(--lh-label); }
-    .team-page-status { grid-column: 2; grid-row: 2; font-size: var(--fs-md); color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .team-page-status { display: block; min-width: 0; grid-column: 2; grid-row: 2; font-size: var(--fs-md); color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .team-page-no-team .team-bar-back { display: none; } /* a team that is not there: the page says so and has its own Back to Agents button */
     .team-page-no-team .team-page-head { grid-template-columns: minmax(0, 1fr); padding-inline: 16px; }
     .team-page-no-team .team-page-title { grid-column: 1; }
@@ -435,7 +435,8 @@
     #team-page-more { display: grid; place-items: center; width: var(--control-touch-height, 44px); height: var(--control-touch-height, 44px); min-height: 0; padding: 0; border: 0; border-radius: 22px; background: none; }
     #team-page-more .team-more-dots { display: block; }
     #team-page-more .team-more-word { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; } /* the word stays the button's name for a screen reader */
-    .team-page-health { grid-column: 2; grid-row: 3; }
+    .team-page-health { grid-column: 2; grid-row: 2; min-height: 0; height: auto; padding: 0; border: 0; background: none; justify-self: start; max-width: 100%; font-size: var(--fs-md); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } /* the status when it is a button (needs attention) is the same context line, not a 44 px row of its own */
+    .team-page-status .team-status-dot { display: inline-block; vertical-align: middle; margin-right: 6px; }
     .team-tabs-row > .team-tab-more { display: none; } /* every tab is in the strip: no More tab */
     .team-tab[data-tab="knowledge"], .team-tab[data-tab="messages"] { display: inline-flex; }
     .team-tabs-row > .team-tabs { overflow-x: auto; scrollbar-width: none; padding-left: 0; padding-right: 0; }

@@ -26,7 +26,7 @@ const BASE = require('./test_base').BASE;
                     // the words' left edge: the first text node's range, not the box (an empty state's box may start before its words)
                     const rng = document.createRange(); const w = document.createTreeWalker(line, NodeFilter.SHOW_TEXT); const n = w.nextNode(); rng.selectNodeContents(n); const t = document.getElementById('team-page-title');
                     return { words: Math.round(rng.getBoundingClientRect().left * 10) / 10, title: Math.round(t.getBoundingClientRect().left * 10) / 10, text: n.textContent.trim().slice(0, 30) }; })()`);
-                assert.ok(Math.abs(r.words - r.title) <= 1, `${at}${tab}: "${r.text}" starts at the page's content edge: words ${r.words}, title ${r.title}`);
+                assert.ok(mobile ? Math.abs(r.words - 16) <= 1 : Math.abs(r.words - r.title) <= 1, `${at}${tab}: "${r.text}" starts at the page's content edge (a phone's 16 px; the title is in the bar after its arrow, #11239 slice B): words ${r.words}, title ${r.title}`);
                 await shot(`team-empty-${tab}-${w}`);
             }
         }

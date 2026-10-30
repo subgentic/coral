@@ -20,7 +20,6 @@ const BASE = require('./test_base').BASE;
         await waitFor(`(window.__qaState.liveSessions || []).some(s => s.name === 'Orchestrator')`, 'the agent', 8000);
         await ev(`window.selectLiveSession('Orchestrator', 'claude', 'Orchestrator-id', 'local'); true`);
         await waitFor(`!!document.getElementById('command-input') && document.getElementById('command-input').getClientRects().length > 0`, 'the composer', 12000);
-        HB = await ev(`getComputedStyle(document.getElementById('agent-bar-menu')).display !== 'none' ? 'agent-bar-menu' : 'top-menu-btn'`);
     };
     // an Enter keyDown without its text does not activate a button: it carries '\r' (#9116)
     const press = async (key, vk) => { await client.Input.dispatchKeyEvent({ type: 'keyDown', key, code: key, windowsVirtualKeyCode: vk, ...(key === 'Enter' ? { text: '\r', unmodifiedText: '\r' } : {}) }); await client.Input.dispatchKeyEvent({ type: 'keyUp', key, code: key, windowsVirtualKeyCode: vk }); await settle(120); };
@@ -31,7 +30,11 @@ const BASE = require('./test_base').BASE;
         // 1. the phone hamburger: its name says the view, and it has a menu keyboard (#9116)
         try {
             await open(390);
-            assert.equal(await ev(`document.getElementById('${HB}').getAttribute('aria-label')`), 'Agents, menu', 'the hamburger is named by the view it shows');
+            // the chat's bar has no ☰ since #11239 slice B: the hamburger is a top-level page's (the page pill's): Automations here
+                await ev(`window.switchNavTab('automations'); true`);
+                await waitFor(`document.getElementById('top-menu-btn') && document.getElementById('top-menu-btn').getClientRects().length > 0`, 'the page pill with its hamburger', 10000);
+                HB = 'top-menu-btn';
+            await waitFor(`document.getElementById('${HB}').getAttribute('aria-label') === 'Automations, menu'`, 'the hamburger is named by the view it shows (Automations here: the chat has no hamburger since #11239 slice B)', 6000);
             await ev(`document.getElementById('${HB}').focus(); true`);
             await press('ArrowDown', KEYS.ArrowDown);
             await waitFor(`!document.getElementById('nav-more-menu').hidden`, 'ArrowDown on the button opens the menu', 4000);

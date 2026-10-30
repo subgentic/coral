@@ -21,6 +21,7 @@
     "model-chip-item": "a menu or dropdown item (slice 1's menus)",
     "overflow-menu-item": "a menu or dropdown item (slice 1's menus)",
     "persona-files-row": "a row of a pane or a form, not a sidebar list (slice 4's second pass)",
+    "phone-title-row": "A detail page's bar on a phone (#11239 slice B): the way back and the title in one 56 px row; it is a page header, not a list row",
     "send-menu-item": "a menu or dropdown item (slice 1's menus)",
     "server-strip-item": "a list inside a pane or the rail (slice 4's second pass)",
     "session-group-item": "the phone's agent card (mobile.css: its own radius and 56 px height) and the compact row's height; the selected look, the hover and the focus are .list-row's",
