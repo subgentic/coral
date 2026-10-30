@@ -172,6 +172,7 @@
 #cost-dashboard-view:not([data-view="overview"]) > .cost-page > .cost-section > .cost-section-title { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 [data-cview][hidden] { display: none !important; }
 
+.cost-card-hint { font-size: var(--fs-sm); color: var(--text-secondary); line-height: var(--lh-ui); }
 .cost-note { margin: 0 0 12px; font-size: var(--fs-md); line-height: var(--lh-ui); color: var(--text-secondary); max-width: 70ch; }
 .cost-help { margin: 0 0 12px; }
 .cost-help .cost-note { margin: 8px 0 0; }

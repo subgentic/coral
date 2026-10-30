@@ -34,6 +34,7 @@ const { coralInboxAdapter, savedExpandFor, listInboxGoals } = await importOnce('
 const { openedFrom, backLabelFor } = await importOnce('./inbox_back_label.js'); // the Back words of the Inbox's task and goal screens (#8861)
 const saved = await importOnce('./saved.js');
 const DT = await importOnce('./data_table.js'); // the one table (#7743): the Tasks group's page is its Tasks columns
+const { el } = DT;
 const { starControl } = await importOnce('./artifact_star.js'); // a star on a review artifact's row (#9834)
 const TF = await importOnce('./task_filters.js');
 const TV = await importOnce('./tasks_view.js'); // the one Tasks view
@@ -691,7 +692,6 @@ export function filterInbox(value) {
 }
 
 // ── Saved message page ──────────────────────
-const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = String(text); return e; };
 function openPageShell(kindLabel, groupKey) {
     const host = $('inbox-page');
     host.hidden = false;

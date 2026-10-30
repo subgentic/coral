@@ -6,9 +6,9 @@
 import { browserLocal } from './safe_storage.js';
 export const DESKTOP_NOTIFY_KEY = 'coral-desktop-notify';
 // Which alerts this browser wants, and whether they make a sound (this browser only, like the opt-in itself; #10068).
-export const ALERT_NEEDS_INPUT_KEY = 'coral-alert-needs-input'; // on unless turned off
-export const ALERT_FINISHED_KEY = 'coral-alert-finished';       // on unless turned off
-export const ALERT_SOUND_KEY = 'coral-alert-sound';             // off unless turned on
+const ALERT_NEEDS_INPUT_KEY = 'coral-alert-needs-input'; // on unless turned off
+const ALERT_FINISHED_KEY = 'coral-alert-finished';       // on unless turned off
+const ALERT_SOUND_KEY = 'coral-alert-sound';             // off unless turned on
 const PREF_DEFAULTS = { needsInput: [ALERT_NEEDS_INPUT_KEY, true], finished: [ALERT_FINISHED_KEY, true], sound: [ALERT_SOUND_KEY, false] };
 const MAX_NAME = 60;
 const MIN_GAP_MS = 30000, PER_MINUTE = 10; // per agent, and overall

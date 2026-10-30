@@ -97,8 +97,8 @@ function _downloadJson(data, filename) {
 }
 
 /** The most an imported personas or templates file may be: a person's own list is kilobytes; a file this size is not one (#10510). */
-export const MAX_IMPORT_BYTES = 1024 * 1024;
-export const MAX_IMPORT_TEMPLATES = 200;
+const MAX_IMPORT_BYTES = 1024 * 1024;
+const MAX_IMPORT_TEMPLATES = 200;
 /** What is wrong with a file about to be read for import, in words, or ''. */
 export function importFileProblem(file) {
     return file && file.size > MAX_IMPORT_BYTES ? `That file is too large to be imported (over ${MAX_IMPORT_BYTES / (1024 * 1024)} MB): a personas or template file is far smaller.` : '';

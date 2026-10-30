@@ -8,7 +8,7 @@ const { fileIconHtml } = await importOnce('./file_explorer.js');
 const { readableName, itemKey, sizeText, typeText, isUnverified } = await importOnce('./artifact_item.js');
 const SORT_KEY = 'coral-artifact-table-sort';
 const keys = ['name', 'type', 'tags', 'size', 'updated'];
-export function artifactSort() {
+function artifactSort() {
     try { const s = JSON.parse(browserLocal.get(SORT_KEY)); if (keys.includes(s?.key) && ['asc', 'desc'].includes(s.dir)) return s; } catch { /* default */ }
     return { key: 'updated', dir: 'desc' };
 }

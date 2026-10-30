@@ -61,7 +61,7 @@ export function folderCount(key, c = counts) {
 }
 
 /** A folder's unread chats (undefined at none, and for a folder this count cannot tell: With notes, a tag): the number beside the folder in the sidebar and the drawer (UI/UX #9687); the table's heading keeps the total. */
-export const folderUnread = key => (unread && unread[key]) || undefined;
+const folderUnread = key => (unread && unread[key]) || undefined;
 
 /** The view list's sections for the chat folders: the number beside a folder is its unread chats, its total is the tooltip (a folder with none unread shows no number). */
 export function chatSections(c = counts) {

@@ -152,11 +152,11 @@ function plain(v, max, tail = false) {
 
 /** Whether recording this candidate needs the box ticked: a program inside a nested shell, or one whose image can't be read (Security's
  *  rules on #391). */
-export const needsAck = c => !!(c && (c.under || c.unidentified));
+const needsAck = c => !!(c && (c.under || c.unidentified));
 
 /** What Record as agent asks before it records (Backend Dev's wording, #391). The program's name and folder come from its image, through
  *  the server; the name is the row's. */
-export function recordConfirmText(c, agentName) {
+function recordConfirmText(c, agentName) {
     const who = plain(agentName, 64) || 'this agent';
     const tail = `as ${who}'s agent? Coral will then type board notices into it.`;
     // An image Coral can't read: no name to show, so it says so (the server's "an unknown program (pid N)"), and the box is needed.
@@ -168,10 +168,10 @@ export function recordConfirmText(c, agentName) {
 }
 
 /** The box a nested or unidentified candidate needs ticked before it is recorded (#391). */
-export const NESTED_ACK = "I know this is the agent, not something I started by hand";
+const NESTED_ACK = "I know this is the agent, not something I started by hand";
 
 /** What is said after Record for all agents, from the server's answer: how many were recorded, and each one left paused with why. */
-export function recordAllText(r) {
+function recordAllText(r) {
     const done = Array.isArray(r && r.recorded) ? r.recorded.length : 0;
     const left = Array.isArray(r && r.left) ? r.left : [];
     let t = `Recorded ${done} agent${done === 1 ? '' : 's'}.`;

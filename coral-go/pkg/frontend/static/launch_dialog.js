@@ -51,7 +51,7 @@ function _launchStage(arg) {
 window._launchStage = _launchStage;
 
 /** Enter in a single-line field of a wizard step is that step's primary button: Next, and Launch on the last step (#11289; a form's Enter). Not in a multi-line field, a select, a button or the folder picker; not with a modifier; and not when the field's own Enter (the folder's) has already acted. */
-export function wireEnterAdvances(step) {
+function wireEnterAdvances(step) {
     if (!step || step.dataset.enterWired) return;
     step.dataset.enterWired = '1';
     step.addEventListener('keydown', e => {
@@ -66,7 +66,7 @@ export function wireEnterAdvances(step) {
 }
 
 /** A suggested role-like name for an agent whose name is left empty: Agent 1, Agent 2 (the next number not taken by a live agent), shown as the field's placeholder and used at launch when the field is empty; Save as persona still needs a typed name. The folder stays the context line (#11289). */
-export function suggestAgentName(input) {
+function suggestAgentName(input) {
     if (!input || input.value.trim()) return;
     const taken = new Set((state.liveSessions || []).map(x => String(x.display_name || x.name || '').trim().toLowerCase()));
     let n = 1; while (taken.has(`agent ${n}`)) n++;

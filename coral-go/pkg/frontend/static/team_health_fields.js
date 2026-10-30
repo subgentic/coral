@@ -12,14 +12,14 @@ const [G_LO, G_HI] = HEALTH_LIMITS.goalTasks;
 const [L_LO, L_HI] = HEALTH_LIMITS.landingWait;
 const [R_LO, R_HI] = HEALTH_LIMITS.releaseWait;
 /** The server's rule for a tag pattern (ReleaseTagPatternValid): letters, digits, . _ - / and the glob characters * ? [ ] ^, at most 60, not starting with -; empty is the default. */
-export const tagPatternProblem = (value) => {
+const tagPatternProblem = (value) => {
     const p = String(value || '').trim();
     if (!p) return '';
     return p.length > 60 || p[0] === '-' || !/^[A-Za-z0-9._/*?[\]^-]+$/.test(p) ? `"${p.slice(0, 40)}" is not a tag pattern Coral reads (letters, digits, . _ - / and the glob characters * ? [ ]; at most 60 characters).` : '';
 };
 const [C_LO, C_HI] = HEALTH_LIMITS.checkWait;
 /** The server's words for a branch name it will not read (LandingBranchValid): letters, digits and . _ - /, at most 100, not starting with - or /, no .., not ending in / or .lock; empty is the default. */
-export const branchProblem = (value) => {
+const branchProblem = (value) => {
     const b = String(value || '').trim();
     if (!b) return '';
     const bad = b.length > 100 || b[0] === '-' || b[0] === '/' || b.includes('..') || b.endsWith('/') || b.endsWith('.lock') || !/^[A-Za-z0-9._/-]+$/.test(b);
@@ -138,7 +138,7 @@ export function healthFields(ctx) {
 }
 
 /** The server's own words for a refused setting start with the API path ("health.unowned_tasks.nudge: ..."): the field's label stands there instead ("Also tell: ..."), and a path no field has is left out, so no API name reaches the screen (#9016). */
-export function plainRefusal(words) {
+function plainRefusal(words) {
     const hit = /^(?:health\.)?([a-z]+(?:_[a-z]+)*(?:\.[a-z_]+)?):\s+([\s\S]+)$/.exec(String(words || ''));
     if (!hit) return words;
     const field = healthFields({}).find(f => f.key === hit[1].replace('.', '_') && f.label && f.type !== 'heading');

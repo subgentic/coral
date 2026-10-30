@@ -12,12 +12,13 @@ import { onGoalsSeq } from './goals_feed.js';
 import { pollEvery } from './overload.js';
 const { openDetailPane, closeDetailPane } = await importOnce('./detail_pane.js'); // the one shared pane (#8914): a goal's task or artifact opens in it, beside the list
 const DT = await importOnce('./data_table.js');
+const { el } = DT;
 const TV = await importOnce('./tasks_view.js');
 const PAGE = 50;
 
 const NOT_YET_KEY = 'coral.goals.notyet';
 /** "Not yet" said to a goal's all-done prompt, per team, goal and task total: it comes back when a task is added or removed. The goal page and the team's Goals row read the same list (#10692). */
-export const goalNotYetKey = (project, g) => `${project}|${g.id}|${W.allTasksOf(g.rollup)}`;
+const goalNotYetKey = (project, g) => `${project}|${g.id}|${W.allTasksOf(g.rollup)}`;
 function notYetList() { try { const v = JSON.parse(browserLocal.get(NOT_YET_KEY) || '[]'); return Array.isArray(v) ? v : []; } catch { return []; } }
 export const goalNotYet = (project, g) => notYetList().includes(goalNotYetKey(project, g));
 
@@ -34,7 +35,6 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
     const drawDetail = drawPage;
     const focusDetail = () => (root.querySelector('.goal-main .goals-back') || root.querySelector('.goals-back') || root.querySelector('#goals-detail-title'))?.focus({ preventScroll: true }); // the keyboard starts at the way back, not at the heading: no ring round plain words (#7404)
     const loadGoals = () => refresh ? refresh() : reload();
-    const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
     const btn = (cls, text, onClick) => { const b = el('button', cls, text); b.type = 'button'; if (onClick) b.addEventListener('click', onClick); return b; };
     const say = text => status?.(text);
 

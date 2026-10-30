@@ -89,7 +89,7 @@ function showCron(expr) {
 }
 
 /** "Runs every day at 02:00. Next: tomorrow 02:00." The schedule as the Jobs page says it; a zone other than the person's own is named: "Runs every day at 02:00 (Asia/Tokyo). Next: today 18:00, your time." */
-export function previewWords(expr, tz, nextIso) {
+function previewWords(expr, tz, nextIso) {
     const words = cronWords(expr);
     const runs = words.startsWith('Schedule:') ? `Runs on the schedule ${expr}` : runsWords(words);
     const other = zoneNote(tz);
