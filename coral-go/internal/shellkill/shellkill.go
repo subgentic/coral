@@ -9,6 +9,7 @@
 package shellkill
 
 import (
+	"regexp"
 	"strings"
 	"time"
 )
@@ -411,14 +412,7 @@ func base(w string) string {
 	return w
 }
 
-func isNumber(s string) bool {
-	if s == "" {
-		return false
-	}
-	for _, r := range s {
-		if (r < '0' || r > '9') && r != '.' && r != 's' && r != 'm' && r != 'h' {
-			return false
-		}
-	}
-	return true
-}
+// durationRe is a number a wrapper takes: timeout's duration (10, 1.5, 30s, 5m, 2h, 1d) and nice's adjustment. It needs a digit: a word of letters like "sh" or "mh" is a program, not a duration.
+var durationRe = regexp.MustCompile(`^[0-9]+(\.[0-9]+)?[smhd]?$`)
+
+func isNumber(s string) bool { return durationRe.MatchString(s) }

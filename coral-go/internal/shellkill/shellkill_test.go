@@ -176,3 +176,30 @@ func TestWrappersWithOptionValuesStillRunTheNextWord(t *testing.T) {
 		assert.Empty(t, PatternKill(c), c)
 	}
 }
+
+// QA's #11204 round 2 SHOULD: sh, dash and zsh after a wrapper are read like bash, so the script of "sudo sh -c", "nohup sh -c" and "env -u A sh -c" is a command in its turn.
+func TestShellScriptsAfterAWrapperAreReadLikeBash(t *testing.T) {
+	for _, c := range []string{
+		`sudo sh -c "pkill -f x"`,
+		`nohup sh -c 'killall node'`,
+		`env -u A sh -c "pkill x"`,
+		`sudo -u root dash -c "pkill -f x"`,
+		`timeout 5 zsh -lc "pkill claude"`,
+		`nice -n 5 sh -c "echo hi; pkill x"`,
+		`sudo env -u A bash -c "pkill x"`,
+		`FOO=1 nohup sudo -u root sh -c 'pkill -f y'`,
+		`sudo sh -c "sudo sh -c 'pkill x'"`,
+		`env -i /bin/sh -c "killall x"`,
+		`sudo /usr/bin/zsh -c "pkill x"`,
+	} {
+		assert.NotEmpty(t, PatternKill(c), c)
+	}
+	for _, c := range []string{
+		`sudo sh -c "echo pkill"`,
+		`nohup sh -c 'kill 123'`,
+		`env -u A sh script.sh`,
+		`sudo sh -c "git commit -m 'no pkill -f'"`,
+	} {
+		assert.Empty(t, PatternKill(c), c)
+	}
+}

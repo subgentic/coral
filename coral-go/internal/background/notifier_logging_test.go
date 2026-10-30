@@ -256,3 +256,42 @@ func TestBoardNotifier_TheLiftGetsTheTimeTheAgentsWereSeen(t *testing.T) {
 	assert.True(t, paused["team"], "a pause newer than the sighting stays")
 	assert.Empty(t, rt.sent, "and nothing is nudged into it")
 }
+
+// QA's #11204 round 2: a Sleep team marks its agents sleeping before it pauses the board. A discovery that began after the pause cannot be refused by the pause's time, so the lift also never acts for an
+// agent whose session row says it is sleeping.
+func TestBoardNotifier_ASleepingAgentNeverLiftsTheSleepPause(t *testing.T) {
+	ctx := context.Background()
+	bs := testBoardStore(t)
+	rt := &mockRuntime{}
+	n := NewBoardNotifier(bs, rt, 10*time.Second)
+	paused := map[string]bool{"team": true}
+	n.SetIsPausedFn(func(p string) bool { return paused[p] })
+	lifts := 0
+	n.SetLiftSleepPauseFn(func(p string, _ time.Time) bool {
+		lifts++
+		delete(paused, p)
+		return true
+	})
+	sleeping := true
+	n.SetSleepingFn(func(context.Context, string) bool { return sleeping })
+	captureNotifierLogs(n)
+	sid := "11111111-2222-3333-4444-555555555555"
+	n.SetDiscoverFn(func(context.Context) ([]AgentInfo, error) {
+		return []AgentInfo{{AgentType: "claude", AgentName: "dev", SessionID: sid, DisplayName: "Dev"}}, nil
+	})
+	_, err := bs.Subscribe(ctx, "team", "Dev", "Developer", "claude-"+sid, nil, "mentions")
+	require.NoError(t, err)
+	_, err = bs.PostMessage(ctx, "team", "Lead", "@Dev please look", nil)
+	require.NoError(t, err)
+
+	require.NoError(t, n.RunOnce(ctx))
+	assert.Zero(t, lifts, "the agent's row says it is sleeping: the pause is not lifted for it")
+	assert.True(t, paused["team"])
+	assert.Empty(t, rt.sent)
+
+	sleeping = false // it woke
+	n.now = func() time.Time { return time.Now().Add(time.Hour) }
+	require.NoError(t, n.RunOnce(ctx))
+	assert.Equal(t, 1, lifts)
+	assert.Len(t, rt.sent, 1, "awake: lifted and nudged")
+}

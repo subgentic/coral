@@ -259,6 +259,10 @@ func startBoardServices(ctx context.Context, cfg *config.Config, srv *server.Ser
 	boardNotifier.SetDiscoverFn(discoverFn)
 	if bh := srv.BoardHandler(); bh != nil {
 		boardNotifier.SetIsPausedFn(bh.IsPaused)
+		boardNotifier.SetSleepingFn(func(ctx context.Context, sessionID string) bool {
+			ls, err := sessStore.GetLiveSession(ctx, sessionID)
+			return err == nil && ls != nil && ls.IsSleeping == 1
+		})
 		boardNotifier.SetLiftSleepPauseFn(bh.LiftSleepPauseSeenAwake) // a board sleep paused, with an awake agent on it, is resumed by the notifier (#11182)
 		bh.SetNotifyFn(boardNotifier.NotifyBoard)
 	}
