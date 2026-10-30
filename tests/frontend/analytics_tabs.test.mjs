@@ -53,4 +53,8 @@ assert.equal(tr.last.label, 'Oct 28'); assert.equal(tr.enough, true);
 const none = D.autonomyTrend(adays.map(d => ({ ...d, tasks: 0 })));
 assert.deepEqual(none.points.map(p => p.value), [null, null, null], 'no task done in the window: a gap, not 0'); assert.equal(none.enough, false);
 assert.equal(D.autonomyTrend(adays.slice(0, 5)).enough, false, 'under 7 days there is no trend');
+// ---- team to team: messages plus goal requests, rows ask and columns are asked; no field is "not recorded", an empty list is "none"
+const pg = D.pairGrid([{ from: 'alpha', to: 'beta', messages: 2, requests: 1, accepted: 1 }, { from: 'beta', to: 'alpha', messages: 1, requests: 0, accepted: 0 }, { from: 'alpha', to: 'gamma', messages: 1, requests: 0, accepted: 0 }]);
+assert.deepEqual(pg.names, ['alpha', 'beta', 'gamma']); assert.equal(pg.cells[0][1], 3, 'alpha asked beta 2 messages and 1 request'); assert.equal(pg.cells[1][0], 1); assert.equal(pg.total, 5);
+assert.equal(D.commModel({ agent_posts: 1 }).pairs, null, 'a read without pairs has not recorded them'); assert.deepEqual(D.commModel({ agent_posts: 1, pairs: [] }).pairs.rows, []);
 console.log('PASS analytics_tabs: usage, operator and communication rows');

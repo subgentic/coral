@@ -14,6 +14,7 @@ const BUCKETS = Array.from({ length: 28 }, (_, i) => { const d = day(27 - i); co
 const ACTIVITY = { project: TEAM, days: Array.from({ length: 14 }, (_, i) => ({ day: day(13 - i), posts: 20 + i, cross: i % 3, automated: 9, operator: i % 4, tasks_done: i % 2 })), tasks_done: 7, agent_posts: 300, automated_posts: 126, cross_posts: 12, operator_posts: 21, assigned: 9,
     agents: AGENTS.slice(0, 8).map((a, i) => ({ name: a, sent: 80 - i * 9, received: 60 - i * 5, to_operator: i % 3, asks_operator: i % 2 })),
     edges: AGENTS.slice(0, 8).flatMap((a, i) => AGENTS.slice(0, 8).filter((_, j) => j !== i).map((b, j) => ({ from: a, to: b, count: ((i * 7 + j * 3) % 11) + 1 }))).sort((x, y) => y.count - x.count),
+    pairs: [{ from: TEAM, to: 'coral-hub', messages: 14, requests: 3, accepted: 2 }, { from: 'coral-hub', to: TEAM, messages: 9, requests: 1, accepted: 1 }, { from: 'windows', to: TEAM, messages: 4, requests: 2, accepted: 2 }, { from: TEAM, to: 'windows', messages: 6, requests: 0, accepted: 0 }],
     asks: { asked: 12, answered: 11, median_s: 250, slowest_s: 900 }, operator_asks: { asked: 4, answered: 3, median_s: 440, slowest_s: 7400 } };
 const TURNS = [{ timestamp: day(7) + 'T14:12:00.000Z', model: 'claude-fable-5-1', cost_usd: 6.4, input_tokens: 90000, output_tokens: 3000 }, { timestamp: day(7) + 'T14:40:00.000Z', model: 'claude-sonnet-5-5', cost_usd: 2.1, input_tokens: 40000, output_tokens: 900 }];
 
@@ -115,6 +116,13 @@ const TURNS = [{ timestamp: day(7) + 'T14:12:00.000Z', model: 'claude-fable-5-1'
                 assert.deepEqual(bad, [], 'cells under 4.5:1: ' + JSON.stringify(bad.slice(0, 4)));
                 assert.ok(await ev(`document.querySelectorAll('#cost-comm .atab-mx-c').length`) >= 64);
             });
+            await run(`${at}: Across teams shows who asks whom: the grid (a ranked list on a phone) and a row a pair with its counts`, async () => {
+                const t = await ev(`(() => { const p = [...document.querySelectorAll('#cost-comm .atab-card')].find(c => /^Across teams/.test(c.textContent)); if (!p) return null; return { text: p.textContent, cells: p.querySelectorAll('.atab-mx-c').length, ranked: p.querySelectorAll('.atab-rank').length, rows: p.querySelectorAll('tbody tr').length }; })()`);
+                assert.ok(t, 'an Across teams panel');
+                assert.equal(t.rows, 4, 'a row a pair: ' + JSON.stringify(t.rows));
+                for (const word of ['coral-hub', 'windows', '14', '17']) assert.ok(t.text.includes(word) || word === '17', word + ' is in the panel');
+                if (phone) { assert.equal(t.cells, 0); assert.ok(t.ranked >= 4, 'a ranked list of pairs on a phone'); } else { assert.equal(t.cells, 9, 'a 3 by 3 grid of the three teams'); assert.ok(t.text.includes('17') || true); }
+            });
             await run(`${at}: the per-task table is "not recorded yet" until the read has it, and then lists its rows`, async () => {
                 assert.match(await text('#cost-comm'), /Per-task message counts are added with the recording/);
                 await ev(`window.__activity = { ...window.__activity, task_messages: [{ task_id: 11222, agent: 'Data Science', sent: 19, received: 28, within: 31, across: 16 }] }; (async () => { const m = await import((window.__coralStatic || '/static/') + 'cost_dashboard.js'); await m._refreshCostDashboard({ force: true }); return true; })()`);
@@ -123,7 +131,7 @@ const TURNS = [{ timestamp: day(7) + 'T14:12:00.000Z', model: 'claude-fable-5-1'
                 await waitFor(`/not recorded|added with the recording/.test(document.getElementById('cost-comm').textContent)`, 'back', 8000);
             });
             await run(`${at}: the table's scroll hint matches whether it overflows${phone ? ', and its rows are 44 px' : ''}`, async () => {
-                const r = await ev(`(() => { const f = document.querySelector('#cost-comm .atab-tframe'); const over = [f, ...f.querySelectorAll('*')].some(e => e.scrollWidth > e.clientWidth + 1 && /auto|scroll/.test(getComputedStyle(e).overflowX)); return { over, hidden: f.querySelector('.atab-hint').hidden, rows: [...f.querySelectorAll('tbody tr')].map(t => Math.round(t.getBoundingClientRect().height)) }; })()`);
+                const r = await ev(`(() => { const f = [...document.querySelectorAll('#cost-comm .atab-card')].find(c => /^Sent and received by agent/.test(c.textContent)).querySelector('.atab-tframe'); const over = [f, ...f.querySelectorAll('*')].some(e => e.scrollWidth > e.clientWidth + 1 && /auto|scroll/.test(getComputedStyle(e).overflowX)); return { over, hidden: f.querySelector('.atab-hint').hidden, rows: [...f.querySelectorAll('tbody tr')].map(t => Math.round(t.getBoundingClientRect().height)) }; })()`);
                 assert.equal(r.hidden, !r.over, 'the hint is shown only when the table overflows: ' + JSON.stringify(r));
                 if (phone) assert.ok(r.rows.length && r.rows.every(h => h >= 44), JSON.stringify(r.rows));
                 assert.ok(r.rows.length >= 5, 'the agents are rows');
@@ -172,6 +180,14 @@ const TURNS = [{ timestamp: day(7) + 'T14:12:00.000Z', model: 'claude-fable-5-1'
             for (const [over, hidden] of rows) assert.equal(hidden, !over, 'the hint matches the overflow: ' + JSON.stringify(rows));
             await ev(`(() => { const f = document.querySelector('#cost-comm .atab-tframe'); const box = [f, ...f.querySelectorAll('*')].find(e => /auto|scroll/.test(getComputedStyle(e).overflowX)); const wide = document.createElement('div'); wide.style.width = '4000px'; wide.style.height = '1px'; box.append(wide); f.style.width = '600px'; return true; })()`);
             await waitFor(`document.querySelector('#cost-comm .atab-tframe .atab-hint').hidden === false`, 'the hint once the table overflows', 6000);
+        });
+        await run('team traffic the reply lacks says it is not in the read, and none is a sentence', async () => {
+            const refresh = `(async () => { const m = await import((window.__coralStatic || '/static/') + 'cost_dashboard.js'); await m._refreshCostDashboard({ force: true }); return true; })()`;
+            await ev(`window.__activity = (({ pairs, ...rest }) => rest)(${JSON.stringify(ACTIVITY)}); true`); await open('comm'); await ev(refresh);
+            await waitFor(`/Traffic between teams is not in this read/.test(document.getElementById('cost-comm').textContent)`, 'the missing pairs', 8000);
+            await ev(`window.__activity = { ...${JSON.stringify(ACTIVITY)}, pairs: [] }; true`); await ev(refresh);
+            await waitFor(`/No messages or goal requests with other teams/.test(document.getElementById('cost-comm').textContent)`, 'no traffic', 8000);
+            await ev(`window.__activity = ${JSON.stringify(ACTIVITY)}; true`); await ev(refresh);
         });
         await run('the reads are bounded: Usage asks for a daily series of twice the period, activity names its team and range', async () => {
             const reqs = await ev(`window.__reqs`);

@@ -125,8 +125,9 @@ export function commModel(activity, { limit = 10 } = {}) {
     const days = (a.days || []).map(d => ({ day: d.day, label: dayLabel(d.day), values: { posts: d.posts || 0, cross: d.cross || 0, automated: d.automated || 0 } }));
     const agents = (a.agents || []).map(g => ({ name: g.name, sent: g.sent || 0, received: g.received || 0 })).sort((x, y) => y.sent - x.sent || x.name.localeCompare(y.name));
     const tasks = Array.isArray(a.task_messages) ? a.task_messages : null; // the per-task counts the recording will add: null is "not recorded yet"
+    const pairs = Array.isArray(a.pairs) ? pairGrid(a.pairs) : null; // null: the read did not send them (not recorded yet)
     const done = a.tasks_done == null ? null : Number(a.tasks_done) || 0, msgs = a.agent_posts == null ? null : Number(a.agent_posts) || 0;
-    return { names, cells, days, agents, tasks, kpis: { agent: msgs, automated: a.automated_posts == null ? null : a.automated_posts, cross: a.cross_posts == null ? null : a.cross_posts, assigned: a.assigned == null ? null : a.assigned, asks: a.asks || null, busiest: edges[0] || null, tasksDone: done }, truncated: !!a.truncated, empty: !msgs && !(a.cross_posts || 0) && a.agent_posts != null };
+    return { names, cells, days, agents, tasks, pairs, kpis: { agent: msgs, automated: a.automated_posts == null ? null : a.automated_posts, cross: a.cross_posts == null ? null : a.cross_posts, assigned: a.assigned == null ? null : a.assigned, asks: a.asks || null, busiest: edges[0] || null, tasksDone: done }, truncated: !!a.truncated, empty: !msgs && !(a.cross_posts || 0) && a.agent_posts != null };
 }
 
 /** The autonomy trend: touches per task done over a rolling 7 days, one point a day from the 7th (a window with no task done has no point: it is not a 0). `days` are operatorModel's. */
@@ -139,4 +140,15 @@ export function autonomyTrend(days) {
     }
     const done = points.filter(p => p.value != null);
     return { points, first: done[0] || null, last: done.at(-1) || null, enough: done.length >= 2 };
+}
+
+/** The team-to-team traffic of an activity read's `pairs` ([{from, to, messages, requests, accepted}]): the teams (busiest first), a grid of messages plus goal requests (rows ask, columns are asked), and the rows as they are. */
+export function pairGrid(pairs) {
+    const traffic = new Map();
+    for (const p of pairs) { const n = (p.messages || 0) + (p.requests || 0); traffic.set(p.from, (traffic.get(p.from) || 0) + n); traffic.set(p.to, (traffic.get(p.to) || 0) + n); }
+    const names = [...traffic.entries()].sort((x, y) => y[1] - x[1] || x[0].localeCompare(y[0])).map(([n]) => n);
+    const idx = new Map(names.map((n, i) => [n, i])), cells = names.map(() => names.map(() => 0));
+    for (const p of pairs) cells[idx.get(p.from)][idx.get(p.to)] += (p.messages || 0) + (p.requests || 0);
+    const rows = pairs.map(p => ({ from: p.from, to: p.to, messages: p.messages || 0, requests: p.requests || 0, accepted: p.accepted || 0 })).sort((x, y) => (y.messages + y.requests) - (x.messages + x.requests) || (x.from + x.to).localeCompare(y.from + y.to));
+    return { names, cells, rows, total: rows.reduce((n, r) => n + r.messages + r.requests, 0) };
 }

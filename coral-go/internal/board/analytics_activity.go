@@ -35,6 +35,18 @@ type ActivityEdge struct {
 	Count int    `json:"count"`
 }
 
+// ActivityPair is the traffic between this board and another team in one direction: who asks whom across teams. Messages are relays and `coral-board send --board` posts (the envelope of a
+// cross-team message names its source and target board); Requests are goal requests; Accepted is how many of those were accepted. Counts only.
+type ActivityPair struct {
+	From       string `json:"from"`
+	To         string `json:"to"`
+	FromServer string `json:"from_server,omitempty"`
+	ToServer   string `json:"to_server,omitempty"`
+	Messages   int    `json:"messages"`
+	Requests   int    `json:"requests"`
+	Accepted   int    `json:"accepted"`
+}
+
 // ActivityAgent is one agent's messages sent and received (an @mention is a received message).
 type ActivityAgent struct {
 	Name         string `json:"name"`
@@ -60,6 +72,7 @@ type Activity struct {
 	Days           []ActivityDay   `json:"days"`
 	Agents         []ActivityAgent `json:"agents"`
 	Edges          []ActivityEdge  `json:"edges"`
+	Pairs          []ActivityPair  `json:"pairs"`          // team to team, this board and the others, by direction
 	Asks           ActivityAsks    `json:"asks"`           // asks between agents
 	OperatorAsks   ActivityAsks    `json:"operator_asks"`  // asks whose asked is the Operator
 	Assigned       int             `json:"assigned"`       // tasks one agent created for another
@@ -106,7 +119,7 @@ func (s *Store) BoardActivity(ctx context.Context, project, since, until string)
 	if err != nil {
 		return nil, err
 	}
-	a := &Activity{Project: project, Since: since, Until: until, Days: []ActivityDay{}, Agents: []ActivityAgent{}, Edges: []ActivityEdge{}}
+	a := &Activity{Project: project, Since: since, Until: until, Days: []ActivityDay{}, Agents: []ActivityAgent{}, Edges: []ActivityEdge{}, Pairs: []ActivityPair{}}
 	if len(msgs) > MaxActivityRows {
 		msgs, a.Truncated = msgs[:MaxActivityRows], true
 	}
@@ -153,6 +166,20 @@ func (s *Store) BoardActivity(ctx context.Context, project, since, until string)
 		return agents[n]
 	}
 	edges := map[[2]string]int{}
+	pairs := map[[4]string]*ActivityPair{}
+	pair := func(from, fromServer, to, toServer string) *ActivityPair {
+		if fromServer == "local" { // this computer is "local" in an envelope and "" in a goal request: one team either way
+			fromServer = ""
+		}
+		if toServer == "local" {
+			toServer = ""
+		}
+		k := [4]string{from, fromServer, to, toServer}
+		if pairs[k] == nil {
+			pairs[k] = &ActivityPair{From: from, To: to, FromServer: fromServer, ToServer: toServer}
+		}
+		return pairs[k]
+	}
 	for _, m := range msgs {
 		d := day(m.CreatedAt)
 		name := m.Sender
@@ -164,6 +191,14 @@ func (s *Store) BoardActivity(ctx context.Context, project, since, until string)
 		case m.External != nil && *m.External != "":
 			d.Cross++
 			a.CrossPosts++
+			var o MessageOrigin
+			if json.Unmarshal([]byte(*m.External), &o) == nil {
+				if o.Direction == "outbound" && o.TargetBoard != "" {
+					pair(project, "", o.TargetBoard, o.TargetServerID).Messages++
+				} else if o.Direction == "inbound" && o.Board != "" {
+					pair(o.Board, o.ServerID, project, "").Messages++
+				}
+			}
 		case m.IsSystem || (m.Origin != nil && *m.Origin == OriginHubNotice) || isAutomatedSender(m.Sender):
 			d.Automated++
 			a.AutomatedPosts++
@@ -210,6 +245,19 @@ func (s *Store) BoardActivity(ctx context.Context, project, since, until string)
 			a.Assigned++
 		}
 	}
+	if err := s.goalRequestPairs(ctx, project, since, until, pair); err != nil {
+		return nil, err
+	}
+	for _, p := range pairs {
+		a.Pairs = append(a.Pairs, *p)
+	}
+	sort.Slice(a.Pairs, func(i, j int) bool {
+		x, y := a.Pairs[i], a.Pairs[j]
+		if x.Messages+x.Requests != y.Messages+y.Requests {
+			return x.Messages+x.Requests > y.Messages+y.Requests
+		}
+		return x.From+x.To+x.FromServer+x.ToServer < y.From+y.To+y.FromServer+y.ToServer
+	})
 	for k, n := range edges {
 		a.Edges = append(a.Edges, ActivityEdge{From: k[0], To: k[1], Count: n})
 	}
@@ -342,9 +390,43 @@ func (s *Store) askCounts(ctx context.Context, project, since, until string, nam
 		}
 		sort.Float64s(w)
 		med, slow := w[len(w)/2], w[len(w)-1]
+		if len(w)%2 == 0 {
+			med = (w[len(w)/2-1] + w[len(w)/2]) / 2 // an even count: the mean of the two middle waits
+		}
 		a.MedianS, a.SlowestS = &med, &slow
 	}
 	fill(&agentAsks, agentWaits)
 	fill(&opAsks, opWaits)
 	return agentAsks, opAsks, nil
+}
+
+// goalRequestPairs counts the goal requests of the window, sent and received, by team pair.
+func (s *Store) goalRequestPairs(ctx context.Context, project, since, until string, pair func(from, fromServer, to, toServer string) *ActivityPair) error {
+	var out []struct {
+		To, Server, Status string
+	}
+	if err := s.reader().SelectContext(ctx, &out, `SELECT to_board AS "to", to_server AS server, status FROM board_goal_requests_out WHERE board_id = ? AND created_at >= ? AND created_at < ? LIMIT ?`, project, since, until, MaxActivityRows); err != nil {
+		return err
+	}
+	for _, r := range out {
+		p := pair(project, "", r.To, r.Server)
+		p.Requests++
+		if r.Status == "accepted" {
+			p.Accepted++
+		}
+	}
+	var in []struct {
+		From, Server, Status string
+	}
+	if err := s.reader().SelectContext(ctx, &in, `SELECT from_board AS "from", from_server AS server, status FROM board_goal_requests_in WHERE board_id = ? AND created_at >= ? AND created_at < ? LIMIT ?`, project, since, until, MaxActivityRows); err != nil {
+		return err
+	}
+	for _, r := range in {
+		p := pair(r.From, r.Server, project, "")
+		p.Requests++
+		if r.Status == "accepted" {
+			p.Accepted++
+		}
+	}
+	return nil
 }

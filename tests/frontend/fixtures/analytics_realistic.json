@@ -1,0 +1,3059 @@
+{
+ "activity": {
+  "activity": {
+   "project": "coral-go-team",
+   "since": "2026-10-16T13:00:00Z",
+   "until": "2026-10-30T13:00:00Z",
+   "days": [
+    {
+     "day": "2026-10-16",
+     "posts": 0,
+     "cross": 0,
+     "automated": 0,
+     "operator": 0,
+     "tasks_done": 0
+    },
+    {
+     "day": "2026-10-17",
+     "posts": 39,
+     "cross": 0,
+     "automated": 5,
+     "operator": 2,
+     "tasks_done": 0
+    },
+    {
+     "day": "2026-10-18",
+     "posts": 35,
+     "cross": 0,
+     "automated": 4,
+     "operator": 0,
+     "tasks_done": 0
+    },
+    {
+     "day": "2026-10-19",
+     "posts": 41,
+     "cross": 0,
+     "automated": 4,
+     "operator": 2,
+     "tasks_done": 3
+    },
+    {
+     "day": "2026-10-20",
+     "posts": 38,
+     "cross": 0,
+     "automated": 5,
+     "operator": 0,
+     "tasks_done": 0
+    },
+    {
+     "day": "2026-10-21",
+     "posts": 44,
+     "cross": 5,
+     "automated": 3,
+     "operator": 1,
+     "tasks_done": 3
+    },
+    {
+     "day": "2026-10-22",
+     "posts": 39,
+     "cross": 3,
+     "automated": 5,
+     "operator": 1,
+     "tasks_done": 0
+    },
+    {
+     "day": "2026-10-23",
+     "posts": 43,
+     "cross": 4,
+     "automated": 4,
+     "operator": 0,
+     "tasks_done": 3
+    },
+    {
+     "day": "2026-10-24",
+     "posts": 44,
+     "cross": 2,
+     "automated": 5,
+     "operator": 0,
+     "tasks_done": 0
+    },
+    {
+     "day": "2026-10-25",
+     "posts": 47,
+     "cross": 0,
+     "automated": 4,
+     "operator": 2,
+     "tasks_done": 3
+    },
+    {
+     "day": "2026-10-26",
+     "posts": 39,
+     "cross": 0,
+     "automated": 4,
+     "operator": 2,
+     "tasks_done": 0
+    },
+    {
+     "day": "2026-10-27",
+     "posts": 39,
+     "cross": 0,
+     "automated": 4,
+     "operator": 1,
+     "tasks_done": 3
+    },
+    {
+     "day": "2026-10-28",
+     "posts": 39,
+     "cross": 0,
+     "automated": 4,
+     "operator": 2,
+     "tasks_done": 0
+    },
+    {
+     "day": "2026-10-29",
+     "posts": 44,
+     "cross": 0,
+     "automated": 5,
+     "operator": 0,
+     "tasks_done": 0
+    },
+    {
+     "day": "2026-10-30",
+     "posts": 38,
+     "cross": 0,
+     "automated": 5,
+     "operator": 2,
+     "tasks_done": 0
+    }
+   ],
+   "agents": [
+    {
+     "name": "Security Reviewer",
+     "sent": 53,
+     "received": 28,
+     "to_operator": 7,
+     "asks_operator": 0
+    },
+    {
+     "name": "Backend Dev",
+     "sent": 50,
+     "received": 33,
+     "to_operator": 7,
+     "asks_operator": 1
+    },
+    {
+     "name": "Mobile Beta Tester",
+     "sent": 49,
+     "received": 38,
+     "to_operator": 6,
+     "asks_operator": 0
+    },
+    {
+     "name": "Data Science",
+     "sent": 48,
+     "received": 38,
+     "to_operator": 7,
+     "asks_operator": 1
+    },
+    {
+     "name": "Docs Writer",
+     "sent": 48,
+     "received": 42,
+     "to_operator": 6,
+     "asks_operator": 0
+    },
+    {
+     "name": "UI/UX",
+     "sent": 48,
+     "received": 35,
+     "to_operator": 4,
+     "asks_operator": 0
+    },
+    {
+     "name": "Lead Developer",
+     "sent": 47,
+     "received": 41,
+     "to_operator": 6,
+     "asks_operator": 0
+    },
+    {
+     "name": "Orchestrator",
+     "sent": 47,
+     "received": 35,
+     "to_operator": 3,
+     "asks_operator": 0
+    },
+    {
+     "name": "DevOps",
+     "sent": 46,
+     "received": 34,
+     "to_operator": 7,
+     "asks_operator": 1
+    },
+    {
+     "name": "QA Reviewer 2",
+     "sent": 46,
+     "received": 44,
+     "to_operator": 3,
+     "asks_operator": 0
+    },
+    {
+     "name": "QA Reviewer 1",
+     "sent": 44,
+     "received": 39,
+     "to_operator": 1,
+     "asks_operator": 0
+    },
+    {
+     "name": "Frontend Dev",
+     "sent": 43,
+     "received": 50,
+     "to_operator": 3,
+     "asks_operator": 0
+    }
+   ],
+   "edges": [
+    {
+     "from": "QA Reviewer 1",
+     "to": "Frontend Dev",
+     "count": 9
+    },
+    {
+     "from": "Security Reviewer",
+     "to": "Lead Developer",
+     "count": 8
+    },
+    {
+     "from": "Docs Writer",
+     "to": "Frontend Dev",
+     "count": 7
+    },
+    {
+     "from": "Mobile Beta Tester",
+     "to": "Frontend Dev",
+     "count": 7
+    },
+    {
+     "from": "Security Reviewer",
+     "to": "Data Science",
+     "count": 7
+    },
+    {
+     "from": "Security Reviewer",
+     "to": "QA Reviewer 2",
+     "count": 7
+    },
+    {
+     "from": "DevOps",
+     "to": "Frontend Dev",
+     "count": 6
+    },
+    {
+     "from": "Docs Writer",
+     "to": "QA Reviewer 1",
+     "count": 6
+    },
+    {
+     "from": "Lead Developer",
+     "to": "Frontend Dev",
+     "count": 6
+    },
+    {
+     "from": "Mobile Beta Tester",
+     "to": "Lead Developer",
+     "count": 6
+    },
+    {
+     "from": "Mobile Beta Tester",
+     "to": "UI/UX",
+     "count": 6
+    },
+    {
+     "from": "Orchestrator",
+     "to": "QA Reviewer 2",
+     "count": 6
+    },
+    {
+     "from": "UI/UX",
+     "to": "QA Reviewer 1",
+     "count": 6
+    },
+    {
+     "from": "Backend Dev",
+     "to": "Data Science",
+     "count": 5
+    },
+    {
+     "from": "Backend Dev",
+     "to": "Lead Developer",
+     "count": 5
+    },
+    {
+     "from": "Backend Dev",
+     "to": "QA Reviewer 1",
+     "count": 5
+    },
+    {
+     "from": "Data Science",
+     "to": "DevOps",
+     "count": 5
+    },
+    {
+     "from": "Data Science",
+     "to": "Mobile Beta Tester",
+     "count": 5
+    },
+    {
+     "from": "Data Science",
+     "to": "QA Reviewer 1",
+     "count": 5
+    },
+    {
+     "from": "DevOps",
+     "to": "Orchestrator",
+     "count": 5
+    },
+    {
+     "from": "DevOps",
+     "to": "UI/UX",
+     "count": 5
+    },
+    {
+     "from": "Docs Writer",
+     "to": "Backend Dev",
+     "count": 5
+    },
+    {
+     "from": "Docs Writer",
+     "to": "UI/UX",
+     "count": 5
+    },
+    {
+     "from": "Frontend Dev",
+     "to": "QA Reviewer 1",
+     "count": 5
+    },
+    {
+     "from": "Frontend Dev",
+     "to": "Security Reviewer",
+     "count": 5
+    },
+    {
+     "from": "Lead Developer",
+     "to": "DevOps",
+     "count": 5
+    },
+    {
+     "from": "Lead Developer",
+     "to": "Docs Writer",
+     "count": 5
+    },
+    {
+     "from": "Lead Developer",
+     "to": "QA Reviewer 2",
+     "count": 5
+    },
+    {
+     "from": "Mobile Beta Tester",
+     "to": "Orchestrator",
+     "count": 5
+    },
+    {
+     "from": "Mobile Beta Tester",
+     "to": "QA Reviewer 2",
+     "count": 5
+    },
+    {
+     "from": "Orchestrator",
+     "to": "Mobile Beta Tester",
+     "count": 5
+    },
+    {
+     "from": "QA Reviewer 1",
+     "to": "Docs Writer",
+     "count": 5
+    },
+    {
+     "from": "QA Reviewer 1",
+     "to": "Mobile Beta Tester",
+     "count": 5
+    },
+    {
+     "from": "QA Reviewer 2",
+     "to": "Data Science",
+     "count": 5
+    },
+    {
+     "from": "QA Reviewer 2",
+     "to": "Docs Writer",
+     "count": 5
+    },
+    {
+     "from": "Security Reviewer",
+     "to": "DevOps",
+     "count": 5
+    },
+    {
+     "from": "Security Reviewer",
+     "to": "UI/UX",
+     "count": 5
+    },
+    {
+     "from": "UI/UX",
+     "to": "DevOps",
+     "count": 5
+    },
+    {
+     "from": "UI/UX",
+     "to": "Docs Writer",
+     "count": 5
+    },
+    {
+     "from": "Backend Dev",
+     "to": "Docs Writer",
+     "count": 4
+    },
+    {
+     "from": "Backend Dev",
+     "to": "Frontend Dev",
+     "count": 4
+    },
+    {
+     "from": "Backend Dev",
+     "to": "QA Reviewer 2",
+     "count": 4
+    },
+    {
+     "from": "Data Science",
+     "to": "Docs Writer",
+     "count": 4
+    },
+    {
+     "from": "Data Science",
+     "to": "Security Reviewer",
+     "count": 4
+    },
+    {
+     "from": "DevOps",
+     "to": "Data Science",
+     "count": 4
+    },
+    {
+     "from": "DevOps",
+     "to": "Mobile Beta Tester",
+     "count": 4
+    },
+    {
+     "from": "Docs Writer",
+     "to": "Lead Developer",
+     "count": 4
+    },
+    {
+     "from": "Docs Writer",
+     "to": "Orchestrator",
+     "count": 4
+    },
+    {
+     "from": "Docs Writer",
+     "to": "QA Reviewer 2",
+     "count": 4
+    },
+    {
+     "from": "Frontend Dev",
+     "to": "Data Science",
+     "count": 4
+    },
+    {
+     "from": "Frontend Dev",
+     "to": "DevOps",
+     "count": 4
+    },
+    {
+     "from": "Frontend Dev",
+     "to": "Orchestrator",
+     "count": 4
+    },
+    {
+     "from": "Lead Developer",
+     "to": "Backend Dev",
+     "count": 4
+    },
+    {
+     "from": "Lead Developer",
+     "to": "Mobile Beta Tester",
+     "count": 4
+    },
+    {
+     "from": "Mobile Beta Tester",
+     "to": "Backend Dev",
+     "count": 4
+    },
+    {
+     "from": "Mobile Beta Tester",
+     "to": "Data Science",
+     "count": 4
+    },
+    {
+     "from": "Orchestrator",
+     "to": "Backend Dev",
+     "count": 4
+    },
+    {
+     "from": "Orchestrator",
+     "to": "Docs Writer",
+     "count": 4
+    },
+    {
+     "from": "Orchestrator",
+     "to": "Frontend Dev",
+     "count": 4
+    },
+    {
+     "from": "QA Reviewer 1",
+     "to": "Orchestrator",
+     "count": 4
+    },
+    {
+     "from": "QA Reviewer 2",
+     "to": "Backend Dev",
+     "count": 4
+    },
+    {
+     "from": "QA Reviewer 2",
+     "to": "Orchestrator",
+     "count": 4
+    },
+    {
+     "from": "Security Reviewer",
+     "to": "Docs Writer",
+     "count": 4
+    },
+    {
+     "from": "Security Reviewer",
+     "to": "Mobile Beta Tester",
+     "count": 4
+    },
+    {
+     "from": "UI/UX",
+     "to": "QA Reviewer 2",
+     "count": 4
+    },
+    {
+     "from": "Backend Dev",
+     "to": "Orchestrator",
+     "count": 3
+    },
+    {
+     "from": "Data Science",
+     "to": "Lead Developer",
+     "count": 3
+    },
+    {
+     "from": "Data Science",
+     "to": "QA Reviewer 2",
+     "count": 3
+    },
+    {
+     "from": "DevOps",
+     "to": "Backend Dev",
+     "count": 3
+    },
+    {
+     "from": "DevOps",
+     "to": "Lead Developer",
+     "count": 3
+    },
+    {
+     "from": "DevOps",
+     "to": "QA Reviewer 2",
+     "count": 3
+    },
+    {
+     "from": "Docs Writer",
+     "to": "Data Science",
+     "count": 3
+    },
+    {
+     "from": "Docs Writer",
+     "to": "DevOps",
+     "count": 3
+    },
+    {
+     "from": "Docs Writer",
+     "to": "Security Reviewer",
+     "count": 3
+    },
+    {
+     "from": "Mobile Beta Tester",
+     "to": "QA Reviewer 1",
+     "count": 3
+    },
+    {
+     "from": "Orchestrator",
+     "to": "UI/UX",
+     "count": 3
+    },
+    {
+     "from": "QA Reviewer 1",
+     "to": "Lead Developer",
+     "count": 3
+    },
+    {
+     "from": "QA Reviewer 2",
+     "to": "Frontend Dev",
+     "count": 3
+    },
+    {
+     "from": "QA Reviewer 2",
+     "to": "Lead Developer",
+     "count": 3
+    },
+    {
+     "from": "QA Reviewer 2",
+     "to": "Mobile Beta Tester",
+     "count": 3
+    },
+    {
+     "from": "QA Reviewer 2",
+     "to": "UI/UX",
+     "count": 3
+    },
+    {
+     "from": "UI/UX",
+     "to": "Lead Developer",
+     "count": 3
+    },
+    {
+     "from": "UI/UX",
+     "to": "Mobile Beta Tester",
+     "count": 3
+    },
+    {
+     "from": "UI/UX",
+     "to": "Security Reviewer",
+     "count": 3
+    },
+    {
+     "from": "Backend Dev",
+     "to": "Mobile Beta Tester",
+     "count": 2
+    },
+    {
+     "from": "Backend Dev",
+     "to": "Security Reviewer",
+     "count": 2
+    },
+    {
+     "from": "Data Science",
+     "to": "Backend Dev",
+     "count": 2
+    },
+    {
+     "from": "Data Science",
+     "to": "Orchestrator",
+     "count": 2
+    },
+    {
+     "from": "Data Science",
+     "to": "UI/UX",
+     "count": 2
+    },
+    {
+     "from": "DevOps",
+     "to": "Docs Writer",
+     "count": 2
+    },
+    {
+     "from": "DevOps",
+     "to": "QA Reviewer 1",
+     "count": 2
+    },
+    {
+     "from": "DevOps",
+     "to": "Security Reviewer",
+     "count": 2
+    },
+    {
+     "from": "Docs Writer",
+     "to": "Mobile Beta Tester",
+     "count": 2
+    },
+    {
+     "from": "Frontend Dev",
+     "to": "Backend Dev",
+     "count": 2
+    },
+    {
+     "from": "Frontend Dev",
+     "to": "Docs Writer",
+     "count": 2
+    },
+    {
+     "from": "Frontend Dev",
+     "to": "Lead Developer",
+     "count": 2
+    },
+    {
+     "from": "Frontend Dev",
+     "to": "QA Reviewer 2",
+     "count": 2
+    },
+    {
+     "from": "Frontend Dev",
+     "to": "UI/UX",
+     "count": 2
+    },
+    {
+     "from": "Lead Developer",
+     "to": "QA Reviewer 1",
+     "count": 2
+    },
+    {
+     "from": "Lead Developer",
+     "to": "Security Reviewer",
+     "count": 2
+    },
+    {
+     "from": "Mobile Beta Tester",
+     "to": "DevOps",
+     "count": 2
+    },
+    {
+     "from": "Mobile Beta Tester",
+     "to": "Docs Writer",
+     "count": 2
+    },
+    {
+     "from": "Mobile Beta Tester",
+     "to": "Security Reviewer",
+     "count": 2
+    },
+    {
+     "from": "Orchestrator",
+     "to": "QA Reviewer 1",
+     "count": 2
+    },
+    {
+     "from": "Orchestrator",
+     "to": "Security Reviewer",
+     "count": 2
+    },
+    {
+     "from": "QA Reviewer 1",
+     "to": "Data Science",
+     "count": 2
+    },
+    {
+     "from": "QA Reviewer 1",
+     "to": "UI/UX",
+     "count": 2
+    },
+    {
+     "from": "QA Reviewer 2",
+     "to": "DevOps",
+     "count": 2
+    },
+    {
+     "from": "QA Reviewer 2",
+     "to": "QA Reviewer 1",
+     "count": 2
+    },
+    {
+     "from": "QA Reviewer 2",
+     "to": "Security Reviewer",
+     "count": 2
+    },
+    {
+     "from": "Security Reviewer",
+     "to": "Backend Dev",
+     "count": 2
+    },
+    {
+     "from": "Security Reviewer",
+     "to": "Orchestrator",
+     "count": 2
+    },
+    {
+     "from": "UI/UX",
+     "to": "Backend Dev",
+     "count": 2
+    },
+    {
+     "from": "UI/UX",
+     "to": "Data Science",
+     "count": 2
+    },
+    {
+     "from": "UI/UX",
+     "to": "Frontend Dev",
+     "count": 2
+    },
+    {
+     "from": "Backend Dev",
+     "to": "DevOps",
+     "count": 1
+    },
+    {
+     "from": "Backend Dev",
+     "to": "UI/UX",
+     "count": 1
+    },
+    {
+     "from": "Data Science",
+     "to": "Frontend Dev",
+     "count": 1
+    },
+    {
+     "from": "Frontend Dev",
+     "to": "Mobile Beta Tester",
+     "count": 1
+    },
+    {
+     "from": "Lead Developer",
+     "to": "Data Science",
+     "count": 1
+    },
+    {
+     "from": "Lead Developer",
+     "to": "Orchestrator",
+     "count": 1
+    },
+    {
+     "from": "Lead Developer",
+     "to": "UI/UX",
+     "count": 1
+    },
+    {
+     "from": "Orchestrator",
+     "to": "Data Science",
+     "count": 1
+    },
+    {
+     "from": "Orchestrator",
+     "to": "DevOps",
+     "count": 1
+    },
+    {
+     "from": "Orchestrator",
+     "to": "Lead Developer",
+     "count": 1
+    },
+    {
+     "from": "QA Reviewer 1",
+     "to": "Backend Dev",
+     "count": 1
+    },
+    {
+     "from": "QA Reviewer 1",
+     "to": "DevOps",
+     "count": 1
+    },
+    {
+     "from": "QA Reviewer 1",
+     "to": "QA Reviewer 2",
+     "count": 1
+    },
+    {
+     "from": "QA Reviewer 1",
+     "to": "Security Reviewer",
+     "count": 1
+    },
+    {
+     "from": "Security Reviewer",
+     "to": "Frontend Dev",
+     "count": 1
+    },
+    {
+     "from": "Security Reviewer",
+     "to": "QA Reviewer 1",
+     "count": 1
+    },
+    {
+     "from": "UI/UX",
+     "to": "Orchestrator",
+     "count": 1
+    }
+   ],
+   "pairs": [
+    {
+     "from": "coral-go-team",
+     "to": "coral-hub",
+     "messages": 5,
+     "requests": 3,
+     "accepted": 1
+    },
+    {
+     "from": "coral-hub",
+     "to": "coral-go-team",
+     "messages": 4,
+     "requests": 2,
+     "accepted": 0
+    },
+    {
+     "from": "coral-go-team",
+     "to": "windows",
+     "messages": 3,
+     "requests": 1,
+     "accepted": 0
+    },
+    {
+     "from": "windows",
+     "to": "coral-go-team",
+     "messages": 2,
+     "requests": 1,
+     "accepted": 0
+    }
+   ],
+   "asks": {
+    "asked": 2,
+    "answered": 2,
+    "median_s": 600,
+    "slowest_s": 900
+   },
+   "operator_asks": {
+    "asked": 3,
+    "answered": 2,
+    "median_s": 3660,
+    "slowest_s": 7200
+   },
+   "assigned": 24,
+   "tasks_done": 15,
+   "truncated": false,
+   "operator_posts": 15,
+   "agent_posts": 569,
+   "automated_posts": 61,
+   "cross_posts": 14,
+   "touches": {
+    "kinds": {
+     "typed": 0,
+     "answer": 0,
+     "approve": 0,
+     "wake": 0,
+     "restart": 0,
+     "stop": 0
+    },
+    "sources": {
+     "local": 0,
+     "hub": 0
+    },
+    "days": [],
+    "agents": [],
+    "truncated": false
+   },
+   "task_messages": []
+  },
+  "generated_at": "2026-10-30T12:00:00Z",
+  "range": "14d"
+ },
+ "expect": {
+  "agent_asks": [
+   2,
+   2,
+   600
+  ],
+  "agent_posts": 569,
+  "assigned": 24,
+  "automated": 61,
+  "cross": 14,
+  "done": 15,
+  "edge_count": 132,
+  "operator_asks": [
+   3,
+   2,
+   3660
+  ],
+  "operator_posts": 15,
+  "operator_slowest": 7200,
+  "pairs": {
+   "coral-go-team\u003ecoral-hub": [
+    5,
+    3,
+    1
+   ],
+   "coral-go-team\u003ewindows": [
+    3,
+    1,
+    0
+   ],
+   "coral-hub\u003ecoral-go-team": [
+    4,
+    2,
+    0
+   ],
+   "windows\u003ecoral-go-team": [
+    2,
+    1,
+    0
+   ]
+  },
+  "received": {
+   "Backend Dev": 33,
+   "Data Science": 38,
+   "DevOps": 34,
+   "Docs Writer": 42,
+   "Frontend Dev": 50,
+   "Lead Developer": 41,
+   "Mobile Beta Tester": 38,
+   "Orchestrator": 35,
+   "QA Reviewer 1": 39,
+   "QA Reviewer 2": 44,
+   "Security Reviewer": 28,
+   "UI/UX": 35
+  },
+  "sent": {
+   "Backend Dev": 50,
+   "Data Science": 48,
+   "DevOps": 46,
+   "Docs Writer": 48,
+   "Frontend Dev": 43,
+   "Lead Developer": 47,
+   "Mobile Beta Tester": 49,
+   "Orchestrator": 47,
+   "QA Reviewer 1": 44,
+   "QA Reviewer 2": 46,
+   "Security Reviewer": 53,
+   "UI/UX": 48
+  },
+  "to_operator": {
+   "Backend Dev": 7,
+   "Data Science": 7,
+   "DevOps": 7,
+   "Docs Writer": 6,
+   "Frontend Dev": 3,
+   "Lead Developer": 6,
+   "Mobile Beta Tester": 6,
+   "Orchestrator": 3,
+   "QA Reviewer 1": 1,
+   "QA Reviewer 2": 3,
+   "Security Reviewer": 7,
+   "UI/UX": 4
+  },
+  "usage": {
+   "cost_cur": 455,
+   "cost_prev": 414,
+   "requests_cur": 84,
+   "tokens_cur": 481100
+  }
+ },
+ "timeseries": {
+  "buckets": [
+   {
+    "bucket": "2026-10-03T00:00:00Z",
+    "cache_read_tokens": 30000,
+    "cache_write_tokens": 0,
+    "cost_usd": 29.5,
+    "cumulative_cost": 29.5,
+    "input_tokens": 34000,
+    "num_requests": 6,
+    "output_tokens": 5400,
+    "series": [
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 7.1,
+      "input_tokens": 8000,
+      "key": "Backend Dev",
+      "label": "Backend Dev",
+      "num_requests": 1,
+      "output_tokens": 900
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 5.2,
+      "input_tokens": 6000,
+      "key": "Frontend Dev",
+      "label": "Frontend Dev",
+      "num_requests": 1,
+      "output_tokens": 1200
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 9,
+      "input_tokens": 5000,
+      "key": "Orchestrator",
+      "label": "Orchestrator",
+      "num_requests": 1,
+      "output_tokens": 300
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 2.3,
+      "input_tokens": 1000,
+      "key": "QA Reviewer 1",
+      "label": "QA Reviewer 1",
+      "num_requests": 1,
+      "output_tokens": 1500
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 4.4,
+      "input_tokens": 6000,
+      "key": "QA Reviewer 2",
+      "label": "QA Reviewer 2",
+      "num_requests": 1,
+      "output_tokens": 600
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 1.5,
+      "input_tokens": 8000,
+      "key": "UI/UX",
+      "label": "UI/UX",
+      "num_requests": 1,
+      "output_tokens": 900
+     }
+    ]
+   },
+   {
+    "bucket": "2026-10-04T00:00:00Z",
+    "cache_read_tokens": 30000,
+    "cache_write_tokens": 0,
+    "cost_usd": 31.499999999999996,
+    "cumulative_cost": 61,
+    "input_tokens": 40000,
+    "num_requests": 6,
+    "output_tokens": 4800,
+    "series": [
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 2.1,
+      "input_tokens": 9000,
+      "key": "Backend Dev",
+      "label": "Backend Dev",
+      "num_requests": 1,
+      "output_tokens": 600
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 9.2,
+      "input_tokens": 7000,
+      "key": "Frontend Dev",
+      "label": "Frontend Dev",
+      "num_requests": 1,
+      "output_tokens": 900
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 4,
+      "input_tokens": 8000,
+      "key": "Orchestrator",
+      "label": "Orchestrator",
+      "num_requests": 1,
+      "output_tokens": 600
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 7.3,
+      "input_tokens": 4000,
+      "key": "QA Reviewer 1",
+      "label": "QA Reviewer 1",
+      "num_requests": 1,
+      "output_tokens": 600
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 1.4,
+      "input_tokens": 5000,
+      "key": "QA Reviewer 2",
+      "label": "QA Reviewer 2",
+      "num_requests": 1,
+      "output_tokens": 1500
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 7.5,
+      "input_tokens": 7000,
+      "key": "UI/UX",
+      "label": "UI/UX",
+      "num_requests": 1,
+      "output_tokens": 600
+     }
+    ]
+   },
+   {
+    "bucket": "2026-10-05T00:00:00Z",
+    "cache_read_tokens": 30000,
+    "cache_write_tokens": 0,
+    "cost_usd": 43.5,
+    "cumulative_cost": 104.5,
+    "input_tokens": 30000,
+    "num_requests": 6,
+    "output_tokens": 4800,
+    "series": [
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 9.1,
+      "input_tokens": 7000,
+      "key": "Backend Dev",
+      "label": "Backend Dev",
+      "num_requests": 1,
+      "output_tokens": 600
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 6.2,
+      "input_tokens": 4000,
+      "key": "Frontend Dev",
+      "label": "Frontend Dev",
+      "num_requests": 1,
+      "output_tokens": 1200
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 8,
+      "input_tokens": 4000,
+      "key": "Orchestrator",
+      "label": "Orchestrator",
+      "num_requests": 1,
+      "output_tokens": 300
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 7.3,
+      "input_tokens": 5000,
+      "key": "QA Reviewer 1",
+      "label": "QA Reviewer 1",
+      "num_requests": 1,
+      "output_tokens": 900
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 3.4,
+      "input_tokens": 5000,
+      "key": "QA Reviewer 2",
+      "label": "QA Reviewer 2",
+      "num_requests": 1,
+      "output_tokens": 300
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 9.5,
+      "input_tokens": 5000,
+      "key": "UI/UX",
+      "label": "UI/UX",
+      "num_requests": 1,
+      "output_tokens": 1500
+     }
+    ]
+   },
+   {
+    "bucket": "2026-10-06T00:00:00Z",
+    "cache_read_tokens": 30000,
+    "cache_write_tokens": 0,
+    "cost_usd": 38.5,
+    "cumulative_cost": 143,
+    "input_tokens": 32000,
+    "num_requests": 6,
+    "output_tokens": 4500,
+    "series": [
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 4.1,
+      "input_tokens": 6000,
+      "key": "Backend Dev",
+      "label": "Backend Dev",
+      "num_requests": 1,
+      "output_tokens": 300
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 2.2,
+      "input_tokens": 8000,
+      "key": "Frontend Dev",
+      "label": "Frontend Dev",
+      "num_requests": 1,
+      "output_tokens": 300
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 8,
+      "input_tokens": 1000,
+      "key": "Orchestrator",
+      "label": "Orchestrator",
+      "num_requests": 1,
+      "output_tokens": 1200
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 8.3,
+      "input_tokens": 5000,
+      "key": "QA Reviewer 1",
+      "label": "QA Reviewer 1",
+      "num_requests": 1,
+      "output_tokens": 600
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 6.4,
+      "input_tokens": 6000,
+      "key": "QA Reviewer 2",
+      "label": "QA Reviewer 2",
+      "num_requests": 1,
+      "output_tokens": 600
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 9.5,
+      "input_tokens": 6000,
+      "key": "UI/UX",
+      "label": "UI/UX",
+      "num_requests": 1,
+      "output_tokens": 1500
+     }
+    ]
+   },
+   {
+    "bucket": "2026-10-07T00:00:00Z",
+    "cache_read_tokens": 30000,
+    "cache_write_tokens": 0,
+    "cost_usd": 21.5,
+    "cumulative_cost": 164.5,
+    "input_tokens": 27000,
+    "num_requests": 6,
+    "output_tokens": 6600,
+    "series": [
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 2.1,
+      "input_tokens": 1000,
+      "key": "Backend Dev",
+      "label": "Backend Dev",
+      "num_requests": 1,
+      "output_tokens": 1500
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 3.2,
+      "input_tokens": 3000,
+      "key": "Frontend Dev",
+      "label": "Frontend Dev",
+      "num_requests": 1,
+      "output_tokens": 300
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 1,
+      "input_tokens": 6000,
+      "key": "Orchestrator",
+      "label": "Orchestrator",
+      "num_requests": 1,
+      "output_tokens": 900
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 6.3,
+      "input_tokens": 8000,
+      "key": "QA Reviewer 1",
+      "label": "QA Reviewer 1",
+      "num_requests": 1,
+      "output_tokens": 1500
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 6.4,
+      "input_tokens": 5000,
+      "key": "QA Reviewer 2",
+      "label": "QA Reviewer 2",
+      "num_requests": 1,
+      "output_tokens": 1500
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 2.5,
+      "input_tokens": 4000,
+      "key": "UI/UX",
+      "label": "UI/UX",
+      "num_requests": 1,
+      "output_tokens": 900
+     }
+    ]
+   },
+   {
+    "bucket": "2026-10-08T00:00:00Z",
+    "cache_read_tokens": 30000,
+    "cache_write_tokens": 0,
+    "cost_usd": 30.5,
+    "cumulative_cost": 195,
+    "input_tokens": 34000,
+    "num_requests": 6,
+    "output_tokens": 5700,
+    "series": [
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 8.1,
+      "input_tokens": 2000,
+      "key": "Backend Dev",
+      "label": "Backend Dev",
+      "num_requests": 1,
+      "output_tokens": 900
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 5.2,
+      "input_tokens": 8000,
+      "key": "Frontend Dev",
+      "label": "Frontend Dev",
+      "num_requests": 1,
+      "output_tokens": 1500
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 8,
+      "input_tokens": 8000,
+      "key": "Orchestrator",
+      "label": "Orchestrator",
+      "num_requests": 1,
+      "output_tokens": 600
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 3.3,
+      "input_tokens": 9000,
+      "key": "QA Reviewer 1",
+      "label": "QA Reviewer 1",
+      "num_requests": 1,
+      "output_tokens": 300
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 2.4,
+      "input_tokens": 5000,
+      "key": "QA Reviewer 2",
+      "label": "QA Reviewer 2",
+      "num_requests": 1,
+      "output_tokens": 1200
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 3.5,
+      "input_tokens": 2000,
+      "key": "UI/UX",
+      "label": "UI/UX",
+      "num_requests": 1,
+      "output_tokens": 1200
+     }
+    ]
+   },
+   {
+    "bucket": "2026-10-09T00:00:00Z",
+    "cache_read_tokens": 30000,
+    "cache_write_tokens": 0,
+    "cost_usd": 35.5,
+    "cumulative_cost": 230.5,
+    "input_tokens": 16000,
+    "num_requests": 6,
+    "output_tokens": 5100,
+    "series": [
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 4.1,
+      "input_tokens": 1000,
+      "key": "Backend Dev",
+      "label": "Backend Dev",
+      "num_requests": 1,
+      "output_tokens": 1500
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 9.2,
+      "input_tokens": 3000,
+      "key": "Frontend Dev",
+      "label": "Frontend Dev",
+      "num_requests": 1,
+      "output_tokens": 1200
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 7,
+      "input_tokens": 3000,
+      "key": "Orchestrator",
+      "label": "Orchestrator",
+      "num_requests": 1,
+      "output_tokens": 600
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 3.3,
+      "input_tokens": 5000,
+      "key": "QA Reviewer 1",
+      "label": "QA Reviewer 1",
+      "num_requests": 1,
+      "output_tokens": 600
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 3.4,
+      "input_tokens": 1000,
+      "key": "QA Reviewer 2",
+      "label": "QA Reviewer 2",
+      "num_requests": 1,
+      "output_tokens": 600
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 8.5,
+      "input_tokens": 3000,
+      "key": "UI/UX",
+      "label": "UI/UX",
+      "num_requests": 1,
+      "output_tokens": 600
+     }
+    ]
+   },
+   {
+    "bucket": "2026-10-10T00:00:00Z",
+    "cache_read_tokens": 30000,
+    "cache_write_tokens": 0,
+    "cost_usd": 24.5,
+    "cumulative_cost": 255,
+    "input_tokens": 31000,
+    "num_requests": 6,
+    "output_tokens": 6600,
+    "series": [
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 6.1,
+      "input_tokens": 7000,
+      "key": "Backend Dev",
+      "label": "Backend Dev",
+      "num_requests": 1,
+      "output_tokens": 300
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 3.2,
+      "input_tokens": 6000,
+      "key": "Frontend Dev",
+      "label": "Frontend Dev",
+      "num_requests": 1,
+      "output_tokens": 1200
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 2,
+      "input_tokens": 4000,
+      "key": "Orchestrator",
+      "label": "Orchestrator",
+      "num_requests": 1,
+      "output_tokens": 1500
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 2.3,
+      "input_tokens": 4000,
+      "key": "QA Reviewer 1",
+      "label": "QA Reviewer 1",
+      "num_requests": 1,
+      "output_tokens": 1500
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 2.4,
+      "input_tokens": 6000,
+      "key": "QA Reviewer 2",
+      "label": "QA Reviewer 2",
+      "num_requests": 1,
+      "output_tokens": 900
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 8.5,
+      "input_tokens": 4000,
+      "key": "UI/UX",
+      "label": "UI/UX",
+      "num_requests": 1,
+      "output_tokens": 1200
+     }
+    ]
+   },
+   {
+    "bucket": "2026-10-11T00:00:00Z",
+    "cache_read_tokens": 30000,
+    "cache_write_tokens": 0,
+    "cost_usd": 17.5,
+    "cumulative_cost": 272.5,
+    "input_tokens": 36000,
+    "num_requests": 6,
+    "output_tokens": 5700,
+    "series": [
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 7.1,
+      "input_tokens": 9000,
+      "key": "Backend Dev",
+      "label": "Backend Dev",
+      "num_requests": 1,
+      "output_tokens": 900
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 2.2,
+      "input_tokens": 9000,
+      "key": "Frontend Dev",
+      "label": "Frontend Dev",
+      "num_requests": 1,
+      "output_tokens": 1500
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 2,
+      "input_tokens": 2000,
+      "key": "Orchestrator",
+      "label": "Orchestrator",
+      "num_requests": 1,
+      "output_tokens": 600
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 2.3,
+      "input_tokens": 5000,
+      "key": "QA Reviewer 1",
+      "label": "QA Reviewer 1",
+      "num_requests": 1,
+      "output_tokens": 900
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 1.4,
+      "input_tokens": 3000,
+      "key": "QA Reviewer 2",
+      "label": "QA Reviewer 2",
+      "num_requests": 1,
+      "output_tokens": 1200
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 2.5,
+      "input_tokens": 8000,
+      "key": "UI/UX",
+      "label": "UI/UX",
+      "num_requests": 1,
+      "output_tokens": 600
+     }
+    ]
+   },
+   {
+    "bucket": "2026-10-12T00:00:00Z",
+    "cache_read_tokens": 30000,
+    "cache_write_tokens": 0,
+    "cost_usd": 17.5,
+    "cumulative_cost": 290,
+    "input_tokens": 39000,
+    "num_requests": 6,
+    "output_tokens": 5700,
+    "series": [
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 2.1,
+      "input_tokens": 9000,
+      "key": "Backend Dev",
+      "label": "Backend Dev",
+      "num_requests": 1,
+      "output_tokens": 1500
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 2.2,
+      "input_tokens": 8000,
+      "key": "Frontend Dev",
+      "label": "Frontend Dev",
+      "num_requests": 1,
+      "output_tokens": 1500
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 3,
+      "input_tokens": 1000,
+      "key": "Orchestrator",
+      "label": "Orchestrator",
+      "num_requests": 1,
+      "output_tokens": 900
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 1.3,
+      "input_tokens": 4000,
+      "key": "QA Reviewer 1",
+      "label": "QA Reviewer 1",
+      "num_requests": 1,
+      "output_tokens": 1200
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 6.4,
+      "input_tokens": 9000,
+      "key": "QA Reviewer 2",
+      "label": "QA Reviewer 2",
+      "num_requests": 1,
+      "output_tokens": 300
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 2.5,
+      "input_tokens": 8000,
+      "key": "UI/UX",
+      "label": "UI/UX",
+      "num_requests": 1,
+      "output_tokens": 300
+     }
+    ]
+   },
+   {
+    "bucket": "2026-10-13T00:00:00Z",
+    "cache_read_tokens": 30000,
+    "cache_write_tokens": 0,
+    "cost_usd": 28.5,
+    "cumulative_cost": 318.5,
+    "input_tokens": 34000,
+    "num_requests": 6,
+    "output_tokens": 4800,
+    "series": [
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 4.1,
+      "input_tokens": 5000,
+      "key": "Backend Dev",
+      "label": "Backend Dev",
+      "num_requests": 1,
+      "output_tokens": 1500
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 5.2,
+      "input_tokens": 7000,
+      "key": "Frontend Dev",
+      "label": "Frontend Dev",
+      "num_requests": 1,
+      "output_tokens": 900
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 8,
+      "input_tokens": 1000,
+      "key": "Orchestrator",
+      "label": "Orchestrator",
+      "num_requests": 1,
+      "output_tokens": 300
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 4.3,
+      "input_tokens": 7000,
+      "key": "QA Reviewer 1",
+      "label": "QA Reviewer 1",
+      "num_requests": 1,
+      "output_tokens": 1200
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 2.4,
+      "input_tokens": 7000,
+      "key": "QA Reviewer 2",
+      "label": "QA Reviewer 2",
+      "num_requests": 1,
+      "output_tokens": 600
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 4.5,
+      "input_tokens": 7000,
+      "key": "UI/UX",
+      "label": "UI/UX",
+      "num_requests": 1,
+      "output_tokens": 300
+     }
+    ]
+   },
+   {
+    "bucket": "2026-10-14T00:00:00Z",
+    "cache_read_tokens": 30000,
+    "cache_write_tokens": 0,
+    "cost_usd": 33.5,
+    "cumulative_cost": 352,
+    "input_tokens": 38000,
+    "num_requests": 6,
+    "output_tokens": 6900,
+    "series": [
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 4.1,
+      "input_tokens": 5000,
+      "key": "Backend Dev",
+      "label": "Backend Dev",
+      "num_requests": 1,
+      "output_tokens": 1200
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 9.2,
+      "input_tokens": 9000,
+      "key": "Frontend Dev",
+      "label": "Frontend Dev",
+      "num_requests": 1,
+      "output_tokens": 900
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 6,
+      "input_tokens": 4000,
+      "key": "Orchestrator",
+      "label": "Orchestrator",
+      "num_requests": 1,
+      "output_tokens": 1500
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 2.3,
+      "input_tokens": 8000,
+      "key": "QA Reviewer 1",
+      "label": "QA Reviewer 1",
+      "num_requests": 1,
+      "output_tokens": 1500
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 7.4,
+      "input_tokens": 3000,
+      "key": "QA Reviewer 2",
+      "label": "QA Reviewer 2",
+      "num_requests": 1,
+      "output_tokens": 1200
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 4.5,
+      "input_tokens": 9000,
+      "key": "UI/UX",
+      "label": "UI/UX",
+      "num_requests": 1,
+      "output_tokens": 600
+     }
+    ]
+   },
+   {
+    "bucket": "2026-10-15T00:00:00Z",
+    "cache_read_tokens": 30000,
+    "cache_write_tokens": 0,
+    "cost_usd": 29.5,
+    "cumulative_cost": 381.5,
+    "input_tokens": 32000,
+    "num_requests": 6,
+    "output_tokens": 6300,
+    "series": [
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 9.1,
+      "input_tokens": 9000,
+      "key": "Backend Dev",
+      "label": "Backend Dev",
+      "num_requests": 1,
+      "output_tokens": 1500
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 5.2,
+      "input_tokens": 2000,
+      "key": "Frontend Dev",
+      "label": "Frontend Dev",
+      "num_requests": 1,
+      "output_tokens": 1500
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 3,
+      "input_tokens": 4000,
+      "key": "Orchestrator",
+      "label": "Orchestrator",
+      "num_requests": 1,
+      "output_tokens": 1200
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 5.3,
+      "input_tokens": 6000,
+      "key": "QA Reviewer 1",
+      "label": "QA Reviewer 1",
+      "num_requests": 1,
+      "output_tokens": 1500
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 5.4,
+      "input_tokens": 2000,
+      "key": "QA Reviewer 2",
+      "label": "QA Reviewer 2",
+      "num_requests": 1,
+      "output_tokens": 300
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 1.5,
+      "input_tokens": 9000,
+      "key": "UI/UX",
+      "label": "UI/UX",
+      "num_requests": 1,
+      "output_tokens": 300
+     }
+    ]
+   },
+   {
+    "bucket": "2026-10-16T00:00:00Z",
+    "cache_read_tokens": 30000,
+    "cache_write_tokens": 0,
+    "cost_usd": 32.5,
+    "cumulative_cost": 414,
+    "input_tokens": 41000,
+    "num_requests": 6,
+    "output_tokens": 6600,
+    "series": [
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 8.1,
+      "input_tokens": 7000,
+      "key": "Backend Dev",
+      "label": "Backend Dev",
+      "num_requests": 1,
+      "output_tokens": 900
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 5.2,
+      "input_tokens": 6000,
+      "key": "Frontend Dev",
+      "label": "Frontend Dev",
+      "num_requests": 1,
+      "output_tokens": 1500
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 5,
+      "input_tokens": 8000,
+      "key": "Orchestrator",
+      "label": "Orchestrator",
+      "num_requests": 1,
+      "output_tokens": 1200
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 6.3,
+      "input_tokens": 3000,
+      "key": "QA Reviewer 1",
+      "label": "QA Reviewer 1",
+      "num_requests": 1,
+      "output_tokens": 900
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 2.4,
+      "input_tokens": 8000,
+      "key": "QA Reviewer 2",
+      "label": "QA Reviewer 2",
+      "num_requests": 1,
+      "output_tokens": 1200
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 5.5,
+      "input_tokens": 9000,
+      "key": "UI/UX",
+      "label": "UI/UX",
+      "num_requests": 1,
+      "output_tokens": 900
+     }
+    ]
+   },
+   {
+    "bucket": "2026-10-17T00:00:00Z",
+    "cache_read_tokens": 30000,
+    "cache_write_tokens": 0,
+    "cost_usd": 24.5,
+    "cumulative_cost": 438.5,
+    "input_tokens": 31000,
+    "num_requests": 6,
+    "output_tokens": 3600,
+    "series": [
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 2.1,
+      "input_tokens": 9000,
+      "key": "Backend Dev",
+      "label": "Backend Dev",
+      "num_requests": 1,
+      "output_tokens": 1500
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 1.2,
+      "input_tokens": 1000,
+      "key": "Frontend Dev",
+      "label": "Frontend Dev",
+      "num_requests": 1,
+      "output_tokens": 300
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 1,
+      "input_tokens": 5000,
+      "key": "Orchestrator",
+      "label": "Orchestrator",
+      "num_requests": 1,
+      "output_tokens": 300
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 2.3,
+      "input_tokens": 1000,
+      "key": "QA Reviewer 1",
+      "label": "QA Reviewer 1",
+      "num_requests": 1,
+      "output_tokens": 300
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 9.4,
+      "input_tokens": 6000,
+      "key": "QA Reviewer 2",
+      "label": "QA Reviewer 2",
+      "num_requests": 1,
+      "output_tokens": 600
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 8.5,
+      "input_tokens": 9000,
+      "key": "UI/UX",
+      "label": "UI/UX",
+      "num_requests": 1,
+      "output_tokens": 600
+     }
+    ]
+   },
+   {
+    "bucket": "2026-10-18T00:00:00Z",
+    "cache_read_tokens": 30000,
+    "cache_write_tokens": 0,
+    "cost_usd": 37.5,
+    "cumulative_cost": 476,
+    "input_tokens": 24000,
+    "num_requests": 6,
+    "output_tokens": 4800,
+    "series": [
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 2.1,
+      "input_tokens": 4000,
+      "key": "Backend Dev",
+      "label": "Backend Dev",
+      "num_requests": 1,
+      "output_tokens": 300
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 8.2,
+      "input_tokens": 3000,
+      "key": "Frontend Dev",
+      "label": "Frontend Dev",
+      "num_requests": 1,
+      "output_tokens": 900
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 6,
+      "input_tokens": 1000,
+      "key": "Orchestrator",
+      "label": "Orchestrator",
+      "num_requests": 1,
+      "output_tokens": 600
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 9.3,
+      "input_tokens": 7000,
+      "key": "QA Reviewer 1",
+      "label": "QA Reviewer 1",
+      "num_requests": 1,
+      "output_tokens": 600
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 6.4,
+      "input_tokens": 6000,
+      "key": "QA Reviewer 2",
+      "label": "QA Reviewer 2",
+      "num_requests": 1,
+      "output_tokens": 1200
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 5.5,
+      "input_tokens": 3000,
+      "key": "UI/UX",
+      "label": "UI/UX",
+      "num_requests": 1,
+      "output_tokens": 1200
+     }
+    ]
+   },
+   {
+    "bucket": "2026-10-19T00:00:00Z",
+    "cache_read_tokens": 30000,
+    "cache_write_tokens": 0,
+    "cost_usd": 32.5,
+    "cumulative_cost": 508.5,
+    "input_tokens": 29000,
+    "num_requests": 6,
+    "output_tokens": 5100,
+    "series": [
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 5.1,
+      "input_tokens": 2000,
+      "key": "Backend Dev",
+      "label": "Backend Dev",
+      "num_requests": 1,
+      "output_tokens": 900
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 9.2,
+      "input_tokens": 3000,
+      "key": "Frontend Dev",
+      "label": "Frontend Dev",
+      "num_requests": 1,
+      "output_tokens": 600
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 7,
+      "input_tokens": 3000,
+      "key": "Orchestrator",
+      "label": "Orchestrator",
+      "num_requests": 1,
+      "output_tokens": 600
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 6.3,
+      "input_tokens": 6000,
+      "key": "QA Reviewer 1",
+      "label": "QA Reviewer 1",
+      "num_requests": 1,
+      "output_tokens": 1500
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 3.4,
+      "input_tokens": 6000,
+      "key": "QA Reviewer 2",
+      "label": "QA Reviewer 2",
+      "num_requests": 1,
+      "output_tokens": 1200
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 1.5,
+      "input_tokens": 9000,
+      "key": "UI/UX",
+      "label": "UI/UX",
+      "num_requests": 1,
+      "output_tokens": 300
+     }
+    ]
+   },
+   {
+    "bucket": "2026-10-20T00:00:00Z",
+    "cache_read_tokens": 30000,
+    "cache_write_tokens": 0,
+    "cost_usd": 29.5,
+    "cumulative_cost": 538,
+    "input_tokens": 27000,
+    "num_requests": 6,
+    "output_tokens": 6600,
+    "series": [
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 7.1,
+      "input_tokens": 8000,
+      "key": "Backend Dev",
+      "label": "Backend Dev",
+      "num_requests": 1,
+      "output_tokens": 900
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 1.2,
+      "input_tokens": 2000,
+      "key": "Frontend Dev",
+      "label": "Frontend Dev",
+      "num_requests": 1,
+      "output_tokens": 1500
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 9,
+      "input_tokens": 1000,
+      "key": "Orchestrator",
+      "label": "Orchestrator",
+      "num_requests": 1,
+      "output_tokens": 1200
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 2.3,
+      "input_tokens": 6000,
+      "key": "QA Reviewer 1",
+      "label": "QA Reviewer 1",
+      "num_requests": 1,
+      "output_tokens": 600
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 5.4,
+      "input_tokens": 3000,
+      "key": "QA Reviewer 2",
+      "label": "QA Reviewer 2",
+      "num_requests": 1,
+      "output_tokens": 900
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 4.5,
+      "input_tokens": 7000,
+      "key": "UI/UX",
+      "label": "UI/UX",
+      "num_requests": 1,
+      "output_tokens": 1500
+     }
+    ]
+   },
+   {
+    "bucket": "2026-10-21T00:00:00Z",
+    "cache_read_tokens": 30000,
+    "cache_write_tokens": 0,
+    "cost_usd": 19.5,
+    "cumulative_cost": 557.5,
+    "input_tokens": 30000,
+    "num_requests": 6,
+    "output_tokens": 5400,
+    "series": [
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 5.1,
+      "input_tokens": 4000,
+      "key": "Backend Dev",
+      "label": "Backend Dev",
+      "num_requests": 1,
+      "output_tokens": 1500
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 1.2,
+      "input_tokens": 7000,
+      "key": "Frontend Dev",
+      "label": "Frontend Dev",
+      "num_requests": 1,
+      "output_tokens": 600
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 5,
+      "input_tokens": 1000,
+      "key": "Orchestrator",
+      "label": "Orchestrator",
+      "num_requests": 1,
+      "output_tokens": 600
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 1.3,
+      "input_tokens": 3000,
+      "key": "QA Reviewer 1",
+      "label": "QA Reviewer 1",
+      "num_requests": 1,
+      "output_tokens": 600
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 3.4,
+      "input_tokens": 6000,
+      "key": "QA Reviewer 2",
+      "label": "QA Reviewer 2",
+      "num_requests": 1,
+      "output_tokens": 1200
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 3.5,
+      "input_tokens": 9000,
+      "key": "UI/UX",
+      "label": "UI/UX",
+      "num_requests": 1,
+      "output_tokens": 900
+     }
+    ]
+   },
+   {
+    "bucket": "2026-10-22T00:00:00Z",
+    "cache_read_tokens": 30000,
+    "cache_write_tokens": 0,
+    "cost_usd": 35.5,
+    "cumulative_cost": 593,
+    "input_tokens": 35000,
+    "num_requests": 6,
+    "output_tokens": 3600,
+    "series": [
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 3.1,
+      "input_tokens": 3000,
+      "key": "Backend Dev",
+      "label": "Backend Dev",
+      "num_requests": 1,
+      "output_tokens": 1200
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 9.2,
+      "input_tokens": 6000,
+      "key": "Frontend Dev",
+      "label": "Frontend Dev",
+      "num_requests": 1,
+      "output_tokens": 300
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 7,
+      "input_tokens": 9000,
+      "key": "Orchestrator",
+      "label": "Orchestrator",
+      "num_requests": 1,
+      "output_tokens": 300
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 5.3,
+      "input_tokens": 1000,
+      "key": "QA Reviewer 1",
+      "label": "QA Reviewer 1",
+      "num_requests": 1,
+      "output_tokens": 1200
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 3.4,
+      "input_tokens": 9000,
+      "key": "QA Reviewer 2",
+      "label": "QA Reviewer 2",
+      "num_requests": 1,
+      "output_tokens": 300
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 7.5,
+      "input_tokens": 7000,
+      "key": "UI/UX",
+      "label": "UI/UX",
+      "num_requests": 1,
+      "output_tokens": 300
+     }
+    ]
+   },
+   {
+    "bucket": "2026-10-23T00:00:00Z",
+    "cache_read_tokens": 30000,
+    "cache_write_tokens": 0,
+    "cost_usd": 19.5,
+    "cumulative_cost": 612.5,
+    "input_tokens": 29000,
+    "num_requests": 6,
+    "output_tokens": 5100,
+    "series": [
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 4.1,
+      "input_tokens": 4000,
+      "key": "Backend Dev",
+      "label": "Backend Dev",
+      "num_requests": 1,
+      "output_tokens": 900
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 1.2,
+      "input_tokens": 4000,
+      "key": "Frontend Dev",
+      "label": "Frontend Dev",
+      "num_requests": 1,
+      "output_tokens": 900
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 1,
+      "input_tokens": 2000,
+      "key": "Orchestrator",
+      "label": "Orchestrator",
+      "num_requests": 1,
+      "output_tokens": 1500
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 5.3,
+      "input_tokens": 8000,
+      "key": "QA Reviewer 1",
+      "label": "QA Reviewer 1",
+      "num_requests": 1,
+      "output_tokens": 300
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 3.4,
+      "input_tokens": 4000,
+      "key": "QA Reviewer 2",
+      "label": "QA Reviewer 2",
+      "num_requests": 1,
+      "output_tokens": 900
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 4.5,
+      "input_tokens": 7000,
+      "key": "UI/UX",
+      "label": "UI/UX",
+      "num_requests": 1,
+      "output_tokens": 600
+     }
+    ]
+   },
+   {
+    "bucket": "2026-10-24T00:00:00Z",
+    "cache_read_tokens": 30000,
+    "cache_write_tokens": 0,
+    "cost_usd": 45.5,
+    "cumulative_cost": 658,
+    "input_tokens": 35000,
+    "num_requests": 6,
+    "output_tokens": 7200,
+    "series": [
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 7.1,
+      "input_tokens": 7000,
+      "key": "Backend Dev",
+      "label": "Backend Dev",
+      "num_requests": 1,
+      "output_tokens": 1200
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 5.2,
+      "input_tokens": 7000,
+      "key": "Frontend Dev",
+      "label": "Frontend Dev",
+      "num_requests": 1,
+      "output_tokens": 1200
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 9,
+      "input_tokens": 3000,
+      "key": "Orchestrator",
+      "label": "Orchestrator",
+      "num_requests": 1,
+      "output_tokens": 600
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 9.3,
+      "input_tokens": 6000,
+      "key": "QA Reviewer 1",
+      "label": "QA Reviewer 1",
+      "num_requests": 1,
+      "output_tokens": 1200
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 7.4,
+      "input_tokens": 5000,
+      "key": "QA Reviewer 2",
+      "label": "QA Reviewer 2",
+      "num_requests": 1,
+      "output_tokens": 1500
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 7.5,
+      "input_tokens": 7000,
+      "key": "UI/UX",
+      "label": "UI/UX",
+      "num_requests": 1,
+      "output_tokens": 1500
+     }
+    ]
+   },
+   {
+    "bucket": "2026-10-25T00:00:00Z",
+    "cache_read_tokens": 30000,
+    "cache_write_tokens": 0,
+    "cost_usd": 35.5,
+    "cumulative_cost": 693.5,
+    "input_tokens": 30000,
+    "num_requests": 6,
+    "output_tokens": 4800,
+    "series": [
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 7.1,
+      "input_tokens": 2000,
+      "key": "Backend Dev",
+      "label": "Backend Dev",
+      "num_requests": 1,
+      "output_tokens": 600
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 3.2,
+      "input_tokens": 2000,
+      "key": "Frontend Dev",
+      "label": "Frontend Dev",
+      "num_requests": 1,
+      "output_tokens": 300
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 8,
+      "input_tokens": 8000,
+      "key": "Orchestrator",
+      "label": "Orchestrator",
+      "num_requests": 1,
+      "output_tokens": 600
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 7.3,
+      "input_tokens": 6000,
+      "key": "QA Reviewer 1",
+      "label": "QA Reviewer 1",
+      "num_requests": 1,
+      "output_tokens": 1500
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 8.4,
+      "input_tokens": 9000,
+      "key": "QA Reviewer 2",
+      "label": "QA Reviewer 2",
+      "num_requests": 1,
+      "output_tokens": 1200
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 1.5,
+      "input_tokens": 3000,
+      "key": "UI/UX",
+      "label": "UI/UX",
+      "num_requests": 1,
+      "output_tokens": 600
+     }
+    ]
+   },
+   {
+    "bucket": "2026-10-26T00:00:00Z",
+    "cache_read_tokens": 30000,
+    "cache_write_tokens": 0,
+    "cost_usd": 42.5,
+    "cumulative_cost": 736,
+    "input_tokens": 36000,
+    "num_requests": 6,
+    "output_tokens": 4500,
+    "series": [
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 5.1,
+      "input_tokens": 3000,
+      "key": "Backend Dev",
+      "label": "Backend Dev",
+      "num_requests": 1,
+      "output_tokens": 900
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 7.2,
+      "input_tokens": 8000,
+      "key": "Frontend Dev",
+      "label": "Frontend Dev",
+      "num_requests": 1,
+      "output_tokens": 300
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 9,
+      "input_tokens": 8000,
+      "key": "Orchestrator",
+      "label": "Orchestrator",
+      "num_requests": 1,
+      "output_tokens": 600
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 3.3,
+      "input_tokens": 9000,
+      "key": "QA Reviewer 1",
+      "label": "QA Reviewer 1",
+      "num_requests": 1,
+      "output_tokens": 1200
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 9.4,
+      "input_tokens": 7000,
+      "key": "QA Reviewer 2",
+      "label": "QA Reviewer 2",
+      "num_requests": 1,
+      "output_tokens": 300
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 8.5,
+      "input_tokens": 1000,
+      "key": "UI/UX",
+      "label": "UI/UX",
+      "num_requests": 1,
+      "output_tokens": 1200
+     }
+    ]
+   },
+   {
+    "bucket": "2026-10-27T00:00:00Z",
+    "cache_read_tokens": 30000,
+    "cache_write_tokens": 0,
+    "cost_usd": 31.499999999999996,
+    "cumulative_cost": 767.5,
+    "input_tokens": 21000,
+    "num_requests": 6,
+    "output_tokens": 6000,
+    "series": [
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 8.1,
+      "input_tokens": 5000,
+      "key": "Backend Dev",
+      "label": "Backend Dev",
+      "num_requests": 1,
+      "output_tokens": 1200
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 1.2,
+      "input_tokens": 4000,
+      "key": "Frontend Dev",
+      "label": "Frontend Dev",
+      "num_requests": 1,
+      "output_tokens": 600
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 6,
+      "input_tokens": 2000,
+      "key": "Orchestrator",
+      "label": "Orchestrator",
+      "num_requests": 1,
+      "output_tokens": 900
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 6.3,
+      "input_tokens": 3000,
+      "key": "QA Reviewer 1",
+      "label": "QA Reviewer 1",
+      "num_requests": 1,
+      "output_tokens": 600
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 2.4,
+      "input_tokens": 3000,
+      "key": "QA Reviewer 2",
+      "label": "QA Reviewer 2",
+      "num_requests": 1,
+      "output_tokens": 1500
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 7.5,
+      "input_tokens": 4000,
+      "key": "UI/UX",
+      "label": "UI/UX",
+      "num_requests": 1,
+      "output_tokens": 1200
+     }
+    ]
+   },
+   {
+    "bucket": "2026-10-28T00:00:00Z",
+    "cache_read_tokens": 30000,
+    "cache_write_tokens": 0,
+    "cost_usd": 37.5,
+    "cumulative_cost": 805,
+    "input_tokens": 14000,
+    "num_requests": 6,
+    "output_tokens": 6300,
+    "series": [
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 3.1,
+      "input_tokens": 3000,
+      "key": "Backend Dev",
+      "label": "Backend Dev",
+      "num_requests": 1,
+      "output_tokens": 900
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 7.2,
+      "input_tokens": 1000,
+      "key": "Frontend Dev",
+      "label": "Frontend Dev",
+      "num_requests": 1,
+      "output_tokens": 1200
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 8,
+      "input_tokens": 4000,
+      "key": "Orchestrator",
+      "label": "Orchestrator",
+      "num_requests": 1,
+      "output_tokens": 900
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 8.3,
+      "input_tokens": 1000,
+      "key": "QA Reviewer 1",
+      "label": "QA Reviewer 1",
+      "num_requests": 1,
+      "output_tokens": 1500
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 3.4,
+      "input_tokens": 3000,
+      "key": "QA Reviewer 2",
+      "label": "QA Reviewer 2",
+      "num_requests": 1,
+      "output_tokens": 600
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 7.5,
+      "input_tokens": 2000,
+      "key": "UI/UX",
+      "label": "UI/UX",
+      "num_requests": 1,
+      "output_tokens": 1200
+     }
+    ]
+   },
+   {
+    "bucket": "2026-10-29T00:00:00Z",
+    "cache_read_tokens": 30000,
+    "cache_write_tokens": 0,
+    "cost_usd": 30.5,
+    "cumulative_cost": 835.5,
+    "input_tokens": 34000,
+    "num_requests": 6,
+    "output_tokens": 6300,
+    "series": [
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 3.1,
+      "input_tokens": 5000,
+      "key": "Backend Dev",
+      "label": "Backend Dev",
+      "num_requests": 1,
+      "output_tokens": 300
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 6.2,
+      "input_tokens": 8000,
+      "key": "Frontend Dev",
+      "label": "Frontend Dev",
+      "num_requests": 1,
+      "output_tokens": 900
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 4,
+      "input_tokens": 1000,
+      "key": "Orchestrator",
+      "label": "Orchestrator",
+      "num_requests": 1,
+      "output_tokens": 1200
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 7.3,
+      "input_tokens": 8000,
+      "key": "QA Reviewer 1",
+      "label": "QA Reviewer 1",
+      "num_requests": 1,
+      "output_tokens": 1500
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 1.4,
+      "input_tokens": 7000,
+      "key": "QA Reviewer 2",
+      "label": "QA Reviewer 2",
+      "num_requests": 1,
+      "output_tokens": 1200
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 8.5,
+      "input_tokens": 5000,
+      "key": "UI/UX",
+      "label": "UI/UX",
+      "num_requests": 1,
+      "output_tokens": 1200
+     }
+    ]
+   },
+   {
+    "bucket": "2026-10-30T00:00:00Z",
+    "cache_read_tokens": 30000,
+    "cache_write_tokens": 0,
+    "cost_usd": 33.5,
+    "cumulative_cost": 869,
+    "input_tokens": 32000,
+    "num_requests": 6,
+    "output_tokens": 4800,
+    "series": [
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 4.1,
+      "input_tokens": 8000,
+      "key": "Backend Dev",
+      "label": "Backend Dev",
+      "num_requests": 1,
+      "output_tokens": 900
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 6.2,
+      "input_tokens": 4000,
+      "key": "Frontend Dev",
+      "label": "Frontend Dev",
+      "num_requests": 1,
+      "output_tokens": 300
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 9,
+      "input_tokens": 6000,
+      "key": "Orchestrator",
+      "label": "Orchestrator",
+      "num_requests": 1,
+      "output_tokens": 1200
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 8.3,
+      "input_tokens": 1000,
+      "key": "QA Reviewer 1",
+      "label": "QA Reviewer 1",
+      "num_requests": 1,
+      "output_tokens": 1200
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 4.4,
+      "input_tokens": 8000,
+      "key": "QA Reviewer 2",
+      "label": "QA Reviewer 2",
+      "num_requests": 1,
+      "output_tokens": 900
+     },
+     {
+      "cache_read_tokens": 5000,
+      "cache_write_tokens": 0,
+      "cost_usd": 1.5,
+      "input_tokens": 5000,
+      "key": "UI/UX",
+      "label": "UI/UX",
+      "num_requests": 1,
+      "output_tokens": 300
+     }
+    ]
+   }
+  ]
+ },
+ "today": "2026-10-30"
+}
