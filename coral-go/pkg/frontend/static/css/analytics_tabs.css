@@ -19,13 +19,13 @@
 .atab-flat { color: var(--text-muted); }
 
 .atab-row2 { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; align-items: start; }
-.atab-card { display: flex; flex-direction: column; gap: 10px; min-width: 0; background: var(--bg-secondary); border: var(--card-border); border-radius: var(--card-radius); padding: var(--card-pad); }
+.atab-card { display: flex; flex-direction: column; gap: 10px; min-width: 0; background: var(--bg-primary); border: var(--card-border); border-radius: var(--card-radius); padding: var(--card-pad); }
 .atab-h { margin: 0; font-size: var(--fs-lg); font-weight: var(--fw-strong); display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
 .atab-h small { font-weight: var(--fw-regular); font-size: var(--fs-base); color: var(--text-muted); }
 .atab-svg { display: block; width: 100%; height: auto; overflow: visible; }
 .atab-axis { fill: var(--text-muted); font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }
 .atab-grid { stroke: var(--border); stroke-width: .7; }
-.atab-stripe { fill: var(--bg-secondary); }
+.atab-stripe { fill: var(--bg-primary); }
 .atab-bar-stripe { pointer-events: none; }
 .atab-sel { fill: none; stroke: var(--text-primary); stroke-width: 1.2; stroke-dasharray: 3 2; pointer-events: none; }
 .atab-hit { fill: transparent; cursor: pointer; }
@@ -33,7 +33,7 @@
 .atab-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 0; padding: 0; list-style: none; font-size: var(--fs-base); color: var(--text-secondary); }
 .atab-legend li { display: inline-flex; align-items: center; gap: 6px; }
 .atab-sw { --c: var(--viz-other); display: inline-block; width: 12px; height: 12px; border-radius: 2px; background: var(--c); }
-.atab-sw-stripe { background: repeating-linear-gradient(45deg, var(--c) 0 3px, var(--bg-secondary) 3px 5px); border: 1px solid var(--c); }
+.atab-sw-stripe { background: repeating-linear-gradient(45deg, var(--c) 0 3px, var(--bg-primary) 3px 5px); border: 1px solid var(--c); }
 
 .atab-days { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .atab-day-say { flex: 1 1 8rem; text-align: center; font-weight: var(--fw-strong); font-variant-numeric: tabular-nums; }
