@@ -356,6 +356,7 @@ POST /api/sessions/live/{name}/attach launch
 POST /api/sessions/live/{name}/auto-accept/disable interact
 POST /api/sessions/live/{name}/auto-accept/enable launch
 POST /api/sessions/live/{name}/context-window never
+POST /api/sessions/live/{name}/dismiss-wait never
 POST /api/sessions/live/{name}/events never
 POST /api/sessions/live/{name}/files/refresh interact
 POST /api/sessions/live/{name}/goal interact

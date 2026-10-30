@@ -364,6 +364,7 @@ b POST /api/sessions/live/team/{boardName}/wake
 b POST /api/sessions/live/wake-all
 b POST /api/sessions/live/{name}/answer-prompt
 b POST /api/sessions/live/{name}/attach
+b POST /api/sessions/live/{name}/dismiss-wait
 b POST /api/sessions/live/{name}/auto-accept/disable
 b POST /api/sessions/live/{name}/auto-accept/enable
 a POST /api/sessions/live/{name}/context-window

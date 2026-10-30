@@ -517,6 +517,7 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 .dt-mail-cell:has(> .inbox-answers) { flex-wrap: wrap; }
 .dt-mail-cell > .inbox-answers { flex: 1 1 100%; padding: 0 12px 8px 56px; } /* under the mail line, in line with its text */
 .dt-mail-cell > .inbox-answers:empty { display: none; }
+@media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) { .inbox-answers .inbox-dismiss, .inbox-answers:not(:has(.inbox-answer)) { display: none; } } /* a phone's Needs you row stays one line: the Dismiss is on the agent's card there (#11352) */
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) { .dt-mail-cell > .inbox-answers { padding-left: 0; padding-right: 0; } } /* a phone's choices have no indent (#10874) */ /* no choices read (yet): no padded empty line under the row, which made it 64 px, not the one line of 56 */
 
 /* The team of a chat's agent, in a table of chats when two or more teams exist (#10134): a dot in the team's colour (the person's pick, else neutral) and its name. */

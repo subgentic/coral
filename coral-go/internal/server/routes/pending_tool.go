@@ -6,11 +6,13 @@ import (
 	"log/slog"
 	"net/http"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 	"unicode/utf8"
 
 	at "github.com/subgentic/coral/internal/agenttypes"
+	"github.com/subgentic/coral/internal/sessionstate"
 	setreg "github.com/subgentic/coral/internal/settings"
 	"github.com/subgentic/coral/internal/shellkill"
 	"github.com/subgentic/coral/internal/store"
@@ -37,6 +39,13 @@ type pendingTools struct {
 	// requestOpen are the sessions with a permission request of the agent's own open (#11352): its tool's PreToolUse that comes next says the permission was given. Only the marker is kept; the
 	// request itself is in the event log.
 	requestOpen map[string]bool
+}
+
+// requestIsOpen reports whether the session has a request of its own marked open.
+func (p *pendingTools) requestIsOpen(sessionID string) bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.requestOpen[sessionID]
 }
 
 // markRequest notes that a session has a request open (open) or no longer has (not open); it reports whether one was open before.
@@ -279,7 +288,7 @@ func (h *SessionsHandler) SetPendingTool(w http.ResponseWriter, r *http.Request)
 		At:        time.Now(),
 	}
 	h.pending.set(body.SessionID, t)
-	h.noteToolStart(r.Context(), body.SessionID, body.ToolName, body.ToolUseID)
+	h.noteToolStart(r.Context(), body.SessionID, body.ToolName, body.ToolUseID, body.ToolInput)
 	h.watchForPrompt(body.SessionID, owner.SessionName, t) // agy sends no hook for a permission prompt (#4819)
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
@@ -321,23 +330,43 @@ func (h *SessionsHandler) notePendingToolEvent(sessionID, eventType, toolUseID s
 	}
 }
 
-// noteToolStart records, when a call starts while the session has a permission request of its own open, that the request was resolved: Claude begins a call (its PreToolUse) once the permission is
-// given, so the card and the Inbox row must not wait for a PostToolUse that comes minutes later with a long command (#11352). One event per request: the marker is taken by the first start, so
-// the PreToolUse of every other call writes nothing. Claude's only; another CLI's PreToolUse says nothing about its prompts.
-func (h *SessionsHandler) noteToolStart(ctx context.Context, sessionID, toolName, toolUseID string) {
-	if sessionID == "" || toolUseID == "" || h.ts == nil || !h.pending.markRequest(sessionID, false) {
-		return
-	}
-	if h.ss == nil {
+// noteToolStart records, when a call starts while the session has a permission request of its own open and the start says the request was answered, that it was resolved (#11352): the card and the
+// Inbox row must not wait for a PostToolUse that comes minutes later with a long command. Claude's only. Whether a start answers a request is the state derivation's own rule (Security's #136728):
+// the call the request waits for starts; a call that began half a minute or more after the request; or, for a request whose call was not known, a start of the same tool with the same input as the
+// request's wants (checked here, and written as same_input). The candidate event is derived first, and only one that closes the request is written: the PreToolUse of every other call writes nothing.
+func (h *SessionsHandler) noteToolStart(ctx context.Context, sessionID, toolName, toolUseID string, input map[string]any) {
+	if sessionID == "" || toolUseID == "" || h.ts == nil || h.ss == nil || !h.pending.requestIsOpen(sessionID) {
 		return
 	}
 	ls, err := h.ss.GetLiveSession(ctx, sessionID)
 	if err != nil || ls == nil || ls.AgentType != at.Claude {
 		return
 	}
-	agentName := ls.AgentName
+	events, err := h.ts.GetSessionStateEvents(ctx, []string{sessionID})
+	if err != nil {
+		return
+	}
+	var in sessionstate.Input
+	for _, ev := range events[sessionID] {
+		in.Events = append(in.Events, ev.StateEvent())
+	}
+	st := sessionstate.Derive(in)
+	if !st.NeedsInput {
+		h.pending.markRequest(sessionID, false) // nothing is open any more: the marker was stale
+		return
+	}
+	same := startMatchesWants(toolName, input, st.WaitingWants)
+	candidate := sessionstate.Event{Type: "request_resolved", ToolName: toolName, ToolUseID: toolUseID, SameInput: same, At: time.Now()}
+	in.Events = append(in.Events, candidate)
+	if sessionstate.Derive(in).NeedsInput {
+		return // this start does not answer it: a sibling, or another call's
+	}
 	id, sid := toolUseID, sessionID
-	ev := &store.AgentEvent{AgentName: agentName, SessionID: &sid, EventType: "request_resolved", Summary: "A call started: the permission was given", RefID: &id}
+	detail := `{"same_input":false}`
+	if same {
+		detail = `{"same_input":true}`
+	}
+	ev := &store.AgentEvent{AgentName: ls.AgentName, SessionID: &sid, EventType: "request_resolved", Summary: "A call started: the permission was given", DetailJSON: &detail, RefID: &id}
 	if toolName != "" {
 		ev.ToolName = &toolName
 	}
@@ -345,7 +374,26 @@ func (h *SessionsHandler) noteToolStart(ctx context.Context, sessionID, toolName
 		slog.Warn("could not record that a permission request was resolved by a call's start", "session_id", sessionID, "error", err)
 		return
 	}
+	h.pending.markRequest(sessionID, false)
 	h.kickFeedForRequestChange(sessionID, "request_resolved")
+}
+
+// startMatchesWants reports whether a call that starts (its tool and input) is what an open request's wants names: a Bash command whose "Wants to run: <command>" line, made as the hook makes it and
+// stored as the server stores it, is the request's own. Any other tool, an input without a command, or no wants is not a match: such a request stays open until it is answered or dismissed.
+func startMatchesWants(tool string, input map[string]any, wants string) bool {
+	if tool != "Bash" || wants == "" {
+		return false
+	}
+	cmd, _ := input["command"].(string)
+	cmd = strings.TrimSpace(cmd)
+	if cmd == "" {
+		return false
+	}
+	if len(cmd) > 1<<10 { // the hook cuts one input to 1 KiB before the server cleans it
+		cmd = cmd[:1<<10]
+	}
+	line, _ := waitingLine("Wants to run: " + strings.ToValidUTF8(cmd, "")).(string)
+	return line != "" && line == wants
 }
 
 // requestCallMaxAge is how recent a call's PreToolUse must be for a permission request to be about it.
