@@ -49,3 +49,15 @@ func TestOpencodeLaunchNeedsCoralsServer(t *testing.T) {
 	assert.Equal(t, at.Opencode, GetAgent(at.Opencode).AgentType())
 	assert.True(t, GetAgent(at.Opencode).SupportsResume())
 }
+
+// The sign-in line puts opencode's credentials where the agents' servers keep theirs (their XDG folders), and quotes every value: a folder with a space or a quote in it cannot change the line.
+func TestTheOpencodeLoginCommandSignsInInTheAgentServersFolderAndQuotesEveryValue(t *testing.T) {
+	cmd := OpencodeLoginCommand("", [][2]string{{"XDG_DATA_HOME", "/Users/a b/it's/opencode/data"}, {"XDG_CONFIG_HOME", "/c"}})
+	assert.Contains(t, cmd, "XDG_DATA_HOME=")
+	assert.Contains(t, cmd, "XDG_CONFIG_HOME=")
+	assert.True(t, strings.HasSuffix(cmd, "opencode auth login"), cmd)
+	assert.NotContains(t, cmd, "/Users/a b/it's/opencode/data ", "the value is quoted, not bare")
+	assert.Equal(t, 1, strings.Count(cmd, "auth login"))
+	assert.Contains(t, OpencodeLoginCommand("/opt/o c/opencode", nil), "auth login")
+	assert.Contains(t, OpencodeLoginCommand("/opt/o c/opencode", nil), "'/opt/o c/opencode'", "the CLI the settings name is quoted too")
+}

@@ -72,12 +72,20 @@ func ToolEnv(inherited []string, dataDir string) []string {
 		}
 		env = append(env, kv)
 	}
-	return append(env,
-		"XDG_CONFIG_HOME="+filepath.Join(dataDir, "config"),
-		"XDG_DATA_HOME="+filepath.Join(dataDir, "data"),
-		"XDG_CACHE_HOME="+filepath.Join(dataDir, "cache"),
-		"XDG_STATE_HOME="+filepath.Join(dataDir, "state"),
-	)
+	for _, kv := range XDGVars(dataDir) {
+		env = append(env, kv[0]+"="+kv[1])
+	}
+	return env
+}
+
+// XDGVars are the folders opencode keeps its config, credentials, cache and state in when it runs for Coral: under Coral's own opencode folder, shared by the servers of Coral's agents and by nothing of the person's.
+func XDGVars(dataDir string) [][2]string {
+	return [][2]string{
+		{"XDG_CONFIG_HOME", filepath.Join(dataDir, "config")},
+		{"XDG_DATA_HOME", filepath.Join(dataDir, "data")},
+		{"XDG_CACHE_HOME", filepath.Join(dataDir, "cache")},
+		{"XDG_STATE_HOME", filepath.Join(dataDir, "state")},
+	}
 }
 
 // serverEnv is the environment of one server: ToolEnv, the server's password, and its own config file when it has a model.

@@ -84,3 +84,16 @@ func opencodePasswordPrefix(file string) string {
 		return fmt.Sprintf(`export OPENCODE_PASSWORD="$(cat %s)";`, q)
 	}
 }
+
+// OpencodeLoginCommand is the line a person runs in a terminal to sign opencode in to a provider for Coral's agents: `opencode auth login` with the same XDG folders the agents' servers use (xdg, from
+// opencode.XDGVars), so what they sign in there is what a server has. Every value is quoted for the shell the person has; bin is the opencode CLI the settings name ("" for opencode on the PATH).
+func OpencodeLoginCommand(bin string, xdg [][2]string) string {
+	var parts, raw []string
+	for _, kv := range xdg {
+		export := formatEnvExport(kv[0], kv[1])
+		raw = append(raw, export)
+		parts = append(parts, export)
+	}
+	parts = append(parts, resolveBinary(bin, "opencode"), "auth", "login")
+	return ShellJoin(parts, raw...)
+}
