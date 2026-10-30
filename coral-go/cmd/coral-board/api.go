@@ -123,6 +123,9 @@ var boardClient *http.Client // nil: a 10 s client (or CORAL_TIMEOUT), made per 
 
 // getBoard does a GET to a /api/board path and returns the cleaned body, erroring on a transport
 // failure or a non-2xx status (#3589), so a refused read is never printed as "no messages".
+// boardPaused is whether the last getBoard answer said the board is paused: an empty list then is not "nothing new" (#11198).
+var boardPaused bool
+
 func getBoard(path string) ([]byte, error) {
 	client, wait := boardClient, clierr.Timeout(10*time.Second)
 	if client == nil {
@@ -135,6 +138,7 @@ func getBoard(path string) ([]byte, error) {
 		return nil, clierr.CannotReach(redactedServerURL(), err, wait)
 	}
 	defer resp.Body.Close()
+	boardPaused = resp.Header.Get("X-Coral-Board-Paused") == "true"
 	data, _ := clitext.ReadReply(resp.Body, rawOutput)
 	var result map[string]any
 	json.Unmarshal(data, &result) // a list reply leaves result empty, but then the status is 2xx
@@ -153,10 +157,15 @@ func apiCallRaw(method, path string, body any) ([]byte, int, error) {
 // apiCallRawTimeout is apiCallRaw with its own timeout (a message relayed to another
 // Coral can take up to about 30 s: the hub waits up to 20 s for the target, #3489).
 func apiCallRawTimeout(method, path string, body any, timeout time.Duration) ([]byte, int, error) {
+	return apiCallRawAt("/api/board", method, path, body, timeout)
+}
+
+// apiCallRawAt is apiCallRawTimeout for a route under another prefix of the server's API (the agent routes, "/api/agent": #11005).
+func apiCallRawAt(prefix, method, path string, body any, timeout time.Duration) ([]byte, int, error) {
 	timeout = clierr.Timeout(timeout) // CORAL_TIMEOUT, when set, replaces the command's own
 	client := &http.Client{Timeout: timeout}
 	var lastErr error
-	for i, endpoint := range requestURLs(serverURL + "/api/board" + path) {
+	for i, endpoint := range requestURLs(serverURL + prefix + path) {
 		if i > 0 && !retryLoopbackTransport(method, lastErr) {
 			break
 		}

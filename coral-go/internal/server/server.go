@@ -113,6 +113,11 @@ func NewWithKey(cfg *config.Config, db *store.DB, backend ptymanager.TerminalBac
 	}
 	if boardStore != nil && db != nil {
 		boardStore.SetSessionsDB(db.Reader())
+		if n, err := boardStore.BackfillJobBoards(context.Background()); err != nil { // boards past job runs used are marked, so no search level reads them (#11076)
+			log.Printf("[boards] marking the boards job runs used failed: %v", err)
+		} else if n > 0 {
+			log.Printf("[boards] marked %d boards job runs used", n)
+		}
 	}
 	if boardStore != nil {
 		agent.SetBoardGoalsBrief(boardGoalsPromptBlock(boardStore)) // an agent's board system prompt lists the board's open goals (#7296)
@@ -166,6 +171,9 @@ func NewWithKey(cfg *config.Config, db *store.DB, backend ptymanager.TerminalBac
 		keyStore.SetSessionBackend(store.NewBrowserSessions(db))
 		keyStore.ApplyRevokeMarker()
 	}
+	// A data folder this start made private: the API key is renewed (signing out the browser sign-ins above) and the notice says what is
+	// left for the person (open_datadir.go).
+	replaceAfterOpenDataDir(context.Background(), cfg.CoralDir(), keyStore, db)
 	if p := os.Getenv("CORAL_INITIAL_PASSWORD_FILE"); p != "" {
 		keyStore.ApplyInitialPasswordFile(p)
 	}
@@ -458,14 +466,15 @@ func (s *Server) RestoreSleepingBoards() {
 		return
 	}
 	s.boardHandler.LoadPaused(ctx) // the Operator's pauses survive a restart (#3668)
-	boards, err := ss.GetSleepingBoardNames(ctx)
-	if err != nil || len(boards) == 0 {
-		return
+	boards, _ := ss.GetSleepingBoardNames(ctx)
+	awake, _ := ss.GetAwakeBoardNames(ctx)
+	resumed := s.boardHandler.RestoreSleepPauses(boards, awake)
+	if len(boards) > 0 {
+		log.Printf("Restored pause state for %d sleeping board(s)", len(boards))
 	}
-	for _, b := range boards {
-		s.boardHandler.PauseForSleep(b) // auto-wake lifts it when it wakes the board's agents; a person's saved Pause stays (#286)
+	for _, b := range resumed {
+		log.Printf("Resumed board %q: the sleep pause was saved before the restart and an agent of it is awake", b)
 	}
-	log.Printf("Restored pause state for %d sleeping board(s)", len(boards))
 }
 
 func (s *Server) buildRouter() chi.Router {

@@ -170,6 +170,8 @@ type UpdaterRecord struct {
 // RestartAgent is one pty agent a relaunch would restart.
 type RestartAgent struct {
 	SessionID, Name, State string
+	// AgentType is the agent's CLI (claude, codex, ...); After is what happens to it after the restart (afterRestart).
+	AgentType, After string
 }
 
 // RelaunchAudit is one attempt, allowed or refused: no email or name, the hub user's pseudonym, ids and a count.
@@ -178,7 +180,9 @@ type RelaunchAudit struct {
 	Installed, Staged string
 	AgentIDs          []string
 	By                string
-	Code              string // the refusal code, or "started"
+	// Source is who asked: "local" (the person at this computer), "hub" (the Hub's owner) or "auto" (Coral itself, once idle, #11170): the history no longer calls an automatic install a Hub relaunch.
+	Source string
+	Code   string // the refusal code, or "started"
 }
 
 // RelaunchUpdater is what the relaunch routes need from the updater (the updater implements it; tests stub it). It owns state.json:
@@ -216,6 +220,16 @@ type UpdateRelaunchHandler struct {
 	// Feeds names the release feeds the channel facts (approved, past_approved, waiting) are read from; nil adds the channel only and asks nothing
 	// (#5557). The server sets releaseFeeds; a test that does not mean to reach a feed leaves it nil, so it never reaches GitHub.
 	Feeds func() updatecheck.Feeds
+
+	// Idle says why the install-when-idle rule must wait (an agent working), "" when none; InFlight is whether Coral is typing into an agent; LastPerson is when a person last typed to one
+	// (#11170). Nil: nothing says Coral is busy. AutoTimes: the rule's timings, nil for the defaults.
+	Idle       func(ctx context.Context) string
+	InFlight   func() bool
+	LastPerson func() time.Time
+	// Work says why a running scheduled job or workflow run keeps the rule waiting (they end when Coral restarts), "" when none runs.
+	Work      func() string
+	AutoTimes *autoInstallTimes
+	auto      autoInstallState
 
 	// SetSetting writes a setting (the update_auto switch's own route uses it).
 	SetSetting func(ctx context.Context, key, value string) error
@@ -459,6 +473,7 @@ type relaunchView struct {
 	code    string // the refusal code of the POST for the same reason
 	rec     UpdaterRecord
 	agents  []RestartAgent
+	wakeCap int // auto_wake_cap: the dialog names it for agents that "asks"
 	digest  string
 	version string // the staged version when it has the pattern
 	// hubAllowed is whether the Hub's owner may relaunch this Coral by the settings alone (the cap, the Operator opt-out, the switch): the same whoever asks, so the person here sees it too.
@@ -479,6 +494,12 @@ func (h *UpdateRelaunchHandler) view(ctx context.Context, id callerIdentity) (re
 		if v.agents, err = h.Agents(ctx); err != nil {
 			return v, err
 		}
+		var settings map[string]string
+		if h.Settings != nil {
+			settings, _ = h.Settings(ctx) // unreadable settings: their defaults, as auto_wake reads them
+		}
+		afterRestart(v.agents, len(v.agents), settings)
+		v.wakeCap = autoWakeCap(settings)
 		if len(v.agents) > maxRestartRows {
 			v.agents = v.agents[:maxRestartRows]
 		}
@@ -512,11 +533,25 @@ func (h *UpdateRelaunchHandler) view(ctx context.Context, id callerIdentity) (re
 func (h *UpdateRelaunchHandler) relaunchJSON(key []byte, id callerIdentity, v relaunchView) (map[string]any, error) {
 	restarts := make([]map[string]any, 0, len(v.agents))
 	for _, a := range v.agents {
-		restarts = append(restarts, map[string]any{"session_id": printable(a.SessionID, 64), "name": cleanName(a.Name), "state": cleanState(a.State)})
+		row := map[string]any{"session_id": printable(a.SessionID, 64), "name": cleanName(a.Name), "state": cleanState(a.State)}
+		if a.After != "" {
+			row["after"] = a.After
+		}
+		// resumes is the older dashboard's field: true reads "starts again afterwards", false "starts a new conversation", so it is sent only when one of those is so
+		switch a.After {
+		case afterWakes:
+			row["resumes"] = true
+		case afterNewConv, afterNewTerminal:
+			row["resumes"] = false
+		}
+		restarts = append(restarts, row)
 	}
 	out := map[string]any{
 		"available": v.reason == "", "reason": v.reason, "hub_allowed": v.hubAllowed,
 		"restarts": restarts, "tmux_agents_restart": v.rec.TmuxAgentsRestart,
+	}
+	if v.wakeCap > 0 {
+		out["wake_cap"] = v.wakeCap
 	}
 	if v.reason == "" {
 		tok, err := h.issue(key, id, v.digest)
@@ -652,6 +687,9 @@ func (h *UpdateRelaunchHandler) Status(w http.ResponseWriter, r *http.Request) {
 	if relaunchNeedsLocalApproval && !viaTunnel(r) {
 		out["local_install"] = true // #7338: this computer's own dashboard may install (POST /api/system/update/install); a request through Coral Hub is never told so
 	}
+	if !viaTunnel(r) { // the local dashboard's "install when idle" facts (#11170); the Hub's shape is unchanged
+		out["auto_install"] = h.AutoInstallFactsNow(r.Context())
+	}
 	if !viaTunnel(r) { // the local dashboard's "check automatically" switch; the Hub's shape is unchanged
 		if settings, err := h.Settings(r.Context()); err == nil {
 			out["auto"] = UpdateAutoOn(settings)
@@ -672,7 +710,20 @@ func (h *UpdateRelaunchHandler) refuse(w http.ResponseWriter, r *http.Request, i
 }
 
 func (h *UpdateRelaunchHandler) audit(ctx context.Context, id callerIdentity, v *relaunchView, code string) {
-	a := RelaunchAudit{At: h.now().UTC(), By: id.pseudo, Code: code}
+	h.auditAs(ctx, id, v, code, relaunchSource(id.pseudo))
+}
+
+// relaunchSource is the source word for whoever asked: the Hub's owner is a pseudonym, the person here is "local", Coral's own idle install is "auto".
+func relaunchSource(by string) string {
+	switch by {
+	case "local", "auto":
+		return by
+	}
+	return "hub"
+}
+
+func (h *UpdateRelaunchHandler) auditAs(ctx context.Context, id callerIdentity, v *relaunchView, code, source string) {
+	a := RelaunchAudit{At: h.now().UTC(), By: id.pseudo, Source: source, Code: code}
 	if v != nil {
 		a.Installed = v.rec.Installed
 		a.Staged = v.version

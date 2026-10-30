@@ -1761,6 +1761,18 @@ body.panel-dragging .agentic-state {
 .artifact-linked-status { margin: 0; padding: 10px 12px; font-size: var(--fs-base); color: var(--text-secondary); }
 .artifact-linked-notice { margin: 0; } /* a .notice-bar: where it sits only */
 .artifact-linked-preview iframe { flex: 1; min-height: 240px; width: 100%; border: 0; background: #fff; }
+/* The HTML preview fills what is under its banner (#11163, the Operator's shot of Knowledge): the host is a column that lets the preview grow (a percent height of an auto-height parent was nothing, so the frame was the banner plus its 240 px floor and the lower half of the dialog was empty), and the document scrolls inside the frame to its end. */
+.artifact-viewer-content:has(.artifact-linked-preview) { height: 88vh; }
+.artifact-viewer-foot { padding-block: 8px; min-height: 0; } /* the footer holds only Close: a slim bar, not a band of 77 px under the preview (#11243); a phone's 44 px Close sets its own height */
+@media (max-width: 767px), (pointer: coarse) { /* a phone: the preview's dialog is the whole screen (like the viewer with comments), its footer a slim bar and its body without padding, so the frame is most of it (#11243) */
+    .artifact-viewer-content:has(.artifact-linked-preview) { height: 100%; max-height: 100%; width: 100vw; border-radius: 0; padding-bottom: 0 !important; } /* the footer is the dialog's bottom edge: no strip of dialog under it, and the frame ends where the footer starts (QA Reviewer 2 on #11243) */
+    .artifact-viewer-content .artifact-viewer-foot.modal-footer { margin: 0 -16px 0 !important; padding: 4px 16px max(4px, env(safe-area-inset-bottom, 0px)) !important; } /* mobile.css sets the shared footer with !important */
+    .artifact-viewer-content:has(.artifact-linked-preview) .artifact-viewer-header { padding-block: 6px; }
+    .artifact-viewer-body:has(> .artifact-linked-preview) { padding: 0; }
+}
+.artifact-viewer-body:has(> .artifact-linked-preview), .detail-doc:has(> .artifact-linked-preview) { display: flex; flex-direction: column; }
+.detail-doc:has(> .artifact-linked-preview) { flex: 1 1 auto; min-height: 0; }
+.artifact-viewer-body > .artifact-linked-preview, .detail-doc > .artifact-linked-preview { flex: 1 1 auto; height: auto; min-height: 0; }
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
     .team-artifacts-action { box-sizing: border-box; padding-top: var(--space-lg); }
 }
@@ -1853,6 +1865,7 @@ body.panel-dragging .agentic-state {
 .board-rename-form[hidden] { display: none; }
 .board-rename-form label { font-size: var(--fs-base); color: var(--text-secondary); }
 .board-rename-form input { min-width: 0; flex: 1 1 140px; }
+@media (max-width: 600px) { .team-home-folder-form label { flex: 1 0 100%; } .team-home-folder-form input, .team-home-folder-form .btn { min-height: var(--control-touch-height, 44px); } } /* the label has its own line over the box, not squeezed beside an empty one (#11128) */
 .board-rename-error { flex-basis: 100%; margin: 0; font-size: var(--fs-base); color: var(--error); }
 .board-rename-error:empty { display: none; }
 .board-rename-note { flex-basis: 100%; margin: 0; font-size: var(--fs-base); color: var(--text-secondary); }

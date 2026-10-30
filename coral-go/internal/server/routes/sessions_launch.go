@@ -3,6 +3,7 @@ package routes
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/subgentic/coral/internal/logsafe"
 	"log/slog"
@@ -25,6 +26,7 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 	defer h.kickWS() // the feed shows the change now, not on the next tick
 	var body struct {
 		WorkingDir      string                 `json:"working_dir"`
+		CreateDir       bool                   `json:"create_dir"` // the folder is the suggested <home>/Coral/<name>: make it (#11258)
 		AgentType       string                 `json:"agent_type"`
 		DisplayName     string                 `json:"display_name"`
 		Flags           []string               `json:"flags"`
@@ -108,7 +110,11 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 	}
 	// A directory that does not exist is the caller's mistake: 400 naming the
 	// field, so the dialog can mark it (it used to surface as a 500) (#3152).
-	if msg := launchDirError(body.WorkingDir); msg != "" {
+	msg := createSuggestedDir(body.WorkingDir, body.CreateDir, h.cfg.CoralRoot)
+	if msg == "" {
+		msg = launchDirError(body.WorkingDir)
+	}
+	if msg != "" {
 		attempt.Finish(tracking.OutcomeFailure, tracking.FailWorkdirUnavailable, 0, 1)
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": msg, "field": "working_dir"})
 		return
@@ -184,6 +190,12 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 		AutoByDefault: !agentCaller(r) && autoDefaultAllowed(lctx, r, h.ss), // not for an agent's launch (it may not start a less-restricted agent, #4032), and a Hub request the owner does not let skip prompts asks instead (#5836)
 	})
 	if err != nil {
+		var refused *modelRefusedError
+		if errors.As(err, &refused) { // a model Pi does not list: the request's fault, refused before anything was made (#11105)
+			attempt.Finish(tracking.OutcomeFailure, tracking.FailInvalidRequest, 0, 1)
+			writeModelRefused(w, refused)
+			return
+		}
 		attempt.Finish(tracking.OutcomeFailure, classifyLaunchError(err), 0, 1)
 		if refuse, ok := cliPathRefusal(viaHub(r.Context(), r), err); ok { // a setting to fix, not a server fault (#115)
 			refuse(w)

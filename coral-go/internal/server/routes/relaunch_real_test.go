@@ -158,7 +158,10 @@ func TestTheRecordSaysWhatTheUpdaterSaysInTheRoutesWords(t *testing.T) {
 		"a relaunch the updater has a result for": {func(o *status.Out) {
 			o.LastApply = &status.Apply{At: "2026-10-22T05:59:30Z", Result: "failed_rolled_back"}
 		}, relaunchState{StartedAt: now.Add(-time.Minute - 45*time.Second), From: "1.4.150"}, updStaged, "", true, true},
-		"a relaunch into another version already ran": {func(o *status.Out) { o.Installed = "1.4.155" }, relaunchState{StartedAt: now.Add(-time.Minute), From: "1.4.150"}, updStaged, "", true, true},
+		"a relaunch into another version already ran": {func(o *status.Out) { o.Installed = "1.4.152" }, relaunchState{StartedAt: now.Add(-time.Minute), From: "1.4.150"}, updStaged, "", true, true},
+		// #395: a staged release the installed version has caught up with (or passed) is not offered
+		"a staged release equal to the installed one":   {func(o *status.Out) { o.Installed = "1.4.155" }, relaunchState{}, updNone, "up_to_date", true, true},
+		"a staged release older than the installed one": {func(o *status.Out) { o.Installed = "1.4.160" }, relaunchState{}, updNone, "up_to_date", true, true},
 	} {
 		out := readyStatus()
 		tc.mod(&out)
@@ -602,4 +605,57 @@ func TestTheRecordTakesTheLastChecksResultInShape(t *testing.T) {
 
 	r = rec(func(o *status.Out) {})
 	assert.Empty(t, r.CheckResult, "an updater that records nothing says nothing")
+}
+
+// QA's #11196: "once per version" is the Hub's rule. An automatic install (or a person's click) that did not finish must not leave the version marked as relaunched from the Hub, or the Hub owner's relaunch
+// of the same update is refused as already done. A Hub-sourced apply still marks it, and the spacing is every source's.
+func TestOnlyAHubAppliesMarksTheVersionAsRelaunchedFromTheHub(t *testing.T) {
+	for by, wantMarked := range map[string]bool{"hub:hub-user-0a1b2c3d": true, "auto": false, "local": false} {
+		f := &fakeProgram{out: readyStatus(), ready: make(chan struct{})}
+		var quit atomic.Int32
+		u := newRealUpdater(t, f, func() { quit.Add(1) })
+		_, err := u.Apply(t.Context(), by)
+		require.NoError(t, err, by)
+		st, err := u.loadState()
+		require.NoError(t, err)
+		assert.Equal(t, relaunchSource(by), st.Source, by)
+		assert.False(t, st.LastHubRelaunch.IsZero(), by+": the spacing is every source's")
+		rec, err := u.Record(t.Context())
+		require.NoError(t, err)
+		if wantMarked {
+			assert.Equal(t, "1.4.155", st.HubRelaunched, by)
+			assert.Equal(t, "1.4.155", rec.HubRelaunched, by)
+		} else {
+			assert.Empty(t, st.HubRelaunched, by+": not a Hub relaunch")
+			assert.Empty(t, rec.HubRelaunched, by)
+		}
+		close(f.ready)
+		untilTrue(t, "the apply's watcher ends", func() bool { return quit.Load() == 1 })
+	}
+}
+
+// Rows written before the source field (a state file and audit rows without it) still decode: a state without a source is read as it was, its Hub mark kept.
+func TestStateAndAuditRowsWithoutASourceStillDecode(t *testing.T) {
+	f := &fakeProgram{out: readyStatus()}
+	u := newRealUpdater(t, f, func() {})
+	require.NoError(t, u.dir.ensure())
+	require.NoError(t, u.dir.write(relaunchStateFile, []byte(`{"hub_relaunched":"1.4.155","last_hub_relaunch":"2026-10-22T05:30:00Z","started_at":"2026-10-22T05:30:00Z","from":"1.4.150","to":"1.4.155","operation":"ab12","by":"hub:hub-user-1"}`)))
+	st, err := u.loadState()
+	require.NoError(t, err)
+	assert.Equal(t, "1.4.155", st.HubRelaunched, "an old state keeps its Hub mark")
+	assert.Empty(t, st.Source)
+	rec, err := u.Record(t.Context())
+	require.NoError(t, err)
+	assert.Equal(t, "1.4.155", rec.HubRelaunched)
+
+	require.NoError(t, u.dir.write(relaunchAuditFile, []byte(`[{"At":"2026-10-22T05:30:00Z","Installed":"1.4.150","Staged":"1.4.155","AgentIDs":null,"By":"hub:hub-user-1","Code":"started"}]`)))
+	require.NoError(t, u.Audit(t.Context(), RelaunchAudit{Code: "auto_started", By: "auto", Source: "auto"}))
+	b, err := u.dir.read(relaunchAuditFile, maxStateBytes)
+	require.NoError(t, err)
+	var rows []RelaunchAudit
+	require.NoError(t, json.Unmarshal(b, &rows))
+	require.Len(t, rows, 2)
+	assert.Equal(t, "started", rows[0].Code)
+	assert.Empty(t, rows[0].Source, "an old row has none")
+	assert.Equal(t, "auto", rows[1].Source)
 }

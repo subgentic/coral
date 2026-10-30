@@ -1,8 +1,8 @@
-// The agent list's ≡ display menu on a phone (#3991). Its "Group by server" and "Show server" options lived only in the sidebar header,
+// The agent list's ≡ display menu on a phone (#3991). Its "Group by computer" and "Show computer" options lived only in the sidebar header,
 // which is hidden below 768 px, so a phone could not group the list by server at all. The phone's list header now has the same menu.
-// At 390 px with two servers: the menu button is there (44 px target), it offers Show summary, Show model (#10816), Show server and Group by server (the other switches went with the one-line row, #9686),
-// ticking Group by server groups the phone's list under the two servers and the menu stays open, unticking puts it back; with one
-// server there is no Group by server; the menu fits the screen. Run against an isolated dev server.
+// At 390 px with two servers: the menu button is there (44 px target), it offers Show summary, Show model (#10816), Show computer and Group by computer (the other switches went with the one-line row, #9686),
+// ticking Group by computer groups the phone's list under the two servers and the menu stays open, unticking puts it back; with one
+// server there is no Group by computer; the menu fits the screen. Run against an isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 
@@ -43,26 +43,26 @@ const { connect } = require('./agent_view_harness');
         assert.deepEqual(v.dupIds, [], 'no id appears twice (the sidebar keeps its ids)');
         await ev(`(() => { const b = document.querySelector('#mobile-agent-list [data-display-button]'); if (b.getAttribute('aria-expanded') !== 'true') b.click(); return true; })()`);
         v = await view();
-        assert.deepEqual(v.rows.map(r => [r.text, r.shown]), [['Show summary', true], ['Show model', true], ['Show server', true], ['Group by server', true]], 'Show summary, Show model, Show server and Group by server are offered with two servers');
+        assert.deepEqual(v.rows.map(r => [r.text, r.shown]), [['Show summary', true], ['Show model', true], ['Show computer', true], ['Group by computer', true]], 'Show summary, Show model, Show computer and Group by computer are offered with two servers');
         assert.equal(v.panelFits, true, 'the menu panel fits the 390 px screen');
         assert.equal(v.overflow, 0, 'no horizontal overflow');
         assert.equal(v.headers.length, 0, 'not grouped to begin with');
-        await click('Group by server');
+        await click('Group by computer');
         await waitFor(`document.querySelectorAll('#mobile-agent-list li.server-group-header').length === 2`, 'two server headers in the phone list', 4000);
         v = await view();
         assert.deepEqual(v.headers.sort(), ['studio-mac', 'workstation'], 'the phone list is grouped under its two servers');
         assert.equal(v.grouped, 'true'); assert.ok(v.open, 'the menu stays open while it is used');
-        assert.equal(v.rows.find(r => r.text === 'Group by server').checked, true, 'and its box reads ticked');
-        await click('Group by server');
+        assert.equal(v.rows.find(r => r.text === 'Group by computer').checked, true, 'and its box reads ticked');
+        await click('Group by computer');
         await waitFor(`document.querySelectorAll('#mobile-agent-list li.server-group-header').length === 0`, 'the grouping is gone', 4000);
         v = await view();
-        assert.equal(v.grouped, 'false'); assert.equal(v.rows.find(r => r.text === 'Group by server').checked, false);
+        assert.equal(v.grouped, 'false'); assert.equal(v.rows.find(r => r.text === 'Group by computer').checked, false);
         // one server: nothing to group by
         await scene([TWO[0]]);
         await waitFor(`!![...document.querySelectorAll('#mobile-agent-list .list-display-option')].length`, 'the menu with one server', 4000);
         v = await view();
-        const group = v.rows.find(r => r.text === 'Group by server');
-        assert.ok(!group || group.shown === false, 'with one server there is no Group by server');
-        console.log('PASS phone display menu: present at 390 px, Group by server groups the phone list and stays open, absent with one server');
+        const group = v.rows.find(r => r.text === 'Group by computer');
+        assert.ok(!group || group.shown === false, 'with one server there is no Group by computer');
+        console.log('PASS phone display menu: present at 390 px, Group by computer groups the phone list and stays open, absent with one server');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });

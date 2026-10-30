@@ -29,7 +29,7 @@ const { setupHubWorld, BASE } = require('./helpers/hub_world');
             await ev(`document.querySelector('#servers-tab-body .cs-open').focus(); true`); await key('Enter'); await settle(300);
             await waitFor(`!!document.querySelector('#servers-tab-body section.cs-page')`, `${tag}: Enter opens the page`);
             let a = await active(); check(a && /cs-page/.test(a.cls), `${tag}: focus is on the page after Enter: ${JSON.stringify(a)}`);
-            const bk = await mark('#servers-back'); check(bk && /Servers/.test(bk.name) && bk.role === 'button', `${tag}: Back is a button named Servers: ${JSON.stringify(bk)}`);
+            const bk = await mark('#servers-back'); check(bk && /Computers/.test(bk.name) && bk.role === 'button', `${tag}: Back is a button named Servers: ${JSON.stringify(bk)}`);
             await key('Tab'); a = await active(); check(a && a.id === 'servers-back', `${tag}: Back is the page's first Tab stop: ${JSON.stringify(a)}`);
             await key('Enter'); await settle(300);
             a = await active(); check(a && /cs-open/.test(a.cls) && /^Open (Laptop|Desktop)/.test(a.text), `${tag}: Back puts focus on the machine's row button: ${JSON.stringify(a)}`);

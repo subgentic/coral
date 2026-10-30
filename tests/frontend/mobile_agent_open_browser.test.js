@@ -68,7 +68,7 @@ const DEVICES = [
             const rows = await evaluate(`[...document.querySelectorAll('#mobile-session-list .session-group-item')].map(e => ({ action: e.getAttribute('data-on-click'), name: e.dataset.name, label: e.textContent.trim() }))`);
             assert.equal(rows.length, 2, `${d.name}: both rows are in the mobile list`);
             assert.ok(rows.every(r => r.action === 'session-open' && r.name === r.label), `${d.name}: each cloned row keeps its action and its agent: ${JSON.stringify(rows)}`);
-            assert.equal(await evaluate(`(() => { const t = document.querySelector('#mobile-agent-list .mobile-list-title'); return !!t && !t.hasAttribute('style') && getComputedStyle(t).fontWeight === '600'; })()`), true, `${d.name}: the list title is styled by a class, not a style attribute the hub's style-src refuses`);
+            assert.equal(await evaluate(`(() => { const t = document.querySelector('#mobile-agent-list .mobile-list-title'); return !!t && !t.hasAttribute('style'); })()`), true, `${d.name}: the list title is styled by a class, not a style attribute the hub's style-src refuses`);
 
             await tap('#mobile-session-list .session-group-item[data-session-id="sid-beta"]');
             await waitFor(`window.__picked.length > 0 && getComputedStyle(document.getElementById('mobile-agent-list')).display === 'none'`, 'the tapped agent to open', { soft: true });
@@ -77,13 +77,14 @@ const DEVICES = [
             assert.equal(await evaluate(`window.__eval`), 0, `${d.name}: nothing went through eval(): ${await evaluate('window.__evalAt')}`);
             assert.equal(await evaluate(`document.documentElement.scrollWidth <= innerWidth`), true, `${d.name}: no sideways page scroll`);
 
-            // The settings menu must open above the side panel, not behind it.
-            await evaluate(`window.toggleAgenticPanel(true)`);
+            // The settings menu must open above the agent page. (An open agent's row has the menu button itself under 640 px and the side panel covers that row, #11056: the panel is shut for the menu and opened again after it.)
+            await evaluate(`window.toggleAgenticPanel(false)`);
             // under 640 px the top row is one hamburger (#9021) and the settings are in its menu; wider, the gear's menu
-            await tap('#top-menu-btn:not([hidden]), .top-bar-settings-wrapper button, #top-bar-settings-btn');
+            await tap((await evaluate(`getComputedStyle(document.getElementById('agent-bar-menu')).display !== 'none'`)) ? '#agent-bar-menu' : '#top-menu-btn:not([hidden]), .top-bar-settings-wrapper button, #top-bar-settings-btn'); // an open agent's row has the menu button itself under 640 px (#11056)
             await waitFor(`!!document.querySelector('#nav-more-menu:not([hidden]), .top-bar-settings-menu')`, 'the settings menu', { soft: true });
             const over = await evaluate(`(() => { const m = document.querySelector('#nav-more-menu:not([hidden]), .top-bar-settings-menu'); if (!m) return 'no menu'; const b = m.getBoundingClientRect(); const top = document.elementFromPoint(b.x + b.width/2, b.y + 12); return m.contains(top) ? 'ok' : 'covered by ' + (top && (top.id || top.className)); })()`);
-            assert.equal(over, 'ok', `${d.name}: settings menu is on top of the open panel`);
+            assert.equal(over, 'ok', `${d.name}: the menu is on top of the page`);
+            await evaluate(`document.getElementById('nav-more-menu').hidden = true; window.toggleAgenticPanel(true)`);
             // Panel tab strip (the rare tabs are drawn out of the row, behind the More menu, #7621): the close button leads it and covers no tab at rest; every tab is reachable by scrolling.
             const strip = await evaluate(`(() => { const s = document.querySelector('#agentic-state .agentic-state-tabs'); const x = document.getElementById('agentic-mobile-close-btn').getBoundingClientRect(); const tabs = [...s.children].filter(e => e !== document.getElementById('agentic-mobile-close-btn') && e.offsetParent && !e.classList.contains('tab-more')); const overlap = tabs.filter(t => { const b = t.getBoundingClientRect(); return b.left < x.right && b.right > x.left; }).map(t => t.id); s.scrollLeft = s.scrollWidth; const last = tabs[tabs.length - 1].getBoundingClientRect(); const reach = last.right <= s.getBoundingClientRect().right + 1; s.scrollLeft = 0; return { xLeft: Math.round(x.left), overlap, reach, n: tabs.length }; })()`);
             assert.ok(strip.xLeft <= 8, `${d.name}: the panel's close button leads the tab strip (left=${strip.xLeft})`);

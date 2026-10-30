@@ -56,7 +56,7 @@ const BASE = require('./test_base').BASE;
         // PANE Network
         assert.match(await row('settings-remote-access-enabled'), /Lets other devices control agents and read files as you do; unencrypted unless TLS is on\./, 'Network and Hub: Remote access says its risk before the switch, in the visible line');
         assert.match(await ev(`(() => { const e = document.getElementById('settings-remote-access-enabled'); const r = e && (e.closest('.settings-row, .sv-row') || e.parentElement); const m = r && r.querySelector('.sv-more'); return m ? m.textContent.replace(/\\s+/g, ' ').trim() + '|' + m.hidden : null; })()`), /^They can also change settings\. TLS is on.*\|true$/, 'the rest is in Learn more, hidden until opened');
-        assert.match(await row('settings-hub-mode-enabled'), /Adds a Servers tab; whoever signs in here controls every computer you add\./, 'Network and Hub: Manage other computers says its risk before the switch');
+        assert.match(await row('settings-hub-mode-enabled'), /Adds a Computers tab; whoever signs in here controls every computer you add\./, 'Network and Hub: Manage other computers says its risk before the switch');
         // END Network
         console.log('PASS Settings tour words');
     } finally { await client.close(); await guard.restore(); }

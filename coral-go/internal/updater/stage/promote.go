@@ -187,7 +187,7 @@ func feedNothingNewer(list []listedRelease, installed string) bool {
 			continue
 		}
 		saw = true
-		cmp, err := verify.CompareVersions(strings.TrimPrefix(r.TagName, "v"), installed)
+		cmp, err := verify.CompareToInstalled(strings.TrimPrefix(r.TagName, "v"), installed)
 		if err != nil || cmp > 0 {
 			return false
 		}

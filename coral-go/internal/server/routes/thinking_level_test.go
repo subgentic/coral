@@ -124,13 +124,24 @@ func TestLaunchRefusesAThinkingLevelTheTypeDoesNotTake(t *testing.T) {
 	stubCLIPaths(t, ss)
 	for _, c := range []struct{ typ, level string }{
 		{"claude", "ultra"}, {"claude", "HIGH"}, {"claude", "high --model x"}, {"claude", "--yolo"}, {"claude", "off"},
-		{"codex", "max"}, {"agy", "minimal"}, {"gemini", "high"}, {"pi", "high"}, {"terminal", "high"},
+		{"codex", "max"}, {"agy", "minimal"}, {"gemini", "high"}, {"pi", "extreme"}, {"pi", "high --model x"}, {"terminal", "high"},
 	} {
 		code, out := postThinkingJSON(t, server.URL+"/api/sessions/launch", map[string]any{"working_dir": t.TempDir(), "agent_type": c.typ, "thinking": c.level})
 		assert.Equal(t, http.StatusBadRequest, code, "%s %q: %s", c.typ, c.level, out)
 		assert.Contains(t, out, `"field":"thinking"`)
 	}
 	assert.Empty(t, term.sentCommands(), "nothing launched")
+}
+
+// #11091: a Pi agent launched with a thinking level starts with --thinking <level> (and one a Pi does not take is refused above).
+func TestLaunchGivesPiItsThinkingLevel(t *testing.T) {
+	server, _, term, ss := setupSessionsTestServer(t)
+	stubCLIPaths(t, ss)
+	code, out := postThinkingJSON(t, server.URL+"/api/sessions/launch", map[string]any{"working_dir": t.TempDir(), "agent_type": "pi", "thinking": "high"})
+	require.Equal(t, http.StatusOK, code, out)
+	cmds := strings.Join(term.sentCommands(), "\n")
+	assert.Contains(t, cmds, "--thinking high")
+	assert.Equal(t, 1, strings.Count(cmds, "--thinking"), "once")
 }
 
 func TestTeamLaunchThinkingLevel(t *testing.T) {
@@ -155,7 +166,7 @@ func TestTeamLaunchThinkingLevel(t *testing.T) {
 	code, out = team(map[string]any{"name": "Bad", "agent_type": "claude", "thinking": "ultra"})
 	assert.Equal(t, http.StatusBadRequest, code, out)
 	assert.Contains(t, out, "thinking must be one of")
-	code, out = team(map[string]any{"name": "Bad", "agent_type": "pi", "thinking": "high"})
+	code, out = team(map[string]any{"name": "Bad", "agent_type": "gemini", "thinking": "high"})
 	assert.Equal(t, http.StatusBadRequest, code, out)
 	assert.Equal(t, before, len(term.sentCommands()), "nothing of a refused team starts")
 }
@@ -175,7 +186,9 @@ func TestDefaultThinkingSettingTakesOnlyTheTypesLevels(t *testing.T) {
 	}
 	assert.Equal(t, http.StatusBadRequest, put(`{"default_thinking_claude":"ultra"}`))
 	assert.Equal(t, http.StatusBadRequest, put(`{"default_thinking_claude":5}`))
-	assert.Equal(t, http.StatusBadRequest, put(`{"default_thinking_pi":"high"}`), "a type with no level yet")
+	assert.Equal(t, http.StatusOK, put(`{"default_thinking_pi":"high"}`), "pi takes --thinking (#11091)")
+	assert.Equal(t, http.StatusBadRequest, put(`{"default_thinking_pi":"ultra"}`))
+	assert.Equal(t, http.StatusBadRequest, put(`{"default_thinking_gemini":"high"}`), "a type with no level yet")
 	assert.Equal(t, http.StatusOK, put(`{"default_thinking_pi":""}`))
 	assert.Equal(t, http.StatusOK, put(`{"default_thinking_codex":"minimal"}`), "codex takes its own levels (#5480)")
 	assert.Equal(t, http.StatusBadRequest, put(`{"default_thinking_codex":"max"}`), "claude's level is not codex's")

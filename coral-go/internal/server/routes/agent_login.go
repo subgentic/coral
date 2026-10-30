@@ -9,6 +9,8 @@ import (
 	"time"
 
 	at "github.com/subgentic/coral/internal/agenttypes"
+	"github.com/subgentic/coral/internal/clitext"
+	"github.com/subgentic/coral/internal/jsonl"
 	"github.com/subgentic/coral/internal/ptymanager"
 	"github.com/subgentic/coral/internal/sessionstate"
 	"github.com/subgentic/coral/internal/store"
@@ -156,8 +158,86 @@ func (h *SessionsHandler) usageLimitText(agentType, sessionID, workingDir string
 		return codexLimitText(logInfo)
 	case at.Agy, at.Antigravity, at.Gemini:
 		return h.agyLimitText(sessionID, workingDir, logInfo)
+	case at.Pi:
+		if t := piLimitText(logInfo); t != "" {
+			return t // the extra-usage refusal has its own plain words and the three ways forward
+		}
+		return piProviderErrorText(sessionID)
 	}
 	return ""
+}
+
+// piExtraUsageRe: the 400 Anthropic gives a third-party app signed in with a Claude plan, as Pi prints it (#11084): "Third-party apps now draw from your extra usage, not your plan limits. Add more at
+// claude.ai/settings/usage and keep going." Pi's pane wraps it, so the lines are joined first (piJoinLines) and the match allows the hyphen of "Third-party" to be cut.
+var piExtraUsageRe = regexp.MustCompile(`(?i)third-?\s*party apps now draw from your extra usage`)
+
+// piLimitLines: only the terminal's last lines count; the error scrolls away once Pi runs again. The raw error is up to five lines at a narrow width.
+const piLimitLines = 10
+
+// piExtraUsageNotice is what the person is told instead of Pi's raw JSON: why, and the three ways forward.
+const piExtraUsageNotice = "Pi can't use this Claude login: Anthropic bills third-party apps to extra usage, and none is added. Add some at claude.ai/settings/usage, use an Anthropic API key (ANTHROPIC_API_KEY, or /login in Pi), or pick another provider (--model provider/id, or Settings > Custom models)."
+
+// piLimitText is the notice for Pi's extra-usage refusal, or "": the exact error in the last lines of its terminal, never any text that merely mentions extra usage.
+func piLimitText(logInfo map[string]any) string {
+	lines, _ := logInfo["recent_lines"].([]string)
+	if len(lines) > piLimitLines {
+		lines = lines[len(lines)-piLimitLines:]
+	}
+	if piExtraUsageRe.MatchString(piJoinLines(lines)) {
+		return capCLIText(piExtraUsageNotice)
+	}
+	return ""
+}
+
+// piProviderErrorText is the notice for any other provider error on Pi's last turn: the errorMessage Pi 1.4.0 wrote on its newest assistant message (#11092), in plain words. A JSON body
+// the provider sent ({"error":{"message":"..."}}) is replaced by its message, so the person reads the reason and not the braces; text with no JSON is shown as Pi wrote it, cut at the cap.
+func piProviderErrorText(sessionID string) string {
+	raw := strings.TrimSpace(jsonl.PiLastError(sessionID))
+	if raw == "" {
+		return ""
+	}
+	reason, status := raw, ""
+	if i := strings.Index(raw, "{"); i > 0 {
+		status = strings.TrimSpace(strings.TrimRight(raw[:i], ": "))
+		var body struct {
+			Message string `json:"message"`
+			Error   struct {
+				Message string `json:"message"`
+			} `json:"error"`
+		}
+		if json.Unmarshal([]byte(raw[i:]), &body) == nil {
+			if body.Error.Message != "" {
+				reason = body.Error.Message
+			} else if body.Message != "" {
+				reason = body.Message
+			}
+		}
+	}
+	// The errorMessage is the agent's own file: a terminal escape, a bidi override or an invisible character in it would be printed under Coral's voice wherever the notice shows. Both parts
+	// go through the name cleaner (controls, escape sequences, bidi and every format character, one line) before they are built into the sentence (Security's MUST on #11092).
+	reason = clitext.CleanName(reason)
+	status = clitext.CleanName(status)
+	if reason == "" {
+		return ""
+	}
+	text := "Pi's last request failed: " + reason
+	if status != "" && status != reason {
+		text += " (" + status + ")"
+	}
+	return capCLIText(text)
+}
+
+// piJoinLines joins a wrapped terminal's lines back into text: a line that ends in a hyphen continues in the next without a space ("Third-" + "party"), any other gets one.
+func piJoinLines(lines []string) string {
+	var b strings.Builder
+	for _, l := range lines {
+		l = strings.TrimRight(l, " \t")
+		b.WriteString(l)
+		if !strings.HasSuffix(l, "-") {
+			b.WriteByte(' ')
+		}
+	}
+	return b.String()
 }
 
 // agyLimitRe: Antigravity's rate-limit, resource-exhausted and quota messages, from real 1.4.2 CLI output.

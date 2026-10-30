@@ -46,7 +46,7 @@ const { removeBoards, removeTeams } = require('./helpers/board_cleanup');
         // the server agrees
         const live = (await api('GET', '/api/sessions/live')).data || [];
         const sess = live.find(s => s.session_id === qa.session_id);
-        assert.ok(sess && sess.archived === true && sess.sleeping === true, 'the server lists it archived and asleep: ' + JSON.stringify(sess && { archived: sess.archived, sleeping: sess.sleeping }));
+        assert.ok(sess && sess.archived === true && sess.sleeping === true, 'the computer lists it archived and asleep: ' + JSON.stringify(sess && { archived: sess.archived, sleeping: sess.sleeping }));
         // Inbox > Archived counts the agent too (it has no chat yet), and its row opens the agent (#10654)
         // The counts are read from the history index, which takes the archive a moment after the sessions list does: wait for Archived to gain this agent. It is an Archived row that gains it and no All chats row.
         let counts = {};

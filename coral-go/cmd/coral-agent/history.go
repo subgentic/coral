@@ -31,10 +31,14 @@ Flags for 'history search':
   --offset N      Number of results to skip (default: 0)
   --ancestors     Include proven resumed ancestors (default: true, use --ancestors=false to disable)
   --session S     Explicit session ID to search (must be in your proven lineage)
+  --team          Also your teammates' chats (the Operator must give this agent 'team')
+  --all           Also every chat Coral launched ('all')
+  --operator-history  Also the Operator's own CLI history on disk ('operator')
   --json          Output raw JSON response
 
 Flags for 'history context':
   --window W      Number of messages before/after target turn (default: 2, max: 10)
+  --team, --all, --operator-history  The reach the session you name is in (as for 'history search')
   --json          Output raw JSON response`
 
 func cmdHistory(args []string) {
@@ -56,6 +60,34 @@ func cmdHistory(args []string) {
 	}
 }
 
+// reachFlagNames are the flags that take no value: they ask for a wider reach than the agent's own history (#11048).
+var reachFlagNames = map[string]bool{"team": true, "all": true, "operator-history": true}
+
+// reachFlags defines --team, --all and --operator-history on fs; the returned func is the reach they ask for ("" is own), or exits 2 when more than one is given. The server checks the reach against the level the
+// Operator gave this agent and refuses one above it, naming the level needed.
+func reachFlags(fs *flag.FlagSet) func() string {
+	team := fs.Bool("team", false, "Also search your teammates' chats (needs the Operator to give this agent 'team')")
+	all := fs.Bool("all", false, "Also search every chat Coral launched (needs 'all')")
+	op := fs.Bool("operator-history", false, "Also search the Operator's own CLI history on disk (needs 'operator')")
+	return func() string {
+		reach, n := "", 0
+		for _, c := range []struct {
+			on   bool
+			name string
+		}{{*team, "team"}, {*all, "all"}, {*op, "operator"}} {
+			if c.on {
+				reach = c.name
+				n++
+			}
+		}
+		if n > 1 {
+			fmt.Fprintln(os.Stderr, "Only one of --team, --all and --operator-history")
+			os.Exit(2)
+		}
+		return reach
+	}
+}
+
 func cmdHistorySearch(args []string) {
 	// Reorder args so query can appear before or after flags
 	var flagArgs []string
@@ -67,7 +99,7 @@ func cmdHistorySearch(args []string) {
 		}
 		if strings.HasPrefix(args[i], "-") {
 			flagArgs = append(flagArgs, args[i])
-			if i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") && !strings.Contains(args[i], "=") {
+			if i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") && !strings.Contains(args[i], "=") && !reachFlagNames[strings.TrimLeft(args[i], "-")] {
 				flagArgs = append(flagArgs, args[i+1])
 				i++
 			}
@@ -83,6 +115,7 @@ func cmdHistorySearch(args []string) {
 	ancestors := fs.Bool("ancestors", true, "Include proven resumed ancestor sessions")
 	targetSession := fs.String("session", "", "Target session ID in lineage")
 	rawJSON := fs.Bool("json", false, "Output JSON response")
+	reachOf := reachFlags(fs)
 	clihelp.ParseFlags(fs, flagArgs, func() string { return commandUsage(os.Args[1], os.Args[2:]) })
 
 	query := strings.Join(queryParts, " ")
@@ -103,6 +136,9 @@ func cmdHistorySearch(args []string) {
 	params.Set("include_ancestors", strconv.FormatBool(*ancestors))
 	if *targetSession != "" {
 		params.Set("target_session_id", *targetSession)
+	}
+	if reach := reachOf(); reach != "" {
+		params.Set("reach", reach)
 	}
 
 	data, status, err := apiCallRaw("GET", "/history/search?"+params.Encode(), nil)
@@ -198,7 +234,7 @@ func cmdHistoryContext(args []string) {
 	for i := 0; i < len(args); i++ {
 		if strings.HasPrefix(args[i], "-") {
 			flagArgs = append(flagArgs, args[i])
-			if i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") && !strings.Contains(args[i], "=") {
+			if i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") && !strings.Contains(args[i], "=") && !reachFlagNames[strings.TrimLeft(args[i], "-")] {
 				flagArgs = append(flagArgs, args[i+1])
 				i++
 			}
@@ -210,6 +246,7 @@ func cmdHistoryContext(args []string) {
 	fs := flag.NewFlagSet("history-context", flag.ContinueOnError)
 	window := fs.Int("window", 2, "Surrounding turns before and after target turn (default: 2, max: 10)")
 	rawJSON := fs.Bool("json", false, "Output JSON response")
+	reachOf := reachFlags(fs)
 	clihelp.ParseFlags(fs, flagArgs, func() string { return commandUsage(os.Args[1], os.Args[2:]) })
 
 	sid := resolveSessionID()
@@ -243,6 +280,9 @@ func cmdHistoryContext(args []string) {
 	params.Set("target_session_id", targetSession)
 	params.Set("message_index", strconv.Itoa(targetIndex))
 	params.Set("window", strconv.Itoa(*window))
+	if reach := reachOf(); reach != "" {
+		params.Set("reach", reach)
+	}
 
 	data, status, err := apiCallRaw("GET", "/history/context?"+params.Encode(), nil)
 	if err != nil {

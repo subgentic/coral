@@ -158,6 +158,8 @@ func startBackgroundServices(ctx context.Context, db *store.DB, cfg *config.Conf
 	wfRunner := background.NewWorkflowRunner(wfStore, launcher, agentRT, nil, nil, cfg.CoralDir(), cfg.AgentHost(), cfg.Port)
 	srv.SetWorkflowRunner(wfRunner)
 	scheduler.SetWorkflowRunner(wfRunner, wfStore)
+	background.RegisterBusyProbe("workflow run", wfRunner.RunningCount) // the update that installs when Coral is idle waits for them (#11170)
+	background.RegisterBusyProbe("scheduled run", scheduler.RunningCount)
 
 	log.Printf("Started 8 background services + workflow runner (git poller, indexer, scheduler, board notifier, remote board poller, batch summarizer, session reconciler, token poller)")
 	return wfRunner, scheduler
@@ -216,13 +218,8 @@ func startIndexingServices(ctx context.Context, cfg *config.Config, srv *server.
 	safeGo(ctx, "git_poller", func() { gitPoller.Run(ctx) })
 
 	// Session indexer
-	scanners := []agent.HistoryScanner{
-		&agent.ClaudeAgent{},
-		&agent.AgyAgent{},
-		&agent.CodexAgent{},
-	}
 	indexer := background.NewSessionIndexer(
-		sessStore, scanners,
+		sessStore, historyScanners(),
 		time.Duration(cfg.IndexerIntervalS)*time.Second,
 		time.Duration(cfg.IndexerStartupDelayS)*time.Second,
 	)
@@ -262,6 +259,11 @@ func startBoardServices(ctx context.Context, cfg *config.Config, srv *server.Ser
 	boardNotifier.SetDiscoverFn(discoverFn)
 	if bh := srv.BoardHandler(); bh != nil {
 		boardNotifier.SetIsPausedFn(bh.IsPaused)
+		boardNotifier.SetSleepingFn(func(ctx context.Context, sessionID string) bool {
+			ls, err := sessStore.GetLiveSession(ctx, sessionID)
+			return err == nil && ls != nil && ls.IsSleeping == 1
+		})
+		boardNotifier.SetLiftSleepPauseFn(bh.LiftSleepPauseSeenAwake) // a board sleep paused, with an awake agent on it, is resumed by the notifier (#11182)
 		bh.SetNotifyFn(boardNotifier.NotifyBoard)
 	}
 	// Seeded before its first pass, but not before the server serves: on a long board
@@ -279,6 +281,9 @@ func startBoardServices(ctx context.Context, cfg *config.Config, srv *server.Ser
 		healthMonitor := background.NewBoardHealthMonitor(srv.BoardStore(), 5*time.Minute)
 		healthMonitor.SetAgents(taskStore, agentRT, discoverFn)
 		healthMonitor.SetLandingWatch(landingWatch)
+		if bh := srv.BoardHandler(); bh != nil {
+			healthMonitor.SetPausedFn(bh.IsPaused) // the check says when the board is paused, so no nudges can go missing unseen (#11182)
+		}
 		healthMonitor.SetIdleThresholds(time.Duration(cfg.TaskIdleReminderS)*time.Second, time.Duration(cfg.TaskIdleEscalationS)*time.Second)
 		safeGo(ctx, "board_health_monitor", func() { healthMonitor.Run(ctx) })
 		// Coral acts on the mechanical items itself (#4175): claim and status nudges.
@@ -529,4 +534,15 @@ func resolveBackend(flagValue, saved, goos string) (backend string, forced bool)
 // without regard to case (#5128).
 func boardHealthMonitorEnabled(settings map[string]string) bool {
 	return setreg.Bool(settings, setreg.BoardHealthMonitor)
+}
+
+// historyScanners are the agent CLIs whose conversations the History indexer reads. Pi was written (pi.go ExtractSessions, #11092) and never listed here, so its chats were never indexed: a Pi agent had no row in
+// History, no summary and no search (found by the Pi acceptance run, #11122).
+func historyScanners() []agent.HistoryScanner {
+	return []agent.HistoryScanner{
+		&agent.ClaudeAgent{},
+		&agent.AgyAgent{},
+		&agent.CodexAgent{},
+		&agent.PiAgent{},
+	}
 }

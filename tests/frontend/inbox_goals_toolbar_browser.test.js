@@ -19,7 +19,7 @@ const GOALS = [
     const results = [];
     const check = (label, cond, detail) => { results.push(!!cond); console.log(`[${cond ? 'PASS' : 'FAIL'}] ${label}${detail !== undefined ? ' - ' + detail : ''}`); };
     const titles = () => ev(`[...document.querySelectorAll('button.dt-primary')].filter(b => b.getClientRects().length).map(b => (b.querySelector('.dt-mail-title') || b).textContent.trim()).sort()`); // a phone's row is a mail row (#9583): its button holds the title, the outcome and the time; the title is the name
-    const folders = async () => (await ev(`${FOLDER_ROWS}.join('|')`)).replace(/Artifacts\d+/, 'Artifacts'); // the Artifacts count arrives on its own time (after the folder opens, on a slow runner): it is not what this check is about
+    const folders = async () => (await ev(`${FOLDER_ROWS}.map(r => /^Goals/.test(r) ? r : r.replace(/\\d+/g, '')).join('|')`)); // the Goals row keeps its count; every other row's count arrives on its own time (a slow runner: Windows), so the check is on the names // the Artifacts count arrives on its own time (after the folder opens, on a slow runner): it is not what this check is about
     const geometry = () => ev(`(() => { const r = document.querySelector('.inbox-folder-toolbar .list-bar-search-row'); if (!r) return null; const q = r.querySelector('input[type=search]'), t = r.querySelector('.list-bar-toggle'); if (!q || !t) return { q: !!q, t: !!t };
         const a = q.getBoundingClientRect(), b = t.getBoundingClientRect(), p = r.querySelector('.team-tb-pills'), s = r.querySelector('.team-tb-select');
         const vis = e => !!e && e.getClientRects().length > 0;
@@ -37,7 +37,7 @@ const GOALS = [
             await ev(`(() => { const R = window.fetch; window.fetch = (u, o) => /\\/api\\/goals(\\?|$)/.test(String(u)) ? Promise.resolve(new Response(JSON.stringify({ goals: ${JSON.stringify(GOALS)} }), { status: 200, headers: { 'Content-Type': 'application/json' } })) : R(u, o); return true; })()`);
             await ev(`window.switchNavTab('hub-inbox'); true`);
             await waitFor(`document.querySelectorAll('.view-list-item').length > 3 || !!document.querySelector('.view-list select')`, 'the folders', 10000);
-            await waitFor(`/Goals5/.test(${FOLDER_ROWS}.join('|')) && /All chats/.test(${FOLDER_ROWS}.join('|'))`, 'the folder counts', 10000);
+            await waitFor(`(rows => /Goals5/.test(rows.join('|')) && ['All chats', 'Board history', 'With notes', 'Starred', 'Active now', 'Archived'].every(n => rows.some(r => r.startsWith(n) && /\\d/.test(r.slice(n.length)))))(${FOLDER_ROWS})`, 'every chat folder shows its count (the first snapshot is taken after they arrive: Windows CI showed them blank before and 0 after)', 15000);
             const before = await folders();
             if (mobile) await ev(`(() => { const s = document.querySelector('.view-list select'); if (s) { s.value = 'goals'; s.dispatchEvent(new Event('change', { bubbles: true })); } return true; })()`);
             else await ev(`document.querySelector('.view-list-item[data-key="goals"]').click(); true`);

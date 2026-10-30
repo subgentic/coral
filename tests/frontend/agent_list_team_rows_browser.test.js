@@ -49,9 +49,9 @@ const { connect } = require('./agent_view_harness');
             await waitFor(`document.querySelectorAll(${JSON.stringify(list(view) + ' .board-card-agents li.session-group-item')}).length === 4`, `${view.name}: the four team rows`, 4000);
             await openPanel(view);
             const s = await rows(view);
-            const want = view.mobile ? 56 : 36; // the phone's row is the sidebar's row at 56 px, with its status line (#10691)
+            const want = view.mobile ? 0 : 36; // a phone's row is a card, 72 to 100 px (#11096); a computer's is 36 px
             for (const [name, r] of Object.entries(s.rows)) {
-                assert.ok(Math.abs(r.h - want) <= 1, `${view.name}: ${name} is one ${want} px line: ${r.h}`);
+                assert.ok(view.mobile ? r.h >= 72 && r.h <= 100 : Math.abs(r.h - want) <= 1, `${view.name}: ${name} is one ${want || '72 to 100'} px row: ${r.h}`);
                 assert.deepEqual(r.lines, [], `${view.name}: ${name} draws no goal, model, branch or activity line: ${JSON.stringify(r.lines)}`);
                 assert.ok(r.chips.length <= 1, `${view.name}: ${name} has at most one chip: ${JSON.stringify(r.chips)}`);
             }

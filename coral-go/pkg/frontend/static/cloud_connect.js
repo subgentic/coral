@@ -189,7 +189,7 @@ class CloudPanel {
         }
         const desc = this.part('mode-desc');
         const full = this.part('mode-full');
-        if (full) put(full, MODE_HELP[mode] + ' Coral Hub\'s owner can limit this further for each server, never raise it.');
+        if (full) put(full, MODE_HELP[mode] + ' Coral Hub\'s owner can limit this further for each computer, never raise it.');
         if (desc && this.asking && this.askBySelect) put(desc, 'You can change this later.'); // the levels are in the sentence above the select: no second line saying the chosen one again
         else if (desc) put(desc, unchosen ? (st.state !== 'idle' && st.state !== 'off' ? 'Coral Hub can only view until you choose here.' : 'Chosen when you connect. Until then Coral Hub can only view.') : '');
         // Auto-accept from the hub (#3182): a local kill switch, shown only with Launch (the owner's opt-in),
@@ -462,7 +462,7 @@ class CloudPanel {
             if (r.ok && out && out.status) {
                 this.render(out.status);
                 this.say('The secret key was replaced. ' + (out.discarded_hub_enrollment ? 'Connect to Coral Hub again. ' : '') +
-                    (out.discarded_remote_server_keys ? "Enter the remote servers' API keys again." : ''));
+                    (out.discarded_remote_server_keys ? "Enter the remote computers' API keys again." : ''));
                 return;
             }
             if (r.status === 403) { this.elsewhere(out); return; }

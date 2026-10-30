@@ -62,11 +62,17 @@ const BASE = require('./test_base').BASE;
             assert.deepEqual(tips, ['nightly-build-job \u2014 Workflow nightly-build', 'summarize-the-day \u2014 Agent prompt (Claude)', 'weekly-cleanup \u2014 Agent prompt (Claude)'], `${at}what a job runs is its name's tooltip (and its page's), not a second line`);
             assert.equal(await ev(`[...document.querySelectorAll('#group-table-view tbody tr')].some(r => [...r.querySelectorAll('.dt-subtitle')].length)`), false, `${at}no row has a subtitle line`);
             assert.equal(await ev(`document.querySelector('#group-table-view .list-bar-search').getAttribute('aria-label')`), 'Search jobs', `${at}the search is named for the folder`);
-            assert.equal(await ev(`/New job/.test((document.querySelector('#group-table-view .team-tb-action') || {}).textContent || '')`), true, `${at}New job is at the row's right`);
+            if (mobile) { // a phone makes a job with the one + (#11239 slice A): the toolbar draws no create button and the + menu says New job
+                assert.equal(await ev(`[...document.querySelectorAll('#group-table-view .team-tb-action')].some(b => b.getClientRects().length > 0)`), false, `${at}no create button in the toolbar on a phone`);
+                await ev(`document.getElementById('phone-fab').click(); true`); await new Promise(r => setTimeout(r, 150)); // sleep-ok: the menu draws
+                assert.ok((await ev(`[...document.querySelectorAll('#phone-fab-menu [role=menuitem]')].map(b => b.textContent.trim())`)).includes('New job'), `${at}the + menu says New job`);
+                await ev(`document.body.click(); true`);
+            } else assert.equal(await ev(`/New job/.test((document.querySelector('#group-table-view .team-tb-action') || {}).textContent || '')`), true, `${at}New job is at the row's right`);
+            if (!mobile) {
             const act = await ev(`(() => { const b = document.querySelector('#group-table-view .team-tb-action'), r = b.getBoundingClientRect(); return { name: b.getAttribute('aria-label'), w: Math.round(r.width), h: Math.round(r.height), text: [...b.querySelectorAll('.automations-act-text')].some(e => e.getClientRects().length > 0) }; })()`);
             assert.equal(act.name, 'New job', `${at}the create action is named whole: ${JSON.stringify(act)}`);
-            if (mobile) assert.ok(act.h >= 44 && act.text, `${at}on a phone it is 44 px tall and says its words, after a "+" (#10275: a bare "+" said nothing): ${JSON.stringify(act)}`);
-            else assert.ok(act.text, `${at}at 1280 it has its words: ${JSON.stringify(act)}`);
+            assert.ok(act.text, `${at}at a wide screen it has its words: ${JSON.stringify(act)}`);
+            }
             if (!mobile) assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view .team-tb-pills .goals-chip')].map(b => b.textContent.trim().replace(/\\s+/g, ' '))`), ['All 3', 'Active 2', 'Turned off 1'], `${at}the pills have the table's counts`);
 
             // the Filters panel

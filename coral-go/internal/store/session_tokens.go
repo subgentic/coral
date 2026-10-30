@@ -67,6 +67,18 @@ func (db *DB) MintSessionToken(ctx context.Context, sessionID, sessionName strin
 	return token, nil
 }
 
+// RevokeAllSessionTokens revokes every live session token, and their proof keys with them: what an agent of an earlier run
+// still holds is refused from now on, and each agent gets a new token when it is next launched. For a start that made the data
+// folder private (config.DataDirMadePrivate). It returns how many it revoked.
+func (db *DB) RevokeAllSessionTokens(ctx context.Context) (int64, error) {
+	res, err := db.ExecContext(ctx, `UPDATE session_tokens SET revoked_at = ?, proof_key = NULL WHERE revoked_at IS NULL`, nowUTC())
+	if err != nil {
+		return 0, err
+	}
+	db.InvalidateSessionTokens()
+	return res.RowsAffected()
+}
+
 // revokeSessionTokensTx revokes every live token of a session.
 func revokeSessionTokensTx(ctx context.Context, tx interface {
 	ExecContext(context.Context, string, ...any) (sql.Result, error)

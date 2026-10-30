@@ -69,6 +69,8 @@ func main() {
 		cmdPost()
 	case "read":
 		cmdRead()
+	case "search":
+		cmdSearch()
 	case "check":
 		cmdCheck()
 	case "projects":
@@ -85,7 +87,16 @@ func main() {
 	case "reviewer":
 		cmdReviewer(os.Args[2:])
 	case "leave":
+		if len(os.Args) > 2 { // --board and --as: the Operator removes another's seat (#11112)
+			if err := runLeaveAs(os.Args[2:], os.Stdout); err != nil {
+				fmt.Fprintln(os.Stderr, err)
+				clierr.Exit1()
+			}
+			break
+		}
 		cmdLeave()
+	case "seats":
+		cmdSeats()
 	case "delete":
 		cmdDelete()
 	case "export":
@@ -182,6 +193,10 @@ Commands:
   queue [--json]               The merge queue: approved tasks whose patches have not landed
   health ack <id>              Mark a health-check item handled: the item that ends
                                with [ack <id>] (orchestrator or Operator)
+  search "<text>" [--from NAME] [--mentions NAME] [--since T] [--until T] [--sort newest|oldest] [--limit N] [--cursor C] [--json]
+                               Search the messages of your own board (the one you were launched on), oldest posts
+                               included; a hit's context is: read --id <id>. --team, --all and --operator-history
+                               ask for a wider reach and are refused unless the Operator raised your search access
   peek "<agent>" [--lines N]   Peek at agent's terminal (orchestrator only)
   waiting "<agent>"            List what waits for an agent: its unread board messages and the last send not typed
                                (the Operator, or an Orchestrator for the agents of its own team)
@@ -192,7 +207,7 @@ Commands:
                                Message another team's Orchestrator on this Coral
                                (Orchestrators and the Operator only; both boards
                                must allow it); "-" as the message reads it from stdin
-  send --address <server>/<team> [--reply-to <id>] [--message-id <id>]
+  send --address <computer>/<team> [--reply-to <id>] [--message-id <id>]
        [--attach coral://artifacts/<id> ...] "<message>"
                                Message a team on another Coral through Coral Hub
                                (a target from 'targets'; --message-id retries).
@@ -215,6 +230,12 @@ Commands:
                                you up via terminal notification. STOP after wait.
                                'coral-board help wait' has the options
   leave                        Unsubscribe from board
+  leave --board <board> --as <name>
+                               The Operator only: remove the seat <name> from <board>
+                               (not for an agent's terminal)
+  seats --foreign [--json]     The Operator only: the seats of agents launched on
+                               another board than the one they sit on, with the
+                               command that removes each (not for an agent's terminal)
   delete                       Delete board and messages (Operator only)
   export [--output FILE] [--format json|markdown|html] [--merge FILE]
                                Export chat (auto-detects format from extension)

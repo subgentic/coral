@@ -50,7 +50,7 @@ const BASE = require('./test_base').BASE;
     assert.equal(await otherClientPut({ macros: JSON.stringify([{ label: 'X', command: 'x' }, { label: 'A', command: 'a' }, { label: 'B', command: 'b' }, { label: 'C', command: 'c' }]) }), 200);
     await ev(`import(${MOD}+'controls.js').then(m=>m.deleteMacro(1)).then(()=>true)`);
     assert.deepEqual((await server('macros')).map(x => x.label), ['X', 'A', 'C'], 'the macro the person clicked is deleted, and the one added elsewhere kept');
-    console.log('PASS saved personas, templates and macros are changed on the server list');
+    console.log('PASS saved personas, templates and macros are changed on the computer list');
   } finally {
     try {
       const back = {};

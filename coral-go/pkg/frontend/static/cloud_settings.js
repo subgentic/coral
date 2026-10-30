@@ -28,7 +28,7 @@ export function settingsErrorMessage(status, body) {
     const err = body && typeof body === 'object' ? body.error : '';
     if (status === 413) return 'Your saved settings are too large. Remove some saved personas, templates or macros.';
     if (status !== 400) return '';
-    if (err === 'unknown_setting') return 'That setting is kept on the machine, not on the hub. Change it in Coral on that machine.';
+    if (err === 'unknown_setting') return 'That setting is kept on the computer, not on the hub. Change it in Coral on that computer.';
     if (err === 'invalid_value') return 'That value is not allowed' + (body.key ? ` for ${String(body.key).slice(0, 60)}` : '') + '.';
     return '';
 }
@@ -55,7 +55,7 @@ export function applyCloudSettingsDialog() {
     if (about) about.hidden = true;
     const note = document.createElement('p');
     note.className = 'settings-hint settings-cloud-note';
-    note.textContent = ('Settings for this account are saved on the hub. Machine settings (working directory, remote access, API key, CLI paths, telemetry) are set on the machine in Coral.');
+    note.textContent = ('Settings for this account are saved on the hub. Computer settings (working directory, remote access, API key, CLI paths, telemetry) are set on the computer in Coral.');
     // Inside the content column, not beside the shell: .settings-modal-body is a row, and a sibling there takes the shell's width (the dialog collapsed to a few pixels in hub mode).
     (shell.querySelector('.settings-panes') || shell).prepend(note);
     refreshSettingsGroups();

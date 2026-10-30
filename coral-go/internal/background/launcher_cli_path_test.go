@@ -195,3 +195,20 @@ func TestCodexRunsFiredTogetherAreStartedApart(t *testing.T) {
 	require.Len(t, claude, 3)
 	assert.Less(t, claude[2].Sub(claude[0]), 300*time.Millisecond, "other agents are not delayed")
 }
+
+// #11105 (row 12): a scheduled job on Pi runs unattended, so Pi is not left to ask whether to trust the repository's own Pi files (the job would wait on a question nobody answers), and a configured --approve
+// cannot turn that off. The session stays. Other agents' jobs are unchanged. The launched command carries it.
+func TestAPiJobIsLaunchedWithoutTrustingTheRepository(t *testing.T) {
+	assert.Equal(t, []string{"--model", "x", "--no-approve"}, jobLaunchFlags(store.ScheduledJob{AgentType: at.Pi, Flags: "--model x --approve"}))
+	assert.Equal(t, []string{"--model", "x"}, jobLaunchFlags(store.ScheduledJob{AgentType: at.Claude, Flags: "--model x"}))
+
+	rt := &spawnRecorder{}
+	l := NewAgentLauncher(rt, store.NewSessionStore(setupTestDB(t)), 8450)
+	_, err := l.LaunchAgent(context.Background(), t.TempDir(), at.Pi, "job", "", jobLaunchFlags(store.ScheduledJob{AgentType: at.Pi}), true, "p", "", "")
+	require.NoError(t, err)
+	rt.mu.Lock()
+	defer rt.mu.Unlock()
+	require.Len(t, rt.commands, 1)
+	assert.Contains(t, rt.commands[0], "--no-approve", rt.commands[0])
+	assert.Contains(t, rt.commands[0], "--session-dir", "and the session is kept for the chat")
+}

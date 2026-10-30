@@ -6,7 +6,7 @@ const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 
-const WANT = ['Agents', 'Inbox', 'Automations', 'Analytics', 'Servers', 'Docs'];
+const WANT = ['Agents', 'Inbox', 'Automations', 'Analytics', 'Computers', 'Docs'];
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const { Input } = client;
@@ -34,7 +34,7 @@ const WANT = ['Agents', 'Inbox', 'Automations', 'Analytics', 'Servers', 'Docs'];
                 const seen = [];
                 for (let i = 0; i < 8; i++) { await key('Tab', 9); seen.push(await ev(`document.activeElement && document.activeElement.classList.contains('top-nav-tab') ? document.activeElement.textContent.trim().replace(/\\d+$/, '').trim() : ''`)); }
                 const walked = seen.filter(Boolean);
-                check('1280: the keyboard walks the tabs in the same order (Servers after Analytics, before Docs)', walked.indexOf('Servers') === walked.indexOf('Analytics') + 1 && walked.indexOf('Docs') === walked.indexOf('Servers') + 1, JSON.stringify(seen));
+                check('1280: the keyboard walks the tabs in the same order (Servers after Analytics, before Docs)', walked.indexOf('Computers') === walked.indexOf('Analytics') + 1 && walked.indexOf('Docs') === walked.indexOf('Computers') + 1, JSON.stringify(seen));
                 await shot('nav-servers-1280');
             } else {
                 await ev(`document.getElementById('nav-select').click(); true`); await settle(400);

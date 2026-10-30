@@ -81,6 +81,9 @@ func (r *SessionReader) TranscriptTurnAt(sessionID string) time.Time {
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	if c.claudeState.turnAt.IsZero() {
+		return c.piState.turnAt
+	}
 	return c.claudeState.turnAt
 }
 
@@ -138,7 +141,10 @@ func (r *SessionReader) TranscriptModel(sessionID string) string {
 	if c.claudeState.model != "" {
 		return c.claudeState.model
 	}
-	return c.codexState.model
+	if c.codexState.model != "" {
+		return c.codexState.model
+	}
+	return c.piState.model
 }
 
 // TranscriptThinking is the thinking level the session's newest turn ran at, as its transcript records it (#4969): Claude's
@@ -159,5 +165,5 @@ func (r *SessionReader) TranscriptThinking(sessionID string) string {
 	if c.codexState.model != "" {
 		return c.codexState.effort
 	}
-	return ""
+	return c.piState.effort
 }

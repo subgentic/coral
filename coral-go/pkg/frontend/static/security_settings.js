@@ -77,7 +77,7 @@ function changeForm() {
     const cf = passwordField({ id: 'sec-confirm', label: 'Confirm new password', autocomplete: 'new-password', name: 'confirm-password' });
     const err = el('p', 'pw-error'); err.id = 'sec-error'; err.setAttribute('role', 'alert'); err.hidden = true;
     const btn = el('button', 'btn btn-primary btn-small', 'Change password'); btn.type = 'submit'; btn.id = 'sec-change-save';
-    form.append(usernameStub(), cur.root, nw.root, meter.root, cf.root, err, btn);
+    form.append(usernameStub(), cur.root, nw.root, cf.root, meter.root, err, btn);
     nw.input.addEventListener('input', () => meter.update(nw.input.value));
     form.addEventListener('submit', async e => {
         e.preventDefault();

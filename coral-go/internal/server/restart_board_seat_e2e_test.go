@@ -36,7 +36,7 @@ func TestRestartKeepsTheLaunchBoardWhenTheOperatorSeatedTheAgentElsewhere(t *tes
 		_ = json.Unmarshal(raw, &out)
 		return resp.StatusCode, out
 	}
-	code, out := do("POST", "/api/sessions/launch", `{"working_dir":"`+work+`","agent_type":"terminal","board_name":"rs-home","display_name":"mover"}`)
+	code, out := do("POST", "/api/sessions/launch", launchBody(t, work, "rs-home", "mover"))
 	require.Equal(t, http.StatusOK, code, out)
 	home, _ := out["board_id"].(string)
 	sid, _ := out["session_id"].(string)
@@ -98,7 +98,7 @@ func TestRestartDoesNotFallBackToAnotherBoardsSeatWhenTheLaunchSeatIsGone(t *tes
 		_ = json.Unmarshal(raw, &out)
 		return resp.StatusCode, out
 	}
-	code, out := do("POST", "/api/sessions/launch", `{"working_dir":"`+work+`","agent_type":"terminal","board_name":"rs2-home","display_name":"leaver"}`)
+	code, out := do("POST", "/api/sessions/launch", launchBody(t, work, "rs2-home", "leaver"))
 	require.Equal(t, http.StatusOK, code, out)
 	home, _ := out["board_id"].(string)
 	sid, _ := out["session_id"].(string)
@@ -140,4 +140,21 @@ func TestRestartDoesNotFallBackToAnotherBoardsSeatWhenTheLaunchSeatIsGone(t *tes
 	seatHome, err := bs.SessionSubscription(ctx, home, newName)
 	require.NoError(t, err)
 	assert.NotNil(t, seatHome, "and the launch re-seats it on its recorded board")
+}
+
+// launchBody is a terminal agent's launch request, JSON-encoded: a Windows working folder has backslashes, which a body built by joining strings turns into invalid JSON (400 before any restart, #11068).
+func launchBody(t *testing.T, workDir, board, name string) string {
+	t.Helper()
+	raw, err := json.Marshal(map[string]string{"working_dir": workDir, "agent_type": "terminal", "board_name": board, "display_name": name})
+	require.NoError(t, err)
+	return string(raw)
+}
+
+func TestLaunchBodyIsValidJSONForAWindowsFolder(t *testing.T) {
+	win := `D:\a\coral\coral\coral-go\internal\server\work-123`
+	var got map[string]string
+	require.NoError(t, json.Unmarshal([]byte(launchBody(t, win, "b", "n")), &got), "a Windows folder is encoded, not pasted into the JSON")
+	assert.Equal(t, win, got["working_dir"])
+	// what the tests did before, to show it was invalid
+	assert.Error(t, json.Unmarshal([]byte(`{"working_dir":"`+win+`"}`), &got), "pasted, the backslashes make an invalid escape")
 }

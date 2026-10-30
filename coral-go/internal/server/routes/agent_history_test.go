@@ -656,3 +656,51 @@ func TestAgentHistorySearch_StopsAtTheMatchCap(t *testing.T) {
 	assert.False(t, got.Truncated, "5 matches against a cap of 5 is not truncated")
 	assert.Equal(t, 5, got.TotalMatches)
 }
+
+// #11088: a Pi agent finds its own earlier words with `coral-agent history search`, and reads the turns around a hit. Pi's session file is <data dir>/pi-sessions/<session id>/*.jsonl; before the jsonl package
+// read it, the search answered "transcripts are unavailable".
+func TestAgentHistorySearch_PiFindsItsOwnWords(t *testing.T) {
+	env := setupAgentHistoryTestEnv(t)
+	ctx := context.Background()
+	piSID := "9b8a7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d"
+	dataDir := t.TempDir()
+	t.Setenv("CORAL_DATA_DIR", dataDir)
+	sessionDir := filepath.Join(dataDir, "pi-sessions", piSID)
+	require.NoError(t, os.MkdirAll(sessionDir, 0o700))
+	fixture, err := os.ReadFile(filepath.Join("..", "..", "jsonl", "testdata", "pi-1.4.0", "session.jsonl"))
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(filepath.Join(sessionDir, "2026-10-29T19-44-35-010Z_01a18931-58c2-74fc-8a74-bed622970705.jsonl"), fixture, 0o600))
+	require.NoError(t, env.ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: piSID, AgentType: at.Pi, AgentName: "pi-dev", WorkingDir: "/work/pi-project"}))
+
+	resp, err := http.Get(env.server.URL + "/api/agent/history/search?session_id=" + piSID + "&query=FIXTURE-ASSISTANT-2")
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	var out AgentHistorySearchResponse
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
+	assert.Equal(t, "complete", out.Status, "the Pi transcript is available")
+	require.Equal(t, 1, out.TotalMatches)
+	assert.Equal(t, "assistant", out.Results[0].Role)
+	assert.Contains(t, out.Results[0].Excerpt, "FIXTURE-ASSISTANT-2 answer")
+
+	// What the person said is found too, and the context around a hit is readable.
+	respU, err := http.Get(env.server.URL + "/api/agent/history/search?session_id=" + piSID + "&query=FIXTURE-USER-3&roles=user")
+	require.NoError(t, err)
+	defer respU.Body.Close()
+	var outU AgentHistorySearchResponse
+	require.NoError(t, json.NewDecoder(respU.Body).Decode(&outU))
+	require.Equal(t, 1, outU.TotalMatches)
+	respC, err := http.Get(fmt.Sprintf("%s/api/agent/history/context?session_id=%s&message_index=%d&window=1", env.server.URL, piSID, outU.Results[0].MessageIndex))
+	require.NoError(t, err)
+	defer respC.Body.Close()
+	require.Equal(t, http.StatusOK, respC.StatusCode)
+	var ctxOut AgentHistoryContextResponse
+	require.NoError(t, json.NewDecoder(respC.Body).Decode(&ctxOut))
+	found := false
+	for _, m := range ctxOut.Messages {
+		if m.IsTarget && strings.Contains(m.Content, "FIXTURE-USER-3 question") {
+			found = true
+		}
+	}
+	assert.True(t, found, "the target turn is in its context")
+}

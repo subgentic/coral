@@ -1,6 +1,6 @@
 // (Moved with #9722: the Hub list's rows open a page and carry no actions; what is pinned here now is the name whole at 200% text. The paragraph below is the history this guard came from.)
 // A folded table row at large text keeps its name whole (#9430, #9427 finding 4): on a phone at 200% text the Servers page's first line held the name and two nowrap buttons (Rename, More) and left the name
-// about 70 px ("Unnamed server" read "Unnar"). The shared table's folded first line gives the name a room of its own (8 rem, which grows with the text): when the actions do not fit beside it they go under
+// about 70 px ("Unnamed computer" read "Unnar"). The shared table's folded first line gives the name a room of its own (8 rem, which grows with the text): when the actions do not fit beside it they go under
 // the name. 390 px, touch, the root font at 32 px, the Hub page mode with two computers, one with no name; at normal text the row is unchanged (name and actions on one line). Drives Chrome over CDP.
 const assert = require('node:assert/strict');
 const { safePaused } = require('./helpers/paused');

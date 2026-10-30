@@ -39,6 +39,8 @@ export function updateInboxTab() {
     // the value it has is still a change to a MutationObserver).
     if (badge.textContent !== text) badge.textContent = text;
     if (badge.hidden !== (n === 0)) badge.hidden = n === 0;
+    const phone = document.getElementById('phone-nav-inbox-badge'); // the phone's floating nav carries the same count (#11116)
+    if (phone) { if (phone.textContent !== text) phone.textContent = text; if (phone.hidden !== (n === 0)) phone.hidden = n === 0; }
     const label = n > 0 ? unreadReviewItems().length || failedUnread().length ? `Inbox, ${n} need your attention` : `Inbox, ${n} waiting for input` : null;
     if (tab.getAttribute('aria-label') !== label) { if (label) tab.setAttribute('aria-label', label); else tab.removeAttribute('aria-label'); }
     setInboxCount('needs', n);

@@ -51,7 +51,7 @@ var personTextFields = []string{"held_messages", "pending_sends"}
 // withoutPersonText is row as an agent may see it when it may read the row: a copy with the person's own words nulled, or the row itself when it holds none (the rows are shared with other
 // connections: never changed in place).
 func withoutPersonText(row map[string]any) map[string]any {
-	has := false
+	has := personLastMessage(row)
 	for _, k := range personTextFields {
 		if v, ok := row[k]; ok && v != nil {
 			has = true
@@ -69,7 +69,20 @@ func withoutPersonText(row map[string]any) map[string]any {
 			out[k] = nil
 		}
 	}
+	if personLastMessage(row) {
+		out["last_message"] = nil // the person's latest words to that agent: an assistant-role one stays (#11097)
+	}
 	return out
+}
+
+// personLastMessage reports whether the row's last_message is the person's: its role is "user" (#11097, Security).
+func personLastMessage(row map[string]any) bool {
+	lm, ok := row["last_message"].(map[string]any)
+	if !ok {
+		return false
+	}
+	role, _ := lm["role"].(string)
+	return role == "user"
 }
 
 // rosterRow is a copy of row with only the roster fields (the rows are shared with other connections: never changed in place).

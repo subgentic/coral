@@ -56,7 +56,7 @@ func TestAgentCLIModelsRoutes(t *testing.T) {
 	_, codexRes := get("codex")
 	assert.Equal(t, []string{"minimal", "low", "medium", "high", "xhigh"}, codexRes.Thinking, "codex takes its level as -c model_reasoning_effort (#5480)")
 	_, piRes := get("pi")
-	assert.Empty(t, piRes.Thinking, "a type with no level yet offers none")
+	assert.Equal(t, []string{"off", "minimal", "low", "medium", "high", "xhigh", "max"}, piRes.Thinking, "pi takes its level as --thinking (pi --help, #11091)")
 	code, _ = get("terminal")
 	assert.Equal(t, http.StatusBadRequest, code)
 	code, _ = get("")

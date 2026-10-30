@@ -30,6 +30,7 @@ import (
 	"github.com/subgentic/coral/internal/ptr"
 	"github.com/subgentic/coral/internal/ptymanager"
 	"github.com/subgentic/coral/internal/safego"
+	"github.com/subgentic/coral/internal/secrets"
 	setreg "github.com/subgentic/coral/internal/settings"
 	"github.com/subgentic/coral/internal/store"
 	"github.com/subgentic/coral/internal/tmux"
@@ -37,6 +38,10 @@ import (
 
 // SessionsHandler handles all live session API endpoints.
 type SessionsHandler struct {
+	// piModelCheck says a Pi model is not one Pi lists (#11105); nil until the server wires it.
+	piModelCheck func(ctx context.Context, model string) string
+	// searchRate is the per-member rate limit of the agent search, refusals counted (#11048).
+	searchRate             searchGuard
 	codexPermissionMu      sync.Mutex // orders Codex hook completion with deferred request promotion
 	codexPermissionWatches sync.Map   // sanitized, unconfirmed Codex approval candidates (#8471)
 	// artifactNudge reminds an agent that published a claude.ai artifact to make a Coral one (#6583); nil: never.
@@ -126,6 +131,8 @@ type SessionsHandler struct {
 	// (session id → revision, #3655 F3). In memory: until a session's next event after a
 	// restart it is unknown, and the gate takes the screen rule (the safe side).
 	hooksRev sync.Map
+	// piLaunchedAt is when Coral started each Pi agent in this server run (session id → time.Time): the Pi extension's handshake is its first hook event, so a Pi agent with none a minute after its launch is listed as not active (hooks_status.go, #11107).
+	piLaunchedAt sync.Map
 	// liveModes is the permission mode each Claude session's CLI reported with its latest hook event (session id → one of the six words, live_permission_mode.go). In memory: until a session's
 	// next event after a restart it is unknown and the dashboard reads the CLI's mode line instead.
 	liveModes sync.Map
@@ -479,6 +486,8 @@ func (h *SessionsHandler) warmTranscript(agent AgentInfo) {
 			h.jsonl.ReadCodexTurnEvent(agent.SessionID, agent.WorkingDir)
 		case at.Agy, at.Antigravity, at.Gemini:
 			h.jsonl.ReadAgyTurnEvent(agent.SessionID, agent.WorkingDir)
+		case at.Pi:
+			h.jsonl.ReadPiTurn(agent.SessionID, agent.WorkingDir)
 		}
 		h.jsonl.FirstUserPrompt(agent.SessionID, agent.WorkingDir, agent.AgentType)
 		<-h.transcriptWarmSem
@@ -730,3 +739,59 @@ func addContextUsage(entry map[string]any, model *string, turnContext int) {
 // ErrStillInOldTmux is a wake on a pty Coral of an agent still running in Coral's old tmux
 // server (#3634): ending it first (Settings, or the Agents tab's banner) avoids a second copy.
 var ErrStillInOldTmux = errors.New("this agent is still running in Coral's old tmux server; end the agents left there first, then wake it")
+
+// lastMessageSource is a session's newest message as the jsonl reader has it.
+type lastMessageSource = jsonl.LastMessage
+
+// lastMessageEnabled is a test seam (the load measurement of #11123 compares the list with and without last_message); always true in the server.
+var lastMessageEnabled = true
+
+// lastMessageMaxChars is the text a row carries of its last message: the first 140 characters.
+const lastMessageMaxChars = 140
+
+// lastMessageField is a live row's last_message (#11097): {role, text, at}, with the text redacted as an excerpt is and cut at the first 140 characters, or nil when there is no message. The Hub's own
+// redaction still applies on the way out of the tunnel, as it does to first_prompt.
+func lastMessageField(m *lastMessageSource, _ bool) map[string]any {
+	if m == nil || m.Text == "" {
+		return nil
+	}
+	text := m.Text
+	if out, err := secrets.Redactor().Text([]byte(text)); err == nil {
+		text = string(out)
+	} else {
+		return nil // a text that cannot be checked is not passed on
+	}
+	if r := []rune(text); len(r) > lastMessageMaxChars {
+		text = string(r[:lastMessageMaxChars])
+	}
+	return map[string]any{"role": m.Role, "text": text, "at": m.At}
+}
+
+// lastMessageOf reads a session's last message (cached by its file, see jsonl.LastMessage); nil when it has none.
+func (h *SessionsHandler) lastMessageOf(sessionID, workingDir, agentType string) map[string]any {
+	if !lastMessageEnabled || h.jsonl == nil || sessionID == "" {
+		return nil
+	}
+	m, ok := h.jsonl.LastMessage(sessionID, workingDir, agentType)
+	if !ok {
+		return nil
+	}
+	return lastMessageField(&m, false)
+}
+
+// lastMessageRow is lastMessageOf for a live row: on a first paint that skips the expensive reads (skipExpensive) only what an earlier read cached is used, so the list answers without opening a file.
+func lastMessageRow(h *SessionsHandler, sessionID, workingDir, agentType string, skipExpensive bool) map[string]any {
+	if !skipExpensive {
+		return h.lastMessageOf(sessionID, workingDir, agentType)
+	}
+	if !lastMessageEnabled || h.jsonl == nil {
+		return nil
+	}
+	if m, ok := h.jsonl.CachedLastMessage(sessionID); ok {
+		return lastMessageField(&m, false)
+	}
+	return nil
+}
+
+// SessionReader is the transcript reader this handler uses: other handlers that read the same session files (the spend read) share it, so a file is parsed once.
+func (h *SessionsHandler) SessionReader() *jsonl.SessionReader { return h.jsonl }

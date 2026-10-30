@@ -44,7 +44,7 @@ const BASE = require('./test_base').BASE;
             return;
         }
         // A hub answers EVERY list as {sessions, servers}. The app asks again shortly after the first list lands (under
-        // load ~100 ms later, inside the phase-15 wait); a plain array from the test server reset the server list to none
+        // load ~100 ms later, inside the phase-15 wait); a plain array from the test server reset the computer list to none
         // and hid the Servers tab: the flake.
         if (u.pathname === '/api/sessions/live' && fakeHub && heldReleased) return json(200, { sessions: [], servers: [{ id: 'r1', label: 'Remote', status: 'online' }] });
         return Fetch.continueRequest({ requestId: e.requestId });
@@ -175,7 +175,7 @@ const BASE = require('./test_base').BASE;
         })()`);
         assert.match(rows.local, /^Coral 9\.9\.9 · (\d+( agents?)?)?$/, 'the This computer row shows its version and its agent count (the number alone, blank at zero): ' + rows.local);
         assert.match(rows.r1meta, /Last seen\s*\d/, 'an unreachable server\'s page says last seen (#9798): ' + rows.r1meta);
-        assert.equal(rows.r1hint, 'Is Coral running on that machine? Check the URL.');
+        assert.equal(rows.r1hint, 'Is Coral running on that computer? Check the URL.');
         console.log('PASS (14) Servers: This computer row version + agents; unreachable row explains and says last seen');
 
         // ── (15) A view the user opens while the first list loads is not opened
@@ -183,7 +183,7 @@ const BASE = require('./test_base').BASE;
         // opened with). A hub with one remote, so the Servers tab stays available.
         fakeHub = true;
         holdNextList = true;
-        // The /ws/coral feed is the test server's (not a hub), and its first full coral_update sets the server list
+        // The /ws/coral feed is the test server's (not a hub), and its first full coral_update sets the computer list
         // to none. Mark when that snapshot has been applied, so the held list (with a remote) lands after it.
         await Page.addScriptToEvaluateOnNewDocument({ source: `(() => {
             const W = window.WebSocket;

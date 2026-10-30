@@ -7,7 +7,9 @@ Scheduled jobs support two execution modes:
 - `prompt` jobs launch a one-shot agent task on a cron schedule.
 - `workflow` jobs trigger a saved workflow on a cron schedule.
 
-A run refused because the job's agent CLI (Claude or Codex) is signed out is `failed` at once, before a worktree is made or anything is launched: its `error_msg` is `Claude is not signed in`, its `error_code` is `not_signed_in` and its `agent_type` names the CLI (a workflow job copies them from its workflow run; see [Workflows](workflows.md)). Such runs do not count toward the pause after three failed runs in a row; the job runs again on its schedule once the CLI is signed in.
+A `prompt` job on Pi runs one shot, `pi --print --no-session --no-approve <prompt>`: Pi answers on the run's terminal, keeps no session and exits, and the run ends with it (the repository's own Pi files are not trusted: nobody is there to answer). Other CLIs' jobs stay open at their prompt until they exit or the run's time is up.
+
+A run refused because the job's agent CLI (Claude, Codex or Pi) is signed out is `failed` at once, before a worktree is made or anything is launched: its `error_msg` is `Claude is not signed in`, its `error_code` is `not_signed_in` and its `agent_type` names the CLI (a workflow job copies them from its workflow run; see [Workflows](workflows.md)). Such runs do not count toward the pause after three failed runs in a row; the job runs again on its schedule once the CLI is signed in.
 
 For one-off launches, see the [Jobs API](jobs.md). For reusable multi-step automations, see the [Workflows API](workflows.md).
 

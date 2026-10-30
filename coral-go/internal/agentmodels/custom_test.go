@@ -51,7 +51,7 @@ func TestValidateCustomSetNamesTheRowFamilyAndField(t *testing.T) {
 		{"duplicate", []Custom{{Family: "codex", Value: "a"}, {Family: "claude", Value: "a"}, {Family: "codex", Value: "a"}}, 2, "value"},
 		{"effort the CLI does not take", []Custom{{Family: "claude", Value: "a", Efforts: []string{"low", "turbo"}}}, 0, "efforts"},
 		{"effort twice", []Custom{{Family: "claude", Value: "a", Efforts: []string{"low", "low"}}}, 0, "efforts"},
-		{"levels for a provider with none", []Custom{{Family: "pi", Value: "a", Efforts: []string{"low"}}}, 0, "efforts"},
+		{"a level the provider's CLI does not take", []Custom{{Family: "pi", Value: "a", Efforts: []string{"extreme"}}}, 0, "efforts"},
 		{"a codex level that is claude's", []Custom{{Family: "codex", Value: "a", Efforts: []string{"max"}}}, 0, "efforts"},
 		{"an empty level", []Custom{{Family: "claude", Value: "a", Efforts: []string{""}}}, 0, "efforts"},
 	}
@@ -91,7 +91,7 @@ func TestFamilyLevelsAreWhatTheCLIsTake(t *testing.T) {
 	assert.Equal(t, []string{"low", "medium", "high", "xhigh", "max"}, FamilyLevels("claude"))
 	assert.Equal(t, []string{"minimal", "low", "medium", "high", "xhigh"}, FamilyLevels("codex"))
 	assert.Equal(t, []string{"low", "medium", "high", "xhigh", "max"}, FamilyLevels("agy"))
-	assert.Equal(t, []string{}, FamilyLevels("pi"), "Pi is not installed to check: no levels")
+	assert.Equal(t, []string{"off", "minimal", "low", "medium", "high", "xhigh", "max"}, FamilyLevels("pi"), "pi --help documents --thinking (#11091)")
 	assert.Equal(t, []string{}, FamilyLevels("nonsense"))
 }
 

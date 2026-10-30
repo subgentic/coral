@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"log/slog"
 	"path/filepath"
 	"time"
 
@@ -44,6 +45,13 @@ func (h *SessionsHandler) wakeExistingSession(ctx context.Context, ls *store.Liv
 		return err
 	}
 	h.finishWake(ctx, ls, plan)
+	// An agent of this board is awake again, so the pause that sleep put on it ends, whichever path woke it (a person's Wake, auto-wake, an agent that ended and was started again, hooks): a board that
+	// stayed paused after a restart sent no nudge for hours (#11182). A pause a person set stays (LiftSleepPause).
+	if bn := ptr.Value(ls.BoardName); bn != "" && h.boardHandler != nil {
+		if h.boardHandler.LiftSleepPause(bn) {
+			slog.Info("[board] resumed a board that sleep had paused: an agent of it is awake", "board", bn, "session_id", ls.SessionID)
+		}
+	}
 	return nil
 }
 

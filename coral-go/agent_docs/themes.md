@@ -203,7 +203,7 @@ Returns the available CSS variable groups and their human-readable labels. Usefu
 POST /api/themes/generate
 ```
 
-Uses an LLM (Claude, Antigravity, or Codex) to generate theme colors from a text description. Requires at least one CLI tool installed (`claude`, `agy`, or `codex`).
+Uses an LLM (Claude, Antigravity, Codex, or Pi) to generate theme colors from a text description. Requires at least one CLI tool installed (`claude`, `agy`, `codex`, or `pi`); Pi is the last one tried, and runs one shot with no tools and no session kept (`pi --print --no-session --no-approve --no-tools`).
 
 **Request Body:**
 ```json

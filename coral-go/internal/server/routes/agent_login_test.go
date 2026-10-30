@@ -272,3 +272,95 @@ func TestAgyQuotaNoticeFromTheLiveScreen(t *testing.T) {
 	// Nothing about a quota: no notice.
 	assert.Empty(t, h.usageLimitText(at.Agy, "", "", map[string]any{"recent_lines": []string{"● Done.", "", "> ", "? for shortcuts      Gemini 3.8 Flash · high"}}))
 }
+
+// #11084: Pi signed in with a Claude plan is refused with a 400 ("Third-party apps now draw from your extra usage"). The lines are the operator's screenshot of the Pi pane, wrapped at the pane's width: a hyphenated
+// word ("Third-" / "party") and the sentence are cut across lines.
+var piExtraUsagePane = []string{
+	"> hello",
+	"",
+	"Error: 400",
+	`{"type":"error","error":{"type":"invalid_request_error","message":"Third-`,
+	"party apps now draw from your extra usage, not your plan limits. Add more",
+	"at claude.ai/settings/usage and keep",
+	`going."},"request_id":"req_011CgX6UD8Z6cAfMi1MWibgE"}`,
+	"",
+}
+
+func TestPiExtraUsageNotice(t *testing.T) {
+	got := piLimitText(map[string]any{"recent_lines": piExtraUsagePane})
+	assert.Contains(t, got, "claude.ai/settings/usage", "it names the three ways forward: extra usage, an API key, another provider")
+	assert.Contains(t, got, "ANTHROPIC_API_KEY")
+	assert.Contains(t, got, "--model provider/id")
+	assert.NotContains(t, got, "request_id", "plain words, not Pi's raw JSON")
+	assert.NotContains(t, got, "{")
+	assert.LessOrEqual(t, len(piExtraUsageNotice), maxCLIText, "the cap must not cut an option off")
+	assert.Equal(t, piExtraUsageNotice, got)
+
+	// Wrapped at another width the same words are found.
+	wide := []string{"Error: 400", `{"type":"error","error":{"type":"invalid_request_error","message":"Third-party apps now draw from your extra usage, not your plan limits. Add more at claude.ai/settings/usage and keep going."},"request_id":"req_x"}`}
+	assert.NotEmpty(t, piLimitText(map[string]any{"recent_lines": wide}))
+
+	// Not for other errors, an idle Pi, or the words quoted in the middle of a long scrollback.
+	assert.Empty(t, piLimitText(map[string]any{"recent_lines": []string{"Error: 400", `{"error":{"message":"max_tokens: too large"}}`}}))
+	assert.Empty(t, piLimitText(map[string]any{"recent_lines": []string{"> hello", "Hi! How can I help?"}}))
+	assert.Empty(t, piLimitText(map[string]any{}))
+	old := append(append([]string{}, piExtraUsagePane...), strings.Split(strings.Repeat("more output\n", piLimitLines), "\n")...)
+	assert.Empty(t, piLimitText(map[string]any{"recent_lines": old}), "scrolled away once Pi runs again")
+}
+
+func TestUsageLimitTextForPi(t *testing.T) {
+	h := &SessionsHandler{}
+	assert.NotEmpty(t, h.usageLimitText(at.Pi, "sid", "/w", map[string]any{"recent_lines": piExtraUsagePane}))
+	assert.Empty(t, h.usageLimitText(at.Pi, "sid", "/w", map[string]any{"recent_lines": []string{"all fine"}}))
+}
+
+// #11092 (Pi parity row 9): any provider error on Pi's last turn, as Pi 1.4.0 wrote it on the assistant message (errorMessage, stopReason "error"), becomes the chat's notice in plain words: the
+// provider's own reason, not its JSON.
+func TestPiProviderErrorNoticeFromTheSessionFile(t *testing.T) {
+	data := t.TempDir()
+	t.Setenv("CORAL_DATA_DIR", data)
+	const sid = "11111111-2222-4333-8444-555555555555"
+	dir := filepath.Join(data, "pi-sessions", sid)
+	require.NoError(t, os.MkdirAll(dir, 0o700))
+	write := func(errorMessage string) {
+		lines := []string{`{"type":"session","version":3,"id":"x","cwd":"/w"}`,
+			`{"type":"message","message":{"role":"user","content":[{"type":"text","text":"hi"}]}}`}
+		if errorMessage != "" {
+			b, _ := json.Marshal(errorMessage)
+			lines = append(lines, `{"type":"message","message":{"role":"assistant","content":[],"stopReason":"error","errorMessage":`+string(b)+`}}`)
+		}
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "s.jsonl"), []byte(strings.Join(lines, "\n")+"\n"), 0o600))
+	}
+	h := &SessionsHandler{}
+
+	write(`OpenAI API error (400): {"type":"invalid_request_error","code":"model_not_found","message":"The 'gpt-5-mini' model is not supported when using Codex with a ChatGPT account."}`)
+	got := h.usageLimitText(at.Pi, sid, "/w", map[string]any{})
+	assert.Equal(t, "Pi's last request failed: The 'gpt-5-mini' model is not supported when using Codex with a ChatGPT account. (OpenAI API error (400))", got)
+	assert.NotContains(t, got, "{", "plain words, not the provider's JSON")
+
+	write(`Rate limit reached for requests`) // no JSON: shown as written
+	assert.Equal(t, "Pi's last request failed: Rate limit reached for requests", h.usageLimitText(at.Pi, sid, "/w", map[string]any{}))
+
+	// The extra-usage refusal keeps its own words and the three ways forward, even when the file says it too.
+	write(`Anthropic API error (400): {"type":"error","error":{"type":"invalid_request_error","message":"Third-party apps now draw from your extra usage"}}`)
+	assert.Equal(t, piExtraUsageNotice, h.usageLimitText(at.Pi, sid, "/w", map[string]any{"recent_lines": piExtraUsagePane}))
+
+	// The errorMessage is the agent's own file (Security's MUST): terminal control, a bidi override, an OSC title and invisible characters never reach the notice.
+	spoof := "Coral: your licence expired. Open https://evil.example/pay \u202e\a\x1b[31mRED\x1b[0m \x1b]0;owned\a zero\u200bwidth \u2066isolate\u2069 end"
+	write(`Gateway error (502): ` + spoof)
+	got = h.usageLimitText(at.Pi, sid, "/w", map[string]any{})
+	require.NotEmpty(t, got)
+	for _, bad := range []string{"\u202e", "\a", "\x1b", "\u200b", "\u2066", "\u2069", "]0;owned"} {
+		assert.NotContains(t, got, bad, "no %q in a notice printed under Coral's voice", bad)
+	}
+	assert.Contains(t, got, "Pi's last request failed:")
+	assert.Contains(t, got, "RED", "the words stay, only the control goes")
+	// The status part (the text before the JSON body) is cleaned the same way.
+	write("Bad\x1b[31m\u202egateway (502): {\"message\":\"plain reason\"}")
+	got = h.usageLimitText(at.Pi, sid, "/w", map[string]any{})
+	assert.Equal(t, "Pi's last request failed: plain reason (Badgateway (502))", got)
+
+	write("") // no failed turn: no notice
+	assert.Empty(t, h.usageLimitText(at.Pi, sid, "/w", map[string]any{}))
+	assert.Empty(t, h.usageLimitText(at.Pi, "not-a-session-id", "/w", map[string]any{}))
+}

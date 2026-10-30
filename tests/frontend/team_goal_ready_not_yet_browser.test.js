@@ -9,7 +9,7 @@ const B = 'goal-notyet-' + Date.now().toString(36);
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const api = (method, path, body) => ev(`fetch('/api/board/${B}' + ${JSON.stringify(path)}, { method: ${JSON.stringify(method)}, headers: { 'Content-Type': 'application/json' }, body: ${body ? JSON.stringify(JSON.stringify(body)) : 'undefined'} }).then(async r => ({ status: r.status, json: await r.json().catch(() => null) }))`);
-    const rowOf = (title) => ev(`(() => { const r = [...document.querySelectorAll('#team-panel-goals tbody tr.dt-row')].find(r => r.textContent.includes(${JSON.stringify(title)})); return r ? { note: !!r.querySelector('.goals-ready-note'), close: r.querySelectorAll('button.goals-ready-close').length } : null; })()`);
+    const rowOf = (title) => ev(`(() => { const r = [...document.querySelectorAll('#team-panel-goals tbody tr.dt-row')].find(r => r.textContent.includes(${JSON.stringify(title)})); return r ? { note: /All tasks done \\u00b7 Close goal/.test(r.textContent), close: r.querySelectorAll('button.goals-ready-close').length } : null; })()`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });

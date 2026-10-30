@@ -13,13 +13,13 @@ import { OUTCOME_UNKNOWN_LINE, isOutcomeUnknown } from './outcome_unknown.js';
 
  const STATUS_META = {
     online:           { label: 'Online',           cls: 'online',       hint: 'Connected' },
-    unreachable:      { label: 'Unreachable',      cls: 'unreachable',  hint: 'The hub cannot reach this server. Agents shown are the last known state.' },
-    unauthorized:     { label: 'Key rejected',     cls: 'unauthorized', hint: 'The server rejected the stored API key. Edit the server and enter a new key.' },
-    key_unreadable:   { label: 'Key unreadable',   cls: 'unauthorized', hint: 'The stored API key cannot be decrypted on this hub. Edit the server and re-enter the key.' },
-    host_refused:     { label: 'Host refused',     cls: 'unreachable',  hint: 'The server refused the host name the hub uses for it (its protection against DNS rebinding). Through a port forward, edit the server to use 127.0.0.1 or localhost.' },
-    version_mismatch: { label: 'Version mismatch', cls: 'unreachable',  hint: 'This server runs a version older than the hub supports.' },
-    offline:          { label: 'Offline',          cls: 'unreachable',  hint: 'This server is not connected to the hub. Agents shown are the last known state; it reconnects by itself when its network is back.' },
-    stale:            { label: 'Offline',          cls: 'unreachable',  hint: 'This server is not connected to the hub. Agents shown are the last known state; it reconnects by itself when its network is back.' },
+    unreachable:      { label: 'Unreachable',      cls: 'unreachable',  hint: 'The hub cannot reach this computer. Agents shown are the last known state.' },
+    unauthorized:     { label: 'Key rejected',     cls: 'unauthorized', hint: 'The computer rejected the stored API key. Edit the computer and enter a new key.' },
+    key_unreadable:   { label: 'Key unreadable',   cls: 'unauthorized', hint: 'The stored API key cannot be decrypted on this hub. Edit the computer and re-enter the key.' },
+    host_refused:     { label: 'Host refused',     cls: 'unreachable',  hint: 'The computer refused the host name the hub uses for it (its protection against DNS rebinding). Through a port forward, edit the computer to use 127.0.0.1 or localhost.' },
+    version_mismatch: { label: 'Version mismatch', cls: 'unreachable',  hint: 'This computer runs a version older than the hub supports.' },
+    offline:          { label: 'Offline',          cls: 'unreachable',  hint: 'This computer is not connected to the hub. Agents shown are the last known state; it reconnects by itself when its network is back.' },
+    stale:            { label: 'Offline',          cls: 'unreachable',  hint: 'This computer is not connected to the hub. Agents shown are the last known state; it reconnects by itself when its network is back.' },
     unknown:          { label: 'Unknown',          cls: 'unknown',      hint: 'Not checked yet' },
 };
 
@@ -76,7 +76,7 @@ export function isStaleSession(s) {
 /** Tooltip/explanation for a stale session. */
 export function staleReason(s) {
     const e = serverEntry(s && s.server);
-    return `${e.label || e.id} is ${statusMeta(e.status).label.toLowerCase()}. This agent shows its last known state and cannot be used until the server is back.`;
+    return `${e.label || e.id} is ${statusMeta(e.status).label.toLowerCase()}. This agent shows its last known state and cannot be used until the computer is back.`;
 }
 
 // Cloud Hub update notice (#3059; coral-hub docs/proxy-feed.md "Update notice").
@@ -132,7 +132,7 @@ export function serverHoverText(id) {
         ? countOn(LOCAL_SERVER)
         : (typeof e.agents === 'number' ? e.agents : countOn(normServer(e.id)));
     const lines = [`${e.label || e.id}: ${m.label}`];
-    lines.push(local ? 'This server (the hub)' : (e.url || e.id));
+    lines.push(local ? 'This computer (the hub)' : (e.url || e.id));
     lines.push(`${count} agent${count === 1 ? '' : 's'}`);
     if (!local && serverVersion(e)) lines.push(`Version ${serverVersion(e)}`);
     if (!local) lines.push(`Last seen: ${formatLastSeen(e.last_seen)}`);
@@ -220,7 +220,7 @@ export function serverDetailsHtml(e) {
     const rows = [
         ['Status', m.label],
         ['Name', e.label || e.id],
-        local ? ['Server', 'This server (the hub)'] : (e.url ? ['Address', e.url] : null),
+        local ? ['Computer', 'This computer (the hub)'] : (e.url ? ['Address', e.url] : null),
         ['Agents', String(count)],
         full ? ['Version', shortVersion(full), full] : null,
         !local ? ['Last seen', formatLastSeen(e.last_seen)] : null,
@@ -250,7 +250,7 @@ function serverLaunchActionsHtml(e) {
         + (blocked ? ` disabled aria-disabled="true" title="${escHtml(blocked)}"` : '') + `>${label}</button>`;
     return `<div class="server-launch-actions" role="group" aria-label="${escHtml(`Launch on ${e.label || e.id}`)}">`
         + actions.map(btn).join('')
-        + `<button type="button" class="server-open-btn" data-server-open="${escHtml(e.id)}">Open in Servers</button>`
+        + `<button type="button" class="server-open-btn" data-server-open="${escHtml(e.id)}">Open in Computers</button>`
         + `</div>`
         + (blocked ? `<p class="server-launch-note">${escHtml(blocked)}</p>` : '')
         + (!local && !blocked ? `<p class="server-launch-hint">To use a folder, choose it when you launch an agent.</p>` : '');
@@ -272,7 +272,7 @@ export function serverGroupHeaderHtml(e, count, collapsed, detailsOpen = false) 
     return `<li class="server-group-header server-${m.cls}${off ? ' is-down' : ''}" data-server-group="${escHtml(e.id)}">`
         + `<button type="button" class="server-group-toggle" data-server-toggle="${escHtml(e.id)}" aria-expanded="${collapsed ? 'false' : 'true'}"`
         + ` title="${escHtml(`${e.label || e.id}: ${m.label}`)}"`
-        + ` aria-label="${escHtml(`Server ${e.label || e.id}: ${m.label}, ${count} agents`)}">`
+        + ` aria-label="${escHtml(`Computer ${e.label || e.id}: ${m.label}, ${count} agents`)}">`
         + SERVER_ICON + `<span class="server-group-name">${escHtml(name)}</span>`
         + `<span class="session-group-count">${count}</span>`
         + (off ? `<span class="server-group-state">${escHtml(m.label.toLowerCase())}</span>` : '')
@@ -295,7 +295,7 @@ export function serverStripHtml() {
         // tab it opens, so they reach touch and keyboard users, not only a hover title.
         return `<li class="server-strip-item server-${m.cls}" data-server="${escHtml(e.id)}" title="${escHtml(serverHoverText(e.id))}">`
             + `<button type="button" class="server-strip-btn" data-server-open="${escHtml(e.id)}"`
-            + ` aria-label="${escHtml(`${e.label || e.id}: ${m.label}. Open in Servers`)}">`
+            + ` aria-label="${escHtml(`${e.label || e.id}: ${m.label}. Open in Computers`)}">`
             + `<span class="server-dot" aria-hidden="true"></span>`
             + `<span class="server-strip-name">${escHtml(e.label || e.id)}</span>`
             + (down ? `<span class="server-strip-state">${escHtml(m.label)}</span>` : '')
@@ -303,7 +303,7 @@ export function serverStripHtml() {
             + (e.id === LOCAL_SERVER ? '' : updateBadgeHtml(e))
             + `</li>`;
     }).join('');
-    return `<li class="server-strip-row" aria-label="Servers"><ul class="server-strip">${rows}</ul></li>`;
+    return `<li class="server-strip-row" aria-label="Computers"><ul class="server-strip">${rows}</ul></li>`;
 }
 
 /** Stable partition: local-server group keys first (keeps relative order). */
@@ -321,14 +321,14 @@ export function describeServerError(httpStatus, body) {
     if (httpStatus === 409 && (st === 'key_unreadable' || /cannot be decrypted/i.test(msg))) {
         return 'The stored API key cannot be decrypted on this hub (the secret key file changed or is missing). Enter the API key again to save it.';
     }
-    if (httpStatus === 409) return msg || 'A server with that id already exists.';
+    if (httpStatus === 409) return msg || 'A computer with that id already exists.';
     if (httpStatus === 502) {
-        if (st === 'unauthorized') return 'The server rejected the API key. Check the key and try again.';
-        if (st === 'host_refused') return 'The server refused the host name in this URL. Through a port forward, use 127.0.0.1 or localhost.';
-        if (st === 'unreachable') return `Could not reach the server${msg ? ' (' + msg + ')' : ''}. Check the URL, and tick "Allow private network" if it is on your LAN or tailnet.`;
-        return msg ? `The server check failed: ${msg}` : 'The server check failed.';
+        if (st === 'unauthorized') return 'The computer rejected the API key. Check the key and try again.';
+        if (st === 'host_refused') return 'The computer refused the host name in this URL. Through a port forward, use 127.0.0.1 or localhost.';
+        if (st === 'unreachable') return `Could not reach the computer${msg ? ' (' + msg + ')' : ''}. Check the URL, and tick "Allow private network" if it is on your LAN or tailnet.`;
+        return msg ? `The computer check failed: ${msg}` : 'The computer check failed.';
     }
-    if (httpStatus === 404) return 'Hub features are not enabled on this server, or the server no longer exists.';
+    if (httpStatus === 404) return 'Hub features are not enabled on this computer, or the computer no longer exists.';
     return msg || `Request failed (HTTP ${httpStatus}).`;
 }
 
@@ -338,10 +338,10 @@ export function describeServerError(httpStatus, body) {
 const PROXY_ERRORS = {
     'remote unreachable': l => `${l} is unreachable. Check that Coral is running there and that this hub can reach it.`,
     'remote unavailable': l => `${l} is not available right now. Try again in a moment.`,
-    'remote key unreadable': l => `This hub cannot read the stored API key for ${l}. Enter the key again in Servers.`,
-    'remote rejected API key': l => `${l} rejected this hub's API key. Update the key in Servers.`,
-    'remote address not allowed': l => `${l}'s address is not allowed. If it is on your LAN or tailnet, allow private network for it in Servers.`,
-    'unknown server': l => `${l} is no longer registered with this hub.`,
+    'remote key unreadable': l => `This hub cannot read the stored API key for ${l}. Enter the key again in Computers.`,
+    'remote rejected API key': l => `${l} rejected this hub's API key. Update the key in Computers.`,
+    'remote address not allowed': l => `${l}'s address is not allowed. If it is on your LAN or tailnet, allow private network for it in Computers.`,
+    'unknown computer': l => `${l} is no longer registered with this hub.`,
     'too_many_streams': l => `${l} is busy. Try again in a moment.`,
 };
 
@@ -349,7 +349,7 @@ const PROXY_ERRORS = {
  *  response is not one (the caller then uses its own message). */
  function proxyErrorMessage(httpStatus, body, serverId) {
     const e = serverEntry(serverId);
-    const label = (e && (e.label || e.id)) || 'The server';
+    const label = (e && (e.label || e.id)) || 'The computer';
     const code = body && typeof body === 'object' ? (body.error || body.code || '') : '';
     if (typeof code === 'string' && PROXY_ERRORS[code]) return PROXY_ERRORS[code](label);
     if (httpStatus === 502 || httpStatus === 503 || httpStatus === 504) return `${label} is not responding. Try again in a moment.`;

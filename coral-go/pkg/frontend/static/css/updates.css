@@ -66,6 +66,9 @@
 .update-agents { max-height: 30vh; overflow-y: auto; }
 .update-agents:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .update-note { color: var(--text-primary); }
+.update-installing { display: flex; align-items: center; gap: var(--space-lg, 16px); padding: var(--space-lg, 16px) 0; }
+.update-installing .task-spinner { width: 28px; height: 28px; border-width: 3px; } /* the install's one signal: bigger than the 15 px in-progress dot */
+.update-installing-text { min-width: 0; flex: 1; } .update-installing-text p { margin: 0; } .update-installing-text p + p { margin-top: 4px; }
 .update-error { color: var(--error); }
 .update-fact { font: var(--dlg-control); } /* a fact and the hub line: the dialog's value size, as every other row's value */
 @media (pointer: coarse) { .update-fail-close { min-width: 44px; min-height: 44px; } }

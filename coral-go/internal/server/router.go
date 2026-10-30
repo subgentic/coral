@@ -22,6 +22,7 @@ import (
 	"github.com/subgentic/coral/internal/server/routes"
 	"github.com/subgentic/coral/internal/serverproof"
 	"github.com/subgentic/coral/internal/store"
+	"github.com/subgentic/coral/internal/terminalinput"
 )
 
 // The router is built in this order; registration and wiring order are as they were in one
@@ -210,6 +211,7 @@ func (s *Server) newRouteHandlers() *routeHandlers {
 	routes.ProtectDataDir(s.cfg.CoralDir())
 	sysHandler := routes.NewSystemHandler(s.db, s.cfg)
 	s.sysHandler = sysHandler
+	sessHandler.SetPiModelCheck(sysHandler.PiModelProblem) // a Pi model that Pi does not list is said so at launch (#11105)
 	sysHandler.SetTerminal(s.terminal)
 	if s.boardStore != nil {
 		sysHandler.SetBoardAuthor(func(ctx context.Context, project string, id int64) (string, bool, error) {
@@ -372,6 +374,7 @@ func (s *Server) registerSessions(r *chi.Mux, h *routeHandlers) {
 
 	// Agent session history search & context (coral-agent history search / context)
 	r.Get("/api/agent/history/search", sessHandler.SearchAgentHistory)
+	r.Get("/api/agent/board/search", sessHandler.SearchAgentBoard)
 	r.Get("/api/agent/history/context", sessHandler.GetAgentHistoryContext)
 	r.Get("/api/sessions/live/{name}/history/search", sessHandler.SearchAgentHistoryForLive)
 	r.Get("/api/sessions/live/{name}/history/context", sessHandler.GetAgentHistoryContextForLive)
@@ -460,6 +463,8 @@ func (s *Server) registerCloud(r *chi.Mux) {
 	r.Post("/api/system/update/check", upd.CheckNow)                   // #5280 step 3 B: local only, 404 until the feature is on
 	r.Put("/api/system/update/settings", upd.SetAuto)                  // check automatically
 	s.goBackground(upd.RunBackgroundChecks)                            // returns at once while the feature is off
+	upd.Idle, upd.InFlight, upd.LastPerson, upd.Work = s.sessHandler.UpdateIdleReason, ptymanager.AutomatedInputInFlight, terminalinput.LastPersonInput, background.BusyWork
+	s.goBackground(upd.RunAutoInstall) // install a verified update once Coral has been idle (#11170); returns at once without an updater
 	// the goal events the feed names are pruned to the newest thousand per board (#7355)
 	if s.boardStore != nil {
 		prune := background.NewGoalEventsPrune(s.boardStore)
@@ -515,6 +520,8 @@ func (s *Server) registerSystem(r *chi.Mux, h *routeHandlers) {
 	r.Delete("/api/teams/detail/{name}", teamsHandler.DeleteTeam)
 	r.Post("/api/teams/detail/{name}/resurrect", sessHandler.ResurrectTeam)
 	r.Put("/api/teams/detail/{name}/home-folder", sessHandler.SetTeamHomeFolder)
+	r.Put("/api/team-members/{memberID}/search-access", sessHandler.SetMemberSearchAccess)
+	r.Get("/api/search-access/log", sessHandler.SearchAccessLog)
 
 	// Worktrees Coral made and kept (#6736)
 	worktreesHandler := routes.NewWorktreesHandler(s.db, s.cfg)

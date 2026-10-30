@@ -37,7 +37,7 @@ assert.equal(describe({ state: 'connected' }), 'Connected to Coral Hub.');
 assert.match(describe({ state: 'retrying', label: 'mac' }), /^Connected to Coral Hub as mac \(reconnecting…\)\. Coral keeps working locally meanwhile\.$/, 'enrolled and retrying reads as connected');
 assert.equal(describe({ state: 'retrying', last_error: 'timeout' }), 'Not connected right now (timeout). Coral keeps working locally and will reconnect on its own.');
 assert.equal(describe({ state: 'retrying' }), 'Not connected right now (retrying). Coral keeps working locally and will reconnect on its own.');
-assert.equal(describe({ state: 'revoked' }), 'The hub revoked this server, so Coral stopped retrying. Connect again to re-enroll.');
+assert.equal(describe({ state: 'revoked' }), 'The hub revoked this computer, so Coral stopped retrying. Connect again to re-enroll.');
 assert.equal(describe({ state: 'key_unreadable', last_error: 'no key' }), 'no key');
 assert.equal(describe({ state: 'upgrade_required', last_error: 'update Coral' }), 'update Coral');
 assert.equal(describe({ state: 'something_new' }), 'something_new', 'an unknown state is said as it is');
@@ -50,8 +50,8 @@ assert.equal(enrolledRetrying(null), false);
 assert.equal(codeExpired({ state: 'idle', last_error_code: 'code_expired' }), true);
 assert.equal(codeExpired({ state: 'enrolling', last_error_code: 'code_expired' }), false);
 
-assert.match(rekeyText({ hub_url: 'https://h.example', remote_server_keys: 2, exposed: true }), /^Other accounts on this computer could read the secret key file.*discards the Coral Hub connection to https:\/\/h\.example .* and 2 remote servers' API keys/s);
-assert.match(rekeyText({ remote_server_keys: 1, message: 'bad file' }), /^Coral can't use its secret key file \(bad file\)\..*1 remote server's API key/s);
+assert.match(rekeyText({ hub_url: 'https://h.example', remote_server_keys: 2, exposed: true }), /^Other accounts on this computer could read the secret key file.*discards the Coral Hub connection to https:\/\/h\.example .* and 2 remote computers' API keys/s);
+assert.match(rekeyText({ remote_server_keys: 1, message: 'bad file' }), /^Coral can't use its secret key file \(bad file\)\..*1 remote computer's API key/s);
 assert.match(rekeyText({}), /discards nothing stored yet\.$/);
 
 assert.equal(autoAcceptChangedText(null), '');

@@ -555,7 +555,7 @@ func (p *TokenPoller) pollPiSession(ctx context.Context, ls *store.LiveSession) 
 			LastActivityAt:   call.Timestamp,
 			RecordedAt:       call.Timestamp,
 			Source:           "jsonl",
-			Model:            call.Model,
+			Model:            piRecordModel(call.Model, ls.Model),
 		}
 
 		recs = append(recs, record)
@@ -575,6 +575,31 @@ func (p *TokenPoller) pollPiSession(ctx context.Context, ls *store.LiveSession) 
 	}
 
 	p.lastEntryCount[ls.SessionID] = total
+}
+
+// piModelLevels are the thinking levels Pi takes after a ":" in --model (pi --help): only such a suffix is cut from a launch model, so a model id with a colon of its own ("llama3:8b") is kept.
+var piModelLevels = map[string]bool{"off": true, "minimal": true, "low": true, "medium": true, "high": true, "xhigh": true, "max": true}
+
+// maxPiModelLen bounds a model id recorded for a Pi turn (a file's own value or the launch model).
+const maxPiModelLen = 200
+
+// piRecordModel is the model a Pi turn is recorded under: the one the turn (or the session's model_change before it) named, else the model the agent was launched with, as the id alone
+// ("openai/gpt-6-luna:high" is "gpt-6-luna"; "ollama/llama3:8b" is "llama3:8b"), so a turn that names none is not a bucket of its own (#11293). At most maxPiModelLen characters.
+func piRecordModel(turn string, launched *string) string {
+	m := turn
+	if m == "" && launched != nil {
+		m = strings.TrimSpace(*launched)
+		if i := strings.LastIndex(m, ":"); i > 0 && piModelLevels[m[i+1:]] {
+			m = m[:i]
+		}
+		if i := strings.Index(m, "/"); i >= 0 {
+			m = m[i+1:]
+		}
+	}
+	if len(m) > maxPiModelLen {
+		m = strings.ToValidUTF8(m[:maxPiModelLen], "")
+	}
+	return m
 }
 
 func extractPiUsage(path string) *piUsageData {

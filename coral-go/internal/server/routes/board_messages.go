@@ -394,6 +394,8 @@ func (h *BoardHandler) ReadMessages(w http.ResponseWriter, r *http.Request) {
 	project := urlParam(r, "project")
 	h.setBoardIdentity(w, r, project)
 	if h.isPaused(project) {
+		// A paused board delivers nothing, and says so: a bare empty list read as "No new messages" while the Stop hook counted unread ones, for hours after a restart (#11198).
+		w.Header().Set(BoardPausedHeader, "true")
 		writeJSON(w, http.StatusOK, []board.Message{})
 		return
 	}
@@ -574,14 +576,13 @@ func (h *BoardHandler) listMessagesFor(w http.ResponseWriter, r *http.Request, p
 	writeJSON(w, http.StatusOK, resp)
 }
 
-// CheckUnread returns the unread message count.
+// BoardPausedHeader marks a read of a paused board: the list is empty because the board is paused, not because there is nothing new.
+const BoardPausedHeader = "X-Coral-Board-Paused"
+
+// CheckUnread returns the unread message count, and paused: true when the board is paused (read delivers none of them until it is resumed).
 // GET /api/board/{project}/messages/check
 func (h *BoardHandler) CheckUnread(w http.ResponseWriter, r *http.Request) {
 	project := urlParam(r, "project")
-	if h.isPaused(project) {
-		writeJSON(w, http.StatusOK, map[string]any{"unread": 0})
-		return
-	}
 	subscriberID, attrOK := attributedTo(w, r, r.URL.Query().Get("subscriber_id"))
 	if !attrOK {
 		return
@@ -589,6 +590,11 @@ func (h *BoardHandler) CheckUnread(w http.ResponseWriter, r *http.Request) {
 	count, err := h.bs.CheckUnread(r.Context(), project, subscriberID)
 	if err != nil {
 		errInternalServer(w, err.Error())
+		return
+	}
+	if h.isPaused(project) {
+		// The count is the real one (what the Stop hook and the sidebar count), with the reason read delivers none of it: 0 here and a hand-off that counted them were two answers to one question (#11198).
+		writeJSON(w, http.StatusOK, map[string]any{"unread": count, "paused": true})
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"unread": count})

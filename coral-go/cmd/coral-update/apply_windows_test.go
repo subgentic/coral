@@ -45,6 +45,9 @@ func (m noProductMSI) Install() (string, error) {
 // After a click in Settings, runApply on Windows reaches the MSI apply (#162) with the clicked version, never the "unsupported_platform" of a
 // platform without one.
 func TestRunApplyOnWindowsReachesTheMSIApply(t *testing.T) {
+	started := fakeStart(t, nil)
+	reg := installFolder(t)
+	registered(t, reg, nil) // the marker below names no folder, so Coral would be started from the registered install: this test's own
 	asked := false
 	old := newWindowsMSI
 	newWindowsMSI = func(string) apply.MSI { return noProductMSI{asked: &asked} }
@@ -61,6 +64,7 @@ func TestRunApplyOnWindowsReachesTheMSIApply(t *testing.T) {
 	assert.Equal(t, "1.5.0", clickedVersion, "with the clicked version")
 	assert.Equal(t, apply.ResultUnsupported, got["result"])
 	assert.Equal(t, "no_registered_product", got["failed_stage"])
+	assert.Equal(t, []string{reg}, *started, "Coral is started again from the registered install (this test's stub), nothing else")
 }
 
 // portableMSI is a Coral registered per machine whose folder the apply refuses (a portable copy beside a registered product, or one moved).

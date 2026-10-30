@@ -83,6 +83,8 @@ func resolveTranscriptPathMode(sessionID, workingDirectory, agentType string, st
 		return resolveAgyTranscript(sessionID, workingDirectory)
 	case at.Codex:
 		return resolveCodexTranscript(sessionID)
+	case at.Pi:
+		return resolvePiTranscript(sessionID)
 	default:
 		return resolveClaudeTranscript(sessionID, workingDirectory)
 	}
@@ -320,12 +322,18 @@ func openTranscript(path, agentType string) (*os.File, error) {
 	if agentType == at.Codex {
 		return transcriptlink.OpenRollout(path)
 	}
+	if agentType == at.Pi {
+		return openPiTranscript(path) // a folder the agent can write in: never through a link
+	}
 	return openTranscriptFile(path)
 }
 
 // openTranscriptFile opens path, through transcriptlink.OpenRollout when it is inside Codex's
 // sessions folder.
 func openTranscriptFile(path string) (*os.File, error) {
+	if filepath.Base(filepath.Dir(filepath.Dir(path))) == "pi-sessions" { // a Pi session's file, in a folder the agent can write: through a root, never a link
+		return openPiTranscript(path)
+	}
 	if transcriptlink.InCodexSessions(path) {
 		return transcriptlink.OpenRollout(path)
 	}

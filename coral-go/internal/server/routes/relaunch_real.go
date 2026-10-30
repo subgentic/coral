@@ -16,6 +16,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/subgentic/coral/internal/executil"
 	"github.com/subgentic/coral/internal/safefs"
 	"github.com/subgentic/coral/internal/safego"
 	"github.com/subgentic/coral/internal/updatecheck"
@@ -70,6 +71,7 @@ type relaunchState struct {
 	To              string    `json:"to,omitempty"`
 	Operation       string    `json:"operation,omitempty"`
 	By              string    `json:"by,omitempty"`
+	Source          string    `json:"source,omitempty"` // local, hub or auto: who asked for the attempt (the hub_* names above are older than the idle install, #11170)
 	// Failed is a relaunch that ended without an update and without the updater saying why: it never got ready, or it ended first (#5982). Reason is a fixed word.
 	Failed *relaunchFailure `json:"failed,omitempty"`
 }
@@ -164,7 +166,7 @@ func recordFrom(out status.Out, st relaunchState, now time.Time) UpdaterRecord {
 		rec.InstallKind = i.Kind
 		rec.Supported = i.Unsupported == "" && i.Writable
 	}
-	if s := out.Staged; s != nil && updateVersionRe.MatchString(s.Version) {
+	if s := out.Staged; s != nil && updateVersionRe.MatchString(s.Version) && !updatecheck.NotNewer(s.Version, out.Installed) { // a staged release that is not newer than the installed one is not an update (#395)
 		rec.State = updStaged
 		rec.Staged = &StagedUpdate{Version: s.Version, StagedAt: parseTime(s.StagedAt), Verified: true, Source: s.Source}
 		rec.Latest = s.Version
@@ -316,7 +318,12 @@ func (u *realUpdater) Apply(ctx context.Context, by string) (string, error) {
 		return "", err
 	}
 	now := u.clock()
-	st := relaunchState{HubRelaunched: rec.Staged.Version, LastHubRelaunch: now, StartedAt: now, From: rec.Installed, To: rec.Staged.Version, Operation: op, By: by}
+	st := relaunchState{Source: relaunchSource(by), LastHubRelaunch: now, StartedAt: now, From: rec.Installed, To: rec.Staged.Version, Operation: op, By: by}
+	if st.Source == "hub" {
+		// Once per version is the Hub's rule: only an attempt a Hub owner asked for marks the version as relaunched from the Hub. An automatic install (or a person's click) that did not finish left it
+		// marked, and the owner's relaunch of the same update was refused as already done (QA's #11196). The spacing (LastHubRelaunch) is every source's.
+		st.HubRelaunched = rec.Staged.Version
+	}
 	if err := u.saveState(st); err != nil {
 		u.mu.Unlock()
 		return "", err
@@ -544,6 +551,7 @@ func (e execProgram) run(ctx context.Context, args ...string) ([]byte, error) {
 		return nil, err
 	}
 	cmd := exec.CommandContext(ctx, p, args...)
+	executil.HideWindow(cmd) // coral-update is a console program: a Coral with no console of its own (the tray's server) would open a window on every check (#383)
 	cmd.Env = programEnv()
 	cmd.WaitDelay = 2 * time.Second // a program that is killed at the timeout but left a child holding its output does not hold this call
 	var out limitedBuffer
@@ -563,6 +571,7 @@ func (e execProgram) StartApply() (applyRun, error) {
 		return applyRun{}, err
 	}
 	cmd := exec.Command(p, "apply")
+	executil.HideWindow(cmd) // as run: no console window for the apply (#383)
 	cmd.Env = programEnv()
 	detach(cmd)
 	if err := cmd.Start(); err != nil {

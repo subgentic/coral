@@ -532,6 +532,8 @@ type SessionLineageItem struct {
 	ResumeFromID *string `db:"resume_from_id" json:"resume_from_id,omitempty"`
 	SourceFile   string  `db:"source_file" json:"source_file,omitempty"`
 	IsCurrent    bool    `db:"-" json:"is_current"`
+	// LiveRead: the session has a live row, so its transcript is read as a running session's (what IsCurrent means to loadSessionMessages), whoever asks (#11048: a teammate's session is read live, never "current").
+	LiveRead bool `db:"-" json:"-"`
 }
 
 // GetSessionAncestry returns the caller session and all proven ancestor sessions
@@ -576,6 +578,7 @@ func (s *SessionStore) GetSessionAncestry(ctx context.Context, sessionID string)
 		DisplayName:  ls.DisplayName,
 		ResumeFromID: ls.ResumeFromID,
 		IsCurrent:    true,
+		LiveRead:     true,
 	}
 	if idx, _ := s.GetIndexedSession(ctx, ls.SessionID); idx != nil {
 		rootItem.SourceFile = idx.SourceFile
@@ -603,6 +606,7 @@ func (s *SessionStore) GetSessionAncestry(ctx context.Context, sessionID string)
 				DisplayName:  ancLS.DisplayName,
 				ResumeFromID: ancLS.ResumeFromID,
 				IsCurrent:    false,
+				LiveRead:     true,
 			}
 			if idx, _ := s.GetIndexedSession(ctx, ancLS.SessionID); idx != nil {
 				item.SourceFile = idx.SourceFile
@@ -688,4 +692,68 @@ func oneLine(s string, max int) string {
 // escapeLike makes s literal inside a LIKE pattern (with ESCAPE '\'): a search for "100%" or "a_b" means those characters.
 func escapeLike(s string) string {
 	return strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(s)
+}
+
+// How many sessions a search above own reads at most, per set (#11048): a level widens the set, never the cost of one request without bound.
+const MaxReachSessions = 500
+
+// SessionIDsOfTeam are the sessions of a team's members, past and present (a stopped member's last session too), newest member row first. The team is its row id: a team's NAME is a label, not a key (#11048).
+func (s *SessionStore) SessionIDsOfTeam(ctx context.Context, teamID int64) ([]string, error) {
+	var ids []string
+	err := s.db.SelectContext(ctx, &ids,
+		`SELECT session_id FROM team_members WHERE team_id = ? AND session_id IS NOT NULL AND session_id != '' ORDER BY id DESC LIMIT ?`, teamID, MaxReachSessions)
+	return ids, err
+}
+
+// teamBoardWhere is a live row that launched on a board of a team Coral launched: a team, a launch board, no job and no remote server.
+const teamBoardWhere = `board_name IS NOT NULL AND board_name != '' AND is_job = 0 AND COALESCE(board_server, '') = ''`
+
+// TeamBoardKeys are the boards the members of one team were launched on, by board KEY (the live rows' board_name, joined by team_id): never the team's name (#11048).
+func (s *SessionStore) TeamBoardKeys(ctx context.Context, teamID int64) ([]string, error) {
+	var keys []string
+	err := s.db.SelectContext(ctx, &keys, `SELECT DISTINCT board_name FROM live_sessions WHERE team_id = ? AND `+teamBoardWhere, teamID)
+	return keys, err
+}
+
+// LaunchedTeamBoardKeys are the boards of every team Coral launched, by key: the launch board of some team member.
+func (s *SessionStore) LaunchedTeamBoardKeys(ctx context.Context) ([]string, error) {
+	var keys []string
+	err := s.db.SelectContext(ctx, &keys, `SELECT DISTINCT board_name FROM live_sessions WHERE team_id IS NOT NULL AND team_id > 0 AND `+teamBoardWhere)
+	return keys, err
+}
+
+// JobAndRelayedBoardKeys are the boards a job runs on or a remote (relayed) server's agent joined: no search level reads them.
+func (s *SessionStore) JobAndRelayedBoardKeys(ctx context.Context) ([]string, error) {
+	var keys []string
+	err := s.db.SelectContext(ctx, &keys,
+		`SELECT DISTINCT board_name FROM live_sessions WHERE board_name IS NOT NULL AND board_name != '' AND (is_job = 1 OR COALESCE(board_server, '') != '')`)
+	return keys, err
+}
+
+// LaunchedSessionIDs are the sessions Coral launched that it still has a row for (teams, solo agents, jobs), newest first.
+func (s *SessionStore) LaunchedSessionIDs(ctx context.Context) ([]string, error) {
+	var ids []string
+	err := s.db.SelectContext(ctx, &ids, `SELECT session_id FROM live_sessions ORDER BY rowid DESC LIMIT ?`, MaxReachSessions)
+	return ids, err
+}
+
+// IndexedSessionItems are the sessions Coral only found on disk (in session_index, no live row), newest first: the Operator's own CLI history. Each is a historical item read from its source file.
+func (s *SessionStore) IndexedSessionItems(ctx context.Context) ([]SessionLineageItem, error) {
+	var rows []SessionIndex
+	err := s.db.SelectContext(ctx, &rows,
+		`SELECT session_id, source_type, source_file, first_timestamp, last_timestamp, message_count, display_summary, agent_name, display_name, indexed_at, file_mtime
+		 FROM session_index WHERE session_id NOT IN (SELECT session_id FROM live_sessions) ORDER BY last_timestamp DESC, rowid LIMIT ?`, MaxReachSessions)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]SessionLineageItem, 0, len(rows))
+	for _, idx := range rows {
+		var dn *string
+		if idx.DisplayName != "" {
+			d := idx.DisplayName
+			dn = &d
+		}
+		out = append(out, SessionLineageItem{SessionID: idx.SessionID, AgentType: idx.SourceType, AgentName: idx.AgentName, DisplayName: dn, SourceFile: idx.SourceFile})
+	}
+	return out, nil
 }

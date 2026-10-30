@@ -104,6 +104,7 @@ function endStopping(words) {
 /** A desktop's chat has its Stop in the toolbar (the ■): it turns red and says Stop while stopNow, and Escape in the empty box presses it. */
 function paintStopNow(want) {
     stopNow = want;
+    if (want) wireStopClick();
     setAttr($('command-pane'), 'data-stop-now', String(want));
 }
 
@@ -209,14 +210,19 @@ if (typeof document !== 'undefined') {
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', wire, { once: true }); else wire();
 }
 
-// the desktop toolbar's Stop (the ■) is the Escape key button while it is red: pressing it is a stop
-document.addEventListener('click', e => {
-    if (!stopNow || !e.target || !e.target.closest || !e.target.closest('#command-pane .btn-esc')) return;
-    if (Date.now() < escHeldUntil) { e.stopPropagation(); e.preventDefault(); return; } // one is enough: a second interrupt quits the CLI
-    escHeldUntil = Date.now() + STOP_AGAIN_MS;
-    e.stopPropagation(); e.preventDefault(); // the button's own Escape is sent by stopAgent, after the held messages are dropped
-    stopAgent('Stop was not sent: the agent is not taking input');
-}, true);
+// the desktop toolbar's Stop (the ■) is the Escape key button while it is red: pressing it is a stop. Its page-wide click listener is registered the first time the button turns red, not at startup (#11032).
+let stopClickOn = false;
+function wireStopClick() {
+    if (stopClickOn) return;
+    stopClickOn = true;
+    document.addEventListener('click', e => {
+        if (!stopNow || !e.target || !e.target.closest || !e.target.closest('#command-pane .btn-esc')) return;
+        if (Date.now() < escHeldUntil) { e.stopPropagation(); e.preventDefault(); return; } // one is enough: a second interrupt quits the CLI
+        escHeldUntil = Date.now() + STOP_AGAIN_MS;
+        e.stopPropagation(); e.preventDefault(); // the button's own Escape is sent by stopAgent, after the held messages are dropped
+        stopAgent('Stop was not sent: the agent is not taking input');
+    }, true);
+}
 
 // Escape in the empty message box stops a working agent: what the CLI itself does; a typed message, an open menu or a mention list keep their own Escape.
 document.addEventListener('keydown', e => {

@@ -1,5 +1,111 @@
 # Release Notes
 
+## v2.0.8 — a phone with one tab strip, Pi workflow steps, jobs and sign-in status, a first run that explains itself, one word for a linked machine, and a more careful data folder
+
+### Changes
+
+#### What you will notice first
+
+- **A phone with one tab strip** (#11239, #11281): the phone's screens share one navigation rule and one tab strip; the open tab stays in view, Automations has its +, and large text fits. The tabs are a real tab list for screen readers, the nav's slots have names, and the ⋯ on Home is a 44 px target.
+- **New-user fixes from the phone and desktop passes** (#11258, #11268, #11289, #11304): the first-run password dialog is in plain words ("Protect Coral with a password"); the amber "No password" banner has a Dismiss button, remembered on this browser; the first agent and the first team start with a suggested folder to say yes to, inside your home folder; the suggested agent name is a placeholder, not a value; a new task joins the board's only open goal; the "Sent:" toast no longer covers the message you just sent in the Chat view; there is no gap between Password and Confirm and no "Launched" toast over the new chat; Settings on a phone is named "Settings and account"; and Quickstart no longer says its examples are from v1.0.8. On the desktop, Escape closes only the folder picker, Enter advances the wizard, and the first step has a way to a team.
+- **Pi agents: workflow steps, scheduled jobs and sign-in status** (#11293): a default (non-interactive) workflow step and a scheduled job on Pi run one shot and exit; Settings shows Pi's sign-in status per provider; Pi usage is counted once and a turn with no model of its own takes the session's model; Pi can generate a theme, a Pi model switch says what to do, and the dashboard doc says what Pi has. Usage counted by v2.0.7 for a Pi turn with no model keeps its old empty-model row; new turns are counted correctly.
+- **One word for a linked machine: "computer"** (#11217, #11241): in the dashboard, the CLI help and the cross-team address (`<computer>/<team>`).
+- **Keyboard shortcuts dialog**: keys as chips beside their descriptions, in four groups; the list scrolls by keyboard (#11246).
+- **A pasted multi-line text with CRLF reaches a tmux agent with one line break each** (#11265).
+- **The artifact viewer's preview fills its dialog and its footer is a slim bar**, on a phone too (#11243).
+
+#### Teams, Hub and Files
+
+- **Goal Artifacts through the Hub**: the Hub's own 404 for a View guest is a quiet line, the same as owner_only; a deleted team is still "could not be read" for an owner (#11280).
+- **The agent page's Details card (Folder / Branch / Model) no longer floats over the Files list**: it closes on an outside tap, Escape or a tab change, and only the card closes (#11284).
+- **Files: a file with a non-ASCII, quote or backslash name opens under the path its list gave** (#11284).
+- **`coral-board task add --self --goal N`**: an agent makes a task for itself without an orchestrator (#11247).
+
+#### Windows and the data folder
+
+- **Coral replaces its API key and agent tokens when it finds its data folder open to other accounts.**
+- **Windows**: the updater's DLL census also covers a hand-built `LazyDLL`, and the apply log says when the DLL search lock could not be set (#240).
+
+#### For developers and releases
+
+- **The embedded dashboard bundle is the same bytes every build** (#11047): `coral` and `launch-coral` used to differ between two builds of one tree (a map written in random order), which made the release cache audit fail on every scheduled run.
+- **The release's module download retries a dropped stream** (up to four tries, each cut at five minutes) and never retries a checksum mismatch; the dry run does the same (#11047).
+- **A release screenshot review** (#11216): every page at 1440, 900 and 390 px, filed as Coral artifacts on a UI review task the run opens itself.
+- The pattern-kill guard allows `kill -$SIG $pid` (#11211). The hourly Go cache trim runs with `--hours 2` (#11251).
+- Not in this release: the Analytics tabs (they go first into v2.0.9).
+
+## v2.0.7 — Coral installs a downloaded update by itself when it is idle, a Windows in-app update that works, Pi agents get board messages, agents can no longer pkill by a pattern, and a long paste is one bubble
+
+### Changes
+
+#### What you will notice first
+
+- **Coral installs a downloaded update by itself when it is idle** (#11170): on by default; the switch is in Settings > Updates (`update_auto_install`). Coral looks every 30 seconds; once an update is downloaded and verified and Coral has been idle for five minutes it installs it. Idle means no agent working, no automated input in flight, nobody having typed to an agent for five minutes. It holds while any agent or terminal on Coral's own terminals would be restarted by the update ("N sessions would be restarted: click Update and relaunch"), and while a scheduled run or a workflow run is going; agents in tmux do not hold it. A failed automatic install is not retried in a loop: Coral waits a day and says why on the update control. The update history says who asked (local, Hub or auto), so an automatic install is not recorded as a Hub relaunch. It takes effect from this version on: a Coral older than 2.0.7 never installs by itself. **Windows stays click-to-install.**
+- **Windows: in-app update does not work from 2.0.0 through 2.0.6. Install the MSI by hand, up to and including 2.0.7; in-app update works from 2.0.7 onward.** The fixes in this release: the updater's copy is judged as the registered install, a refused apply starts Coral again, and a failed stop is in the history (#236); an installed `-rc` build checks for updates and is offered its own release (#237, #402); the updater starts with no console window of its own (#383, #212); and the updater's copy loads DLLs from the system folder only (#240).
+- **macOS: a Coral of 2.0.5 or earlier cannot install updates in-app; install 2.0.6 or later by hand once.**
+- **Agents can no longer stop other agents by a pattern** (#11157, #11211): a Claude agent's `pkill`, `killall` or `kill` of a `pgrep` result is refused at the hook with the reason and what to do instead, and `kill -1`, `kill 0` and a process group are refused too. `pkill` in a commit message, a quote or a heredoc is not refused, and `kill <pid>` is allowed. On by default; the `refuse_pattern_kill` setting turns it off. (A pattern kill matched other agents' launch prompts and ended three agents in one second.)
+- **Pi agents get board messages** (#11107, #11133): a board message reaches a Pi agent at its turn end, through the Coral extension. The text is composed by the server (a fixed opener, a count and the board's name, never a message's words), and the extension injects at most one every 30 seconds and three every 10 minutes. Pi's own editor is read, and a box Coral cannot read is pasted into once, not again (#11165).
+- **A long paste is one bubble** (#11166): a pasted message of more than 1000 characters no longer shows a second, cut "Sent" bubble that never goes.
+
+#### Teams, Hub and Settings
+
+- **A goal page through Coral Hub keeps its Artifacts tab** (#11190): the owner has the full list; a grantee sees a one-line note.
+- **Goals table: a finished goal's row keeps one line** (#11224): the title line ends with one "All tasks done · Close goal" chip.
+- **Tasks table: the State column is the state's word in the state's colour**, no pill, no dot (#11189), and Queued and the default state keep 4.5:1 contrast on the open and selected rows (#11210, #11250). The select column keeps its 44 px (#11160).
+- **An agent's page has no empty red box under its Save bar** (#11219).
+- **A board paused by Sleep no longer reads as "No new messages" with N unread** (#11198): the Stop hook and the after-tool check stay quiet for a paused board. A Sleep team's pause is not undone by the notifier's older look, and a sleeping agent never lifts it (#11204).
+- **The health monitor's "X has waited N min on you" reminder is no longer repeated every five minutes** (#11180).
+- **Update dialog:** for each agent the restart will end, it says what happens afterwards: it wakes in the same conversation, asks you, stays asleep, or starts a new conversation (#238).
+
+#### Phone
+
+- **Chat and Terminal are one button** in the header and the dots' line (#11187).
+- **The HTML artifact preview fills its dialog and pane, and scrolls to the end** (#11163).
+- **The phone card's "needs you" time uses the text-safe accent in both themes**, and the dark "now" on Needs you cards holds 4.5:1 (#11250).
+
+#### For developers
+
+- Tests stop writing into the source tree, the Windows failures assert what Windows does, and a data path inside the module's source tree fails the test at the call (#350, #214). `coral-update` tests never start the person's installed Coral. Tests that listen on a network address run on Windows only on CI or with `CORAL_TEST_NETWORK_BIND=1`.
+- `tools/trim-dev-caches.sh` trims the Go build cache hourly (files unused for 6 hours) and lists merged, idle worktrees; the launchd plist is `tools/dev.coral.trim-dev-caches.plist` (#11251).
+
+## v2.0.6 — search access levels for agents, Pi on par with the other agents, a phone UI in the style of Google Chat, a macOS update that installs, and a deleted board that stays deleted
+
+### Changes
+
+#### What you will notice first
+
+- **Search access levels** (#11048, #11053): each team member has a search reach, `own` by default, that only the Operator raises (`own`, `team`, `all`, `operator`). `coral-board search` finds messages on the agent's own board, and `coral-agent history search` and `context` take `--team`, `--all` and `--operator-history`. The dashboard has a Search chip (shown only above `own`) and a Search access dialog with a Recent access list; every raise is logged. The route is the Operator's alone and is never reachable through Coral Hub.
+- **A phone UI in the style of Google Chat** (#11056, #11096, #11116, #11128): under 640 px the agent page is one row (the menu button leads the header; Details is an overlay card), the Agents page has a round search pill and rows with an avatar, the time and a preview of the last message ("You: ..." or "<Name>: ..."), the chat composer is one line high until the text wraps, and Chrome on Android resizes the page for the keyboard. An empty home has a card for each kind; with agents, the + button opens New agent / New team.
+- **Pi agents are on par with the other agents** (#11084, #11088, #11091, #11092, #11105, #11107, #11109): chat text, working or idle state without hooks, model and thinking-level chips (`--thinking <level>`), History search, tool-call counts, provider-error notices, a sign-in check, `provider/id` model checks, a Coral hook extension with a quiet "Hooks not active" chip, the MCP view (Pi's `mcp.json`), and workflow steps and jobs.
+- **A macOS in-app update that quit Coral and installed nothing is fixed** (#11151, #11155): Coral's own tmux server no longer counts as "Coral still running"; a process list that could not be read is never taken as "nothing runs"; and an apply that ends with Coral still running starts the installed Coral again. The apply's answer is kept in `updates/apply.log`.
+- **A deleted board stays deleted** (#11007): a message, subscribe, task or goal is written with the board's row in one transaction, so a deleted board's row no longer comes back.
+- **A board paused by Sleep is resumed when one of its agents is awake** (#11182): after a restart, a board could stay paused with agents awake and no nudge went out.
+- **Hub notice** (#11146): `PUT /api/board/<board>/settings` now merges a partial health body: it changes only the fields it names, where it used to reset the rest.
+- **Old seats on another team's board** (#11112): Seats an agent made on another team's board before v2.0.5 are not removed by Coral. List them with `coral-board seats --foreign` and remove one with `coral-board leave --board <board> --as <name>`, run in your own terminal (not inside an agent), or with Remove from this board on the agent's page. Both are yours only and never reachable through Coral Hub.
+
+#### Inbox, Hub and teams
+
+- **The Hub's Inbox has Goals and Artifacts** (#11071): Goals is a native folder; Artifacts is hidden only when no computer allows it. A Hub with no computer online logs no console error (#11073).
+- **Board history shows a board's label, not its id** (#11070).
+- **Add agent and Add terminal on a team start in the team's home folder** (#11083), then the first member with a working folder, then the folder step.
+- **The Hub account menu comes from the Hub's nav** (#11106).
+- **A restarted agent keeps its team.**
+- **Show model also shows the thinking level** ("Opus 4.1 · High") (#11063).
+
+#### Update and agents
+
+- **The update dialog is a spinner and one line** after you confirm: "Coral is installing the update and will restart." (#11152). A staged release that is not newer than the installed one is dropped, never offered and never installed (#395).
+- **Agents are told never to `pkill` or `killall` by a pattern** (#11157): a pattern kill matched other agents' launch prompts and ended three agents in one second. Coral now logs every signal it sends and every tmux command that ends or replaces a pane, in `tray.log`.
+- **Search all chats from the phone's pill opens All chats**, not Needs you (#11153).
+
+#### Smaller changes
+
+- Startup: code blocks' page-wide listeners register when the first code block is drawn (#11032).
+- A task made from the team Tasks page is in its list at once, and the Sleep toast names the agent (#11051).
+- The Members table draws the Search column only while some member is above `own`.
+- The phone composer box is as tall as its text, and the phone's person bubble keeps readable text on a light phone when the Hub answers Dark (#11171, #11185).
+- The static budget rises 64 KiB to 5,668,864 bytes (operator approved, 2026-10-29).
+
 ## v2.0.5 — typed board notices carry only fixed words, an agent stays on its own team's board, a held hand-off waits for the turn's end, a send to a busy agent keeps trying, and a sleeping agent is a row
 
 ### Changes

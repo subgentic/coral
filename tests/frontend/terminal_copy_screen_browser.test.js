@@ -17,6 +17,7 @@ const BASE = require('./test_base').BASE;
         await ev(`window.setLiveViewMode('chat'); true`);
         assert.equal(await ev(`window.__vis('#terminal-copy-screen-btn')`), false, 'not in the Chat view');
         await ev(`window.setLiveViewMode('terminal'); true`);
+        await ev(`(() => { const m = document.getElementById('agent-bar-more'); if (m && getComputedStyle(m).display !== 'none' && m.getAttribute('aria-expanded') !== 'true') m.click(); return true; })()`); // under 640 px Copy screen is on the line under the row, behind ⋯ (the one-row header, #11056); a computer's header has it in the row
         await waitFor(`window.__vis('#terminal-copy-screen-btn')`, 'the Copy screen button', 8000);
         const box = await ev(`(() => { const r = document.getElementById('terminal-copy-screen-btn').getBoundingClientRect(); return { w: Math.round(r.width), h: Math.round(r.height), name: document.getElementById('terminal-copy-screen-btn').getAttribute('aria-label') }; })()`);
         assert.ok(box.w >= 44 && box.h >= 44, 'a 44 px target: ' + JSON.stringify(box));

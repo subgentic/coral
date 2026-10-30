@@ -75,7 +75,7 @@ func TestMessageFromAnotherTeamOnThisCoralSaysHowToAnswerIt(t *testing.T) {
 	assert.Len(t, e.messagesOf("alpha"), before)
 }
 
-// A team on another Coral, delivered over Coral Hub: "coral-board send --address <server>/<team> --reply-to <id>", with the address in the form targets lists when the hub has no name for the server.
+// A team on another Coral, delivered over Coral Hub: "coral-board send --address <computer>/<team> --reply-to <id>", with the address in the form targets lists when the hub has no name for the server.
 func TestMessageFromAnotherCoralSaysHowToAnswerIt(t *testing.T) {
 	e := newCrossTeamEnv(t)
 	e.enable("beta", true)

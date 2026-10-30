@@ -8,7 +8,7 @@
 
 import { showToast } from './utils.js';
 import { backendHint } from './settings_fields.js';
-import { setHooksMissing } from './hooks_missing.js';
+import { setHooksMissing, setPiHooksInactive } from './hooks_missing.js';
 import { isCloud } from './server_base.js';
 import { isSignedOut, pollEvery } from './overload.js';
 import { showConfirmModal } from './render.js';
@@ -418,6 +418,7 @@ export async function watchHooksStatus() {
         const st = await hooksStatus();
         showHooksBanner(st);
         setHooksMissing(st.missing); // the agents whose hook programs are gone are flagged on their rows (#6089)
+        setPiHooksInactive(st.pi_inactive); // a Pi agent whose extension never reported (#11107)
     } catch { /* not shown */ }
     if (!_hooksTimer) _hooksTimer = pollEvery(watchHooksStatus, 60000); // an app replaced while Coral runs is seen within a minute
 }

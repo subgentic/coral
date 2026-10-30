@@ -1,11 +1,11 @@
-// Machine health (#3446) from the machine_health feed object (#3444).
+// Computer health (#3446) from the machine_health feed object (#3444).
 //   Local dashboard (Settings, "This machine"):
 //   1. unknown before the first value;
 //   2. coral_update fills the card (status with reason, Coral, agents, load, memory, disk);
 //   3. coral_diff merges the changed fields (null removes one: back at OK the reason goes);
 //   4. unknown while the feed socket is down, never a stale value;
 //   5. a full update without the field (an older Coral) is unknown too.
-//   Through Coral Hub (the Servers tab):
+//   Through Coral Hub (the Computers tab):
 //   6. an online machine with machine_health: a status dot named for screen readers, and the card;
 //   7. an online machine without it: unknown; an offline machine: the dot says unknown, no card.
 //
@@ -87,7 +87,7 @@ const HEALTH = {
         let c = await card();
         assert.equal(c.status, 'Unknown');
         assert.match(c.dot, /machine-health-unknown/);
-        assert.equal(c.label, 'Machine health: Unknown');
+        assert.equal(c.label, 'Computer health: Unknown');
         console.log('   ✓ Unknown');
 
         console.log('2. coral_update fills the card');
@@ -95,7 +95,7 @@ const HEALTH = {
         c = await card();
         assert.equal(c.status, 'Busy (CPU)');
         assert.match(c.dot, /machine-health-busy/);
-        assert.equal(c.label, 'Machine health: Busy (CPU)');
+        assert.equal(c.label, 'Computer health: Busy (CPU)');
         assert.deepEqual(c.rows, {
             'Coral': '4% CPU · 210 MB',
             'Agents': '3 · 120% CPU · 2.5 GB',
@@ -110,7 +110,7 @@ const HEALTH = {
         await send({ type: 'coral_update', sessions: [], active_runs: [], machine_health: IDLE });
         c = await card();
         assert.equal(c.status, 'Busy (other programs)', 'not Busy (CPU): it is not a fault of Coral');
-        assert.equal(c.label, 'Machine health: Busy (other programs)');
+        assert.equal(c.label, 'Computer health: Busy (other programs)');
         assert.match(c.dot, /machine-health-busy/, 'the status is still busy for the suites and the dot');
         const others = await ev(`(() => { const c = document.querySelector('#machine-health-local .machine-health-card'), s = c.querySelector('.machine-health-status'); return { note: (c.querySelector('.machine-health-others') || {}).textContent || '', amber: /goal-state-blocked/.test(s.className) }; })()`);
         assert.equal(others.note, 'Coral and your agents use 0% CPU; the rest is other programs on this computer.');

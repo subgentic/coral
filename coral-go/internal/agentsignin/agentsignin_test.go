@@ -55,6 +55,18 @@ func standIn(mode string, args []string) int {
 	case "claude-garbage":
 		os.Stdout.WriteString("<html>login</html>")
 		return 0
+	case "pi-ready": // pi auth check --provider P --json, ready (#11105)
+		os.Stdout.WriteString(`{"status":"ready","provider":"x","authType":"oauth"}`)
+		return 0
+	case "pi-not-ready":
+		os.Stdout.WriteString(`{"status":"not_ready","provider":"x","reason":"credentials_not_configured"}`)
+		return 1
+	case "pi-not-found": // a provider Pi does not know: a settings mistake, not a signed-out user
+		os.Stdout.WriteString(`{"status":"not_ready","provider":"x","reason":"provider_not_found"}`)
+		return 1
+	case "pi-garbage":
+		os.Stdout.WriteString("<html>login</html>")
+		return 0
 	case "ok":
 		return 0
 	case "exit1":
@@ -145,7 +157,8 @@ func TestACLIThatCannotBeStartedIsUnknown(t *testing.T) {
 func TestOnlyCLIsWithAStatusCommandAreChecked(t *testing.T) {
 	assert.True(t, Supports("claude"))
 	assert.True(t, Supports("codex"))
-	for _, a := range []string{"agy", "antigravity", "gemini", "pi", "", "nonsense"} {
+	assert.True(t, Supports("pi"), "pi auth check (#11105)")
+	for _, a := range []string{"agy", "antigravity", "gemini", "", "nonsense"} {
 		assert.False(t, Supports(a), a)
 		assert.NoError(t, Require(context.Background(), a, "/bin/true"), a)
 	}
@@ -380,4 +393,68 @@ func TestStatusOutputWithoutLoggedInIsUnknownAndSaysSo(t *testing.T) {
 	assert.Equal(t, Unknown, claudeState([]byte(`{"logged_in":true}`), nil, nil), "a renamed field is not read as signed in")
 	assert.Equal(t, Unknown, claudeState([]byte(`{"authMethod":"claude.ai"}`), nil, nil))
 	assert.Equal(t, 1, strings.Count(logged.String(), "without a loggedIn field"), "said once")
+}
+
+// #11105 (row 13): Pi's sign-in is "pi auth check --provider P --json" for the provider Pi starts on (its settings' defaultProvider). Ready is signed in, credentials_not_configured is signed out, anything
+// else (an unknown provider, text, a failure) is Unknown, and the check starts no process at all when there is no provider to ask about.
+func piSettings(t *testing.T, json string) {
+	t.Helper()
+	dir := filepath.Join(t.TempDir(), "pi-home")
+	require.NoError(t, os.MkdirAll(dir, 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "settings.json"), []byte(json), 0o600))
+	t.Setenv("PI_CODING_AGENT_DIR", dir)
+}
+
+func TestPiStatusIsReadFromAuthCheckForTheDefaultProvider(t *testing.T) {
+	reset(t)
+	piSettings(t, `{"defaultProvider":"groq","defaultModel":"x"}`)
+	log := filepath.Join(t.TempDir(), "log")
+	t.Setenv("AGENTSIGNIN_LOG", log)
+	for mode, want := range map[string]State{"pi-ready": SignedIn, "pi-not-ready": SignedOut, "pi-not-found": Unknown, "pi-garbage": Unknown, "exit2": Unknown} {
+		bin := standInBin(t, mode)
+		assert.Equal(t, want, Check(context.Background(), "pi", bin), mode)
+	}
+	raw, err := os.ReadFile(log)
+	require.NoError(t, err)
+	for _, line := range strings.Split(strings.TrimSpace(string(raw)), "\n") {
+		assert.Equal(t, "auth check --provider groq --json", line, "exactly this, never --credentials (no secret in the output)")
+	}
+}
+
+func TestPiIsNotAskedWithoutAProviderOrWithOneThatIsNotAWord(t *testing.T) {
+	reset(t)
+	log := filepath.Join(t.TempDir(), "log")
+	t.Setenv("AGENTSIGNIN_LOG", log)
+	bin := standInBin(t, "pi-not-ready")
+	for name, settings := range map[string]string{
+		"no settings file":   "",
+		"no provider":        `{"defaultModel":"x"}`,
+		"a flag, not a word": `{"defaultProvider":"--credentials"}`,
+		"a path":             `{"defaultProvider":"../../x"}`,
+		"a space":            `{"defaultProvider":"a b"}`,
+		"not a string":       `{"defaultProvider":5}`,
+		"not json":           `defaultProvider: groq`,
+		"too long":           `{"defaultProvider":"` + strings.Repeat("a", 80) + `"}`,
+	} {
+		if settings == "" {
+			t.Setenv("PI_CODING_AGENT_DIR", filepath.Join(t.TempDir(), "none"))
+		} else {
+			piSettings(t, settings)
+		}
+		assert.Equal(t, Unknown, Check(context.Background(), "pi", bin), name)
+		assert.NoError(t, Require(context.Background(), "pi", bin), name+": a CLI that cannot be asked is not locked out")
+	}
+	_, err := os.Stat(log)
+	assert.True(t, os.IsNotExist(err), "no process was started for any of them")
+}
+
+func TestASignedOutPiRefusesBackgroundJobs(t *testing.T) {
+	reset(t)
+	piSettings(t, `{"defaultProvider":"groq"}`)
+	bin := standInBin(t, "pi-not-ready")
+	err := RequireFresh(context.Background(), "pi", bin)
+	var nsi *NotSignedInError
+	require.True(t, errors.As(err, &nsi))
+	assert.Equal(t, "Pi is not signed in", err.Error())
+	assert.Equal(t, CodeNotSignedIn, nsi.Code())
 }

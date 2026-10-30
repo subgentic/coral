@@ -69,7 +69,7 @@ function inset(node) { const p = el('div', 'ibx-panel'); p.append(node); return 
 const SAVED_OPEN_LABEL = 'Read the whole message', SAVED_CLOSE_LABEL = 'Show less';
 const SAVED_WORDS = {
     gone: 'This message was deleted, so only the saved snippet is left.',
-    not_reachable: 'This message cannot be read from here: its agent ended on another server.',
+    not_reachable: 'This message cannot be read from here: its agent ended on another computer.',
     too_long: 'This message is too long to show here.',
 };
 

@@ -13,7 +13,7 @@ export const SORT_LABEL = { default: 'List order', name: 'Name', recent: 'Recent
 const filters = (boardLabel, machineLabel) => defineFilters({
     state: { type: 'choice', values: STATES, chip: v => `State: ${STATE_LABEL[v]}` },
     board: { type: 'text', max: 200, chip: v => `Board: ${boardLabel(v)}` },
-    machine: { type: 'text', max: 200, chip: v => `Machine: ${machineLabel(v)}` },
+    machine: { type: 'text', max: 200, chip: v => `Computer: ${machineLabel(v)}` },
     sort: { type: 'order', values: SORTS, default: 'default' },
 });
 const model = filters(v => v, v => v);

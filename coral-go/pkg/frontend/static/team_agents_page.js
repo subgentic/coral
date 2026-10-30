@@ -5,11 +5,12 @@
 import { importOnce } from './import_once.js';
 import { foldWayBack } from './way_back.js';
 import { state } from './state.js';
-import { boardFetch, inTeam, keyLabel } from './server_base.js';
+import { boardFetch, inTeam, keyLabel, isCloud } from './server_base.js';
 import { pollEvery } from './overload.js';
 import { OPERATOR_ID } from './utils.js';
 import { refreshTeamAvailability, remindAgent, stopAgentReminder } from './team_availability.js';
 const { openRemindDialog, REPEATS } = await importOnce('./team_remind_dialog.js');
+const { searchChip, readSearchLevels, openSearchAccess } = await importOnce('./search_access.js'); // how far an agent's chat search reaches (#11048)
 const Toolbar = await importOnce('./team_toolbar.js'); // the one toolbar of the team tabs (#7717)
 const { rowFocusTarget, stateChip, el } = await importOnce('./team_table.js'); // lazy modules load the others they need through importOnce, so a failed load is retried
 
@@ -24,7 +25,7 @@ const CHIP_WORD = { available: 'Free', unknown: 'Unknown', task_idle: 'Has a tas
 const CLASS = { available: 'goal-state-done', busy: 'goal-state-active', needs_input: 'goal-state-blocked', unavailable: 'team-state-bad' }; // the colours of the goals' own states; Sleeping and the rest stay quiet
 const PROVIDER = { claude: 'Claude', codex: 'Codex', agy: 'Antigravity', antigravity: 'Antigravity', gemini: 'Antigravity', pi: 'Pi', terminal: 'Terminal' };
 
-const model = { team: '', data: null, filter: 'all', search: '', failed: '', loading: false };
+const model = { team: '', data: null, levels: new Map(), filter: 'all', search: '', failed: '', loading: false };
 let root = null, hooks = {};
 const subscribed = new Set(); // teams the operator is already subscribed to on this page, so a Remind is one write
 let itemStatus = null; // the agent page's own live region while that page is on screen: the tab's is hidden then and would not be read
@@ -61,6 +62,7 @@ async function load() {
         if (team !== model.team) return;
         if (!data || !Array.isArray(data.agents)) throw new Error('no answer');
         model.data = data; model.failed = '';
+        model.levels = await readSearchLevels(team);
         hooks.onCount?.(data.agents.filter(a => a.availability !== 'archived').length); // the sidebar group lists a team's live agents and keeps an archived one in its own section: the tab says the same number (#10164); the Archived chip still finds it
     } catch (e) {
         if (team !== model.team) return;
@@ -98,6 +100,25 @@ const askRemind = (agent, opener) => openRemindDialog(agent.name, { opener, onSe
 
 /** The agent's chat: its live session, local or a Hub computer's; null when it has none (an ended agent, a terminal). */
 const openChat = (session) => { window.switchNavTab?.('agents'); window.selectLiveSession?.(session.name, session.agent_type, session.session_id, session.server, { focusChat: true }); };
+
+/** "Remove from this board" (#11112, the Operator's clean-up of a leftover seat): DELETE /api/board/{team}/seats/{subscriber}, after a confirm. The agent keeps running; it just has no seat on this board. The route is the Operator's alone and never goes through the Hub, so the button is not drawn there. */
+function removeSeatButton(agent, ctx) {
+    const b = btn('btn btn-danger', 'Remove from this board', null);
+    b.setAttribute('aria-label', `Remove ${agent.name} from this board`);
+    b.addEventListener('click', async () => {
+        const { showConfirmModal } = await importOnce('./confirm_dialog.js');
+        const { showToast } = await importOnce('./utils.js');
+        showConfirmModal('Remove from this board', `Take ${agent.name}'s seat off ${keyLabel(model.team)}? It stops getting this board's messages and tasks and can no longer post to it. The agent itself keeps running.`, async () => {
+            try {
+                const r = await boardFetch(model.team, `/seats/${encodeURIComponent(agent.subscriber_id)}`, { method: 'DELETE' });
+                if (!r.ok) { const d = await r.json().catch(() => ({})); showToast(d.error || `Could not remove ${agent.name} from the board`, true); return; }
+                showToast(`${agent.name} was removed from the board`);
+                await load(); ctx.onBack();
+            } catch { showToast(`Could not remove ${agent.name} from the board`, true); }
+        }, null, { label: 'Remove seat', danger: true });
+    });
+    return b;
+}
 
 function chatButton(agent) {
     const session = agent.availability !== 'offline' && agent.agent_type !== 'terminal' ? sessionOf(agent) : null;
@@ -152,7 +173,7 @@ function draw() {
     const ended = data.agents.filter(a => a.availability === 'offline').length; // the tab lists every member, the sidebar only the live ones: this says why they differ (#8271)
     const archived = data.agents.filter(a => a.availability === 'archived').length, live = data.agents.length - archived; // the same rule as the tab's badge and the sidebar group: an archived agent is told apart, not counted (#10369)
     body.append(el('p', 'goals-note team-agents-count', `${live} agent${live === 1 ? '' : 's'}${ended ? `, ${ended} ended` : ''}${archived ? `, +${archived} archived` : ''}`));
-    const rows = visibleAgents();
+    const rows = visibleAgents(), searchShown = [...model.levels.values()].some(l => l && l.level && l.level !== 'own');
     body.append(DT.dataTable({
         label: `Agents, ${rows.length}`, rows, rowKey: ag => ag.subscriber_id || ag.session_id || ag.name, state: agentsTableState,
         open: (ag, tr) => hooks.openAgent?.(ag, tr.querySelector('.dt-primary')),
@@ -162,6 +183,7 @@ function draw() {
             { key: 'status', label: 'Status', line: 2, width: '11rem', dropAt: 28, sort: true, sortValue: statusWord, cell: ag => DT.chip(statusWord(ag), CLASS[ag.availability]) },
             { key: 'doing', label: 'Doing', line: 2, width: '18rem', dropAt: 52, sort: true, sortValue: doingOf, cell: ag => { const t = doingOf(ag), span = el('span', null, t); if (t) span.title = t; return span; } }, // one line a row (Goal #79): the whole line is the tooltip
             { key: 'provider', label: 'Provider', line: 2, width: '6rem', dropAt: 36, tone: 'tertiary', sort: true, sortValue: providerOf, cell: providerOf },
+            ...(searchShown ? [{ key: 'search', label: 'Search', line: 2, width: '12rem', dropAt: 44, tone: 'tertiary', cell: ag => searchChip((model.levels.get(ag.name) || {}).level) || '' }] : []), // a column only while some member is above "own": an empty one was drawn, clipped at the right edge of a phone's table as a stray "…" (#11128)
             { key: 'chat', label: 'Chat', line: 1, width: '7rem', cell: chatButton },
         ], oneLine: true, sortBar: false,
     }).el);
@@ -240,7 +262,9 @@ export function renderAgentPage(host, agent, ctx) {
         b.addEventListener('click', () => askRemind(agent, b));
         bar.append(b);
     }
-    const session = sessionOf(agent);
+    const session = sessionOf(agent), reach = model.levels.get(agent.name);
+    if (reach) { const c = searchChip(reach.level); if (c) line.append(c); const b = btn('btn', 'Search access\u2026', null); b.setAttribute('aria-label', `Search access for ${agent.name}`); b.addEventListener('click', () => openSearchAccess({ name: agent.name, team: model.team, ...reach }, { opener: b, onChanged: () => load().then(() => renderAgentPage(host, agent, ctx)) })); bar.append(b); }
+    if (!isCloud() && !String(model.team).startsWith('@') && agent.subscriber_id) bar.append(removeSeatButton(agent, ctx)); // the Operator takes a seat off the board (#11112): on this computer only, never through the Hub
     if (session) bar.append(btn('btn', 'Open chat', () => openChat(session)));
     if (agent.reminder) {
         const id = agent.subscriber_id || agent.name;

@@ -40,8 +40,8 @@ func TestAuthPageStates(t *testing.T) {
 	assert.Contains(t, remote, "Settings &rsaquo; Network and Hub</b> (or the tray menu), or run <b>coral setup-code</b> there", "where the person is, then the terminal (#6410)")
 	assert.NotContains(t, remote, "startup log", "the code is never in a log, so the page does not send anyone to one")
 
-	assert.Contains(t, AuthPage(PageState{PasswordSet: true, Strict: true}), "the tray and coral open sign in by themselves")
-	assert.NotContains(t, AuthPage(PageState{PasswordSet: true}), "the tray and coral open sign in by themselves")
+	assert.Contains(t, AuthPage(PageState{PasswordSet: true, Strict: true}), "The Coral app signs in by itself")
+	assert.NotContains(t, AuthPage(PageState{PasswordSet: true}), "The Coral app signs in by itself")
 }
 
 func TestAuthPageCarriesNoSecretAndNoInlineScript(t *testing.T) {
@@ -171,7 +171,7 @@ func TestAuthPageFirstRunDetails(t *testing.T) {
 // the computer with coral open, or create a password here with the setup code. Strict local auth is untouched: this is words, and the page still takes nothing it did not before.
 func TestAuthPageSaysHowToGetInWhenThereIsNoPasswordYet(t *testing.T) {
 	remote := AuthPage(PageState{}) // another device, no password
-	for _, want := range []string{`id="how-in"`, "Two ways in", "coral open", "coral setup-code", "On the computer that runs Coral", "create a password", "coral open --print", "127.0.0.1", "works once, for 10 minutes", "do not post it where others can read it"} {
+	for _, want := range []string{`id="how-in"`, "Two ways to sign in", "coral open", "coral setup-code", "On the computer that runs Coral", "create a password", "coral open --print", "127.0.0.1", "works once, for 10 minutes", "do not post it where others can read it"} {
 		assert.Contains(t, remote, want, "another device: "+want)
 	}
 	locked := AuthPage(PageState{Local: true, Locked: true}) // a browser on this computer sent here by a locked page

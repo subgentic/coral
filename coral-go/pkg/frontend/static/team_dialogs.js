@@ -22,6 +22,7 @@ const { launchedMode } = await importOnce('./preset_enforcement.js');
 const { BUILTIN_TEAM_TEMPLATES, DEFAULT_TEAM_KEY, GENERATED_TEAM_KEY, _renderTeamTemplateSelector, _syncTemplateMenu, markTeamTemplate, resetTeamTemplatePicker } = await importOnce('./team_templates_ui.js');
 const { showTeamStep, currentTeamStep, TEAM_STEPS } = await importOnce('./team_steps.js');
 const { mountTeamLaunchSettings, readTeamLaunchSettings, applyTeamBoardSettings, setTeamLaunchMode } = await importOnce('./team_launch_settings.js');
+const { offerSuggestion, syncSuggestionLine, usesSuggestion } = await importOnce('./folder_suggestion.js');
 
 
 const _modeLabel = v => [...(document.getElementById('team-permission-mode')?.options || [])].find(o => o.value === v)?.textContent || v;
@@ -406,6 +407,8 @@ async function _initTeamForm() {
     if (goalEl) goalEl.value = "";
     if (launch.server !== LOCAL_SERVER) _resetDirInputs(['launch-team-dir'], launch.server, s, { switching: true });
     else if (s.default_working_dir && dirInput) dirInput.value = s.default_working_dir;
+    else if (dirInput) { delete dirInput.dataset.suggested; offerSuggestion(dirInput, document.getElementById('launch-team-dir-suggest'), 'first-team'); } // a first team has a folder to say yes to (#11258)
+    if (dirInput && !dirInput.dataset.suggestWired) { dirInput.dataset.suggestWired = '1'; dirInput.addEventListener('input', () => syncSuggestionLine(dirInput, document.getElementById('launch-team-dir-suggest'))); }
 
     // Show worktree option when directory is a git repo (checked on the target server)
     if (dirInput && !dirInput.dataset.gitWired) {
@@ -763,6 +766,7 @@ async function launchTeam() {
         agents,
     };
     if (boardServer) payload.board_server = boardServer;
+    if (usesSuggestion(document.getElementById('launch-team-dir'))) payload.create_dir = true; // the folder Coral suggested: it makes it now (#11258)
     if (settings.working_mode) payload.working_mode = settings.working_mode; // the working mode, its guidance and the Additional instructions (#7407)
     if (settings.health_monitor) payload.health_monitor = true;
     if (useWorktree) {

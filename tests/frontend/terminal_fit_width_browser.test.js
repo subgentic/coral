@@ -181,7 +181,9 @@ async function show(tab, a, pane) {
 }
 const click = tab => tab.ev(`(() => { document.getElementById('terminal-fit-width-btn').click(); return true; })()`);
 // Waits for the font to settle at a value `ok` accepts.
-const settled = (tab, what, ok, ms) => tab.waitFor(`(async () => { const v = await ${VIEW}; return v && (${ok}) ? v : null; })()`, what, ms);
+// Under 640 px the toggle is on the line under the one-row header, behind the more button (#11056): open it on each look, as a person does.
+const OPEN_MORE = `(() => { const m = document.getElementById('agent-bar-more'); if (m && getComputedStyle(m).display !== 'none' && m.getAttribute('aria-expanded') !== 'true') m.click(); })()`;
+const settled = (tab, what, ok, ms) => tab.waitFor(`(async () => { ${OPEN_MORE}; const v = await ${VIEW}; return v && (${ok}) ? v : null; })()`, what, ms);
 
 function assertFits(v, what) {
     assert.ok(v.font >= MIN_FONT && v.font < PHONE_BASE, `${what}: the font shrank from the phone's ${PHONE_BASE}, not below ${MIN_FONT} (${JSON.stringify(v)})`);

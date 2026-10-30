@@ -15,7 +15,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms)); // sleep-ok: server sta
 const freePort = () => new Promise((res, rej) => { const s = net.createServer(); s.listen(0, '127.0.0.1', () => { const p = s.address().port; s.close(() => res(p)); }); s.on('error', rej); });
 
 (async () => {
-    const root = fs.mkdtempSync(path.join('/tmp', 'coral-stop-')), home = path.join(root, 'home'), data = path.join(root, 'data'), bin = path.join(root, 'bin');
+    const root = fs.mkdtempSync(path.join(require('./helpers/tmp_root'), 'coral-stop-')), home = path.join(root, 'home'), data = path.join(root, 'data'), bin = path.join(root, 'bin');
     for (const d of [home, data, bin]) fs.mkdirSync(d);
     const port = await freePort(); assert.notEqual(port, 8420);
     const base = `http://127.0.0.1:${port}`;

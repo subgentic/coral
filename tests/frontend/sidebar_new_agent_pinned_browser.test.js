@@ -1,5 +1,5 @@
 // "+ New Agent" stays in view with many agents (#6159, coral-hub's ask): with 25 agents the sidebar scrolls, and the button used to sit at the end of the scrolled content, below the fold. It is pinned to the
-// bottom of the sidebar now and the last agent row can still be scrolled clear of it. At 1280 px (the sidebar) and 390 px (the header's New button), in both themes, with the dashboard's mocked agents
+// bottom of the sidebar now and the last agent row can still be scrolled clear of it. At 1280 px (the sidebar) and 390 px (the + button, which opened the New menu since the phone UI of #11116), in both themes, with the dashboard's mocked agents
 // (agent_view_harness.js) drawn into the real list; against the isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -28,10 +28,10 @@ const BASE = require('./test_base').BASE;
             for (const theme of ['light', 'dark']) {
                 await ev(`${themeJs(theme)}; true`);
                 await ev(`(() => { const s = document.querySelector('.sidebar'); if (s) s.scrollTop = 0; window.scrollTo(0, 0); return true; })()`);
-                const m = await ev(`(() => { const b = [...document.querySelectorAll('[data-on-click="launch-show"]')].filter(e => e.getClientRects().length); const r = b[0] && b[0].getBoundingClientRect();
+                const m = await ev(`(() => { const b = [...document.querySelectorAll(${JSON.stringify(mobile ? '#phone-fab' : '[data-on-click="launch-show"]')})].filter(e => e.getClientRects().length); const r = b[0] && b[0].getBoundingClientRect();
                     return { n: b.length, text: b[0] && b[0].textContent.trim(), top: r && Math.round(r.top), bottom: r && Math.round(r.bottom), left: r && Math.round(r.left), right: r && Math.round(r.right), vh: innerHeight, vw: innerWidth,
                         hit: !!r && (t => !!t && (t === b[0] || b[0].contains(t)))(document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)) }; })()`);
-                check(`${tag} ${theme}: "+ New Agent" is in the viewport at the top of the list, not scrolled to, and nothing covers it`, m.n >= 1 && m.top >= 0 && m.bottom <= m.vh && m.left >= 0 && m.right <= m.vw && m.hit, JSON.stringify(m));
+                check(`${tag} ${theme}: ${mobile ? 'the + button' : '"+ New Agent"'} is in the viewport at the top of the list, not scrolled to, and nothing covers it`, m.n >= 1 && m.top >= 0 && m.bottom <= m.vh && m.left >= 0 && m.right <= m.vw && m.hit, JSON.stringify(m));
                 if (!mobile) {
                     // a row the keyboard focuses just below the fold is scrolled clear of the pinned button, not left under it
                     const f = await ev(`(() => { const s = document.querySelector('.sidebar'); document.activeElement && document.activeElement.blur(); s.scrollTop = 0; const footer = document.querySelector('.sidebar-footer').getBoundingClientRect();

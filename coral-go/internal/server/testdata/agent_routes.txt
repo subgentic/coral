@@ -44,6 +44,7 @@ c GET /api/agent-docs
 c GET /api/agent-docs/all
 c GET /api/agent-docs/{name}
 c GET /api/agent-models
+a GET /api/agent/board/search
 a GET /api/agent/history/context
 a GET /api/agent/history/search
 a GET /api/agent/tasks
@@ -73,6 +74,8 @@ b GET /api/board/remotes/proxy/{remoteServer}/{project}/messages/all
 b GET /api/board/remotes/proxy/{remoteServer}/{project}/messages/check
 b GET /api/board/remotes/proxy/{remoteServer}/{project}/subscribers
 b GET /api/board/tasks
+b DELETE /api/board/{project}/seats/{subscriberID}
+b GET /api/board-seats/foreign
 c GET /api/board/{project}
 a GET /api/board/{project}/artifacts
 b GET /api/board/{project}/cross-team-candidates
@@ -456,6 +459,8 @@ b PUT /api/system/codex-trust-hooks
 b PUT /api/system/hub-operator
 b PUT /api/system/terminal-backend
 b PUT /api/teams/detail/{name}/home-folder
+b PUT /api/team-members/{memberID}/search-access
+b GET /api/search-access/log
 b PUT /api/teams/detail/{name}/knowledge/{agentName}
 b PUT /api/themes/{name}
 b PUT /api/views/{id}

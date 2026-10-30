@@ -80,6 +80,7 @@ type fakePlatform struct {
 	rollErr    error
 	waitHook   func() bool
 	running    bool // Running's answer
+	lookFailed bool // the process list could not be read: Running says false, NothingRunning too
 	verifyHook func() error
 	// restartWhy is CanRestart's answer: why Coral could not be started again ("" = it can).
 	restartWhy string
@@ -156,7 +157,8 @@ func (f *fakePlatform) Swap(a, b string) error {
 	f.version[a], f.version[b] = f.version[b], f.version[a]
 	return nil
 }
-func (f *fakePlatform) Running(string) bool { return f.running }
+func (f *fakePlatform) Running(string) bool        { return f.running }
+func (f *fakePlatform) NothingRunning(string) bool { return !f.running && !f.lookFailed }
 func (f *fakePlatform) Start(ctx context.Context, install string) error {
 	f.rec("start")
 	if len(f.startErrs) > 0 {
@@ -275,10 +277,51 @@ func TestNothingIsInstalledWithoutAPinnedSignerOrWhileCoralRuns(t *testing.T) {
 
 	r = newRig(t)
 	r.plat.coralGone = false
+	r.plat.running = true // something of Coral is still running: it is left alone
 	assert.Equal(t, ResultCoralRunning, r.run().Result)
 	assert.Equal(t, []string{"build", "verify", "wait", "cleanup"}, r.plat.calls, "it builds and checks the new install while Coral runs, waits for Coral, swaps nothing and starts nothing")
 	assert.Equal(t, "old", r.installMarker())
 	assert.NotNil(t, r.staged(), "the staged update is kept")
+	st, err := verify.LoadState(filepath.Join(r.data, stage.UpdatesDir))
+	require.NoError(t, err)
+	require.NotEmpty(t, st.History)
+	assert.Equal(t, ResultCoralRunning, st.History[len(st.History)-1].Result, "the history says why nothing was installed (#11151)")
+	assert.Equal(t, "still_running", st.History[len(st.History)-1].Reason)
+}
+
+// #11155: the server quit for this apply, so when Coral did not end in time and nothing of it runs now, the person has no Coral: the installed one, which nothing changed, is started again
+// and the history says so. A start that fails is said too.
+func TestACoralThatDidNotEndAndIsNotRunningIsStartedAgain(t *testing.T) {
+	r := newRig(t)
+	r.plat.waitHook = func() bool { return false }
+	res := r.run()
+	assert.Equal(t, ResultCoralRunning, res.Result)
+	assert.Contains(t, r.plat.calls, "start", "Coral is not running: the old one is started again")
+	assert.NotContains(t, r.plat.calls, "swap")
+	assert.False(t, res.RestartFailed)
+	assert.Equal(t, "old", r.installMarker())
+	st, err := verify.LoadState(filepath.Join(r.data, stage.UpdatesDir))
+	require.NoError(t, err)
+	require.NotEmpty(t, st.History)
+	assert.Equal(t, "restarted", st.History[len(st.History)-1].Reason)
+
+	// A process list that could not be read is not "nothing runs": the old Coral is not started on it (it could be a second Coral), and the history says so.
+	r = newRig(t)
+	r.plat.waitHook = func() bool { return false }
+	r.plat.lookFailed = true
+	res = r.run()
+	assert.Equal(t, ResultCoralRunning, res.Result)
+	assert.NotContains(t, r.plat.calls, "start")
+	st, err = verify.LoadState(filepath.Join(r.data, stage.UpdatesDir))
+	require.NoError(t, err)
+	assert.Equal(t, "running_unknown", st.History[len(st.History)-1].Reason)
+
+	r = newRig(t)
+	r.plat.waitHook = func() bool { return false }
+	r.plat.startErrs = []error{errors.New("no launcher")}
+	res = r.run()
+	assert.Equal(t, ResultCoralRunning, res.Result)
+	assert.True(t, res.RestartFailed, "nothing is running and the start failed: said")
 }
 
 func TestNothingStagedBusyAndUnsupported(t *testing.T) {
@@ -485,6 +528,7 @@ func TestAnInterruptedApplyIsPutRightAtTheNextOne(t *testing.T) {
 func TestACoralThatDoesNotEndIsNotSwappedUnderAndTheCopyIsRemoved(t *testing.T) {
 	r := newRig(t)
 	r.plat.waitHook = func() bool { return false } // Coral is still running when the apply is ready
+	r.plat.running = true
 	res := r.run()
 	assert.Equal(t, ResultCoralRunning, res.Result)
 	assert.NotContains(t, r.plat.calls, "swap")

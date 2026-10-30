@@ -95,7 +95,7 @@ const num = v => (typeof v === 'number' && Number.isFinite(v) ? v : null);
 const pct = v => (num(v) === null ? '–' : `${Math.round(v)}%`);
 
 /** The status dot: a small coloured dot with the status as its accessible name and title. */
-export function healthDot(h, label = 'Machine') {
+export function healthDot(h, label = 'Computer') {
     const s = healthStatus(h);
     const dot = document.createElement('span');
     dot.className = `machine-health-dot machine-health-${s}`;
@@ -107,7 +107,7 @@ export function healthDot(h, label = 'Machine') {
 }
 
 /** The card (`online`: the machine is connected, so no reading yet is "waiting", not "not connected"): the status with its reason, then Coral, agents, load, memory, disk and responsiveness. */
-export function healthCard(h, { title = 'Machine health', online = false, waitingText = 'Waiting for a health reading from this computer.', chip = null } = {}) {
+export function healthCard(h, { title = 'Computer health', online = false, waitingText = 'Waiting for a health reading from this computer.', chip = null } = {}) {
     const card = document.createElement('section');
     card.className = 'machine-health-card';
     const head = document.createElement('div');
@@ -123,7 +123,7 @@ export function healthCard(h, { title = 'Machine health', online = false, waitin
         const tone = busyByOthers(h) ? '' : tones[healthStatus(h)] || ''; // other programs' load is not an amber warning about Coral
         const c = chip(healthStatusText(h), tone);
         c.classList.add('machine-health-status', `machine-health-${healthStatus(h)}`); // the card's status and its state, as the dot carried them (the suites and the page read them)
-        c.setAttribute('role', 'img'); c.setAttribute('aria-label', `Machine health: ${healthStatusText(h)}`); // as the dot said it
+        c.setAttribute('role', 'img'); c.setAttribute('aria-label', `Computer health: ${healthStatusText(h)}`); // as the dot said it
         head.append(t, c);
     } else head.append(healthDot(h), t, status);
     card.appendChild(head);

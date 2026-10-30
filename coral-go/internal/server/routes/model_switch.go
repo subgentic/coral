@@ -188,7 +188,7 @@ func (h *SessionsHandler) SwitchModel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !liveSwitchTypes[agentType] {
-		writeError(w, http.StatusConflict, "needs_restart", "a "+agentType+" agent cannot switch while it runs: apply it with a restart")
+		writeError(w, http.StatusConflict, "needs_restart", "a "+agentType+" agent takes a new model or thinking level when it restarts, not while it runs: restart it with the new choice (POST /api/sessions/live/{name}/restart; its conversation resumes)")
 		return
 	}
 	var model string

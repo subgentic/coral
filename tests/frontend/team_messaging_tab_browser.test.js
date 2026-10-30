@@ -101,7 +101,7 @@ const SID = '0b7c2e4a-5d1f-4c8e-9a36-2f4d8e1b7c90';
                 p = await panel();
                 check(`${tag}: ${state}: the server's words are shown as text (${p.line.slice(0, 50)}), the dot is "${dot}" and the primary is "${prim}"`, p.line === text && p.imgs === 0 && p.dot === dot && p.prim.text.startsWith(prim) && p.prim.act === act && (href === null || p.prim.href === href), JSON.stringify([p.line === text, p.imgs, p.dot === dot, p.prim.text.startsWith(prim), p.prim.act === act, p.line]));
                 if (state === 'ready') {
-                    check(`${tag}: ready: the linked teams show name, machine and short server id, with Manage in Coral Hub (${JSON.stringify(p.teams)})`, p.teams.length === 2 && p.teams[0].name === 'Team 0' && /box-0 · server srv-0 · confirmed /.test(p.teams[0].sub) && p.manage === HUB_LINKS);
+                    check(`${tag}: ready: the linked teams show name, machine and short server id, with Manage in Coral Hub (${JSON.stringify(p.teams)})`, p.teams.length === 2 && p.teams[0].name === 'Team 0' && /box-0 · computer srv-0 · confirmed /.test(p.teams[0].sub) && p.manage === HUB_LINKS);
                     await shot(`messaging-ready-${view.name}-${view.theme}`);
                 }
                 if (state === 'old') check(`${tag}: an old team shows no linked teams`, p.teams.length === 0);

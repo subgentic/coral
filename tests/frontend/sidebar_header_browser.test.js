@@ -1,8 +1,8 @@
 // The sidebar header (#4062): the collapse button is the last control of the row, and the search box, the Display-options button and the
 // icon buttons share one height, one centre line and even gaps. A click or tap outside closes the display menu and a server header's details,
 // and Escape closes the display menu; and the collapsed rail still has its way back. Desktop and phone width. Run against an isolated dev server.
-// (#4932 removed the search-row server pill; the server list it opened is gone, so its column/footer/arrow-key checks went with it. The server
-//  group headers, Show server, Group by server and the Servers tab are unchanged and covered by server_switcher_browser and server_menu.)
+// (#4932 removed the search-row server pill; the computer list it opened is gone, so its column/footer/arrow-key checks went with it. The server
+//  group headers, Show computer, Group by computer and the Servers tab are unchanged and covered by server_switcher_browser and server_menu.)
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 
@@ -40,7 +40,7 @@ const SERVERS = [
             // 1 + 2: order, heights, centre line, gaps (the search box, the Display-options button and the icon buttons)
             const row = await ev(`(() => { const dm = ${DM}; const header = dm.closest('.sidebar-header, .mobile-list-header'); const r = e => { const b = e.getBoundingClientRect(); return { l: b.left, r: b.right, t: b.top, h: b.height, cy: b.top + b.height / 2 }; };
                 const search = document.querySelector('.sidebar-header .sidebar-search-input'), menu = header.querySelector('[data-display-button]'), collapse = header.querySelector('.sidebar-collapse-btn:not([data-display-button]):not([data-group-toggle])'), toggle = header.querySelector('[data-group-toggle]');
-                const btn = header.querySelector(':scope > .btn'); // the header's own + New, not a button inside the Display options panel (#4746)
+                const btn = header.querySelector(':scope > .btn:not(.phone-menu-btn)'); // the header's own + New (the phone's first row has its own menu button, and New is in the + menu there: #11096, #11116), not a button inside the Display options panel (#4746)
                 return { header: header.className, search: search && search.getClientRects().length ? r(search) : null, menu: r(menu), toggle: toggle && toggle.getClientRects().length ? r(toggle) : null, collapse: collapse && collapse.getClientRects().length ? r(collapse) : null, newBtn: btn && btn.getClientRects().length ? r(btn) : null, last: header.lastElementChild.className }; })()`);
             const ctl = [row.search, row.menu, row.toggle, row.collapse, row.newBtn].filter(Boolean);
             // desktop has search + display menu + collapse + New; the phone list header has the display menu + New (the search-row pill was removed, #4932)

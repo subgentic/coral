@@ -11,7 +11,7 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
-    const dir = fs.mkdtempSync('/tmp/att-'), file = `${dir}/picked.png`;
+    const dir = fs.mkdtempSync(require('node:path').join(require('./helpers/tmp_root'), 'att-')), file = require('node:path').join(dir, 'picked.png');
     fs.writeFileSync(file, PNG);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });

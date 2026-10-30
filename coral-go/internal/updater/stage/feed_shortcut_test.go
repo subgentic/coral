@@ -18,7 +18,7 @@ func feedList(tags ...string) []listedRelease {
 // is never "up to date" from a feed (Security Reviewer's SHOULD on #9719). stage.Check itself refuses such a version before any request (installed_version); this is the second lock on the same door.
 func TestFeedNothingNewerIsNotConcludedForAnInstalledVersionThatCannotBeCompared(t *testing.T) {
 	normal := feedList("v1.4.131", "v1.4.130", "v1.4.129")
-	for _, installed := range []string{"", "dev", "1.4", "1.4.130-rc1", "v1.4.130", "1.4.130 ", "latest", "1.4.x"} {
+	for _, installed := range []string{"", "dev", "1.4", "1.4.130+x", "v1.4.130", "1.4.130 ", "latest", "1.4.x"} {
 		assert.False(t, feedNothingNewer(normal, installed), "installed %q cannot be compared: the API's list is asked", installed)
 		assert.False(t, feedNothingNewer(feedList("v1.4.100"), installed), "even a feed with only old tags: installed %q", installed)
 	}
@@ -26,6 +26,9 @@ func TestFeedNothingNewerIsNotConcludedForAnInstalledVersionThatCannotBeCompared
 	assert.False(t, feedNothingNewer(normal, "1.4.130"), "1.4.131 is newer")
 	assert.True(t, feedNothingNewer(normal, "1.4.131"), "nothing newer")
 	assert.True(t, feedNothingNewer(normal, "1.5.0"), "installed ahead")
+	// an installed prerelease compares as semver does: below its own release, so the feed's newer tag decides
+	assert.False(t, feedNothingNewer(normal, "1.4.130-rc1"), "1.4.131 and 1.4.130 are above the rc")
+	assert.True(t, feedNothingNewer(feedList("v1.4.100"), "1.4.130-rc1"), "nothing newer")
 	assert.False(t, feedNothingNewer(feedList(), "1.4.130"), "an empty feed cannot say")
 	assert.False(t, feedNothingNewer(feedList("v1.4.131-rc1", "nightly"), "1.4.130"), "no product tag cannot say")
 }

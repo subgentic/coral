@@ -274,6 +274,8 @@ var operatorOnlyRoutes = map[string]string{
 	"GET /api/token-usage/turns":                         "list the turns of a window of token usage (names agents)",
 	"GET /api/goals/metrics":                             "read the goal generator's metrics (every session's goal text)", // #5041
 	"GET /api/system/identity-report":                    "read the identity report (every session's calls and mismatches)",
+	"DELETE /api/board/{project}/seats/{subscriberID}":   "remove a seat from a board",
+	"GET /api/board-seats/foreign":                       "list the board seats of agents launched on another board",
 	"GET /api/board/tasks":                               "list the tasks of every board",
 	"GET /api/goals":                                     "list the goals of every board",
 	"GET /api/team-artifacts":                            "list the artifacts of every team",
@@ -295,6 +297,8 @@ var operatorOnlyRoutes = map[string]string{
 	"GET /api/scheduled/runs/recent":                            "list every scheduled run",
 	"DELETE /api/teams/detail/{name}":                           "delete a team",
 	"PUT /api/teams/detail/{name}/home-folder":                  "change the folder a team's agents start in",
+	"PUT /api/team-members/{memberID}/search-access":            "change how far an agent's chat search reaches",
+	"GET /api/search-access/log":                                "read the log of search access (raises and reads above own)",
 	"POST /api/teams/generate":                                  "generate a team",
 	"PUT /api/settings/git-diff-mode":                           "change the diff mode",
 	"POST /api/pinned-folders":                                  "pin a folder (the file browser's bounds)",

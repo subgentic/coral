@@ -453,6 +453,7 @@ var knownPathParams = map[string]string{
 	"agentName":    "an agent's knowledge file in a team: a target",
 	"remoteServer": "a configured remote server's id",
 	"folderName":   "a folder's tag set",
+	"memberID":     "the team member row whose search access the Operator sets: a target (the level a search checks is the caller's own row, never this)",
 	"goalID":       "a goal of the board addressed by its number (another board's goal is not found): a target",
 	"requestID":    "a goal request the board received, by the board's own number (another board's request is not found): a target; who answers it comes from the caller derivation and the planner check",
 	"category":     "a template category",

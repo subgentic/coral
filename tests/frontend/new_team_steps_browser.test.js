@@ -66,7 +66,7 @@ const BASE = require('./test_base').BASE;
             await t.type('input', N.teamName, ''); await t.type('input', N.folder, '/work/payments-app'); s = await state(); assert.match(s.live, /Team name is required/);
             await t.click('button', N.next); assert.match(await stepLine(ev), /^Step 1 of 3/, 'Next does not advance');
         });
-        await S.run('step 1: a machine select named "Machine" with several machines, "Another computer\'s address..." as its last entry, and choosing it reveals the address field', async () => {
+        await S.run('step 1: a machine select named "Computer" with several machines, "Another computer\'s address..." as its last entry, and choosing it reveals the address field', async () => {
             await ev(`window.hideLaunchModal && window.hideLaunchModal(); T.state.hub = true; T.state.cloud = false; T.state.serversKnown = true; T.state.servers = [{ id: 'm1', label: 'build-server', status: 'online', version: '1.4.6', last_seen: new Date().toISOString() }]; true`);
             await openNewTeam(ev, waitFor);
             assert.ok(await t.has('select', N.machine), 'a select named exactly Machine');

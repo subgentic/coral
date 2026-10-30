@@ -191,7 +191,6 @@
     position: relative;
     border-radius: var(--radius-lg);
     --mb-color: var(--mb-color-dark);
-    --mb-tint: var(--mb-tint-dark);
 }
 
 .mb-message:hover {
@@ -201,7 +200,6 @@
 /* The sender's colour, in the theme's AA shade (boardMessageColorStyle). */
 [data-theme="light"] .mb-message {
     --mb-color: var(--mb-color-light);
-    --mb-tint: var(--mb-tint-light);
 }
 
 .mb-message-header,
@@ -3543,6 +3541,8 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 .launch-dir-recents:empty { display: none; }
 .launch-dir-recent { margin: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .launch-dir-hint { margin: 0 0 8px; }
+.launch-team-instead { margin: 8px 0 0; } /* the way to a team from the agent's first step (#11289): a link in the accent text colour, not a grey word */
+.launch-team-instead .btn { padding-inline: 0; color: var(--link-text); text-decoration: underline; background: transparent; }
 @media (pointer: coarse), (max-width: 767px) { .launch-dir-recent { min-height: var(--control-touch-height, 44px); } }
 
 .modal-header .sd-sub { margin: .15rem 0 0; color: var(--text-secondary); font-size: var(--fs-md); font-weight: var(--fw-regular); }
@@ -3589,7 +3589,6 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
     /* A narrow Settings (a phone, a small window, large text) is two screens (#10000): a list of its sections, each a row with a chevron, and one section with a way back. The dialog's data-screen says which (settings_nav.js); a section asked for opens straight on it. The old dropdown read as a form field. */
     .settings-nav { width: auto; flex: none; border-right: 0; border-bottom: 1px solid var(--border); padding: .6rem 1rem; overflow: visible; }
     .settings-shell { flex-direction: column; }
-    .settings-nav .settings-group-pick { display: none; }
     #settings-modal[data-screen="sections"] .settings-nav { flex: 1 1 auto; min-height: 0; border-bottom: 0; padding: 0; overflow-y: auto; }
     #settings-modal[data-screen="sections"] .settings-panes { display: none; }
     #settings-modal[data-screen="pane"] .settings-nav { display: none; }
@@ -3740,6 +3739,7 @@ body:has(#launch-modal[style*="flex"] :is(#launch-tmux-slot, #team-tmux-slot)[da
 .telemetry-install-id .btn { flex: none; }
 
 /* An agent whose hook programs are gone (#6089): a quiet chip on its row, the fix in its tooltip. */
+.hooks-inactive-chip { margin-left: 6px; color: var(--text-muted); background: transparent; border: 1px dashed var(--border); white-space: nowrap; }
 .hooks-missing-chip { margin-left: 6px; color: var(--text-primary); background: color-mix(in srgb, var(--warning) 22%, var(--bg-secondary)); border: 1px solid color-mix(in srgb, var(--warning) 55%, var(--border)); white-space: nowrap; }
 
 /* The agent choice in New Agent's first step (#6199): the label, then a radio group of chips under the folder; 44 px on a phone. */
@@ -3823,6 +3823,7 @@ li:has(> .row-btn:focus-visible) { outline: 2px solid var(--accent); outline-off
 .launch-persona-top .settings-hint { margin: 0 0 14px; }
 .launch-persona-top input[type="text"] { width: 100%; max-width: none; box-sizing: border-box; }
 .launch-stage-sub b { color: var(--text-primary); }
+.launch-stage-sub { overflow-wrap: anywhere; min-width: 0; } /* a folder path has no break opportunity: the step line ("... in /Users/.../Coral/team") wraps inside the dialog at 390 and 320 px, now that a folder is suggested for a new team (#11258 item 3) */
 .launch-recap { flex: none; margin: 0; padding: 10px 24px 0; border-top: 1px solid var(--border); color: var(--text-secondary); font-size: var(--fs-md); overflow-wrap: anywhere; }
 .launch-recap b { color: var(--text-primary); font-weight: var(--fw-strong); }
 .launch-recap-note { display: block; font-size: var(--fs-base); } /* what the chosen mode allows, a line under the recap (#10000) */
@@ -3945,7 +3946,6 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 .launch-wizard .acf-model-note, .launch-wizard .acf-thinking-note, .launch-wizard .acf-thinking-ran { font-size: var(--fs-base); font-weight: var(--fw-regular); }
 #launch-agent-pick .launch-agent-opt { font-size: var(--fs-md); font-weight: var(--fw-medium); }
 .sd-step-header .launch-back-btn { font-family: inherit; }
-[data-quiet-focus] :focus-visible { outline: 0 !important; box-shadow: none !important; }
 
 @container (max-width: 40em) { .launch-note-slot { min-height: 3.8em; } }
 @container (max-width: 17em) { .launch-note-slot { min-height: 5.6em; } }
@@ -4133,3 +4133,18 @@ dialog.team-link-dialog::backdrop { background: rgba(var(--black-rgb), 0.5); }
 
 /* The persona step says "all optional" once, in its title (#10835): no tag on each field */
 #launch-modal[data-all-optional] .launch-optional { display: none; }
+
+/* Keyboard shortcuts (#11246): a list of keys beside what they do. The keys are <kbd> chips in the accent text colour on a subtle fill, the description is the secondary text colour in its own column, and a description that wraps stays under itself, never under the keys. */
+.shortcuts-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.shortcuts-dialog .modal-body { padding-top: 4px; }
+.kbd-group { margin: 14px 0 6px; }
+.kbd-group > .group-head { margin-bottom: 6px; color: var(--text-secondary); }
+.kbd-list { margin: 0; }
+.kbd-row { display: grid; grid-template-columns: minmax(7.5rem, min(40%, 16rem)) 1fr; column-gap: 16px; align-items: baseline; padding: 6px 0; border-top: 1px solid var(--border); }
+.kbd-group .kbd-row:first-child { border-top: 0; }
+.kbd-keys { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin: 0; min-width: 0; }
+.kbd-combo { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.kbd-what { margin: 0; min-width: 0; color: var(--text-secondary); overflow-wrap: anywhere; }
+.kbd-key { display: inline-block; min-width: 1.6em; padding: 2px 6px; text-align: center; font-family: var(--font-mono); font-size: var(--fs-md); color: var(--link-text); background: var(--bg-tertiary); border: 1px solid var(--border); border-bottom-width: 2px; border-radius: var(--radius-xs); }
+.kbd-or, .kbd-plus { color: var(--text-secondary); font-size: var(--fs-sm); }
+@media (max-width: 639px) { .shortcuts-dialog .modal-body { padding-inline: 0; } .kbd-row { grid-template-columns: 1fr; row-gap: 2px; } } /* a phone has no room for a key column beside the words: the keys sit above their description */ /* the phone dialog already has its own side padding: the description column keeps the width */

@@ -1,5 +1,5 @@
 // The mailbox's view list (view_list.js, #7785): at a desktop's width a column of views with a count each, one of them current (aria-current, a bar and weight), a view not built yet disabled and saying "soon"
-// in words, a tag's colour dot; below the phone width the same views are one 44 px select. Picking calls back once; a disabled view never; an update keeps the keyboard on its item; a dot that is not a hex
+// in words, a tag's colour dot; below the phone width the same views are ONE tab strip of 44 px text tabs (#11236, #11239 slice A; the select stays in the DOM, hidden). Picking calls back once; a disabled view never; an update keeps the keyboard on its item; a dot that is not a hex
 // colour draws nothing.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -27,13 +27,14 @@ const SECTIONS = `[{ title: 'Views', items: [{ key: 'all', label: 'All chats', c
                     soon: items.filter(b => b.disabled).map(b => b.dataset.key + ':' + b.textContent.trim()), titles: [...r.querySelectorAll('.view-list-title')].map(e => e.textContent), minH: Math.min(...items.map(b => Math.round(b.getBoundingClientRect().height))),
                     dots: [...r.querySelectorAll('.view-list-dot')].map(d => d.style.getPropertyValue('--view-list-dot')), options: [...sel.querySelectorAll('option')].map(o => o.textContent + (o.selected ? '*' : '')),
                     alerts: [...r.querySelectorAll('.view-list-alert')].map(e => e.textContent), groups: [...sel.querySelectorAll('optgroup')].map(g => g.label), counts: items.map(b => b.querySelector('.view-list-count') ? b.querySelector('.view-list-count').textContent : ''), side: document.documentElement.scrollWidth - document.documentElement.clientWidth }; })()`);
-            await check(`${label}: ${mobile ? 'one select, no column' : 'the column, no select'}`, async () => {
+            await check(`${label}: ${mobile ? 'one tab strip, no select' : 'the column, no select'}`, async () => {
                 const p = await probe();
-                assert.equal(p.nav, !mobile, JSON.stringify(p)); assert.equal(p.sel, mobile, JSON.stringify(p));
-                if (mobile) assert.ok(p.selH >= 44, `the select is 44 px: ${p.selH}`); else assert.ok(p.minH >= 32, `an item is at least 32 px: ${p.minH}`);
+                assert.equal(p.nav, true, JSON.stringify(p)); assert.equal(p.sel, false, JSON.stringify(p));
+                if (mobile) assert.ok(p.minH >= 44, `a tab is 44 px: ${p.minH}`); else assert.ok(p.minH >= 32, `an item is at least 32 px: ${p.minH}`);
+                if (mobile) assert.equal(await ev(`getComputedStyle(window.__root.querySelector('.view-list-nav')).flexDirection`), 'row', 'the strip is a row of tabs');
                 assert.equal(p.side, 0, 'nothing scrolls sideways');
             });
-            await check(`${label}: the select's border is the controls' border colour (3:1 on the page, WCAG 1.4.11), as every other select's (#7946)`, async () => {
+            if (!mobile) await check(`${label}: the select's border is the controls' border colour (3:1 on the page, WCAG 1.4.11), as every other select's (#7946)`, async () => {
                 const c = await ev(`(() => { const probe = document.createElement('i'); probe.style.borderTop = '1px solid var(--control-border)'; document.body.append(probe); const want = getComputedStyle(probe).borderTopColor; probe.remove(); return [getComputedStyle(window.__root.querySelector('.view-list-select')).borderTopColor, want]; })()`);
                 assert.equal(c[0], c[1], JSON.stringify(c));
             });
@@ -41,7 +42,7 @@ const SECTIONS = `[{ title: 'Views', items: [{ key: 'all', label: 'All chats', c
                 const p = await probe();
                 assert.deepEqual(p.current, ['all'], JSON.stringify(p));
                 assert.deepEqual(p.soon, ['active:Active nowsoon'], JSON.stringify(p));
-                assert.deepEqual(p.titles, ['Views', 'Tags']);
+                assert.deepEqual(p.titles, ['Views', 'Tags']); // the strip has no section titles to draw: they stay in the DOM and are hidden
                 assert.deepEqual(p.counts, ['183', '0', 'soon', '14', '1'], JSON.stringify(p));
                 assert.deepEqual(p.alerts, ['183'], 'only a count above 0 that asks for it is the red pill: ' + JSON.stringify(p));
                 assert.deepEqual(p.groups, ['Views', 'Tags'], 'the sections are the select\'s groups: ' + JSON.stringify(p));
@@ -49,8 +50,7 @@ const SECTIONS = `[{ title: 'Views', items: [{ key: 'all', label: 'All chats', c
                 assert.deepEqual(p.options, ['All chats (183)*', 'Board history (0)', 'release (14)', 'bad (1)'], 'the select holds the views that can be picked: ' + JSON.stringify(p));
             });
             await check(`${label}: picking calls back once, a disabled view never, and an update moves the current view and keeps the keyboard`, async () => {
-                if (mobile) await ev(`(() => { const s = window.__root.querySelector('.view-list-select'); s.value = 'groups'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
-                else await ev(`(() => { const b = k => window.__root.querySelector('.view-list-item[data-key="' + k + '"]'); b('active').click(); b('groups').click(); return true; })()`);
+                await ev(`(() => { const b = k => window.__root.querySelector('.view-list-item[data-key="' + k + '"]'); b('active').click(); b('groups').click(); return true; })()`);
                 assert.deepEqual(await ev(`window.__picked`), ['groups']);
                 await ev(`(() => { const b = window.__root.querySelector('.view-list-item[data-key="tag:1"]'); if (!${mobile}) b.focus(); window.__vl.update(window.__root, { sections: [{ title: 'Views', items: [{ key: 'all', label: 'All chats', count: 184 }, { key: 'groups', label: 'Board history', count: 12 }] }, { title: 'Tags', items: [{ key: 'tag:1', label: 'release', count: 14, dot: '#be185d' }] }], current: 'groups' }); return true; })()`);
                 const after = await ev(`({ current: [...window.__root.querySelectorAll('[aria-current="true"]')].map(b => b.dataset.key), focus: document.activeElement.dataset ? document.activeElement.dataset.key || '' : '', n: window.__root.querySelectorAll('.view-list-item').length })`);

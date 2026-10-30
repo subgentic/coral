@@ -81,7 +81,7 @@ function _rowServerPrefix(key) {
     const down = e.status !== 'online' && e.status !== 'unknown';
     return `<span class="row-server-prefix server-${st.cls}${down ? ' is-down' : ''}" title="${escapeAttr(`${e.label || e.id}: ${st.label}`)}">`
         + `<span class="row-server-name">${escapeHtml(name)}</span><span class="row-server-sep" aria-hidden="true">-</span>`
-        + `<span class="sr-only"> (server${down ? ', ' + escapeHtml(st.label.toLowerCase()) : ''}) </span></span>`;
+        + `<span class="sr-only"> (computer${down ? ', ' + escapeHtml(st.label.toLowerCase()) : ''}) </span></span>`;
 }
 
 /** A team/folder header's name, with its server before it when shown: one inline item, so

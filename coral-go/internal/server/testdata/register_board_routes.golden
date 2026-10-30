@@ -4,6 +4,7 @@ DELETE /api/board/{project}/cross-team-links | (*BoardHandler).RemoveLocalLinks-
 DELETE /api/board/{project}/groups/{groupID}/members/{sessionID} | (*BoardHandler).RemoveGroupMember-fm
 DELETE /api/board/{project}/messages/{messageID} | (*BoardHandler).DeleteMessage-fm
 DELETE /api/board/{project}/reminder | (*BoardHandler).RemindSubscriber-fm
+DELETE /api/board/{project}/seats/{subscriberID} | (*BoardHandler).RemoveSeat-fm
 DELETE /api/board/{project}/subscribe | (*BoardHandler).Unsubscribe-fm
 DELETE /api/board/{project}/tasks/{taskID}/park | (*BoardHandler).ParkTask-fm
 DELETE /api/board/{project}/tasks/{taskID}/reminder | (*BoardHandler).RemindTask-fm

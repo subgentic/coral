@@ -78,6 +78,15 @@ func DeliverAutomated(ctx context.Context, in AutomatedInput) (Delivery, error) 
 		noteSkipped(in, v.skip)
 		return Skipped, nil
 	}
+	if v.blind {
+		// Safety net for a box that cannot be read: the last text of the same words may still be in the editor, and nothing can say it was not. It is not pasted again (they pile up there, #11165): only its
+		// Enter is pressed, once, and the next send pastes. At most one copy is ever waiting.
+		if memo, ok := gate.typedFor(in.Name); ok && memo.blind && memo.text == squeeze(in.Text) && gate.now().Sub(memo.at) <= pasteLeftoverWindow {
+			in.submitLeftover(ctx)
+			clearSkipped(in.Name)
+			return Skipped, nil
+		}
+	}
 	enterWithheld, err := gate.typeNow(ctx, in)
 	if errors.Is(err, ErrTeamBusy) {
 		noteSkipped(in, SkipTeamBusy)
@@ -88,6 +97,9 @@ func DeliverAutomated(ctx context.Context, in AutomatedInput) (Delivery, error) 
 		return Skipped, nil
 	}
 	if err == nil {
+		if v.blind {
+			gate.markBlind(in.Name)
+		}
 		noteDeliveredText(in.Name, in.Text)
 		clearSkipped(in.Name)
 	}
@@ -106,6 +118,7 @@ type verdict struct {
 	skip     string // why nothing is typed, "" when the text goes
 	leftover bool   // the box holds exactly what Coral typed last: its Enter is what is missing
 	boxShown bool   // the agent's normal input box is on the screen (RequireInputBox)
+	blind    bool   // the agent is of a type whose input box Coral cannot read: what it holds is never known (#11165)
 }
 
 // look reads the agent's screen once. A terminal that has no screen to read is typed to (there is nothing to look at); one whose
@@ -130,6 +143,7 @@ func (in AutomatedInput) look(ctx context.Context) verdict {
 	box, haveBox := inputBoxText(screen)
 	v := verdict{boxShown: haveBox || InputBoxOnScreen(screen)}
 	if !haveBox {
+		v.blind = !InputBoxKnown(agentType)
 		return v // a readable screen with no box Coral recognises: the text goes (the harness queues it)
 	}
 	if emptyBox(box, in.styledSuggestionOnly(ctx, agentType, sessionID)) {

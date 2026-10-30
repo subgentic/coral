@@ -67,29 +67,29 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
         // automatic retry in the middle of step 1.
         await require('./helpers/wait').bind(ev).coralReady('startup', 'liveList', 'liveListLoaded');
         assert.equal(await ev(`JSON.parse(document.getElementById('coral-boot').textContent).mode`), 'cloud', 'the page runs in cloud mode');
-        // Nothing has loaded the server list yet (it is not part of the startup graph).
+        // Nothing has loaded the computer list yet (it is not part of the startup graph).
         assert.deepEqual(seen, [], 'cloud_server_view.js is not loaded at startup');
 
         // 1. The first load fails: a toast says so and the tab shows no list. 'No list' is read at the moment the
         // toast appears (a MutationObserver runs right after the toast is inserted): later, a background caller's
         // ?retry=N may already have loaded the module and rendered the list, which is fine.
         await ev(`(() => { window.__qaAtToast = null; new MutationObserver((_, o) => {
-            if (![...document.querySelectorAll('.toast')].some(t => /Could not load the server list/.test(t.textContent))) return;
+            if (![...document.querySelectorAll('.toast')].some(t => /Could not load the computer list/.test(t.textContent))) return;
             window.__qaAtToast = { list: !!document.querySelector('#servers-tab-body .cs-row') }; o.disconnect();
         }).observe(document.body, { childList: true, subtree: true, characterData: true }); return true; })()`);
         await openServers();
-        await waitFor(`[...document.querySelectorAll('.toast')].some(t => /Could not load the server list/.test(t.textContent))`, 'the failure toast');
+        await waitFor(`[...document.querySelectorAll('.toast')].some(t => /Could not load the computer list/.test(t.textContent))`, 'the failure toast');
         // The plain URL was requested once and failed. A background caller (the access lookup) may already have
         // retried by now under load; a retry is always a new ?retry=N URL, never the cached failed one (#3118).
         assert.equal(seen[0], 'cloud_server_view.js', 'the first request is the plain URL, and it failed');
         assert.ok(seen.slice(1).every(u => /\?retry=\d+$/.test(u)), 'nothing re-requests the failed URL: ' + JSON.stringify(seen));
         await waitFor(`window.__qaAtToast !== null`, 'the toast snapshot');
         assert.equal((await ev(`window.__qaAtToast`)).list, false, 'no list when the failure is reported');
-        console.log('PASS a failed load shows "Could not load the server list"');
+        console.log('PASS a failed load shows "Could not load the computer list"');
 
         // 2. The next action loads it, under a new URL the failure is not cached for.
         await openServers();
-        await waitFor(`!!document.querySelector('#servers-tab-body .cs-row')`, 'the server list after the retry');
+        await waitFor(`!!document.querySelector('#servers-tab-body .cs-row')`, 'the computer list after the retry');
         assert.match(await ev(`document.querySelector('#servers-tab-body').textContent`), /Work Mac/);
         assert.deepEqual(seen, ['cloud_server_view.js', 'cloud_server_view.js?retry=1'], 'the retry fetched cloud_server_view.js?retry=1');
         console.log('PASS opening the tab again loads it (?retry=1)');
@@ -104,7 +104,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
         })()`);
         assert.ok(same, 'importOnce returns the retried instance');
         await openServers();
-        await waitFor(`!!document.querySelector('#servers-tab-body .cs-row')`, 'the server list again');
+        await waitFor(`!!document.querySelector('#servers-tab-body .cs-row')`, 'the computer list again');
         assert.deepEqual(seen, ['cloud_server_view.js', 'cloud_server_view.js?retry=1'], 'no further module request');
         console.log('PASS later importers share the one instance; no refetch');
 

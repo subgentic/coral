@@ -28,9 +28,12 @@ export function historyRoute(id, query = '') {
     return nativeInbox() ? inboxRouteFor(route) : route; // the Hub's native Inbox has no Chats address: a chat is the chat on screen in the Inbox (Goal #100, #9549)
 }
 
+/** A Hub with no computer online (yet) has nothing to read history from: an empty answer, not a failure. Its readers show an empty list and log nothing (#11073); every other error stays an error. */
+export class NoComputersError extends Error { constructor() { super('No computers online.'); this.code = 'no_computers'; } }
+
 export function historyUrl(url) {
     const server = historyServer();
-    if (!server) throw new Error('No computers online.');
+    if (!server) throw new NoComputersError();
     return serverUrl(url, server);
 }
 
@@ -38,7 +41,7 @@ export function historyUrl(url) {
 // invocation cannot send them through this read-only source.
 export async function historyFetch(url, options) {
     const server = historyServer();
-    if (!server) throw new Error('No computers online.');
+    if (!server) throw new NoComputersError();
     if ((isCloud() || server !== 'local') && (options?.method || 'GET').toUpperCase() !== 'GET') throw new Error('History is read-only through Coral Hub.');
     const response = await serverFetch(server, url, options);
     if (!isCloud() && !state.hub) return response;

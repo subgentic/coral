@@ -6,7 +6,7 @@ import { PHONE_QUERY } from './phone_layout.js';
 import { importOnce } from './import_once.js';
 import { browserLocal, browserSession } from './safe_storage.js';
 import { pollEvery } from './overload.js';
-const { RESUME_KEY, actName, ageTier, canStart, fetchUpdateStatus, installsLocally, notAvailable, requestCheckNow, rollbackText, serverHas } = await importOnce('./update_api.js'); // lazy modules load the others they need through importOnce, so a failed load is retried
+const { RESUME_KEY, idleInstallWords, actName, ageTier, canStart, fetchUpdateStatus, installsLocally, notAvailable, requestCheckNow, rollbackText, serverHas } = await importOnce('./update_api.js'); // lazy modules load the others they need through importOnce, so a failed load is retried
 import { updatesUiOn, UPDATED_KEY } from './update_flag.js';
 import { showToast } from './utils.js';
 
@@ -31,10 +31,12 @@ function pillWords(s) {
     const days = s.staged.days, tier = ageTier(days);
     const age = tier === 'fresh' ? '' : plural(days, 'day');
     const ago = days < 1 ? 'earlier today' : `${plural(days, 'day')} ago`;
+    const idle = idleInstallWords(s);
     return {
         tier, age,
+        idle: idle.short,
         verb: actName(s), // Windows installs from this page (#7338): no relaunch is offered there
-        name: `${actName(s)} to version ${s.staged.version}. Downloaded ${ago}.${canStart(s) ? '' : ` ${notAvailable(s.relaunch.reason)}`}`,
+        name: `${actName(s)} to version ${s.staged.version}. Downloaded ${ago}.${canStart(s) ? '' : ` ${notAvailable(s.relaunch.reason)}`}${idle.long ? ` ${idle.long}` : ''}`,
     };
 }
 
@@ -61,7 +63,7 @@ function renderPill() {
     pill.setAttribute('aria-label', w.name);
     pill.title = w.name;
     pill.querySelector('.update-long').textContent = w.verb;
-    pill.querySelector('.update-age').textContent = w.age ? ` · ${w.age}` : '';
+    pill.querySelector('.update-age').textContent = w.idle ? ` · ${w.idle}` : w.age ? ` · ${w.age}` : '';
     const busy = !canStart(status);
     pill.setAttribute('aria-disabled', String(busy));
 }
@@ -101,7 +103,8 @@ function renderBanner() {
 const READY_SEEN_KEY = 'coral-update-ready-seen';
 function readyNotice(s) {
     if (!relaunchOffered(s) || s.relaunch.reason === 'no_run_record' || !canStart(s)) return null;
-    return { key: s.staged.version, lead: `Coral ${s.staged.version} is ready.`, rest: ' It is downloaded and checked. Nothing is installed until you say yes.' };
+    const auto = idleInstallWords(s).short === 'installs when idle';
+    return { key: s.staged.version, lead: `Coral ${s.staged.version} is ready.`, rest: auto ? ' It is downloaded and checked. Coral installs it by itself when it is idle, or now if you say yes.' : ' It is downloaded and checked. Nothing is installed until you say yes.' };
 }
 function renderReadyNotice() {
     const box = $('update-ready-notice');
