@@ -37,6 +37,19 @@ jobs:
         with:
           go-version-file: coral-go/go.mod
           cache: false
+      # A cold module cache downloads about 40 modules, and proxy.golang.org dropped several on v2.0.4's first attempt (stream INTERNAL_ERROR), failing resolve
+      # before anything was built (#11047). Fetch them here, up to four times with a wait between, so a dropped download is retried instead of failing the release;
+      # go checks every module it downloads against go.sum, and no proxy setting changes.
+      - name: Download the Go modules, retrying a dropped download
+        working-directory: coral-go
+        run: |
+          for attempt in 1 2 3 4; do
+            go mod download && exit 0
+            echo "go mod download failed (attempt $attempt of 4)"
+            [ "$attempt" -lt 4 ] && sleep $((attempt * 15))
+          done
+          echo "::error::go mod download failed four times"
+          exit 1
       # The release provenance record (#5550): who pushed the tag, which commit, whether it is on main, and whether go-tests, go-race and
       # cdp-gate passed on that exact code (the tagged notes commit is gated by its parent). A release is not built from code whose gates failed.
       - name: Record the release provenance
