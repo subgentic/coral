@@ -38,6 +38,11 @@ tests/release/screens/run.sh v2.0.7 --dry-run            # also builds the conta
 8. **Files them** (`publish.mjs`, as a CLI under the identity of whoever runs it):
    the contact sheet first (an HTML artifact: changed pages first with before, after and diff images, the rest
    folded), then each shot named `<page>__<width>.png` (`__light` added for the light theme) on the task.
+   The sheet is named for the one-line summary (`UI review v2.0.8: 202 pages shot, 116 changed vs v2.0.7.html`).
+   Last, once the shots are up, the sheet is uploaded once more with the tag `for review`: that is what Coral's
+   Inbox lists under **Needs you** for the operator (Coral keeps the first upload's name for the same bytes, so
+   the row shows the summary). No mention and no agent. `--dry-run` writes the request it would send to
+   `published.json` (`needsReview`). The goal is `SCREENS_GOAL` (default 163; use an open one).
 
 ## The page list is a census
 
