@@ -80,8 +80,8 @@ const TEAM = `qa-next-steps-${Date.now() % 100000}`;
         // (6) New Agent says Claude is not signed in, with how (#11336): a notice under the provider, Launch stays on, nothing for another provider
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false }); await Emulation.setTouchEmulationEnabled({ enabled: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
-        await ev(`window.__signed = true; const R6 = window.fetch; window.fetch = (u, o) => String(u).includes('/api/system/status') ? Promise.resolve(new Response(JSON.stringify({ claude_signed_in: window.__signed }), { status: 200, headers: { 'Content-Type': 'application/json' } })) : R6(u, o); true`);
-        await ev(`import(${S} + 'launch_signin_notice.js').then(async m => { const sl = await import(${S} + 'signin_line.js'); window.__sl = sl; const host = document.createElement('div'); host.id = 'sn-host'; host.innerHTML = '<form id="sn-form"><select class="acf-agent-type"><option value="claude">Claude</option><option value="codex">Codex</option></select></form><div id="sn-slot" class="launch-cli-slot"></div>'; document.body.append(host); sl.setClaudeSignedIn(true); m.mountLaunchSigninNotice({ slot: document.getElementById('sn-slot'), form: document.getElementById('sn-form'), server: 'local' }); return true; })`);
+        await ev(`window.__signed = true; const R6 = window.fetch; window.fetch = (u, o) => String(u).includes('/api/system/status') ? Promise.resolve(new Response(JSON.stringify({ claude_signed_in: window.__signed }), { status: 200, headers: { 'Content-Type': 'application/json' } })) : String(u).includes('/api/system/cli-check') && String(u).includes('type=pi') ? Promise.resolve(new Response(JSON.stringify(window.__pi), { status: 200, headers: { 'Content-Type': 'application/json' } })) : R6(u, o); window.__pi = { found: true, signed_in: false }; true`);
+        await ev(`import(${S} + 'launch_signin_notice.js').then(async m => { const sl = await import(${S} + 'signin_line.js'); window.__sl = sl; const host = document.createElement('div'); host.id = 'sn-host'; host.innerHTML = '<form id="sn-form"><select class="acf-agent-type"><option value="claude">Claude</option><option value="codex">Codex</option><option value="pi">Pi</option></select></form><div id="sn-slot" class="launch-cli-slot"></div>'; document.body.append(host); sl.setClaudeSignedIn(true); m.mountLaunchSigninNotice({ slot: document.getElementById('sn-slot'), form: document.getElementById('sn-form'), server: 'local' }); return true; })`);
         const sn = () => ev(`(() => { const n = document.querySelector('#sn-host .launch-signin-notice'); const b = n && n.querySelector('button'), st = n && n.querySelector('.launch-signin-steps'); return n ? { shown: !n.hidden, text: n.textContent.replace(/\\s+/g, ' ').trim(), expanded: b.getAttribute('aria-expanded'), steps: !st.hidden } : null; })()`);
         let n0 = await sn();
         check(n0 && !n0.shown, `signed in: no notice: ${JSON.stringify(n0)}`);
@@ -93,6 +93,21 @@ const TEAM = `qa-next-steps-${Date.now() % 100000}`;
         check(!n0.shown, `another provider: no notice about Claude: ${JSON.stringify(n0)}`);
         await ev(`(() => { const x = document.querySelector('#sn-host select'); x.value = 'claude'; x.dispatchEvent(new Event('change', { bubbles: true })); window.__signed = true; window.__sl.setClaudeSignedIn(true); return true; })()`); n0 = await sn();
         check(!n0.shown, `signed in again: the notice goes by itself: ${JSON.stringify(n0)}`);
+        // Pi with no provider signed in (#11336, Pi Tester): the same notice, in Pi's words, from Pi's own sign-in probe; nothing when Pi is signed in or the probe cannot say
+        const pick = name => ev(`(() => { const x = document.querySelector('#sn-host select'); x.value = ${JSON.stringify(name)}; x.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
+        const remount = async pi => { await ev(`window.__pi = ${JSON.stringify(pi)}; import(${S} + 'launch_signin_notice.js').then(m => { document.querySelector('#sn-host .launch-signin-notice')?.remove(); document.querySelector('#sn-host select').value = 'claude'; m.mountLaunchSigninNotice({ slot: document.getElementById('sn-slot'), form: document.getElementById('sn-form'), server: 'local' }); return true; })`); };
+        await ev(`window.__signed = true; window.__sl.setClaudeSignedIn(true); true`);
+        await remount({ found: true, signed_in: false }); await pick('pi');
+        await waitFor(`(() => { const n = document.querySelector('#sn-host .launch-signin-notice'); return !!n && !n.hidden; })()`, 'the Pi notice', 6000).catch(() => {});
+        n0 = await sn();
+        check(n0 && n0.shown && /Pi isn't signed in to any provider on this computer\./.test(n0.text), `Pi not signed in: a notice in Pi's words: ${JSON.stringify(n0)}`);
+        await ev(`document.querySelector('#sn-host .launch-signin-how').click(); true`); n0 = await sn();
+        check(n0.steps && /run pi and type \/login/.test(n0.text), `with Pi's own steps: ${JSON.stringify(n0)}`);
+        await pick('codex'); n0 = await sn(); check(!n0.shown, `another provider: nothing: ${JSON.stringify(n0)}`);
+        for (const [pi, what] of [[{ found: true, signed_in: true }, 'signed in'], [{ found: true, probe: 'ok' }, 'the CLI could not say'], [{ found: false }, 'Pi is not installed']]) {
+            await remount(pi); await pick('pi'); await ev(`new Promise(r => setTimeout(r, 300))`); // sleep-ok: nothing appears; the probe answer is a resolved stub, a little time lets it land
+            n0 = await sn(); check(n0 && !n0.shown, `Pi ${what}: no notice: ${JSON.stringify(n0)}`);
+        }
         await ev(`document.getElementById('sn-host').remove(); true`);
         // (4) plain words
         const root = require('node:path').join(__dirname, '..', '..', 'coral-go', 'pkg', 'frontend', 'static'), read = f => require('node:fs').readFileSync(require('node:path').join(root, f), 'utf8'); // the sources that write the words
