@@ -2,13 +2,14 @@
  * by the delimiter and records by CRLF, LF or CR; a field that begins with a quote is quoted, may hold the delimiter, line breaks and "" (one quote), and ends at the next lone quote; a quote in the middle
  * of an unquoted field is just a character. What the RFC leaves open is decided here and said: a BOM at the start is dropped; a blank line is no record; a line break inside quotes is kept as "\n" whatever it
  * was; text after a closing quote up to the delimiter is kept as it is; an unterminated quote runs to the end of the text; a short or long record is kept as it is (the table pads). It never throws and never
- * reads more than `maxChars` characters (a larger text is cut at its last whole line and `cut` says so), and it stores at most `maxRows` records while still counting the rest. */
+ * reads more than `maxChars` characters (a larger text is cut at its last whole line and `cut` says so), and it stores at most `maxRows` records while still counting the rest, and at most `maxCols` fields of a record while still counting its width. */
 
 export const MAX_CHARS = 2 * 1024 * 1024; // the preview's own cap on text (artifact_preview.js)
 export const MAX_ROWS = 5000;
+export const MAX_COLS = 200;
 
-/** Parses `text`. Returns { rows: string[][], total, cut }: the stored records (the first `maxRows`), how many there were in all, and whether the text was cut at `maxChars`. */
-export function parseDelimited(text, { delimiter = ',', maxRows = Infinity, maxChars = MAX_CHARS } = {}) {
+/** Parses `text`. Returns { rows: string[][], total, cut, width }: the stored records (the first `maxRows`, each with at most `maxCols` fields), how many there were in all, whether the text was cut at `maxChars`, and the most fields any record had. */
+export function parseDelimited(text, { delimiter = ',', maxRows = Infinity, maxChars = MAX_CHARS, maxCols = Infinity } = {}) {
     let s = typeof text === 'string' ? text : String(text == null ? '' : text);
     let cut = false;
     if (s.length > maxChars) {
@@ -20,16 +21,17 @@ export function parseDelimited(text, { delimiter = ',', maxRows = Infinity, maxC
     if (s.charCodeAt(0) === 0xFEFF) s = s.slice(1);
     const delim = typeof delimiter === 'string' && delimiter.length === 1 && delimiter !== '"' && delimiter !== '\n' && delimiter !== '\r' ? delimiter : ',';
     const rows = [];
-    let total = 0, row = [], field = '', quoted = false, inQuotes = false, fieldStart = true;
-    const endField = () => { row.push(field.indexOf('\r') >= 0 ? field.replace(/\r\n?/g, '\n') : field); field = ''; quoted = false; fieldStart = true; };
+    let total = 0, row = [], count = 0, width = 0, field = '', quoted = false, inQuotes = false, fieldStart = true;
+    const endField = () => { count++; if (row.length < maxCols) row.push(field.indexOf('\r') >= 0 ? field.replace(/\r\n?/g, '\n') : field); field = ''; quoted = false; fieldStart = true; };
     const endRow = () => {
-        const blank = row.length === 0 && field === '' && !quoted; // nothing at all on the line
+        const blank = count === 0 && field === '' && !quoted; // nothing at all on the line
         if (!blank) {
             endField();
             total++;
+            if (count > width) width = count;
             if (rows.length < maxRows) rows.push(row);
         }
-        row = []; field = ''; quoted = false; fieldStart = true;
+        row = []; count = 0; field = ''; quoted = false; fieldStart = true;
     };
     for (let i = 0, n = s.length; i < n; i++) {
         const c = s[i];
@@ -48,8 +50,8 @@ export function parseDelimited(text, { delimiter = ',', maxRows = Infinity, maxC
         }
         field += c; fieldStart = false;
     }
-    if (field !== '' || row.length || quoted || inQuotes) endRow(); // the last record, with or without a line break after it; an open quote ends here
-    return { rows, total, cut };
+    if (field !== '' || count || quoted || inQuotes) endRow(); // the last record, with or without a line break after it; an open quote ends here
+    return { rows, total, cut, width };
 }
 
 /** The delimiter of a file: a tab for TSV; for CSV a semicolon when the header line has more of them than commas outside quotes (a European export), else a comma. */

@@ -1,7 +1,7 @@
 // The CSV and TSV parser of the artifact viewer's table (#11382): RFC 4180 by examples, the choices it makes where the RFC is silent, a round-trip fuzz (random tables written with proper quoting and random line
 // endings must come back as they went in) and a garbage fuzz (random strings of the characters that matter never throw and always give clean records), and the caps.
 import assert from 'node:assert/strict';
-import { parseDelimited, delimiterFor, numberOf, columnIsNumeric, MAX_ROWS } from '../../coral-go/pkg/frontend/static/csv_parse.js';
+import { parseDelimited, delimiterFor, numberOf, columnIsNumeric, MAX_ROWS, MAX_COLS } from '../../coral-go/pkg/frontend/static/csv_parse.js';
 
 const P = (t, o) => parseDelimited(t, o).rows;
 
@@ -61,6 +61,20 @@ const cutText = parseDelimited(long, { maxChars: 100 });
 assert.equal(cutText.cut, true, 'a text over the character cap is cut');
 assert.ok(cutText.rows.every(r => r.length === 2 && r[0] !== undefined), 'at a whole line');
 assert.ok(cutText.rows.length <= 100 / 4 + 1);
+
+// the column cap: a record keeps its first maxCols fields and still says how wide it was
+const wide = parseDelimited(Array.from({ length: 1000 }, (_, i) => i).join(',') + '\n1,2', { maxCols: MAX_COLS });
+assert.equal(wide.rows[0].length, MAX_COLS); assert.equal(wide.width, 1000); assert.equal(wide.rows[1].length, 2); assert.equal(wide.total, 2);
+assert.deepEqual(wide.rows[0].slice(-1), [String(MAX_COLS - 1)]);
+// a 2 MB single record of commas: no throw, capped, counted, and fast
+const t0 = Date.now();
+const commas = parseDelimited(','.repeat(2 * 1024 * 1024), { maxCols: MAX_COLS, maxRows: MAX_ROWS });
+assert.equal(commas.rows.length, 1); assert.equal(commas.rows[0].length, MAX_COLS); assert.ok(commas.width > 2 * 1024 * 1024 - 10, 'its true width is counted');
+assert.ok(Date.now() - t0 < 1000, `a 2 MB record of commas parses in under a second (${Date.now() - t0} ms)`);
+// 5,000 records of 400 fields: capped to 200 fields each
+const grid = Array.from({ length: 5000 }, () => 'x,'.repeat(399) + 'x').join('\n');
+const g = parseDelimited(grid, { maxCols: MAX_COLS, maxRows: MAX_ROWS });
+assert.ok(g.rows.every(r => r.length <= MAX_COLS) && g.width === 400);
 
 // a deterministic generator (a small LCG), so a failure is the same every run
 let seed = 20261030;

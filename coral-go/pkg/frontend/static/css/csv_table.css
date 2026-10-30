@@ -5,6 +5,8 @@
 .csv-status { margin: 0; color: var(--text-secondary); font-size: var(--fs-md); }
 .csv-scroll { min-width: 0; max-width: 100%; }
 .csv-raw { min-width: 0; max-width: 100%; overflow: auto; }
+.csv-nowrap { white-space: nowrap; }
+.csv-text { white-space: pre-line; overflow-wrap: anywhere; }
 .csv-long { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
 .csv-clamp { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 6; line-clamp: 6; overflow: hidden; overflow-wrap: anywhere; white-space: pre-wrap; }
 .csv-clamp.csv-clamp-open { display: block; -webkit-line-clamp: unset; line-clamp: unset; overflow: visible; }

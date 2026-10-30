@@ -64,6 +64,11 @@ const STUB = `(() => {
             check(at + 'a quoted note keeps its comma and its quotes, and a line break stays one', t[2][7] === 'He said "ship it", then left.' && t[3][7] === 'first line\nsecond line', JSON.stringify([t[2][7], t[3][7]]));
             check(at + 'a formula, a tag and an image with a handler are text as written, and do nothing', t[5][7] === '=HYPERLINK("http://example.invalid","click")' && t[6][7] === '<b>bold</b>' && t[7][7] === '<img src=x onerror="window.__pwned=1">' && t[8][7] === '@SUM(A1:A2)' && t[9][7] === '-5 and +7' && await ev(`window.__pwned === 0 && !document.querySelector('${V} .csv-scroll b') && !document.querySelector('${V} .csv-scroll img')`));
             check(at + 'a cell of 40 characters is wrapped, not cut with an ellipsis', await ev(`(() => { const td = [...document.querySelectorAll('${V} .csv-scroll tbody td')].find(c => c.textContent.startsWith('<img src=x')); const cs = getComputedStyle(td); return !!td && td.scrollWidth <= td.clientWidth + 1 && cs.whiteSpace !== 'nowrap' && td.getBoundingClientRect().height > 20; })()`));
+            const lines = await ev(`(() => { const cell = t => [...document.querySelectorAll('${V} .csv-scroll tbody td')].find(c => c.textContent.trim() === t); const h = n => Math.round(n.getBoundingClientRect().height), lh = parseFloat(getComputedStyle(cell('open') || cell('closed') || cell('blocked')).lineHeight) || 20;
+                const date = cell('2026-10-01'), id = cell('1'), note = [...document.querySelectorAll('${V} .csv-text')].find(n => n.textContent === 'first line\\nsecond line');
+                return { dateH: date ? h(date.firstElementChild || date) : -1, dateWS: date ? getComputedStyle(date.firstElementChild || date).whiteSpace : '', lh, noteWS: note ? getComputedStyle(note).whiteSpace : '', noteH: note ? h(note) : -1 }; })()`);
+            check(at + 'a date stays on one line (never broken at its hyphens)', lines.dateH > 0 && lines.dateH <= lines.lh * 1.5 && lines.dateWS === 'nowrap', JSON.stringify(lines));
+            check(at + 'a note\'s line break stays inside its cell, on two lines', lines.noteWS === 'pre-line' && lines.noteH >= lines.lh * 1.8, JSON.stringify(lines));
             const geo = await ev(`(() => { const s = document.querySelector('${V} .csv-scroll .dt-box'), th = s.querySelector('thead th'); s.scrollTop = 200; const a = th.getBoundingClientRect().top - s.getBoundingClientRect().top; return { sticky: Math.abs(a) <= 1, scrolls: s.scrollHeight > s.clientHeight, page: document.documentElement.scrollWidth <= document.documentElement.clientWidth, inner: s.scrollWidth > s.clientWidth }; })()`);
             check(at + 'the header sticks to the top of the table box when it scrolls', geo.scrolls && geo.sticky, JSON.stringify(geo));
             check(at + 'the page never scrolls sideways' + (view.phone ? ' (the table box does)' : ''), geo.page && (!view.phone || geo.inner), JSON.stringify(geo));
@@ -115,6 +120,16 @@ const STUB = `(() => {
         await waitFor(`document.querySelectorAll('${V} .csv-scroll tbody tr').length >= 100`, 'the big file drawn', 20000);
         const big = await ev(`({ status: document.querySelector('${V} .csv-status').textContent, rows: document.querySelectorAll('${V} .csv-scroll tbody tr').length })`);
         check('a file of 5,200 rows draws 5,000 and says so', big.rows === 5000 && big.status === 'Showing 5,000 of 5,200 rows.', JSON.stringify(big));
+        // wide and huge files render in under a second, with the caps in the status line: a 2 MB record of commas, and 5,000 rows of 400 columns
+        const timed = (text, label) => ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'csv_table.js'); const host = document.createElement('div'); document.body.append(host);
+            const t0 = performance.now(); m.renderCsvTable(host, ${JSON.stringify(text)}, { name: ${JSON.stringify(label)} }); const ms = performance.now() - t0;
+            const out = { ms: Math.round(ms), status: host.querySelector('.csv-status').textContent, cols: host.querySelectorAll('thead th').length, rows: host.querySelectorAll('tbody tr').length }; host.remove(); return out; })()`);
+        const commas = ',' .repeat(2 * 1024 * 1024);
+        const wideText = Array.from({ length: 5000 }, (_, i) => i === 0 ? Array.from({ length: 400 }, (_, j) => `h${j}`).join(',') : 'x,'.repeat(399) + 'x').join('\n');
+        const w1 = await timed(commas, 'commas.csv');
+        check('a 2 MB record of commas renders in under a second and says its columns are capped', w1.ms < 1000 && w1.rows === 0 && w1.status === 'No rows below the header. Showing the first 200 of 2,097,153 columns.', JSON.stringify(w1));
+        const w2 = await timed(wideText, 'wide.csv');
+        check('5,000 rows of 400 columns render in under a second, with 200 columns, at most 50,000 cells and both caps in the status', w2.ms < 1000 && w2.cols === 200 && w2.rows * w2.cols <= 50000 && w2.rows >= 100 && /Showing [\d,]+ of [\d,]+\+? rows/.test(w2.status) && /Showing the first 200 of 400 columns\./.test(w2.status), JSON.stringify(w2));
         await open({ w: 1280, h: 900, phone: false, theme: 'dark' }, TSV, 'x.tsv');
         const tsv = await cells();
         check('a TSV is split on tabs, and a tab inside quotes stays in its cell', tsv.length === 2 && tsv[0][1] === 'x\ty' && tsv[1][1] === 'z', JSON.stringify(tsv));
