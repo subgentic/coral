@@ -4,6 +4,7 @@
 // live list answered in the page. Run against an isolated dev server; set KILL_SHOT_DIR to save screenshots.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 const S = (id, over) => ({ session_id: 'sid-' + id, name: 'agent-' + id, display_name: 'Agent ' + id, agent_type: 'claude', working_directory: '/repo/' + id, status: 'idle', ...over });
 const SESSIONS = [
@@ -19,7 +20,7 @@ const SESSIONS = [
     const open = async (width, height, mobile) => {
         await Emulation.setDeviceMetricsOverride({ width, height, deviceScaleFactor: 1, mobile });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         // The page's own live list and kill endpoint are answered here; every other request is recorded and passes.
         await ev(`(async () => {
             const render = await import(${MOD} + 'render.js'); const { state } = await import(${MOD} + 'state.js');

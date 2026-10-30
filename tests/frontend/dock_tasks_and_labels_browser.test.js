@@ -11,6 +11,7 @@ const BASE = require('./test_base').BASE;
 const { openBoardTasksTab } = require('./helpers/board_tasks_tab');
 const { removeBoards } = require('./helpers/board_cleanup');
 const { setTheme } = require('./helpers/contrast');
+const { coralReady } = require('./helpers/wait');
 
 const B = 'dock-tasks-' + Date.now().toString(36);
 
@@ -21,11 +22,11 @@ const B = 'dock-tasks-' + Date.now().toString(36);
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         const api = (m, p, body) => ev(`fetch(${JSON.stringify(p)}, { method: ${JSON.stringify(m)}, headers: { 'Content-Type': 'application/json' }, body: ${JSON.stringify(JSON.stringify(body))} }).then(r => r.status)`);
         for (const [id, t] of [['Boss', 'Orchestrator'], ['dev-1', 'Developer']]) assert.equal(await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: id, job_title: t, session_name: id + '-s' }), 200);
         for (const [title, priority] of [['Ship the queue', 'high'], ['Write the docs', 'low'], ['Fix the focus ring', 'medium']]) assert.equal(await api('POST', `/api/board/${B}/tasks`, { subscriber_id: 'Boss', title, priority }), 201);
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         await openBoardTasksTab({ ev, waitFor }, B);
         await waitFor(`document.querySelectorAll('#board-task-list .board-task-item:not(.board-task-header)').length === 3 && document.getElementById('agentic-panel-tasks').getBoundingClientRect().width > 50`, 'three task rows', 15000);
 

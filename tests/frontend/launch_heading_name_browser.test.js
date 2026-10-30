@@ -4,6 +4,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { axName } = require('./helpers/ax_tree');
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -13,7 +14,7 @@ const { axName } = require('./helpers/ax_tree');
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.startup('liveList', 'settings')`);
+        await coralReady(ev, 'startup', 'liveList', 'settings');
         for (const [type, heading, title, back] of [['team', '#launch-team-title', 'New project', '#launch-step-team .launch-back-btn'], ['agent', '#launch-agent-title', 'New agent', '#launch-step-agent .launch-back-btn'], ['terminal', '#launch-step-terminal h3', 'Launch Terminal', '#launch-step-terminal .launch-back-btn']]) {
             await ev(`(async () => { await window.showLaunchModal(); window._selectLaunchType(${JSON.stringify(type)}); return true; })()`);
             await waitFor(`(() => { const e = document.querySelector(${JSON.stringify(heading)}); return !!e && e.getClientRects().length > 0; })()`, `${type}: the heading`, 8000);

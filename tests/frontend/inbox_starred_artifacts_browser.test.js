@@ -12,7 +12,7 @@ const ART = { id: HEX, name: 'screen.png', media_type: 'image/png', starred: tru
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
-    const { settle } = require('./helpers/wait').bind(ev);
+    const { settle, coralReady } = require('./helpers/wait').bind(ev);
     const shot = require('./helpers/scene_shots')(Page, 'inbox-starred');
     const stub = (chats, arts, starredCount) => ev(`(() => { const R = window.__qaFetch || (window.__qaFetch = window.fetch); window.__starRead = [];
         window.fetch = (u, o) => { const url = new URL(String(u), location.href), json = b => Promise.resolve(new Response(JSON.stringify(b), { status: 200, headers: { 'Content-Type': 'application/json' } }));
@@ -29,7 +29,7 @@ const ART = { id: HEX, name: 'screen.png', media_type: 'image/png', starred: tru
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [label, w, h, mobile] of [['1280', 1280, 800, false], ['390', 390, 844, true]]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
-            const fresh = async (chats, arts, starredCount) => { await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.startup('liveList', 'settings')`); await ev('window.__qaFetch = null; true'); await stub(chats, arts, starredCount);
+            const fresh = async (chats, arts, starredCount) => { await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady('startup', 'liveList', 'settings'); await ev('window.__qaFetch = null; true'); await stub(chats, arts, starredCount);
                 await ev(`window.switchNavTab('hub-inbox'); true`); await waitFor(`document.querySelectorAll('.view-list-item').length > 3 || !!document.querySelector('.view-list select')`, 'the folders', 10000); await openStarred(mobile); };
 
             console.log(`${label}: a starred chat and a starred artifact`);

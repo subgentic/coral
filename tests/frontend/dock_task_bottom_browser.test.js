@@ -6,6 +6,7 @@ const { openBoardTasksTab } = require('./helpers/board_tasks_tab');
 const { removeBoards } = require('./helpers/board_cleanup');
 const { setTheme } = require('./helpers/contrast');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 const board = 'task-bottom-' + Date.now().toString(36);
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -18,7 +19,7 @@ const board = 'task-bottom-' + Date.now().toString(36);
     };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         await ev(`(async () => { const api = (p, body) => fetch('/api/board/${board}' + p, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(r => { if (!r.ok) throw new Error('fixture: ' + r.status); });
             await api('/subscribe', { subscriber_id: 'Boss', job_title: 'Orchestrator' });
             for (let i = 1; i <= 6; i++) await api('/tasks', { subscriber_id: 'Boss', title: 'Bottom preview task ' + i, body: 'Keep the chat width and task list.', assigned_to: 'Boss' });
@@ -27,7 +28,7 @@ const board = 'task-bottom-' + Date.now().toString(36);
             try {
                 await Emulation.setDeviceMetricsOverride({ width, height: 900, deviceScaleFactor: 1, mobile: width === 390 });
                 await Emulation.setTouchEmulationEnabled({ enabled: width === 390 });
-                await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+                await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
                 await openBoardTasksTab({ ev, waitFor }, board);
                 await waitFor(`document.querySelectorAll('#board-task-list .board-task-open').length >= 6`, 'task rows');
                 const before = await ev(`(() => { window.__bottomOpener = document.querySelector('#board-task-list .board-task-open'); return { chat: document.querySelector('.live-left-column').getBoundingClientRect().width, url: location.pathname }; })()`);

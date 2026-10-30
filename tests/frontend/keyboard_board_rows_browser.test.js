@@ -5,6 +5,7 @@ const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
 const { axName } = require('./helpers/ax_tree');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -18,13 +19,13 @@ const BASE = require('./test_base').BASE;
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         for (const id of ['Orchestrator', 'QA Engineer', 'Backend Dev']) assert.equal((await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: id, job_title: id, session_name: id + '-s' })).status, 200);
         for (const [who, text] of [['QA Engineer', 'Review of the Inbox patch: approved with two small follow-ups. @Orchestrator #7740'], ['Backend Dev', 'Agreed, the count already follows the read. #7757'], ['Orchestrator', 'Fine. Please look at the plan when you can. #7809']]) assert.equal((await api('POST', `/api/board/${B}/messages`, { subscriber_id: who, content: text })).status, 200);
         for (const [tag, w, mobile] of [['1280', 1280, false], ['390', 390, true]]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: 800, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await ev(`try { localStorage.setItem('coral.board.view', 'table'); } catch {} true`);
-            await Page.navigate({ url: BASE + `/team/${B}/messages` }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+            await Page.navigate({ url: BASE + `/team/${B}/messages` }); await Page.loadEventFired(); await install(); await coralReady(ev);
             await waitFor(`document.querySelectorAll('#mb-messages > .mb-message').length >= 3`, `${tag}: the rows`, 15000); await new Promise(r => setTimeout(r, 400)); // sleep-ok: the rows settle
             await ev(`document.querySelectorAll('#mb-messages > .mb-message .mb-row-toggle')[1].setAttribute('data-axp', 'x'); true`);
             const ax = await axName(client, '[data-axp="x"]'); check(ax && ax.role === 'button' && /Backend Dev/.test(ax.name) && /Agreed/.test(ax.name), `${tag}: a row's toggle is a button named by its sender and the start of the message: ${JSON.stringify(ax)}`);

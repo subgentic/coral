@@ -3,6 +3,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -22,7 +23,7 @@ const BASE = require('./test_base').BASE;
         for (const [w, h] of [[390, 844], [320, 568]]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.startup('liveList', 'settings')`);
+            await coralReady(ev, 'startup', 'liveList', 'settings');
             await ev(`window.openAutomationsFolder('jobs'); true`);
             await waitFor(`document.querySelectorAll('#group-table-view button.dt-primary').length === 3`, `${w}: the three jobs`, 10000);
             await new Promise(r => setTimeout(r, 400)); // sleep-ok: the list draws

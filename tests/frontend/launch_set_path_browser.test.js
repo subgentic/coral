@@ -10,7 +10,7 @@ const BASE = require('./test_base').BASE;
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
-    const { settle } = require('./helpers/wait').bind(ev);
+    const { settle, coralReady } = require('./helpers/wait').bind(ev);
     const problems = [];
     const shot = async name => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(`${d}/${name}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     const STUB = `window.__cliFound = false; const real = window.fetch; window.fetch = (u, o = {}) => { const p = new URL(String(u), location.href); if (p.pathname === '/api/system/cli-check') return Promise.resolve(new Response(JSON.stringify(window.__cliFound ? { found: true, version: '1', status: 'available' } : { found: false, status: 'missing', agent_type: p.searchParams.get('type') }), { status: 200, headers: { 'Content-Type': 'application/json' } })); return real(u, o); }; true`;
@@ -23,7 +23,7 @@ const BASE = require('./test_base').BASE;
         for (const [w, h, mobile] of [[1280, 800, false], [390, 844, true]]) {
             const check = (ok, msg) => { if (!ok) problems.push(`${w}: ${msg}`); };
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`); await installNA(ev); await installNT(ev); await stubModels(ev);
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(); await installNA(ev); await installNT(ev); await stubModels(ev);
             await ev(`localStorage.setItem('coral-recent-dirs', JSON.stringify(['/work/payments-app'])); ${STUB}`);
             // New agent, step 3: the CLI warning
             await openNewAgent(ev, waitFor);
@@ -45,7 +45,7 @@ const BASE = require('./test_base').BASE;
                 check(await ev(`!!window.__na.dialog()`), 'New agent: the dialog is still there');
             }
             // New team, step 3: the reason line (a fresh page: the CLI check is cached for 30 s, and the one above said found)
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`); await installNA(ev); await installNT(ev); await stubModels(ev);
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(); await installNA(ev); await installNT(ev); await stubModels(ev);
             await ev(`localStorage.setItem('coral-recent-dirs', JSON.stringify(['/work/payments-app'])); ${STUB}`);
             await openNewTeam(ev, waitFor);
             await T(ev, waitFor).to(3, {});
