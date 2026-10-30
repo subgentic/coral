@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/coder/websocket"
@@ -31,7 +32,23 @@ type StreamTarget struct {
 	apiKey string
 	once   sync.Once
 	tr     *http.Transport
+	slots  chan struct{} // one per ssh process alive: the cap on streams
+	mu     sync.Mutex
+	failed time.Time // when a dial last failed: dials are refused for streamBackoff after it
 }
+
+// streamCap bounds the ssh processes one target keeps (the dashboard, the poller and the feed each hold a few); streamBackoff is how long dials are refused after one failed, so a dead host or a
+// refused key is not hit again for every request of every poll.
+const (
+	streamCap     = 12
+	streamBackoff = 3 * time.Second
+)
+
+// ErrStreamBusy and ErrStreamBackoff are the two ways a dial is refused before ssh is started.
+var (
+	ErrStreamBusy    = errors.New("sshprov: too many connections to this server")
+	ErrStreamBackoff = errors.New("sshprov: the last connection failed; waiting a moment")
+)
 
 // NewStreamTarget is the target for the remote server of t, listening on its loopback at port, reached with apiKey. The key stays in this value only; it is never put in argv.
 func NewStreamTarget(r Runner, t Target, port int, apiKey string) (*StreamTarget, error) {
@@ -44,7 +61,7 @@ func NewStreamTarget(r Runner, t Target, port int, apiKey string) (*StreamTarget
 	if t.Alias != "" && !aliasRe.MatchString(t.Alias) {
 		return nil, ErrBadTarget
 	}
-	return &StreamTarget{r: r, target: t, port: port, apiKey: apiKey}, nil
+	return &StreamTarget{r: r, target: t, port: port, apiKey: apiKey, slots: make(chan struct{}, streamCap)}, nil
 }
 
 func (s *StreamTarget) transport() *http.Transport {
@@ -95,12 +112,41 @@ func (s *StreamTarget) DialWS(ctx context.Context, path, rawQuery string, protoc
 // dial starts one `ssh -W` and returns its stdin and stdout as a connection. Closing it ends the process. The argv is fixed: the same options as the runner, then -W with the loopback address and
 // the validated port.
 func (s *StreamTarget) dial(ctx context.Context) (net.Conn, error) {
+	s.mu.Lock()
+	recent := !s.failed.IsZero() && time.Since(s.failed) < streamBackoff
+	s.mu.Unlock()
+	if recent {
+		return nil, ErrStreamBackoff
+	}
+	select {
+	case s.slots <- struct{}{}:
+	default:
+		return nil, ErrStreamBusy
+	}
+	conn, err := s.start(ctx)
+	if err != nil {
+		<-s.slots
+		s.noteFailure()
+		return nil, err
+	}
+	conn.release = func() { <-s.slots }
+	conn.onFail = s.noteFailure
+	return conn, nil
+}
+
+func (s *StreamTarget) noteFailure() {
+	s.mu.Lock()
+	s.failed = time.Now()
+	s.mu.Unlock()
+}
+
+func (s *StreamTarget) start(ctx context.Context) (*sshConn, error) {
 	ssh := s.r.SSH
 	if ssh == "" {
 		ssh = "ssh"
 	}
 	argv := append([]string{}, sshOptions...)
-	argv = append(argv, "-W", "127.0.0.1:"+strconv.Itoa(s.port))
+	argv = append(argv, "-o", "ServerAliveInterval=15", "-o", "ServerAliveCountMax=3", "-W", "127.0.0.1:"+strconv.Itoa(s.port))
 	argv = append(argv, s.target.Args()...)
 	argv = append(argv, "--", s.target.Destination())
 	cmd := executil.Command(context.WithoutCancel(ctx), ssh, argv...) // the stream outlives the dial's context; closing the conn ends it
@@ -120,22 +166,44 @@ func (s *StreamTarget) dial(ctx context.Context) (net.Conn, error) {
 }
 
 type sshConn struct {
-	cmd  *exec.Cmd
-	in   io.WriteCloser
-	out  io.ReadCloser
-	once sync.Once
+	cmd     *exec.Cmd
+	in      io.WriteCloser
+	out     io.ReadCloser
+	closing atomic.Bool
+	reaped  sync.Once
+	release func() // gives the stream's slot back, once the process is gone
+	onFail  func() // ssh could not connect (exit 255 before we closed it)
 }
 
-func (c *sshConn) Read(p []byte) (int, error)  { return c.out.Read(p) }
+// reap waits for the process once, gives the slot back, and tells the target when ssh itself failed.
+func (c *sshConn) reap() {
+	c.reaped.Do(func() {
+		err := c.cmd.Wait()
+		if c.release != nil {
+			c.release()
+		}
+		var ee interface{ ExitCode() int }
+		if err != nil && !c.closing.Load() && errors.As(err, &ee) && ee.ExitCode() == 255 && c.onFail != nil {
+			c.onFail()
+		}
+	})
+}
+
+func (c *sshConn) Read(p []byte) (int, error) {
+	n, err := c.out.Read(p)
+	if err != nil {
+		go c.reap() // the stream ended: collect the exit status (the pipe is drained or broken)
+	}
+	return n, err
+}
 func (c *sshConn) Write(p []byte) (int, error) { return c.in.Write(p) }
 func (c *sshConn) Close() error {
-	c.once.Do(func() {
-		c.in.Close()
-		if c.cmd.Process != nil {
-			c.cmd.Process.Kill()
-		}
-		go c.cmd.Wait()
-	})
+	c.closing.Store(true)
+	c.in.Close()
+	if c.cmd.Process != nil {
+		c.cmd.Process.Kill()
+	}
+	go c.reap()
 	return nil
 }
 func (c *sshConn) LocalAddr() net.Addr              { return streamAddr{} }

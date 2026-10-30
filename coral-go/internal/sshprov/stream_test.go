@@ -2,6 +2,7 @@ package sshprov
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net"
 	"net/http"
@@ -12,6 +13,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/coder/websocket"
 	"github.com/go-chi/chi/v5"
@@ -216,6 +218,88 @@ func TestNewStreamTargetRefusesWhatItCannotUse(t *testing.T) {
 	}{{tg, 0, "k"}, {tg, 70000, "k"}, {tg, 8420, ""}, {Target{User: "x y", Host: "box", Port: 22}, 8420, "k"}, {Target{Alias: "-oProxyCommand=x"}, 8420, "k"}} {
 		if _, err := NewStreamTarget(Runner{}, c.t, c.port, c.key); err == nil {
 			t.Errorf("accepted %+v %d %q", c.t, c.port, c.key)
+		}
+	}
+}
+
+func TestStreamTargetCapsConnectionsAndBacksOffAfterAFailedDial(t *testing.T) {
+	dir := t.TempDir()
+	hold := filepath.Join(dir, "ssh")
+	if err := os.WriteFile(hold, []byte("#!/bin/sh\nexec sleep 30\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	tg, _ := ParseTarget("rich@box.example.com")
+	st, _ := NewStreamTarget(Runner{SSH: hold}, tg, 8420, streamKey)
+	var conns []net.Conn
+	for i := 0; i < streamCap; i++ {
+		c, err := st.dial(context.Background())
+		if err != nil {
+			t.Fatalf("dial %d: %v", i, err)
+		}
+		conns = append(conns, c)
+	}
+	if _, err := st.dial(context.Background()); !errors.Is(err, ErrStreamBusy) {
+		t.Errorf("past the cap: %v", err)
+	}
+	conns[0].Close()
+	deadline := time.Now().Add(5 * time.Second)
+	var c net.Conn
+	var err error
+	for time.Now().Before(deadline) { // the slot comes back when the process is gone
+		if c, err = st.dial(context.Background()); err == nil {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if err != nil {
+		t.Fatalf("a closed stream did not give its slot back: %v", err)
+	}
+	conns = append(conns[1:], c)
+	for _, c := range conns {
+		c.Close()
+	}
+
+	fail := filepath.Join(dir, "ssh-fail")
+	if err := os.WriteFile(fail, []byte("#!/bin/sh\necho 'Connection refused' >&2\nexit 255\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	bad, _ := NewStreamTarget(Runner{SSH: fail}, tg, 8420, streamKey)
+	fc, err := bad.dial(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	io.ReadAll(fc) // ssh exits 255 at once: the read ends and the failure is noted
+	time.Sleep(200 * time.Millisecond)
+	if _, err := bad.dial(context.Background()); !errors.Is(err, ErrStreamBackoff) {
+		t.Errorf("right after a failed connection: %v", err)
+	}
+	bad.mu.Lock()
+	bad.failed = time.Now().Add(-streamBackoff - time.Second)
+	bad.mu.Unlock()
+	if c, err := bad.dial(context.Background()); err != nil {
+		t.Errorf("after the backoff: %v", err)
+	} else {
+		c.Close()
+	}
+}
+
+func TestStreamArgvHasKeepAlive(t *testing.T) {
+	remote := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { io.WriteString(w, "ok") }))
+	defer remote.Close()
+	ssh, log := fakeSSHW(t)
+	tg, _ := ParseTarget("rich@box.example.com")
+	st, _ := NewStreamTarget(Runner{SSH: ssh}, tg, portOf(t, remote), streamKey)
+	defer st.Close()
+	req, _ := http.NewRequest("GET", "http://x.invalid/api/health", nil)
+	resp, err := st.RoundTrip(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	b, _ := os.ReadFile(log)
+	for _, want := range []string{"ServerAliveInterval=15", "ServerAliveCountMax=3"} {
+		if !strings.Contains(string(b), want) {
+			t.Errorf("argv lacks %q:\n%s", want, b)
 		}
 	}
 }

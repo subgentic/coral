@@ -205,22 +205,22 @@ func TestScanAliasReadsTheKeyIntoAFreshTempFileAndDeletesIt(t *testing.T) {
 	dir := t.TempDir()
 	log := filepath.Join(dir, "argv")
 	tmpSeen := filepath.Join(dir, "tmpfile")
-	script := "#!/bin/sh\nfor a in \"$@\"; do printf '%s\\n' \"$a\" >> '" + log + "'; case \"$a\" in UserKnownHostsFile=*) f=\"${a#UserKnownHostsFile=}\"; printf '%s' \"$f\" > '" + tmpSeen + "'; printf 'build.internal ssh-ed25519 " + ed + "\\n' > \"$f\";; esac; done\nexit 0\n"
+	script := "#!/bin/sh\nfor a in \"$@\"; do printf '%s\\n' \"$a\" >> '" + log + "'; case \"$a\" in UserKnownHostsFile=*) f=\"${a#UserKnownHostsFile=}\"; printf '%s' \"$f\" > '" + tmpSeen + "'; printf 'build.internal ssh-ed25519 " + ed + "\\n' > \"$f\";; esac; done\nexit 255\n"
 	ssh := filepath.Join(dir, "ssh")
 	if err := os.WriteFile(ssh, []byte(script), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	tg, _ := FromAlias("build-box")
-	k, err := (Runner{SSH: ssh}).ScanAlias(context.Background(), tg)
-	if err != nil || k.Fingerprint != fp || k.Host != "build.internal" || k.Type != "ssh-ed25519" {
-		t.Fatalf("ScanAlias = %+v, %v", k, err)
+	keys, err := (Runner{SSH: ssh}).ScanAlias(context.Background(), tg)
+	if err != nil || len(keys) != 1 || keys[0].Fingerprint != fp || keys[0].Host != "build.internal" || keys[0].Type != "ssh-ed25519" {
+		t.Fatalf("ScanAlias = %+v, %v", keys, err)
 	}
 	b, _ := os.ReadFile(log)
 	argv := string(b)
 	if strings.Count(argv, "StrictHostKeyChecking=") != 1 || !strings.Contains(argv, "StrictHostKeyChecking=no") {
 		t.Errorf("exactly one StrictHostKeyChecking, and it is no (into the temp file):\n%s", argv)
 	}
-	for _, want := range []string{"GlobalKnownHostsFile=/dev/null", "HashKnownHosts=no", "BatchMode=yes", "--\nbuild-box\ntrue\n"} {
+	for _, want := range []string{"GlobalKnownHostsFile=/dev/null", "HashKnownHosts=no", "BatchMode=yes", "PreferredAuthentications=none", "PubkeyAuthentication=no", "IdentityAgent=none", "--\nbuild-box\ntrue\n"} {
 		if !strings.Contains(argv, want) {
 			t.Errorf("argv lacks %q:\n%s", want, argv)
 		}
@@ -234,5 +234,29 @@ func TestScanAliasReadsTheKeyIntoAFreshTempFileAndDeletesIt(t *testing.T) {
 	}
 	if _, err := (Runner{SSH: ssh}).ScanAlias(context.Background(), Target{User: "u", Host: "h", Port: 22}); err == nil {
 		t.Error("ScanAlias took a target that is not an alias")
+	}
+}
+
+func TestScanAliasReturnsEveryHostOfAJumpPathAndNothingElse(t *testing.T) {
+	jump, jfp := blobFor("ssh-ed25519", 4)
+	dest, dfp := blobFor("ssh-ed25519", 5)
+	rsa, _ := blobFor("ssh-rsa", 6)
+	dir := t.TempDir()
+	script := "#!/bin/sh\nfor a in \"$@\"; do case \"$a\" in UserKnownHostsFile=*) f=\"${a#UserKnownHostsFile=}\"; printf 'jump.example.com ssh-ed25519 " + jump + "\\ninner.example.com ssh-rsa " + rsa + "\\ninner.example.com ssh-ed25519 " + dest + "\\n' > \"$f\";; esac; done\nexit 255\n"
+	ssh := filepath.Join(dir, "ssh")
+	if err := os.WriteFile(ssh, []byte(script), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	tg, _ := FromAlias("inner")
+	keys, err := (Runner{SSH: ssh}).ScanAlias(context.Background(), tg)
+	if err != nil || len(keys) != 2 || keys[0].Host != "inner.example.com" || keys[0].Fingerprint != dfp || keys[1].Host != "jump.example.com" || keys[1].Fingerprint != jfp {
+		t.Fatalf("ScanAlias = %+v, %v", keys, err)
+	}
+	empty := filepath.Join(dir, "ssh2")
+	if err := os.WriteFile(empty, []byte("#!/bin/sh\nexit 255\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := (Runner{SSH: empty}).ScanAlias(context.Background(), tg); !errors.Is(err, ErrHostKeyScan) {
+		t.Errorf("no stored key: %v", err)
 	}
 }

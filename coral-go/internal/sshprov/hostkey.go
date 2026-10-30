@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -205,15 +206,17 @@ func Trust(path string, k HostKey) error {
 }
 
 // ScanAlias is the host-key step for a Host name of the owner's SSH config, where the real host, port, jump hosts and key file are the config's business (not ours to resolve). After the owner has
-// confirmed they want to connect, ONE ssh runs `true` with StrictHostKeyChecking=no into a FRESH temporary known_hosts file (never the owner's), and the key it stored there is parsed strictly,
-// the file deleted, and the key returned to be shown. Trust then writes that key, and every later connection is strict. Hashing is off so the stored name is readable.
-func (r Runner) ScanAlias(ctx context.Context, t Target) (HostKey, error) {
+// confirmed they want to connect, ONE ssh runs into a FRESH temporary known_hosts file (never the owner's) with StrictHostKeyChecking=no, and the key it stored there is parsed strictly, the file
+// deleted, and the keys returned to be shown. ssh stores the key before it authenticates, and the scan offers NO credential (no password, no key, no agent), so it never signs in to a host nobody
+// has verified yet: the connection is refused after the key exchange and the non-zero exit is expected. Trust then writes each key the owner confirmed, and every later connection is strict.
+// Hashing is off so the stored name is readable. A ProxyJump chain stores one key per host: ALL of them are returned (one per host, its best type), and the caller confirms and trusts each.
+func (r Runner) ScanAlias(ctx context.Context, t Target) ([]HostKey, error) {
 	if t.Alias == "" || !aliasRe.MatchString(t.Alias) {
-		return HostKey{}, errors.Join(ErrHostKeyScan, ErrBadTarget)
+		return nil, errors.Join(ErrHostKeyScan, ErrBadTarget)
 	}
 	dir, err := os.MkdirTemp("", "coral-hostkey-")
 	if err != nil {
-		return HostKey{}, err
+		return nil, err
 	}
 	defer os.RemoveAll(dir)
 	tmp := filepath.Join(dir, "known_hosts")
@@ -221,48 +224,60 @@ func (r Runner) ScanAlias(ctx context.Context, t Target) (HostKey, error) {
 	if ssh == "" {
 		ssh = "ssh"
 	}
-	argv := append([]string{}, sshOptions...)
+	argv := withoutStrict(append([]string{}, sshOptions...))
 	argv = append(argv, "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile="+tmp, "-o", "GlobalKnownHostsFile=/dev/null", "-o", "HashKnownHosts=no", "-o", "CheckHostIP=no",
+		"-o", "PreferredAuthentications=none", "-o", "PubkeyAuthentication=no", "-o", "IdentityAgent=none", "-o", "IdentitiesOnly=yes",
 		"--", t.Destination(), "true")
-	// The options above come after sshOptions on purpose: ssh takes the FIRST value of an option, so StrictHostKeyChecking=yes in sshOptions would win. Build the list with the relaxed one only.
-	argv = withoutStrict(argv)
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	cmd := executil.Command(ctx, ssh, argv...)
 	var out, errOut capped
 	cmd.Stdout, cmd.Stderr, cmd.Stdin, cmd.Env = &out, &errOut, nil, minimalEnv()
-	if err := cmd.Run(); err != nil {
-		return HostKey{}, fmt.Errorf("%w: could not connect to read the key", ErrHostKeyScan)
-	}
+	_ = cmd.Run() // a refusal to sign in is the expected end; what matters is what was stored
 	data, err := os.ReadFile(tmp)
 	if err != nil {
-		return HostKey{}, fmt.Errorf("%w: no key was stored", ErrHostKeyScan)
+		return nil, fmt.Errorf("%w: no key was stored", ErrHostKeyScan)
 	}
-	best := -1
-	var pick HostKey
+	best := map[string]int{}
+	pick := map[string]HostKey{}
 	for _, line := range strings.Split(string(data), "\n") {
 		if strings.TrimSpace(line) == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
 		name, _, _ := strings.Cut(line, " ")
 		if !knownNameRe.MatchString(name) {
-			return HostKey{}, fmt.Errorf("%w: unexpected stored key", ErrHostKeyScan)
+			return nil, fmt.Errorf("%w: unexpected stored key", ErrHostKeyScan)
 		}
 		k, ok := parseKeyLine(line, name)
 		if !ok {
-			return HostKey{}, fmt.Errorf("%w: unexpected stored key", ErrHostKeyScan)
+			return nil, fmt.Errorf("%w: unexpected stored key", ErrHostKeyScan)
 		}
 		for rank, kt := range keyTypes {
-			if kt == k.Type && (best < 0 || rank < best) {
-				best, pick = rank, k
+			if cur, seen := best[name]; kt == k.Type && (!seen || rank < cur) {
+				best[name], pick[name] = rank, k
 			}
 		}
 	}
-	if best < 0 {
-		return HostKey{}, fmt.Errorf("%w: no key of a type Coral accepts", ErrHostKeyScan)
+	if len(pick) == 0 {
+		return nil, fmt.Errorf("%w: no key of a type Coral accepts", ErrHostKeyScan)
 	}
-	return pick, nil
+	if len(pick) > maxAliasHosts {
+		return nil, fmt.Errorf("%w: too many hosts in the path", ErrHostKeyScan)
+	}
+	names := make([]string, 0, len(pick))
+	for n := range pick {
+		names = append(names, n)
+	}
+	sort.Strings(names)
+	keys := make([]HostKey, 0, len(names))
+	for _, n := range names {
+		keys = append(keys, pick[n])
+	}
+	return keys, nil
 }
+
+// maxAliasHosts bounds the hosts of one alias's path (the target and its jump hosts).
+const maxAliasHosts = 4
 
 // withoutStrict removes the "-o StrictHostKeyChecking=yes" pair of sshOptions, for the one ssh that reads a key into a temporary file.
 func withoutStrict(argv []string) []string {
