@@ -29,6 +29,10 @@ const { removeBoards } = require('./helpers/board_cleanup');
             console.log(`   ${fs}: ` + JSON.stringify(m));
             { const d = process.env.CORAL_SCREENSHOT_DIR; if (d) { require('node:fs').mkdirSync(d, { recursive: true }); require('node:fs').writeFileSync(`${d}/members-${fs}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); } }
             assert.deepEqual(m.cut, [], `${fs}: no name is cut: ` + JSON.stringify(m));
+            { // the Chat cell holds its button whole: no ellipsis beside it, the button inside the cell (the Mobile Beta Tester's stray "…", #11142)
+                const c = await ev(`[...document.querySelectorAll('#team-panel-agents tbody tr')].map(tr => { const td = tr.querySelector('td:has(.team-open-chat)'), b = td && td.querySelector('.team-open-chat'); if (!td || !b) return null; const t = td.getBoundingClientRect(), r = b.getBoundingClientRect(); return { cellW: Math.round(t.width), btnW: Math.round(r.width), inside: r.left >= t.left - 0.5 && r.right <= t.right + 0.5, clipped: td.scrollWidth > td.clientWidth + 1, ellipsis: getComputedStyle(td).textOverflow === 'ellipsis' && td.scrollWidth > td.clientWidth }; })`);
+                assert.ok(c.length >= 3 && c.every(x => x && x.inside && !x.clipped && !x.ellipsis), `${fs}: the Open chat button is whole inside its cell and nothing is clipped (no stray ellipsis): ` + JSON.stringify(c));
+            }
             assert.equal(await ev(`!!document.querySelector('#team-panel-agents thead th[data-key="search"]')`), false, `${fs}: no Search column while every member is at own (an empty one was clipped at the table's edge as a stray "…")`);
             assert.equal(await ev(`[...document.querySelectorAll('#team-panel-agents .team-open-chat')].length`) > 0, true, `${fs}: the Chat column is there`);
             assert.ok(m.cellsRight <= m.boxRight + 1 && m.scroll <= 1 && m.page <= 0, `${fs}: the table fits the screen (no cell past its box, nothing scrolls sideways): ` + JSON.stringify(m));

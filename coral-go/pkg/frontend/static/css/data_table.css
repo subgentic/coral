@@ -188,6 +188,7 @@
 .dt-progress-meter::-moz-progress-bar { background: var(--table-progress-fill); }
 
 .dt-table .dt-action { margin: 0; white-space: nowrap; }
+.dt-table td:has(> .dt-action) { overflow: visible; text-overflow: clip; } /* a cell that holds a button never clips it or draws an ellipsis beside it: Open chat was 8 px wider than its 7rem cell's content box and a stray ellipsis stood at its right (#11142) */
 .dt-box.dt-folded .dt-action { min-height: var(--table-touch); }
 
 .dt-note { max-width: 100%; box-sizing: border-box; white-space: normal; overflow-wrap: anywhere; font-size: var(--table-tertiary-size); font-weight: var(--table-tertiary-weight); }
