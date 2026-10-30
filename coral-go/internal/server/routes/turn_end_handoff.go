@@ -61,6 +61,12 @@ func (h *SessionsHandler) TurnEndHandoff(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	board := *ls.BoardName
+	if h.boardHandler != nil && h.boardHandler.IsPaused(board) {
+		// A paused board delivers nothing to read, so "N new messages, run coral-board read" at every turn end was a loop that led nowhere (#11198): they wait for the board to be resumed.
+		slog.Info("turn-end hand-off held: the board is paused", "session", owner.SessionName, "board", board)
+		writeJSON(w, http.StatusOK, none)
+		return
+	}
 	counts, err := h.bs.GetUnreadCountsForSessions(ctx, []string{owner.SessionName})
 	unread := counts[owner.SessionName]
 	if err != nil || unread <= 0 {

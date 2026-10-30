@@ -346,6 +346,10 @@ func cmdRead() {
 			fmt.Fprintf(os.Stderr, "Message #%d not found.\n", r.messageID)
 			clierr.Exit1()
 		}
+		if boardPaused {
+			fmt.Printf("This board is paused: no messages are delivered until it is resumed (the Operator resumes it from the dashboard). Nothing was marked read.\n")
+			return
+		}
 		fmt.Println("No new messages.")
 		if !r.asJSON {
 			goalsNoticeOnRead(st)
@@ -521,6 +525,9 @@ func cmdCheck() {
 		fmt.Printf("%.0f\n", unread)
 	} else {
 		fmt.Printf("%.0f unread message(s) on '%s'\n", unread, st.Project)
+		if paused, _ := result["paused"].(bool); paused {
+			fmt.Println("This board is paused: read delivers none of them until it is resumed (the Operator resumes it from the dashboard).")
+		}
 	}
 }
 

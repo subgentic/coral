@@ -397,3 +397,38 @@ func TestTurnEndHandoffOnlyForClaudeAndPi(t *testing.T) {
 		assert.Equal(t, c.want, out["handoff"], "%s: hand-off %v with one unread message (%v)", c.agent, c.want, out)
 	}
 }
+
+// #11198: on a paused board read delivers nothing, so the hand-off ("N new messages, run coral-board read") held at every turn end led nowhere: it waits until the board is resumed.
+func TestTurnEndHandoffWaitsWhileTheBoardIsPaused(t *testing.T) {
+	server, h, _, ss := setupSessionsTestServer(t)
+	ctx := context.Background()
+	sid := "eeeeeeee-11198-1b00-0000-000000000001"
+	name := "claude-" + sid
+	board := "team-11198"
+	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: sid, AgentType: "claude", AgentName: "echo", WorkingDir: "/w", BoardName: &board}))
+	tok := agentToken(t, h, sid, name)
+	_, err := h.bs.Subscribe(ctx, board, "Worker", "Worker", name, nil, "all")
+	require.NoError(t, err)
+	_, err = h.bs.Subscribe(ctx, board, "Lead", "Lead", "", nil, "all")
+	require.NoError(t, err)
+	bh := NewBoardHandler(h.bs)
+	t.Cleanup(bh.WaitBackground)
+	h.SetBoardHandler(bh)
+	_, err = h.bs.PostMessage(ctx, board, "Lead", "@Worker please review #12", nil)
+	require.NoError(t, err)
+	ask := func() map[string]any {
+		req, _ := http.NewRequest("POST", server.URL+"/api/sessions/live/echo/turn-end", strings.NewReader(`{}`))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set(store.SessionTokenHeader, tok)
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		var out map[string]any
+		_ = json.NewDecoder(resp.Body).Decode(&out)
+		return out
+	}
+	bh.SetPaused(board, true)
+	assert.Equal(t, false, ask()["handoff"], "a paused board hands nothing over: read would deliver none of it")
+	bh.SetPaused(board, false)
+	assert.Equal(t, true, ask()["handoff"], "resumed: the messages that waited are handed over")
+}
