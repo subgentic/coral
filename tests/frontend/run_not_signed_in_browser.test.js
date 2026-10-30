@@ -4,6 +4,7 @@
 // no such code, or a code this build does not know, is shown as before (its error_msg). Against stubbed APIs; run against an isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 const T0 = '2026-10-20T10:00:00Z', T1 = '2026-10-20T10:00:01Z';
 const run = (id, over = {}) => ({ id, workflow_id: 7, workflow_name: 'Nightly', status: 'failed', trigger_type: 'schedule', started_at: T0, finished_at: T1, error_msg: 'Claude is not signed in', error_code: 'not_signed_in', agent_type: 'claude',
@@ -21,7 +22,7 @@ const JOB = { id: 5, name: 'Nightly review', enabled: true, cron_expr: '0 3 * * 
         await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await ev(`(() => { const R = window.fetch; const json = (b, status = 200) => Promise.resolve(new Response(JSON.stringify(b), { status, headers: { 'content-type': 'application/json' } }));
             const RUNS = ${JSON.stringify(RUNS)}, JOB = ${JSON.stringify(JOB)};
             window.fetch = (u, o = {}) => { const p = new URL(String(u && u.url || u), location.origin).pathname; const m = (o.method || 'GET').toUpperCase();

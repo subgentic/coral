@@ -14,11 +14,11 @@ const BACKS = '.group-table-back, .inbox-phone-back, .wf-phone-back, .sched-back
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const S = `(window.__coralStatic || '/static/')`;
-    const results = []; const { settle } = require('./helpers/wait').bind(ev); const TEAM = `qa-way-${Date.now() % 100000}`;
+    const results = []; const { settle, coralReady } = require('./helpers/wait').bind(ev); const TEAM = `qa-way-${Date.now() % 100000}`;
     const scene = async (name, to, view, setup) => {
         if (process.env.QA_ONLY && !name.includes(process.env.QA_ONLY)) return;
         try {
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady();
             await setup();
             await waitFor(`(() => { const v = document.querySelector(${JSON.stringify(view)}); return !!v && v.getClientRects().length > 0; })()`, 'the page on screen', 8000).catch(() => {}); // a page drawn into a hidden container is shown a task later: on a loaded runner the way back was measured before it was laid out (0x0, #11203); a page that never shows is still reported below
             const g = await ev(`(() => { const v = document.querySelector(${JSON.stringify(view)}); if (!v) return { err: 'no view ' + ${JSON.stringify(view)} };
@@ -48,7 +48,7 @@ const BACKS = '.group-table-back, .inbox-phone-back, .wf-phone-back, .sched-back
         await scene('Team: a task page', 'Tasks', 'body', async () => { await team('Tasks'); await ev(`document.querySelector('#team-panel-tasks .dt-primary').click(); true`); await waitFor(`!!document.querySelector('#team-panel-item #team-task-title')`, 'the task page', 10000); });
         await scene('Team: a goal page', 'Goals', 'body', async () => { await team('Goals'); await ev(`document.querySelector('#team-panel-goals .team-row-btn, #team-panel-goals tbody button').click(); true`); await waitFor(`!!document.querySelector('.goals-page .goals-back, #team-panel-item .goals-back, .goal-page .goals-back')`, 'the goal page', 10000); });
         // the Inbox's goal page (#8702): a real goal of the team seeded above, opened at its own address; the way back is beside the title, the team link under them
-        await scene('Inbox: a goal page', 'Goals', '#inbox-page', async () => { await team('Goals'); const goals = await ev(`fetch('/api/board/${TEAM}/goals?state=proposed,active,blocked,done,dropped').then(r => r.json()).then(j => (Array.isArray(j) ? j : j.goals || []).map(g => g.id))`); assert.ok(goals.length, 'a seeded goal'); await Page.navigate({ url: BASE + `/inbox/goals/${TEAM}/${goals[0]}` }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`); await waitFor(`!!document.querySelector('#inbox-page #goals-detail-title')`, 'the goal page', 15000); });
+        await scene('Inbox: a goal page', 'Goals', '#inbox-page', async () => { await team('Goals'); const goals = await ev(`fetch('/api/board/${TEAM}/goals?state=proposed,active,blocked,done,dropped').then(r => r.json()).then(j => (Array.isArray(j) ? j : j.goals || []).map(g => g.id))`); assert.ok(goals.length, 'a seeded goal'); await Page.navigate({ url: BASE + `/inbox/goals/${TEAM}/${goals[0]}` }); await Page.loadEventFired(); await install(); await coralReady('startup', 'liveList', 'liveListLoaded', 'settings'); await waitFor(`!!document.querySelector('#inbox-page #goals-detail-title')`, 'the goal page', 15000); });
         const want = r => `\u2190 ${r.to}`;
         const bad = results.filter(r => r.err || (r.backs && r.backs.length !== 1) || r.text !== want(r) || r.font !== '13px 500' || r.border !== 'none' || r.bg !== 'rgba(0, 0, 0, 0)' || !r.beside);
         const colours = new Set(results.filter(r => !r.err).map(r => r.color));

@@ -5,6 +5,7 @@
 // Run against an isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 const NOW = new Date().toISOString();
 const SERVERS = [
@@ -20,7 +21,7 @@ const SERVERS = [
         await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await ev(`T.state.hub = true; T.state.cloud = true; T.state.servers = ${JSON.stringify(SERVERS)}; T.state.liveSessions = []; window.__m.agents = {};
             window.__m.add('a-m1', 'S', 3, { sleeping: false, server: 'm1' }); T.render.renderLiveSessions(T.state.liveSessions); true`);
         const measure = () => ev(`(() => { const h = [...document.querySelectorAll('.mobile-list-header')].find(x => x.getClientRects().length);

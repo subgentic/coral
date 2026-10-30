@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const { FOLDER_ROWS } = require('./helpers/folder_rows');
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, ev, waitFor, PRELOAD, install } = await connect();
@@ -12,7 +13,7 @@ const { FOLDER_ROWS } = require('./helpers/folder_rows');
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.startup('liveList', 'settings')`);
+        await coralReady(ev, 'startup', 'liveList', 'settings');
 
         // ── (3) All chats while the first index pass is going ──
         const ROW = { session_id: 'past-1', source_type: 'claude', agent_name: '', display_name: '', summary: 'An old chat', last_timestamp: '2026-10-20T10:00:00Z', duration_sec: 60, message_count: 3, starred: false, archived: false, active: false };

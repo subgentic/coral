@@ -6,6 +6,7 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { OPEN_INBOX_SAVED } = require('./helpers/open_inbox_saved');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, sleep, PRELOAD, install } = await connect();
@@ -25,14 +26,14 @@ const BASE = require('./test_base').BASE;
         await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
         await ev(`localStorage.removeItem('coral.inbox.tab'); true`);
-        await ev(`window.__coralReady.startup('liveList', 'inbox')`).catch(() => {}); await sleep(1000); // sleep-ok: the frame sampler records for a fixed window and the page settles after a navigation: no event to wait for
+        await coralReady(ev, 'startup', 'liveList', 'inbox').catch(() => {}); await sleep(1000); // sleep-ok: the frame sampler records for a fixed window and the page settles after a navigation: no event to wait for
         if (start) { await ev(`window.switchNavTab('hub-inbox'); true`); await sleep(500); await ev(`import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab('${start}')).then(() => true)`); await sleep(500); await ev(`window.switchNavTab('agents'); true`); await sleep(300); } // sleep-ok: the frame sampler records for a fixed window and the page settles after a navigation: no event to wait for
         if (start === 'needs' || !start) await ev(`window.switchNavTab('agents'); true`);
     };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         for (const it of (await api('GET', '/api/saved')).body.items) await api('DELETE', `/api/saved/${it.id}`);
         for (let i = 1; i <= 30; i++) { const r = await api('POST', '/api/saved', { kind: 'agent', ref: 'sv-a', key: i.toString(16).padStart(20, '0'), agent_type: 'claude', title: 'sv-a', snippet: `A message kept for later, number ${i}`, said_at: '2026-10-17T08:00:00Z' }); assert.equal(r.status, 200, JSON.stringify(r)); }
 

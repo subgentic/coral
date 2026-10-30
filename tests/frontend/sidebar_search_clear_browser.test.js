@@ -8,11 +8,11 @@ const BASE = require('./test_base').BASE;
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
-    const { settle } = require('./helpers/wait').bind(ev);
+    const { settle, coralReady } = require('./helpers/wait').bind(ev);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady();
         await ev(`window.__m.add('qa-bot', 'A', 3, { sleeping: false }); true`);
         await ev(`(async () => { const ws = await import((window.__coralStatic || '/static/') + 'websocket.js'); const render = await import((window.__coralStatic || '/static/') + 'render.js'); const { state } = await import((window.__coralStatic || '/static/') + 'state.js'); if (state.coralWs) { state.coralWs.onclose = null; state.coralWs.onmessage = null; try { state.coralWs.close(); } catch {} } ws.handleCoralMessage({ type: 'coral_update', servers: [], sessions: Object.values(window.__m.agents).map(a => window.__m.entry(a)) }); render.flushLiveSessionsRender(); render.renderLiveSessions(state.liveSessions); return true; })()`);
         await waitFor(`document.querySelectorAll('#live-sessions-list .session-group-item').length > 0`, 'the agents', 8000);

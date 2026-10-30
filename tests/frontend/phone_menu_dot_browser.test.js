@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const { axName } = require('./helpers/ax_tree');
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -18,7 +19,7 @@ const { axName } = require('./helpers/ax_tree');
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+        await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
         await waiting(0);
         await waitFor(`!([...document.querySelectorAll('#top-menu-btn, .phone-menu-btn')].find(e => e.getClientRects().length) || document.getElementById('top-menu-btn')).hasAttribute('data-waiting') && getComputedStyle(([...document.querySelectorAll('#top-menu-btn, .phone-menu-btn')].find(e => e.getClientRects().length) || document.getElementById('top-menu-btn'))).display !== 'none'`, 'the phone bar with nothing waiting', 6000);
         const none = await bar(), noneName = await (async () => { await ev(`${MENU_JS}.setAttribute('data-axm', '1'); true`); return axName(client, '[data-axm]'); })();

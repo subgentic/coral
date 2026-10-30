@@ -13,7 +13,7 @@ const VIEWS = [['1280x800', 1280, 800, false, false], ['390x844', 390, 844, true
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
-    const { settle } = require('./helpers/wait').bind(ev);
+    const { settle, coralReady } = require('./helpers/wait').bind(ev);
     const S = scenarios(); const t = T(ev, waitFor);
     const gitDir = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'qa-team-git-')); execFileSync('git', ['init', '-q', gitDir]);
     const same = (a, b, what) => { assert.ok(a && b, `${what}: the dialog is open`); for (const k of ['x', 'y', 'w', 'h']) assert.ok(Math.abs(a[k] - b[k]) <= 0.5, `${what}: dialog ${k} changed from ${a[k]} to ${b[k]}`); };
@@ -23,7 +23,7 @@ const VIEWS = [['1280x800', 1280, 800, false, false], ['390x844', 390, 844, true
         for (const [label, w, h, mobile, big] of VIEWS) {
             console.log(label);
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`); await installNT(ev); await stubModels(ev);
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(); await installNT(ev); await stubModels(ev);
             await ev(`document.documentElement.style.fontSize = ${big ? "'32px'" : "''"}; localStorage.setItem('coral-recent-dirs', JSON.stringify(['/work/payments-app'])); true`);
             let base = null;
             await S.run(`${label}: New team has the fixed size (desktop 960 wide, min(720, screen - 32) high; phone: a full-height sheet) and the same rectangle on steps 1, 2 (blank and with a template) and 3`, async () => {

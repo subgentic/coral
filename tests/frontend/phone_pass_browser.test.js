@@ -79,7 +79,7 @@ const LONG = 'worktree-agent-a1b2c3d4e5f60718/feature/calm-the-dashboard-remove-
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired();
         await ev(`localStorage.clear(); true`);
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await require('./helpers/wait').coralReady(ev);
         await setTheme(ev, theme);
         await ev(STUBFETCH);
     };

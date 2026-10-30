@@ -3,6 +3,7 @@
 // refusal, reads a bad body as {}, carries Retry-After, sends a DELETE with no body; password_ui re-exports the same functions. Drives Chrome over CDP through agent_view_harness.js.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, ev, PRELOAD, install } = await connect();
@@ -10,7 +11,7 @@ const { connect } = require('./agent_view_harness');
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         const out = await ev(`(async () => {
             const S = window.__coralStatic || '/static/';
             const api = await import(S + 'api.js'); const pw = await import(S + 'password_ui.js');

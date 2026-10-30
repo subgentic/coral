@@ -22,7 +22,7 @@ const TASKS = ['Fix the lock taken twice in the update path of the store', 'Writ
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
-    const { settle } = require('./helpers/wait').bind(ev);
+    const { settle, coralReady } = require('./helpers/wait').bind(ev);
     const board = 'phone-light-' + Date.now();
     const problems = [], info = [];
     const S = `(window.__coralStatic || '/static/')`;
@@ -55,7 +55,7 @@ const TASKS = ['Fix the lock taken twice in the update path of the store', 'Writ
         await Emulation.setTouchEmulationEnabled({ enabled: true, maxTouchPoints: 5 });
         await Emulation.setEmulatedMedia({ features: [{ name: 'prefers-color-scheme', value: 'light' }] });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady();
         await setTheme(ev, 'light'); await installAudit(ev);
         await ev(`(async () => { for (const c of ['hello team', 'a longer second message with some words']) await fetch('/api/board/${board}/messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'pl', as: 'QA', content: c }) });
             localStorage.setItem('coral-live-view-mode', 'chat'); const bot = window.__m.add('phone-bot-with-a-long-name', 'A', 8, { sleeping: false, board_project: '${board}' }); bot.msgs = ${JSON.stringify(CHAT)};

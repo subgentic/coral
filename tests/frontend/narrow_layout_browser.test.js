@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install, select } = await connect();
@@ -19,7 +20,7 @@ const BASE = require('./test_base').BASE;
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
             await ev(`localStorage.setItem('coral-agentic-collapsed', 'false'); localStorage.setItem('coral-sidebar-collapsed-rail', '1'); localStorage.setItem('coral-sidebar-width', '300'); true`); // what a wide window left behind: a rail, a wide column, the file column open
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+            await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
             await ev(`window.__m.add('ak', 'A', 6, { sleeping: false, session_id: 'ak-sid' }); window._coralSetLiveSessions(Object.values(window.__m.agents).map(a => window.__m.entry(a))); localStorage.setItem('coral-live-view-mode', 'chat'); true`);
             await select('ak');
             await waitFor(`window.__rendered && window.__rendered().length >= 3`, 'the chat', 15000);
@@ -66,7 +67,7 @@ const BASE = require('./test_base').BASE;
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
         await ev(`localStorage.setItem('coral-agentic-collapsed', 'false'); localStorage.removeItem('coral-sidebar-collapsed-rail'); localStorage.removeItem('coral-sidebar-width'); true`);
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+        await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
         await ev(`window.__m.add('ak', 'A', 6, { sleeping: false, session_id: 'ak-sid' }); window._coralSetLiveSessions(Object.values(window.__m.agents).map(a => window.__m.entry(a))); localStorage.setItem('coral-live-view-mode', 'chat'); true`);
         await select('ak');
         await waitFor(`window.__rendered && window.__rendered().length >= 3`, 'the chat', 15000);

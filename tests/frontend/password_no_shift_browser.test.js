@@ -3,6 +3,7 @@
 // Chrome over CDP through agent_view_harness.js.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -13,7 +14,7 @@ const { connect } = require('./agent_view_harness');
             const tag = `${w} px${font ? ', 200% text' : ''}`;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.startup('liveList', 'settings')`);
+            await coralReady(ev, 'startup', 'liveList', 'settings');
             if (font) await ev(`document.documentElement.style.fontSize = ${JSON.stringify(font)}; true`);
             await ev(`import((window.__coralStatic || '/static/') + 'password_ui.js').then(m => m.showSetPasswordModal({ local: true })).then(() => true)`);
             await waitFor(`!!document.getElementById('set-password-confirm') && document.getElementById('set-password-confirm').getClientRects().length > 0`, `${tag}: the dialog`, 8000);

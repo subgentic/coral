@@ -4,13 +4,14 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.startup('liveList', 'settings')`);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'settings');
         const chip = async row => ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'model_chip.js'); m.updateModelChip(Object.assign({ agent_type: 'claude', name: 'x', session_id: 'x-id', sleeping: false, archived: false }, ${JSON.stringify(row)}), 'local');
             const c = document.getElementById('model-chip'); return { text: document.getElementById('model-chip-text').textContent, title: c.getAttribute('title') || '' }; })()`);
         const none = await chip({});

@@ -11,6 +11,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { setTheme, installAudit, auditRegion } = require('./helpers/contrast');
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install, select } = await connect();
@@ -44,7 +45,7 @@ const { setTheme, installAudit, auditRegion } = require('./helpers/contrast');
     const open = async (w, h, mobile) => {
         await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await ev(`localStorage.clear(); localStorage.setItem('coral-live-view-mode', 'chat'); true`);
     };
     const stubs = () => ev(`(() => { const R = window.fetch; window.__posts = [];

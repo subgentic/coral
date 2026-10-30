@@ -7,6 +7,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const { setTheme, installAudit, auditRegion } = require('./helpers/contrast');
+const { coralReady } = require('./helpers/wait');
 
 const STUB = `(() => { const R = window.fetch; window.__asks = 0; window.__puts = []; window.__getStatus = 200; window.__putStatus = 200;
     window.__custom = [{ family: 'codex', value: 'codex-mine', display_name: 'Codex Mine', efforts: [] }];
@@ -35,7 +36,7 @@ const STUB = `(() => { const R = window.fetch; window.__asks = 0; window.__puts 
             const tag = `${w}px ${theme}`;
             await Emulation.setDeviceMetricsOverride({ width: w, height: 900, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.then(() => true)`); await installAudit(ev); await setTheme(ev, theme);
+            await coralReady(ev); await installAudit(ev); await setTheme(ev, theme);
             await ev(`(() => { for (const k of Object.keys(localStorage)) if (k.startsWith('coral-models:v1:')) localStorage.removeItem(k); return true; })()`);
             await ev(STUB);
             await ev(`const d = document.createElement('div'); d.id = 'acf-t'; document.body.appendChild(d);
@@ -93,7 +94,7 @@ const STUB = `(() => { const R = window.fetch; window.__asks = 0; window.__puts 
         // the real launch dialog: the field is under More options, ends with Add a model…, and the form opens inside the dialog (Escape closes the form first, not the dialog)
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false }); await Emulation.setTouchEmulationEnabled({ enabled: false });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`); await installAudit(ev); await setTheme(ev, 'dark');
+        await coralReady(ev); await installAudit(ev); await setTheme(ev, 'dark');
         await ev(`(() => { for (const k of Object.keys(localStorage)) if (k.startsWith('coral-models:v1:')) localStorage.removeItem(k); return true; })()`);
         await ev(STUB);
         await ev(`(async () => { await window.showLaunchModal(); window._selectLaunchType('agent'); { const d = document.getElementById('launch-dir'); if (!d.value) d.value = '/tmp'; window._launchStage('agent'); } return true; })()`);

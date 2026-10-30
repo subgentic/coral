@@ -4,6 +4,7 @@
 // every Hub row shown (the largest the Network and Hub group gets). What the server holds is stood in for too: no terminal logs and no kept worktrees (a suite that ran before on the same server leaves a log of an ended agent, which adds its row's words). Drives Chrome over CDP against the isolated dev server; the cloud routes are stood in for the page's fetch.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 // words a person can see in a group now, per the audit (artifact 141071b6); a group with no number has not been cut yet
 // #10191: Agents 142 to 153 (+11): Settings' hint under Default permission mode no longer says Auto has safety checks for every CLI ('Everything; safety checks on Claude only.', +2 words), and #10000's one line under Default permission mode (13 words: Default asks, Auto acts on its own, Not set uses Auto; what Auto is on each CLI is behind its Learn more) and the closed CLI paths row's note (3), less what left with the Default models' placeholders, which became dropdowns; a feature's own lines, within UI/UX's about 150 for Agents.
@@ -17,7 +18,7 @@ const BUDGET = { 'Network and Hub': 186, 'Agents': 153, 'Storage and cleanup': 1
         await Page.addScriptToEvaluateOnNewDocument({ source: `try { Object.defineProperty(Notification, 'permission', { get: () => 'default', configurable: true }); } catch (e) {}` });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 1000, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await ev(`(async () => { window.__coral.buildAllLazy(); const real = window.fetch; const json = b => new Response(JSON.stringify(b), { headers: { 'Content-Type': 'application/json' } });
             window.fetch = async (u, o = {}) => { const p = String(u); if (p.endsWith('/api/cloud/status')) return json({ configured: true, state: 'connected', hub_url: 'https://app.coralhub.dev', label: 'my-mac', server_id: 'srv_x', max_mode: 'launch', max_mode_saved: true, allow_hub_auto_accept: true, redact_tokens: true, hub_relaunch_updates: true, hub_cross_team_settings: true, allow_hub_auto_accept_changed: { by: 'hub', user: 'hub-user-3f2a', at: '2026-10-21T20:15:00Z' } }); if (/hub-operator/.test(p)) return json({ linked: true, disabled: false, recent_actions: [] }); if (p.split('?')[0].endsWith('/api/system/terminal-logs')) return json({ files: 0, bytes: 0, ended: { count: 0, bytes: 0 } }); if (p.split('?')[0].endsWith('/api/worktrees')) return json({ worktrees: [] }); return real(u, o); };
             const cc = await import((window.__coralStatic || '/static/') + 'cloud_connect.js'); cc.initCloudConnect(); await cc.loadCloudStatus(); return true; })()`);

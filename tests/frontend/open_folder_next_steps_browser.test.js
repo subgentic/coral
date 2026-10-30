@@ -7,6 +7,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -19,7 +20,7 @@ const BASE = require('./test_base').BASE;
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.startup('liveList', 'settings')`);
+        await coralReady(ev, 'startup', 'liveList', 'settings');
         await ev(`(async () => { const real = window.fetch; window.__launchBody = null;
             window.fetch = async (u, o = {}) => { const r = await real(u, o); if (new URL(String(u), location.href).pathname === '/api/sessions/launch' && (o.method || 'GET') === 'POST') { window.__launchBody = await r.clone().json().catch(() => null); } return r; };
             return true; })()`);

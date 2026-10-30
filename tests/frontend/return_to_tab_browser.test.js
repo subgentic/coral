@@ -2,6 +2,7 @@
 // feed socket was closed meanwhile (and the feed is reconnected now, not at the next backoff tick), nothing in the way once it is done, and nothing at all for a quick refresh. Run against an isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -11,7 +12,7 @@ const { connect } = require('./agent_view_harness');
         await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await ev(`window.__m.add('alpha', 'A', 6, { sleeping: false }); true`);
         await ev(`window.selectLiveSession('alpha', 'claude', 'alpha-id'); true`);
         await waitFor(`!!document.getElementById('live-history-messages')`, 'the chat');

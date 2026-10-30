@@ -3,7 +3,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
-const { framesJs } = require('./helpers/wait');
+const { framesJs, coralReady } = require('./helpers/wait');
 
 // family, size px, weight: the dialog title, pane title, section heading, nav tab and its selected one, row label, control and button, hint, badge
 const SCALE = new Set(['16/700', '17/700', '14/600', '14/400', '13/500', '13/400', '12/400', '11/600']);
@@ -15,7 +15,7 @@ const SCALE = new Set(['16/700', '17/700', '14/600', '14/400', '13/500', '13/400
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false }); await Emulation.setTouchEmulationEnabled({ enabled: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await ev(`const st = document.createElement('style'); st.textContent = '* { transition: none !important; animation: none !important }'; document.head.appendChild(st); window.showSettingsModal(); true`); // a weight or size caught mid-transition is no style
         await waitFor(`!!document.getElementById('settings-modal') && document.getElementById('settings-modal').getClientRects().length > 0 && document.querySelectorAll('#settings-tabs [role="tab"]').length > 3`, 'the dialog and its tabs', 10000);
         const tabs = await ev(`[...document.querySelectorAll('#settings-tabs [role="tab"]')].filter(t => t.getClientRects().length).map(t => t.id)`);

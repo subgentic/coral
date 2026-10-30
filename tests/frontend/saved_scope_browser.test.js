@@ -9,6 +9,7 @@ const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const { removeBoards } = require('./helpers/board_cleanup');
+const { coralReady } = require('./helpers/wait');
 
 const hex = i => i.toString(16).padStart(20, '0');
 
@@ -49,7 +50,7 @@ const hex = i => i.toString(16).padStart(20, '0');
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         for (const it of (await api('GET', '/api/saved')).body.items) await api('DELETE', `/api/saved/${it.id}`);
         // A board bookmark's author is what the board says wrote the message (#4816), so these are real board messages, written by those names.
         const boardMsg = async (team, from, content) => { const r = await api('POST', `/api/board/${team}/messages`, { subscriber_id: from, content }); assert.ok(r.status < 300, JSON.stringify(r)); return String(r.body.id); };
@@ -67,7 +68,7 @@ const hex = i => i.toString(16).padStart(20, '0');
         const open = async (w, mobile) => {
             await Emulation.setDeviceMetricsOverride({ width: w, height: 900, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.then(() => true)`);
+            await coralReady(ev);
             await ev(`document.addEventListener('coral:route-changed', () => { window.__rc = (window.__rc || 0) + 1; }); true`);
             await ev(`(() => { const jobs = { 'qa-a-id': 'QA Engineer', 'fe-a-id': 'Frontend Dev', 'qa-b-id': 'QA Engineer' };
                 const entry = window.__m.entry.bind(window.__m); window.__m.entry = a => ({ ...entry(a), board_job_title: jobs[a.session_id] || '' });

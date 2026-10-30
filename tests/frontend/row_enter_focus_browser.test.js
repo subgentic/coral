@@ -3,6 +3,7 @@
 // stubbed agent. Drives Chrome over CDP through agent_view_harness.js.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -12,7 +13,7 @@ const { connect } = require('./agent_view_harness');
         for (const [w, h, touch, want] of [[1280, 800, false, 'command-input'], [390, 844, true, 'session-name']]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile: touch }); await Emulation.setTouchEmulationEnabled({ enabled: touch });
             await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.startup('liveList', 'settings')`);
+            await coralReady(ev, 'startup', 'liveList', 'settings');
             await ev(`window.__m.add('coral-go', 'm', 3, { sleeping: false, session_id: 'o1' }); T.state.liveSessions = Object.values(window.__m.agents).map(a => window.__m.entry(a)); T.render.renderLiveSessions(T.state.liveSessions); true`);
             await waitFor(`!!document.querySelector('#live-sessions-list .session-group-item, #mobile-session-list .session-group-item')`, `${w}: the agent's row`, 10000);
             await ev(`(() => { const r = document.querySelector('#live-sessions-list .session-group-item, #mobile-session-list .session-group-item'); r.focus(); return document.activeElement === r; })()`);

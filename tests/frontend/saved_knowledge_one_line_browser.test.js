@@ -8,6 +8,7 @@ const { setTheme } = require('./helpers/contrast');
 const { removeBoards } = require('./helpers/board_cleanup');
 const { clearSaved } = require('./helpers/saved_cleanup');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 const board = 'saved-line-' + Date.now().toString(36);
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -15,7 +16,7 @@ const board = 'saved-line-' + Date.now().toString(36);
     const raw = (m, p, b) => ev(`fetch(${JSON.stringify(p)}, { method: ${JSON.stringify(m)}, headers: { 'Content-Type': 'application/json' }${b ? `, body: ${JSON.stringify(JSON.stringify(b))}` : ''} }).then(async r => ({ status: r.status, body: await r.json().catch(() => ({})) }))`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         await clearSaved(raw).catch(() => {});
         assert.equal((await raw('POST', `/api/board/${board}/subscribe`, { subscriber_id: 'Boss', job_title: 'Orchestrator' })).status, 200);
         const ids = [];
@@ -32,7 +33,7 @@ const board = 'saved-line-' + Date.now().toString(36);
                 const at = `${width} ${name}: `;
                 try {
                     await Emulation.setDeviceMetricsOverride({ width, height: 900, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
-                    await Page.navigate({ url: BASE + where }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+                    await Page.navigate({ url: BASE + where }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
                     if (folder) { await ev(`window.switchNavTab('hub-inbox'); true`); await ev(`import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab(${JSON.stringify(folder)})).then(() => true)`); }
                     await waitFor(`document.querySelectorAll('.dt-table tbody tr:not(.dt-group)').length >= ${name === 'Saved' ? 3 : 1}`, at + 'the rows', 15000);
                     const rows = await measure();

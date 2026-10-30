@@ -5,7 +5,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
-const { settle } = require('./helpers/wait');
+const { settle, coralReady } = require('./helpers/wait');
 
 const SHOWN = ['settings-theme', 'settings-renderer-select', 'settings-agent-type', 'settings-permission-mode', 'settings-show-summary', 'settings-group-by-team', 'settings-fit-pane-width', 'settings-notify-needs-input', 'settings-desktop-notify', 'settings-alert-needs-input', 'settings-alert-reply', 'settings-alert-sound', 'settings-file-search-limit'];
 const MACHINE = ['settings-working-dir', 'settings-claude-account-check', 'settings-cli-path-claude', 'settings-remote-access-enabled', 'settings-api-key', 'settings-telemetry-enabled', 'settings-debug-input-log', 'settings-artifact-store-max', 'settings-terminal-font-size', 'settings-auto-resume'];
@@ -20,7 +20,7 @@ const MACHINE = ['settings-working-dir', 'settings-claude-account-check', 'setti
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         await ev(`(async () => { const st = ${S}; window.SD = await import(st + 'settings_dialog.js'); window.CS = await import(st + 'cloud_settings.js'); await window.SD.showSettingsModal('general'); return true; })()`);
         await settle(ev, 800); // the rows the dialog loads on open (Security's, the terminal backend's) are in before the hub trims it, as they are when a person gets to the hub dialog
         await ev(`(() => { window.CS.applyCloudSettingsDialog(); window.CS.applyCloudSettingsDialog(); return true; })()`);

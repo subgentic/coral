@@ -4,6 +4,7 @@
 // are in internal/auth); what the group shows and does is net_pane_browser's.
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, sleep, PRELOAD, install } = await connect();
@@ -15,7 +16,7 @@ const BASE = require('./test_base').BASE;
             const tag = `${w}px`;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.then(() => true)`);
+            await coralReady(ev);
             await ev(`(() => { if (!window.__innerFetch) window.__innerFetch = window.fetch; const real = window.__innerFetch; window.__show = { status: 200, body: { code: 'H2XR-HS16', expires_in: 3540 }, reads: 0 };
                 window.fetch = (u, o = {}) => { if (String(u).includes('/api/auth/setup-code/show')) { window.__show.reads++; return Promise.resolve(new Response(JSON.stringify(window.__show.body), { status: window.__show.status, headers: { 'content-type': 'application/json' } })); } return real(u, o); };
                 return true; })()`);

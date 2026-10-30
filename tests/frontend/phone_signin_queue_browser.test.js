@@ -3,6 +3,7 @@
 // Drives Chrome over CDP through agent_view_harness.js with its mocked agents; the sign-in status is the page's own, with claude_signed_in false added by the page's fetch.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 const SIGNED_OUT = `(() => { const R = window.fetch; window.fetch = async function (u, o) { const resp = await R.apply(this, arguments); let p = ''; try { p = new URL(String(u && u.url || u), location.origin).pathname; } catch { /* not a URL */ }
     if (p !== '/api/system/status' || !resp.ok) return resp; const d = await resp.clone().json(); d.claude_signed_in = false; return new Response(JSON.stringify(d), { status: 200, headers: { 'content-type': 'application/json' } }); }; })()`;
@@ -15,7 +16,7 @@ const SIGNED_OUT = `(() => { const R = window.fetch; window.fetch = async functi
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Page.addScriptToEvaluateOnNewDocument({ source: SIGNED_OUT });
         await Emulation.setDeviceMetricsOverride({ width: 360, height: 800, deviceScaleFactor: 2, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+        await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
         await ev(`window.__m.add('rep', 'R', 8, { sleeping: false }); window._coralSetLiveSessions(Object.values(window.__m.agents).map(a => window.__m.entry(a))); localStorage.setItem('coral-live-view-mode', 'chat'); true`);
         await select('rep');
         await waitFor(`window.__rendered && window.__rendered().length >= 5`, 'the chat', 15000);

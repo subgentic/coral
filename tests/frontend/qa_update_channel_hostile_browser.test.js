@@ -33,7 +33,7 @@ const base = { enabled: true, relaunch_available: true, installed: '1.4.141', st
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired();
         await ev(`localStorage.clear(); true`);
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await require('./helpers/wait').coralReady(ev);
         await ev(`import((window.__coralStatic || '/static/') + 'update_flag.js').then(m => { m.setUpdatesEnabled(true); return true; })`);
         await ev(STUB);
         await ev(`window.__ch.status = ${JSON.stringify(status)}; import(${S} + 'update_ui.js').then(m => m.startUpdateUi && m.startUpdateUi()).then(() => import(${S} + 'update_ui.js')).then(m => m.refreshUpdateStatus()).then(() => true)`);

@@ -6,6 +6,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const { setTheme, installAudit, auditRegion } = require('./helpers/contrast');
+const { coralReady } = require('./helpers/wait');
 
 const STUB = answers => `(() => { const R = window.fetch; window.__asks = 0; window.__answers = ${JSON.stringify(answers)};
     const json = (b, status = 200) => new Response(JSON.stringify(b), { status, headers: { 'content-type': 'application/json' } });
@@ -21,7 +22,7 @@ const STUB = answers => `(() => { const R = window.fetch; window.__asks = 0; win
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         const fresh = async (tag, theme, answers) => {
             await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.then(() => true)`); await installAudit(ev); await setTheme(ev, theme);
+            await coralReady(ev); await installAudit(ev); await setTheme(ev, theme);
             await ev(`localStorage.clear(); localStorage.setItem('coral-live-view-mode', 'chat'); true`);
             await ev(STUB(answers));
             await select('rf-codex');
