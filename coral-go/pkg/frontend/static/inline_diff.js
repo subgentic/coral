@@ -51,7 +51,7 @@ async function mount(slot, file, { original, content }) {
     const extensions = [
         cm.basicSetup, ...cmTheme(cm), cm.EditorView.lineWrapping,
         cm.EditorView.editable.of(false), cm.EditorState.readOnly.of(true),
-        cm.EditorView.theme({ '.cm-scroller': { overflow: 'auto' } }),
+        cm.EditorView.theme({ '.cm-scroller': { overflow: 'visible' } }), // the editor takes the height of its hunks: the panel scrolls, not a box inside it
         // collapsed to the changed hunks, as the preview's diff is: the unchanged lines between them are one click each
         cm.unifiedMergeView({ original: cm.Text.of(original.split('\n')), diffConfig: DIFF_CONFIG, mergeControls: false, collapseUnchanged: { margin: 3, minSize: 4 } }),
     ];

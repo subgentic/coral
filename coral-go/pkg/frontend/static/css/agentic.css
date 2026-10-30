@@ -1174,9 +1174,9 @@ body.panel-dragging .agentic-state {
 
 /* The diff under a changed file's row (#11350): the row's chevron opens it, Expand all stacks every file's. The preview pane is untouched. */
 .file-expand-btn { flex: none; }
-.file-diff { margin: 0 0 6px 20px; border-left: 2px solid var(--border); min-width: 0; }
+.file-diff { margin: 0 0 6px 20px; padding-right: 6px; border-left: 2px solid var(--border); min-width: 0; }
 .file-diff[hidden] { display: none; }
-.file-diff-body { max-height: 60vh; overflow: auto; }
+.file-diff-body { min-width: 0; } /* no box of its own: the stack reads top to bottom in the panel's one scroll (the Mobile Beta Tester's walk on #11350: a long file's last hunks were out of sight) */
 .file-diff-note { margin: 4px 8px; font-size: var(--fs-sm); color: var(--text-secondary); }
 .file-diff-error { color: var(--error); }
 .files-expand-all { flex: none; }
