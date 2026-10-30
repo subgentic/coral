@@ -69,8 +69,14 @@ const TEAM = `qa-team-${Date.now() % 100000}`;
             await S.run(`${label}: the header and the tab strip stay at the same pixels on a goal's page and on a task's page`, async () => {
                 const base = await rect(ev);
                 const open = async (rx, sel) => { assert.ok(await ev(`(() => { const e = window.__tp.find(${JSON.stringify(sel)}, ${rx}); if (!e) return false; e.click(); return true; })()`), `no ${sel} named ${rx}`); await settle(400); };
-                await open('/Explore goals with two teams/', 'button, a, [role=row], tr'); same(base, await rect(ev), 'on the goal page');
-                await goTab(ev, settle, 'Tasks'); await open('/Add the goal filter/', 'button, a, [role=row], tr'); same(base, await rect(ev), 'on the task page');
+                const hidden = () => ev(`['team-page-head', 'team-tabs-row'].every(id => getComputedStyle(document.getElementById(id)).display === 'none')`);
+                const back = sel => ev(`(() => { const b = [...document.querySelectorAll(${JSON.stringify(sel)})].find(e => e.getClientRects().length); if (!b) return false; b.click(); return true; })()`);
+                await open('/Explore goals with two teams/', 'button, a, [role=row], tr');
+                if (phone) { assert.ok(await hidden(), 'on the goal page the phone has its own bar: the team header and strip are not drawn over it (#11314)'); assert.ok(await back('#team-panel-goals .goal-main .goals-back'), 'the goal page has its way back'); await settle(400); } /* a goal's page on a phone is a drill-down: the header and strip come back, at the same pixels, with the list */
+                same(base, await rect(ev), 'on the goal page');
+                await goTab(ev, settle, 'Tasks'); await open('/Add the goal filter/', 'button, a, [role=row], tr');
+                if (phone) { assert.ok(await hidden(), 'on the task page the phone has its own bar'); assert.ok(await back('#team-panel-item .goals-back'), 'the task page has its way back'); await settle(400); }
+                same(base, await rect(ev), 'on the task page');
             });
             await S.run(`${label}: The tabs have their own address (/team/<name>/<tab>); Settings, a popout, has none and leaves the address as it was`, async () => {
                 await goTab(ev, settle, 'Board'); await settle(300);

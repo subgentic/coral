@@ -51,9 +51,9 @@ const BASE = require('./test_base').BASE;
             await openTaskFromGoal(goalUrl, taskUrl, T);
             await ev(`document.querySelector('#team-panel-item .goals-back').click(); true`);
             await waitFor(`document.activeElement?.dataset?.taskId === '${T}'`, at + 'the row is focused first', 8000);
-            await ev(`document.getElementById('team-tab-goals').focus(); true`); // the person moves on while the goal's list may still be drawn again
+            await ev(`(() => { const e = [document.getElementById('team-tab-goals'), document.querySelector('#team-panel-goals .goal-main .goal-actions .btn, #team-panel-goals .goal-main button.btn')].find(x => x && x.getClientRects().length); e.id = e.id || 'moved-on'; e.focus(); window.__movedOn = e.id; return true; })()`); // the person moves on while the goal's list may still be drawn again (a phone's goal page has no tab strip over it: #11314, they move to a button of the page)
             await new Promise(r => setTimeout(r, 1500)); // sleep-ok: the row is re-focused for up to 8 s after Back while the list redraws; a focus that stays through 1.5 s of those 50 ms checks is the proof
-            assert.equal(await ev(`document.activeElement?.id`), 'team-tab-goals', at + 'the tab strip keeps the focus, the row does not take it back');
+            assert.equal(await ev(`document.activeElement?.id`), await ev(`window.__movedOn`), at + 'the control the person moved to keeps the focus, the row does not take it back');
             console.log('   \u2713');
 
             console.log(`${at}a task opened by address keeps the Tasks list`);
