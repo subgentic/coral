@@ -110,6 +110,19 @@ func runStub() {
 		}
 		fmt.Fprint(w, `{"items":[{"id":"m1","type":"assistant","text":"hello from the stand-in"}]}`)
 	})
+	if frames := os.Getenv(eventsFileVar); frames != "" {
+		mux.HandleFunc("/api/event", func(w http.ResponseWriter, r *http.Request) {
+			if _, p, ok := r.BasicAuth(); !ok || p != os.Getenv("OPENCODE_PASSWORD") {
+				http.Error(w, "no", http.StatusUnauthorized)
+				return
+			}
+			b, _ := os.ReadFile(frames)
+			w.Header().Set("Content-Type", "text/event-stream")
+			w.Write(b)
+			w.(http.Flusher).Flush()
+			<-r.Context().Done() // the stream stays open until the reader leaves
+		})
+	}
 	l, err := net.Listen("tcp", "127.0.0.1:"+port)
 	if err != nil {
 		os.Exit(3)
@@ -118,6 +131,8 @@ func runStub() {
 }
 
 // envFileVar names where the stand-in writes the environment it saw. Not a CORAL_, OPENCODE_ or XDG_ name: the server's environment filter keeps nothing of those, and this must reach the stand-in.
+const eventsFileVar = "STANDIN_EVENTS_FOR_TESTS" // a file of SSE frames the stand-in sends on /api/event, then holds the stream open
+
 const envFileVar = "STANDIN_ENVFILE_FOR_TESTS"
 
 // maxStandIns is the most stand-ins one run of this package may start. A test that goes past it fails at once, and each run stops what it started: nothing here may ever start servers without a bound.
