@@ -4,6 +4,8 @@ package executil
 
 import (
 	"context"
+	"errors"
+	"os"
 	"os/exec"
 )
 
@@ -16,4 +18,15 @@ func HideWindow(cmd *exec.Cmd) {
 // Command is like exec.CommandContext but hides console windows on Windows.
 func Command(ctx context.Context, name string, args ...string) *exec.Cmd {
 	return exec.CommandContext(ctx, name, args...)
+}
+
+// Kill ends cmd's process. Off Windows a command's children are not left behind by a .cmd shim, so the process is all there is to end.
+func Kill(cmd *exec.Cmd) error {
+	if cmd.Process == nil {
+		return nil
+	}
+	if err := cmd.Process.Kill(); err != nil && !errors.Is(err, os.ErrProcessDone) {
+		return err
+	}
+	return nil
 }
