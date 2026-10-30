@@ -112,10 +112,15 @@ func (n *BoardNotifier) SeedFromDB(ctx context.Context) {
 	n.notifiedMu.Lock()
 	defer n.notifiedMu.Unlock()
 	now := n.now()
+	seeded := 0
 	for sessName, state := range states {
+		if state.Count == 0 {
+			continue // nothing was unread: it was not nudged, so a fresh message after the restart is nudged at once (a mentions-only subscriber was never nudged until the reminder window, #137219)
+		}
 		n.notified[sessName] = notifyState{count: state.Count, latestID: state.LatestID, at: now}
+		seeded++
 	}
-	n.logger.Info("seeded notifier from DB", "sessions", len(states))
+	n.logger.Info("seeded notifier from DB", "sessions", len(states), "with_unread", seeded)
 }
 
 // seedStates are the unread states of the agents running now (#3875): the passes only nudge
