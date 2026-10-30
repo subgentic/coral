@@ -191,7 +191,6 @@
     position: relative;
     border-radius: var(--radius-lg);
     --mb-color: var(--mb-color-dark);
-    --mb-tint: var(--mb-tint-dark);
 }
 
 .mb-message:hover {
@@ -201,7 +200,6 @@
 /* The sender's colour, in the theme's AA shade (boardMessageColorStyle). */
 [data-theme="light"] .mb-message {
     --mb-color: var(--mb-color-light);
-    --mb-tint: var(--mb-tint-light);
 }
 
 .mb-message-header,
@@ -3589,7 +3587,6 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
     /* A narrow Settings (a phone, a small window, large text) is two screens (#10000): a list of its sections, each a row with a chevron, and one section with a way back. The dialog's data-screen says which (settings_nav.js); a section asked for opens straight on it. The old dropdown read as a form field. */
     .settings-nav { width: auto; flex: none; border-right: 0; border-bottom: 1px solid var(--border); padding: .6rem 1rem; overflow: visible; }
     .settings-shell { flex-direction: column; }
-    .settings-nav .settings-group-pick { display: none; }
     #settings-modal[data-screen="sections"] .settings-nav { flex: 1 1 auto; min-height: 0; border-bottom: 0; padding: 0; overflow-y: auto; }
     #settings-modal[data-screen="sections"] .settings-panes { display: none; }
     #settings-modal[data-screen="pane"] .settings-nav { display: none; }
@@ -3947,7 +3944,6 @@ select.seg-source { display: none; } /* (.modal-content select is display: block
 .launch-wizard .acf-model-note, .launch-wizard .acf-thinking-note, .launch-wizard .acf-thinking-ran { font-size: var(--fs-base); font-weight: var(--fw-regular); }
 #launch-agent-pick .launch-agent-opt { font-size: var(--fs-md); font-weight: var(--fw-medium); }
 .sd-step-header .launch-back-btn { font-family: inherit; }
-[data-quiet-focus] :focus-visible { outline: 0 !important; box-shadow: none !important; }
 
 @container (max-width: 40em) { .launch-note-slot { min-height: 3.8em; } }
 @container (max-width: 17em) { .launch-note-slot { min-height: 5.6em; } }

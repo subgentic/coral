@@ -50,7 +50,6 @@
     --success-text: var(--success); /* green and amber as text on a grey panel or on their own tint: the light theme has darker ones that hold 4.5:1 (#5791) */
     --warning-text: var(--warning);
     --border-subtle:  rgba(255, 255, 255, 0.04); /* a row's hairline inside a table or list (#5146) */
-    --hover-bg:       rgba(255, 255, 255, 0.03); /* a table or list row under the pointer */
     --sidebar-separator: rgba(127, 127, 127, 0.18); /* the team card's frame and the line under its header */
     --error-rgb:   224, 85, 69;
     --danger:      var(--error); /* alias: several rules (stuck dot, tooltips) use this name */
@@ -62,7 +61,6 @@
     --border-color:   var(--border);
     --error-color:    var(--error);
     --working:     #61afef;
-    --working-rgb: 97, 175, 239;
 
     /* Agent rail (collapsed sidebar) */
     --rail-badge-unread:       #e5484d;
@@ -307,12 +305,10 @@
     --success-text: #116329; /* 5.8:1 on the secondary panel; --success is 4.0 */
     --warning-text: #7a5100; /* 5.0:1 on the warning tint; --warning is 4.4 */
     --border-subtle:  rgba(0, 0, 0, 0.06);
-    --hover-bg:       rgba(0, 0, 0, 0.04);
     --sidebar-separator: rgba(127, 127, 127, 0.18);
     --error-rgb:   207, 34, 46;
     --danger:      var(--error);
     --working:     #0969da;
-    --working-rgb: 9, 105, 218;
 
     /* Agent rail (collapsed sidebar) */
     --rail-badge-unread:       #cf222e;
