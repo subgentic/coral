@@ -29,6 +29,10 @@ const BASE = require('./test_base').BASE;
             await open(390, fs, theme);
             const tag = `390@${fs} ${theme}`;
             assert.equal(await ev(`getComputedStyle(document.querySelector('header.top-bar')).display`), 'none', `${tag}: the page's top bar is the list header's first row`);
+            { // a card's kebab: its whole 44 px hit area is inside the card (it hung past the right edge, QA Reviewer 2's nit on #11143)
+                const k = await ev(`(() => { const T = ${require('./helpers/touch_area').TOUCH_AREA}; return [...document.querySelectorAll('#mobile-session-list .session-group-item')].map(li => { const a = T(li.querySelector('.sidebar-kebab-btn')), c = li.getBoundingClientRect(); return { area: [Math.round(a.l - c.left), Math.round(c.right - a.r)], w: Math.round(a.w), inside: a.l >= c.left - 0.5 && a.r <= c.right + 0.5 && a.t >= c.top - 0.5 && a.b <= c.bottom + 0.5, over: Math.round(a.r - c.right) }; }); })()`);
+                assert.ok(k.length >= 3 && k.every(x => x.w >= 44 && x.inside), `${tag}: every card's kebab hit area (44 px) is inside the card: ` + JSON.stringify(k));
+            }
             const menu = await ev(box(`document.querySelector('#mobile-agent-list .phone-menu-btn')`)), pill = await ev(box(`document.querySelector('#mobile-agent-list .mobile-search-input')`)), acct = await ev(box(`document.querySelector('#mobile-agent-list .phone-account-btn')`));
             assert.ok(menu.w >= 44 && menu.h >= 44 && acct.w >= 44 && acct.h >= 44 && pill.h >= 44, `${tag}: menu, search pill and account are 44 px targets: ` + JSON.stringify({ menu, pill, acct }));
             assert.ok(Math.abs((menu.t + menu.b) / 2 - (pill.t + pill.b) / 2) <= 3 && Math.abs((acct.t + acct.b) / 2 - (pill.t + pill.b) / 2) <= 3, `${tag}: one row: ` + JSON.stringify({ menu, pill, acct }));

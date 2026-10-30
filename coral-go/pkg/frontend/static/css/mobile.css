@@ -1392,13 +1392,13 @@
     #mobile-session-list .session-group-item .session-name-spacer { display: none; }
     #mobile-session-list .session-time { display: block; flex: none; font-size: var(--fs-md); color: var(--text-secondary); white-space: nowrap; }
     #mobile-session-list .session-status-line { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); margin: 0; } /* still text for a screen reader and find-in-page: the dot and the preview are what the card shows */
-    #mobile-session-list .session-preview { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-top: 2px; padding-right: 28px; font-size: var(--fs-lg); color: var(--text-secondary); overflow-wrap: anywhere; }
+    #mobile-session-list .session-preview { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-top: 2px; padding-right: 36px; font-size: var(--fs-lg); color: var(--text-secondary); overflow-wrap: anywhere; }
     #mobile-session-list .session-line2 { display: none; } /* the preview is the summary here */
     #mobile-session-list .session-model { margin-left: 0; padding-left: 0; font-size: var(--fs-md); }
     #mobile-session-list .session-group-item.needs-attention .session-label { font-weight: var(--fw-strong); }
     #mobile-session-list .session-group-item.needs-attention .session-preview { color: var(--text-primary); }
     #mobile-session-list .session-group-item.needs-attention .session-time { color: color-mix(in srgb, var(--accent) 78%, rgb(var(--black-rgb))); font-weight: var(--fw-medium); } /* 4.5:1 on the card (the plain accent was 4.44) */
-    #mobile-session-list .session-group-item .sidebar-kebab-wrapper { position: absolute; right: 2px; bottom: 2px; }
+    #mobile-session-list .session-group-item .sidebar-kebab-wrapper { position: absolute; right: 20px; bottom: 15px; } /* the card is the containing block and the wrapper sits 9 px further out than `right` says: the 24 px button is 11 px from the card's right edge and 12 from its bottom, so its 44 px hit area ends at them, not past them */
 }
 
 /* ── The phone's floating nav and + (#11116, slice C of the Google Chat style) ───────────────────────────────────────────────────────────────────────────────────────────────────────────────
