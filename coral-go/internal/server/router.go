@@ -575,9 +575,9 @@ func (s *Server) registerSystem(r *chi.Mux, h *routeHandlers) {
 	r.Delete("/api/pinned-folders", sysHandler.UnpinFolder)
 	// Save for Later (#4510): the Operator's bookmarks on chat and board messages.
 	r.Get("/api/saved", sysHandler.SavedList)
-	r.Post("/api/saved", sysHandler.SavedAdd)
+	r.With(routes.RefuseSignInLink).Post("/api/saved", sysHandler.SavedAdd)
 	r.Get("/api/saved/{id}/message", sysHandler.SavedMessage) // the whole text of a bookmark's source (#5753)
-	r.Patch("/api/saved/{id}", sysHandler.SavedUpdate)
+	r.With(routes.RefuseSignInLink).Patch("/api/saved/{id}", sysHandler.SavedUpdate)
 	r.Delete("/api/saved/{id}", sysHandler.SavedDelete)
 
 	// History
