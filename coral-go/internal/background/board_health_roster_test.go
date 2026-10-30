@@ -286,3 +286,13 @@ func TestRosterCountsClaimableTasks(t *testing.T) {
 	out := h.check()
 	assert.Contains(t, out, "2 claimable tasks")
 }
+
+// #11182: the check says when the board is paused, so a board that sends no nudge can never be silent about it.
+func TestCheckSaysWhenTheBoardIsPaused(t *testing.T) {
+	h := newCheckHarness(t)
+	h.member("Orchestrator", "Orchestrator", 1, 0)
+	h.member("Dev", "Developer", 2, 0)
+	assert.NotContains(t, h.check(), "board paused")
+	h.m.SetPausedFn(func(string) bool { return true })
+	assert.Contains(t, h.check(), "board paused: no nudges go out until it is resumed")
+}

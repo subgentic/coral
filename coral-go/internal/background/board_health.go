@@ -35,6 +35,9 @@ type BoardHealthMonitor struct {
 	// limit says whether a live agent is stopped by a usage limit, and how long until it resets (0 if not shown); nil: nothing is.
 	limit func(ctx context.Context, a AgentInfo) (resets time.Duration, blocked bool)
 
+	// paused says whether a board is paused: nothing is nudged on it, and the check says so (#11182); nil: not said.
+	paused func(project string) bool
+
 	mu        sync.Mutex
 	lastCheck map[string]time.Time       // per board
 	landing   *LandingWatch              // the landing alert's view of the repositories (git_poller.go feeds it); nil: the alert has nothing to read
@@ -61,6 +64,9 @@ func (m *BoardHealthMonitor) SetAgents(ts *store.TaskStore, rt AgentRuntime, dis
 }
 
 // SetLandingWatch gives the check the landing alert's repository view.
+// SetPausedFn gives the check the way to tell that a board is paused.
+func (m *BoardHealthMonitor) SetPausedFn(fn func(project string) bool) { m.paused = fn }
+
 func (m *BoardHealthMonitor) SetLandingWatch(w *LandingWatch) { m.landing = w }
 
 // SetIdleThresholds sets how long an agent with nothing assigned is idle before the check names it
@@ -187,6 +193,10 @@ func (m *BoardHealthMonitor) composeCheck(ctx context.Context, project, orch str
 	issues, _, _ := taskQueueIssues(tasks)
 	for _, is := range issues {
 		items = append(items, teamhealth.Item{Rank: 4, Agent: "Board", Problem: is, Key: "queue|" + is, State: "shown"})
+	}
+	if m.paused != nil && m.paused(project) {
+		// Board paused: the notifier sends no nudge to anyone on it. Rank 1, so it is the first thing the check says (#11182).
+		items = append([]teamhealth.Item{{Rank: 1, Agent: "Board", Problem: "board paused: no nudges go out until it is resumed", Key: "paused|" + project, State: "shown"}}, items...)
 	}
 	items = m.dropAcknowledged(ctx, project, items, now)
 

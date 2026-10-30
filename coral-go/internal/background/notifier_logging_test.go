@@ -174,3 +174,49 @@ func TestBoardNotifier_UnreadLookupFailureIsWarn(t *testing.T) {
 	assert.Contains(t, out, "error=")
 	assert.NotContains(t, out, "level=INFO")
 }
+
+// #11182: a sleep-paused board with an awake agent on it is resumed by the notifier and the mention is nudged (the pause was saved before a restart and nothing lifted it: no nudge for hours); a
+// pause a person set is not lifted and is logged at INFO, once per board, so a board that is silent is never silent without a line saying why.
+func TestBoardNotifier_ASleepPausedBoardWithAnAwakeAgentIsResumedAndNudged(t *testing.T) {
+	ctx := context.Background()
+	bs := testBoardStore(t)
+	rt := &mockRuntime{}
+	n := NewBoardNotifier(bs, rt, 10*time.Second)
+	paused := map[string]bool{"team": true}
+	sleepOnly := true
+	n.SetIsPausedFn(func(p string) bool { return paused[p] })
+	n.SetLiftSleepPauseFn(func(p string) bool {
+		if paused[p] && sleepOnly {
+			delete(paused, p)
+			return true
+		}
+		return false
+	})
+	logs := captureNotifierLogs(n)
+	sid := "11111111-2222-3333-4444-555555555555"
+	n.SetDiscoverFn(func(context.Context) ([]AgentInfo, error) {
+		return []AgentInfo{{AgentType: "claude", AgentName: "dev", SessionID: sid, DisplayName: "Dev"}}, nil
+	})
+	_, err := bs.Subscribe(ctx, "team", "Dev", "Developer", "claude-"+sid, nil, "mentions")
+	require.NoError(t, err)
+	_, err = bs.PostMessage(ctx, "team", "Lead", "@Dev please look", nil)
+	require.NoError(t, err)
+
+	require.NoError(t, n.RunOnce(ctx))
+	require.Len(t, rt.sent, 1, "the board was resumed and the mention nudged")
+	assert.False(t, paused["team"])
+	assert.Contains(t, logs.String(), "resumed a board that sleep had paused")
+
+	// A person's pause: nothing is sent, and the board is named once at INFO, not on every pass.
+	paused["team"], sleepOnly = true, false
+	_, err = bs.PostMessage(ctx, "team", "Lead", "@Dev and this", nil)
+	require.NoError(t, err)
+	sent := len(rt.sent)
+	for i := 0; i < 3; i++ {
+		n.now = func() time.Time { return time.Now().Add(time.Duration(i+3) * 2 * defaultRemindAfter) }
+		require.NoError(t, n.RunOnce(ctx))
+	}
+	assert.Len(t, rt.sent, sent, "a person's pause is kept")
+	assert.Equal(t, 1, strings.Count(logs.String(), "level=INFO msg=\"board paused: no nudges go out until it is resumed\""), "once per board, at INFO")
+	assert.Contains(t, logs.String(), "project=team")
+}

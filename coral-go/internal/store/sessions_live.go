@@ -679,6 +679,17 @@ func (s *SessionStore) GetSleepingBoardNames(ctx context.Context) ([]string, err
 	return names, nil
 }
 
+// GetAwakeBoardNames is the boards with at least one active session that is awake (not sleeping, not archived): a sleep pause on one of them is over (#11182).
+func (s *SessionStore) GetAwakeBoardNames(ctx context.Context) ([]string, error) {
+	var names []string
+	err := s.reader().SelectContext(ctx, &names,
+		`SELECT DISTINCT board_name FROM live_sessions WHERE board_name IS NOT NULL AND board_name != '' AND status = 'active' AND is_sleeping = 0 AND COALESCE(is_archived, 0) = 0`)
+	if err != nil {
+		return nil, err
+	}
+	return names, nil
+}
+
 // CleanupOrphanedSleeping removes sleeping session rows where an awake
 // version with the same display_name and board_name already exists.
 // This cleans up duplicates from old wake code that created new sessions.

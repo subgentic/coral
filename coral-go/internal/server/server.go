@@ -463,14 +463,15 @@ func (s *Server) RestoreSleepingBoards() {
 		return
 	}
 	s.boardHandler.LoadPaused(ctx) // the Operator's pauses survive a restart (#3668)
-	boards, err := ss.GetSleepingBoardNames(ctx)
-	if err != nil || len(boards) == 0 {
-		return
+	boards, _ := ss.GetSleepingBoardNames(ctx)
+	awake, _ := ss.GetAwakeBoardNames(ctx)
+	resumed := s.boardHandler.RestoreSleepPauses(boards, awake)
+	if len(boards) > 0 {
+		log.Printf("Restored pause state for %d sleeping board(s)", len(boards))
 	}
-	for _, b := range boards {
-		s.boardHandler.PauseForSleep(b) // auto-wake lifts it when it wakes the board's agents; a person's saved Pause stays (#286)
+	for _, b := range resumed {
+		log.Printf("Resumed board %q: the sleep pause was saved before the restart and an agent of it is awake", b)
 	}
-	log.Printf("Restored pause state for %d sleeping board(s)", len(boards))
 }
 
 func (s *Server) buildRouter() chi.Router {

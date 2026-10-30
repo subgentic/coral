@@ -24,6 +24,9 @@ type BoardNotifier struct {
 	logger       *slog.Logger
 	discoverFn   func(ctx context.Context) ([]AgentInfo, error)
 	isPausedFn   func(project string) bool
+	liftSleepFn  func(project string) bool // lifts a pause that sleep put on the board (not a person's), true when it did (#11182)
+	pauseLogMu   sync.Mutex
+	pauseLogged  map[string]bool // boards a skipped nudge was already logged for, until they are resumed
 	notifiedMu   sync.Mutex
 	notified     map[string]notifyState // session_name -> last nudge since the agent last read
 	notifyNowCh  chan struct{}
@@ -78,6 +81,9 @@ func NewBoardNotifier(boardStore *board.Store, runtime AgentRuntime, interval ti
 func (n *BoardNotifier) SetDiscoverFn(fn func(ctx context.Context) ([]AgentInfo, error)) {
 	n.discoverFn = fn
 }
+
+// SetLiftSleepPauseFn gives the notifier the way to end a sleep pause: it nudges an agent that is awake, and a board that sleep paused with an awake agent on it is not paused (#11182).
+func (n *BoardNotifier) SetLiftSleepPauseFn(fn func(project string) bool) { n.liftSleepFn = fn }
 
 // SetIsPausedFn sets a function to check if a board project is paused.
 func (n *BoardNotifier) SetIsPausedFn(fn func(project string) bool) {
@@ -416,9 +422,16 @@ func (n *BoardNotifier) nudgeAgent(ctx context.Context, pass *notifyPass, a Agen
 		return
 	}
 	// Skip agents on paused/sleeping boards
+	if n.isPausedFn != nil && sub.Project != "" && n.isPausedFn(sub.Project) && n.liftSleepFn != nil && n.liftSleepFn(sub.Project) {
+		// This agent is awake and the pause is sleep's: the board is resumed here whatever left it paused (a restart, a wake path that did not lift it), and the nudge goes out (#11182).
+		n.logger.Info("resumed a board that sleep had paused: one of its agents is awake", "project", sub.Project, "subscriber_id", subscriberID)
+	}
 	if n.isPausedFn != nil && sub.Project != "" && n.isPausedFn(sub.Project) {
-		n.logger.Debug("skipping paused board", "subscriber_id", subscriberID, "project", sub.Project)
+		n.noteSkippedPaused(sub.Project, subscriberID)
 		return
+	}
+	if sub.Project != "" {
+		n.clearPausedNote(sub.Project)
 	}
 
 	var unread int
@@ -616,4 +629,26 @@ func (n *BoardNotifier) noteAbsent(agents []AgentInfo, onBoards map[string]bool)
 			n.discAbsent[sn] = true
 		}
 	}
+}
+
+// noteSkippedPaused says once per board, at Info, that its nudges are being skipped because it is paused (it was Debug, and a board paused for hours went unnoticed, #11182); it says so again after
+// the board has been resumed and paused again.
+func (n *BoardNotifier) noteSkippedPaused(project, subscriberID string) {
+	n.pauseLogMu.Lock()
+	defer n.pauseLogMu.Unlock()
+	if n.pauseLogged == nil {
+		n.pauseLogged = map[string]bool{}
+	}
+	if n.pauseLogged[project] {
+		return
+	}
+	n.pauseLogged[project] = true
+	n.logger.Info("board paused: no nudges go out until it is resumed", "project", project, "first_skipped", subscriberID)
+}
+
+// clearPausedNote forgets that a board's skipped nudges were logged: it is not paused now.
+func (n *BoardNotifier) clearPausedNote(project string) {
+	n.pauseLogMu.Lock()
+	delete(n.pauseLogged, project)
+	n.pauseLogMu.Unlock()
 }

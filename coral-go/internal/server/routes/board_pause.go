@@ -52,6 +52,21 @@ func (h *BoardHandler) LiftSleepPause(project string) bool {
 	return bySleep
 }
 
+// RestoreSleepPauses is what Coral does with the pauses at startup, after the stored ones are loaded (LoadPaused): each board whose agents all sleep is paused for them, and a board with an
+// agent awake has its sleep pause lifted, since the one saved before the restart is over (the startup recovery woke its agents, or they never slept): restored and never lifted, it kept the
+// board paused and no nudge went out after a restart (#11182). A pause a person set stays. It returns the boards it resumed.
+func (h *BoardHandler) RestoreSleepPauses(sleeping, awake []string) (resumed []string) {
+	for _, b := range sleeping {
+		h.PauseForSleep(b)
+	}
+	for _, b := range awake {
+		if h.LiftSleepPause(b) {
+			resumed = append(resumed, b)
+		}
+	}
+	return resumed
+}
+
 // setPaused changes the pause in memory and in the store; the caller holds pauseMu, so the stored row always ends as the maps do.
 func (h *BoardHandler) setPaused(project string, paused, bySleep bool) {
 	h.mu.Lock()
