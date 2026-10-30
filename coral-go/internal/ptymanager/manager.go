@@ -557,6 +557,7 @@ func (m *PTYBackend) NoteLaunch(name, script, cli string) {
 	if h, can := s.proc.(handoffNoter); can {
 		h.NoteLaunch(script, cli)
 	}
+	tmux.NoteLaunchCLI(name, cli) // a Unix pseudo-terminal: the CLI a wrapper script has to be (#408)
 }
 
 // agentTextProc is implemented by pseudo-terminals that can refuse text altogether (Windows ConPTY: TextTargetChecker).
