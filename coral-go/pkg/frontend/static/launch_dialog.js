@@ -533,7 +533,7 @@ export async function launchSession() {
             const shown = agentName || (type === 'terminal' ? 'Terminal' : defaultAgentName(dir, type));
             const addedTo = launch.addTo && launch.addTo.board ? ` on board ${keyLabel(launch.addTo.board)}` : '';
             const added = !!(launch.addTo && launch.addTo.board); // Add agent to a team opens nothing: the person is on the team's page (#7778); one into a folder opens the new agent (#10077)
-            showToast(server === LOCAL_SERVER ? `Launched: ${shown}${addedTo}` : `Launched on ${serverLabel(server, state.servers)}: ${shown}${addedTo}`);
+            if (added || normServer(server) !== LOCAL_SERVER) showToast(server === LOCAL_SERVER ? `Launched: ${shown}${addedTo}` : `Launched on ${serverLabel(server, state.servers)}: ${shown}${addedTo}`); // said where the chat does not open (a team's agent, another computer's); when the new chat opens, it is the answer and the toast would sit over its header (#11304)
             const opener = document.getElementById('launch-modal')._focusOpener || null; // where the keyboard was when the dialog opened: closing the dialog puts it back there (#10247)
             hideLaunchModal();
             importOnce('./alerts_offer.js').then(m => m.offerAlertsAfterLaunch()).catch(() => {}); // the first agent is when alerts make sense: once per browser (#10068)

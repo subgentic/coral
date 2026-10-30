@@ -133,7 +133,7 @@ export function showSetPasswordModal({ local = false } = {}) {
     const meter = strengthMeter('set-password-strength');
     const confirm = passwordField({ id: 'set-password-confirm', label: 'Confirm password', autocomplete: 'new-password', name: 'confirm-password' });
     const err = el('p', 'pw-error'); err.id = 'set-password-error'; err.setAttribute('role', 'alert'); err.hidden = true;
-    form.append(usernameStub(), pw.root, meter.root, confirm.root, err);
+    form.append(usernameStub(), pw.root, confirm.root, meter.root, err); // the advice sits under both fields: its reserved room is no gap between them (#11304)
     body.append(form, el('p', 'pw-note', 'Forgot it? Run coral reset-password in a terminal on this computer.'));
     const foot = el('div', 'modal-actions modal-footer');
     const later = el('button', 'btn', 'Not now'); later.type = 'button'; later.id = 'set-password-later';
