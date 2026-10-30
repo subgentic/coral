@@ -18,7 +18,7 @@ func visibleCapped(s string, max int, tail bool) string {
 	space := false
 	for _, r := range s {
 		switch {
-		case r == ' ' || r == ' ' || unicode.IsControl(r) && !unicode.IsSpace(r) || unicode.Is(unicode.Cf, r):
+		case r == '\u2028' || r == '\u2029' || unicode.IsControl(r) && !unicode.IsSpace(r) || unicode.Is(unicode.Cf, r):
 			continue
 		case unicode.IsSpace(r):
 			space = b.Len() > 0

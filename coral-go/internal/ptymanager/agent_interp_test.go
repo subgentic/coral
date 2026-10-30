@@ -110,8 +110,8 @@ func TestDescribeImageShowsACleanedCappedFolder(t *testing.T) {
 	assert.Equal(t, "perl", program)
 	assert.Equal(t, "/opt/tools", folder)
 	assert.False(t, unidentified)
-	_, folder, _ = describeImage(7, "/opt/‮evil​/\x1b[31mred\n/x")
-	for _, bad := range []string{"‮", "​", "\x1b", "\n"} {
+	_, folder, _ = describeImage(7, "/opt/\u202eevil\u200b/\x1b[31mred\n/x")
+	for _, bad := range []string{"\u202e", "\u200b", "\x1b", "\n"} {
 		assert.NotContains(t, folder, bad)
 	}
 	_, folder, _ = describeImage(7, "/"+strings.Repeat("a", 500)+"/team-b/work/x")
@@ -124,9 +124,9 @@ func TestDescribeImageShowsACleanedCappedFolder(t *testing.T) {
 
 func TestVisibleName(t *testing.T) {
 	assert.Equal(t, "a b", visibleName("a \t\n b", 10))
-	assert.Equal(t, "abc", visibleName("a‮b​c\x00", 10))
+	assert.Equal(t, "abc", visibleName("a\u202eb\u200bc\x00", 10))
 	assert.Equal(t, "abcd…", visibleName("abcdefgh", 4))
 	assert.Equal(t, "…efgh", visibleTail("abcdefgh", 4))
 	assert.Equal(t, "abc", visibleTail("abc", 4))
-	assert.Equal(t, "", visibleName("    ", 10))
+	assert.Equal(t, "", visibleName("  \u2028 ", 10))
 }
