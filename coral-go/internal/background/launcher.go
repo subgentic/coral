@@ -244,11 +244,10 @@ func (l *AgentLauncher) launchAgent(ctx context.Context, workingDir, agentType, 
 		}
 		if !isTerminal {
 			l.bg.Add(1)
-			go func() {
+			safego.Go("background/launcher:recordCLIVersion", func() {
 				defer l.bg.Done()
-				defer safego.Recover("background/launcher:recordCLIVersion")
 				recordCLIVersion(l.sessDB, sessionID, agentType)
-			}()
+			})
 		}
 	}
 
