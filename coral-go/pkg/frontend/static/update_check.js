@@ -3,7 +3,6 @@
 import { escapeHtml, showToast, escapeAttr } from './utils.js';
 import { registerActions, textOf } from './actions.js';
 import { browserLocal } from './safe_storage.js';
-import { importOnce } from './import_once.js';
 import { reportUpdate } from './dashboard_analytics.js';
 import { noticeColumn, announceNotice } from './notifications.js';
 import { importOnce } from './import_once.js';
