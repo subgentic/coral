@@ -150,3 +150,5 @@
 
 /* The New agent persona step says "all optional" once, in its title (#10835): no tag on each field */
 #launch-modal[data-all-optional] .sv-optional { display: none; }
+
+.provider-card-body .sv-optional { display: none; } /* the provider cards' Model and Thinking (#11235): the defaults are the defaults, nothing there is "optional" */

@@ -61,5 +61,12 @@ const stubModels = ev => ev(`(() => { for (const k of Object.keys(localStorage))
     window.fetch = (u, o = {}) => { const url = new URL(String(u), location.origin);
         if (url.pathname.startsWith('/api/agents/models')) { const t = url.searchParams.get('type') || 'claude'; return Promise.resolve(new Response(JSON.stringify({ agent_type: t, fetched_at: '2026-10-25T00:00:00Z', refreshing: false, source: 'account', models: [{ value: t + '-big', display_name: t + ' Big', efforts: LEVELS }, { value: t + '-small', display_name: t + ' Small', efforts: LEVELS }], thinking: LEVELS }), { status: 200, headers: { 'content-type': 'application/json' } })); }
         return R(u, o); };
+    return true; })()`).then(() => stubCliChecks(ev));
+// Every provider's CLI is found (the page asks GET /api/system/cli-check?type=<provider>): the provider cards (#11235) draw a card with a radio only for a provider this computer has, and an isolated test server has few CLIs.
+// `missing` names the ones to answer as not installed.
+const stubCliChecks = (ev, missing = []) => ev(`(() => { const R = window.fetch, missing = ${JSON.stringify(missing)};
+    window.fetch = (u, o = {}) => { const url = new URL(String(u), location.origin);
+        if (url.pathname === '/api/system/cli-check') { const t = url.searchParams.get('type') || 'claude', found = !missing.includes(t); return Promise.resolve(new Response(JSON.stringify(found ? { agent_type: t, found: true, status: 'available', probe: 'ok' } : { agent_type: t, found: false, status: 'missing', install_url: 'https://example.invalid/install/' + t }), { status: 200, headers: { 'content-type': 'application/json' } })); }
+        return R(u, o); };
     return true; })()`);
-module.exports = { stubModels, SOURCE, install, N, openNewAgent, stepLine, scenarios };
+module.exports = { stubModels, stubCliChecks, SOURCE, install, N, openNewAgent, stepLine, scenarios };

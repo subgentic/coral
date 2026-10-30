@@ -23,6 +23,7 @@ export const CARDS = {
     'prompt-inspection-card': 'regular',
     'team-link-card': 'regular',      // the Link team dialog's form
     'launch-type-card': 'regular',    // a choice in New agent
+    'provider-card': 'none',          // a provider of New agent's Agent step: its head and its body carry their own (#11235)
     'cloud-card': 'roomy',            // the sign-in page's card
     'note-card': 'none',              // a note: its head and body carry their own
     'session-board-card': 'none',     // a team in the sidebar: its header and rows carry their own

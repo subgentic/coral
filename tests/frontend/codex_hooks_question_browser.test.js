@@ -72,25 +72,27 @@ const HOOKS = { question: 'Hooks need review: 3 hooks are new or changed', optio
 
             // the New Agent step: Codex chosen on this computer says it once; another agent says nothing
             console.log(`${tag}: New Agent`);
+            await require('./helpers/new_agent').stubCliChecks(ev); // every provider's CLI is found: a provider card has a radio only for one this computer has (#11235)
             await ev(`(async () => { await window.showLaunchModal(); document.querySelector('#launch-step-chooser [data-arg="agent"]').click(); return true; })()`);
             await waitFor(`getComputedStyle(document.getElementById('launch-step-agent')).display !== 'none' && !!document.getElementById('launch-agent-next')`, 'the folder step', 8000);
             await ev(`(() => { const i = document.getElementById('launch-dir'); if (!i.value) i.value = '/tmp'; document.getElementById('launch-agent-next').click(); document.getElementById('launch-agent-next').click(); return true; })()`); // the agent is chosen on step 3 (#7391)
             await waitFor(`!document.getElementById('launch-agent-pick').hidden && getComputedStyle(document.getElementById('launch-agent-pick')).display !== 'none'`, 'the agent choice', 8000);
             const note = () => ev(`(() => { const n = document.getElementById('launch-codex-note'); return { shown: !!n && !n.hidden && n.getClientRects().length > 0, text: n ? n.textContent : '', count: document.querySelectorAll('#launch-modal .launch-codex-note').length }; })()`);
             await ev(`document.querySelector('#launch-agent-pick input[value="claude"]').click(); true`);
-            const radios = () => ev(`(() => ({ group: document.getElementById('launch-agent-pick').getAttribute('aria-describedby'), radios: [...document.querySelectorAll('#launch-agent-pick input')].map(r => r.getAttribute('aria-describedby')) }))()`);
+            const radios = () => ev(`(() => ({ group: document.getElementById('launch-agent-pick').getAttribute('aria-describedby'), radios: [...document.querySelectorAll('#launch-agent-pick input[type=radio]')].map(r => r.getAttribute('aria-describedby')) }))()`);
+            const noteIn = x => (x || '').split(' ').includes('launch-codex-note'); // a radio is also described by its own status line (Installed, default model, #11235): what is asked is whether the note is among them
             check(`${tag}: Claude chosen: no note`, !(await note()).shown);
             const r0 = await radios();
-            check(`${tag}: Claude chosen: the agent radios are described by nothing (a hidden note would still be read)`, r0.group === null && r0.radios.every(x => x === null), JSON.stringify(r0));
+            check(`${tag}: Claude chosen: the agent radios are described by nothing (a hidden note would still be read)`, r0.group === null && r0.radios.every(x => !noteIn(x)), JSON.stringify(r0));
             await ev(`document.querySelector('#launch-agent-pick input[value="codex"]').click(); true`);
             const n = await note();
             const r1 = await radios();
-            check(`${tag}: Codex chosen: the radio group and every radio are described by the note`, r1.group === 'launch-codex-note' && r1.radios.length === 4 && r1.radios.every(x => x === 'launch-codex-note'), JSON.stringify(r1));
+            check(`${tag}: Codex chosen: the radio group and every radio are described by the note`, r1.group === 'launch-codex-note' && r1.radios.length === 4 && r1.radios.every(noteIn), JSON.stringify(r1));
             check(`${tag}: Codex chosen: one line says Codex will ask about Coral's hooks on this computer, and where to answer`, n.shown && n.count === 1 && /Codex will ask you to trust Coral's hooks on this computer/.test(n.text) && /chat/.test(n.text), JSON.stringify(n));
             await ev(`document.querySelector('#launch-agent-pick input[value="pi"]').click(); true`);
             check(`${tag}: another agent chosen: the note goes`, !(await note()).shown);
             const r2 = await radios();
-            check(`${tag}: and by nothing once it goes`, r2.group === null && r2.radios.every(x => x === null), JSON.stringify(r2));
+            check(`${tag}: and by nothing once it goes`, r2.group === null && r2.radios.every(x => !noteIn(x)), JSON.stringify(r2));
             await ev(`window.hideLaunchModal(); true`);
         }
     } finally { await client.close(); }

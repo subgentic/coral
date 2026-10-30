@@ -13,6 +13,7 @@ const { coralReady } = require('./helpers/wait');
     const check = (label, cond, detail) => { results.push(!!cond); console.log(`[${cond ? 'PASS' : 'FAIL'}] ${label}${detail !== undefined ? ' - ' + detail : ''}`); };
     const shown = sel => `(() => { const e = document.querySelector(${JSON.stringify(sel)}); return !!e && e.getClientRects().length > 0 && e.checkVisibility({ contentVisibilityAuto: true, visibilityProperty: true }); })()`; // a closed <details> hides its content by content-visibility
     const open = async () => {
+        await require('./helpers/new_agent').stubCliChecks(ev); // every provider's CLI is found: a provider card has a radio only for one this computer has (#11235)
         await ev(`(async () => { await window.showLaunchModal(); document.querySelector('#launch-step-chooser [data-arg="agent"]').click(); return true; })()`);
         await waitFor(`getComputedStyle(document.getElementById('launch-step-agent')).display !== 'none' && !!document.getElementById('launch-agent-next')`, 'the folder step', 8000);
         await ev(`(() => { const i = document.getElementById('launch-dir'); if (!i.value) i.value = '/tmp'; document.getElementById('launch-agent-next').click(); document.getElementById('launch-agent-next').click(); return true; })()`); // step 3 (#7391)
@@ -33,7 +34,7 @@ const { coralReady } = require('./helpers/wait');
             const sections = await ev(`[...document.querySelectorAll('.settings-group-pick select option')].map(o => o.value + ':' + o.textContent.trim())`);
             const modelKey = (sections.find(s => /model|agent/i.test(s.split(':')[1]) && !/persona/i.test(s)) || '').split(':')[0];
             if (modelKey) await section(modelKey);
-            const dup = await ev(`(() => { const sel = document.querySelector('#launch-agent-acf .acf-agent-type'); const lab = sel && sel.closest('label'); return { selectInDom: !!sel, labelShown: !!lab && lab.getClientRects().length > 0, radios: document.querySelectorAll('#launch-agent-pick input').length }; })()`);
+            const dup = await ev(`(() => { const sel = document.querySelector('#launch-agent-acf .acf-agent-type'); const lab = sel && sel.closest('label'); return { selectInDom: !!sel, labelShown: !!lab && lab.getClientRects().length > 0, radios: document.querySelectorAll('#launch-agent-pick input[type=radio]').length }; })()`);
             check(`${tag}: the agent is named once: the radio group shows, and the form's "Agent Type" select is not on screen`, dup.radios === 4 && dup.selectInDom && !dup.labelShown, JSON.stringify([dup, sections]));
             await ev(`document.querySelector('#launch-agent-pick input[value="codex"]').click(); true`);
             check(`${tag}: choosing in the group still drives the hidden select`, (await ev(`document.querySelector('#launch-agent-acf .acf-agent-type').value`)) === 'codex');

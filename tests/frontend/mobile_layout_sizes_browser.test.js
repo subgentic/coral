@@ -27,18 +27,17 @@ const { coralReady } = require('./helpers/wait');
         };
         // 1. providers: even columns
         await wizard(844, 390, true, 3);
-        await waitFor(`document.querySelectorAll('#launch-agent-pick .launch-agent-opt').length >= 2`, 'the providers', 8000);
-        const widths = () => ev(`[...document.querySelectorAll('#launch-agent-pick .launch-agent-opt')].map(e => Math.round(e.getBoundingClientRect().width))`);
-        let w = await widths();
-        assert.ok(Math.max(...w) - Math.min(...w) <= 2, 'landscape: the provider tiles are one width: ' + JSON.stringify(w));
+        await waitFor(`document.querySelectorAll('#launch-agent-pick .provider-card-head').length >= 1`, 'the providers', 8000);
+        // the provider cards (#11235) are a column of full-width cards, each 44 px or more, the form's width
+        const cardsNow = () => ev(`(() => { const p = document.getElementById('launch-agent-pick').getBoundingClientRect(), m = document.querySelector('#launch-agent-acf select.acf-model-select, #launch-agent-acf select')?.getBoundingClientRect(); return { pickW: Math.round(p.width), modelW: m ? Math.round(m.width) : 0, cards: [...document.querySelectorAll('#launch-agent-pick .provider-card-head')].map(e => { const b = e.getBoundingClientRect(); return [Math.round(b.width), Math.round(b.height)]; }), inside: p.left >= 0 && p.right <= innerWidth + 1 }; })()`);
+        let g = await cardsNow();
+        assert.ok(g.cards.length >= 1 && g.cards.every(c => c[1] >= 44) && g.inside, 'landscape: the provider cards are 44 px or more and on the screen: ' + JSON.stringify(g));
         await shot('providers-844x390');
         await wizard(390, 844, true, 3);
-        await waitFor(`document.querySelectorAll('#launch-agent-pick .launch-agent-opt').length >= 2`, 'the providers', 8000);
-        w = await widths();
-        assert.ok(Math.max(...w) - Math.min(...w) <= 2, 'phone: the provider tiles are one width: ' + JSON.stringify(w));
-        const g = await ev(`(() => { const p = document.getElementById('launch-agent-pick').getBoundingClientRect(), m = document.querySelector('#launch-agent-acf select.acf-model, #launch-agent-acf select')?.getBoundingClientRect(); return { pickW: Math.round(p.width), modelW: m ? Math.round(m.width) : 0, rows: new Set([...document.querySelectorAll('#launch-agent-pick .launch-agent-opt')].map(e => Math.round(e.getBoundingClientRect().top))).size }; })()`);
-        assert.equal(g.rows, 2, 'phone: two by two: ' + JSON.stringify(g));
-        assert.ok(g.pickW >= g.modelW - 60, 'phone: the grid spans the form, not a corner of it: ' + JSON.stringify(g));
+        await waitFor(`document.querySelectorAll('#launch-agent-pick .provider-card-head').length >= 1`, 'the providers', 8000);
+        g = await cardsNow();
+        assert.ok(g.cards.every(c => c[1] >= 44 && c[0] >= g.pickW - 40) && g.inside, 'phone: the cards are full width and 44 px or more: ' + JSON.stringify(g));
+        assert.ok(g.pickW >= g.modelW - 60, 'phone: the cards span the form, not a corner of it: ' + JSON.stringify(g));
         await shot('providers-390x844');
         // 2. a short screen: more page between the pinned header and footer
         await wizard(844, 390, true, 2);

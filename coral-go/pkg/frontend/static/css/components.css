@@ -4148,3 +4148,22 @@ dialog.team-link-dialog::backdrop { background: rgba(var(--black-rgb), 0.5); }
 .kbd-key { display: inline-block; min-width: 1.6em; padding: 2px 6px; text-align: center; font-family: var(--font-mono); font-size: var(--fs-md); color: var(--link-text); background: var(--bg-tertiary); border: 1px solid var(--border); border-bottom-width: 2px; border-radius: var(--radius-xs); }
 .kbd-or, .kbd-plus { color: var(--text-secondary); font-size: var(--fs-sm); }
 @media (max-width: 639px) { .shortcuts-dialog .modal-body { padding-inline: 0; } .kbd-row { grid-template-columns: 1fr; row-gap: 2px; } } /* a phone has no room for a key column beside the words: the keys sit above their description */ /* the phone dialog already has its own side padding: the description column keeps the width */
+
+/* The provider cards of New Agent's Agent step (#11235, Option B): a radio card for each provider this computer has, the open one holding its Model and Thinking; the ones it has not under "Not installed", with a link and no radio.
+   The ring is for the keyboard only (:focus-visible), so the open card is the one unmistakable state. */
+#launch-agent-pick.provider-cards { display: flex; flex-direction: column; gap: 8px; width: 100%; max-width: none; background: none; border: 0; border-radius: 0; margin: 4px 0 0; padding: 0; overflow: visible; }
+.provider-card { border: var(--card-border); border-radius: var(--card-radius); background: var(--bg-primary); }
+.provider-card.is-open { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); background: var(--bg-hover); }
+.provider-card-head { display: flex !important; flex-direction: row !important; align-items: center; gap: 10px; min-height: var(--control-touch-height, 44px); margin: 0; padding: 6px 14px; cursor: pointer; color: var(--text-primary); border-radius: var(--radius-md); } /* (!important: the dialog's labels are a column of text) */
+.provider-card-head:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+.provider-card-head input { margin: 0; flex: none; width: auto; }
+.provider-mark { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 24px; height: 24px; border-radius: var(--radius-sm); background: var(--bg-tertiary); color: var(--text-primary); font-size: var(--fs-sm); font-weight: var(--fw-strong); }
+.provider-name { font-weight: var(--fw-strong); color: var(--text-primary); }
+.provider-status { margin-left: auto; text-align: right; font-size: var(--fs-sm); font-weight: var(--fw-regular); color: var(--text-secondary); }
+.provider-card-body { padding: 0 14px 12px; }
+.provider-no-thinking { margin: 4px 0 0; color: var(--text-secondary); font-size: var(--fs-md); }
+.provider-missing { margin-top: 8px; }
+.provider-missing-title { margin: 0 0 6px; }
+.provider-missing-entry { display: flex; align-items: center; gap: 10px; min-height: var(--control-touch-height, 44px); margin-bottom: 8px; padding: 0 14px; border-style: dashed; background: transparent; }
+.provider-install { margin-left: auto; display: inline-flex; align-items: center; min-height: var(--control-touch-height, 44px); color: var(--link-text); text-decoration: underline; }
+@media (max-width: 359px) { .provider-card-body .seg-group { display: none; } .provider-card-body select.seg-source { display: block; } } /* a strip of six levels does not fit: the select under it does */
