@@ -34,7 +34,7 @@ function draw(root, { sections, current }) {
         const group = select ? (sec.title ? document.createElement('optgroup') : select) : null;
         if (group && sec.title) group.label = sec.title;
         for (const it of sec.items) {
-            const b = el('button', 'view-list-item list-row'); b.type = 'button'; b.dataset.key = it.key;
+            const b = el('button', 'view-list-item list-row vl-tab'); /* vl-tab: the phone's tab strip draws the same buttons as tabs (view_list.css) */ b.type = 'button'; b.dataset.key = it.key;
             const lab = el('span', 'view-list-label');
             const icon = folderIcon(it.icon);
             if (icon) { b.classList.add('view-list-with-icon'); lab.append(icon); }
@@ -77,7 +77,7 @@ function wireKeys(nav) {
         const b = e.target instanceof Element && e.target.closest('.view-list-item');
         if (!b || e.altKey || e.ctrlKey || e.metaKey) return;
         const items = [...nav.querySelectorAll('.view-list-item')].filter(x => !x.disabled), i = items.indexOf(b);
-        const to = e.key === 'ArrowDown' ? Math.min(items.length - 1, i + 1) : e.key === 'ArrowUp' ? Math.max(0, i - 1) : e.key === 'Home' ? 0 : e.key === 'End' ? items.length - 1 : -1;
+        const to = e.key === 'ArrowDown' || e.key === 'ArrowRight' ? Math.min(items.length - 1, i + 1) : e.key === 'ArrowUp' || e.key === 'ArrowLeft' ? Math.max(0, i - 1) : e.key === 'Home' ? 0 : e.key === 'End' ? items.length - 1 : -1;
         if (to < 0) return;
         e.preventDefault();
         for (const x of items) x.tabIndex = x === items[to] ? 0 : -1;

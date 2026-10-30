@@ -5,6 +5,7 @@
 node class_list_tokens.test.mjs
 node computer_words_census.test.mjs
 node css_duplicate_census.test.mjs
+node phone_screens_census.test.mjs
 node dialog_size_census.test.mjs
 node field_census.test.mjs
 node launch_cards_census.test.mjs

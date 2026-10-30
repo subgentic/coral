@@ -53,7 +53,7 @@ const ICONS = { needs: 'notifications', tasks: 'checklist', goals: 'flag', saved
                 assert.equal(row.hidden, 'true'); assert.equal(row.letter, letter);
             }
             assert.equal(probe.overflow, false, `${label}: no page overflow`);
-            if (width === 390) assert.ok(await ev(`!!document.querySelector('#group-table-view .view-list-trigger')?.getClientRects().length`), `${label}: phone folder drawer button remains usable`);
+            if (width === 390) assert.ok(await ev(`[...document.querySelectorAll('#group-table-view .view-list-nav .view-list-item')].filter(b => b.getClientRects().length).length >= 4`), `${label}: the phone's folder tab strip is drawn`);
             await shot(label);
             console.log('PASS ' + label + ': folder icons, provider marks, labels and counts');
         }

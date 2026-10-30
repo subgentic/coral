@@ -118,12 +118,12 @@ const { ROW_WORDS } = require('./helpers/folder_rows');
         assert.equal(await ev(`[...document.querySelectorAll('#group-table-view .dt-table tbody tr:not(.dt-group) .dt-tag')].map(t => t.textContent).join()`), 'Archived', 'an archived board stays in Board history, marked with its one chip');
         console.log('   ✓');
 
-        console.log('5. Phone: mail rows (the agent, the title, the time), the folders in a drawer, select by the avatar');
+        console.log('5. Phone: mail rows (the agent, the title, the time), the folders in a tab strip, select by the avatar');
         await open(390, 844, true);
         await waitFor(`!!document.querySelector('#group-table-view .dt-box.dt-one-line') && !document.querySelector('#group-table-view .dt-box.dt-folded')`, 'the one-row table, which never folds (#8961)', 5000);
-        const p = await ev(`(() => { const rows = [...document.querySelectorAll('#group-table-view .dt-table tbody tr:not(.dt-group)')]; return { h: rows.slice(0, 5).map(r => Math.round(r.getBoundingClientRect().height)), over: document.documentElement.scrollWidth - innerWidth, select: !!document.querySelector('#group-table-view .view-list-trigger') && getComputedStyle(document.querySelector('#group-table-view .view-list-trigger')).display !== 'none' }; })()`);
+        const p = await ev(`(() => { const rows = [...document.querySelectorAll('#group-table-view .dt-table tbody tr:not(.dt-group)')]; return { h: rows.slice(0, 5).map(r => Math.round(r.getBoundingClientRect().height)), over: document.documentElement.scrollWidth - innerWidth, select: [...document.querySelectorAll('#group-table-view .view-list-nav .view-list-item')].filter(b => b.getClientRects().length).length >= 4 /* the folders' tab strip (#11236 slice A) */ }; })()`);
         assert.equal(await ev(`[...document.querySelectorAll('#group-table-view .dt-chat-flags')].some(f => f.getClientRects().length > 0)`), false, 'a phone\'s rows have no hover icons');
-        assert.ok(p.h.every(h => h >= 44) && p.over <= 1 && p.select, 'phone rows are 44 px or more, no sideways scroll, folders in a drawer ' + JSON.stringify(p));
+        assert.ok(p.h.every(h => h >= 44) && p.over <= 1 && p.select, 'phone rows are 44 px or more, no sideways scroll, folders in a tab strip ' + JSON.stringify(p));
         // #9545: the rows are mail rows; the avatar selects (no gesture), and the bar's Star writes the flag
         const flagsBefore = await ev(`window.__flags.length`);
         await ev(`document.querySelector('#group-table-view tr.dt-mailed button.dt-mail-lead').click(); true`);
