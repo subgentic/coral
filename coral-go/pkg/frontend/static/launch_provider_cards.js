@@ -16,7 +16,8 @@ const MARKS = { claude: 'C', codex: 'X', agy: 'A', pi: 'P', opencode: 'O' }; // 
 const PROBE_MS = 1500;
 // The sign-in command the server gives for OpenCode (agent.OpencodeLoginCommand): the four XDG folders exported, then `opencode auth login`, on one line. A person is asked to paste it into a terminal, so only exactly that
 // shape is shown or copied, and only from this computer's own Coral (a remote server or Coral Hub could name any command): anything else gets a sentence instead (#11364, Security).
-const POSIX_Q = String.raw`'(?:[^'\n]|'\\'')*'`, PS_Q = String.raw`'(?:[^'\n]|'')*'`;
+// No control character in a value, and in PowerShell a quote may appear only DOUBLED, whichever of its four quote characters it is (' and the curly ones U+2018 to U+201B all end a string there): psquote on the server doubles every one.
+const POSIX_Q = String.raw`'(?:[^'\x00-\x1f\x7f]|'\\'')*'`, PS_Q = String.raw`'(?:[^'\u2018\u2019\u201a\u201b\x00-\x1f\x7f]|''|\u2018\u2018|\u2019\u2019|\u201a\u201a|\u201b\u201b)*'`;
 const SIGNIN_POSIX = new RegExp(String.raw`^(?:export XDG_(?:CONFIG|DATA|CACHE|STATE)_HOME=` + POSIX_Q + String.raw` && ){4}(?:` + POSIX_Q + String.raw`|[A-Za-z0-9_./~+-]+) auth login$`);
 const SIGNIN_POWERSHELL = new RegExp(String.raw`^(?:\$env:XDG_(?:CONFIG|DATA|CACHE|STATE)_HOME=` + PS_Q + String.raw`; ){4}(?:& )?(?:` + PS_Q + String.raw`|[A-Za-z0-9_.\\/:~+-]+) auth login$`);
 export const signinCommandIsSafe = c => typeof c === 'string' && c.length <= 2000 && (SIGNIN_POSIX.test(c) || SIGNIN_POWERSHELL.test(c));
