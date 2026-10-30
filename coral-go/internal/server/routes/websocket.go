@@ -991,8 +991,10 @@ func agentStarting(agentType, latestEvent string, sessionAgeSeconds float64, sle
 	return sessionAgeSeconds > 0 && sessionAgeSeconds <= notStartedWindowSeconds
 }
 
-// sessionAgeSeconds returns how long ago a session was created, or 0 when the
-// timestamp is missing or unparseable.
+// sessionAgeSeconds returns how long ago a session was created, or 0 when the timestamp is missing or unparseable (the callers read 0 as "unknown": not starting, not "never started").
+// A timestamp that parses is never 0 unless it is more than a second ahead of this clock (skew): a session registered within the clock's own tick (Windows' clock moves every millisecond or so,
+// and the stored time is to the microsecond), or a stored time a little ahead of this clock, is as young as it can be, not unknown. Reading it as unknown made a just-registered agent's row say starting:false, and the next list,
+// a moment later, starting:true (and not_started the same way): a flicker the row-reuse test saw once on Windows (#11351).
 func sessionAgeSeconds(createdAt string) float64 {
 	if createdAt == "" {
 		return 0
@@ -1002,11 +1004,20 @@ func sessionAgeSeconds(createdAt string) float64 {
 		return 0
 	}
 	age := time.Since(t).Seconds()
-	if age < 0 {
-		return 0
+	if age < -maxClockAheadSeconds {
+		return 0 // far ahead: skew, not a new session
+	}
+	if age < minSessionAgeSeconds {
+		return minSessionAgeSeconds
 	}
 	return age
 }
+
+// minSessionAgeSeconds is the age of a session created this instant: a microsecond, the precision of the stored time.
+const minSessionAgeSeconds = 1e-6
+
+// maxClockAheadSeconds is how far ahead of this clock a stored time may be and still be a session created now.
+const maxClockAheadSeconds = 1.0
 
 // feedIdentityFields name a feed row (the dashboard keys rows by server and session_id,
 // or name): a field-level diff always carries them.
