@@ -158,6 +158,18 @@ func (r *TmuxRuntime) AgentShellIdle(ctx context.Context, name, agentType, sessi
 	return idle, shell, true
 }
 
+// AgentUnknownShell names a shell a person started below the agent's pane's shell, for ptymanager.AgentExitedForLaunch (Security on #387).
+func (r *TmuxRuntime) AgentUnknownShell(ctx context.Context, name, agentType, sessionID string) (string, bool) {
+	if agentType == "" && sessionID == "" {
+		agentType, sessionID = parseSessionName(name)
+	}
+	sh, err := r.client.NestedShell(ctx, name, agentType, sessionID)
+	if err != nil {
+		return "", false
+	}
+	return sh, true
+}
+
 // AgentScreen implements ptymanager.ScreenReader: the bottom of the agent's pane,
 // read by the automated-input gate before typing (#3431).
 func (r *TmuxRuntime) AgentScreen(ctx context.Context, name, agentType, sessionID string) (string, error) {

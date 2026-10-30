@@ -526,9 +526,9 @@ type otherShellReporter interface {
 	OtherShell() (string, error)
 }
 
-// OtherShell names a shell other than a verified PowerShell or cmd running in the session's terminal with no program seen beside it,
-// whose contents can't be seen, so no launch line may be typed there (Security on #216). ok is false when the session is gone or the
-// platform cannot tell; "" with ok true is none.
+// OtherShell names a shell the agent is not running in but that its terminal is: on Windows a shell other than a verified PowerShell or cmd running in the session's terminal with no
+// program seen beside it (what runs in it can't be seen), on Unix a shell a person started below the session's own shell (what runs in it is not the agent). No launch line may be
+// typed there (Security on #216, #387). ok is false when the session is gone or the platform cannot tell; "" with ok true is none.
 func (m *PTYBackend) OtherShell(name string) (shell string, ok bool) {
 	m.mu.RLock()
 	s, found := m.sessions[name]
@@ -536,11 +536,15 @@ func (m *PTYBackend) OtherShell(name string) (shell string, ok bool) {
 	if !found || !s.isRunning() {
 		return "", false
 	}
-	r, can := s.proc.(otherShellReporter)
-	if !can {
+	var sh string
+	var err error
+	if r, can := s.proc.(otherShellReporter); can { // Windows ConPTY
+		sh, err = r.OtherShell()
+	} else if sp, can := s.proc.(shellPIDReporter); can { // a Unix pseudo-terminal
+		sh, err = tmux.NestedShellOf(sp.ShellPID())
+	} else {
 		return "", false
 	}
-	sh, err := r.OtherShell()
 	if err != nil {
 		return "", false
 	}
