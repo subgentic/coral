@@ -2,6 +2,7 @@
 // (#11338: 60+ ids in one list, with an anthropic default that failed with no extra usage). Against a stubbed /api/agents/models (the groups and default_model the server answers); another CLI's list stays flat.
 // 1280 px, isolated dev server.
 const assert = require('node:assert/strict');
+const { coralReady } = require('./helpers/wait');
 const { connect } = require('./agent_view_harness');
 
 (async () => {
@@ -18,7 +19,7 @@ const { connect } = require('./agent_view_harness');
         await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await ev(`(() => { for (const k of Object.keys(localStorage)) if (k.startsWith('coral-models:v1:')) localStorage.removeItem(k); return true; })()`);
         await ev(`fetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ default_model_pi: '' }) }).then(r => r.ok)`);
         await ev(`(() => { const R = window.fetch; window.__serve = { pi: { models: ${JSON.stringify(PI)}, groups: [{ name: 'openai', signed_in: true }, { name: 'anthropic', signed_in: false }], default_model: 'openai/gpt-5.6-luna' } };
