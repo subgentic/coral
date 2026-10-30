@@ -12,7 +12,7 @@ export function client(base, cookie) {
             method,
             headers: { 'Content-Type': 'application/json', Cookie: cookie, Origin: base, 'Sec-Fetch-Site': 'same-origin' },
             body: body === undefined ? undefined : JSON.stringify(body),
-            signal: AbortSignal.timeout(20000),
+            signal: AbortSignal.timeout(Number(process.env.SCREENS_API_TIMEOUT_MS) || 20000),
         });
         const text = await res.text();
         let value;
