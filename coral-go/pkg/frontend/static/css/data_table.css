@@ -138,6 +138,11 @@
 .dt-row[aria-current="true"] td { background: var(--table-hover); }
 .dt-row.dt-quiet td { color: var(--table-tertiary-color); }
 .dt-row.dt-selected td { background: var(--table-selected); }
+/* A task's state in a table is its word in the state's colour, no pill and no dot (#11189): the text-safe tokens (4.5:1 or more on the light and dark panels), the word says the state, the colour is not its only signal. */
+.dt-state { color: var(--text-secondary); font-weight: var(--fw-strong); white-space: nowrap; }
+.dt-state.goal-state-task-active { color: var(--link-text); }
+.dt-state.goal-state-task-blocked { color: var(--warning-text); }
+.dt-state.goal-state-task-done { color: var(--success-text); }
 .dt-table td > .chip:only-child { display: flex; width: fit-content; max-width: 100%; } /* a cell that is one chip: the chip is a block the cell centres, like the select box beside it (a cell with other content keeps its inline chips) (as an inline box its baseline put it 4 px low at 200% text, #11160) */
 .dt-table .dt-check { width: var(--table-check-w); min-width: var(--table-check-w); padding: 0; text-align: center; overflow: visible; }
 .dt-bar { flex: 1 1 auto; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 4px 0; }
