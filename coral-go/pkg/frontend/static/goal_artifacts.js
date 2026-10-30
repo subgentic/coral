@@ -23,6 +23,8 @@ async function read(team, goalId, extra) {
     if (!resp.ok) {
         // Through Coral Hub the list is the owner's alone: the computer answers a View grantee 403 owner_only (as for the team's Artifacts page), which is not a failure to read
         if (resp.status === 403 && await resp.json().then(b => b && (b.code === 'owner_only' || b.error === 'owner_only'), () => false)) throw new Error('owner_only');
+        // A View guest of a computer reaches it through Coral Hub, which answers the owner-only list with its own 404 (the bytes of a missing route) and never asks the computer (#11280): through the Hub that is 'not for you' too. A 404 anywhere else is still an error.
+        if (resp.status === 404 && isCloud()) throw new Error('owner_only');
         throw new Error(`HTTP ${resp.status}`);
     }
     return resp.json();
