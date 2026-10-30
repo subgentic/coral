@@ -10,7 +10,7 @@ const FAKE_VV = `(() => { const t = new EventTarget(); const vv = { height: inne
     Object.defineProperty(window, 'visualViewport', { configurable: true, get: () => vv }); window.__kb = (h, top) => { vv.height = h; vv.offsetTop = top || 0; t.dispatchEvent(new Event('resize')); }; })()`;
 const rects = `(() => { const h = document.querySelector('#live-session-view .terminal-header'), box = e => { const b = e.getBoundingClientRect(); return { l: Math.round(b.left), t: Math.round(b.top), r: Math.round(b.right), b: Math.round(b.bottom) }; };
     const vis = e => e.getClientRects().length > 0 && e.getBoundingClientRect().width > 1;
-    const parts = [['menu', 'agent-bar-menu'], ['back', null], ['identity', 'terminal-header-identity'], ['switch', 'live-view-switch'], ['more', 'agent-bar-more']].map(([n, id]) => [n, id ? document.getElementById(id) : h.querySelector('.terminal-back-btn')]).filter(([, e]) => e && vis(e)).map(([n, e]) => [n, box(e)]);
+    const parts = [['back', null], ['identity', 'terminal-header-identity'], ['switch', 'live-view-switch'], ['more', 'agent-bar-more']].map(([n, id]) => [n, id ? document.getElementById(id) : h.querySelector('.terminal-back-btn')]).filter(([, e]) => e && vis(e)).map(([n, e]) => [n, box(e)]);
     const top = document.querySelector('header.top-bar'), chip = document.getElementById('selection-pause-badge');
     return { header: box(h), parts, topBar: top ? getComputedStyle(top).display : 'none', sideways: document.documentElement.scrollWidth - innerWidth, chip: chip && getComputedStyle(chip).display !== 'none' ? box(chip) : null, mode: JSON.parse(document.getElementById('coral-boot').textContent).mode }; })()`;
 const overlap = (a, b) => Math.min(a.r, b.r) - Math.max(a.l, b.l) > 1 && Math.min(a.b, b.b) - Math.max(a.t, b.t) > 1;
@@ -33,7 +33,7 @@ const overlap = (a, b) => Math.min(a.r, b.r) - Math.max(a.l, b.l) > 1 && Math.mi
             assert.equal(m.mode, 'cloud', `${fs}: the page is the Hub's`);
             assert.equal(m.topBar, 'none', `${fs}: the top bar is hidden while an agent is open`);
             const names = m.parts.map(p => p[0]);
-            for (const n of ['menu', 'back', 'identity', 'switch', 'more']) assert.ok(names.includes(n), `${fs}: ${n} is in the row: ` + JSON.stringify(m.parts));
+            for (const n of ['back', 'identity', 'switch', 'more']) assert.ok(names.includes(n), `${fs}: ${n} is in the row: ` + JSON.stringify(m.parts));
             const mids = m.parts.filter(p => /menu|back|chat|more/.test(p[0])).map(p => (p[1].t + p[1].b) / 2);
             assert.ok(Math.max(...mids) - Math.min(...mids) <= 2, `${fs}: one row (the menu, back, switch and ⋯ on one centre line): ` + JSON.stringify(m.parts));
             for (const [n, b] of m.parts) if (/menu|back|chat|terminal|more/.test(n)) assert.ok(b.r - b.l >= 43 && b.b - b.t >= 43, `${fs}: ${n} is a 44 px target: ` + JSON.stringify(b));
