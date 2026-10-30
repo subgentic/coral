@@ -72,6 +72,10 @@ export async function showShortcuts() {
     }
     m.style.display = 'flex'; // display-ok: a .modal shows as a flex overlay, as showAlertModal does
     body.scrollTop = 0;
+    // The list is a Tab stop only while it scrolls: a keyboard user reaches the rows below the fold, and a list that fits (or an empty one) is no stop and no 16 px target (phone_layout)
+    const sync = () => { body.tabIndex = body.scrollHeight > body.clientHeight + 1 ? 0 : -1; };
+    sync();
+    if (!body.dataset.syncWired) { body.dataset.syncWired = '1'; window.addEventListener('resize', sync); }
 }
 
 export function newAgentShortcut() {

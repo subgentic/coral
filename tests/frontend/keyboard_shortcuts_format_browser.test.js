@@ -89,7 +89,7 @@ const GROUPS = ['Navigation', 'Chat', 'Search', 'Dialogs'];
             else check(/Ctrl/.test(flat) && /Alt/.test(flat) && /Shift/.test(flat) && !/[⌘⌥⇧⌃]/.test(flat), `${tag}: the words, no Mac glyphs: ${flat}`);
             check(d.closeVisible && /close/i.test(d.closeName || '') && d.closeSize[0] >= 24 && d.closeSize[1] >= 24, `${tag}: a visible, named close button in the header: ${JSON.stringify([d.closeName, d.closeSize])}`);
             if (w === 390) check(d.closeSize && d.closeSize[0] >= 44 && d.closeSize[1] >= 44, `${tag}: the close button is 44 px on a phone: ${JSON.stringify(d.closeSize)}`);
-            check(d.bodyRegion === 'region|Keyboard shortcuts list|0', `${tag}: the scrolling body is a focusable, labelled region: ${d.bodyRegion}`);
+            check(d.bodyRegion === (d.overflow > 0 ? 'region|Keyboard shortcuts list|0' : 'region|Keyboard shortcuts list|-1'), `${tag}: the body is a labelled region, a Tab stop only while it scrolls: ${d.bodyRegion}`);
             if (d.overflow > 0) { // a keyboard user can scroll it: Tab from Close reaches the body, then PageDown scrolls down and Home back up
                 await ev(`document.getElementById('shortcuts-close').focus(); true`);
                 await Input.dispatchKeyEvent({ type: 'rawKeyDown', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 }); await Input.dispatchKeyEvent({ type: 'keyUp', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 }); await settle(150);
