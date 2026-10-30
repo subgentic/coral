@@ -5,11 +5,12 @@ package peercred
 import (
 	"errors"
 	"net/netip"
+	"time"
 )
 
 // Supported reports whether this platform can tell the peer's user.
 const Supported = false
 
-func ownerIsMe(client, server netip.AddrPort) (bool, error) {
+func ownerIsMe(client, server netip.AddrPort, _ time.Time) (bool, error) {
 	return false, errors.New("peercred: unsupported on this system")
 }

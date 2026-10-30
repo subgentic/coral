@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -210,7 +211,7 @@ func TestSameUserLayoutIsUnsupported(t *testing.T) {
 		{errors.New("open process: access denied"), false, true},
 		{nil, true, true},
 	} {
-		ownerCheck = func(netip.AddrPort, netip.AddrPort) (bool, error) { return tc.err == nil, tc.err }
+		ownerCheck = func(netip.AddrPort, netip.AddrPort, time.Time) (bool, error) { return tc.err == nil, tc.err }
 		same, supported := SameUser(r)
 		assert.Equal(t, tc.same, same, "%v", tc.err)
 		assert.Equal(t, tc.supported, supported, "%v", tc.err)
