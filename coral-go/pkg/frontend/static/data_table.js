@@ -130,7 +130,7 @@ function rowMore(actions, label) {
     wrap.append(toggle, menu);
     return wrap;
 }
-const mailCell = (m, label, open, pick, showTeam = false) => { // open: the row opens (a button), pick: a function that selects it, or null, showTeam: the team is drawn after the title (always for Needs you, and for a title two rows share)
+const mailCell = (m, label, open, pick, showTeam = false, gap = false) => { // open: the row opens (a button), pick: a function that selects it, or null, showTeam: the team is drawn after the title (always for Needs you, and for a title two rows share)
     const td = el('td', 'dt-mail-cell'); td.setAttribute('role', 'cell');
     const lead = el(pick ? 'button' : 'span', 'dt-mail-lead');
     if (pick) { lead.type = 'button'; lead.setAttribute('role', 'checkbox'); lead.setAttribute('aria-label', `Select ${label}`); lead.setAttribute('aria-checked', 'false'); lead.addEventListener('click', pick); } else lead.setAttribute('aria-hidden', 'true'); // a list that can be selected: the avatar is its checkbox (a tap, no gesture), as the desktop's is
@@ -157,6 +157,7 @@ const mailCell = (m, label, open, pick, showTeam = false) => { // open: the row 
     body.append(text, ' ', side);
     td.append(lead, body);
     if (m.actions && m.actions.length) td.append(rowMore(m.actions, label)); // a row's ⋯ menu, after the row's button and before its choices
+    else if (gap) { const g = el('span', 'dt-mail-more-gap'); g.setAttribute('aria-hidden', 'true'); td.append(g); }
     if (m.answers) td.append(m.answers); // a Needs you row's choices, under the line (#10400)
     return td;
 };
@@ -426,6 +427,7 @@ export function dataTable(cfg) {
         const list = sortedRows();
         const cols = columns.length + (sel ? 1 : 0);
         let lastGroup = null;
+        const mails = mailOn() ? list.map(r => cfg.mail(r)) : null, gap = !!mails && mails.some(m => m.actions && m.actions.length); // a list with a ⋯ on any row reserves its 44 px on every row, so the times line up (#137104)
         list.forEach((r, i) => {
             if (cfg.groupBy && !st.sort) { // the rows come in the caller's order: a divider where their group changes (a day), none once the person has sorted
                 const g = cfg.groupBy(r);
@@ -447,9 +449,9 @@ export function dataTable(cfg) {
                 td.append(cb.hidden ? cb : checkHit(cb)); tr.append(td);
             }
             if (mailOn()) {
-                const m = cfg.mail(r), showTeam = !!m.team && (m.teamAlways || dupTitles().has(m.title));
+                const m = mails[i], showTeam = !!m.team && (m.teamAlways || dupTitles().has(m.title));
                 const pick = sel && eligible(r) ? () => { const cb = tr.querySelector('.dt-check input'); if (!cb) return; if (!st.select) { st.select = true; st.mailSelect = true; syncSelectMode(); } cb.dispatchEvent(new MouseEvent('click', { bubbles: true })); } : null;
-                tr.classList.add('dt-mailed'); tr.append(mailCell(m, nameOf(r), !!cfg.open, pick, showTeam));
+                tr.classList.add('dt-mailed'); tr.append(mailCell(m, nameOf(r), !!cfg.open, pick, showTeam, gap));
             } else for (const c of columns) tr.append(cellOf(c, r, tr));
             if (cfg.open) {
                 tr.classList.add('dt-row-open');
