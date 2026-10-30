@@ -139,12 +139,14 @@ export async function showFirewallWarning(message) {
     warningStack().appendChild(toast);
 }
 
-/** What Coral did to make an open data folder private: told once, as a fix, not as a warning (#295). */
+/** What Coral did to make an open data folder private: told as a fix, not as a warning (#295). */
 export function showSecurityNotice(message) {
     if (!message || document.getElementById("security-notice-toast")) return;
-    showWarningToast("security-notice-toast", "Data folder made private", message, "status");
-    // The status keeps the notice until the page that showed it says so: a CLI or another tab reading the status does not use it up.
-    fetch("/api/system/security-notice/ack", { method: "POST" }).catch(() => {});
+    const toast = buildWarningToast("security-notice-toast", "Data folder made private", message, "status");
+    // Acknowledged when the person dismisses it, not when it is drawn: a background tab or a quick reload leaves it in the status, so it is
+    // shown again, and Settings > Security keeps it until then (it can say the API key was replaced).
+    toast.querySelector(".update-toast-close").addEventListener("click", () => { fetch("/api/system/security-notice/ack", { method: "POST" }).catch(() => {}); });
+    warningStack().appendChild(toast);
 }
 
 export function showDatabaseWarning(message) {

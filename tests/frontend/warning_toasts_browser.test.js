@@ -101,13 +101,28 @@ const DATABASE = 'The sessions database is damaged (page 12 is corrupt). Stop Co
         assert.equal(notice.role, null, "announced politely by the notices' own region, not by a role of its own (#6213)");
         assert.equal(notice.warning, false, 'it is not the Security warning');
 
-        // The notice stays in the status until the page that showed it says so (a CLI or a second tab reading the status does not use it up): the page posts the
-        // acknowledgement once, when the notice is on the screen.
+        // The notice stays in the status until the person dismisses it: drawing it acknowledges nothing (a background tab or a quick reload must not use
+        // it up unseen); its close button posts the acknowledgement once. Settings > Security shows it until then, and its button acknowledges it too.
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
         await waitFor(`!!document.getElementById('agent-search-input')`, 'the page', 15000);
-        const acks = await ev(`(async () => { const m = await import(${STATIC} + 'update_check.js'); const seen = []; const saved = window.fetch; window.fetch = (u, o) => { if (String(u).includes('security-notice/ack')) { seen.push(o && o.method); return Promise.resolve(new Response('{}', { status: 200 })); } return saved(u, o); };
-            m.showSecurityNotice('Coral made its data folder private.'); m.showSecurityNotice('Coral made its data folder private.'); window.fetch = saved; return seen; })()`);
-        assert.deepEqual(acks, ['POST'], 'the notice is acknowledged once, by a POST, when it is shown');
+        const acks = await ev(`(async () => { const m = await import(${STATIC} + 'update_check.js'); const seen = []; window.__ackSeen = seen; const saved = window.fetch; window.__savedFetch = saved;
+            window.fetch = (u, o) => { if (String(u).includes('security-notice/ack')) { seen.push(o && o.method); return Promise.resolve(new Response('{}', { status: 200 })); }
+                if (String(u).includes('/api/system/status')) return Promise.resolve(new Response(JSON.stringify({ security_notice: 'Coral made its data folder private.' }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+                return saved(u, o); };
+            m.showSecurityNotice('Coral made its data folder private.'); m.showSecurityNotice('Coral made its data folder private.');
+            const shown = seen.length;
+            document.querySelector('#security-notice-toast .update-toast-close').click();
+            return { shown, dismissed: seen.slice(), toast: !!document.getElementById('security-notice-toast') }; })()`);
+        assert.equal(acks.shown, 0, 'drawing the notice acknowledges nothing');
+        assert.deepEqual(acks.dismissed, ['POST'], 'dismissing it posts the acknowledgement once');
+        assert.equal(acks.toast, false);
+        const noticeRow = await ev(`(async () => { const m = await import(${STATIC} + 'firewall_warning.js'); await window.showSettingsModal('files'); window.__ackSeen.length = 0; await m.renderSecurityNoticeRow();
+            const r = document.getElementById('settings-security-notice-row'); const text = r && r.querySelector('.settings-hint').textContent;
+            r && r.querySelector('button').click(); const out = { text, acks: window.__ackSeen.slice(), gone: !document.getElementById('settings-security-notice-row') };
+            window.fetch = window.__savedFetch; return out; })()`);
+        assert.equal(noticeRow.text, 'Coral made its data folder private.', 'Settings > Security has the notice while it is not acknowledged');
+        assert.deepEqual(noticeRow.acks, ['POST'], "its I've read this button acknowledges it");
+        assert.equal(noticeRow.gone, true);
 
         console.log('at 200% zoom the warnings are a strip, not the page (#295)');
         for (const [w, h] of [[640, 360], [1280, 800]]) {
