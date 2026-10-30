@@ -3687,6 +3687,9 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 .acf-cli-warning > .btn { order: 1; } /* the button is on the status line at the right, the link, the command and the note under them (the DOM has the button last) */
 .launch-cli-slot .acf-cli-warning code { color: var(--text-primary); overflow-wrap: anywhere; }
 .launch-cli-slot .acf-cli-warning .cli-install-link a { color: var(--link-text); }
+.launch-signin-notice { margin: 0 0 var(--space-md); } /* where it sits; the look is the one notice (#11336) */
+.launch-signin-body { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-sm); min-width: 0; }
+.launch-signin-body p { margin: 0; }
 .launch-cli-slot .acf-cli-warning .btn { margin: 0 0 0 auto; }
 .launch-cli-slot .acf-cli-warning .cli-actions { order: 1; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px 8px; margin-left: auto; } /* Check again and Set path (#10013): one group at the right end of the line, wrapping together */
 .launch-cli-slot .acf-cli-warning .cli-actions .btn { margin: 0; }

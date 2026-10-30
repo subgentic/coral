@@ -77,6 +77,23 @@ const TEAM = `qa-next-steps-${Date.now() % 100000}`;
         check(/^On: the first task will also be the team's goal/.test(gs.withTask || ''), `with a task written: ${JSON.stringify(gs.withTask)}`);
         check(/^Off: the first task will not be saved as a goal/.test(gs.off || '') && gs.read === false, `clicked once it says Off and sends no goal: ${JSON.stringify([gs.off, gs.read])}`);
         check(/^On: the first task will also/.test(gs.backOn || '') && gs.readOn === true, `clicked again it says On: ${JSON.stringify([gs.backOn, gs.readOn])}`);
+        // (6) New Agent says Claude is not signed in, with how (#11336): a notice under the provider, Launch stays on, nothing for another provider
+        await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false }); await Emulation.setTouchEmulationEnabled({ enabled: false });
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await ev(`window.__signed = true; const R6 = window.fetch; window.fetch = (u, o) => String(u).includes('/api/system/status') ? Promise.resolve(new Response(JSON.stringify({ claude_signed_in: window.__signed }), { status: 200, headers: { 'Content-Type': 'application/json' } })) : R6(u, o); true`);
+        await ev(`import(${S} + 'launch_signin_notice.js').then(async m => { const sl = await import(${S} + 'signin_line.js'); window.__sl = sl; const host = document.createElement('div'); host.id = 'sn-host'; host.innerHTML = '<form id="sn-form"><select class="acf-agent-type"><option value="claude">Claude</option><option value="codex">Codex</option></select></form><div id="sn-slot" class="launch-cli-slot"></div>'; document.body.append(host); sl.setClaudeSignedIn(true); m.mountLaunchSigninNotice({ slot: document.getElementById('sn-slot'), form: document.getElementById('sn-form'), server: 'local' }); return true; })`);
+        const sn = () => ev(`(() => { const n = document.querySelector('#sn-host .launch-signin-notice'); const b = n && n.querySelector('button'), st = n && n.querySelector('.launch-signin-steps'); return n ? { shown: !n.hidden, text: n.textContent.replace(/\\s+/g, ' ').trim(), expanded: b.getAttribute('aria-expanded'), steps: !st.hidden } : null; })()`);
+        let n0 = await sn();
+        check(n0 && !n0.shown, `signed in: no notice: ${JSON.stringify(n0)}`);
+        await ev(`window.__signed = false; window.__sl.setClaudeSignedIn(false); true`); n0 = await sn();
+        check(n0.shown && /Claude isn't signed in on this computer\./.test(n0.text) && /How to sign in/.test(n0.text), `Claude not signed in: a notice with How to sign in: ${JSON.stringify(n0)}`);
+        await ev(`document.querySelector('#sn-host .launch-signin-how').click(); true`); n0 = await sn();
+        check(n0.expanded === 'true' && n0.steps && /run claude/.test(n0.text) && /Open terminal and Check again/.test(n0.text), `How to sign in opens the steps: ${JSON.stringify(n0)}`);
+        await ev(`(() => { const x = document.querySelector('#sn-host select'); x.value = 'codex'; x.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`); n0 = await sn();
+        check(!n0.shown, `another provider: no notice about Claude: ${JSON.stringify(n0)}`);
+        await ev(`(() => { const x = document.querySelector('#sn-host select'); x.value = 'claude'; x.dispatchEvent(new Event('change', { bubbles: true })); window.__signed = true; window.__sl.setClaudeSignedIn(true); return true; })()`); n0 = await sn();
+        check(!n0.shown, `signed in again: the notice goes by itself: ${JSON.stringify(n0)}`);
+        await ev(`document.getElementById('sn-host').remove(); true`);
         // (4) plain words
         const root = require('node:path').join(__dirname, '..', '..', 'coral-go', 'pkg', 'frontend', 'static'), read = f => require('node:fs').readFileSync(require('node:path').join(root, f), 'utf8'); // the sources that write the words
         const t = read('task_create.js'), g = read('goals_view.js'), d = read('team_dialogs.js');
