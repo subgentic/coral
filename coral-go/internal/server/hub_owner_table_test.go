@@ -115,7 +115,9 @@ func TestTheOwnerRoutesOfTheTableAreTheReviewedSet(t *testing.T) {
 		"POST /api/artifacts/{hex64}/comments":              "owner-only",
 		"POST /api/artifacts/{hex64}/comments/{id}/resolve": "owner-only",
 		"POST /api/artifacts/{hex64}/comments/{id}/reopen":  "owner-only",
-		"GET /api/board/{project}/settings":                 "owner-sees", "GET /api/system/update": "owner-update", "POST /api/system/update/relaunch": "owner-update",
+		// Approve, or ask changes of, a for-review artifact through the Hub is the owner's alone (#136584, #11354).
+		"POST /api/board/{project}/artifacts/{id}/review": "owner-only",
+		"GET /api/board/{project}/settings":               "owner-sees", "GET /api/system/update": "owner-update", "POST /api/system/update/relaunch": "owner-update",
 	}
 	got := map[string]string{}
 	for _, r := range tunnel.OwnerRoutes() {

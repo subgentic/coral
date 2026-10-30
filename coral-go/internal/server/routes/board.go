@@ -39,12 +39,13 @@ type BoardHandler struct {
 	bs                            *board.Store
 	terminal                      ptymanager.SessionTerminal
 	mu                            sync.RWMutex
-	paused                        map[string]bool         // in-memory set of paused project names
-	touches                       *operatortouch.Recorder // the Operator's touches, counted for the Analytics tab (#11225); nil: not recorded
-	sleepPausedAt                 map[string]time.Time    // when each sleep pause was made in this process (zero for one restored at startup): a lift on what an agent was seen doing earlier must not undo a later one (#11204)
-	sleepPaused                   map[string]bool         // the paused boards whose pause sleep or Coral's restart put there, which auto-wake lifts (#286)
-	pauseMu                       sync.Mutex              // one pause change at a time, its check, maps and stored row together (Security on #119)
-	notifyFn                      func(project string)    // triggers an immediate notification pass for project's board
+	paused                        map[string]bool                                      // in-memory set of paused project names
+	touches                       *operatortouch.Recorder                              // the Operator's touches, counted for the Analytics tab (#11225); nil: not recorded
+	sleepPausedAt                 map[string]time.Time                                 // when each sleep pause was made in this process (zero for one restored at startup): a lift on what an agent was seen doing earlier must not undo a later one (#11204)
+	sleepPaused                   map[string]bool                                      // the paused boards whose pause sleep or Coral's restart put there, which auto-wake lifts (#286)
+	pauseMu                       sync.Mutex                                           // one pause change at a time, its check, maps and stored row together (Security on #119)
+	notifyFn                      func(project string)                                 // triggers an immediate notification pass for project's board
+	reviewPost                    func(ctx context.Context, project, msg string) error // a test's replacement for posting the approval message (team_artifact_review.go)
 	coralDir                      string
 	alsoMu                        sync.Mutex    // serialises adding a later receipt to a received row (#4449)
 	autoAttach                    *AutoAttacher // #3515: an agent's linked images and Markdown

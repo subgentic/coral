@@ -45,16 +45,18 @@ type teamArtifact struct {
 	GoalID    *int64 `json:"goal_id,omitempty"`
 	GoalTitle string `json:"goal_title,omitempty"`
 	// Tags: the team's tags on this stored object (#8583), lowercase words, sorted; absent for none.
-	Tags           []string `json:"tags,omitempty"`
-	Source         string   `json:"source"`
-	URI            string   `json:"uri,omitempty"`
-	Digest         string   `json:"digest,omitempty"`
-	Available      bool     `json:"available"`
-	Inline         bool     `json:"inline"`
-	ReferenceCount int      `json:"reference_count"`
-	PreviewURL     string   `json:"preview_url,omitempty"`
-	DownloadURL    string   `json:"download_url,omitempty"`
-	ContentURL     string   `json:"content_url,omitempty"`
+	Tags []string `json:"tags,omitempty"`
+	// Review is the Operator's decision on an artifact tagged for review, with its time (#136584): absent until one is made.
+	Review         *board.ArtifactReview `json:"review,omitempty"`
+	Source         string                `json:"source"`
+	URI            string                `json:"uri,omitempty"`
+	Digest         string                `json:"digest,omitempty"`
+	Available      bool                  `json:"available"`
+	Inline         bool                  `json:"inline"`
+	ReferenceCount int                   `json:"reference_count"`
+	PreviewURL     string                `json:"preview_url,omitempty"`
+	DownloadURL    string                `json:"download_url,omitempty"`
+	ContentURL     string                `json:"content_url,omitempty"`
 	// SessionID/ProducedBy are the stored-ownership attribution (null when it
 	// cannot be established); see board.ArtifactProducer.
 	SessionID  *string `json:"session_id"`

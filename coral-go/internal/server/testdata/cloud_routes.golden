@@ -277,6 +277,7 @@ POST /api/auth/password/set never
 POST /api/auth/sessions/sign-out-others never
 POST /api/auto-accept/disable-all interact
 POST /api/board/remotes never
+POST /api/board/{project}/artifacts/{id}/review interact
 POST /api/board/{project}/cross-team-links never
 POST /api/board/{project}/cross-team/disable launch
 POST /api/board/{project}/cross-team/enable launch

@@ -36,6 +36,10 @@ const { coralReady } = require('./helpers/wait');
                             const items=window.__reviewItems.filter(a=>!u.searchParams.has('tag')||a.tags.includes(u.searchParams.get('tag')));
                             return json({project:'${team}',artifacts:items,has_more:false});
                         }
+                        if(u.pathname.startsWith('/api/board/${team}/artifacts/')&&u.pathname.endsWith('/review')&&opts.method==='POST'){
+                            const id=u.pathname.split('/').at(-2),body=JSON.parse(opts.body);(window.__decisions=window.__decisions||[]).push({id,decision:body.decision});
+                            window.__reviewItems=window.__reviewItems.filter(a=>a.id!==id);return json({id,state:'approved',changed:true,tags:['approved'],delivered:true,to:'Writer'});
+                        }
                         if(u.pathname.startsWith('/api/board/${team}/artifacts/')&&u.pathname.endsWith('/tags')){
                             if(window.__tagFail)return json({error:'Tag save failed'},500);
                             const id=u.pathname.split('/').at(-2),body=JSON.parse(opts.body);window.__tagWrites.push(body.tags);
@@ -95,11 +99,10 @@ const { coralReady } = require('./helpers/wait');
                 await waitFor(`document.getElementById('nav-tab-hub-inbox-badge').textContent==='2'`,'the badge counts it again (the viewer-opened item stays read)');
                 assert.deepEqual(await ev(`window.__tagWrites.at(-1)`),['for review'],'the read tag is taken off');
                 assert.ok(await ev(`!(${row('Read me 1.txt')}).querySelector('.inbox-review-item')`),'the tag is gone from the row');
-                // Mark reviewed also reads the tags fresh: a tag added meanwhile is kept, and the read tag goes with the review tag (#9299)
-                await ev(`window.__reviewItems[1].tags=['for review','team-tag'];true`);
-                await click('Read me 2.txt','Mark reviewed');
-                await waitFor(`!(${row('Read me 2.txt')})`,'the reviewed row goes');
-                assert.deepEqual((await ev(`window.__tagWrites.at(-1)`)).sort(),['reviewed','team-tag'],'Mark reviewed keeps the tag added meanwhile');
+                // Approve replaced Mark reviewed (#136584): the server swaps the tags (a tag added meanwhile is kept there: board store tests), the row goes, one decision is sent
+                await click('Read me 2.txt','Approve');
+                await waitFor(`!(${row('Read me 2.txt')})`,'the approved row goes');
+                assert.deepEqual(await ev(`window.__decisions.map(d=>d.decision)`),['approve'],'one approve was sent');
                 console.log('PASS review read '+width);
             } catch(error){failures.push(width+': '+error.message);console.error(failures.at(-1));}
         }

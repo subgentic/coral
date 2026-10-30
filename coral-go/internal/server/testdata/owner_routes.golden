@@ -23,6 +23,7 @@ PATCH /api/saved/{id} interact owner-only
 POST /api/artifacts/{id}/comments interact owner-only
 POST /api/artifacts/{id}/comments/{cid}/reopen interact owner-only
 POST /api/artifacts/{id}/comments/{cid}/resolve interact owner-only
+POST /api/board/{project}/artifacts/{id}/review interact owner-only
 POST /api/board/{project}/cross-team/disable launch owner-only-hub
 POST /api/board/{project}/cross-team/enable launch owner-only-hub
 POST /api/board/{project}/cross-team/files/disable launch owner-only-hub

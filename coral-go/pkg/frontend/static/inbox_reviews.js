@@ -101,6 +101,13 @@ export async function setReviewRead(row, read) {
     changed();
 }
 
+/** The Operator decided a review (Approve): the row is out of the list at once, and a read that was already in flight cannot put it back. */
+export function settleReview(row) {
+    revision++;
+    items = items.filter(a => a.reviewKey !== row.reviewKey);
+    changed();
+}
+
 const reading = new Map(); // hex -> the write in flight, so the viewer and the preview opening the same artifact write once
 /** The operator opened an artifact (the viewer, a preview, a link): when it is one of the for-review artifacts, tag it read. Any other artifact is never tagged. Resolves when it is done; rejects with the server's words. */
 export function markOpenedRead(hex) {
@@ -116,19 +123,3 @@ export function markOpenedRead(hex) {
     return p;
 }
 
-/** Swap the review tag, preserving the remaining tags (the 'read' tag goes: a reviewed artifact is settled); keep the row on failure. */
-export async function markReviewed(row) {
-    const current = await currentTags(row); // as the server has them now, read right before the write (the route replaces the whole list): a tag added since the last refresh is kept (#9299)
-    if (current === null) { revision++; items = items.filter(a => a.reviewKey !== row.reviewKey); changed(); return; } // someone settled it meanwhile: nothing to write
-    const tags = [...new Set(current.filter(t => t !== 'for review' && t !== 'read').concat('reviewed'))];
-    const r = await boardFetch(row.team, `/artifacts/${encodeURIComponent(row.id)}/tags`, {
-        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tags }),
-    });
-    if (!r.ok) {
-        const body = await r.json().catch(() => ({}));
-        throw new Error(body.error || `Could not mark reviewed (HTTP ${r.status}).`);
-    }
-    revision++;
-    items = items.filter(a => a.reviewKey !== row.reviewKey);
-    changed();
-}

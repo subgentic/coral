@@ -242,6 +242,19 @@ func (h *SessionsHandler) uploadAgentArtifact(w http.ResponseWriter, r *http.Req
 			}
 		}
 	}
+	if plan != nil && h.bs != nil && hasTag(tags, "for review") { // a new version of the series for review: the older versions' reviews are closed, this one is the pending one (#136588)
+		if teamBoard, _, _ := uploaderOf(sid); teamBoard != "" {
+			if sidOf, _, in := digestSeries(coralDir, hexID); in {
+				for _, m := range seriesMembers(coralDir, sidOf) {
+					if m.Digest != hexID && m.Board == teamBoard {
+						if _, err := h.bs.SupersedeArtifactReview(r.Context(), teamBoard, m.Digest, time.Now()); err != nil {
+							slog.Warn("[artifacts] an older version's review was not closed", "digest", m.Digest, "error", err)
+						}
+					}
+				}
+			}
+		}
+	}
 	// The name and type viewers get: the first upload's, when these bytes were stored before.
 	reply := map[string]any{
 		"uri":        "coral://artifacts/" + hexID,
@@ -432,3 +445,13 @@ var artifactIDRe = regexp.MustCompile(`^[0-9a-f]{64}$`)
 
 // validArtifactID reports whether id is an artifact id (artifactIDRe).
 func validArtifactID(id string) bool { return artifactIDRe.MatchString(id) }
+
+// hasTag reports whether tags holds tag.
+func hasTag(tags []string, tag string) bool {
+	for _, t := range tags {
+		if t == tag {
+			return true
+		}
+	}
+	return false
+}

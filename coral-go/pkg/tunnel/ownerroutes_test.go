@@ -110,6 +110,10 @@ func TestTheOwnerTableAgreesWithTheHandWrittenListItReplaced(t *testing.T) {
 			if m == http.MethodGet && p == "/api/analytics/activity" {
 				continue
 			}
+			// Approving a for-review artifact, or asking changes of it, is the owner's alone through the hub (#136584, #11354): the old list never had it.
+			if m == http.MethodPost && strings.HasPrefix(p, "/api/board/") && strings.HasSuffix(p, "/review") && strings.Contains(p, "/artifacts/") {
+				continue
+			}
 			// The owner's comment writes (a comment or reply, a resolve, a reopen) are new (#7052): the old list never had them.
 			if m == http.MethodPost && strings.HasPrefix(p, "/api/artifacts/") && (strings.HasSuffix(p, "/comments") || strings.HasSuffix(p, "/resolve") || strings.HasSuffix(p, "/reopen")) {
 				continue

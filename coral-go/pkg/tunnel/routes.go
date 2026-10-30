@@ -267,6 +267,10 @@ var routeTable = cat(
 		"/api/artifacts/{hex64}/comments/{id}/resolve",
 		"/api/artifacts/{hex64}/comments/{id}/reopen",
 	)),
+	// The Operator's review of a for-review artifact (#136584, #11354: the owner gets everything through the Hub): Approve takes it out of Needs you and posts ONE fixed-sentence board message to the agent that uploaded it
+	// (the artifact's name quoted as cleaned data), "changes" only records the state (the comment itself is the comment route above; its send to an agent stays unlisted). The OWNER's alone: a guest or a grantee is refused
+	// by the machine before the handler runs. Interact, as a comment is: it moves no work and runs nothing.
+	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/board/{project}/artifacts/{id}/review")),
 	// Saved for later (#4510) is the OWNER's alone through the hub (#5753, Shared Inbox, Security's condition 3): the list holds the bookmarks of the owner's chats, and the whole
 	// message of a bookmark (the text of its source, redacted and cut to 64 KiB; the source is the stored bookmark's, never a ref from the request) is read from its own route. The
 	// changes (POST, PATCH, DELETE) stay as they were (Interact).
