@@ -23,3 +23,14 @@ func TestOpencodeIsSignedInWhenItListsAProviderSignedOutWhenItListsNoneAndUnknow
 	assert.Equal(t, Unknown, opencodeState(nil, nil, errors.New("exit status 1")), "a failure to run is not a sign-out: a job is never refused for it")
 	assert.True(t, Supports("opencode"))
 }
+
+// The real output of `opencode auth list` (opencode-ai 1.19.5, captured on a scratch install with two FAKE credentials and one environment key; the path scrubbed): a bullet, the provider's display name, then
+// how it is signed in (api, oauth) or the environment variable that holds its key, with colour codes between.
+func TestTheRealAuthListOfOpencode1195IsParsed(t *testing.T) {
+	const e = "\x1b[90m"
+	real := "\x1b[0m\n┌  Credentials " + e + "/scrubbed/xdg/data/opencode/auth.json\n│\n●  OpenAI " + e + "api\n│\n●  Anthropic " + e + "oauth\n│\n└  2 credentials\n\n┌  Environment\n│\n●  OpenAI " + e + "OPENAI_API_KEY\n│\n└  1 environment variable\n\n"
+	assert.Equal(t, map[string]bool{"openai": true, "anthropic": true}, ParseOpencodeAuthList([]byte(real)))
+	empty := "\x1b[0m\n┌  Credentials " + e + "/scrubbed/xdg/data/opencode/auth.json\n│\n└  0 credentials\n"
+	assert.Empty(t, ParseOpencodeAuthList([]byte(empty)))
+	assert.Equal(t, SignedOut, opencodeState([]byte(empty), nil, nil), "a run that lists none is signed out")
+}
