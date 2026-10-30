@@ -35,6 +35,7 @@ import (
 	"github.com/subgentic/coral/internal/ptymanager"
 	"github.com/subgentic/coral/internal/safego"
 	"github.com/subgentic/coral/internal/startup"
+	"github.com/subgentic/coral/internal/store"
 	"github.com/subgentic/coral/internal/terminalinput"
 	"github.com/subgentic/coral/internal/tmux"
 	"github.com/subgentic/coral/internal/tracking"
@@ -107,7 +108,7 @@ func main() {
 	var sessionNames []string
 
 	if launchAgents {
-		sessionNames, err = launchAgentSessions(ctx, tc, cfg, targetDir, agentType, logDir)
+		sessionNames, err = launchAgentSessions(ctx, tc, cfg, targetDir, agentType, logDir, savedSettings(ctx, cfg.DBPath))
 		if err != nil {
 			log.Fatalf("Error launching agents: %v", err)
 		}
@@ -176,7 +177,18 @@ func cleanOldLogs(logDir string) {
 	}
 }
 
-func launchAgentSessions(ctx context.Context, tc *tmux.Client, cfg *config.Config, targetDir, agentType, logDir string) ([]string, error) {
+// savedSettings is what the person saved in Settings (the CLI paths among them), read from the data folder's database without opening it as the server does: read-only,
+// nothing created or migrated. No database yet, or one that cannot be read, means no saved settings (a warning says which); the CLI is then looked up as for a first start.
+func savedSettings(ctx context.Context, dbPath string) map[string]string {
+	settings, err := store.ReadSettingsReadOnly(ctx, dbPath)
+	if err != nil {
+		log.Printf("Warning: Coral's saved settings could not be read (%v); the agent CLI is looked up without Settings > CLI paths", err)
+		return nil
+	}
+	return settings
+}
+
+func launchAgentSessions(ctx context.Context, tc *tmux.Client, cfg *config.Config, targetDir, agentType, logDir string, settings map[string]string) ([]string, error) {
 	// Collect valid subdirectories (up to maxAgents)
 	entries, err := os.ReadDir(targetDir)
 	if err != nil {
@@ -219,7 +231,15 @@ func launchAgentSessions(ctx context.Context, tc *tmux.Client, cfg *config.Confi
 
 		// Build the launch command first: its prompt and settings files must be written
 		// before a session is made for it (#3601 W12).
-		cmd, err := ag.LaunchCommand(launchParamsFor(cfg, sessionID, sessionName, protocolPath, dir))
+		// The agent's CLI is resolved here, not left to the shell: a launch line that types a bare name the shell does not know ends in "codex is not recognized" in the pane (#353).
+		cliPath, err := agent.LaunchCLI(settings, agentType) // a path saved in Settings > CLI paths is used, and refused if it cannot be run
+		if err != nil {
+			log.Printf("Warning: not launching %s: %v", sessionName, err)
+			continue
+		}
+		params := launchParamsFor(cfg, sessionID, sessionName, protocolPath, dir)
+		params.CLIPath = cliPath
+		cmd, err := ag.LaunchCommand(params)
 		if err != nil {
 			log.Printf("Warning: not launching %s: %v", sessionName, err)
 			continue
