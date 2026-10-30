@@ -80,7 +80,7 @@ print a path; later releases compare neutral with neutral.
 
 Known limits: a failed run keeps `/tmp/coral-screens` (its data folders hold a throwaway API key until the next run
 clears them); a port is picked just before the server starts, so another process could take it in between and the
-run fails at the health check; one run at a time (`/tmp/coral-screens.lock`).
+run fails at the health check; one run at a time (`/tmp/coral-screens.lock`). The work folder and the lock are made mode 0700 by the run, and one that is a link, belongs to another account or has another mode is refused (`run_guard_test.sh` tests that), so a shared `/tmp` cannot hand the run a folder someone else prepared.
 
 ## The upload limit
 
