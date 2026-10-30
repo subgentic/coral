@@ -24,9 +24,14 @@ const BASE = require('./test_base').BASE;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
             // create buttons: the verb and the thing, no plus sign
-            const label = mobile ? '#mobile-session-list [data-on-click="launch-show"], .mobile-list-header [data-on-click="launch-show"]' : '.sidebar-new-btn-full';
-            await waitFor(`[...document.querySelectorAll(${JSON.stringify(label)})].some(e => e.getClientRects().length)`, at + 'the New agent button', 8000);
-            assert.equal(await ev(`[...document.querySelectorAll(${JSON.stringify(label)})].filter(e => e.getClientRects().length)[0].textContent.trim()`), mobile ? 'New' : 'New agent', at + 'the create button is the verb and the thing, no plus sign');
+            if (mobile) { // a phone has no New button in a header (#11116): an empty home has a card for each kind, and with agents the + button opens a menu (mobile.css); here the home is empty
+                await waitFor(`[...document.querySelectorAll('#mobile-agent-list .empty-launch strong')].some(e => e.getClientRects().length)`, at + 'the New agent card', 8000);
+                assert.deepEqual(await ev(`[...document.querySelectorAll('#mobile-agent-list .empty-launch strong')].map(e => e.textContent.trim()).slice(0, 2)`), ['New agent', 'New project'], at + 'the create cards are the verb and the thing, no plus sign');
+            } else {
+                const label = '.sidebar-new-btn-full';
+                await waitFor(`[...document.querySelectorAll(${JSON.stringify(label)})].some(e => e.getClientRects().length)`, at + 'the New agent button', 8000);
+                assert.equal(await ev(`[...document.querySelectorAll(${JSON.stringify(label)})].filter(e => e.getClientRects().length)[0].textContent.trim()`), 'New agent', at + 'the create button is the verb and the thing, no plus sign');
+            }
             await shot(`words-home-${w}`);
             await Page.navigate({ url: BASE + `/team/${B}/tasks` }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
             await waitFor(`!!document.querySelector('.btn-create-task')`, at + 'the Tasks tab', 10000);

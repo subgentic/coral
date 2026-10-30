@@ -130,11 +130,15 @@ async function freshServer() {
 
         // 3. New Agent in two steps: the choice, then the form
         const before = (await live()).map(x => x.session_id);
-        await clickVisible('[data-on-click="launch-show"]');
-        await waitFor(visible('#launch-step-chooser .launch-type-card'), `${tag}: the choice of what to launch`, { timeout: 8000, diag: `document.body.innerText.slice(0, 300)` });
-        const cards = await ev(`[...document.querySelectorAll('#launch-step-chooser .launch-type-card')].map(c => c.querySelector('.launch-type-label').textContent.trim() + ' ' + c.querySelector('.launch-type-desc').textContent.trim())`);
-        assert.deepEqual(cards.slice(0, 3), ['New agent One agent in a folder you choose.', 'New project Launch a team of agents collaborating on a shared board.', 'Open folder Add a project folder to start agents in later.'], `${tag}: step one offers the kinds in this order, each with what it opens (#9253) (${JSON.stringify(cards)})`);
-        await ev(`document.querySelector('#launch-step-chooser .launch-type-card[data-arg="agent"]').click(); true`);
+        if (!mobile) {
+            await clickVisible('[data-on-click="launch-show"]');
+            await waitFor(visible('#launch-step-chooser .launch-type-card'), `${tag}: the choice of what to launch`, { timeout: 8000, diag: `document.body.innerText.slice(0, 300)` });
+            const cards = await ev(`[...document.querySelectorAll('#launch-step-chooser .launch-type-card')].map(c => c.querySelector('.launch-type-label').textContent.trim() + ' ' + c.querySelector('.launch-type-desc').textContent.trim())`);
+            assert.deepEqual(cards.slice(0, 3), ['New agent One agent in a folder you choose.', 'New project Launch a team of agents collaborating on a shared board.', 'Open folder Add a project folder to start agents in later.'], `${tag}: step one offers the kinds in this order, each with what it opens (#9253) (${JSON.stringify(cards)})`);
+            await ev(`document.querySelector('#launch-step-chooser .launch-type-card[data-arg="agent"]').click(); true`);
+        } else { // the phone has no chooser (#11116): a fresh install's home has a card for each kind (the + button appears with the first agent), and the form is the first step
+            await clickVisible('.empty-launch[data-on-click="m-show-launch-modal-then-select-launch-type"][data-arg="agent"]');
+        }
         await waitFor(`(() => { const e = document.getElementById('launch-step-agent'); return !!e && getComputedStyle(e).display !== 'none' && !!document.getElementById('launch-dir'); })()`, `${tag}: the agent form (step two)`, { timeout: 8000, diag: `document.body.innerText.slice(0, 300)` });
         await setValue('launch-dir', s.dirs.work);
         await ev(`document.querySelector('#launch-step-agent [data-on-click="m-launch-session"]').click(); true`);
@@ -155,13 +159,19 @@ async function freshServer() {
         // 4. Launch Team: the choice, then the team form; the team's agents start and the first task reaches the CLI
         const teamName = `${tag}-first-team`, GOAL = `first task from the ${tag} walkthrough`;
         const beforeTeam = (await live()).map(x => x.session_id);
-        if (!await ev(visible('[data-on-click="launch-show"]'))) { // on a phone the opened agent fills the page: back to the Agents list, where New is
+        if (!mobile) {
+            if (!await ev(visible('[data-on-click="launch-show"]'))) {
+                await ev(`window.switchNavTab('agents'); true`);
+                await waitFor(visible('[data-on-click="launch-show"]'), `${tag}: the Agents list with its New button`, { timeout: 8000, diag: `document.body.innerText.slice(0, 300)` });
+            }
+            await clickVisible('[data-on-click="launch-show"]');
+            await waitFor(visible('#launch-step-chooser .launch-type-card[data-arg="team"]'), `${tag}: the choice of what to launch, again`, { timeout: 8000, diag: `document.body.innerText.slice(0, 300)` });
+            await ev(`document.querySelector('#launch-step-chooser .launch-type-card[data-arg="team"]').click(); true`);
+        } else { // on a phone the opened agent fills the page: back to the Agents list, where the + menu has New team
             await ev(`window.switchNavTab('agents'); true`);
-            await waitFor(visible('[data-on-click="launch-show"]'), `${tag}: the Agents list with its New button`, { timeout: 8000, diag: `document.body.innerText.slice(0, 300)` });
+            await waitFor(visible('#phone-fab'), `${tag}: the Agents list with its + button`, { timeout: 8000, diag: `document.body.innerText.slice(0, 300)` });
+            await clickVisible('#phone-fab'); await clickVisible('[data-on-click="phone-fab-new"][data-arg="team"]');
         }
-        await clickVisible('[data-on-click="launch-show"]');
-        await waitFor(visible('#launch-step-chooser .launch-type-card[data-arg="team"]'), `${tag}: the choice of what to launch, again`, { timeout: 8000, diag: `document.body.innerText.slice(0, 300)` });
-        await ev(`document.querySelector('#launch-step-chooser .launch-type-card[data-arg="team"]').click(); true`);
         await waitFor(`(() => { const e = document.getElementById('launch-step-team'); return !!e && getComputedStyle(e).display !== 'none' && !!document.getElementById('team-board-name'); })()`, `${tag}: the team form`, { timeout: 8000, diag: `document.body.innerText.slice(0, 300)` });
         // the templates are listed by their own request after the form shows: wait for them (a condition), then read; an empty list after the wait is the failure the assertion is for (it read [] on a slow run, 11 of 20 at CPU x6)
         await waitFor(`document.querySelectorAll('#team-template-select option[value]:not([value=""])').length >= 1`, `${tag}: the team templates to be listed`, { timeout: 15000, diag: `document.getElementById('team-template-select') ? document.getElementById('team-template-select').outerHTML.slice(0, 300) : 'no select'` }).catch(() => {});
