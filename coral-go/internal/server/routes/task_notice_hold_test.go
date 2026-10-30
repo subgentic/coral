@@ -40,9 +40,6 @@ var _ ptymanager.NoticeTargetChecker = (*recordTerm)(nil)
 
 // #137853: a TASK notification sent 0.3 s before the agent's process is recorded (the stress runner's case) is typed once, after the record, never before it and never lost.
 func TestATaskNotificationSentJustBeforeTheAgentsProcessIsRecordedIsTypedOnceAfterIt(t *testing.T) {
-	step, max := ptymanager.NoticeHoldForTests(20*time.Millisecond, 5*time.Second)
-	defer ptymanager.NoticeHoldForTests(step, max)
-
 	const sid = "6a1b2c3d-4e5f-4061-8a7b-9c0d1e2f3a4f"
 	name := "claude-" + sid
 	mock := newMockTerminal()

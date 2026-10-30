@@ -158,10 +158,3 @@ func noticePaused(name, what, why string, wait bool) (bool, string) {
 	}
 	return true, why
 }
-
-// NoticeHoldForTests sets the hold's step and bound and returns the old ones (a test of a sender in another package; production never changes them).
-func NoticeHoldForTests(step, max time.Duration) (oldStep, oldMax time.Duration) {
-	oldStep, oldMax = noticeHoldStep, noticeHoldMax
-	noticeHoldStep, noticeHoldMax = step, max
-	return oldStep, oldMax
-}
