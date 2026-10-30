@@ -56,6 +56,18 @@ func TestAMarkForAProductIsInThatProductsFolderOnly(t *testing.T) {
 	assert.Contains(t, names(t, local), "Coral", "the live product's name goes to the live product's folder")
 }
 
+// The launch-pending mark of the elevated Finish (#380) is told its product the same way: the rehearsal's goes to the rehearsal's folder, never to Coral.
+func TestALaunchPendingMarkForAProductIsInThatProductsFolderOnly(t *testing.T) {
+	local := inLocalAppData(t)
+	now := time.Now()
+	require.NoError(t, MarkLaunchPendingFor("Coral Rehearsal", now))
+	assert.Equal(t, []string{"Coral Rehearsal"}, names(t, local), "the live Coral's folder is not made")
+	assert.Equal(t, []string{launchPendingName}, names(t, filepath.Join(local, "Coral Rehearsal")))
+	assert.ErrorIs(t, MarkLaunchPendingFor("coral", now), ErrBadProduct)
+	assert.ErrorIs(t, MarkLaunchPendingFor("", now), ErrBadProduct)
+	assert.Equal(t, []string{"Coral Rehearsal"}, names(t, local), "a bad name made nothing")
+}
+
 func TestABadProductNameTouchesNothing(t *testing.T) {
 	local := inLocalAppData(t)
 	for _, bad := range []string{"", "coral", "Cor", "Coral  X", "Coral Rehearsal Beta", "Coral/x", `Coral\x`, "..", `..\Coral`, "Coral Rehearsal\x00", " Coral", "Coral\n"} {

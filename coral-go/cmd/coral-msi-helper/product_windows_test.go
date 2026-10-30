@@ -16,6 +16,8 @@ func TestTheProductComesFromOneValidArgument(t *testing.T) {
 	}{
 		{[]string{"stop", "--product", "Coral Rehearsal", "--folder", `C:\x`}, "Coral Rehearsal"},
 		{[]string{"start", "--product", "Coral"}, "Coral"},
+		{[]string{"launch-pending", "--product", "Coral Rehearsal"}, "Coral Rehearsal"},
+		{[]string{"launch-pending"}, ""},
 		{[]string{"eula", "--product", "Coral"}, "Coral"},
 		{[]string{"start"}, ""},
 		{nil, ""},
@@ -39,15 +41,19 @@ func TestTheHelperTouchesAMarkOnlyInTheProductItWasTold(t *testing.T) {
 	markFor = func(p string, _ time.Time) error { calls = append(calls, "mark "+p); return nil }
 	takeFor = func(p string, _ time.Time) bool { calls = append(calls, "take "+p); return true }
 	discardFor = func(p string) error { calls = append(calls, "discard "+p); return nil }
-	t.Cleanup(func() { markFor, takeFor, discardFor = oldM, oldT, oldD })
+	oldL := markLaunchPendingFor
+	markLaunchPendingFor = func(p string, _ time.Time) error { calls = append(calls, "pending "+p); return nil }
+	t.Cleanup(func() { markFor, takeFor, discardFor, markLaunchPendingFor = oldM, oldT, oldD, oldL })
 
 	markRestart("")
+	markLaunchPending("")
 	discardRestart("")
 	assert.False(t, takeRestart(""))
 	assert.Empty(t, calls, "no product: no mark touched")
 
 	markRestart("Coral Rehearsal")
+	markLaunchPending("Coral Rehearsal")
 	discardRestart("Coral Rehearsal")
 	assert.True(t, takeRestart("Coral Rehearsal"))
-	assert.Equal(t, []string{"mark Coral Rehearsal", "discard Coral Rehearsal", "take Coral Rehearsal"}, calls)
+	assert.Equal(t, []string{"mark Coral Rehearsal", "pending Coral Rehearsal", "discard Coral Rehearsal", "take Coral Rehearsal"}, calls)
 }

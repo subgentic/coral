@@ -74,10 +74,12 @@ func main() {
 	}
 
 	// Before the tray spawns its background process, which would inherit this elevated token.
+	launchPending := false
 	if startTakesInstallMark(*stop, *serverChild) {
-		takeInstallMark() // this start is the install's restart, whether or not it goes on (#335)
+		takeInstallMark()                   // this start is the install's restart, whether or not it goes on (#335)
+		launchPending = takeLaunchPending() // the elevated installer meant this start to be Explorer's, unelevated (#380)
 	}
-	if installerLaunchRefused(*fromInstaller, processElevated) {
+	if installerLaunchRefused(*fromInstaller || launchPending, processElevated) {
 		fmt.Println("Coral was not started: the installer was run as administrator, and Coral does not start elevated. Open Coral from the Start Menu.")
 		showElevatedInstallerNote() // this is a program with no console: say it where the person is looking
 		return
@@ -300,6 +302,7 @@ var quitAsked atomic.Bool
 
 func quit() {
 	quitAsked.Store(true)
+	allowTrayWindowClose() // the library's Quit posts WM_CLOSE to the tray window; a WM_CLOSE posted by anything else is dropped (#346)
 	systray.Quit()
 }
 
@@ -563,7 +566,7 @@ func runForeground(host string, port int, noBrowser, debugMode bool, backendType
 		exitOnce.Do(func() {
 			closedBySystem := !quitAsked.Load()
 			if closedBySystem {
-				log.Printf("[TRAY] Windows asked Coral to close (an installer's Restart Manager, or the end of the session)")
+				log.Printf("[TRAY] Windows ended the session or an installer's Restart Manager closed Coral (WM_ENDSESSION)")
 				onSystemClose()
 			}
 			killCoralApp()
@@ -571,6 +574,7 @@ func runForeground(host string, port int, noBrowser, debugMode bool, backendType
 			log.Println("coral-tray exited")
 			if closedBySystem && runtime.GOOS == "windows" {
 				// The library ran this from WM_ENDSESSION and keeps its message loop going: end it, so this process exits and frees its files (#335).
+				allowTrayWindowClose()
 				safego.Go("coral-tray/systray-quit", systray.Quit)
 			}
 		})

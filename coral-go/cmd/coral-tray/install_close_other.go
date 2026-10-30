@@ -13,3 +13,7 @@ func watchEndSession(title string, end func(closeApp bool)) {}
 func guardTrayWindow() {}
 
 func takeInstallMark() {}
+
+func takeLaunchPending() bool { return false }
+
+func allowTrayWindowClose() {}

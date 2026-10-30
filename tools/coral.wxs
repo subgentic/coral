@@ -162,10 +162,18 @@
     <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
     <CustomAction Id="LaunchCoral" Directory="INSTALLFOLDER" ExeCommand="&quot;[INSTALLFOLDER]coral-tray.exe&quot; --from-installer" Execute="immediate" Return="ignore" />
     <CustomAction Id="LaunchCoralUnelevated" Directory="INSTALLFOLDER" ExeCommand="&quot;[WindowsFolder]explorer.exe&quot; &quot;[INSTALLFOLDER]coral-tray.exe&quot;" Execute="immediate" Return="ignore" />
+    <!-- Task #380: just before an elevated installer's Finish hands coral-tray to Explorer, the helper writes a short-lived launch-pending
+         mark in this user's %LOCALAPPDATA%\Coral (installrestart.MarkLaunchPending, the restart mark's private-file rules). A coral-tray
+         that starts elevated while the mark is fresh was not started the way the installer meant, and starts nothing; every start of
+         Coral takes the mark. So the unelevated start rests on Coral, not only on Explorer. Synchronous, so it is written before
+         Explorer runs (Order). -->
+    <CustomAction Id="MarkLaunchPending" BinaryRef="CoralMsiHelper" ExeCommand="launch-pending --product &quot;$(var.InstallFolderName)&quot;" Execute="immediate" Return="ignore" />
     <UI>
       <Publish Dialog="ExitDialog" Control="Finish" Event="DoAction" Value="LaunchCoral"
         Condition="WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 AND NOT Installed AND NOT REMOVE~=&quot;ALL&quot; AND NOT MsiRunningElevated" />
-      <Publish Dialog="ExitDialog" Control="Finish" Event="DoAction" Value="LaunchCoralUnelevated"
+      <Publish Dialog="ExitDialog" Control="Finish" Event="DoAction" Value="MarkLaunchPending" Order="1"
+        Condition="WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 AND NOT Installed AND NOT REMOVE~=&quot;ALL&quot; AND MsiRunningElevated" />
+      <Publish Dialog="ExitDialog" Control="Finish" Event="DoAction" Value="LaunchCoralUnelevated" Order="2"
         Condition="WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 AND NOT Installed AND NOT REMOVE~=&quot;ALL&quot; AND MsiRunningElevated" />
     </UI>
 
