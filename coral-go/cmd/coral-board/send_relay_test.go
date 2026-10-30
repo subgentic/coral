@@ -193,7 +193,7 @@ func TestSendUsageErrorsSayWhatToDo(t *testing.T) {
 		want []string
 	}{
 		"--board with a server/team form":   {[]string{"--board", "pro/b-4tt7u67wul", "hi"}, []string{"looks like a team on another Coral", "--address pro/b-4tt7u67wul", "coral-board targets"}},
-		"--address with a local board name": {[]string{"--address", "beta", "hi"}, []string{"--address needs <server>/<team>", "--board beta"}},
+		"--address with a local board name": {[]string{"--address", "beta", "hi"}, []string{"--address needs <computer>/<team>", "--board beta"}},
 		"a missing message, local":          {[]string{"--board", "beta"}, []string{"usage: coral-board send --board", "A message is required", "--file", "stdin"}},
 		"a missing message, address":        {[]string{"--address", "homelab/qa"}, []string{"usage: coral-board send --address", "--attach", "A message is required"}},
 		"--address with --board":            {[]string{"--address", "homelab/qa", "--board", "beta", "hi"}, []string{"can't be combined"}},
