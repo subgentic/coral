@@ -809,7 +809,7 @@ func (h *SessionsHandler) noteEventForLastMessage(sessionID, eventType string) {
 	}
 }
 
-// firstStopKicked remembers the sessions whose first stop has sent the list (bounded, as refusedEventSenders is).
+// firstStopKicked remembers the sessions whose first stop has sent the list (bounded, as refusedEventSenders is: after 10,000 sessions in one server run the kick no longer fires and a first reply waits for the list's next tick, which is the behaviour before it).
 var firstStopKicked = &onceSet{max: 10000}
 
 // SessionReader is the transcript reader this handler uses: other handlers that read the same session files (the spend read) share it, so a file is parsed once.

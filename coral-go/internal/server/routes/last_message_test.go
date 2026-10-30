@@ -53,6 +53,9 @@ func TestLastMessageRowFindsAFirstReplyAtOnceForAStartedAgent(t *testing.T) {
 
 // #11354: a hook event for a session whose row has no last message forgets the remembered miss, and a stop (the end of a turn) sends the list at once; with a message already cached, a stop sends nothing.
 func TestAHookEventForgetsTheMissAndAStopKicksTheListForAFirstReply(t *testing.T) {
+	was := firstStopKicked
+	firstStopKicked = &onceSet{max: 10000} // a set of its own: the package's remembers sessions for the life of the process, and a repeated run (-count=N) must start clean
+	t.Cleanup(func() { firstStopKicked = was })
 	dir := t.TempDir()
 	t.Setenv("CLAUDE_PROJECTS_DIR", dir)
 	sid := "11111111-0000-4000-8000-0000000000bb"
