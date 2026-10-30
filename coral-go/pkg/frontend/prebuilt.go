@@ -68,19 +68,31 @@ func BundleInputHash(static fs.FS, indexHTML []byte) (string, error) {
 
 type prebuiltFile struct {
 	Hash    string
-	Sum     string // SHA-256 of the files (names and bytes, in name order): what the file says its content is, checked after the decode
-	Files   map[string][]byte
+	Sum     string          // SHA-256 of the files (names and bytes, in name order): what the file says its content is, checked after the decode
+	Files   []prebuiltEntry // by name: gob writes a map in Go's random map order, so two builds of one tree would differ in the binary (#11047)
 	Modules []string
 	Lazy    []string
-	Skipped map[string]string // LazySkipped's errors as text
+	Skipped []prebuiltSkip // LazySkipped's errors as text, by name
 }
+
+type prebuiltEntry struct {
+	Name  string
+	Bytes []byte
+}
+
+type prebuiltSkip struct{ Name, Why string }
 
 // EncodePrebuilt writes b, built from the tree whose BundleInputHash is hash, as the embedded file's bytes (gob, gzip).
 func EncodePrebuilt(w io.Writer, b *Bundle, hash string) error {
-	pf := prebuiltFile{Hash: hash, Sum: filesSum(b.Files), Files: b.Files, Modules: b.Modules, Lazy: b.Lazy, Skipped: map[string]string{}}
-	for k, v := range b.LazySkipped {
-		pf.Skipped[k] = v.Error()
+	pf := prebuiltFile{Hash: hash, Sum: filesSum(b.Files), Modules: b.Modules, Lazy: b.Lazy}
+	for k, v := range b.Files {
+		pf.Files = append(pf.Files, prebuiltEntry{Name: k, Bytes: v})
 	}
+	sort.Slice(pf.Files, func(i, j int) bool { return pf.Files[i].Name < pf.Files[j].Name })
+	for k, v := range b.LazySkipped {
+		pf.Skipped = append(pf.Skipped, prebuiltSkip{Name: k, Why: v.Error()})
+	}
+	sort.Slice(pf.Skipped, func(i, j int) bool { return pf.Skipped[i].Name < pf.Skipped[j].Name })
 	zw, err := gzip.NewWriterLevel(w, gzip.BestCompression)
 	if err != nil {
 		return err
@@ -107,15 +119,22 @@ func DecodePrebuilt(r io.Reader) (*Bundle, string, error) {
 	if _, err := io.Copy(io.Discard, zr); err != nil {
 		return nil, "", err
 	}
-	if pf.Sum == "" || pf.Sum != filesSum(pf.Files) {
+	files := make(map[string][]byte, len(pf.Files))
+	for _, e := range pf.Files {
+		if _, dup := files[e.Name]; dup {
+			return nil, "", errors.New("the prebuilt bundle names a file twice")
+		}
+		files[e.Name] = e.Bytes
+	}
+	if pf.Sum == "" || pf.Sum != filesSum(files) {
 		return nil, "", errors.New("the prebuilt bundle does not match its own checksum")
 	}
-	if pf.Hash == "" || len(pf.Files["app.js"]) == 0 {
+	if pf.Hash == "" || len(files["app.js"]) == 0 {
 		return nil, "", errors.New("the prebuilt bundle has no hash or no app.js")
 	}
-	b := &Bundle{Files: pf.Files, Modules: pf.Modules, Lazy: pf.Lazy, LazySkipped: map[string]error{}}
-	for k, v := range pf.Skipped {
-		b.LazySkipped[k] = errors.New(v)
+	b := &Bundle{Files: files, Modules: pf.Modules, Lazy: pf.Lazy, LazySkipped: map[string]error{}}
+	for _, e := range pf.Skipped {
+		b.LazySkipped[e.Name] = errors.New(e.Why)
 	}
 	return b, pf.Hash, nil
 }

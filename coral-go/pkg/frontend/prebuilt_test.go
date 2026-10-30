@@ -2,6 +2,7 @@ package frontend
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"io/fs"
 	"strings"
@@ -211,5 +212,37 @@ func TestEveryBitOfTheGzipHeaderEitherChangesNothingOrIsRefused(t *testing.T) {
 				t.Errorf("header byte %d bit %d: decoded without an error to different content", off, bit)
 			}
 		}
+	}
+}
+
+// The embedded file is the same bytes every time it is encoded from the same bundle: gob writes a map in Go's random map order, so a release built twice from
+// one tree (or with and without a restored build cache) differed in the dashboard binary, and the release cache audit failed on every scheduled run (#11047).
+func TestEncodePrebuiltIsTheSameBytesEveryTime(t *testing.T) {
+	b := &Bundle{Files: map[string][]byte{}, Modules: []string{"a.js", "b.js"}, Lazy: []string{"c.js"}, LazySkipped: map[string]error{}}
+	for i := 0; i < 80; i++ {
+		b.Files[strings.Repeat("f", i%7+1)+string(rune('a'+i%26))+strings.Repeat("x", i)] = []byte(strings.Repeat("body", i+1))
+	}
+	b.Files["app.js"] = []byte("app")
+	for i := 0; i < 12; i++ {
+		b.LazySkipped[strings.Repeat("s", i+1)+".js"] = errors.New("why " + strings.Repeat("y", i))
+	}
+	var first []byte
+	for i := 0; i < 12; i++ {
+		var buf bytes.Buffer
+		if err := EncodePrebuilt(&buf, b, "hash"); err != nil {
+			t.Fatal(err)
+		}
+		if first == nil {
+			first = buf.Bytes()
+		} else if !bytes.Equal(first, buf.Bytes()) {
+			t.Fatalf("encoding the same bundle twice gave different bytes (encoding %d)", i)
+		}
+	}
+	got, hash, err := DecodePrebuilt(bytes.NewReader(first))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if hash != "hash" || len(got.Files) != len(b.Files) || len(got.LazySkipped) != len(b.LazySkipped) || got.LazySkipped["s.js"].Error() != "why " {
+		t.Fatalf("the bundle did not decode back to what was encoded: %d files, %d skipped", len(got.Files), len(got.LazySkipped))
 	}
 }
