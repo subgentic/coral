@@ -52,9 +52,13 @@ const { coralReady } = require('./helpers/wait');
             check(`${tag}: back in the launch folder the list is its own and the worktree is offered`, JSON.stringify(back.files) === JSON.stringify(['launch.txt']) && /The agent is working in the worktree/.test(back.note) && /Follow it/.test(back.note), JSON.stringify(back));
             check(`${tag}: the launch folder was read with worktree=launch, and no diff of the other folder stays open`, back.reads.length > 0 && back.reads.every(r => r.mode === 'launch') && back.open === 0, JSON.stringify(back.reads));
 
+            // the choice is kept for the browser session: a reload does not flip it back
+            check(`${tag}: the way back is remembered in the browser session`, (await ev(`sessionStorage.getItem('coral-files-launch:wp-id')`)) === '1' && (await ev(`import((window.__coralStatic || '/static/') + 'agent_file_api.js').then(m => m.worktreeMode('wp-id'))`)) === 'launch');
+
             // and forward again
             await ev(`window.__reads = []; document.querySelector('#changed-files-list [data-on-click="worktree-follow"]').click(); true`);
             await waitFor(`!!document.querySelector('#changed-files-list [data-on-click="worktree-launch"]')`, `${tag}: following again`, 8000);
+            check(`${tag}: following again forgets the choice`, (await ev(`sessionStorage.getItem('coral-files-launch:wp-id')`)) === null);
             check(`${tag}: following again reads worktree=follow`, (await ev(`window.__reads`)).every(r => r.mode === 'follow'), JSON.stringify(await ev(`window.__reads`)));
             check(`${tag}: the page does not scroll sideways`, (await ev(`document.documentElement.scrollWidth - document.documentElement.clientWidth`)) <= 0);
         }

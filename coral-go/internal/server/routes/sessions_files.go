@@ -12,7 +12,7 @@ import (
 // resolveWorkdir determines the working directory for an agent session.
 func (h *SessionsHandler) resolveWorkdir(ctx context.Context, name, agentType, sessionID string) string {
 	launch := h.launchWorkdir(ctx, name, agentType, sessionID)
-	if followOn(ctx) && !strictIdentity(ctx) { // a request that asked to follow the agent (#11351)
+	if followOn(ctx) { // a request that asked to follow, and may (followAllowed): the dashboard's own page, or a signed-in page on another address, whose bounds stay strict (#11351)
 		if wt, ok := h.activeWorktree(ctx, name, sessionID, launch); ok {
 			return wt.Dir
 		}

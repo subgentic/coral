@@ -15,13 +15,14 @@ type strictIdentityKey struct{}
 
 // agentCtx is r's context, marked when the caller is bounded: resolveWorkdir then takes the folder from the session's own row and nothing else. Every file and diff handler resolves through it.
 func agentCtx(r *http.Request) context.Context {
+	ctx := r.Context()
 	if strictBounds(r) {
-		return context.WithValue(r.Context(), strictIdentityKey{}, true)
+		ctx = context.WithValue(ctx, strictIdentityKey{}, true)
 	}
-	if followRequested(r) { // the Files panel's own reads follow the agent into the worktree it works in (#11351)
-		return context.WithValue(r.Context(), followKey{}, true)
+	if followRequested(r) && followAllowed(r) { // the Files panel's own reads follow the agent into the worktree it works in (#11351); the bounds stay strict for a page that is not this computer's own
+		ctx = context.WithValue(ctx, followKey{}, true)
 	}
-	return r.Context()
+	return ctx
 }
 
 func strictIdentity(ctx context.Context) bool {

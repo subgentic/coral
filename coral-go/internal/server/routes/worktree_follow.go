@@ -32,6 +32,29 @@ type followKey struct{}
 // followRequested reports whether a request opted into following the agent: the Files panel's own reads send worktree=follow.
 func followRequested(r *http.Request) bool { return r.URL.Query().Get("worktree") == "follow" }
 
+// followAllowed reports whether a request may be answered from the followed worktree: this computer's own dashboard page (localDashboard), or a person's SIGNED-IN dashboard page reached by another
+// address, a phone on the network (signedInPage). A separate predicate, not a wider localDashboard: everything else that localDashboard decides (the strict file roots) is unchanged for the LAN page, which keeps
+// strict bounds with the worktree as its root (Security's #137650). A script, a proxy, a Hub-stamped or bearer request and an agent are never followed.
+func followAllowed(r *http.Request) bool { return localDashboard(r) || signedInPage(r) }
+
+// signedInPage is the page of a person who signed in to this Coral from another address: a valid sign-in cookie (the identity layer's own classification, callerDashCookie), a same-origin browser fetch
+// (a cross-site request, a form post or a script cannot be one), no Bearer credential, no tunnel stamp, a Host that names this server, and not an agent (no session token, no agent tool).
+func signedInPage(r *http.Request) bool {
+	if viaTunnel(r) || strings.HasPrefix(strings.ToLower(strings.TrimSpace(r.Header.Get("Authorization"))), "bearer ") {
+		return false
+	}
+	if r.Header.Get(store.SessionTokenHeader) != "" || r.Header.Get("X-API-Key") != "" || isAgentTool(r) {
+		return false
+	}
+	if _, ok := r.Context().Value(verifiedSessionKey{}).(*store.SessionTokenOwner); ok {
+		return false
+	}
+	if kind, _ := r.Context().Value(callerKindKey{}).(string); kind != callerDashCookie {
+		return false
+	}
+	return localHostOK(r.Host) && sameOriginFetch(r) && (r.Header.Get("Origin") != "" || r.Header.Get("Referer") != "" || r.Header.Get("Sec-Fetch-Site") != "")
+}
+
 func followOn(ctx context.Context) bool { v, _ := ctx.Value(followKey{}).(bool); return v }
 
 // followedWorktree is the worktree an agent works in: its git top level, the folder's own name and its branch.
@@ -246,13 +269,13 @@ func (h *SessionsHandler) withWorktree(r *http.Request, name, sessionID string, 
 	if r.URL.Query().Get("worktree") == "" {
 		return out
 	}
-	if strictBounds(r) {
-		noteFollowDecision(sessionID, false, "", "the request is not the local dashboard's own page (strict bounds: a proxy, a stamped request, a bearer, or loopback auth required): the launch folder")
+	if !followAllowed(r) {
+		noteFollowDecision(sessionID, false, "", "the request is not a person's own dashboard page (a script, a proxy, a stamped or bearer request, an agent, or a page without a valid sign-in): the launch folder")
 		return out
 	}
 	launch := h.launchWorkdir(r.Context(), name, "", sessionID)
 	if wt, ok := h.activeWorktree(r.Context(), name, sessionID, launch); ok {
-		out["worktree"] = map[string]any{"path": wt.Dir, "name": wt.Name, "branch": wt.Branch, "followed": followRequested(r), "launch": launch}
+		out["worktree"] = map[string]any{"path": wt.Dir, "name": wt.Name, "branch": wt.Branch, "followed": followOn(agentCtx(r)), "launch": launch}
 	}
 	return out
 }

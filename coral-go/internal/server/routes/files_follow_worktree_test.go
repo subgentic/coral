@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/go-chi/chi/v5"
@@ -25,6 +26,7 @@ import (
 type followRig struct {
 	t        *testing.T
 	server   *httptest.Server
+	router   http.Handler
 	handler  *SessionsHandler
 	sid      string
 	name     string
@@ -48,6 +50,7 @@ func newFollowRig(t *testing.T, launchIsGit bool) *followRig {
 	router.Get("/api/sessions/live/{name}/files", handler.Files)
 	router.Post("/api/sessions/live/{name}/files/refresh", handler.RefreshFiles)
 	router.Get("/api/sessions/live/{name}/file-content", handler.GetFileContent)
+	router.Put("/api/sessions/live/{name}/file-content", handler.SaveFileContent)
 	server := httptest.NewServer(router)
 	t.Cleanup(server.Close)
 
@@ -75,7 +78,7 @@ func newFollowRig(t *testing.T, launchIsGit bool) *followRig {
 	name := "claude-" + sid
 	terminal.addSession(name, launch)
 	require.NoError(t, ss.RegisterLiveSession(context.Background(), &store.LiveSession{SessionID: sid, AgentType: "claude", AgentName: name, WorkingDir: launch}))
-	return &followRig{t: t, server: server, handler: handler, sid: sid, name: name, launch: launch, worktree: worktree}
+	return &followRig{t: t, router: router, server: server, handler: handler, sid: sid, name: name, launch: launch, worktree: worktree}
 }
 
 func (r *followRig) event(tool string, detail map[string]any) {
@@ -256,4 +259,91 @@ func TestAMismatchedNameAndSessionGiveNoWorktree(t *testing.T) {
 	assert.NotNil(t, get(otherName, otherSid)["worktree"], "the session named by its own URL is followed")
 	assert.Nil(t, get(r.name, otherSid)["worktree"], "agent A's URL with agent B's session id follows nothing")
 	assert.Nil(t, get(otherName, r.sid)["worktree"], "nor the other way round")
+}
+
+// A signed-in page on another address, a phone on the network (the operator's way in), is followed too (Security's #137650): a valid sign-in cookie, a same-origin fetch, an accepted Host, no Bearer, no tunnel
+// stamp, not an agent. Its bounds stay strict, with the worktree as the root. The requests are made straight to the router, from a non-loopback peer, as a LAN page's are.
+func (r *followRig) lan(method, target, body string, shape func(*http.Request)) *httptest.ResponseRecorder {
+	r.t.Helper()
+	req := httptest.NewRequest(method, "http://192.168.86.39:8452"+target, strings.NewReader(body))
+	req.RemoteAddr = "192.168.86.40:5555"
+	req.Header.Set("Origin", "http://192.168.86.39:8452")
+	req.Header.Set("Sec-Fetch-Site", "same-origin")
+	req = req.WithContext(context.WithValue(req.Context(), callerKindKey{}, callerDashCookie))
+	if shape != nil {
+		shape(req)
+	}
+	rec := httptest.NewRecorder()
+	r.router.ServeHTTP(rec, req)
+	return rec
+}
+
+func (r *followRig) lanList(shape func(*http.Request)) map[string]any {
+	r.t.Helper()
+	rec := r.lan(http.MethodGet, "/api/sessions/live/"+r.name+"/files?session_id="+r.sid+"&worktree=follow", "", shape)
+	require.Equal(r.t, http.StatusOK, rec.Code, rec.Body.String())
+	var body map[string]any
+	require.NoError(r.t, json.Unmarshal(rec.Body.Bytes(), &body))
+	return body
+}
+
+func TestASignedInPageOnAnotherAddressIsFollowedWithStrictBoundsAndTheWorktreeAsRoot(t *testing.T) {
+	r := newFollowRig(t, true)
+	r.event("Edit", map[string]any{"file_path": filepath.Join(r.worktree, "work.txt")})
+	body := r.lanList(nil)
+	assert.Equal(t, []string{"work.txt"}, filepaths(body), "the LAN page follows")
+	wt, _ := body["worktree"].(map[string]any)
+	require.NotNil(t, wt)
+	assert.Equal(t, true, wt["followed"])
+
+	// strict bounds with the worktree as the root: its file is read, a path out of it is not
+	rec := r.lan(http.MethodGet, "/api/sessions/live/"+r.name+"/file-content?session_id="+r.sid+"&worktree=follow&filepath=work.txt", "", nil)
+	assert.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	assert.Contains(t, rec.Body.String(), "the agent's work")
+	for _, out := range []string{"../main-repo/README.md", filepath.Join(r.launch, "README.md"), "../../etc/passwd"} {
+		rec = r.lan(http.MethodGet, "/api/sessions/live/"+r.name+"/file-content?session_id="+r.sid+"&worktree=follow&filepath="+out, "", nil)
+		assert.NotEqual(t, http.StatusOK, rec.Code, "%s is outside the worktree root: %s", out, rec.Body.String())
+	}
+}
+
+func TestAPageThatIsNotASignedInSameOriginPersonsIsNotFollowedOnAnotherAddress(t *testing.T) {
+	r := newFollowRig(t, true)
+	r.event("Edit", map[string]any{"file_path": filepath.Join(r.worktree, "work.txt")})
+	for name, shape := range map[string]func(*http.Request){
+		"no valid sign-in (this computer's browser, no cookie)": func(req *http.Request) {
+			*req = *req.WithContext(context.WithValue(req.Context(), callerKindKey{}, callerDashNoCookie))
+		},
+		"a script (no kind)": func(req *http.Request) {
+			*req = *req.WithContext(context.WithValue(req.Context(), callerKindKey{}, callerLocalOther))
+		},
+		"a bearer credential":      func(req *http.Request) { req.Header.Set("Authorization", "Bearer abc") },
+		"an API key":               func(req *http.Request) { req.Header.Set("X-API-Key", "k") },
+		"a Hub stamp":              func(req *http.Request) { req.Header.Set(tunnel.ViaHeader, "1") },
+		"an agent's session token": func(req *http.Request) { req.Header.Set(store.SessionTokenHeader, "tok") },
+		"a cross-site page": func(req *http.Request) {
+			req.Header.Set("Origin", "https://evil.example")
+			req.Header.Set("Sec-Fetch-Site", "cross-site")
+		},
+		"no origin at all": func(req *http.Request) { req.Header.Del("Origin"); req.Header.Del("Sec-Fetch-Site") },
+	} {
+		body := r.lanList(shape)
+		assert.Empty(t, filepaths(body), "%s: the launch folder's list", name)
+		assert.Nil(t, body["worktree"], "%s: no worktree is named", name)
+	}
+}
+
+// A cross-site write with a valid cookie is not followed into the worktree: the save lands, if at all, where the launch folder's own rules put it, never in the worktree.
+func TestACrossSiteWriteIsNotFollowedIntoTheWorktree(t *testing.T) {
+	r := newFollowRig(t, true)
+	r.event("Edit", map[string]any{"file_path": filepath.Join(r.worktree, "work.txt")})
+	before, err := os.ReadFile(filepath.Join(r.worktree, "work.txt"))
+	require.NoError(t, err)
+	rec := r.lan(http.MethodPut, "/api/sessions/live/"+r.name+"/file-content?session_id="+r.sid+"&worktree=follow&filepath=work.txt", `{"content":"overwritten by another site"}`, func(req *http.Request) {
+		req.Header.Set("Origin", "https://evil.example")
+		req.Header.Set("Sec-Fetch-Site", "cross-site")
+		req.Header.Set("Content-Type", "application/json")
+	})
+	after, err := os.ReadFile(filepath.Join(r.worktree, "work.txt"))
+	require.NoError(t, err)
+	assert.Equal(t, string(before), string(after), "the worktree's file is untouched (status %d: %s)", rec.Code, rec.Body.String())
 }
