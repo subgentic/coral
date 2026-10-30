@@ -10,6 +10,7 @@
 // agent on screen. Drives Chrome over CDP.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 const NOTE = "Sent, not confirmed";
 const GONE = { error: "Coral can't reach this agent's hooks, so it can't tell whether your message arrived. Check the agent's terminal. To fix this, reopen Coral or restart the agent.", code: 'hooks_unreachable', not_sent: false };
@@ -56,7 +57,7 @@ const HOLD = `(() => {
         await Page.addScriptToEvaluateOnNewDocument({ source: HOLD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await ev(`localStorage.setItem('coral-live-view-mode', 'chat'); window.__m.add('cu-a', 'A', 4, { sleeping: false }); true`);
         await select('cu-a');
         await waitFor(`window.__rendered().length > 0`, 'the conversation');
