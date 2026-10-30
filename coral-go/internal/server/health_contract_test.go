@@ -43,7 +43,8 @@ func TestHealthEndpointContract(t *testing.T) {
 			keys = append(keys, k)
 		}
 		sort.Strings(keys)
-		assert.Equal(t, []string{"hub", "status", "version"}, keys, "exact field set")
+		assert.Equal(t, []string{"hub", "instance_id", "status", "version"}, keys, "exact field set")
+		assert.IsType(t, "", body["instance_id"], "the id of this server run (#245): a command checks it before it sends a credential to the address in the lock file")
 		assert.Equal(t, "ok", body["status"])
 		assert.IsType(t, "", body["version"])
 		// A build without a release Version (tests, make dev) still reports its dev stamp, never "".

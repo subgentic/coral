@@ -30,6 +30,7 @@ func npmCodex(t *testing.T, withNode bool) (link string) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("PATH", "/usr/bin:/bin")
+	t.Setenv("TMPDIR", t.TempDir()) // a CLI in a temp folder is not picked up from a common place (#353): this home is a test folder, so the system temp folder is another one (Unix reads TMPDIR)
 	if _, err := exec.LookPath("node"); err == nil {
 		t.Skip("system node installed")
 	}
