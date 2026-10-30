@@ -5,6 +5,7 @@ import { state } from './state.js';
 import { isCloud, normServer, LOCAL_SERVER } from './server_base.js';
 import { builtScreen, SCREEN_TYPES } from './phone_screens.js';
 import { syncPhoneFab } from './phone_fab.js';
+import { mountTopPhoneBar } from './phone_bar.js';
 
 const VIEW_IDS = [
     "mobile-agent-list",
@@ -75,6 +76,7 @@ export function buildWelcome() {
 }
 
 export function showView(activeId) {
+    mountTopPhoneBar(); // the page's one phone bar (built once; css draws it only on a phone)
     _viewChanges++;
     state.atWelcome = activeId === 'welcome-screen'; // the welcome page is on screen: no agent row is the selected one (session_rows.js, #10035)
     if (activeId === 'welcome-screen') buildWelcome();
