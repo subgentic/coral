@@ -39,6 +39,8 @@ import (
 
 // SessionsHandler handles all live session API endpoints.
 type SessionsHandler struct {
+	opencode OpencodeRuntime // the opencode servers, one per agent; nil until the server wires it
+
 	// piModelCheck says a Pi model is not one Pi lists (#11105); nil until the server wires it.
 	piModelCheck func(ctx context.Context, model string) string
 	// searchRate is the per-member rate limit of the agent search, refusals counted (#11048).

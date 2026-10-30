@@ -97,3 +97,21 @@ func TestAStreamThatEndsForgetsWhatItSaidAndADeadServerIsStartedAgain(t *testing
 	assert.NotSame(t, srv, again, "a server that exited is started again")
 	waitFor(t, "working again from the new server's stream", func() bool { s, _, ok := m.Turn("ses_abc123"); return ok && s == StateWorking })
 }
+
+func TestAnAgentsTurnIsTheNewestStateOfItsOwnServerAndNoOthers(t *testing.T) {
+	cfg, _ := stubConfig(t)
+	frames := filepath.Join(t.TempDir(), "frames")
+	require.NoError(t, os.WriteFile(frames, []byte(
+		"event: session.execution.started\ndata: {\"sessionID\":\"ses_first\"}\n\n"+
+			"event: session.execution.succeeded\ndata: {\"sessionID\":\"ses_first\"}\n\n"), 0o600))
+	t.Setenv(eventsFileVar, frames)
+	m := NewManager(cfg)
+	defer m.Close()
+	_, _, ok := m.AgentTurn("agent-1")
+	assert.False(t, ok, "an agent with no server has no turn")
+	_, err := m.Ensure(context.Background(), "agent-1")
+	require.NoError(t, err)
+	waitFor(t, "idle", func() bool { s, _, ok := m.AgentTurn("agent-1"); return ok && s == StateIdle })
+	_, _, ok = m.AgentTurn("agent-2")
+	assert.False(t, ok, "another agent's server is not this one's")
+}

@@ -179,7 +179,7 @@ func (h *SessionsHandler) launchSession(ctx context.Context, spec launchSpec) (_
 	// files can't be written, the launch fails with nothing left behind (#3601 W12).
 	var cmd string
 	if !isTerminal {
-		if cmd, err = launchCommand(agentImpl, launchParams); err != nil {
+		if cmd, err = h.launchCommand(ctx, agentImpl, launchParams); err != nil {
 			return nil, err
 		}
 	}

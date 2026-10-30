@@ -413,7 +413,7 @@ func (h *SessionsHandler) restartCommand(ctx context.Context, p *restartPlan) (s
 		refuse, _ := cliPathRefusal(ctx, cerr)
 		return "", refuse
 	}
-	cmd, err := launchCommand(agent.GetAgent(p.agentType), agent.LaunchParams{
+	cmd, err := h.launchCommand(ctx, agent.GetAgent(p.agentType), agent.LaunchParams{
 		SessionID:       p.newSessionID,
 		SessionName:     p.newSessionName,
 		ProtocolPath:    h.protocolPath(),

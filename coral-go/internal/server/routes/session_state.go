@@ -61,6 +61,10 @@ func (h *SessionsHandler) applyTranscriptState(input *SessionStateInput, events 
 			kind = "turn_activity" // the turn going on, not a new turn: it never answers an open request
 		}
 		mergeTranscriptTurnEvent(input, events, kind, atTime)
+	case at.Opencode:
+		// opencode keeps no transcript Coral reads: its server's event stream says a turn is going on, ended, or waits for the person.
+		kind, atTime := h.opencodeTurn(sessionID)
+		mergeTranscriptTurnEvent(input, events, kind, atTime)
 	case at.Agy, at.Antigravity, at.Gemini:
 		kind, atTime, summary := h.jsonl.ReadAgyTurnEvent(sessionID, workingDir)
 		mergeTranscriptTurnEvent(input, events, kind, atTime, summary)

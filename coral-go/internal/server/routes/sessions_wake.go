@@ -198,7 +198,7 @@ func (h *SessionsHandler) startWake(ctx context.Context, ls *store.LiveSession, 
 			h.noteWake(ls.SessionID, refusal)
 		}
 		if exited {
-			cmd, err := launchCommand(agentImpl, launchParams)
+			cmd, err := h.launchCommand(ctx, agentImpl, launchParams)
 			if err != nil {
 				return err
 			}
@@ -215,7 +215,7 @@ func (h *SessionsHandler) startWake(ctx context.Context, ls *store.LiveSession, 
 	}
 
 	if !alreadyRunning && ls.AgentType != at.Terminal {
-		cmd, err := launchCommand(agentImpl, launchParams)
+		cmd, err := h.launchCommand(ctx, agentImpl, launchParams)
 		if err != nil {
 			return err
 		}

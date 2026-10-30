@@ -79,6 +79,25 @@ func (m *Manager) Turn(session string) (state State, at time.Time, ok bool) {
 	return "", time.Time{}, false
 }
 
+// AgentTurn is the state of the agent's newest session on its own server: Coral's id for an opencode agent is not opencode's ses_ id, and the agent has one server, so what its server last said is the agent's.
+// ok is false when the agent has no server or its stream has named no session (or a gap made them unknown).
+func (m *Manager) AgentTurn(key string) (state State, at time.Time, ok bool) {
+	m.mu.Lock()
+	g := m.servers[key]
+	m.mu.Unlock()
+	if g == nil {
+		return "", time.Time{}, false
+	}
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	for session, t := range g.at {
+		if s := g.tracker.State(session); s != "" && (!ok || t.After(at)) {
+			state, at, ok = s, t, true
+		}
+	}
+	return state, at, ok
+}
+
 // Stop ends one agent's server and the loop reading it.
 func (m *Manager) Stop(key string) {
 	m.mu.Lock()
