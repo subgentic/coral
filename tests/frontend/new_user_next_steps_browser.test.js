@@ -102,7 +102,7 @@ const TEAM = `qa-next-steps-${Date.now() % 100000}`;
         await remount({ found: true, signed_in: false }); await pick('pi');
         await waitFor(`(() => { const n = document.querySelector('#sn-host .launch-signin-notice'); return !!n && !n.hidden; })()`, 'the Pi notice', 6000).catch(() => {});
         n0 = await sn();
-        check(n0 && n0.shown && /Pi isn't signed in to any provider on this computer\./.test(n0.text), `Pi not signed in: a notice in Pi's words: ${JSON.stringify(n0)}`);
+        check(n0 && n0.shown && /Pi isn't signed in to its default provider on this computer\./.test(n0.text), `Pi's default provider not signed in: a notice in Pi's words: ${JSON.stringify(n0)}`);
         await ev(`document.querySelector('#sn-host .launch-signin-how').click(); true`); n0 = await sn();
         check(n0.steps && /run pi, type \/login, choose how to sign in, then pick a provider/.test(n0.text) && /Pi shows No API key found for the provider and waits for you to sign in/.test(n0.text), `with Pi's own steps: ${JSON.stringify(n0)}`);
         await pick('codex'); n0 = await sn(); check(!n0.shown, `another provider: nothing: ${JSON.stringify(n0)}`);

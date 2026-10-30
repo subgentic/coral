@@ -1,5 +1,5 @@
 /* New Agent's Agent step says so, above the provider cards, when the chosen provider is signed out on this computer (#11336, QA's desktop pass: it was one small grey line behind the dialog that never said how to sign in;
- * then Pi, which lists no models when no provider is signed in and fails at launch with "No API key found"). Claude's answer is the page's own status (signin_line.js); Pi's is asked of the CLI
+ * then Pi, which lists no models when its default provider is not signed in and fails at launch with "No API key found"). Claude's answer is the page's own status (signin_line.js); Pi's is asked of the CLI
  * (GET /api/system/cli-check?type=pi&signin=1) when Pi is chosen. A notice under the provider, not a block: Launch stays on, because the status can be minutes old and the agent's own chat says what to do
  * the moment it needs it (needs_input_card.js). "How to sign in" opens the steps; a person who signs in first does not need them. */
 import { claudeSignedIn, askSigninSoon, onSigninChange } from './signin_line.js';
@@ -8,7 +8,7 @@ import { serverFetch, LOCAL_SERVER, normServer } from './server_base.js';
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 const WORDS = {
     claude: { lead: "Claude isn't signed in on this computer.", steps: 'Open a terminal, run claude and follow the steps. Or launch now: the agent’s chat then shows Open terminal and Check again.' },
-    pi: { lead: "Pi isn't signed in to any provider on this computer.", steps: 'Open a terminal, run pi, type /login, choose how to sign in, then pick a provider. Or launch now: Pi shows No API key found for the provider and waits for you to sign in.' },
+    pi: { lead: "Pi isn't signed in to its default provider on this computer.", steps: 'Open a terminal, run pi, type /login, choose how to sign in, then pick a provider. Or launch now: Pi shows No API key found for the provider and waits for you to sign in.' },
 };
 const PI_ASK_GAP_MS = 10_000;
 
