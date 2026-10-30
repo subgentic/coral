@@ -22,3 +22,7 @@ v1.4.156	- **Update telemetry, exactly three things:**	- **Update telemetry, exa
 #
 # v1.4.165: the #6948 bullet said the two task-diff reads answer 404 through Coral Hub; neither route goes through the Hub (cloud_routes.golden), so the sentence was removed from the published body.
 v1.4.165	- **A task's diff is kept by board and id** (#6948):	- **A task's diff is kept by board and id** (#6948): a repeated task id no longer shows an older task's diff or an older run's step files; the diff of a task from before the update still shows (it is read behind the older-than-task check), and a diff shared with an older task (one stored object) is still served.
+#
+# v2.0.6: the Windows in-app update has been broken since v2.0.0 (the installed version's updater decides, so 2.0.6 to 2.0.7 also fails in-app); the sentence was
+# appended to the macOS update bullet of the published body after publication (the Orchestrator's wording, 2026-10-30).
+v2.0.6	- **A macOS in-app update that quit Coral and installed nothing is fixed**	- **A macOS in-app update that quit Coral and installed nothing is fixed** (#11151, #11155): Coral's own tmux server no longer counts as "Coral still running"; a process list that could not be read is never taken as "nothing runs"; and an apply that ends with Coral still running starts the installed Coral again. The apply's answer is kept in `updates/apply.log`. Windows: in-app update does not work from 2.0.0 through 2.0.6. Install the MSI by hand, up to and including 2.0.7; in-app update works from 2.0.7 onward.
