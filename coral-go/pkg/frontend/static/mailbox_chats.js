@@ -188,7 +188,7 @@ const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 
 /** The divider a chat is under: Today, Yesterday, the weekday for the week before, then the date ("Oct 17", with the year when it is not this one). */
 function dayOf(iso, now = new Date()) {
     const d = new Date(iso);
-    if (!iso || isNaN(d)) return 'Date unknown';
+    if (!iso || isNaN(d)) return 'No messages yet'; // a board nobody has written to has no day: it is not "unknown"
     const day0 = x => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
     const days = Math.round((day0(now) - day0(d)) / 86400000);
     if (days <= 0) return 'Today';

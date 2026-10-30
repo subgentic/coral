@@ -28,6 +28,14 @@ const BASE = require('./test_base').BASE;
         for (const [fs, theme] of [[16, 'light'], [16, 'dark'], [32, 'light']]) {
             await open(390, fs, theme);
             const tag = `390@${fs} ${theme}`;
+            { // the pill filters agents by name; the line under it sends the same words to the chats' search (the Mobile Beta Tester's "0 of 6 agents" for words from a chat)
+                await ev(`(() => { const i = document.querySelector('#mobile-agent-list .mobile-search-input'); i.value = 'build'; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
+                await waitFor(`!document.getElementById('agent-search-all-chats').hidden`, `${tag}: the all-chats line appears`, 4000);
+                const pb = await ev(box(`document.querySelector('#mobile-agent-list .mobile-search-input')`)), ab = await ev(box(`document.getElementById('agent-search-all-chats')`));
+                assert.ok(ab.w > 0 && ab.t >= pb.b - 1 && ab.r <= 390 + 0.5 && /Search all chats for .build./.test(await ev(`document.getElementById('agent-search-all-chats').textContent`)), `${tag}: "Search all chats for build" sits under the pill: ` + JSON.stringify({ pb, ab }));
+                await ev(`(() => { const i = document.querySelector('#mobile-agent-list .mobile-search-input'); i.value = ''; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
+                await waitFor(`document.getElementById('agent-search-all-chats').hidden`, `${tag}: the line goes with the words`, 4000);
+            }
             assert.equal(await ev(`getComputedStyle(document.querySelector('header.top-bar')).display`), 'none', `${tag}: the page's top bar is the list header's first row`);
             { // a card's kebab: its whole 44 px hit area is inside the card (it hung past the right edge, QA Reviewer 2's nit on #11143)
                 const k = await ev(`(() => { const T = ${require('./helpers/touch_area').TOUCH_AREA}; return [...document.querySelectorAll('#mobile-session-list .session-group-item')].map(li => { const a = T(li.querySelector('.sidebar-kebab-btn')), c = li.getBoundingClientRect(); return { area: [Math.round(a.l - c.left), Math.round(c.right - a.r)], w: Math.round(a.w), inside: a.l >= c.left - 0.5 && a.r <= c.right + 0.5 && a.t >= c.top - 0.5 && a.b <= c.bottom + 0.5, over: Math.round(a.r - c.right) }; }); })()`);

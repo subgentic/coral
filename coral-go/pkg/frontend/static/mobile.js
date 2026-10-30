@@ -109,6 +109,7 @@ window.mobileBack = mobileBack;
 // On a phone the agent list is built once, in the Agents page itself: the sidebar's own list element moves into #mobile-agent-list (and takes the id
 // #mobile-session-list that the phone's styles use) instead of being cloned, so the page holds one copy of every row and no id twice (#4497). On a wide
 // screen it moves back, as #live-sessions-list, to where the sidebar has it.
+let _allChatsHome = null; // { parent, next }: where the all-chats line sits in the sidebar
 let _sidebarHome = null; // { parent, next }: where the list sits in the sidebar
 
 function _listHeader(agentList) {
@@ -166,6 +167,11 @@ export function syncMobileAgentList() {
     if (phoneBox && sideBox && !phoneBox.value) phoneBox.value = sideBox.value; // a search typed on a wide screen is still in the box
     syncDisplayMenu();   // the phone's copy of the ≡ menu (#3991)
 
+    const allChats = document.getElementById('agent-search-all-chats'), row = agentList.querySelector('#mobile-search-row');
+    if (allChats && row && allChats.previousElementSibling !== row) { // the line that sends the words to the chats' search (render.js syncSearchAllChats) sits under the pill, so its placeholder is true
+        if (!_allChatsHome) _allChatsHome = { parent: allChats.parentElement, next: allChats.nextSibling };
+        row.after(allChats);
+    }
     const list = document.getElementById('live-sessions-list');
     if (list && list.parentElement !== agentList) {
         _sidebarHome = { parent: list.parentElement, next: list.nextSibling };
@@ -176,6 +182,8 @@ export function syncMobileAgentList() {
 
 /** Wide screen: the list goes back into the sidebar as #live-sessions-list, where it was. */
 function restoreSidebarList() {
+    const allChats = document.getElementById('agent-search-all-chats');
+    if (allChats && _allChatsHome && _allChatsHome.parent.isConnected) { _allChatsHome.parent.insertBefore(allChats, _allChatsHome.next && _allChatsHome.next.parentNode === _allChatsHome.parent ? _allChatsHome.next : null); _allChatsHome = null; }
     const list = document.getElementById('mobile-session-list');
     if (!list || !_sidebarHome || !_sidebarHome.parent.isConnected) return;
     list.id = 'live-sessions-list';
