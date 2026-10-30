@@ -4,6 +4,8 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -133,5 +135,50 @@ func TestDashboardPagePathsCanonicalForm(t *testing.T) {
 	for _, p := range []string{"/agents", "/chats?q=x", "/team/qa"} {
 		resp, _ := pageGet(t, c, "GET", ts.URL+p)
 		assert.Equal(t, 200, resp.StatusCode, "%s is already canonical", p)
+	}
+}
+
+// #11237: the client router (pkg/frontend/static/routes.js) and this list must not drift: every first path word the router's parse() accepts has a family in DashboardPagePaths, so a route added to the router without a
+// server entry fails here instead of showing "Page not found" on a reload. The one exception is the bare "/inbox", which is Coral Hub's own page (see DashboardPagePaths); the words the router does not know (/tasks, /goals,
+// /artifacts, /knowledge, /home, /settings, /themes: nothing in the app links to them) stay a 404.
+func TestEveryFirstWordTheClientRouterParsesIsServed(t *testing.T) {
+	src, err := os.ReadFile("../../pkg/frontend/static/routes.js")
+	require.NoError(t, err)
+	text := string(src)
+	start := strings.Index(text, "    switch (top) {")
+	require.GreaterOrEqual(t, start, 0, "parse()'s switch on the first path word")
+	end := strings.Index(text[start:], "\n    }\n")
+	require.Greater(t, end, 0)
+	body := text[start : start+end]
+	words := map[string]bool{}
+	caseRe := regexp.MustCompile(`case ([^:]+):`)
+	for _, line := range strings.Split(body, "\n") {
+		if !strings.HasPrefix(line, "        case ") { // one level in: the switch's own cases
+			continue
+		}
+		for _, m := range caseRe.FindAllStringSubmatch(line, -1) {
+			w := strings.TrimSpace(m[1])
+			switch {
+			case w == "undefined" || w == "''":
+				// the root
+			case w == "INBOX":
+				words["inbox"] = true
+			case strings.HasPrefix(w, "'") && strings.HasSuffix(w, "'"):
+				words[strings.Trim(w, "'")] = true
+			}
+		}
+	}
+	for _, w := range []string{"agents", "chats", "team", "board", "inbox", "workflows", "jobs", "automations", "analytics", "docs", "servers"} {
+		require.True(t, words[w], "the census found the router's /%s (the parse of routes.js drifted?)", w)
+	}
+	served := map[string]bool{}
+	for _, p := range DashboardPagePaths {
+		served[strings.Split(strings.TrimPrefix(p, "/"), "/")[0]] = true
+	}
+	for w := range words {
+		assert.True(t, served[w], "the client router parses /%s but DashboardPagePaths has no family for it: a reload of that page would be a 404", w)
+	}
+	for _, w := range []string{"tasks", "goals", "artifacts", "knowledge", "home", "settings", "themes"} {
+		assert.False(t, words[w], "the router does not parse /%s", w)
 	}
 }
