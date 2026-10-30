@@ -208,7 +208,7 @@ func TestRound2DesignCallsAsk(t *testing.T) {
 		`sed -n 1p x`, `sed -i 's/a/b/' x`, `sed 's/a/b/g' x`, `sed -n '/w/p' x`, `sed -e 's/a/b/' -e 's/c/d/' x`, `sed '1d' x`, `sed 's/ew/x/' f`, `sed 'y/abc/xyz/' f`, `sed -n '/e/p;/w/p' f`, `sed '1i\hello' f`, `sed 's/a/b/;s/c/d/' f`, `sed -f script.sed f`, `sed -E 's/(a|b)/c/' f`,
 		`pwsh -File x.ps1`, `pwsh -NoProfile -File x.ps1`, `pwsh -ExecutionPolicy Bypass -File x.ps1`, `powershell -NoLogo -File x.ps1 -Verbose`, `pwsh --version`,
 		`npm install`, `npm test`, `npm run build`, `npm exec prettier -- --check .`, `pnpm install`, `yarn install`, `npx prettier --check .`,
-		`gawk -i inplace '{print}' notes.txt`, `awk -v x=1 '{print x}' f`, `groovy x.groovy`, `tsx x.ts`, `ts-node x.ts`, `expect x.exp`, `py x.py`, `py -3 x.py`,
+		`gawk -i inplace '{print}' notes.txt`, `awk -v x=1 '{print x}' f`, `groovy x.groovy`, `tsx x.ts`, `expect x.exp`, `py x.py`, `py -3 x.py`,
 	} {
 		assert.Empty(t, shellRisk(c, dir), "must pass: %s", c)
 	}

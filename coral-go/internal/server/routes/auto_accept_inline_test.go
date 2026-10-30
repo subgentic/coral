@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -49,8 +50,26 @@ func TestShellRiskInlineCodeRulesLeaveOrdinaryCommandsAlone(t *testing.T) {
 		`awk '{print $1}' x`, `awk -F: '$1 > 5 {print}' x`, `awk -F'|' '{print $1}' x`, `awk -F '|' '{print $2}' x`, `awk -v sep='|' '{print $1}' x`, `awk '$1=="a"||$2=="b"' x`, `awk -f prog.awk x`, `awk 'BEGIN{x=1} END{print x}' x`, `gawk '{print $2}' x`, `sed -n 1p x`,
 		// editors and runners named alone, version and help flags, other commands
 		`vim x.txt`, `nvim x.txt`, `vim -V`, `emacs x.txt`, `lua x.lua`, `Rscript x.R`, `julia x.jl`, `osascript x.scpt`, `npx prettier --check .`, `npx tsc`, `rsync -a src/ dst/`, `rsync -av --delete src/ dst/`, `rsync -a --exclude=x src/ dst/`,
-		`ssh-keygen -l -f key`, `ssh-add -l`, `ssh -V`, `ssh -G host`, `ssh -Q cipher`, `scp x host:y`, `parallel --version`, `parallelize x`, `go test ./...`, `git status`, `npm test`, `make`, `echo "python3 -c x"`, `git commit -m "node -e x"`, `ls python3`,
+		`ssh -V`, `ssh -G host`, `ssh -Q cipher`, `scp x host:y`, `parallel --version`, `parallelize x`, `go test ./...`, `git status`, `npm test`, `make`, `echo "python3 -c x"`, `git commit -m "node -e x"`, `ls python3`,
 	} {
 		assert.Empty(t, shellRisk(c, dir), "must pass: %s", c)
+	}
+}
+
+// A hyphenated program name (ssh-keygen, ssh-add, ts-node) is an ordinary command on Unix. On Windows the shell-risk rules for PowerShell take a word of two parts joined by a
+// hyphen for a cmdlet (Verb-Noun), and one whose verb is not a reading one asks: the safe side, and the words say why. This pins both, so the list above stays one that passes everywhere.
+func TestShellRiskHyphenatedProgramNames(t *testing.T) {
+	dir := t.TempDir()
+	// On Windows the reason is the cmdlet rule's own words: -f reads as -Force, and a word with no path in it is "not known to only read".
+	for c, windowsReason := range map[string]string{
+		`ssh-keygen -l -f key`: "it runs ssh-keygen with -Recurse or -Force",
+		`ssh-add -l`:           "it runs ssh-add, which is not known to only read",
+		`ts-node x.ts`:         "it runs ts-node, which is not known to only read",
+	} {
+		if runtime.GOOS == "windows" {
+			assert.Equal(t, windowsReason, shellRisk(c, dir), "asks on Windows: %s", c)
+		} else {
+			assert.Empty(t, shellRisk(c, dir), "must pass: %s", c)
+		}
 	}
 }
