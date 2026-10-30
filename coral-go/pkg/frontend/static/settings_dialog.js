@@ -23,6 +23,7 @@ export async function showSettingsModal(group) {
     importOnce('./terminal_backend.js').then(m => m.loadTerminalBackendRow()).catch(() => {}); // #3634
     importOnce('./worktrees_panel.js').then(m => m.loadWorktrees()).catch(() => {}); // the kept worktrees, in Storage and cleanup (#6743)
     importOnce('./security_settings.js').then(m => m.loadSecurityRow()).catch(() => {}); // #3948
+    importOnce('./firewall_warning.js').then(m => { m.renderFirewallRow(); m.renderSecurityNoticeRow(); }).catch(() => {}); // #295: where the firewall warning and the data-folder notice stay once their toasts are dismissed
     const s = state.settings || {};
     // What this dialog opens with: Save sends only the fields that end up different from it.
     setSettingsAtOpen({ ...s });
