@@ -18,10 +18,14 @@ import (
 // The Windows "Install update" quits the server first, so an apply that installs nothing must start Coral again (#5946, #5931's F1).
 
 // installFolder is a folder with a coral-tray.exe in it, as an installed or a portable Coral has.
+// thisUpdater is the bytes of the running updater in the tests: an install folder holds a coral-update.exe with them.
+const thisUpdater = "the running updater"
+
 func installFolder(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "coral-tray.exe"), []byte("x"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "coral-update.exe"), []byte(thisUpdater), 0o755)) // the install's own updater: what fakeStart's running program is
 	return dir
 }
 
@@ -29,7 +33,10 @@ func installFolder(t *testing.T) string {
 func fakeStart(t *testing.T, err error) *[]string {
 	t.Helper()
 	var started []string
-	oldStart, oldOS, oldReg := startCoralFrom, restartGOOS, registeredInstall
+	oldStart, oldOS, oldReg, oldExe := startCoralFrom, restartGOOS, registeredInstall, runningExe
+	self := filepath.Join(t.TempDir(), "coral-update-self.exe")
+	require.NoError(t, os.WriteFile(self, []byte(thisUpdater), 0o755))
+	runningExe = func() (string, error) { return self, nil }
 	registeredInstall = func() (string, error) { return "", os.ErrNotExist } // no registered Coral unless the test says one (registered)
 	startCoralFrom = func(_, dir string) error {
 		// A test may only name a folder of its own (the temp folder): never the person's installed Coral (QA's extra trays).
@@ -40,7 +47,7 @@ func fakeStart(t *testing.T, err error) *[]string {
 		return err
 	}
 	restartGOOS = "windows"
-	t.Cleanup(func() { startCoralFrom, restartGOOS, registeredInstall = oldStart, oldOS, oldReg })
+	t.Cleanup(func() { startCoralFrom, restartGOOS, registeredInstall, runningExe = oldStart, oldOS, oldReg, oldExe })
 	return &started
 }
 
@@ -291,4 +298,43 @@ func TestAnUnloadableTrustedRootStartsCoralAgain(t *testing.T) {
 	assert.Equal(t, "trusted_root", out.FailedStage)
 	assert.Empty(t, *started, "a check stopped nothing")
 	assert.False(t, out.RestartFailed)
+}
+
+// A folder the marker names that is not the registered install is started only if it holds THIS updater: a planted marker cannot make the updater start a program of its choosing.
+func TestARestartFromAnUnregisteredFolderNeedsThisUpdaterThere(t *testing.T) {
+	started := fakeStart(t, nil)
+	data := t.TempDir()
+
+	own := installFolder(t) // a portable copy's server folder: its coral-update.exe is this program's bytes
+	assert.True(t, restartFromMarker(data, own))
+	assert.Equal(t, []string{own}, *started)
+
+	noUpdater := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(noUpdater, "coral-tray.exe"), []byte("x"), 0o755))
+	assert.False(t, restartFromMarker(data, noUpdater), "a tray alone: another program's folder")
+
+	otherBytes := installFolder(t)
+	require.NoError(t, os.WriteFile(filepath.Join(otherBytes, "coral-update.exe"), []byte("another program"), 0o755))
+	assert.False(t, restartFromMarker(data, otherBytes), "a coral-update.exe that is not this program")
+
+	assert.False(t, restartFromMarker(data, "relative"), "not an absolute folder")
+	assert.Equal(t, []string{own}, *started, "nothing else was started")
+
+	// the registered install is Windows Installer's: no byte check (the apply replaces its files, and it is not the marker's word)
+	reg := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(reg, "coral-tray.exe"), []byte("x"), 0o755))
+	registered(t, reg, nil)
+	assert.True(t, restartFromMarker(data, reg+string(filepath.Separator)))
+	assert.Equal(t, []string{own, reg}, *started)
+}
+
+// What the check does NOT do, written down (Security's probe on #241): a same-user planter who copies this updater beside a coral-tray.exe of their own gets that tray started. The
+// check stops a stray or damaged marker; it is not a defence against someone who can already write the marker and run programs as this user.
+func TestARestartFromAFolderWithACopyOfTheUpdaterStartsWhateverTrayIsThere(t *testing.T) {
+	started := fakeStart(t, nil)
+	planted := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(planted, "coral-tray.exe"), []byte("a program of the planter's choosing"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(planted, "coral-update.exe"), []byte(thisUpdater), 0o755)) // a copy of the running updater
+	assert.True(t, restartFromMarker(t.TempDir(), planted), "known limit: the check shows a copy of this updater, not an install")
+	assert.Equal(t, []string{planted}, *started)
 }
