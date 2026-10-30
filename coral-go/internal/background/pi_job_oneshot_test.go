@@ -18,7 +18,7 @@ import (
 func TestAPiJobRunsOneShotWithItsPromptOnTheCommandLine(t *testing.T) {
 	cliStubsOnPath(t, "pi") // the launch refuses a CLI it cannot find (#353); the stub stands in for it
 	rt := &spawnRecorder{}
-	l := NewAgentLauncher(rt, store.NewSessionStore(setupTestDB(t)), 8450)
+	l := newTestLauncher(t, rt, store.NewSessionStore(setupTestDB(t)), 8450)
 	job := store.ScheduledJob{AgentType: at.Pi, Name: "nightly", RepoPath: t.TempDir(), Prompt: "summarize the open tasks"}
 	_, err := l.launchAgent(context.Background(), job.RepoPath, job.AgentType, job.Name, "", jobLaunchFlags(job), true, job.Prompt, "", "", oneShotJob(job.AgentType))
 	require.NoError(t, err)
@@ -43,7 +43,7 @@ func TestOnlyPiJobsAreOneShot(t *testing.T) {
 func TestAJobOnClaudeIsNotLaunchedOneShot(t *testing.T) {
 	cliStubsOnPath(t, "claude") // the launch refuses a CLI it cannot find (#353); the stub stands in for it
 	rt := &spawnRecorder{}
-	l := NewAgentLauncher(rt, store.NewSessionStore(setupTestDB(t)), 8450)
+	l := newTestLauncher(t, rt, store.NewSessionStore(setupTestDB(t)), 8450)
 	_, err := l.LaunchAgent(context.Background(), t.TempDir(), at.Claude, "job", "", nil, true, "p", "", "")
 	require.NoError(t, err)
 	rt.mu.Lock()
@@ -62,7 +62,7 @@ func TestAOneShotJobIsNotAlsoTypedItsPrompt(t *testing.T) {
 		rt := &spawnRecorder{}
 		db := setupTestDB(t)
 		ss := store.NewSessionStore(db)
-		l := NewAgentLauncher(rt, ss, 8450)
+		l := newTestLauncher(t, rt, ss, 8450)
 		fn := l.BuildSchedulerLaunchFn(store.NewScheduleStore(db))
 		ctx, cancel := context.WithTimeout(context.Background(), 700*time.Millisecond)
 		defer cancel()

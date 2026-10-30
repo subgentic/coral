@@ -42,7 +42,7 @@ func TestJobRunsUseTheConfiguredCLIPath(t *testing.T) {
 	db := setupTestDB(t)
 	ss := store.NewSessionStore(db)
 	rt := &spawnRecorder{}
-	l := NewAgentLauncher(rt, ss, 8450)
+	l := newTestLauncher(t, rt, ss, 8450)
 
 	_, err := l.LaunchAgent(ctx, t.TempDir(), at.Claude, "job", "", nil, true, "p", "", "")
 	require.NoError(t, err)
@@ -84,7 +84,7 @@ func TestLaunchAgentWithNoTypeStillGetsItsLog(t *testing.T) {
 	naming.SetDefaultLogDir(logs)
 	t.Cleanup(func() { naming.SetDefaultLogDir("") })
 	rt := &spawnRecorder{}
-	l := NewAgentLauncher(rt, store.NewSessionStore(setupTestDB(t)), 8450)
+	l := newTestLauncher(t, rt, store.NewSessionStore(setupTestDB(t)), 8450)
 	_, err := l.LaunchAgent(context.Background(), t.TempDir(), "", "job", "", nil, true, "p", "", "")
 	require.NoError(t, err)
 	matches, _ := filepath.Glob(filepath.Join(logs, "claude_coral_*.log"))
@@ -102,7 +102,7 @@ func TestScheduledAgentsAreLaunchedWithThisServersEnvironment(t *testing.T) {
 	cliStubsOnPath(t, "claude", "codex")
 	for _, agentType := range []string{at.Claude, at.Codex} {
 		rt := &spawnRecorder{}
-		l := NewAgentLauncher(rt, store.NewSessionStore(setupTestDB(t)), 8450)
+		l := newTestLauncher(t, rt, store.NewSessionStore(setupTestDB(t)), 8450)
 		dataDir := t.TempDir()
 		l.SetServer("127.0.0.1", dataDir)
 		res, err := l.LaunchAgent(ctx, t.TempDir(), agentType, "job", "", nil, true, "p", "", "")
@@ -130,7 +130,7 @@ func TestScheduledAgentsCarryARunTagOnTmuxOnly(t *testing.T) {
 	ss := store.NewSessionStore(db)
 
 	tagged := &taggingRecorder{}
-	res, err := NewAgentLauncher(tagged, ss, 8450).LaunchAgent(ctx, t.TempDir(), at.Claude, "job", "", nil, true, "p", "", "")
+	res, err := newTestLauncher(t, tagged, ss, 8450).LaunchAgent(ctx, t.TempDir(), at.Claude, "job", "", nil, true, "p", "", "")
 	require.NoError(t, err)
 	tagged.mu.Lock()
 	cmd := tagged.commands[0]
@@ -141,7 +141,7 @@ func TestScheduledAgentsCarryARunTagOnTmuxOnly(t *testing.T) {
 	assert.Contains(t, cmd, tag, "the same tag the row holds")
 
 	plain := &spawnRecorder{}
-	res2, err := NewAgentLauncher(plain, ss, 8450).LaunchAgent(ctx, t.TempDir(), at.Claude, "job", "", nil, true, "p", "", "")
+	res2, err := newTestLauncher(t, plain, ss, 8450).LaunchAgent(ctx, t.TempDir(), at.Claude, "job", "", nil, true, "p", "", "")
 	require.NoError(t, err)
 	plain.mu.Lock()
 	cmd2 := plain.commands[0]
@@ -174,7 +174,7 @@ func TestCodexRunsFiredTogetherAreStartedApart(t *testing.T) {
 	agent.SharedHomeStartGap = 400 * time.Millisecond
 	launch := func(agentType string, n int) []time.Time {
 		rt := &stampRecorder{}
-		l := NewAgentLauncher(rt, store.NewSessionStore(setupTestDB(t)), 8450)
+		l := newTestLauncher(t, rt, store.NewSessionStore(setupTestDB(t)), 8450)
 		var wg sync.WaitGroup
 		for i := 0; i < n; i++ {
 			wg.Add(1)
@@ -208,7 +208,7 @@ func TestAPiJobIsLaunchedWithoutTrustingTheRepository(t *testing.T) {
 	assert.Equal(t, []string{"--model", "x"}, jobLaunchFlags(store.ScheduledJob{AgentType: at.Claude, Flags: "--model x"}))
 
 	rt := &spawnRecorder{}
-	l := NewAgentLauncher(rt, store.NewSessionStore(setupTestDB(t)), 8450)
+	l := newTestLauncher(t, rt, store.NewSessionStore(setupTestDB(t)), 8450)
 	cliStubsOnPath(t, "pi") // a launch refuses a CLI found nowhere (#353)
 	_, err := l.LaunchAgent(context.Background(), t.TempDir(), at.Pi, "job", "", jobLaunchFlags(store.ScheduledJob{AgentType: at.Pi}), true, "p", "", "")
 	require.NoError(t, err)
@@ -226,7 +226,7 @@ func TestJobRunWithNoCLIAnywhereIsRefusedAndSpawnsNothing(t *testing.T) {
 	db := setupTestDB(t)
 	ss := store.NewSessionStore(db)
 	rt := &spawnRecorder{}
-	l := NewAgentLauncher(rt, ss, 8450)
+	l := newTestLauncher(t, rt, ss, 8450)
 	t.Setenv("PATH", t.TempDir())
 	home := t.TempDir()
 	t.Setenv("HOME", home)
