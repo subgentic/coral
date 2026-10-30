@@ -244,10 +244,9 @@ export function mountSshSetup(host, { mode = 'setup', server = null, action = nu
             root.append(el('h5', 'ssh-subhead', `Terms of Service (version ${tm.version})`));
             const pre = el('pre', 'ssh-terms'); pre.textContent = tm.text; pre.tabIndex = 0; pre.setAttribute('aria-label', 'The Terms of Service');
             root.append(pre);
-            // TODO(operator): the wording of the next two lines is a placeholder until the operator answers: (1) that the terms also cover the other Coral installs of the account used on that computer,
-            // (2) how the hub's computer name appears in the record (it is the label the hub sends: hub-owner@<this computer's name>).
+            // TODO(operator): the first line below (the terms also covering the other Coral installs of the account used on that computer) is a placeholder until the operator answers. The second line is the operator's, as written (2026-10-30).
             root.append(el('p', 'ssh-consent', `By pressing ${words().go} you accept these Terms of Service for Coral on ${p.target}, and for the other Coral installs of the account you use there.`));
-            root.append(el('p', 'ssh-consent', `That computer records who accepted (${st.options.acceptance_label}), when, and which version of the terms.`));
+            root.append(el('p', 'ssh-consent', `That computer records who accepted (${st.options.acceptance_label}), when, and which version.`));
         }
         let typedOk = true;
         if (kind() === REMOVE) {
