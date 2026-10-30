@@ -56,9 +56,9 @@ func listDir(t *testing.T, dir string) string {
 			t.Fatal(err)
 		}
 		rel, _ := filepath.Rel(dir, path)
-		// config.Load makes a home that other accounts can read private and marks it for the next start (config.ExposedPendingFile): that is
+		// config.Load makes a home that other accounts can read private and marks it for the next start (config.RenewPendingFile): that is
 		// the folder's own, not the rejected setup's doing, and it happens where the test temp folder is open (a shared drive's).
-		if rel == config.ExposedPendingFile {
+		if rel == config.RenewPendingFile {
 			return nil
 		}
 		info, _ := d.Info()

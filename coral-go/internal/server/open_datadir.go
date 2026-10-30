@@ -21,7 +21,7 @@ import (
 // marks every stored remote server. The command-line token is written new at every start (NewCloudHandler) and a login token lives only in
 // memory. The notice then lists what the person may want to renew, each only when it applies.
 //
-// Only when all three are done is the folder's marker (config.ExposedPendingFile) removed: a start that stopped part of the way leaves it,
+// Only when all three are done is the folder's marker (config.RenewPendingFile) removed: a start that stopped part of the way leaves it,
 // and the next start does it all again and says so.
 func replaceAfterOpenDataDir(ctx context.Context, dir string, ks *auth.KeyStore, db *store.DB) {
 	if !config.DataDirMadePrivate(dir) || ks == nil {
@@ -48,7 +48,7 @@ func replaceAfterOpenDataDir(ctx context.Context, dir string, ks *auth.KeyStore,
 			}
 		}
 		rs := store.NewRemoteServerStore(db, dir)
-		if n, err := rs.MarkKeysExposed(ctx); err != nil {
+		if n, err := rs.MarkKeysForRenewal(ctx); err != nil {
 			log.Printf("[security] could not mark the stored remote servers' keys as readable by others: %v", err)
 		} else {
 			marked = true
@@ -79,11 +79,11 @@ func replaceAfterOpenDataDir(ctx context.Context, dir string, ks *auth.KeyStore,
 	}
 	f.done = f.keyReplaced && f.tokensRevoked && marked
 	if f.done {
-		if err := config.ClearDataDirExposed(dir); err != nil {
+		if err := config.ClearDataDirRenewal(dir); err != nil {
 			log.Printf("[security] the data folder's secrets were replaced, but its marker could not be removed (the next start replaces them again): %v", err)
 		}
 	} else {
-		log.Printf("[security] not everything in the data folder could be replaced: the next start tries again (%s stays)", config.ExposedPendingFile)
+		log.Printf("[security] not everything in the data folder could be replaced: the next start tries again (%s stays)", config.RenewPendingFile)
 	}
 	config.SetDataDirNotice(strings.TrimSpace(config.DataDirNotice() + " " + openFolderWords(f)))
 }

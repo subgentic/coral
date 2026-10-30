@@ -20,17 +20,17 @@ func TestAStoredKeyStaysMarkedUntilItIsReplaced(t *testing.T) {
 	}
 	a, err := rs.Get(ctx, "a")
 	require.NoError(t, err)
-	assert.Nil(t, a.KeyExposedSince, "not marked before")
+	assert.Nil(t, a.KeyRenewSince, "not marked before")
 
-	n, err := rs.MarkKeysExposed(ctx)
+	n, err := rs.MarkKeysForRenewal(ctx)
 	require.NoError(t, err)
 	assert.EqualValues(t, 2, n)
 	a, err = rs.Get(ctx, "a")
 	require.NoError(t, err)
-	require.NotNil(t, a.KeyExposedSince)
-	first := *a.KeyExposedSince
+	require.NotNil(t, a.KeyRenewSince)
+	first := *a.KeyRenewSince
 
-	n, err = rs.MarkKeysExposed(ctx)
+	n, err = rs.MarkKeysForRenewal(ctx)
 	require.NoError(t, err)
 	assert.EqualValues(t, 0, n, "a second open start keeps the first time")
 
@@ -39,25 +39,25 @@ func TestAStoredKeyStaysMarkedUntilItIsReplaced(t *testing.T) {
 	require.NoError(t, err)
 	a, err = rs.Get(ctx, "a")
 	require.NoError(t, err)
-	require.NotNil(t, a.KeyExposedSince, "a new label does not clear it")
-	assert.Equal(t, first, *a.KeyExposedSince)
+	require.NotNil(t, a.KeyRenewSince, "a new label does not clear it")
+	assert.Equal(t, first, *a.KeyRenewSince)
 
 	same := strings.Repeat("e4", 32)
 	_, err = rs.Update(ctx, "a", RemoteServerUpdate{APIKey: &same})
 	require.NoError(t, err)
 	a, err = rs.Get(ctx, "a")
 	require.NoError(t, err)
-	require.NotNil(t, a.KeyExposedSince, "the same key entered again does not clear it")
+	require.NotNil(t, a.KeyRenewSince, "the same key entered again does not clear it")
 
 	key := strings.Repeat("f5", 32)
 	_, err = rs.Update(ctx, "a", RemoteServerUpdate{APIKey: &key})
 	require.NoError(t, err)
 	a, err = rs.Get(ctx, "a")
 	require.NoError(t, err)
-	assert.Nil(t, a.KeyExposedSince, "a different key clears it")
+	assert.Nil(t, a.KeyRenewSince, "a different key clears it")
 	b, err := rs.Get(ctx, "b")
 	require.NoError(t, err)
-	assert.NotNil(t, b.KeyExposedSince, "and only for that server")
+	assert.NotNil(t, b.KeyRenewSince, "and only for that server")
 }
 
 // A stored key that can't be read counts as different: entering a key then clears the mark.
@@ -66,7 +66,7 @@ func TestAnUnreadableStoredKeyCountsAsDifferent(t *testing.T) {
 	ctx := context.Background()
 	_, err := rs.Add(ctx, "a", "a", "http://127.0.0.1:9", strings.Repeat("e4", 32), true)
 	require.NoError(t, err)
-	_, err = rs.MarkKeysExposed(ctx)
+	_, err = rs.MarkKeysForRenewal(ctx)
 	require.NoError(t, err)
 	_, err = db.ExecContext(ctx, "UPDATE remote_servers SET api_key = 'v1:not-a-sealed-key' WHERE id = 'a'")
 	require.NoError(t, err)
@@ -78,5 +78,5 @@ func TestAnUnreadableStoredKeyCountsAsDifferent(t *testing.T) {
 	require.NoError(t, err)
 	a, err := rs.Get(ctx, "a")
 	require.NoError(t, err)
-	assert.Nil(t, a.KeyExposedSince)
+	assert.Nil(t, a.KeyRenewSince)
 }

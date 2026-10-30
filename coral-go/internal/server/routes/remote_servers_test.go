@@ -346,10 +346,10 @@ func TestRedactQueryCredentialNames(t *testing.T) {
 // URL's own warning, and a server never marked has none of it.
 func TestAMarkedServerSaysSoUntilItHasADifferentKey(t *testing.T) {
 	since := "2026-10-30T07:40:00.000000"
-	v := viewRemote(&store.RemoteServer{ID: "b", URL: "https://b.example", KeyExposedSince: &since})
+	v := viewRemote(&store.RemoteServer{ID: "b", URL: "https://b.example", KeyRenewSince: &since})
 	assert.Equal(t, "other accounts on this computer could read this server's API key until 2026-10-30, when Coral found its data folder open: "+
 		"make a new key on that server and enter it here with Edit", v.Warning)
-	v = viewRemote(&store.RemoteServer{ID: "b", URL: "http://192.0.2.7:8420", KeyExposedSince: &since})
+	v = viewRemote(&store.RemoteServer{ID: "b", URL: "http://192.0.2.7:8420", KeyRenewSince: &since})
 	assert.Equal(t, remoteHTTPWarning+"; other accounts on this computer could read this server's API key until 2026-10-30, when Coral found its data folder open: "+
 		"make a new key on that server and enter it here with Edit", v.Warning)
 	assert.Empty(t, viewRemote(&store.RemoteServer{ID: "b", URL: "https://b.example"}).Warning)

@@ -147,18 +147,18 @@ func viewRemote(s *store.RemoteServer) remoteServerView {
 		return remoteServerView{}
 	}
 	warn := remoteURLWarning(s.URL)
-	if exposed := keyExposedWarning(s.KeyExposedSince); exposed != "" {
+	if renew := keyRenewWarning(s.KeyRenewSince); renew != "" {
 		if warn != "" {
 			warn += "; "
 		}
-		warn += exposed
+		warn += renew
 	}
 	return remoteServerView{RemoteServer: *s, Warning: warn}
 }
 
-// keyExposedWarning is the warning of a server marked by store.KeyExposedSince, until a different key is entered: Settings > Servers
+// keyRenewWarning is the warning of a server marked by store.KeyRenewSince, until a different key is entered: Settings > Servers
 // shows it with the server, after the one-time notice of that start is gone.
-func keyExposedWarning(since *string) string {
+func keyRenewWarning(since *string) string {
 	if since == nil || *since == "" {
 		return ""
 	}

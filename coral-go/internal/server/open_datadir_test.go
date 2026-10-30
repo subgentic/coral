@@ -54,10 +54,10 @@ func openFolderServer(t *testing.T, dir string, kind startKind, before func(db *
 		config.SetDataDirMadePrivate(dir, true)
 		config.SetDataDirNotice("Coral made its data folder private to this user: Users could use it.")
 	case private, pending:
-		require.NoError(t, config.ClearDataDirExposed(dir)) // config.Load's own EnsureDataDir may have found this machine's temp folder open
+		require.NoError(t, config.ClearDataDirRenewal(dir)) // config.Load's own EnsureDataDir may have found this machine's temp folder open
 		config.SetDataDirNotice("")
 		if kind == pending {
-			require.NoError(t, os.WriteFile(filepath.Join(dir, config.ExposedPendingFile), []byte("x"), 0o600))
+			require.NoError(t, os.WriteFile(filepath.Join(dir, config.RenewPendingFile), []byte("x"), 0o600))
 		}
 	}
 	db, err := storetest.Open(t, cfg.DBPath)
@@ -118,7 +118,7 @@ func TestAStartAfterAnOpenDataFolderReplacesTheAPIKey(t *testing.T) {
 	assert.Contains(t, notice, "the API keys of the other Corals stored here (build box): make a new key on each of those computers")
 	b, err := store.NewRemoteServerStore(srv.db, dir).Get(context.Background(), "b")
 	require.NoError(t, err)
-	require.NotNil(t, b.KeyExposedSince, "the stored server is marked: Settings > Servers keeps saying it")
+	require.NotNil(t, b.KeyRenewSince, "the stored server is marked: Settings > Servers keeps saying it")
 	assert.NotContains(t, notice, "Coral Hub", "no link is stored")
 	assert.NotContains(t, notice, "password", "no password is set")
 	assert.NotContains(t, notice, ".db_key", "no database key")
@@ -196,7 +196,7 @@ func TestAStartRedoesWhatAnEarlierStartLeftUnfinished(t *testing.T) {
 	newKey := first.keyStore.Key()
 	assert.NotEqual(t, oldKey, newKey, "the key is replaced although EnsureDataDir found nothing to do")
 	assert.Equal(t, http.StatusUnauthorized, statusWithKey(t, ts, oldKey))
-	assert.NoFileExists(t, filepath.Join(dir, config.ExposedPendingFile), "done: the marker is gone")
+	assert.NoFileExists(t, filepath.Join(dir, config.RenewPendingFile), "done: the marker is gone")
 	assert.True(t, strings.HasPrefix(config.DataDirNotice(), "Coral found its data folder had been open to other accounts, and an earlier start did not finish"), config.DataDirNotice())
 	first.Close()
 

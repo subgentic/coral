@@ -56,21 +56,21 @@ func EnsureDataDir(dir string) error {
 		SetDataDirMadePrivate(dir, true)
 		// The marker outlives this process: until a start has renewed what is in the folder, each start renews it. The folder is private
 		// now, so the marker is too.
-		if err := writeExposedPending(dir); err != nil {
-			log.Printf("[security] could not write %s: %v", ExposedPendingFile, err)
+		if err := writeRenewPending(dir); err != nil {
+			log.Printf("[security] could not write %s: %v", RenewPendingFile, err)
 		}
 	}
 	return nil
 }
 
-// ExposedPendingFile marks a data folder that Coral made private until a start has renewed what is in it (the API key, the agents'
-// tokens, the stored remote servers' marks). It is removed only when that has all been done (ClearDataDirExposed).
-const ExposedPendingFile = ".exposed-pending"
+// RenewPendingFile marks a data folder that Coral made private until a start has renewed what is in it (the API key, the agents'
+// tokens, the stored remote servers' marks). It is removed only when that has all been done (ClearDataDirRenewal).
+const RenewPendingFile = ".renew-pending"
 
-// writeExposedPending creates dir's ExposedPendingFile as a new private file: whatever is at that name first (a link, a junction or an older
+// writeRenewPending creates dir's RenewPendingFile as a new private file: whatever is at that name first (a link, a junction or an older
 // marker) is removed, never followed, and the file is opened without following a link and only if it does not exist.
-func writeExposedPending(dir string) error {
-	path := filepath.Join(dir, ExposedPendingFile)
+func writeRenewPending(dir string) error {
+	path := filepath.Join(dir, RenewPendingFile)
 	if err := os.Remove(path); err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return err
 	}
@@ -86,7 +86,7 @@ func writeExposedPending(dir string) error {
 }
 
 // DataDirMadePrivate reports whether this start made the data folder dir private, or an earlier start did and did not finish renewing
-// what is in it (ExposedPendingFile). Such a start renews the secrets Coral can renew (the API key, the agents' session tokens) and the
+// what is in it (RenewPendingFile). Such a start renews the secrets Coral can renew (the API key, the agents' session tokens) and the
 // notice lists the ones a person may want to renew. It is kept per folder: a process that opens another data folder (a test does, for
 // each server) is not told about one it did not open.
 func DataDirMadePrivate(dir string) bool {
@@ -96,15 +96,15 @@ func DataDirMadePrivate(dir string) bool {
 	if set {
 		return true
 	}
-	fi, err := os.Lstat(filepath.Join(dir, ExposedPendingFile))
+	fi, err := os.Lstat(filepath.Join(dir, RenewPendingFile))
 	return err == nil && fi.Mode().IsRegular()
 }
 
-// ClearDataDirExposed ends DataDirMadePrivate for dir: its flag and its ExposedPendingFile. Called once everything in the folder that Coral
+// ClearDataDirRenewal ends DataDirMadePrivate for dir: its flag and its RenewPendingFile. Called once everything in the folder that Coral
 // can renew has been renewed.
-func ClearDataDirExposed(dir string) error {
+func ClearDataDirRenewal(dir string) error {
 	SetDataDirMadePrivate(dir, false)
-	if err := os.Remove(filepath.Join(dir, ExposedPendingFile)); err != nil && !errors.Is(err, fs.ErrNotExist) {
+	if err := os.Remove(filepath.Join(dir, RenewPendingFile)); err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return err
 	}
 	return nil

@@ -46,7 +46,7 @@ func TestTheStartupOrderRenewsTheKeyOfAFolderMadePrivate(t *testing.T) {
 
 	require.NoError(t, config.EnsureDataDir(dir))
 	require.True(t, config.DataDirMadePrivate(dir), "EnsureDataDir made the folder private")
-	require.FileExists(t, filepath.Join(dir, config.ExposedPendingFile), "and left its marker until the secrets are replaced")
+	require.FileExists(t, filepath.Join(dir, config.RenewPendingFile), "and left its marker until the secrets are replaced")
 	groups, err = config.DataDirBroadReaders(filepath.Join(dir, "api_key"))
 	require.NoError(t, err)
 	require.Empty(t, groups, "the key file is private now")
@@ -61,5 +61,5 @@ func TestTheStartupOrderRenewsTheKeyOfAFolderMadePrivate(t *testing.T) {
 	notice := config.DataDirNotice()
 	assert.True(t, strings.HasPrefix(notice, "Coral made its data folder "+dir+" private to this user"), notice)
 	assert.Contains(t, notice, "Coral replaced the API key")
-	assert.NoFileExists(t, filepath.Join(dir, config.ExposedPendingFile), "replaced: the marker is gone")
+	assert.NoFileExists(t, filepath.Join(dir, config.RenewPendingFile), "replaced: the marker is gone")
 }

@@ -14,12 +14,12 @@ func TestTheMarkerIsWrittenWithoutFollowingALink(t *testing.T) {
 	dir, outside := t.TempDir(), t.TempDir()
 	target := filepath.Join(outside, "target")
 	require.NoError(t, os.WriteFile(target, []byte("keep"), 0o600))
-	marker := filepath.Join(dir, ExposedPendingFile)
+	marker := filepath.Join(dir, RenewPendingFile)
 	if err := os.Symlink(target, marker); err != nil {
 		t.Skipf("this system does not let this account make a symbolic link: %v", err)
 	}
 
-	require.NoError(t, writeExposedPending(dir))
+	require.NoError(t, writeRenewPending(dir))
 
 	got, err := os.ReadFile(target)
 	require.NoError(t, err)
@@ -33,13 +33,13 @@ func TestTheMarkerIsWrittenWithoutFollowingALink(t *testing.T) {
 // An older marker is replaced, and DataDirMadePrivate sees only a plain file at that name.
 func TestTheMarkerReplacesAnOlderOneAndOnlyAPlainFileCounts(t *testing.T) {
 	dir := t.TempDir()
-	marker := filepath.Join(dir, ExposedPendingFile)
+	marker := filepath.Join(dir, RenewPendingFile)
 	require.NoError(t, os.WriteFile(marker, []byte("old"), 0o600))
-	require.NoError(t, writeExposedPending(dir))
+	require.NoError(t, writeRenewPending(dir))
 	got, err := os.ReadFile(marker)
 	require.NoError(t, err)
 	assert.NotEqual(t, "old", string(got))
-	require.NoError(t, ClearDataDirExposed(dir))
+	require.NoError(t, ClearDataDirRenewal(dir))
 	assert.False(t, DataDirMadePrivate(dir))
 
 	require.NoError(t, os.Mkdir(marker, 0o700))
