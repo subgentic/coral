@@ -26,9 +26,11 @@ const DOC = '<!doctype html><html><body><h1>Goals post draft</h1>' + Array.from(
             await waitFor(`!!document.querySelector('#artifact-viewer .artifact-viewer-body iframe')`, 'the frame');
             await new Promise(r => setTimeout(r, 600)); // sleep-ok: the dialog's layout settles once the frame is in
             const g = await ev(`(() => { const d = document.getElementById('artifact-viewer'), c = d.querySelector('.artifact-viewer-content').getBoundingClientRect(), f = d.querySelector('.artifact-viewer-body iframe').getBoundingClientRect(), foot = d.querySelector('.artifact-viewer-foot').getBoundingClientRect(), close = d.querySelector('.artifact-viewer-close');
-                return { dialogH: Math.round(c.height), frameH: Math.round(f.height), footH: Math.round(foot.height), closeH: Math.round(close.getBoundingClientRect().height), closeShown: close.getClientRects().length > 0, vh: innerHeight }; })()`);
+                return { frameB: Math.round(f.bottom), footT: Math.round(foot.top), footB: Math.round(foot.bottom), contentB: Math.round(c.bottom), dialogH: Math.round(c.height), frameH: Math.round(f.height), footH: Math.round(foot.height), closeH: Math.round(close.getBoundingClientRect().height), closeShown: close.getClientRects().length > 0, vh: innerHeight }; })()`);
             assert.ok(g.frameH >= g.dialogH * 0.75, `${tag}: the frame is at least 75% of the dialog's height: ${JSON.stringify(g)}`);
             assert.ok(g.footH <= 56, `${tag}: the footer band is no taller than 56 px: ${JSON.stringify(g)}`);
+            assert.ok(g.frameB <= g.footT + 1, `${tag}: the footer does not cover the frame's last pixels (frame bottom ${g.frameB}, footer top ${g.footT})`);
+            if (mobile) assert.ok(g.contentB - g.footB <= 1, `${tag}: no strip of dialog under the footer (${g.contentB - g.footB} px)`);
             assert.ok(g.closeShown && g.closeH >= (mobile ? 44 : 28), `${tag}: Close is still there, and a target (${g.closeH} px)`);
             await ev(`document.querySelector('#artifact-viewer .artifact-viewer-close').click()`);
         }
