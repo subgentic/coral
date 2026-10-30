@@ -1,6 +1,6 @@
 // One goal's detail view, shared by the team Goals list and other page hosts.
 import { openTask } from './task_navigation.js';
-import { boardFetch, keyLabel, isCloud } from './server_base.js';
+import { boardFetch, keyLabel } from './server_base.js';
 import { OPERATOR_ID, copyText, showToast } from './utils.js';
 import { browserLocal } from './safe_storage.js';
 import { whenText } from './when_text.js';
@@ -298,7 +298,7 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
     function drawTabs(g) {
         const wrap = el('div', 'goal-lists');
         const strip = el('div', 'tabs goal-tabs'); strip.setAttribute('role', 'tablist'); strip.setAttribute('aria-label', `The tasks and artifacts of ${g.title}`);
-        const tabs = [['tasks', 'Tasks', totalOf(g.rollup)], ...(isCloud() ? [] : [['artifacts', 'Artifacts', artifacts.total]])];
+        const tabs = [['tasks', 'Tasks', totalOf(g.rollup)], ['artifacts', 'Artifacts', artifacts.total]];
         if (!tabs.some(t => t[0] === model.tab)) model.tab = 'tasks';
         for (const [key, label, n] of tabs) {
             const b = btn('tab goal-tab', null, () => { if (model.tab === key) return; model.tab = key; closePreview(false); drawPage(); root.querySelector(`#goal-tab-${key}`)?.focus({ preventScroll: true }); });
