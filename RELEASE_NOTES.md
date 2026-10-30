@@ -1,5 +1,39 @@
 # Release Notes
 
+## v2.0.8 — a phone with one tab strip, Pi workflow steps, jobs and sign-in status, a first run that explains itself, one word for a linked machine, and a more careful data folder
+
+### Changes
+
+#### What you will notice first
+
+- **A phone with one tab strip** (#11239, #11281): the phone's screens share one navigation rule and one tab strip; the open tab stays in view, Automations has its +, and large text fits. The tabs are a real tab list for screen readers, the nav's slots have names, and the ⋯ on Home is a 44 px target.
+- **New-user fixes from the phone and desktop passes** (#11258, #11268, #11289, #11304): the first-run password dialog is in plain words ("Protect Coral with a password"); the amber "No password" banner has a Dismiss button, remembered on this browser; the first agent and the first team start with a suggested folder to say yes to, inside your home folder; the suggested agent name is a placeholder, not a value; a new task joins the board's only open goal; the "Sent:" toast no longer covers the message you just sent in the Chat view; there is no gap between Password and Confirm and no "Launched" toast over the new chat; Settings on a phone is named "Settings and account"; and Quickstart no longer says its examples are from v1.0.8. On the desktop, Escape closes only the folder picker, Enter advances the wizard, and the first step has a way to a team.
+- **Pi agents: workflow steps, scheduled jobs and sign-in status** (#11293): a default (non-interactive) workflow step and a scheduled job on Pi run one shot and exit; Settings shows Pi's sign-in status per provider; Pi usage is counted once and a turn with no model of its own takes the session's model; Pi can generate a theme, a Pi model switch says what to do, and the dashboard doc says what Pi has. Usage counted by v2.0.7 for a Pi turn with no model keeps its old empty-model row; new turns are counted correctly.
+- **One word for a linked machine: "computer"** (#11217, #11241): in the dashboard, the CLI help and the cross-team address (`<computer>/<team>`).
+- **Keyboard shortcuts dialog**: keys as chips beside their descriptions, in four groups; the list scrolls by keyboard (#11246).
+- **A pasted multi-line text with CRLF reaches a tmux agent with one line break each** (#11265).
+- **The artifact viewer's preview fills its dialog and its footer is a slim bar**, on a phone too (#11243).
+
+#### Teams, Hub and Files
+
+- **Goal Artifacts through the Hub**: the Hub's own 404 for a View guest is a quiet line, the same as owner_only; a deleted team is still "could not be read" for an owner (#11280).
+- **The agent page's Details card (Folder / Branch / Model) no longer floats over the Files list**: it closes on an outside tap, Escape or a tab change, and only the card closes (#11284).
+- **Files: a file with a non-ASCII, quote or backslash name opens under the path its list gave** (#11284).
+- **`coral-board task add --self --goal N`**: an agent makes a task for itself without an orchestrator (#11247).
+
+#### Windows and the data folder
+
+- **Coral replaces its API key and agent tokens when it finds its data folder open to other accounts.**
+- **Windows**: the updater's DLL census also covers a hand-built `LazyDLL`, and the apply log says when the DLL search lock could not be set (#240).
+
+#### For developers and releases
+
+- **The embedded dashboard bundle is the same bytes every build** (#11047): `coral` and `launch-coral` used to differ between two builds of one tree (a map written in random order), which made the release cache audit fail on every scheduled run.
+- **The release's module download retries a dropped stream** (up to four tries, each cut at five minutes) and never retries a checksum mismatch; the dry run does the same (#11047).
+- **A release screenshot review** (#11216): every page at 1440, 900 and 390 px, filed as Coral artifacts on a UI review task the run opens itself.
+- The pattern-kill guard allows `kill -$SIG $pid` (#11211). The hourly Go cache trim runs with `--hours 2` (#11251).
+- Not in this release: the Analytics tabs (they go first into v2.0.9).
+
 ## v2.0.7 — Coral installs a downloaded update by itself when it is idle, a Windows in-app update that works, Pi agents get board messages, agents can no longer pkill by a pattern, and a long paste is one bubble
 
 ### Changes
