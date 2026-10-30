@@ -190,6 +190,17 @@ const TURNS = [{ timestamp: day(7) + 'T14:12:00.000Z', model: 'claude-fable-5-1'
             await waitFor(`/No messages or goal requests with other teams/.test(document.getElementById('cost-comm').textContent)`, 'no traffic', 8000);
             await ev(`window.__activity = ${JSON.stringify(ACTIVITY)}; true`); await ev(refresh);
         });
+        await run('two teams of one name on two servers are two teams: two rows in the table and two names in the grid or the ranked list', async () => {
+            const refresh = `(async () => { const m = await import((window.__coralStatic || '/static/') + 'cost_dashboard.js'); await m._refreshCostDashboard({ force: true }); return true; })()`;
+            const pairs = [{ from: TEAM, to: 'beta', messages: 2, requests: 0, accepted: 0 }, { from: TEAM, to: 'beta', to_server: 'homelab', messages: 5, requests: 1, accepted: 1 }];
+            await ev(`window.__activity = { ...${JSON.stringify(ACTIVITY)}, pairs: ${JSON.stringify(pairs)} }; true`); await open('comm'); await ev(refresh);
+            await waitFor(`/beta on homelab/.test(document.getElementById('cost-comm').textContent)`, 'the remote team named with its server', 8000);
+            const t = await ev(`(() => { const p = [...document.querySelectorAll('#cost-comm .atab-card')].find(c => /^Across teams/.test(c.textContent)); return { rows: [...p.querySelectorAll('tbody tr')].map(r => [...r.cells].map(x => x.textContent.trim()).slice(0, 3)), names: [...p.querySelectorAll('.atab-mx-r, .atab-mx-h, .atab-rank')].map(x => x.textContent) }; })()`);
+            assert.deepEqual(t.rows.map(r => r[1]).sort(), ['beta', 'beta on homelab'], 'two rows: ' + JSON.stringify(t.rows));
+            assert.deepEqual(t.rows.map(r => r[2]).sort(), ['2', '5'], 'each with its own count');
+            assert.ok(t.names.some(n => /beta on homelab/.test(n)) && t.names.some(n => /(^|[^\w])beta(?! on)/.test(n)), 'the grid or the list names both: ' + JSON.stringify(t.names.slice(0, 8)));
+            await ev(`window.__activity = ${JSON.stringify(ACTIVITY)}; true`); await ev(refresh);
+        });
         await run('the reads are bounded: Usage asks for a daily series of twice the period, activity names its team and range', async () => {
             const reqs = await ev(`window.__reqs`);
             assert.ok(reqs.some(r => /timeseries\?since=.*&interval=1d&group_by=agent/.test(r)), JSON.stringify(reqs.slice(0, 3)));
