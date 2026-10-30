@@ -58,3 +58,13 @@ const pg = D.pairGrid([{ from: 'alpha', to: 'beta', messages: 2, requests: 1, ac
 assert.deepEqual(pg.names, ['alpha', 'beta', 'gamma']); assert.equal(pg.cells[0][1], 3, 'alpha asked beta 2 messages and 1 request'); assert.equal(pg.cells[1][0], 1); assert.equal(pg.total, 5);
 assert.equal(D.commModel({ agent_posts: 1 }).pairs, null, 'a read without pairs has not recorded them'); assert.deepEqual(D.commModel({ agent_posts: 1, pairs: [] }).pairs.rows, []);
 console.log('PASS analytics_tabs: usage, operator and communication rows');
+
+// Two teams of one name on two servers are two teams (QA #11294): alpha's local beta and homelab's beta do not merge into one cell or one row.
+{
+    const two = D.pairGrid([{ from: 'alpha', to: 'beta', messages: 2, requests: 0, accepted: 0 }, { from: 'alpha', to: 'beta', to_server: 'homelab', messages: 1, requests: 0, accepted: 0 }]);
+    assert.deepEqual(two.names.sort(), ['alpha', 'beta', 'beta on homelab']);
+    assert.equal(two.rows.length, 2);
+    assert.deepEqual(two.rows.map(r => r.to).sort(), ['beta', 'beta on homelab']);
+    assert.equal(two.total, 3);
+    console.log('analytics_tabs: a team of the same name on another server is its own team ok');
+}

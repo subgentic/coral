@@ -143,7 +143,9 @@ export function autonomyTrend(days) {
 }
 
 /** The team-to-team traffic of an activity read's `pairs` ([{from, to, messages, requests, accepted}]): the teams (busiest first), a grid of messages plus goal requests (rows ask, columns are asked), and the rows as they are. */
-export function pairGrid(pairs) {
+export function pairGrid(rawPairs) {
+    const team = (n, srv) => (srv ? `${n} on ${srv}` : n); // two teams of one name on two servers are two teams
+    const pairs = rawPairs.map(p => ({ ...p, from: team(p.from, p.from_server), to: team(p.to, p.to_server) }));
     const traffic = new Map();
     for (const p of pairs) { const n = (p.messages || 0) + (p.requests || 0); traffic.set(p.from, (traffic.get(p.from) || 0) + n); traffic.set(p.to, (traffic.get(p.to) || 0) + n); }
     const names = [...traffic.entries()].sort((x, y) => y[1] - x[1] || x[0].localeCompare(y[0])).map(([n]) => n);

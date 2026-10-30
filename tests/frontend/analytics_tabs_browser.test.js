@@ -117,11 +117,12 @@ const TURNS = [{ timestamp: day(7) + 'T14:12:00.000Z', model: 'claude-fable-5-1'
                 assert.ok(await ev(`document.querySelectorAll('#cost-comm .atab-mx-c').length`) >= 64);
             });
             await run(`${at}: Across teams shows who asks whom: the grid (a ranked list on a phone) and a row a pair with its counts`, async () => {
-                const t = await ev(`(() => { const p = [...document.querySelectorAll('#cost-comm .atab-card')].find(c => /^Across teams/.test(c.textContent)); if (!p) return null; return { text: p.textContent, cells: p.querySelectorAll('.atab-mx-c').length, ranked: p.querySelectorAll('.atab-rank').length, rows: p.querySelectorAll('tbody tr').length }; })()`);
+                const t = await ev(`(() => { const p = [...document.querySelectorAll('#cost-comm .atab-card')].find(c => /^Across teams/.test(c.textContent)); if (!p) return null; return { text: p.textContent, cells: p.querySelectorAll('.atab-mx-c').length, ranked: p.querySelectorAll('.atab-rank').length, rows: p.querySelectorAll('tbody tr').length, cellTexts: [...p.querySelectorAll('.atab-mx-c')].map(c => c.textContent.trim()), hub: (() => { const r = [...p.querySelectorAll('tbody tr')].find(r => { const c = [...r.cells].map(x => x.textContent.trim()); return c[0] === 'coral-go-team' && c[1] === 'coral-hub'; }); return r ? [...r.cells].slice(2, 5).map(x => x.textContent.trim()) : null; })() }; })()`);
                 assert.ok(t, 'an Across teams panel');
                 assert.equal(t.rows, 4, 'a row a pair: ' + JSON.stringify(t.rows));
-                for (const word of ['coral-hub', 'windows', '14', '17']) assert.ok(t.text.includes(word) || word === '17', word + ' is in the panel');
-                if (phone) { assert.equal(t.cells, 0); assert.ok(t.ranked >= 4, 'a ranked list of pairs on a phone'); } else { assert.equal(t.cells, 9, 'a 3 by 3 grid of the three teams'); assert.ok(t.text.includes('17') || true); }
+                for (const word of ['coral-hub', 'windows']) assert.ok(t.text.includes(word), word + ' is in the panel');
+                assert.deepEqual(t.hub, ['14', '3', '2'], 'coral-go-team asks coral-hub: messages, goal requests, accepted');
+                if (phone) { assert.equal(t.cells, 0); assert.ok(t.ranked >= 4, 'a ranked list of pairs on a phone'); } else { assert.equal(t.cells, 9, 'a 3 by 3 grid of the three teams'); assert.ok(t.cellTexts.includes('17'), 'the grid cell coral-go-team to coral-hub is 17 (14 messages and 3 goal requests): ' + JSON.stringify(t.cellTexts)); }
             });
             await run(`${at}: the per-task table is "not recorded yet" until the read has it, and then lists its rows`, async () => {
                 assert.match(await text('#cost-comm'), /Per-task message counts are added with the recording/);
