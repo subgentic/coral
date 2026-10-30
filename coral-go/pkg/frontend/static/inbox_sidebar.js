@@ -625,7 +625,7 @@ registerGroupSource('hub-inbox', {
         if (key === 'saved') return savedListSpec();
         return null;
     },
-    lead: () => { const here = navCurrent(), sections = folderSections(); return { signature: JSON.stringify([here, sections]), node: () => VL.build({ id: 'inbox-folders-page', label: 'Inbox views', sections, current: here, onPick: pickFolder, drawer: true }) }; }, // a phone: the folders are one select on top of the table
+    lead: () => { const here = navCurrent(), sections = folderSections(); return { signature: JSON.stringify([here, sections]), node: () => VL.build({ id: 'inbox-folders-page', label: 'Inbox views', sections, current: here, onPick: pickFolder, drawer: true, tabs: true }) }; }, // a phone: the folders are one select on top of the table
     isEmpty: () => false, // the tab opens its group's table itself (showInbox)
     showList: () => { closePage(false); window.switchNavTab?.('hub-inbox'); },
     empty: () => { closePage(false); window.switchNavTab?.('hub-inbox'); },

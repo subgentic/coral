@@ -4,11 +4,11 @@ import { accessBlockedMessage } from './hub_access.js';
 export const MODES = ['view', 'interact', 'launch'];
 
 export const MODE_INFO = {
-    view: { label: 'View', text: 'Read terminals, chats, files, tasks and boards. Nothing you do here changes anything on the machine.' },
+    view: { label: 'View', text: 'Read terminals, chats, files, tasks and boards. Nothing you do here changes anything on the computer.' },
     // What each mode allows, as the route table has it (testdata/cloud_routes.golden, what the connector enforces): pinned by
     // TestDashboardModeTextMatchesTheRouteTable (#4526; this said Interact could kill an agent long after #4274 made it Launch).
-    interact: { label: 'Interact', text: 'Also type into running agents, post on boards, change tasks and notes, and rename or archive agents. Agents can run commands, so this can make the machine run code. It can also change a team\'s working mode.' },
-    launch: { label: 'Launch', text: 'Also start, stop, sleep, wake and restart agents (one agent or a whole team), browse the machine\'s folders, pause boards, delete board messages and boards, and turn on auto-accept.' },
+    interact: { label: 'Interact', text: 'Also type into running agents, post on boards, change tasks and notes, and rename or archive agents. Agents can run commands, so this can make the computer run code. It can also change a team\'s working mode.' },
+    launch: { label: 'Launch', text: 'Also start, stop, sleep, wake and restart agents (one agent or a whole team), browse the computer\'s folders, pause boards, delete board messages and boards, and turn on auto-accept.' },
 };
 
 const rank = m => MODES.indexOf(m);

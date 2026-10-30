@@ -68,7 +68,7 @@ Commands:
                                Message another team's Orchestrator on this Coral
                                (Orchestrators and the Operator only; both boards
                                must allow it); "-" as the message reads it from stdin
-  send --address <server>/<team> [--reply-to <id>] [--message-id <id>]
+  send --address <computer>/<team> [--reply-to <id>] [--message-id <id>]
        [--attach coral://artifacts/<id> ...] "<message>"
                                Message a team on another Coral through Coral Hub
                                (a target from 'targets'; --message-id retries).
@@ -209,7 +209,7 @@ Commands:
                                Message another team's Orchestrator on this Coral
                                (Orchestrators and the Operator only; both boards
                                must allow it); "-" as the message reads it from stdin
-  send --address <server>/<team> [--reply-to <id>] [--message-id <id>]
+  send --address <computer>/<team> [--reply-to <id>] [--message-id <id>]
        [--attach coral://artifacts/<id> ...] "<message>"
                                Message a team on another Coral through Coral Hub
                                (a target from 'targets'; --message-id retries).
@@ -351,7 +351,7 @@ Commands:
                                Message another team's Orchestrator on this Coral
                                (Orchestrators and the Operator only; both boards
                                must allow it); "-" as the message reads it from stdin
-  send --address <server>/<team> [--reply-to <id>] [--message-id <id>]
+  send --address <computer>/<team> [--reply-to <id>] [--message-id <id>]
        [--attach coral://artifacts/<id> ...] "<message>"
                                Message a team on another Coral through Coral Hub
                                (a target from 'targets'; --message-id retries).
@@ -575,6 +575,7 @@ Usage: coral-board task <subcommand> [args]
 
 Subcommands:
   add "title" [--body "details"] [--priority P] [--assignee "Agent Name"] [--remind-at TIME] [--goal ID] [--follow-up ID]
+  add "title" --self --goal ID     A task for yourself, any agent may: assigned to you, needs a goal; a repeat of an open title returns that task, at most 5 open
                                    --follow-up ID: the work that came out of task ID: it takes that task's goal, reviewers and assignee unless you give your own,
                                    and ID lists it (task show ID, task detail ID, the goal page's "N follow-ups open")
   list [--json] [--goal ID]        Every task, or one goal's; --json prints the tasks as a JSON array
@@ -641,6 +642,7 @@ Usage: coral-board task <subcommand> [args]
 
 Subcommands:
   add "title" [--body "details"] [--priority P] [--assignee "Agent Name"] [--remind-at TIME] [--goal ID] [--follow-up ID]
+  add "title" --self --goal ID     A task for yourself, any agent may: assigned to you, needs a goal; a repeat of an open title returns that task, at most 5 open
                                    --follow-up ID: the work that came out of task ID: it takes that task's goal, reviewers and assignee unless you give your own,
                                    and ID lists it (task show ID, task detail ID, the goal page's "N follow-ups open")
   list [--json] [--goal ID]        Every task, or one goal's; --json prints the tasks as a JSON array
@@ -830,7 +832,7 @@ Usage: coral-board <command> [args]
                                Message another team's Orchestrator on this Coral
                                (Orchestrators and the Operator only; both boards
                                must allow it); "-" as the message reads it from stdin
-  send --address <server>/<team> [--reply-to <id>] [--message-id <id>]
+  send --address <computer>/<team> [--reply-to <id>] [--message-id <id>]
        [--attach coral://artifacts/<id> ...] "<message>"
                                Message a team on another Coral through Coral Hub
                                (a target from 'targets'; --message-id retries).

@@ -119,7 +119,7 @@ function _listHeader(agentList) {
     header.className = 'mobile-list-header';
     header.innerHTML = `
             <button class="btn btn-quiet btn-icon phone-menu-btn" type="button" data-on-click="m-top-menu" data-hamburger aria-haspopup="menu" aria-expanded="false" aria-controls="nav-more-menu" aria-label="Menu"><span class="material-icons" aria-hidden="true">menu</span></button>
-            <button class="phone-account-btn" type="button" data-on-click="m-top-menu" data-hamburger data-account aria-haspopup="menu" aria-expanded="false" aria-controls="nav-more-menu" aria-label="Account and more"><span class="material-icons" aria-hidden="true">account_circle</span><span class="sr-only" id="phone-hub-state"></span></button>
+            <button class="phone-account-btn" type="button" data-on-click="m-top-menu" data-hamburger data-account aria-haspopup="menu" aria-expanded="false" aria-controls="nav-more-menu" aria-label="Settings and account" title="Settings and account"><span class="material-icons" aria-hidden="true">account_circle</span><span class="sr-only" id="phone-hub-state"></span></button>
             <span class="phone-break" aria-hidden="true"></span>
             <h2 class="mobile-list-title">Agents</h2>
             <div class="phone-chips" role="group" aria-label="Show">
@@ -142,8 +142,8 @@ function _listHeader(agentList) {
                 <div class="agent-list-bar" id="mobile-agent-list-bar" hidden></div>
                 <div class="list-display-options">
                     ${['summary', 'model'].map(k => switchRow({ label: `Show ${k}`, labelClass: 'list-display-option', labelAttrs: ` data-display-row="${escapeAttr(k)}"`, attrs: ` data-display-input="${escapeAttr(k)}" data-on-change="toggle-row-line"` })).join('')}
-                    ${switchRow({ label: 'Show server', labelClass: 'list-display-option', labelAttrs: ' data-display-row="server" hidden', attrs: ' data-display-input="server" data-on-change="toggle-show-server"' })}
-                    ${switchRow({ label: 'Group by server', labelClass: 'list-display-option', labelAttrs: ' data-display-row="group" hidden', attrs: ' data-display-input="group" data-on-change="toggle-group-by-server"' })}
+                    ${switchRow({ label: 'Show computer', labelClass: 'list-display-option', labelAttrs: ' data-display-row="server" hidden', attrs: ' data-display-input="server" data-on-change="toggle-show-server"' })}
+                    ${switchRow({ label: 'Group by computer', labelClass: 'list-display-option', labelAttrs: ' data-display-row="group" hidden', attrs: ' data-display-input="group" data-on-change="toggle-group-by-server"' })}
                 </div>
             </div>
         `;

@@ -10,7 +10,7 @@ const BASE = require('./test_base').BASE;
     const { settle } = require('./helpers/wait').bind(ev);
     const key = (k, extra = {}) => Input.dispatchKeyEvent({ type: 'keyDown', key: k, ...extra }).then(() => Input.dispatchKeyEvent({ type: 'keyUp', key: k, ...extra }));
     const newAgentOpen = () => ev(`(() => { const d = document.getElementById('launch-step-agent'); return !!d && getComputedStyle(d).display !== 'none' && d.getClientRects().length > 0; })()`);
-    const listOpen = () => ev(`(() => { const m = document.getElementById('alert-modal'); return !!m && getComputedStyle(m).display !== 'none' && /Keyboard shortcuts/.test(document.getElementById('alert-modal-title').textContent) ? document.getElementById('alert-modal-message').textContent : null; })()`);
+    const listOpen = () => ev(`(() => { const m = document.getElementById('shortcuts-modal'); return !!m && getComputedStyle(m).display !== 'none' && /Keyboard shortcuts/.test(document.getElementById('shortcuts-title').textContent) ? [...m.querySelectorAll('.kbd-row')].map(r => r.querySelector('dt').textContent.trim() + ' ' + r.querySelector('dd').textContent.trim()).join('\\n') : null; })()`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
@@ -20,8 +20,8 @@ const BASE = require('./test_base').BASE;
         await ev(`document.activeElement && document.activeElement.blur(); true`);
         await key('?', { text: '?', modifiers: 8 }); await settle(300);
         const text = await listOpen();
-        assert.ok(text && /(Alt\+N|Cmd\+Option\+N)\s+New agent/.test(text) && /Show these shortcuts/.test(text), 'the list is shown: ' + JSON.stringify(text));
-        await ev(`document.getElementById('alert-modal-ok').click(); true`); await settle(200);
+        assert.ok(text && /(Alt|⌘⌥)N\s+New agent/.test(text.replace(/\++/g, '')) && /Show these shortcuts/.test(text), 'the list is shown: ' + JSON.stringify(text));
+        await ev(`document.getElementById('shortcuts-close').click(); true`); await settle(200);
         assert.equal(await listOpen(), null, 'the list closes');
         // ? typed into a field stays a ?
         await ev(`(() => { document.getElementById('agent-search-input').focus(); return document.activeElement.id === 'agent-search-input'; })()`);

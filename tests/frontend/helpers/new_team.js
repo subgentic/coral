@@ -17,7 +17,7 @@ const SOURCE = `(() => {
 const install = async ev => { await na.install(ev); return ev(SOURCE); };
 const N = {
     team: /^New project$/i, member: /^(Edit|Add) member/i,
-    teamName: /^Team name/i, folder: /^Folder/i, recents: /^Recent folders$/i, machine: /^Machine$/i, address: /^Another computer's address$/i,
+    teamName: /^Team name/i, folder: /^Folder/i, recents: /^Recent folders$/i, machine: /^Computer$/i, address: /^Another computer's address$/i,
     template: /template/i, bulk: /^Set all workers to/i, section: /section$/i,
     cancel: /^Cancel$/i, back: /^Back$/i, next: /^Next$/i, launch: /^Launch team$/i, save: /^Save member$/i, addMember: /^\+?\s*Add member$/i, addOrch: /^Add Orchestrator$/i,
     tabs: ['Start', 'Workflow', 'Health check', 'Messaging'], memberTabs: ['Agent', 'Permissions', 'Advanced'], // the sections of a member's settings page; its role and prompt are the persona page before it (#7861)

@@ -122,18 +122,18 @@ export function showSetPasswordModal({ local = false } = {}) {
     const modal = el('div', 'modal'); modal.id = 'set-password-modal';
     modal.setAttribute('role', 'dialog'); modal.setAttribute('aria-modal', 'true'); modal.setAttribute('aria-labelledby', 'set-password-title');
     const content = el('div', 'modal-content dlg-confirm');
-    const head = el('div', 'modal-header'); const title = el('h3', '', 'Set a password for Coral'); title.id = 'set-password-title'; head.append(title);
+    const head = el('div', 'modal-header'); const title = el('h3', '', 'Protect Coral with a password'); title.id = 'set-password-title'; head.append(title);
     const body = el('div', 'modal-body');
     // One wording for everyone (a new install and an upgrade alike): what the password is for. The server has no first-run marker, and nobody needs "nothing changed here" (#6010).
-    body.append(el('p', 'pw-lead', 'Choose a password to open Coral in a browser. The Coral app and the tray open without it.'));
-    body.append(el('p', 'pw-note pw-not-now', 'Without one, the Coral app, the tray and the coral open command still let you in here, and nothing else can reach Coral. A password adds sign-in from any browser and from other devices (Settings, Security and privacy).'));
+    body.append(el('p', 'pw-lead', 'A password keeps other people and other devices out of Coral when it is opened in a web browser.'));
+    body.append(el('p', 'pw-note pw-not-now', 'Only you use this computer? You can skip this: the Coral app opens without a password. You can set one later in Settings, Security and privacy.'));
     const form = el('form', 'pw-form'); form.autocomplete = 'on'; form.id = 'set-password-form';
     const pw = passwordField({ id: 'set-password-new', label: 'Password', autocomplete: 'new-password', name: 'new-password' });
     pw.input.setAttribute('aria-describedby', 'set-password-strength');
     const meter = strengthMeter('set-password-strength');
     const confirm = passwordField({ id: 'set-password-confirm', label: 'Confirm password', autocomplete: 'new-password', name: 'confirm-password' });
     const err = el('p', 'pw-error'); err.id = 'set-password-error'; err.setAttribute('role', 'alert'); err.hidden = true;
-    form.append(usernameStub(), pw.root, meter.root, confirm.root, err);
+    form.append(usernameStub(), pw.root, confirm.root, meter.root, err); // the advice sits under both fields: its reserved room is no gap between them (#11304)
     body.append(form, el('p', 'pw-note', 'Forgot it? Run coral reset-password in a terminal on this computer.'));
     const foot = el('div', 'modal-actions modal-footer');
     const later = el('button', 'btn', 'Not now'); later.type = 'button'; later.id = 'set-password-later';

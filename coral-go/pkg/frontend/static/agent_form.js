@@ -42,7 +42,7 @@ function mount(modal) {
     const root = host.dataset.coralRoot || '';
     const fields = [
         { key: 'dir', type: 'path', id: 'launch-dir', label: 'Folder', help: FOLDER_ON_THIS_COMPUTER, required: true, requiredMessage: 'Choose a folder: type a path, or use Browse.', messageAsIs: true, placeholder: 'Choose a folder', attrs: { 'data-coral-root': root },
-            live: [{ id: 'btn-browse', wide: true, describes: false }, { id: 'launch-dir-recents', wide: true, describes: false }, { id: 'launch-dir-hint', describes: false }, { id: 'launch-dir-note', describes: false }, { id: 'dir-browser', wide: true, describes: false }] },
+            live: [{ id: 'btn-browse', wide: true, describes: false }, { id: 'launch-dir-recents', wide: true, describes: false }, { id: 'launch-dir-hint', describes: false }, { id: 'launch-dir-note', describes: false }, { id: 'launch-dir-suggest', describes: false }, { id: 'dir-browser', wide: true, describes: false }] },
     ];
     _view = mountSettingsView(host, { mode: 'form', fields });
     joinBrowse('launch-dir', 'btn-browse'); // Browse at the input's right, as Open folder has it (#9489)

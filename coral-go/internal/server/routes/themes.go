@@ -622,6 +622,8 @@ func resolveThemeCLIAgent(settings map[string]string, agentType string) (path st
 		{"agy", []string{"--print"}},
 		{"gemini", []string{"--print"}},
 		{"codex", []string{"--print"}},
+		// Pi (#11293): one shot, no session kept, the folder's own Pi files not trusted and no tool at all: a theme is text.
+		{"pi", []string{"--print", "--no-session", "--no-approve", "--no-tools"}},
 	}
 
 	// Try requested type first (normalizing agy/gemini)

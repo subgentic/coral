@@ -50,7 +50,7 @@ const folders=['goals','tasks','chats-group','needs','saved','chats','artifacts'
     // A phone's rows are mail rows (#9545): one cell each, no Server column or sort. What holds there: rows of both origins are listed and the Server filter in the panel narrows them (the columns are checked at 1280).
     if(width===390)await waitFor(`!!document.querySelector('#group-table-view tr.dt-mailed')||!!document.querySelector('#group-table-view th[data-key="server"]')`,'the '+folder+' rows, as mail rows or as a table',8000); // Artifacts rows come after the folder opens
     if(width===390&&await ev(`!!document.querySelector('#group-table-view tr.dt-mailed')`)){
-     const rows=`document.querySelectorAll('#group-table-view tr.dt-mailed').length`,pick=`[...document.querySelectorAll('.list-bar-field')].find(e=>e.querySelector('.list-bar-field-label')?.textContent.trim()==='Server')?.querySelector('select')`;
+     const rows=`document.querySelectorAll('#group-table-view tr.dt-mailed').length`,pick=`[...document.querySelectorAll('.list-bar-field')].find(e=>e.querySelector('.list-bar-field-label')?.textContent.trim()==='Computer')?.querySelector('select')`;
      await waitFor(`${rows}>=2`,'rows of both origins in '+folder+' on a phone',8000);
      const all=await ev(rows);
      await ev(`document.querySelector('#group-table-view .list-bar-toggle').click();true`);
@@ -84,7 +84,7 @@ const folders=['goals','tasks','chats-group','needs','saved','chats','artifacts'
     const shotDir=process.env.CORAL_SCREENSHOT_DIR||(process.env.RUNNER_TEMP&&path.join(process.env.RUNNER_TEMP,'out'));
     if(shotDir){fs.mkdirSync(shotDir,{recursive:true});for(const theme of ['light','dark']){await setTheme(ev,theme);fs.writeFileSync(path.join(shotDir,`inbox-server-${folder}-${width}-${theme}.png`),Buffer.from((await Page.captureScreenshot({format:'png'})).data,'base64'));}}
     await ev(`document.querySelector('#group-table-view .list-bar-toggle').click();true`);
-    const select=`[...document.querySelectorAll('.list-bar-field')].find(e=>e.querySelector('.list-bar-field-label')?.textContent.trim()==='Server')?.querySelector('select')`;
+    const select=`[...document.querySelectorAll('.list-bar-field')].find(e=>e.querySelector('.list-bar-field-label')?.textContent.trim()==='Computer')?.querySelector('select')`;
     await waitFor(`!!(${select})&&(${select}).getClientRects().length>0`,'Server filter in '+folder);
     if(shotDir&&['tasks','goals'].includes(folder)){for(const theme of ['light','dark']){await setTheme(ev,theme);fs.writeFileSync(path.join(shotDir,`inbox-server-filter-${folder}-${width}-${theme}.png`),Buffer.from((await Page.captureScreenshot({format:'png'})).data,'base64'));}}
     await ev(`(()=>{const s=${select};s.value='box-2';s.dispatchEvent(new Event('change',{bubbles:true}));return true;})()`);

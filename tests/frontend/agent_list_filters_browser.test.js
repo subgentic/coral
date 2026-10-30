@@ -184,10 +184,10 @@ const stateOf = s => s.waiting_for_input ? 'needs_input' : s.sleeping ? 'asleep'
         await waitFor(`document.querySelector('#agent-list-bar .list-bar-count') && document.querySelector('#agent-list-bar .list-bar-count').textContent === '30 agents'`, 'the hub bar', { timeout: 8000 });
         assert.equal(await ev(`getComputedStyle(document.querySelector('#agent-list-bar #al-machine').closest('label')).display`) !== 'none', true, 'the Machine field shows on a hub');
         assert.deepEqual(await ev(`[...document.querySelectorAll('#agent-list-bar #al-machine option')].map(o => o.value)`), ['', 'local', 's1']);
-        assert.deepEqual(await ev(`[...document.querySelectorAll('#agent-list-bar #al-machine option')].map(o => o.textContent)`), ['Any machine', 'This computer', 'box-one']);
+        assert.deepEqual(await ev(`[...document.querySelectorAll('#agent-list-bar #al-machine option')].map(o => o.textContent)`), ['Any computer', 'This computer', 'box-one']);
         await set('#al-machine', 's1');
         const onS1 = SESSIONS.filter(s => s.server === 's1');
-        expectIds(await ids(), onS1, 'machine s1'); assert.deepEqual(await chips(), ['Machine: box-one']); assert.equal(await count(), `${onS1.length} of 30 agents`);
+        expectIds(await ids(), onS1, 'machine s1'); assert.deepEqual(await chips(), ['Computer: box-one']); assert.equal(await count(), `${onS1.length} of 30 agents`);
         await set('#al-state', 'working');
         expectIds(await ids(), onS1.filter(s => stateOf(s) === 'working'), 'machine and state');
         await set('#al-machine', 'local'); await set('#al-state', '');

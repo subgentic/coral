@@ -83,12 +83,12 @@ export function machineBlock(servers = state.servers) {
 
 export function launchBlockReason(server, hub, servers) {
     const id = normServer(server);
-    if (id === LOCAL_SERVER) return state.cloud === true ? (noMachine(servers) ? CONNECT_FIRST : 'The Coral Hub has no local agents. Choose one of your servers.') : '';
-    if (hub !== true) return 'Hub mode is off; remote servers are unavailable.';
+    if (id === LOCAL_SERVER) return state.cloud === true ? (noMachine(servers) ? CONNECT_FIRST : 'The Coral Hub has no local agents. Choose one of your computers.') : '';
+    if (hub !== true) return 'Hub mode is off; remote computers are unavailable.';
     const hit = remoteServers(servers).find(s => s.id === id);
-    if (!hit) return `Server "${id}" is not registered.`;
+    if (!hit) return `Computer "${id}" is not registered.`;
     const reason = UNUSABLE_STATUS_REASON[hit.status];
-    return reason ? `Server "${hit.label || id}" is unavailable (${reason}).` : '';
+    return reason ? `Computer "${hit.label || id}" is unavailable (${reason}).` : '';
 }
 
 /** Keep a stored selection only while it is still a usable choice. */

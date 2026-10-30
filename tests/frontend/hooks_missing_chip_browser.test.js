@@ -25,7 +25,7 @@ const BASE = require('./test_base').BASE;
             const all = r ? r.querySelectorAll('.hooks-missing-chip') : []; out[id] = { n: all.length, title: all[0] ? all[0].title : '', text: all[0] ? all[0].textContent : '' }; } return out; })()`);
         const rowsShown = await ev(`document.querySelectorAll('.session-group-item').length`);
         assert.equal(rowsShown, 3, 'the three awake agents are on screen');
-        assert.deepEqual(Object.values(await chips()).map(c => c.n), [0, 0, 0], 'no chip until the server lists an agent');
+        assert.deepEqual(Object.values(await chips()).map(c => c.n), [0, 0, 0], 'no chip until the computer lists an agent');
 
         const setMissing = ids => ev(`(() => { window.T.state.hooksMissing = new Set(${JSON.stringify(ids)}); window.T.render.renderLiveSessions(window.T.state.liveSessions); return true; })()`);
         await setMissing(['lost-a-id', 'lost-c-id']);

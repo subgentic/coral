@@ -468,6 +468,15 @@ var piProviderR = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$`)
 
 // piStatusArgs is "auth check --provider <p> --json" for the provider Pi starts on, the defaultProvider of its settings (PI_CODING_AGENT_DIR, else ~/.pi/agent). Pi's check needs a provider, so with none
 // there is nothing to ask. Never --credentials: the answer holds no secret.
+// PiProvider is the provider Pi starts on (the defaultProvider of its settings), the one its sign-in is asked for, or "" when Pi has none set: Settings says which provider the answer is about.
+func PiProvider() string {
+	args, ok := piStatusArgs()
+	if !ok {
+		return ""
+	}
+	return args[3]
+}
+
 func piStatusArgs() ([]string, bool) {
 	dir := os.Getenv("PI_CODING_AGENT_DIR")
 	if dir == "" {

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Hourly trim of the Go build cache (tools/trim-dev-caches.sh, #11251). Install:
+       cp tools/trim-dev-caches.sh ~/.local/bin/trim-dev-caches.sh
+       sed -e "s|__SCRIPT__|$HOME/.local/bin/trim-dev-caches.sh|g" -e "s|__REPO__|$HOME/Software/coral|g" -e "s|__HOME__|$HOME|g" tools/dev.coral.trim-dev-caches.plist > ~/Library/LaunchAgents/dev.coral.trim-dev-caches.plist
+       launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/dev.coral.trim-dev-caches.plist
+     Remove: launchctl bootout gui/$(id -u)/dev.coral.trim-dev-caches. It runs the cache trim (files unused for 2 hours: ten agents building grew the cache from 16 to 30 GB in an hour, #11251) and lists, never removes, merged worktrees;
+     the log is ~/.cache/coral-dev-trim.log. It holds no agent token and does not touch ~/.coral. -->
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>dev.coral.trim-dev-caches</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>__SCRIPT__</string>
+    <string>--hours</string>
+    <string>2</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>CORAL_REPO</key><string>__REPO__</string>
+    <key>PATH</key><string>/opt/homebrew/bin:/usr/local/go/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+  </dict>
+  <key>StartInterval</key><integer>3600</integer>
+  <key>RunAtLoad</key><true/>
+  <key>Nice</key><integer>10</integer>
+  <key>StandardOutPath</key><string>__HOME__/.cache/coral-dev-trim.launchd.out</string>
+  <key>StandardErrorPath</key><string>__HOME__/.cache/coral-dev-trim.launchd.out</string>
+</dict>
+</plist>

@@ -268,9 +268,9 @@ func (b *relayRequest) refusal() answer {
 	case len(b.Content) > maxRelayedContent:
 		return refuse(http.StatusRequestEntityTooLarge, "too_large", fmt.Sprintf("content must be at most %d bytes", maxRelayedContent))
 	case strings.Count(b.ToAddress, "/") >= 2:
-		return refuse(http.StatusBadRequest, "bad_address", "an address is <server>/<team>; addressing an agent isn't supported")
+		return refuse(http.StatusBadRequest, "bad_address", "an address is <computer>/<team>; addressing an agent isn't supported")
 	case !relayAddressRe.MatchString(b.ToAddress):
-		return refuse(http.StatusBadRequest, "bad_address", "an address is <server>/<team>, e.g. homelab/qa (see coral-board targets)")
+		return refuse(http.StatusBadRequest, "bad_address", "an address is <computer>/<team>, e.g. homelab/qa (see coral-board targets)")
 	case b.MessageID != "" && !relayIDRe.MatchString(b.MessageID):
 		return refuse(http.StatusBadRequest, "bad_request", "malformed message_id")
 	}

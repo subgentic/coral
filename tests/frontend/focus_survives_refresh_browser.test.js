@@ -102,7 +102,7 @@ const BASE = require('./test_base').BASE;
             const again = document.activeElement; out.cloudKept = !!again && again.classList.contains('cloud-code') && host2.contains(again); out.typed = again && again.value; out.caret = again && [again.selectionStart, again.selectionEnd];
             cl.hideServersModal(); host2.remove(); window.fetch = realFetch;
             return out; })()`);
-        assert.ok(real.hasAdd && real.hubKept, `Servers: focus stays on Add server after the list is redrawn: ${JSON.stringify(real)}`);
+        assert.ok(real.hasAdd && real.hubKept, `Servers: focus stays on Add computer after the list is redrawn: ${JSON.stringify(real)}`);
         assert.ok(real.hasCode && real.cloudKept, `Cloud servers: focus stays on the enrollment code box: ${JSON.stringify(real)}`);
         assert.equal(real.typed, 'AB12', 'and the code typed in it is still there');
         assert.deepEqual(real.caret, [2, 3], 'with the caret where it was');

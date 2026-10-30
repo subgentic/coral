@@ -89,6 +89,7 @@ func (h *BoardHandler) CreateTask(w http.ResponseWriter, r *http.Request) {
 		Workflow     board.TaskWorkflow `json:"workflow,omitempty"`
 		RemindAt     string             `json:"remind_at,omitempty"` // RFC 3339: a one-time reminder (#4175 step 3)
 		GoalID       *int64             `json:"goal_id,omitempty"`   // a goal of this board the task works toward (#7087)
+		Self         bool               `json:"self,omitempty"`      // a task the caller makes for ITSELF (#11247): any member may, with a goal, one per title, at most maxOpenSelfTasks open
 	}
 	if err := decodeJSON(r, &body); err != nil {
 		errBadRequest(w, "invalid JSON")
@@ -142,7 +143,25 @@ func (h *BoardHandler) CreateTask(w http.ResponseWriter, r *http.Request) {
 		errForbidden(w, "created_by must match subscriber_id")
 		return
 	}
-	if !h.requireTaskPlanner(w, r, project, createdBy) {
+	if body.Self {
+		// A task for the caller alone (#11247, QA's #11216): an agent opens its own work, e.g. the release's "UI review", without an orchestrator. It assigns nothing to anyone else, so the shared-task
+		// rule does not apply; what it must not become is a way to post work for others or to flood the queue: the assignee is the creator, a goal is required, a repeat of an open title returns that
+		// task, and at most maxOpenSelfTasks are open at once.
+		if existing, done := h.selfTaskChecks(w, r, project, createdBy, &body.Title, &body.AssignedTo, body.GoalID); done {
+			if existing != nil {
+				writeExistingTask(w, existing)
+			}
+			return
+		}
+		h.selfTaskMu.Lock()
+		defer h.selfTaskMu.Unlock() // the one-per-title check and the creation are one step
+		if existing, done := h.selfTaskLimits(w, r, project, createdBy, body.Title); done {
+			if existing != nil {
+				writeExistingTask(w, existing)
+			}
+			return
+		}
+	} else if !h.requireTaskPlanner(w, r, project, createdBy) {
 		return
 	}
 	// An agent token may have at most maxOpenTasksPerAgent open tasks it created on a board (#4602, M10); the Operator and
@@ -319,4 +338,67 @@ const (
 func clearReviewFields(wf *board.TaskWorkflow) {
 	wf.ReviewOf, wf.ReviewRound, wf.ReviewRounds, wf.OriginalAuthor = 0, 0, nil, ""
 	wf.ReviewInPool, wf.ReviewAreas, wf.ReviewersWanted, wf.ReviewPooledAt = false, nil, 0, ""
+}
+
+// maxOpenSelfTasks is how many open tasks one agent may have made for itself on a board.
+const maxOpenSelfTasks = 5
+
+// selfTaskChecks is what a self task must be before anything is created: a member of this board making it for itself, with a goal. done is true when the request was answered (a refusal).
+func (h *BoardHandler) selfTaskChecks(w http.ResponseWriter, r *http.Request, project, createdBy string, title, assignedTo *string, goalID *int64) (*board.Task, bool) {
+	if a := strings.TrimSpace(*assignedTo); a != "" && !board.SameIdentity(a, createdBy) {
+		errForbidden(w, "a self task is assigned to its creator only: leave out the assignee, or ask the orchestrator for a task for someone else")
+		return nil, true
+	}
+	if goalID == nil || *goalID <= 0 {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "a self task needs a goal (--goal N): say what it serves", "code": "goal_required", "not_saved": true})
+		return nil, true
+	}
+	if board.IsOperatorName(createdBy) {
+		*assignedTo = createdBy
+		return nil, false // the Operator plans anything; --self for it is the same task, assigned to itself
+	}
+	if sub, err := h.bs.GetProjectSubscription(r.Context(), project, createdBy); err != nil || sub == nil {
+		errForbidden(w, "only a member of this board may make a task for itself")
+		return nil, true
+	}
+	*title = strings.TrimSpace(*title)
+	*assignedTo = createdBy
+	return nil, false
+}
+
+// selfTaskLimits is the one-per-title rule and the cap of open self tasks: a repeat of an open title returns that task (existing, done), and past the cap the request is refused (done).
+func (h *BoardHandler) selfTaskLimits(w http.ResponseWriter, r *http.Request, project, createdBy, title string) (*board.Task, bool) {
+	open, err := h.bs.OpenSelfTasks(r.Context(), project, createdBy)
+	if err != nil {
+		errInternalServer(w, err.Error())
+		return nil, true
+	}
+	for _, t := range open {
+		if strings.EqualFold(strings.TrimSpace(t.Title), strings.TrimSpace(title)) {
+			task, err := h.bs.GetTask(r.Context(), project, t.ID)
+			if err != nil || task == nil {
+				errInternalServer(w, "the existing task could not be read")
+				return nil, true
+			}
+			return task, true
+		}
+	}
+	if len(open) >= maxOpenSelfTasks {
+		msg := fmt.Sprintf("an agent can have at most %d open tasks it made for itself on a board (it has %d): complete or cancel some first", maxOpenSelfTasks, len(open))
+		writeJSON(w, http.StatusConflict, map[string]any{"error": msg, "message": msg, "code": "too_many_self_tasks", "max": maxOpenSelfTasks, "not_saved": true})
+		return nil, true
+	}
+	return nil, false
+}
+
+// writeExistingTask answers a self task whose title is already open: 200 and that task, marked existing so a caller can tell it from one just created.
+func writeExistingTask(w http.ResponseWriter, task *board.Task) {
+	raw, err := json.Marshal(task)
+	var out map[string]any
+	if err != nil || json.Unmarshal(raw, &out) != nil {
+		errInternalServer(w, "the existing task could not be read")
+		return
+	}
+	out["existing"] = true
+	writeJSON(w, http.StatusOK, out)
 }

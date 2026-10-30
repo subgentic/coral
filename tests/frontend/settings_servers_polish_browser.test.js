@@ -44,12 +44,12 @@ const { connect } = require('./agent_view_harness');
             await ev(`window.switchNavTab('servers'); true`);
             await waitFor(`!!document.querySelector('#server-row-m3')`, 'the servers list');
             const rows = await ev(`(async () => { const until = async f => { for (let i = 0; i < 100 && !f(); i++) await new Promise(r => setTimeout(r, 20)); }; const out = {}; for (const id of ['m3', 'm4', 'm5']) { document.querySelector('#server-row-' + id + ' [data-action=open]').click(); await until(() => document.querySelector('.servers-page')); const r = document.querySelector('.servers-page'); const lines = [...r.querySelectorAll('.servers-row-error')]; out[id] = { lines: lines.map(l => l.firstChild.textContent.trim()), details: [...r.querySelectorAll('details')].map(d => d.textContent.replace('Details', '').trim()), text: r.textContent }; document.getElementById('servers-back').click(); await until(() => document.querySelector('table.servers-table')); } return out; })()`); // a server's page (#7638)
-            assert.deepEqual(rows.m3.lines, ['Is Coral running on that machine? Check the URL.'], dev + ': one line for an unreachable server');
+            assert.deepEqual(rows.m3.lines, ['Is Coral running on that computer? Check the URL.'], dev + ': one line for an unreachable server');
             assert.deepEqual(rows.m3.details, ['dial tcp 192.168.1.50:8420: i/o timeout'], 'with the raw error behind Details');
             assert.equal(rows.m4.lines.length, 1, dev + ': one line for a rejected key, not the raw text and the hint');
             assert.match(rows.m4.lines[0], /rejected the stored API key/); assert.deepEqual(rows.m4.details, ['the server rejected the API key']);
             assert.deepEqual(rows.m5.lines, ['warming up'], 'an error with no hint is shown as it is'); assert.deepEqual(rows.m5.details, []);
-            // 4: the Add server form in the tab looks like the dialogs' forms (#4324): a label above a full-width field, fields stacked and aligned, touch-size on a phone.
+            // 4: the Add computer form in the tab looks like the dialogs' forms (#4324): a label above a full-width field, fields stacked and aligned, touch-size on a phone.
             await ev(`document.querySelector('[data-action=add]').click(); true`);
             await waitFor(`!!document.getElementById('servers-form')`, 'the add form');
             const form = await ev(`(() => { const f = document.getElementById('servers-form'); const fr = f.querySelector('.sv-form').getBoundingClientRect(); const px = v => Math.round(v * 10) / 10;

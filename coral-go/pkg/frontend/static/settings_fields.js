@@ -20,7 +20,7 @@ const alertsOff = () => { const e = document.getElementById('settings-desktop-no
 const NOTIFICATIONS_FIELDS = [
     { key: 'notify_needs_input', type: 'toggle', id: 'settings-notify-needs-input', label: 'Show notifications in Coral', help: 'A message in Coral when an agent needs input.' },
     { key: 'desktop_notify', type: 'toggle', id: 'settings-desktop-notify', label: 'Desktop alerts',
-        help: { text: 'An alert on this computer while this tab is in the background.', more: 'This browser only. Shows the agent and server names (your OS may keep them in its notification history), never agent output. May duplicate a local alert.' } },
+        help: { text: 'An alert on this computer while this tab is in the background.', more: 'This browser only. Shows the agent and computer names (your OS may keep them in its notification history), never agent output. May duplicate a local alert.' } },
     // Why the switch above did not turn on (#10068): a browser that blocks alerts, or a permission box that was dismissed. Filled by settings_fill.js.
     { key: 'desktop_notify_blocked', type: 'notice', render: slot => { const p = document.createElement('p'); p.id = 'settings-desktop-blocked'; p.className = 'sv-help'; p.setAttribute('role', 'status'); p.hidden = true; slot.append(p); } },
     // This browser's own choices about those alerts (not saved on the server); they apply while Desktop alerts is on.
@@ -161,25 +161,30 @@ const apiKeyLine = slot => {
     line.append(input, show, copy, qr); slot.append(line);
 };
 
-// The Claude account's line (#10526): who the agents sign in as is the CLI's own login, so Check asks the CLI (GET /api/system/cli-check?type=claude&signin=1) and says signed in, not signed in, or that it could not tell.
-const claudeAccountLine = slot => {
+// A CLI account's line (#10526 Claude, #11293 Pi): who the agents sign in as is the CLI's own login, so Check asks the CLI (GET /api/system/cli-check?type=<cli>&signin=1) and says signed in, not signed in, or that it
+// could not tell. Pi signs in per provider and says which one the answer is for.
+const accountLine = (slot, { cli, name, notSignedIn }) => {
     const line = document.createElement('div'); line.className = 'sv-ctl-line';
-    const status = document.createElement('span'); status.id = 'settings-claude-account-status'; status.className = 'settings-hint'; status.setAttribute('role', 'status');
-    const check = document.createElement('button'); check.type = 'button'; check.id = 'settings-claude-account-check'; check.className = 'btn btn-small'; check.textContent = 'Check'; check.setAttribute('aria-label', 'Check Claude sign-in');
+    const status = document.createElement('span'); status.id = `settings-${cli}-account-status`; status.className = 'settings-hint'; status.setAttribute('role', 'status');
+    const check = document.createElement('button'); check.type = 'button'; check.id = `settings-${cli}-account-check`; check.className = 'btn btn-small'; check.textContent = 'Check'; check.setAttribute('aria-label', `Check ${name} sign-in`);
     check.addEventListener('click', async () => {
         check.disabled = true; status.textContent = 'Checking...';
-        let signedIn;
-        try { const r = await fetch('/api/system/cli-check?type=claude&signin=1&source=settings_check', { cache: 'no-store' }); signedIn = r.ok ? (await r.json()).signed_in : undefined; } catch { /* no answer: said below */ }
-        status.textContent = signedIn === true ? 'Signed in' : signedIn === false ? 'Not signed in: run claude auth login in a terminal' : 'Could not tell if Claude is signed in';
+        let signedIn, provider = '';
+        try { const r = await fetch(`/api/system/cli-check?type=${cli}&signin=1&source=settings_check`, { cache: 'no-store' }); if (r.ok) { const d = await r.json(); signedIn = d.signed_in; provider = typeof d.provider === 'string' ? d.provider : ''; } } catch { /* no answer: said below */ }
+        const to = provider ? ` to ${provider}` : '';
+        status.textContent = signedIn === true ? `Signed in${to}` : signedIn === false ? `Not signed in${to}: ${notSignedIn}` : `Could not tell if ${name} is signed in`;
         check.disabled = false;
     });
     line.append(status, check); slot.append(line);
 };
+const claudeAccountLine = slot => accountLine(slot, { cli: 'claude', name: 'Claude', notSignedIn: 'run claude auth login in a terminal' });
+const piAccountLine = slot => accountLine(slot, { cli: 'pi', name: 'Pi', notSignedIn: 'start pi and run /login' });
 
 export const SECURITY_FIELDS = [
     { key: 'security_access_title', type: 'heading', id: 'settings-security-access-title', label: 'Access' },
     { key: 'api_key', type: 'custom', id: 'settings-api-key-group', label: 'Coral API key', render: slot => apiKeyLine(slot) },
     { key: 'claude_account', type: 'custom', id: 'settings-claude-account', label: 'Claude account', help: moreOnly("Agents sign in through the Claude CLI's own login, not a key stored in Coral. Check asks the CLI now."), render: slot => claudeAccountLine(slot) },
+    { key: 'pi_account', type: 'custom', id: 'settings-pi-account', label: 'Pi account', help: moreOnly("Pi signs in with its own login, per provider. Check asks Pi now for the provider it starts on."), render: slot => piAccountLine(slot) },
     live('settings-security'),
     { key: 'security_data_title', type: 'heading', id: 'settings-security-data-title', label: 'Data and privacy' },
     { key: 'database_encryption', type: 'select', id: 'settings-database-encryption', labelId: 'settings-database-encryption-label', label: 'Database encryption', live: ['settings-database-encryption-status'], visibleWhen: () => { const e = document.getElementById('settings-database-encryption'); return !e || e.dataset.unsupported !== '1'; }, disabledWhen: () => { const e = document.getElementById('settings-database-encryption'); return !!e && e.dataset.locked === '1'; },
@@ -199,7 +204,7 @@ export const NETWORK_FIELDS = [
     { key: 'net_status_title', type: 'heading', id: 'net-status-title', label: 'Status' }, live('about-section'),
     { key: 'net_hub_title', type: 'heading', id: 'net-hub-title', label: 'Coral Hub' }, live('net-group-hub'),
     { key: 'hub_mode', type: 'toggle', id: 'settings-hub-mode-enabled', labelId: 'settings-hub-mode-label', label: 'Manage other computers from this one', live: ['settings-hub-mode-status', 'settings-hub-mode-restart'],
-        help: { text: 'Adds a Servers tab; whoever signs in here controls every computer you add.', more: "It uses this Coral's own address, port and sign-in: the API key from other computers, and Remote access above for who can reach it. Nothing new listens. Turning it off keeps the servers you added." } },
+        help: { text: 'Adds a Computers tab; whoever signs in here controls every computer you add.', more: "It uses this Coral's own address, port and sign-in: the API key from other computers, and Remote access above for who can reach it. Nothing new listens. Turning it off keeps the computers you added." } },
 ];
 
 /** Draws the groups that are fields into the Settings modal's panes (once, when the modal is built). mount is mountSettingsView. */

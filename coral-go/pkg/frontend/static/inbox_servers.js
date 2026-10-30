@@ -8,14 +8,14 @@ export const inboxSources = () => [...(isCloud() ? [] : ['local']), ...new Set(s
 export function serverLabel(id) { return !id || id === 'local' ? 'This computer' : (state.servers || []).find(s => s.id === id)?.label || (state.servers || []).find(s => s.id === id)?.name || id; }
 export const serverOf = row => row.server || splitKey(row.project || row.board_id || row.team || '').server || 'local';
 export const serverMatches = (row, filters) => !multipleServers() || !filters.server || serverOf(row) === filters.server;
-export const serverFilter = { type: 'text', max: 200, chip: value => `Server: ${serverLabel(value)}` };
-export const serverField = id => ({ type: 'select', key: 'server', id: `${id}-server`, label: 'Server', values: [], labels: {}, any: 'Any server' });
+export const serverFilter = { type: 'text', max: 200, chip: value => `Computer: ${serverLabel(value)}` };
+export const serverField = id => ({ type: 'select', key: 'server', id: `${id}-server`, label: 'Computer', values: [], labels: {}, any: 'Any computer' });
 export function syncServerField(bar) {
     const values = serverChoices();
     bar.setOptions('server', values, Object.fromEntries(values.map(id => [id, serverLabel(id)])));
     bar.showField('server', multipleServers());
 }
-export const serverColumns = () => multipleServers() ? [{ key: 'server', label: 'Server', sort: true, sortValue: row => serverLabel(serverOf(row)), line: 2, cell: row => serverLabel(serverOf(row)) }] : [];
+export const serverColumns = () => multipleServers() ? [{ key: 'server', label: 'Computer', sort: true, sortValue: row => serverLabel(serverOf(row)), line: 2, cell: row => serverLabel(serverOf(row)) }] : [];
 
 /** The computers that answered 403 owner_only to the artifacts list: this person is a grantee there. Kept for the session, per computer: no later read asks them again. */
 const ownerOnly = new Set();

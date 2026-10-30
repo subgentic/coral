@@ -211,6 +211,18 @@ func TestSwitchModelNeedsARestartForATypeWithNoLiveSwitch(t *testing.T) {
 	assert.Nil(t, r.state(t))
 }
 
+// A Pi agent switches by restart (typing /model into its TUI opens a picker nothing can answer safely, #11293 row 8): the 409 says what to do, for an API client that has no dialog to open.
+func TestSwitchModelForPiSaysToRestartWithTheChoice(t *testing.T) {
+	r := newSwitchRig(t, "pi")
+	b, _ := json.Marshal(map[string]any{"session_id": r.sid, "agent_type": "pi", "model": "openai/gpt-6-luna"})
+	code, out := dashboardPost(t, r.server.URL+"/api/sessions/live/"+r.name+"/model", json.RawMessage(b))
+	assert.Equal(t, http.StatusConflict, code, out)
+	assert.Contains(t, out, `"code":"needs_restart"`)
+	assert.Contains(t, out, "restart it with the new choice", "it names the way to apply the switch")
+	assert.Contains(t, out, "conversation resumes", "and that the conversation is kept")
+	assert.Empty(t, r.typed(), "nothing is typed into Pi's terminal")
+}
+
 func TestSwitchModelIsConfirmedByTheModelEntry(t *testing.T) {
 	r := newSwitchRig(t, "claude")
 	code, m := r.post(t, map[string]any{"model": "claude-sonnet-5-5"})

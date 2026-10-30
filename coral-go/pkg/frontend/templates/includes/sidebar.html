@@ -117,8 +117,8 @@
                     <div class="list-display-options">
                         <label class="list-display-option" data-display-row="summary"><input type="checkbox" id="display-show-summary" data-display-input="summary" data-on-change="toggle-row-line"> Show summary</label>
                         <label class="list-display-option" data-display-row="model"><input type="checkbox" id="display-show-model" data-display-input="model" data-on-change="toggle-row-line"> Show model</label>
-                        <label class="list-display-option" id="display-show-server-row" data-display-row="server" hidden><input type="checkbox" id="display-show-server" data-display-input="server" data-on-change="toggle-show-server"> Show server</label>
-                        <label class="list-display-option" id="display-group-by-server-row" data-display-row="group" hidden><input type="checkbox" id="display-group-by-server" data-display-input="group" data-on-change="toggle-group-by-server"> Group by server</label>
+                        <label class="list-display-option" id="display-show-server-row" data-display-row="server" hidden><input type="checkbox" id="display-show-server" data-display-input="server" data-on-change="toggle-show-server"> Show computer</label>
+                        <label class="list-display-option" id="display-group-by-server-row" data-display-row="group" hidden><input type="checkbox" id="display-group-by-server" data-display-input="group" data-on-change="toggle-group-by-server"> Group by computer</label>
                     </div>
                         {{ else if eq . "hub-inbox" }}<div id="inbox-saved-bar" class="inbox-saved-bar"></div><!-- the Saved list's Filters and Sort (saved.js builds the bar here; the search is the box above) -->
                         {{ else }}<div class="hf-row">

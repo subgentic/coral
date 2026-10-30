@@ -261,6 +261,10 @@ func (a *PiAgent) LaunchCommand(params LaunchParams) (string, error) {
 		parts = append(parts, flag)
 	}
 
+	if params.OneShot { // answers on the terminal, keeps no session and exits, so the job's run ends with it (#11293)
+		parts = append(parts, "--print", "--no-session", "--no-approve") // last of the flags, as a step's are: a flag that slipped through is never the one that wins
+	}
+
 	// System prompt via --append-system-prompt with temp file
 	if len(sysParts) > 0 {
 		arg := files.promptArg("pi_sys", params.SessionID, "md", "", strings.Join(sysParts, "\n\n"))

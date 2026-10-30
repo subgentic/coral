@@ -47,7 +47,7 @@ const { pathToFileURL } = require('url');
     const down = m.serverHoverText('ws2');
     assert.ok(/^Cloud: Unreachable/.test(down) && /agents?/.test(down) && /Last seen:/.test(down), 'one wording, Last seen (the list column\'s word, #9798; Last contact before), online or not (#3152): ' + down);
     assert.ok(!/Last contact/.test(down)); // one word for the one fact (the guard was against Last seen, #3152; the list column's word won, #9798)
-    assert.ok(/This server \(the hub\)/.test(m.serverHoverText('local')));
+    assert.ok(/This computer \(the hub\)/.test(m.serverHoverText('local')));
 
     // Cloud Hub update notice (#3059): only available/required show anything, the
     // link is the constant releases page, and server-sent text is escaped.
@@ -111,7 +111,7 @@ const { pathToFileURL } = require('url');
         const header = m.serverGroupHeaderHtml(state.servers[0], 3, false, true);
         assert.ok(!/>(Collapse|Expand)</.test(header), 'no Collapse or Expand button in the menu');
         assert.ok(/aria-expanded="true"/.test(header), 'the header toggles the group and says so');
-        assert.strictEqual((header.match(/server-open-btn/g) || []).length, 1, 'Open in Servers once, in the launch row');
+        assert.strictEqual((header.match(/server-open-btn/g) || []).length, 1, 'Open in Computers once, in the launch row');
         assert.ok(!/data-server-launch="folder"/.test(header) && /To use a folder, choose it when you launch an agent\./.test(header), 'a remote has no Open folder, only the hint');
         const rel = m.serverDetailsHtml({ id: 'm2', label: 'rel', status: 'online', version: '1.4.134', last_seen: '2026-10-20T00:00:00Z' });
         assert.ok(/<dd>1\.4\.134<\/dd>/.test(rel) && !/server-version/.test(rel), 'a release version has no build suffix and no tooltip');

@@ -6,12 +6,12 @@ export const serverSources = {
     registered: {
         rows: data => Array.isArray(data) ? data : [],
         refused: async response => describeServerError(response.status, await response.json().catch(() => ({}))),
-        unreachable: 'Could not load the server list. Is this Coral server still running?',
+        unreachable: 'Could not load the computer list. Is this Coral still running?',
     },
     cloud: {
         init: { headers: { Accept: 'application/json' } },
         rows: data => Array.isArray(data?.servers) ? data.servers : [],
-        refused: async () => 'Could not load your servers.',
+        refused: async () => 'Could not load your computers.',
         unreachable: 'Could not reach the hub.',
     },
 };

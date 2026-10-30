@@ -190,7 +190,7 @@ const upToDate = { ...idle, not_ready_reason: 'up_to_date' }; // what the server
             // an address that is not on this site is never followed
             await dlgOpen(); await answer(401, { reason: 'reauth_required', sign_in_url: 'https://evil.test/x' });
             check(`${tag}: a sign-in address on another site is not followed (${await ev(`document.querySelector('#update-confirm-modal .update-signin').getAttribute('href')`)})`, !/evil/.test(await ev(`document.querySelector('#update-confirm-modal .update-signin').getAttribute('href')`)));
-            for (const [status, body, want, what] of [[403, { reason: 'mode_too_low' }, 'Needs Launch access on this machine.', 'mode_too_low'], [429, { reason: 'relaunch_fleet_busy' }, 'Try again in a few minutes.', '429 relaunch_fleet_busy'], [429, { reason: 'too_soon' }, 'Try again in a few minutes.', '429 too_soon'], [500, { reason: 'something_new' }, 'Coral did not say why. Nothing was changed.', 'a reason this build does not know']]) {
+            for (const [status, body, want, what] of [[403, { reason: 'mode_too_low' }, 'Needs Launch access on this computer.', 'mode_too_low'], [429, { reason: 'relaunch_fleet_busy' }, 'Try again in a few minutes.', '429 relaunch_fleet_busy'], [429, { reason: 'too_soon' }, 'Try again in a few minutes.', '429 too_soon'], [500, { reason: 'something_new' }, 'Coral did not say why. Nothing was changed.', 'a reason this build does not know']]) {
                 await dlgOpen(); await answer(status, body);
                 check(`${tag}: ${what}: "${await errText()}", never the raw reason`, (await errText()) === want);
             }
@@ -199,7 +199,7 @@ const upToDate = { ...idle, not_ready_reason: 'up_to_date' }; // what the server
             await ev(`window.__upd.status = null; true`); await ev(`import(${S} + 'update_ui.js').then(m => m.refreshUpdateStatus())`); await settle(300);
             check(`${tag}: and no control is shown`, (await pill()).hidden);
             // the status's own reasons
-            for (const [reason, name, shown] of [['mode_too_low', /Needs Launch access on this machine/, true], ['fleet_busy', /Try again in a few minutes/, true], ['label_missing', /not set up for relaunching from Coral Hub/, true], ['hub_off', null, false], ['mystery', /Coral did not say why\. Nothing was changed\./, true]]) {
+            for (const [reason, name, shown] of [['mode_too_low', /Needs Launch access on this computer/, true], ['fleet_busy', /Try again in a few minutes/, true], ['label_missing', /not set up for relaunching from Coral Hub/, true], ['hub_off', null, false], ['mystery', /Coral did not say why\. Nothing was changed\./, true]]) {
                 const st = staged(3); st.relaunch = { ...st.relaunch, available: false, reason };
                 await setStatus(st); const pl = await pill();
                 check(`${tag}: status reason ${reason}: ${shown ? `the control says "${(pl.name || '').slice(-60)}" and is not pressable` : 'no control'}${reason === 'mystery' ? ' (never the raw word)' : ''}`, shown ? (!pl.hidden && name.test(pl.name) && !/mystery/.test(pl.name) && (await ev(`document.getElementById('update-pill').getAttribute('aria-disabled')`)) === 'true') : pl.hidden);

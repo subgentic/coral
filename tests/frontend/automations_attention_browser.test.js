@@ -68,11 +68,18 @@ const STUB = `(() => {
             assert.equal(await ev(`document.querySelector('#group-table-view .list-bar-search').getAttribute('aria-label')`), 'Search what failed', `${at}the search is named for the folder`);
             await themed('failed', w);
             // the New menu makes either kind
+            if (w <= 600) { // a phone makes either kind with the one + (#11239 slice A): its menu has New job and New workflow, and the toolbar draws no New button
+                assert.equal(await ev(`[...document.querySelectorAll('#automations-new-btn')].some(b => b.getClientRects().length > 0)`), false, `${at}no New button in the toolbar on a phone: the + is the create button`);
+                await ev(`document.getElementById('phone-fab').click(); true`); await settle(200);
+                assert.deepEqual((await ev(`[...document.querySelectorAll('#phone-fab-menu [role=menuitem]')].map(b => b.textContent.trim())`)).slice(0, 2), ['New job', 'New workflow'], `${at}the + menu has New job and New workflow`);
+                await ev(`document.body.click(); true`); await settle(200);
+            } else {
             assert.equal(await ev(`document.querySelector('#automations-new-btn').textContent.trim()`), 'New', `${at}a New button at the toolbar's right`);
             await ev(`document.querySelector('#automations-new-btn').click(); true`); await settle(200);
             assert.deepEqual(await ev(`[...document.querySelectorAll('#automations-new-menu [role=menuitem]')].filter(b => b.getClientRects().length).map(b => b.textContent.trim())`), ['New job', 'New workflow'], `${at}its menu has New job and New workflow`);
             assert.equal(await ev(`document.querySelector('#automations-new-btn').getAttribute('aria-expanded')`), 'true');
             await ev(`document.querySelector('#automations-new-btn').click(); true`); await settle(200);
+            }
 
             // Running now: their own last run, the websocket's live run of a job, and a run with no job of its own
             await ev(`window.openAutomationsFolder('running'); true`);

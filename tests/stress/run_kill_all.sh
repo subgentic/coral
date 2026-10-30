@@ -153,8 +153,8 @@ if [[ "$names" != "$FOLDER" ]]; then
 fi
 pass "precondition: 2 solo, 2 team, 1 archived agent all in folder '$FOLDER'"
 
-kill_round() {  # label, group-by-team on|off
-    local label="$1" grouping="$2"
+kill_round() {  # label, group-by-team on|off, layout desktop|phone (the window size: the list the button is in is the layout's own, #11282)
+    local label="$1" grouping="$2" layout="${3:-desktop}"
     local a b; a=$(sid_of "Solo A"); b=$(sid_of "Solo B")
     local ta tb; ta=$(row_of "$a" | cut -f7); tb=$(row_of "$b" | cut -f7)
     local team_tmux=(); for t in $TEAM_SIDS; do team_tmux+=("$(row_of "$t" | cut -f7)"); done
@@ -164,7 +164,7 @@ kill_round() {  # label, group-by-team on|off
     # Strict local auth is the default (#3936): the tab signs in with a single-use 'coral open' link.
     local link; link=$("$TMP/coral" open --print --url "$BASE_URL" --home "$CORAL_DATA_DIR" | sed -n 's/^ *\(http[^ ]*login_token=[^ ]*\).*/\1/p' | head -1)
     [[ -n "$link" ]] || { fail "[$label] coral open printed no sign-in link"; return; }
-    if ! out=$("$NODE" "$SCRIPT_DIR/kill_all_browser.js" "$BASE_URL" "$FOLDER" "$grouping" "$ids" "$link"); then
+    if ! out=$("$NODE" "$SCRIPT_DIR/kill_all_browser.js" "$BASE_URL" "$FOLDER" "$grouping" "$ids" "$link" "$layout"); then
         fail "[$label] dashboard Kill all did not run"; return
     fi
     log "[$label] confirm: $(echo "$out" | python3 -c 'import json,sys; print(json.load(sys.stdin)["confirm"])')"
@@ -187,12 +187,19 @@ kill_round() {  # label, group-by-team on|off
     if [[ -n "$r" && $(echo "$r" | cut -f6) == 1 ]]; then pass "[$label] archived agent untouched"; else fail "[$label] archived agent killed or changed: '${r}'"; fi
 }
 
-kill_round "group-by-team on" on
-
-log "Relaunching 2 solo agents for the second round ..."
-launch_solo "Solo A"; launch_solo "Solo B"
-wait_running "Solo A" "Solo B"
-kill_round "group-by-team off" off
+# Four rounds: Group by Team on and off, each on a desktop window (#live-sessions-list) and on a phone one (#mobile-session-list). Each kills the two solo agents, so they are launched again between rounds.
+first=1
+for layout in desktop phone; do
+    for grouping in on off; do
+        if [[ $first == 0 ]]; then
+            log "Relaunching 2 solo agents for the next round ..."
+            launch_solo "Solo A"; launch_solo "Solo B"
+            wait_running "Solo A" "Solo B"
+        fi
+        first=0
+        kill_round "$layout, group-by-team $grouping" "$grouping" "$layout"
+    done
+done
 
 coral_test_sandbox_check || FAIL=$((FAIL + 1))   # #4354
 log "Result: $PASS passed, $FAIL failed"

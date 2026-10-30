@@ -125,7 +125,7 @@ const TASKS = { local: [{ id: 7, board_id: 'alpha', title: 'Local task', priorit
             }
             await panel();
             const alabels = await ev(`[...document.querySelectorAll('.inbox-folder-toolbar .list-bar-field-label')].filter(e => e.getClientRects().length).map(e => e.textContent.trim())`);
-            check(`${label}: the Server filter stays in the Artifacts Filters panel while the Server column is hidden (UI/UX's condition on #8839)`, alabels.includes('Server'), JSON.stringify(alabels));
+            check(`${label}: the Computer filter stays in the Artifacts Filters panel while the Computer column is hidden (UI/UX's condition on #8839; 'Server' became 'Computer' in #11217)`, alabels.includes('Computer'), JSON.stringify(alabels));
             const achoices = await teamChoices();
             check(`${label}: Artifacts' Team filter lists the two teams by their computer, each with its count`, achoices.filter(([v]) => v).length === 2 && achoices.some(([v, t]) => v === '@box-2/alpha' && /alpha · Box Two \(1\)/.test(t)) && achoices.some(([v, t]) => v === 'alpha' && /alpha · This computer \(1\)/.test(t)), JSON.stringify(achoices));
             check(`${label}: Needs you's ${mobile ? 'rows name the team after the agent' : 'Team column'}: the two alpha teams are told apart`, nteams && nteams.length === 2 && nteams[0] !== nteams[1] && nteams.some(t => /alpha.*This computer/.test(t)) && nteams.some(t => /alpha.*Box Two/.test(t)), JSON.stringify(nteams));

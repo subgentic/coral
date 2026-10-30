@@ -24,7 +24,7 @@ assert.deepEqual(STATES, ['needs_input', 'working', 'idle', 'asleep']);
 // chips and removal
 const model = makeModel({ boardLabel: v => 'B:' + v, machineLabel: v => 'M:' + v });
 assert.deepEqual(model.chips(EMPTY), []);
-assert.deepEqual(model.chips({ state: 'needs_input', board: 'tb', machine: 's1', sort: 'name' }), [{ key: 'state', label: 'State: Needs input' }, { key: 'board', label: 'Board: B:tb' }, { key: 'machine', label: 'Machine: M:s1' }], 'the sort is not a chip');
+assert.deepEqual(model.chips({ state: 'needs_input', board: 'tb', machine: 's1', sort: 'name' }), [{ key: 'state', label: 'State: Needs input' }, { key: 'board', label: 'Board: B:tb' }, { key: 'machine', label: 'Computer: M:s1' }], 'the sort is not a chip');
 assert.deepEqual(model.without({ state: 'idle', board: 'tb', machine: '', sort: 'cost' }, 'state'), { state: '', board: 'tb', machine: '', sort: 'cost' });
 assert.equal(model.without({ ...EMPTY, sort: 'cost' }, 'sort').sort, 'default');
 assert.equal(model.isFiltered, isFiltered); assert.equal(model.clean, clean); assert.deepEqual(model.EMPTY, EMPTY);

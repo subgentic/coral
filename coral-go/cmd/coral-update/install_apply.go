@@ -15,6 +15,9 @@ import (
 	"github.com/subgentic/coral/internal/updater/trigger"
 )
 
+// dllLockErr is why the process's DLL search could not be limited to the system folder (dll_windows.go); nil when it was, and always nil where there is no such lock.
+var dllLockErr error
+
 // applyProbe says what install an APPLY run is judged by. It is installProbe, except on Windows (install_apply_windows.go), where the dashboard starts the apply from a COPY
 // of coral-update.exe in <data>/updates/apply: the copy's own folder is never the registered install, so judging it by its folder (#6436's portable-copy guard) refused every
 // dashboard install as "portable_install", silently, since v2.0.0.

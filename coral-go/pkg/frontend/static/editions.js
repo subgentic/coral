@@ -177,11 +177,11 @@ const OWN_HUB_COMMANDS = 'coral --hub';
 function _ownHubHtml() {
     return `<div class="modal-content dlg-form editions-content">
         <h2 id="editions-title" class="editions-title">Run your own hub</h2>
-        <p class="editions-sub">One dashboard for the agents on all your machines. Free and self-hosted.</p>
+        <p class="editions-sub">One dashboard for the agents on all your computers. Free and self-hosted.</p>
         <ol class="editions-steps">
-            <li>On the machine you'll use as the hub, start Coral with <code>coral --hub</code>.</li>
-            <li>On each other machine, start Coral, turn on <strong>Remote access</strong> in Settings &rsaquo; Network and Hub (it says what that allows, and that it is unencrypted unless TLS is set up), and copy its API key.</li>
-            <li>In the hub's <strong>Servers</strong> tab, add each machine with its address and key.</li>
+            <li>On the computer you'll use as the hub, start Coral with <code>coral --hub</code>.</li>
+            <li>On each other computer, start Coral, turn on <strong>Remote access</strong> in Settings &rsaquo; Network and Hub (it says what that allows, and that it is unencrypted unless TLS is set up), and copy its API key.</li>
+            <li>In the hub's <strong>Computers</strong> tab, add each computer with its address and key.</li>
         </ol>
         <div class="cloud-command-row editions-commands"><code>${escapeHtml(OWN_HUB_COMMANDS)}</code><button type="button" class="btn btn-small" data-editions="copy-own" aria-label="Copy the hub command">Copy</button></div>
         <a class="editions-guide" href="${escapeAttr(OWN_HUB_GUIDE_URL)}" target="_blank" rel="noopener">Read the guide<span class="material-icons" aria-hidden="true">open_in_new</span></a>
@@ -262,7 +262,7 @@ document.addEventListener('coral:cloud-status', e => {
     const title = document.createElement('strong');
     title.textContent = 'Coral Hub moved';
     const text = document.createElement('span');
-    text.textContent = `Connect this server again${host ? ` at ${host}` : ''}: run coral cloud connect --force on this computer.`;
+    text.textContent = `Connect this computer again${host ? ` at ${host}` : ''}: run coral cloud connect --force on this computer.`;
     copy.replaceChildren(title, ' ', text); // the space keeps the two apart for a screen reader
     copy.dataset.moved = '1';
 });

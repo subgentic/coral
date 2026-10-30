@@ -331,7 +331,7 @@ async function run() {
             await load({ state: 'off', configured: false });
             check(`${label}: a build with no hub configured does not open it`, !(await open()) && (await settings()).welcome_pending === 'True');
             const offText = await ev(`(async () => (await import((window.__coralStatic||'/static/')+'cloud_connect.js')).describe({ state: 'off' }))()`);
-            check(`${label}: not configured: says how to configure it (same text as the CLI)`, /^Coral Hub isn't configured on this server\. Start Coral with --cloud-url https:\/\/app\.coralhub\.dev .*then run: coral cloud connect$/.test(offText), offText);
+            check(`${label}: not configured: says how to configure it (same text as the CLI)`, /^Coral Hub isn't configured on this computer\. Start Coral with --cloud-url https:\/\/app\.coralhub\.dev .*then run: coral cloud connect$/.test(offText), offText);
             await put({ welcome_pending: 'False' });
             await load({}, true);
             await ev(`(async () => (await import((window.__coralStatic||'/static/')+'editions.js')).showHubSetup())()`);

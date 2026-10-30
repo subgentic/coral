@@ -17,7 +17,7 @@ export async function toggleShowServer() {
         });
         if (!resp.ok) throw new Error(`settings ${resp.status}`);
     } catch (e) {
-        console.error('Failed to save server display setting:', e);
+        console.error('Failed to save computer display setting:', e);
         state.settings = { ...state.settings, show_session_server: previous };
         redrawLiveList();
     }

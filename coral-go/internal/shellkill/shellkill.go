@@ -481,6 +481,9 @@ func signalSpec(a string) bool {
 	if len(a) < 2 || a[0] != '-' || a[1] == '-' {
 		return false
 	}
+	if a[1] == '$' {
+		return true // kill -$SIG $pid: the first word after kill is its signal, whatever the variable holds (Security's #11211 SHOULD); a later -$pgid is a target and is refused
+	}
 	for _, r := range a[1:] {
 		if !(r >= '0' && r <= '9' || r >= 'A' && r <= 'Z' || r >= 'a' && r <= 'z') {
 			return false

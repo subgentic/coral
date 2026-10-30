@@ -155,12 +155,12 @@ const BASE = require('./test_base').BASE;
         assert.deepEqual(out.fields.username, { ac: 'username', hidden: true }, 'a username field for the password manager');
         assert.equal(out.fields.type, 'password'); assert.equal(out.fields.focused, 'set-password-new', 'focus moves to the password');
         assert.equal(out.shown, 'text'); assert.equal(out.hiddenAgain, 'password', 'Show then Hide');
-        assert.equal(out.lead1, 'Choose a password to open Coral in a browser. The Coral app and the tray open without it.', 'the dialog says what the password is for, not a change notice');
+        assert.equal(out.lead1, 'A password keeps other people and other devices out of Coral when it is opened in a web browser.', 'the dialog says what the password is for, not a change notice');
         assert.equal(out.lead2, out.lead1, 'the same words on a later visit, and no "nothing changed" notice');
         assert.doesNotMatch(out.lead1 + out.lead2, /nothing changed|now asks browsers/);
         assert.deepEqual(out.weak, { level: 'weak', disabled: false }, 'the meter advises and never blocks');
         assert.equal(out.meterEmpty, 'hidden', 'no strength bar is drawn before anything is typed (#9971), though its space is kept so Confirm does not move when typing starts (#10281)'); assert.equal(out.meterTyped, 'visible', 'the bar shows once something is typed');
-        assert.equal(out.notNowNote, 'Without one, the Coral app, the tray and the coral open command still let you in here, and nothing else can reach Coral. A password adds sign-in from any browser and from other devices (Settings, Security and privacy).', 'the prompt says what no password leaves you with, and the paragraph does not open with the button\'s name (#10892)');
+        assert.equal(out.notNowNote, 'Only you use this computer? You can skip this: the Coral app opens without a password. You can set one later in Settings, Security and privacy.', 'the prompt says what no password leaves you with, and the paragraph does not open with the button\'s name (#10892)');
         assert.ok(out.noteGap >= 8, 'room between that line and the Password label (' + out.noteGap + ' px)'); assert.equal(out.notNowInView, true, 'Not now is within the screen')
         assert.equal(out.emptyErr, 'Enter a password.'); assert.equal(out.callsAfterEmpty, 0);
         assert.match(out.mismatchErr, /do not match/); assert.equal(out.callsAfterMismatch, 0, 'nothing is sent for a mismatch');

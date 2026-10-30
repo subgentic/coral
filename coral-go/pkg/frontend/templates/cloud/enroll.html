@@ -16,7 +16,7 @@
     <main class="cloud-card">
         <h1>Connect to Coral Hub</h1>
         <section id="entry">
-            <p>Enter the code shown on your machine.</p>
+            <p>Enter the code shown on your computer.</p>
             <form id="entry-form" autocomplete="off">
                 <label for="code">Code</label>
                 <input id="code" class="cloud-code" type="text" inputmode="text" autocomplete="off" maxlength="9" spellcheck="false" placeholder="XXXX-XXXX" required>
@@ -24,24 +24,24 @@
             </form>
         </section>
         <section id="review" hidden>
-            <p>A machine is asking to connect to your account.</p>
+            <p>A computer is asking to connect to your account.</p>
             <h2 class="cloud-sub">Seen by this hub</h2>
             <dl id="seen" class="cloud-facts"></dl>
-            <h2 class="cloud-sub">Reported by the machine <span class="cloud-note">(not verified)</span></h2>
+            <h2 class="cloud-sub">Reported by the computer <span class="cloud-note">(not verified)</span></h2>
             <dl id="reported" class="cloud-facts"></dl>
-            <label for="label">Name for this machine</label>
+            <label for="label">Name for this computer</label>
             <input id="label" type="text" maxlength="100" autocomplete="off">
-            <div class="cloud-warn"><strong>Only approve a machine you control.</strong> Approving gives that machine access to your account on this hub, and lets you (and anyone signed in as you) open its terminals and files from the web.</div>
+            <div class="cloud-warn"><strong>Only approve a computer you control.</strong> Approving gives that computer access to your account on this hub, and lets you (and anyone signed in as you) open its terminals and files from the web.</div>
             <details class="cloud-more"><summary aria-label="How access starts"><span class="material-icons" aria-hidden="true">info</span></summary>
-                <p class="cloud-access-note">Connecting from Coral's dashboard asks what Coral Hub may do on that computer. A machine connected from the command line starts in View (read-only) until you change that in Coral on it; you can limit access further in <a href="/servers">Servers</a>.</p>
+                <p class="cloud-access-note">Connecting from Coral's dashboard asks what Coral Hub may do on that computer. A computer connected from the command line starts in View (read-only) until you change that in Coral on it; you can limit access further in <a href="/servers">Computers</a>.</p>
             </details>
-            <button id="approve" class="cloud-btn primary" type="button">Approve this machine</button>
+            <button id="approve" class="cloud-btn primary" type="button">Approve this computer</button>
             <button id="cancel" class="cloud-btn" type="button">Cancel</button>
         </section>
         <section id="done" hidden>
             <p><strong>Connected.</strong> It appears in the dashboard when it connects.</p>
             <a class="cloud-btn primary" href="/">Open the dashboard</a>
-            <a class="cloud-btn" href="/servers">Open Servers</a>
+            <a class="cloud-btn" href="/servers">Open Computers</a>
         </section>
         <div id="status" class="cloud-status" role="status" aria-live="polite"></div>
     </main>

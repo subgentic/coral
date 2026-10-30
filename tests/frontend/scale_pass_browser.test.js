@@ -1,6 +1,6 @@
 // #4706 (UX scale pass): what a long list does to three panels, against stubbed answers.
 //  - Team Artifacts names the board (its label, never its id) and says when the list is only the newest part: "500+ artifacts", "Showing 100 of 500+"
-//  - Servers: with more than five machines "Add server" and a count sit above the list, not screens below it; with a few it stays under the list
+//  - Servers: with more than five machines "Add computer" and a count sit above the list, not screens below it; with a few it stays under the list
 //  - the shared task list in a narrow panel keeps the full title accessible without overflowing
 // Run against an isolated dev server.
 const assert = require('node:assert/strict');
@@ -39,7 +39,7 @@ const { connect } = require('./agent_view_harness');
         assert.equal(await ev(`document.querySelector('${v} .list-bar-count').textContent`), '500+ artifacts');
         assert.equal(await ev(`document.querySelector('${v} .team-count-line').textContent`), 'Showing 3 of 500+');
 
-        console.log('2. Servers: Add server above a long list, under a short one');
+        console.log('2. Servers: Add computer above a long list, under a short one');
         const where = () => ev(`(() => { const b = document.querySelector('#servers-view [data-action="add"]'); const l = document.querySelector('#servers-view .dt-table'); if (!b || !l) return null; return { above: !!(b.compareDocumentPosition(l) & Node.DOCUMENT_POSITION_FOLLOWING), n: document.querySelectorAll('#servers-view [data-action="add"]').length, summary: (document.querySelector('#servers-view .servers-summary') || {}).textContent || '' }; })()`);
         await ev(`(async () => { const base = (window.__coralStatic || '/static/'); const s = await import(base + 'state.js'); s.state.hub = true; s.state.servers = window.__servers; const t = await import(base + 'servers_tab.js'); t.updateServersTabVisibility(); return true; })()`);
         await ev(`window.switchNavTab('servers'); true`);
@@ -47,7 +47,7 @@ const { connect } = require('./agent_view_harness');
         assert.deepEqual(await where(), { above: false, n: 1, summary: '' }, 'three machines: the button stays under the list, no count line');
         await ev(`window.__servers = ${JSON.stringify(servers(8))}; (async () => { const s = await import((window.__coralStatic || '/static/') + 'state.js'); s.state.servers = window.__servers; const t = await import((window.__coralStatic || '/static/') + 'servers_tab.js'); await t.showServersTabContent(); })(); true`);
         await waitFor(`!!document.querySelector('#server-row-m8')`, 'eight servers');
-        assert.deepEqual(await where(), { above: true, n: 1, summary: '8 servers, 6 online, 2 not' }, 'eight machines: one button, above the list, with the count');
+        assert.deepEqual(await where(), { above: true, n: 1, summary: '8 computers, 6 online, 2 not' }, 'eight machines: one button, above the list, with the count');
         assert.equal(await ev(`document.querySelector('#servers-view .servers-summary').hasAttribute('role')`), false, 'the count is plain text: the list is rebuilt on every refresh, a live region would be read out each time');
         const top = await ev(`document.querySelector('#servers-view [data-action="add"]').getBoundingClientRect().top < innerHeight`);
         assert.equal(top, true, 'the button is on the first screen');

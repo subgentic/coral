@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -284,5 +285,9 @@ func TestCLICheckRefusalsKeepTheWordsTheDashboardMatches(t *testing.T) {
 		require.Equal(t, http.StatusBadRequest, rec.Code, query)
 		assert.Contains(t, rec.Body.String(), want, query)
 	}
-	assert.Contains(t, h.cliCheckRefusal(ctx, "/usr/local/bin/definitely-not-a-cli", "claude"), "a path to claude", "a path that is not the CLI's program names the program the dashboard is to point at")
+	notACLI := "/usr/local/bin/definitely-not-a-cli"
+	if runtime.GOOS == "windows" {
+		notACLI = `C:\tools\definitely-not-a-cli.exe` // a rooted path with no drive letter is not absolute on Windows, and the refusal would be "absolute path"
+	}
+	assert.Contains(t, h.cliCheckRefusal(ctx, notACLI, "claude"), "a path to claude", "a path that is not the CLI's program names the program the dashboard is to point at")
 }

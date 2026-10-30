@@ -198,7 +198,8 @@ func (h *SessionsHandler) refreshFilesInner(w http.ResponseWriter, r *http.Reque
 			}
 			adds, _ := strconv.Atoi(parts[0])
 			dels, _ := strconv.Atoi(parts[1])
-			fileMap[parts[2]] = store.ChangedFile{Filepath: parts[2], Additions: adds, Deletions: dels, Status: "M"}
+			fp := unquoteGitPath(parts[2]) // a name with a tab, a quote or a backslash is still quoted by git
+			fileMap[fp] = store.ChangedFile{Filepath: fp, Additions: adds, Deletions: dels, Status: "M"}
 		}
 	}
 
@@ -216,6 +217,7 @@ func (h *SessionsHandler) refreshFilesInner(w http.ResponseWriter, r *http.Reque
 			if f == "" {
 				continue
 			}
+			f = unquoteGitPath(f)
 			untrackedSet[f] = true
 			if _, exists := fileMap[f]; !exists {
 				adds := 0

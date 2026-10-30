@@ -117,7 +117,7 @@ const HOLD = `(() => {
         assert.equal(await ev(`${REGION} === window.__sendRegion`), true, 'the same element again');
         assert.equal(await ev(`document.getElementById('composer-error').hidden`), false, 'the reason is shown');
         assert.match(await ev(`document.getElementById('composer-error').textContent`), /input box but was not sent/); // plain words, with Open terminal and Restart beside them (#10336)
-        assert.deepEqual(await sentToasts(), ['Sent: first message'], 'no Sent for it');
+        assert.deepEqual(await sentToasts(), [], 'the bubble itself says Sent: no toast over the message you just sent (#11258 item 4)');
 
         console.log('An agent not ready: the same');
         await type('third message');

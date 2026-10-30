@@ -152,7 +152,7 @@ export function installCloudFetch() {
             try {
                 const { kept, dropped } = filterSettingsPayload(JSON.parse(init.body));
                 if (dropped.length) {
-                    console.debug('[coral] settings kept on the machine, not sent to the hub:', dropped.join(', '));
+                    console.debug('[coral] settings kept on the computer, not sent to the hub:', dropped.join(', '));
                     if (!Object.keys(kept).length) return new Response('{"ok":true}', { status: 200, headers: { 'Content-Type': 'application/json' } });
                     init = { ...init, body: JSON.stringify(kept) };
                 }
@@ -189,7 +189,7 @@ function buildAccountMenu(email) {
     const signOutBtn = h('button', { type: 'button', className: 'menu-item overflow-menu-item', role: 'menuitem', text: 'Sign out', onclick: signOut });
     const menu = h('div', { className: 'menu cloud-account-menu', id: 'cloud-account-menu', hidden: true, role: 'menu' },
         h('div', { className: 'cloud-account-email', text: email, title: email }),
-        h('button', { type: 'button', className: 'menu-item overflow-menu-item', role: 'menuitem', text: 'Servers', onclick: () => { setOpen(false); importOnce('./servers.js', 'the server list').then(m => m.showServersModal(), () => {}); } }),
+        h('button', { type: 'button', className: 'menu-item overflow-menu-item', role: 'menuitem', text: 'Computers', onclick: () => { setOpen(false); importOnce('./servers.js', 'the computer list').then(m => m.showServersModal(), () => {}); } }),
         ...defaults, signOutBtn,
     );
     const items = () => [...menu.querySelectorAll('[role="menuitem"]')];

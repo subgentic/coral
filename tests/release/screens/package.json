@@ -1,0 +1,15 @@
+{
+  "name": "coral-release-screens",
+  "version": "1.0.0",
+  "private": true,
+  "description": "The release screenshot review: every page of the dashboard at three widths, filed as Coral artifacts on a release task",
+  "type": "module",
+  "scripts": {
+    "test": "node --test census.test.mjs manifest.test.mjs diff.test.mjs sheet.test.mjs"
+  },
+  "dependencies": {
+    "playwright": "1.64.1",
+    "pixelmatch": "8.0.0",
+    "pngjs": "7.0.0"
+  }
+}

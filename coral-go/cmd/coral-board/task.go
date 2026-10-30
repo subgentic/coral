@@ -132,6 +132,7 @@ const taskUsageText = `Usage: coral-board task <subcommand> [args]
 
 Subcommands:
   add "title" [--body "details"] [--priority P] [--assignee "Agent Name"] [--remind-at TIME] [--goal ID] [--follow-up ID]
+  add "title" --self --goal ID     A task for yourself, any agent may: assigned to you, needs a goal; a repeat of an open title returns that task, at most 5 open
                                    --follow-up ID: the work that came out of task ID: it takes that task's goal, reviewers and assignee unless you give your own,
                                    and ID lists it (task show ID, task detail ID, the goal page's "N follow-ups open")
   list [--json] [--goal ID]        Every task, or one goal's; --json prints the tasks as a JSON array

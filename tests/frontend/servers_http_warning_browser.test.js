@@ -7,7 +7,7 @@ const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 
 const WARNING = 'the key crosses the network unencrypted; use https or a tunnel';
-const REFUSED = 'URL must be https: the API key would cross the network unencrypted (a server on a private network or this computer can be registered with allow_private)';
+const REFUSED = 'URL must be https: the API key would cross the network unencrypted (another computer on a private network, or this one, can be registered with allow_private)';
 const SERVERS = [
     { id: 'local', label: 'studio-mac', local: true, status: 'online' },
     { id: 'lan', label: 'LAN box', url: 'http://192.168.1.50:8420', status: 'online', allow_private: true, warning: WARNING },
@@ -60,10 +60,10 @@ const SERVERS = [
         // Name and description by what the markup says: the label text names each field, the help text under it describes it, and neither repeats the other.
         const acc = await ev(`(() => { const t = id => (document.getElementById(id) || {}).textContent?.replace(/\\s+/g, ' ').trim(); const f = n => document.getElementById({ id: 'servers-id', url: 'servers-url', api_key: 'servers-key', allow_private: 'servers-private' }[n]);
             const o = {}; for (const n of ['id', 'url', 'api_key', 'allow_private']) { const e = f(n); o[n] = { name: e.getAttribute('aria-labelledby') ? e.getAttribute('aria-labelledby').split(' ').map(t).join(' ') : document.querySelector('label[for=' + e.id + ']').textContent.replace(/\\s+/g, ' ').trim(), desc: (e.getAttribute('aria-describedby') || '').split(' ').filter(Boolean).map(t).join(' ') }; } return o; })()`);
-        assert.deepEqual(acc.id, { name: 'Server id', desc: 'Lowercase letters, digits and dashes. Cannot be changed later.' });
+        assert.deepEqual(acc.id, { name: 'Computer id', desc: 'Lowercase letters, digits and dashes. Cannot be changed later.' });
         assert.deepEqual(acc.url, { name: 'URL', desc: 'Scheme, host and port only.' });
         assert.deepEqual(acc.api_key, { name: 'API key', desc: 'Write-only. The key is stored encrypted and is never shown again.' });
-        assert.equal(acc.allow_private.name, 'Allow private network address'); assert.match(acc.allow_private.desc, /^Only for a server on your LAN/);
+        assert.equal(acc.allow_private.name, 'Allow private network address'); assert.match(acc.allow_private.desc, /^Only for a computer on your LAN/);
         ok('each server form field is named by its label and described by its help');
         await cancelForm();
         await ev(`document.getElementById('servers-back').click(); true`);
@@ -89,7 +89,7 @@ const SERVERS = [
         assert.equal(err.focus, true, 'focus goes to the URL field');  assert.equal(err.posts, 1); assert.equal(err.kept, 'http://example.org:8420', 'what was typed is kept');
         await shot('refused-desktop');
         // another refusal (a duplicate id) still goes to the form's top error, not next to the URL
-        await ev(`window.__postAnswer = { status: 409, body: { error: 'A server with that id already exists.' } }; true`); await fillForm({ key: 'k' }); await submitForm();
+        await ev(`window.__postAnswer = { status: 409, body: { error: 'A computer with that id already exists.' } }; true`); await fillForm({ key: 'k' }); await submitForm();
         await waitFor(`document.querySelector('#servers-form .sv-status').textContent.includes('already exists')`, 'the status line says it');
         assert.equal(await ev(`!!document.getElementById('servers-url').closest('.sv-row').querySelector('.sv-error') && !document.getElementById('servers-url').closest('.sv-row').querySelector('.sv-error').hidden`), false, 'the URL error is cleared by a new submit');
         ok('a refused http URL shows the server\'s words next to the URL field (flagged, focused, kept); other refusals stay in the top error');

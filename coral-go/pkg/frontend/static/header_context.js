@@ -33,7 +33,7 @@ export function updateHeaderContext(s) {
     setText(serverEl, server);
     setHidden(box, !team && !server);
     // The full text when it is cut short, and for a screen reader.
-    setTitle(box, [team && `Team: ${team}`, server && `Server: ${server}`].filter(Boolean).join(' · '));
+    setTitle(box, [team && `Team: ${team}`, server && `Computer: ${server}`].filter(Boolean).join(' · '));
 }
 
 // A board's label can arrive after the header was filled (the board list loads later): show it then.

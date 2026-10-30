@@ -109,6 +109,16 @@ func (c *Client) typeToTarget(ctx context.Context, o terminalinput.Origin, targe
 	return c.typeCommand(ctx, o, target, command, launch, false)
 }
 
+// personLineBreaks is a person's multi-line text with CRLF as one line break, as an automated text has it (PreparePaste). The text is otherwise the person's own and kept as typed, but tmux's
+// paste-buffer turns every LF into a CR, so a Windows clipboard's CRLF reached the agent as two (a blank line between every line, #11265). A lone CR, and text without a LF, are left alone: they
+// are Enter keys (SendTerminalInputToTarget) and a typed command.
+func personLineBreaks(text string) string {
+	if !strings.Contains(text, "\r\n") {
+		return text
+	}
+	return strings.ReplaceAll(text, "\r\n", "\n")
+}
+
 // typeCommand is typeToTarget; quiet (a launch only) hands the command over as a script whatever its length, which erases the screen first (#5911).
 func (c *Client) typeCommand(ctx context.Context, o terminalinput.Origin, target, command string, launch, quiet bool) error {
 	if !launch && o.SafeText() {
@@ -135,6 +145,9 @@ func (c *Client) typeCommand(ctx context.Context, o terminalinput.Origin, target
 		} else if command, err = terminalinput.PrepareTyped(o, command); err != nil {
 			return err
 		}
+	}
+	if !launch && !o.SafeText() {
+		command = personLineBreaks(command)
 	}
 	originalCommandLen := len(command)
 	cleanup := func() {}

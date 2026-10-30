@@ -26,9 +26,10 @@ const BASE = require('./test_base').BASE;
         // the Hub: the page's own boot flag says cloud, and the Hub answers the sign-in
         await Network.enable(); await Network.setBypassServiceWorker({ bypass: true });
         await Fetch.enable({ patterns: [{ urlPattern: '*', resourceType: 'Document', requestStage: 'Response' }, { urlPattern: '*/auth/session', requestStage: 'Request' }, { urlPattern: '*/artifacts?goal=*', requestStage: 'Request' }] });
-        let grantee = false; // a View grantee: the computer answers the goal's artifact list 403 owner_only
+        let grantee = false; // a View grantee: the computer answers the goal's artifact list 403 owner_only, or (through the Hub) the Hub answers its own 404
+        let granteeStatus = 403, granteeBody = null; // granteeBody: the 404's own body when it is the computer's (a deleted team)
         safePaused(client, async e => {
-            if (/\/artifacts\?goal=/.test(e.request.url)) return grantee ? Fetch.fulfillRequest({ requestId: e.requestId, responseCode: 403, responseHeaders: [{ name: 'Content-Type', value: 'application/json' }], body: Buffer.from(JSON.stringify({ error: 'owner_only', code: 'owner_only' })).toString('base64') }) : Fetch.continueRequest({ requestId: e.requestId });
+            if (/\/artifacts\?goal=/.test(e.request.url)) return grantee ? Fetch.fulfillRequest({ requestId: e.requestId, responseCode: granteeStatus, responseHeaders: [{ name: 'Content-Type', value: 'application/json' }], body: Buffer.from(JSON.stringify(granteeBody || (granteeStatus === 403 ? { error: 'owner_only', code: 'owner_only' } : { error: 'not found' }))).toString('base64') }) : Fetch.continueRequest({ requestId: e.requestId });
             if (e.request.url.endsWith('/auth/session')) return Fetch.fulfillRequest({ requestId: e.requestId, responseCode: 200, responseHeaders: [{ name: 'Content-Type', value: 'application/json' }], body: Buffer.from(JSON.stringify({ authenticated: true, email: 'qa@example.com', csrf: 'qa-csrf' })).toString('base64') });
             if (e.responseStatusCode !== 200) return Fetch.continueRequest({ requestId: e.requestId });
             const { body, base64Encoded } = await Fetch.getResponseBody({ requestId: e.requestId });
@@ -64,6 +65,23 @@ const BASE = require('./test_base').BASE;
         await waitFor(`/Artifacts are for the account this computer is linked to\\./.test(document.querySelector('#team-panel-goals .goal-artifacts-host')?.textContent || '')`, 'the quiet line', 15000);
         assert.equal(await ev(`document.querySelectorAll('#team-panel-goals .goal-list [data-artifact-id]').length`), 0, 'no rows');
         assert.equal(await ev(`/could not be read/.test(document.querySelector('#team-panel-goals .goal-artifacts-host').textContent)`), false, 'not an error');
+        console.log('   ✓');
+        console.log('6. A View guest through the Hub: the Hub answers its own 404, and it is the same quiet line');
+        granteeStatus = 404;
+        await Page.navigate({ url: BASE + `/team/${B}/goals/${G}` }); await Page.loadEventFired(); await install();
+        await waitFor(`!!document.querySelector('#team-panel-goals #goal-tab-artifacts')`, 'the Artifacts tab for a guest', 15000);
+        await ev(`document.querySelector('#team-panel-goals #goal-tab-artifacts').click(); true`);
+        await waitFor(`/Artifacts are for the account this computer is linked to\\./.test(document.querySelector('#team-panel-goals .goal-artifacts-host')?.textContent || '')`, 'the quiet line for a 404', 15000);
+        assert.equal(await ev(`/could not be read/.test(document.querySelector('#team-panel-goals .goal-artifacts-host').textContent)`), false, 'not an error');
+        assert.equal(await ev(`document.querySelector('#team-panel-goals #goal-tab-artifacts .goal-tab-count')?.textContent.trim() || ''`), '0', 'the count is 0');
+        console.log('   ✓');
+        console.log('7. The computer\'s own 404 (a deleted team: code board_not_found) is still an error, not the guest line');
+        granteeBody = { error: 'board not found', code: 'board_not_found' };
+        await Page.navigate({ url: BASE + `/team/${B}/goals/${G}` }); await Page.loadEventFired(); await install();
+        await waitFor(`!!document.querySelector('#team-panel-goals #goal-tab-artifacts')`, 'the Artifacts tab', 15000);
+        await ev(`document.querySelector('#team-panel-goals #goal-tab-artifacts').click(); true`);
+        await waitFor(`/could not be read/.test(document.querySelector('#team-panel-goals .goal-artifacts-host')?.textContent || '')`, 'the error for the computer\'s 404', 15000);
+        assert.equal(await ev(`/Artifacts are for the account/.test(document.querySelector('#team-panel-goals .goal-artifacts-host').textContent)`), false, 'not the guest line');
         console.log('   ✓');
         console.log('PASS goal artifacts through the Hub: the tab, the count 3, the list of 3 and a file\'s preview');
     } finally { await removeBoards(ev, [B]).catch(() => {}); await client.close(); }

@@ -70,7 +70,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
             // the Hub's dialog: read-only
             await ev(`import((window.__coralStatic || '/static/') + 'search_access.js').then(m => m.openSearchAccess({ name: 'orch', id: 10, level: 'team' }, { readOnly: true })); true`);
             await waitFor(`document.getElementById('search-access-dialog')?.open`, `${w}: the Hub's dialog`, 4000);
-            assert.ok(await dlg(`/Change this on the machine's own dashboard\\./.test(d.textContent) && d.querySelectorAll('input[type=radio]').length === 0 && !d.querySelector('.btn-primary')`), `${w}: on the Hub the level is shown, with no radios and no Save`);
+            assert.ok(await dlg(`/Change this on the computer's own dashboard\\./.test(d.textContent) && d.querySelectorAll('input[type=radio]').length === 0 && !d.querySelector('.btn-primary')`), `${w}: on the Hub the level is shown, with no radios and no Save`);
             await ev(`document.getElementById('search-access-dialog').close(); true`);
             console.log(`   ${w}: ok`);
         }

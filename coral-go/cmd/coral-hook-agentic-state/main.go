@@ -120,7 +120,7 @@ func handle(d map[string]any, opts hookArgs, agyModel, agyConversation string) {
 		return
 	}
 
-	if hookType == "Stop" {
+	if hookType == "Stop" && opts.piEvent == "" { // not Pi's: its usage is read turn by turn from its session file, and this would count each turn twice (#11293)
 		forwardTokenUsage(base, agentName, sessionID, d)
 	}
 

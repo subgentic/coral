@@ -24,13 +24,13 @@ const label = m => LABEL[m] || null;
 export function accessBlockedMessage(a, required = 'interact') {
     const parts = [];
     if (label(a.hub)) parts.push(`Hub: ${label(a.hub)}`);
-    if (label(a.local)) parts.push(`This machine allows: ${label(a.local)}`);
+    if (label(a.local)) parts.push(`This computer allows: ${label(a.local)}`);
     if (label(a.effective)) parts.push(`Effective: ${label(a.effective)}`);
     const fix = a.limitedBy === 'machine'
-        ? 'Change it in Coral on that machine (Settings > Network and Hub).'
-        : 'Choose a higher Hub access in Servers.';
+        ? 'Change it in Coral on that computer (Settings > Network and Hub).'
+        : 'Choose a higher Hub access in Computers.';
     const need = label(required) ? ` needs ${label(required)}` : ' is read-only through the Coral Hub';
-    return `Blocked: ${a.label || 'this server'}${need}${parts.length ? ` (${parts.join(' · ')})` : ''}. ${fix}`;
+    return `Blocked: ${a.label || 'this computer'}${need}${parts.length ? ` (${parts.join(' · ')})` : ''}. ${fix}`;
 }
 
 // Launch-level actions on a whole team or board (#3443): through the Coral Hub, killing a whole team
@@ -72,7 +72,7 @@ export function launchBlockedReason(server) { return blockedReason(server, 'laun
  function readOnlyChipText(a) {
     const m = a.limitedBy === 'machine' ? label(a.effective) || label(a.local) : label(a.hub) || label(a.effective);
     if (!m) return 'Read-only';
-    return a.limitedBy === 'machine' ? `Read-only: This machine: ${m}` : `Read-only: Hub: ${m}`;
+    return a.limitedBy === 'machine' ? `Read-only: This computer: ${m}` : `Read-only: Hub: ${m}`;
 }
 
  const VIEW_ONLY_PLACEHOLDER = 'View only through Coral Hub';
@@ -206,7 +206,7 @@ export async function hubBlocked(session, { silent = false } = {}) {
 // The refusal toast; when the hub setting is what limits, it offers the Servers dialog.
 function showBlocked(ro) {
     const opts = ro.hubLimits
-        ? { action: { label: 'Open Servers', onClick: () => importOnce('./servers_tab.js').then(m => m.openServersTab(ro.server)) } }
+        ? { action: { label: 'Open Computers', onClick: () => importOnce('./servers_tab.js').then(m => m.openServersTab(ro.server)) } }
         : {};
     toast(ro.message, true, 6000, opts);
 }

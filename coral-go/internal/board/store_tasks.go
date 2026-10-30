@@ -1109,3 +1109,16 @@ func sortOpenStates(tasks []Task) []Task {
 	}
 	return out
 }
+
+// OpenSelfTask is an open task its creator made for itself (created_by and assigned_to are the same member).
+type OpenSelfTask struct {
+	ID    int64  `db:"id"`
+	Title string `db:"title"`
+}
+
+// OpenSelfTasks are the open tasks agent created for itself on a board, oldest first: what the per-agent cap and the one-per-title rule of task add --self (#11247) read.
+func (s *Store) OpenSelfTasks(ctx context.Context, project, agent string) ([]OpenSelfTask, error) {
+	var tasks []OpenSelfTask
+	err := s.reader().SelectContext(ctx, &tasks, `SELECT id, title FROM board_tasks WHERE board_id = ? AND created_by = ? AND assigned_to = ? AND `+openTaskStatusSQL+` ORDER BY id`, project, agent, agent)
+	return tasks, err
+}

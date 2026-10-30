@@ -298,8 +298,39 @@ func TestTheTimeBoundAloneLetsALongReadingRun(t *testing.T) {
 
 	was := maxWork
 	t.Cleanup(func() { maxWork = was })
-	maxWork = time.Nanosecond // the time the reading may take is over at the first look at the clock
+	maxWork = -time.Nanosecond // the time the reading may take is over at the first look at the clock, even on a clock that reads 0 elapsed (Windows' is coarse: with 1 ns the test failed there)
 	assert.Empty(t, PatternKill(command), "past the time bound the command runs")
 	maxWork = was
 	assert.NotEmpty(t, PatternKill(command), "and the bound is the only thing that changed")
+}
+
+// Security's #11211 SHOULD: "kill -$SIG $pid" has a signal first: the first word after kill is a signal, not a group. A later -$pgid is still a target and still refused.
+func TestAVariableSignalFirstIsASignalNotAGroup(t *testing.T) {
+	for _, c := range []string{
+		`kill -$SIG $pid`,
+		`kill -${SIG} "$pid"`,
+		`kill -$SIG %1`,
+		`sudo kill -$SIG $pid`,
+		`kill -$SIG`,
+	} {
+		assert.Empty(t, PatternKill(c), c)
+	}
+	for _, c := range []string{
+		`kill -9 -$pgid`,
+		`kill -- -$pgid`,
+		`kill -$SIG -$pgid`,
+		`kill -$SIG -1`,
+		`kill -$SIG 0`,
+		`kill $pid -$pgid`,
+		`kill -$SIG -- -$pgid`,
+	} {
+		assert.NotEmpty(t, PatternKill(c), c)
+	}
+}
+
+// Security's #11211 SHOULD: the default time bound is pinned. It runs for every PreToolUse Bash post of every agent, so it must stay short; a test can shrink it (maxWork is a variable) but the default may
+// not grow past 50 ms.
+func TestTheDefaultTimeBoundStaysShort(t *testing.T) {
+	assert.Greater(t, maxWork, time.Duration(0))
+	assert.LessOrEqual(t, maxWork, 50*time.Millisecond, "the reading of an agent's command may not be given more than 50 ms")
 }

@@ -55,9 +55,9 @@ const { setTheme, installAudit, auditRegion } = require('./helpers/contrast');
         await waitFor(`!document.getElementById('launch-agent-go').disabled`, 'Launch is back once the CLI is found', 8000);
         await ev(`document.getElementById('launch-agent-go').click(); true`);
         await waitFor(`window.__launches.length === 1`, 'the launch after the CLI was found', 8000);
-        // the toast names the agent as the list does (its folder, "tmp", not "Agent" and not the session's raw id, #5895, #5990): the stubbed launch answers session_name 'first'
-        await waitFor(`[...document.querySelectorAll('.toast .toast-message')].some(t => /^Launched: /.test(t.textContent))`, 'the launch toast', 8000);
-        assert.deepEqual(await ev(`[...document.querySelectorAll('.toast .toast-message')].map(t => t.textContent).filter(t => /^Launched/.test(t))`), ['Launched: tmp'], 'Launched: the folder, not the session id');
+        // the new chat opens, and that is the answer: no 'Launched' toast over its header (#11304; the name the chat shows is the list's, the folder, #5895, #5990)
+        await new Promise(r => setTimeout(r, 1500)); // sleep-ok: a toast for a launch would be up within a frame or two of the dialog closing
+        assert.deepEqual(await ev(`[...document.querySelectorAll('.toast .toast-message')].map(t => t.textContent).filter(t => /^Launched/.test(t))`), [], 'the chat opens: no Launched toast sits over it');
 
         console.log('4. a launch that is not the New Agent dialog (a board launch) has no form to repeat: Check again says to press Launch again, and never calls launchSession');
         const modalGone = `!document.querySelector('body > .modal:not([id]) [data-action="recheck"]')`;

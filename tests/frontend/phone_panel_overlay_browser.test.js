@@ -95,7 +95,7 @@ const BASE = require('./test_base').BASE;
                 const bad = []; for (let n = w.nextNode(); n; n = w.nextNode()) if (n.nodeValue.trim() === 'null' || /\bnull\b/.test(n.nodeValue)) bad.push(n.nodeValue.trim().slice(0, 40));
                 return { bad, text: host.textContent.slice(0, 80) };
             })()`);
-            assert.deepEqual(nulls.bad, [], `${mode}: no 'null' text in the server list (${JSON.stringify(nulls)})`);
+            assert.deepEqual(nulls.bad, [], `${mode}: no 'null' text in the computer list (${JSON.stringify(nulls)})`);
             console.log(`   ✓ ${mode}: no 'null' text`);
         }
         console.log('\nAll phone panel overlay checks passed');

@@ -50,7 +50,7 @@ const { connect } = require('./agent_view_harness');
         let b = await box();
         assert.equal(b.picker, true, 'the picker shows from the cache before the server answers');
         assert.deepEqual(b.options, ['Default', 'Opus 4.1', 'Other…', 'Add a model…']);
-        await waitFor(`document.querySelectorAll('#acf-t .acf-model-select option').length === 5`, 'the server list', 4000);
+        await waitFor(`document.querySelectorAll('#acf-t .acf-model-select option').length === 5`, 'the computer list', 4000);
         b = await box();
         assert.deepEqual(b.options, ['Default', 'Opus 4.1', 'Sonnet 4.5', 'Other…', 'Add a model…'], 'the server\'s list replaced the cached one');
         assert.equal(b.value, '', 'Default is selected for a blank model'); assert.equal(b.inputShown, false, 'the text box is behind Other…');

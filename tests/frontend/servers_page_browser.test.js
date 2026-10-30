@@ -44,7 +44,7 @@ const SERVERS = [
             // 1. a table: Server, Status, Agents; the name opens the page; no Test, Edit or Remove in the rows
             const t = await ev(`(() => { const tb = document.querySelector('table.dt-table'); return { heads: [...tb.querySelectorAll('thead th')].map(h => (h.querySelector('.dt-sort span') || h.querySelector('.dt-head-text')).textContent.trim()), scopes: [...tb.querySelectorAll('thead th')].map(h => h.getAttribute('scope')), rows: tb.querySelectorAll('tbody tr').length,
                 links: [...tb.querySelectorAll('tbody [data-action=open]')].map(b => (b.querySelector('.dt-name-text') || b).textContent.trim()), rowButtons: [...tb.querySelectorAll('tbody button')].filter(b => b.dataset.action !== 'open').length, overflow: document.documentElement.scrollWidth - innerWidth }; })()`);
-            assert.deepEqual(t.heads, ['Server', 'Tags', 'Status', 'Agents', 'Needs you', 'Last seen', 'Version'], at + 'the columns, UI/UX\'s order (Goal #79, #9679): Tags stays by the name, its warning on the row');
+            assert.deepEqual(t.heads, ['Computer', 'Tags', 'Status', 'Agents', 'Needs you', 'Last seen', 'Version'], at + 'the columns, UI/UX\'s order (Goal #79, #9679): Tags stays by the name, its warning on the row');
             if (!mobile) { // the table's default sizes (#9856): the server's name is at least 24 characters, nothing scrolls sideways, at 1280 and at 1024
                 for (const bw of [1280, 1024]) {
                     await Emulation.setDeviceMetricsOverride({ width: bw, height: h, deviceScaleFactor: 1, mobile: false }); await new Promise(r => setTimeout(r, 400)); // sleep-ok: the table follows its box
@@ -84,7 +84,7 @@ const SERVERS = [
             assert.deepEqual(look.intro, ['13px', '400', true, true], at + 'the intro is secondary 13/400 on one line: ' + JSON.stringify(look));
             assert.equal(look.more, 'About API keys', at + 'the encryption sentence is behind a disclosure');
             assert.equal(await ev(`(() => { const r = document.createRange(); r.selectNodeContents(document.querySelector('.servers-intro-more > summary')); return r.getClientRects().length; })()`), 1, at + 'the About API keys link stays on one line');
-            if (mobile) assert.equal(look.bar, 'Servers', at + 'the phone app bar names the view: ' + JSON.stringify(look));
+            if (mobile) assert.equal(look.bar, 'Computers', at + 'the phone app bar names the view: ' + JSON.stringify(look));
             const clipped = await ev(`[...document.querySelectorAll('table.dt-table tbody td.dt-td')].filter(td => td.getClientRects().length).filter(td => { const r = td.getBoundingClientRect(), edge = r.right - parseFloat(getComputedStyle(td).paddingRight); return [...td.querySelectorAll('*')].some(x => x.getClientRects().length && x.getBoundingClientRect().right > edge + 1); }).map(td => td.dataset.key + ': ' + td.textContent.trim().slice(0, 20))`); // an element wider than its cell runs into the next column
             assert.deepEqual(clipped, [], at + 'no cell content runs past its column (the longest status word, Unreachable, fits its column): ' + JSON.stringify(clipped));
             const seenOrder = async () => { await ev(`document.querySelector('table.dt-table thead th[data-key="seen"] .dt-sort').click(); true`); await new Promise(r => setTimeout(r, 150)); return ev(`[...document.querySelectorAll('table.dt-table tbody tr[data-key]')].map(r => r.dataset.key)`); }; // sleep-ok: the table redraws in a frame
@@ -109,17 +109,17 @@ const SERVERS = [
                 return { name: document.getElementById('servers-page-name').textContent.replace(/\\s+/g, ' ').trim(), back: document.getElementById('servers-back').textContent.trim(), focus: document.activeElement.id, buttons: b.map(x => x.textContent.trim()), remove: b.find(x => x.dataset.action === 'delete').classList.contains('btn-danger'), small: b.some(x => x.classList.contains('btn-small')), barBottomGap: Math.round(v.bottom - r.bottom),
                     facts: Object.fromEntries([...document.querySelectorAll('.servers-fact')].map(f => [f.querySelector('dt').textContent, f.querySelector('dd').textContent.replace(/\\s+/g, ' ').trim()])), error: (document.querySelector('.servers-row-error') || {}).textContent, table: !!document.querySelector('.servers-table'), overflow: document.documentElement.scrollWidth - innerWidth }; })()`);
             assert.match(p.name, /^LAN box lan/, at + 'the name and id');
-            assert.equal(p.back, '← Servers');
+            assert.equal(p.back, '← Computers');
             assert.equal(p.focus, 'servers-back', at + 'the focus goes to the way back');
             assert.deepEqual(p.buttons, ['Test', 'Edit', 'Remove'], at + 'the bar');
             assert.equal(p.remove, true, at + 'Remove is the danger button');
             assert.equal(p.small, false, at + 'the normal button size');
             assert.ok(p.barBottomGap <= 1, at + 'the bar is at the foot of the page: ' + p.barBottomGap);
             assert.equal(p.facts.URL, 'http://192.168.1.50:8420'); assert.match(p.facts['Last seen'] || '', /\S/, at + 'last seen, as it is not online (#9798: was Last contact)'); assert.equal(p.facts['Last contact'], undefined, at + 'one word for the one fact'); assert.equal(p.facts.Agents, '3 agents'); // the three live sessions seeded for LAN box (one waits for the person, one only by its hook: the Needs you column counts the first)
-            assert.match(p.error || '', /Is Coral running on that machine/, at + 'what to do about it');
+            assert.match(p.error || '', /Is Coral running on that computer/, at + 'what to do about it');
             assert.match(await ev(`(document.querySelector('.servers-row-warn') || {}).textContent || ''`), /key crosses the network unencrypted/, at + 'the server\'s own page keeps the warning in words (the sentence a narrow row only has as its name and title)');
             assert.equal(p.table, false, at + 'the table is not on the page');
-            assert.equal(await ev(`document.getElementById('servers-tab-title').checkVisibility()`), false, at + 'the page has no "Servers" title: its back link says it');
+            assert.equal(await ev(`document.getElementById('servers-tab-title').checkVisibility()`), false, at + 'the page has no "Computers" title: its back link says it');
             assert.ok(p.overflow <= 0, at + 'no sideways scroll');
             await shot(`servers-page-${w}`);
             ok(at + 'the page: facts, a way back, Test, Edit and Remove pinned at the foot, Remove the danger button');
