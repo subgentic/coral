@@ -30,7 +30,7 @@ const BASE = require('./test_base').BASE;
             const top = await ev(`${vis('.top-bar button, .top-bar a')}.map(b => ({ id: b.id, label: b.getAttribute('aria-label'), w: Math.round(b.getBoundingClientRect().width), h: Math.round(b.getBoundingClientRect().height) }))`);
             assert.deepEqual(top.map(b => b.id), ['top-menu-btn'], 'the top row is one button: ' + JSON.stringify(top));
             assert.ok(top[0].w >= 44 && top[0].h >= 44, 'a 44 px target: ' + JSON.stringify(top[0]));
-            assert.equal(await ev(`document.getElementById('top-menu-label').textContent`), 'Agents', 'it names the view');
+            await waitFor(`document.getElementById('top-menu-label').textContent === 'Inbox'`, 'the button names the view it is on (the Inbox)', 6000); // it follows the switch: it said Agents only because the read came before the redraw
             assert.equal(await ev(`${vis('#nav-select')}.length`), 0, 'the view dropdown is inside it');
             await shot('top-menu-closed-390');
             // 2. its menu
