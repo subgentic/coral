@@ -176,6 +176,8 @@ var joinSites = map[string]joinEntry{
 	"internal/executil/editor.go\tEditor.macApp":                                             {1, joinOwn, "a fixed or program-made name in its own folder"},
 	"internal/executil/editor.go\teditorCommand":                                             {1, joinOwn, "a fixed or program-made name in its own folder"},
 	"internal/gitutil/gitutil.go\tResolveGitRoot":                                            {1, joinFixed, "names from a directory listing or numbers and hashes the program makes"},
+	"internal/installrestart/installrestart_windows.go\tfolderUnder":                         {1, joinOwn, "the product's folder name (Coral, or Coral and one word: productNameRe) taken from the running program's own install folder, below the user's Local AppData; the mark's names are constants opened relative to a handle"},
+	"internal/installrestart/installrestart_windows.go\tproductDir":                          {1, joinID, "the product name is checked with productNameRe (Coral, or Coral and one word) before any path is built, and the join is below the user's Local AppData; the installer's helper is told it by a constant of the build (--product), never by a property"},
 	"internal/hooks/cache.go\tTaskCacheWrite":                                                {1, joinOwn, "taskCacheName: a validated task id"},
 	"internal/hooks/cache.go\topenCacheFile":                                                 {1, joinOwn, "taskCacheName: a validated task id"},
 	"internal/hooks/cache.go\tpruneTaskCache":                                                {1, joinOwn, "taskCacheName: a validated task id"},

@@ -17,3 +17,11 @@ const (
 	elevatedInstallerNoteTitle = "Coral"
 	elevatedInstallerNote      = "Coral is installed, but it was not started: the installer was run as administrator, and Coral does not start with administrator rights.\n\nOpen Coral from the Start Menu."
 )
+
+// startTakesInstallMark says whether this run of coral-tray takes the install's restart mark (internal/installrestart): every start of
+// Coral does, however it was started (the Finish page's Launch Coral with the from-installer flag, Explorer's unelevated start after an
+// elevated install, which passes no flag, the Start Menu), so a mark is never left behind to start a Coral the person has quit at the
+// next quiet install (#155). A --stop or the tray's own server child is not a start of Coral.
+func startTakesInstallMark(stop, serverChild bool) bool {
+	return !stop && !serverChild
+}

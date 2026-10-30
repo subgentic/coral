@@ -8,6 +8,8 @@ census holds the two together:
   - the build tags are the release's own default (resolve_release.sh: build_tags=fts5);
   - the GUI programs (cgo, -H windowsgui) are exactly gui_commands.txt in both builds, each with the same tags (coral-app
     adds "webview"), and windows-tests reads that list from the file rather than spelling it;
+  - the MSI's custom-action helper (coral-msi-helper, not in the package) is a GUI program too, in both builds and in
+    tools/build_windows.ps1, so no install flashes a console window;
   - windows-tests reads the other programs from commands.txt, and both builds compile them with cgo off;
   - the same GOOS/GOARCH, strip flags and Version flag, and the same bundle check after the build.
 
@@ -19,6 +21,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+HELPER = "coral-msi-helper"
 
 
 def program_list(path):
@@ -93,8 +96,15 @@ def check(wt, rel, resolve, commands, gui, local=None):
         errs.append("windows-tests must read its programs from tests/release/commands.txt")
 
     wt_b, rel_b = go_builds(wt_step), go_builds(rel_step)
-    wt_gui = {c: v for c, v in wt_b.items() if v[1]}
-    rel_gui = {c: v for c, v in rel_b.items() if v[1]}
+    # The MSI's custom-action helper is built beside bin\, never shipped in it, and is a GUI program too (cgo off): Windows Installer runs a
+    # custom action's program as it is, so a console one flashes a console window at every install (#345, QA's tripwire: MSI4E1B.tmp's conhost).
+    for name, b in (("windows-tests", wt_b), ("release.yml", rel_b)):
+        if not b.get(HELPER, (None, False))[1]:
+            errs.append(f"{name} does not build {HELPER} with -H windowsgui: each custom action would flash a console window")
+    if local is not None and not re.search(r'(?m)^\s*go build\s[^\n]*-ldflags "[^"]*-H windowsgui[^"]*"[^\n]*coral-msi-helper\.exe', local):
+        errs.append(f"tools/build_windows.ps1 does not build {HELPER} with -H windowsgui")
+    wt_gui = {c: v for c, v in wt_b.items() if v[1] and c != HELPER}
+    rel_gui = {c: v for c, v in rel_b.items() if v[1] and c != HELPER}
     for name, got in (("windows-tests", wt_gui), ("release.yml", rel_gui)):
         if sorted(got) != sorted(gui):
             errs.append(f"{name} builds the GUI programs {sorted(got)} with -H windowsgui; gui_commands.txt lists {sorted(gui)}")
@@ -184,6 +194,8 @@ def main():
         ("release.yml drops coral-app's webview tag", lambda w, r, g: (w, r.replace("$webviewTags = \"webview,$buildTags\"", "$webviewTags = \"$buildTags\""), g)),
         ("windows-tests drops the webview tag", lambda w, r, g: (w.replace('-tags "webview,$buildTags"', "-tags $buildTags"), r, g)),
         ("windows-tests drops -H windowsgui from the tray", lambda w, r, g: (w.replace('-ldflags "-H windowsgui $ldflags" -o "..\\dist\\windows\\bin\\coral-tray.exe"', '-ldflags "$ldflags" -o "..\\dist\\windows\\bin\\coral-tray.exe"'), r, g)),
+        ("release.yml builds the MSI helper as a console program", lambda w, r, g: (w, r.replace('-ldflags "-H windowsgui $ldflags" -o "..\\dist\\windows\\coral-msi-helper.exe"', '-ldflags "$ldflags" -o "..\\dist\\windows\\coral-msi-helper.exe"'), g)),
+        ("windows-tests builds the MSI helper as a console program", lambda w, r, g: (w.replace('-ldflags "-H windowsgui $ldflags" -o "..\\dist\\windows\\coral-msi-helper.exe"', '-ldflags "$ldflags" -o "..\\dist\\windows\\coral-msi-helper.exe"'), r, g)),
         ("release.yml drops the bundle check", lambda w, r, g: (w, r.replace("verify_standard_bundle.ps1", "x.ps1"), g)),
         ("release.yml builds the MSI as a 32-bit package", lambda w, r, g: (w, r.replace("-arch x64 ", ""), g)),
         ("windows-tests builds the MSI as a 32-bit package", lambda w, r, g: (w.replace("-arch x64 ", ""), r, g)),
@@ -205,6 +217,7 @@ def main():
             errs.append(f"the census did not notice: {name}")
             print("FAIL: the census did not notice:", name)
     local_mutations = [
+        ("build_windows.ps1 builds the MSI helper as a console program", lambda s: s.replace('-ldflags "-s -w -H windowsgui" -o (Join-Path $BuildDir "coral-msi-helper.exe")', '-ldflags "-s -w" -o (Join-Path $BuildDir "coral-msi-helper.exe")')),
         ("build_windows.ps1 builds a program without the overlay", lambda s: s.replace(" -overlay $overlay", "", 1)),
         ("build_windows.ps1 keeps the overlay folder's inherited rights", lambda s: s.replace("/inheritance:r", "/inheritance:e")),
         ("build_windows.ps1 does not give strip-static its folder", lambda s: s.replace("-out $overlayDir", "")),
