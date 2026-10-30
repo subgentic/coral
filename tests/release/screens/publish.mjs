@@ -23,7 +23,7 @@ const bin = program => (process.env.SCREENS_BIN ? path.join(process.env.SCREENS_
 const log = (...a) => console.error('[publish]', ...a);
 
 function call(program, args, { allowFail = false } = {}) {
-    const r = spawnSync(bin(program), args.map(String), { encoding: 'utf8', timeout: 60000 });
+    const r = spawnSync(bin(program), args.map(String), { encoding: 'utf8', timeout: 60000, maxBuffer: 256 << 20 }); // a board's whole task list is big
     if (r.error) throw new Error(`${program}: ${r.error.message}`);
     if (r.status !== 0 && !allowFail) throw new Error(`${program} ${args.slice(0, 3).join(' ')}: ${(r.stderr || r.stdout || '').trim().split('\n')[0]}`);
     return r;

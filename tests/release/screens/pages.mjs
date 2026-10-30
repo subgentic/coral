@@ -37,7 +37,7 @@ export const PAGES = [
     { id: 'team-board', world: 'seeded', path: '/team/{team}/board' },
     { id: 'team-goal-page', world: 'seeded', path: '/team/{team}/goals/{goal}' },
     { id: 'team-task-page', world: 'seeded', path: '/team/{team}/tasks/{task}' },
-    { id: 'team-settings', world: 'seeded', open: 'teamSettings' },
+    { id: 'team-settings', world: 'seeded', open: 'teamSettings', widths: ['1440', '900'], notes: 'the popout of the team page\'s Settings button; a phone reaches it through the page\'s More menu, which this run does not open' },
     // The Inbox and its folders
     { id: 'inbox-needs', world: 'seeded', path: '/inbox/needs' },
     { id: 'inbox-saved', world: 'seeded', path: '/inbox/saved' },
