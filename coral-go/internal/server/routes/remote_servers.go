@@ -344,6 +344,10 @@ func (h *RemoteServersHandler) Update(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	if cur.Transport == store.RemoteTransportSSH {
+		h.updateSSH(w, r, cur, req)
+		return
+	}
 	upd := store.RemoteServerUpdate{AllowPrivate: req.AllowPrivate}
 	if req.Label != nil {
 		l := strings.TrimSpace(*req.Label)
@@ -439,7 +443,9 @@ func (h *RemoteServersHandler) Test(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var health RemoteHealth
-	if _, verr := validateRemoteURL(cur.URL, cur.AllowPrivate); verr != nil {
+	if cur.Transport == store.RemoteTransportSSH {
+		health = h.testSSH(r.Context(), cur, key)
+	} else if _, verr := validateRemoteURL(cur.URL, cur.AllowPrivate); verr != nil {
 		health = RemoteHealth{Status: store.RemoteStatusUnreachable, Err: verr.Error()}
 	} else {
 		health = CheckRemoteHealth(r.Context(), cur.URL, key, cur.AllowPrivate, h.healthTimeout)

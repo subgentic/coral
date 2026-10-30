@@ -13,6 +13,7 @@ import (
 type RemoteResolver struct {
 	store    *store.RemoteServerStore
 	failures FailureSink
+	streams  sshStreams // the targets of the servers reached over SSH (#11370)
 }
 
 // FailureSink takes a failure the proxy saw (background.RemoteAgentHub). It
@@ -44,6 +45,13 @@ func (r *RemoteResolver) Resolve(ctx context.Context, id string) (proxy.Target, 
 			return proxy.HTTPTarget{}, proxy.ErrKeyUnreadable
 		}
 		return proxy.HTTPTarget{}, err
+	}
+	if rs.Transport == store.RemoteTransportSSH {
+		t, err := r.streams.get(rs, key)
+		if err != nil {
+			return proxy.HTTPTarget{}, err
+		}
+		return t, nil
 	}
 	return proxy.HTTPTarget{URL: rs.URL, APIKey: key, AllowPrivate: rs.AllowPrivate}, nil
 }

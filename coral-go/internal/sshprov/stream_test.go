@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -69,10 +70,10 @@ const streamKey = "remote-api-key-123"
 func TestStreamTargetReachesTheRemoteOverSSHWAndSendsTheKeyOnlyAsABearer(t *testing.T) {
 	var mu sync.Mutex
 	var seen http.Header
-	var seenPath string
+	var seenPath, seenHost string
 	remote := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		mu.Lock()
-		seen, seenPath = r.Header.Clone(), r.URL.Path
+		seen, seenPath, seenHost = r.Header.Clone(), r.URL.Path, r.Host
 		mu.Unlock()
 		io.WriteString(w, `{"status":"ok"}`)
 	}))
@@ -96,6 +97,9 @@ func TestStreamTargetReachesTheRemoteOverSSHWAndSendsTheKeyOnlyAsABearer(t *test
 	}
 	mu.Lock()
 	defer mu.Unlock()
+	if seenHost != "127.0.0.1:"+strconv.Itoa(portOf(t, remote)) {
+		t.Errorf("the remote saw Host %q; its own Host check accepts only its loopback address", seenHost)
+	}
 	if seen.Get("Authorization") != "Bearer "+streamKey || seenPath != "/api/health" {
 		t.Errorf("remote saw %v %q", seen, seenPath)
 	}

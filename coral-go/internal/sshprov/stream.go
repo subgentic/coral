@@ -64,6 +64,8 @@ func NewStreamTarget(r Runner, t Target, port int, apiKey string) (*StreamTarget
 	return &StreamTarget{r: r, target: t, port: port, apiKey: apiKey, slots: make(chan struct{}, streamCap)}, nil
 }
 
+func (s *StreamTarget) hostPort() string { return "127.0.0.1:" + strconv.Itoa(s.port) }
+
 func (s *StreamTarget) transport() *http.Transport {
 	s.once.Do(func() {
 		s.tr = &http.Transport{
@@ -83,14 +85,15 @@ func (s *StreamTarget) Close() { s.transport().CloseIdleConnections() }
 // RoundTrip implements hubproxy.Target.
 func (s *StreamTarget) RoundTrip(req *http.Request) (*http.Response, error) {
 	out := req.Clone(req.Context())
-	out.URL.Scheme, out.URL.Host, out.Host = "http", "coral-remote.invalid", "coral-remote.invalid"
+	host := s.hostPort() // the name the remote's own Host check accepts for itself: its loopback address and port (a made-up name is refused as DNS rebinding)
+	out.URL.Scheme, out.URL.Host, out.Host = "http", host, host
 	out.Header.Set("Authorization", "Bearer "+s.apiKey)
 	return s.transport().RoundTrip(out)
 }
 
 // DialWS implements hubproxy.Target.
 func (s *StreamTarget) DialWS(ctx context.Context, path, rawQuery string, protocols []string) (proxy.WSConn, error) {
-	u := url.URL{Scheme: "ws", Host: "coral-remote.invalid", RawPath: path, RawQuery: rawQuery}
+	u := url.URL{Scheme: "ws", Host: s.hostPort(), RawPath: path, RawQuery: rawQuery}
 	if dec, err := url.PathUnescape(path); err == nil {
 		u.Path = dec
 	}
