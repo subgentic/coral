@@ -55,7 +55,7 @@ const TEAM = `qa-team-${Date.now() % 100000}`;
                 const tabindexes = await ev(`window.__tp.tabs().map(t => t.tabIndex)`);
                 assert.deepEqual(tabindexes.filter(i => i === 0).length, 1, `exactly one tab is a tab stop (got ${JSON.stringify(tabindexes)})`);
                 await key('ArrowRight'); assert.equal(await focusedTab(), 'Agents', 'Right moves to Agents');
-                const last = mobile ? 'Artifacts' : 'Board'; // a phone's row ends at Artifacts (the first four tabs): the rest are behind More
+                const last = 'Board'; /* a phone's strip has every tab too (#11239 slice B): it ends at Board as a desktop's does */
                 await key('End'); assert.equal(await focusedTab(), last, `End moves to ${last}`);
                 await key('ArrowRight'); assert.equal(await focusedTab(), 'Goals', 'Right wraps to Goals');
                 await key('ArrowLeft'); assert.equal(await focusedTab(), last, `Left wraps to ${last}`);
