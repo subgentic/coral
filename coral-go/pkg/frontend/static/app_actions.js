@@ -52,7 +52,6 @@ const reshowJobModal = (...args) => loadedModule('./job_form.js')?.reshowJobModa
 let _agentBarMoreOff = null;
 const detailsCard = () => document.getElementById('agent-phone-details');
 function closeAgentBarMoreCard() { const d = detailsCard(); if (d) d.open = false; if (_agentBarMoreOff) { _agentBarMoreOff(); _agentBarMoreOff = null; } }
-document.addEventListener('coral:agentic-tab', () => closeAgentBarMoreCard()); // switchAgenticTab says another part of the agent page was opened
 function closeAgentBarMore() {
     const b = document.getElementById('agent-bar-more'), h = document.querySelector('#live-session-view .terminal-header');
     if (b) b.setAttribute('aria-expanded', 'false');
@@ -69,7 +68,8 @@ function openAgentBarMore(btn) {
     const key = e => { if (e.key === 'Escape') closeAgentBarMoreCard(); };
     document.addEventListener('click', outside, true);
     document.addEventListener('keydown', key, true);
-    _agentBarMoreOff = () => { document.removeEventListener('click', outside, true); document.removeEventListener('keydown', key, true); };
+    document.addEventListener('coral:agentic-tab', closeAgentBarMoreCard); // switchAgenticTab says another part of the agent page was opened; listened to only while the card is open (a startup listener is a startup cost)
+    _agentBarMoreOff = () => { document.removeEventListener('click', outside, true); document.removeEventListener('keydown', key, true); document.removeEventListener('coral:agentic-tab', closeAgentBarMoreCard); };
 }
 
 registerActions({
