@@ -1,11 +1,15 @@
 package routes
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/subgentic/coral/internal/jsonl"
 )
 
 // #11097: a row's last_message is the first 140 characters of the text, redacted like an excerpt, with the role and the time.
@@ -27,4 +31,20 @@ func TestLastMessageFieldIsCutAndRedacted(t *testing.T) {
 	f = lastMessageField(&lastMessageSource{Role: "user", Text: "my key is " + key + " ok"}, false)
 	assert.NotContains(t, f["text"], key, "a secret is redacted before it leaves, as in an excerpt")
 	assert.NotContains(t, f["text"], "aB3_x9Z-aB3_x9Z-", "none of it")
+}
+
+// #11354: a started agent's first reply is on its row at once. The list's row asks with whether the agent has reported an event; a transcript that was not there at the first poll is found at the next.
+func TestLastMessageRowFindsAFirstReplyAtOnceForAStartedAgent(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("CLAUDE_PROJECTS_DIR", dir)
+	sid := "11111111-0000-4000-8000-0000000000aa"
+	h := &SessionsHandler{jsonl: jsonl.NewSessionReader()}
+	assert.Nil(t, lastMessageRow(h, sid, "", "claude", false, false), "no transcript yet: \"No messages yet\"")
+	project := filepath.Join(dir, "proj")
+	require.NoError(t, os.MkdirAll(project, 0o755))
+	reply := `{"type":"assistant","timestamp":"2026-10-30T10:00:05.000Z","message":{"content":[{"type":"text","text":"Hi, ready."}]}}` + "\n"
+	require.NoError(t, os.WriteFile(filepath.Join(project, sid+".jsonl"), []byte(reply), 0o644))
+	f := lastMessageRow(h, sid, "", "claude", false, true)
+	require.NotNil(t, f, "the agent has reported an event: its first reply is the row's last message at the next poll, not 5 s later")
+	assert.Equal(t, "Hi, ready.", f["text"])
 }

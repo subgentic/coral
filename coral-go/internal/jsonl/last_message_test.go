@@ -262,3 +262,23 @@ func TestLastMessage_ReadsOnlyWhatWasAppended(t *testing.T) {
 	assert.Equal(t, "the very last", m.Text)
 	assert.LessOrEqual(t, bytesRead, int64(lastMessageTailMax)+int64(lastMessageTail), "never more than the bound")
 }
+
+// #11354 (Mobile Beta Tester, v2.0.9 phone walk): a row said "No messages yet" for about 5 s after the agent's first reply, because a session whose transcript was not there at one read was not looked for
+// again for lastMessagePathTTL. A session that has reported an event has a transcript or is about to: its miss is not remembered.
+func TestLastMessage_ATranscriptThatAppearsIsFoundAtOnceForAStartedSession(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("CLAUDE_PROJECTS_DIR", dir)
+	sid := "11111111-0000-4000-8000-000000000011"
+	project := filepath.Join(dir, "proj")
+	require.NoError(t, os.MkdirAll(project, 0o755))
+	r := NewSessionReader()
+	_, ok := r.LastMessageOf(sid, "", at.Claude, false)
+	require.False(t, ok, "no transcript yet")
+	line := `{"type":"assistant","timestamp":"2026-10-29T10:00:05.000Z","message":{"content":[{"type":"text","text":"Hello, I am ready."}]}}` + "\n"
+	require.NoError(t, os.WriteFile(filepath.Join(project, sid+".jsonl"), []byte(line), 0o644))
+	_, ok = r.LastMessageOf(sid, "", at.Claude, false)
+	assert.False(t, ok, "an agent that has reported nothing keeps its miss for the TTL: a list is not to look for every file of every starting agent on every poll")
+	m, ok := r.LastMessageOf(sid, "", at.Claude, true)
+	require.True(t, ok, "an agent that has reported an event is looked for again at once")
+	assert.Equal(t, "Hello, I am ready.", m.Text)
+}

@@ -770,11 +770,11 @@ func lastMessageField(m *lastMessageSource, _ bool) map[string]any {
 }
 
 // lastMessageOf reads a session's last message (cached by its file, see jsonl.LastMessage); nil when it has none.
-func (h *SessionsHandler) lastMessageOf(sessionID, workingDir, agentType string) map[string]any {
+func (h *SessionsHandler) lastMessageOf(sessionID, workingDir, agentType string, started bool) map[string]any {
 	if !lastMessageEnabled || h.jsonl == nil || sessionID == "" {
 		return nil
 	}
-	m, ok := h.jsonl.LastMessage(sessionID, workingDir, agentType)
+	m, ok := h.jsonl.LastMessageOf(sessionID, workingDir, agentType, started)
 	if !ok {
 		return nil
 	}
@@ -782,9 +782,9 @@ func (h *SessionsHandler) lastMessageOf(sessionID, workingDir, agentType string)
 }
 
 // lastMessageRow is lastMessageOf for a live row: on a first paint that skips the expensive reads (skipExpensive) only what an earlier read cached is used, so the list answers without opening a file.
-func lastMessageRow(h *SessionsHandler, sessionID, workingDir, agentType string, skipExpensive bool) map[string]any {
+func lastMessageRow(h *SessionsHandler, sessionID, workingDir, agentType string, skipExpensive, started bool) map[string]any {
 	if !skipExpensive {
-		return h.lastMessageOf(sessionID, workingDir, agentType)
+		return h.lastMessageOf(sessionID, workingDir, agentType, started)
 	}
 	if !lastMessageEnabled || h.jsonl == nil {
 		return nil
