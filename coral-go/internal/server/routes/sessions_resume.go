@@ -204,7 +204,7 @@ func (h *SessionsHandler) resumeCommand(ctx context.Context, p *restartPlan, age
 	if permMode == "" {
 		permMode = setreg.Enum(userSettings, "default_permission_mode")
 	}
-	cliPath, cerr := agent.LaunchCLI(userSettings, p.agentType) // a broken cli_path_<agent> refuses the resume (#115)
+	cliPath, cerr := agent.LaunchCLIScreened(userSettings, p.agentType, h.commonPlaceScreen(ctx)) // a broken cli_path_<agent> refuses the resume (#115)
 	if cerr != nil {
 		refuse, _ := cliPathRefusal(ctx, cerr)
 		return "", refuse

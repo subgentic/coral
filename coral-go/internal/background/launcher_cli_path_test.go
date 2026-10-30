@@ -97,6 +97,7 @@ func TestLaunchAgentWithNoTypeStillGetsItsLog(t *testing.T) {
 // the default port (:8420), so a server on any other port stored none of its events (an open permission box showed as "working", "starting" never cleared).
 func TestScheduledAgentsAreLaunchedWithThisServersEnvironment(t *testing.T) {
 	ctx := context.Background()
+	cliStubsOnPath(t, "claude", "codex")
 	for _, agentType := range []string{at.Claude, at.Codex} {
 		rt := &spawnRecorder{}
 		l := NewAgentLauncher(rt, store.NewSessionStore(setupTestDB(t)), 8450)
@@ -164,6 +165,7 @@ func (s *stampRecorder) SpawnAgent(_ context.Context, _, _, _, _ string) error {
 // apart (agent.SharedHomeStartGap); the other agents start at once as before.
 func TestCodexRunsFiredTogetherAreStartedApart(t *testing.T) {
 	ctx := context.Background()
+	cliStubsOnPath(t, at.Codex, at.Claude) // a launch with no cli_path is refused when its CLI is found nowhere (#353): this machine need not have either installed
 	defer func(g time.Duration) { agent.SharedHomeStartGap = g; agent.SetStartStagger(false) }(agent.SharedHomeStartGap)
 	agent.SetStartStagger(true)
 	agent.SharedHomeStartGap = 400 * time.Millisecond
@@ -204,6 +206,7 @@ func TestAPiJobIsLaunchedWithoutTrustingTheRepository(t *testing.T) {
 
 	rt := &spawnRecorder{}
 	l := NewAgentLauncher(rt, store.NewSessionStore(setupTestDB(t)), 8450)
+	cliStubsOnPath(t, "pi") // a launch refuses a CLI found nowhere (#353)
 	_, err := l.LaunchAgent(context.Background(), t.TempDir(), at.Pi, "job", "", jobLaunchFlags(store.ScheduledJob{AgentType: at.Pi}), true, "p", "", "")
 	require.NoError(t, err)
 	rt.mu.Lock()
@@ -211,4 +214,45 @@ func TestAPiJobIsLaunchedWithoutTrustingTheRepository(t *testing.T) {
 	require.Len(t, rt.commands, 1)
 	assert.Contains(t, rt.commands[0], "--no-approve", rt.commands[0])
 	assert.Contains(t, rt.commands[0], "--session-dir", "and the session is kept for the chat")
+}
+
+// #353: a job or scheduled run whose CLI is found nowhere is refused with the same error a launch gives, and spawns nothing: the bare name would be typed and the shell would answer
+// "codex is not recognized".
+func TestJobRunWithNoCLIAnywhereIsRefusedAndSpawnsNothing(t *testing.T) {
+	ctx := context.Background()
+	db := setupTestDB(t)
+	ss := store.NewSessionStore(db)
+	rt := &spawnRecorder{}
+	l := NewAgentLauncher(rt, ss, 8450)
+	t.Setenv("PATH", t.TempDir())
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("LOCALAPPDATA", t.TempDir())
+	t.Setenv("APPDATA", t.TempDir())
+	prev := agent.UntrustedMountDir
+	agent.UntrustedMountDir = func(string) (string, bool) { return "", false }
+	t.Cleanup(func() { agent.UntrustedMountDir = prev })
+
+	_, err := l.LaunchAgent(ctx, t.TempDir(), at.Codex, "job", "", nil, true, "p", "", "")
+	var nf *agent.CLINotFoundError
+	require.ErrorAs(t, err, &nf)
+	assert.Contains(t, err.Error(), "codex CLI not found")
+	rt.mu.Lock()
+	defer rt.mu.Unlock()
+	assert.Empty(t, rt.commands, "nothing was spawned")
+}
+
+// cliStubsOnPath puts a harmless program for each name alone on PATH: a launch with no cli_path finds its CLI there, and is refused when there is none (#353).
+func cliStubsOnPath(t *testing.T, names ...string) {
+	t.Helper()
+	dir := t.TempDir()
+	for _, n := range names {
+		file, body := n, "#!/bin/sh\nexit 0\n"
+		if runtime.GOOS == "windows" {
+			file, body = n+".cmd", "@exit /b 0\r\n"
+		}
+		require.NoError(t, os.WriteFile(filepath.Join(dir, file), []byte(body), 0o755))
+	}
+	t.Setenv("PATH", dir)
 }

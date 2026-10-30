@@ -100,7 +100,7 @@ func (h *SessionsHandler) prepareWake(ctx context.Context, ls *store.LiveSession
 	if serr != nil { // never wake the agent on the CLI found on PATH (#4350)
 		return nil, serr
 	}
-	cliPath, err := agent.LaunchCLI(userSettings, ls.AgentType) // a broken cli_path_<agent> refuses the wake (#115)
+	cliPath, err := agent.LaunchCLIScreened(userSettings, ls.AgentType, h.commonPlaceScreen(ctx)) // a broken cli_path_<agent> refuses the wake (#115)
 	if err != nil {
 		return nil, err
 	}

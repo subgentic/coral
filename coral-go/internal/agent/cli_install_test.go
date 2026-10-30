@@ -171,6 +171,9 @@ func TestAgyInLocalBinIsFoundWithoutPathAndConfiguredPathsStayClosed(t *testing.
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
 	t.Setenv("PATH", t.TempDir())
+	// A CLI in a temp folder is not picked up from a common place (#353), and this home is a test folder: the system temp folder is another one for this test, so the
+	// home is not inside it. (Unix reads TMPDIR; Windows skips this test.)
+	t.Setenv("TMPDIR", t.TempDir())
 	if runtime.GOOS == "windows" {
 		t.Skip("the installer is for macOS and Linux")
 	}

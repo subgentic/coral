@@ -181,7 +181,7 @@ func FindCLIForLaunch(settings map[string]string, agentType string) (string, err
 	if p, err := exec.LookPath(bin); err == nil {
 		return p, nil
 	}
-	if p := FindCLIInCommonPaths(bin); p != "" {
+	if p := CommonPlaceCLI(bin, nil); p != "" {
 		return p, nil
 	}
 	return "", fmt.Errorf("%s CLI %q not found: install it or set its path in Settings > CLI paths", agentType, bin)
@@ -189,11 +189,16 @@ func FindCLIForLaunch(settings map[string]string, agentType string) (string, err
 
 // LaunchCLI is the program a restart, resume, wake or background launch runs for agentType (#115). A configured cli_path_<type> must be
 // usable: FindCLI's answer, so one that can't be run is an error naming the setting and the path, never a silent fall back to whatever agent
-// CLI is first on PATH. With none configured it is the absolute path exec.LookPath finds (which refuses the current folder), rather than
-// a bare name that is looked up again, in the agent's shell, when it runs; when nothing is found it is "" and the launch line keeps the bare
-// name, as before (the launch route itself reports a missing CLI). An agent type with no CLI of its own (a plain terminal) gets whatever
-// is configured, unchecked.
+// CLI is first on PATH. With none configured it is the absolute path exec.LookPath finds (which refuses the current folder), else the one
+// in the common install places, rather than a bare name that is looked up again, in the agent's shell, when it runs. When nothing is found
+// it is a *CLINotFoundError, as a new launch answers it (resolveLaunchCLI): the launch line never types a bare name the shell will not
+// recognise ("codex is not recognized", #353). An agent type with no CLI of its own (a plain terminal) gets whatever is configured, unchecked.
 func LaunchCLI(settings map[string]string, agentType string) (string, error) {
+	return LaunchCLIScreened(settings, agentType, nil)
+}
+
+// LaunchCLIScreened is LaunchCLI with a screen for the common install places (CommonPlaceCLI): the routes pass the check that refuses an agent's working folder and Coral's data folder.
+func LaunchCLIScreened(settings map[string]string, agentType string, screen func(path string) string) (string, error) {
 	info := GetCLIInfo(agentType)
 	if info == nil || info.Binary == "" {
 		return ResolveCLIPath(settings, agentType), nil
@@ -201,14 +206,19 @@ func LaunchCLI(settings map[string]string, agentType string) (string, error) {
 	if ResolveCLIPath(settings, agentType) != "" {
 		return FindCLIForLaunch(settings, agentType)
 	}
-	if p, err := exec.LookPath(info.Binary); err == nil && filepath.IsAbs(p) {
+	if p, err := exec.LookPath(info.Binary); err == nil {
+		if abs, aerr := filepath.Abs(p); aerr == nil {
+			return abs, nil
+		}
+	}
+	if p := CommonPlaceCLI(info.Binary, screen); p != "" {
 		return p, nil
 	}
 	// Not found on PATH because a PATH folder is an untrusted mount point (Windows): the launch line's bare name would fail in the agent's shell the same way, so say why now (#340).
-	if dir, bad := UntrustedMountDir(info.Binary); bad && FindCLIInCommonPaths(info.Binary) == "" {
+	if dir, bad := UntrustedMountDir(info.Binary); bad {
 		return "", &CLIUntrustedMountError{AgentType: agentType, Binary: info.Binary, Dir: dir}
 	}
-	return "", nil
+	return "", &CLINotFoundError{AgentType: agentType, Binary: info.Binary, InstallCommand: info.InstallCommand, InstallURL: info.InstallURL}
 }
 
 // resolveBinary returns cliPath if non-empty, otherwise the default binary name.

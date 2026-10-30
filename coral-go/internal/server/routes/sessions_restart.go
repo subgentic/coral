@@ -401,7 +401,7 @@ func (h *SessionsHandler) restartCommand(ctx context.Context, p *restartPlan) (s
 	if permMode == "" {
 		permMode = setreg.Enum(userSettings, "default_permission_mode")
 	}
-	cliPath, cerr := agent.LaunchCLI(userSettings, p.agentType) // a broken cli_path_<agent> refuses the restart (#115)
+	cliPath, cerr := agent.LaunchCLIScreened(userSettings, p.agentType, h.commonPlaceScreen(ctx)) // a broken cli_path_<agent> refuses the restart (#115)
 	if cerr != nil {
 		refuse, _ := cliPathRefusal(ctx, cerr)
 		return "", refuse
