@@ -287,6 +287,7 @@ var routeTable = cat(
 	// (the artifact's name quoted as cleaned data), "changes" only records the state (the comment itself is the comment route above; its send to an agent stays unlisted). The OWNER's alone: a guest or a grantee is refused
 	// by the machine before the handler runs. Interact, as a comment is: it moves no work and runs nothing.
 	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/board/{project}/artifacts/{id}/review")),
+	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/board/{project}/operator-artifacts", "/api/board/{project}/operator-artifacts/message")), // a file the Operator shares with an agent (#11376)
 	// Saved for later (#4510) is the OWNER's alone through the hub (#5753, Shared Inbox, Security's condition 3): the list holds the bookmarks of the owner's chats, and the whole
 	// message of a bookmark (the text of its source, redacted and cut to 64 KiB; the source is the stored bookmark's, never a ref from the request) is read from its own route. The
 	// changes (POST, PATCH, DELETE) stay as they were (Interact).

@@ -610,6 +610,10 @@ func (c *uploadDirCache) merge(items []teamArtifact, coralDir string, sessions m
 				p := producer
 				item.ProducedBy = &p
 			}
+			if u.rec.Source == sourceOperatorShare { // a file the Operator shared with the agent is the Operator's, not the agent's (#11376)
+				op := board.OperatorName
+				item.ProducedBy = &op
+			}
 			items = append(items, item)
 			added = true
 		}

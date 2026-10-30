@@ -329,6 +329,11 @@ var errStoreFull = errors.New("artifact store is full")
 // storeArtifact). An object that is already stored makes it a free duplicate. It refuses a new
 // object that would take the store past its cap. fresh reports whether the object is new.
 func storeArtifactFile(coralDir, sessionID, name, mediaType, tmpPath, hexID string, size int64, stamp *seriesStamp, taskID int64) (agentArtifactMeta, bool, error) {
+	return storeArtifactFileAs(coralDir, sessionID, name, mediaType, tmpPath, hexID, size, stamp, taskID, nil)
+}
+
+// storeArtifactFileAs is storeArtifactFile with a say in the upload record: `shape` (nil for an agent's own upload) changes it before it is written (the Operator's share, which names the Operator as its uploader).
+func storeArtifactFileAs(coralDir, sessionID, name, mediaType, tmpPath, hexID string, size int64, stamp *seriesStamp, taskID int64, shape func(*agentUploadRecord)) (agentArtifactMeta, bool, error) {
 	defer lockArtifact(hexID)()
 	mine := agentArtifactMeta{Name: name, MediaType: mediaType, Size: size, Digest: "sha256:" + hexID}
 	st := storeFor(coralDir)
@@ -361,6 +366,9 @@ func storeArtifactFile(coralDir, sessionID, name, mediaType, tmpPath, hexID stri
 	if up := uploadsDir(coralDir, sessionID); up != "" {
 		if os.MkdirAll(up, 0o700) == nil {
 			ur := newUploadRecord(mine, sessionID, "", "")
+			if shape != nil {
+				shape(&ur)
+			}
 			if stamp != nil { // a version of a series: the record says which (#6357)
 				ur.SeriesID, ur.Version, ur.Previous = stamp.ID, stamp.Version, stamp.Previous
 			}
