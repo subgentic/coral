@@ -68,9 +68,12 @@ function findChrome() {
         // so wait on the live list rather than on rows).
         await waitFor(`(async () => { const { state } = await import((window.__coralStatic || '/static/') + 'state.js'); const have = new Set((state.liveSessions || []).map(s => s.session_id)); return ${JSON.stringify(ids)}.every(id => have.has(id)); })()`, 'agents in the dashboard list');
         // The folder group's menu item is a registered action since #3645 (no inline onclick): data-on-click="group-kill",
-        // with the group in data-group.
-        const button = `[...document.querySelectorAll('#live-sessions-list [data-on-click="group-kill"]')].find(b => b.dataset.group === ${JSON.stringify(folder)})`;
-        await waitFor(`!!${button}`, `the "${folder}" group's Kill all`);
+        // with the group in data-group. The headless window is narrow, so the dashboard shows its phone layout, where the same list is #mobile-session-list (#4497).
+        const button = `[...document.querySelectorAll('#live-sessions-list [data-on-click="group-kill"], #mobile-session-list [data-on-click="group-kill"]')].find(b => b.dataset.group === ${JSON.stringify(folder)})`;
+        await waitFor(`!!${button}`, `the "${folder}" group's Kill all`).catch(async e => { // say what the list does show: a changed group key or a list that did not render reads differently
+            const seen = await ev(`JSON.stringify({ groups: [...document.querySelectorAll('[data-on-click="group-kill"]')].map(b => b.dataset.group), list: !!document.getElementById('live-sessions-list'), rows: document.querySelectorAll('#live-sessions-list > *').length })`);
+            throw Error(`${e.message}; the page has ${seen}`);
+        });
         await ev(`${button}.click(); true`);
         await waitFor(`getComputedStyle(document.getElementById('confirm-modal')).display !== 'none'`, 'the confirm dialog', 5000);
         const confirm = await ev(`document.getElementById('confirm-modal-message').textContent`);
