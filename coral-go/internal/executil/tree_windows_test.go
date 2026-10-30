@@ -179,8 +179,7 @@ func TestKillEndsTheShimAndItsChild(t *testing.T) {
 
 // A process id reused between the finding and the kill is not ended: the creation time is read again on the handle that terminates.
 func TestTerminateSkipsAProcessThatIsNotTheOneFound(t *testing.T) {
-	cmd := exec.Command("ping", "-n", "30", "127.0.0.1")
-	HideWindow(cmd)
+	cmd := Command(context.Background(), "ping", "-n", "30", "127.0.0.1") // hidden, as every console program in these tests (the consoletest lint)
 	require.NoError(t, cmd.Start())
 	defer func() { _ = cmd.Process.Kill(); _ = cmd.Wait() }()
 	pid := uint32(cmd.Process.Pid)
