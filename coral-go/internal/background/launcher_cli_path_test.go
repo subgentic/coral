@@ -165,6 +165,7 @@ func (s *stampRecorder) SpawnAgent(_ context.Context, _, _, _, _ string) error {
 // apart (agent.SharedHomeStartGap); the other agents start at once as before.
 func TestCodexRunsFiredTogetherAreStartedApart(t *testing.T) {
 	ctx := context.Background()
+	cliStubsOnPath(t, at.Codex, at.Claude) // a launch with no cli_path is refused when its CLI is found nowhere (#353): this machine need not have either installed
 	defer func(g time.Duration) { agent.SharedHomeStartGap = g; agent.SetStartStagger(false) }(agent.SharedHomeStartGap)
 	agent.SetStartStagger(true)
 	agent.SharedHomeStartGap = 400 * time.Millisecond
