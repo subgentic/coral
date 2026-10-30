@@ -1,5 +1,4 @@
-// Two first-run leftovers from the phone check (#11304, Mobile Beta Tester's #11301 and #11257): the "Set a password" dialog has no empty gap between the Password and the Confirm fields (the strength advice sits under both,
-// its room kept so nothing jumps), at 390 and 320 px, 100% and 200% text, light and dark; and in the Change password form of Settings too.
+// Two first-run leftovers from the phone check (#11304, Mobile Beta Tester's #11301 and #11257): the "Set a password" dialog has no empty gap between the Password and the Confirm fields (the strength advice sits under both fields and holds no room until something is typed), at 390 and 320 px, 100% and 200% text, light and dark; and in the Change password form of Settings too.
 // Drives Chrome over CDP through agent_view_harness.js against an isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -17,9 +16,16 @@ const BASE = require('./test_base').BASE;
             await ev(`document.documentElement.style.fontSize = '${fs}px'; document.documentElement.setAttribute('data-theme', '${theme}'); document.activeElement && document.activeElement.blur(); import((window.__coralStatic || '/static/') + 'password_ui.js').then(m => { m.showSetPasswordModal({ local: true }); return true; })`);
             await waitFor(`!!document.getElementById('set-password-modal') && !!document.getElementById('set-password-confirm')`, `${tag}: the dialog`, 8000);
             await new Promise(r => setTimeout(r, 300)); // sleep-ok: the dialog draws
-            const g = await ev(`(() => { const a = document.getElementById('set-password-new').closest('.pw-field'), c = document.getElementById('set-password-confirm').closest('.pw-field'), m = document.getElementById('set-password-strength').closest('.pw-strength'), ar = a.getBoundingClientRect(), cr = c.getBoundingClientRect(), mr = m.getBoundingClientRect(), fs = parseFloat(getComputedStyle(document.documentElement).fontSize); return { gap: Math.round(cr.top - ar.bottom), em: fs, meterAfterConfirm: mr.top >= cr.bottom - 1, order: [...document.querySelectorAll('#set-password-form > *')].map(e => e.className || e.tagName).join('|') }; })()`);
+            const g = await ev(`(() => { const a = document.getElementById('set-password-new').closest('.pw-field'), c = document.getElementById('set-password-confirm').closest('.pw-field'), m = document.getElementById('set-password-strength').closest('.pw-strength'), ar = a.getBoundingClientRect(), cr = c.getBoundingClientRect(), mr = m.getBoundingClientRect(), fs = parseFloat(getComputedStyle(document.documentElement).fontSize); return { gap: Math.round(cr.top - ar.bottom), em: fs, meterAfterConfirm: !!(c.compareDocumentPosition(m.closest('.pw-strength')) & Node.DOCUMENT_POSITION_FOLLOWING), order: [...document.querySelectorAll('#set-password-form > *')].map(e => e.className || e.tagName).join('|') }; })()`);
             if (!(g.gap >= 0 && g.gap <= Math.round(g.em * 1.5))) problems.push(`${tag}: ${g.gap} px between the Password field and Confirm (normal spacing is under ${Math.round(g.em * 1.5)}): ${g.order}`);
             if (!g.meterAfterConfirm) problems.push(`${tag}: the strength advice is under the Confirm field, not between the two`);
+            // nothing typed: the advice holds no room; typing brings it
+            const idle = await ev(`Math.round(document.getElementById('set-password-strength').closest('.pw-strength').getBoundingClientRect().height)`);
+            if (idle !== 0) problems.push(`${tag}: the empty advice holds ${idle} px under Confirm (it holds none until there is something to say)`);
+            await ev(`(() => { const i = document.getElementById('set-password-new'); i.focus(); i.value = 'abc'; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
+            await new Promise(r => setTimeout(r, 200)); // sleep-ok: the advice is drawn on the input event
+            const shown = await ev(`Math.round(document.getElementById('set-password-strength').closest('.pw-strength').getBoundingClientRect().height)`);
+            if (!(shown > 0)) problems.push(`${tag}: the advice appears once a password is typed (it is ${shown} px)`);
             await ev(`document.getElementById('set-password-later').click(); true`);
         }
     } finally { await client.close(); }
