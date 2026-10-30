@@ -13,6 +13,9 @@ import (
 // wait changes. Operator-only (an agent's token is refused: the route is in the census as b), and only for a request of the agent's own kinds, never a sign-in or a launch prompt.
 // POST /api/sessions/live/{name}/dismiss-wait
 func (h *SessionsHandler) DismissWait(w http.ResponseWriter, r *http.Request) {
+	if refuseNonOwner(w, r) { // through Coral Hub the owner's alone: a guest or a grantee gets 403 owner_only (the operator's rule)
+		return
+	}
 	name := chi.URLParam(r, "name")
 	var body struct {
 		SessionID string `json:"session_id"`
