@@ -60,5 +60,21 @@ func (h *ActivityHandler) Activity(w http.ResponseWriter, r *http.Request) {
 		errInternalServer(w, "the activity read failed")
 		return
 	}
+	// The recording of #11225, in the same read: the Operator's touches (a table of their own: kind, agent, team, time) and the messages per task. A part that cannot be read is left out, and the tab
+	// says "not recorded yet" for it.
+	if t, err := h.bs.OperatorTouches(r.Context(), team, since.Format(time.RFC3339), until.Format(time.RFC3339)); err != nil {
+		slog.Error("activity touches read failed", "error", err)
+	} else {
+		a.Touches = t
+	}
+	if tm, truncated, err := h.bs.TaskMessageCounts(r.Context(), team, since.Format(time.RFC3339), until.Format(time.RFC3339)); err != nil {
+		slog.Error("activity task messages read failed", "error", err)
+	} else {
+		if tm == nil {
+			tm = []board.TaskMessages{}
+		}
+		a.TaskMessages = &tm
+		a.Truncated = a.Truncated || truncated
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"range": rng, "generated_at": now.Format(time.RFC3339), "activity": a})
 }

@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"github.com/subgentic/coral/internal/operatortouch"
 	"log/slog"
 	"net/http"
 	"path/filepath"
@@ -37,10 +38,11 @@ type BoardHandler struct {
 	bs                            *board.Store
 	terminal                      ptymanager.SessionTerminal
 	mu                            sync.RWMutex
-	paused                        map[string]bool      // in-memory set of paused project names
-	sleepPaused                   map[string]bool      // the paused boards whose pause sleep or Coral's restart put there, which auto-wake lifts (#286)
-	pauseMu                       sync.Mutex           // one pause change at a time, its check, maps and stored row together (Security on #119)
-	notifyFn                      func(project string) // triggers an immediate notification pass for project's board
+	paused                        map[string]bool         // in-memory set of paused project names
+	touches                       *operatortouch.Recorder // the Operator's touches, counted for the Analytics tab (#11225); nil: not recorded
+	sleepPaused                   map[string]bool         // the paused boards whose pause sleep or Coral's restart put there, which auto-wake lifts (#286)
+	pauseMu                       sync.Mutex              // one pause change at a time, its check, maps and stored row together (Security on #119)
+	notifyFn                      func(project string)    // triggers an immediate notification pass for project's board
 	coralDir                      string
 	alsoMu                        sync.Mutex    // serialises adding a later receipt to a received row (#4449)
 	autoAttach                    *AutoAttacher // #3515: an agent's linked images and Markdown
@@ -286,3 +288,6 @@ type relayCoarseLimits struct {
 	perTarget crossTeamLimiter
 	perSource crossTeamLimiter
 }
+
+// SetTouches gives the handler the recorder of the Operator's touches (#11225).
+func (h *BoardHandler) SetTouches(t *operatortouch.Recorder) { h.touches = t }

@@ -69,6 +69,9 @@ type Activity struct {
 	AgentPosts     int             `json:"agent_posts"`
 	AutomatedPosts int             `json:"automated_posts"`
 	CrossPosts     int             `json:"cross_posts"`
+	// Touches and TaskMessages are filled by the read's handler from the operator_touch table and the task windows (#11225): counts only. Absent (not an empty list) when they could not be read.
+	Touches      *Touches        `json:"touches,omitempty"`
+	TaskMessages *[]TaskMessages `json:"task_messages,omitempty"` // a pointer: an empty list is sent (no task was in progress), a read that failed is left out
 }
 
 type activityMsg struct {

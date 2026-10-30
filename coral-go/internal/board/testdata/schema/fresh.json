@@ -205,6 +205,12 @@
       "type": "index"
     },
     {
+      "name": "idx_operator_touch_team_at",
+      "sql": "CREATE INDEX idx_operator_touch_team_at ON operator_touch(team, at)",
+      "tbl_name": "operator_touch",
+      "type": "index"
+    },
+    {
       "name": "idx_task_deps_blocked_by",
       "sql": "CREATE INDEX idx_task_deps_blocked_by ON task_dependencies(blocked_by_task_id)",
       "tbl_name": "task_dependencies",
@@ -538,6 +544,12 @@
       "name": "hub_operator_actions",
       "sql": "CREATE TABLE hub_operator_actions (\n\t\tid       INTEGER PRIMARY KEY AUTOINCREMENT,\n\t\tat       TEXT NOT NULL,\n\t\thub_user TEXT NOT NULL,\n\t\tmethod   TEXT NOT NULL,\n\t\tpath     TEXT NOT NULL,\n\t\tproject  TEXT NOT NULL,\n\t\tstatus   INTEGER NOT NULL\n\t, hub_user_id TEXT NOT NULL DEFAULT '')",
       "tbl_name": "hub_operator_actions",
+      "type": "table"
+    },
+    {
+      "name": "operator_touch",
+      "sql": "CREATE TABLE operator_touch (\n\t\t\tid    INTEGER PRIMARY KEY AUTOINCREMENT,\n\t\t\tat    TEXT NOT NULL,\n\t\t\tkind  TEXT NOT NULL,\n\t\t\tteam  TEXT NOT NULL,\n\t\t\tagent TEXT NOT NULL\n\t\t)",
+      "tbl_name": "operator_touch",
       "type": "table"
     },
     {
@@ -4866,6 +4878,90 @@
         }
       ],
       "indexes": []
+    },
+    "operator_touch": {
+      "columns": [
+        {
+          "cid": 0,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "id",
+          "notnull": 0,
+          "pk": 1,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 1,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "at",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 2,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "kind",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 3,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "team",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 4,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "agent",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            {
+              "cid": 3,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "team",
+              "seqno": 0
+            },
+            {
+              "cid": 1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "at",
+              "seqno": 1
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 2
+            }
+          ],
+          "name": "idx_operator_touch_team_at",
+          "origin": "c",
+          "partial": 0,
+          "seq": 0,
+          "unique": 0
+        }
+      ]
     },
     "sqlite_sequence": {
       "columns": [

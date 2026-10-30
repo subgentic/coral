@@ -3,6 +3,7 @@ package routes
 import (
 	"context"
 	"fmt"
+	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/cloud"
 	"log/slog"
 	"net/http"
@@ -124,6 +125,10 @@ func (h *SessionsHandler) Keys(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// A person's Escape on its own is the Stop button: a touch of kind stop (#11225), recorded before the keys go so the keystroke is not also counted as typing.
+	if len(body.Keys) == 1 && body.Keys[0] == "Escape" {
+		h.touch(r, body.SessionID, board.TouchStop)
+	}
 	// The origin of the keys: a person's (the dashboard's, the operator's signed CLI) are Person, anything else goes through the gate as Coral's.
 	send := func(ctx context.Context, o terminalinput.Origin) error {
 		return h.terminal.SendRawInput(ctx, o, name, body.Keys, body.AgentType, body.SessionID)

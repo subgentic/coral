@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"github.com/subgentic/coral/internal/board"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -615,6 +616,7 @@ func (h *SessionsHandler) AnswerPrompt(w http.ResponseWriter, r *http.Request) {
 		writeExactTargetError(w, status, message)
 		return
 	}
+	h.touch(r, body.SessionID, board.TouchAnswer) // the Operator answers an agent's question (#11225): counted before the keys go, so a typed answer is not counted twice
 	// The agent's own terminal is gone: say so, rather than "the prompt changed" (#3211)
 	if body.SessionID != "" {
 		if pane, err := h.terminal.FindSession(r.Context(), name, body.AgentType, body.SessionID); err == nil && pane == nil {

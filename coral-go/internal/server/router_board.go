@@ -37,6 +37,7 @@ func (s *Server) configureBoardHandlers(h *routeHandlers) (*routes.BoardHandler,
 	sessHandler, teamsHandler := h.sess, h.teams
 	// Message board
 	boardHandler := routes.NewBoardHandler(s.boardStore)
+	boardHandler.SetTouches(s.touches) // the Operator's approval of a task is a touch (#11225); nil when the board store is not there
 	boardHandler.SetTerminal(s.terminal)
 	boardHandler.SetHubOperatorAllowed(func(r *http.Request) bool {
 		return s.cloudHandler != nil && s.cloudHandler.HubOperatorAllowed(r)
