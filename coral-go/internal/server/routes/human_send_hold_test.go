@@ -34,6 +34,7 @@ type holdRig struct {
 	sid  string
 	name string
 	post func(body string)
+	pre  func(body string) // the agent's PreToolUse hook: POST .../pending-tool
 	send func(text string) *httptest.ResponseRecorder
 }
 
@@ -53,6 +54,15 @@ func newHoldRig(t *testing.T, withSignals bool) *holdRig {
 	r.post = func(body string) {
 		body = strings.Replace(body, "{", `{"hooks_rev":`+strconv.Itoa(agent.ClaudeHooksRev)+`,`, 1)
 		req, _ := http.NewRequest("POST", server.URL+"/api/sessions/live/chat/events", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set(store.SessionTokenHeader, tok)
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		resp.Body.Close()
+		require.Equal(t, http.StatusOK, resp.StatusCode, body)
+	}
+	r.pre = func(body string) {
+		req, _ := http.NewRequest("POST", server.URL+"/api/sessions/live/chat/pending-tool", strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set(store.SessionTokenHeader, tok)
 		resp, err := http.DefaultClient.Do(req)

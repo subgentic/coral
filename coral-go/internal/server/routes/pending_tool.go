@@ -28,6 +28,9 @@ type pendingTool struct {
 	ToolName  string         `json:"tool_name"`
 	Input     map[string]any `json:"input"`
 	At        time.Time      `json:"at"`
+	// Wants is the line a PermissionRequest for this call would carry ("Wants to run: <command>", cleaned as the server stores it), so a request is tied only to the calls it is about (#11352); empty
+	// for a call whose input cannot be compared.
+	Wants string `json:"-"`
 }
 
 type pendingTools struct {
@@ -96,7 +99,7 @@ func (p *pendingTools) set(sessionID string, t pendingTool) {
 			}
 			delete(cs, oldest)
 		}
-		cs[t.ToolUseID] = pendingTool{ToolUseID: t.ToolUseID, ToolName: t.ToolName, At: t.At}
+		cs[t.ToolUseID] = pendingTool{ToolUseID: t.ToolUseID, ToolName: t.ToolName, At: t.At, Wants: t.Wants}
 	}
 }
 
@@ -112,12 +115,12 @@ func (p *pendingTools) callDone(sessionID, toolUseID string) {
 }
 
 // callsFor are the ids of the session's calls of tool still in flight that started within maxAge: the calls a permission request for tool may be about.
-func (p *pendingTools) callsFor(sessionID, tool string, now time.Time, maxAge time.Duration) []string {
+func (p *pendingTools) callsFor(sessionID, tool string, now time.Time, maxAge time.Duration, wants string) []string {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	var ids []string
 	for id, c := range p.calls[sessionID] {
-		if c.ToolName == tool && !c.At.IsZero() && now.Sub(c.At) <= maxAge {
+		if c.ToolName == tool && !c.At.IsZero() && now.Sub(c.At) <= maxAge && (wants == "" || c.Wants == "" || c.Wants == wants) { // a call whose input is not the request's is not what it waits for
 			ids = append(ids, id)
 		}
 	}
@@ -286,6 +289,7 @@ func (h *SessionsHandler) SetPendingTool(w http.ResponseWriter, r *http.Request)
 		ToolName:  body.ToolName,
 		Input:     trimPendingInput(body.ToolInput),
 		At:        time.Now(),
+		Wants:     wantsLineOf(body.ToolName, body.ToolInput),
 	}
 	h.pending.set(body.SessionID, t)
 	h.noteToolStart(r.Context(), body.SessionID, body.ToolName, body.ToolUseID, body.ToolInput)
@@ -378,22 +382,29 @@ func (h *SessionsHandler) noteToolStart(ctx context.Context, sessionID, toolName
 	h.kickFeedForRequestChange(sessionID, "request_resolved")
 }
 
-// startMatchesWants reports whether a call that starts (its tool and input) is what an open request's wants names: a Bash command whose "Wants to run: <command>" line, made as the hook makes it and
-// stored as the server stores it, is the request's own. Any other tool, an input without a command, or no wants is not a match: such a request stays open until it is answered or dismissed.
-func startMatchesWants(tool string, input map[string]any, wants string) bool {
-	if tool != "Bash" || wants == "" {
-		return false
+// wantsLineOf is the line a PermissionRequest for a call would carry, made as the hook makes it and cleaned as the server stores it: "Wants to run: <command>" for a Bash command. "" for any other tool or
+// an input without a command: nothing to compare.
+func wantsLineOf(tool string, input map[string]any) string {
+	if tool != "Bash" {
+		return ""
 	}
 	cmd, _ := input["command"].(string)
 	cmd = strings.TrimSpace(cmd)
 	if cmd == "" {
-		return false
+		return ""
 	}
 	if len(cmd) > 1<<10 { // the hook cuts one input to 1 KiB before the server cleans it
 		cmd = cmd[:1<<10]
 	}
 	line, _ := waitingLine("Wants to run: " + strings.ToValidUTF8(cmd, "")).(string)
-	return line != "" && line == wants
+	return line
+}
+
+// startMatchesWants reports whether a call that starts (its tool and input) is what an open request's wants names. Any other tool, an input without a command, or no wants is not a match: such a request
+// stays open until it is answered or dismissed.
+func startMatchesWants(tool string, input map[string]any, wants string) bool {
+	line := wantsLineOf(tool, input)
+	return wants != "" && line != "" && line == wants
 }
 
 // requestCallMaxAge is how recent a call's PreToolUse must be for a permission request to be about it.
@@ -417,7 +428,8 @@ func (h *SessionsHandler) tieRequestToItsCall(sessionID, tool string, detail any
 	delete(d, "tool_use_id")
 	delete(d, "call_ids")
 	if sessionID != "" && tool != "" {
-		if ids := h.pending.callsFor(sessionID, tool, time.Now(), requestCallMaxAge); len(ids) > 0 && len(ids) <= maxRequestCalls {
+		wants, _ := d["wants"].(string)
+		if ids := h.pending.callsFor(sessionID, tool, time.Now(), requestCallMaxAge, wants); len(ids) > 0 && len(ids) <= maxRequestCalls {
 			d["call_ids"] = ids
 		}
 	}
