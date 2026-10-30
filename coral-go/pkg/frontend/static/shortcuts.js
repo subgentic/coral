@@ -16,6 +16,7 @@ export const shortcutList = (mac = onMac()) => {
 
 // A row's keys as chips: "Cmd+P or Cmd+K" is two alternatives of two keys each. A bare Up or Down after "Option+Down or" is the same modifiers with the other arrow. A Mac shows its glyphs; any other computer the words.
 const GLYPH = { Cmd: '⌘', Option: '⌥', Shift: '⇧', Ctrl: '⌃', Down: '↓', Up: '↑', Escape: 'Esc' };
+const GLYPH_NAME = { '⌘': 'Command', '⌥': 'Option', '⇧': 'Shift', '⌃': 'Control', '↓': 'Down arrow', '↑': 'Up arrow' }; // a glyph has no name a screen reader says right: the command sign is read as a place of interest
 export const keyChips = (keys, mac = onMac()) => {
     const alts = [];
     for (const a of keys.split(' or ')) {
@@ -44,7 +45,14 @@ export function buildShortcuts(mac = onMac()) {
             const row = el('div', 'kbd-row'), dt = el('dt', 'kbd-keys');
             keyChips(keys, mac).forEach((combo, i) => {
                 if (i) dt.append(el('span', 'kbd-or', 'or'));
-                combo.forEach((k, n) => { if (n && !mac) dt.append(el('span', 'kbd-plus', '+')); dt.append(el('kbd', 'kbd-key', k)); });
+                const pair = el('span', 'kbd-combo'); // a key and its '+' stay on one line
+                combo.forEach((k, n) => {
+                    if (n && !mac) pair.append(el('span', 'kbd-plus', '+'));
+                    const kbd = el('kbd', 'kbd-key', k);
+                    if (GLYPH_NAME[k]) kbd.setAttribute('aria-label', GLYPH_NAME[k]);
+                    pair.append(kbd);
+                });
+                dt.append(pair);
             });
             row.append(dt, el('dd', 'kbd-what', what)); dl.append(row);
         }

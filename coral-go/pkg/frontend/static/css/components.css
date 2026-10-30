@@ -4135,7 +4135,7 @@ dialog.team-link-dialog::backdrop { background: rgba(var(--black-rgb), 0.5); }
 /* The persona step says "all optional" once, in its title (#10835): no tag on each field */
 #launch-modal[data-all-optional] .launch-optional { display: none; }
 
-/* Keyboard shortcuts (#11246): a list of keys beside what they do. The keys are <kbd> chips in the primary text colour on a subtle fill, the description is the secondary text colour in its own column, and a description that wraps stays under itself, never under the keys. */
+/* Keyboard shortcuts (#11246): a list of keys beside what they do. The keys are <kbd> chips in the accent text colour on a subtle fill, the description is the secondary text colour in its own column, and a description that wraps stays under itself, never under the keys. */
 .shortcuts-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .shortcuts-dialog .modal-body { padding-top: 4px; }
 .kbd-group { margin: 14px 0 6px; }
@@ -4143,9 +4143,9 @@ dialog.team-link-dialog::backdrop { background: rgba(var(--black-rgb), 0.5); }
 .kbd-list { margin: 0; }
 .kbd-row { display: grid; grid-template-columns: minmax(7.5rem, min(40%, 16rem)) 1fr; column-gap: 16px; align-items: baseline; padding: 6px 0; border-top: 1px solid var(--border); }
 .kbd-group .kbd-row:first-child { border-top: 0; }
-.kbd-keys { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 0; min-width: 0; }
+.kbd-keys { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin: 0; min-width: 0; }
+.kbd-combo { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
 .kbd-what { margin: 0; min-width: 0; color: var(--text-secondary); overflow-wrap: anywhere; }
-.kbd-key { display: inline-block; min-width: 1.6em; padding: 2px 6px; text-align: center; font-family: var(--font-mono); font-size: var(--fs-md); color: var(--text-primary); background: var(--bg-tertiary); border: 1px solid var(--border); border-bottom-width: 2px; border-radius: var(--radius-xs); }
+.kbd-key { display: inline-block; min-width: 1.6em; padding: 2px 6px; text-align: center; font-family: var(--font-mono); font-size: var(--fs-md); color: var(--link-text); background: var(--bg-tertiary); border: 1px solid var(--border); border-bottom-width: 2px; border-radius: var(--radius-xs); }
 .kbd-or, .kbd-plus { color: var(--text-secondary); font-size: var(--fs-sm); }
-.kbd-plus { margin: 0 -1px; }
-@media (max-width: 639px) { .shortcuts-dialog .modal-body { padding-inline: 0; } } /* the phone dialog already has its own side padding: the description column keeps the width */
+@media (max-width: 639px) { .shortcuts-dialog .modal-body { padding-inline: 0; } .kbd-row { grid-template-columns: 1fr; row-gap: 2px; } } /* a phone has no room for a key column beside the words: the keys sit above their description */ /* the phone dialog already has its own side padding: the description column keeps the width */
