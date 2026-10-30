@@ -85,6 +85,26 @@ function ensureRow() {
     return row;
 }
 
+/** Settings: what Coral did to make its data folder private (#295), there until it is acknowledged here or by dismissing its toast. */
+export async function renderSecurityNoticeRow() {
+    let message = '';
+    try { const r = await fetchSystemStatus({ fresh: true }); if (r.ok) message = (await r.json()).security_notice || ''; } catch { /* no row */ }
+    document.getElementById('settings-security-notice-row')?.remove();
+    const anchor = document.getElementById('settings-security');
+    if (!message || !anchor) return;
+    const row = el('div', 'settings-row'); row.id = 'settings-security-notice-row';
+    const dt = el('dt', 'toggle-dt'); dt.append(el('span', null, 'Data folder made private'));
+    const dd = el('dd');
+    const ok = el('button', 'btn btn-small', "I've read this"); ok.type = 'button';
+    ok.addEventListener('click', () => {
+        fetch('/api/system/security-notice/ack', { method: 'POST' }).catch(() => {});
+        row.remove(); document.getElementById('security-notice-toast')?.remove();
+    });
+    dd.append(el('p', 'settings-hint', message), ok);
+    row.append(dt, dd);
+    anchor.after(row);
+}
+
 /** Settings: the row for the warning, there while the warning is, so the toast can be dismissed for good. */
 export async function renderFirewallRow() {
     let message = '';
