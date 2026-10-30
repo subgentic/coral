@@ -274,3 +274,19 @@ func TestSessionAsleepLookupSaysAsleepEndedArchivedOrGone(t *testing.T) {
 	assert.True(t, look(ctx, "aaaaaaaa-0000-4000-8000-000000000002"), "asleep")
 	assert.True(t, look(ctx, "aaaaaaaa-0000-4000-8000-0000000000ff"), "gone")
 }
+
+// Mobile Beta Tester (live, d4c1ca8e0): an approved artifact's state line never showed in a viewer or a preview. The team list answers an approved artifact under ?tag=approved with its tags and its review.
+func TestTheListAnswersAnApprovedArtifactWithItsReviewTime(t *testing.T) {
+	e := newReviewEnv(t, true)
+	e.tag(t, `["for review"]`)
+	code, out := e.approve(t)
+	require.Equal(t, http.StatusOK, code, out)
+	code, list := e.call(t, http.MethodGet, "/api/board/alpha/artifacts?tag=approved&limit=200", "")
+	require.Equal(t, http.StatusOK, code, list)
+	rows, _ := list["artifacts"].([]any)
+	require.Len(t, rows, 1, "the approved artifact is listed under its tag: %v", list)
+	row := rows[0].(map[string]any)
+	assert.Equal(t, []any{"approved"}, row["tags"])
+	require.NotNil(t, row["review"], "with its review: %v", row)
+	assert.NotEmpty(t, row["review"].(map[string]any)["at"], "and the time")
+}

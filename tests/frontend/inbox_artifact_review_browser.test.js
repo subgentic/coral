@@ -155,6 +155,12 @@ const { coralReady } = require('./helpers/wait');
                 assert.ok(await ev(`!!(${row('Review file 01.txt')})`),'failed save keeps row');
                 await ev(`window.__reviewFail=false;[...(${row('Review file 01.txt')}).querySelectorAll('button')].find(b=>(b.getAttribute('aria-label')||'').startsWith('Approve')).click();true`);
                 await waitFor(`!(${row('Review file 01.txt')})`,'approved row removed');
+                if(width===1280){ // Mobile Beta Tester (live): the approved artifact's viewer says Approved with the time (it showed only the tag chip)
+                    await ev(`import((window.__coralStatic||'/static/')+'artifact_viewer.js').then(m=>m.openArtifactViewer('${(1).toString(16).padStart(64,'0')}',{filename:'Review file 01.txt',board:'${team}',server:undefined}));true`);
+                    await waitFor(`/^Approved .+/.test(document.querySelector('.artifact-review-state')?.textContent||'')`,'the viewer of an approved artifact says Approved with its time',8000);
+                    assert.equal(await ev(`document.querySelector('.artifact-review-approve').hidden&&document.querySelector('.artifact-review-changes').hidden`),true,'and offers no Approve');
+                    await ev(`document.querySelector('.artifact-viewer-close').click();true`);
+                }
                 assert.deepEqual(await ev(`window.__decisions.filter(d=>d.decision==='approve').map(d=>d.id)`),[(1).toString(16).padStart(64,'0')],'one approve was sent: the failed press and the second one are not two');
                 assert.equal(await ev(`document.getElementById('nav-tab-hub-inbox-badge').textContent`),'9+');
                 assert.match(await ev(`document.getElementById('nav-tab-hub-inbox').getAttribute('aria-label')`),/^Inbox, 12 /,'twelve left: the pill says 9+, the name says 12');
