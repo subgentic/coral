@@ -66,6 +66,12 @@ const lastMessageAnchor = 64
 // LastMessage is the newest message with text of a session's transcript, cached by the file's size and modification time: a list that polls every few seconds reads a file again only when it changed,
 // and then only its end. ok is false when the session has no transcript or no message yet.
 func (r *SessionReader) LastMessage(sessionID, workingDir, agentType string) (LastMessage, bool) {
+	return r.LastMessageOf(sessionID, workingDir, agentType, false)
+}
+
+// LastMessageOf is LastMessage for a session that may have reported an event (started): a session whose transcript was not found at one read is not looked for again for lastMessagePathTTL, unless it has started,
+// when it has a transcript or is about to (a row said "No messages yet" for 5 s after the agent's first reply, #11354).
+func (r *SessionReader) LastMessageOf(sessionID, workingDir, agentType string, started bool) (LastMessage, bool) {
 	if !transcriptlink.IsSessionID(sessionID) {
 		return LastMessage{}, false
 	}
@@ -83,7 +89,7 @@ func (r *SessionReader) LastMessage(sessionID, workingDir, agentType string) (La
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	if e.path == "" {
-		if !e.resolved.IsZero() && time.Since(e.resolved) < lastMessagePathTTL {
+		if !started && !e.resolved.IsZero() && time.Since(e.resolved) < lastMessagePathTTL {
 			return LastMessage{}, false
 		}
 		e.resolved = time.Now()

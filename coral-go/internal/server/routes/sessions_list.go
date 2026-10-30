@@ -533,7 +533,7 @@ func (h *SessionsHandler) agentRow(trace *phaseTrace, agent AgentInfo, lv liveIn
 		"sleeping":              lv.sleeping[sid],
 		"archived":              lv.archived[sid],
 		"first_prompt":          firstPrompt,
-		"last_message":          lastMessageRow(h, sid, agent.WorkingDir, agent.AgentType, skipExpensive), // {role, text, at} of the newest message, null at none (#11097)
+		"last_message":          lastMessageRow(h, sid, agent.WorkingDir, agent.AgentType, skipExpensive, startedEv(latestEv, d.started[sid]) != ""), // {role, text, at} of the newest message, null at none (#11097)
 		"enrichment_pending":    skipExpensive && !sleeping,
 	}
 	withDisplayActivityHint(entry, displayHint, displayHintAt)
@@ -665,7 +665,7 @@ func (h *SessionsHandler) sleepingRows(allLive []store.LiveSession, liveSIDs map
 			"start_failure":         ptr.Value(ls.StartFailure), // why the last start was refused (a store.StartFailure code), apart from sleep_reason (#353)
 			"start_failure_text":    startFailureSentence(ls.AgentType, ptr.Value(ls.StartFailure)),
 			"first_prompt":          h.sleepingFirstPrompt(ls),
-			"last_message":          h.lastMessageOf(ls.SessionID, ls.WorkingDir, ls.AgentType),
+			"last_message":          h.lastMessageOf(ls.SessionID, ls.WorkingDir, ls.AgentType, false),
 		}
 		withDisplayActivityHint(entry, nil, nil)
 		// Include prompt, model, and capabilities for sleeping sessions too
