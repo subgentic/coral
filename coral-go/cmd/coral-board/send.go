@@ -123,7 +123,7 @@ func runSend(args []string, id sendIdentity, out io.Writer) error {
 	if target == "" || message == "" {
 		return usageError(`usage: coral-board send --board <target> [--to <orchestrator>] [--attach coral://artifacts/<id> ...] "<message>"` + missingMessageHint(target, message))
 	}
-	// (1) a target of another Coral ("<server>/<team>", from 'targets') is not a board of this one
+	// (1) a target of another Coral ("<computer>/<team>", from 'targets') is not a board of this one
 	if strings.Count(target, "/") == 1 && !strings.HasPrefix(target, "/") && !strings.HasSuffix(target, "/") {
 		return usageError(fmt.Sprintf("%s looks like a team on another Coral. Use --address %s (see coral-board targets); --board takes a board on this Coral.", target, target))
 	}
