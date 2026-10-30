@@ -86,9 +86,13 @@ try {
         else if (open.length) throw new Error(`the task #${open[0].id} "${title}" is assigned to ${open[0].assigned_to || 'nobody'}, not to ${me || 'this runner'}: run as that one, pass --task N, or have it reassigned`);
     }
     if (!id) {
-        const add = call('coral-board', ['task', 'add', title, '--goal', goal, '--body', taskBody(manifest, sheetLink), '--priority', 'medium', ...(me ? ['--assignee', me] : [])], { allowFail: true });
+        // The runner makes its own task: `task add --self` (any agent may open work for itself, with a goal: #11247); a coral-board that does not know the switch, or a server that refuses it, falls back to a plain add,
+        // which only the Operator or an orchestrator may do.
+        const base = ['task', 'add', title, '--goal', goal, '--body', taskBody(manifest, sheetLink), '--priority', 'medium'];
+        let add = call('coral-board', [...base, '--self'], { allowFail: true });
+        if (add.status !== 0 && /flag provided but not defined|unknown flag|unknown option|not defined: -self/i.test(add.stderr + add.stdout)) add = call('coral-board', [...base, ...(me ? ['--assignee', me] : [])], { allowFail: true });
         if (add.status !== 0) throw new Error(`this identity cannot create the task (${(add.stderr || add.stdout || '').trim().split('\n')[0]}). Ask the orchestrator to create "${title}" on goal #${goal} assigned to ${me || 'the runner'}, then run again (or pass --task N)`);
-        id = Number((add.stdout.match(/Created Task #(\d+)/) || [])[1]);
+        id = Number((add.stdout.match(/(?:Created Task|Task) #(\d+)/) || [])[1]);
         if (!id) throw new Error('no task id in: ' + add.stdout.trim().slice(0, 120));
     }
     call('coral-board', ['task', 'claim', id], { allowFail: true }); // a task still pending is the runner's to claim; one in progress already is fine

@@ -58,11 +58,14 @@ call is one line, `tests/release/screens/run.sh "$VERSION" || echo "screenshot r
 A launchd or cron watcher on the release machine works the same way; neither needs an agent. A failure never
 blocks a release: `run.sh` only warns when filing fails, and its exit code is for the caller to ignore.
 
-The upload is a CLI call under the runner's identity, so the **task must be the runner's**: an upload links only
-to a task of the uploader, and only the Operator or the orchestrator may create a shared task. Have the
-orchestrator create `UI review: vX.Y.Z` on goal #163 assigned to the runner; `publish.mjs` finds it (or takes
-`--task N`), claims it, uploads, and then hands it to the Operator if the runner may reassign, or completes it with
-the contact sheet's link in the message. A runner that may create tasks creates it (`SCREENS_GOAL`, default 163).
+The upload is a CLI call under the runner's identity, and an upload links only to a task of the uploader. So
+`publish.mjs` opens its own task: **`coral-board task add "UI review: vX.Y.Z" --self --goal 163`** (#11247, in
+v2.0.7: any member of a board may open a task for itself, with a goal, one per title, at most five open), uploads to
+it, and then hands it to the Operator if the runner may reassign (the orchestrator, the Operator), or completes it
+with the contact sheet's link in the message. A `coral-board` without `--self` (before v2.0.7) falls back to a plain
+add, which only the Operator or an orchestrator may do: then have the orchestrator create the task assigned to the
+runner, and `publish.mjs` finds it (or takes `--task N`). A task of the same title that is already open and the
+runner's is reused; a re-run after it was completed opens a new one. `SCREENS_GOAL` changes the goal (default 163).
 
 ## What a shot may show
 
