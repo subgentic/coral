@@ -60,6 +60,14 @@ const S = `(window.__coralStatic || '/static/')`;
                 await wait(1500); // sleep-ok: an announcement is timed; there is no event to wait for
                 await ev(`window.fetch = window.__realFetch; true`);
             }, { must: [[/not sent|busy/i, 'the failure']] });
+            // a send that fails where there is no error box under the composer (#352, Security on #171): the status says it was not sent, once, since no error can say why
+            await scene(`${tag}: a message fails to send with no error box`, async () => {
+                await ev(`(() => { const b = document.getElementById('composer-error'); window.__ceBox = [b, b.parentNode, b.nextSibling]; b.remove(); return true; })()`);
+                await ev(`(() => { const real = window.fetch; window.fetch = (u, o = {}) => /\\/send$/.test(String(u)) && (o.method || '').toUpperCase() === 'POST' ? Promise.resolve(new Response(JSON.stringify({ error: 'The agent is busy.', code: 'agent_busy' }), { status: 409, headers: { 'content-type': 'application/json' } })) : real(u, o); window.__realFetch = real; return true; })()`);
+                await ev(`(() => { const i = document.getElementById('command-input'); i.focus(); i.value = 'With no box'; i.dispatchEvent(new Event('input', { bubbles: true })); document.querySelector('[data-on-click="cmd-send"]').click(); return true; })()`);
+                await wait(1500); // sleep-ok: an announcement is timed; there is no event to wait for
+            }, { must: [[/Message not sent, your text is back in the box/, 'not sent, said by the status']] });
+            await ev(`window.fetch = window.__realFetch; const [b, p, n] = window.__ceBox; p.insertBefore(b, n); true`); // after the scene: the text comes back into the box before the answer is read, so putting the box back sooner would race the refusal
             // asleep, then woken
             await scene(`${tag}: the agent falls asleep and is woken`, async () => {
                 const feed = sleeping => ev(`(() => { window.__m.agents['rep-id'].sleeping = ${sleeping}; window.T.ws.handleCoralMessage({ type: 'coral_diff', changed: [{ ...window.__m.entry(window.__m.agents['rep-id']), session_id: 'rep-id' }] }); return true; })()`);

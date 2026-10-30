@@ -13,7 +13,7 @@ import { escapeHtml, escapeAttr, showToast, showView, setRowCurrent } from './ut
 import { registerActions, idOf } from './actions.js';
 import { renderLiveSessions, KILL_LOG_NOTE } from './render.js';
 import './agentic_state.js';
-import { addPendingMessage, confirmPendingMessage, removePendingMessage } from './live_chat.js';
+import { addPendingMessage, confirmPendingMessage, removePendingMessage, announceNotSent } from './live_chat.js';
 import { serverFetch, currentServer, serverForSession, sessionServer } from './server_base.js';
 import { resolveSessionIdentity } from './session_state.js';
 import { agentWords, WHAT_STAYS_KILL } from './agent_words.js';
@@ -176,7 +176,7 @@ export async function sendCommand({ nudge = false } = {}) {
         input.value = "";
         clearSentDraft(targetSession);
         const notSent = () => {
-            removePendingMessage(sentSessionId, sentAt);
+            removePendingMessage(sentSessionId, sentAt, { announce: false }); // each refusal below shows the error under the composer, which says why, or says it was not sent when there is no box (#352)
             // The typed text only: the attachments stay attached until a send of them succeeds.
             if (!input.value && state.currentSession && state.currentSession.session_id === sentSessionId) { input.value = textPart; const k = sessionKey(targetSession); if (k) saveSessionDraft(k, textPart); }
         };
@@ -198,7 +198,7 @@ export async function sendCommand({ nudge = false } = {}) {
                 // Said under the composer (#3218); a gone terminal also marks the agent and offers Restart.
                 const { text: errText, code, exited } = await responseError(resp, sessionServer(targetSession), `The message was not sent (HTTP ${resp.status}).`);
                 const text = code === 'session_target_mismatch' ? TARGET_CHANGED_MESSAGE : errText; // never the bare 'session target mismatch'
-                reportSendError(targetSession, text, code, exited);
+                if (!reportSendError(targetSession, text, code, exited)) announceNotSent(sentSessionId);
                 console.error("Send failed:", resp.status);
                 return;
             }
@@ -213,7 +213,7 @@ export async function sendCommand({ nudge = false } = {}) {
                 showToast(result.note || "Held until the agent's question is answered.");
             } else if (result.error) {
                 notSent();
-                showComposerError(result.error);
+                if (!showComposerError(result.error)) announceNotSent(sentSessionId);
                 console.error("Send error:", result.error);
             } else {
                 clearComposerError();
@@ -226,7 +226,7 @@ export async function sendCommand({ nudge = false } = {}) {
             }
         } catch (e) {
             notSent();
-            showComposerError("The message was not sent. Check the connection and try again.");
+            if (!showComposerError("The message was not sent. Check the connection and try again.")) announceNotSent(sentSessionId);
             console.error("Send exception:", e);
         }
     } finally {
