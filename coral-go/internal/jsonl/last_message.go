@@ -144,6 +144,22 @@ func (r *SessionReader) LastMessageOf(sessionID, workingDir, agentType string, s
 	return e.msg, e.ok
 }
 
+// ForgetLastMessageMiss drops a remembered "no transcript found" for a session, so the next read looks again: an agent's hook event says its CLI is running and its transcript is, or is about to be, there (#11354: a first
+// reply that came before the first event kept the 5 s miss). A session with a transcript, or none asked about, is untouched.
+func (r *SessionReader) ForgetLastMessageMiss(sessionID string) {
+	r.lastMu.Lock()
+	e := r.lastMessages[sessionID]
+	r.lastMu.Unlock()
+	if e == nil {
+		return
+	}
+	e.mu.Lock()
+	if e.path == "" {
+		e.resolved = time.Time{}
+	}
+	e.mu.Unlock()
+}
+
 // readAppendedMessage reads the bytes from from to size (the newest lastMessageTailMax of them when there are more), together with the anchor bytes before from, and returns the newest message with text in
 // the complete lines after from, where the last complete line ends and the new anchor. same is false when the anchor is no longer what the file has there: the file is not the one that was read.
 func readAppendedMessage(path, agentType string, from, size int64, anchor []byte) (m LastMessage, ok bool, lineEnd int64, newAnchor []byte, same bool) {
