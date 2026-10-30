@@ -16,6 +16,8 @@ const CONFIG = { hookBin: '/opt/coral/tools/coral-hook-agentic-state', envNames:
 function load() { const mod = { exports: {} }; new Function('module', 'exports', 'require', 'process', SRC)(mod, mod.exports, require, process); return mod.exports; }
 const ext = load();
 
+// How a rig child ends: the hook programs without a pipe on their output end with 'exit'; the settle's child (its output is read) ends with 'close', after its last data (#11133, QA's P6).
+const endOf = c => c.handlers.exit || c.handlers.close;
 function rig({ env, config = CONFIG, spawnThrows = false } = {}) {
   const spawned = [], timers = [], registered = {}; let nowMs = 1000;
   const spawn = (bin, args, opts) => {
@@ -32,8 +34,8 @@ function rig({ env, config = CONFIG, spawnThrows = false } = {}) {
     for (let i = 0; i < 600; i++) {
       const t = timers.find(x => x.ms === 0 && !x.done);
       if (t) { t.done = true; t.fn(); continue; }
-      const c = exitChildren ? spawned.find(x => !x.exited && x.handlers.exit) : null;
-      if (!c) break; c.exited = true; c.handlers.exit();
+      const c = exitChildren ? spawned.find(x => !x.exited && endOf(x)) : null;
+      if (!c) break; c.exited = true; endOf(c)();
     }
   };
   return { spawned, timers, registered, sent, run, nowRef: () => nowMs, advance: ms => { nowMs += ms; }, fire: (name, ev) => registered[name](ev, {}) };
@@ -172,12 +174,12 @@ function settleWith(answer, { aborted = false, before = r => {}, after = r => {}
   before(r);
   r.fire('agent_settled', { aborted });
   // the settle's child: run until it is spawned, give it its output, then let it exit
-  for (let i = 0; i < 50 && !r.spawned.find(c => c.args[1] === 'agent_settled'); i++) { const t = r.timers.find(x => x.ms === 0 && !x.done); if (!t) break; t.done = true; t.fn(); const c = r.spawned.find(x => !x.exited && x.handlers.exit && x.args[1] !== 'agent_settled'); if (c) { c.exited = true; c.handlers.exit(); } }
+  for (let i = 0; i < 50 && !r.spawned.find(c => c.args[1] === 'agent_settled'); i++) { const t = r.timers.find(x => x.ms === 0 && !x.done); if (!t) break; t.done = true; t.fn(); const c = r.spawned.find(x => !x.exited && endOf(x) && x.args[1] !== 'agent_settled'); if (c) { c.exited = true; endOf(c)(); } }
   const child = r.spawned.find(c => c.args[1] === 'agent_settled');
   assert.ok(child, 'the settle starts a hook program');
   after(r);
   if (answer !== null && answer !== undefined) child.stdout.handlers.data(answer);
-  child.exited = true; child.handlers.exit();
+  child.exited = true; endOf(child)();
   return { r, child };
 }
 const good = JSON.stringify({ deliver: NOTICE }) + '\n';
@@ -213,7 +215,7 @@ console.log('pi_extension: no injection after an Escape, for an old run, or whil
   const settleOnce = () => {
     r.fire('agent_start', {}); r.run();
     r.fire('agent_settled', { aborted: false });
-    for (let i = 0; i < 20; i++) { const t = r.timers.find(x => x.ms === 0 && !x.done); if (t) { t.done = true; t.fn(); } const c = r.spawned.find(x => !x.exited && x.handlers.exit); if (c) { if (c.args[1] === 'agent_settled') c.stdout.handlers.data(good); c.exited = true; c.handlers.exit(); } if (!t && !c) break; }
+    for (let i = 0; i < 20; i++) { const t = r.timers.find(x => x.ms === 0 && !x.done); if (t) { t.done = true; t.fn(); } const c = r.spawned.find(x => !x.exited && endOf(x)); if (c) { if (c.args[1] === 'agent_settled') c.stdout.handlers.data(good); c.exited = true; endOf(c)(); } if (!t && !c) break; }
     while (seen < r.sent.length) { sentTimes.push(r.nowRef()); seen++; }
   };
   for (let t = 0; t < 30 * 60; t += 5) { settleOnce(); times.push(r.nowRef()); r.advance(5000); } // a settle every 5 seconds: a turn that ends the moment it starts
@@ -222,5 +224,29 @@ console.log('pi_extension: no injection after an Escape, for an old run, or whil
   for (let i = 0; i < sentTimes.length; i++) assert.ok(sentTimes.filter(x => x >= sentTimes[i] && x < sentTimes[i] + 600000).length <= 3, 'no ten-minute window holds more than three injections');
   assert.ok(sentTimes.length <= 9, `thirty minutes: at most nine injections, got ${sentTimes.length}`);
   console.log(`pi_extension: loop test ok (${sentTimes.length} injections in 30 minutes of back-to-back settles against a Coral that always says deliver)`);
+}
+// 16. the settle's output is read when its stream CLOSES, not when the process exits (#11133, QA's P6): Node can emit a child's 'exit' before its last standard output data has been read, which dropped a notice
+{
+  const startSettle = () => { const r = rig(); r.advance(100000); r.fire('agent_start', {}); r.run(); r.fire('agent_settled', { aborted: false });
+    for (let i = 0; i < 50 && !r.spawned.find(c => c.args[1] === 'agent_settled'); i++) { const t = r.timers.find(x => x.ms === 0 && !x.done); if (!t) break; t.done = true; t.fn(); }
+    const child = r.spawned.find(c => c.args[1] === 'agent_settled'); assert.ok(child, 'the settle starts a hook program'); return { r, child }; };
+  // exit first, then the data, then close: the order Node may deliver them in
+  let { r, child } = startSettle();
+  assert.ok(child.handlers.close, 'the settle\'s child is read until its output closes');
+  if (child.handlers.exit) child.handlers.exit();
+  r.run(false); assert.equal(r.sent.length, 0, 'an exit alone injects nothing: the output may not be read yet');
+  child.stdout.handlers.data(good);
+  child.handlers.close(); r.run(false);
+  assert.equal(r.sent.length, 1, 'the notice that arrived after the exit event is injected');
+  assert.equal(r.sent[0].msg.content, NOTICE);
+  child.handlers.close(); r.run(false); assert.equal(r.sent.length, 1, 'a second close does not inject again');
+  // data, then close, with no exit event at all
+  ({ r, child } = startSettle()); child.stdout.handlers.data(good); child.handlers.close(); r.run(false);
+  assert.equal(r.sent.length, 1, 'data then close injects once');
+  // a hook that wrote its line and never closes: the 3 s kill ends it, and what it wrote is what is judged
+  ({ r, child } = startSettle()); child.stdout.handlers.data(good);
+  const kill = r.timers.filter(x => x.ms === 3000).pop(); assert.ok(kill, 'the kill timer is set'); kill.fn(); r.run(false);
+  assert.equal(r.sent.length, 1, 'killed after its line: the line is injected once, the queue goes on');
+  console.log('pi_extension: the settle output is read on close ok');
 }
 console.log('pi_extension: all ok');

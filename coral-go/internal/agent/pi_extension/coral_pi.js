@@ -60,7 +60,8 @@ function create(deps) {
     const next = () => { if (!finished) { finished = true; try { if (item.collect) deliver(item, out); } catch (e) { /* never into Pi */ } if (then) then(); } };
     try {
       const child = spawn(config.hookBin, ['--pi', item.event, '--hooks-rev', String(config.rev || 1)], { detached: true, stdio: ['pipe', item.collect ? 'pipe' : 'ignore', 'ignore'], env: childEnv(), windowsHide: true, shell: false });
-      child.on('error', next); child.on('exit', next);
+      // A child whose output is read ends at 'close' (its streams are done, so the last data has been read): Node can emit 'exit' before the final stdout data, which dropped a notice (#11133, QA's P6). The others end at 'exit'.
+      child.on('error', next); child.on(item.collect ? 'close' : 'exit', next);
       if (item.collect && child.stdout) { child.stdout.on('error', () => {}); child.stdout.on('data', c => { if (outBytes < STDOUT_MAX) { out += String(c).slice(0, STDOUT_MAX - outBytes); outBytes = out.length; } else { out = ''; outBytes = STDOUT_MAX + 1; } }); }
       if (child.stdin) { child.stdin.on('error', () => {}); child.stdin.end(JSON.stringify(item.payload)); }
       const t = setTimer(() => { try { child.kill(); } catch (e) { /* gone already */ } next(); }, CHILD_MS); if (t && t.unref) t.unref();
