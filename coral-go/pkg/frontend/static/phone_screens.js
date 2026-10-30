@@ -13,7 +13,7 @@ export const SCREEN_TYPES = {
     form: { back: true, menu: false, bottomNav: false },
 };
 
-export const BUILT = new Set(['A']);
+export const BUILT = new Set(['A', 'B']);
 
 export const PHONE_SCREENS = {
     'mobile-agent-list': { type: 'top-level', nav: 'nav-agents', fab: 'agents', slice: 'A' }, // Home: the agent list (its + makes an agent or a team)
@@ -24,7 +24,7 @@ export const PHONE_SCREENS = {
     'cost-dashboard-view': { type: 'top-level', nav: 'nav-more', slice: 'C' },       // Analytics
     'docs-view': { type: 'top-level', nav: 'nav-more', slice: 'C' },                 // Docs
     'live-session-view': { type: 'drill-down', slice: 'B' },                         // the agent chat and terminal
-    'team-page-view': { type: 'drill-down', slice: 'B' },                            // a team and its tabs
+    'team-page-view': { type: 'drill-down', slice: 'B' },                            // a team and its tabs (a bar: ←, the team, ⋯)
     'messageboard-view': { type: 'drill-down', slice: 'B' },
     'history-session-view': { type: 'drill-down', slice: 'B' },                      // a past chat
     'servers-view': { type: 'top-level', nav: 'nav-more', slice: 'C' },              // Computers

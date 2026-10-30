@@ -418,3 +418,24 @@
 .search-access-reads, .search-access-note { color: var(--text-secondary); font-size: var(--fs-md); }
 .search-access-log { margin-top: var(--space-md); }
 .search-access-log-list { margin: 0; padding-left: var(--space-xl); color: var(--text-secondary); font-size: var(--fs-md); }
+
+/* A phone's team page is a drill-down (#11236, #11239 slice B): ONE 56 px bar, the arrow at the left, the team's name with its status under it, ⋯ at the right (the More menu's actions), and a strip of every tab under it: no pill above, no
+ * "Agents" for a title, no More tab. A desktop draws neither the arrow nor the dots. */
+.team-bar-back, .team-bar-more { display: none; }
+@media (max-width: 600px) {
+    body.team-page-active header.top-bar { display: none; }
+    .team-page-head { grid-template-columns: 44px minmax(0, 1fr) 44px; grid-template-rows: auto auto; align-items: center; padding: 0 4px; min-height: 56px; gap: 0 4px; border-bottom: 1px solid var(--border); }
+    .team-bar-back, .team-bar-more { display: grid; place-items: center; width: var(--control-touch-height, 44px); height: var(--control-touch-height, 44px); padding: 0; border: 0; border-radius: 22px; background: none; color: var(--text-primary); cursor: pointer; }
+    .team-bar-back { grid-column: 1; grid-row: 1 / span 2; }
+    .team-bar-more { grid-column: 3; grid-row: 1 / span 2; }
+    .team-page-title { grid-column: 2; grid-row: 1; font-size: var(--fs-xl); font-weight: var(--fw-strong); line-height: var(--lh-label); }
+    .team-page-status { grid-column: 2; grid-row: 2; font-size: var(--fs-md); color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .team-page-actions { position: absolute; top: 56px; right: 8px; margin: 0; z-index: 30; } /* only its menu is drawn, under the dots: the Actions button is the dots now */
+    #team-page-more { display: none; }
+    .team-page-health { grid-column: 2; grid-row: 3; }
+    .team-tabs-row > .team-tab-more { display: none; } /* every tab is in the strip: no More tab */
+    .team-tab[data-tab="knowledge"], .team-tab[data-tab="messages"] { display: inline-flex; }
+    .team-tabs-row > .team-tabs { overflow-x: auto; scrollbar-width: none; padding-left: 0; padding-right: 0; }
+    .team-tabs-row > .team-tabs::-webkit-scrollbar { display: none; }
+    .team-tabs-row .team-tab { flex: none; min-height: var(--control-touch-height, 44px); padding: 0 14px; }
+}
