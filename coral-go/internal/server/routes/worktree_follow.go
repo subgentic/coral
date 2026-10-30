@@ -107,7 +107,14 @@ func cachedRoot(ctx context.Context, dir string) (string, string) {
 	if root != "" {
 		branch = branchOf(ctx, root)
 	}
-	rootCache.Store(dir, rootCacheEntry{at: time.Now(), root: root, branch: branch})
+	now := time.Now()
+	rootCache.Range(func(k, v any) bool { // old entries go as new ones come: the cache holds the folders of the last few seconds, not every folder an agent ever named
+		if now.Sub(v.(rootCacheEntry).at) > 2*followCacheFor {
+			rootCache.Delete(k)
+		}
+		return true
+	})
+	rootCache.Store(dir, rootCacheEntry{at: now, root: root, branch: branch})
 	return root, branch
 }
 

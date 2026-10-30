@@ -16,6 +16,7 @@ import (
 
 	"github.com/subgentic/coral/internal/consoletest"
 	"github.com/subgentic/coral/internal/store"
+	"github.com/subgentic/coral/pkg/tunnel"
 )
 
 // #11351 (the operator: "If an agent has switched to a different worktree, it doesn't look like we are following them in the UI"): an agent launched in folder A that works in a git worktree B shows B's
@@ -87,10 +88,18 @@ func (r *followRig) event(tool string, detail map[string]any) {
 
 func (r *followRig) list(query string) map[string]any {
 	r.t.Helper()
+	return r.listAs(query, func(req *http.Request) {
+		req.Header.Set("Origin", r.server.URL) // the dashboard's own page: a same-origin browser fetch from this host
+		req.Header.Set("Sec-Fetch-Site", "same-origin")
+	})
+}
+
+// listAs reads the list as the caller the shape of the request makes it: the dashboard's page, a script, a request through Coral Hub.
+func (r *followRig) listAs(query string, shape func(*http.Request)) map[string]any {
+	r.t.Helper()
 	req, err := http.NewRequest(http.MethodGet, r.server.URL+"/api/sessions/live/"+r.name+"/files?session_id="+r.sid+query, nil)
 	require.NoError(r.t, err)
-	req.Header.Set("Origin", r.server.URL) // the dashboard's own page: a same-origin browser fetch from this host
-	req.Header.Set("Sec-Fetch-Site", "same-origin")
+	shape(req)
 	resp, err := http.DefaultClient.Do(req)
 	require.NoError(r.t, err)
 	defer resp.Body.Close()
@@ -191,4 +200,30 @@ func TestTheHomeFolderIsNeverScannedForRecentFiles(t *testing.T) {
 	require.NoError(t, os.MkdirAll(sub, 0o755))
 	require.NoError(t, os.WriteFile(filepath.Join(sub, "notes.txt"), []byte("x\n"), 0o644))
 	assert.Len(t, recentFilesInPlainFolder(sub, false), 1, "a folder inside it is the agent's own")
+}
+
+// Only the dashboard's own page is followed (Security's #137514): a request that is not it (a script, an agent's bounded call) or that came through Coral Hub (stamped) asks worktree=follow and is answered
+// from the launch folder, with no worktree object. The same holds for the file reads the panel makes.
+func TestOnlyTheDashboardIsFollowedIntoAWorktree(t *testing.T) {
+	r := newFollowRig(t, true)
+	r.event("Edit", map[string]any{"file_path": filepath.Join(r.worktree, "work.txt")})
+	require.Equal(t, []string{"work.txt"}, filepaths(r.list("&worktree=follow")), "the dashboard is followed")
+
+	for name, shape := range map[string]func(*http.Request){
+		"a script (no same-origin page)": func(req *http.Request) {},
+		"a request through Coral Hub": func(req *http.Request) {
+			req.Header.Set(tunnel.ViaHeader, "1")
+			req.Header.Set("Origin", r.server.URL)
+			req.Header.Set("Sec-Fetch-Site", "same-origin")
+		},
+		"a bearer credential": func(req *http.Request) {
+			req.Header.Set("Authorization", "Bearer abc")
+			req.Header.Set("Origin", r.server.URL)
+			req.Header.Set("Sec-Fetch-Site", "same-origin")
+		},
+	} {
+		body := r.listAs("&worktree=follow", shape)
+		assert.Empty(t, filepaths(body), "%s: the launch folder's list, which has no changes", name)
+		assert.Nil(t, body["worktree"], "%s: and no worktree is named", name)
+	}
 }
