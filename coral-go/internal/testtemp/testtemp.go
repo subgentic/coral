@@ -20,7 +20,7 @@ import (
 	"time"
 )
 
-// Use points TMPDIR, TMP, TEMP, HOME, USERPROFILE and CORAL_DATA_DIR at a new folder for the rest of the process and returns the func that removes it. A test that sets one of them
+// Use points TMPDIR, TMP, TEMP, GOTMPDIR, HOME, USERPROFILE and CORAL_DATA_DIR at a new folder for the rest of the process and returns the func that removes it. A test that sets one of them
 // itself (t.Setenv) still can. If the folder can't be made it changes nothing.
 //
 // It acts only in the process `go test` started (or a runner that passes the same flag, tools/go_test_shard.py): a test that re-runs its own binary as a helper child (51 test files do:
@@ -77,7 +77,7 @@ func setup() (cleanup func()) {
 	}
 	release := hold(dir, tmp, home, data) // closed first in cleanup
 	os.Setenv(Marker, dir)
-	for k, v := range map[string]string{"TMPDIR": tmp, "TMP": tmp, "TEMP": tmp, "HOME": home, "USERPROFILE": home, "CORAL_DATA_DIR": data} {
+	for k, v := range map[string]string{"TMPDIR": tmp, "TMP": tmp, "TEMP": tmp, "GOTMPDIR": tmp, "HOME": home, "USERPROFILE": home, "CORAL_DATA_DIR": data} {
 		os.Setenv(k, v)
 	}
 	return func() { os.Unsetenv(Marker); release(); os.RemoveAll(dir) }

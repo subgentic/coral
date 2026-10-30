@@ -14,7 +14,7 @@ import (
 
 func TestUsePointsTheTempFolderAtANewFolderAndRemovesIt(t *testing.T) {
 	before := map[string]string{}
-	for _, k := range []string{"TMPDIR", "TMP", "TEMP", "HOME", "USERPROFILE", "CORAL_DATA_DIR", "GOCACHE", "GOPATH", "GOMODCACHE", "GOENV", Marker} {
+	for _, k := range []string{"TMPDIR", "TMP", "TEMP", "GOTMPDIR", "HOME", "USERPROFILE", "CORAL_DATA_DIR", "GOCACHE", "GOPATH", "GOMODCACHE", "GOENV", Marker} {
 		before[k] = os.Getenv(k)
 	}
 	t.Cleanup(func() {
@@ -26,7 +26,7 @@ func TestUsePointsTheTempFolderAtANewFolderAndRemovesIt(t *testing.T) {
 	dir := os.TempDir()
 	require.NotEqual(t, before["TMP"], os.Getenv("TMP"))
 	dir = filepath.Clean(dir)
-	for _, k := range []string{"TMPDIR", "TMP", "TEMP"} {
+	for _, k := range []string{"TMPDIR", "TMP", "TEMP", "GOTMPDIR"} {
 		assert.Equal(t, os.Getenv("TMP"), os.Getenv(k), k)
 	}
 	root := filepath.Dir(dir)

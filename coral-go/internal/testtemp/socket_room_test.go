@@ -38,3 +38,20 @@ func TestAUnixSocketBelowThePrivateTempFitsTheLimit(t *testing.T) {
 		assert.Equal(t, "/tmp", privateBase(), "on Unix the private folder goes under /tmp, the shortest temp folder")
 	}
 }
+
+// A test's own folder (t.TempDir) is below the private temp folder too. Go's testing makes it below GOTMPDIR when that is set
+// (a run that sets TMP and GOTMPDIR together, as QA's do), so Use points GOTMPDIR there as well. Otherwise a check that a test's
+// folder "is in the temp folder" (mock-agent's ready mode, agent's common-place lookup) is false (QA on the v2.0.5 merge, #399).
+func TestATestsOwnFolderIsBelowThePrivateTemp(t *testing.T) {
+	if os.Getenv(Marker) == "" {
+		t.Skip("not in a private world (a helper child)")
+	}
+	tmp, err := filepath.EvalSymlinks(os.TempDir())
+	require.NoError(t, err)
+	own, err := filepath.EvalSymlinks(t.TempDir())
+	require.NoError(t, err)
+	rel, err := filepath.Rel(tmp, own)
+	require.NoError(t, err)
+	assert.False(t, rel == ".." || len(rel) > 2 && rel[:3] == ".."+string(filepath.Separator), "t.TempDir() %q is not below os.TempDir() %q", own, tmp)
+	assert.Equal(t, os.TempDir(), os.Getenv("GOTMPDIR"), "GOTMPDIR is the private temp folder")
+}
