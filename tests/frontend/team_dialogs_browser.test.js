@@ -48,7 +48,7 @@ const BASE = require('./test_base').BASE;
         await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'team_steps.js'); m.showTeamStep('members'); return true; })()`);
         assert.equal(await ev(`getComputedStyle(document.querySelector('#launch-step-team .empty-state.empty-state-tight')).display !== 'none'`), true, 'the line that says what to do');
         await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'team_steps.js'); m.showTeamStep('team'); return true; })()`);
-        assert.equal(await ev(`document.getElementById('launch-team-dir').value === '' && document.getElementById('launch-team-dir').getAttribute('aria-required') === 'true' && document.getElementById('launch-team-dir').getBoundingClientRect().height > 0`), true, 'the folder is on the first screen, empty and required');
+        assert.equal(await ev(`/[\\/]Coral[\\/]first-team$/.test(document.getElementById('launch-team-dir').value) && document.getElementById('launch-team-dir').getAttribute('aria-required') === 'true' && document.getElementById('launch-team-dir').getBoundingClientRect().height > 0`), true, 'the folder is on the first screen, the suggested one (#11258) and required');
         assert.equal(await ev(`!!document.getElementById('team-goal') && !!document.getElementById('team-goal').closest('#team-panel-start')`), true, 'the optional first task is on step 3, the Start tab');
         await ev(`window._addTeamAgent('Orchestrator', 'First.'); true`);
         // #4950: the team form is a sectioned dialog that opens on Members; the name is above the sections (#5589 finding 6), so every section has it and Launch Team without it stays where it is.

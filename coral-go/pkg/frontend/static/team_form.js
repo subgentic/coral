@@ -59,7 +59,7 @@ function mount(modal) {
             help: "A project is a team of agents working on one board. Letters, digits, - and _.", attrs: { maxlength: '64' }, live: ['team-board-name-hint'],
             validate: v => boardNameProblem(String(v || '').trim()), setup: e => e.setAttribute('data-on-input', 'm-validate-team-name') },
         { key: 'dir', type: 'path', id: 'launch-team-dir', label: 'Folder', help: FOLDER_ON_THIS_COMPUTER, required: true, requiredMessage: 'Choose a folder for the team', messageAsIs: true, placeholder: 'Choose a folder', attrs: { 'data-coral-root': root },
-            live: [{ id: 'btn-browse-team', wide: true, describes: false }, { id: 'launch-team-dir-recents', wide: true, describes: false }, { id: 'dir-browser-team', wide: true, describes: false }] },
+            live: [{ id: 'btn-browse-team', wide: true, describes: false }, { id: 'launch-team-dir-recents', wide: true, describes: false }, { id: 'launch-team-dir-suggest', describes: false }, { id: 'dir-browser-team', wide: true, describes: false }] },
         { key: 'server', type: 'text', id: 'team-board-server', label: "Another computer's address", placeholder: 'e.g. http://remote-machine:8420' },
         { key: 'worktree', type: 'toggle', id: 'launch-team-worktree', label: 'Launch in a git worktree', default: false, help: 'The team works on its own branch in an isolated copy of the repository.' },
         { key: 'base', type: 'text', id: 'launch-team-base-branch', label: 'Base branch', placeholder: "the repo's current branch", visibleWhen: v => !!v.worktree },

@@ -5,6 +5,7 @@ import { showToast, escapeHtml, escapeAttr, boardNameProblem } from './utils.js'
 import { blockedReason } from './hub_access.js';
 import { loadLiveSessions } from './api.js';
 import { recordRecentDir, setDirServerResolver, getRecentDirs } from './browser.js';
+import { offerSuggestion, syncSuggestionNote, usesSuggestion } from './folder_suggestion.js';
 import { pinnedFolders } from './pinned_folders.js';
 import { defaultAgentName } from './session_state.js';
 import { serverFetch, identityKey, isHub, normServer, LOCAL_SERVER, keyLabel, noteBoardLabels } from './server_base.js';
@@ -83,6 +84,7 @@ function _selectLaunchType(type) {
         importOnce('./launch_agent_pick.js').then(m => m.buildAgentPick({ group: document.getElementById('launch-agent-pick'), form: document.getElementById('launch-agent-acf'), server: _effectiveServer(launch.server), implicitDefault: !_settingsFor(_effectiveServer(launch.server)).default_agent_type })).catch(() => {});
         _folderPressed = false; folderForm()?.clearErrors();
         _wireDirNote(); _syncDirNote(); _syncLaunchBlock(); _renderDirRecents();
+        if (!launch.member && !launch.addTo && !_settingsFor(_effectiveServer(launch.server)).default_working_dir) offerSuggestion(document.getElementById('launch-dir'), document.getElementById('launch-dir-suggest'), 'first-agent'); // a first agent has a folder to say yes to (#11258)
         wireRecap(); syncRecap(); _syncLaunchBlock();
         _checkTmuxHere(); // tmux missing: said once, Launch off (#6046)
         if (launch.member) _applyMember(); else if (launch.addTo) _applyAddTo(); else document.getElementById('launch-dir')?.focus(); // the one thing most launches need: the folder
@@ -350,6 +352,7 @@ function _wireDirNote() {
     if (!input || input.dataset.noteWired) return;
     input.dataset.noteWired = '1';
     input.addEventListener('input', _syncDirNote); input.addEventListener('change', _syncDirNote);
+    input.addEventListener('input', () => syncSuggestionNote(input, document.getElementById('launch-dir-suggest'))); input.addEventListener('change', () => syncSuggestionNote(input, document.getElementById('launch-dir-suggest')));
     input.addEventListener('input', _syncLaunchBlock); input.addEventListener('change', _syncLaunchBlock); // Next and Launch say why they are off until there is a folder
     input.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); _launchStage('next'); } }); // Enter is Next
 }
@@ -450,6 +453,7 @@ export async function launchSession() {
     }
 
     const payload = { working_dir: dir, agent_type: type };
+    if (launch.mode !== 'terminal' && usesSuggestion(document.getElementById('launch-dir'))) payload.create_dir = true; // the folder Coral suggested: it makes it now (#11258)
     // Default picked (and Keep Default in "Default mode waits for you") is Default: the form sends no flag for it, which the server cannot tell from "nothing chosen" (that starts in the saved default or Auto), so the request says it (#10362).
     if (launch.mode !== "terminal" && permPick === 'default' && !(flagsStr && _hasPermFlag(flagsStr))) payload.permission_mode = 'default';
     if (agentName) payload.display_name = agentName;
