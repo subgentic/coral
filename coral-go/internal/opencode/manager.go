@@ -44,8 +44,9 @@ type managed struct {
 	tracker *Tracker
 	at      map[string]time.Time // when each session last changed state
 
-	session    string // the opencode session the agent was resumed with: known before the stream names any
-	version    int    // counts the events of the agent's sessions: what a cached read of the history was made at
+	session    string    // the opencode session the agent was resumed with: known before the stream names any
+	sessionAt  time.Time // when UseSession was told
+	version    int       // counts the events of the agent's sessions: what a cached read of the history was made at
 	msgs       []Message
 	msgsAt     int        // the version msgs was read at; -1 when never
 	msgsReadAt time.Time  // when the history was last read
@@ -214,7 +215,7 @@ func (m *Manager) UseSession(key, session string) {
 		return
 	}
 	g.mu.Lock()
-	g.session = session
+	g.session, g.sessionAt = session, time.Now()
 	g.noteSession(session)
 	g.version++
 	g.refreshLast(g.lctx, c, session, m.SkipLast)
@@ -319,6 +320,26 @@ func (g *managed) refreshLast(ctx context.Context, c *Client, session string, sk
 			g.last, g.haveLast = m, true
 		}
 	}()
+}
+
+// AgentSession is AgentTurn for a reader of the history (the indexer): an agent resumed with a stored session is known from the moment UseSession was told, with no state of its own yet (state ""): no turn is
+// going on until the stream says so. ok is false when the agent has no session at all.
+func (m *Manager) AgentSession(key string) (state State, at time.Time, ok bool) {
+	if state, at, ok = m.AgentTurn(key); ok {
+		return state, at, true
+	}
+	m.mu.Lock()
+	g := m.servers[key]
+	m.mu.Unlock()
+	if g == nil {
+		return "", time.Time{}, false
+	}
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if g.session == "" {
+		return "", time.Time{}, false
+	}
+	return "", g.sessionAt, true
 }
 
 // Keys are the agents that have a server now, in no order.

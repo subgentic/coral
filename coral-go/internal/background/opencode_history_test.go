@@ -28,7 +28,7 @@ func (f *fakeOpencodeSessions) Keys() []string {
 	}
 	return k
 }
-func (f *fakeOpencodeSessions) AgentTurn(key string) (opencode.State, time.Time, bool) {
+func (f *fakeOpencodeSessions) AgentSession(key string) (opencode.State, time.Time, bool) {
 	s, ok := f.turns[key]
 	return s, f.at[key], ok
 }

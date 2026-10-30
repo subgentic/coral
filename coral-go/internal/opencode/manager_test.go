@@ -441,3 +441,22 @@ func TestAStoreRecordThatIsNotAKeyIsNotFollowed(t *testing.T) {
 		assert.Equal(t, "", storeOf(cfg.DataDir, "ses_evil"), "%q", rec)
 	}
 }
+
+func TestAResumedAgentIsKnownToTheHistoryIndexerBeforeItsFirstEvent(t *testing.T) {
+	cfg, _ := stubConfig(t) // no events at all
+	m := NewManager(cfg)
+	defer m.Close()
+	_, err := m.Ensure(context.Background(), "agent-1", "", "", "")
+	require.NoError(t, err)
+	_, _, ok := m.AgentSession("agent-1")
+	assert.False(t, ok, "no session at all: nothing to index")
+	m.UseSession("agent-1", "ses_abc123")
+	state, at, ok := m.AgentSession("agent-1")
+	require.True(t, ok, "resumed with a stored session: it has a row before any event")
+	assert.Equal(t, State(""), state, "and no turn is made up for it")
+	assert.WithinDuration(t, time.Now(), at, 5*time.Second)
+	_, _, ok = m.AgentTurn("agent-1")
+	assert.False(t, ok, "the state readers still wait for the stream")
+	_, _, ok = m.AgentSession("agent-2")
+	assert.False(t, ok)
+}

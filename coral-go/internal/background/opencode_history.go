@@ -11,7 +11,7 @@ import (
 // OpencodeSessions is what the history source needs of the opencode manager.
 type OpencodeSessions interface {
 	Keys() []string
-	AgentTurn(key string) (opencode.State, time.Time, bool)
+	AgentSession(key string) (opencode.State, time.Time, bool)
 	AgentMessages(ctx context.Context, key string) ([]opencode.Message, bool, error)
 }
 
@@ -29,9 +29,9 @@ func (h *OpencodeHistory) ExtractLive(ctx context.Context, known map[string]floa
 		if ctx.Err() != nil {
 			break
 		}
-		state, at, ok := h.m.AgentTurn(key)
+		state, at, ok := h.m.AgentSession(key)
 		if !ok || state == opencode.StateWorking {
-			continue // no session named yet, or a turn going on: its row waits for the turn to end
+			continue // no session at all yet, or a turn going on: its row waits for the turn to end
 		}
 		mtime := float64(at.UnixNano()) / 1e9
 		if last, seen := known[agent.OpencodeSourcePrefix+key]; seen && last >= mtime {
