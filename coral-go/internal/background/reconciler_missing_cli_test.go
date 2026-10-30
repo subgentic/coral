@@ -54,7 +54,7 @@ func TestReconciler_AgentWhoseShellCouldNotFindItsCLIIsMarkedFailedToStartAtOnce
 	rt.listed = []AgentInfo{{AgentType: "codex", SessionID: testUUID}}
 	name := FormatSessionName("codex", testUUID)
 	rt.set(name, "powershell")
-	rt.screens[name] = launchLine(testUUID) + "\ncodex : The term 'codex' is not recognized as the name of a cmdlet, function, script file, or operable program."
+	rt.screens[name] = launchLine(testUUID) + "\ncodex : The term 'codex' is not recognized as the name of a cmdlet, function, script file, or operable program.\nPS D:/w> "
 
 	r.reconcileOnce(ctx)
 	assert.True(t, isSleeping(t, ss, testUUID))
@@ -76,7 +76,7 @@ func TestReconciler_AnExitedAgentWithAnUnrelatedErrorWaitsForTheGraceAsBefore(t 
 	rt.listed = []AgentInfo{{AgentType: "codex", SessionID: testUUID}}
 	name := FormatSessionName("codex", testUUID)
 	rt.set(name, "powershell")
-	rt.screens[name] = launchLine(testUUID) + "\nThe term 'git' is not recognized as the name of a cmdlet, function, script file, or operable program."
+	rt.screens[name] = launchLine(testUUID) + "\nThe term 'git' is not recognized as the name of a cmdlet, function, script file, or operable program.\nPS D:/w> "
 	for i := 0; i < 3; i++ {
 		r.reconcileOnce(ctx)
 	}
@@ -127,7 +127,7 @@ func TestReconciler_AWakeWhoseShellCouldNotFindTheCLIIsCaughtByItsLaunchTime(t *
 	rt.listed = []AgentInfo{{AgentType: "codex", SessionID: testUUID}}
 	name := FormatSessionName("codex", testUUID)
 	rt.set(name, "powershell")
-	rt.screens[name] = launchLine(testUUID) + "\nThe term 'codex' is not recognized as the name of a cmdlet, function, script file, or operable program."
+	rt.screens[name] = launchLine(testUUID) + "\nThe term 'codex' is not recognized as the name of a cmdlet, function, script file, or operable program.\nPS D:/w> "
 	r.now = func() time.Time { return time.Now().Add(3 * time.Hour) } // the row was created hours ago
 	r.reconcileOnce(ctx)
 	ls, _ := ss.GetLiveSession(ctx, testUUID)
@@ -147,15 +147,15 @@ func launchLine(sessionID string) string {
 	return "PS D:/w> $env:CORAL_SESSION_ID = '" + sessionID + "'; & codex --x"
 }
 
-// The coral-go-team Security's INFO on #173: only the shell's answer to Coral's own launch line marks an agent. The same words above the line (a
-// transcript scrolled up), far below it, or on a screen where the line can't be found (cleared, scrolled past, redrawn) mark nothing; nothing
-// is typed either way.
-func TestReconciler_OnlyTheShellsAnswerToCoralsLaunchLineMarksAFailedStart(t *testing.T) {
+// The coral-go-team Security's INFO on #173: only the shell's latest answer, right above the prompt it came back to, marks an agent (Coral's quiet
+// launch clears the screen, so the bottom is what tells). The same words higher up, then other output, or then a person's typed command, mark
+// nothing; nothing is typed either way.
+func TestReconciler_OnlyTheShellsLatestAnswerMarksAFailedStart(t *testing.T) {
 	const err = "codex : The term 'codex' is not recognized as the name of a cmdlet, function, script file, or operable program."
 	for what, screen := range map[string]string{
-		"the words above the launch line": err + "\n" + launchLine(testUUID) + "\nPS D:/w> ",
-		"the words far below it":          launchLine(testUUID) + "\n" + strings.Repeat("output\n", 20) + err,
-		"no launch line on the screen":    err + "\nPS D:/w> ",
+		"the words above the launch line":                err + "\n" + launchLine(testUUID) + "\nPS D:/w> ",
+		"the words, then other output":                   err + "\n" + strings.Repeat("output\n", 3) + "PS D:/w> ",
+		"the words, then a typed command, then a prompt": err + "\nPS D:/w> dir\nPS D:/w> ",
 	} {
 		t.Run(what, func(t *testing.T) {
 			ss, rt, r := newMissingCLIFixture(t)
@@ -174,4 +174,22 @@ func TestReconciler_OnlyTheShellsAnswerToCoralsLaunchLineMarksAFailedStart(t *te
 			assert.Zero(t, rt.sends)
 		})
 	}
+}
+
+// QA's tmux screen after a quiet launch (the screen cleared, so no launch line): the shell's answer and its prompt only. It marks at once.
+func TestReconciler_AQuietLaunchsAnswerAloneMarksAFailedStart(t *testing.T) {
+	ss, rt, r := newMissingCLIFixture(t)
+	r.now = func() time.Time { return time.Now() }
+	ctx := context.Background()
+	registerAwake(t, ss, "codex", testUUID)
+	rt.listed = []AgentInfo{{AgentType: "codex", SessionID: testUUID}}
+	name := FormatSessionName("codex", testUUID)
+	rt.set(name, "bash")
+	rt.screens[name] = "bash: codex: command not found\nuser@box:~/w$ "
+	r.reconcileOnce(ctx)
+	ls, err := ss.GetLiveSession(ctx, testUUID)
+	require.NoError(t, err)
+	require.NotNil(t, ls.StartFailure, "marked failed to start")
+	assert.Equal(t, store.StartFailureCLIMissing, *ls.StartFailure)
+	assert.Zero(t, rt.sends, "nothing typed")
 }

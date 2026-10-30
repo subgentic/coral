@@ -36,9 +36,8 @@ type SessionReconciler struct {
 	runtime      AgentRuntime
 	interval     time.Duration
 	logger       *slog.Logger
-	misses       map[string]int  // session_id -> consecutive passes not found
-	exited       map[string]int  // session_id -> consecutive passes its terminal showed a plain shell
-	noLaunchLine map[string]bool // session_id -> cliMissing has logged that its launch line is not on the screen (once per session)
+	misses       map[string]int // session_id -> consecutive passes not found
+	exited       map[string]int // session_id -> consecutive passes its terminal showed a plain shell
 	now          func() time.Time
 	// onSlept hears the sessions one pass marked sleeping (an exited CLI or a gone terminal),
 	// for the exit notice (#3613). Unset: nothing is told.
@@ -65,7 +64,6 @@ func NewSessionReconciler(ss *store.SessionStore, rt AgentRuntime, interval time
 		logger:       slog.Default().With("service", "session_reconciler"),
 		misses:       make(map[string]int),
 		exited:       make(map[string]int),
-		noLaunchLine: make(map[string]bool),
 		now:          time.Now,
 	}
 }
@@ -155,11 +153,6 @@ func (r *SessionReconciler) reconcileOnce(ctx context.Context) {
 			delete(r.exited, sid)
 		}
 	}
-	for sid := range r.noLaunchLine {
-		if !seen[sid] {
-			delete(r.noLaunchLine, sid)
-		}
-	}
 
 	r.killOrphans(ctx, agents)
 }
@@ -243,9 +236,8 @@ func (r *SessionReconciler) checkExited(ctx context.Context, ls store.LiveSessio
 const missingCLIWindow = 45 * time.Second
 
 // cliMissing is the safety net under the CLI checks (#353): the agent's pane is at its shell, Coral typed its launch line moments ago (launched_at, which a wake sets too), and the shell's own "no such command" error for the agent's
-// CLI is its answer to that line (a launch line typed although the CLI was nowhere, or not on the agent's shell's PATH). Only the lines under Coral's own launch line are read, found by the
-// session id it sets (agent.AfterLaunchLine): the same words above it, or an agent's later output, never mark it. With no such line on the screen (cleared, scrolled, redrawn) it marks
-// nothing and says so once. Conclusive at once, so the agent is marked with the reason cli_missing
+// CLI is the shell's latest answer, right above the prompt it came back to (a launch line typed although the CLI was nowhere, or not on the agent's shell's PATH). Only the bottom of the
+// screen is read (agent.MissingCommandAtBottom): the same words higher up, or followed by other output or a typed command, never mark it. Conclusive at once, so the agent is marked with the reason cli_missing
 // ("Failed to start", with the words the dashboard has for it) without the launch grace or the consecutive passes. It only marks: nothing is killed, relaunched or typed, and no setting
 // changes. It reports whether it marked the agent.
 func (r *SessionReconciler) cliMissing(ctx context.Context, ls store.LiveSession, name string) bool {
@@ -266,15 +258,7 @@ func (r *SessionReconciler) cliMissing(ctx context.Context, ls store.LiveSession
 	if err != nil {
 		return false
 	}
-	answer, found := agent.AfterLaunchLine(screen, ls.SessionID)
-	if !found {
-		if !r.noLaunchLine[ls.SessionID] {
-			r.noLaunchLine[ls.SessionID] = true
-			r.logger.Info("could not tell whether the agent's shell found its CLI: Coral's launch line is not on the screen", "session_id", ls.SessionID, "agent_type", ls.AgentType)
-		}
-		return false
-	}
-	if !agent.MissingCommandIn(answer, info.Binary) {
+	if !agent.MissingCommandAtBottom(screen, info.Binary) {
 		return false
 	}
 	if err := r.sessionStore.SetSessionSleepingFor(ctx, ls.SessionID, store.SleepReasonAgentExited); err != nil { // its CLI is not running: it ended
