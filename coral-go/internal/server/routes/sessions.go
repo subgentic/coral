@@ -26,7 +26,6 @@ import (
 	"github.com/subgentic/coral/internal/logparse"
 	"github.com/subgentic/coral/internal/machinehealth"
 	"github.com/subgentic/coral/internal/naming"
-	"github.com/subgentic/coral/internal/operatortouch"
 	"github.com/subgentic/coral/internal/proxy"
 	"github.com/subgentic/coral/internal/ptr"
 	"github.com/subgentic/coral/internal/ptymanager"
@@ -101,8 +100,7 @@ type SessionsHandler struct {
 	subagents   *store.SubagentStore
 	gs          *store.GitStore
 	bs          *board.Store
-	touches     *operatortouch.Recorder // the Operator's touches of agents, counted for the Analytics tab (#11225); nil: not recorded
-	handoffs    handoffLimiter          // when each agent was last handed its board messages at its turn's end (#10996)
+	handoffs    handoffLimiter // when each agent was last handed its board messages at its turn's end (#10996)
 	cfg         *config.Config
 	terminal    ptymanager.SessionTerminal
 	jsonl       *jsonl.SessionReader
@@ -797,29 +795,3 @@ func lastMessageRow(h *SessionsHandler, sessionID, workingDir, agentType string,
 
 // SessionReader is the transcript reader this handler uses: other handlers that read the same session files (the spend read) share it, so a file is parsed once.
 func (h *SessionsHandler) SessionReader() *jsonl.SessionReader { return h.jsonl }
-
-// SetTouches gives the handler the recorder of the Operator's touches (#11225).
-func (h *SessionsHandler) SetTouches(t *operatortouch.Recorder) { h.touches = t }
-
-// touchSource says where a person's request came from: Coral Hub (a grantee, or the owner on another device) or the person at this computer.
-func touchSource(r *http.Request) string {
-	if kind, _ := r.Context().Value(callerKindKey{}).(string); kind == callerHub {
-		return board.TouchHub
-	}
-	return board.TouchLocal
-}
-
-// touch records that the Operator touched the session by hand: a person's request only, never an agent's or Coral's own (#11225). Counts only: the kind, which session and where it came from.
-func (h *SessionsHandler) touch(r *http.Request, sessionID, kind string) {
-	if h.touches != nil && humanInputCaller(r) {
-		h.touches.Touch(r.Context(), sessionID, kind, touchSource(r))
-	}
-}
-
-// noteTouchSource tells the recorder where the typing that this request is about to write came from, so the keystrokes (written deep in the terminal path, which knows no request) are recorded as the
-// person's at this computer or as a Hub caller's.
-func (h *SessionsHandler) noteTouchSource(r *http.Request, sessionID string) {
-	if h.touches != nil && humanInputCaller(r) {
-		h.touches.NoteSource(sessionID, touchSource(r))
-	}
-}

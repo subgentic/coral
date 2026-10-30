@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/subgentic/coral/internal/cloud"
-	"github.com/subgentic/coral/internal/operatortouch"
 	"github.com/subgentic/coral/internal/safego"
 	"html/template"
 	"io"
@@ -70,8 +69,7 @@ type Server struct {
 	boardHandler    *routes.BoardHandler
 	historyHandler  *routes.HistoryHandler
 	sessHandler     *routes.SessionsHandler
-	touches         *operatortouch.Recorder // the Operator's touches of agents, shared by the handlers that record them (#11225)
-	sysHandler      *routes.SystemHandler   // the update notice's source is set where the updater is built (registerCloud, #9726)
+	sysHandler      *routes.SystemHandler // the update notice's source is set where the updater is built (registerCloud, #9726)
 	remoteAgents    *background.RemoteAgentHub
 	goalMetrics     *routes.GoalMetricsHandler
 	systemHandler   *routes.SystemHandler

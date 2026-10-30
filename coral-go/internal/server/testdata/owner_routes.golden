@@ -1,7 +1,6 @@
 DELETE /api/artifacts/{id} launch owner-only
 DELETE /api/artifacts/{id}/star interact owner-only
 DELETE /api/saved/{id} interact owner-only
-GET /api/analytics/activity launch owner-only
 GET /api/artifacts view owner-only
 GET /api/artifacts/resolve view owner-only
 GET /api/artifacts/{id} view owner-only

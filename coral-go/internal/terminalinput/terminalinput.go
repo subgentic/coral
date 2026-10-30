@@ -159,13 +159,6 @@ func AutomatedText(text string) string {
 
 func isControl(r rune) bool { return r < 0x20 || r == 0x7f || (r >= 0x80 && r < 0xa0) }
 
-// personSink is told that a person typed to a target, and nothing else about it: the operator touch recording (#11225) takes the target and counts it; the text and its length stay with Record's own
-// decision below.
-var personSink atomic.Pointer[func(target string)]
-
-// SetPersonSink installs the function Record calls with the target of every input of a person's.
-func SetPersonSink(f func(target string)) { personSink.Store(&f) }
-
 // Record logs one write to target when the input debug log is on: the only caller of inputlog.Write. A person's text (and an unknown
 // origin's) is logged by its length only, unless it is only control input; everything else as it is. Coral's own annotations are inputlog.Note.
 // lastPerson is when a person's input last went to any agent (the dashboard's terminal, its chat box, a signed command line): what "nobody is typing" is read from (#11170).
@@ -183,9 +176,6 @@ func LastPersonInput() time.Time {
 func Record(o Origin, target string, kind Kind, data string) {
 	if o == Person {
 		lastPerson.Store(time.Now().UnixNano())
-		if f := personSink.Load(); f != nil {
-			(*f)(target) // only that a person typed to this target: never the data (#11225)
-		}
 	}
 	if o == Person || o == Unknown {
 		switch {

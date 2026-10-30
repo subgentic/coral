@@ -75,11 +75,11 @@ const BASE = require('./test_base').BASE;
         assert.match(await empty(), /It appears once an agent has done some work\./, 'but still says what makes data appear');
         // 4. Tool and API calls (Coral's own routes) is under Advanced, and its 14-day keep is said in the range's words
         const names = () => ev(`[...document.querySelectorAll('#cost-nav-list .row-btn')].map(b => b.textContent.trim())`);
-        assert.deepEqual(await names(), ['Overview', 'Usage', 'Operator interaction', 'Team communication', 'Tokens per commit', 'Task time', 'Advanced'], 'the list has the six views and Advanced');
+        assert.deepEqual(await names(), ['Overview', 'Tokens per commit', 'Task time', 'Advanced'], 'the list has three views and Advanced');
         assert.equal(await ev(`document.querySelector('#cost-nav-list [data-on-click="analytics-advanced"]').getAttribute('aria-expanded')`), 'false');
         await ev(`(() => { const b = document.querySelector('#cost-nav-list [data-on-click="analytics-advanced"]'); b.focus(); b.click(); return true; })()`);
         await waitFor(`[...document.querySelectorAll('#cost-nav-list .row-btn')].some(b => b.textContent.trim() === 'Tool and API calls')`, 'the advanced view', 8000);
-        assert.deepEqual(await names(), ['Overview', 'Usage', 'Operator interaction', 'Team communication', 'Tokens per commit', 'Task time', 'Advanced', 'Tool and API calls']);
+        assert.deepEqual(await names(), ['Overview', 'Tokens per commit', 'Task time', 'Advanced', 'Tool and API calls']);
         assert.equal(await ev(`document.activeElement && document.activeElement.textContent.trim()`), 'Advanced', 'the keyboard stays on Advanced');
         await ev(`document.querySelector('#cost-nav-list [data-view="calls"]').click(); true`);
         await waitFor(`/last 14 days/.test(document.getElementById('call-metrics-summary').textContent)`, 'the calls say what they keep', 10000);

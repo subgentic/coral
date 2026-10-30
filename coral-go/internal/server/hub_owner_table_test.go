@@ -110,7 +110,6 @@ func TestTheOwnerRoutesOfTheTableAreTheReviewedSet(t *testing.T) {
 		"PATCH /api/saved/{id}":       "owner-only",
 		"DELETE /api/saved/{id}":      "owner-only",
 		"POST /api/hub-auto-accept":   "owner-only-hub",
-		"GET /api/analytics/activity": "owner-only", // the activity counts of the Analytics tabs (#11225)
 		// A comment (or reply), a resolve and a reopen through the Hub are the owner's alone (#7052).
 		"POST /api/artifacts/{hex64}/comments":              "owner-only",
 		"POST /api/artifacts/{hex64}/comments/{id}/resolve": "owner-only",

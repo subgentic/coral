@@ -13,7 +13,6 @@ var routeQueries = map[string]string{
 	"GET /api/agent/ui/{}/content":                "revision,session_id",
 	"GET /api/agent/ui/{}/events":                 "after,session_id",
 	"GET /api/agents/models":                      "type",
-	"GET /api/analytics/activity":                 "range,team",
 	"GET /api/artifacts":                          "board,cursor,limit,starred",
 	"GET /api/artifacts/resolve":                  "link",
 	"GET /api/artifacts/{}":                       "v=2",

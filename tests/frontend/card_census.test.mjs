@@ -18,7 +18,6 @@ export const CARDS = {
     'start-card': 'regular',          // a first-visit choice in an empty state (Automations)
     'cost-card': 'regular',           // an Analytics figure
     'viz-card': 'regular',            // an Analytics chart
-    'atab-card': 'regular',           // a chart or table of the Usage, Operator interaction and Team communication tabs
     'eff-card': 'regular',            // an efficiency figure
     'prompt-inspection-card': 'regular',
     'team-link-card': 'regular',      // the Link team dialog's form

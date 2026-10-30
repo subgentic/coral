@@ -3,7 +3,6 @@ package routes
 import (
 	"errors"
 	"github.com/go-chi/chi/v5"
-	"github.com/subgentic/coral/internal/board"
 	"log"
 	"net/http"
 	"strings"
@@ -128,7 +127,6 @@ func (h *SessionsHandler) Wake(w http.ResponseWriter, r *http.Request) {
 		if humanInputCaller(r) {
 			h.resetAutoResume(ls.SessionID) // a person's wake (#3613, Security's SHOULD 1)
 		}
-		h.touch(r, ls.SessionID, board.TouchWake)
 		relaunched++
 	}
 
@@ -254,7 +252,6 @@ func (h *SessionsHandler) WakeSession(w http.ResponseWriter, r *http.Request) {
 	if humanInputCaller(r) {
 		h.resetAutoResume(sess.SessionID)
 	}
-	h.touch(r, sess.SessionID, board.TouchWake)
 	// One the Operator chose to wake from the over-the-cap list (#3636) gets Coral's notice.
 	if h.takePendingAutoWake(sess.SessionID) {
 		h.sendAutoWakeNotice(ctx, *sess)
@@ -399,7 +396,6 @@ func (h *SessionsHandler) WakeAll(w http.ResponseWriter, r *http.Request) {
 		if humanInputCaller(r) {
 			h.resetAutoResume(ls.SessionID) // a person's wake (#3613, Security's SHOULD 1)
 		}
-		h.touch(r, ls.SessionID, board.TouchWake)
 		relaunched++
 		if bn := ptr.Value(ls.BoardName); bn != "" {
 			boards[bn] = true
