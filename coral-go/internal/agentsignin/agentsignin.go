@@ -100,6 +100,8 @@ func displayName(agentType string) string {
 		return "Codex"
 	case "pi":
 		return "Pi"
+	case "opencode":
+		return "opencode"
 	}
 	return agentType
 }
@@ -117,6 +119,8 @@ var specs = map[string]spec{
 	"claude": {args: []string{"auth", "status", "--json"}, state: claudeState},
 	"codex":  {args: []string{"login", "status"}, state: codexState},
 	"pi":     {argsFn: piStatusArgs, state: piState},
+	// opencode lists its credentials (`opencode auth list`): a provider shown there is signed in. A run that lists none is signed out; a failure to run is Unknown.
+	"opencode": {args: []string{"auth", "list"}, state: opencodeState},
 }
 
 // Supports reports whether agentType has a non-interactive way to tell whether it is signed in. agy and gemini do not, and are never checked.
@@ -534,4 +538,65 @@ func piState(out, _ []byte, _ error) State {
 		return SignedOut
 	}
 	return Unknown
+}
+
+// opencodeState reads `opencode auth list`: signed in when it shows at least one provider, signed out when it ran and showed none, Unknown when it did not run.
+func opencodeState(out, _ []byte, runErr error) State {
+	if runErr != nil {
+		return Unknown
+	}
+	if len(ParseOpencodeAuthList(out)) > 0 {
+		return SignedIn
+	}
+	return SignedOut
+}
+
+var (
+	ansiR     = regexp.MustCompile("\x1b\\[[0-9;?]*[A-Za-z]")
+	authKindR = regexp.MustCompile(`^(?i:oauth|api|wellknown)$`)
+	envVarR   = regexp.MustCompile(`^[A-Z][A-Z0-9]*_[A-Z0-9_]+$`)
+	nonAlnumR = regexp.MustCompile(`[^a-z0-9]+`)
+)
+
+// NormalizeProvider is a provider's name as it is compared: lower case, letters and digits only, so "GitHub Copilot" and "github-copilot" are one.
+func NormalizeProvider(name string) string {
+	return nonAlnumR.ReplaceAllString(strings.ToLower(name), "")
+}
+
+// ParseOpencodeAuthList reads the providers `opencode auth list` shows (a bullet, the provider's name, then how it is signed in: oauth, api, wellknown, or the environment variable that holds its key), as
+// normalized names. Box-drawing lines, headings and the count line are skipped; nothing of a credential is ever in the output or kept.
+func ParseOpencodeAuthList(out []byte) map[string]bool {
+	found := map[string]bool{}
+	for _, line := range strings.Split(string(ansiR.ReplaceAll(out, nil)), "\n") {
+		_, rest, ok := strings.Cut(line, "●")
+		if !ok {
+			continue
+		}
+		f := strings.Fields(rest)
+		if n := len(f); n > 1 && (authKindR.MatchString(f[n-1]) || envVarR.MatchString(f[n-1])) {
+			f = f[:n-1]
+		}
+		if name := NormalizeProvider(strings.Join(f, " ")); name != "" {
+			found[name] = true
+		}
+	}
+	return found
+}
+
+// OpencodeProviders asks opencode at bin which providers it is signed in to, now (one run for all of them): nil when it could not be run.
+func OpencodeProviders(ctx context.Context, bin string) map[string]bool {
+	if bin == "" {
+		return nil
+	}
+	var got map[string]bool
+	st := runStatus(ctx, bin, []string{"auth", "list"}, "", func(out, _ []byte, err error) State {
+		if err == nil {
+			got = ParseOpencodeAuthList(out)
+		}
+		return opencodeState(out, nil, err)
+	})
+	if st == Unknown || st == TimedOut {
+		return nil
+	}
+	return got
 }
