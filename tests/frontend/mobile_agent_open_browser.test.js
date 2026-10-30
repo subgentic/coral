@@ -77,14 +77,21 @@ const DEVICES = [
             assert.equal(await evaluate(`window.__eval`), 0, `${d.name}: nothing went through eval(): ${await evaluate('window.__evalAt')}`);
             assert.equal(await evaluate(`document.documentElement.scrollWidth <= innerWidth`), true, `${d.name}: no sideways page scroll`);
 
-            // The settings menu must open above the agent page. (An open agent's row has the menu button itself under 640 px and the side panel covers that row, #11056: the panel is shut for the menu and opened again after it.)
+            // The settings menu stays reachable from an open agent on a phone (the intent of this check since #9021), by the way slice B of the phone model gives it (#11236, #11239; the operator's decision: a drill-down has no ☰): the agent bar draws no ☰, the arrow goes to the list, and the bottom nav's More opens the menu: two taps. (An open agent's side panel covers the page, #11056: it is shut for the menu.)
             await evaluate(`window.toggleAgenticPanel(false)`);
-            // under 640 px the top row is one hamburger (#9021) and the settings are in its menu; wider, the gear's menu
-            await tap((await evaluate(`getComputedStyle(document.getElementById('agent-bar-menu')).display !== 'none'`)) ? '#agent-bar-menu' : '#top-menu-btn:not([hidden]), .top-bar-settings-wrapper button, #top-bar-settings-btn'); // an open agent's row has the menu button itself under 640 px (#11056)
-            await waitFor(`!!document.querySelector('#nav-more-menu:not([hidden]), .top-bar-settings-menu')`, 'the settings menu', { soft: true });
-            const over = await evaluate(`(() => { const m = document.querySelector('#nav-more-menu:not([hidden]), .top-bar-settings-menu'); if (!m) return 'no menu'; const b = m.getBoundingClientRect(); const top = document.elementFromPoint(b.x + b.width/2, b.y + 12); return m.contains(top) ? 'ok' : 'covered by ' + (top && (top.id || top.className)); })()`);
+            assert.equal(await evaluate(`[...document.querySelectorAll('#agent-bar-menu')].some(e => e.getClientRects().length > 0)`), false, `${d.name}: the agent bar draws no ☰ on a phone`);
+            let taps = 0;
+            await tap('.terminal-back-btn'); taps++;
+            await waitFor(`getComputedStyle(document.getElementById('mobile-agent-list')).display !== 'none' && getComputedStyle(document.getElementById('phone-nav')).display !== 'none'`, 'the list and its bottom nav', { soft: true });
+            await tap('.phone-nav-slot[data-phone-nav="nav-more"]'); taps++;
+            await waitFor(`!!document.querySelector('#nav-more-menu:not([hidden])')`, 'the settings menu', { soft: true });
+            assert.ok(taps <= 2, `${d.name}: the menu is two taps from an open agent`);
+            const over = await evaluate(`(() => { const m = document.querySelector('#nav-more-menu:not([hidden])'); if (!m) return 'no menu'; const b = m.getBoundingClientRect(); const top = document.elementFromPoint(b.x + b.width/2, b.y + 12); return m.contains(top) ? 'ok' : 'covered by ' + (top && (top.id || top.className)); })()`);
             assert.equal(over, 'ok', `${d.name}: the menu is on top of the page`);
-            await evaluate(`document.getElementById('nav-more-menu').hidden = true; window.toggleAgenticPanel(true)`);
+            await evaluate(`document.getElementById('nav-more-menu').hidden = true; true`);
+            await tap('#mobile-session-list .session-group-item[data-session-id="sid-beta"]'); // the agent again, for the panel's tab strip
+            await waitFor(`getComputedStyle(document.getElementById('mobile-agent-list')).display === 'none'`, 'the agent to open again', { soft: true });
+            await evaluate(`window.toggleAgenticPanel(true)`);
             // Panel tab strip (the rare tabs are drawn out of the row, behind the More menu, #7621): the close button leads it and covers no tab at rest; every tab is reachable by scrolling.
             const strip = await evaluate(`(() => { const s = document.querySelector('#agentic-state .agentic-state-tabs'); const x = document.getElementById('agentic-mobile-close-btn').getBoundingClientRect(); const tabs = [...s.children].filter(e => e !== document.getElementById('agentic-mobile-close-btn') && e.offsetParent && !e.classList.contains('tab-more')); const overlap = tabs.filter(t => { const b = t.getBoundingClientRect(); return b.left < x.right && b.right > x.left; }).map(t => t.id); s.scrollLeft = s.scrollWidth; const last = tabs[tabs.length - 1].getBoundingClientRect(); const reach = last.right <= s.getBoundingClientRect().right + 1; s.scrollLeft = 0; return { xLeft: Math.round(x.left), overlap, reach, n: tabs.length }; })()`);
             assert.ok(strip.xLeft <= 8, `${d.name}: the panel's close button leads the tab strip (left=${strip.xLeft})`);
