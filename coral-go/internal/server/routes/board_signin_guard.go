@@ -106,7 +106,9 @@ func percentDecoded(text string) string {
 	return b.String()
 }
 
-func linkHexDigit(c byte) bool { return '0' <= c && c <= '9' || 'a' <= c && c <= 'f' || 'A' <= c && c <= 'F' }
+func linkHexDigit(c byte) bool {
+	return '0' <= c && c <= '9' || 'a' <= c && c <= 'f' || 'A' <= c && c <= 'F'
+}
 
 func linkHexValue(c byte) byte {
 	switch {
