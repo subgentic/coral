@@ -431,6 +431,9 @@ var routeTable = cat(
 	// It never runs a CLI itself: the handler answers from a cache and refreshes in the background at most once a day per CLI build (an hour after
 	// a failure, one fetch at a time), and only type (an exact agent type) may pass. The refresh route (POST .../refresh) stays local.
 	rules(http.MethodGet, TierLaunch, "/api/agents/models"),
+	// The Analytics tabs Operator interaction and Team communication (#11222): counts of messages, @mentions, asks and tasks per agent. Launch, so only the Hub owner
+	// reads it; a view-only guest is refused and the page says so in one line. Only team and range pass; no text is in the reply.
+	rules(http.MethodGet, TierLaunch, "/api/analytics/activity"),
 	// Which agents run an older hook set: for the Operator who would resume them (#3665).
 	rules(http.MethodGet, TierLaunch, "/api/system/hooks-status"),
 	// Relaunching this Coral into an update it has already verified and staged (#5280): the status is View, the relaunch is Launch and
