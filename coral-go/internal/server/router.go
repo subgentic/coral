@@ -463,7 +463,7 @@ func (s *Server) registerCloud(r *chi.Mux) {
 	r.Post("/api/system/update/check", upd.CheckNow)                   // #5280 step 3 B: local only, 404 until the feature is on
 	r.Put("/api/system/update/settings", upd.SetAuto)                  // check automatically
 	s.goBackground(upd.RunBackgroundChecks)                            // returns at once while the feature is off
-	upd.Idle, upd.InFlight, upd.LastPerson = s.sessHandler.UpdateIdleReason, ptymanager.AutomatedInputInFlight, terminalinput.LastPersonInput
+	upd.Idle, upd.InFlight, upd.LastPerson, upd.Work = s.sessHandler.UpdateIdleReason, ptymanager.AutomatedInputInFlight, terminalinput.LastPersonInput, background.BusyWork
 	s.goBackground(upd.RunAutoInstall) // install a verified update once Coral has been idle (#11170); returns at once without an updater
 	// the goal events the feed names are pruned to the newest thousand per board (#7355)
 	if s.boardStore != nil {

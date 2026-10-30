@@ -158,6 +158,8 @@ func startBackgroundServices(ctx context.Context, db *store.DB, cfg *config.Conf
 	wfRunner := background.NewWorkflowRunner(wfStore, launcher, agentRT, nil, nil, cfg.CoralDir(), cfg.AgentHost(), cfg.Port)
 	srv.SetWorkflowRunner(wfRunner)
 	scheduler.SetWorkflowRunner(wfRunner, wfStore)
+	background.RegisterBusyProbe("workflow run", wfRunner.RunningCount) // the update that installs when Coral is idle waits for them (#11170)
+	background.RegisterBusyProbe("scheduled run", scheduler.RunningCount)
 
 	log.Printf("Started 8 background services + workflow runner (git poller, indexer, scheduler, board notifier, remote board poller, batch summarizer, session reconciler, token poller)")
 	return wfRunner, scheduler

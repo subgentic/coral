@@ -222,8 +222,10 @@ type UpdateRelaunchHandler struct {
 	Idle       func(ctx context.Context) string
 	InFlight   func() bool
 	LastPerson func() time.Time
-	AutoTimes  *autoInstallTimes
-	auto       autoInstallState
+	// Work says why a running scheduled job or workflow run keeps the rule waiting (they end when Coral restarts), "" when none runs.
+	Work      func() string
+	AutoTimes *autoInstallTimes
+	auto      autoInstallState
 
 	// SetSetting writes a setting (the update_auto switch's own route uses it).
 	SetSetting func(ctx context.Context, key, value string) error

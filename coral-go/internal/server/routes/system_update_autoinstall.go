@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	at "github.com/subgentic/coral/internal/agenttypes"
 	setreg "github.com/subgentic/coral/internal/settings"
 	"github.com/subgentic/coral/internal/updatecheck"
 )
@@ -18,6 +19,9 @@ import (
 // running, and a failed apply starts the old Coral again and says why in the updater's history, #11151 and #11155). Idle is: no agent working, no automated input in flight and nobody typing
 // in the dashboard for a few minutes, held for a few minutes and looked at again just before the apply. A failed apply is not retried in a loop: the version waits a day, and the pill says why.
 // Windows installs ask a person (UAC) and stay click-to-install; the Hub's own relaunch is as it was.
+
+// autoAttemptResult is the result word of an attempt that has started and has not been seen to end.
+const autoAttemptResult = "did not finish"
 
 // autoInstallFile is where the failure of the last automatic install is kept (a restart does not clear the day's wait).
 const autoInstallFile = "auto_install.json"
@@ -141,6 +145,9 @@ func (h *UpdateRelaunchHandler) say(f AutoInstallFacts) AutoInstallFacts {
 	h.auto.mu.Lock()
 	defer h.auto.mu.Unlock()
 	h.auto.last = f
+	if f.State == autoBackoff || f.State == autoStarted || f.State == autoNone {
+		h.auto.idleSince = time.Time{} // the hold starts over once it may try again
+	}
 	key := f.State + "|" + f.Reason
 	if key != h.auto.logged && f.State != autoNone && f.State != autoOff {
 		h.auto.logged = key
@@ -168,6 +175,13 @@ func (h *UpdateRelaunchHandler) AutoInstallTick(ctx context.Context) AutoInstall
 	}
 	// An attempt this process started that has ended without an update is a failure: it waits the day.
 	h.noteAutoOutcome(v, times)
+	// An attempt that did not finish (this process's, or one before a restart: the attempt is on disk from the moment it starts) is said before anything else, so the control shows why and not "an
+	// install is already under way" (QA's #11170 SHOULD); a Coral that came back with the same update still staged does not try it again inside the day.
+	if v.reason != reasonApplying && v.version != "" {
+		if f, ok := h.readAutoFailure(); ok && f.Version == v.version && h.now().Sub(f.FailedAt) < times.Backoff && !(f.Result == autoAttemptResult && h.startedVersion == v.version && v.rec.State == updApplying) {
+			return h.say(AutoInstallFacts{On: true, State: autoBackoff, Reason: "the last automatic install did not finish (" + f.Result + "); Coral tries again after a day, or use Update and relaunch", RetryAt: f.FailedAt.Add(times.Backoff)})
+		}
+	}
 	switch v.reason {
 	case "":
 	case reasonNothing, reasonNotVerified, reasonUnsupported, reasonNoRunRecord:
@@ -180,9 +194,6 @@ func (h *UpdateRelaunchHandler) AutoInstallTick(ctx context.Context) AutoInstall
 	// Strictly newer than the installed one (the updater re-verifies it too, but only after the server has quit for it).
 	if !updatecheck.Newer(v.version, v.rec.Installed) {
 		return h.say(AutoInstallFacts{On: true, State: autoNone})
-	}
-	if f, ok := h.readAutoFailure(); ok && f.Version == v.version && h.now().Sub(f.FailedAt) < times.Backoff {
-		return h.say(AutoInstallFacts{On: true, State: autoBackoff, Reason: "the last automatic install did not finish (" + f.Result + "); Coral tries again after a day, or use Update and relaunch", RetryAt: f.FailedAt.Add(times.Backoff)})
 	}
 	if why := h.busyReason(ctx, times); why != "" {
 		h.auto.mu.Lock()
@@ -204,6 +215,25 @@ func (h *UpdateRelaunchHandler) AutoInstallTick(ctx context.Context) AutoInstall
 
 // busyReason is why Coral is not idle, or "": an agent working, automated input in flight, or someone typing in the dashboard.
 func (h *UpdateRelaunchHandler) busyReason(ctx context.Context, times autoInstallTimes) string {
+	// What the click shows the person to acknowledge: the sessions this Coral runs itself (pty) that the relaunch ends. They have no acknowledgement here, so the update waits for the click (Security's
+	// and QA's #11170 SHOULD). Agents running in tmux survive, unless this update replaces tmux itself.
+	if h.Agents != nil {
+		ag, err := h.Agents(ctx)
+		if err != nil {
+			return "the sessions that would restart could not be read"
+		}
+		if n := len(ag); n > 0 {
+			return fmt.Sprintf("%d session%s on this Coral's own terminals would be restarted: click Update and relaunch to choose when", n, map[bool]string{true: "s", false: ""}[n != 1])
+		}
+	}
+	if rec, err := h.Updater.Record(ctx); err == nil && rec.TmuxAgentsRestart {
+		return "this update also restarts the agents running in tmux: click Update and relaunch to choose when"
+	}
+	if h.Work != nil {
+		if why := h.Work(); why != "" {
+			return why
+		}
+	}
 	if h.Idle != nil {
 		if why := h.Idle(ctx); why != "" {
 			return why
@@ -248,6 +278,9 @@ func (h *UpdateRelaunchHandler) applyWhenStillIdle(ctx context.Context, times au
 		return h.say(AutoInstallFacts{On: true, State: autoBackoff, Reason: "the install could not be started; Coral tries again after a day", RetryAt: h.now().Add(times.Backoff)})
 	}
 	h.startedVersion, h.startedAt = v.version, h.now()
+	// On disk from the start: an attempt counts as one that did not finish unless the update replaced Coral. A Coral that comes back with the same update staged (the updater started the old one again,
+	// #11155) finds it and waits the day, instead of trying again when the spacing is over.
+	h.writeAutoFailure(autoInstallFailure{Version: v.version, FailedAt: h.now(), Result: autoAttemptResult})
 	h.audit(ctx, localIdentity, &v, "auto_started")
 	slog.Info("[update] installing by itself: Coral is idle", "version", v.version, "operation", printable(op, 64))
 	return h.say(AutoInstallFacts{On: true, State: autoStarted})
@@ -277,8 +310,14 @@ func (h *SessionsHandler) UpdateIdleReason(ctx context.Context) string {
 		return "the agents could not be read"
 	}
 	var working []string
+	ends := TerminalKind(h.terminal) != "tmux" // a tmux Coral keeps its terminals running through a relaunch; any other (pty, or one not known) ends them
 	for _, l := range live {
 		if l.IsSleeping == 1 || l.IsArchived == 1 {
+			continue
+		}
+		if l.AgentType == at.Terminal && ends && !(l.Backend != nil && *l.Backend == "tmux") {
+			// A plain terminal has no turns, but on a pty Coral the relaunch ends it and it cannot resume (a build, an ssh session, a REPL are lost): it is not idle (QA's #11170 MUST).
+			working = append(working, "a terminal is open")
 			continue
 		}
 		if st := h.deriveSingleSessionState(ctx, l.SessionID, 0); st.Working || st.InTurn && !st.NeedsInput {
@@ -293,6 +332,9 @@ func (h *SessionsHandler) UpdateIdleReason(ctx context.Context) string {
 	case 0:
 		return ""
 	case 1:
+		if strings.HasPrefix(working[0], "a terminal") {
+			return working[0]
+		}
 		return working[0] + " is working"
 	}
 	return fmt.Sprintf("%d agents are working", len(working))
