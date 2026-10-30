@@ -45,7 +45,9 @@ func JunctionsTraversable(t *testing.T) bool {
 			return
 		}
 		link := filepath.Join(dir, "link")
-		if out, err := exec.Command("cmd", "/c", "mklink", "/J", link, target).CombinedOutput(); err != nil {
+		cmd := exec.Command("cmd", "/c", "mklink", "/J", link, target)
+		cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true} // no console window on the person's desktop (#212's console lint)
+		if out, err := cmd.CombinedOutput(); err != nil {
 			probeErr = errors.New("mklink /J: " + err.Error() + ": " + string(out))
 			return
 		}

@@ -16,6 +16,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/subgentic/coral/internal/executil"
 	"github.com/subgentic/coral/internal/safefs"
 	"github.com/subgentic/coral/internal/safego"
 	"github.com/subgentic/coral/internal/updatecheck"
@@ -550,6 +551,7 @@ func (e execProgram) run(ctx context.Context, args ...string) ([]byte, error) {
 		return nil, err
 	}
 	cmd := exec.CommandContext(ctx, p, args...)
+	executil.HideWindow(cmd) // coral-update is a console program: a Coral with no console of its own (the tray's server) would open a window on every check (#383)
 	cmd.Env = programEnv()
 	cmd.WaitDelay = 2 * time.Second // a program that is killed at the timeout but left a child holding its output does not hold this call
 	var out limitedBuffer
@@ -569,6 +571,7 @@ func (e execProgram) StartApply() (applyRun, error) {
 		return applyRun{}, err
 	}
 	cmd := exec.Command(p, "apply")
+	executil.HideWindow(cmd) // as run: no console window for the apply (#383)
 	cmd.Env = programEnv()
 	detach(cmd)
 	if err := cmd.Start(); err != nil {

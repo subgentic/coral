@@ -432,7 +432,7 @@ func (w *WindowsMSI) Msiexec(ctx context.Context, args ...string) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	cmd := exec.CommandContext(ctx, exe, args...)
+	cmd := exec.CommandContext(ctx, exe, args...) // consoletest:allow msiexec.exe is a GUI-subsystem program: it opens no console
 	err = cmd.Run()
 	var ee *exec.ExitError
 	if errors.As(err, &ee) {

@@ -27,7 +27,7 @@ func NewRunner() Runner { return execRunner{timeout: 10 * time.Minute} }
 func (r execRunner) Run(ctx context.Context, name string, args ...string) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, r.timeout)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, name, args...)
+	cmd := exec.CommandContext(ctx, name, args...) // consoletest:allow the macOS and Linux runner (PATH=/usr/bin:/bin): never run on Windows
 	cmd.Env = []string{"PATH=/usr/bin:/bin:/usr/sbin:/sbin", "HOME=" + os.Getenv("HOME"), "LANG=C"}
 	var out limited
 	cmd.Stdout, cmd.Stderr = &out, &out
