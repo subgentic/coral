@@ -46,6 +46,48 @@ func (r Runner) AcceptTerms(ctx context.Context, t Target, version string, paylo
 	return nil
 }
 
+// stopWait and stopPoll bound how long a stopped Coral is given to be gone; variables for tests.
+var (
+	stopWait = 15 * time.Second
+	stopPoll = time.Second
+)
+
+// SetStopTimingForTest shortens how long StopAndConfirm waits (other packages' tests run it against a Coral that will not stop); it returns the function that puts the old values back.
+func SetStopTimingForTest(wait, poll time.Duration) (restore func()) {
+	oldW, oldP := stopWait, stopPoll
+	stopWait, stopPoll = wait, poll
+	return func() { stopWait, stopPoll = oldW, oldP }
+}
+
+// ErrNotStopped is a Coral that is still there after a stop (a session, or something listening on its port), or one that could not be checked.
+var ErrNotStopped = errors.New("sshprov: Coral did not stop, or that could not be checked")
+
+// StopAndConfirm ends the coral-server tmux session (matched by its exact name: a far user's "coral-server-notes" is never touched) and then CONFIRMS it: no session by that name and nothing listening on
+// port 8420. It returns nil only on that confirmation; a caller does not delete files or restart on anything else.
+func (r Runner) StopAndConfirm(ctx context.Context, t Target) error {
+	if _, err := r.Run(ctx, t, CmdStopTmux); err != nil {
+		return err
+	}
+	deadline := time.Now().Add(stopWait)
+	for {
+		res, err := r.Run(ctx, t, CmdCheckStopped)
+		if err != nil {
+			return err
+		}
+		if res.ExitCode == 0 {
+			return nil
+		}
+		if res.ExitCode == 3 || time.Now().After(deadline) {
+			return ErrNotStopped
+		}
+		select {
+		case <-ctx.Done():
+			return ErrNotStopped
+		case <-time.After(stopPoll):
+		}
+	}
+}
+
 // StartTmux starts the installed Coral of version in a tmux session called coral-server, once: a session that exists is left as it is.
 func (r Runner) StartTmux(ctx context.Context, t Target, version string) error {
 	res, err := r.Run(ctx, t, CmdStartTmux, version)

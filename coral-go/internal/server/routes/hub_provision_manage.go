@@ -136,8 +136,8 @@ func (pr *Provisioner) stopSteps(ctx context.Context, p *provisionPlan) {
 
 func (pr *Provisioner) stopRemote(ctx context.Context, p *provisionPlan) bool {
 	p.setStep("stop", stepRunning, "")
-	if r, err := pr.runner.Run(ctx, p.Target, sshprov.CmdStopTmux); err != nil || r.ExitCode != 0 {
-		pr.fail(p, "stop", "Could not stop Coral on that computer.")
+	if err := pr.runner.StopAndConfirm(ctx, p.Target); err != nil {
+		pr.fail(p, "stop", "Coral on that computer did not stop, or that could not be checked, so nothing was deleted.")
 		return false
 	}
 	p.setStep("stop", stepOK, "Coral is stopped. Its files are still there.")
@@ -212,8 +212,8 @@ func (pr *Provisioner) upgradeSteps(ctx context.Context, p *provisionPlan) {
 		return
 	}
 	p.setStep("restart", stepRunning, "Stopping Coral and starting the new release.")
-	if r, err := pr.runner.Run(ctx, p.Target, sshprov.CmdStopTmux); err != nil || r.ExitCode != 0 {
-		pr.fail(p, "restart", "Could not stop the running Coral.")
+	if err := pr.runner.StopAndConfirm(ctx, p.Target); err != nil {
+		pr.fail(p, "restart", "The running Coral did not stop, or that could not be checked, so the new release was not started.")
 		return
 	}
 	by := setupAcceptanceLabel()

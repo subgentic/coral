@@ -51,6 +51,9 @@ const (
 	CmdRemoveInstalls
 	// CmdRemoveAll deletes the whole install folder: releases, data (the key, the history), the instance id.
 	CmdRemoveAll
+	// CmdCheckStopped is the check after a stop: exit 0 only when there is no tmux session named exactly coral-server and nothing listens on port 8420 (read from /proc/net/tcp and tcp6, Linux); 1 for a
+	// session, 2 for a listener, 3 when it cannot tell (no /proc/net/tcp): all of them are "not confirmed".
+	CmdCheckStopped
 	// CmdFreeKB prints the free space, in KiB, of the file system that holds the home folder (the install folder lives under it).
 	CmdFreeKB
 	// CmdReadInstalledSum prints that recorded SHA-256, if the release is installed; arg 0 is the version.
@@ -82,15 +85,17 @@ var specs = map[Command]spec{
 	CmdMkVersionDir:   {template: "umask 077 && mkdir -p \"$HOME/" + InstallDir + "/%[1]s\" && chmod 700 \"$HOME/" + InstallDir + "\" \"$HOME/" + InstallDir + "/%[1]s\"", args: []*regexp.Regexp{versionRe}},
 	CmdReceive:        {template: "umask 077 && cat > \"$HOME/" + InstallDir + "/%s/package.tar.gz\"", args: []*regexp.Regexp{versionRe}, timeout: 15 * time.Minute},
 	CmdTarList:        {template: "cd \"$HOME/" + InstallDir + "/%s\" && tar -tzf package.tar.gz", args: []*regexp.Regexp{versionRe}, timeout: 2 * time.Minute},
-	CmdStartTmux: {template: "umask 077 && mkdir -p \"$HOME/" + InstallDir + "/data\" && { tmux has-session -t coral-server 2>/dev/null || tmux new-session -d -s coral-server " +
+	CmdStartTmux: {template: "umask 077 && mkdir -p \"$HOME/" + InstallDir + "/data\" && { tmux has-session -t =coral-server 2>/dev/null || tmux new-session -d -s coral-server " +
 		"\"exec \\\"$HOME/" + InstallDir + "/%[1]s/root/coral\\\" --host 127.0.0.1 --port 8420 --no-browser --cloud-url off --backend tmux --home \\\"$HOME/" + InstallDir + "/data\\\"\"; }", args: []*regexp.Regexp{versionRe}},
 	CmdEnsureInstanceID: {template: "umask 077 && mkdir -p \"$HOME/" + InstallDir + "\" && f=\"$HOME/" + InstallDir + "/instance-id\" && { [ -s \"$f\" ] || head -c 16 /dev/urandom | od -An -tx1 | tr -d ' \\n' > \"$f\"; } && cat \"$f\""},
 	CmdReadAPIKey:       {template: "\"$HOME/" + InstallDir + "/%s/root/coral\" api-key --home \"$HOME/" + InstallDir + "/data\" 2>/dev/null", args: []*regexp.Regexp{versionRe}},
 	CmdAcceptTerms:      {template: "\"$HOME/" + InstallDir + "/%s/root/coral\" accept-terms", args: []*regexp.Regexp{versionRe}},
-	CmdStopTmux:         {template: "tmux kill-session -t coral-server 2>/dev/null; true"},
+	CmdStopTmux:         {template: "tmux kill-session -t =coral-server 2>/dev/null; true"},
 	CmdRemoveInstalls:   {template: "cd \"$HOME/" + InstallDir + "\" 2>/dev/null && for d in [0-9]*; do [ -d \"$d\" ] && rm -rf -- \"$d\"; done; true"},
 	CmdRemoveAll:        {template: "[ -n \"$HOME\" ] && rm -rf \"$HOME/" + InstallDir + "\""},
-	CmdFreeKB:           {template: "df -Pk \"$HOME\" | awk 'NR==2 {print $4}'"},
+	CmdCheckStopped: {template: "if tmux has-session -t =coral-server 2>/dev/null; then exit 1; fi; [ -r /proc/net/tcp ] || exit 3; " +
+		"if grep -Eqs '^ *[0-9]+: [0-9A-Fa-f]+:20E4 [0-9A-Fa-f:]+ 0A ' /proc/net/tcp /proc/net/tcp6; then exit 2; fi; exit 0"},
+	CmdFreeKB: {template: "df -Pk \"$HOME\" | awk 'NR==2 {print $4}'"},
 	// The recorded sum goes FIRST: a re-unpack that is interrupted leaves no sum next to a half-written root, so the next run does not say "already installed". It is written last.
 	CmdUnpack: {template: "umask 077 && cd \"$HOME/" + InstallDir + "/%[1]s\" && rm -f package.sha256 && rm -rf root && mkdir root && tar -xzf package.tar.gz --no-same-owner -C root && " +
 		"{ sha256sum package.tar.gz 2>/dev/null || shasum -a 256 package.tar.gz; } | cut -d' ' -f1 > package.sha256", args: []*regexp.Regexp{versionRe}, timeout: 5 * time.Minute},

@@ -49,6 +49,7 @@ sleep 20
 echo "$@" >> '` + tmuxLog + `'
 case "$1" in
   has-session) [ -e '` + filepath.Join(dir, "session") + `' ] && exit 0; exit 1;;
+  kill-session) [ -e '` + filepath.Join(dir, "stuck") + `' ] && exit 0; rm -f '` + filepath.Join(dir, "session") + `'; exit 0;;
   new-session) touch '` + filepath.Join(dir, "session") + `'
     while [ $# -gt 0 ]; do cmd="$1"; shift; done
     nohup sh -c "$cmd" >/dev/null 2>&1 &
@@ -59,7 +60,9 @@ esac
 		t.Fatal(err)
 	}
 	ssh := filepath.Join(dir, "ssh")
-	script := "#!/bin/sh\nfor a in \"$@\"; do last=\"$a\"; done\nHOME='" + home + "'; export HOME\nPATH='" + bin + ":'\"$PATH\"; export PATH\neval \"$last\"\n"
+	// /proc/net/tcp is Linux's: the check after a stop is answered here from files the tests make (listening, cannot-tell)
+	proc := "case \"$last\" in *\"/proc/net/tcp\"*) if tmux has-session -t =coral-server 2>/dev/null; then exit 1; fi; [ -e '" + filepath.Join(dir, "noproc") + "' ] && exit 3; [ -e '" + filepath.Join(dir, "listening") + "' ] && exit 2; exit 0;; esac\n"
+	script := "#!/bin/sh\nfor a in \"$@\"; do last=\"$a\"; done\nPATH='" + bin + ":'\"$PATH\"; export PATH\n" + proc + "HOME='" + home + "'; export HOME\nPATH='" + bin + ":'\"$PATH\"; export PATH\neval \"$last\"\n"
 	if err := os.WriteFile(ssh, []byte(script), 0o700); err != nil {
 		t.Fatal(err)
 	}
@@ -226,5 +229,77 @@ func TestAcceptTermsGoesOnStdinNeverInArgv(t *testing.T) {
 	}
 	if _, err := r.RunInput(context.Background(), tg, strings.NewReader("x"), CmdAcceptTerms, "../x"); !errors.Is(err, ErrNotAllowed) {
 		t.Errorf("a version that is a path: %v", err)
+	}
+}
+
+func TestTmuxNamesAreExactSoAnotherUsersSessionIsNeverTouched(t *testing.T) {
+	for _, c := range []Command{CmdStartTmux, CmdStopTmux, CmdCheckStopped} {
+		text, err := remoteText(c, "2.0.10")
+		if c != CmdStartTmux {
+			text, err = remoteText(c)
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(text, "-t coral-server") {
+			t.Errorf("%d matches a session by a prefix: %s", c, text)
+		}
+		if !strings.Contains(text, "-t =coral-server") {
+			t.Errorf("%d does not name the session exactly: %s", c, text)
+		}
+	}
+}
+
+func TestStopAndConfirmReturnsOnlyOnAConfirmedStop(t *testing.T) {
+	oldW, oldP := stopWait, stopPoll
+	stopWait, stopPoll = 300*time.Millisecond, 50*time.Millisecond
+	defer func() { stopWait, stopPoll = oldW, oldP }()
+	tg, _ := ParseTarget("rich@box.example.com")
+	ctx := context.Background()
+
+	r, _, _, tmuxLog := startSide(t)
+	if err := r.StartTmux(ctx, tg, "2.0.10"); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.StopAndConfirm(ctx, tg); err != nil {
+		t.Fatalf("a normal stop: %v", err)
+	}
+	if b, _ := os.ReadFile(tmuxLog); !strings.Contains(string(b), "kill-session -t =coral-server") {
+		t.Errorf("tmux log:\n%s", b)
+	}
+	if err := r.StopAndConfirm(ctx, tg); err != nil { // nothing running: still confirmed
+		t.Errorf("a stop with no session: %v", err)
+	}
+
+	r, home, _, _ := startSide(t)
+	dir := filepath.Dir(home)
+	if err := r.StartTmux(ctx, tg, "2.0.10"); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "stuck"), nil, 0o600); err != nil { // the session will not die
+		t.Fatal(err)
+	}
+	if err := r.StopAndConfirm(ctx, tg); !errors.Is(err, ErrNotStopped) {
+		t.Errorf("a session that stays: %v", err)
+	}
+
+	r, home, _, _ = startSide(t)
+	dir = filepath.Dir(home)
+	if err := os.WriteFile(filepath.Join(dir, "listening"), nil, 0o600); err != nil { // something listens on 8420
+		t.Fatal(err)
+	}
+	if err := r.StopAndConfirm(ctx, tg); !errors.Is(err, ErrNotStopped) {
+		t.Errorf("a listener on 8420: %v", err)
+	}
+
+	r, home, _, _ = startSide(t)
+	dir = filepath.Dir(home)
+	if err := os.WriteFile(filepath.Join(dir, "noproc"), nil, 0o600); err != nil { // cannot tell
+		t.Fatal(err)
+	}
+	stopWait = 5 * time.Second // a check that cannot tell does not wait this out
+	start := time.Now()
+	if err := r.StopAndConfirm(ctx, tg); !errors.Is(err, ErrNotStopped) || time.Since(start) > 3*time.Second {
+		t.Errorf("a check that cannot tell must refuse at once: %v after %v", err, time.Since(start))
 	}
 }

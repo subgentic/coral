@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -44,7 +45,8 @@ func newManageEnv(t *testing.T) *manageEnv {
 	require.NoError(t, os.WriteFile(filepath.Join(home, ".coral-server", "instance-id"), []byte(provInstance+"\n"), 0o600))
 	require.NoError(t, os.WriteFile(filepath.Join(home, ".coral-server", "data", "api_key"), []byte(provKey+"\n"), 0o600))
 	require.NoError(t, os.WriteFile(filepath.Join(bin, "tmux"), []byte("#!/bin/sh\necho \"$@\" >> '"+tmuxLog+"'\n[ \"$1\" = has-session ] && exit 1\nexit 0\n"), 0o755))
-	script := "#!/bin/sh\nfor a in \"$@\"; do last=\"$a\"; done\ncase \"$last\" in *\"uname -sm\"*) echo 'Linux x86_64'; exit 0;; *\"command -v tmux\"*) exit 0;; esac\nHOME='" + home + "'; export HOME\nPATH='" + bin + ":'\"$PATH\"; export PATH\neval \"$last\"\n"
+	// the check after a stop reads /proc/net/tcp, which a Mac has not: it is answered here (a file named stuck means Coral will not stop)
+	script := "#!/bin/sh\nfor a in \"$@\"; do last=\"$a\"; done\ncase \"$last\" in *\"uname -sm\"*) echo 'Linux x86_64'; exit 0;; *\"command -v tmux\"*) exit 0;; *\"/proc/net/tcp\"*) [ -e '" + filepath.Join(pe.dir, "stuck") + "' ] && exit 1; exit 0;; esac\nHOME='" + home + "'; export HOME\nPATH='" + bin + ":'\"$PATH\"; export PATH\neval \"$last\"\n"
 	require.NoError(t, os.WriteFile(filepath.Join(pe.dir, "ssh"), []byte(script), 0o700))
 	pe.p.runner = sshprov.Runner{SSH: filepath.Join(pe.dir, "ssh")}
 	pe.p.version = "2.0.10"
@@ -124,7 +126,7 @@ func TestManageStopKeepsEverythingButTheRunningCoral(t *testing.T) {
 	done := me.waitPhase(t, plan, "done")
 	assert.Equal(t, "ok", done["steps"].([]any)[2].(map[string]any)["state"])
 	b, _ := os.ReadFile(me.tmuxLog)
-	assert.Contains(t, string(b), "kill-session -t coral-server")
+	assert.Contains(t, string(b), "kill-session -t =coral-server")
 	assert.True(t, farHas(filepath.Join(me.home, ".coral-server", "2.0.9")))
 	assert.True(t, farHas(filepath.Join(me.home, ".coral-server", "data", "api_key")))
 	_, err := me.e.h.store.Get(context.Background(), "ssh-box")
@@ -250,3 +252,27 @@ func TestManageUpgradeFailsWhenTheNewReleaseDoesNotAnswer(t *testing.T) {
 }
 
 func farHas(p string) bool { _, err := os.Stat(p); return err == nil }
+
+// A stop that cannot be confirmed leaves everything where it is: remove deletes nothing and keeps the row, upgrade does not restart.
+func TestManageNothingIsDeletedOrRestartedWhenTheStopIsNotConfirmed(t *testing.T) {
+	defer sshprov.SetStopTimingForTest(200*time.Millisecond, 20*time.Millisecond)()
+	for _, action := range []string{"remove", "upgrade"} {
+		me := newManageEnv(t)
+		require.NoError(t, os.WriteFile(filepath.Join(me.dir, "stuck"), nil, 0o600))
+		_, v := me.plan(t, action, map[string]any{"delete_data": action == "remove"})
+		plan := v["plan"].(string)
+		me.connectAndRun(t, plan, map[string]any{"confirm": "ssh-box", "accept_terms": true, "terms_sha256": terms.EULADigest()}, 202)
+		failed := me.waitPhase(t, plan, "failed")
+		assert.Contains(t, failed["error"], "did not stop", action)
+		assert.True(t, farHas(filepath.Join(me.home, ".coral-server", "2.0.9")), action+": a release was deleted")
+		assert.True(t, farHas(filepath.Join(me.home, ".coral-server", "data", "api_key")), action+": the data was deleted")
+		assert.True(t, farHas(filepath.Join(me.home, ".coral-server", "instance-id")), action)
+		_, err := me.e.h.store.Get(context.Background(), "ssh-box")
+		assert.NoError(t, err, action+": the row was dropped")
+		b, _ := os.ReadFile(me.tmuxLog)
+		assert.NotContains(t, string(b), "new-session", action+": a new session was started")
+		me.mu.Lock()
+		assert.Empty(t, me.removed, action)
+		me.mu.Unlock()
+	}
+}
