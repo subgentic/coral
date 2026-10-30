@@ -196,6 +196,8 @@ node artifact_sort_words.test.mjs
 node automation_filters.test.mjs
 node inbox_servers.test.mjs
 node inbox_reviews.test.mjs
+node artifact_review_words.test.mjs
+node inbox_reviews_cloud.test.mjs
 node task_list_data.test.mjs
 node template_browser_data.test.mjs
 node chat_search_unit.test.js

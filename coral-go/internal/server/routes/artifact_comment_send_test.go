@@ -411,15 +411,17 @@ func TestTheOwnersListCarriesEachThreadsAsksAndNobodyElsesDoes(t *testing.T) {
 		assert.Contains(t, []int{http.StatusForbidden, http.StatusUnauthorized}, code, name)
 		assert.Empty(t, c, name)
 	}
-	// the owner signed in at Coral Hub (the stamp, the owner role and the enrolled label) may read the comments, and still gets no asks
+	// the owner signed in at Coral Hub (the stamp, the owner role and the enrolled label) may read the comments, and gets the asks as the owner at this computer does (#11354: the change-request send is the owner's through the Hub)
 	withLabel(t, cmtHubUser, nil)
 	code, hubSeen := listOf(cmtAsHubOwner)
 	if code == http.StatusOK {
 		require.NotEmpty(t, hubSeen, "the hub-signed-in owner reads the thread")
+		sawAsks := false
 		for _, c := range hubSeen {
 			_, has := c.(map[string]any)["asks"]
-			assert.False(t, has, "not through Coral Hub")
+			sawAsks = sawAsks || has
 		}
+		assert.True(t, sawAsks, "the Hub's owner sees who was asked, as the owner at this computer does")
 	} else {
 		assert.Contains(t, []int{http.StatusForbidden, http.StatusUnauthorized}, code)
 	}

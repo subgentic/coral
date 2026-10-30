@@ -229,6 +229,12 @@
       "type": "index"
     },
     {
+      "name": "sqlite_autoindex_artifact_reviews_1",
+      "sql": null,
+      "tbl_name": "artifact_reviews",
+      "type": "index"
+    },
+    {
       "name": "sqlite_autoindex_artifact_tags_1",
       "sql": null,
       "tbl_name": "artifact_tags",
@@ -347,6 +353,12 @@
       "sql": null,
       "tbl_name": "task_versions",
       "type": "index"
+    },
+    {
+      "name": "artifact_reviews",
+      "sql": "CREATE TABLE artifact_reviews (\n\t\tboard_id TEXT NOT NULL,\n\t\thex      TEXT NOT NULL,\n\t\tstate    TEXT NOT NULL,\n\t\tat       TEXT NOT NULL,\n\t\tPRIMARY KEY (board_id, hex)\n\t)",
+      "tbl_name": "artifact_reviews",
+      "type": "table"
     },
     {
       "name": "artifact_tags",
@@ -716,6 +728,81 @@
     }
   ],
   "tables": {
+    "artifact_reviews": {
+      "columns": [
+        {
+          "cid": 0,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "board_id",
+          "notnull": 1,
+          "pk": 1,
+          "type": "TEXT"
+        },
+        {
+          "cid": 1,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "hex",
+          "notnull": 1,
+          "pk": 2,
+          "type": "TEXT"
+        },
+        {
+          "cid": 2,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "state",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 3,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "at",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            {
+              "cid": 0,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "board_id",
+              "seqno": 0
+            },
+            {
+              "cid": 1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "hex",
+              "seqno": 1
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 2
+            }
+          ],
+          "name": "sqlite_autoindex_artifact_reviews_1",
+          "origin": "pk",
+          "partial": 0,
+          "seq": 0,
+          "unique": 1
+        }
+      ]
+    },
     "artifact_tags": {
       "columns": [
         {

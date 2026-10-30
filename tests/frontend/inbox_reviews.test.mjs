@@ -1,5 +1,4 @@
-// #8628: the Inbox review data source pages, groups producers, preserves tags,
-// keeps failed writes visible, and cannot resurrect a review from a stale read.
+// #8628: the Inbox review data source pages, groups producers, and cannot resurrect a review from a stale read (an approved one, #136584).
 import assert from 'node:assert/strict';
 const M = await import('../../coral-go/pkg/frontend/static/inbox_reviews.js');
 const row = (i, team = 'a', session = 'writer') => ({ id: i.toString(16).padStart(64, '0'), name: `File ${i}`, team, session_id: session, produced_by: session, tags: ['for review', 'internal'], available: true, created_at: '2026-10-26T10:00:00Z' });
@@ -32,18 +31,13 @@ await M.refreshReviews(true);
 assert.ok(reads>0,'opening Inbox starts review reads');
 assert.equal(M.reviewItems().length,201,'reads beyond the first page');
 const first=M.reviewItems()[0];
-fail=true;
-await assert.rejects(()=>M.markReviewed(first),/Try again/);
-assert.equal(M.reviewItems().length,201,'failed save retains row');
-fail=false;
 slow=true;
 const pending=M.refreshReviews(true);
 // Yield the fixture request microtasks, rather than timing the network.
 await started;
-await M.markReviewed(first);
+M.settleReview(first); // the Operator approved it (artifact_review.js approveRow)
 release(); await pending;
-assert.equal(M.reviewItems().length,200,'an older list cannot resurrect a reviewed item');
-assert.deepEqual(writes[0].tags,['internal','reviewed']);
+assert.equal(M.reviewItems().length,200,'an older list cannot resurrect an approved item');
 failRead=true; await M.refreshReviews(true);
 assert.equal(M.reviewItems().length,200,'failed refresh retains last known rows');
 assert.equal(M.reviewErrors().length,1);

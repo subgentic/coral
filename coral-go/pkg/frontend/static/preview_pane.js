@@ -158,7 +158,7 @@ function _renderToolbar(tab) {
         const link = src && (src.externalURL || mf !== undefined) && mf !== false
             ? `<a class="team-artifacts-action" href="${escapeAttr(dlHref)}" ${src.externalURL ? 'target="_blank" rel="noopener noreferrer"' : `download="${escapeAttr(dlName)}" data-artifact-download="${escapeAttr(dlHref)}" data-artifact-name="${escapeAttr(dlName)}"`}>${src.externalURL ? 'Open link' : 'Download'}</a>`
             : '';
-        const kept = [...bar.children].filter(n => n.classList.contains('ac-toggle') || n.classList.contains('artifact-tags')); // the Comments toggle and the tag editor were appended after the first draw (_render): a redraw (the kind became known, #9941) must not drop them
+        const kept = [...bar.children].filter(n => (n.classList.contains('ac-toggle') || n.classList.contains('artifact-review-line') || n.classList.contains('artifact-tags')) && n.dataset.tabId === String(tab.id)); // the Comments toggle, the review line and the tag editor of THIS tab, appended after the first draw (_render): a redraw (the kind became known, #9941) must not drop them, and another tab's are not carried over (two tabs showed both tabs' tag editors)
         const shownName = visibleName(tab.options.filename);
         bar.innerHTML = `<span class="preview-toolbar-path" title="${escapeAttr(shownName || tab.filepath)}">${escapeHtml(shownName || 'Artifact preview')}</span>
             <div class="inline-preview-actions">${link}</div>`;
@@ -420,12 +420,13 @@ async function _render(tab) {
                 const { commentBoard } = await importOnce('./artifact_comments.js');
                 if (comments && current()) {
                     comments.open(hex, tab.options && tab.options.server, commentBoard(tab.options));
+                    comments.toggle.dataset.tabId = String(tab.id);
                     document.getElementById('preview-toolbar')?.append(comments.toggle);
                 } else comments = null;
             } catch (e) { comments = null; console.error('[coral] comments', e); } // the document is shown without them
         }
         if (hex && tab.options && tab.options.tagging) { // the file's tags in the head (#8594): chips with an x and Add tag, as in the team page's sheet
-            try { const { tagEditor } = await importOnce('./artifact_tags.js'); if (current()) document.getElementById('preview-toolbar')?.append(tagEditor({ ...tab.options.tagging, hex })); } catch (e) { console.error('[coral] tags', e); }
+            try { const { tagEditor, reviewWords } = await importOnce('./artifact_tags.js'); if (current()) { const bar = document.getElementById('preview-toolbar'); const words = reviewWords(tab.options.tagging.tags, tab.options.tagging.review); if (words && bar) { const line = document.createElement('span'); line.className = 'artifact-review-line'; line.dataset.tabId = String(tab.id); line.setAttribute('role', 'status'); line.textContent = words; bar.append(line); } const editor = tagEditor({ ...tab.options.tagging, hex }); editor.dataset.tabId = String(tab.id); bar?.append(editor); } } catch (e) { console.error('[coral] tags', e); }
         }
         await renderArtifact(body, tab.filepath, tab.options, {
             signal: tab.abort.signal,

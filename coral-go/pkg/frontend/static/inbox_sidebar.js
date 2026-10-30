@@ -11,7 +11,7 @@ import { needsYou, askedRow } from './asked_before_restart.js';
  * are in Display options. The hub's own framed /inbox is not this: it keeps the frame, full width (inbox_tab.js). */
 import { state } from './state.js';
 
-import { reviewItems, unreadReviewItems, reviewErrors, refreshReviews, reviewGroups, markReviewed, setReviewRead, markOpenedRead, isRead } from './inbox_reviews.js';
+import { reviewItems, unreadReviewItems, reviewErrors, refreshReviews, reviewGroups, setReviewRead, markOpenedRead, isRead } from './inbox_reviews.js';
 import { failedUnread, finishedUnread, refreshRuns, markSeen, runRoute, failureWords } from './automation_runs.js';
 import { go, note, backIs, currentRoute } from './nav.js';
 
@@ -152,9 +152,9 @@ const stateOf = t => TV.taskWord(t);
 const inboxTasksState = DT.tableState();
 const needsState = DT.tableState();
 
-async function openReview(row) {
+async function openReview(row, extra = {}) {
     const { openArtifactViewer } = await importOnce('./artifact_viewer.js');
-    openArtifactViewer(row.hex, { server: splitKey(row.team).server, filename: row.name, mediaType: row.media_type, board: splitKey(row.team).name });
+    openArtifactViewer(row.hex, { server: splitKey(row.team).server, filename: row.name, mediaType: row.media_type, board: splitKey(row.team).name, compare: true, ...extra }); // a later version of a series opens with what changed since the one before (#136588)
     markOpenedRead(row.hex).catch(error => sayLive(error.message)); // opening is reading it: the 'read' tag, so it stops counting everywhere (#9277); the viewer does the same for any for-review artifact, once; a failed save is said, and the item keeps counting
 }
 function reviewActions(row) {
@@ -162,12 +162,17 @@ function reviewActions(row) {
     const errorText = DT.el('span', 'inbox-review-error'); errorText.setAttribute('role', 'alert');
     const open = DT.el('button', 'btn btn-small', 'Open'); open.type = 'button';
     open.setAttribute('aria-label', `Open ${row.name}`); open.addEventListener('click', () => openReview(row));
-    const done = DT.el('button', 'btn btn-small', 'Mark reviewed'); done.type = 'button';
-    done.setAttribute('aria-label', `Mark reviewed: ${row.name}`);
+    const done = DT.el('button', 'btn btn-small', 'Approve'); done.type = 'button'; // replaces Mark reviewed (#136584): it clears the row, marks the review approved and tells the agent that uploaded it
+    done.setAttribute('aria-label', `Approve: ${row.name}`);
+    const changes = DT.el('button', 'btn btn-small inbox-review-icon'); changes.type = 'button'; changes.title = 'Request changes'; // an icon, so the row stays one line; its name says what it does
+    changes.append(DT.el('span', 'material-icons', 'rate_review')); changes.firstChild.setAttribute('aria-hidden', 'true');
+    changes.setAttribute('aria-label', `Request changes: ${row.name}`);
+    changes.addEventListener('click', () => openReview(row, { requestChanges: true }));
     done.addEventListener('click', async () => {
         done.disabled = true; errorText.textContent = '';
         try {
-            await markReviewed(row); sayLive(`Reviewed ${row.name}.`);
+            const { approveRow, sayApproved } = await importOnce('./artifact_review.js');
+            sayApproved(row.name, await approveRow(row.team, row)); sayLive(`Approved ${row.name}.`);
             const target = $('group-table-view')?.querySelector('.inbox-review-actions button') || $('group-table-view')?.querySelector('input[type=search]');
             target?.focus({ preventScroll: true });
         } catch (error) { done.disabled = false; errorText.textContent = error.message; }
@@ -186,8 +191,9 @@ function reviewActions(row) {
         });
         box.append(unread);
     }
-    if (isRead(row)) { done.classList.add('inbox-review-icon'); done.title = 'Mark reviewed'; done.textContent = ''; done.append(DT.el('span', 'material-icons', 'done_all')); done.firstChild.setAttribute('aria-hidden', 'true'); }
-    box.append(done, errorText); return box;
+    if (isRead(row) || isPhoneLayout()) { done.classList.add('inbox-review-icon'); done.title = 'Approve'; done.textContent = ''; done.append(DT.el('span', 'material-icons', 'check')); done.firstChild.setAttribute('aria-hidden', 'true'); }
+    box.append(done); if (!isPhoneLayout()) box.append(changes); // a phone's row has no room for a fourth action: Request changes is in the viewer Open leads to (#136584)
+    box.append(errorText); return box;
 }
 
 /** A failed run opens on its job's or workflow's page; opening it is what clears it from Needs you. */

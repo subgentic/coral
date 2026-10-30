@@ -1,5 +1,5 @@
 // #8628: for-review artifacts join Needs you; ten per producer, overflow disclosed,
-// preview stays in Inbox, and Mark reviewed preserves the artifact's other tags.
+// preview stays in Inbox, and Approve (which replaced Mark reviewed, #136584) takes the row out, tells the uploader once and shows the viewer's "Approved" state; Request changes asks the uploader through a comment.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -25,7 +25,7 @@ const { coralReady } = require('./helpers/wait');
                 await ev(`(() => {
                     localStorage.removeItem('coral-inbox-needs-filters');
                     const style=document.createElement('style'); style.textContent='*,*::before,*::after{transition:none!important;animation:none!important}';document.head.append(style);
-                    window.__reviewWrites=[];window.__reviewFail=false;
+                    window.__reviewWrites=[];window.__reviewFail=false;window.__decisions=[];window.__comments=[];
                     window.__reviewItems=Array.from({length:13},(_,i)=>({id:(i+1).toString(16).padStart(64,'0'),name:'Review file '+String(i+1).padStart(2,'0')+'.txt',media_type:'text/plain',size:30,created_at:new Date(Date.now()-(20-i)*60000).toISOString(),task_id:0,source:'upload',available:true,session_id:i<11?'writer-a':'writer-b',produced_by:i<11?'Writer A':'Writer B',tags:['for review','internal'],uri:'coral://artifacts/'+(i+1).toString(16).padStart(64,'0')}));
                     const original=window.fetch, json=(body,status=200)=>Promise.resolve(new Response(JSON.stringify(body),{status,headers:{'Content-Type':'application/json'}}));
                     window.fetch=(url,opts={})=>{
@@ -35,6 +35,16 @@ const { coralReady } = require('./helpers/wait');
                             return json({project:'${team}',artifacts:items.slice(offset,offset+limit),has_more:offset+limit<items.length});
                         }
                         if(u.pathname.startsWith('/api/artifacts/')&&u.pathname.endsWith('/star')&&u.pathname.split('/').length===5&&(opts.method==='PUT'||opts.method==='DELETE')){ const id=u.pathname.split('/')[3], it=window.__reviewItems.find(x=>x.id===id); if(!it)return json({error:'not found'},404); it.starred=opts.method==='PUT'; window.__starCalls=(window.__starCalls||[]).concat(opts.method+' '+id); return json({starred:it.starred}); } // what the server does: the next list says it
+                        if(u.pathname.startsWith('/api/board/${team}/artifacts/')&&u.pathname.endsWith('/review')&&opts.method==='POST'){
+                            if(window.__reviewFail)return json({error:'Review save failed'},500);
+                            const id=u.pathname.split('/').at(-2),body=JSON.parse(opts.body),it=window.__reviewItems.find(a=>a.id===id);window.__decisions.push({id,decision:body.decision});
+                            if(body.decision==='approve'){it.tags=it.tags.filter(t=>t!=='for review'&&t!=='read'&&t!=='changes requested').concat('approved');it.review={state:'approved',at:new Date().toISOString()};}
+                            else{it.tags=[...new Set(it.tags.concat('for review','changes requested'))];}
+                            return json({id,state:body.decision==='approve'?'approved':'changes requested',changed:true,tags:it.tags,review:it.review||null,delivered:body.decision==='approve',to:'Writer'});
+                        }
+                        if(u.pathname.startsWith('/api/artifacts/')&&u.pathname.endsWith('/versions')&&window.__twoVersions){const d=u.pathname.split('/')[3],old=(99).toString(16).padStart(64,'0');return json([{digest:old,version:1,versions:2,is_latest:false,name:'Review file 01.txt',size:30,media_type:'text/plain',at:new Date(Date.now()-3600000).toISOString(),uploader:'Writer A',role:'Writer'},{digest:d,version:2,versions:2,is_latest:true,name:'Review file 01.txt',size:30,media_type:'text/plain',at:new Date().toISOString(),uploader:'Writer A',role:'Writer'}]);}
+                        if(u.pathname.startsWith('/api/artifacts/')&&u.pathname.endsWith('/comments')&&opts.method==='POST'){const b=JSON.parse(opts.body);window.__comments.push(b);return json({id:7,body:b.body,anchor:b.anchor,author_kind:'owner',author_name:'You',state:'open',created_at:new Date().toISOString(),replies:[]},201);}
+                        if(u.pathname.startsWith('/api/artifacts/')&&u.pathname.endsWith('/comments/7/send')){const b=JSON.parse(opts.body);window.__comments.push({sent:b.agents});return json({ok:true,results:[{agent:b.agents[0],state:'sent',ask_id:1}]});}
                         if(u.pathname.startsWith('/api/board/${team}/artifacts/')&&u.pathname.endsWith('/tags')){
                             if(window.__reviewFail)return json({error:'Review save failed'},500);
                             const id=u.pathname.split('/').at(-2),body=JSON.parse(opts.body);window.__reviewWrites.push(body);
@@ -62,8 +72,17 @@ const { coralReady } = require('./helpers/wait');
                     if (width === 1280) { // the order columns go in when the box is tight (design rule 5): Waiting for first, then Goal, never Actions or the name; and an agent row brings CLI and Folder back
                         const headsAt = async (w) => { await Emulation.setDeviceMetricsOverride({ width: w, height: 900, deviceScaleFactor: 1, mobile: false }); await new Promise(r => setTimeout(r, 400)); // sleep-ok: the box resizes and the table measures itself again
                             return ev(`(() => { const box = document.querySelector('#group-table-view .dt-box'), shown = e => !!e && getComputedStyle(e).display !== 'none'; return { heads: [...box.querySelectorAll('thead th.dt-th')].filter(shown).map(th => th.dataset.key), actionsInside: (() => { const a = box.querySelector('tbody tr.dt-row td[data-key="review"]'); return !!a && a.getBoundingClientRect().right <= box.getBoundingClientRect().right + 1; })(), fits: box.scrollWidth <= box.clientWidth + 1 }; })()`); };
-                        const w1180 = await headsAt(1180), w1024 = await headsAt(1024);
-                        assert.ok(!w1180.heads.includes('asks') && w1180.heads.includes('goal') && w1180.actionsInside && w1180.fits, '1180: only the first drop is needed: Waiting for is gone, Goal is still there: ' + JSON.stringify(w1180));
+                        // The exact width at which Waiting for goes depends on how wide the Actions column is (Approve and a Request changes icon, #136584), so the order is checked over a sweep, not pinned at one width:
+                        // Waiting for goes first, Goal never before it, the name and Actions never; everything fits at every width.
+                        let seenAsksGone = false;
+                        for (const w of [1280, 1180, 1120, 1060]) {
+                            const h = await headsAt(w);
+                            assert.ok(h.heads.includes('agent') && h.heads.includes('review') && h.actionsInside && h.fits, w + ': the name and Actions stay and fit: ' + JSON.stringify(h));
+                            if (!h.heads.includes('asks')) seenAsksGone = true;
+                            if (!h.heads.includes('goal')) assert.ok(!h.heads.includes('asks'), w + ': Goal goes only after Waiting for: ' + JSON.stringify(h));
+                            if (seenAsksGone) assert.ok(!h.heads.includes('asks'), w + ': a column that went does not come back at a narrower width: ' + JSON.stringify(h));
+                        }
+                        const w1024 = await headsAt(1024);
                         assert.ok(!w1024.heads.includes('asks') && !w1024.heads.includes('goal') && w1024.heads.includes('agent') && w1024.heads.includes('review') && w1024.actionsInside && w1024.fits, '1024: Waiting for and Goal are gone, the name and Actions stay and fit: ' + JSON.stringify(w1024));
                         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false }); await new Promise(r => setTimeout(r, 400)); // sleep-ok: back to the width the rest of this pass reads
                         await ev(`(async () => { const { state } = await import((window.__coralStatic || '/static/') + 'state.js'), m = await import((window.__coralStatic || '/static/') + 'inbox_tab.js'); state.liveSessions = [{ name: 'agent-one', session_id: '00000001-0000-4000-8000-0000000000aa', agent_type: 'claude', server: 'local', status: 'idle', display_name: 'Agent One', working_directory: '/repo/alpha', waiting_for_input: true, waiting_kind: 'permission', waiting_since: new Date(Date.now() - 300000).toISOString(), sleeping: false }]; m.updateInboxTab(); await m.selectInboxTab('needs'); return true; })()`);
@@ -113,12 +132,45 @@ const { coralReady } = require('./helpers/wait');
                 assert.equal(await ev(`document.body.dataset.navTab`),'hub-inbox','preview keeps Inbox');
                 // Close the shared viewer using its visible control, retaining the list.
                 await ev(`document.querySelector('.artifact-viewer-close').click();true`);
-                await ev(`window.__reviewFail=true;[...(${row('Review file 01.txt')}).querySelectorAll('button')].find(b=>b.textContent.trim()==='Mark reviewed'||(b.getAttribute('aria-label')||'').startsWith('Mark reviewed')).click();true`);
+                // the viewer's review bar: a pending review shows Approve and Request changes; the row's own buttons are the same two (no Mark reviewed any more)
+                assert.deepEqual(await ev(`[...(${row('Review file 01.txt')}).querySelectorAll('.inbox-review-actions button:not(.dt-star)')].map(b=>(b.getAttribute('aria-label')||b.textContent).trim()).filter(t=>!t.startsWith('Mark unread'))`),['Open Review file 01.txt','Approve: Review file 01.txt',...(width<=390?[]:['Request changes: Review file 01.txt'])],'Open and Approve, and on a wider screen Request changes (a phone has it in the viewer): Mark reviewed is gone and nothing looks like it');
+                if(width===1280){
+                    await ev(`[...(${row('Review file 01.txt')}).querySelectorAll('button')].find(b=>b.textContent.trim()==='Open').click();true`);
+                    await waitFor(`!!document.querySelector('.artifact-review:not([hidden]) .artifact-review-approve:not([hidden])')`,'the viewer shows Approve for a pending review',8000);
+                    assert.match(await ev(`document.querySelector('.artifact-review-state').textContent`),/Waiting for your review/);
+                    await ev(`document.querySelector('.artifact-review-changes').click();true`);
+                    await waitFor(`document.activeElement&&document.activeElement.id==='artifact-review-text'`,'the change request box has the focus',4000);
+                    await ev(`(()=>{const t=document.getElementById('artifact-review-text');t.value='Please add the totals row';const f=document.querySelector('.artifact-review-form');f.requestSubmit();f.requestSubmit();return true;})()`); // a second tap while the first request is on its way (a phone: Mobile Beta Tester)
+                    await waitFor(`window.__decisions.some(d=>d.decision==='changes')`,'the change request was recorded',8000);
+                    const sent=await ev(`window.__comments`);
+                    assert.equal(sent[0].anchor.whole,true,'a comment on the whole document'); assert.match(sent[0].body,/Please add the totals row/); assert.deepEqual(sent[1].sent,['Writer A'],'sent to the agent that uploaded it');
+                    await waitFor(`/Changes requested/.test(document.querySelector('.artifact-review-state').textContent)`,'the state says Changes requested',8000);
+                    assert.equal(await ev(`document.querySelector('.artifact-review-form').hidden`),true,'the request form is closed after it was sent: it does not stay open under Changes requested');
+                    assert.equal(await ev(`window.__decisions.filter(d=>d.decision==='changes').length`),1,'two taps sent one request');
+                    assert.equal(await ev(`window.__comments.filter(c=>c.body).length`),1,'and made one comment');
+                    assert.ok(await ev(`!!(${row('Review file 01.txt')})`),'a row with changes requested stays in Needs you');
+                    await ev(`document.querySelector('.artifact-viewer-close').click();true`);
+                }
+                await ev(`window.__reviewFail=true;[...(${row('Review file 01.txt')}).querySelectorAll('button')].find(b=>(b.getAttribute('aria-label')||'').startsWith('Approve')).click();true`);
                 await waitFor(`document.body.textContent.includes('Review save failed')`,'failed save is visible');
                 assert.ok(await ev(`!!(${row('Review file 01.txt')})`),'failed save keeps row');
-                await ev(`window.__reviewFail=false;[...(${row('Review file 01.txt')}).querySelectorAll('button')].find(b=>b.textContent.trim()==='Mark reviewed'||(b.getAttribute('aria-label')||'').startsWith('Mark reviewed')).click();true`);
-                await waitFor(`!(${row('Review file 01.txt')})`,'reviewed row removed');
-                assert.deepEqual((await ev(`window.__reviewWrites.at(-1).tags`)).sort(),['internal','reviewed']);
+                await ev(`window.__reviewFail=false;[...(${row('Review file 01.txt')}).querySelectorAll('button')].find(b=>(b.getAttribute('aria-label')||'').startsWith('Approve')).click();true`);
+                await waitFor(`!(${row('Review file 01.txt')})`,'approved row removed');
+                if(width===1280){ // Mobile Beta Tester (live): the approved artifact's viewer says Approved with the time (it showed only the tag chip)
+                    await ev(`import((window.__coralStatic||'/static/')+'artifact_viewer.js').then(m=>m.openArtifactViewer('${(1).toString(16).padStart(64,'0')}',{filename:'Review file 01.txt',board:'${team}',server:undefined}));true`);
+                    await waitFor(`/^Approved .+/.test(document.querySelector('.artifact-review-state')?.textContent||'')`,'the viewer of an approved artifact says Approved with its time',8000);
+                    assert.equal(await ev(`document.querySelector('.artifact-review-approve').hidden&&document.querySelector('.artifact-review-changes').hidden`),true,'and offers no Approve');
+                    await ev(`document.querySelector('.artifact-viewer-close').click();true`);
+                    // the same for the newest of two versions (Mobile Beta Tester, live: the head of a two-version artifact had the versions bar and no approval line)
+                    await ev(`window.__twoVersions=true;import((window.__coralStatic||'/static/')+'artifact_viewer.js').then(m=>m.openArtifactViewer('${(1).toString(16).padStart(64,'0')}',{filename:'Review file 01.txt',board:'${team}',server:undefined}));true`);
+                    await waitFor(`!!document.querySelector('.artifact-viewer .av-compare, .artifact-viewer .av-current')`,'the versions bar of a two-version artifact',8000);
+                    await new Promise(r=>setTimeout(r,800)); // sleep-ok: the version bar's own reload settles
+                    await waitFor(`/^Approved .+/.test(document.querySelector('.artifact-review-state')?.textContent||'')`,'the head of a two-version approved artifact says Approved with its time',8000);
+                    const vis = await ev(`(() => { const b = document.querySelector('.artifact-review'), r = b.getBoundingClientRect(), cs = getComputedStyle(b); return { h: Math.round(r.height), w: Math.round(r.width), display: cs.display, hidden: b.hidden, parent: b.parentElement.className, prev: b.previousElementSibling?.className, next: b.nextElementSibling?.className }; })()`);
+                    assert.ok(vis.h > 0 && vis.w > 0 && vis.display !== 'none', 'the review bar of a two-version artifact is on the screen: ' + JSON.stringify(vis));
+                    await ev(`document.querySelector('.artifact-viewer-close').click();window.__twoVersions=false;true`);
+                }
+                assert.deepEqual(await ev(`window.__decisions.filter(d=>d.decision==='approve').map(d=>d.id)`),[(1).toString(16).padStart(64,'0')],'one approve was sent: the failed press and the second one are not two');
                 assert.equal(await ev(`document.getElementById('nav-tab-hub-inbox-badge').textContent`),'9+');
                 assert.match(await ev(`document.getElementById('nav-tab-hub-inbox').getAttribute('aria-label')`),/^Inbox, 12 /,'twelve left: the pill says 9+, the name says 12');
                 assert.ok(await ev(`!!(${row('Review file 11.txt')})`),'overflow promotes next artifact');
