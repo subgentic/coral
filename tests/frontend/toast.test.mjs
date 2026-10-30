@@ -76,10 +76,10 @@ for (const flag of [true, 'error']) {
 // An action toast lasts at least 10s and does not fade.
 {
     let ran = 0;
-    const t = showToast('Blocked: Hub: View', true, 20, { action: { label: 'Open Servers', onClick: () => { ran++; } } });
+    const t = showToast('Blocked: Hub: View', true, 20, { action: { label: 'Open Computers', onClick: () => { ran++; } } });
     const btn = t.querySelector('button.toast-action');
     assert.ok(btn);
-    assert.strictEqual(btn.textContent, 'Open Servers');
+    assert.strictEqual(btn.textContent, 'Open Computers');
     assert.ok(t.classList.contains('has-action'));
     await wait(60);
     assert.strictEqual(toasts().length, 1, 'an action toast outlives a short duration');

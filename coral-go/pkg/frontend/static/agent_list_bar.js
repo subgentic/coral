@@ -26,7 +26,7 @@ function spec(idp) {
         fields: [
             { type: 'select', key: 'state', id: `${idp}-state`, label: 'State', values: STATES, labels: STATE_LABEL, any: 'Any state' },
             { type: 'select', key: 'board', id: `${idp}-board`, label: 'Board', values: [], labels: {}, any: 'Any board' },
-            { type: 'select', key: 'machine', id: `${idp}-machine`, label: 'Machine', values: [], labels: {}, any: 'Any machine' },
+            { type: 'select', key: 'machine', id: `${idp}-machine`, label: 'Computer', values: [], labels: {}, any: 'Any computer' },
         ],
         model: MODEL,
     };

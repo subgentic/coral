@@ -43,7 +43,7 @@ const SESSIONS = Array.from({ length: 6 }, (_, i) => {
             assert.equal(await dot(), false, at + 'no dot with nothing on');
             assert.equal(await label(), 'Display options');
 
-            // 2. display settings only (what is left of them: Show server and Group by server): still no dot, no line. The switches are drawn only with servers to choose between, so they are flipped where they are in the panel (#9686 removed the other five)
+            // 2. display settings only (what is left of them: Show computer and Group by computer): still no dot, no line. The switches are drawn only with servers to choose between, so they are flipped where they are in the panel (#9686 removed the other five)
             await panel(true);
             await waitFor(`!!document.querySelector('${header} [data-display-input="server"]') && !!document.querySelector('${header} [data-display-input="group"]')`, 'the display options', 8000);
             for (const k of ['server', 'group']) await ev(`(() => { const c = document.querySelector('${header} [data-display-input="${k}"]'); c.click(); return true; })()`);

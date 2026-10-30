@@ -115,12 +115,12 @@ const REASON_TEXT = {
     applying: 'The update is being installed.',
     unsupported_install: 'This install cannot update itself.',
     already_relaunched: 'This update was already tried. Relaunch from this computer, or wait for a newer version.',
-    mode_too_low: 'Needs Launch access on this machine.',
-    hub_off: 'Relaunching from Coral Hub is switched off for this machine.',
-    fleet_busy: 'Other machines are relaunching. Try again in a few minutes.',
+    mode_too_low: 'Needs Launch access on this computer.',
+    hub_off: 'Relaunching from Coral Hub is switched off for this computer.',
+    fleet_busy: 'Other computers are relaunching. Try again in a few minutes.',
     relaunch_fleet_busy: 'Try again in a few minutes.',
     too_soon: 'Try again in a few minutes.',
-    label_missing: 'This machine is not set up for relaunching from Coral Hub.',
+    label_missing: 'This computer is not set up for relaunching from Coral Hub.',
     reauth_required: 'Sign in again to relaunch this Coral.',
     no_run_record: 'Coral could not be restarted automatically on this computer, so it cannot relaunch itself here.', // #5419
     local_approval_needed: 'Installing an update on Windows needs someone at this computer to approve it: use Install update in Settings there.', // #166: Coral Hub cannot do it

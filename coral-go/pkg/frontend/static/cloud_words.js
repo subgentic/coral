@@ -34,7 +34,7 @@ export function spellCode(code) {
 // ── the status sentences and the confirm texts of the connect panel (moved from cloud_connect.js, #8386)
 
 // Said when this server has no hub (a dev build, or --cloud-url off); the CLI says the same (#3285).
-export const OFF_TEXT = "Coral Hub isn't configured on this server. Start Coral with --cloud-url https://app.coralhub.dev (or CORAL_CLOUD_URL=https://app.coralhub.dev), then run: coral cloud connect";
+export const OFF_TEXT = "Coral Hub isn't configured on this computer. Start Coral with --cloud-url https://app.coralhub.dev (or CORAL_CLOUD_URL=https://app.coralhub.dev), then run: coral cloud connect";
 
 // What the Hub may do at each level, as the sentence after "may now:" said once a change is saved.
 export const LEVEL_NOW = { view: 'look only', interact: 'send and answer', launch: 'start agents' };
@@ -64,7 +64,7 @@ export function enrolledRetrying(st) {
 export function rekeyText(sk) {
     const lost = [];
     if (sk.hub_url) lost.push('the Coral Hub connection to ' + sk.hub_url + ' (connect again afterwards, and remove this computer in Coral Hub)');
-    if (sk.remote_server_keys) lost.push(sk.remote_server_keys === 1 ? "1 remote server's API key (enter it again)" : sk.remote_server_keys + " remote servers' API keys (enter them again)");
+    if (sk.remote_server_keys) lost.push(sk.remote_server_keys === 1 ? "1 remote computer's API key (enter it again)" : sk.remote_server_keys + " remote computers' API keys (enter them again)");
     const why = sk.exposed ? 'Other accounts on this computer could read the secret key file, so what it protects must be treated as known.'
         : "Coral can't use its secret key file" + (sk.message ? ' (' + sk.message + ')' : '') + '.';
     return why + ' Replacing it makes a new key and discards ' + (lost.length ? lost.join(' and ') : 'nothing stored yet') + '.';
@@ -90,7 +90,7 @@ export function describe(st) {
             if (enrolledRetrying(st)) return 'Connected to Coral Hub' + (st.label ? ' as ' + st.label : '') + ' (reconnecting…). Coral keeps working locally meanwhile.';
             return 'Not connected right now (' + (st.last_error || 'retrying') + '). Coral keeps working locally and will reconnect on its own.';
         case 'revoked':
-            return 'The hub revoked this server, so Coral stopped retrying. Connect again to re-enroll.';
+            return 'The hub revoked this computer, so Coral stopped retrying. Connect again to re-enroll.';
         case 'key_unreadable':
             return st.last_error;
         case 'upgrade_required':

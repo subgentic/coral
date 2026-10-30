@@ -20,7 +20,7 @@ const alertsOff = () => { const e = document.getElementById('settings-desktop-no
 const NOTIFICATIONS_FIELDS = [
     { key: 'notify_needs_input', type: 'toggle', id: 'settings-notify-needs-input', label: 'Show notifications in Coral', help: 'A message in Coral when an agent needs input.' },
     { key: 'desktop_notify', type: 'toggle', id: 'settings-desktop-notify', label: 'Desktop alerts',
-        help: { text: 'An alert on this computer while this tab is in the background.', more: 'This browser only. Shows the agent and server names (your OS may keep them in its notification history), never agent output. May duplicate a local alert.' } },
+        help: { text: 'An alert on this computer while this tab is in the background.', more: 'This browser only. Shows the agent and computer names (your OS may keep them in its notification history), never agent output. May duplicate a local alert.' } },
     // Why the switch above did not turn on (#10068): a browser that blocks alerts, or a permission box that was dismissed. Filled by settings_fill.js.
     { key: 'desktop_notify_blocked', type: 'notice', render: slot => { const p = document.createElement('p'); p.id = 'settings-desktop-blocked'; p.className = 'sv-help'; p.setAttribute('role', 'status'); p.hidden = true; slot.append(p); } },
     // This browser's own choices about those alerts (not saved on the server); they apply while Desktop alerts is on.
@@ -199,7 +199,7 @@ export const NETWORK_FIELDS = [
     { key: 'net_status_title', type: 'heading', id: 'net-status-title', label: 'Status' }, live('about-section'),
     { key: 'net_hub_title', type: 'heading', id: 'net-hub-title', label: 'Coral Hub' }, live('net-group-hub'),
     { key: 'hub_mode', type: 'toggle', id: 'settings-hub-mode-enabled', labelId: 'settings-hub-mode-label', label: 'Manage other computers from this one', live: ['settings-hub-mode-status', 'settings-hub-mode-restart'],
-        help: { text: 'Adds a Servers tab; whoever signs in here controls every computer you add.', more: "It uses this Coral's own address, port and sign-in: the API key from other computers, and Remote access above for who can reach it. Nothing new listens. Turning it off keeps the servers you added." } },
+        help: { text: 'Adds a Computers tab; whoever signs in here controls every computer you add.', more: "It uses this Coral's own address, port and sign-in: the API key from other computers, and Remote access above for who can reach it. Nothing new listens. Turning it off keeps the computers you added." } },
 ];
 
 /** Draws the groups that are fields into the Settings modal's panes (once, when the modal is built). mount is mountSettingsView. */

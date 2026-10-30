@@ -63,7 +63,7 @@ const settle = ms => new Promise(r => setTimeout(r, ms)); // sleep-ok: a soak wa
         const isSoak = x => /^Soak/.test(x.display_name || x.name || '');
         let live = [];
         for (let k = 0; k < 60 && live.filter(isSoak).length < AGENTS; k++) { const r = await api('GET', '/api/sessions/live'); live = Array.isArray(r.data) ? r.data : (r.data && r.data.sessions) || []; if (live.filter(isSoak).length < AGENTS) await settle(1000); }
-        if (live.filter(isSoak).length < AGENTS) throw new Error(`the server lists ${live.filter(isSoak).length} of ${AGENTS} agents after 1 min (raw: ${JSON.stringify(live).slice(0, 300)}): ${JSON.stringify(live.map(x => [x.name, x.display_name, x.status || x.state]).slice(0, 12))}`);
+        if (live.filter(isSoak).length < AGENTS) throw new Error(`the computer lists ${live.filter(isSoak).length} of ${AGENTS} agents after 1 min (raw: ${JSON.stringify(live).slice(0, 300)}): ${JSON.stringify(live.map(x => [x.name, x.display_name, x.status || x.state]).slice(0, 12))}`);
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await coralReady();
         await ev(`(async () => { const base = window.__coralStatic || '/static/'; const [state, x] = await Promise.all([import(base + 'state.js'), import(base + 'xterm_renderer.js')]); window.T = { state: state.state }; window.__getTerm = x.getTerminal; return true; })()`);
         try { await waitFor(`T.state.liveSessions.filter(s => /^Soak/.test(s.display_name || s.name || '')).length >= ${AGENTS}`, 'the six agents in the list', 40000); }

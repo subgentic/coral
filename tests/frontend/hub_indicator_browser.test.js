@@ -96,7 +96,7 @@ const STATES = {
         check('enrolled with the old host (hub_moved): amber, saying where it moved and what to run', !l.hidden && l.state === 'disconnected' && l.color === rgb(l.warning)
             && l.aria === 'Connect to Coral Hub (Coral Hub moved to app.coralhub.dev: run coral cloud connect --force)', JSON.stringify(l));
         const movedHome = await ev(homeHub);
-        check('the home section says to connect again, not the never-enrolled offer', /^Coral Hub moved Connect this server again at app\.coralhub\.dev: run coral cloud connect --force/.test(movedHome) && movedHome !== offer, movedHome);
+        check('the home section says to connect again, not the never-enrolled offer', /^Coral Hub moved Connect this computer again at app\.coralhub\.dev: run coral cloud connect --force/.test(movedHome) && movedHome !== offer, movedHome);
         await show('movedFailed'); l = await look();
         check('after a failed attempt to enroll again (its own code): still amber, still "connect again"', !l.hidden && l.state === 'disconnected'
             && l.aria === 'Connect to Coral Hub (Coral Hub moved to app.coralhub.dev: run coral cloud connect --force)' && (await ev(homeHub)) === movedHome, JSON.stringify(l));

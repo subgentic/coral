@@ -1,6 +1,6 @@
 // The Servers list's search box (#4778): the shared list bar with a search and a count, above the list, from six machines up. Both lists, against stubbed answers:
 //   - a self-hosted hub (servers.js: "N servers"): no box with five; with eight a box above the list says "8 servers"; typing narrows the rows by name, id or address and the count says "k of 8 servers";
-//     nothing matching says so (and "Add server" is still there); clearing brings the list back; the periodic refresh keeps the text and the focus; leaving the tab drops the box and its text;
+//     nothing matching says so (and "Add computer" is still there); clearing brings the list back; the periodic refresh keeps the text and the focus; leaving the tab drops the box and its text;
 //   - Coral Hub's own list (servers.js: "N machines"): the same, through the hub's Servers tab in cloud mode;
 //   - a phone: the box fits, nothing scrolls sideways.
 // Notes and Knowledge have no search box by design (one markdown document per agent, an overview and one document per agent: the browser's find covers them).
@@ -89,7 +89,7 @@ const hubRows = n => remotes(n).map(s => ({ id: s.id, label: s.label, online: s.
         await typeInto('zzz-nothing');
         await settle(`!!document.querySelector('#servers-view .empty-state.empty-state-tight')`, 'the empty line');
         v = await view(ROWS);
-        check('nothing matching says so, the list is the local machine only, and Add server is still there', /No servers match this search/.test(v.empty || '') && v.rows.length === 0 && v.addVisible && v.count === '0 of 8 servers', JSON.stringify([v.empty, v.rows.length, v.addVisible, v.count]));
+        check('nothing matching says so, the list is the local machine only, and Add computer is still there', /No computers match this search/.test(v.empty || '') && v.rows.length === 0 && v.addVisible && v.count === '0 of 8 servers', JSON.stringify([v.empty, v.rows.length, v.addVisible, v.count]));
         await typeInto('machine-1');
         await settle(`document.querySelectorAll('${ROWS}').length === 1 && !!document.getElementById('server-row-m1')`, 'machine-1');
         v = await view(ROWS);

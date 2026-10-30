@@ -6,7 +6,7 @@
             <p id="launch-access-note" class="launch-access-note" role="status"></p>
             <!-- Hub only: launch target server (hidden unless hub mode has a usable remote) -->
             <div id="launch-server-row" class="launch-server-row form-row form-row-inline" style="display:none">
-                <label for="launch-server" class="form-label form-label-nowrap">Machine</label>
+                <label for="launch-server" class="form-label form-label-nowrap">Computer</label>
                 <select id="launch-server" class="form-control-grow" data-on-change="m-on-launch-server-change"></select>
                 <span id="launch-server-note" class="text-muted-sm"></span>
             </div>
@@ -145,7 +145,7 @@
                                 <input type="text" id="launch-board-name" placeholder="e.g. auth-feature, sprint-42" maxlength="64" pattern="[A-Za-z0-9][A-Za-z0-9_\-]{0,63}" title="Letters, digits, - and _">
                             </div>
                             <div id="launch-board-server-row" class="form-row" style="display:none">
-                                <label class="form-label" for="launch-board-server">Remote Server <span class="launch-optional">optional</span></label>
+                                <label class="form-label" for="launch-board-server">Remote computer <span class="launch-optional">optional</span></label>
                                 <input type="text" id="launch-board-server" placeholder="e.g. http://remote-machine:8420">
                             </div>
                             <div class="form-row" style="display:none">
@@ -778,7 +778,7 @@
                     <div class="settings-cloud-connect-row">
                         <button type="button" id="settings-cloud-connect" data-cloud="connect" class="btn btn-small btn-primary" hidden>Connect to Coral Hub</button>
                     </div>
-                    <div class="settings-hint" data-info>The hub can read everything you view through it. This is the most Coral Hub can ever do here: its owner can limit it further for each server but never raise it, and only you can change it, here. Interact lets a hub user type into running agents, which can run commands; Launch also lets them start, stop, sleep, wake and restart agents. Disconnect removes the token from this computer; revoke the server on the hub's Servers page to cut it off from there.</div>
+                    <div class="settings-hint" data-info>The hub can read everything you view through it. This is the most Coral Hub can ever do here: its owner can limit it further for each computer but never raise it, and only you can change it, here. Interact lets a hub user type into running agents, which can run commands; Launch also lets them start, stop, sleep, wake and restart agents. Disconnect removes the token from this computer; revoke the computer on the hub's Computers page to cut it off from there.</div>
                 </div>
                 </section>
                             <div id="settings-hub-mode-status" class="settings-hint" role="status" aria-live="polite"></div>

@@ -51,7 +51,7 @@ const relinkOpen = new Set(); // ids whose "Owner not confirmed" explanation is 
 /** The words for a machine the hub says cannot confirm its owner yet (GET /api/servers needs_relink, #6110). The step is owner_label.js's, the same one the message on that computer says (#6108); the Servers row names the machine,
  *  because it is not the computer in the person's hand. */
 const RELINK_BUTTON = 'Owner not confirmed';
-const relinkHelp = label => `${label || 'This machine'} can't confirm its owner yet. On that computer, ${OWNER_LABEL_STEP}.`;
+const relinkHelp = label => `${label || 'This computer'} can't confirm its owner yet. On that computer, ${OWNER_LABEL_STEP}.`;
 const relinkId = s => `${rowId(s.id)}-relink`;
 
 let load;
@@ -84,7 +84,7 @@ async function call(id, method, body) {
         const r = await fetch(`/api/servers/${encodeURIComponent(id)}`, {
             method, headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined,
         });
-        if (!r.ok) loadError = r.status === 404 ? 'That server no longer exists.' : 'The change was not saved.';
+        if (!r.ok) loadError = r.status === 404 ? 'That computer no longer exists.' : 'The change was not saved.';
         else { loadError = ''; invalidateServerAccess(); changed = accessChange; }
     } catch { loadError = 'Could not reach the hub.'; }
     busy.delete(id);
@@ -137,7 +137,7 @@ function sortValue(s, key) {
     if (key === 'version') return serverVersion(live);
     if (key === 'agents') return serverAgentCount(live);
     if (key === 'access') return rank(effectiveOf(s));
-    return String(s.label || 'Unnamed server').toLowerCase();
+    return String(s.label || 'Unnamed computer').toLowerCase();
 }
 
 
@@ -150,7 +150,7 @@ let backTo = null;
 function cancelRename(s) { renaming = null; render(); focusRow(s.id, '.cs-rename-btn'); } // Escape and Cancel close the field and the keyboard goes back to Rename (#9783)
 function renameForm(s) {
     return h('form', { className: 'cs-actions cs-rename', onkeydown: e => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); cancelRename(s); } }, onsubmit: e => { e.preventDefault(); const v = e.target.elements.label.value.trim(); renaming = null; if (v && v !== s.label) call(s.id, 'PATCH', { label: v }); else render(); } },
-        h('input', { name: 'label', type: 'text', value: s.label || '', maxLength: 100, 'aria-label': 'Server name', autocomplete: 'off' }),
+        h('input', { name: 'label', type: 'text', value: s.label || '', maxLength: 100, 'aria-label': 'Computer name', autocomplete: 'off' }),
         h('button', { type: 'submit', className: 'btn btn-small btn-primary', text: 'Save' }),
         h('button', { type: 'button', className: 'btn btn-small', text: 'Cancel', onclick: () => cancelRename(s) }));
 }
@@ -159,11 +159,11 @@ function renameForm(s) {
 function nameCell(s, live, online) {
     const un = updateNotice(live), warning = un && un.level === 'required' ? un.label : s.needs_relink === true ? 'owner not confirmed' : ''; // the button's name says the state once, and a warning (the #9683 rule: Open <name>, <state word>[, warning: <sentence>])
     return h('div', { className: 'cs-title' },
-        h('button', { type: 'button', className: 'cs-toggle cs-open', 'aria-label': `Open ${s.label || 'this server'}, ${online ? 'online' : 'offline'}${warning ? `, warning: ${warning}` : ''}`, onclick: () => openPage(s.id) },
+        h('button', { type: 'button', className: 'cs-toggle cs-open', 'aria-label': `Open ${s.label || 'this computer'}, ${online ? 'online' : 'offline'}${warning ? `, warning: ${warning}` : ''}`, onclick: () => openPage(s.id) },
             h('span', { className: 'cs-dot ' + (online ? 'online' : 'offline'), 'aria-hidden': 'true' }),
-            h('span', { className: 'cs-name', text: s.label || 'Unnamed server' })),
+            h('span', { className: 'cs-name', text: s.label || 'Unnamed computer' })),
         // The machine's health (#3446): the hub relays it while the machine is connected; without it (offline, held, reconnecting) the dot says unknown, never a stale ok.
-        healthDot(online ? live.machine_health : null, s.label || 'Server'),
+        healthDot(online ? live.machine_health : null, s.label || 'Computer'),
         relaunchBadge(h, s.id));
 }
 
@@ -171,7 +171,7 @@ function accessPicker(s, isBusy, helpId) {
     // The owner's choice, View / Interact / Launch; an option above what the computer announced is disabled (Launch means "up to what the computer allows"). The text under it says why (in the open row).
     const choice = accessChoice(s);
     const local = rank(s.local_mode) >= 0 ? s.local_mode : 'view'; // not announced yet: View
-    return h('label', { className: 'cs-launch' }, h('span', { className: 'sr-only', text: `Hub access for ${s.label || 'this server'} ` }),
+    return h('label', { className: 'cs-launch' }, h('span', { className: 'sr-only', text: `Hub access for ${s.label || 'this computer'} ` }),
         h('select', { disabled: isBusy, value: choice, 'aria-describedby': helpId, onchange: e => setAccess(s, e.target.value) },
             ['view', 'interact', 'launch'].map(v => h('option', { value: v, selected: v === choice, disabled: rank(v) > rank(local) && v !== choice, text: MODE_INFO[v].label }))));
 }
@@ -194,15 +194,15 @@ function rowActions(s, isBusy) {
     return confirming === s.id
         ? [h('button', { type: 'button', className: 'btn btn-small btn-danger', text: 'Confirm revoke', 'aria-describedby': revokeNoteId(s), onclick: () => { confirming = null; call(s.id, 'DELETE'); } }),
            h('button', { type: 'button', className: 'btn btn-small cs-revoke-cancel', text: 'Cancel', 'aria-describedby': revokeNoteId(s), onclick: () => cancelRevoke(s) })]
-        : [s.needs_relink === true ? h('button', { type: 'button', className: 'btn btn-small btn-primary cs-relink', text: RELINK_BUTTON, 'aria-label': `${RELINK_BUTTON} for ${s.label || 'this server'}: how to confirm it`, 'aria-expanded': String(relinkOpen.has(s.id)), 'aria-controls': relinkId(s),
+        : [s.needs_relink === true ? h('button', { type: 'button', className: 'btn btn-small btn-primary cs-relink', text: RELINK_BUTTON, 'aria-label': `${RELINK_BUTTON} for ${s.label || 'this computer'}: how to confirm it`, 'aria-expanded': String(relinkOpen.has(s.id)), 'aria-controls': relinkId(s),
                onclick: () => { if (relinkOpen.has(s.id)) relinkOpen.delete(s.id); else relinkOpen.add(s.id); render(); focusRow(s.id, '.cs-relink'); } }) : null,
-           h('button', { type: 'button', className: 'btn btn-small cs-rename-btn', text: 'Rename', 'aria-label': `Rename ${s.label || 'this server'}`, disabled: isBusy, onclick: () => { renaming = s.id; render(); } }),
+           h('button', { type: 'button', className: 'btn btn-small cs-rename-btn', text: 'Rename', 'aria-label': `Rename ${s.label || 'this computer'}`, disabled: isBusy, onclick: () => { renaming = s.id; render(); } }),
            // Revoke is a More away: the row shows Rename, and the rare, destructive step is in a small menu of its own (Escape and a click elsewhere close it).
            h('div', { className: 'cs-more', onkeydown: e => { if (e.key === 'Escape' && moreOpen === s.id) { e.preventDefault(); e.stopPropagation(); moreOpen = null; render(); focusRow(s.id, '.cs-more-btn'); } } },
-               h('button', { type: 'button', className: 'btn btn-small cs-more-btn', text: 'More', 'aria-label': `More for ${s.label || 'this server'}`, 'aria-expanded': String(moreOpen === s.id), 'aria-controls': `${rowId(s.id)}-more`,
+               h('button', { type: 'button', className: 'btn btn-small cs-more-btn', text: 'More', 'aria-label': `More for ${s.label || 'this computer'}`, 'aria-expanded': String(moreOpen === s.id), 'aria-controls': `${rowId(s.id)}-more`,
                    onclick: () => { moreOpen = moreOpen === s.id ? null : s.id; render(); focusRow(s.id, '.cs-more-btn'); } }),
                h('div', { className: 'menu cs-more-menu', id: `${rowId(s.id)}-more`, hidden: moreOpen !== s.id },
-                   h('button', { type: 'button', className: 'menu-item menu-item-danger cs-revoke', text: 'Revoke', 'aria-label': `Revoke ${s.label || 'this server'}`, disabled: isBusy, onclick: () => askRevoke(s) })))];
+                   h('button', { type: 'button', className: 'menu-item menu-item-danger cs-revoke', text: 'Revoke', 'aria-label': `Revoke ${s.label || 'this computer'}`, disabled: isBusy, onclick: () => askRevoke(s) })))];
 }
 
 function detailCell(s, live, online, isBusy, helpId) {
@@ -216,11 +216,11 @@ function detailCell(s, live, online, isBusy, helpId) {
     const infoId = `${rowId(s.id)}-access-details`;
     const infoOpen = accessDetails.has(s.id);
     const info = h('div', { className: 'cs-access-details' },
-        h('button', { type: 'button', className: 'btn btn-small btn-quiet cs-access-info', 'aria-label': `Access details for ${s.label || 'this server'}`, 'aria-expanded': String(infoOpen), 'aria-controls': infoId,
+        h('button', { type: 'button', className: 'btn btn-small btn-quiet cs-access-info', 'aria-label': `Access details for ${s.label || 'this computer'}`, 'aria-expanded': String(infoOpen), 'aria-controls': infoId,
             onclick: () => { if (accessDetails.has(s.id)) accessDetails.delete(s.id); else accessDetails.add(s.id); render(); } },
             h('span', { className: 'material-icons', 'aria-hidden': 'true', text: 'info' }), 'Access details'),
         h('div', { id: infoId, className: 'cs-access-matrix', hidden: !infoOpen },
-            h('p', { text: 'What Coral Hub may do on a machine is what you allowed when you connected it; you can limit it further here.' }),
+            h('p', { text: 'What Coral Hub may do on a computer is what you allowed when you connected it; you can limit it further here.' }),
             ...MODES.map(mode => h('p', {}, h('strong', { text: `${MODE_INFO[mode].label}: ` }), MODE_INFO[mode].text))));
     const eff = effectiveNote(s);
     const effEl = eff ? h('div', { className: 'cs-meta cs-access-effective', text: eff }) : null;
@@ -234,7 +234,7 @@ function detailCell(s, live, online, isBusy, helpId) {
         s.needs_relink === true ? h('div', { className: 'cs-note cs-relink-note', id: relinkId(s), hidden: !relinkOpen.has(s.id), text: relinkHelp(s.label) }) : null,
         h('div', { className: 'cs-main' }, belowMinimumText(live) ? h('div', { className: 'cs-meta server-below-minimum', text: belowMinimumText(live) }) : null,
             online ? healthCard(live.machine_health, { title: 'Health', online: true, waitingText: 'No health reading yet.' }) : null, effEl, helpEl, info),
-        confirming === s.id ? h('div', { className: 'cs-note', id: revokeNoteId(s), text: `Revoke ${s.label || 'this server'}? It disconnects this computer from Coral Hub. Its token stops working; to connect it again you must enroll it again.` }) : null,
+        confirming === s.id ? h('div', { className: 'cs-note', id: revokeNoteId(s), text: `Revoke ${s.label || 'this computer'}? It disconnects this computer from Coral Hub. Its token stops working; to connect it again you must enroll it again.` }) : null,
         updateNote);
 }
 
@@ -246,9 +246,9 @@ function machinePage(s) {
     const n = needsCount(s);
     const fact = (label, ...value) => [h('dt', { text: label }), h('dd', {}, ...value)];
     const page = h('section', { className: 'servers-page cs-page', id: rowId(s.id), tabindex: '-1', 'data-id': s.id, 'aria-labelledby': 'cs-page-name' },
-        h('button', { type: 'button', className: 'back-link', id: 'servers-back', text: '← Servers', onclick: () => closePage() }),
+        h('button', { type: 'button', className: 'back-link', id: 'servers-back', text: '← Computers', onclick: () => closePage() }),
         renaming === s.id ? renameForm(s)
-            : h('h3', { className: 'servers-page-name cs-page-name', id: 'cs-page-name' }, h('span', { className: 'cs-dot ' + (online ? 'online' : 'offline'), 'aria-hidden': 'true' }), s.label || 'Unnamed server', relaunchBadge(h, s.id)), // the dot and the Status row say it once: no hollow health circle after the name (the Health card below has the reading, #9798)
+            : h('h3', { className: 'servers-page-name cs-page-name', id: 'cs-page-name' }, h('span', { className: 'cs-dot ' + (online ? 'online' : 'offline'), 'aria-hidden': 'true' }), s.label || 'Unnamed computer', relaunchBadge(h, s.id)), // the dot and the Status row say it once: no hollow health circle after the name (the Health card below has the reading, #9798)
         h('dl', { className: 'facts servers-facts cs-facts' },
             ...fact('Status', online ? 'Online' : 'Offline'),
             ...fact('Coral', h('span', { text: version || '—' }), upd ? ' ' : null, upd),
@@ -276,7 +276,7 @@ function serversTable(shown) {
         access: s => accessPicker(s, busy.has(s.id), `${rowId(s.id)}-access-help`),
     };
     return buildServersTable(DT, {
-        label: 'Your computers', state: dtState, rows: shown, rowKey: s => s.id, rowName: s => s.label || 'Unnamed server',
+        label: 'Your computers', state: dtState, rows: shown, rowKey: s => s.id, rowName: s => s.label || 'Unnamed computer',
         columns: [
             { key: 'name', label: 'Name', primary: true, width: 'grow', line: 1, sort: true, sortValue: s => sortValue(s, 'name'), cell: cellOf.name },
             { key: 'status', label: 'Status', line: 2, sort: true, sortValue: s => sortValue(s, 'status'), cell: cellOf.status },
@@ -313,7 +313,7 @@ function enrollBlock() {
             h('button', { type: 'button', id: 'cs-enroll-toggle', className: open ? 'btn btn-small' : 'btn btn-primary btn-small', 'aria-expanded': String(open), 'aria-controls': 'cs-enroll-body', onclick: () => { enrollOpen = !open; render(); } }, 'Add a computer')),
         h('div', { className: 'cs-enroll-body', id: 'cs-enroll-body', hidden: !open },
             h('div', { className: 'cs-enroll-steps' },
-                h('p', { className: 'cs-meta', text: 'Each machine connects out to this hub; no inbound port is needed.' }),
+                h('p', { className: 'cs-meta', text: 'Each computer connects out to this hub; no inbound port is needed.' }),
                 h('ol', {},
                     h('li', {}, h('strong', { text: 'Install Coral' }), ' on the computer you want to add: ', h('a', { href: DOWNLOAD_URL, target: '_blank', rel: 'noopener noreferrer', text: 'coralhub.dev/coral.html#download' })),
                     h('li', {}, 'Open Coral on that computer and press ', h('strong', { text: 'Connect to Coral Hub' }), ' (Settings › Network and Hub, or the Coral Hub card on the home screen).'),

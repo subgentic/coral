@@ -35,7 +35,7 @@ const MACHINE = ['settings-working-dir', 'settings-claude-account-check', 'setti
         });
         await run('the note says where machine settings live, once, even when applied twice', async () => {
             const notes = await ev(`[...document.querySelectorAll('#settings-modal .settings-cloud-note')].map(n => n.textContent)`);
-            assert.equal(notes.length, 1, JSON.stringify(notes)); assert.match(notes[0], /saved on the hub/); assert.match(notes[0], /set on the machine in Coral/);
+            assert.equal(notes.length, 1, JSON.stringify(notes)); assert.match(notes[0], /saved on the hub/); assert.match(notes[0], /set on the computer in Coral/);
             assert.equal(await ev(`!!document.querySelector('#settings-modal .settings-panes > .settings-cloud-note')`), true, 'inside the content column');
         });
         await run('groups with no per-user row leave the list and the shown group has a row on screen', async () => {

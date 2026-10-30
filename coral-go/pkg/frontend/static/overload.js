@@ -164,10 +164,10 @@ export function pausedForMs(machine = '') {
         if (resp.headers && resp.headers.get('X-Coral-Hub-Overload') === '1') return 'Coral Hub';
         let m = '';
         try { m = resp.url ? machineOf(new URL(resp.url).pathname) : ''; } catch { /* not a URL */ }
-        return m ? 'the machine' : self;
+        return m ? 'the computer' : self;
     }
     const m = machine === 'local' ? '' : String(machine || '');
-    return m && overloadHooks.now() >= _global.until && isPaused(m) ? 'the machine' : self;
+    return m && overloadHooks.now() >= _global.until && isPaused(m) ? 'the computer' : self;
 }
 
 /** The text a first load refused as busy shows while it waits to retry. */
@@ -252,7 +252,7 @@ export function installOverloadWatch() {
             if (method !== 'GET' && (scope || remoteRefused) && overloadHooks.now() - (_lastBusyToast.get(kind) || 0) > MIN_PAUSE_MS) {
                 _lastBusyToast.set(kind, overloadHooks.now());
                 const text = remoteRefused
-                    ? "That machine is busy or unreachable, and didn't do that. Try again in a moment."
+                    ? "That computer is busy or unreachable, and didn't do that. Try again in a moment."
                     : `Coral is busy and didn't do that. Try again in ${Math.ceil(pausedForMs() / 1000)} s.`;
                 importOnce('./utils.js').then(u => u.showToast(text, true)).catch(() => {});
             }

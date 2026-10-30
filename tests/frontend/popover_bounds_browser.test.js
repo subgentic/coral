@@ -1,4 +1,4 @@
-// At 200 percent text the display menu, the server list, a server's menu and the Settings modal stay inside the screen (#4247, from QA's
+// At 200 percent text the display menu, the computer list, a server's menu and the Settings modal stay inside the screen (#4247, from QA's
 // phone and large-text pass #4231): on a 390 px phone and in the desktop sidebar (a popover never leaves the sidebar), dark and light,
 // 100 and 200 percent. A server header keeps its name beside the Update required marker (the marker gives way first), and the
 // Settings modal body does not scroll sideways, its buttons and selects whole.

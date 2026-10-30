@@ -94,11 +94,11 @@ function menuEntries(viewLabels = new Set()) {
     const out = [entry('home', 'Home', { action: 'm-go-home' })];
     out.push(entry('settings', 'Settings', { action: 'm-close-top-bar-settings-then-show-settings-modal' }), entry('palette', 'Themes', { action: 'm-close-top-bar-settings-then-show-theme-configurator' }));
     if (!cloud) out.push(entry('system_update', 'Check for updates', { action: 'm-close-top-bar-settings-then-check-for-updates' }));
-    if ((isHub() || cloud) && !viewLabels.has('Servers')) out.push(entry('dns', 'Servers', { action: 'm-close-top-bar-settings-then-show-servers-modal' })); // not twice: when the Servers view is one of the views above, two entries are named alike
+    if ((isHub() || cloud) && !viewLabels.has('Computers')) out.push(entry('dns', 'Computers', { action: 'm-close-top-bar-settings-then-show-servers-modal' })); // not twice: when the Servers view is one of the views above, two entries are named alike
     const account = document.getElementById('cloud-account-menu');
     if (account) for (const item of account.querySelectorAll('a.overflow-menu-item, button.overflow-menu-item')) {
         const label = item.textContent.trim();
-        if (label === 'Servers') continue; // already above
+        if (label === 'Computers') continue; // already above
         out.push(entry(label === 'Sign out' ? 'lock' : label === 'Account' ? 'account_circle' : 'open_in_new', label, { onClick: () => item.click() })); // the account menu's own handler, so Sign out clears the drafts first
     }
     return out;

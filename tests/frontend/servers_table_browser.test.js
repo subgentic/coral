@@ -217,7 +217,7 @@ const contrast = (a, b) => {
         const info = await infoState();
         assert.equal(info.open, 'true'); assert.equal(info.hidden, false); assert.equal(info.focus, true, 'focus survives the redraw');
         assert.match(info.words, /View:.*Interact:.*Launch:/, 'every access level remains available on demand');
-        assert.match(info.words, /What Coral Hub may do on a machine is what you allowed when you connected it; you can limit it further here\./, 'the enrollment access limit remains reachable');
+        assert.match(info.words, /What Coral Hub may do on a computer is what you allowed when you connected it; you can limit it further here\./, 'the enrollment access limit remains reachable');
         assert.match(info.words, /turn on auto-accept/, 'the complete capability text is preserved');
         await ev(`document.querySelector('#server-row-m1 .cs-access-info').click(); true`);
         assert.equal(d.update, DOWNLOAD, 'the update notice points to the download page, not GitHub');

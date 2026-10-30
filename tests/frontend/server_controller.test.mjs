@@ -22,5 +22,5 @@ const start=pending.start();pending.stop();resolveRead(response({servers:[{id:'l
 assert.equal(draws,0);assert.equal(timers,0);
 assert.deepEqual(serverSources.registered.rows({servers:[1]}),[]);
 assert.deepEqual(serverSources.cloud.rows([1]),[]);
-assert.equal(await serverSources.cloud.refused(response({},503)),'Could not load your servers.');
+assert.equal(await serverSources.cloud.refused(response({},503)),'Could not load your computers.');
 console.log('server_controller: both API shapes, error states, edit guard, polling teardown and late-response isolation pass');

@@ -1,8 +1,8 @@
 // The sidebar header (#4062): the collapse button is the last control of the row, and the search box, the Display-options button and the
 // icon buttons share one height, one centre line and even gaps. A click or tap outside closes the display menu and a server header's details,
 // and Escape closes the display menu; and the collapsed rail still has its way back. Desktop and phone width. Run against an isolated dev server.
-// (#4932 removed the search-row server pill; the server list it opened is gone, so its column/footer/arrow-key checks went with it. The server
-//  group headers, Show server, Group by server and the Servers tab are unchanged and covered by server_switcher_browser and server_menu.)
+// (#4932 removed the search-row server pill; the computer list it opened is gone, so its column/footer/arrow-key checks went with it. The server
+//  group headers, Show computer, Group by computer and the Servers tab are unchanged and covered by server_switcher_browser and server_menu.)
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 

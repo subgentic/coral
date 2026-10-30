@@ -235,8 +235,8 @@
 2	message_board.js	p.message_count
 1	message_board.js	p.subscriber_count
 1	mobile.js	['summary', 'model'].map(k => switchRow({ label: `Show ${k}`, labelClass: 'list-display-option', labelAttrs: `
-1	mobile.js	switchRow({ label: 'Group by server', labelClass: 'list-display-option', labelAttrs: ' data-display-row="group
-1	mobile.js	switchRow({ label: 'Show server', labelClass: 'list-display-option', labelAttrs: ' data-display-row="server" h
+1	mobile.js	switchRow({ label: 'Group by computer', labelClass: 'list-display-option', labelAttrs: ' data-display-row="gro
+1	mobile.js	switchRow({ label: 'Show computer', labelClass: 'list-display-option', labelAttrs: ' data-display-row="server"
 1	model_chip.js	checked
 2	model_chip.js	how
 1	model_chip.js	kind
@@ -466,7 +466,7 @@
 1	team_availability.js	label
 1	team_availability.js	tasks(a.tasks)
 1	team_availability.js	tasks(data.unassigned_tasks)
-1	team_cross_team_fields.js	[l.machine && escapeHtml(l.machine), l.sid && 'server ' + escapeHtml(l.sid), l.refreshed && 'confirmed ' + esc
+1	team_cross_team_fields.js	[l.machine && escapeHtml(l.machine), l.sid && 'computer ' + escapeHtml(l.sid), l.refreshed && 'confirmed ' + e
 1	team_cross_team_fields.js	buttonFor(st)
 1	team_cross_team_fields.js	links.map(l => `<li><span><b>${escapeHtml(l.team)}</b></span><span class="xt-sub">${[l.machine && escapeHtml(l
 1	team_cross_team_fields.js	turnOn

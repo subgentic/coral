@@ -84,7 +84,7 @@
             <button class="tab top-nav-tab" data-local-only id="nav-tab-automations" data-on-click="m-switch-nav-tab" data-arg="automations" aria-controls="scheduler-view" title="Jobs and workflows that run on a schedule or when you start them">Automations</button>
             <button class="tab top-nav-tab" data-local-only id="nav-tab-tokens" data-on-click="m-switch-nav-tab" data-arg="tokens" title="Analytics — token usage and cost">Analytics</button>
             <!-- Servers right after Analytics, before Docs (the operator's order, #8704: Agents, Inbox, Workflows, Jobs, Analytics, Servers, Docs; on the Hub's own pages, where the local tabs are not drawn, right after Chats). -->
-            <button class="tab top-nav-tab" id="nav-tab-servers" data-on-click="m-switch-nav-tab" data-arg="servers" aria-controls="servers-view" hidden>Servers</button>
+            <button class="tab top-nav-tab" id="nav-tab-servers" data-on-click="m-switch-nav-tab" data-arg="servers" aria-controls="servers-view" hidden>Computers</button>
             <button class="tab top-nav-tab" id="nav-tab-docs" data-on-click="m-switch-nav-tab" data-arg="docs" title="How Coral works, with search">Docs</button>
             <!-- Artifacts after Docs, on the Hub only and only where GET /api/account says artifacts_tab is true (artifacts_tab.js, #6236): the hub's /artifacts page in a frame, as the Inbox is -->
             <button class="tab top-nav-tab" id="nav-tab-artifacts" data-cloud-only data-on-click="m-switch-nav-tab" data-arg="artifacts" aria-controls="artifacts-view" hidden>Artifacts</button>
@@ -126,7 +126,7 @@
                     </button>
                     <button class="menu-item overflow-menu-item" data-hub-only style="display:none" data-on-click="m-close-top-bar-settings-then-show-servers-modal">
                         <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="2.5" width="12" height="4.5" rx="1"/><rect x="2" y="9" width="12" height="4.5" rx="1"/><circle cx="4.5" cy="4.75" r=".6" fill="currentColor"/><circle cx="4.5" cy="11.25" r=".6" fill="currentColor"/></svg>
-                        Servers
+                        Computers
                     </button>
                     <button class="menu-item overflow-menu-item" data-on-click="m-close-top-bar-settings-then-show-settings-modal">
                         <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -333,7 +333,7 @@
                             </button>
                             <button type="button" class="editions-home-item" data-editions="home-own">
                                 <span class="editions-home-icon material-icons" aria-hidden="true">device_hub</span>
-                                <span class="editions-home-copy"><strong>Run your own hub</strong><span>Or host it yourself: connect your own machines with <code>coral --hub</code>. Free and self-hosted.</span></span>
+                                <span class="editions-home-copy"><strong>Run your own hub</strong><span>Or host it yourself: connect your own computers with <code>coral --hub</code>. Free and self-hosted.</span></span>
                                 <span class="editions-home-arrow material-icons" aria-hidden="true">arrow_forward</span>
                             </button>
                         </div>

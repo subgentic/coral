@@ -260,7 +260,7 @@ const UNDERSIZED = `(() => {
             await ev(`document.getElementById('top-menu-btn').click(); true`);
             await waitFor(`[...document.querySelectorAll('#nav-more-menu:not([hidden]) .nav-more-item')].some(e => /Sign out/.test(e.textContent))`, 'the hamburger menu with the account entries', { soft: true });
             const menuTexts = await ev(`[...document.querySelectorAll('#nav-more-menu:not([hidden]) .nav-more-item')].map(e => e.textContent.replace(/\\s+/g, ' ').trim())`);
-            for (const word of ['Servers', 'Account', 'Saved for later', 'Sign out']) assert.ok(menuTexts.some(t => t.includes(word)), `the hamburger menu has ${word}: ` + JSON.stringify(menuTexts));
+            for (const word of ['Computers', 'Account', 'Saved for later', 'Sign out']) assert.ok(menuTexts.some(t => t.includes(word)), `the hamburger menu has ${word}: ` + JSON.stringify(menuTexts));
             const hamburgerRows = await menuRows('#nav-more-menu:not([hidden]) .nav-more-item');
             for (const [w, h] of hamburgerRows) assert.ok(w >= 44 && h >= 44, `hamburger menu row ${w}x${h} under 44px`);
             await ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); true`);

@@ -126,7 +126,7 @@ export async function launchStandaloneTerminal(workDir, server) {
     if (server === undefined) {
         server = _serverForWorkDir(workDir);
         if (server === null) {
-            showToast('This directory is used on more than one server; launch the terminal from that server\'s group.', true);
+            showToast('This directory is used on more than one computer; launch the terminal from that computer\'s group.', true);
             return;
         }
     }

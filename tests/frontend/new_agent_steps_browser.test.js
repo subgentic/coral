@@ -71,12 +71,12 @@ const BASE = require('./test_base').BASE;
         await S.run('a machine selector is there with several machines and only then (any select about the machine or server on step 1)', async () => {
             await ev(`window.hideLaunchModal && window.hideLaunchModal(); T.state.hub = true; T.state.cloud = true; T.state.serversKnown = true; T.state.servers = [{ id: 'm1', label: 'build-server', status: 'online', version: '1.4.6', last_seen: new Date().toISOString() }]; true`);
             await openNewAgent(ev, waitFor);
-            assert.ok(await has('select', /machine|server/i), 'a select for the machine with two machines (this computer and build-server)');
+            assert.ok(await has('select', /computer|machine|server/i), 'a select for the machine with two machines (this computer and build-server)');
             await ev(`window.hideLaunchModal(); T.state.servers = []; T.state.hub = false; T.state.cloud = false; true`);
             await openNewAgent(ev, waitFor);
-            assert.ok(!(await has('select', /machine|server/i)), 'no machine select with this computer alone');
+            assert.ok(!(await has('select', /computer|machine|server/i)), 'no machine select with this computer alone');
         });
-        await S.run('that select is named "Machine" (the design\'s name; a screen reader hears it)', async () => {
+        await S.run('that select is named "Computer" (the design\'s name; a screen reader hears it)', async () => {
             await ev(`window.hideLaunchModal && window.hideLaunchModal(); T.state.hub = true; T.state.cloud = true; T.state.serversKnown = true; T.state.servers = [{ id: 'm1', label: 'build-server', status: 'online', version: '1.4.6', last_seen: new Date().toISOString() }]; true`);
             await openNewAgent(ev, waitFor);
             assert.ok(await has('select', N.machine), 'a select named exactly Machine');

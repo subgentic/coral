@@ -15,7 +15,7 @@ export function readAccount() {
 
 /** The Hub's pages the account menu links to, BY KEY, from Coral's own table (#11106, the Hub's ask): the label and the same-origin path are fixed here and never taken from GET /api/account, whose `nav` names only the keys, in the order to show, of what
  *  this account may use. A key that is not in the table is ignored (not drawn, not an error). */
-export const ACCOUNT_NAV = { account: ['Account', '/account'], billing: ['Billing', '/account/billing'], team: ['Team', '/account/team'], 'team-links': ['Team links', '/team-links'], usage: ['Usage', '/usage'], goals: ['Goals', '/goals'], machines: ['Machines', '/machines'], saved: ['Saved for later', '/saved'] };
+export const ACCOUNT_NAV = { account: ['Account', '/account'], billing: ['Billing', '/account/billing'], team: ['Team', '/account/team'], 'team-links': ['Team links', '/team-links'], usage: ['Usage', '/usage'], goals: ['Goals', '/goals'], machines: ['Computers', '/machines'], saved: ['Saved for later', '/saved'] };
 
 /** The entries `nav` names that Coral knows, each once, in the Hub's order: [[label, path], ...]; null when `nav` is not an array (an older Hub: today's links stay). */
 export function accountNavEntries(nav) {

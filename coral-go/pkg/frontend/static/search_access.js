@@ -97,7 +97,7 @@ export function openSearchAccess(member, opts = {}) {
 
     const first = () => {
         const body = mk('div', 'modal-body search-access-body');
-        if (readOnly) body.append(mk('p', 'search-access-note', `Search reaches: ${(LEVELS.find(l => l[0] === level) || LEVELS[0])[1].toLowerCase()}. Change this on the machine's own dashboard.`));
+        if (readOnly) body.append(mk('p', 'search-access-note', `Search reaches: ${(LEVELS.find(l => l[0] === level) || LEVELS[0])[1].toLowerCase()}. Change this on the computer's own dashboard.`));
         else {
             const list = mk('div', 'search-access-levels'); list.setAttribute('role', 'radiogroup'); list.setAttribute('aria-labelledby', 'search-access-title');
             for (const [key, word, reads] of LEVELS) {

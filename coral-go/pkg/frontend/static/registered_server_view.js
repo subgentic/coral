@@ -120,7 +120,7 @@ function serverCell(s, live) {
 function tagsCell(s) {
     const cell = DT.el('span', 'dt-title-cell');
     cell.append(DT.tag(isLocal(s) ? 'local' : s.id));
-    if (!isLocal(s) && s.allow_private) { const t = DT.tag('private network'); t.title = 'Private network addresses are allowed for this server'; cell.append(t); }
+    if (!isLocal(s) && s.allow_private) { const t = DT.tag('private network'); t.title = 'Private network addresses are allowed for this computer'; cell.append(t); }
     return cell;
 }
 /** The version a server runs: this hub's own, or what the registered server reported (its version row on the page says more). */
@@ -138,9 +138,9 @@ function serversTable(local, remotes) {
     const rows = [local, ...remotes];
     const live = s => (isLocal(s) ? { id: 'local', status: 'online' } : liveOf(s));
     return buildServersTable(DT, {
-        label: 'Registered servers', state: _dt, rows, oneLine: true, rowKey: s => (isLocal(s) ? 'local' : s.id), rowName: s => s.label || s.id,
+        label: 'Registered computers', state: _dt, rows, oneLine: true, rowKey: s => (isLocal(s) ? 'local' : s.id), rowName: s => s.label || s.id,
         columns: [ // one line a row (Goal #79, UI/UX's order #9679): Server, Tags, Status, Agents, Needs you, Last seen, Version; a narrow list drops Version, then Tags and Last seen, then Agents (dropAt, #8931); Needs you and the name's warning never go; under 16 rem (a phone at 200% text) Status leaves and its dot moves before the name
-            { key: 'server', label: 'Server', primary: true, width: 'grow', sort: true, sortValue: s => (s.label || s.id || '').toLowerCase(), cell: s => serverCell(s, live(s)), title: s => s.label || s.id },
+            { key: 'server', label: 'Computer', primary: true, width: 'grow', sort: true, sortValue: s => (s.label || s.id || '').toLowerCase(), cell: s => serverCell(s, live(s)), title: s => s.label || s.id },
             { key: 'tags', label: 'Tags', width: '11rem', dropAt: 36, cell: tagsCell },
             { key: 'status', label: 'Status', width: '8rem', dropAt: 16, sort: true, sortValue: s => statusMeta(live(s).status || s.status).label, cell: s => statusDotWord(live(s).status || s.status) },
             { key: 'agents', label: 'Agents', width: '5rem', dropAt: 28, tone: 'tertiary', align: 'end', sort: 'number', sortValue: s => serverAgentCount(live(s)), cell: s => { const n = serverAgentCount(live(s)); return n ? String(n) : ''; } }, // the count alone under its header, nothing at zero (UI/UX #9679)
@@ -170,7 +170,7 @@ function pageHtml(s) {
     // One line says what to do; the raw error is behind Details, for support (#3981).
     const act = (s.status === 'key_unreadable' || s.status === 'unauthorized')
         ? statusMeta(s.status).hint
-        : s.status === 'unreachable' ? 'Is Coral running on that machine? Check the URL.' : '';
+        : s.status === 'unreachable' ? 'Is Coral running on that computer? Check the URL.' : '';
     const raw = s.last_error && s.last_error !== act ? s.last_error : '';
     const attention = act
         ? `<div class="servers-row-error" role="status"><span class="servers-row-hint">${escHtml(act)}</span>${raw ? ` <details class="servers-row-detail"><summary>Details</summary>${escHtml(raw)}</details>` : ''}</div>`
@@ -184,8 +184,8 @@ function pageHtml(s) {
            <button type="button" class="btn" data-action="edit" data-id="${escHtml(s.id)}"${busy ? ' disabled' : ''}>Edit</button>
            <button type="button" class="btn btn-danger servers-remove" data-action="delete" data-id="${escHtml(s.id)}"${busy ? ' disabled' : ''}>Remove</button>`;
     return `<section class="servers-page" id="server-row-${escHtml(s.id)}" tabindex="-1" data-id="${escHtml(s.id)}" aria-labelledby="servers-page-name">
-        <button type="button" class="back-link" id="servers-back" data-action="back">&larr; Servers</button>
-        <h3 class="servers-page-name" id="servers-page-name">${escHtml(s.label || s.id)} <span class="servers-id">${escHtml(s.id)}</span>${s.allow_private ? ' <span class="chip chip-tag servers-tag" title="Private network addresses are allowed for this server">private network</span>' : ''}</h3>
+        <button type="button" class="back-link" id="servers-back" data-action="back">&larr; Computers</button>
+        <h3 class="servers-page-name" id="servers-page-name">${escHtml(s.label || s.id)} <span class="servers-id">${escHtml(s.id)}</span>${s.allow_private ? ' <span class="chip chip-tag servers-tag" title="Private network addresses are allowed for this computer">private network</span>' : ''}</h3>
         <p class="item-meta">${statusPill(status)}</p>
         <dl class="facts servers-facts">
             ${factHtml('URL', escHtml(s.url || ''))}
@@ -203,7 +203,7 @@ function pageHtml(s) {
 function formHtml() {
     const adding = _editing === '';
     const cur = { ...(adding ? {} : (_servers.find(s => s.id === _editing) || {})), ...(_draft || {}) };
-    const title = adding ? 'Add server' : `Edit ${escHtml(cur.label || cur.id || '')}`;
+    const title = adding ? 'Add computer' : `Edit ${escHtml(cur.label || cur.id || '')}`;
     return `<div class="servers-form" id="servers-form">
         <h4>${title}</h4>
         ${adding ? '' : warningHtml(_servers.find(x => x.id === _editing))}
@@ -218,17 +218,17 @@ function mountServerForm(host) {
     const adding = _editing === '';
     const cur = { ...(adding ? {} : (_servers.find(s => s.id === _editing) || {})), ...(_draft || {}) };
     const fields = [
-        { key: 'id', type: 'text', id: 'servers-id', label: 'Server id', required: adding, requiredMessage: 'Enter the server id.', readOnly: !adding, placeholder: 'workstation', help: 'Lowercase letters, digits and dashes. Cannot be changed later.',
-            validate: v => (adding && !isValidServerId(String(v || '').trim()) ? 'Server id must be 1 to 32 lowercase letters, digits or dashes, and cannot be "local".' : ''), messageAsIs: true, attrs: { maxlength: '32' } },
+        { key: 'id', type: 'text', id: 'servers-id', label: 'Computer id', required: adding, requiredMessage: 'Enter the computer id.', readOnly: !adding, placeholder: 'workstation', help: 'Lowercase letters, digits and dashes. Cannot be changed later.',
+            validate: v => (adding && !isValidServerId(String(v || '').trim()) ? 'Computer id must be 1 to 32 lowercase letters, digits or dashes, and cannot be "local".' : ''), messageAsIs: true, attrs: { maxlength: '32' } },
         { key: 'label', type: 'text', id: 'servers-label', label: 'Display name', placeholder: 'Workstation' },
-        { key: 'url', type: 'text', id: 'servers-url', label: 'URL', required: adding, requiredMessage: 'Enter the server URL.', placeholder: 'https://coral.example.com:8420', help: 'Scheme, host and port only.', setup: e => e.setAttribute('type', 'url') },
-        { key: 'api_key', type: 'secret', id: 'servers-key', label: 'API key', required: adding, requiredMessage: "Enter the remote server's API key.", messageAsIs: true,
-            placeholder: adding ? "Paste the remote server's API key" : 'Leave blank to keep the current key', help: 'Write-only. The key is stored encrypted and is never shown again.', setup: e => e.setAttribute('autocomplete', 'new-password') },
+        { key: 'url', type: 'text', id: 'servers-url', label: 'URL', required: adding, requiredMessage: 'Enter the computer URL.', placeholder: 'https://coral.example.com:8420', help: 'Scheme, host and port only.', setup: e => e.setAttribute('type', 'url') },
+        { key: 'api_key', type: 'secret', id: 'servers-key', label: 'API key', required: adding, requiredMessage: "Enter the remote computer's API key.", messageAsIs: true,
+            placeholder: adding ? "Paste the remote computer's API key" : 'Leave blank to keep the current key', help: 'Write-only. The key is stored encrypted and is never shown again.', setup: e => e.setAttribute('autocomplete', 'new-password') },
         { key: 'allow_private', type: 'toggle', id: 'servers-private', label: 'Allow private network address', default: false,
-            help: { text: 'Only for a server on your LAN, tailnet or localhost that you trust.', more: 'It lets this hub connect to private and reserved addresses, which is normally refused. Leave it off for a server on the public internet.' } },
+            help: { text: 'Only for a computer on your LAN, tailnet or localhost that you trust.', more: 'It lets this hub connect to private and reserved addresses, which is normally refused. Leave it off for a computer on the public internet.' } },
     ];
     _formView = mountSettingsView(host, { mode: 'form', fields, words: { busy: 'Checking connection...', failed: '' },
-        form: { submit: adding ? 'Add server' : 'Save', cancel: 'Cancel', onSubmit: submitServerForm, onCancel: () => { _editing = null; _formError = ''; _urlError = ''; _draft = null; render(); } } });
+        form: { submit: adding ? 'Add computer' : 'Save', cancel: 'Cancel', onSubmit: submitServerForm, onCancel: () => { _editing = null; _formError = ''; _urlError = ''; _draft = null; render(); } } });
     for (const k of ['id', 'label', 'url']) if (cur[k] !== undefined) _formView.set(k, cur[k]);
     _formView.set('allow_private', !!cur.allow_private);
     if (_urlError) _formView.error('url', _urlError);
@@ -251,17 +251,17 @@ function render() {
     // A long list pushes "Add server" screens below the fold: with many machines it sits above the list, beside how many answer.
     const many = allRemotes.length > 5;
     const online = allRemotes.filter(s => s.status === 'online').length;
-    const topBar = `<div class="servers-top"><span class="servers-summary">${allRemotes.length} servers, ${online} online${online < allRemotes.length ? `, ${allRemotes.length - online} not` : ''}</span><button type="button" class="btn btn-primary" data-action="add">Add server</button></div>`;
+    const topBar = `<div class="servers-top"><span class="servers-summary">${allRemotes.length} computers, ${online} online${online < allRemotes.length ? `, ${allRemotes.length - online} not` : ''}</span><button type="button" class="btn btn-primary" data-action="add">Add computer</button></div>`;
     const restoreFocus = rememberFocus(m); // a control the redraw replaced (Add server, Test, Edit) gets focus back (#4882)
     const table = '<div id="servers-table-slot"></div>'; // the data_table goes in once the markup is set
-    const back = '<button type="button" class="back-link" id="servers-back" data-action="back">&larr; Servers</button>';
+    const back = '<button type="button" class="back-link" id="servers-back" data-action="back">&larr; Computers</button>';
     const body = _open && page
         ? (_editing === _open ? `<section class="servers-page" id="server-row-${escHtml(_open)}" tabindex="-1" data-id="${escHtml(_open)}">${back}${formHtml()}</section>` : pageHtml(page))
         : `${many && _editing === null ? topBar : ''}
             ${table}
-            ${!remotes.length && !_loadError ? `<p class="empty-state empty-state-tight">${serversFiltered() ? 'No servers match this search.' : 'No remote servers yet.'}</p>` : ''}
-            ${_editing !== null ? formHtml() : many ? '' : '<div class="servers-form-actions"><button type="button" class="btn btn-primary" data-action="add">Add server</button></div>'}`;
-    m.innerHTML = `${_open && page ? '' : '<div class="servers-intro"><p class="servers-intro-line">Servers whose agents and teams appear in this hub.</p><details class="servers-intro-more"><summary>About API keys</summary><p>The hub stores each server\'s API key (encrypted); a key grants full control of that server.</p></details></div>'}
+            ${!remotes.length && !_loadError ? `<p class="empty-state empty-state-tight">${serversFiltered() ? 'No computers match this search.' : 'No remote computers yet.'}</p>` : ''}
+            ${_editing !== null ? formHtml() : many ? '' : '<div class="servers-form-actions"><button type="button" class="btn btn-primary" data-action="add">Add computer</button></div>'}`;
+    m.innerHTML = `${_open && page ? '' : '<div class="servers-intro"><p class="servers-intro-line">Computers whose agents and teams appear in this hub.</p><details class="servers-intro-more"><summary>About API keys</summary><p>The hub stores each computer\'s API key (encrypted); a key grants full control of that computer.</p></details></div>'}
             ${_loadError ? `<div class="servers-form-error" role="alert">${escHtml(_loadError)}</div>` : ''}
             ${body}`;
     fillWarnings(m);
@@ -326,7 +326,7 @@ async function doDelete(id) {
     try {
         const resp = await fetch(`/api/servers/${encodeURIComponent(id)}`, { method: 'DELETE' });
         if (!resp.ok) _loadError = describeServerError(resp.status, await readBody(resp));
-        else { _loadError = ''; _open = null; _focusNext = 'row'; showToast('Server removed'); }
+        else { _loadError = ''; _open = null; _focusNext = 'row'; showToast('Computer removed'); }
     } catch {
         _loadError = 'Remove failed: could not reach the hub.';
     }
@@ -371,7 +371,7 @@ async function submitServerForm(values) {
             failure = message;
         } else {
             _editing = null; _draft = null;
-            showToast(adding ? 'Server added' : 'Server updated');
+            showToast(adding ? 'Computer added' : 'Computer updated');
         }
     } catch {
         failure = 'Could not reach the hub. Try again.';
