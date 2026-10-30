@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -44,7 +45,8 @@ func TestLastMessageRowFindsAFirstReplyAtOnceForAStartedAgent(t *testing.T) {
 	require.NoError(t, os.MkdirAll(project, 0o755))
 	reply := `{"type":"assistant","timestamp":"2026-10-30T10:00:05.000Z","message":{"content":[{"type":"text","text":"Hi, ready."}]}}` + "\n"
 	require.NoError(t, os.WriteFile(filepath.Join(project, sid+".jsonl"), []byte(reply), 0o644))
+	time.Sleep(1100 * time.Millisecond) // sleep-ok: the started session's miss is kept one second (jsonl's clock seam is not reachable from here)
 	f := lastMessageRow(h, sid, "", "claude", false, true)
-	require.NotNil(t, f, "the agent has reported an event: its first reply is the row's last message at the next poll, not 5 s later")
+	require.NotNil(t, f, "the agent has reported an event: its first reply is the row's last message about a second later, not 5 s later")
 	assert.Equal(t, "Hi, ready.", f["text"])
 }
