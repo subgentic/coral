@@ -33,3 +33,25 @@ func TestPiUsageBeforeAnyModelIsKnownStaysEmpty(t *testing.T) {
 		t.Fatalf("calls = %+v", p.Calls)
 	}
 }
+
+// With no model named anywhere in the session file, a Pi turn is on the model the agent was launched with (the live session's model, "provider/id" or "provider/id:level" as Pi takes it), written
+// the way Pi writes its turns' models: the id alone.
+func TestPiLaunchModelNamesATurnThatNamesNone(t *testing.T) {
+	str := func(s string) *string { return &s }
+	for _, tc := range []struct {
+		turn   string
+		launch *string
+		want   string
+	}{
+		{"gpt-6-luna", str("openai/other"), "gpt-6-luna"}, // a turn that names its model keeps it
+		{"", str("openai/gpt-6-luna"), "gpt-6-luna"},
+		{"", str("openai/gpt-6-luna:high"), "gpt-6-luna"},
+		{"", str("gpt-6-luna"), "gpt-6-luna"},
+		{"", nil, ""},
+		{"", str(""), ""},
+	} {
+		if got := piRecordModel(tc.turn, tc.launch); got != tc.want {
+			t.Errorf("piRecordModel(%q, %v) = %q, want %q", tc.turn, tc.launch, got, tc.want)
+		}
+	}
+}

@@ -555,7 +555,7 @@ func (p *TokenPoller) pollPiSession(ctx context.Context, ls *store.LiveSession) 
 			LastActivityAt:   call.Timestamp,
 			RecordedAt:       call.Timestamp,
 			Source:           "jsonl",
-			Model:            call.Model,
+			Model:            piRecordModel(call.Model, ls.Model),
 		}
 
 		recs = append(recs, record)
@@ -575,6 +575,22 @@ func (p *TokenPoller) pollPiSession(ctx context.Context, ls *store.LiveSession) 
 	}
 
 	p.lastEntryCount[ls.SessionID] = total
+}
+
+// piRecordModel is the model a Pi turn is recorded under: the one the turn (or the session's model_change before it) named, else the model the agent was launched with, as the id alone
+// ("openai/gpt-6-luna:high" is "gpt-6-luna"), so a turn that names none is not a bucket of its own (#11293).
+func piRecordModel(turn string, launched *string) string {
+	if turn != "" || launched == nil {
+		return turn
+	}
+	m := strings.TrimSpace(*launched)
+	if i := strings.LastIndex(m, ":"); i > 0 {
+		m = m[:i]
+	}
+	if i := strings.Index(m, "/"); i >= 0 {
+		m = m[i+1:]
+	}
+	return m
 }
 
 func extractPiUsage(path string) *piUsageData {
