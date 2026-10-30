@@ -35,7 +35,6 @@ func TestAPausedBoardsReadAndCheckSayItIsPaused(t *testing.T) {
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&msgs))
 	resp.Body.Close()
 	assert.Empty(t, msgs, "a paused board delivers nothing")
-	
 
 	resp, err = http.Get(srv.URL + "/api/board/team/messages/check?subscriber_id=Dev")
 	require.NoError(t, err)
