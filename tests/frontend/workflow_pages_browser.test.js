@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { assertPinnedBar } = require('./helpers/pinned_bar');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -16,7 +17,7 @@ const BASE = require('./test_base').BASE;
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+        await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
         const r = await api('POST', '/api/workflows', { name, description: 'Install, then run the tests', max_duration_s: 300, steps: [{ name: 'Install', type: 'shell', command: 'echo installing packages; echo done' }, { name: 'Test', type: 'shell', command: 'echo running tests; echo "FAIL: 2 tests" 1>&2; exit 3' }] });
         assert.ok(r.status < 300, JSON.stringify(r)); id = r.body.id;
         assert.ok((await api('POST', `/api/workflows/by-name/${name}/trigger`, {})).status < 300);
@@ -25,7 +26,7 @@ const BASE = require('./test_base').BASE;
             const tag = `${w} px${font ? ', 200% text' : ''}`;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled(mobile ? { enabled: true, maxTouchPoints: 5 } : { enabled: false });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+            await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
             if (font) await ev(`document.documentElement.style.fontSize = '${font}'; true`);
             await ev(`window.openAutomationsFolder('workflows'); true`);
             await waitFor(`[...document.querySelectorAll('#group-table-view tbody tr[data-key] .dt-primary')].some(c => c.textContent.includes(${JSON.stringify(name)}))`, 'the workflow row', 10000);

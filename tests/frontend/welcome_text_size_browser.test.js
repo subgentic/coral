@@ -3,6 +3,7 @@
 // are twice that; the launch glyph stays inside its box. Run against an isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 // [selector, px at the default size]
 const SIZES = [['.welcome-eyebrow', 11], ['.welcome-header p', 14], ['.welcome-launch-icon', 24], ['.welcome-launch-copy strong', 14], ['.welcome-launch-copy span', 12],
@@ -16,7 +17,7 @@ const SIZES = [['.welcome-eyebrow', 11], ['.welcome-header p', 14], ['.welcome-l
         await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await waitFor(`!!document.querySelector('.welcome-launch-icon') && document.querySelector('.welcome-launch-icon').getClientRects().length > 0`, 'the home screen', 8000);
         const read = () => ev(`Object.fromEntries(${JSON.stringify(SIZES.map(s => s[0]))}.map(s => { const e = document.querySelector(s); return [s, e ? parseFloat(getComputedStyle(e).fontSize) : null]; }))`);
         const box = () => ev(`(() => { const e = document.querySelector('.welcome-launch-icon'); const b = e.getBoundingClientRect(); const g = document.createRange(); g.selectNodeContents(e); const r = g.getBoundingClientRect(); return { w: b.width, h: b.height, gw: r.width, gh: r.height }; })()`);

@@ -11,6 +11,7 @@ const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const GOLDEN = path.join(__dirname, 'fixtures', 'task_list_golden.json');
 const sha = t => require('node:crypto').createHash('sha256').update(t).digest('hex');
+const { coralReady } = require('./helpers/wait');
 
 const t = (id, status, o = {}) => ({ id, title: 'Task ' + id, status, priority: 'medium', created_by: 'Orchestrator', created_at: `2026-10-0${1 + (id % 9)}T0${id % 9}:00:00Z`, ...o });
 const BOARD = [
@@ -34,7 +35,7 @@ const SUBAGENTS = [{ id: 'a1', description: 'Search the repo', subagent_type: 'E
         await Emulation.setTimezoneOverride({ timezoneId: 'UTC' });
         await Emulation.setDeviceMetricsOverride({ width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.startup('liveList', 'settings')`);
+        await coralReady(ev, 'startup', 'liveList', 'settings');
         await ev(`(async () => {
             const st = window.__coralStatic || '/static/';
             const T = window.T = { state: (await import(st + 'state.js')).state, tasks: await import(st + 'tasks.js') };

@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const B = 'task-links-' + Date.now().toString(36), title = 'One task destination';
@@ -12,7 +13,7 @@ const BASE = require('./test_base').BASE;
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+        await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
         // The ordinary CDP shard permits unauthenticated reads/posts with a claimed sender.
         // A reply intentionally has no claimed sender: sign in as the fixture's Operator.
         if (process.env.CORAL_TEST_DATA_DIR) assert.equal(await ev(`fetch('/auth/password', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:'coral-cdp-suites-test-password',keep:false})}).then(r=>r.status)`), 200, 'fixture Operator signs in for the real reply route');

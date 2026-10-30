@@ -5,20 +5,21 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 const board = 'task-tb-' + Date.now().toString(36);
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         const api = (p, body) => ev(`fetch(${JSON.stringify(p)}, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: ${JSON.stringify(JSON.stringify(body))} }).then(async r => ({ status: r.status, body: await r.json().catch(() => ({})) }))`);
         assert.equal((await api(`/api/board/${board}/subscribe`, { subscriber_id: 'Boss', job_title: 'Orchestrator' })).status, 200);
         const goal = await api(`/api/board/${board}/goals`, { title: 'A goal', outcome: 'x', subscriber_id: 'Operator' });
         for (let i = 1; i <= 3; i++) assert.equal((await api(`/api/board/${board}/tasks`, { subscriber_id: 'Boss', assigned_to: 'Boss', goal_id: goal.body.id, title: `Task ${i}` })).status, 201);
         for (const width of [1600, 1280, 1024]) {
             await Emulation.setDeviceMetricsOverride({ width, height: 900, deviceScaleFactor: 1, mobile: false }); await Emulation.setTouchEmulationEnabled({ enabled: false });
-            await Page.navigate({ url: `${BASE}/team/${board}/tasks` }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+            await Page.navigate({ url: `${BASE}/team/${board}/tasks` }); await Page.loadEventFired(); await install(); await coralReady(ev);
             await waitFor(`document.querySelectorAll('#team-panel-tasks tbody tr').length >= 3`, width + ': the task rows', 15000);
             const bar = await ev(`(() => { const row = document.querySelector('#team-panel-tasks .list-bar-search-row'), btn = row.querySelector('.team-tb-action'), pane = document.getElementById('team-panel-tasks').getBoundingClientRect(), r = btn.getBoundingClientRect();
                 const shown = e => !!e && e.getClientRects().length > 0;

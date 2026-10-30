@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 const B = 'open-paging-' + Date.now().toString(36);
 
 (async () => {
@@ -13,7 +14,7 @@ const B = 'open-paging-' + Date.now().toString(36);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         assert.ok((await post('/subscribe', { subscriber_id: 'Boss', job_title: 'Orchestrator', session_name: 'boss-' + B })).status < 300);
         await ev(`(async () => { const mk = (i) => fetch('/api/board/${B}/tasks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: 'Open task ' + i, body: 'x'.repeat(300), created_by: 'Boss', priority: i % 7 === 0 ? 'high' : 'medium', assigned_to: 'Boss' }) }).then(r => { if (!r.ok) throw new Error('fixture ' + r.status); });
             for (let i = 0; i < 360; i += 20) await Promise.all(Array.from({ length: 20 }, (_, k) => mk(i + k))); return true; })()`);

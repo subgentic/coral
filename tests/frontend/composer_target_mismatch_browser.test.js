@@ -6,6 +6,7 @@
 // The agent and its routes are mocked in the page (agent_view_harness.js); the rest is the isolated test server. Drives Chrome over CDP.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 // Sends to /api/sessions/live/<name>/send, recorded as window.__sends: the name in the path. 'tm-old' is refused as the server refuses a
 // name that is not the stored one (400, code session_target_mismatch); 'tm-new' is accepted; 'tm-stuck' is always refused.
@@ -38,7 +39,7 @@ const STUB = `(() => {
         await Page.addScriptToEvaluateOnNewDocument({ source: STUB });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await ev(`localStorage.setItem('coral-live-view-mode', 'chat'); window.__m.add('tm-old', 'A', 2, { sleeping: false, session_id: 'tm-old-id' }); true`);
         await select('tm-old');
         await waitFor(`!!document.getElementById('command-input')`, 'the composer');

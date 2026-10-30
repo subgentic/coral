@@ -4,6 +4,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -15,7 +16,7 @@ const BASE = require('./test_base').BASE;
     const open = async (w, fs, theme) => {
         await Emulation.setDeviceMetricsOverride({ width: w, height: 844, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+        await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
         await ev(`${SEED}; true`);
         await waitFor(`(window.__qaState.liveSessions || []).length >= 3`, 'the agents', 10000);
         await ev(`(async () => { const s = await import((window.__coralStatic || '/static/') + 'state.js'); const by = { 'Orchestrator': { waiting_for_input: true, summary: 'Wire the access log into the dialog', staleness_seconds: 120 }, 'UI/UX': { working: true, summary: 'The tab strip after the control is reviewed', staleness_seconds: 5400 }, 'Docs Writer': { staleness_seconds: 200000 } }; for (const r of s.state.liveSessions) Object.assign(r, by[r.name] || {}); const r = await import((window.__coralStatic || '/static/') + 'render.js'); r.renderLiveSessions(s.state.liveSessions); return true; })()`);

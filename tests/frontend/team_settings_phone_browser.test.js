@@ -7,6 +7,7 @@ const { connect } = require('./agent_view_harness');
 const { setTheme, installAudit, auditRegion } = require('./helpers/contrast');
 const { removeBoards } = require('./helpers/board_cleanup');
 const { TOUCH_AREA } = require('./helpers/touch_area');
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -21,7 +22,7 @@ const { TOUCH_AREA } = require('./helpers/touch_area');
         const load = async (theme, path) => {
             await Emulation.setEmulatedMedia({ features: [{ name: 'prefers-color-scheme', value: theme }] });
             await Page.navigate({ url: process.env.CORAL_TEST_URL + (path || '/') }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.then(() => true)`);
+            await coralReady(ev);
             await installAudit(ev); await setTheme(ev, theme);
         };
         await load('dark');

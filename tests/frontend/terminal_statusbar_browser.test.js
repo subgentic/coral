@@ -7,7 +7,7 @@
 // Run against an isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
-const { settle } = require('./helpers/wait');
+const { settle, coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -32,7 +32,7 @@ const { settle } = require('./helpers/wait');
             console.log(label);
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile });
             await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.then(() => true)`);
+            await coralReady(ev);
             await ev(`localStorage.setItem('coral-live-view-mode', 'terminal'); window.__m.add('bar-bot', 'A', 3, { sleeping: false }); (async () => { const x = await import((window.__coralStatic || '/static/') + 'xterm_renderer.js'); window.__term = x.getTerminal; })(); true`);
             await settle(ev, 700); // sleep-ok: layout settles over a few frames; there is no completion event
             await ev(`window.selectLiveSession('bar-bot', 'claude', 'bar-bot-id', 'local'); window.setLiveViewMode('terminal'); true`);

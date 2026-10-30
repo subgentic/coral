@@ -22,7 +22,7 @@ module.exports = async function runScenes(group) {
     // settle(ms): wait for the layout to stop moving before a scan measures its geometry (#4768). One shared copy
     // in helpers/wait.js; it is no worse than the old fixed settle-sleeps (caps at ms, never throws) and usually
     // far faster. The views and dialogs fill over frames with no completion event, so the scans below settle first.
-    const { settle } = require('./helpers/wait').bind(ev);
+    const { settle, coralReady } = require('./helpers/wait').bind(ev);
 const { removeBoards } = require('./helpers/board_cleanup');
     const report = []; const problems = [];
     let board = ''; // the board the scenes make, taken away again in the finally (#4959)
@@ -37,7 +37,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
         await Emulation.setTouchEmulationEnabled({ enabled: true, maxTouchPoints: 5 });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady();
         board = 'probe-' + Date.now();
         await ev(`(async () => { for (const c of ['hello team', 'a longer second message with some words']) await fetch('/api/board/${board}/messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'a', content: c }) }).catch(() => {});
             localStorage.setItem('coral-live-view-mode', 'chat'); window.__m.add('phone-bot-with-a-long-name', 'A', 8, { sleeping: false, board_project: '${board}' }); window.__m.add('second-bot', 'B', 5, { sleeping: true }); return true; })()`);

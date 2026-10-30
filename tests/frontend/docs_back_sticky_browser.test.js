@@ -2,13 +2,14 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         await ev(`window.switchNavTab('docs'); true`); await waitFor(`document.querySelectorAll('#docs-nav-list [data-doc], #mobile-docs-list [data-doc]').length >= 3`, 'the topics', 15000);
         await ev(`window.selectDoc((document.querySelector('#docs-nav-list [data-doc]') || document.querySelector('#mobile-docs-list [data-doc]')).dataset.doc); true`);
         await waitFor(`!!document.querySelector('#docs-content .phone-title-row') && document.querySelectorAll('#docs-content h2').length >= 1`, 'the topic', 15000);

@@ -3,6 +3,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -10,7 +11,7 @@ const BASE = require('./test_base').BASE;
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [w, h, mobile, list] of [[1280, 800, false, '#live-sessions-list'], [390, 844, true, '#mobile-session-list']]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
             await ev(`(() => { for (const n of ['f1', 'f2', 'f3']) window.__m.add('same', n.toUpperCase(), 2, { sleeping: false, session_id: n + '-id' }); window.__m.add('same', 'Z', 2, { sleeping: true, session_id: 'fz-id' }); window.T.render.renderLiveSessions(window.T.state.liveSessions); return true; })()`);
             if (mobile) await ev(`import((window.__coralStatic || '/static/') + 'mobile.js').then(m => { m.syncMobileAgentList(); return true; })`);
             await waitFor(`!!document.querySelector('${list} .session-group-header:not(.board-card-header) .session-group-count') && document.querySelectorAll('${list} .session-group-item').length >= 3`, `${w}: the folder and its rows`, 8000);

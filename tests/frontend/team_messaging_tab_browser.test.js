@@ -63,7 +63,7 @@ const SID = '0b7c2e4a-5d1f-4c8e-9a36-2f4d8e1b7c90';
             await Emulation.setTouchEmulationEnabled({ enabled: view.phone });
             await Emulation.setEmulatedMedia({ features: [{ name: 'prefers-color-scheme', value: view.theme }] });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.then(() => true)`); await installAudit(ev); await setTheme(ev, view.theme);
+            await require('./helpers/wait').coralReady(ev); await installAudit(ev); await setTheme(ev, view.theme);
             const sub = await board('/subscribe', 'POST', { subscriber_id: 'Boss', job_title: 'Orchestrator', session_name: TEAM + '-session' });
             assert.ok(sub.status < 300, JSON.stringify(sub));
             await board('/settings', 'PUT', { subscriber_id: 'Operator', cross_team_messaging: false, cross_team_artifacts: false });

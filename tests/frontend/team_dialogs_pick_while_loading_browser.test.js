@@ -9,6 +9,7 @@ const assert = require('node:assert/strict');
 const { removeBoards } = require('./helpers/board_cleanup');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, ev, waitFor, PRELOAD, install } = await connect();
@@ -16,7 +17,7 @@ const BASE = require('./test_base').BASE;
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Page.navigate({ url: BASE }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.startup('liveList', 'settings')`);
+        await coralReady(ev, 'startup', 'liveList', 'settings');
         await ev(`(async () => {
             window.__teamLaunches = []; window.__posts = []; window.__entered = []; window.__generates = []; window.__templates = []; window.__boards = ['taken'];
             window.__launchAnswer = { status: 200, body: { agents: [{ name: 'A', session_id: 's' }] } };

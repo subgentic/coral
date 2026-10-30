@@ -3,6 +3,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 const S = `(window.__coralStatic || '/static/')`;
 
 (async () => {
@@ -10,7 +11,7 @@ const S = `(window.__coralStatic || '/static/')`;
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await ev(`(() => { const real = window.fetch; window.__reads = 0;
             window.__wt = [{ id: 'w3', kind: 'team', name: 'crew-2', path: '/data/worktrees/crew-2', repo_path: '/work/other', branch: 'coral-team/crew-2', dirty: false, unmerged: false, in_use: true }];
             window.fetch = (u, o) => { const p = new URL(String(u), location.origin).pathname;

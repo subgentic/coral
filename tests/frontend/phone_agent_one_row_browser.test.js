@@ -4,6 +4,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -11,7 +12,7 @@ const BASE = require('./test_base').BASE;
     const open = async (w, fs, mobile) => {
         await Emulation.setDeviceMetricsOverride({ width: w, height: 844, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await ev(`document.documentElement.style.fontSize = '${fs}px'; window.__m.add('orchestrator-with-a-long-name', 'A', 12, { sleeping: false, session_id: 'o-id', board_project: 'a-team-with-a-long-name' }); true`);
         await waitFor(`(window.__qaState.liveSessions || []).some(s => s.name === 'orchestrator-with-a-long-name')`, 'the agent', 10000);
         await ev(`window.selectLiveSession('orchestrator-with-a-long-name', 'claude', 'o-id', 'local'); true`);

@@ -4,7 +4,7 @@
 // against the isolated dev server; the board's tasks are answered by the test (task_list_golden_browser pins the rest of the list).
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
-const { framesJs } = require('./helpers/wait');
+const { framesJs, coralReady } = require('./helpers/wait');
 const BASE = require('./test_base').BASE;
 
 // 40 recently finished tasks, and older open ones of every open status: the open ones are the oldest by created_at.
@@ -23,7 +23,7 @@ const open = [
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.startup('liveList', 'settings')`);
+        await coralReady(ev, 'startup', 'liveList', 'settings');
         await ev(`(async () => {
             const st = window.__coralStatic || '/static/';
             const T = window.T = { state: (await import(st + 'state.js')).state, tasks: await import(st + 'tasks.js') };

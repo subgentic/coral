@@ -2,7 +2,7 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs'), path = require('node:path');
 const { connect } = require('./agent_view_harness');
-const { framesJs } = require('./helpers/wait');
+const { framesJs, coralReady } = require('./helpers/wait');
 const { openBoardTasksTab } = require('./helpers/board_tasks_tab');
 const { removeBoards } = require('./helpers/board_cleanup');
 const { setTheme } = require('./helpers/contrast');
@@ -14,7 +14,7 @@ const board = 'preview-room-' + Date.now().toString(36);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         await ev(`(async () => { const api = (p, b) => fetch('/api/board/${board}' + p, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b) }).then(r => { if (!r.ok) throw new Error('fixture ' + r.status); });
             await api('/subscribe', { subscriber_id: 'Boss', job_title: 'Orchestrator' });
             for (const title of ['First task with a descriptive title', 'Second task with a descriptive title']) await api('/tasks', { subscriber_id: 'Boss', title, body: 'Readable task preview', assigned_to: 'Boss' });

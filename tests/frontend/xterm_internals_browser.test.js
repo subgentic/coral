@@ -7,7 +7,7 @@
 // Drives Chrome over CDP against the isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
-const { framesJs } = require('./helpers/wait');
+const { framesJs, coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, PRELOAD, install } = await connect();
@@ -19,7 +19,7 @@ const { framesJs } = require('./helpers/wait');
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await ev(`(async () => { const v = await import(${S} + 'vendor_loader.js'); await v.loadXterm();
             const host = document.createElement('div'); host.id = 'xi-host'; host.style.cssText = 'width:640px;height:400px;position:fixed;left:0;top:0'; document.body.appendChild(host);
             const t = new window.Terminal({ cols: 80, rows: 24, fontSize: 14, fontFamily: 'monospace', scrollback: 100 }); t.loadAddon(new window.CanvasAddon.CanvasAddon()); t.open(host);

@@ -6,6 +6,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -22,7 +23,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         // A team with two members, through the real API.
         for (const [id, title] of [['Boss', 'Orchestrator'], ['Dev One', 'Developer']]) {
             const r = await api('/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: id, job_title: title, session_name: id.toLowerCase().replace(' ', '-') + '-session' }) });
@@ -161,7 +162,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
 
         // 9. phone and 200% text: no sideways scroll in the panel
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         for (const [label, w, big] of [['phone 390', 390, false], ['phone 390 at 200% text', 390, true]]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: 844, deviceScaleFactor: 1, mobile: true });
             await ev(`document.documentElement.style.fontSize = ${big ? "'200%'" : "''"}; true`);

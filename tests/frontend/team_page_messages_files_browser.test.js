@@ -11,12 +11,12 @@ const A = 'a'.repeat(64), B = 'b'.repeat(64), C = 'c'.repeat(64);
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
-    const { settle } = require('./helpers/wait').bind(ev);
+    const { settle, coralReady } = require('./helpers/wait').bind(ev);
     const S = scenarios();
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`); await installTP(ev);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(); await installTP(ev);
         await seed(ev, TEAM);
         await ev(`(() => { const D = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'src'); // thumbnails are not loaded (the artifact is not real): the address the chip gives is kept, so the chip stays an image chip
             Object.defineProperty(HTMLImageElement.prototype, 'src', { configurable: true, get() { return this.__src || D.get.call(this); }, set(v) { if (this.hasAttribute('data-attachment-img')) this.__src = v; else D.set.call(this, v); } });

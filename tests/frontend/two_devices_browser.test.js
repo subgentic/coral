@@ -10,6 +10,7 @@ const CDP = require('chrome-remote-interface');
 const { connect } = require('./agent_view_harness');
 
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 const CDP_PORT = Number(process.env.CDP_PORT || 9222);
 
 async function browserClient() {
@@ -32,7 +33,7 @@ async function device(name) {
     await Page.navigate({ url: BASE + '/' });
     await Page.loadEventFired();
     await install();
-    await ev(`window.__coralReady.then(() => true)`);
+    await coralReady(ev);
     // The server's two answers this test plays: the held message's cancel, and an answer to the question.
     await ev(`(() => {
         window.__calls = []; window.__answerStatus = 200;

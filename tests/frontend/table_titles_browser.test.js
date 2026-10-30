@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -15,7 +16,7 @@ const BASE = require('./test_base').BASE;
     const titles = sel => ev(`[...document.querySelectorAll(${JSON.stringify(sel)})].filter(e => e.getClientRects().length).map(e => { const c = getComputedStyle(e); return c.fontSize + ' ' + c.fontWeight; })`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
         assert.ok((await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: 'orch', job_title: 'Orchestrator', session_name: 'o-s' })).status < 300);
         assert.ok((await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: 'be', job_title: 'Backend Dev', session_name: 'b-s' })).status < 300);
         for (const t of ['Write the release notes', 'Fix the flaky test']) assert.ok((await api('POST', `/api/board/${B}/tasks`, { title: t, body: 'x', created_by: 'orch', priority: 'medium', assigned_to: 'be' })).status < 300);
@@ -28,13 +29,13 @@ const BASE = require('./test_base').BASE;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile });
             await Emulation.setTouchEmulationEnabled(mobile ? { enabled: true, maxTouchPoints: 5 } : { enabled: false });
             for (const [tab, panel] of [['tasks', 'team-panel-tasks'], ['artifacts', 'team-panel-artifacts']]) {
-                await Page.navigate({ url: BASE + `/team/${B}/${tab}` }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+                await Page.navigate({ url: BASE + `/team/${B}/${tab}` }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
                 await waitFor(`document.querySelectorAll('#${panel} .dt-primary').length >= 2`, `${tab}: rows`, 20000);
                 const sizes = await titles(`#${panel} .dt-primary`);
                 assert.ok(sizes.length >= 2 && sizes.every(s => s === '13px 400'), at + `${tab}: every title is 13px 400: ` + sizes.join(', '));
                 for (const t of ['dark', 'light']) { await theme(t); await new Promise(r => setTimeout(r, 450)); await shot(`table-titles-${tab}-${t}-${w}`); } // sleep-ok: the theme's colour transition settles
             }
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
             await ev(`window.switchNavTab('hub-inbox'); import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('tasks')).then(() => true)`);
             await waitFor(`document.querySelectorAll('#group-table-view .dt-primary').length >= 1`, 'inbox tasks rows', 20000);
             const inbox = await titles(mobile ? '#group-table-view .dt-mail-title' : '#group-table-view .dt-primary'); // a phone's Inbox row is a mail row (#9545): the title the person reads is its .dt-mail-title, not the open button around it

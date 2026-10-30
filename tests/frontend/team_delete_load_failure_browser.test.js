@@ -3,6 +3,7 @@
 // the module's request is blocked, then allowed. The menu item is a stand-in carrying the action and the team name the real one carries.
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, sleep, PRELOAD, install } = await connect();
@@ -15,7 +16,7 @@ const BASE = require('./test_base').BASE;
         await client.Network.enable();
         await client.Network.setBlockedURLs({ urls: ['*message_board*'] });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+        await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
         await ev(`window.__unhandled = 0; window.addEventListener('unhandledrejection', () => { window.__unhandled++; }); true`);
         await choose();
         await waitFor(`/Could not load the board/.test(document.body.innerText)`, 'the failure toast', 8000);

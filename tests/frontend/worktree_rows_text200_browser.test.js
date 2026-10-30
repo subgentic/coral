@@ -3,6 +3,7 @@
 // fetch. Drives Chrome over CDP through agent_view_harness.js against the isolated dev server.
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, sleep, PRELOAD, install } = await connect();
@@ -15,7 +16,7 @@ const BASE = require('./test_base').BASE;
         console.log('a kept-worktree row at 200% text on a 360 px phone');
         await Emulation.setDeviceMetricsOverride({ width: 360, height: 740, deviceScaleFactor: 1, mobile: true });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await ev(`document.documentElement.style.fontSize = '32px'; (() => { const real = window.fetch; const json = (o, status) => Promise.resolve(new Response(JSON.stringify(o), { status: status || 200, headers: { 'Content-Type': 'application/json' } }));
             window.fetch = (u, o) => { const p = new URL(String(u), location.origin).pathname; if (p === '/api/worktrees') return json({ worktrees: [
                 { id: 'w1', kind: 'team', name: 'crew-1', path: '/data/worktrees/crew-1', repo_path: '/work/repo', branch: 'coral-team/crew-1', dirty: true, unmerged: false, in_use: false, checked: true },
@@ -30,7 +31,7 @@ const BASE = require('./test_base').BASE;
         console.log('the message box placeholder at 320 px and 200% text');
         await Emulation.setDeviceMetricsOverride({ width: 320, height: 640, deviceScaleFactor: 1, mobile: true });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await ev(`localStorage.setItem('coral-live-view-mode', 'chat'); document.documentElement.style.fontSize = '32px'; window.__m.add('dk-a', 'A', 3, { sleeping: false, agent_type: 'claude', session_id: 'dk-id' }); true`);
         await sleep(500); // sleep-ok: the first live list renders from several answers
         await ev(`window.selectLiveSession('dk-a', 'claude', 'dk-id', 'local'); true`);

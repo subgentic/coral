@@ -5,6 +5,7 @@
 // when it can do something; the relaunch dialog says what happens next per install kind and never promises that the page reconnects. Drives Chrome over CDP against the isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 const REASONS = ['owner_only', 'max_mode', 'switch_off', 'nothing_staged', 'not_verified', 'busy', 'too_soon', 'already_relaunched', 'unsupported_install', 'no_run_record'];
 const staged = (over = {}, rel = {}) => ({ enabled: true, relaunch_available: true, installed: '1.4.125', state: 'staged', staged: { version: '1.4.126', staged_at: '2026-10-17T03:00:00Z', days_ready: 3, verified: true }, relaunch: { available: true, reason: '', restarts: [], tmux_agents_restart: false, ack: 'ack-1', ...rel }, last_result: null, ...over });
 const idle = (over = {}) => ({ enabled: true, relaunch_available: true, installed: '1.4.125', state: 'none', staged: null, relaunch: { available: false, reason: 'nothing_staged', restarts: [], ack: '' }, last_result: null, ...over });
@@ -21,7 +22,7 @@ const idle = (over = {}) => ({ enabled: true, relaunch_available: true, installe
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
         await ev(`localStorage.clear(); true`);
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await ev(`import((window.__coralStatic || '/static/') + 'update_flag.js').then(m => { m.setUpdatesEnabled(true); return true; })`);
         await ev(`(() => { const R = window.fetch; window.__st = null; window.__relaunch = { status: 202, body: { ok: true } };
             const json = (b, s = 200) => Promise.resolve(new Response(JSON.stringify(b), { status: s, headers: { 'content-type': 'application/json' } }));

@@ -3,6 +3,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -10,7 +11,7 @@ const BASE = require('./test_base').BASE;
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         await ev(`(() => { const R = window.fetch; window.fetch = (u, o) => { const url = new URL(String(u && u.url || u), location.origin);
             if (url.pathname === '/api/sessions/history/counts') return Promise.resolve(new Response(JSON.stringify({ all: 119, group: 1, notes: 9, active: 2, starred: 4, archived: 3, by_agent_type: { claude: 90, codex: 29 }, tags: [] }), { status: 200, headers: { 'content-type': 'application/json' } }));
             return R(u, o); }; return true; })()`);

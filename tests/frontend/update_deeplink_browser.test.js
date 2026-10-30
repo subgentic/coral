@@ -3,6 +3,7 @@
 // any other parameter stays. The status route is stubbed (the page's fetch, installed before the page's own scripts run).
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 const STATUS = { enabled: true, relaunch_available: true, installed: '1.4.155', state: 'none', not_ready_reason: 'up_to_date', relaunch: { available: false, reason: 'nothing_staged', restarts: [], ack: '' } };
 const stub = (status, body) => `(() => { const R = window.fetch;
@@ -18,7 +19,7 @@ const stub = (status, body) => `(() => { const R = window.fetch;
         const open = async (source, query) => {
             const { identifier } = await Page.addScriptToEvaluateOnNewDocument({ source });
             await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' + query }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.then(() => true)`);
+            await coralReady(ev);
             return identifier;
         };
         const paneOpen = () => ev(`!!document.getElementById('settings-pane-updates') && !document.getElementById('settings-pane-updates').hidden`);

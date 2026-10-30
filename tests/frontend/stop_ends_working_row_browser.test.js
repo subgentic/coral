@@ -4,6 +4,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 const STUB = `(() => { const real = window.fetch; window.__keys = []; window.__order = [];
     window.fetch = (u, o = {}) => { if (/\\/held\\/7$/.test(String(u)) && (o.method || 'GET').toUpperCase() === 'DELETE') { window.__order.push('cancel-held'); return Promise.resolve(new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } })); } if (/\\/api\\/sessions\\/live\\/[^/]+\\/keys$/.test(String(u)) && (o.method || 'GET').toUpperCase() === 'POST') { window.__order.push('escape'); window.__keys.push(JSON.parse(o.body).keys); return Promise.resolve(new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } })); }
@@ -19,7 +20,7 @@ const STUB = `(() => { const real = window.fetch; window.__keys = []; window.__o
             const at = `${w} px: `;
             await Emulation.setDeviceMetricsOverride({ width: w, height: 800, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`); await ev(STUB);
+            await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings'); await ev(STUB);
             await ev(`window.__m.add('sw', 'A', 6, { sleeping: false, session_id: 'sw-id' }); window._coralSetLiveSessions(Object.values(window.__m.agents).map(a => window.__m.entry(a))); localStorage.setItem('coral-live-view-mode', 'chat'); true`);
             await select('sw');
             await waitFor(`window.__rendered && window.__rendered().length >= 3`, at + 'the chat', 15000);

@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 const BOARD = 'return-team-' + Date.now().toString(36);
 
 (async () => {
@@ -16,7 +17,7 @@ const BOARD = 'return-team-' + Date.now().toString(36);
         for (const [w, h, mobile] of [[1280, 800, false], [390, 844, true]]) {
             const check = (ok, msg) => { if (!ok) problems.push(`${w}: ${msg}`); };
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
             await ev(`fetch('/api/board/${BOARD}/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'Boss', job_title: 'Orchestrator' }) }).then(r => r.status)`);
             // Agents with no team open is Home, as before
             await ev(`window.switchNavTab('hub-inbox'); window.switchNavTab('agents'); true`); await new Promise(r => setTimeout(r, 500)); // sleep-ok: the tab draws

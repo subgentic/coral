@@ -5,13 +5,14 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { install: installNA, N, openNewAgent, stubModels, scenarios } = require('./helpers/new_agent');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, ev, waitFor, PRELOAD, install } = await connect();
     const S = scenarios();
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`); await installNA(ev); await stubModels(ev);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev); await installNA(ev); await stubModels(ev);
         // Every launch the page sends is kept and answered with a folder error, so no agent starts.
         await ev(`(() => { window.__posts = []; const R = window.fetch; window.fetch = (u, o = {}) => { const p = new URL(String(u), location.origin).pathname;
             if (o.method === 'POST' && (p === '/api/sessions/launch' || p === '/api/sessions/launch-team')) { window.__posts.push({ p, body: JSON.parse(o.body) }); return Promise.resolve(new Response(JSON.stringify({ error: 'stopped by the test', field: 'working_dir' }), { status: 400, headers: { 'Content-Type': 'application/json' } })); }

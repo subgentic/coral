@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -12,10 +13,10 @@ const BASE = require('./test_base').BASE;
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Emulation.setFocusEmulationEnabled({ enabled: true });
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         assert.equal(await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: 'Boss', job_title: 'Orchestrator', session_name: 'boss-s' }), 200);
         assert.equal(await api('POST', `/api/board/${B}/messages`, { subscriber_id: 'Boss', content: 'Hello.' }), 200);
-        await Page.navigate({ url: `${BASE}/team/${B}/messages` }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: `${BASE}/team/${B}/messages` }); await Page.loadEventFired(); await install(); await coralReady(ev);
         await waitFor(`!!document.querySelector('.mb-post-send-btn') && document.querySelector('.mb-post-send-btn').getClientRects().length > 0`, 'the composer', 15000);
         const g = await ev(`(() => { const card = document.querySelector('.mb-post-card'), b = document.querySelector('.mb-post-send-btn'), c = card.getBoundingClientRect(), r = b.getBoundingClientRect(); const R = parseFloat(getComputedStyle(card).borderTopRightRadius), br = parseFloat(getComputedStyle(b).borderTopRightRadius);
             // the card's outline near its right end: a corner point of Send is inside when it is inside the quarter circle of radius R at the card's top right and bottom right

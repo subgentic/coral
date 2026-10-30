@@ -9,13 +9,13 @@ const TEAM = `qa-chips-${Date.now() % 100000}`;
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
-    const { settle } = require('./helpers/wait').bind(ev);
+    const { settle, coralReady } = require('./helpers/wait').bind(ev);
     const S = scenarios();
     const sel = () => ev(`(() => { const s = [...document.querySelectorAll('#team-page-view .team-tb-select')].find(e => e.getClientRects().length); if (!s) return null; const pills = document.querySelector('#team-page-view .team-tb-pills'); return { h: Math.round(s.getBoundingClientRect().height), value: s.value, text: s.selectedOptions[0].textContent, options: s.options.length, pillsShown: !!pills && pills.getClientRects().length > 0, side: document.documentElement.scrollWidth - document.documentElement.clientWidth }; })()`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`); await installTP(ev);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(); await installTP(ev);
         await ev(`document.documentElement.style.fontSize = '200%'; true`);
         await seed(ev, TEAM); await ev(`window.syncMobileAgentList && window.syncMobileAgentList(); true`); await openTeam(ev, waitFor, TEAM); await settle(500);
         let heights = [];

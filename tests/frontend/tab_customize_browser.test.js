@@ -3,7 +3,7 @@
 // phone sheet, and 200 percent text. Drives the real dashboard's tab row over CDP; run against an isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
-const { settle } = require('./helpers/wait');
+const { settle, coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, sleep, PRELOAD, install } = await connect();
@@ -21,7 +21,7 @@ const { settle } = require('./helpers/wait');
     const close = async () => { await ev(`document.getElementById('tab-customize')?.remove(); true`); };
     const ok = (name) => console.log(`   ✓ ${name}`);
     const load = async () => {
-        await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         await ev(`window.__m.add('tab-bot', 'A', 3, { sleeping: false }); true`);
         await settle(ev, 600); // sleep-ok: the first live list renders from several answers; no single completion event
         await ev(`window.selectLiveSession('tab-bot', 'claude', 'tab-bot-id', 'local'); true`);

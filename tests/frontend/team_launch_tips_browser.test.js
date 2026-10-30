@@ -3,6 +3,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -12,7 +13,7 @@ const BASE = require('./test_base').BASE;
         for (const [w, h, mobile] of [[1280, 800, false]]) { // a phone picks the section from a select, not from this list
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+            await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
             await ev(`window.showLaunchModal(); true`); await waitFor(`document.querySelector('#launch-modal .modal-content') && document.querySelector('#launch-modal .modal-content').getClientRects().length > 0`, `${w}: the launch dialog`, 8000);
             await ev(`window._selectLaunchType('team'); true`); await waitFor(`document.getElementById('launch-step-team').dataset.stage === 'team'`, `${w}: step 1`, 8000);
             await ev(`{ const n = document.getElementById('team-board-name'); n.value = 'tips-run'; n.dispatchEvent(new Event('input', { bubbles: true })); const d = document.getElementById('launch-team-dir'); d.value = '/tmp/tips-run'; d.dispatchEvent(new Event('input', { bubbles: true })); document.getElementById('launch-team-next').click(); } true`);

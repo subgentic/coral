@@ -6,6 +6,7 @@
 // Run against an isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, PRELOAD, install } = await connect();
@@ -21,7 +22,7 @@ const { connect } = require('./agent_view_harness');
             seen.length = 0;
             await Network.clearBrowserCache();
             await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.then(() => true)`);
+            await coralReady(ev);
             if (view === 'chat') {
                 await ev(`localStorage.setItem('coral-live-view-mode', 'chat'); window.__m.add('vendor-bot', 'A', 6, { sleeping: false }); true`);
                 await ev(`window.selectLiveSession('vendor-bot', 'claude', 'vendor-bot-id', 'local'); true`);

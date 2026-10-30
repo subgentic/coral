@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { openBoardTasksTab } = require('./helpers/board_tasks_tab');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 const HEX = 'b'.repeat(64);
 const STUB = `(() => { const real = window.fetch; window.__reqs = []; window.__artifacts = null;
     window.fetch = (u, o) => { const url = new URL(String(u && u.url || u), location.origin); window.__reqs.push(url.pathname + url.search);
@@ -21,7 +22,7 @@ const STUB = `(() => { const real = window.fetch; window.__reqs = []; window.__a
         await Emulation.setDeviceMetricsOverride({ width: mobile ? 390 : 1280, height: mobile ? 844 : 900, deviceScaleFactor: 1, mobile: !!mobile });
         await Emulation.setTouchEmulationEnabled(mobile ? { enabled: true, maxTouchPoints: 5 } : { enabled: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+        await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
         await ev(`window.__artifacts = ${JSON.stringify(reply)}; true`);
         await openBoardTasksTab({ ev, waitFor }, B);
         await waitFor(`document.querySelectorAll('#agentic-panel-tasks .board-task-item:not(.board-task-header)').length === 1`, 'the task', 12000);
@@ -32,7 +33,7 @@ const STUB = `(() => { const real = window.fetch; window.__reqs = []; window.__a
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Page.addScriptToEvaluateOnNewDocument({ source: STUB });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+        await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
         for (const [sid, jt] of [['orch', 'Orchestrator'], ['be', 'Backend Dev']]) assert.ok((await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: sid, job_title: jt, session_name: sid + '-s' })).status < 300);
         const made = await api('POST', `/api/board/${B}/tasks`, { title: 'Write the report', body: 'Details', assigned_to: 'be', created_by: 'orch', priority: 'high' });
         assert.ok(made.status < 300, JSON.stringify(made)); const id = made.body.id;

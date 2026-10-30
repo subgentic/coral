@@ -9,6 +9,7 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const { guardSettings } = require('./helpers/settings_guard');
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const guard = await guardSettings(); // the suite saves a template (saved_team_templates): it is put back (#11000, a leak in CI)
@@ -18,7 +19,7 @@ const { guardSettings } = require('./helpers/settings_guard');
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.startup('liveList', 'settings')`);
+        await coralReady(ev, 'startup', 'liveList', 'settings');
         const vis = sel => `(() => { const e = document.querySelector(${JSON.stringify(sel)}); return !!e && e.checkVisibility({ checkVisibilityCSS: true, contentVisibilityAuto: true }); })()`;
 
         console.log('4. the team\'s Export says what it exports');

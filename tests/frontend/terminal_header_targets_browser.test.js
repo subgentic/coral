@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install, select } = await connect();
@@ -15,7 +16,7 @@ const BASE = require('./test_base').BASE;
             const at = `at ${w}px, fine pointer: `;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 2, mobile: false }); await Emulation.setTouchEmulationEnabled({ enabled: false });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.then(() => true)`);
+            await coralReady(ev);
             assert.equal(await ev(`matchMedia('(pointer: coarse)').matches`), false, at + 'the pointer is fine');
             await ev(`window.__m.add('th-a', 'A', 4, { sleeping: false }); true`); await select('th-a');
             await ev(`window.setLiveViewMode('terminal'); true`);

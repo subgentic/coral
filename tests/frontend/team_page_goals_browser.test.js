@@ -15,7 +15,7 @@ const GOAL = 'Explore goals with two teams';
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
-    const { settle } = require('./helpers/wait').bind(ev);
+    const { settle, coralReady } = require('./helpers/wait').bind(ev);
     const S = scenarios();
     const click = async (sel, rx, what) => { assert.ok(await ev(`(() => { const e = window.__tp.find(${JSON.stringify(sel)}, ${rx}); if (!e) return false; e.click(); return true; })()`), `no visible ${what || sel} named ${rx}`); await settle(350); };
     const headers = () => ev(`(() => { const m = window.__tp.page(); const t = m && [...m.querySelectorAll('table, [role=table], [role=grid]')].find(x => x.getClientRects().length); return t ? [...t.querySelectorAll('th:not(.dt-check), [role=columnheader]:not(.dt-check)')].map(h => window.__na.text(h)) : null; })()`);
@@ -27,7 +27,7 @@ const GOAL = 'Explore goals with two teams';
         for (const [label, w, h, mobile] of VIEWS) {
             console.log(label);
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`); await installTP(ev);
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(); await installTP(ev);
             await seed(ev, TEAM);
             if (mobile) await ev(`window.syncMobileAgentList && window.syncMobileAgentList(); true`);
             await openTeam(ev, waitFor, TEAM).catch(() => {}); await settle(400);

@@ -12,7 +12,7 @@ const G1 = 'Explore goals with two teams', G2 = 'Plan the release notes';
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
-    const { settle } = require('./helpers/wait').bind(ev);
+    const { settle, coralReady } = require('./helpers/wait').bind(ev);
     const S = scenarios();
     const panel = `[role=tabpanel][id^=team-panel-]:not([hidden])`; // the team page's open tab, not the goal screen's own Tasks | Artifacts panel inside a hidden one (#8914)
     const shot = async n => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; require('node:fs').mkdirSync(d, { recursive: true }); require('node:fs').writeFileSync(`${d}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
@@ -24,7 +24,7 @@ const G1 = 'Explore goals with two teams', G2 = 'Plan the release notes';
         for (const [label, w, h, mobile] of VIEWS) {
             console.log(label);
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`); await installTP(ev);
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(); await installTP(ev);
             await seed(ev, TEAM);
             if (mobile) await ev(`window.syncMobileAgentList && window.syncMobileAgentList(); true`);
             await ev(`localStorage.removeItem('coral-list-bar-open:team-tasks:${TEAM}'); true`); // the panel opens as the first time
@@ -106,11 +106,11 @@ const G1 = 'Explore goals with two teams', G2 = 'Plan the release notes';
                 assert.equal(where, `/team/${TEAM}/tasks?goal=${id}&agent=Orchestrator`, where);
                 await pick('tk-assignee', '');
                 await ev(`localStorage.removeItem('coral-task-filters:${TEAM}'); true`); // a link must not need what this browser kept
-                await Page.navigate({ url: BASE + `/team/${TEAM}/tasks?goal=${id}` }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+                await Page.navigate({ url: BASE + `/team/${TEAM}/tasks?goal=${id}` }); await Page.loadEventFired(); await install(); await coralReady();
                 await waitFor(`document.querySelectorAll('${panel} .dt-primary').length === 3`, 'the link opens the goal\'s three tasks', 15000);
                 assert.deepEqual(await chips(), [`Goal: ${G1} ×`]);
                 assert.equal(await ev(`location.search`), `?goal=${id}`);
-                await Page.navigate({ url: BASE + `/team/${TEAM}/tasks?goal=0&agent=%00&q=${'x'.repeat(250)}` }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+                await Page.navigate({ url: BASE + `/team/${TEAM}/tasks?goal=0&agent=%00&q=${'x'.repeat(250)}` }); await Page.loadEventFired(); await install(); await coralReady();
                 await waitFor(`document.querySelectorAll('${panel} .dt-primary').length === 5`, 'a bad query is dropped: every task', 15000);
                 assert.equal(await ev(`location.search`), '', 'and the address says so');
                 await installTP(ev); await seed(ev, TEAM); await openTeam(ev, waitFor, TEAM).catch(() => {}); await goTab(ev, settle, 'Tasks');

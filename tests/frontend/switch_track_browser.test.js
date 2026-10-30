@@ -4,6 +4,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -13,7 +14,7 @@ const BASE = require('./test_base').BASE;
         await Emulation.setTouchEmulationEnabled({ enabled: true, maxTouchPoints: 5 });
         for (const forced of [false, true]) {
             await Emulation.setEmulatedMedia({ features: [{ name: 'forced-colors', value: forced ? 'active' : 'none' }] });
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
             for (const scale of [100, 200]) {
                 const at = `${forced ? 'forced colours' : 'normal colours'}, ${scale}% text: `;
                 await ev(`document.documentElement.style.fontSize = '${scale}%'; true`);

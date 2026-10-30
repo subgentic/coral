@@ -9,7 +9,7 @@ const ITEMS = ['plan.md', 'notes.md'].map((name, i) => ({ name, media_type: 'tex
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
-    const { settle } = require('./helpers/wait').bind(ev);
+    const { settle, coralReady } = require('./helpers/wait').bind(ev);
     const results = [];
     const check = (label, cond, detail) => { results.push(!!cond); console.log(`[${cond ? 'PASS' : 'FAIL'}] ${label}${detail !== undefined ? ' - ' + detail : ''}`); };
     const rows = () => ev(`document.querySelectorAll('#team-panel-artifacts tbody tr').length`);
@@ -51,7 +51,7 @@ const ITEMS = ['plan.md', 'notes.md'].map((name, i) => ({ name, media_type: 'tex
             await Page.removeScriptToEvaluateOnNewDocument({ identifier: delayed.identifier });
             }
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.then(() => true)`);
+            await coralReady();
             for (const answerId of [ID, 'b-someoneelse0']) {
                 await ev(`(async () => { const S = window.__coralStatic || '/static/'; const sb = await import(S + 'server_base.js'); sb.noteBoardLabels([{ board_id: ${JSON.stringify(ID)}, board_label: ${JSON.stringify(LABEL)} }], 'board_id', 'local');
                     window.__answerId = ${JSON.stringify(answerId)}; if (!window.__stubbed) { window.__stubbed = true; const R = window.fetch; const json = (b, status = 200) => Promise.resolve(new Response(JSON.stringify(b), { status, headers: { 'content-type': 'application/json' } }));

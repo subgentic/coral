@@ -6,6 +6,7 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const { safePaused } = require('./helpers/paused');
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, sleep, PRELOAD, install } = await connect();
@@ -14,7 +15,7 @@ const { safePaused } = require('./helpers/paused');
     const menu = () => ev(`(() => { document.getElementById('agentic-tab-customize').click(); const rows = [...document.querySelectorAll('#tab-customize .tc-row')].map(r => ({ tab: r.dataset.tab, glyph: (r.querySelector('.tc-icon.material-icons') || {}).textContent || '', svg: !!r.querySelector('.tc-icon svg') })); document.getElementById('tab-customize')?.remove(); return rows; })()`);
     const shown = () => ev(`[...document.querySelectorAll('#agentic-block-top .agentic-tab[data-tab]')].filter(b => getComputedStyle(b).display !== 'none').map(b => b.dataset.tab)`);
     const load = async () => {
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         await ev(`localStorage.removeItem('coral-agentic-tab-prefs'); window.__m.add('tab-bot', 'A', 3, { sleeping: false }); true`);
         await sleep(600); // sleep-ok: the first live list renders from several answers; no single completion event
         await ev(`window.selectLiveSession('tab-bot', 'claude', 'tab-bot-id', 'local'); true`);

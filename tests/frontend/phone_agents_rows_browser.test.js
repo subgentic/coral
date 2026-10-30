@@ -6,6 +6,7 @@ const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const { setTheme } = require('./helpers/contrast');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -14,7 +15,7 @@ const BASE = require('./test_base').BASE;
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 2, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         await ev(`(() => { const entry = window.__m.entry.bind(window.__m); window.__m.entry = a => ({ ...entry(a), ...(a.name === 'Orchestrator' ? { waiting_for_input: true, waiting_kind: 'permission', waiting_summary: 'Wants to run npm test', status: 'Waiting for input' } : a.name === 'Lead Developer' ? { working: true, status: 'Working', summary: 'Refactoring the sidebar rows' } : {}) });
             window.__m.add('Orchestrator', 'O', 4, { sleeping: false, board_project: 'team-a' }); window.__m.add('Lead Developer', 'L', 4, { sleeping: false, board_project: 'team-a' }); window.__m.add('QA Engineer', 'Q', 4, { sleeping: true, board_project: 'team-a' }); window.__m.add('solo', 'S', 4, { sleeping: false }); return true; })()`);
         await sleep(1200); // sleep-ok: the list draws over frames

@@ -6,6 +6,7 @@
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, sleep, PRELOAD, install } = await connect();
@@ -21,7 +22,7 @@ const BASE = require('./test_base').BASE;
             const tag = `1280 px, ${pct}% text`;
             await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
             await Page.navigate({ url: BASE }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.then(() => true)`);
+            await coralReady(ev);
             await ev(`${font ? `document.documentElement.style.fontSize = '${font}';` : ''} (() => { const inner = window.__innerFetch || (window.__innerFetch = window.fetch); window.__answer = { ok: true, sessions_killed: 1 }; window.__copied = null;
                 navigator.clipboard.writeText = t => { window.__copied = t; return Promise.resolve(); };
                 window.fetch = (url, opts = {}) => { if (/\\/api\\/sessions\\/live\\/(?:team\\/)?[^/]+\\/kill/.test(String(url))) return Promise.resolve(new Response(JSON.stringify(window.__answer), { status: 200, headers: { 'content-type': 'application/json' } })); return inner(url, opts); }; return true; })()`);

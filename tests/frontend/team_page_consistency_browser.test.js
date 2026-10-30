@@ -9,7 +9,7 @@ const TEAM = `qa-consist-${Date.now() % 100000}`;
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
-    const { settle } = require('./helpers/wait').bind(ev);
+    const { settle, coralReady } = require('./helpers/wait').bind(ev);
     const S = scenarios();
     const stub = () => ev(`(() => { const R = window.fetch.bind(window); window.__avail = 'waiting'; window.__done = false; window.__hold = null; window.__release = null;
         const j = (b, s = 200) => Promise.resolve(new Response(JSON.stringify(b), { status: s, headers: { 'Content-Type': 'application/json' } }));
@@ -25,7 +25,7 @@ const TEAM = `qa-consist-${Date.now() % 100000}`;
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`); await installTP(ev);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(); await installTP(ev);
         await seed(ev, TEAM); await stub(); await openTeam(ev, waitFor, TEAM); await settle(700);
         await S.run('a waiting agent is "needs attention", not "All well"', async () => {
             assert.equal(await status(), '1 needs attention', `got ${JSON.stringify(await status())}`);

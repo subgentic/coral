@@ -3,6 +3,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 const S = `(window.__coralStatic || '/static/')`;
 
 const STUB = `(() => {
@@ -27,7 +28,7 @@ const STUB = `(() => {
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Page.addScriptToEvaluateOnNewDocument({ source: STUB });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 820, deviceScaleFactor: 1, mobile: false });
-        await Page.navigate({ url: BASE + '/automations/jobs' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: BASE + '/automations/jobs' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         await waitFor(`document.querySelectorAll('.view-list-item').length >= 4`, 'the folders', 15000);
         // a run is going (the live tick), and the runs were read a moment ago (so the 30 s throttle would hold the next read)
         const run = { id: 77, job_id: 1, job_name: 'nightly-build-job', status: 'running', scheduled_at: new Date().toISOString(), started_at: new Date().toISOString(), trigger_type: 'cron', session_id: 'sess-77' };

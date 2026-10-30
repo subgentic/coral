@@ -4,6 +4,7 @@ const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
 const sceneShots = require('./helpers/scene_shots');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 (async () => {
  const {client,Page,Emulation,ev,waitFor,PRELOAD,install}=await connect();
  const capture=sceneShots(Page,'task-versions');
@@ -13,7 +14,7 @@ const BASE = require('./test_base').BASE;
  const click=word=>ev(`[...document.querySelectorAll('#team-panel-item .goals-pinbar button')].find(e=>e.textContent===${JSON.stringify(word)}).click();true`);
  try {
  await Page.enable();await Page.addScriptToEvaluateOnNewDocument({source:PRELOAD});
- await Page.navigate({url:BASE+'/'});await Page.loadEventFired();await install();await ev(`window.__coralReady.then(()=>true)`);
+ await Page.navigate({url:BASE+'/'});await Page.loadEventFired();await install();await coralReady(ev);
  for(const width of [1280,390]) {
   await Emulation.setDeviceMetricsOverride({width,height:900,deviceScaleFactor:1,mobile:width===390});
   const made=await api('POST',`/api/board/${board}/tasks`,{subscriber_id:'Operator',title:'Original task '+width,priority:'medium'});assert.equal(made.status,201);
