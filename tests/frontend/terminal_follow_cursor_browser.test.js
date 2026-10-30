@@ -1,5 +1,5 @@
 // A terminal that follows a pane taller than its window (Coral Hub's View mode, a viewer, a phone) keeps the prompt line in view (#4586): at 1280x756 and on a phone, the pane's
-// rows arrive (terminal_size, 60 rows), and the cursor line is inside the container's visible area, stays there as output moves it, is left alone once the person scrolls it out of
+// rows arrive (terminal_size, 100 rows), and the cursor line is inside the container's visible area, stays there as output moves it, is left alone once the person scrolls it out of
 // view, and comes back when they type. On the real xterm with a fake terminal socket. Run against an isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -29,9 +29,9 @@ const { connect } = require('./agent_view_harness');
         await waitFor(`!!window.__tws && !!document.querySelector('#xterm-container .xterm')`, 'the terminal', 15000);
         // A viewer (as the hub's View mode makes one) cannot resize the pane, so the terminal follows the pane's own size.
         await ev(`window.__stateMod.state.currentSession.hubReadOnly = true; true`);
-        await ev(`window.__tws.onmessage({ data: JSON.stringify({ type: 'terminal_size', cols: 100, rows: 60, seq: 0, initial: true }) }); true`);
-        await waitFor(`document.getElementById('xterm-container').classList.contains('xterm-follow-pane') && window.__term().rows === 60`, 'following the 60-row pane', 6000);
-        await write(out(58));
+        await ev(`window.__tws.onmessage({ data: JSON.stringify({ type: 'terminal_size', cols: 100, rows: 100, seq: 0, initial: true }) }); true`);
+        await waitFor(`document.getElementById('xterm-container').classList.contains('xterm-follow-pane') && window.__term().rows === 100`, 'following the 100-row pane', 6000);
+        await write(out(98));
         await sleep(400); // sleep-ok: the scroll to the cursor runs on an animation frame
     };
     try {
@@ -39,7 +39,7 @@ const { connect } = require('./agent_view_harness');
         await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Page.addScriptToEvaluateOnNewDocument({ source: FAKE });
         for (const [w, h, name] of [[1280, 756, 'desktop 1280x756'], [390, 720, 'phone 390x720']]) {
-            console.log(`${name}: a 60-row pane`);
+            console.log(`${name}: a 100-row pane`);
             await open(w, h);
             const v = await visible('the pane\'s rows arrived');
             assert.ok(v.scrollH > v.clientH + 50, `the pane is taller than the window, so the container scrolls ${JSON.stringify(v)}`);
