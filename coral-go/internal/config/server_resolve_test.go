@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -139,4 +140,54 @@ func TestTheHealthQuestionDoesNotDependOnTheDefaultTransport(t *testing.T) {
 	http.DefaultTransport = refusingTransport{}
 	t.Cleanup(func() { http.DefaultTransport = old })
 	assert.Equal(t, l.srv.URL, VerifiedServer(record(t, os.Getpid(), l.srv.URL, goodID)))
+}
+
+// Why a live record did not verify: the KIND only (timeout, could not connect, status, JSON, not ok, id, version), never the address's query, the instance id or the body.
+func TestWhyARecordDidNotVerifyNamesTheKindOnly(t *testing.T) {
+	oldT := healthTimeout
+	healthTimeout = 150 * time.Millisecond
+	t.Cleanup(func() { healthTimeout = oldT })
+	const secret = "SECRET-BODY-TEXT"
+	slow := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { time.Sleep(600 * time.Millisecond) }))
+	t.Cleanup(slow.Close)
+	closed := httptest.NewServer(http.NotFoundHandler())
+	closedURL := closed.URL
+	closed.Close()
+	for name, tc := range map[string]struct {
+		addr, id, want string
+	}{
+		"timeout":               {slow.URL, goodID, "timed out after 150ms"},
+		"refused":               {closedURL, goodID, "could not connect"},
+		"status":                {newListener(t, 500, secret).srv.URL, goodID, "answered 500, not 200"},
+		"not JSON":              {newListener(t, 200, secret).srv.URL, goodID, "the answer is not JSON"},
+		"status not ok":         {newListener(t, 200, `{"status":"`+secret+`","version":"1"}`).srv.URL, goodID, "the status in the answer is not ok"},
+		"another instance":      {newListener(t, 200, `{"status":"ok","version":"1","instance_id":"ffffffffffffffffffffffffffffffff"}`).srv.URL, goodID, "the instance id in the answer is not the recorded one"},
+		"no version, no id yet": {newListener(t, 200, `{"status":"ok"}`).srv.URL, "", "the answer has no version"},
+	} {
+		addr, err := ResolveRecorded(record(t, os.Getpid(), tc.addr, tc.id))
+		require.Error(t, err, name)
+		assert.Empty(t, addr, name)
+		assert.Contains(t, err.Error(), "did not answer as this Coral ("+tc.want+")", name)
+		assert.NotContains(t, err.Error(), secret, name+": no body text")
+		assert.NotContains(t, err.Error(), "ffffffffffffffffffffffffffffffff", name+": no instance id from the answer")
+		assert.NotContains(t, err.Error(), "/api/health", name+": no request path or Go error text")
+	}
+}
+
+// The hooks (LocalServerURL) give a recorded address 2 s and no more; the commands give it 5 s: a server that answers in between is found by the commands, not the hooks.
+func TestHooksWaitLessForARecordedServerThanTheCommandsDo(t *testing.T) {
+	oldT, oldQ := healthTimeout, quickHealthTimeout
+	healthTimeout, quickHealthTimeout = 2*time.Second, 80*time.Millisecond
+	t.Cleanup(func() { healthTimeout, quickHealthTimeout = oldT, oldQ })
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(400 * time.Millisecond)
+		_, _ = w.Write([]byte(`{"status":"ok","version":"2.0.7","instance_id":"` + goodID + `"}`))
+	}))
+	t.Cleanup(srv.Close)
+	dir := record(t, os.Getpid(), srv.URL, goodID)
+	t.Setenv("CORAL_DATA_DIR", dir)
+	addr, err := ResolveRecorded(dir)
+	require.NoError(t, err, "a command waits for it")
+	assert.Equal(t, srv.URL, addr)
+	assert.Empty(t, LocalServerURL(), "a hook does not")
 }

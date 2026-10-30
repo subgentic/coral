@@ -3,6 +3,7 @@ package config
 import (
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -54,8 +55,14 @@ func RecordedInstance(coralDir string) (pid int, addr, id string) {
 // instanceIDShape is what a server's instance id looks like: 32 lower-case hex digits.
 var instanceIDShape = regexp.MustCompile(`^[0-9a-f]{32}$`)
 
-// healthTimeout bounds the one question VerifiedServer asks.
-const healthTimeout = 2 * time.Second
+// healthTimeout bounds the one question the commands (coral-board, coral) ask before they go to a recorded address. It is 5 s: the first connection a process makes to a loopback
+// address can be slow on a busy or cold Windows machine (a hosted runner's first connect was taken for a dead record at 2 s). A recorded address that does not answer is an ERROR
+// (since #246 never a fall back to the default port), and a dead record on loopback is refused at once, so only an address that swallows the request waits this long. No credential is
+// sent before the answer is checked. A variable so a test can shorten it.
+var healthTimeout = 5 * time.Second
+
+// quickHealthTimeout is the same question for LocalServerURL, which the hooks and the agent tools call on every run: a hung server must not hold each of them for 5 s.
+var quickHealthTimeout = 2 * time.Second
 
 // defaultServerURL is where a command goes when no usable record names the Coral: this platform's default port. A variable so a test can point it at a scratch server.
 var defaultServerURL = "http://localhost:" + strconv.Itoa(DefaultPort)
@@ -73,29 +80,46 @@ type healthAnswer struct {
 // askHealth asks addr (a loopback address) /api/health and returns the answer if it is a 200 JSON one. It sends no credential and follows no redirect. For an https
 // address the certificate is not verified: a Coral with TLS on a non-default port uses a certificate of its own that nothing here could check, and nothing is sent that
 // a listener could misuse; the instance id in the answer, not the certificate, is the identity (a record without one is the weaker check VerifiedServer says).
-func askHealth(addr string) (healthAnswer, bool) {
+func askHealth(addr string, timeout time.Duration) (healthAnswer, error) {
 	var h healthAnswer
 	if plainTransport == nil {
-		return h, false
+		return h, errors.New("no HTTP transport")
 	}
 	tr := plainTransport.Clone() // keeps the default transport's dial hook (the tests' guard against reaching a live Coral)
 	if skipsCertificateCheck(addr) {
 		tr.TLSClientConfig = &tls.Config{InsecureSkipVerify: true} //nolint:gosec // loopback only, no credential sent, identity is the instance id
 	}
-	client := &http.Client{Timeout: healthTimeout, Transport: tr, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	client := &http.Client{Timeout: timeout, Transport: tr, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	defer tr.CloseIdleConnections()
 	resp, err := client.Get(strings.TrimRight(addr, "/") + "/api/health")
 	if err != nil {
-		return h, false
+		var ne net.Error
+		if errors.As(err, &ne) && ne.Timeout() {
+			return h, fmt.Errorf("timed out after %s", timeout)
+		}
+		return h, errors.New("could not connect") // the kind only: no address, query or error text
+
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return h, false
+		return h, fmt.Errorf("answered %d, not 200", resp.StatusCode)
 	}
-	if err := json.NewDecoder(io.LimitReader(resp.Body, 4096)).Decode(&h); err != nil || h.Status != "ok" {
-		return h, false
+	if err := json.NewDecoder(io.LimitReader(resp.Body, 4096)).Decode(&h); err != nil {
+		return h, errors.New("the answer is not JSON")
 	}
-	return h, true
+	if h.Status != "ok" {
+		return h, errors.New("the status in the answer is not ok")
+	}
+	return h, nil
+}
+
+// verifyAddr asks addr who it is and checks the answer against the record's instance id (or, for a record without one, a version): nil if it is that Coral, else why not.
+func verifyAddr(addr, id string, timeout time.Duration) error {
+	h, err := askHealth(addr, timeout)
+	if err != nil {
+		return err
+	}
+	return h.mismatch(id)
 }
 
 // skipsCertificateCheck is whether askHealth leaves the certificate unverified for addr: only an https address on this computer (localhost or a loopback IP).
@@ -104,12 +128,18 @@ func skipsCertificateCheck(addr string) bool {
 	return err == nil && u.Scheme == "https" && localServerURL(addr)
 }
 
-// answersAs is whether h is the answer of the Coral a record names: its instance id, or for a record without one (an older server wrote it) a version.
-func (h healthAnswer) answersAs(id string) bool {
+// mismatch is nil when h is the answer of the Coral a record names: its instance id, or for a record without one (an older server wrote it) a version; else why not.
+func (h healthAnswer) mismatch(id string) error {
 	if id != "" {
-		return h.InstanceID == id
+		if h.InstanceID != id {
+			return errors.New("the instance id in the answer is not the recorded one")
+		}
+		return nil
 	}
-	return h.Version != ""
+	if h.Version == "" {
+		return errors.New("the answer has no version")
+	}
+	return nil
 }
 
 // VerifiedServer is the address of the Coral server recorded for coralDir, only if that record is still true: the recorded process is running, and the address answers
@@ -122,7 +152,7 @@ func VerifiedServer(coralDir string) string {
 	if addr == "" || !processAlive(pid) {
 		return ""
 	}
-	if h, ok := askHealth(addr); ok && h.answersAs(id) {
+	if verifyAddr(addr, id, healthTimeout) == nil {
 		return addr
 	}
 	return ""
@@ -141,10 +171,14 @@ func ResolveServerAt(coralDir, fallback string) (string, error) {
 	if addr, err := ResolveRecorded(coralDir); addr != "" || err != nil {
 		return addr, err
 	}
-	if h, ok := askHealth(fallback); ok && h.Version != "" {
+	h, err := askHealth(fallback, healthTimeout)
+	if err == nil && h.Version == "" {
+		err = errors.New("the answer has no version")
+	}
+	if err == nil {
 		return fallback, nil
 	}
-	return "", fmt.Errorf("no Coral answered at %s. Start Coral, or set CORAL_URL to the address of the one you mean", fallback)
+	return "", fmt.Errorf("no Coral answered at %s (%v). Start Coral, or set CORAL_URL to the address of the one you mean", fallback, err)
 }
 
 // ResolveRecorded is the record half of ResolveServerAt: the verified recorded address; an error when a live process recorded one that does not answer as that Coral; and
@@ -155,11 +189,16 @@ func ResolveRecorded(coralDir string) (string, error) {
 	if addr == "" || !processAlive(pid) {
 		return "", nil
 	}
-	if h, ok := askHealth(addr); ok && h.answersAs(id) {
-		return addr, nil
+	if err := verifyAddr(addr, id, healthTimeout); err != nil {
+		return "", unverifiedError(pid, addr, err)
 	}
-	return "", fmt.Errorf("Coral is running on this data folder (PID %d) and recorded %s, but that address did not answer as this Coral. "+
-		"Restart Coral, or set CORAL_URL to its address. If Coral is not running, start it (the record may name a process id that something else now uses)", pid, addr)
+	return addr, nil
+}
+
+// unverifiedError is the error for a live process whose recorded address did not answer as that Coral; why is the kind of failure only.
+func unverifiedError(pid int, addr string, why error) error {
+	return fmt.Errorf("Coral is running on this data folder (PID %d) and recorded %s, but that address did not answer as this Coral (%v). "+
+		"Restart Coral, or set CORAL_URL to its address. If Coral is not running, start it (the record may name a process id that something else now uses)", pid, addr, why)
 }
 
 // LocalServer is where a command typed with no CORAL_URL, CORAL_HOST or CORAL_PORT finds this computer's Coral: ResolveServer for the data folder (CORAL_DATA_DIR, else ~/.coral).
@@ -174,11 +213,11 @@ func LocalServerURL() string {
 	dir := ResolveCoralDir("")
 	pid, addr, id := RecordedInstance(dir)
 	if addr != "" && processAlive(pid) {
-		if h, ok := askHealth(addr); ok && h.answersAs(id) {
+		err := verifyAddr(addr, id, quickHealthTimeout)
+		if err == nil {
 			return strings.TrimRight(addr, "/")
 		}
-		_, err := ResolveRecorded(dir)
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Error: %v\n", unverifiedError(pid, addr, err))
 		return ""
 	}
 	return defaultServerURL
