@@ -1,5 +1,51 @@
 # Release Notes
 
+## v2.0.9 — board notices go only into an agent's own CLI, the Windows team's batch of safety and launch fixes, Analytics tabs, provider cards for a new agent, and the phone's drill-down team page
+
+### Changes
+
+#### What you will notice first
+
+- **Coral now types board notices only into an agent's own CLI, never into a shell left behind after the CLI exits** (#224, #225). Agents that were already running when you update have no record of their CLI yet, so their notices pause until you restart or wake them, or use Record as agent once. Record for all agents does it for every agent whose CLI is in front; any it can't tell stay paused and are listed. To go back to the old behaviour, set `CORAL_NOTICE_TARGET_CHECK=off` (Coral logs it).
+- **New agent shows each provider as a card**: whether it's installed, and once chosen, its Model and Thinking inside the card, with a one-line summary of what will launch above Launch.
+- **Analytics has three new tabs**: Usage, Operator interaction and Team communication, below Overview, with team-to-team pairs. They show counts per day and per agent, never message text; a figure Coral has not recorded says "not recorded yet", not 0. The Operator tab shows how many touches came through Coral Hub. Through Coral Hub, only the Hub's owner sees the Usage, Operator interaction and Team communication tabs; the cost tabs aren't available through the Hub. Coral records the Operator's touches from this version on, so the tabs fill from the day you update.
+- **A phone with a drill-down team page**: the team page has a bar you drill down from, a goal, task or agent page is one bar, the agent chat's bar has no menu button on a phone, and each agent row in the list shows its latest message (who, a short excerpt), updated within about a second of a reply.
+- **Record as agent, in the dashboard**: one agent or all after an update (the Operator's alone). A program inside a nested shell is recorded only with a separate box ticked; the confirm names the program's image and its folder, and says plainly when it cannot tell.
+- **The board refuses a sign-in link** (#232, #239, #244): a post, task, goal, notification or other text a member reads that carries a Coral sign-in link is refused, and `coral-board post` and `send` and `coral-agent` say so before they send.
+- **Settings > Security has one Accounts row for Claude and Pi**: one "Learn more" and one "Check".
+- **Pi's model list is grouped by provider, and a new Pi agent starts on a signed-in one**.
+
+#### Launch and the CLI
+
+- **A launch, restart, resume, wake or job run whose CLI is found nowhere is refused** (`cli_not_found`) (#150, #172, #173). A sleeping agent refused on wake, restart or resume gets a "Failed to start" card with the reason and one board line, and a new launch shows the refusal in its dialog. A CLI found only through an untrusted mount point is refused with the folder and the fix.
+- **`launch-coral` resolves each agent's CLI before it launches** and skips a folder with the reason; it reads the saved Settings > CLI paths read-only; its agents mode is refused up front on Windows, naming what works.
+- **`coral --port 0` means any free port**, and a command trusts the address in the data folder's lock file only once it answers as that Coral (`/api/health` carries an `instance_id`) (#245, #246).
+- **A sign-in link's opener that could not be attributed yet is answered "try again"** and is not used up; a sign-in link may be opened through WSL's localhost relay, and nothing else may (#208, #209, #231).
+
+#### The composer and the terminal
+
+- **A send the server could not confirm, though it may have arrived, keeps its bubble as "Sent, not confirmed"**; a refused send is announced once; a message held behind the agent's question is not announced as not sent; a message to an agent whose hooks are gone is typed once (#200).
+- **Windows terminal: Ctrl+C copies a selection and Ctrl+V pastes**, as in Windows Terminal (#217).
+- **Artifact names and attachment chips are cleaned** of invisible characters everywhere a name is shown (#220).
+- **The Set a password dialog hangs from a fixed top**, so no field moves as you type, and the idle advice holds no room.
+
+#### Windows and the data folder
+
+- **A data folder behind a junction Windows will not open is refused by name**, with the way out; a junction Windows refuses to traverse is the named refusal `ErrOutside` (#203, #204).
+- **A refused apply starts a folder the update marker names only if its `coral-update.exe` is this updater** (#241).
+- **Tools-folder warning: each account once**, with its ways of changing the folder together (#199).
+
+#### Known issues
+
+- **Windows: in-app update does not work from 2.0.0 through 2.0.6.** If you're on one of those, download and install the MSI by hand; from 2.0.7 on, in-app update works.
+- **macOS: a Coral of 2.0.5 or earlier cannot install updates in-app; install 2.0.6 or later by hand once.**
+
+#### For developers and releases
+
+- **Every test package runs in a private temp, home and data folder** (#177), only when `go test` started it; Windows tests start console programs hidden, and a lint says so (#211).
+- **CDP suites wait for the page through `coralReady`**, with a lint against new open waits.
+- **The static budget rises to 5,767,168 bytes** (`5<<20 + 512<<10`): the operator's raise of 2026-10-30, for the Analytics tabs, the provider cards, the phone navigation and the new-user fixes. The page-weight baseline follows (the startup bundle grows by 7,665 bytes with the Windows batch).
+
 ## v2.0.8 — a phone with one tab strip, Pi workflow steps, jobs and sign-in status, a first run that explains itself, one word for a linked machine, and a more careful data folder
 
 ### Changes
