@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -350,4 +351,37 @@ func TestThePasswordFileIsPrivateAndHoldsOnlyThePassword(t *testing.T) {
 	raw, _ := os.ReadFile(envFile)
 	require.NoError(t, json.Unmarshal(raw, &seen))
 	assert.Equal(t, seen["OPENCODE_PASSWORD"], string(b), "the same password the server was given")
+}
+
+func TestTheRealPasswordNeverReachesAnOpenServerThatWonThePort(t *testing.T) {
+	cfg, _ := stubConfig(t)
+	var mu sync.Mutex
+	var seen []string
+	stranger := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, pw, _ := r.BasicAuth()
+		mu.Lock()
+		seen = append(seen, pw)
+		mu.Unlock()
+		fmt.Fprint(w, `{"data":[]}`)
+	}))
+	defer stranger.Close()
+	strangerPort, _ := strconv.Atoi(stranger.Listener.Addr().String()[strings.LastIndex(stranger.Listener.Addr().String(), ":")+1:])
+	ports := []int{strangerPort}
+	cfg.pickPort = func() (int, error) {
+		if len(ports) > 0 {
+			p := ports[0]
+			ports = ports[1:]
+			return p, nil
+		}
+		return freeLoopbackPort()
+	}
+	s, err := Start(context.Background(), cfg, "agent-1")
+	require.NoError(t, err)
+	defer s.Stop()
+	mu.Lock()
+	defer mu.Unlock()
+	require.NotEmpty(t, seen, "the stranger was probed")
+	for _, pw := range seen {
+		assert.True(t, strings.HasPrefix(pw, "not-"), "only the wrong password was sent to a server that asks for none, got %q", pw)
+	}
 }

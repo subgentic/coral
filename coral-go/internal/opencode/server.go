@@ -199,6 +199,19 @@ func startOn(ctx context.Context, cfg Config, dir string, port int) (*Server, er
 	if err != nil {
 		return fail(err)
 	}
+	// The probe sends a WRONG password first: only a server that refuses it is one that wants a password, and the real one goes to the port only after that, so a stranger that won the port race never sees it.
+	bad, err := New(s.URL, "not-"+password)
+	if err != nil {
+		return fail(err)
+	}
+	exited := func() bool {
+		select {
+		case <-s.done:
+			return true
+		default:
+			return false
+		}
+	}
 	deadline := time.Now().Add(cfg.Ready)
 	for {
 		select {
@@ -210,27 +223,23 @@ func startOn(ctx context.Context, cfg Config, dir string, port int) (*Server, er
 		default:
 		}
 		actx, cancel := context.WithTimeout(ctx, time.Second)
-		status, err := c.ping(actx)
+		status, err := bad.ping(actx)
 		cancel()
 		switch {
 		case err == nil && status == 200:
-			// It is alive and took this server's password: and a wrong one is refused, which a stranger's open server would not do, and the child is still running (one that could not listen has exited).
-			if bad, berr := New(s.URL, "not-"+password); berr == nil {
-				bctx, bcancel := context.WithTimeout(ctx, time.Second)
-				bstatus, perr := bad.ping(bctx)
-				bcancel()
-				select {
-				case <-s.done:
-					_ = os.Remove(pidFile)
-					return nil, errors.New("opencode: the server exited before it answered")
-				default:
-				}
-				if perr == nil && (bstatus == 401 || bstatus == 403) {
-					return s, nil
-				}
-			}
-			return fail(errors.New("opencode: the port answers, but not as the server that was started"))
+			return fail(errors.New("opencode: another server answers on this port, one that asks for no password"))
 		case err == nil && (status == 401 || status == 403):
+			// It wants a password. Now the real one: the child must still be running (one that could not listen has exited) and must take it.
+			rctx, rcancel := context.WithTimeout(ctx, time.Second)
+			rstatus, rerr := c.ping(rctx)
+			rcancel()
+			if exited() {
+				_ = os.Remove(pidFile)
+				return nil, errors.New("opencode: the server exited before it answered")
+			}
+			if rerr == nil && rstatus == 200 {
+				return s, nil
+			}
 			return fail(errors.New("opencode: another server answers on this port"))
 		}
 		if time.Now().After(deadline) {
