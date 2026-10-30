@@ -3,6 +3,8 @@ package agent
 import (
 	"regexp"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 )
 
 // MissingCommandIn reports whether out holds a shell's "no such command" error for binary. It is the backup under the CLI checks (#353): the refusal before the launch line is typed is the
@@ -43,67 +45,83 @@ func MissingCommandIn(out, binary string) bool {
 	return false
 }
 
-// answerLines is the most of the screen above the bottom prompt that is read as the shell's latest answer: a PowerShell error, the longest, is the
-// sentence (wrapped on a narrow pane) and its "Check the spelling" line.
-const answerLines = 12
-
-// psTrailer is a line PowerShell prints under a command's error: its position ("At line:1 char:1") and the lines that start with "+" (the
-// command, its underline, CategoryInfo, FullyQualifiedErrorId).
-var psTrailer = regexp.MustCompile(`^\s*(?:At line:\d+ char:\d+|\+.*)$`)
+// answerLines is the most of the screen above the bottom prompt that is read as the shell's latest answer: Windows PowerShell's error record, the
+// longest, is the sentence and five trailer lines, and a narrow pane breaks each of them over several rows (QA's 30-column ConPTY screen: 16).
+const answerLines = 24
 
 // MissingCommandAtBottom reports whether the shell's LATEST answer, right above the prompt at the bottom of screen, is its "no such command"
 // error for binary (#353's safety net; the coral-go-team Security's INFO on #173). Coral's quiet launch clears the screen, so the line it typed is
-// not there to anchor on; the bottom is: the prompt the shell came back to is the last line, and the error must END the block of lines right
-// above it (PowerShell's position and "+" lines under the error are skipped, blank lines end the block). The same words higher up, or followed
-// by any other output or a typed command, are not the shell's latest answer and do not count.
+// not there to anchor on; the bottom is. The prompt the shell came back to is the last row, with the rows above it that it wrapped from (a row as
+// wide as the pane continues on the next); the error must END the block of rows right above it, a blank row ending the block.
+// A pane breaks a long line at its last column, mid-word or not, so the block is compared with its row breaks and all spacing taken out. The same
+// words higher up, or followed by any other output or a typed command, are not the shell's latest answer and do not count.
 func MissingCommandAtBottom(screen, binary string) bool {
 	b := strings.TrimSuffix(strings.ToLower(strings.TrimSpace(binary)), ".exe")
 	if b == "" {
 		return false
 	}
-	lines := strings.Split(strings.ReplaceAll(screen, "\r\n", "\n"), "\n")
+	rows := strings.Split(strings.ReplaceAll(screen, "\r\n", "\n"), "\n")
+	// The pane's width, as the screen shows it: the widest row, when at least two rows reach it (a pane that wrapped anything fills its rows to
+	// the last column). Otherwise nothing is taken as wrapped: the longest line is just the longest line.
+	width, full := 0, 0
+	for _, r := range rows {
+		switch n := utf8.RuneCountInString(r); {
+		case n > width:
+			width, full = n, 1
+		case n == width:
+			full++
+		}
+	}
+	if full < 2 {
+		width = -1
+	}
+	blank := func(r string) bool { return strings.TrimSpace(r) == "" }
 	trimBlank := func() {
-		for len(lines) > 0 && strings.TrimSpace(lines[len(lines)-1]) == "" {
-			lines = lines[:len(lines)-1]
+		for len(rows) > 0 && blank(rows[len(rows)-1]) {
+			rows = rows[:len(rows)-1]
 		}
 	}
 	trimBlank()
-	if len(lines) < 2 {
+	if len(rows) < 2 {
 		return false // a prompt alone, or nothing: no answer
 	}
-	lines = lines[:len(lines)-1] // the prompt the shell came back to
-	trimBlank()
-	for len(lines) > 0 && psTrailer.MatchString(lines[len(lines)-1]) {
-		lines = lines[:len(lines)-1]
+	rows = rows[:len(rows)-1] // the prompt's last row
+	for len(rows) > 0 && !blank(rows[len(rows)-1]) && utf8.RuneCountInString(rows[len(rows)-1]) == width {
+		rows = rows[:len(rows)-1] // a full row above it: the prompt wrapped from there
 	}
 	trimBlank()
-	start := len(lines)
-	for start > 0 && len(lines)-start < answerLines && strings.TrimSpace(lines[start-1]) != "" {
+	start := len(rows)
+	for start > 0 && len(rows)-start < answerLines && !blank(rows[start-1]) {
 		start--
 	}
-	block := lines[start:]
+	block := rows[start:]
 	if len(block) == 0 {
 		return false
 	}
-	q := regexp.QuoteMeta(b)
-	name := `['"` + "`" + `]?` + q + `(?:\.(?:exe|cmd|bat|ps1))?['"` + "`" + `]?`
-	// A POSIX shell's error is one line: the block's last.
-	last := strings.ToLower(strings.TrimSpace(block[len(block)-1]))
-	for _, re := range []*regexp.Regexp{
-		regexp.MustCompile(`^(?:[^:]*:\s*)*` + q + `: (?:command )?not found$`),
-		regexp.MustCompile(`command not found: ` + q + `$`),
-	} {
-		if re.MatchString(last) {
-			return true
+	var flat strings.Builder
+	for _, l := range block {
+		for _, r := range strings.ToLower(l) {
+			if !unicode.IsSpace(r) {
+				flat.WriteRune(r)
+			}
 		}
 	}
-	// PowerShell's and cmd's are sentences a narrow pane wraps: matched on the block with its line breaks collapsed, and they must END it.
-	collapsed := strings.Join(strings.Fields(strings.ToLower(strings.Join(block, " "))), " ")
+	q := regexp.QuoteMeta(b)
+	name := `['"` + "`" + `]?` + q + `(?:\.(?:exe|cmd|bat|ps1))?['"` + "`" + `]?`
+	sentence := `theterm` + name + `isnotrecognizedas(?:the|a)nameofacmdlet,function,scriptfile,or(?:operable|executable)program\.(?:checkthespellingofthename,orifapathwasincluded,verifythatthepathiscorrectandtryagain\.)?`
+	// Windows PowerShell 5.1's record under the sentence: "At line:1 char:1", the command and its underline ("+ codex", "+ ~~~~~"), then
+	// "+ CategoryInfo : ObjectNotFound: (codex:String) [], CommandNotFoundException" and "+ FullyQualifiedErrorId : CommandNotFoundException".
+	trailer := `(?:atline:\d+char:\d+(?:\+[^+]*)*\+categoryinfo:objectnotfound:[^+]*commandnotfoundexception\+fullyqualifiederrorid:commandnotfoundexception)?`
 	for _, re := range []*regexp.Regexp{
-		regexp.MustCompile(`the term ` + name + ` is not recognized as (?:the|a) name of a cmdlet, function, script file, or (?:operable|executable) program\.(?: check the spelling of the name, or if a path was included, verify that the path is correct and try again\.)?$`),
-		regexp.MustCompile(`(?:^| )` + name + ` is not recognized as an internal or external command, operable program or batch file\.$`),
+		// POSIX shells: "bash: codex: command not found", "sh: 1: codex: not found", "zsh: command not found: codex".
+		regexp.MustCompile(`(?:^|:)` + q + `:(?:command)?notfound$`),
+		regexp.MustCompile(`commandnotfound:` + q + `$`),
+		// Windows PowerShell 5.1 (with its record) and 7.
+		regexp.MustCompile(sentence + trailer + `$`),
+		// cmd.
+		regexp.MustCompile(name + `isnotrecognizedasaninternalorexternalcommand,operableprogramorbatchfile\.$`),
 	} {
-		if re.MatchString(collapsed) {
+		if re.MatchString(flat.String()) {
 			return true
 		}
 	}
