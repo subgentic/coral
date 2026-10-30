@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -36,13 +37,20 @@ func runStub() {
 	}
 	if out := os.Getenv("CORAL_TEST_OPENCODE_ENVFILE"); out != "" {
 		seen := map[string]string{"args": strings.Join(os.Args[1:], " ")}
-		for _, k := range []string{"OPENCODE_PASSWORD", "OPENCODE_DB", "OPENCODE_SERVER_URL", "XDG_DATA_HOME", "XDG_CONFIG_HOME", "XDG_CACHE_HOME", "XDG_STATE_HOME", "HOME"} {
+		for _, k := range []string{"OPENCODE_PASSWORD", "OPENCODE_DB", "OPENCODE_SERVER_URL", "XDG_DATA_HOME", "XDG_CONFIG_HOME", "XDG_CACHE_HOME", "XDG_STATE_HOME", "HOME", "CORAL_SESSION_TOKEN", "CORAL_INITIAL_PASSWORD_FILE", "CORAL_URL", "CORAL_SESSION_NAME", "ANTHROPIC_API_KEY_OF_ANOTHER_AGENT"} {
 			seen[k] = os.Getenv(k)
 		}
 		b, _ := json.Marshal(seen)
 		_ = os.WriteFile(out, b, 0o600)
 	}
 	mux := http.NewServeMux()
+	mux.HandleFunc("/api/session", func(w http.ResponseWriter, r *http.Request) {
+		if _, p, ok := r.BasicAuth(); !ok || p != os.Getenv("OPENCODE_PASSWORD") {
+			http.Error(w, "no", http.StatusUnauthorized)
+			return
+		}
+		fmt.Fprint(w, `{"data":[]}`)
+	})
 	mux.HandleFunc("/api/session/ses_abc123/message", func(w http.ResponseWriter, r *http.Request) {
 		if _, p, ok := r.BasicAuth(); !ok || p != os.Getenv("OPENCODE_PASSWORD") {
 			http.Error(w, "no", http.StatusUnauthorized)
@@ -73,7 +81,7 @@ func TestTheServerRunsInCoralsOwnFolderBehindItsOwnPasswordAndIsStoppedByItsPid(
 	t.Setenv("OPENCODE_SERVER_URL", "http://127.0.0.1:4096")
 	t.Setenv("XDG_DATA_HOME", "/home/person/.local/share")
 	cfg, envFile := stubConfig(t)
-	s, err := Start(context.Background(), cfg)
+	s, err := Start(context.Background(), cfg, "agent-1")
 	require.NoError(t, err)
 	defer s.Stop()
 
@@ -101,7 +109,7 @@ func TestTheServerRunsInCoralsOwnFolderBehindItsOwnPasswordAndIsStoppedByItsPid(
 	_, err = wrong.Messages(context.Background(), "ses_abc123", MessagesOpts{})
 	assert.ErrorContains(t, err, "401")
 
-	rec, err := os.ReadFile(filepath.Join(cfg.DataDir, "server.json"))
+	rec, err := os.ReadFile(filepath.Join(cfg.DataDir, "servers", "agent-1", "server.json"))
 	require.NoError(t, err)
 	assert.NotContains(t, string(rec), seen["OPENCODE_PASSWORD"], "the pid file holds the pid and the port, never the password")
 	var pr pidRecord
@@ -115,7 +123,7 @@ func TestTheServerRunsInCoralsOwnFolderBehindItsOwnPasswordAndIsStoppedByItsPid(
 	s.Stop()
 	_, err = net.DialTimeout("tcp", "127.0.0.1:"+port, 300*time.Millisecond)
 	assert.Error(t, err, "stopped")
-	_, err = os.Stat(filepath.Join(cfg.DataDir, "server.json"))
+	_, err = os.Stat(filepath.Join(cfg.DataDir, "servers", "agent-1", "server.json"))
 	assert.True(t, os.IsNotExist(err), "and its pid file is gone")
 }
 
@@ -123,34 +131,148 @@ func TestAServerThatExitsBeforeItAnswersIsAnErrorAndLeavesNothingRunning(t *test
 	cfg, _ := stubConfig(t)
 	cfg.Args = func(int) []string { return []string{"serve", "--port", "1"} } // port 1 cannot be listened on: the stand-in exits
 	cfg.Ready = 5 * time.Second
-	_, err := Start(context.Background(), cfg)
+	_, err := Start(context.Background(), cfg, "agent-1")
 	assert.ErrorContains(t, err, "exited before it answered")
-	_, statErr := os.Stat(filepath.Join(cfg.DataDir, "server.json"))
+	_, statErr := os.Stat(filepath.Join(cfg.DataDir, "servers", "agent-1", "server.json"))
 	assert.True(t, os.IsNotExist(statErr))
 }
 
-func TestALeftOverPidThatIsAnotherProcessIsNeverSignalled(t *testing.T) {
+func TestALeftOverPidIsSignalledOnlyWhenItsCommandAndStartTimeAreTheRecordedOnes(t *testing.T) {
 	dir := t.TempDir()
 	f := filepath.Join(dir, "server.json")
-	// this test process's own pid, with a port that is not in its command line: it is not the server that was recorded
-	rec, _ := json.Marshal(pidRecord{PID: os.Getpid(), Port: 54321})
-	require.NoError(t, os.WriteFile(f, rec, 0o600))
-	stopLeftOver(f) // must not signal this process (it would end the test)
-	_, err := os.Stat(f)
-	assert.True(t, os.IsNotExist(err), "the record is dropped")
-	assert.False(t, isOurServer(os.Getpid(), 54321))
-	assert.False(t, isOurServer(0, 1) || isOurServer(1<<30, 1), "no such process")
-	_ = strconv.Itoa
+	me := os.Getpid()
+	write := func(rec pidRecord) {
+		b, _ := json.Marshal(rec)
+		require.NoError(t, os.WriteFile(f, b, 0o600))
+	}
+	// this test process's own pid, with a command and a start time that are not its: never signalled (it would end the test)
+	for _, rec := range []pidRecord{
+		{PID: me, Port: 54321, Command: "serve --port 54321", Started: processStart(me)},                 // a command that is not its own
+		{PID: me, Port: 54321, Command: strings.Join(os.Args, " "), Started: "Mon Jan  1 00:00:00 2001"}, // its own command, another start time
+		{PID: me, Port: 54321, Command: "", Started: processStart(me)},                                   // a record from before the command was kept
+		{PID: me, Port: 54321, Command: strings.Join(os.Args, " ")},                                      // no start time
+		{PID: 1, Port: 1, Command: "launchd", Started: "x"},                                              // never pid 1
+	} {
+		write(rec)
+		stopLeftOver(f) // must not signal this process
+		_, err := os.Stat(f)
+		assert.True(t, os.IsNotExist(err), "the record is dropped: %+v", rec)
+	}
+	assert.False(t, isRecordedServer(pidRecord{PID: 1 << 30, Command: "x", Started: "y"}), "no such process")
+}
+
+func TestALeftOverServerOfTheSameAgentIsStoppedByItsExactCommand(t *testing.T) {
+	cfg, _ := stubConfig(t)
+	first, err := Start(context.Background(), cfg, "agent-1")
+	require.NoError(t, err)
+	pid := first.cmd.Process.Pid
+	// a Coral that crashed: its record is there, its server is still running; the next Start for the same agent stops it, by that pid
+	second, err := Start(context.Background(), cfg, "agent-1")
+	require.NoError(t, err)
+	defer second.Stop()
+	select {
+	case <-first.done:
+	case <-time.After(5 * time.Second):
+		t.Fatalf("the left-over server (pid %d) was not stopped", pid)
+	}
+	assert.NotEqual(t, first.URL, second.URL)
+}
+
+func TestEachAgentHasItsOwnServerPasswordAndPort(t *testing.T) {
+	cfg, _ := stubConfig(t)
+	a, err := Start(context.Background(), cfg, "agent-1")
+	require.NoError(t, err)
+	defer a.Stop()
+	b, err := Start(context.Background(), cfg, "agent-2")
+	require.NoError(t, err)
+	defer b.Stop()
+	assert.NotEqual(t, a.URL, b.URL, "two ports")
+	assert.NotEqual(t, a.PasswordEnv(), b.PasswordEnv(), "two passwords")
+	pa, _ := a.PasswordFile()
+	pb, _ := b.PasswordFile()
+	assert.NotEqual(t, pa, pb)
+	cb, err := b.Client()
+	require.NoError(t, err)
+	_, _, err = cb.LastMessage(context.Background(), "ses_abc123")
+	require.NoError(t, err)
+	wrong, _ := New(b.URL, strings.TrimPrefix(a.PasswordEnv(), "OPENCODE_PASSWORD="))
+	_, err = wrong.Messages(context.Background(), "ses_abc123", MessagesOpts{})
+	assert.ErrorContains(t, err, "401", "one agent's password does not open another agent's server")
+	_, err = Start(context.Background(), cfg, "../agent")
+	assert.Error(t, err, "a key is a plain name")
+}
+
+func TestThePortIsOnlyTrustedWhenTheChildIsAliveAndAnswersAsItself(t *testing.T) {
+	cfg, _ := stubConfig(t)
+	// a stranger holds a port and answers 200 to everything, with no password at all
+	stranger := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { fmt.Fprint(w, `{"data":[]}`) }))
+	defer stranger.Close()
+	strangerPort, _ := strconv.Atoi(stranger.Listener.Addr().String()[strings.LastIndex(stranger.Listener.Addr().String(), ":")+1:])
+	ports := []int{strangerPort}
+	cfg.pickPort = func() (int, error) {
+		if len(ports) > 0 {
+			p := ports[0]
+			ports = ports[1:]
+			return p, nil
+		}
+		return freeLoopbackPort()
+	}
+	s, err := Start(context.Background(), cfg, "agent-1")
+	require.NoError(t, err, "the first port is the stranger's: its child cannot listen and exits, so the next port is tried")
+	defer s.Stop()
+	assert.NotContains(t, s.URL, strconv.Itoa(strangerPort))
+	c, _ := s.Client()
+	_, _, err = c.LastMessage(context.Background(), "ses_abc123")
+	assert.NoError(t, err, "and the server that is trusted is the one that was started")
+}
+
+func TestTheServersEnvironmentIsTheAgentsFilteredOneAndOnlyWhatOpencodeNeeds(t *testing.T) {
+	t.Setenv("CORAL_SESSION_TOKEN", "tok-of-the-agent-that-started-coral")
+	t.Setenv("CORAL_INITIAL_PASSWORD_FILE", "/tmp/pw")
+	t.Setenv("CORAL_URL", "http://127.0.0.1:8420")
+	t.Setenv("CORAL_SESSION_NAME", "claude-x")
+	cfg, envFile := stubConfig(t)
+	s, err := Start(context.Background(), cfg, "agent-1")
+	require.NoError(t, err)
+	defer s.Stop()
+	var seen map[string]string
+	raw, _ := os.ReadFile(envFile)
+	require.NoError(t, json.Unmarshal(raw, &seen))
+	for _, k := range []string{"CORAL_SESSION_TOKEN", "CORAL_INITIAL_PASSWORD_FILE", "CORAL_URL", "CORAL_SESSION_NAME"} {
+		assert.Equal(t, "", seen[k], k+" does not reach the server")
+	}
+	assert.NotEmpty(t, seen["HOME"], "the rest of the person's environment does (opencode needs its HOME and PATH)")
+}
+
+func TestThePrivateWriterRefusesALinkAndReplacesByRename(t *testing.T) {
+	dir := t.TempDir()
+	target := filepath.Join(dir, "secret-target")
+	require.NoError(t, os.WriteFile(target, []byte("keep"), 0o600))
+	p := filepath.Join(dir, "password")
+	require.NoError(t, os.Symlink(target, p)) // a link planted where the password goes
+	require.NoError(t, writePrivate(p, []byte("pw")), "a link at the final name is replaced by rename, never written through")
+	b, _ := os.ReadFile(target)
+	assert.Equal(t, "keep", string(b), "what the link pointed at is untouched")
+	b, _ = os.ReadFile(p)
+	assert.Equal(t, "pw", string(b))
+	info, _ := os.Lstat(p)
+	assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
+	assert.True(t, info.Mode().IsRegular())
+	// a planted temp name is not reused: the writer picks its own
+	entries, _ := os.ReadDir(dir)
+	for _, e := range entries {
+		assert.False(t, strings.HasSuffix(e.Name(), ".tmp"), "no temp file is left")
+	}
 }
 
 func TestThePasswordFileIsPrivateAndHoldsOnlyThePassword(t *testing.T) {
 	cfg, envFile := stubConfig(t)
-	s, err := Start(context.Background(), cfg)
+	s, err := Start(context.Background(), cfg, "agent-1")
 	require.NoError(t, err)
 	defer s.Stop()
 	p, err := s.PasswordFile()
 	require.NoError(t, err)
-	assert.Equal(t, filepath.Join(cfg.DataDir, "password"), p)
+	assert.Equal(t, filepath.Join(cfg.DataDir, "servers", "agent-1", "password"), p)
 	info, err := os.Stat(p)
 	require.NoError(t, err)
 	assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
