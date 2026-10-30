@@ -207,7 +207,7 @@ Commands:
                                Message another team's Orchestrator on this Coral
                                (Orchestrators and the Operator only; both boards
                                must allow it); "-" as the message reads it from stdin
-  send --address <server>/<team> [--reply-to <id>] [--message-id <id>]
+  send --address <computer>/<team> [--reply-to <id>] [--message-id <id>]
        [--attach coral://artifacts/<id> ...] "<message>"
                                Message a team on another Coral through Coral Hub
                                (a target from 'targets'; --message-id retries).
