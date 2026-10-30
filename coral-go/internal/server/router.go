@@ -390,9 +390,9 @@ func (s *Server) registerSessions(r *chi.Mux, h *routeHandlers) {
 
 	// Agent events
 	r.Get("/api/sessions/live/{name}/events", sessHandler.ListEvents)
-	r.Post("/api/sessions/live/{name}/events", sessHandler.CreateEvent)
-	r.Post("/api/sessions/live/{name}/turn-end", sessHandler.TurnEndHandoff)
-	r.Post("/api/sessions/live/{name}/pending-tool", sessHandler.SetPendingTool)
+	r.With(routes.RedactSignInLink).Post("/api/sessions/live/{name}/events", sessHandler.CreateEvent)
+	r.With(routes.RedactSignInLink).Post("/api/sessions/live/{name}/turn-end", sessHandler.TurnEndHandoff)
+	r.With(routes.RedactSignInLink).Post("/api/sessions/live/{name}/pending-tool", sessHandler.SetPendingTool)
 	r.Post("/api/sessions/live/{name}/answer-prompt", sessHandler.AnswerPrompt)
 	r.Get("/api/sessions/live/{name}/events/counts", sessHandler.EventCounts)
 	r.Delete("/api/sessions/live/{name}/events", sessHandler.ClearEvents)
@@ -481,9 +481,9 @@ func (s *Server) registerSystem(r *chi.Mux, h *routeHandlers) {
 	schedHandler, workflowHandler, themeHandler := h.sched, h.workflow, h.theme
 	// System / settings
 	r.Get("/api/settings", sysHandler.GetSettings)
-	r.Put("/api/settings", sysHandler.PutSettings)
+	r.With(routes.RefuseSignInLink).Put("/api/settings", sysHandler.PutSettings)
 	r.Get("/api/custom-models", sysHandler.GetCustomModels)
-	r.Put("/api/custom-models", sysHandler.PutCustomModels)
+	r.With(routes.RefuseSignInLink).Put("/api/custom-models", sysHandler.PutCustomModels)
 	r.Put("/api/settings/git-diff-mode", sysHandler.PutGitDiffMode)
 	r.Get("/api/system/privacy", sysHandler.GetPrivacyStatus)
 	// The models each agent CLI offers (#4065): the cached list, and the Operator's Refresh.
@@ -507,8 +507,8 @@ func (s *Server) registerSystem(r *chi.Mux, h *routeHandlers) {
 	r.Get("/api/filesystem/list", sysHandler.ListFilesystem)
 	r.Get("/api/filesystem/is-git", sysHandler.IsGitDir)
 	r.Post("/api/indexer/refresh", sysHandler.RefreshIndexer)
-	r.Post("/api/teams/import", sysHandler.ImportTeam)
-	r.Post("/api/teams/generate", sysHandler.GenerateTeam)
+	r.With(routes.RefuseSignInLink).Post("/api/teams/import", sysHandler.ImportTeam)
+	r.With(routes.RefuseSignInLink).Post("/api/teams/generate", sysHandler.GenerateTeam)
 	r.Get("/api/teams/generate/{jobId}", sysHandler.GenerateTeamStatus)
 
 	// Team persistence
@@ -533,7 +533,7 @@ func (s *Server) registerSystem(r *chi.Mux, h *routeHandlers) {
 	r.Get("/api/teams/detail/{name}/distill-knowledge", sessHandler.GetKnowledgeStatus)
 	r.Get("/api/teams/detail/{name}/knowledge", sessHandler.GetTeamKnowledge)
 	r.Get("/api/teams/detail/{name}/knowledge/{agentName}", sessHandler.GetAgentKnowledge)
-	r.Put("/api/teams/detail/{name}/knowledge/{agentName}", sessHandler.SaveAgentKnowledge)
+	r.With(routes.RefuseSignInLink).Put("/api/teams/detail/{name}/knowledge/{agentName}", sessHandler.SaveAgentKnowledge)
 
 	// Token usage
 	tokenHandler := routes.NewTokenUsageHandler(s.db)
@@ -548,7 +548,7 @@ func (s *Server) registerSystem(r *chi.Mux, h *routeHandlers) {
 
 	// Tags
 	r.Get("/api/tags", sysHandler.ListTags)
-	r.Post("/api/tags", sysHandler.CreateTag)
+	r.With(routes.RefuseSignInLink).Post("/api/tags", sysHandler.CreateTag)
 	r.Delete("/api/tags/{tagID}", sysHandler.DeleteTag)
 	r.With(routes.RefuseSignInLink).Post("/api/sessions/history/{sessionID}/tags", sysHandler.AddSessionTag)
 	r.Delete("/api/sessions/history/{sessionID}/tags/{tagID}", sysHandler.RemoveSessionTag)
@@ -556,7 +556,7 @@ func (s *Server) registerSystem(r *chi.Mux, h *routeHandlers) {
 	// Folder tags
 	r.Get("/api/folder-tags", sysHandler.GetAllFolderTags)
 	r.Get("/api/folder-tags/{folderName}", sysHandler.GetFolderTags)
-	r.Post("/api/folder-tags/{folderName}", sysHandler.AddFolderTag)
+	r.With(routes.RefuseSignInLink).Post("/api/folder-tags/{folderName}", sysHandler.AddFolderTag)
 	r.Delete("/api/folder-tags/{folderName}/{tagID}", sysHandler.RemoveFolderTag)
 	r.Get("/api/pinned-folders", sysHandler.ListPinnedFolders)
 	r.Post("/api/pinned-folders", sysHandler.PinFolder)
@@ -601,14 +601,14 @@ func (s *Server) registerSystem(r *chi.Mux, h *routeHandlers) {
 
 	// Workflows
 	r.Get("/api/workflows", workflowHandler.ListWorkflows)
-	r.Post("/api/workflows", workflowHandler.CreateWorkflow)
+	r.With(routes.RefuseSignInLink).Post("/api/workflows", workflowHandler.CreateWorkflow)
 	r.Get("/api/workflows/runs/recent", workflowHandler.ListRecentRuns)
 	r.Get("/api/workflows/by-name/{name}", workflowHandler.GetWorkflowByName)
-	r.Post("/api/workflows/by-name/{name}/trigger", workflowHandler.TriggerWorkflowByName)
+	r.With(routes.RefuseSignInLink).Post("/api/workflows/by-name/{name}/trigger", workflowHandler.TriggerWorkflowByName)
 	r.Get("/api/workflows/{workflowID}", workflowHandler.GetWorkflow)
-	r.Put("/api/workflows/{workflowID}", workflowHandler.UpdateWorkflow)
+	r.With(routes.RefuseSignInLink).Put("/api/workflows/{workflowID}", workflowHandler.UpdateWorkflow)
 	r.Delete("/api/workflows/{workflowID}", workflowHandler.DeleteWorkflow)
-	r.Post("/api/workflows/{workflowID}/trigger", workflowHandler.TriggerWorkflow)
+	r.With(routes.RefuseSignInLink).Post("/api/workflows/{workflowID}/trigger", workflowHandler.TriggerWorkflow)
 	r.Get("/api/workflows/{workflowID}/runs", workflowHandler.ListWorkflowRuns)
 	r.Get("/api/workflows/runs/{runID}", workflowHandler.GetWorkflowRun)
 	r.Post("/api/workflows/runs/{runID}/kill", workflowHandler.KillWorkflowRun)
@@ -646,9 +646,9 @@ func (s *Server) registerSystem(r *chi.Mux, h *routeHandlers) {
 	// Custom views
 	viewsHandler := routes.NewViewsHandler(s.db)
 	r.Get("/api/views", viewsHandler.ListViews)
-	r.Post("/api/views", viewsHandler.CreateView)
+	r.With(routes.RefuseSignInLink).Post("/api/views", viewsHandler.CreateView)
 	r.Get("/api/views/{id}", viewsHandler.GetView)
-	r.Put("/api/views/{id}", viewsHandler.UpdateView)
+	r.With(routes.RefuseSignInLink).Put("/api/views/{id}", viewsHandler.UpdateView)
 	r.Delete("/api/views/{id}", viewsHandler.DeleteView)
 
 	// Remote server registry (multi-server hub). Hub-local, never proxied.

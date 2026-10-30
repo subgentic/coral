@@ -63,6 +63,19 @@ var signInGuardedRoutes = []string{
 	"POST /api/artifacts/{id}/comments/{cid}/reply",
 	"PUT /api/agent/ui/{id}",
 	"POST /api/agent/ui-request",
+	"PUT /api/settings",
+	"PUT /api/custom-models",
+	"POST /api/teams/import",
+	"POST /api/teams/generate",
+	"PUT /api/teams/detail/{name}/knowledge/{agentName}",
+	"POST /api/tags",
+	"POST /api/folder-tags/{folderName}",
+	"POST /api/workflows",
+	"PUT /api/workflows/{workflowID}",
+	"POST /api/workflows/by-name/{name}/trigger",
+	"POST /api/workflows/{workflowID}/trigger",
+	"POST /api/views",
+	"PUT /api/views/{id}",
 	"POST /api/board/{project}/messages",
 	"POST /api/board/{project}/external-messages",
 	"POST /api/board/{project}/relay-messages",
@@ -118,7 +131,7 @@ func TestTheBoardRoutesRefuseASignInLinkFromAnyClient(t *testing.T) {
 		require.True(t, served[rt], "%s is not a served route", rt)
 		method, pattern, _ := strings.Cut(rt, " ")
 		path := strings.NewReplacer("{project}", "team", "{taskID}", "1", "{goalID}", "1", "{requestID}", "1", "{presetID}", "1", "{id}", "1",
-			"{subscriberID}", "Lead", "{groupID}", "1", "{name}", "agent-1", "{noteID}", "1", "{sessionID}", "s-1", "{jobID}", "1", "{cid}", "1").Replace(pattern)
+			"{subscriberID}", "Lead", "{groupID}", "1", "{name}", "agent-1", "{noteID}", "1", "{sessionID}", "s-1", "{jobID}", "1", "{cid}", "1", "{agentName}", "Lead", "{folderName}", "f", "{workflowID}", "1").Replace(pattern)
 		code, out, raw := do(method, path, tainted)
 		assert.Equal(t, http.StatusBadRequest, code, "%s: %s", rt, raw)
 		assert.Equal(t, "sign_in_link", out["code"], rt)
@@ -163,6 +176,19 @@ var writeRoutesWithoutTheGuard = map[string]string{
 	"POST /api/board/{project}/tasks/current":                          "ids only (subscriber_id)",
 	"POST /api/board/{project}/tasks/{taskID}/publish":                 "ids only (subscriber_id)",
 	"DELETE /api/agent/ui/{id}":                                        "a delete: no text is kept",
+	"DELETE /api/folder-tags/{folderName}/{tagID}":                     "a delete by id: no text is kept",
+	"DELETE /api/tags/{tagID}":                                         "a delete by id: no text is kept",
+	"DELETE /api/teams/detail/{name}":                                  "a delete: no text is kept",
+	"DELETE /api/upload/{name}":                                        "a delete by name: no text is kept",
+	"DELETE /api/views/{id}":                                           "a delete by id: no text is kept",
+	"DELETE /api/workflows/{workflowID}":                               "a delete by id: no text is kept",
+	"POST /api/teams/detail/{name}/distill-knowledge":                  "a control: the server writes the knowledge itself",
+	"POST /api/teams/detail/{name}/resurrect":                          "a control: no text is kept",
+	"POST /api/upload":                                                 "a file upload: its name is refused in the handler; its contents are the person's (#232 warns of files)",
+	"POST /api/workflows/runs/{runID}/kill":                            "ids only",
+	"POST /api/workflows/runs/{runID}/seen":                            "ids only",
+	"PUT /api/settings/git-diff-mode":                                  "one of a few fixed words",
+	"PUT /api/teams/detail/{name}/home-folder":                         "a folder's path on this computer, not text for others",
 	"POST /api/board/{project}/external-artifacts":                     "a received file: its metadata (the name) is checked in the handler, as JSON decoded and percent-decoded; its bytes are stored as sent (#232)",
 	"DELETE /api/artifacts/series/{series_id}":                         "a delete: no text is kept",
 	"DELETE /api/artifacts/{id}":                                       "a delete: no text is kept",
@@ -204,13 +230,11 @@ var writeRoutesWithoutTheGuard = map[string]string{
 	"POST /api/sessions/live/{name}/auto-accept/disable":               "a control: no text is kept",
 	"POST /api/sessions/live/{name}/auto-accept/enable":                "a control: no text is kept",
 	"POST /api/sessions/live/{name}/context-window":                    "a control: no text is kept",
-	"POST /api/sessions/live/{name}/events":                            "an agent's own hook reporting what its tools did: refusing it would lose the record; it is not posted for others",
 	"POST /api/sessions/live/{name}/files/refresh":                     "a control: no text is kept",
 	"POST /api/sessions/live/{name}/keys":                              "input typed into an agent's terminal: it goes to the agent, not kept for others to read",
 	"POST /api/sessions/live/{name}/kill":                              "a control: no text is kept",
 	"POST /api/sessions/live/{name}/model":                             "a model's name and level: no text for others",
 	"POST /api/sessions/live/{name}/open-in-editor":                    "a path opened on this computer: no text kept",
-	"POST /api/sessions/live/{name}/pending-tool":                      "an agent's own hook reporting what its tools did: refusing it would lose the record; it is not posted for others",
 	"POST /api/sessions/live/{name}/resize":                            "a control: no text is kept",
 	"POST /api/sessions/live/{name}/restart":                           "a control: no text is kept",
 	"POST /api/sessions/live/{name}/resume":                            "a control: no text is kept",
@@ -218,7 +242,6 @@ var writeRoutesWithoutTheGuard = map[string]string{
 	"POST /api/sessions/live/{name}/share-file":                        "a file's contents (code may quote the parameter): files are warned of on the client, not refused (#232)",
 	"POST /api/sessions/live/{name}/tasks/reorder":                     "ids only",
 	"POST /api/sessions/live/{name}/token-usage":                       "an agent's own hook reporting what its tools did: refusing it would lose the record; it is not posted for others",
-	"POST /api/sessions/live/{name}/turn-end":                          "an agent's own hook reporting what its tools did: refusing it would lose the record; it is not posted for others",
 	"POST /api/sessions/live/{name}/waiting/send":                      "input typed into an agent's terminal: it goes to the agent, not kept for others to read",
 	"POST /api/sessions/live/{sessionID}/archive":                      "a control: no text is kept",
 	"POST /api/sessions/live/{sessionID}/refresh-hooks":                "a control: no text is kept",
@@ -239,6 +262,7 @@ var writeRoutesWithoutTheGuard = map[string]string{
 func TestEveryWriteRouteIsGuardedOrSaysWhyNot(t *testing.T) {
 	srv, _, _ := strictServer(t, false)
 	guard := reflect.ValueOf(routes.RefuseSignInLink).Pointer()
+	redact := reflect.ValueOf(routes.RedactSignInLink).Pointer() // an agent's own hook reports: the link's value is replaced, the record kept
 	served := map[string]bool{}
 	require.NoError(t, chi.Walk(srv.Router(), func(method, route string, _ http.Handler, mws ...func(http.Handler) http.Handler) error {
 		switch method {
@@ -253,7 +277,7 @@ func TestEveryWriteRouteIsGuardedOrSaysWhyNot(t *testing.T) {
 		served[key] = true
 		guarded := false
 		for _, mw := range mws {
-			if reflect.ValueOf(mw).Pointer() == guard {
+			if pc := reflect.ValueOf(mw).Pointer(); pc == guard || pc == redact {
 				guarded = true
 			}
 		}
@@ -278,7 +302,8 @@ func TestEveryWriteRouteIsGuardedOrSaysWhyNot(t *testing.T) {
 
 // guardCensusCovers is which routes TestEveryWriteRouteIsGuardedOrSaysWhyNot looks at.
 func guardCensusCovers(route string) bool {
-	for _, p := range []string{"/api/board/", "/api/saved", "/api/tasks/", "/api/artifacts", "/api/agent/", "/api/sessions/", "/api/scheduled/"} {
+	for _, p := range []string{"/api/board/", "/api/saved", "/api/tasks/", "/api/artifacts", "/api/agent/", "/api/sessions/", "/api/scheduled/",
+		"/api/teams/", "/api/workflows", "/api/settings", "/api/tags", "/api/folder-tags", "/api/views", "/api/custom-models", "/api/upload"} {
 		if strings.HasPrefix(route, p) {
 			return true
 		}
