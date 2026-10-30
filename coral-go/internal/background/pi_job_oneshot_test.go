@@ -16,6 +16,7 @@ import (
 // #11293 (row 12): a scheduled job on Pi ran Pi interactive with its session kept and no --print, so Pi stayed open at its prompt and the run ended killed at its maximum duration. A Pi job
 // is one shot: `pi --print --no-session --no-approve ... <prompt>`, the job's prompt as the argument (not typed afterwards), so Pi answers and exits and the run ends with it.
 func TestAPiJobRunsOneShotWithItsPromptOnTheCommandLine(t *testing.T) {
+	cliStubsOnPath(t, "pi") // the launch refuses a CLI it cannot find (#353); the stub stands in for it
 	rt := &spawnRecorder{}
 	l := NewAgentLauncher(rt, store.NewSessionStore(setupTestDB(t)), 8450)
 	job := store.ScheduledJob{AgentType: at.Pi, Name: "nightly", RepoPath: t.TempDir(), Prompt: "summarize the open tasks"}
@@ -40,6 +41,7 @@ func TestOnlyPiJobsAreOneShot(t *testing.T) {
 }
 
 func TestAJobOnClaudeIsNotLaunchedOneShot(t *testing.T) {
+	cliStubsOnPath(t, "claude") // the launch refuses a CLI it cannot find (#353); the stub stands in for it
 	rt := &spawnRecorder{}
 	l := NewAgentLauncher(rt, store.NewSessionStore(setupTestDB(t)), 8450)
 	_, err := l.LaunchAgent(context.Background(), t.TempDir(), at.Claude, "job", "", nil, true, "p", "", "")
@@ -52,6 +54,7 @@ func TestAJobOnClaudeIsNotLaunchedOneShot(t *testing.T) {
 // Security's INFO on #11293: a one-shot job has its prompt on the command line and is not also typed it: Pi has exited (or is answering), and text typed into it would start a second turn. A Claude job
 // is, as the control that the harness sees typed input.
 func TestAOneShotJobIsNotAlsoTypedItsPrompt(t *testing.T) {
+	cliStubsOnPath(t, "pi", "claude") // the launch refuses a CLI it cannot find (#353); the stub stands in for it
 	old := promptInitialDelay
 	promptInitialDelay = 10 * time.Millisecond
 	t.Cleanup(func() { promptInitialDelay = old })

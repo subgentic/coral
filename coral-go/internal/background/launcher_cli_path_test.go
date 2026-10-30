@@ -37,6 +37,7 @@ func (s *spawnRecorder) SpawnAgent(_ context.Context, _, _, _, command string) e
 // Job and scheduled runs use Settings > CLI paths like a dashboard launch, not
 // whatever binary is first on PATH (#3205).
 func TestJobRunsUseTheConfiguredCLIPath(t *testing.T) {
+	cliStubsOnPath(t, "claude") // the launch refuses a CLI it cannot find (#353); the stub stands in for it
 	ctx := context.Background()
 	db := setupTestDB(t)
 	ss := store.NewSessionStore(db)
@@ -78,6 +79,7 @@ func TestLaunchAgentValidatesAgentType(t *testing.T) {
 // is Claude, defaulted before the log path is built, so the launch still gets its log under the
 // log folder (naming.LogFile refuses an empty type).
 func TestLaunchAgentWithNoTypeStillGetsItsLog(t *testing.T) {
+	cliStubsOnPath(t, "claude") // the launch refuses a CLI it cannot find (#353); the stub stands in for it
 	logs := t.TempDir()
 	naming.SetDefaultLogDir(logs)
 	t.Cleanup(func() { naming.SetDefaultLogDir("") })
@@ -122,6 +124,7 @@ func (*taggingRecorder) TagsRuns() bool { return true }
 // #6770 (#6767 point 4): a scheduled agent on tmux carries the run tag a dashboard launch does, and it is recorded on its live row, where a Kill finds it by session id; the built-in terminal tags its own
 // processes, so nothing is exported there.
 func TestScheduledAgentsCarryARunTagOnTmuxOnly(t *testing.T) {
+	cliStubsOnPath(t, "claude") // the launch refuses a CLI it cannot find (#353); the stub stands in for it
 	ctx := context.Background()
 	db := setupTestDB(t)
 	ss := store.NewSessionStore(db)

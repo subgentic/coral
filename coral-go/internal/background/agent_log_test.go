@@ -21,6 +21,7 @@ import (
 // #3601 (weak site W17, Security's SHOULD-1): a job or scheduled run's agent log is created
 // 0600 like every other agent's, through the same safe writer.
 func TestJobRunLogIsPrivate(t *testing.T) {
+	cliStubsOnPath(t, "claude") // the launch refuses a CLI it cannot find (#353); the stub stands in for it
 	logs := t.TempDir()
 	naming.SetDefaultLogDir(logs)
 	t.Cleanup(func() { naming.SetDefaultLogDir("") }) // unset again: it follows the temp dir
