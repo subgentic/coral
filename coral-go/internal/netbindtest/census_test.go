@@ -16,8 +16,12 @@ import (
 // opens a listening socket in a _test.go file is read: a Unix socket, or an address literal that starts with 127., [::1], ::1 or localhost,
 // is loopback; any other call (a wildcard, a network address, a host taken from a variable) is "open", and its file must import this
 // package, or be named in loopbackByConstruction with the reason its address is loopback.
+//
+// This is a guard against an accident, not a proof: it reads the calls a test file makes, so a production helper that listens (listenAll, say,
+// called with a Config) is seen only as the call, not as what the helper binds.
 var listenCalls = map[string]int{ // the function names that listen, and the position of the address argument
 	"Listen": -1, "ListenTCP": -1, "ListenUDP": -1, "ListenPacket": -1, "ListenIP": -1, "listenTCP": 0, "listenAll": -2,
+	"ListenAndServe": 0, "ListenAndServeTLS": 0,
 }
 
 // loopbackByConstruction: files whose open listens are on an address that is loopback by how the test makes it.
@@ -129,6 +133,11 @@ func TestATestListensOnlyOnLoopbackUnlessItAsksFirst(t *testing.T) {
 func loopbackCall(call *ast.CallExpr, name string, pos int) bool {
 	if name == "listenAll" {
 		return false // takes a Config: its Host decides
+	}
+	// http.ListenAndServe(addr, handler) and http.ListenAndServeTLS(addr, cert, key, handler) name the address; the methods of an http.Server
+	// (no arguments, or cert and key) take it from the server's Addr, which is not read here: open.
+	if name == "ListenAndServe" && len(call.Args) != 2 || name == "ListenAndServeTLS" && len(call.Args) != 4 {
+		return false
 	}
 	if len(call.Args) > 0 {
 		if lit, ok := call.Args[0].(*ast.BasicLit); ok && lit.Kind == token.STRING {
