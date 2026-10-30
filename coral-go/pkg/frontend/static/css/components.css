@@ -3541,6 +3541,8 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 .launch-dir-recents:empty { display: none; }
 .launch-dir-recent { margin: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .launch-dir-hint { margin: 0 0 8px; }
+.launch-team-instead { margin: 8px 0 0; } /* the way to a team from the agent's first step (#11289): a link in the accent text colour, not a grey word */
+.launch-team-instead .btn { padding-inline: 0; color: var(--link-text); text-decoration: underline; background: transparent; }
 @media (pointer: coarse), (max-width: 767px) { .launch-dir-recent { min-height: var(--control-touch-height, 44px); } }
 
 .modal-header .sd-sub { margin: .15rem 0 0; color: var(--text-secondary); font-size: var(--fs-md); font-weight: var(--fw-regular); }

@@ -116,6 +116,14 @@ document.addEventListener("keydown", (e) => {
         // Find topmost visible modal and close only that one
         for (const modal of modalsTopFirst()) {
             if (modal.style.display !== 'none' && modal.getClientRects().length > 0) {
+                // A folder picker open inside the dialog is closed alone (#11289): Escape in Browse threw the whole wizard, and the folder typed so far, away
+                const picker = [...modal.querySelectorAll('.dir-browser')].find(p => p.style.display !== 'none' && p.getClientRects().length > 0);
+                if (picker) {
+                    picker.style.display = 'none'; // display-ok: the picker is shown and hidden by its inline display (browser.js toggleBrowser)
+                    modal.querySelector(`[data-browser~="${CSS.escape(picker.id)}"]`)?.focus();
+                    e.preventDefault();
+                    return;
+                }
                 hideDialog(modal);
                 e.preventDefault();
                 return;

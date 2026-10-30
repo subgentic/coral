@@ -40,6 +40,7 @@ function _launchStage(arg) {
     }
     const list = document.getElementById('dir-browser'); if (list) list.style.display = 'none'; // display-ok: the folder list is shown and hidden by style.display where it is opened (browser.js)
     const sub = setLaunchStage(to);
+    if (to === 'persona' && !launch.member) suggestAgentName(document.getElementById('launch-agent-name-input')); // a role-like name, not the folder's (#11289)
     syncRecap(); _syncLaunchBlock();
     const live = document.getElementById('launch-stage-live');
     if (live) live.textContent = sub || '';
@@ -48,6 +49,30 @@ function _launchStage(arg) {
     first?.focus();
 }
 window._launchStage = _launchStage;
+
+/** Enter in a single-line field of a wizard step is that step's primary button: Next, and Launch on the last step (#11289; a form's Enter). Not in a multi-line field, a select, a button or the folder picker; not with a modifier; and not when the field's own Enter (the folder's) has already acted. */
+export function wireEnterAdvances(step) {
+    if (!step || step.dataset.enterWired) return;
+    step.dataset.enterWired = '1';
+    step.addEventListener('keydown', e => {
+        if (e.key !== 'Enter' || e.defaultPrevented || e.isComposing || e.shiftKey || e.ctrlKey || e.metaKey || e.altKey) return;
+        const t = e.target;
+        if (!(t instanceof HTMLInputElement) || !/^(text|search|number|url|email|tel|password)$/.test(t.type) || t.closest('.dir-browser, [role="listbox"], [role="combobox"]')) return;
+        const go = [...step.querySelectorAll('.modal-actions .btn-primary')].find(b => !b.hidden && b.getClientRects().length > 0);
+        if (!go) return;
+        e.preventDefault();
+        if (!go.disabled) go.click();
+    });
+}
+
+/** A suggested role-like name for an agent whose name is left empty: Agent 1, Agent 2 (the next number not taken by a live agent), so a folder's agents are told apart and the folder stays the context line (#11289). */
+export function suggestAgentName(input) {
+    if (!input || input.value.trim() || input.dataset.suggestWired === 'off') return;
+    const taken = new Set((state.liveSessions || []).map(x => String(x.display_name || x.name || '').trim().toLowerCase()));
+    let n = 1; while (taken.has(`agent ${n}`)) n++;
+    input.value = `Agent ${n}`; input.dataset.suggested = '1';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+}
 
 function _selectLaunchType(type) {
     if (type === "back" && launch.member) { window.cancelTeamMember?.(); return; } // the arrow on a member goes back to the team form (#7861)
@@ -59,6 +84,8 @@ function _selectLaunchType(type) {
     }
     launch.mode = type;
     if (type === "agent") setLaunchMore(false); // New Agent always opens on step 1, the folder (#7391)
+    wireEnterAdvances(document.getElementById('launch-step-agent')); wireEnterAdvances(document.getElementById('launch-step-team')); // Enter in a single-line field is Next, and Launch on the last step (#11289)
+    { const ti = document.getElementById('launch-team-instead'); if (ti) ti.hidden = !!(launch.member || launch.addTo); } // the way to a team from the agent's first step: not for a team's own member or an agent added to a team
     _showLaunchStep(type);
     if (type === "agent") {
         if (!launch.addTo && !launch.member) { // New Agent: its own title and no team (Add agent and a member set both below, #7778, #7861)
