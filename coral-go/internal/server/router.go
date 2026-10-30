@@ -622,10 +622,10 @@ func (s *Server) registerSystem(r *chi.Mux, h *routeHandlers) {
 	r.Get("/api/themes", themeHandler.ListThemes)
 	r.Get("/api/themes/variables", themeHandler.GetThemeVariables)
 	r.Get("/api/themes/{name}", themeHandler.GetTheme)
-	r.Put("/api/themes/{name}", themeHandler.SaveTheme)
+	r.With(routes.RefuseSignInLink).Put("/api/themes/{name}", themeHandler.SaveTheme)
 	r.Delete("/api/themes/{name}", themeHandler.DeleteTheme)
-	r.Post("/api/themes/import", themeHandler.ImportTheme)
-	r.Post("/api/themes/generate", themeHandler.GenerateTheme)
+	r.With(routes.RefuseSignInLink).Post("/api/themes/import", themeHandler.ImportTheme)
+	r.With(routes.RefuseSignInLink).Post("/api/themes/generate", themeHandler.GenerateTheme)
 
 	// Templates
 	tmplHandler := routes.NewTemplatesHandler()

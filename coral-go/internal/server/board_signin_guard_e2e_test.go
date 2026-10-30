@@ -63,6 +63,9 @@ var signInGuardedRoutes = []string{
 	"POST /api/artifacts/{id}/comments/{cid}/reply",
 	"PUT /api/agent/ui/{id}",
 	"POST /api/agent/ui-request",
+	"PUT /api/themes/{name}",
+	"POST /api/themes/import",
+	"POST /api/themes/generate",
 	"PUT /api/settings",
 	"PUT /api/custom-models",
 	"POST /api/teams/import",
@@ -176,6 +179,10 @@ var writeRoutesWithoutTheGuard = map[string]string{
 	"POST /api/board/{project}/tasks/current":                          "ids only (subscriber_id)",
 	"POST /api/board/{project}/tasks/{taskID}/publish":                 "ids only (subscriber_id)",
 	"DELETE /api/agent/ui/{id}":                                        "a delete: no text is kept",
+	"DELETE /api/pinned-folders":                                       "a delete: no text is kept",
+	"DELETE /api/themes/{name}":                                        "a delete by name: no text is kept",
+	"POST /api/pinned-folders":                                         "a folder's path on this computer, not text for others",
+	"PUT /api/system/hub-operator":                                     "a switch (disabled: yes or no): no text",
 	"DELETE /api/folder-tags/{folderName}/{tagID}":                     "a delete by id: no text is kept",
 	"DELETE /api/tags/{tagID}":                                         "a delete by id: no text is kept",
 	"DELETE /api/teams/detail/{name}":                                  "a delete: no text is kept",
@@ -314,7 +321,8 @@ func TestEveryWriteRouteIsGuardedOrSaysWhyNot(t *testing.T) {
 // guardCensusCovers is which routes TestEveryWriteRouteIsGuardedOrSaysWhyNot looks at.
 func guardCensusCovers(route string) bool {
 	for _, p := range []string{"/api/board/", "/api/saved", "/api/tasks/", "/api/artifacts", "/api/agent/", "/api/sessions/", "/api/scheduled/",
-		"/api/teams/", "/api/workflows", "/api/settings", "/api/tags", "/api/folder-tags", "/api/views", "/api/custom-models", "/api/upload"} {
+		"/api/teams/", "/api/workflows", "/api/settings", "/api/tags", "/api/folder-tags", "/api/views", "/api/custom-models", "/api/upload",
+		"/api/themes", "/api/pinned-folders", "/api/system/hub-operator"} {
 		if strings.HasPrefix(route, p) {
 			return true
 		}
