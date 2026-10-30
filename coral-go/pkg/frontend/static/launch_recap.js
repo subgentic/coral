@@ -27,18 +27,22 @@ function recapParts() {
     };
 }
 
+/** A long folder on a phone (under 600 px) is cut in the middle, its ends kept, so the summary above Launch stays two or three lines at 320 px (#11235); its whole path is the hover. */
+const PHONE_PATH_MAX = 26;
+const shortPath = p => (typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(max-width: 599px)').matches && p.length > PHONE_PATH_MAX) ? `${p.slice(0, 10)}\u2026${p.slice(-(PHONE_PATH_MAX - 11))}` : p;
+
 /** Put the recap right for what the form holds now (the nodes are replaced only when the words changed). */
 export function syncRecap() {
     const el = document.getElementById('launch-recap'), p = recapParts();
     if (!el || !p) return;
-    const text = `${p.name ? p.name + ': ' : ''}${p.provider}, ${p.folder}, ${p.model}${p.mode ? ', ' + p.mode + ' mode' : ''}`;
+    const folder = shortPath(p.folder), text = `${p.name ? p.name + ': ' : ''}${p.provider}, ${folder}, ${p.model}${p.mode ? ', ' + p.mode + ' mode' : ''}`;
     const note = !p.mode || !p.modeNote ? '' : p.modeNote === PI_NO_PERMISSIONS.replace(/\.$/, '') ? PI_NO_PERMISSIONS : `${p.mode} mode allows: ${p.modeNote.charAt(0).toLowerCase() + p.modeNote.slice(1)}.`; // Pi has no modes to allow: its sentence stands alone
     if (el.dataset.recap === text + note) return;
     el.dataset.recap = text + note;
     const b = s => { const e = document.createElement('b'); e.textContent = s; return e; };
     const dash = /isolated/i.test(note) ? note.indexOf(' \u2014 ') : -1; // a mode that is only safe somewhere (Bypass: "...isolated containers and VMs only") keeps its warning in two words: the whole sentence is its hover
     const line = note ? [Object.assign(document.createElement('span'), { className: 'launch-recap-note', textContent: dash > 0 ? `\u26a0 ${note.slice(dash + 3).charAt(0).toUpperCase()}${note.slice(dash + 4)}` : note, title: dash > 0 ? note : '' })] : [];
-    el.replaceChildren(...(p.name ? [b(p.name), ': '] : []), b(p.provider), ', ', b(p.folder), `, ${p.model}`, ...(p.mode ? [', ', b(p.mode), ' mode'] : []), ...line);
+    el.replaceChildren(...(p.name ? [b(p.name), ': '] : []), b(p.provider), ', ', Object.assign(b(folder), { title: folder === p.folder ? '' : p.folder }), `, ${p.model}`, ...(p.mode ? [', ', b(p.mode), ' mode'] : []), ...line);
 }
 
 /** Follow the form once: any change in it, in the folder or the name, and the model default arriving after it was drawn. */

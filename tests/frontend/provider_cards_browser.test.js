@@ -23,12 +23,13 @@ const { install: installNA, N, stubModels } = require('./helpers/new_agent');
         window.fetch = (u, o = {}) => { const url = new URL(String(u), location.origin);
             if (url.pathname === '/api/settings' && (!o.method || o.method === 'GET')) return R(u, o).then(async r => { const d = await r.json(); d.settings = { ...(d.settings || {}), default_model_claude: 'claude-big' }; return new Response(JSON.stringify(d), { status: 200, headers: { 'content-type': 'application/json' } }); });
             if (${JSON.stringify(!!agyHasNoLevels)} && url.pathname.startsWith('/api/agents/models') && url.searchParams.get('type') === 'agy') return Promise.resolve(new Response(JSON.stringify({ agent_type: 'agy', fetched_at: '2026-10-25T00:00:00Z', refreshing: false, source: 'account', models: [{ value: 'agy-big', display_name: 'agy Big' }], thinking: [] }), { status: 200, headers: { 'content-type': 'application/json' } }));
+            if (url.pathname.startsWith('/api/agents/models') && url.searchParams.get('type') === 'pi') return Promise.resolve(new Response(JSON.stringify({ agent_type: 'pi', fetched_at: '2026-10-25T00:00:00Z', refreshing: false, source: 'account', models: [{ value: 'pi-big', display_name: 'pi Big', efforts: ['off', 'minimal', 'low', 'medium'] }], thinking: ['off', 'minimal', 'low', 'medium'] }), { status: 200, headers: { 'content-type': 'application/json' } }));
             return R(u, o); };
         return true; })()`).then(() => require('./helpers/new_agent').stubCliChecks(ev, missing));
-    const open = async (w, h, mobile, theme, missing, agyNoLevels) => {
+    const open = async (w, h, mobile, theme, missing, agyNoLevels, fontPx) => {
         await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`); await installNA(ev);
-        await ev(`document.documentElement.setAttribute('data-theme', ${JSON.stringify(theme)}); true`);
+        await ev(`document.documentElement.setAttribute('data-theme', ${JSON.stringify(theme)}); ${fontPx ? `document.documentElement.style.setProperty('font-size', '${fontPx}px', 'important');` : ''} true`);
         await stubModels(ev); await stub(missing, agyNoLevels);
         await ev(`(async () => { await window.showLaunchModal(); const c = document.querySelector('#launch-step-chooser [data-arg="agent"]'); if (c && c.getClientRects().length) c.click(); return true; })()`);
         await waitFor(`!!document.getElementById('launch-dir') && document.getElementById('launch-dir').getClientRects().length > 0`, 'the folder step', 8000);
@@ -57,6 +58,14 @@ const { install: installNA, N, stubModels } = require('./helpers/new_agent');
             check(d.cards.slice(1).every(c => !c.hasModel && !c.hasThinking), `${tag}: a closed card holds no Model or Thinking`);
             check(d.heading === 'Not installed' && d.missing.length === 1 && d.missing[0].name === 'Antigravity' && !d.missing[0].radio && /^Install Antigravity$/.test(d.missing[0].link), `${tag}: Antigravity is under Not installed with an Install link and no radio: ${JSON.stringify([d.heading, d.missing])}`);
             check(d.optional === 0, `${tag}: nothing in the step says optional (${d.optional})`);
+            // the muted text inside the open card holds 4.5:1 (it was 4.4 on a grey fill in the light theme)
+            const lows = await ev(`(() => { const cv = document.createElement('canvas').getContext('2d'); const rgba = c => { cv.clearRect(0, 0, 1, 1); cv.fillStyle = '#000'; cv.fillStyle = c; cv.fillRect(0, 0, 1, 1); const d = cv.getImageData(0, 0, 1, 1).data; return [d[0], d[1], d[2], d[3] / 255]; };
+                const lum = ([r, g, b]) => { const f = v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }; return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
+                const bgOf = e => { const layers = []; for (let n = e; n; n = n.parentElement) { const c = rgba(getComputedStyle(n).backgroundColor); if (c[3] > 0) { layers.push(c); if (c[3] >= 1) break; } } let base = [255, 255, 255]; for (let i = layers.length - 1; i >= 0; i--) { const [r, g, b, a] = layers[i]; base = [r * a + base[0] * (1 - a), g * a + base[1] * (1 - a), b * a + base[2] * (1 - a)]; } return base; };
+                const open = document.querySelector('#launch-agent-pick .provider-card.is-open'); const out = [];
+                for (const e of open.querySelectorAll('.provider-status, .sv-label, .provider-name, .provider-no-thinking, .acf-model-note')) { if (!e.getClientRects().length || !e.textContent.trim()) continue; const fg = rgba(getComputedStyle(e).color), bg = bgOf(e), f = [0, 1, 2].map(i => fg[i] * fg[3] + bg[i] * (1 - fg[3])), a = lum(f), b = lum(bg), r = (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05); if (r < 4.5) out.push([e.className.toString().split(' ')[0], +r.toFixed(2)]); }
+                return out; })()`);
+            check(lows.length === 0, `${tag}: text in the open card is under 4.5:1: ${JSON.stringify(lows)}`);
 
             // the mouse: a card chosen by a click shows the open state, not a focus ring; the keyboard shows the ring
             const headBox = type => ev(`(() => { const r = document.querySelector('#launch-agent-pick .provider-card[data-type="${type}"] .provider-card-head').getBoundingClientRect(); return { x: Math.round(r.left + 60), y: Math.round(r.top + r.height / 2) }; })()`);
@@ -88,6 +97,20 @@ const { install: installNA, N, stubModels } = require('./helpers/new_agent');
                 check(m.launchShown && m.launchBottom <= m.vh, `${tag}: Launch stays on the screen (bottom ${m.launchBottom} of ${m.vh})`);
                 check(!m.sideways, `${tag}: nothing scrolls sideways (the Thinking strip wraps)`);
             }
+        }
+        // 320 px at 200% text (Mobile Beta Tester's #11311): the open card is whole on the screen, its status wraps under the name, the Model select is in view, a long folder is cut in the middle in the summary, and Pi's Off is capitalised
+        for (const theme of ['dark', 'light']) {
+            const tag = `320px 200% ${theme}`;
+            await Emulation.setDeviceMetricsOverride({ width: 320, height: 700, deviceScaleFactor: 1, mobile: true });
+            await open(320, 700, true, theme, ['agy'], false, 32);
+            await ev(`(() => { const i = document.getElementById('launch-dir'); i.value = '/home/someone/projects/a-rather-long-folder-name/and/more/of/it'; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`); await settle(300);
+            const g = await ev(`(() => { const vis = e => e && e.getClientRects().length > 0, r = e => e.getBoundingClientRect(); const c = document.querySelector('#launch-agent-pick .provider-card.is-open'), cr = r(c), st = c.querySelector('.provider-status'), nm = c.querySelector('.provider-name'), sel = c.querySelector('.acf-model-select'), rc = document.getElementById('launch-recap');
+                return { rect: [Math.round(cr.left), Math.round(cr.right), innerWidth], cardOk: cr.left >= 0 && cr.right <= innerWidth + 1, statusIn: r(st).right <= cr.right + 1 && r(st).left >= cr.left - 1, statusBelow: r(st).top >= r(nm).bottom - 1 || r(st).left >= r(nm).right - 1, modelIn: vis(sel) && r(sel).right <= cr.right + 1 && r(sel).left >= cr.left - 1, sideways: document.documentElement.scrollWidth > innerWidth + 1, recapLines: Math.round(rc.getBoundingClientRect().height / parseFloat(getComputedStyle(rc).lineHeight || 20)), recap: rc.textContent, recapTitle: (rc.querySelector('b[title]') || {}).title || '' }; })()`);
+            check(g.cardOk && g.statusIn && g.modelIn && !g.sideways, `${tag}: the open card is whole on the screen with its status and Model inside it: ${JSON.stringify(g)}`);
+            check(/\u2026/.test(g.recap) && g.recapTitle.includes('a-rather-long-folder-name') && g.recapLines <= 4, `${tag}: a long folder is cut in the middle in the summary, the whole path is its hover: ${JSON.stringify([g.recapLines, g.recap, g.recapTitle])}`);
+            await ev(`document.querySelector('#launch-agent-pick input[value="pi"]').click(); true`); await settle(500);
+            const lv = await ev(`[...document.querySelectorAll('#launch-agent-pick .provider-card.is-open select.acf-thinking option')].map(o => o.textContent.trim())`);
+            check(lv.includes('Off') && !lv.includes('off'), `${tag}: Pi's Thinking says Off, capitalised like the others: ${JSON.stringify(lv)}`);
         }
         // a provider with no thinking levels says so, and a narrow phone has the select for Thinking
         await open(1440, 900, false, 'light', [], true);

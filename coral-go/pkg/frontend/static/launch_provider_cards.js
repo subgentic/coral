@@ -11,6 +11,7 @@ const { CLI_INSTALL_INSTRUCTIONS } = await importOnce('./cli_check.js');
 
 const TYPES = [['claude', 'Claude'], ['codex', 'Codex'], ['agy', 'Antigravity'], ['pi', 'Pi']];
 const ALIAS = { gemini: 'agy', antigravity: 'agy' };
+const MARKS = { claude: 'C', codex: 'X', agy: 'A', pi: 'P' }; // the badge letters of the mockup: Codex is X, Antigravity A, so no two badges are the same
 const PROBE_MS = 1500;
 
 /** What the server says of that agent's CLI: { found: true|false|null (could not say), url }. */
@@ -80,7 +81,7 @@ export async function buildProviderCards({ group, form, server, implicitDefault 
             const input = el('input'); input.type = 'radio'; input.name = `${group.id}-radios`; input.value = type;
             input.addEventListener('change', () => { if (!input.checked) return; chosen = true; select.value = type; select.dispatchEvent(new Event('change', { bubbles: true })); });
             input.setAttribute('aria-label', label); // the name is the provider's; its status is the description
-            const mark = el('span', 'provider-mark', label[0]); mark.setAttribute('aria-hidden', 'true');
+            const mark = el('span', 'provider-mark', MARKS[type] || label[0]); mark.setAttribute('aria-hidden', 'true');
             const st = el('span', 'provider-status', statusOf(type)); st.id = `${group.id}-st-${type}`;
             head.append(input, mark, el('span', 'provider-name', label), st);
             const body = el('div', 'provider-card-body'); body.hidden = true;
@@ -94,7 +95,7 @@ export async function buildProviderCards({ group, form, server, implicitDefault 
             sec.append(h);
             for (const [type, label] of missing) {
                 const row = el('div', 'provider-card provider-missing-entry is-missing'); row.dataset.type = type;
-                const mark = el('span', 'provider-mark', label[0]); mark.setAttribute('aria-hidden', 'true');
+                const mark = el('span', 'provider-mark', MARKS[type] || label[0]); mark.setAttribute('aria-hidden', 'true');
                 const info = CLI_INSTALL_INSTRUCTIONS[type] || {};
                 const a = el('a', 'provider-install', `Install ${label}`); a.href = state.get(type).url || info.url || '#'; a.target = '_blank'; a.rel = 'noopener noreferrer';
                 row.append(mark, el('span', 'provider-name', label), a);

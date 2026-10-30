@@ -20,7 +20,7 @@ const SOURCE = `(() => {
     // The dialog's visible panel: role=dialog may be a full-screen backdrop that holds the panel (.modal-content), so the panel is measured, not the backdrop.
     const panel = () => { const d = dialog(); if (!d) return null; const r = d.getBoundingClientRect(); const full = r.width >= innerWidth - 1 && r.height >= innerHeight - 1; const c = full ? [...d.children].find(e => vis(e) && e.getBoundingClientRect().width > 100) : null; return c || d; };
     // A choice of a radiogroup: a role=radio button or a native radio input; checked by aria-checked or the input's own state.
-    const radios = g => [...g.querySelectorAll('[role=radio], input[type=radio]')];
+    const radios = g => [...g.querySelectorAll('[role=radio], input[type=radio]')].filter(r => r.closest('[role=radiogroup]') === g); // a group's own radios: the Provider cards hold the open card's Thinking group, whose radios are not the providers (#11235)
     const isChecked = r => r.getAttribute('aria-checked') === 'true' || (r.type === 'radio' && r.checked);
     const radioName = r => { const n = name(r); if (n) return n; const l = r.closest('label'); return l ? text(l) : ''; };
     const box = e => { if (!e) return null; const r = e.getBoundingClientRect(); return { x: Math.round(r.left * 10) / 10, y: Math.round(r.top * 10) / 10, w: Math.round(r.width * 10) / 10, h: Math.round(r.height * 10) / 10 }; };

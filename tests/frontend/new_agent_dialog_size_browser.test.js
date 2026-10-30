@@ -50,7 +50,7 @@ const VIEWS = [['1280x800', 1280, 800, false, false], ['390x844', 390, 844, true
                 assert.ok(launch.y + launch.h <= h + 1, `the footer is on screen (Launch bottom ${launch.y + launch.h} of ${h})`);
                 assert.ok(await ev(`document.documentElement.scrollWidth <= innerWidth + 1`), 'no sideways scroll');
             });
-            await S.run(`${label}: choosing each provider moves nothing: not the dialog, not Model, not Thinking, and the note goes in a reserved polite slot`, async () => {
+            await S.run(`${label}: choosing each provider moves only the cards' area: not the dialog, not the footer with Launch, and the note goes in a reserved polite slot (#11235: the open card holds Model and Thinking, so they move with it)`, async () => {
                 await section('Agent');
                 const names = await ev(`(() => { const g = [...window.__na.dialog().querySelectorAll('[role=radiogroup]')].find(e => ${N.provider}.test(window.__na.name(e))); return g ? window.__na.radios(g).map(r => window.__na.radioName(r)) : null; })()`);
                 assert.ok(names && names.length >= 3, `Provider is a radiogroup of the providers (found ${JSON.stringify(names)})`);
@@ -65,7 +65,9 @@ const VIEWS = [['1280x800', 1280, 800, false, false], ['390x844', 390, 844, true
                         await settle(300);
                         const p = await probe(); same(first.dialog, p.dialog, `provider ${n} (CLI ${cli}): dialog`);
                         slotMin = Math.min(slotMin, await ev(`document.getElementById('launch-note-slot').offsetHeight`));
-                        for (const k of ['model', 'thinking', 'launch']) { assert.ok(p[k], `provider ${n} (CLI ${cli}): ${k} is shown`); for (const c of ['x', 'y', 'w', 'h']) assert.ok(Math.abs(first[k][c] - p[k][c]) <= 0.5, `provider ${n} (CLI ${cli}): ${k} ${c} moved from ${first[k][c]} to ${p[k][c]}`); } // Provider, Model, Thinking and Launch never move, at any width: the notes have their room at the end of the pane, under Thinking (#8528, the operator's no-shift rule #8497)
+                        // the design decision of Option B (#11235, the Operator's pick): the open card holds Model and Thinking, so they move with the card the person chose; the dialog, the footer and Launch never move, at any width
+                        for (const k of cli === 'found' ? ['model', 'thinking', 'launch'] : ['launch']) assert.ok(p[k], `provider ${n} (CLI ${cli}): ${k} is shown`); // a provider whose CLI is missing is under Not installed: it has no card, so no Model or Thinking, and Launch is held by the blocker
+                        for (const c of ['x', 'y', 'w', 'h']) assert.ok(Math.abs(first.launch[c] - p.launch[c]) <= 0.5, `provider ${n} (CLI ${cli}): launch ${c} moved from ${first.launch[c]} to ${p.launch[c]}`);
                     }
                 }
                 if (mobile) assert.ok(slotMin <= 24, `on a phone an empty notes slot takes no room (the smallest slot seen was ${slotMin}px tall)`);
