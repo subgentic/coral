@@ -3,6 +3,7 @@
 package main
 
 import (
+	"runtime"
 	"syscall"
 	"testing"
 	"unsafe"
@@ -24,11 +25,16 @@ func TestExeCarriesTheAppIcon(t *testing.T) {
 }
 
 func TestSetWindowIconGivesTheWindowBothSizes(t *testing.T) {
+	// A window belongs to the OS thread that created it, and SendMessageW from any other thread waits until that
+	// thread reads its messages, which a test thread never does: the goroutine must stay on one thread from
+	// CreateWindowExW to DestroyWindow, or a move between threads hangs the test until the package times out.
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
 	user32 := windows.NewLazySystemDLL("user32.dll")
 	class, _ := syscall.UTF16PtrFromString("STATIC")
 	hwnd, _, err := user32.NewProc("CreateWindowExW").Call(0, uintptr(unsafe.Pointer(class)), 0, 0, 0, 0, 10, 10, 0, 0, 0, 0)
 	require.NotZero(t, hwnd, "CreateWindowEx: %v", err)
-	t.Cleanup(func() { user32.NewProc("DestroyWindow").Call(hwnd) })
+	defer user32.NewProc("DestroyWindow").Call(hwnd) // on the creating thread: before the deferred unlock, unlike a t.Cleanup
 
 	const wmGetIcon = 0x007F
 	get := func(kind uintptr) uintptr {
