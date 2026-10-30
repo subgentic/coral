@@ -42,8 +42,9 @@ func TestCheckDataPathIsInertOutsideTests(t *testing.T) {
 	if len(protectedDirs()) == 0 {
 		t.Skip("no home directory to protect")
 	}
+	was := enabled
 	enabled = func() bool { return false }
-	t.Cleanup(func() { enabled = testing.Testing })
+	t.Cleanup(func() { enabled = was }) // what it was, not a guess at it: the guard is InTestRun (TestTheGuardIsOnOnlyInARunningTestBinary)
 	CheckDataPath(protectedDirs()[0])
 }
 
