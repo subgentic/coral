@@ -102,7 +102,7 @@ const TEAM = `qa-next-steps-${Date.now() % 100000}`;
         n0 = await sn();
         check(n0 && n0.shown && /Pi isn't signed in to any provider on this computer\./.test(n0.text), `Pi not signed in: a notice in Pi's words: ${JSON.stringify(n0)}`);
         await ev(`document.querySelector('#sn-host .launch-signin-how').click(); true`); n0 = await sn();
-        check(n0.steps && /run pi and type \/login/.test(n0.text), `with Pi's own steps: ${JSON.stringify(n0)}`);
+        check(n0.steps && /run pi, type \/login, choose how to sign in, then pick a provider/.test(n0.text) && /Pi shows No API key found for the provider and waits for you to sign in/.test(n0.text), `with Pi's own steps: ${JSON.stringify(n0)}`);
         await pick('codex'); n0 = await sn(); check(!n0.shown, `another provider: nothing: ${JSON.stringify(n0)}`);
         for (const [pi, what] of [[{ found: true, signed_in: true }, 'signed in'], [{ found: true, probe: 'ok' }, 'the CLI could not say'], [{ found: false }, 'Pi is not installed']]) {
             await remount(pi); await pick('pi'); await ev(`new Promise(r => setTimeout(r, 300))`); // sleep-ok: nothing appears; the probe answer is a resolved stub, a little time lets it land

@@ -8,7 +8,7 @@ import { serverFetch, LOCAL_SERVER, normServer } from './server_base.js';
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 const WORDS = {
     claude: { lead: "Claude isn't signed in on this computer.", steps: 'Open a terminal, run claude and follow the steps. Or launch now: the agent’s chat then shows Open terminal and Check again.' },
-    pi: { lead: "Pi isn't signed in to any provider on this computer.", steps: 'Open a terminal, run pi and type /login to pick a provider. Or launch now: Pi stops and says which key is missing.' },
+    pi: { lead: "Pi isn't signed in to any provider on this computer.", steps: 'Open a terminal, run pi, type /login, choose how to sign in, then pick a provider. Or launch now: Pi shows No API key found for the provider and waits for you to sign in.' },
 };
 const PI_ASK_GAP_MS = 10_000;
 
