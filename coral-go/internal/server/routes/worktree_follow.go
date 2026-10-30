@@ -3,6 +3,8 @@ package routes
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -11,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/subgentic/coral/internal/logsafe"
 	"github.com/subgentic/coral/internal/naming"
 	"github.com/subgentic/coral/internal/safefs"
 	"github.com/subgentic/coral/internal/store"
@@ -59,19 +62,41 @@ var rootCache sync.Map // folder -> rootCacheEntry: the git work tree of a folde
 
 // activeWorktree is the worktree the session's agent has most recently worked in, when that is not its launch folder.
 func (h *SessionsHandler) activeWorktree(ctx context.Context, name, sessionID, launchDir string) (followedWorktree, bool) {
+	info, ok, why := h.deriveWorktree(ctx, name, sessionID, launchDir)
+	noteFollowDecision(sessionID, ok, info.Dir, why)
+	return info, ok
+}
+
+// followDecisions keeps the last decision per session, so the log says it once and again only when it changes.
+var followDecisions sync.Map
+
+// noteFollowDecision logs, when it changes, whether a session's panel follows a worktree and why not: folder names only, never a file's contents.
+func noteFollowDecision(sessionID string, followed bool, dir, why string) {
+	line := why
+	if followed {
+		line = "following " + logsafe.Dir(dir)
+	}
+	if prev, ok := followDecisions.Load(sessionID); ok && prev == line {
+		return
+	}
+	followDecisions.Store(sessionID, line)
+	slog.Info("files: worktree decision", "session_id", sessionID, "decision", line)
+}
+
+func (h *SessionsHandler) deriveWorktree(ctx context.Context, name, sessionID, launchDir string) (followedWorktree, bool, string) {
 	if sessionID == "" || h.ts == nil || h.ss == nil {
-		return followedWorktree{}, false
+		return followedWorktree{}, false, "no session"
 	}
 	// The name and the session id must belong together (Security's #137549): the panel of agent A is not made to follow agent B's worktree by naming B's session, and a viewer through Coral Hub cannot ask
 	// about a session the URL does not name. From here on it is the live row's own session id.
 	live, err := h.ss.GetLiveSession(ctx, sessionID)
 	if err != nil || live == nil || (live.AgentName != name && naming.SessionName(live.AgentType, live.SessionID) != name) {
-		return followedWorktree{}, false
+		return followedWorktree{}, false, "the name and the session id do not belong together"
 	}
 	sessionID = live.SessionID
 	events, err := h.ts.ListAgentEvents(ctx, "", followEvents, &sessionID) // newest first; by session alone: an event's agent_name is the live row's, which the panel's URL (the tmux session name) is not
 	if err != nil {
-		return followedWorktree{}, false
+		return followedWorktree{}, false, "the events could not be read"
 	}
 	launchRoot := launchDir
 	if launchDir != "" {
@@ -81,6 +106,7 @@ func (h *SessionsHandler) activeWorktree(ctx context.Context, name, sessionID, l
 	}
 	launchReal := realPath(launchRoot)
 	seen := map[string]bool{}
+	var rejected []string // the first few folders the events named and why each was not one: folder names only
 	for _, ev := range events {
 		for _, dir := range eventFolders(ev) {
 			if seen[dir] {
@@ -88,19 +114,25 @@ func (h *SessionsHandler) activeWorktree(ctx context.Context, name, sessionID, l
 			}
 			seen[dir] = true
 			if len(seen) > followCandidates {
-				return followedWorktree{}, false
+				return followedWorktree{}, false, "too many folders named; none qualified (" + strings.Join(rejected, "; ") + ")"
 			}
 			root, branch := cachedRoot(ctx, dir)
 			if root == "" {
+				if len(rejected) < 4 {
+					rejected = append(rejected, logsafe.Dir(dir)+": not a git work tree the file bounds allow")
+				}
 				continue
 			}
 			if launchReal != "" && within(launchReal, realPath(root)) {
-				return followedWorktree{}, false // the newest folder it worked in is its launch folder
+				return followedWorktree{}, false, "the newest folder the agent worked in is its launch folder"
 			}
-			return followedWorktree{Dir: root, Name: filepath.Base(root), Branch: branch}, true
+			return followedWorktree{Dir: root, Name: filepath.Base(root), Branch: branch}, true, ""
 		}
 	}
-	return followedWorktree{}, false
+	if len(seen) == 0 {
+		return followedWorktree{}, false, fmt.Sprintf("none of the session's %d newest events names a folder (an edit with a file_path, or a command starting with cd or git -C)", len(events))
+	}
+	return followedWorktree{}, false, "no folder qualified (" + strings.Join(rejected, "; ") + ")"
 }
 
 // cachedRoot is the allowed git work tree dir is in, and its branch ("" for a folder that is not one).
@@ -211,7 +243,11 @@ func branchOf(ctx context.Context, root string) string {
 // withWorktree adds to a files answer the worktree the agent works in, for a request that sent worktree=follow or worktree=launch: where it is, its branch, the folder it was launched in, and whether the
 // answer is from it (followed) or from the launch folder with the worktree offered. Nothing when the agent works in its launch folder.
 func (h *SessionsHandler) withWorktree(r *http.Request, name, sessionID string, out map[string]any) map[string]any {
-	if r.URL.Query().Get("worktree") == "" || strictBounds(r) {
+	if r.URL.Query().Get("worktree") == "" {
+		return out
+	}
+	if strictBounds(r) {
+		noteFollowDecision(sessionID, false, "", "the request is not the local dashboard's own page (strict bounds: a proxy, a stamped request, a bearer, or loopback auth required): the launch folder")
 		return out
 	}
 	launch := h.launchWorkdir(r.Context(), name, "", sessionID)
