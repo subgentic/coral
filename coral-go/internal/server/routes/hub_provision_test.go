@@ -23,6 +23,12 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/subgentic/coral/internal/sshprov"
+	"github.com/subgentic/coral/internal/store"
+)
+
+const (
+	provInstance = "0123456789abcdef0123456789abcdef"
+	provKey      = "PROVISION-REMOTE-KEY-0123456789abcdef"
 )
 
 type provEnv struct {
@@ -78,6 +84,10 @@ exit 0
 	pr.install = func(_ context.Context, p *provisionPlan, _ sshprov.Arch) error { // no network in a route test: the installer has its own tests
 		p.setStep("install", stepOK, "Installed.")
 		return nil
+	}
+	pr.startRemote = func(context.Context, *provisionPlan) (string, string, error) { return provInstance, provKey, nil }
+	pr.checkHealth = func(context.Context, *store.RemoteServer, string) RemoteHealth {
+		return RemoteHealth{Status: store.RemoteStatusOnline, Version: "9.9.9"}
 	}
 	r := chi.NewRouter()
 	r.Post("/api/servers/provision/plan", pr.Plan)
@@ -191,10 +201,21 @@ func TestProvisionUnknownHostShowsTheScannedKeyAndTrustsOnlyThatAfterAccept(t *t
 	assert.Equal(t, "ok", steps[0].(map[string]any)["state"])
 	assert.Equal(t, "ok", steps[1].(map[string]any)["state"])
 	assert.Equal(t, "ok", steps[2].(map[string]any)["state"])
-	assert.Equal(t, "skipped", steps[3].(map[string]any)["state"], "start and register do not exist yet and say so")
-	assert.Equal(t, "skipped", steps[4].(map[string]any)["state"])
-	_, err = pe.e.h.store.Get(context.Background(), "ssh-box-example-com")
-	assert.Error(t, err, "a run that installed nothing registered a server")
+	assert.Equal(t, "ok", steps[3].(map[string]any)["state"])
+	assert.Equal(t, "ok", steps[4].(map[string]any)["state"])
+	srv, err := pe.e.h.store.Get(context.Background(), "ssh-box-example-com")
+	require.NoError(t, err)
+	assert.Equal(t, "ssh", srv.Transport)
+	assert.Equal(t, "rich@box.example.com:22", srv.SSHTarget)
+	assert.Equal(t, 8420, srv.RemotePort)
+	assert.Equal(t, provInstance, srv.InstanceID)
+	assert.Equal(t, "online", srv.Status)
+	key, err := pe.e.h.store.DecryptedKey(context.Background(), "ssh-box-example-com")
+	require.NoError(t, err)
+	assert.Equal(t, provKey, key)
+	raw, _ := json.Marshal(done)
+	assert.NotContains(t, string(raw), provKey, "the remote's key is in the plan's answer")
+	assert.NotContains(t, string(raw), provInstance)
 }
 
 func TestProvisionRefusesAChangedHostKeyAndNeverOffersIt(t *testing.T) {
@@ -354,4 +375,66 @@ func TestProvisionInstallFailureIsAFixedSentence(t *testing.T) {
 	assert.Equal(t, "Could not install Coral on that computer.", failed["error"])
 	b, _ := json.Marshal(failed)
 	assert.NotContains(t, string(b), "id_rsa")
+}
+
+func runToEnd(t *testing.T, pe *provEnv, want string) map[string]any {
+	t.Helper()
+	_, v := pe.do("POST", "/api/servers/provision/plan", map[string]any{"target": "rich@box.example.com"})
+	plan := v["plan"].(string)
+	_, v = pe.do("POST", "/api/servers/provision/"+plan+"/connect", nil)
+	require.Equal(t, "connected", v["phase"], "%v", v)
+	code, _ := pe.do("POST", "/api/servers/provision/"+plan+"/run", map[string]any{"accept_terms": true})
+	require.Equal(t, 202, code)
+	return pe.waitPhase(t, plan, want)
+}
+
+func TestProvisionTellsTheHubWhenItRegistersAServer(t *testing.T) {
+	pe := newProvEnv(t, "known", "Linux x86_64", true)
+	var mu sync.Mutex
+	var heard []string
+	pe.p.SetStatusListener(func(id, status string) { mu.Lock(); heard = append(heard, id+":"+status); mu.Unlock() })
+	runToEnd(t, pe, "done")
+	mu.Lock()
+	defer mu.Unlock()
+	assert.Equal(t, []string{"ssh-box-example-com:online"}, heard)
+}
+
+func TestProvisionRegistersNothingWhenTheHubCannotReachTheNewServer(t *testing.T) {
+	pe := newProvEnv(t, "known", "Linux x86_64", true)
+	pe.p.checkHealth = func(context.Context, *store.RemoteServer, string) RemoteHealth {
+		return RemoteHealth{Status: store.RemoteStatusUnreachable, Err: "ssh: connect to host box.example.com port 22: Connection refused"}
+	}
+	failed := runToEnd(t, pe, "failed")
+	assert.Equal(t, "Coral started, but this hub could not reach it over SSH.", failed["error"])
+	_, err := pe.e.h.store.Get(context.Background(), "ssh-box-example-com")
+	assert.Error(t, err)
+	b, _ := json.Marshal(failed)
+	assert.NotContains(t, string(b), "Connection refused")
+}
+
+func TestProvisionNeverTakesAnotherServersPlaceOrKey(t *testing.T) {
+	pe := newProvEnv(t, "known", "Linux x86_64", true)
+	_, err := pe.e.h.store.AddSSH(context.Background(), "old-name", "Old", "u@other.example.com:22", 8420, provInstance, "the-old-servers-key-0123456789")
+	require.NoError(t, err)
+	failed := runToEnd(t, pe, "failed")
+	assert.Equal(t, "That computer is already registered under another name.", failed["error"])
+	key, _ := pe.e.h.store.DecryptedKey(context.Background(), "old-name")
+	assert.Equal(t, "the-old-servers-key-0123456789", key, "the existing server's key was replaced")
+	_, err = pe.e.h.store.Get(context.Background(), "ssh-box-example-com")
+	assert.Error(t, err)
+}
+
+func TestProvisionStartFailureIsAFixedSentenceAndHidesTheCause(t *testing.T) {
+	pe := newProvEnv(t, "known", "Linux x86_64", true)
+	pe.p.startRemote = func(context.Context, *provisionPlan) (string, string, error) {
+		return "", "", errors.New("tmux: /home/rich/.ssh/secret: no server running " + provKey)
+	}
+	failed := runToEnd(t, pe, "failed")
+	assert.Equal(t, "Could not start Coral on that computer.", failed["error"])
+	b, _ := json.Marshal(failed)
+	assert.NotContains(t, string(b), provKey)
+	assert.NotContains(t, string(b), "secret")
+	steps := failed["steps"].([]any)
+	assert.Equal(t, "failed", steps[3].(map[string]any)["state"])
+	assert.Equal(t, "pending", steps[4].(map[string]any)["state"])
 }

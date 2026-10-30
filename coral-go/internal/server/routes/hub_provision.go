@@ -127,15 +127,24 @@ type Provisioner struct {
 	plans    map[string]*provisionPlan
 	runSteps func(ctx context.Context, p *provisionPlan) // the steps after the keys are trusted
 	// install puts the hub's own release on the far computer (sshprov.Installer); a variable so a test does not reach the network.
-	install   func(ctx context.Context, p *provisionPlan, arch sshprov.Arch) error
-	startedAt time.Time
+	install func(ctx context.Context, p *provisionPlan, arch sshprov.Arch) error
+	// startRemote starts the installed Coral in tmux and reads the remote's instance id and API key; checkHealth asks the new server, through its SSH stream, whether it answers. Variables for tests.
+	startRemote func(ctx context.Context, p *provisionPlan) (instanceID, key string, err error)
+	checkHealth func(ctx context.Context, rs *store.RemoteServer, key string) RemoteHealth
+	notify      func(id, status string) // tells the hub's remote workers a server was added (the same hook the registry's edits use)
+	startedAt   time.Time
 }
+
+// SetStatusListener sets who hears that a server was registered (the hub's remote workers, as for the registry's own edits).
+func (pr *Provisioner) SetStatusListener(f func(id, status string)) { pr.notify = f }
 
 // NewProvisioner is the setup routes' handler. The paths are the hub user's own (never a path from a request).
 func NewProvisioner(s *store.RemoteServerStore) *Provisioner {
 	pr := &Provisioner{store: s, configs: sshprov.DefaultConfigPath, known: sshprov.DefaultKnownHostsPath, plans: map[string]*provisionPlan{}, startedAt: time.Now()}
 	pr.runSteps = pr.detectSteps
 	pr.install = pr.realInstall
+	pr.startRemote = pr.realStartRemote
+	pr.checkHealth = pr.realCheckHealth
 	return pr
 }
 
@@ -460,12 +469,92 @@ func (pr *Provisioner) detectSteps(ctx context.Context, p *provisionPlan) {
 		pr.fail(p, "install", msg)
 		return
 	}
-	for _, s := range []string{"start", "register"} {
-		p.setStep(s, stepSkipped, "Not available yet.")
+	if err := pr.finish(ctx, p); err != nil {
+		var ie *sshprov.ErrInstall
+		step, msg := "start", "Could not start Coral on that computer."
+		if errors.As(err, &ie) {
+			step, msg = ie.Step, ie.Msg
+		}
+		slog.Info("[provision] failed", "plan", p.ID, "step", step)
+		pr.fail(p, step, msg)
+		return
 	}
 	p.mu.Lock()
 	p.phase = phaseDone
 	p.mu.Unlock()
+}
+
+// finish starts the installed Coral, reads what the hub needs and registers it. Every sentence is fixed: the key is held in a local variable, never in a log, an error, a step or the plan.
+func (pr *Provisioner) finish(ctx context.Context, p *provisionPlan) error {
+	p.setStep("start", stepRunning, "Starting Coral in tmux, listening on this computer's loopback only.")
+	instanceID, key, err := pr.startRemote(ctx, p)
+	if err != nil {
+		return err
+	}
+	p.setStep("start", stepOK, "Coral is running in the tmux session coral-server.")
+
+	p.setStep("register", stepRunning, "Connecting it to this hub over SSH.")
+	rs := &store.RemoteServer{ID: p.ServerID, SSHTarget: p.Target.Stored(), RemotePort: sshprov.RemotePort}
+	if h := pr.checkHealth(ctx, rs, key); h.Status != store.RemoteStatusOnline {
+		return &sshprov.ErrInstall{Step: "register", Msg: "Coral started, but this hub could not reach it over SSH."}
+	}
+	if existing, err := pr.store.FindByInstance(ctx, instanceID); err != nil {
+		return &sshprov.ErrInstall{Step: "register", Msg: "Could not read this hub's server list."}
+	} else if existing != "" {
+		if existing != p.ServerID {
+			return &sshprov.ErrInstall{Step: "register", Msg: "That computer is already registered under another name."}
+		}
+		p.setStep("register", stepOK, "Already registered; nothing was changed.") // a re-run: the key and the row stay as they are
+		return nil
+	}
+	if _, err := pr.store.AddSSH(ctx, p.ServerID, p.Label, rs.SSHTarget, rs.RemotePort, instanceID, key); err != nil {
+		switch {
+		case errors.Is(err, store.ErrRemoteExists):
+			return &sshprov.ErrInstall{Step: "register", Msg: "A server with that name is already registered."}
+		case errors.Is(err, store.ErrRemoteInstanceExists):
+			return &sshprov.ErrInstall{Step: "register", Msg: "That computer is already registered under another name."}
+		}
+		return &sshprov.ErrInstall{Step: "register", Msg: "Could not save the server."}
+	}
+	_ = pr.store.SetStatus(ctx, p.ServerID, store.RemoteStatusOnline, "")
+	if pr.notify != nil {
+		pr.notify(p.ServerID, store.RemoteStatusOnline)
+	}
+	p.setStep("register", stepOK, "Registered. It appears in your server list.")
+	return nil
+}
+
+func (pr *Provisioner) realStartRemote(ctx context.Context, p *provisionPlan) (string, string, error) {
+	fail := func(msg string) error { return &sshprov.ErrInstall{Step: "start", Msg: msg} }
+	if err := pr.runner.StartTmux(ctx, p.Target, config.Version); err != nil {
+		return "", "", fail("Could not start Coral on that computer.")
+	}
+	id, err := pr.runner.EnsureInstanceID(ctx, p.Target)
+	if err != nil {
+		return "", "", fail("Could not make this server's identity on that computer.")
+	}
+	key, err := pr.runner.ReadAPIKey(ctx, p.Target, config.Version)
+	if err != nil {
+		return "", "", fail("Coral started, but it did not make its key in time.")
+	}
+	return id, key, nil
+}
+
+// realCheckHealth asks the new server's /api/health through a one-off stream target, for up to 40 s (a Coral that has just made its key may not be listening yet).
+func (pr *Provisioner) realCheckHealth(ctx context.Context, rs *store.RemoteServer, key string) RemoteHealth {
+	t, err := newSSHTarget(rs, key)
+	if err != nil {
+		return RemoteHealth{Status: store.RemoteStatusUnreachable, Err: "could not connect"}
+	}
+	defer t.Close()
+	deadline := time.Now().Add(40 * time.Second)
+	for {
+		h := CheckTargetHealth(ctx, t, 10*time.Second)
+		if h.Status == store.RemoteStatusOnline || time.Now().After(deadline) || ctx.Err() != nil {
+			return h
+		}
+		time.Sleep(3500 * time.Millisecond) // past the stream target's 3 s backoff after a failed dial
+	}
 }
 
 // Status handles GET /api/servers/provision/{plan}.

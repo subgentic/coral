@@ -37,6 +37,12 @@ const (
 	CmdTarList
 	// CmdUnpack unpacks that package into <install>/<version>/root and records its SHA-256 in <install>/<version>/package.sha256; arg 0 is the version.
 	CmdUnpack
+	// CmdStartTmux starts the installed Coral of version arg 0 in a tmux session named coral-server, listening on loopback only, with its data under the install folder; nothing is done if the session exists.
+	CmdStartTmux
+	// CmdEnsureInstanceID makes the provisioner's instance id file (32 hex digits, once) and prints it.
+	CmdEnsureInstanceID
+	// CmdReadAPIKey prints the API key of the Coral of version arg 0 (its data folder under the install folder); it fails until that Coral has started once.
+	CmdReadAPIKey
 	// CmdFreeKB prints the free space, in KiB, of the file system that holds the home folder (the install folder lives under it).
 	CmdFreeKB
 	// CmdReadInstalledSum prints that recorded SHA-256, if the release is installed; arg 0 is the version.
@@ -68,7 +74,11 @@ var specs = map[Command]spec{
 	CmdMkVersionDir:   {template: "umask 077 && mkdir -p \"$HOME/" + InstallDir + "/%[1]s\" && chmod 700 \"$HOME/" + InstallDir + "\" \"$HOME/" + InstallDir + "/%[1]s\"", args: []*regexp.Regexp{versionRe}},
 	CmdReceive:        {template: "umask 077 && cat > \"$HOME/" + InstallDir + "/%s/package.tar.gz\"", args: []*regexp.Regexp{versionRe}, timeout: 15 * time.Minute},
 	CmdTarList:        {template: "cd \"$HOME/" + InstallDir + "/%s\" && tar -tzf package.tar.gz", args: []*regexp.Regexp{versionRe}, timeout: 2 * time.Minute},
-	CmdFreeKB:         {template: "df -Pk \"$HOME\" | awk 'NR==2 {print $4}'"},
+	CmdStartTmux: {template: "umask 077 && mkdir -p \"$HOME/" + InstallDir + "/data\" && { tmux has-session -t coral-server 2>/dev/null || tmux new-session -d -s coral-server " +
+		"\"exec \\\"$HOME/" + InstallDir + "/%[1]s/root/coral\\\" --host 127.0.0.1 --port 8420 --no-browser --backend tmux --home \\\"$HOME/" + InstallDir + "/data\\\"\"; }", args: []*regexp.Regexp{versionRe}},
+	CmdEnsureInstanceID: {template: "umask 077 && mkdir -p \"$HOME/" + InstallDir + "\" && f=\"$HOME/" + InstallDir + "/instance-id\" && { [ -s \"$f\" ] || head -c 16 /dev/urandom | od -An -tx1 | tr -d ' \\n' > \"$f\"; } && cat \"$f\""},
+	CmdReadAPIKey:       {template: "\"$HOME/" + InstallDir + "/%s/root/coral\" api-key --home \"$HOME/" + InstallDir + "/data\" 2>/dev/null", args: []*regexp.Regexp{versionRe}},
+	CmdFreeKB:           {template: "df -Pk \"$HOME\" | awk 'NR==2 {print $4}'"},
 	// The recorded sum goes FIRST: a re-unpack that is interrupted leaves no sum next to a half-written root, so the next run does not say "already installed". It is written last.
 	CmdUnpack: {template: "umask 077 && cd \"$HOME/" + InstallDir + "/%[1]s\" && rm -f package.sha256 && rm -rf root && mkdir root && tar -xzf package.tar.gz --no-same-owner -C root && " +
 		"{ sha256sum package.tar.gz 2>/dev/null || shasum -a 256 package.tar.gz; } | cut -d' ' -f1 > package.sha256", args: []*regexp.Regexp{versionRe}, timeout: 5 * time.Minute},
