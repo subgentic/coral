@@ -129,6 +129,9 @@ func finalPath(dir string) string {
 // processElevated says whether this run's token is elevated (a variable so a test can run both paths whatever token the runner has).
 var processElevated = func() bool { return windows.GetCurrentProcessToken().IsElevated() }
 
+// createLog makes the elevated run's log in the mark folder (a variable so a test can point it at a test folder).
+var createLog = installrestart.CreateLog
+
 // openLog sends the log to a new coral-msi-helper-<random>.log in this user's temporary folder, and only there: a GUI program that Windows
 // Installer starts has no standard error, and a MultiWriter with it stopped at its failed write, so the file stayed empty (Security on
 // #155, tested live). A fixed name in a folder the user can write is a link an elevated run could be made to write through: a new file with
@@ -140,7 +143,7 @@ func openLog() func() {
 	if processElevated() {
 		// An elevated run never writes into TEMP (the user's, a folder where a link can be planted): the log is created new in the opened, plain mark folder (#155
 		// review). No such folder, no log: never a fallback to TEMP.
-		f, err = installrestart.CreateLog("coral-msi-helper")
+		f, err = createLog("coral-msi-helper")
 	} else {
 		f, err = os.CreateTemp(os.TempDir(), "coral-msi-helper-*.log")
 	}
