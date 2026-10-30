@@ -12,6 +12,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/subgentic/coral/internal/consoletest"
 )
 
 // #10534 (Security Reviewer Windows on #10276, SHOULD 4): a job that runs without a worktree works in the folder itself, an agent with the person's permissions: it may not be the home folder or the
@@ -69,7 +71,7 @@ func TestTheFirstCommitOfInitRepoIsNeverSigned(t *testing.T) {
 	dir := t.TempDir()
 	code, body := sendJSON(t, http.MethodPost, srv.URL+"/api/scheduled/jobs/init-repo", map[string]any{"repo_path": dir})
 	require.Equal(t, http.StatusOK, code, "%v", body)
-	out, err := exec.Command("git", "-C", dir, "rev-list", "--count", "HEAD").Output()
+	out, err := consoletest.HiddenCommand("git", "-C", dir, "rev-list", "--count", "HEAD").Output()
 	require.NoError(t, err)
 	assert.Equal(t, "1", strings.TrimSpace(string(out)), "the first commit was made with signing on")
 }

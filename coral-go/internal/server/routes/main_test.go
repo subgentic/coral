@@ -7,12 +7,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/subgentic/coral/internal/consoletest"
 	"github.com/subgentic/coral/internal/secfile/secfiletest"
 	"github.com/subgentic/coral/internal/testleak"
+	"github.com/subgentic/coral/internal/testtemp"
 	"github.com/subgentic/coral/internal/tmux"
 )
 
 func TestMain(m *testing.M) {
+	cleanupWorld := testtemp.Use() // a private temp, home and data folder for this package (#356)
 	// The terminal tests drive shells, which need no 300ms between a command
 	// and its Enter (production keeps it for agent TUIs).
 	tmux.SetSendKeysSettleForTest(20 * time.Millisecond)
@@ -36,7 +39,7 @@ func TestMain(m *testing.M) {
 	// package's time (#83); and what is in %TEMP% (a foreign ACL entry added by a Codex sandbox, leftovers) can't reach the tests (#28).
 	cleanupTemp := secfiletest.UsePrivateTemp()
 	before := packageArtifactFiles()
-	code := m.Run()
+	code := consoletest.Guard(m)
 	cleanupTemp()
 	// A test whose Config has no data folder writes artifacts and diffs under "artifacts" here,
 	// in the package folder, shared by every test in the run (#3566: the hourly upload cap then
@@ -60,7 +63,7 @@ func TestMain(m *testing.M) {
 			code = 1
 		}
 	}
-	os.Exit(testleak.Check(code)) // no goroutine left running (#4167)
+	testtemp.Exit(cleanupWorld, testleak.Check(code)) // no goroutine left running (#4167)
 }
 
 // packageArtifactFiles lists the files under ./artifacts (the package folder), if any.

@@ -4,12 +4,13 @@ import (
 	"encoding/json"
 	"net/url"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/subgentic/coral/internal/consoletest"
 )
 
 // #3558 (Security's #3556 finding 1): /diff?filepath= has file-content's bounds for anything
@@ -21,7 +22,7 @@ func TestDiffBounds(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(e.repo, ".git", "config.extra"), nil, 0o644))
 	// Tracked and modified, so a pathspec that matched more than one file would show them.
 	git := func(args ...string) {
-		out, err := exec.Command("git", append([]string{"-C", e.repo, "-c", "user.email=t@example.test", "-c", "user.name=t"}, args...)...).CombinedOutput()
+		out, err := consoletest.HiddenCommand("git", append([]string{"-C", e.repo, "-c", "user.email=t@example.test", "-c", "user.name=t"}, args...)...).CombinedOutput()
 		require.NoError(t, err, string(out))
 	}
 	git("add", "README.md", ".env", "certs/server.pem", "app/main.go")

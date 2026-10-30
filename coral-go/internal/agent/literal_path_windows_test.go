@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/subgentic/coral/internal/consoletest"
 )
 
 // #3913 (Security's note on #3904): a path is passed to Get-Content and Remove-Item as
@@ -64,7 +66,7 @@ func powerShellForTest(t *testing.T) string {
 
 func runPowerShell(t *testing.T, ps, script string) string {
 	t.Helper()
-	cmd := exec.Command(ps, "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", script)
+	cmd := consoletest.HiddenCommand(ps, "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", script)
 	cmd.Dir = t.TempDir() // see psquote_roundtrip_windows_test.go
 	out, err := cmd.CombinedOutput()
 	if err != nil {

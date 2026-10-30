@@ -322,3 +322,19 @@ func TestStatusSaysWhatTheLastCheckFound(t *testing.T) {
 	assert.NotContains(t, out, "script")
 	assert.NotContains(t, out, "rm -rf")
 }
+
+// #395: a release staged before a newer one was installed is not "ready to install": the status says nothing is ready, as it does with nothing staged.
+func TestStatusDoesNotOfferAStagedReleaseThatIsNotNewerThanTheInstalledOne(t *testing.T) {
+	for _, tc := range []struct{ staged, installed string }{{"1.4.120", "1.4.130"}, {"1.4.130", "1.4.130"}} {
+		dir := withVersion(t, tc.installed)
+		writeState(t, dir, verify.State{Stage: &verify.StageState{Staged: tc.staged, StagedAt: "2026-10-20T10:00:00Z"}})
+		m := statusJSON(t, nil)
+		assert.NotContains(t, m, "staged", tc.staged+" on "+tc.installed)
+		_, out := statusRun(t, nil, "status")
+		assert.Contains(t, out, "Ready to install: nothing", tc.staged+" on "+tc.installed)
+		assert.NotContains(t, out, "Ready to install: "+tc.staged)
+	}
+	dir := withVersion(t, "1.4.130")
+	writeState(t, dir, verify.State{Stage: &verify.StageState{Staged: "1.4.131", StagedAt: "2026-10-20T10:00:00Z"}})
+	assert.Contains(t, statusJSON(t, nil), "staged", "a newer one is still offered")
+}

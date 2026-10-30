@@ -25,6 +25,7 @@ type LaunchParams struct {
 	BoardLabel      string // the board's display name (#3536); the prompt shows it, BoardName (the id) stays the key
 	Role            string
 	Prompt          string
+	OneShot         bool              // run once and exit: Pi's --print --no-session with Prompt as its argument (a scheduled job, #11293); other CLIs ignore it
 	PromptOverrides map[string]string // user overrides for orchestrator/worker prompts
 	BoardType       string
 	Capabilities    *Capabilities

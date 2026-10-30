@@ -4,7 +4,6 @@ package ptymanager
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -30,7 +29,7 @@ func TestLaunchScriptRunsUnderARestrictedExecutionPolicy(t *testing.T) {
 	require.Equal(t, 1, len(sh), "the terminal shell is started with no ExecutionPolicy flag: %v", sh)
 
 	run := func(command string) (string, error) {
-		cmd := exec.Command(sh[0], "-NoProfile", "-Command", command)
+		cmd := hiddenCommand(sh[0], "-NoProfile", "-Command", command)
 		cmd.Env = env
 		out, err := cmd.CombinedOutput()
 		return string(out), err
@@ -72,7 +71,7 @@ func TestHandoffBypassDoesNotReachThePowerShellsTheAgentStarts(t *testing.T) {
 	t.Cleanup(cleanup)
 	sh, err := defaultShell()
 	require.NoError(t, err)
-	cmd := exec.Command(sh[0], "-NoProfile", "-Command", invocation)
+	cmd := hiddenCommand(sh[0], "-NoProfile", "-Command", invocation)
 	cmd.Env = append(os.Environ(), "PSExecutionPolicyPreference=Restricted")
 	out, err := cmd.CombinedOutput()
 	require.NoError(t, err, string(out))

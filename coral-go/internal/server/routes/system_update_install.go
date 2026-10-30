@@ -20,6 +20,8 @@ import (
 	"sync/atomic"
 
 	"github.com/subgentic/coral/internal/cliauth"
+	"github.com/subgentic/coral/internal/config"
+	"github.com/subgentic/coral/internal/updatecheck"
 	"github.com/subgentic/coral/internal/updater/trigger"
 )
 
@@ -104,6 +106,14 @@ func (h *CloudHandler) InstallUpdate(w http.ResponseWriter, r *http.Request) {
 	version, err := staged(r.Context())
 	if err != nil {
 		writeError(w, http.StatusConflict, "nothing_staged", "There is no verified update staged to install")
+		return
+	}
+	installed := config.Version
+	if h.installedVersion != nil {
+		installed = h.installedVersion()
+	}
+	if updatecheck.NotNewer(version, installed) { // a staged release that is not newer than the running one is never installed (#395)
+		writeError(w, http.StatusConflict, "not_newer", "The update that is ready is not newer than this Coral: nothing was installed")
 		return
 	}
 	if shown != nil && *shown != version {

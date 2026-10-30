@@ -256,6 +256,7 @@ func (o *IdentityObserver) Middleware(next http.Handler) http.Handler {
 					"This agent can't act as "+strconv.Quote(m.Claimed)+" ("+m.Field+"): its session is "+strconv.Quote(m.Expected)+" ("+m.Kind+")")
 				return
 			}
+			o.noteJobBoard(r, owner)
 			// Who the request is from, decided here and read from here (#4244): the member name the
 			// token's session holds on this board. The claim is compared in log mode.
 			actor := Actor{Kind: ActorToken, Name: actorName, Session: owner.SessionName}

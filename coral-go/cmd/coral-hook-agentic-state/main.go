@@ -33,7 +33,7 @@ func main() {
 	if !ok {
 		return
 	}
-	agyEvent, hooksRev := opts.agyEvent, opts.hooksRev
+	agyEvent := opts.agyEvent
 	agyModel := agyModelOf(d, agyEvent)               // read before fromAgy rewrites the payload
 	agyConversation := agyConversationOf(d, agyEvent) // read before fromAgy rewrites the payload
 	if agyEvent != "" {
@@ -47,6 +47,28 @@ func main() {
 		}
 	}
 
+	var piStop map[string]any // the Stop a Pi shutdown event carries (fromPi's _pi_stop): read only for a --pi invocation, never from any other payload
+	if opts.piEvent != "" {
+		var ok bool
+		if d, ok = fromPi(d, opts.piEvent); !ok { // only the allow-listed keys are read: nothing else in the payload reaches a post
+			hooks.DebugLog("AGENTIC_STATE PI_SKIPPED")
+			return
+		}
+		piStop, _ = d["_pi_stop"].(map[string]any)
+		delete(d, "_pi_stop")
+	} else if len(os.Args) > 1 && contains(os.Args[1:], "--pi") {
+		return // --pi named an event Coral does not record
+	}
+
+	if piStop != nil {
+		handle(piStop, opts, agyModel, agyConversation) // Pi's last event carries the Stop that has not been sent: Stop, then SessionEnd, in this order, in this one process (#11107 slice 1b)
+	}
+	handle(d, opts, agyModel, agyConversation)
+}
+
+// handle posts one hook event: the payload already in the Claude shape.
+func handle(d map[string]any, opts hookArgs, agyModel, agyConversation string) {
+	agyEvent, hooksRev := opts.agyEvent, opts.hooksRev
 	hookType := hookTypeOf(d)
 	hooks.DebugLog(fmt.Sprintf("AGENTIC_STATE INPUT: hook_type=%s argv=%v", hooks.LogID(hookType), os.Args[1:]))
 
@@ -62,7 +84,11 @@ func main() {
 	postAgyModel(base, agentName, sessionID, agyModel)
 
 	if hookType == "PreToolUse" {
-		recordPendingTool(base, agentName, sessionID, d, agyEvent, hooksRev)
+		why := recordPendingTool(base, agentName, sessionID, d, agyEvent, hooksRev)
+		if why != "" && agyEvent == "" && strings.HasPrefix(os.Getenv("CORAL_SESSION_NAME"), "claude-") {
+			os.Stdout.Write(preToolDeny(why)) // the command is not run (#11157)
+			hooks.DebugLog(fmt.Sprintf("PRETOOL_REFUSED: agent=%s", agentName))
+		}
 		return
 	}
 
@@ -94,8 +120,13 @@ func main() {
 		return
 	}
 
-	if hookType == "Stop" {
+	if hookType == "Stop" && opts.piEvent == "" { // not Pi's: its usage is read turn by turn from its session file, and this would count each turn twice (#11293)
 		forwardTokenUsage(base, agentName, sessionID, d)
+	}
+
+	if hookType == "Stop" && opts.piEvent == "Stop" {
+		// A Pi agent's turn has settled (agent_settled, not the Stop a shutdown event carries): ask Coral whether it has board messages to hand over, and say so to the extension on standard output (pi_delivery.go).
+		piHandoff(base, agentName, os.Stdout)
 	}
 
 	hooks.DebugLog(fmt.Sprintf("DONE: agent=%s event_type=%s", agentName, event["event_type"]))
@@ -170,13 +201,22 @@ func postAgyModel(base, agentName, sessionID, agyModel string) {
 
 // recordPendingTool records the tool call that is starting (PreToolUse), so the chat can show what a permission prompt, question or plan approval is asking. It is not
 // an activity event; its PostToolUse is.
-func recordPendingTool(base, agentName, sessionID string, d map[string]any, agyEvent string, hooksRev int) {
+func recordPendingTool(base, agentName, sessionID string, d map[string]any, agyEvent string, hooksRev int) (refuse string) {
 	pending := parsePendingTool(d, sessionID)
 	if pending == nil {
-		return
+		return ""
 	}
-	if _, err := hooks.CoralAPI(base, "POST", hooks.LivePath(agentName, "/pending-tool"), pending); err != nil {
+	raw, err := hooks.CoralAPI(base, "POST", hooks.LivePath(agentName, "/pending-tool"), pending)
+	if err != nil {
 		hooks.DebugLog(fmt.Sprintf("PENDING_POST_FAILED: agent=%s tool=%v err=%v", agentName, pending["tool_name"], err))
+	} else {
+		// Coral answers "refuse" with the reason when the command stops processes by a pattern (pkill, killall): it is not a pending tool and the CLI is told not to run it.
+		var r struct {
+			Refuse string `json:"refuse"`
+		}
+		if json.Unmarshal(raw, &r) == nil && r.Refuse != "" {
+			return r.Refuse
+		}
 	}
 	// agy sends no hook for a question to the user, only this PreToolUse: its ask_question always waits for the user, so the
 	// request is recorded as Claude's PermissionRequest records it (#4819). A tool permission prompt is not known from here: the
@@ -189,6 +229,22 @@ func recordPendingTool(base, agentName, sessionID string, d map[string]any, agyE
 			hooks.DebugLog(fmt.Sprintf("POST_FAILED: base=%s agent=%s event_type=%s err=%v", hooks.RedactedURL(base), agentName, event["event_type"], err))
 		}
 	}
+	return ""
+}
+
+// preToolDeny is the PreToolUse hook output that stops the tool call and tells the agent why: Claude Code's permissionDecision "deny" with the reason.
+func preToolDeny(reason string) []byte {
+	out, err := json.Marshal(map[string]any{
+		"hookSpecificOutput": map[string]any{
+			"hookEventName":            "PreToolUse",
+			"permissionDecision":       "deny",
+			"permissionDecisionReason": reason,
+		},
+	})
+	if err != nil {
+		return nil
+	}
+	return out
 }
 
 // postEvent posts the activity event and reports whether it was sent. A tool call that ended (PostToolUse) is recorded without the agent waiting for Coral's answer; the Stop event
@@ -237,6 +293,7 @@ func claudePermissionMode(d map[string]any) string {
 type hookArgs struct {
 	sessionClear bool   // --session-clear: a /clear
 	agyEvent     string // --agy <event>: an Antigravity hook
+	piEvent      string // --pi <event>: Coral's Pi extension (pi_events.go); only an event of piEventNames
 	hooksRev     int    // --hooks-rev N: the hook set's revision (#3655 F3); 0 when absent or not a positive number
 }
 
@@ -248,6 +305,8 @@ func parseArgs(args []string) hookArgs {
 			o.sessionClear = true
 		case arg == "--agy" && i+1 < len(args):
 			o.agyEvent = args[i+1]
+		case arg == "--pi" && i+1 < len(args):
+			o.piEvent = piEventNames[args[i+1]]
 		case arg == "--hooks-rev" && i+1 < len(args):
 			if n, err := strconv.Atoi(args[i+1]); err == nil && n > 0 {
 				o.hooksRev = n
@@ -964,4 +1023,13 @@ func withDetail(detail map[string]any, key string, val any) map[string]any {
 	}
 	detail[key] = val
 	return detail
+}
+
+func contains(list []string, want string) bool {
+	for _, x := range list {
+		if x == want {
+			return true
+		}
+	}
+	return false
 }

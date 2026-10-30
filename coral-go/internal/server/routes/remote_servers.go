@@ -100,7 +100,7 @@ func validateNewRemoteURL(raw string, allowPrivate bool) (string, error) {
 		return "", err
 	}
 	if !allowPrivate && strings.HasPrefix(norm, "http://") {
-		return "", errors.New("URL must be https: the API key would cross the network unencrypted (a server on a private network or this computer can be registered with allow_private)")
+		return "", errors.New("URL must be https: the API key would cross the network unencrypted (another computer on a private network, or this one, can be registered with allow_private)")
 	}
 	return norm, nil
 }
@@ -146,7 +146,29 @@ func viewRemote(s *store.RemoteServer) remoteServerView {
 	if s == nil {
 		return remoteServerView{}
 	}
-	return remoteServerView{RemoteServer: *s, Warning: remoteURLWarning(s.URL)}
+	warn := remoteURLWarning(s.URL)
+	if renew := keyRenewWarning(s.KeyRenewSince); renew != "" {
+		if warn != "" {
+			warn += "; "
+		}
+		warn += renew
+	}
+	return remoteServerView{RemoteServer: *s, Warning: warn}
+}
+
+// keyRenewWarning is the warning of a server marked by store.KeyRenewSince, until a different key is entered: Settings > Servers
+// shows it with the server, after the one-time notice of that start is gone.
+func keyRenewWarning(since *string) string {
+	if since == nil || *since == "" {
+		return ""
+	}
+	day := *since
+	if t, err := time.Parse(time.RFC3339Nano, *since); err == nil {
+		day = t.Format("2006-01-02")
+	} else if len(day) > 10 {
+		day = day[:10]
+	}
+	return "other accounts on this computer could read this server's API key until " + day + ", when Coral found its data folder open: make a new key on that server and enter it here with Edit"
 }
 
 // CheckRemoteHealth calls GET {baseURL}/api/health with the key. Unless
@@ -212,7 +234,7 @@ func CheckRemoteHealth(ctx context.Context, baseURL, apiKey string, allowPrivate
 		Version string `json:"version"`
 	}
 	if err := json.NewDecoder(io.LimitReader(resp.Body, 64*1024)).Decode(&body); err != nil || body.Status != "ok" {
-		return RemoteHealth{Status: store.RemoteStatusUnreachable, Err: "remote is not a Coral server"}
+		return RemoteHealth{Status: store.RemoteStatusUnreachable, Err: "remote is not running Coral"}
 	}
 	return RemoteHealth{Status: store.RemoteStatusOnline, Version: body.Version}
 }
@@ -238,7 +260,7 @@ func decodeRemoteReq(w http.ResponseWriter, r *http.Request) (remoteServerReques
 func remoteErr(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, store.ErrRemoteNotFound):
-		errNotFound(w, "server not found")
+		errNotFound(w, "computer not found")
 	case errors.Is(err, store.ErrRemoteExists):
 		errConflict(w, "server id already exists")
 	case errors.Is(err, store.ErrInvalidRemoteID):

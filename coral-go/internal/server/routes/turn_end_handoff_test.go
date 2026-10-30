@@ -3,6 +3,7 @@ package routes
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 	"testing"
@@ -283,4 +284,151 @@ func TestTurnEndHandoffACrossBoardMentionIsNotUrgent(t *testing.T) {
 
 func crossTeamPost(target, text string, mentions []string) board.CrossTeamPost {
 	return board.CrossTeamPost{Origin: board.MessageOrigin{Board: "other-team", Sender: "Boss", SenderRole: "Orchestrator", TargetBoard: target}, Mentions: mentions, Content: text}
+}
+
+// #11107 slice 2: a Pi agent uses the same hand-off route, with the same rules, and a text the server composes (a fixed opener, a count, the board's name made fit); Claude's text is unchanged.
+func TestTurnEndHandoffForAPiAgent(t *testing.T) {
+	server, h, _, ss := setupSessionsTestServer(t)
+	ctx := context.Background()
+	sid := "eeeeeeee-11107-2000-0000-000000000001"
+	name := "pi-" + sid
+	team := "team-11107"
+	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: sid, AgentType: "pi", AgentName: "echo", WorkingDir: "/w", BoardName: &team}))
+	tok := agentToken(t, h, sid, name)
+	_, err := h.bs.Subscribe(ctx, team, "Orch", "Orchestrator", name, nil, "all") // an Orchestrator is told of every message
+	require.NoError(t, err)
+	_, err = h.bs.Subscribe(ctx, team, "Lead", "Lead", "", nil, "all")
+	require.NoError(t, err)
+	ask := func() map[string]any {
+		req, _ := http.NewRequest("POST", server.URL+"/api/sessions/live/echo/turn-end", strings.NewReader(`{}`))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set(store.SessionTokenHeader, tok)
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		var out map[string]any
+		_ = json.NewDecoder(resp.Body).Decode(&out)
+		return out
+	}
+	assert.Equal(t, false, ask()["handoff"], "nothing unread: nothing")
+	_, err = h.bs.PostMessage(ctx, team, "Lead", "please review #12; the secret is CANARY-7F3A $(touch x)", nil) // not a mention: the window applies
+	require.NoError(t, err)
+
+	end := ptymanager.BeginPersonSend(sid)
+	assert.Equal(t, false, ask()["handoff"], "a person's send is in flight: no hand-off, for a Pi agent as for Claude (Security's 2c)")
+	end()
+
+	out := ask()
+	require.Equal(t, true, out["handoff"])
+	text, _ := out["context"].(string)
+	assert.Equal(t, board.PiBoardNotice(1, team), text, "the text is the server's own: the fixed opener, the count, the board")
+	assert.True(t, strings.HasPrefix(text, board.PiNoticeOpener))
+	assert.NotContains(t, text, "CANARY", "no message body is ever in it")
+	assert.NotContains(t, text, "touch")
+
+	assert.Equal(t, false, ask()["handoff"], "one hand-off per window (the same limiter): a second ask a moment later is held, a Pi agent cannot be looped")
+	// An @mention, or the Operator's message, is NOT held by the window (the existing rule, for Claude and for Pi alike): the bound a Pi agent has against being handed over turn after turn by an urgent message it
+	// does not read is the extension's own (one injection per 30 s, three per 10 minutes: pi_extension.test.mjs's loop test), not this one.
+	_, err = h.bs.PostMessage(ctx, team, "Lead", "@Orch are you there", nil)
+	require.NoError(t, err)
+	assert.Equal(t, true, ask()["handoff"], "a mention goes at once")
+	require.NoError(t, ss.SetSetting(ctx, TurnEndHandoffSetting, "off"))
+	assert.Equal(t, false, ask()["handoff"], "the setting off: no hand-off")
+	require.NoError(t, ss.SetSetting(ctx, TurnEndHandoffSetting, "on"))
+
+	// a board name someone chose is made fit before it is in the text
+	odd := "t\u202eeam$(x) \"y\""
+	sid2 := "eeeeeeee-11107-2000-0000-000000000002"
+	name2 := "pi-" + sid2
+	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: sid2, AgentType: "pi", AgentName: "echo2", WorkingDir: "/w", BoardName: &odd}))
+	tok2 := agentToken(t, h, sid2, name2)
+	_, err = h.bs.Subscribe(ctx, odd, "Orch2", "Orchestrator", name2, nil, "all")
+	require.NoError(t, err)
+	_, err = h.bs.Subscribe(ctx, odd, "Lead2", "Lead2", "", nil, "all")
+	require.NoError(t, err)
+	_, err = h.bs.PostMessage(ctx, odd, "Lead2", "fyi hello", nil)
+	require.NoError(t, err)
+	req, _ := http.NewRequest("POST", server.URL+"/api/sessions/live/echo2/turn-end", strings.NewReader(`{}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set(store.SessionTokenHeader, tok2)
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	var out2 map[string]any
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&out2))
+	if out2["handoff"] == true {
+		got, _ := out2["context"].(string)
+		assert.Equal(t, board.PiBoardNotice(1, odd), got)
+		assert.NotContains(t, got, "\u202e")
+		assert.NotContains(t, got, "$(")
+		assert.NotContains(t, got, "\"")
+	}
+}
+
+// The hand-off is for Claude and Pi only: a codex, agy, gemini or terminal session with the same unread message gets none (Security on #11133: the AgentType gate was untested). Claude and Pi are the control: the
+// same setup does hand off, so a "false" for the others is the gate and not an empty board.
+func TestTurnEndHandoffOnlyForClaudeAndPi(t *testing.T) {
+	server, h, _, ss := setupSessionsTestServer(t)
+	ctx := context.Background()
+	for i, c := range []struct {
+		agent string
+		want  bool
+	}{{"claude", true}, {"pi", true}, {"codex", false}, {"agy", false}, {"gemini", false}, {"terminal", false}} {
+		sid := fmt.Sprintf("eeeeeeee-11133-3000-0000-%012d", i)
+		name := c.agent + "-" + sid
+		agent := fmt.Sprintf("gate%d", i)
+		team := fmt.Sprintf("team-11133-%d", i)
+		require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: sid, AgentType: c.agent, AgentName: agent, WorkingDir: "/w", BoardName: &team}))
+		tok := agentToken(t, h, sid, name)
+		_, err := h.bs.Subscribe(ctx, team, "Orch", "Orchestrator", name, nil, "all")
+		require.NoError(t, err)
+		_, err = h.bs.Subscribe(ctx, team, "Lead", "Lead", "", nil, "all")
+		require.NoError(t, err)
+		_, err = h.bs.PostMessage(ctx, team, "Lead", "please review #12", nil)
+		require.NoError(t, err)
+		req, _ := http.NewRequest("POST", server.URL+"/api/sessions/live/"+agent+"/turn-end", strings.NewReader(`{}`))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set(store.SessionTokenHeader, tok)
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		var out map[string]any
+		_ = json.NewDecoder(resp.Body).Decode(&out)
+		resp.Body.Close()
+		assert.Equal(t, c.want, out["handoff"], "%s: hand-off %v with one unread message (%v)", c.agent, c.want, out)
+	}
+}
+
+// #11198: on a paused board read delivers nothing, so the hand-off ("N new messages, run coral-board read") held at every turn end led nowhere: it waits until the board is resumed.
+func TestTurnEndHandoffWaitsWhileTheBoardIsPaused(t *testing.T) {
+	server, h, _, ss := setupSessionsTestServer(t)
+	ctx := context.Background()
+	sid := "eeeeeeee-11198-1b00-0000-000000000001"
+	name := "claude-" + sid
+	board := "team-11198"
+	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: sid, AgentType: "claude", AgentName: "echo", WorkingDir: "/w", BoardName: &board}))
+	tok := agentToken(t, h, sid, name)
+	_, err := h.bs.Subscribe(ctx, board, "Worker", "Worker", name, nil, "all")
+	require.NoError(t, err)
+	_, err = h.bs.Subscribe(ctx, board, "Lead", "Lead", "", nil, "all")
+	require.NoError(t, err)
+	bh := NewBoardHandler(h.bs)
+	t.Cleanup(bh.WaitBackground)
+	h.SetBoardHandler(bh)
+	_, err = h.bs.PostMessage(ctx, board, "Lead", "@Worker please review #12", nil)
+	require.NoError(t, err)
+	ask := func() map[string]any {
+		req, _ := http.NewRequest("POST", server.URL+"/api/sessions/live/echo/turn-end", strings.NewReader(`{}`))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set(store.SessionTokenHeader, tok)
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		var out map[string]any
+		_ = json.NewDecoder(resp.Body).Decode(&out)
+		return out
+	}
+	bh.SetPaused(board, true)
+	assert.Equal(t, false, ask()["handoff"], "a paused board hands nothing over: read would deliver none of it")
+	bh.SetPaused(board, false)
+	assert.Equal(t, true, ask()["handoff"], "resumed: the messages that waited are handed over")
 }

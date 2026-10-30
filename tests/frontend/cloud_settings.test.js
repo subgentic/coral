@@ -25,7 +25,7 @@ const { JSDOM } = require('jsdom');
 
     // messages
     assert.match(m.settingsErrorMessage(413, {}), /too large/);
-    assert.match(m.settingsErrorMessage(400, { error: 'unknown_setting' }), /kept on the machine/);
+    assert.match(m.settingsErrorMessage(400, { error: 'unknown_setting' }), /kept on the computer/);
     assert.match(m.settingsErrorMessage(400, { error: 'invalid_value', key: 'theme' }), /not allowed for theme/);
     assert.ok(!m.settingsErrorMessage(400, { error: 'invalid_value', key: 'x'.repeat(500) }).includes('x'.repeat(61)));
     assert.strictEqual(m.settingsErrorMessage(400, { error: 'other' }), '');

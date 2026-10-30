@@ -6,6 +6,7 @@ DELETE /api/board/{project}/cross-team-links | board-claims +token-session | ope
 DELETE /api/board/{project}/groups/{groupID}/members/{sessionID} | board-claims | operator-only
 DELETE /api/board/{project}/messages/{messageID} | board-claims | operator-only
 DELETE /api/board/{project}/reminder | board-claims
+DELETE /api/board/{project}/seats/{subscriberID} | board-claims | operator-only
 DELETE /api/board/{project}/subscribe | board-claims
 DELETE /api/board/{project}/tasks/{taskID}/park | board-claims +token-session
 DELETE /api/board/{project}/tasks/{taskID}/reminder | board-claims
@@ -15,6 +16,7 @@ DELETE /api/sessions/live/{name}/events | token-bound
 DELETE /api/sessions/live/{name}/held/{id} | unbound | operator-only
 DELETE /api/sessions/live/{name}/notes/{noteID} | token-bound
 DELETE /api/sessions/live/{name}/tasks/{taskID} | token-bound
+GET /api/agent/board/search | token-bound
 GET /api/agent/history/context | token-bound
 GET /api/agent/history/search | token-bound
 GET /api/agent/tasks | token-bound

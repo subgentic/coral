@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/subgentic/coral/internal/board"
+	"github.com/subgentic/coral/internal/consoletest"
 	"github.com/subgentic/coral/internal/gitutil"
 	"github.com/subgentic/coral/internal/store"
 	"github.com/subgentic/coral/internal/store/storetest"
@@ -198,7 +199,7 @@ func TestGitTipReadsTheLocalBranchAndSharesWorktreeRepository(t *testing.T) {
 	dir := t.TempDir()
 	run := func(d string, args ...string) {
 		t.Helper()
-		cmd := exec.Command("git", append([]string{"-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "init.defaultBranch=main"}, args...)...)
+		cmd := consoletest.HiddenCommand("git", append([]string{"-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "init.defaultBranch=main"}, args...)...)
 		cmd.Dir = d
 		out, err := cmd.CombinedOutput()
 		require.NoError(t, err, string(out))
@@ -230,7 +231,7 @@ func TestGitTipTakesTheLaterOfTheLocalAndRemoteBranchAndReadsTheReflog(t *testin
 	dir := t.TempDir()
 	run := func(env []string, args ...string) {
 		t.Helper()
-		cmd := exec.Command("git", append([]string{"-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "init.defaultBranch=main"}, args...)...)
+		cmd := consoletest.HiddenCommand("git", append([]string{"-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "init.defaultBranch=main"}, args...)...)
 		cmd.Dir = dir
 		cmd.Env = append(os.Environ(), env...)
 		out, err := cmd.CombinedOutput()
@@ -351,7 +352,7 @@ func TestGitReleaseReadsTheNewestMatchingTagTheBranchContains(t *testing.T) {
 	dir := t.TempDir()
 	run := func(args ...string) {
 		t.Helper()
-		cmd := exec.Command("git", append([]string{"-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "init.defaultBranch=main"}, args...)...)
+		cmd := consoletest.HiddenCommand("git", append([]string{"-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "init.defaultBranch=main"}, args...)...)
 		cmd.Dir = dir
 		out, err := cmd.CombinedOutput()
 		require.NoError(t, err, string(out))
@@ -395,7 +396,7 @@ func TestGitReleaseCountsCommitsOnOriginsBranchTheLocalOneHasNotPulled(t *testin
 	dir := t.TempDir()
 	run := func(env []string, args ...string) {
 		t.Helper()
-		cmd := exec.Command("git", append([]string{"-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "init.defaultBranch=main"}, args...)...)
+		cmd := consoletest.HiddenCommand("git", append([]string{"-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "init.defaultBranch=main"}, args...)...)
 		cmd.Dir = dir
 		cmd.Env = append(os.Environ(), env...)
 		out, err := cmd.CombinedOutput()

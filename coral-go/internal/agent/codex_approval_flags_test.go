@@ -2,13 +2,14 @@ package agent
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/subgentic/coral/internal/consoletest"
 )
 
 // #5890: Codex 0.163 takes the approval policy as -a or --ask-for-approval (both with a space and with =), and only the values on-request and never. It rejects --approval-mode (the name
@@ -107,7 +108,7 @@ func TestCodex163ApprovalTableMatchesTheRealParser(t *testing.T) {
 	for _, name := range []string{"-a", "--ask-for-approval", "--approval-mode"} {
 		for _, value := range []string{"untrusted", "on-failure", "on-request", "never"} {
 			for _, argv := range [][]string{{name, value}, {name + "=" + value}} {
-				cmd := exec.Command(bin, append(argv, "--help")...)
+				cmd := consoletest.HiddenCommand(bin, append(argv, "--help")...)
 				cmd.Env = []string{"HOME=" + home, "CODEX_HOME=" + filepath.Join(home, "codex"), "PATH=/usr/bin:/bin"}
 				err := cmd.Run()
 				accepted, _ := codexAcceptsApproval(argv, 0)

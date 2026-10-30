@@ -13,7 +13,9 @@ as_board() {
         0|off|false|no) ;;
         *)              _tok="$(token_of "$session")" ;;
     esac
-    env -u TMUX -u CORAL_PORT CORAL_URL="$BASE_URL" \
+    # CORAL_TIMEOUT: the workflow tests send many board notices and nudges to one team in a burst, and Coral spaces a team's automated sends 2-3 s apart (#3613, up to 30 s in the request), so a CLI
+    # call that nudges (submit-review, complete, assign) can take longer than the CLI's 10 s default while the server is doing exactly what it should.
+    env -u TMUX -u CORAL_PORT CORAL_URL="$BASE_URL" CORAL_TIMEOUT="${CORAL_TIMEOUT:-60s}" \
         CORAL_SESSION_NAME="$session" CORAL_SUBSCRIBER_ID="$role" \
         CORAL_SESSION_TOKEN="$_tok" \
         "$TMPDIR_AT/coral-board" "$@"
@@ -48,6 +50,16 @@ reject_board() {
     if "$@" >"$TMPDIR_AT/last-rejection.log" 2>&1; then return 1; fi
 }
 
+# An agent can join only a board it already has a seat on or was launched on (#11013: a join with its token to any other board is refused as cross_board), so the Operator seats these four
+# on the shared board through the dashboard's API, and each agent's own join then records the board for its CLI.
+operator_seat() {
+    local board="$1" session="$2" role="$3" title="$4"
+    api POST "/api/board/$board/subscribe" -d "{\"subscriber_id\":\"$role\",\"session_name\":\"$session\",\"job_title\":\"$title\"}" >/dev/null
+}
+operator_seat workflow-integration "$SESS_A" Builder Builder
+operator_seat workflow-integration "$SESS_B" Tester Tester
+operator_seat workflow-integration "$SESS_PLANNER" Orchestrator Orchestrator
+operator_seat workflow-integration "$SESS_REVIEWER" Reviewer Reviewer
 builder join workflow-integration --as Builder >/dev/null
 tester join workflow-integration --as Tester >/dev/null
 planner join workflow-integration --as Orchestrator >/dev/null

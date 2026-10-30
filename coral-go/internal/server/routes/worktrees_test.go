@@ -21,6 +21,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/subgentic/coral/internal/config"
+	"github.com/subgentic/coral/internal/consoletest"
 	"github.com/subgentic/coral/internal/gitutil"
 	"github.com/subgentic/coral/internal/store"
 	"github.com/subgentic/coral/internal/store/storetest"
@@ -260,7 +261,7 @@ func TestWorktreeEntryIsNotCheckedWhenTheUnmergedReadStalls(t *testing.T) {
 	fakeDir := t.TempDir()
 	readyPath := filepath.Join(fakeDir, "ready")
 	holdPath := filepath.Join(fakeDir, "hold")
-	require.NoError(t, exec.Command("mkfifo", readyPath, holdPath).Run())
+	require.NoError(t, consoletest.HiddenCommand("mkfifo", readyPath, holdPath).Run())
 	ready, err := os.OpenFile(readyPath, os.O_RDWR, 0o600)
 	require.NoError(t, err)
 	defer ready.Close()

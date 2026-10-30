@@ -141,7 +141,7 @@ const contrast = (a, b) => {
         assert.ok(t.viewShown && t.viewRole === 'region', 'the view is shown as a labelled region');
         assert.equal(t.current, 'page', 'aria-current=page after opening'); assert.equal(t.selected, null, 'still no aria-selected');
         assert.equal(t.focus, 'servers-tab-title', 'focus moves to the heading');
-        assert.equal(await ev(`!!document.getElementById('cloud-servers-modal')`), false, 'no Servers dialog any more');
+        assert.equal(await ev(`!!document.getElementById('cloud-servers-modal')`), false, 'no Computers dialog any more');
         console.log('   ✓ nav button aria-current/controls, region, heading focused, no dialog');
 
         // The row's words hold 4.5:1 in both themes (the control, the helper line, the notes, the Follow button; Revoke has its own check below), and CORAL_SCREENSHOT_DIR keeps the shots to look at.
@@ -279,15 +279,15 @@ const contrast = (a, b) => {
         await waitFor(`document.activeElement && document.activeElement.id === 'server-row-m2'`, 'the old #servers/m2 link focuses its page', 6000);
         assert.equal(await ev('location.pathname + location.hash'), '/servers/m2', 'and its URL becomes the path');
         await ev(`window.switchNavTab('agents'); localStorage.setItem('coral-group-by-server', 'true'); window.__m.add('chip-agent', 'C', 3, { sleeping: false, server: 'm3' }); T.render.renderLiveSessions(T.state.liveSessions); true`);
-        // #4932 (replaces the removed search-row pill): a server group header's ⋮ panel has an 'Open in Servers' button that opens its row.
+        // #4932 (replaces the removed search-row pill): a server group header's ⋮ panel has an 'Open in Computers' button that opens its row.
         await ev(`document.querySelector('li.server-group-header[data-server-group="m3"] details[data-server-details]').open = true; true`);
         const item = await ev(`(() => { const b = document.querySelector('li.server-group-header[data-server-group="m3"] button.server-open-btn[data-server-open="m3"]'); return b ? { tag: b.tagName, focusable: b.tabIndex >= 0, text: b.textContent.trim() } : null; })()`);
-        assert.ok(item && item.tag === 'BUTTON' && item.focusable, `the header's Open in Servers is a keyboard-reachable button (${JSON.stringify(item)})`);
-        assert.equal(item.text, 'Open in Servers', 'its label says what it opens');
+        assert.ok(item && item.tag === 'BUTTON' && item.focusable, `the header's Open in Computers is a keyboard-reachable button (${JSON.stringify(item)})`);
+        assert.equal(item.text, 'Open in Computers', 'its label says what it opens');
         await ev(`document.querySelector('li.server-group-header[data-server-group="m3"] button.server-open-btn[data-server-open="m3"]').click(); true`);
-        await waitFor(`document.activeElement && document.activeElement.id === 'server-row-m3'`, 'the header Open in Servers opens m3\'s page', 6000);
+        await waitFor(`document.activeElement && document.activeElement.id === 'server-row-m3'`, 'the header Open in Computers opens m3\'s page', 6000);
         assert.equal(await ev('location.pathname'), '/servers/m3', 'it writes its row\'s path');
-        console.log('   ✓ /servers/m2 → row focused + highlighted; /servers → heading; #servers/m2 → /servers/m2; header Open in Servers → row m3');
+        console.log('   ✓ /servers/m2 → row focused + highlighted; /servers → heading; #servers/m2 → /servers/m2; header Open in Computers → row m3');
 
         console.log('5. Phone 375 px: no overflow, in the list and on a machine\'s page, the foot bar inside the viewport');
         await Emulation.setDeviceMetricsOverride({ width: 375, height: 812, deviceScaleFactor: 2, mobile: true });
@@ -347,9 +347,9 @@ const contrast = (a, b) => {
 
         console.log('7. Enroll page points new machines at Servers');
         const enroll = fs.readFileSync(path.join(__dirname, '../../coral-go/pkg/frontend/templates/cloud/enroll.html'), 'utf8');
-        assert.match(enroll, /A machine connected from the command line starts in View \(read-only\) until you change that in Coral on it; you can limit access further in <a href="\/servers">Servers<\/a>\./);
-        assert.match(enroll, /<a class="cloud-btn" href="\/servers">Open Servers<\/a>/);
-        console.log('   ✓ review note + done-step Open Servers link to /servers');
+        assert.match(enroll, /A computer connected from the command line starts in View \(read-only\) until you change that in Coral on it; you can limit access further in <a href="\/servers">Computers<\/a>\./);
+        assert.match(enroll, /<a class="cloud-btn" href="\/servers">Open Computers<\/a>/);
+        console.log('   ✓ review note + done-step Open Computers link to /servers');
 
         console.log('\nAll Servers tab checks passed');
     } finally {

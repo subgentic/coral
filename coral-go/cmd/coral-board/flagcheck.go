@@ -28,8 +28,12 @@ func checkKnownFlags(args []string) error {
 		spec = clihelp.FlagSpec{Bools: []string{"--all", "-a", "--json"}, Values: []string{"--id", "--last"}}
 	case "check":
 		spec = clihelp.FlagSpec{Bools: []string{"--quiet"}}
-	case "projects", "subscribers", "leave", "delete", "targets":
+	case "projects", "subscribers", "delete", "targets":
 		spec = noFlags
+	case "leave":
+		spec = clihelp.FlagSpec{Values: []string{"--board", "--as"}} // the Operator removes a seat (#11112); bare, the caller leaves its own
+	case "seats":
+		spec = clihelp.FlagSpec{Bools: []string{"--foreign", "--json"}}
 	case "link":
 		spec = clihelp.FlagSpec{Bools: []string{"--one-way", "--no-files"}, Positional: 2}
 	case "unlink":
@@ -38,6 +42,8 @@ func checkKnownFlags(args []string) error {
 		spec = clihelp.FlagSpec{Positional: 1}
 	case "status":
 		spec = clihelp.FlagSpec{Bools: []string{"--activity", "--json"}, Values: []string{"--board"}}
+	case "search":
+		spec = clihelp.FlagSpec{Bools: []string{"--json", "--team", "--all", "--operator-history"}, Values: []string{"--from", "--since", "--until", "--sort", "--limit", "--cursor", "--mentions"}, Positional: 1}
 	case "queue":
 		spec = jsonOnly
 	case "goal":

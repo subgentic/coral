@@ -40,8 +40,8 @@ const part = (role) => document.querySelector(`[data-cloud="${role}"]`);
 const text = m.rekeyText(refused);
 assert.match(text, /Other accounts on this computer could read/);
 assert.match(text, /https:\/\/hub\.example\.com/);
-assert.match(text, /2 remote servers' API keys/);
-assert.match(m.rekeyText({ state: 'refused', remote_server_keys: 1, message: 'bad file' }), /bad file.*1 remote server's API key/s);
+assert.match(text, /2 remote computers' API keys/);
+assert.match(m.rekeyText({ state: 'refused', remote_server_keys: 1, message: 'bad file' }), /bad file.*1 remote computer's API key/s);
 assert.match(m.rekeyText({ state: 'refused', remote_server_keys: 0 }), /nothing stored yet/);
 
 // A usable key: no row.
@@ -61,7 +61,7 @@ status = { ...status, secret_key: refused };
 panel.load();
 await tick();
 assert.strictEqual(part('rekey-row').hidden, false);
-assert.match(part('rekey-text').textContent, /2 remote servers' API keys/);
+assert.match(part('rekey-text').textContent, /2 remote computers' API keys/);
 
 // The button asks first; nothing is sent until Yes.
 part('rekey').click();

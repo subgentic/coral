@@ -22,7 +22,7 @@ function fitPlaceholder(input) {
     input.style.removeProperty("--ph-scale");
     if (input.value || !input.placeholder || input.clientWidth < 40) return;   // not laid out yet: nothing to measure
     const cs = getComputedStyle(input);
-    // A word of the placeholder wider than the box broke inside itself ("Messag / e"): the placeholder's size is scaled down, as far as the box needs and no further (never below 60 percent), until its widest word
+    // A word of the placeholder wider than the box broke inside itself ("Messag / e"): the placeholder's size is scaled down, as far as the box needs and no further (never below 55 percent), until its widest word
     // fits; the placeholder wraps only at spaces then, whatever the word, the box or the text size (#6971; the CSS reads --ph-scale on a phone's layout).
     const room = input.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
     const ruler = document.createElement("span");
@@ -31,7 +31,7 @@ function fitPlaceholder(input) {
     let widest = 0;
     for (const word of input.placeholder.split(/\s+/)) { if (!word) continue; ruler.textContent = word; widest = Math.max(widest, ruler.getBoundingClientRect().width); }
     ruler.remove();
-    const scale = widest > room && widest > 0 ? Math.max(0.6, Math.floor((room / widest) * 100) / 100) : 1;
+    const scale = widest > room && widest > 0 ? Math.max(0.55, Math.floor((room / widest) * 100) / 100) : 1;
     if (scale < 1) input.style.setProperty("--ph-scale", String(scale));
     const pad = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom) + parseFloat(cs.borderTopWidth) + parseFloat(cs.borderBottomWidth);
     const probe = document.createElement("div");
@@ -45,6 +45,9 @@ function fitPlaceholder(input) {
         input.style.setProperty("max-height", `${need}px`, "important");
     }
 }
+
+/** The box's top and bottom border, which a border-box height holds and scrollHeight does not. */
+const borderY = (input) => { const cs = getComputedStyle(input); return (parseFloat(cs.borderTopWidth) || 0) + (parseFloat(cs.borderBottomWidth) || 0); };
 
 export function autosizeCommandInput() {
     const input = document.getElementById("command-input");
@@ -60,7 +63,7 @@ export function autosizeCommandInput() {
         // A phone's box is three lines tall and grows with the text to the CSS cap (about five lines), then scrolls (#10281); with no text it keeps its three lines.
         if (input.offsetParent && !desktopComposer.matches) {
             input.style.height = "0px";
-            const need = input.scrollHeight;
+            const need = input.scrollHeight + borderY(input);
             input.style.height = "";
             if (need > input.offsetHeight + 0.5) input.style.height = `${need}px`;
         }
@@ -68,7 +71,7 @@ export function autosizeCommandInput() {
     }
     // Collapse first so scrollHeight measures the text, not the old height
     input.style.height = "0px";
-    input.style.height = input.scrollHeight + "px";
+    input.style.height = (input.scrollHeight + borderY(input)) + "px"; // scrollHeight leaves out the border a border-box height includes: without it the box was 2 px short of its text
     if (input.offsetHeight === before) return;
     if (document.getElementById("capture-wrapper")?.classList.contains("chat-mode")) {
         // Keep the newest reply in view as the box grows

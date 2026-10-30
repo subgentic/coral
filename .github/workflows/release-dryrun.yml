@@ -35,6 +35,25 @@ jobs:
         with:
           go-version-file: coral-go/go.mod
           cache: false
+      # A cold module cache downloads about 40 modules, and proxy.golang.org dropped several on v2.0.4's first attempt (stream INTERNAL_ERROR), failing resolve
+      # before anything was built (#11047). Fetch them here, up to four times with a wait between, so a dropped download is retried instead of failing the release (each try is cut at five minutes);
+      # go checks every module it downloads against go.sum, a mismatch is never retried, and no proxy setting changes.
+      - name: Download the Go modules, retrying a dropped download
+        working-directory: coral-go
+        run: |
+          for attempt in 1 2 3 4; do
+            out=$(timeout 300 go mod download 2>&1) && { echo "$out"; exit 0; }
+            echo "$out"
+            # A module that does not match go.sum is never retried into green: it means something served other bytes, and the release must fail (Security on #11300).
+            if echo "$out" | grep -qiE 'checksum mismatch|SECURITY ERROR|verifying module'; then
+              echo "::error::a module did not match go.sum: not retried"
+              exit 1
+            fi
+            echo "go mod download failed (attempt $attempt of 4)"
+            [ "$attempt" -lt 4 ] && sleep $((attempt * 15))
+          done
+          echo "::error::go mod download failed four times"
+          exit 1
       # Only this step gets the token (the provenance record reads the gates' runs); the candidate's own test scripts below never see it.
       - name: Release provenance record
         id: prov
@@ -111,6 +130,7 @@ jobs:
           run_check "promote_copy_check_test" bash tests/release/promote_copy_check_test.sh
           run_check "signature_required_check_test" bash tests/release/signature_required_check_test.sh
           run_check "ldflags_build_test" bash tests/release/ldflags_build_test.sh
+          run_check "go_mod_download_retry_test" bash tests/release/go_mod_download_retry_test.sh
           run_check "workflows_lint" python3 tests/release/workflows_lint.py
           run_check "release_dryrun_test (this list matches release.yml)" python3 tests/release/release_dryrun_test.py
           if [ "${#fails[@]}" -eq 0 ]; then

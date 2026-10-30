@@ -19,8 +19,8 @@ import { updatesUiOn } from './update_flag.js';
 import { serverBase } from './server_base.js';
 
 const BADGE_TEXT = 'Updating';
-const BADGE_NAME = 'Updating: Coral on this machine is restarting into an update. It reconnects on its own.'; // the accessible name starts with the visible word (UI/UX on #5355: label in name)
-const BADGE_TIP = 'Coral on this machine is restarting into an update. It reconnects on its own.';
+const BADGE_NAME = 'Updating: Coral on this computer is restarting into an update. It reconnects on its own.'; // the accessible name starts with the visible word (UI/UX on #5355: label in name)
+const BADGE_TIP = 'Coral on this computer is restarting into an update. It reconnects on its own.';
 const AGE_OUT_MS = 5 * 60 * 1000;
 
 const reads = new Map();   // server id -> { flag, at }: the latest read (flag is true only for relaunching: true), and when

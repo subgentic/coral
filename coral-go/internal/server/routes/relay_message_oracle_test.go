@@ -478,10 +478,10 @@ func (h *BoardHandler) postRelayMessageBefore4756(w http.ResponseWriter, r *http
 		relayError(w, http.StatusRequestEntityTooLarge, "too_large", fmt.Sprintf("content must be at most %d bytes", maxRelayedContent), 0)
 		return
 	case strings.Count(body.ToAddress, "/") >= 2:
-		relayError(w, http.StatusBadRequest, "bad_address", "an address is <server>/<team>; addressing an agent isn't supported", 0)
+		relayError(w, http.StatusBadRequest, "bad_address", "an address is <computer>/<team>; addressing an agent isn't supported", 0)
 		return
 	case !relayAddressRe.MatchString(body.ToAddress):
-		relayError(w, http.StatusBadRequest, "bad_address", "an address is <server>/<team>, e.g. homelab/qa (see coral-board targets)", 0)
+		relayError(w, http.StatusBadRequest, "bad_address", "an address is <computer>/<team>, e.g. homelab/qa (see coral-board targets)", 0)
 		return
 	case body.MessageID != "" && !relayIDRe.MatchString(body.MessageID):
 		relayError(w, http.StatusBadRequest, "bad_request", "malformed message_id", 0)

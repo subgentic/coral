@@ -35,6 +35,7 @@ const BASE = require('./test_base').BASE;
         for (const w of [390, 1280]) {
             console.log(`-- ${w} px`);
             await load(w); await stub();
+            if (w < 640) { await ev(`window.switchNavTab('hub-inbox'); true`); await new Promise(r => setTimeout(r, 500)); } // sleep-ok: the Inbox draws over a frame; the Agents page has no top bar under 601 px (#11096)
             // 1. the Settings menu by Enter (under 640 px the top row is the hamburger and its menu holds Settings, #9021)
             const menuId = w < 640 ? 'nav-more-menu' : 'top-bar-settings-menu', btnSel = w < 640 ? '#top-menu-btn' : '[aria-controls="top-bar-settings-menu"]';
             await ev(`document.querySelector(${JSON.stringify(btnSel)}).focus(); true`);

@@ -522,7 +522,7 @@ body.popout-mode.popout-terminal-blocked .attach-image-btn { pointer-events: non
     /* On a phone's layout the placeholder is scaled to its widest word (command_autosize.js sets --ph-scale on the box, never below 60 percent), so it wraps only at spaces: "Message" broke inside the word, "Messag / e dk-a", in a 320 px window at 200% text (#6943), and a fixed 0.9 em broke again for a longer word or a narrower box (#6971). */
     #command-input::placeholder { font-size: calc(1em * var(--ph-scale, 1)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } /* one line, cut with an ellipsis: a long name must not make the box tall (#8206) */
     /* A phone: the menu is a sheet over the bottom of the screen, with room for 44 px targets. */
-    .model-chip-menu { position: fixed; left: 8px; right: 8px; bottom: 8px; max-width: none; max-height: 60vh; }
+    .model-chip-menu { position: fixed; left: 8px; right: 8px; top: 12vh; bottom: auto; max-width: none; max-height: 45vh; } /* a sheet over the chat, not over the composer: the text box and Send stay on screen while the model and thinking are chosen (#11128) */
     .model-chip-item { min-height: 44px; }
     .model-chip-add-field input, .model-chip-add-actions .btn { min-height: 44px; }
     .model-chip { min-height: 44px; min-width: 44px; } /* a touch target (#4276) */

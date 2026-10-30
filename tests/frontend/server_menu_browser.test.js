@@ -1,4 +1,4 @@
-// The server row's menu in the agent list (Group by server, #4185): its kebab sits in the same column, at the same size,
+// The server row's menu in the agent list (Group by computer, #4185): its kebab sits in the same column, at the same size,
 // as the team and folder rows' kebabs (desktop and a 375 px phone), and its menu opens with Launch team, Open folder and
 // Launch agent, each opening the launch flow with that server already chosen; a server that cannot launch has them
 // disabled with the reason (an unreachable one; Open folder for a remote, whose pins live on this Coral).
@@ -82,18 +82,18 @@ const SERVERS = [
         for (const a of ['teamAgent', 'folderAgent']) assert.ok(Math.abs(centre(k[a]) - centre(k.server)) <= 1, `${a} kebab centre ${centre(k[a])} vs server ${centre(k.server)}`);
         console.log(`   ✓ x ${k.server.left}, ${k.server.width} x ${k.server.height} px for all three`);
 
-        console.log('2. The menu opens with one launch row (Launch agent, Launch team, Open in Servers), a hint for the folder, then the details');
+        console.log('2. The menu opens with one launch row (Launch agent, Launch team, Open in Computers), a hint for the folder, then the details');
         await openMenu('m1');
         const menu = await ev(`(() => { const p = document.querySelector('#live-sessions-list li.server-group-header[data-server-group="m1"] .server-switcher-panel');
             return { first: [...p.children].map(c => c.className.split(' ')[0]), actions: [...p.querySelectorAll('[data-server-launch]')].map(b => ({ kind: b.dataset.serverLaunch, label: b.firstChild.textContent.trim(), disabled: b.disabled })), row: [...p.querySelector('.server-launch-actions').children].map(b => b.textContent.trim()), hint: (p.querySelector('.server-launch-hint') || {}).textContent || '', collapse: [...p.querySelectorAll('button')].some(b => /^(Collapse|Expand)$/.test(b.textContent.trim())), hasDetails: !!p.querySelector('.server-details-list') }; })()`);
         assert.equal(menu.first[0], 'server-launch-actions', `the launch actions come first (${menu.first})`);
         assert.deepEqual(menu.actions.map(a => a.label), ['New agent', 'New project']);
         assert.deepEqual(menu.actions.map(a => a.kind), ['agent', 'team']);
-        assert.deepEqual(menu.row, ['New agent', 'New project', 'Open in Servers'], 'one row: the two launches and Open in Servers as its last item');
+        assert.deepEqual(menu.row, ['New agent', 'New project', 'Open in Computers'], 'one row: the two launches and Open in Computers as its last item');
         assert.equal(menu.hint, 'To use a folder, choose it when you launch an agent.', 'a remote has no Open folder: a one-line hint says where the folder is chosen');
         assert.equal(menu.collapse, false, 'no Collapse button in the menu: the header toggles the group');
         assert.ok(menu.hasDetails, 'the details stay');
-        console.log('   ✓ agent, team and Open in Servers in one row, the folder hint, no Collapse; details after');
+        console.log('   ✓ agent, team and Open in Computers in one row, the folder hint, no Collapse; details after');
 
         console.log('3. Launch team and Launch agent open the launch flow with that server chosen');
         await click('m1', 'team');
@@ -114,7 +114,7 @@ const SERVERS = [
         assert.equal(off.length, 2);
         assert.ok(off.every(o => o.disabled && o.aria === 'true' && /unavailable \(offline\)/.test(o.why)), `both launches disabled, with the reason (${JSON.stringify(off)})`);
         assert.match(await ev(`document.querySelector('#live-sessions-list li.server-group-header[data-server-group="m3"] .server-launch-note').textContent`), /unavailable \(offline\)/, 'the reason is said once under the row');
-        assert.equal(await ev(`document.querySelector('#live-sessions-list li.server-group-header[data-server-group="m3"] .server-open-btn').disabled`), false, 'Open in Servers still works for an offline server');
+        assert.equal(await ev(`document.querySelector('#live-sessions-list li.server-group-header[data-server-group="m3"] .server-open-btn').disabled`), false, 'Open in Computers still works for an offline server');
         await ev(`document.querySelector('#live-sessions-list li.server-group-header[data-server-group="m3"] [data-server-launch="team"]').click(); true`);
         st = await launchState();
         assert.equal(st.launch, false, 'nothing opened');
@@ -155,7 +155,9 @@ const SERVERS = [
         assert.ok(k.server && k.team && k.folder, `phone: all three kebabs present (${JSON.stringify(k)})`);
         assert.deepEqual([k.server.right, k.server.width, k.server.height], [k.team.right, k.team.width, k.team.height], `phone: server vs team kebab (${JSON.stringify(k)})`);
         assert.deepEqual([k.server.right, k.server.width, k.server.height], [k.folder.right, k.folder.width, k.folder.height], `phone: server vs folder kebab (${JSON.stringify(k)})`);
-        for (const a of ['teamAgent', 'folderAgent']) assert.ok(Math.abs((k[a].left + k[a].right) / 2 - (k.server.left + k.server.right) / 2) <= 1, `phone: ${a} kebab in the column (${JSON.stringify(k)})`);
+        // a phone's agent row is a card whose kebab is at its lower right (#11096): only the group headers' menus (server, team, folder) share a column
+        for (const a of ['teamAgent', 'folderAgent']) assert.ok(k[a].right <= 390 && k[a].width >= 24, `phone: ${a} kebab is on the screen inside its card (${JSON.stringify(k)})`);
+        for (const a of ['team', 'folder']) assert.ok(Math.abs((k[a].left + k[a].right) / 2 - (k.server.left + k.server.right) / 2) <= 1, `phone: ${a} kebab in the column (${JSON.stringify(k)})`);
         // what a finger hits: the server kebab is a 24 px box with a 44 px ::after (#9332)
         const hit = await ev(`(() => { const a = (${TOUCH_AREA})(document.querySelector('#mobile-agent-list li.server-group-header[data-server-group="m1"] .server-group-more-btn')); return { w: Math.round(a.w), h: Math.round(a.h), after: a.after }; })()`);
         assert.ok(hit.w >= 44 && hit.h >= 44, `phone: a 44 px hit area (${JSON.stringify(hit)})`);

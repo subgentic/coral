@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"testing"
 
@@ -12,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/subgentic/coral/internal/config"
+	"github.com/subgentic/coral/internal/consoletest"
 	"github.com/subgentic/coral/internal/naming"
 	"github.com/subgentic/coral/internal/ptymanager"
 	"github.com/subgentic/coral/internal/store"
@@ -32,11 +32,11 @@ func TestPTYWakeOfAnAgentStillInTheOldTmuxServer(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { os.RemoveAll(dataDir) })
 	socket := tmux.PrivateSocketPath(dataDir)
-	t.Cleanup(func() { exec.Command(bin, "-S", socket, "kill-server").Run() })
+	t.Cleanup(func() { consoletest.HiddenCommand(bin, "-S", socket, "kill-server").Run() })
 
 	const sid = "0b2f6c1e-3d4a-4b5c-8d6e-7f8091a2b3c4"
 	name := naming.SessionName("claude", sid)
-	start := exec.Command(bin, "-S", socket, "new-session", "-d", "-s", name, "sleep 600")
+	start := consoletest.HiddenCommand(bin, "-S", socket, "new-session", "-d", "-s", name, "sleep 600")
 	start.Env = append(os.Environ(), "TMUX=")
 	out, err := start.CombinedOutput()
 	require.NoError(t, err, string(out))

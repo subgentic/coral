@@ -148,7 +148,7 @@ func inputBoxTextAny(screen string) (text string, ok bool) {
 	lines := tailLines(screenText(screen), boxScanLines)
 	start := boxStartLine(lines)
 	if start < 0 {
-		return "", false
+		return piEditorText(screen) // Pi's editor has no marker (#11165)
 	}
 	m := inputBoxRe.FindStringSubmatchIndex(lines[start])
 	parts := []string{lines[start][m[1]:]}

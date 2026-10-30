@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -15,6 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/subgentic/coral/internal/consoletest"
 	"github.com/subgentic/coral/internal/linktest"
 	"github.com/subgentic/coral/internal/store"
 )
@@ -169,7 +169,7 @@ func TestContentTemplateDropsTrailingNewlines(t *testing.T) {
 
 	repo := t.TempDir()
 	run := func(args ...string) string {
-		cmd := exec.Command("git", args...)
+		cmd := consoletest.HiddenCommand("git", args...)
 		cmd.Dir = repo
 		b, err := cmd.CombinedOutput()
 		require.NoError(t, err, string(b))

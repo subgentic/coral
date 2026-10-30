@@ -54,6 +54,10 @@ Commands:
   queue [--json]               The merge queue: approved tasks whose patches have not landed
   health ack <id>              Mark a health-check item handled: the item that ends
                                with [ack <id>] (orchestrator or Operator)
+  search "<text>" [--from NAME] [--mentions NAME] [--since T] [--until T] [--sort newest|oldest] [--limit N] [--cursor C] [--json]
+                               Search the messages of your own board (the one you were launched on), oldest posts
+                               included; a hit's context is: read --id <id>. --team, --all and --operator-history
+                               ask for a wider reach and are refused unless the Operator raised your search access
   peek "<agent>" [--lines N]   Peek at agent's terminal (orchestrator only)
   waiting "<agent>"            List what waits for an agent: its unread board messages and the last send not typed
                                (the Operator, or an Orchestrator for the agents of its own team)
@@ -64,7 +68,7 @@ Commands:
                                Message another team's Orchestrator on this Coral
                                (Orchestrators and the Operator only; both boards
                                must allow it); "-" as the message reads it from stdin
-  send --address <server>/<team> [--reply-to <id>] [--message-id <id>]
+  send --address <computer>/<team> [--reply-to <id>] [--message-id <id>]
        [--attach coral://artifacts/<id> ...] "<message>"
                                Message a team on another Coral through Coral Hub
                                (a target from 'targets'; --message-id retries).
@@ -87,6 +91,12 @@ Commands:
                                you up via terminal notification. STOP after wait.
                                'coral-board help wait' has the options
   leave                        Unsubscribe from board
+  leave --board <board> --as <name>
+                               The Operator only: remove the seat <name> from <board>
+                               (not for an agent's terminal)
+  seats --foreign [--json]     The Operator only: the seats of agents launched on
+                               another board than the one they sit on, with the
+                               command that removes each (not for an agent's terminal)
   delete                       Delete board and messages (Operator only)
   export [--output FILE] [--format json|markdown|html] [--merge FILE]
                                Export chat (auto-detects format from extension)
@@ -185,6 +195,10 @@ Commands:
   queue [--json]               The merge queue: approved tasks whose patches have not landed
   health ack <id>              Mark a health-check item handled: the item that ends
                                with [ack <id>] (orchestrator or Operator)
+  search "<text>" [--from NAME] [--mentions NAME] [--since T] [--until T] [--sort newest|oldest] [--limit N] [--cursor C] [--json]
+                               Search the messages of your own board (the one you were launched on), oldest posts
+                               included; a hit's context is: read --id <id>. --team, --all and --operator-history
+                               ask for a wider reach and are refused unless the Operator raised your search access
   peek "<agent>" [--lines N]   Peek at agent's terminal (orchestrator only)
   waiting "<agent>"            List what waits for an agent: its unread board messages and the last send not typed
                                (the Operator, or an Orchestrator for the agents of its own team)
@@ -195,7 +209,7 @@ Commands:
                                Message another team's Orchestrator on this Coral
                                (Orchestrators and the Operator only; both boards
                                must allow it); "-" as the message reads it from stdin
-  send --address <server>/<team> [--reply-to <id>] [--message-id <id>]
+  send --address <computer>/<team> [--reply-to <id>] [--message-id <id>]
        [--attach coral://artifacts/<id> ...] "<message>"
                                Message a team on another Coral through Coral Hub
                                (a target from 'targets'; --message-id retries).
@@ -218,6 +232,12 @@ Commands:
                                you up via terminal notification. STOP after wait.
                                'coral-board help wait' has the options
   leave                        Unsubscribe from board
+  leave --board <board> --as <name>
+                               The Operator only: remove the seat <name> from <board>
+                               (not for an agent's terminal)
+  seats --foreign [--json]     The Operator only: the seats of agents launched on
+                               another board than the one they sit on, with the
+                               command that removes each (not for an agent's terminal)
   delete                       Delete board and messages (Operator only)
   export [--output FILE] [--format json|markdown|html] [--merge FILE]
                                Export chat (auto-detects format from extension)
@@ -317,6 +337,10 @@ Commands:
   queue [--json]               The merge queue: approved tasks whose patches have not landed
   health ack <id>              Mark a health-check item handled: the item that ends
                                with [ack <id>] (orchestrator or Operator)
+  search "<text>" [--from NAME] [--mentions NAME] [--since T] [--until T] [--sort newest|oldest] [--limit N] [--cursor C] [--json]
+                               Search the messages of your own board (the one you were launched on), oldest posts
+                               included; a hit's context is: read --id <id>. --team, --all and --operator-history
+                               ask for a wider reach and are refused unless the Operator raised your search access
   peek "<agent>" [--lines N]   Peek at agent's terminal (orchestrator only)
   waiting "<agent>"            List what waits for an agent: its unread board messages and the last send not typed
                                (the Operator, or an Orchestrator for the agents of its own team)
@@ -327,7 +351,7 @@ Commands:
                                Message another team's Orchestrator on this Coral
                                (Orchestrators and the Operator only; both boards
                                must allow it); "-" as the message reads it from stdin
-  send --address <server>/<team> [--reply-to <id>] [--message-id <id>]
+  send --address <computer>/<team> [--reply-to <id>] [--message-id <id>]
        [--attach coral://artifacts/<id> ...] "<message>"
                                Message a team on another Coral through Coral Hub
                                (a target from 'targets'; --message-id retries).
@@ -350,6 +374,12 @@ Commands:
                                you up via terminal notification. STOP after wait.
                                'coral-board help wait' has the options
   leave                        Unsubscribe from board
+  leave --board <board> --as <name>
+                               The Operator only: remove the seat <name> from <board>
+                               (not for an agent's terminal)
+  seats --foreign [--json]     The Operator only: the seats of agents launched on
+                               another board than the one they sit on, with the
+                               command that removes each (not for an agent's terminal)
   delete                       Delete board and messages (Operator only)
   export [--output FILE] [--format json|markdown|html] [--merge FILE]
                                Export chat (auto-detects format from extension)
@@ -545,6 +575,7 @@ Usage: coral-board task <subcommand> [args]
 
 Subcommands:
   add "title" [--body "details"] [--priority P] [--assignee "Agent Name"] [--remind-at TIME] [--goal ID] [--follow-up ID]
+  add "title" --self --goal ID     A task for yourself, any agent may: assigned to you, needs a goal; a repeat of an open title returns that task, at most 5 open
                                    --follow-up ID: the work that came out of task ID: it takes that task's goal, reviewers and assignee unless you give your own,
                                    and ID lists it (task show ID, task detail ID, the goal page's "N follow-ups open")
   list [--json] [--goal ID]        Every task, or one goal's; --json prints the tasks as a JSON array
@@ -611,6 +642,7 @@ Usage: coral-board task <subcommand> [args]
 
 Subcommands:
   add "title" [--body "details"] [--priority P] [--assignee "Agent Name"] [--remind-at TIME] [--goal ID] [--follow-up ID]
+  add "title" --self --goal ID     A task for yourself, any agent may: assigned to you, needs a goal; a repeat of an open title returns that task, at most 5 open
                                    --follow-up ID: the work that came out of task ID: it takes that task's goal, reviewers and assignee unless you give your own,
                                    and ID lists it (task show ID, task detail ID, the goal page's "N follow-ups open")
   list [--json] [--goal ID]        Every task, or one goal's; --json prints the tasks as a JSON array
@@ -800,7 +832,7 @@ Usage: coral-board <command> [args]
                                Message another team's Orchestrator on this Coral
                                (Orchestrators and the Operator only; both boards
                                must allow it); "-" as the message reads it from stdin
-  send --address <server>/<team> [--reply-to <id>] [--message-id <id>]
+  send --address <computer>/<team> [--reply-to <id>] [--message-id <id>]
        [--attach coral://artifacts/<id> ...] "<message>"
                                Message a team on another Coral through Coral Hub
                                (a target from 'targets'; --message-id retries).

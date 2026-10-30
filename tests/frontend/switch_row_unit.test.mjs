@@ -10,8 +10,8 @@ assert.equal(switchRow({ label: 'Share files with other teams', name: 'cross_tea
 // editions.js and mobile.js: label class and extra attributes.
 assert.equal(switchRow({ label: 'Coral Hub can turn on auto-accept', labelClass: 'editions-auto-accept', attrs: ' data-cloud="allow-auto-accept"' }),
     '<label class="editions-auto-accept"><input type="checkbox" data-cloud="allow-auto-accept"> Coral Hub can turn on auto-accept</label>');
-assert.equal(switchRow({ label: 'Show server', labelClass: 'list-display-option', labelAttrs: ' data-display-row="server" hidden', attrs: ' data-display-input="server" data-on-change="toggle-show-server"' }),
-    '<label class="list-display-option" data-display-row="server" hidden><input type="checkbox" data-display-input="server" data-on-change="toggle-show-server"> Show server</label>');
+assert.equal(switchRow({ label: 'Show computer', labelClass: 'list-display-option', labelAttrs: ' data-display-row="server" hidden', attrs: ' data-display-input="server" data-on-change="toggle-show-server"' }),
+    '<label class="list-display-option" data-display-row="server" hidden><input type="checkbox" data-display-input="server" data-on-change="toggle-show-server"> Show computer</label>');
 // team_health_settings.js: a rule head names the switch by its title and describes it by the sentence after the label.
 assert.equal(switchRow({ label: 'Nudge an idle agent', name: 'claim_nudge_on', checked: true, labelClass: 'health-rule-head', labelId: 'hr-claim_nudge-t', desc: 'Why.', descId: 'hr-claim_nudge-w', descTag: 'p', descClass: 'health-why' }),
     '<label class="health-rule-head"><input type="checkbox" name="claim_nudge_on" checked aria-labelledby="hr-claim_nudge-t" aria-describedby="hr-claim_nudge-w"> <span id="hr-claim_nudge-t">Nudge an idle agent</span></label><p class="health-why" id="hr-claim_nudge-w">Why.</p>');

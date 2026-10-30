@@ -259,7 +259,7 @@ func (l *Linux) exec(ctx context.Context, env []string, name string, args ...str
 	}
 	cctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-	cmd := exec.CommandContext(cctx, name, args...)
+	cmd := exec.CommandContext(cctx, name, args...) // consoletest:allow the Linux apply (systemd, ps): never run on Windows
 	cmd.Env = env
 	var out bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &out
@@ -472,6 +472,14 @@ func (l *Linux) running(install string) int {
 }
 
 func (l *Linux) Running(install string) bool { return l.running(install) > 0 }
+
+// NothingRunning: /proc was read and no process of the install is in it. An unreadable /proc is not "nothing runs" (#11155).
+func (l *Linux) NothingRunning(install string) bool {
+	if _, err := os.ReadDir(l.proc()); err != nil {
+		return false
+	}
+	return l.running(install) == 0
+}
 
 // Healthy: a process of the install is running, and still is a few seconds later.
 func (l *Linux) Healthy(ctx context.Context, install string) error {

@@ -8,26 +8,44 @@ import { importOnce } from './import_once.js';
 
 import { UPDATED_KEY } from './update_flag.js';
 import { pollEvery } from './overload.js';
-const { RESUME_KEY, RELEASES_REPO, RELEASES_URL, ACT_INSTALL, ACT_RELAUNCH, releaseNotesUrl, installsLocally, reasonText, requestInstall, requestRelaunch } = await importOnce('./update_api.js');
+const { RESUME_KEY, idleInstallWords, RELEASES_REPO, RELEASES_URL, ACT_INSTALL, ACT_RELAUNCH, releaseNotesUrl, installsLocally, reasonText, requestInstall, requestRelaunch } = await importOnce('./update_api.js');
 
-// What happens after Relaunch, by how this Coral was installed (the docs' per-platform table): none of it promises that this page comes back by itself
-const AFTER = {
-    app: 'Coral is quitting to install the update. It may open the disk image to finish. If Coral does not start again by itself, open it.',
-    msi: 'Windows will ask for your permission to install the update (the usual admin prompt). Coral starts again when the installer is done.',
-    portable: 'Coral is quitting to swap in the update. If it does not start again by itself, start it.',
-    tarball: 'Coral is quitting to install the update. If it was not started by the tray or a service, it stays stopped: start it again.',
-};
-const AFTER_DEFAULT = 'Coral is quitting to install the update. If it does not start again by itself, start it.';
+// After the confirm the dialog is a spinner and one line (the Operator, #11152): none of the per-install details. Windows alone adds what it will be asked, the one thing that is not Coral's doing.
+const INSTALLING = 'Coral is installing the update and will restart.';
+const INSTALLING_WIN = 'Windows will ask for your permission (the usual admin prompt).';
 const STATE_WORDS = { working: 'working', idle: 'idle', waiting: 'waiting for you' };
 
 const mk = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 
-/** Which of the restarted agents come back on their own (the server's `resumes`), in words: " 2 start again on their own afterwards; 1 starts a new conversation." Empty when the server does not say. */
-function comeBack(back, fresh, n) {
-    const parts = [];
-    if (back) parts.push(back === n ? `All ${n} start again on their own afterwards` : `${back} start${back === 1 ? 's' : ''} again on their own afterwards`);
-    if (fresh) parts.push(fresh === n ? `All ${n} start a new conversation` : `${fresh} start${fresh === 1 ? 's' : ''} a new conversation`);
-    return parts.length ? ` ${parts.join('; ')}.` : '';
+// What happens to each agent after the restart (the server's `after`, by auto_wake's rule), in words: one per agent, and the summary's. "asks" and "stays_asleep" hold for all of them or none.
+const settingOff = 'Wake agents after a restart is off in Settings > Terminal';
+const overCap = (cap) => (cap ? `more than ${cap} ${cap === 1 ? 'agent was' : 'agents were'} running` : 'more agents were running than it wakes on its own');
+function afterNote(after, cap) {
+    switch (after) {
+        case 'wakes': return 'wakes again afterwards, in the same conversation';
+        case 'asks': return `Coral asks you before waking it: ${overCap(cap)}`;
+        case 'stays_asleep': return `stays asleep until you wake it (${settingOff})`;
+        case 'new_conversation': return 'starts a new conversation';
+        case 'new_terminal': return 'starts again as a new terminal';
+        default: return 'not known whether it starts again'; // never an agent left unexplained (#7360)
+    }
+}
+/** The summary of what comes back, after "Their work in progress stops.": " All 6 wake again afterwards, each in its own conversation, unless Coral has restarted several times in the last hour." Empty when the server does not say. */
+function comeBack(restarts, cap) {
+    const n = restarts.length, count = (k) => restarts.filter(a => a.after === k).length;
+    const s = (k) => (k === 1 ? 's' : '');
+    const all = (k, whole, some) => { const c = count(k); return c === 0 ? '' : c === n ? whole : some(c); };
+    const parts = [
+        all('wakes', n === 1 ? 'It wakes again afterwards, in its own conversation' : `All ${n} wake again afterwards, each in its own conversation`, c => `${c} wake${s(c)} again afterwards, in ${c === 1 ? 'its' : 'their'} own conversation`),
+        all('new_conversation', n === 1 ? 'It starts a new conversation' : `All ${n} start a new conversation`, c => `${c} start${s(c)} a new conversation`),
+        all('new_terminal', n === 1 ? 'It starts again as a new terminal' : `All ${n} start again as new terminals`, c => `${c} start${s(c)} again as ${c === 1 ? 'a new terminal' : 'new terminals'}`),
+    ].filter(Boolean);
+    // the crash-loop guard (several restarts within the hour) can't be known now: the summary doesn't promise past it
+    const woken = parts.length ? ` ${parts.join('; ')}, unless Coral has restarted several times in the last hour.` : '';
+    const them = n === 1 ? 'it' : 'them';
+    const asks = count('asks') ? ` Coral asks you before waking ${them}: ${overCap(cap)}.` : '';
+    const asleep = count('stays_asleep') ? ` ${n === 1 ? 'It stays' : 'They stay'} asleep until you wake ${them}: ${settingOff}.` : '';
+    return woken + asks + asleep;
 }
 let dialog = null;
 let current = null; // the status the dialog shows
@@ -63,19 +81,18 @@ function draw(note) {
     body.append(from);
     const notes = s.source === RELEASES_REPO ? releaseNotesUrl(s.staged.version) : ''; // what is in the update: this release's notes on the one repository the page knows (#7360)
     if (notes) { const np = mk('p'); const na = mk('a', 'update-notes-link', `What is new in ${s.staged.version}`); na.href = notes; na.target = '_blank'; na.rel = 'noopener noreferrer'; np.append(na); body.append(np); }
+    const idleNote = idleInstallWords(s).long; // install when idle (#11170): the dialog says what happens if nobody clicks
+    if (idleNote) body.append(mk('p', 'update-idle-note', idleNote.replace(/^Coral installs it by itself when it is idle\./, 'If you do not choose now, Coral installs it by itself once it is idle (no agent working, nobody typing).')));
     if (note) { const p = mk('p', 'update-note', note); p.setAttribute('role', 'status'); body.append(p); }
     if (n > 0) {
         const warn = mk('div', 'update-warn');
         const icon = mk('span', 'material-icons', 'warning'); icon.setAttribute('aria-hidden', 'true');
         const inner = mk('div', 'update-warn-body');
-        const back = r.restarts.filter(a => a.resumes === true).length, fresh = r.restarts.filter(a => a.resumes === false).length;
-        const lead = mk('p'); lead.append(mk('b', null, `${win ? 'Installing' : 'Relaunching'} restarts ${plural(n, 'agent')}`), document.createTextNode(` that Coral runs. Their work in progress stops.${comeBack(back, fresh, n)}`));
+        const lead = mk('p'); lead.append(mk('b', null, `${win ? 'Installing' : 'Relaunching'} restarts ${plural(n, 'agent')}`), document.createTextNode(` that Coral runs. Their work in progress stops.${comeBack(r.restarts, r.wakeCap)}`));
         const list = mk('ul', 'update-agents'); list.tabIndex = 0; list.setAttribute('aria-label', 'Agents that restart');
         for (const a of r.restarts) {
             const li = mk('li'); li.append(mk('span', 'update-agent-name', a.name || a.sessionId), ' ', mk('span', 'update-agent-state', STATE_WORDS[a.state] || a.state)); // spaces between the parts: the row's text reads as words wherever it is read from (#6315)
-            if (a.resumes === true) li.append(' ', mk('span', 'update-agent-note', 'starts again afterwards'));
-            else if (a.resumes === false) li.append(' ', mk('span', 'update-agent-note', 'starts a new conversation'));
-            else li.append(' ', mk('span', 'update-agent-note', 'not known whether it starts again')); // never an agent left unexplained (#7360)
+            li.append(' ', mk('span', 'update-agent-note', afterNote(a.after, r.wakeCap)));
             list.append(li);
         }
         inner.append(lead, list, mk('p', 'update-keep', r.tmuxRestart ? 'Agents in tmux restart too: the bundled tmux changed.' : 'Agents in tmux keep running and reattach.'));
@@ -100,12 +117,15 @@ async function sendRelaunch(go, later) {
     // Windows: the version this dialog showed is sent with the click, so the server installs that one or none (409 stale_version); a relaunch sends the acknowledgement of what it showed
     const res = win ? await requestInstall(current.staged.version) : await requestRelaunch(current.relaunch.ack);
     if (res.ok) {
-        const body = dialog.querySelector('.modal-body');
-        const p = mk('p', 'update-note', win ? AFTER.msi : AFTER[current.installKind] || AFTER_DEFAULT); p.setAttribute('role', 'status');
-        body.querySelector('.update-later-note')?.remove(); // sent: "Not now?" no longer applies
         const to = current.staged.version;
-        body.append(mk('p', 'update-note update-updating', `Updating Coral to ${to}. This page reloads when the new Coral answers.`), p);
-        watchUpdate(to); later.textContent = 'Close'; later.disabled = false; go.hidden = true;
+        dialog.querySelector('#update-confirm-title').textContent = `Installing Coral ${to}`;
+        const body = dialog.querySelector('.modal-body'); body.replaceChildren(); // the confirmation's provenance, notes and warnings are for before the choice only
+        const box = mk('div', 'update-installing'); box.setAttribute('role', 'status');
+        const spin = mk('span', 'task-spinner'); spin.setAttribute('aria-hidden', 'true');
+        const text = mk('div', 'update-installing-text'); text.append(mk('p', 'update-note update-updating', INSTALLING));
+        if (win) text.append(mk('p', 'update-note update-uac', INSTALLING_WIN));
+        box.append(spin, text); body.append(box);
+        watchUpdate(to, () => installStalled(body, to)); later.textContent = 'Close'; later.disabled = false; go.hidden = true;
         return;
     }
     if (res.status === 409 && res.code === 'stale_ack' && res.relaunch) {
@@ -116,9 +136,10 @@ async function sendRelaunch(go, later) {
     }
     go.disabled = false; later.disabled = false;
     // 409 stale_version: the staged update is not the one this dialog showed; the status is read again and the dialog is drawn for what is ready now, nothing was installed (#7338)
-    if (res.status === 409 && res.code === 'stale_version') {
+    // 409 not_newer (#395): what is staged is not newer than this Coral; the same re-read leaves nothing to offer, so the dialog closes and the banner is gone
+    if (res.status === 409 && (res.code === 'stale_version' || res.code === 'not_newer')) {
         const fresh = await (await importOnce('./update_ui.js')).refreshUpdateStatus();
-        if (fresh && installsLocally(fresh)) { current = fresh; draw(reasonText('stale_version')); dialog.querySelector('[data-initial-focus]')?.focus(); return; }
+        if (fresh && installsLocally(fresh)) { current = fresh; draw(reasonText(res.code)); dialog.querySelector('[data-initial-focus]')?.focus(); return; }
         close(); return;
     }
     // 404: Coral Hub has relaunching switched off for this machine: nothing to offer, so nothing is shown
@@ -140,13 +161,22 @@ async function sendRelaunch(go, later) {
     }
 }
 
+/** The update did not finish in the time given (or the server said it failed): the spinner goes, one plain line says what to do, and the release page is a click away. */
+function installStalled(body, to) {
+    const box = mk('div', 'update-installing'); box.setAttribute('role', 'alert');
+    const line = mk('p', 'update-note update-error', 'The update did not finish. Start Coral again, or download the update and install it yourself.');
+    const a = mk('a', 'update-download-fallback', `Download Coral ${to}`); a.href = releaseNotesUrl(to) || `${RELEASES_URL}/releases/latest`; a.target = '_blank'; a.rel = 'noopener noreferrer';
+    const text = mk('div', 'update-installing-text'); const row = mk('p', 'update-note'); row.append(a); text.append(line, row);
+    box.append(text); body.replaceChildren(box);
+}
+
 /** Waits for the new Coral (#10834): the server is down while it installs; when it answers as the new version the page reloads and update_ui.js says "Coral is now X" there. Gives up after four minutes (the note above says what to do). */
 const bare = v => String(v).replace(/^v/, '');
-function watchUpdate(to) {
+function watchUpdate(to, onGiveUp) {
     browserSession.set(UPDATED_KEY, to);
     const until = Date.now() + 240000;
     const t = pollEvery(async () => {
-        if (Date.now() > until) return clearInterval(t);
+        if (Date.now() > until) { clearInterval(t); onGiveUp?.(); return; }
         try { const r = await fetch('/api/system/update', { cache: 'no-store' }); if (r.ok && bare((await r.json()).installed) === bare(to)) { clearInterval(t); location.reload(); } } catch { /* down while it installs */ }
     }, 3000, { whenHidden: true });
 }

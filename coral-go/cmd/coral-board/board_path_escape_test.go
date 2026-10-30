@@ -86,7 +86,7 @@ func TestEveryBoardCommandEscapesTheBoardName(t *testing.T) {
 		before := len(paths)
 		mu.Unlock()
 		enc, _ := json.Marshal(args)
-		cmd := exec.Command(os.Args[0], "-test.run=^TestBoardPathHelperProcess$")
+		cmd := exec.CommandContext(helperCtx(t), os.Args[0], "-test.run=^TestBoardPathHelperProcess$")
 		// The child dials the fake server above: CORAL_URL is this test's, not the live Coral.
 		cmd.Env = append(os.Environ(), "CORAL_BOARD_HELPER_ARGS="+string(enc), testguard.TestURLEnv+"=1")
 		cmd.Stdin = strings.NewReader("")

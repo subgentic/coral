@@ -3,7 +3,9 @@
 # ("The command line is too long", #11042), and a line each merges without conflict (.gitattributes: merge=union).
 # A plain-node suite is "node <file>.test.js"; suites.mjs reads those lines to know no suite is left out of every run.
 node class_list_tokens.test.mjs
+node computer_words_census.test.mjs
 node css_duplicate_census.test.mjs
+node phone_screens_census.test.mjs
 node dialog_size_census.test.mjs
 node field_census.test.mjs
 node launch_cards_census.test.mjs
@@ -139,6 +141,9 @@ node saved_link.test.mjs
 node remote_browse.test.mjs
 node overload.test.mjs
 node team_availability_polling.test.mjs
+node team_folder_pick.test.mjs
+node account_nav.test.mjs
+node topbar_contract.test.mjs
 node team_artifacts_copy_link.test.mjs
 node shared_images.test.mjs
 node board_keyset_paging.test.mjs
@@ -255,3 +260,5 @@ node mobile_words.test.mjs
 node cli_verify_words.test.mjs
 node run_cloud_checks.test.mjs
 node board_cleanup_retry.test.js
+node history_group_name.test.mjs
+node pi_extension.test.mjs

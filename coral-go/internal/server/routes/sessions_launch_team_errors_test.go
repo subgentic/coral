@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"testing"
 
@@ -16,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/subgentic/coral/internal/config"
+	"github.com/subgentic/coral/internal/consoletest"
 	"github.com/subgentic/coral/internal/store"
 	"github.com/subgentic/coral/internal/tracking"
 )
@@ -139,7 +139,7 @@ func TestTeamLaunchWhereNoMemberStartsRemovesItsWorktree(t *testing.T) {
 	require.NoError(t, ss.SetSetting(context.Background(), "cli_path_claude", filepath.Join(t.TempDir(), "no-such-cli")))
 	repo := t.TempDir()
 	for _, args := range [][]string{{"init", "-q", "-b", "main"}, {"-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "--allow-empty", "-m", "init"}} {
-		cmd := exec.Command("git", append([]string{"-C", repo}, args...)...)
+		cmd := consoletest.HiddenCommand("git", append([]string{"-C", repo}, args...)...)
 		out, err := cmd.CombinedOutput()
 		require.NoError(t, err, string(out))
 	}
@@ -161,7 +161,7 @@ func TestTeamLaunchWhereNoMemberStartsRemovesTheBranchItMade(t *testing.T) {
 	require.NoError(t, ss.SetSetting(context.Background(), "cli_path_claude", filepath.Join(t.TempDir(), "no-such-cli")))
 	repo := t.TempDir()
 	git := func(args ...string) string {
-		out, err := exec.Command("git", append([]string{"-C", repo, "-c", "user.email=t@t", "-c", "user.name=t"}, args...)...).CombinedOutput()
+		out, err := consoletest.HiddenCommand("git", append([]string{"-C", repo, "-c", "user.email=t@t", "-c", "user.name=t"}, args...)...).CombinedOutput()
 		require.NoError(t, err, string(out))
 		return string(out)
 	}

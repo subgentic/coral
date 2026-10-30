@@ -109,6 +109,7 @@ window.mobileBack = mobileBack;
 // On a phone the agent list is built once, in the Agents page itself: the sidebar's own list element moves into #mobile-agent-list (and takes the id
 // #mobile-session-list that the phone's styles use) instead of being cloned, so the page holds one copy of every row and no id twice (#4497). On a wide
 // screen it moves back, as #live-sessions-list, to where the sidebar has it.
+let _allChatsHome = null; // { parent, next }: where the all-chats line sits in the sidebar
 let _sidebarHome = null; // { parent, next }: where the list sits in the sidebar
 
 function _listHeader(agentList) {
@@ -117,7 +118,14 @@ function _listHeader(agentList) {
     header = document.createElement('div');
     header.className = 'mobile-list-header';
     header.innerHTML = `
+            <button class="btn btn-quiet btn-icon phone-menu-btn" type="button" data-on-click="m-top-menu" data-hamburger aria-haspopup="menu" aria-expanded="false" aria-controls="nav-more-menu" aria-label="Menu"><span class="material-icons" aria-hidden="true">menu</span></button>
+            <button class="phone-account-btn" type="button" data-on-click="m-top-menu" data-hamburger data-account aria-haspopup="menu" aria-expanded="false" aria-controls="nav-more-menu" aria-label="Settings and account" title="Settings and account"><span class="material-icons" aria-hidden="true">account_circle</span><span class="sr-only" id="phone-hub-state"></span></button>
+            <span class="phone-break" aria-hidden="true"></span>
             <h2 class="mobile-list-title">Agents</h2>
+            <div class="phone-chips" role="group" aria-label="Show">
+                <button class="chip phone-chip phone-chip-need" type="button" data-phone-chip="needs_input" data-on-click="phone-home-filter" aria-pressed="false" hidden></button>
+                <button class="chip phone-chip" type="button" data-phone-chip="working" data-on-click="phone-home-filter" aria-pressed="false" hidden></button>
+            </div>
             <button class="btn btn-quiet btn-icon sidebar-collapse-btn" type="button" data-display-button data-on-click="display-panel-toggle" aria-expanded="false" aria-controls="mobile-display-panel" title="Display options" aria-label="Display options">
                 <span class="material-icons" style="font-size:var(--icon-size)" aria-hidden="true">notes</span><span class="display-dot" data-display-badge hidden></span>
             </button>
@@ -127,19 +135,20 @@ function _listHeader(agentList) {
             </button>
             <button class="btn btn-small btn-primary" data-on-click="launch-show">New</button>
             <div class="mobile-search-row" id="mobile-search-row">
-                <input type="search" class="field field-search sidebar-search-input mobile-search-input" placeholder="Search agents" autocomplete="off" aria-label="Search agents" data-on-input="agent-search-filter" data-on-keydown="agent-search-key">
+                <input type="search" class="field field-search sidebar-search-input mobile-search-input" placeholder="Search agents and messages" autocomplete="off" aria-label="Search agents and messages" data-on-input="agent-search-filter" data-on-keydown="agent-search-key">
             </div>
             <span class="sr-only" role="status" aria-live="polite" data-agent-list-live></span>
             <div class="list-display-panel" id="mobile-display-panel" data-display-panel role="group" aria-label="Display options" data-on-keydown="display-panel-key" hidden>
                 <div class="agent-list-bar" id="mobile-agent-list-bar" hidden></div>
                 <div class="list-display-options">
                     ${['summary', 'model'].map(k => switchRow({ label: `Show ${k}`, labelClass: 'list-display-option', labelAttrs: ` data-display-row="${escapeAttr(k)}"`, attrs: ` data-display-input="${escapeAttr(k)}" data-on-change="toggle-row-line"` })).join('')}
-                    ${switchRow({ label: 'Show server', labelClass: 'list-display-option', labelAttrs: ' data-display-row="server" hidden', attrs: ' data-display-input="server" data-on-change="toggle-show-server"' })}
-                    ${switchRow({ label: 'Group by server', labelClass: 'list-display-option', labelAttrs: ' data-display-row="group" hidden', attrs: ' data-display-input="group" data-on-change="toggle-group-by-server"' })}
+                    ${switchRow({ label: 'Show computer', labelClass: 'list-display-option', labelAttrs: ' data-display-row="server" hidden', attrs: ' data-display-input="server" data-on-change="toggle-show-server"' })}
+                    ${switchRow({ label: 'Group by computer', labelClass: 'list-display-option', labelAttrs: ' data-display-row="group" hidden', attrs: ' data-display-input="group" data-on-change="toggle-group-by-server"' })}
                 </div>
             </div>
         `;
     agentList.prepend(header);
+    const hubWords = document.body.getAttribute('data-hub-label'); if (hubWords) header.querySelector('#phone-hub-state').textContent = `, ${hubWords}`; // the hub's state, if it was read before this header was built (hub_indicator.js)
     return header;
 }
 
@@ -158,6 +167,11 @@ export function syncMobileAgentList() {
     if (phoneBox && sideBox && !phoneBox.value) phoneBox.value = sideBox.value; // a search typed on a wide screen is still in the box
     syncDisplayMenu();   // the phone's copy of the ≡ menu (#3991)
 
+    const allChats = document.getElementById('agent-search-all-chats'), row = agentList.querySelector('#mobile-search-row');
+    if (allChats && row && allChats.previousElementSibling !== row) { // the line that sends the words to the chats' search (render.js syncSearchAllChats) sits under the pill, so its placeholder is true
+        if (!_allChatsHome) _allChatsHome = { parent: allChats.parentElement, next: allChats.nextSibling };
+        row.after(allChats);
+    }
     const list = document.getElementById('live-sessions-list');
     if (list && list.parentElement !== agentList) {
         _sidebarHome = { parent: list.parentElement, next: list.nextSibling };
@@ -168,6 +182,8 @@ export function syncMobileAgentList() {
 
 /** Wide screen: the list goes back into the sidebar as #live-sessions-list, where it was. */
 function restoreSidebarList() {
+    const allChats = document.getElementById('agent-search-all-chats');
+    if (allChats && _allChatsHome && _allChatsHome.parent.isConnected) { _allChatsHome.parent.insertBefore(allChats, _allChatsHome.next && _allChatsHome.next.parentNode === _allChatsHome.parent ? _allChatsHome.next : null); _allChatsHome = null; }
     const list = document.getElementById('mobile-session-list');
     if (!list || !_sidebarHome || !_sidebarHome.parent.isConnected) return;
     list.id = 'live-sessions-list';
@@ -443,7 +459,8 @@ function _initKeyboardDetection() {
     });
 
     window.addEventListener('resize', () => {
-        if (!document.body.classList.contains('keyboard-open')) {
+        // A page Chrome resizes for the keyboard (interactive-widget=resizes-content, #11060) gets this event with the shorter height before the visual viewport's own: a shrink of more than 100 px is the keyboard, not a new size
+        if (!document.body.classList.contains('keyboard-open') && visibleHeight() > initialHeight - 100) {
             initialHeight = visibleHeight();
         }
         updateViewportHeight();

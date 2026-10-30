@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 	"sort"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 
@@ -26,6 +27,13 @@ import (
 func (h *SessionsHandler) noteLaunchedHooks(ctx context.Context, sessionID, agentType string) {
 	h.noteLaunchedRunTag(ctx, sessionID)  // a tmux agent's tag, for Kill to find what detaches (#6141)
 	h.noteLaunchedHookDir(ctx, sessionID) // every agent type's hooks are found on the PATH it was started with (#6089)
+	if agentType == at.Pi && sessionID != "" {
+		// Pi's hooks are the extension Coral starts it with (#11107): a launch proves nothing about them, only an event from it does. What an earlier run of this session said is forgotten, and the clock starts.
+		h.hooksRev.Delete(sessionID)
+		h.hooksNoRev.Delete(sessionID)
+		h.piLaunchedAt.Store(sessionID, time.Now())
+		return
+	}
 	if agentType != at.Claude || sessionID == "" || h.ss == nil {
 		return
 	}
@@ -113,7 +121,7 @@ func (h *SessionsHandler) HooksStatus(w http.ResponseWriter, r *http.Request) {
 		}
 		return agents[i].Name < agents[j].Name
 	})
-	writeJSON(w, http.StatusOK, map[string]any{"current": agent.ClaudeHooksRev, "agents": agents, "missing": h.agentsWithoutHooks(ctx, sessions)})
+	writeJSON(w, http.StatusOK, map[string]any{"current": agent.ClaudeHooksRev, "agents": agents, "missing": h.agentsWithoutHooks(ctx, sessions), "pi_inactive": h.piHooksInactive(sessions, time.Now())})
 }
 
 // agentsWithoutHooks lists the running agents, of any type, whose hook programs are gone from the folder they were started with (#6089): the app was replaced or moved while they ran. The
@@ -222,4 +230,36 @@ func (h *SessionsHandler) RefreshHooks(w http.ResponseWriter, r *http.Request) {
 	}
 	h.sendAutoWakeNotice(ctx, *slept) // its board hears that its last turn may not have finished
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "hooks_rev": agent.ClaudeHooksRev})
+}
+
+// piHandshakeGrace is how long a Pi agent has to say its extension is running (its first hook event carries the revision) before it is listed as not active.
+const piHandshakeGrace = time.Minute
+
+// piHooksInactive lists the running Pi agents Coral started in this server run whose extension has not been heard from within piHandshakeGrace of the launch (#11107): the hook programs are missing from
+// the tools folder, Pi rejected the extension, or its API changed. It lists nothing it cannot be sure of: an agent started before this server run has no launch time, so it is not listed. The list only
+// says so on the agent's row (a quiet chip); a missing handshake never changes the agent's state, and the state from Pi's session files stands.
+func (h *SessionsHandler) piHooksInactive(sessions []store.LiveSession, now time.Time) []hooksAgent {
+	out := []hooksAgent{}
+	for _, ls := range sessions {
+		if ls.AgentType != at.Pi || ls.IsSleeping == 1 || ls.IsArchived == 1 || ls.IsJob == 1 {
+			continue
+		}
+		v, ok := h.piLaunchedAt.Load(ls.SessionID)
+		launched, _ := v.(time.Time)
+		if !ok || now.Sub(launched) < piHandshakeGrace {
+			continue
+		}
+		if rev, _ := h.hooksRev.Load(ls.SessionID); rev != nil {
+			if n, _ := rev.(int); n >= agent.PiExtensionRev {
+				continue
+			}
+		}
+		name := ptr.Value(ls.DisplayName)
+		if name == "" {
+			name = ls.AgentName
+		}
+		out = append(out, hooksAgent{SessionID: ls.SessionID, Name: name, Team: ptr.Value(ls.BoardName), Status: "inactive"})
+	}
+	sort.SliceStable(out, func(i, j int) bool { return out[i].SessionID < out[j].SessionID })
+	return out
 }

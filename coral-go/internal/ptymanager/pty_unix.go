@@ -97,7 +97,9 @@ func (p *unixPTY) Terminate() error {
 	tree = p.seen.add(tree)            // with what the sampler saw: a helper that has detached is sent the stop too
 	pgid, err := syscall.Getpgid(p.cmd.Process.Pid)
 	if err == nil && pgid > 0 {
+		logSignal(-pgid, syscall.SIGHUP)
 		_ = syscall.Kill(-pgid, syscall.SIGHUP)
+		logSignal(-pgid, syscall.SIGTERM)
 		err = syscall.Kill(-pgid, syscall.SIGTERM)
 	} else {
 		_ = p.cmd.Process.Signal(syscall.SIGHUP)
@@ -115,6 +117,7 @@ func (p *unixPTY) ForceKill() error {
 	killTree(p.seen.all(), p.root, p.tag) // the whole tree, not only the shell's group (#6125)
 	pgid, err := syscall.Getpgid(p.cmd.Process.Pid)
 	if err == nil && pgid > 0 {
+		logSignal(-pgid, syscall.SIGKILL)
 		return syscall.Kill(-pgid, syscall.SIGKILL)
 	}
 	return p.cmd.Process.Kill()

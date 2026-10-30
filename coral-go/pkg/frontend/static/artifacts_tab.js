@@ -3,17 +3,15 @@
  * hub's side. It is made exactly as the Inbox's frame is (inbox_tab.js): the same attributes, and the same same-origin CSP frame-src. Where the answer is false, absent, an error or not a boolean there is no tab
  * and no frame. */
 
+import { readAccount } from './account_info.js';
 const ARTIFACTS_URL = '/artifacts';
 
 /** Read GET /api/account once and show the tab only on artifacts_frame === true. Never throws: no answer is no tab. */
 export async function initArtifactsTab() {
     const tab = document.getElementById('nav-tab-artifacts');
     if (!tab) return false;
-    let on = false;
-    try {
-        const r = await fetch('/api/account', { headers: { Accept: 'application/json' } });
-        if (r.ok) { const d = await r.json(); on = !!d && d.artifacts_frame === true; }
-    } catch { /* no answer: no tab */ }
+    const d = await readAccount(); // the page's one read of /api/account (account_info.js); no answer is no tab
+    const on = !!d && d.artifacts_frame === true;
     if (tab.hidden === on) tab.hidden = !on; // nav_tabs.js redraws the row when the button changes
     return on;
 }

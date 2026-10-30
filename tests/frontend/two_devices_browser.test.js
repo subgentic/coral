@@ -134,7 +134,7 @@ async function device(name) {
         console.log('3. a message sent on one device shows on the other before the transcript has it');
         const pendingBubbles = d => d.ev(`[...document.querySelectorAll('#live-history-messages .pending-messages .chat-bubble.pending')].map(e => e.textContent.replace(/\\s+/g, ' ').trim())`);
         const iso = new Date().toISOString();
-        // A sends: its own pending bubble at once; the server lists the typed message on the row for both screens.
+        // A sends: its own pending bubble at once; the computer lists the typed message on the row for both screens.
         await A.ev(`import(${S} + 'pending_messages.js').then(m => { m.addPendingMessage('dv-id', 'Hello from A', Date.now(), { sending: true }); return true; })`);
         await both(d => d.ev(`window.__push({ waiting_for_input: false, pending_sends: [{ id: 'p1', text: 'Hello from A', at: ${JSON.stringify(iso)} }] })`));
         await B.waitFor(`document.querySelectorAll('#live-history-messages .pending-messages .chat-bubble.pending').length === 1`, 'B: the pending bubble', 4000);

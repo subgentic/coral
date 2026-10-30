@@ -84,7 +84,7 @@ go build -p 1 -tags "dev fts5" -o "$T/" ./cmd/coral ./cmd/coral-board ./cmd/cora
 
 log "Starting coral server on port $PORT..."
 coral_test_sandbox   # #4354: stub agent CLIs first on PATH; checked at the end
-mapfile -t HOME_ENV < <(coral_test_home_env "$T/host-home")
+HOME_ENV=(); while IFS= read -r _l; do HOME_ENV+=("$_l"); done < <(coral_test_home_env "$T/host-home") # not mapfile: macOS ships bash 3.2, which has none
 env -u CORAL_PORT -u CORAL_URL -u CORAL_HOST -u CORAL_DIR -u CORAL_SESSION_NAME -u CORAL_SUBSCRIBER_ID \
     -u CLAUDE_PROJECTS_DIR -u GEMINI_TMP_DIR -u ANTIGRAVITY_DATA_DIR -u PI_CODING_AGENT_DIR -u CORAL_CLOUD_URL \
     "${HOME_ENV[@]}" PATH="$CORAL_TEST_STUB_BIN:$PATH" \

@@ -3,6 +3,8 @@ import { checkAgentView } from './agent_view.js';
 import { setDockPage } from './dock_page.js';
 import { state } from './state.js';
 import { isCloud, normServer, LOCAL_SERVER } from './server_base.js';
+import { builtScreen, SCREEN_TYPES } from './phone_screens.js';
+import { syncPhoneFab } from './phone_fab.js';
 
 const VIEW_IDS = [
     "mobile-agent-list",
@@ -83,6 +85,13 @@ export function showView(activeId) {
     const layout = document.querySelector('.layout');
     if (layout) layout.classList.toggle('sidebar-hidden', FULL_WIDTH_VIEWS.has(activeId) && !(activeId === 'inbox-view' && !isCloud())); // the Inbox has its pane except as the hub's frame (#7472)
     document.body.classList.toggle('live-session-active', activeId === 'live-session-view');
+    document.body.classList.toggle('agent-home-active', activeId === 'mobile-agent-list');
+    const screen = builtScreen(activeId, document.body.getAttribute('data-nav-tab') || ''); // the phone's navigation model (#11236): the screen's declared type says whether the floating nav shows and which of its slots is lit (phone_screens.js)
+    document.body.classList.toggle('phone-nav-on', !!screen && SCREEN_TYPES[screen.type].bottomNav);
+    if (screen) document.body.dataset.phoneType = screen.type; else delete document.body.dataset.phoneType;
+    document.body.classList.toggle('large-text', parseFloat(getComputedStyle(document.documentElement).fontSize) >= 24); // 150% text and more (the root is 24 px): the nav's count badge is drawn smaller (mobile.css)
+    syncPhoneFab(screen && screen.fab); // the + of a top-level list page: its kind and its menu (phone_fab.js)
+    for (const it of document.querySelectorAll('.phone-nav-slot[data-phone-nav]')) { const on = !!screen && screen.nav === it.dataset.phoneNav; it.classList.toggle('active', on); if (on) it.setAttribute('aria-current', 'page'); else it.removeAttribute('aria-current'); } // the phone's Agents page has its own top bar in its header (#11096)
     // Which CLI the agent page on screen is, for the lines that are about one CLI only (the "Claude is not signed in" line, #6070): its type, or "remote" for an agent on another computer or seen through
     // Coral Hub (this computer's CLI says nothing about it); empty off an agent's page. Plain CSS reads it, so no listener is needed at startup.
     const open = activeId === 'live-session-view' ? state.currentSession : null;

@@ -9,6 +9,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/subgentic/coral/internal/consoletest"
 )
 
 // #3930 (Security's #3927 finding 7): a path template in a shell step is quoted for where it
@@ -38,7 +40,7 @@ func TestShellStepPathTemplatesAreQuoted(t *testing.T) {
 		expanded, err := expandShellTemplates(cmd, env)
 		require.NoError(t, err)
 		cwd := t.TempDir()
-		c := exec.Command(sh, "-c", expanded)
+		c := consoletest.HiddenCommand(sh, "-c", expanded)
 		c.Dir = cwd
 		got, err := c.CombinedOutput()
 		assert.NoError(t, err, "%s -> %s: %s", cmd, expanded, got)

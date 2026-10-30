@@ -286,3 +286,36 @@ func TestRosterCountsClaimableTasks(t *testing.T) {
 	out := h.check()
 	assert.Contains(t, out, "2 claimable tasks")
 }
+
+// #11182: the check says when the board is paused, so a board that sends no nudge can never be silent about it.
+func TestCheckSaysWhenTheBoardIsPaused(t *testing.T) {
+	h := newCheckHarness(t)
+	h.member("Orchestrator", "Orchestrator", 1, 0)
+	h.member("Dev", "Developer", 2, 0)
+	assert.NotContains(t, h.check(), "board paused")
+	h.m.SetPausedFn(func(string) bool { return true })
+	assert.Contains(t, h.check(), "board paused: no nudges go out until it is resumed")
+}
+
+// #11180: a wait's escalation ends when its wait is no longer active, and not before: scans of a long wait post once, and the escalation record is there for as long as the wait is.
+func TestRosterAWaitEscalationEndsWithItsWait(t *testing.T) {
+	h := newCheckHarness(t)
+	ctx := context.Background()
+	h.member("Orchestrator", "Orchestrator", 1, 0)
+	h.member("Security Reviewer", "Security", 2, 0)
+	h.member("Lead Developer", "Developer", 3, 0)
+	h.wait(3, "Lead Developer", "message", "Security Reviewer")
+	h.now = h.now.Add(20 * time.Minute)
+	for i := 0; i < 4; i++ {
+		h.m.scan(ctx)
+		h.now = h.now.Add(5 * time.Minute)
+	}
+	esc, err := h.s.HealthEscalations(ctx, "team")
+	require.NoError(t, err)
+	assert.Len(t, esc, 1, "the record stays while the wait is active")
+	require.NoError(t, h.s.CancelActiveWait(ctx, "team", "Lead Developer"))
+	h.m.scan(ctx)
+	esc, err = h.s.HealthEscalations(ctx, "team")
+	require.NoError(t, err)
+	assert.Empty(t, esc, "the wait ended: its escalation ended with it")
+}

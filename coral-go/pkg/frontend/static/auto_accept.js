@@ -338,7 +338,7 @@ export async function stopAllAutoAccept() {
     scheduleLiveSessionsRender();
     syncAutoAcceptHeader();
     syncStopAll();
-    if (failed) showToast(`Auto-accept stopped for ${stopped} agent${stopped === 1 ? '' : 's'}; ${failed} server${failed === 1 ? '' : 's'} could not be reached`, true);
+    if (failed) showToast(`Auto-accept stopped for ${stopped} agent${stopped === 1 ? '' : 's'}; ${failed} computer${failed === 1 ? '' : 's'} could not be reached`, true);
     else showToast(`Auto-accept stopped for ${stopped} agent${stopped === 1 ? '' : 's'}`);
     return { stopped, failed };
 }

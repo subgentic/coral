@@ -3,11 +3,12 @@ package routes
 import (
 	"context"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/subgentic/coral/internal/consoletest"
 )
 
 // trackedPaths replaced a full `git ls-files` of the repository, so it has to
@@ -16,7 +17,7 @@ func TestTrackedPathsAnswersOnlyAboutTheGivenPaths(t *testing.T) {
 	repo := t.TempDir()
 	runGit := func(args ...string) {
 		t.Helper()
-		out, err := exec.Command("git", append([]string{"-C", repo}, args...)...).CombinedOutput()
+		out, err := consoletest.HiddenCommand("git", append([]string{"-C", repo}, args...)...).CombinedOutput()
 		require.NoError(t, err, "%s", out)
 	}
 	write := func(rel, content string) {
@@ -71,7 +72,7 @@ func TestTrackedPathsWithNoCandidatesIsEmpty(t *testing.T) {
 // with no output for an unmatched pathspec.
 func TestTrackedPathsToleratesMissingPaths(t *testing.T) {
 	repo := t.TempDir()
-	out, err := exec.Command("git", "-C", repo, "init").CombinedOutput()
+	out, err := consoletest.HiddenCommand("git", "-C", repo, "init").CombinedOutput()
 	require.NoError(t, err, "%s", out)
 
 	got := trackedPaths(context.Background(), repo, []string{"never_existed.go"})

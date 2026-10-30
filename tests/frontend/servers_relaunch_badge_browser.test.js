@@ -11,7 +11,7 @@ const { connect } = require('./agent_view_harness');
 const { setTheme, installAudit, auditRegion } = require('./helpers/contrast');
 const DIR = path.join(__dirname, 'fixtures', 'relaunch_status');
 const CASES = fs.readdirSync(DIR).filter(f => f.endsWith('.json')).sort().map(f => ({ name: f.replace(/\.json$/, ''), ...JSON.parse(fs.readFileSync(path.join(DIR, f), 'utf8')) }));
-const TIP = 'Coral on this machine is restarting into an update. It reconnects on its own.';
+const TIP = 'Coral on this computer is restarting into an update. It reconnects on its own.';
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();

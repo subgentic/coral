@@ -56,7 +56,8 @@ func TestARecreatedBoardGetsANewCrossTeamID(t *testing.T) {
 	old, _, _ := bs.CrossTeamID(ctx, "alpha")
 	_, err = bs.db.ExecContext(ctx, `DELETE FROM boards WHERE id = 'alpha'`)
 	require.NoError(t, err)
-	bs.ensureBoardRow(ctx, "alpha")
+	_, err = bs.db.ExecContext(ctx, `INSERT OR IGNORE INTO boards (id, label, created_at) VALUES ('alpha', 'alpha', ?)`, nowUTC()) // the board made again under its name
+	require.NoError(t, err)
 	fresh, ok, err := bs.CrossTeamID(ctx, "alpha")
 	require.NoError(t, err)
 	require.True(t, ok)

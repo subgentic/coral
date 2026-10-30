@@ -75,7 +75,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
 
         // 3. A server's details menu (the markup server_status.js draws, as a fixture): Down opens, Up/Down/Home/End move over its buttons, Escape returns focus.
         await ev(`(() => { const d = document.createElement('details'); d.id = 'kb-server-details'; d.className = 'server-group-more'; d.setAttribute('data-server-details', 'kb');
-            d.innerHTML = '<summary id="kb-sum" aria-label="Details for kb">⋮</summary><div class="server-switcher-panel"><button type="button" id="kb-b1">Launch team</button><button type="button" id="kb-b2" disabled>Gone</button><button type="button" id="kb-b3">Open in Servers</button><button type="button" id="kb-b4">Collapse</button></div>';
+            d.innerHTML = '<summary id="kb-sum" aria-label="Details for kb">⋮</summary><div class="server-switcher-panel"><button type="button" id="kb-b1">Launch team</button><button type="button" id="kb-b2" disabled>Gone</button><button type="button" id="kb-b3">Open in Computers</button><button type="button" id="kb-b4">Collapse</button></div>';
             document.body.appendChild(d); document.getElementById('kb-sum').focus(); return true; })()`);
         await key('ArrowDown');
         await waitFor(`document.activeElement.id === 'kb-b1'`, 'first button focused', 3000, `document.activeElement.id`);

@@ -221,7 +221,7 @@ export async function sendCommand({ nudge = false } = {}) {
                 clearAttachments(targetSession);
                 const key = sessionKey(targetSession);
                 if (key) saveSessionDraft(key, "");
-                showToast(sentToastText(command), false, 4000, { silent: true }); // the send status says "Message sent": the toast is for the eyes
+                toastSent(command);
                 _getXtermModule().then(m => m.focusTerminal());
             }
         } catch (e) {
@@ -250,12 +250,18 @@ function _settleSocketSend(session, command, sentAt, ok) {
         confirmPendingMessage(session.session_id, sentAt);
         // Text typed since the send is a new draft and stays.
         if (key && saved.trim() === command) saveSessionDraft(key, "");
-        showToast(sentToastText(command), false, 4000, { silent: true }); // the send status says "Message sent": the toast is for the eyes
+        toastSent(command);
         return;
     }
     removePendingMessage(session.session_id, sentAt);
     if (key && !saved.trim()) saveSessionDraft(key, command);
     if (onIt && !input.value) input.value = command;
+}
+
+/** The toast that a message was sent (the send status says "Message sent": the toast is for the eyes). The Chat view's pending bubble says Sent itself, and a toast over it covers the message just sent (#11258 item 4), so it is for the Terminal view, which has no bubble. */
+function toastSent(command) {
+    if (document.getElementById('live-history-messages')?.getClientRects().length) return;
+    showToast(sentToastText(command), false, 4000, { silent: true });
 }
 
 const DEFAULT_TEAM_REMINDER_ORCHESTRATOR = "Remember to coordinate with your team and check the message board for updates";

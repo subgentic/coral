@@ -47,6 +47,31 @@ const boardPage = () => loadedModule('./message_board.js'); // the board's own b
 const hideJobModal = (...args) => loadedModule('./job_form.js')?.hideJobModal(...args);
 const reshowJobModal = (...args) => loadedModule('./job_form.js')?.reshowJobModal(...args);
 
+// The agent row's ⋯ (#11056) opens the controls that do not fit the one row and the Details card (folder, branch, model) under it. The card stayed floating over the Files list after the person went on (#11284): it now also
+// closes with a tap outside it, with Escape, and when another tab of the agent page is opened. The controls the ⋯ revealed stay (the panel's toggle, Find): only the ⋯ itself closes them, as before.
+let _agentBarMoreOff = null;
+const detailsCard = () => document.getElementById('agent-phone-details');
+function closeAgentBarMoreCard() { const d = detailsCard(); if (d) d.open = false; if (_agentBarMoreOff) { _agentBarMoreOff(); _agentBarMoreOff = null; } }
+function closeAgentBarMore() {
+    const b = document.getElementById('agent-bar-more'), h = document.querySelector('#live-session-view .terminal-header');
+    if (b) b.setAttribute('aria-expanded', 'false');
+    if (h) h.removeAttribute('data-more');
+    closeAgentBarMoreCard();
+}
+function openAgentBarMore(btn) {
+    const d = detailsCard(), h = btn.closest('.terminal-header');
+    btn.setAttribute('aria-expanded', 'true');
+    if (h) h.toggleAttribute('data-more', true);
+    if (d) d.open = true;
+    if (_agentBarMoreOff) _agentBarMoreOff();
+    const outside = e => { if (e.target.closest && (e.target.closest('#agent-phone-details') || e.target.closest('#agent-bar-more'))) return; closeAgentBarMoreCard(); };
+    const key = e => { if (e.key === 'Escape') closeAgentBarMoreCard(); };
+    document.addEventListener('click', outside, true);
+    document.addEventListener('keydown', key, true);
+    document.addEventListener('coral:agentic-tab', closeAgentBarMoreCard); // switchAgenticTab says another part of the agent page was opened; listened to only while the card is open (a startup listener is a startup cost)
+    _agentBarMoreOff = () => { document.removeEventListener('click', outside, true); document.removeEventListener('keydown', key, true); document.removeEventListener('coral:agentic-tab', closeAgentBarMoreCard); };
+}
+
 registerActions({
     'mb-jump-latest': () => boardPage()?.jumpToLatest(), // the board's own buttons are in the page's markup but their code loads with the board (a lazy group), so the action is here
     'mb-select-mode': () => boardPage()?.toggleSelectMode(),
@@ -169,11 +194,12 @@ registerActions({
     'sidebar-search-focus': () => focusSidebarSearch(),
     'launch-show': () => window.showLaunchModal(),
     'agent-search-filter': el => window.filterLiveAgents(el.value),
-    'past-chats': () => { importOnce('./inbox_tab.js').then(async m => { window.switchNavTab('hub-inbox'); await m.selectInboxTab('chats'); }); }, // the agent list's Past chats: Inbox > All chats (#10055)
-    'search-all-chats': () => { const q = (document.getElementById('agent-search-input')?.value || '').trim(); if (q) importOnce('./inbox_tab.js').then(async m => { window.switchNavTab('hub-inbox'); await m.selectInboxTab('chats'); await m.searchInboxFolder(q); const box = document.getElementById('agent-search-input'); if (box) { box.value = ''; box.dispatchEvent(new Event('input', { bubbles: true })); } /* the words moved to the chats search: the Agents box is empty again when the person goes back (#10512) */ }); }, // the sidebar's search words, as a search of every chat: Inbox > All chats with the words in its box and the list read with them (#10050, #10263)
+    'past-chats': () => { importOnce('./inbox_tab.js').then(async m => { (await importOnce('./inbox_sidebar.js')).rememberGroup('chats'); /* asked for by name: the Inbox's reopen rule (Needs you first when something waits, the phone's landing) does not move it */ window.switchNavTab('hub-inbox', { folder: 'chats' }); await m.selectInboxTab('chats'); }); }, // the agent list's Past chats: Inbox > All chats (#10055)
+    'search-all-chats': () => { const q = (document.getElementById('agent-search-input')?.value || document.querySelector('#mobile-search-row input')?.value || '').trim(); /* the sidebar's box, or the phone's pill (the sidebar's is empty there) */ if (q) importOnce('./inbox_tab.js').then(async m => { (await importOnce('./inbox_sidebar.js')).rememberGroup('chats'); /* asked for by name: the Inbox's reopen rule (Needs you first when something waits, the phone's landing) does not move it */ window.switchNavTab('hub-inbox', { folder: 'chats' }); await m.selectInboxTab('chats'); await m.searchInboxFolder(q); const box = document.getElementById('agent-search-input'); if (box) { box.value = ''; box.dispatchEvent(new Event('input', { bubbles: true })); } /* the words moved to the chats search: the Agents box is empty again when the person goes back (#10512) */ }); }, // the sidebar's search words, as a search of every chat: Inbox > All chats with the words in its box and the list read with them (#10050, #10263)
     'agent-search-key': (el, event) => window.agentSearchKey(event),
     'groups-toggle-all': el => { const kind = el.closest('.sidebar-pane')?.dataset.pane; if (kind && kind !== 'agents') toggleAllGroupFolds(kind); else toggleAllGroups(); }, // each tab's header folds its own groups (#7443)
     'display-panel-toggle': el => toggleDisplayPanel(el),
+    'phone-home-filter': el => { importOnce('./agent_list_bar.js').then(m => m.toggleStateChip(el.dataset.phoneChip)); }, // the phone Agents page's chips (#11096)
     'display-panel-key': (el, event) => displayPanelKey(event),
     'toggle-show-server': () => window.toggleShowServer(),
     'toggle-row-line': el => window.toggleRowLine(el.dataset.displayInput),
@@ -186,8 +212,22 @@ registerActions({
     'mobile-back': () => window.mobileBack(),
     'goal-refresh': () => window.refreshGoal(),
     'goal-edit': () => window.editGoal(),
+    'live-view-switch': () => { const t = document.getElementById('live-view-btn-terminal'); window.setLiveViewMode(t && t.classList.contains('active') ? 'chat' : 'terminal'); }, // a phone's one switch: the view it is not on (#11187)
     'live-view-mode': el => { if (el.dataset.mode === 'chat' || el.dataset.mode === 'terminal') window.setLiveViewMode(el.dataset.mode); },
     'chat-find-toggle': () => window.toggleChatFind(),
+    'phone-nav': el => { // the phone's floating nav (#11116): Home, Inbox, Tasks (More opens the menu: m-top-menu)
+        const arg = el.dataset.arg;
+        if (arg === 'nav-agents') window.switchNavTab('agents');
+        else { window.switchNavTab('hub-inbox'); if (arg === 'nav-tasks') importOnce('./inbox_tab.js').then(m => m.selectInboxTab('tasks')); }
+    },
+    'phone-fab': (el, event) => { // the + : New agent, New team (the menu is drawn above it)
+        event.stopPropagation();
+        const menu = document.getElementById('phone-fab-menu'), open = menu.hidden;
+        menu.hidden = !open; el.setAttribute('aria-expanded', String(open));
+        if (open) { menu.querySelector('[role=menuitem]')?.focus(); document.addEventListener('click', () => { menu.hidden = true; el.setAttribute('aria-expanded', 'false'); }, { once: true }); }
+    },
+    'phone-fab-new': el => { const menu = document.getElementById('phone-fab-menu'); menu.hidden = true; document.getElementById('phone-fab').setAttribute('aria-expanded', 'false'); window.showLaunchModal(); window._selectLaunchType(el.dataset.arg); },
+    'agent-bar-more': el => { const open = el.getAttribute('aria-expanded') !== 'true'; if (open) openAgentBarMore(el); else closeAgentBarMore(); }, // a phone's agent row (#11056): the controls that do not fit the one row, and the Details, open under it; they close with an outside tap, Escape and the other parts of the agent page (#11284)
     'agentic-panel-toggle': el => (el.dataset.open === '0' ? window.toggleAgenticPanel(false) : window.toggleAgenticPanel()),
     'agentic-tab': el => { if (AGENTIC_TABS.has(el.dataset.tab)) window.switchAgenticTab(el.dataset.tab, 'top'); },
     'session-restart': () => window.restartSession(),

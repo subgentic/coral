@@ -1,6 +1,6 @@
 // Servers in the agent list (#3085; #4932 removed the search-row server pill): short display names, no
-// strip, and with 'Show server' an optional server prefix on each row ("pro-coral-hub", the server in
-// italics, #3507); with 'Group by server' the rows are grouped under collapsible server headers
+// strip, and with 'Show computer' an optional server prefix on each row ("pro-coral-hub", the server in
+// italics, #3507); with 'Group by computer' the rows are grouped under collapsible server headers
 // (persisted): the outermost, flush-left level, with a computer icon and no status dot (#3507).
 // Phone width, 44 px touch; agent state dots kept under server headers; team view from a prefixed row;
 // the top tabs in the operator's order (Agents, Servers, ..., Docs).
@@ -70,7 +70,7 @@ const SETTINGS_PRELOAD = `(() => {
         await Page.navigate({ url: BASE });
         await Page.loadEventFired();
         await install();
-        // The page's own settings load must be in before a step sets 'Show server': a late one would
+        // The page's own settings load must be in before a step sets 'Show computer': a late one would
         // put back whatever the server held (on a busy machine, step 2's saved "False" in step 3).
         await require('./helpers/wait').bind(ev).coralReady('startup', 'settings');
         await ev(`localStorage.clear(); true`);
@@ -88,14 +88,14 @@ const SETTINGS_PRELOAD = `(() => {
         });
         console.log('   ✓ hostnames lose their domain; IPs, IPv6 and renamed labels stay');
 
-        console.log('2. One server: no strip, no chips, no headers; Show server adds chips (#4932 removed the search-row pill)');
+        console.log('2. One server: no strip, no chips, no headers; Show computer adds chips (#4932 removed the search-row pill)');
         await scene(ONE);
         let v = await view();
         assert.equal(v.strip, 0, 'no strip'); assert.deepEqual(v.chips, [], 'no row chips with one server');
         assert.deepEqual(v.headers, [], 'no server headers with one server');
-        assert.equal(v.groupRow, false, "'Group by server' is not offered with one server");
-        // 'Show server' with one server: off by default; turning it on saves the setting and shows chips.
-        assert.equal(v.showServerRow, true, "'Show server' is offered with one server");
+        assert.equal(v.groupRow, false, "'Group by computer' is not offered with one server");
+        // 'Show computer' with one server: off by default; turning it on saves the setting and shows chips.
+        assert.equal(v.showServerRow, true, "'Show computer' is offered with one server");
         assert.equal(await ev(`document.getElementById('display-show-server').checked`), false, 'off by default with one server');
         await ev(`(() => { const c = document.getElementById('display-show-server'); c.click(); return true; })()`);
         // Its answer, not only its sending: a GET sent after the PUT can reach a loaded server first
@@ -103,22 +103,22 @@ const SETTINGS_PRELOAD = `(() => {
         await waitFor(`window.__settingsPutsAnswered.some(p => p && p.show_session_server === true)`, 'PUT /api/settings {show_session_server: true} answered', 3000);
         const stored = await ev(`fetch('/api/settings').then(r => r.json()).then(d => String((d.settings || d).show_session_server))`);
         assert.equal(stored.toLowerCase(), 'true', `the server keeps the setting (${stored})`);
-        await waitFor(`document.querySelectorAll('#live-sessions-list .row-server-prefix').length > 0`, 'server prefixes after Show server', 3000);
+        await waitFor(`document.querySelectorAll('#live-sessions-list .row-server-prefix').length > 0`, 'server prefixes after Show computer', 3000);
         v = await view();
         assert.ok(v.chips.every(c => /^studio-mac/.test(c)), `chips use the short name (${JSON.stringify(v.chips)})`);
         await ev(`document.getElementById('display-show-server').click(); true`);
         await waitFor(`window.__settingsPuts.some(p => p && p.show_session_server === false)`, 'PUT {show_session_server: false}', 3000);
-        console.log('   ✓ one server: no strip/chips/headers, Show server saves + chips');
+        console.log('   ✓ one server: no strip/chips/headers, Show computer saves + chips');
 
-        console.log('3. Three servers (one offline): chips by default, Group by server, collapse persisted');
+        console.log('3. Three servers (one offline): chips by default, Group by computer, collapse persisted');
         // Back to unset before the scene renders: done here, not in a promise left running (step 2 left "False").
         await ev(`window.__settingsPuts.length = 0; if (T.state.settings) delete T.state.settings.show_session_server; true`);
         await scene(THREE);
         v = await view();
         assert.equal(v.strip, 0, 'no strip');
-        assert.ok(v.chips.length > 0, "'Show server' is on by default with 2+ servers");
+        assert.ok(v.chips.length > 0, "'Show computer' is on by default with 2+ servers");
         assert.ok(v.chips.some(c => /^Old Laptop/.test(c)) && v.chips.some(c => /^workstation/.test(c)), `chips name each server (${JSON.stringify(v.chips)})`);
-        assert.equal(v.groupRow, true, "'Group by server' is offered with 2+ servers");
+        assert.equal(v.groupRow, true, "'Group by computer' is offered with 2+ servers");
         // #3507 ungrouped: the server BEFORE the team name, in italics, with no dot; an offline one is dimmed.
         const pre = await ev(`(() => {
             const li = id => [...document.querySelectorAll('#live-sessions-list li')].find(l => l.querySelector('.row-server-prefix') && l.textContent.includes(id));
@@ -131,16 +131,16 @@ const SETTINGS_PRELOAD = `(() => {
         assert.equal(pre.m2.text, 'workstation-team-m2', `"server-team" (${JSON.stringify(pre.m2)})`);
         assert.ok(pre.m2.first, 'the server comes before the team name');
         assert.equal(pre.m2.italic, 'italic', 'the server part is in italics');
-        assert.equal(pre.m2.down, false); assert.equal(pre.m2.title, 'workstation.lan: Online'); assert.equal(pre.m2.sr, '(server)');
+        assert.equal(pre.m2.down, false); assert.equal(pre.m2.title, 'workstation.lan: Online'); assert.equal(pre.m2.sr, '(computer)');
         assert.equal(pre.m3.down, true, 'an offline server is marked'); assert.ok(pre.m3.op < pre.m2.op, `and dimmed (${pre.m3.op} < ${pre.m2.op})`);
-        assert.equal(pre.m3.title, 'Old Laptop: Unreachable', 'its state is in the tooltip'); assert.equal(pre.m3.sr, '(server, unreachable)', 'and for screen readers');
+        assert.equal(pre.m3.title, 'Old Laptop: Unreachable', 'its state is in the tooltip'); assert.equal(pre.m3.sr, '(computer, unreachable)', 'and for screen readers');
         assert.equal(pre.dots, 0, 'no status dot or chip on a row');
         // Team view from a prefixed row opens that server's team.
         await ev(`(() => { const l = [...document.querySelectorAll('#live-sessions-list li')].find(l => l.querySelector('.row-server-prefix') && l.textContent.includes('team-m2')); (l.matches('[data-on-click="team-name-open"]') ? l : l.querySelector('[data-on-click="team-name-open"]')).click(); return true; })()`);
         await waitFor(`T.state.selectedTeam === '@m2/team-m2'`, 'team view of @m2/team-m2', 3000, `T.state.selectedTeam`);
         await ev(`window.exitTeamPage({ force: true }); true`);
         console.log('   ✓ ungrouped: "workstation-team-m2", server in italics first, offline dimmed with tooltip + sr text, no dots; team view opens @m2/team-m2');
-        // Group by server.
+        // Group by computer.
         await ev(`document.getElementById('display-group-by-server').click(); true`);
         await waitFor(`document.querySelectorAll('#live-sessions-list li.server-group-header').length === 3`, 'server headers', 3000);
         assert.equal(await ev(`localStorage.getItem('coral-group-by-server')`), 'true', 'grouping persisted');
@@ -167,7 +167,7 @@ const SETTINGS_PRELOAD = `(() => {
         assert.equal(lay.dots, 0, 'no status dot on a server header'); assert.equal(lay.icons, lay.n, 'every server header has the computer icon');
         assert.ok(lay.headerLeft < lay.rowMin, `server headers sit left of every team and agent row (icon ${lay.headerLeft} < rows ${lay.rowMin})`);
         assert.ok(lay.m3.down && lay.m3.op < lay.m2op && lay.m3.opName < 1, `the offline server is dimmed (${JSON.stringify(lay.m3)})`);
-        assert.equal(lay.m3.title, 'Old Laptop: Unreachable'); assert.match(lay.m3.aria, /^Server Old Laptop: Unreachable, 2 agents$/); // aria-expanded says open or collapsed; the name does not repeat it (#4272)
+        assert.equal(lay.m3.title, 'Old Laptop: Unreachable'); assert.match(lay.m3.aria, /^Computer Old Laptop: Unreachable, 2 agents$/); // aria-expanded says open or collapsed; the name does not repeat it (#4272)
         assert.ok(lay.agents.length >= 4 && lay.agents.every(a => a.dot && !a.title && /^.+, .+/.test(a.label)), `agent state dots kept under server headers: the dot has no native title any more (#9822), the row's name says the state (${JSON.stringify(lay.agents)})`);
         console.log(`   ✓ grouped: headers outermost (icon at ${lay.headerLeft}px, rows from ${lay.rowMin}px), computer icon, no dots, offline dimmed + tooltip + aria; ${lay.agents.length} agent rows keep their state dot`);
         const m2rows = ['solo-m2-id', 'team-m2-id'];
@@ -183,7 +183,7 @@ const SETTINGS_PRELOAD = `(() => {
         await ev(`document.querySelector('li.server-group-header[data-server-group="m3"] details[data-server-details]').open = true; true`);
         const d3 = await ev(`(() => { const p = document.querySelector('li.server-group-header[data-server-group="m3"] .server-switcher-panel'); const dl = Object.fromEntries([...p.querySelectorAll('dt')].map(dt => [dt.textContent, dt.nextElementSibling.textContent])); return { dl, hint: !!p.querySelector('.server-details-hint'), buttons: [...p.querySelectorAll('button')].map(b => b.textContent) }; })()`);
         assert.equal(d3.dl.Status, 'Unreachable'); assert.equal(d3.dl.Error, 'dial tcp: timeout'); assert.ok('Last seen' in d3.dl && !('Last contact' in d3.dl), 'one wording, Last seen (the list column\'s word, #9798), online or not (#3152)'); assert.ok(d3.hint, 'offline hint');
-        assert.deepEqual(d3.buttons, ['New agent', 'New project', 'Open in Servers']); // the launch row, with Open in Servers as its last item, and no Collapse button: the header toggles the group (#5487, server_menu_browser.test.js)
+        assert.deepEqual(d3.buttons, ['New agent', 'New project', 'Open in Computers']); // the launch row, with Open in Computers as its last item, and no Collapse button: the header toggles the group (#5487, server_menu_browser.test.js)
         // Persistence across a reload.
         await Page.navigate({ url: BASE });
         await Page.loadEventFired();
@@ -252,7 +252,7 @@ const SETTINGS_PRELOAD = `(() => {
         assert.equal(col.m1, col.neutral, `a team with no color of its own is the neutral group color (${JSON.stringify(col)})`);
         assert.equal(col.m3, col.neutral, 'every such team: the same neutral color');
         assert.equal(col.m2, 'rgb(198, 120, 221)', 'a color the user picked is kept');
-        assert.equal(col.m3down, false, "an 'unknown' server (not checked yet) isn't dimmed"); assert.equal(col.m3sr, '(server)');
+        assert.equal(col.m3down, false, "an 'unknown' server (not checked yet) isn't dimmed"); assert.equal(col.m3sr, '(computer)');
         await ev(`localStorage.setItem('coral-group-by-server', 'true'); T.render.renderLiveSessions(T.state.liveSessions); true`);
         const unk = await ev(`(() => { const h = document.querySelector('#live-sessions-list li.server-group-header[data-server-group="m3"]'); return { down: h.classList.contains('is-down'), state: h.querySelector('.server-group-state')?.textContent || null }; })()`);
         assert.deepEqual(unk, { down: false, state: null }, "nor is its group header");
@@ -320,7 +320,7 @@ const SETTINGS_PRELOAD = `(() => {
         assert.equal(tabs.dom.indexOf('nav-tab-servers'), tabs.dom.indexOf('nav-tab-tokens') + 1, `Servers right after Analytics (${tabs.dom})`); // the operator's order (#8704): Agents, Inbox, Workflows, Jobs, Analytics, Servers, Docs
         assert.ok(tabs.dom.indexOf('nav-tab-servers') < tabs.dom.indexOf('nav-tab-docs'), 'Servers before Docs');
         assert.ok(tabs.dom.indexOf('nav-tab-docs') > tabs.dom.indexOf('nav-tab-tokens'), 'Docs after the local tabs');
-        assert.deepEqual(tabs.shown.filter(t => ['Agents', 'Servers', 'Docs'].includes(t)), ['Agents', 'Servers', 'Docs'], `shown in that order (${tabs.shown})`);
+        assert.deepEqual(tabs.shown.filter(t => ['Agents', 'Computers', 'Docs'].includes(t)), ['Agents', 'Computers', 'Docs'], `shown in that order (${tabs.shown})`);
         console.log(`   ✓ ${tabs.shown.join(', ')}`);
 
         console.log('\nAll server switcher checks passed');

@@ -33,6 +33,7 @@ type CloudHandler struct {
 	// stagedUpdate, launchUpdater and installing belong to InstallUpdate (system_update_install.go); the three funcs are nil in production (the staged
 	// folder, the updater's own answer to "will you install?" and the Windows updater launch are used) and are set by a test.
 	stagedUpdate     func(context.Context) (string, error)
+	installedVersion func() string // the running version (config.Version unless a test says otherwise)
 	preflightUpdater func(context.Context) error
 	launchUpdater    func(context.Context) error
 	installing       int32

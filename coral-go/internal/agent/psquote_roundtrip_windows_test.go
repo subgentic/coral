@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/subgentic/coral/internal/consoletest"
 	"github.com/subgentic/coral/internal/psquote"
 )
 
@@ -35,7 +36,7 @@ func TestPSLiteralRoundTripsThroughPowerShell(t *testing.T) {
 	scratch := t.TempDir()
 	for _, word := range words {
 		script := "$s = " + psquote.Literal(word) + "; [string]::Join(',', [int[]][char[]]$s)"
-		cmd := exec.Command(ps, "-NoProfile", "-NonInteractive", "-Command", script)
+		cmd := consoletest.HiddenCommand(ps, "-NoProfile", "-NonInteractive", "-Command", script)
 		cmd.Dir = scratch
 		out, err := cmd.CombinedOutput()
 		if err != nil {

@@ -164,3 +164,46 @@ func assertNotNudged(t *testing.T, rb *store.RemoteBoardStore, rt *mockRuntime) 
 	defer rt.mu.Unlock()
 	assert.Empty(t, rt.sent)
 }
+
+// #11198: a remote board that is paused answers the real count with paused: true, and its read delivers none of it: the agent is not nudged to read what it cannot read, and the nudge comes when
+// the board is resumed (unread, not paused).
+func TestRemoteBoardPollerDoesNotNudgeForAPausedRemoteBoard(t *testing.T) {
+	paused := atomic.Bool{}
+	paused.Store(true)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if paused.Load() {
+			_, _ = w.Write([]byte(`{"unread":3,"paused":true}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"unread":3}`))
+	}))
+	defer srv.Close()
+	db, err := storetest.Open(t, filepath.Join(t.TempDir(), "sessions.db"))
+	require.NoError(t, err)
+	defer db.Close()
+	rb := store.NewRemoteBoardStore(db)
+	ctx := context.Background()
+	_, err = rb.AddRemoteSub(ctx, "sess-1", srv.URL, "team", "Dev")
+	require.NoError(t, err)
+	rt := &mockRuntime{}
+	p := NewRemoteBoardPoller(rb, rt, time.Hour)
+	p.validateURL = func(string) (string, error) { return "203.0.113.1", nil }
+	p.validateAddr = func(string) (string, error) { return "127.0.0.1", nil }
+	p.SetDiscoverFn(func(context.Context) ([]AgentInfo, error) {
+		return []AgentInfo{{AgentName: "claude", AgentType: "claude", SessionID: "sess-1"}}, nil
+	})
+	require.NoError(t, p.RunOnce(ctx))
+	rt.mu.Lock()
+	assert.Empty(t, rt.sent, "paused: no nudge")
+	rt.mu.Unlock()
+	subs, err := rb.ListAllRemoteSubs(ctx)
+	require.NoError(t, err)
+	require.Len(t, subs, 1)
+	assert.Zero(t, subs[0].LastNotifiedUnread, "and it is not counted as notified, so the resume is nudged")
+
+	paused.Store(false)
+	require.NoError(t, p.RunOnce(ctx))
+	rt.mu.Lock()
+	defer rt.mu.Unlock()
+	assert.Len(t, rt.sent, 1, "resumed: the nudge goes out")
+}

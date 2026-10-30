@@ -281,6 +281,14 @@ func (m *Mac) processes(ctx context.Context) (map[int]string, error) {
 	return res, nil
 }
 
+// bundledTmux is whether a command (the part after <install>/Contents/MacOS/) is the tmux server Coral runs from its own bundle. It holds the agents' terminals and outlives Coral
+// on purpose (the agents keep working while Coral is replaced), so it is not "Coral still running": counted, the wait for Coral to end timed out on every Mac that had started an
+// agent in tmux, nothing was installed and nothing said why, and the new install could never be told from the old tmux when checking that it stayed up (#11151).
+func bundledTmux(rest string) bool {
+	name, _, _ := strings.Cut(rest, " ")
+	return name == "tmux"
+}
+
 func (m *Mac) running(ctx context.Context, install string) (int, error) {
 	procs, err := m.processes(ctx)
 	if err != nil {
@@ -289,7 +297,7 @@ func (m *Mac) running(ctx context.Context, install string) (int, error) {
 	prefix := install + "/Contents/MacOS/"
 	n := 0
 	for pid, cmd := range procs {
-		if pid != m.Self && pid != os.Getpid() && strings.HasPrefix(cmd, prefix) {
+		if pid != m.Self && pid != os.Getpid() && strings.HasPrefix(cmd, prefix) && !bundledTmux(strings.TrimPrefix(cmd, prefix)) {
 			n++
 		}
 	}
@@ -300,6 +308,12 @@ func (m *Mac) running(ctx context.Context, install string) (int, error) {
 func (m *Mac) Running(install string) bool {
 	n, err := m.running(context.Background(), install)
 	return err == nil && n > 0
+}
+
+// NothingRunning: the process list was read and no process of the install is in it. A list that could not be read is not "nothing runs" (#11155).
+func (m *Mac) NothingRunning(install string) bool {
+	n, err := m.running(context.Background(), install)
+	return err == nil && n == 0
 }
 
 // Healthy: a process of the install is running, and still is a few seconds later.

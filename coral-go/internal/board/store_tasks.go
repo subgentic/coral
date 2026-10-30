@@ -132,7 +132,7 @@ func (s *Store) CreateTaskWithOpts(ctx context.Context, project, title, body, pr
 	if err != nil {
 		return nil, err
 	}
-	result, err := s.db.ExecContext(ctx,
+	result, err := s.execEnsuringBoard(ctx, project,
 		`INSERT INTO board_tasks (board_id, title, body, status, priority, created_by, assigned_to, created_at, goal_id, remote_board_uid, remote_goal_uid, request_id, request_server, request_board, initial_instructions)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		project, title, bodyPtr, initialStatus, priority, createdBy, assignPtr, now, goalID, remoteBoard, remoteGoal, requestID, requestServer, requestBoard, w.Instructions)
@@ -140,7 +140,6 @@ func (s *Store) CreateTaskWithOpts(ctx context.Context, project, title, body, pr
 		return nil, err
 	}
 	taskID, _ := result.LastInsertId()
-	s.ensureBoardRow(ctx, project)
 	// Keep new tasks unclaimable until configuration and dependencies are stored.
 	if err := saveWorkflow(ctx, s.db, taskID, w); err != nil {
 		return nil, err
@@ -1109,4 +1108,17 @@ func sortOpenStates(tasks []Task) []Task {
 		out[i] = tasks[k.place]
 	}
 	return out
+}
+
+// OpenSelfTask is an open task its creator made for itself (created_by and assigned_to are the same member).
+type OpenSelfTask struct {
+	ID    int64  `db:"id"`
+	Title string `db:"title"`
+}
+
+// OpenSelfTasks are the open tasks agent created for itself on a board, oldest first: what the per-agent cap and the one-per-title rule of task add --self (#11247) read.
+func (s *Store) OpenSelfTasks(ctx context.Context, project, agent string) ([]OpenSelfTask, error) {
+	var tasks []OpenSelfTask
+	err := s.reader().SelectContext(ctx, &tasks, `SELECT id, title FROM board_tasks WHERE board_id = ? AND created_by = ? AND assigned_to = ? AND `+openTaskStatusSQL+` ORDER BY id`, project, agent, agent)
+	return tasks, err
 }

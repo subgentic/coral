@@ -1,7 +1,7 @@
 // Cloud Hub View mode (#3068): when the hub (or the machine's own setting) limits a server to View, the hub
 // drops terminal input without an error, so the dashboard must refuse up front. No /send or /keys, no
 // terminal-socket frame, no false 'Sent:' toast, the draft is kept, an error toast says why (with
-// 'Open Servers' when the hub is the limit), keystrokes typed into the terminal are dropped, and the
+// 'Open Computers' when the hub is the limit), keystrokes typed into the terminal are dropped, and the
 // terminal header shows a read-only chip. A {type:'hub_read_only'} frame on the terminal socket does the
 // same. Interact servers, unknown servers and failed lookups are unaffected.
 //
@@ -146,7 +146,7 @@ const CLOUD_PRELOAD = `(() => {
         assert.equal(await ev(`JSON.parse(document.getElementById('coral-boot').textContent).mode`), 'cloud', 'cloud mode boot flag');
         await ev(`localStorage.setItem('coral-live-view-mode', 'terminal'); true`);
 
-        console.log('1. Hub View: every send path refused, draft kept, chip, Open Servers');
+        console.log('1. Hub View: every send path refused, draft kept, chip, Open Computers');
         await setServers([row('m1', 'view', 'launch'), row('m2', 'interact', 'view'), row('m3', 'interact', 'launch'), row('m4', 'interact', 'launch')]);
         await ev(`window.__m.add('ro-hub', 'H', 5, { sleeping: false, server: 'm1' }); window.__m.add('ro-mach', 'M', 5, { sleeping: false, server: 'm2' }); window.__m.add('rw', 'W', 5, { sleeping: false, server: 'm3' }); window.__m.add('frame', 'F', 5, { sleeping: false, server: 'm4' }); window.__m.add('unknown', 'U', 5, { sleeping: false, server: 'm9' }); true`);
         await select('ro-hub', 'm1');
@@ -154,7 +154,7 @@ const CLOUD_PRELOAD = `(() => {
         assert.ok(c && c.shown, 'chip shown for a View server');
         assert.equal(c.text, 'Read-only: Hub: View');
         assert.equal(c.role, 'status');
-        const hubMsg = 'Blocked: Box M1 needs Interact (Hub: View · This machine allows: Launch · Effective: View). Choose a higher Hub access in Servers.';
+        const hubMsg = 'Blocked: Box M1 needs Interact (Hub: View · This computer allows: Launch · Effective: View). Choose a higher Hub access in Computers.';
         assert.equal(c.title, hubMsg, 'chip title is the full message');
         await clearSends(); await clearToasts();
         await typeDraft('hello there');
@@ -170,9 +170,9 @@ const CLOUD_PRELOAD = `(() => {
         assert.ok(blocked, `refusal toast with the exact message (${JSON.stringify(t)})`);
         assert.equal(blocked.role, null, 'the refusal is said by the notices\' alert region, not by a role of its own (#6213)');
         await waitFor(`document.getElementById('notice-alert').textContent.includes(${JSON.stringify(hubMsg.slice(0, 30))})`, 'the refusal is announced', 5000);
-        assert.equal(blocked.action, 'Open Servers');
-        await ev(`[...document.querySelectorAll('.toast .toast-action')].find(b => b.textContent.trim() === 'Open Servers').click(); true`);
-        // 'Open Servers' opens the Servers tab at the refused server's row (#3070).
+        assert.equal(blocked.action, 'Open Computers');
+        await ev(`[...document.querySelectorAll('.toast .toast-action')].find(b => b.textContent.trim() === 'Open Computers').click(); true`);
+        // 'Open Computers' opens the Servers tab at the refused server's row (#3070).
         await waitFor(`(() => { const v = document.getElementById('servers-view'); return !!v && getComputedStyle(v).display !== 'none' && document.activeElement && document.activeElement.id === 'server-row-m1'; })()`, 'Servers tab focused on the refused server', 3000);
         await ev(`window.switchNavTab('agents'); true`);
         await select('ro-hub', 'm1');
@@ -184,7 +184,7 @@ const CLOUD_PRELOAD = `(() => {
         assert.equal(await draft(), 'hello there', 'the draft survives every path (quick command, macro, protocol, reminder, resend)');
         t = await toasts();
         assert.ok(!t.some(x => /^Sent/.test(x.text)), 'still no Sent toast');
-        console.log(`   ✓ Enter + 9 paths${typed ? ' + typing' : ''}: 0 posts, 0 frames, draft kept, exact Blocked toast with Open Servers, chip '${c.text}'`);
+        console.log(`   ✓ Enter + 9 paths${typed ? ' + typing' : ''}: 0 posts, 0 frames, draft kept, exact Blocked toast with Open Computers, chip '${c.text}'`);
 
         // Chat view opens no terminal socket (#3719), so a typed command and a quick key go through POST /send and /keys;
         // a View-only hub must refuse them exactly as it refuses the socket.
@@ -206,18 +206,18 @@ const CLOUD_PRELOAD = `(() => {
         console.log(`   ✓ Chat view: Enter + 9 paths${typedInChat ? ' + typing' : ''}: 0 posts, 0 frames, draft kept, exact Blocked toast`);
         await ev(`localStorage.setItem('coral-live-view-mode', 'terminal'); true`);
 
-        console.log('2. Machine-limited: different text, no Open Servers');
+        console.log('2. Machine-limited: different text, no Open Computers');
         await select('ro-mach', 'm2');
         c = await chip();
-        assert.equal(c.text, 'Read-only: This machine: View');
+        assert.equal(c.text, 'Read-only: This computer: View');
         await clearSends(); await clearToasts();
         await typeDraft('machine draft'); await pressEnter(); await afterEnter();
         s = await sends();
         assert.equal(s.posts + s.frames.length, 0, 'machine-limited: nothing sent');
         t = await toasts();
         const mach = t.find(x => /^Blocked: Box M2/.test(x.text));
-        assert.ok(mach && /Change it in Coral on that machine \(Settings > Network and Hub\)\.$/.test(mach.text), `machine text (${JSON.stringify(t)})`);
-        assert.equal(mach.action, null, 'no Open Servers when the machine is the limit');
+        assert.ok(mach && /Change it in Coral on that computer \(Settings > Network and Hub\)\.$/.test(mach.text), `machine text (${JSON.stringify(t)})`);
+        assert.equal(mach.action, null, 'no Open Computers when the machine is the limit');
         assert.equal(await draft(), 'machine draft');
         console.log(`   ✓ '${c.text}', machine text, no action button, draft kept`);
 
@@ -264,7 +264,7 @@ const CLOUD_PRELOAD = `(() => {
         await ev(`window.__wsInject(JSON.stringify({ type: 'hub_read_only', required: 'sudo-everything', hub_mode: '<b>root</b>' })); true`);
         await clearToasts(); await pressEnter(); await afterEnter();
         t = await toasts();
-        assert.ok(t.some(x => x.text === 'Blocked: Box M4 is read-only through the Coral Hub. Choose a higher Hub access in Servers.'), `unknown enum: generic text, nothing echoed (${JSON.stringify(t)})`);
+        assert.ok(t.some(x => x.text === 'Blocked: Box M4 is read-only through the Coral Hub. Choose a higher Hub access in Computers.'), `unknown enum: generic text, nothing echoed (${JSON.stringify(t)})`);
         assert.ok(!t.some(x => /sudo-everything|root/.test(x.text)), 'no server-sent value echoed');
         // Reselecting clears the frame state; the list says Interact now.
         await select('frame', 'm4');
@@ -316,11 +316,11 @@ const CLOUD_PRELOAD = `(() => {
         await ev(`window.switchNavTab('servers'); true`);
         await waitFor(`!!document.querySelector('#server-row-m7 .cs-launch select')`, 'the Access select for m7', 5000);
         await ev(`(() => { const s = document.querySelector('#server-row-m7 .cs-launch select'); s.value = 'launch'; s.dispatchEvent(new Event('change')); return true; })()`);
-        await waitFor(`window.__qaServers.patches.length === 1 && T.state.currentSession.hubReadOnly && /This machine/.test(T.state.currentSession.hubReadOnly.chip)`, 'the lock re-explained by the machine limit', 5000);
+        await waitFor(`window.__qaServers.patches.length === 1 && T.state.currentSession.hubReadOnly && /This computer/.test(T.state.currentSession.hubReadOnly.chip)`, 'the lock re-explained by the machine limit', 5000);
         const b = await ev(`({ ro: T.state.currentSession.hubReadOnly, chip: document.getElementById('hub-readonly-chip').textContent })`);
         assert.equal(b.ro.fromFrame, true, 'still frame-sticky: a later lookup still cannot clear it');
-        assert.equal(b.chip, 'Read-only: This machine: View', 'the chip names the machine limit');
-        assert.match(b.ro.message, /Change it in Coral on that machine/, 'the refusal says where to change it');
+        assert.equal(b.chip, 'Read-only: This computer: View', 'the chip names the machine limit');
+        assert.match(b.ro.message, /Change it in Coral on that computer/, 'the refusal says where to change it');
         console.log('   ✓ machine-limited (effective View): the lock stays and names the machine limit');
 
         console.log('\nAll hub read-only checks passed');

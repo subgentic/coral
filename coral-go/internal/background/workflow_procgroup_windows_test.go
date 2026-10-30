@@ -14,6 +14,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/windows"
+
+	"github.com/subgentic/coral/internal/executil"
 )
 
 // processGone reports whether the process pid has exited (or can't be opened any more).
@@ -57,7 +59,7 @@ func activeInJob(t *testing.T, job windows.Handle) uint32 {
 func TestKillChildProcessEndsTheStepsJob(t *testing.T) {
 	shell, err := workflowShell()
 	require.NoError(t, err)
-	cmd := exec.CommandContext(context.Background(), shell, "-c", "/usr/bin/sleep 600 & wait") // as the steps make it
+	cmd := executil.Command(context.Background(), shell, "-c", "/usr/bin/sleep 600 & wait") // as the steps make it
 	configureChildProcess(cmd)
 	require.NoError(t, cmd.Start())
 	trackChildProcess(cmd)
@@ -76,7 +78,7 @@ func TestKillChildProcessEndsTheStepsJob(t *testing.T) {
 func TestStepProcessRunsAfterTrackingStartedItSuspended(t *testing.T) {
 	shell, err := workflowShell()
 	require.NoError(t, err)
-	cmd := exec.CommandContext(context.Background(), shell, "-c", "exit 7")
+	cmd := executil.Command(context.Background(), shell, "-c", "exit 7")
 	configureChildProcess(cmd)
 	require.NoError(t, cmd.Start())
 	trackChildProcess(cmd)
@@ -93,7 +95,7 @@ func TestStepDoesNotRunBeforeItIsTracked(t *testing.T) {
 	shell, err := workflowShell()
 	require.NoError(t, err)
 	mark := filepath.ToSlash(filepath.Join(t.TempDir(), "ran"))
-	cmd := exec.CommandContext(context.Background(), shell, "-c", "echo x > '"+mark+"'; /usr/bin/sleep 600 & /usr/bin/sleep 600 & wait")
+	cmd := executil.Command(context.Background(), shell, "-c", "echo x > '"+mark+"'; /usr/bin/sleep 600 & /usr/bin/sleep 600 & wait")
 	configureChildProcess(cmd)
 	require.NoError(t, cmd.Start())
 	time.Sleep(1500 * time.Millisecond) // the old gap, made wide

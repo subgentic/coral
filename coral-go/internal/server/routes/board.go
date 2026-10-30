@@ -28,6 +28,7 @@ func taskClaimNudge(taskID int64) string {
 
 // BoardHandler handles message board HTTP endpoints.
 type BoardHandler struct {
+	selfTaskMu sync.Mutex // makes the one-per-title check and the creation of a self task one step (#11247)
 	// goalReqWake is when each target board had its Orchestrators last woken for a goal request (#7361): one wake per few minutes, with the count, so a loop cannot make a paid turn per request.
 	goalReqWake sync.Map
 	// goalLinks limits the Hub service's reads of GET /api/goal-links per asker (#7411).
@@ -38,6 +39,7 @@ type BoardHandler struct {
 	terminal                      ptymanager.SessionTerminal
 	mu                            sync.RWMutex
 	paused                        map[string]bool      // in-memory set of paused project names
+	sleepPausedAt                 map[string]time.Time // when each sleep pause was made in this process (zero for one restored at startup): a lift on what an agent was seen doing earlier must not undo a later one (#11204)
 	sleepPaused                   map[string]bool      // the paused boards whose pause sleep or Coral's restart put there, which auto-wake lifts (#286)
 	pauseMu                       sync.Mutex           // one pause change at a time, its check, maps and stored row together (Security on #119)
 	notifyFn                      func(project string) // triggers an immediate notification pass for project's board
@@ -237,6 +239,7 @@ func NewBoardHandler(bs *board.Store) *BoardHandler {
 		bs:                            bs,
 		paused:                        make(map[string]bool),
 		sleepPaused:                   make(map[string]bool),
+		sleepPausedAt:                 make(map[string]time.Time),
 		reminders:                     make(map[string]context.CancelFunc),
 		subscriberReminderIntervals:   make(map[string]int),
 		subscriberReminderGenerations: make(map[string]uint64),

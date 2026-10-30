@@ -430,6 +430,7 @@ func (h *HistoryHandler) listSessionsBefore4713(w http.ResponseWriter, r *http.R
 				boardSessions = append(boardSessions, map[string]any{
 					"session_id":        fmt.Sprintf("board:%s", p.Project),
 					"title":             p.Project,
+					"board_label":       p.BoardLabel, // the board's display name beside its key (#11070)
 					"type":              "group",
 					"source_type":       "board",
 					"summary":           fmt.Sprintf("%d messages, %d participants", p.MessageCount, p.SubscriberCount),

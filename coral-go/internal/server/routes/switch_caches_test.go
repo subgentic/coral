@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sync"
 	"sync/atomic"
@@ -21,6 +20,7 @@ import (
 	"github.com/subgentic/coral/internal/background"
 	"github.com/subgentic/coral/internal/board/boardtest"
 	"github.com/subgentic/coral/internal/config"
+	"github.com/subgentic/coral/internal/consoletest"
 	"github.com/subgentic/coral/internal/store"
 	"github.com/subgentic/coral/internal/store/storetest"
 )
@@ -35,7 +35,7 @@ func gitRepoWith(t testing.TB, n int) string {
 		require.NoError(t, os.WriteFile(p, []byte("package x\n"), 0o644))
 	}
 	for _, args := range [][]string{{"init", "-q"}, {"add", "-A"}, {"-c", "user.email=t@example.test", "-c", "user.name=t", "commit", "-qm", "x"}} {
-		out, err := exec.Command("git", append([]string{"-C", dir}, args...)...).CombinedOutput()
+		out, err := consoletest.HiddenCommand("git", append([]string{"-C", dir}, args...)...).CombinedOutput()
 		require.NoError(t, err, "%s", out)
 	}
 	return dir

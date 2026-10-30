@@ -78,7 +78,15 @@ let _btn = null;
 let _status = null;
 
 /** Hide the indicator, leaving no state, title or name behind (QA). */
+/** The phone's Agents page has no top bar (its header is the page's first row, #11096), so the hub's state shows as a dot on the account button there: body[data-hub-state] for the CSS, and the words in the button's hidden text. */
+function phoneState(state, label) {
+    const bd = document.body; // only a change is written (a poll every 15 s)
+    if (state) { if (bd.getAttribute('data-hub-state') !== state) bd.setAttribute('data-hub-state', state); if (bd.getAttribute('data-hub-label') !== label) bd.setAttribute('data-hub-label', label); } else { bd.removeAttribute('data-hub-state'); bd.removeAttribute('data-hub-label'); }
+    const t = document.getElementById('phone-hub-state'), words = state ? `, ${label}` : ''; if (t && t.textContent !== words) t.textContent = words;
+}
+
 function hide(b) {
+    phoneState('', '');
     b.hidden = true;
     b.removeAttribute('data-state');
     b.removeAttribute('title');
@@ -114,6 +122,7 @@ export function renderIndicator(st, now = new Date()) {
     if (!state) { hide(b); return; }
     _status = st;
     const label = indicatorTitle(st, state, now);
+    phoneState(state, label);
     b.dataset.state = state;
     b.title = label;
     b.setAttribute('aria-label', label);

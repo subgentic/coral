@@ -352,3 +352,25 @@ func TestAnUnansweredAskRemindsTheAskedMemberOnce(t *testing.T) {
 	n.h.RunOnce(ctx)
 	assert.Len(t, n.sentTo("Dev B"), 1, "Dev B answered the third: only the first reminder")
 }
+
+// #11180 (QA's #11176): the health pass ends an escalation with its task, but a wait escalation's subject is a wait's id, never a task's: the pass reset it every time and the same wait was escalated
+// again five minutes later. The pass leaves a wait's escalation alone; the task-keyed ones still end with their task.
+func TestAFullHealthPassLeavesAWaitEscalationAlone(t *testing.T) {
+	n := newNudgeHarness(t, "")
+	ctx := context.Background()
+	n.agent("Dev", "15151515-1515-1515-1515-151515151515")
+	require.NoError(t, n.bs.MarkHealthEscalated(ctx, "team", ruleWaitEscalation, "Dev", "7", n.now))
+	task, err := n.bs.CreateTask(ctx, "team", "work", "", "high", "Operator", "Dev")
+	require.NoError(t, err)
+	require.NoError(t, n.bs.MarkHealthEscalated(ctx, "team", ruleClaimNudge, "Dev", fmt.Sprint(task.ID), n.now))
+	_, err = n.bs.CancelTask(ctx, "team", task.ID, "Operator", nil)
+	require.NoError(t, err)
+	for i := 0; i < 3; i++ {
+		n.run(5 * time.Minute)
+	}
+	esc, err := n.bs.HealthEscalations(ctx, "team")
+	require.NoError(t, err)
+	require.Len(t, esc, 1, "the cancelled task's escalation ended, the wait's did not")
+	assert.Equal(t, ruleWaitEscalation, esc[0].Rule)
+	assert.Equal(t, "7", esc[0].Subject)
+}

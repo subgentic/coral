@@ -1,4 +1,4 @@
-// The Working mode list in Team settings says what the chosen mode means (#5760): a one-line description under it, read from the preset the server lists (its `description`),
+// The Working mode list in Team settings says what the chosen mode means (#5760): a one-line description under it, read from the preset the computer lists (its `description`),
 // tied to the list by aria-describedby so a screen reader reads it with the list. None, Shared checkout, Worktrees, Merge queue and Task queue have one; a team's own preset has none, and the
 // line is hidden (not an empty paragraph). Drives Chrome over CDP against the isolated dev server, at 1280 and 390 px.
 const assert = require('node:assert/strict');

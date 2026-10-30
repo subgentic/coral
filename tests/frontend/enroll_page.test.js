@@ -13,7 +13,7 @@ const dir = path.resolve(__dirname, '../../coral-go/pkg/frontend');
 const tpl = fs.readFileSync(path.join(dir, 'templates/cloud/enroll.html'), 'utf8');
 assert.match(tpl, /<title>Connect to Coral Hub<\/title>/, 'title');
 assert.match(tpl, /<h1>Connect to Coral Hub<\/h1>/, 'heading');
-assert.match(tpl, /<p>Enter the code shown on your machine\.<\/p>/, 'intro');
+assert.match(tpl, /<p>Enter the code shown on your computer\.<\/p>/, 'intro');
 assert.ok(!/Cloud Hub/i.test(tpl), 'no "Cloud Hub" on the page');
 
 // ── 2. prefill ───────────────────────────────────────────────────────

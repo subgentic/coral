@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/subgentic/coral/internal/agent"
 	at "github.com/subgentic/coral/internal/agenttypes"
 	"github.com/subgentic/coral/internal/store"
 )
@@ -115,4 +116,50 @@ func TestWorkflowPrintStepOnUnverifiedCLIFailsClearly(t *testing.T) {
 	assert.Contains(t, err.Error(), "aren't supported for codex yet")
 	assert.Equal(t, "", PrintStepError(at.Claude))
 	assert.Contains(t, PrintStepError("nope"), "unknown agent_type")
+}
+
+// #11105 (row 12): a workflow step on Pi runs `pi --print --no-session --no-approve [model] [flags] [--tools ...] <prompt>`: one-shot, nothing kept, the repository's Pi files not trusted, the configured tool
+// allowlist given as --tools (a name that is not plain is dropped) and an --approve in the flags dropped. Run against a fake pi that records its arguments.
+func TestWorkflowPiStepRunsOneShotWithItsTools(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("shell-script fake binary")
+	}
+	db := setupTestDB(t)
+	t.Setenv("HOME", t.TempDir())
+	dir := t.TempDir()
+	argsFile := filepath.Join(dir, "args")
+	pi := filepath.Join(dir, "pi-fake")
+	require.NoError(t, os.WriteFile(pi, []byte("#!/bin/sh\nprintf '%s\\n' \"$@\" > '"+argsFile+"'\necho done\n"), 0o755))
+	require.NoError(t, store.NewSessionStore(db).SetSetting(context.Background(), agent.CLIPathSettingKey(at.Pi), pi))
+	runner := NewWorkflowRunner(store.NewWorkflowStore(db), nil, nil, nil, nil, t.TempDir(), "localhost", 8420)
+	cfg := &AgentStepConfig{AgentType: at.Pi, Model: "anthropic/m", Flags: []string{"--approve", "--thinking", "high"}, Tools: []string{"read", "bash", "--evil", "a b"}}
+	require.NoError(t, runner.executeAgentPrint(context.Background(), 1, StepDef{Name: "s"}, testStepFiles(t), t.TempDir(), os.Environ(), cfg, "summarize the board", nil, &StepResult{}))
+	raw, err := os.ReadFile(argsFile)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"--print", "--model", "anthropic/m", "--thinking", "high", "--tools", "read,bash", "--no-session", "--no-approve", "summarize the board"}, strings.Split(strings.TrimSpace(string(raw)), "\n"))
+}
+
+// #11293 (row 12): a default (non-interactive) workflow step on Pi was refused with "print (non-interactive) steps aren't supported for pi yet", though the one-shot run above exists: the gate still said
+// Pi was not verified. Pi 1.4.0 was run for real: `pi --print --no-session --no-approve --model openai/... "<prompt>"` prints the answer, keeps no session and exits. The step runs through the gate.
+func TestWorkflowDefaultStepOnPiIsNotRefusedAndRunsOneShot(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("shell-script fake binary")
+	}
+	assert.Equal(t, "", PrintStepError(at.Pi), "a print step on Pi is allowed")
+	assert.True(t, KnownStepAgentType(at.Pi))
+	db := setupTestDB(t)
+	t.Setenv("HOME", t.TempDir())
+	dir := t.TempDir()
+	argsFile := filepath.Join(dir, "args")
+	pi := filepath.Join(dir, "pi-fake")
+	require.NoError(t, os.WriteFile(pi, []byte("#!/bin/sh\nprintf '%s\\n' \"$@\" > '"+argsFile+"'\necho done\n"), 0o755))
+	require.NoError(t, store.NewSessionStore(db).SetSetting(context.Background(), agent.CLIPathSettingKey(at.Pi), pi))
+	runner := NewWorkflowRunner(store.NewWorkflowStore(db), nil, nil, nil, nil, t.TempDir(), "localhost", 8420)
+	err := runner.executeAgentStep(context.Background(), 1, StepDef{Name: "s", Prompt: "summarize the board"}, testStepFiles(t), t.TempDir(), os.Environ(), &AgentStepConfig{AgentType: at.Pi}, &StepResult{})
+	if err != nil {
+		assert.NotContains(t, err.Error(), "aren't supported", "the step is not refused")
+	}
+	raw, rerr := os.ReadFile(argsFile)
+	require.NoError(t, rerr, "pi ran")
+	assert.Equal(t, []string{"--print", "--no-session", "--no-approve", "summarize the board"}, strings.Split(strings.TrimSpace(string(raw)), "\n"))
 }

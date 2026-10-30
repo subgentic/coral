@@ -54,6 +54,7 @@ type launchTeamRequest struct {
 	BoardID            string            `json:"board_id"`  // relaunch on this board (#3536)
 	NewBoard           bool              `json:"new_board"` // create another board even if the name exists
 	WorkingDir         string            `json:"working_dir"`
+	CreateDir          bool              `json:"create_dir"` // the folder is the suggested <home>/Coral/<name>: make it (#11258)
 	AgentType          string            `json:"agent_type"`
 	Flags              []string          `json:"flags"`
 	BoardServer        string            `json:"board_server"`
@@ -172,6 +173,10 @@ func (h *SessionsHandler) LaunchTeam(w http.ResponseWriter, r *http.Request) {
 	}
 	if msg := checkTeamRequest(body); msg != "" {
 		refuse(tracking.FailInvalidRequest, msg)
+		return
+	}
+	if msg := createSuggestedDir(body.WorkingDir, body.CreateDir, h.cfg.CoralRoot); msg != "" {
+		refuse(tracking.FailWorkdirUnavailable, msg)
 		return
 	}
 	// From here a worktree, a team record and terminals are made: the team launches to its end whatever the request does, with a bound that grows with

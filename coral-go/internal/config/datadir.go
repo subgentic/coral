@@ -3,12 +3,17 @@ package config
 import (
 	"errors"
 	"fmt"
+	"github.com/subgentic/coral/internal/logsafe"
 	"io/fs"
 	"log"
 	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
+
+	"github.com/subgentic/coral/internal/secfile"
 )
 
 // EnsureDataDir creates Coral's data folder if it doesn't exist, readable by this user only:
@@ -26,16 +31,24 @@ func EnsureDataDir(dir string) error {
 	if dir == "" {
 		return errors.New("no data folder")
 	}
-	_, err := os.Lstat(dir)
+	fi, err := os.Lstat(dir)
 	existed := err == nil
+	if err != nil && untrustedMountRefusal(err) {
+		return behindJunction(dir, err)
+	}
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return err
 	}
-	if err := os.MkdirAll(dir, 0o700); err != nil {
-		return err
-	}
 	if !existed {
+		if err := os.MkdirAll(dir, 0o700); err != nil {
+			return err
+		}
 		return protectDataDir(dir)
+	}
+	// An existing folder is not made again: MkdirAll follows a link, and on a Windows that refuses to traverse a junction (untrusted mount point) it came back as a raw mkdir
+	// error instead of the refusal below. Only a file in the folder's place is an error here.
+	if !fi.IsDir() && fi.Mode()&(os.ModeSymlink|os.ModeIrregular) == 0 {
+		return fmt.Errorf("the data folder %s is not a folder", dir)
 	}
 	notice, err := secureExistingDataDir(dir)
 	if err != nil {
@@ -49,8 +62,105 @@ func EnsureDataDir(dir string) error {
 	if notice != "" {
 		log.Printf("[security] %s", notice)
 		setDataDirNotice(notice)
+		SetDataDirMadePrivate(dir, true)
+		// The marker outlives this process: until a start has renewed what is in the folder, each start renews it. The folder is private
+		// now, so the marker is too.
+		if err := writeRenewPending(dir); err != nil {
+			log.Printf("[security] could not write %s: %v", logsafe.Path(RenewPendingFile), err)
+		}
 	}
 	return nil
+}
+
+// RenewPendingFile marks a data folder that Coral made private until a start has renewed what is in it (the API key, the agents'
+// tokens, the stored remote servers' marks). It is removed only when that has all been done (ClearDataDirRenewal).
+const RenewPendingFile = ".renew-pending"
+
+// writeRenewPending creates dir's RenewPendingFile as a new private file: whatever is at that name first (a link, a junction or an older
+// marker) is removed, never followed, and the file is opened without following a link and only if it does not exist.
+func writeRenewPending(dir string) error {
+	path := filepath.Join(dir, RenewPendingFile)
+	if err := os.Remove(path); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return err
+	}
+	f, err := secfile.OpenNoFollow(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	if err != nil {
+		return err
+	}
+	if _, err := f.WriteString("Coral made this folder private; the next start renews the secrets in it.\n"); err != nil {
+		f.Close()
+		return err
+	}
+	return f.Close()
+}
+
+// DataDirMadePrivate reports whether this start made the data folder dir private, or an earlier start did and did not finish renewing
+// what is in it (RenewPendingFile). Such a start renews the secrets Coral can renew (the API key, the agents' session tokens) and the
+// notice lists the ones a person may want to renew. It is kept per folder: a process that opens another data folder (a test does, for
+// each server) is not told about one it did not open.
+func DataDirMadePrivate(dir string) bool {
+	madePrivateMu.Lock()
+	set := madePrivate[madePrivateKey(dir)]
+	madePrivateMu.Unlock()
+	if set {
+		return true
+	}
+	fi, err := os.Lstat(filepath.Join(dir, RenewPendingFile))
+	return err == nil && fi.Mode().IsRegular()
+}
+
+// ClearDataDirRenewal ends DataDirMadePrivate for dir: its flag and its RenewPendingFile. Called once everything in the folder that Coral
+// can renew has been renewed.
+func ClearDataDirRenewal(dir string) error {
+	SetDataDirMadePrivate(dir, false)
+	if err := os.Remove(filepath.Join(dir, RenewPendingFile)); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return err
+	}
+	return nil
+}
+
+func madePrivateKey(dir string) string {
+	k := filepath.Clean(dir)
+	if runtime.GOOS == "windows" {
+		k = strings.ToLower(k)
+	}
+	return k
+}
+
+// SetDataDirMadePrivate sets what DataDirMadePrivate reports for dir. EnsureDataDir sets it; the tests of the start that follows (internal/server,
+// internal/startup) set it too, for a folder of their own.
+func SetDataDirMadePrivate(dir string, v bool) {
+	madePrivateMu.Lock()
+	defer madePrivateMu.Unlock()
+	if v {
+		madePrivate[madePrivateKey(dir)] = true
+	} else {
+		delete(madePrivate, madePrivateKey(dir))
+	}
+}
+
+// DataDirNotice is what Coral said it did to the data folder at this start, or "".
+func DataDirNotice() string { return getDataDirNotice() }
+
+// SetDataDirNotice replaces that notice: the server adds what it renewed and what the person may want to do.
+func SetDataDirNotice(s string) { setDataDirNotice(s) }
+
+// ErrDataDirBehindJunction is the error of a data folder whose path goes through a junction that Windows refuses to traverse (Windows 11 build 26300 and later, for a junction a
+// non-administrator made): the folder can be neither checked nor used. The text says what to do; the system's own error stays in the chain.
+var ErrDataDirBehindJunction = errors.New("the data folder is behind a junction Windows will not open")
+
+type dataDirJunctionRefusal struct {
+	text  string
+	cause error
+}
+
+func (e dataDirJunctionRefusal) Error() string        { return e.text }
+func (e dataDirJunctionRefusal) Is(target error) bool { return target == ErrDataDirBehindJunction }
+func (e dataDirJunctionRefusal) Unwrap() error        { return e.cause }
+
+func behindJunction(dir string, cause error) error {
+	return dataDirJunctionRefusal{fmt.Sprintf("Coral cannot use its data folder %s: its path goes through a junction that Windows will not open (untrusted mount point). "+
+		"Set CORAL_DATA_DIR to a folder whose path has no junction in it, or use the real folder the junction points to.", dir), cause}
 }
 
 // ErrSharedDataDir is the error of an existing data folder that other accounts can read and that Coral could not make private.
@@ -58,6 +168,8 @@ var ErrSharedDataDir = errors.New("the data folder can be read by other accounts
 
 var (
 	allowSharedDataDir atomic.Bool
+	madePrivateMu      sync.Mutex
+	madePrivate        = map[string]bool{}
 	dataDirNoticeMu    sync.Mutex
 	dataDirNotice      string
 )

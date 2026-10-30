@@ -7,7 +7,6 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -19,6 +18,7 @@ import (
 
 	"github.com/subgentic/coral/internal/board/boardtest"
 	"github.com/subgentic/coral/internal/config"
+	"github.com/subgentic/coral/internal/consoletest"
 	"github.com/subgentic/coral/internal/store/storetest"
 	"github.com/subgentic/coral/pkg/tunnel"
 )
@@ -163,11 +163,11 @@ func TestIsGitAnswersTheCurrentBranch(t *testing.T) {
 		dir := filepath.Join(e.home, "projects", name)
 		require.NoError(t, os.MkdirAll(dir, 0o755))
 		for _, args := range [][]string{{"init", "-q", "-b", "trunk"}} {
-			out, err := exec.Command("git", append([]string{"-C", dir}, args...)...).CombinedOutput()
+			out, err := consoletest.HiddenCommand("git", append([]string{"-C", dir}, args...)...).CombinedOutput()
 			require.NoError(t, err, string(out))
 		}
 		if commit {
-			out, err := exec.Command("git", "-C", dir, "-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "--allow-empty", "-m", "x").CombinedOutput()
+			out, err := consoletest.HiddenCommand("git", "-C", dir, "-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "--allow-empty", "-m", "x").CombinedOutput()
 			require.NoError(t, err, string(out))
 		}
 		return dir

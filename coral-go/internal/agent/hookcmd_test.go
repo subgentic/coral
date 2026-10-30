@@ -11,6 +11,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/subgentic/coral/internal/consoletest"
 )
 
 // hookEchoEnv makes a copy of this test binary print its own path and exit (TestMain).
@@ -73,8 +75,8 @@ func TestHookCommandRunsTheToolsFolder(t *testing.T) {
 	for _, sh := range []string{"sh", "bash"} {
 		if p, err := exec.LookPath(sh); err == nil && !strings.EqualFold(filepath.Dir(p), os.Getenv("SystemRoot")+`\System32`) {
 			// The setup is real: the bare name runs the decoy.
-			assert.Equal(t, decoyPath, ranFrom(sh, exec.Command(p, "-c", "coral-hook-agentic-state --hooks-rev 2")), "%s: the decoy is first", sh)
-			check(sh, exec.Command(p, "-c", cmd))
+			assert.Equal(t, decoyPath, ranFrom(sh, consoletest.HiddenCommand(p, "-c", "coral-hook-agentic-state --hooks-rev 2")), "%s: the decoy is first", sh)
+			check(sh, consoletest.HiddenCommand(p, "-c", cmd))
 			ran++
 		}
 	}

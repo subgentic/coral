@@ -1,7 +1,7 @@
 /* The agent list's groups: a team's card, a workflow's, a folder's, and the order they go in (moved out of render.js, #4996; no behaviour change). */
 import { teamLinkOffered } from './list_hooks.js';
 import { state } from './state.js';
-import { keyLabel, splitKey, sessionTeamKey, sessionFolderKey } from './server_base.js';
+import { keyLabel, splitKey, sessionTeamKey, sessionFolderKey, pickTeamFolder } from './server_base.js';
 import { distillChip } from './knowledge_distill.js';
 import { MORE_DOTS_SVG, escapeAttr, escapeHtml } from './utils.js';
 import { _sortByOrder, _getGroupOrder, _sortGroups } from './list_order.js';
@@ -19,7 +19,7 @@ function _renderTeamCard(boardName, boardSessions) {
         const accentStyle = _boardAccentStyle(boardName);
         const boardCollapsed = _isGroupCollapsed(boardName);
         const boardLink = '';
-        const boardWorkDir = boardSessions[0]?.working_directory || '';
+        const boardWorkDir = pickTeamFolder('', boardSessions);
         const boardIsSleeping = boardSessions.every(s => s.sleeping);
         const boardSleepIcon = boardIsSleeping ? ' <span class="agent-icon" title="Team is sleeping">🌙</span>' : '';
         const sleepLabel = boardIsSleeping ? 'Wake Team' : 'Sleep Team';
@@ -265,7 +265,7 @@ function _renderFolderFirstGroup(groupName, groupSessions) {
                 const accentStyle = _boardAccentStyle(boardName);
                 const boardCollapsed = _isGroupCollapsed(boardName);
                 const boardLink = '';
-                const boardWorkDir = boardSessions[0]?.working_directory || '';
+                const boardWorkDir = pickTeamFolder('', boardSessions);
                 const boardIsSleeping = boardSessions.some(s => s.sleeping);
                 const boardSleepIcon = boardIsSleeping ? ' <span class="agent-icon" title="Team is sleeping">🌙</span>' : '';
                 const sleepLabel = boardIsSleeping ? 'Wake Team' : 'Sleep Team';

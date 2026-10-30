@@ -54,6 +54,13 @@ func (h *SessionsHandler) applyTranscriptState(input *SessionStateInput, events 
 		}
 		mergeTranscriptTurnEvent(input, events, kind, atTime)
 		h.applyCodexCompletedPermission(input, sessionID, workingDir)
+	case at.Pi:
+		// Pi fires no hook: its session file says a turn is going on (a prompt, a tool call, a tool result) or ended (stop, error), like Codex's rollout (#11091).
+		kind, atTime, activity := h.jsonl.ReadPiTurn(sessionID, workingDir)
+		if kind == "prompt_submit" && activity {
+			kind = "turn_activity" // the turn going on, not a new turn: it never answers an open request
+		}
+		mergeTranscriptTurnEvent(input, events, kind, atTime)
 	case at.Agy, at.Antigravity, at.Gemini:
 		kind, atTime, summary := h.jsonl.ReadAgyTurnEvent(sessionID, workingDir)
 		mergeTranscriptTurnEvent(input, events, kind, atTime, summary)

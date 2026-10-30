@@ -107,6 +107,11 @@ func (r *PTYRuntime) AgentShellIdle(_ context.Context, name, _, _ string) (bool,
 	return r.backend.ShellIdle(name)
 }
 
+// AgentUnknownShell names a shell of unknown contents in the agent's terminal, for ptymanager.AgentExitedForLaunch (Security on #216).
+func (r *PTYRuntime) AgentUnknownShell(_ context.Context, name, _, _ string) (string, bool) {
+	return r.backend.OtherShell(name)
+}
+
 // AgentScreen implements ptymanager.ScreenReader: the session's output rendered as the
 // screen (as the HTTP senders read it), read by the automated-input gate before typing
 // (#3431).

@@ -32,6 +32,7 @@
 
 
 .goals-failed { display: flex; gap: 8px; padding: 12px; border: 1px dashed var(--border-light); border-radius: var(--radius-lg); color: var(--text-secondary); flex-direction: row; flex-wrap: wrap; align-items: center; border-style: solid; border-color: var(--error); }
+.goals-failed[hidden] { display: none; } /* the display above beats the hidden attribute: an empty one drew as a box (#11219) */
 
 .goals-dialog { margin: auto; /* the base reset gives every dialog margin 0, which pinned it to the corner */ border: 1px solid var(--border-light); border-radius: var(--dlg-radius); background: var(--bg-secondary); color: var(--text-primary); padding: 16px; }
 .goals-dialog::backdrop { background: rgba(var(--black-rgb), 0.5); }
@@ -95,3 +96,10 @@
 .goals-tasks-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-xs); }
 @media (pointer: coarse) { .goals-tasks-link { min-height: 44px; min-width: 44px; } } /* a short count ("9 tasks") is still a 44 px target both ways (#7972, the phone census) */
 
+
+/* The Goals row's 'All tasks done · Close goal' chip (#11224): one quiet chip at the end of the title line, in the link colour, never a line of its own on a computer; the title gives way to it. */
+.goals-ready-close { flex: 0 0 auto; white-space: nowrap; min-height: 0; height: 24px; padding-block: 0; background: transparent; color: var(--link-text); border-color: var(--border); font-size: var(--fs-base); }
+@media (pointer: coarse) { .goals-ready-close { min-height: var(--control-touch-height, 44px); height: auto; } }
+@media (max-width: 760px), (pointer: coarse) { button.btn.goals-ready-close { padding-inline: 6px; font-size: var(--fs-sm); } .goals-ready-close .goals-ready-state { display: none; } } /* on a phone the chip is 'Close goal' alone: the full one took the title's room and ran into the State column (#11224, QA Reviewer 2) */
+.goals-ready-icon { display: none; font-size: var(--icon-size, 1.125rem); line-height: 1; }
+@media (max-width: 360px) { button.btn.goals-ready-close { min-width: var(--control-touch-height, 44px); padding-inline: 0; justify-content: center; } .goals-ready-close .goals-ready-label { display: none; } .goals-ready-close .goals-ready-icon { display: inline-block; } } /* a 320 px phone has no room for the words beside a title: a check, 44 px square, named Close goal */

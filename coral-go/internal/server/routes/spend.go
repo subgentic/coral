@@ -10,6 +10,7 @@ import (
 
 	"github.com/subgentic/coral/internal/agenttypes"
 	"github.com/subgentic/coral/internal/board"
+	"github.com/subgentic/coral/internal/jsonl"
 	"github.com/subgentic/coral/internal/landedcommits"
 	"github.com/subgentic/coral/internal/naming"
 	"github.com/subgentic/coral/internal/store"
@@ -19,7 +20,7 @@ import (
 // GET /api/board/{project}/spend?range=24h|7d. NEVER through Coral Hub for now (no row in the tunnel table, a census line): it names agents and counts their work.
 //
 // Tokens are measured for Claude, Codex, Pi and agy (the token poller reads their transcripts) and not for Gemini, which writes no rows: those agents are null, never zero. Tool calls come from the
-// tool_use events the hooks record (Claude, Codex, agy), not Gemini or Pi. Commits are read from the repository's own history (internal/landedcommits): the board's live agents' most common git root and
+// tool_use events the hooks record (Claude, Codex, agy) and, for Pi, which has no hooks, from the toolCall blocks of its session file (#11105); not Gemini. Commits are read from the repository's own history (internal/landedcommits): the board's live agents' most common git root and
 // the repository's default branch, the author name is the agent, a commit that matches no agent is "Unattributed". Task times are what the board stores (store: board/task_times.go).
 
 // SpendHandler serves the spend read.
@@ -30,11 +31,19 @@ type SpendHandler struct {
 	bs      *board.Store
 	commits landedcommits.Cache
 	now     func() time.Time
+	reader  *jsonl.SessionReader // the tool calls of a Pi session file are counted from it (#11105)
 }
 
 // NewSpendHandler creates the handler.
 func NewSpendHandler(db *store.DB, bs *board.Store) *SpendHandler {
-	return &SpendHandler{db: db, ts: store.NewTokenUsageStore(db), ss: store.NewSessionStore(db), bs: bs}
+	return &SpendHandler{db: db, ts: store.NewTokenUsageStore(db), ss: store.NewSessionStore(db), bs: bs, reader: jsonl.NewSessionReader()}
+}
+
+// SetSessionReader shares the server's session reader (so a Pi session's file is read once for the chat, the state and these counts).
+func (h *SpendHandler) SetSessionReader(r *jsonl.SessionReader) {
+	if r != nil {
+		h.reader = r
+	}
 }
 
 func (h *SpendHandler) clock() time.Time {
@@ -47,7 +56,7 @@ func (h *SpendHandler) clock() time.Time {
 // tokenSources and toolSources are the CLIs that have a source for each measure.
 var (
 	tokenSources = map[string]bool{agenttypes.Claude: true, agenttypes.Codex: true, agenttypes.Pi: true, agenttypes.Agy: true}
-	toolSources  = map[string]bool{agenttypes.Claude: true, agenttypes.Codex: true, agenttypes.Agy: true}
+	toolSources  = map[string]bool{agenttypes.Claude: true, agenttypes.Codex: true, agenttypes.Agy: true, agenttypes.Pi: true} // Pi has no hooks: its calls are counted from its session file (#11105)
 )
 
 type spendTokens struct {
@@ -295,9 +304,12 @@ type spendToolRows struct {
 
 // readToolCalls reads the tool_use events of the board's agents that have a tool source, hour by hour from the start of the usual period.
 func (h *SpendHandler) readToolCalls(ctx context.Context, ro *spendRoster, fr spendFrame) (*spendToolRows, string) {
-	var sessions []string
+	var sessions, piSessions []string
 	for _, id := range ro.order {
-		if toolSources[ro.accs[id].sess.AgentType] {
+		switch typ := ro.accs[id].sess.AgentType; {
+		case typ == agenttypes.Pi:
+			piSessions = append(piSessions, id)
+		case toolSources[typ]:
 			sessions = append(sessions, id)
 		}
 	}
@@ -307,6 +319,18 @@ func (h *SpendHandler) readToolCalls(ctx context.Context, ro *spendRoster, fr sp
 		var err error
 		if rows, err = h.db.ToolCallBuckets(ctx, sessions, spendDBStamp(fr.usualStart), spendDBStamp(fr.end), bucketLen); err != nil {
 			return nil, "could not read tool calls"
+		}
+	}
+	// A Pi agent's calls, hour by hour, from its session file: the same buckets as the events' (#11105).
+	if h.reader != nil {
+		since, until := spendDBStamp(fr.usualStart)[:bucketLen], spendDBStamp(fr.end)[:bucketLen]
+		for _, id := range piSessions {
+			_, byHour := h.reader.PiToolStats(id, ro.accs[id].sess.WorkingDir)
+			for hour, n := range byHour {
+				if hour >= since && hour < until { // the window ends on an hour
+					rows = append(rows, store.ToolCallBucket{SessionID: id, Bucket: hour, N: n})
+				}
+			}
 		}
 	}
 	out := &spendToolRows{bySession: map[string]int{}, byHour: map[string]int{}}

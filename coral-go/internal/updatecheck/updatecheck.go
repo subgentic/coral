@@ -15,10 +15,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/subgentic/coral/internal/semverorder"
 	"net/http"
-	"regexp"
-	"strconv"
-	"strings"
 	"time"
 )
 
@@ -49,7 +47,7 @@ var client = &http.Client{CheckRedirect: func(req *http.Request, via []*http.Req
 }}
 
 // tagShape is a release tag: v, three numbers, an optional prerelease of letters, digits and dots.
-var tagShape = regexp.MustCompile(`^v?(\d{1,9})\.(\d{1,9})\.(\d{1,9})(?:-([0-9A-Za-z.]{1,40}))?$`)
+var tagShape = semverorder.TagShape
 
 // ErrBadTag is a reply whose tag_name doesn't look like a version.
 var ErrBadTag = errors.New("updatecheck: the release tag is not a version")
@@ -71,9 +69,13 @@ func Latest(ctx context.Context, apiURL string) (string, error) {
 // Newer reports whether latest is strictly newer than current, both versions with or without a
 // "v". A current that isn't a version ("dev", "") is never offered an update.
 func Newer(latest, current string) bool {
-	l, ok1 := parse(latest)
-	c, ok2 := parse(current)
-	return ok1 && ok2 && compare(l, c) > 0
+	return semverorder.Newer(latest, current)
+}
+
+// NotNewer reports whether candidate is a version that is NOT newer than current: older or equal, both parsing as versions (a prerelease of a version is older than the version, as in Newer).
+// A version that doesn't parse says nothing here (false), so a build whose version is "dev" or unknown never has an update dropped by this.
+func NotNewer(candidate, current string) bool {
+	return semverorder.NotNewer(candidate, current)
 }
 
 // Available is Latest, then Newer against current: the version to offer, or "".
@@ -85,68 +87,8 @@ func Available(ctx context.Context, apiURL, current string) (string, error) {
 	return latest, nil
 }
 
-type version struct {
-	core [3]int
-	pre  []string // empty for a release
-}
+type version = semverorder.Version
 
-func parse(s string) (version, bool) {
-	m := tagShape.FindStringSubmatch(s)
-	if m == nil {
-		return version{}, false
-	}
-	var v version
-	for i := 0; i < 3; i++ {
-		v.core[i], _ = strconv.Atoi(m[i+1])
-	}
-	if m[4] != "" {
-		v.pre = strings.Split(m[4], ".")
-	}
-	return v, true
-}
+func parse(s string) (version, bool) { return semverorder.Parse(s) }
 
-// compare orders versions as semver: the core numbers, then a release above any prerelease of
-// the same core, then prerelease identifiers (numbers below words, numbers by value).
-func compare(a, b version) int {
-	for i := range a.core {
-		if a.core[i] != b.core[i] {
-			return cmpInt(a.core[i], b.core[i])
-		}
-	}
-	switch {
-	case len(a.pre) == 0 && len(b.pre) == 0:
-		return 0
-	case len(a.pre) == 0:
-		return 1
-	case len(b.pre) == 0:
-		return -1
-	}
-	for i := 0; i < len(a.pre) && i < len(b.pre); i++ {
-		x, y := a.pre[i], b.pre[i]
-		xn, xerr := strconv.Atoi(x)
-		yn, yerr := strconv.Atoi(y)
-		switch {
-		case xerr == nil && yerr == nil:
-			if xn != yn {
-				return cmpInt(xn, yn)
-			}
-		case xerr == nil:
-			return -1
-		case yerr == nil:
-			return 1
-		case x != y:
-			return strings.Compare(x, y)
-		}
-	}
-	return cmpInt(len(a.pre), len(b.pre))
-}
-
-func cmpInt(a, b int) int {
-	switch {
-	case a < b:
-		return -1
-	case a > b:
-		return 1
-	}
-	return 0
-}
+func compare(a, b version) int { return semverorder.Compare(a, b) }

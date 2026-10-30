@@ -4,7 +4,6 @@ package ptymanager
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -113,12 +112,12 @@ func TestWindowsStopRecordsItsControlKeysAndKeepsItsTiming(t *testing.T) {
 // #5665: the root's image is read from its process handle. A started cmd.exe is a shell; a started ping.exe (an agent started directly) is not;
 // a process that does not exist is not.
 func TestRootIsShellReadsTheImageOfTheProcess(t *testing.T) {
-	sh := exec.Command("cmd.exe", "/c", "ping -n 20 127.0.0.1 >nul")
+	sh := hiddenCommand("cmd.exe", "/c", "ping -n 20 127.0.0.1 >nul")
 	require.NoError(t, sh.Start())
 	defer func() { _ = sh.Process.Kill(); _ = sh.Wait() }()
 	assert.True(t, rootIsShell(sh.Process.Pid), "cmd.exe is a shell")
 
-	direct := exec.Command("ping.exe", "-n", "20", "127.0.0.1")
+	direct := hiddenCommand("ping.exe", "-n", "20", "127.0.0.1")
 	require.NoError(t, direct.Start())
 	defer func() { _ = direct.Process.Kill(); _ = direct.Wait() }()
 	assert.False(t, rootIsShell(direct.Process.Pid), "ping.exe started directly is not a shell, as an agent started directly is not")

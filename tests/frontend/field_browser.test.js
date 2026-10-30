@@ -23,6 +23,7 @@ const BASE = require('./test_base').BASE;
             assert.ok(m.rows.length >= 3, at + 'fields are on the page: ' + m.rows.length);
             assert.deepEqual(m.legacy, [], at + 'every legacy field class also carries .field');
             for (const r of m.rows) {
+                if (/\bmobile-search-input\b/.test(r.cls) && +((/(\d+)px/.exec(at) || [])[1]) <= 600) { assert.equal(r.radius, '24px', at + `${r.cls}: the Agents page's search is the round pill (#11096)`); continue; } // the Google Chat pill: a 48 px box, fully rounded, no border, a surface fill
                 assert.equal(r.radius, m.want.radius, at + `${r.cls}: one radius`); assert.equal(r.border, m.want.border, at + `${r.cls}: one border`); assert.equal(r.bg, m.want.bg, at + `${r.cls}: one background`);
                 assert.equal(r.size, '13px', at + `${r.cls}: one font size`);
                 const want = mobile ? '44px' : (r.cls.split(' ').includes('field-dense') ? '32px' : '36px');

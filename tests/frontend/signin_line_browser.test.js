@@ -49,7 +49,10 @@ const PRELOAD = `(() => {
             // the field is false from the start: the page's first status answer shows the line
             await Emulation.setDeviceMetricsOverride({ width: view.width, height: view.height, deviceScaleFactor: 1, mobile: view.mobile });
             await load(view, false);
-            await waitFor(`!document.getElementById('claude-signin-line').hidden`, 'the line from the first status answer');
+            // The first status answer and the agent list both have to be in before the line shows, and on a slow machine (a Windows runner) that took more than the default 5 s (#11045: 'timed out waiting for the line from the first status answer', 1 attempt in 2). Ask again now, as the page's minute tick does, so
+            // the wait is on the answer and not on when the page first happened to ask; say what the page knew if it still does not come.
+            await ev(`window.__ticks.forEach(f => f()); true`);
+            await waitFor(`!document.getElementById('claude-signin-line').hidden`, 'the line from the first status answer', 20000, `({ hidden: document.getElementById('claude-signin-line').hidden, started: !document.getElementById('startup-loading') || document.getElementById('startup-loading').className, ticks: window.__ticks.length, claudeInList: (window.__coralLive || []).length })`);
             let s = await state();
             check(`${view.name}: "${s.text}"`, s.shown && s.text === (view.mobile ? "info Claude isn't signed in" : "info Claude isn't signed in: scheduled jobs and workflows that use it are waiting")); // a phone: the short fact, the rest behind the button (#6737)
             check('hover says what to do (title)', s.title === 'Open a terminal, run claude, and follow the steps');

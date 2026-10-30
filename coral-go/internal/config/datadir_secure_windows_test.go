@@ -3,9 +3,9 @@
 package config
 
 import (
+	"github.com/subgentic/coral/internal/consoletest"
 	"github.com/subgentic/coral/internal/winuser"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -23,7 +23,7 @@ func usersCanRead(t *testing.T, dir string) {
 	t.Helper()
 	me, err := winuser.CurrentSID()
 	require.NoError(t, err)
-	out, err := exec.Command("icacls", dir, "/inheritance:r", "/grant:r", "*"+me.String()+":(OI)(CI)F", "/grant:r", "*S-1-5-18:(OI)(CI)F",
+	out, err := consoletest.HiddenCommand("icacls", dir, "/inheritance:r", "/grant:r", "*"+me.String()+":(OI)(CI)F", "/grant:r", "*S-1-5-18:(OI)(CI)F",
 		"/grant:r", "*S-1-5-32-545:(OI)(CI)RX").CombinedOutput()
 	require.NoError(t, err, string(out))
 }
@@ -49,7 +49,7 @@ func TestExistingDataFolderOthersCanReadIsTightened(t *testing.T) {
 	// A file with an EXPLICIT entry for Users, which a change to the folder's list would not remove.
 	explicit := filepath.Join(dir, "api-key")
 	require.NoError(t, os.WriteFile(explicit, []byte("secret"), 0o600))
-	out, err := exec.Command("icacls", explicit, "/inheritance:d", "/grant", "*S-1-5-32-545:R").CombinedOutput()
+	out, err := consoletest.HiddenCommand("icacls", explicit, "/inheritance:d", "/grant", "*S-1-5-32-545:R").CombinedOutput()
 	require.NoError(t, err, string(out))
 	require.NotEmpty(t, readersOf(t, explicit))
 
@@ -130,7 +130,7 @@ func TestDataFolderLinksAreNeverFollowed(t *testing.T) {
 	require.NoError(t, os.Mkdir(dir, 0o700))
 	usersCanRead(t, dir)
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "sessions.db"), []byte("db"), 0o600)) // Coral's own folder (a folder that is not is refused, #5698)
-	out, err := exec.Command("cmd", "/c", "mklink", "/J", filepath.Join(dir, "link"), outside).CombinedOutput()
+	out, err := consoletest.HiddenCommand("cmd", "/c", "mklink", "/J", filepath.Join(dir, "link"), outside).CombinedOutput()
 	require.NoError(t, err, string(out))
 
 	require.NoError(t, EnsureDataDir(dir))
@@ -141,22 +141,15 @@ func TestDataFolderLinksAreNeverFollowed(t *testing.T) {
 
 	// The data folder is itself a junction to a shared folder: refused, not changed.
 	link := filepath.Join(root, "datalink")
-	out, err = exec.Command("cmd", "/c", "mklink", "/J", link, outside).CombinedOutput()
+	out, err = consoletest.HiddenCommand("cmd", "/c", "mklink", "/J", link, outside).CombinedOutput()
 	require.NoError(t, err, string(out))
 	t.Cleanup(func() { SetAllowSharedDataDir(false); setDataDirNotice("") })
 	err = EnsureDataDir(link)
-	if linktest.JunctionsTraversable(t) {
-		t.Log("a data folder that is a junction is refused by: Coral (ErrSharedDataDir)")
-		require.ErrorIs(t, err, ErrSharedDataDir)
-		assert.Contains(t, err.Error(), "link or junction")
-	} else {
-		// Build 26300 and later: Windows will not open anything through a junction ("untrusted mount point"), so the data folder never opens; it is refused, by
-		// the system, before Coral reads its ACL (the error says only that the folder can't be made, #350).
-		t.Log("a data folder that is a junction is refused by: Windows (untrusted mount point)")
-		require.Error(t, err)
-		_, statErr := os.Stat(filepath.Join(link, "sessions.db"))
-		assert.True(t, linktest.UntrustedMountPoint(statErr), "Windows refuses the junction: %v", statErr)
-	}
+	// Refused by name on every Windows (#350): where junctions can be followed Coral reads the target's list and refuses it as shared; where Windows will not open
+	// the target (build 26300 and later: untrusted mount point), the folder behind it cannot be shown to be private, so it is refused the same way.
+	t.Logf("junctions can be followed here: %v", linktest.JunctionsTraversable(t))
+	require.ErrorIs(t, err, ErrSharedDataDir)
+	assert.Contains(t, err.Error(), "link or junction")
 	assert.NotEmpty(t, readersOf(t, outside), "the target keeps its list")
 }
 
@@ -167,12 +160,12 @@ func TestExistingDataFolderGrantingOtherAccountsIsTightened(t *testing.T) {
 	require.NoError(t, os.Mkdir(dir, 0o700))
 	// "Guest" stands for a named account; "Backup Operators" for a custom group.
 	for _, who := range []string{"Guest", "Backup Operators"} {
-		out, err := exec.Command("icacls", dir, "/grant", who+":(OI)(CI)R").CombinedOutput()
+		out, err := consoletest.HiddenCommand("icacls", dir, "/grant", who+":(OI)(CI)R").CombinedOutput()
 		require.NoError(t, err, string(out))
 	}
 	old := filepath.Join(dir, "old.db")
 	require.NoError(t, os.WriteFile(old, []byte("x"), 0o600))
-	out, err := exec.Command("icacls", old, "/inheritance:d", "/grant", "Guest:R").CombinedOutput()
+	out, err := consoletest.HiddenCommand("icacls", old, "/inheritance:d", "/grant", "Guest:R").CombinedOutput()
 	require.NoError(t, err, string(out))
 	got := readersOf(t, dir)
 	require.Len(t, got, 2, got)
@@ -189,7 +182,7 @@ func TestDataFolderWithOnlyAdministratorsIsLeftAlone(t *testing.T) {
 	setDataDirNotice("")
 	dir := filepath.Join(privateRoot(t), "coral")
 	require.NoError(t, os.Mkdir(dir, 0o700))
-	out, err := exec.Command("icacls", dir, "/grant", "*S-1-5-32-544:(OI)(CI)F").CombinedOutput()
+	out, err := consoletest.HiddenCommand("icacls", dir, "/grant", "*S-1-5-32-544:(OI)(CI)F").CombinedOutput()
 	require.NoError(t, err, string(out))
 	require.NoError(t, EnsureDataDir(dir))
 	assert.Empty(t, DataDirWarning(dir))
@@ -232,4 +225,32 @@ func TestFolderTheInstallerMadeWithOnlyTheEulaMarkerIsTightened(t *testing.T) {
 	require.NoError(t, EnsureDataDir(dir))
 	assert.Empty(t, readersOf(t, dir), "the folder is private now")
 	assert.Empty(t, readersOf(t, filepath.Join(dir, ".eula-accepted")))
+}
+
+// A data folder whose path goes through a junction (the folder itself is not the link), existing or new: where Windows follows the junction it is used as any folder; where it
+// refuses (build 26300 and later: untrusted mount point) EnsureDataDir answers the named refusal with the way out, not the system's bare error (#350). Either way nothing is
+// created through the junction.
+func TestDataFolderBehindAJunctionIsRefusedByNameWhereWindowsWillNotOpenIt(t *testing.T) {
+	root := t.TempDir()
+	target := filepath.Join(root, "target")
+	require.NoError(t, os.MkdirAll(filepath.Join(target, "coral"), 0o700))
+	link := filepath.Join(root, "junc")
+	out, err := consoletest.HiddenCommand("cmd", "/c", "mklink", "/J", link, target).CombinedOutput()
+	require.NoError(t, err, string(out))
+	traversable := linktest.JunctionsTraversable(t)
+	t.Logf("junctions can be followed here: %v", traversable)
+	for _, name := range []string{"coral", "newfolder"} { // an existing folder behind the junction, and one that does not exist yet
+		err := EnsureDataDir(filepath.Join(link, name))
+		if traversable {
+			assert.NotErrorIs(t, err, ErrDataDirBehindJunction, name)
+			continue
+		}
+		require.ErrorIs(t, err, ErrDataDirBehindJunction, name)
+		assert.Contains(t, err.Error(), "CORAL_DATA_DIR", "it says what to do")
+		assert.True(t, linktest.UntrustedMountPoint(err), "the system's own error stays in the chain: %v", err)
+	}
+	if !traversable {
+		_, statErr := os.Stat(filepath.Join(target, "newfolder"))
+		assert.True(t, os.IsNotExist(statErr), "nothing was created behind the junction")
+	}
 }

@@ -103,7 +103,8 @@ export async function showCreateTaskModal(preset = {}) {
     if (boardProject) {
         const read = await readOpenGoals(boardProject);
         _requireGoal = read.requireGoal;
-        fillGoalSelect(document.getElementById('create-task-goal'), { goals: read.goals, requireGoal: read.requireGoal, selectedId: preset.goal_id });
+        // exactly one open goal: the new task starts on it (#11258 item 5, the phone NUX pass); with a choice to make, or a preset's own goal (a duplicate, a goal's New task), nothing changes
+        fillGoalSelect(document.getElementById('create-task-goal'), { goals: read.goals, requireGoal: read.requireGoal, selectedId: preset.goal_id ?? (read.goals.length === 1 ? read.goals[0].id : undefined) });
         _goalShown = read.goals.length > 0 || read.requireGoal;
     }
 
@@ -163,6 +164,7 @@ async function submitValues(values) {
         hideCreateTaskModal();
         if (_created) await _created();
         else await loadBoardTasks(boardProject);
+        document.dispatchEvent(new CustomEvent('coral:task-created', { detail: { project: boardProject } })); // the team's Tasks page reads its own list again (it is not the dock's)
         showToast('Task created');
     } catch (e) {
         view.fold(true); // server validation can name a workflow or prerequisite field; keep all of them visible

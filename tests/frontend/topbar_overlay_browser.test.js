@@ -85,7 +85,8 @@ const HIT = id => `(() => {
         await ev(`toggleAgenticPanel(true)`); await sleep(400);
         assert.ok(await ev(`document.getElementById('agentic-state').classList.contains('mobile-panel-overlay')`), 'the side panel is open as the phone overlay');
         const bar = await barBottom();
-        assert.ok(bar > 49, `the coarse-pointer top bar is taller than the desktop 49px (bottom ${bar})`);
+        // an open agent's page has no top bar under 640 px (the one-row header is its first row, #11056): the panel then starts at the top of the screen; with a bar it must start below it
+        if (await ev(`getComputedStyle(document.querySelector('header.top-bar')).display !== 'none'`)) assert.ok(bar > 49, `the coarse-pointer top bar is taller than the desktop 49px (bottom ${bar})`);
         assert.ok(Math.abs(await panelTop() - bar) <= 1, `the overlay starts at the bar's bottom (${await panelTop()} vs ${bar})`);
         for (const id of ['agentic-tab-files', 'agentic-tab-artifacts']) { // Browse is behind the More menu now (#7621): Files and Artifacts are the tabs in the row
             const h = await ev(HIT(id));

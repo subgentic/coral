@@ -20,6 +20,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/windows"
+
+	"github.com/subgentic/coral/internal/testtemp"
 )
 
 // The test program stands for coral-update.exe: copied as that name into a fake install folder, then started by Launch like the real one. Run with
@@ -29,7 +31,8 @@ func TestMain(m *testing.M) {
 		childRecord(out)
 		return
 	}
-	os.Exit(m.Run())
+	cleanupTemp := testtemp.Use() // a private temp, home and data folder for this package (#356)
+	testtemp.Exit(cleanupTemp, m.Run())
 }
 
 var procGetHandleInformation = windows.NewLazySystemDLL("kernel32.dll").NewProc("GetHandleInformation")

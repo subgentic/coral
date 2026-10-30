@@ -384,3 +384,28 @@ func TestLiveListForAnAgentTokenHasNoPersonText(t *testing.T) {
 	assert.NotContains(t, agent, "HELD-WORDS", "an agent's list has no held message, its own row's included")
 	assert.NotContains(t, agent, "TYPED-WORDS", "and no pending send")
 }
+
+// #11097 (Security): a user-role last_message is the person's latest words to that agent: an agent token gets it nulled on the rows it may read, like held_messages and pending_sends (#10510), and keeps an
+// assistant-role one (an agent's own words to the person are what its board mates may see).
+func TestAnAgentTokenGetsNoPersonLastMessage(t *testing.T) {
+	rows := rosterRows()
+	rows[0]["last_message"] = map[string]any{"role": "user", "text": "PERSON-WORDS-me", "at": "2026-10-29T10:00:00Z"}
+	rows[1]["last_message"] = map[string]any{"role": "assistant", "text": "AGENT-WORDS-mate", "at": "2026-10-29T10:00:01Z"}
+	got := scopeRowsForAgent(rows, "sid-me")
+	assert.Contains(t, got[0], "last_message", "the key stays, null: a screen that kept an earlier list drops it")
+	assert.Nil(t, got[0]["last_message"], "a user-role last_message is person text")
+	require.NotNil(t, got[1]["last_message"], "an assistant-role one stays")
+	assert.Equal(t, "AGENT-WORDS-mate", got[1]["last_message"].(map[string]any)["text"])
+	assert.NotNil(t, rows[0]["last_message"], "the shared rows are never changed in place")
+
+	tick := &wsTick{sessions: rows, current: map[string]string{}, byKey: map[string]map[string]any{}}
+	for _, r := range rows {
+		key := r["session_id"].(string)
+		b, _ := json.Marshal(r)
+		tick.current[key], tick.byKey[key] = string(b), r
+	}
+	scoped := scopeTickForAgent(tick, "sid-me")
+	assert.NotContains(t, scoped.current["sid-me"], "PERSON-WORDS", "the diff form the socket sends carries no person text")
+	assert.Contains(t, scoped.current["sid-mate"], "AGENT-WORDS-mate")
+	assert.Contains(t, tick.current["sid-me"], "PERSON-WORDS-me", "the shared tick is untouched")
+}

@@ -19,7 +19,9 @@ const BASE = require('./test_base').BASE;
         await ev(`document.querySelector('#update-confirm-modal .update-go').click(); true`);
         await waitFor(`!!document.querySelector('#update-confirm-modal .update-updating')`, 'the updating line', 6000);
         const t = await ev(`document.querySelector('#update-confirm-modal .update-updating').textContent`);
-        assert.match(t, /^Updating Coral to 9\.9\.9\. This page reloads when the new Coral answers\.$/, t);
+        assert.equal(t, 'Coral is installing the update and will restart.', t);
+        const first = await ev(`(() => { const m = document.getElementById('update-confirm-modal'), b = m.querySelector('.modal-body'); return { spin: !!b.querySelector('.task-spinner'), spinPx: Math.round(b.querySelector('.task-spinner').getBoundingClientRect().width), text: b.innerText.replace(/\\s+/g, ' ').trim(), links: b.querySelectorAll('a').length, warn: b.querySelectorAll('.update-warn,.update-later-note').length }; })()`);
+        assert.ok(first.spin && first.spinPx >= 24 && first.text === 'Coral is installing the update and will restart.' && !first.links && !first.warn, 'the dialog is a spinner and one line, nothing else: ' + JSON.stringify(first));
         assert.equal(await ev(`sessionStorage.getItem('coral-updated-to')`), '9.9.9', 'the version it goes to is kept for the page that comes back');
         // the page that comes back: the new Coral answers as 9.9.9
         await ev(`window.__st = { ...window.__st, installed: '9.9.9', state: 'none', staged: null }; document.querySelectorAll('.toast').forEach(e => e.remove()); import(${S} + 'update_ui.js').then(m => m.refreshUpdateStatus()).then(() => true)`);
@@ -32,7 +34,9 @@ const BASE = require('./test_base').BASE;
             await ev(`document.querySelector('#update-confirm-modal .update-go').click(); true`);
             await waitFor(`!!document.querySelector('#update-confirm-modal .update-updating')`, `${kind}: the updating line`, 6000);
             const u = await ev(`document.querySelector('#update-confirm-modal .update-updating').textContent`);
-            assert.equal(u, 'Updating Coral to 9.9.9. This page reloads when the new Coral answers.', `${kind}: no promise that Coral starts again by itself or in a minute: ${u}`);
+            assert.equal(u, 'Coral is installing the update and will restart.', `${kind}: the one line, no promise about disk images or a stopped Coral: ${u}`);
+            const all = await ev(`document.querySelector('#update-confirm-modal .modal-body').innerText.replace(/\\s+/g, ' ').trim()`);
+            assert.equal(all, kind === 'msi' ? 'Coral is installing the update and will restart. Windows will ask for your permission (the usual admin prompt).' : 'Coral is installing the update and will restart.', `${kind}: nothing else in the body: ${all}`);
         }
         // a refused install ends with something to do: the button is back and a download link says so
         await ev(`window.__st = ${JSON.stringify(READY)}; (() => { const R = window.fetch; window.fetch = (u, o) => String(u).endsWith('/relaunch-local') ? Promise.resolve(new Response(JSON.stringify({ code: 'updater_not_started' }), { status: 500, headers: { 'Content-Type': 'application/json' } })) : R(u, o); })(); import(${S} + 'update_ui.js').then(async m => { await m.refreshUpdateStatus(); const d = await import(${S} + 'update_dialog.js'); d.openUpdateDialog(m.getUpdateStatus()); return true; })`);
@@ -41,6 +45,16 @@ const BASE = require('./test_base').BASE;
         await waitFor(`!!document.querySelector('#update-confirm-modal .update-error')`, 'the refusal', 6000);
         const f = await ev(`(() => { const e = document.querySelector('#update-confirm-modal .update-error'); const a = document.querySelector('#update-confirm-modal .update-download-fallback'); return { text: e.textContent + ' ' + (a ? a.textContent : ''), href: a && a.href, again: !document.querySelector('#update-confirm-modal .update-go').disabled }; })()`);
         assert.ok(/Download Coral 9\.9\.9 yourself/.test(f.text) && /github\.com\/subgentic\/coral\/releases\/tag\/v9\.9\.9$/.test(f.href) && f.again, 'a failure has the way on: ' + JSON.stringify(f));
+        // an install that never finishes: after the wait the spinner goes and one plain line says what to do
+        await ev(`(() => { const R = window.fetch; window.fetch = (u, o) => /relaunch|install/.test(String(u)) && !/system\\/update$/.test(String(u)) ? Promise.resolve(new Response(JSON.stringify({ ok: true }), { status: 202, headers: { 'Content-Type': 'application/json' } })) : R(u, o); return true; })()`);
+        await ev(`window.__st = ${JSON.stringify({ ...READY, install_kind: 'app' })}; import(${S} + 'update_ui.js').then(async m => { await m.refreshUpdateStatus(); const d = await import(${S} + 'update_dialog.js'); d.openUpdateDialog(m.getUpdateStatus()); return true; })`);
+        await waitFor(`!!document.querySelector('#update-confirm-modal .update-go') && getComputedStyle(document.getElementById('update-confirm-modal')).display !== 'none'`, 'the confirmation once more', 6000);
+        await ev(`document.querySelector('#update-confirm-modal .update-go').click(); true`);
+        await waitFor(`!!document.querySelector('#update-confirm-modal .task-spinner')`, 'the spinner', 6000);
+        await ev(`(() => { const real = Date.now.bind(Date); Date.now = () => real() + 300000; return true; })()`);
+        await waitFor(`!!document.querySelector('#update-confirm-modal [role=alert] .update-error')`, 'the failure line', 8000);
+        const stalled = await ev(`(() => { const b = document.querySelector('#update-confirm-modal .modal-body'); const a = b.querySelector('a'); return { text: b.innerText.replace(/\\s+/g, ' ').trim(), spin: !!b.querySelector('.task-spinner'), href: a && a.href }; })()`);
+        assert.ok(!stalled.spin && /^The update did not finish\. Start Coral again, or download the update and install it yourself\. Download Coral 9\.9\.9$/.test(stalled.text) && /v9\.9\.9$/.test(stalled.href), 'a stalled install says what to do: ' + JSON.stringify(stalled));
         console.log('PASS');
     } finally { try { await client.close(); } catch (e) {} }
 })().catch(e => { console.error(e); process.exit(1); });

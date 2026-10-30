@@ -13,12 +13,16 @@ import (
 func Output(d time.Duration, name string, args ...string) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), d)
 	defer cancel()
-	return exec.CommandContext(ctx, name, args...).Output()
+	cmd := exec.CommandContext(ctx, name, args...)
+	HideWindow(cmd) // a console program started by a Coral with no console of its own would open a window (#383)
+	return cmd.Output()
 }
 
 // Run runs name with args and waits for it, killing it after d.
 func Run(d time.Duration, name string, args ...string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), d)
 	defer cancel()
-	return exec.CommandContext(ctx, name, args...).Run()
+	cmd := exec.CommandContext(ctx, name, args...)
+	HideWindow(cmd)
+	return cmd.Run()
 }

@@ -18,15 +18,18 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/windows"
+
+	"github.com/subgentic/coral/internal/testtemp"
 )
 
 // The hooks tests send to example loopback ports through a recording transport, never a real server: by default nothing is
 // listening there as far as the check knows, whatever this computer has on those ports (this one has a service on 8420).
 // The tests below set the lookups themselves.
 func TestMain(m *testing.M) {
+	cleanupTemp := testtemp.Use() // a private temp, home and data folder for this package (#356)
 	listenerPIDs = func(string, int) ([]uint32, error) { return nil, nil }
 	AllowTestServerListener = true // the tests' own servers
-	os.Exit(m.Run())
+	testtemp.Exit(cleanupTemp, m.Run())
 }
 
 // resetListenerCheck clears the per-process cache and restores the real lookups (or the test's) for one test.

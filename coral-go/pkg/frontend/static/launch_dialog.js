@@ -24,6 +24,7 @@ const { _initAgentPresets } = await importOnce('./persona_io.js');
 const { quietFocus } = await importOnce('./quiet_focus.js');
 const { markFieldInvalid, _launchBlocked, _launchOn, _refreshAfterLaunch, _resetDirInputs, _showLaunchStep, _syncMobileLaunchSections, _withServerSettings, hideLaunchModal, setLaunchMore, setLaunchStage, LAUNCH_STAGES, launchStages } = await importOnce('./launch_core.js');
 const { wireRecap, syncRecap } = await importOnce('./launch_recap.js');
+const { offerSuggestion, syncSuggestionLine, usesSuggestion } = await importOnce('./folder_suggestion.js');
 
 /** New Agent's three steps (#7391): Next goes from the folder to the persona to the agent (a folder is needed first), Back returns. `arg` is a stage name, "next" or "back" (the old "details" is the persona step). Focus follows, and a screen reader hears which step. */
 function _launchStage(arg) {
@@ -39,6 +40,7 @@ function _launchStage(arg) {
     }
     const list = document.getElementById('dir-browser'); if (list) list.style.display = 'none'; // display-ok: the folder list is shown and hidden by style.display where it is opened (browser.js)
     const sub = setLaunchStage(to);
+    if (to === 'persona' && !launch.member) suggestAgentName(document.getElementById('launch-agent-name-input')); // a role-like name, not the folder's (#11289)
     syncRecap(); _syncLaunchBlock();
     const live = document.getElementById('launch-stage-live');
     if (live) live.textContent = sub || '';
@@ -47,6 +49,30 @@ function _launchStage(arg) {
     first?.focus();
 }
 window._launchStage = _launchStage;
+
+/** Enter in a single-line field of a wizard step is that step's primary button: Next, and Launch on the last step (#11289; a form's Enter). Not in a multi-line field, a select, a button or the folder picker; not with a modifier; and not when the field's own Enter (the folder's) has already acted. */
+export function wireEnterAdvances(step) {
+    if (!step || step.dataset.enterWired) return;
+    step.dataset.enterWired = '1';
+    step.addEventListener('keydown', e => {
+        if (e.key !== 'Enter' || e.defaultPrevented || e.isComposing || e.shiftKey || e.ctrlKey || e.metaKey || e.altKey) return;
+        const t = e.target;
+        if (!(t instanceof HTMLInputElement) || !/^(text|search|number|url|email|tel|password)$/.test(t.type) || t.closest('.dir-browser, [role="listbox"], [role="combobox"]')) return;
+        const go = [...step.querySelectorAll('.modal-actions .btn-primary')].find(b => !b.hidden && b.getClientRects().length > 0);
+        if (!go) return;
+        e.preventDefault();
+        if (!go.disabled) go.click();
+    });
+}
+
+/** A suggested role-like name for an agent whose name is left empty: Agent 1, Agent 2 (the next number not taken by a live agent), shown as the field's placeholder and used at launch when the field is empty; Save as persona still needs a typed name. The folder stays the context line (#11289). */
+export function suggestAgentName(input) {
+    if (!input || input.value.trim()) return;
+    const taken = new Set((state.liveSessions || []).map(x => String(x.display_name || x.name || '').trim().toLowerCase()));
+    let n = 1; while (taken.has(`agent ${n}`)) n++;
+    if (input.dataset.ownPlaceholder === undefined) input.dataset.ownPlaceholder = input.placeholder;
+    input.dataset.suggestedName = `Agent ${n}`; input.placeholder = `Agent ${n}`;
+}
 
 function _selectLaunchType(type) {
     if (type === "back" && launch.member) { window.cancelTeamMember?.(); return; } // the arrow on a member goes back to the team form (#7861)
@@ -58,6 +84,8 @@ function _selectLaunchType(type) {
     }
     launch.mode = type;
     if (type === "agent") setLaunchMore(false); // New Agent always opens on step 1, the folder (#7391)
+    wireEnterAdvances(document.getElementById('launch-step-agent')); wireEnterAdvances(document.getElementById('launch-step-team')); // Enter in a single-line field is Next, and Launch on the last step (#11289)
+    { const ti = document.getElementById('launch-team-instead'); if (ti) ti.hidden = !!(launch.member || launch.addTo); } // the way to a team from the agent's first step: not for a team's own member or an agent added to a team
     _showLaunchStep(type);
     if (type === "agent") {
         if (!launch.addTo && !launch.member) { // New Agent: its own title and no team (Add agent and a member set both below, #7778, #7861)
@@ -83,6 +111,7 @@ function _selectLaunchType(type) {
         importOnce('./launch_agent_pick.js').then(m => m.buildAgentPick({ group: document.getElementById('launch-agent-pick'), form: document.getElementById('launch-agent-acf'), server: _effectiveServer(launch.server), implicitDefault: !_settingsFor(_effectiveServer(launch.server)).default_agent_type })).catch(() => {});
         _folderPressed = false; folderForm()?.clearErrors();
         _wireDirNote(); _syncDirNote(); _syncLaunchBlock(); _renderDirRecents();
+        if (!launch.member && !launch.addTo && !_settingsFor(_effectiveServer(launch.server)).default_working_dir) offerSuggestion(document.getElementById('launch-dir'), document.getElementById('launch-dir-suggest'), 'first-agent'); // a first agent has a folder to say yes to (#11258)
         wireRecap(); syncRecap(); _syncLaunchBlock();
         _checkTmuxHere(); // tmux missing: said once, Launch off (#6046)
         if (launch.member) _applyMember(); else if (launch.addTo) _applyAddTo(); else document.getElementById('launch-dir')?.focus(); // the one thing most launches need: the folder
@@ -129,7 +158,7 @@ export function showLaunchModal(server, lock = false) {
 
     // Reset agent form
     const agentNameInput = document.getElementById("launch-agent-name-input");
-    if (agentNameInput) agentNameInput.value = "";
+    if (agentNameInput) { agentNameInput.value = ""; delete agentNameInput.dataset.suggestedName; if (agentNameInput.dataset.ownPlaceholder !== undefined) agentNameInput.placeholder = agentNameInput.dataset.ownPlaceholder; } // a new dialog: no suggestion yet (#11289)
     document.getElementById("launch-board-name").value = "";
     document.getElementById("launch-board-server").value = "";
     const agentBoardSelect = document.getElementById("launch-board-select");
@@ -350,6 +379,7 @@ function _wireDirNote() {
     if (!input || input.dataset.noteWired) return;
     input.dataset.noteWired = '1';
     input.addEventListener('input', _syncDirNote); input.addEventListener('change', _syncDirNote);
+    input.addEventListener('input', () => syncSuggestionLine(input, document.getElementById('launch-dir-suggest'))); input.addEventListener('change', () => syncSuggestionLine(input, document.getElementById('launch-dir-suggest')));
     input.addEventListener('input', _syncLaunchBlock); input.addEventListener('change', _syncLaunchBlock); // Next and Launch say why they are off until there is a folder
     input.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); _launchStage('next'); } }); // Enter is Next
 }
@@ -422,7 +452,7 @@ export async function launchSession() {
         dir = document.getElementById("launch-dir").value.trim();
         const config = getAgentConfig('launch-agent-acf');
         type = config.agentType || 'claude';
-        agentName = document.getElementById("launch-agent-name-input")?.value.trim() || config.name;
+        agentName = document.getElementById("launch-agent-name-input")?.value.trim() || document.getElementById("launch-agent-name-input")?.dataset.suggestedName || config.name;
         flagsStr = config.flags;
         permPick = config.permissionMode;
         backend = document.getElementById("launch-backend")?.value;
@@ -450,6 +480,7 @@ export async function launchSession() {
     }
 
     const payload = { working_dir: dir, agent_type: type };
+    if (launch.mode !== 'terminal' && usesSuggestion(document.getElementById('launch-dir'))) payload.create_dir = true; // the folder Coral suggested: it makes it now (#11258)
     // Default picked (and Keep Default in "Default mode waits for you") is Default: the form sends no flag for it, which the server cannot tell from "nothing chosen" (that starts in the saved default or Auto), so the request says it (#10362).
     if (launch.mode !== "terminal" && permPick === 'default' && !(flagsStr && _hasPermFlag(flagsStr))) payload.permission_mode = 'default';
     if (agentName) payload.display_name = agentName;
@@ -502,7 +533,7 @@ export async function launchSession() {
             const shown = agentName || (type === 'terminal' ? 'Terminal' : defaultAgentName(dir, type));
             const addedTo = launch.addTo && launch.addTo.board ? ` on board ${keyLabel(launch.addTo.board)}` : '';
             const added = !!(launch.addTo && launch.addTo.board); // Add agent to a team opens nothing: the person is on the team's page (#7778); one into a folder opens the new agent (#10077)
-            showToast(server === LOCAL_SERVER ? `Launched: ${shown}${addedTo}` : `Launched on ${serverLabel(server, state.servers)}: ${shown}${addedTo}`);
+            if (added || normServer(server) !== LOCAL_SERVER) showToast(server === LOCAL_SERVER ? `Launched: ${shown}${addedTo}` : `Launched on ${serverLabel(server, state.servers)}: ${shown}${addedTo}`); // said where the chat does not open (a team's agent, another computer's); when the new chat opens, it is the answer and the toast would sit over its header (#11304)
             const opener = document.getElementById('launch-modal')._focusOpener || null; // where the keyboard was when the dialog opened: closing the dialog puts it back there (#10247)
             hideLaunchModal();
             importOnce('./alerts_offer.js').then(m => m.offerAlertsAfterLaunch()).catch(() => {}); // the first agent is when alerts make sense: once per browser (#10068)

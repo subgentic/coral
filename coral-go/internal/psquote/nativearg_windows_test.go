@@ -13,6 +13,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/subgentic/coral/internal/consoletest"
+	"github.com/subgentic/coral/internal/testtemp"
 )
 
 // argvEchoEnv makes this test binary print each argument it got, as the C runtime and Go
@@ -27,7 +30,8 @@ func TestMain(m *testing.M) {
 		fmt.Print("--\n")
 		os.Exit(0)
 	}
-	os.Exit(m.Run())
+	cleanupTemp := testtemp.Use() // a private temp, home and data folder for this package (#356)
+	testtemp.Exit(cleanupTemp, m.Run())
 }
 
 // Each string goes through a script run by Windows PowerShell 5.1, as Coral's launch line
@@ -94,7 +98,7 @@ func roundTrip(t *testing.T, ps string, program, cases []string) {
 	}
 	file := filepath.Join(t.TempDir(), "args.ps1")
 	require.NoError(t, os.WriteFile(file, []byte(script.String()), 0o600))
-	cmd := exec.Command(ps, "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", file)
+	cmd := consoletest.HiddenCommand(ps, "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", file)
 	cmd.Env = append(os.Environ(), argvEchoEnv+"=1")
 	out, err := cmd.CombinedOutput()
 	require.NoError(t, err, "%s", out)

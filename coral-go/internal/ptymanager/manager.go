@@ -509,9 +509,42 @@ func (m *PTYBackend) Close() error {
 }
 
 // shellPIDReporter is implemented by pseudo-terminals that can name the process
-// they started (Unix). ConPTY sessions don't, so on Windows nothing is reported.
+// they started (Unix). ConPTY sessions report their shell's state themselves (shellIdleReporter).
 type shellPIDReporter interface {
 	ShellPID() int
+}
+
+// shellIdleReporter is implemented by pseudo-terminals that tell for themselves whether their shell is back at a bare prompt
+// (Windows, pty_foreground_windows.go).
+type shellIdleReporter interface {
+	ShellIdle() (idle bool, shell string, err error)
+}
+
+// otherShellReporter is implemented by pseudo-terminals that can name a shell of unknown contents under their own (Windows,
+// pty_foreground_windows.go).
+type otherShellReporter interface {
+	OtherShell() (string, error)
+}
+
+// OtherShell names a shell other than a verified PowerShell or cmd running in the session's terminal with no program seen beside it,
+// whose contents can't be seen, so no launch line may be typed there (Security on #216). ok is false when the session is gone or the
+// platform cannot tell; "" with ok true is none.
+func (m *PTYBackend) OtherShell(name string) (shell string, ok bool) {
+	m.mu.RLock()
+	s, found := m.sessions[name]
+	m.mu.RUnlock()
+	if !found || !s.isRunning() {
+		return "", false
+	}
+	r, can := s.proc.(otherShellReporter)
+	if !can {
+		return "", false
+	}
+	sh, err := r.OtherShell()
+	if err != nil {
+		return "", false
+	}
+	return sh, true
 }
 
 // ShellIdle reports whether a session's own shell is idle, with nothing running
@@ -523,6 +556,13 @@ func (m *PTYBackend) ShellIdle(name string) (idle bool, shell string, ok bool) {
 	m.mu.RUnlock()
 	if !found || !s.isRunning() {
 		return false, "", false
+	}
+	if si, can := s.proc.(shellIdleReporter); can { // Windows: ConPTY names no pid for the ps check
+		idle, shell, err := si.ShellIdle()
+		if err != nil {
+			return false, "", false
+		}
+		return idle, shell, true
 	}
 	sp, can := s.proc.(shellPIDReporter)
 	if !can {

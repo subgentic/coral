@@ -3,10 +3,12 @@ package ptymanager
 import (
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/subgentic/coral/internal/testleak"
+	"github.com/subgentic/coral/internal/testtemp"
 	"github.com/subgentic/coral/internal/tmux"
 )
 
@@ -38,6 +40,7 @@ func TestMain(m *testing.M) {
 		}
 		os.Exit(0)
 	}
+	cleanupTemp := testtemp.Use() // a private temp, home and data folder for this package (#356)
 	os.Unsetenv("TMUX")
 	os.Unsetenv("TMUX_PANE")
 	// The tests' tmux servers start their panes with $SHELL. A developer's interactive shell and its
@@ -46,6 +49,15 @@ func TestMain(m *testing.M) {
 	// The tests drive shells, which need no 300ms between a command and its
 	// Enter (production keeps it for agent TUIs).
 	tmux.SetSendKeysSettleForTest(20 * time.Millisecond)
+	consoles := startConsoleTripwire()
 	code := m.Run()
-	os.Exit(testleak.Check(code)) // no goroutine left running (#4167)
+	// No test may open a console window on the person's desktop (#381): a console program started outside a pseudo console without
+	// hiddenCommand is handed to the default terminal, which shows it.
+	if opened := consoles(); len(opened) > 0 {
+		fmt.Fprintf(os.Stderr, "FAIL: a test opened a console window: %s (start console programs with hiddenCommand)\n", strings.Join(opened, "; "))
+		if code == 0 {
+			code = 1
+		}
+	}
+	testtemp.Exit(cleanupTemp, testleak.Check(code)) // no goroutine left running (#4167)
 }

@@ -152,6 +152,7 @@ func usageKeyPossible(line string) bool {
 // piParser extracts per-turn usage from Pi session lines.
 type piParser struct {
 	piUsageData
+	model string // the model the session is on: its last model_change, or the last turn that named one (#11293 row 11)
 }
 
 func (p *piParser) line(line string) {
@@ -162,6 +163,7 @@ func (p *piParser) line(line string) {
 	var entry struct {
 		Type      string `json:"type"`
 		Timestamp string `json:"timestamp"`
+		ModelID   string `json:"modelId"` // a model_change entry's
 		Message   struct {
 			Role  string `json:"role"`
 			Model string `json:"model"`
@@ -183,7 +185,17 @@ func (p *piParser) line(line string) {
 	if entry.Timestamp != "" && p.SessionStartAt == "" {
 		p.SessionStartAt = entry.Timestamp
 	}
+	if entry.Type == "model_change" && entry.ModelID != "" {
+		p.model = entry.ModelID
+	}
+	if entry.Type == "message" && entry.Message.Role == "assistant" && entry.Message.Model != "" {
+		p.model = entry.Message.Model
+	}
 	if entry.Type == "message" && entry.Message.Role == "assistant" && entry.Message.Usage.Input > 0 {
+		model := entry.Message.Model
+		if model == "" {
+			model = p.model // a turn that names none is on the session's model, not in a bucket of its own
+		}
 		p.Calls = append(p.Calls, piCallData{
 			InputTokens:      entry.Message.Usage.Input,
 			OutputTokens:     entry.Message.Usage.Output,
@@ -191,7 +203,7 @@ func (p *piParser) line(line string) {
 			CacheWriteTokens: entry.Message.Usage.CacheWrite,
 			TotalTokens:      entry.Message.Usage.TotalTokens,
 			CostUSD:          entry.Message.Usage.Cost.Total,
-			Model:            entry.Message.Model,
+			Model:            model,
 			Timestamp:        entry.Timestamp,
 		})
 	}

@@ -13,12 +13,12 @@ const BASE = require('./test_base').BASE;
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
         await ev(`window.switchNavTab('automations'); true`);
         await waitFor(`!!document.querySelector('#group-table-view button.dt-primary') && document.getElementById('group-table-view').getClientRects().length > 0`, 'the Jobs folder', 10000);
-        const m = await ev(`(() => { const head = document.querySelector('#group-table-view .inbox-folder-head'), sel = document.querySelector('#group-table-view .view-list-select'), top = document.getElementById('group-table-view').getBoundingClientRect().top, bar = document.querySelector('#group-table-view .list-bar-search-row');
-            return { headDrawn: !!head && (head.getBoundingClientRect().width > 2 || head.getBoundingClientRect().height > 2), select: !!sel && sel.getClientRects().length > 0, selectName: sel ? sel.selectedOptions[0].textContent.replace(/\\s+/g, ' ').trim() : '', barGap: bar ? Math.round(bar.getBoundingClientRect().top - top) : null }; })()`);
-        assert.equal(m.headDrawn, false, 'the folder page draws no title of its own on a phone: the folders\' select names it ' + JSON.stringify(m));
-        assert.equal(m.select, true, 'the folders are one select over the table ' + JSON.stringify(m));
+        const m = await ev(`(() => { const head = document.querySelector('#group-table-view .inbox-folder-head'), sel = document.querySelector('#group-table-view .view-list-nav .view-list-item[aria-current="true"]'), top = document.getElementById('group-table-view').getBoundingClientRect().top, bar = document.querySelector('#group-table-view .list-bar-search-row');
+            return { headDrawn: !!head && (head.getBoundingClientRect().width > 2 || head.getBoundingClientRect().height > 2), select: !!sel && sel.getClientRects().length > 0, selectName: sel ? sel.textContent.replace(/\\s+/g, ' ').trim() : '', barGap: bar ? Math.round(bar.getBoundingClientRect().top - top) : null }; })()`);
+        assert.equal(m.headDrawn, false, 'the folder page draws no title of its own on a phone: the folders\' tab strip names it ' + JSON.stringify(m));
+        assert.equal(m.select, true, 'the folders are one tab strip over the table (the open tab names the folder) ' + JSON.stringify(m));
         assert.match(m.selectName, /^Jobs/, 'and it says which folder is on screen ' + JSON.stringify(m));
-        assert.ok(m.barGap !== null && m.barGap <= 80, 'and the toolbar starts right under the select ' + JSON.stringify(m));
+        assert.ok(m.barGap !== null && m.barGap <= 96, 'and the toolbar starts right under the strip ' + JSON.stringify(m));
         console.log('PASS the Jobs folder on a phone has no title row');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });

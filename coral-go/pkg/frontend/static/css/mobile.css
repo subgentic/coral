@@ -1317,11 +1317,148 @@
 
 /* A Hub page framed in the Inbox (Needs you, Tasks, Saved for later: #9542) runs edge to edge on a phone: no gutter round it and no panel fill, the Hub's own page is the page (#9660). */
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) {
-    .group-table-view:has(> .inbox-frame) { position: relative; padding: 0; display: flex; flex-direction: column; overflow: hidden; }
-    .group-table-view:has(> .inbox-frame) > .group-table-head { position: absolute; width: 1px; height: 1px; min-height: 0; max-height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; } /* the folder button names the page, so no heading is drawn under it; the heading stays in the page for a screen reader (#9660, as #9631) */
-    .group-table-view > .inbox-frame { flex: 1 1 auto; width: 100%; min-height: 0; border: 0; border-radius: 0; }
+    .group-table-view:has(.inbox-frame) { position: relative; padding: 0; display: flex; flex-direction: column; overflow: hidden; }
+    .group-table-view:has(.inbox-frame) .group-table-head { position: absolute; width: 1px; height: 1px; min-height: 0; max-height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; } /* the folder button names the page, so no heading is drawn under it; the heading stays in the page for a screen reader (#9660, as #9631) */
+    .group-table-view .inbox-frame { flex: 1 1 auto; width: 100%; min-height: 0; border: 0; border-radius: 0; }
 }
 
 /* The chat header's status dot has its state in a word beside it on a phone, where a hollow circle alone meant nothing (#10885); real text, hidden elsewhere */
-.terminal-status-word { display: none; }
-@media (max-width: 767px) { .terminal-status-word { display: inline; margin: 0 6px 0 4px; font-size: var(--fs-sm); color: var(--text-secondary); white-space: nowrap; } }
+
+/* A phone's agent page: the top bar and the agent's header are ONE row (#11056, the operator: "the hamburger menu and the agent toolbar should be one line"). Under 640 px, while an agent is open, the page's top bar is hidden and its menu
+   button is the first of this row: ☰, ←, the dot and the name (the team under it), the Chat/Terminal switch and ⋯. Search, the panel, the branch and the rest of what the header holds, and the Details (folder, model, context), are behind ⋯,
+   on a line under the row. The row wraps rather than overlap at large text. */
+.agent-bar-menu { display: none; order: 0; }
+@media (max-width: 639px) {
+    body.live-session-active:not(.popout-mode) { --top-bar-height: env(safe-area-inset-top, 0px); } /* no bar: the side panel and the sidebar start under the notch's band, over the row */
+    body.live-session-active:not(.popout-mode) header.top-bar { display: none; }
+    body.live-session-active:not(.popout-mode) .terminal-header { height: auto; min-height: calc(56px + env(safe-area-inset-top, 0px)); flex-wrap: nowrap; justify-content: flex-start; padding: env(safe-area-inset-top, 0px) var(--space-md) 0; gap: 0 var(--space-xs); }
+    body.live-session-active:not(.popout-mode) .terminal-header-left { flex: 1 1 0; min-width: 0; flex-wrap: nowrap; gap: var(--space-xs); order: 1; } /* the name takes what is left and ends in an ellipsis: the row never wraps (the Orchestrator: one row matters more than the rest) */
+    body.live-session-active:not(.popout-mode) .terminal-header-actions { display: contents; }
+    body.live-session-active:not(.popout-mode) .agent-bar-menu, body.live-session-active:not(.popout-mode) .agent-bar-more { display: inline-flex; align-items: center; justify-content: center; flex: none; min-width: 44px; min-height: 44px; }
+    body.live-session-active:not(.popout-mode) .terminal-state-pill { display: none; } /* the header draws only the dot, named with the state (aria-label, title): no word (the operator, #9927; the Orchestrator, #11056) */
+    body.live-session-active:not(.popout-mode) .terminal-identity { display: flex; flex-direction: column; justify-content: center; flex: 1 1 0; min-width: var(--control-touch-height, 44px); }
+    body.live-session-active:not(.popout-mode) .terminal-session-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-left: 0; }
+    body.live-session-active:not(.popout-mode) .terminal-session-context { margin-left: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    body.live-session-active:not(.popout-mode) .terminal-header .live-view-toggle { display: none; } /* Chat and Terminal are one button here (#11187, the operator): it shows the view it goes to, and the dots' second line has it with its words */
+    body.live-session-active:not(.popout-mode) .terminal-header .live-view-switch:not([hidden]) { display: inline-flex; order: 2; margin-left: 0; min-width: var(--control-touch-height, 44px); min-height: var(--control-touch-height, 44px); align-items: center; justify-content: center; }
+    body.live-session-active:not(.popout-mode) .terminal-header[data-more] .live-view-switch:not([hidden]) { display: none; } /* with the dots open the switch is the line under it, with its words: one of the two on screen, not two controls of one name */
+    body.live-session-active:not(.popout-mode) .terminal-header .live-view-switch-menu { min-height: var(--control-touch-height, 44px); gap: 6px; align-items: center; }
+    body.live-session-active:not(.popout-mode) .terminal-header .agent-bar-more { order: 3; }
+    body.live-session-active:not(.popout-mode) .terminal-header .terminal-header-actions > :not(.live-view-toggle):not(.live-view-switch):not(.agent-bar-more) { display: none !important; } /* the header's ids set their own display, some with !important (touch.css, mobile.css) */
+    body.live-session-active:not(.popout-mode) .terminal-header[data-more] { flex-wrap: wrap; } /* only while ⋯ is open: the second line holds Search, the panel and the rest */
+    body.live-session-active:not(.popout-mode) .terminal-header[data-more]::before { content: ''; order: 4; flex: 0 0 100%; height: 0; }
+    body.live-session-active:not(.popout-mode) .terminal-header[data-more] .terminal-header-actions > :not(.live-view-toggle):not(.live-view-switch):not(.agent-bar-more):not([hidden]):not([style*="display: none"]):not([style*="display:none"]):not(.terminal-branch) { display: inline-flex !important; order: 5; } /* what a mode hid stays hidden */
+    body.live-session-active:not(.popout-mode) #popout-panel-toggle-btn { display: none !important; } /* its id sets display: flex !important (above) */
+    body.live-session-active:not(.popout-mode) .terminal-header[data-more] #popout-panel-toggle-btn { display: flex !important; order: 5; }
+}
+
+/* ── The phone's Agents page in Google Chat's style (#11096, slice A; the operator: "for the mobile ui, let's go more Google chat") ───────────────────────────────────────────────────────────────────────
+   Under 601 px the page's top bar is the list header's first row: the menu button, a round search pill and the account button; then the title with two chips ("N need you", "N working"); then the agents as cards: a round
+   avatar (the team's colour, the agent's initial) with the state as a dot on its corner, the name, the short time at the right and a two-line preview (the goal until the last message is a field of the row). No borders, soft
+   surfaces. Wider screens keep the sidebar's row (the avatar, the time and the preview are drawn by this block only). */
+.session-avatar, .session-time, .session-preview, .phone-menu-btn, .phone-account-btn, .phone-break, .phone-chips { display: none; }
+@media (max-width: 300px) { body.live-session-active:not(.popout-mode) .terminal-header { flex-wrap: wrap; } } /* a phone at 200% zoom is 195 px wide: the row wraps before ⋯ is cut off (phone_layout) */
+@media (max-width: 600px) {
+    body.agent-home-active header.top-bar { display: none; }
+    body.agent-home-active { --top-bar-height: env(safe-area-inset-top, 0px); }
+    #mobile-agent-list .mobile-list-header { padding: calc(8px + env(safe-area-inset-top, 0px)) 8px 4px; gap: 4px; flex-wrap: wrap; justify-content: flex-start; align-items: center; }
+    #mobile-agent-list .phone-menu-btn, #mobile-agent-list .phone-account-btn { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 44px; height: 44px; min-width: 44px; padding: 0; border-radius: 50%; }
+    #mobile-agent-list .phone-menu-btn { order: 0; }
+    #mobile-agent-list .mobile-search-row { order: 1; flex: 1 1 0; min-width: 0; }
+    #mobile-agent-list .phone-account-btn { position: relative; order: 2; border: 0; background: none; color: var(--text-secondary); cursor: pointer; }
+    #mobile-agent-list .phone-account-btn .material-icons { font-size: var(--icon-size); }
+    #mobile-agent-list .phone-break { order: 3; display: block; flex: 0 0 100%; height: 0; }
+    #mobile-agent-list .mobile-list-header .mobile-search-input { height: 48px; border-radius: 24px; border: 0; background: var(--bg-secondary); padding: 0 18px; font-size: var(--fs-lg); }
+    #mobile-agent-list .mobile-list-title { order: 4; font-size: var(--fs-2xl); font-weight: var(--fw-regular); margin: 0 auto 0 8px; }
+    #mobile-agent-list .phone-chips { order: 5; display: flex; gap: 6px; flex: 0 1 auto; min-width: 0; }
+    #mobile-agent-list .phone-chip { min-height: 44px; height: auto; padding: 0 12px; border: 0; border-radius: 18px; background: var(--bg-hover); color: var(--text-primary); font-size: var(--fs-md); white-space: nowrap; cursor: pointer; }
+    #mobile-agent-list .phone-chip[hidden] { display: none; }
+    #mobile-agent-list .phone-chip-need { background: rgba(var(--fx-yellow-rgb), 0.18); color: var(--warning); }
+    #mobile-agent-list .phone-chip[aria-pressed="true"] { box-shadow: inset 0 0 0 2px currentColor; }
+    #mobile-agent-list .mobile-list-header > .btn-small, #mobile-agent-list .mobile-list-header > .sidebar-collapse-btn { order: 7; }
+    #mobile-agent-list .mobile-list-header > .sidebar-collapse-btn[data-display-button] { order: 6; margin-left: auto; } /* Display options, the groups' toggle and New share the line under the title, at its right */
+
+    /* the cards */
+    #mobile-session-list { padding: 0 8px 112px; } /* room under the floating nav and the + (96 px of them) */
+    #mobile-session-list .session-group-item, #mobile-session-list > .session-group-item {
+        position: relative; display: grid; grid-template-columns: 48px minmax(0, 1fr); column-gap: 12px; align-items: start;
+        margin: 0 0 3px; padding: 14px 12px !important; min-height: 76px; border: 0; border-radius: 14px; background: var(--bg-secondary); box-shadow: none;
+    }
+    #mobile-session-list .session-group-item.active { background: var(--bg-hover); box-shadow: none; }
+    #mobile-session-list .session-avatar { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 50%; background: color-mix(in srgb, var(--avatar, var(--accent)) 62%, rgb(var(--black-rgb))); color: var(--text-on-accent); font-size: var(--fs-xl); font-weight: var(--fw-medium); }
+    #mobile-session-list .session-info { min-width: 0; }
+    #mobile-session-list .session-dot { position: absolute; left: 46px; top: 48px; width: 16px; height: 16px; margin: 0; border: 3px solid var(--bg-secondary); box-sizing: border-box; }
+    #mobile-session-list .session-name-row { display: flex; align-items: baseline; gap: 8px; min-height: 0; }
+    #mobile-session-list .session-label { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: var(--fs-xl); font-weight: var(--fw-regular); }
+    #mobile-session-list .session-label-name, #mobile-session-list .session-label .sln-head, #mobile-session-list .session-label .sln-tail { color: var(--agent-name-color, var(--text-primary)); font-weight: inherit; } /* the name in the card's ink, bold when the agent needs you */
+    #mobile-session-list .session-label-name { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; } /* the name itself ends in an ellipsis inside the card at 320 px (mobile_text_sizes) */
+    #mobile-session-list .session-group-item .session-name-spacer { display: none; }
+    #mobile-session-list .session-time { display: block; flex: none; font-size: var(--fs-md); color: var(--text-secondary); white-space: nowrap; }
+    #mobile-session-list .session-status-line { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); margin: 0; } /* still text for a screen reader and find-in-page: the dot and the preview are what the card shows */
+    #mobile-session-list .session-preview { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-top: 2px; padding-right: 36px; font-size: var(--fs-lg); color: var(--text-secondary); overflow-wrap: anywhere; }
+    #mobile-session-list .session-line2 { display: none; } /* the preview is the summary here */
+    #mobile-session-list .session-model { margin-left: 0; padding-left: 0; font-size: var(--fs-md); }
+    #mobile-session-list .session-group-item.needs-attention .session-label { font-weight: var(--fw-strong); }
+    #mobile-session-list .session-group-item.needs-attention .session-preview { color: var(--text-primary); }
+    #mobile-session-list .session-group-item.needs-attention .session-time { color: var(--link-text); font-weight: var(--fw-medium); } /* the text-safe accent: 4.5:1 or more on the card in both themes (the accent was 4.44 in light, and darkening it for light made dark 4.4: #4581c7 on #18181c) */
+    #mobile-session-list .session-group-item .sidebar-kebab-wrapper { position: absolute; right: 20px; bottom: 15px; } /* the card is the containing block and the wrapper sits 9 px further out than `right` says: the 24 px button is 11 px from the card's right edge and 12 from its bottom, so its 44 px hit area ends at them, not past them */
+}
+
+/* ── The phone's floating nav and + (#11116, slice C of the Google Chat style) ───────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   Home, Inbox (with the waiting count), Tasks and More are a pill 18 px above the bottom; the + is a separate rounded button at the right and opens New agent and New team. Under 601 px, on the Agents page and the Inbox, and not
+   while the keyboard is up (the + only on the Agents page). The lists keep room under them (96 px). */
+.phone-nav, .phone-fab, .phone-fab-menu { display: none; }
+@media (max-width: 600px) {
+    body.phone-nav-on:not(.keyboard-open):not(.popout-mode) .phone-nav { position: fixed; left: 14px; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); z-index: 40; display: flex; align-items: center; justify-content: space-around; gap: 2px; width: 268px; height: 64px; padding: 0 6px; border-radius: 32px; background: var(--bg-secondary); box-shadow: 0 2px 14px rgba(var(--black-rgb), 0.22); }
+    .phone-nav-slot { position: relative; display: grid; place-items: center; flex: none; width: 56px; height: 44px; padding: 0; border: 0; border-radius: 22px; background: none; color: var(--text-primary); cursor: pointer; }
+    @media (max-width: 359px) { .phone-nav-slot { width: 48px; } body.phone-nav-on:not(.keyboard-open):not(.popout-mode) .phone-nav { width: 212px; } } /* the + (64 px at the right) never covers the nav's last slot at 320 px: four 48 px slots end before it begins (the Mobile Beta Tester: a tap on More hit New) */
+    .phone-nav-slot.active { background: var(--bg-hover); }
+    .phone-nav-slot svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .phone-nav-slot[data-phone-nav="nav-more"] svg { fill: currentColor; stroke: none; }
+    .phone-nav-badge { position: absolute; top: 0; right: 6px; background: var(--warning); color: var(--bg-primary); } 
+    body.large-text .phone-nav-badge { transform: scale(0.5); transform-origin: top right; } /* at 200% text the count stays a badge on the icon's corner: it does not grow over the icon (the Mobile Beta Tester) */
+    .phone-nav-badge[hidden] { display: none; }
+    body.agent-home-active:not(.keyboard-open):not(.popout-mode) .phone-fab, body[data-phone-fab="automations"]:not(.keyboard-open):not(.popout-mode) .phone-fab { position: fixed; right: 16px; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); z-index: 40; display: grid; place-items: center; width: 64px; height: 64px; padding: 0; border: 0; border-radius: 20px; background: var(--accent); color: var(--text-on-accent); box-shadow: 0 2px 14px rgba(var(--black-rgb), 0.22); cursor: pointer; }
+    .phone-fab svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; }
+    body.phone-nav-on #mobile-agent-list, body.phone-nav-on #group-table-view, body.phone-nav-on #inbox-view:not([data-phone-item]), body.phone-nav-on #scheduler-view:not([data-phone-item]), body.phone-nav-on #workflows-view:not([data-phone-item]) { padding-bottom: 112px; } /* the empty page's cards scroll clear of the nav too (the Mobile Beta Tester, #11116) */
+    body:has(#inbox-view[data-phone-item]) .phone-nav { display: none; } /* a task or a message opened in the Inbox is a page of its own: the nav goes while it is open */
+    body.agent-home-active:has(#mobile-agent-list .empty-launch) .phone-fab { display: none; } /* an empty page has its own New agent button */
+    body.agent-home-active .phone-fab-menu:not([hidden]), body[data-phone-fab="automations"] .phone-fab-menu:not([hidden]) { position: fixed; right: 16px; bottom: calc(92px + env(safe-area-inset-bottom, 0px)); z-index: 41; display: flex; flex-direction: column; min-width: 180px; }
+}
+
+@media (max-width: 600px) {
+    #mobile-agent-list { overflow-x: hidden; } /* a 1 px overflow drew a horizontal scrollbar, a grey strip under the page (the Mobile Beta Tester, #11116) */
+    #mobile-agent-list .mobile-list-header > .btn-small.btn-primary { display: none; } /* New is in the + menu (the title row stays one row with both chips) */
+    #mobile-session-list .session-dot::before { content: none; } /* the sleeping moon was a clipped dark crescent in a 16 px badge */
+    #mobile-session-list .session-dot.your-turn, #mobile-session-list .session-dot.sleeping { background: var(--text-muted); box-shadow: none; }
+    #mobile-session-list .session-dot.your-turn { background: var(--bg-secondary); box-shadow: inset 0 0 0 2px var(--text-primary); }
+}
+
+/* The phone's composer in Google Chat's language (#11128, slice D): a pill for the text, one line high until the text wraps (the rows="3" default is overridden by its height), and a round Send (Stop is round too), on top of the one-row header. 44 px and more everywhere; the keyboard rule (#11060) and Stop's behaviour are as they were. */
+@media (max-width: 600px) {
+    .command-pane textarea { height: 3rem; min-height: 3rem !important; padding: calc(0.75rem - 1px) 18px; border-radius: 26px; background: var(--bg-secondary); } /* the 1 px border is inside the 3rem: the padding gives it back, so the line fits the box and nothing scrolls */
+    .command-pane .mobile-send-btn { border-radius: 50%; }
+    .command-pane .mobile-send-btn.is-stop { border-radius: 50%; }
+    .command-pane .mobile-send-more > button { border-radius: 50%; }
+}
+
+@media (max-width: 600px) {
+    .settings-tab-name[data-sub] { display: flex; flex-direction: column; align-items: flex-start; }
+    .settings-tab-name[data-sub]::after { content: attr(data-sub); font-size: var(--fs-md); font-weight: var(--fw-regular); color: var(--text-secondary); } /* the group's list row says what is inside, so Theme is found under General (#11128) */
+}
+
+@media (max-width: 600px) { /* the hub's state on the Agents page (its top bar is the page's own first row): a dot on the account button, the colours of the top bar's indicator (hub_indicator.js) */
+    body[data-hub-state] #mobile-agent-list .phone-account-btn::after { content: ''; position: absolute; right: 6px; bottom: 6px; width: 12px; height: 12px; box-sizing: border-box; border-radius: 50%; border: 2px solid var(--bg-primary); background: var(--text-muted); }
+    body[data-hub-state="connected"] #mobile-agent-list .phone-account-btn::after { background: var(--success); }
+    body[data-hub-state="disconnected"] #mobile-agent-list .phone-account-btn::after { background: var(--warning); }
+}
+@media (max-width: 600px) {
+    body[data-phone-fab="automations"] .automations-create, body[data-phone-fab="automations"] .automations-act { display: none; } /* the + at the bottom right makes a job or a workflow: the toolbar's create buttons are not drawn (#11239 slice A) */
+    body:has(#scheduler-view[data-phone-item]) .phone-nav, body:has(#scheduler-view[data-phone-item]) .phone-fab, body:has(#workflows-view[data-phone-item]) .phone-nav, body:has(#workflows-view[data-phone-item]) .phone-fab { display: none; } /* a job or a workflow opened is a page of its own (a drill-down): no nav and no + over its footer */
+}
+
+/* The Home list's per-row and per-team ⋯ is a 44 px button on a phone (#11281), not a 24 px box with a hidden hit area: the rows are 44 px high already */
+@media (max-width: 599px) {
+    .session-list .sidebar-kebab-btn, .group-kebab .sidebar-kebab-btn { width: var(--control-touch-height, 44px); min-width: var(--control-touch-height, 44px); height: var(--control-touch-height, 44px); min-height: var(--control-touch-height, 44px); margin-block: 0; }
+    .session-list .sidebar-kebab-btn::after, .group-kebab .sidebar-kebab-btn::after { inset: 0; }
+}

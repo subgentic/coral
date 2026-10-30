@@ -54,7 +54,7 @@ function scrollToTaskArtifacts(id) {
 
 export function taskColumns(ctx, keys = ['state', 'task', 'who', 'goal', 'priority', 'updated']) {
     const all = {
-        state: { key: 'state', label: 'State', cell: (t) => DT.chip(taskWord(t), statusClass(taskWord(t))), sort: true, sortValue: (t) => STATE_RANK[taskWord(t)] ?? 9, line: 1 },
+        state: { key: 'state', label: 'State', cell: (t) => DT.el('span', `dt-state ${statusClass(taskWord(t))}`, taskWord(t)), sort: true, sortValue: (t) => STATE_RANK[taskWord(t)] ?? 9, line: 1 }, // the state is its word in the state's colour (the Operator, #11189): no pill, no dot, no fill
         task: { key: 'task', label: 'Task', primary: true, width: 'grow', min: 24, share: 2, sort: true, sortValue: (t) => t.title, line: 1,
             cell: (t) => { const c = DT.el('span', 'dt-title-cell'); const b = DT.primaryButton(t.title, ctx.hideTaskId ? `Open task #${t.id}: ${t.title}, ${taskWord(t)}` : `Open task #${t.id}: ${t.title}`); b.dataset.taskId = String(t.id); if (ctx.hideTaskId) c.title = `Task #${t.id}`; else c.append(DT.el('span', 'dt-id', `#${t.id}`)); c.append(b); return c; } }, // a goal's column does not lead with the number (#8784): it is the row's hover title and the button's name; its button's name also ends with the state a sighted row shows as a chip, as the dock's rows do (#8952)
         who: { key: 'who', label: 'Who', sort: true, sortValue: (t) => doerOf(t) || '', line: 1, width: '6rem', max: 12, cell: (t) => whoCell(t) },

@@ -17,6 +17,8 @@ var columnMigrations = []struct {
 }{
 	// A job's runs work in a worktree of its folder (0, as every job before this did) or in the folder itself (1): a folder that is not a git repository can be one (#10276).
 	{"scheduled_jobs", "no_worktree", "INTEGER NOT NULL DEFAULT 0"},
+	// How far an agent's chat search reaches (#11048): own, team, all or operator. Every member is "own" until the Operator raises it.
+	{"team_members", "search_reach", "TEXT NOT NULL DEFAULT 'own'"},
 	// The thinking level a call ran at, kept on each usage row from now on (#8915): what the transcript recorded for the call, else the level the agent's session was set to when a live call was
 	// recorded. NULL on every older row (the analytics show "Not recorded"); a rolled-up hourly row keeps it too (token_usage_hourly groups by it).
 	{"token_usage", "thinking", "TEXT"},
@@ -102,7 +104,9 @@ var columnMigrations = []struct {
 	{"session_tokens", "proof_key", "TEXT"},
 	{"live_sessions", "permission_mode", "TEXT"}, // the launch's effective permission mode (#5188)
 	{"cloud_connection", "route_key", "TEXT"},    // the hub's routing hint for this enrollment (#3683)
-	{"cloud_connection", "hub_owner", "TEXT"},    // the Coral Hub account that owns this enrollment (#3966)
+	// When Coral made its data folder private while this server's key was stored; NULL once a different key is entered.
+	{"remote_servers", "key_renew_since", "TEXT"},
+	{"cloud_connection", "hub_owner", "TEXT"}, // the Coral Hub account that owns this enrollment (#3966)
 	// The owner's hub-user-<8 hex> label as the hub stamps it, recorded at enrolment only (#5280); NULL = unknown.
 	{"cloud_connection", "hub_owner_user", "TEXT"},
 	// What the machine is enrolled as (#7061): "team" with the Hub organisation's id in hub_owner_org (a canonical lower-case UUID), recorded at enrolment only; NULL = personal, which is every

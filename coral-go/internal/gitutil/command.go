@@ -74,6 +74,7 @@ func safeConfig() []string {
 		"-c", "diff.ignoreSubmodules=all",
 		"-c", "submodule.recurse=false",
 		"-c", "status.submoduleSummary=false",
+		"-c", "core.quotePath=false", // a non-ASCII file name is listed as it is, not as "r\303\251sum\303\251.html" in quotes, which no file has (#11284)
 	}
 }
 

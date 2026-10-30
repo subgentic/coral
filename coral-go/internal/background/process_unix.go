@@ -4,6 +4,7 @@ package background
 
 import (
 	"context"
+	"log/slog"
 	"os/exec"
 	"sync"
 	"syscall"
@@ -42,6 +43,7 @@ func killChildProcess(cmd *exec.Cmd) {
 	if err != nil {
 		pgid = cmd.Process.Pid
 	}
+	slog.Info("[background] signalling a step's process group", "pgid", pgid, "signal", "SIGTERM")
 	_ = syscall.Kill(-pgid, syscall.SIGTERM)
 	ended := make(chan struct{})
 	killEscalationsMu.Lock()
@@ -61,6 +63,7 @@ func killChildProcess(cmd *exec.Cmd) {
 			}
 		}
 		if err := syscall.Kill(-pgid, 0); err == nil {
+			slog.Info("[background] signalling a step's process group", "pgid", pgid, "signal", "SIGKILL")
 			_ = syscall.Kill(-pgid, syscall.SIGKILL)
 		}
 	}()

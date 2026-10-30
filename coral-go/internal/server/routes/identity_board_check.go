@@ -232,3 +232,24 @@ func sessionLaunchedOnBoard(ctx context.Context, ss *store.SessionStore, session
 	}
 	return ls.BoardName != nil && *ls.BoardName == boardKey, nil
 }
+
+// noteJobBoard marks the board a request acts on as a job's when the agent making it is a scheduled job's or a workflow step's (its live row says is_job). The mark stays on the board row after the run ends and its
+// live row is gone, so no search level reads that board (#11076). Only a request that passed every identity check gets here.
+func (o *IdentityObserver) noteJobBoard(r *http.Request, owner *store.SessionTokenOwner) {
+	if o.bs == nil || o.db == nil || owner == nil {
+		return
+	}
+	project, _, ok := boardRoute(r)
+	if !ok {
+		return
+	}
+	switch project {
+	case "", "projects", "tasks", "remotes":
+		return
+	}
+	ls, err := store.NewSessionStore(o.db).GetLiveSession(r.Context(), owner.SessionID)
+	if err != nil || ls == nil || ls.IsJob != 1 {
+		return
+	}
+	_, _ = o.bs.MarkBoardKind(r.Context(), resolvedBoardKey(r, o.bs, project), board.BoardKindJob)
+}

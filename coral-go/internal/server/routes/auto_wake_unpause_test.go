@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
@@ -33,9 +34,9 @@ func restartBoardHandler(t *testing.T, r *wakeRig) *BoardHandler {
 	bh.LoadPaused(ctx)
 	boards, err := r.ss.GetSleepingBoardNames(ctx)
 	require.NoError(t, err)
-	for _, b := range boards {
-		bh.PauseForSleep(b)
-	}
+	awake, err := r.ss.GetAwakeBoardNames(ctx)
+	require.NoError(t, err)
+	bh.RestoreSleepPauses(boards, awake)
 	r.h.SetBoardHandler(bh)
 	return bh
 }
@@ -217,4 +218,82 @@ func TestAPersonsPauseWinsEitherRace(t *testing.T) {
 			require.Equal(t, "", by, "%s: stored as the person's", b)
 		}
 	}
+}
+
+// #11182: after a restart the pause that sleep saved is lifted for a board that has an agent awake (the startup recovery woke it), and a mention is read; before, it was restored and nothing lifted it, and
+// no nudge went out for hours. A pause a person set stays through the same restart.
+func TestARestartLiftsASavedSleepPauseWhenAnAgentIsAwake(t *testing.T) {
+	const team = "team-11182"
+	ctx := context.Background()
+	r := newWakeRig(t)
+	teamAsleepAfterCrash(t, r, team)
+	first := restartBoardHandler(t, r) // the first start pauses the board for its sleeping agent and stores it as sleep's
+	require.True(t, first.IsPaused(team))
+	// The agent is awake when Coral starts again (the startup recovery set it awake).
+	_, err := r.h.db.ExecContext(ctx, "UPDATE live_sessions SET is_sleeping = 0, sleep_reason = '' WHERE session_id = ?", sid(1))
+	require.NoError(t, err)
+
+	bh := restartBoardHandler(t, r)
+	assert.False(t, bh.IsPaused(team), "an agent of the board is awake: the saved sleep pause is over")
+	_, err = r.h.bs.PostMessage(ctx, team, "orch-sub", "@Dev look at #11182", nil)
+	require.NoError(t, err)
+	var texts []string
+	for _, m := range readAs(t, bh, team, naming.SubscriberID("Dev", "claude")) {
+		texts = append(texts, m.Content)
+	}
+	assert.Contains(t, texts, "@Dev look at #11182", "the board reads and is nudged again")
+	paused, err := r.h.bs.PausedBoardsBy(ctx)
+	require.NoError(t, err)
+	assert.NotContains(t, paused, team, "and it is stored resumed")
+}
+
+func TestARestartKeepsAPersonsPauseOnABoardWithAnAwakeAgent(t *testing.T) {
+	const team = "team-11182b"
+	ctx := context.Background()
+	r := newWakeRig(t)
+	teamAsleepAfterCrash(t, r, team)
+	before := NewBoardHandler(r.h.bs)
+	t.Cleanup(before.WaitBackground)
+	before.SetPaused(team, true)
+	_, err := r.h.db.ExecContext(ctx, "UPDATE live_sessions SET is_sleeping = 0, sleep_reason = '' WHERE session_id = ?", sid(1))
+	require.NoError(t, err)
+
+	bh := restartBoardHandler(t, r)
+	assert.True(t, bh.IsPaused(team), "the person's Pause stays through a restart with an agent awake")
+}
+
+// Waking one agent, by any path, lifts the pause sleep put on its board (the wake itself, not only auto-wake).
+func TestWakingOneAgentLiftsTheSleepPause(t *testing.T) {
+	const team = "team-11182c"
+	ctx := context.Background()
+	r := newWakeRig(t)
+	teamAsleepAfterCrash(t, r, team)
+	bh := restartBoardHandler(t, r)
+	require.True(t, bh.IsPaused(team))
+	ls, err := r.ss.GetLiveSession(ctx, sid(1))
+	require.NoError(t, err)
+	require.NoError(t, r.h.wakeExistingSession(ctx, ls))
+	assert.False(t, bh.IsPaused(team), "the wake resumed the board")
+}
+
+// QA's #11188: the notifier lifts a sleep pause because it saw an agent awake, but its sighting can be seconds old. A person's Sleep team in between is a newer decision, and the lift must not undo it.
+func TestALiftOnAnEarlierSightingDoesNotUndoALaterSleepPause(t *testing.T) {
+	r := newWakeRig(t)
+	bh := NewBoardHandler(r.h.bs)
+	t.Cleanup(bh.WaitBackground)
+
+	seen := time.Now()
+	time.Sleep(5 * time.Millisecond) // sleep-ok: the pause must be made after the sighting by a measurable moment
+	bh.PauseForSleep("team-11204")   // a person's Sleep team after the agent was seen awake
+	require.True(t, bh.IsPaused("team-11204"))
+	assert.False(t, bh.LiftSleepPauseSeenAwake("team-11204", seen), "the pause is newer than the sighting")
+	assert.True(t, bh.IsPaused("team-11204"), "it stays")
+
+	assert.True(t, bh.LiftSleepPauseSeenAwake("team-11204", time.Now()), "an agent seen awake after the pause lifts it")
+	assert.False(t, bh.IsPaused("team-11204"))
+
+	// A person's pause is never lifted, whatever was seen.
+	bh.SetPaused("team-11204b", true)
+	assert.False(t, bh.LiftSleepPauseSeenAwake("team-11204b", time.Now().Add(time.Hour)))
+	assert.True(t, bh.IsPaused("team-11204b"))
 }

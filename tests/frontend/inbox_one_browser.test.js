@@ -85,12 +85,12 @@ const AGENTS = (waiting) => waiting ? [
             assert.equal(await ev(`document.getElementById('inbox-title') === null && document.getElementById('inbox-tablist') === null`), true, at + 'the old title and tab strip are gone');
 
             if (mobile) {
-                await waitFor(`!!document.querySelector('#group-table-view .view-list-trigger') && document.getElementById('group-table-view').getClientRects().length > 0`, at + 'the phone opens on the table with the folders\' drawer button on top', 10000);
+                await waitFor(`!!document.querySelector('#group-table-view .view-list-nav .view-list-item') && document.getElementById('group-table-view').getClientRects().length > 0`, at + 'the phone opens on the table with the folders\' tab strip on top', 10000);
                 assert.equal(await ev(`[...document.querySelectorAll('#mobile-inbox-list .sidebar-hide-btn')].some(b => b.getClientRects().length > 0)`), false, at + 'no Hide on a phone');
-                assert.equal(await ev(`(() => { const sel = document.querySelector('#group-table-view .view-list-trigger').getBoundingClientRect(), nxt = document.querySelector('#group-table-view .gt-toolbar, #group-table-view .group-table-head').getBoundingClientRect(); return nxt.top - sel.bottom >= 8; })()`), true, at + 'the folders\' drawer button does not touch the field under it: 8 px (#7851)');
+                assert.equal(await ev(`(() => { const sel = document.querySelector('#group-table-view .view-list-nav').getBoundingClientRect(), nxt = document.querySelector('#group-table-view .gt-toolbar, #group-table-view .group-table-head').getBoundingClientRect(); return nxt.top - sel.bottom >= 8; })()`), true, at + 'the folders\' tab strip does not touch the field under it: 8 px (#7851)');
                 await shot(`inbox-one-list-${w}`);
-                await ev(`document.querySelector('#group-table-view .view-list-trigger').click(); document.querySelector('#group-table-view .view-list-item[data-key="tasks"]').click(); true`);
-                await waitFor(`!!document.querySelector('#group-table-view .dt-primary')`, at + 'the drawer opens Tasks', 8000);
+                await ev(`document.querySelector('#group-table-view .view-list-item[data-key="tasks"]').click(); true`);
+                await waitFor(`!!document.querySelector('#group-table-view .dt-primary')`, at + 'the Tasks tab opens Tasks', 8000);
                 await ev(`document.querySelector('#group-table-view .dt-primary').click(); true`);
                 await waitFor(`document.getElementById('inbox-page').getClientRects().length > 0 && !!document.querySelector('#inbox-page .ibx-reply-input')`, at + 'the task as a screen of its own', 10000);
                 assert.equal(await ev(`document.querySelector('#inbox-page .goals-back').textContent.trim()`), '\u2190 Tasks', at + 'with the way back, to the folder it came from');
@@ -128,7 +128,7 @@ const AGENTS = (waiting) => waiting ? [
             // the one task row (#7737): a table on a desktop (State, Task, Team, Updated), the two-line column on a phone; one word set for the state (the Inbox's "Open" is Queued)
             const wide = await ev(`!document.querySelector('#group-table-view .dt-box').classList.contains('dt-folded')`);
             if (wide) assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view th')].map(h => h.textContent.replace(/[↑↓↕]/g, '').trim()).filter(Boolean)`), ['State', 'Task', 'Team', 'Updated'], at + 'State, Task, Team, Updated (no Priority, #8784)');
-            assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view .dt-table tbody tr')].map(r => [r.querySelector('.dt-primary').textContent, r.querySelector('.goal-chip').textContent, getComputedStyle(r.querySelector('td[data-key="team"]')).display === 'none' ? '' : r.querySelector('td[data-key="team"]').textContent].join('|'))`),
+            assert.deepEqual(await ev(`[...document.querySelectorAll('#group-table-view .dt-table tbody tr')].map(r => [r.querySelector('.dt-primary').textContent, r.querySelector('.dt-state').textContent, getComputedStyle(r.querySelector('td[data-key="team"]')).display === 'none' ? '' : r.querySelector('td[data-key="team"]').textContent].join('|'))`),
                 wide ? ['Review the release plan|Queued|team-a', 'Write the release notes|In progress|team-a', 'Check the installer|Blocked|team-b'] : ['Review the release plan|Queued|', 'Write the release notes|In progress|', 'Check the installer|Blocked|'], at + 'rows in order, with no Priority column (#8784)');
             assert.deepEqual(await ev(`(${ON_SCALE})(document.getElementById('group-table-view'), ${SCALE})`), [], at + 'every text of the tasks table is on the scale');
             await ev(`document.querySelector('#group-table-view .dt-primary').click(); true`);

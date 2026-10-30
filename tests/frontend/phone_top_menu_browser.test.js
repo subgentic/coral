@@ -25,10 +25,12 @@ const BASE = require('./test_base').BASE;
         // 1. the top row is one hamburger
         try {
             await open(390);
+            await ev(`window.switchNavTab('hub-inbox'); true`); // the Agents page has the menu button in its own header (#11096): the top bar is the other pages'
+            await waitFor(`!!document.getElementById('top-menu-btn') && document.getElementById('top-menu-btn').getClientRects().length > 0`, 'the top bar on the Inbox', 6000);
             const top = await ev(`${vis('.top-bar button, .top-bar a')}.map(b => ({ id: b.id, label: b.getAttribute('aria-label'), w: Math.round(b.getBoundingClientRect().width), h: Math.round(b.getBoundingClientRect().height) }))`);
             assert.deepEqual(top.map(b => b.id), ['top-menu-btn'], 'the top row is one button: ' + JSON.stringify(top));
             assert.ok(top[0].w >= 44 && top[0].h >= 44, 'a 44 px target: ' + JSON.stringify(top[0]));
-            assert.equal(await ev(`document.getElementById('top-menu-label').textContent`), 'Agents', 'it names the view');
+            await waitFor(`document.getElementById('top-menu-label').textContent === 'Inbox'`, 'the button names the view it is on (the Inbox)', 6000); // it follows the switch: it said Agents only because the read came before the redraw
             assert.equal(await ev(`${vis('#nav-select')}.length`), 0, 'the view dropdown is inside it');
             await shot('top-menu-closed-390');
             // 2. its menu

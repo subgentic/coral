@@ -141,7 +141,8 @@ func (p *RemoteBoardPoller) RunOnce(ctx context.Context) error {
 			continue
 		}
 		var data struct {
-			Unread int `json:"unread"`
+			Unread int  `json:"unread"`
+			Paused bool `json:"paused"` // the remote board is paused: its check says the real count and read delivers none of it (#11198)
 		}
 		if err := json.NewDecoder(io.LimitReader(resp.Body, 1<<20)).Decode(&data); err != nil {
 			p.logger.Warn("failed to decode remote poll response", "server", sub.RemoteServer, "error", err)
@@ -150,6 +151,9 @@ func (p *RemoteBoardPoller) RunOnce(ctx context.Context) error {
 		}
 		resp.Body.Close()
 
+		if data.Paused {
+			continue // nothing the agent could read: a nudge would lead nowhere; it comes when the board is resumed
+		}
 		if data.Unread == 0 {
 			if sub.LastNotifiedUnread != 0 {
 				p.store.UpdateLastNotified(ctx, sub.ID, 0)

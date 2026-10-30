@@ -17,6 +17,8 @@ func parseTranscriptEntry(entry map[string]any, toolUseNames map[string]string, 
 		return parseAgyEntry(entry, toolUseNames)
 	case at.Codex:
 		return parseCodexEntry(entry, toolUseNames)
+	case at.Pi:
+		return parsePiEntry(entry, toolUseNames)
 	default:
 		return parseClaudeEntry(entry, toolUseNames)
 	}

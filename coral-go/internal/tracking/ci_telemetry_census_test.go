@@ -65,6 +65,14 @@ var notAStarter = map[string]string{
 	// Checks the words of the goal page's "Copy for an agent" line; the line it asserts ("run coral-board goal brief 65") names the coral-board command and starts nothing.
 	"tests/frontend/goal_words.test.mjs": "imports goal_words.js and compares strings, one of which names the coral-board command (it matches startsCoral); starts no Coral",
 
+	// Pi's board-notice tests (#11107 slice 2): the notice they assert ("Run coral-board read to read them") names the coral-board command (it matches startsCoral); neither runs a Coral. One drives the extension with fake child processes, the other runs real Pi against a stand-in Coral (a bare HTTP server of its own) and the hook program: no Coral that could send.
+	"tests/frontend/pi_extension.test.mjs": "drives the Pi extension with fake child processes and asserts the notice text, which names the coral-board command (it matches startsCoral); starts no Coral",
+	"tests/pi/pi_delivery_e2e.mjs":         "runs real Pi with the hook program against a stand-in Coral (its own HTTP server); the notice it asserts names the coral-board command (it matches startsCoral); starts no Coral",
+
+	// The release screenshot runner's board client (#11216): it runs the coral-board and coral-agent CLIs (which name a Coral in the match) against the run's own server, which run.sh starts with CORAL_TELEMETRY_DISABLED=1 (and seed.mjs puts in every child's environment); a CLI sends nothing itself.
+	"tests/release/screens/publish.mjs": "runs coral-board and coral-agent against the run's own server (started with CORAL_TELEMETRY_DISABLED=1 by run.sh); a CLI call sends no telemetry",
+	"tests/release/screens/stubs.mjs":   "the run's stand-in CLIs and the coral-board/coral-agent calls it makes against the run's own server (started with CORAL_TELEMETRY_DISABLED=1 by run.sh); starts no sender of its own",
+
 	// Checks the words of the phone dialog; the text "/coral setup-code/" is a regular expression it asserts is absent, not a command.
 	"tests/frontend/mobile_words.test.mjs": "imports mobile_words.js and checks its strings; '/coral setup-code/' is a regex pattern in an assertion (it matches startsCoral), starts no Coral",
 

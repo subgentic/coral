@@ -36,8 +36,8 @@ export async function renderServersInto(el, { source = isCloud() ? 'cloud' : 're
     let item = sources.get(source);
     if (!item) {
         const { serverView: view } = source === 'cloud'
-            ? await importOnce('./cloud_server_view.js', 'the server list')
-            : await importOnce('./registered_server_view.js', 'the server list');
+            ? await importOnce('./cloud_server_view.js', 'the computer list')
+            : await importOnce('./registered_server_view.js', 'the computer list');
         if (seq !== navSeq) return; // a stale import must not replace the active controller in the cache
         item = { source, view, controller: createServerController(serverSources[source], view) };
         sources.set(source, item);

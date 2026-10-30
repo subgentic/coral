@@ -28,7 +28,7 @@ function markNotHere(el, label) {
     const note = document.createElement('span');
     note.className = 'mb-not-here';
     note.title = 'This file was not sent with the message, so it is not stored on this computer.';
-    note.append(document.createTextNode(label), Object.assign(document.createElement('span'), { className: 'mb-not-here-note', textContent: ' (not on this machine)' }));
+    note.append(document.createTextNode(label), Object.assign(document.createElement('span'), { className: 'mb-not-here-note', textContent: ' (not on this computer)' }));
     el.replaceWith(note);
 }
 

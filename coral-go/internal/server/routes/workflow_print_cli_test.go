@@ -8,7 +8,7 @@ import (
 )
 
 // #3522: a non-interactive ("print") agent step runs only on a CLI verified for it (Claude
-// for now); another CLI is refused at save with a clear message, an interactive step on it
+// and Pi, #11293); another CLI is refused at save with a clear message, an interactive step on it
 // is allowed, and an unknown agent_type is refused.
 func TestValidateStepsPrintStepCLIs(t *testing.T) {
 	step := func(agent string, interactive bool) []json.RawMessage {
@@ -16,8 +16,10 @@ func TestValidateStepsPrintStepCLIs(t *testing.T) {
 			"agent": map[string]string{"agent_type": agent}})
 		return []json.RawMessage{b}
 	}
-	assert.Equal(t, "", validateSteps(step("claude", false), nil), "claude print steps are supported")
-	for _, cli := range []string{"codex", "gemini", "agy", "antigravity", "pi"} {
+	for _, cli := range []string{"claude", "pi"} {
+		assert.Equal(t, "", validateSteps(step(cli, false), nil), "%s print steps are supported", cli)
+	}
+	for _, cli := range []string{"codex", "gemini", "agy", "antigravity"} {
 		assert.Contains(t, validateSteps(step(cli, false), nil), "aren't supported for "+cli+" yet", cli)
 		assert.Equal(t, "", validateSteps(step(cli, true), nil), "%s: an interactive step is allowed", cli)
 	}

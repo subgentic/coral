@@ -1,14 +1,16 @@
 /* A red banner while local sign-in is off, and an amber one while no password is set (#10061) (#4291, Security's #4288): with CORAL_STRICT_LOCAL_AUTH=0 any program on this computer can use
  * Coral without a credential, and the person at the dashboard should know. GET /api/system/auth-status says so with strict_local_auth
  * (false); a missing field or an older server shows nothing, and the Coral Hub's view never does (the Hub is not this computer's door).
- * The banner has no close button: it goes when sign-in is turned back on. It is a note, only ever shown or hidden, never rewritten: the page start is quiet,
+ * The red sign-in-off banner has no close button: it goes when sign-in is turned back on. The amber no-password one can be dismissed, remembered on this browser (#11258). It is a note, only ever shown or hidden, never rewritten: the page start is quiet,
  * and when it appears after the first read its sentence is announced once, not again on the polls that find nothing changed (#10374). */
 import { isCloud } from './server_base.js';
 import { state } from './state.js';
 import { pollEvery } from './overload.js';
 import { importOnce } from './import_once.js';
+import { browserLocal } from './safe_storage.js';
 
 const CHECK_MS = 60000;
+const DISMISSED_KEY = 'coral-nopw-banner-dismissed'; // the amber no-password notice was dismissed on this browser (#11258); a password set clears it, so a later removal nudges again
 let started = false;
 let read = false; // the first answer is in: what appears after it is a change
 
@@ -30,7 +32,11 @@ export async function checkLocalAuthBanner() {
     const st = await authState();
     if (!st) return;
     const first = !read; read = true;
-    const show = st.off || st.noPassword;
+    if (!st.noPassword && !st.off && browserLocal.get(DISMISSED_KEY)) browserLocal.remove(DISMISSED_KEY); // a password is set: the next time there is none is a new situation
+    const dismissed = browserLocal.get(DISMISSED_KEY) === '1';
+    const show = st.off || (st.noPassword && !dismissed); // sign-in off is a risk and ignores the memory
+    const close = document.getElementById('local-auth-dismiss');
+    if (close && close.hidden === (st.noPassword && !st.off)) close.hidden = !(st.noPassword && !st.off);
     // Written only on a change (a poll that finds the same thing touches nothing); a note, so the page start is quiet (#10374)
     const words = st.off ? 'off' : 'nopw';
     for (const span of banner.querySelectorAll('[data-auth-state]')) { const want = span.dataset.authState !== words; if (span.hidden !== want) span.hidden = want; }
@@ -53,5 +59,6 @@ export function startLocalAuthBanner() {
     started = true;
     pollEvery(checkLocalAuthBanner, CHECK_MS);
     document.addEventListener('coral:password-changed', () => { checkLocalAuthBanner(); }); // a password was set or changed: the bar asks again at once
+    document.getElementById('local-auth-dismiss')?.addEventListener('click', () => { browserLocal.set(DISMISSED_KEY, '1'); checkLocalAuthBanner(); });
     return checkLocalAuthBanner();
 }

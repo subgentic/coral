@@ -81,7 +81,7 @@ const BASE = require('./test_base').BASE;
         await ev(`(async () => { window.__qa.status = 503; window.__qa.retryAfter = '3'; await fetch('/api/remote/box-b/api/qa-overload/act', { method: 'POST', body: '{}' }); return true; })()`);
         assert.equal(await ev(`window.__o.isPaused('box-b')`), true, 'that machine pauses');
         assert.equal(await ev(`window.__o.isPaused('')`), false, 'Coral itself does not');
-        await waitFor(`[...document.querySelectorAll('.toast .toast-message')].some(t => /That machine is busy or unreachable/.test(t.textContent))`, 'the machine message');
+        await waitFor(`[...document.querySelectorAll('.toast .toast-message')].some(t => /That computer is busy or unreachable/.test(t.textContent))`, 'the machine message');
         await ev(`window.__o._resetOverloadForTests(); true`);
         console.log('   ✓ machine-scoped pause and message');
 

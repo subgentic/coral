@@ -73,16 +73,28 @@ func main() {
 	}
 
 	count, _ := result["unread"].(float64)
-	hooks.DebugLog(fmt.Sprintf("message_check: project=%s unread=%d", hooks.LogID(project), int(count)))
+	hooks.DebugLog(fmt.Sprintf("message_check: project=%s unread=%d paused=%v", hooks.LogID(project), int(count), result["paused"] == true))
 
-	if int(count) > 0 {
-		plural := "s"
-		if int(count) == 1 {
-			plural = ""
-		}
-		fmt.Printf("\nYou have %d unread message%s on the message board. Run 'coral-board read' to see them.\n\n",
-			int(count), plural)
+	if text := unreadNotice(result); text != "" {
+		fmt.Print(text)
 	}
+}
+
+// unreadNotice is what the hook prints after a tool call: the unread count and how to read them, or "" when there is nothing to say. A paused board says nothing: its check answers the real count with
+// paused: true (#11198), and read delivers none of it until the board is resumed, so a line after every tool call would be a dead end repeated (QA's #11198 MUST).
+func unreadNotice(result map[string]any) string {
+	if paused, _ := result["paused"].(bool); paused {
+		return ""
+	}
+	count, _ := result["unread"].(float64)
+	if int(count) <= 0 {
+		return ""
+	}
+	plural := "s"
+	if int(count) == 1 {
+		plural = ""
+	}
+	return fmt.Sprintf("\nYou have %d unread message%s on the message board. Run 'coral-board read' to see them.\n\n", int(count), plural)
 }
 
 func loadBoardState() map[string]any {

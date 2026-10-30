@@ -94,11 +94,11 @@ function menuEntries(viewLabels = new Set()) {
     const out = [entry('home', 'Home', { action: 'm-go-home' })];
     out.push(entry('settings', 'Settings', { action: 'm-close-top-bar-settings-then-show-settings-modal' }), entry('palette', 'Themes', { action: 'm-close-top-bar-settings-then-show-theme-configurator' }));
     if (!cloud) out.push(entry('system_update', 'Check for updates', { action: 'm-close-top-bar-settings-then-check-for-updates' }));
-    if ((isHub() || cloud) && !viewLabels.has('Servers')) out.push(entry('dns', 'Servers', { action: 'm-close-top-bar-settings-then-show-servers-modal' })); // not twice: when the Servers view is one of the views above, two entries are named alike
+    if ((isHub() || cloud) && !viewLabels.has('Computers')) out.push(entry('dns', 'Computers', { action: 'm-close-top-bar-settings-then-show-servers-modal' })); // not twice: when the Servers view is one of the views above, two entries are named alike
     const account = document.getElementById('cloud-account-menu');
     if (account) for (const item of account.querySelectorAll('a.overflow-menu-item, button.overflow-menu-item')) {
         const label = item.textContent.trim();
-        if (label === 'Servers') continue; // already above
+        if (label === 'Computers') continue; // already above
         out.push(entry(label === 'Sign out' ? 'lock' : label === 'Account' ? 'account_circle' : 'open_in_new', label, { onClick: () => item.click() })); // the account menu's own handler, so Sign out clears the drafts first
     }
     return out;
@@ -117,7 +117,7 @@ function closeMenu() {
 function openMenu(btn) {
     const menu = document.getElementById('nav-more-menu');
     if (!menu) return;
-    const hamburger = btn.id === 'top-menu-btn';
+    const hamburger = btn.id === 'top-menu-btn' || btn.hasAttribute('data-hamburger'); // the agent row's menu button is the same menu (#11056)
     const all = hamburger || btn.hasAttribute('data-nav-all');
     const items = all ? availableTabs() : _more;
     if (!items.length) return;
@@ -130,9 +130,15 @@ function openMenu(btn) {
     } else menu.replaceChildren(...items.map(makeItem));
     menu.hidden = false;
     const r = btn.getBoundingClientRect();
-    menu.style.top = Math.round(r.bottom + 6) + 'px';
-    menu.style.bottom = 'auto';
-    menu.style.maxHeight = Math.max(120, window.innerHeight - Math.round(r.bottom + 6) - 8) + 'px'; // never taller than the room under its button: on a short phone the last item (Sign out) was 30 px off the screen (#10767); .nav-more-menu scrolls
+    if (btn.hasAttribute('data-menu-up')) { // the phone's floating nav (#11116): the menu opens above its button, never taller than the room over it
+        menu.style.top = 'auto';
+        menu.style.bottom = Math.round(window.innerHeight - r.top + 6) + 'px';
+        menu.style.maxHeight = Math.max(120, Math.round(r.top - 6) - 8) + 'px';
+    } else {
+        menu.style.top = Math.round(r.bottom + 6) + 'px';
+        menu.style.bottom = 'auto';
+        menu.style.maxHeight = Math.max(120, window.innerHeight - Math.round(r.bottom + 6) - 8) + 'px'; // never taller than the room under its button: on a short phone the last item (Sign out) was 30 px off the screen (#10767); .nav-more-menu scrolls
+    }
     if (all) { menu.style.left = '8px'; menu.style.right = '8px'; }
     else { menu.style.left = 'auto'; menu.style.right = Math.max(8, window.innerWidth - r.right) + 'px'; }
     btn.setAttribute('aria-expanded', 'true');
@@ -173,14 +179,15 @@ function layoutSelect() {
     const words = cur ? cur.label : (hiddenOn ? (hiddenOn.dataset.label || hiddenOn.textContent).trim() : '');
     label.textContent = words;
     const top = document.getElementById('top-menu-label'); if (top) top.textContent = words;
-    const hamburger = document.getElementById('top-menu-btn');
+    for (const hamburger of document.querySelectorAll('#top-menu-btn, [data-hamburger]:not([data-account])')) { // (the phone's account button opens the same menu under its own name) // the top bar's and, under 640 px while an agent is open, the agent row's (#11056): one menu, one name
     if (hamburger) {
         // What waits for the person is the Inbox tab's own name ("Inbox, 3 waiting for input", set by inbox_tab.js): the closed bar shows a dot for it and the button's name says it in the same words (#9829)
         const waits = ((document.getElementById('nav-tab-hub-inbox') || {}).getAttribute?.('aria-label') || '').replace(/^Inbox, /, '');
         hamburger.setAttribute('aria-label', (words ? `${words}, menu` : 'Menu') + (waits ? `, ${waits}` : '')); // its name has the words it shows: the open view first (#9116)
         if (hamburger.hasAttribute('data-waiting') !== !!waits) hamburger.toggleAttribute('data-waiting', !!waits);
     }
-    if (_menuFor && (_menuFor.id === 'nav-select' && !isPhone() || _menuFor.id === 'top-menu-btn' && !window.matchMedia('(max-width: 639px)').matches)) closeMenu();
+    }
+    if (_menuFor && (_menuFor.id === 'nav-select' && !isPhone() || (_menuFor.id === 'top-menu-btn' || _menuFor.hasAttribute('data-hamburger')) && !window.matchMedia('(max-width: 639px)').matches)) closeMenu();
 }
 
 let _scheduled = 0;
@@ -228,6 +235,8 @@ if (typeof document !== 'undefined') {
                 const button = _menuFor; closeMenu();
                 const a = document.activeElement; // a choice gives the focus back to the button, unless what it opened (a dialog) has taken it (#9116)
                 if (button && (!a || a === document.body || !a.getClientRects().length)) button.focus(); // (a view's own switch may have focused a control the phone does not draw: the dropdown or a tab)
+                // the agent row's menu button goes with the agent's page when the view changes: the top bar's takes the focus then (#11056)
+                if (button && button.hasAttribute('data-hamburger') && button.id !== 'top-menu-btn') setTimeout(() => { if (!button.getClientRects().length && (!document.activeElement || document.activeElement === document.body)) document.getElementById('top-menu-btn')?.focus(); }, 0);
             } else if (!e.target.closest('#nav-more-menu, [data-on-click="m-nav-more"], [data-on-click="m-top-menu"]')) closeMenu();
         });
         document.addEventListener('keydown', e => {

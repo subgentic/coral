@@ -304,7 +304,7 @@ registerGroupSource('automations', {
     keys: () => FOLDERS.map(f => f.key),
     redraw: () => renderNav(true),
     table: key => (folderOf(key) ? folderTable(key) : null),
-    lead: () => ({ signature: JSON.stringify([folder, sections()]), node: () => VL.build({ id: 'automations-folders-page', label: 'Automations folders', sections: sections(), current: folder, onPick: pickFolder }) }), // a phone: the folders are one select on top of the table
+    lead: () => ({ signature: JSON.stringify([folder, sections()]), node: () => VL.build({ id: 'automations-folders-page', label: 'Automations folders', sections: sections(), current: folder, onPick: pickFolder, tabs: true }) }), // a phone: the folders are one select on top of the table
     isEmpty: () => false, // the tab opens its folder itself (showAutomationsTab)
     showList: () => window.switchNavTab?.('automations'),
     empty: () => window.switchNavTab?.('automations'),

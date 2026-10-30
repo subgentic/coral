@@ -5,7 +5,6 @@ package startup
 import (
 	"context"
 	"net"
-	"os"
 	"strconv"
 	"syscall"
 	"testing"
@@ -13,6 +12,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/windows"
+
+	"github.com/subgentic/coral/internal/netbindtest"
 )
 
 // reuseAddrLC listens with SO_REUSEADDR, which on Windows lets a socket bind an address and port another socket already holds,
@@ -27,17 +28,13 @@ var reuseAddrLC = net.ListenConfig{Control: func(_, _ string, c syscall.RawConn)
 	return serr
 }}
 
-// wildcardBinds: the cases that listen on 0.0.0.0 and [::] run only on request, since a first listen on every interface makes
-// Windows Firewall ask about the test binary (a new path at every build) on the person's desktop.
-func wildcardBinds() bool { return os.Getenv("CORAL_TEST_WILDCARD_BIND") == "1" }
-
 // #224 (reproduced live by the Security Reviewer): another socket on Coral's port takes this computer's connections to it,
 // either by binding the same address with SO_REUSEADDR or, with Coral on 0.0.0.0, by binding the more specific 127.0.0.1 (the
 // more specific address wins). Coral's listeners hold their port exclusively: both are refused while Coral runs.
 func TestNobodyBindsCoralsPortWhileItRuns(t *testing.T) {
 	type bind struct{ coral, other string }
 	cases := []bind{{"127.0.0.1", "127.0.0.1"}, {"[::1]", "[::1]"}}
-	if wildcardBinds() {
+	if netbindtest.Allowed() { // 0.0.0.0 and [::]: a Windows Firewall prompt for the test binary, so only on CI or on request
 		cases = append(cases, bind{"0.0.0.0", "127.0.0.1"}, bind{"[::]", "[::1]"})
 	}
 	for _, c := range cases {
@@ -75,12 +72,10 @@ func TestCoralsListenerHoldsItsPortExclusively(t *testing.T) {
 	assert.Equal(t, 1, val, "Coral's listener holds its port exclusively")
 }
 
-// The takeover itself, both ways (on request: CORAL_TEST_WILDCARD_BIND=1): a plain 0.0.0.0 listener lets a second socket bind
+// The takeover itself, both ways (on CI or on request: CORAL_TEST_NETWORK_BIND=1): a plain 0.0.0.0 listener lets a second socket bind
 // the more specific 127.0.0.1 of its port, the one Coral now refuses.
 func TestWithoutExclusiveTheMoreSpecificBindGetsIn(t *testing.T) {
-	if !wildcardBinds() {
-		t.Skip("listens on 0.0.0.0 (a Windows Firewall prompt for the test binary): set CORAL_TEST_WILDCARD_BIND=1")
-	}
+	netbindtest.Require(t) // listens on 0.0.0.0
 	plain, err := net.Listen("tcp", "0.0.0.0:0")
 	require.NoError(t, err)
 	defer plain.Close()

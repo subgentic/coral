@@ -95,8 +95,8 @@ func TestPiIndexerKeepsTheFirstUserMessage(t *testing.T) {
 	p := filepath.Join(t.TempDir(), "pi.jsonl")
 	writeLines(t, p,
 		`{"type":"session","id":"pi-6207"}`,
-		`{"type":"message","role":"assistant","content":"hello","timestamp":"2026-10-23T00:00:00Z"}`,
-		`{"type":"message","role":"user","content":"what can you do?","timestamp":"2026-10-23T00:00:01Z"}`)
+		`{"type":"message","timestamp":"2026-10-23T00:00:00Z","message":{"role":"assistant","content":[{"type":"text","text":"hello"}]}}`,
+		`{"type":"message","timestamp":"2026-10-23T00:00:01Z","message":{"role":"user","content":[{"type":"text","text":"what can you do?"}]}}`)
 	s, err := parsePiSession(p, 1)
 	require.NoError(t, err)
 	require.NotNil(t, s)

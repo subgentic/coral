@@ -28,7 +28,7 @@ type sendIdentity struct {
 // runSend posts a cross-team message to another board's Orchestrator.
 //
 //	coral-board send --board <target> [--to <orchestrator>] [--reply-to <message id>] [--attach coral://artifacts/<id> ...] "<message>"
-//	coral-board send --address <server>/<team> [--reply-to <message id>] [--message-id <id>] [--attach coral://artifacts/<id> ...] "<message>"
+//	coral-board send --address <computer>/<team> [--reply-to <message id>] [--message-id <id>] [--attach coral://artifacts/<id> ...] "<message>"
 //
 // The server checks that the sender is an Orchestrator on its board (or the
 // Operator), that both boards allow cross-team messaging, and the rate limit. With
@@ -181,7 +181,7 @@ func cmdSend() {
 // runRelaySend sends message to another Coral through Coral Hub (#3489).
 func runRelaySend(id sendIdentity, address, replyTo, messageID, message string, attach []string, out io.Writer) error {
 	if message == "" {
-		return fmt.Errorf(`usage: coral-board send --address <server>/<team> [--reply-to <message id>] [--message-id <id>] "<message>"`)
+		return fmt.Errorf(`usage: coral-board send --address <computer>/<team> [--reply-to <message id>] [--message-id <id>] "<message>"`)
 	}
 	if id.Board == "" {
 		return fmt.Errorf("not subscribed to a board. Run: coral-board join <project> --as <role>")

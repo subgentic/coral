@@ -1,5 +1,5 @@
 // QA (#5487): the expanded machine row, rendered from the page's own code for the cases a person meets: an online remote with an update available and a dev build version, one that must update,
-// an offline one, and the hub's own machine. At a 380 px phone and a 1280 px desktop, in both themes: one launch row (Launch agent first, Launch team, Open in Servers as a text link; Open folder only
+// an offline one, and the hub's own machine. At a 380 px phone and a 1280 px desktop, in both themes: one launch row (Launch agent first, Launch team, Open in Computers as a text link; Open folder only
 // on the hub's own machine, a hint elsewhere), exactly one Update control, no Collapse/Expand button, the version cut before "+" with the full build in its tooltip and name, nothing wider than the
 // viewport, and every control keyboard-reachable and named. With QA_SHOTS=<dir> it also saves a screenshot of each menu.
 const assert = require('node:assert/strict');
@@ -76,7 +76,7 @@ const SERVERS = [
                     if (id === 'm3') check(`${tag}: an offline machine's launch buttons are disabled and the reason is said once`, r.launch.every(x => x.disabled) && (r.text.match(/unavailable \(offline\)/g) || []).length === 1, r.text.slice(0, 120));
                     if (id !== 'm3') check(`${tag}: an online machine's launch buttons are enabled`, r.launch.every(x => !x.disabled));
                     check(`${tag}: Launch agent is first`, r.launch[0] && r.launch[0].kind === 'agent');
-                    check(`${tag}: Open in Servers is a text link-style control after the buttons`, r.open && r.open.text === 'Open in Servers');
+                    check(`${tag}: Open in Computers is a text link-style control after the buttons`, r.open && r.open.text === 'Open in Computers');
                     check(`${tag}: no Collapse or Expand button in the panel`, !r.hasCollapse);
                     check(`${tag}: nothing wider than the viewport (panel ${r.panel.l}..${r.panel.r} of ${r.vw})`, !r.overflowX && !r.docOverflow && r.panel.l >= 0 && r.panel.r <= r.vw);
                     const mids = r.launch.map(x => x.box).map(b => (b.t + b.b) / 2); const rows = new Set(); mids.forEach(m => { if (![...rows].some(x => Math.abs(x - m) < 12)) rows.add(m); });
@@ -93,7 +93,7 @@ const SERVERS = [
             }
         }
         check(`the two themes are really different (${JSON.stringify(bg)})`, bg.light && bg.dark && bg.light !== bg.dark);
-        // keyboard: Tab reaches Launch agent, Launch team, then Open in Servers, in that order
+        // keyboard: Tab reaches Launch agent, Launch team, then Open in Computers, in that order
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         const order = await ev(`(() => { const d = document.querySelector('li.server-group-header[data-server-group="m4"] details[data-server-details]'); d.open = true; const p = d.querySelector('.server-switcher-panel');
             return [...p.querySelectorAll('button, a, [tabindex="0"]')].map(b => b.dataset.serverLaunch || (b.dataset.serverOpen !== undefined ? 'open' : b.className)); })()`);

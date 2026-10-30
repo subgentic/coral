@@ -275,6 +275,50 @@ func TestMacWaitsForCoralToEndAndNeverStopsIt(t *testing.T) {
 	assert.True(t, m.WaitCoralGone(context.Background(), install))
 }
 
+// #11151: the operator's in-app update 2.0.3 -> 2.0.5 quit Coral and installed nothing. Coral's own tmux server (the agents' terminals, started from the bundle, outliving Coral on
+// purpose) was counted as "Coral still running", so the wait ended after two minutes with coral_running, and nobody was told.
+func TestMacTheBundledTmuxServerIsNotCoralRunning(t *testing.T) {
+	proc := func(pid int, cmd string) string { return strings.Repeat(" ", 3) + itoa(pid) + " " + cmd + "\n" }
+	m, fr, install := newMac(t)
+	m.Self = 777
+	m.WaitFor = 50 * time.Millisecond
+	m.Sleep = func(time.Duration) { time.Sleep(20 * time.Millisecond) }
+	tmux := proc(7135, install+"/Contents/MacOS/tmux -S /Users/me/.coral/tmux.sock -f /dev/null new-session -d -P -F #{pane_pid} -s claude-1")
+	fr.answers[psTool] = proc(777, install+"/Contents/MacOS/coral-update apply") + tmux
+	assert.True(t, m.WaitCoralGone(context.Background(), install), "the tmux server keeps running while Coral is replaced")
+	assert.False(t, m.Running(install))
+
+	// A program of the install whose name only starts with tmux is Coral's.
+	m, fr, install = newMac(t)
+	m.WaitFor = 50 * time.Millisecond
+	m.Sleep = func(time.Duration) { time.Sleep(20 * time.Millisecond) }
+	fr.answers[psTool] = proc(9, install+"/Contents/MacOS/tmux-helper")
+	assert.False(t, m.WaitCoralGone(context.Background(), install))
+
+	// The new install is up only when a program of it other than tmux is: the old tmux must not stand for it.
+	m, fr, install = newMac(t)
+	m.HealthFor = 100 * time.Millisecond
+	m.Sleep = func(time.Duration) { time.Sleep(5 * time.Millisecond) }
+	fr.answers[psTool] = tmux
+	assert.Error(t, m.Healthy(context.Background(), install), "only tmux is running: the new Coral did not start")
+	fr.answers[psTool] = tmux + proc(100, install+"/Contents/MacOS/coral-tray")
+	m.HealthFor = time.Second
+	assert.NoError(t, m.Healthy(context.Background(), install))
+}
+
+// #11155: a process list that could not be read is not "nothing runs".
+func TestMacAPsErrorIsNeverNothingRunning(t *testing.T) {
+	m, fr, install := newMac(t)
+	fr.fail = map[string]error{psTool: errors.New("ps: operation not permitted")}
+	assert.False(t, m.NothingRunning(install), "the look failed")
+	assert.False(t, m.Running(install))
+	fr.fail = nil
+	fr.answers[psTool] = " 1 /sbin/launchd\n"
+	assert.True(t, m.NothingRunning(install), "read, and nothing of the install in it")
+	fr.answers[psTool] = " 100 " + install + "/Contents/MacOS/coral\n"
+	assert.False(t, m.NothingRunning(install))
+}
+
 func itoa(n int) string {
 	return strings.TrimSpace(strings.Join(strings.Fields(strings.Repeat(" ", 0)+fmtInt(n)), ""))
 }

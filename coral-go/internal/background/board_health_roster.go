@@ -184,7 +184,11 @@ func (m *BoardHealthMonitor) buildRoster(ctx context.Context, in rosterInputs) (
 // at the next scan, and one that went out is recorded so a restart never repeats it).
 func (m *BoardHealthMonitor) escalateWaits(ctx context.Context, project string) {
 	waits, err := m.store.ListActiveWaits(ctx, project)
-	if err != nil || len(waits) == 0 {
+	if err != nil {
+		return
+	}
+	m.endFinishedWaitEscalations(ctx, project, waits)
+	if len(waits) == 0 {
 		return
 	}
 	subs, err := m.store.ListSubscribers(ctx, project)
@@ -222,5 +226,23 @@ func (m *BoardHealthMonitor) escalateWaits(ctx context.Context, project string) 
 			continue
 		}
 		_ = m.store.MarkHealthEscalated(ctx, project, ruleWaitEscalation, target.sub.SubscriberID, subject, now)
+	}
+}
+
+// endFinishedWaitEscalations ends a wait's escalation when the wait is no longer active (answered, cancelled or expired), so the next wait of the same agent on the same party is a new one and is told
+// once. The health pass's endFinishedEscalations leaves these counters alone: their subject is a wait's id, not a task's (#11180).
+func (m *BoardHealthMonitor) endFinishedWaitEscalations(ctx context.Context, project string, active []board.RegisteredWait) {
+	esc, err := m.store.HealthEscalations(ctx, project)
+	if err != nil {
+		return
+	}
+	live := map[string]bool{}
+	for _, w := range active {
+		live[fmt.Sprint(w.ID)] = true
+	}
+	for _, e := range esc {
+		if e.Rule == ruleWaitEscalation && !live[e.Subject] {
+			_ = m.store.ResetHealthCounter(ctx, project, e.Rule, e.Target, e.Subject)
+		}
 	}
 }

@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/subgentic/coral/internal/executil"
 	"github.com/subgentic/coral/internal/startup"
 )
 
@@ -122,6 +123,7 @@ func Build(t *testing.T, dir string, tags ...string) (path string, ok bool) {
 	}
 	args = append(args, "-o", bin, ".")
 	cmd := exec.Command("go", args...)
+	executil.HideWindow(cmd)
 	cmd.Dir = dir
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Logf("not built here: %v\n%s", err, out)
