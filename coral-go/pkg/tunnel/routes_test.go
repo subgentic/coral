@@ -823,8 +823,27 @@ func TestArtifactCommentRoutesThroughTheHub(t *testing.T) {
 		_, m := OwnerRoute(c.method, c.path)
 		assert.Equal(t, OwnerRefuse, m, c.method+" "+c.path+" is the owner's alone")
 	}
+	// The owner's edit, delete, lock and unlock are Interact, and the change-request send is Launch (it types the owner's words into an agent), all the owner's alone (#11354).
+	for _, c := range []struct {
+		method, path string
+		tier         Tier
+	}{{"PATCH", base + "/7", TierInteract}, {"DELETE", base + "/7", TierInteract}, {"PUT", base + "/lock", TierInteract}, {"DELETE", base + "/lock", TierInteract}, {"POST", base + "/7/send", TierLaunch}} {
+		assert.Equal(t, c.tier, Classify(c.method, c.path, ""), c.method+" "+c.path)
+		assert.False(t, AllowRequest(func() Mode { return TierView })(c.method, c.path, ""), c.method+" "+c.path+" at view")
+		assert.True(t, AllowRequest(func() Mode { return TierLaunch })(c.method, c.path, ""), c.method+" "+c.path+" at launch")
+		assert.Equal(t, c.tier == TierLaunch, AllowRequest(func() Mode { return TierLaunch })(c.method, c.path, "") && !AllowRequest(func() Mode { return TierInteract })(c.method, c.path, ""), c.method+" "+c.path+": only Launch admits the send")
+		_, m := OwnerRoute(c.method, c.path)
+		assert.Equal(t, OwnerRefuse, m, c.method+" "+c.path+" is the owner's alone")
+	}
+	// The owner's version list and series reads (View).
+	for _, p := range []string{"/api/artifacts/" + hex + "/versions", "/api/artifacts/series/s-1", "/api/artifacts/series/s-1/versions"} {
+		assert.Equal(t, TierView, Classify("GET", p, ""), p)
+		_, m := OwnerRoute("GET", p)
+		assert.Equal(t, OwnerRefuse, m, p)
+	}
+	assert.Equal(t, TierNever, Classify("DELETE", "/api/artifacts/series/s-1", ""), "deleting a whole series stays unlisted")
 	for _, c := range []struct{ method, path string }{
-		{"PATCH", base + "/7"}, {"DELETE", base + "/7"}, {"POST", base + "/7/send"}, {"POST", base + "/7/reply"}, {"PUT", base + "/lock"}, {"DELETE", base + "/lock"},
+		{"POST", base + "/7/reply"},
 		{"PUT", base}, {"POST", base + "/lock"},
 	} {
 		for _, mode := range []Tier{TierView, TierInteract, TierLaunch} {

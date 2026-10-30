@@ -1,14 +1,13 @@
 // Send to agent: the picker inside a comment card, and what came of the ask (split out of attachComments, #8376).
 import { importOnce } from './import_once.js';
 import { scrollBehavior } from './motion.js';
-import { isCloud } from './server_base.js';
 const api = await importOnce('./artifact_comments_api.js');
 const askUi = await importOnce('./artifact_comment_send.js');
 
 /** The ask state and actions of one comments panel: `st` is the panel's state (`st.ask` is the open picker), the rest are its draw and announce hooks. */
 export function createAsk({ st, panel, render, announce, refresh, ownHex }) {
     const askedBy = new Map(); // comment id -> Map(agent role, lowercase -> words): who was asked into a thread from this panel (the server refuses a second ask of an open one, and says so)
-    const canAsk = (c) => !isCloud() && !!st.board && !!st.data?.canLock && !c.deleted && !c.resolved && c.parentId == null;
+    const canAsk = (c) => !!st.board && !!st.data?.canLock && !c.deleted && !c.resolved && c.parentId == null;
     const askedOf = (id) => askedBy.get(id) || (askedBy.set(id, new Map()), askedBy.get(id));
     // Who is asked into this thread: what the server's list says (an ask that is still open, with how many times the agent has replied: it survives a reload) and what this page sent since (the newest words).
     function askedNow(id) {

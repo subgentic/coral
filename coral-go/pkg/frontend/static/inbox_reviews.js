@@ -1,7 +1,7 @@
 /* Review artifacts use the same owner-protected team list and tags routes as Artifacts.
  * After the Inbox first opens, keep its badge updated on other tabs without eager startup reads. */
 import { fetchProjects } from './board_fetch.js';
-import { boardFetch, isCloud, keyLabel, splitKey } from './server_base.js';
+import { boardFetch, keyLabel, splitKey } from './server_base.js';
 
 let items = [], errors = [], pending = null, lastRead = 0, revision = 0, changed = () => {};
 let activated = false;
@@ -26,7 +26,6 @@ export function reviewGroups(rows) {
 
 /** Refresh in bounded pages, coalescing feed updates. Failed teams retain their last known rows. */
 export function refreshReviews(force = false) {
-    if (isCloud()) return null;
     // showInbox requests a forced read; badge/feed updates alone must not start the project scan.
     if (force) activated = true;
     if (!activated) return null;
@@ -112,7 +111,7 @@ const reading = new Map(); // hex -> the write in flight, so the viewer and the 
 /** The operator opened an artifact (the viewer, a preview, a link): when it is one of the for-review artifacts, tag it read. Any other artifact is never tagged. Resolves when it is done; rejects with the server's words. */
 export function markOpenedRead(hex) {
     hex = String(hex || '').toLowerCase();
-    if (!hex || isCloud()) return Promise.resolve();
+    if (!hex) return Promise.resolve();
     if (reading.has(hex)) return reading.get(hex);
     const p = (async () => {
         if (!activated) await refreshReviews(true); else if (pending) await pending;

@@ -1,7 +1,7 @@
 /* The Operator's review of an artifact a team tagged "for review" (#136584, #136588), in the artifact viewer: Approve (the row leaves Needs you, the uploading agent is told) and Request changes (a comment
  * on the whole document, sent to the uploader through the comments' own Send to agent, and the row stays in Needs you as "changes requested"). The state is read from the team's artifact list (its tags and,
- * once decided, the time); the buttons show only for a pending one; through Coral Hub the owner has Approve (Request changes needs the comment send, which stays on this computer). */
-import { boardFetch, identityKey, isCloud } from './server_base.js';
+ * once decided, the time); the buttons show only for a pending one; through Coral Hub the owner has both: the change-request send is the owner's too (#11354). */
+import { boardFetch, identityKey } from './server_base.js';
 import { showToast } from './utils.js';
 import { importOnce } from './import_once.js';
 const { createComment, sendComment } = await importOnce('./artifact_comments_api.js'); // lazy, as the viewer's other modules: a failure is retried
@@ -118,7 +118,6 @@ export function attachReview(d, { reload }) {
             try { s = await reviewStateOf(team, hex); } catch { s = null; }
             if (g !== gen || !s) return;
             show({ ...s, team, hex, server: opts.server, name: opts.board });
-            changes.hidden = changes.hidden || isCloud(); // through Coral Hub the comment's send to an agent is not available: Request changes is on this computer
             if (opts.requestChanges && !opts.switched && !done && (s.state === 'pending' || s.state === 'changes')) openForm(true); // not on the reload after a send: the form stays closed
         },
         close() { gen++; show(null); form.hidden = true; },
