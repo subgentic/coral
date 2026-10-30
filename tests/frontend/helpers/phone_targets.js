@@ -116,7 +116,9 @@ const SCALE = `(() => {
     const d = e => e.tagName.toLowerCase() + (e.id ? '#' + e.id : '') + (typeof e.className === 'string' && e.className.trim() ? '.' + e.className.trim().split(/\\s+/)[0] : '');
     const txt = e => (e.getAttribute('aria-label') || e.textContent || '').replace(/\\s+/g, ' ').trim().slice(0, 40);
     const out = { hscroll: null, offscreen: [], overlap: [], clipped: [], n: 0 };
-    const de = document.documentElement, W = navigator.maxTouchPoints > 0 ? Math.min(innerWidth, screen.width || innerWidth) : innerWidth; // a phone's layout width can grow to fit wide content: its screen's width is what a person has
+    // a phone's layout width can grow to fit wide content: its screen's width is what a person has. A phone is touch emulation's coarse pointer, not navigator.maxTouchPoints: a computer with a touch
+    // screen keeps that above 0 with emulation off, and headless Chrome's screen is 800 px wide, so a 1280 px desktop was measured as cut off at 800
+    const de = document.documentElement, W = matchMedia('(pointer: coarse)').matches ? Math.min(innerWidth, screen.width || innerWidth) : innerWidth;
     if (de.scrollWidth > W + 1) out.hscroll = de.scrollWidth + ' > ' + W;
     const scrolls = e => { for (let p = e.parentElement; p && p !== document.body; p = p.parentElement) { const cs = getComputedStyle(p); if (/(auto|scroll)/.test(cs.overflowX) && p.scrollWidth > p.clientWidth) return true; } return false; };
     const controls = [];

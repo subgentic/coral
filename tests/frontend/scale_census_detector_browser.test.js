@@ -34,6 +34,19 @@ const { SCALE, scaleOf } = require('./helpers/phone_targets');
         const after = await scaleOf(ev, 'made page');
         assert.ok(after.fixed.some(f => /Fixed size/.test(f)), 'text in px that ignores the root font is found: ' + JSON.stringify(after.fixed));
         // (a label that exists only at the larger size has no 16 px twin to compare with: it is not a pair, and not a pass by silence either: the 13px one beside it is still reported above)
-        console.log('PASS the 200% detector finds a cut label, an overlap, a control past the edge, a wide row and text that did not grow, and nothing on the dashboard itself');
+        // a desktop on a computer with a touch screen (#352): touch emulation off, but navigator.maxTouchPoints above 0 and a screen narrower than the window (headless Chrome's is 800 px). The edge is
+        // the window's: a control at 1100 px is on screen, one past 1280 is not
+        await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, screenWidth: 800, screenHeight: 600, deviceScaleFactor: 1, mobile: false });
+        await Emulation.setTouchEmulationEnabled({ enabled: false });
+        await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
+        await ev(`(() => { Object.defineProperty(Navigator.prototype, 'maxTouchPoints', { get: () => 10, configurable: true });
+            for (const [t, l] of [['Inside', 1100], ['Outside', 1250]]) { const b = document.createElement('button'); b.textContent = t; b.style.cssText = 'position:fixed;top:300px;width:100px;height:40px;z-index:99999;left:' + l + 'px'; document.body.appendChild(b); }
+            document.documentElement.style.fontSize = '32px'; return true; })()`);
+        await new Promise(r => setTimeout(r, 400)); // sleep-ok: the page reflows at the new size
+        assert.deepEqual(await ev(`[navigator.maxTouchPoints, screen.width, innerWidth]`), [10, 800, 1280], 'the touch-screen desktop is what is measured');
+        const desk = await ev(SCALE);
+        assert.ok(desk.offscreen.some(o => /Outside/.test(o)), 'a control past the window is found: ' + JSON.stringify(desk));
+        assert.ok(!desk.offscreen.some(o => /Inside/.test(o)) && !desk.hscroll, 'nothing inside the window is cut off at the screen\'s 800 px: ' + JSON.stringify(desk));
+        console.log('PASS the 200% detector finds a cut label, an overlap, a control past the edge, a wide row and text that did not grow, and nothing on the dashboard itself; on a touch-screen desktop the edge is the window\'s');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
