@@ -2,6 +2,8 @@ package frontend
 
 import (
 	"bytes"
+	"compress/gzip"
+	"encoding/gob"
 	"errors"
 	"io"
 	"io/fs"
@@ -244,5 +246,22 @@ func TestEncodePrebuiltIsTheSameBytesEveryTime(t *testing.T) {
 	}
 	if hash != "hash" || len(got.Files) != len(b.Files) || len(got.LazySkipped) != len(b.LazySkipped) || got.LazySkipped["s.js"].Error() != "why " {
 		t.Fatalf("the bundle did not decode back to what was encoded: %d files, %d skipped", len(got.Files), len(got.LazySkipped))
+	}
+}
+
+// A stream that names a file twice is refused, not read with the later copy winning (Security's SHOULD on #11299): the decode builds a map from the entries.
+func TestDecodePrebuiltRefusesAFileNamedTwice(t *testing.T) {
+	files := []prebuiltEntry{{Name: "app.js", Bytes: []byte("one")}, {Name: "app.js", Bytes: []byte("two")}}
+	var buf bytes.Buffer
+	zw := gzip.NewWriter(&buf)
+	pf := prebuiltFile{Hash: "h", Sum: "anything", Files: files}
+	if err := gob.NewEncoder(zw).Encode(&pf); err != nil {
+		t.Fatal(err)
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := DecodePrebuilt(bytes.NewReader(buf.Bytes())); err == nil || !strings.Contains(err.Error(), "twice") {
+		t.Fatalf("a bundle naming app.js twice was not refused for that: %v", err)
 	}
 }
