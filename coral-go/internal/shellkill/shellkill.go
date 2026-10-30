@@ -305,6 +305,24 @@ var wrapperOptionValues = map[string]map[string]bool{
 	"stdbuf":  set("-i", "--input", "-o", "--output", "-e", "--error"),
 }
 
+// optionTakesNextWord is whether the option word w of a wrapper is followed by its value as the next word: a listed option by itself (-u, --user), or a cluster of short options whose last letter takes a
+// value ("sudo -nu root", "sudo -Eu root"); a value attached in the cluster ("-uroot", "-nuroot") is not another word.
+func optionTakesNextWord(wrapper, w string) bool {
+	opts := wrapperOptionValues[wrapper]
+	if opts[w] {
+		return true
+	}
+	if len(w) < 3 || w[0] != '-' || w[1] == '-' {
+		return false
+	}
+	for i := 1; i < len(w); i++ {
+		if opts["-"+string(w[i])] {
+			return i == len(w)-1 // the letter ends the cluster: its value is the next word; else the rest of the cluster is its value
+		}
+	}
+	return false
+}
+
 func set(words ...string) map[string]bool {
 	m := make(map[string]bool, len(words))
 	for _, w := range words {
@@ -335,7 +353,7 @@ func programIndex(c cmd) int {
 			i++
 			for i < len(c.words) && (strings.HasPrefix(c.words[i], "-") || isNumber(c.words[i]) || strings.Contains(c.words[i], "=")) {
 				// An option that takes its own value ("sudo -u root", "env -u NAME", "timeout -s KILL 10", "ionice -c 3") eats the next word: it is not the program (QA's #11179).
-				takes := wrapperOptionValues[wrapper][c.words[i]]
+				takes := optionTakesNextWord(wrapper, c.words[i])
 				i++
 				if takes && i < len(c.words) {
 					i++
@@ -412,7 +430,7 @@ func base(w string) string {
 	return w
 }
 
-// durationRe is a number a wrapper takes: timeout's duration (10, 1.5, 30s, 5m, 2h, 1d) and nice's adjustment. It needs a digit: a word of letters like "sh" or "mh" is a program, not a duration.
-var durationRe = regexp.MustCompile(`^[0-9]+(\.[0-9]+)?[smhd]?$`)
+// durationRe is a number a wrapper takes: timeout's duration (10, 1.5, .5, 5., 30s, 5.s, 5m, 2h, 1d) and nice's adjustment. It needs a digit: a word of letters like "sh" or "mh" is a program, not a duration.
+var durationRe = regexp.MustCompile(`^([0-9]+(\.[0-9]*)?|\.[0-9]+)[smhd]?$`)
 
 func isNumber(s string) bool { return durationRe.MatchString(s) }

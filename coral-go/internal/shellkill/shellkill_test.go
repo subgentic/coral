@@ -203,3 +203,38 @@ func TestShellScriptsAfterAWrapperAreReadLikeBash(t *testing.T) {
 		assert.Empty(t, PatternKill(c), c)
 	}
 }
+
+// QA's and Security's #11204 follow-ups: a duration may be written .5 or 5. or 5.s, and a cluster of short options ending in an option that takes a value ("sudo -nu root", "sudo -Eu root") takes the next
+// word; a value attached in the cluster ("-uroot") takes none.
+func TestDurationsAndOptionClustersOfWrappers(t *testing.T) {
+	for _, d := range []string{"10", "1.5", ".5", "5.", "5.s", "30s", "5m", "2h", "1d", "0.5m"} {
+		assert.True(t, isNumber(d), d)
+	}
+	for _, d := range []string{"", ".", "s", "sh", "mh", "5x", "1.2.3", "--5", "ms"} {
+		assert.False(t, isNumber(d), d)
+	}
+	for _, c := range []string{
+		`timeout .5 pkill -f x`,
+		`timeout 5. pkill x`,
+		`timeout 5.s killall node`,
+		`sudo -nu root pkill -f x`,
+		`sudo -Eu root killall node`,
+		`sudo -nEu me pkill x`,
+		`sudo -uroot pkill x`,
+		`sudo -nuroot pkill x`,
+		`env -iu A pkill x`,
+		`sudo -Eu root sh -c "pkill x"`,
+		`sudo -n pkill x`,
+	} {
+		assert.NotEmpty(t, PatternKill(c), c)
+	}
+	for _, c := range []string{
+		`sudo -nu root ls`,
+		`sudo -Eu root kill 123`,
+		`sudo -uroot ls`,
+		`sudo -nu pkill ls`,
+		`timeout .5 sleep 1`,
+	} {
+		assert.Empty(t, PatternKill(c), c)
+	}
+}
