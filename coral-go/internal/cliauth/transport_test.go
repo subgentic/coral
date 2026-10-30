@@ -196,3 +196,46 @@ func TestUnsignedRequestExplainsA401Once(t *testing.T) {
 	require.True(t, ok)
 	assert.Contains(t, h.hint, "restart the agent")
 }
+
+// Inside an agent session OperatorRoundTripper is the base: with a readable command-line token it still sends no CLIAuthHeader and makes no hello (the session's own
+// identity is what the server reads), whichever agent marker is set. Outside a session the same token signs (hello first).
+func TestOperatorRoundTripperInsideAnAgentSessionSendsNoSignatureAndNoHello(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, TokenFile), []byte("tok"), 0o600))
+	t.Setenv("CORAL_DATA_DIR", dir)
+	var paths []string
+	var signed int
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		paths = append(paths, r.URL.Path)
+		if r.Header.Get(CLIAuthHeader) != "" {
+			signed++
+		}
+		w.WriteHeader(http.StatusNotFound) // a server that does not know the hello: a signing client gets nothing further sent
+	}))
+	defer srv.Close()
+	get := func() error {
+		paths, signed = nil, 0
+		client := &http.Client{Transport: OperatorRoundTripper(http.DefaultTransport, io.Discard)}
+		resp, err := client.Get(srv.URL + "/api/x")
+		if resp != nil {
+			resp.Body.Close()
+		}
+		return err
+	}
+
+	for _, k := range agentMarkers {
+		t.Setenv(k, "")
+	}
+	err := get()
+	assert.Error(t, err, "outside a session the token signs: the hello comes first and this server does not answer it")
+	assert.Equal(t, []string{CLIHelloPath}, paths, "outside a session, a hello and nothing else")
+
+	for _, marker := range []string{"CORAL_SESSION_NAME", "CORAL_SESSION_ID", "CORAL_SESSION_TOKEN", "CORAL_SUBSCRIBER_ID"} {
+		t.Setenv(marker, "set-by-coral")
+		require.True(t, InsideAgentSession(), marker)
+		require.NoError(t, get(), marker)
+		assert.Equal(t, []string{"/api/x"}, paths, marker+": no hello, only the request itself")
+		assert.Zero(t, signed, marker+": no CLIAuthHeader")
+		t.Setenv(marker, "")
+	}
+}

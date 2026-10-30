@@ -266,7 +266,7 @@ func InstallOperatorSigning() bool {
 	dir := DataDir()
 	tok, err := ReadToken(dir)
 	if err != nil {
-		installUnsignedHint(fmt.Sprintf("this command couldn't read Coral's command-line token in %s (%v), so it could not sign as you: run it as the user Coral runs as, with CORAL_DATA_DIR set if Coral uses another data folder", dir, err))
+		installUnsignedHint(unreadableTokenHint(dir, err))
 		return false
 	}
 	if _, done := http.DefaultTransport.(Transport); done {
@@ -274,6 +274,25 @@ func InstallOperatorSigning() bool {
 	}
 	http.DefaultTransport = Transport{Base: http.DefaultTransport, Token: tok, Dir: dir, Proof: newProofTransports(baseHTTP())}
 	return true
+}
+
+// unreadableTokenHint is what a 401 is explained with when the command-line token could not be read.
+func unreadableTokenHint(dir string, err error) string {
+	return fmt.Sprintf("this command couldn't read Coral's command-line token in %s (%v), so it could not sign as you: run it as the user Coral runs as, with CORAL_DATA_DIR set if Coral uses another data folder", dir, err)
+}
+
+// OperatorRoundTripper is InstallOperatorSigning for one client, leaving http.DefaultTransport alone: base signing with the command-line token when it can be read, else
+// base as it is, wrapped so that a 401 from this computer's Coral says once, on stderr, why the request went out without a credential. Inside an agent session it is base.
+func OperatorRoundTripper(base http.RoundTripper, stderr io.Writer) http.RoundTripper {
+	if InsideAgentSession() {
+		return base
+	}
+	dir := DataDir()
+	tok, err := ReadToken(dir)
+	if err != nil {
+		return unsignedHint{base: base, hint: unreadableTokenHint(dir, err), once: new(sync.Once), out: stderr}
+	}
+	return Transport{Base: base, Token: tok, Dir: dir}
 }
 
 // unsignedHint explains, once, a 401 from this computer's Coral to a request that went out
