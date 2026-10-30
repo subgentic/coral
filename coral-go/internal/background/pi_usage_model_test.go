@@ -1,6 +1,9 @@
 package background
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 // A Pi turn whose message names no model ("model":"" or none) was recorded under the empty model, a bucket of its own beside the real ones in the token summary (#11293 row 11).
 // The model of the session at that point is the one its model_change entry (or the last turn that named one) gave.
@@ -47,8 +50,12 @@ func TestPiLaunchModelNamesATurnThatNamesNone(t *testing.T) {
 		{"", str("openai/gpt-6-luna"), "gpt-6-luna"},
 		{"", str("openai/gpt-6-luna:high"), "gpt-6-luna"},
 		{"", str("gpt-6-luna"), "gpt-6-luna"},
+		{"", str("ollama/llama3:8b"), "llama3:8b"},      // a colon that is not a thinking level is part of the id
+		{"", str("ollama/llama3:8b:high"), "llama3:8b"}, // a level after it is cut
 		{"", nil, ""},
 		{"", str(""), ""},
+		{strings.Repeat("m", 300), nil, strings.Repeat("m", 200)}, // bounded
+		{"", str("p/" + strings.Repeat("é", 300)), strings.Repeat("é", 100)},
 	} {
 		if got := piRecordModel(tc.turn, tc.launch); got != tc.want {
 			t.Errorf("piRecordModel(%q, %v) = %q, want %q", tc.turn, tc.launch, got, tc.want)
