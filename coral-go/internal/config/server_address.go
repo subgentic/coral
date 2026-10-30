@@ -135,7 +135,7 @@ func ResolveServerAt(coralDir, fallback string) (string, error) {
 			return addr, nil
 		}
 		return "", fmt.Errorf("Coral is running on this data folder (PID %d) and recorded %s, but that address did not answer as this Coral. "+
-			"Restart Coral, or set CORAL_URL to its address", pid, addr)
+			"Restart Coral, or set CORAL_URL to its address. If Coral is not running, start it (the record may name a process id that something else now uses)", pid, addr)
 	}
 	if h, ok := askHealth(fallback); ok && h.Version != "" {
 		return fallback, nil
