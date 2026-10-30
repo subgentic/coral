@@ -174,8 +174,10 @@ const accountsLines = slot => {
     });
     const row = mk('div', 'sv-ctl-line'), check = mk('button', 'btn btn-small', 'Check');
     check.type = 'button'; check.id = 'settings-accounts-check'; check.setAttribute('aria-label', 'Check Claude and Pi sign-in');
+    let busy = false; // not disabled while it asks: a disabled button drops the keyboard to the page (#11323)
     check.addEventListener('click', async () => {
-        check.disabled = true;
+        if (busy) return;
+        busy = true; check.setAttribute('aria-disabled', 'true');
         await Promise.all(lines.map(async a => {
             a.status.textContent = 'Checking...';
             let signedIn, provider = '';
@@ -183,7 +185,7 @@ const accountsLines = slot => {
             const to = provider ? ` to ${provider}` : '';
             a.status.textContent = signedIn === true ? `Signed in${to}` : signedIn === false ? `Not signed in${to}: ${a.notSignedIn}` : `Could not tell if ${a.name} is signed in`;
         }));
-        check.disabled = false;
+        busy = false; check.removeAttribute('aria-disabled');
     });
     row.append(check); slot.append(row);
 };
