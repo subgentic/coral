@@ -25,9 +25,23 @@ export function mountTopPhoneBar() {
     if (!header || header.querySelector(':scope > .phone-bar')) return;
     header.prepend(buildPhoneBar({ id: 'top-phone-bar', menuId: 'top-phone-menu' }));
     setPhoneBarTitle(document.getElementById('top-menu-label')?.textContent || '');
+    watchPageHeading();
 }
 
-/** The view's name in the pill (nav_tabs.js says it, with the tab's words). */
+/** The view's name in the pill (nav_tabs.js says it, with the tab's words). A page that is not one of the nav's tabs (Tasks, Goals and Files from Home are a folder's table, a team page's tabs) has none: the pill then says the page's own heading, so it is never empty (QA Reviewer 2's nit on #137846). */
 export function setPhoneBarTitle(words) {
-    for (const t of document.querySelectorAll('.phone-bar-title')) t.textContent = words || '';
+    _named = !!words;
+    for (const t of document.querySelectorAll('.phone-bar-title')) t.textContent = words || pageHeading();
+}
+let _named = false;
+function pageHeading() {
+    const h = ['#group-table-view .group-table-head h2', '#group-table-view h2', '#team-page-title', '#servers-tab-title', 'main h1'].map(sel => [...document.querySelectorAll(sel)].find(e => e.getClientRects().length > 0 && e.textContent.trim())).find(Boolean);
+    return h ? h.textContent.replace(/\s+/g, ' ').trim() : '';
+}
+/** A table's heading is drawn after the view switches: the pill follows it while the nav has no word of its own. */
+export function watchPageHeading() {
+    const host = document.getElementById('group-table-view');
+    if (!host || host._phoneBarWatched) return;
+    host._phoneBarWatched = true;
+    new MutationObserver(() => { if (!_named) setPhoneBarTitle(''); }).observe(host, { childList: true, subtree: true });
 }
