@@ -36,13 +36,19 @@ jobs:
           go-version-file: coral-go/go.mod
           cache: false
       # A cold module cache downloads about 40 modules, and proxy.golang.org dropped several on v2.0.4's first attempt (stream INTERNAL_ERROR), failing resolve
-      # before anything was built (#11047). Fetch them here, up to four times with a wait between, so a dropped download is retried instead of failing the release;
-      # go checks every module it downloads against go.sum, and no proxy setting changes.
+      # before anything was built (#11047). Fetch them here, up to four times with a wait between, so a dropped download is retried instead of failing the release (each try is cut at five minutes);
+      # go checks every module it downloads against go.sum, a mismatch is never retried, and no proxy setting changes.
       - name: Download the Go modules, retrying a dropped download
         working-directory: coral-go
         run: |
           for attempt in 1 2 3 4; do
-            go mod download && exit 0
+            out=$(timeout 300 go mod download 2>&1) && { echo "$out"; exit 0; }
+            echo "$out"
+            # A module that does not match go.sum is never retried into green: it means something served other bytes, and the release must fail (Security on #11300).
+            if echo "$out" | grep -qiE 'checksum mismatch|SECURITY ERROR|verifying module'; then
+              echo "::error::a module did not match go.sum: not retried"
+              exit 1
+            fi
             echo "go mod download failed (attempt $attempt of 4)"
             [ "$attempt" -lt 4 ] && sleep $((attempt * 15))
           done
