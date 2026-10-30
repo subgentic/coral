@@ -99,7 +99,7 @@ export function fmtWait(s) {
 /** What an activity read becomes for the Operator tab. A figure the read does not carry (the touches the new recording will add) is null, and the page says "not recorded yet". */
 export function operatorModel(activity) {
     const a = activity || {}, touches = a.touches || null;
-    const days = (a.days || []).map(d => ({ day: d.day, label: dayLabel(d.day), values: { posts: d.operator || 0, ...(touches ? touchDay(touches, d.day) : {}) } }));
+    const days = (a.days || []).map(d => ({ day: d.day, label: dayLabel(d.day), tasks: d.tasks_done || 0, values: { posts: d.operator || 0, ...(touches ? touchDay(touches, d.day) : {}) } }));
     const posts = Array.isArray(a.days) ? days.reduce((n, d) => n + d.values.posts, 0) : null; // a read with no days has not recorded the posts
     const kinds = [{ key: 'posts', name: 'Board posts by the Operator', recorded: true }, ...(touches ? ['typed', 'answer', 'approve', 'wake', 'restart', 'stop'].map(k => ({ key: k, name: KIND_NAMES[k], recorded: true })) : [])];
     const sumTouches = days.reduce((n, d) => n + Object.values(d.values).reduce((x, v) => x + v, 0), 0);
@@ -127,4 +127,16 @@ export function commModel(activity, { limit = 10 } = {}) {
     const tasks = Array.isArray(a.task_messages) ? a.task_messages : null; // the per-task counts the recording will add: null is "not recorded yet"
     const done = a.tasks_done == null ? null : Number(a.tasks_done) || 0, msgs = a.agent_posts == null ? null : Number(a.agent_posts) || 0;
     return { names, cells, days, agents, tasks, kpis: { agent: msgs, automated: a.automated_posts == null ? null : a.automated_posts, cross: a.cross_posts == null ? null : a.cross_posts, assigned: a.assigned == null ? null : a.assigned, asks: a.asks || null, busiest: edges[0] || null, tasksDone: done }, truncated: !!a.truncated, empty: !msgs && !(a.cross_posts || 0) && a.agent_posts != null };
+}
+
+/** The autonomy trend: touches per task done over a rolling 7 days, one point a day from the 7th (a window with no task done has no point: it is not a 0). `days` are operatorModel's. */
+export function autonomyTrend(days) {
+    const points = [];
+    for (let i = 6; i < days.length; i++) {
+        const win = days.slice(i - 6, i + 1), tasks = win.reduce((n, d) => n + (d.tasks || 0), 0);
+        const touches = win.reduce((n, d) => n + Object.values(d.values).reduce((x, v) => x + v, 0), 0);
+        points.push({ label: days[i].label, value: tasks > 0 ? touches / tasks : null, touches, tasks });
+    }
+    const done = points.filter(p => p.value != null);
+    return { points, first: done[0] || null, last: done.at(-1) || null, enough: done.length >= 2 };
 }

@@ -45,4 +45,12 @@ assert.equal(D.countWords(null), 'not recorded yet'); assert.equal(D.countWords(
 assert.equal(D.waitWords(null, 'median_s'), 'not recorded yet'); assert.equal(D.waitWords({ asked: 0, answered: 0, median_s: null }, 'median_s'), 'No asks');
 assert.equal(D.waitWords({ asked: 3, answered: 0, median_s: null }, 'median_s'), 'No answer yet'); assert.equal(D.waitWords({ asked: 3, answered: 2, median_s: 120, slowest_s: 300 }, 'slowest_s'), '5 min');
 assert.equal(D.perTaskWords(null, 4), 'not recorded yet'); assert.equal(D.perTaskWords(8, null), 'not recorded yet'); assert.equal(D.perTaskWords(8, 0), 'No tasks done'); assert.equal(D.perTaskWords(9, 3), '3.0');
+// ---- autonomy: touches per task done over a rolling 7 days; a window with no task has a gap, not a 0
+const adays = Array.from({ length: 9 }, (_, i) => ({ day: `2026-10-${20 + i}`, label: `Oct ${20 + i}`, tasks: i === 0 || i === 1 ? 0 : 1, values: { posts: 2, typed: 1 } }));
+const tr = D.autonomyTrend(adays);
+assert.equal(tr.points.length, 3, 'one point a day from the 7th'); assert.equal(tr.points[0].value, 21 / 5, '7 days: 21 touches over 5 tasks'); assert.equal(tr.points[2].value, 21 / 7);
+assert.equal(tr.last.label, 'Oct 28'); assert.equal(tr.enough, true);
+const none = D.autonomyTrend(adays.map(d => ({ ...d, tasks: 0 })));
+assert.deepEqual(none.points.map(p => p.value), [null, null, null], 'no task done in the window: a gap, not 0'); assert.equal(none.enough, false);
+assert.equal(D.autonomyTrend(adays.slice(0, 5)).enough, false, 'under 7 days there is no trend');
 console.log('PASS analytics_tabs: usage, operator and communication rows');
