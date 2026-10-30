@@ -46,7 +46,7 @@ import (
 const maxAgents = 5
 
 func main() {
-	portFlag := flag.Int("port", 0, "Override web server port (default: $CORAL_PORT or 8420)")
+	portFlag := flag.Int("port", 0, "Override web server port (default: $CORAL_PORT or 8420); 0 is any free port")
 	skipWeb := flag.Bool("skip-web-server", false, "Skip launching the web server")
 	noBrowser := flag.Bool("no-browser", false, "Don't open the browser on startup")
 	flag.Parse()
@@ -102,8 +102,11 @@ func main() {
 	// Clean up old coral logs (only in a folder of our own, never the shared temp dir)
 	cleanOldLogs(logDir)
 
-	if *portFlag > 0 {
-		cfg.Port = *portFlag
+	portGiven := false
+	flag.Visit(func(f *flag.Flag) { portGiven = portGiven || f.Name == "port" })
+	if err := config.ApplyPortFlag(cfg, *portFlag, portGiven); err != nil { // an explicit --port 0 is any free port, as in coral
+		fmt.Fprintf(os.Stderr, "launch-coral: %v\n", err)
+		os.Exit(2)
 	}
 	cfg.CoralRoot = targetDir
 

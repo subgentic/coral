@@ -72,6 +72,10 @@ type Config struct {
 	// registry, the /api/remote proxy and merged remote agents. Off by default;
 	// set by the --hub flag or CORAL_HUB=1.
 	HubMode bool
+
+	// InstanceID is a random name this server gives itself when it starts (startup.Start): it is recorded in the data folder's lock file and answered by /api/health,
+	// so a command that finds the recorded address can tell this Coral from whatever listens on that port later (config.VerifiedServer). Empty until Start sets it.
+	InstanceID string
 	// HubModeForced: HubMode came from --hub or CORAL_HUB=1, which win over the saved
 	// Settings > Run as a hub (#3460); turning it off then means starting without them.
 	HubModeForced bool

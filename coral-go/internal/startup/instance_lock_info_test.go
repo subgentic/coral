@@ -20,7 +20,7 @@ func TestASecondStartSaysWhichCoralRunsAndWhere(t *testing.T) {
 	first, err := acquireInstanceLock(lockPath)
 	require.NoError(t, err)
 	defer first.close(lockPath)
-	first.recordAddress("http://localhost:8476")
+	first.recordAddress("http://localhost:8476", "")
 
 	pid, url := runningServer(lockPath)
 	assert.Equal(t, os.Getpid(), pid)
@@ -60,7 +60,7 @@ func TestTheServerRecordsItsAddressWhileItRuns(t *testing.T) {
 	lockPath := filepath.Join(dir, config.ServerLockFile)
 	first, err := acquireInstanceLock(lockPath)
 	require.NoError(t, err)
-	first.recordAddress("http://localhost:8476")
+	first.recordAddress("http://localhost:8476", "")
 	pid, url := config.RecordedServer(dir)
 	assert.Equal(t, os.Getpid(), pid)
 	assert.Equal(t, "http://localhost:8476", url)
@@ -73,7 +73,7 @@ func TestTheServerRecordsItsAddressWhileItRuns(t *testing.T) {
 	second, err := acquireInstanceLock(lockPath)
 	require.NoError(t, err, "the next server takes the lock")
 	defer second.close(lockPath)
-	second.recordAddress("http://localhost:8477")
+	second.recordAddress("http://localhost:8477", "")
 	_, url = config.RecordedServer(dir)
 	assert.Equal(t, "http://localhost:8477", url)
 }
