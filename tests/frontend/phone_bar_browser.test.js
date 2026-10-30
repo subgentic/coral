@@ -46,6 +46,11 @@ const BASE = require('./test_base').BASE;
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`); await settle(500);
         const wide = await ev(`(() => { const i = document.querySelector('#mobile-agent-list .mobile-search-input'), m = document.querySelector('#mobile-agent-list .phone-menu-btn'), a = document.querySelector('#mobile-agent-list .phone-account-btn'); return { search: !!i && i.getBoundingClientRect().width > 100, menu: !!m && m.getClientRects().length > 0, account: !!a && a.getClientRects().length > 0 }; })()`);
         assert.deepEqual(wide, { search: true, menu: false, account: false }, 'at 700 px Home has its search and no phone ☰ or avatar: ' + JSON.stringify(wide));
+        // a new Coral's Home on a short phone (the Mobile Beta Tester's walk, item 6): its last card, Open folder, can be scrolled to and ends above the floating nav, not under it
+        await Emulation.setDeviceMetricsOverride({ width: 390, height: 640, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`); await settle(600);
+        const end = await ev(`(() => { const list = document.getElementById('mobile-agent-list'); list.scrollTop = list.scrollHeight; const card = [...list.querySelectorAll('button, a, [role=button], .welcome-launch')].filter(e => e.getClientRects().length && /Open folder/.test(e.textContent)).pop(); const nav = document.getElementById('phone-nav'); if (!card) return null; return { cardBottom: Math.round(card.getBoundingClientRect().bottom), navTop: getComputedStyle(nav).display === 'none' ? 9999 : Math.round(nav.getBoundingClientRect().top) }; })()`);
+        assert.ok(end && end.cardBottom <= end.navTop, 'the Open folder card scrolls to above the bottom nav: ' + JSON.stringify(end));
         // a drill-down is not this bar: no ☰ and no avatar
         await ev(`window.switchNavTab('tokens'); true`); await settle(700);
         assert.equal(await ev(`[...document.querySelectorAll('.phone-bar')].filter(b => b.getClientRects().length > 0).length`), 0, 'a drill-down (an Analytics view) draws neither ☰ nor the avatar');
