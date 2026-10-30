@@ -112,6 +112,10 @@ const SERVERS = [
             assert.match(p.name, /^LAN box lan/, at + 'the name and id');
             assert.equal(p.back, '← Computers');
             assert.equal(p.focus, 'servers-back', at + 'the focus goes to the way back');
+            if (w <= 600) { // slice D (#11239): a computer's page is a drill-down on a phone: one bar (a 44 px arrow, the name beside it), no bottom nav
+                const dd = await ev(`(() => { const row = document.querySelector('#servers-view .phone-title-row'), back = document.getElementById('servers-back').getBoundingClientRect(), name = document.getElementById('servers-page-name').getBoundingClientRect(), nav = getComputedStyle(document.getElementById('phone-nav')).display; return { item: document.getElementById('servers-view').hasAttribute('data-phone-item'), rowH: row ? Math.round(row.getBoundingClientRect().height) : 0, w: Math.round(back.width), h: Math.round(back.height), beside: name.left >= back.right - 2 && name.top < back.bottom, nav }; })()`);
+                assert.ok(dd.item && dd.rowH >= 56 && dd.w >= 44 && dd.h >= 44 && dd.beside && dd.nav === 'none', at + "a computer's page is a drill-down (one 56 px bar, a 44 px arrow beside the name, no nav): " + JSON.stringify(dd));
+            }
             assert.deepEqual(p.buttons, ['Test', 'Edit', 'Remove'], at + 'the bar');
             assert.equal(p.remove, true, at + 'Remove is the danger button');
             assert.equal(p.small, false, at + 'the normal button size');
