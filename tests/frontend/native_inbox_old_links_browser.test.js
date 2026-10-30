@@ -9,9 +9,9 @@ const { FOLDER_ROWS, ROW_WORDS } = require('./helpers/folder_rows');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor } = await connect();
-    const { settle } = require('./helpers/wait').bind(ev);
+    const { settle, coralReady } = require('./helpers/wait').bind(ev);
     const shot = async name => { const dir = process.env.CORAL_SCREENSHOT_DIR; if (!dir) return; fs.mkdirSync(dir, { recursive: true }); await settle(300); fs.writeFileSync(`${dir}/${name}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
-    const open = async path => { await Page.navigate({ url: BASE + path }); await Page.loadEventFired(); await waitFor(`typeof window.switchNavTab === 'function' && !!window.__coralReady`, 'the dashboard'); await ev(`window.__coralReady.startup('liveList', 'settings')`); };
+    const open = async path => { await Page.navigate({ url: BASE + path }); await Page.loadEventFired(); await waitFor(`typeof window.switchNavTab === 'function' && !!window.__coralReady`, 'the dashboard'); await coralReady('startup', 'liveList', 'settings'); };
     try {
         await setupHubWorld({ client, Page, Emulation, width: 1280, height: 800, mobile: false, inbox: 'native' });
         await open('/');

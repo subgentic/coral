@@ -3,6 +3,7 @@
 // machine. Drives Chrome over CDP against the isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 // words a person can see in a group now, per the audit (artifact 141071b6); a group with no number has not been cut yet
 const TERMINAL_BUDGET = 66; // #7405: +1 for the visible hint lines (the (i) are gone), +3 for round 2's Fit pane width line, +2 for the Display and Backend sub-headings (#9490: a group of eight rows is headed); the backend's own sentence is kept on purpose (isolation versus surviving an upgrade is the one choice a person must be told about)
@@ -14,7 +15,7 @@ const WITH_WARNING_BUDGET = 88; // 60 (+1 for the render engine's disclosure mov
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await client.Emulation.setFocusEmulationEnabled({ enabled: true });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 1000, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await ev(`(async () => { window.__coral.buildAllLazy(); const real = window.fetch; const json = b => new Response(JSON.stringify(b), { headers: { 'Content-Type': 'application/json' } });
             window.fetch = async (u, o = {}) => { const p = String(u); if (p.endsWith('/api/system/terminal-backend')) return json({ saved: '', running: 'pty', forced: false, choice: false, restart_required: false, can_restart: true, running_agents: 0, leftover_tmux_agents: 0, next: 'pty' }); if (p.endsWith('/api/cloud/status')) return json({ configured: true, state: 'connected', hub_url: 'https://app.coralhub.dev', label: 'my-mac', server_id: 'srv_x', max_mode: 'launch', max_mode_saved: true, allow_hub_auto_accept: true, redact_tokens: true, hub_relaunch_updates: true, hub_cross_team_settings: true, allow_hub_auto_accept_changed: { by: 'hub', user: 'hub-user-3f2a', at: '2026-10-21T20:15:00Z' } }); if (/hub-operator/.test(p)) return json({ linked: true, disabled: false, recent_actions: [] }); return real(u, o); };
             const cc = await import((window.__coralStatic || '/static/') + 'cloud_connect.js'); cc.initCloudConnect(); await cc.loadCloudStatus(); return true; })()`);

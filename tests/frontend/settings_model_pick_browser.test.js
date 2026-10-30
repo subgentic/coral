@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const { guardSettings } = require('./helpers/settings_guard');
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const guard = await guardSettings();
@@ -25,7 +26,7 @@ const { guardSettings } = require('./helpers/settings_guard');
             const check = (ok, msg) => { if (!ok) problems.push(`${w}: ${msg}`); };
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.startup('liveList', 'settings')`);
+            await coralReady(ev, 'startup', 'liveList', 'settings');
             check(await put({ default_model_claude: '' }) === 200, 'nothing saved to start with');
             await open();
             let s = await state('claude');

@@ -2,6 +2,7 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -10,7 +11,7 @@ const { connect } = require('./agent_view_harness');
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await ev(`window.__m.add('past-bot', 'A', 2, { sleeping: false }); true`);
         await ev(`(() => { T.state.liveSessions = [window.__m.entry(window.__m.agents['past-bot-id'])]; T.render.renderLiveSessions(T.state.liveSessions); return true; })()`);
         await waitFor(`!!document.getElementById('agent-past-chats') && document.querySelectorAll('#live-sessions-list .session-group-item').length >= 1`, 'the list and its Past chats link', 8000);

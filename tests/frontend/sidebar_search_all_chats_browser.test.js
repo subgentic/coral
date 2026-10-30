@@ -7,11 +7,11 @@ const BASE = require('./test_base').BASE;
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
-    const { settle } = require('./helpers/wait').bind(ev);
+    const { settle, coralReady } = require('./helpers/wait').bind(ev);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady();
         const box = () => ev(`(() => { const i = document.getElementById('agent-search-input'), b = document.getElementById('agent-search-all-chats'); return { placeholder: i && i.placeholder, label: i && i.getAttribute('aria-label'), line: b && !b.hidden && b.getClientRects().length > 0 ? b.textContent : null, role: b && b.tagName }; })()`);
         let s = await box();
         assert.equal(s.placeholder, 'Search agents', 'the box says what it searches');

@@ -5,6 +5,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -19,7 +20,7 @@ const BASE = require('./test_base').BASE;
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         await ev(`(async () => { const st = ${S}; window.ST = (await import(st + 'state.js')).state; window.SD = await import(st + 'settings_dialog.js');
             window.__puts = []; window.__mode = 'ok'; window.__toasts = []; const real = window.fetch; const json = (b, s = 200) => Promise.resolve(new Response(JSON.stringify(b), { status: s, headers: { 'content-type': 'application/json' } }));
             window.fetch = (u, o = {}) => { const p = new URL(String(u), location.href).pathname, m = (o.method || 'GET').toUpperCase(); if (p === '/api/system/terminal-backend' && m === 'GET') return json({ saved: '', running: 'pty', forced: false, choice: false, restart_required: false, can_restart: true, running_agents: 0, left_over: 0 }); if (p === '/api/settings' && m === 'PUT') { window.__puts.push(o.body); return window.__mode === 'ok' ? json({ ok: true }) : json({ error: 'default_working_dir must be a folder' }, 400); } return real(u, o); };

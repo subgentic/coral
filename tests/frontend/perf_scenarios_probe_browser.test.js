@@ -9,7 +9,7 @@
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
-const { framesJs } = require('./helpers/wait');
+const { framesJs, coralReady } = require('./helpers/wait');
 const { removeBoards } = require('./helpers/board_cleanup');
 
 const AGENTS = 50, MESSAGES = 2000, ARTIFACTS = 300;
@@ -45,7 +45,7 @@ if (!process.env.PERF_PROBE) { console.log('perf_scenarios_probe: skipped (set P
         await Emulation.setDeviceMetricsOverride({ width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
         // the board's 2,000 messages, on the isolated server
         await Page.navigate({ url: BASE }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await ev(`(async () => { const post = (p, b) => fetch(p, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b) });
             await post('/api/board/${BOARD}/subscribe', { subscriber_id: 'Operator', job_title: 'Operator' }); await post('/api/board/${BOARD}/subscribe', { subscriber_id: 'Dev One', job_title: 'Developer' });
             for (let i = 0; i < ${MESSAGES}; i += 10) await Promise.all(Array.from({ length: 10 }, (_, k) => post('/api/board/${BOARD}/messages', { subscriber_id: i % 20 < 10 ? 'Operator' : 'Dev One', content: 'Board message ' + (i + k) + ' about handler_' + ((i + k) % 37) + ': the retry budget is per call, **not** per run; see \`internal/server/x.go\` for the loop.' })));
@@ -59,7 +59,7 @@ if (!process.env.PERF_PROBE) { console.log('perf_scenarios_probe: skipped (set P
         for (let r = 0; r < RUNS; r++) {
             const m0 = await metrics();
             await Page.navigate({ url: BASE }); await Page.loadEventFired();
-            await ev(`window.__coralReady.startup('liveList')`);
+            await coralReady(ev, 'startup', 'liveList');
             const fp = await ev(`(() => { const p = performance.getEntriesByName('first-contentful-paint')[0]; return { fcp: p ? Math.round(p.startTime) : null, list: window.__firstList }; })()`);
             const m1 = await metrics();
             rows.push({ wall: fp.list != null ? fp.list : 0, fcp: fp.fcp, lt: await ev(`window.__longtasks.length`), ...delta(m0, m1) });
@@ -67,7 +67,7 @@ if (!process.env.PERF_PROBE) { console.log('perf_scenarios_probe: skipped (set P
         }
         await profStop('firstPaint'); out.firstPaint = { ...stats(rows), fcpMs: median(rows.map(r => r.fcp).filter(Boolean)) };
         await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await ev(STUB_ART);
         // ---- 2. agent switch
         rows = []; await profStart();
@@ -95,7 +95,7 @@ if (!process.env.PERF_PROBE) { console.log('perf_scenarios_probe: skipped (set P
         rows = []; const allRows = []; await profStart();
         await ev(`window.switchNavTab('agents'); true`);
         for (let r = 0; r < RUNS; r++) {
-            await Page.navigate({ url: BASE }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`); await ev(STUB_ART); // a fresh page each run: the list is drawn for the first time (a list shown before is redrawn whole)
+            await Page.navigate({ url: BASE }); await Page.loadEventFired(); await install(); await coralReady(ev); await ev(STUB_ART); // a fresh page each run: the list is drawn for the first time (a list shown before is redrawn whole)
             await ev(`window.selectLiveSession('agent-0', 'claude', 'sid-0', ''); window.switchAgenticTab('files', 'top'); true`);
             await ev(`${framesJs(3)}`);
             const m = await metrics(); await ev(`window.__ltBefore = window.__longtasks.length; window.__a0 = performance.now(); window.openTeamPage(${JSON.stringify(BOARD)}, { tab: 'artifacts' }); true`);
@@ -115,7 +115,7 @@ if (!process.env.PERF_PROBE) { console.log('perf_scenarios_probe: skipped (set P
         for (const [name, tab, sel, prep] of [['browse', 'browse', '#agentic-panel-browse .explorer-item', ''], ['changedFiles', 'files', '#agentic-panel-files .file-item', '']]) {
             rows = []; const allRows2 = []; await profStart();
             for (let r = 0; r < RUNS; r++) {
-                await Page.navigate({ url: BASE }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`); await ev(STUB_FILES);
+                await Page.navigate({ url: BASE }); await Page.loadEventFired(); await install(); await coralReady(ev); await ev(STUB_FILES);
                 await ev(`window.selectLiveSession('agent-0', 'claude', 'sid-0', ''); window.switchAgenticTab('${tab === 'files' ? 'browse' : 'files'}', 'top'); true`); await ev(`${framesJs(3)}`);
                 const m = await metrics(); await ev(`window.__ltBefore = window.__longtasks.length; window.__f0 = performance.now(); window.switchAgenticTab('${tab}', 'top'); true`);
                 await waitFor(`document.querySelectorAll('${sel}').length > 10`, '${name} rows', 20000);

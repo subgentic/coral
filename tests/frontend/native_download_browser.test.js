@@ -6,6 +6,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 const SOURCE = fs.readFileSync(path.join(__dirname, '../../coral-go/cmd/coral-app/downloads.go'), 'utf8');
 const SCRIPT = SOURCE.slice(SOURCE.indexOf('`', SOURCE.indexOf('const downloadInterceptScript')) + 1, SOURCE.lastIndexOf('`'));
@@ -18,7 +19,7 @@ assert.ok(/coral:native-download/.test(SCRIPT), "the app's script was read from 
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
         // before the page's own scripts: the native flag, the stand-in native save, and the app's download script
         await Page.addScriptToEvaluateOnNewDocument({ source: `window.__CORAL_APP__ = true; window.__saved = []; window.__told = []; window.addEventListener('coral:native-download', e => window.__told.push(e.detail)); window._coralSaveFile = async (name, b64) => { window.__saved.push([name, atob(b64)]); return '/tmp/dl/' + name; };\n${SCRIPT}` });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         const before = await ev(`location.pathname`);
         // the person's click on <a download> (the Download button of an artifact is one)
         await ev(`(() => { const a = document.createElement('a'); a.id = 'dl-test'; a.href = '/api/health'; a.setAttribute('download', 'health.json'); a.textContent = 'Download'; a.style.cssText = 'position:fixed;left:20px;top:20px;width:120px;height:32px;z-index:99999;background:#fff;color:#000'; document.body.append(a); return true; })()`);

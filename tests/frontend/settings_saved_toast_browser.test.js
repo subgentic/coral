@@ -3,6 +3,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -12,7 +13,7 @@ const BASE = require('./test_base').BASE;
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         // The Save's PUT is answered here, not by the server: a first Save also writes the defaults the person never touched (16 settings on a new server), and the suite must leave the server's settings as it found them.
         await ev(`(() => { const real = window.fetch; window.__puts = []; window.fetch = (u, o) => { if (o && String(o.method).toUpperCase() === 'PUT' && /\\/api\\/settings$/.test(String(u))) { window.__puts.push(String(o.body)); return Promise.resolve(new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } })); } return real(u, o); }; return true; })()`);
         // two changes in two panes: a switch and a select

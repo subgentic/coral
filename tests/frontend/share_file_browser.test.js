@@ -3,6 +3,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 const SID = '0b2f6c1e-3d4a-4b5c-8d6e-000000010269';
 const NAME = 'claude-' + SID;
@@ -26,7 +27,7 @@ const URI = 'coral://artifacts/' + 'ab12cd34'.repeat(8);
         for (const [w, h, mobile] of [[1280, 800, false], [390, 844, true]]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`); await stub();
+            await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings'); await stub();
             await ev(`(async () => { const st = (await import(${MOD} + 'state.js')).state; st.currentSession = { type: 'live', name: ${JSON.stringify(NAME)}, session_id: ${JSON.stringify(SID)} };
                 const m = await import(${MOD} + 'changed_files.js'); await m.loadChangedFiles(${JSON.stringify(NAME)}, ${JSON.stringify(SID)}); return true; })()`);
             const label = await ev(`(() => { const b = document.querySelector('#changed-files-list .file-item [data-on-click="file-share"]'); return b ? b.getAttribute('aria-label') : null; })()`);

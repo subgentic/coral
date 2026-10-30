@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { safePaused } = require('./helpers/paused');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -18,7 +19,7 @@ const { connect } = require('./agent_view_harness');
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true, maxTouchPoints: 5 });
         const openInbox = async (label, hub = false) => {
             await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-            if (hub) await waitFor(`!!document.getElementById('coral-boot') && JSON.parse(document.getElementById('coral-boot').textContent).mode === 'cloud'`, label + ": the Hub's boot flag", 10000); else await ev(`window.__coralReady.then(() => true)`);
+            if (hub) await waitFor(`!!document.getElementById('coral-boot') && JSON.parse(document.getElementById('coral-boot').textContent).mode === 'cloud'`, label + ": the Hub's boot flag", 10000); else await coralReady(ev);
             await waitFor(`!!document.body.getAttribute('data-nav-tab')`, label + ': a tab is on screen', 10000);
             await ev(`window.switchNavTab('hub-inbox'); true`);
             await waitFor(`document.body.getAttribute('data-nav-tab') === 'hub-inbox' && document.querySelectorAll('.view-list-item, #group-table-view').length > 0`, label + ': the Inbox', 12000);

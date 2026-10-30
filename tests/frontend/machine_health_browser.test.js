@@ -16,6 +16,7 @@ const { safePaused } = require('./helpers/paused');
 const { connect } = require('./agent_view_harness');
 
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 const GB = 1024 ** 3;
 const HEALTH = {
     status: 'busy', reason: 'cpu', responsiveness_ms: 42,
@@ -203,7 +204,7 @@ const HEALTH = {
         await Page.loadEventFired();
         await waitFor(`typeof window.switchNavTab === 'function'`, 'the hub page', 10000);
         // The page's own first live-list load sets state.servers too: inject after it.
-        await ev(`window.__coralReady.startup('liveListLoaded').then(() => true)`);
+        await coralReady(ev, 'startup', 'liveListLoaded');
         await ev(`(async () => {
             const { state } = await import((window.__coralStatic || '/static/') + 'state.js');
             // The test server's own feed would replace these servers with its (empty) list: detach it.

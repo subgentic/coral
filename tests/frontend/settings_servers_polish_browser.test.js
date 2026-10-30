@@ -4,6 +4,7 @@
 const assert = require('node:assert/strict');
 const { acrossGroups } = require('./helpers/settings_groups');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -24,7 +25,7 @@ const { connect } = require('./agent_view_harness');
         for (const [dev, w, h, mobile] of [['phone', 390, 844, true], ['desktop', 1280, 800, false]]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile });
             await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.then(() => true)`);
+            await coralReady(ev);
             // 1 and 2: Settings
             await ev(`(async () => { await window.showSettingsModal(); return true; })()`);
             await waitFor(`getComputedStyle(document.getElementById('settings-modal')).display !== 'none'`, 'settings');

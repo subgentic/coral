@@ -10,6 +10,7 @@ const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const GOLDEN = path.join(__dirname, 'fixtures', 'live_history_golden.json');
 const sha = t => require('node:crypto').createHash('sha256').update(t).digest('hex');
+const { coralReady } = require('./helpers/wait');
 
 const MSGS = [
     { type: 'user', content: 'Please fix the build' }, { type: 'assistant', text: 'Looking at it now.' }, { type: 'user', content: 'and add a test' },
@@ -45,7 +46,7 @@ const STEPS = [
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.startup('liveList', 'settings')`);
+        await coralReady(ev, 'startup', 'liveList', 'settings');
         await ev(`(async () => {
             const st = window.__coralStatic || '/static/';
             const T = window.T = { state: (await import(st + 'state.js')).state, chat: await import(st + 'live_chat.js') };

@@ -8,6 +8,7 @@ const { SIZING } = require('./helpers/table_sizing');
 const { connect } = require('./agent_view_harness');
 const { oneLinePerRow } = require('./helpers/row_lines');
 const { setTheme } = require('./helpers/contrast');
+const { coralReady } = require('./helpers/wait');
 
 const SERVERS = [
     { id: 'local', label: 'studio-mac', local: true, status: 'online' },
@@ -36,7 +37,7 @@ const SERVERS = [
             const at = `at ${w}px: `;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.then(() => true)`);
+            await coralReady(ev);
             await ev(`(async () => { const s = await import((window.__coralStatic || '/static/') + 'state.js'); s.state.hub = true; s.state.servers = ${JSON.stringify(SERVERS)}; s.state.liveSessions = [{ session_id: 'w1', name: 'waiter', agent_type: 'claude', server: 'lan', waiting_for_input: true }, { session_id: 'w2', name: 'busy', agent_type: 'claude', server: 'lan', waiting_for_input: false }, { session_id: 'w3', name: 'hinted', agent_type: 'codex', server: 'lan', waiting_for_input: true, waiting_kind: 'permission', waiting_since: new Date(Date.now() - 20000).toISOString(), display_activity_hint: 'working', display_activity_hint_at: new Date().toISOString() }]; window.switchNavTab('servers'); return true; })()`); // switched in the same breath: a screen's working hint is good for 10 s, and the page must render inside that // w3 is waiting by its hook but its screen says working: the Inbox does not count it, so neither does this page // one agent of LAN box waits for its person (the Needs you column)
             await ev(`window.switchNavTab('servers'); true`);
             await waitFor(`!!document.querySelector('#server-row-lan')`, 'the servers table');

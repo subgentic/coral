@@ -11,7 +11,7 @@ const GOALS = [
 ];
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
-    const { settle } = require('./helpers/wait').bind(ev);
+    const { settle, coralReady } = require('./helpers/wait').bind(ev);
     const shot = require('./helpers/scene_shots')(Page, 'one-line-rows');
     const B = 'rw-' + Date.now().toString(36);
     const api = (method, path, body) => ev(`fetch(${JSON.stringify(path)}, { method: ${JSON.stringify(method)}, headers: { 'Content-Type': 'application/json' }, body: ${body ? JSON.stringify(JSON.stringify(body)) : 'undefined'} }).then(async r => ({ status: r.status, body: await r.json().catch(() => ({})) }))`);
@@ -24,7 +24,7 @@ const GOALS = [
         for (const [label, w, h, mobile] of [['1280', 1280, 800, false], ['390', 390, 844, true]]) {
             phone = mobile;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.startup('liveList', 'settings')`);
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady('startup', 'liveList', 'settings');
             if (label === '1280') { await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: 'orch', job_title: 'Orchestrator who coordinates the whole team', session_name: 'o-s' }); await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: 'dev', job_title: 'Developer', session_name: 'd-s' });
                 for (const g of [['Ship the thing with a long title', 'A long outcome sentence that wraps over several lines at large text'], ['Second goal', 'Short']]) { const r = await api('POST', `/api/board/${B}/goals`, { subscriber_id: 'Operator', title: g[0], outcome: g[1], done_when: 'done' }); await api('PATCH', `/api/board/${B}/goals/${r.body.id}`, { subscriber_id: 'Operator', state: 'active' }); } }
             // Needs you
@@ -44,7 +44,7 @@ const GOALS = [
             await settle(1800); await one(label, 'Inbox Goals', '#group-table-view tr', 2); await shot(`${label}-goals`);
             // team goals + agents
             for (const tab of ['goals', 'agents']) {
-                await Page.navigate({ url: BASE + `/team/${B}/${tab}` }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`); await settle(2000);
+                await Page.navigate({ url: BASE + `/team/${B}/${tab}` }); await Page.loadEventFired(); await install(); await coralReady('startup', 'liveList', 'liveListLoaded', 'settings'); await settle(2000);
                 await one(label, 'team ' + tab, '.team-panel tr', 2); await shot(`${label}-team-${tab}`);
             }
         }

@@ -2,6 +2,7 @@
 // the General page about 50 px taller), and a switch's toggle is level with that (i) (#5109: the box sat at the top of its 44 px area, about 17 px above the (i)'s centre: the area is a label whose generic 12 px bottom margin was part of what got centred). Every section is checked at 390 px with a coarse pointer: wherever a row has an (i), it is level with the label and to its right.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -11,7 +12,7 @@ const { connect } = require('./agent_view_harness');
         await Emulation.setTouchEmulationEnabled({ enabled: true, maxTouchPoints: 5 });
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
         const l = Page.loadEventFired(); await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await l; await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await ev(`window.showSettingsModal().then(() => true)`);
         await waitFor(`(m => !!m && getComputedStyle(m).display !== 'none' && m.querySelectorAll('.settings-row, .sv-row').length > 3 && !!m.querySelector('.settings-group-pick select'))(document.getElementById('settings-modal'))`, 'Settings', 10000);
         const groups = await ev(`[...document.querySelector('#settings-modal .settings-group-pick select').options].map(o => o.value)`);

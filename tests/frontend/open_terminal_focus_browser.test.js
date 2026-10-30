@@ -3,6 +3,7 @@
 // CDP through agent_view_harness.js; the terminal's input is stood in by a textarea named as the real one is (xterm_renderer.js), made a moment after showTerminalView.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -13,7 +14,7 @@ const { connect } = require('./agent_view_harness');
             const check = (ok, msg) => { if (!ok) problems.push(`${w}: ${msg}`); };
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile: false });
             await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.then(() => true)`);
+            await coralReady(ev);
             await ev(`(() => { document.getElementById('kb-card')?.remove(); document.getElementById('kb-term')?.remove();
                 const card = document.body.appendChild(Object.assign(document.createElement('button'), { id: 'kb-card', textContent: 'Open terminal' })); card.dataset.onClick = 'terminal-view-open'; card.style.cssText = 'position:fixed;left:8px;top:8px;z-index:99999';
                 window.showTerminalView = () => { setTimeout(() => { const t = document.body.appendChild(Object.assign(document.createElement('textarea'), { id: 'kb-term' })); t.setAttribute('aria-label', "Terminal: what you type goes straight to the agent's shell"); t.style.cssText = 'position:fixed;left:8px;top:60px;width:200px;height:40px;z-index:99999'; }, 400); };

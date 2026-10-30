@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 const uid = n => '0000' + String(n).padStart(4, '0') + '-0000-4000-8000-000000000000';
 const SESSIONS = Array.from({ length: 4 }, (_, i) => { const n = i + 1; return { name: 'ag-' + n, session_id: uid(n), agent_type: 'claude', server: 'local', status: 'idle', summary: 'Task ' + n, display_name: 'Agent ' + n, working_directory: '/repo/team-a', branch: 'main', board_project: 'team-a', staleness_seconds: 100 * n, token_cost_usd: n, working: n === 2, waiting_for_input: n === 1, sleeping: n === 4 }; });
@@ -18,7 +19,7 @@ const SESSIONS = Array.from({ length: 4 }, (_, i) => { const n = i + 1; return {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.startup('liveList', 'settings')`);
+        await coralReady(ev, 'startup', 'liveList', 'settings');
         await ev(`(async () => { const st = window.__coralStatic || '/static/'; const ws = await import(st + 'websocket.js'); const render = await import(st + 'render.js'); const { state } = await import(st + 'state.js');
             if (state.coralWs) { state.coralWs.onclose = null; state.coralWs.onmessage = null; try { state.coralWs.close(); } catch {} }
             localStorage.clear(); state.hub = false; window.__T = { ws, render, state };
@@ -36,7 +37,11 @@ const SESSIONS = Array.from({ length: 4 }, (_, i) => { const n = i + 1; return {
             await ev(`document.documentElement.setAttribute('data-theme', '${theme}'); true`);
             const secondary = await tok('--text-secondary'), primary = await tok('--text-primary');
             for (const [name, l] of Object.entries(lists)) {
-                await ev(`${l.go}; true`); await sleep(700); // sleep-ok: the page behind the tab is drawn
+                await ev(`${l.go}; true`);
+                // the page behind the tab is drawn: a row at rest, and the current row (Agents: a plain row to mark current)
+                const shown = `[...document.querySelectorAll(${JSON.stringify(l.row)})].filter(e => e.getClientRects().length)`;
+                await waitFor(name === 'Agents' ? `${shown}.some(${l.rest}) && !!document.querySelector('#live-sessions-list li.session-group-item:not(.sleeping):not(.needs-attention)')`
+                    : `${shown}.some(${l.rest}) && ${shown}.some(${l.cur})`, `${theme} ${name}: its rows drawn`, 8000);
                 if (name === 'Agents') await ev(`document.querySelector('#live-sessions-list li.session-group-item:not(.sleeping):not(.needs-attention)').classList.add('active', 'list-row-current'); true`); // the current agent, as the list marks it
                 const rest = await look(l.row, l.label, l.rest), cur = await look(l.row, l.label, name === 'Agents' ? 'e => e.classList.contains("active")' : l.cur);
                 const at = `${theme} ${name}: `;

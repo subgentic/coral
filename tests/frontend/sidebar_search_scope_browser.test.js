@@ -3,6 +3,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, sleep, PRELOAD, install } = await connect();
@@ -10,7 +11,7 @@ const BASE = require('./test_base').BASE;
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+        await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
         await ev(`window.__m.add('alpha-one', 'A', 1, { sleeping: false }); window.__m.add('beta-two', 'B', 2, { sleeping: false }); window.T.render.renderLiveSessions(window.T.state.liveSessions); true`);
         await waitFor(`document.querySelectorAll('#live-sessions-list li[data-session-id]').length >= 2`, 'the two agents', 10000);
         const rows = () => ev(`[...document.querySelectorAll('#live-sessions-list li[data-session-id]')].filter(l => l.getClientRects().length).length`);

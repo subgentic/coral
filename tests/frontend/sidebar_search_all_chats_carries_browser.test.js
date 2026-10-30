@@ -6,12 +6,12 @@ const BASE = require('./test_base').BASE;
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
-    const { settle } = require('./helpers/wait').bind(ev);
+    const { settle, coralReady } = require('./helpers/wait').bind(ev);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [w, h, mobile] of [[1280, 800, false], [390, 844, true]]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady();
             await ev(`(() => { window.__asked = []; const R = window.fetch.bind(window); const json = b => Promise.resolve(new Response(JSON.stringify(b), { status: 200, headers: { 'content-type': 'application/json' } }));
                 const all = Array.from({ length: 6 }, (_, i) => ({ session_id: 'chat-' + i, type: 'agent', title: i === 2 ? 'The build failed' : 'Other chat ' + i, summary: i === 2 ? 'the build failed twice' : 'nothing', agent_name: 'Backend Dev', display_name: 'Backend Dev', last_timestamp: new Date(Date.now() - i * 3600000).toISOString(), duration_sec: 60, source_type: 'claude', starred: false, archived: false, active: false, tags: [] }));
                 window.fetch = (u, o = {}) => { const url = new URL(String(u && u.url || u), location.origin);

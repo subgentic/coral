@@ -11,7 +11,7 @@ const VIEWS = [['1280x800', 1280, 800, false, false], ['390x844', 390, 844, true
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install, select } = await connect();
-    const { settle } = require('./helpers/wait').bind(ev);
+    const { settle, coralReady } = require('./helpers/wait').bind(ev);
     const S = scenarios();
     const rect = () => ev(`(() => { const d = window.__na.panel(); return d ? window.__na.box(d) : null; })()`);
     const click = async (sel, rx) => { assert.ok(await ev(`(() => { const e = window.__na.find(${JSON.stringify(sel)}, ${rx}); if (!e) return false; e.click(); return true; })()`), `no visible ${sel} named ${rx}`); };
@@ -28,7 +28,7 @@ const VIEWS = [['1280x800', 1280, 800, false, false], ['390x844', 390, 844, true
         for (const [label, w, h, mobile, big] of VIEWS) {
             console.log(`${label}`);
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`); await installNA(ev); await stubModels(ev);
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(); await installNA(ev); await stubModels(ev);
             await ev(`document.documentElement.style.fontSize = ${big ? "'32px'" : "''"}; true`);
             let base = null;
             await S.run(`${label}: the dialog is the fixed size (desktop: 640 px or the screen minus 32; phone: a full-height sheet), and the same on step 1, 2 and 3`, async () => {

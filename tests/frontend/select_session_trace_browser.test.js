@@ -10,6 +10,7 @@ const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const GOLDEN = path.join(__dirname, 'fixtures', 'select_session_trace.json');
 const sha = t => require('node:crypto').createHash('sha256').update(t).digest('hex');
+const { coralReady } = require('./helpers/wait');
 
 const RECORD = `(() => {
     window.__seen = { fetches: [], sockets: [] };
@@ -50,7 +51,7 @@ const RECORD = `(() => {
         const run = async (name, setup, calls) => {
             await Page.navigate({ url: BASE }); await Page.loadEventFired(); await install();
             await ev(RECORD);
-            await ev(`window.__coralReady.startup('liveList', 'settings')`);
+            await coralReady(ev, 'startup', 'liveList', 'settings');
             await ev(`localStorage.clear(); ${setup}; T.render.renderLiveSessions(T.state.liveSessions); true`);
             await sleep(300); // sleep-ok: the list and startup loads settle over frames; there is no completion event
             const steps = [];

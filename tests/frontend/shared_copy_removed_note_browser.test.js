@@ -4,6 +4,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 const HEX = 'c'.repeat(64);
 const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
 
@@ -16,7 +17,7 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await ev(`(() => { const real = window.fetch; window.__deletes = [];
             window.fetch = async (u, o = {}) => { const p = String(u), m = (o.method || 'GET').toUpperCase();
                 if (m === 'DELETE' && p.includes('/api/shared-images/${HEX}')) { window.__deletes.push(p); return new Response(window.__answer === 'nobody' ? '' : JSON.stringify(window.__answer), { status: window.__status || 200, headers: { 'Content-Type': 'application/json' } }); }

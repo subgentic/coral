@@ -5,6 +5,7 @@ const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const { seed } = require('./helpers/team_page');
 const { removeBoards } = require('./helpers/board_cleanup');
+const { coralReady } = require('./helpers/wait');
 const TEAM = `qa-restore-${Date.now() % 100000}`;
 
 (async () => {
@@ -13,7 +14,7 @@ const TEAM = `qa-restore-${Date.now() % 100000}`;
     const results = [];
     const check = (label, cond, detail) => { results.push(!!cond); console.log(`[${cond ? 'PASS' : 'FAIL'}] ${label}${detail !== undefined ? ' - ' + detail : ''}`); };
     const shot = async name => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; const fs = require('node:fs'); fs.mkdirSync(d, { recursive: true }); await sleep(350); fs.writeFileSync(`${d}/${name}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); }; // sleep-ok: a picture waits for the paint
-    const open = async path => { await Page.navigate({ url: BASE + path }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`); await sleep(900); }; // sleep-ok: the start route is shown after the live list answers; no single completion event
+    const open = async path => { await Page.navigate({ url: BASE + path }); await Page.loadEventFired(); await install(); await coralReady(ev); await sleep(900); }; // sleep-ok: the start route is shown after the live list answers; no single completion event
     const state = () => ev(`({ path: location.pathname, search: location.search, kept: (() => { try { return localStorage.getItem('coral-last-place'); } catch { return 'blocked'; } })(), toast: [...document.querySelectorAll('.toast, #toast-container .toast, [role=alert]')].map(t => t.textContent.trim()).filter(Boolean), home: !!document.getElementById('welcome-screen') && getComputedStyle(document.getElementById('welcome-screen')).display !== 'none' && document.getElementById('welcome-screen').getBoundingClientRect().height > 0, team: !!document.getElementById('team-page-view') && getComputedStyle(document.getElementById('team-page-view')).display !== 'none' && document.getElementById('team-page-view').getBoundingClientRect().height > 0 })`);
     const isHome = p => p === '/' || p === '/agents'; // Home's address is /agents once the start is written
     const go = route => ev(`Promise.all([import(${S} + 'nav.js'), import(${S} + 'routes.js')]).then(([n, r]) => n.go(${route})).then(() => true)`);

@@ -4,6 +4,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -14,7 +15,7 @@ const BASE = require('./test_base').BASE;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled(mobile ? { enabled: true, maxTouchPoints: 5 } : { enabled: false });
             for (const found of [false, true]) {
                 await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-                await ev(`window.__coralReady.then(() => true)`);
+                await coralReady(ev);
                 await ev(`(() => { const real = window.fetch; window.fetch = (u, o) => /\\/api\\/system\\/cli-check/.test(String(u)) ? Promise.resolve(new Response(JSON.stringify({ found: ${found}, status: ${found ? "'available'" : "'missing'"}, agent_type: new URL(String(u), location.href).searchParams.get('type') }), { status: 200, headers: { 'Content-Type': 'application/json' } })) : real(u, o); return true; })()`);
                 await ev(`window.showSettingsModal('agents'); true`);
                 await waitFor(`!!document.querySelector('#settings-pane-agents #settings-cli-paths > summary') && document.querySelector('#settings-pane-agents #settings-cli-paths > summary').getClientRects().length > 0`, 'the CLI paths line', 8000);

@@ -5,6 +5,7 @@
 //  group headers, Show computer, Group by computer and the Servers tab are unchanged and covered by server_switcher_browser and server_menu.)
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 const NOW = new Date().toISOString();
 const SERVERS = [
@@ -30,7 +31,7 @@ const SERVERS = [
             console.log(dev);
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile });
             await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.then(() => true)`);
+            await coralReady(ev);
             await ev(`T.state.hub = true; T.state.cloud = true; T.state.servers = ${JSON.stringify(SERVERS)}; T.state.liveSessions = []; window.__m.agents = {};
                 ${JSON.stringify(SERVERS)}.forEach(s => { window.__m.add('a-' + s.id, 'S', 3, { sleeping: false, server: s.id }); window.__m.add('b-' + s.id, 'T', 3, { sleeping: false, server: s.id }); });
                 T.render.renderLiveSessions(T.state.liveSessions); true`);

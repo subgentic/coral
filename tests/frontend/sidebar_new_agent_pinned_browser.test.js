@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { themeJs } = require('./helpers/theme');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -17,7 +18,7 @@ const BASE = require('./test_base').BASE;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile });
             await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.then(() => true)`);
+            await coralReady(ev);
             await ev(`window.switchNavTab('agents'); true`);
             const n = await ev(`(async () => { T.state.liveSessions = []; window.__m.agents = {};
                 for (let i = 1; i <= 25; i++) window.__m.add('agent-' + String(i).padStart(2, '0'), 'A', 3, { sleeping: false });

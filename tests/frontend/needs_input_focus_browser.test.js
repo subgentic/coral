@@ -3,6 +3,7 @@
 // (200% zoom). Drives Chrome over CDP through agent_view_harness.js; the card is the real needs_input_card.js, built in the chat of a selected agent.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -15,7 +16,7 @@ const { connect } = require('./agent_view_harness');
         for (const [w, h] of [[1280, 800], [640, 400]]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile: false });
             await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.startup('liveList', 'settings')`);
+            await coralReady(ev, 'startup', 'liveList', 'settings');
             await ev(`T.state.liveSessions = ${JSON.stringify([base])}; T.render.renderLiveSessions(T.state.liveSessions); window.selectLiveSession('coral-go', 'claude', 'o1'); true`);
             await waitFor(`!!document.getElementById('command-input') && document.getElementById('command-input').getClientRects().length > 0 && !!document.getElementById('live-history-messages')`, `${w}: the chat with its message box`, 10000);
             for (const [what, summary, options] of [['question', 'Wants to know: Pick a color', [['Red', 'select'], ['Blue', 'select']]], ['permission', 'Wants to run: rm -rf /tmp/x', [['Yes', 'select'], ['No', 'select']]]]) {

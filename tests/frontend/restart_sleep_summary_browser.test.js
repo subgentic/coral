@@ -3,6 +3,7 @@
 // fold into the sidebar's line, "4 sleeping agents, all after Coral restarted", with no Wake button on it (#10814: each agent wakes from its own row). An ordinary sleep stays a row. 1280 and 390 px. Drives Chrome over CDP through agent_view_harness.js (mocked live list and wake) against the isolated dev server.
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, sleep, PRELOAD, install } = await connect();
@@ -17,7 +18,7 @@ const BASE = require('./test_base').BASE;
             const tag = `${w}px`; LIST = mobile ? '#mobile-session-list' : '#live-sessions-list';
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.then(() => true)`);
+            await coralReady(ev);
             await ev(`(() => {
                 window.__m.add('lead', 'L', 2, { sleeping: false, board_project: 'restart-team' });
                 window.__m.add('dev-a', 'A', 2, { sleeping: true, sleep_reason: 'coral_stopped', board_project: 'restart-team' });

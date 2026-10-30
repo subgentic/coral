@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 const OK = '{"is_error":false,"result":"Mock agent goal","total_cost_usd":0,"type":"result","usage":{"input_tokens":43,"output_tokens":8}}';
 const BAD = '{"type":"result","is_error":true,"result":"The folder does not exist: /tmp/x","usage":{"input_tokens":1}}';
@@ -13,7 +14,7 @@ const BAD = '{"type":"result","is_error":true,"result":"The folder does not exis
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         const show = (title, message, level) => ev(`import((window.__coralStatic || '/static/') + 'notifications.js').then(m => { document.querySelectorAll('.alert-notification-overlay').forEach(o => o.remove()); m.showAlertNotification(${JSON.stringify(title)}, ${JSON.stringify(message)}, ${JSON.stringify(level)}); return true; })`);
         const read = () => ev(`(() => { const o = [...document.querySelectorAll('.alert-notification-overlay')].pop(); const d = o.querySelector('.alert-notification-details'); return { message: o.querySelector('.alert-notification-message')?.textContent, details: d ? d.querySelector('summary').textContent : null, open: d ? d.open : null, raw: d ? d.querySelector('pre').textContent : null, shown: d ? d.open : null }; })()`);
         await show('Daily Motivation', OK, 'success');
