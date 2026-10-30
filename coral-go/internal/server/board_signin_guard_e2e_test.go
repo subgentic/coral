@@ -119,6 +119,7 @@ var writeRoutesWithoutTheGuard = map[string]string{
 	"DELETE /api/board/remotes":                                        "a delete: no text is kept",
 	"DELETE /api/board/{project}":                                      "a delete: no text is kept",
 	"DELETE /api/board/{project}/subscribe":                            "a delete: no text is kept",
+	"DELETE /api/board/{project}/seats/{subscriberID}":                 "a delete by id: no text is kept",
 	"DELETE /api/board/{project}/messages/{messageID}":                 "a delete by id: no text is kept",
 	"DELETE /api/board/{project}/groups/{groupID}/members/{sessionID}": "a delete by id: no text is kept",
 	"DELETE /api/board/{project}/waits":                                "a delete: no text is kept",
