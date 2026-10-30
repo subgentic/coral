@@ -26,7 +26,7 @@ import { attachmentsLead, sentToastText } from './shared_images.js';
 import './lazy_panels.js';
 import { responseError } from './server_status.js';
 import './launch_flags.js';
-import { reportSendError, showComposerError, clearComposerError, awaitSocketAccept, nextInputId, refuseSocketSends } from './terminal_gone.js';
+import { reportSendError, showComposerError, clearComposerError, awaitSocketAccept, nextInputId, refuseSocketSends, mayHaveArrived } from './terminal_gone.js';
 import { rememberSend, noteHeld } from './held_sends.js';
 import './overload.js';
 import { syncSendStarting } from './agent_starting.js';
@@ -193,6 +193,15 @@ export async function sendCommand({ nudge = false } = {}) {
                 if (fresh) resp = await post(fresh.name, fresh.agent_type);
             }
             if (!resp.ok) {
+                const body = await resp.clone().json().catch(() => null); // null: not JSON
+                if (body && mayHaveArrived(body.code, body.not_sent)) {
+                    // It may well have arrived (#318): the bubble stays with what Coral can't confirm, the box stays empty, and the attachments went with it. Sending it again would type it twice.
+                    confirmPendingMessage(sentSessionId, sentAt, true);
+                    clearAttachments(targetSession); // the box and its saved draft were emptied when it was sent
+                    const { text, code, exited } = await responseError(resp, sessionServer(targetSession), `The message was not confirmed (HTTP ${resp.status}).`);
+                    reportSendError(targetSession, text, code, exited);
+                    return;
+                }
                 notSent();
                 // Plain text naming the server; never the raw response (#3151). The draft stays.
                 // Said under the composer (#3218); a gone terminal also marks the agent and offers Restart.
@@ -240,12 +249,17 @@ function clearSentDraft(session) {
     if (key) saveSessionDraft(key, "");
 }
 
-/** A composer send over the terminal socket was accepted or refused (#3218). */
+/** A composer send over the terminal socket was accepted, refused, or not confirmed though it may have arrived (#3218, #318). */
 function _settleSocketSend(session, command, sentAt, ok) {
     const key = sessionKey(session);
     const saved = (key && state.sessionInputText[key]) || "";
     const input = document.getElementById("command-input");
     const onIt = !!(input && state.currentSession && sessionKey(state.currentSession) === key);
+    if (ok && ok.unconfirmed) {
+        // It may well have arrived (#318): not taken back. The bubble stays with its note (the reason is under the box), the box and the draft stay empty.
+        confirmPendingMessage(session.session_id, sentAt, true); // the draft was emptied when it was sent
+        return;
+    }
     if (ok) {
         confirmPendingMessage(session.session_id, sentAt);
         // Text typed since the send is a new draft and stays.
