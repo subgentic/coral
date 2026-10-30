@@ -11,6 +11,8 @@ package testtemp
 
 import (
 	"context"
+	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -21,7 +23,8 @@ import (
 )
 
 // Use points TMPDIR, TMP, TEMP, GOTMPDIR, HOME, USERPROFILE and CORAL_DATA_DIR at a new folder for the rest of the process and returns the func that removes it. A test that sets one of them
-// itself (t.Setenv) still can. If the folder can't be made it changes nothing.
+// itself (t.Setenv) still can. If the folder can't be made it changes nothing, and says so in one line on stderr: the tests then run in the real
+// temp and home folders.
 //
 // It acts only in the process `go test` started (or a runner that passes the same flag, tools/go_test_shard.py): a test that re-runs its own binary as a helper child (51 test files do:
 // coral-board's runBoardInput, the fake CLIs, the hook echoes) hands that child exactly the environment it means it to have, and the child's own TestMain must not replace it. `go test`
@@ -64,14 +67,28 @@ func privateBase() string {
 
 func setup() (cleanup func()) {
 	pinGoTool()
-	dir, err := os.MkdirTemp(privateBase(), "ct-")
+	return setupIn(privateBase(), os.Stderr)
+}
+
+// setupIn makes the private world under base (the system temp folder when ""), first removing what earlier runs left there (sweepStale).
+// A failure is one line on stderr, and nothing changes.
+func setupIn(base string, stderr io.Writer) (cleanup func()) {
+	sweepStale(base, time.Now())
+	dir, err := os.MkdirTemp(base, "ct-")
 	if err != nil {
+		fmt.Fprintf(stderr, "testtemp: no private test folder (%v): the tests run in the real temp and home folders\n", err)
 		return func() {}
+	}
+	// Windows: a TMP on a folder with a wider access list would hand it on to the private folder; make it this user's alone before
+	// anything is made in it. A failure is said, and the private folder is still used.
+	if _, err := ownerOnly(dir); err != nil {
+		fmt.Fprintf(stderr, "testtemp: the private test folder %s could not be made this user's alone: %v\n", dir, err)
 	}
 	tmp, home, data := filepath.Join(dir, "tmp"), filepath.Join(dir, "home"), filepath.Join(dir, "coral-data")
 	for _, d := range []string{tmp, home, data} {
-		if os.MkdirAll(d, 0o700) != nil {
+		if err := os.MkdirAll(d, 0o700); err != nil {
 			os.RemoveAll(dir)
+			fmt.Fprintf(stderr, "testtemp: no private test folder (%v): the tests run in the real temp and home folders\n", err)
 			return func() {}
 		}
 	}
