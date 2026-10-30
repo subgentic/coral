@@ -7,6 +7,7 @@ import (
 	"errors"
 	"net/http"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/go-chi/chi/v5"
@@ -237,10 +238,10 @@ func TestRecordingAProgramUnderANestedShellNeedsTheAcknowledgement(t *testing.T)
 // #391, Unix: after an update, an npm-installed CLI runs as `node <script>`. Bulk records it only when the IMAGE is an interpreter and the script is exactly the resolved CLI file.
 func TestBulkRecordsAnInterpreterRunningExactlyTheCLI(t *testing.T) {
 	srv, term, ss, nameA, nameB := recordFixture(t)
-	settings, err := ss.GetSettingsForCLI(context.Background())
-	require.NoError(t, err)
-	cli := settings["cli_path_claude"]
+	// A CLI file this test makes itself: the fixture's stub may be a system binary (/usr/bin/true on macOS) that cannot be written.
+	cli := filepath.Join(t.TempDir(), "claude-cli.js")
 	require.NoError(t, os.WriteFile(cli, []byte("#!/usr/bin/env node\n"), 0o755))
+	require.NoError(t, ss.SetSetting(context.Background(), "cli_path_claude", cli))
 	term.paused[nameA], term.paused[nameB] = true, true
 	term.cand[nameA] = ptymanager.AgentCandidate{PID: 100, Start: "s1", Program: "node", Image: "/usr/bin/node", Script: cli}
 	term.cand[nameB] = ptymanager.AgentCandidate{PID: 200, Start: "s2", Program: "node", Image: "/usr/bin/node", Script: cli + ".other"}

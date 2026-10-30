@@ -15,6 +15,7 @@ import (
 	at "github.com/subgentic/coral/internal/agenttypes"
 	"github.com/subgentic/coral/internal/naming"
 	"github.com/subgentic/coral/internal/ptymanager"
+	"github.com/subgentic/coral/internal/safefs"
 	"github.com/subgentic/coral/internal/store"
 )
 
@@ -241,7 +242,7 @@ func sameImage(image, cli string) bool {
 }
 
 func resolvedPath(p string) string {
-	if r, err := filepath.EvalSymlinks(p); err == nil {
+	if r, err := safefs.Resolve(p); err == nil { // the route census asks for safefs.Resolve, not a bare EvalSymlinks
 		p = r
 	}
 	return filepath.Clean(p)
