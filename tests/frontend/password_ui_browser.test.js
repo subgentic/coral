@@ -53,7 +53,7 @@ const BASE = require('./test_base').BASE;
             out.shown = $('set-password-new').type;
             document.querySelector('#set-password-modal .pw-toggle').click();
             out.hiddenAgain = $('set-password-new').type;
-            out.meterEmpty = getComputedStyle(document.querySelector('#set-password-modal .pw-strength')).display; out.notNowNote = document.querySelector('#set-password-modal .pw-not-now')?.textContent || ''; { const n = document.querySelector('#set-password-modal .pw-not-now'), l = document.querySelector('#set-password-modal label'); out.noteGap = Math.round(l.getBoundingClientRect().top - n.getBoundingClientRect().bottom); out.notNowInView = $('set-password-later').getBoundingClientRect().bottom <= innerHeight; }
+            out.meterEmpty = getComputedStyle(document.querySelector('#set-password-modal .pw-strength')).visibility; out.notNowNote = document.querySelector('#set-password-modal .pw-not-now')?.textContent || ''; { const n = document.querySelector('#set-password-modal .pw-not-now'), l = document.querySelector('#set-password-modal label'); out.noteGap = Math.round(l.getBoundingClientRect().top - n.getBoundingClientRect().bottom); out.notNowInView = $('set-password-later').getBoundingClientRect().bottom <= innerHeight; }
             type('set-password-new', 'a');
             out.meterTyped = getComputedStyle(document.querySelector('#set-password-modal .pw-strength')).visibility;
             out.weak = { level: document.querySelector('#set-password-modal .pw-strength').getAttribute('data-level'), disabled: $('set-password-save').disabled };
@@ -159,7 +159,7 @@ const BASE = require('./test_base').BASE;
         assert.equal(out.lead2, out.lead1, 'the same words on a later visit, and no "nothing changed" notice');
         assert.doesNotMatch(out.lead1 + out.lead2, /nothing changed|now asks browsers/);
         assert.deepEqual(out.weak, { level: 'weak', disabled: false }, 'the meter advises and never blocks');
-        assert.equal(out.meterEmpty, 'none', 'no strength bar is drawn before anything is typed (#9971) and it holds no room: it sits under Confirm, so typing moves nothing above it (#10281, #11304)'); assert.equal(out.meterTyped, 'visible', 'the bar shows once something is typed');
+        assert.equal(out.meterEmpty, 'hidden', 'no strength bar is drawn before anything is typed (#9971), though its space is kept so Confirm does not move when typing starts (#10281)'); assert.equal(out.meterTyped, 'visible', 'the bar shows once something is typed');
         assert.equal(out.notNowNote, 'Only you use this computer? You can skip this: the Coral app opens without a password. You can set one later in Settings, Security and privacy.', 'the prompt says what no password leaves you with, and the paragraph does not open with the button\'s name (#10892)');
         assert.ok(out.noteGap >= 8, 'room between that line and the Password label (' + out.noteGap + ' px)'); assert.equal(out.notNowInView, true, 'Not now is within the screen')
         assert.equal(out.emptyErr, 'Enter a password.'); assert.equal(out.callsAfterEmpty, 0);
