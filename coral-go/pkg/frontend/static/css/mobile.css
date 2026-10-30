@@ -1362,7 +1362,7 @@
     #mobile-agent-list .phone-menu-btn, #mobile-agent-list .phone-account-btn { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 44px; height: 44px; min-width: 44px; padding: 0; border-radius: 50%; }
     #mobile-agent-list .phone-menu-btn { order: 0; }
     #mobile-agent-list .mobile-search-row { order: 1; flex: 1 1 0; min-width: 0; }
-    #mobile-agent-list .phone-account-btn { order: 2; border: 0; background: none; color: var(--text-secondary); cursor: pointer; }
+    #mobile-agent-list .phone-account-btn { position: relative; order: 2; border: 0; background: none; color: var(--text-secondary); cursor: pointer; }
     #mobile-agent-list .phone-account-btn .material-icons { font-size: var(--icon-size); }
     #mobile-agent-list .phone-break { order: 3; display: block; flex: 0 0 100%; height: 0; }
     #mobile-agent-list .mobile-list-header .mobile-search-input { height: 48px; border-radius: 24px; border: 0; background: var(--bg-secondary); padding: 0 18px; font-size: var(--fs-lg); }
@@ -1443,7 +1443,6 @@
 }
 
 @media (max-width: 600px) { /* the hub's state on the Agents page (its top bar is the page's own first row): a dot on the account button, the colours of the top bar's indicator (hub_indicator.js) */
-    #mobile-agent-list .phone-account-btn { position: relative; }
     body[data-hub-state] #mobile-agent-list .phone-account-btn::after { content: ''; position: absolute; right: 6px; bottom: 6px; width: 12px; height: 12px; box-sizing: border-box; border-radius: 50%; border: 2px solid var(--bg-primary); background: var(--text-muted); }
     body[data-hub-state="connected"] #mobile-agent-list .phone-account-btn::after { background: var(--success); }
     body[data-hub-state="disconnected"] #mobile-agent-list .phone-account-btn::after { background: var(--warning); }

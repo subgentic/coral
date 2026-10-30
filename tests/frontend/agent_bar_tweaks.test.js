@@ -593,7 +593,7 @@ async function run() {
                      over: list.scrollWidth - list.clientWidth };
         })()`);
         check('mobile clone list rendered at 390px', mobile.list && mobile.viewport === 390, JSON.stringify(mobile));
-        check('mobile card is one 56 px row (Option A, #10691), nothing sideways', mobile.height >= 55 && mobile.height <= 57 && mobile.over <= 1, JSON.stringify(mobile));
+        check('mobile card is one card, 72 to 100 px (the Google Chat cards, #11096; it was a 56 px row, #10691), nothing sideways', mobile.height >= 72 && mobile.height <= 100 && mobile.over <= 1, JSON.stringify(mobile));
         check('mobile card: a Check terminal agent has its status line drawn (no chip on a phone, #10691), and no goal, banner, meta or context pill', mobile.chips.length === 0 && mobile.status === 'Check terminal' && mobile.extra.length === 0, JSON.stringify(mobile));
         // Back to desktop; the desktop rules must still hide the mobile rows.
         await Emulation.setDeviceMetricsOverride({ width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });

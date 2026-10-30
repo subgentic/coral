@@ -155,7 +155,9 @@ const SERVERS = [
         assert.ok(k.server && k.team && k.folder, `phone: all three kebabs present (${JSON.stringify(k)})`);
         assert.deepEqual([k.server.right, k.server.width, k.server.height], [k.team.right, k.team.width, k.team.height], `phone: server vs team kebab (${JSON.stringify(k)})`);
         assert.deepEqual([k.server.right, k.server.width, k.server.height], [k.folder.right, k.folder.width, k.folder.height], `phone: server vs folder kebab (${JSON.stringify(k)})`);
-        for (const a of ['teamAgent', 'folderAgent']) assert.ok(Math.abs((k[a].left + k[a].right) / 2 - (k.server.left + k.server.right) / 2) <= 1, `phone: ${a} kebab in the column (${JSON.stringify(k)})`);
+        // a phone's agent row is a card whose kebab is at its lower right (#11096): only the group headers' menus (server, team, folder) share a column
+        for (const a of ['teamAgent', 'folderAgent']) assert.ok(k[a].right <= 390 && k[a].width >= 24, `phone: ${a} kebab is on the screen inside its card (${JSON.stringify(k)})`);
+        for (const a of ['team', 'folder']) assert.ok(Math.abs((k[a].left + k[a].right) / 2 - (k.server.left + k.server.right) / 2) <= 1, `phone: ${a} kebab in the column (${JSON.stringify(k)})`);
         // what a finger hits: the server kebab is a 24 px box with a 44 px ::after (#9332)
         const hit = await ev(`(() => { const a = (${TOUCH_AREA})(document.querySelector('#mobile-agent-list li.server-group-header[data-server-group="m1"] .server-group-more-btn')); return { w: Math.round(a.w), h: Math.round(a.h), after: a.after }; })()`);
         assert.ok(hit.w >= 44 && hit.h >= 44, `phone: a 44 px hit area (${JSON.stringify(hit)})`);
