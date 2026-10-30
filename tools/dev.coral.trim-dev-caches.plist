@@ -4,7 +4,7 @@
        cp tools/trim-dev-caches.sh ~/.local/bin/trim-dev-caches.sh
        sed -e "s|__SCRIPT__|$HOME/.local/bin/trim-dev-caches.sh|g" -e "s|__REPO__|$HOME/Software/coral|g" -e "s|__HOME__|$HOME|g" tools/dev.coral.trim-dev-caches.plist > ~/Library/LaunchAgents/dev.coral.trim-dev-caches.plist
        launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/dev.coral.trim-dev-caches.plist
-     Remove: launchctl bootout gui/$(id -u)/dev.coral.trim-dev-caches. It runs the cache trim (files unused for 6 hours) and lists, never removes, merged worktrees;
+     Remove: launchctl bootout gui/$(id -u)/dev.coral.trim-dev-caches. It runs the cache trim (files unused for 2 hours: ten agents building grew the cache from 16 to 30 GB in an hour, #11251) and lists, never removes, merged worktrees;
      the log is ~/.cache/coral-dev-trim.log. It holds no agent token and does not touch ~/.coral. -->
 <plist version="1.0">
 <dict>
@@ -13,6 +13,8 @@
   <array>
     <string>/bin/bash</string>
     <string>__SCRIPT__</string>
+    <string>--hours</string>
+    <string>2</string>
   </array>
   <key>EnvironmentVariables</key>
   <dict>
