@@ -242,7 +242,7 @@ export function renderAgentPage(host, agent, ctx) {
     host.setAttribute('aria-label', agent.name);
     const back = el('button', 'back-link goals-back'); back.type = 'button';
     const arrow = el('span', 'goals-back-arrow', '←'); arrow.setAttribute('aria-hidden', 'true');
-    back.append(arrow, document.createTextNode(' Agents'));
+    back.append(arrow, el('span', null, ' Agents'));
     back.addEventListener('click', () => ctx.onBack());
     const page = el('div', 'goals-page goals-table-page team-agent-page');
     const status = el('div', 'team-agents-status sr-only'); status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');

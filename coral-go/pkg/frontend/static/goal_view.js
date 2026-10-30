@@ -106,7 +106,7 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
     function backButton(text, onClick) {
         const b = btn('back-link goals-back', null, onClick);
         const arrow = el('span', 'goals-back-arrow', '←'); arrow.setAttribute('aria-hidden', 'true');
-        b.append(arrow, document.createTextNode(` ${text}`));
+        b.append(arrow, el('span', null, ` ${text}`));
         return b;
     }
 

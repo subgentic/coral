@@ -384,7 +384,7 @@ export function renderTaskPage(host, task, ctx, mode = 'view') {
     const acts = { project: ctx.project, redraw: (t, m) => renderTaskPage(host, t || task, ctx, m), reload: (message) => reloadTask(host, task.id, ctx, message) };
     const back = el('button', 'back-link goals-back'); back.type = 'button'; back.hidden = !!ctx.hideBack;
     const arrow = el('span', 'goals-back-arrow', '←'); arrow.setAttribute('aria-hidden', 'true');
-    back.append(arrow, document.createTextNode(` ${ctx.backLabel}`));
+    back.append(arrow, el('span', null, ` ${ctx.backLabel}`));
     back.addEventListener('click', () => ctx.onBack());
     const page = el('div', 'goals-page goals-table-page team-task-page');
     const h = el('h2', 'goals-detail-title', `#${task.id} ${task.title}`); h.tabIndex = -1; h.id = 'team-task-title';

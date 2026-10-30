@@ -696,7 +696,7 @@ function openPageShell(kindLabel, groupKey) {
     host.replaceChildren();
     const back = el('button', 'back-link', `\u2190 ${kindLabel}`); // the link back to the group's table (the shared one, sidebar_groups.js)
     back.type = 'button'; back.setAttribute('data-on-click', 'inbox-back'); back.dataset.kind = 'hub-inbox'; back.dataset.group = groupKey; // the way back puts the focus on the row it came from
-    const phoneBack = el('button', 'back-link inbox-phone-back', `\u2190 ${kindLabel}`); // a phone: back to the folder's table, which has the folders' select on top
+    const phoneBack = el('button', 'back-link inbox-phone-back'); phoneBack.append(el('span', null, `\u2190 ${kindLabel}`)); /* the words in a span: a phone's bar draws the arrow and hides them (layout.css) */ // a phone: back to the folder's table, which has the folders' select on top
     phoneBack.type = 'button'; phoneBack.setAttribute('data-on-click', 'inbox-phone-back');
     host.append(back, phoneBack);
     return host;
