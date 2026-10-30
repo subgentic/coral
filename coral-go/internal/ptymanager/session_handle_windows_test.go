@@ -35,14 +35,26 @@ const exitNow = "powershell.exe -NoProfile -Command exit"
 func TestASecondBatchOfSessionsThatEndOnTheirOwnAddsNoHandles(t *testing.T) {
 	naming.SetDefaultLogDir(t.TempDir())
 	const runs = 8
-	settle := func() { time.Sleep(exitDrain + 6*time.Second) }
 	backend := NewPTYBackend()
 	defer backend.Close()
+	// A batch is counted once every session in it has ended and its exit watcher has had the drain to close it, not after a fixed
+	// time: on a busy machine a PowerShell can take longer than the old 6 s to start and exit, and a session still running holds its
+	// pseudo console, which read as up to 61 "leaked" handles (#370). The limit below is unchanged.
 	batch := func(tag string) {
-		for i := 0; i < runs; i++ {
-			require.NoError(t, backend.Spawn(fmt.Sprintf("hd-%s%d", tag, i), "test", t.TempDir(), fmt.Sprintf("sid-hd-%s%d", tag, i), exitNow, 120, 40))
+		names := make([]string, runs)
+		for i := range names {
+			names[i] = fmt.Sprintf("hd-%s%d", tag, i)
+			require.NoError(t, backend.Spawn(names[i], "test", t.TempDir(), fmt.Sprintf("sid-hd-%s%d", tag, i), exitNow, 120, 40))
 		}
-		settle()
+		require.Eventually(t, func() bool {
+			for _, n := range names {
+				if backend.IsRunning(n) {
+					return false
+				}
+			}
+			return true
+		}, 90*time.Second, 100*time.Millisecond, "the %s batch's sessions did not all end", tag)
+		time.Sleep(exitDrain + time.Second) // the exit watcher closes each pseudo console after the drain
 	}
 	batch("a") // the first batch pays the one-time cost
 	before := handleCount(t)
