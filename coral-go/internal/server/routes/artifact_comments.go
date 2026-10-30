@@ -98,11 +98,11 @@ func (l *commentLimiter) allow(key string, now time.Time) bool {
 // RegisterArtifactComments adds the comment routes.
 func (h *SessionsHandler) RegisterArtifactComments(r chi.Router) {
 	r.Get("/api/artifacts/{id}/comments", h.listArtifactComments)
-	r.Post("/api/artifacts/{id}/comments", h.createArtifactComment)
-	r.Patch("/api/artifacts/{id}/comments/{cid}", h.editArtifactComment)
+	r.With(RefuseSignInLink).Post("/api/artifacts/{id}/comments", h.createArtifactComment)
+	r.With(RefuseSignInLink).Patch("/api/artifacts/{id}/comments/{cid}", h.editArtifactComment)
 	r.Delete("/api/artifacts/{id}/comments/{cid}", h.deleteArtifactComment)
-	r.Post("/api/artifacts/{id}/comments/{cid}/send", h.sendArtifactComment)
-	r.Post("/api/artifacts/{id}/comments/{cid}/reply", h.agentReplyArtifactComment)
+	r.With(RefuseSignInLink).Post("/api/artifacts/{id}/comments/{cid}/send", h.sendArtifactComment)
+	r.With(RefuseSignInLink).Post("/api/artifacts/{id}/comments/{cid}/reply", h.agentReplyArtifactComment)
 	r.Post("/api/artifacts/{id}/comments/{cid}/resolve", h.resolveArtifactComment(true))
 	r.Post("/api/artifacts/{id}/comments/{cid}/reopen", h.resolveArtifactComment(false))
 	r.Put("/api/artifacts/{id}/comments/lock", h.lockArtifactComments(true))

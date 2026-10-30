@@ -22,12 +22,12 @@ const uiCSP = "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe
 // RegisterAgentUI exposes the session-scoped POC, separate from global Custom Views.
 func (h *SessionsHandler) RegisterAgentUI(r chi.Router) {
 	r.Get("/api/agent/ui", h.agentUI)
-	r.Put("/api/agent/ui/{id}", h.agentUI)
+	r.With(RefuseSignInLink).Put("/api/agent/ui/{id}", h.agentUI)
 	r.Delete("/api/agent/ui/{id}", h.agentUI)
 	r.Get("/api/agent/ui/{id}/content", h.agentUI)
 	r.Get("/api/agent/ui/{id}/events", h.agentUI)
 	r.Post("/api/agent/ui/{id}/events", h.agentUI)
-	r.Post("/api/agent/ui-request", h.agentUIRequest)
+	r.With(RefuseSignInLink).Post("/api/agent/ui-request", h.agentUIRequest)
 }
 func (h *SessionsHandler) agentUI(w http.ResponseWriter, r *http.Request) {
 	sid := r.URL.Query().Get("session_id")

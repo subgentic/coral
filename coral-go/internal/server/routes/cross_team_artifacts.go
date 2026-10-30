@@ -385,6 +385,13 @@ func (h *BoardHandler) PostExternalArtifact(w http.ResponseWriter, r *http.Reque
 		receivedRefuse(w, http.StatusBadRequest, "bad_frame", "the metadata is not valid", "")
 		return
 	}
+	// The metadata (the name, above all) is shown to people here: a sign-in link in it is refused, checked as JSON once decoded and once more
+	// percent-decoded. The file's bytes are not looked at: a file that quotes the parameter is stored as sent (#232 warns of files, it does not
+	// refuse them). Before the quota, so a refusal costs the sender nothing.
+	if carriesSignInLink(raw) {
+		receivedRefuse(w, http.StatusBadRequest, "sign_in_link", signInLinkRefusal, "")
+		return
+	}
 	if ok, limit, retry := h.received.admitTransfer(src+"\x00"+meta.MessageID+"\x00"+meta.Digest, src, target, meta.Size); !ok {
 		secs := int((retry + time.Second - 1) / time.Second)
 		httputil.WriteActionLimitBody(w, secs, map[string]any{"ok": false, "error": "artifact_quota", "limit": limit, "message": "too many files received; retry later"})

@@ -109,6 +109,12 @@ func (h *SessionsHandler) uploadAgentArtifact(w http.ResponseWriter, r *http.Req
 		errBadRequest(w, "X-Artifact-Name must be 1–160 characters of plain text, with no control or formatting characters")
 		return
 	}
+	// The name is shown to other people (the artifact list, cross-team messages); the file's contents are the person's to share (#232 warns of
+	// them on the client and does not refuse).
+	if hasSignInLink(name) {
+		writeError(w, http.StatusBadRequest, "sign_in_link", signInLinkRefusal)
+		return
+	}
 	if !board.ValidLabel(strings.TrimSpace(r.Header.Get("X-Artifact-Media-Type")), 127) {
 		errBadRequest(w, "X-Artifact-Media-Type must be at most 127 characters of plain text, with no control or formatting characters")
 		return

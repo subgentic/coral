@@ -96,6 +96,11 @@ func UploadFile(w http.ResponseWriter, r *http.Request) {
 	if header != nil {
 		filename = header.Filename
 	}
+	// The name is shown with the file and shared with it; the file's contents are the person's (#232 warns of files, it does not refuse them).
+	if hasSignInLink(filename) {
+		writeError(w, http.StatusBadRequest, "sign_in_link", signInLinkRefusal)
+		return
+	}
 
 	ext := ""
 	if filename != "" {
