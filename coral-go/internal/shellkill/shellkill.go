@@ -290,7 +290,27 @@ func balanced(s string) (string, int) {
 }
 
 // prefixes are words that run the next word as a program: the program after them is the command.
-var prefixes = map[string]bool{"sudo": true, "command": true, "exec": true, "nohup": true, "env": true, "time": true, "nice": true, "timeout": true, "builtin": true, "stdbuf": true, "setsid": true, "doas": true}
+var prefixes = map[string]bool{"sudo": true, "command": true, "exec": true, "nohup": true, "env": true, "time": true, "nice": true, "timeout": true, "builtin": true, "stdbuf": true, "setsid": true, "ionice": true, "chrt": true, "doas": true}
+
+// wrapperOptionValues are, for the wrappers, the options (short and long, as the separate word that names them) whose value is the next word.
+var wrapperOptionValues = map[string]map[string]bool{
+	"sudo":    set("-u", "--user", "-g", "--group", "-h", "--host", "-p", "--prompt", "-C", "--close-from", "-D", "--chdir", "-R", "--chroot", "-r", "--role", "-t", "--type", "-U", "--other-user", "-T", "--command-timeout"),
+	"doas":    set("-u", "-C"),
+	"env":     set("-u", "--unset", "-C", "--chdir", "-S", "--split-string", "-a", "--argv0"),
+	"timeout": set("-s", "--signal", "-k", "--kill-after"),
+	"ionice":  set("-c", "--class", "-n", "--classdata", "-p", "--pid", "-P", "--pgid", "-u", "--uid"),
+	"nice":    set("-n", "--adjustment"),
+	"chrt":    set("-p", "--pid"),
+	"stdbuf":  set("-i", "--input", "-o", "--output", "-e", "--error"),
+}
+
+func set(words ...string) map[string]bool {
+	m := make(map[string]bool, len(words))
+	for _, w := range words {
+		m[w] = true
+	}
+	return m
+}
 
 // keywords start a command the way ; does: what follows then, do, else, if, elif, while, until and ! is in command position ("if true; then pkill x; fi").
 var keywords = map[string]bool{"if": true, "then": true, "else": true, "elif": true, "do": true, "while": true, "until": true, "!": true, "{": true}
@@ -310,9 +330,15 @@ func programIndex(c cmd) int {
 			continue
 		}
 		if prefixes[base(w)] {
+			wrapper := base(w)
 			i++
 			for i < len(c.words) && (strings.HasPrefix(c.words[i], "-") || isNumber(c.words[i]) || strings.Contains(c.words[i], "=")) {
+				// An option that takes its own value ("sudo -u root", "env -u NAME", "timeout -s KILL 10", "ionice -c 3") eats the next word: it is not the program (QA's #11179).
+				takes := wrapperOptionValues[wrapper][c.words[i]]
 				i++
+				if takes && i < len(c.words) {
+					i++
+				}
 			}
 			continue
 		}

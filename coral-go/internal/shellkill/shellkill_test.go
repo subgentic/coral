@@ -136,3 +136,43 @@ func TestKeywordsAndShellScriptsAreCommandPosition(t *testing.T) {
 		assert.Empty(t, PatternKill(c), c)
 	}
 }
+
+// QA's #11179: sudo -u X, env -u X, timeout -s SIG N and ionice -c N are wrappers whose next word is still in command position: the value of their option is not the program.
+func TestWrappersWithOptionValuesStillRunTheNextWord(t *testing.T) {
+	for _, c := range []string{
+		`sudo -u root pkill -f x`,
+		`sudo --user root killall node`,
+		`sudo -E -u me pkill claude`,
+		`sudo -u root -g wheel pkill x`,
+		`env -u FOO pkill -f x`,
+		`env -u A -u B pkill x`,
+		`env --unset NAME killall node`,
+		`env -i FOO=1 pkill x`,
+		`timeout -s KILL 10 pkill -f x`,
+		`timeout --signal=KILL 5 pkill x`,
+		`timeout --signal KILL 5 pkill x`,
+		`timeout -k 5 -s TERM 10 killall node`,
+		`ionice -c 3 pkill x`,
+		`ionice -c 2 -n 7 pkill -f y`,
+		`nice -n 10 pkill x`,
+		`nohup nice -n 5 sudo -u root pkill -f x`,
+		`doas -u root pkill x`,
+		`FOO=1 sudo -u root timeout -s KILL 5 pkill x`,
+	} {
+		assert.NotEmpty(t, PatternKill(c), c)
+	}
+	for _, c := range []string{
+		`sudo -u root ls`,
+		`sudo -u root kill 123`,
+		`env -u FOO echo pkill`,
+		`timeout -s KILL 10 go test ./...`,
+		`timeout 10 sleep 3`,
+		`ionice -c 3 kill 123`,
+		`nice -n 10 make`,
+		`sudo -u pkill ls`,
+		`env -u pkill echo hi`,
+		`timeout -s KILL 10 echo 'pkill -f x'`,
+	} {
+		assert.Empty(t, PatternKill(c), c)
+	}
+}
