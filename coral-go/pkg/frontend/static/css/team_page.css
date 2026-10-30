@@ -163,7 +163,7 @@
 }
 
 /* The Agents tab (stage 3): a quiet line and Refresh, status chips with counts on one line (they scroll sideways when too many), Remind as a quiet button in its row */
-.team-state-bad { --goal-hue: var(--error); }
+.team-state-bad { --goal-hue: var(--error); --goal-text: var(--error-text); }
 .team-agent-tasks { margin: 0; padding-left: 18px; }
 /* The Settings tab (stage 3): one page of four sections, rows with the label and hint at the left and the control at the right, and a bar pinned under it (the status line, Cancel at the left, Save settings at the right). */
 .team-settings-page { flex: 1; min-height: 0; display: flex; flex-direction: column; container-type: inline-size; }

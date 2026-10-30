@@ -91,9 +91,8 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
     const taskTotal = (goal, t) => Math.max(t.rows.length, goal ? goal.rollup.done + goal.rollup.active + goal.rollup.blocked + goal.rollup.queued : 0);
 
     function stateChip(goal) {
-        const chip = el('span', `chip goal-chip goal-state-${goal.state || 'unknown'}`);
-        chip.append(el('span', 'goal-dot'), document.createTextNode(W.stateWord(goal)));
-        return chip;
+        const c = DT.chip(W.stateWord(goal), `goal-state-${goal.state || 'unknown'}`); c.classList.remove('dt-chip');
+        return c;
     }
 
     function rollupBar(rollup) {

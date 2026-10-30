@@ -43,7 +43,7 @@ export function taskStatusWord(status, review) {
     return word(s.replace(/_/g, ' '));
 }
 /** The class that colours a state's dot (the goal chips' classes, shared). */
-export const statusClass = (w) => `goal-state-task-${({ 'In progress': 'active', 'In review': 'active' }[w] || w).toLowerCase()}`;
+export const statusClass = (w) => `goal-state-task-${({ 'In progress': 'active', 'In review': 'review' }[w] || w).toLowerCase()}`;
 
 
 /** What the page's status region says once after a chip is pressed: "Showing all 5 goals", "Showing 1 blocked goal", "No dropped goals". */
