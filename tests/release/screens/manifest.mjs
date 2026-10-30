@@ -84,3 +84,19 @@ export const uploadArgs = (file, name, taskId, extra = []) => ['artifact', 'uplo
 
 /** The arguments that put the contact sheet in the operator's Needs you, on the release task. */
 export const reviewUploadArgs = (file, name, taskId) => uploadArgs(file, name, taskId, ['--tag', 'for review']);
+
+/**
+ * The goal the run's own task goes under (`task add --self` needs one). goals: `coral-board goal list --json` (open ones); wanted: --goal / SCREENS_GOAL, if the runner was told one.
+ * A goal that was named and is open is used; one that was named and is closed is not (a closed goal refuses new tasks: #163 was closed); otherwise the lowest-numbered open goal with "UI review" in its title.
+ * Returns { id, why } or { id: null, why } when there is none to use.
+ */
+export function pickGoal(goals, wanted) {
+    const open = (Array.isArray(goals) ? goals : []).filter(g => g && g.id != null && !['done', 'dropped'].includes(g.state));
+    const w = wanted ? Number(String(wanted).replace(/^#/, '')) : NaN;
+    if (Number.isInteger(w)) {
+        if (open.some(g => g.id === w)) return { id: w, why: `goal #${w}, as asked` };
+    }
+    const own = open.filter(g => /\bUI review\b/i.test(g.title || '')).sort((a, b) => a.id - b.id)[0];
+    if (own) return { id: own.id, why: `goal #${own.id} "${own.title}"${Number.isInteger(w) ? ` (#${w} is not open)` : ''}` };
+    return { id: null, why: `no open goal to file under${Number.isInteger(w) ? ` (#${w} is closed or not on this board)` : ''}: ask the orchestrator for an open goal with "UI review" in its title, or pass --goal N / SCREENS_GOAL` };
+}
