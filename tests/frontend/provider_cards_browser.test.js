@@ -7,6 +7,7 @@
 //  - a phone: the Thinking strip wraps inside the card (a select under 360 px), every target is 44 px, and Launch stays on the screen.
 // Drives Chrome over CDP through agent_view_harness.js against an isolated dev server, the CLI checks and the model lists stood in.
 const assert = require('node:assert/strict');
+const { coralReady } = require('./helpers/wait');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const { install: installNA, N, stubModels } = require('./helpers/new_agent');
@@ -28,7 +29,7 @@ const { install: installNA, N, stubModels } = require('./helpers/new_agent');
         return true; })()`).then(() => require('./helpers/new_agent').stubCliChecks(ev, missing));
     const open = async (w, h, mobile, theme, missing, agyNoLevels, fontPx) => {
         await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`); await installNA(ev);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev); await installNA(ev);
         await ev(`document.documentElement.setAttribute('data-theme', ${JSON.stringify(theme)}); ${fontPx ? `document.documentElement.style.setProperty('font-size', '${fontPx}px', 'important');` : ''} true`);
         await stubModels(ev); await stub(missing, agyNoLevels);
         await ev(`(async () => { await window.showLaunchModal(); const c = document.querySelector('#launch-step-chooser [data-arg="agent"]'); if (c && c.getClientRects().length) c.click(); return true; })()`);

@@ -2,6 +2,7 @@
 // the left (44 px, goes back to the agent list), the team's name as the title with its status under it, and ⋯ at the right (44 px, its menu holds Add agent and Settings); every tab is in ONE strip under it (Board and Knowledge
 // too: no More tab), each 44 px; there is no bottom nav and nothing scrolls sideways but the strip. Drives Chrome over CDP through agent_view_harness.js against an isolated dev server.
 const assert = require('node:assert/strict');
+const { coralReady } = require('./helpers/wait');
 const { connect } = require('./agent_view_harness');
 const { install: installTP, seed, openTeam, goTab } = require('./helpers/team_page');
 const { removeBoards } = require('./helpers/board_cleanup');
@@ -19,7 +20,7 @@ const BASE = require('./test_base').BASE;
         for (const [w, fs, theme] of [[390, 16, 'light'], [390, 16, 'dark'], [390, 32, 'light'], [320, 16, 'dark']]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: 844, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+            await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
             await ev(`document.documentElement.style.fontSize = '${fs}px'; document.documentElement.setAttribute('data-theme', '${theme}'); true`);
             await installTP(ev); await seed(ev, TEAM); await ev(`window.syncMobileAgentList && window.syncMobileAgentList(); true`);
             await openTeam(ev, waitFor, TEAM); await goTab(ev, settle, 'Goals'); await settle(400);
@@ -62,7 +63,7 @@ const BASE = require('./test_base').BASE;
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
         const BACKS = '.group-table-back, .inbox-phone-back, .wf-phone-back, .sched-back, .docs-phone-back, .cost-phone-back, .back-link, .goals-back, .mobile-history-back, .team-bar-back';
         const detail = async (name, view, setup, goes) => {
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
             await setup(); await settle(500);
             const g = await ev(`(() => { const vis = e => e.getClientRects().length > 0 && getComputedStyle(e).visibility !== 'hidden' && !e.closest('[hidden]');
                 const v = document.querySelector(${JSON.stringify(view)}); const backs = [...document.querySelectorAll(${JSON.stringify(BACKS)})].filter(vis).filter(e => v.contains(e) || e.closest('#team-page-view'));
