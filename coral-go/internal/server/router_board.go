@@ -137,7 +137,7 @@ func (s *Server) registerBoardMessageRoutes(r chi.Router, boardHandler *routes.B
 	r.Get("/api/board/{project}/settings", boardHandler.GetBoardSettings)
 	r.With(routes.RefuseSignInLink).Put("/api/board/{project}/settings", boardHandler.UpdateBoardSettings)
 	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/external-messages", boardHandler.PostExternalMessage)
-	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/external-artifacts", boardHandler.PostExternalArtifact)
+	r.Post("/api/board/{project}/external-artifacts", boardHandler.PostExternalArtifact) // its metadata is checked for a sign-in link in the handler, not its file
 	// To another Coral through Coral Hub (#3489); this computer only (not in the tunnel's table).
 	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/relay-messages", boardHandler.PostRelayMessage)
 	r.Get("/api/board/{project}/relay-targets", boardHandler.ListRelayTargets)
