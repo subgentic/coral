@@ -1,5 +1,5 @@
-// The team page's tab row on a phone (#10759, Mobile pass 38): the tabs behind More (Knowledge, Board) have no tab in the row, so a team that opens on the Board showed the row with More underlined and nothing named Board.
-// More now carries the open tab's name while one of its tabs is open ("Board", "Knowledge") and says "More" otherwise; the row still fits 320 and 390 px with no sideways scroll. A real board over the API.
+// The team page's tab strip on a phone (#10759 Mobile pass 38, now #11239 slice B): a team that opens on the Board or on Knowledge names the open tab and shows it. The tabs behind a More menu (the old design) are in the one strip now, so the
+// open tab is the selected one in the strip, named for itself and kept inside it (the strip scrolls it in), with no More tab; the row and the page do not scroll sideways at 320 and 390 px. A real board over the API.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
@@ -20,21 +20,20 @@ const { coralReady } = require('./helpers/wait');
             await api('POST', `/api/board/${B}/messages`, { subscriber_id: 'Boss', content: 'Please check the release notes.' });
             const seen = async tab => {
                 await Page.navigate({ url: `${BASE}/team/${B}/${tab}` }); await Page.loadEventFired(); await install(); await coralReady(ev);
-                await waitFor(`!!document.getElementById('team-tab-more') && document.getElementById('team-tab-more').getClientRects().length > 0`, `${w}: the tab row on ${tab}`, 15000);
+                await waitFor(`!!document.getElementById('team-tab-${tab}') && document.getElementById('team-tab-${tab}').getClientRects().length > 0`, `${w}: the tab strip on ${tab}`, 15000);
                 await waitFor(`document.getElementById('team-tab-${tab}') && document.getElementById('team-tab-${tab}').getAttribute('aria-selected') === 'true'`, `${w}: ${tab} is the open tab`, 15000);
-                return ev(`(() => { const m = document.getElementById('team-tab-more'), row = document.getElementById('team-tabs-row'); return { more: (m.querySelector('.team-tab-label') || m).textContent.trim(), current: m.classList.contains('is-current'), label: m.getAttribute('aria-label'), over: row.scrollWidth - row.clientWidth, page: document.documentElement.scrollWidth - document.documentElement.clientWidth }; })()`);
+                await new Promise(r => setTimeout(r, 400)); // sleep-ok: the strip scrolls the open tab in over a frame or two
+                return ev(`(() => { const tl = document.getElementById('team-tabs'), nr = tl.getBoundingClientRect(), t = document.getElementById('team-tab-${tab}'), r = t.getBoundingClientRect(), m = document.getElementById('team-tab-more'); return { name: (t.querySelector('.team-tab-label') || t).textContent.trim(), selected: t.getAttribute('aria-selected') === 'true', inStrip: r.left >= nr.left - 1 && r.right <= nr.right + 1, more: !!m && m.getClientRects().length > 0, page: document.documentElement.scrollWidth - innerWidth }; })()`);
             };
-            const board = await seen('messages');
-            if (board.more !== 'Board') problems.push(`${w}: with the Board open, More says "${board.more}" (it should say Board)`);
-            if (!/Board/.test(board.label || '')) problems.push(`${w}: the button is still named for the Board for a screen reader (${board.label})`);
-            if (board.over > 1 || board.page > 1) problems.push(`${w}: the tab row or page scrolls sideways with "${board.more}" in it (${board.over}, ${board.page})`);
-            const k = await seen('knowledge');
-            if (k.more !== 'Knowledge') problems.push(`${w}: with Knowledge open, More says "${k.more}"`);
-            if (k.over > 1 || k.page > 1) problems.push(`${w}: the tab row or page scrolls sideways with "${k.more}" in it (${k.over}, ${k.page})`);
-            const g = await seen('goals');
-            if (g.more !== 'More' || g.current) problems.push(`${w}: on Goals More says "${g.more}" and is ${g.current ? '' : 'not '}current (it should say More, not current)`);
+            for (const [tab, name] of [['messages', 'Board'], ['knowledge', 'Knowledge'], ['goals', 'Goals']]) {
+                const r = await seen(tab);
+                if (r.name !== name || !r.selected) problems.push(`${w}: with ${name} open the strip's selected tab is "${r.name}" (${JSON.stringify(r)})`);
+                if (!r.inStrip) problems.push(`${w}: the open ${name} tab is not inside the strip (${JSON.stringify(r)})`);
+                if (r.more) problems.push(`${w}: a More tab is drawn (${JSON.stringify(r)})`);
+                if (r.page > 1) problems.push(`${w}: the page scrolls sideways with ${name} open (${r.page})`);
+            }
         }
     } finally { await removeBoards(ev, [B]).catch(() => {}); await client.close(); }
     assert.deepEqual(problems, [], 'the team page tab row on a phone:\n  ' + problems.join('\n  '));
-    console.log('PASS More names the open tab behind it');
+    console.log('PASS the open tab is named and in view in the strip');
 })().catch(e => { console.error(e); process.exit(1); });

@@ -68,6 +68,7 @@
     .view-list .view-list-title { display: none; }
     .view-list .vl-tab .view-list-label, .view-list .vl-tab.view-list-with-icon .view-list-label { display: flex; flex: none; min-width: auto; }
     .view-list .vl-tab .view-list-name, .view-list .vl-tab.view-list-with-icon .view-list-name { white-space: nowrap; overflow: visible; }
+    .view-list .vl-tab .view-list-count.view-list-alert { line-height: var(--lh-label); min-width: 1.5em; } /* the pill's 16 px line cut its digit in half at 200% text (the Mobile Beta Tester): it follows the text */
     .view-list .vl-tab .view-list-icon { display: none; } /* text tabs: the folder's glyph is for the column, not the strip */
     .view-list .vl-tab { display: inline-flex; align-items: center; justify-content: center; gap: 6px; flex: none; width: auto; min-width: var(--control-touch-height, 44px); min-height: var(--control-touch-height, 44px); height: auto; padding: 0 14px; border-radius: 0; background: none; border: 0; border-bottom: 3px solid transparent; color: var(--text-secondary); font-weight: var(--fw-medium); white-space: nowrap; }
     .view-list .vl-tab.view-list-current { color: var(--text-primary); border-bottom-color: var(--accent); font-weight: var(--fw-strong); box-shadow: none; }

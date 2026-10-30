@@ -76,7 +76,6 @@ function buildOnce() {
     $('team-page-missing-back')?.addEventListener('click', () => { go({ view: 'agents' }); });
     $('team-page-back-agent')?.addEventListener('click', backToAgent);
     $('team-page-bar-back')?.addEventListener('click', () => { if (backTo) backToAgent(); else go({ view: 'agents' }); }); // a phone's bar arrow: back to the agent it came from, else to the agent list (#11239)
-    $('team-page-bar-more')?.addEventListener('click', () => { $('team-page-more')?.click(); $('team-page-bar-more').setAttribute('aria-expanded', String(moreOpen)); }); // the dots open the Actions menu (Add agent, Settings, Stop agents), the same one the Actions button opens
     $('team-page-add-agent').addEventListener('click', () => { window.showAddAgentToBoard?.(S.team, teamDir()); });
     $('team-page-settings').addEventListener('click', () => { openSettings(); });
     buildMore();
@@ -166,7 +165,8 @@ function buildStop() {
 
 function buildMore() {
     const host = $('team-page-actions');
-    const b = el('button', 'btn team-page-more', 'Actions'); b.type = 'button'; b.id = 'team-page-more'; b.setAttribute('aria-expanded', 'false'); b.setAttribute('aria-controls', 'team-page-more-menu');
+    const b = el('button', 'btn team-page-more'); b.type = 'button'; b.id = 'team-page-more';
+    b.innerHTML = '<svg class="team-more-dots" viewBox="0 0 24 24" width="24" height="24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="12" cy="19" r="1.7"/></svg><span class="team-more-word">Actions</span>'; /* a phone draws the dots (#11239 slice B), a wide screen the word; the name is Actions on both */ b.setAttribute('aria-expanded', 'false'); b.setAttribute('aria-controls', 'team-page-more-menu');
     const menu = el('div', 'menu team-more-menu'); menu.id = 'team-page-more-menu'; menu.hidden = true; menu.setAttribute('aria-label', 'More team actions');
     const add = el('button', 'menu-item team-more-add', 'Add agent'); add.type = 'button'; add.id = 'team-page-more-add'; // a phone's header has one button: More, with Add agent first, then Settings
     add.addEventListener('click', () => { window.showAddAgentToBoard?.(S.team, teamDir()); });
@@ -174,13 +174,11 @@ function buildMore() {
     settings.addEventListener('click', () => { openSettings(); });
     menu.append(add, settings);
     host.append(b, menu);
-    const bar = $('team-page-bar-more'); // a phone's dots (#11239 slice B): the same menu as the Actions button, which a phone does not draw
-    const set = (open, { focus = false } = {}) => { moreOpen = open; menu.hidden = !open; b.setAttribute('aria-expanded', String(open)); if (bar) bar.setAttribute('aria-expanded', String(open)); if (open) menu.querySelector('button:not([hidden])')?.focus(); else if (focus) b.focus(); };
+    const set = (open, { focus = false } = {}) => { moreOpen = open; menu.hidden = !open; b.setAttribute('aria-expanded', String(open)); if (open) menu.querySelector('button:not([hidden])')?.focus(); else if (focus) b.focus(); };
     b.addEventListener('click', () => { syncStop(); set(!moreOpen); }); // the Stop items in it follow the team (asleep or not) each time it opens
     menu.addEventListener('click', (e) => { if (e.target.closest('button')) set(false); });
     document.addEventListener('keydown', (e) => { if (moreOpen && e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); set(false, { focus: true }); } }, true);
-    if (bar && !bar.dataset.wired) { bar.dataset.wired = '1'; bar.addEventListener('click', () => { syncStop(); set(menu.hidden); }); }
-    document.addEventListener('click', (e) => { if (moreOpen && !menu.contains(e.target) && !b.contains(e.target) && !(bar && bar.contains(e.target))) set(false); });
+    document.addEventListener('click', (e) => { if (moreOpen && !menu.contains(e.target) && !b.contains(e.target)) set(false); });
 }
 const BOARD_ACTIONS = ['mb-select-btn', 'mb-export-btn', 'mb-pause-btn', 'mb-delete-btn'];
 function adoptBoardActions() {

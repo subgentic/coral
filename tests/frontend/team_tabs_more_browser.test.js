@@ -1,13 +1,11 @@
-// The team page's tabs on a phone (Goal #60, audit #8572 point 5): seven tabs scrolled sideways at 390 px. Now Goals, Agents, Tasks and Artifacts are the row and Knowledge and Board are behind
-// a More menu (desktop: all six, no More; Settings is a popout button since #8853). The row never scrolls sideways; More is a 44 px menu button that says which of its tabs is open; the menu is reachable by keyboard (Enter or ArrowDown
-// opens it on its first item, arrows move, Escape closes it back on More, Enter chooses) and by a screen reader (a menu button with aria-haspopup and aria-expanded, a menu of menuitems named for the tabs).
-// Written failing-first against a build with seven tabs at 390. Isolated dev server, 1280 and 390 px.
+// The team page's tabs on a phone were Goals, Agents, Tasks and Artifacts with Knowledge and Board behind a More menu (Goal #60, audit #8572 point 5). The phone's navigation model (#11236, #11239 slice B) makes them ONE
+// strip: every tab (Goals, Agents, Tasks, Artifacts, Knowledge, Board) in a row of 44 px tabs under the bar, scrolling sideways with a fade, the open tab kept in view; no More tab and no menu of tabs. The page itself never scrolls
+// sideways. Right from the last tab wraps to the first and Left from the first to the last; a tap on Board opens the Board and the strip shows it. Desktop: all six, no More. Isolated dev server, 1280 and 390 px.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { install: installTP, seed, openTeam } = require('./helpers/team_page');
 const BASE = require('./test_base').BASE;
 const { removeBoards } = require('./helpers/board_cleanup');
-const fs = require('node:fs');
 
 const TEAM = `qa-tabs-more-${Date.now() % 100000}`;
 
@@ -17,72 +15,35 @@ const TEAM = `qa-tabs-more-${Date.now() % 100000}`;
     const { Input } = client;
     const results = [];
     const check = (label, cond, detail) => { results.push(!!cond); console.log(`[${cond ? 'PASS' : 'FAIL'}] ${label}${detail !== undefined ? ' — ' + detail : ''}`); };
-    const shot = async name => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(`${d}/${name}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
-    const key = async (k, code) => { await Input.dispatchKeyEvent({ type: 'keyDown', key: k, code: k, windowsVirtualKeyCode: code, ...(k === 'Enter' ? { text: '\r' } : {}) }); await Input.dispatchKeyEvent({ type: 'keyUp', key: k, code: k, windowsVirtualKeyCode: code }); };
-    const state = () => ev(`(() => { const tl = document.getElementById('team-tabs'), more = document.getElementById('team-tab-more'), menu = document.getElementById('team-tabs-more-menu');
+    const key = async (k, code) => { await Input.dispatchKeyEvent({ type: 'keyDown', key: k, code: k, windowsVirtualKeyCode: code }); await Input.dispatchKeyEvent({ type: 'keyUp', key: k, code: k, windowsVirtualKeyCode: code }); await settle(250); };
+    const state = () => ev(`(() => { const tl = document.getElementById('team-tabs'), more = document.getElementById('team-tab-more'), nr = tl.getBoundingClientRect();
         const vis = e => !!e && e.getClientRects().length > 0 && getComputedStyle(e).visibility !== 'hidden';
-        const tabs = [...tl.querySelectorAll('[role=tab]')].filter(vis).map(t => t.dataset.tab);
-        const sel = [...tl.querySelectorAll('[role=tab]')].find(t => t.getAttribute('aria-selected') === 'true');
-        const r = more ? more.getBoundingClientRect() : null;
-        return { tabs, selected: sel && sel.dataset.tab, shown: vis(more), name: more && more.getAttribute('aria-label'), text: more && more.textContent.trim(), expanded: more && more.getAttribute('aria-expanded'), haspopup: more && more.getAttribute('aria-haspopup'),
-            h: r && Math.round(r.height), w: r && Math.round(r.width), sideways: tl.scrollWidth - tl.clientWidth, current: more && more.classList.contains('is-current'), inList: !!(more && tl.contains(more)),
-            menuOpen: !!menu && !menu.hidden && vis(menu), items: menu ? [...menu.querySelectorAll('[role=menuitem]')].map(i => ({ tab: i.dataset.tab, name: i.textContent.replace(/\\s+/g, ' ').trim(), h: Math.round(i.getBoundingClientRect().height) })) : [],
-            focus: document.activeElement && (document.activeElement.id || document.activeElement.dataset.tab || document.activeElement.tagName), panel: ['artifacts', 'knowledge', 'messages', 'goals'].find(p => vis(document.getElementById('team-panel-' + p))) }; })()`);
+        const tabs = [...tl.querySelectorAll('[role=tab]')].filter(vis), sel = tabs.find(t => t.getAttribute('aria-selected') === 'true'), sr = sel && sel.getBoundingClientRect();
+        return { tabs: tabs.map(t => t.dataset.tab), h: tabs.map(t => Math.round(t.getBoundingClientRect().height)), selected: sel && sel.dataset.tab, more: vis(more), scrolls: tl.scrollWidth > tl.clientWidth + 1, page: document.documentElement.scrollWidth <= innerWidth,
+            fade: /gradient/.test(getComputedStyle(tl).maskImage || getComputedStyle(tl).webkitMaskImage || ''), selIn: !!sr && sr.left >= nr.left - 1 && sr.right <= nr.right + 1, focus: document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.tab || '' : '' }; })()`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [label, w, h, mobile] of [['1280', 1280, 800, false], ['390', 390, 844, true]]) {
-            console.log(label);
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(); await installTP(ev);
-            await seed(ev, TEAM);
-            if (mobile) await ev(`window.syncMobileAgentList && window.syncMobileAgentList(); true`);
-            await openTeam(ev, waitFor, TEAM); await settle(500);
+            await seed(ev, TEAM); await ev(`window.syncMobileAgentList && window.syncMobileAgentList(); true`); await openTeam(ev, waitFor, TEAM); await settle(400);
             let s = await state();
-            if (!mobile) {
-                check('1280: all six tabs are in the row in the operator\'s order (Goals, Agents, Tasks, Artifacts, Knowledge, Board; Settings is a popout button, #8853) and there is no More', s.tabs.join() === 'goals,agents,tasks,artifacts,knowledge,messages' && !s.shown, JSON.stringify(s.tabs));
-                check('1280: the row does not scroll sideways', s.sideways <= 0, String(s.sideways));
-                await shot('team-tabs-1280');
-                continue;
-            }
-            check('390: the row is the first four tabs, Goals, Agents, Tasks and Artifacts, then More', s.tabs.join() === 'goals,agents,tasks,artifacts' && s.shown, JSON.stringify(s.tabs));
-            check('390: the row never scrolls sideways', s.sideways <= 0, String(s.sideways));
-            check('390: More is a menu button (aria-haspopup=menu, aria-expanded=false) named "More tabs", 44 px, beside the tab list and not a tab in it', s.haspopup === 'menu' && s.expanded === 'false' && s.name === 'More tabs' && s.h >= 44 && s.w >= 44 && !s.inList, JSON.stringify(s));
-            await shot('team-tabs-390');
-            // by keyboard: Enter opens on the first item, the arrows move, Escape closes back on More
-            await ev(`document.getElementById('team-tab-more').focus(); true`);
-            await key('Enter', 13); await settle(250);
+            check(`${label}: all six tabs, no More tab`, ['goals', 'agents', 'tasks', 'artifacts', 'knowledge', 'messages'].every(t => s.tabs.includes(t)) && !s.more, JSON.stringify(s));
+            if (!mobile) continue;
+            check(`${label}: each tab is 44 px, the page does not scroll sideways, the strip has its fade`, s.h.every(x => x >= 44) && s.page && (!s.scrolls || s.fade), JSON.stringify(s));
+            // the last tab: Right wraps to the first, a tap opens Board and the strip shows it
+            await ev(`document.querySelector('#team-tabs [data-tab="messages"]').click(); true`); await settle(500);
             s = await state();
-            check('390: Enter on More opens the menu with Knowledge and Board (menuitems, 44 px), the first focused, aria-expanded true', s.menuOpen && s.expanded === 'true' && s.items.map(i => i.tab).join() === 'knowledge,messages' && s.items.every(i => i.h >= 44 && /^(Knowledge|Board)/.test(i.name)) && s.focus === 'knowledge' || (s.menuOpen && s.focus && /knowledge/.test(String(s.focus))), JSON.stringify(s));
-            await shot('team-tabs-390-menu');
-            await key('ArrowDown', 40); await settle(100);
-            check('390: ArrowDown moves to the next item', (await state()).focus === 'messages', (await state()).focus);
-            await key('Escape', 27); await settle(200);
+            check(`${label}: a tap on Board opens it and the strip shows the open tab`, s.selected === 'messages' && s.selIn, JSON.stringify(s));
+            await ev(`document.querySelector('#team-tabs [data-tab="messages"]').focus(); true`); await key('ArrowRight', 39);
             s = await state();
-            check('390: Escape closes the menu and the keyboard is back on More', !s.menuOpen && s.expanded === 'false' && s.focus === 'team-tab-more', JSON.stringify(s));
-            // choose by keyboard
-            await key('Enter', 13); await settle(200); await key('ArrowDown', 40); await key('Enter', 13); await settle(600);
+            check(`${label}: Right from the last tab (Board) wraps to Goals`, s.focus === 'goals' || s.selected === 'goals', JSON.stringify(s));
+            await key('ArrowLeft', 37);
             s = await state();
-            check('390: choosing Board from the menu opens the Board tab, More says so (named "Board, more tabs", underlined, and its words are Board, #10759) and keeps the keyboard', s.selected === 'messages' && s.panel === 'messages' && s.name === 'Board, more tabs' && s.current && s.text === 'Board' && s.focus === 'team-tab-more' && !s.menuOpen, JSON.stringify(s));
-            await shot('team-tabs-390-board');
-            // by tap
-            await ev(`document.getElementById('team-tab-more').click(); true`); await settle(200);
-            await ev(`document.querySelector('#team-tabs-more-menu [data-tab="knowledge"]').click(); true`); await settle(600);
-            s = await state();
-            check('390: tapping Knowledge opens the Knowledge tab', s.selected === 'knowledge' && s.panel === 'knowledge' && s.current, JSON.stringify(s));
-            // a tab of the row takes the page back and More is a plain More again
-            await ev(`document.getElementById('team-tab-goals').click(); true`); await settle(500);
-            s = await state();
-            check('390: a tab of the row opens its page and More is plain again', s.selected === 'goals' && !s.current && s.name === 'More tabs' && s.text === 'More', JSON.stringify(s));
-            // the arrow keys of the row stay on the tabs that are in it
-            await ev(`document.getElementById('team-tab-artifacts').focus(); true`);
-            await key('ArrowRight', 39); await settle(300);
-            s = await state();
-            check('390: ArrowRight from Artifacts, the last tab of the row, wraps to Goals, not to a tab behind More', s.focus === 'team-tab-goals' && s.selected === 'goals', JSON.stringify(s));
-            check('390: the page does not scroll sideways', (await ev(`document.documentElement.scrollWidth - document.documentElement.clientWidth`)) <= 0);
+            check(`${label}: Left from the first tab (Goals) wraps to Board`, s.focus === 'messages' || s.selected === 'messages', JSON.stringify(s));
         }
-        const failed = results.filter(r => !r).length;
-        console.log(`${results.length - failed} of ${results.length} checks passed`);
-        await removeBoards(ev, [TEAM]).catch(() => {});
-        await client.close(); process.exit(failed ? 1 : 0);
-    } catch (e) { console.error('FAIL', e && e.stack || e); await client.close().catch(() => {}); process.exit(1); }
-})().catch(e => { console.error(e); process.exitCode = 1; });
+    } finally { await removeBoards(ev, [TEAM]); await client.close(); }
+    const failed = results.filter(r => !r).length;
+    console.log(`${results.length - failed} of ${results.length} checks passed`);
+    process.exit(failed ? 1 : 0);
+})().catch(e => { console.error(e); process.exit(1); });
