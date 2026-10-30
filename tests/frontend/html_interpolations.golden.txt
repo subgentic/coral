@@ -268,7 +268,7 @@
 1	preview_pane.js	renderMarkdownStrict(content)
 1	preview_pane.js	unshare
 1	prompt_modals.js	bg
-1	registered_server_view.js	adding ? '' : warningHtml((_servers.find(x => x.id === _editing) || {}).warning)
+1	registered_server_view.js	adding ? '' : warningHtml(_servers.find(x => x.id === _editing))
 1	registered_server_view.js	attention
 1	registered_server_view.js	back
 1	registered_server_view.js	bar
@@ -283,7 +283,7 @@
 1	registered_server_view.js	statusPill(status)
 1	registered_server_view.js	title
 1	registered_server_view.js	value
-1	registered_server_view.js	warningHtml(s.warning)
+1	registered_server_view.js	warningHtml(s)
 1	render.js	LAUNCH_CARDS.map(phoneCard).join('\n')
 1	render.js	PHONE_CARD_ACTION[c.key]
 1	render.js	c.desc
