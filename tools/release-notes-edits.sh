@@ -17,7 +17,7 @@ notes_drop_edited() {
   while IFS= read -r line || [ -n "$line" ]; do
     for i in "${!prefixes[@]}"; do
       case "$line" in
-        "${prefixes[$i]}"*) [ -n "${repl[$i]}" ] && printf '%s\n' "${repl[$i]}"; continue 2 ;;
+        "${prefixes[$i]}"*) [ -n "${repl[$i]}" ] && printf '%s\n' "${repl[$i]//\\n/$'\n'}"; continue 2 ;; # a \n in the replacement is a line break: one row can add whole bullets (v2.0.8)
       esac
     done
     printf '%s\n' "$line"

@@ -20,6 +20,11 @@ export RELEASE_NOTES_EDITS_FILE="$T"
 in2=$'- keep\n- **Replace me:** the old text\n- Drop me too\n- keep last\n'
 ok "a replaced row swaps the line and a drop row drops it" "$(notes_drop_edited v1.4.150 <<<"$in2")" "$(printf '%s\n' '- keep' '- **Replace me:** the corrected text' '- keep last')"
 ok "a replaced row of another tag does not apply" "$(notes_drop_edited v1.4.151 <<<"$in2")" "$(printf '%s' "$in2")"
+# a \n in the third column is a line break: one row can add whole bullets to a published body (v2.0.8's known issues)
+printf 'v1.4.160\t- **Add after me:**\t- **Add after me:** text\\n- **A new bullet.** one\\n- **Another.** two\n' > "$T"
+export RELEASE_NOTES_EDITS_FILE="$T"
+in3=$'- first\n- **Add after me:** text\n- last\n'
+ok "a replacement with \\n becomes several lines" "$(notes_drop_edited v1.4.160 <<<"$in3")" "$(printf '%s\n' '- first' '- **Add after me:** text' '- **A new bullet.** one' '- **Another.** two' '- last')"
 export RELEASE_NOTES_EDITS_FILE=/nonexistent
 ok "no table: everything is kept" "$(notes_drop_edited v1.4.142 <<<"$in")" "$(printf '%s' "$in")"
 # Intentional live history pin; all parser cases above use fixed table fixtures.
