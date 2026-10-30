@@ -30,7 +30,7 @@ type fakeOpencode struct {
 	used     []string
 }
 
-func (f *fakeOpencode) Ensure(context.Context, string, string) (*opencode.Server, error) {
+func (f *fakeOpencode) Ensure(context.Context, string, string, string) (*opencode.Server, error) {
 	return nil, assert.AnError
 }
 func (f *fakeOpencode) AgentTurn(string) (opencode.State, time.Time, bool) {
@@ -170,4 +170,19 @@ func TestAResumedOpencodeAgentIsGivenItsStoredSessionAndOnlyAValidOne(t *testing
 	h.useResumedSession(agent.LaunchParams{SessionID: "sid", ResumeSessionID: "../../etc/passwd"})
 	h.useResumedSession(agent.LaunchParams{SessionID: "sid"})
 	assert.Equal(t, []string{"sid=ses_abc123"}, f.used, "a fresh agent and an id that is not a session id are not passed on")
+}
+
+func TestTheModelOfALaunchIsTheLastValidModelFlag(t *testing.T) {
+	for flags, want := range map[string]string{
+		"--model openai/gpt-6":                      "openai/gpt-6",
+		"-m anthropic/claude-x#high":                "anthropic/claude-x#high",
+		"--model=openai/gpt-5 --model openai/gpt-6": "openai/gpt-6",
+		"--model $(rm -rf x)":                       "",
+		"--model gpt-6":                             "",
+		"--model":                                   "",
+		"--model-x openai/gpt-6":                    "",
+		"":                                          "",
+	} {
+		assert.Equal(t, want, modelFromFlags(strings.Fields(flags)), flags)
+	}
 }

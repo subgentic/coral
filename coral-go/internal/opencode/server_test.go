@@ -89,7 +89,7 @@ func runStub() {
 	}
 	if out := os.Getenv(envFileVar); out != "" {
 		seen := map[string]string{"args": strings.Join(os.Args[1:], " ")}
-		for _, k := range []string{"OPENCODE_PASSWORD", "OPENCODE_DB", "OPENCODE_SERVER_URL", "XDG_DATA_HOME", "XDG_CONFIG_HOME", "XDG_CACHE_HOME", "XDG_STATE_HOME", "HOME", "CORAL_SESSION_TOKEN", "CORAL_INITIAL_PASSWORD_FILE", "CORAL_URL", "CORAL_SESSION_NAME", "ANTHROPIC_API_KEY_OF_ANOTHER_AGENT"} {
+		for _, k := range []string{"OPENCODE_PASSWORD", "OPENCODE_CONFIG", "OPENCODE_DB", "OPENCODE_SERVER_URL", "XDG_DATA_HOME", "XDG_CONFIG_HOME", "XDG_CACHE_HOME", "XDG_STATE_HOME", "HOME", "CORAL_SESSION_TOKEN", "CORAL_INITIAL_PASSWORD_FILE", "CORAL_URL", "CORAL_SESSION_NAME", "ANTHROPIC_API_KEY_OF_ANOTHER_AGENT"} {
 			seen[k] = os.Getenv(k)
 		}
 		b, _ := json.Marshal(seen)
@@ -410,5 +410,40 @@ func TestTheRealPasswordNeverReachesAnOpenServerThatWonThePort(t *testing.T) {
 	require.NotEmpty(t, seen, "the stranger was probed")
 	for _, pw := range seen {
 		assert.True(t, strings.HasPrefix(pw, "not-"), "only the wrong password was sent to a server that asks for none, got %q", pw)
+	}
+}
+
+func TestTheModelIsATopLevelModelOfTheServersOwnConfigFileAndOnlyAValidOne(t *testing.T) {
+	t.Setenv("OPENCODE_CONFIG", "/home/person/their-own-opencode.json")
+	cfg, envFile := stubConfig(t)
+	read := func() map[string]string {
+		var seen map[string]string
+		raw, _ := os.ReadFile(envFile)
+		require.NoError(t, json.Unmarshal(raw, &seen))
+		return seen
+	}
+	s, err := Start(context.Background(), cfg, "none")
+	require.NoError(t, err)
+	assert.Empty(t, read()["OPENCODE_CONFIG"], "no model: no config, and the person's own is not passed on")
+	s.Stop()
+
+	cfg.Model = "openai/gpt-6#high"
+	s, err = Start(context.Background(), cfg, "agent-1")
+	require.NoError(t, err)
+	defer s.Stop()
+	file := filepath.Join(cfg.DataDir, "servers", "agent-1", "opencode.json")
+	assert.Equal(t, file, read()["OPENCODE_CONFIG"])
+	b, err := os.ReadFile(file)
+	require.NoError(t, err)
+	var conf map[string]string
+	require.NoError(t, json.Unmarshal(b, &conf))
+	assert.Equal(t, "openai/gpt-6#high", conf["model"])
+	fi, _ := os.Stat(file)
+	assert.Equal(t, os.FileMode(0o600), fi.Mode().Perm())
+
+	for _, bad := range []string{"gpt-6", "-openai/x", "openai/x y", "openai/x\"}", "openai/x#", "a/b#c#d", "openai/$(id)"} {
+		cfg.Model = bad
+		_, err := Start(context.Background(), cfg, "agent-2")
+		assert.Error(t, err, bad)
 	}
 }

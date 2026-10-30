@@ -16,7 +16,7 @@ import (
 // OpencodeRuntime is what an opencode agent needs of the server Coral runs for it (opencode.Manager): the server started for the agent (Ensure), the state its event stream gave (AgentTurn), and the end of
 // both with the agent (Stop). The key is the agent's Coral session id.
 type OpencodeRuntime interface {
-	Ensure(ctx context.Context, key, bin string) (*opencode.Server, error)
+	Ensure(ctx context.Context, key, bin, model string) (*opencode.Server, error)
 	AgentTurn(key string) (opencode.State, time.Time, bool)
 	AgentMessages(ctx context.Context, key string) ([]opencode.Message, bool, error)
 	UseSession(key, session string)
@@ -33,7 +33,7 @@ func (h *SessionsHandler) launchCommand(ctx context.Context, ag agent.Agent, p a
 		if h.opencode == nil {
 			return "", fmt.Errorf("opencode: Coral's opencode server is not available")
 		}
-		srv, err := h.opencode.Ensure(ctx, p.SessionID, p.CLIPath)
+		srv, err := h.opencode.Ensure(ctx, p.SessionID, p.CLIPath, modelFromFlags(p.Flags))
 		if err != nil {
 			return "", err
 		}
@@ -131,4 +131,23 @@ func (h *SessionsHandler) useResumedSession(p agent.LaunchParams) {
 	if h.opencode != nil && agent.IsOpencodeSessionID(p.ResumeSessionID) {
 		h.opencode.UseSession(p.SessionID, p.ResumeSessionID)
 	}
+}
+
+// modelFromFlags is the model a launch asks for: the value of --model (or -m, or --model=value) in the flags, the last one given; "" when there is none or it is not one opencode's config takes.
+func modelFromFlags(flags []string) string {
+	model := ""
+	for i := 0; i < len(flags); i++ {
+		f := flags[i]
+		switch {
+		case (f == "--model" || f == "-m") && i+1 < len(flags):
+			model = flags[i+1]
+			i++
+		case strings.HasPrefix(f, "--model="):
+			model = strings.TrimPrefix(f, "--model=")
+		}
+	}
+	if !opencode.ValidModel(model) {
+		return ""
+	}
+	return model
 }

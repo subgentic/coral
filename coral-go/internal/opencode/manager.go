@@ -57,11 +57,11 @@ func NewManager(cfg Config) *Manager {
 }
 
 // Ensure returns the agent's server, starting it (and the reading of its events) on the first call; a server that has since exited is started again. bin is the opencode binary the person's settings
-// name, "opencode" (found on the PATH) when it is empty and the manager has none of its own.
+// name, "opencode" (found on the PATH) when it is empty and the manager has none of its own; model is the model the agent's server starts on ("": opencode's own default).
 //
 // The manager's lock is held only around its maps, never across a start (which can take a minute): a slow start of one agent's server never holds up AgentTurn, Stop or another agent's launch. A second
 // Ensure for a key that is starting waits for that start and shares its result.
-func (m *Manager) Ensure(ctx context.Context, key, bin string) (*Server, error) {
+func (m *Manager) Ensure(ctx context.Context, key, bin, model string) (*Server, error) {
 	for {
 		m.mu.Lock()
 		if m.closed {
@@ -95,7 +95,7 @@ func (m *Manager) Ensure(ctx context.Context, key, bin string) (*Server, error) 
 		if dead != nil {
 			dead.stop()
 		}
-		g, err := m.start(ctx, key, bin)
+		g, err := m.start(ctx, key, bin, model)
 
 		m.mu.Lock()
 		delete(m.starting, key)
@@ -117,8 +117,9 @@ func (m *Manager) Ensure(ctx context.Context, key, bin string) (*Server, error) 
 }
 
 // start runs one server and the loop reading its events; it touches none of the manager's maps.
-func (m *Manager) start(ctx context.Context, key, bin string) (*managed, error) {
+func (m *Manager) start(ctx context.Context, key, bin, model string) (*managed, error) {
 	cfg := m.cfg
+	cfg.Model = model
 	if bin != "" {
 		cfg.Bin = bin
 	} else if cfg.Bin == "" {

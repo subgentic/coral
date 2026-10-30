@@ -34,6 +34,7 @@ type Config struct {
 	Bin     string // the opencode executable, as it is exec'd
 	DataDir string // Coral's own folder for opencode (<Coral data dir>/opencode): the XDG folders, its database and its credentials are here and nowhere else
 	Args    func(port int) []string
+	Model   string        // the model this server starts on, "provider/model" or "provider/model#variant" (a top-level "model" of a config file Coral writes for it); "" leaves opencode's own
 	Ready   time.Duration // how long one attempt waits for the server to answer an authenticated call (default 20 s)
 
 	pickPort func() (int, error) // a test's way to make a port race
@@ -60,7 +61,7 @@ func (s *Server) Client() (*Client, error) { return New(s.URL, s.password) }
 
 // serverEnv is the environment of the server: the one an agent gets (agentenv.Filter: Coral's own variables, tokens, keys and the identity of whatever started Coral are not passed on), without any OPENCODE_ or XDG_
 // name of the person's own, plus only what opencode needs: the password and Coral's XDG folders.
-func serverEnv(inherited []string, dataDir, password string) []string {
+func serverEnv(inherited []string, dataDir, password, configFile string) []string {
 	var env []string
 	for _, kv := range agentenv.Filter(inherited) {
 		name, _, _ := strings.Cut(kv, "=")
@@ -69,6 +70,9 @@ func serverEnv(inherited []string, dataDir, password string) []string {
 			continue
 		}
 		env = append(env, kv)
+	}
+	if configFile != "" {
+		env = append(env, "OPENCODE_CONFIG="+configFile)
 	}
 	return append(env,
 		"OPENCODE_PASSWORD="+password,
@@ -86,6 +90,29 @@ func freeLoopbackPort() (int, error) {
 	}
 	defer l.Close()
 	return l.Addr().(*net.TCPAddr).Port, nil
+}
+
+// modelRe is a model as opencode's config takes it: provider/model, with an optional #variant (the effort). It never holds a space, a quote or a control character, and never starts with a dash.
+var modelRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:@\[\]+-]{0,63}/[A-Za-z0-9._:@\[\]+/-]{1,127}(#[A-Za-z0-9._-]{1,32})?$`)
+
+// ValidModel reports whether m can be the model of a server's config.
+func ValidModel(m string) bool { return modelRe.MatchString(m) }
+
+// writeModelConfig writes the config file of one server (a top-level "model", nothing else) into its own folder, and returns its path; "" when there is no model to set. The file is the server's alone: the person's
+// own opencode.json is never read or changed.
+func writeModelConfig(dir, model string) (string, error) {
+	if model == "" {
+		return "", nil
+	}
+	if !ValidModel(model) {
+		return "", fmt.Errorf("opencode: %q is not a model (provider/model, with an optional #variant)", model)
+	}
+	b, err := json.Marshal(map[string]string{"$schema": "https://opencode.ai/config.json", "model": model})
+	if err != nil {
+		return "", err
+	}
+	p := filepath.Join(dir, "opencode.json")
+	return p, writePrivate(p, b)
 }
 
 // pidRecord is what Coral keeps of a server it started, to stop it after a crash: the pid and the port, the exact command it was started with and when the process began: never the password.
@@ -182,7 +209,11 @@ func startOn(ctx context.Context, cfg Config, dir string, port int) (*Server, er
 	args := cfg.Args(port)
 	cmd := executil.Command(context.Background(), cfg.Bin, args...) // not ctx: the server outlives one request
 	cmd.Dir = cfg.DataDir
-	cmd.Env = serverEnv(os.Environ(), cfg.DataDir, password)
+	configFile, err := writeModelConfig(dir, cfg.Model)
+	if err != nil {
+		return nil, err
+	}
+	cmd.Env = serverEnv(os.Environ(), cfg.DataDir, password, configFile)
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("opencode: could not start the server: %w", err)
 	}
