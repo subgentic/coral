@@ -697,3 +697,17 @@ func newPlanID() string {
 	_, _ = rand.Read(raw[:])
 	return hex.EncodeToString(raw[:])
 }
+
+// Options handles GET /api/servers/provision/options: what the setup dialog needs before a plan: the Host names of the hub user's SSH config (names only, concrete ones), the terms the person is about to
+// accept (version, digest and text, so the dialog shows exactly what the digest it sends back covers), and the label the acceptance is recorded under.
+func (pr *Provisioner) Options(w http.ResponseWriter, r *http.Request) {
+	hosts, _ := sshprov.ConfigHosts(pr.configs())
+	if hosts == nil {
+		hosts = []string{}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"hosts":            hosts,
+		"terms":            map[string]string{"version": license.EULAVersion, "sha256": terms.EULADigest(), "text": license.EULAText},
+		"acceptance_label": setupAcceptanceLabel(),
+	})
+}

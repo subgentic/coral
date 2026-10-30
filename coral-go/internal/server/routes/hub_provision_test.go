@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/binary"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -95,6 +96,7 @@ exit 0
 	r.Post("/api/servers/provision/plan", pr.Plan)
 	r.Post("/api/servers/provision/{plan}/connect", pr.Connect)
 	r.Post("/api/servers/provision/{plan}/run", pr.Run)
+	r.Get("/api/servers/provision/options", pr.Options)
 	r.Get("/api/servers/provision/{plan}", pr.Status)
 	r.Delete("/api/servers/provision/{plan}", pr.Cancel)
 	return &provEnv{e: e, p: pr, dir: dir, router: r, known: known, sshLog: log, keyBlob: b64}
@@ -473,4 +475,22 @@ func TestProvisionRunWantsTheDigestOfTheTermsThatWereShown(t *testing.T) {
 	}
 	code, _ := pe.do("POST", "/api/servers/provision/"+plan+"/run", map[string]any{"accept_terms": true, "terms_sha256": terms.EULADigest()})
 	assert.Equal(t, 202, code)
+}
+
+func TestProvisionOptionsListHostsAndTheTermsTheDigestCovers(t *testing.T) {
+	pe := newProvEnv(t, "known", "Linux x86_64", true)
+	require.NoError(t, os.WriteFile(filepath.Join(pe.dir, "config"), []byte("Host build-box *.wild !no\nHost -oProxyCommand=x\nHost second\n"), 0o600))
+	code, v := pe.do("GET", "/api/servers/provision/options", nil)
+	require.Equal(t, 200, code)
+	assert.Equal(t, []any{"build-box", "second"}, v["hosts"])
+	tm := v["terms"].(map[string]any)
+	assert.Equal(t, license.EULAVersion, tm["version"])
+	assert.Equal(t, terms.EULADigest(), tm["sha256"])
+	sum := sha256.Sum256([]byte(tm["text"].(string)))
+	assert.Equal(t, terms.EULADigest(), hex.EncodeToString(sum[:]), "the text shown is the text the digest covers")
+	assert.Equal(t, setupAcceptanceLabel(), v["acceptance_label"])
+	// an empty config is an empty list, not null
+	require.NoError(t, os.Remove(filepath.Join(pe.dir, "config")))
+	_, v = pe.do("GET", "/api/servers/provision/options", nil)
+	assert.Equal(t, []any{}, v["hosts"])
 }

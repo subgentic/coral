@@ -214,6 +214,7 @@ var operatorOnlyRoutes = map[string]string{
 	"DELETE /api/servers/{id}":    "remove a remote server",
 	"POST /api/servers/{id}/test": "test a remote server",
 	// #11370: setting a server up over SSH runs commands on another computer with the hub user's SSH access.
+	"GET /api/servers/provision/options":         "read what the server setup dialog shows",
 	"POST /api/servers/provision/plan":           "plan setting up a server over SSH",
 	"POST /api/servers/provision/{plan}/connect": "connect to a computer to set a server up",
 	"POST /api/servers/provision/{plan}/run":     "set a server up over SSH",
@@ -358,7 +359,7 @@ var operatorOnlyRoutes = map[string]string{
 // lets them be absent otherwise.
 var hubModeRoutes = map[string]bool{
 	"GET /api/servers": true, "POST /api/servers": true, "PATCH /api/servers/{id}": true, "DELETE /api/servers/{id}": true, "POST /api/servers/{id}/test": true,
-	"POST /api/servers/provision/plan": true, "POST /api/servers/provision/{plan}/connect": true, "POST /api/servers/provision/{plan}/run": true,
+	"GET /api/servers/provision/options": true, "POST /api/servers/provision/plan": true, "POST /api/servers/provision/{plan}/connect": true, "POST /api/servers/provision/{plan}/run": true,
 	"GET /api/servers/provision/{plan}": true, "DELETE /api/servers/provision/{plan}": true,
 	"CONNECT /api/remote/{server}/*": true,
 	"DELETE /api/remote/{server}/*":  true,
