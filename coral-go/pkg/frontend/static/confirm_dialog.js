@@ -3,21 +3,37 @@
 // Called when the open confirm modal is dismissed without confirming.
 let _confirmCancel = null;
 
-/** opts.label: the confirming button's word, the action ("Delete panel", "Sleep agent"): every caller passes it (confirm_census), so no question is answered with Yes. opts.danger: true makes the button the danger style; every caller names it (confirm_census), a question that loses nothing keeps the primary. */
+/** opts.acknowledge: a sentence the person must tick before the confirming button works (an unticked box under the message, #391's
+ *  nested-shell record); onConfirm then gets true. opts.label: the confirming button's word, the action ("Delete panel", "Sleep agent"): every caller passes it (confirm_census), so no question is answered with Yes. opts.danger: true makes the button the danger style; every caller names it (confirm_census), a question that loses nothing keeps the primary. */
 export function showConfirmModal(title, message, onConfirm, onCancel, opts = {}) {
     _dismissConfirm(); // a modal replaced before an answer counts as cancelled
     document.getElementById("confirm-modal-title").textContent = title;
-    document.getElementById("confirm-modal-message").textContent = message;
+    const msg = document.getElementById("confirm-modal-message");
+    msg.textContent = message;
+    document.getElementById("confirm-modal-ack")?.remove(); // each question starts without a box, or with a new unticked one
     const yesBtn = document.getElementById("confirm-modal-yes");
     const newBtn = yesBtn.cloneNode(true);
     newBtn.textContent = opts.label || 'Confirm'; // every caller names the action (confirm_census); the fallback is not a Yes
     newBtn.className = opts.danger === true ? 'btn btn-danger' : 'btn btn-primary'; // set on every call: the template's class is not kept
     const noBtn = document.querySelector('#confirm-modal .modal-actions .btn:not(#confirm-modal-yes)'); if (noBtn) noBtn.textContent = opts.cancelLabel || 'Cancel'; // the stay button's words, put back to Cancel for every other question
     yesBtn.parentNode.replaceChild(newBtn, yesBtn);
+    let ack = null;
+    if (opts.acknowledge) {
+        const label = document.createElement('label');
+        label.id = 'confirm-modal-ack';
+        label.className = 'confirm-modal-ack';
+        ack = document.createElement('input');
+        ack.type = 'checkbox';
+        label.append(ack, ' ', String(opts.acknowledge));
+        msg.after(label);
+        newBtn.disabled = true;
+        ack.addEventListener('change', () => { newBtn.disabled = !ack.checked; });
+    }
     newBtn.addEventListener("click", () => {
+        if (ack && !ack.checked) return;
         _confirmCancel = null;
         hideConfirmModal();
-        onConfirm();
+        onConfirm(!!(ack && ack.checked));
     });
     _confirmCancel = onCancel || null;
     document.getElementById("confirm-modal").style.display = "flex";
