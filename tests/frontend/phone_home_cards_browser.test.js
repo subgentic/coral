@@ -33,6 +33,11 @@ const BASE = require('./test_base').BASE;
                 await waitFor(`!document.getElementById('agent-search-all-chats').hidden`, `${tag}: the all-chats line appears`, 4000);
                 const pb = await ev(box(`document.querySelector('#mobile-agent-list .mobile-search-input')`)), ab = await ev(box(`document.getElementById('agent-search-all-chats')`));
                 assert.ok(ab.w > 0 && ab.t >= pb.b - 1 && ab.r <= 390 + 0.5 && /Search all chats for .build./.test(await ev(`document.getElementById('agent-search-all-chats').textContent`)), `${tag}: "Search all chats for build" sits under the pill: ` + JSON.stringify({ pb, ab }));
+                await ev(`document.getElementById('agent-search-all-chats').click(); true`);
+                await waitFor(`document.getElementById('group-table-view')?.dataset.group === 'hub-inbox:chats'`, `${tag}: All chats opens`, 5000);
+                const landed = await ev(`({ group: document.getElementById('group-table-view')?.dataset.group, path: location.pathname, box: document.getElementById('inbox-search')?.value })`);
+                assert.ok(landed.group === 'hub-inbox:chats' && landed.box === 'build' && !/needs/.test(landed.path), `${tag}: the tap opens All chats with the words, not Needs you: ` + JSON.stringify(landed));
+                await ev(`window.switchNavTab('agents'); true`).catch(() => {});
                 await ev(`(() => { const i = document.querySelector('#mobile-agent-list .mobile-search-input'); i.value = ''; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
                 await waitFor(`document.getElementById('agent-search-all-chats').hidden`, `${tag}: the line goes with the words`, 4000);
             }
