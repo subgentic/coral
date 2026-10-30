@@ -10,7 +10,7 @@ export function buildPhoneBar({ pill = null, id = '' } = {}) {
     const menu = el('button', 'btn btn-quiet btn-icon phone-menu-btn', '<span class="material-icons" aria-hidden="true">menu</span>');
     menu.type = 'button'; menu.setAttribute('data-on-click', 'm-top-menu'); menu.setAttribute('data-hamburger', ''); menu.setAttribute('aria-haspopup', 'menu'); menu.setAttribute('aria-expanded', 'false'); menu.setAttribute('aria-controls', 'nav-more-menu'); menu.setAttribute('aria-label', 'Menu');
     let mid = pill;
-    if (!mid) { mid = el('h1', 'phone-bar-title'); mid.setAttribute('data-phone-bar-title', ''); }
+    if (!mid) { mid = el('h1', 'phone-bar-title'); }
     mid.classList.add('phone-bar-pill');
     const account = el('button', 'phone-account-btn', '<span class="material-icons" aria-hidden="true">account_circle</span><span class="sr-only phone-hub-state"></span>');
     account.type = 'button'; account.setAttribute('data-on-click', 'm-top-menu'); account.setAttribute('data-hamburger', ''); account.setAttribute('data-account', ''); account.setAttribute('aria-haspopup', 'menu'); account.setAttribute('aria-expanded', 'false'); account.setAttribute('aria-controls', 'nav-more-menu'); account.setAttribute('aria-label', 'Account and more');
@@ -28,5 +28,5 @@ export function mountTopPhoneBar() {
 
 /** The view's name in the pill (nav_tabs.js says it, with the tab's words). */
 export function setPhoneBarTitle(words) {
-    for (const t of document.querySelectorAll('[data-phone-bar-title]')) t.textContent = words || '';
+    for (const t of document.querySelectorAll('.phone-bar-title')) t.textContent = words || '';
 }
