@@ -161,25 +161,30 @@ const apiKeyLine = slot => {
     line.append(input, show, copy, qr); slot.append(line);
 };
 
-// The Claude account's line (#10526): who the agents sign in as is the CLI's own login, so Check asks the CLI (GET /api/system/cli-check?type=claude&signin=1) and says signed in, not signed in, or that it could not tell.
-const claudeAccountLine = slot => {
+// A CLI account's line (#10526 Claude, #11293 Pi): who the agents sign in as is the CLI's own login, so Check asks the CLI (GET /api/system/cli-check?type=<cli>&signin=1) and says signed in, not signed in, or that it
+// could not tell. Pi signs in per provider and says which one the answer is for.
+const accountLine = (slot, { cli, name, notSignedIn }) => {
     const line = document.createElement('div'); line.className = 'sv-ctl-line';
-    const status = document.createElement('span'); status.id = 'settings-claude-account-status'; status.className = 'settings-hint'; status.setAttribute('role', 'status');
-    const check = document.createElement('button'); check.type = 'button'; check.id = 'settings-claude-account-check'; check.className = 'btn btn-small'; check.textContent = 'Check'; check.setAttribute('aria-label', 'Check Claude sign-in');
+    const status = document.createElement('span'); status.id = `settings-${cli}-account-status`; status.className = 'settings-hint'; status.setAttribute('role', 'status');
+    const check = document.createElement('button'); check.type = 'button'; check.id = `settings-${cli}-account-check`; check.className = 'btn btn-small'; check.textContent = 'Check'; check.setAttribute('aria-label', `Check ${name} sign-in`);
     check.addEventListener('click', async () => {
         check.disabled = true; status.textContent = 'Checking...';
-        let signedIn;
-        try { const r = await fetch('/api/system/cli-check?type=claude&signin=1&source=settings_check', { cache: 'no-store' }); signedIn = r.ok ? (await r.json()).signed_in : undefined; } catch { /* no answer: said below */ }
-        status.textContent = signedIn === true ? 'Signed in' : signedIn === false ? 'Not signed in: run claude auth login in a terminal' : 'Could not tell if Claude is signed in';
+        let signedIn, provider = '';
+        try { const r = await fetch(`/api/system/cli-check?type=${cli}&signin=1&source=settings_check`, { cache: 'no-store' }); if (r.ok) { const d = await r.json(); signedIn = d.signed_in; provider = typeof d.provider === 'string' ? d.provider : ''; } } catch { /* no answer: said below */ }
+        const to = provider ? ` to ${provider}` : '';
+        status.textContent = signedIn === true ? `Signed in${to}` : signedIn === false ? `Not signed in${to}: ${notSignedIn}` : `Could not tell if ${name} is signed in`;
         check.disabled = false;
     });
     line.append(status, check); slot.append(line);
 };
+const claudeAccountLine = slot => accountLine(slot, { cli: 'claude', name: 'Claude', notSignedIn: 'run claude auth login in a terminal' });
+const piAccountLine = slot => accountLine(slot, { cli: 'pi', name: 'Pi', notSignedIn: 'start pi and run /login' });
 
 export const SECURITY_FIELDS = [
     { key: 'security_access_title', type: 'heading', id: 'settings-security-access-title', label: 'Access' },
     { key: 'api_key', type: 'custom', id: 'settings-api-key-group', label: 'Coral API key', render: slot => apiKeyLine(slot) },
     { key: 'claude_account', type: 'custom', id: 'settings-claude-account', label: 'Claude account', help: moreOnly("Agents sign in through the Claude CLI's own login, not a key stored in Coral. Check asks the CLI now."), render: slot => claudeAccountLine(slot) },
+    { key: 'pi_account', type: 'custom', id: 'settings-pi-account', label: 'Pi account', help: moreOnly("Pi signs in with its own login, per provider. Check asks Pi now for the provider it starts on."), render: slot => piAccountLine(slot) },
     live('settings-security'),
     { key: 'security_data_title', type: 'heading', id: 'settings-security-data-title', label: 'Data and privacy' },
     { key: 'database_encryption', type: 'select', id: 'settings-database-encryption', labelId: 'settings-database-encryption-label', label: 'Database encryption', live: ['settings-database-encryption-status'], visibleWhen: () => { const e = document.getElementById('settings-database-encryption'); return !e || e.dataset.unsupported !== '1'; }, disabledWhen: () => { const e = document.getElementById('settings-database-encryption'); return !!e && e.dataset.locked === '1'; },

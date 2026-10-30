@@ -17,6 +17,7 @@ import (
 
 	"github.com/subgentic/coral/internal/agent"
 	"github.com/subgentic/coral/internal/agentsignin"
+	at "github.com/subgentic/coral/internal/agenttypes"
 	"github.com/subgentic/coral/internal/cloud"
 	"github.com/subgentic/coral/internal/tmux"
 	"github.com/subgentic/coral/internal/tracking"
@@ -160,8 +161,19 @@ func (h *SystemHandler) CLICheck(w http.ResponseWriter, r *http.Request) {
 		} else if known {
 			reply["signed_in"] = signedIn
 		}
+		if p := piSigninProvider(agentType); p != "" { // Pi signs in per provider: the answer is for the one it starts on (#11293)
+			reply["provider"] = p
+		}
 	}
 	writeJSON(w, http.StatusOK, hubCLIReply(r, reply))
+}
+
+// piSigninProvider is the provider a Pi sign-in answer is about ("" for any other CLI, or a Pi with none set).
+func piSigninProvider(agentType string) string {
+	if agentType != at.Pi {
+		return ""
+	}
+	return agentsignin.PiProvider()
 }
 
 // signInAskedAt is when the CLI's status command was last run for a request, per agent type, under signInAskMu: the route runs a process, so it is not a way to start one in a loop (#6048).
