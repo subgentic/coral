@@ -38,9 +38,11 @@ export function buildManifest({ version, sha, ranAt, widths, themes, results, ch
     for (const a of artifacts) { if (names.has(a.name)) throw new Error('two shots with the name ' + a.name); names.add(a.name); }
     const failed = results.filter(r => !r.ok).map(r => ({ page: r.id, width: r.width, theme: r.theme, error: r.error || 'unknown' }));
     const pages = new Set(results.map(r => r.id));
+    const shotPageCount = new Set(artifacts.map(a => a.page)).size;
+    const changedPageCount = new Set(artifacts.filter(a => a.status === 'changed').map(a => a.page)).size;
     const count = s => artifacts.filter(a => a.status === s).length;
     return {
-        version, tag: versionTag(version), title: taskTitle(version), sha, ranAt, widths, themes, pageCount: pages.size, shotCount: artifacts.length, artifacts, failed,
+        version, tag: versionTag(version), title: taskTitle(version), sha, ranAt, widths, themes, pageCount: pages.size, shotPageCount, changedPageCount, shotCount: artifacts.length, artifacts, failed,
         counts: { changed: count('changed'), unchanged: count('unchanged'), new: count('new'), baseline: count('baseline'), removed: (changes || []).filter(r => r.status === 'removed').length },
     };
 }
@@ -63,3 +65,22 @@ export function taskBody(m, sheetLink) {
     lines.push('', 'Every shot is a Coral artifact named <page>__<width>.png on this task. The pixel diff decided what changed.');
     return lines.join('\n');
 }
+
+/** The tags of the contact sheet's final upload: "for review" is what Coral's Needs you reads (the Inbox lists the board's artifacts with it, for the operator to open), "ui review" groups the run's files. */
+export const REVIEW_TAGS = ['ui review', 'for review'];
+
+/** The one line the operator's Needs you row shows (the artifact's name): the version, the pages shot and how many changed against the previous release (pages, not shots: a page at three widths is one). */
+export function reviewName(m, prevVersion) {
+    const head = `UI review ${m.tag}: ${m.shotPageCount} pages shot`;
+    return m.counts.baseline === m.shotCount || !prevVersion ? `${head}, no earlier release to compare with` : `${head}, ${m.changedPageCount} changed vs ${versionTag(prevVersion)}`;
+}
+
+/** The contact sheet's artifact name: the one-line summary, then .html. Coral keeps the FIRST upload's name for bytes it has already stored, so the sheet is uploaded under this name from the start and its later "for review"
+ *  upload (the same bytes, which adds the tag) shows the same line in Needs you. */
+export const sheetArtifactName = (m, prevVersion) => reviewName(m, prevVersion) + '.html';
+
+/** The coral-agent arguments of every upload of a run: the file, its name, the release task and the "ui review" tag, then any extra (what a dry run prints). */
+export const uploadArgs = (file, name, taskId, extra = []) => ['artifact', 'upload', file, '--name', name, '--task', String(taskId), '--tag', 'ui review', ...extra];
+
+/** The arguments that put the contact sheet in the operator's Needs you, on the release task. */
+export const reviewUploadArgs = (file, name, taskId) => uploadArgs(file, name, taskId, ['--tag', 'for review']);
