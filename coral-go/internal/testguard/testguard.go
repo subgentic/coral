@@ -44,9 +44,10 @@ var protectedDirs = sync.OnceValue(func() []string {
 	return dirs
 })
 
-// enabled reports whether the guard applies. It is a variable so the guard's
-// own tests can exercise the non-test path.
-var enabled = InTest
+// enabled reports whether the guard applies: only in a running test binary (InTestRun), never on the strength of the program's name or arguments,
+// which a launcher of a shipped binary controls (the coral-go-team's Security on #214). It is a variable so the guard's own tests can exercise the
+// non-test path.
+var enabled = InTestRun
 
 // CheckDataPath panics if this is a test binary and path is, or is inside,
 // the user's real ~/.coral directory. Outside tests it does nothing.
@@ -83,12 +84,16 @@ func inMemoryDB(name string) bool {
 	if !hasQuery {
 		return false
 	}
+	// Exactly one mode= parameter, and it is mode=memory. With two (file:x.db?mode=memory&mode=rwc, or the other order) SQLite's own answer is not
+	// worth guessing, so the name is treated as a file (the coral-go-team's Security on #214).
+	modes, memory := 0, false
 	for _, param := range strings.Split(query, "&") {
-		if param == "mode=memory" {
-			return true
+		if strings.HasPrefix(param, "mode=") {
+			modes++
+			memory = param == "mode=memory"
 		}
 	}
-	return false
+	return modes == 1 && memory
 }
 
 // sourceTree is the module's source folder: the nearest parent of the test's working directory (a test runs in its package's folder) that

@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"testing"
 
@@ -152,7 +153,8 @@ func TestCheckDataPathPanicsInsideTheSourceTree(t *testing.T) {
 		}
 	}
 	// A real file in the package folder must reach the check, however its name looks.
-	for _, p := range []string{"x.db", "file:x.db", "file:x.db?mode=rwc", "file::memory:evil.db", "file:mode=memory.db", "file:x.db#mode=memory", "file:x.db?foo#mode=memory", "file:x.db?mode=memoryx"} {
+	for _, p := range []string{"x.db", "file:x.db", "file:x.db?mode=rwc", "file::memory:evil.db", "file:mode=memory.db", "file:x.db#mode=memory", "file:x.db?foo#mode=memory", "file:x.db?mode=memoryx",
+		"file:x.db?mode=memory&mode=rwc", "file:x.db?mode=rwc&mode=memory", "file:x.db?mode=memory&mode=memory"} { // more than one mode=: a file (the coral-go-team's Security on #214)
 		if !panics(p) {
 			t.Errorf("a database FILE name in the package folder was not refused: %q", p)
 		}
@@ -164,5 +166,13 @@ func TestCheckDataPathPanicsInsideTheSourceTree(t *testing.T) {
 	enabled = func() bool { return false }
 	if panics(root) {
 		t.Error("the guard is not inert outside tests")
+	}
+}
+
+// The guard turns on only in a running test binary (InTestRun), not on InTest, which also trusts a -test.* argument that a launcher of a shipped
+// binary could pass (the coral-go-team's Security on #214).
+func TestTheGuardIsOnOnlyInARunningTestBinary(t *testing.T) {
+	if reflect.ValueOf(enabled).Pointer() != reflect.ValueOf(InTestRun).Pointer() {
+		t.Error("CheckDataPath's guard is not InTestRun")
 	}
 }
