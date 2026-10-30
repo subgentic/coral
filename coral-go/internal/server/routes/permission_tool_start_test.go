@@ -131,3 +131,52 @@ func TestAnAgentsPermissionRequestCannotNameCallsOrWantsInAnotherCase(t *testing
 	r.h.noteToolStart(ctx, r.sid, "Bash", "toolu_forged", map[string]any{"command": "rm -rf /"})
 	assert.True(t, r.h.deriveSingleSessionState(ctx, r.sid, 0).NeedsInput, "a call the agent named does not close its own request")
 }
+
+// #11352, the Mobile Beta Tester's walk (#137092 item 5), the common shape: a turn has earlier tool calls. PreToolUse(E, ls) with no PostToolUse yet, then the PermissionRequest for call A (which has
+// no PreToolUse of its own yet), then PreToolUse(A, same command): the request was tied to E, the only call in flight, and A's start closed nothing. A request is tied only to the calls whose input is
+// the one it asks for.
+func TestAnEarlierCallOfTheTurnDoesNotTakeTheRequestAndTheRequestedCommandStartingClosesIt(t *testing.T) {
+	r := newHoldRig(t, true)
+	ctx := context.Background()
+	r.pre(`{"tool_use_id":"toolu_E","tool_name":"Bash","tool_input":{"command":"ls"}}`) // an earlier call of the turn, still running
+	r.requestFor("Wants to run: go test ./...")
+	require.True(t, r.h.deriveSingleSessionState(ctx, r.sid, 0).NeedsInput)
+
+	r.pre(`{"tool_use_id":"toolu_A","tool_name":"Bash","tool_input":{"command":"go test ./..."}}`)
+	assert.False(t, r.h.deriveSingleSessionState(ctx, r.sid, 0).NeedsInput, "the command the request asked for started: the card goes")
+	assert.False(t, r.h.blockedOnBox(ctx, r.name, "claude", r.sid))
+}
+
+// The same turn, a sibling command starting instead: the request stays.
+func TestAnEarlierCallOfTheTurnAndAnotherCommandStartingLeavesTheRequestOpen(t *testing.T) {
+	r := newHoldRig(t, true)
+	ctx := context.Background()
+	r.pre(`{"tool_use_id":"toolu_E","tool_name":"Bash","tool_input":{"command":"ls"}}`)
+	r.requestFor("Wants to run: go test ./...")
+	r.pre(`{"tool_use_id":"toolu_B","tool_name":"Bash","tool_input":{"command":"date"}}`)
+	assert.True(t, r.h.deriveSingleSessionState(ctx, r.sid, 0).NeedsInput, "another command starting does not answer it")
+	assert.True(t, r.h.blockedOnBox(ctx, r.name, "claude", r.sid))
+}
+
+// When the call's PreToolUse comes first (the order the hooks document), the request is tied to that call alone, not to an earlier one still running: its PostToolUse, and no other call's, closes it.
+func TestARequestIsTiedOnlyToTheCallItsInputNames(t *testing.T) {
+	r := newHoldRig(t, true)
+	ctx := context.Background()
+	r.pre(`{"tool_use_id":"toolu_E","tool_name":"Bash","tool_input":{"command":"ls"}}`)
+	r.pre(`{"tool_use_id":"toolu_A","tool_name":"Bash","tool_input":{"command":"go test ./..."}}`)
+	r.requestFor("Wants to run: go test ./...")
+	evs, err := r.h.ts.ListAgentEvents(ctx, "chat", 50, &r.sid)
+	require.NoError(t, err)
+	tied := ""
+	for _, e := range evs {
+		if e.EventType == "permission_request" && e.DetailJSON != nil {
+			tied = *e.DetailJSON
+		}
+	}
+	assert.Contains(t, tied, `"call_ids":["toolu_A"]`, "tied to the call whose command it asks for")
+	assert.NotContains(t, tied, "toolu_E")
+	r.post(`{"event_type":"tool_use","summary":"Ran: ls","tool_name":"Bash","tool_use_id":"toolu_E"}`)
+	assert.True(t, r.h.deriveSingleSessionState(ctx, r.sid, 0).NeedsInput, "the earlier call finishing does not answer it")
+	r.post(`{"event_type":"tool_use","summary":"Ran: go test","tool_name":"Bash","tool_use_id":"toolu_A"}`)
+	assert.False(t, r.h.deriveSingleSessionState(ctx, r.sid, 0).NeedsInput)
+}
