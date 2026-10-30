@@ -76,28 +76,24 @@ var (
 	helloRetryWait = 300 * time.Millisecond
 )
 
-// PeerUndecidedError is a hello still answered "try again" after the retries: the server's own sentence.
-type PeerUndecidedError struct{ Msg string }
+// PeerUndecidedError is a hello still answered "try again" after the retries. Its words are fixed, never the answer's: until the hello is
+// proved, the answer may come from any program on the port (where the Coral proof is off), and its text is not printed to the terminal.
+type PeerUndecidedError struct{}
 
-func (e PeerUndecidedError) Error() string { return e.Msg }
+func (PeerUndecidedError) Error() string {
+	return "Coral could not tell yet which user this command runs as (the system had not caught up with the connection); try again in a moment"
+}
 
 // helloUndecided reports whether resp (its body already read into body) is the server's "try again: whose connection this is can't be told
-// yet", and its sentence.
-func helloUndecided(resp *http.Response, body []byte) (string, bool) {
+// yet" (503 with PeerUndecidedCode).
+func helloUndecided(resp *http.Response, body []byte) bool {
 	if resp.StatusCode != http.StatusServiceUnavailable {
-		return "", false
+		return false
 	}
 	var e struct {
-		Code  string `json:"code"`
-		Error string `json:"error"`
+		Code string `json:"code"`
 	}
-	if json.Unmarshal(body, &e) != nil || e.Code != PeerUndecidedCode {
-		return "", false
-	}
-	if e.Error == "" {
-		e.Error = "Coral could not tell yet which user this command runs as; try again"
-	}
-	return e.Error, true
+	return json.Unmarshal(body, &e) == nil && e.Code == PeerUndecidedCode
 }
 
 // waitHelloRetry waits helloRetryWait, or until ctx ends (false).
@@ -344,12 +340,11 @@ func (c CLIClient) Do(ctx context.Context, method, path string, body []byte, hea
 		hbody, _ = io.ReadAll(io.LimitReader(hresp.Body, 4096))
 		io.Copy(io.Discard, io.LimitReader(hresp.Body, 4096)) // to the end, so the second request reuses the proved connection
 		hresp.Body.Close()
-		msg, undecided := helloUndecided(hresp, hbody)
-		if !undecided {
+		if !helloUndecided(hresp, hbody) {
 			break
 		}
 		if attempt >= helloRetries || !waitHelloRetry(ctx) {
-			return nil, PeerUndecidedError{msg} // still not told: the server's words (#409)
+			return nil, PeerUndecidedError{} // still not told (#409)
 		}
 	}
 	var hello struct {

@@ -233,12 +233,11 @@ func (t Transport) helloOn(ctx context.Context, base string, rt http.RoundTrippe
 		body, _ = io.ReadAll(io.LimitReader(resp.Body, 4096))
 		io.Copy(io.Discard, io.LimitReader(resp.Body, 4096)) // to the end, so the connection (and its proof) is reused by the signed request
 		resp.Body.Close()
-		msg, undecided := helloUndecided(resp, body)
-		if !undecided {
+		if !helloUndecided(resp, body) {
 			break
 		}
 		if attempt >= helloRetries || !waitHelloRetry(ctx) {
-			return "", "", PeerUndecidedError{msg} // still not told: the server's words (#409); it closed that connection, so each retry was a new one
+			return "", "", PeerUndecidedError{} // still not told (#409); the server closed that connection, so each retry was a new one
 		}
 	}
 	var h struct {

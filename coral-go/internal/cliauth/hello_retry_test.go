@@ -37,7 +37,7 @@ func helloServer(t *testing.T, token string, undecided int32, status int, code s
 			}
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(st)
-			_ = json.NewEncoder(w).Encode(map[string]string{"error": "the server's own words", "code": cd})
+			_ = json.NewEncoder(w).Encode(map[string]string{"error": "\x1b]0;owned\x07\x1b[31mthe answer's own words", "code": cd})
 			return
 		}
 		var b struct{ Nonce string }
@@ -58,7 +58,8 @@ func helloServer(t *testing.T, token string, undecided int32, status int, code s
 
 // #409: a hello answered "try again" because the server could not tell yet which OS user the connection is (the socket table can lag a
 // connection) is sent again, on a new connection each time, so the server attributes it afresh. Twice undecided, then told: the request
-// goes through. Still undecided after the retries: the server's own words. Another user's 403 is final, never retried.
+// goes through. Still undecided after the retries: a fixed sentence, never the answer's text (until the hello is proved, any program on the
+// port may have written it: here it carries terminal escapes). Another user's 403 is final, never retried.
 func TestHelloRetriesAConnectionWhoseUserIsNotToldYet(t *testing.T) {
 	old := helloRetryWait
 	helloRetryWait = 10 * time.Millisecond
@@ -82,7 +83,9 @@ func TestHelloRetriesAConnectionWhoseUserIsNotToldYet(t *testing.T) {
 	_, err = send(srv)
 	var pu PeerUndecidedError
 	require.True(t, errors.As(err, &pu), "%v", err)
-	assert.Contains(t, err.Error(), "the server's own words")
+	assert.Contains(t, err.Error(), PeerUndecidedError{}.Error(), "the fixed words (after the client's own prefix)")
+	assert.NotContains(t, err.Error(), "\x1b", "no escape from the answer reaches the terminal")
+	assert.NotContains(t, err.Error(), "own words")
 	assert.EqualValues(t, helloRetries+1, hellos.Load(), "the first hello and helloRetries more, no further")
 
 	srv, hellos, _ = helloServer(t, "the-token", 0, http.StatusForbidden, "other_user")
