@@ -42,3 +42,33 @@ func MissingCommandIn(out, binary string) bool {
 	}
 	return false
 }
+
+// launchAnswerLines is how much of the screen under Coral's launch line is the shell's answer to it: a PowerShell error, the longest, is the
+// sentence (wrapped on a narrow pane), its position and its category lines.
+const launchAnswerLines = 12
+
+// AfterLaunchLine is the screen's text under the last line that sets CORAL_SESSION_ID to sessionID, at most launchAnswerLines lines of it.
+// Coral's launch line sets it (coralEnvPrefix: "export ... CORAL_SESSION_ID=<id>" or "$env:CORAL_SESSION_ID = '<id>'"), so that line is the
+// launch, and what follows it is the shell's answer, not an agent's later output or a transcript printed above it. A line that only shows the
+// id (an echo of it) is not the launch. ok is false when no line sets it (the screen was cleared, scrolled past it or redrawn): then nothing on
+// the screen can be tied to the launch.
+func AfterLaunchLine(screen, sessionID string) (string, bool) {
+	if sessionID == "" {
+		return "", false
+	}
+	sets := regexp.MustCompile(`CORAL_SESSION_ID\s*=\s*['"]?` + regexp.QuoteMeta(sessionID))
+	all := sets.FindAllStringIndex(screen, -1)
+	if len(all) == 0 {
+		return "", false
+	}
+	rest := screen[all[len(all)-1][0]:]
+	nl := strings.IndexByte(rest, '\n')
+	if nl < 0 {
+		return "", true // the launch line is the last line: no answer yet
+	}
+	lines := strings.SplitN(rest[nl+1:], "\n", launchAnswerLines+1)
+	if len(lines) > launchAnswerLines {
+		lines = lines[:launchAnswerLines]
+	}
+	return strings.Join(lines, "\n"), true
+}
