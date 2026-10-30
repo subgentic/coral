@@ -118,6 +118,7 @@ var ownerRefusals = map[string]string{
 	tunnel.OwnerRouteKey("GET", "/api/artifacts/{hex64}/versions"):                  textArtifactsOwnerOnly,
 	tunnel.OwnerRouteKey("GET", "/api/artifacts/series/{series}"):                   textArtifactsOwnerOnly,
 	tunnel.OwnerRouteKey("GET", "/api/artifacts/series/{series}/versions"):          textArtifactsOwnerOnly,
+	tunnel.OwnerRouteKey("POST", "/api/sessions/live/{name}/dismiss-wait"):          "through Coral Hub only the account this computer is linked to can dismiss an agent's wait (#11352)",
 	tunnel.OwnerRouteKey("PUT", "/api/board/{project}/settings"):                    "only the account this computer is linked to can change board settings through Coral Hub",
 	tunnel.OwnerRouteKey("GET", tunnel.PromptInspectionPath):                        "only the account this computer is linked to can read the prompts through Coral Hub",
 	tunnel.OwnerRouteKey("GET", "/api/board/{project}/cross-team/settings"):         textHubSwitchOwnerOnly,

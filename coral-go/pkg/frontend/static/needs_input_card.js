@@ -7,7 +7,6 @@ import { askWords } from './session_state.js';
 import { state } from './state.js';
 import { claudeSignedIn, askSigninSoon, isLocalClaude, isLocalAgent, setClaudeSignedIn } from './signin_line.js';
 import { registerActions } from './actions.js';
-import { isLocalServer, isCloud, sessionServer } from './server_base.js';
 
 // ── Needs input ──────────────────────────────────────────────────────────
 // Claude Code writes a tool call to the transcript only once it completes, so
@@ -176,9 +175,9 @@ function reviewHtml(info) {
         `<div class="cni-review-row"><dt>${escapeHtml(it.question)}</dt><dd>${escapeHtml(it.answer || "—")}</dd></div>`).join("") + `</dl>`;
 }
 
-// A Dismiss is offered for a request of the agent's own kinds, on this computer only (#11352; the route is not served through Coral Hub): the same rule as the Inbox row's (dismiss_wait.js, loaded when it is pressed).
+// A Dismiss is offered for a request of the agent's own kinds (#11352): the same rule as the Inbox row's (dismiss_wait.js, loaded when it is pressed). Through Coral Hub the machine answers anyone but the owner 403.
 function canDismissWait(session, kind) {
-    return !!(session && session.session_id && (kind === "permission" || kind === "question" || kind === "plan") && isLocalServer(sessionServer(session)) && !isCloud());
+    return !!(session && session.session_id && (kind === "permission" || kind === "question" || kind === "plan"));
 }
 
 function needsInputHtml(info, session) {
