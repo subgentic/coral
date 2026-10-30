@@ -148,8 +148,17 @@ export function matrix(names, cells, { phone = false } = {}) {
 export function plainTable(head, rows, { right = [], label = 'Table' } = {}) {
     const columns = head.map((h, i) => ({ key: 'c' + i, label: h || '\u00a0', numeric: right.includes(i), tone: i === 0 ? 'primary' : undefined, cell: r => r['c' + i] }));
     const t = dataTable({ label, rowKey: r => r.__i, state: tableState(), fold: 'labeled', scroll: true, columns, rows: rows.map((r, n) => Object.fromEntries([['__i', n], ...r.map((c, i) => ['c' + i, c])])) });
-    const frame = el('div', 'atab-tframe'); frame.append(t.el, el('p', 'atab-hint', 'Scroll sideways for more columns.'));
+    const frame = el('div', 'atab-tframe'), hint = el('p', 'atab-hint', 'Scroll sideways for more columns.');
+    hint.hidden = true; // shown only when the table really overflows (a phone stacks it into rows: nothing to scroll)
+    frame.append(t.el, hint);
+    watchOverflow(frame, hint);
     return frame;
+}
+
+/** The scroll hint follows the table: shown while any box in `frame` is wider than its window, checked when it is added and whenever the frame is resized. */
+function watchOverflow(frame, hint) {
+    const check = () => { hint.hidden = ![frame, ...frame.querySelectorAll('*')].some(e => e !== hint && e.scrollWidth > e.clientWidth + 1 && /auto|scroll/.test(getComputedStyle(e).overflowX)); };
+    requestAnimationFrame(() => { if (!frame.isConnected) return; check(); if (typeof ResizeObserver === 'function') new ResizeObserver(check).observe(frame); });
 }
 
 /** A panel: a heading (and a small line after it) over its content. */

@@ -16,7 +16,6 @@ const D = await importOnce('./analytics_tabs_data.js'); // not in the start's st
 const { el } = V;
 const TEAM_KEY = 'coral-activity-team';
 const GUEST_LINE = 'Operator interaction and Team communication are visible to the owner of this Coral only. Usage is available to you.';
-const NOT_YET = 'not recorded yet';
 const tabs = {
     usage: { range: '14d', metric: 'cost', group: 'agent', day: -1, data: null, status: 'loading', seq: 0, turns: null },
     operator: { range: '14d', team: '', data: null, status: 'loading', seq: 0 },
@@ -160,16 +159,17 @@ function turnsTable(t) {
 
 /* ---- Operator interaction ---- */
 function pendingNote(text) { const n = el('p', 'atab-pending'); n.append(el('b', null, 'Not recorded yet. '), document.createTextNode(text)); return n; }
+const kv = (label, value, note, extra) => ({ label, value, note, pending: value === D.NOT_RECORDED, ...extra });
 function drawOperator(m) {
     const o = D.operatorModel(m.data);
     const a = o.asks;
     const kpis = V.kpiStrip([
-        { label: 'Operator board posts', value: String(o.days.reduce((n, d) => n + d.values.posts, 0)), note: 'posts signed as the Operator' },
-        { label: 'Posts per task done', value: o.tasksDone ? (o.days.reduce((n, d) => n + d.values.posts, 0) / o.tasksDone).toFixed(1) : '—', note: `${o.tasksDone} tasks done in the period` },
-        { label: 'Asks to the Operator', value: String(a.asked), note: `${a.answered} answered` },
-        { label: 'Median wait for an answer', value: D.fmtWait(a.median_s), note: 'from the ask to the first reply' },
-        { label: 'Slowest wait', value: D.fmtWait(a.slowest_s), note: 'of the answered asks' },
-        { label: 'Touches (all kinds)', value: o.recorded ? String(o.touches) : '—', pending: !o.recorded, note: !o.recorded ? NOT_YET : o.hub ? `${o.hub} of them through Coral Hub` : 'every kind below' },
+        kv('Operator board posts', D.countWords(o.posts), 'posts signed as the Operator'),
+        kv('Posts per task done', D.perTaskWords(o.posts, o.tasksDone), o.tasksDone == null ? '' : `${o.tasksDone} tasks done in the period`),
+        kv('Asks to the Operator', D.countWords(a && a.asked), a ? `${a.answered} answered` : ''),
+        kv('Median wait for an answer', D.waitWords(a, 'median_s'), 'from the ask to the first reply'),
+        kv('Slowest wait', D.waitWords(a, 'slowest_s'), 'of the answered asks'),
+        kv('Touches (all kinds)', o.recorded ? String(o.touches) : D.NOT_RECORDED, !o.recorded ? '' : o.hub ? `${o.hub} of them through Coral Hub` : 'every kind below'),
     ]);
     const out = [kpis];
     if (!o.recorded) out.push(pendingNote('Typed messages, answers to prompts, approvals, wakes, restarts and stops are counted from a recording that is being added. Until then this tab shows the Operator’s board posts and asks.'));
@@ -178,7 +178,7 @@ function drawOperator(m) {
     const who = V.panel('Who needs the Operator', 'asks and @mentions of the Operator',
         o.agents.length ? V.rankedBars(o.agents.slice(0, 8).map((g, i) => ({ name: g.name, value: g.need, i, text: `${g.asks} asks · ${g.toOperator} @mentions` }))) : say('No agent asked or @mentioned the Operator in this period.'));
     if (phone()) out.push(hero, who); else out.push(rowOf(hero, who));
-    out.push(V.panel('Wait for the Operator', 'asks only', V.plainTable(['', 'Asks'], [['Asked', String(a.asked)], ['Answered', String(a.answered)], ['Not yet answered', String(Math.max(0, a.asked - a.answered))], ['Median wait', D.fmtWait(a.median_s)], ['Slowest wait', D.fmtWait(a.slowest_s)]], { right: [1], label: 'Wait for the Operator' }), o.recorded ? el('span') : pendingNote('Waits for a permission prompt are added with the recording.')));
+    out.push(V.panel('Wait for the Operator', 'asks only', V.plainTable(['', 'Asks'], [['Asked', D.countWords(a && a.asked)], ['Answered', D.countWords(a && a.answered)], ['Not yet answered', D.countWords(a && Math.max(0, a.asked - a.answered))], ['Median wait', D.waitWords(a, 'median_s')], ['Slowest wait', D.waitWords(a, 'slowest_s')]], { right: [1], label: 'Wait for the Operator' }), o.recorded ? el('span') : pendingNote('Waits for a permission prompt are added with the recording.')));
     if (o.truncated) out.push(say(`This period holds more than ${D.fmtCount(50000)} messages; the first ones are counted.`));
     return out;
 }
@@ -189,12 +189,12 @@ function drawComm(m) {
     if (c.empty) return [say('No agent wrote to the board in this period.')];
     const asks = k.asks;
     const kpis = V.kpiStrip([
-        { label: 'Messages by agents', value: D.fmtCount(k.agent), note: `${D.fmtCount(k.automated)} automated notices counted apart` },
-        { label: 'Per task done', value: k.perTask == null ? '—' : k.perTask.toFixed(1), note: `${k.tasksDone} tasks done` },
-        { label: 'With other teams', value: D.fmtCount(k.cross), note: 'sent and received' },
-        { label: 'Tasks handed to another agent', value: String(k.assigned), note: 'created for someone else' },
-        { label: 'Median reply to an ask', value: D.fmtWait(asks.median_s), note: `${asks.answered} of ${asks.asked} answered` },
-        { label: 'Busiest pair', value: k.busiest ? `${k.busiest.from} → ${k.busiest.to}` : '—', note: k.busiest ? `${k.busiest.count} @mentions` : 'no @mentions' },
+        kv('Messages by agents', D.countWords(k.agent == null ? null : D.fmtCount(k.agent)), k.automated == null ? '' : `${D.fmtCount(k.automated)} automated notices counted apart`),
+        kv('Per task done', D.perTaskWords(k.agent, k.tasksDone), k.tasksDone == null ? '' : `${k.tasksDone} tasks done`),
+        kv('With other teams', D.countWords(k.cross == null ? null : D.fmtCount(k.cross)), 'sent and received'),
+        kv('Tasks handed to another agent', D.countWords(k.assigned), 'created for someone else'),
+        kv('Median reply to an ask', D.waitWords(asks, 'median_s'), asks ? `${asks.answered} of ${asks.asked} answered` : ''),
+        kv('Busiest pair', k.busiest ? `${k.busiest.from} \u2192 ${k.busiest.to}` : 'No @mentions', k.busiest ? `${k.busiest.count} @mentions` : ''),
     ]);
     const kinds = [{ key: 'posts', name: 'Messages by agents' }, { key: 'cross', name: 'With other teams' }, { key: 'automated', name: 'Automated notices' }];
     const who = V.panel('Who talks to whom', 'an @mention is a message to that agent', c.names.length ? V.matrix(c.names, c.cells, { phone: phone() }) : say('No agent @mentioned another in this period.'));

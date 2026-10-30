@@ -33,8 +33,16 @@ assert.equal(D.operatorModel({}).perTask, null);
 // ---- Communication
 const c = D.commModel({ agent_posts: 6, tasks_done: 3, edges: [{ from: 'A', to: 'B', count: 4 }, { from: 'B', to: 'A', count: 1 }], agents: [{ name: 'A', sent: 4, received: 1 }, { name: 'B', sent: 1, received: 4 }, { name: 'Idle', sent: 0, received: 0 }], days: [{ day: '2026-10-30', posts: 6, cross: 1, automated: 9 }] });
 assert.deepEqual(c.names, ['A', 'B'], 'agents with no traffic are not in the grid'); assert.deepEqual(c.cells, [[0, 4], [1, 0]]);
-assert.equal(c.kpis.perTask, 2); assert.equal(c.tasks, null, 'per-task counts that are not sent are "not recorded yet"');
+assert.equal(c.kpis.agent, 6); assert.equal(c.kpis.tasksDone, 3); assert.equal(D.perTaskWords(c.kpis.agent, c.kpis.tasksDone), '2.0'); assert.equal(c.tasks, null, 'per-task counts that are not sent are "not recorded yet"');
 assert.deepEqual(D.commModel({ agent_posts: 1, task_messages: [] }).tasks, [], 'an empty list is recorded, with no rows');
-assert.equal(D.commModel({}).empty, true);
+assert.equal(D.commModel({ agent_posts: 0 }).empty, true, 'a read that counted no messages says so');
+assert.equal(D.commModel({}).empty, false, 'a read with no counts at all is not "nothing was written": its figures are not recorded');
+assert.equal(D.commModel({}).kpis.agent, null);
 assert.equal(D.dayLabel('2026-10-05'), 'Oct 5'); assert.equal(D.fmtWait(7300), '2 h 02 min'); assert.equal(D.fmtCount(18200000), '18.2M'); assert.equal(D.fmtMoney(412.4), '$412');
+// ---- a figure the read lacks says "not recorded yet", never 0 and never a dash; a recorded 0 is a 0
+assert.equal(D.operatorModel({}).asks, null); assert.equal(D.operatorModel({}).posts, null);
+assert.equal(D.countWords(null), 'not recorded yet'); assert.equal(D.countWords(0), '0', 'a recorded zero stays a zero');
+assert.equal(D.waitWords(null, 'median_s'), 'not recorded yet'); assert.equal(D.waitWords({ asked: 0, answered: 0, median_s: null }, 'median_s'), 'No asks');
+assert.equal(D.waitWords({ asked: 3, answered: 0, median_s: null }, 'median_s'), 'No answer yet'); assert.equal(D.waitWords({ asked: 3, answered: 2, median_s: 120, slowest_s: 300 }, 'slowest_s'), '5 min');
+assert.equal(D.perTaskWords(null, 4), 'not recorded yet'); assert.equal(D.perTaskWords(8, null), 'not recorded yet'); assert.equal(D.perTaskWords(8, 0), 'No tasks done'); assert.equal(D.perTaskWords(9, 3), '3.0');
 console.log('PASS analytics_tabs: usage, operator and communication rows');
