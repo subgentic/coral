@@ -123,6 +123,7 @@
     --space-2xl: 24px;
 
     /* Design Tokens — Card (Goal #84, spec item 9): every card look takes these; one radius and one border, three paddings by kind (dense: a row-like card, regular, roomy: a card that stands alone on a page) */
+    --pw-top: clamp(16px, 8vh, 72px); /* where the Set a password dialog hangs from (#11304) */
     --card-pad: 12px 14px;
     --card-pad-dense: 6px 10px;
     --card-pad-roomy: 28px;
