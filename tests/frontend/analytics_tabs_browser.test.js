@@ -93,9 +93,10 @@ const TURNS = [{ timestamp: day(7) + 'T14:12:00.000Z', model: 'claude-fable-5-1'
                 assert.equal(await ev(`document.querySelectorAll('#cost-operator .atab-legend li').length`), 1, 'only the recorded kind is in the legend until the rest is');
             });
             await run(`${at}: with touches recorded the six kinds appear`, async () => {
-                await ev(`window.__activity = { ...window.__activity, touches: { kinds: {}, days: ${JSON.stringify(ACTIVITY.days.map(d => ({ day: d.day, typed: 3, answer: 1, approve: 1, wake: 0, restart: 1, stop: 0 })))}, agents: [{ name: 'Backend Dev', typed: 9 }] } }; (async () => { const m = await import((window.__coralStatic || '/static/') + 'cost_dashboard.js'); await m._refreshCostDashboard({ force: true }); return true; })()`);
+                await ev(`window.__activity = { ...window.__activity, touches: { kinds: {}, days: ${JSON.stringify(ACTIVITY.days.map(d => ({ day: d.day, typed: 3, answer: 1, approve: 1, wake: 0, restart: 1, stop: 0 })))}, agents: [{ name: 'Backend Dev', typed: 9 }], sources: { local: 60, hub: 5 } } }; (async () => { const m = await import((window.__coralStatic || '/static/') + 'cost_dashboard.js'); await m._refreshCostDashboard({ force: true }); return true; })()`);
                 await waitFor(`document.querySelectorAll('#cost-operator .atab-legend li').length === 7`, 'seven kinds', 8000);
                 assert.equal(await ev(`document.querySelectorAll('#cost-operator .atab-pending').length`), 0);
+                assert.match(await text('#cost-operator .atab-kpi-pending, #cost-operator .atab-kpis'), /5 of them through Coral Hub/, 'the Hub share is said as such');
                 await ev(`window.__activity = ${JSON.stringify(ACTIVITY)}; (async () => { const m = await import((window.__coralStatic || '/static/') + 'cost_dashboard.js'); await m._refreshCostDashboard({ force: true }); return true; })()`);
                 await waitFor(`document.querySelectorAll('#cost-operator .atab-legend li').length === 1`, 'back', 8000);
             });

@@ -169,7 +169,7 @@ function drawOperator(m) {
         { label: 'Asks to the Operator', value: String(a.asked), note: `${a.answered} answered` },
         { label: 'Median wait for an answer', value: D.fmtWait(a.median_s), note: 'from the ask to the first reply' },
         { label: 'Slowest wait', value: D.fmtWait(a.slowest_s), note: 'of the answered asks' },
-        { label: 'Touches (all kinds)', value: o.recorded ? String(o.touches) : '—', pending: !o.recorded, note: o.recorded ? 'every kind below' : NOT_YET },
+        { label: 'Touches (all kinds)', value: o.recorded ? String(o.touches) : '—', pending: !o.recorded, note: !o.recorded ? NOT_YET : o.hub ? `${o.hub} of them through Coral Hub` : 'every kind below' },
     ]);
     const out = [kpis];
     if (!o.recorded) out.push(pendingNote('Typed messages, answers to prompts, approvals, wakes, restarts and stops are counted from a recording that is being added. Until then this tab shows the Operator’s board posts and asks.'));
