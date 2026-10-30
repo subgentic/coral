@@ -550,6 +550,7 @@ func (m *PTYBackend) NoteLaunch(name, script, cli string) {
 	if h, can := s.proc.(handoffNoter); can {
 		h.NoteLaunch(script, cli)
 	}
+	tmux.NoteLaunchCLI(name, cli) // a Unix pseudo-terminal: the CLI a wrapper script has to be (#408)
 }
 
 // AgentNoticeVerdict says whether a notice may be typed into a session's terminal. ok is false when the session is gone or the platform cannot tell.

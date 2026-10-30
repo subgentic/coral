@@ -111,6 +111,13 @@ func programsBelowRule(src procSource, root int, cli, handoff string) (progs []w
 					case (n.depth == 0 || n.handoff) && cli != "" && p.name == "cmd" && siblingPrograms == 0:
 						if line, ok := src.commandLine(c); ok && isLauncherCommandLine(line, cli) {
 							via, isLauncher = "", true // Coral's launcher for the resolved CLI: not a shell a person started
+							if !hasProgramChild(src, c) {
+								// A .bat or .cmd that IS the resolved CLI and stays alive with nothing started below it (it blocks in a builtin): the cmd is the agent itself, not a shell with
+								// nothing under it (#408). One that starts a program keeps the rule above: that program is the CLI's own.
+								p.via, p.launched = "", true
+								progs = append(progs, p)
+								continue
+							}
 						}
 					case n.depth == 0 && handoff != "" && cli != "" && (p.name == "powershell" || p.name == "pwsh") && siblingPrograms == 0:
 						if line, ok := src.commandLine(c); ok && isHandoffCommandLine(line, handoff) && onlyChildIsLauncher(src, c, cli) {
@@ -137,6 +144,16 @@ func programsBelowRule(src procSource, root int, cli, handoff string) (progs []w
 		}
 	}
 	return progs, unknown, deep
+}
+
+// hasProgramChild is whether pid has a child that is not a console host (conhost.exe, OpenConsole): a program, a shell of any kind, or one the system could not describe.
+func hasProgramChild(src procSource, pid int) bool {
+	for _, k := range src.children(pid) {
+		if src.info(k).kind != kindConsoleHost {
+			return true
+		}
+	}
+	return false
 }
 
 // winAgent is what Coral recorded of a session's agent process: its pid and creation time.

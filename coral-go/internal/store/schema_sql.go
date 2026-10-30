@@ -615,6 +615,14 @@ CREATE TABLE IF NOT EXISTS session_tokens (
 );
 CREATE INDEX IF NOT EXISTS idx_session_tokens_session ON session_tokens(session_id);
 
+-- The CLI path a terminal session was launched with, or recorded as the agent with (#408): a wrapper script that IS the CLI is recognised by it at every notice, and it has to be known after a
+-- Coral restart. Keyed by the terminal's session name (the key the notice check uses). A session from before this has no row: its notices wait for a record, as before.
+CREATE TABLE IF NOT EXISTS session_launch_cli (
+    session_name TEXT PRIMARY KEY,
+    cli          TEXT NOT NULL,
+    updated_at   TEXT NOT NULL
+);
+
 -- Browser sign-ins (#3949): a sign-in link, the API-key form or the password. Only the
 -- SHA-256 of the cookie value is kept; times are unix seconds; expires_at is absolute.
 CREATE TABLE IF NOT EXISTS browser_sessions (

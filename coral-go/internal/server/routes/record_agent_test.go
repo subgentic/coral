@@ -26,6 +26,7 @@ type recordTerminal struct {
 	cand     map[string]ptymanager.AgentCandidate // by session name: the single foreground program
 	why      map[string]string                    // by session name: why there is no single program
 	recorded map[string]ptymanager.AgentCandidate
+	wantCLI  map[string]string // the CLI path each RecordAgent call carried (#408)
 	paused   map[string]bool
 	readErr  map[string]error // by session name: the record's own read of the terminal fails
 }
@@ -59,6 +60,7 @@ func (r *recordTerminal) RecordAgent(_ context.Context, name, _, _ string, want 
 		return ptymanager.AgentCandidate{}, &ptymanager.NeedsAcknowledgementError{Under: cur.Under, Unidentified: cur.Unidentified}
 	}
 	r.recorded[name] = cur
+	r.wantCLI[name] = want.CLIPath
 	r.paused[name] = false
 	return cur, nil
 }
@@ -71,7 +73,7 @@ const (
 func recordFixture(t *testing.T) (srv string, term *recordTerminal, ss *store.SessionStore, nameA, nameB string) {
 	t.Helper()
 	_, handler, mock, ss := setupSessionsTestServer(t)
-	term = &recordTerminal{fgSessionTerminal: newFGTerminal(mock), cand: map[string]ptymanager.AgentCandidate{}, why: map[string]string{}, recorded: map[string]ptymanager.AgentCandidate{}, paused: map[string]bool{}}
+	term = &recordTerminal{fgSessionTerminal: newFGTerminal(mock), cand: map[string]ptymanager.AgentCandidate{}, why: map[string]string{}, recorded: map[string]ptymanager.AgentCandidate{}, wantCLI: map[string]string{}, paused: map[string]bool{}}
 	handler.terminal = term
 	r := chi.NewRouter()
 	r.Get("/api/sessions/live/{sessionID}/agent-candidate", handler.AgentCandidate)
@@ -348,4 +350,31 @@ func TestAnUnidentifiedProgramNeedsTheAcknowledgementAndBulkLeavesIt(t *testing.
 	code, _ = postRecordJSON(t, srv+"/api/sessions/live/"+recordSIDa+"/record-agent", map[string]any{"pid": 100, "start": "s1", "acknowledge_nested": true})
 	assert.Equal(t, http.StatusOK, code)
 	assert.Contains(t, term.recorded, nameA)
+}
+
+// #408: Record as agent keeps the SERVER-resolved CLI path with the session, never one from the request: a body that names a path of its own (any spelling) is ignored.
+func TestRecordAsAgentUsesOnlyTheServerResolvedCLIPath(t *testing.T) {
+	srv, term, ss, nameA, nameB := recordFixture(t)
+	resolved := stubCLI(t)
+	require.NoError(t, ss.SetSetting(context.Background(), "cli_path_claude", resolved))
+	require.NoError(t, ss.SetSetting(context.Background(), "cli_path_codex", resolved))
+	evil := filepath.Join(t.TempDir(), "evil-wrapper.sh")
+
+	term.paused[nameA] = true
+	term.cand[nameA] = ptymanager.AgentCandidate{PID: 4242, Start: "s1", Program: "node"}
+	code, _ := postRecordJSON(t, srv+"/api/sessions/live/"+recordSIDa+"/record-agent",
+		map[string]any{"pid": 4242, "start": "s1", "cli_path": evil, "cli": evil, "CLIPath": evil, "cliPath": evil, "image": evil})
+	require.Equal(t, http.StatusOK, code)
+	assert.Equal(t, resolved, term.wantCLI[nameA], "the path the server resolved from its settings")
+	assert.NotEqual(t, evil, term.wantCLI[nameA])
+
+	// Bulk: the same, per agent.
+	term.paused[nameA], term.paused[nameB] = true, true
+	term.cand[nameA] = ptymanager.AgentCandidate{PID: 100, Start: "s2", Program: "true", Image: resolved}
+	term.cand[nameB] = ptymanager.AgentCandidate{PID: 200, Start: "s3", Program: "true", Image: resolved}
+	code, _ = postRecordJSON(t, srv+"/api/sessions/record-agents", map[string]any{"cli_path": evil, "CLIPath": evil})
+	require.Equal(t, http.StatusOK, code)
+	for _, n := range []string{nameA, nameB} {
+		assert.Equal(t, resolved, term.wantCLI[n], n)
+	}
 }
