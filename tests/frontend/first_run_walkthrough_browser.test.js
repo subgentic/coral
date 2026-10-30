@@ -33,13 +33,19 @@ async function freshServer() {
     const dirs = { root, home: path.join(root, 'home'), data: path.join(root, 'data'), bin: path.join(root, 'bin'), work: path.join(root, 'project'), teamWork: path.join(root, 'team-project') };
     for (const d of [dirs.home, dirs.data, dirs.bin, dirs.work, dirs.teamWork]) fs.mkdirSync(d);
     const got = path.join(root, 'got');
-    fs.writeFileSync(path.join(dirs.bin, 'claude'), [
-        '#!/bin/sh',
-        'case "$1" in --version) echo "2.0.0 (stand-in)"; exit 0;; auth) echo \'{"loggedIn": true}\'; exit 0;; esac',
-        "printf 'stand-in claude ready\\n> '",
-        `while IFS= read -r line; do printf '%s\\n' "$line" >> '${got}'; done`,
-        'exec sleep 600', '',
-    ].join('\n'), { mode: 0o755 });
+    // The stand-in CLI is a node program, not a shell script: Coral records an agent's process only when its foreground program is not a shell, and on macOS a "#!/bin/sh" script shows as "sh" (on Linux as the
+    // script's own name), so a shell-script stand-in is never recorded there, board notices stay off and the first task is never typed (red on macOS since the recorded-CLI rule, green on Linux CI). Its model probe
+    // (a control_request line on stdin) is answered by nothing and not logged: `got` holds what an agent was typed.
+    const standIn = `#!${process.execPath}\nconst GOT = ${JSON.stringify(got)};
+const a = process.argv[2] || '';
+if (a === '--version') { console.log('2.0.0 (stand-in)'); process.exit(0); }
+if (a === 'auth') { console.log('{"loggedIn": true}'); process.exit(0); }
+process.stdout.write('stand-in claude ready\\n> ');
+const fs = require('node:fs'); let buf = '';
+process.stdin.on('data', d => { buf += d; let i; while ((i = buf.indexOf('\\n')) >= 0) { const line = buf.slice(0, i); buf = buf.slice(i + 1); if (!line.startsWith('{"type":"control_request"')) fs.appendFileSync(GOT, line + '\\n'); } });
+setInterval(() => {}, 1 << 30);
+`;
+    fs.writeFileSync(path.join(dirs.bin, 'claude'), standIn, { mode: 0o755 });
     const port = await freePort(), deadHub = await freePort();
     assert.notEqual(port, 8420);
     const log = path.join(root, 'coral.log');
