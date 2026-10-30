@@ -16,22 +16,22 @@ const BASE = require('./test_base').BASE;
                 if (url.pathname === '/api/system/cli-check' && url.searchParams.get('signin') === '1') { window.__asks.push(url.search); return Promise.resolve(new Response(JSON.stringify(window.__answer), { status: 200, headers: { 'Content-Type': 'application/json' } })); }
                 return R(u, o); }; return true; })()`);
         await ev(`(async () => { await window.showSettingsModal('security'); return true; })()`);
-        await waitFor(`getComputedStyle(document.getElementById('settings-modal')).display !== 'none' && !!document.getElementById('settings-claude-account-check')`, 'the Claude account row');
+        await waitFor(`getComputedStyle(document.getElementById('settings-modal')).display !== 'none' && !!document.getElementById('settings-accounts-check')`, 'the Accounts row');
         const labels = await ev(`[...document.querySelectorAll('#settings-modal .sv-label, #settings-modal label, #settings-modal .sv-row-label')].map(e => e.textContent.trim())`);
         assert.ok(labels.some(t => t === 'Coral API key'), 'the key is labelled Coral API key: ' + JSON.stringify(labels));
-        assert.ok(labels.some(t => t === 'Claude account'), 'a Claude account row: ' + JSON.stringify(labels));
+        assert.ok(labels.some(t => t === 'Accounts'), 'an Accounts row, one for Claude and Pi (#11320): ' + JSON.stringify(labels));
         assert.equal(await ev(`document.getElementById('settings-api-key').getAttribute('aria-label')`), 'Coral API key');
-        assert.equal(await ev(`document.getElementById('settings-claude-account-check').getAttribute('aria-label')`), 'Check Claude sign-in');
+        assert.equal(await ev(`document.getElementById('settings-accounts-check').getAttribute('aria-label')`), 'Check Claude and Pi sign-in');
         // the explanation is behind the row's own More (a tooltip never shows on a phone), not a line of the pane
-        const more = await ev(`(() => { const row = document.getElementById('settings-claude-account').closest('.sv-row'); const t = row.querySelector('.sv-help-toggle, button[aria-expanded], summary'); return t ? { label: t.textContent.trim(), expanded: t.getAttribute('aria-expanded') } : null; })()`);
+        const more = await ev(`(() => { const row = document.getElementById('settings-accounts').closest('.sv-row'); const t = row.querySelector('.sv-help-toggle, button[aria-expanded], summary'); return t ? { label: t.textContent.trim(), expanded: t.getAttribute('aria-expanded') } : null; })()`);
         assert.ok(more, 'the row has a Learn more control');
-        await ev(`(() => { const row = document.getElementById('settings-claude-account').closest('.sv-row'); const t = row.querySelector('.sv-help-toggle, button[aria-expanded], summary'); t.click(); return true; })()`);
-        assert.match(await ev(`document.getElementById('settings-claude-account').closest('.sv-row').textContent`), /Claude CLI's own login/, 'the explanation is in the row once More is open');
-        const check = async answer => { await ev(`window.__answer = ${JSON.stringify(answer)}; document.getElementById('settings-claude-account-check').click(); true`); await waitFor(`document.getElementById('settings-claude-account-status').textContent !== 'Checking...' && document.getElementById('settings-claude-account-status').textContent !== 'Not checked yet'`, 'the answer'); return ev(`document.getElementById('settings-claude-account-status').textContent`); };
+        await ev(`(() => { const row = document.getElementById('settings-accounts').closest('.sv-row'); const t = row.querySelector('.sv-help-toggle, button[aria-expanded], summary'); t.click(); return true; })()`);
+        assert.match(await ev(`document.getElementById('settings-accounts').closest('.sv-row').textContent`), /each CLI's own login/, 'the explanation is in the row once More is open');
+        const check = async answer => { await ev(`window.__answer = ${JSON.stringify(answer)}; document.getElementById('settings-accounts-check').click(); true`); await waitFor(`document.getElementById('settings-claude-account-status').textContent !== 'Checking...' && document.getElementById('settings-claude-account-status').textContent !== 'Not checked yet'`, 'the answer'); return ev(`document.getElementById('settings-claude-account-status').textContent`); };
         assert.equal(await check({ found: true, signed_in: true }), 'Signed in');
         assert.match(await check({ found: true, signed_in: false }), /^Not signed in: run claude auth login/);
         assert.match(await check({ found: true, signal: 1 }), /^Could not tell/);
-        assert.equal(await ev(`window.__asks.length`), 3, 'each Check asks the CLI');
+        assert.equal(await ev(`window.__asks.length`), 6, 'each Check asks both CLIs (Claude and Pi), three Checks');
         assert.ok((await ev(`window.__asks`)).every(q => /source=settings_check/.test(q)), 'the Settings Check has its own analytics source');
         console.log('PASS Coral API key and the Claude account row');
     } finally { await client.close(); }

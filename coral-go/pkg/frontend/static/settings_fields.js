@@ -161,30 +161,37 @@ const apiKeyLine = slot => {
     line.append(input, show, copy, qr); slot.append(line);
 };
 
-// A CLI account's line (#10526 Claude, #11293 Pi): who the agents sign in as is the CLI's own login, so Check asks the CLI (GET /api/system/cli-check?type=<cli>&signin=1) and says signed in, not signed in, or that it
-// could not tell. Pi signs in per provider and says which one the answer is for.
-const accountLine = (slot, { cli, name, notSignedIn }) => {
-    const line = document.createElement('div'); line.className = 'sv-ctl-line';
-    const status = document.createElement('span'); status.id = `settings-${cli}-account-status`; status.className = 'settings-hint'; status.setAttribute('role', 'status');
-    const check = document.createElement('button'); check.type = 'button'; check.id = `settings-${cli}-account-check`; check.className = 'btn btn-small'; check.textContent = 'Check'; check.setAttribute('aria-label', `Check ${name} sign-in`);
+// The agents' CLI accounts, one row (#10526 Claude, #11293 Pi, #11320): who the agents sign in as is each CLI's own login, so Check asks the CLIs (GET /api/system/cli-check?type=<cli>&signin=1) and each line says signed in,
+// not signed in, or that it could not tell. A line per provider, one Learn more and one Check for all (the row was two, with two of each, and the pane's word budget was over). Pi signs in per provider and says which one.
+const ACCOUNTS = [{ cli: 'claude', name: 'Claude', notSignedIn: 'run claude auth login in a terminal' }, { cli: 'pi', name: 'Pi', notSignedIn: 'start pi and run /login' }];
+const accountsLines = slot => {
+    const mk = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+    const lines = ACCOUNTS.map(a => {
+        const line = mk('div', 'sv-ctl-line account-line'), status = mk('span', 'settings-hint');
+        status.id = `settings-${a.cli}-account-status`; status.setAttribute('role', 'status');
+        line.append(mk('span', 'account-name', a.name), status); slot.append(line);
+        return { ...a, status };
+    });
+    const row = mk('div', 'sv-ctl-line'), check = mk('button', 'btn btn-small', 'Check');
+    check.type = 'button'; check.id = 'settings-accounts-check'; check.setAttribute('aria-label', 'Check Claude and Pi sign-in');
     check.addEventListener('click', async () => {
-        check.disabled = true; status.textContent = 'Checking...';
-        let signedIn, provider = '';
-        try { const r = await fetch(`/api/system/cli-check?type=${cli}&signin=1&source=settings_check`, { cache: 'no-store' }); if (r.ok) { const d = await r.json(); signedIn = d.signed_in; provider = typeof d.provider === 'string' ? d.provider : ''; } } catch { /* no answer: said below */ }
-        const to = provider ? ` to ${provider}` : '';
-        status.textContent = signedIn === true ? `Signed in${to}` : signedIn === false ? `Not signed in${to}: ${notSignedIn}` : `Could not tell if ${name} is signed in`;
+        check.disabled = true;
+        await Promise.all(lines.map(async a => {
+            a.status.textContent = 'Checking...';
+            let signedIn, provider = '';
+            try { const r = await fetch(`/api/system/cli-check?type=${a.cli}&signin=1&source=settings_check`, { cache: 'no-store' }); if (r.ok) { const d = await r.json(); signedIn = d.signed_in; provider = typeof d.provider === 'string' ? d.provider : ''; } } catch { /* said as could not tell */ }
+            const to = provider ? ` to ${provider}` : '';
+            a.status.textContent = signedIn === true ? `Signed in${to}` : signedIn === false ? `Not signed in${to}: ${a.notSignedIn}` : `Could not tell if ${a.name} is signed in`;
+        }));
         check.disabled = false;
     });
-    line.append(status, check); slot.append(line);
+    row.append(check); slot.append(row);
 };
-const claudeAccountLine = slot => accountLine(slot, { cli: 'claude', name: 'Claude', notSignedIn: 'run claude auth login in a terminal' });
-const piAccountLine = slot => accountLine(slot, { cli: 'pi', name: 'Pi', notSignedIn: 'start pi and run /login' });
 
 export const SECURITY_FIELDS = [
     { key: 'security_access_title', type: 'heading', id: 'settings-security-access-title', label: 'Access' },
     { key: 'api_key', type: 'custom', id: 'settings-api-key-group', label: 'Coral API key', render: slot => apiKeyLine(slot) },
-    { key: 'claude_account', type: 'custom', id: 'settings-claude-account', label: 'Claude account', help: moreOnly("Agents sign in through the Claude CLI's own login, not a key stored in Coral. Check asks the CLI now."), render: slot => claudeAccountLine(slot) },
-    { key: 'pi_account', type: 'custom', id: 'settings-pi-account', label: 'Pi account', help: moreOnly("Pi signs in with its own login, per provider. Check asks Pi now for the provider it starts on."), render: slot => piAccountLine(slot) },
+    { key: 'accounts', type: 'custom', id: 'settings-accounts', label: 'Accounts', help: moreOnly("Agents sign in through each CLI's own login, not a key stored in Coral. Check asks Claude and Pi now; Pi signs in per provider and says which one."), render: slot => accountsLines(slot) },
     live('settings-security'),
     { key: 'security_data_title', type: 'heading', id: 'settings-security-data-title', label: 'Data and privacy' },
     { key: 'database_encryption', type: 'select', id: 'settings-database-encryption', labelId: 'settings-database-encryption-label', label: 'Database encryption', live: ['settings-database-encryption-status'], visibleWhen: () => { const e = document.getElementById('settings-database-encryption'); return !e || e.dataset.unsupported !== '1'; }, disabledWhen: () => { const e = document.getElementById('settings-database-encryption'); return !!e && e.dataset.locked === '1'; },

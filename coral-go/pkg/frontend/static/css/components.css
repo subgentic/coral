@@ -4169,3 +4169,5 @@ dialog.team-link-dialog::backdrop { background: rgba(var(--black-rgb), 0.5); }
 .provider-missing-entry { display: flex; flex-wrap: wrap; align-items: center; gap: 0 10px; min-height: var(--control-touch-height, 44px); margin-bottom: 8px; padding: 0 14px; border-style: dashed; background: transparent; }
 .provider-install { margin-left: auto; display: inline-flex; align-items: center; min-height: var(--control-touch-height, 44px); color: var(--link-text); text-decoration: underline; }
 @media (max-width: 359px) { .provider-card-body .seg-group { display: none; } .provider-card-body select.seg-source { display: block; } } /* a strip of six levels does not fit: the select under it does */
+
+.account-line { display: grid !important; grid-template-columns: 5em minmax(0, 1fr); align-items: start; gap: 12px; } .account-name { font-size: var(--fs-md); color: var(--text-primary); } /* Settings > Security > Accounts (#11320): a line per provider, its name and its answer */
