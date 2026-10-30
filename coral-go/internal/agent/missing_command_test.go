@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -39,4 +40,48 @@ func TestMissingCommandInIgnoresOtherCommandsAndTheAgentsOwnWords(t *testing.T) 
 		assert.False(t, MissingCommandIn(out, "codex"), name)
 	}
 	assert.False(t, MissingCommandIn("bash: codex: command not found", ""), "no binary named")
+}
+
+// The coral-go-team Security's INFO on #173: only the shell's answer to Coral's own launch line counts. The line is found by the session id it
+// sets; text above it, or far below it, is not the launch's; with no such line on the screen there is nothing to read.
+func TestAfterLaunchLineIsTheShellsAnswerToCoralsLine(t *testing.T) {
+	const sid = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+	launch := "PS D:\\w> $env:CORAL_SESSION_ID = '" + sid + "'; & codex --x"
+	err := "codex : The term 'codex' is not recognized as the name of a cmdlet, function, script file, or operable program."
+
+	got, ok := AfterLaunchLine(launch+"\n"+err+"\nPS D:\\w> ", sid)
+	if !ok || !MissingCommandIn(got, "codex") {
+		t.Fatalf("the error right under the launch line is its answer: %q %v", got, ok)
+	}
+	if got, ok := AfterLaunchLine(err+"\n"+launch+"\n", sid); !ok || MissingCommandIn(got, "codex") {
+		t.Errorf("an error above the launch line is not its answer: %q", got)
+	}
+	far := launch + "\n" + strings.Repeat("agent output\n", launchAnswerLines) + err
+	if got, ok := AfterLaunchLine(far, sid); !ok || MissingCommandIn(got, "codex") {
+		t.Errorf("the words far below the launch line are an agent's output, not the shell's answer: %q", got)
+	}
+	again := launch + "\n" + err + "\nPS D:\\w> $env:CORAL_SESSION_ID = '" + sid + "'; & codex --x\nWelcome to Codex"
+	if got, ok := AfterLaunchLine(again, sid); !ok || MissingCommandIn(got, "codex") {
+		t.Errorf("the LAST launch line counts (a wake that started): %q", got)
+	}
+	if _, ok := AfterLaunchLine(err+"\nPS D:\\w> ", sid); ok {
+		t.Error("no launch line on the screen: nothing can be tied to the launch")
+	}
+	echoed := launch + "\n" + err + "\nPS D:\\w> echo " + sid + "\n" + sid + "\nbash: codex: command not found"
+	if got, ok := AfterLaunchLine(echoed, sid); !ok || !strings.HasPrefix(got, err) {
+		t.Errorf("a line that only shows the id (an echo) is not the launch: the answer is still the launch line's: %q", got)
+	}
+	unix := "w$ unset TMUX; export CORAL_SESSION_ID='" + sid + "' CORAL_PORT='8450'; codex --x\nbash: codex: command not found"
+	if got, ok := AfterLaunchLine(unix, sid); !ok || !MissingCommandIn(got, "codex") {
+		t.Errorf("the Unix launch line sets it with export: %q %v", got, ok)
+	}
+	if _, ok := AfterLaunchLine("w$ echo "+sid+"\nbash: codex: command not found", sid); ok {
+		t.Error("only an echo of the id on the screen: no launch line")
+	}
+	if got, ok := AfterLaunchLine(launch, sid); !ok || got != "" {
+		t.Errorf("a launch line with nothing under it yet: %q %v", got, ok)
+	}
+	if _, ok := AfterLaunchLine(launch+"\n"+err, ""); ok {
+		t.Error("no session id: no launch line")
+	}
 }

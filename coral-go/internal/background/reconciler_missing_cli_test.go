@@ -2,6 +2,7 @@ package background
 
 import (
 	"context"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -53,7 +54,7 @@ func TestReconciler_AgentWhoseShellCouldNotFindItsCLIIsMarkedFailedToStartAtOnce
 	rt.listed = []AgentInfo{{AgentType: "codex", SessionID: testUUID}}
 	name := FormatSessionName("codex", testUUID)
 	rt.set(name, "powershell")
-	rt.screens[name] = "PS D:/w> & codex --x\ncodex : The term 'codex' is not recognized as the name of a cmdlet, function, script file, or operable program."
+	rt.screens[name] = launchLine(testUUID) + "\ncodex : The term 'codex' is not recognized as the name of a cmdlet, function, script file, or operable program."
 
 	r.reconcileOnce(ctx)
 	assert.True(t, isSleeping(t, ss, testUUID))
@@ -75,7 +76,7 @@ func TestReconciler_AnExitedAgentWithAnUnrelatedErrorWaitsForTheGraceAsBefore(t 
 	rt.listed = []AgentInfo{{AgentType: "codex", SessionID: testUUID}}
 	name := FormatSessionName("codex", testUUID)
 	rt.set(name, "powershell")
-	rt.screens[name] = "The term 'git' is not recognized as the name of a cmdlet, function, script file, or operable program."
+	rt.screens[name] = launchLine(testUUID) + "\nThe term 'git' is not recognized as the name of a cmdlet, function, script file, or operable program."
 	for i := 0; i < 3; i++ {
 		r.reconcileOnce(ctx)
 	}
@@ -126,7 +127,7 @@ func TestReconciler_AWakeWhoseShellCouldNotFindTheCLIIsCaughtByItsLaunchTime(t *
 	rt.listed = []AgentInfo{{AgentType: "codex", SessionID: testUUID}}
 	name := FormatSessionName("codex", testUUID)
 	rt.set(name, "powershell")
-	rt.screens[name] = "The term 'codex' is not recognized as the name of a cmdlet, function, script file, or operable program."
+	rt.screens[name] = launchLine(testUUID) + "\nThe term 'codex' is not recognized as the name of a cmdlet, function, script file, or operable program."
 	r.now = func() time.Time { return time.Now().Add(3 * time.Hour) } // the row was created hours ago
 	r.reconcileOnce(ctx)
 	ls, _ := ss.GetLiveSession(ctx, testUUID)
@@ -139,4 +140,38 @@ func TestReconciler_AWakeWhoseShellCouldNotFindTheCLIIsCaughtByItsLaunchTime(t *
 	require.NoError(t, err)
 	require.NotNil(t, ls.StartFailure)
 	assert.Equal(t, store.StartFailureCLIMissing, *ls.StartFailure)
+}
+
+// launchLine is the line Coral types to start an agent, as the shell shows it: it sets CORAL_SESSION_ID to the session id.
+func launchLine(sessionID string) string {
+	return "PS D:/w> $env:CORAL_SESSION_ID = '" + sessionID + "'; & codex --x"
+}
+
+// The coral-go-team Security's INFO on #173: only the shell's answer to Coral's own launch line marks an agent. The same words above the line (a
+// transcript scrolled up), far below it, or on a screen where the line can't be found (cleared, scrolled past, redrawn) mark nothing; nothing
+// is typed either way.
+func TestReconciler_OnlyTheShellsAnswerToCoralsLaunchLineMarksAFailedStart(t *testing.T) {
+	const err = "codex : The term 'codex' is not recognized as the name of a cmdlet, function, script file, or operable program."
+	for what, screen := range map[string]string{
+		"the words above the launch line": err + "\n" + launchLine(testUUID) + "\nPS D:/w> ",
+		"the words far below it":          launchLine(testUUID) + "\n" + strings.Repeat("output\n", 20) + err,
+		"no launch line on the screen":    err + "\nPS D:/w> ",
+	} {
+		t.Run(what, func(t *testing.T) {
+			ss, rt, r := newMissingCLIFixture(t)
+			r.now = func() time.Time { return time.Now() }
+			ctx := context.Background()
+			registerAwake(t, ss, "codex", testUUID)
+			rt.listed = []AgentInfo{{AgentType: "codex", SessionID: testUUID}}
+			name := FormatSessionName("codex", testUUID)
+			rt.set(name, "powershell")
+			rt.screens[name] = screen
+			r.reconcileOnce(ctx)
+			ls, err := ss.GetLiveSession(ctx, testUUID)
+			require.NoError(t, err)
+			assert.Nil(t, ls.StartFailure, "not marked failed to start")
+			assert.False(t, isSleeping(t, ss, testUUID), "nor ended, inside the launch grace")
+			assert.Zero(t, rt.sends)
+		})
+	}
 }
