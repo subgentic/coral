@@ -191,6 +191,22 @@ const TURNS = [{ timestamp: day(7) + 'T14:12:00.000Z', model: 'claude-fable-5-1'
             await waitFor(`/No messages or goal requests with other teams/.test(document.getElementById('cost-comm').textContent)`, 'no traffic', 8000);
             await ev(`window.__activity = ${JSON.stringify(ACTIVITY)}; true`); await ev(refresh);
         });
+        await run('an axis counts in whole figures that differ: nothing counted is one 0 and a line that says so, a few is 0, 1, 2, 3 (not 1, 1, 1, 0, 0)', async () => {
+            const refresh = `(async () => { const m = await import((window.__coralStatic || '/static/') + 'cost_dashboard.js'); await m._refreshCostDashboard({ force: true }); return true; })()`;
+            const axis = () => ev(`(() => { const svg = document.querySelector('#cost-operator .atab-card svg.atab-svg'); const y = [...svg.querySelectorAll('text.atab-axis')].filter(t => t.getAttribute('text-anchor') === 'end').map(t => t.textContent); return { y, empty: !!svg.querySelector('.atab-empty') }; })()`);
+            const zero = { ...ACTIVITY, days: ACTIVITY.days.map(d => ({ ...d, operator: 0, tasks_done: 0 })), touches: { kinds: {}, days: ACTIVITY.days.map(d => ({ day: d.day, typed: 0, answer: 0, approve: 0, wake: 0, restart: 0, stop: 0 })), agents: [], sources: { hub: 0 } } };
+            await ev(`window.__activity = ${JSON.stringify(zero)}; true`); await open('operator'); await ev(refresh);
+            await waitFor(`!!document.querySelector('#cost-operator .atab-card svg.atab-svg .atab-empty')`, 'the empty axis', 8000);
+            let a = await axis();
+            assert.deepEqual(a.y, ['0'], 'nothing counted: one 0, no repeated labels: ' + JSON.stringify(a));
+            assert.ok(a.empty, 'and a line that says so');
+            const few = { ...zero, days: zero.days.map((d, i) => ({ ...d, operator: i % 4 })) };
+            await ev(`window.__activity = ${JSON.stringify(few)}; true`); await ev(refresh);
+            await waitFor(`!document.querySelector('#cost-operator .atab-card svg.atab-svg .atab-empty')`, 'a few counted', 8000);
+            a = await axis();
+            assert.ok(a.y.length >= 2 && new Set(a.y).size === a.y.length && a.y.every(v => /^\d+$/.test(v)) && a.y.includes('0'), 'a few counted: whole figures that differ: ' + JSON.stringify(a));
+            await ev(`window.__activity = ${JSON.stringify(ACTIVITY)}; true`); await ev(refresh);
+        });
         await run('the reads are bounded: Usage asks for a daily series of twice the period, activity names its team and range', async () => {
             const reqs = await ev(`window.__reqs`);
             assert.ok(reqs.some(r => /timeseries\?since=.*&interval=1d&group_by=agent/.test(r)), JSON.stringify(reqs.slice(0, 3)));
