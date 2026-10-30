@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -48,18 +49,48 @@ func init() {
 // inherited live one. The default port stays refused.
 const TestURLEnv = "CORAL_TESTGUARD_TEST_URL"
 
-// defaultPort is the port a Coral server listens on unless told otherwise.
-const defaultPort = "8420"
+// defaultPorts are the ports a Coral server listens on unless told otherwise: 8450 on Windows (config.DefaultPort) and 8420 elsewhere. BOTH are refused on every OS: a
+// test binary runs wherever it is built, and a CLI client that finds no verifiable record and no CORAL_URL goes to its OS's default, the live Coral's port. (This
+// list once held 8420 only, so on Windows the live Coral at 8450 was never refused.) A test in the external test package asserts config.DefaultPort is in it.
+var defaultPorts = []string{"8420", "8450"}
+
+// DefaultPorts is the list above, for a test that checks it against config.DefaultPort (this package cannot import config: config links it).
+func DefaultPorts() []string { return append([]string(nil), defaultPorts...) }
+
+// lockFileName is the instance lock a running Coral server holds in its data folder, with its address in it (config.ServerLockFile; not imported, see above).
+const lockFileName = "coral-server.lock"
+
+// recordedPorts are the ports of the addresses the live servers recorded in the real data folders' lock files (pid, url and instance id, one to a line): a Coral on a
+// port other than the default is the live Coral too, and a test must not reach it by finding its record.
+func recordedPorts(dirs []string) []string {
+	var ports []string
+	for _, dir := range dirs {
+		b, err := os.ReadFile(filepath.Join(dir, lockFileName))
+		if err != nil || len(b) > 4096 {
+			continue
+		}
+		lines := strings.Split(strings.TrimSpace(string(b)), "\n")
+		if len(lines) < 2 {
+			continue
+		}
+		if u, err := url.Parse(strings.TrimSpace(lines[1])); err == nil && u.Port() != "" {
+			ports = append(ports, u.Port())
+		}
+	}
+	return ports
+}
 
 // liveServerAddrs returns the host:port values a test must not dial: the
-// inherited CORAL_URL and the loopback addresses on the default port and on
-// CORAL_PORT.
+// inherited CORAL_URL and the loopback addresses on the default ports (both,
+// on every OS), on CORAL_PORT and on the port the live server recorded in the
+// real data folder's lock file.
 func liveServerAddrs(coralURL, coralPort string) map[string]bool {
 	addrs := map[string]bool{}
-	ports := []string{defaultPort}
+	ports := append([]string(nil), defaultPorts...)
 	if coralPort != "" {
 		ports = append(ports, coralPort)
 	}
+	ports = append(ports, recordedPorts(protectedDirs())...)
 	if u, err := url.Parse(strings.TrimSpace(coralURL)); err == nil && u.Host != "" {
 		port := u.Port()
 		if port == "" {
@@ -92,7 +123,9 @@ func normalizeAddr(addr string) string {
 // must stop the run.
 func checkDial(live map[string]bool, addr string) {
 	if live[normalizeAddr(addr)] {
-		panic(fmt.Sprintf("testguard: test dialed %s, the live Coral server (inherited CORAL_URL or the default port); "+
-			"point the test at an httptest server", addr))
+		_, port, _ := net.SplitHostPort(normalizeAddr(addr))
+		panic(fmt.Sprintf("testguard: test dialed %s: port %s is the live Coral's (a default port, 8420 or 8450, the port in CORAL_URL or CORAL_PORT, or the one in the real "+
+			"data folder's lock file). A client that finds no verifiable record and no CORAL_URL goes to a default port: CORAL_URL must point at a scratch server "+
+			"(an httptest server), and the child process of a harness that does that sets %s=1", addr, port, TestURLEnv))
 	}
 }
