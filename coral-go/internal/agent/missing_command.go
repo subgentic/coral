@@ -43,32 +43,69 @@ func MissingCommandIn(out, binary string) bool {
 	return false
 }
 
-// launchAnswerLines is how much of the screen under Coral's launch line is the shell's answer to it: a PowerShell error, the longest, is the
-// sentence (wrapped on a narrow pane), its position and its category lines.
-const launchAnswerLines = 12
+// answerLines is the most of the screen above the bottom prompt that is read as the shell's latest answer: a PowerShell error, the longest, is the
+// sentence (wrapped on a narrow pane) and its "Check the spelling" line.
+const answerLines = 12
 
-// AfterLaunchLine is the screen's text under the last line that sets CORAL_SESSION_ID to sessionID, at most launchAnswerLines lines of it.
-// Coral's launch line sets it (coralEnvPrefix: "export ... CORAL_SESSION_ID=<id>" or "$env:CORAL_SESSION_ID = '<id>'"), so that line is the
-// launch, and what follows it is the shell's answer, not an agent's later output or a transcript printed above it. A line that only shows the
-// id (an echo of it) is not the launch. ok is false when no line sets it (the screen was cleared, scrolled past it or redrawn): then nothing on
-// the screen can be tied to the launch.
-func AfterLaunchLine(screen, sessionID string) (string, bool) {
-	if sessionID == "" {
-		return "", false
+// psTrailer is a line PowerShell prints under a command's error: its position ("At line:1 char:1") and the lines that start with "+" (the
+// command, its underline, CategoryInfo, FullyQualifiedErrorId).
+var psTrailer = regexp.MustCompile(`^\s*(?:At line:\d+ char:\d+|\+.*)$`)
+
+// MissingCommandAtBottom reports whether the shell's LATEST answer, right above the prompt at the bottom of screen, is its "no such command"
+// error for binary (#353's safety net; the coral-go-team Security's INFO on #173). Coral's quiet launch clears the screen, so the line it typed is
+// not there to anchor on; the bottom is: the prompt the shell came back to is the last line, and the error must END the block of lines right
+// above it (PowerShell's position and "+" lines under the error are skipped, blank lines end the block). The same words higher up, or followed
+// by any other output or a typed command, are not the shell's latest answer and do not count.
+func MissingCommandAtBottom(screen, binary string) bool {
+	b := strings.TrimSuffix(strings.ToLower(strings.TrimSpace(binary)), ".exe")
+	if b == "" {
+		return false
 	}
-	sets := regexp.MustCompile(`CORAL_SESSION_ID\s*=\s*['"]?` + regexp.QuoteMeta(sessionID))
-	all := sets.FindAllStringIndex(screen, -1)
-	if len(all) == 0 {
-		return "", false
+	lines := strings.Split(strings.ReplaceAll(screen, "\r\n", "\n"), "\n")
+	trimBlank := func() {
+		for len(lines) > 0 && strings.TrimSpace(lines[len(lines)-1]) == "" {
+			lines = lines[:len(lines)-1]
+		}
 	}
-	rest := screen[all[len(all)-1][0]:]
-	nl := strings.IndexByte(rest, '\n')
-	if nl < 0 {
-		return "", true // the launch line is the last line: no answer yet
+	trimBlank()
+	if len(lines) < 2 {
+		return false // a prompt alone, or nothing: no answer
 	}
-	lines := strings.SplitN(rest[nl+1:], "\n", launchAnswerLines+1)
-	if len(lines) > launchAnswerLines {
-		lines = lines[:launchAnswerLines]
+	lines = lines[:len(lines)-1] // the prompt the shell came back to
+	trimBlank()
+	for len(lines) > 0 && psTrailer.MatchString(lines[len(lines)-1]) {
+		lines = lines[:len(lines)-1]
 	}
-	return strings.Join(lines, "\n"), true
+	trimBlank()
+	start := len(lines)
+	for start > 0 && len(lines)-start < answerLines && strings.TrimSpace(lines[start-1]) != "" {
+		start--
+	}
+	block := lines[start:]
+	if len(block) == 0 {
+		return false
+	}
+	q := regexp.QuoteMeta(b)
+	name := `['"` + "`" + `]?` + q + `(?:\.(?:exe|cmd|bat|ps1))?['"` + "`" + `]?`
+	// A POSIX shell's error is one line: the block's last.
+	last := strings.ToLower(strings.TrimSpace(block[len(block)-1]))
+	for _, re := range []*regexp.Regexp{
+		regexp.MustCompile(`^(?:[^:]*:\s*)*` + q + `: (?:command )?not found$`),
+		regexp.MustCompile(`command not found: ` + q + `$`),
+	} {
+		if re.MatchString(last) {
+			return true
+		}
+	}
+	// PowerShell's and cmd's are sentences a narrow pane wraps: matched on the block with its line breaks collapsed, and they must END it.
+	collapsed := strings.Join(strings.Fields(strings.ToLower(strings.Join(block, " "))), " ")
+	for _, re := range []*regexp.Regexp{
+		regexp.MustCompile(`the term ` + name + ` is not recognized as (?:the|a) name of a cmdlet, function, script file, or (?:operable|executable) program\.(?: check the spelling of the name, or if a path was included, verify that the path is correct and try again\.)?$`),
+		regexp.MustCompile(`(?:^| )` + name + ` is not recognized as an internal or external command, operable program or batch file\.$`),
+	} {
+		if re.MatchString(collapsed) {
+			return true
+		}
+	}
+	return false
 }

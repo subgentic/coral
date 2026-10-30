@@ -1,7 +1,6 @@
 package agent
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -42,46 +41,38 @@ func TestMissingCommandInIgnoresOtherCommandsAndTheAgentsOwnWords(t *testing.T) 
 	assert.False(t, MissingCommandIn("bash: codex: command not found", ""), "no binary named")
 }
 
-// The coral-go-team Security's INFO on #173: only the shell's answer to Coral's own launch line counts. The line is found by the session id it
-// sets; text above it, or far below it, is not the launch's; with no such line on the screen there is nothing to read.
-func TestAfterLaunchLineIsTheShellsAnswerToCoralsLine(t *testing.T) {
-	const sid = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
-	launch := "PS D:\\w> $env:CORAL_SESSION_ID = '" + sid + "'; & codex --x"
-	err := "codex : The term 'codex' is not recognized as the name of a cmdlet, function, script file, or operable program."
-
-	got, ok := AfterLaunchLine(launch+"\n"+err+"\nPS D:\\w> ", sid)
-	if !ok || !MissingCommandIn(got, "codex") {
-		t.Fatalf("the error right under the launch line is its answer: %q %v", got, ok)
-	}
-	if got, ok := AfterLaunchLine(err+"\n"+launch+"\n", sid); !ok || MissingCommandIn(got, "codex") {
-		t.Errorf("an error above the launch line is not its answer: %q", got)
-	}
-	far := launch + "\n" + strings.Repeat("agent output\n", launchAnswerLines) + err
-	if got, ok := AfterLaunchLine(far, sid); !ok || MissingCommandIn(got, "codex") {
-		t.Errorf("the words far below the launch line are an agent's output, not the shell's answer: %q", got)
-	}
-	again := launch + "\n" + err + "\nPS D:\\w> $env:CORAL_SESSION_ID = '" + sid + "'; & codex --x\nWelcome to Codex"
-	if got, ok := AfterLaunchLine(again, sid); !ok || MissingCommandIn(got, "codex") {
-		t.Errorf("the LAST launch line counts (a wake that started): %q", got)
-	}
-	if _, ok := AfterLaunchLine(err+"\nPS D:\\w> ", sid); ok {
-		t.Error("no launch line on the screen: nothing can be tied to the launch")
-	}
-	echoed := launch + "\n" + err + "\nPS D:\\w> echo " + sid + "\n" + sid + "\nbash: codex: command not found"
-	if got, ok := AfterLaunchLine(echoed, sid); !ok || !strings.HasPrefix(got, err) {
-		t.Errorf("a line that only shows the id (an echo) is not the launch: the answer is still the launch line's: %q", got)
-	}
-	unix := "w$ unset TMUX; export CORAL_SESSION_ID='" + sid + "' CORAL_PORT='8450'; codex --x\nbash: codex: command not found"
-	if got, ok := AfterLaunchLine(unix, sid); !ok || !MissingCommandIn(got, "codex") {
-		t.Errorf("the Unix launch line sets it with export: %q %v", got, ok)
-	}
-	if _, ok := AfterLaunchLine("w$ echo "+sid+"\nbash: codex: command not found", sid); ok {
-		t.Error("only an echo of the id on the screen: no launch line")
-	}
-	if got, ok := AfterLaunchLine(launch, sid); !ok || got != "" {
-		t.Errorf("a launch line with nothing under it yet: %q %v", got, ok)
-	}
-	if _, ok := AfterLaunchLine(launch+"\n"+err, ""); ok {
-		t.Error("no session id: no launch line")
+// The coral-go-team Security's INFO on #173, after QA's tmux run: Coral's quiet launch clears the screen, so only the bottom tells what the shell
+// last answered. The error marks only when it is the shell's latest answer, right above the prompt it came back to.
+func TestMissingCommandAtBottomIsTheShellsLatestAnswer(t *testing.T) {
+	const ps51 = "codex : The term 'codex' is not recognized as the name of a cmdlet, function, script file, or operable program. Check the\n" +
+		"spelling of the name, or if a path was included, verify that the path is correct and try again.\n" +
+		"At line:1 char:1\n+ codex --x\n+ ~~~~~\n    + CategoryInfo          : ObjectNotFound: (codex:String) [], CommandNotFoundException\n" +
+		"    + FullyQualifiedErrorId : CommandNotFoundException\n"
+	const ps7 = "codex: The term 'codex' is not recognized as a name of a cmdlet, function, script file, or executable program.\n" +
+		"Check the spelling of the name, or if a path was included, verify that the path is correct and try again.\n"
+	const cmd = "'codex' is not recognized as an internal or external command,\noperable program or batch file.\n"
+	launch := "PS D:\\w> $env:CORAL_SESSION_ID = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'; & codex --x"
+	for name, tc := range map[string]struct {
+		screen string
+		want   bool
+	}{
+		"QA's tmux screen: the answer and the prompt only": {"bash: codex: command not found\nuser@box:~/w$ ", true},
+		"zsh": {"zsh: command not found: codex\n% ", true},
+		"sh":  {"sh: 1: codex: not found\n$ \n\n", true},
+		"Windows PowerShell 5.1, then its prompt":                 {ps51 + "\nPS D:\\w> ", true},
+		"PowerShell 7, then its prompt":                           {ps7 + "PS D:\\w> ", true},
+		"cmd, wrapped, then its prompt":                           {cmd + "\nD:\\w>", true},
+		"a narrow pane wraps the sentence":                        {"codex : The term 'codex' is\nnot recognized as the name\nof a cmdlet, function,\nscript file, or operable\nprogram.\nPS> ", true},
+		"the words, then other output, then a prompt":             {"bash: codex: command not found\nsome output\n$ ", false},
+		"the words, then a typed command, then a prompt":          {"bash: codex: command not found\n$ ls\n$ ", false},
+		"PowerShell's error, then a typed command, then a prompt": {ps51 + "\nPS D:\\w> dir\nPS D:\\w> ", false},
+		"the words above Coral's launch line, then a prompt":      {"bash: codex: command not found\n" + launch + "\n$ ", false},
+		"another command's error":                                 {"bash: git: command not found\n$ ", false},
+		"the error with no prompt under it yet":                   {"bash: codex: command not found", false},
+		"an empty screen":                                         {"", false},
+	} {
+		if got := MissingCommandAtBottom(tc.screen, "codex"); got != tc.want {
+			t.Errorf("%s: %v, want %v", name, got, tc.want)
+		}
 	}
 }
