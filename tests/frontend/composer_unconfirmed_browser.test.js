@@ -108,7 +108,7 @@ const HOLD = `(() => {
         await waitFor(`window.__frames.some(f => JSON.parse(f).type === 'composer_send')`, 'the frame');
         await reply({ type: 'terminal_input_ack' });
         await waitFor(`document.querySelectorAll('#live-history-messages .pending-sent .chat-bubble').length === 1`, 'the Sent bubble');
-        assert.deepEqual(await sentToasts(), ['Sent: all good']);
+        assert.deepEqual(await sentToasts(), [], 'in the Chat view the bubble says Sent, so no toast covers it (#11258 item 4, 6e2c9b762)');
 
         console.log('5. An unconfirmed Coral panel request (its own bubble kind) is labelled with the note too, never the label function');
         await ev(`window.__frames.length = 0; true`);
