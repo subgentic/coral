@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"github.com/subgentic/coral/internal/logsafe"
 	"io/fs"
 	"log"
 	"os"
@@ -57,7 +58,7 @@ func EnsureDataDir(dir string) error {
 		// The marker outlives this process: until a start has renewed what is in the folder, each start renews it. The folder is private
 		// now, so the marker is too.
 		if err := writeRenewPending(dir); err != nil {
-			log.Printf("[security] could not write %s: %v", RenewPendingFile, err)
+			log.Printf("[security] could not write %s: %v", logsafe.Path(RenewPendingFile), err)
 		}
 	}
 	return nil

@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"errors"
+	"github.com/subgentic/coral/internal/logsafe"
 	"log"
 	"os"
 	"path/filepath"
@@ -83,7 +84,7 @@ func replaceAfterOpenDataDir(ctx context.Context, dir string, ks *auth.KeyStore,
 			log.Printf("[security] the data folder's secrets were replaced, but its marker could not be removed (the next start replaces them again): %v", err)
 		}
 	} else {
-		log.Printf("[security] not everything in the data folder could be replaced: the next start tries again (%s stays)", config.RenewPendingFile)
+		log.Printf("[security] not everything in the data folder could be replaced: the next start tries again (%s stays)", logsafe.Path(config.RenewPendingFile))
 	}
 	config.SetDataDirNotice(strings.TrimSpace(config.DataDirNotice() + " " + openFolderWords(f)))
 }
