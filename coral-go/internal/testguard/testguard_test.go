@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"testing"
 
@@ -41,8 +42,9 @@ func TestCheckDataPathIsInertOutsideTests(t *testing.T) {
 	if len(protectedDirs()) == 0 {
 		t.Skip("no home directory to protect")
 	}
+	was := enabled
 	enabled = func() bool { return false }
-	t.Cleanup(func() { enabled = testing.Testing })
+	t.Cleanup(func() { enabled = was }) // what it was, not a guess at it: the guard is InTestRun (TestTheGuardIsOnOnlyInARunningTestBinary)
 	CheckDataPath(protectedDirs()[0])
 }
 
@@ -122,5 +124,57 @@ func TestProtectedInResolvesSymlinksAndCase(t *testing.T) {
 		if _, ok := protectedIn(p, dirs); ok {
 			t.Errorf("%s should not be protected", p)
 		}
+	}
+}
+
+// A data path inside the module's source tree fails the test at the call: that is how a Config with no data folder wrote api_key, messageboard.db and themes into
+// cmd/coral for months, and made the go test cache miss for every package that scans the tree.
+func TestCheckDataPathPanicsInsideTheSourceTree(t *testing.T) {
+	panics := func(p string) (did bool) {
+		defer func() { did = recover() != nil }()
+		CheckDataPath(p)
+		return false
+	}
+	root := sourceTree()
+	if root == "" {
+		t.Fatal("the test runs inside the module: no go.mod found above the working directory")
+	}
+	for _, p := range []string{root, filepath.Join(root, "cmd", "coral"), filepath.Join(root, "internal", "x", "api_key"), "."} {
+		if !panics(p) {
+			t.Errorf("a data path in the source tree did not fail the test: %q", p)
+		}
+	}
+	if panics(t.TempDir()) {
+		t.Error("a temp folder was refused")
+	}
+	// An in-memory SQLite database has no file: ":memory:" resolves to a relative name in the package folder, but nothing is written there. Each name is checked on its own.
+	for _, p := range []string{":memory:", "file::memory:", "file::memory:?cache=shared", "file:x?mode=memory&cache=shared", "file:x?cache=shared&mode=memory"} {
+		if panics(p) {
+			t.Errorf("an in-memory database name was refused: %q", p)
+		}
+	}
+	// A real file in the package folder must reach the check, however its name looks.
+	for _, p := range []string{"x.db", "file:x.db", "file:x.db?mode=rwc", "file::memory:evil.db", "file:mode=memory.db", "file:x.db#mode=memory", "file:x.db?foo#mode=memory", "file:x.db?mode=memoryx",
+		"file:x.db?mode=memory&mode=rwc", "file:x.db?mode=rwc&mode=memory", "file:x.db?mode=memory&mode=memory",
+		"file:x.db?mode=memory&mod%65=rwc", "file:x.db?%6Dode=rwc&mode=memory"} { // more than one mode=, or a percent-escape that could spell one: a file (the coral-go-team's Security on #214)
+		if !panics(p) {
+			t.Errorf("a database FILE name in the package folder was not refused: %q", p)
+		}
+	}
+	if panics(filepath.Join(filepath.Dir(root), "elsewhere")) {
+		t.Error("a sibling of the module folder was refused")
+	}
+	defer func(f func() bool) { enabled = f }(enabled)
+	enabled = func() bool { return false }
+	if panics(root) {
+		t.Error("the guard is not inert outside tests")
+	}
+}
+
+// The guard turns on only in a running test binary (InTestRun), not on InTest, which also trusts a -test.* argument that a launcher of a shipped
+// binary could pass (the coral-go-team's Security on #214).
+func TestTheGuardIsOnOnlyInARunningTestBinary(t *testing.T) {
+	if reflect.ValueOf(enabled).Pointer() != reflect.ValueOf(InTestRun).Pointer() {
+		t.Error("CheckDataPath's guard is not InTestRun")
 	}
 }

@@ -44,20 +44,89 @@ var protectedDirs = sync.OnceValue(func() []string {
 	return dirs
 })
 
-// enabled reports whether the guard applies. It is a variable so the guard's
-// own tests can exercise the non-test path.
-var enabled = InTest
+// enabled reports whether the guard applies: only in a running test binary (InTestRun), never on the strength of the program's name or arguments,
+// which a launcher of a shipped binary controls (the coral-go-team's Security on #214). It is a variable so the guard's own tests can exercise the
+// non-test path.
+var enabled = InTestRun
 
 // CheckDataPath panics if this is a test binary and path is, or is inside,
 // the user's real ~/.coral directory. Outside tests it does nothing.
 func CheckDataPath(path string) {
-	if path == "" || !enabled() {
+	if path == "" || !enabled() || inMemoryDB(path) {
 		return
 	}
 	if dir, ok := protected(path); ok {
 		panic(fmt.Sprintf("testguard: test resolved %q inside the real Coral data directory %s; "+
 			"pass a t.TempDir() (or set CORAL_DATA_DIR / CORAL_TMUX_SOCKET) instead", path, dir))
 	}
+	if root, ok := inSourceTree(path); ok {
+		panic(fmt.Sprintf("testguard: test resolved %q inside the source tree %s; a Config or store with no data folder "+
+			"writes into the package folder (api_key, messageboard.db, themes) and every test that scans the tree then sees the files "+
+			"(go's test cache re-checks them): pass a t.TempDir() (cfg.UseCoralDir(t.TempDir())) instead", path, root))
+	}
+}
+
+// inMemoryDB: a SQLite name for a database that has no file: ":memory:", "file::memory:" (alone or followed by "?" and parameters), or a "file:" URI whose query holds the exact
+// parameter mode=memory. Nothing is written anywhere, so the path checks do not apply. Narrow on purpose: a file that merely starts or contains such text ("file::memory:evil.db",
+// "file:mode=memory.db", "file:x.db#mode=memory") is a real file in the package folder and must reach the source-tree check. SQLite reads mode= only from the query.
+func inMemoryDB(name string) bool {
+	if name == ":memory:" {
+		return true
+	}
+	rest, ok := strings.CutPrefix(name, "file:")
+	if !ok {
+		return false
+	}
+	path, query, hasQuery := strings.Cut(rest, "?")
+	if path == ":memory:" {
+		return true // "file::memory:" alone or followed by "?"
+	}
+	if !hasQuery || strings.Contains(query, "%") {
+		return false // a percent-escape could spell a second mode= (mod%65=rwc) that SQLite decodes and this check would not see (Security on #214)
+	}
+	// Exactly one mode= parameter, and it is mode=memory. With two (file:x.db?mode=memory&mode=rwc, or the other order) SQLite's own answer is not
+	// worth guessing, so the name is treated as a file (the coral-go-team's Security on #214).
+	modes, memory := 0, false
+	for _, param := range strings.Split(query, "&") {
+		if strings.HasPrefix(param, "mode=") {
+			modes++
+			memory = param == "mode=memory"
+		}
+	}
+	return modes == 1 && memory
+}
+
+// sourceTree is the module's source folder: the nearest parent of the test's working directory (a test runs in its package's folder) that
+// holds go.mod, or "" when there is none.
+var sourceTree = sync.OnceValue(func() string {
+	wd, err := os.Getwd()
+	if err != nil {
+		return ""
+	}
+	for dir := wd; ; {
+		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
+			return dir
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return ""
+		}
+		dir = parent
+	}
+})
+
+// inSourceTree reports whether path is, or is inside, the module's source folder. A relative path counts from the working directory, which is a
+// folder of the source tree: the "" data folder a Config falls back to is exactly that.
+func inSourceTree(path string) (string, bool) {
+	root := sourceTree()
+	if root == "" {
+		return "", false
+	}
+	p, cd := comparable(path), comparable(root)
+	if p == cd || strings.HasPrefix(p, cd+string(filepath.Separator)) {
+		return root, true
+	}
+	return "", false
 }
 
 func protected(path string) (string, bool) {
