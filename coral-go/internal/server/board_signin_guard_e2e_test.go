@@ -257,6 +257,14 @@ var writeRoutesWithoutTheGuard = map[string]string{
 	"POST /api/tasks/runs/{runID}/kill":                                "ids only",
 }
 
+// writeRoutesFromOtherRows are write routes another PR of the same batch adds, listed here with why they carry no text, so the tree they
+// merge into passes. A route here need not be served on this PR's own tree (the PR that adds it may land first or after); once it is, it
+// is treated as any listed route.
+var writeRoutesFromOtherRows = map[string]string{
+	"POST /api/sessions/live/{sessionID}/record-agent": "#226: a process id, its start time and a yes/no; no text",
+	"POST /api/sessions/record-agents":                 "#226: no body; the server walks the live sessions",
+}
+
 // Every write route under the board, saved-item, notification and one-shot task prefixes either refuses a sign-in link (routes.RefuseSignInLink
 // as its middleware) or is listed in writeRoutesWithoutTheGuard with why; the two lists agree with what the router serves.
 func TestEveryWriteRouteIsGuardedOrSaysWhyNot(t *testing.T) {
@@ -282,6 +290,9 @@ func TestEveryWriteRouteIsGuardedOrSaysWhyNot(t *testing.T) {
 			}
 		}
 		why, listed := writeRoutesWithoutTheGuard[key]
+		if !listed {
+			why, listed = writeRoutesFromOtherRows[key]
+		}
 		switch {
 		case guarded && listed:
 			t.Errorf("%s is guarded but listed as not (%s)", key, why)
