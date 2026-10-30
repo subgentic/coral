@@ -1357,16 +1357,23 @@
    avatar (the team's colour, the agent's initial) with the state as a dot on its corner, the name, the short time at the right and a two-line preview (the goal until the last message is a field of the row). No borders, soft
    surfaces. Wider screens keep the sidebar's row (the avatar, the time and the preview are drawn by this block only). */
 .session-avatar, .session-time, .session-preview, .phone-menu-btn, .phone-account-btn, .phone-break, .phone-chips { display: none; }
+.phone-bar { display: none; }
 @media (max-width: 300px) { body.live-session-active:not(.popout-mode) .terminal-header { flex-wrap: wrap; } } /* a phone at 200% zoom is 195 px wide: the row wraps before ⋯ is cut off (phone_layout) */
 @media (max-width: 600px) {
     body.agent-home-active header.top-bar { display: none; }
     body.agent-home-active { --top-bar-height: env(safe-area-inset-top, 0px); }
     #mobile-agent-list .mobile-list-header { padding: calc(8px + env(safe-area-inset-top, 0px)) 8px 4px; gap: 4px; flex-wrap: wrap; justify-content: flex-start; align-items: center; }
-    #mobile-agent-list .phone-menu-btn, #mobile-agent-list .phone-account-btn { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 44px; height: 44px; min-width: 44px; padding: 0; border-radius: 50%; }
-    #mobile-agent-list .phone-menu-btn { order: 0; }
+    .phone-bar .phone-menu-btn, .phone-bar .phone-account-btn { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 44px; height: 44px; min-width: 44px; padding: 0; border-radius: 50%; }
+    .phone-bar .phone-menu-btn { order: 0; }
     #mobile-agent-list .mobile-search-row { order: 1; flex: 1 1 0; min-width: 0; }
-    #mobile-agent-list .phone-account-btn { position: relative; order: 2; border: 0; background: none; color: var(--text-secondary); cursor: pointer; }
-    #mobile-agent-list .phone-account-btn .material-icons { font-size: var(--icon-size); }
+    .phone-bar { order: 0; display: flex; align-items: center; gap: 4px; flex: 1 0 100%; min-width: 0; }
+    .phone-bar .phone-bar-pill { order: 1; flex: 1 1 0; min-width: 0; margin: 0; }
+    .phone-bar .phone-bar-title { display: flex; align-items: center; height: 48px; box-sizing: border-box; padding: 0 18px; border: 0; border-radius: 24px; background: var(--bg-secondary); color: var(--text-primary); font-size: var(--fs-lg); font-weight: var(--fw-regular); line-height: var(--lh-label); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } /* a view's name in the pill: the same box as Home's search (48 px, fully rounded, filled, no border); a heading, with no title attribute, so no tooltip lands on it */
+    header.top-bar > .phone-bar { display: flex; }
+    header.top-bar > :not(.phone-bar) { display: none !important; } /* the old pill, the views menu, Home and the gear: the one bar replaces them on a phone */
+    header.top-bar { padding: calc(8px + env(safe-area-inset-top, 0px)) 8px 4px; gap: 4px; background: var(--bg-primary); border: 0; box-shadow: none; min-height: 0; }
+    .phone-bar .phone-account-btn { position: relative; order: 2; border: 0; background: none; color: var(--text-secondary); cursor: pointer; }
+    .phone-bar .phone-account-btn .material-icons { font-size: var(--icon-size); }
     #mobile-agent-list .phone-break { order: 3; display: block; flex: 0 0 100%; height: 0; }
     #mobile-agent-list .mobile-list-header .mobile-search-input { height: 48px; border-radius: 24px; border: 0; background: var(--bg-secondary); padding: 0 18px; font-size: var(--fs-lg); }
     #mobile-agent-list .mobile-list-title { order: 4; font-size: var(--fs-2xl); font-weight: var(--fw-regular); margin: 0 auto 0 8px; }
@@ -1448,9 +1455,9 @@
 }
 
 @media (max-width: 600px) { /* the hub's state on the Agents page (its top bar is the page's own first row): a dot on the account button, the colours of the top bar's indicator (hub_indicator.js) */
-    body[data-hub-state] #mobile-agent-list .phone-account-btn::after { content: ''; position: absolute; right: 6px; bottom: 6px; width: 12px; height: 12px; box-sizing: border-box; border-radius: 50%; border: 2px solid var(--bg-primary); background: var(--text-muted); }
-    body[data-hub-state="connected"] #mobile-agent-list .phone-account-btn::after { background: var(--success); }
-    body[data-hub-state="disconnected"] #mobile-agent-list .phone-account-btn::after { background: var(--warning); }
+    body[data-hub-state] .phone-bar .phone-account-btn::after { content: ''; position: absolute; right: 6px; bottom: 6px; width: 12px; height: 12px; box-sizing: border-box; border-radius: 50%; border: 2px solid var(--bg-primary); background: var(--text-muted); }
+    body[data-hub-state="connected"] .phone-bar .phone-account-btn::after { background: var(--success); }
+    body[data-hub-state="disconnected"] .phone-bar .phone-account-btn::after { background: var(--warning); }
 }
 @media (max-width: 600px) {
     body[data-phone-fab="automations"] .automations-create, body[data-phone-fab="automations"] .automations-act { display: none; } /* the + at the bottom right makes a job or a workflow: the toolbar's create buttons are not drawn (#11239 slice A) */
