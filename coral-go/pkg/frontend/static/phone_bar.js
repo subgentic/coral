@@ -5,10 +5,11 @@
 const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
 
 /** The bar. `pill` is the node that sits in the middle (Home's search row); without one the pill is the view's title (text set by setPhoneBarTitle). */
-export function buildPhoneBar({ pill = null, id = '' } = {}) {
+export function buildPhoneBar({ pill = null, id = '', menuId = '' } = {}) {
     const bar = el('div', 'phone-bar'); if (id) bar.id = id;
     const menu = el('button', 'btn btn-quiet btn-icon phone-menu-btn', '<span class="material-icons" aria-hidden="true">menu</span>');
     menu.type = 'button'; menu.setAttribute('data-on-click', 'm-top-menu'); menu.setAttribute('data-hamburger', ''); menu.setAttribute('aria-haspopup', 'menu'); menu.setAttribute('aria-expanded', 'false'); menu.setAttribute('aria-controls', 'nav-more-menu'); menu.setAttribute('aria-label', 'Menu');
+    if (menuId) menu.id = menuId;
     let mid = pill;
     if (!mid) { mid = el('h1', 'phone-bar-title'); }
     mid.classList.add('phone-bar-pill');
@@ -22,7 +23,7 @@ export function buildPhoneBar({ pill = null, id = '' } = {}) {
 export function mountTopPhoneBar() {
     const header = document.querySelector('header.top-bar');
     if (!header || header.querySelector(':scope > .phone-bar')) return;
-    header.prepend(buildPhoneBar({ id: 'top-phone-bar' }));
+    header.prepend(buildPhoneBar({ id: 'top-phone-bar', menuId: 'top-phone-menu' }));
     setPhoneBarTitle(document.getElementById('top-menu-label')?.textContent || '');
 }
 

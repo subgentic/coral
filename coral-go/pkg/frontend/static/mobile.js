@@ -166,7 +166,7 @@ export function syncMobileAgentList() {
     if (phoneBox && sideBox && !phoneBox.value) phoneBox.value = sideBox.value; // a search typed on a wide screen is still in the box
     syncDisplayMenu();   // the phone's copy of the ≡ menu (#3991)
 
-    const allChats = document.getElementById('agent-search-all-chats'), row = agentList.querySelector('#mobile-search-row');
+    const allChats = document.getElementById('agent-search-all-chats'), row = agentList.querySelector('.phone-bar'); /* under the shared bar (phone_bar.js), not inside its pill */
     if (allChats && row && allChats.previousElementSibling !== row) { // the line that sends the words to the chats' search (render.js syncSearchAllChats) sits under the pill, so its placeholder is true
         if (!_allChatsHome) _allChatsHome = { parent: allChats.parentElement, next: allChats.nextSibling };
         row.after(allChats);

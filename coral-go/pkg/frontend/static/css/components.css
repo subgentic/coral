@@ -3451,8 +3451,6 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 .saved-jump { position: relative; }
 .saved-jump::before { content: "Saved"; position: absolute; left: 0; top: -22px; background: var(--accent-dim); color: var(--text-on-accent, #fff); font-size: var(--fs-sm); font-weight: var(--fw-strong); border-radius: var(--radius-lg); padding: 0 7px; line-height: 16px; pointer-events: none; }
 /* Keep the bookmark and the view selector at large text sizes on a phone. */
-.saved-bar-wrap .top-bar { flex-wrap: wrap; row-gap: 4px; }
-.saved-bar-wrap .nav-select { order: 3; flex: 1 1 100%; margin: 0; }
 
 /* The install help where an agent CLI is missing (#4569): the vendor's page as a link in the theme's link colour, and a quiet note. */
 .acf-cli-warning .cli-install-link, .acf-cli-warning .cli-install-note { margin: 6px 0 0; }
