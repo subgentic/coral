@@ -16,7 +16,9 @@ import (
 
 // #95 (Security's conditions 1 and 5): only a positive answer is Self. Another user is OtherUser;
 // no row after one re-read 20 ms later, two owners, a process that can't be opened or any other
-// error is Unattributed (fail closed); a table layout this build doesn't know is Unsupported.
+// error is Unattributed (fail closed); a table layout this build doesn't know is Unsupported. #409: any
+// read error but an unknown layout is read again once (macOS's sysctl size race), so a read that fails
+// for a moment and then finds Coral's user is Self.
 func TestAttribute(t *testing.T) {
 	if !Supported {
 		v, err := Attribute(netip.MustParseAddrPort("127.0.0.1:50000"), netip.MustParseAddrPort("127.0.0.1:8420"))
@@ -39,9 +41,10 @@ func TestAttribute(t *testing.T) {
 		{"another user", []error{nil}, false, OtherUser},
 		{"no row, then one on the re-read", []error{ErrNotFound, nil}, true, Self},
 		{"no row twice", []error{ErrNotFound, ErrNotFound}, true, Unattributed},
-		{"two owners", []error{errAmbiguous}, true, Unattributed},
-		{"process can't be opened", []error{errors.New("open process 1234: Access is denied")}, true, Unattributed},
-		{"unknown table layout", []error{fmt.Errorf("%w: an inpcb item of 112 bytes", ErrLayout)}, true, Unsupported},
+		{"two owners", []error{errAmbiguous, errAmbiguous}, true, Unattributed},
+		{"process can't be opened", []error{errors.New("open process 1234: Access is denied"), errors.New("open process 1234: Access is denied")}, true, Unattributed},
+		{"a read that fails for a moment, then finds the row", []error{errors.New("sysctl net.inet.tcp.pcblist_n: cannot allocate memory"), nil}, true, Self},
+		{"unknown table layout, read once", []error{fmt.Errorf("%w: an inpcb item of 112 bytes", ErrLayout)}, true, Unsupported},
 	} {
 		reads := 0
 		var times []time.Time

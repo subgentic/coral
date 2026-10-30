@@ -219,22 +219,32 @@ func (t Transport) helloOn(ctx context.Context, base string, rt http.RoundTrippe
 		return "", "", err
 	}
 	hb, _ := json.Marshal(map[string]string{"nonce": b64.EncodeToString(cn)})
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, base+CLIHelloPath, bytes.NewReader(hb))
-	if err != nil {
-		return "", "", err
+	var resp *http.Response
+	var body []byte
+	for attempt := 0; ; attempt++ {
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, base+CLIHelloPath, bytes.NewReader(hb))
+		if err != nil {
+			return "", "", err
+		}
+		req.Header.Set("Content-Type", "application/json")
+		if resp, err = rt.RoundTrip(req); err != nil {
+			return "", "", err
+		}
+		body, _ = io.ReadAll(io.LimitReader(resp.Body, 4096))
+		io.Copy(io.Discard, io.LimitReader(resp.Body, 4096)) // to the end, so the connection (and its proof) is reused by the signed request
+		resp.Body.Close()
+		if !helloUndecided(resp, body) {
+			break
+		}
+		if attempt >= helloRetries || !waitHelloRetry(ctx) {
+			return "", "", PeerUndecidedError{} // still not told (#409); the server closed that connection, so each retry was a new one
+		}
 	}
-	req.Header.Set("Content-Type", "application/json")
-	resp, err := rt.RoundTrip(req)
-	if err != nil {
-		return "", "", err
-	}
-	defer resp.Body.Close()
 	var h struct {
 		Nonce string `json:"nonce"`
 		Proof string `json:"proof"`
 	}
-	_ = json.NewDecoder(io.LimitReader(resp.Body, 4096)).Decode(&h)
-	io.Copy(io.Discard, io.LimitReader(resp.Body, 4096)) // to the end, so the connection (and its proof) is reused by the signed request
+	_ = json.Unmarshal(body, &h)
 	if resp.Header.Get(httputil.ActionLimitHeader) != "" {
 		return "", "", ErrServerBusy
 	}

@@ -149,6 +149,30 @@ func PeerReason(r *http.Request) string {
 	return cp.reason
 }
 
+// PeerVerdict is r's loopback connection's attribution, worked out (and retried, #385) as PeerReason does, from the one verdict kept for the
+// connection: peercred.Self, OtherUser, Relay, Unattributed (not told yet: a later request on the connection asks again, a new connection is
+// attributed afresh) or Unsupported. ok is false without ConnContext and for a request that is not a loopback one: the caller applies its own
+// rules (#409: the cloud gate reads this, not a table read of its own).
+func PeerVerdict(r *http.Request) (peercred.Verdict, bool) {
+	cp, _ := r.Context().Value(connPeerKey{}).(*connPeer)
+	if cp == nil {
+		return peercred.Unsupported, false
+	}
+	if (cp.known && !cp.client.Addr().Unmap().IsLoopback()) || (!cp.known && !remoteIsLoopback(r)) {
+		return peercred.Unsupported, false
+	}
+	reason := PeerReason(r)
+	cp.mu.Lock()
+	defer cp.mu.Unlock()
+	switch {
+	case !cp.known:
+		return peercred.Unattributed, true // addresses Coral can't read: never told (fail closed)
+	case reason == PeerUnattributed:
+		return peercred.Unattributed, true
+	}
+	return cp.verdict, true
+}
+
 // PeerIsRelay reports whether r's loopback connection is WSL's localhost relay (peercred.Relay, #396): a root-owned loopback socket on a WSL kernel, behind which the Windows user cannot be
 // told. The ONLY thing that may act on it is the sign-in link (handleLoginToken); every other check (PeerReason, SameUser) treats it as another user. False without ConnContext, for a
 // connection that is not loopback, and for any other verdict.
