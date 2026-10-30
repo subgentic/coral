@@ -1,6 +1,6 @@
 DELETE /api/artifacts/{id} launch owner-only
 DELETE /api/artifacts/{id}/comments/lock interact owner-only
-DELETE /api/artifacts/{id}/comments/{cid} interact owner-only
+DELETE /api/artifacts/{id}/comments/{cid} interact owner-sees
 DELETE /api/artifacts/{id}/star interact owner-only
 DELETE /api/saved/{id} interact owner-only
 GET /api/analytics/activity launch owner-only
@@ -24,7 +24,7 @@ GET /api/session-artifacts view owner-only
 GET /api/settings/prompt-inspection launch owner-only
 GET /api/system/update view owner-update
 GET /api/team-artifacts view owner-only
-PATCH /api/artifacts/{id}/comments/{cid} interact owner-only
+PATCH /api/artifacts/{id}/comments/{cid} interact owner-sees
 PATCH /api/saved/{id} interact owner-only
 POST /api/artifacts/{id}/comments interact owner-only
 POST /api/artifacts/{id}/comments/{cid}/reopen interact owner-only

@@ -160,13 +160,12 @@ func ownerCommentRequest(r *http.Request) bool {
 // as owner-only and the agent's reply are never one.
 func ownerCommentWrite(r *http.Request) bool {
 	pattern, mode := tunnel.OwnerRoute(r.Method, r.URL.Path)
-	if mode == tunnel.OwnerNone || !mode.Refuses() {
-		return false
-	}
 	switch pattern {
 	case "/api/artifacts/{hex64}/comments", "/api/artifacts/{hex64}/comments/{id}/resolve", "/api/artifacts/{hex64}/comments/{id}/reopen",
-		"/api/artifacts/{hex64}/comments/{id}", "/api/artifacts/{hex64}/comments/lock", "/api/artifacts/{hex64}/comments/{id}/send":
-		return true
+		"/api/artifacts/{hex64}/comments/lock", "/api/artifacts/{hex64}/comments/{id}/send":
+		return mode != tunnel.OwnerNone && mode.Refuses()
+	case "/api/artifacts/{hex64}/comments/{id}": // the edit and delete: the owner's (the stamped marker) or the author's, the comment policy decides which (#11354)
+		return mode == tunnel.OwnerSees
 	}
 	return false
 }

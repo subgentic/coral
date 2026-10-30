@@ -827,13 +827,20 @@ func TestArtifactCommentRoutesThroughTheHub(t *testing.T) {
 	for _, c := range []struct {
 		method, path string
 		tier         Tier
-	}{{"PATCH", base + "/7", TierInteract}, {"DELETE", base + "/7", TierInteract}, {"PUT", base + "/lock", TierInteract}, {"DELETE", base + "/lock", TierInteract}, {"POST", base + "/7/send", TierLaunch}} {
+	}{{"PUT", base + "/lock", TierInteract}, {"DELETE", base + "/lock", TierInteract}, {"POST", base + "/7/send", TierLaunch}} {
 		assert.Equal(t, c.tier, Classify(c.method, c.path, ""), c.method+" "+c.path)
 		assert.False(t, AllowRequest(func() Mode { return TierView })(c.method, c.path, ""), c.method+" "+c.path+" at view")
 		assert.True(t, AllowRequest(func() Mode { return TierLaunch })(c.method, c.path, ""), c.method+" "+c.path+" at launch")
 		assert.Equal(t, c.tier == TierLaunch, AllowRequest(func() Mode { return TierLaunch })(c.method, c.path, "") && !AllowRequest(func() Mode { return TierInteract })(c.method, c.path, ""), c.method+" "+c.path+": only Launch admits the send")
 		_, m := OwnerRoute(c.method, c.path)
 		assert.Equal(t, OwnerRefuse, m, c.method+" "+c.path+" is the owner's alone")
+	}
+	// The edit and delete are the owner's and the author's (a guest loses nothing, 2026-10-30): the owner marker is stamped and the handler decides, at Interact.
+	for _, c := range []struct{ method, path string }{{"PATCH", base + "/7"}, {"DELETE", base + "/7"}} {
+		assert.Equal(t, TierInteract, Classify(c.method, c.path, ""), c.method+" "+c.path)
+		_, m := OwnerRoute(c.method, c.path)
+		assert.Equal(t, OwnerSees, m, c.method+" "+c.path+" is stamped, and the handler decides who may")
+		assert.False(t, m.Refuses(), "the machine does not refuse a hub viewer here")
 	}
 	// The owner's version list and series reads (View).
 	for _, p := range []string{"/api/artifacts/" + hex + "/versions", "/api/artifacts/series/s-1", "/api/artifacts/series/s-1/versions"} {

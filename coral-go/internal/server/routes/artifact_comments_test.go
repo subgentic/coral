@@ -216,7 +216,7 @@ func TestArtifactCommentsOwnerNeverDeletesOrEditsAnotherAuthors(t *testing.T) {
 	code, _ = rig.do("DELETE", fmt.Sprintf("%s/%d", cp(cmtDoc), hubID), cmtAsHubTwo, nil)
 	assert.Equal(t, 403, code, "a hub viewer cannot delete another hub viewer's")
 	code, _ = rig.do("DELETE", fmt.Sprintf("%s/%d", cp(cmtDoc), hubID), cmtAsHub, nil)
-	assert.Equal(t, 403, code, "through the Hub a delete is the owner's alone (#11354): a hub viewer cannot delete even their own")
+	assert.Equal(t, 200, code, "the author deletes their own: a guest loses nothing to the owner's gain (#11354)")
 	// Through the Hub a resolve is the owner's alone now (#7052): another hub viewer cannot resolve a thread either.
 	code, out = rig.do("POST", fmt.Sprintf("%s/%d/resolve", cp(cmtDoc), mine), cmtAsHubTwo, nil)
 	assert.Equal(t, 403, code)
@@ -740,12 +740,18 @@ func TestArtifactCommentsThroughTheHubOnlyTheOwnerMayWrite(t *testing.T) {
 		}
 	}
 	assert.Equal(t, before, count(), "nothing was stored by any of them")
-	// An edit, a delete and the lock are the owner's alone through the Hub (#11354): a hub viewer is refused, the owner's marker is served.
+	// The lock is the owner's alone through the Hub (#11354): a hub viewer is refused; an edit or delete of the OWNER's comment by a hub viewer is refused by the comment policy (not the author), never served.
 	withLabel(t, cmtHubUser, nil)
-	for _, c := range []struct{ method, path string }{{"PATCH", fmt.Sprintf("%s/%d", cp(cmtDoc), id)}, {"DELETE", fmt.Sprintf("%s/%d", cp(cmtDoc), id)}, {"PUT", cp(cmtDoc) + "/lock"}, {"DELETE", cp(cmtDoc) + "/lock"}} {
+	for _, c := range []struct{ method, path string }{{"PUT", cp(cmtDoc) + "/lock"}, {"DELETE", cp(cmtDoc) + "/lock"}} {
 		code, out := rig.do(c.method, c.path, cmtAsHub, map[string]any{"body": "x"})
 		assert.Equal(t, 403, code, "a hub viewer: "+c.method+" "+c.path)
 		assert.Equal(t, "owner_only", out["code"])
+	}
+	rig.hubOn()
+	for _, c := range []struct{ method, path string }{{"PATCH", fmt.Sprintf("%s/%d", cp(cmtDoc), id)}, {"DELETE", fmt.Sprintf("%s/%d", cp(cmtDoc), id)}} {
+		code, out := rig.do(c.method, c.path, cmtAsHub, map[string]any{"body": "x"})
+		assert.Equal(t, 403, code, "a hub viewer cannot touch the owner's comment: "+c.method)
+		assert.Equal(t, "comments_forbidden", out["code"], "by the comment policy, not as a non-owner")
 	}
 	code, _ := rig.do("PATCH", fmt.Sprintf("%s/%d", cp(cmtDoc), id), cmtAsHubOwner, map[string]any{"body": "edited by the owner"})
 	assert.Equal(t, 200, code, "the owner edits their comment through the Hub")
@@ -979,4 +985,21 @@ func TestArtifactCommentsTheSendThroughTheHubIsTheOwnersAlone(t *testing.T) {
 	assert.NotEqual(t, "not_through_hub", out["code"], "and the route is no longer refused for the Hub: %d %v", code, out)
 	code, _ = rig.do("POST", fmt.Sprintf("%s/%d/reply", cp(cmtDoc), id), cmtAsHubOwner, map[string]any{"body": "x"})
 	assert.Equal(t, 403, code, "an agent's reply is never a person's, through the Hub either")
+}
+
+// #11354, the operator's decision (2026-10-30): the owner gets more through the Hub and a guest loses nothing: a hub viewer allowed to comment edits and deletes their OWN comment (the author is the stored identity,
+// never a value of the request), and cannot touch another's; the lock and the send stay the owner's alone.
+func TestArtifactCommentsAHubGuestStillEditsAndDeletesTheirOwn(t *testing.T) {
+	rig := newCmtRig(t)
+	rig.hubOn()
+	mine := rig.hubComment(cmtHubUser, "my words", "")
+	theirs := rig.hubComment("hub-user-9999ffff", "someone else's", "")
+	code, _ := rig.do("PATCH", fmt.Sprintf("%s/%d", cp(cmtDoc), mine), cmtAsHub, map[string]any{"body": "my better words"})
+	assert.Equal(t, 200, code, "the guest edits their own")
+	code, out := rig.do("PATCH", fmt.Sprintf("%s/%d", cp(cmtDoc), theirs), cmtAsHub, map[string]any{"body": "mine now", "author": "hub-user-9999ffff"})
+	assert.Equal(t, 403, code, "not another guest's, whatever the request says: %v", out)
+	code, _ = rig.do("DELETE", fmt.Sprintf("%s/%d", cp(cmtDoc), theirs), cmtAsHub, nil)
+	assert.Equal(t, 403, code, "nor delete it")
+	code, _ = rig.do("DELETE", fmt.Sprintf("%s/%d", cp(cmtDoc), mine), cmtAsHub, nil)
+	assert.Equal(t, 200, code, "and deletes their own")
 }
