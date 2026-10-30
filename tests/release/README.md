@@ -86,3 +86,10 @@ Items: 1 download (sha256 against `SHA256SUMS.txt`, every program of `commands.t
 then, only with `--throwaway-machine` or on a GitHub-hosted runner: 5 apply (the person's request installs TO and Coral comes back from its run record), 6 install (`coral --version`, `coral-update` and every
 program byte for byte TO's own tarball), 7 tmux (the agent's session and pane process survive), 8 settled. Needs Linux (amd64 or arm64), curl, python3, tar and sha256sum, and go or `PERSON_CALL=` a built
 `internal/updater/testrig/cmd/person-call`. Run once on an arm64 VM: v2.0.0 to itself (items 1 to 3, 4 to 8 skipped as designed) and v1.4.168 to v2.0.0 (all eight PASS).
+
+## screens/: the release screenshot review (#11216)
+
+`screens/run.sh vX.Y.Z` photographs every page of the dashboard at 1440, 900 and 390 px on a private server with
+made-up data, compares with the previous release's shots, and files the contact sheet and the shots as Coral
+artifacts on the `UI review: vX.Y.Z` task. A plain script, no agent and no tokens; DevOps runs it after
+`verify-release`, and a failure never blocks the release. See `screens/README.md`.
