@@ -1172,6 +1172,14 @@ body.panel-dragging .agentic-state {
     border-bottom: 1px solid var(--border);
 }
 
+/* The diff under a changed file's row (#11350): the row's chevron opens it, Expand all stacks every file's. The preview pane is untouched. */
+.file-expand-btn { flex: none; }
+.file-diff { margin: 0 0 6px 20px; border-left: 2px solid var(--border); min-width: 0; }
+.file-diff[hidden] { display: none; }
+.file-diff-body { max-height: 60vh; overflow: auto; }
+.file-diff-note { margin: 4px 8px; font-size: var(--fs-sm); color: var(--text-secondary); }
+.file-diff-error { color: var(--error); }
+.files-expand-all { flex: none; }
 .file-item {
     display: flex;
     align-items: center;
@@ -1971,4 +1979,4 @@ body.panel-dragging .agentic-state {
 
 /* An open file's note when the file changed on disk under unsaved edits (#10334). */
 .preview-disk-note { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 6px 12px; font-size: var(--fs-sm); color: var(--text-secondary); border-bottom: 1px solid var(--border); }
-.files-legend { padding: var(--space-xs) var(--space-md); font-size: var(--fs-sm); color: var(--text-muted); }
+.files-legend { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: var(--space-xs) var(--space-md); font-size: var(--fs-sm); color: var(--text-muted); } /* the line also holds Expand all (#11350) */

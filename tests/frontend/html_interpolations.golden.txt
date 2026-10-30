@@ -90,7 +90,10 @@
 1	changed_files.js	compareNote
 2	changed_files.js	copyBtn
 1	changed_files.js	dels
+1	changed_files.js	diffSlot
 2	changed_files.js	editBtn
+1	changed_files.js	expandAll
+1	changed_files.js	expandBtn
 1	changed_files.js	f.additions
 1	changed_files.js	f.deletions
 1	changed_files.js	fileIconHtml(name)

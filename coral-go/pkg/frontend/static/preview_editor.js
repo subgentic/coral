@@ -1,7 +1,6 @@
 /* The active preview editor and read-only diff, including capture and disposal. */
 import { escapeHtml } from './utils.js';
-import { getCm, getLangExtension, getLangFromPath, DIFF_CONFIG } from './cm_util.js';
-import { isCloud } from './server_base.js';
+import { getCm, getLangExtension, getLangFromPath, DIFF_CONFIG, cmHost, cmTheme } from './cm_util.js';
 import { retryOnce } from './overload.js';
 import { _renderContentView } from './preview_content.js';
 
@@ -23,38 +22,13 @@ export function createPreviewEditor({ _activeTab, _isDirty, _renderTabs, _fileUr
         else if (_fallbackEditor) tab.content = _fallbackEditor.value;
     }
 
-    /** The element an editor mounts into. CodeMirror writes its theme into <style> elements, which the hub's CSP
-     *  (style-src 'self') blocks; inside a shadow root it adopts a constructable stylesheet instead, which the CSP does
-     *  not govern. So in cloud mode the editor lives in a shadow root and the page rules that style it (the same ones
-     *  agentic.css/output.css hold for local mode) come from a stylesheet loaded from /static: no inline style anywhere. */
-    function _cmHost(body) {
-        body.replaceChildren();
-        const host = document.createElement('div');
-        host.className = 'inline-preview-cm preview-pane-cm';
-        body.appendChild(host);
-        if (!isCloud() || !host.attachShadow) return host;
-        const root = host.attachShadow({ mode: 'open' });
-        const link = document.createElement('link');
-        link.rel = 'stylesheet';
-        link.href = new URL('./css/cm_shadow.css', import.meta.url).href; // inherits a versioned static prefix
-        const mount = document.createElement('div');
-        mount.className = 'cm-shadow-mount';
-        root.append(link, mount);
-        return mount;
-    }
-
-    /** The editor's colours follow the page's theme (#7654): CodeMirror's own light look in the light theme, One Dark only in the dark one. Taken when the editor is made, as each file or tab opens it afresh. */
-    function _cmTheme(cm) {
-        return document.documentElement.getAttribute('data-theme') === 'light' ? [] : [cm.oneDark];
-    }
-
     function _mountEditor(tab, body) {
         const cm = getCm();
         if (cm) {
             try {
-                const host = _cmHost(body);
+                const host = cmHost(body);
                 const extensions = [
-                    cm.basicSetup, ..._cmTheme(cm), cm.search(), cm.EditorView.lineWrapping,
+                    cm.basicSetup, ...cmTheme(cm), cm.search(), cm.EditorView.lineWrapping,
                     cm.EditorView.theme({ '&': { height: '100%' }, '.cm-scroller': { overflow: 'auto' } }),
                     cm.EditorView.updateListener.of(u => {
                         if (!u.docChanged) return;
@@ -105,9 +79,9 @@ export function createPreviewEditor({ _activeTab, _isDirty, _renderTabs, _fileUr
         const cm = tab.hasDiff ? getCm() : null;
         if (cm) {
             try {
-                const host = _cmHost(body);
+                const host = cmHost(body);
                 const extensions = [
-                    cm.basicSetup, ..._cmTheme(cm), cm.EditorView.lineWrapping,
+                    cm.basicSetup, ...cmTheme(cm), cm.EditorView.lineWrapping,
                     cm.EditorView.editable.of(false), cm.EditorState.readOnly.of(true),
                     cm.EditorView.theme({ '&': { height: '100%' }, '.cm-scroller': { overflow: 'auto' } }),
                     // diffConfig: the merge view's own scanLimit would otherwise return one chunk.
