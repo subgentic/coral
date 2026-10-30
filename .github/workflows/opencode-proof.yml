@@ -1,0 +1,64 @@
+name: opencode-proof
+# One-off proof for #11377: the opencode package's tests, run on a GitHub-hosted runner (never on a developer Mac) under a process cap and a watchdog, with the process count sampled. The old stand-in
+# guard started a new copy of the test binary for every test (357, then 1,864 processes on the operator's Mac); this shows the argument-based guard starts a bounded few. Runs only on pushes to
+# proof/11377-opencode; read-only contents, no secrets; actions pinned by SHA.
+on:
+  push:
+    branches: ["proof/11377-opencode"]
+
+permissions:
+  contents: read
+
+jobs:
+  opencode:
+    name: opencode tests under a process cap
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      CORAL_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+        with:
+          go-version-file: coral-go/go.mod
+          cache: false
+      - name: compile the package's tests (nothing runs yet)
+        working-directory: coral-go
+        run: go test -c -o "$RUNNER_TEMP/opencode.test" ./internal/opencode
+      - name: run them under a cap and a watchdog, sampling the process count
+        working-directory: coral-go/internal/opencode
+        shell: bash
+        run: |
+          set -u
+          bin="$RUNNER_TEMP/opencode.test"
+          before=$(ps -e | wc -l)
+          cap=$((before + 400))   # the shell's own limit: a runaway cannot take the runner
+          watch=$((before + 120)) # the watchdog stops the group well before that
+          echo "processes before: $before (ulimit -u $cap, watchdog at $watch)"
+          ( ulimit -u "$cap"; exec setsid "$bin" -test.count=1 -test.v > "$RUNNER_TEMP/opencode.log" 2>&1 ) &
+          runner=$!
+          max=0
+          tripped=0
+          while kill -0 "$runner" 2>/dev/null; do
+            n=$(ps -e | wc -l)
+            [ "$n" -gt "$max" ] && max=$n
+            if [ "$n" -gt "$watch" ]; then
+              echo "WATCHDOG: $n processes; stopping the test's process group"
+              kill -TERM -- "-$runner" 2>/dev/null || true
+              tripped=1
+              break
+            fi
+            sleep 0.2
+          done
+          wait "$runner" 2>/dev/null
+          code=$?
+          echo "exit code: $code"
+          echo "processes: before $before, highest seen $max, extra $((max - before))"
+          echo "--- last lines of the test output"
+          tail -n 25 "$RUNNER_TEMP/opencode.log"
+          grep -c '^=== RUN' "$RUNNER_TEMP/opencode.log" | sed 's/^/tests run: /'
+          [ "$tripped" -eq 0 ] || { echo "the watchdog tripped"; exit 1; }
+          [ "$code" -eq 0 ] || exit 1
+          [ $((max - before)) -le 60 ] || { echo "too many extra processes"; exit 1; }
