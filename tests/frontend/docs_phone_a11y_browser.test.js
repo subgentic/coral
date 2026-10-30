@@ -31,10 +31,10 @@ const BASE = require('./test_base').BASE;
             assert.ok(code.some(c => c.scrolls), 'a code block of Troubleshooting scrolls at 390 px: ' + JSON.stringify(code));
             for (const c of code) assert.deepEqual(c.scrolls ? [c.tab, c.role, c.label] : [c.tab, c.role], c.scrolls ? [0, 'region', 'Code, scrolls sideways'] : [-1, null], JSON.stringify(c));
         });
-        await S.run('390 px at 200% text: the way back is over the title when it would not have 10 rem beside it, and no topic scrolls the page sideways', async () => {
+        await S.run('390 px at 200% text: the way back stays beside the title in the bar (the title is cut with an ellipsis, #11236), and no topic scrolls the page sideways', async () => {
             await ev(`document.documentElement.style.fontSize = '32px'; true`); await select(names[0]); await settle(400);
-            const g = await ev(`(() => { const b = document.getElementById('docs-phone-back').getBoundingClientRect(), t = document.querySelector('#docs-content h1').getBoundingClientRect(); return { over: b.bottom <= t.top + 1, titleWidth: Math.round(t.width) }; })()`); await shot('docs-390-200');
-            assert.ok(g.over && g.titleWidth > 200, 'over the title, which has the width of the screen: ' + JSON.stringify(g));
+            const g = await ev(`(() => { const b = document.getElementById('docs-phone-back').getBoundingClientRect(), t = document.querySelector('#docs-content h1').getBoundingClientRect(); return { beside: t.left >= b.right - 2 && t.top < b.bottom, titleWidth: Math.round(t.width) }; })()`); await shot('docs-390-200');
+            assert.ok(g.beside && g.titleWidth > 100, 'beside the title in one bar, at any text size: ' + JSON.stringify(g));
             const wide = [];
             for (const n of names) { await select(n); if (await ev(`document.documentElement.scrollWidth > innerWidth + 1`)) wide.push(n); }
             await ev(`document.documentElement.style.fontSize = ''; true`);

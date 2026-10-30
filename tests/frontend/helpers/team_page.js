@@ -4,7 +4,7 @@
 const na = require('./new_agent');
 const SOURCE = `(() => {
     const A = window.__na;
-    const main = () => [...document.querySelectorAll('main, [role=main]')].filter(A.vis).find(m => [...m.querySelectorAll('h1')].some(A.vis)) || null;
+    const main = () => [...document.querySelectorAll('main, [role=main]')].filter(A.vis).find(m => [...m.querySelectorAll('h1')].some(A.vis) || (m.querySelector('#team-page-view') && A.vis(m.querySelector('#team-page-view')) && getComputedStyle(m.querySelector('#team-page-head')).display === 'none')) || null; /* a phone's goal, task or agent page is a drill-down with its own bar: the team's h1 is not drawn then (#11314), its own title is the page's */
     const page = () => [...document.querySelectorAll('.team-settings-modal')].find(A.vis) || main(); // team settings are a popout (#8853): while it is open it is the page the settings suites read
     const h1 = () => { const m = main(); return m ? [...m.querySelectorAll('h1')].find(A.vis) || null : null; };
     const tablist = () => { const m = main(); return m ? [...m.querySelectorAll('[role=tablist]')].find(t => /^Team$/i.test(A.name(t))) || null : null; };

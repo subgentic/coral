@@ -405,6 +405,7 @@ registerActions({
 /** A phone's way from the open document back to the list of topics. */
 export function docsPhoneBack() {
     selectedDoc = null;
+    if (currentRoute()?.view === 'docs') note({ view: 'docs' }); /* the list is /docs: the address leaves the topic with the screen */
     syncPhonePage();
     renderDocNav();
     document.querySelector('#docs-nav-list .row-btn')?.focus({ preventScroll: true });
