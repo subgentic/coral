@@ -69,6 +69,9 @@ func farSide(t *testing.T, mode string) (ssh, home, log string) {
 	}
 	log = filepath.Join(dir, "ssh.log")
 	pre := ""
+	if mode == "full" {
+		pre = `case "$last" in *"df -Pk"*) echo 100; exit 0;; esac`
+	}
 	if mode == "corrupt" {
 		pre = `case "$last" in *"cat >"*) head -c 100 | eval "$last"; exit $?;; esac`
 	}
@@ -244,6 +247,9 @@ func TestInstallRefusesAPackageWithBadPathsLocally(t *testing.T) {
 		"hard link":      {{name: "h", typ: tar.TypeLink, link: "coral"}},
 		"fifo":           {{name: "f", typ: tar.TypeFifo}},
 		"link escapes":   {{name: "l", typ: tar.TypeSymlink, link: "../../etc/passwd"}},
+		"link with ..":   {{name: "sub/y", typ: tar.TypeSymlink, link: ".."}},
+		"through a link": {{name: "sub", typ: tar.TypeSymlink, link: "real"}, {name: "sub/evil", body: "x"}},
+		"deep through":   {{name: "a/b", typ: tar.TypeSymlink, link: "c"}, {name: "a/b/c/d/evil", body: "x"}},
 		"absolute link":  {{name: "l", typ: tar.TypeSymlink, link: "/etc/passwd"}},
 		"backslash name": {{name: "a\\b", body: "x"}},
 		"empty":          {},
@@ -351,5 +357,47 @@ func TestDownloadReleaseIsHardened(t *testing.T) {
 	}
 	if err := downloadRelease(ctx, ts.URL+"/ok", dst, 10); err == nil {
 		t.Error("an existing file was overwritten")
+	}
+}
+
+func TestInstallRefusesWhenTheFarSideHasNoRoomAndCopiesNothing(t *testing.T) {
+	pkg := goodTar(t)
+	e, home, log := newInstallEnv(t, pkg, "full")
+	tg, _ := ParseTarget("rich@box.example.com")
+	_, err := e.in.Install(context.Background(), tg, ArchAMD64)
+	if err == nil || !strings.Contains(err.Error(), "not enough free disk space") {
+		t.Fatalf("err = %v", err)
+	}
+	b, _ := os.ReadFile(log)
+	if strings.Contains(string(b), "cat >") || strings.Contains(string(b), "mkdir") {
+		t.Errorf("something was copied or made before the room check:\n%s", b)
+	}
+	if _, serr := os.Stat(filepath.Join(home, ".coral-server")); serr == nil {
+		t.Error("the install folder was made on a computer with no room")
+	}
+}
+
+func TestParseKB(t *testing.T) {
+	for in, want := range map[string]int64{"123\n": 123, " 0 ": 0} {
+		if n, ok := parseKB(in); !ok || n != want {
+			t.Errorf("%q = %d %v", in, n, ok)
+		}
+	}
+	for _, bad := range []string{"", "x", "12 34", "-5", "1e3", "1234567890123456"} {
+		if _, ok := parseKB(bad); ok {
+			t.Errorf("%q accepted", bad)
+		}
+	}
+}
+
+// The sum is removed before the folder it describes: an interrupted re-unpack must not leave a matching sum next to a half-written root.
+func TestUnpackRemovesTheRecordedSumFirstAndWritesItLast(t *testing.T) {
+	text, err := remoteText(CmdUnpack, "2.0.10")
+	if err != nil {
+		t.Fatal(err)
+	}
+	rmSum, rmRoot, tarX, write := strings.Index(text, "rm -f package.sha256"), strings.Index(text, "rm -rf root"), strings.Index(text, "tar -xzf"), strings.Index(text, "> package.sha256")
+	if !(rmSum >= 0 && rmSum < rmRoot && rmRoot < tarX && tarX < write) {
+		t.Errorf("order is wrong: %s", text)
 	}
 }

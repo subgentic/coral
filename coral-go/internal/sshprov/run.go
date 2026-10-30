@@ -37,6 +37,8 @@ const (
 	CmdTarList
 	// CmdUnpack unpacks that package into <install>/<version>/root and records its SHA-256 in <install>/<version>/package.sha256; arg 0 is the version.
 	CmdUnpack
+	// CmdFreeKB prints the free space, in KiB, of the file system that holds the home folder (the install folder lives under it).
+	CmdFreeKB
 	// CmdReadInstalledSum prints that recorded SHA-256, if the release is installed; arg 0 is the version.
 	CmdReadInstalledSum
 )
@@ -66,7 +68,9 @@ var specs = map[Command]spec{
 	CmdMkVersionDir:   {template: "umask 077 && mkdir -p \"$HOME/" + InstallDir + "/%[1]s\" && chmod 700 \"$HOME/" + InstallDir + "\" \"$HOME/" + InstallDir + "/%[1]s\"", args: []*regexp.Regexp{versionRe}},
 	CmdReceive:        {template: "umask 077 && cat > \"$HOME/" + InstallDir + "/%s/package.tar.gz\"", args: []*regexp.Regexp{versionRe}, timeout: 15 * time.Minute},
 	CmdTarList:        {template: "cd \"$HOME/" + InstallDir + "/%s\" && tar -tzf package.tar.gz", args: []*regexp.Regexp{versionRe}, timeout: 2 * time.Minute},
-	CmdUnpack: {template: "umask 077 && cd \"$HOME/" + InstallDir + "/%[1]s\" && rm -rf root && mkdir root && tar -xzf package.tar.gz --no-same-owner -C root && " +
+	CmdFreeKB:         {template: "df -Pk \"$HOME\" | awk 'NR==2 {print $4}'"},
+	// The recorded sum goes FIRST: a re-unpack that is interrupted leaves no sum next to a half-written root, so the next run does not say "already installed". It is written last.
+	CmdUnpack: {template: "umask 077 && cd \"$HOME/" + InstallDir + "/%[1]s\" && rm -f package.sha256 && rm -rf root && mkdir root && tar -xzf package.tar.gz --no-same-owner -C root && " +
 		"{ sha256sum package.tar.gz 2>/dev/null || shasum -a 256 package.tar.gz; } | cut -d' ' -f1 > package.sha256", args: []*regexp.Regexp{versionRe}, timeout: 5 * time.Minute},
 	CmdReadInstalledSum: {template: "cat \"$HOME/" + InstallDir + "/%s/package.sha256\" 2>/dev/null", args: []*regexp.Regexp{versionRe}},
 }

@@ -137,8 +137,13 @@ func (in Installer) Install(ctx context.Context, t Target, arch Arch) (string, e
 	if err != nil || !hexRe.MatchString(sum) {
 		return "", fail("install", "The release could not be verified, so nothing was installed.")
 	}
-	if err := checkLocalPackage(filepath.Join(dir, asset)); err != nil {
+	unpacked, err := checkLocalPackage(filepath.Join(dir, asset))
+	if err != nil {
 		return "", fail("install", "The package holds paths that are not allowed, so nothing was installed.")
+	}
+	pkgSize := int64(0)
+	if st, err := os.Stat(filepath.Join(dir, asset)); err == nil {
+		pkgSize = st.Size()
 	}
 
 	// Already installed? (a re-run)
@@ -149,6 +154,15 @@ func (in Installer) Install(ctx context.Context, t Target, arch Arch) (string, e
 		return "", connectErr(err)
 	}
 
+	// Room for the package and what it unpacks to, and a margin, before anything is copied.
+	need := (pkgSize+unpacked)/1024 + diskMarginKB
+	fr, err := in.Runner.Run(ctx, t, CmdFreeKB)
+	if err != nil {
+		return "", connectErr(err)
+	}
+	if free, ok := parseKB(fr.Stdout); !ok || free < need {
+		return "", fail("install", "There is not enough free disk space on the other computer.")
+	}
 	in.say("install", "running", "Copying the package to the other computer.")
 	if _, err := in.Runner.Run(ctx, t, CmdMkVersionDir, in.Version); err != nil {
 		return "", connectErr(err)
@@ -189,6 +203,25 @@ func (in Installer) Install(ctx context.Context, t Target, arch Arch) (string, e
 	return sum, nil
 }
 
+// diskMarginKB is the free space kept beyond the package and its unpacked size (100 MiB).
+const diskMarginKB = 100 << 10
+
+// parseKB reads the one number df printed: digits only, at most 15.
+func parseKB(s string) (int64, bool) {
+	s = strings.TrimSpace(s)
+	if s == "" || len(s) > 15 {
+		return 0, false
+	}
+	var n int64
+	for _, r := range s {
+		if r < '0' || r > '9' {
+			return 0, false
+		}
+		n = n*10 + int64(r-'0')
+	}
+	return n, true
+}
+
 func connectErr(err error) error {
 	if errors.Is(err, ErrHostKey) || errors.Is(err, ErrHostKeyChanged) {
 		return fail("install", "The host key no longer matches.")
@@ -226,56 +259,68 @@ func checkMemberName(n string) error {
 	return nil
 }
 
-// checkLocalPackage reads the verified package's members on the hub: names as above, only files and folders and links that stay inside (no hard link, no device, no FIFO), a bounded count and size.
-func checkLocalPackage(file string) error {
+// checkLocalPackage reads the verified package's members on the hub: names as above, only files, folders and symlinks (no hard link, device or FIFO), a bounded count and size. A symlink's target must be
+// relative with no ".." element, and no member's path may pass through an EARLIER symlink member: with those two rules a chain such as sub/y -> .. and then x -> sub/y/.. cannot be built, whatever tar
+// does on the far side. It returns the unpacked size.
+func checkLocalPackage(file string) (int64, error) {
 	f, err := os.Open(file)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	defer f.Close()
 	gz, err := gzip.NewReader(f)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	tr := tar.NewReader(gz)
 	var count int
 	var total int64
+	links := map[string]bool{} // clean paths of the symlink members seen so far
 	for {
 		h, err := tr.Next()
 		if err == io.EOF {
 			break
 		}
 		if err != nil {
-			return err
+			return 0, err
 		}
 		count++
 		if count > maxMembers {
-			return errors.New("too many members")
+			return 0, errors.New("too many members")
 		}
 		if err := checkMemberName(h.Name); err != nil {
-			return err
+			return 0, err
+		}
+		clean := path.Clean(h.Name)
+		for p := path.Dir(clean); p != "." && p != "/"; p = path.Dir(p) {
+			if links[p] {
+				return 0, fmt.Errorf("member %q passes through a link", h.Name)
+			}
 		}
 		switch h.Typeflag {
 		case tar.TypeReg, tar.TypeDir:
 			total += h.Size
 		case tar.TypeSymlink:
 			if h.Linkname == "" || strings.HasPrefix(h.Linkname, "/") || strings.ContainsAny(h.Linkname, "\\\x00") {
-				return fmt.Errorf("link target of %q", h.Name)
+				return 0, fmt.Errorf("link target of %q", h.Name)
 			}
-			if rel := path.Join(path.Dir(h.Name), h.Linkname); rel == ".." || strings.HasPrefix(rel, "../") {
-				return fmt.Errorf("link %q leaves the folder", h.Name)
+			for _, el := range strings.Split(h.Linkname, "/") {
+				if el == ".." {
+					return 0, fmt.Errorf("link %q has .. in its target", h.Name)
+				}
 			}
+			links[clean] = true
 		default:
-			return fmt.Errorf("member %q has a type that is not allowed", h.Name)
+			return 0, fmt.Errorf("member %q has a type that is not allowed", h.Name)
 		}
 		if total > maxUnpacked {
-			return errors.New("too large when unpacked")
+			return 0, errors.New("too large when unpacked")
 		}
 	}
 	if count == 0 {
-		return errors.New("empty package")
+		return 0, errors.New("empty package")
 	}
-	return nil
+	return total, nil
 }
 
 // runHelper runs `coral-update verify-package` by its absolute path with a minimal environment and a timeout, and reads its JSON answer. Anything but "verified" with a SHA-256 is a refusal.
