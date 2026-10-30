@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
@@ -20,7 +21,7 @@ func runBuilder(t *testing.T, env map[string]string) []byte {
 	}
 	out := filepath.Join(t.TempDir(), "promote.json")
 	cmd := exec.Command(py, "-I", filepath.Join("..", "..", "..", "..", "tools", "promote_manifest.py"), "build")
-	cmd.Env = []string{"PROMOTE_OUT=" + out}
+	cmd.Env = append(systemEnv(), "PROMOTE_OUT="+out)
 	for k, v := range env {
 		cmd.Env = append(cmd.Env, k+"="+v)
 	}
@@ -30,6 +31,22 @@ func runBuilder(t *testing.T, env map[string]string) []byte {
 	data, err := os.ReadFile(out)
 	require.NoError(t, err)
 	return data
+}
+
+// systemEnv is what a Windows program needs from the environment to find its system folders. Python started without SystemDrive and ProgramData
+// (the Microsoft Store's python3 is) writes its cache under the literal folder %SystemDrive%\ProgramData in the current directory, which is this
+// package's source folder (found by #350: it was left untracked in the tree and made the package's test result depend on it).
+func systemEnv() []string {
+	if runtime.GOOS != "windows" {
+		return nil
+	}
+	var env []string
+	for _, k := range []string{"SystemRoot", "SystemDrive", "ProgramData", "ALLUSERSPROFILE", "TEMP", "TMP"} {
+		if v := os.Getenv(k); v != "" {
+			env = append(env, k+"="+v)
+		}
+	}
+	return env
 }
 
 func builderEnv(tag, prerelease string) map[string]string {

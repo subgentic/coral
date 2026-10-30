@@ -25,6 +25,7 @@ const maxParsedCommand = 256 << 10
 type riskRun struct {
 	memo  map[riskKey]string
 	depth int // how many commands inside commands (a shell wrapper, eval, find -exec, ...) this one is nested in
+	evals int // how many commands this run has judged, not counting an answer taken from memo: the tests assert the work done, not the time it took (#350)
 }
 
 // maxWrapperDepth is how deep commands may sit inside commands (bash -c in bash -c, eval in eval, find -exec sh -c ...) before the reading stops and asks the person (a launcher takes two of these levels: the command it runs, and the shell inside that): a real command line does not nest a dozen of them, and each
@@ -46,6 +47,7 @@ func (r *riskRun) from(command, workDir, dir string) string {
 	}
 	r.depth++
 	defer func() { r.depth-- }()
+	r.evals++
 	why := r.plain(command, workDir, dir)
 	if why == "" {
 		// The command again with every spelled-out word written plainly (r''m, \rm, "rm", $'\x72m' are rm), and a command whose name is built at run time ($X, $(echo rm)) is a risk (#7106).
