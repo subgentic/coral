@@ -1,4 +1,4 @@
-// New project, step 3's side list (#10719, Desktop #10714 moment 5): "Start none", "Workflow none", "Health check off", "Messaging off" said their state and not what each is. Each tab now has a short plain tip as its tooltip, and
+// New team, step 3's side list (#10719, Desktop #10714 moment 5): "Start none", "Workflow none", "Health check off", "Messaging off" said their state and not what each is. Each tab now has a short plain tip as its tooltip, and
 // for a screen reader as its description after the state; the visible words do not grow (the tab reads as before). At 1280 px (a phone picks the section from a select).
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');

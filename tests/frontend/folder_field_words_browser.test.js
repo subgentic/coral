@@ -15,11 +15,11 @@ const { coralReady } = require('./helpers/wait');
         await openNewAgent(ev, waitFor);
         const help = await ev(`(() => { const f = document.getElementById('launch-dir'); const row = f.closest('.sv-row') || f.parentElement.parentElement; return row ? row.innerText.replace(/\\s+/g, ' ') : ''; })()`);
         assert.ok(/A folder on the computer running Coral\./.test(help), 'the folder field says where the folder is: ' + JSON.stringify(help));
-        // New project step 1 and the job form say it too, in the same words (#11015, 7b)
+        // New team step 1 and the job form say it too, in the same words (#11015, 7b)
         const rowText = id => ev(`(() => { const f = document.getElementById(${JSON.stringify(id)}); const row = f && (f.closest('.sv-row') || f.parentElement.parentElement); return row ? row.innerText.replace(/\\s+/g, ' ') : ''; })()`);
         await ev(`window.hideLaunchModal && window.hideLaunchModal(); (async () => { await window.showLaunchModal(); window._selectLaunchType('team'); return true; })()`);
-        await waitFor(`!!document.getElementById('launch-team-dir') && document.getElementById('launch-team-dir').getClientRects().length > 0`, 'New project step 1', 8000);
-        assert.ok(/A folder on the computer running Coral\./.test(await rowText('launch-team-dir')), 'New project step 1 says where the folder is: ' + JSON.stringify(await rowText('launch-team-dir')));
+        await waitFor(`!!document.getElementById('launch-team-dir') && document.getElementById('launch-team-dir').getClientRects().length > 0`, 'New team step 1', 8000);
+        assert.ok(/A folder on the computer running Coral\./.test(await rowText('launch-team-dir')), 'New team step 1 says where the folder is: ' + JSON.stringify(await rowText('launch-team-dir')));
         await ev(`window.hideLaunchModal && window.hideLaunchModal(); window.showJobModal(); true`);
         await waitFor(`!!document.getElementById('job-modal-repo') && document.getElementById('job-modal-repo').getClientRects().length > 0`, 'the job form', 8000);
         assert.ok(/A folder on the computer running Coral\./.test(await rowText('job-modal-repo')), 'the job form says where the folder is: ' + JSON.stringify(await rowText('job-modal-repo')));

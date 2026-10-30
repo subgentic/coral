@@ -303,8 +303,8 @@ func TestHowDoIAnswersContinueAFileAndThePermissionModes(t *testing.T) {
 	assert.Contains(t, fields, "docs: { topic: 'how-do-i', answer: 'What the permission modes allow' }", "Learn more beside Default permission mode opens that answer in Docs")
 }
 
-// #10605 and #10595: the launch choice is New project, not New team: no shipped agent doc names the old button.
-func TestAgentDocsNameNewProjectNotNewTeam(t *testing.T) {
+// #10605, #10595 and #11336: the launch choice is New team, not New project: no shipped agent doc names the old button.
+func TestAgentDocsNameNewTeamNotNewProject(t *testing.T) {
 	entries, err := os.ReadDir(filepath.Join("..", "..", "..", "agent_docs"))
 	require.NoError(t, err)
 	for _, e := range entries {
@@ -313,7 +313,7 @@ func TestAgentDocsNameNewProjectNotNewTeam(t *testing.T) {
 		}
 		b, err := os.ReadFile(filepath.Join("..", "..", "..", "agent_docs", e.Name()))
 		require.NoError(t, err)
-		assert.NotContains(t, string(b), "New team", e.Name()+" names the old button: it is New project")
+		assert.NotContains(t, string(b), "New project", e.Name()+" names the old button: it is New team")
 	}
 }
 

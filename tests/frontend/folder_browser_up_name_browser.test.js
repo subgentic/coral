@@ -1,5 +1,5 @@
 // The folder browser's up button reads ".." and its title said "Go up", but a title is only a description when the button has words: a screen reader said "dot dot" (#10693, the first-run pass; the Mobile Beta Tester's
-// pass 37). Every up button of the folder browsers (New agent, New project, Resume, Open folder, Terminal, the job form) now names itself. Drives Chrome over CDP through agent_view_harness.js: the accessibility tree's
+// pass 37). Every up button of the folder browsers (New agent, New team, Resume, Open folder, Terminal, the job form) now names itself. Drives Chrome over CDP through agent_view_harness.js: the accessibility tree's
 // own name for each, at 1280 and 390 px, with New agent's browser opened.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');

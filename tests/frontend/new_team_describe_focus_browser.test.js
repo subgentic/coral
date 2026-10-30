@@ -1,4 +1,4 @@
-// Describe your team by keyboard (#10652, the New project dialog's keyboard and screen-reader pass): the box opens with the keyboard in its text box; Escape or Cancel closes it and the keyboard goes back to the
+// Describe your team by keyboard (#10652, the New team dialog's keyboard and screen-reader pass): the box opens with the keyboard in its text box; Escape or Cancel closes it and the keyboard goes back to the
 // Describe your team button it came from (it fell to the page, so the next Tab started at the top of the window). 1280 and 390 px; the real dialog on the isolated dev server. Drives Chrome over CDP through agent_view_harness.js.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');

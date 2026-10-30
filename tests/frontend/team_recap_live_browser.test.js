@@ -1,4 +1,4 @@
-// The line above the New project buttons is a polite live region (#team-recap): it says why Next is off, or the recap "<team>: 3 members, <folder>". It was rewritten every time the step, a field or a CLI check was synced, with the
+// The line above the New team buttons is a polite live region (#team-recap): it says why Next is off, or the recap "<team>: 3 members, <folder>". It was rewritten every time the step, a field or a CLI check was synced, with the
 // same words each time, and a screen reader says a rewritten region again: one tap on Next with no name said "Team name is required" seven times (#10693, the first-run keyboard and screen-reader pass). Now an unchanged line is left
 // alone: a blocked Next, a step shown again and typing that changes nothing write it at most once. At 1280 and 390 px. Drives Chrome over CDP through agent_view_harness.js.
 const assert = require('node:assert/strict');
@@ -42,6 +42,6 @@ const { coralReady } = require('./helpers/wait');
             await ev(`window.hideLaunchModal(); true`);
         }
     } finally { await client.close(); }
-    assert.deepEqual(problems, [], 'the New project live line:\n  ' + problems.join('\n  '));
-    console.log('PASS the New project line is written when it changes, not every sync');
+    assert.deepEqual(problems, [], 'the New team live line:\n  ' + problems.join('\n  '));
+    console.log('PASS the New team line is written when it changes, not every sync');
 })().catch(e => { console.error(e); process.exit(1); });
