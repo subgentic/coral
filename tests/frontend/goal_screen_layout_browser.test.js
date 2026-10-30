@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -13,7 +14,7 @@ const BASE = require('./test_base').BASE;
     const bothShots = async name => { await shot(name + '-dark'); await theme('light'); await new Promise(r => setTimeout(r, 500)); await shot(name + '-light'); await theme('dark'); await new Promise(r => setTimeout(r, 500)); } // sleep-ok: the theme's colour transition settles; // dark and light (#8952)
     const B = 'gl-' + Date.now().toString(36), TITLE = 'Ship the goal screen', DONE = 'Write the report', OPEN = 'Review the report';
     const api = (method, path, body) => ev(`fetch(${JSON.stringify(path)}, { method: ${JSON.stringify(method)}, headers: { 'Content-Type': 'application/json' }, body: ${body ? JSON.stringify(JSON.stringify(body)) : 'undefined'} }).then(async r => ({ status: r.status, body: await r.json().catch(() => ({})) }))`);
-    const load = async url => { await Page.navigate({ url: BASE + url }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`); };
+    const load = async url => { await Page.navigate({ url: BASE + url }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings'); };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await load('/');

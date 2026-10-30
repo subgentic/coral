@@ -4,6 +4,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -13,7 +14,7 @@ const BASE = require('./test_base').BASE;
     const open = async (w, mobile, zoom) => {
         await Emulation.setDeviceMetricsOverride({ width: w, height: mobile ? 844 : 800, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         if (zoom) await ev(`document.documentElement.style.fontSize = '${zoom}'; true`);
     };
     // the tab opens on its first group's table on a wide screen and on its list on a phone (#7443): the README is opened from there

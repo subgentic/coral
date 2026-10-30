@@ -3,7 +3,7 @@
 // opens them with the keyboard and carries the open one's word. Below 1280 the tabs are icons alone with their names as title and aria-label. Drives the real dashboard over CDP; an isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
-const { settle } = require('./helpers/wait');
+const { settle, coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -17,7 +17,7 @@ const { settle } = require('./helpers/wait');
         return { words: r.hasAttribute('data-words'), shown: tabs.map(b => [b.dataset.tab || b.id.replace('agentic-tab-', ''), word(b)]), tops: [...new Set(tabs.map(b => b.offsetTop))], clipped: r.scrollWidth > r.clientWidth, more: (() => { const m = document.getElementById('agentic-tab-more'); return m.hidden ? null : [m.getAttribute('aria-label'), m.classList.contains('active'), m.getAttribute('aria-expanded')]; })() }; })()`);
     const load = async (w, mobile) => {
         await Emulation.setDeviceMetricsOverride({ width: w, height: 900, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
-        await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         await ev(`localStorage.removeItem('coral-agentic-tab-prefs'); window.__m.add('dock-bot', 'A', 3, { sleeping: false }); true`);
         await settle(ev, 600); // sleep-ok: the first live list renders from several answers; no single completion event
         await ev(`window.selectLiveSession('dock-bot', 'claude', 'dock-bot-id', 'local'); true`);

@@ -6,6 +6,7 @@ const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 const MEASURE = `(() => {
     const out = [];
@@ -35,7 +36,7 @@ const MEASURE = `(() => {
             const tag = `${w}px`;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.then(() => true)`);
+            await coralReady(ev);
             await ev(`window.showSettingsModal('general'); true`);
             await waitFor(`!!document.querySelector('#settings-modal .settings-hint-line')`, 'the Settings dialog', 8000);
             const groups = await ev(`[...document.querySelectorAll('#settings-modal .settings-group-pick option, #settings-modal [role=tab][data-group]')].map(o => o.value || o.dataset.group).filter(Boolean).filter((v, i, a) => a.indexOf(v) === i)`);
@@ -62,7 +63,7 @@ const MEASURE = `(() => {
                 const tag = `${w}px, Team settings`;
                 await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
                 await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-                await ev(`window.__coralReady.startup('liveList', 'settings')`);
+                await coralReady(ev, 'startup', 'liveList', 'settings');
                 await ev(`fetch('/api/board/${TEAM}/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'Boss', job_title: 'Orchestrator', session_name: 'boss-session' }) }).then(r => r.status)`);
                 await ev(`import((window.__coralStatic || '/static/') + 'team_working_mode.js').then(m => m.showTeamWorkingMode(${JSON.stringify(TEAM)}, { page: (document.getElementById('qa-ts-host') || document.body.appendChild(Object.assign(document.createElement('div'), { id: 'qa-ts-host', style: 'position:fixed;inset:0;display:flex;z-index:50;background:var(--bg-primary)' }))) })); true`);
                 await waitFor(`!!document.querySelector('#team-settings-workspace .sv[data-ready]')`, 'the Team settings', 15000);

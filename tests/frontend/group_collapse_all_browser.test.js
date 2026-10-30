@@ -4,6 +4,7 @@
 // and the headers' aria-expanded follow. It is absent when the list has no groups. Run against an isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -15,7 +16,7 @@ const { connect } = require('./agent_view_harness');
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile });
             await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.then(() => true)`);
+            await coralReady(ev);
             const root = dev === 'phone' ? '#mobile-agent-list' : '#live-sessions-list';
             const build = () => ev(`(() => { localStorage.removeItem('coral_collapsed_groups'); window.__m.agents = {};
                 for (let t = 1; t <= 10; t++) for (let a = 1; a <= 2; a++) window.__m.add('t' + t + 'a' + a, 'A', 1, { sleeping: false, session_id: 'sid-' + t + '-' + a, board_project: 'team-' + t });

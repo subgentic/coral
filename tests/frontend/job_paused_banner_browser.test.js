@@ -4,6 +4,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 const S = `(window.__coralStatic || '/static/')`;
 
 (async () => {
@@ -12,7 +13,7 @@ const S = `(window.__coralStatic || '/static/')`;
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+        await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
         await ev(`(() => { const real = window.fetch; const json = (o) => Promise.resolve(new Response(JSON.stringify(o), { status: 200, headers: { 'Content-Type': 'application/json' } }));
             const ago = h => new Date(Date.now() - h * 3600000).toISOString(); const nxt = h => new Date(Date.now() + h * 3600000).toISOString();
             const fail = id => ({ id, status: 'failed', exit_reason: 'agent_error', error_msg: 'the agent exited with 1', started_at: ago(id), finished_at: ago(id - 0.1) });

@@ -17,7 +17,7 @@ const TASKS = { local: [{ id: 7, board_id: 'alpha', title: 'Local task', priorit
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
-    const { settle } = require('./helpers/wait').bind(ev);
+    const { settle, coralReady } = require('./helpers/wait').bind(ev);
     const results = [];
     const check = (label, cond, detail) => { results.push(!!cond); console.log(`[${cond ? 'PASS' : 'FAIL'}] ${label}${detail !== undefined ? ' - ' + detail : ''}`); };
     const shot = async (name, theme) => { // the review shots, when a folder is given (CORAL_SCREENSHOT_DIR)
@@ -33,7 +33,7 @@ const TASKS = { local: [{ id: 7, board_id: 'alpha', title: 'Local task', priorit
         for (const [label, w, h, mobile] of [['1280', 1280, 900, false], ['390', 390, 844, true]]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.startup('liveList', 'settings')`);
+            await coralReady('startup', 'liveList', 'settings');
             await ev(`try { for (const k of Object.keys(localStorage)) if ((k.startsWith('coral-inbox-') || k.startsWith('coral-saved-filters'))) localStorage.removeItem(k); } catch {} true`);
             await ev(`(async () => { const st = (await import((window.__coralStatic || '/static/') + 'state.js')).state; st.hub = true; st.servers = [{ id: 'box-2', label: 'Box Two', status: 'online' }];
                 const R = window.fetch; const json = b => Promise.resolve(new Response(JSON.stringify(b), { status: 200, headers: { 'Content-Type': 'application/json' } }));

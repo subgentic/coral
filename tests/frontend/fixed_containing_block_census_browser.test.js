@@ -10,6 +10,7 @@ const BASE = require('./test_base').BASE;
 const { STUB: ARTIFACT_STUB, HEX } = require('./helpers/comments_scale');
 const { UPDATE_STAGED } = require('./helpers/census_world');
 const { showUpdateReady, UPDATE_DIALOG_UP } = require('./helpers/phone_targets');
+const { coralReady } = require('./helpers/wait');
 
 // [ancestor selector, fixed descendant selector, why it is meant]
 const INTENDED = [
@@ -40,7 +41,7 @@ const SCAN = `(() => { const sel = e => (e.id ? '#' + e.id : e.tagName.toLowerCa
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled(mobile ? { enabled: true, maxTouchPoints: 5 } : { enabled: false });
             await Emulation.setEmulatedMedia({ features: mobile ? [{ name: 'pointer', value: 'coarse' }, { name: 'hover', value: 'none' }] : [] });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.then(() => true)`);
+            await coralReady(ev);
             // a team whose agents are on an unreachable server (stale: the grey filter that was the bug), and a solo agent
             await ev(`(async () => { for (let i = 1; i <= 3; i++) window.__m.add('rb' + i, 'R' + i, 3, { sleeping: false, agent_type: 'claude', session_id: 'rb-' + i, server: 'box-b', board_project: 'team-x' });
                 window.__m.add('solo', 'S', 1, { sleeping: false, agent_type: 'claude', session_id: 'solo-id' });

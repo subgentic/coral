@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const { removeBoards } = require('./helpers/board_cleanup');
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -16,7 +17,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+        await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
         await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: 'orch', job_title: 'Orchestrator', session_name: 'orch-s' });
         for (const [t, p] of [['Pick the name for the Goals tab', 'low'], ['Approve the design', 'medium'], ['Decide: ship 166 with the Windows trace pending?', 'high']]) { const r = await api('POST', `/api/board/${B}/tasks`, { title: t, assigned_to: 'Operator', created_by: 'orch', priority: p }); assert.ok(r.status < 300, JSON.stringify(r)); await sleep(1100); } // sleep-ok: the three tasks get different update times, oldest the high one last
         let ki = 0;

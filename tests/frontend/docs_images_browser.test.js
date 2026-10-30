@@ -5,13 +5,14 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor } = await connect();
     try {
         await Page.enable();
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
-        const load = async path => { const loaded = Page.loadEventFired(); await Page.navigate({ url: BASE + path }); await loaded; await ev(`window.__coralReady.then(() => true)`); };
+        const load = async path => { const loaded = Page.loadEventFired(); await Page.navigate({ url: BASE + path }); await loaded; await coralReady(ev); };
         await load('/');
 
         console.log('1. Only the docs-img shape keeps its image');

@@ -2,13 +2,14 @@
 // container held, and treats the text as text, never as markup. Drives Chrome over CDP through agent_view_harness.js.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, ev, PRELOAD, install } = await connect();
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         const out = await ev(`(async () => {
             const { emptyState } = await import((window.__coralStatic || '/static/') + 'dom_write.js');
             const same = (build, old) => { const a = document.createElement('div'); const b = document.createElement('div'); build(a); b.innerHTML = old; return a.innerHTML === b.innerHTML; };

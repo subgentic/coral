@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 const S = `(window.__coralStatic || '/static/')`;
 
 (async () => {
@@ -15,7 +16,7 @@ const S = `(window.__coralStatic || '/static/')`;
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await api('POST', '/messages', { subscriber_id: 'Operator', as: 'Operator', content: 'a board for goals' });
         const g1 = await api('POST', '/goals', { subscriber_id: 'Operator', title: 'Ship it', done_when: 'it is shipped', outcome: 'Shipped.' });
         assert.equal(g1.status, 201, JSON.stringify(g1)); const id1 = g1.json.id || (g1.json.goal && g1.json.goal.id);

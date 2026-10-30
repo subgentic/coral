@@ -5,6 +5,7 @@ const { connect } = require('./agent_view_harness');
 const kb = require('./helpers/keyboard_census');
 const { axName } = require('./helpers/ax_tree');
 const { setupHubWorld, BASE } = require('./helpers/hub_world');
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor } = await connect();
@@ -22,7 +23,7 @@ const { setupHubWorld, BASE } = require('./helpers/hub_world');
         for (const [tag, w, mobile] of [['1280', 1280, false], ['390', 390, true]]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: mobile ? 844 : 800, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired();
-            await waitFor(`typeof window.switchNavTab==='function' && !!window.__coralReady`, 'dashboard'); await ev(`window.__coralReady.startup('liveList','settings')`);
+            await waitFor(`typeof window.switchNavTab==='function' && !!window.__coralReady`, 'dashboard'); await coralReady(ev, 'startup', 'liveList', 'settings');
             await ev(`window.switchNavTab('servers'); true`);
             await waitFor(`document.querySelectorAll('#servers-tab-body .cs-open').length >= 2`, `${tag}: the machines`, 10000);
             const rowName = await mark('#servers-tab-body .cs-open'); check(rowName && /^Open (Laptop|Desktop), (online|offline)/.test(rowName.name), `${tag}: the row button's name is "Open <name>, <state>": ${JSON.stringify(rowName)}`);

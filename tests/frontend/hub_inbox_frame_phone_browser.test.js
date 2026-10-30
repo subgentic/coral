@@ -10,13 +10,13 @@ const NAMES = { needs: 'Needs you', tasks: 'Tasks', saved: 'Saved for later' };
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor } = await connect();
-    const { settle } = require('./helpers/wait').bind(ev);
+    const { settle, coralReady } = require('./helpers/wait').bind(ev);
     const shot = async name => { const dir = process.env.CORAL_SCREENSHOT_DIR; if (!dir) return; fs.mkdirSync(dir, { recursive: true }); await settle(300); fs.writeFileSync(`${dir}/${name}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     const open = async (w, h, mobile, group) => {
         await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired();
         await waitFor(`typeof window.switchNavTab === 'function' && !!window.__coralReady`, 'the dashboard');
-        await ev(`window.__coralReady.startup('liveList', 'settings')`);
+        await coralReady('startup', 'liveList', 'settings');
         await ev(`window.switchNavTab('hub-inbox'); true`);
         await ev(`import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab(${JSON.stringify(group)})).then(() => true)`);
         await waitFor(`!!document.querySelector('#group-table-view iframe.inbox-frame')`, `the ${group} frame`, 10000);

@@ -4,6 +4,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 const SETS = {
     claude: ['Yes', "Yes, and don't ask again for: npm test:*", 'Yes, allow all edits during this session (shift+tab)', 'Yes, allow reading from src/ from this project', 'No'],
@@ -23,7 +24,7 @@ const SHOWN = { claude: ['Yes', 'No'], claudeLasting: ['Yes', 'No'], claudeTrust
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await ev(`window.__posts = []; window.__ask = 'ask-1'; window.__status = 200; window.__opts = ${JSON.stringify(SETS.claude)};
             const real = window.fetch; window.fetch = (u, o = {}) => { const url = String(u), m = (o.method || 'GET').toUpperCase();
                 if (m === 'POST' && /\\/answer-prompt$/.test(url)) { window.__posts.push(JSON.parse(o.body)); return Promise.resolve(new Response(JSON.stringify(window.__status === 200 ? { ok: true } : window.__status === 409 ? { error: 'That question changed; look at it again.', code: 'ask_changed' } : window.__status === 'late' ? { error: "The answer was sent, but the agent's prompt is still open. Check the terminal.", code: 'answer_sent_prompt_open' } : { error: "The prompt's selection didn't move to that option. Answer it in the terminal.", code: 'prompt_still_open' }), { status: window.__status === 'late' || window.__status === 'unmoved' ? 409 : window.__status, headers: { 'content-type': 'application/json' } })); }

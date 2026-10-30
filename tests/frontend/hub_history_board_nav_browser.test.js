@@ -6,7 +6,7 @@ const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const { safePaused } = require('./helpers/paused');
 const { BASE } = require('./test_base');
-const { framesJs } = require('./helpers/wait');
+const { framesJs, coralReady } = require('./helpers/wait');
 // Use the app's theme functions without the contrast helper's injected style
 // element: the Hub's CSP correctly rejects such an inline stylesheet.
 const setTheme = (ev, theme) => ev(`(async()=>{const m=await import((window.__coralStatic||'/static/')+'settings_core.js');m.clearCustomThemeVars();m.applyTheme(${JSON.stringify(theme)});await ${framesJs(2)};return true;})()`);
@@ -64,7 +64,7 @@ const CSP = ["default-src 'self'", "script-src 'self'", "style-src 'self'", "sty
     return json({});
    };
   })();`});
-  const boot=async path=>{await Page.navigate({url:BASE+path});await Page.loadEventFired();await waitFor(`typeof window.switchNavTab==='function' && !!window.__coralReady`,'dashboard');await ev(`window.__coralReady.startup('liveList','settings')`);};
+  const boot=async path=>{await Page.navigate({url:BASE+path});await Page.loadEventFired();await waitFor(`typeof window.switchNavTab==='function' && !!window.__coralReady`,'dashboard');await coralReady(ev, 'startup', 'liveList', 'settings');};
   const menu=async()=>{await ev(`document.getElementById('nav-select').click();true`);await waitFor(`!document.getElementById('nav-more-menu').hidden`,'phone nav');};
   await boot('/');
   for(const theme of ['light','dark']){

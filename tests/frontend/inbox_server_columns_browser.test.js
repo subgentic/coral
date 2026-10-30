@@ -4,6 +4,7 @@ const {connect}=require('./agent_view_harness');
 const {setTheme}=require('./helpers/contrast');
 const BASE=require('./test_base').BASE;
 const fs=require('node:fs'),path=require('node:path');
+const { coralReady } = require('./helpers/wait');
 const folders=['goals','tasks','chats-group','needs','saved','chats','artifacts'];
 (async()=>{
  const {client,Page,Emulation,ev,waitFor,PRELOAD,install}=await connect();const failures=[];
@@ -16,7 +17,7 @@ const folders=['goals','tasks','chats-group','needs','saved','chats','artifacts'
   for(const width of [1280,390]){
    await Emulation.setDeviceMetricsOverride({width,height:900,deviceScaleFactor:1,mobile:width===390});
    await Page.navigate({url:BASE+'/'});await Page.loadEventFired();await install();
-   await ev(`window.__coralReady.startup('liveList','liveListLoaded','settings')`);
+   await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
    await ev(`(async()=>{
     const {state}=await import((window.__coralStatic||'/static/')+'state.js');window.__serverState=state;
     state.hub=true;state.servers=[{id:'local',label:'Hub',status:'online'},{id:'box-2',label:'Remote box',name:'Remote box',status:'online'}];

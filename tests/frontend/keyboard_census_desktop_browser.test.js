@@ -16,6 +16,7 @@ const { GOALS_STUB, SHOW_ALL_GOALS } = require('./helpers/goals_stub');
 const { DATA_WORLD, httpJson, UPDATE_STAGED, CLOUD_LINKED, CLOUD_IDLE, CLOUD_WAITING } = require('./helpers/census_world');
 const { INBOX_WORLD } = require('./helpers/inbox_world');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 const TEAM = 'census-k-' + Date.now().toString(36);
 const S = `(window.__coralStatic || '/static/')`;
 const BUBBLES = [{ type: 'user', content: 'Is the build green?', key: 'c1', timestamp: '2026-10-19T00:00:00Z' }, { type: 'assistant', text: 'Yes. **All 12 checks pass.**\n\n- the unit tests\n- the lint\n\n`go test ./...` is clean, see [the run](https://example.com/run/1).\n\n```sh\ngo build ./...\n```', key: 'c2', timestamp: '2026-10-19T00:00:05Z' }];
@@ -38,7 +39,7 @@ const BUBBLES = [{ type: 'user', content: 'Is the build green?', key: 'c1', time
         if (!r.stops.length) found.push(`${name}: Tab reached no control at all`);
     };
     const tap = sel => tapSel(ev, sel);
-    const load = async () => { await Page.navigate({ url: 'about:blank' }); await Page.loadEventFired(); await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.startup('liveList', 'settings')`); };
+    const load = async () => { await Page.navigate({ url: 'about:blank' }); await Page.loadEventFired(); await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'settings'); };
     try {
         // The agent's folder is the Files list of the terminal view, and that list is the git changes of the folder's repository. The runner's tmp dir can sit inside a repository (epoch's does): Chrome's profile files and coral.log are then
         // changed files that arrive during the Tab walk, and each is a control no press reached (#10924, red on epoch). So the agent works in a folder that is its own repository, with one file in it, whatever the tmp dir is inside.

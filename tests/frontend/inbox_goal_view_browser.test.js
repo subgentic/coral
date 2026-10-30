@@ -5,6 +5,7 @@ const path = require('node:path');
 const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const board = 'goal-mount-' + Date.now().toString(36);
@@ -15,7 +16,7 @@ const BASE = require('./test_base').BASE;
         fs.mkdirSync(dir, { recursive: true });
         fs.writeFileSync(path.join(dir, name + '.png'), Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64'));
     };
-    const load = async url => { await Page.navigate({url: BASE + url}); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.startup('liveList','liveListLoaded','settings')`);
+    const load = async url => { await Page.navigate({url: BASE + url}); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
         // Review captures show the final theme, never an intermediate color in its transition.
         await ev(`(() => { const style = document.createElement('style'); style.textContent = '*, *::before, *::after { transition: none !important; animation: none !important; }'; document.head.append(style); return true; })()`);
     };

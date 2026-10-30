@@ -3,6 +3,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, PRELOAD, install } = await connect();
@@ -15,7 +16,7 @@ const BASE = require('./test_base').BASE;
             const at = `at ${w}px: `;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile });
             await Emulation.setTouchEmulationEnabled(mobile ? { enabled: true, maxTouchPoints: 5 } : { enabled: false });
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
             const m = await ev(`(() => { const rows = [...document.querySelectorAll('input.field, select.field, textarea.field')].map(e => { const c = getComputedStyle(e); return { cls: e.className, id: e.id, radius: c.borderTopLeftRadius, border: c.borderTopWidth + ' ' + c.borderTopColor, bg: c.backgroundColor, size: c.fontSize, minH: c.minHeight }; });
                 const t = document.createElement('i'); t.style.cssText = 'border-radius:var(--radius-lg);border:1px solid var(--control-border);background:var(--bg-primary);'; document.body.append(t); const c = getComputedStyle(t); const want = { radius: c.borderTopLeftRadius, border: c.borderTopWidth + ' ' + c.borderTopColor, bg: c.backgroundColor }; t.remove();
                 const legacy = ['sidebar-search-input', 'files-search-input', 'cost-time-select', 'list-bar-search', 'list-bar-select', 'view-list-select', 'viz-select', 'chat-find-input'].flatMap(k => [...document.querySelectorAll('.' + k)].filter(e => !e.classList.contains('field')).map(e => k));

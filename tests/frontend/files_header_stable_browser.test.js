@@ -2,6 +2,7 @@
 // rect before and after the first list is the same at a desktop, at 390 px and at 390 px with 200% text.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -19,7 +20,7 @@ const { connect } = require('./agent_view_harness');
             const at = `at ${w}px${zoom ? ' at 200% text' : ''}: `;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.then(() => true)`);
+            await coralReady(ev);
             if (zoom) await ev(`document.documentElement.style.fontSize = ${JSON.stringify(zoom)}; true`);
             await ev(`window.__m.add('hdr-bot', 'A', 3, { sleeping: false }); true`);
             await new Promise(r => setTimeout(r, 600)); // sleep-ok: the first live list renders from several answers; no single completion event

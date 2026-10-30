@@ -2,7 +2,7 @@
 // (a poll); choosing the agent again selects it and opens its chat. 1280 px, a desktop sidebar.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
-const { settle } = require('./helpers/wait');
+const { settle, coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -10,7 +10,7 @@ const { settle } = require('./helpers/wait');
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
-        await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         await ev(`window.__m.add('home-bot', 'A', 3, { sleeping: false }); true`); await settle(ev, 600); // sleep-ok: the first live list renders from several answers
         await ev(`window.selectLiveSession('home-bot', 'claude', 'home-bot-id', 'local'); true`);
         await waitFor(`getComputedStyle(document.getElementById('live-session-view')).display !== 'none'`, 'the agent page', 8000);

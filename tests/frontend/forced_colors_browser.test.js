@@ -11,6 +11,7 @@ const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
 const { stubFetch } = require('./helpers/comments_stub');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 const HEX = 'd'.repeat(64);
 const MD = '# Migration plan\n\n## Steps\n\n1. Add the new columns behind a flag and backfill in batches of 500 rows.\n2. Switch reads to the new columns.\n\n## Risks\n\nThe backfill takes a write lock on large databases, so it must run off-peak.\n';
 
@@ -21,7 +22,7 @@ const MD = '# Migration plan\n\n## Steps\n\n1. Add the new columns behind a flag
     const start = async (forced, dark) => {
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false }); await media(forced, dark);
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.startup('liveList', 'settings')`);
+        await coralReady(ev, 'startup', 'liveList', 'settings');
     };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });

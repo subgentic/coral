@@ -5,6 +5,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 const S = `(window.__coralStatic || '/static/')`;
 const MISSING = 'The base branch main does not exist in /work/repo. Its branches: master. Choose one under More options > Base Branch.';
 
@@ -18,7 +19,7 @@ const MISSING = 'The base branch main does not exist in /work/repo. Its branches
             const tag = `${w}px`;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.then(() => true)`);
+            await coralReady(ev);
             await ev(`(() => { const real = window.fetch; const json = (o, status) => Promise.resolve(new Response(JSON.stringify(o), { status: status || 200, headers: { 'Content-Type': 'application/json' } }));
                 window.__saves = []; window.__saveAnswer = null;
                 const job = { id: 5, name: 'nightly-agent', description: '', timezone: 'UTC', agent_type: 'claude', repo_path: '/work/repo', base_branch: 'main', prompt: 'Tidy.', enabled: 1, max_duration_s: 3600, cleanup_worktree: 0, flags: '', job_type: 'prompt', cron_expr: '0 2 * * *', next_fire_at: new Date(Date.now() + 3600000).toISOString(), consecutive_failures: 0, last_run: { id: 1, status: 'completed', started_at: new Date(Date.now() - 3600000).toISOString() } };
