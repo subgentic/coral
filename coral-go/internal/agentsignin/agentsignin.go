@@ -228,6 +228,13 @@ func CheckIn(ctx context.Context, agentType, bin, dir string) State {
 			return Unknown
 		}
 	}
+	if agentType == "opencode" {
+		envOf := opencodeEnvFunc()
+		if envOf == nil {
+			return Unknown // no folder of Coral's to ask about: never the person's own opencode
+		}
+		return runStatusEnv(ctx, bin, args, dir, sp.state, envOf)
+	}
 	return runStatus(ctx, bin, args, dir, sp.state)
 }
 
@@ -241,6 +248,11 @@ func CheckPiProvider(ctx context.Context, bin, provider string) State {
 
 // runStatus runs a CLI's status command (args) under the check's limits and reads its answer with state.
 func runStatus(ctx context.Context, bin string, args []string, dir string, state func(out, errOut []byte, runErr error) State) State {
+	return runStatusEnv(ctx, bin, args, dir, state, nil)
+}
+
+// runStatusEnv is runStatus with an environment of its own: envOf maps the usual (filtered) environment to the one the CLI runs in; nil leaves it.
+func runStatusEnv(ctx context.Context, bin string, args []string, dir string, state func(out, errOut []byte, runErr error) State, envOf func(base []string) []string) State {
 	cctx, cancel := context.WithTimeout(ctx, effectiveCheckTimeout())
 	defer cancel()
 	cmd := executil.Command(cctx, bin, args...)
@@ -251,8 +263,12 @@ func runStatus(ctx context.Context, bin string, args []string, dir string, state
 			cmd.Dir = dir
 		}
 	}
-	cmd.Env = agent.CLIEnv(agentenv.Filter(os.Environ()), bin) // an npm-installed CLI runs with its own node (#5899)
-	cmd.WaitDelay = 2 * time.Second                            // a child that holds the pipes open cannot hold this call
+	base := os.Environ()
+	if envOf != nil {
+		base = envOf(base)
+	}
+	cmd.Env = agent.CLIEnv(agentenv.Filter(base), bin) // an npm-installed CLI runs with its own node (#5899)
+	cmd.WaitDelay = 2 * time.Second                    // a child that holds the pipes open cannot hold this call
 	var out, errOut limited
 	cmd.Stdout = &out
 	cmd.Stderr = &errOut
@@ -540,6 +556,25 @@ func piState(out, _ []byte, _ error) State {
 	return Unknown
 }
 
+var (
+	opencodeEnvMu sync.Mutex
+	opencodeEnv   func(base []string) []string
+)
+
+// SetOpencodeEnv gives the sign-in check the environment opencode's credentials live in: the agent servers' own (their XDG folders, Coral's), not the person's. Until it is set, opencode is never asked
+// and its sign-in is Unknown: asking the person's own opencode would describe credentials an agent's server does not have.
+func SetOpencodeEnv(f func(base []string) []string) {
+	opencodeEnvMu.Lock()
+	defer opencodeEnvMu.Unlock()
+	opencodeEnv = f
+}
+
+func opencodeEnvFunc() func(base []string) []string {
+	opencodeEnvMu.Lock()
+	defer opencodeEnvMu.Unlock()
+	return opencodeEnv
+}
+
 // opencodeState reads `opencode auth list`: signed in when it shows at least one provider, signed out when it ran and showed none, Unknown when it did not run.
 func opencodeState(out, _ []byte, runErr error) State {
 	if runErr != nil {
@@ -588,13 +623,17 @@ func OpencodeProviders(ctx context.Context, bin string) map[string]bool {
 	if bin == "" {
 		return nil
 	}
+	envOf := opencodeEnvFunc()
+	if envOf == nil {
+		return nil // never the person's own opencode
+	}
 	var got map[string]bool
-	st := runStatus(ctx, bin, []string{"auth", "list"}, "", func(out, _ []byte, err error) State {
+	st := runStatusEnv(ctx, bin, []string{"auth", "list"}, "", func(out, _ []byte, err error) State {
 		if err == nil {
 			got = ParseOpencodeAuthList(out)
 		}
 		return opencodeState(out, nil, err)
-	})
+	}, envOf)
 	if st == Unknown || st == TimedOut {
 		return nil
 	}

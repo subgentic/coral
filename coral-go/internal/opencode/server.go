@@ -59,28 +59,34 @@ func (s *Server) PasswordEnv() string { return "OPENCODE_PASSWORD=" + s.password
 // Client is a client of the server.
 func (s *Server) Client() (*Client, error) { return New(s.URL, s.password) }
 
-// serverEnv is the environment of the server: the one an agent gets (agentenv.Filter: Coral's own variables, tokens, keys and the identity of whatever started Coral are not passed on), without any OPENCODE_ or XDG_
-// name of the person's own, plus only what opencode needs: the password and Coral's XDG folders.
-func serverEnv(inherited []string, dataDir, password, configFile string) []string {
+// ToolEnv is the environment opencode runs in for Coral, the server and anything that asks it about its own credentials (`opencode auth list`, `opencode auth login`): the one an agent gets (agentenv.Filter:
+// Coral's own variables, tokens, keys and the identity of whatever started Coral are not passed on), without any OPENCODE_ or XDG_ name of the person's own or any CORAL_ one, plus Coral's XDG folders. Its
+// credential store is Coral's, never the person's own opencode's: what is signed in there is what an agent's server has.
+func ToolEnv(inherited []string, dataDir string) []string {
 	var env []string
 	for _, kv := range agentenv.Filter(inherited) {
 		name, _, _ := strings.Cut(kv, "=")
-		// nothing of Coral's reaches the server either: agentenv.Filter keeps the CORAL_ variables an agent's tools read (CORAL_URL, CORAL_SESSION_NAME ...), which an opencode server has no use for
+		// nothing of Coral's reaches opencode either: agentenv.Filter keeps the CORAL_ variables an agent's tools read (CORAL_URL, CORAL_SESSION_NAME ...), which opencode has no use for
 		if strings.HasPrefix(strings.ToUpper(name), "OPENCODE_") || strings.HasPrefix(name, "XDG_") || strings.HasPrefix(strings.ToUpper(name), "CORAL_") {
 			continue
 		}
 		env = append(env, kv)
 	}
-	if configFile != "" {
-		env = append(env, "OPENCODE_CONFIG="+configFile)
-	}
 	return append(env,
-		"OPENCODE_PASSWORD="+password,
 		"XDG_CONFIG_HOME="+filepath.Join(dataDir, "config"),
 		"XDG_DATA_HOME="+filepath.Join(dataDir, "data"),
 		"XDG_CACHE_HOME="+filepath.Join(dataDir, "cache"),
 		"XDG_STATE_HOME="+filepath.Join(dataDir, "state"),
 	)
+}
+
+// serverEnv is the environment of one server: ToolEnv, the server's password, and its own config file when it has a model.
+func serverEnv(inherited []string, dataDir, password, configFile string) []string {
+	env := ToolEnv(inherited, dataDir)
+	if configFile != "" {
+		env = append(env, "OPENCODE_CONFIG="+configFile)
+	}
+	return append(env, "OPENCODE_PASSWORD="+password)
 }
 
 func freeLoopbackPort() (int, error) {

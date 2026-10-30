@@ -14,6 +14,7 @@ import (
 
 	"github.com/go-chi/cors"
 	"github.com/subgentic/coral/internal/agent"
+	"github.com/subgentic/coral/internal/agentsignin"
 	"github.com/subgentic/coral/internal/auth"
 	"github.com/subgentic/coral/internal/background"
 	"github.com/subgentic/coral/internal/cliauth"
@@ -225,7 +226,9 @@ func (s *Server) newRouteHandlers() *routeHandlers {
 	s.opencode = opencode.NewManager(opencode.Config{DataDir: filepath.Join(s.cfg.CoralDir(), "opencode")})          // the binary comes from the person's settings at each launch
 	s.opencode.SkipLast = func(m opencode.Message) bool { return m.Role == "user" && agent.IsCoralDelivery(m.Text) } // a nudge or task notice Coral typed is not what was said
 	sessHandler.SetOpencodeRuntime(s.opencode)
-	s.opencode.StartReaper(30*time.Second, 2*time.Minute, sessHandler.OpencodeAlive) // a server whose agent is gone, by a path that never said so, does not outlive it
+	opencodeDir := filepath.Join(s.cfg.CoralDir(), "opencode")
+	agentsignin.SetOpencodeEnv(func(base []string) []string { return opencode.ToolEnv(base, opencodeDir) }) // sign-in is asked of the agents' servers' own folder, not the person's opencode
+	s.opencode.StartReaper(30*time.Second, 2*time.Minute, sessHandler.OpencodeAlive)                        // a server whose agent is gone, by a path that never said so, does not outlive it
 	// The Operator's touches of agents are counted for the Analytics tab (#11225): which session, what kind, never what was typed. The terminal's person path, the answer, stop, wake and restart routes
 	// and the Operator's task approval write them; a session that is on no board is not recorded.
 	if s.boardStore != nil {
