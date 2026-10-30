@@ -75,6 +75,8 @@ type Runner struct {
 	SSH string
 	// Timeout bounds one command (default 30s).
 	Timeout time.Duration
+	// KeyScan is the ssh-keyscan program of the host-key step; empty means "ssh-keyscan" from the PATH.
+	KeyScan string
 }
 
 // Result is what a command printed and how it ended.
