@@ -240,10 +240,16 @@ export function addPendingMessage(sessionId, text, sentAt = Date.now(), { sendin
 // like this screen's own when the transcript has it. Each listed message is looked at once; one this screen sent itself (its own pending bubble has the same words), or that its transcript
 // already holds, is not shown twice.
 const adoptedSends = new Set();
+// The row keeps a message's first 1000 characters (pendingSendsRunes in routes/pending_sends.go): a long paste is listed cut. The cut copy is the beginning of the message this screen has whole, so it is the same
+// message (it was drawn as a second bubble, which the whole one then left stranded, #11166); and a transcript entry that holds the beginning, wrapped as Claude Code wraps a paste, is the message too.
+const PENDING_SENDS_RUNES = 1000;
 function isKnownSend(sessionId, text, at) {
     const want = pendingMatchText(text);
-    if ((pendingBySession.get(sessionId) || []).some(p => pendingMatchText(p.text) === want)) return true;
-    return (recentUserEntriesBySession.get(sessionId) || []).some(e => pendingMatchText(e.content) === want && (!Number.isFinite(at) || e.receivedAt >= at - 60000));
+    const cut = Array.from(String(text || '')).length >= PENDING_SENDS_RUNES;
+    const same = (have) => have === want || (cut && have.startsWith(want));
+    if ((pendingBySession.get(sessionId) || []).some(p => same(pendingMatchText(p.text)))) return true;
+    return (recentUserEntriesBySession.get(sessionId) || []).some(e => (!Number.isFinite(at) || e.receivedAt >= at - 60000)
+        && [e.content, unwrapPastedContent(e.content)].some(c => { const have = pendingMatchText(c); return have === want || (cut && have.includes(want)); }));
 }
 export function syncSendsFromRow(row) {
     if (!row || !row.session_id || !Array.isArray(row.pending_sends)) return;
