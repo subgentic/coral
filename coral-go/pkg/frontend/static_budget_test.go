@@ -22,7 +22,8 @@ const (
 	// 5.34 MiB (5,603,328 bytes) since the operator's approval (Oct 28, #10690): 96 KiB more, room for #10019's docs pictures, #10049, #10376 and #10558.
 	// 5.41 MiB (5,668,864 bytes) since the operator's approval (Oct 29, #11058's raise): 64 KiB more. The v2.0.6 tree is at 5,592,908 bytes (10,420 free) with the agent search levels UI (the Search chip and the Search access
 	// dialog, #11053: about 7 KB) and the phone chat screen in it, and the queued work (the one-row header, the keyboard fix, the Inbox Goals and Artifacts folders, Board history, #11063's model line: 1.5 KB) is more than that room.
-	staticBudget = 5<<20 + 416<<10
+	// 5.5 MiB (5,767,168 bytes) since the operator's approval (Oct 30, 2026): 96 KiB more, for Analytics (the Usage, Operator interaction and Team communication tabs and the cross-team pairs), the Option B provider cards, the phone navigation slices and the new-user fixes. Data Science's measurement: coral://artifacts/3cdd1b52eb860ae1e45e7aefcb140a8adbcf202451de1eb0685b7a90fe3386f3.
+	staticBudget = 5<<20 + 512<<10
 	// fileBudget is the most one embedded file may hold (the CodeMirror bundle, the largest, is ~1 MB).
 	fileBudget = 1536 << 10
 )
