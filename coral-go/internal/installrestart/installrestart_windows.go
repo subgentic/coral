@@ -65,13 +65,6 @@ func folderFor(exe string) (string, error) {
 	return folderUnder(local, exe), nil
 }
 
-// SetFolderForTest puts the mark's folder at dir until the returned function is called (for the tests of programs that use this package, which cannot reach the variable).
-func SetFolderForTest(dir string) (restore func()) {
-	old := folder
-	folder = func() (string, error) { return dir, nil }
-	return func() { folder = old }
-}
-
 // folderUnder is the mark's folder below the user's Local AppData folder local, for a program at exe.
 func folderUnder(local, exe string) string { return filepath.Join(local, productFolderName(exe)) }
 
@@ -308,6 +301,12 @@ func CreateLog(prefix string) (*os.File, error) {
 	if err != nil {
 		return nil, err
 	}
+	return CreateLogIn(dir, prefix)
+}
+
+// CreateLogIn is CreateLog for the folder dir (the same checks and the same way of creating the file): it lets a program's tests point the log at a test folder
+// without any way to change where the package puts its mark.
+func CreateLogIn(dir, prefix string) (*os.File, error) {
 	if err := makeFolder(dir); err != nil {
 		return nil, err
 	}

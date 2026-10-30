@@ -124,7 +124,7 @@ func TestAnElevatedRunLogsInTheMarkFolderNeverInTemp(t *testing.T) {
 	t.Setenv("TMP", temp)
 	t.Setenv("TEMP", temp)
 	mark := filepath.Join(t.TempDir(), "Coral")
-	t.Cleanup(installrestart.SetFolderForTest(mark))
+	logIn(t, mark)
 	stderr := os.Stderr
 	t.Cleanup(func() { log.SetOutput(stderr) })
 
@@ -147,12 +147,19 @@ func TestAnElevatedRunLogsInTheMarkFolderNeverInTemp(t *testing.T) {
 	link := filepath.Join(t.TempDir(), "Coral")
 	out, cerr := exec.Command("cmd", "/c", "mklink", "/J", link, target).CombinedOutput()
 	require.NoError(t, cerr, "mklink /J: %s", out)
-	t.Cleanup(installrestart.SetFolderForTest(link))
+	logIn(t, link)
 	closeLog = openLog()
 	log.Printf("not logged")
 	closeLog()
 	assert.Empty(t, mustGlob(t, filepath.Join(target, "*")), "nothing was created through the junction")
 	assert.Empty(t, mustGlob(t, filepath.Join(temp, "coral-msi-helper-*.log")), "no fallback to TEMP")
+}
+
+// logIn points the elevated log at dir for the test.
+func logIn(t *testing.T, dir string) {
+	old := createLog
+	createLog = func(prefix string) (*os.File, error) { return installrestart.CreateLogIn(dir, prefix) }
+	t.Cleanup(func() { createLog = old })
 }
 
 func mustGlob(t *testing.T, pattern string) []string {
