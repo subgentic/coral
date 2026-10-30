@@ -167,6 +167,10 @@ var columnMigrations = []struct {
 	// (tool_use_id for tool calls, API request id for thinking turns).
 	{"agent_events", "duration_ms", "INTEGER"},
 	{"agent_events", "ref_id", "TEXT"},
+	// Why the last start of the agent was refused ('cli_missing': its CLI is missing or can't be run, #353), kept apart from sleep_reason so an agent Coral stopped still auto-wakes at the next start once
+	// the CLI is fixed. NULL when the last start worked; cleared on wake. launched_at is when Coral last typed the agent's launch line (a wake included); NULL means created_at.
+	{"live_sessions", "start_failure", "TEXT"},
+	{"live_sessions", "launched_at", "TEXT"},
 }
 
 // reportForeignKeyOrphans logs rows of an encrypted database that break a foreign key

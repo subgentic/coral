@@ -403,6 +403,7 @@ func (h *SessionsHandler) restartCommand(ctx context.Context, p *restartPlan) (s
 	}
 	cliPath, cerr := agent.LaunchCLIScreened(userSettings, p.agentType, h.commonPlaceScreen(ctx)) // a broken cli_path_<agent> refuses the restart (#115)
 	if cerr != nil {
+		h.markStartRefused(ctx, p.stored, cerr) // only a sleeping agent is marked (#353)
 		refuse, _ := cliPathRefusal(ctx, cerr)
 		return "", refuse
 	}
@@ -620,6 +621,7 @@ func (h *SessionsHandler) restartRecord(ctx context.Context, p *restartPlan) {
 		}(),
 	})
 	h.noteLaunchedHooks(ctx, p.newSessionID, p.agentType) // #3665
+	h.noteStartSucceeded(ctx, p.newSessionID)
 	h.ss.MigrateDisplayName(ctx, p.req.SessionID, p.newSessionID)
 	h.ss.MigrateSessionTags(ctx, p.req.SessionID, p.newSessionID) // and its tags (#3216)
 	if p.sleeping != nil {
