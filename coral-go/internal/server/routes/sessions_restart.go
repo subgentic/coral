@@ -115,6 +115,12 @@ func (h *SessionsHandler) Restart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.restartRecord(ctx, plan)
+	// The Operator restarted an agent by hand (#11225): recorded once it has happened, for the session it is now (QA's #11225 INFO: not before the outcome is known).
+	if id := plan.newSessionID; id != "" {
+		h.touch(r, id, board.TouchRestart)
+	} else if plan.stored != nil {
+		h.touch(r, plan.stored.SessionID, board.TouchRestart)
+	}
 	out := map[string]any{"ok": true, "session_id": plan.newSessionID, "session_name": plan.newSessionName}
 	if plan.modeNotRecorded {
 		out["mode_note"] = "Its mode was not recorded: restarted in Default"

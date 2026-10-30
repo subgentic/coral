@@ -325,6 +325,7 @@ async function _refreshCalendarCost() {
 
 export async function _refreshCostDashboard({ force = false } = {}) {
     _watchCostTables();
+    if (force && TAB_VIEWS.has(state.analyticsView)) openTab(state.analyticsView, true); // Refresh on one of the three tabs reads it again (#11222)
     const { costRange, providerRows, modelRows, thinkingRows, agentRows } = await importOnce('./cost_data.js'); // the range and the rows, pure (#8359); loaded when the page first refreshes, as the page's other lazy parts are
     const period = document.getElementById('cost-time-range')?.value || 'day';
     const { hoursAgo, since, sinceParam, interval, tsParams } = costRange(period, Date.now());
@@ -539,7 +540,14 @@ async function _refreshOverview() {
     series.drawOverviewPanel(host, { phone: isPhoneLayout() });
 }
 
+const TAB_VIEWS = new Set(['usage', 'operator', 'comm']);
+async function openTab(key, force = false) {
+    const host = document.getElementById(`cost-${key}`);
+    if (!host) return;
+    try { const m = await importOnce('./analytics_tabs.js'); await m.showTab(key, host, force); } catch { host.textContent = 'This could not be loaded. Refresh the page to try again.'; }
+}
 document.addEventListener('cost-view-change', e => {
+    if (TAB_VIEWS.has(e.detail)) { openTab(e.detail); return; } // Usage, Operator interaction, Team communication: their own module and reads (#11222)
     if (e.detail !== 'overview') _setCompare(''); // the comparison is the Overview's: no other view says it
     if (SERIES_VIEWS[e.detail]) _refreshSeries(e.detail); else if (e.detail === 'overview') _refreshOverview();
 });

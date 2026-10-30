@@ -37,6 +37,7 @@ func (s *Server) configureBoardHandlers(h *routeHandlers) (*routes.BoardHandler,
 	sessHandler, teamsHandler := h.sess, h.teams
 	// Message board
 	boardHandler := routes.NewBoardHandler(s.boardStore)
+	boardHandler.SetTouches(s.touches) // the Operator's approval of a task is a touch (#11225); nil when the board store is not there
 	boardHandler.SetTerminal(s.terminal)
 	boardHandler.SetHubOperatorAllowed(func(r *http.Request) bool {
 		return s.cloudHandler != nil && s.cloudHandler.HubOperatorAllowed(r)
@@ -184,6 +185,9 @@ func (s *Server) registerBoardTaskRoutes(r chi.Router, boardHandler *routes.Boar
 	r.Get("/api/board/{project}/spend", spendHandler(s).Spend) // the Analytics view: tokens, commits on main, tool calls and task times (#7525); never through the Hub
 	// the Analytics view's tokens per commit and task time, grouped (#8915); never through Coral Hub
 	r.Get("/api/analytics/efficiency", routes.NewEfficiencyHandler(s.db, s.boardStore).Efficiency)
+	// the Analytics tabs Operator interaction and Team communication (#11222): counts from the board, the Hub owner only
+	activityHandler := routes.NewActivityHandler(s.boardStore)
+	r.Get("/api/analytics/activity", activityHandler.Activity)
 	// Goals (#7087): board text, written by the Operator or an orchestrator, readable like tasks.
 	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/goals", boardHandler.CreateGoal)
 	r.Get("/api/goals", boardHandler.ListAllGoals) // every board's goals (#7260), the Operator's; /api/goals/metrics is the Jobs metrics

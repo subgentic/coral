@@ -26,8 +26,8 @@ const BRANCHES = [{ repo_name: 'coral', branch: 'main', board_name: 'coral-go-te
 
 const TASKS = [{ id: 86091, title: 'Named agent task', status: 'completed', assigned_to: 'Backend Dev', priority: 'high', cost_usd: 1.25 },
     { id: 86092, title: 'Unassigned task', status: 'completed', assigned_to: null, priority: 'low', cost_usd: 0.5 }];
-const VIEWS = ['Overview', 'Tokens per commit', 'Task time', 'Tool and API calls']; // one entry per metric (#9236)
-const LISTED = ['Overview', 'Tokens per commit', 'Task time', 'Advanced']; // Tool and API calls is under Advanced (#10521)
+const VIEWS = ['Overview', 'Tokens per commit', 'Task time', 'Tool and API calls']; // one entry per metric (#9236): the views that use the header's Time range. Usage, Operator interaction and Team communication (#11222) carry their own Period (analytics_tabs_browser)
+const LISTED = ['Overview', 'Usage', 'Operator interaction', 'Team communication', 'Tokens per commit', 'Task time', 'Advanced']; // Tool and API calls is under Advanced (#10521)
 const GROUP_OF = { 'By provider': 'Provider', 'By model': 'Model', 'By thinking level': 'Thinking level', 'By team': 'Team', 'By agent': 'Agent', 'By branch': 'Branch', 'By task': 'Task' }; // the groupings are Overview's Group by (#9236), not sidebar entries
 const STUB = `(() => { const R = window.fetch; const json = b => Promise.resolve(new Response(JSON.stringify(b), { headers: { 'content-type': 'application/json' } }));
     window.fetch = (u, o) => { const url = String(u && u.url || u); window.__costReq = (window.__costReq || []).concat(url);
@@ -94,7 +94,7 @@ const STUB = `(() => { const R = window.fetch; const json = b => Promise.resolve
                 assert.equal(await ev(`document.querySelector('.cost-phone-back').textContent.trim()`), '\u2190 Analytics', at + 'with the way back to the list');
                 await ev(`document.querySelector('.cost-phone-back').click(); true`);
                 await waitFor(`document.getElementById('mobile-analytics-list').getClientRects().length > 0 && document.getElementById('cost-page').getClientRects().length === 0`, at + 'the way back is the list', 4000);
-                assert.deepEqual(await ev(`(() => { const rows = [...document.querySelectorAll('${pane} li')].filter(l => l.querySelector('.row-btn')); return [rows.length, [...new Set(rows.map(l => Math.round(l.getBoundingClientRect().height)))]]; })()`), [4, [44]], at + 'the views are the shared row: 44 px on a phone');
+                assert.deepEqual(await ev(`(() => { const rows = [...document.querySelectorAll('${pane} li')].filter(l => l.querySelector('.row-btn')); return [rows.length, [...new Set(rows.map(l => Math.round(l.getBoundingClientRect().height)))]]; })()`), [7, [44]], at + 'the views are the shared row: 44 px on a phone');
                 await shot(`analytics-one-list-${w}`);
                 await choose('By model');
                 await waitFor(`document.getElementById('cost-page').getClientRects().length > 0`, at + 'the view as a screen', 6000);
@@ -125,7 +125,7 @@ const STUB = `(() => { const R = window.fetch; const json = b => Promise.resolve
             assert.deepEqual(await ev(`[...new Set([...document.querySelectorAll('#cost-summary-cards .cost-card-label')].map(e => getComputedStyle(e).fontSize + '/' + getComputedStyle(e).fontWeight))]`), ['12px/500'], at + 'every tile label is 12/500');
             assert.equal(await ev(`document.querySelectorAll('#cost-summary-cards .cost-card').length`), 7, at + 'seven tiles');
             assert.deepEqual(await ev(`[...document.querySelectorAll('#cost-summary-cards .cost-card-value')].filter(v => { const r = document.createRange(); r.selectNodeContents(v); return new Set([...r.getClientRects()].map(x => Math.round(x.top))).size > 1; }).map(v => v.textContent)`), [], at + 'every figure is on one line, whole');
-            assert.deepEqual(await ev(`(() => { const rows = [...document.querySelectorAll('${pane} li')].filter(l => l.querySelector('.row-btn')); const h = [...new Set(rows.map(l => Math.round(l.getBoundingClientRect().height)))]; return [rows.length, h]; })()`), [4, [mobile ? 44 : 36]], at + 'the views are the shared sidebar row: 36 px on a desktop, 44 on a phone, the button is the row');
+            assert.deepEqual(await ev(`(() => { const rows = [...document.querySelectorAll('${pane} li')].filter(l => l.querySelector('.row-btn')); const h = [...new Set(rows.map(l => Math.round(l.getBoundingClientRect().height)))]; return [rows.length, h]; })()`), [7, [mobile ? 44 : 36]], at + 'the views are the shared sidebar row: 36 px on a desktop, 44 on a phone, the button is the row');
             assert.deepEqual(await ev(`[...document.querySelectorAll('#cost-dashboard-view [data-cview]')].filter(e => e.getClientRects().length).map(e => e.dataset.cview)`).then(a => [...new Set(a)]), ['overview'], at + 'only the Overview parts are shown');
             assert.deepEqual(await ev(`(() => { const t = getComputedStyle(document.querySelector('#cost-dashboard-view .cost-section[data-cview=overview] .cost-section-title')); return [t.fontSize, t.fontWeight]; })()`), ['14px', '600'], at + 'a section heading is 14/600');
             await waitFor(`document.querySelectorAll('#cost-spend-chart .spend-label').length === 6`, at + 'the cumulative chart labels', 5000);
