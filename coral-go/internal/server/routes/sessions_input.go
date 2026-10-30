@@ -174,7 +174,7 @@ func (h *SessionsHandler) markEndedAfterFailedSend(ctx context.Context, name, ag
 	if sessionID == "" || h.ss == nil {
 		return false
 	}
-	if exited, _ := ptymanager.AgentExited(ctx, h.terminal, name, agentType, sessionID); !exited {
+	if exited, _, _ := ptymanager.AgentExitedForLaunch(ctx, h.terminal, name, agentType, sessionID); !exited { // a shell of unknown contents is not marked ended (Security on #216)
 		return false
 	}
 	if err := h.ss.SetSessionSleepingFor(ctx, sessionID, store.SleepReasonAgentExited); err != nil {

@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -26,6 +27,11 @@ import (
 // ── Lifecycle ───────────────────────────────────────────────────────────
 
 func sendLaunchCommand(ctx context.Context, terminal ptymanager.SessionTerminal, target, command string) error {
+	// Read at the moment of typing, which may be a spaced start's later slot: a shell of unknown contents in the terminal (git-bash,
+	// WSL) gets no launch line (Security on #216).
+	if sh := ptymanager.UnknownShell(ctx, terminal, strings.TrimSuffix(target, ".0"), "", ""); sh != "" {
+		return errors.New(ptymanager.UnknownShellRefusal(sh))
+	}
 	send := terminal.SendToTarget
 	if q, ok := terminal.(ptymanager.QuietLauncher); ok {
 		send = q.SendQuietLaunchToTarget // one short line that sources a private script, which erases the screen first (#5911); the full line is in the server's log
