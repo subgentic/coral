@@ -1,5 +1,43 @@
 # Release Notes
 
+## v2.0.6 — search access levels for agents, Pi on par with the other agents, a phone UI in the style of Google Chat, a macOS update that installs, and a deleted board that stays deleted
+
+### Changes
+
+#### What you will notice first
+
+- **Search access levels** (#11048, #11053): each team member has a search reach, `own` by default, that only the Operator raises (`own`, `team`, `all`, `operator`). `coral-board search` finds messages on the agent's own board, and `coral-agent history search` and `context` take `--team`, `--all` and `--operator-history`. The dashboard has a Search chip (shown only above `own`) and a Search access dialog with a Recent access list; every raise is logged. The route is the Operator's alone and is never reachable through Coral Hub.
+- **A phone UI in the style of Google Chat** (#11056, #11096, #11116, #11128): under 640 px the agent page is one row (the menu button leads the header; Details is an overlay card), the Agents page has a round search pill and rows with an avatar, the time and a preview of the last message ("You: ..." or "<Name>: ..."), the chat composer is one line high until the text wraps, and Chrome on Android resizes the page for the keyboard. An empty home has a card for each kind; with agents, the + button opens New agent / New team.
+- **Pi agents are on par with the other agents** (#11084, #11088, #11091, #11092, #11105, #11107, #11109): chat text, working or idle state without hooks, model and thinking-level chips (`--thinking <level>`), History search, tool-call counts, provider-error notices, a sign-in check, `provider/id` model checks, a Coral hook extension with a quiet "Hooks not active" chip, the MCP view (Pi's `mcp.json`), and workflow steps and jobs.
+- **A macOS in-app update that quit Coral and installed nothing is fixed** (#11151, #11155): Coral's own tmux server no longer counts as "Coral still running"; a process list that could not be read is never taken as "nothing runs"; and an apply that ends with Coral still running starts the installed Coral again. The apply's answer is kept in `updates/apply.log`.
+- **A deleted board stays deleted** (#11007): a message, subscribe, task or goal is written with the board's row in one transaction, so a deleted board's row no longer comes back.
+- **A board paused by Sleep is resumed when one of its agents is awake** (#11182): after a restart, a board could stay paused with agents awake and no nudge went out.
+- **Hub notice** (#11146): `PUT /api/board/<board>/settings` now merges a partial health body: it changes only the fields it names, where it used to reset the rest.
+- **Old seats on another team's board** (#11112): Seats an agent made on another team's board before v2.0.5 are not removed by Coral. List them with `coral-board seats --foreign` and remove one with `coral-board leave --board <board> --as <name>`, run in your own terminal (not inside an agent), or with Remove from this board on the agent's page. Both are yours only and never reachable through Coral Hub.
+
+#### Inbox, Hub and teams
+
+- **The Hub's Inbox has Goals and Artifacts** (#11071): Goals is a native folder; Artifacts is hidden only when no computer allows it. A Hub with no computer online logs no console error (#11073).
+- **Board history shows a board's label, not its id** (#11070).
+- **Add agent and Add terminal on a team start in the team's home folder** (#11083), then the first member with a working folder, then the folder step.
+- **The Hub account menu comes from the Hub's nav** (#11106).
+- **A restarted agent keeps its team.**
+- **Show model also shows the thinking level** ("Opus 4.1 · High") (#11063).
+
+#### Update and agents
+
+- **The update dialog is a spinner and one line** after you confirm: "Coral is installing the update and will restart." (#11152). A staged release that is not newer than the installed one is dropped, never offered and never installed (#395).
+- **Agents are told never to `pkill` or `killall` by a pattern** (#11157): a pattern kill matched other agents' launch prompts and ended three agents in one second. Coral now logs every signal it sends and every tmux command that ends or replaces a pane, in `tray.log`.
+- **Search all chats from the phone's pill opens All chats**, not Needs you (#11153).
+
+#### Smaller changes
+
+- Startup: code blocks' page-wide listeners register when the first code block is drawn (#11032).
+- A task made from the team Tasks page is in its list at once, and the Sleep toast names the agent (#11051).
+- The Members table draws the Search column only while some member is above `own`.
+- The phone composer box is as tall as its text, and the phone's person bubble keeps readable text on a light phone when the Hub answers Dark (#11171, #11185).
+- The static budget rises 64 KiB to 5,668,864 bytes (operator approved, 2026-10-29).
+
 ## v2.0.5 — typed board notices carry only fixed words, an agent stays on its own team's board, a held hand-off waits for the turn's end, a send to a busy agent keeps trying, and a sleeping agent is a row
 
 ### Changes
