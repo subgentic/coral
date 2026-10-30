@@ -16,7 +16,7 @@ const FAKE = `(() => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const ok = name => console.log(`   ✓ ${name}`);
     const shown = () => ev(`(() => { const b = document.getElementById('local-auth-banner'); return !!b && !b.hidden && b.checkVisibility({ checkVisibilityCSS: true }); })()`);
-    const dismissBtn = () => ev(`(() => { const x = document.getElementById('local-auth-dismiss'); return x ? { shown: !x.hidden && x.getClientRects().length > 0, name: x.getAttribute('aria-label'), h: Math.round(x.getBoundingClientRect().height) } : null; })()`);
+    const dismissBtn = () => ev(`(() => { const x = document.getElementById('local-auth-dismiss'); return x ? { shown: !x.hidden && x.getClientRects().length > 0, name: (x.getAttribute('aria-label') || x.textContent).trim(), h: Math.round(x.getBoundingClientRect().height) } : null; })()`);
     const load = async () => { await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`); };
     try {
         await Page.enable();

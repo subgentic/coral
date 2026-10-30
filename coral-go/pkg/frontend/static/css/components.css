@@ -3194,7 +3194,6 @@ button.terminal-gone-header { margin: 0 4px 0 0; font-size: var(--fs-sm); line-h
 .local-auth-banner[hidden] { display: none; }
 .local-auth-banner .material-icons { flex: none; color: var(--error); font-size: var(--fs-2xl); }
 .local-auth-banner.notice-warn .material-icons { color: var(--warning); } /* no password, sign-in on: amber, not red (#10061) */
-.local-auth-banner .local-auth-dismiss .material-icons { color: inherit; font-size: var(--icon-size, 1.125rem); } /* the Dismiss's close glyph is a button's, not the notice's warning icon (#11258) */
 .local-auth-banner-text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 @media (max-width: 767px) { .local-auth-banner { flex-wrap: wrap; } .local-auth-banner-text { flex: 1 1 8em; } .local-auth-banner > .btn { flex: 1 1 100%; } } /* at 200% text the words beside the button were a column one or two letters wide: the button goes on its own row (#11026) */
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) { .leftover-tmux-banner { flex-wrap: wrap; } }

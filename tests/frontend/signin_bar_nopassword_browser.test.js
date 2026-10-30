@@ -33,7 +33,7 @@ const FAKE = `(() => {
             await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
             await waitFor(`!document.getElementById('local-auth-banner').hidden`, at + 'the bar when strict is on and no password is set', 15000);
             let b = await bar();
-            assert.ok(b.shown && b.role === 'note' && /No password/.test(b.text) && b.buttons.length === 2 && b.buttons[0] === 'Set a password' && b.buttons[1] === 'close', at + 'a bar says no password, with Set a password and a Dismiss (#11258: remembered; local_auth_banner_dismiss covers it): ' + JSON.stringify(b));
+            assert.ok(b.shown && b.role === 'note' && /No password/.test(b.text) && b.buttons.length === 2 && b.buttons[0] === 'Set a password' && b.buttons[1] === 'Dismiss', at + 'a bar says no password, with Set a password and a Dismiss (#11258: remembered; local_auth_banner_dismiss covers it): ' + JSON.stringify(b));
             assert.ok(b.right <= b.vw, at + 'it fits the screen: ' + JSON.stringify(b));
             assert.ok(!/setup code/.test(b.text), at + 'no word about other devices while remote access is off: ' + b.text);
             await ev(`import((window.__coralStatic || '/static/') + 'state.js').then(m => { m.state.privacyStatus = { remote_access_enabled: true }; }); true`); await recheck();
