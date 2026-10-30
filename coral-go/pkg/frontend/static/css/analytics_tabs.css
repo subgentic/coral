@@ -27,6 +27,9 @@
 .atab-grid { stroke: var(--border); stroke-width: .7; }
 .atab-stripe { fill: var(--bg-primary); }
 .atab-bar-stripe { pointer-events: none; }
+.atab-line { stroke: var(--accent); stroke-width: 2; }
+.atab-dot { fill: var(--accent); }
+.atab-end { paint-order: stroke; stroke: var(--bg-primary); stroke-width: 3px; fill: var(--text-primary); font-size: var(--fs-sm); font-weight: var(--fw-strong); }
 .atab-sel { fill: none; stroke: var(--text-primary); stroke-width: 1.2; stroke-dasharray: 3 2; pointer-events: none; }
 .atab-hit { fill: transparent; cursor: pointer; }
 
@@ -67,3 +70,4 @@
 /* The three tabs carry their own period; the page's Last 24 hours control and its line under the title belong to Overview and the views that use it. */
 #cost-dashboard-view:is([data-view="usage"], [data-view="operator"], [data-view="comm"]) :is(#cost-time-range, #cost-range-line) { display: none; }
 .atab-drill { align-self: flex-start; }
+.atab-trend { display: flex; flex-direction: column; gap: 8px; }

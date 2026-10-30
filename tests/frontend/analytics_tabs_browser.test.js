@@ -86,6 +86,8 @@ const TURNS = [{ timestamp: day(7) + 'T14:12:00.000Z', model: 'claude-fable-5-1'
             await open('operator'); await waitFor(`document.querySelectorAll('#cost-operator .atab-kpi').length >= 6`, 'Operator drawn ' + at, 10000);
             await run(`${at}: Operator interaction says what is not recorded yet, and the Operator's posts and asks are there`, async () => {
                 assert.match(await text('#cost-operator .atab-pending'), /Not recorded yet\./);
+                assert.equal(await ev(`document.querySelectorAll('#cost-operator .atab-trend').length`), 0, 'no trend line while the touches are not recorded');
+                assert.match(await text('#cost-operator'), /The trend needs every kind of touch/);
                 const k = await ev(`[...document.querySelectorAll('#cost-operator .atab-kpi')].map(x => x.textContent.replace(/\\s+/g, ' ').trim())`);
                 assert.ok(/Operator board posts\s*21/.test(k[0].replace(/(\\d)(\\D)/, '$1 $2')) || /Operator board posts/.test(k[0]), k[0]); assert.ok(/Asks to the Operator4/.test(k[2]) || /Asks to the Operator/.test(k[2]), k[2]);
                 assert.ok(/Touches \(all kinds\)/.test(k[5]) && /not recorded yet/.test(k[5]), 'the touches KPI is pending, not zero: ' + k[5]);
@@ -96,6 +98,9 @@ const TURNS = [{ timestamp: day(7) + 'T14:12:00.000Z', model: 'claude-fable-5-1'
                 await ev(`window.__activity = { ...window.__activity, touches: { kinds: {}, days: ${JSON.stringify(ACTIVITY.days.map(d => ({ day: d.day, typed: 3, answer: 1, approve: 1, wake: 0, restart: 1, stop: 0 })))}, agents: [{ name: 'Backend Dev', typed: 9 }], sources: { local: 60, hub: 5 } } }; (async () => { const m = await import((window.__coralStatic || '/static/') + 'cost_dashboard.js'); await m._refreshCostDashboard({ force: true }); return true; })()`);
                 await waitFor(`document.querySelectorAll('#cost-operator .atab-legend li').length === 7`, 'seven kinds', 8000);
                 assert.equal(await ev(`document.querySelectorAll('#cost-operator .atab-pending').length`), 0);
+                assert.ok(await ev(`!!document.querySelector('#cost-operator .atab-trend svg path.atab-line')`), 'the autonomy line is drawn');
+                assert.match(await text('#cost-operator .atab-trend'), /touches per task done in the 7 days to .*, against .* in the 7 days to .*Fewer is more autonomy/);
+                await shot(`operator-recorded-${w}-${theme}`);
                 assert.match(await text('#cost-operator .atab-kpi-pending, #cost-operator .atab-kpis'), /5 of them through Coral Hub/, 'the Hub share is said as such');
                 await ev(`window.__activity = ${JSON.stringify(ACTIVITY)}; (async () => { const m = await import((window.__coralStatic || '/static/') + 'cost_dashboard.js'); await m._refreshCostDashboard({ force: true }); return true; })()`);
                 await waitFor(`document.querySelectorAll('#cost-operator .atab-legend li').length === 1`, 'back', 8000);

@@ -159,6 +159,7 @@ function turnsTable(t) {
 
 /* ---- Operator interaction ---- */
 function pendingNote(text) { const n = el('p', 'atab-pending'); n.append(el('b', null, 'Not recorded yet. '), document.createTextNode(text)); return n; }
+const trendBody = (chart, line) => { const d = el('div', 'atab-trend'); d.append(chart, line); return d; };
 const kv = (label, value, note, extra) => ({ label, value, note, pending: value === D.NOT_RECORDED, ...extra });
 function drawOperator(m) {
     const o = D.operatorModel(m.data);
@@ -176,8 +177,13 @@ function drawOperator(m) {
     const chart = V.stackedBars(o.days, o.kinds, { fmt: D.fmtCount, phone: phone(), label: 'Operator touches over time' });
     const hero = V.panel('Operator touches over time', 'a day', chart, V.legend(o.kinds));
     const who = V.panel('Who needs the Operator', 'asks and @mentions of the Operator',
-        o.agents.length ? V.rankedBars(o.agents.slice(0, 8).map((g, i) => ({ name: g.name, value: g.need, i, text: `${g.asks} asks · ${g.toOperator} @mentions` }))) : say('No agent asked or @mentioned the Operator in this period.'));
-    if (phone()) out.push(hero, who); else out.push(rowOf(hero, who));
+        o.agents.length ? V.rankedBars(o.agents.slice(0, 8).map((g, i) => ({ name: g.name, value: g.need, i, text: `${g.asks} ${g.asks === 1 ? 'ask' : 'asks'} · ${g.toOperator} @${g.toOperator === 1 ? 'mention' : 'mentions'}` }))) : say('No agent asked or @mentioned the Operator in this period.'));
+    const tr = D.autonomyTrend(o.days);
+    const trend = V.panel('Autonomy', 'touches per task done, over 7 days', !o.recorded ? pendingNote('The trend needs every kind of touch. It appears when they are recorded.')
+        : !tr.enough ? say('The trend needs at least 8 days with a task done in them. Choose a longer period.')
+        : trendBody(V.lineChart(tr.points, { fmt: (v) => v.toFixed(1), phone: phone() }), say(`${tr.last.value.toFixed(1)} touches per task done in the 7 days to ${tr.last.label}, against ${tr.first.value.toFixed(1)} in the 7 days to ${tr.first.label}. Fewer is more autonomy.`)));
+
+    if (phone()) out.push(hero, trend, who); else out.push(rowOf(hero, trend), who);
     out.push(V.panel('Wait for the Operator', 'asks only', V.plainTable(['', 'Asks'], [['Asked', D.countWords(a && a.asked)], ['Answered', D.countWords(a && a.answered)], ['Not yet answered', D.countWords(a && Math.max(0, a.asked - a.answered))], ['Median wait', D.waitWords(a, 'median_s')], ['Slowest wait', D.waitWords(a, 'slowest_s')]], { right: [1], label: 'Wait for the Operator' }), o.recorded ? el('span') : pendingNote('Waits for a permission prompt are added with the recording.')));
     if (o.truncated) out.push(say(`This period holds more than ${D.fmtCount(50000)} messages; the first ones are counted.`));
     return out;

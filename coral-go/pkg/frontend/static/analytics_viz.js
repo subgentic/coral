@@ -1,5 +1,5 @@
 /* The drawing helpers of the Analytics tabs Usage, Operator interaction and Team communication (#11222): a KPI strip, a stacked bar chart one bar a day with a previous/next day picker, ranked bars,
- * a who-talks-to-whom grid. One look for all three: the series colours are Coral's --viz tokens, every series after the fourth also has a stripe so no two are told apart by colour alone,
+ * a line and a who-talks-to-whom grid. One look for all three: the series colours are Coral's --viz tokens, every series after the fourth also has a stripe so no two are told apart by colour alone,
  * every series is named in the legend, and the charts are aria-hidden: the picker, the ranked bars and the tables beside them are their text. Everything is built with the DOM and textContent:
  * names are written by agents. */
 
@@ -115,6 +115,23 @@ export function rankedBars(rows) {
         list.append(li);
     }
     return list;
+}
+
+/** A line over days: points [{label, value}] where a null value leaves a gap in the line; the last point is marked and named. */
+export function lineChart(points, { fmt = String, phone = false } = {}) {
+    const W = phone ? 360 : 440, H = 176, pl = 40, pb = 30, pt = 12, iw = W - pl - 14, ih = H - pb - pt;
+    const vals = points.map(p => p.value).filter(v => v != null), max = niceMax(Math.max(0, ...vals));
+    const svg = sv('svg', { viewBox: `0 0 ${W} ${H}`, class: 'atab-svg', 'aria-hidden': 'true', focusable: 'false' });
+    for (let g = 0; g <= 3; g++) { const y = pt + ih - ih * g / 3; svg.append(sv('line', { x1: pl, x2: W - 14, y1: y, y2: y, class: 'atab-grid' }), sv('text', { x: pl - 6, y: y + 4, 'text-anchor': 'end', class: 'atab-axis' }, fmt(max * g / 3))); }
+    const n = points.length, xy = points.map((p, i) => p.value == null ? null : [pl + (n > 1 ? iw * i / (n - 1) : iw / 2), pt + ih - ih * p.value / max]);
+    let d = '', pen = false;
+    xy.forEach(q => { if (!q) { pen = false; return; } d += (pen ? 'L' : 'M') + q[0].toFixed(1) + ',' + q[1].toFixed(1); pen = true; });
+    svg.append(sv('path', { d, class: 'atab-line', fill: 'none' }));
+    const step = Math.max(1, Math.ceil(n / (phone ? 4 : 6)));
+    points.forEach((p, i) => { if (i % step === 0) svg.append(sv('text', { x: (pl + (n > 1 ? iw * i / (n - 1) : iw / 2)).toFixed(1), y: H - 4, 'text-anchor': 'middle', class: 'atab-axis' }, p.label)); });
+    const last = xy.map((q, i) => q && i).filter(i => i !== null && i !== undefined).at(-1);
+    if (last != null) { const e = xy[last]; svg.append(sv('circle', { cx: e[0], cy: e[1], r: 4, class: 'atab-dot' }), sv('text', { x: e[0] - 7, y: e[1] - 9, 'text-anchor': 'end', class: 'atab-end' }, fmt(points[last].value))); }
+    return svg;
 }
 
 /** The who-talks-to-whom grid: names (rows send, columns receive), cells[i][j] counts. Cell text is always the page's text colour on a tint of at most 45% of the accent, so it holds 4.5:1 in both themes. On a phone the grid is
