@@ -184,13 +184,13 @@ func TestProvisionUnknownHostShowsTheScannedKeyAndTrustsOnlyThatAfterAccept(t *t
 	// no acceptance of the terms, or of the keys: nothing runs
 	code, _ = pe.do("POST", "/api/servers/provision/"+plan+"/run", map[string]any{"accept_keys": true})
 	assert.Equal(t, 400, code)
-	code, _ = pe.do("POST", "/api/servers/provision/"+plan+"/run", map[string]any{"accept_terms": true})
+	code, _ = pe.do("POST", "/api/servers/provision/"+plan+"/run", map[string]any{"accept_terms": true, "terms_sha256": terms.EULADigest()})
 	assert.Equal(t, 400, code)
 	_, err = os.Stat(pe.known)
 	assert.True(t, os.IsNotExist(err))
 
 	// a key sent by the browser is not read at all: the one trusted is the scanned one
-	code, v = pe.do("POST", "/api/servers/provision/"+plan+"/run", map[string]any{"accept_terms": true, "accept_keys": true, "host_keys": []map[string]string{{"host": "evil", "type": "ssh-ed25519", "blob": "AAAA"}}})
+	code, v = pe.do("POST", "/api/servers/provision/"+plan+"/run", map[string]any{"accept_terms": true, "terms_sha256": terms.EULADigest(), "accept_keys": true, "host_keys": []map[string]string{{"host": "evil", "type": "ssh-ed25519", "blob": "AAAA"}}})
 	require.Equal(t, 202, code, "%v", v)
 	b, err := os.ReadFile(pe.known)
 	require.NoError(t, err)
@@ -229,7 +229,7 @@ func TestProvisionRefusesAChangedHostKeyAndNeverOffersIt(t *testing.T) {
 	assert.Equal(t, "failed", v["phase"])
 	assert.Nil(t, v["host_keys"])
 	assert.Contains(t, v["error"], "has changed")
-	code, _ = pe.do("POST", "/api/servers/provision/"+plan+"/run", map[string]any{"accept_terms": true, "accept_keys": true})
+	code, _ = pe.do("POST", "/api/servers/provision/"+plan+"/run", map[string]any{"accept_terms": true, "terms_sha256": terms.EULADigest(), "accept_keys": true})
 	assert.Equal(t, 409, code)
 	_, err := os.Stat(pe.known)
 	assert.True(t, os.IsNotExist(err))
@@ -250,7 +250,7 @@ func TestProvisionDetectStopsOnAnUnsupportedSystemOrNoTmux(t *testing.T) {
 			plan := v["plan"].(string)
 			_, v = pe.do("POST", "/api/servers/provision/"+plan+"/connect", nil)
 			require.Equal(t, "connected", v["phase"], "%v", v)
-			code, _ := pe.do("POST", "/api/servers/provision/"+plan+"/run", map[string]any{"accept_terms": true})
+			code, _ := pe.do("POST", "/api/servers/provision/"+plan+"/run", map[string]any{"accept_terms": true, "terms_sha256": terms.EULADigest()})
 			require.Equal(t, 202, code)
 			failed := pe.waitPhase(t, plan, "failed")
 			assert.Contains(t, failed["error"], c.want)
@@ -310,7 +310,7 @@ func TestProvisionConnectAndRunAreAPersonsNotAScripts(t *testing.T) {
 		t.Errorf("a script's connect started ssh: %s", b)
 	}
 	_, _ = pe.do("POST", "/api/servers/provision/"+plan+"/connect", nil)
-	code, _ = pe.send(false, "POST", "/api/servers/provision/"+plan+"/run", map[string]any{"accept_terms": true, "accept_keys": true})
+	code, _ = pe.send(false, "POST", "/api/servers/provision/"+plan+"/run", map[string]any{"accept_terms": true, "terms_sha256": terms.EULADigest(), "accept_keys": true})
 	assert.Equal(t, 403, code)
 	_, err := os.Stat(pe.known)
 	assert.True(t, os.IsNotExist(err), "a script pinned a host key")
@@ -330,7 +330,7 @@ func TestProvisionTwoRunsAtOnceStartOne(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			code, _ := pe.do("POST", "/api/servers/provision/"+plan+"/run", map[string]any{"accept_terms": true})
+			code, _ := pe.do("POST", "/api/servers/provision/"+plan+"/run", map[string]any{"accept_terms": true, "terms_sha256": terms.EULADigest()})
 			mu.Lock()
 			codes[code]++
 			mu.Unlock()
@@ -357,7 +357,7 @@ func TestProvisionInstallFailureIsAFixedSentence(t *testing.T) {
 	_, v := pe.do("POST", "/api/servers/provision/plan", map[string]any{"target": "rich@box.example.com"})
 	plan := v["plan"].(string)
 	pe.do("POST", "/api/servers/provision/"+plan+"/connect", nil)
-	code, _ := pe.do("POST", "/api/servers/provision/"+plan+"/run", map[string]any{"accept_terms": true})
+	code, _ := pe.do("POST", "/api/servers/provision/"+plan+"/run", map[string]any{"accept_terms": true, "terms_sha256": terms.EULADigest()})
 	require.Equal(t, 202, code)
 	failed := pe.waitPhase(t, plan, "failed")
 	assert.Equal(t, "The release could not be verified, so nothing was installed.", failed["error"])
@@ -372,7 +372,7 @@ func TestProvisionInstallFailureIsAFixedSentence(t *testing.T) {
 	_, v = pe2.do("POST", "/api/servers/provision/plan", map[string]any{"target": "rich@box.example.com"})
 	plan = v["plan"].(string)
 	pe2.do("POST", "/api/servers/provision/"+plan+"/connect", nil)
-	pe2.do("POST", "/api/servers/provision/"+plan+"/run", map[string]any{"accept_terms": true})
+	pe2.do("POST", "/api/servers/provision/"+plan+"/run", map[string]any{"accept_terms": true, "terms_sha256": terms.EULADigest()})
 	failed = pe2.waitPhase(t, plan, "failed")
 	assert.Equal(t, "Could not install Coral on that computer.", failed["error"])
 	b, _ := json.Marshal(failed)
@@ -385,7 +385,7 @@ func runToEnd(t *testing.T, pe *provEnv, want string) map[string]any {
 	plan := v["plan"].(string)
 	_, v = pe.do("POST", "/api/servers/provision/"+plan+"/connect", nil)
 	require.Equal(t, "connected", v["phase"], "%v", v)
-	code, _ := pe.do("POST", "/api/servers/provision/"+plan+"/run", map[string]any{"accept_terms": true})
+	code, _ := pe.do("POST", "/api/servers/provision/"+plan+"/run", map[string]any{"accept_terms": true, "terms_sha256": terms.EULADigest()})
 	require.Equal(t, 202, code)
 	return pe.waitPhase(t, plan, want)
 }
@@ -451,4 +451,26 @@ func TestTermsPayloadAndLabelMatchWhatTheFarSideAccepts(t *testing.T) {
 	assert.Equal(t, terms.EULADigest(), p["sha256"])
 	assert.Equal(t, label, p["by"])
 	assert.Len(t, p, 3, "no other field: the far side refuses one")
+}
+
+func TestProvisionRunWantsTheDigestOfTheTermsThatWereShown(t *testing.T) {
+	pe := newProvEnv(t, "known", "Linux x86_64", true)
+	_, v := pe.do("POST", "/api/servers/provision/plan", map[string]any{"target": "rich@box.example.com"})
+	plan := v["plan"].(string)
+	pe.do("POST", "/api/servers/provision/"+plan+"/connect", nil)
+	for name, body := range map[string]map[string]any{
+		"none":       {"accept_terms": true},
+		"wrong":      {"accept_terms": true, "terms_sha256": strings.Repeat("0", 64)},
+		"upper case": {"accept_terms": true, "terms_sha256": strings.ToUpper(terms.EULADigest())},
+	} {
+		code, _ := pe.do("POST", "/api/servers/provision/"+plan+"/run", body)
+		assert.Equal(t, 409, code, name)
+	}
+	_, st := pe.do("GET", "/api/servers/provision/"+plan, nil)
+	assert.Equal(t, "connected", st["phase"], "a refused run changed the plan")
+	if b, err := os.ReadFile(pe.sshLog); err == nil && strings.Contains(string(b), "package.tar.gz") {
+		t.Error("a run with the wrong digest started work")
+	}
+	code, _ := pe.do("POST", "/api/servers/provision/"+plan+"/run", map[string]any{"accept_terms": true, "terms_sha256": terms.EULADigest()})
+	assert.Equal(t, 202, code)
 }

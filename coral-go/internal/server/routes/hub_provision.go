@@ -345,6 +345,8 @@ func (pr *Provisioner) fail(p *provisionPlan, step, sentence string) {
 type runRequest struct {
 	AcceptKeys  bool `json:"accept_keys"`  // the fingerprints shown are the ones the owner means to trust
 	AcceptTerms bool `json:"accept_terms"` // Set up: the terms the dialog shows are accepted
+	// TermsSHA256 is the digest of the terms text the dialog showed. The hub compares it with its own terms before it runs anything: an acceptance is of the text that was in front of the person.
+	TermsSHA256 string `json:"terms_sha256"`
 }
 
 // Run handles POST /api/servers/provision/{plan}/run. Pressing Set up is the acceptance of the terms the dialog shows (accept_terms must be true); keys held under the plan are trusted only when the
@@ -363,6 +365,10 @@ func (pr *Provisioner) Run(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, 1024)
 	if err := decodeJSON(r, &req); err != nil || !req.AcceptTerms {
 		errBadRequest(w, "Set up needs the terms accepted")
+		return
+	}
+	if req.TermsSHA256 != terms.EULADigest() {
+		errConflict(w, "The terms changed since you read them. Reload this page and read them again.")
 		return
 	}
 	// One critical section decides what happens: two requests cannot both start a run, or both trust the keys.

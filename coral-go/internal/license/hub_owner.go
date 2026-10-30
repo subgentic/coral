@@ -45,6 +45,10 @@ func RecordHubOwnerAcceptance(version, digest, by string) error {
 	if marker == "" {
 		return errors.New("license: no place to record the acceptance")
 	}
+	// A marker that already records acceptance of these exact terms is left as it is: a person at that computer accepted them in the dialog, and who accepted and when is theirs to keep.
+	if m, ok := readEULAMarker(); ok && !m.Legacy && m.Version == EULAVersion && m.Digest == terms.EULADigest() {
+		return nil
+	}
 	testguard.CheckDataPath(marker)
 	if err := os.MkdirAll(filepath.Dir(marker), 0o755); err != nil {
 		return err

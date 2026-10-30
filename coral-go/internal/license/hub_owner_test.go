@@ -71,3 +71,42 @@ func TestHubOwnerAcceptanceRefusesOtherTermsAndOddLabels(t *testing.T) {
 		t.Error("accepted after refusals")
 	}
 }
+
+// A person who accepted the terms in Coral's own dialog on that computer keeps their record: the hub's acceptance does not overwrite it.
+func TestHubOwnerAcceptanceNeverOverwritesAnExistingAcceptanceOfTheseTerms(t *testing.T) {
+	marker := markerAt(t)
+	if err := WriteEULAMarker(); err != nil { // the dialog's acceptance
+		t.Fatal(err)
+	}
+	before, err := os.ReadFile(marker)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := RecordHubOwnerAcceptance(EULAVersion, terms.EULADigest(), "hub-owner@build-host"); err != nil {
+		t.Fatal(err)
+	}
+	after, _ := os.ReadFile(marker)
+	if string(after) != string(before) || !strings.Contains(string(after), "source=dialog") {
+		t.Errorf("the marker was overwritten:\n%s\n--\n%s", before, after)
+	}
+	// the same for a hub's own earlier record
+	os.Remove(marker)
+	if err := RecordHubOwnerAcceptance(EULAVersion, terms.EULADigest(), "hub-owner@first"); err != nil {
+		t.Fatal(err)
+	}
+	first, _ := os.ReadFile(marker)
+	if err := RecordHubOwnerAcceptance(EULAVersion, terms.EULADigest(), "hub-owner@second"); err != nil {
+		t.Fatal(err)
+	}
+	if again, _ := os.ReadFile(marker); string(again) != string(first) || strings.Contains(string(again), "second") {
+		t.Errorf("a second acceptance replaced the first:\n%s", again)
+	}
+	// a marker for OTHER terms is not an acceptance of these: it is replaced by the new one
+	writeMarker(t, marker, "accepted\nversion=1999-01-01\nsha256="+strings.Repeat("0", 64)+"\nsource=dialog\n")
+	if err := RecordHubOwnerAcceptance(EULAVersion, terms.EULADigest(), "hub-owner@third"); err != nil {
+		t.Fatal(err)
+	}
+	if b, _ := os.ReadFile(marker); !strings.Contains(string(b), "accepted_by=hub-owner@third") {
+		t.Errorf("an acceptance of other terms was kept:\n%s", b)
+	}
+}
