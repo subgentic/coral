@@ -70,6 +70,9 @@ function draw(root, { sections, current }) {
     const stop = items.find(b => b.dataset.key === held) || items.find(b => b.getAttribute('aria-current') === 'true') || items[0];
     for (const b of nav.querySelectorAll('.view-list-item')) b.tabIndex = b === stop ? 0 : -1;
     if (held) stop?.focus({ preventScroll: true });
+    // The phone's tab strip (#11239): the open tab is brought into view when the view changes and when the strip is first drawn, with the tabs on either side showing it scrolls; a person's own scrolling is left alone by a redraw of the same view
+    const open = nav.querySelector('.view-list-item[aria-current="true"]'), key = open ? open.dataset.key : '';
+    if (open && root._shownKey !== key) { root._shownKey = key; if (!nav._wired) { nav._wired = true; for (const ev of ['pointerdown', 'touchstart', 'wheel', 'keydown']) nav.addEventListener(ev, () => { nav._touchedKey = nav.querySelector('.view-list-item[aria-current="true"]')?.dataset.key || ''; }, { passive: true }); } /* a person who has touched the strip keeps it where they put it until the open view changes */ nav._touchedKey = ''; const centre = () => { if (nav._touchedKey === key) return; if (nav.clientWidth && nav.scrollWidth > nav.clientWidth) nav.scrollLeft = Math.max(0, open.offsetLeft - (nav.clientWidth - open.offsetWidth) / 2); }; centre(); requestAnimationFrame(() => { centre(); requestAnimationFrame(centre); }); document.fonts?.ready.then(() => { if (root._shownKey === key) centre(); }); /* the strip's width settles with the page's layout and fonts */ }
 }
 
 function wireKeys(nav) {

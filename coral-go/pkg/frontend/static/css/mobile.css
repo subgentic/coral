@@ -1415,14 +1415,15 @@
     .phone-nav-slot.active { background: var(--bg-hover); }
     .phone-nav-slot svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
     .phone-nav-slot[data-phone-nav="nav-more"] svg { fill: currentColor; stroke: none; }
-    .phone-nav-badge { position: absolute; top: 0; right: 6px; background: var(--warning); color: var(--bg-primary); }
+    .phone-nav-badge { position: absolute; top: 0; right: 6px; background: var(--warning); color: var(--bg-primary); } 
+    body.large-text .phone-nav-badge { transform: scale(0.5); transform-origin: top right; } /* at 200% text the count stays a badge on the icon's corner: it does not grow over the icon (the Mobile Beta Tester) */
     .phone-nav-badge[hidden] { display: none; }
-    body.agent-home-active:not(.keyboard-open):not(.popout-mode) .phone-fab { position: fixed; right: 16px; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); z-index: 40; display: grid; place-items: center; width: 64px; height: 64px; padding: 0; border: 0; border-radius: 20px; background: var(--accent); color: var(--text-on-accent); box-shadow: 0 2px 14px rgba(var(--black-rgb), 0.22); cursor: pointer; }
+    body.agent-home-active:not(.keyboard-open):not(.popout-mode) .phone-fab, body[data-phone-fab="automations"]:not(.keyboard-open):not(.popout-mode) .phone-fab { position: fixed; right: 16px; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); z-index: 40; display: grid; place-items: center; width: 64px; height: 64px; padding: 0; border: 0; border-radius: 20px; background: var(--accent); color: var(--text-on-accent); box-shadow: 0 2px 14px rgba(var(--black-rgb), 0.22); cursor: pointer; }
     .phone-fab svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; }
-    body.phone-nav-on #mobile-agent-list, body.phone-nav-on #group-table-view, body.phone-nav-on #inbox-view, body.phone-nav-on #scheduler-view, body.phone-nav-on #workflows-view { padding-bottom: 112px; } /* the empty page's cards scroll clear of the nav too (the Mobile Beta Tester, #11116) */
+    body.phone-nav-on #mobile-agent-list, body.phone-nav-on #group-table-view, body.phone-nav-on #inbox-view:not([data-phone-item]), body.phone-nav-on #scheduler-view:not([data-phone-item]), body.phone-nav-on #workflows-view:not([data-phone-item]) { padding-bottom: 112px; } /* the empty page's cards scroll clear of the nav too (the Mobile Beta Tester, #11116) */
     body:has(#inbox-view[data-phone-item]) .phone-nav { display: none; } /* a task or a message opened in the Inbox is a page of its own: the nav goes while it is open */
     body.agent-home-active:has(#mobile-agent-list .empty-launch) .phone-fab { display: none; } /* an empty page has its own New agent button */
-    body.agent-home-active .phone-fab-menu:not([hidden]) { position: fixed; right: 16px; bottom: calc(92px + env(safe-area-inset-bottom, 0px)); z-index: 41; display: flex; flex-direction: column; min-width: 180px; }
+    body.agent-home-active .phone-fab-menu:not([hidden]), body[data-phone-fab="automations"] .phone-fab-menu:not([hidden]) { position: fixed; right: 16px; bottom: calc(92px + env(safe-area-inset-bottom, 0px)); z-index: 41; display: flex; flex-direction: column; min-width: 180px; }
 }
 
 @media (max-width: 600px) {
@@ -1450,4 +1451,8 @@
     body[data-hub-state] #mobile-agent-list .phone-account-btn::after { content: ''; position: absolute; right: 6px; bottom: 6px; width: 12px; height: 12px; box-sizing: border-box; border-radius: 50%; border: 2px solid var(--bg-primary); background: var(--text-muted); }
     body[data-hub-state="connected"] #mobile-agent-list .phone-account-btn::after { background: var(--success); }
     body[data-hub-state="disconnected"] #mobile-agent-list .phone-account-btn::after { background: var(--warning); }
+}
+@media (max-width: 600px) {
+    body[data-phone-fab="automations"] .automations-create, body[data-phone-fab="automations"] .automations-act { display: none; } /* the + at the bottom right makes a job or a workflow: the toolbar's create buttons are not drawn (#11239 slice A) */
+    body:has(#scheduler-view[data-phone-item]) .phone-nav, body:has(#scheduler-view[data-phone-item]) .phone-fab, body:has(#workflows-view[data-phone-item]) .phone-nav, body:has(#workflows-view[data-phone-item]) .phone-fab { display: none; } /* a job or a workflow opened is a page of its own (a drill-down): no nav and no + over its footer */
 }

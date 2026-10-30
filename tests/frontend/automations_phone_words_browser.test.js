@@ -35,9 +35,12 @@ const BASE = require('./test_base').BASE;
             await new Promise(r => setTimeout(r, 400)); // sleep-ok: the toolbar draws
             // (1) the create button says its words, and is a 44 px target on the screen
             const acts = async () => ev(`[...document.querySelectorAll('.automations-act')].filter(b => b.getClientRects().length > 0).map(b => { const r = b.getBoundingClientRect(); return { seen: b.innerText.replace(/\\s+/g, ' ').trim(), name: b.getAttribute('aria-label'), w: Math.round(r.width), h: Math.round(r.height), l: Math.round(r.left), r: Math.round(r.right) }; })`);
+            // a phone makes a job or a workflow with the one + at the bottom right (#11239 slice A): its menu says the words; a wide screen's toolbar buttons are the page's
+            const fabItems = async () => { await ev(`document.getElementById('phone-fab').click(); true`); await new Promise(r => setTimeout(r, 120)); /* sleep-ok: the menu draws */ const items = await ev(`[...document.querySelectorAll('#phone-fab-menu [role=menuitem]')].map(b => b.textContent.trim())`), box = await ev(`(() => { const r = document.getElementById('phone-fab').getBoundingClientRect(); return { w: Math.round(r.width), h: Math.round(r.height), r: Math.round(r.right) }; })()`); await ev(`document.body.click(); true`); return { items, box }; };
             let a = await acts();
-            check(a.length === 1 && /New job/.test(a[0].seen), `Jobs: the create button says New job in words (it shows ${JSON.stringify(a.map(x => x.seen))})`);
-            check(a.every(x => x.h >= (mobile ? 44 : 0) && x.l >= 0 && x.r <= w), `Jobs: each create button is 44 px tall and on the screen ${JSON.stringify(a)}`);
+            if (mobile) { const f = await fabItems(); check(a.length === 0 && f.items.includes('New job') && f.box.w >= 44 && f.box.h >= 44 && f.box.r <= w, `Jobs: the + says New job in words and the toolbar draws no create button (the + shows ${JSON.stringify(f)}, buttons ${JSON.stringify(a.map(x => x.seen))})`); }
+            else { check(a.length === 1 && /New job/.test(a[0].seen), `Jobs: the create button says New job in words (it shows ${JSON.stringify(a.map(x => x.seen))})`);
+            check(a.every(x => x.h >= (mobile ? 44 : 0) && x.l >= 0 && x.r <= w), `Jobs: each create button is 44 px tall and on the screen ${JSON.stringify(a)}`); }
             // (2) a paused job says Paused beside its name; the active one does not
             const rows = await ev(`[...document.querySelectorAll('#group-table-view tbody tr[data-key]')].map(r => ({ name: r.querySelector('.dt-primary').textContent.trim(), paused: [...r.querySelectorAll('.chip')].some(c => c.textContent.trim() === 'Turned off' && c.getClientRects().length > 0) }))`);
             check(rows.length === 2 && rows.find(r => r.name === 'weekly-cleanup').paused === true && rows.find(r => r.name === 'summarize-the-day').paused === false, `Jobs: only the turned-off job shows Turned off (${JSON.stringify(rows)})`);
@@ -46,8 +49,9 @@ const BASE = require('./test_base').BASE;
             await waitFor(`document.querySelectorAll('#group-table-view button.dt-primary').length === 2`, `${w}: the two workflows`, 10000);
             await new Promise(r => setTimeout(r, 400)); // sleep-ok: the toolbar draws
             a = await acts();
-            check(a.length === 2 && a.some(x => /Build with Agent/.test(x.seen)) && a.some(x => /New workflow/.test(x.seen)), `Workflows: Build with Agent and New workflow say their words (they show ${JSON.stringify(a.map(x => x.seen))})`);
-            check(a.every(x => x.h >= (mobile ? 44 : 0) && x.l >= 0 && x.r <= w), `Workflows: each create button is 44 px tall and on the screen ${JSON.stringify(a)}`);
+            if (mobile) { const f = await fabItems(); check(a.length === 0 && f.items.includes('New workflow') && f.items.some(i => /Build a workflow with an agent/.test(i)), `Workflows: the + says New workflow and Build a workflow with an agent (it shows ${JSON.stringify(f.items)}, buttons ${JSON.stringify(a.map(x => x.seen))})`); }
+            else { check(a.length === 2 && a.some(x => /Build with Agent/.test(x.seen)) && a.some(x => /New workflow/.test(x.seen)), `Workflows: Build with Agent and New workflow say their words (they show ${JSON.stringify(a.map(x => x.seen))})`);
+            check(a.every(x => x.h >= (mobile ? 44 : 0) && x.l >= 0 && x.r <= w), `Workflows: each create button is 44 px tall and on the screen ${JSON.stringify(a)}`); }
             // (3) a long name wraps at its words (narrow) or fits (wide), never an ellipsis mid-word
             const names = await ev(`[...document.querySelectorAll('#group-table-view button.dt-primary')].map(b => { const cs = getComputedStyle(b); return { t: b.textContent.trim(), cut: b.scrollWidth > b.clientWidth + 1, ellipsis: cs.textOverflow === 'ellipsis' && cs.whiteSpace === 'nowrap', h: Math.round(b.getBoundingClientRect().height) }; })`);
             if (mobile) check(names.every(n => !n.cut && !n.ellipsis), `Workflows: a long name wraps, it is not cut: ${JSON.stringify(names)}`);

@@ -62,13 +62,13 @@
 /* The phone's tabs: ONE pattern (#11236, #11239 slice A). Under 600 px the view list is a strip of text tabs under the bar, 44 px tall, the current one in the text colour with a 3 px accent underline and its count inside,
  * scrolling sideways with a fade at the edge, in place of the select and the drawer's button. Section titles are not drawn (a strip has no groups): the order is the sections' order. */
 @media (max-width: 600px) {
-    .view-list .view-list-nav { display: flex; flex-direction: row; gap: 0; overflow-x: auto; scrollbar-width: none; padding: 0; margin-bottom: 8px; background: none; border: 0; border-bottom: 1px solid var(--border); position: static; width: auto; }
+    .view-list .view-list-nav { display: flex; flex-direction: row; gap: 0; overflow-x: auto; scrollbar-width: none; padding: 0; margin-bottom: 8px; padding-right: 28px; scroll-padding-inline: 32px; -webkit-mask-image: linear-gradient(90deg, rgb(var(--black-rgb)) calc(100% - 28px), transparent); mask-image: linear-gradient(90deg, rgb(var(--black-rgb)) calc(100% - 28px), transparent); background: none; border: 0; border-bottom: 1px solid var(--border); position: static; width: auto; }
     .view-list .view-list-nav::-webkit-scrollbar { display: none; }
     .view-list .view-list-select, .view-list-drawer .view-list-trigger { display: none; }
     .view-list .view-list-title { display: none; }
     .view-list .vl-tab .view-list-label, .view-list .vl-tab.view-list-with-icon .view-list-label { display: flex; flex: none; min-width: auto; }
     .view-list .vl-tab .view-list-name, .view-list .vl-tab.view-list-with-icon .view-list-name { white-space: nowrap; overflow: visible; }
     .view-list .vl-tab .view-list-icon { display: none; } /* text tabs: the folder's glyph is for the column, not the strip */
-    .view-list .vl-tab { display: inline-flex; align-items: center; justify-content: center; gap: 6px; flex: none; width: auto; min-width: var(--control-touch-height, 44px); min-height: var(--control-touch-height, 44px); padding: 0 14px; border-radius: 0; background: none; border: 0; border-bottom: 3px solid transparent; color: var(--text-secondary); font-weight: var(--fw-medium); white-space: nowrap; }
+    .view-list .vl-tab { display: inline-flex; align-items: center; justify-content: center; gap: 6px; flex: none; width: auto; min-width: var(--control-touch-height, 44px); min-height: var(--control-touch-height, 44px); height: auto; padding: 0 14px; border-radius: 0; background: none; border: 0; border-bottom: 3px solid transparent; color: var(--text-secondary); font-weight: var(--fw-medium); white-space: nowrap; }
     .view-list .vl-tab.view-list-current { color: var(--text-primary); border-bottom-color: var(--accent); font-weight: var(--fw-strong); box-shadow: none; }
 }
