@@ -25,6 +25,12 @@ const inlineCommandLimit = 900
 // complete command from a temporary script. The script removes itself before
 // running the command; callers should remove it on delivery failure.
 func commandInvocation(command string, quiet bool) (invocation string, cleanup func(), err error) {
+	invocation, _, cleanup, err = commandHandoff(command, quiet)
+	return invocation, cleanup, err
+}
+
+// commandHandoff is commandInvocation that also returns the path of the script it wrote, which the session keeps to recognise the handoff PowerShell (#391).
+func commandHandoff(command string, quiet bool) (invocation, script string, cleanup func(), err error) {
 	// In the launch temp folder (private to this user and SYSTEM, #4381), not the shared %TEMP%, and created
 	// private: OpenNoFollow gives the new file this user and SYSTEM only, on the handle, before anything is
 	// written, and refuses a planted link at the path (#25 G2B). The script holds the launch line (paths,
@@ -33,7 +39,7 @@ func commandInvocation(command string, quiet bool) (invocation string, cleanup f
 	for attempt := 0; ; attempt++ {
 		var rnd [8]byte
 		if _, err := rand.Read(rnd[:]); err != nil {
-			return "", func() {}, fmt.Errorf("create command handoff: %w", err)
+			return "", "", func() {}, fmt.Errorf("create command handoff: %w", err)
 		}
 		// Digits only: cmdhandoff.Sweep removes the ones a shell never ran by that name.
 		path := filepath.Join(dir, "coral-command-"+strconv.FormatUint(binary.BigEndian.Uint64(rnd[:]), 10)+".ps1")
@@ -42,19 +48,19 @@ func commandInvocation(command string, quiet bool) (invocation string, cleanup f
 			if os.IsExist(err) && attempt < 5 {
 				continue
 			}
-			return "", func() {}, fmt.Errorf("create command handoff: %w", err)
+			return "", "", func() {}, fmt.Errorf("create command handoff: %w", err)
 		}
 		content, invocation := psHandoffWith(handoffShell(), path, command, quiet, quiet && cmdhandoff.KeepScripts())
 		if _, err := file.WriteString(content); err != nil {
 			file.Close()
 			os.Remove(path)
-			return "", func() {}, fmt.Errorf("write command handoff: %w", err)
+			return "", "", func() {}, fmt.Errorf("write command handoff: %w", err)
 		}
 		if err := file.Close(); err != nil {
 			os.Remove(path)
-			return "", func() {}, fmt.Errorf("close command handoff: %w", err)
+			return "", "", func() {}, fmt.Errorf("close command handoff: %w", err)
 		}
-		return invocation, func() { _ = os.Remove(path) }, nil
+		return invocation, path, func() { _ = os.Remove(path) }, nil
 	}
 }
 

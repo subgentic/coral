@@ -224,24 +224,27 @@ func (p *PTYSessionTerminal) SendQuietLaunchToTarget(ctx context.Context, o term
 	return p.sendLaunch(ctx, o, target, command, true)
 }
 
-func (p *PTYSessionTerminal) sendLaunch(_ context.Context, o terminalinput.Origin, target, command string, quiet bool) error {
+func (p *PTYSessionTerminal) sendLaunch(ctx context.Context, o terminalinput.Origin, target, command string, quiet bool) error {
 	ForgetSession(target) // what Coral remembers of the old process is not true of a new one
 	resolved := p.resolveSessionKey(target)
 	if quiet {
 		p.backend.ArmReplayClear(resolved) // the script's clear restarts the replay, this once
 	}
 	if quiet || len(command) > inlineCommandLimit {
-		invocation, cleanup, err := commandInvocation(command, quiet)
+		invocation, script, cleanup, err := commandHandoff(command, quiet)
 		if err != nil {
 			return err
 		}
+		p.backend.NoteLaunch(resolved, script, LaunchCLIOf(ctx)) // the session keeps the script it was launched with (#391)
 		if err := p.backend.SendLine(o, resolved, invocation); err != nil {
+			p.backend.NoteLaunch(resolved, "", "")
 			cleanup()
 			return err
 		}
 		p.backend.AdoptAgent(resolved) // the agent's process is recorded when it appears (#389)
 		return nil
 	}
+	p.backend.NoteLaunch(resolved, "", LaunchCLIOf(ctx)) // typed as it is: no handoff script for this launch
 	err := p.backend.SendLine(o, resolved, command)
 	if err == nil {
 		p.backend.AdoptAgent(resolved)

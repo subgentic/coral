@@ -47,6 +47,14 @@ func (h *SessionsHandler) resolvedCLI(ctx context.Context, agentType string) str
 	return cli
 }
 
+// withLaunchCLI marks a launch with the CLI path it is made with, so the terminal keeps it with the session (the Windows launcher cmd is compared with it later, not with the setting as it then is).
+func (h *SessionsHandler) withLaunchCLI(ctx context.Context, agentType string) context.Context {
+	if cli := h.resolvedCLI(ctx, agentType); cli != "" {
+		return ptymanager.WithLaunchCLI(ctx, cli)
+	}
+	return ctx
+}
+
 // noticesPaused is whether board notices are withheld from the terminal now, and why. A terminal that cannot say is not "paused" here: a record cannot fix it.
 func (h *SessionsHandler) noticesPaused(ctx context.Context, ls *store.LiveSession, name string) (paused bool, reason string) {
 	if h.terminal == nil || ls.AgentType == at.Terminal {
@@ -150,7 +158,7 @@ type leftAgent struct {
 }
 
 // RecordAgents: POST /api/sessions/record-agents (Operator only), after an update. Every agent whose notices are paused and whose single foreground program is its resolved CLI is
-// recorded. The match is the program's image path against the resolved CLI path, or an interpreter (node, bun, deno) running exactly the CLI file (the npm bin: for the one-time update of already-running agents); anything else (a script run by node, a wrapper, two programs, an unreadable image) is left paused
+// recorded. The match is the program's image path against the resolved CLI path, or (Windows) that it ran behind the recognised launcher cmd of the CLI (a shim's node), or an interpreter (node, bun, deno) running exactly the CLI file (the npm bin: for the one-time update of already-running agents); anything else (a script run by node, a wrapper, two programs, an unreadable image) is left paused
 // and listed.
 func (h *SessionsHandler) RecordAgents(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
@@ -202,7 +210,7 @@ func (h *SessionsHandler) RecordAgents(w http.ResponseWriter, r *http.Request) {
 			left = append(left, leftAgent{name, "the agent's CLI could not be resolved"})
 			continue
 		}
-		if !sameImage(cand.Image, cli) && !ptymanager.ScriptIsCLI(cand.Image, cand.Script, cli) {
+		if !cand.Launched && !sameImage(cand.Image, cli) && !ptymanager.ScriptIsCLI(cand.Image, cand.Script, cli) {
 			left = append(left, leftAgent{name, "ambiguous: the program is " + programName(cand) + ", not the resolved CLI (a script run by an interpreter, or a wrapper): record it with the button"})
 			continue
 		}

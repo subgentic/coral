@@ -564,7 +564,7 @@ func (h *SessionsHandler) restartLaunch(ctx context.Context, p *restartPlan, tar
 		// input limit while a fresh PTY is initializing.
 		where, what = p.newSessionName, "pty launch command failed"
 	}
-	if err := sendLaunchCommand(ctx, h.terminal, where, cmd); err != nil {
+	if err := sendLaunchCommand(h.withLaunchCLI(ctx, p.agentType), h.terminal, where, cmd); err != nil {
 		h.putSubscriptionBack(ctx, p.subscription)
 		return func(w http.ResponseWriter) { errInternalServer(w, fmt.Sprintf("%s: %v", what, err)) }
 	}
