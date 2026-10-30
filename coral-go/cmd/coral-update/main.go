@@ -98,6 +98,10 @@ func print(w io.Writer, o output) {
 
 // run is main without the process: args after the program name, the environment, and where the JSON goes. It returns the exit code.
 func run(args []string, getenv func(string) string, stdout io.Writer) int {
+	// verify-package checks a release the self-hosted hub downloaded (#11370); see verify_package.go. It has its own arguments and is not gated by the update switches.
+	if len(args) > 0 && args[0] == "verify-package" {
+		return runVerifyPackage(args[1:], stdout)
+	}
 	// status only reads the updater's own files: no network, and it answers when the feature is off.
 	if (len(args) == 1 && args[0] == "status") || (len(args) == 2 && args[0] == "status" && args[1] == "--json") {
 		return runStatus(args, getenv, stdout)
