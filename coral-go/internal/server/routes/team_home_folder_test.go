@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/subgentic/coral/internal/linktest"
 	"github.com/subgentic/coral/internal/naming"
 	"github.com/subgentic/coral/internal/ptr"
 	"github.com/subgentic/coral/internal/safefs"
@@ -115,7 +116,7 @@ func TestSetTeamHomeFolderResolvesLinks(t *testing.T) {
 	root := filepath.Join(handler.cfg.CoralDir(), "worktrees")
 	require.NoError(t, os.MkdirAll(root, 0o755))
 	elsewhere := t.TempDir()
-	require.NoError(t, os.Symlink(elsewhere, filepath.Join(root, "wt"))) // the team's own name, but a link out
+	linktest.Symlink(t, elsewhere, filepath.Join(root, "wt")) // the team's own name, but a link out
 	_, err := ts.CreateTeam(ctx, &store.Team{Name: "wt", ConfigJSON: "{}", WorkingDir: filepath.Join(root, "wt"), IsWorktree: 1})
 	require.NoError(t, err)
 	code, body := putHomeFolder(t, srv.URL, "wt", filepath.Join(root, "wt"))
@@ -123,7 +124,7 @@ func TestSetTeamHomeFolderResolvesLinks(t *testing.T) {
 
 	target := t.TempDir()
 	link := filepath.Join(t.TempDir(), "link-to-folder")
-	require.NoError(t, os.Symlink(target, link))
+	linktest.Symlink(t, target, link)
 	_, err = ts.CreateTeam(ctx, &store.Team{Name: "plain", ConfigJSON: "{}", WorkingDir: t.TempDir()})
 	require.NoError(t, err)
 	code, body = putHomeFolder(t, srv.URL, "plain", link)
@@ -133,7 +134,7 @@ func TestSetTeamHomeFolderResolvesLinks(t *testing.T) {
 	assert.NotEqual(t, link, got.WorkingDir)
 
 	dangling := filepath.Join(t.TempDir(), "dangling")
-	require.NoError(t, os.Symlink(filepath.Join(t.TempDir(), "gone"), dangling))
+	linktest.Symlink(t, filepath.Join(t.TempDir(), "gone"), dangling)
 	code, _ = putHomeFolder(t, srv.URL, "plain", dangling)
 	assert.Equal(t, http.StatusBadRequest, code, "a link to nothing is not a folder")
 }
@@ -149,7 +150,7 @@ func TestWakeResolvesTheTeamsFolderAgain(t *testing.T) {
 	elsewhere := t.TempDir()
 	team, err := ts.CreateTeam(ctx, &store.Team{Name: "wt", ConfigJSON: "{}", WorkingDir: filepath.Join(root, "wt"), IsWorktree: 1})
 	require.NoError(t, err)
-	require.NoError(t, os.Symlink(elsewhere, filepath.Join(root, "wt"))) // the worktree was swapped for a link out
+	linktest.Symlink(t, elsewhere, filepath.Join(root, "wt")) // the worktree was swapped for a link out
 	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: homeSID, AgentType: "claude", AgentName: "m", WorkingDir: own, IsSleeping: 1}))
 	require.NoError(t, ss.SetTeamID(ctx, homeSID, team.ID))
 	resp, err := http.Post(srv.URL+"/api/sessions/live/"+homeSID+"/wake", "application/json", strings.NewReader("{}"))
@@ -269,7 +270,7 @@ func TestWakeFollowsALinkedTeamFolderToWhereItReallyIs(t *testing.T) {
 	ctx := context.Background()
 	target := t.TempDir()
 	link := filepath.Join(t.TempDir(), "team-home")
-	require.NoError(t, os.Symlink(target, link))
+	linktest.Symlink(t, target, link)
 	team, err := ts.CreateTeam(ctx, &store.Team{Name: "linked", ConfigJSON: "{}", WorkingDir: link})
 	require.NoError(t, err)
 	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: homeSID, AgentType: "claude", AgentName: "m", WorkingDir: t.TempDir(), IsSleeping: 1}))
