@@ -2,7 +2,8 @@
 // opens the isolated server's dashboard, sets Group by Team, clicks the folder
 // group's "Kill all" and confirms. Prints one JSON line with the confirm text.
 //
-// usage: node kill_all_browser.js <base-url> <folder-key> <group-by-team: on|off> <expect-session-ids-csv>
+// usage: node kill_all_browser.js <base-url> <folder-key> <group-by-team: on|off> <expect-session-ids-csv> <sign-in-link> [desktop|phone]
+// The window is set to a desktop (1440x900) or a phone (390x844, touch) size, so the list the button is looked for in is the layout's own: #live-sessions-list on a desktop, #mobile-session-list on a phone (#11282).
 // The listed session ids must all be visible in the sidebar before it clicks.
 const fs = require('node:fs');
 const os = require('node:os');
@@ -12,7 +13,9 @@ const { createRequire } = require('node:module');
 
 // signInLink: a single-use 'coral open --print' link, opened first so the tab has the dashboard's
 // sign-in cookie (strict local auth, the default since #3936).
-const [base, folder, grouping, idsCsv, signInLink] = process.argv.slice(2);
+const [base, folder, grouping, idsCsv, signInLink, layoutArg] = process.argv.slice(2);
+const layout = layoutArg === 'desktop' ? 'desktop' : 'phone';
+const LIST = layout === 'desktop' ? '#live-sessions-list' : '#mobile-session-list';
 const log = m => console.error(`[kill-all-browser] ${m}`);
 const delay = ms => new Promise(r => setTimeout(r, ms));
 if (!/^http:\/\/(127\.0\.0\.1|localhost):\d+\/?$/.test(base || '') || Number(new URL(base).port) === 8420) {
@@ -43,7 +46,7 @@ function findChrome() {
         }
         if (!port) throw Error('Chrome debug port not ready in 20s');
         client = await CDP({ port });
-        const { Page, Runtime } = client;
+        const { Page, Runtime, Emulation } = client;
         const ev = async expression => {
             const r = await Runtime.evaluate({ expression, returnByValue: true, awaitPromise: true });
             if (r.exceptionDetails) throw Error(JSON.stringify(r.exceptionDetails).slice(0, 400));
@@ -54,6 +57,7 @@ function findChrome() {
             throw Error(`timed out waiting for ${what}`);
         };
         await Page.enable();
+        await Emulation.setDeviceMetricsOverride(layout === 'desktop' ? { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false } : { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
         if (signInLink) {
             await Page.navigate({ url: signInLink });
             await Page.loadEventFired();
@@ -68,8 +72,8 @@ function findChrome() {
         // so wait on the live list rather than on rows).
         await waitFor(`(async () => { const { state } = await import((window.__coralStatic || '/static/') + 'state.js'); const have = new Set((state.liveSessions || []).map(s => s.session_id)); return ${JSON.stringify(ids)}.every(id => have.has(id)); })()`, 'agents in the dashboard list');
         // The folder group's menu item is a registered action since #3645 (no inline onclick): data-on-click="group-kill",
-        // with the group in data-group. The headless window is narrow, so the dashboard shows its phone layout, where the same list is #mobile-session-list (#4497).
-        const button = `[...document.querySelectorAll('#live-sessions-list [data-on-click="group-kill"], #mobile-session-list [data-on-click="group-kill"]')].find(b => b.dataset.group === ${JSON.stringify(folder)})`;
+        // with the group in data-group. The window is set to the layout under test: on a phone the same list is #mobile-session-list (#4497), on a desktop #live-sessions-list.
+        const button = `[...document.querySelectorAll('${LIST} [data-on-click="group-kill"]')].find(b => b.dataset.group === ${JSON.stringify(folder)})`;
         await waitFor(`!!${button}`, `the "${folder}" group's Kill all`).catch(async e => { // say what the list does show: a changed group key or a list that did not render reads differently
             const seen = await ev(`JSON.stringify({ groups: [...document.querySelectorAll('[data-on-click="group-kill"]')].map(b => b.dataset.group), list: !!document.getElementById('live-sessions-list'), rows: document.querySelectorAll('#live-sessions-list > *').length })`);
             throw Error(`${e.message}; the page has ${seen}`);
