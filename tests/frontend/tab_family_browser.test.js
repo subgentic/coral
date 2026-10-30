@@ -24,19 +24,29 @@ const { coralReady } = require('./helpers/wait');
             const at = `at ${w}px: `;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile });
             await Emulation.setTouchEmulationEnabled(mobile ? { enabled: true, maxTouchPoints: 5 } : { enabled: false });
-            await Page.navigate({ url: BASE + `/team/${B}/goals/${G}` }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
-            await waitFor(`!!document.querySelector('#team-panel-goals #goal-tab-tasks') && !!document.querySelector('#team-tabs .tab[aria-selected=true]')`, 'the tab strips', 20000);
-            const m = await ev(`(() => { const g = el => { const cs = getComputedStyle(el), r = el.getBoundingClientRect(); return { cls: el.className, h: Math.round(r.height), size: cs.fontSize, weight: cs.fontWeight, color: cs.color, line: cs.borderBottomWidth + ' ' + cs.borderBottomColor }; };
+            const open = async url => { await Page.navigate({ url: BASE + url }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings'); };
+            if (mobile) await open(`/team/${B}/goals`); // a phone's goal page has its own bar and no team strip over it (#11239 slice B): the team strip is measured on the list, the goal's on the goal page
+            else await open(`/team/${B}/goals/${G}`);
+            await waitFor(mobile ? `!!document.querySelector('#team-tabs .tab[aria-selected=true]')` : `!!document.querySelector('#team-panel-goals #goal-tab-tasks') && !!document.querySelector('#team-tabs .tab[aria-selected=true]')`, 'the tab strips', 20000);
+            let m = await ev(`(() => { const g = el => { const cs = getComputedStyle(el), r = el.getBoundingClientRect(); return { cls: el.className, h: Math.round(r.height), size: cs.fontSize, weight: cs.fontWeight, color: cs.color, line: cs.borderBottomWidth + ' ' + cs.borderBottomColor }; };
                 const acc = (() => { const t = document.createElement('i'); t.style.color = 'var(--accent)'; document.body.append(t); const c = getComputedStyle(t).color; t.remove(); return c; })();
-                const team = [...document.querySelectorAll('#team-tabs .tab')].filter(t => t.getClientRects().length), goal = [...document.querySelectorAll('#team-panel-goals .goal-tabs .tab')];
                 const on = ts => ts.find(t => t.getAttribute('aria-selected') === 'true'), off = ts => ts.find(t => t.getAttribute('aria-selected') !== 'true');
-                const counts = [...document.querySelectorAll('.team-tab .tab-count, .goal-tab .tab-count')].filter(c => c.getClientRects().length).map(c => { const cs = getComputedStyle(c); return { size: cs.fontSize, weight: cs.fontWeight, radius: cs.borderTopLeftRadius }; });
+                const team = [...document.querySelectorAll('#team-tabs .tab')].filter(t => t.getClientRects().length), goal = [...document.querySelectorAll('#team-panel-goals .goal-tabs .tab')]; if (!goal.length) return { teamOn: g(on(team)), teamOff: g(off(team)), counts: [...document.querySelectorAll('.team-tab .tab-count')].filter(c => c.getClientRects().length).map(c => { const cs = getComputedStyle(c); return { size: cs.fontSize, weight: cs.fontWeight, radius: cs.borderTopLeftRadius }; }), acc, teamStrip: getComputedStyle(document.getElementById('team-tabs')).borderBottomWidth };
+                                const counts = [...document.querySelectorAll('.team-tab .tab-count, .goal-tab .tab-count')].filter(c => c.getClientRects().length).map(c => { const cs = getComputedStyle(c); return { size: cs.fontSize, weight: cs.fontWeight, radius: cs.borderTopLeftRadius }; });
                 return { acc, teamOn: g(on(team)), teamOff: g(off(team)), goalOn: g(on(goal)), goalOff: g(off(goal)), counts, teamStrip: getComputedStyle(document.getElementById('team-tabs')).borderBottomWidth }; })()`);
             if (mobile) { // #9377: at 200% text the team tabs are wider than the strip: it says which edge hides more, with the text size changed after the page loaded
                 await ev(`document.documentElement.style.fontSize = '32px'; true`); await new Promise(r => setTimeout(r, 500)); // sleep-ok: the observer draws the cue after the reflow
                 const cue = await ev(`(() => { const s = document.getElementById('team-tabs'); return { scrolls: s.scrollWidth > s.clientWidth + 1, more: s.getAttribute('data-more') || '' }; })()`);
                 assert.ok(cue.scrolls && cue.more, 'the team tabs scroll at 200% text and fade the hidden edge: ' + JSON.stringify(cue));
                 await ev(`document.documentElement.style.fontSize = ''; true`);
+            }
+            if (mobile) {
+                await open(`/team/${B}/goals/${G}`); await waitFor(`!!document.querySelector('#team-panel-goals #goal-tab-tasks')`, 'the goal tabs', 20000);
+                const gm = await ev(`(() => { const g = el => { const cs = getComputedStyle(el), r = el.getBoundingClientRect(); return { cls: el.className, h: Math.round(r.height), size: cs.fontSize, weight: cs.fontWeight, color: cs.color, line: cs.borderBottomWidth + ' ' + cs.borderBottomColor }; };
+                    const goal = [...document.querySelectorAll('#team-panel-goals .goal-tabs .tab')], on = goal.find(t => t.getAttribute('aria-selected') === 'true'), off = goal.find(t => t.getAttribute('aria-selected') !== 'true');
+                    const counts = [...document.querySelectorAll('.goal-tab .tab-count')].filter(c => c.getClientRects().length).map(c => { const cs = getComputedStyle(c); return { size: cs.fontSize, weight: cs.fontWeight, radius: cs.borderTopLeftRadius }; });
+                    return { goalOn: g(on), goalOff: g(off), counts }; })()`);
+                m = { ...m, ...gm, counts: [...m.counts, ...gm.counts] };
             }
             const want = mobile ? 44 : 40;
             for (const [n, t] of [['team', m.teamOn], ['goal', m.goalOn]]) {
