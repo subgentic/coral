@@ -59,7 +59,7 @@ if $APPLY && [ -n "$old" ]; then echo "$old" | while IFS= read -r d; do rm -rf -
 
 # 2. the worktrees
 [ -d "$ROOT" ] || { say "worktrees: no folder $ROOT"; exit 0; }
-MAIN="$(git -C "$(dirname "$0")" rev-parse --show-toplevel 2>/dev/null)"
+MAIN="${CORAL_REPO:-$(git -C "$(dirname "$0")" rev-parse --show-toplevel 2>/dev/null)}"  # CORAL_REPO: a copy of the script outside a checkout (the launchd agent)
 [ -n "$MAIN" ] || { say "worktrees: run from a checkout of coral"; exit 0; }
 git -C "$MAIN" fetch -q origin main 2>/dev/null || say "worktrees: could not fetch origin/main; using the local ref"
 git -C "$MAIN" rev-parse -q --verify origin/main >/dev/null || { say "worktrees: no origin/main"; exit 0; }
