@@ -222,7 +222,7 @@ function openCreate() {
     const where = el('p', 'goals-note', `Created on this board: ${keyLabel(model.project)}`);
     const go = btn('btn btn-primary', 'Create goal'); go.type = 'submit';
     const cancel = btn('btn', 'Cancel', () => dlg.close());
-    form.append(title, field('Title (required)', t, 'goal-new-title'), field('Done when (optional): what a person can check', d, 'goal-new-done'), field('Driver (optional)', dr, 'goal-new-driver'), driverNote, where, err, el('div', 'goals-actions'));
+    form.append(title, field('Title (required)', t, 'goal-new-title'), field('Done when (optional): what a person can check', d, 'goal-new-done'), field('Driver, the agent who looks after it (optional)', dr, 'goal-new-driver'), driverNote, where, err, el('div', 'goals-actions'));
     form.querySelector('.goals-actions').append(cancel, go);
     dlg.append(form); document.body.append(dlg);
     readJson('/subscribers').then(json => {

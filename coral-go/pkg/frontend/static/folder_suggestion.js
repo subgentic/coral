@@ -20,13 +20,28 @@ export function usesSuggestion(input) {
     return !!(input && input.dataset.suggested && input.value.trim() === input.dataset.suggested);
 }
 
-/** Fill `input` with the suggestion and show `line`, when the field is empty (or still the earlier suggestion), the server is this one and no recent folder exists. */
-export function offerSuggestion(input, line, name) {
+/** True when every recent folder is one Coral made under <root>/Coral/ (a person who has only used the suggestions has chosen no folder of their own, #11336). */
+export function onlyCoralMadeRecents(root, recents) {
+    const r = String(root || '').replace(/[\\/]+$/, '');
+    return !!r && recents.length > 0 && recents.every(d => { const x = String(d || '').replace(/\\/g, '/'); return x.startsWith(`${r.replace(/\\/g, '/')}/Coral/`); });
+}
+
+/** A name under <root>/Coral/ that no recent folder uses: first-team, first-team-2, ... */
+function freshFolder(root, name, recents) {
+    const taken = new Set(recents.map(d => String(d || '').replace(/[\\/]+$/, '')));
+    for (let n = 1; n < 100; n++) { const f = suggestedFolder(root, n === 1 ? name : `${name}-${n}`); if (f && !taken.has(f)) return f; }
+    return suggestedFolder(root, name);
+}
+
+/** Fill `input` with the suggestion and show `line`, when the field is empty (or still the earlier suggestion), the server is this one and no recent folder exists. With `afterCoralMade` the recent
+ *  folders being only ones Coral itself made (the first agent's) is no reason to leave the field empty: a team is offered its own new folder beside them (#11336). */
+export function offerSuggestion(input, line, name, { afterCoralMade = false } = {}) {
     if (!input || input.dataset.dirServer) return;
     const now = input.value.trim();
     if (now && !usesSuggestion(input)) { showLine(input, line, false); return; }
-    if (getRecentDirs(LOCAL_SERVER).length) { if (usesSuggestion(input)) { input.value = ''; delete input.dataset.suggested; } showLine(input, line, false); return; }
-    const dir = suggestedFolder(input.dataset.coralRoot, name);
+    const recents = getRecentDirs(LOCAL_SERVER), mayOffer = !recents.length || (afterCoralMade && onlyCoralMadeRecents(input.dataset.coralRoot, recents));
+    if (!mayOffer) { if (usesSuggestion(input)) { input.value = ''; delete input.dataset.suggested; } showLine(input, line, false); return; }
+    const dir = recents.length ? freshFolder(input.dataset.coralRoot, name, recents) : suggestedFolder(input.dataset.coralRoot, name);
     if (!dir) return;
     input.value = dir; input.dataset.suggested = dir;
     input.dispatchEvent(new Event('input', { bubbles: true }));

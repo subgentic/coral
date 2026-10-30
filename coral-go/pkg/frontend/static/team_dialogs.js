@@ -94,7 +94,7 @@ function _syncTeamMembers() {
     });
     const empty = document.querySelector('#team-panel-members .empty-state.empty-state-tight'); if (empty) empty.hidden = rows.length > 0;
     const count = document.getElementById('team-agents-count');
-    if (count) count.textContent = rows.length ? `${rows.length} ${rows.length === 1 ? 'member' : 'members'}. Select one to edit it.` : '';
+    if (count) count.textContent = rows.length ? `${rows.length} ${rows.length === 1 ? 'member' : 'members'}. Select one to edit it. The Orchestrator plans the work and hands tasks to the others.` : '';
     const line = document.getElementById('team-orchestrator-line'); if (line) line.hidden = hasOrchestrator();
     showTeamWorkers(rows.some(r => !isOrchestrator(rowRole(r))));
     _syncTeamGate();
@@ -407,7 +407,7 @@ async function _initTeamForm() {
     if (goalEl) goalEl.value = "";
     if (launch.server !== LOCAL_SERVER) _resetDirInputs(['launch-team-dir'], launch.server, s, { switching: true });
     else if (s.default_working_dir && dirInput) dirInput.value = s.default_working_dir;
-    else if (dirInput) { delete dirInput.dataset.suggested; offerSuggestion(dirInput, document.getElementById('launch-team-dir-suggest'), 'first-team'); } // a first team has a folder to say yes to (#11258)
+    else if (dirInput) { delete dirInput.dataset.suggested; offerSuggestion(dirInput, document.getElementById('launch-team-dir-suggest'), 'first-team', { afterCoralMade: true }); } // a first team has a folder to say yes to (#11258), and so does one after the first agent: its own new folder beside the one Coral made (#11336)
     if (dirInput && !dirInput.dataset.suggestWired) { dirInput.dataset.suggestWired = '1'; dirInput.addEventListener('input', () => syncSuggestionLine(dirInput, document.getElementById('launch-team-dir-suggest'))); }
 
     // Show worktree option when directory is a git repo (checked on the target server)

@@ -162,9 +162,9 @@
 
     <!-- #4291: local sign-in is off, or no password is set (local_auth_banner.js, #10061). A strip across the top, like the tmux banner below, and not a child of .main-content: the
          views in it are counted and sized, and its height is settled before the terminal is sized. The red sign-in-off banner has no close button (a risk, not a nudge); the amber no-password one can be dismissed, and that is remembered (#11258). -->
-    <div id="local-auth-banner" class="notice notice-error notice-bar local-auth-banner" role="note" hidden>
+    <div id="local-auth-banner" class="notice notice-error notice-bar notice-compact local-auth-banner" role="note" hidden>
         <span class="material-icons" aria-hidden="true">warning</span>
-        <div class="local-auth-banner-text"><span data-auth-state="off"><b>Sign-in is off:</b> any program on this computer can use Coral without a password.</span><span data-auth-state="nopw" hidden><b>No password is set.</b> The Coral app opens without one; a browser needs a password to sign in.<span id="local-auth-remote" hidden> Other devices sign in with the setup code (Settings, Network and Hub).</span></span></div>
+        <div class="local-auth-banner-text"><span data-auth-state="off"><b>Sign-in is off:</b> any program on this computer can use Coral without a password.</span><span data-auth-state="nopw" hidden><b>No password is set.</b><span class="local-auth-more"> The Coral app opens without one; a browser needs a password to sign in.<span id="local-auth-remote" hidden> Other devices sign in with the setup code (Settings, Network and Hub).</span></span></span></div>
         <button type="button" class="btn btn-small" id="local-auth-set-password" data-on-click="local-auth-set-password" hidden>Set a password</button>
         <button type="button" class="btn btn-small local-auth-dismiss" id="local-auth-dismiss" hidden>Dismiss</button>
     </div>
