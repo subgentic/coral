@@ -26,14 +26,19 @@ var rawOutput bool
 
 func init() {
 	serverURL = endpointFromEnv(os.Getenv("CORAL_URL"), os.Getenv("CORAL_HOST"), os.Getenv("CORAL_PORT"))
+}
+
+// resolveLocalServer is the plain-terminal case: with no CORAL_URL, CORAL_HOST or CORAL_PORT, the running server's recorded address, else the platform's default port
+// (8450 on Windows), only if it answers as a Coral; otherwise the command stops with the reason (serverURLErr, checked in main) and sends nothing anywhere. It runs in
+// main, not init: it asks the network, and a test binary's init must not.
+func resolveLocalServer() {
 	if os.Getenv("CORAL_URL") == "" && os.Getenv("CORAL_HOST") == "" && os.Getenv("CORAL_PORT") == "" {
-		// a plain terminal: the running server's recorded address, else the platform's default port (8450 on Windows), only if it answers as a Coral;
-		// otherwise the command stops with the reason (serverURLErr, checked in main) and sends nothing anywhere.
 		serverURL, serverURLErr = config.LocalServer()
 	}
 }
 
 func main() {
+	resolveLocalServer()
 	hooks.InstallIdentity("coral-board") // the agent session's token, sent with every request (#3387)
 	// A person running it in their own terminal (no agent session) signs with the
 	// command-line token instead, as the local Operator (strict local auth, #3418).

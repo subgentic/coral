@@ -114,3 +114,14 @@ func TestAnOlderRecordWhoseAnswerHasNoVersionIsRefused(t *testing.T) {
 func TestTheFallbackAddressIsThisPlatformsDefaultPort(t *testing.T) {
 	assert.Equal(t, "http://localhost:"+strconv.Itoa(DefaultPort), defaultServerURL)
 }
+
+// The certificate is left unverified only for an https address on this computer: never for another host, another scheme, or a name that merely starts like localhost.
+func TestCertificateCheckIsSkippedOnlyForLoopbackHttps(t *testing.T) {
+	for _, addr := range []string{"https://127.0.0.1:8450", "https://localhost:9443", "https://[::1]:9443", "https://127.1.2.3:9443"} {
+		assert.True(t, skipsCertificateCheck(addr), addr)
+	}
+	for _, addr := range []string{"http://127.0.0.1:8450", "https://example.com:8450", "https://10.0.0.5:8450", "https://localhost.example.com:9443",
+		"https://127.0.0.1.example.com:9443", "https://user:pw@127.0.0.1:9443", "https://127.0.0.1", "ftp://127.0.0.1:21", "", "not a url"} {
+		assert.False(t, skipsCertificateCheck(addr), addr)
+	}
+}

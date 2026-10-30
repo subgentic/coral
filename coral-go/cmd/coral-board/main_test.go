@@ -254,7 +254,11 @@ func TestEndpointFromEnv_PreservesExplicitURLAndSupportsHostPortFallback(t *test
 
 func TestSubprocess_EndpointInitialization(t *testing.T) {
 	if os.Getenv("TEST_SUBPROCESS_ENDPOINT") == "1" {
+		resolveLocalServer() // what main does first
 		fmt.Println("RESOLVED_SERVER_URL=" + serverURL)
+		if serverURLErr != nil {
+			fmt.Println("RESOLVED_SERVER_ERROR=" + serverURLErr.Error())
+		}
 		os.Exit(0)
 	}
 
@@ -264,6 +268,7 @@ func TestSubprocess_EndpointInitialization(t *testing.T) {
 		coralHost string
 		coralPort string
 		wantURL   string
+		lock      string // "scratch" or "closed": the data folder gets a record naming a scratch Coral, or a loopback address nothing listens on (this process's pid is the live one)
 	}{
 		{
 			name:      "explicit_url_wins_over_port_and_host",
@@ -293,21 +298,42 @@ func TestSubprocess_EndpointInitialization(t *testing.T) {
 			coralPort: "8420",
 			wantURL:   "http://[::1]:8420",
 		},
+		// With nothing named and no record, init would ask the platform's default port whether a Coral answers there; a test must not (the guard refuses it), so the
+		// cases below give the data folder a record: one a scratch Coral answers, and one whose live process has nothing answering at its address (an error, not the default).
 		{
-			name:      "default_legacy",
-			coralURL:  "",
-			coralHost: "",
-			coralPort: "",
-			wantURL:   "http://localhost:" + strconv.Itoa(config.DefaultPort), // no lock file in the (empty) data folder: the platform default
+			name:    "recorded_server_found",
+			lock:    "scratch",
+			wantURL: "scratch",
+		},
+		{
+			name:    "recorded_server_that_does_not_answer_is_an_error_not_the_default",
+			lock:    "closed",
+			wantURL: "\nRESOLVED_SERVER_ERROR=Coral is running on this data folder",
 		},
 	}
 
+	scratch := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"status":"ok","version":"test"}`))
+	}))
+	t.Cleanup(scratch.Close)
+	closed := httptest.NewServer(http.NotFoundHandler())
+	closedURL := closed.URL
+	closed.Close()
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			dataDir := t.TempDir() // the running Coral's lock file is not read
+			switch tt.lock {
+			case "scratch":
+				tt.wantURL = scratch.URL
+				_ = os.WriteFile(filepath.Join(dataDir, config.ServerLockFile), []byte(strconv.Itoa(os.Getpid())+"\n"+scratch.URL+"\n"), 0o600)
+			case "closed":
+				_ = os.WriteFile(filepath.Join(dataDir, config.ServerLockFile), []byte(strconv.Itoa(os.Getpid())+"\n"+closedURL+"\n"), 0o600)
+			}
 			cmd := exec.Command(os.Args[0], "-test.run=^TestSubprocess_EndpointInitialization$")
 			cmd.Env = append(os.Environ(),
 				"TEST_SUBPROCESS_ENDPOINT=1",
-				"CORAL_DATA_DIR="+t.TempDir(), "CORAL_DIR=", // an empty data folder: the running Coral's lock file is not read
+				"CORAL_DATA_DIR="+dataDir, "CORAL_DIR=",
 				"CORAL_URL="+tt.coralURL,
 				"CORAL_HOST="+tt.coralHost,
 				"CORAL_PORT="+tt.coralPort,

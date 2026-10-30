@@ -21,12 +21,19 @@ func runningServerURL(fs *flag.FlagSet, base, home string) string {
 }
 
 // resolveServerURL is runningServerURL with the failure returned: a record whose process runs but whose address does not answer as that Coral is an error (the default
-// port is not tried), and the default (base) is used only if it answers /api/health as a Coral (status ok and a version), since a command sends credentials to it.
+// port is not tried), and with no record the default (base) is used; the commands prove the server (CLI token hello) before they send a credential, so the default is not asked here.
 func resolveServerURL(fs *flag.FlagSet, base, home string) (string, error) {
 	given := false
 	fs.Visit(func(f *flag.Flag) { given = given || f.Name == "url" })
 	if given || os.Getenv("CORAL_URL") != "" || os.Getenv("CORAL_PORT") != "" {
 		return base, nil
 	}
-	return config.ResolveServerAt(config.ResolveCoralDir(home), base)
+	addr, err := config.ResolveRecorded(config.ResolveCoralDir(home))
+	if err != nil {
+		return "", err
+	}
+	if addr == "" {
+		addr = base // the default is not asked here: these commands prove the server themselves before they send a credential (the CLI token hello)
+	}
+	return addr, err
 }
