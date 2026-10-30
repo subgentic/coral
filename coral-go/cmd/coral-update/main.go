@@ -1,4 +1,6 @@
-// coral-update is Coral's updater program (#5231, #5292). Its argv is fixed: "check" finds the newest promoted release, has the verifier approve
+// coral-update is Coral's updater program (#5231, #5292). Its argv is fixed, with ONE exception (#11370): "verify-package --tag --asset --dir", which a self-hosted hub runs to verify a release it
+// downloaded before it installs that release on another computer over SSH (verify_package.go). That command is never built from a request: the hub passes its own running version as the tag,
+// a fixed per-architecture asset name and a fresh 0700 temp folder, by this program's absolute path, with a minimal environment and a timeout. Otherwise: "check" finds the newest promoted release, has the verifier approve
 // it and stages the package; "apply" is not built yet. It prints one JSON object on stdout, for display only, and takes no URL, version, path, hash
 // or pid from whoever started it: the pins are compiled in, the data folder is resolved as Coral resolves its own, and the installed version is the
 // one this program was built as. It is the only program that links the Sigstore verifier.

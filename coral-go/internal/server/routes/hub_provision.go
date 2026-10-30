@@ -14,6 +14,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/subgentic/coral/internal/config"
 	"github.com/subgentic/coral/internal/sshprov"
 	"github.com/subgentic/coral/internal/store"
 )
@@ -118,13 +119,15 @@ func (p *provisionPlan) setStep(name, state, detail string) {
 
 // Provisioner holds the plans and what they need from the hub.
 type Provisioner struct {
-	store     *store.RemoteServerStore
-	runner    sshprov.Runner
-	configs   func() string // the hub user's SSH config path
-	known     func() string // the known_hosts file ssh reads
-	mu        sync.Mutex
-	plans     map[string]*provisionPlan
-	runSteps  func(ctx context.Context, p *provisionPlan) // the steps after the keys are trusted; a variable so the install pipeline replaces the skeleton
+	store    *store.RemoteServerStore
+	runner   sshprov.Runner
+	configs  func() string // the hub user's SSH config path
+	known    func() string // the known_hosts file ssh reads
+	mu       sync.Mutex
+	plans    map[string]*provisionPlan
+	runSteps func(ctx context.Context, p *provisionPlan) // the steps after the keys are trusted
+	// install puts the hub's own release on the far computer (sshprov.Installer); a variable so a test does not reach the network.
+	install   func(ctx context.Context, p *provisionPlan, arch sshprov.Arch) error
 	startedAt time.Time
 }
 
@@ -132,6 +135,7 @@ type Provisioner struct {
 func NewProvisioner(s *store.RemoteServerStore) *Provisioner {
 	pr := &Provisioner{store: s, configs: sshprov.DefaultConfigPath, known: sshprov.DefaultKnownHostsPath, plans: map[string]*provisionPlan{}, startedAt: time.Now()}
 	pr.runSteps = pr.detectSteps
+	pr.install = pr.realInstall
 	return pr
 }
 
@@ -445,7 +449,18 @@ func (pr *Provisioner) detectSteps(ctx context.Context, p *provisionPlan) {
 	p.system = knownSystem(sys)
 	p.mu.Unlock()
 	p.setStep("detect", stepOK, sys+", tmux found.")
-	for _, s := range []string{"install", "start", "register"} {
+	arch, _ := sshprov.ArchOf(sys)
+	if err := pr.install(ctx, p, arch); err != nil {
+		var ie *sshprov.ErrInstall
+		msg := "Could not install Coral on that computer."
+		if errors.As(err, &ie) {
+			msg = ie.Msg // a fixed sentence of the installer's, never text from the far side or the network
+		}
+		slog.Info("[provision] install failed", "plan", p.ID, "step", "install")
+		pr.fail(p, "install", msg)
+		return
+	}
+	for _, s := range []string{"start", "register"} {
 		p.setStep(s, stepSkipped, "Not available yet.")
 	}
 	p.mu.Lock()
@@ -480,4 +495,16 @@ func (pr *Provisioner) Cancel(w http.ResponseWriter, r *http.Request) {
 	}
 	p.mu.Unlock()
 	writeJSON(w, http.StatusOK, map[string]string{"status": "cancelled"})
+}
+
+// realInstall installs the hub's own release: the version is the one this hub runs (never a request's), the verifier is coral-update next to this executable, and each step is a fixed sentence.
+func (pr *Provisioner) realInstall(ctx context.Context, p *provisionPlan, arch sshprov.Arch) error {
+	in := sshprov.Installer{
+		Runner:   pr.runner,
+		Version:  config.Version,
+		Helper:   sshprov.HelperPath(),
+		Progress: func(_, state, detail string) { p.setStep("install", state, detail) },
+	}
+	_, err := in.Install(ctx, p.Target, arch)
+	return err
 }

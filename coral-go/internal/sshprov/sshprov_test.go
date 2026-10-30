@@ -201,7 +201,8 @@ func TestRunGivesSSHAMinimalEnvironmentAndQuotesTheText(t *testing.T) {
 		t.Errorf("the agent or locale is missing:\n%s", b)
 	}
 	text, _ := os.ReadFile(envFile + ".text")
-	want := `sh -c 'cd "$HOME/.coral-server" && sha256sum -- ` + `'\''a/b.tgz'\''` + `'`
+	q := `'\''a/b.tgz'\''`
+	want := `sh -c 'cd "$HOME/.coral-server" && { sha256sum -- ` + q + ` 2>/dev/null || shasum -a 256 -- ` + q + `; }'`
 	if string(text) != want {
 		t.Errorf("remote text = %s; want %s", text, want)
 	}

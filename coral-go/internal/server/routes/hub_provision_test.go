@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -74,6 +75,10 @@ exit 0
 	pr.runner = sshprov.Runner{SSH: filepath.Join(dir, "ssh"), KeyScan: filepath.Join(dir, "ssh-keyscan")}
 	pr.configs = func() string { return filepath.Join(dir, "config") }
 	pr.known = func() string { return known }
+	pr.install = func(_ context.Context, p *provisionPlan, _ sshprov.Arch) error { // no network in a route test: the installer has its own tests
+		p.setStep("install", stepOK, "Installed.")
+		return nil
+	}
 	r := chi.NewRouter()
 	r.Post("/api/servers/provision/plan", pr.Plan)
 	r.Post("/api/servers/provision/{plan}/connect", pr.Connect)
@@ -185,7 +190,9 @@ func TestProvisionUnknownHostShowsTheScannedKeyAndTrustsOnlyThatAfterAccept(t *t
 	steps := done["steps"].([]any)
 	assert.Equal(t, "ok", steps[0].(map[string]any)["state"])
 	assert.Equal(t, "ok", steps[1].(map[string]any)["state"])
-	assert.Equal(t, "skipped", steps[2].(map[string]any)["state"], "the install steps do not exist yet and say so")
+	assert.Equal(t, "ok", steps[2].(map[string]any)["state"])
+	assert.Equal(t, "skipped", steps[3].(map[string]any)["state"], "start and register do not exist yet and say so")
+	assert.Equal(t, "skipped", steps[4].(map[string]any)["state"])
 	_, err = pe.e.h.store.Get(context.Background(), "ssh-box-example-com")
 	assert.Error(t, err, "a run that installed nothing registered a server")
 }
@@ -317,4 +324,34 @@ func TestKnownSystemKeepsOnlyWhatWeSupport(t *testing.T) {
 	for _, s := range []string{"", "Darwin arm64", "Linux x86_64; rm -rf ~", "Linux x86_64\nwelcome to box", "\x1b[31mLinux x86_64", "Linux armv7l"} {
 		assert.Equal(t, "", knownSystem(s), "%q", s)
 	}
+}
+
+func TestProvisionInstallFailureIsAFixedSentence(t *testing.T) {
+	pe := newProvEnv(t, "known", "Linux x86_64", true)
+	pe.p.install = func(context.Context, *provisionPlan, sshprov.Arch) error {
+		return &sshprov.ErrInstall{Step: "install", Msg: "The release could not be verified, so nothing was installed."}
+	}
+	_, v := pe.do("POST", "/api/servers/provision/plan", map[string]any{"target": "rich@box.example.com"})
+	plan := v["plan"].(string)
+	pe.do("POST", "/api/servers/provision/"+plan+"/connect", nil)
+	code, _ := pe.do("POST", "/api/servers/provision/"+plan+"/run", map[string]any{"accept_terms": true})
+	require.Equal(t, 202, code)
+	failed := pe.waitPhase(t, plan, "failed")
+	assert.Equal(t, "The release could not be verified, so nothing was installed.", failed["error"])
+	steps := failed["steps"].([]any)
+	assert.Equal(t, "failed", steps[2].(map[string]any)["state"])
+
+	// an error that is not the installer's own words is not shown
+	pe2 := newProvEnv(t, "known", "Linux x86_64", true)
+	pe2.p.install = func(context.Context, *provisionPlan, sshprov.Arch) error {
+		return errors.New("scp: /home/rich/.ssh/id_rsa: permission denied")
+	}
+	_, v = pe2.do("POST", "/api/servers/provision/plan", map[string]any{"target": "rich@box.example.com"})
+	plan = v["plan"].(string)
+	pe2.do("POST", "/api/servers/provision/"+plan+"/connect", nil)
+	pe2.do("POST", "/api/servers/provision/"+plan+"/run", map[string]any{"accept_terms": true})
+	failed = pe2.waitPhase(t, plan, "failed")
+	assert.Equal(t, "Could not install Coral on that computer.", failed["error"])
+	b, _ := json.Marshal(failed)
+	assert.NotContains(t, string(b), "id_rsa")
 }

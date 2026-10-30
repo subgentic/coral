@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"regexp"
 	"strings"
@@ -28,6 +29,16 @@ const (
 	CmdSha256
 	// CmdReadInstanceID prints the remote Coral's instance id file, if there is one.
 	CmdReadInstanceID
+	// CmdMkVersionDir makes (0700) the folder of one release under the install folder; arg 0 is the version.
+	CmdMkVersionDir
+	// CmdReceive writes its stdin to <install>/<version>/package.tar.gz (the package, streamed from the hub); arg 0 is the version.
+	CmdReceive
+	// CmdTarList prints the member names of that package; arg 0 is the version.
+	CmdTarList
+	// CmdUnpack unpacks that package into <install>/<version>/root and records its SHA-256 in <install>/<version>/package.sha256; arg 0 is the version.
+	CmdUnpack
+	// CmdReadInstalledSum prints that recorded SHA-256, if the release is installed; arg 0 is the version.
+	CmdReadInstalledSum
 )
 
 // InstallDir is where everything the provisioner puts on the remote lives, under the remote user's home. Never outside it.
@@ -37,7 +48,12 @@ type spec struct {
 	// template is the remote shell text, with %s for each validated argument in order.
 	template string
 	args     []*regexp.Regexp
+	// timeout overrides the runner's (a package upload takes longer than a question).
+	timeout time.Duration
 }
+
+// versionRe is a release version as the hub names it: numbers and an optional suffix, never a path.
+var versionRe = regexp.MustCompile(`^[0-9]{1,4}\.[0-9]{1,4}\.[0-9]{1,4}(-[A-Za-z0-9.]{1,32})?$`)
 
 var relPathRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,63}(/[A-Za-z0-9][A-Za-z0-9._-]{0,63}){0,3}$`)
 
@@ -45,8 +61,14 @@ var specs = map[Command]spec{
 	CmdUname:          {template: "uname -sm"},
 	CmdHasTmux:        {template: "command -v tmux >/dev/null 2>&1"},
 	CmdHasSystemdUser: {template: "systemctl --user show-environment >/dev/null 2>&1"},
-	CmdSha256:         {template: "cd \"$HOME/" + InstallDir + "\" && sha256sum -- '%s'", args: []*regexp.Regexp{relPathRe}},
+	CmdSha256:         {template: "cd \"$HOME/" + InstallDir + "\" && { sha256sum -- '%[1]s' 2>/dev/null || shasum -a 256 -- '%[1]s'; }", args: []*regexp.Regexp{relPathRe}},
 	CmdReadInstanceID: {template: "cat \"$HOME/" + InstallDir + "/instance-id\" 2>/dev/null"},
+	CmdMkVersionDir:   {template: "umask 077 && mkdir -p \"$HOME/" + InstallDir + "/%[1]s\" && chmod 700 \"$HOME/" + InstallDir + "\" \"$HOME/" + InstallDir + "/%[1]s\"", args: []*regexp.Regexp{versionRe}},
+	CmdReceive:        {template: "umask 077 && cat > \"$HOME/" + InstallDir + "/%s/package.tar.gz\"", args: []*regexp.Regexp{versionRe}, timeout: 15 * time.Minute},
+	CmdTarList:        {template: "cd \"$HOME/" + InstallDir + "/%s\" && tar -tzf package.tar.gz", args: []*regexp.Regexp{versionRe}, timeout: 2 * time.Minute},
+	CmdUnpack: {template: "umask 077 && cd \"$HOME/" + InstallDir + "/%[1]s\" && rm -rf root && mkdir root && tar -xzf package.tar.gz --no-same-owner -C root && " +
+		"{ sha256sum package.tar.gz 2>/dev/null || shasum -a 256 package.tar.gz; } | cut -d' ' -f1 > package.sha256", args: []*regexp.Regexp{versionRe}, timeout: 5 * time.Minute},
+	CmdReadInstalledSum: {template: "cat \"$HOME/" + InstallDir + "/%s/package.sha256\" 2>/dev/null", args: []*regexp.Regexp{versionRe}},
 }
 
 // ErrNotAllowed is a command or argument the closed list does not allow.
@@ -128,6 +150,11 @@ func (c *capped) Write(p []byte) (int, error) {
 
 // Run runs command c with args on t. The argv is fixed: options, "--", the destination, then the one validated text as a single argument.
 func (r Runner) Run(ctx context.Context, t Target, c Command, args ...string) (Result, error) {
+	return r.RunInput(ctx, t, nil, c, args...)
+}
+
+// RunInput is Run with input on the command's stdin (the package for CmdReceive).
+func (r Runner) RunInput(ctx context.Context, t Target, input io.Reader, c Command, args ...string) (Result, error) {
 	text, err := remoteText(c, args...)
 	if err != nil {
 		return Result{}, err
@@ -135,6 +162,9 @@ func (r Runner) Run(ctx context.Context, t Target, c Command, args ...string) (R
 	timeout := r.Timeout
 	if timeout <= 0 {
 		timeout = 30 * time.Second
+	}
+	if st := specs[c].timeout; st > timeout {
+		timeout = st
 	}
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
@@ -147,7 +177,7 @@ func (r Runner) Run(ctx context.Context, t Target, c Command, args ...string) (R
 	argv = append(argv, "--", t.Destination(), "sh -c "+shQuote(text))
 	cmd := executil.Command(ctx, ssh, argv...)
 	var out, errOut capped
-	cmd.Stdout, cmd.Stderr, cmd.Stdin = &out, &errOut, nil
+	cmd.Stdout, cmd.Stderr, cmd.Stdin = &out, &errOut, input
 	cmd.Env = minimalEnv()
 	runErr := cmd.Run()
 	res := Result{Stdout: out.b.String()}
