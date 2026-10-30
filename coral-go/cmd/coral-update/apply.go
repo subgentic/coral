@@ -108,6 +108,16 @@ const applyLogMax = 64 << 10
 // is the user's alone, never followed through a link, and starts again when it is large.
 func printApply(w io.Writer, dataDir string, o output) {
 	print(w, o)
+	b, err := json.Marshal(o)
+	if err != nil {
+		return
+	}
+	appendApplyLog(dataDir, string(b))
+}
+
+// appendApplyLog appends one line (the time and the text) to <data dir>/updates/apply.log, under the rules printApply states: the user's file, never through a link, starting
+// again when it is large.
+func appendApplyLog(dataDir, text string) {
 	if dataDir == "" {
 		return
 	}
@@ -130,9 +140,5 @@ func printApply(w io.Writer, dataDir string, o output) {
 		return
 	}
 	defer f.Close()
-	b, err := json.Marshal(o)
-	if err != nil {
-		return
-	}
-	_, _ = f.WriteString(time.Now().UTC().Format(time.RFC3339) + " " + string(b) + "\n")
+	_, _ = f.WriteString(time.Now().UTC().Format(time.RFC3339) + " " + text + "\n")
 }

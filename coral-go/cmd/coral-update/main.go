@@ -121,6 +121,9 @@ func run(args []string, getenv func(string) string, stdout io.Writer) int {
 	}
 	// An install a package manager owns (Homebrew's cask) is never staged or applied: the same classifier the status and the apply use says so before any network or any trusted root.
 	dataDir := config.ResolveCoralDir("")
+	if dllLockErr != nil && args[0] == "apply" { // the program's output is the null device when the dashboard starts it: the log is where a person can find this out
+		appendApplyLog(dataDir, fmt.Sprintf(`{"note":"dll_search_lock_failed","error":%q}`, dllLockErr.Error()))
+	}
 	probe := installProbe
 	if args[0] == "apply" {
 		// The dashboard runs the apply from a copy in <data>/updates/apply, not from the install folder: that copy is judged by the click's marker and its own bytes (applyProbe).

@@ -10,7 +10,8 @@ import "golang.org/x/sys/windows"
 // (LOAD_LIBRARY_SEARCH_SYSTEM32). No package of this program loads a DLL by a bare name anyway (internal/testguard's census holds that); this is the process-wide
 // second lock, set in the first init of the main package, after the packages it imports have initialised (none of them loads a DLL at init).
 func init() {
-	dllSearchLocked = windows.SetDefaultDllDirectories(windows.LOAD_LIBRARY_SEARCH_SYSTEM32) == nil
+	dllLockErr = windows.SetDefaultDllDirectories(windows.LOAD_LIBRARY_SEARCH_SYSTEM32)
+	dllSearchLocked = dllLockErr == nil
 }
 
 // dllSearchLocked says whether the lock took (a test reads it).
