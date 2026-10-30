@@ -6,7 +6,7 @@ const { connect } = require('./agent_view_harness');
 const { install: installTP, seed, openTeam, goTab } = require('./helpers/team_page');
 const { removeBoards } = require('./helpers/board_cleanup');
 const { install: installNT, openNewTeam } = require('./helpers/new_team');
-const { install: installNA, openNewAgent } = require('./helpers/new_agent');
+const { install: installNA, openNewAgent, stubModels, stepLine } = require('./helpers/new_agent');
 const BASE = require('./test_base').BASE;
 
 const TEAM = `qa-next-steps-${Date.now() % 100000}`;
@@ -164,6 +164,21 @@ const TEAM = `qa-next-steps-${Date.now() % 100000}`;
         check(t0.open, `Enter opens it from the keyboard: ${JSON.stringify(t0)}`);
         await ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); true`); t0 = await tip(); check(!t0.open, `Escape closes it: ${JSON.stringify(t0)}`);
         await ev(`document.getElementById('mn-host').remove(); true`);
+        // (10) New agent on a phone (#11336, Mobile Beta Tester): step 2 says what a persona is; step 3's section picker says it is the sections ("Section" above it)
+        await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`); await installNA(ev); await stubModels(ev);
+        await ev(`localStorage.setItem('coral-recent-dirs', JSON.stringify(['/tmp'])); true`);
+        await openNewAgent(ev, waitFor);
+        const seen = {};
+        for (let i = 0; i < 4 && !seen.s3; i++) {
+            const line = await stepLine(ev);
+            if (/Step 2 of 3/.test(line)) seen.s2 = await ev(`(() => { const p = document.querySelector('#launch-step-agent .launch-persona-lead'); return { text: p ? p.textContent : null, shown: !!p && p.getClientRects().length > 0 }; })()`);
+            if (/Step 3 of 3/.test(line)) { seen.s3 = await ev(`(() => { const l = document.querySelector('#launch-step-agent .settings-group-pick-label'), sel = document.querySelector('#launch-step-agent .settings-group-pick select'); const lr = l && l.getBoundingClientRect(), sr = sel && sel.getBoundingClientRect(); return { text: l ? l.textContent : null, shown: !!l && l.getClientRects().length > 0, above: !!lr && !!sr && lr.bottom <= sr.top + 1, sameLeft: !!lr && !!sr && Math.abs(lr.left - sr.left) < 2, name: sel ? sel.getAttribute('aria-label') : null, hiddenFromAT: l ? l.getAttribute('aria-hidden') : null }; })()`); break; }
+            await ev(`(() => { const b = [...document.querySelectorAll('[role=dialog] button')].find(x => /^Next$/.test(x.textContent.trim()) && x.getClientRects().length); const f = document.getElementById('launch-dir'); if (f && !f.value) { f.value = '/tmp'; f.dispatchEvent(new Event('input', { bubbles: true })); } if (b) b.click(); return true; })()`);
+            await waitFor(`true`, 'a beat', 50).catch(() => {});
+        }
+        check(seen.s2 && seen.s2.shown && /role you give this agent/.test(seen.s2.text) && /Reviewer or Designer/.test(seen.s2.text), `step 2 says what a persona is: ${JSON.stringify(seen.s2)}`);
+        check(seen.s3 && seen.s3.shown && seen.s3.text === 'Section' && seen.s3.above && seen.s3.sameLeft && /section$/.test(seen.s3.name || ''), `step 3's picker says Section above it, its name still ends with section: ${JSON.stringify(seen.s3)}`);
         // (4) plain words
         const root = require('node:path').join(__dirname, '..', '..', 'coral-go', 'pkg', 'frontend', 'static'), read = f => require('node:fs').readFileSync(require('node:path').join(root, f), 'utf8'); // the sources that write the words
         const t = read('task_create.js'), g = read('goals_view.js'), d = read('team_dialogs.js');

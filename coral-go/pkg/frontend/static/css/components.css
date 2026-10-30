@@ -3580,6 +3580,7 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
     .sd-modal-content .settings-tabs { display: none; }
     .sd-modal-content .settings-nav .settings-group-pick { display: block; }
     .sd-modal-content .settings-group-pick select { width: 100%; max-width: none; min-height: 44px; }
+    .sd-modal-content .settings-group-pick-label { display: block; margin: 0 0 var(--space-xs); color: var(--text-secondary); font-size: var(--fs-sm); } /* the select is the section list: it says so (#11336) */
     .sd-modal-content .settings-panes { padding: .8rem 1rem 1.2rem; }
     .sd-modal-content .launch-note-slot { min-height: 0; } /* on a phone an empty notes slot takes no room (no tall gap under Provider): a note that appears pushes Model and Thinking down (#7912) */
     .sd-modal-content .settings-pane :is(select, input[type="text"], textarea, .btn, .perm-chip) { min-height: 44px; }
