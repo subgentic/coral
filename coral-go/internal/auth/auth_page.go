@@ -2,8 +2,12 @@ package auth
 
 import (
 	"bytes"
+	"html"
 	"html/template"
 	"net/http"
+	"net/url"
+	"strconv"
+	"strings"
 )
 
 // PageState says which screen the /auth page shows (#3948). The server decides it, so the page never asks an
@@ -293,6 +297,42 @@ const linkUsedPage = `<!DOCTYPE html>
 </body>
 </html>
 `
+
+// linkRetryMax is how many times a sign-in link is retried when whose connection it is could not be told (#385); linkRetryParam counts them.
+const (
+	linkRetryMax   = 5
+	linkRetryParam = "link_retry"
+)
+
+func linkRetryNumber(r *http.Request) int {
+	n, err := strconv.Atoi(r.URL.Query().Get(linkRetryParam))
+	if err != nil || n < 0 {
+		return 0
+	}
+	return n
+}
+
+// writeLinkRetry answers a sign-in link whose opener could not be attributed yet: 503 with Retry-After, and a page that opens the same link again after a second (a browser needs
+// nothing from the person). The link is not used up. try is the number of this retry, in the link_retry parameter.
+func writeLinkRetry(w http.ResponseWriter, r *http.Request, try int) {
+	q := r.URL.Query()
+	q.Set(linkRetryParam, strconv.Itoa(try))
+	next := (&url.URL{Path: r.URL.Path, RawPath: r.URL.RawPath, RawQuery: q.Encode()}).String()
+	next = "/" + strings.TrimLeft(next, "/\\")
+	page := strings.Replace(linkUsedPage, "</head>", `<meta http-equiv="refresh" content="1;url=`+html.EscapeString(next)+`"></head>`, 1)
+	page = strings.Replace(page, "This sign-in link has been used", "Signing you in", 1)
+	page = strings.Replace(page, `<p class="sub">A sign-in link works once, and for 10 minutes. To get a new one, run this in a terminal on the computer that runs Coral:</p>
+  <code class="code">coral open</code>`, `<p class="sub">One moment. This page tries again by itself.</p>`, 1)
+	h := w.Header()
+	h.Set("Content-Type", "text/html; charset=utf-8")
+	h.Set("Cache-Control", "no-store")
+	h.Set("Retry-After", "1")
+	h.Set("Content-Security-Policy", authPageCSP)
+	h.Set("X-Frame-Options", "DENY")
+	h.Set("Referrer-Policy", "no-referrer")
+	w.WriteHeader(http.StatusServiceUnavailable)
+	_, _ = w.Write([]byte(page))
+}
 
 // writeLinkUsed answers a sign-in link that was used, expired or opened by another user of this computer: the
 // same page for all three, so it says nothing about which (#9961).

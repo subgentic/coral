@@ -183,7 +183,13 @@ func (ks *KeyStore) handleLoginToken(w http.ResponseWriter, r *http.Request) boo
 		same, supported := ks.peerUser(r)
 		switch {
 		case supported && !same:
-			log.Printf("[auth] a sign-in link was opened by another user of this computer: refused (the link still works for you)")
+			// Whose connection it is could not be told (the socket table can lag a connection by a moment): say "try again", and do not use the link up. A socket that is
+			// positively another user's, and a link still undecided after linkRetryMax tries, get the final answer (#385).
+			if try := linkRetryNumber(r); ks.peerUnknown != nil && try < linkRetryMax && ks.peerUnknown(r) {
+				writeLinkRetry(w, r, try+1)
+				return true
+			}
+			log.Printf("[auth] a sign-in link was opened by another user of this computer, or by a process whose user could not be told: refused (the link still works for you)")
 			writeLinkUsed(w)
 			return true
 		case !supported:
@@ -208,6 +214,7 @@ func (ks *KeyStore) handleLoginToken(w http.ResponseWriter, r *http.Request) boo
 	q := r.URL.Query()
 	q.Del(LoginTokenParam)
 	q.Del(AppClientParam)
+	q.Del(linkRetryParam)
 	target := (&url.URL{Path: r.URL.Path, RawPath: r.URL.RawPath, RawQuery: q.Encode()}).String()
 	// One leading "/": "//host/..." (or "/\host", which browsers read the same) would be
 	// another host (Security, #3532).

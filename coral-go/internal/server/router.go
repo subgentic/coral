@@ -173,7 +173,15 @@ func (s *Server) registerAuth(r *chi.Mux) {
 		return s.cloudHandler.SameUser(r)
 	}
 	authRoutes.SetPeerUser(peerUser)
-	s.keyStore.SetPeerUser(peerUser) // a sign-in link opened by another OS user is refused (#3970)
+	// A sign-in link opened by another OS user is refused (#3970). The refusal and the "could not tell" answer both come from the connection's own cached verdict (auth.PeerReason: a few
+	// bounded, throttled table reads per connection, under attributeSlots), never from a fresh table read per request, so looping on a link cannot force reads (#385).
+	s.keyStore.SetPeerUser(func(r *http.Request) (bool, bool) {
+		if auth.PeerReason(r) != "" {
+			return false, true // positively another user's, or not told yet (SetPeerUnknown says which)
+		}
+		return peerUser(r)
+	})
+	s.keyStore.SetPeerUnknown(func(r *http.Request) bool { return auth.PeerReason(r) == auth.PeerUnattributed }) // ... but one whose opener could not be told is retried, not used up (#385)
 	r.Post("/auth/password", authRoutes.SignInWithPassword)
 	r.Post("/auth/password/create", authRoutes.CreatePassword)
 	r.Get("/api/auth/setup-code", authRoutes.GetSetupCode)

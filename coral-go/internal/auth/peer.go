@@ -31,14 +31,23 @@ const (
 	PeerUnattributed = "unattributed" // the owner couldn't be told (fail closed)
 )
 
-// connPeer is one TCP connection's attribution: worked out once, on the connection's first
-// request, and kept for that connection only (never reused across connections, or by process id).
+// connPeer is one TCP connection's attribution, kept for that connection only (never reused across connections, or by process id). A positive identity (Coral's user, or positively another
+// user) is worked out on the first loopback request and kept for the connection. An unattributed answer is NOT final: the socket table can lag a connection by a moment (#385), so a
+// later request on the same connection asks again, at most every unattributedRetryEvery and unattributedTries times; it fails closed meanwhile, and is never turned into an allow.
 type connPeer struct {
 	client, server netip.AddrPort
 	known          bool // both addresses are TCP ones
-	once           sync.Once
+	mu             sync.Mutex
+	decided        bool
 	reason         string
+	tries          int
+	lastTry        time.Time
 }
+
+const (
+	unattributedRetryEvery = 100 * time.Millisecond
+	unattributedTries      = 5
+)
 
 type connPeerKey struct{}
 
@@ -96,28 +105,37 @@ func PeerReason(r *http.Request) string {
 	if !cp.known && !remoteIsLoopback(r) {
 		return ""
 	}
-	cp.once.Do(func() {
-		if !cp.known {
-			cp.reason = PeerUnattributed
-			logPeer(cp.client.Addr(), cp.reason, errors.New("the connection's addresses are not TCP ones Coral can read"))
-			return
-		}
-		attributeSlots <- struct{}{} // at most a few socket-table reads at once (#95 review F5)
-		v, err := attributePeer(cp.client, cp.server)
-		<-attributeSlots
-		if v == peercred.Unsupported && peercred.Supported {
-			peerCheckLost.Store(true) // this OS version's socket table isn't one this build reads (F3)
-		}
-		switch v {
-		case peercred.OtherUser:
-			cp.reason = PeerOtherUser
-		case peercred.Unattributed:
-			cp.reason = PeerUnattributed
-		default:
-			return
-		}
-		logPeer(cp.client.Addr(), cp.reason, err)
-	})
+	cp.mu.Lock()
+	defer cp.mu.Unlock()
+	if cp.decided {
+		return cp.reason
+	}
+	if !cp.known {
+		cp.decided, cp.reason = true, PeerUnattributed
+		logPeer(cp.client.Addr(), cp.reason, errors.New("the connection's addresses are not TCP ones Coral can read"))
+		return cp.reason
+	}
+	if cp.reason == PeerUnattributed && (cp.tries >= unattributedTries || time.Since(cp.lastTry) < unattributedRetryEvery) {
+		return cp.reason // asked a moment ago (or often enough): still unattributed, fail closed
+	}
+	cp.tries++
+	cp.lastTry = time.Now()
+	attributeSlots <- struct{}{} // at most a few socket-table reads at once (#95 review F5)
+	v, err := attributePeer(cp.client, cp.server)
+	<-attributeSlots
+	if v == peercred.Unsupported && peercred.Supported {
+		peerCheckLost.Store(true) // this OS version's socket table isn't one this build reads (F3)
+	}
+	switch v {
+	case peercred.OtherUser:
+		cp.decided, cp.reason = true, PeerOtherUser
+	case peercred.Unattributed:
+		cp.reason = PeerUnattributed // not final: a later request asks again
+	default:
+		cp.decided, cp.reason = true, "" // Coral's own user (or no check on this system)
+		return cp.reason
+	}
+	logPeer(cp.client.Addr(), cp.reason, err)
 	return cp.reason
 }
 
