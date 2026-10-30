@@ -130,6 +130,7 @@ jobs:
           run_check "promote_copy_check_test" bash tests/release/promote_copy_check_test.sh
           run_check "signature_required_check_test" bash tests/release/signature_required_check_test.sh
           run_check "ldflags_build_test" bash tests/release/ldflags_build_test.sh
+          run_check "go_mod_download_retry_test" bash tests/release/go_mod_download_retry_test.sh
           run_check "workflows_lint" python3 tests/release/workflows_lint.py
           run_check "release_dryrun_test (this list matches release.yml)" python3 tests/release/release_dryrun_test.py
           if [ "${#fails[@]}" -eq 0 ]; then
