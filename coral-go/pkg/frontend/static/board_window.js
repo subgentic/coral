@@ -307,7 +307,7 @@ export function renderMessages(messages, { keepAnchor = false, prepended = 0 } =
     if (!messages.length) {
         // An empty board has one next step (#11336): ask its lead to plan the first task; the box gets the start of the message and the focus.
         const wrap = document.createElement('div'); wrap.className = 'empty-state mb-empty-board'; wrap.setAttribute('role', 'listitem'); // the messages box is a list: its one notice is an item
-        const text = document.createElement('p'); text.textContent = 'No messages on the board yet. Agents post here as they work.';
+        const text = document.createElement('p'); text.textContent = 'No messages on the board yet. Agents post here as they work, and they call you the Operator.';
         const lead = boardLeadName(), ask = document.createElement('button');
         ask.type = 'button'; ask.className = 'btn btn-small mb-empty-ask'; ask.textContent = lead ? `Ask ${lead} to plan the first task` : 'Write the first message';
         ask.addEventListener('click', () => { const box = document.getElementById('mb-post-input'), who = boardLeadName(); if (!box) return; box.value = who ? `@${who} Please plan the first task for this team: ` : ''; box.dispatchEvent(new Event('input', { bubbles: true })); box.focus(); box.setSelectionRange(box.value.length, box.value.length); });

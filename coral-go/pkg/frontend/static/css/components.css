@@ -466,7 +466,8 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 }
 /* @mentions of a board member (#5964): weight and a tint, never colour alone; the viewer's own name (the Operator) is stronger, with an underline bar as well. Text only: no role change. */
 .mb-mention { font-weight: var(--fw-strong); color: var(--text-primary); background: color-mix(in srgb, var(--accent) 16%, transparent); border-radius: var(--radius-sm); padding: 0 3px; }
-.mb-mention-self { background: color-mix(in srgb, var(--accent) 36%, transparent); box-shadow: inset 0 -2px 0 var(--accent); }
+.mb-mention-self { position: relative; cursor: help; background: color-mix(in srgb, var(--accent) 36%, transparent); box-shadow: inset 0 -2px 0 var(--accent); }
+.mb-mention-self[data-tip-open]::after { content: "That is you"; position: absolute; left: 0; bottom: calc(100% + 4px); z-index: 5; padding: 2px 8px; border-radius: var(--radius-md); background: var(--bg-elevated, var(--bg-secondary)); color: var(--text-primary); border: 1px solid var(--border); font-size: var(--fs-sm); font-weight: var(--fw-medium); white-space: nowrap; box-shadow: var(--shadow-md, none); } /* a tap or Enter on the mention of you (#11336): there is no hover on a touch screen */
 .mb-message-body a:hover,
 .board-artifact-link:hover {
     text-decoration: underline;

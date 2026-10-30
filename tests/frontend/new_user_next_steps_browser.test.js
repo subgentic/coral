@@ -29,7 +29,7 @@ const TEAM = `qa-next-steps-${Date.now() % 100000}`;
             await goTab(ev, settle, 'Board'); await waitFor(`!!document.querySelector('#mb-messages .mb-empty-board')`, `${label}: the empty board`, 10000).catch(() => {});
             if (process.env.DBG) console.log('DBG', await ev(`(() => { const m = document.getElementById('mb-messages'); return JSON.stringify({ tab: (document.querySelector('[role=tab][aria-selected=true]') || {}).textContent, board: (document.getElementById('mb-board') || {}).style?.display, boardIn: document.getElementById('mb-board')?.parentElement?.id, html: m ? m.outerHTML.slice(0, 200) : null, panelHtml: (document.querySelector('#team-page-view [role=tabpanel]:not([hidden])') || {}).innerHTML?.slice(0, 500), rows: document.querySelectorAll('#team-panel-messages *').length, panel: (document.getElementById('team-panel-messages') || {}).innerText?.slice(0, 300) }); })()`));
             const b = await ev(`(() => { const e = document.querySelector('#mb-messages .mb-empty-board'); const btn = e && e.querySelector('.mb-empty-ask'); return { empty: !!e, text: e ? e.querySelector('p').textContent : null, btn: btn ? btn.textContent : null, btnShown: !!btn && btn.getClientRects().length > 0 }; })()`);
-            check(b.empty && /^No messages on the board yet/.test(b.text || ''), `${label}: an empty board says so: ${JSON.stringify(b)}`);
+            check(b.empty && /^No messages on the board yet/.test(b.text || '') && /they call you the Operator\.$/.test(b.text || ''), `${label}: an empty board says so: ${JSON.stringify(b)}`);
             check(b.btnShown && /^(Ask .+ to plan the first task|Write the first message)$/.test(b.btn || ''), `${label}: and offers one action: ${JSON.stringify(b.btn)}`);
             if (b.btnShown) {
                 const target = b.btn.replace(/^Ask (.+) to plan the first task$/, '$1');
@@ -149,6 +149,21 @@ const TEAM = `qa-next-steps-${Date.now() % 100000}`;
             await ev(`document.getElementById('set-password-modal').remove(); true`);
             check(await shown() === true, `${w} px: and shows again when it is closed`);
         }
+        // (9) "Operator" is explained where a newcomer meets it (#11336 item 7, option 2): the empty Board says agents call you the Operator, and an @Operator mention says "That is you" on hover, on a tap and in the words a screen reader reads
+        await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        const mt = await ev(`import(${S} + 'board_message_text.js').then(m => { const host = document.createElement('div'); host.id = 'mn-host'; host.innerHTML = m.highlightMentionsHtml('<p>Please look, @Operator, and @Orchestrator too.</p>'); document.body.append(host); const self = host.querySelector('.mb-mention-self'), other = [...host.querySelectorAll('.mb-mention')].find(x => !x.classList.contains('mb-mention-self')); return { selfText: self && self.textContent, title: self && self.title, tab: self && self.tabIndex, role: self && self.getAttribute('role'), label: self && self.getAttribute('aria-label'), other: other && { title: other.title, tab: other.tabIndex, text: other.textContent } }; })`);
+        check(mt.selfText === '@Operator' && mt.title === 'That is you' && mt.tab === 0 && mt.role === 'button' && mt.label === '@Operator, that is you', `the @Operator mention is told it is you, by title, by an accessible name (the text is unchanged) and by Tab: ${JSON.stringify(mt)}`);
+        check(mt.other && mt.other.title === '' && mt.other.tab === -1 && mt.other.text === '@Orchestrator', `another mention is left as it was: ${JSON.stringify(mt.other)}`);
+        const tip = () => ev(`(() => { const s = document.querySelector('#mn-host .mb-mention-self'); return { open: s.hasAttribute('data-tip-open'), expanded: s.getAttribute('aria-expanded'), shown: getComputedStyle(s, '::after').content }; })()`);
+        let t0 = await tip(); check(!t0.open && !/That is you/.test(t0.shown), `closed to start: ${JSON.stringify(t0)}`);
+        await ev(`document.querySelector('#mn-host .mb-mention-self').click(); true`); t0 = await tip();
+        check(t0.open && t0.expanded === 'true' && /That is you/.test(t0.shown), `a tap opens the bubble (aria-expanded true): ${JSON.stringify(t0)}`);
+        await ev(`document.body.click(); true`); t0 = await tip(); check(!t0.open, `a tap elsewhere closes it: ${JSON.stringify(t0)}`);
+        await ev(`const sm = document.querySelector('#mn-host .mb-mention-self'); sm.focus(); sm.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })); true`); t0 = await tip();
+        check(t0.open, `Enter opens it from the keyboard: ${JSON.stringify(t0)}`);
+        await ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); true`); t0 = await tip(); check(!t0.open, `Escape closes it: ${JSON.stringify(t0)}`);
+        await ev(`document.getElementById('mn-host').remove(); true`);
         // (4) plain words
         const root = require('node:path').join(__dirname, '..', '..', 'coral-go', 'pkg', 'frontend', 'static'), read = f => require('node:fs').readFileSync(require('node:path').join(root, f), 'utf8'); // the sources that write the words
         const t = read('task_create.js'), g = read('goals_view.js'), d = read('team_dialogs.js');
