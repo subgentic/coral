@@ -149,8 +149,10 @@ func TestPiShutdownPostsStopThenSessionEndInOneProcess(t *testing.T) {
 	}
 	with := runFlow(t, flowRun{cli: "pi", args: []string{"--pi", "session_shutdown"}, stdin: payload(map[string]any{"reason": "quit", "stop": true, "aborted": false, "input_tokens": 12.0, "output_tokens": 3.0, "num_turns": 1.0})})
 	got := paths(with)
-	require.GreaterOrEqual(t, len(got), 3, "%v", got)
-	assert.Equal(t, []string{"events:stop", "token-usage:", "events:session_end"}, got, "Stop (and its usage), then the session's end")
+	require.GreaterOrEqual(t, len(got), 2, "%v", got)
+	// The usage is NOT forwarded (#11293 row 11): Coral reads a Pi agent's usage turn by turn from its session file (the token poller, with each turn's own model and time), so a second row from here
+	// counted the same turn twice, once under no model at all (a model:'' bucket in the summary).
+	assert.Equal(t, []string{"events:stop", "events:session_end"}, got, "Stop, then the session's end: no token usage of its own")
 	without := runFlow(t, flowRun{cli: "pi", args: []string{"--pi", "session_shutdown"}, stdin: payload(map[string]any{"reason": "quit"})})
 	assert.Equal(t, []string{"events:session_end"}, paths(without), "no Stop to send: only the end")
 }
