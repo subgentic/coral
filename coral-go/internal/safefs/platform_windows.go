@@ -3,9 +3,12 @@
 package safefs
 
 import (
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	"golang.org/x/sys/windows"
 )
@@ -27,6 +30,9 @@ func LinkCount(f *os.File, _ os.FileInfo) (n uint64, ok bool) {
 	return uint64(info.NumberOfLinks), true
 }
 
+// errUntrustedMountPoint is ERROR_UNTRUSTED_MOUNT_POINT: "The path cannot be traversed because it contains an untrusted mount point." (Windows 11 build 26300 and later, for a junction a non-administrator made).
+const errUntrustedMountPoint syscall.Errno = 448
+
 // realPath is where p really is. filepath.EvalSymlinks doesn't follow junctions (mount
 // points) in current Go: a junction as the last name comes back unresolved, and one on the way
 // to a file fails the whole walk (ENOTDIR), so a junction leading out of a root looked inside
@@ -43,7 +49,13 @@ func realPath(p string) (string, error) {
 		windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE|windows.FILE_SHARE_DELETE, nil,
 		windows.OPEN_EXISTING, windows.FILE_FLAG_BACKUP_SEMANTICS, 0)
 	if err != nil {
-		return "", &os.PathError{Op: "open", Path: r, Err: err}
+		pe := &os.PathError{Op: "open", Path: r, Err: err}
+		if errors.Is(err, errUntrustedMountPoint) {
+			// Windows 11 build 26300+ refuses to traverse a junction a non-administrator made: this path cannot be shown to be inside any root, so it is outside (never "resolved"). The system's own
+			// refusal stays in the chain for a caller that wants to say why.
+			return "", fmt.Errorf("%w: %w", ErrOutside, pe)
+		}
+		return "", pe
 	}
 	defer windows.CloseHandle(h)
 	buf := make([]uint16, windows.MAX_LONG_PATH)
