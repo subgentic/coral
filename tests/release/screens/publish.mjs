@@ -1,6 +1,6 @@
 // Files a run on the board: the release task "UI review: vX.Y.Z", the contact sheet and every shot as Coral artifacts on it. A plain script: coral-board and coral-agent are called as a CLI under the
 // identity of whoever runs it (the operator's or DevOps's), no agent turn and no model is involved.
-//   node publish.mjs --out DIR --version 2.0.7 --sha SHA [--prev DIR] [--goal 163] [--assignee Operator] [--task N] [--all] [--dry-run]
+//   node publish.mjs --out DIR --version 2.0.7 --sha SHA [--prev DIR] [--goal N] [--assignee Operator] [--task N] [--all] [--dry-run]
 // The link of an artifact is the SHA-256 of its bytes, so every link is known before anything is uploaded: the contact sheet (which links every shot) goes up FIRST, then the shots, and each
 // upload's answer is checked against the link the sheet holds. Nothing here ever blocks a release: a failure is reported and the exit code says so, and run.sh only warns.
 //
@@ -10,15 +10,15 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { buildManifest, taskBody, taskTitle, expectedLink, artifactName, reviewName, sheetArtifactName, reviewUploadArgs, uploadArgs } from './manifest.mjs';
+import { buildManifest, taskBody, taskTitle, expectedLink, artifactName, reviewName, sheetArtifactName, reviewUploadArgs, uploadArgs, pickGoal } from './manifest.mjs';
 import { buildSheet } from './sheet.mjs';
 
 const arg = name => { const i = process.argv.indexOf('--' + name); return i > 0 ? process.argv[i + 1] : undefined; };
 const flag = name => process.argv.includes('--' + name);
-const out = arg('out'), version = arg('version'), sha = arg('sha') || 'unknown', prevDir = arg('prev'), goal = arg('goal') || process.env.SCREENS_GOAL || '163', assignee = arg('assignee') || process.env.SCREENS_ASSIGNEE || 'Operator';
+const out = arg('out'), version = arg('version'), sha = arg('sha') || 'unknown', prevDir = arg('prev'), wantedGoal = arg('goal') || process.env.SCREENS_GOAL || '', assignee = arg('assignee') || process.env.SCREENS_ASSIGNEE || 'Operator';
 const dry = flag('dry-run'), all = flag('all');
 const perHour = Number(process.env.SCREENS_UPLOADS_PER_HOUR || 80), maxWaitMs = Number(process.env.SCREENS_MAX_WAIT_MIN || 300) * 60000;
-if (!out || !version) { console.error('usage: publish.mjs --out DIR --version X.Y.Z --sha SHA [--prev DIR] [--goal 163] [--assignee Operator] [--task N] [--all] [--dry-run]'); process.exit(2); }
+if (!out || !version) { console.error('usage: publish.mjs --out DIR --version X.Y.Z --sha SHA [--prev DIR] [--goal N] [--assignee Operator] [--task N] [--all] [--dry-run]'); process.exit(2); }
 const bin = program => (process.env.SCREENS_BIN ? path.join(process.env.SCREENS_BIN, program) : program);
 const log = (...a) => console.error('[publish]', ...a);
 
@@ -90,10 +90,14 @@ try {
     if (!id) {
         // The runner makes its own task: `task add --self` (any agent may open work for itself, with a goal: #11247); a coral-board that does not know the switch, or a server that refuses it, falls back to a plain add,
         // which only the Operator or an orchestrator may do.
+        let goals = []; try { goals = JSON.parse(call('coral-board', ['goal', 'list', '--json']).stdout); } catch (e) { log('could not read the goals:', String(e.message || e).slice(0, 120)); }
+        const picked = pickGoal(goals, wantedGoal); // a goal that is open: #163 was closed and refused the task
+        if (picked.id == null) throw new Error(picked.why);
+        const goal = picked.id; log('filing under', picked.why);
         const base = ['task', 'add', title, '--goal', goal, '--body', taskBody(manifest, sheetLink), '--priority', 'medium'];
         let add = call('coral-board', [...base, '--self'], { allowFail: true });
         if (add.status !== 0 && /flag provided but not defined|unknown flag|unknown option|not defined: -self/i.test(add.stderr + add.stdout)) add = call('coral-board', [...base, ...(me ? ['--assignee', me] : [])], { allowFail: true });
-        if (add.status !== 0) throw new Error(`this identity cannot create the task (${(add.stderr || add.stdout || '').trim().split('\n')[0]}). Ask the orchestrator to create "${title}" on goal #${goal} assigned to ${me || 'the runner'}, then run again (or pass --task N)`);
+        if (add.status !== 0) throw new Error(`this identity cannot create the task (${(add.stderr || add.stdout || '').trim().split('\n')[0]}). Ask the orchestrator to create "${title}" on an open goal assigned to ${me || 'the runner'}, then run again (or pass --task N)`);
         id = Number((add.stdout.match(/(?:Created Task|Task) #(\d+)/) || [])[1]);
         if (!id) throw new Error('no task id in: ' + add.stdout.trim().slice(0, 120));
     }

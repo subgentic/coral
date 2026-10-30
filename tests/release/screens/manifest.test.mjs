@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { versionTag, taskTitle, artifactName, expectedLink, buildManifest, taskBody, NAME_RE, reviewName, reviewUploadArgs, REVIEW_TAGS, sheetArtifactName } from './manifest.mjs';
+import { versionTag, taskTitle, artifactName, expectedLink, buildManifest, taskBody, NAME_RE, reviewName, reviewUploadArgs, REVIEW_TAGS, sheetArtifactName, pickGoal } from './manifest.mjs';
 
 const results = [
     { id: 'home', width: '1440', theme: 'dark', file: 'dark/home__1440.png', ok: true, sha: 'a'.repeat(64), notes: '' },
@@ -84,4 +84,16 @@ test('the review upload carries the "for review" tag and the contact sheet, on t
 
 test('the sheet is uploaded under the review line from the start: Coral keeps the first upload\'s name for bytes it already has', () => {
     assert.equal(sheetArtifactName(withChanges(), 'v2.0.7'), 'UI review v2.0.8: 2 pages shot, 1 changed vs v2.0.7.html');
+});
+
+test('the goal is one that is open: the asked one, else the lowest open "UI review" goal, else none with the reason', () => {
+    const goals = [{ id: 129, state: 'active', title: 'New User Onboarding Experience' }, { id: 163, state: 'done', title: 'UI review of every release' }, { id: 170, state: 'active', title: 'UI review of every release' }, { id: 171, state: 'blocked', title: 'The UI review backlog' }];
+    assert.equal(pickGoal(goals, '129').id, 129, 'an open goal that was asked for');
+    assert.equal(pickGoal(goals, '163').id, 170, 'a closed one is not used: the open UI review goal is');
+    assert.equal(pickGoal(goals, undefined).id, 170);
+    assert.match(pickGoal(goals, '163').why, /#163 is not open/);
+    const none = pickGoal([{ id: 129, state: 'active', title: 'Onboarding' }], '163');
+    assert.equal(none.id, null);
+    assert.match(none.why, /orchestrator/);
+    assert.equal(pickGoal(null, undefined).id, null);
 });
