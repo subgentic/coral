@@ -7,7 +7,7 @@ const BASE = require('./test_base').BASE;
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
-    const { settle } = require('./helpers/wait').bind(ev);
+    const { settle } = require('./helpers/wait').bind(ev), { coralReady } = require('./helpers/wait');
     const shot = async n => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; require('node:fs').mkdirSync(d, { recursive: true }); require('node:fs').writeFileSync(`${d}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     const measure = () => ev(`(() => { const vis = e => e && e.getClientRects().length > 0 && getComputedStyle(e).visibility !== 'hidden';
         const bar = [...document.querySelectorAll('.phone-bar')].find(vis); if (!bar) return null;
@@ -21,7 +21,7 @@ const BASE = require('./test_base').BASE;
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [w, fs, theme] of [[390, 16, 'dark'], [390, 16, 'light'], [390, 32, 'dark'], [500, 16, 'dark']]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: 844, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
             await ev(`document.documentElement.style.fontSize = '${fs}px'; document.documentElement.setAttribute('data-theme', '${theme}'); true`);
             const got = {};
             for (const [tab, name] of VIEWS) {
@@ -43,12 +43,12 @@ const BASE = require('./test_base').BASE;
         }
         // a window between 601 and 767 px keeps its own layout, but Home's search is in the bar's pill and must still be there (the list is the page up to 767 px): visible, with no ☰ or avatar drawn
         await Emulation.setDeviceMetricsOverride({ width: 700, height: 844, deviceScaleFactor: 1, mobile: false }); await Emulation.setTouchEmulationEnabled({ enabled: false });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`); await settle(500);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev); await settle(500);
         const wide = await ev(`(() => { const i = document.querySelector('#mobile-agent-list .mobile-search-input'), m = document.querySelector('#mobile-agent-list .phone-menu-btn'), a = document.querySelector('#mobile-agent-list .phone-account-btn'); return { search: !!i && i.getBoundingClientRect().width > 100, menu: !!m && m.getClientRects().length > 0, account: !!a && a.getClientRects().length > 0 }; })()`);
         assert.deepEqual(wide, { search: true, menu: false, account: false }, 'at 700 px Home has its search and no phone ☰ or avatar: ' + JSON.stringify(wide));
         // a new Coral's Home on a short phone (the Mobile Beta Tester's walk, item 6): its last card, Open folder, can be scrolled to and ends above the floating nav, not under it
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 640, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`); await settle(600);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev); await settle(600);
         const end = await ev(`(() => { const list = document.getElementById('mobile-agent-list'); list.scrollTop = list.scrollHeight; const card = [...list.querySelectorAll('button, a, [role=button], .welcome-launch')].filter(e => e.getClientRects().length && /Open folder/.test(e.textContent)).pop(); const nav = document.getElementById('phone-nav'); if (!card) return null; return { cardBottom: Math.round(card.getBoundingClientRect().bottom), navTop: getComputedStyle(nav).display === 'none' ? 9999 : Math.round(nav.getBoundingClientRect().top) }; })()`);
         assert.ok(end && end.cardBottom <= end.navTop, 'the Open folder card scrolls to above the bottom nav: ' + JSON.stringify(end));
         // a drill-down is not this bar: no ☰ and no avatar
