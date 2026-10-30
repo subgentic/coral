@@ -277,12 +277,12 @@ func TestAShortSuffixOfASessionIsNoAgent(t *testing.T) {
 	e := newShareEnv(t, true)
 	short := sessAlice[len(sessAlice)-4:] // the end of Alice's session id: it names nobody
 	code, _ := e.upload(t, short, "a.txt", "x")
-	assert.Equal(t, http.StatusNotFound, code, "a short suffix is refused before anything is stored")
+	assert.Contains(t, []int{http.StatusBadRequest, http.StatusNotFound}, code, "a short suffix is refused before anything is stored")
 	entries, _ := os.ReadDir(filepath.Join(e.coralDir, "artifacts", "objects"))
 	assert.Empty(t, entries)
 	_, up := e.upload(t, sessAlice, "a.txt", "x")
 	code, _ = e.tell(t, short, up["id"].(string))
-	assert.Equal(t, http.StatusNotFound, code, "and the message route does not take it either")
+	assert.Contains(t, []int{http.StatusBadRequest, http.StatusNotFound}, code, "and the message route does not take it either")
 	assert.Empty(t, e.operatorMessages(t))
 }
 
@@ -342,4 +342,23 @@ func TestTheMinuteLimiterForgetsABoardThatWentQuiet(t *testing.T) {
 	require.False(t, l.allow("a", 1, now.Add(time.Second)))
 	require.True(t, l.allow("b", 1, now.Add(2*time.Minute)), "a minute on, the first board's entry is pruned")
 	assert.NotContains(t, l.seen, "a", "an empty key is deleted")
+}
+
+func TestASessionIdThatIsNoUuidNamesNoAgent(t *testing.T) {
+	e := newShareEnv(t, true)
+	for _, odd := range []string{"alice", "claude-x", "1234"} {
+		code, _ := e.upload(t, odd, "a.txt", "x")
+		assert.Equal(t, http.StatusBadRequest, code, odd)
+		code, _ = e.tell(t, odd, strings.Repeat("a", 64))
+		assert.Equal(t, http.StatusBadRequest, code, odd)
+	}
+}
+
+func TestAUuidShapedSuffixOfALongerSessionIsNoAgent(t *testing.T) {
+	e := newShareEnv(t, true)
+	longer := "ffffffff-" + sessAlice // ends with Alice's whole id, and looks like a uuid
+	code, _ := e.upload(t, longer, "a.txt", "x")
+	assert.Equal(t, http.StatusNotFound, code)
+	entries, _ := os.ReadDir(filepath.Join(e.coralDir, "artifacts", "objects"))
+	assert.Empty(t, entries)
 }

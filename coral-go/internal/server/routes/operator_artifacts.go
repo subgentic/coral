@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -94,6 +95,9 @@ var operatorShares = struct {
 	m map[string]operatorShare
 }{m: map[string]operatorShare{}}
 
+// sessionIDLike is what an agent's session id looks like (a uuid): 32 or more hex digits and dashes. Anything else names no agent, so an oddly named session cannot match a shorter id.
+var sessionIDLike = regexp.MustCompile(`^[0-9a-fA-F-]{32,}$`)
+
 func shareKey(project, sessionID, hexID string) string {
 	return project + "\x00" + sessionID + "\x00" + hexID
 }
@@ -165,7 +169,7 @@ func (h *BoardHandler) UploadOperatorArtifact(w http.ResponseWriter, r *http.Req
 	}
 	project := urlParam(r, "project")
 	sessionID := r.URL.Query().Get("session_id")
-	if !safefs.IsSafeID(sessionID) {
+	if !safefs.IsSafeID(sessionID) || !sessionIDLike.MatchString(sessionID) {
 		errBadRequest(w, "session_id names the agent the file is for")
 		return
 	}
@@ -325,7 +329,7 @@ func (h *BoardHandler) ShareOperatorArtifacts(w http.ResponseWriter, r *http.Req
 		commentRefuse(w, http.StatusConflict, "board_paused", "the board is paused: nothing is sent to its agents until it is resumed")
 		return
 	}
-	if !safefs.IsSafeID(body.SessionID) || len(body.Digests) == 0 || len(body.Digests) > maxShareFiles {
+	if !safefs.IsSafeID(body.SessionID) || !sessionIDLike.MatchString(body.SessionID) || len(body.Digests) == 0 || len(body.Digests) > maxShareFiles {
 		errBadRequest(w, fmt.Sprintf("session_id and 1 to %d digests", maxShareFiles))
 		return
 	}
