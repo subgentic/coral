@@ -550,6 +550,7 @@ func (m *PTYBackend) NoteLaunch(name, script, cli string) {
 	if h, can := s.proc.(handoffNoter); can {
 		h.NoteLaunch(script, cli)
 	}
+	tmux.NoteLaunchCLI(name, cli) // a Unix pseudo-terminal: the CLI a wrapper script has to be (#408)
 }
 
 // AgentNoticeVerdict says whether a notice may be typed into a session's terminal. ok is false when the session is gone or the platform cannot tell.
@@ -601,7 +602,7 @@ func (m *PTYBackend) OtherShell(name string) (shell string, ok bool) {
 	if r, can := s.proc.(otherShellReporter); can { // Windows ConPTY
 		sh, err = r.OtherShell()
 	} else if sp, can := s.proc.(shellPIDReporter); can { // a Unix pseudo-terminal
-		sh, err = tmux.NestedShellOf(sp.ShellPID())
+		sh, err = tmux.NestedShellOf(sp.ShellPID(), tmux.WrapperCheckFor(name))
 	} else {
 		return "", false
 	}
@@ -632,7 +633,7 @@ func (m *PTYBackend) ShellIdle(name string) (idle bool, shell string, ok bool) {
 	if !can {
 		return false, "", false
 	}
-	idle, shell, err := tmux.ShellIdle(sp.ShellPID())
+	idle, shell, err := tmux.ShellIdle(sp.ShellPID(), tmux.WrapperCheckFor(name))
 	if err != nil {
 		return false, "", false
 	}

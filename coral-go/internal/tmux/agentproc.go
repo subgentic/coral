@@ -65,6 +65,9 @@ var agentRecs = struct {
 
 // ForgetAgentProc drops what Coral recorded of a session's agent process (the session ended, or a new launch line is about to be typed).
 func ForgetAgentProc(session string) {
+	launchCLIs.Lock()
+	delete(launchCLIs.m, session) // the CLI path noted for the old launch (a new launch notes its own; the database keeps the row until the session ends)
+	launchCLIs.Unlock()
 	agentRecs.Lock()
 	defer agentRecs.Unlock()
 	if r, ok := agentRecs.m[session]; ok {
@@ -215,7 +218,7 @@ func watchForAgent(ctx context.Context, session string, findShell func(context.C
 		if err != nil {
 			continue
 		}
-		cand, ok := adoptCandidate(procs, shell)
+		cand, ok := adoptCandidate(procs, shell, wrapperIsCLI(launchCLIOf(session)))
 		if !ok {
 			last, since = AgentProc{}, time.Time{} // none yet, or more than one: nothing to adopt
 			continue
@@ -243,7 +246,11 @@ type fgProg struct {
 
 // programsBelowUnder lists the foreground programs (a '+' in ps state, not shells) below the pane's shell, walking through the shells in between: the top ones, not their own children
 // (an agent's tools run in its foreground group too, and are its). deep is true when the walk hit its depth bound.
-func programsBelowUnder(t *procTable, shell int) (progs []fgProg, deep bool) {
+//
+// agent, when given (at most one is used), names a shell that IS the agent: a foreground shell running exactly the resolved CLI script (wrapperIsCLI). It is a program, not a shell to walk
+// through (#408): a wrapper script that stays alive with no children of its own would otherwise show no program at all.
+func programsBelowUnder(t *procTable, shell int, agent ...func(pid int) bool) (progs []fgProg, deep bool) {
+	isAgent := firstAgent(agent)
 	seen := map[int]bool{}
 	var walk func(pid, depth int, under string)
 	walk = func(pid, depth int, under string) {
@@ -258,6 +265,10 @@ func programsBelowUnder(t *procTable, shell int) (progs []fgProg, deep bool) {
 		for _, c := range t.children[pid] {
 			e := t.byPID[c]
 			if IsShellCommand(e.comm) {
+				if isAgent != nil && strings.Contains(e.stat, "+") && isAgent(c) {
+					progs = append(progs, fgProg{c, under})
+					continue
+				}
 				u := under
 				if u == "" {
 					u = ProgramBase(e.comm)
@@ -273,8 +284,8 @@ func programsBelowUnder(t *procTable, shell int) (progs []fgProg, deep bool) {
 }
 
 // programsBelow is programsBelowUnder's pids.
-func programsBelow(t *procTable, shell int) (progs []int, deep bool) {
-	list, deep := programsBelowUnder(t, shell)
+func programsBelow(t *procTable, shell int, agent ...func(pid int) bool) (progs []int, deep bool) {
+	list, deep := programsBelowUnder(t, shell, agent...)
 	for _, p := range list {
 		progs = append(progs, p.pid)
 	}
@@ -282,8 +293,8 @@ func programsBelow(t *procTable, shell int) (progs []int, deep bool) {
 }
 
 // adoptCandidate is the one foreground program below the pane's shell, or false when there is none or more than one (nothing is adopted then).
-func adoptCandidate(t *procTable, shell int) (AgentProc, bool) {
-	progs, deep := programsBelow(t, shell)
+func adoptCandidate(t *procTable, shell int, agent ...func(pid int) bool) (AgentProc, bool) {
+	progs, deep := programsBelow(t, shell, agent...)
 	if deep || len(progs) != 1 {
 		return AgentProc{}, false
 	}
@@ -291,12 +302,21 @@ func adoptCandidate(t *procTable, shell int) (AgentProc, bool) {
 }
 
 // decideNotice is whether a notice may be typed given the recorded process: it is alive (same pid, same start time) and it is the only foreground program of the pane.
-func decideNotice(t *procTable, shell int, rec AgentProc) NoticeVerdict {
+func decideNotice(t *procTable, shell int, rec AgentProc, recheck ...func(pid int) bool) NoticeVerdict {
 	e, ok := t.byPID[rec.PID]
 	if !ok || e.start != rec.Start {
 		return NoticeVerdict{Reason: ReasonGone}
 	}
-	progs, deep := programsBelow(t, shell)
+	// The recorded process is the same process (pid and start time, checked above). A recorded process that is a shell is the agent only while it still runs exactly the resolved CLI script, checked at EVERY notice (recheck is wrapperIsCLI for the session's CLI; with
+	// none, a recorded shell is not the agent): a wrapper that ends in `exec bash -i` has the same pid and start time and is a person's shell from then on.
+	var agent func(pid int) bool
+	if IsShellCommand(t.byPID[rec.PID].comm) {
+		check := firstAgent(recheck)
+		agent = func(pid int) bool { return pid == rec.PID && check != nil && check(pid) }
+	} else {
+		agent = func(pid int) bool { return pid == rec.PID }
+	}
+	progs, deep := programsBelow(t, shell, agent)
 	if deep {
 		return NoticeVerdict{Reason: ReasonForeground}
 	}
@@ -338,7 +358,7 @@ func noticeVerdict(procs *procTable, shell int, session string, load func() (Age
 		return NoticeVerdict{Wait: true, Reason: ReasonAdopting}
 	}
 	if adopted {
-		v := decideNotice(procs, shell, rec)
+		v := decideNotice(procs, shell, rec, wrapperIsCLI(launchCLIOf(session)))
 		if v.OK || v.Reason != ReasonGone {
 			return v
 		}
@@ -349,7 +369,7 @@ func noticeVerdict(procs *procTable, shell int, session string, load func() (Age
 	// Nothing in memory (a Coral restart): the process kept in the tmux session is checked, that exact one, never guessed from what the pane runs now.
 	if load != nil {
 		if kept, ok := load(); ok {
-			v := decideNotice(procs, shell, kept)
+			v := decideNotice(procs, shell, kept, wrapperIsCLI(launchCLIOf(session)))
 			if v.Reason != ReasonGone {
 				agentRecs.Lock()
 				if r := agentRecs.m[session]; r == nil || !r.adopting {
