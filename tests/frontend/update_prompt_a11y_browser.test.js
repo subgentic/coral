@@ -63,7 +63,7 @@ const { watch, clear, log, said } = require('./helpers/announce_census');
             assert.match(d.desc, /Nothing is installed until you choose Update and relaunch/, `${tag}: it is described by its body, which has the consent line (${d.desc})`);
             assert.ok(d.inside && /update-later/.test(d.focus), `${tag}: focus is on Later, the safe answer, because agents would restart (${d.focus})`);
             assert.equal(d.list && d.list.name, 'Agents that restart', `${tag}: the agent list is named`);
-            assert.deepEqual(d.list.spoken, ['release-agent working starts again afterwards', 'docs-agent waiting for you starts a new conversation'], `${tag}: each agent reads as words with spaces between its parts (${JSON.stringify(d.list.items)})`);
+            assert.deepEqual(d.list.spoken, ['release-agent working wakes again afterwards, in the same conversation', 'docs-agent waiting for you starts a new conversation'], `${tag}: each agent reads as words with spaces between its parts (${JSON.stringify(d.list.items)})`);
             assert.deepEqual(d.list.plain.filter(t => /[a-z]working|[a-z]waiting|you(starts|a new)|afterwards[a-z]/.test(t)), [], `${tag}: the words of an agent's row are not run together in the page's text (${JSON.stringify(d.list.plain)}; shown as ${JSON.stringify(d.list.shown)})`);
             assert.ok(d.buttons.includes('Later') && d.buttons.some(b => /^Update and relaunch, restart 2 agents$/.test(b)), `${tag}: the buttons say what they do (${JSON.stringify(d.buttons)})`);
 
