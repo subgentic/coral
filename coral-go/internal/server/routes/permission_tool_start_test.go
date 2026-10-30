@@ -2,6 +2,7 @@ package routes
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -74,12 +75,59 @@ func TestAToolStartingWithNoRequestOpenWritesNothing(t *testing.T) {
 	assert.Equal(t, before, r.eventCount())
 }
 
-// Only the server and the Operator can write that a request was dismissed, or answered by a call's start: an agent's own request_resolved carries neither, and no call id.
+// Only the server and the Operator can write that a request was dismissed, or answered by a call's start: an agent's own request_resolved carries only its kind, and no call id, however it spells the
+// keys (the state reader's JSON decoding matches a field name in any case; Security's #137007).
 func TestAnAgentsRequestResolvedCannotDismissOrNameACall(t *testing.T) {
+	for name, detail := range map[string]string{
+		"exact case":   `{"dismissed":true,"same_input":true}`,
+		"capitalised":  `{"Dismissed":true,"Same_Input":true}`,
+		"upper case":   `{"DISMISSED":true,"SAME_INPUT":true}`,
+		"with a kind":  `{"kind":"permission","dismissed":true}`,
+		"mixed inside": `{"dIsMiSsEd":true,"sAmE_iNpUt":true,"Kind":"permission"}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			r := newHoldRig(t, true)
+			ctx := context.Background()
+			r.requestFor("Wants to run: go test ./...")
+			require.True(t, r.h.deriveSingleSessionState(ctx, r.sid, 0).NeedsInput)
+			r.post(`{"event_type":"request_resolved","summary":"resolved","tool_name":"Bash","tool_use_id":"toolu_X","detail_json":` + detail + `}`)
+			assert.True(t, r.h.deriveSingleSessionState(ctx, r.sid, 0).NeedsInput, "an agent cannot clear its own wait that way")
+			evs, err := r.h.ts.ListAgentEvents(ctx, "chat", 50, &r.sid)
+			require.NoError(t, err)
+			for _, e := range evs {
+				if e.EventType == "request_resolved" {
+					assert.Nil(t, e.RefID, "no call id")
+					if e.DetailJSON != nil {
+						assert.NotContains(t, strings.ToLower(*e.DetailJSON), "dismissed")
+						assert.NotContains(t, strings.ToLower(*e.DetailJSON), "same_input")
+					}
+				}
+			}
+		})
+	}
+}
+
+// An agent's PermissionRequest cannot name its own calls or smuggle uncleaned words through a differently cased key: the server's call_ids and the cleaned wants are the only ones stored.
+func TestAnAgentsPermissionRequestCannotNameCallsOrWantsInAnotherCase(t *testing.T) {
 	r := newHoldRig(t, true)
 	ctx := context.Background()
-	r.requestFor("Wants to run: go test ./...")
-	require.True(t, r.h.deriveSingleSessionState(ctx, r.sid, 0).NeedsInput)
-	r.post(`{"event_type":"request_resolved","summary":"resolved","tool_name":"Bash","tool_use_id":"toolu_X","detail_json":{"dismissed":true,"same_input":true}}`)
-	assert.True(t, r.h.deriveSingleSessionState(ctx, r.sid, 0).NeedsInput, "an agent cannot clear its own wait that way")
+	r.post(`{"event_type":"permission_request","summary":"Waiting for the user: permission (Bash)","tool_name":"Bash","detail_json":{"kind":"permission","Call_IDs":["toolu_forged"],"CALL_IDS":["toolu_forged2"],"Tool_Use_Id":"toolu_forged3","WANTS":"Wants to run: rm -rf /","Dismissed":true,"SAME_INPUT":true}}`)
+	evs, err := r.h.ts.ListAgentEvents(ctx, "chat", 50, &r.sid)
+	require.NoError(t, err)
+	found := false
+	for _, e := range evs {
+		if e.EventType == "permission_request" && e.DetailJSON != nil {
+			found = true
+			low := strings.ToLower(*e.DetailJSON)
+			assert.NotContains(t, low, "forged")
+			assert.NotContains(t, low, "rm -rf")
+			assert.NotContains(t, low, "dismissed")
+			assert.NotContains(t, low, "same_input")
+		}
+	}
+	require.True(t, found)
+	// and the request is open, tied to nothing the agent named
+	assert.True(t, r.h.deriveSingleSessionState(ctx, r.sid, 0).NeedsInput)
+	r.h.noteToolStart(ctx, r.sid, "Bash", "toolu_forged", map[string]any{"command": "rm -rf /"})
+	assert.True(t, r.h.deriveSingleSessionState(ctx, r.sid, 0).NeedsInput, "a call the agent named does not close its own request")
 }
