@@ -3605,11 +3605,13 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
     .settings-tab .sd-dot { margin-left: auto; margin-right: .6rem; }
     .settings-tab:has(.sd-dot:not([hidden]))::after { margin-left: 0; }
     .settings-tab[aria-selected="true"] { background: none; box-shadow: none; font-weight: var(--fw-regular); }
-    #settings-modal:not([data-screen="pane"]) .modal-header { display: flex; align-items: center; gap: 4px; min-height: 56px; padding: 0 4px; }
+    #settings-modal:not([data-screen="pane"]) .modal-header { display: flex; align-items: center; gap: 4px; box-sizing: border-box; height: 56px; min-height: 0; padding: 0 4px; border-bottom: 1px solid var(--border); }
     #settings-modal:not([data-screen="pane"]) .settings-bar-back { display: inline-grid; place-items: center; flex: none; width: var(--control-touch-height, 44px); height: var(--control-touch-height, 44px); padding: 0; border: 0; border-radius: 22px; background: none; color: var(--text-primary); font-size: var(--fs-2xl); cursor: pointer; } /* the sections' list: ← closes Settings, the title beside it (a bar, not a title over a Close at the bottom only) */
     #settings-modal .modal-header h3 { margin: 0; }
-    @media (max-height: 500px) { #settings-modal:not([data-screen="pane"]) .modal-header { min-height: 44px; } } /* a phone turned sideways: the bar is the arrow's height, the form keeps its room (phone_landscape_dialogs) */
-    #settings-modal[data-screen="pane"] .modal-header { padding: 0; min-height: 0; }
+    @media (max-height: 500px) { #settings-modal:not([data-screen="pane"]) .modal-header { height: 44px; } } /* a phone turned sideways: the bar is the arrow's height, the form keeps its room (phone_landscape_dialogs) */
+    #settings-modal[data-screen="pane"] .modal-header { position: absolute; width: 1px; height: 1px; margin: 0; padding: 0; min-height: 0; overflow: hidden; border: 0; clip-path: inset(50%); }
+    #settings-modal[data-screen="pane"] .modal-content { padding-top: 0; }
+    #settings-modal[data-screen="pane"] .settings-panes { padding-top: 0; } /* a section: its own bar (the way back) is the first row, not under an empty strip */
     #settings-modal[data-screen="pane"] #settings-title { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; } /* a section is open: its way back says Settings, so the title is not said twice; the dialog keeps its name (#10783) */
     #settings-modal[data-screen="pane"] .settings-back { display: inline-flex; align-items: center; gap: .4rem; min-height: 56px; margin: -.8rem 0 .4rem -.6rem; }
     .settings-panes { padding: .8rem 1rem 1.2rem; }
