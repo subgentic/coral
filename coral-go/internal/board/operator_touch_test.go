@@ -25,12 +25,12 @@ func TestOperatorTouchHoldsNoText(t *testing.T) {
 	for _, c := range cols {
 		names = append(names, c.Name)
 	}
-	assert.Equal(t, []string{"id", "at", "kind", "team", "agent"}, names, "the table is the whole record: no column for text, a length or anything typed")
+	assert.Equal(t, []string{"id", "at", "kind", "team", "agent", "source"}, names, "the table is the whole record: no column for text, a length or anything typed")
 
 	// What is recorded is only what the signature takes: kind, team, agent and time. A secret typed, a long paste and a name written to look like text leave nothing but the kind and the agent.
 	secret := "correct horse battery staple " + strings.Repeat("x", 4000)
-	require.NoError(t, s.RecordOperatorTouch(ctx, "team", "Dev", TouchTyped, time.Now()))
-	require.NoError(t, s.RecordOperatorTouch(ctx, "team", "Dev", TouchAnswer, time.Now()))
+	require.NoError(t, s.RecordOperatorTouch(ctx, "team", "Dev", TouchTyped, TouchLocal, time.Now()))
+	require.NoError(t, s.RecordOperatorTouch(ctx, "team", "Dev", TouchAnswer, TouchHub, time.Now()))
 	var rows []struct {
 		At, Kind, Team, Agent string
 	}
@@ -42,8 +42,9 @@ func TestOperatorTouchHoldsNoText(t *testing.T) {
 	_ = secret
 
 	// A kind that is not one of the six, or no team or agent, is refused and stores nothing.
-	for _, bad := range [][3]string{{"team", "Dev", "typed text"}, {"team", "Dev", ""}, {"", "Dev", TouchTyped}, {"team", "", TouchTyped}} {
-		assert.ErrorIs(t, s.RecordOperatorTouch(ctx, bad[0], bad[1], bad[2], time.Now()), ErrBadTouch, fmt.Sprint(bad))
+	for _, bad := range [][4]string{{"team", "Dev", "typed text", TouchLocal}, {"team", "Dev", "", TouchLocal}, {"", "Dev", TouchTyped, TouchLocal}, {"team", "", TouchTyped, TouchLocal},
+		{"team", "Dev", TouchTyped, ""}, {"team", "Dev", TouchTyped, "grantee: some text"}} {
+		assert.ErrorIs(t, s.RecordOperatorTouch(ctx, bad[0], bad[1], bad[2], bad[3], time.Now()), ErrBadTouch, fmt.Sprint(bad))
 	}
 	var n int
 	require.NoError(t, s.db.GetContext(ctx, &n, `SELECT COUNT(*) FROM operator_touch`))
@@ -55,7 +56,7 @@ func TestOperatorTouchesCountByKindDayAndAgent(t *testing.T) {
 	ctx := context.Background()
 	now := time.Now().UTC()
 	rec := func(team, agent, kind string, ago time.Duration) {
-		require.NoError(t, s.RecordOperatorTouch(ctx, team, agent, kind, now.Add(-ago)))
+		require.NoError(t, s.RecordOperatorTouch(ctx, team, agent, kind, TouchLocal, now.Add(-ago)))
 	}
 	rec("team", "Dev", TouchTyped, time.Hour)
 	rec("team", "Dev", TouchTyped, 2*time.Hour)
@@ -93,9 +94,9 @@ func TestOperatorTouchesAreKeptNinetyDays(t *testing.T) {
 	s := testStore(t)
 	ctx := context.Background()
 	now := time.Now().UTC()
-	require.NoError(t, s.RecordOperatorTouch(ctx, "team", "Dev", TouchTyped, now.Add(-89*24*time.Hour)))
-	require.NoError(t, s.RecordOperatorTouch(ctx, "team", "Dev", TouchTyped, now.Add(-91*24*time.Hour)))
-	require.NoError(t, s.RecordOperatorTouch(ctx, "team", "Dev", TouchStop, now.Add(-200*24*time.Hour)))
+	require.NoError(t, s.RecordOperatorTouch(ctx, "team", "Dev", TouchTyped, TouchLocal, now.Add(-89*24*time.Hour)))
+	require.NoError(t, s.RecordOperatorTouch(ctx, "team", "Dev", TouchTyped, TouchLocal, now.Add(-91*24*time.Hour)))
+	require.NoError(t, s.RecordOperatorTouch(ctx, "team", "Dev", TouchStop, TouchLocal, now.Add(-200*24*time.Hour)))
 	n, err := s.PruneOperatorTouches(ctx, now)
 	require.NoError(t, err)
 	assert.EqualValues(t, 2, n)
@@ -162,4 +163,67 @@ func TestTaskMessageCountsAreOfTheTimeATaskIsInProgress(t *testing.T) {
 	// the window is checked
 	_, _, err = s.TaskMessageCounts(ctx, "team", until, since)
 	assert.ErrorIs(t, err, ErrBadActivityWindow)
+}
+
+// Security's #11225 SHOULD 2: a touch says where it came from, one fixed word, so the tab can tell the person at this computer from a Coral Hub caller.
+func TestOperatorTouchesSaySourceLocalOrHub(t *testing.T) {
+	s := testStore(t)
+	ctx := context.Background()
+	now := time.Now().UTC()
+	require.NoError(t, s.RecordOperatorTouch(ctx, "team", "Dev", TouchTyped, TouchLocal, now.Add(-time.Hour)))
+	require.NoError(t, s.RecordOperatorTouch(ctx, "team", "Dev", TouchTyped, TouchLocal, now.Add(-2*time.Hour)))
+	require.NoError(t, s.RecordOperatorTouch(ctx, "team", "QA", TouchStop, TouchHub, now.Add(-3*time.Hour)))
+	since, until := activityWindow()
+	got, err := s.OperatorTouches(ctx, "team", since, until)
+	require.NoError(t, err)
+	assert.Equal(t, TouchSources{Local: 2, Hub: 1}, got.Sources)
+	assert.Equal(t, 3, got.Kinds.Total(), "the kinds count every source")
+	b, _ := json.Marshal(got)
+	assert.Contains(t, string(b), `"sources":{"local":2,"hub":1}`)
+}
+
+// A table made before the source column (a development build) gets it on the next start, every earlier row the local person's.
+func TestAnEarlierOperatorTouchTableGainsTheSourceColumn(t *testing.T) {
+	s := testStore(t)
+	ctx := context.Background()
+	_, err := s.db.ExecContext(ctx, `DROP TABLE operator_touch`)
+	require.NoError(t, err)
+	_, err = s.db.ExecContext(ctx, `CREATE TABLE operator_touch (id INTEGER PRIMARY KEY AUTOINCREMENT, at TEXT NOT NULL, kind TEXT NOT NULL, team TEXT NOT NULL, agent TEXT NOT NULL)`)
+	require.NoError(t, err)
+	_, err = s.db.ExecContext(ctx, `INSERT INTO operator_touch (at, kind, team, agent) VALUES (?, 'typed', 'team', 'Dev')`, time.Now().UTC().Format(time.RFC3339))
+	require.NoError(t, err)
+	require.NoError(t, s.ensureOperatorTouchSchema(ctx))
+	since, until := activityWindow()
+	got, err := s.OperatorTouches(ctx, "team", since, until)
+	require.NoError(t, err)
+	assert.Equal(t, TouchSources{Local: 1}, got.Sources)
+}
+
+// QA's #11225 INFO: the board stores times in more than one shape; a message of the same second as a claim, in a fractional-second or offset shape, is on the right side of it.
+func TestTaskMessageCountsCompareTimesNotStrings(t *testing.T) {
+	s := testStore(t)
+	ctx := context.Background()
+	for _, n := range []string{"Orchestrator", "Dev"} {
+		_, err := sub(s, ctx, "team", n, n)
+		require.NoError(t, err)
+	}
+	task, err := s.CreateTask(ctx, "team", "build it", "", "medium", "Orchestrator", "Dev")
+	require.NoError(t, err)
+	base := time.Now().UTC().Truncate(time.Second).Add(-time.Hour)
+	_, err = s.db.ExecContext(ctx, `UPDATE board_tasks SET claimed_at = ?, status = 'in_progress' WHERE id = ?`, base.Format(time.RFC3339), task.ID)
+	require.NoError(t, err)
+	post := func(at string) {
+		m, err := s.PostMessage(ctx, "team", "Dev", "a post", nil)
+		require.NoError(t, err)
+		_, err = s.db.ExecContext(ctx, `UPDATE board_messages SET created_at = ? WHERE id = ?`, at, m.ID)
+		require.NoError(t, err)
+	}
+	post(base.Add(500 * time.Millisecond).Format("2006-01-02T15:04:05.000000000+00:00"))  // the same second as the claim, fractional: after it
+	post(base.Add(-500 * time.Millisecond).Format("2006-01-02T15:04:05.000000000+00:00")) // the second before it, fractional: not the task's
+	post(base.Add(time.Minute).Format(time.RFC3339))                                      // a minute after, as Z
+	since, until := activityWindow()
+	got, _, err := s.TaskMessageCounts(ctx, "team", since, until)
+	require.NoError(t, err)
+	require.Len(t, got, 1)
+	assert.Equal(t, 2, got[0].Sent, "the post at the claim's own second counts, the one before it does not (as strings the first was the wrong side)")
 }

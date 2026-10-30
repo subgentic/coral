@@ -25,6 +25,13 @@ const (
 // TouchKinds are the kinds, in the order the tab shows them.
 var TouchKinds = []string{TouchTyped, TouchAnswer, TouchApprove, TouchWake, TouchRestart, TouchStop}
 
+// Where a touch came from: the person at this computer (the dashboard, the signed command line), or a Coral Hub caller who may act on an agent (a grantee at Interact or Launch, or the owner on
+// another device). The tab can then say which, and not count a grantee's hand as the Operator's (Security's #11225 SHOULD). One fixed word, never text.
+const (
+	TouchLocal = "local"
+	TouchHub   = "hub"
+)
+
 // TouchRetention is how long touches are kept (90 days, the longest window a read may ask for).
 const TouchRetention = 90 * 24 * time.Hour
 
@@ -34,7 +41,7 @@ const TouchBurst = 30 * time.Second
 // MaxTouchRows bounds how many grouped rows one touches read returns.
 const MaxTouchRows = 20000
 
-// ErrBadTouch means the kind is not one of TouchKinds, or the team or agent is empty.
+// ErrBadTouch means the kind is not one of TouchKinds, the source is not local or hub, or the team or agent is empty.
 var ErrBadTouch = errors.New("not an operator touch: the kind is unknown, or the team or agent is empty")
 
 func (s *Store) ensureOperatorTouchSchema(ctx context.Context) error {
@@ -45,7 +52,8 @@ func (s *Store) ensureOperatorTouchSchema(ctx context.Context) error {
 			at    TEXT NOT NULL,
 			kind  TEXT NOT NULL,
 			team  TEXT NOT NULL,
-			agent TEXT NOT NULL
+			agent TEXT NOT NULL,
+			source TEXT NOT NULL DEFAULT 'local'
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_operator_touch_team_at ON operator_touch(team, at)`,
 	} {
@@ -53,23 +61,34 @@ func (s *Store) ensureOperatorTouchSchema(ctx context.Context) error {
 			return err
 		}
 	}
+	// A table made before the source column existed (a development build) gets it, every earlier row the person at this computer's.
+	var has int
+	if err := s.db.GetContext(ctx, &has, `SELECT COUNT(*) FROM pragma_table_info('operator_touch') WHERE name = 'source'`); err != nil {
+		return err
+	}
+	if has == 0 {
+		if _, err := s.db.ExecContext(ctx, `ALTER TABLE operator_touch ADD COLUMN source TEXT NOT NULL DEFAULT 'local'`); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
-// RecordOperatorTouch records one touch of agent (its label, as the board shows it) on team at at. Nothing else is taken: the signature has no text and no length to take.
-func (s *Store) RecordOperatorTouch(ctx context.Context, team, agent, kind string, at time.Time) error {
+// RecordOperatorTouch records one touch of agent (its label, as the board shows it) on team at at, from source (TouchLocal or TouchHub). Nothing else is taken: the signature has no text and no length
+// to take.
+func (s *Store) RecordOperatorTouch(ctx context.Context, team, agent, kind, source string, at time.Time) error {
 	team, agent = strings.TrimSpace(team), strings.TrimSpace(agent)
 	valid := false
 	for _, k := range TouchKinds {
 		valid = valid || k == kind
 	}
-	if !valid || team == "" || agent == "" {
+	if !valid || team == "" || agent == "" || (source != TouchLocal && source != TouchHub) {
 		return ErrBadTouch
 	}
 	if len(agent) > 120 {
 		agent = agent[:120]
 	}
-	_, err := s.db.ExecContext(ctx, `INSERT INTO operator_touch (at, kind, team, agent) VALUES (?, ?, ?, ?)`, at.UTC().Format(time.RFC3339), kind, team, agent)
+	_, err := s.db.ExecContext(ctx, `INSERT INTO operator_touch (at, kind, team, agent, source) VALUES (?, ?, ?, ?, ?)`, at.UTC().Format(time.RFC3339), kind, team, agent, source)
 	return err
 }
 
@@ -124,9 +143,16 @@ type TouchAgent struct {
 	TouchCount
 }
 
+// TouchSources are the touches by where they came from.
+type TouchSources struct {
+	Local int `json:"local"`
+	Hub   int `json:"hub"`
+}
+
 // Touches is a team's operator touches over a window: the totals by kind, by day and by agent (counts only).
 type Touches struct {
 	Kinds     TouchCount   `json:"kinds"`
+	Sources   TouchSources `json:"sources"` // who made them: the person at this computer, or a caller through Coral Hub
 	Days      []TouchDay   `json:"days"`
 	Agents    []TouchAgent `json:"agents"`
 	Truncated bool         `json:"truncated"` // more grouped rows than MaxTouchRows: the counts are of the first ones
@@ -143,10 +169,11 @@ func (s *Store) OperatorTouches(ctx context.Context, team, since, until string) 
 		Day   string `db:"day"`
 		Agent string `db:"agent"`
 		Kind  string `db:"kind"`
+		Src   string `db:"source"`
 		N     int    `db:"n"`
 	}
-	if err := s.reader().SelectContext(ctx, &rows, `SELECT substr(at, 1, 10) AS day, agent, kind, COUNT(*) AS n FROM operator_touch
-		WHERE team = ? AND at >= ? AND at < ? GROUP BY day, agent, kind ORDER BY day LIMIT ?`, team, since, until, MaxTouchRows+1); err != nil {
+	if err := s.reader().SelectContext(ctx, &rows, `SELECT substr(at, 1, 10) AS day, agent, kind, source, COUNT(*) AS n FROM operator_touch
+		WHERE team = ? AND at >= ? AND at < ? GROUP BY day, agent, kind, source ORDER BY day LIMIT ?`, team, since, until, MaxTouchRows+1); err != nil {
 		return nil, err
 	}
 	t := &Touches{Days: []TouchDay{}, Agents: []TouchAgent{}}
@@ -164,6 +191,11 @@ func (s *Store) OperatorTouches(ctx context.Context, team, since, until string) 
 		days[r.Day].add(r.Kind, r.N)
 		agents[r.Agent].add(r.Kind, r.N)
 		t.Kinds.add(r.Kind, r.N)
+		if r.Src == TouchHub {
+			t.Sources.Hub += r.N
+		} else {
+			t.Sources.Local += r.N
+		}
 	}
 	for _, d := range days {
 		t.Days = append(t.Days, *d)

@@ -57,6 +57,7 @@ func (h *SessionsHandler) Send(w http.ResponseWriter, r *http.Request) {
 	// types directly. Anything else (an agent's tool, a script, an API key) is
 	// automation: it goes through the automated-input gate and is held while the
 	// agent waits on a prompt, so it can't answer one (#3431).
+	h.noteTouchSource(r, body.SessionID)
 	if !humanInputCaller(r) {
 		if held := h.sendAutomatedHTTP(w, r, name, body.AgentType, body.SessionID, body.Command, "/send", send); held {
 			return
@@ -125,6 +126,7 @@ func (h *SessionsHandler) Keys(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	h.noteTouchSource(r, body.SessionID)
 	// A person's Escape on its own is the Stop button: a touch of kind stop (#11225), recorded before the keys go so the keystroke is not also counted as typing.
 	if len(body.Keys) == 1 && body.Keys[0] == "Escape" {
 		h.touch(r, body.SessionID, board.TouchStop)

@@ -548,7 +548,7 @@
     },
     {
       "name": "operator_touch",
-      "sql": "CREATE TABLE operator_touch (\n\t\t\tid    INTEGER PRIMARY KEY AUTOINCREMENT,\n\t\t\tat    TEXT NOT NULL,\n\t\t\tkind  TEXT NOT NULL,\n\t\t\tteam  TEXT NOT NULL,\n\t\t\tagent TEXT NOT NULL\n\t\t)",
+      "sql": "CREATE TABLE operator_touch (\n\t\t\tid    INTEGER PRIMARY KEY AUTOINCREMENT,\n\t\t\tat    TEXT NOT NULL,\n\t\t\tkind  TEXT NOT NULL,\n\t\t\tteam  TEXT NOT NULL,\n\t\t\tagent TEXT NOT NULL,\n\t\t\tsource TEXT NOT NULL DEFAULT 'local'\n\t\t)",
       "tbl_name": "operator_touch",
       "type": "table"
     },
@@ -4922,6 +4922,15 @@
           "dflt_value": null,
           "hidden": 0,
           "name": "agent",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 5,
+          "dflt_value": "'local'",
+          "hidden": 0,
+          "name": "source",
           "notnull": 1,
           "pk": 0,
           "type": "TEXT"

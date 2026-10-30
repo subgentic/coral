@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/require"
 
 	"github.com/subgentic/coral/internal/board"
@@ -56,8 +57,8 @@ func TestActivityRouteCarriesTouchesAndTaskMessagesAsCountsOnly(t *testing.T) {
 	require.NoError(t, err)
 	task, err := bs.CreateTask(ctx, "team", "build", "", "medium", "Operator", "Dev")
 	require.NoError(t, err)
-	require.NoError(t, bs.RecordOperatorTouch(ctx, "team", "Dev", board.TouchTyped, time.Now()))
-	require.NoError(t, bs.RecordOperatorTouch(ctx, "team", "Dev", board.TouchStop, time.Now()))
+	require.NoError(t, bs.RecordOperatorTouch(ctx, "team", "Dev", board.TouchTyped, board.TouchLocal, time.Now()))
+	require.NoError(t, bs.RecordOperatorTouch(ctx, "team", "Dev", board.TouchStop, board.TouchHub, time.Now()))
 	_, err = bs.PostMessage(ctx, "team", "Dev", "SECRET-WORDS @Operator", nil)
 	require.NoError(t, err)
 	h := NewActivityHandler(bs)
@@ -82,4 +83,80 @@ func TestActivityRouteCarriesTouchesAndTaskMessagesAsCountsOnly(t *testing.T) {
 	require.NotNil(t, out.Activity.TaskMessages, "task_messages is a list (empty when no task was in progress)")
 	require.False(t, strings.Contains(body, "SECRET-WORDS"), "the reply carries counts, never text")
 	_ = task
+}
+
+// #11225 (Security's MUST): through Coral Hub the activity counts are the owner's alone: a grantee at Launch or below, an owner from another account and an unlabelled caller get 403 owner_only; the
+// owner and this computer's own dashboard read it.
+func TestActivityThroughTheHubIsOwnerOnly(t *testing.T) {
+	bs, err := board.NewStoreWithKey(filepath.Join(t.TempDir(), "board.db"), "")
+	require.NoError(t, err)
+	t.Cleanup(func() { bs.Close() })
+	ctx := context.Background()
+	_, err = bs.Subscribe(ctx, "team", "Dev", "Dev", "claude-dev", nil, "all")
+	require.NoError(t, err)
+	_, err = bs.PostMessage(ctx, "team", "Dev", "PRIVATE-TEXT", nil)
+	require.NoError(t, err)
+	r := chi.NewRouter()
+	r.Get("/api/analytics/activity", NewActivityHandler(bs).Activity)
+	srv := httptest.NewServer(r)
+	t.Cleanup(srv.Close)
+	for _, c := range hubCallers() {
+		withLabel(t, c.label, nil)
+		status, body := hubGet(t, srv.URL+"/api/analytics/activity?team=team&range=7d", c.header)
+		if c.allow {
+			require.Equal(t, http.StatusOK, status, c.name+": "+body)
+			continue
+		}
+		require.Equal(t, http.StatusForbidden, status, c.name)
+		if strings.Contains(c.name, "no enrolled label") {
+			require.Contains(t, body, "owner_label_missing", c.name) // the owner of a machine that recorded no owner at enrolment: asked to confirm it, not told they are not the owner
+		} else {
+			require.Contains(t, body, "owner_only", c.name)
+			require.Contains(t, body, "the account this computer is linked to only", c.name)
+		}
+		require.NotContains(t, body, "agent_posts", c.name+": a refusal carries no counts")
+	}
+	// this computer's own request (not through the Hub) is as before
+	withLabel(t, ownerLabel, nil)
+	status, _ := hubGet(t, srv.URL+"/api/analytics/activity?team=team&range=7d", nil)
+	require.Equal(t, http.StatusOK, status)
+}
+
+// Security's #11225 SHOULD 1: the messages are scanned once for an hour-aligned window however many reads ask for it (a polling tab, two tabs); the next hour, another team or another range is another
+// scan; and the touches, a cheap read, are fresh on every read.
+func TestActivityReadsScanTheMessagesOncePerHour(t *testing.T) {
+	bs, err := board.NewStoreWithKey(filepath.Join(t.TempDir(), "board.db"), "")
+	require.NoError(t, err)
+	t.Cleanup(func() { bs.Close() })
+	ctx := context.Background()
+	_, err = bs.Subscribe(ctx, "team", "Dev", "Dev", "claude-dev", nil, "all")
+	require.NoError(t, err)
+	_, err = bs.PostMessage(ctx, "team", "Dev", "a post", nil)
+	require.NoError(t, err)
+	h := NewActivityHandler(bs)
+	clock := time.Date(2026, 10, 30, 9, 10, 0, 0, time.UTC)
+	h.now = func() time.Time { return clock }
+
+	for i := 0; i < 5; i++ {
+		code, _ := activityGet(t, h, "team=team&range=7d")
+		require.Equal(t, http.StatusOK, code)
+	}
+	require.EqualValues(t, 1, h.scans.Load(), "five reads in the hour scanned the messages once")
+	clock = clock.Add(20 * time.Minute)
+	activityGet(t, h, "team=team&range=7d")
+	require.EqualValues(t, 1, h.scans.Load(), "still the same hour")
+
+	// a touch made after the first read shows on the next one
+	require.NoError(t, bs.RecordOperatorTouch(ctx, "team", "Dev", board.TouchStop, board.TouchLocal, clock))
+	_, body := activityGet(t, h, "team=team&range=7d")
+	require.Contains(t, body, `"stop":1`, "the touches are not cached")
+	require.EqualValues(t, 1, h.scans.Load())
+
+	activityGet(t, h, "team=team&range=30d")
+	require.EqualValues(t, 2, h.scans.Load(), "another range")
+	activityGet(t, h, "team=other&range=7d")
+	require.EqualValues(t, 3, h.scans.Load(), "another team")
+	clock = clock.Add(time.Hour)
+	activityGet(t, h, "team=team&range=7d")
+	require.EqualValues(t, 4, h.scans.Load(), "the next hour")
 }

@@ -801,9 +801,25 @@ func (h *SessionsHandler) SessionReader() *jsonl.SessionReader { return h.jsonl 
 // SetTouches gives the handler the recorder of the Operator's touches (#11225).
 func (h *SessionsHandler) SetTouches(t *operatortouch.Recorder) { h.touches = t }
 
-// touch records that the Operator touched the session by hand: a person's request only, never an agent's or Coral's own (#11225). Counts only: the kind and which session.
+// touchSource says where a person's request came from: Coral Hub (a grantee, or the owner on another device) or the person at this computer.
+func touchSource(r *http.Request) string {
+	if kind, _ := r.Context().Value(callerKindKey{}).(string); kind == callerHub {
+		return board.TouchHub
+	}
+	return board.TouchLocal
+}
+
+// touch records that the Operator touched the session by hand: a person's request only, never an agent's or Coral's own (#11225). Counts only: the kind, which session and where it came from.
 func (h *SessionsHandler) touch(r *http.Request, sessionID, kind string) {
 	if h.touches != nil && humanInputCaller(r) {
-		h.touches.Touch(r.Context(), sessionID, kind)
+		h.touches.Touch(r.Context(), sessionID, kind, touchSource(r))
+	}
+}
+
+// noteTouchSource tells the recorder where the typing that this request is about to write came from, so the keystrokes (written deep in the terminal path, which knows no request) are recorded as the
+// person's at this computer or as a Hub caller's.
+func (h *SessionsHandler) noteTouchSource(r *http.Request, sessionID string) {
+	if h.touches != nil && humanInputCaller(r) {
+		h.touches.NoteSource(sessionID, touchSource(r))
 	}
 }
