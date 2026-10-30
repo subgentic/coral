@@ -58,3 +58,16 @@ func TestPickShell(t *testing.T) {
 	}
 	assert.Contains(t, errNoPowerShell.Error(), "install PowerShell", "the refusal says what to do")
 }
+
+// #384: the test suites' server starts PowerShell without the person's profile; a real launch, and any other shell, are left as they are.
+func TestTheTestServersPowerShellSkipsTheProfile(t *testing.T) {
+	ps := `C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe`
+	assert.Equal(t, []string{ps, "-NoProfile"}, withoutProfileForTests([]string{ps}, true))
+	assert.Equal(t, []string{`C:\pwsh\pwsh.exe`, "-NoProfile"}, withoutProfileForTests([]string{`C:\pwsh\pwsh.exe`}, true))
+	assert.Equal(t, []string{ps}, withoutProfileForTests([]string{ps}, false), "a real launch keeps the profile")
+	assert.Equal(t, []string{"/bin/bash"}, withoutProfileForTests([]string{"/bin/bash"}, true), "not a PowerShell: unchanged")
+	assert.Empty(t, withoutProfileForTests(nil, true))
+	in := []string{ps}
+	_ = withoutProfileForTests(in, true)
+	assert.Equal(t, []string{ps}, in, "the slice it was given is not changed")
+}

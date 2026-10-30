@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/subgentic/coral/internal/agentenv"
+	"github.com/subgentic/coral/internal/config"
 	"github.com/subgentic/coral/internal/naming"
 	"github.com/subgentic/coral/internal/safego"
 	"github.com/subgentic/coral/internal/terminalinput"
@@ -463,7 +464,18 @@ func defaultShell() ([]string, error) {
 			log.Printf("[pty] CORAL_SHELL=%q is ignored for agents: Coral starts Windows agents through PowerShell, since cmd.exe can't run their launch line", os.Getenv("CORAL_SHELL"))
 		})
 	}
-	return sh, err
+	return withoutProfileForTests(sh, config.TestHooksEnvHonoured && os.Getenv("CORAL_TEST_HOOKS") == "1"), err
+}
+
+// withoutProfileForTests adds -NoProfile to a PowerShell when testHooks is set: the dashboard test suites' server (a dev build with
+// CORAL_TEST_HOOKS=1, which every other tier ignores) must not run the person's own PowerShell profile in its agents' terminals, and
+// PowerShell finds that profile through the Documents folder, which no environment variable moves (#384). A real launch keeps it.
+// Only the arguments change: the program, and with it how the launch line is quoted, stays the one pickShell chose.
+func withoutProfileForTests(sh []string, testHooks bool) []string {
+	if !testHooks || len(sh) == 0 || !winshell.IsPowerShell(sh[0]) {
+		return sh
+	}
+	return append(sh[:len(sh):len(sh)], "-NoProfile")
 }
 
 // pickShell is defaultShell's rule, with the environment and PATH lookup passed in.
