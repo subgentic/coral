@@ -9,8 +9,10 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -70,7 +72,7 @@ func parseKeyLine(line, want string) (HostKey, bool) {
 
 // Scan asks the host for its key with ssh-keyscan (KeyScan, default "ssh-keyscan"), preferring ed25519. For an alias target the caller resolves the real host and port first (ResolveAlias).
 func (r Runner) Scan(ctx context.Context, host string, port int) (HostKey, error) {
-	if !validHostName(host) && !strings.Contains(host, ":") {
+	if !validHostName(host) && net.ParseIP(host) == nil {
 		return HostKey{}, errors.Join(ErrHostKeyScan, ErrBadTarget)
 	}
 	if port < 1 || port > 65535 {
@@ -123,11 +125,43 @@ func DefaultKnownHostsPath() string {
 	return filepath.Join(home, ".ssh", "known_hosts")
 }
 
-// ErrKeyConflict means known_hosts already names the host with a different key: that is a changed key, never something to overwrite.
+// ErrKeyConflict means known_hosts already names the host with a different key of the same type: that is a changed key, never something to overwrite.
 var ErrKeyConflict = errors.New("sshprov: known_hosts already has a different key for this host")
 
-// Trust writes k, the key the owner confirmed, to the known_hosts file at path (0600, in a 0700 folder), unless it is already there. A different key already named for the same host is refused
-// (ErrKeyConflict): the runner's StrictHostKeyChecking=yes then keeps refusing a changed key, and the owner deals with it by hand. Hashed entries cannot be compared here; ssh itself still checks them.
+var knownNameRe = regexp.MustCompile(`^(\[[A-Za-z0-9.:-]{1,253}\]:[0-9]{1,5}|[A-Za-z0-9][A-Za-z0-9.:-]{0,252})$`)
+
+// keygenProgram is ssh-keygen, which reads known_hosts the way ssh does (hashed entries included); a variable for tests.
+var keygenProgram = "ssh-keygen"
+
+// existingKeys are the keys known_hosts at path has for name, found by ssh-keygen -F so that a HASHED file (the default on Debian and Ubuntu) is searched too. name is validated first.
+func existingKeys(ctx context.Context, path, name string) ([][2]string, error) {
+	if !knownNameRe.MatchString(name) {
+		return nil, ErrHostKeyScan
+	}
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	cmd := executil.Command(ctx, keygenProgram, "-F", name, "-f", path)
+	var out, errOut capped
+	cmd.Stdout, cmd.Stderr, cmd.Stdin, cmd.Env = &out, &errOut, nil, minimalEnv()
+	if err := cmd.Run(); err != nil && out.b.Len() == 0 {
+		var ee interface{ ExitCode() int }
+		if errors.As(err, &ee) && ee.ExitCode() == 1 {
+			return nil, nil // not found
+		}
+		return nil, fmt.Errorf("sshprov: could not search known_hosts: %w", err)
+	}
+	var keys [][2]string
+	for _, line := range strings.Split(out.b.String(), "\n") {
+		f := strings.Fields(line)
+		if len(f) >= 3 && !strings.HasPrefix(line, "#") {
+			keys = append(keys, [2]string{f[1], f[2]})
+		}
+	}
+	return keys, nil
+}
+
+// Trust writes k, the key the owner confirmed, to the known_hosts file at path (0600, in a 0700 folder), unless it is already there. A different key of the same type already named for the host,
+// in a plain or a hashed file, is refused (ErrKeyConflict): the runner's StrictHostKeyChecking=yes then keeps refusing a changed key, and the owner deals with it by hand.
 func Trust(path string, k HostKey) error {
 	if path == "" {
 		return errors.New("sshprov: no known_hosts path")
@@ -139,21 +173,19 @@ func Trust(path string, k HostKey) error {
 	if err != nil && !os.IsNotExist(err) {
 		return err
 	}
-	for _, line := range strings.Split(string(data), "\n") {
-		f := strings.Fields(line)
-		if len(f) < 3 || strings.HasPrefix(f[0], "|1|") || strings.HasPrefix(f[0], "#") {
-			continue
+	if err == nil {
+		keys, kerr := existingKeys(context.Background(), path, k.Host)
+		if kerr != nil {
+			return kerr
 		}
-		for _, h := range strings.Split(f[0], ",") {
-			if h != k.Host {
+		for _, e := range keys {
+			if e[0] != k.Type {
 				continue
 			}
-			if f[1] == k.Type && f[2] == k.Blob {
+			if e[1] == k.Blob {
 				return nil
 			}
-			if f[1] == k.Type {
-				return ErrKeyConflict
-			}
+			return ErrKeyConflict
 		}
 	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
@@ -170,4 +202,77 @@ func Trust(path string, k HostKey) error {
 	}
 	_, err = f.WriteString(prefix + k.Line() + "\n")
 	return err
+}
+
+// ScanAlias is the host-key step for a Host name of the owner's SSH config, where the real host, port, jump hosts and key file are the config's business (not ours to resolve). After the owner has
+// confirmed they want to connect, ONE ssh runs `true` with StrictHostKeyChecking=no into a FRESH temporary known_hosts file (never the owner's), and the key it stored there is parsed strictly,
+// the file deleted, and the key returned to be shown. Trust then writes that key, and every later connection is strict. Hashing is off so the stored name is readable.
+func (r Runner) ScanAlias(ctx context.Context, t Target) (HostKey, error) {
+	if t.Alias == "" || !aliasRe.MatchString(t.Alias) {
+		return HostKey{}, errors.Join(ErrHostKeyScan, ErrBadTarget)
+	}
+	dir, err := os.MkdirTemp("", "coral-hostkey-")
+	if err != nil {
+		return HostKey{}, err
+	}
+	defer os.RemoveAll(dir)
+	tmp := filepath.Join(dir, "known_hosts")
+	ssh := r.SSH
+	if ssh == "" {
+		ssh = "ssh"
+	}
+	argv := append([]string{}, sshOptions...)
+	argv = append(argv, "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile="+tmp, "-o", "GlobalKnownHostsFile=/dev/null", "-o", "HashKnownHosts=no", "-o", "CheckHostIP=no",
+		"--", t.Destination(), "true")
+	// The options above come after sshOptions on purpose: ssh takes the FIRST value of an option, so StrictHostKeyChecking=yes in sshOptions would win. Build the list with the relaxed one only.
+	argv = withoutStrict(argv)
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	cmd := executil.Command(ctx, ssh, argv...)
+	var out, errOut capped
+	cmd.Stdout, cmd.Stderr, cmd.Stdin, cmd.Env = &out, &errOut, nil, minimalEnv()
+	if err := cmd.Run(); err != nil {
+		return HostKey{}, fmt.Errorf("%w: could not connect to read the key", ErrHostKeyScan)
+	}
+	data, err := os.ReadFile(tmp)
+	if err != nil {
+		return HostKey{}, fmt.Errorf("%w: no key was stored", ErrHostKeyScan)
+	}
+	best := -1
+	var pick HostKey
+	for _, line := range strings.Split(string(data), "\n") {
+		if strings.TrimSpace(line) == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		name, _, _ := strings.Cut(line, " ")
+		if !knownNameRe.MatchString(name) {
+			return HostKey{}, fmt.Errorf("%w: unexpected stored key", ErrHostKeyScan)
+		}
+		k, ok := parseKeyLine(line, name)
+		if !ok {
+			return HostKey{}, fmt.Errorf("%w: unexpected stored key", ErrHostKeyScan)
+		}
+		for rank, kt := range keyTypes {
+			if kt == k.Type && (best < 0 || rank < best) {
+				best, pick = rank, k
+			}
+		}
+	}
+	if best < 0 {
+		return HostKey{}, fmt.Errorf("%w: no key of a type Coral accepts", ErrHostKeyScan)
+	}
+	return pick, nil
+}
+
+// withoutStrict removes the "-o StrictHostKeyChecking=yes" pair of sshOptions, for the one ssh that reads a key into a temporary file.
+func withoutStrict(argv []string) []string {
+	out := make([]string, 0, len(argv))
+	for i := 0; i < len(argv); i++ {
+		if argv[i] == "-o" && i+1 < len(argv) && argv[i+1] == "StrictHostKeyChecking=yes" {
+			i++
+			continue
+		}
+		out = append(out, argv[i])
+	}
+	return out
 }

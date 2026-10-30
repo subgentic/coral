@@ -91,6 +91,11 @@ var ErrHostKey = errors.New("sshprov: the host key is unknown or has changed")
 // ErrConnect is a failure to connect or sign in (ssh exit 255) other than the host key.
 var ErrConnect = errors.New("sshprov: could not connect")
 
+// sshOptions are on every ssh the hub starts: no prompt, no unknown host key, no forwarding of the hub user's agent or display, no command from the config.
+// ClearAllForwardings does not stop -W, which is the one forward the stream target asks for.
+var sshOptions = []string{"-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=yes", "-o", "ConnectTimeout=10", "-o", "ClearAllForwardings=yes", "-o", "RequestTTY=no", "-o", "LogLevel=ERROR",
+	"-o", "ForwardAgent=no", "-o", "ForwardX11=no", "-o", "PermitLocalCommand=no", "-o", "RemoteCommand=none"}
+
 const maxOutput = 64 << 10
 
 // shQuote is s as one single-quoted word for the remote shell.
@@ -134,8 +139,7 @@ func (r Runner) Run(ctx context.Context, t Target, c Command, args ...string) (R
 	if ssh == "" {
 		ssh = "ssh"
 	}
-	argv := []string{"-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=yes", "-o", "ConnectTimeout=10", "-o", "ClearAllForwardings=yes", "-o", "RequestTTY=no", "-o", "LogLevel=ERROR",
-		"-o", "ForwardAgent=no", "-o", "ForwardX11=no", "-o", "PermitLocalCommand=no", "-o", "RemoteCommand=none"}
+	argv := append([]string{}, sshOptions...)
 	argv = append(argv, t.Args()...)
 	argv = append(argv, "--", t.Destination(), "sh -c "+shQuote(text))
 	cmd := executil.Command(ctx, ssh, argv...)
