@@ -129,7 +129,9 @@ def params(body, seen, depth=0):
     return ps
 
 
-reg = re.compile(r'r\.(Get|Post|Put|Patch|Delete)\("([^"]+)",\s*([\w\.]+)\)')
+# A route may be registered through one middleware: r.With(routes.RefuseSignInLink).Post(...) (the generator missed these, and a regeneration dropped the
+# notes, tasks, nudge and reminder routes' session_id / subscriber_id entries, which the Hub would then have refused: Security on #11342).
+reg = re.compile(r'r(?:\.With\([^)]*\))?\.(Get|Post|Put|Patch|Delete)\("([^"]+)",\s*([\w\.]+)\)')
 # The routes are registered in router.go since #3825 split buildRouter out of server.go; read every non-test file of the
 # package (sorted, so the output never depends on directory order), so a later move can't hide the routes again.
 sv = '\n'.join(open(f, encoding='utf-8').read() for f in sorted(glob.glob(ROOT + '/*.go')) if not f.endswith('_test.go'))
