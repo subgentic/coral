@@ -338,6 +338,10 @@ by trusting the agent's summary.
 | Agents launch but never post to the board | Confirm the server's view with `/api/board/<project>/subscribers`. Agents are given `CORAL_URL` and `CORAL_DATA_DIR`; a custom wrapper that clears the environment can lose them. |
 | Agent launch fails with a tmux error | tmux is missing (Linux, source builds). The macOS app bundles it. Coral starts anyway and only fails at launch time; `--backend pty` avoids tmux. |
 
+## Stop only what you started
+
+Never `pkill`, `pkill -f`, `killall` or `kill $(pgrep ...)` by a name or a pattern. `-f` matches the whole command line, and an agent's own command line holds the prompt it was launched with: a pattern such as `go test ./...`, `coral` or a worktree path ends the other agents whose prompt mentions it, and the person sees three agents quit in the same second with nothing in the log (#11157). Start the process you want to stop in the background yourself and stop that one: `cmd & pid=$!` then `kill "$pid"`, or `kill %1`; for a test run, let it finish or bound it with `timeout 600 go test ...`. Ask the person before ending a process you did not start.
+
 ## Next
 
 - [Teams and multi-agent runs](teams.md) — and read
