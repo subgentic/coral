@@ -13,7 +13,6 @@ import (
 	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/cliauth"
 	"github.com/subgentic/coral/internal/cloud"
-	"github.com/subgentic/coral/internal/peercred"
 	"github.com/subgentic/coral/internal/store"
 )
 
@@ -55,9 +54,8 @@ type CloudHandler struct {
 	cliAuth  *cloud.CLIAuth
 	cliToken string
 	dataDir  string
-	// sameUser tells whether a loopback request comes from Coral's own user
-	// (peercred.SameUser; a test seam).
-	sameUser func(*http.Request) (same, supported bool)
+	// peer tells whose a loopback request is (connPeerAnswer: the connection's cached verdict, #409; a test seam).
+	peer func(*http.Request) peerAnswer
 	// linked overrides whether a Hub link exists (a test seam; nil reads the manager).
 	linked func() bool
 
@@ -74,7 +72,7 @@ type CloudHandler struct {
 // dataDir. The manager is attached later (SetManager) because it needs the
 // running server's address.
 func NewCloudHandler(ss *store.SessionStore, dataDir string) *CloudHandler {
-	h := &CloudHandler{ss: ss, sameUser: peercred.SameUser, dataDir: dataDir}
+	h := &CloudHandler{ss: ss, peer: connPeerAnswer, dataDir: dataDir}
 	tok, err := cloud.WriteCLIToken(dataDir)
 	if err != nil {
 		slog.Warn("cloud: could not write the command-line token; `coral cloud connect` will be refused", "error", err)
@@ -98,7 +96,16 @@ func (h *CloudHandler) Close() {
 
 // SetPeerCheck replaces the same-user check (tests).
 // SetPeerCheck has no production caller: it is exported for the cloud-gate, hook and hub end-to-end tests in internal/server.
-func (h *CloudHandler) SetPeerCheck(f func(*http.Request) (same, supported bool)) { h.sameUser = f }
+func (h *CloudHandler) SetPeerCheck(f func(*http.Request) (same, supported bool)) {
+	h.peer = func(r *http.Request) peerAnswer { return answerOf(f(r)) }
+}
+
+// UseConnPeerCheck puts the default peer check back (the connection's cached verdict, connPeerAnswer).
+// UseConnPeerCheck has no production caller: it is exported for the end-to-end tests in internal/server, whose rig pins another check.
+func (h *CloudHandler) UseConnPeerCheck() { h.peer = connPeerAnswer }
+
+// setPeerAnswer replaces the peer check with one that can also say "undecided" (tests in this package).
+func (h *CloudHandler) setPeerAnswer(f func(*http.Request) peerAnswer) { h.peer = f }
 
 // SetManager attaches the connector manager.
 func (h *CloudHandler) SetManager(m *cloud.Manager) {
@@ -202,8 +209,7 @@ func (h *CloudHandler) refuseCloud(w http.ResponseWriter, r *http.Request, allow
 		errForbidden(w, "Cloud connector settings are only available on this computer")
 		return true
 	}
-	if same, supported := h.sameUser(r); supported && !same {
-		writeError(w, http.StatusForbidden, "other_user", "Cloud connector settings are only available to the user Coral runs as")
+	if h.refusePeer(w, r, "Cloud connector settings are only available to the user Coral runs as") {
 		return true
 	}
 	if allow&allowDashboard != 0 && r.Header.Get(cloud.CLIAuthHeader) == "" && localDashboard(r) {
