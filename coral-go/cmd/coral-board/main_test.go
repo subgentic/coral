@@ -322,15 +322,16 @@ func TestSubprocess_EndpointInitialization(t *testing.T) {
 	closed.Close()
 
 	for _, tt := range tests {
+		// The case's data folder is set up before its subtest (the running Coral's lock file is not read).
+		dataDir := t.TempDir()
+		switch tt.lock {
+		case "scratch":
+			tt.wantURL = scratch.URL
+			_ = os.WriteFile(filepath.Join(dataDir, config.ServerLockFile), []byte(strconv.Itoa(os.Getpid())+"\n"+scratch.URL+"\n"), 0o600)
+		case "closed":
+			_ = os.WriteFile(filepath.Join(dataDir, config.ServerLockFile), []byte(strconv.Itoa(os.Getpid())+"\n"+closedURL+"\n"), 0o600)
+		}
 		t.Run(tt.name, func(t *testing.T) {
-			dataDir := t.TempDir() // the running Coral's lock file is not read
-			switch tt.lock {
-			case "scratch":
-				tt.wantURL = scratch.URL
-				_ = os.WriteFile(filepath.Join(dataDir, config.ServerLockFile), []byte(strconv.Itoa(os.Getpid())+"\n"+scratch.URL+"\n"), 0o600)
-			case "closed":
-				_ = os.WriteFile(filepath.Join(dataDir, config.ServerLockFile), []byte(strconv.Itoa(os.Getpid())+"\n"+closedURL+"\n"), 0o600)
-			}
 			cmd := exec.Command(os.Args[0], "-test.run=^TestSubprocess_EndpointInitialization$")
 			cmd.Env = append(os.Environ(),
 				"TEST_SUBPROCESS_ENDPOINT=1",
