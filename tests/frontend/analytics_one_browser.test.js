@@ -26,8 +26,8 @@ const BRANCHES = [{ repo_name: 'coral', branch: 'main', board_name: 'coral-go-te
 
 const TASKS = [{ id: 86091, title: 'Named agent task', status: 'completed', assigned_to: 'Backend Dev', priority: 'high', cost_usd: 1.25 },
     { id: 86092, title: 'Unassigned task', status: 'completed', assigned_to: null, priority: 'low', cost_usd: 0.5 }];
-const VIEWS = ['Overview', 'Tokens per commit', 'Task time', 'Tool and API calls']; // one entry per metric (#9236)
-const LISTED = ['Overview', 'Tokens per commit', 'Task time', 'Advanced']; // Tool and API calls is under Advanced (#10521)
+const VIEWS = ['Overview', 'Usage', 'Operator interaction', 'Team communication', 'Tokens per commit', 'Task time', 'Tool and API calls']; // one entry per metric (#9236)
+const LISTED = ['Overview', 'Usage', 'Operator interaction', 'Team communication', 'Tokens per commit', 'Task time', 'Advanced']; // Tool and API calls is under Advanced (#10521)
 const GROUP_OF = { 'By provider': 'Provider', 'By model': 'Model', 'By thinking level': 'Thinking level', 'By team': 'Team', 'By agent': 'Agent', 'By branch': 'Branch', 'By task': 'Task' }; // the groupings are Overview's Group by (#9236), not sidebar entries
 const STUB = `(() => { const R = window.fetch; const json = b => Promise.resolve(new Response(JSON.stringify(b), { headers: { 'content-type': 'application/json' } }));
     window.fetch = (u, o) => { const url = String(u && u.url || u); window.__costReq = (window.__costReq || []).concat(url);
