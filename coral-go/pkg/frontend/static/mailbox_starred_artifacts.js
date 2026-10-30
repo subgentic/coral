@@ -4,6 +4,7 @@ import { readInboxArtifacts } from './inbox_servers.js';
 import { teamLabel } from './server_status.js';
 import { splitKey, isCloud } from './server_base.js';
 import { importOnce } from './import_once.js';
+import { visibleName } from './artifact_names.js';
 const DT = await importOnce('./data_table.js');
 
 const STALE_MS = 30000;
@@ -41,9 +42,9 @@ export function starredArtifactsSection() {
     if (state.error) { const e = DT.el('p', 'empty-state-line', state.error); e.setAttribute('role', 'status'); section.append(e); return section; }
     const table = DT.dataTable({
         label: `Starred artifacts, ${state.rows.length}`, rows: state.rows, rowKey: r => `${r.server}:${r.id}`, state: tableState, oneLine: true, resize: false, sortBar: false,
-        open: r => importOnce('./artifact_viewer.js').then(m => m.openArtifactViewer(hexOf(r), { server: splitKey(r.board_id).server, filename: r.name, mediaType: r.media_type, board: splitKey(r.board_id).name })),
+        open: r => importOnce('./artifact_viewer.js').then(m => m.openArtifactViewer(hexOf(r), { server: splitKey(r.board_id).server, filename: visibleName(r.name), mediaType: r.media_type, board: splitKey(r.board_id).name })),
         columns: [
-            { key: 'name', label: 'Name', primary: true, width: 'grow', cell: r => DT.primaryButton(r.name || hexOf(r).slice(0, 12), `Open ${r.name || 'artifact'}`) },
+            { key: 'name', label: 'Name', primary: true, width: 'grow', cell: r => { const name = visibleName(r.name); return DT.primaryButton(name || hexOf(r).slice(0, 12), `Open ${name || 'artifact'}`); } }, // the uploader's text (Security on #220)
             { key: 'team', label: 'Team', width: '10rem', dropAt: 36, cell: r => teamLabel(r.board_id, r.team) },
             { key: 'when', label: 'When', tone: 'tertiary', align: 'end', width: '7.5rem', cell: r => DT.timeCell(r.created_at) },
         ],

@@ -9,6 +9,7 @@ import { inlineArtifactPath } from './artifact_paths.js';
 import { isSvg, svgDataUrl } from './image_source.js';
 import { wireDownloads } from './artifact_download.js';
 import { lockFrame, sandboxedDoc } from './sandbox_frame.js';
+import { visibleName } from './artifact_names.js';
 import { responseFilename as contentDispositionName } from './content_disposition.js'; // Content-Disposition describes the stored file; the artifact label may be extensionless or entirely different. Keep it independent of the UI title.
 
 const MAX_ARTIFACT_PREVIEW_BYTES = 2 * 1024 * 1024;
@@ -69,7 +70,7 @@ function _parseManifest(content) {
     const entries = [];
     for (const item of value) {
         if (!item || typeof item !== 'object' || Array.isArray(item)) return null;
-        const name = typeof item.name === 'string' ? item.name.trim() : '';
+        const name = typeof item.name === 'string' ? visibleName(item.name) : ''; // the uploader's text, made visible once here for every use (Security on #220)
         const uri = typeof item.uri === 'string' ? item.uri.trim() : '';
         const match = CORAL_ARTIFACT_URI_RE.exec(uri);
         const mediaType = typeof item.media_type === 'string' ? item.media_type.trim() : '';
@@ -100,11 +101,12 @@ function _entryType(entry) {
 function _renderManifest(body, manifest, filename, ctx) {
     const rows = manifest.entries.map((entry, index) => {
         const digest = CORAL_ARTIFACT_URI_RE.exec(entry.uri)[1];
+        const name = visibleName(entry.name); // a manifest's entry names are the uploader's text (Security on #220)
         return `<li class="artifact-manifest-entry">
         <div class="artifact-manifest-main"><button type="button" class="artifact-manifest-open" data-manifest-index="${Number(index)}">
-            <span class="artifact-manifest-name">${escapeHtml(entry.name)}</span>
+            <span class="artifact-manifest-name">${escapeHtml(name)}</span>
             <span class="artifact-manifest-type">${escapeHtml(_entryType(entry))}</span>
-        </button><a class="artifact-manifest-download" href="${escapeAttr(serverUrl(artifactPath(digest), contextServer()))}" download="${escapeAttr(entry.name)}" data-artifact-download="${escapeAttr(serverUrl(artifactPath(digest), contextServer()))}" data-artifact-name="${escapeAttr(entry.name)}" aria-label="Download ${escapeAttr(entry.name)}">Download</a></div>
+        </button><a class="artifact-manifest-download" href="${escapeAttr(serverUrl(artifactPath(digest), contextServer()))}" download="${escapeAttr(name)}" data-artifact-download="${escapeAttr(serverUrl(artifactPath(digest), contextServer()))}" data-artifact-name="${escapeAttr(name)}" aria-label="Download ${escapeAttr(name)}">Download</a></div>
         <span class="artifact-manifest-uri">${escapeHtml(entry.uri)}</span>
     </li>`;
     }).join('');

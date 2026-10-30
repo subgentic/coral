@@ -11,6 +11,7 @@
  * Off the hub the links keep working as plain links. */
 import { importOnce } from './import_once.js';
 import { isCloud } from './server_base.js';
+import { visibleName } from './artifact_names.js';
 
 export const MAX_DOWNLOAD_BYTES = 25 * 1024 * 1024;
 
@@ -20,7 +21,7 @@ const WINDOWS_RESERVED = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(\.|$)/i;
  *  no trailing dots or spaces, a Windows reserved device name (CON, NUL, COM1, LPT1 ...) prefixed with "_", at most
  *  100 characters, and "artifact" when nothing is left. */
 export function sanitizeDownloadName(name) {
-    let n = String(name == null ? '' : name);
+    let n = visibleName(name); // without what hides or reorders text, as every artifact name is shown (Security on #220)
     n = n.slice(n.lastIndexOf('/') + 1);
     n = n.slice(n.lastIndexOf('\\') + 1);
     // eslint-disable-next-line no-control-regex

@@ -9,6 +9,7 @@ import { serverUrl, artifactPath, contextServer, keyLabel, boardKeyName, splitKe
 import { _claimedFor } from './subagents.js';
 import { _verifyLine } from './task_verify_marks.js';
 import { _getBoardProject } from './task_board_context.js';
+import { visibleName } from './artifact_names.js';
 
 /** The top of the task detail: its title, lifecycle, priority, result and verification line. */
 function _taskDetailHeadHtml(task) {
@@ -101,8 +102,8 @@ function _taskWorkflowHtml(task) {
             // A link is its name (the address is its title): a coral:// address is 64 characters and ran out of the dialog (#7182).
             const linked = /^https?:\/\//i.test(uri) || coralMatch;
             const nameHtml = linked
-                ? `<a href="${escapeAttr(coralMatch ? '#' : escapeAttr(href))}" data-artifact-uri="${escapeAttr(uri)}" title="${escapeAttr(uri)}"${coralMatch ? ' data-on-click="task-artifact-open"' : ' target="_blank" rel="noopener noreferrer"'}><strong>${escapeHtml(a.name || uri)}</strong></a>`
-                : `<strong>${escapeHtml(a.name)}</strong>`;
+                ? `<a href="${escapeAttr(coralMatch ? '#' : escapeAttr(href))}" data-artifact-uri="${escapeAttr(uri)}" title="${escapeAttr(uri)}"${coralMatch ? ' data-on-click="task-artifact-open"' : ' target="_blank" rel="noopener noreferrer"'}><strong>${escapeHtml(visibleName(a.name) || uri)}</strong></a>`
+                : `<strong>${escapeHtml(visibleName(a.name))}</strong>`; // a worker's text (Security on #220)
             const uriDisplay = linked ? '' : escapeHtml(uri);
             return `<div class="task-detail-body">${nameHtml}${a.revision ? ` · ${escapeHtml(a.revision)}` : ''}${a.digest ? ` · ${escapeHtml(a.digest)}` : ''}${uriDisplay ? `<div>${uriDisplay}</div>` : ''}${a.content ? `<pre style="white-space:pre-wrap;overflow-wrap:anywhere">${escapeHtml(a.content)}</pre>` : ''}</div>`;
         };

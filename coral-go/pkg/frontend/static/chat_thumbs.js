@@ -13,6 +13,7 @@ import { openChatImageTab } from './preview_pane.js';
 import { removeSharedCopy, removedCopyText } from './shared_images.js';
 import { showConfirmModal } from './confirm_dialog.js';
 import { showToast } from './utils.js';
+import { visibleName } from './artifact_names.js';
 import { OWNER_LABEL_NOTE } from './owner_label.js'; // beside a thumbnail that cannot load because the computer has not confirmed its owner (#6108)
 
 
@@ -24,7 +25,7 @@ export function thumbHtml(att) {
     const ref = !artifact && att && /^[0-9a-f]{32}$/.test(att.ref || '') ? att.ref : '';
     const file = att && att.file ? String(att.file) : '';
     if (!artifact && !ref && !file) return '';
-    const label0 = (att && att.name) || file || 'image';
+    const label0 = (att && visibleName(att.name)) || file || 'image'; // a file's name is its uploader's text (Security on #220)
     // An image pasted in the dashboard is named by its place ("Pasted image 2"): read as a sentence, "Open pasted image 2", not "Open Pasted image 2".
     const label = /^Pasted image\b/.test(label0) ? label0.charAt(0).toLowerCase() + label0.slice(1) : label0;
     // An artifact (an image pasted in the dashboard, #5284) is served by the artifact route, locally and through Coral Hub; its owner can remove the shared copy (on this computer only).
