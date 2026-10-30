@@ -4,7 +4,7 @@ import { isPhoneLayout } from './phone_layout.js';
 import { scrollBehavior } from './motion.js';
 import { showToast, escapeHtml, escapeAttr, boardNameProblem, OPERATOR_ID } from './utils.js';
 import { loadLiveSessions } from './api.js';
-import { recordRecentDir, getRecentDirs } from './browser.js';
+import { recordRecentDir, getRecentDirs, pruneMissingRecents } from './browser.js';
 import { teamForm, showTeamWorktree, showTeamWorkers } from './team_form.js';
 import { agentNameForm, agentStatus } from './agent_form.js';
 import { cliPathButton } from './prerequisites.js';
@@ -363,6 +363,7 @@ function _renderTeamDirRecents() {
     const box = document.getElementById('launch-team-dir-recents');
     if (!box) return;
     const dirs = getRecentDirs(_effectiveServer(launch.server)).slice(0, 3);
+    if (!box._pruned) { box._pruned = true; pruneMissingRecents(_effectiveServer(launch.server)).then(changed => { box._pruned = false; if (!changed) return; _renderTeamDirRecents(); const f = document.getElementById('launch-team-dir'); if (f && !f.value && !_settingsFor(_effectiveServer(launch.server)).default_working_dir) offerSuggestion(f, document.getElementById('launch-team-dir-suggest'), 'first-team', { afterCoralMade: true }); }).catch(() => { box._pruned = false; }); } // folders that are gone are dropped once per opening (#11336)
     box.replaceChildren(...(dirs.length ? [Object.assign(document.createElement('span'), { className: 'launch-recent-label', textContent: 'Recent:' })] : []), ...dirs.map(d => {
         const b = document.createElement('button');
         b.type = 'button'; b.className = 'btn btn-small launch-dir-recent'; b.title = d; b.dataset.dir = d; b.dataset.team = '1'; b.setAttribute('data-on-click', 'launch-dir-recent');

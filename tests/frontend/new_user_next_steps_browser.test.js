@@ -5,6 +5,8 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { install: installTP, seed, openTeam, goTab } = require('./helpers/team_page');
 const { removeBoards } = require('./helpers/board_cleanup');
+const { install: installNT, openNewTeam } = require('./helpers/new_team');
+const { install: installNA, openNewAgent } = require('./helpers/new_agent');
 const BASE = require('./test_base').BASE;
 
 const TEAM = `qa-next-steps-${Date.now() % 100000}`;
@@ -109,6 +111,31 @@ const TEAM = `qa-next-steps-${Date.now() % 100000}`;
             n0 = await sn(); check(n0 && !n0.shown, `Pi ${what}: no notice: ${JSON.stringify(n0)}`);
         }
         await ev(`document.getElementById('sn-host').remove(); true`);
+        // (7) recent folders that are gone (#11336 item 9): the browser keeps them when the data folder is wiped; the dialogs drop them, and a person left with none is offered the first folder
+        await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false }); await Emulation.setTouchEmulationEnabled({ enabled: false });
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        const GONE = '/no-such-folder-for-coral-test', GONE2 = '/another/missing/one';
+        const rc = await ev(`import(${S} + 'browser.js').then(async m => { m.recordRecentDir(${JSON.stringify(GONE2)}); m.recordRecentDir('/tmp'); m.recordRecentDir(${JSON.stringify(GONE)}); const before = m.getRecentDirs(); const changed = await m.pruneMissingRecents(); const again = await m.pruneMissingRecents(); const other = await m.pruneMissingRecents('box-b'); return { before, changed, after: m.getRecentDirs(), again, other }; })`);
+        check(rc.changed === true && JSON.stringify(rc.after) === JSON.stringify(['/tmp']), `missing recents are dropped and an existing one kept: ${JSON.stringify(rc)}`);
+        check(rc.again === false && rc.other === false, `nothing more to drop is false, and another server is not asked: ${JSON.stringify([rc.again, rc.other])}`);
+        await ev(`import(${S} + 'browser.js').then(m => { m.recordRecentDir(${JSON.stringify(GONE)}); m.recordRecentDir('/tmp'); return true; })`);
+        await installNT(ev); await openNewTeam(ev, waitFor);
+        await waitFor(`!document.querySelector('#launch-team-dir-recents [data-dir=${JSON.stringify(GONE)}]')`, 'the missing folder dropped from the recent buttons', 8000).catch(() => {});
+        const tb = await ev(`[...document.querySelectorAll('#launch-team-dir-recents button')].map(b => b.dataset.dir)`);
+        check(JSON.stringify(tb) === JSON.stringify(['/tmp']), `New team shows only the recent folder that exists: ${JSON.stringify(tb)}`);
+        const fresh = async recents => { // a returning person: a new page whose browser still holds these recent folders
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+            await ev(`import(${S} + 'browser.js').then(m => { for (const k of Object.keys(localStorage)) if (k.includes('coral-recent-dirs')) localStorage.removeItem(k); for (const d of ${JSON.stringify(recents)}) m.recordRecentDir(d); return true; })`);
+        };
+        await fresh([GONE]); await installNT(ev); await openNewTeam(ev, waitFor);
+        await waitFor(`/\\/Coral\\/first-team/.test(document.getElementById('launch-team-dir').value)`, 'the first folder offered once the stale one is dropped', 8000).catch(() => {});
+        const tf = await ev(`({ value: document.getElementById('launch-team-dir').value, buttons: document.querySelectorAll('#launch-team-dir-recents button').length })`);
+        check(/\/Coral\/first-team$/.test(tf.value) && tf.buttons === 0, `a person left with only a missing folder is offered the first team's folder, no buttons: ${JSON.stringify(tf)}`);
+        // the same for New agent's folder step
+        await fresh(['/tmp', GONE]); await installNA(ev); await openNewAgent(ev, waitFor);
+        await waitFor(`!document.querySelector('#launch-dir-recents [data-dir=${JSON.stringify(GONE)}]')`, 'the missing folder dropped from New agent', 8000).catch(() => {});
+        const ab = await ev(`[...document.querySelectorAll('#launch-dir-recents button')].map(b => b.dataset.dir)`);
+        check(JSON.stringify(ab) === JSON.stringify(['/tmp']), `New agent shows only the recent folder that exists: ${JSON.stringify(ab)}`);
         // (4) plain words
         const root = require('node:path').join(__dirname, '..', '..', 'coral-go', 'pkg', 'frontend', 'static'), read = f => require('node:fs').readFileSync(require('node:path').join(root, f), 'utf8'); // the sources that write the words
         const t = read('task_create.js'), g = read('goals_view.js'), d = read('team_dialogs.js');

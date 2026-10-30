@@ -7,6 +7,7 @@ const { connect } = require('./agent_view_harness');
 const { install: installNA, N, openNewAgent, stepLine, scenarios } = require('./helpers/new_agent');
 const BASE = require('./test_base').BASE;
 const { coralReady } = require('./helpers/wait');
+const { existing: recentsExist } = require('./helpers/recent_dirs');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -35,7 +36,7 @@ const { coralReady } = require('./helpers/wait');
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
         await coralReady(ev);
         await installNA(ev);
-        await ev(`localStorage.setItem('coral-recent-dirs', JSON.stringify(['/work/payments-app', '/work/website', '/work/docs'])); true`);
+        await recentsExist(ev); await ev(`localStorage.setItem('coral-recent-dirs', JSON.stringify(['/work/payments-app', '/work/website', '/work/docs'])); true`);
         await openNewAgent(ev, waitFor).catch(() => {});
 
         await S.run('the dialog is a role=dialog named "New agent", and it opens on "Step 1 of 3: Where it launches"', async () => {

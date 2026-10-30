@@ -6,6 +6,7 @@ const { connect } = require('./agent_view_harness');
 const { install: installNA, N, openNewAgent, stubModels, scenarios } = require('./helpers/new_agent');
 const BASE = require('./test_base').BASE;
 const { coralReady } = require('./helpers/wait');
+const { existing: recentsExist } = require('./helpers/recent_dirs');
 
 (async () => {
     const { client, Page, ev, waitFor, PRELOAD, install } = await connect();
@@ -48,7 +49,7 @@ const { coralReady } = require('./helpers/wait');
         await S.run('with a recent folder there is no suggestion', async () => {
             await ev(`window.hideLaunchModal && window.hideLaunchModal(); true`);
             await clearRecents();
-            await ev(`localStorage.setItem('coral-recent-dirs', JSON.stringify(['/tmp/earlier'])); true`);
+            await recentsExist(ev); await ev(`localStorage.setItem('coral-recent-dirs', JSON.stringify(['/tmp/earlier'])); true`);
             await openNewAgent(ev, waitFor);
             const s = await dirState('launch-dir');
             assert.ok(!/first-agent/.test(s.value) && !s.note, 'no folder is chosen for them: ' + JSON.stringify(s));

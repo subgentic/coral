@@ -4,7 +4,7 @@ import { state } from './state.js';
 import { showToast, escapeHtml, escapeAttr, boardNameProblem } from './utils.js';
 import { blockedReason } from './hub_access.js';
 import { loadLiveSessions } from './api.js';
-import { recordRecentDir, setDirServerResolver, getRecentDirs } from './browser.js';
+import { recordRecentDir, setDirServerResolver, getRecentDirs, pruneMissingRecents } from './browser.js';
 import { pinnedFolders } from './pinned_folders.js';
 import { defaultAgentName } from './session_state.js';
 import { serverFetch, identityKey, isHub, normServer, LOCAL_SERVER, keyLabel, noteBoardLabels } from './server_base.js';
@@ -352,6 +352,7 @@ function _renderDirRecents() {
     const box = document.getElementById('launch-dir-recents'), hint = document.getElementById('launch-dir-hint');
     if (!box || !hint) return;
     const dirs = getRecentDirs(_effectiveServer(launch.server)).slice(0, 3);
+    if (!box._pruned) { box._pruned = true; pruneMissingRecents(_effectiveServer(launch.server)).then(changed => { box._pruned = false; if (!changed) return; _renderDirRecents(); const f = document.getElementById('launch-dir'); if (f && !f.value && !launch.member && !launch.addTo && !_settingsFor(_effectiveServer(launch.server)).default_working_dir) offerSuggestion(f, document.getElementById('launch-dir-suggest'), 'first-agent'); }).catch(() => { box._pruned = false; }); } // folders that are gone are dropped once per opening; a person left with none is offered the first-agent folder (#11336)
     box.replaceChildren(...(dirs.length ? [Object.assign(document.createElement('span'), { className: 'launch-recent-label', textContent: 'Recent:' })] : []), ...dirs.map(d => {
         const b = document.createElement('button');
         b.type = 'button'; b.className = 'btn btn-small launch-dir-recent'; b.title = d; b.dataset.dir = d; b.setAttribute('data-on-click', 'launch-dir-recent');
