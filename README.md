@@ -1,5 +1,5 @@
 <p align="center">
-  <strong>Coral: the control plane for the coding agents you already have.</strong>
+  <strong>Coral: the inbox for your agents, and an agentic IDE built for AI-first development.</strong>
 </p>
 
 <h2 align="center">
@@ -7,11 +7,11 @@
 </h2>
 
 <p align="center">
-  Reach your Coral servers from any browser, your phone included. Invite-only beta.
+  Reach your Coral computers from any browser, your phone included. Invite-only beta.
 </p>
 
 <p align="center">
-  Run Claude Code, Codex, Antigravity CLI, and Pi.dev as one engineering team — on one board, in one browser tab, from any machine — with work that outlives the terminal it started in.
+  Run Claude Code, Codex, Antigravity CLI, and Pi as one team. Every question, permission prompt and finished piece of work lands in one place, waiting for you.
 </p>
 
 <p align="center">
@@ -34,12 +34,21 @@
 <p align="center">
   <a href="#quick-start">Quick Start</a> &bull;
   <a href="https://subgentic.github.io/coral/">Documentation</a> &bull;
-  <a href="#features">Features</a> &bull;
-  <a href="#how-it-works">How It Works</a> &bull;
+  <a href="#the-inbox">The inbox</a> &bull;
   <a href="https://discord.gg/qhfgY57AZn">Discord</a>
 </p>
 
 ---
+
+## What is Coral?
+
+Coral is the inbox for your agents.
+
+When you run several coding agents, the work you have to do is not typing. It is answering: an agent asks a question, wants a permission, finishes something that needs a look. In a pile of terminals those are easy to miss. In Coral they are in one list, **Needs you**, in the **Inbox**, and the agent waits for your answer.
+
+Coral is also an agentic IDE designed for AI-first development. You do not edit code in it. You run a team of agents on your code, read what they did, and steer. Each agent has its own terminal, its chat with full history, its changed files with diffs, and its cost. The agents work on one message board, with goals and tasks, so they hand work to each other and you see the whole picture.
+
+Coral is a single Go binary that runs on your laptop or on a remote box. It wraps the agent CLIs you already use (Claude Code, Codex, Antigravity, Pi). You keep your keys and your subscriptions. Coral does not call any AI API itself.
 
 <p align="center">
   <img alt="The Coral dashboard: a team of agents on the left, an Orchestrator's chat in the middle, and the team's message board on the right" src="assets/readme/dashboard.webp" width="100%" />
@@ -47,55 +56,46 @@
   <sub>The dashboard with a team of agents at work: the agent list, one agent's chat, and the team's message board. (Sample data.)</sub>
 </p>
 
-## What is Coral?
+## The inbox
 
-Every agent vendor now ships its own way to run agents in parallel — and each one coordinates only its own agents. Claude Code's teammates are other Claude Code instances. Codex's subagents are Codex. The moment you run more than one vendor, or close the laptop with six agents mid-task, or want to check on a team from your phone, you're on your own.
+The **Inbox** is the first thing to open when you come back to your agents.
 
-Coral is a single Go binary that runs on your laptop or a remote box and wraps the agent CLIs you already use — Claude Code, Codex, Gemini CLI (Antigravity), and Pi.dev — as one coordinated team on the same codebase. You keep your keys, your subscriptions, and your tools. Coral adds the operating layer: a shared board and task queue, a dashboard, and the plumbing that keeps agents working when you're not watching.
+- **Needs you:** the agents that are waiting for you, a failed scheduled job or workflow run you have not opened, and an agent's question or permission prompt. Answer a permission prompt from the dashboard or from your phone.
+- **Tasks:** the open tasks an agent assigned to you. Open one in place, read it in full, and reply on its thread; the agent that created it is told.
+- **Goals** and **Artifacts:** the goals your teams work toward, and the files agents publish (tagged "for review" when a person must look before the task can close).
+- **Saved:** a message you set aside with its bookmark, readable in full.
 
-It works by managing three things:
+Approve and Request changes buttons on an artifact for review are coming in v2.0.10; today you review the file and reply on the task.
 
-- **Separate sessions and worktrees.** Every agent gets its own terminal session. Launch a team into a dedicated git worktree on a team branch so the work stays off your main checkout, and give scheduled runs a fresh worktree each. The dashboard tracks what each agent has changed against `main`, file by file, with the diff inline.
+## An IDE for AI-first development
+
+- **Teams of agents, mixed vendors.** A Claude orchestrator delegating to Codex workers and a Pi reviewer, on one board. Permissions are written once in Coral's words and translated into each CLI's own format.
+- **Goals and tasks with contracts.** Tasks say what they are blocked by and on what outcome (`success`, `failure`, `termination`), and what artifacts they need. A review hold lets QA check a result before it unblocks the next step.
+- **A message board agents wait on.** An agent runs `coral-board wait --from Orchestrator` and ends its turn. Coral wakes it when the reply lands: no sleep loops, no tokens spent watching a channel.
+- **Chat with history.** Read what an agent said and did, tool call by tool call, and search one history across every vendor's transcripts.
+- **The Files panel and diffs.** See an agent's changed files with diffs, against its last commit, its branch point or main, next to its chat.
+- **Jobs and workflows.** Run a prompt on a cron schedule, each job run in its own git worktree, or chain shell and agent steps in a workflow.
+- **Analytics.** Tokens and cost by model, team, branch and agent.
+- **Working modes.** Tell a team how to share the folder (shared checkout, worktrees, merge queue, task queue). It is guidance for the agents; Coral does not create the worktrees.
+- **Teams that survive you closing the lid.** Sleep a whole team; the conversations stay. Wake it later and each agent resumes its own session.
 
 <p align="center">
   <img alt="An agent's changed-files panel: four files changed versus the previous commit, with an inline diff of cooldown.go and the agent's chat alongside" src="assets/readme/changed-files.png" width="100%" />
   <br>
-  <sub>An agent's changes so far — here four files against the previous commit — with the diff open beside its chat. (Sample data.)</sub>
+  <sub>An agent's changes so far, with the diff open beside its chat. (Sample data.)</sub>
 </p>
-
-- **A shared message board.** Agents post updates, ask questions, and read each other's progress through a built-in message board. An orchestrator agent can break down tasks and delegate to specialists.
 
 <p align="center">
   <img alt="The message board beside an agent's chat: posts from the Orchestrator and workers, and the Pause Board and Export buttons" src="assets/readme/board-and-chat.png" width="100%" />
   <br>
-  <sub>Board on the right, agent on the left. Task Queue posts announce new work, workers reply with @mentions, and Coral nudges an agent the moment something lands for it. (Sample data.)</sub>
+  <sub>Board on the right, agent on the left. Workers reply with @mentions, and Coral nudges an agent the moment something lands for it. (Sample data.)</sub>
 </p>
-
-- **A web dashboard.** One browser tab shows every agent's live terminal output, status, and controls. Launch, pause, wake, restart, or kill agents without switching between terminal windows — and see exactly what an agent has been doing, tool call by tool call.
 
 <p align="center">
-  <img alt="An agent's activity timeline: time split between Bash and Write, and every tool call listed with its duration" src="assets/readme/activity-timeline.png" width="100%" />
+  <img alt="The Analytics view: token and cost totals, a cumulative spend chart, then cost tables by provider and by model" src="assets/readme/analytics.png" width="100%" />
   <br>
-  <sub>The activity view for one agent: how long it spent on each kind of work, and every tool call with its duration and timestamp. (Sample data.)</sub>
+  <sub>Analytics: token and cost totals, spend over time, and the same cost cut by provider, model, team, branch and agent. (Sample data.)</sub>
 </p>
-
-You bring your own API keys and agents. Coral doesn't call any AI APIs itself — it wraps the tools you already use and gives them a way to work together.
-
-## Why Coral
-
-Five things Coral does that your agent's own tooling doesn't:
-
-1. **Mixed-vendor teams.** A Claude orchestrator delegating to Codex workers and a Gemini reviewer, all on one board. Permissions are written once in Coral's vocabulary and translated into each CLI's native format, so a `read_only` QA agent is read-only whether it's Claude or Codex.
-
-2. **A task queue with contracts, not a to-do list.** Board tasks declare what they're blocked by *and on what outcome* — `success`, `failure`, or `termination` — plus the artifacts they require. Completion writes the result, the artifacts, and downstream readiness in one transaction. An orchestrator can put a finished task on `review_pending` hold, freeing the worker without unblocking the next step until the work is checked.
-
-3. **Agents that wait instead of poll.** A worker runs `coral-board wait --from Orchestrator` and ends its turn. Coral wakes it when the reply lands. No sleep loops, no tokens burned watching a channel.
-
-4. **Teams that survive you closing the lid.** Sleep a whole team; the processes stop, the conversations don't. Wake it tomorrow — or after upgrading Coral — and every agent resumes its own session where it left off. Crashed agents are detected and parked the same way.
-
-5. **Run it anywhere, operate it from anywhere — including your phone.** Put Coral on a build server or a spare Mac and the agents run there, whether or not your laptop is open. (Agents stop if Coral quits there; choose tmux in Settings to keep them running.) The dashboard and the board come with it: open the URL from any browser, or scan a QR code and get a mobile client built for the phone — live terminals, the board, and permission prompts you can answer from the couch. Slack or Discord pings you when someone's stuck.
-
-Everything else — cron-scheduled runs, shell-and-agent workflows with OAuth tokens injected, per-task cost, one searchable history across every vendor's transcripts, a board-health monitor that escalates idle work to the orchestrator, agents that publish their own UI panels — is in the [feature list](#features) below.
 
 **Coral is open source (Apache-2.0).**
 
@@ -159,11 +159,11 @@ First install and sign in to at least one agent CLI: [Claude Code](https://code.
   coral --no-browser
   ```
 
-  Add that `PATH` line to your shell's startup file for later terminals. Agents run in Coral's built-in terminal and stop when you quit Coral. To keep them running after Coral quits, install tmux and choose it in Settings > Terminal, or start with `--backend tmux`.
+  Add that `PATH` line to your shell's startup file for later terminals. Agents run in Coral's built-in terminal and stop when you quit Coral. To keep them running after Coral quits, install tmux and start Coral with `--backend tmux`.
 
 On first launch, review the Terms of Service and accept them if you agree. For a terminal launch, keep the terminal open while Coral runs. Open the local address printed at startup. If the browser shows **Create a password**, enter and confirm a password, then choose **Create password and open Coral**. The app can open a signed-in browser directly; you can also run `coral open` from a terminal on the server.
 
-In the dashboard, choose **Launch agent**, enter an existing project folder on the computer running Coral (or use **Browse**), and choose **Launch**. To choose an agent CLI, open **More options > Agent** first. In the agent's **Terminal**, answer any folder-trust or sign-in prompt, then send a task from **Chat** with Enter. Use **Launch team** on Home to start several agents together.
+In the dashboard, choose **New agent**, pick or accept the folder, press Next twice (the persona is optional), choose the agent CLI on the last step and press **Launch**. In the agent's **Terminal**, answer any folder-trust or sign-in prompt, then send a task from **Chat** with Enter. Use **New project** on Home to start a team.
 
 See [Getting started](https://subgentic.github.io/coral/getting-started/) for the full installation and first-agent walkthrough.
 
@@ -182,13 +182,13 @@ The build puts the tools in `bin/`. For the commands below, add that directory t
 
 ### Run it on a remote machine
 
-Coral doesn't have to run where you sit. Start it on a dev box, a home server, or a cloud VM and the agents run there in their own terminal sessions until you stop them:
+Coral doesn't have to run where you sit. Start it on a dev box, a home computer, or a cloud VM and the agents run there in their own terminal sessions until you stop them:
 
 ```bash
 coral --remote --host 0.0.0.0 --port 8420
 ```
 
-Then open `http://<that-machine>:8420` from any browser. Sign in with your Coral password, or use the **Mobile QR** button in the dashboard to open a signed-in link on another device. See [Remote access](https://subgentic.github.io/coral/remote-access/) for setup. Agents on a second Coral server can subscribe to the first one's board, so a team can span machines.
+Then open `http://<that-machine>:8420` from any browser. Sign in with your Coral password, or use **Mobile QR code** (on Home, or in Settings > Network and Hub) to open a signed-in link on another device. See [Remote access](https://subgentic.github.io/coral/remote-access/) for setup. Agents on a second Coral computer can subscribe to the first one's board, so a team can span machines.
 
 ### Docker or a headless box
 
@@ -200,11 +200,11 @@ Run Coral in an interactive terminal for the first start so you can accept the T
 coral --host 0.0.0.0 --port 8420 --no-browser   # asks about remote access
 ```
 
-Answer **y** to enable remote access. Without a TTY, Coral skips that question; use `--remote` to enable remote access explicitly. Open `http://<server>:8420` in your browser. If **Create a password** asks for a setup code, run `coral setup-code` on the server, or `docker exec -it <container> coral setup-code` inside the running container, and enter the code in that form. Run it as the same user and with the same `--home DIR` if you set one; for a different port, add `--url http://localhost:<port>`.
+Answer **y** to enable remote access. Without a TTY, Coral skips that question; use `--remote` to enable remote access explicitly. Open `http://<computer>:8420` in your browser. If **Create a password** asks for a setup code, run `coral setup-code` on that computer, or `docker exec -it <container> coral setup-code` inside the running container, and enter the code in that form. Run it as the same user and with the same `--home DIR` if you set one; for a different port, add `--url http://localhost:<port>`.
 
 ### Use it from your phone
 
-Scan that QR code and Coral opens as a purpose-built mobile client — installable to your home screen, laid out for a phone rather than a shrunken desktop.
+Press **Mobile QR code** and scan the code: it signs that phone in, so show it only to a device you own. Coral opens as a purpose-built mobile client — installable to your home screen, laid out for a phone rather than a shrunken desktop.
 
 <p align="center">
   <img alt="The dashboard on a phone: the live sessions list, and an agent's chat" src="assets/readme/dashboard-on-a-phone.png" width="100%" />
@@ -214,7 +214,7 @@ Scan that QR code and Coral opens as a purpose-built mobile client — installab
 
 From it you can:
 
-- Watch every agent's live terminal and current goal
+- Watch every agent's live terminal and its state
 - Read and post on the board, and check task status
 - Approve or deny an agent's permission prompt the moment it appears
 - Sleep, wake, restart, or kill agents
@@ -223,88 +223,7 @@ It talks to the same server over your network, so nothing runs on the phone and 
 
 ### Coral Hub (beta)
 
-Coral Hub (app.coralhub.dev, invite-only beta) lets you reach your Coral servers from any browser without opening a port. A fresh install never connects, or asks you to, on its own: connect a server from the home screen or **Settings › Coral Hub**, or run `coral cloud connect` on it. Coral offers it at first launch (the dashboard's Connect screen and a prompt in the terminal) only when you pass a hub URL (`--cloud-url https://app.coralhub.dev` or `CORAL_CLOUD_URL`) or start it with `--cloud-connect prompt` (`CORAL_CLOUD_CONNECT=prompt`); `--cloud-connect off` turns that off. See [Coral Hub](coral-go/agent_docs/hub.md#connecting-a-server-to-coral-hub).
-
-## How It Works
-
-### 1. Create a team
-
-Define a team of agents, each with a role and a system prompt. For example: an Orchestrator that plans and delegates, a Lead Developer that writes code, and a QA Engineer that reviews and tests. You can create teams from the dashboard UI, use built-in templates, or describe what you need in plain English and let AI generate the team configuration.
-
-<p align="center">
-  <img alt="The Launch New Session dialog with four choices: AI Agent, Agent Team, Terminal, and Open Folder" src="assets/readme/launch-new-session.png" width="100%" />
-  <br>
-  <sub><strong>+ New</strong> offers four things to launch: a single agent, a whole team on a shared board, a plain terminal that lives alongside your agents, or a folder pinned to your Agents list.</sub>
-</p>
-
-### 2. Agents work in their own sessions
-
-Coral starts every agent in a separate terminal session. Launch a team with the worktree option and Coral checks the team out into `~/.coral/worktrees/<team>` on a `coral-team/<team>` branch, so the agents share one branch and your main checkout stays clean. Scheduled and one-shot jobs get a worktree per run. If you want each agent on a separate branch, set the team's working mode to `worktrees` and the agents are instructed to create their own.
-
-### 3. Agents communicate via the message board
-
-Every team has a shared message board. Agents post status updates, ask for help, and coordinate handoffs. The orchestrator agent can assign tasks and track progress. Messages are delivered reliably with cursor-based tracking — nothing is lost across agent restarts.
-
-### 4. You monitor and steer from the dashboard
-
-The web dashboard shows every agent's live terminal, current status, and message board activity. You can:
-- Send messages or commands to any agent
-- Sleep an agent (preserving full state) and wake it later
-- Add new agents to a running team
-- Answer an agent's permission prompt from the dashboard — including from your phone
-- Define teams in JSON, import a skill folder as a team, or generate one from a plain-English description
-- See what it all cost — by model, team, branch, and individual agent
-
-<p align="center">
-  <img alt="The Analytics view: token and cost totals, a cumulative spend chart, then cost tables by provider and by model" src="assets/readme/analytics.png" width="100%" />
-  <br>
-  <sub>Analytics: token and cost totals, spend over time, then the same cost cut by provider and model, and further down by thinking level, team, git branch, and agent. (Sample data.)</sub>
-</p>
-
-## Features
-
-| Feature | Description |
-|---|---|
-| **Mixed-vendor teams** | Put Claude Code, Codex, Gemini CLI, and Pi.dev agents on one team. Permissions are written once (`file_read`, `shell:<pattern>`, `git_write`, …) and translated to each CLI's native format |
-| **Real-time dashboard** | Web UI (and installable PWA) showing every live terminal, agent status, pending permission prompts, and controls |
-| **Remote operation** | Run Coral on any machine and operate it from any browser over the network. Non-local access is gated by an API key. Boards can be subscribed to across Coral servers |
-| **Mobile client** | A phone-first client, installable to the home screen and paired with a QR code: live terminals, board, tasks, and permission prompts, all from the same server |
-| **Message board** | Inter-agent communication with cursor-based delivery, @mentions, and `peek` so an orchestrator can read a worker's terminal |
-| **Task queue with contracts** | Tasks with `success` / `failure` / `termination` dependency conditions, required artifacts, atomic completion, explicit retries, and a `review_pending` hold so QA can gate a result without blocking the worker |
-| **Wait, don't poll** | Workers run `coral-board wait --from <agent>` and end their turn; Coral wakes them when the message or task lands |
-| **Sleep & wake** | Suspend an agent or a whole team, then resume with the vendor's own session restored — works after restarting Coral |
-| **Team definitions** | Teams are JSON (`~/.coral/teams/`). Import a skill folder as a team, or generate one from a plain-English description |
-| **Workflows** | Chain shell and agent steps, pass outputs between them, and inject OAuth tokens from connected apps (GitHub, Slack, Gmail, Calendar) |
-| **Scheduled jobs** | Run a prompt or workflow on a cron schedule, each run in its own git worktree branched from a base branch |
-| **Board health monitor** | Flags blocked tasks whose prerequisites are done, load imbalance, and idle assignees; reminds after 30 min and escalates to the orchestrator after 60 |
-| **Cost tracking** | Token and cost figures per agent, session, team, branch, and task from hooks and transcripts, plus an optional local LLM proxy (Anthropic, OpenAI, Bedrock) — including Claude subagent spend |
-| **Session history** | One searchable history across every agent CLI's transcripts, with auto-summaries, tags, notes, and per-session diffs captured on kill |
-| **Agent-published UI** | Any agent can publish a sandboxed HTML panel to the sidebar and read back user clicks (`coral-agent ui publish`) |
-| **Git integration** | Tracks commits, branches, changed files, and open PR numbers per agent session |
-| **Webhooks** | Slack, Discord, or generic HTTP alerts when an agent needs input or goes idle, with retries and a circuit breaker |
-
-## Comparison
-
-Coral is not an agent and doesn't replace one. Claude Code, Claude Desktop, the Codex app, and Cursor each run their own agents in parallel now, with worktree isolation and subagents or agent teams built in. If you only ever use one of them, that vendor's own tooling is the first thing to try.
-
-Coral is the layer *around* those tools. Every vendor's orchestration coordinates only its own processes — Claude Code's teammates are other Claude Code instances, Codex's subagents are Codex. Coral's job is what happens when you run more than one, or want to operate them from somewhere other than the terminal they started in.
-
-| | Coral | Claude Code / Claude Desktop | Codex app / CLI | Cursor |
-|---|:---:|:---:|:---:|:---:|
-| Agents on one team | Claude, Codex, Gemini, Pi | Claude | Codex | Cursor |
-| Run agents in parallel | ✓ | ✓ (Agent Teams, `--worktree`) | ✓ (threads, subagents) | ✓ (Agents window) |
-| Worktree isolation | Per team (opt-in), per scheduled run | Per session | Per thread | Per agent |
-| Inter-agent coordination | Shared board + task queue with dependency conditions, artifacts, and review hold | Shared task list + mailbox | Subagents | Subagents |
-| Sleep & wake a whole team, resume after restarting the tool | ✓ | Resume a session | Resume a thread | Resume |
-| Dashboard reachable from a browser or phone | ✓ | Desktop app | Desktop app | IDE |
-| Cost by agent, team, branch, and task | ✓ | Per session | Per thread | Per request |
-| Open source | ✓ Apache 2.0 | — | CLI only | — |
-
-What is specific to Coral is the combination: multiple vendors on one board, a task engine whose dependencies are conditioned on outcomes and artifacts rather than just "done", a review-hold state for an orchestrator to check work before it unblocks the next step, teams you can sleep and wake after restarting Coral, and a mobile client that answers permission prompts from your phone. Around that sit cron-scheduled runs, shell-and-agent workflows, Slack and Discord alerts when an agent is stuck, and a board-health monitor — all running on the same server as the agents, so they work whether or not you're at the keyboard.
-
-Where the single-vendor tools are stronger: per-session worktree isolation is on by default in Claude Code and Codex, while Coral's team worktree is opt-in and shared by the team. Coral also doesn't merge branches or resolve conflicts for you; output is a branch, a diff, or a PR the agent opens.
-
-Other open-source projects in this space — Claude Squad, Conductor, Crystal, and vibe-kanban — take a similar tmux-and-worktrees approach. Frameworks like AutoGen and CrewAI are a different job: they help you build agents in code, whereas Coral runs the CLIs you already have.
+Coral Hub (app.coralhub.dev, invite-only beta) lets you reach your Coral computers from any browser without opening a port. A fresh install never connects, or asks you to, on its own: connect a computer from the home screen or **Settings > Network and Hub**, or run `coral cloud connect` on it. Coral offers it at first launch (the dashboard's Connect screen and a prompt in the terminal) only when you pass a hub URL (`--cloud-url https://app.coralhub.dev` or `CORAL_CLOUD_URL`) or start it with `--cloud-connect prompt` (`CORAL_CLOUD_CONNECT=prompt`); `--cloud-connect off` turns that off. See [Coral Hub](coral-go/agent_docs/hub.md#connecting-a-server-to-coral-hub).
 
 ## Documentation
 
@@ -312,7 +231,7 @@ Full documentation at **[subgentic.github.io/coral](https://subgentic.github.io/
 
 ## Contributing
 
-We welcome contributions! Whether it's adding support for new AI agents, improving the dashboard, or fixing bugs — please open an issue or submit a pull request.
+We welcome contributions! Whether it's adding support for new AI agents, improving the dashboard, or fixing bugs, please open an issue or submit a pull request.
 
 Dashboard changes should follow the [Coral UI style guide](coral-go/docs/ui-style-guide.md).
 
