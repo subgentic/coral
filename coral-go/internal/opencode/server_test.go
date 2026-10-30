@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -20,10 +21,14 @@ import (
 
 // TestMain makes this test binary the stand-in opencode when asked: `<binary> serve --hostname H --port P` listens on P, answers the messages route behind the password it was given in its environment,
 // and writes the environment it saw to a file, so a test can read what the server was given.
+//
+// The stand-in is told apart by ITS ARGUMENTS ALONE: the first one is "serve". The test runner never starts this binary that way (its arguments are -test flags), and no variable is needed, which matters:
+// the server's environment is filtered (agentenv.Filter drops every CORAL_ variable), so a guard variable named CORAL_... never reached the child, the child took itself for a test run, ran every test,
+// and each of those started another stand-in: 357, then 1,864 processes, three crashes of the operator's Mac (#11377). A child that is the stand-in never calls m.Run().
 func TestMain(m *testing.M) {
-	if os.Getenv("CORAL_TEST_OPENCODE_STUB") == "1" {
+	if len(os.Args) > 1 && os.Args[1] == "serve" {
 		runStub()
-		return
+		os.Exit(0)
 	}
 	os.Exit(m.Run())
 }
@@ -35,7 +40,7 @@ func runStub() {
 			port = os.Args[i+1]
 		}
 	}
-	if out := os.Getenv("CORAL_TEST_OPENCODE_ENVFILE"); out != "" {
+	if out := os.Getenv(envFileVar); out != "" {
 		seen := map[string]string{"args": strings.Join(os.Args[1:], " ")}
 		for _, k := range []string{"OPENCODE_PASSWORD", "OPENCODE_DB", "OPENCODE_SERVER_URL", "XDG_DATA_HOME", "XDG_CONFIG_HOME", "XDG_CACHE_HOME", "XDG_STATE_HOME", "HOME", "CORAL_SESSION_TOKEN", "CORAL_INITIAL_PASSWORD_FILE", "CORAL_URL", "CORAL_SESSION_NAME", "ANTHROPIC_API_KEY_OF_ANOTHER_AGENT"} {
 			seen[k] = os.Getenv(k)
@@ -65,14 +70,32 @@ func runStub() {
 	_ = http.Serve(l, mux)
 }
 
+// envFileVar names where the stand-in writes the environment it saw. Not a CORAL_, OPENCODE_ or XDG_ name: the server's environment filter keeps nothing of those, and this must reach the stand-in.
+const envFileVar = "STANDIN_ENVFILE_FOR_TESTS"
+
+// maxStandIns is the most stand-ins one run of this package may start. A test that goes past it fails at once, and each run stops what it started: nothing here may ever start servers without a bound.
+const maxStandIns = 24
+
+var standInsStarted atomic.Int32
+
 func stubConfig(t *testing.T) (Config, string) {
 	t.Helper()
+	if n := standInsStarted.Add(1); n > maxStandIns {
+		t.Fatalf("%d stand-in servers started in one run: more than the %d this package ever needs (a start that loops?)", n, maxStandIns)
+	}
 	exe, err := os.Executable()
 	require.NoError(t, err)
-	t.Setenv("CORAL_TEST_OPENCODE_STUB", "1")
 	envFile := filepath.Join(t.TempDir(), "env.json")
-	t.Setenv("CORAL_TEST_OPENCODE_ENVFILE", envFile)
-	return Config{Bin: exe, DataDir: filepath.Join(t.TempDir(), "opencode"), Ready: 10 * time.Second}, envFile
+	t.Setenv(envFileVar, envFile)
+	cfg := Config{Bin: exe, DataDir: filepath.Join(t.TempDir(), "opencode"), Ready: 10 * time.Second}
+	// whatever a test leaves running is stopped by the pid Coral recorded for it, when the test ends
+	t.Cleanup(func() {
+		recs, _ := filepath.Glob(filepath.Join(cfg.DataDir, "servers", "*", "server.json"))
+		for _, f := range recs {
+			stopLeftOver(f)
+		}
+	})
+	return cfg, envFile
 }
 
 func TestTheServerRunsInCoralsOwnFolderBehindItsOwnPasswordAndIsStoppedByItsPid(t *testing.T) {
