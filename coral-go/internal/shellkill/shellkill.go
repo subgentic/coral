@@ -17,11 +17,13 @@ import (
 // Bounds (Security's #11157 MUST): the command comes from an agent, and a prompt-injected one must not make the server work for it. Past any of them the command is LET RUN (""): this is a guard against
 // an accident, not a sandbox.
 const (
-	maxBytes    = 64 << 10              // a longer command is not read
-	maxDepth    = 8                     // substitutions and bash -c / eval inside each other
-	maxCommands = 2000                  // simple commands read
-	maxWork     = 20 * time.Millisecond // the time the reading may take
+	maxBytes    = 64 << 10 // a longer command is not read
+	maxDepth    = 8        // substitutions and bash -c / eval inside each other
+	maxCommands = 2000     // simple commands read
 )
+
+// maxWork is the time the reading may take. A variable so that a test can make the bound short enough to pass.
+var maxWork = 20 * time.Millisecond
 
 // Reason is why the command is refused, or "" when it stops nothing by a pattern. It never refuses `kill <pid>`, `kill %1`, `kill -9 "$pid"`, `pkill` written inside a quote or a here-document.
 func PatternKill(command string) string {
@@ -389,6 +391,9 @@ func judge(c cmd) string {
 			}
 		}
 	case "kill":
+		if why := killsEverything(args); why != "" {
+			return why
+		}
 		for _, a := range args {
 			if strings.Contains(a, "$(…)") || strings.Contains(a, "`…`") {
 				for _, sub := range c.subst {
@@ -434,3 +439,52 @@ func base(w string) string {
 var durationRe = regexp.MustCompile(`^([0-9]+(\.[0-9]*)?|\.[0-9]+)[smhd]?$`)
 
 func isNumber(s string) bool { return durationRe.MatchString(s) }
+
+// killsEverything is why a kill signals more than the process it names (Security's #11157 INFOs): -1 signals every process the user can reach and 0 the whole process group, which in an agent's shell
+// holds Coral's own tmux panes and the other agents; a negative number is a process group. "kill 1234", "kill %1", "kill $pid" and "kill -9 1234" are not it.
+func killsEverything(args []string) string {
+	i, signal := 0, ""
+	var targets []string
+	afterDashes := false
+	for i < len(args) {
+		a := args[i]
+		switch {
+		case a == "--" && !afterDashes:
+			afterDashes = true
+		case !afterDashes && len(targets) == 0 && signal == "" && (a == "-s" || a == "-n" || a == "--signal"):
+			signal = a
+			i++ // its value is the signal
+			if i < len(args) {
+				signal = args[i]
+			}
+		case !afterDashes && len(targets) == 0 && signal == "" && signalSpec(a):
+			signal = a
+		default:
+			targets = append(targets, a)
+		}
+		i++
+	}
+	const why = "kill of -1, 0 or a process group signals every process the user owns or the whole group, Coral's own and the other agents' included"
+	if len(targets) == 0 && signal == "-1" {
+		return why // "kill -1": every process, as written in the one place it was asked for
+	}
+	for _, t := range targets {
+		if t == "0" || t == "-0" || (len(t) > 1 && t[0] == '-' && (t[1] >= '0' && t[1] <= '9' || t[1] == '$')) {
+			return why
+		}
+	}
+	return ""
+}
+
+// signalSpec is a kill option naming a signal: -9, -KILL, -SIGTERM, -HUP.
+func signalSpec(a string) bool {
+	if len(a) < 2 || a[0] != '-' || a[1] == '-' {
+		return false
+	}
+	for _, r := range a[1:] {
+		if !(r >= '0' && r <= '9' || r >= 'A' && r <= 'Z' || r >= 'a' && r <= 'z') {
+			return false
+		}
+	}
+	return true
+}

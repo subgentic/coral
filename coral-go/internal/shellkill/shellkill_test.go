@@ -238,3 +238,68 @@ func TestDurationsAndOptionClustersOfWrappers(t *testing.T) {
 		assert.Empty(t, PatternKill(c), c)
 	}
 }
+
+// Security's #11157 INFOs: kill -1 and kill 0 signal every process the user can reach, or the whole process group (Coral's own panes and the other agents'); a negative number is a process group.
+func TestKillOfEverythingOrAGroupIsRefused(t *testing.T) {
+	for _, c := range []string{
+		`kill -1`,
+		`kill -9 -1`,
+		`kill -KILL -1`,
+		`kill -SIGKILL -1`,
+		`kill -s KILL -1`,
+		`kill -n 9 -1`,
+		`kill 0`,
+		`kill -9 0`,
+		`kill -TERM 0`,
+		`kill -- -1`,
+		`kill -- -1234`,
+		`kill -9 -- -1234`,
+		`kill -9 -1234`,
+		`kill -- -$pgid`,
+		`kill -9 -$pgid`,
+		`sudo kill -9 -1`,
+		`sudo -u root kill 0`,
+		`timeout 5 kill -9 -1`,
+		`bash -c "kill -9 -1"`,
+		`kill 1234 -1`,
+		`kill 1234 0`,
+	} {
+		assert.NotEmpty(t, PatternKill(c), c)
+	}
+	for _, c := range []string{
+		`kill 1234`,
+		`kill -9 1234`,
+		`kill -KILL 1234`,
+		`kill -s TERM 1234`,
+		`kill %1`,
+		`kill -9 %1`,
+		`kill "$pid"`,
+		`kill -9 "$pid"`,
+		`kill $!`,
+		`kill -TERM "$!"`,
+		`kill -1 1234`,
+		`kill -l`,
+		`kill -0 1234`,
+		`kill -- 1234`,
+		`kill 10 20`,
+		`kill 100`,
+		`echo kill -1`,
+		`git commit -m "kill -9 -1"`,
+	} {
+		assert.Empty(t, PatternKill(c), c)
+	}
+}
+
+// Security's #11157 INFO 2: the 20 ms bound on the reading, alone. A command that is inside the size, depth and command bounds but takes longer than the time to read is let run, whatever it says; the same
+// command is read and refused with the time the bound normally is.
+func TestTheTimeBoundAloneLetsALongReadingRun(t *testing.T) {
+	command := strings.Repeat("echo a; ", 400) + "pkill -f x" // 3 KB, 400 commands, depth 0: inside every other bound
+	assert.NotEmpty(t, PatternKill(command), "inside every bound it is read and refused")
+
+	was := maxWork
+	t.Cleanup(func() { maxWork = was })
+	maxWork = time.Nanosecond // the time the reading may take is over at the first look at the clock
+	assert.Empty(t, PatternKill(command), "past the time bound the command runs")
+	maxWork = was
+	assert.NotEmpty(t, PatternKill(command), "and the bound is the only thing that changed")
+}
