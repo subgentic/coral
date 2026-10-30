@@ -291,7 +291,7 @@ func (s *Service) piGroups(models []Model, path string) ([]Group, string) {
 			break
 		}
 		wg.Add(1)
-		go func() { defer wg.Done(); signed[i] = s.piSignedIn(ctx, path, n) }()
+		safego.Go("agentmodels:pi-signin:"+n, func() { defer wg.Done(); signed[i] = s.piSignedIn(ctx, path, n) })
 	}
 	wg.Wait()
 	var in, out []Group
