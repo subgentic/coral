@@ -119,7 +119,7 @@ function _listHeader(agentList) {
     header.className = 'mobile-list-header';
     header.innerHTML = `
             <button class="btn btn-quiet btn-icon phone-menu-btn" type="button" data-on-click="m-top-menu" data-hamburger aria-haspopup="menu" aria-expanded="false" aria-controls="nav-more-menu" aria-label="Menu"><span class="material-icons" aria-hidden="true">menu</span></button>
-            <button class="phone-account-btn" type="button" data-on-click="m-top-menu" data-hamburger data-account aria-haspopup="menu" aria-expanded="false" aria-controls="nav-more-menu" aria-label="Account and more"><span class="material-icons" aria-hidden="true">account_circle</span><span class="sr-only" id="phone-hub-state"></span></button>
+            <button class="phone-account-btn" type="button" data-on-click="m-top-menu" data-hamburger data-account aria-haspopup="menu" aria-expanded="false" aria-controls="nav-more-menu" aria-label="Settings and account" title="Settings and account"><span class="material-icons" aria-hidden="true">account_circle</span><span class="sr-only" id="phone-hub-state"></span></button>
             <span class="phone-break" aria-hidden="true"></span>
             <h2 class="mobile-list-title">Agents</h2>
             <div class="phone-chips" role="group" aria-label="Show">
