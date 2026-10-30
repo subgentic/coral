@@ -6,7 +6,7 @@ Task-oriented notes on the dashboard controls. Every statement was checked again
 
 ## Choose a model and thinking level
 
-**At launch and restart.** In **New agent** and **Restart**, the **Agent** section has **Model** and **Thinking** . Thinking (reasoning effort) offers Low, Medium, High, Extra high and Max for Claude Code and Antigravity, and Minimal, Low, Medium, High and Extra high for Codex, narrowed to the levels the chosen model takes. Pi and plain terminals have no Thinking select today.
+**At launch and restart.** In **New agent** and **Restart**, the **Agent** section has **Model** and **Thinking** . Thinking (reasoning effort) offers Low, Medium, High, Extra high and Max for Claude Code and Antigravity, Minimal, Low, Medium, High and Extra high for Codex, and Off, Minimal, Low, Medium, High, Extra high and Max for Pi (its `--thinking` option), narrowed to the levels the chosen model takes. Plain terminals have no Thinking select.
 
 - **Default** passes nothing, so the CLI uses its own default.
 - **Restart** opens on the level the agent was started with and keeps it unless you change it. Choose **Default** to clear it.
@@ -23,7 +23,7 @@ The agent's header does not repeat the model (the chips, the **Details** disclos
 
 - **Claude Code switches live.** Coral types the CLI's own `/model` and `/effort` into the agent's terminal once the agent is between turns. The chip you used says `Switching to …` until the transcript confirms it, and shows the CLI's message if it refused. You can keep typing the whole time.
 - **Switches after this reply.** You changed it while the agent was in the middle of a turn. Coral waits for the reply to end and never types into the middle of one.
-- **Apply with restart.** Shown in the menu for a CLI with no live switch (Codex, Antigravity, Pi: only Claude is checked so far). Choosing an item opens the Restart dialog with your choice filled in; the dialog is the confirmation.
+- **Apply with restart.** Shown in the menu for a CLI with no live switch (Codex, Antigravity, Pi: only Claude is checked so far). A Pi agent takes its new model or level when it restarts, and its conversation resumes. The model chip's API answers 409 `needs_restart` for it, naming the restart. Choosing an item opens the Restart dialog with your choice filled in; the dialog is the confirmation.
 
 A second change while one is still pending is refused with a message. The API behind this is `POST /api/sessions/live/{name}/model` in [Sessions](sessions.md).
 
@@ -33,7 +33,7 @@ The agent list is one line per agent: its name and what it is doing. The provide
 
 ![An agent row's hover card: state, goal, status, branch, model, thinking level and context](docs-img/agent-hover-card.png)
 
-- **Only what is on record.** A plain terminal has none of the three, and Pi reports no thinking level, so there is none to show. Antigravity keeps showing the level it was started with. An agent started with no level shows none until its first reply.
+- **Only what is on record.** A plain terminal has none of the three. Pi shows its model and thinking level from its session file, read from its last `model_change`, `thinking_level_change` and turn. Antigravity keeps showing the level it was started with. An agent started with no level shows none until its first reply.
 - **Changing them** is done from the chips beside the Send button (see above), not from the list.
 
 ## See cost by provider, model and thinking level
