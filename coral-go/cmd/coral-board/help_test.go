@@ -92,6 +92,11 @@ type recordingServer struct {
 func newRecordingServer(t *testing.T) *recordingServer {
 	rs := &recordingServer{}
 	rs.Server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/health" { // what a command asks before it trusts an address from the lock file (config.VerifiedServer); not a request the tests count
+			w.Header().Set("Content-Type", "application/json")
+			w.Write([]byte(`{"status":"ok","version":"test"}`))
+			return
+		}
 		body, _ := io.ReadAll(r.Body)
 		rs.mu.Lock()
 		rs.reqs = append(rs.reqs, r.Method+" "+r.URL.Path+" "+string(body))

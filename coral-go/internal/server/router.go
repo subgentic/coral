@@ -141,7 +141,8 @@ func (s *Server) registerAuth(r *chi.Mux) {
 		w.WriteHeader(http.StatusOK)
 		// "version" is additive; older hubs ignore unknown fields.
 		// "hub" tells the frontend whether to show the multi-server UI.
-		json.NewEncoder(w).Encode(map[string]any{"status": "ok", "version": config.ReportedVersion(), "hub": s.cfg.HubMode})
+		// "instance_id" names this server run: a command that found its address in the data folder's lock file checks it before it sends a credential (config.VerifiedServer).
+		json.NewEncoder(w).Encode(map[string]any{"status": "ok", "version": config.ReportedVersion(), "hub": s.cfg.HubMode, "instance_id": s.cfg.InstanceID})
 	})
 
 	// Auth endpoints

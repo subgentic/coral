@@ -16,7 +16,7 @@ func runningServerURL(fs *flag.FlagSet, base, home string) string {
 	if given || os.Getenv("CORAL_URL") != "" || os.Getenv("CORAL_PORT") != "" {
 		return base
 	}
-	if _, u := config.RecordedServer(config.ResolveCoralDir(home)); u != "" {
+	if u := config.VerifiedServer(config.ResolveCoralDir(home)); u != "" {
 		return u
 	}
 	return base

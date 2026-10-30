@@ -1,6 +1,8 @@
 package startup
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
@@ -12,10 +14,10 @@ import (
 // errAlreadyRunning: the data folder's instance lock is held, so another Coral server runs for it.
 var errAlreadyRunning = errors.New("another Coral is already running on this data folder")
 
-// recordAddress writes the address this server listens on after its PID ("<pid>\n<url>\n"), once it listens, so a command finds
+// recordAddress writes the address this server listens on after its PID and its instance id ("<pid>\n<url>\n<id>\n"), once it listens, so a command finds
 // the server of its data folder on whatever port it took (config.RecordedServer), and a second start on the same folder can say
 // which server runs and where (#235). The lock itself is a byte far past this text, so the file stays readable while it is held.
-func (l *instanceLock) recordAddress(url string) {
+func (l *instanceLock) recordAddress(url, id string) {
 	if l == nil || l.file == nil {
 		return
 	}
@@ -25,7 +27,7 @@ func (l *instanceLock) recordAddress(url string) {
 	if _, err := l.file.Seek(0, 0); err != nil {
 		return
 	}
-	_, _ = fmt.Fprintf(l.file, "%d\n%s\n", os.Getpid(), url)
+	_, _ = fmt.Fprintf(l.file, "%d\n%s\n%s\n", os.Getpid(), url, id)
 	_ = l.file.Sync()
 }
 
@@ -57,4 +59,13 @@ func alreadyRunningError(coralDir, lockPath string) error {
 	return fmt.Errorf("Coral is already running on this data folder (%s)%s. Open it with 'coral open'. "+
 		"To stop it, press Ctrl+C in its window or choose Quit in the Coral tray. "+
 		"To run a second Coral, give it its own data folder (--home or CORAL_DATA_DIR).", coralDir, which)
+}
+
+// newInstanceID is a fresh random name for this server run: 32 lower-case hex digits (config.RecordedInstance reads that shape).
+func newInstanceID() string {
+	var b [16]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return "" // no id is recorded: a command then falls back to the older, weaker check
+	}
+	return hex.EncodeToString(b[:])
 }

@@ -2,6 +2,8 @@ package main
 
 import (
 	"flag"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -43,6 +45,12 @@ func TestTheCommandsFindTheRunningServerOfTheirDataFolder(t *testing.T) {
 	record := func(dir, text string) {
 		require.NoError(t, os.WriteFile(filepath.Join(dir, config.ServerLockFile), []byte(text), 0o600))
 	}
+	// A recorded address is used only once it answers /api/health as a Coral and its process runs (config.VerifiedServer): these are real listeners, and this test's own PID.
+	coral := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"status":"ok","version":"test"}`))
+	}))
+	t.Cleanup(coral.Close)
+	live := strconv.Itoa(os.Getpid())
 
 	fs, base, home := parse()
 	assert.Equal(t, def, runningServerURL(fs, *base, *home), "nothing recorded: the default")
@@ -50,13 +58,17 @@ func TestTheCommandsFindTheRunningServerOfTheirDataFolder(t *testing.T) {
 	record(dir, "4242\n")
 	assert.Equal(t, def, runningServerURL(fs, *base, *home), "an older server's lock file, the PID only: the default")
 
-	record(dir, "4242\nhttp://localhost:8476\n")
-	assert.Equal(t, "http://localhost:8476", runningServerURL(fs, *base, *home), "the recorded address")
+	record(dir, live+"\n"+coral.URL+"\n")
+	assert.Equal(t, coral.URL, runningServerURL(fs, *base, *home), "the recorded address, verified")
+	record(dir, "4242\n"+coral.URL+"\n")
+	assert.Equal(t, def, runningServerURL(fs, *base, *home), "a record whose process is not running is not taken")
+	record(dir, live+"\nhttp://localhost:8476\n")
+	assert.Equal(t, def, runningServerURL(fs, *base, *home), "an address that does not answer is not taken")
 
 	other := t.TempDir()
-	record(other, "77\nhttps://127.0.0.1:9001\n")
+	record(other, live+"\n"+coral.URL+"\n")
 	fs, base, home = parse("--home", other)
-	assert.Equal(t, "https://127.0.0.1:9001", runningServerURL(fs, *base, *home), "--home's server")
+	assert.Equal(t, coral.URL, runningServerURL(fs, *base, *home), "--home's server")
 
 	fs, base, home = parse("--url", "http://localhost:1234")
 	assert.Equal(t, "http://localhost:1234", runningServerURL(fs, *base, *home), "--url wins")
