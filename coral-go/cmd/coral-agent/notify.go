@@ -41,6 +41,9 @@ func cmdNotify(args []string, out io.Writer) error {
 	default:
 		return errors.New("--level must be info, success, warning or error")
 	}
+	if err := refuseSignInLinkIn("a notification", *title, *message); err != nil {
+		return err
+	}
 	body := map[string]string{"title": *title, "message": *message, "level": *level}
 	if *alert {
 		body["type"] = "alert"

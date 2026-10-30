@@ -154,6 +154,11 @@ func uploadArtifact(serverURL, file, name, mediaType, sid, newVersionOf, task st
 
 // uploadArtifactTags is uploadArtifact with the tags asked for the file (#8583), each sent as a tag parameter.
 func uploadArtifactTags(serverURL, file, name, mediaType, sid, newVersionOf, task string, tags []string, stdout, stderr io.Writer) error {
+	if err := refuseSignInLinkIn("an artifact name or tag", append([]string{name}, tags...)...); err != nil {
+		return err
+	}
+	// Its contents: a warning only, and the upload goes ahead.
+	warnSignInLinkInFile(file, stderr)
 	f, err := os.Open(file) // streamed to Coral, not read into memory (#3553)
 	if err != nil {
 		return err
@@ -260,6 +265,9 @@ func replyToComment(serverURL, ref, commentID, text string, stdout io.Writer) er
 	commentID = strconv.FormatInt(n, 10) // the path is exactly the digits: "+5" and "0005" are 5
 	if strings.TrimSpace(text) == "" {
 		return fmt.Errorf("a reply needs some text")
+	}
+	if err := refuseSignInLinkIn("a reply", text); err != nil {
+		return err
 	}
 	payload, _ := json.Marshal(map[string]string{"body": text})
 	req, err := http.NewRequest(http.MethodPost, serverURL+"/api/artifacts/"+id+"/comments/"+commentID+"/reply", bytes.NewReader(payload))

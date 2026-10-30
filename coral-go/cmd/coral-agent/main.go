@@ -154,6 +154,9 @@ func apiCallRaw(method, path string, body any) ([]byte, int, error) {
 }
 
 func apiCall(method, path string, body any, timeout time.Duration) ([]byte, int, error) {
+	if err := refuseSignInLinkInBody(body); err != nil { // nothing other people read carries a sign-in link
+		return nil, 0, err
+	}
 	var bodyReader io.Reader
 	if body != nil {
 		data, _ := json.Marshal(body)

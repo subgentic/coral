@@ -175,6 +175,10 @@ func cmdPost() {
 			clierr.Exit1()
 		}
 	}
+	if err := refuseSignInLink("post", message); err != nil { // from the arguments, --file or stdin alike
+		fmt.Fprintln(os.Stderr, err)
+		clierr.Exit1()
+	}
 
 	if assignArg == "" && (goalArg != "" || titleArg != "" || priorityArg != "") {
 		fmt.Fprintln(os.Stderr, "Error: --goal, --title and --priority are for --assign: post --assign \"Name\" [--goal N] [--title T] [--priority P] \"text\"")

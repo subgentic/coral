@@ -16,6 +16,7 @@ import (
 
 // workflowAPICall performs an HTTP request against /api/workflows (not /api/board).
 func workflowAPICall(method, path string, body any) ([]byte, int, error) {
+	refuseSignInLinkInBody(body)
 	var bodyReader io.Reader
 	if body != nil {
 		data, _ := json.Marshal(body)

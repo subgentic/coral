@@ -42,6 +42,7 @@ func endpointFromEnv(explicitURL, host, port string) string {
 }
 
 func apiCall(method, path string, body any) (map[string]any, int, error) {
+	refuseSignInLinkInBody(body) // nothing members read carries a sign-in link
 	var bodyReader io.Reader
 	if body != nil {
 		data, _ := json.Marshal(body)
@@ -162,6 +163,7 @@ func apiCallRawTimeout(method, path string, body any, timeout time.Duration) ([]
 
 // apiCallRawAt is apiCallRawTimeout for a route under another prefix of the server's API (the agent routes, "/api/agent": #11005).
 func apiCallRawAt(prefix, method, path string, body any, timeout time.Duration) ([]byte, int, error) {
+	refuseSignInLinkInBody(body)      // nothing members read carries a sign-in link
 	timeout = clierr.Timeout(timeout) // CORAL_TIMEOUT, when set, replaces the command's own
 	client := &http.Client{Timeout: timeout}
 	var lastErr error
