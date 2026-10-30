@@ -297,7 +297,7 @@ func (s *Server) registerSessions(r *chi.Mux, h *routeHandlers) {
 	r.Get("/api/sessions/live/{name}/git", sessHandler.Git)
 	r.Post("/api/sessions/live/{name}/send", sessHandler.Send)
 	r.Delete("/api/sessions/live/{name}/held/{id}", sessHandler.CancelHeld)
-	r.Post("/api/sessions/live/{name}/goal", sessHandler.RequestGoal)
+	r.With(routes.RefuseSignInLink).Post("/api/sessions/live/{name}/goal", sessHandler.RequestGoal)
 	s.goalMetrics = routes.NewGoalMetricsHandler(s.db)
 	r.Get("/api/goals/metrics", s.goalMetrics.Metrics)
 	callMetrics := routes.NewCallMetricsHandler(s.db)
@@ -312,8 +312,8 @@ func (s *Server) registerSessions(r *chi.Mux, h *routeHandlers) {
 	r.Post("/api/sessions/live/{name}/model", sessHandler.SwitchModel) // the live model and thinking-level switch (#4969)
 	r.Post("/api/sessions/live/{name}/resume", sessHandler.Resume)
 	r.Post("/api/sessions/live/{name}/attach", sessHandler.Attach)
-	r.Put("/api/sessions/live/{name}/display-name", sessHandler.SetDisplayName)
-	r.Put("/api/sessions/live/{name}/instructions", sessHandler.SetInstructions) // what the agent is told at its next restart (#10133)
+	r.With(routes.RefuseSignInLink).Put("/api/sessions/live/{name}/display-name", sessHandler.SetDisplayName)
+	r.With(routes.RefuseSignInLink).Put("/api/sessions/live/{name}/instructions", sessHandler.SetInstructions) // what the agent is told at its next restart (#10133)
 	r.Get("/api/sessions/live/{name}/file-content", sessHandler.GetFileContent)
 	r.Get("/api/sessions/live/{name}/resolve-path", sessHandler.ResolvePath)
 	r.Post("/api/sessions/live/{name}/open-in-editor", sessHandler.OpenInEditor)
@@ -327,8 +327,8 @@ func (s *Server) registerSessions(r *chi.Mux, h *routeHandlers) {
 	r.Post("/api/sessions/live/{name}/auto-accept/disable", sessHandler.DisableAutoAccept)
 	r.Post("/api/auto-accept/disable-all", sessHandler.DisableAllAutoAccept)
 	r.Post("/api/sessions/live/{name}/context-window", sessHandler.UpdateContextWindow)
-	r.Post("/api/sessions/launch", sessHandler.Launch)
-	r.Post("/api/sessions/launch-team", sessHandler.LaunchTeam)
+	r.With(routes.RefuseSignInLink).Post("/api/sessions/launch", sessHandler.Launch)
+	r.With(routes.RefuseSignInLink).Post("/api/sessions/launch-team", sessHandler.LaunchTeam)
 	r.Post("/api/sessions/live/team/{boardName}/kill", sessHandler.KillTeam)
 	r.Post("/api/sessions/live/team/{boardName}/reset", sessHandler.ResetTeam)
 
@@ -357,20 +357,20 @@ func (s *Server) registerSessions(r *chi.Mux, h *routeHandlers) {
 	sessHandler.RegisterArtifactComments(r) // #5176
 	sessHandler.RegisterTerminalLogs(r)
 	r.Get("/api/sessions/live/{name}/tasks", sessHandler.ListTasks)
-	r.Post("/api/sessions/live/{name}/tasks", sessHandler.CreateTask)
-	r.Patch("/api/sessions/live/{name}/tasks/{taskID}", sessHandler.UpdateTask)
+	r.With(routes.RefuseSignInLink).Post("/api/sessions/live/{name}/tasks", sessHandler.CreateTask)
+	r.With(routes.RefuseSignInLink).Patch("/api/sessions/live/{name}/tasks/{taskID}", sessHandler.UpdateTask)
 	r.Delete("/api/sessions/live/{name}/tasks/{taskID}", sessHandler.DeleteTask)
 	r.Post("/api/sessions/live/{name}/tasks/reorder", sessHandler.ReorderTasks)
 	// The agent's own tasks (coral-agent task ...), mirroring the board task API
 	r.Get("/api/agent/tasks", sessHandler.ListAgentTasksForAgent)
 	r.Get("/api/agent/tasks/{taskID}", sessHandler.GetAgentTaskForAgent)
-	r.Patch("/api/agent/tasks/{taskID}", sessHandler.UpdateAgentTaskForAgent)
+	r.With(routes.RefuseSignInLink).Patch("/api/agent/tasks/{taskID}", sessHandler.UpdateAgentTaskForAgent)
 	r.Post("/api/agent/tasks/{taskID}/publish", sessHandler.PublishAgentTaskForAgent)
-	r.Post("/api/agent/tasks", sessHandler.AddAgentTaskForAgent)
+	r.With(routes.RefuseSignInLink).Post("/api/agent/tasks", sessHandler.AddAgentTaskForAgent)
 	r.Post("/api/agent/tasks/claim", sessHandler.ClaimAgentTaskForAgent)
 	r.Post("/api/agent/tasks/current", sessHandler.CurrentAgentTaskForAgent)
-	r.Post("/api/agent/tasks/{taskID}/complete", sessHandler.CompleteAgentTaskForAgent)
-	r.Post("/api/agent/tasks/{taskID}/cancel", sessHandler.CancelAgentTaskForAgent)
+	r.With(routes.RefuseSignInLink).Post("/api/agent/tasks/{taskID}/complete", sessHandler.CompleteAgentTaskForAgent)
+	r.With(routes.RefuseSignInLink).Post("/api/agent/tasks/{taskID}/cancel", sessHandler.CancelAgentTaskForAgent)
 
 	// Agent session history search & context (coral-agent history search / context)
 	r.Get("/api/agent/history/search", sessHandler.SearchAgentHistory)
@@ -384,8 +384,8 @@ func (s *Server) registerSessions(r *chi.Mux, h *routeHandlers) {
 
 	// Agent notes
 	r.Get("/api/sessions/live/{name}/notes", sessHandler.ListNotes)
-	r.Post("/api/sessions/live/{name}/notes", sessHandler.CreateNote)
-	r.Patch("/api/sessions/live/{name}/notes/{noteID}", sessHandler.UpdateNote)
+	r.With(routes.RefuseSignInLink).Post("/api/sessions/live/{name}/notes", sessHandler.CreateNote)
+	r.With(routes.RefuseSignInLink).Patch("/api/sessions/live/{name}/notes/{noteID}", sessHandler.UpdateNote)
 	r.Delete("/api/sessions/live/{name}/notes/{noteID}", sessHandler.DeleteNote)
 
 	// Agent events
@@ -550,7 +550,7 @@ func (s *Server) registerSystem(r *chi.Mux, h *routeHandlers) {
 	r.Get("/api/tags", sysHandler.ListTags)
 	r.Post("/api/tags", sysHandler.CreateTag)
 	r.Delete("/api/tags/{tagID}", sysHandler.DeleteTag)
-	r.Post("/api/sessions/history/{sessionID}/tags", sysHandler.AddSessionTag)
+	r.With(routes.RefuseSignInLink).Post("/api/sessions/history/{sessionID}/tags", sysHandler.AddSessionTag)
 	r.Delete("/api/sessions/history/{sessionID}/tags/{tagID}", sysHandler.RemoveSessionTag)
 
 	// Folder tags
@@ -576,7 +576,7 @@ func (s *Server) registerSystem(r *chi.Mux, h *routeHandlers) {
 	r.Get("/api/sessions/history/{sessionID}", histHandler.GetSessionDetail)
 	r.Get("/api/sessions/history/{sessionID}/agent-notes", histHandler.GetSessionAgentNotes)
 	r.Get("/api/sessions/history/{sessionID}/notes", histHandler.GetSessionNotes)
-	r.Put("/api/sessions/history/{sessionID}/notes", histHandler.SaveSessionNotes)
+	r.With(routes.RefuseSignInLink).Put("/api/sessions/history/{sessionID}/notes", histHandler.SaveSessionNotes)
 	r.Post("/api/sessions/history/{sessionID}/resummarize", histHandler.Resummarize)
 	r.Get("/api/sessions/history/{sessionID}/tags", histHandler.GetSessionTags)
 	r.Get("/api/sessions/history/{sessionID}/git", histHandler.GetSessionGit)
@@ -588,9 +588,9 @@ func (s *Server) registerSystem(r *chi.Mux, h *routeHandlers) {
 	// Scheduled jobs
 	r.Get("/api/scheduled/jobs", schedHandler.ListJobs)
 	r.Get("/api/scheduled/jobs/{jobID}", schedHandler.GetJob)
-	r.Post("/api/scheduled/jobs", schedHandler.CreateJob)
+	r.With(routes.RefuseSignInLink).Post("/api/scheduled/jobs", schedHandler.CreateJob)
 	r.Post("/api/scheduled/jobs/init-repo", schedHandler.InitJobRepo)
-	r.Put("/api/scheduled/jobs/{jobID}", schedHandler.UpdateJob)
+	r.With(routes.RefuseSignInLink).Put("/api/scheduled/jobs/{jobID}", schedHandler.UpdateJob)
 	r.Delete("/api/scheduled/jobs/{jobID}", schedHandler.DeleteJob)
 	r.Post("/api/scheduled/jobs/{jobID}/toggle", schedHandler.ToggleJob)
 	r.Post("/api/scheduled/jobs/{jobID}/run", schedHandler.RunJob)

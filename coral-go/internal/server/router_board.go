@@ -239,7 +239,7 @@ func (s *Server) registerOneShotTasks(r *chi.Mux) {
 	// One-shot tasks
 	tasksHandler := routes.NewTasksHandler(s.db, s.cfg)
 	s.tasksHandler = tasksHandler
-	r.Post("/api/tasks/run", tasksHandler.SubmitTask)
+	r.With(routes.RefuseSignInLink).Post("/api/tasks/run", tasksHandler.SubmitTask)
 	r.Get("/api/tasks/runs", tasksHandler.ListTasks)
 	r.Get("/api/tasks/active", tasksHandler.ListActiveRuns)
 	r.Get("/api/tasks/runs/{runID}", tasksHandler.GetTaskStatus)
