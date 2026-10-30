@@ -34,6 +34,25 @@ type pendingTools struct {
 	// calls are all the tool calls a session has started and not finished (tool_use_id -> the call), so a permission request can be tied to the calls it may be for (#6687): the slot above
 	// holds only the newest, and agents run tool calls in parallel.
 	calls map[string]map[string]pendingTool
+	// requestOpen are the sessions with a permission request of the agent's own open (#11352): its tool's PreToolUse that comes next says the permission was given. Only the marker is kept; the
+	// request itself is in the event log.
+	requestOpen map[string]bool
+}
+
+// markRequest notes that a session has a request open (open) or no longer has (not open); it reports whether one was open before.
+func (p *pendingTools) markRequest(sessionID string, open bool) bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	was := p.requestOpen[sessionID]
+	if open {
+		if p.requestOpen == nil {
+			p.requestOpen = map[string]bool{}
+		}
+		p.requestOpen[sessionID] = true
+	} else {
+		delete(p.requestOpen, sessionID)
+	}
+	return was
 }
 
 // maxCallsPerSession bounds what is remembered of one session's calls in flight.
@@ -260,6 +279,7 @@ func (h *SessionsHandler) SetPendingTool(w http.ResponseWriter, r *http.Request)
 		At:        time.Now(),
 	}
 	h.pending.set(body.SessionID, t)
+	h.noteToolStart(r.Context(), body.SessionID, body.ToolName, body.ToolUseID)
 	h.watchForPrompt(body.SessionID, owner.SessionName, t) // agy sends no hook for a permission prompt (#4819)
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
@@ -277,6 +297,12 @@ func (h *SessionsHandler) notePendingToolEvent(sessionID, eventType, toolUseID s
 	case "stop", "prompt_submit", "session_reset", "session_end":
 		h.pending.callDone(sessionID, "")
 	}
+	switch eventType { // the session's own request: open from its PermissionRequest until the turn moves on (#11352)
+	case "permission_request":
+		h.pending.markRequest(sessionID, true)
+	case "stop", "prompt_submit", "session_reset", "session_end", "request_resolved":
+		h.pending.markRequest(sessionID, false)
+	}
 	// A PostToolUse for another tool than the pending one is a late one of an earlier call: the pending tool still runs, and whatever it waits on is
 	// still open. It changes nothing (it would otherwise mark the session as waiting for nothing, and a prompt answer is refused, #5254).
 	if eventType == "tool_use" && toolUseID != "" {
@@ -293,6 +319,33 @@ func (h *SessionsHandler) notePendingToolEvent(sessionID, eventType, toolUseID s
 	case "stop", "prompt_submit", "session_reset", "session_end":
 		h.pending.clear(sessionID, "")
 	}
+}
+
+// noteToolStart records, when a call starts while the session has a permission request of its own open, that the request was resolved: Claude begins a call (its PreToolUse) once the permission is
+// given, so the card and the Inbox row must not wait for a PostToolUse that comes minutes later with a long command (#11352). One event per request: the marker is taken by the first start, so
+// the PreToolUse of every other call writes nothing. Claude's only; another CLI's PreToolUse says nothing about its prompts.
+func (h *SessionsHandler) noteToolStart(ctx context.Context, sessionID, toolName, toolUseID string) {
+	if sessionID == "" || toolUseID == "" || h.ts == nil || !h.pending.markRequest(sessionID, false) {
+		return
+	}
+	if h.ss == nil {
+		return
+	}
+	ls, err := h.ss.GetLiveSession(ctx, sessionID)
+	if err != nil || ls == nil || ls.AgentType != at.Claude {
+		return
+	}
+	agentName := ls.AgentName
+	id, sid := toolUseID, sessionID
+	ev := &store.AgentEvent{AgentName: agentName, SessionID: &sid, EventType: "request_resolved", Summary: "A call started: the permission was given", RefID: &id}
+	if toolName != "" {
+		ev.ToolName = &toolName
+	}
+	if _, err := h.ts.InsertAgentEvent(ctx, ev); err != nil {
+		slog.Warn("could not record that a permission request was resolved by a call's start", "session_id", sessionID, "error", err)
+		return
+	}
+	h.kickFeedForRequestChange(sessionID, "request_resolved")
 }
 
 // requestCallMaxAge is how recent a call's PreToolUse must be for a permission request to be about it.
