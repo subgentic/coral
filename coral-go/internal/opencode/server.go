@@ -265,6 +265,7 @@ func (s *Server) Stop() {
 		<-s.done
 	}
 	_ = os.Remove(filepath.Join(s.dir, "server.json"))
+	_ = os.Remove(filepath.Join(s.dir, "password")) // a dead server's password is not kept
 }
 
 // stopLeftOver stops the server a previous Coral recorded, if that process is still there: its pid must show, by ps, the exact command that was recorded and the start time that was recorded. A pid that is

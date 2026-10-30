@@ -123,6 +123,9 @@ func runStub() {
 			<-r.Context().Done() // the stream stays open until the reader leaves
 		})
 	}
+	if ms, _ := strconv.Atoi(os.Getenv(listenDelayVar)); ms > 0 {
+		time.Sleep(time.Duration(ms) * time.Millisecond) // a server that is slow to come up
+	}
 	l, err := net.Listen("tcp", "127.0.0.1:"+port)
 	if err != nil {
 		os.Exit(3)
@@ -131,6 +134,8 @@ func runStub() {
 }
 
 // envFileVar names where the stand-in writes the environment it saw. Not a CORAL_, OPENCODE_ or XDG_ name: the server's environment filter keeps nothing of those, and this must reach the stand-in.
+const listenDelayVar = "STANDIN_LISTEN_DELAY_MS_FOR_TESTS"
+
 const eventsFileVar = "STANDIN_EVENTS_FOR_TESTS" // a file of SSE frames the stand-in sends on /api/event, then holds the stream open
 
 const envFileVar = "STANDIN_ENVFILE_FOR_TESTS"

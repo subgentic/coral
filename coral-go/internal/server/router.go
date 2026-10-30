@@ -10,6 +10,7 @@ import (
 	"log"
 	"net/http"
 	"path/filepath"
+	"time"
 
 	"github.com/go-chi/cors"
 	"github.com/subgentic/coral/internal/auth"
@@ -222,6 +223,7 @@ func (s *Server) newRouteHandlers() *routeHandlers {
 	s.sessHandler = sessHandler
 	s.opencode = opencode.NewManager(opencode.Config{DataDir: filepath.Join(s.cfg.CoralDir(), "opencode")}) // the binary comes from the person's settings at each launch
 	sessHandler.SetOpencodeRuntime(s.opencode)
+	s.opencode.StartReaper(30*time.Second, 2*time.Minute, sessHandler.OpencodeAlive) // a server whose agent is gone, by a path that never said so, does not outlive it
 	// The Operator's touches of agents are counted for the Analytics tab (#11225): which session, what kind, never what was typed. The terminal's person path, the answer, stop, wake and restart routes
 	// and the Operator's task approval write them; a session that is on no board is not recorded.
 	if s.boardStore != nil {

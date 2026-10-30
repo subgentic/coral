@@ -32,9 +32,7 @@ func (h *SessionsHandler) Kill(w http.ResponseWriter, r *http.Request) {
 
 	slog.Info("killing agent", "agent_name", name, "session_id", body.SessionID, "agent_type", body.AgentType)
 	h.modelSwitches.end(body.SessionID, "The agent was ended before the change was confirmed.") // a pending model or level switch does not outlive it (#6219)
-	if h.opencode != nil && body.SessionID != "" {
-		h.opencode.Stop(body.SessionID) // an opencode agent's server ends with it
-	}
+	h.stopOpencode(body.SessionID)                                                              // an opencode agent's server ends with it
 
 	// Use a background context for DB operations so they complete even if
 	// the HTTP request context is cancelled (e.g., during tmux command failures).

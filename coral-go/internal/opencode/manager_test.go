@@ -115,3 +115,84 @@ func TestAnAgentsTurnIsTheNewestStateOfItsOwnServerAndNoOthers(t *testing.T) {
 	_, _, ok = m.AgentTurn("agent-2")
 	assert.False(t, ok, "another agent's server is not this one's")
 }
+
+func TestASlowStartOfOneServerHoldsUpNeitherAnotherAgentNorTheStateReads(t *testing.T) {
+	cfg, _ := stubConfig(t)
+	t.Setenv(listenDelayVar, "1500")
+	m := NewManager(cfg)
+	defer m.Close()
+	started := make(chan error, 2)
+	go func() { _, err := m.Ensure(context.Background(), "slow", ""); started <- err }()
+	time.Sleep(300 * time.Millisecond) // the first start is under way and still not listening
+
+	t0 := time.Now()
+	_, _, ok := m.AgentTurn("other")
+	_, _, ok2 := m.Turn("ses_abc123")
+	m.Stop("other")
+	assert.False(t, ok || ok2)
+	assert.Less(t, time.Since(t0), 300*time.Millisecond, "state reads and a stop of another key never wait for a start")
+
+	go func() { _, err := m.Ensure(context.Background(), "slow", ""); started <- err }() // the same key: waits for the first start, shares it
+	require.NoError(t, <-started)
+	require.NoError(t, <-started)
+	m.mu.Lock()
+	n := len(m.servers)
+	m.mu.Unlock()
+	assert.Equal(t, 1, n, "two Ensures of one key made one server")
+}
+
+func TestAServerWhoseAgentIsGoneIsReapedAfterItsGraceAndAYoungOneNever(t *testing.T) {
+	cfg, _ := stubConfig(t)
+	m := NewManager(cfg)
+	defer m.Close()
+	gone, err := m.Ensure(context.Background(), "gone", "")
+	require.NoError(t, err)
+	kept, err := m.Ensure(context.Background(), "kept", "")
+	require.NoError(t, err)
+	alive := func(key string) bool { return key == "kept" }
+
+	assert.Empty(t, m.Reap(alive, time.Hour), "a young server is never reaped, its agent's row may not be written yet")
+	select {
+	case <-gone.done:
+		t.Fatal("a young server was stopped")
+	default:
+	}
+	assert.Equal(t, []string{"gone"}, m.Reap(alive, 0))
+	select {
+	case <-gone.done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the reaped server is still running")
+	}
+	select {
+	case <-kept.done:
+		t.Fatal("an agent that is alive lost its server")
+	default:
+	}
+}
+
+func TestTheReaperRunsUntilCloseAndStopsWhatItReaps(t *testing.T) {
+	cfg, _ := stubConfig(t)
+	m := NewManager(cfg)
+	srv, err := m.Ensure(context.Background(), "gone", "")
+	require.NoError(t, err)
+	m.StartReaper(20*time.Millisecond, 0, func(string) bool { return false })
+	select {
+	case <-srv.done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the reaper never stopped a server whose agent is gone")
+	}
+	m.Close() // waits for the reaper: no goroutine outlives it
+}
+
+func TestAStoppedServerLeavesNeitherItsPidRecordNorItsPassword(t *testing.T) {
+	cfg, _ := stubConfig(t)
+	s, err := Start(context.Background(), cfg, "agent-1")
+	require.NoError(t, err)
+	p, err := s.PasswordFile()
+	require.NoError(t, err)
+	_, err = os.Stat(p)
+	require.NoError(t, err)
+	s.Stop()
+	_, err = os.Stat(p)
+	assert.True(t, os.IsNotExist(err), "a dead server's password is not kept")
+}

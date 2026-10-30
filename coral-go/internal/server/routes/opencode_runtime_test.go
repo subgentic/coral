@@ -2,15 +2,20 @@ package routes
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/subgentic/coral/internal/agent"
 	at "github.com/subgentic/coral/internal/agenttypes"
 	"github.com/subgentic/coral/internal/opencode"
+	"github.com/subgentic/coral/internal/store"
 )
 
 type fakeOpencode struct {
@@ -61,4 +66,46 @@ func TestAnOpencodeAgentWithNoServerOrNoStreamHasNoTurnAndLaunchesNothingWithout
 	h.opencode = &fakeOpencode{}
 	_, err = h.launchCommand(context.Background(), agent.GetAgent(at.Opencode), agent.LaunchParams{SessionID: "sid"})
 	assert.ErrorIs(t, err, assert.AnError, "a server that cannot start is the launch's error")
+}
+
+// An opencode agent has one server: every way the agent ends or sleeps stops it (Security's #137718: one process per agent ever started, and the Mac ran out of processes).
+func TestEveryWayAnOpencodeAgentEndsOrSleepsStopsItsServer(t *testing.T) {
+	post := func(h *SessionsHandler, pattern, path, body string, handler http.HandlerFunc) {
+		r := chi.NewRouter()
+		r.Use(testIdentity(h.db))
+		r.Post(pattern, handler)
+		req := httptest.NewRequest("POST", path, strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		r.ServeHTTP(httptest.NewRecorder(), req)
+	}
+	for name, do := range map[string]func(h *SessionsHandler, id string){
+		"sleep": func(h *SessionsHandler, id string) {
+			post(h, "/api/sessions/live/{sessionID}/sleep", "/api/sessions/live/"+id+"/sleep", "{}", h.SleepSession)
+		},
+		"archive": func(h *SessionsHandler, id string) {
+			post(h, "/api/sessions/live/{sessionID}/archive", "/api/sessions/live/"+id+"/archive", "{}", h.ArchiveSession)
+		},
+		"kill": func(h *SessionsHandler, id string) {
+			post(h, "/api/sessions/live/{name}/kill", "/api/sessions/live/opencode-agent/kill", `{"agent_type":"opencode","session_id":"`+id+`"}`, h.Kill)
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, h, _, ss := setupSessionsTestServer(t)
+			require.NoError(t, ss.RegisterLiveSession(context.Background(), &store.LiveSession{SessionID: sid(1), AgentName: "opencode-agent", AgentType: "opencode", WorkingDir: t.TempDir()}))
+			rt := &fakeOpencode{}
+			h.SetOpencodeRuntime(rt)
+			do(h, sid(1))
+			assert.Equal(t, []string{sid(1)}, rt.stopped)
+		})
+	}
+}
+
+func TestAnOpencodeServerIsKeptOnlyForAnAwakeAgentThatIsThere(t *testing.T) {
+	_, h, _, ss := setupSessionsTestServer(t)
+	ctx := context.Background()
+	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: sid(1), AgentName: "a", AgentType: "opencode", WorkingDir: t.TempDir()}))
+	assert.True(t, h.OpencodeAlive(sid(1)), "an awake agent keeps its server")
+	assert.False(t, h.OpencodeAlive(sid(2)), "an agent with no row has no use for one")
+	require.NoError(t, ss.SetSessionSleeping(ctx, sid(1), true))
+	assert.False(t, h.OpencodeAlive(sid(1)), "a sleeping one neither")
 }

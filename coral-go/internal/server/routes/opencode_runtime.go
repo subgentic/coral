@@ -60,3 +60,22 @@ func (h *SessionsHandler) opencodeTurn(sessionID string) (kind string, at time.T
 	}
 	return "", time.Time{}
 }
+
+// stopOpencode ends an agent's opencode server when the agent ends, sleeps, is archived or is replaced by a restart: one opencode process per live agent, never one left behind (the Mac ran out of processes).
+func (h *SessionsHandler) stopOpencode(sessionID string) {
+	if h.opencode != nil && sessionID != "" {
+		h.opencode.Stop(sessionID)
+	}
+}
+
+// OpencodeAlive says whether an opencode server's agent should still have one: its row is there, awake and not archived. A failed read says yes: nothing is stopped on a guess.
+func (h *SessionsHandler) OpencodeAlive(key string) bool {
+	if h.ss == nil {
+		return true
+	}
+	ls, err := h.ss.GetLiveSession(context.Background(), key)
+	if err != nil {
+		return true
+	}
+	return ls != nil && ls.IsSleeping != 1 && ls.IsArchived != 1
+}
