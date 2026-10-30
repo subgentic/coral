@@ -3191,6 +3191,7 @@ button.terminal-gone-header { margin: 0 4px 0 0; font-size: var(--fs-sm); line-h
 .alerts-offer-banner .btn-icon { margin-left: auto; } /* the x stays at the right edge, on the buttons' row */
 .local-auth-banner { flex: none; } /* where it sits: what it looks like is the one notice's (.notice, layout.css) */ /* #4291 */
 .local-auth-banner[hidden] { display: none; }
+body:has(#set-password-modal) .local-auth-banner { display: none; } /* the password dialog is the answer to it: the strip is not left behind the dialog on a first launch (#11336) */
 .local-auth-banner .material-icons { flex: none; color: var(--error); font-size: var(--fs-2xl); }
 .local-auth-banner.notice-warn .material-icons { color: var(--warning); } /* no password, sign-in on: amber, not red (#10061) */
 .local-auth-banner-text { flex: 1; min-width: 0; overflow-wrap: anywhere; }

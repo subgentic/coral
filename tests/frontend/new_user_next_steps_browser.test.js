@@ -136,6 +136,19 @@ const TEAM = `qa-next-steps-${Date.now() % 100000}`;
         await waitFor(`!document.querySelector('#launch-dir-recents [data-dir=${JSON.stringify(GONE)}]')`, 'the missing folder dropped from New agent', 8000).catch(() => {});
         const ab = await ev(`[...document.querySelectorAll('#launch-dir-recents button')].map(b => b.dataset.dir)`);
         check(JSON.stringify(ab) === JSON.stringify(['/tmp']), `New agent shows only the recent folder that exists: ${JSON.stringify(ab)}`);
+        // (8) the no-password banner is not left behind the password dialog (#11336, Mobile Beta Tester): hidden while the dialog is open, back when it closes
+        for (const [w, mobile] of [[1280, false], [390, true]]) {
+            await Emulation.setDeviceMetricsOverride({ width: w, height: 844, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+            await ev(`(() => { const b = document.getElementById('local-auth-banner'); b.hidden = false; b.classList.remove('notice-error'); b.classList.add('notice-warn'); b.querySelector('[data-auth-state=off]').hidden = true; b.querySelector('[data-auth-state=nopw]').hidden = false; return true; })()`);
+            const shown = () => ev(`(() => { const b = document.getElementById('local-auth-banner'); return b.getClientRects().length > 0 && getComputedStyle(b).display !== 'none'; })()`);
+            check(await shown() === true, `${w} px: the banner shows with no dialog`);
+            await ev(`import(${S} + 'password_ui.js').then(m => { m.showSetPasswordModal({ local: true }); return true; })`);
+            await waitFor(`!!document.getElementById('set-password-modal')`, 'the password dialog', 6000);
+            check(await shown() === false, `${w} px: the banner is hidden while the password dialog is open`);
+            await ev(`document.getElementById('set-password-modal').remove(); true`);
+            check(await shown() === true, `${w} px: and shows again when it is closed`);
+        }
         // (4) plain words
         const root = require('node:path').join(__dirname, '..', '..', 'coral-go', 'pkg', 'frontend', 'static'), read = f => require('node:fs').readFileSync(require('node:path').join(root, f), 'utf8'); // the sources that write the words
         const t = read('task_create.js'), g = read('goals_view.js'), d = read('team_dialogs.js');
