@@ -414,7 +414,7 @@ export function createArtifactsList({ inbox = false } = {}) {
             importOnce('./preview_pane.js').then(m => m.openArtifactTab(link.hex ? `coral://artifacts/${link.hex}` : item.uri || '', {
                 server: link.server, filename: name, mediaType: item.media_type,
                 contentURL: link.contentURL, externalURL: link.preview ? undefined : link.url,
-                tagging: link.hex ? { project: model.project, tags: item.tags, editable: local(), offer: teamTags, onChange: tags => retag(link.hex, tags) } : undefined, // the tags in the preview's head (#8594)
+                tagging: link.hex ? { project: model.project, tags: item.tags, review: item.review, editable: local(), offer: teamTags, onChange: tags => retag(link.hex, tags) } : undefined, // the tags in the preview's head (#8594)
             }));
             root?.querySelectorAll('tr[data-key]').forEach(r => { if (r.dataset.key === key) r.setAttribute('aria-current', 'true'); else r.removeAttribute('aria-current'); });
             return;

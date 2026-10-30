@@ -47,7 +47,8 @@ export async function approveRow(team, row) {
 
 /** Say what an approval did, in a toast. */
 export function sayApproved(name, out) {
-    if (out.delivered) showToast(`Approved. ${out.to} was told.`);
+    if (out.delivered && out.asleep) showToast(`Approved. ${out.to} is asleep: it will see this when it wakes.`);
+    else if (out.delivered) showToast(`Approved. ${out.to} was told.`);
     else if (out.reason === 'no_uploader') showToast(`Approved ${name}. No agent is recorded for it, so nobody was told.`);
     else showToast(`Approved ${name}.`);
 }
@@ -70,7 +71,7 @@ export function attachReview(d, { reload }) {
     const $ = s => bar.querySelector(s);
     const stateEl = $('.artifact-review-state'), approve = $('.artifact-review-approve'), changes = $('.artifact-review-changes');
     const form = $('.artifact-review-form'), text = $('#artifact-review-text'), error = $('.artifact-review-error');
-    let cur = null, gen = 0;
+    let cur = null, gen = 0, sending = false, done = false;
     const show = (s) => {
         cur = s;
         const pending = !!s && (s.state === 'pending' || s.state === 'changes');
@@ -90,9 +91,10 @@ export function attachReview(d, { reload }) {
     });
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
+        if (sending) return; // a second tap while the first request is on its way sends nothing
         const body = text.value.trim();
         if (!body || !cur) { error.textContent = 'Say what should change.'; return; }
-        const submit = form.querySelector('button[type=submit]'); submit.disabled = true; error.textContent = '';
+        const submit = form.querySelector('button[type=submit]'); sending = true; submit.disabled = true; text.readOnly = true; error.textContent = '';
         try {
             const who = cur.row.produced_by;
             if (!who) throw new Error('No agent is recorded for this artifact, so there is nobody to ask: use a comment.');
@@ -103,12 +105,12 @@ export function attachReview(d, { reload }) {
             await decide(cur.team, cur.row, 'changes');
             importOnce('./inbox_reviews.js').then(m => m.refreshReviews(true)).catch(() => {});
             showToast(`Changes requested. ${who} was asked.`);
-            text.value = ''; openForm(false); show({ ...cur, state: 'changes' }); reload();
-        } catch (err) { error.textContent = err.message; } finally { submit.disabled = false; }
+            text.value = ''; done = true; openForm(false); show({ ...cur, state: 'changes' }); changes.focus({ preventScroll: true }); reload();
+        } catch (err) { error.textContent = err.message; } finally { sending = false; submit.disabled = false; text.readOnly = false; }
     });
     return {
         async open(hex, opts = {}) {
-            const g = ++gen; show(null);
+            const g = ++gen; show(null); if (!opts.switched) done = false;
             if (!opts.board) return;
             const team = identityKey(opts.server, opts.board);
             let s = null;
@@ -116,7 +118,7 @@ export function attachReview(d, { reload }) {
             if (g !== gen || !s) return;
             show({ ...s, team, hex, server: opts.server, name: opts.board });
             changes.hidden = changes.hidden || isCloud(); // through Coral Hub the comment's send to an agent is not available: Request changes is on this computer
-            if (opts.requestChanges && (s.state === 'pending' || s.state === 'changes')) openForm(true);
+            if (opts.requestChanges && !opts.switched && !done && (s.state === 'pending' || s.state === 'changes')) openForm(true); // not on the reload after a send: the form stays closed
         },
         close() { gen++; show(null); form.hidden = true; },
     };

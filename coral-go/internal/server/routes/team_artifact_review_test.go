@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/subgentic/coral/internal/board"
+	"github.com/subgentic/coral/internal/store"
 	"github.com/subgentic/coral/pkg/tunnel"
 )
 
@@ -237,4 +238,39 @@ func TestChangesOnAFullyTaggedArtifactIsARefusalNotAnError(t *testing.T) {
 	assert.Equal(t, http.StatusConflict, code, out)
 	assert.Equal(t, "too_many_tags", out["code"])
 	assert.Equal(t, []string{"a", "b", "c", "d", "for review"}, e.h.bsTags(t)[e.id], "nothing changed")
+}
+
+// Mobile Beta Tester: the toast said the agent "was told" even when it is asleep. The answer says whether the uploader is awake, so the toast can say it will see the message when it wakes.
+func TestTheApprovalSaysWhetherTheUploaderIsAsleep(t *testing.T) {
+	for _, c := range []struct {
+		name   string
+		asleep bool
+	}{{"asleep", true}, {"awake", false}} {
+		e := newReviewEnv(t, true)
+		e.h.SetSessionAsleepLookup(func(_ context.Context, sid string) bool {
+			assert.Equal(t, sessAlice, sid, "the uploader's session")
+			return c.asleep
+		})
+		e.tag(t, `["for review"]`)
+		code, out := e.approve(t)
+		require.Equal(t, http.StatusOK, code, out)
+		assert.Equal(t, true, out["delivered"], c.name)
+		if c.asleep {
+			assert.Equal(t, true, out["asleep"], "it will see the message when it wakes")
+		} else {
+			assert.NotContains(t, out, "asleep", "an awake agent is simply told")
+		}
+	}
+}
+
+func TestSessionAsleepLookupSaysAsleepEndedArchivedOrGone(t *testing.T) {
+	_, handler, _, ss := setupSessionsTestServer(t)
+	_ = handler
+	ctx := context.Background()
+	look := SessionAsleepLookup(ss)
+	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: "aaaaaaaa-0000-4000-8000-000000000001", AgentType: "claude", AgentName: "Awake", WorkingDir: t.TempDir()}))
+	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: "aaaaaaaa-0000-4000-8000-000000000002", AgentType: "claude", AgentName: "Asleep", WorkingDir: t.TempDir(), IsSleeping: 1}))
+	assert.False(t, look(ctx, "aaaaaaaa-0000-4000-8000-000000000001"))
+	assert.True(t, look(ctx, "aaaaaaaa-0000-4000-8000-000000000002"), "asleep")
+	assert.True(t, look(ctx, "aaaaaaaa-0000-4000-8000-0000000000ff"), "gone")
 }

@@ -425,7 +425,7 @@ async function _render(tab) {
             } catch (e) { comments = null; console.error('[coral] comments', e); } // the document is shown without them
         }
         if (hex && tab.options && tab.options.tagging) { // the file's tags in the head (#8594): chips with an x and Add tag, as in the team page's sheet
-            try { const { tagEditor } = await importOnce('./artifact_tags.js'); if (current()) document.getElementById('preview-toolbar')?.append(tagEditor({ ...tab.options.tagging, hex })); } catch (e) { console.error('[coral] tags', e); }
+            try { const { tagEditor, reviewWords } = await importOnce('./artifact_tags.js'); if (current()) { const bar = document.getElementById('preview-toolbar'); const words = reviewWords(tab.options.tagging.tags, tab.options.tagging.review); if (words && bar) { const line = document.createElement('span'); line.className = 'artifact-review-line'; line.setAttribute('role', 'status'); line.textContent = words; bar.append(line); } bar?.append(tagEditor({ ...tab.options.tagging, hex })); } } catch (e) { console.error('[coral] tags', e); }
         }
         await renderArtifact(body, tab.filepath, tab.options, {
             signal: tab.abort.signal,

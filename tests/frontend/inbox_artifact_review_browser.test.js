@@ -139,11 +139,14 @@ const { coralReady } = require('./helpers/wait');
                     assert.match(await ev(`document.querySelector('.artifact-review-state').textContent`),/Waiting for your review/);
                     await ev(`document.querySelector('.artifact-review-changes').click();true`);
                     await waitFor(`document.activeElement&&document.activeElement.id==='artifact-review-text'`,'the change request box has the focus',4000);
-                    await ev(`(()=>{const t=document.getElementById('artifact-review-text');t.value='Please add the totals row';document.querySelector('.artifact-review-form').requestSubmit();return true;})()`);
+                    await ev(`(()=>{const t=document.getElementById('artifact-review-text');t.value='Please add the totals row';const f=document.querySelector('.artifact-review-form');f.requestSubmit();f.requestSubmit();return true;})()`); // a second tap while the first request is on its way (a phone: Mobile Beta Tester)
                     await waitFor(`window.__decisions.some(d=>d.decision==='changes')`,'the change request was recorded',8000);
                     const sent=await ev(`window.__comments`);
                     assert.equal(sent[0].anchor.whole,true,'a comment on the whole document'); assert.match(sent[0].body,/Please add the totals row/); assert.deepEqual(sent[1].sent,['Writer A'],'sent to the agent that uploaded it');
                     await waitFor(`/Changes requested/.test(document.querySelector('.artifact-review-state').textContent)`,'the state says Changes requested',8000);
+                    assert.equal(await ev(`document.querySelector('.artifact-review-form').hidden`),true,'the request form is closed after it was sent: it does not stay open under Changes requested');
+                    assert.equal(await ev(`window.__decisions.filter(d=>d.decision==='changes').length`),1,'two taps sent one request');
+                    assert.equal(await ev(`window.__comments.filter(c=>c.body).length`),1,'and made one comment');
                     assert.ok(await ev(`!!(${row('Review file 01.txt')})`),'a row with changes requested stays in Needs you');
                     await ev(`document.querySelector('.artifact-viewer-close').click();true`);
                 }

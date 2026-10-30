@@ -225,3 +225,4 @@
 .artifact-review-form textarea { width: 100%; min-height: 4.5em; resize: vertical; }
 .artifact-review-form[hidden], .artifact-review[hidden] { display: none; }
 .artifact-review-error { color: var(--error-text, var(--error)); min-height: 1em; }
+.artifact-review-line { color: var(--text-secondary); font-size: var(--fs-sm, 0.8125rem); margin-inline-end: 8px; } /* the review's state in words, in the preview's head (#136584) */

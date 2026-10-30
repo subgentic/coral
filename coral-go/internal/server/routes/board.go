@@ -103,6 +103,8 @@ type BoardHandler struct {
 	liveSessionType func(ctx context.Context, sessionID string) (agentType string, ok bool, err error)
 	// clearBoardChatFlags removes the deleted board's mailbox flags from the separate sessions database.
 	clearBoardChatFlags func(ctx context.Context, project string) error
+	// sessionAsleep reports whether a live session is asleep, ended or archived: an approval's message waits for it (SetSessionAsleepLookup). Nil: not known.
+	sessionAsleep func(ctx context.Context, sessionID string) bool
 	// uploads caches per-session upload records for the artifact views.
 	uploads uploadDirCache
 	// taskCounts keeps each board's artifact count per task for a few seconds (taskArtifactCounts, #8591).
@@ -140,6 +142,11 @@ func (h *BoardHandler) SetSessionThinkingLookup(fn func(ctx context.Context, ses
 // SetLiveSessionLookup tells the board how to find a live session's agent type (#3864).
 func (h *BoardHandler) SetLiveSessionLookup(fn func(ctx context.Context, sessionID string) (string, bool, error)) {
 	h.liveSessionType = fn
+}
+
+// SetSessionAsleepLookup tells the board how to find whether a session is asleep, ended or archived (the approval of an artifact says so).
+func (h *BoardHandler) SetSessionAsleepLookup(fn func(ctx context.Context, sessionID string) bool) {
+	h.sessionAsleep = fn
 }
 
 // SetBoardChatFlagsClearer wires the sessions database's cleanup after a board is deleted.

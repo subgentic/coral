@@ -243,13 +243,11 @@ func (h *SessionsHandler) uploadAgentArtifact(w http.ResponseWriter, r *http.Req
 		}
 	}
 	if plan != nil && h.bs != nil && hasTag(tags, "for review") { // a new version of the series for review: the older versions' reviews are closed, this one is the pending one (#136588)
-		if teamBoard, _, _ := uploaderOf(sid); teamBoard != "" {
-			if sidOf, _, in := digestSeries(coralDir, hexID); in {
-				for _, m := range seriesMembers(coralDir, sidOf) {
-					if m.Digest != hexID && m.Board == teamBoard {
-						if _, err := h.bs.SupersedeArtifactReview(r.Context(), teamBoard, m.Digest, time.Now()); err != nil {
-							slog.Warn("[artifacts] an older version's review was not closed", "digest", m.Digest, "error", err)
-						}
+		if teamBoard, _, _ := uploaderOf(sid); teamBoard != "" && teamBoard == plan.board {
+			for _, m := range plan.rows { // the versions before this one, read under the series lock (a new series: the artifact it is a version of); the series index does not hold them yet
+				if m.Digest != hexID && m.Board == teamBoard {
+					if _, err := h.bs.SupersedeArtifactReview(r.Context(), teamBoard, m.Digest, time.Now()); err != nil {
+						slog.Warn("[artifacts] an older version's review was not closed", "digest", m.Digest, "error", err)
 					}
 				}
 			}

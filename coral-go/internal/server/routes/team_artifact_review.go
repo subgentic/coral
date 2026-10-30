@@ -127,6 +127,9 @@ func (h *BoardHandler) ReviewArtifact(w http.ResponseWriter, r *http.Request) {
 	}
 	slog.Info("[artifact review] approved", "surface", "local", "artifact", id, "agent", title, "board", project)
 	out["delivered"], out["to"] = true, title
+	if h.sessionAsleep != nil && item.SessionID != nil && h.sessionAsleep(r.Context(), *item.SessionID) { // asleep, ended, archived or gone: the message is unread when it wakes, and the answer (and the toast) say so
+		out["asleep"] = true
+	}
 	writeJSON(w, http.StatusOK, out)
 }
 
