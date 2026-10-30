@@ -168,11 +168,13 @@ func TestAssetURLsInheritThePrefix(t *testing.T) {
 	if strings.Contains(string(css), "url(/static/") || !strings.Contains(string(css), "url(../vendor/fonts/") {
 		t.Error("fonts.css must load its fonts with relative url()s")
 	}
-	// Preview responsibilities may live in separate modules; check the whole family.
+	// Preview responsibilities may live in separate modules; check the whole family. The editor's host (the shadow root that loads cm_shadow.css) is in cm_util.js, shared by the preview and the inline diffs
+	// (#11350): it is part of the family too.
 	paths, err := fs.Glob(Static, "static/preview_*.js")
 	if err != nil {
 		t.Fatal(err)
 	}
+	paths = append(paths, "static/cm_util.js")
 	var js []byte
 	for _, path := range paths {
 		part, err := Static.ReadFile(path)
