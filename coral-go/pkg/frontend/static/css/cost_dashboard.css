@@ -463,8 +463,8 @@
 @media (max-width: 600px) {
     #cost-dashboard-view .cost-header-left { display: grid; grid-template-columns: var(--control-touch-height, 44px) minmax(0, 1fr); grid-template-rows: 56px auto auto; column-gap: 8px; align-items: center; padding: 0 4px; }
     #cost-dashboard-view .cost-title-block { display: contents; }
-    #cost-dashboard-view .cost-phone-back { position: relative; display: inline-grid; place-items: center; width: var(--control-touch-height, 44px); min-width: var(--control-touch-height, 44px); height: var(--control-touch-height, 44px); overflow: hidden; text-indent: 200vw; white-space: nowrap; grid-column: 1; grid-row: 1; }
-    #cost-dashboard-view .cost-phone-back::before { content: "\2190"; position: absolute; inset: 0; display: grid; place-items: center; text-indent: 0; transform: scale(1.6); }
+    #cost-dashboard-view .cost-phone-back { position: relative; display: inline-grid; place-items: center; width: var(--control-touch-height, 44px); min-width: var(--control-touch-height, 44px); height: var(--control-touch-height, 44px); font-size: 0; grid-column: 1; grid-row: 1; } /* the words stay the button's name at no size (text cut off by overflow would be clipped text) */
+    #cost-dashboard-view .cost-phone-back::before { content: "\2190"; position: absolute; inset: 0; display: grid; place-items: center; font-size: var(--fs-2xl); }
     #cost-dashboard-view #cost-view-title { grid-column: 2; grid-row: 1; margin: 0; font-size: var(--fs-xl); font-weight: var(--fw-strong); line-height: var(--lh-label); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     #cost-dashboard-view .cost-view-question, #cost-dashboard-view .cost-range-line { grid-column: 1 / -1; margin-inline: 12px; }
 }
