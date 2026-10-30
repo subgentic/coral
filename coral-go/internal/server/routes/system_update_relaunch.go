@@ -178,7 +178,9 @@ type RelaunchAudit struct {
 	Installed, Staged string
 	AgentIDs          []string
 	By                string
-	Code              string // the refusal code, or "started"
+	// Source is who asked: "local" (the person at this computer), "hub" (the Hub's owner) or "auto" (Coral itself, once idle, #11170): the history no longer calls an automatic install a Hub relaunch.
+	Source string
+	Code   string // the refusal code, or "started"
 }
 
 // RelaunchUpdater is what the relaunch routes need from the updater (the updater implements it; tests stub it). It owns state.json:
@@ -685,7 +687,20 @@ func (h *UpdateRelaunchHandler) refuse(w http.ResponseWriter, r *http.Request, i
 }
 
 func (h *UpdateRelaunchHandler) audit(ctx context.Context, id callerIdentity, v *relaunchView, code string) {
-	a := RelaunchAudit{At: h.now().UTC(), By: id.pseudo, Code: code}
+	h.auditAs(ctx, id, v, code, relaunchSource(id.pseudo))
+}
+
+// relaunchSource is the source word for whoever asked: the Hub's owner is a pseudonym, the person here is "local", Coral's own idle install is "auto".
+func relaunchSource(by string) string {
+	switch by {
+	case "local", "auto":
+		return by
+	}
+	return "hub"
+}
+
+func (h *UpdateRelaunchHandler) auditAs(ctx context.Context, id callerIdentity, v *relaunchView, code, source string) {
+	a := RelaunchAudit{At: h.now().UTC(), By: id.pseudo, Source: source, Code: code}
 	if v != nil {
 		a.Installed = v.rec.Installed
 		a.Staged = v.version

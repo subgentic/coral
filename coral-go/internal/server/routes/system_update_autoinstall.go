@@ -273,7 +273,7 @@ func (h *UpdateRelaunchHandler) applyWhenStillIdle(ctx context.Context, times au
 	op, err := h.Updater.Apply(ctx, "auto")
 	if err != nil {
 		slog.Warn("[update] the automatic install did not start", "error", err)
-		h.audit(ctx, localIdentity, &v, "auto_failed_to_start")
+		h.auditAs(ctx, localIdentity, &v, "auto_failed_to_start", "auto")
 		h.writeAutoFailure(autoInstallFailure{Version: v.version, FailedAt: h.now(), Result: "did not start"})
 		return h.say(AutoInstallFacts{On: true, State: autoBackoff, Reason: "the install could not be started; Coral tries again after a day", RetryAt: h.now().Add(times.Backoff)})
 	}
@@ -281,7 +281,7 @@ func (h *UpdateRelaunchHandler) applyWhenStillIdle(ctx context.Context, times au
 	// On disk from the start: an attempt counts as one that did not finish unless the update replaced Coral. A Coral that comes back with the same update staged (the updater started the old one again,
 	// #11155) finds it and waits the day, instead of trying again when the spacing is over.
 	h.writeAutoFailure(autoInstallFailure{Version: v.version, FailedAt: h.now(), Result: autoAttemptResult})
-	h.audit(ctx, localIdentity, &v, "auto_started")
+	h.auditAs(ctx, localIdentity, &v, "auto_started", "auto")
 	slog.Info("[update] installing by itself: Coral is idle", "version", v.version, "operation", printable(op, 64))
 	return h.say(AutoInstallFacts{On: true, State: autoStarted})
 }

@@ -255,3 +255,20 @@ func TestAutoInstall_AnAwakePlainTerminalIsNotIdleOnACoralThatEndsItsTerminals(t
 	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: id, AgentType: "terminal", AgentName: "build-shell", WorkingDir: t.TempDir(), Backend: &tmuxBacked}))
 	assert.Empty(t, h.UpdateIdleReason(ctx), "a terminal started the tmux way survives the relaunch")
 }
+
+// Security's #11170 INFO 1: the history says who asked. An automatic install is source "auto", the person's click "local", a Hub owner's relaunch "hub": an automatic install is no longer recorded as a
+// Hub relaunch.
+func TestAutoInstall_TheHistoryNamesWhoAsked(t *testing.T) {
+	assert.Equal(t, "auto", relaunchSource("auto"))
+	assert.Equal(t, "local", relaunchSource("local"))
+	assert.Equal(t, "hub", relaunchSource("hub-user-1234abcd"))
+
+	e := autoEnv(t)
+	e.tick()
+	e.now = e.now.Add(6 * time.Minute)
+	require.Equal(t, autoStarted, e.tick().State)
+	require.NotEmpty(t, e.up.audits)
+	last := e.up.audits[len(e.up.audits)-1]
+	assert.Equal(t, "auto_started", last.Code)
+	assert.Equal(t, "auto", last.Source)
+}
