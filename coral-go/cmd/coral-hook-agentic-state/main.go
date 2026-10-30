@@ -84,7 +84,11 @@ func handle(d map[string]any, opts hookArgs, agyModel, agyConversation string) {
 	postAgyModel(base, agentName, sessionID, agyModel)
 
 	if hookType == "PreToolUse" {
-		recordPendingTool(base, agentName, sessionID, d, agyEvent, hooksRev)
+		why := recordPendingTool(base, agentName, sessionID, d, agyEvent, hooksRev)
+		if why != "" && agyEvent == "" && strings.HasPrefix(os.Getenv("CORAL_SESSION_NAME"), "claude-") {
+			os.Stdout.Write(preToolDeny(why)) // the command is not run (#11157)
+			hooks.DebugLog(fmt.Sprintf("PRETOOL_REFUSED: agent=%s", agentName))
+		}
 		return
 	}
 
@@ -197,13 +201,22 @@ func postAgyModel(base, agentName, sessionID, agyModel string) {
 
 // recordPendingTool records the tool call that is starting (PreToolUse), so the chat can show what a permission prompt, question or plan approval is asking. It is not
 // an activity event; its PostToolUse is.
-func recordPendingTool(base, agentName, sessionID string, d map[string]any, agyEvent string, hooksRev int) {
+func recordPendingTool(base, agentName, sessionID string, d map[string]any, agyEvent string, hooksRev int) (refuse string) {
 	pending := parsePendingTool(d, sessionID)
 	if pending == nil {
-		return
+		return ""
 	}
-	if _, err := hooks.CoralAPI(base, "POST", hooks.LivePath(agentName, "/pending-tool"), pending); err != nil {
+	raw, err := hooks.CoralAPI(base, "POST", hooks.LivePath(agentName, "/pending-tool"), pending)
+	if err != nil {
 		hooks.DebugLog(fmt.Sprintf("PENDING_POST_FAILED: agent=%s tool=%v err=%v", agentName, pending["tool_name"], err))
+	} else {
+		// Coral answers "refuse" with the reason when the command stops processes by a pattern (pkill, killall): it is not a pending tool and the CLI is told not to run it.
+		var r struct {
+			Refuse string `json:"refuse"`
+		}
+		if json.Unmarshal(raw, &r) == nil && r.Refuse != "" {
+			return r.Refuse
+		}
 	}
 	// agy sends no hook for a question to the user, only this PreToolUse: its ask_question always waits for the user, so the
 	// request is recorded as Claude's PermissionRequest records it (#4819). A tool permission prompt is not known from here: the
@@ -216,6 +229,22 @@ func recordPendingTool(base, agentName, sessionID string, d map[string]any, agyE
 			hooks.DebugLog(fmt.Sprintf("POST_FAILED: base=%s agent=%s event_type=%s err=%v", hooks.RedactedURL(base), agentName, event["event_type"], err))
 		}
 	}
+	return ""
+}
+
+// preToolDeny is the PreToolUse hook output that stops the tool call and tells the agent why: Claude Code's permissionDecision "deny" with the reason.
+func preToolDeny(reason string) []byte {
+	out, err := json.Marshal(map[string]any{
+		"hookSpecificOutput": map[string]any{
+			"hookEventName":            "PreToolUse",
+			"permissionDecision":       "deny",
+			"permissionDecisionReason": reason,
+		},
+	})
+	if err != nil {
+		return nil
+	}
+	return out
 }
 
 // postEvent posts the activity event and reports whether it was sent. A tool call that ended (PostToolUse) is recorded without the agent waiting for Coral's answer; the Stop event

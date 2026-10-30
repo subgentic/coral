@@ -1,12 +1,19 @@
 package routes
 
 import (
+	"context"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"sort"
 	"sync"
 	"time"
 	"unicode/utf8"
+
+	at "github.com/subgentic/coral/internal/agenttypes"
+	setreg "github.com/subgentic/coral/internal/settings"
+	"github.com/subgentic/coral/internal/shellkill"
+	"github.com/subgentic/coral/internal/store"
 )
 
 // A tool call the agent has started but not finished, reported by the
@@ -239,6 +246,12 @@ func (h *SessionsHandler) SetPendingTool(w http.ResponseWriter, r *http.Request)
 	}
 	body.ToolName = truncateUTF8(body.ToolName, 200)
 	body.ToolUseID = truncateUTF8(body.ToolUseID, 200)
+	if why := h.patternKillRefusal(r.Context(), owner, body.ToolName, body.ToolInput); why != "" {
+		// The command is not run, so it is not a pending tool. The hook turns this into the CLI's refusal; only the reason is logged, never the command.
+		slog.Info("[guard] a command that stops processes by a pattern was refused", "session", owner.SessionName, "why", why)
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "refuse": shellkill.Message(why)})
+		return
+	}
 	h.hints.forget(body.SessionID) // a blocking tool may open a prompt: read the screen again
 	t := pendingTool{
 		ToolUseID: body.ToolUseID,
@@ -311,4 +324,27 @@ func (h *SessionsHandler) tieRequestToItsCall(sessionID, tool string, detail any
 		return nil
 	}
 	return d
+}
+
+// patternKillRefusal is why a Claude agent's Bash command is refused: it stops processes by a name or a pattern (pkill, killall, a kill fed by pgrep), which also ends other agents whose launch
+// prompt, held in their command line, matches (#11157). "" lets it run: another tool or agent, the check turned off (refuse_pattern_kill), or a command that stops nothing by a pattern.
+func (h *SessionsHandler) patternKillRefusal(ctx context.Context, owner *store.SessionTokenOwner, tool string, input map[string]any) string {
+	if tool != "Bash" || input == nil {
+		return ""
+	}
+	command, _ := input["command"].(string)
+	if command == "" {
+		return ""
+	}
+	why := shellkill.PatternKill(command)
+	if why == "" {
+		return ""
+	}
+	if ls, err := h.ss.GetLiveSession(ctx, owner.SessionID); err != nil || ls == nil || ls.AgentType != at.Claude {
+		return "" // the refusal is the Claude CLI's hook answer
+	}
+	if s, err := h.ss.GetSettings(ctx); err == nil && !setreg.Bool(s, setreg.RefusePatternKill) {
+		return ""
+	}
+	return why
 }

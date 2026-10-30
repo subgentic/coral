@@ -46,6 +46,7 @@ const (
 	BoardAutoAttach          = "board_auto_attach"
 	CrossTeamAllowlist       = "cross_team_allowlist"
 	TurnEndHandoff           = "turn_end_handoff"
+	RefusePatternKill        = "refuse_pattern_kill"
 	SavedTeamTemplates       = "saved_team_templates"
 	DefaultPromptOrch        = "default_prompt_orchestrator"
 	DefaultPromptWorker      = "default_prompt_worker"
@@ -140,6 +141,7 @@ func init() {
 	boolOn(NudgeClaudeArtifacts, ApplyLive, "Remind an agent that published a claude.ai artifact to make a Coral artifact instead (once per artifact).")
 	register(Spec{Key: UpdateChannel, Kind: KindEnum, Values: []string{"approved", "agentic"}, Default: "approved", Apply: ApplyLive, Doc: "Which releases the update notice and the tray offer: approved (the release marked latest) or agentic (every published release, approved or not). Notice only: the updater installs approved releases whatever this says (#5557)."})
 	register(Spec{Key: TurnEndHandoff, Kind: KindEnum, Values: []string{"off", "on"}, Default: "on", Apply: ApplyLive, Doc: "Hand the turn on at its end."})
+	boolOn(RefusePatternKill, ApplyLive, "Refuse an agent's pkill, killall and kill of a pgrep result: a pattern matches the command lines of other agents too (#11157).")
 	boolOn(AutoGoals, ApplyLive, "Run the goals service.")
 	ownCheck(AutoGoals)
 	boolOff(AutoResumeAfterAPIError, ApplyLive, "Resume an agent after an API error.")
