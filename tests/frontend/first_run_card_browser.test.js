@@ -84,7 +84,7 @@ const SESSIONS = [{ name: 'first-agent', display_name: 'Agent', agent_type: 'cla
         // its life, so the earlier steps' answers would otherwise still count). The CLI says "not signed in"; the status says nothing.
         await Page.addScriptToEvaluateOnNewDocument({ source: 'window.__cli = false;' });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired();
-        await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+        await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
         await ev(`window.switchNavTab('agents'); window._coralSetLiveSessions(JSON.parse(JSON.stringify(window.__sessions))); true`);
         await ev(`Promise.resolve(window.selectLiveSession('first-agent', 'claude', ${JSON.stringify(SID)})).then(() => { window.setLiveViewMode('chat'); return true; })`);
         await waitFor(`/Claude is not signed in/.test((document.querySelector('#live-history-messages > .chat-needs-input') || {}).textContent || '')`, 'the sign-in card from the CLI check alone', 10000);
