@@ -14,6 +14,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"syscall"
 	"testing"
 )
@@ -254,7 +255,11 @@ func TestEndpointFromEnv_PreservesExplicitURLAndSupportsHostPortFallback(t *test
 
 func TestSubprocess_EndpointInitialization(t *testing.T) {
 	if os.Getenv("TEST_SUBPROCESS_ENDPOINT") == "1" {
+		resolveLocalServer() // what main does first
 		fmt.Println("RESOLVED_SERVER_URL=" + serverURL)
+		if serverURLErr != nil {
+			fmt.Println("RESOLVED_SERVER_ERROR=" + serverURLErr.Error())
+		}
 		os.Exit(0)
 	}
 
@@ -264,6 +269,7 @@ func TestSubprocess_EndpointInitialization(t *testing.T) {
 		coralHost string
 		coralPort string
 		wantURL   string
+		lock      string // "scratch" or "closed": the data folder gets a record naming a scratch Coral, or a loopback address nothing listens on (this process's pid is the live one)
 	}{
 		{
 			name:      "explicit_url_wins_over_port_and_host",
@@ -293,21 +299,43 @@ func TestSubprocess_EndpointInitialization(t *testing.T) {
 			coralPort: "8420",
 			wantURL:   "http://[::1]:8420",
 		},
+		// With nothing named and no record, init would ask the platform's default port whether a Coral answers there; a test must not (the guard refuses it), so the
+		// cases below give the data folder a record: one a scratch Coral answers, and one whose live process has nothing answering at its address (an error, not the default).
 		{
-			name:      "default_legacy",
-			coralURL:  "",
-			coralHost: "",
-			coralPort: "",
-			wantURL:   "http://localhost:" + strconv.Itoa(config.DefaultPort), // no lock file in the (empty) data folder: the platform default
+			name:    "recorded_server_found",
+			lock:    "scratch",
+			wantURL: "scratch",
+		},
+		{
+			name:    "recorded_server_that_does_not_answer_is_an_error_not_the_default",
+			lock:    "closed",
+			wantURL: "\nRESOLVED_SERVER_ERROR=Coral is running on this data folder",
 		},
 	}
 
+	scratch := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"status":"ok","version":"test"}`))
+	}))
+	t.Cleanup(scratch.Close)
+	closed := httptest.NewServer(http.NotFoundHandler())
+	closedURL := closed.URL
+	closed.Close()
+
 	for _, tt := range tests {
+		// The case's data folder is set up before its subtest (the running Coral's lock file is not read).
+		dataDir := t.TempDir()
+		switch tt.lock {
+		case "scratch":
+			tt.wantURL = scratch.URL
+			_ = os.WriteFile(filepath.Join(dataDir, config.ServerLockFile), []byte(strconv.Itoa(os.Getpid())+"\n"+scratch.URL+"\n"), 0o600)
+		case "closed":
+			_ = os.WriteFile(filepath.Join(dataDir, config.ServerLockFile), []byte(strconv.Itoa(os.Getpid())+"\n"+closedURL+"\n"), 0o600)
+		}
 		t.Run(tt.name, func(t *testing.T) {
 			cmd := exec.Command(os.Args[0], "-test.run=^TestSubprocess_EndpointInitialization$")
 			cmd.Env = append(os.Environ(),
 				"TEST_SUBPROCESS_ENDPOINT=1",
-				"CORAL_DATA_DIR="+t.TempDir(), "CORAL_DIR=", // an empty data folder: the running Coral's lock file is not read
+				"CORAL_DATA_DIR="+dataDir, "CORAL_DIR=",
 				"CORAL_URL="+tt.coralURL,
 				"CORAL_HOST="+tt.coralHost,
 				"CORAL_PORT="+tt.coralPort,
@@ -965,5 +993,32 @@ func TestCmdRead_IDAsJSON(t *testing.T) {
 	}
 	if m["subscriber_id"] != "Operator" || m["content"] != "PRELAND-CHECK ref=main id=a1" || m["id"] != float64(42) {
 		t.Errorf("unexpected message: %v", m)
+	}
+}
+
+// --help and a usage error make no request: the local server is looked for only once a command is going to run (main resolves it after help and the flag checks).
+func TestHelpAndUsageErrorsMakeNoRequest(t *testing.T) {
+	if os.Getenv("TEST_SUBPROCESS_RUN_MAIN") == "1" {
+		os.Args = append([]string{"coral-board"}, strings.Fields(os.Getenv("TEST_SUBPROCESS_ARGS"))...)
+		main()
+		return
+	}
+	var requests atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests.Add(1)
+		_, _ = w.Write([]byte(`{"status":"ok","version":"test"}`))
+	}))
+	t.Cleanup(srv.Close)
+	for _, args := range []string{"--help", "help", "post --help", "read --help", "post --no-such-flag"} {
+		dataDir := t.TempDir()
+		// a record this very process makes live, so a resolve WOULD ask the scratch server
+		_ = os.WriteFile(filepath.Join(dataDir, config.ServerLockFile), []byte(strconv.Itoa(os.Getpid())+"\n"+srv.URL+"\n"), 0o600)
+		cmd := exec.Command(os.Args[0], "-test.run=^TestHelpAndUsageErrorsMakeNoRequest$")
+		cmd.Env = append(os.Environ(), "TEST_SUBPROCESS_RUN_MAIN=1", "TEST_SUBPROCESS_ARGS="+args,
+			"CORAL_DATA_DIR="+dataDir, "CORAL_DIR=", "CORAL_URL=", "CORAL_HOST=", "CORAL_PORT=")
+		_ = cmd.Run() // exit status differs per case; only the requests matter
+		if n := requests.Load(); n != 0 {
+			t.Errorf("%q made %d request(s)", args, n)
+		}
 	}
 }

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -16,7 +17,7 @@ func TestBoardFindsTheRunningCoralFromItsLockFile(t *testing.T) {
 	dir := t.TempDir()
 	state, _ := json.Marshal(boardState{Project: "team", JobTitle: "Tester"})
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "board_state_help-test.json"), state, 0o644))
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "coral-server.lock"), []byte("4242\n"+srv.URL+"\n"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "coral-server.lock"), []byte(strconv.Itoa(os.Getpid())+"\n"+srv.URL+"\n"), 0o600))
 
 	res := runBoardNoURL(t, dir, "post", "found by the lock")
 	require.Equal(t, 0, res.code, res.stderr)

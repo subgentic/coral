@@ -305,7 +305,8 @@ func Start(ctx context.Context, cfg *config.Config, opts Options) (*RunningServe
 	if tlsConfig != nil {
 		scheme = "https"
 	}
-	instance.recordAddress(fmt.Sprintf("%s://localhost:%d", scheme, boundPort))
+	cfg.InstanceID = newInstanceID()
+	instance.recordAddress(fmt.Sprintf("%s://localhost:%d", scheme, boundPort), cfg.InstanceID)
 	// The DNS-rebinding check accepts exactly the names Coral listens on (#3594).
 	auth.SetListenHosts(cfg.ListenHosts())
 	// The re-checks end with the server (Shutdown, or a Start that fails later), not only with the caller's ctx: a caller may pass
