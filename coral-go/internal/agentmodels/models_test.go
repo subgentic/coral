@@ -94,3 +94,16 @@ func TestModelValuesAreOnlyModelIDs(t *testing.T) {
 	assert.Equal(t, []string{"ok-1"}, values(models))
 	assert.Equal(t, "Name [31m red", models[0].DisplayName, "control and format characters become spaces")
 }
+
+// #11364: `opencode models` lists one provider/model per line; the provider is the group, a notice line is not a model, and none at all is ErrNoModels.
+func TestParseOpencodeModels(t *testing.T) {
+	models, err := ParseOpencodeModels([]byte("opencode/big-pickle\nopencode/beam-free\nopenai/gpt-6#high\nNo authenticated integrations\n\n  anthropic/claude-opus-5-5  \n-x/evil\nbad id/with space\n"))
+	require.NoError(t, err)
+	assert.Equal(t, []string{"opencode/big-pickle", "opencode/beam-free", "anthropic/claude-opus-5-5"}, values(models), "ids as written, trimmed; a variant, a notice, a flag-looking id and a spaced one are not listed")
+	assert.Equal(t, "big-pickle", models[0].DisplayName)
+	assert.Equal(t, "opencode", models[0].Group)
+	assert.Equal(t, "anthropic", models[2].Group)
+	_, err = ParseOpencodeModels([]byte("No authenticated integrations\n"))
+	assert.ErrorIs(t, err, ErrNoModels)
+	assert.Equal(t, "opencode", Family("opencode"))
+}

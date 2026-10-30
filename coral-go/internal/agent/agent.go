@@ -39,6 +39,9 @@ type LaunchParams struct {
 	// RunTag is the CORAL_PTY_RUN value of an agent started on tmux (#6141): exported with the agent's other variables so everything the agent starts carries it, and Kill can find what detached. Empty on the built-in
 	// terminal, whose processes get a tag of their own when the terminal is made.
 	RunTag string
+	// OpencodeURL and OpencodePasswordFile are Coral's opencode server (internal/opencode): the address the opencode TUI attaches to and the private file its password is read from (#11364).
+	OpencodeURL          string
+	OpencodePasswordFile string
 }
 
 // CoralEnv returns the Coral environment every launched agent needs, as
@@ -205,6 +208,8 @@ func GetAgent(agentType string) Agent {
 		return &AgyAgent{customType: at.Gemini}
 	case at.Codex:
 		return &CodexAgent{}
+	case at.Opencode:
+		return &OpencodeAgent{}
 	case at.Pi:
 		return &PiAgent{}
 	case at.Claude, "":

@@ -53,6 +53,8 @@ func Family(agentType string) string {
 		return "agy"
 	case at.Pi:
 		return "pi"
+	case at.Opencode:
+		return "opencode"
 	}
 	return ""
 }
@@ -372,6 +374,13 @@ func FetchFromCLI(ctx context.Context, family, path string) ([]Model, string, er
 			return nil, "", err
 		}
 		m, err := ParseAgyModels(out)
+		return m, "account", err
+	case "opencode":
+		out, err := runCLI(ctx, path, dir, "models")
+		if err != nil {
+			return nil, "", err
+		}
+		m, err := ParseOpencodeModels(out)
 		return m, "account", err
 	case "pi":
 		out, err := runCLI(ctx, path, dir, "--list-models")
