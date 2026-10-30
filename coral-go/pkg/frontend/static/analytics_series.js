@@ -103,12 +103,7 @@ export function agrees(a, b) { return Math.abs(a - b) <= 1e-6 * Math.max(1, Math
 const axisLabel = (fmt, v) => { const t = fmt(v); return t.startsWith('$') && v >= 100 ? (v >= 1000 ? `$${compactFigure(v)}` : `$${Math.round(v)}`) : t; };
 /** The labels of a whole axis: money steps that read the same ($0.01, $0.01) are shown with the decimals that tell them apart (#10740). */
 const axisLabels = (fmt, values) => { const labels = values.map(v => axisLabel(fmt, v)); if (!labels[0].startsWith('$') || new Set(labels).size === labels.length) return labels; const digits = costDigits(values); return values.map(v => (v >= 100 ? axisLabel(fmt, v) : formatCost(v, { zeroAsTwo: true, digits }))); };
-/** A round top for a chart's axis. `parts` (the gridlines' count) makes whole figures read whole: a count's top is a multiple of it, so no gridline says 0.33. */
-export const niceMax = (v, parts = 0) => {
-    if (!(v > 0)) return parts ? parts : 1;
-    const p = 10 ** Math.floor(Math.log10(v)), f = v / p, top = (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * p;
-    return parts && Number.isInteger(v) ? Math.ceil(top / parts) * parts : top;
-};
+const niceMax = v => { if (!(v > 0)) return 1; const p = 10 ** Math.floor(Math.log10(v)), f = v / p; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * p; };
 const colorOf = line => (line.other ? 'var(--viz-other)' : `var(--viz-${((line.slot ?? 0) % 7) + 1})`);
 
 export function timeLabel(ms, interval) {

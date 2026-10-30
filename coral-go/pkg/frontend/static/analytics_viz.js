@@ -4,10 +4,10 @@
  * names are written by agents. */
 
 import { importOnce } from './import_once.js';
-const { dataTable, tableState, el } = await importOnce('./data_table.js'); // the shared table (#7743) and its element builder
-const { niceMax } = await importOnce('./analytics_series.js'); // the one axis-top rule (whole figures read whole)
+const { dataTable, tableState } = await importOnce('./data_table.js'); // the shared table (#7743)
 const SVG = 'http://www.w3.org/2000/svg';
 const SVG_PATTERN = 'pat' + 'tern'; // the SVG element's name, written in two parts: the icon scanner (icon_names.mjs) reads a lone word in quotes as a Material icon's name
+const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 const sv = (tag, attrs = {}, text) => { const e = document.createElementNS(SVG, tag); for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, String(v)); if (text != null) e.textContent = text; return e; };
 export { el };
 
@@ -54,7 +54,7 @@ export function legend(series) {
 export function stackedBars(rows, series, { fmt = String, selected = -1, onPick = null, phone = false, label = 'Chart' } = {}) {
     const W = phone ? 360 : 760, H = phone ? 220 : 240, pl = 40, pb = 24, pt = 10, iw = W - pl - 6, ih = H - pb - pt;
     const totals = rows.map(r => series.reduce((n, s) => n + (r.values[s.key] || 0), 0));
-    const max = niceMax(Math.max(0, ...totals), 4);
+    const max = niceMax(Math.max(0, ...totals));
     const svg = sv('svg', { viewBox: `0 0 ${W} ${H}`, class: 'atab-svg', 'aria-hidden': 'true', focusable: 'false' });
     const pid = 'atab-p' + (++ids);
     const defs = sv('defs'); const pat = sv(SVG_PATTERN, { id: pid, width: 5, height: 5, patternUnits: 'userSpaceOnUse', patternTransform: 'rotate(45)' });
@@ -82,6 +82,12 @@ export function stackedBars(rows, series, { fmt = String, selected = -1, onPick 
     });
     svg.setAttribute('data-label', label);
     return svg;
+}
+
+function niceMax(v) {
+    if (!(v > 0)) return 1;
+    const p = 10 ** Math.floor(Math.log10(v)), n = v / p;
+    return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * p;
 }
 
 /** The previous/next day buttons (44 px, and the keyboard's) and the sentence for the day picked: `texts[i]` is what day i says. */
@@ -114,7 +120,7 @@ export function rankedBars(rows) {
 /** A line over days: points [{label, value}] where a null value leaves a gap in the line; the last point is marked and named. */
 export function lineChart(points, { fmt = String, phone = false } = {}) {
     const W = 340, H = 176, pl = 40, pb = 30, pt = 12, iw = W - pl - 14, ih = H - pb - pt;
-    const vals = points.map(p => p.value).filter(v => v != null), max = niceMax(Math.max(0, ...vals), 3);
+    const vals = points.map(p => p.value).filter(v => v != null), max = niceMax(Math.max(0, ...vals));
     const svg = sv('svg', { viewBox: `0 0 ${W} ${H}`, class: 'atab-svg', 'aria-hidden': 'true', focusable: 'false' });
     for (let g = 0; g <= 3; g++) { const y = pt + ih - ih * g / 3; svg.append(sv('line', { x1: pl, x2: W - 14, y1: y, y2: y, class: 'atab-grid' }), sv('text', { x: pl - 6, y: y + 4, 'text-anchor': 'end', class: 'atab-axis' }, fmt(max * g / 3))); }
     const n = points.length, xy = points.map((p, i) => p.value == null ? null : [pl + (n > 1 ? iw * i / (n - 1) : iw / 2), pt + ih - ih * p.value / max]);

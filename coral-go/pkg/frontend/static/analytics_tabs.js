@@ -123,10 +123,9 @@ function drawUsage(m) {
         { label: 'Busiest day', value: u.busiest ? u.busiest.label : '—', delta: u.busiest ? D.fmtMetric(m.metric, u.busiest.total) : '', good: null, note: 'by the chart’s measure' },
     ]);
     const fmt = (v) => D.fmtMetric(m.metric, v), texts = u.rows.map(r => `${r.label} · ${fmt(r.total)}`);
-    const pick = i => { m.day = i; m.turns = null; draw('usage'); };
-    const chart = V.stackedBars(u.rows, u.series, { fmt, selected: m.day, phone: phone(), label: 'Usage over time', onPick: pick });
+    const chart = V.stackedBars(u.rows, u.series, { fmt, selected: m.day, phone: phone(), label: 'Usage over time', onPick: i => { m.day = i; m.turns = null; draw('usage'); } });
     const hero = V.panel('Usage over time', `${D.METRICS.find(x => x[0] === m.metric)[1]} a day, by ${({ agent: 'agent', team: 'team', provider: 'agent type', model: 'model' })[m.group]}`,
-        V.dayPicker(u.rows, m.day, texts, pick), chart, V.legend(u.series));
+        V.dayPicker(u.rows, m.day, texts, i => { m.day = i; m.turns = null; draw('usage'); }), chart, V.legend(u.series));
     const row = u.rows[m.day], rank = D.dayRanking(row, u.series, m.metric);
     const list = V.rankedBars(rank.map(r => ({ name: r.name, value: r.value, i: r.i, text: `${fmt(r.value)} · ${Math.round(r.share * 100)}%` })));
     const drill = V.panel(row.label, `${fmt(row.total)} that day`, list);
