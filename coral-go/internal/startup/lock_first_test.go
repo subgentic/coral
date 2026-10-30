@@ -48,7 +48,7 @@ func TestAStartThatLosesTheInstanceLockTouchesNothing(t *testing.T) {
 	home := t.TempDir()
 	cfg := config.Load(home)
 	cfg.Host = "127.0.0.1"
-	cfg.Port = freePort(t)
+	cfg.Port = 0 // port 0: the system picks one, Start reports it in cfg.Port (no number is picked first, closed and hoped to stay free)
 	dir := cfg.CoralDir()
 	require.NoError(t, os.MkdirAll(dir, 0o755)) // looser than a start would leave it: a start that got as far as preparing the folder would tighten it
 	require.NoError(t, os.Chmod(dir, 0o755))

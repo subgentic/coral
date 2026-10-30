@@ -83,17 +83,10 @@ func bootStubCLIs(t *testing.T, seed func(ctx context.Context, db *store.DB, hom
 
 	// The server's background services run until its context ends (#4167, goleak).
 	ctx, cancel := context.WithCancel(context.Background())
-	var rs *RunningServer
-	var cfg *config.Config
-	var err error
-	for try := 0; try < 5; try++ { // freePort's port can be taken before Start binds it
-		cfg = config.Load(home)
-		cfg.Host = "127.0.0.1"
-		cfg.Port = freePort(t)
-		if rs, err = Start(ctx, cfg, Options{BackendType: "pty"}); err == nil || !addrInUse(err) {
-			break
-		}
-	}
+	cfg := config.Load(home)
+	cfg.Host = "127.0.0.1"
+	cfg.Port = 0 // port 0: the system picks one, Start reports it in cfg.Port (no number is picked first, closed and hoped to stay free)
+	rs, err := Start(ctx, cfg, Options{BackendType: "pty"})
 	if err != nil {
 		cancel()
 	}

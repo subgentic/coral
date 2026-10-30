@@ -297,6 +297,9 @@ func Start(ctx context.Context, cfg *config.Config, opts Options) (*RunningServe
 	if err != nil {
 		return closeDB(err)
 	}
+	// A port of 0 asked for any free port: the one the system gave is the server's port from here on (the dashboard address, the launcher's, the caller's cfg.Port), so
+	// nobody has to pick a number first, close its socket and hope it is still free when Start binds it.
+	cfg.Port = boundPort
 	// Where this server can be reached, recorded next to its PID for a second start on the same data folder (#235).
 	scheme := "http"
 	if tlsConfig != nil {

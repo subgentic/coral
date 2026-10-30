@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/creack/pty"
+	"github.com/subgentic/coral/internal/config"
 )
 
 // #6381, on a real terminal: the Hub question at startup is answered on a pty, as a person types it. Enter skips (as Enter declines the Terms) and the skip is stored where the dashboard's own
@@ -37,7 +38,7 @@ func TestCloudStartupPromptOnATerminal(t *testing.T) {
 		skipped     bool
 	}{{"Enter skips", "\r", true}, {"yes connects", "yes\r", false}} {
 		t.Run(tc.name, func(t *testing.T) {
-			port, deadHub := freeLoopbackPort(t), freeLoopbackPort(t)
+			deadHub := freeLoopbackPort(t) // a Hub address nothing listens on (that is the point); the server itself takes port 0 and records the port it got
 			dataDir, err := os.MkdirTemp("", "coral6381")
 			if err != nil {
 				t.Fatal(err)
@@ -47,7 +48,7 @@ func TestCloudStartupPromptOnATerminal(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			cmd := exec.Command(bin, "--host", "127.0.0.1", "--port", fmt.Sprint(port), "--no-browser", "--cloud-url", fmt.Sprintf("http://127.0.0.1:%d", deadHub), "--cloud-connect", "prompt")
+			cmd := exec.Command(bin, "--host", "127.0.0.1", "--port", "0", "--no-browser", "--cloud-url", fmt.Sprintf("http://127.0.0.1:%d", deadHub), "--cloud-connect", "prompt")
 			cmd.Env = append(os.Environ(), "CORAL_DATA_DIR="+dataDir, "HOME="+dataDir, "CORAL_NO_DEMO_SEED=1", "CORAL_TELEMETRY_DISABLED=1")
 			cmd.Stdin, cmd.Stdout, cmd.Stderr = tty, tty, tty
 			cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true, Setctty: true}
@@ -95,7 +96,15 @@ func TestCloudStartupPromptOnATerminal(t *testing.T) {
 				waitFor("Coral Hub")
 			}
 			time.Sleep(300 * time.Millisecond) // sleep-ok: the stored answer is written by the request the step makes right after it prints
-			base := fmt.Sprintf("http://127.0.0.1:%d", port)
+			var base string
+			for until := time.Now().Add(30 * time.Second); base == "" && time.Now().Before(until); time.Sleep(50 * time.Millisecond) {
+				if pid, addr := config.RecordedServer(dataDir); pid == cmd.Process.Pid && addr != "" {
+					base = strings.TrimRight(addr, "/")
+				}
+			}
+			if base == "" {
+				t.Fatal("the server never recorded the address it took")
+			}
 			got := storedWelcome(t, base, dataDir)
 			if tc.skipped {
 				if got["welcome_choice"] != "skipped" || got["welcome_pending"] != "False" {
@@ -116,6 +125,7 @@ func TestCloudStartupPromptOnATerminal(t *testing.T) {
 	}
 }
 
+// freeLoopbackPort is a loopback port that was free a moment ago: for an address that must have NOTHING listening (a dead Hub). A server that must listen takes port 0.
 func freeLoopbackPort(t *testing.T) int {
 	t.Helper()
 	ln, err := net.Listen("tcp", "127.0.0.1:0")

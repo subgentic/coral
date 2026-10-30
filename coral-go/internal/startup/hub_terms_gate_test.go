@@ -2,12 +2,9 @@ package startup
 
 import (
 	"context"
-	"net"
 	"os"
 	"path/filepath"
-	"strconv"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -81,7 +78,7 @@ func TestStartLeavingTheTermsToTheHubServesNothingWhenTheyAreNotConfirmed(t *tes
 
 	cfg := config.Load(home)
 	cfg.Host = "127.0.0.1"
-	cfg.Port = freePort(t)
+	cfg.Port = 0      // port 0: the system picks one, Start reports it in cfg.Port (no number is picked first, closed and hoped to stay free)
 	cfg.CloudURL = "" // no Hub to confirm anything
 	cfg.TermsViaHub = true
 	ctx, cancel := context.WithCancel(context.Background())
@@ -92,11 +89,7 @@ func TestStartLeavingTheTermsToTheHubServesNothingWhenTheyAreNotConfirmed(t *tes
 	assert.ErrorIs(t, err, errTermsNotConfirmed)
 	assert.Equal(t, []int{2}, exits, "the process ends with the bootstrap's code for no Hub")
 
-	conn, derr := net.DialTimeout("tcp", net.JoinHostPort("127.0.0.1", strconv.Itoa(cfg.Port)), time.Second)
-	if derr == nil {
-		conn.Close()
-	}
-	assert.Error(t, derr, "nothing was listening: the terms came first")
+	assert.Zero(t, cfg.Port, "nothing was listening: the terms came first (Start reports the port it bound, and it bound none)")
 }
 
 // A person at a terminal can still accept the terms there when the Hub did not confirm them (a credential that cannot be used, a Hub that is down): the start asks as it always did, and goes on if they say yes.

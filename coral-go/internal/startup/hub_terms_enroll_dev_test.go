@@ -81,7 +81,7 @@ func isolatedTermsStart(t *testing.T, hub *termsHub) (*config.Config, string) {
 
 	cfg := config.Load(home)
 	cfg.Host = "127.0.0.1"
-	cfg.Port = freePort(t)
+	cfg.Port = 0 // port 0: the system picks one, Start reports it in cfg.Port (no number is picked first, closed and hoped to stay free)
 	cfg.CloudURL = hub.srv.URL
 	cfg.BootstrapFile = cred
 	cfg.TermsViaHub = true
@@ -153,9 +153,5 @@ func TestAnotherTermsVersionFromTheHubStartsNothing(t *testing.T) {
 	assert.Nil(t, rs)
 	assert.Equal(t, []int{1}, exits, "hub_refused ends with 1")
 	assert.False(t, license.IsEULAAccepted(), "another version is never recorded as this one")
-	conn, derr := net.DialTimeout("tcp", net.JoinHostPort("127.0.0.1", strconv.Itoa(cfg.Port)), time.Second)
-	if derr == nil {
-		conn.Close()
-	}
-	assert.Error(t, derr, "nothing listened")
+	assert.Zero(t, cfg.Port, "nothing listened: Start reports the port it bound, and it bound none")
 }
