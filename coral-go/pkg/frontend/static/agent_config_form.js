@@ -314,6 +314,7 @@ function acfTopHtml(uid, { agentTypeVal, modelVal }) {
                     <option value="codex"${agentTypeVal === 'codex' ? ' selected' : ''}>Codex</option>
                     <option value="agy"${agentTypeVal === 'agy' || agentTypeVal === 'antigravity' || agentTypeVal === 'gemini' ? ' selected' : ''}>Antigravity</option>
                     <option value="pi"${agentTypeVal === 'pi' ? ' selected' : ''}>Pi</option>
+                    <option value="opencode"${agentTypeVal === 'opencode' ? ' selected' : ''}>OpenCode</option>
                     <option value="terminal"${agentTypeVal === 'terminal' ? ' selected' : ''}>Plain terminal (no AI)</option>
                 </select>
             </label>

@@ -6,12 +6,13 @@
 import { serverFetch, normServer, LOCAL_SERVER } from './server_base.js';
 import { importOnce } from './import_once.js';
 import { modelName } from './model_labels.js';
+import { copyText } from './utils.js';
 const { _getDefaultModels } = await importOnce('./launch_models.js');
 const { CLI_INSTALL_INSTRUCTIONS } = await importOnce('./cli_check.js');
 
-const TYPES = [['claude', 'Claude'], ['codex', 'Codex'], ['agy', 'Antigravity'], ['pi', 'Pi']];
+const TYPES = [['claude', 'Claude'], ['codex', 'Codex'], ['agy', 'Antigravity'], ['pi', 'Pi'], ['opencode', 'OpenCode']];
 const ALIAS = { gemini: 'agy', antigravity: 'agy' };
-const MARKS = { claude: 'C', codex: 'X', agy: 'A', pi: 'P' }; // the badge letters of the mockup: Codex is X, Antigravity A, so no two badges are the same
+const MARKS = { claude: 'C', codex: 'X', agy: 'A', pi: 'P', opencode: 'O' }; // the badge letters of the mockup: Codex is X, Antigravity A, so no two badges are the same
 const PROBE_MS = 1500;
 
 /** What the server says of that agent's CLI: { found: true|false|null (could not say), url }. */
@@ -47,6 +48,39 @@ export async function buildProviderCards({ group, form, server, implicitDefault 
     const state = new Map(TYPES.map(([t]) => [t, { found: null, url: '' }])); // found: null until the check answers
     let defaults = {};
     const cards = new Map();
+    // A provider that must be signed in to a provider of its own (OpenCode, #11364): when the CLI says it is signed in to none, its open card shows the command to run in a terminal (the server's `signin_command`,
+    // shown as text, never as markup) with Copy, and Check again asks the CLI itself. Nothing here blocks Launch: the status can be old, and a person may sign in from the agent's own terminal.
+    const signin = { type: 'opencode', label: 'OpenCode', signedIn: undefined, command: '' };
+    async function askSignin() {
+        try {
+            const r = await serverFetch(server, `/api/system/cli-check?type=${signin.type}&signin=1`, { cache: 'no-store' });
+            const d = r.ok ? await r.json() : null;
+            signin.signedIn = d && d.found !== false && typeof d.signed_in === 'boolean' ? d.signed_in : undefined;
+            signin.command = signin.signedIn === false && typeof d.signin_command === 'string' ? d.signin_command : '';
+        } catch { signin.signedIn = undefined; signin.command = ''; }
+        if (group._pickToken === gen) renderSignin();
+    }
+    function renderSignin() {
+        const box = group.querySelector(`.provider-card[data-type="${signin.type}"] .provider-signin`); if (!box) return;
+        const on = signin.signedIn === false && !!signin.command;
+        if (on) box.querySelector('.provider-signin-cmd').textContent = signin.command;
+        if (box.hidden === on) box.hidden = !on;
+    }
+    function signinBox() {
+        const box = el('div', 'notice notice-warn notice-compact provider-signin'); box.hidden = true; box.setAttribute('role', 'status');
+        const icon = el('span', 'material-icons', 'info'); icon.setAttribute('aria-hidden', 'true');
+        const body = el('div', 'provider-signin-body');
+        const lead = el('p', 'provider-signin-lead', `${signin.label} isn't signed in to any provider on this computer.`);
+        const how = el('p', 'provider-signin-how', 'Run this in a terminal, then press Check again.');
+        const cmd = el('code', 'provider-signin-cmd');
+        const row = el('div', 'provider-signin-actions');
+        const copy = el('button', 'btn btn-sm', 'Copy command'); copy.type = 'button';
+        copy.addEventListener('click', async () => { const ok = await copyText(signin.command); copy.textContent = ok ? 'Copied' : 'Copy failed'; setTimeout(() => { copy.textContent = 'Copy command'; }, 2000); });
+        const again = el('button', 'btn btn-sm', 'Check again'); again.type = 'button';
+        again.addEventListener('click', async () => { again.disabled = true; again.textContent = 'Checking\u2026'; await askSignin(); again.disabled = false; again.textContent = 'Check again'; });
+        row.append(copy, again); body.append(lead, how, cmd, row); box.append(icon, body);
+        return box;
+    }
 
     const statusOf = type => { const s = state.get(type); if (s.found === null) return ''; const d = defaults[type]; return `Installed · default ${d ? modelName(type, d, server) : 'model'}`; };
     const noThinking = (card, label) => { const p = card.querySelector('.provider-no-thinking'); if (!p) return; const wrap = thinkingWrap(), known = Array.isArray(form._thinkingLevels); p.hidden = !(card.classList.contains('is-open') && known && wrap && wrap.hidden); p.textContent = `${label} has no thinking levels, so there is nothing to set.`; };
@@ -96,6 +130,7 @@ export async function buildProviderCards({ group, form, server, implicitDefault 
             const body = el('div', 'provider-card-body'); body.hidden = true;
             const none = el('p', 'provider-no-thinking sv-hint'); none.hidden = true; none.setAttribute('role', 'status');
             card.append(head, body); body.append(none);
+            if (type === signin.type) body.prepend(signinBox());
             group.append(card); cards.set(type, card);
         }
         if (missing.length) {
@@ -113,6 +148,7 @@ export async function buildProviderCards({ group, form, server, implicitDefault 
             group.append(sec);
         }
         sync();
+        renderSignin();
     }
 
     select.addEventListener('change', () => { if (select.value !== start) chosen = true; sync(); });
@@ -132,6 +168,7 @@ export async function buildProviderCards({ group, form, server, implicitDefault 
     if (!group.contains(document.activeElement) || !chosen) draw(); // moving a card would drop the keyboard from it: only when nobody is on the group
     else for (const [type, card] of cards) { const s = card.querySelector('.provider-status'); if (s) s.textContent = statusOf(type); }
     group.dataset.probed = '1';
+    if (state.get(signin.type).found === true) askSignin();
     // a later check of a CLI (Check again, or after Set path and Save) draws its card again from the fresh answer (#10161)
     const onChecked = e => {
         if (!group.isConnected) { document.removeEventListener('cli-checked', onChecked); return; }

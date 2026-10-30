@@ -4166,6 +4166,11 @@ dialog.team-link-dialog::backdrop { background: rgba(var(--black-rgb), 0.5); }
 .provider-status { margin-left: auto; min-width: 0; text-align: right; font-size: var(--fs-sm); font-weight: var(--fw-regular); color: var(--text-secondary); }
 .provider-card-body { padding: 0 14px 12px; }
 .provider-no-thinking { margin: 4px 0 0; color: var(--text-secondary); font-size: var(--fs-md); }
+.provider-signin { margin: 12px 0 0; }
+.provider-signin-body { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-sm); min-width: 0; }
+.provider-signin-body p { margin: 0; }
+.provider-signin-cmd { display: block; max-width: 100%; padding: var(--space-sm); border-radius: var(--radius-md); background: var(--bg-primary); color: var(--text-primary); font-family: var(--font-mono); overflow-wrap: anywhere; user-select: all; } /* the command is one click to select (#11364) */
+.provider-signin-actions { display: flex; flex-wrap: wrap; gap: var(--space-sm); }
 .provider-missing { margin-top: 8px; }
 .provider-missing-title { margin: 0 0 6px; }
 .provider-missing-entry { display: flex; flex-wrap: wrap; align-items: center; gap: 0 10px; min-height: var(--control-touch-height, 44px); margin-bottom: 8px; padding: 0 14px; border-style: dashed; background: transparent; }

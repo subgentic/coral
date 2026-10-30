@@ -43,7 +43,7 @@ const CLOUD_ALLOWED = /^\/api\/settings\/git-diff-mode$/;
 
 /** The one /api/system route the hub exposes (Launch tier): the New Agent dialog's CLI check. The tunnel's allowlist is `type` (one of these agent types) and `source=cli_recheck`
  *  (pkg/tunnel/routes_query.go, GET /api/system/cli-check), and never a `binary` path; anything else is refused here too, so the UI does not send what the hub would drop. */
-const CLI_CHECK_TYPES = ['claude', 'agy', 'antigravity', 'gemini', 'codex', 'pi'];
+const CLI_CHECK_TYPES = ['claude', 'agy', 'antigravity', 'gemini', 'codex', 'pi', 'opencode'];
 export function cloudCliCheckAllowed(url) {
     let u;
     try { u = new URL(String(url), 'http://x.invalid'); } catch { return false; }
