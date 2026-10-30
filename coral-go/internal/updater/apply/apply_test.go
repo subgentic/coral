@@ -80,6 +80,7 @@ type fakePlatform struct {
 	rollErr    error
 	waitHook   func() bool
 	running    bool // Running's answer
+	lookFailed bool // the process list could not be read: Running says false, NothingRunning too
 	verifyHook func() error
 	// restartWhy is CanRestart's answer: why Coral could not be started again ("" = it can).
 	restartWhy string
@@ -156,7 +157,8 @@ func (f *fakePlatform) Swap(a, b string) error {
 	f.version[a], f.version[b] = f.version[b], f.version[a]
 	return nil
 }
-func (f *fakePlatform) Running(string) bool { return f.running }
+func (f *fakePlatform) Running(string) bool        { return f.running }
+func (f *fakePlatform) NothingRunning(string) bool { return !f.running && !f.lookFailed }
 func (f *fakePlatform) Start(ctx context.Context, install string) error {
 	f.rec("start")
 	if len(f.startErrs) > 0 {
@@ -302,6 +304,17 @@ func TestACoralThatDidNotEndAndIsNotRunningIsStartedAgain(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, st.History)
 	assert.Equal(t, "restarted", st.History[len(st.History)-1].Reason)
+
+	// A process list that could not be read is not "nothing runs": the old Coral is not started on it (it could be a second Coral), and the history says so.
+	r = newRig(t)
+	r.plat.waitHook = func() bool { return false }
+	r.plat.lookFailed = true
+	res = r.run()
+	assert.Equal(t, ResultCoralRunning, res.Result)
+	assert.NotContains(t, r.plat.calls, "start")
+	st, err = verify.LoadState(filepath.Join(r.data, stage.UpdatesDir))
+	require.NoError(t, err)
+	assert.Equal(t, "running_unknown", st.History[len(st.History)-1].Reason)
 
 	r = newRig(t)
 	r.plat.waitHook = func() bool { return false }

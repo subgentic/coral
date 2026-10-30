@@ -306,6 +306,19 @@ func TestMacTheBundledTmuxServerIsNotCoralRunning(t *testing.T) {
 	assert.NoError(t, m.Healthy(context.Background(), install))
 }
 
+// #11155: a process list that could not be read is not "nothing runs".
+func TestMacAPsErrorIsNeverNothingRunning(t *testing.T) {
+	m, fr, install := newMac(t)
+	fr.fail = map[string]error{psTool: errors.New("ps: operation not permitted")}
+	assert.False(t, m.NothingRunning(install), "the look failed")
+	assert.False(t, m.Running(install))
+	fr.fail = nil
+	fr.answers[psTool] = " 1 /sbin/launchd\n"
+	assert.True(t, m.NothingRunning(install), "read, and nothing of the install in it")
+	fr.answers[psTool] = " 100 " + install + "/Contents/MacOS/coral\n"
+	assert.False(t, m.NothingRunning(install))
+}
+
 func itoa(n int) string {
 	return strings.TrimSpace(strings.Join(strings.Fields(strings.Repeat(" ", 0)+fmtInt(n)), ""))
 }

@@ -315,8 +315,17 @@ func Run(ctx context.Context, cfg Config) Result {
 		res.Result = ResultCoralRunning
 		// The server quit for this run: when nothing of Coral is running now the person has no Coral, so the one that was installed (nothing was changed) is started again, as the
 		// Windows apply does (#11155). Something of Coral still running is left alone: that one is Coral, and a second start would be a second Coral.
-		if cfg.Platform.Running(install) {
-			cfg.history(&st, cfg.Installed, rec.Version, ResultCoralRunning, "still_running") // said where Settings can read it (#11151)
+		// Only a look that worked and found nothing is "nothing runs": a process list that could not be read (ps failing, /proc unreadable) says nothing, and a start on it could be a second Coral.
+		gone := !cfg.Platform.Running(install)
+		if g, ok := cfg.Platform.(interface{ NothingRunning(install string) bool }); ok {
+			gone = g.NothingRunning(install)
+		}
+		if !gone {
+			reason := "still_running"
+			if !cfg.Platform.Running(install) {
+				reason = "running_unknown" // the look failed: not restarted
+			}
+			cfg.history(&st, cfg.Installed, rec.Version, ResultCoralRunning, reason) // said where Settings can read it (#11151)
 			_ = verify.SaveState(dir, st)
 			return res
 		}

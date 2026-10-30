@@ -310,6 +310,12 @@ func (m *Mac) Running(install string) bool {
 	return err == nil && n > 0
 }
 
+// NothingRunning: the process list was read and no process of the install is in it. A list that could not be read is not "nothing runs" (#11155).
+func (m *Mac) NothingRunning(install string) bool {
+	n, err := m.running(context.Background(), install)
+	return err == nil && n == 0
+}
+
 // Healthy: a process of the install is running, and still is a few seconds later.
 func (m *Mac) Healthy(ctx context.Context, install string) error {
 	deadline := m.HealthFor
