@@ -23,7 +23,7 @@ export function goalColumns(ctx = {}, keys = ['state', 'goal', 'team', 'progress
                 // every task of an active goal is done: the title line ends with one chip, state then action, that goes straight to the close dialog (#10604); it was a Close button and a question stacked under the title (#11224)
                 const w = DT.el('span', 'dt-title-cell'), c = DT.el('button', 'btn btn-small goals-ready-close'); c.append(DT.el('span', 'goals-ready-state', 'All tasks done \u00b7 '), DT.el('span', 'goals-ready-label', 'Close goal'), DT.el('span', 'material-icons goals-ready-icon', 'check')); // a phone's chip says only 'Close goal', a very narrow one only a check (the title keeps its room); the name keeps the whole
                 c.querySelector('.goals-ready-icon').setAttribute('aria-hidden', 'true');
-                c.type = 'button'; c.setAttribute('aria-label', `All tasks done \u00b7 Close goal: ${g.title || g.id}`); c.addEventListener('click', e => { e.stopPropagation(); ctx.closeReady(g); });
+                c.type = 'button'; c.title = 'Close goal'; c.setAttribute('aria-label', `All tasks done \u00b7 Close goal: ${g.title || g.id}`); c.addEventListener('click', e => { e.stopPropagation(); ctx.closeReady(g); });
                 w.append(b, c); return w; } }, // one line a row (Goal #79): the title alone; the outcome is in the goal's preview and page
         team: { key: 'team', label: 'Team', sort: true, sortValue: team, line: 2, width: '9rem', dropAt: 36,
             cell: g => ctx.openTeam ? DT.link(team(g), () => ctx.openTeam(g)) : team(g) },

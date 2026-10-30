@@ -48,6 +48,7 @@ const B = 'goal-ready-' + Date.now().toString(36);
                 if (mobile) assert.ok(vis.titleW >= vis.twelve - 1, `${w}${big ? ' at 200% text' : ''}: the goal title keeps room for at least 12 characters: ${JSON.stringify(vis)}`);
             }
             assert.ok(!open.note && !open.close.length, `${w}: a goal with an open task has no chip: ${JSON.stringify(open)}`);
+            assert.equal(await ev(`document.querySelector('#team-panel-goals button.goals-ready-close').title`), 'Close goal', `${w}: a pointer user is told what the chip (or the check) does`);
             assert.ok(done.close[0].tab >= 0, `${w}: it is reachable by keyboard`);
             if (!mobile) assert.ok(Math.abs(done.h - open.h) <= 4, `${w}: the finished goal's row keeps its normal height (${done.h} px against ${open.h} px)`);
             else assert.ok(done.close[0].h >= 44, `${w}: a 44 px target on a phone (${done.close[0].h} px)`);
