@@ -20,26 +20,26 @@ export function usesSuggestion(input) {
     return !!(input && input.dataset.suggested && input.value.trim() === input.dataset.suggested);
 }
 
-/** Fill `input` with the suggestion and show `note`, when the field is empty (or still the earlier suggestion), the server is this one and no recent folder exists. */
-export function offerSuggestion(input, note, name) {
+/** Fill `input` with the suggestion and show `line`, when the field is empty (or still the earlier suggestion), the server is this one and no recent folder exists. */
+export function offerSuggestion(input, line, name) {
     if (!input || input.dataset.dirServer) return;
     const now = input.value.trim();
-    if (now && !usesSuggestion(input)) { showNote(input, note, false); return; }
-    if (getRecentDirs(LOCAL_SERVER).length) { if (usesSuggestion(input)) { input.value = ''; delete input.dataset.suggested; } showNote(input, note, false); return; }
+    if (now && !usesSuggestion(input)) { showLine(input, line, false); return; }
+    if (getRecentDirs(LOCAL_SERVER).length) { if (usesSuggestion(input)) { input.value = ''; delete input.dataset.suggested; } showLine(input, line, false); return; }
     const dir = suggestedFolder(input.dataset.coralRoot, name);
     if (!dir) return;
     input.value = dir; input.dataset.suggested = dir;
     input.dispatchEvent(new Event('input', { bubbles: true }));
-    showNote(input, note, true);
+    showLine(input, line, true);
 }
 
-/** Keep the note true as the person edits: it goes as soon as the field is anything but the suggestion. */
-export function syncSuggestionNote(input, note) { showNote(input, note, usesSuggestion(input)); }
+/** Keep the line true as the person edits: it goes as soon as the field is anything but the suggestion. */
+export function syncSuggestionLine(input, line) { showLine(input, line, usesSuggestion(input)); }
 
-function showNote(input, note, on) {
-    if (!note) return;
-    if (note.hidden === on) note.hidden = !on;
-    const ids = (input.getAttribute('aria-describedby') || '').split(/\s+/).filter(x => x && x !== note.id);
-    if (on) ids.push(note.id);
+function showLine(input, line, on) {
+    if (!line) return;
+    if (line.hidden === on) line.hidden = !on;
+    const ids = (input.getAttribute('aria-describedby') || '').split(/\s+/).filter(x => x && x !== line.id);
+    if (on) ids.push(line.id);
     if (ids.length) input.setAttribute('aria-describedby', ids.join(' ')); else input.removeAttribute('aria-describedby');
 }

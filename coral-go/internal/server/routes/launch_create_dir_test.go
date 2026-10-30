@@ -47,6 +47,8 @@ func TestCreateSuggestedDirMakesOnlyTheSuggestedShape(t *testing.T) {
 		filepath.Join(coral, strings.Repeat("x", 65)),
 		filepath.Join(filepath.Dir(home), "Coral", "outside"), // another home
 		"relative/Coral/x",
+		filepath.Join(coral, "CON"), filepath.Join(coral, "nul.txt"), filepath.Join(coral, "COM1"), filepath.Join(coral, "lpt9"),
+		filepath.Join(coral, "dot."),
 	} {
 		if msg := createSuggestedDir(bad, true); msg == "" {
 			t.Errorf("%q must be refused", bad)
@@ -123,4 +125,33 @@ func TestLaunchCreateDirMakesTheSuggestedFolderAndNoOther(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, fi.IsDir())
 	assert.NotEqual(t, "working_dir", out["field"])
+}
+
+func TestCreateSuggestedDirMakesBothFoldersPrivate(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows has no mode bits")
+	}
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	if msg := createSuggestedDir(filepath.Join(home, "Coral", "first"), true); msg != "" {
+		t.Fatal(msg)
+	}
+	for _, d := range []string{filepath.Join(home, "Coral"), filepath.Join(home, "Coral", "first")} {
+		fi, err := os.Stat(d)
+		require.NoError(t, err)
+		assert.Zero(t, fi.Mode().Perm()&0o077, "%s is private to the person: %v", d, fi.Mode().Perm())
+	}
+}
+
+func TestCreateSuggestedDirRefusesANameThatIsALink(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlinks need privileges on Windows")
+	}
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	require.NoError(t, os.Mkdir(filepath.Join(home, "Coral"), 0o700))
+	require.NoError(t, os.Symlink(t.TempDir(), filepath.Join(home, "Coral", "first")))
+	if msg := createSuggestedDir(filepath.Join(home, "Coral", "first"), true); msg == "" {
+		t.Fatal("a name that is a link is refused")
+	}
 }

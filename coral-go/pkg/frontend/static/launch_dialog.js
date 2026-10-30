@@ -5,7 +5,6 @@ import { showToast, escapeHtml, escapeAttr, boardNameProblem } from './utils.js'
 import { blockedReason } from './hub_access.js';
 import { loadLiveSessions } from './api.js';
 import { recordRecentDir, setDirServerResolver, getRecentDirs } from './browser.js';
-import { offerSuggestion, syncSuggestionNote, usesSuggestion } from './folder_suggestion.js';
 import { pinnedFolders } from './pinned_folders.js';
 import { defaultAgentName } from './session_state.js';
 import { serverFetch, identityKey, isHub, normServer, LOCAL_SERVER, keyLabel, noteBoardLabels } from './server_base.js';
@@ -25,6 +24,7 @@ const { _initAgentPresets } = await importOnce('./persona_io.js');
 const { quietFocus } = await importOnce('./quiet_focus.js');
 const { markFieldInvalid, _launchBlocked, _launchOn, _refreshAfterLaunch, _resetDirInputs, _showLaunchStep, _syncMobileLaunchSections, _withServerSettings, hideLaunchModal, setLaunchMore, setLaunchStage, LAUNCH_STAGES, launchStages } = await importOnce('./launch_core.js');
 const { wireRecap, syncRecap } = await importOnce('./launch_recap.js');
+const { offerSuggestion, syncSuggestionLine, usesSuggestion } = await importOnce('./folder_suggestion.js');
 
 /** New Agent's three steps (#7391): Next goes from the folder to the persona to the agent (a folder is needed first), Back returns. `arg` is a stage name, "next" or "back" (the old "details" is the persona step). Focus follows, and a screen reader hears which step. */
 function _launchStage(arg) {
@@ -352,7 +352,7 @@ function _wireDirNote() {
     if (!input || input.dataset.noteWired) return;
     input.dataset.noteWired = '1';
     input.addEventListener('input', _syncDirNote); input.addEventListener('change', _syncDirNote);
-    input.addEventListener('input', () => syncSuggestionNote(input, document.getElementById('launch-dir-suggest'))); input.addEventListener('change', () => syncSuggestionNote(input, document.getElementById('launch-dir-suggest')));
+    input.addEventListener('input', () => syncSuggestionLine(input, document.getElementById('launch-dir-suggest'))); input.addEventListener('change', () => syncSuggestionLine(input, document.getElementById('launch-dir-suggest')));
     input.addEventListener('input', _syncLaunchBlock); input.addEventListener('change', _syncLaunchBlock); // Next and Launch say why they are off until there is a folder
     input.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); _launchStage('next'); } }); // Enter is Next
 }

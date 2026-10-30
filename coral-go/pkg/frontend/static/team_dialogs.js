@@ -5,7 +5,6 @@ import { scrollBehavior } from './motion.js';
 import { showToast, escapeHtml, escapeAttr, boardNameProblem, OPERATOR_ID } from './utils.js';
 import { loadLiveSessions } from './api.js';
 import { recordRecentDir, getRecentDirs } from './browser.js';
-import { offerSuggestion, syncSuggestionNote, usesSuggestion } from './folder_suggestion.js';
 import { teamForm, showTeamWorktree, showTeamWorkers } from './team_form.js';
 import { agentNameForm, agentStatus } from './agent_form.js';
 import { cliPathButton } from './prerequisites.js';
@@ -23,6 +22,7 @@ const { launchedMode } = await importOnce('./preset_enforcement.js');
 const { BUILTIN_TEAM_TEMPLATES, DEFAULT_TEAM_KEY, GENERATED_TEAM_KEY, _renderTeamTemplateSelector, _syncTemplateMenu, markTeamTemplate, resetTeamTemplatePicker } = await importOnce('./team_templates_ui.js');
 const { showTeamStep, currentTeamStep, TEAM_STEPS } = await importOnce('./team_steps.js');
 const { mountTeamLaunchSettings, readTeamLaunchSettings, applyTeamBoardSettings, setTeamLaunchMode } = await importOnce('./team_launch_settings.js');
+const { offerSuggestion, syncSuggestionLine, usesSuggestion } = await importOnce('./folder_suggestion.js');
 
 
 const _modeLabel = v => [...(document.getElementById('team-permission-mode')?.options || [])].find(o => o.value === v)?.textContent || v;
@@ -408,7 +408,7 @@ async function _initTeamForm() {
     if (launch.server !== LOCAL_SERVER) _resetDirInputs(['launch-team-dir'], launch.server, s, { switching: true });
     else if (s.default_working_dir && dirInput) dirInput.value = s.default_working_dir;
     else if (dirInput) { delete dirInput.dataset.suggested; offerSuggestion(dirInput, document.getElementById('launch-team-dir-suggest'), 'first-team'); } // a first team has a folder to say yes to (#11258)
-    if (dirInput && !dirInput.dataset.suggestWired) { dirInput.dataset.suggestWired = '1'; dirInput.addEventListener('input', () => syncSuggestionNote(dirInput, document.getElementById('launch-team-dir-suggest'))); }
+    if (dirInput && !dirInput.dataset.suggestWired) { dirInput.dataset.suggestWired = '1'; dirInput.addEventListener('input', () => syncSuggestionLine(dirInput, document.getElementById('launch-team-dir-suggest'))); }
 
     // Show worktree option when directory is a git repo (checked on the target server)
     if (dirInput && !dirInput.dataset.gitWired) {
