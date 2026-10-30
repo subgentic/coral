@@ -373,7 +373,7 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
         const fs = el('fieldset', 'goals-radios'); fs.append(el('legend', null, 'Close it as'));
         const radio = (value, label) => { const l = el('label', 'goals-radio'); const r = el('input'); r.type = 'radio'; r.name = 'goal-close-state'; r.value = value; r.checked = choose === value; l.append(r, el('span', null, label)); return l; };
         fs.append(radio('done', W.closeDoneLabel), radio('dropped', W.closeDroppedLabel));
-        const reason = el('input'); reason.type = 'text'; reason.maxLength = 300; reason.autocomplete = 'off'; reason.id = 'goal-close-reason'; reason.required = true; reason.setAttribute('aria-required', 'true');
+        const reason = el('input'); reason.type = 'text'; reason.maxLength = 300; reason.autocomplete = 'off'; reason.id = 'goal-close-reason';
         const hint = el('span', 'goals-note', W.closeReasonHint); hint.id = 'goal-close-hint'; reason.setAttribute('aria-describedby', hint.id);
         const rl = el('label', 'goals-field'); rl.append(el('span', null, W.closeReasonLabel), reason, hint);
         const err = el('p', 'goals-field-error'); err.setAttribute('role', 'alert'); err.id = 'goal-close-error';
@@ -386,11 +386,11 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
             e.preventDefault();
             err.textContent = '';
             if (!form.querySelector('input[name="goal-close-state"]:checked')) return;
-            if (!reason.value.trim()) { err.textContent = W.closeReasonNeeded; reason.setAttribute('aria-invalid', 'true'); reason.setAttribute('aria-describedby', `${hint.id} ${err.id}`); reason.focus(); return; }
-            reason.removeAttribute('aria-invalid'); reason.setAttribute('aria-describedby', hint.id); go.disabled = true;
+            go.disabled = true;
             const as = form.querySelector('input[name="goal-close-state"]:checked')?.value === 'dropped' ? 'dropped' : 'done';
+            const why = reason.value.trim() || W.closeReasonDefault(as); // the server needs one line; a person is not made to write it
             try {
-                const r = await boardFetch(model.project, `/goals/${g.id}/close`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: OPERATOR_ID, reason: reason.value.trim(), state: as }) });
+                const r = await boardFetch(model.project, `/goals/${g.id}/close`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: OPERATOR_ID, reason: why, state: as }) });
                 if (!r.ok) throw await failure(r);
                 dlg.close();
                 say(W.closedAsText(as, open));

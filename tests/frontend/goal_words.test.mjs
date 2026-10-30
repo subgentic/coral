@@ -50,7 +50,7 @@ assert.deepEqual(W.closeWarning({ done: 2, active: 1, queued: 2 }), { head: '3 o
 assert.equal(W.closedAsText('done', 0), 'Closed as done.'); assert.equal(W.closedAsText('dropped', 2), 'Closed as dropped. 2 tasks are still open.'); assert.equal(W.closedAsText('dropped', 1), 'Closed as dropped. 1 task is still open.');
 assert.equal(W.allDoneLine(3), 'All 3 tasks are done.'); assert.equal(W.allDoneLine(1), 'All 1 task is done.'); assert.equal(W.allDoneAsk('X works'), 'Done when: X works. Is that true?'); assert.equal(W.allDoneAsk(''), 'Is that true?');
 assert.equal(W.isOpenGoal({ state: 'blocked' }), true); assert.equal(W.isClosedGoal({ state: 'dropped' }), true); assert.equal(W.isOpenGoal({ state: 'done' }), false);
-assert.equal(W.allDoneSaid(3, 'Ship it'), 'All 3 tasks of Ship it are done'); assert.equal(W.allDoneSaid(1, 'A'), 'All 1 task of A is done'); assert.equal(W.closeReasonHint, '300 characters at most.');
+assert.equal(W.allDoneSaid(3, 'Ship it'), 'All 3 tasks of Ship it are done'); assert.equal(W.allDoneSaid(1, 'A'), 'All 1 task of A is done'); assert.equal(W.closeReasonHint, '300 characters at most. Left empty, the agents are told who closed it.'); assert.equal(W.closeReasonDefault('done'), 'Closed by the Operator.'); assert.equal(W.closeReasonDefault('dropped'), 'Dropped by the Operator.');
 // #11004: the line "Copy for an agent" copies
 assert.equal(W.agentBriefLine({ id: 65, title: 'Fast, reliable releases' }), 'Goal #65 (Fast, reliable releases): run coral-board goal brief 65');
 assert.equal(W.agentBriefLine({ id: 7, title: '' }), 'Goal #7: run coral-board goal brief 7', 'no title: no empty brackets');

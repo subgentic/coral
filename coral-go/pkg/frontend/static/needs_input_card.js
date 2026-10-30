@@ -240,7 +240,7 @@ function needsInputHtml(info, session) {
         if (info.signedOut) {
             kicker = "Sign-in needed";
             question = `${agentDisplayName(session)} is not signed in`;
-            context = `<div class="cni-context-text">Open the terminal and sign in, then check again.</div>`;
+            context = `<div class="cni-context-text">Open the terminal and finish what it asks, such as choosing a theme and signing in. Then press Check again.</div>`;
         } else {
             question = "The agent may be waiting at a startup prompt";
             context = `<div class="cni-context-text">For example, trusting this folder or signing in. Open the terminal, answer it there, then come back and type your first message.</div>`;
