@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/subgentic/coral/internal/agent"
+	"github.com/subgentic/coral/internal/ptr"
 	"github.com/subgentic/coral/internal/ptymanager"
 	"github.com/subgentic/coral/internal/store"
 )
@@ -208,6 +210,9 @@ func (r *SessionReconciler) checkExited(ctx context.Context, ls store.LiveSessio
 		delete(r.exited, ls.SessionID)
 		return
 	}
+	if r.cliMissing(ctx, ls, name) {
+		return
+	}
 	if created, err := time.Parse(store.ISOFormat, ls.CreatedAt); err == nil && r.now().Sub(created) < exitedLaunchGrace {
 		return
 	}
@@ -223,4 +228,43 @@ func (r *SessionReconciler) checkExited(ctx context.Context, ls store.LiveSessio
 	r.slept = append(r.slept, ls.SessionID)
 	r.logger.Warn("agent CLI has exited, marking as sleeping (Wake resumes it)",
 		"session_id", ls.SessionID, "agent_name", ls.AgentName, "foreground", fg)
+}
+
+// missingCLIWindow is how long after Coral typed an agent's launch line a shell's "no such command" error for the agent's CLI counts as the launch's own: the reconciler's pass is
+// every 30 seconds, so this is the first pass or two. Later the same words on a screen are an agent's own output (a transcript of a failed command) and are left alone.
+const missingCLIWindow = 45 * time.Second
+
+// cliMissing is the safety net under the CLI checks (#353): the agent's pane is at its shell, Coral typed its launch line moments ago (launched_at, which a wake sets too), and the shell's own "no such command" error for the agent's
+// CLI is on the screen (a launch line typed although the CLI was nowhere, or not on the agent's shell's PATH). Conclusive at once, so the agent is marked with the reason cli_missing
+// ("Failed to start", with the words the dashboard has for it) without the launch grace or the consecutive passes. It only marks: nothing is killed, relaunched or typed, and no setting
+// changes. It reports whether it marked the agent.
+func (r *SessionReconciler) cliMissing(ctx context.Context, ls store.LiveSession, name string) bool {
+	info := agent.GetCLIInfo(ls.AgentType)
+	sr, ok := r.runtime.(ptymanager.ScreenReader)
+	if info == nil || info.Binary == "" || !ok {
+		return false
+	}
+	// When Coral last typed the launch line: launched_at, which a wake stamps because it reuses the row; a launch, restart or resume makes a new row, whose created_at is that moment.
+	launched, err := time.Parse(store.ISOFormat, ptr.Value(ls.LaunchedAt))
+	if err != nil {
+		launched, err = time.Parse(store.ISOFormat, ls.CreatedAt)
+	}
+	if err != nil || r.now().Sub(launched) > missingCLIWindow {
+		return false
+	}
+	screen, err := sr.AgentScreen(ctx, name, ls.AgentType, ls.SessionID)
+	if err != nil || !agent.MissingCommandIn(screen, info.Binary) {
+		return false
+	}
+	if err := r.sessionStore.SetSessionSleepingFor(ctx, ls.SessionID, store.SleepReasonAgentExited); err != nil { // its CLI is not running: it ended
+		r.logger.Error("failed to mark an agent whose CLI is missing", "session_id", ls.SessionID, "error", err)
+		return false
+	}
+	if err := r.sessionStore.SetStartFailure(ctx, ls.SessionID, store.StartFailureCLIMissing); err != nil {
+		r.logger.Error("failed to record why an agent could not start", "session_id", ls.SessionID, "error", err)
+	}
+	delete(r.exited, ls.SessionID)
+	r.slept = append(r.slept, ls.SessionID)
+	r.logger.Warn("the agent's shell could not find its CLI; marking it ended, failed to start", "session_id", ls.SessionID, "agent_name", ls.AgentName, "agent_type", ls.AgentType)
+	return true
 }

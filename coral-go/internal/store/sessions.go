@@ -63,6 +63,9 @@ type LiveSession struct {
 	IsSleeping   int     `db:"is_sleeping" json:"is_sleeping"`
 	IsArchived   int     `db:"is_archived" json:"is_archived"`
 	SleepReason  *string `db:"sleep_reason" json:"sleep_reason,omitempty"`
+	// StartFailure is why the last start was refused (StartFailureCLIMissing), apart from SleepReason; LaunchedAt is when the last launch line was typed (#353).
+	StartFailure *string `db:"start_failure" json:"start_failure,omitempty"`
+	LaunchedAt   *string `db:"launched_at" json:"launched_at,omitempty"`
 	BoardType    *string `db:"board_type" json:"board_type,omitempty"`
 	GitDiffMode  *string `db:"git_diff_mode" json:"git_diff_mode,omitempty"`
 	Capabilities *string `db:"capabilities" json:"capabilities,omitempty"`

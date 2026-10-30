@@ -8,6 +8,7 @@ import { factsHtml } from './facts.js';
 import { formatTokens, formatCost } from './format.js';
 import { getCachedAgentAvailability } from './team_availability.js';
 import { isGoneAsleep } from './terminal_gone.js';
+import { isStartFailed } from './start_failed.js';
 import { keyLabel, sessionTeamKey } from './server_base.js';
 import { setClassName, setTitle, setAttr } from './dom_write.js';
 
@@ -186,6 +187,8 @@ export function sessionStateInfo(s, opts) {
     if (key === 'sleeping' && isGoneAsleep(s)) info.label = 'Terminal gone';
     // Asleep because its CLI exited (#6058): the word is "Ended", in the row and the header, not a plain "Sleeping".
     if (key === 'sleeping' && !s.archived && s.sleep_reason === 'agent_exited') info.label = info.pill = 'Ended';
+    // Asleep because its start was refused for its CLI (#353): "Failed to start", in the row and the header.
+    if (key === 'sleeping' && isStartFailed(s)) info.label = info.pill = 'Failed to start';
     if (key === 'waiting_on') info.label = waitingOnLabel(getCachedAgentAvailability(s)?.waiting_on) || info.label;
     // What the agent itself says it waits on (#3481): its permission, question, plan or
     // input request. A prompt Coral only saw on the screen has no kind: plain Needs input.

@@ -15,6 +15,7 @@ import { scheduleLiveSessionsRender } from './render.js';
 import { TERMINAL_GONE_MESSAGE } from './server_status.js';
 import { isPopout } from './popout.js';
 import { importOnce } from './import_once.js';
+import { isStartFailed } from './start_failed.js';
 import { noteHeld, noteDone, wasCancelled } from './held_sends.js'; // the queued lines under the composer (#6611)
 
 /** Agents whose terminal answered terminal_gone, by server and session id. A restart
@@ -56,12 +57,15 @@ export function isExitedAsleep(s) {
     return !!s && !!s.sleeping && !s.archived && s.sleep_reason === 'agent_exited';
 }
 
-/** The "Terminal gone" chip for an agent's sidebar row, "Ended" for one whose CLI exited ('' otherwise); a click restarts it. */
+/** The "Terminal gone" chip for an agent's sidebar row, "Ended" for one whose CLI exited and "Failed to start" for one whose start was refused for its CLI (#353) ('' otherwise); a click restarts it. */
 export function terminalGoneChip(s) {
     const ended = isExitedAsleep(s);
-    if (!ended && !isTerminalGone(s)) return '';
-    return `<button type="button" class="terminal-gone-chip" title="${ended ? "This agent's CLI exited. Click to restart it." : "This agent's terminal is gone. Click to restart it."}"`
-        + `${ended ? ' aria-label="Ended. Restart"' : ''} data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type || '')}" data-session-id="${escapeAttr(s.session_id)}">${ended ? 'Ended' : 'Terminal gone'}</button>`;
+    const failed = isStartFailed(s);
+    if (!ended && !failed && !isTerminalGone(s)) return '';
+    const word = failed ? 'Failed to start' : ended ? 'Ended' : 'Terminal gone';
+    const title = failed ? "Its CLI is missing or can't be run. Click to restart once that is fixed." : ended ? "This agent's CLI exited. Click to restart it." : "This agent's terminal is gone. Click to restart it.";
+    return `<button type="button" class="terminal-gone-chip" title="${title}"`
+        + `${ended || failed ? ` aria-label="${word}. Restart"` : ''} data-name="${escapeAttr(s.name)}" data-agent-type="${escapeAttr(s.agent_type || '')}" data-session-id="${escapeAttr(s.session_id)}">${word}</button>`;
 }
 
 /** The header badge for the selected agent while its terminal is gone. */

@@ -644,6 +644,8 @@ func (h *SessionsHandler) liveSessionRowsBefore4713(r *http.Request, trace *phas
 			"sleeping":              true,
 			"archived":              ls.IsArchived == 1,
 			"sleep_reason":          sleepReason(ls),
+			"start_failure":         ptr.Value(ls.StartFailure),
+			"start_failure_text":    startFailureSentence(ls.AgentType, ptr.Value(ls.StartFailure)),
 			"first_prompt":          h.sleepingFirstPrompt(ls),
 		})
 		// Include prompt, model, and capabilities for sleeping sessions too

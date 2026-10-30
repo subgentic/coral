@@ -23,17 +23,18 @@ var systemPostAllowed = map[string]struct {
 	calls  int
 	reason string
 }{
-	"routes/agent_exit.go postExitNotice":              {1, "the stopped agents' cleaned names, a fixed label and a fixed plan"},
-	"routes/agent_exit.go autoResume":                  {1, "a live @title and a constant sentence"},
-	"routes/auto_review.go autoDelegateReview":         {3, "reviewer names through teamhealth.Name, task numbers, fixed words"},
-	"routes/auto_review.go healthBudgetReached":        {1, "a live @orchestrator and a number"},
-	"routes/auto_wake.go sendAutoWakeNotice":           {1, "a live @title and a constant sentence"},
-	"routes/board_goal_requests.go wakeForGoalRequest": {1, "Coral's own how-to sentence with a request number"},
-	"routes/task_park.go ParkTask":                     {2, "teamhealth.Name of who, a time, task numbers; the park reason stays on the task"},
-	"background/board_health_roster.go escalateWaits":  {1, "two cleaned names and an age"},
-	"background/health_held.go heldNotice":             {1, "cleaned names and minutes"},
-	"background/health_nudges.go postLines":            {2, "cleaned names; a budget number"},
-	"background/health_remind.go RunOnce":              {1, "a task number, a time and a target name"},
+	"routes/agent_exit.go postExitNotice":               {1, "the stopped agents' cleaned names, a fixed label and a fixed plan"},
+	"routes/agent_exit.go autoResume":                   {1, "a live @title and a constant sentence"},
+	"routes/auto_review.go autoDelegateReview":          {3, "reviewer names through teamhealth.Name, task numbers, fixed words"},
+	"routes/auto_review.go healthBudgetReached":         {1, "a live @orchestrator and a number"},
+	"routes/auto_wake.go sendAutoWakeNotice":            {1, "a live @title and a constant sentence"},
+	"routes/board_goal_requests.go wakeForGoalRequest":  {1, "Coral's own how-to sentence with a request number"},
+	"routes/sessions_start_refused.go markStartRefused": {1, "the agent's cleaned notice name (noticeName: capped, no @) and a fixed sentence by refusal code (startFailureSentence)"},
+	"routes/task_park.go ParkTask":                      {2, "teamhealth.Name of who, a time, task numbers; the park reason stays on the task"},
+	"background/board_health_roster.go escalateWaits":   {1, "two cleaned names and an age"},
+	"background/health_held.go heldNotice":              {1, "cleaned names and minutes"},
+	"background/health_nudges.go postLines":             {2, "cleaned names; a budget number"},
+	"background/health_remind.go RunOnce":               {1, "a task number, a time and a target name"},
 }
 
 func TestEveryServerPostThatQuotesStoredTextIsDefused(t *testing.T) {

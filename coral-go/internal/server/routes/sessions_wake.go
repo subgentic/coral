@@ -33,6 +33,7 @@ func (h *SessionsHandler) wakeExistingSession(ctx context.Context, ls *store.Liv
 		}
 		if err == nil && launched {
 			h.noteLaunchedHooks(ctx, ls.SessionID, ls.AgentType)
+			h.noteStartSucceeded(ctx, ls.SessionID)          // the launch line was typed now: the safety net's window starts here, and no start failure stands (#353)
 			_ = h.ss.StampSessionSettings(ctx, ls.SessionID) // the CLI now runs with the stored model and level: turns the transcript recorded before are older than them (#6225)
 		}
 	}()
@@ -101,6 +102,7 @@ func (h *SessionsHandler) prepareWake(ctx context.Context, ls *store.LiveSession
 	}
 	cliPath, err := agent.LaunchCLIScreened(userSettings, ls.AgentType, h.commonPlaceScreen(ctx)) // a broken cli_path_<agent> refuses the wake (#115)
 	if err != nil {
+		h.markStartRefused(ctx, ls, err) // a wake nobody watches shows on the card and the board (#353)
 		return nil, err
 	}
 

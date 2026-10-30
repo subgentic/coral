@@ -662,6 +662,8 @@ func (h *SessionsHandler) sleepingRows(allLive []store.LiveSession, liveSIDs map
 			"sleeping":              true,
 			"archived":              ls.IsArchived == 1,
 			"sleep_reason":          sleepReason(ls),
+			"start_failure":         ptr.Value(ls.StartFailure), // why the last start was refused (a store.StartFailure code), apart from sleep_reason (#353)
+			"start_failure_text":    startFailureSentence(ls.AgentType, ptr.Value(ls.StartFailure)),
 			"first_prompt":          h.sleepingFirstPrompt(ls),
 			"last_message":          h.lastMessageOf(ls.SessionID, ls.WorkingDir, ls.AgentType),
 		}
