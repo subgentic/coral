@@ -17,12 +17,35 @@ const STATE_WORDS = { working: 'working', idle: 'idle', waiting: 'waiting for yo
 
 const mk = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 
-/** Which of the restarted agents come back on their own (the server's `resumes`), in words: " 2 start again on their own afterwards; 1 starts a new conversation." Empty when the server does not say. */
-function comeBack(back, fresh, n) {
-    const parts = [];
-    if (back) parts.push(back === n ? `All ${n} start again on their own afterwards` : `${back} start${back === 1 ? 's' : ''} again on their own afterwards`);
-    if (fresh) parts.push(fresh === n ? `All ${n} start a new conversation` : `${fresh} start${fresh === 1 ? 's' : ''} a new conversation`);
-    return parts.length ? ` ${parts.join('; ')}.` : '';
+// What happens to each agent after the restart (the server's `after`, by auto_wake's rule), in words: one per agent, and the summary's. "asks" and "stays_asleep" hold for all of them or none.
+const settingOff = 'Wake agents after a restart is off in Settings > Terminal';
+const overCap = (cap) => (cap ? `more than ${cap} ${cap === 1 ? 'agent was' : 'agents were'} running` : 'more agents were running than it wakes on its own');
+function afterNote(after, cap) {
+    switch (after) {
+        case 'wakes': return 'wakes again afterwards, in the same conversation';
+        case 'asks': return `Coral asks you before waking it: ${overCap(cap)}`;
+        case 'stays_asleep': return `stays asleep until you wake it (${settingOff})`;
+        case 'new_conversation': return 'starts a new conversation';
+        case 'new_terminal': return 'starts again as a new terminal';
+        default: return 'not known whether it starts again'; // never an agent left unexplained (#7360)
+    }
+}
+/** The summary of what comes back, after "Their work in progress stops.": " All 6 wake again afterwards, each in its own conversation, unless Coral has restarted several times in the last hour." Empty when the server does not say. */
+function comeBack(restarts, cap) {
+    const n = restarts.length, count = (k) => restarts.filter(a => a.after === k).length;
+    const s = (k) => (k === 1 ? 's' : '');
+    const all = (k, whole, some) => { const c = count(k); return c === 0 ? '' : c === n ? whole : some(c); };
+    const parts = [
+        all('wakes', n === 1 ? 'It wakes again afterwards, in its own conversation' : `All ${n} wake again afterwards, each in its own conversation`, c => `${c} wake${s(c)} again afterwards, in ${c === 1 ? 'its' : 'their'} own conversation`),
+        all('new_conversation', n === 1 ? 'It starts a new conversation' : `All ${n} start a new conversation`, c => `${c} start${s(c)} a new conversation`),
+        all('new_terminal', n === 1 ? 'It starts again as a new terminal' : `All ${n} start again as new terminals`, c => `${c} start${s(c)} again as ${c === 1 ? 'a new terminal' : 'new terminals'}`),
+    ].filter(Boolean);
+    // the crash-loop guard (several restarts within the hour) can't be known now: the summary doesn't promise past it
+    const woken = parts.length ? ` ${parts.join('; ')}, unless Coral has restarted several times in the last hour.` : '';
+    const them = n === 1 ? 'it' : 'them';
+    const asks = count('asks') ? ` Coral asks you before waking ${them}: ${overCap(cap)}.` : '';
+    const asleep = count('stays_asleep') ? ` ${n === 1 ? 'It stays' : 'They stay'} asleep until you wake ${them}: ${settingOff}.` : '';
+    return woken + asks + asleep;
 }
 let dialog = null;
 let current = null; // the status the dialog shows
@@ -63,14 +86,11 @@ function draw(note) {
         const warn = mk('div', 'update-warn');
         const icon = mk('span', 'material-icons', 'warning'); icon.setAttribute('aria-hidden', 'true');
         const inner = mk('div', 'update-warn-body');
-        const back = r.restarts.filter(a => a.resumes === true).length, fresh = r.restarts.filter(a => a.resumes === false).length;
-        const lead = mk('p'); lead.append(mk('b', null, `${win ? 'Installing' : 'Relaunching'} restarts ${plural(n, 'agent')}`), document.createTextNode(` that Coral runs. Their work in progress stops.${comeBack(back, fresh, n)}`));
+        const lead = mk('p'); lead.append(mk('b', null, `${win ? 'Installing' : 'Relaunching'} restarts ${plural(n, 'agent')}`), document.createTextNode(` that Coral runs. Their work in progress stops.${comeBack(r.restarts, r.wakeCap)}`));
         const list = mk('ul', 'update-agents'); list.tabIndex = 0; list.setAttribute('aria-label', 'Agents that restart');
         for (const a of r.restarts) {
             const li = mk('li'); li.append(mk('span', 'update-agent-name', a.name || a.sessionId), ' ', mk('span', 'update-agent-state', STATE_WORDS[a.state] || a.state)); // spaces between the parts: the row's text reads as words wherever it is read from (#6315)
-            if (a.resumes === true) li.append(' ', mk('span', 'update-agent-note', 'starts again afterwards'));
-            else if (a.resumes === false) li.append(' ', mk('span', 'update-agent-note', 'starts a new conversation'));
-            else li.append(' ', mk('span', 'update-agent-note', 'not known whether it starts again')); // never an agent left unexplained (#7360)
+            li.append(' ', mk('span', 'update-agent-note', afterNote(a.after, r.wakeCap)));
             list.append(li);
         }
         inner.append(lead, list, mk('p', 'update-keep', r.tmuxRestart ? 'Agents in tmux restart too: the bundled tmux changed.' : 'Agents in tmux keep running and reattach.'));

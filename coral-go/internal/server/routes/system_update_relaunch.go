@@ -170,6 +170,8 @@ type UpdaterRecord struct {
 // RestartAgent is one pty agent a relaunch would restart.
 type RestartAgent struct {
 	SessionID, Name, State string
+	// AgentType is the agent's CLI (claude, codex, ...); After is what happens to it after the restart (afterRestart).
+	AgentType, After string
 }
 
 // RelaunchAudit is one attempt, allowed or refused: no email or name, the hub user's pseudonym, ids and a count.
@@ -459,6 +461,7 @@ type relaunchView struct {
 	code    string // the refusal code of the POST for the same reason
 	rec     UpdaterRecord
 	agents  []RestartAgent
+	wakeCap int // auto_wake_cap: the dialog names it for agents that "asks"
 	digest  string
 	version string // the staged version when it has the pattern
 	// hubAllowed is whether the Hub's owner may relaunch this Coral by the settings alone (the cap, the Operator opt-out, the switch): the same whoever asks, so the person here sees it too.
@@ -479,6 +482,12 @@ func (h *UpdateRelaunchHandler) view(ctx context.Context, id callerIdentity) (re
 		if v.agents, err = h.Agents(ctx); err != nil {
 			return v, err
 		}
+		var settings map[string]string
+		if h.Settings != nil {
+			settings, _ = h.Settings(ctx) // unreadable settings: their defaults, as auto_wake reads them
+		}
+		afterRestart(v.agents, len(v.agents), settings)
+		v.wakeCap = autoWakeCap(settings)
 		if len(v.agents) > maxRestartRows {
 			v.agents = v.agents[:maxRestartRows]
 		}
@@ -512,11 +521,25 @@ func (h *UpdateRelaunchHandler) view(ctx context.Context, id callerIdentity) (re
 func (h *UpdateRelaunchHandler) relaunchJSON(key []byte, id callerIdentity, v relaunchView) (map[string]any, error) {
 	restarts := make([]map[string]any, 0, len(v.agents))
 	for _, a := range v.agents {
-		restarts = append(restarts, map[string]any{"session_id": printable(a.SessionID, 64), "name": cleanName(a.Name), "state": cleanState(a.State)})
+		row := map[string]any{"session_id": printable(a.SessionID, 64), "name": cleanName(a.Name), "state": cleanState(a.State)}
+		if a.After != "" {
+			row["after"] = a.After
+		}
+		// resumes is the older dashboard's field: true reads "starts again afterwards", false "starts a new conversation", so it is sent only when one of those is so
+		switch a.After {
+		case afterWakes:
+			row["resumes"] = true
+		case afterNewConv, afterNewTerminal:
+			row["resumes"] = false
+		}
+		restarts = append(restarts, row)
 	}
 	out := map[string]any{
 		"available": v.reason == "", "reason": v.reason, "hub_allowed": v.hubAllowed,
 		"restarts": restarts, "tmux_agents_restart": v.rec.TmuxAgentsRestart,
+	}
+	if v.wakeCap > 0 {
+		out["wake_cap"] = v.wakeCap
 	}
 	if v.reason == "" {
 		tok, err := h.issue(key, id, v.digest)

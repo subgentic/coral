@@ -4,7 +4,7 @@
  * The status, as the server sends it:
  *   { enabled, installed, state: none|staged|applying|failed,
  *     staged: { version, staged_at, days_ready, verified },
- *     relaunch: { available, reason, hub_allowed, restarts: [{ session_id, name, state, resumes? }], tmux_agents_restart, ack },
+ *     relaunch: { available, reason, hub_allowed, restarts: [{ session_id, name, state, after?, resumes? }], wake_cap?, tmux_agents_restart, ack },
  *     last_result: { at, from, to, result: relaunched|refused|failed_rolled_back, by },
  *     checked_at?, install_kind? (homebrew|unsupported), upgrade_command?, auto? }
  * The fields marked ? are not in the design yet; the UI treats each as absent when it is not sent. */
@@ -85,11 +85,17 @@ export function normalizeStatus(raw) {
     };
 }
 
+// What happens to an agent after the restart (the server's `after`, from auto_wake's own rule): one of these, or '' when the server does not say. An older server's `resumes` stands in for it.
+const AFTER = new Set(['wakes', 'asks', 'stays_asleep', 'new_conversation', 'new_terminal']);
+const afterOf = (a) => AFTER.has(str(a && a.after)) ? a.after : a && a.resumes === true ? 'wakes' : a && a.resumes === false ? 'new_conversation' : '';
+
 function normalizeRelaunch(r) {
+    const cap = Number(r.wake_cap);
     return {
         available: r.available === true,
         reason: str(r.reason),
-        restarts: (Array.isArray(r.restarts) ? r.restarts : []).map((a) => ({ sessionId: str(a && a.session_id), name: str(a && a.name), state: str(a && a.state), resumes: a && typeof a.resumes === 'boolean' ? a.resumes : null })),
+        restarts: (Array.isArray(r.restarts) ? r.restarts : []).map((a) => ({ sessionId: str(a && a.session_id), name: str(a && a.name), state: str(a && a.state), after: afterOf(a) })),
+        wakeCap: Number.isInteger(cap) && cap >= 1 && cap <= 50 ? cap : 0, // auto_wake_cap's own range; 0 when not sent
         tmuxRestart: r.tmux_agents_restart === true,
         ack: str(r.ack),
     };

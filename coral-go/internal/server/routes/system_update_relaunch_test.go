@@ -212,7 +212,8 @@ func TestRelaunchHappyPathAndStatusShape(t *testing.T) {
 	assert.Equal(t, "", rl["reason"])
 	assert.EqualValues(t, 60, rl["ack_expires_in"])
 	assert.Equal(t, false, rl["tmux_agents_restart"])
-	assert.Equal(t, []any{map[string]any{"session_id": "claude-1", "name": "Dev", "state": "idle"}}, rl["restarts"])
+	assert.Equal(t, []any{map[string]any{"session_id": "claude-1", "name": "Dev", "state": "idle", "after": "wakes", "resumes": true}}, rl["restarts"])
+	assert.EqualValues(t, 8, rl["wake_cap"])
 
 	code, out := e.post(ack(rl["ack"].(string)), hubHdr(ownerA))
 	require.Equal(t, 202, code, "%v", out)
