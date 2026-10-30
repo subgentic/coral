@@ -76,3 +76,27 @@ func TestAClaudeAgentsPatternKillIsRefusedAtTheHookPost(t *testing.T) {
 	_ = json.NewDecoder(resp.Body).Decode(&out2)
 	assert.Nil(t, out2["refuse"])
 }
+
+// Security's #11157 MUST: the command is not read at all for an agent that is not Claude, a tool that is not Bash or the check turned off, and a hostile one costs the server little.
+func TestAHostileCommandCostsTheServerLittleAndIsNotReadWhenNothingCouldRefuseIt(t *testing.T) {
+	server, h, _, ss := setupSessionsTestServer(t)
+	ctx := context.Background()
+	sid := "eeeeeeee-1157-1b00-0000-000000000003"
+	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: sid, AgentType: "claude", AgentName: "echo3", WorkingDir: "/w"}))
+	tok := agentToken(t, h, sid, "claude-"+sid)
+	post := func(command string) time.Duration {
+		body, _ := json.Marshal(map[string]any{"session_id": sid, "tool_use_id": "t", "tool_name": "Bash", "tool_input": map[string]any{"command": command}})
+		req, _ := http.NewRequest("POST", server.URL+"/api/sessions/live/echo3/pending-tool", strings.NewReader(string(body)))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set(store.SessionTokenHeader, tok)
+		start := time.Now()
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		resp.Body.Close()
+		return time.Since(start)
+	}
+	assert.Less(t, post(strings.Repeat("$(", 30)), 2*time.Second, "nested substitutions: bounded")
+	assert.Less(t, post(strings.Repeat("$(", 16)+"pkill -f x"+strings.Repeat(")", 16)), 2*time.Second)
+	require.NoError(t, ss.SetSetting(ctx, settings.RefusePatternKill, "false"))
+	assert.Less(t, post(strings.Repeat("$(", 30)), 2*time.Second)
+}

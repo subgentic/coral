@@ -1,7 +1,9 @@
 package shellkill
 
 import (
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -77,4 +79,60 @@ func TestTheRefusalSaysWhatToDoInstead(t *testing.T) {
 	assert.Contains(t, m, "pid=$!")
 	assert.Contains(t, m, "kill %1")
 	assert.Contains(t, m, "refuse_pattern_kill")
+}
+
+// Security's #11157 MUST: reading the command is bounded. It ran on every PreToolUse post of every agent, before anything was checked, and it was exponential in how deep substitutions nested: 18
+// nested "$(" cost 34 s of CPU and 20 never returned. Past a bound the command is let run.
+func TestReadingTheCommandIsBounded(t *testing.T) {
+	inputs := map[string]string{
+		"18 open substitutions":      strings.Repeat("$(", 18),
+		"40 open substitutions":      strings.Repeat("$(", 40),
+		"well-formed depth 16":       strings.Repeat("$(", 16) + "pkill -f x" + strings.Repeat(")", 16),
+		"well-formed depth 30":       strings.Repeat("echo $(", 30) + "date" + strings.Repeat(")", 30),
+		"backquotes":                 strings.Repeat("`", 5000),
+		"nested double quotes":       strings.Repeat(`"$(`, 20) + "x" + strings.Repeat(`)"`, 20),
+		"bash -c inside bash -c":     strings.Repeat(`bash -c "`, 12) + "pkill -f x" + strings.Repeat(`"`, 12),
+		"a long run of words":        strings.Repeat("word ", 20000),
+		"3000 commands":              strings.Repeat("echo a; ", 3000),
+		"a megabyte of substitution": "echo " + strings.Repeat("$(echo $(echo a))", 60000),
+	}
+	for name, in := range inputs {
+		start := time.Now()
+		got := PatternKill(in)
+		took := time.Since(start)
+		assert.Less(t, took, 250*time.Millisecond, name)
+		assert.Empty(t, got, name+": past a bound it runs")
+	}
+	// Inside the bounds the same shapes are read: depth 8 is, depth 9 is not.
+	assert.NotEmpty(t, PatternKill(strings.Repeat("$(", 7)+"pkill -f x"+strings.Repeat(")", 7)))
+	assert.Empty(t, PatternKill(strings.Repeat("$(", 9)+"pkill -f x"+strings.Repeat(")", 9)), "deeper than the bound: let run")
+}
+
+// Security's SHOULDs on #11157: a keyword starts a command, and one level of bash -c and eval is read.
+func TestKeywordsAndShellScriptsAreCommandPosition(t *testing.T) {
+	for _, c := range []string{
+		"if true; then pkill -f x; fi",
+		"for p in a b; do killall node; done",
+		"while true; do pkill x; done",
+		"if false; then echo; else pkill -f y; fi",
+		`bash -c "pkill -f x"`,
+		`sh -c 'killall node'`,
+		`zsh -lc "pkill claude"`,
+		`eval "pkill -f x"`,
+		`eval pkill -f x`,
+		`sudo bash -c "pkill -f x"`,
+		`bash -c "echo hi; pkill -f x"`,
+	} {
+		assert.NotEmpty(t, PatternKill(c), c)
+	}
+	for _, c := range []string{
+		`bash -c "echo pkill"`,
+		`bash script.sh`,
+		`sh -c 'kill 123'`,
+		`eval "echo hi"`,
+		`if true; then echo pkill; fi`,
+		`bash -c 'git commit -m "no pkill -f"'`,
+	} {
+		assert.Empty(t, PatternKill(c), c)
+	}
 }

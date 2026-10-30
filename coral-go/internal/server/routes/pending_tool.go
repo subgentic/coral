@@ -329,6 +329,8 @@ func (h *SessionsHandler) tieRequestToItsCall(sessionID, tool string, detail any
 // patternKillRefusal is why a Claude agent's Bash command is refused: it stops processes by a name or a pattern (pkill, killall, a kill fed by pgrep), which also ends other agents whose launch
 // prompt, held in their command line, matches (#11157). "" lets it run: another tool or agent, the check turned off (refuse_pattern_kill), or a command that stops nothing by a pattern.
 func (h *SessionsHandler) patternKillRefusal(ctx context.Context, owner *store.SessionTokenOwner, tool string, input map[string]any) string {
+	// Everything that is cheap and decides whether to read the command at all comes first (Security's #11157 MUST): an agent that is not Claude, a tool that is not Bash and the check being off never
+	// make the server parse a command an agent wrote.
 	if tool != "Bash" || input == nil {
 		return ""
 	}
@@ -336,15 +338,11 @@ func (h *SessionsHandler) patternKillRefusal(ctx context.Context, owner *store.S
 	if command == "" {
 		return ""
 	}
-	why := shellkill.PatternKill(command)
-	if why == "" {
+	if s, err := h.ss.GetSettings(ctx); err == nil && !setreg.Bool(s, setreg.RefusePatternKill) {
 		return ""
 	}
 	if ls, err := h.ss.GetLiveSession(ctx, owner.SessionID); err != nil || ls == nil || ls.AgentType != at.Claude {
 		return "" // the refusal is the Claude CLI's hook answer
 	}
-	if s, err := h.ss.GetSettings(ctx); err == nil && !setreg.Bool(s, setreg.RefusePatternKill) {
-		return ""
-	}
-	return why
+	return shellkill.PatternKill(command) // bounded: a command past a bound runs
 }

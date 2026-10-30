@@ -8,11 +8,27 @@
 // a prefix such as sudo, env, nohup, time, timeout, nice or command), so the word pkill in a commit message, a heredoc, a quoted argument, grep or echo is not a command.
 package shellkill
 
-import "strings"
+import (
+	"strings"
+	"time"
+)
+
+// Bounds (Security's #11157 MUST): the command comes from an agent, and a prompt-injected one must not make the server work for it. Past any of them the command is LET RUN (""): this is a guard against
+// an accident, not a sandbox.
+const (
+	maxBytes    = 64 << 10              // a longer command is not read
+	maxDepth    = 8                     // substitutions and bash -c / eval inside each other
+	maxCommands = 2000                  // simple commands read
+	maxWork     = 20 * time.Millisecond // the time the reading may take
+)
 
 // Reason is why the command is refused, or "" when it stops nothing by a pattern. It never refuses `kill <pid>`, `kill %1`, `kill -9 "$pid"`, `pkill` written inside a quote or a here-document.
 func PatternKill(command string) string {
-	for _, c := range commands(command) {
+	cmds, ok := commands(command)
+	if !ok {
+		return "" // past a bound: it runs
+	}
+	for _, c := range cmds {
 		if why := judge(c); why != "" {
 			return why
 		}
@@ -32,11 +48,11 @@ type cmd struct {
 	subst []string // the text of every $( ) and `` ` `` inside its words, which a shell runs as commands
 }
 
-// commands splits the text into simple commands (and the commands inside $( ) and backquotes).
-func commands(src string) []cmd {
+// parseOne splits one text into its simple commands, once: what is inside $( ) and backquotes is kept as text on the command (cmd.subst) for the caller to read in its turn, so every text is read
+// once and the work is linear in the depth (it was exponential before: each level was read twice). It reports false when the time is up.
+func parseOne(s string, p *reader) ([]cmd, bool) {
 	var out []cmd
-	var walk func(s string)
-	walk = func(s string) {
+	{
 		var cur cmd
 		var word strings.Builder
 		inWord := false
@@ -57,6 +73,9 @@ func commands(src string) []cmd {
 		var heredocs []string // delimiters waiting for the end of this line
 		i := 0
 		for i < len(s) {
+			if p.tick() {
+				return nil, false
+			}
 			ch := s[i]
 			switch {
 			case ch == '\n':
@@ -170,17 +189,87 @@ func commands(src string) []cmd {
 		}
 		endCmd()
 	}
-	walk(src)
-	// The commands inside substitutions are commands too.
-	for i := 0; i < len(out); i++ {
-		for _, sub := range out[i].subst {
-			var inner []cmd
-			inner = append(inner, commands(sub)...)
-			out = append(out, inner...)
-		}
-		out[i].subst = out[i].subst[:len(out[i].subst):len(out[i].subst)]
+	return out, !p.over
+}
+
+// reader holds what one reading may spend: its start, the commands read so far and whether a bound was passed.
+type reader struct {
+	start time.Time
+	steps int
+	cmds  int
+	over  bool
+}
+
+// tick is called once per character: the clock is looked at every 512, and true means a bound was passed.
+func (p *reader) tick() bool {
+	p.steps++
+	if p.steps&511 == 0 && time.Since(p.start) > maxWork {
+		p.over = true
 	}
-	return out
+	return p.over
+}
+
+// commands reads src and everything inside it that a shell runs as a command: substitutions, and the script of a bash -c or eval, each once, to a depth of maxDepth. ok is false when a bound was
+// passed (the size, the depth, the number of commands, the time): the caller lets the command run.
+func commands(src string) (all []cmd, ok bool) {
+	if len(src) > maxBytes {
+		return nil, false
+	}
+	p := &reader{start: time.Now()}
+	type item struct {
+		text  string
+		depth int
+	}
+	queue := []item{{src, 0}}
+	for len(queue) > 0 {
+		it := queue[0]
+		queue = queue[1:]
+		cs, ok := parseOne(it.text, p)
+		if !ok {
+			return nil, false
+		}
+		for _, c := range cs {
+			p.cmds++
+			if p.cmds > maxCommands {
+				return nil, false
+			}
+			all = append(all, c)
+			subs := append([]string(nil), c.subst...)
+			subs = append(subs, scriptsOf(c)...)
+			if len(subs) > 0 && it.depth+1 > maxDepth {
+				return nil, false
+			}
+			for _, sub := range subs {
+				queue = append(queue, item{sub, it.depth + 1})
+			}
+		}
+	}
+	return all, true
+}
+
+// shells are the programs whose -c argument is a script, read one level in its turn.
+var shells = map[string]bool{"bash": true, "sh": true, "zsh": true, "dash": true, "ksh": true}
+
+// scriptsOf is the text a command hands to a shell to run: the argument after -c (or a flag cluster ending in c, -lc) of bash, sh, zsh, dash and ksh, and what eval is given.
+func scriptsOf(c cmd) []string {
+	i := programIndex(c)
+	if i < 0 {
+		return nil
+	}
+	prog, args := base(c.words[i]), c.words[i+1:]
+	switch {
+	case prog == "eval":
+		if len(args) > 0 {
+			return []string{strings.Join(args, " ")}
+		}
+	case shells[prog]:
+		for j, a := range args {
+			if strings.HasPrefix(a, "-") && !strings.HasPrefix(a, "--") && strings.HasSuffix(a, "c") && j+1 < len(args) {
+				return []string{args[j+1]}
+			}
+		}
+	}
+	return nil
 }
 
 // balanced returns the text up to the ) that closes a $( and how many bytes it took with that ).
@@ -203,12 +292,20 @@ func balanced(s string) (string, int) {
 // prefixes are words that run the next word as a program: the program after them is the command.
 var prefixes = map[string]bool{"sudo": true, "command": true, "exec": true, "nohup": true, "env": true, "time": true, "nice": true, "timeout": true, "builtin": true, "stdbuf": true, "setsid": true, "doas": true}
 
-func judge(c cmd) string {
+// keywords start a command the way ; does: what follows then, do, else, if, elif, while, until and ! is in command position ("if true; then pkill x; fi").
+var keywords = map[string]bool{"if": true, "then": true, "else": true, "elif": true, "do": true, "while": true, "until": true, "!": true, "{": true}
+
+// programIndex is where the program is among a command's words: after VAR=value assignments, keywords and prefix words (sudo, env, timeout 5, ...) with their own options and numbers; -1 when
+// there is none.
+func programIndex(c cmd) int {
 	i := 0
-	// leading VAR=value assignments and prefix words (with their own options and numbers)
 	for i < len(c.words) {
 		w := c.words[i]
 		if strings.Contains(w, "=") && !strings.HasPrefix(w, "=") && !strings.ContainsAny(strings.SplitN(w, "=", 2)[0], "/ ") {
+			i++
+			continue
+		}
+		if keywords[w] {
 			i++
 			continue
 		}
@@ -222,6 +319,14 @@ func judge(c cmd) string {
 		break
 	}
 	if i >= len(c.words) {
+		return -1
+	}
+	return i
+}
+
+func judge(c cmd) string {
+	i := programIndex(c)
+	if i < 0 {
 		return ""
 	}
 	prog := base(c.words[i])
@@ -254,7 +359,11 @@ func judge(c cmd) string {
 
 // searches is whether a command text looks processes up by name (what a kill must not be fed).
 func searches(sub string) bool {
-	for _, c := range commands(sub) {
+	cs, ok := parseOne(sub, &reader{start: time.Now()})
+	if !ok {
+		return false
+	}
+	for _, c := range cs {
 		for i, w := range c.words {
 			switch base(w) {
 			case "pgrep", "pidof":
