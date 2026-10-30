@@ -107,7 +107,7 @@ const S = `(window.__coralStatic || '/static/')`;
             // #9293: an enabled job's primary is Run now and Turn off is beside it in the main row (#10475); More holds Delete
             assert.equal(await ev(`document.querySelector('#scheduler-detail .sched-actions > .btn-primary')?.textContent.trim()`), 'Run now', `${at}: Run now is the primary`);
             assert.deepEqual(await ev(`[...document.querySelectorAll('#scheduler-detail .sched-actions > [data-on-click="job-toggle"]')].map(b => b.textContent.trim())`), ['Turn off'], `${at}: Turn off stays in the main row while the job is on (#10475)`);
-            assert.deepEqual(await ev(`[...document.querySelectorAll('#scheduler-detail .sched-more-menu .menu-item')].map(b => b.textContent.trim())`), ['Delete'], `${at}: More holds only Delete`);
+            assert.deepEqual(await ev(`[...document.querySelectorAll('#scheduler-detail .sched-more-menu .menu-item:not(.sched-menu-phone)')].map(b => b.textContent.trim())`), ['Delete'], `${at}: More holds only Delete (Edit and Turn off are in it too, on a phone only: .sched-menu-phone, phone_model_d)`);
             assert.equal(await ev(`[...document.querySelectorAll('#scheduler-detail .sched-more-menu .menu-item')].every(b => { const r = b.getBoundingClientRect(); return r.top >= 0 && r.bottom <= window.innerHeight; })`), true, `${at}: every item of More is on the screen (the menu opens above the pinned bar)`);
             await shot(`jobs-page-more-${w}`);
             await ev(`document.querySelector('#scheduler-detail .sched-more-btn').click(); true`);
@@ -141,7 +141,7 @@ const S = `(window.__coralStatic || '/static/')`;
             await ev(`import(${S} + 'scheduler.js').then(m => m.selectScheduledJob(3)).then(() => true)`);
             await waitFor(`!!document.querySelector('#scheduler-detail .sched-actions')`, `${at}: the paused job's page`, 4000);
             assert.deepEqual(await ev(`[...document.querySelectorAll('#scheduler-detail .sched-actions > .btn')].map(b => b.textContent.trim() + (b.classList.contains('btn-primary') ? '*' : ''))`), ['Turn on*', 'Edit', 'Run now'], `${at}: paused: Turn on is the primary and Run now is last, where a workflow's Run is (#10476)`);
-            assert.deepEqual(await ev(`[...document.querySelectorAll('#scheduler-detail .sched-more-menu .menu-item')].map(b => b.textContent.trim())`), ['Delete'], `${at}: a paused job's More holds only Delete`);
+            assert.deepEqual(await ev(`[...document.querySelectorAll('#scheduler-detail .sched-more-menu .menu-item:not(.sched-menu-phone)')].map(b => b.textContent.trim())`), ['Delete'], `${at}: a paused job's More holds only Delete`);
             await shot(`jobs-page-paused-${w}`);
         }
         console.log('jobs_screen: ok');

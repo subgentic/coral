@@ -2,6 +2,7 @@
 // last row for it. At 390 and 320 px, 100% and 200% text, light and dark. Drives Chrome over CDP through agent_view_harness.js against an isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { DATA_WORLD } = require('./helpers/census_world');
 const BASE = require('./test_base').BASE;
 
 (async () => {
@@ -21,6 +22,27 @@ const BASE = require('./test_base').BASE;
             assert.ok(d.type === 'top-level' && d.nav === 'flex' && d.lit === 'nav-more' && d.pad >= 100 && d.bar && d.title === 'Computers' && d.page, `${tag}: Computers is a top-level screen (shared bar, nav with More lit, room under the content, no sideways scroll): ` + JSON.stringify(d));
             await shot(`model-d-computers-${w}-${fs}-${theme}`);
         }
+        // a job's page: ONE primary action in the pinned footer: More and Run now; Edit and Turn off are in the More menu (Delete as before)
+        await Page.addScriptToEvaluateOnNewDocument({ source: DATA_WORLD });
+        await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
+        await ev(`window.switchNavTab('automations'); true`); await waitFor(`!!document.querySelector('#group-table-view button.dt-primary')`, 'the jobs list', 10000);
+        await ev(`document.querySelector('#group-table-view button.dt-primary').click(); true`); await waitFor(`!!document.querySelector('#scheduler-detail .sched-actions')`, 'the job page', 10000); await settle(400);
+        const foot = await ev(`(() => { const vis = e => e.getClientRects().length > 0; const bs = [...document.querySelectorAll('#scheduler-detail .sched-actions > .btn, #scheduler-detail .sched-actions > .sched-more > .btn')].filter(vis); return { names: bs.map(b => b.textContent.trim()), small: bs.filter(b => b.getBoundingClientRect().height < 44).length, primary: bs.filter(b => b.classList.contains('btn-primary')).length }; })()`);
+        assert.deepEqual(foot.names, ['More', 'Run now'], 'the job footer holds More and the one primary action: ' + JSON.stringify(foot));
+        assert.ok(foot.primary === 1 && foot.small === 0, 'one primary, both 44 px: ' + JSON.stringify(foot));
+        await ev(`document.querySelector('#scheduler-detail .sched-more-btn').click(); true`); await settle(250);
+        const menu = await ev(`[...document.querySelectorAll('#scheduler-detail .sched-more-menu .menu-item')].filter(e => e.getClientRects().length).map(e => e.textContent.trim())`);
+        assert.deepEqual(menu, ['Edit', 'Turn off', 'Delete'], 'Edit and Turn off are in the More menu with Delete: ' + JSON.stringify(menu));
+        // a workflow's page: the same single primary footer: More and Run; Edit with Agent, Edit, Duplicate and Delete are in the More menu
+        await ev(`window.openAutomationsFolder('workflows'); true`); await waitFor(`!!document.querySelector('#group-table-view tbody tr[data-key] .dt-primary')`, 'the workflows list', 10000);
+        await ev(`document.querySelector('#group-table-view tbody tr[data-key] .dt-primary').click(); true`); await waitFor(`!!document.querySelector('#wf-detail-container .wf-detail-actions')`, 'the workflow page', 10000); await settle(400);
+        const wf = await ev(`(() => { const bs = [...document.querySelectorAll('#wf-detail-container .wf-detail-actions > .btn, #wf-detail-container .wf-detail-actions > .wf-more > .btn')].filter(b => b.getClientRects().length); return { names: bs.map(b => b.textContent.replace(/\\s+/g, ' ').trim().replace(/^(smart_toy|play_arrow)\\s*/, '')), small: bs.filter(b => b.getBoundingClientRect().height < 44).length }; })()`);
+        assert.deepEqual(wf.names, ['More', 'Run'], 'the workflow footer holds More and the one primary action: ' + JSON.stringify(wf));
+        assert.equal(wf.small, 0, 'both 44 px');
+        await ev(`document.querySelector('#wf-detail-container .wf-more-btn').click(); true`); await settle(250);
+        const wm = await ev(`[...document.querySelectorAll('#wf-detail-container .wf-more-menu .menu-item')].filter(e => e.getClientRects().length).map(e => e.textContent.trim())`);
+        assert.deepEqual(wm, ['Edit with Agent', 'Edit', 'Duplicate', 'Delete'], 'the More menu holds the rest: ' + JSON.stringify(wm));
         console.log('PASS the phone model, slice D: Computers');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
