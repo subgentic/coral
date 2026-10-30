@@ -520,6 +520,33 @@ type shellIdleReporter interface {
 	ShellIdle() (idle bool, shell string, err error)
 }
 
+// otherShellReporter is implemented by pseudo-terminals that can name a shell of unknown contents under their own (Windows,
+// pty_foreground_windows.go).
+type otherShellReporter interface {
+	OtherShell() (string, error)
+}
+
+// OtherShell names a shell other than a verified PowerShell or cmd running in the session's terminal with no program seen beside it,
+// whose contents can't be seen, so no launch line may be typed there (Security on #216). ok is false when the session is gone or the
+// platform cannot tell; "" with ok true is none.
+func (m *PTYBackend) OtherShell(name string) (shell string, ok bool) {
+	m.mu.RLock()
+	s, found := m.sessions[name]
+	m.mu.RUnlock()
+	if !found || !s.isRunning() {
+		return "", false
+	}
+	r, can := s.proc.(otherShellReporter)
+	if !can {
+		return "", false
+	}
+	sh, err := r.OtherShell()
+	if err != nil {
+		return "", false
+	}
+	return sh, true
+}
+
 // ShellIdle reports whether a session's own shell is idle, with nothing running
 // in it: the agent CLI has exited (#3219). ok is false when the session is gone
 // or the platform cannot tell.

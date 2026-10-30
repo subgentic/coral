@@ -203,7 +203,8 @@ func (r *SessionReconciler) killOrphans(ctx context.Context, agents []AgentInfo)
 // marked.
 func (r *SessionReconciler) checkExited(ctx context.Context, ls store.LiveSession) {
 	name := FormatSessionName(ls.AgentType, ls.SessionID)
-	exited, fg := ptymanager.AgentExited(ctx, r.runtime, name, ls.AgentType, ls.SessionID)
+	// A shell of unknown contents is not "exited" here: marking the agent ended would let Wake type its launch line into it (Security on #216).
+	exited, fg, _ := ptymanager.AgentExitedForLaunch(ctx, r.runtime, name, ls.AgentType, ls.SessionID)
 	if !exited {
 		delete(r.exited, ls.SessionID)
 		return

@@ -29,9 +29,34 @@ func (p *windowsPTY) ShellIdle() (idle bool, shell string, err error) {
 	if !isShellImage(image) {
 		return false, shell, nil
 	}
-	busy, err := runsNonShell(pid)
+	busy, other, err := shellTree(pid)
 	if err != nil {
 		return false, shell, err
 	}
+	if other != "" {
+		return true, other, nil // a shell of unknown contents: no notice is typed into it (Security on #216)
+	}
 	return !busy, shell, nil
+}
+
+// OtherShell names the shell other than a verified PowerShell or cmd that runs under the terminal's root shell with no program seen
+// beside it (shellTree): what runs inside it can't be seen from Windows, so Coral types no launch line into it either (Security on
+// #216). "" when there is none, or the root is not a shell.
+func (p *windowsPTY) OtherShell() (string, error) {
+	pid := p.cpty.Pid()
+	if pid <= 0 {
+		return "", fmt.Errorf("no shell pid")
+	}
+	image, ok := processImage(pid)
+	if !ok {
+		return "", fmt.Errorf("read process %d", pid)
+	}
+	if !isShellImage(image) {
+		return "", nil
+	}
+	busy, other, err := shellTree(pid)
+	if err != nil || busy {
+		return "", err
+	}
+	return other, nil
 }
