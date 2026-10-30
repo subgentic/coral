@@ -119,7 +119,7 @@ export function rankedBars(rows) {
 
 /** A line over days: points [{label, value}] where a null value leaves a gap in the line; the last point is marked and named. */
 export function lineChart(points, { fmt = String, phone = false } = {}) {
-    const W = phone ? 360 : 440, H = 176, pl = 40, pb = 30, pt = 12, iw = W - pl - 14, ih = H - pb - pt;
+    const W = 340, H = 176, pl = 40, pb = 30, pt = 12, iw = W - pl - 14, ih = H - pb - pt;
     const vals = points.map(p => p.value).filter(v => v != null), max = niceMax(Math.max(0, ...vals));
     const svg = sv('svg', { viewBox: `0 0 ${W} ${H}`, class: 'atab-svg', 'aria-hidden': 'true', focusable: 'false' });
     for (let g = 0; g <= 3; g++) { const y = pt + ih - ih * g / 3; svg.append(sv('line', { x1: pl, x2: W - 14, y1: y, y2: y, class: 'atab-grid' }), sv('text', { x: pl - 6, y: y + 4, 'text-anchor': 'end', class: 'atab-axis' }, fmt(max * g / 3))); }

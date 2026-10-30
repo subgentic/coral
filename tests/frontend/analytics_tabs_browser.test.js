@@ -81,6 +81,7 @@ const TURNS = [{ timestamp: day(7) + 'T14:12:00.000Z', model: 'claude-fable-5-1'
                 const bad = await ev(`(() => { const card = getComputedStyle(document.querySelector('#cost-usage .atab-card')).backgroundColor; const out = []; for (let i = 1; i <= 7; i++) { const probe = document.createElement('i'); probe.style.color = 'var(--viz-' + i + ')'; document.body.append(probe); const c = getComputedStyle(probe).color; probe.remove(); const r = window.__ratio(c, card); if (r < 3) out.push([i, r.toFixed(2)]); } return out; })()`);
                 assert.deepEqual(bad, [], 'series colours under 3:1: ' + JSON.stringify(bad));
             });
+            await run(`${at}: Usage chart text is at least 9 px as drawn`, async () => { const k = await ev(`(() => { const svg = document.querySelector('#cost-usage svg.atab-svg'); const r = svg.getBoundingClientRect().width / svg.viewBox.baseVal.width; return parseFloat(getComputedStyle(svg.querySelector('text')).fontSize) * r; })()`); assert.ok(k >= 9, 'axis text ' + k.toFixed(1) + ' px'); });
             await shot(`usage-${w}-${theme}`);
 
             await open('operator'); await waitFor(`document.querySelectorAll('#cost-operator .atab-kpi').length >= 6`, 'Operator drawn ' + at, 10000);
@@ -126,6 +127,10 @@ const TURNS = [{ timestamp: day(7) + 'T14:12:00.000Z', model: 'claude-fable-5-1'
                 assert.equal(r.hidden, !r.over, 'the hint is shown only when the table overflows: ' + JSON.stringify(r));
                 if (phone) assert.ok(r.rows.length && r.rows.every(h => h >= 44), JSON.stringify(r.rows));
                 assert.ok(r.rows.length >= 5, 'the agents are rows');
+            });
+            await run(`${at}: axis text on every chart is at least 9 px as drawn`, async () => {
+                const small = await ev(`(() => { const out = []; for (const host of ['cost-usage', 'cost-operator', 'cost-comm']) for (const svg of document.querySelectorAll('#' + host + ' svg.atab-svg')) { if (!svg.getClientRects().length) continue; const k = svg.getBoundingClientRect().width / svg.viewBox.baseVal.width; for (const t of svg.querySelectorAll('text')) { const px = parseFloat(getComputedStyle(t).fontSize) * k; if (px < 9) out.push([host, t.textContent, px.toFixed(1)]); } } return out; })()`);
+                assert.deepEqual(small, [], 'chart text under 9 px: ' + JSON.stringify(small.slice(0, 4)));
             });
             await shot(`communication-${w}-${theme}`);
         }

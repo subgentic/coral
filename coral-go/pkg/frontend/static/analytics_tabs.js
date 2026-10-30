@@ -205,8 +205,7 @@ function drawComm(m) {
     const kinds = [{ key: 'posts', name: 'Messages by agents' }, { key: 'cross', name: 'With other teams' }, { key: 'automated', name: 'Automated notices' }];
     const who = V.panel('Who talks to whom', 'an @mention is a message to that agent', c.names.length ? V.matrix(c.names, c.cells, { phone: phone() }) : say('No agent @mentioned another in this period.'));
     const over = V.panel('Messages over time', 'a day', V.stackedBars(c.days, kinds, { fmt: D.fmtCount, phone: phone(), label: 'Messages over time' }), V.legend(kinds));
-    const out = [kpis, phone() ? who : rowOf(who, over)];
-    if (phone()) out.push(over);
+    const out = [kpis, who, over]; // stacked at every width: beside the grid the chart was 320 px and its axis text 4.6 px
     out.push(V.panel('Sent and received by agent', 'received counts @mentions', V.plainTable(['Agent', 'Sent', 'Received'], c.agents.map(g => [g.name, String(g.sent), String(g.received)]), { right: [1, 2], label: 'Messages sent and received by agent' })));
     out.push(V.panel('Messages per agent and task', 'sent and received while on the task', c.tasks
         ? V.plainTable(['Task', 'Agent', 'Sent', 'Received', 'Within team', 'Across teams'], c.tasks.map(t => [`#${t.task_id}`, t.agent, String(t.sent), String(t.received), String(t.within), String(t.across)]), { right: [2, 3, 4, 5], label: 'Messages per agent and task' })
