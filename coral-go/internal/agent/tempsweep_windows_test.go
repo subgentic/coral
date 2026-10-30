@@ -5,7 +5,6 @@ package agent
 import (
 	"context"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"testing"
 	"time"
@@ -14,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/windows"
 
+	"github.com/subgentic/coral/internal/consoletest"
 	"github.com/subgentic/coral/internal/linktest"
 )
 
@@ -168,7 +168,7 @@ func TestWindowsSweepKeepsAJunctionWithACoralName(t *testing.T) {
 	precious := filepath.Join(target, "precious.txt")
 	require.NoError(t, os.WriteFile(precious, []byte("precious"), 0o600))
 	junction := filepath.Join(dir, "coral_prompt_"+winDeadSID+"_123.txt")
-	out, err := exec.Command("cmd", "/c", "mklink", "/J", junction, target).CombinedOutput()
+	out, err := consoletest.HiddenCommand("cmd", "/c", "mklink", "/J", junction, target).CombinedOutput()
 	require.NoError(t, err, "mklink /J: %s", out)
 	old := time.Now().Add(-winOldAge)
 	_ = os.Chtimes(junction, old, old) // best effort: a junction can't always be opened to set its time, so the guard is also asserted directly below
