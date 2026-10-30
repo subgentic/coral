@@ -10,11 +10,14 @@ import (
 	"path/filepath"
 	"runtime"
 	"strconv"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/subgentic/coral/internal/store"
+	"github.com/subgentic/coral/pkg/hubowner"
 	proxy "github.com/subgentic/coral/pkg/hubproxy"
 )
 
@@ -122,4 +125,39 @@ func TestDeletingAnSSHServerDropsItsStreamTarget(t *testing.T) {
 	_, err = r.Resolve(ctx, "build")
 	assert.Error(t, err)
 	_ = a
+}
+
+// #11378: the resolver gives each target the owner secret the hub holds for the server, and a rotated secret makes a new stream target.
+func TestResolverGivesTargetsTheOwnerSecretTheHubHolds(t *testing.T) {
+	e := newRSEnv(t)
+	ctx := context.Background()
+	secret := strings.Repeat("ab", 32)
+	_, err := e.h.store.AddSSH(ctx, "build", "Build box", "rich@box.example.com", 8420, "inst-1", routeSecret)
+	require.NoError(t, err)
+	_, err = e.h.store.Add(ctx, "web", "By URL", "http://10.0.0.5:8420", routeSecret, true)
+	require.NoError(t, err)
+	r := NewRemoteResolver(e.h.store)
+
+	// no secret yet: nothing is signed
+	a, err := r.Resolve(ctx, "build")
+	require.NoError(t, err)
+	_, ok := a.(proxy.OwnerStamper).OwnerStamp("POST", "/api/board/t/artifacts/x/review", []byte("{}"))
+	assert.False(t, ok)
+	w, _ := r.Resolve(ctx, "web")
+	assert.Empty(t, w.(proxy.HTTPTarget).OwnerSecret)
+
+	require.NoError(t, e.h.store.SetOwnerSecret(ctx, "build", secret))
+	require.NoError(t, e.h.store.SetOwnerSecret(ctx, "web", secret))
+	b, err := r.Resolve(ctx, "build")
+	require.NoError(t, err)
+	assert.NotSame(t, a, b, "a new secret must make a new stream target")
+	stamp, ok := b.(proxy.OwnerStamper).OwnerStamp("POST", "/api/board/t/artifacts/x/review", []byte("{}"))
+	require.True(t, ok)
+	v := hubowner.Verifier{Secret: secret, RemoteID: "build", Start: time.Now().Add(-time.Hour)}
+	assert.NoError(t, v.Verify(stamp, "POST", "/api/board/t/artifacts/x/review", "/api/board/t/artifacts/x/review", []byte("{}")), "signed for the id the server is registered under")
+	w, _ = r.Resolve(ctx, "web")
+	assert.Equal(t, secret, w.(proxy.HTTPTarget).OwnerSecret)
+	assert.Equal(t, "web", w.(proxy.HTTPTarget).RemoteID)
+	c, _ := r.Resolve(ctx, "build")
+	assert.Same(t, b, c, "the same secret keeps the same target")
 }
