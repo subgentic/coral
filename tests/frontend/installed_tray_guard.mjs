@@ -27,6 +27,18 @@ export function newInstalledTrays(before, after, dirs) {
   return installedTrays(after, dirs).filter(p => !seen.has(key(p)));
 }
 
+/** text with the profile folder written %USERPROFILE% (either separator, any case) and the user name anywhere else written %USERNAME%,
+ *  so the failure line can be pasted into a post without naming the person (#5237, Security on #235). */
+export function redactProfile(text, env = process.env) {
+  let s = String(text);
+  const esc = v => v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const profile = (env.USERPROFILE || '').replace(/[\\/]+$/, '');
+  if (profile) for (const form of new Set([profile, profile.replace(/\\/g, '/')])) s = s.replace(new RegExp(esc(form), 'gi'), '%USERPROFILE%');
+  const user = env.USERNAME || '';
+  if (user.length >= 2) s = s.replace(new RegExp(esc(user), 'gi'), '%USERNAME%');
+  return s;
+}
+
 /** The coral-tray.exe processes now: [] off Windows. Throws when Windows cannot list them, so the check fails closed. */
 export function listCoralTrays() {
   if (process.platform !== 'win32') return [];

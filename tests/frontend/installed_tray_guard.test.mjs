@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { programDirs, installedTrays, newInstalledTrays, listCoralTrays } from './installed_tray_guard.mjs';
+import { programDirs, installedTrays, newInstalledTrays, listCoralTrays, redactProfile } from './installed_tray_guard.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const env = { ProgramFiles: 'C:\\Program Files', ProgramW6432: 'C:\\Program Files\\', 'ProgramFiles(x86)': 'C:\\Program Files (x86)' };
@@ -29,6 +29,18 @@ assert.deepEqual(newInstalledTrays([live], [{ ...live, started: '2026-10-29T18:0
   'the same pid with another start time is a new process (a reused pid)');
 assert.deepEqual(newInstalledTrays([live, strayFromRun], [live], dirs), [], 'a tray that went away is not a new one');
 
+// The failure line names no person (Security on #235): the profile folder becomes %USERPROFILE% (either separator, any case), the user
+// name anywhere else %USERNAME%; the rest of the line is kept.
+const who = { USERPROFILE: 'C:\\Users\\jdoe', USERNAME: 'jdoe' };
+const line = '"C:\\Program Files\\Coral\\coral-tray.exe" --foreground --port 8450 --home C:\\users\\JDOE\\AppData\\Local\\Temp\\ct-1\\home --backend ""';
+assert.equal(redactProfile(line, who), '"C:\\Program Files\\Coral\\coral-tray.exe" --foreground --port 8450 --home %USERPROFILE%\\AppData\\Local\\Temp\\ct-1\\home --backend ""',
+  'the profile folder in --home is written %USERPROFILE%');
+assert.equal(redactProfile('--home C:/Users/jdoe/x', who), '--home %USERPROFILE%/x', 'forward slashes too');
+assert.equal(redactProfile('D:\\cache\\jdoe-runs\\coral-tray.exe', who), 'D:\\cache\\%USERNAME%-runs\\coral-tray.exe', 'the user name outside the profile');
+assert.doesNotMatch(redactProfile(line + ' ' + line.toUpperCase(), who), /jdoe/i, 'the name appears nowhere, in any case');
+assert.equal(redactProfile('nothing personal', {}), 'nothing personal', 'no profile or user name known: the text is unchanged');
+assert.equal(redactProfile('C:\\Users\\a.b+c\\x', { USERPROFILE: 'C:\\Users\\a.b+c' }), '%USERPROFILE%\\x', 'regex characters in the path are taken literally');
+
 // The real listing: an array of { pid, path, started } on Windows (it throws when Windows cannot list, so the runner fails closed), [] elsewhere.
 const now = listCoralTrays();
 assert.ok(Array.isArray(now), 'listCoralTrays returns an array');
@@ -40,6 +52,8 @@ const runner = fs.readFileSync(path.join(here, 'run_cdp_suites.mjs'), 'utf8');
 assert.match(runner, /from '\.\/installed_tray_guard\.mjs'/, 'the runner imports the guard');
 assert.match(runner, /const trayBaseline = /, 'the runner lists the installed trays before the run');
 assert.match(runner, /newInstalledTrays\(trayBaseline, /, 'and compares after it');
+assert.match(runner, /redactProfile\(p\.command \|\| p\.path\)/, 'and prints a stray tray\'s command line without the user\'s name');
+assert.match(runner, /installed-tray check error: \$\{redactProfile\(e\.message\)\}/, 'and the check\'s own error the same way');
 assert.match(runner, /const NO_TMUX_HERE = process\.platform === 'win32'/, 'Windows has no tmux backend');
 assert.match(runner, /const tmuxShard = !NO_TMUX_HERE && /, 'so a full run adds no tmux phase there');
 assert.match(runner, /sequencesOnly && !NO_TMUX_HERE/, 'and --sequences does not start its shards with --backend tmux there');

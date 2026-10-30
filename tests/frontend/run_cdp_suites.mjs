@@ -80,7 +80,7 @@
 // command line still names that run's temp directory, so a reused pid is never hit.
 // Never run bare 'tmux' from an agent shell: $TMUX there points at production Coral's ~/.coral/tmux.sock.
 import { execFileSync, spawn, spawnSync } from './helpers/child_process.js';
-import { listCoralTrays, newInstalledTrays, programDirs } from './installed_tray_guard.mjs';
+import { listCoralTrays, newInstalledTrays, programDirs, redactProfile } from './installed_tray_guard.mjs';
 // The browser password every test server starts with (a throwaway; never printed or logged).
 const TEST_PASSWORD = 'coral-cdp-suites-test-password';
 import { createRequire } from 'node:module';
@@ -1047,10 +1047,10 @@ try {
   const started = newInstalledTrays(trayBaseline, listCoralTrays(), programDirs());
   if (started.length) {
     console.error('FAIL (#5293): the run started the installed Coral; these are left running (stop them by PID once read):\n    ' +
-      started.map(p => `${p.pid} ${p.command || p.path}`).join('\n    '));
+      started.map(p => `${p.pid} ${redactProfile(p.command || p.path)}`).join('\n    '));
     sandboxOk = false;
   }
-} catch (e) { console.error(`#5293 installed-tray check error: ${e.message}`); sandboxOk = false; }
+} catch (e) { console.error(`#5293 installed-tray check error: ${redactProfile(e.message)}`); sandboxOk = false; }
 if (!sandboxOk && !exitCode) exitCode = 1;
 
 allPassed = results.every(r => r.status === 'pass') && !leaks.length && sandboxOk;
