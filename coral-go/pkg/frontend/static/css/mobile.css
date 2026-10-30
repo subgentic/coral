@@ -1400,7 +1400,7 @@
     #mobile-session-list .session-model { margin-left: 0; padding-left: 0; font-size: var(--fs-md); }
     #mobile-session-list .session-group-item.needs-attention .session-label { font-weight: var(--fw-strong); }
     #mobile-session-list .session-group-item.needs-attention .session-preview { color: var(--text-primary); }
-    #mobile-session-list .session-group-item.needs-attention .session-time { color: color-mix(in srgb, var(--accent) 78%, rgb(var(--black-rgb))); font-weight: var(--fw-medium); } /* 4.5:1 on the card (the plain accent was 4.44) */
+    #mobile-session-list .session-group-item.needs-attention .session-time { color: var(--link-text); font-weight: var(--fw-medium); } /* the text-safe accent: 4.5:1 or more on the card in both themes (the accent was 4.44 in light, and darkening it for light made dark 4.4: #4581c7 on #18181c) */
     #mobile-session-list .session-group-item .sidebar-kebab-wrapper { position: absolute; right: 20px; bottom: 15px; } /* the card is the containing block and the wrapper sits 9 px further out than `right` says: the 24 px button is 11 px from the card's right edge and 12 from its bottom, so its 44 px hit area ends at them, not past them */
 }
 
