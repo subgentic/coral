@@ -177,3 +177,15 @@ func TestStateOfNamesTheEventsThatMoveASession(t *testing.T) {
 		assert.False(t, ok, e.Type+" "+e.Status)
 	}
 }
+
+func TestAFrameOverTheLimitIsDroppedAndTheStreamGoesOn(t *testing.T) {
+	big := "event: message.part\ndata: {\"sessionID\":\"ses_big\",\"pad\":\"" + strings.Repeat("x", 2<<20) + "\"}\n\n"
+	many := "event: message.part\n" + strings.Repeat("data: "+strings.Repeat("y", 1000)+"\n", 2000) + "\n" // many small lines, over the limit together
+	good := func(id string) string {
+		return "event: session.execution.started\ndata: {\"sessionID\":\"" + id + "\"}\n\n"
+	}
+	var got []string
+	err := ParseStream(context.Background(), strings.NewReader(good("ses_one")+big+good("ses_two")+many+good("ses_three")), func(e Event) { got = append(got, e.SessionID) })
+	require.NoError(t, err)
+	assert.Equal(t, []string{"ses_one", "ses_two", "ses_three"}, got)
+}

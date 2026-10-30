@@ -80,38 +80,75 @@ func parseFrame(sseType, data string) (Event, bool) {
 // ParseStream reads a server-sent-events stream and calls fn for each event, until the stream ends or ctx is done. A frame that is not JSON or is too large is skipped; the stream is volatile by design, and
 // the caller reconciles from the session after a gap.
 func ParseStream(ctx context.Context, r io.Reader, fn func(Event)) error {
-	sc := bufio.NewScanner(r)
-	sc.Buffer(make([]byte, 0, 64<<10), maxFrame)
+	br := bufio.NewReaderSize(r, 64<<10)
 	var typ string
 	var data []string
+	size := 0
+	dropped := false // the frame in progress is over maxFrame: it is skipped to its blank line
 	flush := func() {
-		if len(data) > 0 {
+		if len(data) > 0 && !dropped {
 			if e, ok := parseFrame(typ, strings.Join(data, "\n")); ok {
 				fn(e)
 			}
 		}
-		typ, data = "", nil
+		typ, data, size, dropped = "", nil, 0, false
 	}
-	for sc.Scan() {
+	for {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
-		line := sc.Text()
+		line, tooLong, err := readLine(br, maxFrame)
+		if tooLong {
+			dropped, typ, data = true, "", nil
+		}
 		switch {
+		case tooLong:
 		case line == "":
-			flush()
+			if err == nil {
+				flush()
+			}
 		case strings.HasPrefix(line, ":"): // a comment: a keep-alive
 		case strings.HasPrefix(line, "event:"):
 			typ = strings.TrimSpace(strings.TrimPrefix(line, "event:"))
 		case strings.HasPrefix(line, "data:"):
-			data = append(data, strings.TrimPrefix(strings.TrimPrefix(line, "data:"), " "))
+			if size += len(line); size > maxFrame {
+				dropped, typ, data = true, "", nil
+			} else if !dropped {
+				data = append(data, strings.TrimPrefix(strings.TrimPrefix(line, "data:"), " "))
+			}
+		}
+		if err != nil {
+			flush()
+			if err == io.EOF {
+				return ctx.Err()
+			}
+			if ctx.Err() == nil {
+				return err
+			}
+			return ctx.Err()
 		}
 	}
-	flush()
-	if err := sc.Err(); err != nil && ctx.Err() == nil {
-		return err
+}
+
+// readLine reads one line without its newline. A line over limit is read to its end and discarded, tooLong says so: the stream goes on at the next line, and no more than limit bytes are ever held.
+func readLine(br *bufio.Reader, limit int) (line string, tooLong bool, err error) {
+	var buf []byte
+	for {
+		chunk, e := br.ReadSlice('\n')
+		if !tooLong {
+			if len(buf)+len(chunk) > limit+1 {
+				tooLong, buf = true, nil
+			} else {
+				buf = append(buf, chunk...)
+			}
+		}
+		if e == bufio.ErrBufferFull {
+			continue
+		}
+		err = e
+		break
 	}
-	return ctx.Err()
+	return strings.TrimRight(string(buf), "\r\n"), tooLong, err
 }
 
 // Events connects to the server's event stream (GET /api/event) and calls fn for each event until it ends.
