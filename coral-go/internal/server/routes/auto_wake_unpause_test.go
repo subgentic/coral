@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
@@ -273,4 +274,26 @@ func TestWakingOneAgentLiftsTheSleepPause(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, r.h.wakeExistingSession(ctx, ls))
 	assert.False(t, bh.IsPaused(team), "the wake resumed the board")
+}
+
+// QA's #11188: the notifier lifts a sleep pause because it saw an agent awake, but its sighting can be seconds old. A person's Sleep team in between is a newer decision, and the lift must not undo it.
+func TestALiftOnAnEarlierSightingDoesNotUndoALaterSleepPause(t *testing.T) {
+	r := newWakeRig(t)
+	bh := NewBoardHandler(r.h.bs)
+	t.Cleanup(bh.WaitBackground)
+
+	seen := time.Now()
+	time.Sleep(5 * time.Millisecond) // sleep-ok: the pause must be made after the sighting by a measurable moment
+	bh.PauseForSleep("team-11204")   // a person's Sleep team after the agent was seen awake
+	require.True(t, bh.IsPaused("team-11204"))
+	assert.False(t, bh.LiftSleepPauseSeenAwake("team-11204", seen), "the pause is newer than the sighting")
+	assert.True(t, bh.IsPaused("team-11204"), "it stays")
+
+	assert.True(t, bh.LiftSleepPauseSeenAwake("team-11204", time.Now()), "an agent seen awake after the pause lifts it")
+	assert.False(t, bh.IsPaused("team-11204"))
+
+	// A person's pause is never lifted, whatever was seen.
+	bh.SetPaused("team-11204b", true)
+	assert.False(t, bh.LiftSleepPauseSeenAwake("team-11204b", time.Now().Add(time.Hour)))
+	assert.True(t, bh.IsPaused("team-11204b"))
 }

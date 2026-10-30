@@ -185,7 +185,7 @@ func TestBoardNotifier_ASleepPausedBoardWithAnAwakeAgentIsResumedAndNudged(t *te
 	paused := map[string]bool{"team": true}
 	sleepOnly := true
 	n.SetIsPausedFn(func(p string) bool { return paused[p] })
-	n.SetLiftSleepPauseFn(func(p string) bool {
+	n.SetLiftSleepPauseFn(func(p string, _ time.Time) bool {
 		if paused[p] && sleepOnly {
 			delete(paused, p)
 			return true
@@ -219,4 +219,40 @@ func TestBoardNotifier_ASleepPausedBoardWithAnAwakeAgentIsResumedAndNudged(t *te
 	assert.Len(t, rt.sent, sent, "a person's pause is kept")
 	assert.Equal(t, 1, strings.Count(logs.String(), "level=INFO msg=\"board paused: no nudges go out until it is resumed\""), "once per board, at INFO")
 	assert.Contains(t, logs.String(), "project=team")
+}
+
+// #11204: the notifier passes when it saw its agents (the start of the discovery) to the lift, so a sleep pause made after that is not undone by a stale sighting.
+func TestBoardNotifier_TheLiftGetsTheTimeTheAgentsWereSeen(t *testing.T) {
+	ctx := context.Background()
+	bs := testBoardStore(t)
+	rt := &mockRuntime{}
+	n := NewBoardNotifier(bs, rt, 10*time.Second)
+	seenAt := time.Date(2026, 10, 30, 5, 0, 0, 0, time.UTC)
+	n.now = func() time.Time { return seenAt }
+	pausedAt := seenAt.Add(2 * time.Second) // a Sleep team after the sighting
+	paused := map[string]bool{"team": true}
+	n.SetIsPausedFn(func(p string) bool { return paused[p] })
+	var got time.Time
+	n.SetLiftSleepPauseFn(func(p string, seen time.Time) bool {
+		got = seen
+		if pausedAt.After(seen) {
+			return false // what the board handler does for a pause newer than the sighting
+		}
+		delete(paused, p)
+		return true
+	})
+	captureNotifierLogs(n)
+	sid := "11111111-2222-3333-4444-555555555555"
+	n.SetDiscoverFn(func(context.Context) ([]AgentInfo, error) {
+		return []AgentInfo{{AgentType: "claude", AgentName: "dev", SessionID: sid, DisplayName: "Dev"}}, nil
+	})
+	_, err := bs.Subscribe(ctx, "team", "Dev", "Developer", "claude-"+sid, nil, "mentions")
+	require.NoError(t, err)
+	_, err = bs.PostMessage(ctx, "team", "Lead", "@Dev please look", nil)
+	require.NoError(t, err)
+
+	require.NoError(t, n.RunOnce(ctx))
+	assert.Equal(t, seenAt, got, "the lift is told when the agents were seen")
+	assert.True(t, paused["team"], "a pause newer than the sighting stays")
+	assert.Empty(t, rt.sent, "and nothing is nudged into it")
 }

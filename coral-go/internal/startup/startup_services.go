@@ -259,7 +259,7 @@ func startBoardServices(ctx context.Context, cfg *config.Config, srv *server.Ser
 	boardNotifier.SetDiscoverFn(discoverFn)
 	if bh := srv.BoardHandler(); bh != nil {
 		boardNotifier.SetIsPausedFn(bh.IsPaused)
-		boardNotifier.SetLiftSleepPauseFn(bh.LiftSleepPause) // a board sleep paused, with an awake agent on it, is resumed by the notifier (#11182)
+		boardNotifier.SetLiftSleepPauseFn(bh.LiftSleepPauseSeenAwake) // a board sleep paused, with an awake agent on it, is resumed by the notifier (#11182)
 		bh.SetNotifyFn(boardNotifier.NotifyBoard)
 	}
 	// Seeded before its first pass, but not before the server serves: on a long board
