@@ -61,6 +61,7 @@ var agentCLIs = map[string]CLIInfo{
 	at.Antigravity: {Binary: "agy", InstallCommand: agyInstallCommand, InstallURL: agyInstallURL, InstallNote: agyInstallNote},
 	at.Gemini:      {Binary: "agy", InstallCommand: agyInstallCommand, InstallURL: agyInstallURL, InstallNote: agyInstallNote},
 	at.Codex:       {Binary: "codex", InstallCommand: "npm install -g @openai/codex", InstallURL: "https://github.com/openai/codex"},
+	at.Opencode:    {Binary: "opencode", InstallCommand: "npm install -g opencode-ai", InstallURL: "https://opencode.ai"},
 	at.Pi:          {Binary: "pi", InstallCommand: "npm install -g --ignore-scripts @earendil-works/pi-coding-agent", InstallURL: "https://pi.dev"},
 }
 

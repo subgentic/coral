@@ -17,10 +17,11 @@ import (
 // #4569: every CLI Coral can launch says how to install it and links the vendor's own page (https, never a guide).
 func TestEveryCLIHasAnInstallCommandAndOfficialPage(t *testing.T) {
 	official := map[string]string{
-		at.Claude: "https://code.claude.com/docs/en/overview",
-		at.Codex:  "https://github.com/openai/codex",
-		at.Pi:     "https://pi.dev",
-		at.Agy:    "https://antigravity.google", at.Antigravity: "https://antigravity.google", at.Gemini: "https://antigravity.google",
+		at.Claude:   "https://code.claude.com/docs/en/overview",
+		at.Codex:    "https://github.com/openai/codex",
+		at.Pi:       "https://pi.dev",
+		at.Opencode: "https://opencode.ai",
+		at.Agy:      "https://antigravity.google", at.Antigravity: "https://antigravity.google", at.Gemini: "https://antigravity.google",
 	}
 	for typ, info := range agentCLIs {
 		assert.NotEmpty(t, info.InstallCommand, typ)
