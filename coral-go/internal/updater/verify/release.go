@@ -246,7 +246,7 @@ func CheckManifest(m *Manifest, pins Pins, st State, installed string, now time.
 	if m.Prerelease {
 		return fail(StageManifestRules, "version %s is a prerelease", m.Version)
 	}
-	cmp, err := CompareVersions(m.Version, installed)
+	cmp, err := CompareToInstalled(m.Version, installed)
 	if err != nil {
 		return fail(StageManifestRules, "installed version: %v", err)
 	}

@@ -705,3 +705,31 @@ func TestDropStaleStageLeavesUnparsedVersionsAlone(t *testing.T) {
 	assert.Equal(t, "1.4.129", dropStaleStage(&st, "1.4.130-rc1"), "lower than a prerelease of a later core too")
 	assert.Nil(t, st.Stage)
 }
+
+// An installed -rc build checks for updates (the live bug: "failed / installed_version", so an rc user was never offered the release): the release of its own prerelease is staged, a
+// release below it is not, and a version that is no Coral version still fails at the installed_version stage.
+func TestAnInstalledPrereleaseIsOfferedItsRelease(t *testing.T) {
+	e := newEnv(t, "1.4.130-rc1")
+	res := e.check()
+	require.Equal(t, ResultStaged, res.Result, "%+v", res)
+	assert.Equal(t, "1.4.130", res.Version, "a release is above its own prerelease")
+	assert.Equal(t, []string{"1.4.130"}, e.stagedVersions())
+
+	s, err := LoadStaged(e.data)
+	require.NoError(t, err)
+	_, err = Reverify(e.signer, e.cfg.Pins, s, asset, verify.State{}, "1.4.130-rc1", e.now, DefaultMaxPackage)
+	assert.NoError(t, err, "the apply's own check agrees: strictly newer than the installed rc")
+	_, err = Reverify(e.signer, e.cfg.Pins, s, asset, verify.State{}, "1.4.131-rc1", e.now, DefaultMaxPackage)
+	assert.Error(t, err, "a release below the installed rc of a later one is never installed")
+
+	e = newEnv(t, "1.4.131-rc1")
+	assert.Equal(t, ResultUpToDate, e.check().Result, "the installed rc is of a later release")
+	assert.Empty(t, e.stagedVersions())
+
+	for _, bad := range []string{"dev", "", "v1.4.130", "1.4.130+x"} {
+		e = newEnv(t, bad)
+		res := e.check()
+		assert.Equal(t, ResultFailed, res.Result, bad)
+		assert.Equal(t, "installed_version", res.FailedStage, bad)
+	}
+}

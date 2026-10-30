@@ -232,9 +232,10 @@ func TestFeedTagsReadsOnlyTheReleaseTags(t *testing.T) {
 	assert.Len(t, tags, 30)
 }
 
-// An installed version that is not X.Y.Z (a dev build) is refused by the check before any request, so the feed is never asked and nothing is concluded from it.
+// An installed version that is no Coral version (a dev build) is refused by the check before any request, so the feed is never asked and nothing is concluded from it. (A
+// prerelease of a release, 1.4.130-rc1, is a Coral version: it is compared, and offered 1.4.131.)
 func TestANonSemverInstalledVersionNeverReachesTheFeed(t *testing.T) {
-	for _, v := range []string{"dev", "1.4.130-rc1", ""} {
+	for _, v := range []string{"dev", "v1.4.130", "1.4.130+x", ""} {
 		r := newRig(t)
 		r.publish(Spec{Version: "1.4.131", Sequence: 7})
 		r.cfg.Installed = v

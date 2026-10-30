@@ -116,7 +116,7 @@ func Check(ctx context.Context, cfg Config) Result {
 	cfg.defaults()
 	res := Result{Installed: cfg.Installed}
 	now := cfg.now()
-	if _, err := verify.ParseVersion(cfg.Installed); err != nil {
+	if !verify.ParseInstalled(cfg.Installed) { // a release, or a prerelease of one: an installed -rc build checks too
 		res.Result = ResultFailed
 		res.FailedStage = "installed_version"
 		return res
@@ -297,7 +297,7 @@ func (c *checker) run(ctx context.Context) Result {
 	}
 	manifest, m := p.manifest, p.m
 	c.res.Version = m.Version
-	if cmp, cerr := verify.CompareVersions(m.Version, cfg.Installed); cerr != nil || cmp <= 0 {
+	if cmp, cerr := verify.CompareToInstalled(m.Version, cfg.Installed); cerr != nil || cmp <= 0 {
 		c.save()
 		c.res.Result = ResultUpToDate
 		return c.res
