@@ -67,6 +67,12 @@ func main() {
 		launchAgents = true
 	}
 
+	// Before anything else, so nothing is left behind: no instance lock, data folder, CLI lookup or prompt file (#386).
+	if msg := agentsModeRefusal(runtime.GOOS, launchAgents); msg != "" {
+		fmt.Fprintf(os.Stderr, "launch-coral: %s\n", msg)
+		os.Exit(2)
+	}
+
 	// Resolve target directory to absolute path
 	absTarget, err := filepath.Abs(targetDir)
 	if err != nil {
@@ -428,4 +434,13 @@ func sameDir(a, b string) bool {
 		return p
 	}
 	return resolve(a) == resolve(b)
+}
+
+// agentsModeRefusal is why "launch-coral <path> <agent> agents" cannot run on goos, or "" when it can. It starts each agent in a tmux session and Windows has no tmux, so it would
+// start none at all, with or without the agent's CLI: say so up front and name what works (#386). The web-server-only mode is unchanged.
+func agentsModeRefusal(goos string, launchAgents bool) string {
+	if goos != "windows" || !launchAgents {
+		return ""
+	}
+	return "the agents mode starts agents in tmux sessions, and Windows has no tmux, so it can start none here. Start agents from the Coral dashboard instead (a single agent or a team); launch-coral without \"agents\" still starts the web server."
 }
