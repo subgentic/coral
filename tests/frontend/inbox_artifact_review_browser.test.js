@@ -42,6 +42,7 @@ const { coralReady } = require('./helpers/wait');
                             else{it.tags=[...new Set(it.tags.concat('for review','changes requested'))];}
                             return json({id,state:body.decision==='approve'?'approved':'changes requested',changed:true,tags:it.tags,review:it.review||null,delivered:body.decision==='approve',to:'Writer'});
                         }
+                        if(u.pathname.startsWith('/api/artifacts/')&&u.pathname.endsWith('/versions')&&window.__twoVersions){const d=u.pathname.split('/')[3],old=(99).toString(16).padStart(64,'0');return json([{digest:old,version:1,versions:2,is_latest:false,name:'Review file 01.txt',size:30,media_type:'text/plain',at:new Date(Date.now()-3600000).toISOString(),uploader:'Writer A',role:'Writer'},{digest:d,version:2,versions:2,is_latest:true,name:'Review file 01.txt',size:30,media_type:'text/plain',at:new Date().toISOString(),uploader:'Writer A',role:'Writer'}]);}
                         if(u.pathname.startsWith('/api/artifacts/')&&u.pathname.endsWith('/comments')&&opts.method==='POST'){const b=JSON.parse(opts.body);window.__comments.push(b);return json({id:7,body:b.body,anchor:b.anchor,author_kind:'owner',author_name:'You',state:'open',created_at:new Date().toISOString(),replies:[]},201);}
                         if(u.pathname.startsWith('/api/artifacts/')&&u.pathname.endsWith('/comments/7/send')){const b=JSON.parse(opts.body);window.__comments.push({sent:b.agents});return json({ok:true,results:[{agent:b.agents[0],state:'sent',ask_id:1}]});}
                         if(u.pathname.startsWith('/api/board/${team}/artifacts/')&&u.pathname.endsWith('/tags')){
@@ -160,6 +161,14 @@ const { coralReady } = require('./helpers/wait');
                     await waitFor(`/^Approved .+/.test(document.querySelector('.artifact-review-state')?.textContent||'')`,'the viewer of an approved artifact says Approved with its time',8000);
                     assert.equal(await ev(`document.querySelector('.artifact-review-approve').hidden&&document.querySelector('.artifact-review-changes').hidden`),true,'and offers no Approve');
                     await ev(`document.querySelector('.artifact-viewer-close').click();true`);
+                    // the same for the newest of two versions (Mobile Beta Tester, live: the head of a two-version artifact had the versions bar and no approval line)
+                    await ev(`window.__twoVersions=true;import((window.__coralStatic||'/static/')+'artifact_viewer.js').then(m=>m.openArtifactViewer('${(1).toString(16).padStart(64,'0')}',{filename:'Review file 01.txt',board:'${team}',server:undefined}));true`);
+                    await waitFor(`!!document.querySelector('.artifact-viewer .av-compare, .artifact-viewer .av-current')`,'the versions bar of a two-version artifact',8000);
+                    await new Promise(r=>setTimeout(r,800)); // sleep-ok: the version bar's own reload settles
+                    await waitFor(`/^Approved .+/.test(document.querySelector('.artifact-review-state')?.textContent||'')`,'the head of a two-version approved artifact says Approved with its time',8000);
+                    const vis = await ev(`(() => { const b = document.querySelector('.artifact-review'), r = b.getBoundingClientRect(), cs = getComputedStyle(b); return { h: Math.round(r.height), w: Math.round(r.width), display: cs.display, hidden: b.hidden, parent: b.parentElement.className, prev: b.previousElementSibling?.className, next: b.nextElementSibling?.className }; })()`);
+                    assert.ok(vis.h > 0 && vis.w > 0 && vis.display !== 'none', 'the review bar of a two-version artifact is on the screen: ' + JSON.stringify(vis));
+                    await ev(`document.querySelector('.artifact-viewer-close').click();window.__twoVersions=false;true`);
                 }
                 assert.deepEqual(await ev(`window.__decisions.filter(d=>d.decision==='approve').map(d=>d.id)`),[(1).toString(16).padStart(64,'0')],'one approve was sent: the failed press and the second one are not two');
                 assert.equal(await ev(`document.getElementById('nav-tab-hub-inbox-badge').textContent`),'9+');

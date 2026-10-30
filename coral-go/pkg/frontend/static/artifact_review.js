@@ -20,6 +20,7 @@ export async function reviewStateOf(team, hex) {
             const row = list.find(a => rowHex(a) === hex);
             if (row) {
                 const tags = row.tags || [];
+                if (!['approved', 'for review', 'reviewed'].some(t => tags.includes(t))) break; // the list is asked by tag, and a row without any of them is not a review (never "Reviewed" by default)
                 const state = tags.includes('approved') ? 'approved' : tags.includes('for review') ? (tags.includes('changes requested') ? 'changes' : 'pending') : 'reviewed';
                 return { row, state, at: row.review?.at || '' };
             }
