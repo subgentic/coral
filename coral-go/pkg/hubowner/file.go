@@ -1,12 +1,17 @@
 package hubowner
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
+
+	"github.com/subgentic/coral/internal/secfile"
 )
 
 // FileName is the file in the remote's data folder that holds the id the hub knows it by and the stamp secret. Only a human act writes it: the hub's SSH session (`coral hub-owner-secret` on the remote, the
@@ -27,16 +32,17 @@ func WriteFile(dir, remoteID, secret string) error {
 	if fi, err := os.Lstat(final); err == nil && !fi.Mode().IsRegular() {
 		return fmt.Errorf("hubowner: %s is not a plain file", FileName)
 	}
-	tmp, err := os.CreateTemp(dir, FileName+".tmp-*")
+	var rnd [8]byte
+	if _, err := rand.Read(rnd[:]); err != nil {
+		return err
+	}
+	name := filepath.Join(dir, FileName+".tmp-"+hex.EncodeToString(rnd[:]))
+	// created new, never through a link, and on Windows with a private access list from the first byte (secfile.OpenNoFollow protects the handle)
+	tmp, err := secfile.OpenNoFollow(name, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
 	if err != nil {
 		return err
 	}
-	name := tmp.Name()
 	defer os.Remove(name)
-	if err := tmp.Chmod(0o600); err != nil && runtime.GOOS != "windows" {
-		tmp.Close()
-		return err
-	}
 	if _, err := tmp.WriteString(remoteID + "\n" + secret + "\n"); err != nil {
 		tmp.Close()
 		return err
@@ -63,9 +69,20 @@ func ReadFile(dir string) (remoteID, secret string, ok bool, err error) {
 	if runtime.GOOS != "windows" && fi.Mode().Perm()&0o077 != 0 {
 		return "", "", false, fmt.Errorf("hubowner: %s is readable by others: fix its mode to 0600", FileName)
 	}
-	b, err := os.ReadFile(path)
+	f, err := os.Open(path)
 	if err != nil {
 		return "", "", false, err
+	}
+	defer f.Close()
+	if st, err := f.Stat(); err != nil || !os.SameFile(fi, st) {
+		return "", "", false, fmt.Errorf("hubowner: %s changed while it was opened", FileName)
+	}
+	if err := secfile.CheckOpen(f); err != nil { // Windows: one name, this user's, an access list no other account can write (made private if inherited); nothing outside Windows
+		return "", "", false, err
+	}
+	b, err := io.ReadAll(io.LimitReader(f, maxFile+1))
+	if err != nil || len(b) > maxFile {
+		return "", "", false, fmt.Errorf("hubowner: %s could not be read as a small file", FileName)
 	}
 	lines := strings.Split(strings.TrimRight(string(b), "\n"), "\n")
 	if len(lines) != 2 || !ValidRemoteID(lines[0]) || !ValidSecret(lines[1]) {
