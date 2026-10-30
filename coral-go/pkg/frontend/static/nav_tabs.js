@@ -6,6 +6,7 @@
  *    on and opens the list of all views. Escape and a click outside close it.
  * - Under 640 px (#9021) the top row is one hamburger button: it names the view and opens the views, then Home, Settings (themes, servers, updates) and the account.
  * The buttons drawn here carry the same data-on-click as the tabs, so switching a tab is still the one action. */
+import { setPhoneBarTitle } from './phone_bar.js';
 import { PHONE_QUERY } from './phone_layout.js';
 import { registerActions } from './actions.js';
 import { isHub } from './server_base.js';
@@ -179,6 +180,7 @@ function layoutSelect() {
     const words = cur ? cur.label : (hiddenOn ? (hiddenOn.dataset.label || hiddenOn.textContent).trim() : '');
     label.textContent = words;
     const top = document.getElementById('top-menu-label'); if (top) top.textContent = words;
+    setPhoneBarTitle(words); // the shared bar's pill names the view (phone_bar.js)
     for (const hamburger of document.querySelectorAll('#top-menu-btn, [data-hamburger]:not([data-account])')) { // (the phone's account button opens the same menu under its own name) // the top bar's and, under 640 px while an agent is open, the agent row's (#11056): one menu, one name
     if (hamburger) {
         // What waits for the person is the Inbox tab's own name ("Inbox, 3 waiting for input", set by inbox_tab.js): the closed bar shows a dot for it and the button's name says it in the same words (#9829)
