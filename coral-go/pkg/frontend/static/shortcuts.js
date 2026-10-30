@@ -5,12 +5,25 @@ import { state } from './state.js';
 import { sessionTeamKey } from './server_base.js';
 import { isTerminalToggleKey } from './terminal_leave_key.js';
 
-// The list is the one place that names the keys, in the person's own: a Mac shows Cmd and Option, any other computer Ctrl and Alt (#10579).
+// The list is the one place that names the keys, in the person's own: a Mac shows Cmd and Option, any other computer Ctrl and Alt (#10579). Each row is [keys, what, group]; the group is the heading it sits under in the dialog (#11246).
+export const SHORTCUT_GROUPS = ['Navigation', 'Chat', 'Search', 'Dialogs'];
 export const shortcutList = (mac = onMac()) => {
     const c = mac ? 'Cmd+' : 'Ctrl+', o = mac ? 'Option' : 'Alt';
-    return [[mac ? 'Cmd+Option+N' : 'Alt+N', 'New agent'], [`${c}P or ${c}K`, 'Jump to an agent, chat, team or goal'], [`${c}Shift+P or F1`, 'The command list'], [`${c},`, 'Settings'], [`${c}B`, 'Show or hide the sidebar'],
-        [`${c}Shift+F`, 'Search all chats'], ['/', 'Search agents'], [`${o}+Down or Up`, 'Next or previous agent'], [`${o}+Shift+Down or Up`, 'Next or previous team'], ['Ctrl+`', "The agent's terminal, and back to its chat (from the terminal too)"],
-        ['?', 'Show these shortcuts'], ['Enter', 'Send a message'], ['Shift+Enter', 'A new line in a message'], ['Escape', 'Stop a reply (empty message box); close a dialog or menu'], [`${c}F`, 'Find in a chat']];
+    return [[mac ? 'Cmd+Option+N' : 'Alt+N', 'New agent', 'Navigation'], [`${c}P or ${c}K`, 'Jump to an agent, chat, team or goal', 'Navigation'], [`${c}Shift+P or F1`, 'The command list', 'Navigation'], [`${c},`, 'Settings', 'Navigation'], [`${c}B`, 'Show or hide the sidebar', 'Navigation'],
+        [`${c}Shift+F`, 'Search all chats', 'Search'], ['/', 'Search agents', 'Search'], [`${o}+Down or Up`, 'Next or previous agent', 'Navigation'], [`${o}+Shift+Down or Up`, 'Next or previous team', 'Navigation'], ['Ctrl+`', "The agent's terminal, and back to its chat (from the terminal too)", 'Navigation'],
+        ['?', 'Show these shortcuts', 'Dialogs'], ['Enter', 'Send a message', 'Chat'], ['Shift+Enter', 'A new line in a message', 'Chat'], ['Escape', 'Stop a reply (empty message box); close a dialog or menu', 'Dialogs'], [`${c}F`, 'Find in a chat', 'Search']];
+};
+
+// A row's keys as chips: "Cmd+P or Cmd+K" is two alternatives of two keys each. A bare Up or Down after "Option+Down or" is the same modifiers with the other arrow. A Mac shows its glyphs; any other computer the words.
+const GLYPH = { Cmd: '⌘', Option: '⌥', Shift: '⇧', Ctrl: '⌃', Down: '↓', Up: '↑', Escape: 'Esc' };
+export const keyChips = (keys, mac = onMac()) => {
+    const alts = [];
+    for (const a of keys.split(' or ')) {
+        const parts = a === '+' ? [a] : a.split(/\+(?=.)/);
+        if (parts.length === 1 && /^(Up|Down)$/.test(parts[0]) && alts.length) parts.unshift(...alts[alts.length - 1].slice(0, -1));
+        alts.push(parts);
+    }
+    return alts.map(parts => parts.map(k => (mac || /^(Down|Up|Escape)$/.test(k)) ? GLYPH[k] || k : k));
 };
 
 const typing = t => !!t && t instanceof Element && !!t.closest('input, textarea, select, [contenteditable="true"], .xterm, [role="dialog"], .modal');
@@ -19,11 +32,38 @@ const onMac = () => /Mac|iPhone|iPad/i.test((navigator.userAgentData && navigato
 const inMessageBox = t => t instanceof Element && t.id === 'command-input';
 const dialogOpen = () => [...document.querySelectorAll('.modal-overlay, [role="dialog"]')].some(d => d.getClientRects().length > 0 && getComputedStyle(d).display !== 'none');
 
+const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+
+/** The dialog's body: a heading and a list for each group, a row being the keys (<dt>, one <kbd> chip a key) beside what they do (<dd>). */
+export function buildShortcuts(mac = onMac()) {
+    const frag = document.createDocumentFragment(), rows = shortcutList(mac);
+    for (const group of SHORTCUT_GROUPS) {
+        const sec = el('section', 'kbd-group'), h = el('h4', 'group-head', group), dl = el('dl', 'kbd-list');
+        for (const [keys, what, g] of rows) {
+            if (g !== group) continue;
+            const row = el('div', 'kbd-row'), dt = el('dt', 'kbd-keys');
+            keyChips(keys, mac).forEach((combo, i) => {
+                if (i) dt.append(el('span', 'kbd-or', 'or'));
+                combo.forEach((k, n) => { if (n && !mac) dt.append(el('span', 'kbd-plus', '+')); dt.append(el('kbd', 'kbd-key', k)); });
+            });
+            row.append(dt, el('dd', 'kbd-what', what)); dl.append(row);
+        }
+        sec.append(h, dl); frag.append(sec);
+    }
+    return frag;
+}
+
 export async function showShortcuts() {
-    const { showAlertModal } = await importOnce('./prompt_modals.js');
-    const m = document.getElementById('alert-modal-message');
-    showAlertModal('Keyboard shortcuts', shortcutList().map(([k, what]) => `${k}   ${what}`).join('\n'), () => { if (m) m.style.whiteSpace = ''; });
-    if (m) m.style.whiteSpace = 'pre-line';
+    const m = document.getElementById('shortcuts-modal'), body = document.getElementById('shortcuts-body');
+    if (!m || !body) return;
+    body.replaceChildren(buildShortcuts());
+    const close = document.getElementById('shortcuts-close');
+    if (close && !close.dataset.wired) {
+        close.dataset.wired = '1';
+        close.addEventListener('click', () => { m.style.display = 'none'; }); // display-ok: a dialog is hidden by display none, as modal_chrome.js hides every unlisted one
+    }
+    m.style.display = 'flex'; // display-ok: a .modal shows as a flex overlay, as showAlertModal does
+    body.scrollTop = 0;
 }
 
 export function newAgentShortcut() {

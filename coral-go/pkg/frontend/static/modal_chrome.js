@@ -34,6 +34,7 @@ const DIALOGS = Object.assign(Object.create(null), { // no prototype: an element
     'macro-modal': { backdrop: true },
     'jump-modal': { backdrop: true }, // Jump to (Cmd/Ctrl+K, #10579): hidden by display none, as an unlisted dialog is
     'alert-modal': { hide: byWindow('hideAlertModal'), backdrop: true },
+    'shortcuts-modal': { backdrop: true }, // Keyboard shortcuts (#11246): hidden by display none, as an unlisted dialog is
     'confirm-modal': { hide: byWindow('hideConfirmModal'), backdrop: true },
     'mb-export-modal': { backdrop: true },
     'prompt-modal': { hide: byWindow('hidePromptModal') },
