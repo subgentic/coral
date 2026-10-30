@@ -10,7 +10,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { buildManifest, taskBody, taskTitle, expectedLink, artifactName } from './manifest.mjs';
+import { buildManifest, taskBody, taskTitle, expectedLink, artifactName, reviewName, sheetArtifactName, reviewUploadArgs, uploadArgs } from './manifest.mjs';
 import { buildSheet } from './sheet.mjs';
 
 const arg = name => { const i = process.argv.indexOf('--' + name); return i > 0 ? process.argv[i + 1] : undefined; };
@@ -46,11 +46,13 @@ for (const a of manifest.artifacts) {
 const sheetFile = path.join(out, 'contact-sheet.html');
 const writeSheet = () => fs.writeFileSync(sheetFile, buildSheet({ manifest, links, dir: out, prevDir: prevDir && fs.existsSync(prevDir) ? prevDir : null }));
 writeSheet();
-const sheetName = `UI review ${manifest.tag}: contact sheet.html`;
+const prevVersion = prevDir && fs.existsSync(prevDir) ? path.basename(prevDir.replace(/\/+$/, '')) : ''; // the cache folder is named for the release (~/.cache/coral-screens/2.0.7)
+const cmp = /^\d+\.\d+\.\d+/.test(prevVersion) ? prevVersion : '';
+const reviewTitle = reviewName(manifest, cmp), sheetName = sheetArtifactName(manifest, cmp);
 let sheetLink = expectedLink(fs.readFileSync(sheetFile));
 log(`${manifest.shotCount} shots, ${manifest.pageCount} pages, ${manifest.failed.length} not photographed; ${toUpload.length} to upload; sheet ${(fs.statSync(sheetFile).size / 1e6).toFixed(1)} MB`);
 if (dry) {
-    fs.writeFileSync(path.join(out, 'published.json'), JSON.stringify({ dryRun: true, title: taskTitle(version), body: taskBody(manifest, sheetLink), sheetLink }, null, 2));
+    fs.writeFileSync(path.join(out, 'published.json'), JSON.stringify({ dryRun: true, title: taskTitle(version), body: taskBody(manifest, sheetLink), sheetLink, needsReview: { program: 'coral-agent', args: reviewUploadArgs(sheetFile, sheetName, '<the release task>') } }, null, 2));
     log('dry run: nothing uploaded; see manifest.json, contact-sheet.html, published.json');
     process.exit(0);
 }
@@ -100,7 +102,7 @@ try {
     const upload = async (file, name, extra = []) => {
         for (;;) {
             await room();
-            const r = call('coral-agent', ['artifact', 'upload', file, '--name', name, '--task', id, '--tag', 'ui review', ...extra], { allowFail: true });
+            const r = call('coral-agent', uploadArgs(file, name, id, extra), { allowFail: true });
             if (r.status !== 0) {
                 const text = (r.stderr || r.stdout || '').trim();
                 const retry = text.match(/Retry-After: (\d+)/);
@@ -131,6 +133,10 @@ try {
         const v = await upload(sheetFile, sheetName, ['--new-version-of', published.sheet]);
         if (v.error) log('the corrected sheet was not uploaded:', v.error); else published.sheet = v.uri;
     }
+    // 4. the operator's Needs you: the contact sheet once more, tagged "for review" and named for the one-line summary. Last, so the sheet's links are all live when it shows up (the same bytes are another upload record
+    //    of the same link). The Inbox lists the board's "for review" files; no mention, no agent: this script is all there is.
+    const rv = await upload(sheetFile, sheetName, ['--tag', 'for review']);
+    if (rv.error) { published.failed.push({ name: 'needs review', error: rv.error }); log('the contact sheet was not put in Needs you:', rv.error); } else { published.review = rv.uri; log('in Needs you:', reviewTitle); }
     const handed = call('coral-board', ['task', 'reassign', id, '--to', assignee], { allowFail: true });
     if (handed.status !== 0) { // this runner may not reassign: the task is completed with the contact sheet in its message, which is where the Operator reads the result
         call('coral-board', ['task', 'complete', id, '--message', taskBody(manifest, published.sheet)], { allowFail: true });
