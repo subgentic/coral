@@ -21,6 +21,7 @@ import (
 type SessionIndexer struct {
 	store        *store.SessionStore
 	scanners     []agent.HistoryScanner
+	liveSources  []LiveSource // histories that are not files (opencode)
 	interval     time.Duration
 	startupDelay time.Duration
 	logger       *slog.Logger
@@ -121,6 +122,19 @@ func (idx *SessionIndexer) Run(ctx context.Context) error {
 	}
 }
 
+// LiveSource is a history that is not in a file: sessions of agents that keep none (opencode, whose messages come through its server's API, #11383). ExtractLive returns the sessions whose row changed since
+// the pass before (known maps each SourceFile to the time it was last indexed): one that did not change is not returned, and a source reads nothing for it.
+type LiveSource interface {
+	ExtractLive(ctx context.Context, knownMtimes map[string]float64) []agent.IndexedSession
+}
+
+// AddLiveSource adds a source of history that is not a file. Call it before Run.
+func (idx *SessionIndexer) AddLiveSource(s LiveSource) {
+	idx.runMu.Lock()
+	defer idx.runMu.Unlock()
+	idx.liveSources = append(idx.liveSources, s)
+}
+
 // indexerFTSBatch is how many sessions' search text one pass collects before writing it (store.UpsertFTSBatch).
 const indexerFTSBatch = 100
 
@@ -150,6 +164,10 @@ func (idx *SessionIndexer) RunOnce(ctx context.Context) error {
 			continue
 		}
 		allSessions = append(allSessions, sessions...)
+	}
+
+	for _, src := range idx.liveSources {
+		allSessions = append(allSessions, src.ExtractLive(ctx, knownMtimes)...)
 	}
 
 	// Batch-lookup agent names from live_sessions

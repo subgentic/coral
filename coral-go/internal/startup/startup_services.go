@@ -223,6 +223,9 @@ func startIndexingServices(ctx context.Context, cfg *config.Config, srv *server.
 		time.Duration(cfg.IndexerIntervalS)*time.Second,
 		time.Duration(cfg.IndexerStartupDelayS)*time.Second,
 	)
+	if m := srv.OpencodeManager(); m != nil {
+		indexer.AddLiveSource(background.NewOpencodeHistory(m)) // opencode keeps no file: its history is read through its servers
+	}
 	safeGo(ctx, "session_indexer", func() { indexer.Run(ctx) })
 	srv.SetIndexer(indexer)
 }

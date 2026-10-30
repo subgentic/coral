@@ -329,6 +329,9 @@ func (s *Server) SetScheduler(sched *background.JobScheduler) {
 	}
 }
 
+// OpencodeManager is the manager of the opencode servers (the history indexer reads their sessions through it).
+func (s *Server) OpencodeManager() *opencode.Manager { return s.opencode }
+
 // SetIndexer injects the session indexer for manual refresh triggers.
 func (s *Server) SetIndexer(idx routes.Indexer) {
 	if s.systemHandler != nil {

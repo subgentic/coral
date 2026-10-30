@@ -321,6 +321,17 @@ func (g *managed) refreshLast(ctx context.Context, c *Client, session string, sk
 	}()
 }
 
+// Keys are the agents that have a server now, in no order.
+func (m *Manager) Keys() []string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	keys := make([]string, 0, len(m.servers))
+	for k := range m.servers {
+		keys = append(keys, k)
+	}
+	return keys
+}
+
 // Stop ends one agent's server and the loop reading it. The key stays reserved until the old server is gone: an Ensure of the same key meanwhile waits, so the old server's shutdown never removes files
 // (its pid record, its password) the new one has written into the same folder.
 func (m *Manager) Stop(key string) {
