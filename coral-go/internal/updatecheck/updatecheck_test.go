@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -186,5 +188,23 @@ func TestLatestRefusesAReplyThatIsNotThisRepositorysRelease(t *testing.T) {
 	} {
 		_, err := Latest(ctx, serve(t, 200, b))
 		assert.Error(t, err, name)
+	}
+}
+
+// #395: a staged release that is not newer than the running Coral is not an update. The table is shared with verify.NotNewer (the updater's): the two must agree on every row.
+func TestNotNewer(t *testing.T) {
+	b, err := os.ReadFile(filepath.Join("testdata", "not_newer_cases.json"))
+	require.NoError(t, err)
+	var table struct {
+		Cases []struct {
+			Staged, Installed string
+			NotNewer          bool
+			Why               string
+		}
+	}
+	require.NoError(t, json.Unmarshal(b, &table))
+	require.NotEmpty(t, table.Cases)
+	for _, tc := range table.Cases {
+		assert.Equal(t, tc.NotNewer, NotNewer(tc.Staged, tc.Installed), tc.Staged+" vs "+tc.Installed+": "+tc.Why)
 	}
 }

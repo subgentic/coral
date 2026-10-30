@@ -119,6 +119,7 @@ const REASON_TEXT = {
     // the refusals of POST /api/system/update/install (#7338)
     network: 'Coral could not be reached. Nothing was changed.',
     stale_version: 'The update that is ready changed since this page showed it. Look at it again before you install.',
+    not_newer: 'The update that was ready is not newer than this Coral, so it was not installed. Nothing was changed.',
     apply_not_enabled: 'Installing updates from here is not turned on yet. Coral keeps running as it is.',
     updates_off: 'Updates are turned off for this Coral. It keeps running as it is.',
     install_not_supported: 'This Coral was not installed with the installer, so it cannot update itself. Update it from its installer.',

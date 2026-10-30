@@ -2,6 +2,7 @@ package verify
 
 import (
 	"fmt"
+	"github.com/subgentic/coral/internal/semverorder"
 	"regexp"
 	"strconv"
 	"strings"
@@ -22,6 +23,10 @@ func ParseVersion(s string) ([3]int, error) {
 	}
 	return out, nil
 }
+
+// NotNewer reports whether staged is NOT newer than installed: older or equal, in the one order everything that asks "is this newer?" uses (semverorder: a "v", a prerelease; a release is newer
+// than its own prerelease). A version that does not parse (build metadata "+x" included: Coral's versions have none) says nothing (false), so nothing is dropped on a guess.
+func NotNewer(staged, installed string) bool { return semverorder.NotNewer(staged, installed) }
 
 // CompareVersions is -1, 0 or 1; both must parse.
 func CompareVersions(a, b string) (int, error) {

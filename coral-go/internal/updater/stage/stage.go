@@ -145,6 +145,16 @@ func Check(ctx context.Context, cfg Config) Result {
 	defer release()
 
 	st, _ := verify.LoadState(dir) // an unreadable state is a first run, never permission (the verifier's rules still apply)
+	// A release staged before this one was installed (by hand, or by another way) is not an update any more: drop it before anything else, also when the next attempt is waiting
+	// out a back-off (#395: 2.0.1 stayed "ready to install" on a Coral at 2.0.3).
+	if dropped := dropStaleStage(&st, cfg.Installed); dropped != "" {
+		log.Printf("[update] the staged release %s is not newer than the installed %s: dropped", dropped, cfg.Installed)
+		_ = verify.SaveState(dir, st)
+		// The files go only for a plain X.Y.Z name, as before: the name is read from the state file, and the delete keeps the strict check that a staged folder's name always had.
+		if _, perr := verify.ParseVersion(dropped); perr == nil {
+			_ = os.RemoveAll(filepath.Join(dir, StagingDir, dropped))
+		}
+	}
 	if s := st.Stage; s != nil && s.NextAttempt != "" {
 		if next, perr := time.Parse(time.RFC3339, s.NextAttempt); perr == nil && now.Before(next) {
 			res.Result, res.Version, res.NextAttempt = ResultBackoff, s.Version, s.NextAttempt
@@ -155,6 +165,21 @@ func Check(ctx context.Context, cfg Config) Result {
 	out := c.run(ctx)
 	c.recordOutcome(out)
 	return out
+}
+
+// dropStaleStage clears a staged release that is not newer than installed (its version, its time; a pending back-off for another release stays) and returns the version it dropped,
+// or "". A staged or installed version that doesn't parse is left alone.
+func dropStaleStage(st *verify.State, installed string) string {
+	s := st.Stage
+	if s == nil || s.Staged == "" || !verify.NotNewer(s.Staged, installed) {
+		return ""
+	}
+	dropped := s.Staged
+	s.Staged, s.StagedAt = "", ""
+	if *s == (verify.StageState{}) {
+		st.Stage = nil
+	}
+	return dropped
 }
 
 type checker struct {

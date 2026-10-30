@@ -158,7 +158,10 @@ func TestTheRecordSaysWhatTheUpdaterSaysInTheRoutesWords(t *testing.T) {
 		"a relaunch the updater has a result for": {func(o *status.Out) {
 			o.LastApply = &status.Apply{At: "2026-10-22T05:59:30Z", Result: "failed_rolled_back"}
 		}, relaunchState{StartedAt: now.Add(-time.Minute - 45*time.Second), From: "1.4.150"}, updStaged, "", true, true},
-		"a relaunch into another version already ran": {func(o *status.Out) { o.Installed = "1.4.155" }, relaunchState{StartedAt: now.Add(-time.Minute), From: "1.4.150"}, updStaged, "", true, true},
+		"a relaunch into another version already ran": {func(o *status.Out) { o.Installed = "1.4.152" }, relaunchState{StartedAt: now.Add(-time.Minute), From: "1.4.150"}, updStaged, "", true, true},
+		// #395: a staged release the installed version has caught up with (or passed) is not offered
+		"a staged release equal to the installed one": {func(o *status.Out) { o.Installed = "1.4.155" }, relaunchState{}, updNone, "up_to_date", true, true},
+		"a staged release older than the installed one": {func(o *status.Out) { o.Installed = "1.4.160" }, relaunchState{}, updNone, "up_to_date", true, true},
 	} {
 		out := readyStatus()
 		tc.mod(&out)

@@ -116,9 +116,10 @@ async function sendRelaunch(go, later) {
     }
     go.disabled = false; later.disabled = false;
     // 409 stale_version: the staged update is not the one this dialog showed; the status is read again and the dialog is drawn for what is ready now, nothing was installed (#7338)
-    if (res.status === 409 && res.code === 'stale_version') {
+    // 409 not_newer (#395): what is staged is not newer than this Coral; the same re-read leaves nothing to offer, so the dialog closes and the banner is gone
+    if (res.status === 409 && (res.code === 'stale_version' || res.code === 'not_newer')) {
         const fresh = await (await importOnce('./update_ui.js')).refreshUpdateStatus();
-        if (fresh && installsLocally(fresh)) { current = fresh; draw(reasonText('stale_version')); dialog.querySelector('[data-initial-focus]')?.focus(); return; }
+        if (fresh && installsLocally(fresh)) { current = fresh; draw(reasonText(res.code)); dialog.querySelector('[data-initial-focus]')?.focus(); return; }
         close(); return;
     }
     // 404: Coral Hub has relaunching switched off for this machine: nothing to offer, so nothing is shown
