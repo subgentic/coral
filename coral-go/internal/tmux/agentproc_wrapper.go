@@ -121,3 +121,6 @@ func launchCLIOf(session string) string {
 	}
 	return cli
 }
+
+// WrapperCheckFor is wrapperIsCLI for the CLI path noted for the session (from memory or the database): the test the exited-agent gate and the notice check share. nil when none is known.
+func WrapperCheckFor(session string) func(pid int) bool { return wrapperIsCLI(launchCLIOf(session)) }
