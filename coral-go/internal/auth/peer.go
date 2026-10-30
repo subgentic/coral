@@ -44,6 +44,7 @@ type connPeer struct {
 	reason  string
 	tries   int
 	lastTry time.Time
+	verdict peercred.Verdict // what the attribution found, kept as the verdict and not as an "ok": the relay is a refusal that only the sign-in link tells apart (#396)
 }
 
 const (
@@ -126,6 +127,7 @@ func PeerReason(r *http.Request) string {
 	cp.lastTry = time.Now()
 	attributeSlots <- struct{}{} // at most a few socket-table reads at once (#95 review F5)
 	v, err := attributePeer(cp.client, cp.server, cp.accepted)
+	cp.verdict = v
 	<-attributeSlots
 	if v == peercred.Unsupported && peercred.Supported {
 		peerCheckLost.Store(true) // this OS version's socket table isn't one this build reads (F3)
@@ -133,6 +135,10 @@ func PeerReason(r *http.Request) string {
 	switch v {
 	case peercred.OtherUser:
 		cp.decided, cp.reason = true, PeerOtherUser
+	case peercred.Relay:
+		cp.decided, cp.reason = true, PeerOtherUser // for everything but the sign-in link, the relay is another user (#396)
+		logRelay(cp.client.Addr())
+		return cp.reason
 	case peercred.Unattributed:
 		cp.reason = PeerUnattributed // not final: the next request asks again
 	default:
@@ -141,6 +147,38 @@ func PeerReason(r *http.Request) string {
 	}
 	logPeer(cp.client.Addr(), cp.reason, err)
 	return cp.reason
+}
+
+// PeerIsRelay reports whether r's loopback connection is WSL's localhost relay (peercred.Relay, #396): a root-owned loopback socket on a WSL kernel, behind which the Windows user cannot be
+// told. The ONLY thing that may act on it is the sign-in link (handleLoginToken); every other check (PeerReason, SameUser) treats it as another user. False without ConnContext, for a
+// connection that is not loopback, and for any other verdict.
+func PeerIsRelay(r *http.Request) bool {
+	if !remoteIsLoopback(r) || PeerReason(r) == "" { // a request from another computer is never the relay; PeerReason attributes the connection once
+		return false
+	}
+	cp, _ := r.Context().Value(connPeerKey{}).(*connPeer)
+	if cp == nil {
+		return false
+	}
+	cp.mu.Lock() // the verdict is written under this lock by PeerReason
+	defer cp.mu.Unlock()
+	return cp.verdict == peercred.Relay
+}
+
+var relayLog struct {
+	sync.Mutex
+	last time.Time
+}
+
+// logRelay says, once a minute, that a loopback connection came through WSL's relay.
+func logRelay(addr netip.Addr) {
+	relayLog.Lock()
+	defer relayLog.Unlock()
+	if time.Since(relayLog.last) < time.Minute {
+		return
+	}
+	relayLog.last = time.Now()
+	log.Printf("[auth] a loopback connection from %s comes through WSL's localhost relay (a root-owned socket on the VM's loopback): which Windows user is behind it can't be told, so it needs a credential like another user's and gets no local-only power; a sign-in link may still be opened through it", addr)
 }
 
 // attributeSlots caps the socket-table reads running at once (#95 review F5): each new loopback

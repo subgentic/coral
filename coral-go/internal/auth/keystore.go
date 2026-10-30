@@ -76,6 +76,8 @@ type KeyStore struct {
 	// peerUnknown says whether a request the peerUser check refused was refused only because its owner could not be told (not because it is positively another user's): such a
 	// sign-in link is answered "try again" and not used up (#385). nil: every refusal is final.
 	peerUnknown func(*http.Request) bool
+	// peerRelay says the request came through WSL's localhost relay (#396): the sign-in link, and nothing else, is opened by it.
+	peerRelay   func(*http.Request) bool
 	unknownPeer sync.Once
 }
 

@@ -479,6 +479,13 @@ func (ks *KeyStore) SetPeerUnknown(f func(*http.Request) bool) {
 	ks.mu.Unlock()
 }
 
+// SetPeerRelay gives the store the check for WSL's localhost relay, which may open a sign-in link (#396).
+func (ks *KeyStore) SetPeerRelay(f func(*http.Request) bool) {
+	ks.mu.Lock()
+	ks.peerRelay = f
+	ks.mu.Unlock()
+}
+
 // SetPeerUser gives the store the peer-user check for sign-in links (#3970).
 func (ks *KeyStore) SetPeerUser(f func(*http.Request) (same, supported bool)) {
 	ks.mu.Lock()

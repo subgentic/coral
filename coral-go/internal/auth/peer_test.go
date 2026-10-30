@@ -221,3 +221,40 @@ type tcpConn struct{ net.Conn }
 
 func (tcpConn) RemoteAddr() net.Addr { return &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 50000} }
 func (tcpConn) LocalAddr() net.Addr  { return &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 8420} }
+
+// #396: WSL's localhost relay is its own verdict, kept in the connection's cache as the verdict. For every check but the sign-in link it IS another user: the reason is other_user, it is
+// never direct-local, and only PeerIsRelay tells it apart. Any other verdict is not the relay.
+func TestTheRelayIsAnotherUserEverywhereButTheSignInLink(t *testing.T) {
+	t.Cleanup(ResetPeerCheckLostForTest) // an Unsupported verdict below sets the sticky "peer check lost" flag, which takes local-only powers from every later test
+	asked := 0
+	var verdict peercred.Verdict
+	t.Cleanup(SetPeerAttribution(func(netip.AddrPort, netip.AddrPort) (peercred.Verdict, error) {
+		asked++
+		return verdict, nil
+	}))
+	request := func() *http.Request {
+		r := httptest.NewRequest("GET", "/api/x", nil).WithContext(ConnContext(context.Background(), tcpConn{}))
+		r.RemoteAddr = "127.0.0.1:50000"
+		return r
+	}
+
+	verdict = peercred.Relay
+	r := request()
+	assert.Equal(t, PeerOtherUser, PeerReason(r), "the relay is another user for the loopback pass")
+	assert.False(t, isDirectLocal(r), "and gets no local-only power")
+	assert.True(t, PeerIsRelay(r))
+	assert.True(t, PeerIsRelay(r))
+	assert.Equal(t, PeerOtherUser, PeerReason(r))
+	assert.Equal(t, 1, asked, "asked once per connection: the cache keeps the verdict, so PeerIsRelay needs no second read")
+
+	for _, v := range []peercred.Verdict{peercred.OtherUser, peercred.Unattributed, peercred.Self, peercred.Unsupported} {
+		verdict = v
+		r := request()
+		assert.False(t, PeerIsRelay(r), "verdict %v is not the relay", v)
+	}
+	verdict = peercred.Relay
+	notLoopback := httptest.NewRequest("GET", "/api/x", nil).WithContext(ConnContext(context.Background(), tcpConn{}))
+	notLoopback.RemoteAddr = "192.0.2.7:50000"
+	assert.False(t, PeerIsRelay(notLoopback), "a request from another computer is not the relay")
+	assert.False(t, PeerIsRelay(httptest.NewRequest("GET", "/", nil)), "no ConnContext: no relay")
+}

@@ -237,3 +237,48 @@ func TestTheCoralAppsSignInLinkNamesItsSession(t *testing.T) {
 	assert.Equal(t, "Coral app on Windows", newSessionLabel(r, SessionByLink))
 	assert.Equal(t, "Coral app", appSessionLabel("Mozilla/5.0 (X11; U; unknown)"), "an unknown system: just the app's name")
 }
+
+// #396: a browser on Windows reaches a WSL Coral through WSL's localhost relay, behind which the Windows user cannot be told. The sign-in link is accepted through it, and only the link:
+// still single use, an ordinary session, and the link itself is never logged. Another user's browser (not the relay) is still refused, and the link stays good for its owner.
+func TestLoginTokenAcceptsWSLsLocalhostRelayOnce(t *testing.T) {
+	var logs strings.Builder
+	log.SetOutput(&logs)
+	t.Cleanup(func() { log.SetOutput(os.Stderr) })
+	ks, err := NewKeyStore(t.TempDir())
+	require.NoError(t, err)
+	h := Middleware(ks)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(299) }))
+	get := func(token string) *httptest.ResponseRecorder {
+		r := httptest.NewRequest("GET", "/?login_token="+token, nil)
+		r.RemoteAddr = "127.0.0.1:1234"
+		r.Host = "localhost:8420"
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, r)
+		return rec
+	}
+	relay := true
+	ks.SetPeerUser(func(*http.Request) (bool, bool) { return false, true }) // not the same user, as the relay's root-owned socket reads
+	ks.SetPeerRelay(func(*http.Request) bool { return relay })
+
+	tok, err := ks.MintLoginToken()
+	require.NoError(t, err)
+	rec := get(tok)
+	assert.Equal(t, http.StatusFound, rec.Code, "the relay may open the link")
+	cookies := rec.Result().Cookies()
+	require.NotEmpty(t, cookies, "an ordinary session cookie")
+	assert.Contains(t, logs.String(), "WSL's localhost relay")
+	assert.NotContains(t, logs.String(), tok, "the link is never logged")
+	assert.Equal(t, 1, strings.Count(logs.String(), "accepted, single use"))
+	assert.Equal(t, http.StatusForbidden, get(tok).Code, "single use: the second time it is spent")
+	assert.Equal(t, 1, strings.Count(logs.String(), "accepted, single use"), "the spent second open is not logged as accepted")
+	assert.Equal(t, 1, strings.Count(logs.String(), "was used or expired: refused"), "it says it was used")
+
+	relay = false
+	tok2, _ := ks.MintLoginToken()
+	rec = get(tok2)
+	assert.Equal(t, http.StatusForbidden, rec.Code, "another user that is not the relay is refused")
+	assert.Empty(t, rec.Result().Cookies())
+	assert.Contains(t, logs.String(), "opened by another user")
+	ks.SetPeerUser(func(*http.Request) (bool, bool) { return true, true })
+	assert.Equal(t, http.StatusFound, get(tok2).Code, "and the link still works for its owner")
+	assert.Equal(t, 1, strings.Count(logs.String(), "accepted, single use"), "only the relay's open is logged as accepted: not another user's refused one, and not the owner's own")
+}
