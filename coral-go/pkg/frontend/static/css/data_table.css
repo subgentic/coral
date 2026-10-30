@@ -139,7 +139,7 @@
 .dt-row.dt-quiet td { color: var(--table-tertiary-color); }
 .dt-row.dt-selected td { background: var(--table-selected); }
 /* A task's state in a table is its word in the state's colour, no pill and no dot (#11189): the text-safe tokens (4.5:1 or more on the light and dark panels), the word says the state, the colour is not its only signal. */
-.dt-state { color: var(--text-secondary); font-weight: var(--fw-strong); white-space: nowrap; }
+.dt-state { color: var(--table-secondary-color); font-weight: var(--fw-strong); white-space: nowrap; }
 .dt-state.goal-state-task-active { color: var(--link-text); }
 .dt-state.goal-state-task-blocked { color: var(--warning-text); }
 .dt-state.goal-state-task-done { color: var(--success-text); }
@@ -291,7 +291,7 @@
 
 /* The hover/current background is stronger than the panel. Quiet text still
  * needs 4.5:1 on that background in either theme. */
-.dt-row:hover, .dt-row[aria-current="true"] { --table-tertiary-color: color-mix(in srgb, var(--text-muted) 85%, var(--text-primary)); --table-secondary-color: color-mix(in srgb, var(--text-secondary) 85%, var(--text-primary)); }
+.dt-row:hover, .dt-row[aria-current="true"], .dt-row.dt-selected { --table-tertiary-color: color-mix(in srgb, var(--text-muted) 85%, var(--text-primary)); --table-secondary-color: color-mix(in srgb, var(--text-secondary) 85%, var(--text-primary)); }
 
 /* Measuring fit must reserve a readable name, not only fit the metadata. */
 .dt-box.dt-fit:not(.dt-folded) td.dt-grow { min-width: var(--table-fit-name-min); }

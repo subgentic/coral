@@ -39,6 +39,18 @@ const sceneShots = require('./helpers/scene_shots');
                         return { cls: cell.className, text: cell.textContent.trim(), dot: !!td.querySelector('.goal-dot'), border: cs.borderTopWidth, bg: cs.backgroundColor, radius: cs.borderTopLeftRadius, ratios }; })()`);
                     assert.ok(/dt-state/.test(st.cls) && !/chip/.test(st.cls) && !st.dot && st.border === '0px' && /rgba\(0, 0, 0, 0\)|transparent/.test(st.bg) && st.text, `${width} ${theme}: the state is plain text, no pill, dot or fill: ` + JSON.stringify(st));
                     assert.ok(Object.values(st.ratios).every(r => r >= 4.5), `${width} ${theme}: every state's text holds 4.5:1 on the row: ` + JSON.stringify(st.ratios));
+                    { // and on every kind of row: rest, open (aria-current, the row's hover background), selected and quiet, in this theme (QA Reviewer 2 on #11189: Queued was 4.40:1 on the open row, #11210)
+                        const rows = await ev(`(() => { const P = c => { const n = c.match(/[\\d.]+/g).map(Number), k = c.startsWith('color(') ? 255 : 1; return [n[0] * k, n[1] * k, n[2] * k, c.includes('/') || n.length > 3 ? n[3] : 1]; };
+                            const lum = a => { const [r, g, b] = a.slice(0, 3).map(v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+                            const page = P(getComputedStyle(document.body).backgroundColor), over = (f, b) => [0, 1, 2].map(i => f[i] * f[3] + b[i] * (1 - f[3])).concat(1), ratio = (fg, bg) => { const a = lum(fg), b = lum(bg); return Math.round(((Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05)) * 100) / 100; };
+                            const trs = [...document.querySelectorAll('.dt-table tbody tr.dt-row')], out = {}; const kinds = { rest: () => {}, open: tr => tr.setAttribute('aria-current', 'true'), selected: tr => tr.classList.add('dt-selected'), quiet: tr => tr.classList.add('dt-quiet') };
+                            for (const [k, set] of Object.entries(kinds)) { const tr = trs[0], was = [tr.getAttribute('aria-current'), tr.className]; set(tr); const td = tr.children[1], bgc = getComputedStyle(td).backgroundColor, bg = over(P(bgc), page), ratios = {};
+                                for (const c of ['queued', 'active', 'blocked', 'done']) { const p = document.createElement('span'); p.className = 'dt-state goal-state-task-' + c; p.textContent = c; td.append(p); ratios[c] = ratio(over(P(getComputedStyle(p).color), bg), bg); p.remove(); }
+                                const sec = tr.querySelector('.dt-tone-secondary, .dt-subtitle'); if (sec) ratios.secondaryCell = ratio(over(P(getComputedStyle(sec).color), bg), bg);
+                                out[k] = { bg: bgc, ratios }; tr.removeAttribute('aria-current'); if (was[0]) tr.setAttribute('aria-current', was[0]); tr.className = was[1]; }
+                            return out; })()`);
+                        for (const [k, v] of Object.entries(rows)) assert.ok(Object.values(v.ratios).every(r => r >= 4.5), `${width} ${theme}: on the ${k} row (${v.bg}) every state colour and the secondary cells hold 4.5:1: ` + JSON.stringify(v.ratios));
+                    }
                 }
                 if (width === 1280) for (const fs of [16, 32]) { // the select column keeps its 44 px at any text size: the box is inside the table's border with the table's own inner padding, level with its row's text, and the chip is not cut (the Operator: "the checkboxes are outside the line", #11160)
                     await ev(`document.documentElement.style.fontSize = '${fs}px'; true`);
