@@ -51,6 +51,20 @@ const BASE = require('./test_base').BASE;
             assert.ok(d.nav === 'none' && d.top === 'none' && d.row && d.row.h >= 56 && d.back && d.back.w >= 44 && d.back.h >= 44 && d.title === fs && d.page, `${tag}: an open view is a drill-down: the bar with its arrow, no page pill, no nav: ` + JSON.stringify(d));
             await shot(`model-c-analytics-view-${w}-${fs}-${theme}`);
         }
+        // Settings is a form screen: the list of sections has its ← in a 56 px bar with the title (it closes Settings), a section has a 56 px bar with its ← to the list, and the footer (Close, Save) stays pinned
+        await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.startup('liveList', 'settings')`);
+        await ev(`window.showSettingsModal(); true`);
+        await waitFor(`(m => !!m && getComputedStyle(m).display !== 'none' && m.querySelectorAll('.settings-tab').length >= 6)(document.getElementById('settings-modal'))`, 'Settings open', 10000); await settle(400);
+        const bx = sel => ev(`(() => { const e = [...document.querySelectorAll(${JSON.stringify(sel)})].find(x => x.getClientRects().length); if (!e) return null; const b = e.getBoundingClientRect(); return { w: Math.round(b.width), h: Math.round(b.height), t: Math.round(b.top), b: Math.round(b.bottom) }; })()`);
+        let hd = await bx('#settings-modal .modal-header'), ar = await bx('#settings-modal .settings-bar-back'), ft = await bx('#settings-modal .modal-footer');
+        assert.ok(hd && hd.h >= 56 && ar && ar.w >= 44 && ar.h >= 44 && ft && ft.b >= 844 - 24, 'the sections\' list has a 56 px bar with a 44 px arrow and a pinned footer: ' + JSON.stringify({ hd, ar, ft }));
+        await ev(`document.querySelector('#settings-modal #settings-tab-agents').click(); true`); await settle(300);
+        const bk = await bx('#settings-modal .settings-back');
+        assert.ok(bk && bk.h >= 56 && !(await bx('#settings-modal .settings-bar-back')), 'a section has ONE bar: its way back is 56 px and the list\'s arrow is not drawn: ' + JSON.stringify(bk));
+        await ev(`document.querySelector('#settings-modal .settings-back').click(); true`); await settle(300);
+        await ev(`document.querySelector('#settings-modal .settings-bar-back').click(); true`); await settle(300);
+        assert.equal(await ev(`getComputedStyle(document.getElementById('settings-modal')).display`), 'none', 'the arrow in the list\'s bar closes Settings');
         console.log('PASS the phone model, slice C: Docs and Analytics');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
