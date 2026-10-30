@@ -34,6 +34,41 @@ const sourceOperatorShare = "share"
 // operatorShareTTL is how long a stored file may be named in a message: the message follows the upload within the same drop.
 const operatorShareTTL = 10 * time.Minute
 
+// shareLimitPerMinute is how many files the Operator can share in a minute (a drop of 20 fits, a script that loops does not); a refused file counts.
+var shareLimitPerMinute = 30
+
+var shareLimit minuteLimiter
+
+// minuteLimiter allows `limit` calls in any minute, in memory, with a bounded table of keys.
+type minuteLimiter struct {
+	mu   sync.Mutex
+	seen map[string][]time.Time
+}
+
+func (l *minuteLimiter) allow(key string, limit int, now time.Time) bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.seen == nil {
+		l.seen = map[string][]time.Time{}
+	}
+	cut := now.Add(-time.Minute)
+	kept := l.seen[key][:0]
+	for _, t := range l.seen[key] {
+		if t.After(cut) {
+			kept = append(kept, t)
+		}
+	}
+	if len(kept) >= limit {
+		l.seen[key] = kept
+		return false
+	}
+	if _, known := l.seen[key]; !known && len(l.seen) >= 256 {
+		return false
+	}
+	l.seen[key] = append(kept, now)
+	return true
+}
+
 // maxShareFiles is how many files one message names.
 const maxShareFiles = 20
 
@@ -140,6 +175,15 @@ func (h *BoardHandler) UploadOperatorArtifact(w http.ResponseWriter, r *http.Req
 	default:
 		w.Header().Set("Retry-After", "2")
 		writeError(w, http.StatusTooManyRequests, "busy", "files are already arriving; try again in a moment")
+		return
+	}
+	if h.isPaused(project) { // nothing reaches the agents of a paused board: say so before a byte is read, in the board's own words
+		commentRefuse(w, http.StatusConflict, "board_paused", "the board is paused: nothing is sent to its agents until it is resumed")
+		return
+	}
+	if !shareLimit.allow(project, shareLimitPerMinute, time.Now()) {
+		w.Header().Set("Retry-After", "60")
+		writeError(w, http.StatusTooManyRequests, "rate_limited", "too many files in a minute; try again shortly")
 		return
 	}
 	name := strings.TrimSpace(r.Header.Get("X-Artifact-Name"))
@@ -267,6 +311,10 @@ func (h *BoardHandler) ShareOperatorArtifacts(w http.ResponseWriter, r *http.Req
 	}
 	if err := decodeJSON(r, &body); err != nil {
 		errBadRequest(w, "invalid JSON")
+		return
+	}
+	if h.isPaused(project) {
+		commentRefuse(w, http.StatusConflict, "board_paused", "the board is paused: nothing is sent to its agents until it is resumed")
 		return
 	}
 	if !safefs.IsSafeID(body.SessionID) || len(body.Digests) == 0 || len(body.Digests) > maxShareFiles {

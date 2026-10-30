@@ -241,3 +241,32 @@ func TestAFormPostCannotShareAFile(t *testing.T) {
 	entries, _ := os.ReadDir(filepath.Join(e.coralDir, "artifacts", "objects"))
 	assert.Empty(t, entries, "nothing was stored")
 }
+
+func TestAPausedBoardRefusesTheShareInItsOwnWords(t *testing.T) {
+	e := newShareEnv(t, true)
+	e.h.SetPaused("alpha", true)
+	code, out := e.upload(t, sessAlice, "a.txt", "x")
+	assert.Equal(t, http.StatusConflict, code)
+	assert.Equal(t, "board_paused", out["code"])
+	assert.Contains(t, out["error"], "the board is paused")
+	entries, _ := os.ReadDir(filepath.Join(e.coralDir, "artifacts", "objects"))
+	assert.Empty(t, entries, "nothing was stored")
+	e.h.SetPaused("alpha", false)
+	code, _ = e.upload(t, sessAlice, "a.txt", "x")
+	assert.Equal(t, http.StatusCreated, code, "resumed: it works")
+}
+
+func TestTooManyFilesInAMinuteAreRefused(t *testing.T) {
+	old := shareLimitPerMinute
+	shareLimitPerMinute = 2
+	shareLimit = minuteLimiter{}
+	t.Cleanup(func() { shareLimitPerMinute = old; shareLimit = minuteLimiter{} })
+	e := newShareEnv(t, true)
+	for i, name := range []string{"one.txt", "two.txt"} {
+		code, out := e.upload(t, sessAlice, name, "file "+name)
+		require.Equal(t, http.StatusCreated, code, "file %d: %v", i, out)
+	}
+	code, out := e.upload(t, sessAlice, "three.txt", "file three")
+	assert.Equal(t, http.StatusTooManyRequests, code, out)
+	assert.Equal(t, "rate_limited", out["code"])
+}
