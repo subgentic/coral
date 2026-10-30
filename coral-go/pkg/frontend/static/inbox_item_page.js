@@ -10,7 +10,7 @@ export function mountInboxItem(host, { kind, team, id, back, onChanged, backLabe
     const task = kind === 'tasks';
     const teamURL = build(keyRoute('team', team, task ? 'tasks' : 'messages', task ? id : null));
     const backButton = () => {
-        const b = el('button', 'back-link goals-back', `← ${backLabel || (task ? 'Tasks' : 'Board history')}`); b.type = 'button'; b.addEventListener('click', back); return b;
+        const b = el('button', 'back-link goals-back'); b.append(el('span', null, `← ${backLabel || (task ? 'Tasks' : 'Board history')}`)); b.type = 'button'; /* the words are in a span: a phone's bar draws the arrow and hides them (layout.css) */ b.addEventListener('click', back); return b;
     };
     const links = () => {
         const row = el('div', 'goal-back-row'), link = el('a', 'goal-team-link inbox-team-link', 'Open on team page');

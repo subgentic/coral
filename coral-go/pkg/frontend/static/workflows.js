@@ -201,7 +201,7 @@ function renderWorkflowDetail(wf, runs) {
     const factRows = [['Folder', wf.repo_path || 'not set'], ['Time limit', limitWords(wf.max_duration_s || 3600)], ...(wf.created_at ? [['Created', formatTime(wf.created_at)]] : [])];
     container.innerHTML = `
         <button type="button" class="back-link" id="wf-back-btn" data-on-click="automations-back" data-folder="workflows">\u2190 Workflows</button>
-        <button type="button" class="back-link wf-phone-back" data-on-click="automations-back" data-folder="workflows">&larr; Workflows</button>
+        <button type="button" class="back-link wf-phone-back" data-on-click="automations-back" data-folder="workflows"><span>&larr; Workflows</span></button>
         <h2 class="wf-item-title" id="wf-title">${esc(wf.name)}</h2>
         <p class="item-meta wf-status-line">${esc(status)}</p>
         ${wf.description ? `<p class="wf-desc">${esc(wf.description)}</p>` : ''}
@@ -335,8 +335,8 @@ function renderRunDetail(run) {
         : '';
     container.innerHTML = `
         ${backHtml}
-        ${job ? '<button type="button" class="back-link wf-phone-back" data-on-click="automations-back" data-folder="jobs">&larr; Jobs</button>'
-            : '<button type="button" class="back-link wf-phone-back" data-on-click="automations-back" data-folder="workflows">&larr; Workflows</button>'}
+        ${job ? '<button type="button" class="back-link wf-phone-back" data-on-click="automations-back" data-folder="jobs"><span>&larr; Jobs</span></button>'
+            : '<button type="button" class="back-link wf-phone-back" data-on-click="automations-back" data-folder="workflows"><span>&larr; Workflows</span></button>'}
         <h2 class="wf-item-title wf-run-title">${esc(run.workflow_name ? `${run.workflow_name}, run #${run.id}` : `Run #${run.id}`)}</h2>
         ${runMetaHtml(run, signInFailure, errorExcerpt, job && job.name)}
         ${progressBarHtml}

@@ -209,7 +209,7 @@ function renderJobDetail(job, runs, workflowRuns, runsTotal, workflowRunsTotal) 
         : '';
     container.innerHTML = `
         <button type="button" class="back-link" data-on-click="automations-back" data-folder="jobs">&larr; Jobs</button>
-        <button type="button" class="back-link sched-back" data-on-click="automations-back" data-folder="jobs">&larr; Jobs</button>
+        <button type="button" class="back-link sched-back" data-on-click="automations-back" data-folder="jobs"><span>&larr; Jobs</span></button>
         ${failBanner}
         <div class="sched-header">
             <h2>${escapeHtml(job.name)}${isExample(job.name, job.description) ? ' <span class="chip chip-tag dt-tag">Example</span>' : ''}</h2>

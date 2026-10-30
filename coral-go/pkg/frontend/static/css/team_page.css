@@ -254,6 +254,7 @@
 .goal-team-link { font-size: var(--fs-md); font-weight: var(--fw-medium); color: var(--accent); }
 /* A task page's row in the Inbox holds the way back, the team link and the title: the back on the left and the link on the right over the title; on a phone the back is beside the title and the link is under them (the phone way-back rule) */
 .goal-back-row > .goals-back, .goal-back-row > .phone-title-row { order: 1; }
+.goal-back-row > .goals-back { white-space: nowrap; flex: none; } /* a way back is one line at any text size (it was "←" over "Tasks" at 200%) */
 .goal-back-row > .goal-team-link { order: 2; }
 @media (min-width: 761px) { .goal-back-row .phone-title-row > .goals-back { order: 1; } .goal-back-row .goals-detail-title { order: 3; flex: 0 0 100%; margin-top: 4px; } } /* a descendant: the folded phone-title-row is display: contents here, so the title is a flex item of the row; on a phone it stays beside the way back */
 @media (max-width: 760px) {
