@@ -11,6 +11,8 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+
+	"github.com/subgentic/coral/internal/secfile"
 )
 
 // EnsureDataDir creates Coral's data folder if it doesn't exist, readable by this user only:
@@ -54,7 +56,7 @@ func EnsureDataDir(dir string) error {
 		SetDataDirMadePrivate(dir, true)
 		// The marker outlives this process: until a start has renewed what is in the folder, each start renews it. The folder is private
 		// now, so the marker is too.
-		if err := os.WriteFile(filepath.Join(dir, ExposedPendingFile), []byte("Coral found this folder open to other accounts; the secrets in it are replaced at the next start.\n"), 0o600); err != nil {
+		if err := writeExposedPending(dir); err != nil {
 			log.Printf("[security] could not write %s: %v", ExposedPendingFile, err)
 		}
 	}
@@ -64,6 +66,24 @@ func EnsureDataDir(dir string) error {
 // ExposedPendingFile marks a data folder that Coral made private until a start has renewed what is in it (the API key, the agents'
 // tokens, the stored remote servers' marks). It is removed only when that has all been done (ClearDataDirExposed).
 const ExposedPendingFile = ".exposed-pending"
+
+// writeExposedPending creates dir's ExposedPendingFile as a new private file: whatever is at that name first (a link, a junction or an older
+// marker) is removed, never followed, and the file is opened without following a link and only if it does not exist.
+func writeExposedPending(dir string) error {
+	path := filepath.Join(dir, ExposedPendingFile)
+	if err := os.Remove(path); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return err
+	}
+	f, err := secfile.OpenNoFollow(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	if err != nil {
+		return err
+	}
+	if _, err := f.WriteString("Coral made this folder private; the next start renews the secrets in it.\n"); err != nil {
+		f.Close()
+		return err
+	}
+	return f.Close()
+}
 
 // DataDirMadePrivate reports whether this start made the data folder dir private, or an earlier start did and did not finish renewing
 // what is in it (ExposedPendingFile). Such a start renews the secrets Coral can renew (the API key, the agents' session tokens) and the
