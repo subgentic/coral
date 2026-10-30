@@ -50,3 +50,28 @@ func TestAPrivateFolderUnderAWiderFolderIsMadeThisUsersAlone(t *testing.T) {
 		t.Errorf("a folder that is this user's alone was changed again (%v, %v)", changed, err)
 	}
 }
+
+// The sweep removes only this user's folders: one this user made is theirs, and a folder another account owns (the Windows folder, owned by
+// TrustedInstaller) is not. A ct- folder owned by another account can't be made without an administrator's rights, so the sweep's skip is
+// tested through ownedByMe.
+func TestOnlyThisUsersFoldersCountAsOwned(t *testing.T) {
+	mine := t.TempDir()
+	fi, err := os.Lstat(mine)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ownedByMe(mine, fi) {
+		t.Error("a folder this user made is not counted as theirs")
+	}
+	sys := os.Getenv("SystemRoot")
+	if sys == "" {
+		t.Skip("no SystemRoot")
+	}
+	fi, err = os.Lstat(sys)
+	if err != nil {
+		t.Skip(err)
+	}
+	if ownedByMe(sys, fi) {
+		t.Errorf("%s, owned by another account, is counted as this user's", sys)
+	}
+}

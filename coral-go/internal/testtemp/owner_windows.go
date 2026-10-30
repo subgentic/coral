@@ -7,9 +7,20 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-// ownedByMe is always true on Windows: the system temp folder is the user's own (%LOCALAPPDATA%\Temp), and a TMP pointed elsewhere is
-// the person's own choice of folder.
-func ownedByMe(os.FileInfo) bool { return true }
+// ownedByMe reports whether path's owner is this process's user: a TMP pointed at a folder other accounts share can hold another user's
+// folders, which are not this run's to remove. A folder whose owner can't be read is left alone.
+func ownedByMe(path string, _ os.FileInfo) bool {
+	me, err := currentUser()
+	if err != nil {
+		return false
+	}
+	sd, err := windows.GetNamedSecurityInfo(path, windows.SE_FILE_OBJECT, windows.OWNER_SECURITY_INFORMATION)
+	if err != nil {
+		return false
+	}
+	owner, _, err := sd.Owner()
+	return err == nil && owner != nil && owner.Equals(me)
+}
 
 // ownerOnly gives dir a protected access list that grants this user alone full control, inherited by what is made in it, when its list
 // grants anyone else besides SYSTEM and Administrators: a TMP on a folder with a wider list (a shared drive's, which grants Authenticated

@@ -8,7 +8,7 @@ import (
 )
 
 // ownedByMe reports whether this user owns fi: /tmp is shared, and another user's folders are not this run's to remove.
-func ownedByMe(fi os.FileInfo) bool {
+func ownedByMe(_ string, fi os.FileInfo) bool {
 	st, ok := fi.Sys().(*syscall.Stat_t)
 	return ok && int(st.Uid) == os.Getuid()
 }
