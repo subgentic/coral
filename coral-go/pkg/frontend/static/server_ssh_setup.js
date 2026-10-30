@@ -28,10 +28,10 @@ const sayError = (r, fallback) => (r.data && (r.data.error || r.data.message)) |
 
 /** What each kind of plan is called and does, in the words the person confirms. */
 const KINDS = {
-    setup: { title: 'Set up a server over SSH', go: 'Set up', intro: 'This hub will connect to that computer with your SSH access, install the Coral release this hub runs under your home folder, and start it in tmux, listening on that computer only. Nothing is opened to the network.' },
-    upgrade: { title: 'Upgrade the server', go: 'Upgrade', intro: 'This hub will install the Coral release it runs on that computer and restart Coral there. A Coral that already runs this release is left alone.' },
-    stop: { title: 'Stop Coral on that computer', go: 'Stop Coral', intro: 'This stops Coral on that computer. Its files stay, and the server stays in this hub\'s list.' },
-    remove: { title: 'Remove Coral from that computer', go: 'Remove', intro: 'This stops Coral on that computer, deletes what was installed there, and removes the server from this hub.' },
+    setup: { title: 'Set up a computer over SSH', go: 'Set up', intro: 'This hub will connect to that computer with your SSH access, install the Coral release this hub runs under your home folder, and start it in tmux, listening on that computer only. Nothing is opened to the network.' },
+    upgrade: { title: 'Upgrade Coral on that computer', go: 'Upgrade', intro: 'This hub will install the Coral release it runs on that computer and restart Coral there. A Coral that already runs this release is left alone.' },
+    stop: { title: 'Stop Coral on that computer', go: 'Stop Coral', intro: 'This stops Coral on that computer. Its files stay, and the computer stays in this hub\'s list.' },
+    remove: { title: 'Remove Coral from that computer', go: 'Remove', intro: 'This stops Coral on that computer, deletes what was installed there, and removes the computer from this hub.' },
 };
 
 // The kinds, by their KINDS keys in this order (the names the hub's plan uses). They are taken from the keys so no quoted word here is read as an icon's name (the icon census counts any whole string that is one).
@@ -202,7 +202,7 @@ export function mountSshSetup(host, { mode = 'setup', server = null, action = nu
         const dl = el('dl', 'facts servers-facts');
         const fact = (k, v) => { const d = el('div', 'servers-fact'); d.append(el('dt', '', k), el('dd', '', v)); dl.append(d); };
         fact('Computer', p.target);
-        fact('Server name in this hub', `${p.label} (${p.server_id})`);
+        fact('Name in this hub', `${p.label} (${p.server_id})`);
         if (kind() === REMOVE) fact('Data', p.delete_data ? 'Deleted too: the key, the history and the install folder.' : 'Kept: the data, the key and the instance id stay on that computer.');
         root.append(el('p', 'ssh-intro', words().intro), dl, el('h5', 'ssh-subhead', 'What will happen'), stepList(p.steps));
         root.append(el('p', 'ssh-help', 'Nothing has connected yet. The next press connects, and checks the host key.'));
@@ -237,7 +237,7 @@ export function mountSshSetup(host, { mode = 'setup', server = null, action = nu
         }
         if (kind() === REMOVE || kind() === STOP) {
             root.append(el('p', 'ssh-note', kind() === REMOVE
-                ? 'If it fails after Coral was stopped, Coral on that computer stays stopped, and the server stays in this hub\'s list.'
+                ? 'If it fails after Coral was stopped, Coral on that computer stays stopped, and the computer stays in this hub\'s list.'
                 : 'Agents running in that Coral end when it stops.'));
         }
         if (needsTerms()) {
@@ -250,7 +250,7 @@ export function mountSshSetup(host, { mode = 'setup', server = null, action = nu
         }
         let typedOk = true;
         if (kind() === REMOVE) {
-            const l = el('label', 'ssh-label', `Type the server name (${p.server_id}) to confirm`); l.htmlFor = 'ssh-typed';
+            const l = el('label', 'ssh-label', `Type the computer name (${p.server_id}) to confirm`); l.htmlFor = 'ssh-typed';
             const t = el('input', 'field ssh-input'); t.id = 'ssh-typed'; t.type = 'text'; t.value = st.typed; t.autocomplete = 'off'; t.spellcheck = false;
             t.addEventListener('input', () => { st.typed = t.value; const go = root.querySelector('[data-ssh-go]'); if (go) go.disabled = st.busy || (keys.length > 0 && !st.keysOk) || st.typed.trim() !== p.server_id; });
             root.append(l, t);
@@ -270,7 +270,7 @@ export function mountSshSetup(host, { mode = 'setup', server = null, action = nu
         live.append(stepList(p.steps));
         root.append(live);
         if (done) {
-            root.append(el('p', 'ssh-done', kind() === 'setup' ? 'Done. The server is in your list.' : 'Done.'));
+            root.append(el('p', 'ssh-done', kind() === 'setup' ? 'Done. The computer is in your list.' : 'Done.'));
             const bar = el('div', 'servers-form-actions');
             bar.append(button('Close', 'btn-primary', close));
             root.append(bar);

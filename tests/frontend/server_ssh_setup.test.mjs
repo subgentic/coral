@@ -82,7 +82,7 @@ function fresh() { const host = doc.createElement('div'); doc.body.append(host);
     btn(host, 'Set up').click();
     await until(() => runBody, 'the run');
     assert.deepEqual(runBody, { accept_terms: true, terms_sha256: DIGEST, accept_keys: true }, 'only the acceptance and the digest of the terms shown are sent: no key');
-    await until(() => host.textContent.includes('Done. The server is in your list.'), 'the progress to finish');
+    await until(() => host.textContent.includes('Done. The computer is in your list.'), 'the progress to finish');
     assert.ok(changed >= 1, 'the server list was not told');
     btn(host, 'Close').click();
     assert.equal(closed, 1);

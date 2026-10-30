@@ -85,7 +85,7 @@ const HUB = `(() => {
             // run: the body, the steps, done
             await ev(`${btn('Set up')}.click(); true`);
             await waitFor(`!!document.querySelector('.ssh-progress[role="status"]')`, 'the progress', 8000);
-            await waitFor(`document.querySelector('.ssh-setup').textContent.includes('Done. The server is in your list.')`, 'done', 12000); await settle(200);
+            await waitFor(`document.querySelector('.ssh-setup').textContent.includes('Done. The computer is in your list.')`, 'done', 12000); await settle(200);
             const sent = await ev(`JSON.stringify(window.__hub.runBody)`);
             check(`${label}: Set up sent the acceptance, the digest of the terms shown and the key box, no key`, sent === JSON.stringify({ accept_terms: true, terms_sha256: 'b'.repeat(64), accept_keys: true }), sent);
             check(`${label}: the finished steps are all done`, await ev(`[...document.querySelectorAll('.ssh-step')].every(li => li.classList.contains('ssh-step-ok'))`));
