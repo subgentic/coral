@@ -115,6 +115,7 @@ func TestTheOwnerRoutesOfTheTableAreTheReviewedSet(t *testing.T) {
 		"POST /api/artifacts/{hex64}/comments":              "owner-only",
 		"POST /api/artifacts/{hex64}/comments/{id}/resolve": "owner-only",
 		"POST /api/artifacts/{hex64}/comments/{id}/reopen":  "owner-only",
+		"POST /api/sessions/live/{name}/dismiss-wait":       "owner-only",
 		"GET /api/board/{project}/settings":                 "owner-sees", "GET /api/system/update": "owner-update", "POST /api/system/update/relaunch": "owner-update",
 	}
 	got := map[string]string{}

@@ -111,6 +111,7 @@ var ownerRefusals = map[string]string{
 	tunnel.OwnerRouteKey("POST", "/api/artifacts/{hex64}/comments"):                 textCommentsOwnerOnly,
 	tunnel.OwnerRouteKey("POST", "/api/artifacts/{hex64}/comments/{id}/resolve"):    textCommentsOwnerOnly,
 	tunnel.OwnerRouteKey("POST", "/api/artifacts/{hex64}/comments/{id}/reopen"):     textCommentsOwnerOnly,
+	tunnel.OwnerRouteKey("POST", "/api/sessions/live/{name}/dismiss-wait"):          "through Coral Hub only the account this computer is linked to can dismiss an agent's wait (#11352)",
 	tunnel.OwnerRouteKey("PUT", "/api/board/{project}/settings"):                    "only the account this computer is linked to can change board settings through Coral Hub",
 	tunnel.OwnerRouteKey("GET", tunnel.PromptInspectionPath):                        "only the account this computer is linked to can read the prompts through Coral Hub",
 	tunnel.OwnerRouteKey("GET", "/api/board/{project}/cross-team/settings"):         textHubSwitchOwnerOnly,

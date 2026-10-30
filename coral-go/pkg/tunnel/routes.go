@@ -267,6 +267,9 @@ var routeTable = cat(
 		"/api/artifacts/{hex64}/comments/{id}/resolve",
 		"/api/artifacts/{hex64}/comments/{id}/reopen",
 	)),
+	// The Operator's Dismiss of a stale wait (#11352) is the OWNER's alone through the hub (the operator's rule: the owner gets everything): a guest or a grantee gets 403 owner_only. It clears Coral's
+	// own record of a wait and types nothing, presses nothing in the agent's terminal, so Interact; the machine's own mode still caps it.
+	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/sessions/live/{name}/dismiss-wait")),
 	// Saved for later (#4510) is the OWNER's alone through the hub (#5753, Shared Inbox, Security's condition 3): the list holds the bookmarks of the owner's chats, and the whole
 	// message of a bookmark (the text of its source, redacted and cut to 64 KiB; the source is the stored bookmark's, never a ref from the request) is read from its own route. The
 	// changes (POST, PATCH, DELETE) stay as they were (Interact).

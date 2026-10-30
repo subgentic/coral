@@ -41,6 +41,11 @@ const { coralReady } = require('./helpers/wait');
             const posts = await ev(`window.__posts`);
             assert.deepEqual(posts.map(p => p.body), [{ session_id: 'dw-id', agent_type: 'claude' }], `${w}: the id of the agent, nothing else: ${JSON.stringify(posts)}`);
             assert.ok(posts.every(p => /\/dismiss-wait$/.test(p.url)), `${w}: nothing went to send, keys or answer-prompt: ${JSON.stringify(posts)}`);
+            // through Coral Hub a guest is told who can (403 owner_only): said as a notice, and nothing else happens
+            await ev(`window.fetch = (u, o = {}) => Promise.resolve(new Response(JSON.stringify({ code: 'owner_only' }), { status: 403, headers: { 'content-type': 'application/json' } })); true`);
+            await ev(`import((window.__coralStatic || '/static/') + 'dismiss_wait.js').then(m => m.dismissWait(window.__row, null)).then(() => true)`);
+            await waitFor(`/linked to can dismiss it/.test(document.body.textContent)`, `${w}: a guest is told only the linked account can dismiss`, 8000);
+            await ev(`document.querySelectorAll('#notices .toast').forEach(t => t.remove()); true`);
             // a sign-in is not dismissed here
             await ev(`window.__row.waiting_kind = 'login'; document.querySelector('.inbox-answers')?.remove(); import((window.__coralStatic || '/static/') + 'inbox_answer.js').then(m => { window.__cell = m.answerCell(window.__row); return true; })`);
             assert.equal(await ev(`window.__cell === '' || !window.__cell.querySelector?.('.inbox-dismiss')`), true, `${w}: no Dismiss for a sign-in`);
