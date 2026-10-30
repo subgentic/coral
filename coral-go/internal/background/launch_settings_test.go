@@ -55,7 +55,7 @@ func TestCLIRunnersDoNotRunACommandWhenSettingsCannotBeRead(t *testing.T) {
 	var results []result
 
 	rec := &spawnRecorder{}
-	_, err = NewAgentLauncher(rec, ss, 8450).LaunchAgent(ctx, t.TempDir(), at.Claude, "job", "", nil, true, "p", "", "")
+	_, err = newTestLauncher(t, rec, ss, 8450).LaunchAgent(ctx, t.TempDir(), at.Claude, "job", "", nil, true, "p", "", "")
 	require.Error(t, err, "the background launcher fails")
 	assert.Contains(t, err.Error(), "settings")
 	rec.mu.Lock()

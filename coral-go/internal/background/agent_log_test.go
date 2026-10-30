@@ -26,7 +26,7 @@ func TestJobRunLogIsPrivate(t *testing.T) {
 	naming.SetDefaultLogDir(logs)
 	t.Cleanup(func() { naming.SetDefaultLogDir("") }) // unset again: it follows the temp dir
 	db := setupTestDB(t)
-	l := NewAgentLauncher(&spawnRecorder{}, store.NewSessionStore(db), 8450)
+	l := newTestLauncher(t, &spawnRecorder{}, store.NewSessionStore(db), 8450)
 	_, err := l.LaunchAgent(context.Background(), t.TempDir(), at.Claude, "job", "", nil, true, "p", "", "")
 	require.NoError(t, err)
 	matches, _ := filepath.Glob(filepath.Join(logs, "*_coral_*.log"))

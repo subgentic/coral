@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -35,6 +36,7 @@ type AgentLauncher struct {
 	// :8420 (#6767: a scheduled agent's events went to the default port, so a server on any other port stored none).
 	host     string
 	coralDir string
+	bg       sync.WaitGroup // the version probes a launch starts (Wait)
 }
 
 // runTagger is a runtime whose agents carry a run tag (the tmux one): the agent's processes get CORAL_PTY_RUN=<tag> so a Kill, a sleep or a quit finds what they detached. The built-in terminal
@@ -58,6 +60,10 @@ func (l *AgentLauncher) newRunTag() string {
 func (l *AgentLauncher) SetServer(host, coralDir string) {
 	l.host, l.coralDir = host, coralDir
 }
+
+// Wait returns when the version probes that launches started have finished (each runs the agent's CLI with --version and writes the answer to the store): what a test, or a shutdown that is about to close
+// the store, waits for so that none writes to a closed database or into a folder being removed (#11354).
+func (l *AgentLauncher) Wait() { l.bg.Wait() }
 
 // NewAgentLauncher creates a new AgentLauncher.
 func NewAgentLauncher(runtime AgentRuntime, sessDB *store.SessionStore, port int) *AgentLauncher {
@@ -237,7 +243,9 @@ func (l *AgentLauncher) launchAgent(ctx context.Context, workingDir, agentType, 
 			}
 		}
 		if !isTerminal {
+			l.bg.Add(1)
 			go func() {
+				defer l.bg.Done()
 				defer safego.Recover("background/launcher:recordCLIVersion")
 				recordCLIVersion(l.sessDB, sessionID, agentType)
 			}()

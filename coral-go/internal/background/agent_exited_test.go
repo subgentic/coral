@@ -213,7 +213,7 @@ func fastPromptTimings(t *testing.T, startWait time.Duration) {
 func TestLauncherPromptWaitsForTheCLI(t *testing.T) {
 	fastPromptTimings(t, 30*time.Second)
 	rt := &fgMockRuntime{}
-	l := NewAgentLauncher(rt, nil, 0)
+	l := newTestLauncher(t, rt, nil, 0)
 	name := FormatSessionName("claude", testUUID)
 
 	rt.set(name, "zsh")
@@ -230,7 +230,7 @@ func TestLauncherPromptWaitsForTheCLI(t *testing.T) {
 func TestLauncherPromptNeverTypedIntoAShell(t *testing.T) {
 	fastPromptTimings(t, 100*time.Millisecond)
 	rt := &fgMockRuntime{}
-	l := NewAgentLauncher(rt, nil, 0)
+	l := newTestLauncher(t, rt, nil, 0)
 	name := FormatSessionName("claude", testUUID)
 	rt.set(name, "zsh") // the CLI never starts
 	require.NoError(t, l.SendPrompt(context.Background(), testUUID, name, "claude", "do the task"))
