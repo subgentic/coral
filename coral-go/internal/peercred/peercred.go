@@ -239,7 +239,7 @@ func AttributeAt(client, server netip.AddrPort, accepted time.Time) (Verdict, er
 	}
 	client, server = unmap(client), unmap(server)
 	var err error
-	for attempt := 0; attempt < 2; attempt++ { // re-read once: the race with accept
+	for attempt := 0; attempt < 2; attempt++ { // re-read once: the race with accept, or a read that failed for a moment (macOS's sysctl size race, #409)
 		if attempt > 0 {
 			time.Sleep(retryWait)
 		}
@@ -253,8 +253,8 @@ func AttributeAt(client, server netip.AddrPort, accepted time.Time) (Verdict, er
 			}
 			return OtherUser, nil
 		}
-		if !errors.Is(err, ErrNotFound) {
-			break
+		if errors.Is(err, ErrLayout) {
+			break // a table layout this build doesn't know: reading it again tells nothing new
 		}
 	}
 	if errors.Is(err, ErrLayout) {
