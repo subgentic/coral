@@ -30,7 +30,7 @@ const BASE = require('./test_base').BASE;
             } else {
                 await ev(`window.switchNavTab('history'); true`);
                 await waitFor(`!!document.querySelector('.list-bar-search-row')`, 'the chats toolbar', 10000); await settle(600);
-                const e = await ev(`(() => { const row = document.querySelector('.list-bar-search-row').getBoundingClientRect().left; const sel = document.querySelector('#group-table-view .view-list-nav .view-list-item'); /* the tab strip's first tab (#11236 slice A) */ return { row: Math.round(row), select: sel ? Math.round(sel.getBoundingClientRect().left) : null }; })()`);
+                const e = await ev(`(() => { const row = document.querySelector('.list-bar-search-row').getBoundingClientRect().left; const sel = document.querySelector('#group-table-view .view-list-nav'); /* the tab strip's own left edge (#11236 slice A): its tabs scroll, the strip does not */ return { row: Math.round(row), select: sel ? Math.round(sel.getBoundingClientRect().left) : null }; })()`);
                 assert.ok(e.select !== null && e.row === e.select, at + 'the toolbar starts at the left edge of the folder button above it (the drawer\'s, #9545): ' + JSON.stringify(e));
                 await shot(`${w}-chats`);
             }
