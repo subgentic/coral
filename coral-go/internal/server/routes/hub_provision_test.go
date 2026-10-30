@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/base64"
@@ -12,6 +13,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -81,9 +83,22 @@ exit 0
 	return &provEnv{e: e, p: pr, dir: dir, router: r, known: known, sshLog: log, keyBlob: b64}
 }
 
+// do sends the request as the dashboard's person (the identity layer's classification of a signed-in browser).
 func (pe *provEnv) do(method, path string, body any) (int, map[string]any) {
-	e := &rsEnv{router: pe.router}
-	w := e.do(method, path, body)
+	return pe.send(true, method, path, body)
+}
+
+func (pe *provEnv) send(person bool, method, path string, body any) (int, map[string]any) {
+	var buf bytes.Buffer
+	if body != nil {
+		_ = json.NewEncoder(&buf).Encode(body)
+	}
+	req := httptest.NewRequest(method, path, &buf)
+	if person {
+		req = req.WithContext(context.WithValue(req.Context(), callerKindKey{}, callerDashCookie))
+	}
+	w := httptest.NewRecorder()
+	pe.router.ServeHTTP(w, req)
 	return w.Code, decodeMap(w)
 }
 
@@ -249,4 +264,57 @@ func mustB64(t *testing.T, s string) []byte {
 	b, err := base64.StdEncoding.DecodeString(s)
 	require.NoError(t, err)
 	return b
+}
+
+// A script with the hub's API key is automation, not the person who accepts the terms or pins a host key.
+func TestProvisionConnectAndRunAreAPersonsNotAScripts(t *testing.T) {
+	pe := newProvEnv(t, "unknown", "Linux x86_64", true)
+	_, v := pe.do("POST", "/api/servers/provision/plan", map[string]any{"target": "rich@box.example.com"})
+	plan := v["plan"].(string)
+	code, v := pe.send(false, "POST", "/api/servers/provision/"+plan+"/connect", nil)
+	assert.Equal(t, 403, code, "%v", v)
+	assert.Equal(t, "operator_only", v["code"])
+	_, st := pe.do("GET", "/api/servers/provision/"+plan, nil)
+	assert.Equal(t, "planned", st["phase"], "a refused connect changed the plan")
+	if b, err := os.ReadFile(pe.sshLog); err == nil && len(b) > 0 {
+		t.Errorf("a script's connect started ssh: %s", b)
+	}
+	_, _ = pe.do("POST", "/api/servers/provision/"+plan+"/connect", nil)
+	code, _ = pe.send(false, "POST", "/api/servers/provision/"+plan+"/run", map[string]any{"accept_terms": true, "accept_keys": true})
+	assert.Equal(t, 403, code)
+	_, err := os.Stat(pe.known)
+	assert.True(t, os.IsNotExist(err), "a script pinned a host key")
+}
+
+// Two Set up requests at once start one run, and the keys are written once.
+func TestProvisionTwoRunsAtOnceStartOne(t *testing.T) {
+	pe := newProvEnv(t, "known", "Linux x86_64", true)
+	_, v := pe.do("POST", "/api/servers/provision/plan", map[string]any{"target": "rich@box.example.com"})
+	plan := v["plan"].(string)
+	_, v = pe.do("POST", "/api/servers/provision/"+plan+"/connect", nil)
+	require.Equal(t, "connected", v["phase"], "%v", v)
+	var mu sync.Mutex
+	codes := map[int]int{}
+	var wg sync.WaitGroup
+	for i := 0; i < 8; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			code, _ := pe.do("POST", "/api/servers/provision/"+plan+"/run", map[string]any{"accept_terms": true})
+			mu.Lock()
+			codes[code]++
+			mu.Unlock()
+		}()
+	}
+	wg.Wait()
+	assert.Equal(t, 1, codes[202], "%v", codes)
+	assert.Equal(t, 7, codes[409], "%v", codes)
+}
+
+func TestKnownSystemKeepsOnlyWhatWeSupport(t *testing.T) {
+	assert.Equal(t, "Linux x86_64", knownSystem("Linux x86_64\n"))
+	assert.Equal(t, "Linux aarch64", knownSystem("Linux aarch64"))
+	for _, s := range []string{"", "Darwin arm64", "Linux x86_64; rm -rf ~", "Linux x86_64\nwelcome to box", "\x1b[31mLinux x86_64", "Linux armv7l"} {
+		assert.Equal(t, "", knownSystem(s), "%q", s)
+	}
 }

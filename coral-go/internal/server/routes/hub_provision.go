@@ -37,12 +37,14 @@ const (
 
 // Phases of a plan.
 const (
-	phasePlanned   = "planned"    // shown, not confirmed
-	phaseKeys      = "needs_keys" // connected; the host keys shown await the owner
-	phaseConnected = "connected"  // every host key known: ready for the run
-	phaseRunning   = "running"
-	phaseDone      = "done"
-	phaseFailed    = "failed"
+	phasePlanned    = "planned"    // shown, not confirmed
+	phaseKeys       = "needs_keys" // connected; the host keys shown await the owner
+	phaseConnected  = "connected"  // every host key known: ready for the run
+	phaseConnecting = "connecting" // a connect is in progress (one at a time per plan)
+	phaseTrusting   = "trusting"   // the confirmed keys are being written
+	phaseRunning    = "running"
+	phaseDone       = "done"
+	phaseFailed     = "failed"
 )
 
 // Step states.
@@ -260,16 +262,18 @@ func planSteps() []provisionStep {
 // Connect handles POST /api/servers/provision/{plan}/connect: the owner confirmed the host and the steps. The hub connects with strict host-key checking. A host it has never seen is scanned and
 // its fingerprints returned for the owner to confirm; a host whose key has CHANGED is refused and never offered for trust.
 func (pr *Provisioner) Connect(w http.ResponseWriter, r *http.Request) {
+	if !humanInputCaller(r) { // a script with the hub's API key is not the person who confirms a host
+		provisionPersonOnly(w)
+		return
+	}
 	p := pr.plan(chi.URLParam(r, "plan"))
 	if p == nil {
 		errNotFound(w, "no such setup")
 		return
 	}
-	p.mu.Lock()
-	phase := p.phase
-	p.mu.Unlock()
-	if phase != phasePlanned && phase != phaseKeys {
-		errConflict(w, "this setup is already past that step")
+	_, ok := p.moveFrom(phasePlanned, phaseKeys, phaseConnecting)
+	if !ok {
+		errConflict(w, "this setup is already past that step, or a connect is in progress")
 		return
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 45*time.Second)
@@ -279,7 +283,7 @@ func (pr *Provisioner) Connect(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case err == nil:
 		p.mu.Lock()
-		p.phase, p.keys, p.system = phaseConnected, nil, strings.TrimSpace(res.Stdout)
+		p.phase, p.keys, p.system = phaseConnected, nil, knownSystem(res.Stdout)
 		p.mu.Unlock()
 		p.setStep("connect", stepOK, "Connected; the host key is already known.")
 	case errors.Is(err, sshprov.ErrHostKeyChanged):
@@ -329,6 +333,10 @@ type runRequest struct {
 // Run handles POST /api/servers/provision/{plan}/run. Pressing Set up is the acceptance of the terms the dialog shows (accept_terms must be true); keys held under the plan are trusted only when the
 // owner accepted them (accept_keys), and it is THOSE keys, scanned by the hub, that are written.
 func (pr *Provisioner) Run(w http.ResponseWriter, r *http.Request) {
+	if !humanInputCaller(r) { // Set up is the person's acceptance of the terms and of the host keys: never a script's
+		provisionPersonOnly(w)
+		return
+	}
 	p := pr.plan(chi.URLParam(r, "plan"))
 	if p == nil {
 		errNotFound(w, "no such setup")
@@ -340,16 +348,26 @@ func (pr *Provisioner) Run(w http.ResponseWriter, r *http.Request) {
 		errBadRequest(w, "Set up needs the terms accepted")
 		return
 	}
+	// One critical section decides what happens: two requests cannot both start a run, or both trust the keys.
 	p.mu.Lock()
-	phase, keys := p.phase, append([]sshprov.HostKey(nil), p.keys...)
+	var keys []sshprov.HostKey
+	switch {
+	case p.phase == phaseConnected:
+		p.phase = phaseRunning
+	case p.phase == phaseKeys && req.AcceptKeys:
+		keys = append(keys, p.keys...)
+		p.phase = phaseTrusting
+	case p.phase == phaseKeys:
+		p.mu.Unlock()
+		errBadRequest(w, "confirm the host key first")
+		return
+	default:
+		p.mu.Unlock()
+		errConflict(w, "this setup is not ready to run, or is already running")
+		return
+	}
 	p.mu.Unlock()
-	switch phase {
-	case phaseConnected:
-	case phaseKeys:
-		if !req.AcceptKeys {
-			errBadRequest(w, "confirm the host key first")
-			return
-		}
+	if len(keys) > 0 {
 		for _, k := range keys {
 			if err := sshprov.Trust(pr.known(), k); err != nil {
 				slog.Info("[provision] could not trust a host key", "plan", p.ID, "error", err.Error())
@@ -359,22 +377,46 @@ func (pr *Provisioner) Run(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		p.mu.Lock()
-		p.phase, p.keys = phaseConnected, nil
+		p.keys, p.phase = nil, phaseRunning
 		p.mu.Unlock()
 		p.setStep("connect", stepOK, "Host key saved.")
-	default:
-		errConflict(w, "this setup is not ready to run")
-		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Minute)
 	p.mu.Lock()
-	p.phase, p.cancel = phaseRunning, cancel
+	p.cancel = cancel
 	p.mu.Unlock()
 	go func() {
 		defer cancel()
 		pr.runSteps(ctx, p)
 	}()
 	writeJSON(w, http.StatusAccepted, p.view())
+}
+
+func provisionPersonOnly(w http.ResponseWriter) {
+	writeError(w, http.StatusForbidden, "operator_only", "only a person at the dashboard can set a server up")
+}
+
+var linuxSystemRe = regexp.MustCompile(`^Linux (x86_64|aarch64)$`)
+
+// knownSystem is the remote's system text only when it is one we support, else empty: nothing else the far computer printed is kept or shown.
+func knownSystem(s string) string {
+	s = strings.TrimSpace(s)
+	if linuxSystemRe.MatchString(s) {
+		return s
+	}
+	return ""
+}
+
+// moveFrom sets the phase to next when it is one of from, in one critical section, and says what it was.
+func (p *provisionPlan) moveFrom(from1, from2, next string) (string, bool) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.phase != from1 && p.phase != from2 {
+		return "", false
+	}
+	prev := p.phase
+	p.phase = next
+	return prev, true
 }
 
 // detectSteps is the first real step of the run: the system and tmux. The install steps follow in later commits; until they exist the run says so and stops, and registers nothing.
@@ -400,7 +442,7 @@ func (pr *Provisioner) detectSteps(ctx context.Context, p *provisionPlan) {
 		return
 	}
 	p.mu.Lock()
-	p.system = sys
+	p.system = knownSystem(sys)
 	p.mu.Unlock()
 	p.setStep("detect", stepOK, sys+", tmux found.")
 	for _, s := range []string{"install", "start", "register"} {
