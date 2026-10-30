@@ -15,6 +15,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/subgentic/coral/internal/netbindtest"
 )
 
 // The real kernel tables: a connection this process opens is its own user's, on
@@ -26,6 +28,9 @@ func TestOwnerIsMeRealLoopback(t *testing.T) {
 		{"IPv4 to a dual-stack listener", "tcp", ":0", "tcp4", "127.0.0.1"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			if tc.listenAddr == ":0" {
+				netbindtest.Require(t) // every interface: a Windows Firewall prompt for the test binary
+			}
 			ln, err := net.Listen(tc.listenNet, tc.listenAddr)
 			if err != nil {
 				t.Skipf("%s unavailable: %v", tc.listenNet, err)

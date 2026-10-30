@@ -20,12 +20,14 @@ import (
 	"github.com/subgentic/coral/internal/agentenv"
 	"github.com/subgentic/coral/internal/auth"
 	"github.com/subgentic/coral/internal/config"
+	"github.com/subgentic/coral/internal/netbindtest"
 )
 
 // localNetworkIPv4 is a non-loopback IPv4 address of this machine (a LAN or tailnet address),
 // or "" when it has none.
 func localNetworkIPv4(t *testing.T) string {
 	t.Helper()
+	netbindtest.Require(t) // listening on a network address makes Windows Firewall ask about the test binary
 	addrs, err := net.InterfaceAddrs()
 	if err != nil {
 		return ""
