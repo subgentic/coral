@@ -1,5 +1,39 @@
 # Release Notes
 
+## v2.0.7 — Coral installs a downloaded update by itself when it is idle, a Windows in-app update that works, Pi agents get board messages, agents can no longer pkill by a pattern, and a long paste is one bubble
+
+### Changes
+
+#### What you will notice first
+
+- **Coral installs a downloaded update by itself when it is idle** (#11170): on by default; the switch is in Settings > Updates (`update_auto_install`). Coral looks every 30 seconds; once an update is downloaded and verified and Coral has been idle for five minutes it installs it. Idle means no agent working, no automated input in flight, nobody having typed to an agent for five minutes. It holds while any agent or terminal on Coral's own terminals would be restarted by the update ("N sessions would be restarted: click Update and relaunch"), and while a scheduled run or a workflow run is going; agents in tmux do not hold it. A failed automatic install is not retried in a loop: Coral waits a day and says why on the update control. The update history says who asked (local, Hub or auto), so an automatic install is not recorded as a Hub relaunch. It takes effect from this version on: a Coral older than 2.0.7 never installs by itself. **Windows stays click-to-install.**
+- **Windows: in-app update does not work from 2.0.0 through 2.0.6. Install the MSI by hand, up to and including 2.0.7; in-app update works from 2.0.7 onward.** The fixes in this release: the updater's copy is judged as the registered install, a refused apply starts Coral again, and a failed stop is in the history (#236); an installed `-rc` build checks for updates and is offered its own release (#237, #402); the updater starts with no console window of its own (#383, #212); and the updater's copy loads DLLs from the system folder only (#240).
+- **macOS: a Coral of 2.0.5 or earlier cannot install updates in-app; install 2.0.6 or later by hand once.**
+- **Agents can no longer stop other agents by a pattern** (#11157, #11211): a Claude agent's `pkill`, `killall` or `kill` of a `pgrep` result is refused at the hook with the reason and what to do instead, and `kill -1`, `kill 0` and a process group are refused too. `pkill` in a commit message, a quote or a heredoc is not refused, and `kill <pid>` is allowed. On by default; the `refuse_pattern_kill` setting turns it off. (A pattern kill matched other agents' launch prompts and ended three agents in one second.)
+- **Pi agents get board messages** (#11107, #11133): a board message reaches a Pi agent at its turn end, through the Coral extension. The text is composed by the server (a fixed opener, a count and the board's name, never a message's words), and the extension injects at most one every 30 seconds and three every 10 minutes. Pi's own editor is read, and a box Coral cannot read is pasted into once, not again (#11165).
+- **A long paste is one bubble** (#11166): a pasted message of more than 1000 characters no longer shows a second, cut "Sent" bubble that never goes.
+
+#### Teams, Hub and Settings
+
+- **A goal page through Coral Hub keeps its Artifacts tab** (#11190): the owner has the full list; a grantee sees a one-line note.
+- **Goals table: a finished goal's row keeps one line** (#11224): the title line ends with one "All tasks done · Close goal" chip.
+- **Tasks table: the State column is the state's word in the state's colour**, no pill, no dot (#11189), and Queued and the default state keep 4.5:1 contrast on the open and selected rows (#11210, #11250). The select column keeps its 44 px (#11160).
+- **An agent's page has no empty red box under its Save bar** (#11219).
+- **A board paused by Sleep no longer reads as "No new messages" with N unread** (#11198): the Stop hook and the after-tool check stay quiet for a paused board. A Sleep team's pause is not undone by the notifier's older look, and a sleeping agent never lifts it (#11204).
+- **The health monitor's "X has waited N min on you" reminder is no longer repeated every five minutes** (#11180).
+- **Update dialog:** for each agent the restart will end, it says what happens afterwards: it wakes in the same conversation, asks you, stays asleep, or starts a new conversation (#238).
+
+#### Phone
+
+- **Chat and Terminal are one button** in the header and the dots' line (#11187).
+- **The HTML artifact preview fills its dialog and pane, and scrolls to the end** (#11163).
+- **The phone card's "needs you" time uses the text-safe accent in both themes**, and the dark "now" on Needs you cards holds 4.5:1 (#11250).
+
+#### For developers
+
+- Tests stop writing into the source tree, the Windows failures assert what Windows does, and a data path inside the module's source tree fails the test at the call (#350, #214). `coral-update` tests never start the person's installed Coral. Tests that listen on a network address run on Windows only on CI or with `CORAL_TEST_NETWORK_BIND=1`.
+- `tools/trim-dev-caches.sh` trims the Go build cache hourly (files unused for 6 hours) and lists merged, idle worktrees; the launchd plist is `tools/dev.coral.trim-dev-caches.plist` (#11251).
+
 ## v2.0.6 — search access levels for agents, Pi on par with the other agents, a phone UI in the style of Google Chat, a macOS update that installs, and a deleted board that stays deleted
 
 ### Changes
