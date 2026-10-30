@@ -536,6 +536,22 @@ func (m *PTYBackend) AdoptAgent(name string) {
 	}
 }
 
+// handoffNoter is a session process that keeps the handoff script of its launch (Windows ConPTY, #391).
+type handoffNoter interface{ NoteLaunch(script, cli string) }
+
+// NoteLaunch tells a session the script Coral wrote for its launch ("" when the line was typed as it is) and the CLI path it launched with.
+func (m *PTYBackend) NoteLaunch(name, script, cli string) {
+	m.mu.RLock()
+	s, found := m.sessions[name]
+	m.mu.RUnlock()
+	if !found {
+		return
+	}
+	if h, can := s.proc.(handoffNoter); can {
+		h.NoteLaunch(script, cli)
+	}
+}
+
 // AgentNoticeVerdict says whether a notice may be typed into a session's terminal. ok is false when the session is gone or the platform cannot tell.
 func (m *PTYBackend) AgentNoticeVerdict(name string) (v tmux.NoticeVerdict, ok bool) {
 	m.mu.RLock()

@@ -24,6 +24,8 @@ type windowsPTY struct {
 	job    windows.Handle // ends the whole process tree (0: none)
 	// stopName is the session name the stop's own writes are recorded under in the input debug log (set before Terminate).
 	stopName string
+	// agent is what Coral recorded of the session's agent process (#389): board notices are typed only while it is the only program in the terminal.
+	agent winAgent
 }
 
 func (p *windowsPTY) setStopName(name string) { p.stopName = name }
@@ -140,6 +142,7 @@ func (p *windowsPTY) Close() error {
 
 // endTree terminates every process of the terminal's tree and releases the job.
 func (p *windowsPTY) endTree() {
+	p.agent.stopWatch() // the watch for the agent's process ends with the session (#389)
 	if p.job != 0 {
 		_ = windows.TerminateJobObject(p.job, 1)
 		_ = windows.CloseHandle(p.job)

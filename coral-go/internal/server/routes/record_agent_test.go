@@ -235,6 +235,30 @@ func TestRecordingAProgramUnderANestedShellNeedsTheAcknowledgement(t *testing.T)
 	assert.Equal(t, 100, term.recorded[nameA].PID)
 }
 
+// #391, Windows shims: a program behind the recognised launcher cmd (node behind claude.cmd) is the CLI's own process, so bulk records it though its image is not the CLI file; a program
+// that merely is not the CLI (no launcher) is left, and a launched program under a nested shell is never bulk-recorded.
+func TestBulkRecordFollowsTheLauncherShim(t *testing.T) {
+	srv, term, _, nameA, nameB := recordFixture(t)
+	term.paused[nameA], term.paused[nameB] = true, true
+	term.cand[nameA] = ptymanager.AgentCandidate{PID: 100, Start: "s1", Program: "node.exe", Image: `C:\Program Files\nodejs\node.exe`, Launched: true}
+	term.cand[nameB] = ptymanager.AgentCandidate{PID: 200, Start: "s2", Program: "node.exe", Image: `C:\Program Files\nodejs\node.exe`}
+
+	code, out := postRecordJSON(t, srv+"/api/sessions/record-agents", map[string]any{})
+	require.Equal(t, http.StatusOK, code)
+	recorded, _ := out["recorded"].([]any)
+	require.Len(t, recorded, 1)
+	assert.Equal(t, nameA, recorded[0].(map[string]any)["session"])
+	assert.Contains(t, term.recorded, nameA)
+	assert.NotContains(t, term.recorded, nameB, "a different program that is not behind the launcher is not recorded")
+
+	// Launched never overrides Under: a nested shell's program needs the button.
+	term.paused[nameB] = true
+	term.cand[nameB] = ptymanager.AgentCandidate{PID: 300, Start: "s3", Program: "node.exe", Under: "cmd", Launched: true}
+	_, out = postRecordJSON(t, srv+"/api/sessions/record-agents", map[string]any{})
+	assert.Empty(t, out["recorded"])
+	assert.NotContains(t, term.recorded, nameB)
+}
+
 // #391, Unix: after an update, an npm-installed CLI runs as `node <script>`. Bulk records it only when the IMAGE is an interpreter and the script is exactly the resolved CLI file.
 func TestBulkRecordsAnInterpreterRunningExactlyTheCLI(t *testing.T) {
 	srv, term, ss, nameA, nameB := recordFixture(t)
