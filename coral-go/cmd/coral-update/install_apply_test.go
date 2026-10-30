@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -147,4 +148,37 @@ func TestTheRegisteredInstallIsStartedByItsOwnSpelling(t *testing.T) {
 	other := installFolder(t) // a portable copy's server: its own folder is where it comes back
 	assert.True(t, restartFromMarker(t.TempDir(), other))
 	assert.Equal(t, []string{reg, other}, *started)
+}
+
+// When the DLL search lock could not be set (dll_windows.go), the apply says so in its log: its output is the null device when the dashboard starts it.
+func TestAFailedDLLSearchLockIsInTheApplyLog(t *testing.T) {
+	if !config.TierChecksForUpdates {
+		t.Skip("a build of another tier answers off")
+	}
+	oldVersion := config.Version
+	t.Cleanup(func() { config.Version = oldVersion })
+	config.Version = "2.0.3"
+	oldApply, oldProbe, oldErr := applyEnabled, applyProbe, dllLockErr
+	t.Cleanup(func() { applyEnabled, applyProbe, dllLockErr = oldApply, oldProbe, oldErr })
+	applyEnabled = true
+	applyProbe = func(string) *status.Install {
+		return &status.Install{Kind: "portable", Unsupported: "portable_install"}
+	}
+	dllLockErr = errors.New("The parameter is incorrect.")
+	fakeStart(t, nil)
+	data := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(data, "updates"), 0o700))
+	t.Setenv("CORAL_DATA_DIR", data)
+	runOut(t, nil, "apply")
+	b, err := os.ReadFile(filepath.Join(data, "updates", "apply.log"))
+	require.NoError(t, err)
+	assert.Contains(t, string(b), `"note":"dll_search_lock_failed"`)
+	assert.Contains(t, string(b), "The parameter is incorrect.")
+	assert.Contains(t, string(b), "portable_install", "the apply's own answer is still logged")
+
+	dllLockErr = nil
+	require.NoError(t, os.Remove(filepath.Join(data, "updates", "apply.log")))
+	runOut(t, nil, "apply")
+	b, _ = os.ReadFile(filepath.Join(data, "updates", "apply.log"))
+	assert.NotContains(t, string(b), "dll_search_lock_failed", "no note when the lock took")
 }

@@ -1,6 +1,7 @@
 package testguard
 
 import (
+	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -11,6 +12,8 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 // Census: no program loads a DLL by a bare name. A bare name is searched for in the folder the program runs from before the system folder, and the updater runs from a copy in a folder
@@ -55,6 +58,74 @@ func firstString(call *ast.CallExpr) string {
 	return ""
 }
 
+// bareDLLFindings reads one parsed file and returns what it does wrong, and how many system-folder loads (NewLazySystemDLL) it makes. Besides a call of a bare-name loader it
+// catches a LazyDLL built by hand (a struct literal) and a bare-name loader used as a VALUE (stored, passed or returned without being called), which a call-only census misses.
+func bareDLLFindings(fset *token.FileSet, f *ast.File, dir, name string) (findings []string, safe int) {
+	at := func(n ast.Node) string {
+		return fmt.Sprintf("%s:%d", filepath.Join(dir, name), fset.Position(n.Pos()).Line)
+	}
+	library := allowedLibrary(dir)
+	isatty := strings.Contains(filepath.ToSlash(dir), "mattn/go-isatty@")
+	called := map[ast.Node]bool{}   // the Fun of every call
+	declared := map[ast.Node]bool{} // names that are not a use of their own: a declared function, the name after a dot
+	ast.Inspect(f, func(n ast.Node) bool {
+		switch v := n.(type) {
+		case *ast.CallExpr:
+			called[v.Fun] = true
+		case *ast.FuncDecl:
+			declared[v.Name] = true
+		case *ast.SelectorExpr:
+			declared[v.Sel] = true // the name after a dot is judged with its selector, not on its own
+		}
+		return true
+	})
+	ast.Inspect(f, func(n ast.Node) bool {
+		switch v := n.(type) {
+		case *ast.CallExpr:
+			var fn string
+			switch c := v.Fun.(type) {
+			case *ast.SelectorExpr:
+				fn = c.Sel.Name
+			case *ast.Ident:
+				fn = c.Name
+			}
+			switch {
+			case fn == "NewLazySystemDLL":
+				safe++
+			case bareDLLLoads[fn] && knownDLLs[firstString(v)]:
+				// a KnownDLL by its literal name: the loader maps it from the system folder
+			case bareDLLLoads[fn] && library && isatty:
+				findings = append(findings, fmt.Sprintf("%s loads %q by a bare name: go-isatty is allowed only kernel32.dll and ntdll.dll", at(v), firstString(v)))
+			case bareDLLLoads[fn] && library:
+				// the loader itself
+			case bareDLLLoads[fn]:
+				findings = append(findings, fmt.Sprintf("%s loads a DLL by a bare name (%s): use windows.NewLazySystemDLL", at(v), fn))
+			}
+		case *ast.CompositeLit:
+			var tn string
+			switch ty := v.Type.(type) {
+			case *ast.SelectorExpr:
+				tn = ty.Sel.Name
+			case *ast.Ident:
+				tn = ty.Name
+			}
+			if tn == "LazyDLL" && !library {
+				findings = append(findings, fmt.Sprintf("%s builds a LazyDLL by hand (a bare-name load): use windows.NewLazySystemDLL", at(v)))
+			}
+		case *ast.SelectorExpr:
+			if bareDLLLoads[v.Sel.Name] && !called[v] && !library {
+				findings = append(findings, fmt.Sprintf("%s uses %s as a value: a bare-name loader must not be stored or passed (use windows.NewLazySystemDLL)", at(v), v.Sel.Name))
+			}
+		case *ast.Ident:
+			if bareDLLLoads[v.Name] && !called[v] && !declared[v] && !library {
+				findings = append(findings, fmt.Sprintf("%s uses %s as a value: a bare-name loader must not be stored or passed (use windows.NewLazySystemDLL)", at(v), v.Name))
+			}
+		}
+		return true
+	})
+	return findings, safe
+}
+
 func scanBareDLLLoads(t *testing.T, dir string) (calls, safe int) {
 	t.Helper()
 	entries, err := os.ReadDir(dir)
@@ -71,36 +142,44 @@ func scanBareDLLLoads(t *testing.T, dir string) (calls, safe int) {
 		if perr != nil {
 			continue
 		}
-		ast.Inspect(f, func(n ast.Node) bool {
-			call, ok := n.(*ast.CallExpr)
-			if !ok {
-				return true
-			}
-			var fn string
-			switch c := call.Fun.(type) {
-			case *ast.SelectorExpr:
-				fn = c.Sel.Name
-			case *ast.Ident:
-				fn = c.Name
-			}
-			switch {
-			case fn == "NewLazySystemDLL":
-				safe++
-			case bareDLLLoads[fn] && knownDLLs[firstString(call)]:
-				// a KnownDLL by its literal name: the loader maps it from the system folder
-			case bareDLLLoads[fn] && allowedLibrary(dir) && strings.Contains(filepath.ToSlash(dir), "mattn/go-isatty@"):
-				calls++
-				t.Errorf("%s:%d loads %q by a bare name: go-isatty is allowed only kernel32.dll and ntdll.dll", filepath.Join(dir, name), fset.Position(call.Pos()).Line, firstString(call))
-			case bareDLLLoads[fn] && allowedLibrary(dir):
-				// the loader itself
-			case bareDLLLoads[fn]:
-				calls++
-				t.Errorf("%s:%d loads a DLL by a bare name (%s): use windows.NewLazySystemDLL", filepath.Join(dir, name), fset.Position(call.Pos()).Line, fn)
-			}
-			return true
-		})
+		findings, s := bareDLLFindings(fset, f, dir, name)
+		safe += s
+		for _, msg := range findings {
+			calls++
+			t.Error(msg)
+		}
 	}
 	return calls, safe
+}
+
+// The scanner on source text: a call, a hand-built LazyDLL and a loader used as a value are each found, a system-folder load and a KnownDLL are not.
+func TestTheCensusCatchesALazyDLLLiteralAndALoaderUsedAsAValue(t *testing.T) {
+	find := func(src string) []string {
+		fset := token.NewFileSet()
+		f, err := parser.ParseFile(fset, "x.go", src, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		got, _ := bareDLLFindings(fset, f, "repo/pkg", "x.go")
+		return got
+	}
+	for name, src := range map[string]string{
+		"a call":                          `package p; import "syscall"; var d = syscall.NewLazyDLL("version.dll")`,
+		"a LazyDLL literal":               `package p; import "syscall"; var d = &syscall.LazyDLL{Name: "version.dll"}`,
+		"a bare literal of the type":      `package p; type LazyDLL struct{ Name string }; var d = LazyDLL{Name: "version.dll"}`,
+		"NewLazyDLL stored as a value":    `package p; import "syscall"; var load = syscall.NewLazyDLL`,
+		"LoadDLL passed as a value":       `package p; import "syscall"; func use(f func(string) (*syscall.DLL, error)) {}; func g() { use(syscall.LoadDLL) }`,
+		"LoadLibrary returned as a value": `package p; import "syscall"; func g() func(string) (uintptr, error) { return syscall.LoadLibrary }`,
+	} {
+		assert.NotEmpty(t, find(src), name)
+	}
+	for name, src := range map[string]string{
+		"a system-folder load":     `package p; import "golang.org/x/sys/windows"; var d = windows.NewLazySystemDLL("version.dll")`,
+		"a KnownDLL by its name":   `package p; import "syscall"; var d = syscall.NewLazyDLL("kernel32.dll")`,
+		"a function named LoadDLL": `package p; func LoadDLL(name string) {}`,
+	} {
+		assert.Empty(t, find(src), name)
+	}
 }
 
 func TestNoProgramLoadsADLLByABareName(t *testing.T) {
