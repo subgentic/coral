@@ -99,6 +99,11 @@ func TestResolveBaseOnADetachedHead(t *testing.T) {
 // Branch names are text from the repository: cleaned, capped at 20 names of 100 characters, the rest counted.
 func TestBranchMissingTextIsCleanedAndCapped(t *testing.T) {
 	dir := baseRepo(t, "master", true)
+	// The 120-character branch names make paths near Windows' 260-character limit once the test's own temp folder is below a private one
+	// (#177): git for Windows needs core.longpaths to write their ref files. It does nothing elsewhere.
+	if out, err := exec.Command("git", "-C", dir, "config", "core.longpaths", "true").CombinedOutput(); err != nil {
+		t.Fatalf("git config core.longpaths: %v: %s", err, out)
+	}
 	for i := 0; i < 25; i++ {
 		out, err := exec.Command("git", "-C", dir, "branch", fmt.Sprintf("b%02d-%s", i, strings.Repeat("x", 120))).CombinedOutput()
 		require.NoError(t, err, string(out))
