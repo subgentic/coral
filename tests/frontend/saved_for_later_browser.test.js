@@ -383,10 +383,10 @@ const hex = i => i.toString(16).padStart(20, '0');
         console.log('9. A phone at 200% text: the hamburger names the view and keeps Settings in its menu, with no Saved for later entry (the top bar has no bookmark, #9929); the Inbox\'s Saved folder is the way in');
         await ev(`window.switchNavTab('hub-inbox'); true`); // the Agents page has no top bar under 601 px (#11096): the hamburger is the Inbox's here
         await ev(`document.documentElement.style.fontSize = '32px'; true`);
-        await waitFor(`(() => { const b = document.getElementById('top-menu-btn').getBoundingClientRect(); return b.width > 0 && b.height >= 44; })()`, 'the hamburger at large text', 6000);
-        const big = await ev(`(() => { const b = document.getElementById('top-menu-btn'), br = b.getBoundingClientRect(), label = document.getElementById('top-menu-label'); return { w: br.width, h: br.height, left: br.left, right: br.right, labelFits: label.scrollWidth <= label.clientWidth + 1, page: document.documentElement.scrollWidth <= innerWidth }; })()`);
-        assert.ok(big.w >= 100 && big.h >= 44 && big.left >= 0 && big.right <= 390 && big.labelFits && big.page, 'the hamburger is an on-screen touch target that names the view: ' + JSON.stringify(big));
-        await ev(`document.getElementById('top-menu-btn').click(); true`);
+        await waitFor(`(() => { const b = document.getElementById('top-phone-menu').getBoundingClientRect(); return b.width > 0 && b.height >= 44; })()`, 'the hamburger at large text', 6000);
+        const big = await ev(`(() => { const b = document.getElementById('top-phone-menu'), br = b.getBoundingClientRect(), label = document.querySelector('#top-phone-bar .phone-bar-title'); /* the ☰ is a 44 px circle and the view's name is in the pill beside it (phone_bar.js, #11236) */ return { w: br.width, h: br.height, left: br.left, right: br.right, labelFits: label.scrollWidth <= label.clientWidth + 1 && label.textContent.trim().length > 0, page: document.documentElement.scrollWidth <= innerWidth }; })()`);
+        assert.ok(big.w >= 44 && big.h >= 44 && big.left >= 0 && big.right <= 390 && big.labelFits && big.page, 'the hamburger is an on-screen touch target that names the view: ' + JSON.stringify(big));
+        await ev(`document.getElementById('top-phone-menu').click(); true`);
         await waitFor(`!!document.querySelector('#nav-more-menu:not([hidden])')`, 'the hamburger menu at large text', 6000);
         assert.equal(await ev(`document.querySelectorAll('#nav-more-menu [data-on-click="m-show-saved"]').length`), 0, 'the menu has no Saved for later entry');
         assert.ok(!/Saved for later/.test(await ev(`document.getElementById('nav-more-menu').textContent`)), 'and none by its words');
@@ -397,7 +397,7 @@ const hex = i => i.toString(16).padStart(20, '0');
         await ev(`document.querySelector('#inbox-nav-list .view-list-item[data-key="saved"]').click(); true`);
         await waitFor(`${INBOX_SAVED} && true`, 'the Inbox folder to open Saved', 8000);
         await ev(`document.documentElement.style.fontSize = ''; true`);
-        await waitFor(`!document.body.classList.contains('saved-bar-wrap')`, 'the view selector to return to one row at normal text', 6000);
+        await waitFor(`(b => !!b && b.getBoundingClientRect().height <= 64)(document.getElementById('top-phone-bar'))`, 'the top bar to be one row at normal text (the shared bar never wraps: it is one row at 200% too)', 6000);
         console.log('   ✓');
 
         await Emulation.setTouchEmulationEnabled({ enabled: false });

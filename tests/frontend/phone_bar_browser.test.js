@@ -41,6 +41,11 @@ const BASE = require('./test_base').BASE;
                 assert.ok(!g.titled && (name === 'Home' || g.text.length > 0), `${tag}: ${name}'s pill has its title in it and no title attribute (no tooltip) above it: ` + JSON.stringify(g));
             }
         }
+        // a window between 601 and 767 px keeps its own layout, but Home's search is in the bar's pill and must still be there (the list is the page up to 767 px): visible, with no ☰ or avatar drawn
+        await Emulation.setDeviceMetricsOverride({ width: 700, height: 844, deviceScaleFactor: 1, mobile: false }); await Emulation.setTouchEmulationEnabled({ enabled: false });
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`); await settle(500);
+        const wide = await ev(`(() => { const i = document.querySelector('#mobile-agent-list .mobile-search-input'), m = document.querySelector('#mobile-agent-list .phone-menu-btn'), a = document.querySelector('#mobile-agent-list .phone-account-btn'); return { search: !!i && i.getBoundingClientRect().width > 100, menu: !!m && m.getClientRects().length > 0, account: !!a && a.getClientRects().length > 0 }; })()`);
+        assert.deepEqual(wide, { search: true, menu: false, account: false }, 'at 700 px Home has its search and no phone ☰ or avatar: ' + JSON.stringify(wide));
         // a drill-down is not this bar: no ☰ and no avatar
         await ev(`window.switchNavTab('tokens'); true`); await settle(700);
         assert.equal(await ev(`[...document.querySelectorAll('.phone-bar')].filter(b => b.getClientRects().length > 0).length`), 0, 'a drill-down (an Analytics view) draws neither ☰ nor the avatar');

@@ -1358,6 +1358,8 @@
    surfaces. Wider screens keep the sidebar's row (the avatar, the time and the preview are drawn by this block only). */
 .session-avatar, .session-time, .session-preview, .phone-menu-btn, .phone-account-btn, .phone-break, .phone-chips { display: none; }
 .phone-bar { display: none; }
+#mobile-agent-list .phone-bar { display: flex; align-items: center; gap: 4px; flex: 1 0 100%; min-width: 0; } /* Home's list is the page up to 767 px, and its search is in this bar: the bar is there at every width the list is (the ☰ and the avatar are drawn only on a phone, below) */
+#mobile-agent-list .phone-bar .phone-bar-pill { flex: 1 1 0; min-width: 0; margin: 0; }
 @media (max-width: 300px) { body.live-session-active:not(.popout-mode) .terminal-header { flex-wrap: wrap; } } /* a phone at 200% zoom is 195 px wide: the row wraps before ⋯ is cut off (phone_layout) */
 @media (max-width: 600px) {
     body.agent-home-active header.top-bar { display: none; }
