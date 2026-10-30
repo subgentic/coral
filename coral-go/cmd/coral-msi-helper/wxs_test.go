@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -67,7 +68,7 @@ func TestNoCustomActionRunsAConsoleProgram(t *testing.T) {
 	def := regexp.MustCompile(`<CustomAction Id="WriteEULAMarker"[^>]*/>`).FindString(wxs)
 	require.NotEmpty(t, def)
 	assert.Contains(t, def, `BinaryRef="CoralMsiHelper"`)
-	assert.Contains(t, def, `ExeCommand="eula"`)
+	assert.Contains(t, def, `ExeCommand="eula --product `)
 	assert.Contains(t, def, `Execute="immediate"`)
 	for _, a := range regexp.MustCompile(`<CustomAction [^>]*/>`).FindAllString(wxs, -1) {
 		assert.NotRegexp(t, `(?i)ExeCommand="[^"]*\b(cmd|powershell|pwsh|conhost)(\.exe)?\b`, a)
@@ -85,4 +86,20 @@ func TestOnlyTheUninstallsCloseForgetsTheRestart(t *testing.T) {
 	}
 	assert.Regexp(t, `^stop --uninstall `, exe("CloseCoralForUninstall"))
 	assert.NotContains(t, exe("CloseCoralForInstall"), "--uninstall")
+}
+
+// Every custom action that runs the helper names its product as the WiX define InstallFolderName (a constant of the build, not a property a person
+// can set on the msiexec line: the helper runs from a temporary copy and must never default to the live product's folder), and ignores the helper's
+// exit code so it can never fail an install.
+func TestEveryHelperActionInTheInstallerCarriesTheProduct(t *testing.T) {
+	wxs := readWxs(t)
+	actions := regexp.MustCompile(`(?s)<CustomAction [^>]*?BinaryRef="CoralMsiHelper"[^>]*?/>`).FindAllString(wxs, -1)
+	require.GreaterOrEqual(t, len(actions), 4, "the census found the helper's actions: WriteEULAMarker, CloseCoralForInstall, CloseCoralForUninstall, StartCoralAfterInstall")
+	const product = `--product &quot;$(var.InstallFolderName)&quot;`
+	for _, a := range actions {
+		id := regexp.MustCompile(`Id="([^"]+)"`).FindStringSubmatch(a)[1]
+		assert.Equal(t, 1, strings.Count(a, "--product"), "%s names a product once", id)
+		assert.Equal(t, 1, strings.Count(a, product), "%s: --product is the InstallFolderName define, nothing else", id)
+		assert.Regexp(t, `Return="(ignore|asyncNoWait)"`, a, "%s: the helper's exit code never fails the install", id)
+	}
 }

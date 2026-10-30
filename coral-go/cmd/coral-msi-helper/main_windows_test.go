@@ -93,7 +93,7 @@ func TestTheLogReachesItsFileWithNoStandardError(t *testing.T) {
 	os.Stderr = closed
 	t.Cleanup(func() { os.Stderr = stderr; log.SetOutput(stderr) })
 
-	closeLog := openLog()
+	closeLog := openLog("Coral Rehearsal")
 	log.Printf("a later line")
 	closeLog()
 
@@ -128,7 +128,7 @@ func TestAnElevatedRunLogsInTheMarkFolderNeverInTemp(t *testing.T) {
 	stderr := os.Stderr
 	t.Cleanup(func() { log.SetOutput(stderr) })
 
-	closeLog := openLog()
+	closeLog := openLog("Coral Rehearsal")
 	log.Printf("an elevated line")
 	closeLog()
 
@@ -148,7 +148,7 @@ func TestAnElevatedRunLogsInTheMarkFolderNeverInTemp(t *testing.T) {
 	out, cerr := exec.Command("cmd", "/c", "mklink", "/J", link, target).CombinedOutput()
 	require.NoError(t, cerr, "mklink /J: %s", out)
 	logIn(t, link)
-	closeLog = openLog()
+	closeLog = openLog("Coral Rehearsal")
 	log.Printf("not logged")
 	closeLog()
 	assert.Empty(t, mustGlob(t, filepath.Join(target, "*")), "nothing was created through the junction")
@@ -158,7 +158,7 @@ func TestAnElevatedRunLogsInTheMarkFolderNeverInTemp(t *testing.T) {
 // logIn points the elevated log at dir for the test.
 func logIn(t *testing.T, dir string) {
 	old := createLog
-	createLog = func(prefix string) (*os.File, error) { return installrestart.CreateLogIn(dir, prefix) }
+	createLog = func(_, prefix string) (*os.File, error) { return installrestart.CreateLogIn(dir, prefix) }
 	t.Cleanup(func() { createLog = old })
 }
 

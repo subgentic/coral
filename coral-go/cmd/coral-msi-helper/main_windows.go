@@ -52,14 +52,15 @@ import (
 )
 
 func main() {
-	closeLog := openLog()
+	product := productArg(os.Args[1:])
+	closeLog := openLog(product)
 	defer closeLog()
 	if len(os.Args) < 2 {
 		log.Printf("usage: coral-msi-helper stop --folder DIR... | start | eula")
 		return
 	}
 	if os.Args[1] == "eula" {
-		if len(os.Args) != 2 {
+		if len(os.Args) != 2 && !(len(os.Args) == 4 && os.Args[2] == "--product") {
 			log.Printf("eula: bad arguments")
 			return
 		}
@@ -70,6 +71,7 @@ func main() {
 	fs.SetOutput(io.Discard)
 	var folders multiFlag
 	fs.Var(&folders, "folder", "a Coral install folder")
+	fs.String("product", "", "the product's install-folder name, from the installer (read by productArg)")
 	wait := fs.Int("wait", 60, "seconds to wait for Coral to end")
 	uninstall := fs.Bool("uninstall", false, "stop: Coral is being uninstalled, so it is not started again")
 	// stop takes the folders to look in; start takes none: it starts Coral from the registered product, never from a folder on its command line.
@@ -84,9 +86,9 @@ func main() {
 	}
 	switch os.Args[1] {
 	case "stop":
-		stop(me, folders, time.Duration(*wait)*time.Second, *uninstall)
+		stop(me, folders, product, time.Duration(*wait)*time.Second, *uninstall)
 	case "start":
-		start(me)
+		start(me, product)
 	default:
 		log.Printf("unknown mode %q", os.Args[1])
 	}
@@ -129,21 +131,75 @@ func finalPath(dir string) string {
 // processElevated says whether this run's token is elevated (a variable so a test can run both paths whatever token the runner has).
 var processElevated = func() bool { return windows.GetCurrentProcessToken().IsElevated() }
 
-// createLog makes the elevated run's log in the mark folder (a variable so a test can point it at a test folder).
-var createLog = installrestart.CreateLog
+// The mark operations and the elevated log, by product (variables so a test can point them at a test folder or record them).
+var (
+	createLog  = installrestart.CreateLogFor
+	markFor    = installrestart.MarkFor
+	takeFor    = installrestart.TakeFor
+	discardFor = installrestart.DiscardFor
+)
+
+// markRestart, takeRestart and discardRestart are the helper's only touches of a mark, each in the folder of the product it was told. With no valid
+// product they do nothing and say so (no mark written, none taken, none removed): never a fallback to the live product.
+func markRestart(product string) {
+	if product == "" {
+		log.Printf("stop: no valid --product: no restart mark is written, so Coral won't be started again after the install")
+		return
+	}
+	if err := markFor(product, time.Now()); err != nil {
+		log.Printf("stop: Coral won't be started again after the install: %v", err)
+	}
+}
+
+func takeRestart(product string) bool {
+	if product == "" {
+		log.Printf("start: no valid --product: no restart mark is taken, so nothing is started")
+		return false
+	}
+	return takeFor(product, time.Now())
+}
+
+func discardRestart(product string) {
+	if product == "" {
+		log.Printf("stop: no valid --product: the restart mark is not touched")
+		return
+	}
+	if err := discardFor(product); err != nil {
+		log.Printf("stop: the restart mark: %v", err)
+	}
+}
+
+// productArg is the product's install-folder name the installer passed as --product NAME (a constant from the WiX define, never a property a person
+// can set on the msiexec line), or "" when it is missing, given twice, or not a Coral product's folder name. The helper runs from a temporary copy,
+// so it cannot tell its product from where it runs, and it must never default to "Coral" (the live product's folder): with "" it writes, takes and
+// removes no mark and writes no elevated log, and says why.
+func productArg(args []string) string {
+	product := ""
+	for i := 0; i < len(args); i++ {
+		if args[i] != "--product" {
+			continue
+		}
+		if product != "" || i+1 >= len(args) || !installrestart.ValidProduct(args[i+1]) {
+			return ""
+		}
+		product = args[i+1]
+		i++
+	}
+	return product
+}
 
 // openLog sends the log to a new coral-msi-helper-<random>.log in this user's temporary folder, and only there: a GUI program that Windows
 // Installer starts has no standard error, and a MultiWriter with it stopped at its failed write, so the file stayed empty (Security on
 // #155, tested live). A fixed name in a folder the user can write is a link an elevated run could be made to write through: a new file with
 // a random name is created, never opened (Security on #335). The first line says whether this run's token is elevated.
-func openLog() func() {
+func openLog(product string) func() {
 	log.SetFlags(log.LstdFlags)
 	var f *os.File
 	var err error
 	if processElevated() {
 		// An elevated run never writes into TEMP (the user's, a folder where a link can be planted): the log is created new in the opened, plain mark folder (#155
 		// review). No such folder, no log: never a fallback to TEMP.
-		f, err = createLog("coral-msi-helper")
+		f, err = createLog(product, "coral-msi-helper")
 	} else {
 		f, err = os.CreateTemp(os.TempDir(), "coral-msi-helper-*.log")
 	}
@@ -302,15 +358,13 @@ func coralOf(me identity, folders []string) func(proc) bool {
 	return func(p proc) bool { return p.who.is(me) && under(p.image, folders) }
 }
 
-func stop(me identity, folders []string, wait time.Duration, uninstall bool) {
+func stop(me identity, folders []string, product string, wait time.Duration, uninstall bool) {
 	if uninstall {
 		// Nothing is started after an uninstall: a mark is never added, and one already there is removed. Restart Manager may have closed the
 		// tray before this ran (an uninstall's close comes after its files-in-use check), and the tray marks when Restart Manager closes it
 		// (#345, step b). This runs only after consent, so a declined uninstall leaves the mark as it was.
 		defer func() {
-			if err := installrestart.Discard(); err != nil {
-				log.Printf("stop: the restart mark: %v", err)
-			}
+			discardRestart(product)
 		}()
 	}
 	procs, err := list(windows.PROCESS_TERMINATE|windows.SYNCHRONIZE, coralOf(me, folders))
@@ -334,8 +388,8 @@ func stop(me identity, folders []string, wait time.Duration, uninstall bool) {
 		}
 	} else if uninstall {
 		log.Printf("stop: Coral is being uninstalled: it won't be started again")
-	} else if err := installrestart.Mark(time.Now()); err != nil {
-		log.Printf("stop: Coral won't be started again after the install: %v", err)
+	} else {
+		markRestart(product)
 	}
 	for _, t := range trays {
 		quitTray(me, folders, t, wait)
@@ -450,8 +504,8 @@ func eula(elevated bool) {
 	log.Printf("eula: the terms accepted in the installer are recorded (%s)", license.EULAMarkerPath())
 }
 
-func start(me identity) {
-	if !installrestart.Take(time.Now()) {
+func start(me identity, product string) {
+	if !takeRestart(product) {
 		log.Printf("start: Coral was not running before the install: nothing to start")
 		return
 	}
