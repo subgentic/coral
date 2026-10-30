@@ -125,3 +125,18 @@ func TestCertificateCheckIsSkippedOnlyForLoopbackHttps(t *testing.T) {
 		assert.False(t, skipsCertificateCheck(addr), addr)
 	}
 }
+
+type refusingTransport struct{}
+
+func (refusingTransport) RoundTrip(*http.Request) (*http.Response, error) {
+	return nil, http.ErrNotSupported
+}
+
+// coral-board replaces http.DefaultTransport with one that signs its requests before it runs a command; the health question must not depend on what was installed there.
+func TestTheHealthQuestionDoesNotDependOnTheDefaultTransport(t *testing.T) {
+	l := newListener(t, 200, `{"status":"ok","version":"2.0.7","instance_id":"`+goodID+`"}`)
+	old := http.DefaultTransport
+	http.DefaultTransport = refusingTransport{}
+	t.Cleanup(func() { http.DefaultTransport = old })
+	assert.Equal(t, l.srv.URL, VerifiedServer(record(t, os.Getpid(), l.srv.URL, goodID)))
+}

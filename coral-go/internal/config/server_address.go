@@ -60,6 +60,10 @@ const healthTimeout = 2 * time.Second
 // defaultServerURL is where a command goes when no usable record names the Coral: this platform's default port. A variable so a test can point it at a scratch server.
 var defaultServerURL = "http://localhost:" + strconv.Itoa(DefaultPort)
 
+// plainTransport is http.DefaultTransport as this package found it at start-up. A command may later replace the default transport with one that signs its requests
+// (coral-board does, before it runs a command), and the health question must be asked with the plain one, whatever was installed since.
+var plainTransport, _ = http.DefaultTransport.(*http.Transport)
+
 type healthAnswer struct {
 	Status     string `json:"status"`
 	Version    string `json:"version"`
@@ -71,11 +75,10 @@ type healthAnswer struct {
 // a listener could misuse; the instance id in the answer, not the certificate, is the identity (a record without one is the weaker check VerifiedServer says).
 func askHealth(addr string) (healthAnswer, bool) {
 	var h healthAnswer
-	tr, ok := http.DefaultTransport.(*http.Transport)
-	if !ok {
+	if plainTransport == nil {
 		return h, false
 	}
-	tr = tr.Clone() // keeps the default transport's dial hook (the tests' guard against reaching a live Coral)
+	tr := plainTransport.Clone() // keeps the default transport's dial hook (the tests' guard against reaching a live Coral)
 	if skipsCertificateCheck(addr) {
 		tr.TLSClientConfig = &tls.Config{InsecureSkipVerify: true} //nolint:gosec // loopback only, no credential sent, identity is the instance id
 	}
