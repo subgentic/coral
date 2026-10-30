@@ -61,7 +61,7 @@ func (h *SessionsHandler) activeWorktree(ctx context.Context, name, sessionID, l
 	if sessionID == "" || h.ts == nil {
 		return followedWorktree{}, false
 	}
-	events, err := h.ts.ListAgentEvents(ctx, name, followEvents, &sessionID) // newest first
+	events, err := h.ts.ListAgentEvents(ctx, "", followEvents, &sessionID) // newest first; by session alone: an event's agent_name is the live row's, which the panel's URL (the tmux session name) is not
 	if err != nil {
 		return followedWorktree{}, false
 	}

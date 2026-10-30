@@ -81,8 +81,9 @@ func newFollowRig(t *testing.T, launchIsGit bool) *followRig {
 func (r *followRig) event(tool string, detail map[string]any) {
 	r.t.Helper()
 	b, _ := json.Marshal(detail)
-	dj, sid, name := string(b), r.sid, r.name
-	_, err := r.handler.ts.InsertAgentEvent(context.Background(), &store.AgentEvent{AgentName: name, SessionID: &sid, EventType: "tool_use", ToolName: &tool, Summary: "Ran: " + tool, DetailJSON: &dj})
+	dj, sid := string(b), r.sid
+	// the event's agent name is the live row's (what the events route stores: the agent's own name), not the tmux session name the panel's URL carries: the two differ for a real agent
+	_, err := r.handler.ts.InsertAgentEvent(context.Background(), &store.AgentEvent{AgentName: "proj", SessionID: &sid, EventType: "tool_use", ToolName: &tool, Summary: "Ran: " + tool, DetailJSON: &dj})
 	require.NoError(r.t, err)
 }
 
