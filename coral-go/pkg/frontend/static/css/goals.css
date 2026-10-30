@@ -14,7 +14,7 @@
 
 /* A state is a coloured dot and its word in the same colour at normal weight: no outline, no fill (the operator, #11356). One component for every list (data_table.js chip()); each state has its own colour,
  * the text one of the theme's -text tokens (4.5:1 on a row in both themes), the dot its plain hue. On a phone the dot alone stands for the state: the word stays in the page, hidden, as its name. */
-.state-label { --goal-hue: var(--text-muted); --goal-text: var(--text-secondary); display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; color: var(--goal-text); font-size: var(--fs-md); font-weight: var(--fw-regular); }
+.state-label { --goal-hue: var(--text-muted); --goal-text: var(--text-primary); display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; color: var(--goal-text); font-size: var(--fs-md); font-weight: var(--fw-regular); }
 .goal-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--goal-hue); flex: none; }
 .goal-state-active, .goal-state-task-active { --goal-hue: var(--accent); --goal-text: var(--link-text); }
 .goal-state-task-review { --goal-hue: var(--state-review); --goal-text: var(--state-review); }
