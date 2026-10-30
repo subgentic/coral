@@ -32,8 +32,9 @@ func NewManager(cfg Config) *Manager {
 	return &Manager{cfg: cfg, servers: map[string]*managed{}}
 }
 
-// Ensure returns the agent's server, starting it (and the reading of its events) on the first call; a server that has since exited is started again.
-func (m *Manager) Ensure(ctx context.Context, key string) (*Server, error) {
+// Ensure returns the agent's server, starting it (and the reading of its events) on the first call; a server that has since exited is started again. bin is the opencode binary the person's settings
+// name, "opencode" (found on the PATH) when it is empty and the manager has none of its own.
+func (m *Manager) Ensure(ctx context.Context, key, bin string) (*Server, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.closed {
@@ -48,7 +49,13 @@ func (m *Manager) Ensure(ctx context.Context, key string) (*Server, error) {
 			return g.srv, nil
 		}
 	}
-	srv, err := Start(ctx, m.cfg, key)
+	cfg := m.cfg
+	if bin != "" {
+		cfg.Bin = bin
+	} else if cfg.Bin == "" {
+		cfg.Bin = "opencode"
+	}
+	srv, err := Start(ctx, cfg, key)
 	if err != nil {
 		return nil, err
 	}

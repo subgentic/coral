@@ -13,7 +13,7 @@ import (
 // OpencodeRuntime is what an opencode agent needs of the server Coral runs for it (opencode.Manager): the server started for the agent (Ensure), the state its event stream gave (AgentTurn), and the end of
 // both with the agent (Stop). The key is the agent's Coral session id.
 type OpencodeRuntime interface {
-	Ensure(ctx context.Context, key string) (*opencode.Server, error)
+	Ensure(ctx context.Context, key, bin string) (*opencode.Server, error)
 	AgentTurn(key string) (opencode.State, time.Time, bool)
 	Stop(key string)
 }
@@ -27,7 +27,7 @@ func (h *SessionsHandler) launchCommand(ctx context.Context, ag agent.Agent, p a
 		if h.opencode == nil {
 			return "", fmt.Errorf("opencode: Coral's opencode server is not available")
 		}
-		srv, err := h.opencode.Ensure(ctx, p.SessionID)
+		srv, err := h.opencode.Ensure(ctx, p.SessionID, p.CLIPath)
 		if err != nil {
 			return "", err
 		}

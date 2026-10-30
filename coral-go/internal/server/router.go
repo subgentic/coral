@@ -9,6 +9,7 @@ import (
 	"io/fs"
 	"log"
 	"net/http"
+	"path/filepath"
 
 	"github.com/go-chi/cors"
 	"github.com/subgentic/coral/internal/auth"
@@ -18,6 +19,7 @@ import (
 	"github.com/subgentic/coral/internal/config"
 	"github.com/subgentic/coral/internal/httputil"
 	"github.com/subgentic/coral/internal/logexit"
+	"github.com/subgentic/coral/internal/opencode"
 	"github.com/subgentic/coral/internal/operatortouch"
 	"github.com/subgentic/coral/internal/ptymanager"
 	"github.com/subgentic/coral/internal/server/routes"
@@ -218,6 +220,8 @@ func (s *Server) newRouteHandlers() *routeHandlers {
 	runTagStore := store.NewSessionStore(s.db)
 	ptymanager.SetRunTagLookup(func(sessionID string) string { return runTagStore.RunTagOf(context.Background(), sessionID) })
 	s.sessHandler = sessHandler
+	s.opencode = opencode.NewManager(opencode.Config{DataDir: filepath.Join(s.cfg.CoralDir(), "opencode")}) // the binary comes from the person's settings at each launch
+	sessHandler.SetOpencodeRuntime(s.opencode)
 	// The Operator's touches of agents are counted for the Analytics tab (#11225): which session, what kind, never what was typed. The terminal's person path, the answer, stop, wake and restart routes
 	// and the Operator's task approval write them; a session that is on no board is not recorded.
 	if s.boardStore != nil {

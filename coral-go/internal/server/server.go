@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/subgentic/coral/internal/cloud"
+	"github.com/subgentic/coral/internal/opencode"
 	"github.com/subgentic/coral/internal/operatortouch"
 	"github.com/subgentic/coral/internal/safego"
 	"html/template"
@@ -70,6 +71,7 @@ type Server struct {
 	boardHandler    *routes.BoardHandler
 	historyHandler  *routes.HistoryHandler
 	sessHandler     *routes.SessionsHandler
+	opencode        *opencode.Manager       // one opencode server per opencode agent; stopped with the server
 	touches         *operatortouch.Recorder // the Operator's touches of agents, shared by the handlers that record them (#11225)
 	sysHandler      *routes.SystemHandler   // the update notice's source is set where the updater is built (registerCloud, #9726)
 	remoteAgents    *background.RemoteAgentHub
@@ -243,6 +245,9 @@ const closeWait = 5 * time.Second
 // server has stopped; it is safe to call more than once.
 func (s *Server) Close() {
 	s.closeOnce.Do(func() {
+		if s.opencode != nil {
+			s.opencode.Close() // every opencode server Coral started ends with it, by its own pid
+		}
 		if s.bgStop != nil {
 			s.bgStop()
 		}

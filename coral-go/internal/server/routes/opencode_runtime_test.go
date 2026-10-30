@@ -20,7 +20,7 @@ type fakeOpencode struct {
 	stopped []string
 }
 
-func (f *fakeOpencode) Ensure(context.Context, string) (*opencode.Server, error) {
+func (f *fakeOpencode) Ensure(context.Context, string, string) (*opencode.Server, error) {
 	return nil, assert.AnError
 }
 func (f *fakeOpencode) AgentTurn(string) (opencode.State, time.Time, bool) {
