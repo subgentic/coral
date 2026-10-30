@@ -18,6 +18,12 @@ const FAKE = `(() => {
     const ok = name => console.log(`   ✓ ${name}`);
     const shown = () => ev(`(() => { const b = document.getElementById('local-auth-banner'); return !!b && !b.hidden && b.checkVisibility({ checkVisibilityCSS: true }); })()`);
     const dismissBtn = () => ev(`(() => { const x = document.getElementById('local-auth-dismiss'); return x ? { shown: !x.hidden && x.getClientRects().length > 0, name: (x.getAttribute('aria-label') || x.textContent).trim(), h: Math.round(x.getBoundingClientRect().height) } : null; })()`);
+    // A new install with no password opens the Set a password dialog by itself, and the banner is hidden while it is open (#11336, 9b7e5adf9): close it as a person does (Not now), then look at the banner.
+    const closePw = async () => {
+        await waitFor(`!!document.getElementById('set-password-modal')`, 'the first-launch password dialog', 3000).catch(() => {});
+        await ev(`(() => { const m = document.getElementById('set-password-modal'); if (!m) return true; const b = [...m.querySelectorAll('button')].find(x => /not now|skip|cancel/i.test(x.textContent)); if (b) b.click(); else m.remove(); return true; })()`);
+        await waitFor(`!document.getElementById('set-password-modal')`, 'the password dialog closed', 5000);
+    };
     const load = async () => { await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev); };
     try {
         await Page.enable();
@@ -30,6 +36,7 @@ const FAKE = `(() => {
             await ev(`localStorage.removeItem('coral-nopw-banner-dismissed'); true`);
             await load();
             await waitFor(`!document.getElementById('local-auth-banner').hidden`, `${w}: the no-password banner shows on a new install`, 15000);
+            await closePw();
             assert.equal(await shown(), true);
             const d = await dismissBtn();
             assert.ok(d && d.shown && /Dismiss/i.test(d.name), `${w}: it can be dismissed: ${JSON.stringify(d)}`);
