@@ -78,3 +78,10 @@ func opencodeRFC3339(s string) string {
 	}
 	return ""
 }
+
+// IsLabelSource reports whether a history row's source is a label, not a file (an opencode agent's, whose history is kept by its own server): anything that opens session_index.source_file as a path must ask this
+// first and never open a label, which is a relative path in whatever folder Coral was started from.
+func IsLabelSource(source string) bool { return strings.HasPrefix(source, OpencodeSourcePrefix) }
+
+// LabelSourceNote is what a person is told when a label source is asked to be opened as a file.
+const LabelSourceNote = "this agent's history is kept by its own server; it cannot be opened here"

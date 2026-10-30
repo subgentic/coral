@@ -2,6 +2,7 @@ package routes
 
 import (
 	"context"
+	"github.com/subgentic/coral/internal/agent"
 	"net/http"
 	"sort"
 	"strings"
@@ -81,7 +82,7 @@ func (h *HistoryHandler) SearchChats(w http.ResponseWriter, r *http.Request) {
 			status = "unavailable"
 		} else {
 			for _, idx := range listed.Sessions {
-				if idx.SourceFile == "" || !fileExists(idx.SourceFile) {
+				if idx.SourceFile == "" || agent.IsLabelSource(idx.SourceFile) || !fileExists(idx.SourceFile) { // a label (opencode) is not a file
 					unavailable++
 					continue
 				}

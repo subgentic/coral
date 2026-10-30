@@ -102,3 +102,36 @@ func TestTheOpencodeSourceLeavesAnAgentThatIsWorkingOrHasNoSessionYet(t *testing
 	fake.turns[ocAgent] = opencode.StateFailed
 	assert.Len(t, src.ExtractLive(context.Background(), map[string]float64{}), 1, "a failed turn has ended")
 }
+
+type blockingSource struct {
+	started chan struct{}
+	release chan struct{}
+}
+
+func (b *blockingSource) ExtractLive(context.Context, map[string]float64) []agent.IndexedSession {
+	close(b.started)
+	<-b.release
+	return nil
+}
+
+// A source may read many agents' servers one after another: the pass's lock is never held across it (Security's INFO 3, #137942).
+func TestAPassDoesNotHoldItsLockWhileALiveSourceReads(t *testing.T) {
+	ctx := context.Background()
+	db, err := store.OpenWithKey(ctx, filepath.Join(t.TempDir(), "sessions.db"), "")
+	require.NoError(t, err)
+	defer db.Close()
+	idx := NewSessionIndexer(store.NewSessionStore(db), nil, time.Hour, 0)
+	src := &blockingSource{started: make(chan struct{}), release: make(chan struct{})}
+	idx.AddLiveSource(src)
+	done := make(chan error, 1)
+	go func() { done <- idx.RunOnce(ctx) }()
+	select {
+	case <-src.started:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the source was never asked")
+	}
+	require.True(t, idx.runMu.TryLock(), "the pass's lock is free while the source reads")
+	idx.runMu.Unlock()
+	close(src.release)
+	require.NoError(t, <-done)
+}

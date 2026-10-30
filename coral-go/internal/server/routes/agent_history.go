@@ -3,6 +3,7 @@ package routes
 import (
 	"context"
 	"fmt"
+	"github.com/subgentic/coral/internal/agent"
 	"github.com/subgentic/coral/internal/secrets"
 	"github.com/subgentic/coral/pkg/redact"
 	"net/http"
@@ -514,6 +515,9 @@ func (h *SessionsHandler) loadSessionMessages(ctx context.Context, item store.Se
 	}
 
 	// Historical ancestor session: prefer direct SourceFile if recorded
+	if agent.IsLabelSource(item.SourceFile) {
+		return nil, agent.LabelSourceNote, nil // a label, never opened as a path
+	}
 	if item.SourceFile != "" {
 		if !fileExists(item.SourceFile) {
 			return nil, fmt.Sprintf("historical transcript file %s does not exist", item.SourceFile), nil
