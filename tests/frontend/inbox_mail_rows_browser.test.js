@@ -22,7 +22,7 @@ const AGENTS = [
     const T = '#group-table-view';
     const rows = () => ev(`(() => [...document.querySelectorAll('${T} tr.dt-mailed')].map(tr => { const r = e => e && e.getBoundingClientRect(), q = s => tr.querySelector(s), box = r(tr);
         return { h: Math.round(box.height), lead: Math.round(r(q('.dt-mail-lead')).height), leadW: Math.round(r(q('.dt-mail-lead')).width), avatar: Math.round(r(q('.dt-mail-avatar')).width), title: q('.dt-mail-title').textContent, snippet: q('.dt-mail-snippet').textContent, ask: q('.dt-mail-ask') && q('.dt-mail-ask').textContent,
-            time: q('.dt-mail-time').textContent, bold: getComputedStyle(q('.dt-mail-title')).fontWeight, dot: !!q('.dt-mail-dot'), sameLine: Math.abs(r(q('.dt-mail-title')).top - r(q('.dt-mail-snippet')).top) < 4, timeRight: Math.round(box.right - r(q('.dt-mail-time')).right), open: !!q('button.dt-mail-open') }; }))()`);
+            more: !!q('.dt-mail-more'), time: q('.dt-mail-time').textContent, bold: getComputedStyle(q('.dt-mail-title')).fontWeight, dot: !!q('.dt-mail-dot'), sameLine: Math.abs(r(q('.dt-mail-title')).top - r(q('.dt-mail-snippet')).top) < 4, timeRight: Math.round(box.right - r(q('.dt-mail-time')).right), open: !!q('button.dt-mail-open') }; }))()`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [w, h, mobile] of [[1280, 820, false], [390, 844, true], [412, 915, true], [360, 780, true]]) {
@@ -51,7 +51,7 @@ const AGENTS = [
                 assert.ok(x.leadW >= 44 && x.lead >= 44 && x.avatar === 32, at + 'a 44 px target around a 32 px avatar ' + JSON.stringify(x));
                 assert.ok(x.open && x.dot && x.bold >= 600, at + 'a button, the amber dot, the title bold ' + JSON.stringify(x));
                 assert.ok(x.h === 56 && x.sameLine && !x.ask && x.snippet.trim(), at + 'Needs you is one line, 56 px like Tasks and Saved: the agent, then what it asks (#9986, the operator: Gmail-like one-line rows) ' + JSON.stringify(x));
-                assert.ok(x.timeRight <= 16 && /ago|min|\d/.test(x.time), at + 'the time is at the right ' + JSON.stringify(x));
+                assert.ok(x.timeRight <= (x.more ? 16 + 44 : 16) && /ago|min|\d/.test(x.time), at + 'the time is at the right (a row with a ⋯ keeps its 44 px: #137104) ' + JSON.stringify(x));
             }
             assert.ok(r.some(x => /Wants to run: go test/.test(x.snippet)) && r.some(x => x.snippet.trim() && x.title === 'Agent Two'), at + 'the ask follows the name on its line, the state when there is none ' + JSON.stringify(r));
             await ev(`document.querySelectorAll('${T} tr.dt-mailed .dt-primary').forEach((b, i) => b.setAttribute('data-axp', String(i))); true`);
