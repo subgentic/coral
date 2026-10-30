@@ -4,6 +4,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 const STUB = `(() => { const real = window.fetch; window.__saved = [];
     window.fetch = (u, o = {}) => { const p = new URL(String(u), location.origin).pathname, m = (o.method || 'GET').toUpperCase();
@@ -24,7 +25,7 @@ const STUB = `(() => { const real = window.fetch; window.__saved = [];
             const at = `at ${w}px: `;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.then(() => true)`); await ev(STUB);
+            await coralReady(ev); await ev(STUB);
 
             // 1. a template fills the form, and saves nothing until Create
             await ev(`window.openAutomationsFolder('workflows'); window.showWorkflowCreateModal(); true`);

@@ -4,6 +4,7 @@
 // 1280 and 390 px; isolated dev server over CDP; the chat list is a stub, the agents are the harness's mocked live list.
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, sleep, PRELOAD, install } = await connect();
@@ -17,7 +18,7 @@ const BASE = require('./test_base').BASE;
             const tag = `${w}px`;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+            await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
             await ev(`localStorage.setItem('coral-board-colors', JSON.stringify({ 'team-a': '#d7263d' })); true`);
             await ev(`(() => { const real = window.fetch; const json = o => Promise.resolve(new Response(JSON.stringify(o), { status: 200, headers: { 'Content-Type': 'application/json' } }));
                 const at = hh => { const d = new Date(); d.setHours(hh, 0, 0, 0); return d.toISOString(); };

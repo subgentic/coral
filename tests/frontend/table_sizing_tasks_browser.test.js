@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const { removeBoards } = require('./helpers/board_cleanup');
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -18,7 +19,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         for (const w of [1280, 1024, 800]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: 800, deviceScaleFactor: 1, mobile: false });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+            await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
             await ev(`window.openTeamPage(${JSON.stringify(B)}, { tab: 'tasks' }); true`);
             await waitFor(`document.querySelectorAll('#team-panel-tasks .dt-table tbody tr').length >= 3`, `${w}: the tasks`, 15000);
             await new Promise(r => setTimeout(r, 500)); // sleep-ok: the table settles after its first draw

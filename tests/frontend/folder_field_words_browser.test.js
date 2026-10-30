@@ -4,13 +4,14 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { install: installNA, N, openNewAgent, stubModels } = require('./helpers/new_agent');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`); await installNA(ev); await stubModels(ev);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev); await installNA(ev); await stubModels(ev);
         await openNewAgent(ev, waitFor);
         const help = await ev(`(() => { const f = document.getElementById('launch-dir'); const row = f.closest('.sv-row') || f.parentElement.parentElement; return row ? row.innerText.replace(/\\s+/g, ' ') : ''; })()`);
         assert.ok(/A folder on the computer running Coral\./.test(help), 'the folder field says where the folder is: ' + JSON.stringify(help));

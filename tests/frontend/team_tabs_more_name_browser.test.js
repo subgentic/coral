@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -14,11 +15,11 @@ const BASE = require('./test_base').BASE;
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [w, h] of [[390, 844], [320, 640]]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
             await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: 'Boss', job_title: 'Orchestrator', session_name: 'boss-s' });
             await api('POST', `/api/board/${B}/messages`, { subscriber_id: 'Boss', content: 'Please check the release notes.' });
             const seen = async tab => {
-                await Page.navigate({ url: `${BASE}/team/${B}/${tab}` }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+                await Page.navigate({ url: `${BASE}/team/${B}/${tab}` }); await Page.loadEventFired(); await install(); await coralReady(ev);
                 await waitFor(`!!document.getElementById('team-tab-more') && document.getElementById('team-tab-more').getClientRects().length > 0`, `${w}: the tab row on ${tab}`, 15000);
                 await waitFor(`document.getElementById('team-tab-${tab}') && document.getElementById('team-tab-${tab}').getAttribute('aria-selected') === 'true'`, `${w}: ${tab} is the open tab`, 15000);
                 return ev(`(() => { const m = document.getElementById('team-tab-more'), row = document.getElementById('team-tabs-row'); return { more: (m.querySelector('.team-tab-label') || m).textContent.trim(), current: m.classList.contains('is-current'), label: m.getAttribute('aria-label'), over: row.scrollWidth - row.clientWidth, page: document.documentElement.scrollWidth - document.documentElement.clientWidth }; })()`);

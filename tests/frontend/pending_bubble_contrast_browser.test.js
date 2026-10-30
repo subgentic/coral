@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { setTheme } = require('./helpers/contrast');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, PRELOAD, install } = await connect();
@@ -12,7 +13,7 @@ const BASE = require('./test_base').BASE;
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         for (const theme of ['light', 'dark']) {
             await setTheme(ev, theme);
             const r = await ev(`(() => { document.getElementById('cb-box')?.remove(); const b = document.createElement('div'); b.id = 'cb-box'; b.className = 'chat-messages chat-prose'; b.style.cssText = 'position:absolute;left:0;top:60px;width:900px;height:300px;z-index:9999;background:var(--bg-primary)';

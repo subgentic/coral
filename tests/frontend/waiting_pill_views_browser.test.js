@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const LOGIN = require('crypto').randomUUID(), ASK = require('crypto').randomUUID();
+const { coralReady } = require('./helpers/wait');
 const SESSIONS = [
     { name: 'login-agent', display_name: 'Login', agent_type: 'claude', session_id: LOGIN, working_directory: '/repo/a', waiting_for_input: true, needs_login: true, waiting_kind: 'login', waiting_reason: 'login' },
     { name: 'ask-agent', display_name: 'Ask', agent_type: 'claude', session_id: ASK, working_directory: '/repo/b', waiting_for_input: true, waiting_kind: 'permission', waiting_summary: 'Allow?' },
@@ -26,7 +27,7 @@ const SESSIONS = [
               return window.__origFetch(url, opts); };` });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired();
-        await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+        await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
         await ev(`window.switchNavTab('agents'); window._coralSetLiveSessions(JSON.parse(JSON.stringify(window.__sessions))); true`);
         const shot = async name => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; require('node:fs').mkdirSync(d, { recursive: true }); require('node:fs').writeFileSync(`${d}/${name}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
         const pill = () => ev(`(() => { const b = document.getElementById('waiting-banner'); const r = b.getBoundingClientRect(); return { hidden: b.hidden, display: getComputedStyle(b).display, h: Math.round(r.height), text: b.textContent.trim() }; })()`);

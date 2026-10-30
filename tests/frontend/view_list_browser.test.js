@@ -4,6 +4,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 const VIEWS = [['1280x800', 1280, 800, false], ['390x844', 390, 844, true]];
 const SECTIONS = `[{ title: 'Views', items: [{ key: 'all', label: 'All chats', count: 183, alert: true }, { key: 'groups', label: 'Board history', count: 0, alert: true }, { key: 'active', label: 'Active now', soon: true }] },
@@ -18,7 +19,7 @@ const SECTIONS = `[{ title: 'Views', items: [{ key: 'all', label: 'All chats', c
         for (const [label, w, h, mobile] of VIEWS) {
             console.log(label);
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
             await ev(`import((window.__coralStatic || '/static/') + 'view_list.js').then(m => { window.__vl = m; window.__picked = []; const host = document.createElement('div'); host.id = 'vl-host'; host.style.cssText = 'position:fixed;inset:0 auto 0 0;width:' + (innerWidth < 768 ? '100%' : '260px') + ';z-index:99999;background:var(--bg-primary)'; document.body.append(host);
                 window.__root = m.build({ id: 'test', label: 'Chat views', sections: ${SECTIONS}, current: 'all', onPick: k => window.__picked.push(k) }); host.append(window.__root); return true; })`);
             const probe = () => ev(`(() => { const r = window.__root, vis = e => !!e && getComputedStyle(e).display !== 'none' && e.getClientRects().length > 0;

@@ -7,6 +7,7 @@
 // CYCLES=n runs more rounds; TEARDOWN_HANG_SELFTEST=1 makes round 3 wait on a promise that never settles (the suite must fail within TEARDOWN_STEP_ms naming the step); TEARDOWN_LEAK_SELFTEST=1 adds a deliberate leak (a listener on window, an interval, a ResizeObserver per round) the bounds must catch.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 const HEX = 'a'.repeat(64);
 const MD = '# Title\n\ntext [link](https://example.test)\n\n```js\nconst x = 1;\n```\n';
 const PANES = ['general', 'agents', 'files', 'terminal', 'notifications', 'network', 'security', 'cleanup', 'updates'];
@@ -63,7 +64,7 @@ const wait = ms => new Promise(r => setTimeout(r, ms)); // a settle for the page
         })();` });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await ev(`(() => { for (let i = 0; i < 6; i++) window.__m.add('td-' + i, String.fromCharCode(65 + i), 50, { sleeping: false }); T.render.renderLiveSessions(T.state.liveSessions);
             const real = window.fetch; window.fetch = (u, o) => { const s = String(u && u.url || u); if (s.includes('/api/artifacts/${HEX}')) return Promise.resolve(new Response(${JSON.stringify(MD)}, { headers: { 'Content-Type': 'text/markdown' } })); return real(u, o); }; return true; })()`);
         const within = (p, what) => { let t; return Promise.race([p, new Promise((_, rej) => { t = setTimeout(() => rej(new Error(`stalled ${STEP_MS} ms in ${what}`)), STEP_MS); })]).finally(() => clearTimeout(t)); };

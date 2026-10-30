@@ -7,7 +7,7 @@ const BASE = require('./test_base').BASE;
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
-    const { settle } = require('./helpers/wait').bind(ev);
+    const { settle, coralReady } = require('./helpers/wait').bind(ev);
     const t = T(ev, waitFor);
     const problems = [];
     const key = async (k, code, text) => { const b = { key: k, code: k, windowsVirtualKeyCode: code }; await client.Input.dispatchKeyEvent({ type: 'keyDown', ...b, ...(text ? { text } : {}) }); await client.Input.dispatchKeyEvent({ type: 'keyUp', ...b }); await settle(300); };
@@ -16,7 +16,7 @@ const BASE = require('./test_base').BASE;
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [w, h, mobile] of [[1280, 900, false], [390, 844, true]]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile, maxTouchPoints: 5 });
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`); await installNT(ev); await stubModels(ev);
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(); await installNT(ev); await stubModels(ev);
             await ev(`localStorage.setItem('coral-recent-dirs', JSON.stringify(['/work/payments-app'])); true`);
             await openNewTeam(ev, waitFor); await settle(400);
             await t.type('input', N.teamName, 'alpha'); await t.type('input', N.folder, '/work/payments-app');

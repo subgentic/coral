@@ -4,6 +4,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -18,7 +19,7 @@ const BASE = require('./test_base').BASE;
     const open = async (w, mobile) => {
         await Emulation.setDeviceMetricsOverride({ width: w, height: 800, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled(mobile ? { enabled: true, maxTouchPoints: 5 } : { enabled: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`); await stub();
+        await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings'); await stub();
         // the page already knows one board's name (its sidebar read it): the registry wins over the row
         await ev(`import((window.__coralStatic || '/static/') + 'server_base.js').then(m => { m.noteBoardLabels([{ board_project: 'b-4tt7u67wul', board_label: 'Registry name' }]); return true; })`);
         await ev(`window.switchNavTab('hub-inbox'); true`);

@@ -6,6 +6,7 @@ const { setTheme } = require('./helpers/contrast');
 const SHOT_DIR = process.env.CORAL_SCREENSHOT_DIR || process.env.SHOTS || path.join(process.env.RUNNER_TEMP || require('node:os').tmpdir(), 'out', 'shots');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -28,7 +29,7 @@ const BASE = require('./test_base').BASE;
         for (const [w, h, mobile] of [[1280, 800, false], [390, 844, true]]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.startup('liveList', 'settings')`);
+            await coralReady(ev, 'startup', 'liveList', 'settings');
             await ev(`window.openAutomationsFolder('workflows'); true`);
             await waitFor(`document.querySelectorAll('#group-table-view tbody tr[data-key] .dt-primary').length === 1`, 'the workflow row', 8000).catch(async e => { throw new Error(e.message + ' at ' + w + ': ' + await ev(`JSON.stringify([document.getElementById('workflows-view')?.style.display, document.getElementById('workflows-view')?.innerText.slice(0, 200), location.hash])`)); });
             await ev(`document.querySelector('#group-table-view tbody tr[data-key] .dt-primary').click(); true`);

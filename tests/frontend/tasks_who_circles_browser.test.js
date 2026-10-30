@@ -11,7 +11,7 @@ const TEAM = `qa-who8492-${Date.now() % 100000}`;
 const SHOTS = process.env.CORAL_SCREENSHOT_DIR;
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
-    const { settle } = require('./helpers/wait').bind(ev);
+    const { settle, coralReady } = require('./helpers/wait').bind(ev);
     const shot = async n => { if (!SHOTS) return; fs.mkdirSync(SHOTS, { recursive: true }); fs.writeFileSync(`${SHOTS}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     const T = (id, title, status, extra) => ({ id, title, status, priority: 'medium', created_by: 'Orchestrator', created_at: '2026-10-25T10:00:00Z', updated_at: '2026-10-26T09:00:00Z', ...extra });
     const TASKS = [T(11, 'Pick the release date', 'pending', { assigned_to: null }), T(12, 'Fix the focus ring', 'in_progress', { assigned_to: 'Frontend Dev' }),
@@ -22,7 +22,7 @@ const SHOTS = process.env.CORAL_SCREENSHOT_DIR;
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [tag, w, h, mobile] of [['1280', 1280, 800, false], ['390', 390, 844, true]]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`); await installTP(ev);
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(); await installTP(ev);
             await ev(`(async () => { const sc = await import((window.__coralStatic || '/static/') + 'settings_core.js'); sc.clearCustomThemeVars(); sc.applyTheme('dark'); return true; })()`);
             await seed(ev, TEAM); if (mobile) await ev(`window.syncMobileAgentList && window.syncMobileAgentList(); true`);
             await ev(`(() => { const real = window.fetch; window.fetch = (u, o = {}) => { const p = new URL(String(u), location.href); if (/\\/api\\/board\\/[^/]+\\/tasks$/.test(p.pathname) && (!o.method || o.method === 'GET')) return Promise.resolve(new Response(JSON.stringify({ tasks: ${JSON.stringify(TASKS)}, next_cursor: '', total_open: 3, total_completed: 2 }), { status: 200, headers: { 'content-type': 'application/json' } })); return real(u, o); }; return true; })()`);

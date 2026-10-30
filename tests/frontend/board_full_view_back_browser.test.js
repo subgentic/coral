@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 const B = 'full-view-back-' + Date.now().toString(36);
 
 (async () => {
@@ -11,13 +12,13 @@ const B = 'full-view-back-' + Date.now().toString(36);
     const api = (m, p, body) => ev(`fetch(${JSON.stringify(p)}, { method: ${JSON.stringify(m)}, headers: { 'Content-Type': 'application/json' }, body: ${JSON.stringify(JSON.stringify(body))} }).then(async r => ({ status: r.status, body: await r.json().catch(() => null) }))`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         assert.equal((await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: 'Boss', job_title: 'Orchestrator' })).status, 200);
         assert.equal((await api('POST', `/api/board/${B}/messages`, { subscriber_id: 'Boss', content: 'A message on the board.' })).status, 200);
         for (const [w, mobile] of [[1280, false], [390, true]]) {
             const at = `${w} px: `;
             await Emulation.setDeviceMetricsOverride({ width: w, height: 900, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
             await ev(`window.__m.add('fv-agent', 'B', 1, { sleeping: false, board_project: ${JSON.stringify(B)} }); true`);
             await waitFor(`(window.__qaState.liveSessions || []).some(s => s.name === 'fv-agent')`, at + 'the agent on the board', 8000);
             await ev(`window.selectLiveSession('fv-agent', 'claude', 'fv-agent-id', 'local'); true`);

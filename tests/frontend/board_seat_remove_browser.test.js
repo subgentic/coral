@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const { removeBoards } = require('./helpers/board_cleanup');
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -15,7 +16,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
             await Emulation.setDeviceMetricsOverride({ width: w, height: 800, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
             if (w === 1280) for (const [id, jt] of [['orch', 'Orchestrator'], ['stale', 'Stale seat']]) assert.equal((await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: id, job_title: jt, session_name: id + '-s' })).status, 200);
-            await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+            await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
             await ev(`window.__dels = []; window.__delStatus = 200; { const real = window.fetch; window.fetch = (u, o = {}) => { const p = new URL(String(u), location.href); if ((o.method || 'GET') === 'DELETE' && /\\/seats\\//.test(p.pathname)) { window.__dels.push(p.pathname); return Promise.resolve(new Response(JSON.stringify(window.__delStatus === 200 ? { ok: true } : { error: 'that board has no such seat' }), { status: window.__delStatus, headers: { 'content-type': 'application/json' } })); } return real(u, o); }; } true`);
             await ev(`window.openTeamPage(${JSON.stringify(B)}, { tab: 'agents' }); true`);
             await waitFor(`document.querySelectorAll('#team-panel-agents .dt-table tbody tr').length >= 2`, `${w}: the members`, 15000);

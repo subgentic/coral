@@ -41,7 +41,7 @@ const agenticSt = { ...base, channel: 'agentic', approved: { version: '1.4.142',
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired();
         await ev(`localStorage.clear(); true`);
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await require('./helpers/wait').coralReady(ev);
         await ev(`import((window.__coralStatic || '/static/') + 'update_flag.js').then(m => { m.setUpdatesEnabled(true); return true; })`);
         await installAudit(ev); await setTheme(ev, view.theme);
         await ev(STUB);

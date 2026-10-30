@@ -3,6 +3,7 @@
 // through agent_view_harness.js against the isolated dev server.
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 const S = `(window.__coralStatic || '/static/')`;
 
 (async () => {
@@ -16,7 +17,7 @@ const S = `(window.__coralStatic || '/static/')`;
             const tag = `${w} px${font ? ', 200% text' : ''}`;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled(mobile ? { enabled: true, maxTouchPoints: 5 } : { enabled: false });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.then(() => true)`);
+            await coralReady(ev);
             await ev(`${font ? `document.documentElement.style.fontSize = '${font}';` : ''} window.openAutomationsFolder('workflows'); true`);
             await waitFor(`!!document.querySelector('#group-table-view .empty-state .empty-state-hint') && document.querySelector('#group-table-view .empty-state .empty-state-hint').getClientRects().length > 0`, 'the Workflows folder', 8000);
             await sleep(300); // sleep-ok: the page lays out

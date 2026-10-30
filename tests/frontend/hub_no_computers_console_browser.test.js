@@ -4,6 +4,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { setupHubWorld, BASE } = require('./helpers/hub_world');
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, Runtime, ev, waitFor } = await connect();
@@ -17,7 +18,7 @@ const { setupHubWorld, BASE } = require('./helpers/hub_world');
             await Page.addScriptToEvaluateOnNewDocument({ source: 'window.__computers.splice(0); window.__noComputers = true;' }); // after the stub's own script: no computer is online
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired();
             await waitFor(`typeof window.switchNavTab === 'function' && !!window.__coralReady`, 'the dashboard', 15000);
-            await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings', 'history'); true`);
+            await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings', 'history');
             // what the page does with no computer: ask for the tags and the first page of chats, as the Chats tab (or the Inbox's All chats) does
             await ev(`(async () => { const S = window.__coralStatic || '/static/'; const t = await import(S + 'tags.js'); const a = await import(S + 'api.js'); await t.loadAllTags(true); await a.loadHistorySessionsPaged(1, 50); return true; })()`);
             await new Promise(r => setTimeout(r, 800)); // sleep-ok: proves a negative, nothing is logged by the reads above or the page's own start

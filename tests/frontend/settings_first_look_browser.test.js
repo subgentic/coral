@@ -2,6 +2,7 @@
 // theme is also called Dark, and Close with a change not saved opens its Discard dialog on the first click. Real isolated server; the saved themes list is stood in for. 1280 px.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -10,7 +11,7 @@ const { connect } = require('./agent_view_harness');
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await ev(`(() => { const f = window.fetch; window.fetch = (u, o) => String(u).split('?')[0] === '/api/themes' ? Promise.resolve(new Response(JSON.stringify({ themes: [{ name: 'Dark' }, { name: 'Obsidian' }] }), { headers: { 'Content-Type': 'application/json' } })) : f(u, o); return true; })()`);
         await ev(`window.showSettingsModal(); true`);
         await waitFor(`!!document.getElementById('settings-theme') && document.getElementById('settings-theme').options.length > 3`, 'the theme list with the saved themes', 15000);

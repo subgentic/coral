@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 const B = 'goal-none-' + Date.now().toString(36);
 
 (async () => {
@@ -11,10 +12,10 @@ const B = 'goal-none-' + Date.now().toString(36);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         assert.ok((await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: 'orch', job_title: 'Orchestrator', session_name: 'orch-s' })).status < 300);
         const g = await api('POST', `/api/board/${B}/goals`, { subscriber_id: 'Operator', title: 'Nothing yet', outcome: 'o', done_when: 'd' }); assert.equal(g.status, 201, JSON.stringify(g));
-        await Page.navigate({ url: `${BASE}/team/${B}/goals/${g.body.id}` }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: `${BASE}/team/${B}/goals/${g.body.id}` }); await Page.loadEventFired(); await install(); await coralReady(ev);
         await waitFor(`/Nothing yet/.test(document.body.innerText) && /No tasks yet/.test(document.body.innerText)`, 'the goal page', 15000);
         const n = await ev(`(document.body.innerText.match(/No tasks yet/g) || []).length`);
         assert.equal(n, 1, 'No tasks yet is said once, not ' + n);

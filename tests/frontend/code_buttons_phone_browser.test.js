@@ -3,13 +3,14 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, PRELOAD, install } = await connect();
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         for (const fs of ['', '32px']) {
             const r = await ev(`(() => { document.documentElement.style.fontSize = ${JSON.stringify(fs)}; document.getElementById('zz-code')?.remove(); const w = document.createElement('div'); w.id = 'zz-code'; w.className = 'chat-messages chat-prose'; w.style.cssText = 'position:fixed;left:0;top:100px;width:300px;z-index:9999;background:#000';
                 w.innerHTML = '<div class="chat-bubble assistant"><div class="message-text"><div class="code-block"><pre><code>const x = \\'a very long line that would sit under the buttons\\';</code></pre><span class="code-scroll-hint">Scrolls sideways</span><button type="button" class="code-wrap-btn" title="Wrap long lines" aria-label="Wrap lines" aria-pressed="false">Wrap</button><button type="button" class="code-copy-btn" title="Copy code" aria-label="Copy code"><span class="material-icons" aria-hidden="true">content_copy</span></button></div></div></div>'; document.body.append(w);

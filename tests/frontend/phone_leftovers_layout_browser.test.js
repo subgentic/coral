@@ -5,6 +5,7 @@ const { connect } = require('./agent_view_harness');
 const { install: installTP, seed, openTeam } = require('./helpers/team_page');
 const { removeBoards } = require('./helpers/board_cleanup');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 const TEAM = `plo-${Date.now() % 100000}`;
 
 (async () => {
@@ -12,7 +13,7 @@ const TEAM = `plo-${Date.now() % 100000}`;
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         // Weekly day buttons
         await ev(`window.showJobModal(); true`);
         await waitFor(`!!document.getElementById('sched-picker')`, 'the job form', 8000);

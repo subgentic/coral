@@ -11,7 +11,7 @@ const A = 'a'.repeat(64), B = 'b'.repeat(64);
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
-    const { settle } = require('./helpers/wait').bind(ev);
+    const { settle, coralReady } = require('./helpers/wait').bind(ev);
     const S = scenarios();
     const shot = async name => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; const fs = require('node:fs'); fs.mkdirSync(d, { recursive: true }); await settle(350); fs.writeFileSync(`${d}/${name}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     const stub = () => ev(`(() => { const R = window.fetch.bind(window);
@@ -32,7 +32,7 @@ const A = 'a'.repeat(64), B = 'b'.repeat(64);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`); await installTP(ev);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(); await installTP(ev);
         await ev(`localStorage.removeItem('coral-detail-width'); true`);
         await seed(ev, TEAM); await stub(); await openTeam(ev, waitFor, TEAM); await goTab(ev, settle, 'Artifacts'); await waitFor(`document.querySelectorAll('#team-panel-artifacts tbody tr').length >= 2`, 'the two artifacts', 10000);
         await S.run('an artifact opens in the right pane with the shared handle: a separator, named, with the dock\'s limits', async () => {

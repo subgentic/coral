@@ -13,7 +13,7 @@ const TEAM = `qa-settings-${Date.now() % 100000}`;
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
-    const { settle } = require('./helpers/wait').bind(ev);
+    const { settle, coralReady } = require('./helpers/wait').bind(ev);
     const S = scenarios();
     const bar = () => ev(`(() => { const save = window.__tp.find('button', /^Save settings$/i), cancel = window.__tp.find('button', /^Cancel$/i); const st = [...window.__tp.page().querySelectorAll('[role=status], output, p, div')].filter(window.__na.vis).map(e => window.__na.text(e)).find(t => /^(No changes to save|You have unsaved changes|Saved\.|Could not save)/.test(t.trim()) && t.length < 80) || ''; return { save: save ? { disabled: save.disabled || save.getAttribute('aria-disabled') === 'true', ...window.__na.box(save) } : null, cancel: cancel ? window.__na.box(cancel) : null, status: st.trim(), vh: innerHeight }; })()`);
     const sw = n => `(() => { const e = [...window.__tp.page().querySelectorAll('[role=switch], input[type=checkbox]')].filter(window.__na.vis).find(x => window.__na.name(x) === ${JSON.stringify(n)}); return e; })()`;
@@ -27,7 +27,7 @@ const TEAM = `qa-settings-${Date.now() % 100000}`;
         for (const [label, w, h, mobile] of VIEWS) {
             console.log(label);
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`); await installTP(ev);
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(); await installTP(ev);
             await seed(ev, TEAM);
             if (mobile) await ev(`window.syncMobileAgentList && window.syncMobileAgentList(); true`);
             await openTeam(ev, waitFor, TEAM).catch(() => {});

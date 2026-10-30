@@ -4,6 +4,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 const FAKE_VV = `(() => { const real = window.visualViewport; const t = new EventTarget(); const vv = { height: innerHeight, width: innerWidth, scale: 1, offsetTop: 0, offsetLeft: 0, pageTop: 0, pageLeft: 0, addEventListener: (...a) => t.addEventListener(...a), removeEventListener: (...a) => t.removeEventListener(...a), dispatchEvent: e => t.dispatchEvent(e) };
     Object.defineProperty(window, 'visualViewport', { configurable: true, get: () => vv });
@@ -15,7 +16,7 @@ const FAKE_VV = `(() => { const real = window.visualViewport; const t = new Even
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Page.addScriptToEvaluateOnNewDocument({ source: FAKE_VV });
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await ev(`window.__m.add('kb-agent', 'A', 14, { sleeping: false, session_id: 'kb-id' }); true`);
         await waitFor(`(window.__qaState.liveSessions || []).some(s => s.name === 'kb-agent')`, 'the agent', 10000);
         await ev(`window.selectLiveSession('kb-agent', 'claude', 'kb-id', 'local'); true`);

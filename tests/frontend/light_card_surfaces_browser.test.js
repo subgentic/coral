@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { setTheme } = require('./helpers/contrast');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 const CLASSES = ['cost-card', 'cost-chart-container', 'spend-box', 'eff-card', 'eff-panel', 'dt-box'];
 
@@ -15,7 +16,7 @@ const CLASSES = ['cost-card', 'cost-chart-container', 'spend-box', 'eff-card', '
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+        await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
         await ev(`import((window.__coralStatic || '/static/') + 'lazy_styles.js').then(m => m.loadStyles('cost_dashboard.css')).then(() => true)`); // the Analytics cards' rules arrive with the Analytics page since #10706, not with the start's stylesheet
         await ev(`(() => { const host = document.createElement('div'); host.id = 'surface-probe'; host.style.cssText = 'position:fixed;left:0;top:0;width:600px;padding:8px;z-index:1;background:var(--bg-primary)'; host.innerHTML = ${JSON.stringify(CLASSES.map(c => `<div class="${c}" data-probe="${c}" style="margin:6px 0;min-height:20px">x</div>`).join(''))}; document.body.append(host); return true; })()`);
         const read = () => ev(`(() => { const lum = c => { const m = c.match(/[\\d.]+/g).map(Number); const f = v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }; return 0.2126 * f(m[0]) + 0.7152 * f(m[1]) + 0.0722 * f(m[2]); };

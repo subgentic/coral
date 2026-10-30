@@ -6,6 +6,7 @@ const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const ASK = require('crypto').randomUUID(), LOGIN = require('crypto').randomUUID();
+const { coralReady } = require('./helpers/wait');
 const SESSIONS = [
     { name: 'ask-agent', display_name: 'Ask', agent_type: 'claude', session_id: ASK, working_directory: '/repo/b', waiting_for_input: true, waiting_kind: 'permission', waiting_summary: 'Allow the agent to run npm test?' },
     { name: 'login-agent', display_name: 'Login', agent_type: 'claude', session_id: LOGIN, working_directory: '/repo/a', waiting_for_input: true, needs_login: true, waiting_kind: 'login', waiting_reason: 'Run claude login' },
@@ -33,7 +34,7 @@ const SESSIONS = [
             const tag = `${nm}, ${name}`;
             await Emulation.setDeviceMetricsOverride({ width: w, height: 800, deviceScaleFactor: 1, mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired();
-            await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+            await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
             await ev(`window.switchNavTab('agents'); window._coralSetLiveSessions(JSON.parse(JSON.stringify(window.__sessions))); true`);
             await ev(`Promise.resolve(window.selectLiveSession(${JSON.stringify(name)}, 'claude', ${JSON.stringify(sid)})).then(() => { window.setLiveViewMode('chat'); return true; })`);
             await waitFor(`document.querySelectorAll('#live-history-messages > *').length > 20 && !!document.querySelector('#live-history-messages > .chat-needs-input')`, `${tag}: the long chat and its card`, 15000);

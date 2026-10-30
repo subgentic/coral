@@ -7,6 +7,7 @@ const assert = require('node:assert/strict');
 const { removeBoards } = require('./helpers/board_cleanup');
 const { connect } = require('./agent_view_harness');
 const { setTheme } = require('./helpers/contrast');
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -40,7 +41,7 @@ const { setTheme } = require('./helpers/contrast');
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile });
             await Emulation.setTouchEmulationEnabled({ enabled: mobile, maxTouchPoints: 5 }); // a phone is a coarse pointer: the 44 px rule
             await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.then(() => true)`);
+            await coralReady(ev);
 
           for (const theme of ['dark', 'light']) {
             await setTheme(ev, theme);
@@ -107,7 +108,7 @@ const { setTheme } = require('./helpers/contrast');
         // A click opens the team's settings on the Health check tab, which (real server) shows a new team's check off and what it costs.
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         const sub = await ev(`fetch('/api/board/${TEAM}/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'Boss', job_title: 'Orchestrator', session_name: 'hl-boss' }) }).then(r => r.status)`);
         assert.ok(sub < 300, 'subscribe');
         await render(false);

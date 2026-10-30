@@ -10,7 +10,7 @@ const GROUPS = ['Navigation', 'Chat', 'Search', 'Dialogs'];
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const { Input } = client;
-    const { settle } = require('./helpers/wait').bind(ev);
+    const { settle, coralReady } = require('./helpers/wait').bind(ev);
     const problems = [];
     const check = (ok, what) => { if (!ok) problems.push(what); };
     // The page's own theme key, set before the page loads; a Mac or another computer, by what the page asks the browser (navigator.userAgentData first, then platform).
@@ -18,7 +18,7 @@ const GROUPS = ['Navigation', 'Chat', 'Search', 'Dialogs'];
         await Emulation.setDeviceMetricsOverride({ width: w, height: 900, deviceScaleFactor: 1, mobile: w < 600 });
         await Page.navigate({ url: 'about:blank' });
         await ev(`try { localStorage.setItem('coral-theme', ${JSON.stringify(theme)}); } catch (e) {} true`).catch(() => {});
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady();
         await ev(`try { localStorage.setItem('coral-theme', ${JSON.stringify(theme)}); } catch (e) {} document.documentElement.setAttribute('data-theme', ${JSON.stringify(theme)}); true`);
         await ev(`Object.defineProperty(navigator, 'platform', { configurable: true, get: () => ${JSON.stringify(mac ? 'MacIntel' : 'Win32')} }); Object.defineProperty(navigator, 'userAgentData', { configurable: true, get: () => ({ platform: ${JSON.stringify(mac ? 'macOS' : 'Windows')} }) }); document.activeElement && document.activeElement.blur(); true`);
         await ev(`import((window.__coralStatic || '/static/') + 'shortcuts.js').then(m => m.showShortcuts()).then(() => true)`); await settle(400);

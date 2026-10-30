@@ -3,6 +3,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -22,7 +23,7 @@ const BASE = require('./test_base').BASE;
             };
             return true; })()`;
         await Page.addScriptToEvaluateOnNewDocument({ source: STUB });
-        await Page.navigate({ url: BASE + '/automations/jobs' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: BASE + '/automations/jobs' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 1`, 'the job', 10000);
         // the job's page
         await ev(`document.querySelector('#group-table-view tbody tr .dt-primary').click(); true`);

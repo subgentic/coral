@@ -38,7 +38,7 @@ const stagedFrom = (source, relaunch = {}) => { const st = staged('1.4.160', {},
         return true; })()`;
     const boot = async (view, { flag = true } = {}) => {
         await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await require('./helpers/wait').coralReady(ev);
         if (flag) await ev(`import(${S} + 'update_flag.js').then(m => { m.setUpdatesEnabled(true); return true; })`);
         await ev(STUB);
         await setTheme(ev, view.theme);

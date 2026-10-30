@@ -5,6 +5,7 @@ const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const fs = require('node:fs');
 const SID = require('crypto').randomUUID();
+const { coralReady } = require('./helpers/wait');
 const SESSIONS = [{ name: 'first-agent', display_name: 'Agent', agent_type: 'claude', session_id: SID, working_directory: '/repo/first', not_started: true }];
 const CODEX = [{ name: 'first-codex', display_name: 'Agent', agent_type: 'codex', session_id: SID, working_directory: '/repo/first', not_started: true }];
 
@@ -29,7 +30,7 @@ const CODEX = [{ name: 'first-codex', display_name: 'Agent', agent_type: 'codex'
         console.log('1. Claude: the signed-out card has Check again; a fresh answer clears it; no answer leaves it and says so');
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired();
-        await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+        await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
         await ev(`window.__signedIn = false; window.switchNavTab('agents'); window._coralSetLiveSessions(JSON.parse(JSON.stringify(window.__sessions))); true`);
         await ev(`Promise.resolve(window.selectLiveSession('first-agent', 'claude', ${JSON.stringify(SID)})).then(() => { window.setLiveViewMode('chat'); return true; })`);
         await waitFor(`/Claude is not signed in/.test((document.querySelector('#live-history-messages > .chat-needs-input') || {}).textContent || '')`, 'the signed-out card', 15000);

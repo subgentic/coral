@@ -3,6 +3,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, sleep, PRELOAD, install } = await connect();
@@ -10,7 +11,7 @@ const BASE = require('./test_base').BASE;
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         await ev(`window.__refusal = ''; const real = window.fetch; window.fetch = (u, o = {}) => { const url = String(u && u.url ? u.url : u), m = (o.method || 'GET').toUpperCase(); if (m === 'POST' && /\\/api\\/scheduled\\/jobs$/.test(url)) return Promise.resolve(new Response(JSON.stringify({ error: window.__refusal }), { status: 400, headers: { 'content-type': 'application/json' } })); return real(u, o); }; true`);
         await ev(`Promise.resolve(window.showJobModal()).then(() => true)`);
         await waitFor(`!!document.getElementById('job-modal-name') && getComputedStyle(document.getElementById('job-modal')).display !== 'none'`, 'the New job dialog', 8000);

@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 const BOARD = 'team-focus-' + Date.now().toString(36);
 
 (async () => {
@@ -17,7 +18,7 @@ const BOARD = 'team-focus-' + Date.now().toString(36);
         for (const [w, h, touch, want] of [[1280, 800, false, 'textarea#mb-post-input'], [390, 844, true, 'h1#team-page-title'], [390, 844, false, 'h1#team-page-title']]) {
             const check = (ok, msg) => { if (!ok) problems.push(`${w}${touch ? ' touch' : ' mouse'}: ${msg}`); };
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile: touch }); await Emulation.setTouchEmulationEnabled({ enabled: touch });
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
             await ev(`fetch('/api/board/${BOARD}/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'Boss', job_title: 'Orchestrator' }) }).then(r => r.status)`);
             await ev(`window.__posted = []; { const R = window.fetch; window.fetch = (u, o = {}) => { const p = new URL(String(u), location.href).pathname; if (p === ${JSON.stringify('/api/board/' + BOARD + '/messages')} && String(o.method).toUpperCase() === 'POST') { window.__posted.push(String(o.body || '')); return Promise.resolve(new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } })); } return R(u, o); }; } true`); // the first task's post answers ok (and is recorded): a task that really goes out, so the first-task case is not the one that falls back to the box
             for (const goal of ['', 'Say hello to the team']) {

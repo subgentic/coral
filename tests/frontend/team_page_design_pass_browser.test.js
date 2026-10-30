@@ -11,7 +11,7 @@ const TEAM = `qa-design-${Date.now() % 100000}`;
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
-    const { settle } = require('./helpers/wait').bind(ev);
+    const { settle, coralReady } = require('./helpers/wait').bind(ev);
     const S = scenarios();
     const panel = () => `(document.querySelector('[role=tabpanel]:not([hidden])') || document)`;
     const searchBox = () => ev(`(() => { const p = ${panel()}; const i = [...p.querySelectorAll('input[type=search], input[type=text]')].find(window.__na.vis); const r = i && i.getBoundingClientRect(); return r && { left: Math.round(r.left), top: Math.round(r.top), ph: i.placeholder }; })()`);
@@ -20,7 +20,7 @@ const TEAM = `qa-design-${Date.now() % 100000}`;
         for (const [label, w, h, mobile] of VIEWS) {
             console.log(label);
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`); await installTP(ev);
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(); await installTP(ev);
             await seed(ev, TEAM); await agentsUp(ev);
             if (mobile) await ev(`window.syncMobileAgentList && window.syncMobileAgentList(); true`);
             await openTeam(ev, waitFor, TEAM).catch(() => {});

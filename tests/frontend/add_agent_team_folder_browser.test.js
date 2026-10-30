@@ -3,6 +3,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -13,7 +14,7 @@ const BASE = require('./test_base').BASE;
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+        await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
         await ev(`window.__homeDir = ''; { const real = window.fetch; window.fetch = (u, o = {}) => { const p = new URL(String(u), location.href); if (p.pathname === '/api/teams/detail/${TEAM}' && (o.method || 'GET') === 'GET') return Promise.resolve(window.__homeDir ? new Response(JSON.stringify({ name: '${TEAM}', working_dir: window.__homeDir }), { status: 200, headers: { 'content-type': 'application/json' } }) : new Response('{}', { status: 404 })); return real(u, o); }; } true`);
         await ev(`window.__m.add('first-terminal', 'T', 1, { sleeping: false, session_id: 'ft1', board_project: ${JSON.stringify(TEAM)}, agent_type: 'terminal' }); window.__m.add('second-worker', 'W', 1, { sleeping: false, session_id: 'ft2', board_project: ${JSON.stringify(TEAM)} }); true`);
         await waitFor(`(window.__qaState.liveSessions || []).filter(s => s.board_project === ${JSON.stringify(TEAM)}).length === 2`, 'the team', 10000);

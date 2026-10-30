@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -14,12 +15,12 @@ const BASE = require('./test_base').BASE;
         for (const [width, mobile] of [[1280, false], [390, true]]) {
             const at = `${width} px: `, board = `goal-close-${width}-` + Date.now().toString(36); boards.push(board);
             await Emulation.setDeviceMetricsOverride({ width, height: 900, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.startup('liveList','liveListLoaded','settings')`);
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
             assert.equal((await api('POST', `/api/board/${board}/subscribe`, { subscriber_id: 'orch', job_title: 'Orchestrator', session_name: board })).status, 200);
             const g = await api('POST', `/api/board/${board}/goals`, { subscriber_id: 'Operator', title: 'Close me with care', outcome: 'One goal', done_when: 'A person chooses' }); assert.equal(g.status, 201); const id = g.body.id;
             assert.equal((await api('PATCH', `/api/board/${board}/goals/${id}`, { subscriber_id: 'Operator', state: 'active' })).status, 200);
             assert.ok((await api('POST', `/api/board/${board}/tasks`, { created_by: 'orch', title: 'Still open', body: 'x', priority: 'medium', goal_id: id })).status < 300);
-            await Page.navigate({ url: BASE + `/inbox/goals/${board}/${id}` }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.startup('liveList','liveListLoaded','settings')`);
+            await Page.navigate({ url: BASE + `/inbox/goals/${board}/${id}` }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
             await waitFor(`!!document.querySelector('#inbox-page .goals-close')`, at + 'the goal page', 15000);
             await ev(`document.querySelector('#inbox-page .goals-close').click(); true`);
             await waitFor(`!!document.querySelector('.goals-close-dialog[open]')`, at + 'the Close dialog', 5000);

@@ -4,6 +4,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -11,7 +12,7 @@ const BASE = require('./test_base').BASE;
     const NAMES = ['my-daily-motivation', 'agent-step-blank', 'agent-step-codex-default'];
     const fresh = async () => {
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await ev(`window.openAutomationsFolder('workflows'); window.showWorkflowCreateModal(); true`);
         await waitFor(`document.getElementById('wf-create-modal').style.display === 'flex'`, 'the dialog', 8000);
     };

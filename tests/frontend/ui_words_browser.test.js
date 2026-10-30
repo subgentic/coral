@@ -6,6 +6,7 @@ const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -16,13 +17,13 @@ const BASE = require('./test_base').BASE;
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: 'Orchestrator', name: 'Orchestrator', role: 'Orchestrator', job_title: 'Orchestrator', working_directory: '/tmp/x', agent_type: 'claude' });
         await api('POST', `/api/board/${B}/tasks`, { subscriber_id: 'Orchestrator', title: 'A task', body: 'x', priority: 'medium', assigned_to: 'Orchestrator' });
         for (const [w, h, mobile] of [[1280, 800, false], [390, 844, true]]) {
             const at = `at ${w}px: `;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
             // create buttons: the verb and the thing, no plus sign
             if (mobile) { // a phone has no New button in a header (#11116): an empty home has a card for each kind, and with agents the + button opens a menu (mobile.css); here the home is empty
                 await waitFor(`[...document.querySelectorAll('#mobile-agent-list .empty-launch strong')].some(e => e.getClientRects().length)`, at + 'the New agent card', 8000);
@@ -33,7 +34,7 @@ const BASE = require('./test_base').BASE;
                 assert.equal(await ev(`[...document.querySelectorAll(${JSON.stringify(label)})].filter(e => e.getClientRects().length)[0].textContent.trim()`), 'New agent', at + 'the create button is the verb and the thing, no plus sign');
             }
             await shot(`words-home-${w}`);
-            await Page.navigate({ url: BASE + `/team/${B}/tasks` }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+            await Page.navigate({ url: BASE + `/team/${B}/tasks` }); await Page.loadEventFired(); await install(); await coralReady(ev);
             await waitFor(`!!document.querySelector('.btn-create-task')`, at + 'the Tasks tab', 10000);
             assert.equal(await ev(`document.querySelector('.btn-create-task').textContent.trim()`), 'New task', at + 'the Tasks bar says New task');
             // a dialog: no Close X, Cancel closes it
@@ -54,7 +55,7 @@ const BASE = require('./test_base').BASE;
             await ev(`document.querySelector('#confirm-modal .modal-actions .btn:not(#confirm-modal-yes)').click(); true`);
         }
         // the agent row's status on the phone's list, drawn: sentence case, not upper-cased (an agent that needs you; the phone has no chip since #10691, the state is the row's second line)
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
         await ev(`window.switchNavTab('agents'); window._coralSetLiveSessions([{ session_id: 'i1', name: 'idle-1', agent_type: 'claude', working_directory: '/tmp/x', sleeping: false, display_name: 'Idle One', model: 'claude-opus-5-5', summary: 'Waiting for work', waiting_for_input: true }]); true`);
         await waitFor(`!!document.querySelector('#mobile-session-list .session-status-line') && document.querySelector('#mobile-session-list .session-status-line').getClientRects().length > 0`, 'the phone row status line, drawn', 8000);
         const chip = await ev(`(() => { const c = document.querySelector('#mobile-session-list .session-status-line'); return { text: c.textContent.trim(), transform: getComputedStyle(c).textTransform }; })()`);

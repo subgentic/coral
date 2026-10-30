@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 const BOARD = 'goal-dlg-' + Date.now().toString(36);
 
 (async () => {
@@ -11,9 +12,9 @@ const BOARD = 'goal-dlg-' + Date.now().toString(36);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         await ev(`fetch('/api/board/${BOARD}/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'Boss', job_title: 'Orchestrator' }) }).then(r => r.status)`);
-        await Page.navigate({ url: `${BASE}/team/${BOARD}/goals` }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: `${BASE}/team/${BOARD}/goals` }); await Page.loadEventFired(); await install(); await coralReady(ev);
         await waitFor(`!!document.querySelector('.goals-new') && document.querySelector('.goals-new').getClientRects().length > 0`, 'New goal', 15000);
         await ev(`document.querySelector('.goals-new').click(); true`);
         await waitFor(`!!document.querySelector('dialog.goals-dialog[open]')`, 'the dialog', 5000);

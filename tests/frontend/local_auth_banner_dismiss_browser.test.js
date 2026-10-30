@@ -2,6 +2,7 @@
 // Settings > Security. It comes back if a password is set and later removed. The red 'Sign-in is off' banner is a risk, not a nudge: it has no dismiss and ignores the memory. Run against an isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 const FAKE = `(() => {
     window.__auth = { strict_local_auth: true, password_set: false };
@@ -17,7 +18,7 @@ const FAKE = `(() => {
     const ok = name => console.log(`   ✓ ${name}`);
     const shown = () => ev(`(() => { const b = document.getElementById('local-auth-banner'); return !!b && !b.hidden && b.checkVisibility({ checkVisibilityCSS: true }); })()`);
     const dismissBtn = () => ev(`(() => { const x = document.getElementById('local-auth-dismiss'); return x ? { shown: !x.hidden && x.getClientRects().length > 0, name: (x.getAttribute('aria-label') || x.textContent).trim(), h: Math.round(x.getBoundingClientRect().height) } : null; })()`);
-    const load = async () => { await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`); };
+    const load = async () => { await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev); };
     try {
         await Page.enable();
         await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });

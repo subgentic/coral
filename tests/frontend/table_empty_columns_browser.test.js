@@ -2,6 +2,7 @@
 // actions column are never hidden, a column with an action in it is not empty, and a table with no rows hides nothing. The table is the real data_table.js, built in the page.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -25,7 +26,7 @@ const { connect } = require('./agent_view_harness');
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+        await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
 
         await build([{ id: 'a', name: 'First' }, { id: 'b', name: 'Second' }]);
         await waitFor(`!!document.querySelector('#zz-table tbody tr.dt-row')`, 'the rows', 6000);

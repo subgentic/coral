@@ -13,7 +13,7 @@ const TEAM = `qa-team-${Date.now() % 100000}`;
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
-    const { settle } = require('./helpers/wait').bind(ev);
+    const { settle, coralReady } = require('./helpers/wait').bind(ev);
     const S = scenarios();
     let phone = false; // a phone's More button names the open tab behind it (Board, Knowledge: #10759), so the strip beside it is as wide as the button leaves it: its width is the one thing that moves there (#10903)
     const same = (a, b, what) => { assert.ok(a && b, `${what}: the header and the tab strip are there`); for (const part of ['h1', 'tabs']) { assert.ok(a[part] && b[part], `${what}: the ${part} is there`); for (const k of (phone && part === 'tabs' ? ['x', 'y', 'h'] : ['x', 'y', 'w', 'h'])) assert.ok(Math.abs(a[part][k] - b[part][k]) <= 0.5, `${what}: the ${part} ${k} moved from ${a[part][k]} to ${b[part][k]}`); } };
@@ -26,7 +26,7 @@ const TEAM = `qa-team-${Date.now() % 100000}`;
             phone = mobile;
             console.log(label);
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`); await installTP(ev);
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(); await installTP(ev);
             await seed(ev, TEAM);
             if (mobile) await ev(`window.syncMobileAgentList && window.syncMobileAgentList(); true`);
             await S.run(`${label}: the team's row opens the team page on Goals, with the team's name in an h1 and no tab but Goals selected`, async () => {

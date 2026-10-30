@@ -3,6 +3,7 @@
 // timed out); an explicit duration still holds for a short toast. Drives Chrome over CDP through agent_view_harness.js at 390 px.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, PRELOAD, install } = await connect();
@@ -13,7 +14,7 @@ const { connect } = require('./agent_view_harness');
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 2, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         const show = (text, err, dur) => ev(`import(${S} + 'notifications.js').then(m => { const t = m.showToast(${JSON.stringify(text)}, ${err}, ${dur === undefined ? 'undefined' : dur}); t.id = 'probe-toast'; return true; })`);
         const state = () => ev(`(() => { const t = document.getElementById('probe-toast'); if (!t) return null; const m = t.querySelector('.toast-message'); const cs = getComputedStyle(m); return { clamp: cs.webkitLineClamp, expanded: t.classList.contains('expanded'), lines: Math.round(m.getBoundingClientRect().height / parseFloat(cs.lineHeight || '18')) }; })()`);
         // an error toast with no duration of its own: four lines, and still there after the old 4 s

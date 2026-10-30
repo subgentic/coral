@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const { safePaused } = require('./helpers/paused');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 const HUB_PRELOAD = `(() => {
     const inner = window.fetch;
@@ -41,7 +42,7 @@ const HUB_PRELOAD = `(() => {
         // 1. this computer's dashboard: a History load fills the cache, as in 157
         await cloudMode(false);
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         let r = await ev(`(async () => { window._allTagsCache = ['old']; const m = await import(${S} + 'tags.js'); const t = await m.loadAllTags(true); return { returned: t.map(x => x.name), cache: (window._allTagsCache || []).map(x => x.name || x) }; })()`);
         check('this computer: a History tag load fills the cache with its tags', JSON.stringify(r.cache) === '["local-tag"]' && JSON.stringify(r.returned) === '["local-tag"]', JSON.stringify(r));
         r = await ev(`(async () => { window._allTagsCache = ['old']; const m = await import(${S} + 'tags.js'); await m.loadAllTags(false); return (window._allTagsCache || []).map(x => x.name || x); })()`);

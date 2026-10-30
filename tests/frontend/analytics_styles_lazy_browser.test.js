@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 const Z = { cache_read_tokens: 10, cache_write_tokens: 5 };
 const MODEL = [{ model: 'claude-opus-5-5', agent_type: 'claude', num_sessions: 3, input_tokens: 2000, output_tokens: 300, ...Z, cost_usd: 2.5 }, { model: 'claude-sonnet-5-5', agent_type: 'claude', num_sessions: 1, input_tokens: 900, output_tokens: 100, ...Z, cost_usd: 0.4 }];
@@ -33,7 +34,7 @@ const VIEWS = ['overview', 'provider', 'model', 'thinking', 'team', 'agent', 'pe
             await Emulation.setEmulatedMedia({ features: mobile ? [{ name: 'pointer', value: 'coarse' }, { name: 'hover', value: 'none' }] : [] });
             await Emulation.setTouchEmulationEnabled(mobile ? { enabled: true, maxTouchPoints: 5 } : { enabled: false });
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile });
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
             await ev(`document.documentElement.setAttribute('data-theme', ${JSON.stringify(theme)}); true`);
             if (await linked()) problems.push(`${w}/${theme}: the start already links cost_dashboard.css`);
             await stub(); await ev(`window.switchNavTab('tokens'); true`);

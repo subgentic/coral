@@ -48,14 +48,14 @@ const AGENT_TASK = { id: 40, title: 'My own task', agent_name: 'solo', started_a
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
-    const { waitStable } = require('./helpers/wait').bind(ev);
+    const { waitStable, coralReady } = require('./helpers/wait').bind(ev);
     const out = {};
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setTimezoneOverride({ timezoneId: 'UTC' }); await Emulation.setLocaleOverride({ locale: 'en-US' });
         await Emulation.setDeviceMetricsOverride({ width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.startup('liveList', 'settings')`);
+        await coralReady('startup', 'liveList', 'settings');
         await ev(`(async () => {
             const st = window.__coralStatic || '/static/';
             const T = window.T = { state: (await import(st + 'state.js')).state, tasks: await import(st + 'tasks.js') };

@@ -2,6 +2,7 @@
 // browser), that it can be skipped on a computer only one person uses, and has ONE clear primary action. No jargon: the tray, a command, 'strict', 'local sign-in'. At 1280 and 390 px. Against a stubbed auth-status.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -9,7 +10,7 @@ const { connect } = require('./agent_view_harness');
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [w, mobile] of [[1280, false], [390, true]]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: 900, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
-            await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+            await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
             await ev(`(() => { const real = window.fetch; window.fetch = (u, o) => String(u).startsWith('/api/system/auth-status') ? Promise.resolve(new Response(JSON.stringify({ authenticated: true, method: 'session', password_set: false, local: true }), { status: 200 })) : real(u, o); localStorage.removeItem('coral-password-not-now'); return true; })()`);
             await ev(`import((window.__coralStatic || '/static/') + 'password_ui.js').then(m => m.maybePromptSetPassword()).then(() => true)`);
             await waitFor(`!!document.getElementById('set-password-modal')`, `${w}: the prompt`, 10000);
