@@ -516,6 +516,13 @@ func (h *SessionsHandler) CreateEvent(w http.ResponseWriter, r *http.Request) {
 			if k, _ := d["kind"].(string); !sessionstate.RequestKinds[k] {
 				d["kind"] = ""
 			}
+			if body.EventType == "request_resolved" { // only the server and the Operator say a request was dismissed, or that a call's start answered it (#11352)
+				delete(d, "dismissed")
+				delete(d, "same_input")
+			}
+		}
+		if body.EventType == "request_resolved" {
+			event.RefID = nil // an agent's resolution carries no call: a start of a call is the server's own record
 		}
 	}
 	if body.DetailJSON != nil {

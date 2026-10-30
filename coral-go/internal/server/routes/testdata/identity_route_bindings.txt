@@ -207,6 +207,7 @@ POST /api/sessions/live/{name}/attach | unbound | operator-only
 POST /api/sessions/live/{name}/auto-accept/disable | unbound | operator-only
 POST /api/sessions/live/{name}/auto-accept/enable | unbound | operator-only
 POST /api/sessions/live/{name}/context-window | token-bound
+POST /api/sessions/live/{name}/dismiss-wait | unbound | operator-only
 POST /api/sessions/live/{name}/events | token-session
 POST /api/sessions/live/{name}/files/refresh | unbound
 POST /api/sessions/live/{name}/goal | unbound | operator-only
