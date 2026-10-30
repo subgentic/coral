@@ -47,6 +47,7 @@ const (
 	CrossTeamAllowlist       = "cross_team_allowlist"
 	TurnEndHandoff           = "turn_end_handoff"
 	RefusePatternKill        = "refuse_pattern_kill"
+	UpdateAutoInstall        = "update_auto_install"
 	SavedTeamTemplates       = "saved_team_templates"
 	DefaultPromptOrch        = "default_prompt_orchestrator"
 	DefaultPromptWorker      = "default_prompt_worker"
@@ -141,6 +142,7 @@ func init() {
 	boolOn(NudgeClaudeArtifacts, ApplyLive, "Remind an agent that published a claude.ai artifact to make a Coral artifact instead (once per artifact).")
 	register(Spec{Key: UpdateChannel, Kind: KindEnum, Values: []string{"approved", "agentic"}, Default: "approved", Apply: ApplyLive, Doc: "Which releases the update notice and the tray offer: approved (the release marked latest) or agentic (every published release, approved or not). Notice only: the updater installs approved releases whatever this says (#5557)."})
 	register(Spec{Key: TurnEndHandoff, Kind: KindEnum, Values: []string{"off", "on"}, Default: "on", Apply: ApplyLive, Doc: "Hand the turn on at its end."})
+	boolOn(UpdateAutoInstall, ApplyLive, "Install a downloaded, verified update by itself once Coral has been idle for a few minutes: no agent working, no automated input in flight and nobody typing in the dashboard. It restarts Coral the way the Update and relaunch button does (agents in tmux keep running); a failed install starts the old Coral again and is tried at most once a day. Off: only the button installs. Windows installs stay click-to-install.")
 	boolOn(RefusePatternKill, ApplyLive, "Refuse an agent's pkill, killall and kill of a pgrep result: a pattern matches the command lines of other agents too (#11157).")
 	boolOn(AutoGoals, ApplyLive, "Run the goals service.")
 	ownCheck(AutoGoals)
@@ -207,7 +209,7 @@ func init() {
 	ownRoute(CloudMaxMode, KindText, "", "The most access Coral Hub may have.")
 	ownRoute(CloudAllowHubAutoAccept, KindBool, "true", "The Hub may auto-accept, or start an agent that skips permission prompts (on unless the owner turned it off; the Hub owner may change it, #5840).")
 	ownRoute(CodexTrustCoralHooks, KindBool, "true", "Coral trusts its own hooks for each Codex it launches, when only an administrator can change them (#153); off, Codex asks the person to review them.")
-	ownRoute(UpdateAuto, KindBool, "true", "Coral checks for updates in the background and keeps a verified one ready (#5280); installing one always needs a person to relaunch it.")
+	ownRoute(UpdateAuto, KindBool, "true", "Coral checks for updates in the background and keeps a verified one ready (#5280); installing one needs a person to relaunch it unless update_auto_install is on (#11170).")
 	ownRoute(HubRelaunchUpdates, KindBool, "false", "The Hub's owner may relaunch this Coral to install a staged update (#5280). Off until the person at this computer turns it on (#6290): an install the person here was not asked about is never the default.")
 	optIn(HubRelaunchUpdates)
 	ownRoute(HubCrossTeamSettings, KindBool, "true", "Coral Hub's owner may turn cross-team messaging and file sharing on or off for this computer's teams (#5572); off, Coral Hub changes neither, in either direction.")

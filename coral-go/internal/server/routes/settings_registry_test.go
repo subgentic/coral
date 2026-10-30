@@ -47,6 +47,7 @@ var settingRows = map[string]struct{ good, bad string }{
 	"auto_summarize":              {`"1"`, `"nope"`},
 	"nudge_claude_artifacts":      {`"off"`, `"nope"`},
 	"refuse_pattern_kill":         {`"off"`, `"nope"`},
+	"update_auto_install":         {`"off"`, `"nope"`},
 	"turn_end_handoff":            {`"off"`, `"later"`},
 	"update_channel":              {`"agentic"`, `"nightly"`},
 	"welcome_choice":              {`"connected"`, `"maybe"`},

@@ -22,6 +22,7 @@ import (
 	"github.com/subgentic/coral/internal/server/routes"
 	"github.com/subgentic/coral/internal/serverproof"
 	"github.com/subgentic/coral/internal/store"
+	"github.com/subgentic/coral/internal/terminalinput"
 )
 
 // The router is built in this order; registration and wiring order are as they were in one
@@ -462,6 +463,8 @@ func (s *Server) registerCloud(r *chi.Mux) {
 	r.Post("/api/system/update/check", upd.CheckNow)                   // #5280 step 3 B: local only, 404 until the feature is on
 	r.Put("/api/system/update/settings", upd.SetAuto)                  // check automatically
 	s.goBackground(upd.RunBackgroundChecks)                            // returns at once while the feature is off
+	upd.Idle, upd.InFlight, upd.LastPerson = s.sessHandler.UpdateIdleReason, ptymanager.AutomatedInputInFlight, terminalinput.LastPersonInput
+	s.goBackground(upd.RunAutoInstall) // install a verified update once Coral has been idle (#11170); returns at once without an updater
 	// the goal events the feed names are pruned to the newest thousand per board (#7355)
 	if s.boardStore != nil {
 		prune := background.NewGoalEventsPrune(s.boardStore)

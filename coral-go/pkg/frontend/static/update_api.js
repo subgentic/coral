@@ -72,6 +72,8 @@ export function normalizeStatus(raw) {
         latest: VERSION_RE.test(str(raw.latest)) ? raw.latest : '',
         rollback: raw.last_rollback && typeof raw.last_rollback === 'object' ? { at: str(raw.last_rollback.at), from: str(raw.last_rollback.from), to: str(raw.last_rollback.to), reason: ROLLBACK_REASONS.includes(raw.last_rollback.reason) ? raw.last_rollback.reason : 'other', restartFailed: raw.last_rollback.restart_failed === true } : null,
         auto: typeof raw.auto === 'boolean' ? raw.auto : null,
+        // Install when idle (#11170): the server's own word for what the rule is doing (state and a reason in words); an older server sends none and nothing about it is drawn.
+        autoInstall: raw.auto_install && typeof raw.auto_install === 'object' && AUTO_INSTALL_STATES.includes(raw.auto_install.state) ? { on: raw.auto_install.on === true, state: raw.auto_install.state, reason: str(raw.auto_install.reason).slice(0, 200), retryAt: str(raw.auto_install.retry_at) } : null,
         source: raw.staged && SOURCE_RE.test(str(raw.staged.source)) ? raw.staged.source : '', // staged.source: the repository the staged update came from, sent by the server only for a verified update (#6292); anything but owner/name is ignored
         // Release channels (#5558; the server's #5557): the fields are optional, an older server sends none and the pane then draws no channel group.
         hubRelaunch: raw.relaunch_available === true, // #7343: Coral Hub's relaunch exists in this build; without it Settings draws no Hub row
@@ -233,6 +235,23 @@ export async function savePrefs({ auto }, was = {}) {
         const resp = await fetch(ROUTES.prefs, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ auto: !!auto }) });
         if (!resp.ok) throw new Error('Could not save the update settings.');
     }
+}
+
+const AUTO_INSTALL_STATES = ['off', 'waiting', 'soon', 'backoff', 'started', 'none'];
+
+/** Save "Install updates automatically when idle" (an ordinary setting: PUT /api/settings { update_auto_install }). */
+export async function saveAutoInstall(on) {
+    const resp = await fetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ update_auto_install: !!on }) });
+    if (!resp.ok) throw new Error('Could not save the update settings.');
+}
+
+/** What the control says about the install that Coral does by itself when it is idle (#11170): a short phrase for the control and a sentence for its name; nothing when the rule is off or not drawn by this server. */
+export function idleInstallWords(s) {
+    const a = s && s.autoInstall;
+    if (!a || !a.on) return { short: '', long: '' };
+    if (a.state === 'waiting' || a.state === 'soon') return { short: 'installs when idle', long: `Coral installs it by itself when it is idle.${a.reason ? ` Waiting: ${a.reason}.` : ''}` };
+    if (a.state === 'backoff') return { short: 'not installed', long: `Coral tried to install it by itself and it did not finish. ${a.reason}` };
+    return { short: '', long: '' };
 }
 
 /** Save the update channel (an ordinary setting: PUT /api/settings { update_channel }); throws with the server's reason when it refuses. */

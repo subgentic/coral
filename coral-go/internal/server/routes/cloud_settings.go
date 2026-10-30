@@ -35,7 +35,7 @@ const AllowHubAutoAcceptSetting = "cloud_allow_hub_auto_accept"
 // PUT /api/settings refuses it like the mode cap.
 const HubRelaunchSetting = "hub_relaunch_updates"
 
-// UpdateAutoSetting is "check for updates automatically" (#5280 step 3 B): the background check and staging. Installing one always needs a person (the relaunch with its acknowledgement).
+// UpdateAutoSetting is "check for updates automatically" (#5280 step 3 B): the background check and staging. Installing one needs a person (the relaunch with its acknowledgement) unless update_auto_install is on: then Coral installs it once idle (#11170).
 const UpdateAutoSetting = "update_auto"
 
 // UpdateAutoOn: on unless the owner turned it off.

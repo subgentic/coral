@@ -8,7 +8,7 @@ import { importOnce } from './import_once.js';
 
 import { UPDATED_KEY } from './update_flag.js';
 import { pollEvery } from './overload.js';
-const { RESUME_KEY, RELEASES_REPO, RELEASES_URL, ACT_INSTALL, ACT_RELAUNCH, releaseNotesUrl, installsLocally, reasonText, requestInstall, requestRelaunch } = await importOnce('./update_api.js');
+const { RESUME_KEY, idleInstallWords, RELEASES_REPO, RELEASES_URL, ACT_INSTALL, ACT_RELAUNCH, releaseNotesUrl, installsLocally, reasonText, requestInstall, requestRelaunch } = await importOnce('./update_api.js');
 
 // After the confirm the dialog is a spinner and one line (the Operator, #11152): none of the per-install details. Windows alone adds what it will be asked, the one thing that is not Coral's doing.
 const INSTALLING = 'Coral is installing the update and will restart.';
@@ -58,6 +58,8 @@ function draw(note) {
     body.append(from);
     const notes = s.source === RELEASES_REPO ? releaseNotesUrl(s.staged.version) : ''; // what is in the update: this release's notes on the one repository the page knows (#7360)
     if (notes) { const np = mk('p'); const na = mk('a', 'update-notes-link', `What is new in ${s.staged.version}`); na.href = notes; na.target = '_blank'; na.rel = 'noopener noreferrer'; np.append(na); body.append(np); }
+    const idleNote = idleInstallWords(s).long; // install when idle (#11170): the dialog says what happens if nobody clicks
+    if (idleNote) body.append(mk('p', 'update-idle-note', idleNote.replace(/^Coral installs it by itself when it is idle\./, 'If you do not choose now, Coral installs it by itself once it is idle (no agent working, nobody typing).')));
     if (note) { const p = mk('p', 'update-note', note); p.setAttribute('role', 'status'); body.append(p); }
     if (n > 0) {
         const warn = mk('div', 'update-warn');

@@ -217,6 +217,14 @@ type UpdateRelaunchHandler struct {
 	// (#5557). The server sets releaseFeeds; a test that does not mean to reach a feed leaves it nil, so it never reaches GitHub.
 	Feeds func() updatecheck.Feeds
 
+	// Idle says why the install-when-idle rule must wait (an agent working), "" when none; InFlight is whether Coral is typing into an agent; LastPerson is when a person last typed to one
+	// (#11170). Nil: nothing says Coral is busy. AutoTimes: the rule's timings, nil for the defaults.
+	Idle       func(ctx context.Context) string
+	InFlight   func() bool
+	LastPerson func() time.Time
+	AutoTimes  *autoInstallTimes
+	auto       autoInstallState
+
 	// SetSetting writes a setting (the update_auto switch's own route uses it).
 	SetSetting func(ctx context.Context, key, value string) error
 
@@ -651,6 +659,9 @@ func (h *UpdateRelaunchHandler) Status(w http.ResponseWriter, r *http.Request) {
 	out["relaunch_available"] = h.on()
 	if relaunchNeedsLocalApproval && !viaTunnel(r) {
 		out["local_install"] = true // #7338: this computer's own dashboard may install (POST /api/system/update/install); a request through Coral Hub is never told so
+	}
+	if !viaTunnel(r) { // the local dashboard's "install when idle" facts (#11170); the Hub's shape is unchanged
+		out["auto_install"] = h.AutoInstallFactsNow(r.Context())
 	}
 	if !viaTunnel(r) { // the local dashboard's "check automatically" switch; the Hub's shape is unchanged
 		if settings, err := h.Settings(r.Context()); err == nil {

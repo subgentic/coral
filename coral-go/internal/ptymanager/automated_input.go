@@ -153,3 +153,19 @@ func (g *inputGate) forgetTyped(name string) {
 	defer g.mu.Unlock()
 	delete(g.lastTyped, name)
 }
+
+// AutomatedInputInFlight reports whether Coral is typing automated text into any agent right now (a send holds its session's lock for the look, the paste and the Enter). The update that
+// installs when Coral is idle waits for it to be false (#11170).
+func AutomatedInputInFlight() bool {
+	busy := false
+	gate.sending.Range(func(_, v any) bool {
+		mu := v.(*sync.Mutex)
+		if !mu.TryLock() {
+			busy = true
+			return false
+		}
+		mu.Unlock()
+		return true
+	})
+	return busy
+}

@@ -21,6 +21,8 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync/atomic"
+	"time"
 	"unicode/utf8"
 
 	"github.com/subgentic/coral/internal/inputlog"
@@ -159,7 +161,22 @@ func isControl(r rune) bool { return r < 0x20 || r == 0x7f || (r >= 0x80 && r < 
 
 // Record logs one write to target when the input debug log is on: the only caller of inputlog.Write. A person's text (and an unknown
 // origin's) is logged by its length only, unless it is only control input; everything else as it is. Coral's own annotations are inputlog.Note.
+// lastPerson is when a person's input last went to any agent (the dashboard's terminal, its chat box, a signed command line): what "nobody is typing" is read from (#11170).
+var lastPerson atomic.Int64
+
+// LastPersonInput is when a person's own input last went to an agent through Coral; the zero time when none has since this process started.
+func LastPersonInput() time.Time {
+	n := lastPerson.Load()
+	if n == 0 {
+		return time.Time{}
+	}
+	return time.Unix(0, n)
+}
+
 func Record(o Origin, target string, kind Kind, data string) {
+	if o == Person {
+		lastPerson.Store(time.Now().UnixNano())
+	}
 	if o == Person || o == Unknown {
 		switch {
 		case kind != Keys && hasPrintable(data):
