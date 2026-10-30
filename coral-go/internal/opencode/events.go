@@ -137,7 +137,7 @@ func (c *Client) Events(ctx context.Context, fn func(Event)) error {
 	return ParseStream(ctx, resp.Body, fn)
 }
 
-// StateOf is the state an event puts its session in, and false for an event that says nothing about it (text and tool frames, steps, replies of other sessions).
+// StateOf is the state an event puts its session in (v2.2.4 sends session.execution.started and .succeeded, with .failed and .interrupted for the rest; session.status and session.idle are read too, for another build), and false for an event that says nothing about it (text and tool frames, steps, replies of other sessions).
 func StateOf(e Event) (State, bool) {
 	switch e.Type {
 	case "session.status":

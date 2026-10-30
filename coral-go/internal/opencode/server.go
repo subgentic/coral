@@ -20,8 +20,8 @@ import (
 	"github.com/subgentic/coral/internal/executil"
 )
 
-// ServeArgs are the arguments that start an opencode server for Coral on a loopback port; the password comes in OPENCODE_PASSWORD, never in the arguments. Unconfirmed against `opencode serve --help` of the
-// real build (Pi Tester, #11364): the one place that names them.
+// ServeArgs are the arguments that start an opencode server for Coral on a loopback port (`opencode serve --hostname 127.0.0.1 --port <port>`, confirmed on v2.2.4 by Pi Tester, #11364); the password comes in
+// OPENCODE_PASSWORD (the server has no password flag), never in the arguments.
 func ServeArgs(port int) []string {
 	return []string{"serve", "--hostname", "127.0.0.1", "--port", strconv.Itoa(port)}
 }

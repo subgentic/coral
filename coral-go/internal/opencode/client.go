@@ -16,7 +16,7 @@ import (
 	"time"
 )
 
-// Username is the HTTP Basic user of an opencode server; its password is the one Coral generated for it (OPENCODE_PASSWORD). Unconfirmed against the real build: one constant, here.
+// Username is the HTTP Basic user of an opencode server; its password is the one Coral generated for it (OPENCODE_PASSWORD). Confirmed on v2.2.4 (Pi Tester, #11364): HTTP Basic, opencode:<OPENCODE_PASSWORD>.
 const Username = "opencode"
 
 // maxBody bounds what a read of the API takes: a message list page is small, and a server that answers with more is not trusted to.
@@ -165,11 +165,12 @@ func (c *Client) Messages(ctx context.Context, sessionID string, opts MessagesOp
 		io.Copy(io.Discard, io.LimitReader(resp.Body, 1<<16))
 		return Page{}, fmt.Errorf("opencode: messages of %s: HTTP %d", sessionID, resp.StatusCode)
 	}
+	// The page of v2.2.4 is {"data": [...], "cursor": {"previous": ..., "next": ...}}; "items" and a bare list or a cursor that is a string are read too, for another build.
 	var body struct {
-		Items  []apiMessage `json:"items"`
-		Data   []apiMessage `json:"data"`
-		Cursor string       `json:"cursor"`
-		Next   string       `json:"next"`
+		Items  []apiMessage    `json:"items"`
+		Data   []apiMessage    `json:"data"`
+		Cursor json.RawMessage `json:"cursor"`
+		Next   string          `json:"next"`
 	}
 	raw, err := io.ReadAll(io.LimitReader(resp.Body, maxBody+1))
 	if err != nil {
@@ -189,8 +190,16 @@ func (c *Client) Messages(ctx context.Context, sessionID string, opts MessagesOp
 		items = body.Data
 	}
 	page := Page{Next: body.Next}
-	if page.Next == "" {
-		page.Next = body.Cursor
+	if page.Next == "" && len(body.Cursor) > 0 {
+		var obj struct {
+			Next string `json:"next"`
+		}
+		var str string
+		if json.Unmarshal(body.Cursor, &obj) == nil {
+			page.Next = obj.Next
+		} else if json.Unmarshal(body.Cursor, &str) == nil {
+			page.Next = str
+		}
 	}
 	for _, m := range items {
 		if msg, ok := m.message(); ok {

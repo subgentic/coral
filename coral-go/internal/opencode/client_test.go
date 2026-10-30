@@ -37,11 +37,11 @@ func newStandIn(t *testing.T, password string) *standIn {
 	mux.HandleFunc("/api/session/ses_abc123/message", auth(func(w http.ResponseWriter, r *http.Request) {
 		s.queries <- r.URL.RawQuery
 		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprint(w, `{"items":[
+		fmt.Fprint(w, `{"data":[
 			{"id":"m3","type":"idle","outcome":"succeeded"},
 			{"id":"m2","type":"assistant","content":[{"type":"text","text":"The tests pass."},{"type":"tool","text":"ignored"}],"time":{"created":"2026-10-30T10:00:05Z"}},
 			{"id":"m1","type":"user","text":"run the tests","time":{"created":"2026-10-30T10:00:00Z"}}
-		],"next":"cur2"}`)
+		],"cursor":{"previous":"cur0","next":"cur2"}}`)
 	}))
 	mux.HandleFunc("/api/event", auth(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
@@ -72,7 +72,7 @@ func TestMessagesAreReadThroughTheAPIWithItsPassword(t *testing.T) {
 	require.Len(t, p.Messages, 2, "the idle marker is not a message")
 	assert.Equal(t, Message{ID: "m2", Role: "assistant", Text: "The tests pass.", At: "2026-10-30T10:00:05Z"}, p.Messages[0], "text blocks only")
 	assert.Equal(t, "run the tests", p.Messages[1].Text)
-	assert.Equal(t, "cur2", p.Next)
+	assert.Equal(t, "cur2", p.Next, "the next cursor of {cursor:{previous,next}}")
 
 	last, ok, err := c.LastMessage(context.Background(), "ses_abc123")
 	require.NoError(t, err)
@@ -132,11 +132,11 @@ func TestTheEventStreamDrivesTheStateOfEachSession(t *testing.T) {
 	}()
 	for _, f := range []string{
 		": keep-alive\n\n",
-		"data: {\"type\":\"session.status\",\"properties\":{\"sessionID\":\"ses_abc123\",\"status\":{\"type\":\"busy\"}}}\n\n",
+		"event: session.execution.started\ndata: {\"sessionID\":\"ses_abc123\"}\n\n",          // v2.2.4's own frames: execution started and succeeded
 		"event: session.text.delta\ndata: {\"sessionID\":\"ses_abc123\",\"text\":\"hi\"}\n\n", // says nothing about the state
 		"data: not json\n\n",
 		"data: {\"type\":\"permission.asked\",\"sessionID\":\"ses_abc123\"}\n\n",
-		"event: session.idle\ndata: {\"sessionID\":\"ses_abc123\"}\n\n",
+		"event: session.execution.succeeded\ndata: {\"sessionID\":\"ses_abc123\"}\n\n",
 		"data: {\"type\":\"session.status\",\"sessionID\":\"../etc\",\"status\":\"busy\"}\n\n", // not a session id: ignored
 	} {
 		s.events <- f
