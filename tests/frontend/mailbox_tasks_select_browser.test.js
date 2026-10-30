@@ -31,6 +31,16 @@ const sceneShots = require('./helpers/scene_shots');
                 await ev(`document.documentElement.setAttribute('data-theme', ${JSON.stringify(theme)}); true`);
                 await waitFor(`document.querySelector('#group-table-view .dt-box').classList.contains('dt-folded') === ${width===390}`, 'table layout settled');
                 await shot(`${width}-${theme}`);
+                if (width === 1280) for (const fs of [16, 32]) { // the select column keeps its 44 px at any text size: the box is inside the table's border with the table's own inner padding, level with its row's text, and the chip is not cut (the Operator: "the checkboxes are outside the line", #11160)
+                    await ev(`document.documentElement.style.fontSize = '${fs}px'; true`);
+                    const g = await ev(`(() => { const box = document.querySelector('#group-table-view .dt-box'), b = box.getBoundingClientRect(), bw = parseFloat(getComputedStyle(box).borderLeftWidth), pad = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--table-pad-x')) || 12; const R = e => e.getBoundingClientRect(); const rows = [...document.querySelectorAll('.dt-table thead tr, .dt-table tbody tr.dt-row')].map(tr => { const cell = tr.children[0], inp = cell.querySelector('input'), next = tr.children[1], lead = next.querySelector('button, .chip, span, *') || next; const c = R(cell), i = R(inp), n = R(next), l = R(lead); return { inset: Math.round((i.left - b.left - bw) * 10) / 10, cellW: Math.round(c.width), dy: Math.round(((i.top + i.bottom) / 2 - (l.top + l.bottom) / 2) * 10) / 10, gap: Math.round((l.left - i.right) * 10) / 10, clipped: l.right > n.right + 0.5, inLeft: i.left >= c.left - 0.5 && i.right <= c.right + 0.5 }; }); return { pad, rows }; })()`);
+                    const at = `${fs}px ${theme}: `;
+                    assert.ok(g.rows.length >= 4 && g.rows.every(r => r.cellW >= 44 && r.inLeft), at + 'the select cell keeps its 44 px and holds the box: ' + JSON.stringify(g));
+                    assert.ok(g.rows.every(r => r.inset >= g.pad - 1), at + `each checkbox is inside the table's border by the table's own padding (${g.pad} px): ` + JSON.stringify(g));
+                    assert.ok(g.rows.every(r => Math.abs(r.dy) <= 1.5 && !r.clipped), at + 'the header and every row share a centre line with their first cell, nothing is clipped: ' + JSON.stringify(g));
+                    assert.ok(new Set(g.rows.map(r => r.inset)).size === 1, at + 'the header box and the rows\' boxes are in one column: ' + JSON.stringify(g));
+                    await ev(`document.documentElement.style.fontSize = ''; true`);
+                }
             }
         }
         await Emulation.setDeviceMetricsOverride({ width:1280, height:800, deviceScaleFactor:1, mobile:false });

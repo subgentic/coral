@@ -138,7 +138,8 @@
 .dt-row[aria-current="true"] td { background: var(--table-hover); }
 .dt-row.dt-quiet td { color: var(--table-tertiary-color); }
 .dt-row.dt-selected td { background: var(--table-selected); }
-.dt-table .dt-check { width: var(--table-check-w); padding: 0; text-align: center; overflow: visible; }
+.dt-table td > .chip { display: flex; width: fit-content; max-width: 100%; } /* a chip is a block the cell centres, like the select box beside it (as an inline box its baseline put it 4 px low at 200% text, #11160) */
+.dt-table .dt-check { width: var(--table-check-w); min-width: var(--table-check-w); padding: 0; text-align: center; overflow: visible; }
 .dt-bar { flex: 1 1 auto; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 4px 0; }
 .dt-bar > * { margin: 0; }
 .dt-bar-count { font-size: var(--table-secondary-size); font-weight: var(--fw-strong); color: var(--table-primary-color); }
