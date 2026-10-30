@@ -8,6 +8,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
 const { install: installNT, openNewTeam } = require('./helpers/new_team');
 const { install: installNA, openNewAgent, stubModels, stepLine } = require('./helpers/new_agent');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 const TEAM = `qa-next-steps-${Date.now() % 100000}`;
 
@@ -22,7 +23,7 @@ const TEAM = `qa-next-steps-${Date.now() % 100000}`;
         // (1) the empty Board
         for (const [label, w, h, mobile] of [['1280 px', 1280, 800, false], ['390 px', 390, 844, true]]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`); await installTP(ev);
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev); await installTP(ev);
             await seed(ev, TEAM); if (mobile) await ev(`window.syncMobileAgentList && window.syncMobileAgentList(); true`);
             await openTeam(ev, waitFor, TEAM).catch(() => {});
             await ev(`(() => { const R = window.fetch; window.fetch = (u, o) => String(u).includes('/messages/all') ? Promise.resolve(new Response(JSON.stringify({ messages: [], total: 0, before_count: 0 }), { status: 200, headers: { 'content-type': 'application/json' } })) : R(u, o); return true; })()`); // a board nothing was posted on: the seeded one holds the system lines of its goals and tasks
@@ -54,7 +55,7 @@ const TEAM = `qa-next-steps-${Date.now() % 100000}`;
         // (3) the banner
         for (const [w, theme, zoom] of [[390, 'light', 100], [390, 'dark', 100], [320, 'light', 100], [390, 'light', 200], [390, 'dark', 200], [320, 'light', 200]]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: 844, deviceScaleFactor: 1, mobile: true });
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
             await ev(`document.documentElement.setAttribute('data-theme', ${JSON.stringify(theme)}); document.documentElement.style.fontSize = '${zoom}%'; const b = document.getElementById('local-auth-banner'); b.hidden = false; b.classList.remove('notice-error'); b.classList.add('notice-warn'); b.querySelector('[data-auth-state=off]').hidden = true; b.querySelector('[data-auth-state=nopw]').hidden = false; document.getElementById('local-auth-set-password').hidden = false; document.getElementById('local-auth-dismiss').hidden = false; true`); await settle(300);
             const g = await ev(`(() => { const b = document.getElementById('local-auth-banner'), r = b.getBoundingClientRect(), vis = e => e.getClientRects().length > 0 && e.getBoundingClientRect().width > 4, d = document.getElementById('local-auth-dismiss'), s = document.getElementById('local-auth-set-password'); return { h: Math.round(r.height), vh: innerHeight, shown: vis(d) && vis(s), text: b.textContent.replace(/\\s+/g, ' ').trim(), seen: [...b.querySelectorAll('[data-auth-state=nopw] > b, .local-auth-more')].map(e => Math.round(e.getBoundingClientRect().width)), col: Math.round(b.querySelector('.local-auth-banner-text').getBoundingClientRect().width) }; })()`);
             if (process.env.DBG) console.log('DBG3', w, theme, zoom, g.h, g.vh, g.col);
@@ -65,7 +66,7 @@ const TEAM = `qa-next-steps-${Date.now() % 100000}`;
         }
         // (5) the goal switch of the team's first task says its state in words (#11336: a newcomer "ticks" it, which turns it off)
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false }); await Emulation.setTouchEmulationEnabled({ enabled: false });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         await ev(`import(${S} + 'team_launch_settings.js').then(m => { window.__tls = m; const h = document.createElement('div'); h.id = 'team-start-host'; document.body.append(h); m.mountTeamLaunchSettings(); return true; })`);
         await waitFor(`!!document.getElementById('team-goal-state')`, 'the goal state line', 8000);
         const gs = await ev(`(() => { const m = window.__tls;
@@ -81,7 +82,7 @@ const TEAM = `qa-next-steps-${Date.now() % 100000}`;
         check(/^On: the first task will also/.test(gs.backOn || '') && gs.readOn === true, `clicked again it says On: ${JSON.stringify([gs.backOn, gs.readOn])}`);
         // (6) New Agent says Claude is not signed in, with how (#11336): a notice under the provider, Launch stays on, nothing for another provider
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false }); await Emulation.setTouchEmulationEnabled({ enabled: false });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         await ev(`window.__signed = true; const R6 = window.fetch; window.fetch = (u, o) => String(u).includes('/api/system/status') ? Promise.resolve(new Response(JSON.stringify({ claude_signed_in: window.__signed }), { status: 200, headers: { 'Content-Type': 'application/json' } })) : String(u).includes('/api/system/cli-check') && String(u).includes('type=pi') ? Promise.resolve(new Response(JSON.stringify(window.__pi), { status: 200, headers: { 'Content-Type': 'application/json' } })) : R6(u, o); window.__pi = { found: true, signed_in: false }; true`);
         await ev(`import(${S} + 'launch_signin_notice.js').then(async m => { const sl = await import(${S} + 'signin_line.js'); window.__sl = sl; const host = document.createElement('div'); host.id = 'sn-host'; host.innerHTML = '<form id="sn-form"><select class="acf-agent-type"><option value="claude">Claude</option><option value="codex">Codex</option><option value="pi">Pi</option></select></form><div id="sn-slot" class="launch-cli-slot"></div>'; document.body.append(host); sl.setClaudeSignedIn(true); m.mountLaunchSigninNotice({ slot: document.getElementById('sn-slot'), form: document.getElementById('sn-form'), server: 'local' }); return true; })`);
         const sn = () => ev(`(() => { const n = document.querySelector('#sn-host .launch-signin-notice'); const b = n && n.querySelector('button'), st = n && n.querySelector('.launch-signin-steps'); return n ? { shown: !n.hidden, text: n.textContent.replace(/\\s+/g, ' ').trim(), expanded: b.getAttribute('aria-expanded'), steps: !st.hidden } : null; })()`);
@@ -113,7 +114,7 @@ const TEAM = `qa-next-steps-${Date.now() % 100000}`;
         await ev(`document.getElementById('sn-host').remove(); true`);
         // (7) recent folders that are gone (#11336 item 9): the browser keeps them when the data folder is wiped; the dialogs drop them, and a person left with none is offered the first folder
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false }); await Emulation.setTouchEmulationEnabled({ enabled: false });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         const GONE = '/no-such-folder-for-coral-test', GONE2 = '/another/missing/one';
         const rc = await ev(`import(${S} + 'browser.js').then(async m => { m.recordRecentDir(${JSON.stringify(GONE2)}); m.recordRecentDir('/tmp'); m.recordRecentDir(${JSON.stringify(GONE)}); const before = m.getRecentDirs(); const changed = await m.pruneMissingRecents(); const again = await m.pruneMissingRecents(); const other = await m.pruneMissingRecents('box-b'); return { before, changed, after: m.getRecentDirs(), again, other }; })`);
         check(rc.changed === true && JSON.stringify(rc.after) === JSON.stringify(['/tmp']), `missing recents are dropped and an existing one kept: ${JSON.stringify(rc)}`);
@@ -124,7 +125,7 @@ const TEAM = `qa-next-steps-${Date.now() % 100000}`;
         const tb = await ev(`[...document.querySelectorAll('#launch-team-dir-recents button')].map(b => b.dataset.dir)`);
         check(JSON.stringify(tb) === JSON.stringify(['/tmp']), `New team shows only the recent folder that exists: ${JSON.stringify(tb)}`);
         const fresh = async recents => { // a returning person: a new page whose browser still holds these recent folders
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
             await ev(`import(${S} + 'browser.js').then(m => { for (const k of Object.keys(localStorage)) if (k.includes('coral-recent-dirs')) localStorage.removeItem(k); for (const d of ${JSON.stringify(recents)}) m.recordRecentDir(d); return true; })`);
         };
         await fresh([GONE]); await installNT(ev); await openNewTeam(ev, waitFor);
@@ -139,7 +140,7 @@ const TEAM = `qa-next-steps-${Date.now() % 100000}`;
         // (8) the no-password banner is not left behind the password dialog (#11336, Mobile Beta Tester): hidden while the dialog is open, back when it closes
         for (const [w, mobile] of [[1280, false], [390, true]]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: 844, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
             await ev(`(() => { const b = document.getElementById('local-auth-banner'); b.hidden = false; b.classList.remove('notice-error'); b.classList.add('notice-warn'); b.querySelector('[data-auth-state=off]').hidden = true; b.querySelector('[data-auth-state=nopw]').hidden = false; return true; })()`);
             const shown = () => ev(`(() => { const b = document.getElementById('local-auth-banner'); return b.getClientRects().length > 0 && getComputedStyle(b).display !== 'none'; })()`);
             check(await shown() === true, `${w} px: the banner shows with no dialog`);
@@ -151,7 +152,7 @@ const TEAM = `qa-next-steps-${Date.now() % 100000}`;
         }
         // (9) "Operator" is explained where a newcomer meets it (#11336 item 7, option 2): the empty Board says agents call you the Operator, and an @Operator mention says "That is you" on hover, on a tap and in the words a screen reader reads
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         const mt = await ev(`import(${S} + 'board_message_text.js').then(m => { const host = document.createElement('div'); host.id = 'mn-host'; host.innerHTML = m.highlightMentionsHtml('<p>Please look, @Operator, and @Orchestrator too.</p>'); document.body.append(host); const self = host.querySelector('.mb-mention-self'), other = [...host.querySelectorAll('.mb-mention')].find(x => !x.classList.contains('mb-mention-self')); return { selfText: self && self.textContent, title: self && self.title, tab: self && self.tabIndex, role: self && self.getAttribute('role'), label: self && self.getAttribute('aria-label'), other: other && { title: other.title, tab: other.tabIndex, text: other.textContent } }; })`);
         check(mt.selfText === '@Operator' && mt.title === 'That is you' && mt.tab === 0 && mt.role === 'button' && mt.label === '@Operator, that is you', `the @Operator mention is told it is you, by title, by an accessible name (the text is unchanged) and by Tab: ${JSON.stringify(mt)}`);
         check(mt.other && mt.other.title === '' && mt.other.tab === -1 && mt.other.text === '@Orchestrator', `another mention is left as it was: ${JSON.stringify(mt.other)}`);
@@ -166,7 +167,7 @@ const TEAM = `qa-next-steps-${Date.now() % 100000}`;
         await ev(`document.getElementById('mn-host').remove(); true`);
         // (10) New agent on a phone (#11336, Mobile Beta Tester): step 2 says what a persona is; step 3's section picker says it is the sections ("Section" above it)
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`); await installNA(ev); await stubModels(ev);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev); await installNA(ev); await stubModels(ev);
         await ev(`localStorage.setItem('coral-recent-dirs', JSON.stringify(['/tmp'])); true`);
         await openNewAgent(ev, waitFor);
         const seen = {};
