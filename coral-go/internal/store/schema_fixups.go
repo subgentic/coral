@@ -104,7 +104,9 @@ var columnMigrations = []struct {
 	{"session_tokens", "proof_key", "TEXT"},
 	{"live_sessions", "permission_mode", "TEXT"}, // the launch's effective permission mode (#5188)
 	{"cloud_connection", "route_key", "TEXT"},    // the hub's routing hint for this enrollment (#3683)
-	{"cloud_connection", "hub_owner", "TEXT"},    // the Coral Hub account that owns this enrollment (#3966)
+	// When Coral made its data folder private while this server's key was stored; NULL once a different key is entered.
+	{"remote_servers", "key_exposed_since", "TEXT"},
+	{"cloud_connection", "hub_owner", "TEXT"}, // the Coral Hub account that owns this enrollment (#3966)
 	// The owner's hub-user-<8 hex> label as the hub stamps it, recorded at enrolment only (#5280); NULL = unknown.
 	{"cloud_connection", "hub_owner_user", "TEXT"},
 	// What the machine is enrolled as (#7061): "team" with the Hub organisation's id in hub_owner_org (a canonical lower-case UUID), recorded at enrolment only; NULL = personal, which is every

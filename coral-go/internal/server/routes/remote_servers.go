@@ -146,7 +146,29 @@ func viewRemote(s *store.RemoteServer) remoteServerView {
 	if s == nil {
 		return remoteServerView{}
 	}
-	return remoteServerView{RemoteServer: *s, Warning: remoteURLWarning(s.URL)}
+	warn := remoteURLWarning(s.URL)
+	if exposed := keyExposedWarning(s.KeyExposedSince); exposed != "" {
+		if warn != "" {
+			warn += "; "
+		}
+		warn += exposed
+	}
+	return remoteServerView{RemoteServer: *s, Warning: warn}
+}
+
+// keyExposedWarning is the warning of a server marked by store.KeyExposedSince, until a different key is entered: Settings > Servers
+// shows it with the server, after the one-time notice of that start is gone.
+func keyExposedWarning(since *string) string {
+	if since == nil || *since == "" {
+		return ""
+	}
+	day := *since
+	if t, err := time.Parse(time.RFC3339Nano, *since); err == nil {
+		day = t.Format("2006-01-02")
+	} else if len(day) > 10 {
+		day = day[:10]
+	}
+	return "other accounts on this computer could read this server's API key until " + day + ", when Coral found its data folder open: make a new key on that server and enter it here with Edit"
 }
 
 // CheckRemoteHealth calls GET {baseURL}/api/health with the key. Unless

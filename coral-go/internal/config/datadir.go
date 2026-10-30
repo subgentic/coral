@@ -6,6 +6,8 @@ import (
 	"io/fs"
 	"log"
 	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -49,15 +51,78 @@ func EnsureDataDir(dir string) error {
 	if notice != "" {
 		log.Printf("[security] %s", notice)
 		setDataDirNotice(notice)
+		SetDataDirMadePrivate(dir, true)
+		// The marker outlives this process: until a start has renewed what is in the folder, each start renews it. The folder is private
+		// now, so the marker is too.
+		if err := os.WriteFile(filepath.Join(dir, ExposedPendingFile), []byte("Coral found this folder open to other accounts; the secrets in it are replaced at the next start.\n"), 0o600); err != nil {
+			log.Printf("[security] could not write %s: %v", ExposedPendingFile, err)
+		}
 	}
 	return nil
 }
+
+// ExposedPendingFile marks a data folder that Coral made private until a start has renewed what is in it (the API key, the agents'
+// tokens, the stored remote servers' marks). It is removed only when that has all been done (ClearDataDirExposed).
+const ExposedPendingFile = ".exposed-pending"
+
+// DataDirMadePrivate reports whether this start made the data folder dir private, or an earlier start did and did not finish renewing
+// what is in it (ExposedPendingFile). Such a start renews the secrets Coral can renew (the API key, the agents' session tokens) and the
+// notice lists the ones a person may want to renew. It is kept per folder: a process that opens another data folder (a test does, for
+// each server) is not told about one it did not open.
+func DataDirMadePrivate(dir string) bool {
+	madePrivateMu.Lock()
+	set := madePrivate[madePrivateKey(dir)]
+	madePrivateMu.Unlock()
+	if set {
+		return true
+	}
+	fi, err := os.Lstat(filepath.Join(dir, ExposedPendingFile))
+	return err == nil && fi.Mode().IsRegular()
+}
+
+// ClearDataDirExposed ends DataDirMadePrivate for dir: its flag and its ExposedPendingFile. Called once everything in the folder that Coral
+// can renew has been renewed.
+func ClearDataDirExposed(dir string) error {
+	SetDataDirMadePrivate(dir, false)
+	if err := os.Remove(filepath.Join(dir, ExposedPendingFile)); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return err
+	}
+	return nil
+}
+
+func madePrivateKey(dir string) string {
+	k := filepath.Clean(dir)
+	if runtime.GOOS == "windows" {
+		k = strings.ToLower(k)
+	}
+	return k
+}
+
+// SetDataDirMadePrivate sets what DataDirMadePrivate reports for dir. EnsureDataDir sets it; the tests of the start that follows (internal/server,
+// internal/startup) set it too, for a folder of their own.
+func SetDataDirMadePrivate(dir string, v bool) {
+	madePrivateMu.Lock()
+	defer madePrivateMu.Unlock()
+	if v {
+		madePrivate[madePrivateKey(dir)] = true
+	} else {
+		delete(madePrivate, madePrivateKey(dir))
+	}
+}
+
+// DataDirNotice is what Coral said it did to the data folder at this start, or "".
+func DataDirNotice() string { return getDataDirNotice() }
+
+// SetDataDirNotice replaces that notice: the server adds what it renewed and what the person may want to do.
+func SetDataDirNotice(s string) { setDataDirNotice(s) }
 
 // ErrSharedDataDir is the error of an existing data folder that other accounts can read and that Coral could not make private.
 var ErrSharedDataDir = errors.New("the data folder can be read by other accounts")
 
 var (
 	allowSharedDataDir atomic.Bool
+	madePrivateMu      sync.Mutex
+	madePrivate        = map[string]bool{}
 	dataDirNoticeMu    sync.Mutex
 	dataDirNotice      string
 )

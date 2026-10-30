@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"crypto/subtle"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -59,6 +60,9 @@ type RemoteServer struct {
 	CreatedAt    string  `json:"created_at" db:"created_at"`
 	LastSeen     *string `json:"last_seen" db:"last_seen"`
 	LastError    *string `json:"last_error" db:"last_error"`
+	// KeyExposedSince is when Coral made its data folder private while this server's key was stored in it (UTC); nil when it never was,
+	// or a different key has been entered since. Settings > Servers shows it until then.
+	KeyExposedSince *string `json:"key_exposed_since,omitempty" db:"key_exposed_since"`
 }
 
 // RemoteServerStore manages the remote_servers table. API keys are encrypted
@@ -185,6 +189,12 @@ func (s *RemoteServerStore) Update(ctx context.Context, id string, u RemoteServe
 		}
 	}
 	if u.APIKey != nil {
+		// Only a DIFFERENT key ends the warning (KeyExposedSince); the same key entered again leaves it. A stored key that can't be read
+		// counts as different. Read before the key is replaced below.
+		keepExposed := false
+		if old, err := s.DecryptedKey(ctx, id); err == nil {
+			keepExposed = subtle.ConstantTimeCompare([]byte(old), []byte(*u.APIKey)) == 1
+		}
 		// Re-entering a key is the explicit recovery path, so a lost key
 		// file may be replaced here (other rows were already unreadable).
 		box, err := s.getBox(ctx, true, true)
@@ -195,12 +205,26 @@ func (s *RemoteServerStore) Update(ctx context.Context, id string, u RemoteServe
 		if err != nil {
 			return nil, err
 		}
-		if _, err := s.db.ExecContext(ctx, "UPDATE remote_servers SET api_key = ?, status = ?, last_error = NULL WHERE id = ?",
+		clear := ", key_exposed_since = NULL"
+		if keepExposed {
+			clear = ""
+		}
+		if _, err := s.db.ExecContext(ctx, "UPDATE remote_servers SET api_key = ?, status = ?, last_error = NULL"+clear+" WHERE id = ?",
 			env, RemoteStatusUnknown, id); err != nil {
 			return nil, err
 		}
 	}
 	return s.Get(ctx, id)
+}
+
+// MarkKeysExposed sets KeyExposedSince = now on every stored server, keeping an earlier time where there is one. For a start that made the
+// data folder private (config.DataDirMadePrivate).
+func (s *RemoteServerStore) MarkKeysExposed(ctx context.Context) (int64, error) {
+	res, err := s.db.ExecContext(ctx, "UPDATE remote_servers SET key_exposed_since = ? WHERE key_exposed_since IS NULL", nowUTC())
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
 }
 
 // Delete removes a server. Returns ErrRemoteNotFound if absent.
@@ -215,7 +239,7 @@ func (s *RemoteServerStore) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
-const remoteCols = "id, label, url, allow_private, status, created_at, last_seen, last_error"
+const remoteCols = "id, label, url, allow_private, status, created_at, last_seen, last_error, key_exposed_since"
 
 // Get returns one server (without its key). Status is key_unreadable when the
 // stored key cannot be decrypted.
