@@ -64,6 +64,21 @@ orchestrator create `UI review: vX.Y.Z` on goal #163 assigned to the runner; `pu
 `--task N`), claims it, uploads, and then hands it to the Operator if the runner may reassign, or completes it with
 the contact sheet's link in the message. A runner that may create tasks creates it (`SCREENS_GOAL`, default 163).
 
+## What a shot may show
+
+The work folder, the HOME and the data folder of a run have the same neutral names every run
+(`/tmp/coral-screens/...`), because some pages print them (a job's folder, an agent's terminal): a path that
+changed per run would make every release look changed, and one under the runner's own home would name the person.
+`shoot.mjs` also reads each page's text before photographing it and **refuses a shot that holds the runner's `HOME`
+or `TMPDIR`** (a canvas-drawn terminal is not in the page text; the neutral names are what protect it; a page of
+documentation may print an example `/Users/me`, so the check is for the runner's own paths only). The first v2.0.6 baseline predates this: its shots show
+`/var/folders/.../T/coral-screens.XXXX` paths (no account name), so the first comparison flags the few pages that
+print a path; later releases compare neutral with neutral.
+
+Known limits: a failed run keeps `/tmp/coral-screens` (its data folders hold a throwaway API key until the next run
+clears them); a port is picked just before the server starts, so another process could take it in between and the
+run fails at the health check; one run at a time (`/tmp/coral-screens.lock`).
+
 ## The upload limit
 
 The server lets one agent session upload **100 files and 512 MiB an hour**, refused ones included. So the script

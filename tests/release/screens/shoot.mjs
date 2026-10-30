@@ -1,5 +1,5 @@
 // Photographs every page of pages.mjs at every width (and theme) with Playwright's Chromium (or the Chrome on this computer), into <out>/<theme>/<page>__<width>.png.
-//   node shoot.mjs --out DIR --seeded URL --seeded-link LINK --seed seed.json [--fresh URL --fresh-link LINK] [--themes dark,light] [--only id,id] [--widths 1440,900,390]
+//   node shoot.mjs [--forbid HOME:TMPDIR] --out DIR --seeded URL --seeded-link LINK --seed seed.json [--fresh URL --fresh-link LINK] [--themes dark,light] [--only id,id] [--widths 1440,900,390]
 // A page that cannot be photographed is recorded in results.json (with the reason) and the run goes on: one broken page never costs the others. The clock is fixed, animations and the caret are off,
 // and a shot waits for the app's own ready signal and then for its requests to go quiet, so two runs of the same build look the same.
 import fs from 'node:fs';
@@ -12,6 +12,7 @@ import { STUBS } from './stubs.mjs';
 
 const arg = name => { const i = process.argv.indexOf('--' + name); return i > 0 ? process.argv[i + 1] : undefined; };
 const out = arg('out'), seededBase = arg('seeded'), seededLink = arg('seeded-link'), freshBase = arg('fresh'), freshLink = arg('fresh-link'), seedFile = arg('seed');
+const forbid = (arg('forbid') || '').split(':').filter(x => x.length > 3 && x !== '/'); // the runner's HOME and TMPDIR: no shot may show them
 const themes = (arg('themes') || DEFAULT_THEMES.join(',')).split(',').filter(t => THEMES.includes(t));
 const only = arg('only') ? new Set(arg('only').split(',')) : null;
 const widthNames = arg('widths') ? new Set(arg('widths').split(',')) : null;
@@ -97,6 +98,10 @@ for (const theme of themes) {
                 }
                 if (/^\/agents\/[0-9a-f-]{36}/.test(entry.path || '')) await page.evaluate(id => window.__coralReady.agentSelected(id), fill(entry.path).match(/[0-9a-f-]{36}/)[0]).catch(() => {});
                 await settle(page);
+                // A path of the person who runs this must never be in a shot: the page's text is read before it is photographed (the work folders have neutral names, so this finds a leak, it does not clean one).
+                const text = await page.evaluate(() => document.body.innerText || '');
+                const leak = forbid.find(f => text.includes(f));
+                if (leak) throw new Error(`the page shows a path of the runner (${leak.slice(0, 40)}): not photographed`);
                 await page.screenshot({ path: path.join(out, theme, file), fullPage: true, animations: 'disabled', caret: 'hide' });
                 rec.ok = true;
                 rec.url = page.url().replace(world.base, '');

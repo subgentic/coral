@@ -11,13 +11,15 @@
 #   --keep       keep the private data folder and the shots' work folder (for a failed run)
 # Needs Go, Node 20+, git, Chrome (or SCREENS_CHROME=/path/to/chrome, or "npx playwright install chromium" and SCREENS_CHANNEL=chromium), and for the upload a coral-board and coral-agent that are
 # signed in as the person who runs it (SCREENS_BIN=<dir> to name the folder of those two programs).
-# NEVER ~/.coral and never :8420: the server gets its own data folder and a free port, --cloud-url off and --no-browser. The shots of each release are kept by version in
+# NEVER ~/.coral and never :8420: the server gets its own data folder (/tmp/coral-screens, one run at a time) and a free port (picked just before the start: another process could take it in between, and the
+# run then fails at the health check), --cloud-url off and --no-browser. The shots of each release are kept by version in
 # ${SCREENS_CACHE:-~/.cache/coral-screens}/<version>/, which the next release is compared with.
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$HERE/../../.." && pwd)"
 # The runner's own identity (a session, a token, the board it is on) is what files the shots at the end; the private servers and everything else must never see it, so it is set aside here, before
 # agent_env.sh clears it, and handed to publish.mjs alone.
+REAL_HOME="$HOME"; REAL_TMPDIR="${TMPDIR:-}"   # shoot.mjs refuses a shot that shows either
 KEEP_ENV=()
 for v in CORAL_SESSION_NAME CORAL_SESSION_ID CORAL_SESSION_TOKEN CORAL_SESSION_AUTH_FILE CORAL_SUBSCRIBER_ID CORAL_URL CORAL_PORT CORAL_HOST CORAL_DATA_DIR CORAL_DIR TMUX TMUX_PANE \
          CORAL_TMUX_SOCKET CORAL_TMUX_FALLBACK CORAL_BOARD_HELPER CORAL_BOARD_ARGS CORAL_AGENT_HELPER CORAL_AGENT_ARGS CORAL_CLOUD_URL CORAL_HUB CORAL_SHELL; do
@@ -47,7 +49,12 @@ CACHE="${SCREENS_CACHE:-$HOME/.cache/coral-screens}"
 case "$CACHE" in "$HOME/.coral"|"$HOME/.coral/"*) echo "refusing a cache inside ~/.coral" >&2; exit 2 ;; esac
 
 log() { echo "[screens] $*"; }
-WORK="$(mktemp -d "${TMPDIR:-/tmp}/coral-screens.XXXXXX")"
+# A work folder, a HOME and a data folder with the SAME names every run, under /tmp: their paths appear in some pages (a job's folder, an agent's terminal), and a path that changes with every run, or
+# names the person who runs it, would be in every shot of every release. Two runs at once would share them, so one at a time (a lock folder; a stale one from a crashed run is removed by hand).
+NEUTRAL=/tmp/coral-screens
+if ! mkdir "$NEUTRAL.lock" 2>/dev/null; then echo "another screenshot run holds $NEUTRAL.lock (remove it if that run is gone)" >&2; exit 3; fi
+rm -rf "$NEUTRAL"; mkdir -p "$NEUTRAL"
+WORK="$NEUTRAL"
 SEEDED_PID="" FRESH_PID="" TREE="" TREE_IS_WORKTREE=0
 stop_server() { # kills only the process this run started, and only its own tmux server
     local pid="$1" data="$2"
@@ -61,7 +68,8 @@ cleanup() {
     stop_server "$FRESH_PID" "$WORK/fresh/data"
     coral_test_sandbox_cleanup 2>/dev/null || true
     if [ "$TREE_IS_WORKTREE" = 1 ] && [ -n "$TREE" ]; then git -C "$ROOT" worktree remove --force "$TREE" 2>/dev/null || true; fi
-    if [ "$KEEP" = 1 ] || [ "$rc" != 0 ]; then log "kept $WORK (--keep or a failed run)"; else rm -rf "$WORK"; fi   # the data of the private server goes with it
+    if [ "$KEEP" = 1 ] || [ "$rc" != 0 ]; then log "kept $WORK (--keep or a failed run): its data folders hold a throwaway API key until the next run clears them"; else rm -rf "$WORK"; fi   # the data of the private server goes with it
+    rmdir "$NEUTRAL.lock" 2>/dev/null || true
     exit "$rc"
 }
 trap cleanup EXIT
@@ -91,6 +99,7 @@ log "building the dev server, the board tools and the mock agent"
 
 # ── two private servers: one with data, one with nothing (the first-run screens) ─────────────────
 coral_test_sandbox   # an isolated HOME and a stub for every agent CLI first on PATH: a real CLI can never run
+mv "$CORAL_TEST_HOME" "$NEUTRAL/home" && export CORAL_TEST_HOME="$NEUTRAL/home"   # the HOME has a neutral name too
 free_port() { node -e "const s=require('net').createServer().listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})"; }
 start_server() { # name, extra env...
     local name="$1"; shift
@@ -116,7 +125,7 @@ node "$HERE/seed.mjs" --base "$SEEDED" --link "$(link_for "$SEEDED" "$WORK/seede
 # ── the shots ────────────────────────────────────────────────────────────────────────────────────
 OUT="${SCREENS_OUT:-$WORK/out}"; mkdir -p "$OUT"
 log "photographing (themes: $THEMES) into $OUT"
-node "$HERE/shoot.mjs" --out "$OUT" --seed "$WORK/seed.json" --themes "$THEMES" \
+node "$HERE/shoot.mjs" --out "$OUT" --seed "$WORK/seed.json" --themes "$THEMES" --forbid "${REAL_HOME}:${REAL_TMPDIR}" \
     --seeded "$SEEDED" --seeded-link "$(link_for "$SEEDED" "$WORK/seeded/data")" --fresh "$FRESH" --fresh-link "$(link_for "$FRESH" "$WORK/fresh/data")"
 # A stub that was run for anything but a "--version" probe (Settings and the CLI checks probe every agent CLI) means a launch fell back to a CLI on PATH.
 if [ -s "${CORAL_TEST_STUB_MARKER:-/nonexistent}" ] && grep -v -- ' --version$' "$CORAL_TEST_STUB_MARKER" | grep -q .; then log "WARNING: an agent CLI on PATH was run for more than a version probe:"; grep -v -- ' --version$' "$CORAL_TEST_STUB_MARKER" | head -3; fi
