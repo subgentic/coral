@@ -64,12 +64,14 @@ func TestTheCommandsFindTheRunningServerOfTheirDataFolder(t *testing.T) {
 	assert.Equal(t, def, runningServerURL(fs, *base, *home), "an older server's lock file, the PID only: the default")
 
 	record(dir, live+"\n"+coral.URL+"\n")
-	assert.Equal(t, coral.URL, runningServerURL(fs, *base, *home), "the recorded address, verified")
+	got, err := resolveServerURL(fs, *base, *home)
+	assert.NoError(t, err, "the recorded address, verified (the error says why not)")
+	assert.Equal(t, coral.URL, got, "the recorded address, verified")
 	record(dir, "4242\n"+coral.URL+"\n")
 	assert.Equal(t, def, runningServerURL(fs, *base, *home), "a record whose process is not running is not taken")
 	// A live process whose recorded address does not answer is an error, not the default (the Coral is up somewhere the record does not lead to).
 	record(dir, live+"\n"+closedLoopbackURL(t)+"\n")
-	got, err := resolveServerURL(fs, *base, *home)
+	got, err = resolveServerURL(fs, *base, *home)
 	assert.Empty(t, got)
 	assert.ErrorContains(t, err, "did not answer as this Coral")
 
