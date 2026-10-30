@@ -21,7 +21,7 @@ const BASE = require('./test_base').BASE;
     };
     const rects = () => ev(`(() => { const h = document.querySelector('#live-session-view .terminal-header'), r = h.getBoundingClientRect(); const vis = e => e.getClientRects().length > 0 && getComputedStyle(e).visibility !== 'hidden' && e.getBoundingClientRect().width > 1;
         const box = e => { const b = e.getBoundingClientRect(); return { l: Math.round(b.left), t: Math.round(b.top), r: Math.round(b.right), b: Math.round(b.bottom) }; };
-        const names = ['agent-bar-menu', 'terminal-status-dot', 'terminal-header-identity', 'live-view-btn-chat', 'live-view-btn-terminal', 'agent-bar-more'], parts = names.map(n => [n, document.getElementById(n)]).concat([['back', h.querySelector('.terminal-back-btn')]]);
+        const names = ['agent-bar-menu', 'terminal-status-dot', 'terminal-header-identity', 'live-view-switch', 'agent-bar-more'], parts = names.map(n => [n, document.getElementById(n)]).concat([['back', h.querySelector('.terminal-back-btn')]]);
         const shown = parts.filter(([, e]) => e && vis(e)).map(([n, e]) => [n, box(e)]);
         const more = ['chat-find-btn', 'popout-panel-toggle-btn'].map(n => [n, document.getElementById(n)]).filter(([, e]) => e && vis(e)).map(([n, e]) => [n, box(e)]);
         const top = document.querySelector('header.top-bar');
@@ -35,10 +35,20 @@ const BASE = require('./test_base').BASE;
             let m = await rects();
             assert.equal(m.topBar, 'none', `${fs}: the page's top bar is hidden while an agent is open`);
             const names = m.shown.map(s => s[0]);
-            for (const n of ['agent-bar-menu', 'back', 'terminal-header-identity', 'live-view-btn-chat', 'live-view-btn-terminal', 'agent-bar-more']) assert.ok(names.includes(n), `${fs}: ${n} is in the row: ` + JSON.stringify(m.shown));
+            for (const n of ['agent-bar-menu', 'back', 'terminal-header-identity', 'live-view-switch', 'agent-bar-more']) assert.ok(names.includes(n), `${fs}: ${n} is in the row: ` + JSON.stringify(m.shown));
             for (const [n, b] of m.shown) if (/menu|back|live-view|more/.test(n)) assert.ok(b.r - b.l >= 43 && b.b - b.t >= 43, `${fs}: ${n} is a 44 px target: ` + JSON.stringify(b));
+            { // Chat and Terminal are ONE button here (the operator, #11187): the segmented toggle is gone, the button shows the view it goes to, its label and icon follow, the dots' second line has it with its words
+                const sw = () => ev(`(() => { const b = document.getElementById('live-view-switch'), t = document.querySelector('.live-view-toggle'), m = document.getElementById('live-view-switch-menu'); return { label: b.getAttribute('aria-label'), icon: b.querySelector('.material-icons').textContent, pressed: b.hasAttribute('aria-pressed'), toggle: getComputedStyle(t).display, menu: m.querySelector('.live-view-switch-text').textContent, term: document.getElementById('live-view-btn-terminal').classList.contains('active') }; })()`);
+                const a = await sw();
+                assert.ok(a.toggle === 'none' && a.label === 'Show terminal' && a.icon === 'terminal' && a.menu === 'Show terminal' && !a.term, `${fs}: in Chat the one button says Show terminal with a terminal icon, and the two-button toggle is gone: ` + JSON.stringify(a));
+                await ev(`document.getElementById('live-view-switch').click(); true`);
+                const b = await sw();
+                assert.ok(b.term && b.label === 'Show chat' && b.icon === 'chat' && b.menu === 'Show chat', `${fs}: pressed, it shows the terminal and now says Show chat with a chat icon: ` + JSON.stringify(b));
+                await ev(`document.getElementById('live-view-switch').click(); true`);
+                assert.equal((await sw()).label, 'Show terminal', `${fs}: pressed again, it is back to the chat and says Show terminal`);
+            }
             { // ONE row at both text sizes, a long name and a long team too: no control wraps under another (the Mobile Beta Tester: 91 px, then three rows)
-                const tops = m.shown.filter(s => /menu|back|live-view-btn-chat|more/.test(s[0])).map(s => (s[1].t + s[1].b) / 2);
+                const tops = m.shown.filter(s => /menu|back|live-view-switch|more/.test(s[0])).map(s => (s[1].t + s[1].b) / 2);
                 assert.ok(Math.max(...tops) - Math.min(...tops) <= 2, `${fs}: one centre line, the menu, back, switch and ⋯ on one row: ` + JSON.stringify(m.shown));
             }
             if (fs === 16) {

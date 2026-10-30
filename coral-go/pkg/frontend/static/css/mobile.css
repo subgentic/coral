@@ -1339,12 +1339,15 @@
     body.live-session-active:not(.popout-mode) .terminal-identity { display: flex; flex-direction: column; justify-content: center; flex: 1 1 0; min-width: var(--control-touch-height, 44px); }
     body.live-session-active:not(.popout-mode) .terminal-session-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-left: 0; }
     body.live-session-active:not(.popout-mode) .terminal-session-context { margin-left: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    body.live-session-active:not(.popout-mode) .terminal-header .live-view-toggle { order: 2; margin-left: 0; }
+    body.live-session-active:not(.popout-mode) .terminal-header .live-view-toggle { display: none; } /* Chat and Terminal are one button here (#11187, the operator): it shows the view it goes to, and the dots' second line has it with its words */
+    body.live-session-active:not(.popout-mode) .terminal-header .live-view-switch:not([hidden]) { display: inline-flex; order: 2; margin-left: 0; min-width: var(--control-touch-height, 44px); min-height: var(--control-touch-height, 44px); align-items: center; justify-content: center; }
+    body.live-session-active:not(.popout-mode) .terminal-header[data-more] .live-view-switch:not([hidden]) { display: none; } /* with the dots open the switch is the line under it, with its words: one of the two on screen, not two controls of one name */
+    body.live-session-active:not(.popout-mode) .terminal-header .live-view-switch-menu { min-height: var(--control-touch-height, 44px); gap: 6px; align-items: center; }
     body.live-session-active:not(.popout-mode) .terminal-header .agent-bar-more { order: 3; }
-    body.live-session-active:not(.popout-mode) .terminal-header .terminal-header-actions > :not(.live-view-toggle):not(.agent-bar-more) { display: none !important; } /* the header's ids set their own display, some with !important (touch.css, mobile.css) */
+    body.live-session-active:not(.popout-mode) .terminal-header .terminal-header-actions > :not(.live-view-toggle):not(.live-view-switch):not(.agent-bar-more) { display: none !important; } /* the header's ids set their own display, some with !important (touch.css, mobile.css) */
     body.live-session-active:not(.popout-mode) .terminal-header[data-more] { flex-wrap: wrap; } /* only while ⋯ is open: the second line holds Search, the panel and the rest */
     body.live-session-active:not(.popout-mode) .terminal-header[data-more]::before { content: ''; order: 4; flex: 0 0 100%; height: 0; }
-    body.live-session-active:not(.popout-mode) .terminal-header[data-more] .terminal-header-actions > :not(.live-view-toggle):not(.agent-bar-more):not([hidden]):not([style*="display: none"]):not([style*="display:none"]):not(.terminal-branch) { display: inline-flex !important; order: 5; } /* what a mode hid stays hidden */
+    body.live-session-active:not(.popout-mode) .terminal-header[data-more] .terminal-header-actions > :not(.live-view-toggle):not(.live-view-switch):not(.agent-bar-more):not([hidden]):not([style*="display: none"]):not([style*="display:none"]):not(.terminal-branch) { display: inline-flex !important; order: 5; } /* what a mode hid stays hidden */
     body.live-session-active:not(.popout-mode) #popout-panel-toggle-btn { display: none !important; } /* its id sets display: flex !important (above) */
     body.live-session-active:not(.popout-mode) .terminal-header[data-more] #popout-panel-toggle-btn { display: flex !important; order: 5; }
 }

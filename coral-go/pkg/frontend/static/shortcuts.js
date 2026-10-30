@@ -43,7 +43,8 @@ export function searchAllChats() {
 
 /** The agent's terminal view, and back to its chat (Ctrl+`). */
 function toggleTerminal() {
-    const term = document.getElementById('live-view-btn-terminal'), chat = document.getElementById('live-view-btn-chat');
+    const term = document.getElementById('live-view-btn-terminal'), chat = document.getElementById('live-view-btn-chat'), one = document.getElementById('live-view-switch');
+    if (one && one.getClientRects().length) { const back = !!term && term.classList.contains('active'); one.click(); if (back) document.getElementById('command-input')?.focus(); return; } // a phone's one switch (#11187)
     if (!term || !term.getClientRects().length) return;
     const back = term.classList.contains('active');
     (back ? chat : term).click();
