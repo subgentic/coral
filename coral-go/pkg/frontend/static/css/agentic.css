@@ -1172,6 +1172,10 @@ body.panel-dragging .agentic-state {
     border-bottom: 1px solid var(--border);
 }
 
+/* Which worktree the list is from (#11351). */
+.files-worktree { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: var(--space-xs) var(--space-md); font-size: var(--fs-sm); color: var(--text-secondary); }
+.files-worktree > span { min-width: 0; overflow-wrap: anywhere; }
+.files-worktree-branch { font-family: var(--font-mono); color: var(--text-muted); }
 /* The diff under a changed file's row (#11350): the row's chevron opens it, Expand all stacks every file's. The preview pane is untouched. */
 .file-expand-btn { flex: none; }
 .file-diff { margin: 0 0 6px 20px; padding-right: 6px; border-left: 2px solid var(--border); min-width: 0; }

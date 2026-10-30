@@ -18,6 +18,9 @@ func agentCtx(r *http.Request) context.Context {
 	if strictBounds(r) {
 		return context.WithValue(r.Context(), strictIdentityKey{}, true)
 	}
+	if followRequested(r) { // the Files panel's own reads follow the agent into the worktree it works in (#11351)
+		return context.WithValue(r.Context(), followKey{}, true)
+	}
 	return r.Context()
 }
 

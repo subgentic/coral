@@ -29,7 +29,7 @@ var recentPlainSkipDirs = map[string]bool{"node_modules": true, "vendor": true, 
 // recentFilesInPlainFolder lists the files of dir changed in the last week, newest first, as the changed-files list's rows (status "??", no line counts, recorded_at the change time).
 func recentFilesInPlainFolder(dir string, strict bool) []store.ChangedFile {
 	realRoot, err := safefs.Resolve(dir)
-	if err != nil || (strict && !rootAllowed(realRoot)) || sensitivePath(realRoot) {
+	if err != nil || !rootAllowed(realRoot) || sensitivePath(realRoot) { // the home folder, or one that holds it, is never scanned for a git view, strict or not (#11351)
 		return []store.ChangedFile{}
 	}
 	cutoff := time.Now().Add(-recentPlainWindow)
