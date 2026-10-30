@@ -5,6 +5,8 @@ package secfile
 import (
 	"fmt"
 	"path/filepath"
+	"slices"
+	"strings"
 	"sync"
 	"time"
 	"unsafe"
@@ -51,23 +53,43 @@ func Writers(path string) ([]string, error) {
 		}
 	}
 	names := accountNames(found, p)
-	var who []string
-	seen := map[string]bool{}
-	for i, w := range found {
-		name := names[i] + w.note
-		if !seen[name] {
-			seen[name] = true
-			who = append(who, name)
-		}
-	}
-	return who, nil
+	return mergeWays(names, found), nil
 }
 
-// writer is an account aclWriters found (nil sid: Everyone, for no access list) and why, as
-// " (the owner)".
+// mergeWays gives each account once, in the order the accounts first appear, with every way it can change the folder
+// once each in one parenthesis: an account found as the owner, by an entry of its own and through the parent folder
+// is "this user (the owner, through the parent folder)", not three names (#307's copy note).
+func mergeWays(names []string, found []writer) []string {
+	var order []string
+	ways := map[string][]string{}
+	for i, w := range found {
+		name := names[i]
+		if _, seen := ways[name]; !seen {
+			order = append(order, name)
+			ways[name] = []string{}
+		}
+		for _, way := range w.ways {
+			if !slices.Contains(ways[name], way) {
+				ways[name] = append(ways[name], way)
+			}
+		}
+	}
+	who := make([]string, 0, len(order))
+	for _, name := range order {
+		if len(ways[name]) == 0 {
+			who = append(who, name)
+		} else {
+			who = append(who, name+" ("+strings.Join(ways[name], ", ")+")")
+		}
+	}
+	return who
+}
+
+// writer is an account aclWriters found (nil sid: Everyone, for no access list) and how it can change the
+// folder ("the owner", "through the parent folder"); none for an entry of its own on the folder.
 type writer struct {
 	sid  *windows.SID
-	note string
+	ways []string
 }
 
 // aclWriters adds to found the accounts that hold one of mask's rights in path's access list (on
@@ -79,17 +101,15 @@ func aclWriters(found []writer, path string, mask uint32, files bool, p principa
 	if err != nil {
 		return found, err
 	}
-	note := func(why string) string {
+	note := func(why string) []string {
+		var ways []string
+		if why != "" {
+			ways = append(ways, why)
+		}
 		if via != "" {
-			if why != "" {
-				why += ", "
-			}
-			why += via
+			ways = append(ways, via)
 		}
-		if why == "" {
-			return ""
-		}
-		return " (" + why + ")"
+		return ways
 	}
 	if owner, _, err := sd.Owner(); err == nil && owner != nil && !trusted(owner, p) {
 		if owner, err = owner.Copy(); err == nil {
