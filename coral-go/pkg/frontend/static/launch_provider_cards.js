@@ -51,10 +51,16 @@ export async function buildProviderCards({ group, form, server, implicitDefault 
     const statusOf = type => { const s = state.get(type); if (s.found === null) return ''; const d = defaults[type]; return `Installed · default ${d ? modelName(type, d, server) : 'model'}`; };
     const noThinking = (card, label) => { const p = card.querySelector('.provider-no-thinking'); if (!p) return; const wrap = thinkingWrap(), known = Array.isArray(form._thinkingLevels); p.hidden = !(card.classList.contains('is-open') && known && wrap && wrap.hidden); p.textContent = `${label} has no thinking levels, so there is nothing to set.`; };
 
+    /** Moving a row blurs what has the focus inside it (the Model field's add form, its select): the provider checks answer late, redraw the cards and move the rows, and Escape then went to the page and not to the form. The focus goes back to what had it. */
+    const keepFocus = move => {
+        const had = document.activeElement, inside = had && had !== document.body && [modelRow, thinkingRow].some(r => r && r.contains(had));
+        move();
+        if (inside && had.isConnected && document.activeElement !== had) had.focus({ preventScroll: true });
+    };
     function place() { // the open card holds the Model and Thinking rows; with none open they wait in the hold
         const open = cards.get(typeNow());
         const into = open && !open.classList.contains('is-missing') ? open.querySelector('.provider-card-body') : hold;
-        for (const row of [modelRow, thinkingRow]) if (row && row.parentNode !== into) into.append(row);
+        keepFocus(() => { for (const row of [modelRow, thinkingRow]) if (row && row.parentNode !== into) into.append(row); });
         // the thinking sentence sits after the rows: the row hides itself when the provider has no levels
         if (open && into !== hold) noThinking(open, TYPES.find(([t]) => t === typeNow())?.[1] || '');
     }
@@ -71,6 +77,9 @@ export async function buildProviderCards({ group, form, server, implicitDefault 
     }
 
     function draw() {
+        keepFocus(() => drawCards());
+    }
+    function drawCards() {
         for (const row of [modelRow, thinkingRow]) if (row) hold.append(row); // out of the cards before they are replaced
         group.replaceChildren(hold);
         cards.clear();
