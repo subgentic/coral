@@ -77,6 +77,12 @@ func TestLaunchCLIFoundNowhereIsCLINotFound(t *testing.T) {
 		if GetCLIInfo(typ) == nil {
 			continue
 		}
+		if p := FindCLIInCommonPaths(GetCLIInfo(typ).Binary); p != "" {
+			// A CLI really installed in a fixed system folder (/usr/local/bin, /opt/homebrew/bin, /snap/bin) cannot be hidden from a test by its environment: this machine has one, so
+			// the "found nowhere" case cannot be shown for it here. It runs on a machine without that install (CI).
+			t.Logf("%s: skipped, a real install is at %s", typ, p)
+			continue
+		}
 		got, err := LaunchCLI(nil, typ)
 		var nf *CLINotFoundError
 		require.ErrorAs(t, err, &nf, typ)
