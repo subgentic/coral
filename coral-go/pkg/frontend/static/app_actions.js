@@ -47,25 +47,26 @@ const boardPage = () => loadedModule('./message_board.js'); // the board's own b
 const hideJobModal = (...args) => loadedModule('./job_form.js')?.hideJobModal(...args);
 const reshowJobModal = (...args) => loadedModule('./job_form.js')?.reshowJobModal(...args);
 
-// The agent row's ⋯ (#11056) opens the Details card under the row; it stayed floating over the Files list after the person went on (#11284). It closes with the ⋯ again, a tap outside it, Escape, and when the Files
-// or another tab of the agent page is opened.
+// The agent row's ⋯ (#11056) opens the controls that do not fit the one row and the Details card (folder, branch, model) under it. The card stayed floating over the Files list after the person went on (#11284): it now also
+// closes with a tap outside it, with Escape, and when another tab of the agent page is opened. The controls the ⋯ revealed stay (the panel's toggle, Find): only the ⋯ itself closes them, as before.
 let _agentBarMoreOff = null;
-document.addEventListener('coral:agentic-tab', () => closeAgentBarMore()); // switchAgenticTab says another part of the agent page was opened
+const detailsCard = () => document.getElementById('agent-phone-details');
+function closeAgentBarMoreCard() { const d = detailsCard(); if (d) d.open = false; if (_agentBarMoreOff) { _agentBarMoreOff(); _agentBarMoreOff = null; } }
+document.addEventListener('coral:agentic-tab', () => closeAgentBarMoreCard()); // switchAgenticTab says another part of the agent page was opened
 function closeAgentBarMore() {
-    const b = document.getElementById('agent-bar-more'), d = document.getElementById('agent-phone-details'), h = document.querySelector('#live-session-view .terminal-header');
+    const b = document.getElementById('agent-bar-more'), h = document.querySelector('#live-session-view .terminal-header');
     if (b) b.setAttribute('aria-expanded', 'false');
     if (h) h.removeAttribute('data-more');
-    if (d) d.open = false;
-    if (_agentBarMoreOff) { _agentBarMoreOff(); _agentBarMoreOff = null; }
+    closeAgentBarMoreCard();
 }
 function openAgentBarMore(btn) {
-    const d = document.getElementById('agent-phone-details'), h = btn.closest('.terminal-header');
+    const d = detailsCard(), h = btn.closest('.terminal-header');
     btn.setAttribute('aria-expanded', 'true');
     if (h) h.toggleAttribute('data-more', true);
     if (d) d.open = true;
     if (_agentBarMoreOff) _agentBarMoreOff();
-    const outside = e => { if (e.target.closest && (e.target.closest('#agent-phone-details') || e.target.closest('#agent-bar-more'))) return; closeAgentBarMore(); };
-    const key = e => { if (e.key === 'Escape') closeAgentBarMore(); };
+    const outside = e => { if (e.target.closest && (e.target.closest('#agent-phone-details') || e.target.closest('#agent-bar-more'))) return; closeAgentBarMoreCard(); };
+    const key = e => { if (e.key === 'Escape') closeAgentBarMoreCard(); };
     document.addEventListener('click', outside, true);
     document.addEventListener('keydown', key, true);
     _agentBarMoreOff = () => { document.removeEventListener('click', outside, true); document.removeEventListener('keydown', key, true); };

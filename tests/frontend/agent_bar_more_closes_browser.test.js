@@ -19,23 +19,24 @@ const BASE = require('./test_base').BASE;
             await waitFor(`document.getElementById('terminal-header-label')?.textContent === 'more-agent' && document.querySelector('.terminal-header').getClientRects().length > 0`, `${w}: the header`, 10000);
             await waitFor(`!!document.getElementById('agent-bar-more') && document.getElementById('agent-bar-more').getClientRects().length > 0`, `${w}: the ⋯`, 8000);
             const state = () => ev(`(() => { const d = document.getElementById('agent-phone-details'), b = document.getElementById('agent-bar-more'); return { open: d.open, expanded: b.getAttribute('aria-expanded'), more: document.querySelector('.terminal-header').hasAttribute('data-more') }; })()`);
-            const openMore = async () => { await ev(`document.getElementById('agent-bar-more').click(); true`); await waitFor(`document.getElementById('agent-phone-details').open`, `${w}: ⋯ opens the card`, 4000); assert.deepEqual(await state(), { open: true, expanded: 'true', more: true }); };
+            const openMore = async () => { if ((await state()).expanded === 'true') await ev(`document.getElementById('agent-bar-more').click(); true`); await ev(`document.getElementById('agent-bar-more').click(); true`); await waitFor(`document.getElementById('agent-phone-details').open`, `${w}: ⋯ opens the card`, 4000); assert.deepEqual(await state(), { open: true, expanded: 'true', more: true }); };
+            const cardClosed = { open: false, expanded: 'true', more: true }; // the card is gone; the controls the ⋯ revealed (Find, the panel toggle) stay until the ⋯ is tapped
             const closed = { open: false, expanded: 'false', more: false };
 
             await openMore();
             await ev(`document.getElementById('live-history-messages').click(); true`); // a tap outside the card and the row
             await waitFor(`!document.getElementById('agent-phone-details').open`, `${w}: an outside tap closes it`, 4000);
-            assert.deepEqual(await state(), closed, `${w}: the ⋯ says closed after an outside tap`);
+            assert.deepEqual(await state(), cardClosed, `${w}: the card is closed after an outside tap and the revealed controls stay`);
 
             await openMore();
             await ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); true`);
             await waitFor(`!document.getElementById('agent-phone-details').open`, `${w}: Escape closes it`, 4000);
-            assert.deepEqual(await state(), closed, `${w}: the ⋯ says closed after Escape`);
+            assert.deepEqual(await state(), cardClosed, `${w}: the card is closed after Escape`);
 
             await openMore();
             await ev(`window.switchAgenticTab('files', 'top'); true`);
             await waitFor(`!document.getElementById('agent-phone-details').open`, `${w}: opening the Files tab closes it (it floated over the list)`, 4000);
-            assert.deepEqual(await state(), closed, `${w}: the ⋯ says closed after the Files tab opens`);
+            assert.deepEqual(await state(), cardClosed, `${w}: the card is closed after the Files tab opens`);
 
             await openMore();
             await ev(`document.getElementById('agent-bar-more').click(); true`);
