@@ -26,6 +26,7 @@ import (
 	"github.com/subgentic/coral/internal/license"
 	"github.com/subgentic/coral/internal/sshprov"
 	"github.com/subgentic/coral/internal/store"
+	"github.com/subgentic/coral/pkg/hubowner"
 	terms "github.com/subgentic/coral/pkg/license"
 )
 
@@ -35,13 +36,15 @@ const (
 )
 
 type provEnv struct {
-	e       *rsEnv
-	p       *Provisioner
-	dir     string
-	router  chi.Router
-	known   string
-	sshLog  string
-	keyBlob string
+	ownerGiven []string // the secrets installOwner was handed
+	ownerErr   error    // what installOwner answers
+	e          *rsEnv
+	p          *Provisioner
+	dir        string
+	router     chi.Router
+	known      string
+	sshLog     string
+	keyBlob    string
 }
 
 // newProvEnv wires a Provisioner to a fake ssh and a fake ssh-keyscan. mode: "known" (the host key is in known_hosts: ssh answers), "unknown" (ssh exits 255 with the host key refusal until the key is trusted),
@@ -80,6 +83,7 @@ exit 0
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "ssh"), []byte(script), 0o700))
 	scan := "#!/bin/sh\necho 'box.example.com ssh-ed25519 " + b64 + "'\n"
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "ssh-keyscan"), []byte(scan), 0o700))
+	pe := &provEnv{}
 	pr := NewProvisioner(e.h.store)
 	pr.runner = sshprov.Runner{SSH: filepath.Join(dir, "ssh"), KeyScan: filepath.Join(dir, "ssh-keyscan")}
 	pr.configs = func() string { return filepath.Join(dir, "config") }
@@ -89,6 +93,10 @@ exit 0
 		return nil
 	}
 	pr.startRemote = func(context.Context, *provisionPlan) (string, string, error) { return provInstance, provKey, nil }
+	pr.installOwner = func(_ context.Context, _ *provisionPlan, secret string) error { // what the far Coral's hub-owner-secret would be given on stdin
+		pe.ownerGiven = append(pe.ownerGiven, secret)
+		return pe.ownerErr
+	}
 	pr.checkHealth = func(context.Context, *store.RemoteServer, string) RemoteHealth {
 		return RemoteHealth{Status: store.RemoteStatusOnline, Version: "9.9.9"}
 	}
@@ -99,7 +107,8 @@ exit 0
 	r.Get("/api/servers/provision/options", pr.Options)
 	r.Get("/api/servers/provision/{plan}", pr.Status)
 	r.Delete("/api/servers/provision/{plan}", pr.Cancel)
-	return &provEnv{e: e, p: pr, dir: dir, router: r, known: known, sshLog: log, keyBlob: b64}
+	pe.e, pe.p, pe.dir, pe.router, pe.known, pe.sshLog, pe.keyBlob = e, pr, dir, r, known, log, b64
+	return pe
 }
 
 // do sends the request as the dashboard's person (the identity layer's classification of a signed-in browser).
@@ -493,4 +502,36 @@ func TestProvisionOptionsListHostsAndTheTermsTheDigestCovers(t *testing.T) {
 	require.NoError(t, os.Remove(filepath.Join(pe.dir, "config")))
 	_, v = pe.do("GET", "/api/servers/provision/options", nil)
 	assert.Equal(t, []any{}, v["hosts"])
+}
+
+func TestProvisionGivesANewComputerItsOwnerSecretAndStoresTheOtherHalf(t *testing.T) {
+	pe := newProvEnv(t, "known", "Linux x86_64", true)
+	done := runToEnd(t, pe, "done")
+	require.Len(t, pe.ownerGiven, 1, "the secret was installed once")
+	secret := pe.ownerGiven[0]
+	assert.True(t, hubowner.ValidSecret(secret))
+	got, ok, err := pe.e.h.store.OwnerSecret(context.Background(), "ssh-box-example-com")
+	require.NoError(t, err)
+	assert.True(t, ok)
+	assert.Equal(t, secret, got, "the hub holds what the computer was given")
+	srv, _ := pe.e.h.store.Get(context.Background(), "ssh-box-example-com")
+	assert.True(t, srv.OwnerStamp)
+	raw, _ := json.Marshal(done)
+	assert.NotContains(t, string(raw), secret, "the secret is in the plan's answer")
+	assert.NotContains(t, done["steps"].([]any)[4].(map[string]any)["detail"], "not set up")
+}
+
+func TestProvisionRegistersWithoutTheStampWhenTheComputerWillNotTakeTheSecret(t *testing.T) {
+	pe := newProvEnv(t, "known", "Linux x86_64", true)
+	pe.ownerErr = errors.New("coral: hub-owner-secret: refused: /home/rich/.coral-server/secret detail")
+	done := runToEnd(t, pe, "done")
+	srv, err := pe.e.h.store.Get(context.Background(), "ssh-box-example-com")
+	require.NoError(t, err, "the registration stopped for a missing stamp")
+	assert.False(t, srv.OwnerStamp, "a secret the computer did not take was stored")
+	_, ok, _ := pe.e.h.store.OwnerSecret(context.Background(), "ssh-box-example-com")
+	assert.False(t, ok)
+	detail := done["steps"].([]any)[4].(map[string]any)["detail"].(string)
+	assert.Contains(t, detail, "not set up")
+	assert.NotContains(t, detail, "refused", "the cause is not echoed")
+	assert.NotContains(t, detail, "/home/rich")
 }

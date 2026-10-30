@@ -20,6 +20,7 @@ import (
 	"github.com/subgentic/coral/internal/license"
 	"github.com/subgentic/coral/internal/sshprov"
 	"github.com/subgentic/coral/internal/store"
+	"github.com/subgentic/coral/pkg/hubowner"
 	terms "github.com/subgentic/coral/pkg/license"
 )
 
@@ -154,10 +155,12 @@ type Provisioner struct {
 	// startRemote starts the installed Coral in tmux and reads the remote's instance id and API key; checkHealth asks the new server, through its SSH stream, whether it answers. Variables for tests.
 	startRemote func(ctx context.Context, p *provisionPlan) (instanceID, key string, err error)
 	checkHealth func(ctx context.Context, rs *store.RemoteServer, key string) RemoteHealth
-	version     string                  // the release this hub runs and the only one it installs (config.Version; a test sets its own)
-	onRemoved   func(id string)         // a remove took the server out of the registry
-	notify      func(id, status string) // tells the hub's remote workers a server was added (the same hook the registry's edits use)
-	startedAt   time.Time
+	// installOwner puts the secret this hub signs the computer's owner stamps with on the computer (#11378), by the far Coral's own command, the secret on stdin; a variable for tests.
+	installOwner func(ctx context.Context, p *provisionPlan, secret string) error
+	version      string                  // the release this hub runs and the only one it installs (config.Version; a test sets its own)
+	onRemoved    func(id string)         // a remove took the server out of the registry
+	notify       func(id, status string) // tells the hub's remote workers a server was added (the same hook the registry's edits use)
+	startedAt    time.Time
 }
 
 // SetStatusListener sets who hears that a server was registered (the hub's remote workers, as for the registry's own edits).
@@ -171,6 +174,9 @@ func NewProvisioner(s *store.RemoteServerStore) *Provisioner {
 	pr.install = pr.realInstall
 	pr.startRemote = pr.realStartRemote
 	pr.checkHealth = pr.realCheckHealth
+	pr.installOwner = func(ctx context.Context, p *provisionPlan, secret string) error {
+		return pr.runner.InstallOwnerSecret(ctx, p.Target, pr.version, p.ServerID, secret)
+	}
 	return pr
 }
 
@@ -573,6 +579,10 @@ func (pr *Provisioner) finish(ctx context.Context, p *provisionPlan) error {
 		p.setStep("register", stepOK, "Already registered; nothing was changed.") // a re-run: the key and the row stay as they are
 		return nil
 	}
+	// The owner stamp (#11378): a new secret for this computer, installed on it by its own command line before it is registered, so Approve and Request changes can work through this hub. A failure here does
+	// not stop the registration; the page says the stamp is not set up.
+	ownerSecret, serr := hubowner.NewSecret()
+	ownerOK := serr == nil && pr.installOwner(ctx, p, ownerSecret) == nil
 	if _, err := pr.store.AddSSH(ctx, p.ServerID, p.Label, rs.SSHTarget, rs.RemotePort, instanceID, key); err != nil {
 		switch {
 		case errors.Is(err, store.ErrRemoteExists):
@@ -582,11 +592,18 @@ func (pr *Provisioner) finish(ctx context.Context, p *provisionPlan) error {
 		}
 		return &sshprov.ErrInstall{Step: "register", Msg: "Could not save the server."}
 	}
+	if ownerOK {
+		ownerOK = pr.store.SetOwnerSecret(ctx, p.ServerID, ownerSecret) == nil
+	}
 	_ = pr.store.SetStatus(ctx, p.ServerID, store.RemoteStatusOnline, "")
 	if pr.notify != nil {
 		pr.notify(p.ServerID, store.RemoteStatusOnline)
 	}
-	p.setStep("register", stepOK, "Registered. It appears in your server list.")
+	detail := "Registered. It appears in your server list."
+	if !ownerOK {
+		detail += " Approve and Request changes through this hub are not set up for it."
+	}
+	p.setStep("register", stepOK, detail)
 	return nil
 }
 
