@@ -196,6 +196,8 @@ node artifact_sort_words.test.mjs
 node automation_filters.test.mjs
 node inbox_servers.test.mjs
 node inbox_reviews.test.mjs
+node artifact_review_words.test.mjs
+node inbox_reviews_cloud.test.mjs
 node task_list_data.test.mjs
 node template_browser_data.test.mjs
 node chat_search_unit.test.js
@@ -268,3 +270,4 @@ node history_group_name.test.mjs
 node pi_extension.test.mjs
 node installed_tray_guard.test.mjs
 node server_ssh_setup.test.mjs
+node hub_review_remote.test.mjs

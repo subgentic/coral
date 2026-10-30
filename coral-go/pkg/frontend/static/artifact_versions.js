@@ -246,12 +246,13 @@ export function attachVersions(dialog, hooks) {
 
     return {
         /** A version of an artifact is on show: draw the bar when it is one of a series. `switched` says it was chosen from the bar (said once, and the keyboard stays on the bar). */
-        async open(hex, server, { switched = false } = {}) {
+        async open(hex, server, { switched = false, compare = false } = {}) {
             const same = st.rows && st.hex !== hex && st.server === server && st.rows.some(r => r.digest === hex);
             st.hex = hex; st.server = server; st.listOpen = false;
             if (!switched) { st.comparing = false; dialog.classList.remove('av-comparing', 'av-keep-wide'); }
             if (!same && !(st.rows && st.rows.some(r => r.digest === hex))) { st.rows = null; draw(); const gen = ++st.gen; const rows = await load(hex, server); if (gen !== st.gen || st.hex !== hex) return; st.rows = rows; }
             draw();
+            if (compare && !switched && st.rows && cur() > 0 && !st.comparing) startCompare(); // a later version opened from Needs you (#136588): what changed since the one before, at once
             if (switched && !bar.hidden) {
                 const row = st.rows[cur()], w = whenOf(row.at);
                 say(`Showing v${row.version} of ${st.rows.length}, ${w.label} (${w.full}), ${row.role || row.uploader || 'unknown'}`);

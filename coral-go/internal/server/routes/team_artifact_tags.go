@@ -20,9 +20,14 @@ func (h *BoardHandler) attachArtifactTags(ctx context.Context, project string, i
 	if err != nil || len(tags) == 0 {
 		return
 	}
+	reviews, _ := h.bs.ArtifactReviews(ctx, project) // when a review was decided (#136584); a read that fails leaves the rows without it
 	for i := range items {
 		if items[i].managed != "" {
 			items[i].Tags = tags[items[i].managed]
+			if rv, ok := reviews[items[i].managed]; ok {
+				rv := rv
+				items[i].Review = &rv
+			}
 		}
 	}
 }
@@ -52,23 +57,29 @@ func teamTagCounts(items []teamArtifact) map[string]int {
 
 // teamHasManagedArtifact reports whether the object id is one of the team's artifacts: referenced by a task result of the board, uploaded by one of its sessions, or received by it.
 func (h *BoardHandler) teamHasManagedArtifact(ctx context.Context, project, id string) bool {
+	_, ok := h.teamManagedArtifact(ctx, project, id)
+	return ok
+}
+
+// teamManagedArtifact is the team's row for the object id (its name, and who uploaded it), or false when it is not one of the team's.
+func (h *BoardHandler) teamManagedArtifact(ctx context.Context, project, id string) (teamArtifact, bool) {
 	subscribers, err := h.bs.TeamSubscriberSessions(ctx, project)
 	if err != nil {
-		return false
+		return teamArtifact{}, false
 	}
 	tasks, _, err := h.bs.ListTeamArtifactTasksQuery(ctx, board.TeamArtifactQuery{Project: project, Limit: board.MaxTeamArtifactTaskScan, Subscribers: subscribers})
 	if err != nil {
-		return false
+		return teamArtifact{}, false
 	}
 	items := collectTeamArtifacts(project, tasks, subscribers, "")
 	items = h.uploads.merge(items, h.coralDir, teamUploadSessions(tasks, subscribers))
 	items = h.mergeCrossTeamRows(items, project)
 	for _, it := range items {
 		if it.managed == id {
-			return true
+			return it, true
 		}
 	}
-	return false
+	return teamArtifact{}, false
 }
 
 // SetArtifactTags replaces the tags of one of the team's artifacts: the Operator's and the team owner's (an agent's token is refused by the identity layer; a Hub viewer has no route to it).

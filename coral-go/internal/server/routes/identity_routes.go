@@ -142,6 +142,7 @@ var operatorOnlyRoutes = map[string]string{
 	"POST /api/artifacts/retention/ack":                                   "acknowledge artifact retention",
 	"POST /api/artifacts/prune":                                           "prune artifacts",
 	"PUT /api/board/{project}/artifacts/{id}/tags":                        "change an artifact's tags",
+	"POST /api/board/{project}/artifacts/{id}/review":                     "approve an artifact or ask changes of it",
 	"PUT /api/board/{project}/subscribers/{subscriberID}/review-settings": "set an agent's Reviews only switch and review areas",
 	"PUT /api/artifacts/{id}/keep":                                        "keep an artifact",
 	"GET /api/artifacts/resolve":                                          "resolve a shortened artifact link",

@@ -439,6 +439,15 @@ export function isCloud() {
     return bootConfig().mode === 'cloud';
 }
 
+/** Whether Approve, Request changes and the change-request send are NOT drawn for `server`. Reached by this self-hosted hub's API key the machine sees a script, not a person, and refuses them (#11372);
+ *  they work only where the hub can sign the signed-in person's decision (#11378): the live server list says owner_stamp when the hub holds the secret for that computer AND the computer says it holds the
+ *  other half. Through Coral Hub (isCloud) the owner's stamp carries the person; the hub's own machine has no key in between. */
+export function decisionNeedsPerson(server) {
+    if (isLocalServer(server) || isCloud()) return false;
+    const live = (state.servers || []).find(s => s && normServer(s.id) === normServer(server));
+    return !(live && live.owner_stamp === true);
+}
+
 /** The Hub-served dashboard draws its own Inbox (Chats folders and Boards) in place of the Hub's framed one, and the top row's Chats and Board tabs go (Goal #100). One switch, set by the Hub's
  *  boot value `inbox: 'native'`; off until the Hub's own pages have moved off /inbox. Read by: the Inbox tab (inbox_tab.js), the folder list and sources (inbox_sidebar.js, inbox_servers.js, mailbox_chats.js)
  *  and the tab filter (nav_tabs.js, through the body class that cloud.js sets). */

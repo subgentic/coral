@@ -522,3 +522,5 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 /* The team of a chat's agent, in a table of chats when two or more teams exist (#10134): a dot in the team's colour (the person's pick, else neutral) and its name. */
 .dt-team { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
 .dt-team-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; background: var(--team-accent, var(--text-muted)); }
+.artifact-review-line { color: var(--text-secondary); font-size: var(--fs-sm, 0.8125rem); margin-inline-end: 8px; } /* the review's state in words, in the preview's head (#136584) */
+.artifact-sheet-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; } /* the review line above the tags in a team artifact's sheet (#136584) */
