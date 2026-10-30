@@ -15,6 +15,7 @@ const BASE = require('./test_base').BASE;
             const at = `at ${w}px: `;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled(mobile ? { enabled: true, maxTouchPoints: 5 } : { enabled: false });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+            if (w < 640) { await ev(`window.switchNavTab('hub-inbox'); true`); await new Promise(r => setTimeout(r, 500)); } // sleep-ok: the Inbox draws over a frame; the Agents page has no top bar under 601 px (#11096)
             const m = await ev(`(() => { const info = sel => [...document.querySelectorAll(sel)].map(b => { const cs = getComputedStyle(b), r = b.getBoundingClientRect(); return { cls: b.className, shown: b.getClientRects().length > 0, w: Math.round(r.width), h: Math.round(r.height), bg: cs.backgroundColor, border: cs.borderTopWidth }; });
                 return { bar: info('.top-bar-actions .top-bar-btn:not(.hub-indicator)'), rail: info('.sidebar-rail-btn'), menu: info('#top-menu-btn') }; })()`);
             for (const b of m.bar.concat(m.rail)) assert.ok(/\bbtn\b/.test(b.cls) && /\bbtn-quiet\b/.test(b.cls) && /\bbtn-icon\b/.test(b.cls), `${at}an icon button of the family: ${b.cls}`);

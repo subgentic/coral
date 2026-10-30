@@ -66,7 +66,7 @@ const { connect } = require('./agent_view_harness');
                     const rest = await read(GROUP); assert.ok(!rest.bg || rest.bg.a === 0, `${label}, ${th}, group header: no fill at rest`);
                     const c = await centre(GROUP); await move(c.x, c.y);
                     const hov = await read(GROUP);
-                    assert.equal(hov.hover, true);
+                    assert.equal(hov.hover, true, `${label}, ${th}, group header: the pointer is over the button: ` + JSON.stringify({ c, top: await ev(`(() => { const e = document.elementFromPoint(${c.x}, ${c.y}); return e && (e.tagName + '.' + String(e.className).slice(0, 40)); })()`), chain: await ev(`(() => { const out = []; for (let n = document.querySelector(${JSON.stringify(GROUP)}); n && out.length < 7; n = n.parentElement) { const b = n.getBoundingClientRect(); out.push(n.tagName + '.' + String(n.className).split(' ').slice(0, 2).join('.') + ' pos=' + getComputedStyle(n).position + ' ' + Math.round(b.left) + '-' + Math.round(b.right) + 'x' + Math.round(b.top) + '-' + Math.round(b.bottom)); } return out; })()`) }));
                     assert.ok(!hov.bg || hov.bg.a === 0, `${label}, ${th}, group header: no hover fill: ` + JSON.stringify(hov.bg));
                     assert.notDeepEqual(hov.color, rest.color, `${label}, ${th}, group header: the dots change colour on hover`);
                 }

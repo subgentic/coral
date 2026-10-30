@@ -381,6 +381,7 @@ const hex = i => i.toString(16).padStart(20, '0');
         assert.ok(gap.checked > 4); assert.deepEqual(gap.over, [], 'no button hangs over the next message: ' + JSON.stringify(gap));
         await shot('saved-button-phone');
         console.log('9. A phone at 200% text: the hamburger names the view and keeps Settings in its menu, with no Saved for later entry (the top bar has no bookmark, #9929); the Inbox\'s Saved folder is the way in');
+        await ev(`window.switchNavTab('hub-inbox'); true`); // the Agents page has no top bar under 601 px (#11096): the hamburger is the Inbox's here
         await ev(`document.documentElement.style.fontSize = '32px'; true`);
         await waitFor(`(() => { const b = document.getElementById('top-menu-btn').getBoundingClientRect(); return b.width > 0 && b.height >= 44; })()`, 'the hamburger at large text', 6000);
         const big = await ev(`(() => { const b = document.getElementById('top-menu-btn'), br = b.getBoundingClientRect(), label = document.getElementById('top-menu-label'); return { w: br.width, h: br.height, left: br.left, right: br.right, labelFits: label.scrollWidth <= label.clientWidth + 1, page: document.documentElement.scrollWidth <= innerWidth }; })()`);

@@ -61,9 +61,9 @@ const { settle } = require('./helpers/wait');
         for (const w of [320, 330, 340, 350, 355, 360, 365, 370, 375, 390, 414]) {
             const r = await oneRow(w);
             assert.ok(r.headerH <= rowH + 1 && r.kidsBottom <= r.headerH + 1, `${w} px at 100% text: one header row (rows end at ${r.kidsBottom}, header ${r.headerH}, one row is ${rowH}) with the name ${r.w}px wide`);
-            assert.ok(r.w >= (w <= 340 ? 100 : 48), `${w} px at 100% text: the name has room (${r.w}px)`);
+            assert.ok(r.w >= 48, `${w} px at 100% text: the name has room (${r.w}px; the menu, back, the Chat/Terminal switch and the more button take the rest of a 320 px row, the one-row header, #11056)`);
             assert.equal(await ev(`getComputedStyle(document.getElementById('terminal-open-window-link')).display`), 'none', `${w} px: Open Agent Tab is not in a phone's header (a pop-out tab is of little use there)`);
-            assert.equal(r.branchShown, w >= 370, `${w} px at 100% text: the branch ${w >= 370 ? 'stays in' : 'is left out of'} the header`);
+            assert.equal(r.branchShown, false, `${w} px at 100% text: the branch is left out of the header (it is in the Details card behind the more button, the one-row header, #11056)`);
             assert.ok(r.over <= 0, `${w} px: no sideways scroll`);
         }
         ok('from 320 to 414 px with normal text the header is one row, the name has room, and the branch shows from 370 px up (the container is the content box of the header, 12 px under the viewport)');

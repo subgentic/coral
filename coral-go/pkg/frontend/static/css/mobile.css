@@ -1389,7 +1389,7 @@
     #mobile-session-list .session-label { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: var(--fs-xl); font-weight: var(--fw-regular); }
     #mobile-session-list .session-label-name, #mobile-session-list .session-label .sln-head, #mobile-session-list .session-label .sln-tail { color: var(--agent-name-color, var(--text-primary)); font-weight: inherit; } /* the name in the card's ink, bold when the agent needs you */
     #mobile-session-list .session-label-name { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; } /* the name itself ends in an ellipsis inside the card at 320 px (mobile_text_sizes) */
-    #mobile-session-list .session-name-spacer { display: none; }
+    #mobile-session-list .session-group-item .session-name-spacer { display: none; }
     #mobile-session-list .session-time { display: block; flex: none; font-size: var(--fs-md); color: var(--text-secondary); white-space: nowrap; }
     #mobile-session-list .session-status-line { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); margin: 0; } /* still text for a screen reader and find-in-page: the dot and the preview are what the card shows */
     #mobile-session-list .session-preview { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-top: 2px; padding-right: 28px; font-size: var(--fs-lg); color: var(--text-secondary); overflow-wrap: anywhere; }
@@ -1440,4 +1440,11 @@
 @media (max-width: 600px) {
     .settings-tab-name[data-sub] { display: flex; flex-direction: column; align-items: flex-start; }
     .settings-tab-name[data-sub]::after { content: attr(data-sub); font-size: var(--fs-md); font-weight: var(--fw-regular); color: var(--text-secondary); } /* the group's list row says what is inside, so Theme is found under General (#11128) */
+}
+
+@media (max-width: 600px) { /* the hub's state on the Agents page (its top bar is the page's own first row): a dot on the account button, the colours of the top bar's indicator (hub_indicator.js) */
+    #mobile-agent-list .phone-account-btn { position: relative; }
+    body[data-hub-state] #mobile-agent-list .phone-account-btn::after { content: ''; position: absolute; right: 6px; bottom: 6px; width: 12px; height: 12px; box-sizing: border-box; border-radius: 50%; border: 2px solid var(--bg-primary); background: var(--text-muted); }
+    body[data-hub-state="connected"] #mobile-agent-list .phone-account-btn::after { background: var(--success); }
+    body[data-hub-state="disconnected"] #mobile-agent-list .phone-account-btn::after { background: var(--warning); }
 }

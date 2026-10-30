@@ -135,6 +135,11 @@ const STATES = {
         console.log('5. Phone width');
         await Emulation.setDeviceMetricsOverride({ width: 375, height: 812, deviceScaleFactor: 2, mobile: true });
         await show('connected');
+        // the Agents page has no top bar under 601 px (its header is its first row, #11096): the hub's state is a dot on the account button there, with its words; the other pages keep the indicator
+        const dot = await ev(`(() => { const a = document.querySelector('#mobile-agent-list .phone-account-btn'); if (!a || !a.getClientRects().length) return null; return { state: document.body.getAttribute('data-hub-state'), after: getComputedStyle(a, '::after').content, words: (document.getElementById('phone-hub-state') || {}).textContent }; })()`);
+        check('the Agents page shows the hub state as a dot on the account button, named in words', dot && dot.state === 'connected' && dot.after === '""' && /connected/.test(dot.words || ''), JSON.stringify(dot));
+        await ev(`window.switchNavTab('hub-inbox'); true`);
+        await new Promise(r => setTimeout(r, 400)); // sleep-ok: the page changes over a frame
         const phone = await ev(`(() => { const b = document.getElementById('hub-indicator'); const r = b.getBoundingClientRect();
             return { visible: !b.hidden && r.width > 0, inside: r.left >= 0 && r.right <= innerWidth, overflow: document.documentElement.scrollWidth - innerWidth }; })()`);
         check('visible and inside the viewport at 375 px, no overflow', phone.visible && phone.inside && phone.overflow <= 0, JSON.stringify(phone));
