@@ -266,8 +266,11 @@ func configureServer(cfg *config.Config, sf *serverFlags) {
 		fmt.Fprintf(os.Stderr, "coral: %v\n", err)
 		os.Exit(1)
 	}
-	if *sf.port != 0 {
-		cfg.Port = *sf.port
+	portGiven := false
+	flag.Visit(func(f *flag.Flag) { portGiven = portGiven || f.Name == "port" })
+	if err := applyPortFlag(cfg, *sf.port, portGiven); err != nil {
+		fmt.Fprintf(os.Stderr, "coral: %v\n", err)
+		os.Exit(2)
 	}
 
 	// Check EULA acceptance (terminal prompt on first launch). A machine started with a Coral Hub credential (--bootstrap-file, or the well-known file) has nobody at a
@@ -603,4 +606,18 @@ func resolveCloudMaxMode(flagGiven bool, flagValue, envValue string) (string, er
 		return "", fmt.Errorf("--cloud-max-mode / CORAL_CLOUD_MAX_MODE must be view, interact or launch, got %q", v)
 	}
 	return v, nil
+}
+
+// applyPortFlag puts --port into cfg. A port that was not given leaves the default (or CORAL_PORT) as it is; one that was given replaces it, and an explicit 0 means
+// "any free port", which startup.Start binds and reports in cfg.Port: 0 is no longer taken for "not given" (a test, or a person, asking for port 0 got the default port,
+// which on Windows is the live Coral's 8450). A port outside 0-65535 is refused.
+func applyPortFlag(cfg *config.Config, port int, given bool) error {
+	if !given {
+		return nil
+	}
+	if port < 0 || port > 65535 {
+		return fmt.Errorf("--port %d is not a port: use 0 for any free port, or 1-65535", port)
+	}
+	cfg.Port = port
+	return nil
 }

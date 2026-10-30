@@ -2,7 +2,6 @@ package loginlink_test
 
 import (
 	"context"
-	"net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -18,14 +17,6 @@ import (
 	"github.com/subgentic/coral/internal/startup"
 )
 
-func freePort(t *testing.T) int {
-	t.Helper()
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
-	require.NoError(t, err)
-	defer ln.Close()
-	return ln.Addr().(*net.TCPAddr).Port
-}
-
 // #3394: a real Coral. The desktop window (another process) gets a sign-in link through
 // the command-line handshake, the tray and launch-coral get one from the server they run;
 // each link signs in once (a session cookie, then the same page without the token), with
@@ -35,7 +26,7 @@ func TestAppsSignInWithoutTheAPIKey(t *testing.T) {
 	t.Setenv("CORAL_NO_DEMO_SEED", "1")
 	cfg := config.Load(t.TempDir())
 	cfg.Host = "127.0.0.1"
-	cfg.Port = freePort(t)
+	cfg.Port = 0 // port 0: the system picks one, Start reports it in cfg.Port (no number is picked first, closed and hoped to stay free)
 	rs, err := startup.Start(context.Background(), cfg, startup.Options{BackendType: "pty"})
 	require.NoError(t, err)
 	// Shutdown stops serving; Close releases the instance lock and the databases, as coral does,

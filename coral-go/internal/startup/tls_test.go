@@ -163,26 +163,18 @@ func TestStartWithTLSAnswersHealthOverHTTPS(t *testing.T) {
 	home := t.TempDir()
 	cfg := config.Load(home)
 	cfg.Host = "127.0.0.1"
-	cfg.Port = freePort(t)
+	cfg.Port = 0 // port 0: the system picks one, Start reports it in cfg.Port (no number is picked first, closed and hoped to stay free)
 	_, err := Start(context.Background(), cfg, Options{BackendType: "pty", TLSCert: certFile})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "needs both --tls-cert and --tls-key")
 
-	// freePort's port can be taken by another process before Start binds it (a busy host):
-	// try another one, up to five times.
 	// The server's background services run until its context ends, as the commands' do at exit:
 	// a test ends it, or they outlive the test (#4167, goleak).
 	ctx, cancel := context.WithCancel(context.Background())
-	var rs *RunningServer
-	for try := 0; try < 5; try++ {
-		cfg = config.Load(home)
-		cfg.Host = "127.0.0.1"
-		cfg.Port = freePort(t)
-		if rs, err = Start(ctx, cfg, Options{BackendType: "pty", TLSCert: certFile, TLSKey: keyFile}); err == nil || !addrInUse(err) {
-			break
-		}
-		t.Logf("try %d: %v", try+1, err)
-	}
+	cfg = config.Load(home)
+	cfg.Host = "127.0.0.1"
+	cfg.Port = 0 // port 0: the system picks one, Start reports it in cfg.Port (no number is picked first, closed and hoped to stay free)
+	rs, err := Start(ctx, cfg, Options{BackendType: "pty", TLSCert: certFile, TLSKey: keyFile})
 	if err != nil {
 		cancel()
 	}
@@ -221,12 +213,4 @@ func TestStartWithTLSAnswersHealthOverHTTPS(t *testing.T) {
 	assert.Equal(t, http.StatusFound, resp2.StatusCode)
 	assert.NotEmpty(t, resp2.Cookies(), "signed in")
 	assert.NotEmpty(t, rs.LoginToken, "the startup token too")
-}
-
-func freePort(t *testing.T) int {
-	t.Helper()
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
-	require.NoError(t, err)
-	defer ln.Close()
-	return ln.Addr().(*net.TCPAddr).Port
 }

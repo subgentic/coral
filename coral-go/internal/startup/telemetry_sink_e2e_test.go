@@ -12,7 +12,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -21,6 +20,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/subgentic/coral/internal/config"
 	"github.com/subgentic/coral/internal/store"
 )
 
@@ -125,8 +125,9 @@ func TestTelemetrySinkE2E(t *testing.T) {
 			seed(ctx, store.NewSessionStore(db))
 			require.NoError(t, db.Close())
 		}
-		port := freePort(t)
-		cmd := exec.Command(bin, "--host", "127.0.0.1", "--port", strconv.Itoa(port), "--no-browser", "--cloud-url", "off")
+		// port 0: the server takes a free port itself and records its address in its data folder (config.RecordedServer), where the loop below reads it: no number is picked
+		// first, closed and hoped to stay free.
+		cmd := exec.Command(bin, "--host", "127.0.0.1", "--port", "0", "--no-browser", "--cloud-url", "off")
 		cmd.Env = append([]string{
 			"HOME=" + home, "USERPROFILE=" + home,
 			"TMPDIR=" + iso,
@@ -144,13 +145,14 @@ func TestTelemetrySinkE2E(t *testing.T) {
 		}()
 
 		deadline := time.Now().Add(30 * time.Second)
-		base := "http://127.0.0.1:" + strconv.Itoa(port) + "/"
 		up := false
-		for time.Now().Before(deadline) { // the server is up
-			if resp, err := http.Get(base); err == nil {
-				resp.Body.Close()
-				up = true
-				break
+		for time.Now().Before(deadline) { // the server is up: it has recorded the address it took, and answers there
+			if pid, addr := config.RecordedServer(data); pid == cmd.Process.Pid && addr != "" {
+				if resp, err := http.Get(strings.TrimRight(addr, "/") + "/"); err == nil {
+					resp.Body.Close()
+					up = true
+					break
+				}
 			}
 			time.Sleep(200 * time.Millisecond)
 		}

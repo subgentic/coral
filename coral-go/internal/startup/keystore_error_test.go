@@ -20,7 +20,7 @@ func TestStartReturnsTheAPIKeyError(t *testing.T) {
 	home := t.TempDir()
 	cfg := config.Load(home)
 	cfg.Host = "127.0.0.1"
-	cfg.Port = freePort(t)
+	cfg.Port = 0 // port 0: the system picks one, Start reports it in cfg.Port (no number is picked first, closed and hoped to stay free)
 	require.NoError(t, os.MkdirAll(filepath.Join(cfg.CoralDir(), "api_key"), 0o700))
 
 	rs, err := Start(context.Background(), cfg, Options{BackendType: "pty"})

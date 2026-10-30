@@ -92,7 +92,7 @@ func TestEULAAcceptedFollowsTheSavedAnalyticsChoice(t *testing.T) {
 
 			cfg := config.Load(home)
 			cfg.Host = "127.0.0.1"
-			cfg.Port = freePort(t)
+			cfg.Port = 0 // port 0: the system picks one, Start reports it in cfg.Port (no number is picked first, closed and hoped to stay free)
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			rs, err := Start(ctx, cfg, Options{BackendType: "pty"})
@@ -182,7 +182,7 @@ func (e *funnelEnv) save(setting, value string) {
 func (e *funnelEnv) start() []map[string]any {
 	cfg := config.Load(e.home)
 	cfg.Host = "127.0.0.1"
-	cfg.Port = freePort(e.t)
+	cfg.Port = 0 // port 0: the system picks one, Start reports it in cfg.Port (no number is picked first, closed and hoped to stay free)
 	ctx, cancel := context.WithCancel(context.Background())
 	rs, err := Start(ctx, cfg, Options{BackendType: "pty"})
 	require.NoError(e.t, err)
