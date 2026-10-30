@@ -17,3 +17,12 @@ func ProgramArgs(pid int) []string {
 	}
 	return strings.Split(strings.TrimSuffix(string(b), "\x00"), "\x00")
 }
+
+// ProgramCwd is a process's working directory (/proc/<pid>/cwd), "" when it cannot be read.
+func ProgramCwd(pid int) string {
+	d, err := os.Readlink(fmt.Sprintf("/proc/%d/cwd", pid))
+	if err != nil {
+		return ""
+	}
+	return d
+}

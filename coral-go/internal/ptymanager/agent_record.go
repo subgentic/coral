@@ -74,8 +74,8 @@ func fromTmux(c tmux.Candidate) AgentCandidate {
 }
 
 // AgentCandidate implements AgentRecorder for tmux.
-func (t *TmuxSessionTerminal) AgentCandidate(ctx context.Context, name, agentType, sessionID, _ string) (AgentCandidate, string, error) {
-	c, why, err := t.client.AgentCandidate(ctx, name, agentType, sessionID)
+func (t *TmuxSessionTerminal) AgentCandidate(ctx context.Context, name, agentType, sessionID, cliPath string) (AgentCandidate, string, error) {
+	c, why, err := t.client.AgentCandidate(ctx, name, agentType, sessionID, cliPath)
 	if err != nil || why != "" {
 		return AgentCandidate{}, why, err
 	}
@@ -84,10 +84,11 @@ func (t *TmuxSessionTerminal) AgentCandidate(ctx context.Context, name, agentTyp
 
 // RecordAgent implements AgentRecorder for tmux.
 func (t *TmuxSessionTerminal) RecordAgent(ctx context.Context, name, agentType, sessionID string, want AgentCandidate) (AgentCandidate, error) {
-	c, err := t.client.RecordAgent(ctx, name, agentType, sessionID, tmux.AgentProc{PID: want.PID, Start: want.Start}, want.AcknowledgeNested)
+	c, err := t.client.RecordAgent(ctx, name, agentType, sessionID, tmux.AgentProc{PID: want.PID, Start: want.Start}, want.AcknowledgeNested, want.CLIPath)
 	if err != nil {
 		return AgentCandidate{}, err
 	}
+	tmux.NoteLaunchCLI(name, want.CLIPath) // kept with the session (and in the database): a wrapper script that is the CLI is re-checked by it at every notice, also after a restart (#408)
 	return fromTmux(c), nil
 }
 
@@ -130,7 +131,7 @@ func (m *PTYBackend) AgentCandidate(name, cliPath string) (AgentCandidate, strin
 	if !can {
 		return AgentCandidate{}, "this terminal cannot say which program is in its foreground", nil
 	}
-	c, why, err := tmux.CandidateForShell(sp.ShellPID())
+	c, why, err := tmux.CandidateForShell(sp.ShellPID(), cliPath)
 	if err != nil || why != "" {
 		return AgentCandidate{}, why, err
 	}
@@ -152,10 +153,11 @@ func (m *PTYBackend) RecordAgent(name string, want AgentCandidate) (AgentCandida
 	if !can {
 		return AgentCandidate{}, ErrNoCandidate
 	}
-	c, err := tmux.RecordAgentForShell(name, sp.ShellPID(), tmux.AgentProc{PID: want.PID, Start: want.Start}, want.AcknowledgeNested)
+	c, err := tmux.RecordAgentForShell(name, sp.ShellPID(), tmux.AgentProc{PID: want.PID, Start: want.Start}, want.AcknowledgeNested, want.CLIPath)
 	if err != nil {
 		return AgentCandidate{}, err
 	}
+	tmux.NoteLaunchCLI(name, want.CLIPath) // kept with the session (and in the database): a wrapper script that is the CLI is re-checked by it at every notice, also after a restart (#408)
 	return fromTmux(c), nil
 }
 
