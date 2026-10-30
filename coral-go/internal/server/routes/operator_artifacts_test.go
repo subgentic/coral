@@ -5,12 +5,14 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
@@ -269,4 +271,75 @@ func TestTooManyFilesInAMinuteAreRefused(t *testing.T) {
 	code, out := e.upload(t, sessAlice, "three.txt", "file three")
 	assert.Equal(t, http.StatusTooManyRequests, code, out)
 	assert.Equal(t, "rate_limited", out["code"])
+}
+
+func TestAShortSuffixOfASessionIsNoAgent(t *testing.T) {
+	e := newShareEnv(t, true)
+	short := sessAlice[len(sessAlice)-4:] // the end of Alice's session id: it names nobody
+	code, _ := e.upload(t, short, "a.txt", "x")
+	assert.Equal(t, http.StatusNotFound, code, "a short suffix is refused before anything is stored")
+	entries, _ := os.ReadDir(filepath.Join(e.coralDir, "artifacts", "objects"))
+	assert.Empty(t, entries)
+	_, up := e.upload(t, sessAlice, "a.txt", "x")
+	code, _ = e.tell(t, short, up["id"].(string))
+	assert.Equal(t, http.StatusNotFound, code, "and the message route does not take it either")
+	assert.Empty(t, e.operatorMessages(t))
+}
+
+type shareZeros struct{}
+
+func (shareZeros) Read(p []byte) (int, error) { return len(p), nil }
+
+func TestAChunkedUploadOverTheLimitIsRefusedAndItsTempFileRemoved(t *testing.T) {
+	e := newShareEnv(t, true)
+	req := httptest.NewRequest(http.MethodPost, "/api/board/alpha/operator-artifacts?session_id="+sessAlice, io.LimitReader(shareZeros{}, maxAgentArtifactSize+2))
+	req.ContentLength = -1 // no Content-Length: the limit is the reader's
+	req.Header.Set("X-Artifact-Name", "stream.bin")
+	req.Header.Set("Content-Type", "application/octet-stream")
+	req = req.WithContext(context.WithValue(req.Context(), callerKindKey{}, callerDashCookie))
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("project", "alpha")
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+	w := httptest.NewRecorder()
+	e.h.UploadOperatorArtifact(w, req)
+	assert.Equal(t, http.StatusRequestEntityTooLarge, w.Code)
+	assert.Contains(t, w.Body.String(), "artifact_too_large")
+	entries, _ := os.ReadDir(filepath.Join(e.coralDir, "artifacts", "objects"))
+	assert.Empty(t, entries, "the temp file is gone and nothing is stored")
+}
+
+func TestAHubGranteeGetsOwnerOnlyOnBothRoutes(t *testing.T) {
+	e := newShareEnv(t, true)
+	for _, path := range []string{"/api/board/alpha/operator-artifacts?session_id=" + sessAlice, "/api/board/alpha/operator-artifacts/message"} {
+		req := httptest.NewRequest(http.MethodPost, path, strings.NewReader(`{"session_id":"`+sessAlice+`","digests":["`+strings.Repeat("a", 64)+`"]}`))
+		req.Header.Set("Content-Type", "application/octet-stream")
+		req.Header.Set("X-Artifact-Name", "a.txt")
+		for k, v := range granteeHeaders() {
+			req.Header.Set(k, v)
+		}
+		req = req.WithContext(context.WithValue(req.Context(), callerKindKey{}, callerDashCookie))
+		rctx := chi.NewRouteContext()
+		rctx.URLParams.Add("project", "alpha")
+		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+		w := httptest.NewRecorder()
+		if strings.HasSuffix(strings.SplitN(path, "?", 2)[0], "/message") {
+			e.h.ShareOperatorArtifacts(w, req)
+		} else {
+			e.h.UploadOperatorArtifact(w, req)
+		}
+		assert.Equal(t, http.StatusForbidden, w.Code, path)
+		assert.Contains(t, w.Body.String(), "owner_only", path)
+	}
+	entries, _ := os.ReadDir(filepath.Join(e.coralDir, "artifacts", "objects"))
+	assert.Empty(t, entries, "nothing was stored")
+	assert.Empty(t, e.operatorMessages(t))
+}
+
+func TestTheMinuteLimiterForgetsABoardThatWentQuiet(t *testing.T) {
+	var l minuteLimiter
+	now := time.Now()
+	require.True(t, l.allow("a", 1, now))
+	require.False(t, l.allow("a", 1, now.Add(time.Second)))
+	require.True(t, l.allow("b", 1, now.Add(2*time.Minute)), "a minute on, the first board's entry is pruned")
+	assert.NotContains(t, l.seen, "a", "an empty key is deleted")
 }

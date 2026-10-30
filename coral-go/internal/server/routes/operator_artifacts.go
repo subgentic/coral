@@ -16,6 +16,7 @@ import (
 
 	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/mediatype"
+	"github.com/subgentic/coral/internal/naming"
 	"github.com/subgentic/coral/internal/safefs"
 )
 
@@ -52,14 +53,21 @@ func (l *minuteLimiter) allow(key string, limit int, now time.Time) bool {
 		l.seen = map[string][]time.Time{}
 	}
 	cut := now.Add(-time.Minute)
-	kept := l.seen[key][:0]
-	for _, t := range l.seen[key] {
-		if t.After(cut) {
-			kept = append(kept, t)
+	for k, ts := range l.seen { // a key with nothing left in the minute is forgotten, so the table holds only boards that are busy now
+		kept := ts[:0]
+		for _, t := range ts {
+			if t.After(cut) {
+				kept = append(kept, t)
+			}
+		}
+		if len(kept) == 0 {
+			delete(l.seen, k)
+		} else {
+			l.seen[k] = kept
 		}
 	}
+	kept := l.seen[key]
 	if len(kept) >= limit {
-		l.seen[key] = kept
 		return false
 	}
 	if _, known := l.seen[key]; !known && len(l.seen) >= 256 {
@@ -131,7 +139,7 @@ func (h *BoardHandler) operatorShareTarget(r *http.Request, project, sessionID s
 		if t := strings.TrimSpace(s.JobTitle); t != "" {
 			names = append(names, t)
 		}
-		if title == "" && s.SessionName != "" && strings.HasSuffix(s.SessionName, sessionID) {
+		if title == "" && s.SessionName != "" && (s.SessionName == sessionID || naming.SessionIDFromName(s.SessionName) == sessionID) { // the FULL session id: a short suffix is no agent
 			title = cleanAgentName(s.JobTitle)
 		}
 	}
