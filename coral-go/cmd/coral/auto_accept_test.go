@@ -70,31 +70,31 @@ func TestAutoAcceptOffNeverSendsUnsigned(t *testing.T) {
 	assert.Contains(t, errb.String(), "could not prove")
 }
 
-// A command-line token that is there but cannot be used (here empty; on Windows also one whose access list lets other accounts in) is said so, and NOTHING is sent: the
-// silent unsigned request it used to make was only refused by Coral, with no word of why.
-func TestAutoAcceptOffWithAnUnusableTokenSendsNothingAndSaysWhy(t *testing.T) {
+// A command-line token that is there but cannot be used (here empty; on Windows also one whose access list lets other accounts in) does not stop the kill switch: the
+// request goes out unsigned (a Coral with strict auth off takes it), and a 401 from a Coral that does not says once why.
+func TestAutoAcceptOffWithAnUnusableTokenGoesOutUnsignedAndExplainsARefusal(t *testing.T) {
 	dir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(dir, cliauth.TokenFile), nil, 0o600))
 	t.Setenv("CORAL_DATA_DIR", dir)
 	for _, k := range []string{"CORAL_SESSION_NAME", "CORAL_SESSION_ID", "CORAL_SESSION_TOKEN", "CORAL_SUBSCRIBER_ID"} {
 		t.Setenv(k, "")
 	}
-	var calls int
+	status := http.StatusOK
+	var calls []string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		calls++
-		_, _ = w.Write([]byte(`{"stopped":1}`))
+		calls = append(calls, r.Method+" "+r.URL.Path+" signed="+strconv.FormatBool(r.Header.Get(cliauth.CLIAuthHeader) != ""))
+		w.WriteHeader(status)
+		_, _ = w.Write([]byte(`{"stopped":1,"error":"session_token_required"}`))
 	}))
 	defer srv.Close()
 	var out, errb bytes.Buffer
-	assert.Equal(t, 1, runAutoAccept([]string{"off", "--all", "--url", srv.URL}, &out, &errb))
-	assert.Zero(t, calls, "nothing was sent")
-	assert.Contains(t, errb.String(), "not private to this user")
-	assert.Contains(t, errb.String(), "restart Coral to rewrite it")
-	assert.Contains(t, errb.String(), dir)
+	assert.Equal(t, 0, runAutoAccept([]string{"off", "--all", "--url", srv.URL}, &out, &errb), "strict auth off: the unsigned kill switch works")
+	assert.Equal(t, []string{"POST /api/auto-accept/disable-all signed=false"}, calls)
 
-	// No token file at all (Coral never wrote one here) is not this case: the command goes on as before.
-	require.NoError(t, os.Remove(filepath.Join(dir, cliauth.TokenFile)))
+	status = http.StatusUnauthorized
+	calls = nil
 	errb.Reset()
-	assert.Equal(t, 0, runAutoAccept([]string{"off", "--all", "--url", srv.URL}, &out, &errb))
-	assert.Equal(t, 1, calls)
+	assert.Equal(t, 1, runAutoAccept([]string{"off", "--all", "--url", srv.URL}, &out, &errb))
+	assert.Contains(t, errb.String(), "couldn't read Coral's command-line token in "+dir)
+	assert.Contains(t, errb.String(), "Coral refused the request (401)")
 }

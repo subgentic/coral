@@ -9,7 +9,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -50,20 +49,9 @@ func runAutoAccept(args []string, stdout, stderr io.Writer) int {
 	// Coral's command-line token (never inside an agent session). A server that can't
 	// prove it knows that token gets nothing, and the error says which folder was used.
 	client := &http.Client{Timeout: clierr.Timeout(15 * time.Second)}
-	dir := cliauth.DataDir()
-	if !cliauth.InsideAgentSession() {
-		tok, terr := cliauth.ReadToken(dir)
-		switch {
-		case terr == nil:
-			client.Transport = cliauth.Transport{Base: http.DefaultTransport, Token: tok, Dir: dir}
-		case tokenFileExists(dir):
-			// The token is there but cannot be used (its access list lets other accounts in, or it is damaged): an unsigned request would only be refused, and says nothing
-			// about why. Say so, and send nothing.
-			fmt.Fprintf(stderr, "coral auto-accept: the command-line token in %s is not private to this user, or is damaged (%v). "+
-				"Fix its access list or restart Coral to rewrite it. Nothing was sent.\n", dir, terr)
-			return 1
-		}
-	}
+	// A token that cannot be read is not a reason to refuse: the kill switch must still work where Coral takes an unsigned local request (strict auth off), so it goes out
+	// unsigned, and on a 401 the transport says once why (cliauth.OperatorRoundTripper).
+	client.Transport = cliauth.OperatorRoundTripper(http.DefaultTransport, stderr)
 	resp, err := send(client)
 	if err != nil {
 		fmt.Fprintf(stderr, "coral auto-accept: could not reach Coral at %s: %v\n", *base, err)
@@ -126,10 +114,4 @@ func subcommand(args []string) (int, bool) {
 		return unknownCommand(os.Stderr, args[0]), true
 	}
 	return 0, false
-}
-
-// tokenFileExists is whether the command-line token's file is in dir at all (as opposed to Coral never having written one there).
-func tokenFileExists(dir string) bool {
-	_, err := os.Lstat(filepath.Join(dir, cliauth.TokenFile))
-	return err == nil
 }
