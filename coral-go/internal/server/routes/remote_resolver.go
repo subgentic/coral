@@ -26,6 +26,9 @@ type FailureSink interface {
 // registry row and the worker's status cannot disagree (#3202).
 func (r *RemoteResolver) SetFailureSink(s FailureSink) { r.failures = s }
 
+// Forget drops what the resolver keeps for a server that was deleted: its ssh stream target and the key in it (#11370).
+func (r *RemoteResolver) Forget(id string) { r.streams.forget(id) }
+
 // NewRemoteResolver wraps the registry store for use by the proxy and poller.
 func NewRemoteResolver(s *store.RemoteServerStore) *RemoteResolver {
 	return &RemoteResolver{store: s}

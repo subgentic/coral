@@ -88,6 +88,9 @@ type Result struct {
 // ErrHostKey is an unknown or changed host key (ssh refused it). The owner confirms or investigates; the runner never accepts it.
 var ErrHostKey = errors.New("sshprov: the host key is unknown or has changed")
 
+// ErrHostKeyChanged is a host whose key is known and no longer matches: never offered for trust, the owner investigates (it may be another machine at that address).
+var ErrHostKeyChanged = errors.New("sshprov: the host key has changed")
+
 // ErrConnect is a failure to connect or sign in (ssh exit 255) other than the host key.
 var ErrConnect = errors.New("sshprov: could not connect")
 
@@ -155,7 +158,10 @@ func (r Runner) Run(ctx context.Context, t Target, c Command, args ...string) (R
 	if errors.As(runErr, &ee) {
 		res.ExitCode = ee.ExitCode()
 		if res.ExitCode == 255 {
-			if strings.Contains(errOut.b.String(), "Host key verification failed") || strings.Contains(errOut.b.String(), "REMOTE HOST IDENTIFICATION HAS CHANGED") {
+			if strings.Contains(errOut.b.String(), "REMOTE HOST IDENTIFICATION HAS CHANGED") {
+				return res, ErrHostKeyChanged
+			}
+			if strings.Contains(errOut.b.String(), "Host key verification failed") {
 				return res, ErrHostKey
 			}
 			return res, ErrConnect

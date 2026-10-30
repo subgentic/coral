@@ -29,6 +29,7 @@ b DELETE /api/saved/{id}
 b DELETE /api/remote/{server}/*
 b DELETE /api/scheduled/jobs/{jobID}
 b DELETE /api/servers/{id}
+b DELETE /api/servers/provision/{plan}
 b DELETE /api/sessions/history/{sessionID}/tags/{tagID}
 c DELETE /api/sessions/live/{name}/events
 a DELETE /api/sessions/live/{name}/notes/{noteID}
@@ -133,6 +134,7 @@ b GET /api/scheduled/jobs/{jobID}
 b GET /api/scheduled/jobs/{jobID}/runs
 b GET /api/scheduled/runs/recent
 b GET /api/servers
+b GET /api/servers/provision/{plan}
 c GET /api/session-artifacts
 b GET /api/sessions/history
 b GET /api/sessions/history/search
@@ -353,6 +355,9 @@ b POST /api/scheduled/runs/{runID}/seen
 b POST /api/scheduled/validate-cron
 b POST /api/servers
 b POST /api/servers/{id}/test
+b POST /api/servers/provision/plan
+b POST /api/servers/provision/{plan}/connect
+b POST /api/servers/provision/{plan}/run
 b POST /api/sessions/history/{sessionID}/resummarize
 b POST /api/sessions/history/{sessionID}/tags
 a POST /api/sessions/launch

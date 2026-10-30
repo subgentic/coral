@@ -105,3 +105,21 @@ func TestResolverGivesAnSSHServerOneSharedStreamTarget(t *testing.T) {
 	_, direct := got.(proxy.HTTPTarget)
 	assert.True(t, direct, "a server added by URL is still a direct target")
 }
+
+func TestDeletingAnSSHServerDropsItsStreamTarget(t *testing.T) {
+	e := newRSEnv(t)
+	ctx := context.Background()
+	_, err := e.h.store.AddSSH(ctx, "build", "Build box", "rich@box.example.com", 8420, "inst-1", routeSecret)
+	require.NoError(t, err)
+	r := NewRemoteResolver(e.h.store)
+	e.h.SetOnDelete(r.Forget)
+	a, err := r.Resolve(ctx, "build")
+	require.NoError(t, err)
+	require.Len(t, r.streams.m, 1)
+	w := e.do("DELETE", "/api/servers/build", nil)
+	require.Equal(t, 200, w.Code)
+	assert.Empty(t, r.streams.m, "the deleted server's target and its key are still in memory")
+	_, err = r.Resolve(ctx, "build")
+	assert.Error(t, err)
+	_ = a
+}

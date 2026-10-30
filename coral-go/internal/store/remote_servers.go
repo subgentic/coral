@@ -45,7 +45,8 @@ var (
 
 // ValidateRemoteID checks the slug rules.
 func ValidateRemoteID(id string) error {
-	if id == LocalServerID || !remoteIDRe.MatchString(id) {
+	if id == LocalServerID || id == "provision" || !remoteIDRe.MatchString(id) { // "provision" is the path of the setup routes under /api/servers
+
 		return ErrInvalidRemoteID
 	}
 	return nil
@@ -197,6 +198,9 @@ func (s *RemoteServerStore) AddSSH(ctx context.Context, id, label, sshTarget str
 		 VALUES (?, ?, ?, ?, 0, ?, ?, 'ssh', ?, ?, ?)`,
 		id, label, "ssh://"+sshTarget, env, RemoteStatusUnknown, nowUTC(), sshTarget, remotePort, instanceID)
 	if err != nil {
+		if strings.Contains(err.Error(), "remote_servers.instance_id") {
+			return nil, ErrRemoteInstanceExists // a second AddSSH for the same machine that passed the check at the same time
+		}
 		if strings.Contains(err.Error(), "UNIQUE") || strings.Contains(err.Error(), "PRIMARY KEY") {
 			return nil, ErrRemoteExists
 		}
@@ -242,7 +246,11 @@ func (s *RemoteServerStore) Update(ctx context.Context, id string, u RemoteServe
 		}
 	}
 	if u.URL != nil {
-		if cur, _ := s.Get(ctx, id); cur != nil && cur.Transport != RemoteTransportHTTP {
+		cur, err := s.Get(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		if cur.Transport != RemoteTransportHTTP {
 			return nil, ErrRemoteTransport // a server reached over SSH has no URL to edit: it would turn into a direct one
 		}
 		if _, err := s.db.ExecContext(ctx, "UPDATE remote_servers SET url = ?, status = ?, last_error = NULL WHERE id = ?",

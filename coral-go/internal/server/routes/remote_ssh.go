@@ -71,6 +71,17 @@ func (c *sshStreams) get(rs *store.RemoteServer, key string) (proxy.Target, erro
 	return t, nil
 }
 
+// forget drops a server's stream target (its idle ssh streams are closed, its key leaves memory): a deleted server, or one whose row changed.
+func (c *sshStreams) forget(id string) {
+	c.mu.Lock()
+	e, ok := c.m[id]
+	delete(c.m, id)
+	c.mu.Unlock()
+	if ok {
+		e.t.Close()
+	}
+}
+
 // CheckTargetHealth is CheckRemoteHealth for a target that is not a URL: GET /api/health through it. A failure to connect is the one fixed sentence, whatever ssh said.
 func CheckTargetHealth(ctx context.Context, t proxy.Target, timeout time.Duration) RemoteHealth {
 	ctx, cancel := context.WithTimeout(ctx, timeout)

@@ -77,3 +77,27 @@ func TestRemoteServers_SSHTransport(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, all, 2)
 }
+
+// Two AddSSH calls that both pass the FindByInstance check (a race) cannot both insert: the unique index refuses the second, and AddSSH says it is the same machine.
+func TestRemoteServers_InstanceIsUniqueInTheDatabase(t *testing.T) {
+	s, db, _, _ := newRemoteStore(t)
+	ctx := context.Background()
+	_, err := s.AddSSH(ctx, "one", "One", "u@h1", 8420, "inst-1", plainKey)
+	require.NoError(t, err)
+	_, err = db.ExecContext(ctx, `INSERT INTO remote_servers (id, label, url, api_key, status, created_at, transport, ssh_target, remote_port, instance_id)
+		VALUES ('two', 'Two', 'ssh://u@h2', 'x', 'unknown', 'now', 'ssh', 'u@h2', 8420, 'inst-1')`)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "remote_servers.instance_id")
+	// servers added by URL have no instance id, and any number of them may exist
+	_, err = s.Add(ctx, "a", "A", "http://10.0.0.5:8420", plainKey, true)
+	require.NoError(t, err)
+	_, err = s.Add(ctx, "b", "B", "http://10.0.0.6:8420", plainKey, true)
+	require.NoError(t, err)
+}
+
+func TestRemoteServers_UpdateOfAMissingServerIsNotFound(t *testing.T) {
+	s, _, _, _ := newRemoteStore(t)
+	u := "http://10.0.0.5:8420"
+	_, err := s.Update(context.Background(), "ghost", RemoteServerUpdate{URL: &u})
+	assert.ErrorIs(t, err, ErrRemoteNotFound)
+}
