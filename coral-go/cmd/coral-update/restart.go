@@ -63,6 +63,13 @@ func restartFromMarker(dataDir, dir string) bool {
 		// The marker names the registered install: start it by Windows Installer's own spelling of the folder, not the marker's (a short name, or a link to it). The marker's folder
 		// is used as it is only for the install it was added for (#5946): a portable copy's server, or no registered product.
 		dir = reg
+	default:
+		// Not the registered install, and the marker is a file this user can write: Coral is started from that folder only if it is the install this updater belongs to, which
+		// a coral-update.exe in it with this program's own bytes shows (the dashboard's copy is a copy of the server's own updater). Any other folder is a failure said in
+		// the answer, so a planted marker cannot make the updater start a program of its choosing.
+		if !hasThisUpdater(dir) {
+			return false
+		}
 	}
 	if !filepath.IsAbs(dir) {
 		return false
@@ -105,4 +112,24 @@ func sameFinalFolder(a, b string) bool {
 	}
 	rb, err := safefs.Resolve(b)
 	return err == nil && sameFolder(ra, rb)
+}
+
+// runningExe is the path of this program (a variable so a test can say).
+var runningExe = os.Executable
+
+// hasThisUpdater says whether dir holds a coral-update.exe whose bytes are this running program's.
+func hasThisUpdater(dir string) bool {
+	if !filepath.IsAbs(dir) {
+		return false
+	}
+	exe, err := runningExe()
+	if err != nil {
+		return false
+	}
+	self, err := fileSHA256(exe)
+	if err != nil {
+		return false
+	}
+	there, err := fileSHA256(filepath.Join(dir, "coral-update.exe"))
+	return err == nil && self == there
 }
