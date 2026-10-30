@@ -1,6 +1,7 @@
 package sshprov
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"regexp"
@@ -30,6 +31,19 @@ func (t Target) Stored() string {
 		h = "[" + h + "]"
 	}
 	return t.User + "@" + h + ":" + strconv.Itoa(t.Port)
+}
+
+// AcceptTerms passes the owner's acceptance (the JSON the caller built: version, sha256, by) to the far computer on stdin; the far Coral refuses terms that are not its own. Nothing of the payload is in
+// argv, a log or an error.
+func (r Runner) AcceptTerms(ctx context.Context, t Target, version string, payload []byte) error {
+	res, err := r.RunInput(ctx, t, bytes.NewReader(payload), CmdAcceptTerms, version)
+	if err != nil {
+		return err
+	}
+	if res.ExitCode != 0 {
+		return errors.New("sshprov: the far computer did not accept the terms")
+	}
+	return nil
 }
 
 // StartTmux starts the installed Coral of version in a tmux session called coral-server, once: a session that exists is left as it is.

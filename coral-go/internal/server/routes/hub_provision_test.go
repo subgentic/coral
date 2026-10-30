@@ -22,8 +22,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/subgentic/coral/internal/license"
 	"github.com/subgentic/coral/internal/sshprov"
 	"github.com/subgentic/coral/internal/store"
+	terms "github.com/subgentic/coral/pkg/license"
 )
 
 const (
@@ -437,4 +439,16 @@ func TestProvisionStartFailureIsAFixedSentenceAndHidesTheCause(t *testing.T) {
 	steps := failed["steps"].([]any)
 	assert.Equal(t, "failed", steps[3].(map[string]any)["state"])
 	assert.Equal(t, "pending", steps[4].(map[string]any)["state"])
+}
+
+func TestTermsPayloadAndLabelMatchWhatTheFarSideAccepts(t *testing.T) {
+	label := setupAcceptanceLabel()
+	assert.Regexp(t, `^[A-Za-z0-9._@-]{1,64}$`, label)
+	assert.True(t, strings.HasPrefix(label, "hub-owner@"))
+	var p map[string]string
+	require.NoError(t, json.Unmarshal(termsPayload(label), &p))
+	assert.Equal(t, license.EULAVersion, p["version"])
+	assert.Equal(t, terms.EULADigest(), p["sha256"])
+	assert.Equal(t, label, p["by"])
+	assert.Len(t, p, 3, "no other field: the far side refuses one")
 }

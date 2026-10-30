@@ -36,6 +36,7 @@ if [ "$1" = "api-key" ]; then
   [ -s "$home/api_key" ] || exit 1
   cat "$home/api_key"; exit 0
 fi
+if [ "$1" = "accept-terms" ]; then echo "$@" >> '` + argsLog + `.accept'; cat > '` + argsLog + `.stdin'; exit "${COMMA_EXIT:-0}"; fi
 echo "$@" >> '` + argsLog + `'
 home=""; while [ $# -gt 0 ]; do [ "$1" = "--home" ] && home="$2"; shift; done
 sleep 0.3; mkdir -p "$home"; printf '%s\n' '` + testKey + `' > "$home/api_key"
@@ -90,12 +91,12 @@ func TestStartTmuxStartsCoralOnLoopbackOnlyAndOnlyOnce(t *testing.T) {
 	if strings.Count(args, "\n") != 1 {
 		t.Errorf("coral was started more than once:\n%s", args)
 	}
-	for _, want := range []string{"--host 127.0.0.1", "--port 8420", "--no-browser", "--backend tmux", "--home " + filepath.Join(home, ".coral-server", "data")} {
+	for _, want := range []string{"--host 127.0.0.1", "--port 8420", "--no-browser", "--cloud-url off", "--backend tmux", "--home " + filepath.Join(home, ".coral-server", "data")} {
 		if !strings.Contains(args, want) {
 			t.Errorf("coral args lack %q: %s", want, args)
 		}
 	}
-	for _, bad := range []string{"0.0.0.0", "--remote", "--cloud"} {
+	for _, bad := range []string{"0.0.0.0", "--remote", "--cloud-connect", "--cloud-url http"} {
 		if strings.Contains(args, bad) {
 			t.Errorf("coral was started with %q: %s", bad, args)
 		}
@@ -201,5 +202,29 @@ func TestStoredRoundTripsThroughTheParsers(t *testing.T) {
 	a, _ := FromAlias("build-box")
 	if a.Stored() != "build-box" {
 		t.Errorf("alias = %s", a.Stored())
+	}
+}
+
+func TestAcceptTermsGoesOnStdinNeverInArgv(t *testing.T) {
+	r, _, argsLog, _ := startSide(t)
+	tg, _ := ParseTarget("rich@box.example.com")
+	payload := []byte(`{"version":"2026-03-26","sha256":"` + strings.Repeat("ab", 32) + `","by":"hub-owner@build-host"}`)
+	if err := r.AcceptTerms(context.Background(), tg, "2.0.10", payload); err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(argsLog + ".stdin")
+	if err != nil || string(got) != string(payload) {
+		t.Fatalf("stdin = %q, %v", got, err)
+	}
+	args, _ := os.ReadFile(argsLog + ".accept")
+	if strings.TrimSpace(string(args)) != "accept-terms" {
+		t.Errorf("coral got arguments: %q", args)
+	}
+	text, err := remoteText(CmdAcceptTerms, "2.0.10")
+	if err != nil || strings.Contains(text, "ab") && strings.Contains(text, "hub-owner") {
+		t.Errorf("the remote text carries the payload: %q %v", text, err)
+	}
+	if _, err := r.RunInput(context.Background(), tg, strings.NewReader("x"), CmdAcceptTerms, "../x"); !errors.Is(err, ErrNotAllowed) {
+		t.Errorf("a version that is a path: %v", err)
 	}
 }

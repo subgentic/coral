@@ -4,9 +4,11 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
+	"os"
 	"regexp"
 	"strings"
 	"sync"
@@ -15,8 +17,10 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/subgentic/coral/internal/config"
+	"github.com/subgentic/coral/internal/license"
 	"github.com/subgentic/coral/internal/sshprov"
 	"github.com/subgentic/coral/internal/store"
+	terms "github.com/subgentic/coral/pkg/license"
 )
 
 // Setting a Coral server up on another computer over SSH, from the self-hosted hub (#11370). The routes are hub mode only and the Operator's (agent tokens are refused by the identity census).
@@ -526,6 +530,12 @@ func (pr *Provisioner) finish(ctx context.Context, p *provisionPlan) error {
 
 func (pr *Provisioner) realStartRemote(ctx context.Context, p *provisionPlan) (string, string, error) {
 	fail := func(msg string) error { return &sshprov.ErrInstall{Step: "start", Msg: msg} }
+	// Set up was pressed with the terms shown (Run checked accept_terms): the far Coral is given THAT acceptance, on stdin, bound to this release's terms. It is the only way a first start with no terminal gets past them.
+	by := setupAcceptanceLabel()
+	if err := pr.runner.AcceptTerms(ctx, p.Target, config.Version, termsPayload(by)); err != nil {
+		return "", "", fail("Could not record your acceptance of the terms on that computer.")
+	}
+	slog.Info("[provision] terms accepted for a setup", "plan", p.ID, "version", license.EULAVersion, "by", by, "at", time.Now().UTC().Format(time.RFC3339))
 	if err := pr.runner.StartTmux(ctx, p.Target, config.Version); err != nil {
 		return "", "", fail("Could not start Coral on that computer.")
 	}
@@ -596,4 +606,26 @@ func (pr *Provisioner) realInstall(ctx context.Context, p *provisionPlan, arch s
 	}
 	_, err := in.Install(ctx, p.Target, arch)
 	return err
+}
+
+var labelUnsafe = regexp.MustCompile(`[^A-Za-z0-9._-]+`)
+
+// setupAcceptanceLabel is who the acceptance is recorded for: the hub's owner at this hub's computer, "hub-owner@<host>", in the label alphabet the far side checks.
+func setupAcceptanceLabel() string {
+	host, _ := os.Hostname()
+	host = strings.Trim(labelUnsafe.ReplaceAllString(host, "-"), "-.")
+	if host == "" {
+		host = "hub"
+	}
+	l := "hub-owner@" + host
+	if len(l) > 64 {
+		l = l[:64]
+	}
+	return l
+}
+
+// termsPayload is the acceptance the far Coral reads on stdin: this hub's terms version and the digest of its text (the far Coral is the same release and refuses anything else), and who.
+func termsPayload(by string) []byte {
+	b, _ := json.Marshal(map[string]string{"version": license.EULAVersion, "sha256": terms.EULADigest(), "by": by})
+	return b
 }
