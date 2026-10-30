@@ -2989,6 +2989,7 @@ input.switch:disabled { opacity: .5; cursor: not-allowed; }
     input.switch:disabled::before { background: GrayText; }
 }
 .field-error { margin: 4px 0 .9rem; color: var(--error-text, var(--error)); font-size: var(--fs-sm, 0.8125rem); line-height: var(--lh-ui); overflow-wrap: anywhere; }
+.field-error .field-error-action { display: block; margin-top: 6px; } /* the button under the words, not after the last wrapped line of them (#11336) */
 
 /* Auto-accept (#3182): the AUTO chip (agent row and header), the menu switch's state and the warning dialog. */
 .auto-accept-chip {
