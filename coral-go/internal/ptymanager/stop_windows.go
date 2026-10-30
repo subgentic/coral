@@ -75,7 +75,14 @@ func hasChildProcesses(pid int) (bool, error) {
 // program. A shell of unknown contents covers everything under it: a program below it (WSL's processes, a Cygwin child that does show)
 // is that shell's, not the agent's, so it leaves the pane "unknown contents" and notices are withheld (Security on #216). A program
 // that is under no such shell (the agent: powershell, its script, the claude.cmd shim's cmd, node) is busy, as before.
-func shellTree(pid int) (busy bool, other string, err error) {
+//
+// launcher, when given (the session's launcherCheck), says whether a verified cmd is Coral's launcher for the resolved CLI (isLauncherCommandLine): a direct child of the root that is
+// one is the agent whether or not it has started a program below it (a .bat or .cmd that IS the CLI and blocks in a builtin has none), so the tree is busy (#408).
+func shellTree(pid int, launcher ...func(pid int) bool) (busy bool, other string, err error) {
+	var isLauncher func(pid int) bool
+	if len(launcher) > 0 {
+		isLauncher = launcher[0]
+	}
 	snap, err := windows.CreateToolhelp32Snapshot(windows.TH32CS_SNAPPROCESS, 0)
 	if err != nil {
 		return false, "", err
@@ -130,6 +137,9 @@ func shellTree(pid int) (busy bool, other string, err error) {
 			case isProgram:
 				return true, "", nil
 			case verifiedWindowsShell(image):
+				if isLauncher != nil && n.depth == 0 && n.under == "" && isLauncher(c) {
+					return true, "", nil
+				}
 				queue = append(queue, node{c, start, n.depth + 1, n.under})
 			case shellNamed(image):
 				name := strings.TrimSuffix(strings.ToLower(filepath.Base(image)), ".exe")
