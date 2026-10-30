@@ -2,12 +2,11 @@
 
 Get from a downloaded release to a committed, tested change.
 
-The example output and timings in steps 4-5 were
-captured on an earlier (v1.0.8) build, so treat them as illustrative. Where something is unverified, it says so.
+The example output and timings in steps 4-5 are illustrative: they come from a test run of a small task, and your agent CLI's wording and speed will differ. Where something is unverified, it says so.
 
-> **Example result (v1.0.8 measurement):** about 90 seconds from starting the server to a
-> committed, passing change — *after* your agent CLI is installed and authenticated, and
-> *after* you answer the trust prompt in step 4. Installing and authenticating an agent
+> **Example result:** a small task took about 90 seconds from starting Coral to a
+> committed, passing change — *after* your agent CLI was installed and signed in, and
+> *after* the trust prompt in step 4 was answered. Installing and signing in to an agent
 > CLI is the long pole on a clean machine, and Coral does not do it for you.
 
 ## Prerequisites
@@ -314,7 +313,7 @@ Given a small Go package and this task —
 > Run `go test ./...` and make sure it passes. Then `git add -A` and
 > `git commit -m "add Capitalize + tests"`.
 
-— the result in the v1.0.8 test run, 90 seconds after the server started:
+— the result of that test run, about 90 seconds after Coral started:
 
 ```console
 $ git log --oneline
