@@ -47,6 +47,30 @@ const boardPage = () => loadedModule('./message_board.js'); // the board's own b
 const hideJobModal = (...args) => loadedModule('./job_form.js')?.hideJobModal(...args);
 const reshowJobModal = (...args) => loadedModule('./job_form.js')?.reshowJobModal(...args);
 
+// The agent row's ⋯ (#11056) opens the Details card under the row; it stayed floating over the Files list after the person went on (#11284). It closes with the ⋯ again, a tap outside it, Escape, and when the Files
+// or another tab of the agent page is opened.
+let _agentBarMoreOff = null;
+document.addEventListener('coral:agentic-tab', () => closeAgentBarMore()); // switchAgenticTab says another part of the agent page was opened
+function closeAgentBarMore() {
+    const b = document.getElementById('agent-bar-more'), d = document.getElementById('agent-phone-details'), h = document.querySelector('#live-session-view .terminal-header');
+    if (b) b.setAttribute('aria-expanded', 'false');
+    if (h) h.removeAttribute('data-more');
+    if (d) d.open = false;
+    if (_agentBarMoreOff) { _agentBarMoreOff(); _agentBarMoreOff = null; }
+}
+function openAgentBarMore(btn) {
+    const d = document.getElementById('agent-phone-details'), h = btn.closest('.terminal-header');
+    btn.setAttribute('aria-expanded', 'true');
+    if (h) h.toggleAttribute('data-more', true);
+    if (d) d.open = true;
+    if (_agentBarMoreOff) _agentBarMoreOff();
+    const outside = e => { if (e.target.closest && (e.target.closest('#agent-phone-details') || e.target.closest('#agent-bar-more'))) return; closeAgentBarMore(); };
+    const key = e => { if (e.key === 'Escape') closeAgentBarMore(); };
+    document.addEventListener('click', outside, true);
+    document.addEventListener('keydown', key, true);
+    _agentBarMoreOff = () => { document.removeEventListener('click', outside, true); document.removeEventListener('keydown', key, true); };
+}
+
 registerActions({
     'mb-jump-latest': () => boardPage()?.jumpToLatest(), // the board's own buttons are in the page's markup but their code loads with the board (a lazy group), so the action is here
     'mb-select-mode': () => boardPage()?.toggleSelectMode(),
@@ -202,7 +226,7 @@ registerActions({
         if (open) { menu.querySelector('[role=menuitem]')?.focus(); document.addEventListener('click', () => { menu.hidden = true; el.setAttribute('aria-expanded', 'false'); }, { once: true }); }
     },
     'phone-fab-new': el => { const menu = document.getElementById('phone-fab-menu'); menu.hidden = true; document.getElementById('phone-fab').setAttribute('aria-expanded', 'false'); window.showLaunchModal(); window._selectLaunchType(el.dataset.arg); },
-    'agent-bar-more': el => { const d = document.getElementById('agent-phone-details'), h = el.closest('.terminal-header'), open = el.getAttribute('aria-expanded') !== 'true'; el.setAttribute('aria-expanded', String(open)); if (h) h.toggleAttribute('data-more', open); if (d) d.open = open; }, // a phone's agent row (#11056): the controls that do not fit the one row, and the Details, open under it
+    'agent-bar-more': el => { const open = el.getAttribute('aria-expanded') !== 'true'; if (open) openAgentBarMore(el); else closeAgentBarMore(); }, // a phone's agent row (#11056): the controls that do not fit the one row, and the Details, open under it; they close with an outside tap, Escape and the other parts of the agent page (#11284)
     'agentic-panel-toggle': el => (el.dataset.open === '0' ? window.toggleAgenticPanel(false) : window.toggleAgenticPanel()),
     'agentic-tab': el => { if (AGENTIC_TABS.has(el.dataset.tab)) window.switchAgenticTab(el.dataset.tab, 'top'); },
     'session-restart': () => window.restartSession(),
