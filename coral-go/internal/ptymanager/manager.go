@@ -514,6 +514,50 @@ type shellPIDReporter interface {
 	ShellPID() int
 }
 
+// agentNoticeProc is implemented by pseudo-terminals that record the session's agent process themselves (Windows ConPTY, #389); a Unix pseudo-terminal names its shell pid
+// (shellPIDReporter) and the process table of the tmux package does the same.
+type agentNoticeProc interface {
+	AdoptAgentAfterLaunch(session string)
+	NoticeVerdict() (tmux.NoticeVerdict, error)
+}
+
+// AdoptAgent starts the watch for a session's agent process after a launch line was typed (a no-op where nothing can be recorded).
+func (m *PTYBackend) AdoptAgent(name string) {
+	m.mu.RLock()
+	s, found := m.sessions[name]
+	m.mu.RUnlock()
+	if !found || !s.isRunning() {
+		return
+	}
+	if r, can := s.proc.(agentNoticeProc); can {
+		r.AdoptAgentAfterLaunch(name)
+	} else if sp, can := s.proc.(shellPIDReporter); can {
+		tmux.AdoptAgentForShell(name, sp.ShellPID())
+	}
+}
+
+// AgentNoticeVerdict says whether a notice may be typed into a session's terminal. ok is false when the session is gone or the platform cannot tell.
+func (m *PTYBackend) AgentNoticeVerdict(name string) (v tmux.NoticeVerdict, ok bool) {
+	m.mu.RLock()
+	s, found := m.sessions[name]
+	m.mu.RUnlock()
+	if !found || !s.isRunning() {
+		return tmux.NoticeVerdict{}, false
+	}
+	var err error
+	if r, can := s.proc.(agentNoticeProc); can {
+		v, err = r.NoticeVerdict()
+	} else if sp, can := s.proc.(shellPIDReporter); can {
+		v, err = tmux.NoticeVerdictForShell(name, sp.ShellPID())
+	} else {
+		return tmux.NoticeVerdict{}, false
+	}
+	if err != nil {
+		return tmux.NoticeVerdict{}, false
+	}
+	return v, true
+}
+
 // shellIdleReporter is implemented by pseudo-terminals that tell for themselves whether their shell is back at a bare prompt
 // (Windows, pty_foreground_windows.go).
 type shellIdleReporter interface {

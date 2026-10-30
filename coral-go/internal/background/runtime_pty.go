@@ -107,6 +107,15 @@ func (r *PTYRuntime) AgentShellIdle(_ context.Context, name, _, _ string) (bool,
 	return r.backend.ShellIdle(name)
 }
 
+// AgentNoticeTarget says whether a board nudge may be typed into the agent's terminal: only while the recorded agent process is its foreground program (ptymanager.NoticeBlocked, #389).
+func (r *PTYRuntime) AgentNoticeTarget(_ context.Context, name, _, _ string) (ok, wait bool, why string, known bool) {
+	v, found := r.backend.AgentNoticeVerdict(name)
+	if !found {
+		return false, false, "", false
+	}
+	return v.OK, v.Wait, v.Reason, true
+}
+
 // AgentUnknownShell names a shell of unknown contents in the agent's terminal (Windows: git-bash, WSL) or a shell a person started below the agent's shell (Unix), for
 // ptymanager.AgentExitedForLaunch (Security on #216, #387).
 func (r *PTYRuntime) AgentUnknownShell(_ context.Context, name, _, _ string) (string, bool) {

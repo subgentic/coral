@@ -344,6 +344,9 @@ func (s *Server) registerSessions(r *chi.Mux, h *routeHandlers) {
 	// Individual session sleep/wake
 	r.Post("/api/sessions/live/{sessionID}/sleep", sessHandler.SleepSession)
 	r.Post("/api/sessions/live/{sessionID}/wake", sessHandler.WakeSession)
+	r.Get("/api/sessions/live/{sessionID}/agent-candidate", sessHandler.AgentCandidate) // #391: Operator only (operatorOnlyRoutes)
+	r.Post("/api/sessions/live/{sessionID}/record-agent", sessHandler.RecordAgent)
+	r.Post("/api/sessions/record-agents", sessHandler.RecordAgents)
 	r.Post("/api/sessions/live/{sessionID}/refresh-hooks", sessHandler.RefreshHooks) // #3665
 	r.Get("/api/system/hooks-status", sessHandler.HooksStatus)                       // #3665
 	// #3636: the start's wake of the agents running when a pty Coral stopped.

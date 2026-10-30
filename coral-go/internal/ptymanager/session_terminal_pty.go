@@ -239,9 +239,27 @@ func (p *PTYSessionTerminal) sendLaunch(_ context.Context, o terminalinput.Origi
 			cleanup()
 			return err
 		}
+		p.backend.AdoptAgent(resolved) // the agent's process is recorded when it appears (#389)
 		return nil
 	}
-	return p.backend.SendLine(o, resolved, command)
+	err := p.backend.SendLine(o, resolved, command)
+	if err == nil {
+		p.backend.AdoptAgent(resolved)
+	}
+	return err
+}
+
+// AgentNoticeTarget implements NoticeTargetChecker for the PTY backend (#389).
+func (p *PTYSessionTerminal) AgentNoticeTarget(_ context.Context, name, _, sessionID string) (ok, wait bool, why string, known bool) {
+	key, err := p.keyFor(name, sessionID)
+	if err != nil {
+		return false, false, "", false
+	}
+	v, found := p.backend.AgentNoticeVerdict(key)
+	if !found {
+		return false, false, "", false
+	}
+	return v.OK, v.Wait, v.Reason, true
 }
 
 func (p *PTYSessionTerminal) SendTerminalInput(_ context.Context, o terminalinput.Origin, target, data string) error {

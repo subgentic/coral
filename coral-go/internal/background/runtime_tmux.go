@@ -158,6 +158,19 @@ func (r *TmuxRuntime) AgentShellIdle(ctx context.Context, name, agentType, sessi
 	return idle, shell, true
 }
 
+// AgentNoticeTarget says whether a board nudge may be typed into the agent's pane: only while the recorded agent process is its foreground program (ptymanager.NoticeBlocked, #389).
+// The notifier, the scheduler and the other automated senders of this package type through the runtime, not through the routes' terminal, so the runtime has to answer it too.
+func (r *TmuxRuntime) AgentNoticeTarget(ctx context.Context, name, agentType, sessionID string) (ok, wait bool, why string, known bool) {
+	if agentType == "" && sessionID == "" {
+		agentType, sessionID = parseSessionName(name)
+	}
+	v, err := r.client.AgentNoticeVerdict(ctx, name, agentType, sessionID)
+	if err != nil {
+		return false, false, "", false
+	}
+	return v.OK, v.Wait, v.Reason, true
+}
+
 // AgentUnknownShell names a shell a person started below the agent's pane's shell, for ptymanager.AgentExitedForLaunch (Security on #387).
 func (r *TmuxRuntime) AgentUnknownShell(ctx context.Context, name, agentType, sessionID string) (string, bool) {
 	if agentType == "" && sessionID == "" {
