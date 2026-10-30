@@ -7,6 +7,7 @@ const { connect } = require('./agent_view_harness');
 const { setTheme, installAudit, auditRegion } = require('./helpers/contrast');
 const { guardSettings } = require('./helpers/settings_guard');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 const SEED = [{ id: 1, family: 'claude', value: 'global-opus-5-5', display_name: 'Global Opus 5.5', efforts: ['low', 'high'] }, { id: 2, family: 'pi', value: 'openai/gpt-5-mini', display_name: '', efforts: [] }, { id: 3, family: 'agy', value: 'img-test', display_name: '<img src=x onerror="window.__pwn=1">', efforts: [] }];
 const LIMITS = { max_per_family: 50, max_total: 200, efforts: { claude: ['low', 'medium', 'high', 'xhigh', 'max'], codex: [], agy: [], pi: [] } };
@@ -28,7 +29,7 @@ const LIMITS = { max_per_family: 50, max_total: 200, efforts: { claude: ['low', 
         await Emulation.setDeviceMetricsOverride({ width: view.w, height: view.h, deviceScaleFactor: 1, mobile: view.phone });
         await Emulation.setEmulatedMedia({ features: [{ name: 'prefers-color-scheme', value: theme }] });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`); await installAudit(ev); await setTheme(ev, theme);
+        await coralReady(ev); await installAudit(ev); await setTheme(ev, theme);
         await ev(STUB(route));
         await ev(`window.showSettingsModal('agents'); true`);
         if (route) await waitFor(`document.querySelectorAll('#settings-custom-models .cm-row').length === 3 && !!document.querySelector('#settings-custom-models [data-cm-add]')`, 'the list and its one Add button', 8000);

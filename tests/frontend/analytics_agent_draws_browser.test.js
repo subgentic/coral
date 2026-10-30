@@ -4,6 +4,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -11,7 +12,7 @@ const BASE = require('./test_base').BASE;
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
         await ev(`(() => { const real = window.fetch; const agents = Array.from({ length: 30 }, (_, i) => 'agent-' + i);
             const sess = Array.from({ length: 300 }, (_, i) => ({ session_id: 's' + i, agent_name: agents[i % 30], board_name: 'team-' + (i % 5), folder: '/repo/' + (i % 7), working_dir: '/repo/' + (i % 7), requests: 50 + i, input_tokens: 1e6 + i * 1000, output_tokens: 1e5 + i, cache_read_tokens: 5e6, cache_write_tokens: 1e5, cost_usd: 1 + i / 10, first_seen: new Date(Date.now() - 86400000).toISOString(), last_seen: new Date().toISOString() }));
             window.fetch = function (u, o) { const url = typeof u === 'string' ? u : u.url; const ok = b => Promise.resolve(new Response(JSON.stringify(b), { status: 200, headers: { 'Content-Type': 'application/json' } }));

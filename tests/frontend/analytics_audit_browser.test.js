@@ -3,6 +3,7 @@
 // (its sort column was cut off at the edge); the Model column is the size of its neighbours. From stubbed answers; the calls requests are recorded.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 const AGENT = [
     { session_id: 'a1', agent_name: 'Frontend Dev', board_name: 'coral-go-team', folder: 'coral', requests: 700, input_tokens: 5000, output_tokens: 700, cache_read_tokens: 0, cache_write_tokens: 0, cost_usd: 3.2, first_seen: '2026-10-19T00:00:00Z', last_seen: '2026-10-19T05:00:00Z' },
@@ -30,7 +31,7 @@ const CALLS = [{ operation: '/api/board/{project}/messages', call_type: 'api', a
         await Emulation.setTouchEmulationEnabled(mobile ? { enabled: true, maxTouchPoints: 5 } : { enabled: false });
         await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile });
         const l = Page.loadEventFired(); await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await l; await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await stub();
         await ev(`window.switchNavTab('tokens'); true`);
         await waitFor(`['cost-by-provider', 'cost-by-model', 'cost-by-agent'].every(id => document.querySelectorAll('#' + id + ' tbody tr').length >= 2) && document.querySelectorAll('#call-metrics-summary tbody tr').length >= 1`, 'the tables');

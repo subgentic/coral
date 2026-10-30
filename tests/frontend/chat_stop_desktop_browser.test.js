@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 const STUB = `(() => { const real = window.fetch; window.__keys = [];
     window.fetch = (u, o = {}) => { if (/\\/api\\/sessions\\/live\\/[^/]+\\/keys$/.test(String(u)) && (o.method || 'GET').toUpperCase() === 'POST') { window.__keys.push(JSON.parse(o.body).keys); if (window.__keysFail) return Promise.resolve(new Response(JSON.stringify({ error: 'The agent is not taking input' }), { status: 409, headers: { 'content-type': 'application/json' } })); return Promise.resolve(new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'content-type': 'application/json' } })); } return real(u, o); };
@@ -17,7 +18,7 @@ const STUB = `(() => { const real = window.fetch; window.__keys = [];
         const row = patch => ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'session_header_updates.js'); const base = window.__m.entry(Object.values(window.__m.agents).find(a => a.name === 'ak')); m.updateWaitingIndicator({ ...base, session_id: 'ak-sid', ...${JSON.stringify(patch)} }); await new Promise(r => setTimeout(r, 80)); return true; })()`);
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`); await ev(STUB);
+        await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings'); await ev(STUB);
         await ev(`window.__m.add('ak', 'A', 6, { sleeping: false, session_id: 'ak-sid' }); window._coralSetLiveSessions(Object.values(window.__m.agents).map(a => window.__m.entry(a))); localStorage.setItem('coral-live-view-mode', 'chat'); true`);
         await select('ak');
         await waitFor(`window.__rendered && window.__rendered().length >= 3`, 'the chat', 15000);

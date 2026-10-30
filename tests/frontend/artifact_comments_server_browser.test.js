@@ -10,6 +10,7 @@ const { execFileSync } = require('./helpers/child_process.js');
 const { connect } = require('./agent_view_harness');
 const { guardSettings } = require('./helpers/settings_guard');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 const DOC = ['# Migration plan', '', '## Steps', '', '1. Add the new columns behind a flag and backfill in batches of 500 rows.', '2. Switch reads to the new columns.', '', '## Risks', '', 'The backfill takes a write lock on large databases.', ''].join('\n');
 const HEX = crypto.createHash('sha256').update(DOC).digest('hex');
@@ -34,7 +35,7 @@ const DATA = process.env.CORAL_TEST_DATA_DIR || '';
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         const open = async () => { await ev(`import((window.__coralStatic || '/static/') + 'artifact_viewer.js').then(m => m.openArtifactViewer('${HEX}', { filename: 'plan.md', mediaType: 'text/markdown' })); true`); await waitFor(`!!document.querySelector('#artifact-viewer:not([hidden]) .artifact-viewer-markdown') && !!document.querySelector('.ac-panel')`, 'the viewer with its panel', 8000); };
         await open();
         await waitFor(`document.querySelector('.ac-panel .empty-state.empty-state-tight') || document.querySelector('.ac-panel .ac-card')`, 'the panel to load', 8000);

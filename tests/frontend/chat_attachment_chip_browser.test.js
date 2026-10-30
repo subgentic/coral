@@ -4,6 +4,7 @@
 // Run against an isolated dev server; set CHIP_SHOT_DIR to save screenshots.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, PRELOAD, install } = await connect();
@@ -16,7 +17,7 @@ const { connect } = require('./agent_view_harness');
     const open = async (width, height, mobile) => {
         await Emulation.setDeviceMetricsOverride({ width, height, deviceScaleFactor: 1, mobile });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
     };
     const render = msgs => ev(`import(${MOD} + 'live_chat.js').then(m => {
         document.getElementById('chip-box')?.remove();

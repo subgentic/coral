@@ -3,6 +3,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 const STUB = `(() => { const real = window.fetch; window.__sends = [];
     window.fetch = (u, o = {}) => { if (/\\/api\\/sessions\\/live\\/[^/]+\\/send$/.test(String(u)) && (o.method || 'GET').toUpperCase() === 'POST') { window.__sends.push(JSON.parse(o.body).command); if (window.__refuse) return Promise.resolve(new Response(JSON.stringify({ error: 'refused' }), { status: 409, headers: { 'content-type': 'application/json' } })); return new Promise(() => {}); }
@@ -17,7 +18,7 @@ const STUB = `(() => { const real = window.fetch; window.__sends = [];
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
         const open = async () => {
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`); await ev(STUB);
+            await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings'); await ev(STUB);
             await ev(`window.__m.add('ak', 'A', 6, { sleeping: false, session_id: 'ak-sid' }); window._coralSetLiveSessions(Object.values(window.__m.agents).map(a => window.__m.entry(a))); localStorage.setItem('coral-live-view-mode', 'chat'); true`);
             await select('ak');
             await waitFor(`window.__rendered && window.__rendered().length >= 3`, 'the chat', 15000);

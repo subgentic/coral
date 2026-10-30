@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -14,12 +15,12 @@ const BASE = require('./test_base').BASE;
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Page.addScriptToEvaluateOnNewDocument({ source: "try { localStorage.setItem('coral.board.view', 'chat'); } catch (e) {}" }); // the chat rows: the team page's Board tab is the table by default (#8129)
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         for (const [id, t] of [['Orchestrator', 'Orchestrator'], ['QA Engineer', 'QA Engineer'], ['Gemini Dev', 'Developer']]) assert.equal(await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: id, job_title: t, session_name: id + '-s' }), 200);
         for (const [who, text] of [['Orchestrator', 'The release is ready for the gate.'], ['Orchestrator', 'A second line from the same sender, grouped under the first.'], ['QA Engineer', 'Gate run is green on the Mac.'], ['Gemini Dev', 'A longer message that wraps onto more than one line at a narrow width, so the left edge of every line can be seen against the row.']]) assert.equal(await api('POST', `/api/board/${B}/messages`, { subscriber_id: who, content: text }), 200);
         const check = async (label, w, h, mobile, zoom, theme) => {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile });
-            await Page.navigate({ url: `${BASE}/board/${B}` }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+            await Page.navigate({ url: `${BASE}/board/${B}` }); await Page.loadEventFired(); await install(); await coralReady(ev);
             await ev(`(async () => { const sc = await import((window.__coralStatic || '/static/') + 'settings_core.js'); sc.clearCustomThemeVars(); sc.applyTheme(${JSON.stringify(theme)}); document.documentElement.style.fontSize = ${JSON.stringify(zoom || '')}; return true; })()`);
             await waitFor(`document.querySelectorAll('#mb-messages .mb-message').length >= 4`, `${label}: the messages`, 15000);
             const r = await ev(`(() => { const rows = [...document.querySelectorAll('#mb-messages .mb-message')]; const composer = document.getElementById('mb-post-input').getBoundingClientRect().bottom; const si = document.querySelector('input[placeholder="Search the board"]'), sr = si && si.getBoundingClientRect(), fb = [...document.querySelectorAll('.mb-search-toggle, .list-bar-filter-btn')].find(b => b.getBoundingClientRect().width > 0); const search = sr && sr.width > 0 ? sr.left : fb.getBoundingClientRect().left; /* a phone has the search as a button row (#7183): the bar's own left edge then */ return { below: Math.round(innerHeight - composer), search: Math.round(search), badges: document.querySelectorAll('#mb-messages .mb-avatar').length, rows: rows.map((m, i) => { const mr = m.getBoundingClientRect(), b = m.querySelector('.mb-message-body').getBoundingClientRect(), n = m.querySelector('.mb-agent-name'); const nr = n.getBoundingClientRect(); const prev = rows[i - 1] && rows[i - 1].querySelector('.mb-message-body').getBoundingClientRect(); return { abs: Math.round(b.left), gap: prev ? Math.round(b.top - prev.bottom) : null, grouped: m.classList.contains('mb-message-grouped'), body: Math.round(b.left - mr.left), name: getComputedStyle(n).display === 'none' ? null : Math.round(nr.left - mr.left), color: getComputedStyle(n).color, time: !!m.querySelector('.mb-message-time, .mb-time, time') }; }), sideways: document.documentElement.scrollWidth > innerWidth + 1 }; })()`);

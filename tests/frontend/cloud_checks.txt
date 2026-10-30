@@ -39,6 +39,7 @@ node agent_text_links.test.js
 node child_process_hygiene.test.js
 node sleep_hygiene.test.js
 node waitfor_hygiene.test.js
+node ready_wait_hygiene.test.js
 node waitfor_helper.test.js
 node stand_in_agent.test.js
 node raf_hygiene.test.js

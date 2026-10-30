@@ -3,6 +3,7 @@
 // handleCoralMessage). Run against an isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -15,7 +16,7 @@ const { connect } = require('./agent_view_harness');
         await Page.addScriptToEvaluateOnNewDocument({ source: `window.__errs = []; window.addEventListener('error', e => window.__errs.push(String(e.message))); window.addEventListener('unhandledrejection', e => window.__errs.push(String(e.reason)));` });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await ev(`window.__m.add('cx', 'C', 6, { sleeping: false, agent_type: 'codex' }); window.__m.add('cx2', 'D', 6, { sleeping: false, agent_type: 'codex' }); true`);
         const HOLD = await ev(`import(${MOD} + 'websocket.js').then(m => m.CODEX_REVIEW_HOLD_MS)`);
         const feed = (waiting, drop = []) => ev(`(async () => {

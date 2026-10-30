@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const { setTheme } = require('./helpers/contrast');
+const { coralReady } = require('./helpers/wait');
 
 const NAMES = ['coral-go-team', 'hub-team', 'docs-sprint', 'checkout-redesign', 'infra-ops', 'mobile-fix', 'research', 'qa-lab', 'design-sys'];
 const TEAMS = NAMES.map((n, i) => ({ board_name: n, num_agents: 9 - i, input_tokens: (9 - i) * 1000, output_tokens: (9 - i) * 100, cache_read_tokens: (9 - i) * 5000, cache_write_tokens: 0, cost_usd: (9 - i) * 1.5 }));
@@ -35,7 +36,7 @@ const series = (rows, key) => Array.from({ length: 24 }, (_, h) => ({ cost_usd: 
         await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
         await Emulation.setEmulatedMedia({ features: mobile ? [{ name: 'pointer', value: 'coarse' }, { name: 'hover', value: 'none' }] : [] });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`); await stub();
+        await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings'); await stub();
         await ev(`window.switchNavTab('tokens'); true`);
         // Tab entry owns the phone's list/view state. Choose after that entry has drawn,
         // rather than inspecting a chart left in the hidden page by an early selectView.

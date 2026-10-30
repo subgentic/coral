@@ -5,6 +5,7 @@
 // Run against an isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 const BLOCK = `
 (() => {
@@ -30,7 +31,7 @@ window.addEventListener('unhandledrejection', e => window.__errs.push('rejection
         for (const [name, script] of [['blocked (access throws)', BLOCK], ['full (writes throw)', FULL]]) {
             const added = await Page.addScriptToEvaluateOnNewDocument({ source: ERRORS + script + PRELOAD });
             await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.then(() => true)`);
+            await coralReady(ev);
             await ev(`window.__m.add('store-bot', 'A', 2, { sleeping: false }); true`);
             await sleep(600); // sleep-ok: the first live list renders from several answers; no single completion event
             await ev(`window.selectLiveSession('store-bot', 'claude', 'store-bot-id', 'local'); true`);

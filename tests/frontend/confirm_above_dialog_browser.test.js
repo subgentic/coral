@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -13,7 +14,7 @@ const { connect } = require('./agent_view_harness');
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         const onTop = () => ev(`(() => { const c = document.querySelector('#confirm-modal .modal-content'); const r = c.getBoundingClientRect(); const at = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
             return { shown: getComputedStyle(document.getElementById('confirm-modal')).display !== 'none', inside: !!at && !!at.closest('#confirm-modal'), what: at && (at.id || at.className || at.tagName) }; })()`);
         for (const [name, open] of [['Settings', `window.showSettingsModal()`]]) {

@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -18,7 +19,7 @@ const BASE = require('./test_base').BASE;
         await ev(`fetch('/api/board/${B}/messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'qa', as: 'QA Engineer', content: 'a board to delete' }) }).then(r => r.status)`);
         l = Page.loadEventFired(); await Page.navigate({ url: `${BASE}/board/${B}` }); await l;
         await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         // The harness detaches the real feed in install(), but the feed's first message (the test server's empty list) can reach the page before that on a slow machine and replace the mocked agent; nothing then
         // brings it back inside the wait below (Windows, ci/v161: "timed out waiting for the running agent in the list", #6529). The list is asked for again, from the mock, so the agent is there however the two raced.
         await ev(`import((window.__coralStatic || '/static/') + 'api.js').then(m => m.loadLiveSessions()).then(() => true)`);

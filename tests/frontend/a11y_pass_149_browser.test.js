@@ -8,6 +8,7 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -20,7 +21,7 @@ const BASE = require('./test_base').BASE;
         const start = async (w, h, mobile) => {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.startup('liveList', 'settings')`);
+            await coralReady(ev, 'startup', 'liveList', 'settings');
             await ev(`(() => { const real = window.fetch; const json = (b, status = 200) => Promise.resolve(new Response(JSON.stringify(b), { status, headers: { 'content-type': 'application/json' } }));
                 window.fetch = (u, o = {}) => { const p = new URL(String(u), location.href);
                     if (p.pathname.endsWith('/readers')) return json({ machine_owner: 'op', owners: [{ kind: 'operator', id: 'x', records: 1, teams: [{ label: 't' }] }], note: 'A Coral control, not an operating-system boundary.' });

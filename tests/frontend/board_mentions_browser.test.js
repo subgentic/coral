@@ -5,6 +5,7 @@ const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
 const { setTheme, installAudit, auditRegion } = require('./helpers/contrast');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -15,7 +16,7 @@ const BASE = require('./test_base').BASE;
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Page.addScriptToEvaluateOnNewDocument({ source: "try { localStorage.setItem('coral.board.view', 'chat'); } catch (e) {}" }); // the chat rows: the team page's Board tab is the table by default (#8129)
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         for (const [id, t] of [['boss', 'Orchestrator'], ['sec1', 'Security Reviewer Windows'], ['sec2', 'Security Reviewer'], ['qa', 'QA Engineer']]) assert.equal(await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: id, job_title: t, session_name: id + '-s' }), 200);
         const posts = [
             ['boss', '@Security Reviewer Windows please review #1, then @Security Reviewer the rest.'],
@@ -24,7 +25,7 @@ const BASE = require('./test_base').BASE;
             ['sec2', 'Run `@Orchestrator` in a shell, see [@Operator](https://example.com/x) and\n\n```\n@all in a block\n```\n\n@all: done.'],
         ];
         for (const [who, content] of posts) assert.equal(await api('POST', `/api/board/${B}/messages`, { subscriber_id: who, content }), 200);
-        await Page.navigate({ url: `${BASE}/board/${B}` }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: `${BASE}/board/${B}` }); await Page.loadEventFired(); await install(); await coralReady(ev);
         await waitFor(`document.querySelectorAll('#mb-messages .mb-message').length >= 4`, 'the messages', 15000);
         await waitFor(`document.querySelectorAll('#mb-messages .mb-mention').length >= 6`, 'the mentions are highlighted once the members are known', 15000);
         const got = await ev(`[...document.querySelectorAll('#mb-messages .mb-message-body')].map(b => [...b.querySelectorAll('.mb-mention')].map(s => s.textContent + (s.classList.contains('mb-mention-self') ? '*' : '') + (s.closest('code, pre, a') ? '!inside' : '')))`);

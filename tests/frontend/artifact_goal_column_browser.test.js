@@ -6,6 +6,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 const LONG_GOAL = 'Fast, reliable releases: every tag publishes on the first run, the dry run says go, and the cask points at the release';
 const LONG_TASK = 'Goal #84 batch goldens found by QA Engineer on 152b: html_builders_golden, live_list_golden and task_list_golden are red';
@@ -27,7 +28,7 @@ const ITEMS = [
         for (const [label, w, h, mobile] of [['1280', 1280, 900, false], ['390', 390, 844, true]]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.startup('liveList', 'settings')`);
+            await coralReady(ev, 'startup', 'liveList', 'settings');
             await ev(`try { for (const k of Object.keys(localStorage)) if (k.startsWith('coral-inbox-') || k.startsWith('coral-saved-filters')) localStorage.removeItem(k); } catch {} true`);
             await ev(`(() => { const R = window.fetch; const json = b => Promise.resolve(new Response(JSON.stringify(b), { status: 200, headers: { 'Content-Type': 'application/json' } }));
                 window.fetch = (u, o = {}) => { const url = new URL(String(u && u.url || u), location.href);

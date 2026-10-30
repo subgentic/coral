@@ -7,6 +7,7 @@ const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const { removeBoards } = require('./helpers/board_cleanup');
 const { openBoardPage } = require('./helpers/team_board');
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -18,7 +19,7 @@ const { openBoardPage } = require('./helpers/team_board');
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+        await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
         assert.equal((await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: 'orch', job_title: 'Orchestrator', session_name: 'o-' + B })).status, 200);
         const first = await api('POST', `/api/board/${B}/messages`, { subscriber_id: 'orch', content: 'First thing   to say, with some length so it is cut in the confirmation text, past sixty characters in all.' });
         assert.ok(first.status < 300, JSON.stringify(first)); const ID = first.body.id;

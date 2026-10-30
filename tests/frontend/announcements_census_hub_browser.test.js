@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { watch, clear, log, problems, said } = require('./helpers/announce_census');
 const { setupHubWorld, BASE } = require('./helpers/hub_world');
+const { coralReady } = require('./helpers/wait');
 const S = `(window.__coralStatic || '/static/')`;
 
 (async () => {
@@ -24,7 +25,7 @@ const S = `(window.__coralStatic || '/static/')`;
         await setupHubWorld({ client, Page, Emulation, width: 1280, height: 800, mobile: false });
         const run = async tag => {
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired();
-            await waitFor(`typeof window.switchNavTab==='function' && !!window.__coralReady`, 'dashboard'); await ev(`window.__coralReady.startup('liveList','settings')`);
+            await waitFor(`typeof window.switchNavTab==='function' && !!window.__coralReady`, 'dashboard'); await coralReady(ev, 'startup', 'liveList', 'settings');
             await watch(ev);
             await scene(`${tag}: hub: a search is made`, async () => {
                 await ev(`window.switchNavTab('history'); true`);

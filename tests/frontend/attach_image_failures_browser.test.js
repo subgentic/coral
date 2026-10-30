@@ -15,7 +15,7 @@ async function httpJson(method, p, body, headers = {}) {
 
 (async () => {
     const { Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
-    const { settle } = require('./helpers/wait').bind(ev);
+    const { settle, coralReady } = require('./helpers/wait').bind(ev);
     const results = [];
     const check = (label, cond, detail) => { results.push(!!cond); console.log(`[${cond ? 'PASS' : 'FAIL'}] ${label}${detail !== undefined ? ' - ' + detail : ''}`); };
     const guard = await guardSettings();
@@ -27,7 +27,7 @@ async function httpJson(method, p, body, headers = {}) {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady();
         // record the upload request, the toasts and console.error; modes break one step at a time
         await ev(`(() => { const real = window.fetch; window.__rec = { toasts: [], errors: [] }; window.__mode = 'ok';
             window.fetch = async (u, o = {}) => { const url = String(u && u.url || u), m = (o.method || 'GET').toUpperCase();

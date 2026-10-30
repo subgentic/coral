@@ -4,6 +4,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -13,7 +14,7 @@ const BASE = require('./test_base').BASE;
         for (const [w, h, mobile] of [[1280, 800, false], [390, 844, true]]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+            await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
             await ev(`(() => { const real = window.fetch; const json = b => Promise.resolve(new Response(JSON.stringify(b), { headers: { 'content-type': 'application/json' } }));
                 window.fetch = (u, o = {}) => { const p = new URL(String(u), location.href);
                 if (p.pathname === '/api/settings' && (o.method || 'GET') === 'GET') return real(u, o).then(r => r.json()).then(j => json({ ...j, cli_path_claude: '', cli_path_codex: '', cli_path_pi: '', cli_path_agy: '', cli_path_gemini: '' })); // no CLI path saved: a server that earlier suites used may hold one, which the form fills back in after the test emptied the field (#11004-style isolation)

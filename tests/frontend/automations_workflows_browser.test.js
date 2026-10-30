@@ -10,6 +10,7 @@ const { connect } = require('./agent_view_harness');
 const { setTheme, auditRegion } = require('./helpers/contrast');
 const { oneLinePerRow } = require('./helpers/row_lines');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 const now = Date.now();
 const iso = ms => new Date(now - ms).toISOString();
@@ -153,11 +154,11 @@ const STUB = `(() => { const real = window.fetch; const J = b => Promise.resolve
             assert.equal(await ev(`document.activeElement && document.activeElement.textContent.trim()`), 'nightly-build', at + 'with the keyboard on the row the workflow came from');
 
             // addresses: a workflow's, a run's, and the old ones
-            await Page.navigate({ url: BASE + '/automations/workflows/1/runs/2' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+            await Page.navigate({ url: BASE + '/automations/workflows/1/runs/2' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
             await waitFor(`!!document.querySelector('#wf-run-detail .wf-run-title')`, at + "a run's address opens its page", 10000);
-            await Page.navigate({ url: BASE + '/workflows/1' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+            await Page.navigate({ url: BASE + '/workflows/1' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
             await waitFor(`location.pathname === '/automations/workflows/1' && !!document.querySelector('#wf-detail .item-bar')`, at + '/workflows/1 opens the workflow in Automations', 10000);
-            await Page.navigate({ url: BASE + '/workflows' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+            await Page.navigate({ url: BASE + '/workflows' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
             await waitFor(`location.pathname === '/automations/workflows' && document.querySelectorAll('#group-table-view tbody tr[data-key]').length === 3`, at + '/workflows opens the Workflows folder', 10000);
 
             // no workflow on a phone: the same one line, its hint and the toolbar's actions (a shot for UI/UX)

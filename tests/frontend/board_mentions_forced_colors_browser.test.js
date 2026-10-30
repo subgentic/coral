@@ -2,6 +2,7 @@
 // underlined: still told apart from the text around it without colour. The text is rendered by the board's own renderer; nothing else about it is checked here (board_mentions_browser does).
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, PRELOAD, install } = await connect();
@@ -9,7 +10,7 @@ const { connect } = require('./agent_view_harness');
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.then(() => true)`);
+        await coralReady(ev);
         await ev(`import((window.__coralStatic || '/static/') + 'utils.js').then(u => { u.setBoardMentionNames(['Orchestrator', 'QA Engineer']); const d = document.createElement('div'); d.id = 'mt'; d.innerHTML = u.renderBoardMessageBody({ id: 1, content: 'hello @QA Engineer and @Operator, plain words' }); document.body.prepend(d); return true; })`);
         const read = () => ev(`(() => { const q = c => { const e = document.querySelector('#mt .' + c), cs = getComputedStyle(e); return { bw: cs.borderTopWidth, bs: cs.borderTopStyle, ul: cs.textDecorationLine, fw: cs.fontWeight }; }; return { m: q('mb-mention:not(.mb-mention-self)'), self: q('mb-mention-self') }; })()`);
         let r = await read();

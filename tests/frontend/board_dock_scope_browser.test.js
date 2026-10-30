@@ -6,6 +6,7 @@ const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -22,7 +23,7 @@ const BASE = require('./test_base').BASE;
     const state = () => ev(`(() => { const bar = document.querySelector('#agentic-panel-board > .board-chat-scope'), note = document.getElementById('board-chat-scope-note'); return { bar: !!bar, switches: document.querySelectorAll('#agentic-panel-board .mb-view-btn[data-scope], #agentic-panel-board .board-chat-scope button, #agentic-panel-board .board-scope-link, #agentic-panel-board .mb-search-link').length, note: note && !note.hidden ? note.textContent.replace(/\\u00a0/g, ' ') : '', rows: document.querySelectorAll('#board-panel-msgs > .mb-message').length, empty: (document.querySelector('#board-panel-msgs .empty-state.empty-state-tight') || {}).textContent || '' }; })()`);
     const mount = async (w, h, mobile, dockPx) => {
         await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         await ev(`(async () => { try { localStorage.removeItem('coral.board.scope'); localStorage.setItem('coral.board.view', 'table'); } catch (e) {}
             const agentView = document.getElementById('live-session-view'); if (agentView) agentView.style.display = '';
             let p = document.getElementById('agentic-panel-board'); if (!p) { p = document.createElement('div'); p.id = 'agentic-panel-board'; document.body.appendChild(p); }
@@ -41,7 +42,7 @@ const BASE = require('./test_base').BASE;
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         for (const [w, h, mobile, dock] of [[1280, 800, false, 420], [390, 844, true, 390]]) {
             const at = `at ${w}px: `;
             await mount(w, h, mobile, dock);

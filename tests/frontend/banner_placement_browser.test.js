@@ -2,6 +2,7 @@
 // and the top bar, a click on Send lands on Send, and an open menu is never under a banner. At 1280 and at 390. Run against an isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -15,7 +16,7 @@ const { connect } = require('./agent_view_harness');
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile });
             await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.then(() => true)`);
+            await coralReady(ev);
             await ev(`window.__m.add('alpha', 'A', 6, { sleeping: false }); true`);
             await ev(`window.selectLiveSession('alpha', 'claude', 'alpha-id'); true`);
             await waitFor(`!!document.getElementById('live-history-messages') && document.querySelectorAll('[data-on-click="cmd-send"]').length > 0`, 'the chat and its composer');
