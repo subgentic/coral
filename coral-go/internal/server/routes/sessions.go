@@ -773,6 +773,12 @@ func lastMessageField(m *lastMessageSource, _ bool) map[string]any {
 
 // lastMessageOf reads a session's last message (cached by its file, see jsonl.LastMessage); nil when it has none.
 func (h *SessionsHandler) lastMessageOf(sessionID, workingDir, agentType string, started bool) map[string]any {
+	if agentType == at.Opencode && lastMessageEnabled && sessionID != "" { // no transcript: the server's last turn
+		if m, ok := h.opencodeLastMessage(sessionID); ok {
+			return lastMessageField(&m, false)
+		}
+		return nil
+	}
 	if !lastMessageEnabled || h.jsonl == nil || sessionID == "" {
 		return nil
 	}
@@ -787,6 +793,9 @@ func (h *SessionsHandler) lastMessageOf(sessionID, workingDir, agentType string,
 func lastMessageRow(h *SessionsHandler, sessionID, workingDir, agentType string, skipExpensive, started bool) map[string]any {
 	if !skipExpensive {
 		return h.lastMessageOf(sessionID, workingDir, agentType, started)
+	}
+	if agentType == at.Opencode {
+		return h.lastMessageOf(sessionID, workingDir, agentType, started) // already only what the manager kept: it reads no file
 	}
 	if !lastMessageEnabled || h.jsonl == nil {
 		return nil

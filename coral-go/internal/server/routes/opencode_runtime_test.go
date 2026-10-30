@@ -19,10 +19,12 @@ import (
 )
 
 type fakeOpencode struct {
-	state   opencode.State
-	at      time.Time
-	known   bool
-	stopped []string
+	state    opencode.State
+	at       time.Time
+	known    bool
+	stopped  []string
+	last     opencode.Message
+	haveLast bool
 }
 
 func (f *fakeOpencode) Ensure(context.Context, string, string) (*opencode.Server, error) {
@@ -30,6 +32,9 @@ func (f *fakeOpencode) Ensure(context.Context, string, string) (*opencode.Server
 }
 func (f *fakeOpencode) AgentTurn(string) (opencode.State, time.Time, bool) {
 	return f.state, f.at, f.known
+}
+func (f *fakeOpencode) AgentLastMessage(string) (opencode.Message, bool) {
+	return f.last, f.haveLast
 }
 func (f *fakeOpencode) Stop(key string) { f.stopped = append(f.stopped, key) }
 
@@ -108,4 +113,16 @@ func TestAnOpencodeServerIsKeptOnlyForAnAwakeAgentThatIsThere(t *testing.T) {
 	assert.False(t, h.OpencodeAlive(sid(2)), "an agent with no row has no use for one")
 	require.NoError(t, ss.SetSessionSleeping(ctx, sid(1), true))
 	assert.False(t, h.OpencodeAlive(sid(1)), "a sleeping one neither")
+}
+
+func TestAnOpencodeAgentsLastMessageIsWhatItsServerGaveAndIsRedactedLikeAnyOther(t *testing.T) {
+	h := &SessionsHandler{opencode: &fakeOpencode{last: opencode.Message{Role: "assistant", Text: "done:\n  the build passed", At: "2026-10-30T22:00:00Z"}, haveLast: true}}
+	for _, skip := range []bool{false, true} {
+		got := lastMessageRow(h, "sid", "/w", at.Opencode, skip, false)
+		require.NotNil(t, got, "skipExpensive=%v", skip)
+		assert.Equal(t, "assistant", got["role"])
+		assert.Equal(t, "done: the build passed", got["text"], "one line, like every agent's")
+	}
+	h.opencode = &fakeOpencode{}
+	assert.Nil(t, lastMessageRow(h, "sid", "/w", at.Opencode, false, false), "no turn has ended yet: no message")
 }

@@ -3,10 +3,12 @@ package routes
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/subgentic/coral/internal/agent"
 	at "github.com/subgentic/coral/internal/agenttypes"
+	"github.com/subgentic/coral/internal/jsonl"
 	"github.com/subgentic/coral/internal/opencode"
 )
 
@@ -15,6 +17,7 @@ import (
 type OpencodeRuntime interface {
 	Ensure(ctx context.Context, key, bin string) (*opencode.Server, error)
 	AgentTurn(key string) (opencode.State, time.Time, bool)
+	AgentLastMessage(key string) (opencode.Message, bool)
 	Stop(key string)
 }
 
@@ -78,4 +81,20 @@ func (h *SessionsHandler) OpencodeAlive(key string) bool {
 		return true
 	}
 	return ls != nil && ls.IsSleeping != 1 && ls.IsArchived != 1
+}
+
+// opencodeLastMessage is an opencode agent's newest message as the list shows it: what its server's last turn gave, kept by the manager (the list never calls the server).
+func (h *SessionsHandler) opencodeLastMessage(sessionID string) (jsonl.LastMessage, bool) {
+	if h.opencode == nil {
+		return jsonl.LastMessage{}, false
+	}
+	m, ok := h.opencode.AgentLastMessage(sessionID)
+	if !ok {
+		return jsonl.LastMessage{}, false
+	}
+	text := strings.Join(strings.Fields(m.Text), " ") // one line, as the transcript readers give it
+	if r := []rune(text); len(r) > 600 {
+		text = string(r[:600])
+	}
+	return jsonl.LastMessage{Role: m.Role, Text: text, At: m.At}, true
 }

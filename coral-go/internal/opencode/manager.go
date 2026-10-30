@@ -35,6 +35,10 @@ type managed struct {
 	mu      sync.Mutex
 	tracker *Tracker
 	at      map[string]time.Time // when each session last changed state
+
+	last       Message // the newest message of the agent's newest session, as read when a turn last ended
+	haveLast   bool
+	refreshing bool // a read of it is under way: one at a time
 }
 
 func NewManager(cfg Config) *Manager {
@@ -158,20 +162,52 @@ func (m *Manager) AgentTurn(key string) (state State, at time.Time, ok bool) {
 	return state, at, ok
 }
 
+// AgentLastMessage is the newest message the agent's server has given, read when a turn ended and kept: a session list asks for it on every row, so it never reaches the server itself. ok is false until a turn has ended.
+func (m *Manager) AgentLastMessage(key string) (Message, bool) {
+	m.mu.Lock()
+	g := m.servers[key]
+	m.mu.Unlock()
+	if g == nil {
+		return Message{}, false
+	}
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	return g.last, g.haveLast
+}
+
+// refreshLast reads a session's last message in the background (one read at a time; a turn that ends while one runs is read by the next end). The caller holds g.mu.
+func (g *managed) refreshLast(ctx context.Context, c *Client, session string) {
+	if g.refreshing {
+		return
+	}
+	g.refreshing = true
+	go func() {
+		rctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		defer cancel()
+		m, ok, err := c.LastMessage(rctx, session)
+		g.mu.Lock()
+		defer g.mu.Unlock()
+		g.refreshing = false
+		if err == nil && ok {
+			g.last, g.haveLast = m, true
+		}
+	}()
+}
+
 // Stop ends one agent's server and the loop reading it. The key stays reserved until the old server is gone: an Ensure of the same key meanwhile waits, so the old server's shutdown never removes files
 // (its pid record, its password) the new one has written into the same folder.
 func (m *Manager) Stop(key string) {
-	if g, st := m.take(key); g != nil {
+	if g, st := m.take(key, nil); g != nil {
 		m.stopReserved(key, g, st)
 	}
 }
 
-// take removes the key's server from the map and reserves the key; nil when there is none.
-func (m *Manager) take(key string) (*managed, *starting) {
+// take removes the key's server from the map and reserves the key; nil when there is none, or when want is given and the key's server is not that one.
+func (m *Manager) take(key string, want *managed) (*managed, *starting) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	g := m.servers[key]
-	if g == nil || m.starting[key] != nil {
+	if g == nil || m.starting[key] != nil || (want != nil && g != want) {
 		return nil, nil
 	}
 	delete(m.servers, key)
@@ -195,31 +231,27 @@ func (m *Manager) stopReserved(key string, g *managed, st *starting) {
 // Reap stops every server that has been up for at least minAge and whose agent is no longer alive (alive false): an agent that ended, slept or was deleted by a path that never told the manager keeps no
 // opencode process. It returns the keys it stopped. A young server is left alone, so one whose agent row is not written yet is never reaped.
 func (m *Manager) Reap(alive func(key string) bool, minAge time.Duration) []string {
+	type judged struct {
+		key string
+		g   *managed
+	}
 	m.mu.Lock()
-	var stale []string
+	var stale []judged
 	for key, g := range m.servers {
 		if time.Since(g.since) >= minAge {
-			stale = append(stale, key)
+			stale = append(stale, judged{key, g})
 		}
 	}
 	m.mu.Unlock()
 	var stopped []string
-	for _, key := range stale {
-		if alive(key) {
+	for _, j := range stale {
+		if alive(j.key) {
 			continue
 		}
-		m.mu.Lock()
-		g := m.servers[key]
-		if g != nil && time.Since(g.since) < minAge { // not the server that was judged
-			g = nil
-		}
-		m.mu.Unlock()
-		if g == nil {
-			continue
-		}
-		if g, st := m.take(key); g != nil {
-			m.stopReserved(key, g, st)
-			stopped = append(stopped, key)
+		// only the server that was judged: one that was stopped and started again for the same agent meanwhile is a new server, with an agent that is alive
+		if g, st := m.take(j.key, j.g); g != nil {
+			m.stopReserved(j.key, g, st)
+			stopped = append(stopped, j.key)
 		}
 	}
 	return stopped
@@ -289,8 +321,11 @@ func (g *managed) loop(ctx context.Context) {
 		_ = c.Events(ctx, func(e Event) {
 			g.mu.Lock()
 			defer g.mu.Unlock()
-			if session, _, moved := g.tracker.Apply(e); moved {
+			if session, to, moved := g.tracker.Apply(e); moved {
 				g.at[session] = time.Now()
+				if to == StateIdle || to == StateFailed { // a turn ended: its reply is the new last message
+					g.refreshLast(ctx, c, session)
+				}
 			}
 		})
 		g.mu.Lock()

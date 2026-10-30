@@ -235,3 +235,50 @@ func TestAnEnsureOfAKeyWaitsForItsOldServerToBeStoppedAndFindsItsFilesIntact(t *
 	_, err = os.Stat(p)
 	assert.NoError(t, err)
 }
+
+func TestAnAgentsLastMessageIsReadWhenATurnEndsAndKeptForTheList(t *testing.T) {
+	cfg, _ := stubConfig(t)
+	frames := filepath.Join(t.TempDir(), "frames")
+	require.NoError(t, os.WriteFile(frames, []byte(
+		"event: session.execution.started\ndata: {\"sessionID\":\"ses_abc123\"}\n\n"+
+			"event: session.execution.succeeded\ndata: {\"sessionID\":\"ses_abc123\"}\n\n"), 0o600))
+	t.Setenv(eventsFileVar, frames)
+	m := NewManager(cfg)
+	defer m.Close()
+	_, ok := m.AgentLastMessage("agent-1")
+	assert.False(t, ok, "nothing before a server runs")
+	_, err := m.Ensure(context.Background(), "agent-1", "")
+	require.NoError(t, err)
+	waitFor(t, "the last message", func() bool { _, ok := m.AgentLastMessage("agent-1"); return ok })
+	msg, _ := m.AgentLastMessage("agent-1")
+	assert.Equal(t, "assistant", msg.Role)
+	assert.Equal(t, "hello from the stand-in", msg.Text)
+	_, ok = m.AgentLastMessage("agent-2")
+	assert.False(t, ok, "another agent's is not this one's")
+}
+
+func TestTheReaperStopsOnlyTheServerItJudgedNotOneStartedForTheSameAgentMeanwhile(t *testing.T) {
+	cfg, _ := stubConfig(t)
+	m := NewManager(cfg)
+	defer m.Close()
+	old, err := m.Ensure(context.Background(), "agent-1", "")
+	require.NoError(t, err)
+	var fresh *Server
+	// the agent is judged gone, and in that moment it is woken: its old server is stopped and a new one started
+	stopped := m.Reap(func(key string) bool {
+		m.Stop(key)
+		fresh, err = m.Ensure(context.Background(), key, "")
+		return false
+	}, 0)
+	require.NoError(t, err)
+	assert.Empty(t, stopped, "the server that was judged is already gone; the new one was not judged")
+	assert.NotSame(t, old, fresh)
+	select {
+	case <-fresh.done:
+		t.Fatal("the reaper stopped the new server of an agent that is alive")
+	case <-time.After(200 * time.Millisecond):
+	}
+	got, err := m.Ensure(context.Background(), "agent-1", "")
+	require.NoError(t, err)
+	assert.Same(t, fresh, got)
+}
