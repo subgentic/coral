@@ -263,3 +263,24 @@ func TestANoticeForASessionJustCreatedForALaunchWaitsUntilItsGraceEnds(t *testin
 	agentRecs.Unlock()
 	assert.True(t, noticeVerdict(running, 600, session, none).OK, "an adopted process decides, whatever launchAt says")
 }
+
+// #137855: a sender names the agent by the name it knows it by ("solo-agent"), the record is kept under the tmux session's own name ("claude-<id>"): the verdict must find it through the session.
+func TestTheVerdictFindsTheRecordWhateverNameTheSenderKnowsTheAgentBy(t *testing.T) {
+	c := newTestClient(t)
+	ctx := context.Background()
+	const sid = "8f0b2d54-6e7a-4293-9d4e-2a5b6c7d8e93"
+	name := "claude-" + sid
+	createTestSession(t, c, name, t.TempDir())
+	t.Cleanup(func() { ForgetAgentProc(name) })
+	require.NoError(t, c.SendKeysToTarget(ctx, terminalinput.Unclassified, name+".0", "CORAL_SESSION_NAME="+name+" sleep 120"))
+	c.AdoptAgentAfterLaunch(name, name+".0")
+	v, err := c.AgentNoticeVerdict(ctx, "solo-agent", "claude", sid)
+	require.NoError(t, err)
+	assert.True(t, v.Wait, "while the watch is recording the process, a notice asked for by the agent's display name waits (it was told 'not recorded' for good)")
+	assert.Equal(t, ReasonAdopting, v.Reason)
+	require.Eventually(t, func() bool { _, ok := AdoptedAgentProc(name); return ok }, shellWait, 50*time.Millisecond, "the agent's process was never recorded")
+	require.Eventually(t, func() bool {
+		v, err := c.AgentNoticeVerdict(ctx, "solo-agent", "claude", sid)
+		return err == nil && v.OK
+	}, shellWait, 25*time.Millisecond, "asked by the agent's display name, the verdict did not find the record kept under the session's name")
+}

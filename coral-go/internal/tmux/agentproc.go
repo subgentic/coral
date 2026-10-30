@@ -343,7 +343,19 @@ func (c *Client) AgentNoticeVerdict(ctx context.Context, agentName, agentType, s
 	if err != nil {
 		return NoticeVerdict{}, fmt.Errorf("read process table: %w", err)
 	}
-	return noticeVerdict(procs, shell, agentName, func() (AgentProc, bool) { return c.loadAgentProc(ctx, agentName, agentType, sessionID) }), nil
+	return noticeVerdict(procs, shell, c.recordKey(ctx, agentName, agentType, sessionID), func() (AgentProc, bool) { return c.loadAgentProc(ctx, agentName, agentType, sessionID) }), nil
+}
+
+// recordKey is the key the agent's process is recorded under: the tmux session's own name (AdoptAgentAfterLaunch records by it), which is not the name a sender knows the agent by (a task notice names the agent
+// "solo-agent", its session is "claude-<id>"). Asking by the sender's name never found the record, so every notice for such an agent read "not recorded" for good (#137855). The sender's name is the key only when the
+// session's own cannot be read.
+func (c *Client) recordKey(ctx context.Context, agentName, agentType, sessionID string) string {
+	if out, err := c.DisplayForAgent(ctx, agentName, agentType, sessionID, "#{session_name}"); err == nil {
+		if s := strings.TrimSpace(out); s != "" {
+			return s
+		}
+	}
+	return agentName
 }
 
 // noticeVerdict is the answer for a session. load reads the process kept in the tmux session (nil: none): used when Coral has nothing in memory (it restarted), to re-check that exact process.
