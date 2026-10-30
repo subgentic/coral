@@ -41,7 +41,7 @@ func TestAttribute(t *testing.T) {
 	} {
 		reads := 0
 		var times []time.Time
-		ownerCheck = func(netip.AddrPort, netip.AddrPort) (bool, error) {
+		ownerCheck = func(netip.AddrPort, netip.AddrPort, time.Time) (bool, error) {
 			times = append(times, time.Now())
 			err := tc.answers[reads]
 			reads++

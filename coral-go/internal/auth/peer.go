@@ -31,17 +31,19 @@ const (
 	PeerUnattributed = "unattributed" // the owner couldn't be told (fail closed)
 )
 
-// connPeer is one TCP connection's attribution, kept for that connection only (never reused across connections, or by process id). A positive identity (Coral's user, or positively another
-// user) is worked out on the first loopback request and kept for the connection. An unattributed answer is NOT final: the socket table can lag a connection by a moment (#385), so a
-// later request on the same connection asks again, at most every unattributedRetryEvery and unattributedTries times; it fails closed meanwhile, and is never turned into an allow.
+// connPeer is one TCP connection's attribution: worked out once, on the connection's first
+// request, and kept for that connection only (never reused across connections, or by process id).
 type connPeer struct {
 	client, server netip.AddrPort
 	known          bool // both addresses are TCP ones
-	mu             sync.Mutex
-	decided        bool
-	reason         string
-	tries          int
-	lastTry        time.Time
+	accepted       time.Time
+	// mu guards the verdict. A definite one (Coral's user, or another user's) is kept for the connection; an unattributed one is NOT final: a later request on the same connection asks
+	// again (at most every unattributedRetryEvery, and unattributedTries times), because the socket table can lag a connection by a moment (#385).
+	mu      sync.Mutex
+	decided bool
+	reason  string
+	tries   int
+	lastTry time.Time
 }
 
 const (
@@ -51,14 +53,14 @@ const (
 
 type connPeerKey struct{}
 
-// attributePeer is peercred.Attribute (a test seam: SetPeerAttribution).
-var attributePeer = peercred.Attribute
+// attributePeer is peercred.AttributeAt (a test seam: SetPeerAttribution).
+var attributePeer = peercred.AttributeAt
 
 // SetPeerAttribution replaces how a loopback connection is attributed and returns the function
 // that puts it back: for tests in other packages, which can't make another OS user's connection.
 func SetPeerAttribution(f func(client, server netip.AddrPort) (peercred.Verdict, error)) (restore func()) {
 	old := attributePeer
-	attributePeer = f
+	attributePeer = func(client, server netip.AddrPort, _ time.Time) (peercred.Verdict, error) { return f(client, server) }
 	return func() { attributePeer = old }
 }
 
@@ -71,7 +73,9 @@ func SetPeerAttribution(f func(client, server netip.AddrPort) (peercred.Verdict,
 func ConnContext(ctx context.Context, c net.Conn) context.Context {
 	client, ok1 := tcpAddrPort(c.RemoteAddr())
 	server, ok2 := tcpAddrPort(c.LocalAddr())
-	return context.WithValue(ctx, connPeerKey{}, &connPeer{client: client, server: server, known: ok1 && ok2})
+	now := time.Now()
+	ctx = peercred.WithAccepted(ctx, now)
+	return context.WithValue(ctx, connPeerKey{}, &connPeer{client: client, server: server, known: ok1 && ok2, accepted: now})
 }
 
 // remoteIsLoopback reports whether r's peer address (the connection's, as net/http sets it) is a
@@ -121,7 +125,7 @@ func PeerReason(r *http.Request) string {
 	cp.tries++
 	cp.lastTry = time.Now()
 	attributeSlots <- struct{}{} // at most a few socket-table reads at once (#95 review F5)
-	v, err := attributePeer(cp.client, cp.server)
+	v, err := attributePeer(cp.client, cp.server, cp.accepted)
 	<-attributeSlots
 	if v == peercred.Unsupported && peercred.Supported {
 		peerCheckLost.Store(true) // this OS version's socket table isn't one this build reads (F3)
@@ -130,7 +134,7 @@ func PeerReason(r *http.Request) string {
 	case peercred.OtherUser:
 		cp.decided, cp.reason = true, PeerOtherUser
 	case peercred.Unattributed:
-		cp.reason = PeerUnattributed // not final: a later request asks again
+		cp.reason = PeerUnattributed // not final: the next request asks again
 	default:
 		cp.decided, cp.reason = true, "" // Coral's own user (or no check on this system)
 		return cp.reason

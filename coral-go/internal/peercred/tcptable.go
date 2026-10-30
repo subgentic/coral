@@ -88,3 +88,29 @@ func ownerPID(rows []tcpRow, client, server netip.AddrPort) (uint32, error) {
 	}
 	return pid, nil
 }
+
+// ownerPIDTransitional: the owner of the client's row when Windows reports that row in a transitional state: CLOSED (1), LISTEN (2) or a zero state, with the exact pair as its local and
+// remote address and a pid (#385). A loopback client socket that has connected is reported so for a while, with the real client's pid (the server's accepted row is ESTABLISHED), until
+// the client next touches the socket. A LISTEN row of a real listener has no remote, so it never matches the pair. Two rows with different pids are ambiguous (fail closed); none is
+// ErrNotFound. The caller checks that the process is running and was created before the connection was accepted.
+func ownerPIDTransitional(rows []tcpRow, client, server netip.AddrPort) (pid, state uint32, err error) {
+	found := false
+	for _, r := range rows {
+		if r.local != client || r.remote != server || r.pid == 0 {
+			continue
+		}
+		switch r.state {
+		case 0, mibClosed, mibListen:
+		default:
+			continue
+		}
+		if found && r.pid != pid {
+			return 0, 0, errAmbiguous
+		}
+		pid, state, found = r.pid, r.state, true
+	}
+	if !found {
+		return 0, 0, ErrNotFound
+	}
+	return pid, state, nil
+}
