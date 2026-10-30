@@ -1327,14 +1327,14 @@
 /* A phone's agent page: the top bar and the agent's header are ONE row (#11056, the operator: "the hamburger menu and the agent toolbar should be one line"). Under 640 px, while an agent is open, the page's top bar is hidden and its menu
    button is the first of this row: ☰, ←, the dot and the name (the team under it), the Chat/Terminal switch and ⋯. Search, the panel, the branch and the rest of what the header holds, and the Details (folder, model, context), are behind ⋯,
    on a line under the row. The row wraps rather than overlap at large text. */
-.agent-bar-menu { display: none; order: 0; }
+.agent-bar-menu { display: none; order: 0; } /* the chat's bar has no ☰ on a phone (#11236, the operator: a drill-down is ←, the title, ⋯; the arrow returns to the list, which has the nav) */
 @media (max-width: 639px) {
     body.live-session-active:not(.popout-mode) { --top-bar-height: env(safe-area-inset-top, 0px); } /* no bar: the side panel and the sidebar start under the notch's band, over the row */
     body.live-session-active:not(.popout-mode) header.top-bar { display: none; }
     body.live-session-active:not(.popout-mode) .terminal-header { height: auto; min-height: calc(56px + env(safe-area-inset-top, 0px)); flex-wrap: nowrap; justify-content: flex-start; padding: env(safe-area-inset-top, 0px) var(--space-md) 0; gap: 0 var(--space-xs); }
     body.live-session-active:not(.popout-mode) .terminal-header-left { flex: 1 1 0; min-width: 0; flex-wrap: nowrap; gap: var(--space-xs); order: 1; } /* the name takes what is left and ends in an ellipsis: the row never wraps (the Orchestrator: one row matters more than the rest) */
     body.live-session-active:not(.popout-mode) .terminal-header-actions { display: contents; }
-    body.live-session-active:not(.popout-mode) .agent-bar-menu, body.live-session-active:not(.popout-mode) .agent-bar-more { display: inline-flex; align-items: center; justify-content: center; flex: none; min-width: 44px; min-height: 44px; }
+    body.live-session-active:not(.popout-mode) .agent-bar-more { display: inline-flex; align-items: center; justify-content: center; flex: none; min-width: 44px; min-height: 44px; }
     body.live-session-active:not(.popout-mode) .terminal-state-pill { display: none; } /* the header draws only the dot, named with the state (aria-label, title): no word (the operator, #9927; the Orchestrator, #11056) */
     body.live-session-active:not(.popout-mode) .terminal-identity { display: flex; flex-direction: column; justify-content: center; flex: 1 1 0; min-width: var(--control-touch-height, 44px); }
     body.live-session-active:not(.popout-mode) .terminal-session-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-left: 0; }

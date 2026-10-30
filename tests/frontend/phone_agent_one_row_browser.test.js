@@ -36,7 +36,8 @@ const { coralReady } = require('./helpers/wait');
             let m = await rects();
             assert.equal(m.topBar, 'none', `${fs}: the page's top bar is hidden while an agent is open`);
             const names = m.shown.map(s => s[0]);
-            for (const n of ['agent-bar-menu', 'back', 'terminal-header-identity', 'live-view-switch', 'agent-bar-more']) assert.ok(names.includes(n), `${fs}: ${n} is in the row: ` + JSON.stringify(m.shown));
+            assert.ok(!names.includes('agent-bar-menu'), `${fs}: the chat's bar has no ☰ (#11236: a drill-down is the arrow, the title, the switch and the dots): ` + JSON.stringify(m.shown));
+            for (const n of ['back', 'terminal-header-identity', 'live-view-switch', 'agent-bar-more']) assert.ok(names.includes(n), `${fs}: ${n} is in the row: ` + JSON.stringify(m.shown));
             for (const [n, b] of m.shown) if (/menu|back|live-view|more/.test(n)) assert.ok(b.r - b.l >= 43 && b.b - b.t >= 43, `${fs}: ${n} is a 44 px target: ` + JSON.stringify(b));
             { // Chat and Terminal are ONE button here (the operator, #11187): the segmented toggle is gone, the button shows the view it goes to, its label and icon follow, the dots' second line has it with its words
                 const sw = () => ev(`(() => { const b = document.getElementById('live-view-switch'), t = document.querySelector('.live-view-toggle'), m = document.getElementById('live-view-switch-menu'); return { label: b.getAttribute('aria-label'), icon: b.querySelector('.material-icons').textContent, pressed: b.hasAttribute('aria-pressed'), toggle: getComputedStyle(t).display, menu: m.querySelector('.live-view-switch-text').textContent, term: document.getElementById('live-view-btn-terminal').classList.contains('active') }; })()`);
@@ -49,8 +50,8 @@ const { coralReady } = require('./helpers/wait');
                 assert.equal((await sw()).label, 'Show terminal', `${fs}: pressed again, it is back to the chat and says Show terminal`);
             }
             { // ONE row at both text sizes, a long name and a long team too: no control wraps under another (the Mobile Beta Tester: 91 px, then three rows)
-                const tops = m.shown.filter(s => /menu|back|live-view-switch|more/.test(s[0])).map(s => (s[1].t + s[1].b) / 2);
-                assert.ok(Math.max(...tops) - Math.min(...tops) <= 2, `${fs}: one centre line, the menu, back, switch and ⋯ on one row: ` + JSON.stringify(m.shown));
+                const tops = m.shown.filter(s => /back|live-view-switch|more/.test(s[0])).map(s => (s[1].t + s[1].b) / 2);
+                assert.ok(Math.max(...tops) - Math.min(...tops) <= 2, `${fs}: one centre line, the back, switch and ⋯ on one row: ` + JSON.stringify(m.shown));
             }
             if (fs === 16) {
                 assert.ok(m.header.b - m.header.t <= 60, `100%: the row is about 56 px: ` + JSON.stringify(m.header));
@@ -62,11 +63,7 @@ const { coralReady } = require('./helpers/wait');
             assert.ok(m.sideways <= 0, `${fs}: nothing scrolls sideways`);
             const shot = async n => { const d = process.env.CORAL_SCREENSHOT_DIR; if (d) require('node:fs').writeFileSync(`${d}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
             await shot(`phone-one-row-${fs}`);
-            // ☰ opens the menu
-            await ev(`document.getElementById('agent-bar-menu').click(); true`);
-            await waitFor(`document.getElementById('agent-bar-menu').getAttribute('aria-expanded') === 'true' && !document.getElementById('nav-more-menu').hidden && document.querySelectorAll('#nav-more-menu .nav-more-item').length > 1`, `${fs}: ☰ opens the menu`, 4000);
-            await ev(`document.getElementById('agent-bar-menu').click(); true`);
-            await waitFor(`document.getElementById('nav-more-menu').hidden`, `${fs}: ☰ closes it`, 4000);
+            // (no ☰ here since #11239 slice B: the arrow returns to the list, which has the nav; the ☰ is not drawn)
             // ⋯ opens Search, the panel and the Details under the row
             await ev(`document.getElementById('agent-bar-more').click(); true`);
             await waitFor(`document.getElementById('agent-phone-details').open && document.getElementById('chat-find-btn').getBoundingClientRect().width > 0`, `${fs}: ⋯ opens the line under the row`, 4000);
