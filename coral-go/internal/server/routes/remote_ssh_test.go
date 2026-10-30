@@ -2,6 +2,7 @@ package routes
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"net"
 	"net/http"
@@ -14,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/subgentic/coral/internal/store"
@@ -160,4 +162,64 @@ func TestResolverGivesTargetsTheOwnerSecretTheHubHolds(t *testing.T) {
 	assert.Equal(t, "web", w.(proxy.HTTPTarget).RemoteID)
 	c, _ := r.Resolve(ctx, "build")
 	assert.Same(t, b, c, "the same secret keeps the same target")
+}
+
+// #11378: a computer added by URL gets the owner stamp through a person's press at the hub and a human act at the computer.
+func TestOwnerSecretRouteIsAPersonsAndShowsTheLineOnce(t *testing.T) {
+	e := newRSEnv(t)
+	e.router.(*chi.Mux).Post("/api/servers/{id}/owner-secret", e.h.OwnerSecret)
+	ctx := context.Background()
+	_, err := e.h.store.Add(ctx, "web", "By URL", "http://10.0.0.5:8420", routeSecret, true)
+	require.NoError(t, err)
+	_, err = e.h.store.AddSSH(ctx, "build", "Build box", "rich@box.example.com", 8420, "inst-1", routeSecret)
+	require.NoError(t, err)
+
+	asPerson := func(id string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest("POST", "/api/servers/"+id+"/owner-secret", nil)
+		req = req.WithContext(context.WithValue(req.Context(), callerKindKey{}, callerDashCookie))
+		w := httptest.NewRecorder()
+		e.router.ServeHTTP(w, req)
+		return w
+	}
+
+	// a script (no person) gets nothing and changes nothing
+	w := e.do("POST", "/api/servers/web/owner-secret", nil)
+	assert.Equal(t, http.StatusForbidden, w.Code, w.Body.String())
+	_, ok, _ := e.h.store.OwnerSecret(ctx, "web")
+	assert.False(t, ok, "a script made a secret")
+
+	// the person: a secret is made, sealed, and shown once in a setup line
+	w = asPerson("web")
+	require.Equal(t, 200, w.Code, w.Body.String())
+	assert.Equal(t, "no-store", w.Header().Get("Cache-Control"))
+	var out map[string]string
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &out))
+	assert.Equal(t, "web", out["remote_id"])
+	assert.Equal(t, "coral hub-owner-secret", out["command"])
+	id, secret, found := strings.Cut(out["setup_line"], " ")
+	require.True(t, found)
+	assert.Equal(t, "web", id)
+	assert.True(t, hubowner.ValidSecret(secret))
+	held, ok, err := e.h.store.OwnerSecret(ctx, "web")
+	require.NoError(t, err)
+	assert.True(t, ok)
+	assert.Equal(t, secret, held, "the hub holds what the person was shown")
+
+	// it is shown once: the server list and a second read of the server never carry it
+	list := e.do("GET", "/api/servers", nil)
+	assert.NotContains(t, list.Body.String(), secret)
+	assert.Contains(t, list.Body.String(), `"owner_stamp":true`)
+
+	// again: a new secret (the old stamps stop until the computer has the new line)
+	w = asPerson("web")
+	require.Equal(t, 200, w.Code)
+	_ = json.Unmarshal(w.Body.Bytes(), &out)
+	_, second, _ := strings.Cut(out["setup_line"], " ")
+	assert.NotEqual(t, secret, second)
+
+	// a computer set up over SSH, and one that does not exist
+	assert.Equal(t, http.StatusConflict, asPerson("build").Code)
+	assert.Equal(t, http.StatusNotFound, asPerson("ghost").Code)
+	_, ok, _ = e.h.store.OwnerSecret(ctx, "build")
+	assert.False(t, ok, "a secret was made for an SSH computer")
 }

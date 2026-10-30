@@ -271,3 +271,4 @@ node pi_extension.test.mjs
 node installed_tray_guard.test.mjs
 node server_ssh_setup.test.mjs
 node hub_review_remote.test.mjs
+node server_owner_secret.test.mjs

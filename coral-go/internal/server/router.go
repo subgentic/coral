@@ -700,6 +700,7 @@ func (s *Server) registerSystem(r *chi.Mux, h *routeHandlers) {
 		r.Patch("/api/servers/{id}", rsHandler.Update)
 		r.Delete("/api/servers/{id}", rsHandler.Delete)
 		r.Post("/api/servers/{id}/test", rsHandler.Test)
+		r.Post("/api/servers/{id}/owner-secret", rsHandler.OwnerSecret)
 		// Set a Coral server up on another computer over SSH (#11370): hub mode only, the Operator's.
 		prov := routes.NewProvisioner(rsHandler.Store())
 		r.Get("/api/servers/provision/options", prov.Options)

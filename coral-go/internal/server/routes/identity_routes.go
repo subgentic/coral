@@ -210,10 +210,11 @@ var operatorOnlyRoutes = map[string]string{
 	// #3685 (Security's #3670 follow-up): the hub's server registry (each entry holds a remote
 	// Coral's address and API key, and the hub forwards to it), and the board's remote
 	// subscriptions (which remote boards this Coral reads and relays).
-	"POST /api/servers":           "add a remote server",
-	"PATCH /api/servers/{id}":     "change a remote server",
-	"DELETE /api/servers/{id}":    "remove a remote server",
-	"POST /api/servers/{id}/test": "test a remote server",
+	"POST /api/servers":                   "add a remote server",
+	"PATCH /api/servers/{id}":             "change a remote server",
+	"DELETE /api/servers/{id}":            "remove a remote server",
+	"POST /api/servers/{id}/test":         "test a remote server",
+	"POST /api/servers/{id}/owner-secret": "set up Approve through this hub for a computer added by URL",
 	// #11370: setting a server up over SSH runs commands on another computer with the hub user's SSH access.
 	"GET /api/servers/provision/options":         "read what the server setup dialog shows",
 	"POST /api/servers/provision/plan":           "plan setting up a server over SSH",
@@ -359,7 +360,7 @@ var operatorOnlyRoutes = map[string]string{
 // hubModeRoutes are entries the router serves only in hub mode (--hub): ValidateGuardedRoutes
 // lets them be absent otherwise.
 var hubModeRoutes = map[string]bool{
-	"GET /api/servers": true, "POST /api/servers": true, "PATCH /api/servers/{id}": true, "DELETE /api/servers/{id}": true, "POST /api/servers/{id}/test": true,
+	"GET /api/servers": true, "POST /api/servers": true, "PATCH /api/servers/{id}": true, "DELETE /api/servers/{id}": true, "POST /api/servers/{id}/test": true, "POST /api/servers/{id}/owner-secret": true,
 	"GET /api/servers/provision/options": true, "POST /api/servers/provision/plan": true, "POST /api/servers/provision/{plan}/connect": true, "POST /api/servers/provision/{plan}/run": true,
 	"GET /api/servers/provision/{plan}": true, "DELETE /api/servers/provision/{plan}": true,
 	"CONNECT /api/remote/{server}/*": true,
