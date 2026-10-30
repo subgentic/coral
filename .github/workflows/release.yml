@@ -447,11 +447,11 @@ jobs:
           path: ${{ env.ZIP_PATH }}
 
   # ── macOS ──────────────────────────────────────────────────────
-  # Build each architecture on its native hosted runner. macos-14 is arm64
+  # Build each architecture on its native hosted runner. macos-15 is arm64
   # and macos-15-intel is Intel. Keep native GUI deployment at macOS 13.0.
   build-macos-arm64:
     needs: [resolve]
-    runs-on: macos-14
+    runs-on: macos-15
     environment: release # the release secrets live in this environment only: tags v* and the owner's approval (#5522)
     permissions:
       contents: read
@@ -582,7 +582,7 @@ jobs:
 
   build-macos:
     needs: [resolve, build-macos-arm64, build-macos-amd64]
-    runs-on: macos-14
+    runs-on: macos-15
     environment: release # the release secrets live in this environment only: tags v* and the owner's approval (#5522)
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0

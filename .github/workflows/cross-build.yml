@@ -73,7 +73,7 @@ jobs:
           key: ${{ steps.gocache.outputs.cache-primary-key }}
 
   darwin:
-    runs-on: macos-14
+    runs-on: macos-15
     strategy:
       fail-fast: false
       matrix:
@@ -123,7 +123,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runner: [macos-14, macos-15-intel]
+        runner: [macos-15, macos-15-intel]
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:

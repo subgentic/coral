@@ -221,7 +221,7 @@ jobs:
   macos-arm64:
     needs: [plan]
     if: contains(needs.plan.outputs.platforms, ' macos ')
-    runs-on: macos-14
+    runs-on: macos-15
     env:
       OPENSSL_TARGET: darwin64-arm64-cc
     steps:
@@ -239,7 +239,7 @@ jobs:
         id: openssl
         with:
           path: ${{ runner.temp }}/openssl-${{ env.OPENSSL_VERSION }}-arm64
-          key: openssl-${{ env.OPENSSL_VERSION }}-${{ env.OPENSSL_SHA256 }}-${{ env.OPENSSL_TARGET }}-${{ env.OPENSSL_OPTIONS }}-macos-14
+          key: openssl-${{ env.OPENSSL_VERSION }}-${{ env.OPENSSL_SHA256 }}-${{ env.OPENSSL_TARGET }}-${{ env.OPENSSL_OPTIONS }}-macos-15
       - name: Install isolated native dependencies
         if: steps.openssl.outputs.cache-hit != 'true'
         run: |
@@ -344,7 +344,7 @@ jobs:
 
   macos:
     needs: [macos-arm64, macos-amd64]
-    runs-on: macos-14
+    runs-on: macos-15
     env:
       OPENSSL_TARGET: darwin64-arm64-cc
     steps:
@@ -362,7 +362,7 @@ jobs:
         id: openssl
         with:
           path: ${{ runner.temp }}/openssl-${{ env.OPENSSL_VERSION }}-arm64
-          key: openssl-${{ env.OPENSSL_VERSION }}-${{ env.OPENSSL_SHA256 }}-${{ env.OPENSSL_TARGET }}-${{ env.OPENSSL_OPTIONS }}-macos-14
+          key: openssl-${{ env.OPENSSL_VERSION }}-${{ env.OPENSSL_SHA256 }}-${{ env.OPENSSL_TARGET }}-${{ env.OPENSSL_OPTIONS }}-macos-15
       - name: Install merge and verification dependencies
         if: steps.openssl.outputs.cache-hit != 'true'
         run: |
