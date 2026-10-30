@@ -82,6 +82,24 @@ type LaunchResult struct {
 func (l *AgentLauncher) LaunchAgent(ctx context.Context, workingDir, agentType, displayName string,
 	resumeSessionID string, flags []string, isJob bool,
 	prompt, boardName, boardServer string) (*LaunchResult, error) {
+	return l.launchAgent(ctx, workingDir, agentType, displayName, resumeSessionID, flags, isJob, prompt, boardName, boardServer, false)
+}
+
+// oneShotPrompt is the prompt a launch command carries: the job's for a one-shot run, none otherwise (an interactive agent has it typed).
+func oneShotPrompt(oneShot bool, prompt string) string {
+	if oneShot {
+		return prompt
+	}
+	return ""
+}
+
+// oneShotJob reports whether a scheduled job on agentType runs once and exits instead of staying open at its prompt: Pi (pi --print --no-session; the other CLIs' jobs stay interactive).
+func oneShotJob(agentType string) bool { return agentType == at.Pi }
+
+// launchAgent is LaunchAgent; oneShot starts the CLI to answer prompt and exit (see oneShotJob): the prompt goes on the command line and is not typed afterwards.
+func (l *AgentLauncher) launchAgent(ctx context.Context, workingDir, agentType, displayName string,
+	resumeSessionID string, flags []string, isJob bool,
+	prompt, boardName, boardServer string, oneShot bool) (*LaunchResult, error) {
 
 	// A scheduled job's or a caller's agent type names the log file and the CLI (#3602 W13).
 	if err := agent.ValidateAgentType(agentType); err != nil {
@@ -156,6 +174,8 @@ func (l *AgentLauncher) LaunchAgent(ctx context.Context, workingDir, agentType, 
 			Flags:           flags,
 			WorkingDir:      workingDir,
 			CLIPath:         cliPath,
+			OneShot:         oneShot,
+			Prompt:          oneShotPrompt(oneShot, prompt),
 		})
 		if err != nil {
 			return nil, fmt.Errorf("launch command: %w", err)
@@ -304,8 +324,9 @@ func (l *AgentLauncher) BuildSchedulerLaunchFn(schedStore *store.ScheduleStore) 
 	return func(ctx context.Context, job store.ScheduledJob, runID int64) error {
 		flagsList := jobLaunchFlags(job)
 
-		result, err := l.LaunchAgent(ctx, job.RepoPath, job.AgentType, job.Name,
-			"", flagsList, true, job.Prompt, "", "")
+		oneShot := oneShotJob(job.AgentType)
+		result, err := l.launchAgent(ctx, job.RepoPath, job.AgentType, job.Name,
+			"", flagsList, true, job.Prompt, "", "", oneShot)
 		if err != nil {
 			return err
 		}
@@ -320,7 +341,9 @@ func (l *AgentLauncher) BuildSchedulerLaunchFn(schedStore *store.ScheduleStore) 
 
 		// Send prompt to the agent after delay, on the run's own context: when the run ends the
 		// delivery (and an initial prompt held for a screen nobody answers) ends with it (#3999).
-		l.startPromptDelivery(ctx, result.SessionID, result.SessionName, job.AgentType, job.Prompt)
+		if !oneShot { // a one-shot run has its prompt on the command line
+			l.startPromptDelivery(ctx, result.SessionID, result.SessionName, job.AgentType, job.Prompt)
+		}
 
 		// Monitor the tmux session — return when agent finishes or context expires
 		return l.watchSession(ctx, result.SessionName)
