@@ -99,3 +99,26 @@ func TestMissingCommandAtBottomOnQAsLiveScreens(t *testing.T) {
 		t.Error("the same screen with a typed command after the error: not the latest answer")
 	}
 }
+
+// The coral-go-team Security's Finding B on #253: a full-width row of a person's own output after the error (a ruler, a wide ls line) is not the
+// prompt wrapping, so the older error above it is not the shell's latest answer. Each screen has a second full-width row (the error wrapped), so
+// the pane's width is known and the row is a candidate. The same screen with the prompt really wrapped still marks.
+func TestMissingCommandAtBottomTellsTheWrappedPromptFromAPersonsOutput(t *testing.T) {
+	const w = 24
+	errRows := "bash: codex: command not\n found" // bash's answer broken at 24 columns: the first row is full
+	if len("bash: codex: command not") != w || len("a.txt  b.txt  note.md  x") != w {
+		t.Fatal("the fixture's error row is not the pane's width")
+	}
+	for name, tc := range map[string]struct {
+		screen string
+		want   bool
+	}{
+		"the error, then a full-width ruler, then the prompt":   {errRows + "\n" + strings.Repeat("-", w) + "\nuser@box:~/w$ ", false},
+		"the error, then a full-width ls row, then the prompt":  {errRows + "\n" + "a.txt  b.txt  note.md  x" + "\nuser@box:~/w$ ", false},
+		"the error, then the prompt wrapped over two full rows": {errRows + "\n" + "someone@devbox:/home/som" + "\n" + "eone/projects/coral/work" + "\n/sub$ ", true},
+	} {
+		if got := MissingCommandAtBottom(tc.screen, "codex"); got != tc.want {
+			t.Errorf("%s: %v, want %v", name, got, tc.want)
+		}
+	}
+}

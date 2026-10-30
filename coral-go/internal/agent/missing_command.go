@@ -45,6 +45,22 @@ func MissingCommandIn(out, binary string) bool {
 	return false
 }
 
+// promptPiece reports whether row, right above the prompt's last row (or above another piece), is the prompt wrapped from there: as wide as the
+// pane, and shaped like a prompt, not like a person's output (the coral-go-team Security's Finding B on #253): no "not found" or "not recognized"
+// in it, not one character repeated (a ruler), and no run of spaces (columns, a wide ls line). A row of output taken for the prompt would make an
+// older error the end of the block.
+func promptPiece(row string, width int) bool {
+	if strings.TrimSpace(row) == "" || utf8.RuneCountInString(row) != width {
+		return false
+	}
+	low := strings.ToLower(row)
+	if strings.Contains(low, "not found") || strings.Contains(low, "not recognized") || strings.Contains(row, "  ") {
+		return false
+	}
+	t := strings.TrimSpace(row)
+	return strings.Trim(t, t[:1]) != "" // all one character: a ruler
+}
+
 // answerLines is the most of the screen above the bottom prompt that is read as the shell's latest answer: Windows PowerShell's error record, the
 // longest, is the sentence and five trailer lines, and a narrow pane breaks each of them over several rows (QA's 30-column ConPTY screen: 16).
 const answerLines = 24
@@ -86,7 +102,7 @@ func MissingCommandAtBottom(screen, binary string) bool {
 		return false // a prompt alone, or nothing: no answer
 	}
 	rows = rows[:len(rows)-1] // the prompt's last row
-	for len(rows) > 0 && !blank(rows[len(rows)-1]) && utf8.RuneCountInString(rows[len(rows)-1]) == width {
+	for len(rows) > 0 && promptPiece(rows[len(rows)-1], width) {
 		rows = rows[:len(rows)-1] // a full row above it: the prompt wrapped from there
 	}
 	trimBlank()
