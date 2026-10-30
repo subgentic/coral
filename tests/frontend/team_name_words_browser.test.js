@@ -20,7 +20,7 @@ const BASE = require('./test_base').BASE;
         await new Promise(r => setTimeout(r, 400)); // sleep-ok: the validation draws after the click
         const said = await ev(`(() => { const f = document.getElementById('launch-step-team'); const err = [...f.querySelectorAll('.sv-error')].map(e => e.textContent.trim()).filter(Boolean); return { err, footer: (document.getElementById('team-recap') || {}).textContent || '' }; })()`);
         const field = said.err.find(t => /letters, digits/i.test(t));
-        assert.equal(field, 'Team name: Use letters, digits, - or _, starting with a letter or digit.', 'the field says it, short: ' + JSON.stringify(said));
+        assert.equal(field, 'Team name: Use English letters (A-Z), digits, - or _, starting with a letter or digit: no accents or spaces.', 'the field says it, short: ' + JSON.stringify(said));
         assert.doesNotMatch(said.footer, /letters, digits/i, 'the footer does not say it again: ' + JSON.stringify(said));
         assert.match(said.footer, /team name/i, 'the footer points at the name: ' + JSON.stringify(said));
         console.log('PASS the team name hint and its one error are in plain words');
