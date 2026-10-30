@@ -1454,7 +1454,7 @@
 }
 @media (max-width: 600px) {
     body[data-phone-fab="automations"] .automations-create, body[data-phone-fab="automations"] .automations-act { display: none; } /* the + at the bottom right makes a job or a workflow: the toolbar's create buttons are not drawn (#11239 slice A) */
-    body:has(#scheduler-view[data-phone-item]) .phone-nav, body:has(#scheduler-view[data-phone-item]) .phone-fab, body:has(#workflows-view[data-phone-item]) .phone-nav, body:has(#workflows-view[data-phone-item]) .phone-fab, body:has(#docs-view[data-phone-item]) .phone-nav, body:has(#cost-dashboard-view[data-phone-item]) .phone-nav, body:has(#servers-view[data-phone-item]) .phone-nav { display: none; } /* a job or a workflow opened is a page of its own (a drill-down): no nav and no + over its footer */
+    body:has(#scheduler-view[data-phone-item]:not([style*="display: none"])) .phone-nav, body:has(#scheduler-view[data-phone-item]:not([style*="display: none"])) .phone-fab, body:has(#workflows-view[data-phone-item]:not([style*="display: none"])) .phone-nav, body:has(#workflows-view[data-phone-item]:not([style*="display: none"])) .phone-fab, body:has(#docs-view[data-phone-item]:not([style*="display: none"])) .phone-nav, body:has(#cost-dashboard-view[data-phone-item]:not([style*="display: none"])) .phone-nav, body:has(#servers-view[data-phone-item]:not([style*="display: none"])) .phone-nav { display: none; } /* a job or a workflow opened is a page of its own (a drill-down): no nav and no + over its footer */
 }
 
 /* The Home list's per-row and per-team ⋯ is a 44 px button on a phone (#11281), not a 24 px box with a hidden hit area: the rows are 44 px high already */

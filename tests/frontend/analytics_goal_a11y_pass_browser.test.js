@@ -30,14 +30,14 @@ const TEAM = `qa-a11y-pass-${Date.now() % 100000}`;
             const links = await ev(`[...document.querySelectorAll('#cost-by-agent .dt-link')].filter(e => e.getClientRects().length).map(e => { const b = e.getBoundingClientRect(); return [e.textContent.trim(), Math.round(b.height)]; })`);
             assert.ok(links.length >= 2, 'the By agent table has agent links: ' + JSON.stringify(links)); for (const [n, h] of links) assert.ok(h >= 44, `${n} is ${h} px high`);
         });
-        await S.run('a phone: the way back is on the title\'s line at normal text (no row spent) and over it at 200% text, where the title would be a word a line', async () => {
+        await S.run('a phone: the way back is on the title\'s line in the bar at every text size (the title is cut with an ellipsis, not stacked under the arrow, #11236)', async () => {
             await view('provider');
             const geo = () => ev(`(() => { const b = document.querySelector('.cost-phone-back').getBoundingClientRect(), t = document.getElementById('cost-view-title').getBoundingClientRect(); return { backTop: Math.round(b.top), backBottom: Math.round(b.bottom), titleTop: Math.round(t.top), titleWidth: Math.round(t.width) }; })()`);
             const normal = await geo(); await shot('analytics-100-back');
             assert.ok(normal.titleTop < normal.backBottom, 'at normal text the title is beside the way back, not under it: ' + JSON.stringify(normal));
             await ev(`document.documentElement.style.fontSize = '32px'; true`); await settle(700);
             const big = await geo(); await shot('analytics-200-back'); await ev(`document.documentElement.style.fontSize = ''; true`);
-            assert.ok(big.backBottom <= big.titleTop + 1, 'at 200% the title is under the way back: ' + JSON.stringify(big)); assert.ok(big.titleWidth > 200, 'and has the width of the screen, not a word a line: ' + JSON.stringify(big));
+            assert.ok(big.titleTop < big.backBottom, 'at 200% the title is still beside the way back, in the bar: ' + JSON.stringify(big)); assert.ok(big.titleWidth > 100, 'and is not a word a line: ' + JSON.stringify(big));
         });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false }); await Emulation.setTouchEmulationEnabled({ enabled: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(); await installTP(ev);

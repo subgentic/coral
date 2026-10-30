@@ -12,7 +12,7 @@ const BASE = require('./test_base').BASE;
     const S = `(window.__coralStatic || '/static/')`;
     const shot = async n => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; require('node:fs').mkdirSync(d, { recursive: true }); require('node:fs').writeFileSync(`${d}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     const lit = () => ev(`document.querySelector('.phone-nav-slot.active')?.dataset.phoneNav || null`);
-    const state = view => ev(`(() => { const v = document.getElementById('${view}'), cs = getComputedStyle(v), nav = getComputedStyle(document.getElementById('phone-nav')).display, top = getComputedStyle(document.querySelector('header.top-bar')).display, row = v.querySelector('.phone-title-row'), back = row && row.querySelector('.back-link, .docs-phone-back, #docs-phone-back, .cost-phone-back'), r = e => { if (!e || !e.getClientRects().length) return null; const b = e.getBoundingClientRect(); return { h: Math.round(b.height), w: Math.round(b.width), l: Math.round(b.left) }; };
+    const state = view => ev(`(() => { const v = document.getElementById('${view}'), cs = getComputedStyle(v), nav = getComputedStyle(document.getElementById('phone-nav')).display, top = getComputedStyle(document.querySelector('header.top-bar')).display, row = v.querySelector('.phone-title-row, .cost-header-left'), back = row && row.querySelector('.back-link, .docs-phone-back, #docs-phone-back, .cost-phone-back'), r = e => { if (!e || !e.getClientRects().length) return null; const b = e.getBoundingClientRect(); return { h: Math.round(b.height), w: Math.round(b.width), l: Math.round(b.left) }; };
         return { type: document.body.dataset.phoneType, nav, top, pad: parseFloat(cs.paddingBottom), row: r(row), back: r(back), title: row && row.querySelector('h1, h2') ? Math.round(parseFloat(getComputedStyle(row.querySelector('h1, h2')).fontSize)) : null, item: v.hasAttribute('data-phone-item'), page: document.documentElement.scrollWidth <= innerWidth }; })()`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Page.addScriptToEvaluateOnNewDocument({ source: DATA_WORLD });
@@ -39,6 +39,8 @@ const BASE = require('./test_base').BASE;
             await ev(`window.switchNavTab('tokens'); true`);
             await waitFor(`!!document.getElementById('cost-nav-list') && document.getElementById('cost-dashboard-view').getClientRects().length > 0`, `${tag}: the analytics list`, 10000);
             await settle(500);
+            await ev(`document.querySelector('#cost-dashboard-view .cost-phone-back, #cost-dashboard-view .phone-title-row .back-link').click(); true`); // a phone opens Analytics on a page (#10064): the arrow shows the list
+            await waitFor(`!document.getElementById('cost-dashboard-view').hasAttribute('data-phone-item')`, `${tag}: the list`, 5000); await settle(300);
             d = await state('cost-dashboard-view');
             assert.ok(d.type === 'top-level' && d.nav === 'flex' && !d.item && d.pad >= 100 && d.page, `${tag}: Analytics' list is a top-level screen with the nav and room under it: ` + JSON.stringify(d));
             assert.equal(await lit(), 'nav-more', `${tag}: More is lit on Analytics`);
@@ -46,7 +48,7 @@ const BASE = require('./test_base').BASE;
             await waitFor(`document.getElementById('cost-dashboard-view').hasAttribute('data-phone-item') && document.getElementById('cost-dashboard-view').getClientRects().length > 0`, `${tag}: an analytics view`, 8000);
             await settle(300);
             d = await state('cost-dashboard-view');
-            assert.ok(d.nav === 'none' && d.top === 'none' && d.row && d.row.h >= 56 && d.back && d.back.w >= 44 && d.page, `${tag}: an open view is a drill-down: the bar with its arrow, no page pill, no nav: ` + JSON.stringify(d));
+            assert.ok(d.nav === 'none' && d.top === 'none' && d.row && d.row.h >= 56 && d.back && d.back.w >= 44 && d.back.h >= 44 && d.title === fs && d.page, `${tag}: an open view is a drill-down: the bar with its arrow, no page pill, no nav: ` + JSON.stringify(d));
             await shot(`model-c-analytics-view-${w}-${fs}-${theme}`);
         }
         console.log('PASS the phone model, slice C: Docs and Analytics');
