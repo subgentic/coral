@@ -18,7 +18,7 @@ func PiBoardNotice(unread int, boardName string) string {
 	if unread < 1 {
 		return ""
 	}
-	label := TypedLabel(boardName)
+	label := asciiLabel(TypedLabel(boardName))
 	if label == "" {
 		label = "this board"
 	}
@@ -31,12 +31,23 @@ func PiBoardNotice(unread int, boardName string) string {
 		count = "999+"
 	}
 	text := fmt.Sprintf("%s%s new message%s on %s. Run coral-board read to read them, then carry on.", PiNoticeOpener, count, plural, label)
-	if len(text) > piNoticeMax { // a label is at most 80 runes, but they can be multi-byte letters: the bound is on the bytes too
-		text = text[:piNoticeMax]
-		text = strings.TrimRight(text, " ") // cut on a byte boundary of the letters TypedLabel keeps: a partial rune is not allowed through
-		for len(text) > 0 && text[len(text)-1] >= 0x80 {
-			text = text[:len(text)-1]
-		}
+	if len(text) > piNoticeMax { // the label is ASCII and at most 80 runes, so this only guards the sentence's own length
+		text = strings.TrimRight(text[:piNoticeMax], " ")
 	}
 	return text
+}
+
+// asciiLabel turns every non-ASCII character of a label into a space and collapses the runs: the hook that passes the notice on drops anything but ASCII (so a board named with accents or CJK would get no notice
+// at all, Security on #11133). A result with no letter or digit left (nothing, or only the dots of a cut label) is "": the caller says 'this board'.
+func asciiLabel(s string) string {
+	out := strings.Join(strings.Fields(strings.Map(func(r rune) rune {
+		if r >= 0x80 {
+			return ' '
+		}
+		return r
+	}, s)), " ")
+	if strings.IndexFunc(out, func(r rune) bool { return r >= '0' && r <= '9' || r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' }) < 0 {
+		return ""
+	}
+	return out
 }

@@ -34,3 +34,26 @@ func TestPiBoardNoticeCannotBeShapedByABoardName(t *testing.T) {
 		assert.NotContains(t, got, "\n")
 	}
 }
+
+// The Pi hook drops anything that is not ASCII (Security on #11133), so a board named with accents or CJK would get no notice at all: every non-ASCII character of the label becomes a space, and a label with
+// nothing left is 'this board'.
+func TestPiBoardNoticeKeepsOnlyTheAsciiOfABoardName(t *testing.T) {
+	const tail = ". Run coral-board read to read them, then carry on."
+	for name, want := range map[string]string{
+		"Café Équipe": "Caf quipe",
+		"チーム":         "this board",
+		"dev チーム ops": "dev ops",
+		"日本語":         "this board",
+		"team-é-a":    "team- -a",
+		"Zürich/ops":  "Z rich/ops",
+	} {
+		got := PiBoardNotice(2, name)
+		assert.Equal(t, PiNoticeOpener+"2 new messages on "+want+tail, got, "%q", name)
+		for _, r := range got {
+			assert.Less(t, r, rune(0x80), "%q: %q is not ASCII in %q", name, r, got)
+		}
+	}
+	for _, name := range []string{strings.Repeat("é", 500), strings.Repeat("日", 100)} {
+		assert.Contains(t, PiBoardNotice(2, name), "on this board.", "a label with no ASCII letter at all")
+	}
+}

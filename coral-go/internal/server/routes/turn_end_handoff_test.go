@@ -3,6 +3,7 @@ package routes
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 	"testing"
@@ -361,5 +362,38 @@ func TestTurnEndHandoffForAPiAgent(t *testing.T) {
 		assert.NotContains(t, got, "\u202e")
 		assert.NotContains(t, got, "$(")
 		assert.NotContains(t, got, "\"")
+	}
+}
+
+// The hand-off is for Claude and Pi only: a codex, agy, gemini or terminal session with the same unread message gets none (Security on #11133: the AgentType gate was untested). Claude and Pi are the control: the
+// same setup does hand off, so a "false" for the others is the gate and not an empty board.
+func TestTurnEndHandoffOnlyForClaudeAndPi(t *testing.T) {
+	server, h, _, ss := setupSessionsTestServer(t)
+	ctx := context.Background()
+	for i, c := range []struct {
+		agent string
+		want  bool
+	}{{"claude", true}, {"pi", true}, {"codex", false}, {"agy", false}, {"gemini", false}, {"terminal", false}} {
+		sid := fmt.Sprintf("eeeeeeee-11133-3000-0000-%012d", i)
+		name := c.agent + "-" + sid
+		agent := fmt.Sprintf("gate%d", i)
+		team := fmt.Sprintf("team-11133-%d", i)
+		require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: sid, AgentType: c.agent, AgentName: agent, WorkingDir: "/w", BoardName: &team}))
+		tok := agentToken(t, h, sid, name)
+		_, err := h.bs.Subscribe(ctx, team, "Orch", "Orchestrator", name, nil, "all")
+		require.NoError(t, err)
+		_, err = h.bs.Subscribe(ctx, team, "Lead", "Lead", "", nil, "all")
+		require.NoError(t, err)
+		_, err = h.bs.PostMessage(ctx, team, "Lead", "please review #12", nil)
+		require.NoError(t, err)
+		req, _ := http.NewRequest("POST", server.URL+"/api/sessions/live/"+agent+"/turn-end", strings.NewReader(`{}`))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set(store.SessionTokenHeader, tok)
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		var out map[string]any
+		_ = json.NewDecoder(resp.Body).Decode(&out)
+		resp.Body.Close()
+		assert.Equal(t, c.want, out["handoff"], "%s: hand-off %v with one unread message (%v)", c.agent, c.want, out)
 	}
 }
