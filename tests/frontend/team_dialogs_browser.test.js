@@ -85,6 +85,7 @@ const { coralReady } = require('./helpers/wait');
         const opts = await ev(`[...document.querySelectorAll('#team-template-select option')].map(o => o.textContent)`);
         assert.ok(opts.some(o => /^Coding Team \(7 members\)$/.test(o)), JSON.stringify(opts));
         await ev(`import((window.__coralStatic || '/static/') + 'team_dialogs.js').then(m => m._pickTeamTemplate('Dungeon Master')); true`);
+        await waitFor(`document.querySelectorAll('#team-agents-list .team-agent-row').length === 7`, 'the template fills the agents'); // the pick runs after an async import: reading the rows at once raced it (flaky in the v2.0.9 batch-1 gate, 1 of 2 attempts)
         assert.deepEqual((await teamRows()).slice(0, 2), ['Dungeon Master', 'Warrior']); assert.equal((await teamRows()).length, 7);
         assert.equal(await ev(`document.getElementById('team-template-select').value`), 'Dungeon Master', 'the chosen template is shown in the select');
         await ev(`window._saveTeamTemplate(); true`);
