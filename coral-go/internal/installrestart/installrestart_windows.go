@@ -58,11 +58,37 @@ var folder = func() (string, error) {
 
 // folderFor is the mark's folder for a program at exe.
 func folderFor(exe string) (string, error) {
-	local, err := windows.KnownFolderPath(windows.FOLDERID_LocalAppData, windows.KF_FLAG_DONT_VERIFY) // Mark makes it when missing
+	local, err := localAppData()
 	if err != nil {
 		return "", err
 	}
 	return folderUnder(local, exe), nil
+}
+
+// localAppData is the user's Local AppData folder (Windows' known folder, not the variable; Mark makes the mark's folder below it when missing). A
+// variable so a test can put it elsewhere.
+var localAppData = func() (string, error) {
+	return windows.KnownFolderPath(windows.FOLDERID_LocalAppData, windows.KF_FLAG_DONT_VERIFY)
+}
+
+// ErrBadProduct: a product name that is not a Coral product's folder name.
+var ErrBadProduct = errors.New("not a Coral product's folder name")
+
+// ValidProduct says whether name is a Coral product's install-folder name: "Coral", or "Coral" and one more word ("Coral Rehearsal").
+func ValidProduct(name string) bool { return productNameRe.MatchString(name) }
+
+// productDir is the mark's folder for the named product: below the user's Local AppData folder, named by the product and by nothing else. The name is
+// checked first, so no path is built from anything else (the installer's helper runs from a temporary copy, so it cannot tell its product from
+// where it runs: it is told, by a constant in the package, never by a property a person can set).
+func productDir(product string) (string, error) {
+	if !ValidProduct(product) {
+		return "", ErrBadProduct
+	}
+	local, err := localAppData()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(local, product), nil
 }
 
 // folderUnder is the mark's folder below the user's Local AppData folder local, for a program at exe.
@@ -250,6 +276,19 @@ func Mark(now time.Time) error {
 	if err != nil {
 		return err
 	}
+	return markIn(dir, now)
+}
+
+// MarkFor is Mark in the named product's folder (see productDir).
+func MarkFor(product string, now time.Time) error {
+	dir, err := productDir(product)
+	if err != nil {
+		return err
+	}
+	return markIn(dir, now)
+}
+
+func markIn(dir string, now time.Time) error {
 	if err := makeFolder(dir); err != nil {
 		return err
 	}
@@ -282,6 +321,19 @@ func Discard() error {
 	if err != nil {
 		return err
 	}
+	return discardIn(dir)
+}
+
+// DiscardFor is Discard in the named product's folder.
+func DiscardFor(product string) error {
+	dir, err := productDir(product)
+	if err != nil {
+		return err
+	}
+	return discardIn(dir)
+}
+
+func discardIn(dir string) error {
 	d, err := openPlainFolder(dir)
 	if err != nil {
 		if notFound(err) {
@@ -298,6 +350,15 @@ func Discard() error {
 // new relative to it, exclusively, so nothing is followed and nothing existing is opened. A folder that is not a plain folder is ErrNotPlainFolder.
 func CreateLog(prefix string) (*os.File, error) {
 	dir, err := folder()
+	if err != nil {
+		return nil, err
+	}
+	return CreateLogIn(dir, prefix)
+}
+
+// CreateLogFor is CreateLog in the named product's folder.
+func CreateLogFor(product, prefix string) (*os.File, error) {
+	dir, err := productDir(product)
 	if err != nil {
 		return nil, err
 	}
@@ -338,6 +399,19 @@ func Take(now time.Time) bool {
 	if err != nil {
 		return false
 	}
+	return takeIn(dir, now)
+}
+
+// TakeFor is Take in the named product's folder.
+func TakeFor(product string, now time.Time) bool {
+	dir, err := productDir(product)
+	if err != nil {
+		return false
+	}
+	return takeIn(dir, now)
+}
+
+func takeIn(dir string, now time.Time) bool {
 	d, err := openPlainFolder(dir)
 	if err != nil {
 		return false

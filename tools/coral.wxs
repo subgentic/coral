@@ -177,7 +177,7 @@
          installing; never with an elevated token (msiexec run as administrator), when the Coral window asks instead. It was a cmd.exe line,
          which opened a console window at every first install (#345). -->
     <CustomAction Id="WriteEULAMarker" BinaryRef="CoralMsiHelper"
-      ExeCommand="eula"
+      ExeCommand="eula --product &quot;$(var.InstallFolderName)&quot;"
       Execute="immediate" Return="ignore" />
     <!-- Closing Coral for the install, and starting it again after (#335). Coral's processes keep its programs open (the tray and its server
          child, the Coral window, an agent's coral-board or hook), and the tray and its server have no window of their own, so Restart Manager
@@ -206,13 +206,13 @@
     <Binary Id="CoralMsiHelper" SourceFile="$(var.BuildDir)\coral-msi-helper.exe" />
     <Property Id="CORALCLOSED" Secure="yes" />
     <CustomAction Id="CloseCoralForInstall" BinaryRef="CoralMsiHelper"
-      ExeCommand="stop --folder &quot;[ProgramFiles64Folder]$(var.InstallFolderName)&quot; --folder &quot;[ProgramFilesFolder]$(var.InstallFolderName)&quot; --wait 60"
+      ExeCommand="stop --product &quot;$(var.InstallFolderName)&quot; --folder &quot;[ProgramFiles64Folder]$(var.InstallFolderName)&quot; --folder &quot;[ProgramFilesFolder]$(var.InstallFolderName)&quot; --wait 60"
       Execute="immediate" Return="ignore" />
     <CustomAction Id="CloseCoralForUninstall" BinaryRef="CoralMsiHelper"
-      ExeCommand="stop --uninstall --folder &quot;[ProgramFiles64Folder]$(var.InstallFolderName)&quot; --folder &quot;[ProgramFilesFolder]$(var.InstallFolderName)&quot; --wait 60"
+      ExeCommand="stop --uninstall --product &quot;$(var.InstallFolderName)&quot; --folder &quot;[ProgramFiles64Folder]$(var.InstallFolderName)&quot; --folder &quot;[ProgramFilesFolder]$(var.InstallFolderName)&quot; --wait 60"
       Execute="deferred" Impersonate="yes" Return="ignore" />
     <CustomAction Id="StartCoralAfterInstall" BinaryRef="CoralMsiHelper"
-      ExeCommand="start"
+      ExeCommand="start --product &quot;$(var.InstallFolderName)&quot;"
       Execute="immediate" Return="ignore" />
     <InstallExecuteSequence>
       <Custom Action="WriteEULAMarker" After="InstallFiles" Condition="NOT Installed" />
