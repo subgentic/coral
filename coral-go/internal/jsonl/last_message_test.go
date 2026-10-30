@@ -264,21 +264,50 @@ func TestLastMessage_ReadsOnlyWhatWasAppended(t *testing.T) {
 }
 
 // #11354 (Mobile Beta Tester, v2.0.9 phone walk): a row said "No messages yet" for about 5 s after the agent's first reply, because a session whose transcript was not there at one read was not looked for
-// again for lastMessagePathTTL. A session that has reported an event has a transcript or is about to: its miss is not remembered.
-func TestLastMessage_ATranscriptThatAppearsIsFoundAtOnceForAStartedSession(t *testing.T) {
+// again for lastMessagePathTTL. A session that has reported an event has a transcript or is about to: its miss is kept for lastMessageStartedTTL (1 s), not 5 s, and not looked up on every poll.
+func TestLastMessage_AStartedSessionsMissIsRecheckedAfterOneSecondNotBefore(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("CLAUDE_PROJECTS_DIR", dir)
 	sid := "11111111-0000-4000-8000-000000000011"
 	project := filepath.Join(dir, "proj")
 	require.NoError(t, os.MkdirAll(project, 0o755))
+	now := time.Now()
+	lastMessageNow = func() time.Time { return now }
+	t.Cleanup(func() { lastMessageNow = time.Now })
 	r := NewSessionReader()
-	_, ok := r.LastMessageOf(sid, "", at.Claude, false)
+	_, ok := r.LastMessageOf(sid, "", at.Claude, true)
 	require.False(t, ok, "no transcript yet")
 	line := `{"type":"assistant","timestamp":"2026-10-29T10:00:05.000Z","message":{"content":[{"type":"text","text":"Hello, I am ready."}]}}` + "\n"
 	require.NoError(t, os.WriteFile(filepath.Join(project, sid+".jsonl"), []byte(line), 0o644))
-	_, ok = r.LastMessageOf(sid, "", at.Claude, false)
-	assert.False(t, ok, "an agent that has reported nothing keeps its miss for the TTL: a list is not to look for every file of every starting agent on every poll")
+
+	now = now.Add(900 * time.Millisecond)
+	_, ok = r.LastMessageOf(sid, "", at.Claude, true)
+	assert.False(t, ok, "inside the second the miss stands: no walk of the projects folder on every poll")
+	now = now.Add(200 * time.Millisecond) // 1.1 s after the miss
 	m, ok := r.LastMessageOf(sid, "", at.Claude, true)
-	require.True(t, ok, "an agent that has reported an event is looked for again at once")
+	require.True(t, ok, "after a second the started session is looked for again")
 	assert.Equal(t, "Hello, I am ready.", m.Text)
+}
+
+// A session that has reported nothing keeps its miss for the full 5 s.
+func TestLastMessage_ASessionThatHasNotStartedKeepsItsMissFiveSeconds(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("CLAUDE_PROJECTS_DIR", dir)
+	sid := "11111111-0000-4000-8000-000000000012"
+	project := filepath.Join(dir, "proj")
+	require.NoError(t, os.MkdirAll(project, 0o755))
+	now := time.Now()
+	lastMessageNow = func() time.Time { return now }
+	t.Cleanup(func() { lastMessageNow = time.Now })
+	r := NewSessionReader()
+	_, ok := r.LastMessageOf(sid, "", at.Claude, false)
+	require.False(t, ok)
+	line := `{"type":"assistant","timestamp":"2026-10-29T10:00:05.000Z","message":{"content":[{"type":"text","text":"Hi."}]}}` + "\n"
+	require.NoError(t, os.WriteFile(filepath.Join(project, sid+".jsonl"), []byte(line), 0o644))
+	now = now.Add(4 * time.Second)
+	_, ok = r.LastMessageOf(sid, "", at.Claude, false)
+	assert.False(t, ok, "4 s on: still the miss")
+	now = now.Add(2 * time.Second)
+	_, ok = r.LastMessageOf(sid, "", at.Claude, false)
+	assert.True(t, ok, "6 s on: found")
 }

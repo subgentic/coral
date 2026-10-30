@@ -35,7 +35,14 @@ const (
 	lastMessageMaxRunes = 600
 	lastMessageMax      = 4096 // entries kept
 	lastMessagePathTTL  = 5 * time.Second
+	// lastMessageStartedTTL is how long a started session's miss is kept: its transcript is about to be written, so it is looked for again at the next poll or so, not every tick (a walk of the projects folder each time).
+	lastMessageStartedTTL = time.Second
 )
+
+// lastMessageNow is the clock the miss TTLs run on (a test moves it).
+var lastMessageNow = time.Now
+
+func lastMessageSince(t time.Time) time.Duration { return lastMessageNow().Sub(t) }
 
 // lastMessageBytes counts the bytes every LastMessage read has taken since the process started (LastMessageBytesRead): a load measurement takes the difference over a poll.
 var lastMessageBytes atomic.Int64
@@ -69,8 +76,8 @@ func (r *SessionReader) LastMessage(sessionID, workingDir, agentType string) (La
 	return r.LastMessageOf(sessionID, workingDir, agentType, false)
 }
 
-// LastMessageOf is LastMessage for a session that may have reported an event (started): a session whose transcript was not found at one read is not looked for again for lastMessagePathTTL, unless it has started,
-// when it has a transcript or is about to (a row said "No messages yet" for 5 s after the agent's first reply, #11354).
+// LastMessageOf is LastMessage for a session that may have reported an event (started): a session whose transcript was not found at one read is not looked for again for lastMessagePathTTL (5 s), or for
+// lastMessageStartedTTL (1 s) when it has started, as it has a transcript or is about to (a row said "No messages yet" for 5 s after the agent's first reply, #11354).
 func (r *SessionReader) LastMessageOf(sessionID, workingDir, agentType string, started bool) (LastMessage, bool) {
 	if !transcriptlink.IsSessionID(sessionID) {
 		return LastMessage{}, false
@@ -89,10 +96,14 @@ func (r *SessionReader) LastMessageOf(sessionID, workingDir, agentType string, s
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	if e.path == "" {
-		if !started && !e.resolved.IsZero() && time.Since(e.resolved) < lastMessagePathTTL {
+		ttl := lastMessagePathTTL
+		if started {
+			ttl = lastMessageStartedTTL
+		}
+		if !e.resolved.IsZero() && lastMessageSince(e.resolved) < ttl {
 			return LastMessage{}, false
 		}
-		e.resolved = time.Now()
+		e.resolved = lastMessageNow()
 		e.path = resolveTranscriptPathMode(sessionID, workingDir, agentType, true)
 		if e.path == "" {
 			return LastMessage{}, false
