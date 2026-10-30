@@ -264,7 +264,7 @@ var printStepCLIs = map[string]bool{
 	at.Agy:    false, // to verify: "agy --print" takes the prompt as its value (stdin only with stream-json); pin --mode
 	// agy's older name, accepted everywhere else in Coral (QA's review of #3522).
 	at.Antigravity: false,
-	at.Pi:          false, // to verify: not installed on the test machines yet
+	at.Pi:          true, // verified with Pi 1.4.0 (#11293): --print with the prompt as the last argument, --no-session and --no-approve pinned (StepPrintArgs); it answers on stdout, keeps no session and exits
 }
 
 // PrintStepError says why a non-interactive step can't run on agentType, or "" when it can:
