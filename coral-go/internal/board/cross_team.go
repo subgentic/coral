@@ -89,6 +89,9 @@ type BoardSettingsUpdate struct {
 	CrossTeamAllowed *[]AllowedSender `json:"cross_team_allowed"`
 	// Health replaces the whole health configuration (clamped; the handler checks the recipient).
 	Health *HealthSettings `json:"health"`
+	// HealthPatch is a request's own health object (the settings route sets it, and not Health): a setting it names changes and one it does not keeps its stored value, at every depth, applied in the
+	// transaction that reads the stored ones. It wins over Health.
+	HealthPatch json.RawMessage `json:"-"`
 	// RequireGoal turns the board's require-a-goal rule on or off (#7116).
 	RequireGoal *bool `json:"require_goal"`
 	// GoalRequests turns taking goal requests from other teams on or off (#7361).
@@ -261,7 +264,7 @@ func (s *Store) UpdateBoardSettings(ctx context.Context, project string, u Board
 		}
 		allowed = string(raw)
 	}
-	if u.Health != nil {
+	if u.Health != nil && u.HealthPatch == nil {
 		raw, err := json.Marshal(u.Health.Clamp())
 		if err != nil {
 			return BoardSettings{}, err
@@ -273,6 +276,23 @@ func (s *Store) UpdateBoardSettings(ctx context.Context, project string, u Board
 		return BoardSettings{}, err
 	}
 	defer tx.Rollback()
+	if u.HealthPatch != nil {
+		merged := DefaultHealthSettings()
+		var stored string
+		if err := tx.GetContext(ctx, &stored, `SELECT value FROM board_settings WHERE project = ? AND key = ?`, project, settingHealth); err == nil && stored != "" {
+			_ = json.Unmarshal([]byte(stored), &merged)
+		} else if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return BoardSettings{}, err
+		}
+		if err := json.Unmarshal(u.HealthPatch, &merged); err != nil {
+			return BoardSettings{}, err
+		}
+		raw, err := json.Marshal(merged.Clamp())
+		if err != nil {
+			return BoardSettings{}, err
+		}
+		health = string(raw)
+	}
 	if u.CrossTeamMessaging != nil {
 		if err := upsert(tx, settingCrossTeamMessaging, fmt.Sprint(*u.CrossTeamMessaging)); err != nil {
 			return BoardSettings{}, err
@@ -303,7 +323,7 @@ func (s *Store) UpdateBoardSettings(ctx context.Context, project string, u Board
 			return BoardSettings{}, err
 		}
 	}
-	if u.Health != nil {
+	if u.Health != nil || u.HealthPatch != nil {
 		if err := upsert(tx, settingHealth, health); err != nil {
 			return BoardSettings{}, err
 		}

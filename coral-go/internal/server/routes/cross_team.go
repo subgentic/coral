@@ -166,6 +166,9 @@ func (h *BoardHandler) UpdateBoardSettings(w http.ResponseWriter, r *http.Reques
 	var body struct {
 		SubscriberID string `json:"subscriber_id"`
 		board.BoardSettingsUpdate
+		// HealthRaw takes the "health" key before the embedded update's own field can (the shallower field wins), so the update sees the request's own keys and a health body that names only
+		// some settings changes only those.
+		HealthRaw json.RawMessage `json:"health"`
 	}
 	if cloud.Tunneled(r) {
 		// Through Coral Hub this is the owner's alone, decided before the body is read (#5307), and the body is strict: one JSON object of at
@@ -269,17 +272,36 @@ func (h *BoardHandler) UpdateBoardSettings(w http.ResponseWriter, r *http.Reques
 		}
 		body.CrossTeamServers = &clean
 	}
-	if body.Health != nil {
-		if msg := body.Health.Landing.Problem(); msg != "" {
+	if p := bytes.TrimSpace(body.HealthRaw); len(p) > 0 && !bytes.Equal(p, []byte("null")) {
+		// A health body is a patch: what it does not name keeps its stored value, at every depth (the store applies it in the same transaction as the rest). The checks below are of the
+		// settings it names, on what they would become.
+		merged := h.bs.GetHealthSettings(r.Context(), urlParam(r, "project"))
+		dec := json.NewDecoder(bytes.NewReader(p))
+		if viaHub {
+			dec.DisallowUnknownFields()
+		}
+		var named map[string]json.RawMessage
+		if err := dec.Decode(&merged); err != nil || json.Unmarshal(p, &named) != nil {
+			errBadRequest(w, "invalid JSON")
+			return
+		}
+		body.HealthPatch = p
+		body.Health = &merged
+		_, landing := named["landing"]
+		_, release := named["release"]
+		_, goalsReady := named["goals_ready"]
+		_, unowned := named["unowned_tasks"]
+		_, recipient := named["recipient"]
+		if msg := body.Health.Landing.Problem(); landing && msg != "" {
 			errBadRequest(w, msg)
 			return
 		}
-		if msg := body.Health.Release.Problem(); msg != "" {
+		if msg := body.Health.Release.Problem(); release && msg != "" {
 			errBadRequest(w, msg)
 			return
 		}
 		for field, who := range map[string]string{"landing": body.Health.Landing.Nudge, "release": body.Health.Release.Nudge} {
-			if who = strings.TrimSpace(who); who != "" {
+			if who = strings.TrimSpace(who); who != "" && (field == "landing" && landing || field == "release" && release) {
 				if sub, err := h.bs.GetProjectSubscription(r.Context(), urlParam(r, "project"), who); err != nil || sub == nil {
 					errBadRequest(w, fmt.Sprintf("health.%s.nudge: %q is not a member of this team", field, board.OneLine(who)))
 					return
@@ -290,6 +312,9 @@ func (h *BoardHandler) UpdateBoardSettings(w http.ResponseWriter, r *http.Reques
 			name string
 			c    board.HealthWaitCheck
 		}{{"goals_ready", body.Health.GoalsReady}, {"unowned_tasks", body.Health.UnownedTasks}} {
+			if wc.name == "goals_ready" && !goalsReady || wc.name == "unowned_tasks" && !unowned {
+				continue
+			}
 			if msg := wc.c.Problem(wc.name); msg != "" {
 				errBadRequest(w, msg)
 				return
@@ -302,7 +327,7 @@ func (h *BoardHandler) UpdateBoardSettings(w http.ResponseWriter, r *http.Reques
 			}
 		}
 		// The check's recipient is a member of this team, never anyone else (#4176 rule 18).
-		if rcpt := strings.TrimSpace(body.Health.Recipient); rcpt != "" {
+		if rcpt := strings.TrimSpace(body.Health.Recipient); recipient && rcpt != "" {
 			if sub, err := h.bs.GetProjectSubscription(r.Context(), urlParam(r, "project"), rcpt); err != nil || sub == nil {
 				errBadRequest(w, fmt.Sprintf("health.recipient: %q is not a member of this team", board.OneLine(rcpt)))
 				return
@@ -850,7 +875,7 @@ func (h *BoardHandler) recordHubSettings(w http.ResponseWriter, r *http.Request,
 		if u.GoalRequests != nil {
 			undo.GoalRequests = &before.GoalRequests
 		}
-		if u.Health != nil { // the health setup sent in the same body was applied with the rest: it is undone with it (QA's #7329 finding)
+		if u.Health != nil || u.HealthPatch != nil { // the health setup sent in the same body was applied with the rest: it is undone with it (QA's #7329 finding)
 			undo.Health = &before.Health
 		}
 		if _, uerr := h.bs.UpdateBoardSettings(ctx, project, undo); uerr != nil {
