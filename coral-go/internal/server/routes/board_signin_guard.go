@@ -14,16 +14,18 @@ import (
 const signInLinkRefusal = "Refused: this text contains a sign-in link (" + signinguard.Param + "=), and anyone who reads it could sign in with it. " +
 	"Nothing was saved. Post only the result lines, never a command's whole output; to talk about the parameter, write it without '='."
 
-// RefuseSignInLink wraps a board route whose body is text other people read (a post, a task, a goal, a notification): a body that carries a
+// RefuseSignInLink is the middleware (r.With) of a board route whose body is text other people read (a post, a task, a goal, a notification): a body that carries a
 // sign-in link's token is answered 400 sign_in_link and the handler never runs. coral-board and coral-agent refuse such text before they send it
 // (#232); this is the same rule (signinguard) for a client that calls the API directly. A guard against accidents, not a leak filter.
 //
+// As middleware the route keeps its handler: chi.Walk, the board route pin and the identity census see the handler itself.
+//
 // The body is read whole (BodyLimit has capped it) and handed on unchanged. It is checked as text and, when it is JSON, string by string after
-// decoding, so an escape such as = in place of '=' is no way around it.
-func RefuseSignInLink(next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+// decoding, so an escape such as \u003d in place of '=' is no way around it.
+func RefuseSignInLink(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Body == nil || r.Body == http.NoBody {
-			next(w, r)
+			next.ServeHTTP(w, r)
 			return
 		}
 		body, err := io.ReadAll(r.Body)
@@ -41,8 +43,8 @@ func RefuseSignInLink(next http.HandlerFunc) http.HandlerFunc {
 			writeError(w, http.StatusBadRequest, "sign_in_link", signInLinkRefusal)
 			return
 		}
-		next(w, r)
-	}
+		next.ServeHTTP(w, r)
+	})
 }
 
 // carriesSignInLink reports whether body carries a sign-in link's token: in its text, or in any JSON string or key once decoded.

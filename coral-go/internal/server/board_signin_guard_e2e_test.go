@@ -14,7 +14,7 @@ import (
 )
 
 // signInGuardedRoutes are the board routes whose body is text other people read: each refuses a sign-in link's token (routes.RefuseSignInLink,
-// the server side of #232). A route added to this list must be wrapped in router_board.go; the test fails otherwise.
+// the server side of #232). A route added to this list must be registered with r.With(routes.RefuseSignInLink) in router_board.go; the test fails otherwise.
 var signInGuardedRoutes = []string{
 	"POST /api/notifications",
 	"POST /api/board/{project}/messages",

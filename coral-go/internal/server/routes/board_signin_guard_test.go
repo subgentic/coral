@@ -19,21 +19,21 @@ const secretToken = "S3cretTok3n"
 func guardCall(t *testing.T, body string) (*httptest.ResponseRecorder, []byte) {
 	t.Helper()
 	var got []byte
-	h := RefuseSignInLink(func(w http.ResponseWriter, r *http.Request) {
+	h := RefuseSignInLink(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		b, err := io.ReadAll(r.Body)
 		require.NoError(t, err)
 		got = append([]byte{}, b...)
 		w.WriteHeader(http.StatusOK)
-	})
+	}))
 	rec := httptest.NewRecorder()
-	h(rec, httptest.NewRequest(http.MethodPost, "/api/board/team/messages", strings.NewReader(body)))
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/board/team/messages", strings.NewReader(body)))
 	return rec, got
 }
 
 // A body that carries a sign-in link's token, however it is spelled or wherever it sits in the JSON, is refused before the handler runs,
 // with the sentence and code the clients match on, and without the token.
 func TestABoardWriteWithASignInLinkIsRefused(t *testing.T) {
-	jsonEscapedEquals := string([]byte{92}) + "u003d" // =, an escaped '=' that only decoding the JSON shows
+	jsonEscapedEquals := string([]byte{92}) + "u003d" // \u003d, an escaped '=' that only decoding the JSON shows
 	for name, body := range map[string]string{
 		"in a post":                    `{"content":"see http://127.0.0.1:8420/?login_token=` + secretToken + `","subscriber_id":"Lead"}`,
 		"in capitals":                  `{"content":"LOGIN_TOKEN=` + secretToken + `"}`,
