@@ -224,6 +224,19 @@ func CheckIn(ctx context.Context, agentType, bin, dir string) State {
 			return Unknown
 		}
 	}
+	return runStatus(ctx, bin, args, dir, sp.state)
+}
+
+// CheckPiProvider asks Pi at bin whether one provider is signed in ("pi auth check --provider <provider> --json"), now: a provider that is not a plain word is Unknown, never passed to the CLI. Never --credentials.
+func CheckPiProvider(ctx context.Context, bin, provider string) State {
+	if bin == "" || !piProviderR.MatchString(provider) {
+		return Unknown
+	}
+	return runStatus(ctx, bin, []string{"auth", "check", "--provider", provider, "--json"}, "", piState)
+}
+
+// runStatus runs a CLI's status command (args) under the check's limits and reads its answer with state.
+func runStatus(ctx context.Context, bin string, args []string, dir string, state func(out, errOut []byte, runErr error) State) State {
 	cctx, cancel := context.WithTimeout(ctx, effectiveCheckTimeout())
 	defer cancel()
 	cmd := executil.Command(cctx, bin, args...)
@@ -247,7 +260,7 @@ func CheckIn(ctx context.Context, agentType, bin, dir string) State {
 		}
 		return TimedOut
 	}
-	return sp.state(out.b.Bytes(), errOut.b.Bytes(), err)
+	return state(out.b.Bytes(), errOut.b.Bytes(), err)
 }
 
 // limited keeps the first maxStatusOutput bytes and drops the rest.

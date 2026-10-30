@@ -210,7 +210,7 @@ function _renderMenu(kind) {
         const models = (_data && _data.models) || [];
         if (models.length) {
             html = `<div class="model-chip-group" role="group" aria-label="Model"><div class="model-chip-head">Model ${how}</div>`
-                + models.map(m => item('model', m.value, (m.display_name || m.value) + (m.custom === true ? ' (custom)' : ''), m.value === s.model)).join('') + '</div>';
+                + models.map(m => item('model', m.value, (m.display_name || m.value) + (m.group ? ` (${m.group})` : '') + (m.custom === true ? ' (custom)' : ''), m.value === s.model)).join('') + '</div>';
         }
     } else {
         const levels = _levelsFor(s.model);

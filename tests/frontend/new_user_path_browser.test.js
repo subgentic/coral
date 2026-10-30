@@ -144,6 +144,17 @@ const REPLY = "Hi! I'm mock-agent, a stand-in for a real agent, so this reply is
             }
             throw new Error(`the first task did not reach the Orchestrator: on the board ${posted}; its chat has ${msgs.length} messages: ${JSON.stringify(msgs.map(m => [m.type, String(m.content || m.text || '').slice(0, 50)]))}`);
         });
+        await step('C4. "Also save this as the team\'s goal" (on by default) made the goal, and the first task is listed under it (#11338)', 20000, async () => {
+            const board = encodeURIComponent(orchestrator.board);
+            let goals = [], tasks = [];
+            for (const until = Date.now() + 15000; Date.now() < until; await new Promise(r => setTimeout(r, 500))) { // sleep-ok: polling the board through the API
+                const g = await api('GET', `/api/board/${board}/goals`); goals = (g.data && (g.data.goals || g.data)) || [];
+                const t = await api('GET', `/api/board/${board}/tasks`); tasks = (t.data && (t.data.tasks || t.data)) || [];
+                if (goals.length && tasks.some(x => x.goal_id)) break;
+            }
+            assert.ok(Array.isArray(goals) && goals.some(x => JSON.stringify(x).includes(TASK)), 'the Goals tab has the first task as the goal: ' + JSON.stringify(goals).slice(0, 300));
+            assert.ok(tasks.some(x => JSON.stringify(x).includes(TASK) && x.goal_id), 'the first task is listed under that goal: ' + JSON.stringify(tasks).slice(0, 300));
+        });
         console.log('PASS the new user path: ' + timeline.map(([n, ms]) => `${n.split('.')[0]} ${ms} ms`).join(', '));
     } finally {
         for (const s of sessions) { if (s) await api('POST', `/api/sessions/live/${encodeURIComponent(s.session_name || s.name)}/kill`, { session_id: s.id, agent_type: 'claude' }).catch(() => {}); }

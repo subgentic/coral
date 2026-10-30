@@ -36,6 +36,18 @@ export function modelPickerHtml() {
         + `<span class="acf-model-id"></span><span class="acf-model-note" role="status"></span><span class="acf-model-add" hidden></span></span>`;
 }
 
+const optionHtml = m => `<option value="${escapeAttr(m.value)}">${escapeHtml((m.display_name || m.value) + (m.custom === true ? ' (custom)' : ''))}</option>`;
+
+/** The model options: a list whose models name a provider (Pi's) is one group of choices per provider, the ones the CLI is signed in to first (the server's `groups` order); any other list is flat (#11338). */
+function modelOptions(models, groups) {
+    if (!models.some(m => m.group)) return models.map(optionHtml).join('');
+    const order = (Array.isArray(groups) ? groups : []).map(g => g && g.name).filter(Boolean);
+    for (const m of models) if (m.group && !order.includes(m.group)) order.push(m.group);
+    const signed = new Set((Array.isArray(groups) ? groups : []).filter(g => g && g.signed_in).map(g => g.name));
+    const loose = models.filter(m => !m.group).map(optionHtml).join('');
+    return order.map(name => `<optgroup label="${escapeAttr(name + (signed.has(name) ? ' · signed in' : ''))}">${models.filter(m => m.group === name).map(optionHtml).join('')}</optgroup>`).join('') + loose;
+}
+
 function fill(container, agentType, data) {
     const { input, wrap, select, id, note } = parts(container);
     container._thinkingLevels = data && Array.isArray(data.thinking) ? data.thinking : [];   // the levels the server passes this type's CLI (#4969)
@@ -45,10 +57,15 @@ function fill(container, agentType, data) {
     container._modelList = models;
     if (!models.length) { wrap.hidden = true; input.hidden = false; return; }   // no list: the text box, as before
     select.innerHTML = `<option value="">Default</option>`
-        + models.map(m => `<option value="${escapeAttr(m.value)}">${escapeHtml((m.display_name || m.value) + (m.custom === true ? ' (custom)' : ''))}</option>`).join('')
+        + modelOptions(models, data && data.groups)
         + `<option value="${escapeAttr(OTHER)}">Other…</option>`
         + (familyOf(agentType) && peekCanAdd(_acfServer(container)) !== false ? `<option value="${escapeAttr(ADD)}">Add a model…</option>` : '');
     wrap.hidden = false;
+    if (data && typeof data.default_model === 'string' && data.default_model && input.value.trim() === '' && !container._defaultModelUsed) { // Pi's own default provider is not signed in and another is: the form starts on a model that works (#11338)
+        container._defaultModelUsed = true;
+        input.value = data.default_model;
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+    }
     if (note) note.textContent = data && data.error ? data.error : (data && data.refreshing && container._refreshAsked ? 'Updating the list…' : ''); // a status of a list the person asked to refresh, not of the one that loaded as the form opened (#7912)
     syncModelPicker(container);
     if (id) id.hidden = false;
@@ -108,6 +125,7 @@ export async function loadModelPicker(container, agentType) {
     const { wrap, input, select } = parts(container);
     if (!container || !wrap || !select) return;
     const token = container._modelToken = (container._modelToken || 0) + 1;
+    container._defaultModelUsed = false; // once for each load of the list (the dialog is opened again, the type changes), not once for the page
     closeAdd(container, false);
     if (agentType === 'terminal') { wrap.hidden = true; container._thinkingLevels = []; syncThinking(container); return; }
     const cached = readModelsCache(_acfServer(container), agentType);

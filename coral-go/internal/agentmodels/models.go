@@ -31,6 +31,8 @@ type Model struct {
 	Efforts     []string `json:"efforts,omitempty"`
 	// Custom marks a model the operator added in Settings > Custom models (#5480); its Efforts are the levels they set for it.
 	Custom bool `json:"custom,omitempty"`
+	// Group is the provider a model is listed under (Pi lists many: a picker shows one group of choices per provider, #11338); empty for a CLI whose models have no provider.
+	Group string `json:"group,omitempty"`
 }
 
 const (
@@ -81,6 +83,7 @@ func clean(in []Model) []Model {
 			m.DisplayName = plainText(m.Value, maxDisplayName) // a model id can be longer than a name may be (#5002)
 		}
 		m.Description = plainText(m.Description, maxDescription)
+		m.Group = plainText(m.Group, maxDisplayName)
 		var efforts []string
 		for _, e := range m.Efforts {
 			if e = plainText(e, maxEffort); e != "" && ValidModelValue(e) {
@@ -227,7 +230,7 @@ func ParsePiModels(b []byte) ([]Model, error) {
 			continue
 		}
 		if len(f) >= 2 {
-			models = append(models, Model{Value: f[0] + "/" + f[1], DisplayName: f[1] + " (" + f[0] + ")"})
+			models = append(models, Model{Value: f[0] + "/" + f[1], DisplayName: f[1], Group: f[0]})
 		}
 	}
 	return result(models)

@@ -74,7 +74,8 @@ func TestParsePiModels(t *testing.T) {
 	models, err := ParsePiModels(fixture(t, "pi-0.73.1-list-models.txt"))
 	require.NoError(t, err)
 	assert.Equal(t, "openai/gpt-4", models[0].Value)
-	assert.Equal(t, "gpt-4 (openai)", models[0].DisplayName)
+	assert.Equal(t, "gpt-4", models[0].DisplayName, "the model's own name: its provider is the group it is listed under (#11338)")
+	assert.Equal(t, "openai", models[0].Group)
 	_, err = ParsePiModels([]byte("No models available. Use /login to log into a provider via OAuth or API key. See:\n  /x/docs/providers.md\n"))
 	assert.ErrorIs(t, err, ErrNoModels)
 }

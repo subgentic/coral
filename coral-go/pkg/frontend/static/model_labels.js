@@ -50,7 +50,7 @@ export function modelName(agentType, modelId, server) {
     if (!modelId || agentType === 'terminal') return '';
     const cached = readModelsCache(server, agentType);
     const hit = cached && cached.models.find(m => m && m.value === modelId);
-    return (hit && hit.display_name) || shortModelName(modelId);
+    return (hit && hit.display_name && (hit.group ? `${hit.display_name} (${hit.group})` : hit.display_name)) || shortModelName(modelId);
 }
 
 /** "Claude · Opus 4.1", or '' when the agent has no model on record. */

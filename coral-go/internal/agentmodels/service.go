@@ -67,6 +67,16 @@ type Result struct {
 	Error      string     `json:"error,omitempty"`
 	// Thinking is the levels Coral gives this type's CLI at launch (ThinkingLevels); empty when the type takes none. A model's own `efforts` narrow it.
 	Thinking []string `json:"thinking,omitempty"`
+	// Groups is Pi's providers in the order a picker lists them, the ones Pi is signed in to first (#11338); empty for any other CLI.
+	Groups []Group `json:"groups,omitempty"`
+	// DefaultModel is the model a new Pi agent starts on when Pi's own default provider is not signed in but another listed one is: that provider's first model. Empty when Pi's default works.
+	DefaultModel string `json:"default_model,omitempty"`
+}
+
+// Group is one provider's models in a picker.
+type Group struct {
+	Name     string `json:"name"`
+	SignedIn bool   `json:"signed_in"`
 }
 
 type entry struct {
@@ -78,6 +88,8 @@ type entry struct {
 	err         string
 	refreshing  bool
 	manualAt    time.Time
+	groups      []Group
+	defaultMod  string
 }
 
 // Fetcher runs a family's CLI at path and returns its models (tests replace it).
@@ -90,6 +102,9 @@ type Service struct {
 	find  func(agentType string) (string, error)
 	fetch Fetcher
 	now   func() time.Time
+	// piSignedIn asks whether Pi is signed in to one provider, piDefault is the provider Pi starts on ("" when none is set): replaced by tests.
+	piSignedIn func(ctx context.Context, path, provider string) bool
+	piDefault  func() string
 
 	mu      sync.Mutex
 	entries map[string]*entry
@@ -100,7 +115,11 @@ type Service struct {
 // NewService returns a Service that finds each CLI with find (agent.FindCLI with the
 // current settings: the same executable a launch runs).
 func NewService(find func(agentType string) (string, error)) *Service {
-	return &Service{find: find, fetch: FetchFromCLI, now: time.Now, entries: map[string]*entry{}, busy: make(chan struct{}, 1)}
+	return &Service{find: find, fetch: FetchFromCLI, now: time.Now, entries: map[string]*entry{}, busy: make(chan struct{}, 1),
+		piSignedIn: func(ctx context.Context, path, provider string) bool {
+			return agentsignin.CheckPiProvider(ctx, path, provider) == agentsignin.SignedIn
+		},
+		piDefault: agentsignin.PiProvider}
 }
 
 // SetFetcher replaces how a CLI is run (tests).
@@ -210,6 +229,8 @@ func (s *Service) get(agentType string, manual bool) Result {
 		t := e.fetchedAt
 		res.FetchedAt = &t
 		res.Source = e.source
+		res.Groups = append([]Group(nil), e.groups...)
+		res.DefaultModel = e.defaultMod
 	}
 	res.Refreshing = e.refreshing
 	res.Error = e.err
@@ -224,6 +245,11 @@ func (s *Service) runFetch(family, path, key string) {
 	ctx, cancel := context.WithTimeout(context.Background(), fetchTimeout)
 	defer cancel()
 	models, source, err := s.fetch(ctx, family, path)
+	var groups []Group
+	var defaultModel string
+	if err == nil && family == "pi" {
+		groups, defaultModel = s.piGroups(models, path)
+	}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -236,6 +262,57 @@ func (s *Service) runFetch(family, path, key string) {
 		return
 	}
 	e.key, e.models, e.source, e.fetchedAt, e.err = key, models, source, s.now(), ""
+	e.groups, e.defaultMod = groups, defaultModel
+}
+
+// maxPiProviders is how many of Pi's providers are asked whether Pi is signed in to them: the rest are listed, not marked.
+const maxPiProviders = 8
+
+// piGroups lists Pi's providers (the signed-in ones first) and, when Pi's own default provider is not signed in but another is, the first model of the first signed-in one: a new agent
+// then starts on a model that works, not on the default that fails (#11338). Each provider is asked once, together, with "pi auth check --provider P" (a sign-in check is all it is).
+func (s *Service) piGroups(models []Model, path string) ([]Group, string) {
+	var names []string
+	first := map[string]string{}
+	for _, m := range models {
+		if m.Group == "" {
+			continue
+		}
+		if _, ok := first[m.Group]; !ok {
+			names = append(names, m.Group)
+			first[m.Group] = m.Value
+		}
+	}
+	signed := make([]bool, len(names))
+	ctx, cancel := context.WithTimeout(context.Background(), fetchTimeout)
+	defer cancel()
+	var wg sync.WaitGroup
+	for i, n := range names {
+		if i >= maxPiProviders {
+			break
+		}
+		wg.Add(1)
+		go func() { defer wg.Done(); signed[i] = s.piSignedIn(ctx, path, n) }()
+	}
+	wg.Wait()
+	var in, out []Group
+	for i, n := range names {
+		if signed[i] {
+			in = append(in, Group{Name: n, SignedIn: true})
+		} else {
+			out = append(out, Group{Name: n})
+		}
+	}
+	groups := append(in, out...)
+	if len(in) == 0 {
+		return groups, ""
+	}
+	own := s.piDefault()
+	for _, g := range in {
+		if g.Name == own {
+			return groups, "" // Pi's own default is signed in: it is the choice
+		}
+	}
+	return groups, first[in[0].Name]
 }
 
 // describe is a failure in Coral's words: never the CLI's own output.
