@@ -88,3 +88,53 @@ func TestAToolStartWithNoRequestOpenChangesNothing(t *testing.T) {
 	assert.Equal(t, before.AwaitingUser, after.AwaitingUser)
 	assert.Equal(t, before.Since, after.Since)
 }
+
+// #11352: the Operator's Dismiss writes a request_resolved with dismissed set; it clears the open request, whichever tool and call it was for, and only an event the server wrote can say so.
+func TestADismissedRequestResolvedClearsTheOpenRequest(t *testing.T) {
+	t0 := time.Date(2026, 10, 30, 17, 28, 0, 0, time.UTC)
+	request := Event{Type: "permission_request", Kind: "permission", ToolName: "Bash", CallIDs: []string{"toolu_A"}, At: t0}
+	d := `{"dismissed":true}`
+	dismiss := NewEvent("request_resolved", "The Operator dismissed the wait", &d)
+	dismiss.At = t0.Add(time.Minute)
+	assert.True(t, dismiss.Dismissed)
+	assert.False(t, Derive(Input{Events: []Event{{Type: "prompt_submit", At: t0.Add(-time.Second)}, request, dismiss}}).NeedsInput)
+	// Only request_resolved reads it.
+	other := NewEvent("notification", "x", &d)
+	assert.False(t, other.Dismissed)
+}
+
+// Security's #136728: a sibling that starts a few seconds after the request leaves it open, for a PreToolUse and a PostToolUse alike; half a minute is the margin.
+func TestASiblingStartingSecondsLaterLeavesTheRequestOpen(t *testing.T) {
+	t0 := time.Date(2026, 10, 30, 17, 28, 0, 0, time.UTC)
+	prompt := Event{Type: "prompt_submit", At: t0}
+	request := Event{Type: "permission_request", Kind: "permission", ToolName: "Bash", CallIDs: []string{"toolu_asked"}, At: t0.Add(10 * time.Second)}
+	pre := func(after time.Duration) Event {
+		return Event{Type: "request_resolved", ToolName: "Bash", ToolUseID: "toolu_sib", At: request.At.Add(after)}
+	}
+	post := func(after time.Duration) Event {
+		return Event{Type: "tool_use", ToolName: "Bash", ToolUseID: "toolu_sib", At: request.At.Add(after + time.Minute), Started: request.At.Add(after)}
+	}
+	assert.True(t, Derive(Input{Events: []Event{prompt, request, pre(5 * time.Second)}}).NeedsInput, "a PreToolUse 5 s later is a sibling")
+	assert.True(t, Derive(Input{Events: []Event{prompt, request, post(5 * time.Second)}}).NeedsInput, "so is a call that began 5 s later")
+	assert.True(t, Derive(Input{Events: []Event{prompt, request, pre(29 * time.Second)}}).NeedsInput)
+	assert.False(t, Derive(Input{Events: []Event{prompt, request, pre(31 * time.Second)}}).NeedsInput, "past the margin it is not")
+	assert.False(t, Derive(Input{Events: []Event{prompt, request, post(31 * time.Second)}}).NeedsInput)
+}
+
+// A request whose call was not known is closed by a start only when the server checked the tool and the input (SameInput), never by the tool's name.
+func TestARequestWithNoCallIsClosedOnlyByAVerifiedStart(t *testing.T) {
+	t0 := time.Date(2026, 10, 30, 17, 28, 0, 0, time.UTC)
+	prompt := Event{Type: "prompt_submit", At: t0}
+	request := Event{Type: "permission_request", Kind: "permission", ToolName: "Bash", Wants: "Wants to run: go test ./...", At: t0.Add(5 * time.Second)}
+	byName := Event{Type: "request_resolved", ToolName: "Bash", ToolUseID: "toolu_X", At: t0.Add(6 * time.Second)}
+	assert.True(t, Derive(Input{Events: []Event{prompt, request, byName}}).NeedsInput, "the tool's name alone closes nothing")
+	byNameLater := byName
+	byNameLater.At = t0.Add(5 * time.Minute)
+	assert.True(t, Derive(Input{Events: []Event{prompt, request, byNameLater}}).NeedsInput, "nor does time: no call is known to compare")
+	verified := byName
+	verified.SameInput = true
+	assert.False(t, Derive(Input{Events: []Event{prompt, request, verified}}).NeedsInput, "the server checked the tool and the input")
+	other := verified
+	other.ToolName = "Edit"
+	assert.True(t, Derive(Input{Events: []Event{prompt, request, other}}).NeedsInput, "a verified start of another tool closes a Bash request not")
+}

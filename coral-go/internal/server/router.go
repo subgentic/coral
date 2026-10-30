@@ -427,6 +427,7 @@ func (s *Server) registerSessions(r *chi.Mux, h *routeHandlers) {
 	r.With(routes.RedactSignInLink).Post("/api/sessions/live/{name}/turn-end", sessHandler.TurnEndHandoff)
 	r.With(routes.RedactSignInLink).Post("/api/sessions/live/{name}/pending-tool", sessHandler.SetPendingTool)
 	r.Post("/api/sessions/live/{name}/answer-prompt", sessHandler.AnswerPrompt)
+	r.Post("/api/sessions/live/{name}/dismiss-wait", sessHandler.DismissWait)
 	r.Get("/api/sessions/live/{name}/events/counts", sessHandler.EventCounts)
 	r.Delete("/api/sessions/live/{name}/events", sessHandler.ClearEvents)
 	r.Post("/api/sessions/live/{name}/token-usage", sessHandler.RecordTokenUsage)

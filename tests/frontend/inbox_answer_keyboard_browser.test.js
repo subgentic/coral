@@ -41,14 +41,15 @@ const { coralReady } = require('./helpers/wait');
             await waitFor(`(() => { const b = document.querySelector('#group-table-view .inbox-answer'); if (!b) return false; if (window.__seen !== b) { window.__seen = b; window.__seenAt = performance.now(); return false; } return performance.now() - window.__seenAt > 500; })()`, `${w}: the table has settled (the same choice for half a second)`, 8000);
             // (1) names: the choice and the agent
             const names = await ev(`[...document.querySelectorAll('#group-table-view tbody tr')].map(r => [...r.querySelectorAll('button')].map(b => b.getAttribute('aria-label') || b.textContent.trim()))`);
-            const want = [['Open qa', 'Answer Red for qa', 'Answer Blue for qa'], ['Open dev', 'Answer Red for dev', 'Answer Blue for dev']];
+            const want = [['Open qa', 'Answer Red for qa', 'Answer Blue for qa', 'Dismiss the wait of qa'], ['Open dev', 'Answer Red for dev', 'Answer Blue for dev', 'Dismiss the wait of dev']]; // the Dismiss (#11352) is last in the row; a phone's row does not draw it (the agent's card has it)
             if (JSON.stringify(names) !== JSON.stringify(want)) problems.push(`${w}: each button's name says the agent and the choice, in reading order: ${JSON.stringify(names)}`);
             // (2) Tab order: from the first choice through the row and on to the next row's
             await ev(`document.querySelector('#group-table-view tbody tr .dt-primary').focus(); true`);
             const where = () => ev(`(() => { const a = document.activeElement; return !a || a === document.body ? 'the page (nothing)' : (a.getAttribute('aria-label') || a.textContent.trim()).slice(0, 40); })()`);
             const order = [await where()];
-            for (let i = 0; i < 5; i++) { await key('Tab', 9); order.push(await where()); }
-            if (JSON.stringify(order.map(x => x.replace(/ for .*/, ''))) !== JSON.stringify(['Open qa', 'Answer Red', 'Answer Blue', 'Open dev', 'Answer Red', 'Answer Blue'])) problems.push(`${w}: Tab goes Open, choice, choice, then the next row: ${JSON.stringify(order)}`);
+            const dismissShown = w >= 768; // a phone's row stays one line: its Dismiss is not drawn there (#11352)
+            for (let i = 0; i < (dismissShown ? 6 : 5); i++) { await key('Tab', 9); order.push(await where()); }
+            if (JSON.stringify(order.map(x => x.replace(/ for .*/, ''))) !== JSON.stringify(dismissShown ? ['Open qa', 'Answer Red', 'Answer Blue', 'Dismiss the wait of qa', 'Open dev', 'Answer Red', 'Answer Blue'] : ['Open qa', 'Answer Red', 'Answer Blue', 'Open dev', 'Answer Red', 'Answer Blue'])) problems.push(`${w}: Tab goes Open, choice, choice, (Dismiss on a desktop row), then the next row: ${JSON.stringify(order)}`);
             // (3) Enter answers qa's Red: said once, and the keyboard stays in the row
             await ev(`window.__said = []; window.__last = {}; new MutationObserver(() => { for (const id of ['notice-live', 'notice-alert']) { const t = (document.getElementById(id) || {}).textContent; if (t && window.__last[id] !== t) { window.__last[id] = t; window.__said.push(t); } } }).observe(document.body, { childList: true, characterData: true, subtree: true }); document.querySelector('#group-table-view .inbox-answer').focus(); true`);
             await key('Enter', 13, '\r'); await waitFor(`window.__answers.length >= 1`, `${w}: the answer is sent`, 5000); await sleep(1500); // sleep-ok: the answer, the announcement and the redraw come a moment after the key
