@@ -268,3 +268,4 @@ node history_group_name.test.mjs
 node pi_extension.test.mjs
 node installed_tray_guard.test.mjs
 node server_ssh_setup.test.mjs
+node server_owner_secret.test.mjs
