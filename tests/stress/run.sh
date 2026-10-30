@@ -118,7 +118,8 @@ wait_for_server() {
 TMPDIR_STRESS="$(mktemp -d "${TMPDIR:-/tmp}/coral-test-run.XXXXXX")"
 # The server's os.TempDir() droppings (coral_settings_/coral_prompt_/sysprompt/agyhooks) land in our own dir, removed on exit; never a glob in the shared TMPDIR where live Coral writes the same names (#3926).
 export TMPDIR="$TMPDIR_STRESS"
-export CORAL_DATA_DIR="$TMPDIR_STRESS"
+export CORAL_DATA_DIR="$TMPDIR_STRESS/data"   # not the folder the runner's own programs are in: the server keeps its data folder owner-only (0600 files), which took the execute bit off the coral-board built next to it (test 30: Permission denied)
+mkdir -p "$CORAL_DATA_DIR"
 export CORAL_NO_DEMO_SEED=1  # no demo workflow/job (it would run a real agent)
 export CORAL_NO_WELCOME=1    # no first-launch screen (#3221)
 # Synthetic provider histories only; never scan the operator Codex sessions.
