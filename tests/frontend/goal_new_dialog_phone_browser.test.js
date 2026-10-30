@@ -17,9 +17,11 @@ const BOARD = 'goal-dlg-' + Date.now().toString(36);
         await waitFor(`!!document.querySelector('.goals-new') && document.querySelector('.goals-new').getClientRects().length > 0`, 'New goal', 15000);
         await ev(`document.querySelector('.goals-new').click(); true`);
         await waitFor(`!!document.querySelector('dialog.goals-dialog[open]')`, 'the dialog', 5000);
-        const r = await ev(`(() => { const d = document.querySelector('dialog.goals-dialog'), b = d.getBoundingClientRect(), h = d.querySelector('h3'), hr = h.getBoundingClientRect(); return { w: Math.round(b.width), h: Math.round(b.height), left: Math.round(b.left), titleTop: Math.round(hr.top - b.top), titleBorder: getComputedStyle(h).borderBottomWidth, iw: innerWidth }; })()`);
+        const r = await ev(`(() => { const d = document.querySelector('dialog.goals-dialog'), b = d.getBoundingClientRect(), h = d.querySelector('.goals-form-head'), hr = h.getBoundingClientRect(); return { w: Math.round(b.width), h: Math.round(b.height), left: Math.round(b.left), titleTop: Math.round(hr.top - b.top), titleBorder: getComputedStyle(h).borderBottomWidth, iw: innerWidth }; })()`);
         assert.ok(r.w >= r.iw - 1 && r.left <= 1, 'the dialog fills the screen width: ' + JSON.stringify(r));
-        assert.ok(r.titleBorder !== '0px', 'its title is a bar with a rule under it, as the other phone dialogs have: ' + JSON.stringify(r));
+        assert.ok(r.titleBorder !== '0px', 'its title is a bar (an arrow and the title) with a rule under it, as the other phone dialogs have: ' + JSON.stringify(r));
+        const f = await ev(`(() => { const d = document.querySelector('dialog.goals-dialog'), a = d.querySelector('.goals-actions').getBoundingClientRect(), bk = d.querySelector('.goals-form-back').getBoundingClientRect(), h = d.querySelector('.goals-form-head').getBoundingClientRect(); return { actionsBottom: Math.round(a.bottom), vh: innerHeight, back: [Math.round(bk.width), Math.round(bk.height)], head: Math.round(h.height) }; })()`);
+        assert.ok(f.actionsBottom >= f.vh - 8 && f.back[0] >= 44 && f.back[1] >= 44 && f.head >= 56, 'a form screen: a 56 px bar with a 44 px arrow, and the actions pinned at the bottom of the screen: ' + JSON.stringify(f));
         console.log('PASS');
     } finally { try { await removeBoards(ev, [BOARD]); } catch (e) {} try { await client.close(); } catch (e) {} }
 })().catch(e => { console.error(e); process.exit(1); });
