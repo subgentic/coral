@@ -36,10 +36,10 @@ const MODE_WORDS = { shared_checkout: 'Shared checkout', worktrees: 'Worktrees',
 /** What each menu item holds, said under its name (Start: none, Health check: on), so nobody opens one to find out (#9971). */
 function menuStates(v) {
     return {
-        start: v.first_task || v.custom_instructions ? 'set' : 'none',
-        workflow: MODE_WORDS[v.mode] || (v.dependency_guidance ? 'guidance' : 'none'),
-        health: valuesToHealth(v, HEALTH_DEFAULTS).on ? 'on' : 'off',
-        messaging: v.cross_team_messaging || v.cross_team_artifacts ? 'on' : 'off',
+        start: v.first_task || v.custom_instructions ? 'set' : 'optional',
+        workflow: MODE_WORDS[v.mode] || (v.dependency_guidance ? 'guidance' : 'no extra rules'),
+        health: valuesToHealth(v, HEALTH_DEFAULTS).on ? 'on' : 'off: no stuck-agent checks', // an "off" alone told a newcomer nothing (#11368, QA's walk): the word says what is off
+        messaging: v.cross_team_messaging || v.cross_team_artifacts ? 'on: other computers' : 'off: this team only',
     };
 }
 function syncMenuStates() {

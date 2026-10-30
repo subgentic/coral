@@ -28,7 +28,7 @@ const { coralReady } = require('./helpers/wait');
                 if (t.title && t.text.includes(t.title)) problems.push(`${w}: "${t.text}": the tip is not visible words`);
             }
             const words = tabs.map(t => t.text).join(' | ');
-            if (!/^Start \w+ \| Workflow \w+ \| Health check \w+ \| Messaging \w+$/.test(words)) problems.push(`${w}: the visible words are as before (${words})`);
+            if (!/^Start (set|optional) \| Workflow [A-Za-z ]+ \| Health check (on|off: no stuck-agent checks) \| Messaging (on: other computers|off: this team only)$/.test(words)) problems.push(`${w}: the visible words say what each state is (${words})`); // #11368: a bare "off" told a newcomer nothing
             await ev(`window.hideLaunchModal(); true`);
         }
     } finally { await client.close(); }
