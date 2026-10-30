@@ -28,7 +28,19 @@ const { coralReady } = require('./helpers/wait');
             const shown = await ev(`Math.round(document.getElementById('set-password-strength').closest('.pw-strength').getBoundingClientRect().height)`);
             if (!(shown > 0)) problems.push(`${tag}: the advice appears once a password is typed (it is ${shown} px)`);
             await ev(`document.getElementById('set-password-later').click(); true`);
+            // the same spacing in Settings' Change password form
+            const cp = await ev(`(async () => { const R = window.fetch; window.fetch = (u, o = {}) => { const p = String(u); if (p.startsWith('/api/system/auth-status')) return Promise.resolve(new Response(JSON.stringify({ authenticated: true, method: 'session', password_set: true, local: true }), { status: 200, headers: { 'content-type': 'application/json' } })); if (p.startsWith('/api/auth/sessions') && !o.method) return Promise.resolve(new Response(JSON.stringify({ sessions: [], recent: [] }), { status: 200, headers: { 'content-type': 'application/json' } })); return R(u, o); };
+                document.body.insertAdjacentHTML('beforeend', '<div id="settings-security" class="tb-row sec-row" role="group"></div>'); const sec = await import((window.__coralStatic || '/static/') + 'security_settings.js'); await sec.loadSecurityRow(); await new Promise(r => setTimeout(r, 200)); // sleep-ok: the row is drawn after its two fetches
+                const d = document.getElementById('sec-change'); d.open = true; await new Promise(r => setTimeout(r, 100));
+                const n = document.getElementById('sec-new').closest('.pw-field'), c = document.getElementById('sec-confirm').closest('.pw-field'), m = document.getElementById('sec-strength').closest('.pw-strength'), fsz = parseFloat(getComputedStyle(document.documentElement).fontSize);
+                const out = { gap: Math.round(c.getBoundingClientRect().top - n.getBoundingClientRect().bottom), em: fsz, meterAfter: !!(c.compareDocumentPosition(m) & Node.DOCUMENT_POSITION_FOLLOWING), idleH: Math.round(m.getBoundingClientRect().height) };
+                window.fetch = R; document.getElementById('settings-security').remove(); return out; })()`);
+            if (!(cp.gap >= 0 && cp.gap <= Math.round(cp.em * 1.5))) problems.push(`${tag}: Settings' Change password: ${cp.gap} px between New password and Confirm (under ${Math.round(cp.em * 1.5)} is normal)`);
+            if (!cp.meterAfter || cp.idleH !== 0) problems.push(`${tag}: Settings' Change password: the advice is under Confirm and holds no room while empty (after: ${cp.meterAfter}, ${cp.idleH} px)`);
         }
+        // a chat that cannot open: the caller is told, and says the agent launched
+        const seam = await ev(`import((window.__coralStatic || '/static/') + 'launch_dialog.js').then(async m => ({ failed: await m._openLaunched({ session_name: 'x', session_id: 'x' }, 'claude', null, { select: async () => { throw new Error('no chat'); } }), opened: await m._openLaunched({ session_name: 'x', session_id: 'x' }, 'claude', null, { select: async () => {} }) }))`);
+        if (seam.failed !== false || seam.opened !== true) problems.push(`_openLaunched says whether the chat opened: ${JSON.stringify(seam)}`);
     } finally { await client.close(); }
     assert.deepEqual(problems, [], 'the Set a password dialog:\n  ' + problems.join('\n  '));
     console.log('PASS the Set a password dialog has no empty gap between Password and Confirm, at 390 and 320, 100% and 200%, light and dark');
