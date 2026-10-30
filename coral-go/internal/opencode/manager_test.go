@@ -196,3 +196,42 @@ func TestAStoppedServerLeavesNeitherItsPidRecordNorItsPassword(t *testing.T) {
 	_, err = os.Stat(p)
 	assert.True(t, os.IsNotExist(err), "a dead server's password is not kept")
 }
+
+func TestAnEnsureOfAKeyWaitsForItsOldServerToBeStoppedAndFindsItsFilesIntact(t *testing.T) {
+	cfg, _ := stubConfig(t)
+	m := NewManager(cfg)
+	defer m.Close()
+	old, err := m.Ensure(context.Background(), "agent-1", "")
+	require.NoError(t, err)
+
+	got := make(chan *Server, 1)
+	m.beforeStop = func() {
+		// the old server is being stopped: a wake of the same agent asks for its server now
+		go func() {
+			s, err := m.Ensure(context.Background(), "agent-1", "")
+			if err == nil {
+				got <- s
+			}
+		}()
+		select {
+		case <-got:
+			t.Error("Ensure started a new server while the old one was still being stopped")
+		case <-time.After(300 * time.Millisecond):
+		}
+	}
+	m.Stop("agent-1")
+	m.beforeStop = nil
+	var fresh *Server
+	select {
+	case fresh = <-got:
+	case <-time.After(10 * time.Second):
+		t.Fatal("the Ensure that waited never got its server")
+	}
+	assert.NotSame(t, old, fresh)
+	_, err = os.Stat(filepath.Join(cfg.DataDir, "servers", "agent-1", "server.json"))
+	assert.NoError(t, err, "the new server's pid record is still there")
+	p, err := fresh.PasswordFile()
+	require.NoError(t, err)
+	_, err = os.Stat(p)
+	assert.NoError(t, err)
+}

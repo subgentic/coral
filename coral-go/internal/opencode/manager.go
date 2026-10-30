@@ -18,6 +18,8 @@ type Manager struct {
 	closed   bool
 	reapStop chan struct{} // closed by Close: the reaper ends
 	reapDone chan struct{}
+
+	beforeStop func() // a test's hook: runs while a key is reserved for its server's stop
 }
 
 // starting is a server on its way up: done closes when it is published in servers or has failed.
@@ -156,15 +158,38 @@ func (m *Manager) AgentTurn(key string) (state State, at time.Time, ok bool) {
 	return state, at, ok
 }
 
-// Stop ends one agent's server and the loop reading it.
+// Stop ends one agent's server and the loop reading it. The key stays reserved until the old server is gone: an Ensure of the same key meanwhile waits, so the old server's shutdown never removes files
+// (its pid record, its password) the new one has written into the same folder.
 func (m *Manager) Stop(key string) {
-	m.mu.Lock()
-	g := m.servers[key]
-	delete(m.servers, key)
-	m.mu.Unlock()
-	if g != nil {
-		g.stop()
+	if g, st := m.take(key); g != nil {
+		m.stopReserved(key, g, st)
 	}
+}
+
+// take removes the key's server from the map and reserves the key; nil when there is none.
+func (m *Manager) take(key string) (*managed, *starting) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	g := m.servers[key]
+	if g == nil || m.starting[key] != nil {
+		return nil, nil
+	}
+	delete(m.servers, key)
+	st := &starting{done: make(chan struct{})}
+	m.starting[key] = st
+	return g, st
+}
+
+// stopReserved stops a server taken out of the map and then lets the key be started again.
+func (m *Manager) stopReserved(key string, g *managed, st *starting) {
+	if m.beforeStop != nil {
+		m.beforeStop()
+	}
+	g.stop()
+	m.mu.Lock()
+	delete(m.starting, key)
+	m.mu.Unlock()
+	close(st.done)
 }
 
 // Reap stops every server that has been up for at least minAge and whose agent is no longer alive (alive false): an agent that ended, slept or was deleted by a path that never told the manager keeps no
@@ -185,14 +210,15 @@ func (m *Manager) Reap(alive func(key string) bool, minAge time.Duration) []stri
 		}
 		m.mu.Lock()
 		g := m.servers[key]
-		if g != nil && time.Since(g.since) >= minAge { // still the server that was judged
-			delete(m.servers, key)
-		} else {
+		if g != nil && time.Since(g.since) < minAge { // not the server that was judged
 			g = nil
 		}
 		m.mu.Unlock()
-		if g != nil {
-			g.stop()
+		if g == nil {
+			continue
+		}
+		if g, st := m.take(key); g != nil {
+			m.stopReserved(key, g, st)
 			stopped = append(stopped, key)
 		}
 	}
