@@ -114,7 +114,7 @@ function drawUsage(m) {
     const days = D.daysOf(m.range), u = D.usageModel(m.data, { days, metric: m.metric, today: todayUTC() });
     if (u.empty) return [say('Nothing was spent in this period. Spend counts the agents Coral has run.')];
     if (m.day < 0 || m.day >= u.rows.length) m.day = u.busiest ? u.rows.indexOf(u.busiest) : u.rows.length - 1;
-    const c = u.cur, p = u.prev, more = (a, b) => { const t = V.changeWords(a, b); return t ? `${t} than the ${days} days before` : ''; };
+    const c = u.cur, p = u.prev, more = (a, b) => { const t = V.changeWords(a, b); return !t ? '' : t === 'same as before' ? `same as the ${days} days before` : `${t} than the ${days} days before`; };
     const kpis = V.kpiStrip([
         { label: 'Spend', value: D.fmtMoney(c.cost), delta: more(c.cost, p.cost), good: c.cost <= p.cost ? true : false, note: 'cost of every turn' },
         { label: 'Tokens', value: D.fmtCount(c.tokens), delta: more(c.tokens, p.tokens), good: null, note: 'input plus output; cache reads beside' },

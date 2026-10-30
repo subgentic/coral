@@ -186,6 +186,7 @@ node fetch_share.test.mjs
 node polls_ask_fresh.test.mjs
 node analytics_task_read.test.mjs
 node analytics_efficiency.test.mjs
+node analytics_tabs.test.mjs
 node artifact_sort_words.test.mjs
 node automation_filters.test.mjs
 node inbox_servers.test.mjs
