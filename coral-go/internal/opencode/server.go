@@ -64,7 +64,8 @@ func serverEnv(inherited []string, dataDir, password string) []string {
 	var env []string
 	for _, kv := range agentenv.Filter(inherited) {
 		name, _, _ := strings.Cut(kv, "=")
-		if strings.HasPrefix(strings.ToUpper(name), "OPENCODE_") || strings.HasPrefix(name, "XDG_") {
+		// nothing of Coral's reaches the server either: agentenv.Filter keeps the CORAL_ variables an agent's tools read (CORAL_URL, CORAL_SESSION_NAME ...), which an opencode server has no use for
+		if strings.HasPrefix(strings.ToUpper(name), "OPENCODE_") || strings.HasPrefix(name, "XDG_") || strings.HasPrefix(strings.ToUpper(name), "CORAL_") {
 			continue
 		}
 		env = append(env, kv)
