@@ -279,6 +279,10 @@ func TestNothingIsInstalledWithoutAPinnedSignerOrWhileCoralRuns(t *testing.T) {
 	assert.Equal(t, []string{"build", "verify", "wait", "cleanup"}, r.plat.calls, "it builds and checks the new install while Coral runs, waits for Coral, swaps nothing and starts nothing")
 	assert.Equal(t, "old", r.installMarker())
 	assert.NotNil(t, r.staged(), "the staged update is kept")
+	st, err := verify.LoadState(filepath.Join(r.data, stage.UpdatesDir))
+	require.NoError(t, err)
+	require.NotEmpty(t, st.History)
+	assert.Equal(t, ResultCoralRunning, st.History[len(st.History)-1].Result, "the history says why nothing was installed (#11151)")
 }
 
 func TestNothingStagedBusyAndUnsupported(t *testing.T) {

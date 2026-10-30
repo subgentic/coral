@@ -312,6 +312,8 @@ func Run(ctx context.Context, cfg Config) Result {
 	}
 	if !cfg.Platform.WaitCoralGone(ctx, install) {
 		_ = os.RemoveAll(newPath)
+		cfg.history(&st, cfg.Installed, rec.Version, ResultCoralRunning, "") // said where Settings can read it: the answer printed here goes nowhere when the server started this run (#11151)
+		_ = verify.SaveState(dir, st)
 		res.Result = ResultCoralRunning
 		return res
 	}
