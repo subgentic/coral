@@ -53,6 +53,9 @@ var startsCoral = regexp.MustCompile(`coral-tray|coral-board|coral-agent|launch-
 // must carry the opt-out. If one of these starts sending, remove it here and it will be required to set
 // the flag.
 var notAStarter = map[string]string{
+	// The installed-Coral guard (#5293, #234): it lists the machine's processes with powershell and compares the lists; neither file runs a Coral.
+	"tests/frontend/installed_tray_guard.mjs":      "lists the coral-tray.exe processes under Program Files before and after a run and compares them; it starts no Coral",
+	"tests/frontend/installed_tray_guard.test.mjs": "feeds the guard's functions made-up process lists; it starts nothing",
 	// Build / generate / download tools: they build or fetch, they do not run Coral.
 	"tools/build_windows.ps1":        "builds the Windows binaries",
 	"tools/gen_route_queries.py":     "code generator",
