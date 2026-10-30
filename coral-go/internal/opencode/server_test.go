@@ -26,11 +26,57 @@ import (
 // the server's environment is filtered (agentenv.Filter drops every CORAL_ variable), so a guard variable named CORAL_... never reached the child, the child took itself for a test run, ran every test,
 // and each of those started another stand-in: 357, then 1,864 processes, three crashes of the operator's Mac (#11377). A child that is the stand-in never calls m.Run().
 func TestMain(m *testing.M) {
-	if len(os.Args) > 1 && os.Args[1] == "serve" {
+	switch binaryMode(os.Args) {
+	case modeStandIn:
 		runStub()
 		os.Exit(0)
+	case modeRefuse:
+		fmt.Fprintln(os.Stderr, "opencode tests: this binary runs tests only under go test (-test. flags) and answers `serve` as the stand-in; nothing else")
+		os.Exit(2)
 	}
 	os.Exit(m.Run())
+}
+
+const (
+	modeTests   = iota // go test's own start: no arguments, or a -test. flag first
+	modeStandIn        // started as `<binary> serve ...` by Start: answer as the opencode server, run no test
+	modeRefuse         // anything else: run nothing, exit 2 (a copy of this binary that was handed something this package never hands it can never run the suite)
+)
+
+// binaryMode decides what this test binary is from its arguments alone (Security's #137647: a cap per process cannot stop a recursion across processes, a decision that never runs the suite for an
+// unexpected start can). Pure: the test of it spawns nothing.
+func binaryMode(args []string) int {
+	switch {
+	case len(args) <= 1:
+		return modeTests
+	case strings.HasPrefix(args[1], "-test."):
+		return modeTests
+	case args[1] == "serve":
+		return modeStandIn
+	}
+	return modeRefuse
+}
+
+func TestTheBinaryRunsTestsOnlyUnderGoTestAndIsTheStandInOnlyForServe(t *testing.T) {
+	for _, tc := range []struct {
+		args []string
+		want int
+	}{
+		{[]string{"opencode.test"}, modeTests},
+		{[]string{"opencode.test", "-test.v"}, modeTests},
+		{[]string{"opencode.test", "-test.run=^TestX$", "-test.count=1"}, modeTests},
+		{[]string{"opencode.test", "serve"}, modeStandIn},
+		{[]string{"opencode.test", "serve", "--hostname", "127.0.0.1", "--port", "4096"}, modeStandIn},
+		{[]string{"opencode.test", "--version"}, modeRefuse},
+		{[]string{"opencode.test", "run"}, modeRefuse},
+		{[]string{"opencode.test", "Serve"}, modeRefuse},
+		{[]string{"opencode.test", "serve2"}, modeRefuse},
+		{[]string{"opencode.test", "-v"}, modeRefuse},
+		{[]string{"opencode.test", "test.run=x"}, modeRefuse},
+		{[]string{"opencode.test", "", "serve"}, modeRefuse},
+	} {
+		assert.Equal(t, tc.want, binaryMode(tc.args), "%v", tc.args)
+	}
 }
 
 func runStub() {
