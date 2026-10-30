@@ -86,7 +86,15 @@ func redactJSON(v any) any {
 }
 
 // redactText replaces the value of each sign-in link's parameter in text: written plainly, escaped once (%3D) or twice (%253D), the depth
-// the refusal reads to (hasSignInLink). The parameter's name stays, followed by <removed>.
+// the refusal reads to (hasSignInLink). The parameter's name stays, followed by <removed>. Text that still carries a link once those are
+// replaced (a name with an escaped letter: login%5Ftoken=, %6Cogin_token=) is replaced whole.
 func redactText(s string) string {
-	return signInValue.ReplaceAllString(s, "${1}"+redactedValue)
+	out := signInValue.ReplaceAllString(s, "${1}"+redactedValue)
+	if hasSignInLink(redactedForm.ReplaceAllString(out, "")) {
+		return redactedValue
+	}
+	return out
 }
+
+// redactedForm is a parameter whose value redactText has already replaced.
+var redactedForm = regexp.MustCompile(`(?i)login_token(?:=|%3d|%253d)` + regexp.QuoteMeta(redactedValue))

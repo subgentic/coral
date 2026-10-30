@@ -88,3 +88,15 @@ func TestAnUploadWhoseNameCarriesASignInLinkIsRefused(t *testing.T) {
 	assert.Contains(t, rec.Body.String(), `"code":"sign_in_link"`)
 	assert.NotContains(t, rec.Body.String(), secretToken)
 }
+
+// A link whose parameter name has an escaped letter is not matched by the value pattern; the string that carries it is replaced whole.
+func TestAHookReportWithAnEscapedLetterInTheNameLosesTheWholeString(t *testing.T) {
+	for _, name := range []string{"login%5Ftoken=", "%6Cogin_token="} {
+		_, got := redactCall(t, `{"event_type":"tool_use","summary":"see /?`+name+secretToken+`","tool_name":"Bash"}`)
+		assert.NotContains(t, got, secretToken, name)
+		var v map[string]any
+		require.NoError(t, json.Unmarshal([]byte(got), &v), name)
+		assert.Equal(t, redactedValue, v["summary"], name)
+		assert.Equal(t, "Bash", v["tool_name"], "%s: the other fields are kept", name)
+	}
+}
