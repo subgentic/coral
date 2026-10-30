@@ -2,6 +2,7 @@ package opencode
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -36,7 +37,7 @@ func TestTheManagerReadsEachSessionsStateFromItsAgentsEventStream(t *testing.T) 
 	_, ok := func() (State, bool) { s, _, ok := m.Turn("ses_abc123"); return s, ok }()
 	assert.False(t, ok, "nothing is known before a server runs")
 
-	_, err := m.Ensure(context.Background(), "agent-1", "", "")
+	_, err := m.Ensure(context.Background(), "agent-1", "", "", "")
 	require.NoError(t, err)
 	waitFor(t, "ses_other to be idle", func() bool { s, _, ok := m.Turn("ses_other"); return ok && s == StateIdle })
 	s, at, ok := m.Turn("ses_abc123")
@@ -51,12 +52,12 @@ func TestEnsureReturnsTheSameServerAndStopLeavesNothingRunning(t *testing.T) {
 	cfg, _ := stubConfig(t)
 	m := NewManager(cfg)
 	defer m.Close()
-	a, err := m.Ensure(context.Background(), "agent-1", "", "")
+	a, err := m.Ensure(context.Background(), "agent-1", "", "", "")
 	require.NoError(t, err)
-	b, err := m.Ensure(context.Background(), "agent-1", "", "")
+	b, err := m.Ensure(context.Background(), "agent-1", "", "", "")
 	require.NoError(t, err)
 	assert.Same(t, a, b, "one server per agent")
-	other, err := m.Ensure(context.Background(), "agent-2", "", "")
+	other, err := m.Ensure(context.Background(), "agent-2", "", "", "")
 	require.NoError(t, err)
 	assert.NotSame(t, a, other)
 
@@ -75,7 +76,7 @@ func TestEnsureReturnsTheSameServerAndStopLeavesNothingRunning(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("Close left a server running")
 	}
-	_, err = m.Ensure(context.Background(), "agent-3", "", "")
+	_, err = m.Ensure(context.Background(), "agent-3", "", "", "")
 	assert.Error(t, err, "a closed manager starts nothing")
 }
 
@@ -86,14 +87,14 @@ func TestAStreamThatEndsForgetsWhatItSaidAndADeadServerIsStartedAgain(t *testing
 	t.Setenv(eventsFileVar, frames)
 	m := NewManager(cfg)
 	defer m.Close()
-	srv, err := m.Ensure(context.Background(), "agent-1", "", "")
+	srv, err := m.Ensure(context.Background(), "agent-1", "", "", "")
 	require.NoError(t, err)
 	waitFor(t, "working", func() bool { s, _, ok := m.Turn("ses_abc123"); return ok && s == StateWorking })
 
 	srv.Stop() // the server dies under the stream
 	waitFor(t, "the state to be forgotten", func() bool { _, _, ok := m.Turn("ses_abc123"); return !ok })
 
-	again, err := m.Ensure(context.Background(), "agent-1", "", "")
+	again, err := m.Ensure(context.Background(), "agent-1", "", "", "")
 	require.NoError(t, err)
 	assert.NotSame(t, srv, again, "a server that exited is started again")
 	waitFor(t, "working again from the new server's stream", func() bool { s, _, ok := m.Turn("ses_abc123"); return ok && s == StateWorking })
@@ -110,7 +111,7 @@ func TestAnAgentsTurnIsTheNewestStateOfItsOwnServerAndNoOthers(t *testing.T) {
 	defer m.Close()
 	_, _, ok := m.AgentTurn("agent-1")
 	assert.False(t, ok, "an agent with no server has no turn")
-	_, err := m.Ensure(context.Background(), "agent-1", "", "")
+	_, err := m.Ensure(context.Background(), "agent-1", "", "", "")
 	require.NoError(t, err)
 	waitFor(t, "idle", func() bool { s, _, ok := m.AgentTurn("agent-1"); return ok && s == StateIdle })
 	_, _, ok = m.AgentTurn("agent-2")
@@ -123,7 +124,7 @@ func TestASlowStartOfOneServerHoldsUpNeitherAnotherAgentNorTheStateReads(t *test
 	m := NewManager(cfg)
 	defer m.Close()
 	started := make(chan error, 2)
-	go func() { _, err := m.Ensure(context.Background(), "slow", "", ""); started <- err }()
+	go func() { _, err := m.Ensure(context.Background(), "slow", "", "", ""); started <- err }()
 	time.Sleep(300 * time.Millisecond) // the first start is under way and still not listening
 
 	t0 := time.Now()
@@ -133,7 +134,7 @@ func TestASlowStartOfOneServerHoldsUpNeitherAnotherAgentNorTheStateReads(t *test
 	assert.False(t, ok || ok2)
 	assert.Less(t, time.Since(t0), 300*time.Millisecond, "state reads and a stop of another key never wait for a start")
 
-	go func() { _, err := m.Ensure(context.Background(), "slow", "", ""); started <- err }() // the same key: waits for the first start, shares it
+	go func() { _, err := m.Ensure(context.Background(), "slow", "", "", ""); started <- err }() // the same key: waits for the first start, shares it
 	require.NoError(t, <-started)
 	require.NoError(t, <-started)
 	m.mu.Lock()
@@ -146,9 +147,9 @@ func TestAServerWhoseAgentIsGoneIsReapedAfterItsGraceAndAYoungOneNever(t *testin
 	cfg, _ := stubConfig(t)
 	m := NewManager(cfg)
 	defer m.Close()
-	gone, err := m.Ensure(context.Background(), "gone", "", "")
+	gone, err := m.Ensure(context.Background(), "gone", "", "", "")
 	require.NoError(t, err)
-	kept, err := m.Ensure(context.Background(), "kept", "", "")
+	kept, err := m.Ensure(context.Background(), "kept", "", "", "")
 	require.NoError(t, err)
 	alive := func(key string) bool { return key == "kept" }
 
@@ -174,7 +175,7 @@ func TestAServerWhoseAgentIsGoneIsReapedAfterItsGraceAndAYoungOneNever(t *testin
 func TestTheReaperRunsUntilCloseAndStopsWhatItReaps(t *testing.T) {
 	cfg, _ := stubConfig(t)
 	m := NewManager(cfg)
-	srv, err := m.Ensure(context.Background(), "gone", "", "")
+	srv, err := m.Ensure(context.Background(), "gone", "", "", "")
 	require.NoError(t, err)
 	m.StartReaper(20*time.Millisecond, 0, func(string) bool { return false })
 	select {
@@ -202,14 +203,14 @@ func TestAnEnsureOfAKeyWaitsForItsOldServerToBeStoppedAndFindsItsFilesIntact(t *
 	cfg, _ := stubConfig(t)
 	m := NewManager(cfg)
 	defer m.Close()
-	old, err := m.Ensure(context.Background(), "agent-1", "", "")
+	old, err := m.Ensure(context.Background(), "agent-1", "", "", "")
 	require.NoError(t, err)
 
 	got := make(chan *Server, 1)
 	m.beforeStop = func() {
 		// the old server is being stopped: a wake of the same agent asks for its server now
 		go func() {
-			s, err := m.Ensure(context.Background(), "agent-1", "", "")
+			s, err := m.Ensure(context.Background(), "agent-1", "", "", "")
 			if err == nil {
 				got <- s
 			}
@@ -248,7 +249,7 @@ func TestAnAgentsLastMessageIsReadWhenATurnEndsAndKeptForTheList(t *testing.T) {
 	defer m.Close()
 	_, ok := m.AgentLastMessage("agent-1")
 	assert.False(t, ok, "nothing before a server runs")
-	_, err := m.Ensure(context.Background(), "agent-1", "", "")
+	_, err := m.Ensure(context.Background(), "agent-1", "", "", "")
 	require.NoError(t, err)
 	waitFor(t, "the last message", func() bool { _, ok := m.AgentLastMessage("agent-1"); return ok })
 	msg, _ := m.AgentLastMessage("agent-1")
@@ -262,13 +263,13 @@ func TestTheReaperStopsOnlyTheServerItJudgedNotOneStartedForTheSameAgentMeanwhil
 	cfg, _ := stubConfig(t)
 	m := NewManager(cfg)
 	defer m.Close()
-	old, err := m.Ensure(context.Background(), "agent-1", "", "")
+	old, err := m.Ensure(context.Background(), "agent-1", "", "", "")
 	require.NoError(t, err)
 	var fresh *Server
 	// the agent is judged gone, and in that moment it is woken: its old server is stopped and a new one started
 	stopped := m.Reap(func(key string) bool {
 		m.Stop(key)
-		fresh, err = m.Ensure(context.Background(), key, "", "")
+		fresh, err = m.Ensure(context.Background(), key, "", "", "")
 		return false
 	}, 0)
 	require.NoError(t, err)
@@ -279,7 +280,7 @@ func TestTheReaperStopsOnlyTheServerItJudgedNotOneStartedForTheSameAgentMeanwhil
 		t.Fatal("the reaper stopped the new server of an agent that is alive")
 	case <-time.After(200 * time.Millisecond):
 	}
-	got, err := m.Ensure(context.Background(), "agent-1", "", "")
+	got, err := m.Ensure(context.Background(), "agent-1", "", "", "")
 	require.NoError(t, err)
 	assert.Same(t, fresh, got)
 }
@@ -294,7 +295,7 @@ func TestAnAgentsHistoryIsItsNewestSessionsMessagesFromItsServer(t *testing.T) {
 	_, ok, err := m.AgentMessages(context.Background(), "agent-1")
 	require.NoError(t, err)
 	assert.False(t, ok, "no server, no history")
-	_, err = m.Ensure(context.Background(), "agent-1", "", "")
+	_, err = m.Ensure(context.Background(), "agent-1", "", "", "")
 	require.NoError(t, err)
 	waitFor(t, "a session to be named", func() bool { _, _, ok := m.AgentTurn("agent-1"); return ok })
 	msgs, ok, err := m.AgentMessages(context.Background(), "agent-1")
@@ -323,7 +324,7 @@ func TestTheLastMessageSkipsWhatCoralTypedAndATurnOfToolsAlone(t *testing.T) {
 	m := NewManager(cfg)
 	m.SkipLast = func(msg Message) bool { return msg.Role == "user" && strings.HasPrefix(msg.Text, "You have 2 unread") }
 	defer m.Close()
-	_, err := m.Ensure(context.Background(), "agent-1", "", "")
+	_, err := m.Ensure(context.Background(), "agent-1", "", "", "")
 	require.NoError(t, err)
 	waitFor(t, "the last message", func() bool { _, ok := m.AgentLastMessage("agent-1"); return ok })
 	msg, _ := m.AgentLastMessage("agent-1")
@@ -334,7 +335,7 @@ func TestAResumedAgentShowsItsChatAndLastMessageBeforeAnyEvent(t *testing.T) {
 	cfg, _ := stubConfig(t) // no events file: the stream says nothing, as after a Coral restart
 	m := NewManager(cfg)
 	defer m.Close()
-	_, err := m.Ensure(context.Background(), "agent-1", "", "")
+	_, err := m.Ensure(context.Background(), "agent-1", "", "", "")
 	require.NoError(t, err)
 	_, ok, _ := m.AgentMessages(context.Background(), "agent-1")
 	assert.False(t, ok, "before the stored session is known there is nothing to show")
@@ -358,7 +359,7 @@ func TestAStreamOfTextDeltasCausesNoMoreThanOneReReadOfTheHistory(t *testing.T) 
 	cfg, _ := stubConfig(t)
 	m := NewManager(cfg)
 	defer m.Close()
-	_, err := m.Ensure(context.Background(), "agent-1", "", "")
+	_, err := m.Ensure(context.Background(), "agent-1", "", "", "")
 	require.NoError(t, err)
 	m.UseSession("agent-1", "ses_abc123")
 	_, ok, err := m.AgentMessages(context.Background(), "agent-1")
@@ -376,4 +377,67 @@ func TestAStreamOfTextDeltasCausesNoMoreThanOneReReadOfTheHistory(t *testing.T) 
 	reads := g.reads
 	g.mu.Unlock()
 	assert.Equal(t, 1, reads, "fifty events inside the interval: the history was read once, not fifty times")
+}
+
+func seenEnv(t *testing.T, envFile string) map[string]string {
+	t.Helper()
+	var seen map[string]string
+	raw, err := os.ReadFile(envFile)
+	require.NoError(t, err)
+	require.NoError(t, json.Unmarshal(raw, &seen))
+	return seen
+}
+
+// One agent's server must not be able to list or read another's conversations (Security's #137832): each has its own session store, and only the credentials' folder is shared.
+func TestEveryAgentsServerRunsOnItsOwnSessionStoreAndSharesOnlyTheCredentialsFolder(t *testing.T) {
+	cfg, envFile := stubConfig(t)
+	m := NewManager(cfg)
+	defer m.Close()
+	_, err := m.Ensure(context.Background(), "agent-1", "", "", "")
+	require.NoError(t, err)
+	one := seenEnv(t, envFile)
+	_, err = m.Ensure(context.Background(), "agent-2", "", "", "")
+	require.NoError(t, err)
+	two := seenEnv(t, envFile)
+	assert.Equal(t, StoreFile(cfg.DataDir, "agent-1"), one["OPENCODE_DB"])
+	assert.Equal(t, StoreFile(cfg.DataDir, "agent-2"), two["OPENCODE_DB"])
+	assert.NotEqual(t, one["OPENCODE_DB"], two["OPENCODE_DB"])
+	assert.Equal(t, one["XDG_DATA_HOME"], two["XDG_DATA_HOME"], "the credentials are shared")
+}
+
+// A resumed agent has a new Coral id, and the session it picks up is in the store it was made in: it runs on that store, so its history is there, unless another live server already holds it.
+func TestAResumedSessionRunsOnTheStoreItWasMadeInUnlessAnotherServerHoldsIt(t *testing.T) {
+	cfg, envFile := stubConfig(t)
+	m := NewManager(cfg)
+	defer m.Close()
+	_, err := m.Ensure(context.Background(), "agent-1", "", "", "")
+	require.NoError(t, err)
+	m.UseSession("agent-1", "ses_abc123")                                                    // records that the session is in agent-1's store
+	require.NoError(t, os.WriteFile(StoreFile(cfg.DataDir, "agent-1"), []byte("db"), 0o600)) // the store exists once opencode has written it
+
+	_, err = m.Ensure(context.Background(), "agent-2", "", "", "ses_abc123")
+	require.NoError(t, err)
+	assert.Equal(t, StoreFile(cfg.DataDir, "agent-2"), seenEnv(t, envFile)["OPENCODE_DB"], "agent-1 is alive and holds the store: agent-2 never shares it")
+
+	m.Stop("agent-1")
+	m.Stop("agent-2")
+	_, err = m.Ensure(context.Background(), "agent-3", "", "", "ses_abc123")
+	require.NoError(t, err)
+	assert.Equal(t, StoreFile(cfg.DataDir, "agent-1"), seenEnv(t, envFile)["OPENCODE_DB"], "with agent-1 gone, the resumed session is found in its store")
+
+	for _, bad := range []string{"ses_nope", "../ses_abc123", ""} {
+		_, err = m.Ensure(context.Background(), "agent-4", "", "", bad)
+		require.NoError(t, err)
+		assert.Equal(t, StoreFile(cfg.DataDir, "agent-4"), seenEnv(t, envFile)["OPENCODE_DB"], "%q", bad)
+		m.Stop("agent-4")
+	}
+}
+
+func TestAStoreRecordThatIsNotAKeyIsNotFollowed(t *testing.T) {
+	cfg, _ := stubConfig(t)
+	require.NoError(t, os.MkdirAll(storesDir(cfg.DataDir), 0o700))
+	for _, rec := range []string{"../../etc", "a b", "", "/abs/path", strings.Repeat("k", 300)} {
+		require.NoError(t, os.WriteFile(filepath.Join(storesDir(cfg.DataDir), "ses_evil"), []byte(rec), 0o600))
+		assert.Equal(t, "", storeOf(cfg.DataDir, "ses_evil"), "%q", rec)
+	}
 }

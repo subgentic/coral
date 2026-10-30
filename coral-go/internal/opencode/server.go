@@ -34,6 +34,7 @@ type Config struct {
 	Bin     string // the opencode executable, as it is exec'd
 	DataDir string // Coral's own folder for opencode (<Coral data dir>/opencode): the XDG folders, its database and its credentials are here and nowhere else
 	Args    func(port int) []string
+	DBFile  string        // this server's own session store (OPENCODE_DB): its conversations are in no other server's reach; "" leaves opencode's own place under the shared data folder
 	Model   string        // the model this server starts on, "provider/model" or "provider/model#variant" (a top-level "model" of a config file Coral writes for it); "" leaves opencode's own
 	Ready   time.Duration // how long one attempt waits for the server to answer an authenticated call (default 20 s)
 
@@ -89,10 +90,13 @@ func XDGVars(dataDir string) [][2]string {
 }
 
 // serverEnv is the environment of one server: ToolEnv, the server's password, and its own config file when it has a model.
-func serverEnv(inherited []string, dataDir, password, configFile string) []string {
+func serverEnv(inherited []string, dataDir, password, configFile, dbFile string) []string {
 	env := ToolEnv(inherited, dataDir)
 	if configFile != "" {
 		env = append(env, "OPENCODE_CONFIG="+configFile)
+	}
+	if dbFile != "" {
+		env = append(env, "OPENCODE_DB="+dbFile) // this agent's own session store: the shared XDG_DATA_HOME holds the credentials only
 	}
 	return append(env, "OPENCODE_PASSWORD="+password)
 }
@@ -127,6 +131,45 @@ func writeModelConfig(dir, model string) (string, error) {
 	}
 	p := filepath.Join(dir, "opencode.json")
 	return p, writePrivate(p, b)
+}
+
+// StoreFile is the session store of the agent whose server folder is key's: servers/<key>/opencode.db. Every server has its own, so one agent's server can never list or read another's conversations;
+// only the credentials (the shared XDG_DATA_HOME) are common.
+func StoreFile(dataDir, key string) string {
+	return filepath.Join(dataDir, "servers", key, "opencode.db")
+}
+
+// storesDir holds, for each opencode session a server has named, which agent's store the session is in (a file stores/<session id> holding that agent's key): a restart or resume gives the agent a new Coral
+// id, and the session it picks up is found in the store it was made in.
+func storesDir(dataDir string) string { return filepath.Join(dataDir, "stores") }
+
+// noteStore records that session is in key's store.
+func noteStore(dataDir, session, key string) {
+	if !validSessionID(session) || !keyRe.MatchString(key) {
+		return
+	}
+	if err := os.MkdirAll(storesDir(dataDir), 0o700); err == nil {
+		_ = writePrivate(filepath.Join(storesDir(dataDir), session), []byte(key))
+	}
+}
+
+// storeOf is the key of the agent whose store holds session: "" when it is not known, or the record is not a key, or that store is not there.
+func storeOf(dataDir, session string) string {
+	if !validSessionID(session) {
+		return ""
+	}
+	b, err := os.ReadFile(filepath.Join(storesDir(dataDir), session))
+	if err != nil || len(b) > 256 {
+		return ""
+	}
+	key := strings.TrimSpace(string(b))
+	if !keyRe.MatchString(key) {
+		return ""
+	}
+	if fi, err := os.Stat(StoreFile(dataDir, key)); err != nil || !fi.Mode().IsRegular() {
+		return ""
+	}
+	return key
 }
 
 // pidRecord is what Coral keeps of a server it started, to stop it after a crash: the pid and the port, the exact command it was started with and when the process began: never the password.
@@ -227,7 +270,7 @@ func startOn(ctx context.Context, cfg Config, dir string, port int) (*Server, er
 	if err != nil {
 		return nil, err
 	}
-	cmd.Env = serverEnv(os.Environ(), cfg.DataDir, password, configFile)
+	cmd.Env = serverEnv(os.Environ(), cfg.DataDir, password, configFile, cfg.DBFile)
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("opencode: could not start the server: %w", err)
 	}

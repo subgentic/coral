@@ -15,6 +15,7 @@ type Manager struct {
 	mu       sync.Mutex
 	servers  map[string]*managed
 	starting map[string]*starting // servers being started, by key
+	stores   map[string]string    // the store each live or starting server runs on, by key
 	closed   bool
 	reapStop chan struct{} // closed by Close: the reaper ends
 	reapDone chan struct{}
@@ -30,11 +31,14 @@ type starting struct{ done chan struct{} }
 
 // managed is one agent's server and the loop reading its events.
 type managed struct {
-	srv    *Server
-	cancel context.CancelFunc
-	done   chan struct{}   // closed when the event loop has returned
-	since  time.Time       // when the server came up
-	lctx   context.Context // the event loop's: what ends with the server
+	srv     *Server
+	cancel  context.CancelFunc
+	done    chan struct{} // closed when the event loop has returned
+	since   time.Time     // when the server came up
+	store   string        // the key of the agent whose session store this server runs on (its own, or the one a resumed session is in)
+	dataDir string
+	noted   map[string]bool // sessions whose store has been recorded (under mu)
+	lctx    context.Context // the event loop's: what ends with the server
 
 	mu      sync.Mutex
 	tracker *Tracker
@@ -53,7 +57,7 @@ type managed struct {
 }
 
 func NewManager(cfg Config) *Manager {
-	return &Manager{cfg: cfg, servers: map[string]*managed{}, starting: map[string]*starting{}}
+	return &Manager{cfg: cfg, servers: map[string]*managed{}, starting: map[string]*starting{}, stores: map[string]string{}}
 }
 
 // Ensure returns the agent's server, starting it (and the reading of its events) on the first call; a server that has since exited is started again. bin is the opencode binary the person's settings
@@ -61,7 +65,7 @@ func NewManager(cfg Config) *Manager {
 //
 // The manager's lock is held only around its maps, never across a start (which can take a minute): a slow start of one agent's server never holds up AgentTurn, Stop or another agent's launch. A second
 // Ensure for a key that is starting waits for that start and shares its result.
-func (m *Manager) Ensure(ctx context.Context, key, bin, model string) (*Server, error) {
+func (m *Manager) Ensure(ctx context.Context, key, bin, model, resume string) (*Server, error) {
 	for {
 		m.mu.Lock()
 		if m.closed {
@@ -90,12 +94,14 @@ func (m *Manager) Ensure(ctx context.Context, key, bin, model string) (*Server, 
 		}
 		st := &starting{done: make(chan struct{})}
 		m.starting[key] = st
+		store := m.pickStore(key, resume)
+		m.stores[key] = store
 		m.mu.Unlock()
 
 		if dead != nil {
 			dead.stop()
 		}
-		g, err := m.start(ctx, key, bin, model)
+		g, err := m.start(ctx, key, bin, model, store)
 
 		m.mu.Lock()
 		delete(m.starting, key)
@@ -103,6 +109,9 @@ func (m *Manager) Ensure(ctx context.Context, key, bin, model string) (*Server, 
 			err = errManagerClosed
 		} else if err == nil {
 			m.servers[key] = g
+		}
+		if err != nil {
+			delete(m.stores, key)
 		}
 		m.mu.Unlock()
 		close(st.done)
@@ -116,10 +125,25 @@ func (m *Manager) Ensure(ctx context.Context, key, bin, model string) (*Server, 
 	}
 }
 
+// pickStore is the agent whose session store a server for key runs on: its own, or, for a resumed session, the store that session was made in (the agent had another Coral id then) when no other live server
+// holds it. A session whose store is not known, or is held, is simply not found by the new server: never shared. The caller holds m.mu.
+func (m *Manager) pickStore(key, resume string) string {
+	if from := storeOf(m.cfg.DataDir, resume); from != "" && from != key {
+		for k, held := range m.stores {
+			if held == from && k != key {
+				return key
+			}
+		}
+		return from
+	}
+	return key
+}
+
 // start runs one server and the loop reading its events; it touches none of the manager's maps.
-func (m *Manager) start(ctx context.Context, key, bin, model string) (*managed, error) {
+func (m *Manager) start(ctx context.Context, key, bin, model, store string) (*managed, error) {
 	cfg := m.cfg
 	cfg.Model = model
+	cfg.DBFile = StoreFile(cfg.DataDir, store)
 	if bin != "" {
 		cfg.Bin = bin
 	} else if cfg.Bin == "" {
@@ -129,7 +153,7 @@ func (m *Manager) start(ctx context.Context, key, bin, model string) (*managed, 
 	if err != nil {
 		return nil, err
 	}
-	g := &managed{srv: srv, since: time.Now(), done: make(chan struct{}), tracker: NewTracker(), at: map[string]time.Time{}, msgsAt: -1}
+	g := &managed{srv: srv, store: store, dataDir: cfg.DataDir, noted: map[string]bool{}, since: time.Now(), done: make(chan struct{}), tracker: NewTracker(), at: map[string]time.Time{}, msgsAt: -1}
 	g.lctx, g.cancel = context.WithCancel(context.Background()) // not ctx: the loop lives as long as the server
 	go g.loop(g.lctx, m.SkipLast)
 	return g, nil
@@ -191,6 +215,7 @@ func (m *Manager) UseSession(key, session string) {
 	}
 	g.mu.Lock()
 	g.session = session
+	g.noteSession(session)
 	g.version++
 	g.refreshLast(g.lctx, c, session, m.SkipLast)
 	g.mu.Unlock()
@@ -198,6 +223,15 @@ func (m *Manager) UseSession(key, session string) {
 
 // rereadEvery is the least time between two reads of an agent's history: a model streaming text sends an event for every few words, and the chat must not read the whole session for each.
 var rereadEvery = 3 * time.Second
+
+// noteSession records which store the session is in, once per session. The caller holds g.mu.
+func (g *managed) noteSession(session string) {
+	if g.noted[session] || len(g.noted) >= 1024 {
+		return
+	}
+	g.noted[session] = true
+	noteStore(g.dataDir, session, g.store)
+}
 
 // lastKeptRunes bounds the text of the kept last message; the route redacts it and shows its first characters.
 const lastKeptRunes = 20000
@@ -317,6 +351,7 @@ func (m *Manager) stopReserved(key string, g *managed, st *starting) {
 	g.stop()
 	m.mu.Lock()
 	delete(m.starting, key)
+	delete(m.stores, key)
 	m.mu.Unlock()
 	close(st.done)
 }
@@ -417,6 +452,7 @@ func (g *managed) loop(ctx context.Context, skip func(Message) bool) {
 			g.version++
 			if session, to, moved := g.tracker.Apply(e); moved {
 				g.at[session] = time.Now()
+				g.noteSession(session)
 				if to == StateIdle || to == StateFailed { // a turn ended: its reply is the new last message
 					g.refreshLast(ctx, c, session, skip)
 				}

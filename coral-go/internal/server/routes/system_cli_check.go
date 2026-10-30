@@ -173,7 +173,11 @@ func (h *SystemHandler) CLICheck(w http.ResponseWriter, r *http.Request) {
 			reply["signed_in"] = signedIn
 		}
 		if agentType == at.Opencode && reply["signed_in"] == false { // opencode signs in per agent-server folder: the one command that signs in there
-			reply["signin_command"] = agent.OpencodeLoginCommand(resolvedPath, opencode.XDGVars(filepath.Join(h.cfg.CoralDir(), "opencode")))
+			if cloud.Tunneled(r) {
+				reply["signin_note"] = "Sign in on the computer Coral runs on." // the command holds this computer's folders and user name: it is not sent through Coral Hub
+			} else {
+				reply["signin_command"] = agent.OpencodeLoginCommand(resolvedPath, opencode.XDGVars(filepath.Join(h.cfg.CoralDir(), "opencode")))
+			}
 		}
 		if p := piSigninProvider(agentType); p != "" { // Pi signs in per provider: the answer is for the one it starts on (#11293)
 			reply["provider"] = p

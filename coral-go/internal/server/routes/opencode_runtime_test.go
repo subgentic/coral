@@ -30,7 +30,7 @@ type fakeOpencode struct {
 	used     []string
 }
 
-func (f *fakeOpencode) Ensure(context.Context, string, string, string) (*opencode.Server, error) {
+func (f *fakeOpencode) Ensure(context.Context, string, string, string, string) (*opencode.Server, error) {
 	return nil, assert.AnError
 }
 func (f *fakeOpencode) AgentTurn(string) (opencode.State, time.Time, bool) {

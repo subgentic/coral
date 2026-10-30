@@ -148,7 +148,7 @@ const eventsFileVar = "STANDIN_EVENTS_FOR_TESTS" // a file of SSE frames the sta
 const envFileVar = "STANDIN_ENVFILE_FOR_TESTS"
 
 // maxStandIns is the most stand-ins one run of this package may start. A test that goes past it fails at once, and each run stops what it started: nothing here may ever start servers without a bound.
-const maxStandIns = 24
+const maxStandIns = 48
 
 var standInsStarted atomic.Int32
 
