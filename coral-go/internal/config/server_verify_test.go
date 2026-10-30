@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync/atomic"
@@ -13,6 +12,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/subgentic/coral/internal/consoletest"
 )
 
 const goodID = "0123456789abcdef0123456789abcdef"
@@ -53,7 +53,7 @@ func newListener(t *testing.T, status int, body string) *listener {
 
 func deadPID(t *testing.T) int {
 	t.Helper()
-	cmd := exec.Command(os.Args[0], "-test.run=^$")
+	cmd := consoletest.HiddenCommand(os.Args[0], "-test.run=^$")
 	require.NoError(t, cmd.Run())
 	return cmd.Process.Pid // a process that has ended and been waited for
 }

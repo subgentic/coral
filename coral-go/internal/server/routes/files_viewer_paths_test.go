@@ -7,7 +7,6 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"testing"
@@ -16,6 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/subgentic/coral/internal/consoletest"
 	"github.com/subgentic/coral/internal/store"
 )
 
@@ -33,7 +33,7 @@ func TestEveryFileTheFilesPanelListsOpensUnderItsOwnPath(t *testing.T) {
 	ctx := context.Background()
 
 	git := func(dir string, args ...string) {
-		c := exec.Command("git", append([]string{"-c", "user.email=a@b.c", "-c", "user.name=n"}, args...)...)
+		c := consoletest.HiddenCommand("git", append([]string{"-c", "user.email=a@b.c", "-c", "user.name=n"}, args...)...)
 		c.Dir = dir
 		out, err := c.CombinedOutput()
 		require.NoError(t, err, string(out))
