@@ -166,7 +166,7 @@ const upToDate = { ...idle, not_ready_reason: 'up_to_date' }; // what the server
             await waitFor(`document.querySelectorAll('#update-confirm-modal .update-agent-name').length === 4`, `${tag}: the new list`, 4000); f = await focused();
             check(`${tag}: a stale ack shows the new list, says it changed, and focus is on the safe answer (${await ev(`document.querySelector('#update-confirm-modal .update-note').textContent`)})`, /changed/.test(await ev(`document.querySelector('#update-confirm-modal .update-note').textContent`)) && f && f.cls.includes('update-later'));
             await ev(`window.__upd.calls.length = 0; window.__upd.relaunch = { status: 202, body: { ok: true, operation: 'op-1' } }; document.querySelector('#update-confirm-modal .update-go').click(); true`);
-            await waitFor(`/Relaunching/.test(document.querySelector('#update-confirm-modal .modal-body').textContent)`, `${tag}: relaunching`, 4000);
+            await waitFor(`/installing the update and will restart/.test(document.querySelector('#update-confirm-modal .modal-body').textContent)`, `${tag}: relaunching`, 4000);
             const post = await ev(`window.__upd.calls.filter(c => c.method === 'POST')`);
             check(`${tag}: the request carries the new ack and nothing else (${JSON.stringify(post)})`, post.length === 1 && post[0].url === '/relaunch-local' && JSON.stringify(post[0].body) === '{"ack":"ack-2"}');
             await press('Escape', 'Escape', 27);

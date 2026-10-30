@@ -127,13 +127,13 @@ const idle = (over = {}) => ({ enabled: true, relaunch_available: true, installe
         await setStatus(staged({ installed: '1.4.130', last_result: { at: '2026-10-20T08:21:00Z', from: '1.4.130', to: '1.4.131', result: 'failed_rolled_back', by: 'local' } }));
         check('a rolled-back update that can be relaunched again offers Try again', (await againShown()) === true);
 
-        console.log('6. the relaunch dialog says what happens next, per install kind');
-        for (const [kind, want] of [['app', /may open the disk image/], ['msi', /Windows will ask for your permission/], ['portable', /swap in the update/], ['tarball', /stays stopped: start it again/], ['', /does not start again by itself, start it/]]) {
+        console.log('6. once sent, the dialog is one line for every install kind (the Operator, #11152)');
+        for (const [kind, want] of [['app', /^Coral is installing the update and will restart\.$/], ['msi', /^Coral is installing the update and will restart\.$/], ['portable', /^Coral is installing the update and will restart\.$/], ['tarball', /^Coral is installing the update and will restart\.$/], ['', /^Coral is installing the update and will restart\.$/]]) {
             await ev(`window.__relaunch = { status: 202, body: { ok: true } }; import(${S} + 'update_api.js').then(a => import(${S} + 'update_dialog.js').then(d => d.openUpdateDialog(a.normalizeStatus(${JSON.stringify(staged(kind ? { install_kind: kind } : {}))})))).then(() => true)`);
             await settle(200);
             await ev(`document.querySelector('#update-confirm-modal .update-go').click(); true`);
             await waitFor(`!!document.querySelector('#update-confirm-modal .update-note')`, `${kind || 'unknown'}: the note`, 6000);
-            const note = await ev(`document.querySelector('#update-confirm-modal .update-note:not(.update-updating)').textContent`); // the Updating line (#10834) is its own
+            const note = await ev(`document.querySelector('#update-confirm-modal .update-updating').textContent`);
             check(`${kind || '(no kind)'}: "${note}"; "Not now?" is gone once it is sent`, want.test(note) && !/reconnects when Coral is back/.test(note) && (await ev(`!document.querySelector('#update-confirm-modal .update-later-note')`)));
             await ev(`document.querySelector('#update-confirm-modal .update-later').click(); true`); await settle(100);
         }

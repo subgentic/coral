@@ -10,14 +10,9 @@ import { UPDATED_KEY } from './update_flag.js';
 import { pollEvery } from './overload.js';
 const { RESUME_KEY, RELEASES_REPO, RELEASES_URL, ACT_INSTALL, ACT_RELAUNCH, releaseNotesUrl, installsLocally, reasonText, requestInstall, requestRelaunch } = await importOnce('./update_api.js');
 
-// What happens after Relaunch, by how this Coral was installed (the docs' per-platform table): none of it promises that this page comes back by itself
-const AFTER = {
-    app: 'Coral is quitting to install the update. It may open the disk image to finish. If Coral does not start again by itself, open it.',
-    msi: 'Windows will ask for your permission to install the update (the usual admin prompt). Coral starts again when the installer is done.',
-    portable: 'Coral is quitting to swap in the update. If it does not start again by itself, start it.',
-    tarball: 'Coral is quitting to install the update. If it was not started by the tray or a service, it stays stopped: start it again.',
-};
-const AFTER_DEFAULT = 'Coral is quitting to install the update. If it does not start again by itself, start it.';
+// After the confirm the dialog is a spinner and one line (the Operator, #11152): none of the per-install details. Windows alone adds what it will be asked, the one thing that is not Coral's doing.
+const INSTALLING = 'Coral is installing the update and will restart.';
+const INSTALLING_WIN = 'Windows will ask for your permission (the usual admin prompt).';
 const STATE_WORDS = { working: 'working', idle: 'idle', waiting: 'waiting for you' };
 
 const mk = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
@@ -100,12 +95,15 @@ async function sendRelaunch(go, later) {
     // Windows: the version this dialog showed is sent with the click, so the server installs that one or none (409 stale_version); a relaunch sends the acknowledgement of what it showed
     const res = win ? await requestInstall(current.staged.version) : await requestRelaunch(current.relaunch.ack);
     if (res.ok) {
-        const body = dialog.querySelector('.modal-body');
-        const p = mk('p', 'update-note', win ? AFTER.msi : AFTER[current.installKind] || AFTER_DEFAULT); p.setAttribute('role', 'status');
-        body.querySelector('.update-later-note')?.remove(); // sent: "Not now?" no longer applies
         const to = current.staged.version;
-        body.append(mk('p', 'update-note update-updating', `Updating Coral to ${to}. This page reloads when the new Coral answers.`), p);
-        watchUpdate(to); later.textContent = 'Close'; later.disabled = false; go.hidden = true;
+        dialog.querySelector('#update-confirm-title').textContent = `Installing Coral ${to}`;
+        const body = dialog.querySelector('.modal-body'); body.replaceChildren(); // the confirmation's provenance, notes and warnings are for before the choice only
+        const box = mk('div', 'update-installing'); box.setAttribute('role', 'status');
+        const spin = mk('span', 'task-spinner'); spin.setAttribute('aria-hidden', 'true');
+        const text = mk('div', 'update-installing-text'); text.append(mk('p', 'update-note update-updating', INSTALLING));
+        if (win) text.append(mk('p', 'update-note update-uac', INSTALLING_WIN));
+        box.append(spin, text); body.append(box);
+        watchUpdate(to, () => installStalled(body, to)); later.textContent = 'Close'; later.disabled = false; go.hidden = true;
         return;
     }
     if (res.status === 409 && res.code === 'stale_ack' && res.relaunch) {
@@ -141,13 +139,22 @@ async function sendRelaunch(go, later) {
     }
 }
 
+/** The update did not finish in the time given (or the server said it failed): the spinner goes, one plain line says what to do, and the release page is a click away. */
+function installStalled(body, to) {
+    const box = mk('div', 'update-installing'); box.setAttribute('role', 'alert');
+    const line = mk('p', 'update-note update-error', 'The update did not finish. Start Coral again, or download the update and install it yourself.');
+    const a = mk('a', 'update-download-fallback', `Download Coral ${to}`); a.href = releaseNotesUrl(to) || `${RELEASES_URL}/releases/latest`; a.target = '_blank'; a.rel = 'noopener noreferrer';
+    const text = mk('div', 'update-installing-text'); const row = mk('p', 'update-note'); row.append(a); text.append(line, row);
+    box.append(text); body.replaceChildren(box);
+}
+
 /** Waits for the new Coral (#10834): the server is down while it installs; when it answers as the new version the page reloads and update_ui.js says "Coral is now X" there. Gives up after four minutes (the note above says what to do). */
 const bare = v => String(v).replace(/^v/, '');
-function watchUpdate(to) {
+function watchUpdate(to, onGiveUp) {
     browserSession.set(UPDATED_KEY, to);
     const until = Date.now() + 240000;
     const t = pollEvery(async () => {
-        if (Date.now() > until) return clearInterval(t);
+        if (Date.now() > until) { clearInterval(t); onGiveUp?.(); return; }
         try { const r = await fetch('/api/system/update', { cache: 'no-store' }); if (r.ok && bare((await r.json()).installed) === bare(to)) { clearInterval(t); location.reload(); } } catch { /* down while it installs */ }
     }, 3000, { whenHidden: true });
 }
