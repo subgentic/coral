@@ -311,6 +311,11 @@ func (r *healthRun) endFinishedEscalations(ctx context.Context, tasks []board.Ta
 		}
 	}
 	for _, e := range esc {
+		// Only the rules whose counter is keyed by a task end with that task. A wait escalation's subject is a wait's id, which is never a task id, so this reset it on every pass and the escalation
+		// was posted again five minutes later (#11180, QA's #11176); it ends with its wait (BoardHealthMonitor.endFinishedWaitEscalations).
+		if e.Rule != ruleClaimNudge && e.Rule != ruleStatusNudge {
+			continue
+		}
 		if !open[e.Target+"|"+e.Subject] {
 			r.h.store.ResetHealthCounter(ctx, r.project, e.Rule, e.Target, e.Subject)
 		}
