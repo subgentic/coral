@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/subgentic/coral/internal/logsafe"
 	"log"
+	"log/slog"
 	"os/exec"
 	"runtime"
 	"strings"
@@ -26,6 +27,9 @@ var runObserver func(args []string)
 func (c *Client) run(ctx context.Context, args ...string) (string, error) {
 	if runObserver != nil {
 		runObserver(args)
+	}
+	if len(args) > 0 && endsPane[args[0]] {
+		logEndsPane(args)
 	}
 	if len(args) > 0 && paneChanging[args[0]] {
 		// After it has run, so a list taken while it ran isn't kept either (the generation).
@@ -223,4 +227,13 @@ func ExecCounts() map[string]int64 {
 		return true
 	})
 	return out
+}
+
+// endsPane are the tmux commands that end the program in a pane or replace it. Each is logged where it is sent, so an agent that ended is traced to the command that did it (#11157: three
+// agents ended in one second and nothing in the log said what ended them).
+var endsPane = map[string]bool{"kill-session": true, "kill-window": true, "kill-pane": true, "kill-server": true, "respawn-pane": true, "respawn-window": true}
+
+func logEndsPane(args []string) {
+	verb := args[0]
+	slog.Info("[tmux] a command that ends or replaces a pane", "command", verb, "about", describeTmuxCommand(args)) // the target and the size of the rest, never the text in it
 }
