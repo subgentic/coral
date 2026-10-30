@@ -238,7 +238,7 @@ func (h *BoardHandler) reviewVerdict(w http.ResponseWriter, r *http.Request, app
 	}
 	task := v.Task
 	if approve && board.IsOperatorName(body.SubscriberID) && h.touches != nil && task.AssignedTo != nil && *task.AssignedTo != "" {
-		h.touches.TouchAgent(ctx, project, *task.AssignedTo, board.TouchApprove) // the Operator approved a task (#11225): a count of the approval and of whose task it was, nothing of the note
+		h.touches.TouchAgent(ctx, project, *task.AssignedTo, board.TouchApprove, touchSource(r)) // the Operator approved a task (#11225): a count of the approval and of whose task it was, nothing of the note
 	}
 	note := ""
 	if body.Note != "" {

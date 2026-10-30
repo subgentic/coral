@@ -39,8 +39,8 @@ func (s *Store) TaskMessageCounts(ctx context.Context, project, since, until str
 		CompletedAt *string `db:"completed_at"`
 	}
 	if err := s.reader().SelectContext(ctx, &tasks, `SELECT id, assigned_to, claimed_at, completed_at FROM board_tasks
-		WHERE board_id = ? AND assigned_to IS NOT NULL AND assigned_to != '' AND claimed_at IS NOT NULL AND claimed_at < ? AND (completed_at IS NULL OR completed_at >= ?)
-		ORDER BY id LIMIT ?`, project, until, since, MaxActivityRows+1); err != nil {
+		WHERE board_id = ? AND assigned_to IS NOT NULL AND assigned_to != '' AND claimed_at IS NOT NULL AND substr(claimed_at, 1, 10) <= ? AND (completed_at IS NULL OR substr(completed_at, 1, 10) >= ?)
+		ORDER BY id LIMIT ?`, project, en.Format("2006-01-02"), st.Format("2006-01-02"), MaxActivityRows+1); err != nil {
 		return nil, false, err
 	}
 	truncated := false
@@ -77,7 +77,7 @@ func (s *Store) TaskMessageCounts(ctx context.Context, project, since, until str
 	// each assignee's task windows, clipped to the read window
 	type window struct {
 		row        *TaskMessages
-		start, end string
+		start, end time.Time
 	}
 	byAgent := map[string][]window{}
 	rows := make([]*TaskMessages, 0, len(tasks))
@@ -86,14 +86,22 @@ func (s *Store) TaskMessageCounts(ctx context.Context, project, since, until str
 		if name == "" {
 			name = t.AssignedTo
 		}
-		start, end := t.ClaimedAt, until
-		if start < since {
-			start = since
+		// Times are compared as times, not as strings: the board stores them in more than one shape (Z, a fractional second, an offset), and a string comparison put a message of the same second as a
+		// claim on the wrong side of it (QA's #11225 INFO).
+		start, ok := parseBoardTime(t.ClaimedAt)
+		if !ok {
+			continue
 		}
-		if t.CompletedAt != nil && *t.CompletedAt < end {
-			end = *t.CompletedAt
+		end := en
+		if t.CompletedAt != nil {
+			if done, ok := parseBoardTime(*t.CompletedAt); ok && done.Before(end) {
+				end = done
+			}
 		}
-		if end <= start {
+		if start.Before(st) {
+			start = st
+		}
+		if !end.After(start) {
 			continue
 		}
 		row := &TaskMessages{TaskID: t.ID, Agent: name}
@@ -106,13 +114,17 @@ func (s *Store) TaskMessageCounts(ctx context.Context, project, since, until str
 	var msgs []activityMsg
 	if err := s.reader().SelectContext(ctx, &msgs, `SELECT m.id, COALESCE(m.subscriber_id, '') AS subscriber_id, s.job_title, m.content, m.created_at, m.is_system, m.origin, m.external_json
 		FROM board_messages m LEFT JOIN board_subscribers s ON m.project = s.project AND m.subscriber_id = s.subscriber_id
-		WHERE m.project = ? AND m.created_at >= ? AND m.created_at < ? ORDER BY m.id LIMIT ?`, project, since, until, MaxActivityRows+1); err != nil {
+		WHERE m.project = ? AND substr(m.created_at, 1, 10) >= ? AND substr(m.created_at, 1, 10) <= ? ORDER BY m.id LIMIT ?`, project, st.Format("2006-01-02"), en.Format("2006-01-02"), MaxActivityRows+1); err != nil {
 		return nil, false, err
 	}
 	if len(msgs) > MaxActivityRows {
 		msgs, truncated = msgs[:MaxActivityRows], true
 	}
 	for _, m := range msgs {
+		at, ok := parseBoardTime(m.CreatedAt)
+		if !ok || at.Before(st) || !at.Before(en) {
+			continue
+		}
 		name := m.Sender
 		if m.Title != nil && *m.Title != "" {
 			name = *m.Title
@@ -126,7 +138,7 @@ func (s *Store) TaskMessageCounts(ctx context.Context, project, since, until str
 		if !automated {
 			// sent: the author's own tasks in progress at the time
 			for _, w := range byAgent[name] {
-				if m.CreatedAt >= w.start && m.CreatedAt < w.end {
+				if !at.Before(w.start) && at.Before(w.end) {
 					w.row.Sent++
 					if cross {
 						w.row.Across++
@@ -141,7 +153,7 @@ func (s *Store) TaskMessageCounts(ctx context.Context, project, since, until str
 				continue
 			}
 			for _, w := range byAgent[to] {
-				if m.CreatedAt < w.start || m.CreatedAt >= w.end {
+				if at.Before(w.start) || !at.Before(w.end) {
 					continue
 				}
 				switch {
@@ -174,4 +186,14 @@ func (s *Store) TaskMessageCounts(ctx context.Context, project, since, until str
 		out, truncated = out[:MaxTaskMessageRows], true
 	}
 	return out, truncated, nil
+}
+
+// parseBoardTime reads a time the board stored, in any of the shapes it stores them in.
+func parseBoardTime(s string) (time.Time, bool) {
+	for _, layout := range []string{time.RFC3339Nano, "2006-01-02 15:04:05.999999999Z07:00", "2006-01-02T15:04:05", "2006-01-02 15:04:05"} {
+		if t, err := time.Parse(layout, s); err == nil {
+			return t.UTC(), true
+		}
+	}
+	return time.Time{}, false
 }

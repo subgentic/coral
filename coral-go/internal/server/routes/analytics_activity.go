@@ -1,9 +1,12 @@
 package routes
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/subgentic/coral/internal/board"
@@ -22,7 +25,22 @@ var activityRanges = map[string]time.Duration{"7d": 7 * 24 * time.Hour, "14d": 1
 type ActivityHandler struct {
 	bs  *board.Store
 	now func() time.Time
+
+	// The counts of an hour-aligned window are the same for the whole hour, and finding them reads the text of up to 50000 messages (to see who they @mention): a tab that polls, or two tabs, must not
+	// repeat it (Security's #11225 SHOULD 1). So the answer is kept per (team, range, window end) until the hour is over; the touches, a cheap grouped read, are not, so a touch shows at once.
+	mu     sync.Mutex
+	cached map[string]activityEntry
+	scans  atomic.Int64 // how many times the messages were scanned (a test reads it)
 }
+
+type activityEntry struct {
+	activity  board.Activity
+	taskMsgs  *[]board.TaskMessages
+	truncated bool
+}
+
+// maxCachedActivities bounds the entries kept (a team and a range each): a few teams and four ranges.
+const maxCachedActivities = 64
 
 // NewActivityHandler creates the handler.
 func NewActivityHandler(bs *board.Store) *ActivityHandler { return &ActivityHandler{bs: bs} }
@@ -36,6 +54,9 @@ func (h *ActivityHandler) clock() time.Time {
 
 // Activity answers the read.
 func (h *ActivityHandler) Activity(w http.ResponseWriter, r *http.Request) {
+	if refuseNonOwner(w, r) { // through Coral Hub the owner's alone (#11225, Security's MUST): the reply is how hands-on the Operator is and what each agent did
+		return
+	}
 	q := r.URL.Query()
 	team := strings.TrimSpace(q.Get("team"))
 	if team == "" {
@@ -54,7 +75,8 @@ func (h *ActivityHandler) Activity(w http.ResponseWriter, r *http.Request) {
 	now := h.clock()
 	until := now.Truncate(time.Hour).Add(time.Hour) // a whole hour, so a repeat read within it is the same window
 	since := until.Add(-dur)
-	a, err := h.bs.BoardActivity(r.Context(), team, since.Format(time.RFC3339), until.Format(time.RFC3339))
+	key := team + "|" + rng + "|" + until.Format(time.RFC3339)
+	a, taskMsgs, truncated, err := h.counted(r.Context(), key, team, since.Format(time.RFC3339), until.Format(time.RFC3339))
 	if err != nil {
 		slog.Error("activity read failed", "error", err) // the detail is the log's: a reply never carries a store's error text
 		errInternalServer(w, "the activity read failed")
@@ -67,14 +89,40 @@ func (h *ActivityHandler) Activity(w http.ResponseWriter, r *http.Request) {
 	} else {
 		a.Touches = t
 	}
-	if tm, truncated, err := h.bs.TaskMessageCounts(r.Context(), team, since.Format(time.RFC3339), until.Format(time.RFC3339)); err != nil {
-		slog.Error("activity task messages read failed", "error", err)
+	a.TaskMessages = taskMsgs
+	a.Truncated = a.Truncated || truncated
+	writeJSON(w, http.StatusOK, map[string]any{"range": rng, "generated_at": now.Format(time.RFC3339), "activity": a})
+}
+
+// counted is the window's counts (the messages' scan and the task messages): from the hour's cache when it is there, else read and kept. A read that fails is not kept.
+func (h *ActivityHandler) counted(ctx context.Context, key, team, since, until string) (*board.Activity, *[]board.TaskMessages, bool, error) {
+	h.mu.Lock()
+	if e, ok := h.cached[key]; ok {
+		h.mu.Unlock()
+		a := e.activity // a copy: the caller adds the touches
+		return &a, e.taskMsgs, e.truncated, nil
+	}
+	h.mu.Unlock()
+	a, err := h.bs.BoardActivity(ctx, team, since, until)
+	if err != nil {
+		return nil, nil, false, err
+	}
+	h.scans.Add(1)
+	var taskMsgs *[]board.TaskMessages
+	truncated := false
+	if tm, tr, terr := h.bs.TaskMessageCounts(ctx, team, since, until); terr != nil {
+		slog.Error("activity task messages read failed", "error", terr) // left out of the reply: the tab says "not recorded yet" for it
 	} else {
 		if tm == nil {
 			tm = []board.TaskMessages{}
 		}
-		a.TaskMessages = &tm
-		a.Truncated = a.Truncated || truncated
+		taskMsgs, truncated = &tm, tr
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"range": rng, "generated_at": now.Format(time.RFC3339), "activity": a})
+	h.mu.Lock()
+	if h.cached == nil || len(h.cached) >= maxCachedActivities {
+		h.cached = map[string]activityEntry{} // a new hour (the keys carry the window's end), or too many: start again
+	}
+	h.cached[key] = activityEntry{activity: *a, taskMsgs: taskMsgs, truncated: truncated}
+	h.mu.Unlock()
+	return a, taskMsgs, truncated, nil
 }

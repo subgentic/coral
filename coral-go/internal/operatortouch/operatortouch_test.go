@@ -14,17 +14,17 @@ import (
 	"github.com/subgentic/coral/internal/terminalinput"
 )
 
-type row struct{ Team, Agent, Kind string }
+type row struct{ Team, Agent, Kind, Source string }
 
 type fakeStore struct {
 	mu   sync.Mutex
 	rows []row
 }
 
-func (f *fakeStore) RecordOperatorTouch(_ context.Context, team, agent, kind string, _ time.Time) error {
+func (f *fakeStore) RecordOperatorTouch(_ context.Context, team, agent, kind, source string, _ time.Time) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.rows = append(f.rows, row{team, agent, kind})
+	f.rows = append(f.rows, row{team, agent, kind, source})
 	return nil
 }
 func (f *fakeStore) kinds() []string {
@@ -65,17 +65,17 @@ func TestTypedInputIsOneTouchPerBurstAndOtherTouchesStartOne(t *testing.T) {
 	assert.Equal(t, []string{board.TouchTyped, board.TouchTyped}, st.kinds(), "the next burst")
 
 	*now = now.Add(time.Minute)
-	r.Touch(context.Background(), sid1, board.TouchAnswer)
+	r.Touch(context.Background(), sid1, board.TouchAnswer, board.TouchLocal)
 	r.Typed(sid1) // the answer's own keystroke
 	*now = now.Add(2 * time.Second)
-	r.Touch(context.Background(), sid1, board.TouchStop)
+	r.Touch(context.Background(), sid1, board.TouchStop, board.TouchLocal)
 	r.Typed(sid1)
 	assert.Equal(t, []string{board.TouchTyped, board.TouchTyped, board.TouchAnswer, board.TouchStop}, st.kinds())
 
 	// Wake, restart and approve are one touch each, every time.
-	r.Touch(context.Background(), sid1, board.TouchWake)
-	r.Touch(context.Background(), sid1, board.TouchWake)
-	r.TouchAgent(context.Background(), "team", "Dev", board.TouchApprove)
+	r.Touch(context.Background(), sid1, board.TouchWake, board.TouchLocal)
+	r.Touch(context.Background(), sid1, board.TouchWake, board.TouchLocal)
+	r.TouchAgent(context.Background(), "team", "Dev", board.TouchApprove, board.TouchLocal)
 	assert.Equal(t, []string{board.TouchTyped, board.TouchTyped, board.TouchAnswer, board.TouchStop, board.TouchWake, board.TouchWake, board.TouchApprove}, st.kinds())
 }
 
@@ -84,11 +84,12 @@ func TestASessionOnNoBoardOrANonSessionTargetIsNotRecorded(t *testing.T) {
 	r.Typed("99999999-2222-3333-4444-555555555555") // on no board
 	r.TypedTo("a-plain-terminal")                   // not a session's name
 	r.TypedTo("")
-	r.Touch(context.Background(), "", board.TouchWake)
+	r.Touch(context.Background(), "", board.TouchWake, board.TouchLocal)
 	var nilRecorder *Recorder
 	nilRecorder.Typed(sid1) // not recording at all: harmless
-	nilRecorder.Touch(context.Background(), sid1, board.TouchStop)
-	nilRecorder.TouchAgent(context.Background(), "t", "a", board.TouchApprove)
+	nilRecorder.Touch(context.Background(), sid1, board.TouchStop, board.TouchLocal)
+	nilRecorder.TouchAgent(context.Background(), "t", "a", board.TouchApprove, board.TouchLocal)
+	nilRecorder.NoteSource(sid1, board.TouchHub)
 	assert.Empty(t, st.kinds())
 }
 
@@ -104,4 +105,43 @@ func TestWhatAPersonTypedNeverReachesTheRecording(t *testing.T) {
 	dump, _ := json.Marshal(st.rows)
 	assert.NotContains(t, string(dump), "hunter2")
 	assert.Less(t, len(dump), 100, "what is kept does not grow with what was typed")
+}
+
+// QA's #11225 MUST: on the tmux backend a terminal's target is the pane, claude-<uuid>:0.0, and the typed touch was never recorded because that did not parse. The pane form, the session name of the
+// pty backend and a pane of another window all name the session.
+func TestTypedTouchesAreRecordedOnTheTmuxPaneFormAndThePtyName(t *testing.T) {
+	for _, target := range []string{"claude-" + sid1 + ":0.0", "claude-" + sid1, "claude-" + sid1 + ":1.2", "claude-" + sid1 + ":"} {
+		r, st, _ := rec(t)
+		r.TypedTo(target)
+		assert.Equal(t, []string{board.TouchTyped}, st.kinds(), target)
+	}
+	r, st, _ := rec(t)
+	for _, target := range []string{"plain-terminal:0.0", ":0.0", "claude-not-a-uuid:0.0"} {
+		r.TypedTo(target)
+	}
+	assert.Empty(t, st.kinds(), "a target that names no session is still ignored")
+	terminalinput.SetPersonSink(r.TypedTo)
+	t.Cleanup(func() { terminalinput.SetPersonSink(func(string) {}) })
+	terminalinput.Record(terminalinput.Person, "claude-"+sid1+":0.0", terminalinput.Text, "typed on tmux")
+	assert.Equal(t, []string{board.TouchTyped}, st.kinds(), "through the person path, as the tmux backend calls it")
+}
+
+// Security's #11225 SHOULD 2: the typing a route is about to write is recorded as from where the route said (local or a Hub caller); with no word, or an old one, it is the person at this computer's.
+func TestTypedTouchesCarryWhereTheRouteSaidTheyCameFrom(t *testing.T) {
+	r, st, now := rec(t)
+	r.NoteSource(sid1, board.TouchHub)
+	r.TypedTo("claude-" + sid1 + ":0.0")
+	*now = now.Add(time.Minute)
+	r.TypedTo("claude-" + sid1) // the word is a minute old: the person here
+	r.Touch(context.Background(), sid1, board.TouchWake, board.TouchHub)
+	r.NoteSource(sid1, "not a source")
+	*now = now.Add(time.Minute)
+	r.TypedTo("claude-" + sid1)
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	var got []string
+	for _, x := range st.rows {
+		got = append(got, x.Kind+"/"+x.Source)
+	}
+	assert.Equal(t, []string{"typed/hub", "typed/local", "wake/hub", "typed/local"}, got)
 }
