@@ -12,7 +12,7 @@ import (
 const maxConfigBytes = 1 << 20
 
 // ConfigHosts lists the Host names of the SSH config at path (the hub user's own ~/.ssh/config; the caller names it, this reads that file only). It returns concrete names only: a pattern
-// (* ? !), a name ssh would reject as an argument, and anything under Match are skipped, and an Include is NOT followed. Nothing in the file is run, and nothing is copied out but the names.
+// (* ? !) and a name ssh would reject as an argument are skipped, a Match line is ignored (never evaluated, so nothing it names runs), and an Include is NOT followed. Nothing in the file is run, and nothing is copied out but the names.
 func ConfigHosts(path string) ([]string, error) {
 	f, err := os.Open(path)
 	if err != nil {

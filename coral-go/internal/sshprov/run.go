@@ -91,6 +91,20 @@ var ErrConnect = errors.New("sshprov: could not connect")
 
 const maxOutput = 64 << 10
 
+// shQuote is s as one single-quoted word for the remote shell.
+func shQuote(s string) string { return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'" }
+
+// minimalEnv is all ssh is given: the hub's own CORAL_* values and anything else in its environment never reach a user's SendEnv or ProxyCommand. SSH_AUTH_SOCK is the user's agent.
+func minimalEnv() []string {
+	env := []string{"LC_ALL=C"}
+	for _, k := range []string{"HOME", "USER", "PATH", "SSH_AUTH_SOCK"} {
+		if v, ok := os.LookupEnv(k); ok {
+			env = append(env, k+"="+v)
+		}
+	}
+	return env
+}
+
 type capped struct {
 	b bytes.Buffer
 }
@@ -118,13 +132,14 @@ func (r Runner) Run(ctx context.Context, t Target, c Command, args ...string) (R
 	if ssh == "" {
 		ssh = "ssh"
 	}
-	argv := []string{"-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=yes", "-o", "ConnectTimeout=10", "-o", "ClearAllForwardings=yes", "-o", "RequestTTY=no", "-o", "LogLevel=ERROR"}
+	argv := []string{"-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=yes", "-o", "ConnectTimeout=10", "-o", "ClearAllForwardings=yes", "-o", "RequestTTY=no", "-o", "LogLevel=ERROR",
+		"-o", "ForwardAgent=no", "-o", "ForwardX11=no", "-o", "PermitLocalCommand=no", "-o", "RemoteCommand=none"}
 	argv = append(argv, t.Args()...)
-	argv = append(argv, "--", t.Destination(), text)
+	argv = append(argv, "--", t.Destination(), "sh -c "+shQuote(text))
 	cmd := executil.Command(ctx, ssh, argv...)
 	var out, errOut capped
 	cmd.Stdout, cmd.Stderr, cmd.Stdin = &out, &errOut, nil
-	cmd.Env = append(os.Environ(), "LC_ALL=C")
+	cmd.Env = minimalEnv()
 	runErr := cmd.Run()
 	res := Result{Stdout: out.b.String()}
 	if runErr == nil {

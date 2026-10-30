@@ -129,7 +129,7 @@ func TestRunBuildsOneFixedArgvAndNeverRelaxesHostKeyChecking(t *testing.T) {
 	b, _ := os.ReadFile(log)
 	argv := strings.Split(strings.TrimSpace(string(b)), "\n")
 	joined := strings.Join(argv, " ")
-	for _, want := range []string{"BatchMode=yes", "StrictHostKeyChecking=yes", "ClearAllForwardings=yes", "-p 2222"} {
+	for _, want := range []string{"BatchMode=yes", "StrictHostKeyChecking=yes", "ClearAllForwardings=yes", "-p 2222", "ForwardAgent=no", "ForwardX11=no", "PermitLocalCommand=no", "RemoteCommand=none"} {
 		if !strings.Contains(joined, want) {
 			t.Errorf("argv lacks %q: %v", want, argv)
 		}
@@ -138,7 +138,7 @@ func TestRunBuildsOneFixedArgvAndNeverRelaxesHostKeyChecking(t *testing.T) {
 		t.Errorf("host key checking was relaxed: %v", argv)
 	}
 	n := len(argv)
-	if argv[n-3] != "--" || argv[n-2] != "rich@box.example.com" || argv[n-1] != "uname -sm" {
+	if argv[n-3] != "--" || argv[n-2] != "rich@box.example.com" || argv[n-1] != "sh -c 'uname -sm'" {
 		t.Errorf("the tail of argv is not '-- destination text': %v", argv[n-3:])
 	}
 }
@@ -176,5 +176,33 @@ func TestRunCapsWhatItKeeps(t *testing.T) {
 	res, err := Runner{SSH: ssh}.Run(context.Background(), tg, CmdUname)
 	if err != nil || len(res.Stdout) != maxOutput {
 		t.Errorf("kept %d bytes, err %v", len(res.Stdout), err)
+	}
+}
+
+func TestRunGivesSSHAMinimalEnvironmentAndQuotesTheText(t *testing.T) {
+	t.Setenv("CORAL_SECRET_THING", "leak")
+	t.Setenv("SSH_AUTH_SOCK", "/tmp/agent.sock")
+	dir := t.TempDir()
+	envFile := filepath.Join(dir, "env")
+	script := "#!/bin/sh\nenv > '" + envFile + "'\nfor a in \"$@\"; do last=\"$a\"; done\nprintf '%s' \"$last\" > '" + envFile + ".text'\n"
+	p := filepath.Join(dir, "ssh")
+	if err := os.WriteFile(p, []byte(script), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	tg, _ := ParseTarget("rich@box.example.com")
+	if _, err := (Runner{SSH: p}).Run(context.Background(), tg, CmdSha256, "a/b.tgz"); err != nil {
+		t.Fatal(err)
+	}
+	b, _ := os.ReadFile(envFile)
+	if strings.Contains(string(b), "CORAL_") || strings.Contains(string(b), "leak") {
+		t.Errorf("the hub's environment reached ssh:\n%s", b)
+	}
+	if !strings.Contains(string(b), "SSH_AUTH_SOCK=/tmp/agent.sock") || !strings.Contains(string(b), "LC_ALL=C") {
+		t.Errorf("the agent or locale is missing:\n%s", b)
+	}
+	text, _ := os.ReadFile(envFile + ".text")
+	want := `sh -c 'cd "$HOME/.coral-server" && sha256sum -- ` + `'\''a/b.tgz'\''` + `'`
+	if string(text) != want {
+		t.Errorf("remote text = %s; want %s", text, want)
 	}
 }
