@@ -9,6 +9,9 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '../../coral-go/pkg/frontend');
 const WORD = /(?<![\w-])(servers?|machines?)(?![\w-])/i;
+// A hyphen joins words in prose too (a placeholder like http://remote-machine:8420, "a server-side thing"): the word with a hyphen beside it counts in a URL, or in text that reads as a sentence (a capital letter or a closing mark), not in a list of class names or a route.
+const WORD_HYPHEN = /(?<!\w)(servers?|machines?)(?!\w)/i;
+const prose = x => /:\/\//.test(x) || (/\s/.test(x) && (/[A-Z]/.test(x) || /[.!?:]\s*$/.test(x) || /\be\.g\./.test(x)));
 // [file, text it must contain]: not a linked computer
 const KEEP = [
     ['capture.js', 'capture poll: server not reachable'],            // a console line, not on screen
@@ -23,12 +26,13 @@ const KEEP = [
     ['live_history.js', 'the reply from the server'],                 // this Coral's own answer
     ['saved_marks.js', 'the server sent a bookmark'],
     ['waiting.js', 'the server did not answer'],
+    ['editions.js', 'multi-server-hub'],                              // the address of a docs page, not a word on screen
 ];
 const KEEP_TEMPLATE = ['MCP servers', 'Board Server', 'Lost connection to server', 'build server, test runner'];
 
 const bad = [];
 const attrless = s => s.replace(/\b(?:class|id|for|name|value|href|data-[\w-]+|aria-controls|aria-labelledby|type|role)=\\?["'][^"']*\\?["']/g, '');
-const visible = t => { const x = attrless(t); return WORD.test(x) && (/\s/.test(x) || /^[A-Z]/.test(x)); };
+const visible = t => { const x = attrless(t); return WORD.test(x) ? (/\s/.test(x) || /^[A-Z]/.test(x)) : WORD_HYPHEN.test(x) && prose(x); };
 
 const dir = path.join(root, 'static');
 for (const f of fs.readdirSync(dir).filter(f => f.endsWith('.js'))) {
@@ -50,7 +54,7 @@ for (const f of htmls) {
     for (const [i, t] of parts) {
         if (!/[A-Za-z]/.test(t) || /\{\{/.test(t) && !/[A-Za-z]{3}/.test(t.replace(/\{\{[^}]*\}\}/g, ''))) continue;
         const plain = t.replace(/\{\{[^}]*\}\}/g, ' ');
-        if (WORD.test(plain) && !KEEP_TEMPLATE.some(k => plain.includes(k))) bad.push(`${path.relative(root, f)}:${s.slice(0, i).split('\n').length}: ${JSON.stringify(plain.trim()).slice(0, 120)}`);
+        if ((WORD.test(plain) || (WORD_HYPHEN.test(plain) && prose(plain))) && !KEEP_TEMPLATE.some(k => plain.includes(k))) bad.push(`${path.relative(root, f)}:${s.slice(0, i).split('\n').length}: ${JSON.stringify(plain.trim()).slice(0, 120)}`);
     }
 }
 if (bad.length) { console.error('computer_words_census FAIL: a visible "server" or "machine" for a linked Coral (say "computer"; or list it in KEEP with its reason):\n  ' + bad.join('\n  ')); process.exit(1); }

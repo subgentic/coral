@@ -7,7 +7,7 @@ const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 
 const WARNING = 'the key crosses the network unencrypted; use https or a tunnel';
-const REFUSED = 'URL must be https: the API key would cross the network unencrypted (a server on a private network or this computer can be registered with allow_private)';
+const REFUSED = 'URL must be https: the API key would cross the network unencrypted (another computer on a private network, or this one, can be registered with allow_private)';
 const SERVERS = [
     { id: 'local', label: 'studio-mac', local: true, status: 'online' },
     { id: 'lan', label: 'LAN box', url: 'http://192.168.1.50:8420', status: 'online', allow_private: true, warning: WARNING },

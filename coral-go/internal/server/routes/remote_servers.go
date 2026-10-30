@@ -100,7 +100,7 @@ func validateNewRemoteURL(raw string, allowPrivate bool) (string, error) {
 		return "", err
 	}
 	if !allowPrivate && strings.HasPrefix(norm, "http://") {
-		return "", errors.New("URL must be https: the API key would cross the network unencrypted (a server on a private network or this computer can be registered with allow_private)")
+		return "", errors.New("URL must be https: the API key would cross the network unencrypted (another computer on a private network, or this one, can be registered with allow_private)")
 	}
 	return norm, nil
 }
@@ -234,7 +234,7 @@ func CheckRemoteHealth(ctx context.Context, baseURL, apiKey string, allowPrivate
 		Version string `json:"version"`
 	}
 	if err := json.NewDecoder(io.LimitReader(resp.Body, 64*1024)).Decode(&body); err != nil || body.Status != "ok" {
-		return RemoteHealth{Status: store.RemoteStatusUnreachable, Err: "remote is not a Coral server"}
+		return RemoteHealth{Status: store.RemoteStatusUnreachable, Err: "remote is not running Coral"}
 	}
 	return RemoteHealth{Status: store.RemoteStatusOnline, Version: body.Version}
 }
@@ -260,7 +260,7 @@ func decodeRemoteReq(w http.ResponseWriter, r *http.Request) (remoteServerReques
 func remoteErr(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, store.ErrRemoteNotFound):
-		errNotFound(w, "server not found")
+		errNotFound(w, "computer not found")
 	case errors.Is(err, store.ErrRemoteExists):
 		errConflict(w, "server id already exists")
 	case errors.Is(err, store.ErrInvalidRemoteID):

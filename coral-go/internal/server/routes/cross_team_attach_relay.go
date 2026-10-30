@@ -278,7 +278,7 @@ func (h *BoardHandler) sendRelayAttachments(w http.ResponseWriter, ctx context.C
 				relayError(w, http.StatusServiceUnavailable, "not_linked", textNotLinked, 0)
 				return false, true
 			case errors.Is(err, tunnel.ErrRelayArtifactUnsupported):
-				relayError(w, http.StatusNotImplemented, "relay_unsupported", "Coral Hub doesn't relay files for this server (its file relay is switched off, or the hub is too old); the message was not sent", 0)
+				relayError(w, http.StatusNotImplemented, "relay_unsupported", "Coral Hub doesn't relay files for this computer (its file relay is switched off, or the hub is too old); the message was not sent", 0)
 				return false, true
 			}
 			relayError(w, http.StatusBadGateway, "hub_unreachable", which+" could not be sent to Coral Hub"+retry, 0)

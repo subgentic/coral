@@ -69,8 +69,8 @@ The ☰ **Display options** button under the search box opens a panel in place (
 
 ![The Display options panel under the search box: State, Board and Sort, and the agent count](docs-img/display-options.png)
 
-- **State** (Needs input, Working, Idle, Asleep), **Board**, **Machine** (when other machines are connected) and **Sort** (List order, Name, Recent activity, Cost), then the count ("4 of 10 agents") and **Clear filters**.
-- **Show server** and **Group by server** are two more switches in the panel, shown when two or more machines are connected.
+- **State** (Needs input, Working, Idle, Asleep), **Board**, **Computer** (when other computers are connected) and **Sort** (List order, Name, Recent activity, Cost), then the count ("4 of 10 agents") and **Clear filters**.
+- **Show computer** and **Group by computer** are two more switches in the panel, shown when two or more computers are connected.
 - **A summary line** under the search says what is on, for example `State: Working (4 of 10 agents)`, with **Clear**, and a dot on the button marks that something is on.
 - **Escape** closes the panel and returns to its button. Whether it is open is remembered in this browser. On a phone the same panel is in the Agents page header.
 
