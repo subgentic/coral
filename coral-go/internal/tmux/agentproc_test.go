@@ -227,3 +227,39 @@ func TestAdoptAgentAfterLaunchOnARealPane(t *testing.T) {
 	require.Eventually(t, func() bool { v := verdict(); return !v.OK && v.Reason != "" }, shellWait, 25*time.Millisecond)
 	assert.NotEqual(t, ReasonAdopting, verdict().Reason)
 }
+
+// #137855: the launch call returns before the launch line is typed (and so before the watch begins), and a task created right after it asks for the verdict first: that is "not recorded YET", a wait,
+// never a refusal, for launchGrace; after that, or once the watch has begun and found nothing, it is refused as before. Nothing is typed on this verdict.
+func TestANoticeForASessionJustCreatedForALaunchWaitsUntilItsGraceEnds(t *testing.T) {
+	const session = "claude-launching"
+	t.Cleanup(func() { ForgetAgentProc(session); agentRecs.Lock(); delete(agentRecs.m, session); agentRecs.Unlock() })
+	none := func() (AgentProc, bool) { return AgentProc{}, false }
+	running := table("  600     1 Ss   "+t0+" -zsh", "  700   600 S+   "+t1+" claude")
+	old := launchGrace
+	defer func() { launchGrace = old }()
+
+	assert.Equal(t, ReasonNotRecorded, noticeVerdict(running, 600, session, none).Reason, "a session nobody launched is not waited for")
+
+	NoteLaunching(session)
+	v := noticeVerdict(running, 600, session, none)
+	assert.True(t, v.Wait, "created a moment ago, the line not typed yet: wait")
+	assert.False(t, v.OK, "and nothing is typed")
+	assert.Equal(t, ReasonAdopting, v.Reason)
+
+	launchGrace = time.Millisecond
+	time.Sleep(5 * time.Millisecond)
+	v = noticeVerdict(running, 600, session, none)
+	assert.False(t, v.Wait, "a launch whose line never came is not waited for for ever")
+	assert.Equal(t, ReasonNotRecorded, v.Reason)
+
+	launchGrace = old
+	NoteLaunching(session)
+	assert.True(t, noticeVerdict(running, 600, session, none).Wait)
+	ForgetAgentProc(session)
+	assert.False(t, noticeVerdict(running, 600, session, none).Wait, "a session forgotten (killed, relaunched) is not waited for")
+
+	agentRecs.Lock()
+	agentRecs.m[session] = &agentRec{proc: AgentProc{PID: 700, Start: t1}, adopted: true, launchAt: time.Now()}
+	agentRecs.Unlock()
+	assert.True(t, noticeVerdict(running, 600, session, none).OK, "an adopted process decides, whatever launchAt says")
+}

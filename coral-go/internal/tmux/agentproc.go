@@ -39,6 +39,7 @@ type agentRec struct {
 	proc     AgentProc
 	adopted  bool
 	adopting bool
+	launchAt time.Time          // when the session was created for a launch whose line is not typed yet (zero once the watch has begun)
 	gen      int                // a newer launch line supersedes the watch of an older one
 	stop     context.CancelFunc // ends the watch of this launch
 }
@@ -70,10 +71,30 @@ func ForgetAgentProc(session string) {
 	if r, ok := agentRecs.m[session]; ok {
 		r.gen++ // a watch of the old launch sees it changed and ends
 		r.proc, r.adopted, r.adopting = AgentProc{}, false, false
+		r.launchAt = time.Time{}
 		if r.stop != nil {
 			r.stop()
 			r.stop = nil
 		}
+	}
+}
+
+// launchGrace is how long after a session is created for a launch its notices are told to wait, not refused, while the launch line is not typed yet (the launch call returns before it is, and a task
+// created right after it would otherwise be dropped, #137855). A launch whose line is never typed stops being waited for after this.
+var launchGrace = 15 * time.Second
+
+// NoteLaunching records that session was just created for an agent launch: until its launch line is typed and the watch begins (AdoptAgentAfterLaunch), a notice for it gets the "wait" verdict. Nothing is
+// ever typed on this: it only turns "not recorded" into "not recorded yet" for launchGrace.
+func NoteLaunching(session string) {
+	agentRecs.Lock()
+	defer agentRecs.Unlock()
+	r := agentRecs.m[session]
+	if r == nil {
+		r = &agentRec{}
+		agentRecs.m[session] = r
+	}
+	if !r.adopting && !r.adopted {
+		r.launchAt = time.Now()
 	}
 }
 
@@ -130,6 +151,7 @@ func adoptAfterLaunch(session string, findShell func(context.Context) (int, erro
 	ctx, cancel := context.WithTimeout(context.Background(), adoptWindow+10*time.Second)
 	r.stop = cancel
 	r.adopted, r.proc, r.adopting = false, AgentProc{}, true
+	r.launchAt = time.Time{} // the watch itself says the process is on its way
 	watches.Add(1)
 	agentRecs.Unlock()
 	safego.Go("tmux-adopt-agent", func() { defer watches.Done(); defer cancel(); watchForAgent(ctx, session, findShell, persist, gen) })
@@ -329,12 +351,13 @@ func noticeVerdict(procs *procTable, shell int, session string, load func() (Age
 	agentRecs.Lock()
 	r := agentRecs.m[session]
 	var rec AgentProc
-	adopted, adopting := false, false
+	adopted, adopting, launching := false, false, false
 	if r != nil {
 		rec, adopted, adopting = r.proc, r.adopted, r.adopting
+		launching = !r.launchAt.IsZero() && time.Since(r.launchAt) < launchGrace
 	}
 	agentRecs.Unlock()
-	if adopting {
+	if adopting || (launching && !adopted) {
 		return NoticeVerdict{Wait: true, Reason: ReasonAdopting}
 	}
 	if adopted {

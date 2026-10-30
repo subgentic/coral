@@ -2,9 +2,12 @@ package ptymanager
 
 import (
 	"context"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type fakeNoticeTerm struct {
@@ -76,4 +79,62 @@ func TestNoticeBlockedOffSwitch(t *testing.T) {
 func TestNoticeBlockedIgnoresATerminalAgent(t *testing.T) {
 	blocked, _ := NoticeBlocked(context.Background(), fakeNoticeTerm{known: true, why: "foreground"}, "terminal-6a1b2c3d-4e5f-4061-8a7b-9c0d1e2f3a4b", "terminal", "", "board message")
 	assert.False(t, blocked, "a terminal agent never gets automated input at all: that is decided elsewhere")
+}
+
+// scriptedTerm answers "the process is still being recorded" until readyAt, then "go ahead".
+type scriptedTerm struct {
+	readyAt time.Time
+	asked   *atomic.Int32
+}
+
+func (s scriptedTerm) AgentNoticeTarget(context.Context, string, string, string) (bool, bool, string, bool) {
+	s.asked.Add(1)
+	if time.Now().Before(s.readyAt) {
+		return false, true, "starting", true
+	}
+	return true, false, "", true
+}
+
+// #137855: a task notice that comes 0.3 s before the agent's process is recorded is held and typed once, after the record, never before it and never lost; one for which no record ever lands is
+// withheld (shown as a pause, logged once) when the hold runs out.
+func TestANoticeForAnAgentJustLaunchedIsHeldUntilItsProcessIsRecorded(t *testing.T) {
+	const name = "claude-6a1b2c3d-4e5f-4061-8a7b-9c0d1e2f3a4d"
+	t.Cleanup(func() { clearSkipped(name); noticeLogged.Delete(name + "\x00starting") })
+	step, max := noticeHoldStep, noticeHoldMax
+	defer func() { noticeHoldStep, noticeHoldMax = step, max }()
+	noticeHoldStep, noticeHoldMax = 20*time.Millisecond, 5*time.Second
+
+	var asked atomic.Int32
+	began := time.Now()
+	blocked, why := NoticeBlockedWait(context.Background(), scriptedTerm{readyAt: began.Add(300 * time.Millisecond), asked: &asked}, name, "claude", "", "task notification")
+	assert.False(t, blocked, "typed once the process is recorded")
+	assert.Empty(t, why)
+	assert.GreaterOrEqual(t, time.Since(began), 300*time.Millisecond, "never before the record")
+	assert.Greater(t, asked.Load(), int32(3), "it asked again, not once")
+	_, shown := SkippedOf(name)
+	assert.False(t, shown, "a launch moments ago is never shown as a pause")
+
+	noticeHoldMax = 150 * time.Millisecond
+	asked.Store(0)
+	blocked, why = NoticeBlockedWait(context.Background(), scriptedTerm{readyAt: time.Now().Add(time.Hour), asked: &asked}, name, "claude", "", "task notification")
+	assert.True(t, blocked, "the record never landed: withheld")
+	assert.Equal(t, "starting", why)
+	s, shown := SkippedOf(name)
+	require.True(t, shown, "and the dashboard says why")
+	assert.Contains(t, s.Why, SkipNotAgent)
+}
+
+func TestAHeldNoticeStopsWhenItsContextEnds(t *testing.T) {
+	const name = "claude-6a1b2c3d-4e5f-4061-8a7b-9c0d1e2f3a4e"
+	t.Cleanup(func() { clearSkipped(name); noticeLogged.Delete(name + "\x00starting") })
+	step := noticeHoldStep
+	defer func() { noticeHoldStep = step }()
+	noticeHoldStep = 20 * time.Millisecond
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+	var asked atomic.Int32
+	began := time.Now()
+	blocked, _ := NoticeBlockedWait(ctx, scriptedTerm{readyAt: time.Now().Add(time.Hour), asked: &asked}, name, "claude", "", "task notification")
+	assert.True(t, blocked)
+	assert.Less(t, time.Since(began), 2*time.Second, "a cancelled sender is not held for the whole hold")
 }
