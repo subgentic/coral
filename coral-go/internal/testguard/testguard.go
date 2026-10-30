@@ -81,8 +81,8 @@ func inMemoryDB(name string) bool {
 	if path == ":memory:" {
 		return true // "file::memory:" alone or followed by "?"
 	}
-	if !hasQuery {
-		return false
+	if !hasQuery || strings.Contains(query, "%") {
+		return false // a percent-escape could spell a second mode= (mod%65=rwc) that SQLite decodes and this check would not see (Security on #214)
 	}
 	// Exactly one mode= parameter, and it is mode=memory. With two (file:x.db?mode=memory&mode=rwc, or the other order) SQLite's own answer is not
 	// worth guessing, so the name is treated as a file (the coral-go-team's Security on #214).

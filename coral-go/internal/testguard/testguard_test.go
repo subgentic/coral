@@ -155,7 +155,8 @@ func TestCheckDataPathPanicsInsideTheSourceTree(t *testing.T) {
 	}
 	// A real file in the package folder must reach the check, however its name looks.
 	for _, p := range []string{"x.db", "file:x.db", "file:x.db?mode=rwc", "file::memory:evil.db", "file:mode=memory.db", "file:x.db#mode=memory", "file:x.db?foo#mode=memory", "file:x.db?mode=memoryx",
-		"file:x.db?mode=memory&mode=rwc", "file:x.db?mode=rwc&mode=memory", "file:x.db?mode=memory&mode=memory"} { // more than one mode=: a file (the coral-go-team's Security on #214)
+		"file:x.db?mode=memory&mode=rwc", "file:x.db?mode=rwc&mode=memory", "file:x.db?mode=memory&mode=memory",
+		"file:x.db?mode=memory&mod%65=rwc", "file:x.db?%6Dode=rwc&mode=memory"} { // more than one mode=, or a percent-escape that could spell one: a file (the coral-go-team's Security on #214)
 		if !panics(p) {
 			t.Errorf("a database FILE name in the package folder was not refused: %q", p)
 		}
