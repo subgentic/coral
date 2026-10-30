@@ -58,3 +58,24 @@ function showLine(input, line, on) {
     if (on) ids.push(line.id);
     if (ids.length) input.setAttribute('aria-describedby', ids.join(' ')); else input.removeAttribute('aria-describedby');
 }
+
+/** True when `value` is <root>/Coral/<name>, the one shape the server makes (create_dir, launch_create_dir.go): a path outside it only gets the error and Browse. */
+export function fitsCoralFolder(root, value) {
+    const r = String(root || '').replace(/\\/g, '/').replace(/\/+$/, ''), v = String(value || '').trim().replace(/\\/g, '/').replace(/\/+$/, '');
+    return !!r && v.startsWith(`${r}/Coral/`) && v.length > r.length + 7 && !v.slice(r.length + 7).includes('/');
+}
+
+/** After the server said the folder does not exist (the error line is up): a "Create this folder" button inside that line when the path is one Coral may make. It marks the value as
+ *  the suggestion, so create_dir goes with the next launch, and takes the error away. Returns true when the button was added. */
+export function offerCreateFolder(input) {
+    const err = input && document.getElementById(`${input.id}-error`);
+    if (!err || input.dataset.dirServer || !fitsCoralFolder(input.dataset.coralRoot, input.value)) return false;
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'btn btn-sm field-error-action'; b.textContent = 'Create this folder';
+    b.addEventListener('click', () => {
+        input.dataset.suggested = input.value.trim();
+        input.dispatchEvent(new Event('input', { bubbles: true })); // the error goes, the suggestion line says Coral makes it at Launch
+        input.focus();
+    });
+    err.append(' ', b);
+    return true;
+}

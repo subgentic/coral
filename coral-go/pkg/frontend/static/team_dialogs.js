@@ -22,7 +22,7 @@ const { launchedMode } = await importOnce('./preset_enforcement.js');
 const { BUILTIN_TEAM_TEMPLATES, DEFAULT_TEAM_KEY, GENERATED_TEAM_KEY, _renderTeamTemplateSelector, _syncTemplateMenu, markTeamTemplate, resetTeamTemplatePicker } = await importOnce('./team_templates_ui.js');
 const { showTeamStep, currentTeamStep, TEAM_STEPS } = await importOnce('./team_steps.js');
 const { mountTeamLaunchSettings, readTeamLaunchSettings, applyTeamBoardSettings, setTeamLaunchMode } = await importOnce('./team_launch_settings.js');
-const { offerSuggestion, syncSuggestionLine, usesSuggestion } = await importOnce('./folder_suggestion.js');
+const { offerSuggestion, offerCreateFolder, syncSuggestionLine, usesSuggestion } = await importOnce('./folder_suggestion.js');
 
 
 const _modeLabel = v => [...(document.getElementById('team-permission-mode')?.options || [])].find(o => o.value === v)?.textContent || v;
@@ -780,7 +780,11 @@ async function launchTeam() {
 
     try {
         const result = await _launchOn(server, "/api/sessions/launch-team", payload, undefined, { teamFailures: true, fields: { base_branch: document.getElementById('launch-team-base-branch') } });
-        if (result) {
+        const missing = result && result.ok === false && Array.isArray(result.agents) && result.agents.length ? result.agents.find(a => a && /^directory not found/i.test(a.error || '')) : null;
+        if (missing && result.agents.every(a => a && /^directory not found/i.test(a.error || ''))) { // every member stopped on the folder: it is said at the Folder field, on the step that has it, not in a list of members (#11336)
+            const dirInput = document.getElementById('launch-team-dir');
+            showTeamStep('team'); markFieldInvalid(dirInput, missing.error); offerCreateFolder(dirInput);
+        } else if (result) {
             if (result.ok !== false) recordRecentDir(workingDir, server); // not for a team in which nobody started (#122)
             // Check for per-agent errors in the launched array
             const launched = result.agents || result.launched || [];
