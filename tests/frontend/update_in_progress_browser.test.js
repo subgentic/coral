@@ -3,6 +3,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -12,7 +13,7 @@ const BASE = require('./test_base').BASE;
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.startup('liveList', 'settings')`);
+        await coralReady(ev, 'startup', 'liveList', 'settings');
         await ev(`try { sessionStorage.removeItem('coral-updated-to'); } catch (e) {} (() => { window.__st = ${JSON.stringify(READY)}; const R = window.fetch.bind(window); window.fetch = (u, o) => { const p = new URL(String(u), location.href).pathname; const j = (b, s = 200) => Promise.resolve(new Response(JSON.stringify(b), { status: s, headers: { 'Content-Type': 'application/json' } })); if (p === '/api/system/update') return j(window.__st); if (p === '/api/system/update/relaunch-local' || p === '/api/system/update/install') return j({ ok: true }, 202); return R(u, o); }; return true; })()`);
         await ev(`import(${S} + 'update_ui.js').then(async m => { await m.refreshUpdateStatus(); const d = await import(${S} + 'update_dialog.js'); d.openUpdateDialog(m.getUpdateStatus()); return true; })`);
         await waitFor(`!!document.querySelector('#update-confirm-modal .update-go')`, 'the confirmation', 6000);

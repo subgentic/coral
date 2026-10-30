@@ -3,6 +3,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 const WORLD = `(() => {
     const real = window.fetch;
@@ -25,7 +26,7 @@ const WORLD = `(() => {
         for (const [width, mobile] of [[1280, false], [390, true]]) {
             const at = `${width} px: `;
             await Emulation.setDeviceMetricsOverride({ width, height: 900, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
             // toasts: the delay each kind is given, and what a page change does
             const t = await ev(`(async () => { const n = await import((window.__coralStatic || '/static/') + 'notifications.js');
                 const real = window.setTimeout, delays = []; window.setTimeout = (fn, ms, ...a) => { if (a[0] !== 'pin-watch') delays.push(ms); return real(fn, ms, ...a); };

@@ -3,6 +3,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -12,7 +13,7 @@ const BASE = require('./test_base').BASE;
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
         await ev(`localStorage.setItem('coral-theme', 'dark'); document.documentElement.setAttribute('data-theme', 'dark'); true`);
         await ev(`window.__saves = []; { const real = window.fetch; window.fetch = (u, o = {}) => { const p = new URL(String(u), location.href); if (p.pathname === '/api/settings' && /^(PUT|POST)$/i.test(o.method || '')) { window.__saves.push(String(o.body || '')); return Promise.resolve(new Response(JSON.stringify({ ok: true, settings: {} }), { status: 200, headers: { 'content-type': 'application/json' } })); } return real(u, o); }; } true`); // Save is answered by the test: the isolated server's settings are not written
-        await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+        await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
         // the menu's Settings
         await ev(`document.querySelector('#mobile-agent-list .phone-menu-btn').click(); true`);
         await waitFor(`!document.getElementById('nav-more-menu').hidden`, 'the menu', 5000);

@@ -3,6 +3,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -11,7 +12,7 @@ const BASE = require('./test_base').BASE;
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+        await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
         await ev(`(async () => { const u = await import((window.__coralStatic || '/static/') + 'utils.js'); u.showView('history-session-view'); const box = document.getElementById('history-messages');
             box.innerHTML = '<div class="chat-bubble human"><div class="role-label">You</div><div class="message-text">please fix the flaky login test</div></div><div class="chat-bubble assistant"><div class="role-label">Claude</div><div class="message-text">the login test is fixed; the login page is slower</div></div>'; return true; })()`);
         await waitFor(`document.getElementById('history-messages').offsetParent !== null`, 'the past chat is on screen', 8000);

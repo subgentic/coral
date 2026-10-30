@@ -4,6 +4,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 const S = `(window.__coralStatic || '/static/')`;
 
 (async () => {
@@ -14,7 +15,7 @@ const S = `(window.__coralStatic || '/static/')`;
         for (const fs of [16, 32]) {
             await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.then(() => true)`);
+            await coralReady(ev);
             await ev(`document.documentElement.style.fontSize = '${fs}px'; window.__m.add('low-a', 'A', 4, { sleeping: false, session_id: 'low-a-id' }); true`);
             await waitFor(`(window.__qaState.liveSessions || []).some(s => s.name === 'low-a')`, 'the agent', 10000);
             await ev(`window.selectLiveSession('low-a', 'claude', 'low-a-id', 'local'); true`);

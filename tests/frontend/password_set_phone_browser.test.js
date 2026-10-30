@@ -3,6 +3,7 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, sleep, PRELOAD, install } = await connect();
@@ -12,7 +13,7 @@ const { connect } = require('./agent_view_harness');
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 2, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true, maxTouchPoints: 5 });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.startup('liveList', 'settings')`);
+        await coralReady(ev, 'startup', 'liveList', 'settings');
         await ev(`(() => { const R = window.fetch; window.fetch = (u, o) => /\\/api\\/auth\\/password\\/set/.test(String(u && u.url || u)) ? Promise.resolve(new Response(JSON.stringify({ ok: true }), { headers: { 'content-type': 'application/json' } })) : R(u, o); return true; })()`);
         // the person had the search box when the dialog came up
         const search = await ev(`(() => { const e = [...document.querySelectorAll('#agent-search-input, #mobile-agent-list .mobile-search-input, input[type=search]')].find(x => x.getClientRects().length > 0); if (!e) return null; e.focus(); return e.id || e.className; })()`);

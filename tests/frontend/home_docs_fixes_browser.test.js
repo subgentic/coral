@@ -3,6 +3,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -12,7 +13,7 @@ const BASE = require('./test_base').BASE;
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [w, h, mobile] of [[1280, 800, false], [390, 844, true]]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
 
             // 1. the phone strip on Home offers the Mobile QR code beside Coral Hub
             const strip = await ev(`(() => { const s = document.getElementById('editions-home') || [...document.querySelectorAll('template')].map(t => t.content.getElementById('editions-home')).find(Boolean); if (!s) return null; const items = [...s.querySelectorAll('.editions-home-item')].map(b => (b.querySelector('strong') || {}).textContent || ''); const q = [...s.querySelectorAll('.editions-home-item')].find(b => /Mobile QR code/.test(b.textContent)); return { items, qrAction: q ? q.getAttribute('data-on-click') : null }; })()`);

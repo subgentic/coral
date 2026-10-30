@@ -4,6 +4,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -12,7 +13,7 @@ const BASE = require('./test_base').BASE;
         for (const [w, mobile] of [[390, true], [1024, false]]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: 844, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.then(() => true)`);
+            await coralReady(ev);
             await ev(`window.__m.add('more-agent', 'A', 3, { sleeping: false, session_id: 'm-id', board_project: 'a-team' }); true`);
             await waitFor(`(window.__qaState.liveSessions || []).some(s => s.name === 'more-agent')`, `${w}: the agent`, 10000);
             await ev(`window.selectLiveSession('more-agent', 'claude', 'm-id', 'local'); true`);

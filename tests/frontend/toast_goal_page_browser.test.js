@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 const B = 'toast-goal-' + Date.now().toString(36);
 
 (async () => {
@@ -11,10 +12,10 @@ const B = 'toast-goal-' + Date.now().toString(36);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         assert.ok((await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: 'orch', job_title: 'Orchestrator', session_name: 'orch-s' })).status < 300);
         const g = await api('POST', `/api/board/${B}/goals`, { subscriber_id: 'Operator', title: 'A goal with a title', outcome: 'o', done_when: 'd' }); assert.equal(g.status, 201, JSON.stringify(g));
-        await Page.navigate({ url: `${BASE}/team/${B}/goals/${g.body.id}` }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: `${BASE}/team/${B}/goals/${g.body.id}` }); await Page.loadEventFired(); await install(); await coralReady(ev);
         await waitFor(`!!document.querySelector('.goals-detail-title') && document.querySelector('.goals-detail-title').getClientRects().length > 0`, 'the goal page', 15000);
         await ev(`(async () => { const n = await import((window.__coralStatic || '/static/') + 'notifications.js'); n.showToast('Copied: paste it to an agent'); return true; })()`);
         await waitFor(`!!document.querySelector('#toast-host > .toast')`, 'the toast', 5000);

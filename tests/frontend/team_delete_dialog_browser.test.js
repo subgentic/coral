@@ -5,6 +5,7 @@ const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -18,7 +19,7 @@ const BASE = require('./test_base').BASE;
             await ev(`fetch('/api/board/${B}/messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'qa', as: 'QA Engineer', content: 'a team to delete' }) }).then(r => r.status)`);
             l = Page.loadEventFired(); await Page.navigate({ url: `${BASE}/board/${B}` }); await l;
             await install();
-            await ev(`window.__coralReady.then(() => true)`);
+            await coralReady(ev);
             await waitFor(`!!document.getElementById('team-page-more') && document.getElementById('team-page-more').getBoundingClientRect().width > 0`, `${w}: the team page and its More menu`, 15000);
             await ev(`document.getElementById('team-page-more').click(); true`);
             await waitFor(`!!document.getElementById('mb-delete-btn') && document.getElementById('mb-delete-btn').getClientRects().length > 0`, `${w}: Delete in the More menu`, 5000);
@@ -49,7 +50,7 @@ const BASE = require('./test_base').BASE;
             let l = Page.loadEventFired(); await Page.navigate({ url: BASE + '/' }); await l;
             await ev(`fetch('/api/board/${B2}/messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'qa', as: 'QA Engineer', content: 'a team to delete from the sidebar' }) }).then(r => r.status)`);
             l = Page.loadEventFired(); await Page.navigate({ url: BASE + '/' }); await l;
-            await install(); await ev(`window.__coralReady.then(() => true)`);
+            await install(); await coralReady(ev);
             await ev(`Promise.resolve(window._coralLoadLiveSessions()).then(() => true)`);
             await waitFor(`!!document.querySelector('[data-on-click="team-delete"][data-board="${B2}"]')`, 'Delete team in the sidebar team menu', 15000);
             await ev(`document.querySelector('[data-on-click="team-delete"][data-board="${B2}"]').click(); true`);

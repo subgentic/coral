@@ -4,6 +4,7 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
+const { coralReady } = require('./helpers/wait');
 
 const uid = n => '0000' + String(n).padStart(4, '0') + '-0000-4000-8000-000000000000';
 const row = (n, o) => Object.assign({ name: 'ag-' + n, session_id: uid(n), agent_type: 'claude', server: 'local', status: 'idle', summary: '', display_name: 'Agent ' + n, working_directory: '/repo/t', branch: '', board_project: 'beta-team', staleness_seconds: 100, working: false, waiting_for_input: false, sleeping: false }, o);
@@ -18,7 +19,7 @@ const row = (n, o) => Object.assign({ name: 'ag-' + n, session_id: uid(n), agent
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
-        await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         console.log('1. Two asleep in a team: rows, after the awake one');
         await show([row(1, { sleeping: true }), row(2), row(3, { sleeping: true })]);
         let l = await list();

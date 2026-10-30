@@ -3,13 +3,14 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, PRELOAD, install } = await connect();
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         for (const fs of ['', '32px']) {
             const r = await ev(`(async () => { document.documentElement.style.fontSize = ${JSON.stringify(fs)}; const b = document.getElementById('local-auth-banner'); b.hidden = false; b.classList.remove('notice-error'); b.classList.add('notice-warn');
                 for (const s of b.querySelectorAll('[data-auth-state]')) s.hidden = s.dataset.authState !== 'nopw'; document.getElementById('local-auth-set-password').hidden = false; await new Promise(r => setTimeout(r, 300)); /* sleep-ok: the layout settles */

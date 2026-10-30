@@ -5,6 +5,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { setupHubWorld, BASE } = require('./helpers/hub_world');
+const { coralReady } = require('./helpers/wait');
 
 const FAKE_VV = `(() => { const t = new EventTarget(); const vv = { height: innerHeight, width: innerWidth, scale: 1, offsetTop: 0, offsetLeft: 0, pageTop: 0, pageLeft: 0, addEventListener: (...a) => t.addEventListener(...a), removeEventListener: (...a) => t.removeEventListener(...a), dispatchEvent: e => t.dispatchEvent(e) };
     Object.defineProperty(window, 'visualViewport', { configurable: true, get: () => vv }); window.__kb = (h, top) => { vv.height = h; vv.offsetTop = top || 0; t.dispatchEvent(new Event('resize')); }; })()`;
@@ -25,7 +26,7 @@ const overlap = (a, b) => Math.min(a.r, b.r) - Math.max(a.l, b.l) > 1 && Math.mi
             await Page.addScriptToEvaluateOnNewDocument({ source: FAKE_VV });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired();
             await waitFor(`typeof window.switchNavTab === 'function' && !!window.__coralReady`, 'the dashboard');
-            await ev(`window.__coralReady.startup('liveList', 'settings')`);
+            await coralReady(ev, 'startup', 'liveList', 'settings');
             await waitFor(`(window.__qaState ? window.__qaState.liveSessions : []).length >= 0 && !!document.querySelector('#mobile-agent-list')`, 'the list', 10000);
             await ev(`document.documentElement.style.fontSize = '${fs}px'; window.selectLiveSession('hub-agent-2', 'claude', 'hub-agent-2', 'm2'); true`);
             await waitFor(`document.getElementById('terminal-header-label')?.textContent.includes('Build agent') && document.querySelector('#live-session-view .terminal-header')?.getClientRects().length > 0`, `${fs}: the Hub's agent opens`, 12000);
@@ -61,7 +62,7 @@ const overlap = (a, b) => Math.min(a.r, b.r) - Math.max(a.l, b.l) > 1 && Math.mi
         await setupHubWorld({ client, Page, Emulation, width: 390, height: 844, mobile: true });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired();
         await waitFor(`typeof window.switchNavTab === 'function' && !!window.__coralReady`, 'the dashboard');
-        await ev(`window.__coralReady.startup('liveList', 'settings')`);
+        await coralReady(ev, 'startup', 'liveList', 'settings');
         await ev(`window.selectLiveSession('hub-agent-2', 'claude', 'hub-agent-2', 'm2'); true`);
         await waitFor(`document.getElementById('terminal-header-label')?.textContent.includes('Build agent') && document.querySelector('#live-session-view .terminal-header')?.getClientRects().length > 0`, 'the agent', 12000);
         const before = (await ev(rects)).header;

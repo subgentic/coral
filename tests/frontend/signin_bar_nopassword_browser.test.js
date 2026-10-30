@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const { axName } = require('./helpers/ax_tree');
+const { coralReady } = require('./helpers/wait');
 
 const FAKE = `(() => {
     window.__auth = { strict_local_auth: true, password_set: false };
@@ -30,7 +31,7 @@ const FAKE = `(() => {
         for (const [w, h, mobile] of [[1280, 900, false], [390, 844, true]]) {
             const at = `${w} px: `;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
-            await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.then(() => true)`);
+            await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
             await waitFor(`!document.getElementById('local-auth-banner').hidden`, at + 'the bar when strict is on and no password is set', 15000);
             let b = await bar();
             assert.ok(b.shown && b.role === 'note' && /No password/.test(b.text) && b.buttons.length === 2 && b.buttons[0] === 'Set a password' && b.buttons[1] === 'Dismiss', at + 'a bar says no password, with Set a password and a Dismiss (#11258: remembered; local_auth_banner_dismiss covers it): ' + JSON.stringify(b));

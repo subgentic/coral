@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -15,7 +16,7 @@ const BASE = require('./test_base').BASE;
         for (const [w, h, mobile] of [[1280, 900, false], [390, 844, true]]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             let l = Page.loadEventFired(); await Page.navigate({ url: BASE + '/' }); await l;
-            await install(); await ev(`window.__coralReady.then(() => true)`);
+            await install(); await coralReady(ev);
             await ev(`Promise.resolve(window._coralLoadLiveSessions()).then(() => true)`);
             await waitFor(`!!document.querySelector('[data-on-click="kebab-toggle"]')`, `${w}: a row menu button`, 15000);
             // every open menu: the danger group is last, separated, with room above it

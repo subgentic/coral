@@ -3,6 +3,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -10,7 +11,7 @@ const BASE = require('./test_base').BASE;
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+        await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
         const show = changes => ev(`(() => { localStorage.setItem('coral-live-view-mode', 'chat'); window.__m.agents = {}; ${changes.map((n, i) => `window.__m.add('blog', 'A${i}', 3, { sleeping: false, session_id: 'b${i}' });`).join(' ')} const counts = ${JSON.stringify(changes)}; window._coralSetLiveSessions(Object.values(window.__m.agents).map((a, i) => ({ ...window.__m.entry(a), changed_file_count: counts[i] }))); return true; })()`);
         await show([1, 1]);
         await waitFor(`!!document.querySelector('#live-sessions-list .session-group-header')`, 'the folder row', 10000);

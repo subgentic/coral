@@ -4,6 +4,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -13,7 +14,7 @@ const BASE = require('./test_base').BASE;
     const open = async (w, fs, theme) => {
         await Emulation.setDeviceMetricsOverride({ width: w, height: 844, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-        await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
+        await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
         await ev(`for (const n of ['Ada', 'Bo', 'Cy', 'Di']) window.__m.add(n, 'A', 2, { sleeping: false, session_id: n + '-id', board_project: 'team-a' }); true`);
         await waitFor(`(window.__qaState.liveSessions || []).length >= 4`, 'the agents', 10000);
         await ev(`(async () => { const s = await import((window.__coralStatic || '/static/') + 'state.js'); const lm = { Ada: { role: 'user', text: 'please ship  it\\n today', at: 'x' }, Bo: { role: 'assistant', text: 'Done: the suite passes', at: 'x' }, Cy: null, Di: null };
