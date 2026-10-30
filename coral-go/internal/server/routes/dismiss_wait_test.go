@@ -51,3 +51,18 @@ func TestDismissWaitRefusesAnotherSessionsId(t *testing.T) {
 	assert.NotEqual(t, http.StatusOK, rec.Code, rec.Body.String())
 	assert.True(t, r.h.deriveSingleSessionState(ctx, r.sid, 0).NeedsInput, "the agent's own wait is untouched")
 }
+
+// A store failure is answered with a fixed sentence: the database's own words are logged, never sent (QA's SHOULD on #11352, made required).
+func TestDismissWaitAnswersAStoreFailureWithAFixedSentence(t *testing.T) {
+	r := newHoldRig(t, true)
+	r.requestFor("Wants to run: go test ./...")
+	_, err := r.h.db.Exec(`CREATE TRIGGER refuse_dismissal BEFORE INSERT ON agent_events WHEN NEW.event_type = 'request_resolved' BEGIN SELECT RAISE(ABORT, 'secret database text: /Users/x/.coral/sessions.db'); END`)
+	require.NoError(t, err)
+
+	rec := r.dismiss(r.sid)
+	assert.Equal(t, http.StatusInternalServerError, rec.Code, rec.Body.String())
+	assert.Contains(t, rec.Body.String(), "Could not dismiss it. Try again.")
+	assert.NotContains(t, rec.Body.String(), "secret database text")
+	assert.NotContains(t, rec.Body.String(), "sessions.db")
+	assert.True(t, r.h.deriveSingleSessionState(context.Background(), r.sid, 0).NeedsInput, "nothing was cleared")
+}

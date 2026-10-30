@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"log/slog"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -50,7 +51,8 @@ func (h *SessionsHandler) DismissWait(w http.ResponseWriter, r *http.Request) {
 	detail := `{"dismissed":true}`
 	ev := &store.AgentEvent{AgentName: ls.AgentName, SessionID: &sid, EventType: "request_resolved", Summary: "The Operator dismissed the wait", DetailJSON: &detail}
 	if _, err := h.ts.InsertAgentEvent(r.Context(), ev); err != nil {
-		errInternalServer(w, err.Error())
+		slog.Warn("could not record the Operator's dismissal of a wait", "session_id", sid, "error", err) // the cause is logged, never sent: no database text in a response
+		errInternalServer(w, "Could not dismiss it. Try again.")
 		return
 	}
 	h.pending.markRequest(body.SessionID, false)
