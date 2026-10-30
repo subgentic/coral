@@ -377,7 +377,10 @@ func (h *SessionsHandler) deliverHumanSend(ctx context.Context, name, agentType,
 				if len(echoKey(text)) < echoMinChars && !command && screen != before {
 					return nil // too short to search for: a screen that moved is all there is to go on
 				}
-				if !command && retyped < tm.Retypes {
+				// Typed again only for an agent whose hooks can run (one still starting): there an empty box with no echo means its keystrokes were lost.
+				// With its hooks gone, an empty box is also what a message it took looks like and nothing can tell the two apart, so a second copy would be a
+				// guess: it was typed twice into an agent that had taken it, then reported not sent, and sent a third time (#318).
+				if !command && !hooksGone && retyped < tm.Retypes {
 					if err := send(); err != nil { // no trace of it: its keystrokes were lost while it started, and none of it is in the box
 						return err
 					}
