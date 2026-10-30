@@ -298,7 +298,7 @@ func TestTheTimeBoundAloneLetsALongReadingRun(t *testing.T) {
 
 	was := maxWork
 	t.Cleanup(func() { maxWork = was })
-	maxWork = time.Nanosecond // the time the reading may take is over at the first look at the clock
+	maxWork = -time.Nanosecond // the time the reading may take is over at the first look at the clock, even on a clock that reads 0 elapsed (Windows' is coarse: with 1 ns the test failed there)
 	assert.Empty(t, PatternKill(command), "past the time bound the command runs")
 	maxWork = was
 	assert.NotEmpty(t, PatternKill(command), "and the bound is the only thing that changed")
