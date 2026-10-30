@@ -105,6 +105,6 @@ const CSP = ["default-src 'self'", "script-src 'self'", "style-src 'self'", "sty
     } finally { await client.close(); }
     const bad = problems(results).concat(required(results, ['hub: toasts', 'hub: home', 'hub: home, no computer connected', 'hub: nav menu', 'hub: chats list', 'hub: search results', 'hub: search, advanced filters', 'hub: search finds nothing', 'hub: chat transcript', 'hub: chat tab notes', 'hub: chat tab commits', 'hub: boards list', 'hub: board', 'hub: servers', 'hub: inbox', 'hub: artifacts', 'hub: docs', 'hub: account menu', 'hub: settings general', 'hub: launch']));
     if (process.env.PHONE_TARGETS_REPORT) { require('node:fs').writeFileSync(process.env.PHONE_TARGETS_REPORT, results.map(r => `${r.name}: ${r.error || r.n + ' controls, ' + r.small.length + ' small'}`).join('\n') + '\n--\n' + bad.join('\n') + '\n'); process.exit(0); }
-    assert.deepEqual(bad, [], 'controls under 44 px on a phone through the Hub:\n  ' + bad.join('\n  '));
+    assert.deepEqual(bad, [], `controls under 44 px on a phone through the Hub (${bad.length}): ${bad.slice(0, 6).join(' | ')}${bad.length > 6 ? ' | ...' : ''}\n  ` + bad.join('\n  ')); // the first line names them (#11185)
     console.log(`PASS ${results.length} Hub scenes: every control is at least 44 x 44 px`);
 })().catch(e => { console.error(e); process.exit(1); });

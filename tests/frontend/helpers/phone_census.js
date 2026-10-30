@@ -275,7 +275,7 @@ module.exports = part => (async () => {
     } finally { await httpJson('DELETE', `/api/board/${TEAM}`).catch(() => {}); if (standIn) await standIn.stop().catch(() => {}); await guard.restore().catch(() => {}); await client.close(); }
     const bad = problems(results).concat(required(results, requiredScenes('phone-' + part)));
     if (process.env.PHONE_TARGETS_REPORT) { require('node:fs').writeFileSync(process.env.PHONE_TARGETS_REPORT, results.map(r => `${r.name}: ${r.error || r.n + ' controls, ' + r.small.length + ' small'}`).join('\n') + '\n--\n' + bad.join('\n') + '\n'); process.exit(0); }
-    assert.deepEqual(bad, [], 'controls under 44 px on a phone:\n  ' + bad.join('\n  '));
+    assert.deepEqual(bad, [], `controls under 44 px on a phone (${bad.length}): ${bad.slice(0, 6).join(' | ')}${bad.length > 6 ? ' | ...' : ''}\n  ` + bad.join('\n  ')); // the first line names them: a CI excerpt keeps one line (#11185)
     console.log(`PASS ${results.length} scenes: every control is at least 44 x 44 px`);
 })().catch(e => { console.error(e); process.exit(1); });
 
