@@ -14,7 +14,7 @@ import (
 
 // Both default ports are refused whatever the OS, and so are loopback names for them.
 func TestBothDefaultPortsAreRefusedOnEveryOS(t *testing.T) {
-	live := liveServerAddrs("", "")
+	live := liveServerAddrs("", "", protectedDirs())
 	for _, addr := range []string{"127.0.0.1:8420", "localhost:8420", "[::1]:8420", "127.0.0.1:8450", "LOCALHOST:8450", "[::1]:8450"} {
 		assert.True(t, live[normalizeAddr(addr)], "%s is a live Coral's address", addr)
 	}
@@ -35,7 +35,7 @@ func TestThePortInTheRealLockFileIsRefused(t *testing.T) {
 }
 
 func TestThePanicNamesThePortAndSaysWhatToDo(t *testing.T) {
-	live := liveServerAddrs("", "")
+	live := liveServerAddrs("", "", protectedDirs())
 	var msg string
 	func() {
 		defer func() { msg, _ = recover().(string) }()
@@ -88,4 +88,29 @@ func httpGet(u string) {
 	if err == nil {
 		resp.Body.Close()
 	}
+}
+
+// The live addresses include the port in a lock file in the real data folder (here a temp folder standing in for it, passed as liveServerAddrs's dirs).
+func TestAPortRecordedInTheProtectedFolderIsRefused(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, lockFileName), []byte("4242\nhttp://127.0.0.1:9777\n"), 0o600))
+	live := liveServerAddrs("", "", []string{dir})
+	for _, host := range []string{"127.0.0.1", "localhost", "[::1]"} {
+		assert.True(t, live[normalizeAddr(host+":9777")], host)
+	}
+	assert.False(t, liveServerAddrs("", "", []string{t.TempDir()})[normalizeAddr("127.0.0.1:9777")], "no record, not refused")
+	assert.Panics(t, func() { checkDial(live, "127.0.0.1:9777") })
+}
+
+// A lock file that is not a regular file is skipped, never opened: a FIFO would block test init forever.
+func TestALockFileThatIsNotARegularFileIsSkipped(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.Symlink(filepath.Join(dir, "elsewhere"), filepath.Join(dir, lockFileName)); err != nil {
+		t.Skip("cannot make a link here:", err)
+	}
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "elsewhere"), []byte("1\nhttp://127.0.0.1:9778\n"), 0o600))
+	assert.Empty(t, recordedPorts([]string{dir}), "a link is not followed")
+	big := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(big, lockFileName), []byte("1\nhttp://127.0.0.1:9779\n"+strings.Repeat("x", 5000)), 0o600))
+	assert.Empty(t, recordedPorts([]string{big}), "over 4 KB")
 }

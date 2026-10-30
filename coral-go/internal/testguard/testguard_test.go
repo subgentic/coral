@@ -49,7 +49,7 @@ func TestCheckDataPathIsInertOutsideTests(t *testing.T) {
 }
 
 func TestLiveServerAddrs(t *testing.T) {
-	live := liveServerAddrs("http://127.0.0.1:9123", "9200")
+	live := liveServerAddrs("http://127.0.0.1:9123", "9200", protectedDirs())
 	for _, addr := range []string{"127.0.0.1:9123", "localhost:9123", "127.0.0.1:8420", "LOCALHOST:8420", "[::1]:8420", "127.0.0.1:9200"} {
 		if !live[normalizeAddr(addr)] {
 			t.Errorf("%s should be refused", addr)
@@ -60,13 +60,13 @@ func TestLiveServerAddrs(t *testing.T) {
 			t.Errorf("%s should be allowed", addr)
 		}
 	}
-	if !liveServerAddrs("https://coral.example", "")[normalizeAddr("coral.example:443")] {
+	if !liveServerAddrs("https://coral.example", "", protectedDirs())[normalizeAddr("coral.example:443")] {
 		t.Error("CORAL_URL without a port should use the scheme's port")
 	}
 }
 
 func TestCheckDialPanicsOnLiveServer(t *testing.T) {
-	live := liveServerAddrs("", "")
+	live := liveServerAddrs("", "", protectedDirs())
 	func() {
 		defer func() {
 			if recover() == nil {

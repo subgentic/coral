@@ -3,6 +3,7 @@ package testguard
 import (
 	"context"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/url"
@@ -31,7 +32,7 @@ func init() {
 	if os.Getenv(TestURLEnv) == "1" {
 		coralURL = "" // a test harness pointed CORAL_URL at its own server
 	}
-	live := liveServerAddrs(coralURL, os.Getenv("CORAL_PORT"))
+	live := liveServerAddrs(coralURL, os.Getenv("CORAL_PORT"), protectedDirs())
 	if t, ok := http.DefaultTransport.(*http.Transport); ok {
 		dial := t.DialContext
 		if dial == nil {
@@ -60,13 +61,32 @@ func DefaultPorts() []string { return append([]string(nil), defaultPorts...) }
 // lockFileName is the instance lock a running Coral server holds in its data folder, with its address in it (config.ServerLockFile; not imported, see above).
 const lockFileName = "coral-server.lock"
 
+// readRegularFile is the first max bytes of path, only if it is a regular file (Lstat, so a link or a FIFO named like the lock file is skipped, not opened: opening a FIFO
+// would hang test init). nil for anything else, an empty file, or one over max.
+func readRegularFile(path string, max int64) []byte {
+	fi, err := os.Lstat(path)
+	if err != nil || !fi.Mode().IsRegular() || fi.Size() > max {
+		return nil
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return nil
+	}
+	defer f.Close()
+	b, err := io.ReadAll(io.LimitReader(f, max+1))
+	if err != nil || int64(len(b)) > max {
+		return nil
+	}
+	return b
+}
+
 // recordedPorts are the ports of the addresses the live servers recorded in the real data folders' lock files (pid, url and instance id, one to a line): a Coral on a
 // port other than the default is the live Coral too, and a test must not reach it by finding its record.
 func recordedPorts(dirs []string) []string {
 	var ports []string
 	for _, dir := range dirs {
-		b, err := os.ReadFile(filepath.Join(dir, lockFileName))
-		if err != nil || len(b) > 4096 {
+		b := readRegularFile(filepath.Join(dir, lockFileName), 4096)
+		if b == nil {
 			continue
 		}
 		lines := strings.Split(strings.TrimSpace(string(b)), "\n")
@@ -84,13 +104,13 @@ func recordedPorts(dirs []string) []string {
 // inherited CORAL_URL and the loopback addresses on the default ports (both,
 // on every OS), on CORAL_PORT and on the port the live server recorded in the
 // real data folder's lock file.
-func liveServerAddrs(coralURL, coralPort string) map[string]bool {
+func liveServerAddrs(coralURL, coralPort string, dirs []string) map[string]bool {
 	addrs := map[string]bool{}
 	ports := append([]string(nil), defaultPorts...)
 	if coralPort != "" {
 		ports = append(ports, coralPort)
 	}
-	ports = append(ports, recordedPorts(protectedDirs())...)
+	ports = append(ports, recordedPorts(dirs)...)
 	if u, err := url.Parse(strings.TrimSpace(coralURL)); err == nil && u.Host != "" {
 		port := u.Port()
 		if port == "" {

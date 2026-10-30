@@ -11,10 +11,10 @@ import (
 
 // Census: every package whose tests can name a Coral's address links testguard. The guard only exists in a test binary that links it (its init refuses the live Coral's ports,
 // drops the agent shell's tmux), so a package that can call a Coral and does not link it is a test that can reach the live server unguarded. "Can name a Coral's address" is read from
-// the source: a non-test file that mentions CORAL_URL, CORAL_PORT, DefaultPort or a lookup of the recorded server (LocalServerURL, RecordedServer, VerifiedServer); a package's test
+// the source: a non-test file that mentions CORAL_URL, CORAL_PORT, CORAL_HOST, the literal 8420 or 8450, DefaultPort or a lookup of the recorded server (LocalServerURL, RecordedServer, VerifiedServer); a package's test
 // binary "can" if it links such a package, or is one. internal/config links testguard itself, so every package that imports config does; the census holds the rest.
 // An accident guard: a raw net.Dial or a custom http.Transport still bypasses the guard, and a package that builds its address from nothing named above is not seen.
-var corAddressMentions = regexp.MustCompile(`CORAL_URL|CORAL_PORT|DefaultPort|LocalServerURL|RecordedServer|VerifiedServer`)
+var corAddressMentions = regexp.MustCompile(`CORAL_URL|CORAL_PORT|CORAL_HOST|8420|8450|DefaultPort|LocalServerURL|RecordedServer|VerifiedServer`)
 
 const guardPackage = "github.com/subgentic/coral/internal/testguard"
 
