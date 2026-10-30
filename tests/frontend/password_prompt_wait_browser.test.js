@@ -15,14 +15,14 @@ const { coralReady } = require('./helpers/wait');
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
         await coralReady(ev);
-        // local: false, so a "Not now" here is not remembered and each case can ask again.
+        // local: false: a "Not now" here is remembered for this browser session only (main's #10930); dismiss() forgets it, so each case asks afresh.
         await ev(`(() => { const R = window.fetch; window.__ps = false;
             window.fetch = (u, o = {}) => String(u).startsWith('/api/system/auth-status')
                 ? Promise.resolve(new Response(JSON.stringify({ authenticated: true, method: 'session', password_set: window.__ps, local: false }), { status: 200 }))
                 : R(u, o);
             return true; })()`);
         const shown = () => ev(`!!document.getElementById('set-password-modal')`);
-        const dismiss = () => ev(`(() => { const b = document.getElementById('set-password-later'); if (b) b.click(); document.getElementById('set-password-modal')?.remove(); document.getElementById('set-password-card')?.remove(); return true; })()`);
+        const dismiss = () => ev(`(() => { const b = document.getElementById('set-password-later'); if (b) b.click(); document.getElementById('set-password-modal')?.remove(); document.getElementById('set-password-card')?.remove(); sessionStorage.removeItem('coral-password-not-now'); return true; })()`);
         // The prompt as the dashboard asks for it; __settled says whether the promise (which the Coral Hub question waits on) has settled.
         const ask = () => ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'password_ui.js'); window.__ps = false; window.__settled = false;
             m.maybePromptSetPassword().then(() => { window.__settled = true; }); return true; })()`);
@@ -94,6 +94,16 @@ const { coralReady } = require('./helpers/wait');
         console.log('3. nothing in the way: it opens at once (a fresh install still sees it)');
         await ask();
         await waitFor(`!!document.getElementById('set-password-modal')`, 'the prompt with nothing in the way', 1500);
+        await dismiss();
+
+        console.log('3b. "Not now" from another computer holds for this browser session: asked again in the same session, it does not open (#10930)');
+        await ask();
+        await waitFor(`!!document.getElementById('set-password-modal')`, 'the prompt', 1500);
+        await ev(`document.getElementById('set-password-later').click(); true`);
+        await ask();
+        await waitFor(`window.__settled === true`, 'the promise settled', 2000);
+        assert.equal(await shown(), false, 'not asked again in the same session');
+        assert.equal(await ev(`!!document.getElementById('set-password-card')`), false, 'nor as a card');
         await dismiss();
 
         console.log('4. a password set while it waited: it does not open');
