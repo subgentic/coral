@@ -31,16 +31,24 @@ func EnsureDataDir(dir string) error {
 	if dir == "" {
 		return errors.New("no data folder")
 	}
-	_, err := os.Lstat(dir)
+	fi, err := os.Lstat(dir)
 	existed := err == nil
+	if err != nil && untrustedMountRefusal(err) {
+		return behindJunction(dir, err)
+	}
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return err
 	}
-	if err := os.MkdirAll(dir, 0o700); err != nil {
-		return err
-	}
 	if !existed {
+		if err := os.MkdirAll(dir, 0o700); err != nil {
+			return err
+		}
 		return protectDataDir(dir)
+	}
+	// An existing folder is not made again: MkdirAll follows a link, and on a Windows that refuses to traverse a junction (untrusted mount point) it came back as a raw mkdir
+	// error instead of the refusal below. Only a file in the folder's place is an error here.
+	if !fi.IsDir() && fi.Mode()&(os.ModeSymlink|os.ModeIrregular) == 0 {
+		return fmt.Errorf("the data folder %s is not a folder", dir)
 	}
 	notice, err := secureExistingDataDir(dir)
 	if err != nil {
@@ -136,6 +144,24 @@ func DataDirNotice() string { return getDataDirNotice() }
 
 // SetDataDirNotice replaces that notice: the server adds what it renewed and what the person may want to do.
 func SetDataDirNotice(s string) { setDataDirNotice(s) }
+
+// ErrDataDirBehindJunction is the error of a data folder whose path goes through a junction that Windows refuses to traverse (Windows 11 build 26300 and later, for a junction a
+// non-administrator made): the folder can be neither checked nor used. The text says what to do; the system's own error stays in the chain.
+var ErrDataDirBehindJunction = errors.New("the data folder is behind a junction Windows will not open")
+
+type dataDirJunctionRefusal struct {
+	text  string
+	cause error
+}
+
+func (e dataDirJunctionRefusal) Error() string        { return e.text }
+func (e dataDirJunctionRefusal) Is(target error) bool { return target == ErrDataDirBehindJunction }
+func (e dataDirJunctionRefusal) Unwrap() error        { return e.cause }
+
+func behindJunction(dir string, cause error) error {
+	return dataDirJunctionRefusal{fmt.Sprintf("Coral cannot use its data folder %s: its path goes through a junction that Windows will not open (untrusted mount point). "+
+		"Set CORAL_DATA_DIR to a folder whose path has no junction in it, or use the real folder the junction points to.", dir), cause}
+}
 
 // ErrSharedDataDir is the error of an existing data folder that other accounts can read and that Coral could not make private.
 var ErrSharedDataDir = errors.New("the data folder can be read by other accounts")
