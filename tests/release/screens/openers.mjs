@@ -14,11 +14,11 @@ async function fire(page, selector, what) {
     if (!ok) throw new Error(`no ${what} (${selector})`);
 }
 
-/** The gear's menu (on a phone the header's "Account and more" menu): open it, then click the entry. */
+/** The gear's menu (on a phone the header's account menu: "Account and more" up to v2.0.7, the list's own m-top-menu button since the v2.0.8 phone redesign): open it, then click the entry. */
 async function fromMenu(page, action, what) {
     const gear = page.locator(act('m-toggle-top-bar-settings')).filter({ visible: true });
     if (await gear.count()) await gear.first().click();
-    else await clickVisible(page, 'button[aria-label="Account and more"]', 'Account and more menu button');
+    else await clickVisible(page, 'button[aria-label="Account and more"], #mobile-agent-list [data-on-click="m-top-menu"]', 'the phone\'s account and more menu button');
     await clickVisible(page, act(action), what);
 }
 
