@@ -52,8 +52,20 @@ log() { echo "[screens] $*"; }
 # A work folder, a HOME and a data folder with the SAME names every run, under /tmp: their paths appear in some pages (a job's folder, an agent's terminal), and a path that changes with every run, or
 # names the person who runs it, would be in every shot of every release. Two runs at once would share them, so one at a time (a lock folder; a stale one from a crashed run is removed by hand).
 NEUTRAL=/tmp/coral-screens
-if ! mkdir "$NEUTRAL.lock" 2>/dev/null; then echo "another screenshot run holds $NEUTRAL.lock (remove it if that run is gone)" >&2; exit 3; fi
-rm -rf "$NEUTRAL"; mkdir -p "$NEUTRAL"
+# /tmp is shared: a folder or a link of that name made by another account (or by anything but this run) must never be used. The lock and the work folder are made here with mode 0700, and a path that is a
+# link, is not ours, or is not 0700 is refused (Security's #11216 INFO).
+owned_private() { # a real folder, owned by this user, mode 700
+    local d="$1" perm
+    [ -d "$d" ] && [ ! -L "$d" ] && [ -O "$d" ] || return 1
+    perm="$(stat -c %a "$d" 2>/dev/null || stat -f %Lp "$d" 2>/dev/null)"
+    [ "$perm" = 700 ]
+}
+if [ -L "$NEUTRAL.lock" ] || [ -L "$NEUTRAL" ]; then echo "refusing $NEUTRAL or its lock: it is a link" >&2; exit 3; fi
+if ! (umask 077 && mkdir -m 700 "$NEUTRAL.lock" 2>/dev/null); then echo "another screenshot run holds $NEUTRAL.lock (remove it if that run is gone)" >&2; exit 3; fi
+owned_private "$NEUTRAL.lock" || { echo "refusing $NEUTRAL.lock: it is not a folder of this user with mode 0700" >&2; rmdir "$NEUTRAL.lock" 2>/dev/null; exit 3; }
+if [ -e "$NEUTRAL" ] && ! owned_private "$NEUTRAL"; then echo "refusing $NEUTRAL: it exists and is not a folder of this user with mode 0700 (made by another account?); remove it or run as the account that owns it" >&2; rmdir "$NEUTRAL.lock" 2>/dev/null; exit 3; fi
+rm -rf "$NEUTRAL"; (umask 077 && mkdir -m 700 "$NEUTRAL")
+owned_private "$NEUTRAL" || { echo "refusing $NEUTRAL: could not make it private" >&2; rmdir "$NEUTRAL.lock" 2>/dev/null; exit 3; }
 WORK="$NEUTRAL"
 SEEDED_PID="" FRESH_PID="" TREE="" TREE_IS_WORKTREE=0
 stop_server() { # kills only the process this run started, and only its own tmux server
