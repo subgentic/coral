@@ -37,7 +37,7 @@ const BASE = require('./test_base').BASE;
             await load(w); await stub();
             if (w < 640) { await ev(`window.switchNavTab('hub-inbox'); true`); await new Promise(r => setTimeout(r, 500)); } // sleep-ok: the Inbox draws over a frame; the Agents page has no top bar under 601 px (#11096)
             // 1. the Settings menu by Enter (under 640 px the top row is the hamburger and its menu holds Settings, #9021)
-            const menuId = w < 640 ? 'nav-more-menu' : 'top-bar-settings-menu', btnSel = w < 640 ? '#top-menu-btn' : '[aria-controls="top-bar-settings-menu"]';
+            const menuId = w < 640 ? 'nav-more-menu' : 'top-bar-settings-menu', btnSel = w < 640 ? '#top-phone-menu' : '[aria-controls="top-bar-settings-menu"]';
             await ev(`document.querySelector(${JSON.stringify(btnSel)}).focus(); true`);
             await key('Enter'); await settle(300);
             const open = await ev(`(() => { const m = document.getElementById(${JSON.stringify(menuId)}), a = document.activeElement; return { shown: !!m && !m.hidden && m.style.display !== 'none' && m.getClientRects().length > 0, inMenu: !!a && !!a.closest(${JSON.stringify('#' + menuId)}), item: !!a && /overflow-menu-item|nav-more-item/.test(a.className) }; })()`);

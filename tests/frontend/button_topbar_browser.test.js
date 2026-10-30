@@ -17,7 +17,7 @@ const BASE = require('./test_base').BASE;
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await ev(`window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
             if (w < 640) { await ev(`window.switchNavTab('hub-inbox'); true`); await new Promise(r => setTimeout(r, 500)); } // sleep-ok: the Inbox draws over a frame; the Agents page has no top bar under 601 px (#11096)
             const m = await ev(`(() => { const info = sel => [...document.querySelectorAll(sel)].map(b => { const cs = getComputedStyle(b), r = b.getBoundingClientRect(); return { cls: b.className, shown: b.getClientRects().length > 0, w: Math.round(r.width), h: Math.round(r.height), bg: cs.backgroundColor, border: cs.borderTopWidth }; });
-                return { bar: info('.top-bar-actions .top-bar-btn:not(.hub-indicator)'), rail: info('.sidebar-rail-btn'), menu: info('#top-menu-btn') }; })()`);
+                return { bar: info('.top-bar-actions .top-bar-btn:not(.hub-indicator)'), rail: info('.sidebar-rail-btn'), menu: info('#top-phone-menu') /* a phone's ☰ is the shared bar's (phone_bar.js, #11236) */ }; })()`);
             for (const b of m.bar.concat(m.rail)) assert.ok(/\bbtn\b/.test(b.cls) && /\bbtn-quiet\b/.test(b.cls) && /\bbtn-icon\b/.test(b.cls), `${at}an icon button of the family: ${b.cls}`);
             assert.ok(m.bar.length >= 3 && m.rail.length === 3, `${at}the buttons are on the page: ${m.bar.length} + ${m.rail.length}`);
             for (const b of m.bar.filter(x => x.shown)) assert.ok(b.w >= 30 && b.w <= 34 && b.h >= 30 && b.h <= 34, `${at}a 32 px quiet square: ${b.w}x${b.h}`);

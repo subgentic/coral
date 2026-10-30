@@ -257,14 +257,4 @@ document.addEventListener('click', async (e) => {
     }
 });
 
-// Keep the top bar's buttons whole at large text sizes: the view selector gets
-// its own row, as it does on a very narrow viewport, so neither control is cut.
-function fitSavedBar() {
-    const big = isPhoneLayout() && parseFloat(getComputedStyle(document.documentElement).fontSize) >= 24;
-    document.body.classList.toggle('saved-bar-wrap', big);
-}
-if (typeof ResizeObserver === 'function') {
-    const start = () => { fitSavedBar(); const bar = document.querySelector('.top-bar'); if (bar) new ResizeObserver(fitSavedBar).observe(bar); };
-    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
-}
-window.addEventListener('resize', fitSavedBar);
+/* (The top bar's view selector used to take its own row at large text so neither control was cut: the shared phone bar, phone_bar.js, is one row at any size, so that wrap is gone, #11236.) */
