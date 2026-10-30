@@ -118,6 +118,10 @@ func TestTheOwnerTableAgreesWithTheHandWrittenListItReplaced(t *testing.T) {
 			if m == http.MethodPost && strings.HasPrefix(p, "/api/board/") && strings.HasSuffix(p, "/review") && strings.Contains(p, "/artifacts/") {
 				continue
 			}
+			// Sharing a file with an agent as the Operator (#11376) is the owner's alone through the hub: the old list never had it.
+			if m == http.MethodPost && strings.HasPrefix(p, "/api/board/") && (strings.HasSuffix(p, "/operator-artifacts") || strings.HasSuffix(p, "/operator-artifacts/message")) {
+				continue
+			}
 			// The owner's comment writes (a comment or reply, a resolve, a reopen) are new (#7052): the old list never had them.
 			if m == http.MethodPost && strings.HasPrefix(p, "/api/artifacts/") && (strings.HasSuffix(p, "/comments") || strings.HasSuffix(p, "/resolve") || strings.HasSuffix(p, "/reopen")) {
 				continue
