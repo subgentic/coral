@@ -360,7 +360,8 @@ func InputBoxOnScreen(screen string) bool {
 			return true
 		}
 	}
-	return false
+	_, pi := piEditorText(screen)
+	return pi
 }
 
 // isInputBoxLine reports whether line is an agent's input line (not a menu's
@@ -374,7 +375,7 @@ func isInputBoxLine(line string) bool {
 // open (a box Coral can't recognise would hold it forever).
 func InputBoxKnown(agentType string) bool {
 	switch agentType {
-	case at.Claude, at.Codex, at.Gemini, at.Agy, at.Antigravity:
+	case at.Claude, at.Codex, at.Gemini, at.Agy, at.Antigravity, at.Pi:
 		return true
 	}
 	return false

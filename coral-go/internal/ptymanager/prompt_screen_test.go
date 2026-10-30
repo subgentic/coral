@@ -127,7 +127,8 @@ func TestInputBoxOnScreen(t *testing.T) {
 	}
 	assert.True(t, InputBoxKnown("claude"))
 	assert.True(t, InputBoxKnown("agy"), "agy's \"> \" box (#3478)")
-	assert.False(t, InputBoxKnown("pi"), "an agent whose box Coral can't recognise")
+	assert.True(t, InputBoxKnown("pi"), "Pi's editor is read: the lines between two rules above its footer (#11165)")
+	assert.False(t, InputBoxKnown("terminal"), "an agent whose box Coral can't recognise")
 }
 
 // Real Claude 2.1.299 screens (#3457 hotfix): a no-break space after the marker,

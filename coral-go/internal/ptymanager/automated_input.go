@@ -95,6 +95,7 @@ type typedMemo struct {
 	text  string
 	paste bool
 	at    time.Time // when Coral typed it: a paste placeholder is Coral's own only for a short while after
+	blind bool      // it went to an agent whose box Coral cannot read: nothing says it was taken (#11165)
 }
 
 type inputGate struct {
@@ -128,6 +129,16 @@ func (g *inputGate) noteTyped(name, text string, paste bool) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	g.lastTyped[name] = typedMemo{text: squeeze(text), paste: paste, at: g.now()}
+}
+
+// markBlind notes that the text just typed to name went to a box that cannot be read.
+func (g *inputGate) markBlind(name string) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if m, ok := g.lastTyped[name]; ok {
+		m.blind = true
+		g.lastTyped[name] = m
+	}
 }
 
 func (g *inputGate) typedFor(name string) (typedMemo, bool) {
