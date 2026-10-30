@@ -38,7 +38,6 @@ func resolveLocalServer() {
 }
 
 func main() {
-	resolveLocalServer()
 	hooks.InstallIdentity("coral-board") // the agent session's token, sent with every request (#3387)
 	// A person running it in their own terminal (no agent session) signs with the
 	// command-line token instead, as the local Operator (strict local auth, #3418).
@@ -71,6 +70,7 @@ func main() {
 		os.Exit(2)
 	}
 
+	resolveLocalServer() // after help and the flag checks: --help and a usage error touch no network
 	if serverURLErr != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", serverURLErr)
 		clierr.Exit1()

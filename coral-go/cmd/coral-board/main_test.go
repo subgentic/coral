@@ -14,6 +14,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"syscall"
 	"testing"
 )
@@ -991,5 +992,32 @@ func TestCmdRead_IDAsJSON(t *testing.T) {
 	}
 	if m["subscriber_id"] != "Operator" || m["content"] != "PRELAND-CHECK ref=main id=a1" || m["id"] != float64(42) {
 		t.Errorf("unexpected message: %v", m)
+	}
+}
+
+// --help and a usage error make no request: the local server is looked for only once a command is going to run (main resolves it after help and the flag checks).
+func TestHelpAndUsageErrorsMakeNoRequest(t *testing.T) {
+	if os.Getenv("TEST_SUBPROCESS_RUN_MAIN") == "1" {
+		os.Args = append([]string{"coral-board"}, strings.Fields(os.Getenv("TEST_SUBPROCESS_ARGS"))...)
+		main()
+		return
+	}
+	var requests atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests.Add(1)
+		_, _ = w.Write([]byte(`{"status":"ok","version":"test"}`))
+	}))
+	t.Cleanup(srv.Close)
+	for _, args := range []string{"--help", "help", "post --help", "read --help", "post --no-such-flag"} {
+		dataDir := t.TempDir()
+		// a record this very process makes live, so a resolve WOULD ask the scratch server
+		_ = os.WriteFile(filepath.Join(dataDir, config.ServerLockFile), []byte(strconv.Itoa(os.Getpid())+"\n"+srv.URL+"\n"), 0o600)
+		cmd := exec.Command(os.Args[0], "-test.run=^TestHelpAndUsageErrorsMakeNoRequest$")
+		cmd.Env = append(os.Environ(), "TEST_SUBPROCESS_RUN_MAIN=1", "TEST_SUBPROCESS_ARGS="+args,
+			"CORAL_DATA_DIR="+dataDir, "CORAL_DIR=", "CORAL_URL=", "CORAL_HOST=", "CORAL_PORT=")
+		_ = cmd.Run() // exit status differs per case; only the requests matter
+		if n := requests.Load(); n != 0 {
+			t.Errorf("%q made %d request(s)", args, n)
+		}
 	}
 }
