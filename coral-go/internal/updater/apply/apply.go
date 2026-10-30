@@ -312,10 +312,17 @@ func Run(ctx context.Context, cfg Config) Result {
 	}
 	if !cfg.Platform.WaitCoralGone(ctx, install) {
 		_ = os.RemoveAll(newPath)
-		cfg.history(&st, cfg.Installed, rec.Version, ResultCoralRunning, "") // said where Settings can read it: the answer printed here goes nowhere when the server started this run (#11151)
-		_ = verify.SaveState(dir, st)
 		res.Result = ResultCoralRunning
-		return res
+		// The server quit for this run: when nothing of Coral is running now the person has no Coral, so the one that was installed (nothing was changed) is started again, as the
+		// Windows apply does (#11155). Something of Coral still running is left alone: that one is Coral, and a second start would be a second Coral.
+		if cfg.Platform.Running(install) {
+			cfg.history(&st, cfg.Installed, rec.Version, ResultCoralRunning, "still_running") // said where Settings can read it (#11151)
+			_ = verify.SaveState(dir, st)
+			return res
+		}
+		cfg.history(&st, cfg.Installed, rec.Version, ResultCoralRunning, "restarted")
+		_ = verify.SaveState(dir, st)
+		return startPreviousAgain(ctx, cfg, dir, &st, install, res)
 	}
 	// From here Coral has ended (this run's wait saw it go): any stop before the swap starts the old one again.
 	// 6: swap, start, check; roll back on any failure from here.
