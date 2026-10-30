@@ -65,6 +65,13 @@ const BASE = require('./test_base').BASE;
         await ev(`document.querySelector('#settings-modal .settings-back').click(); true`); await settle(300);
         await ev(`document.querySelector('#settings-modal .settings-bar-back').click(); true`); await settle(300);
         assert.equal(await ev(`getComputedStyle(document.getElementById('settings-modal')).display`), 'none', 'the arrow in the list\'s bar closes Settings');
+        // Create task is a form screen as well: the whole screen, a 56 px bar with a 44 px ←, the actions pinned at the bottom; the arrow cancels
+        await ev(`window.showCreateTaskModal(); true`);
+        await waitFor(`!!document.getElementById('create-task-modal') && getComputedStyle(document.getElementById('create-task-modal')).display !== 'none' && !!document.getElementById('create-task-footer').querySelector('button')`, 'Create task open', 10000); await settle(300);
+        const ch = await bx('#create-task-modal .modal-header'), ca = await bx('#create-task-modal .create-task-bar-back'), cf = await bx('#create-task-modal .modal-footer'), cc = await bx('#create-task-modal .modal-content');
+        assert.ok(ch && ch.h >= 56 && ca && ca.w >= 44 && ca.h >= 44 && cf && cf.b >= 844 - 24 && cc && cc.w >= 389 && cc.h >= 843, 'Create task is a form screen: the whole screen, a 56 px bar with a 44 px arrow, the actions pinned at the bottom: ' + JSON.stringify({ ch, ca, cf, cc }));
+        await ev(`document.getElementById('create-task-bar-back').click(); true`); await settle(300);
+        assert.equal(await ev(`getComputedStyle(document.getElementById('create-task-modal')).display`), 'none', 'the arrow cancels the form');
         console.log('PASS the phone model, slice C: Docs and Analytics');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

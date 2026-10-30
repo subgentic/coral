@@ -1613,6 +1613,17 @@ body.panel-dragging .agentic-state {
     min-width: 0;
 }
 
+.create-task-bar-back { display: none; }
+/* Create task on a phone is a form screen (#11236 approved, #11239 slice C): the whole screen, a 56 px bar with a 44 px ← and the title, the fields scroll, Cancel and Create are pinned at the bottom */
+@media (max-width: 600px) {
+    #create-task-modal { padding: 0; }
+    #create-task-modal .modal-content.dlg-form { --dlg-max: 100vw; width: 100vw; max-width: none; height: 100dvh; max-height: none; margin: 0; border-radius: 0; display: flex; flex-direction: column; padding: 0; }
+    #create-task-modal .modal-header { flex: none; justify-content: flex-start; gap: 4px; min-height: 56px; padding: 0 4px; border-bottom: 1px solid var(--border); }
+    #create-task-modal .create-task-bar-back { display: inline-grid; place-items: center; flex: none; width: var(--control-touch-height, 44px); height: var(--control-touch-height, 44px); padding: 0; border: 0; border-radius: 22px; background: none; color: var(--text-primary); font-size: var(--fs-2xl); cursor: pointer; }
+    #create-task-modal .modal-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+    #create-task-modal .modal-footer { flex: none; padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px)); }
+}
+
 /* Generated agent panels */
 #agentic-panel-agent-ui { overflow:auto; min-width:0; padding:12px; }
 .agent-ui-card { margin-bottom:16px; min-width:0; flex-shrink:0; }
