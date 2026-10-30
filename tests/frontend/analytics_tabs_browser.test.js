@@ -124,6 +124,17 @@ const TURNS = [{ timestamp: day(7) + 'T14:12:00.000Z', model: 'claude-fable-5-1'
                 assert.deepEqual(t.hub, ['14', '3', '2'], 'coral-go-team asks coral-hub: messages, goal requests, accepted');
                 if (phone) { assert.equal(t.cells, 0); assert.ok(t.ranked >= 4, 'a ranked list of pairs on a phone'); } else { assert.equal(t.cells, 9, 'a 3 by 3 grid of the three teams'); assert.ok(t.cellTexts.includes('17'), 'the grid cell coral-go-team to coral-hub is 17 (14 messages and 3 goal requests): ' + JSON.stringify(t.cellTexts)); }
             });
+            await run(`${at}: two teams of one name on two servers are two teams: two rows in the table and two names in the grid or the ranked list`, async () => {
+                const refresh = `(async () => { const m = await import((window.__coralStatic || '/static/') + 'cost_dashboard.js'); await m._refreshCostDashboard({ force: true }); return true; })()`;
+                const pairs = [{ from: TEAM, to: 'beta', messages: 2, requests: 0, accepted: 0 }, { from: TEAM, to: 'beta', to_server: 'homelab', messages: 5, requests: 1, accepted: 1 }];
+                await ev(`window.__activity = { ...${JSON.stringify(ACTIVITY)}, pairs: ${JSON.stringify(pairs)} }; true`); await open('comm'); await ev(refresh);
+                await waitFor(`/beta on homelab/.test(document.getElementById('cost-comm').textContent)`, 'the remote team named with its server', 8000);
+                const t = await ev(`(() => { const p = [...document.querySelectorAll('#cost-comm .atab-card')].find(c => /^Across teams/.test(c.textContent)); return { rows: [...p.querySelectorAll('tbody tr')].map(r => [...r.cells].map(x => x.textContent.trim()).slice(0, 3)), names: [...p.querySelectorAll('.atab-mx-r, .atab-mx-h, .atab-rank')].map(x => x.textContent) }; })()`);
+                assert.deepEqual(t.rows.map(r => r[1]).sort(), ['beta', 'beta on homelab'], 'two rows: ' + JSON.stringify(t.rows));
+                assert.deepEqual(t.rows.map(r => r[2]).sort(), ['2', '5'], 'each with its own count');
+                assert.ok(t.names.some(n => /beta on homelab/.test(n)) && t.names.some(n => /(^|[^\w])beta(?! on)/.test(n)), 'the grid or the list names both: ' + JSON.stringify(t.names.slice(0, 8)));
+                await ev(`window.__activity = ${JSON.stringify(ACTIVITY)}; true`); await ev(refresh);
+            });
             await run(`${at}: the per-task table is "not recorded yet" until the read has it, and then lists its rows`, async () => {
                 assert.match(await text('#cost-comm'), /Per-task message counts are added with the recording/);
                 await ev(`window.__activity = { ...window.__activity, task_messages: [{ task_id: 11222, agent: 'Data Science', sent: 19, received: 28, within: 31, across: 16 }] }; (async () => { const m = await import((window.__coralStatic || '/static/') + 'cost_dashboard.js'); await m._refreshCostDashboard({ force: true }); return true; })()`);
@@ -188,17 +199,6 @@ const TURNS = [{ timestamp: day(7) + 'T14:12:00.000Z', model: 'claude-fable-5-1'
             await waitFor(`/Traffic between teams is not in this read/.test(document.getElementById('cost-comm').textContent)`, 'the missing pairs', 8000);
             await ev(`window.__activity = { ...${JSON.stringify(ACTIVITY)}, pairs: [] }; true`); await ev(refresh);
             await waitFor(`/No messages or goal requests with other teams/.test(document.getElementById('cost-comm').textContent)`, 'no traffic', 8000);
-            await ev(`window.__activity = ${JSON.stringify(ACTIVITY)}; true`); await ev(refresh);
-        });
-        await run('two teams of one name on two servers are two teams: two rows in the table and two names in the grid or the ranked list', async () => {
-            const refresh = `(async () => { const m = await import((window.__coralStatic || '/static/') + 'cost_dashboard.js'); await m._refreshCostDashboard({ force: true }); return true; })()`;
-            const pairs = [{ from: TEAM, to: 'beta', messages: 2, requests: 0, accepted: 0 }, { from: TEAM, to: 'beta', to_server: 'homelab', messages: 5, requests: 1, accepted: 1 }];
-            await ev(`window.__activity = { ...${JSON.stringify(ACTIVITY)}, pairs: ${JSON.stringify(pairs)} }; true`); await open('comm'); await ev(refresh);
-            await waitFor(`/beta on homelab/.test(document.getElementById('cost-comm').textContent)`, 'the remote team named with its server', 8000);
-            const t = await ev(`(() => { const p = [...document.querySelectorAll('#cost-comm .atab-card')].find(c => /^Across teams/.test(c.textContent)); return { rows: [...p.querySelectorAll('tbody tr')].map(r => [...r.cells].map(x => x.textContent.trim()).slice(0, 3)), names: [...p.querySelectorAll('.atab-mx-r, .atab-mx-h, .atab-rank')].map(x => x.textContent) }; })()`);
-            assert.deepEqual(t.rows.map(r => r[1]).sort(), ['beta', 'beta on homelab'], 'two rows: ' + JSON.stringify(t.rows));
-            assert.deepEqual(t.rows.map(r => r[2]).sort(), ['2', '5'], 'each with its own count');
-            assert.ok(t.names.some(n => /beta on homelab/.test(n)) && t.names.some(n => /(^|[^\w])beta(?! on)/.test(n)), 'the grid or the list names both: ' + JSON.stringify(t.names.slice(0, 8)));
             await ev(`window.__activity = ${JSON.stringify(ACTIVITY)}; true`); await ev(refresh);
         });
         await run('the reads are bounded: Usage asks for a daily series of twice the period, activity names its team and range', async () => {
