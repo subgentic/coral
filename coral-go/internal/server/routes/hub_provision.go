@@ -81,6 +81,8 @@ type provisionPlan struct {
 	ServerID string
 	Label    string
 	Mode     string
+	Kind     string // "" or "setup": a new server; "upgrade", "stop", "remove": one already registered (#11370)
+	Delete   bool   // remove: also delete the data (the key, the history, the instance id)
 	phase    string
 	steps    []provisionStep
 	keys     []sshprov.HostKey // held here: what is trusted is THIS, never a key from a request
@@ -88,6 +90,20 @@ type provisionPlan struct {
 	created  time.Time
 	cancel   context.CancelFunc
 	failure  string
+}
+
+const (
+	kindSetup   = "setup"
+	kindUpgrade = "upgrade"
+	kindStop    = "stop"
+	kindRemove  = "remove"
+)
+
+func (p *provisionPlan) kind() string {
+	if p.Kind == "" {
+		return kindSetup
+	}
+	return p.Kind
 }
 
 func (p *provisionPlan) view() map[string]any {
@@ -98,7 +114,10 @@ func (p *provisionPlan) view() map[string]any {
 		keys = append(keys, provisionKey{Host: k.Host, Type: k.Type, Fingerprint: k.Fingerprint})
 	}
 	steps := append([]provisionStep(nil), p.steps...)
-	v := map[string]any{"plan": p.ID, "target": p.Target.String(), "server_id": p.ServerID, "label": p.Label, "mode": p.Mode, "phase": p.phase, "steps": steps}
+	v := map[string]any{"plan": p.ID, "target": p.Target.String(), "server_id": p.ServerID, "label": p.Label, "mode": p.Mode, "kind": p.kind(), "phase": p.phase, "steps": steps}
+	if p.Kind == kindRemove {
+		v["delete_data"] = p.Delete
+	}
 	if len(keys) > 0 && p.phase == phaseKeys {
 		v["host_keys"] = keys
 	}
@@ -135,6 +154,8 @@ type Provisioner struct {
 	// startRemote starts the installed Coral in tmux and reads the remote's instance id and API key; checkHealth asks the new server, through its SSH stream, whether it answers. Variables for tests.
 	startRemote func(ctx context.Context, p *provisionPlan) (instanceID, key string, err error)
 	checkHealth func(ctx context.Context, rs *store.RemoteServer, key string) RemoteHealth
+	version     string                  // the release this hub runs and the only one it installs (config.Version; a test sets its own)
+	onRemoved   func(id string)         // a remove took the server out of the registry
 	notify      func(id, status string) // tells the hub's remote workers a server was added (the same hook the registry's edits use)
 	startedAt   time.Time
 }
@@ -145,7 +166,8 @@ func (pr *Provisioner) SetStatusListener(f func(id, status string)) { pr.notify 
 // NewProvisioner is the setup routes' handler. The paths are the hub user's own (never a path from a request).
 func NewProvisioner(s *store.RemoteServerStore) *Provisioner {
 	pr := &Provisioner{store: s, configs: sshprov.DefaultConfigPath, known: sshprov.DefaultKnownHostsPath, plans: map[string]*provisionPlan{}, startedAt: time.Now()}
-	pr.runSteps = pr.detectSteps
+	pr.version = config.Version
+	pr.runSteps = pr.runPlan
 	pr.install = pr.realInstall
 	pr.startRemote = pr.realStartRemote
 	pr.checkHealth = pr.realCheckHealth
@@ -190,6 +212,10 @@ type planRequest struct {
 	Alias  string `json:"alias"`  // a Host name of the owner's SSH config
 	Mode   string `json:"mode"`   // "tmux" (the only one so far)
 	Label  string `json:"label"`
+	// ServerID and Action manage a server that is already registered and was set up over SSH: "upgrade", "stop" or "remove" (DeleteData with remove). The target is the registry's, never the request's.
+	ServerID   string `json:"server_id"`
+	Action     string `json:"action"`
+	DeleteData bool   `json:"delete_data"`
 }
 
 // Plan handles POST /api/servers/provision/plan: validate, name the server, and return the host and the steps to confirm. Nothing connects.
@@ -198,6 +224,14 @@ func (pr *Provisioner) Plan(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, 4096)
 	if err := decodeJSON(r, &req); err != nil {
 		errBadRequest(w, "invalid request body")
+		return
+	}
+	if req.ServerID != "" {
+		pr.planManage(w, r, req)
+		return
+	}
+	if req.Action != "" || req.DeleteData {
+		errBadRequest(w, "an action needs the server it is for")
 		return
 	}
 	if (req.Target == "") == (req.Alias == "") {
@@ -248,12 +282,7 @@ func (pr *Provisioner) Plan(w http.ResponseWriter, r *http.Request) {
 		errBadRequest(w, "the label is too long or has a control character")
 		return
 	}
-	var raw [8]byte
-	if _, err := rand.Read(raw[:]); err != nil {
-		errInternalServer(w, "internal error")
-		return
-	}
-	p := &provisionPlan{ID: hex.EncodeToString(raw[:]), Target: t, ServerID: id, Label: label, Mode: "tmux", phase: phasePlanned, created: time.Now(), steps: planSteps()}
+	p := &provisionPlan{ID: newPlanID(), Target: t, ServerID: id, Label: label, Mode: "tmux", phase: phasePlanned, created: time.Now(), steps: planSteps()}
 	pr.mu.Lock()
 	pr.expireLocked()
 	if len(pr.plans) >= provisionMaxPlans {
@@ -347,6 +376,8 @@ type runRequest struct {
 	AcceptTerms bool `json:"accept_terms"` // Set up: the terms the dialog shows are accepted
 	// TermsSHA256 is the digest of the terms text the dialog showed. The hub compares it with its own terms before it runs anything: an acceptance is of the text that was in front of the person.
 	TermsSHA256 string `json:"terms_sha256"`
+	// Confirm is the server's id, typed by the person, for a remove.
+	Confirm string `json:"confirm"`
 }
 
 // Run handles POST /api/servers/provision/{plan}/run. Pressing Set up is the acceptance of the terms the dialog shows (accept_terms must be true); keys held under the plan are trusted only when the
@@ -363,12 +394,23 @@ func (pr *Provisioner) Run(w http.ResponseWriter, r *http.Request) {
 	}
 	var req runRequest
 	r.Body = http.MaxBytesReader(w, r.Body, 1024)
-	if err := decodeJSON(r, &req); err != nil || !req.AcceptTerms {
-		errBadRequest(w, "Set up needs the terms accepted")
+	if err := decodeJSON(r, &req); err != nil {
+		errBadRequest(w, "invalid request body")
 		return
 	}
-	if req.TermsSHA256 != terms.EULADigest() {
-		errConflict(w, "The terms changed since you read them. Reload this page and read them again.")
+	// A setup and an upgrade put Coral on the computer and record the terms: they need the press and the digest of the text that was shown. Stop and remove do not touch the terms.
+	if k := p.kind(); k == kindSetup || k == kindUpgrade {
+		if !req.AcceptTerms {
+			errBadRequest(w, "Set up needs the terms accepted")
+			return
+		}
+		if req.TermsSHA256 != terms.EULADigest() {
+			errConflict(w, "The terms changed since you read them. Reload this page and read them again.")
+			return
+		}
+	}
+	if p.kind() == kindRemove && req.Confirm != p.ServerID {
+		errBadRequest(w, "Remove needs the server's name typed to confirm")
 		return
 	}
 	// One critical section decides what happens: two requests cannot both start a run, or both trust the keys.
@@ -444,31 +486,45 @@ func (p *provisionPlan) moveFrom(from1, from2, next string) (string, bool) {
 
 // detectSteps is the first real step of the run: the system and tmux. The install steps follow in later commits; until they exist the run says so and stops, and registers nothing.
 func (pr *Provisioner) detectSteps(ctx context.Context, p *provisionPlan) {
+	arch, ok := pr.detect(ctx, p)
+	if !ok {
+		return
+	}
+	pr.setupSteps(ctx, p, arch)
+}
+
+// detect checks the far computer's system and tmux; on a failure it has failed the plan and says false.
+func (pr *Provisioner) detect(ctx context.Context, p *provisionPlan) (sshprov.Arch, bool) {
 	p.setStep("detect", stepRunning, "")
 	res, err := pr.runner.Run(ctx, p.Target, sshprov.CmdUname)
 	if err != nil {
 		pr.fail(p, "detect", "Could not connect.")
-		return
+		return "", false
 	}
 	sys := strings.TrimSpace(res.Stdout)
 	if sys != "Linux x86_64" && sys != "Linux aarch64" {
 		pr.fail(p, "detect", "This computer is not supported yet (Linux x86_64 or arm64 only).")
-		return
+		return "", false
 	}
 	tm, err := pr.runner.Run(ctx, p.Target, sshprov.CmdHasTmux)
 	if err != nil {
 		pr.fail(p, "detect", "Could not connect.")
-		return
+		return "", false
 	}
 	if tm.ExitCode != 0 {
 		pr.fail(p, "detect", "tmux is not installed on that computer.")
-		return
+		return "", false
 	}
 	p.mu.Lock()
 	p.system = knownSystem(sys)
 	p.mu.Unlock()
 	p.setStep("detect", stepOK, sys+", tmux found.")
 	arch, _ := sshprov.ArchOf(sys)
+	return arch, true
+}
+
+// setupSteps is the rest of a setup: install, start, register.
+func (pr *Provisioner) setupSteps(ctx context.Context, p *provisionPlan, arch sshprov.Arch) {
 	if err := pr.install(ctx, p, arch); err != nil {
 		var ie *sshprov.ErrInstall
 		msg := "Could not install Coral on that computer."
@@ -538,18 +594,18 @@ func (pr *Provisioner) realStartRemote(ctx context.Context, p *provisionPlan) (s
 	fail := func(msg string) error { return &sshprov.ErrInstall{Step: "start", Msg: msg} }
 	// Set up was pressed with the terms shown (Run checked accept_terms): the far Coral is given THAT acceptance, on stdin, bound to this release's terms. It is the only way a first start with no terminal gets past them.
 	by := setupAcceptanceLabel()
-	if err := pr.runner.AcceptTerms(ctx, p.Target, config.Version, termsPayload(by)); err != nil {
+	if err := pr.runner.AcceptTerms(ctx, p.Target, pr.version, termsPayload(by)); err != nil {
 		return "", "", fail("Could not record your acceptance of the terms on that computer.")
 	}
 	slog.Info("[provision] terms accepted for a setup", "plan", p.ID, "version", license.EULAVersion, "by", by, "at", time.Now().UTC().Format(time.RFC3339))
-	if err := pr.runner.StartTmux(ctx, p.Target, config.Version); err != nil {
+	if err := pr.runner.StartTmux(ctx, p.Target, pr.version); err != nil {
 		return "", "", fail("Could not start Coral on that computer.")
 	}
 	id, err := pr.runner.EnsureInstanceID(ctx, p.Target)
 	if err != nil {
 		return "", "", fail("Could not make this server's identity on that computer.")
 	}
-	key, err := pr.runner.ReadAPIKey(ctx, p.Target, config.Version)
+	key, err := pr.runner.ReadAPIKey(ctx, p.Target, pr.version)
 	if err != nil {
 		return "", "", fail("Coral started, but it did not make its key in time.")
 	}
@@ -606,7 +662,7 @@ func (pr *Provisioner) Cancel(w http.ResponseWriter, r *http.Request) {
 func (pr *Provisioner) realInstall(ctx context.Context, p *provisionPlan, arch sshprov.Arch) error {
 	in := sshprov.Installer{
 		Runner:   pr.runner,
-		Version:  config.Version,
+		Version:  pr.version,
 		Helper:   sshprov.HelperPath(),
 		Progress: func(_, state, detail string) { p.setStep("install", state, detail) },
 	}
@@ -634,4 +690,10 @@ func setupAcceptanceLabel() string {
 func termsPayload(by string) []byte {
 	b, _ := json.Marshal(map[string]string{"version": license.EULAVersion, "sha256": terms.EULADigest(), "by": by})
 	return b
+}
+
+func newPlanID() string {
+	var raw [8]byte
+	_, _ = rand.Read(raw[:])
+	return hex.EncodeToString(raw[:])
 }

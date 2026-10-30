@@ -710,6 +710,7 @@ func (s *Server) registerSystem(r *chi.Mux, h *routeHandlers) {
 		s.remoteAgents = background.NewRemoteAgentHub(rsHandler.Store(), remoteResolver, remoteAgentHubConfig)
 		rsHandler.SetStatusListener(s.remoteAgents.Refresh) // an edited key shows at once (#3649)
 		rsHandler.SetOnDelete(remoteResolver.Forget)
+		prov.SetOnRemoved(remoteResolver.Forget)
 		prov.SetStatusListener(s.remoteAgents.Refresh) // a server the setup registered shows at once
 		remoteResolver.SetFailureSink(s.remoteAgents)
 		sessHandler.SetRemoteAgents(s.remoteAgents)

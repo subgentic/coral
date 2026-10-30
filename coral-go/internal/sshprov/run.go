@@ -45,6 +45,12 @@ const (
 	CmdReadAPIKey
 	// CmdAcceptTerms hands the owner's acceptance of the terms (JSON, on STDIN, never in argv) to the Coral of version arg 0 (`coral accept-terms`); it refuses terms other than its own.
 	CmdAcceptTerms
+	// CmdStopTmux ends the coral-server tmux session (the Coral in it); nothing is done if there is none.
+	CmdStopTmux
+	// CmdRemoveInstalls deletes the installed releases (the numbered folders) under the install folder and keeps the data, the instance id and the key.
+	CmdRemoveInstalls
+	// CmdRemoveAll deletes the whole install folder: releases, data (the key, the history), the instance id.
+	CmdRemoveAll
 	// CmdFreeKB prints the free space, in KiB, of the file system that holds the home folder (the install folder lives under it).
 	CmdFreeKB
 	// CmdReadInstalledSum prints that recorded SHA-256, if the release is installed; arg 0 is the version.
@@ -81,6 +87,9 @@ var specs = map[Command]spec{
 	CmdEnsureInstanceID: {template: "umask 077 && mkdir -p \"$HOME/" + InstallDir + "\" && f=\"$HOME/" + InstallDir + "/instance-id\" && { [ -s \"$f\" ] || head -c 16 /dev/urandom | od -An -tx1 | tr -d ' \\n' > \"$f\"; } && cat \"$f\""},
 	CmdReadAPIKey:       {template: "\"$HOME/" + InstallDir + "/%s/root/coral\" api-key --home \"$HOME/" + InstallDir + "/data\" 2>/dev/null", args: []*regexp.Regexp{versionRe}},
 	CmdAcceptTerms:      {template: "\"$HOME/" + InstallDir + "/%s/root/coral\" accept-terms", args: []*regexp.Regexp{versionRe}},
+	CmdStopTmux:         {template: "tmux kill-session -t coral-server 2>/dev/null; true"},
+	CmdRemoveInstalls:   {template: "cd \"$HOME/" + InstallDir + "\" 2>/dev/null && for d in [0-9]*; do [ -d \"$d\" ] && rm -rf -- \"$d\"; done; true"},
+	CmdRemoveAll:        {template: "[ -n \"$HOME\" ] && rm -rf \"$HOME/" + InstallDir + "\""},
 	CmdFreeKB:           {template: "df -Pk \"$HOME\" | awk 'NR==2 {print $4}'"},
 	// The recorded sum goes FIRST: a re-unpack that is interrupted leaves no sum next to a half-written root, so the next run does not say "already installed". It is written last.
 	CmdUnpack: {template: "umask 077 && cd \"$HOME/" + InstallDir + "/%[1]s\" && rm -f package.sha256 && rm -rf root && mkdir root && tar -xzf package.tar.gz --no-same-owner -C root && " +
