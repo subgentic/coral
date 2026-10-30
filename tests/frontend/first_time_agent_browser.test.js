@@ -17,12 +17,12 @@ const BASE = require('./test_base').BASE;
                 window.fetch = (u, o = {}) => { const p = new URL(String(u), location.href); if (p.pathname === '/api/system/cli-check') return json({ found: true, version: '1', status: 'available' }); if (p.pathname === '/api/board/projects') return json([]); return real(u, o); }; return true; })()`);
         };
 
-        console.log('1. New Agent opens with no folder chosen; the home folder, once chosen, says what it means');
+        console.log('1. New Agent opens with a suggested folder, not the home folder; the home folder, once chosen, says what it means');
         await open(1280, 900, false);
         await ev(`(async () => { await window.showLaunchModal(); window._selectLaunchType('agent'); return true; })()`);
         await waitFor(`!!document.getElementById('launch-step-agent') && getComputedStyle(document.getElementById('launch-step-agent')).display !== 'none'`, 'the agent step');
         const first = await ev(`(() => { const d = document.getElementById('launch-dir'), n = document.getElementById('launch-dir-note'); return { value: d.value, placeholder: d.placeholder, noteHidden: n.hidden, root: d.dataset.coralRoot }; })()`);
-        assert.equal(first.value, '', 'no folder is chosen for the person'); assert.equal(first.placeholder, 'Choose a folder'); assert.equal(first.noteHidden, true); assert.ok(first.root, 'the server has a root to compare with');
+        assert.notEqual(first.value, first.root, 'the home folder is not chosen for the person'); assert.equal(first.value, first.root + '/Coral/first-agent', 'a suggestion inside it is offered, created on confirm (#11258 item 3)'); assert.equal(first.placeholder, 'Choose a folder'); assert.equal(first.noteHidden, true); assert.ok(first.root, 'the server has a root to compare with');
         const typed = v => ev(`(() => { const d = document.getElementById('launch-dir'); d.value = ${JSON.stringify(v)}; d.dispatchEvent(new Event('input', { bubbles: true })); return !document.getElementById('launch-dir-note').hidden; })()`);
         assert.equal(await typed(first.root), true, 'the home folder: the note shows');
         // the Folder field's own help line ("A folder on the computer running Coral.", #10961 item 7b) describes it too, under a generated id: so the note is the last of the described-by ids and the others are only that line

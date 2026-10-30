@@ -3824,6 +3824,7 @@ li:has(> .row-btn:focus-visible) { outline: 2px solid var(--accent); outline-off
 .launch-persona-top .settings-hint { margin: 0 0 14px; }
 .launch-persona-top input[type="text"] { width: 100%; max-width: none; box-sizing: border-box; }
 .launch-stage-sub b { color: var(--text-primary); }
+.launch-stage-sub { overflow-wrap: anywhere; min-width: 0; } /* a folder path has no break opportunity: the step line ("... in /Users/.../Coral/team") wraps inside the dialog at 390 and 320 px, now that a folder is suggested for a new team (#11258 item 3) */
 .launch-recap { flex: none; margin: 0; padding: 10px 24px 0; border-top: 1px solid var(--border); color: var(--text-secondary); font-size: var(--fs-md); overflow-wrap: anywhere; }
 .launch-recap b { color: var(--text-primary); font-weight: var(--fw-strong); }
 .launch-recap-note { display: block; font-size: var(--fs-base); } /* what the chosen mode allows, a line under the recap (#10000) */
