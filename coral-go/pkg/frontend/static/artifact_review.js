@@ -1,7 +1,7 @@
 /* The Operator's review of an artifact a team tagged "for review" (#136584, #136588), in the artifact viewer: Approve (the row leaves Needs you, the uploading agent is told) and Request changes (a comment
  * on the whole document, sent to the uploader through the comments' own Send to agent, and the row stays in Needs you as "changes requested"). The state is read from the team's artifact list (its tags and,
  * once decided, the time); the buttons show only for a pending one; through Coral Hub the owner has both: the change-request send is the owner's too (#11354). */
-import { boardFetch, identityKey } from './server_base.js';
+import { boardFetch, identityKey, decisionNeedsPerson } from './server_base.js';
 import { showToast } from './utils.js';
 import { importOnce } from './import_once.js';
 const { createComment, sendComment } = await importOnce('./artifact_comments_api.js'); // lazy, as the viewer's other modules: a failure is retried
@@ -75,11 +75,12 @@ export function attachReview(d, { reload }) {
     let cur = null, gen = 0, sending = false, done = false;
     const show = (s) => {
         cur = s;
-        const pending = !!s && (s.state === 'pending' || s.state === 'changes');
+        const waiting = !!s && (s.state === 'pending' || s.state === 'changes');
+        const pending = waiting && !decisionNeedsPerson(s.server); // a remote of a self-hosted hub: the decision is made on that machine's own dashboard (#11372)
         bar.hidden = !s;
         approve.hidden = changes.hidden = !pending;
         if (!pending) form.hidden = true;
-        stateEl.textContent = !s ? '' : s.state === 'approved' ? `Approved${s.at ? ' ' + timeWords(s.at) : ''}` : s.state === 'reviewed' ? 'Reviewed' : s.state === 'changes' ? 'Changes requested' : 'Waiting for your review';
+        stateEl.textContent = !s ? '' : s.state === 'approved' ? `Approved${s.at ? ' ' + timeWords(s.at) : ''}` : s.state === 'reviewed' ? 'Reviewed' : s.state === 'changes' ? 'Changes requested' : waiting && !pending ? 'Waiting for your review. Approve it on that computer\'s own dashboard.' : 'Waiting for your review';
     };
     const openForm = (on) => { form.hidden = !on; changes.setAttribute('aria-expanded', String(on)); if (on) { error.textContent = ''; text.focus(); } };
     changes.addEventListener('click', () => openForm(form.hidden));
