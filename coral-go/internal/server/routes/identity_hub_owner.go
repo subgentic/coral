@@ -29,9 +29,28 @@ type hubOwnerStamps struct {
 	mu    sync.Mutex
 	key   string
 	v     *hubowner.Verifier
+	noted time.Time // the secret file's time as last noted in the log (zero: none was there)
+}
+
+// note logs every time the secret file is installed, replaced or removed: a person's act at this computer, which must not pass silently (a rotation is exactly what an owner would want to see). It is
+// called from startup, from the health answer and from each stamp check, so a change shows within moments of anyone looking. It returns the file's time.
+func (h *hubOwnerStamps) note() (time.Time, bool) {
+	at, ok := hubowner.InstalledAt(h.dir)
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	switch {
+	case ok && !at.Equal(h.noted):
+		slog.Warn("[hub owner stamp] the secret file was installed or replaced: the hub's owner stamps for this computer are now checked against it", "at", at.Format(time.RFC3339))
+		h.noted = at
+	case !ok && !h.noted.IsZero():
+		slog.Warn("[hub owner stamp] the secret file is gone or not usable: the hub's owner stamps are refused")
+		h.noted = time.Time{}
+	}
+	return at, ok
 }
 
 func (h *hubOwnerStamps) verifier() *hubowner.Verifier {
+	h.note()
 	id, secret, ok, err := hubowner.ReadFile(h.dir)
 	if err != nil || !ok {
 		return nil
@@ -47,6 +66,15 @@ func (h *hubOwnerStamps) verifier() *hubowner.Verifier {
 // SetHubOwnerDir turns stamp checking on, against the secret file in dir. start is when this process started.
 func (o *IdentityObserver) SetHubOwnerDir(dir string, start time.Time) {
 	o.stamps = &hubOwnerStamps{dir: dir, start: start}
+	o.stamps.note() // a secret already there at startup is logged once
+}
+
+// HubOwnerStampAt is when the secret file was last written, for the health answer; ok is false when none is installed. Asking also logs a change since the last look.
+func (o *IdentityObserver) HubOwnerStampAt() (time.Time, bool) {
+	if o == nil || o.stamps == nil {
+		return time.Time{}, false
+	}
+	return o.stamps.note()
 }
 
 // stampValues is every value of the header, in any spelling of its name.
@@ -69,7 +97,7 @@ func (o *IdentityObserver) checkOwnerStamp(w http.ResponseWriter, r *http.Reques
 	}
 	refuse := func(why string) (bool, bool) {
 		slog.Info("[hub owner stamp] refused", "reason", why, "route", r.Method+" "+r.URL.Path)
-		o.refuse(w, http.StatusForbidden, "hub_owner_stamp_refused", "The hub's owner stamp on this request is not valid, so it was refused")
+		o.refuse(w, http.StatusForbidden, "hub_owner_stamp_refused", "The hub's owner stamp on this request is not valid, so it was refused. Check that both computers' clocks are right.")
 		return false, false
 	}
 	if caller != callerAPIKey || len(vals) != 1 || o.stamps == nil {

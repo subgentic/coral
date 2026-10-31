@@ -1,10 +1,13 @@
 package routes
 
 import (
+	"bytes"
 	"context"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -188,4 +191,50 @@ func TestNoStampChangesNothing(t *testing.T) {
 		assert.Equal(t, callerAPIKey, rig.seen.kind, route)
 	}
 	_ = context.Background
+}
+
+// A secret installed, replaced or removed is a person's act that must not pass silently: one warning line in the log each time, and the time in the health answer (Security's SHOULD 1b).
+func TestTheSecretFileBeingInstalledReplacedOrRemovedIsLoggedEachTime(t *testing.T) {
+	var buf bytes.Buffer
+	old := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelInfo})))
+	t.Cleanup(func() { slog.SetDefault(old) })
+
+	rig := newStampRig(t, false) // SetHubOwnerDir ran with no file: nothing to say yet
+	assert.NotContains(t, buf.String(), "secret file", "a warning for a file that is not there")
+	_, ok := rig.o.HubOwnerStampAt()
+	assert.False(t, ok)
+
+	require.NoError(t, hubowner.WriteFile(rig.dir, "ssh-box", stampSecret))
+	at, ok := rig.o.HubOwnerStampAt()
+	require.True(t, ok)
+	assert.False(t, at.IsZero())
+	assert.Equal(t, 1, strings.Count(buf.String(), "installed or replaced"), "installing was not logged once:\n"+buf.String())
+	assert.Contains(t, buf.String(), "level=WARN")
+	_, _ = rig.o.HubOwnerStampAt() // looking again says nothing more
+	assert.Equal(t, 1, strings.Count(buf.String(), "installed or replaced"))
+
+	// a replacement (a later time) is logged again, and so is the first stamp check after it
+	require.NoError(t, hubowner.WriteFile(rig.dir, "ssh-box", strings.Repeat("ab", 32)))
+	later := time.Now().Add(2 * time.Second)
+	require.NoError(t, os.Chtimes(filepath.Join(rig.dir, hubowner.FileName), later, later))
+	rig.do("POST", stampRoute, "{}", func(r *http.Request) { r.Header.Set(hubowner.Header, "junk") }) // a stamp check looks at the file
+	assert.Equal(t, 2, strings.Count(buf.String(), "installed or replaced"), "a replacement was not logged:\n"+buf.String())
+
+	// removal
+	require.NoError(t, os.Remove(filepath.Join(rig.dir, hubowner.FileName)))
+	_, ok = rig.o.HubOwnerStampAt()
+	assert.False(t, ok)
+	assert.Contains(t, buf.String(), "gone or not usable")
+	assert.NotContains(t, buf.String(), stampSecret, "the secret is in the log")
+	assert.NotContains(t, buf.String(), strings.Repeat("ab", 32))
+}
+
+func TestAStampRefusalAsksForTheClocksToBeChecked(t *testing.T) {
+	rig := newStampRig(t, true)
+	w := rig.do("POST", stampRoute, "{}", func(r *http.Request) {
+		r.Header.Set(hubowner.Header, stampFor(t, "POST", stampRoute, "{}", time.Now().Add(-time.Minute)))
+	})
+	require.Equal(t, http.StatusForbidden, w.Code)
+	assert.Contains(t, w.Body.String(), "Check that both computers' clocks are right")
 }

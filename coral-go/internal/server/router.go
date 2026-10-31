@@ -9,6 +9,7 @@ import (
 	"io/fs"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/cors"
 	"github.com/subgentic/coral/internal/auth"
@@ -145,7 +146,7 @@ func (s *Server) registerAuth(r *chi.Mux) {
 		// "version" is additive; older hubs ignore unknown fields.
 		// "hub" tells the frontend whether to show the multi-server UI.
 		// "instance_id" names this server run: a command that found its address in the data folder's lock file checks it before it sends a credential (config.VerifiedServer).
-		json.NewEncoder(w).Encode(map[string]any{"status": "ok", "version": config.ReportedVersion(), "hub": s.cfg.HubMode, "instance_id": s.cfg.InstanceID, "hub_owner_stamp": hubowner.Installed(s.cfg.CoralDir())})
+		json.NewEncoder(w).Encode(map[string]any{"status": "ok", "version": config.ReportedVersion(), "hub": s.cfg.HubMode, "instance_id": s.cfg.InstanceID, "hub_owner_stamp": hubowner.Installed(s.cfg.CoralDir()), "hub_owner_stamp_at": stampAt(s.identity)})
 	})
 
 	// Auth endpoints
@@ -795,4 +796,12 @@ func (s *Server) registerStatic(r *chi.Mux) {
 	// Bare /team and /board name no view: they go to /agents (QA, one rule with the slashes).
 	r.Get("/team", s.servePagePath)
 	r.Get("/board", s.servePagePath)
+}
+
+// stampAt is when the owner stamp secret file was last written, as the health answer says it ("" when none): a rotation shows there, and in the log, every time the file changes (#11378).
+func stampAt(o *routes.IdentityObserver) string {
+	if at, ok := o.HubOwnerStampAt(); ok {
+		return at.Format(time.RFC3339)
+	}
+	return ""
 }
