@@ -32,6 +32,7 @@ func (l *LocalHandler) serveWS(ctx context.Context, s *Stream) {
 	defer release()
 	hdr := l.stamp(scrub(h.Headers, http.MethodGet, dec))
 	stampRole(hdr, h, http.MethodGet, dec)
+	stampGuide(hdr, h, http.MethodGet, dec) // a guide's WebSocket never gets here (checkRequest); this removes any client copy of the headers
 	stampTeam(hdr, h, http.MethodGet, dec)
 	if l.Authorize != nil {
 		l.Authorize(hdr)

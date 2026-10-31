@@ -91,11 +91,13 @@ func (h *SessionsHandler) RegisterAgentArtifacts(r chi.Router) {
 	r.Post("/api/artifacts/received/unlisted/delete", h.deleteUnlistedReceivedRoute) // #4441
 	r.Get("/api/system/artifact-store/kept", h.keptListRoute)                        // #3554
 	r.Post("/api/artifacts/prune", h.pruneArtifactsRoute)
-	r.Post("/api/artifacts/retention/ack", h.retentionAckRoute) // #3554
-	r.Put("/api/artifacts/{id}/keep", h.keepArtifactRoute)      // #3554
-	r.Delete("/api/artifacts/{id}/keep", h.keepArtifactRoute)   // #3554
-	r.Put("/api/artifacts/{id}/star", h.starArtifactRoute)      // #9819
-	r.Delete("/api/artifacts/{id}/star", h.starArtifactRoute)   // #9819
+	r.Post("/api/artifacts/retention/ack", h.retentionAckRoute)  // #3554
+	r.Put("/api/artifacts/{id}/keep", h.keepArtifactRoute)       // #3554
+	r.Delete("/api/artifacts/{id}/keep", h.keepArtifactRoute)    // #3554
+	r.Get("/api/artifacts/{id}/private", h.artifactPrivateRoute) // #11457: the manager's private mark: a guide never reads a private artifact
+	r.Put("/api/artifacts/{id}/private", h.artifactPrivateRoute)
+	r.Put("/api/artifacts/{id}/star", h.starArtifactRoute)    // #9819
+	r.Delete("/api/artifacts/{id}/star", h.starArtifactRoute) // #9819
 	r.Get("/api/system/artifact-store", h.getArtifactStore)
 }
 

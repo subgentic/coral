@@ -69,6 +69,16 @@ func Guard(maxMode func() tunnel.Mode) func(http.Handler) http.Handler {
 	allowService := tunnel.AllowServiceRequest(maxMode)
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if guideClaimed(r) && GuideNotFound(r) { // another board's path: the answer an unknown route gets, so a guide learns nothing of boards it has no grant on
+				http.NotFound(w, r)
+				return
+			}
+			if guideClaimed(r) && !guideAllowed(r) { // a guide (guide.go): the closed table, the authentic stamp, nothing forged or repeated
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusForbidden)
+				_, _ = w.Write([]byte(`{"error":"not available through the Coral Hub in this access mode","code":"` + GuardRefusedCode + `"}`))
+				return
+			}
 			if Tunneled(r) && !allow(r.Method, r.URL.Path, r.URL.RawQuery) {
 				if _, service := ServiceAsker(r); !service || !allowService(r.Method, r.URL.Path, r.URL.RawQuery) {
 					w.Header().Set("Content-Type", "application/json")

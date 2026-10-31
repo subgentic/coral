@@ -27,6 +27,9 @@ import (
 // hubIssuer is the issuer stamped on a Coral Hub viewer's identity until the hub names its origin and a stable account (#5176): the subject then is today's hub-user id.
 const hubIssuer = "coral-hub"
 
+// guideIssuer is the issuer stamped on a guide's comment: their label is the subject, so a guide's own comments are told apart from a plain Hub viewer's and from the owner's.
+const guideIssuer = "coral-hub-guide"
+
 // commentTeamIssuerPrefix starts the issuer of a comment written on a team's machine (#7061): the prefix and the organisation's id, so the same hub user id in another organisation is another author.
 // The issuer is stored, compared and rate-limited as it is; what a viewer is shown is commentTeamIssuerShown, never the organisation's id.
 const (
@@ -94,6 +97,13 @@ func (h *SessionsHandler) commentOwnerID(ctx context.Context, create bool) strin
 
 // artifactCommentCaller is the single derivation. A false ok means the request is refused with the given status and code.
 func (h *SessionsHandler) artifactCommentCaller(r *http.Request) (c commentCaller, status int, code string) {
+	if g, ok := guideOf(r); ok { // a guide (the connector's stamp, the grant's board, a label): their own kind, named from the roster, never an owner or a plain viewer (#11457)
+		name := g.Label
+		if h.bs != nil {
+			name = h.bs.GuideDisplayName(r.Context(), g.Board, g.Label)
+		}
+		return commentCaller{Kind: commentCallerGuide, Issuer: guideIssuer, Subject: g.Label, Name: cleanCommentName(name)}, 0, ""
+	}
 	if r.Header.Get(tunnel.ViaHeader) != "" {
 		if !cloud.TunneledAuthentic(r) {
 			return commentCaller{}, http.StatusForbidden, "forged_tunnel_stamp"

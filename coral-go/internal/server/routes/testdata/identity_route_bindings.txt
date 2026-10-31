@@ -49,6 +49,8 @@ GET /api/board/{project}/goals | board-claims
 GET /api/board/{project}/goals/{goalID} | board-claims
 GET /api/board/{project}/groups | board-claims
 GET /api/board/{project}/groups/{groupID}/members | board-claims
+GET /api/board/{project}/guide-asks | board-claims
+GET /api/board/{project}/guide-roster | board-claims | operator-only
 GET /api/board/{project}/lifecycle-log | board-claims | operator-only
 GET /api/board/{project}/messages | board-claims
 GET /api/board/{project}/messages/all | board-claims
@@ -248,6 +250,7 @@ POST /api/sessions/live/{sessionID}/wake | unbound | operator-only
 POST /api/sessions/record-agents | unbound | operator-only
 PUT /api/agent/ui/{id} | token-bound
 PUT /api/board/{project}/artifacts/{id}/tags | board-claims | operator-only
+PUT /api/board/{project}/guide-roster | board-claims | operator-only
 PUT /api/board/{project}/orchestrator-grant | board-claims | operator-only
 PUT /api/board/{project}/settings | board-claims +token-session | operator-only
 PUT /api/board/{project}/subscribers/{subscriberID}/review-settings | board-claims | operator-only

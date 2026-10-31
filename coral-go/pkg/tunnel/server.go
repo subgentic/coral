@@ -561,6 +561,9 @@ func (s *Session) RoundTrip(req *http.Request) (*http.Response, error) {
 	if t := hubTeamFrom(ctx); t != (HubTeam{}) {
 		hdr.HubOrg, hdr.HubTeamRole, hdr.HubUserID = t.Org, t.Role, t.UserID
 	}
+	if g, ok := hubGuideFrom(ctx); ok {
+		hdr.HubRole, hdr.GuideBoard, hdr.GuideLabel, hdr.GuideSince = HubRoleGuide, g.Board, g.Label, g.Since // one role: a guide stream never also says owner
+	}
 	if a, ok := hubServiceFrom(ctx); ok {
 		hdr.HubService, hdr.AskServer, hdr.AskBoard = true, a.Server, a.Board
 	}

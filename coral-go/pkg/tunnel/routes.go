@@ -197,6 +197,8 @@ var routeTable = cat(
 		"/api/board/{project}/messages",
 		"/api/board/{project}/messages/all",
 		"/api/board/{project}/messages/search",
+		// The questions put to a guide (#11457): served only to a guide, who reads their own label's (the stamp's); View, like the board's other reads.
+		"/api/board/{project}/guide-asks",
 		"/api/board/{project}/subscribers",
 		"/api/board/{project}/paused",
 		"/api/board/{project}/tasks",
@@ -306,6 +308,8 @@ var routeTable = cat(
 	// The Hub's service-only per-machine read of the tasks that came from one accepted goal request (#7364, #7331 section 6): forwarded at View, and the machine answers only a stream the Hub's own service stamped
 	// with who asked (hubservice.go): an owner, a viewer or a local program gets 403 there.
 	service(rules(http.MethodGet, TierView, "/api/goal-links")),
+	// Coral Hub's word that a guide's grant ended (#11457): the Hub's own service stream (its stamp and the guide's board as the asker), never a person's, and View so a computer in any mode takes it: it only takes proposals back.
+	service(rules(http.MethodPost, TierView, "/api/cloud/guide-revoked")),
 	// ... and so are its changes (#5763, Security's SHOULD 3 on #5761): a bookmark is the owner's own note, so a hub Interact grantee can neither read, create, mark done nor delete one.
 	// Still Interact for the tier (they move no work); the machine also refuses anyone but the owner.
 	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/saved")),
@@ -473,7 +477,11 @@ var routeTable = cat(
 	owner(OwnerRefuse, rules(http.MethodGet, TierView, "/api/operator-asks")),
 	// The Operator's grant to a board's orchestrator and the log of what agents did to the board's agents (#11432) are the OWNER's alone through the hub (an authentic stamp, the owner marker): the switch lets an agent wake,
 	// sleep and start agents. The orchestrator's own wake and sleep routes are not here: they are agent-only and local, so the hub never reaches them.
-	owner(OwnerRefuse, rules(http.MethodGet, TierLaunch, "/api/board/{project}/orchestrator-grant", "/api/board/{project}/lifecycle-log")),
+	owner(OwnerRefuse, rules(http.MethodGet, TierLaunch, "/api/board/{project}/orchestrator-grant", "/api/board/{project}/lifecycle-log", "/api/board/{project}/guide-roster")),
+	owner(OwnerRefuse, rules(http.MethodPut, TierLaunch, "/api/board/{project}/guide-roster")),
+	// The manager's private mark on an artifact (#11457): the owner's alone through the hub, like the star next to it.
+	owner(OwnerRefuse, rules(http.MethodGet, TierView, "/api/artifacts/{hex64}/private")),
+	owner(OwnerRefuse, rules(http.MethodPut, TierInteract, "/api/artifacts/{hex64}/private")),
 	owner(OwnerRefuse, rules(http.MethodPut, TierLaunch, "/api/board/{project}/orchestrator-grant")),
 	// Which agents run an older hook set: for the Operator who would resume them (#3665).
 	rules(http.MethodGet, TierLaunch, "/api/system/hooks-status"),

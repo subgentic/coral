@@ -181,6 +181,10 @@ Commands:
                                until each answers (post --reply-to N "...", or a
                                post that @mentions you); whoever has not is
                                reminded once after 15 min (a team setting)
+  post --ask --guide <label> "<question>"
+                               A question to a guide of this team (the label is
+                               the one the Operator's roster has for them). It
+                               stays open until the guide answers it
   post --reply-to N "<text>"   Answer message N: what closes a question asked of
                                you ('read' prints its number)
   post --assign "Name" [--goal N] [--title T] [--priority P] "<text>"

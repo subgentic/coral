@@ -144,7 +144,7 @@ func TestHubSweepNoHomeInAnyViewRoute(t *testing.T) {
 		"/api/board/{project}/proposals": true, "/api/proposals": true, // what agents asked to add is the owner's alone through the hub (#11389)
 		"/api/operator-asks": true, // the questions agents asked the Operator are the owner's alone (#11417)
 		"/api/chief":         true, // which agent the Operator recorded as Chief is the owner's alone through the hub (#11470)
-		"/api/board/{project}/orchestrator-grant": true, "/api/board/{project}/lifecycle-log": true, // the grant to a board's orchestrator and its log are the owner's alone (#11432)
+		"/api/board/{project}/orchestrator-grant": true, "/api/board/{project}/lifecycle-log": true, "/api/board/{project}/guide-roster": true, "/api/artifacts/{id}/private": true, // the grant to a board's orchestrator and its log are the owner's alone (#11432)
 		"/api/custom-models": true} // the custom models are the owner's alone through the hub (#5996)
 
 	golden, err := os.ReadFile("testdata/cloud_routes.golden")
@@ -161,11 +161,18 @@ func TestHubSweepNoHomeInAnyViewRoute(t *testing.T) {
 			continue
 		}
 		path := repl.Replace(f[1])
+		if f[1] == "/api/board/{project}/guide-asks" { // a guide's own read (#11457): for the owner and for anyone else it is not found, so it is not a route that answers 200 here
+			require.Equal(t, 404, call(h, "GET", path, "", owner).Code, "the owner is not a guide")
+			continue
+		}
 		if f[1] == "/api/artifacts/{id}" {
 			path = "/api/artifacts/" + artifactHex
 		}
 		if f[1] == "/api/artifacts/resolve" { // which artifact a shortened link means (#9841): it needs a link to answer 200 (none matches in the rig)
 			path = "/api/artifacts/resolve?link=" + artifactHex[:8]
+		}
+		if f[1] == "/api/artifacts/{id}/private" { // the manager's private mark on that artifact (#11457)
+			path = "/api/artifacts/" + artifactHex + "/private"
 		}
 		if f[1] == "/api/artifacts/{id}/meta" { // the facts of that artifact (#5465)
 			path = "/api/artifacts/" + artifactHex + "/meta"

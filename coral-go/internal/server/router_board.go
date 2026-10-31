@@ -113,6 +113,8 @@ func (s *Server) registerBoardAPI(r *chi.Mux, boardHandler *routes.BoardHandler,
 		r.With(routes.RefuseSignInLink).Get("/api/board/{project}/orchestrator-grant", sessHandler.OrchestratorGrant)
 		r.With(routes.RefuseSignInLink).Put("/api/board/{project}/orchestrator-grant", sessHandler.OrchestratorGrant)
 		r.Get("/api/board/{project}/lifecycle-log", sessHandler.LifecycleLog)
+		r.With(routes.RefuseSignInLink).Get("/api/board/{project}/guide-roster", boardHandler.GuideRoster) // #11457: which name goes with which guide: the Operator's, the owner's through Coral Hub
+		r.With(routes.RefuseSignInLink).Put("/api/board/{project}/guide-roster", boardHandler.GuideRoster)
 		r.With(routes.RefuseSignInLink).Post("/api/board/{project}/agents/{subscriber}/wake", sessHandler.OrchestratorWake)
 		r.With(routes.RefuseSignInLink).Post("/api/board/{project}/agents/{subscriber}/sleep", sessHandler.OrchestratorSleep)
 	})
@@ -133,6 +135,7 @@ func (s *Server) registerBoardMessageRoutes(r chi.Router, boardHandler *routes.B
 	r.Get("/api/board-seats/foreign", boardHandler.ListForeignSeats)               // the seats of agents launched on another board (#11112)
 	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/messages", boardHandler.PostMessage)
 	r.Get("/api/board/{project}/messages", boardHandler.ReadMessages)
+	r.Get("/api/board/{project}/guide-asks", boardHandler.GuideAsks)                                           // #11457: the questions put to a guide (the guide's own label, from the connector's stamp)
 	r.Get("/api/operator-asks", boardHandler.OperatorAsks)                                                     // the questions agents asked the Operator (post --ask, wait --operator), for Needs you (#11417)
 	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/asks/{messageID}/close", boardHandler.CloseAsk) // close a question answered elsewhere (ask close, #11417)
 	r.Get("/api/board/{project}/messages/all", boardHandler.ListAllMessages)
@@ -155,6 +158,7 @@ func (s *Server) registerBoardMessageRoutes(r chi.Router, boardHandler *routes.B
 	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/hub-notice", boardHandler.PostHubNotice)
 	// Coral Hub's full list of cross-team links (#5572): only through this computer's own connector, only from Coral Hub.
 	r.Post("/api/cloud/cross-team-links", boardHandler.PostCrossTeamLinks)
+	r.Post("/api/cloud/guide-revoked", boardHandler.PostGuideRevoked) // #11457: Coral Hub's word that a guide's grant ended (hub only: the stamp and its own header)
 	// Coral Hub's owner turns a team's two cross-team switches on or off (#5572): Launch tier, the owner marker, the local lock.
 	r.Get("/api/board/{project}/cross-team/settings", boardHandler.GetCrossTeamSettingsForHub)
 	r.Post("/api/board/{project}/cross-team/enable", boardHandler.HubCrossTeamEnable)

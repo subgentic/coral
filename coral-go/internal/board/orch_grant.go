@@ -72,6 +72,12 @@ func (s *Store) ensureOrchSchema(ctx context.Context) error {
 			at      TEXT NOT NULL
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_board_lifecycle_project ON board_lifecycle_log(project, at)`,
+		// The manager's private mark on an artifact (#11457): a guide never reads it, whatever board it is on. Keyed by the artifact's digest alone: the mark follows the content.
+		`CREATE TABLE IF NOT EXISTS artifact_private (
+			artifact_id TEXT PRIMARY KEY,
+			set_by      TEXT NOT NULL DEFAULT '',
+			set_at      TEXT NOT NULL DEFAULT ''
+		)`,
 	} {
 		if _, err := s.db.ExecContext(ctx, stmt); err != nil {
 			return err

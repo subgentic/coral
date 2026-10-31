@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/subgentic/coral/internal/board"
@@ -72,7 +73,29 @@ func (h *BoardHandler) MarkRead(w http.ResponseWriter, r *http.Request) {
 func (h *BoardHandler) PostMessage(w http.ResponseWriter, r *http.Request) {
 	project := urlParam(r, "project")
 	var body postMessageBody
-	derr := decodeJSON(r, &body)
+	var derr error
+	if g, guide := guideOf(r); guide { // a guide's post is content and nothing else, and at most maxGuideMessage characters (guide.go)
+		var ok bool
+		if !guideBoardOK(w, project, g) { // the board first, before the body is read
+			return
+		}
+		if body, ok = readGuideMessage(w, r); !ok {
+			return
+		}
+		if body.ReplyTo != 0 { // a guide may reply only to a question put to them that is still open (S3): the label is the stamp's, never a field
+			open, err := h.bs.GuideAskOpenFor(r.Context(), project, body.ReplyTo, g.Label, g.Since, time.Now())
+			if err != nil {
+				errInternalServer(w, "could not read the questions put to this guide")
+				return
+			}
+			if !open {
+				errBadRequest(w, "reply_to is not a question put to you that is still open")
+				return
+			}
+		}
+	} else {
+		derr = decodeJSON(r, &body)
+	}
 	var answer *taskReply
 	if derr == nil && len(body.TaskID) > 0 && string(body.TaskID) != "null" {
 		id, perr := strconv.ParseInt(strings.TrimSpace(string(body.TaskID)), 10, 64)
@@ -89,7 +112,14 @@ func (h *BoardHandler) PostMessage(w http.ResponseWriter, r *http.Request) {
 	}
 	// An ask (post --ask, #7794) needs someone to ask, and a reply_to a message of this board: both are checked before anything is posted.
 	var asked []string
-	if derr == nil && body.Ask {
+	guideAsk := ""
+	if derr == nil && body.Guide != "" {
+		label, ok := h.guideAskTarget(w, r, project, body)
+		if !ok {
+			return
+		}
+		guideAsk, asked = label, []string{label}
+	} else if derr == nil && body.Ask {
 		to, err := h.bs.AskTargets(r.Context(), project, body.SubscriberID, clitext.Clean(unescapeLineBreaks(body.Content)))
 		if err != nil {
 			errBadRequest(w, err.Error())
@@ -107,7 +137,11 @@ func (h *BoardHandler) PostMessage(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if len(asked) > 0 {
+	if guideAsk != "" { // a question to a guide: the one asked is their label (the member rules above do not apply: a guide is not a member)
+		if err := h.bs.RecordGuideAsk(r.Context(), project, msg, guideAsk); err != nil {
+			slog.Warn("guide ask not recorded", "board", project, "message", msg.ID, "error", err)
+		}
+	} else if len(asked) > 0 {
 		// The sender is known now (the request proved it): who is asked is decided again from what was stored, so the asker is never among them.
 		if to, err := h.bs.AskTargets(r.Context(), project, msg.SubscriberID, msg.Content); err == nil {
 			if err := h.bs.RecordAsk(r.Context(), project, msg, to); err != nil {
@@ -147,6 +181,8 @@ type postMessageBody struct {
 	// no mention is added (the person reads the task's page), the sender is the one the request proves, exactly as for any post.
 	// Ask makes the post a question to the members it @mentions (#7794), open until each has answered; ReplyTo makes it an answer to that message of the board.
 	Ask bool `json:"ask,omitempty"`
+	// Guide makes the ask a question to a guide of this team (#11457): the guide's hub label, which must be in the team's roster. Only an agent's own post, and only with Ask.
+	Guide string `json:"guide,omitempty"`
 	// DryRun checks the post (size, mentions) and answers {"ok": true, "dry_run": true} without storing anything: "post --assign" asks before it creates the task, so a refused post leaves nothing behind (#9047).
 	DryRun  bool            `json:"dry_run,omitempty"`
 	ReplyTo int64           `json:"reply_to,omitempty"`
@@ -265,7 +301,25 @@ func (h *BoardHandler) postMessageCore(w http.ResponseWriter, r *http.Request, p
 	// text says so, so an agent can tell it from the local Operator. Without the header
 	// it is never the Operator.
 	origin, hubUser, hubOperator := "", "", false
-	if cloud.Tunneled(r) {
+	guide, isGuide := guideOf(r)
+	if isGuide {
+		// A guide (the connector's stamp, the grant's board) posts under their hub label and never as the Operator or a member: the sender is the label, the origin hub_guide, and the text starts with their
+		// name from the roster and their role. Nothing in the body can ask for more (the body holds content only).
+		if !guideBoardOK(w, project, guide) {
+			return nil, false
+		}
+		n, cerr := h.bs.CountGuideMessagesSince(r.Context(), project, guide.Label, time.Now().UTC().Add(-time.Hour).Format(time.RFC3339))
+		if guideOverLimit(w, n, cerr, guideMessagesPerHour, fmt.Sprintf("a guide may post at most %d messages an hour on a team: wait a little", guideMessagesPerHour)) {
+			return nil, false
+		}
+		if _, _, status, msg := h.tunnelChatSender(r, project); status != 0 {
+			writeJSON(w, status, map[string]any{"error": msg, "code": "hub_user_required"})
+			return nil, false
+		}
+		subscriberID, origin, hubUser = guide.Label, board.OriginHubGuide, guide.Label
+		body.Content = guidePrefix(h.guideAuthor(r, project, guide.Label), guide.Label) + body.Content
+		body.As = ""
+	} else if cloud.Tunneled(r) {
 		user, hubOrigin, status, msg := h.tunnelChatSender(r, project)
 		if status != 0 {
 			writeJSON(w, status, map[string]any{"error": msg, "code": "hub_user_required"})
@@ -313,7 +367,9 @@ func (h *BoardHandler) postMessageCore(w http.ResponseWriter, r *http.Request, p
 	if reply != nil {
 		taskID = &reply.taskID
 	}
-	if hubUser != "" {
+	if isGuide {
+		msg, err = h.bs.PostGuideMessage(r.Context(), project, guide.Label, body.Content)
+	} else if hubUser != "" {
 		msg, err = h.bs.PostHubMessageForTask(r.Context(), project, hubUser, body.Content, body.TargetGroupID, hubOperator, taskID)
 	} else {
 		msg, err = h.bs.PostMessageForTask(r.Context(), project, subscriberID, body.Content, body.TargetGroupID, origin, taskID)
@@ -411,6 +467,10 @@ func (h *BoardHandler) ReadMessages(w http.ResponseWriter, r *http.Request) {
 		// A paused board delivers nothing, and says so: a bare empty list read as "No new messages" while the Stop hook counted unread ones, for hours after a restart (#11198).
 		w.Header().Set(BoardPausedHeader, "true")
 		writeJSON(w, http.StatusOK, []board.Message{})
+		return
+	}
+	if g, ok := guideOf(r); ok {
+		h.readGuideMessages(w, r, project, g)
 		return
 	}
 	if cloud.Tunneled(r) {

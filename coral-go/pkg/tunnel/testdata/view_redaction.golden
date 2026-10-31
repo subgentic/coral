@@ -9,6 +9,7 @@ GET /api/artifacts/series/{series}/versions redact
 GET /api/artifacts/{hex64} exempt: byte-exact download: the id is the SHA-256 of the bytes, so any change breaks the link and its check
 GET /api/artifacts/{hex64}/comments redact
 GET /api/artifacts/{hex64}/meta redact
+GET /api/artifacts/{hex64}/private redact
 GET /api/artifacts/{hex64}/readers redact
 GET /api/artifacts/{hex64}/versions redact
 GET /api/board/projects redact
@@ -18,6 +19,7 @@ GET /api/board/{project}/artifacts redact
 GET /api/board/{project}/cross-team/settings redact
 GET /api/board/{project}/goals redact
 GET /api/board/{project}/goals/{id} redact
+GET /api/board/{project}/guide-asks redact
 GET /api/board/{project}/messages redact
 GET /api/board/{project}/messages/all redact
 GET /api/board/{project}/messages/search redact
@@ -123,3 +125,4 @@ GET /api/views redact
 GET /api/views/{id} redact
 GET /ws/coral redact
 GET /ws/terminal/{name} redact
+POST /api/cloud/guide-revoked redact

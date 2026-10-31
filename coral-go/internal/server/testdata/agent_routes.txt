@@ -62,6 +62,7 @@ a GET /api/artifacts/series/{series_id}/versions
 a GET /api/artifacts/{id}
 a GET /api/artifacts/{id}/comments
 a GET /api/artifacts/{id}/meta
+b GET /api/artifacts/{id}/private
 a GET /api/artifacts/{id}/versions
 b GET /api/artifacts/{id}/readers
 b GET /api/auth/hub-origins
@@ -89,6 +90,8 @@ a GET /api/board/{project}/goals
 a GET /api/board/{project}/goals/{goalID}
 c GET /api/board/{project}/groups
 c GET /api/board/{project}/groups/{groupID}/members
+c GET /api/board/{project}/guide-asks
+b GET /api/board/{project}/guide-roster
 b GET /api/board/{project}/lifecycle-log
 a GET /api/board/{project}/messages
 a GET /api/board/{project}/messages/all
@@ -345,6 +348,7 @@ b POST /api/cloud/connect
 b POST /api/cloud/connect/cancel
 b POST /api/cloud/cross-team-links
 b POST /api/cloud/disconnect
+b POST /api/cloud/guide-revoked
 b POST /api/cloud/owner-label/arm
 b POST /api/cloud/redeem
 b POST /api/cloud/rekey
@@ -443,6 +447,7 @@ a PUT /api/agent/ui/{id}
 b PUT /api/artifacts/{id}/comments/lock
 b PUT /api/artifacts/{id}/keep
 b GET /api/artifacts/resolve
+b PUT /api/artifacts/{id}/private
 b PUT /api/artifacts/{id}/star
 b PUT /api/auth/hub-origins
 b PUT /api/auth/hub-signin
@@ -450,6 +455,7 @@ b POST /api/board/{project}/artifacts/{id}/review
 b POST /api/board/{project}/operator-artifacts
 b POST /api/board/{project}/operator-artifacts/message
 b PUT /api/board/{project}/artifacts/{id}/tags
+b PUT /api/board/{project}/guide-roster
 b PUT /api/board/{project}/orchestrator-grant
 b PUT /api/board/{project}/settings
 b PUT /api/board/{project}/subscribers/{subscriberID}/review-settings
