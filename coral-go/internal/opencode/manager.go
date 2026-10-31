@@ -3,6 +3,7 @@ package opencode
 import (
 	"context"
 	"errors"
+	"github.com/subgentic/coral/internal/safego"
 	"sync"
 	"time"
 )
@@ -158,7 +159,7 @@ func (m *Manager) start(ctx context.Context, key, bin, model, store string) (*ma
 	}
 	g := &managed{srv: srv, key: key, store: store, dataDir: cfg.DataDir, noted: map[string]bool{}, since: time.Now(), done: make(chan struct{}), tracker: NewTracker(), at: map[string]time.Time{}, msgsAt: -1}
 	g.lctx, g.cancel = context.WithCancel(context.Background()) // not ctx: the loop lives as long as the server
-	go g.loop(g.lctx, m.SkipLast)
+	safego.Go("opencode:events:"+key, func() { g.loop(g.lctx, m.SkipLast) })
 	return g, nil
 }
 
@@ -309,7 +310,7 @@ func (g *managed) refreshLast(ctx context.Context, c *Client, session string, sk
 		return
 	}
 	g.refreshing = true
-	go func() {
+	safego.Go("opencode:last-message", func() {
 		rctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 		defer cancel()
 		m, ok, err := c.LastMessageSkipping(rctx, session, skip)
@@ -322,7 +323,7 @@ func (g *managed) refreshLast(ctx context.Context, c *Client, session string, sk
 			}
 			g.last, g.haveLast = m, true
 		}
-	}()
+	})
 }
 
 // AgentSession is AgentTurn for a reader of the history (the indexer): an agent resumed with a stored session is known from the moment UseSession was told, with no state of its own yet (state ""): no turn is
@@ -450,7 +451,7 @@ func (m *Manager) StartReaper(interval, minAge time.Duration, alive func(key str
 	m.reapStop, m.reapDone = make(chan struct{}), make(chan struct{})
 	stop, done := m.reapStop, m.reapDone
 	m.mu.Unlock()
-	go func() {
+	safego.Go("opencode:reaper", func() {
 		defer close(done)
 		t := time.NewTicker(interval)
 		defer t.Stop()
@@ -462,7 +463,7 @@ func (m *Manager) StartReaper(interval, minAge time.Duration, alive func(key str
 				m.Reap(alive, minAge)
 			}
 		}
-	}()
+	})
 }
 
 // Close stops every server and loop, and refuses any later Ensure.

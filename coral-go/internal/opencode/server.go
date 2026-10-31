@@ -7,6 +7,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/subgentic/coral/internal/fsreplace"
+	"github.com/subgentic/coral/internal/safego"
 	"net"
 	"os"
 	"os/exec"
@@ -243,7 +245,7 @@ func writePrivate(path string, data []byte) error {
 		os.Remove(tmp)
 		return err
 	}
-	if err := os.Rename(tmp, path); err != nil {
+	if err := fsreplace.Rename(tmp, path); err != nil {
 		os.Remove(tmp)
 		return err
 	}
@@ -317,6 +319,11 @@ func Start(ctx context.Context, cfg Config, key string) (*Server, error) {
 	return nil, lastErr
 }
 
+// startOn starts one server on port and trusts it only when it proves itself (below).
+//
+// A stranger that holds the chosen port: checked on opencode 1.19.5 (a python listener on 127.0.0.1:<port>, #138222): `opencode serve --port <port>` EXITS at once with a ServeError and does not move to another
+// port, so s.done fires, this attempt is thrown away and the next has a new password, port and server; and once opencode listens, a plain bind, SO_REUSEADDR and SO_REUSEPORT on the same port are all refused, so a
+// stranger cannot share it. A build that fell back to another port while a stranger answered on this one could be told apart only by who owns the listener (#11398).
 func startOn(ctx context.Context, cfg Config, version Version, dir string, port int) (*Server, error) {
 	raw := make([]byte, 32)
 	if _, err := rand.Read(raw); err != nil {
@@ -335,7 +342,7 @@ func startOn(ctx context.Context, cfg Config, version Version, dir string, port 
 		return nil, fmt.Errorf("opencode: could not start the server: %w", err)
 	}
 	s := &Server{URL: "http://127.0.0.1:" + strconv.Itoa(port), Version: version, password: password, cmd: cmd, dir: dir, done: make(chan struct{})}
-	go func() { _ = cmd.Wait(); close(s.done) }()
+	safego.Go("opencode:wait", func() { defer close(s.done); _ = cmd.Wait() })
 	pidFile := filepath.Join(dir, "server.json")
 	rec, _ := json.Marshal(pidRecord{PID: cmd.Process.Pid, Port: port, Command: strings.Join(append([]string{cfg.Bin}, args...), " "), Started: processStart(cmd.Process.Pid)})
 	_ = writePrivate(pidFile, rec)

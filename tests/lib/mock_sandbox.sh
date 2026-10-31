@@ -25,7 +25,7 @@
 # binary is not in this list, so it stays in step automatically.
 # The built-in defaults are ALWAYS stubbed; an inherited CORAL_TEST_STUB_CLIS may ADD names, never
 # remove them, so a stray value in the environment can't shorten the list for a run (Lead's INFO on #4354).
-CORAL_TEST_STUB_CLIS="claude codex gemini agy pi antigravity ${CORAL_TEST_STUB_CLIS:-}"
+CORAL_TEST_STUB_CLIS="claude codex gemini agy pi antigravity opencode ${CORAL_TEST_STUB_CLIS:-}"
 
 coral_test_sandbox() {
     CORAL_TEST_HOME="$(mktemp -d "${TMPDIR:-/tmp}/coral-test-home.XXXXXX")"

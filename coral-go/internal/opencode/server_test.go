@@ -169,6 +169,9 @@ func runStub() {
 	if ms, _ := strconv.Atoi(os.Getenv(listenDelayVar)); ms > 0 {
 		time.Sleep(time.Duration(ms) * time.Millisecond) // a server that is slow to come up
 	}
+	if os.Getenv("STANDIN_NO_BIND") == "1" {
+		select {} // alive, never listening: ended by the signal Stop sends
+	}
 	l, err := net.Listen("tcp", "127.0.0.1:"+port)
 	if err != nil {
 		os.Exit(3)
@@ -418,20 +421,24 @@ func TestThePasswordFileIsPrivateAndHoldsOnlyThePassword(t *testing.T) {
 	assert.Equal(t, seen["OPENCODE_PASSWORD"], string(b), "the same password the server was given")
 }
 
-func TestTheRealPasswordNeverReachesAnOpenServerThatWonThePort(t *testing.T) {
-	cfg, _ := stubConfig(t)
+// An open "stranger" holds the first port (#138222). The wrong password is sent first, and only a server that refuses it is sent the real one: an open stranger answers 200 to the wrong one and is refused, so
+// the real password never reaches it. Two shapes, both deterministic:
+//   - the stand-in child stays ALIVE and does not bind (STANDIN_NO_BIND): the stranger is always probed, the start fails on it, and every request the stranger saw carried only a "not-" password;
+//   - the child fails to bind and EXITS at once: whether the stranger is probed before the exit is noticed is a race, so what is asserted is what holds either way: no request carried the real password.
+func strangerOnTheFirstPort(t *testing.T, cfg *Config) (seen func() []string) {
+	t.Helper()
 	var mu sync.Mutex
-	var seen []string
+	var got []string
 	stranger := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, pw, _ := r.BasicAuth()
 		mu.Lock()
-		seen = append(seen, pw)
+		got = append(got, pw)
 		mu.Unlock()
 		fmt.Fprint(w, `{"data":[]}`)
 	}))
-	defer stranger.Close()
-	strangerPort, _ := strconv.Atoi(stranger.Listener.Addr().String()[strings.LastIndex(stranger.Listener.Addr().String(), ":")+1:])
-	ports := []int{strangerPort}
+	t.Cleanup(stranger.Close)
+	port, _ := strconv.Atoi(stranger.Listener.Addr().String()[strings.LastIndex(stranger.Listener.Addr().String(), ":")+1:])
+	ports := []int{port}
 	cfg.pickPort = func() (int, error) {
 		if len(ports) > 0 {
 			p := ports[0]
@@ -440,14 +447,31 @@ func TestTheRealPasswordNeverReachesAnOpenServerThatWonThePort(t *testing.T) {
 		}
 		return freeLoopbackPort()
 	}
+	return func() []string { mu.Lock(); defer mu.Unlock(); return append([]string(nil), got...) }
+}
+
+func TestAnOpenStrangerIsAlwaysProbedWhenTheChildStaysAliveAndIsNeverSentTheRealPassword(t *testing.T) {
+	t.Setenv("STANDIN_NO_BIND", "1") // the child lives, never listens: the loop cannot see it exit before it probes
+	cfg, _ := stubConfig(t)
+	cfg.Ready = 5 * time.Second
+	seen := strangerOnTheFirstPort(t, &cfg)
+	_, err := Start(context.Background(), cfg, "agent-1")
+	require.Error(t, err, "the stranger answers a wrong password with 200: refused")
+	pws := seen()
+	require.NotEmpty(t, pws, "the stranger was probed")
+	for _, pw := range pws {
+		assert.True(t, strings.HasPrefix(pw, "not-"), "only the wrong password reached a server that asks for none, got %q", pw)
+	}
+}
+
+func TestAStrangerIsNeverSentTheRealPasswordWhenTheChildExitsAtOnce(t *testing.T) {
+	cfg, _ := stubConfig(t)
+	seen := strangerOnTheFirstPort(t, &cfg)
 	s, err := Start(context.Background(), cfg, "agent-1")
-	require.NoError(t, err)
+	require.NoError(t, err, "the child could not bind the stranger's port and exited: the next port is tried")
 	defer s.Stop()
-	mu.Lock()
-	defer mu.Unlock()
-	require.NotEmpty(t, seen, "the stranger was probed")
-	for _, pw := range seen {
-		assert.True(t, strings.HasPrefix(pw, "not-"), "only the wrong password was sent to a server that asks for none, got %q", pw)
+	for _, pw := range seen() { // empty or not, depending on which the loop notices first: never the real password
+		assert.True(t, strings.HasPrefix(pw, "not-"), "got %q", pw)
 	}
 }
 
