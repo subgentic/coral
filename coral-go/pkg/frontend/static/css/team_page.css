@@ -154,6 +154,7 @@
     .goals-table-page .goals-back, .inbox-board-head .goals-back { min-height: 44px; min-width: 44px; } /* a short label ("Goals") is still a 44 px target both ways */
     .team-task-extra summary { min-height: 44px; display: flex; align-items: center; } /* the dialog's folded sections are 44 px targets on a phone */
     .detail-pane { position: fixed; inset: 0; z-index: 30; width: auto; border-left: 0; }
+    body.phone-nav-on .detail-pane { padding-bottom: calc(92px + env(safe-area-inset-bottom, 0px)); } /* the floating nav (64 px, 18 px from the bottom) is over the sheet: its action row sits above it, not under it (the v2.0.10 phone walk, #11400) */
     .detail-close { width: 44px; height: 44px; }
     .detail-grip { display: none; }
     .detail-back { min-height: 44px; min-width: 44px; }

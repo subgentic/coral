@@ -13,6 +13,7 @@ import { state } from './state.js';
 import { sessionServer } from './server_base.js';
 import { needsYou } from './asked_before_restart.js';
 import { showToast } from './utils.js';
+import { HUB_FEATURES_OFF } from './server_status.js';
 import { mountSettingsView } from './settings_view.js'; // the add and edit form (a startup module)
 import {
     statusMeta, escHtml, describeServerError, formatLastSeen, isValidServerId,
@@ -51,7 +52,7 @@ export const serverView = {
     },
     canRefresh: () => _editing === null && !_ssh && !_busy.size,
     accept: rows => { _servers = rows; _loadError = ''; },
-    fail: error => { _loadError = error; },
+    fail: error => { _loadError = error === HUB_FEATURES_OFF ? '' : error; }, // a Coral that is not a hub has no list of remote computers (404): that is not an error to show a new person, the page says "No remote computers yet" (#11400)
     render,
 };
 
