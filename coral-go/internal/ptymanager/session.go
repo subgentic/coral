@@ -458,13 +458,54 @@ var cmdShellIgnored sync.Once
 // CORAL_SHELL naming it is ignored, logged once. On Windows the default is PowerShell, and with
 // none installed the launch is refused rather than started in a shell it can't run in.
 func defaultShell() ([]string, error) {
-	sh, ignored, err := pickShell(runtime.GOOS, os.Getenv("CORAL_SHELL"), os.Getenv("SHELL"), exec.LookPath)
+	sh, ignored, err := pickShell(runtime.GOOS, os.Getenv("CORAL_SHELL"), os.Getenv("SHELL"), memoLookPath)
 	if ignored {
 		cmdShellIgnored.Do(func() {
 			log.Printf("[pty] CORAL_SHELL=%q is ignored for agents: Coral starts Windows agents through PowerShell, since cmd.exe can't run their launch line", os.Getenv("CORAL_SHELL"))
 		})
 	}
 	return withoutProfileForTests(sh, config.TestHooksEnvHonoured && os.Getenv("CORAL_TEST_HOOKS") == "1"), err
+}
+
+// memoLookPath is exec.LookPath that remembers its answer for the same name and PATH, as winshell.PowerShell does for its own: every launch asks for pwsh and powershell, and on Windows a
+// name that is not found is a stat in every PATH folder for every extension, which a test binary's input log keeps and cmd/go resolves again (#413). A found program is remembered; "not found"
+// only for lookupNotFoundFor, so a PowerShell installed a moment later is picked up (Security on #413). A change of PATH asks again.
+func memoLookPath(name string) (string, error) {
+	key := os.Getenv("PATH") + "\x00" + name
+	lookups.Lock()
+	defer lookups.Unlock()
+	if r, ok := lookups.m[key]; ok && (r.err == nil || lookupNow().Sub(r.at) < lookupNotFoundFor) {
+		return r.path, r.err
+	}
+	path, err := exec.LookPath(name)
+	if lookups.m == nil {
+		lookups.m = map[string]lookupResult{}
+	}
+	lookups.m[key] = lookupResult{path, err, lookupNow()}
+	return path, err
+}
+
+const lookupNotFoundFor = 10 * time.Second
+
+// lookupClock is the clock of memoLookPath; a test stores its own (an atomic, since a goroutine an earlier test left running may read it: #5266) and stores nil to restore time.Now.
+var lookupClock atomic.Pointer[func() time.Time]
+
+func lookupNow() time.Time {
+	if f := lookupClock.Load(); f != nil {
+		return (*f)()
+	}
+	return time.Now()
+}
+
+var lookups struct {
+	sync.Mutex
+	m map[string]lookupResult
+}
+
+type lookupResult struct {
+	path string
+	err  error
+	at   time.Time
 }
 
 // withoutProfileForTests adds -NoProfile to a PowerShell when testHooks is set: the dashboard test suites' server (a dev build with
