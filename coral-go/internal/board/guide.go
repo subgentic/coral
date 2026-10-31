@@ -197,3 +197,52 @@ func shortLabel(s string) string {
 	}
 	return clitext.Clean(s)
 }
+
+// SetArtifactPrivate marks an artifact private to the manager, or clears the mark. The caller has decided who may (the Operator, or the Hub owner); a guide never does. Setting it twice is fine.
+func (s *Store) SetArtifactPrivate(ctx context.Context, artifactID string, private bool, by string) error {
+	if !ValidArtifactDigest(artifactID) {
+		return fmt.Errorf("not an artifact id")
+	}
+	if !private {
+		_, err := s.db.ExecContext(ctx, `DELETE FROM artifact_private WHERE artifact_id = ?`, artifactID)
+		return err
+	}
+	_, err := s.db.ExecContext(ctx, `INSERT INTO artifact_private (artifact_id, set_by, set_at) VALUES (?, ?, ?) ON CONFLICT (artifact_id) DO NOTHING`, artifactID, shortLabel(by), nowUTC())
+	return err
+}
+
+// ArtifactPrivate reports whether an artifact is marked private to the manager. An error means the answer is unknown, and a guide's read is then refused.
+func (s *Store) ArtifactPrivate(ctx context.Context, artifactID string) (bool, error) {
+	var n int
+	err := s.reader().GetContext(ctx, &n, `SELECT COUNT(*) FROM artifact_private WHERE artifact_id = ?`, artifactID)
+	return n > 0, err
+}
+
+// PrivateArtifacts is the subset of ids that are private, in one read.
+func (s *Store) PrivateArtifacts(ctx context.Context, ids []string) (map[string]bool, error) {
+	out := map[string]bool{}
+	for start := 0; start < len(ids); start += 500 {
+		end := start + 500
+		if end > len(ids) {
+			end = len(ids)
+		}
+		chunk := ids[start:end]
+		args := make([]any, len(chunk))
+		for i, id := range chunk {
+			args[i] = id
+		}
+		var found []string
+		if err := s.reader().SelectContext(ctx, &found, `SELECT artifact_id FROM artifact_private WHERE artifact_id IN (`+strings.TrimSuffix(strings.Repeat("?,", len(chunk)), ",")+`)`, args...); err != nil {
+			return nil, err
+		}
+		for _, id := range found {
+			out[id] = true
+		}
+	}
+	return out, nil
+}
+
+var artifactDigestRe = regexp.MustCompile(`^[0-9a-f]{64}$`)
+
+// ValidArtifactDigest reports whether s is the 64 lower-case hex digits of an artifact id.
+func ValidArtifactDigest(s string) bool { return artifactDigestRe.MatchString(s) }

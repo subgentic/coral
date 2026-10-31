@@ -241,6 +241,12 @@
       "type": "index"
     },
     {
+      "name": "sqlite_autoindex_artifact_private_1",
+      "sql": null,
+      "tbl_name": "artifact_private",
+      "type": "index"
+    },
+    {
       "name": "sqlite_autoindex_artifact_reviews_1",
       "sql": null,
       "tbl_name": "artifact_reviews",
@@ -371,6 +377,12 @@
       "sql": null,
       "tbl_name": "task_versions",
       "type": "index"
+    },
+    {
+      "name": "artifact_private",
+      "sql": "CREATE TABLE artifact_private (\n\t\t\tartifact_id TEXT PRIMARY KEY,\n\t\t\tset_by      TEXT NOT NULL DEFAULT '',\n\t\t\tset_at      TEXT NOT NULL DEFAULT ''\n\t\t)",
+      "tbl_name": "artifact_private",
+      "type": "table"
     },
     {
       "name": "artifact_reviews",
@@ -770,6 +782,64 @@
     }
   ],
   "tables": {
+    "artifact_private": {
+      "columns": [
+        {
+          "cid": 0,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "artifact_id",
+          "notnull": 0,
+          "pk": 1,
+          "type": "TEXT"
+        },
+        {
+          "cid": 1,
+          "dflt_value": "''",
+          "hidden": 0,
+          "name": "set_by",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 2,
+          "dflt_value": "''",
+          "hidden": 0,
+          "name": "set_at",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            {
+              "cid": 0,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "artifact_id",
+              "seqno": 0
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 1
+            }
+          ],
+          "name": "sqlite_autoindex_artifact_private_1",
+          "origin": "pk",
+          "partial": 0,
+          "seq": 0,
+          "unique": 1
+        }
+      ]
+    },
     "artifact_reviews": {
       "columns": [
         {

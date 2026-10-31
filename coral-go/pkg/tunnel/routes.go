@@ -474,6 +474,9 @@ var routeTable = cat(
 	// sleep and start agents. The orchestrator's own wake and sleep routes are not here: they are agent-only and local, so the hub never reaches them.
 	owner(OwnerRefuse, rules(http.MethodGet, TierLaunch, "/api/board/{project}/orchestrator-grant", "/api/board/{project}/lifecycle-log", "/api/board/{project}/guide-roster")),
 	owner(OwnerRefuse, rules(http.MethodPut, TierLaunch, "/api/board/{project}/guide-roster")),
+	// The manager's private mark on an artifact (#11457): the owner's alone through the hub, like the star next to it.
+	owner(OwnerRefuse, rules(http.MethodGet, TierView, "/api/artifacts/{hex64}/private")),
+	owner(OwnerRefuse, rules(http.MethodPut, TierInteract, "/api/artifacts/{hex64}/private")),
 	owner(OwnerRefuse, rules(http.MethodPut, TierLaunch, "/api/board/{project}/orchestrator-grant")),
 	// Which agents run an older hook set: for the Operator who would resume them (#3665).
 	rules(http.MethodGet, TierLaunch, "/api/system/hooks-status"),

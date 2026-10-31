@@ -61,16 +61,25 @@ func TestGuardRefusesAnyClaimToBeAGuideThatIsNotWholeAuthenticAndServed(t *testi
 	h := guardServer(t)
 	board := "/api/board/dev%20team"
 	// the routes served for a guide pass with a perfect stamp, on the grant's board
-	for _, target := range []string{board + "/messages", board + "/messages?limit=20", board + "/goals?state=proposed&limit=5", board + "/goals/12"} {
+	art := "/api/artifacts/" + strings.Repeat("a", 64)
+	for _, target := range []string{board + "/messages", board + "/messages?limit=20", board + "/goals?state=proposed&limit=5", board + "/goals/12", board + "/artifacts?limit=10&tag=for%20review",
+		art, art + "?v=2", art + "/meta", art + "/comments?state=open", art + "/versions", "/api/artifacts/series/s1", "/api/artifacts/series/s1/versions"} {
 		assert.Equal(t, http.StatusNoContent, serveGuard(h, http.MethodGet, target, guideStampHeaders()).Code, target)
 	}
+	art0 := "/api/artifacts/" + strings.Repeat("a", 64)
 	// the writes need the route table's tier as for anyone: refused at View, through at Launch
 	assert.Equal(t, http.StatusForbidden, serveGuard(h, http.MethodPost, board+"/messages", guideStampHeaders()).Code, "the viewer's tier still applies to a guide")
 	hl := Guard(func() tunnel.Mode { return tunnel.TierLaunch })(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusNoContent) }))
 	assert.Equal(t, http.StatusNoContent, serveGuard(hl, http.MethodPost, board+"/messages", guideStampHeaders()).Code)
 	assert.Equal(t, http.StatusNoContent, serveGuard(hl, http.MethodPost, board+"/goals", guideStampHeaders()).Code)
+	assert.Equal(t, http.StatusNoContent, serveGuard(hl, http.MethodPost, art0+"/comments", guideStampHeaders()).Code, "a comment on an artifact")
+	for _, target := range []string{art0 + "/comments/3/resolve", art0 + "/comments/3/reopen", art0 + "/comments/3/send", art0 + "/comments/lock", art0 + "/star", art0 + "/keep", art0 + "/review"} {
+		assert.Equal(t, http.StatusForbidden, serveGuard(hl, http.MethodPost, target, guideStampHeaders()).Code, "a guide cannot "+target)
+		assert.Equal(t, http.StatusForbidden, serveGuard(hl, http.MethodPut, target, guideStampHeaders()).Code, target)
+	}
+	assert.Equal(t, http.StatusForbidden, serveGuard(hl, http.MethodDelete, art0, guideStampHeaders()).Code, "a guide deletes nothing")
 	// a route of the table that is not served yet, and a route outside it, are refused
-	for _, target := range []string{"/api/artifacts/" + strings.Repeat("a", 64), "/api/artifacts/" + strings.Repeat("a", 64) + "/comments", board + "/artifacts", board + "/settings", "/api/health"} {
+	for _, target := range []string{"/api/artifacts/" + strings.Repeat("a", 64) + "/readers", "/api/artifacts/" + strings.Repeat("a", 64) + "/private", "/api/artifacts", "/api/team-artifacts", board + "/settings", "/api/health"} {
 		rec := serveGuard(h, http.MethodGet, target, guideStampHeaders())
 		assert.Equal(t, http.StatusForbidden, rec.Code, target)
 		assert.Contains(t, rec.Body.String(), GuardRefusedCode)

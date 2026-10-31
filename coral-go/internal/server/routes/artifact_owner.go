@@ -74,6 +74,8 @@ type ArtifactCircle struct {
 	SessionBoard func(ctx context.Context, sessionID string) (string, error)
 	// BoardOwner is who owns a board.
 	BoardOwner func(ctx context.Context, boardKey string) (artifactPrincipal, error)
+	// PrivateArtifacts is the subset of ids the manager marked private (#11457): a guide never reads them. An error means unknown, and a guide's read is refused.
+	PrivateArtifacts func(ctx context.Context, ids []string) (map[string]bool, error)
 }
 
 var artifactCircle ArtifactCircle
@@ -101,6 +103,12 @@ func NewArtifactCircle(ss *store.SessionStore, bs *board.Store) ArtifactCircle {
 				return "", nil
 			}
 			return *ls.BoardName, nil
+		},
+		PrivateArtifacts: func(ctx context.Context, ids []string) (map[string]bool, error) {
+			if bs == nil {
+				return nil, errors.New("no board store")
+			}
+			return bs.PrivateArtifacts(ctx, ids)
 		},
 		BoardOwner: func(ctx context.Context, boardKey string) (artifactPrincipal, error) {
 			if bs == nil {
@@ -245,6 +253,9 @@ func agentSessionOf(r *http.Request) (sessionID string, isAgent bool) {
 // artifactReadable is the one read check: whether the caller of r may read artifact id. The machine owner, the dashboard, the signed command line, an API key and a request with no credential
 // (an install that opted out of strict local auth) read everything; through Coral Hub refuseNonOwner has already decided. An agent reads what its team's owner owns.
 func artifactReadable(r *http.Request, coralDir, id string) bool {
+	if g, ok := guideOf(r); ok { // a guide reads what is on the grant's board and was not marked private to the manager (#11457); everything else answers as an artifact that does not exist
+		return guideMayRead(r.Context(), coralDir, g.Board, []string{id})[id]
+	}
 	if cloud.Tunneled(r) {
 		return true
 	}
@@ -272,6 +283,22 @@ func artifactReadable(r *http.Request, coralDir, id string) bool {
 // filterReadable drops the items an agent may not read from a list, with one pass over the records for the whole list. Items with no artifact id of the store (a link the team never
 // uploaded) stay: there is nothing of the store to read. Not an agent (or Coral Hub, already decided): the list is unchanged. An error empties an agent's list.
 func filterReadable(r *http.Request, coralDir string, items []teamArtifact) []teamArtifact {
+	if g, ok := guideOf(r); ok { // a guide's list: only what the guide may read, private ones left out whole (so no count or cursor shows them); an error empties it
+		ids := make([]string, 0, len(items))
+		for _, it := range items {
+			if id := artifactStoreID(it); id != "" {
+				ids = append(ids, id)
+			}
+		}
+		may := guideMayRead(r.Context(), coralDir, g.Board, ids)
+		out := make([]teamArtifact, 0, len(items))
+		for _, it := range items {
+			if id := artifactStoreID(it); id == "" || may[id] {
+				out = append(out, it)
+			}
+		}
+		return out
+	}
 	if cloud.Tunneled(r) {
 		return items
 	}

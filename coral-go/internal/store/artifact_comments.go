@@ -259,3 +259,10 @@ func (s *SessionStore) ArtifactCommentsLocked(ctx context.Context, artifactID, b
 	err := s.reader().GetContext(ctx, &n, "SELECT COUNT(*) FROM artifact_comment_locks WHERE (scope = 'artifact' AND key = ?) OR (scope = 'board' AND key = ? AND ? <> '')", artifactID, board, board)
 	return n > 0, err
 }
+
+// CountArtifactCommentsBy is how many comments one author identity (issuer, subject) wrote since a time, on any artifact: Coral's own ceiling for a guide, whatever the Hub's rate caps say.
+func (s *SessionStore) CountArtifactCommentsBy(ctx context.Context, issuer, subject string, since time.Time) (int, error) {
+	var n int
+	err := s.db.GetContext(ctx, &n, `SELECT COUNT(*) FROM artifact_comments WHERE author_issuer = ? AND author_subject = ? AND created_at >= ?`, issuer, subject, since.UTC().Format(time.RFC3339))
+	return n, err
+}

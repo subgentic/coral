@@ -147,12 +147,15 @@ var ownerRefusals = map[string]string{
 	tunnel.OwnerRouteKey("GET", "/api/board/{project}/orchestrator-grant"):          textOrchGrantOwnerOnly,
 	tunnel.OwnerRouteKey("PUT", "/api/board/{project}/orchestrator-grant"):          textOrchGrantOwnerOnly,
 	tunnel.OwnerRouteKey("GET", "/api/board/{project}/lifecycle-log"):               textOrchGrantOwnerOnly,
+	tunnel.OwnerRouteKey("GET", "/api/artifacts/{hex64}/private"):                   textArtifactPrivateOwnerOnly,
+	tunnel.OwnerRouteKey("PUT", "/api/artifacts/{hex64}/private"):                   textArtifactPrivateOwnerOnly,
 	tunnel.OwnerRouteKey("GET", "/api/board/{project}/guide-roster"):                textGuideRosterOwnerOnly,
 	tunnel.OwnerRouteKey("PUT", "/api/board/{project}/guide-roster"):                textGuideRosterOwnerOnly,
 }
 
 const textNoticesOwnerOnly = "through Coral Hub pausing an agent's notices is for the account this computer is linked to only (#11387)"
 const textOperatorAsksOwnerOnly = "through Coral Hub the questions asked of the Operator are for the account this computer is linked to only (#11417)"
+const textArtifactPrivateOwnerOnly = "through Coral Hub marking an artifact private to the manager is for the account this computer is linked to only (#11457)"
 const textGuideRosterOwnerOnly = "through Coral Hub the guides' names on a board are for the account this computer is linked to only (#11457)"
 const textOrchGrantOwnerOnly = "through Coral Hub what a board's orchestrator may do, and the log of it, are for the account this computer is linked to only (#11432)"
 const textActivityOwnerOnly = "through Coral Hub the activity counts are for the account this computer is linked to only (#11225)"
@@ -172,6 +175,9 @@ const textArtifactsOwnerOnly = "through Coral Hub artifacts and pasted images ar
 // Every owner-only handler calls it first; a request from this computer is refused only on the routes that are the Hub owner's alone (OwnerHubOnly). A route that is not in the table, or has no sentence, is refused in general words:
 // the table is the truth and the check fails closed.
 func refuseNonOwner(w http.ResponseWriter, r *http.Request) bool {
+	if _, guide := guideOf(r); guide && tunnel.IsGuideRoute(r.Method, r.URL.Path) {
+		return false // a guide on a route of the guide table (the guard let it through): the owner marker is not theirs and their reach is the table's; each of those routes does its own check of the board and the artifact (#11457)
+	}
 	pattern, mode := tunnel.OwnerRoute(r.Method, r.URL.Path)
 	if !cloud.Tunneled(r) && !mode.RefusesLocal() {
 		return false

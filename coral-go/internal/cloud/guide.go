@@ -19,13 +19,24 @@ var guideServed = []string{
 	"GET /api/board/{project}/goals",
 	"GET /api/board/{project}/goals/{id}",
 	"POST /api/board/{project}/goals",
+	"GET /api/board/{project}/artifacts",
+	"GET /api/artifacts/{hex64}",
+	"GET /api/artifacts/{hex64}/meta",
+	"GET /api/artifacts/{hex64}/comments",
+	"GET /api/artifacts/{hex64}/versions",
+	"GET /api/artifacts/series/{series_id}",
+	"GET /api/artifacts/series/{series_id}/versions",
+	"POST /api/artifacts/{hex64}/comments",
 }
 
 // guideQueryKeys are the query parameters a guide's read may carry, per route (the closed filter: nothing else reaches the handler, so a guide cannot steer a read with a parameter the route also takes for
 // the owner). A route not listed takes none.
 var guideQueryKeys = map[string][]string{
-	"GET /api/board/{project}/messages": {"limit"},
-	"GET /api/board/{project}/goals":    {"state", "limit", "cursor"},
+	"GET /api/board/{project}/messages":   {"limit"},
+	"GET /api/board/{project}/goals":      {"state", "limit", "cursor"},
+	"GET /api/board/{project}/artifacts":  {"tag", "limit", "cursor", "goal"},
+	"GET /api/artifacts/{hex64}":          {"v"},
+	"GET /api/artifacts/{hex64}/comments": {"state"},
 }
 
 // guideClaimed reports whether the request says, by any header, that it is a guide's.

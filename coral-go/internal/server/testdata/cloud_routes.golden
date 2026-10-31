@@ -56,6 +56,7 @@ GET /api/artifacts/series/{series_id}/versions view
 GET /api/artifacts/{id} view
 GET /api/artifacts/{id}/comments view
 GET /api/artifacts/{id}/meta view
+GET /api/artifacts/{id}/private view
 GET /api/artifacts/{id}/readers view
 GET /api/artifacts/{id}/versions view
 GET /api/auth/hub-origins never
@@ -434,6 +435,7 @@ POST /api/worktrees/remove never
 PUT /api/agent/ui/{id} never
 PUT /api/artifacts/{id}/comments/lock interact
 PUT /api/artifacts/{id}/keep never
+PUT /api/artifacts/{id}/private interact
 PUT /api/artifacts/{id}/star interact
 PUT /api/auth/hub-origins never
 PUT /api/auth/hub-signin never

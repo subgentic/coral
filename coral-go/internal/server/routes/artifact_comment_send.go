@@ -244,6 +244,8 @@ func (h *SessionsHandler) sendArtifactComment(w http.ResponseWriter, r *http.Req
 		author = "the owner"
 	case t.AuthorKind == commentCallerHub:
 		author = "a Coral Hub viewer" + map[bool]string{true: " (" + author + ")", false: ""}[author != ""]
+	case t.AuthorKind == commentCallerGuide:
+		author = "a guide" + map[bool]string{true: " (" + author + ")", false: ""}[author != ""]
 	case t.AuthorKind == commentCallerAgent:
 		author = "an agent" + map[bool]string{true: " (" + author + ")", false: ""}[author != ""]
 	case author == "":

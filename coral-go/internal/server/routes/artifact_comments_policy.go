@@ -11,6 +11,7 @@ const (
 	commentCallerOwner = "owner" // the person at this computer (the dashboard, the signed command line, this server's API key), never a request carrying the tunnel's stamp
 	commentCallerHub   = "hub"   // a Coral Hub viewer through the authentic tunnel stamp
 	commentCallerAgent = "agent" // an agent's session token
+	commentCallerGuide = "guide" // a guide: a person the Operator invited to one board through Coral Hub (#11457): reads, comments and replies on that board's artifacts, nothing more
 )
 
 // Actions on comments.
@@ -44,7 +45,7 @@ func (c commentCaller) sameAuthor(t *store.ArtifactComment) bool {
 // anything up, so a caller who may never do it learns nothing about which artifacts exist. commentPolicy repeats it, then adds the target and the lock.
 func commentKindMay(c commentCaller, action string, hubWrite bool) (bool, string) {
 	switch c.Kind {
-	case commentCallerOwner, commentCallerHub, commentCallerAgent:
+	case commentCallerOwner, commentCallerHub, commentCallerAgent, commentCallerGuide:
 	default:
 		return false, "sign in to see comments"
 	}
@@ -61,6 +62,13 @@ func commentKindMay(c commentCaller, action string, hubWrite bool) (bool, string
 		return false, "unknown action"
 	}
 	switch c.Kind {
+	case commentCallerGuide:
+		if action != commentCreate {
+			return false, "a guide comments and replies; it cannot edit, delete, resolve or reopen"
+		}
+		if c.Subject == "" {
+			return false, "Coral Hub did not say who you are, so the comment cannot be attributed"
+		}
 	case commentCallerAgent:
 		return false, "agents read comments; they cannot write them yet"
 	case commentCallerHub:

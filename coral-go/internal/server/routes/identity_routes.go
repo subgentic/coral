@@ -50,6 +50,8 @@ var operatorOnlyRoutes = map[string]string{
 	"GET /api/board/{project}/orchestrator-grant":       "read what a board's orchestrator may do",
 	"PUT /api/board/{project}/orchestrator-grant":       "change what a board's orchestrator may do (wake, sleep and start agents)",
 	"GET /api/board/{project}/lifecycle-log":            "read what agents did to a board's agents",
+	"GET /api/artifacts/{id}/private":                   "read whether an artifact is private to the manager",
+	"PUT /api/artifacts/{id}/private":                   "mark an artifact private to the manager, or clear it",
 	"GET /api/board/{project}/guide-roster":             "read the names of the guides of a board",
 	"PUT /api/board/{project}/guide-roster":             "change the names of the guides of a board",
 	"POST /api/cloud/guide-revoked":                     "tell that a guide's grant ended (Coral Hub's word)",

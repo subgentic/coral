@@ -81,8 +81,11 @@ func guideBoardOK(w http.ResponseWriter, project string, g tunnel.HubGuide) bool
 
 // The per-label ceilings Coral keeps itself, under the Hub's own rate caps (20 messages an hour, 5 goals a day): a guide cannot flood a team even if the Hub's counter is wrong or reset.
 const (
-	guideMessagesPerHour = 60
-	guideProposalsPerDay = 10
+	guideMessagesPerHour  = 60
+	guideProposalsPerDay  = 10
+	guideCommentsPerHour  = 30
+	guideCommentChars     = 4000
+	guideCommentBodyBytes = 64 << 10 // the body's size, anchor included, before it is read
 )
 
 // guideOverLimit answers 429 (an action limit on this guide, not an overloaded Coral) when the label has used its ceiling; it answers a store failure as 500.

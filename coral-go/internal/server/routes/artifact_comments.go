@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -284,6 +285,9 @@ func commentTextLike(m agentArtifactMeta) bool {
 
 // commentBoards is the set of boards an agent is on, among the boards these comments were made on; the owner and a hub viewer see all (nil).
 func (h *SessionsHandler) commentBoards(r *http.Request, c commentCaller, comments []store.ArtifactComment) []string {
+	if g, ok := guideOf(r); ok && c.Kind == commentCallerGuide {
+		return []string{g.Board} // a guide reads the comments made on the grant's board and no other board's (#11457)
+	}
 	if c.Kind != commentCallerAgent {
 		return nil
 	}
@@ -558,7 +562,28 @@ func (h *SessionsHandler) createArtifactComment(w http.ResponseWriter, r *http.R
 		// NotifyAgent false keeps the Operator's comment on a "for review" artifact from being sent to the agent that uploaded it (#11420); absent means it is sent.
 		NotifyAgent *bool `json:"notify_agent"`
 	}
-	if !readJSONBody(w, r, 3*store.MaxArtifactCommentBody, &in) {
+	if g, isGuide := guideOf(r); isGuide {
+		// a guide's comment is body, anchor and parent_id and nothing else (no board, no notify flag): the board is the grant's, and the comment is never sent to an agent by the guide's own request
+		var gin struct {
+			Body     string         `json:"body"`
+			Anchor   *commentAnchor `json:"anchor"`
+			ParentID *int64         `json:"parent_id"`
+		}
+		r.Body = http.MaxBytesReader(w, r.Body, int64(guideCommentBodyBytes))
+		if err := decodeJSONStrict(r, &gin); err != nil {
+			errBadRequest(w, "send body, anchor and parent_id as JSON, and nothing else")
+			return
+		}
+		if utf8.RuneCountInString(gin.Body) > guideCommentChars {
+			errBadRequest(w, fmt.Sprintf("a guide's comment is at most %d characters", guideCommentChars))
+			return
+		}
+		in.Body, in.Anchor, in.ParentID, in.Board = gin.Body, gin.Anchor, gin.ParentID, g.Board
+		n, cerr := h.ss.CountArtifactCommentsBy(r.Context(), guideIssuer, g.Label, time.Now().UTC().Add(-time.Hour))
+		if guideOverLimit(w, n, cerr, guideCommentsPerHour, fmt.Sprintf("a guide may write at most %d comments an hour: wait a little", guideCommentsPerHour)) {
+			return
+		}
+	} else if !readJSONBody(w, r, 3*store.MaxArtifactCommentBody, &in) {
 		return
 	}
 	if in.Board != "" && !commentBoardRe.MatchString(in.Board) {
@@ -617,7 +642,7 @@ func (h *SessionsHandler) createArtifactComment(w http.ResponseWriter, r *http.R
 		errInternalServer(w, "could not save the comment")
 	default:
 		view := h.commentView(caller, c, locked, hubWrite)
-		if in.NotifyAgent == nil || *in.NotifyAgent {
+		if _, isGuide := guideOf(r); !isGuide && (in.NotifyAgent == nil || *in.NotifyAgent) {
 			if d := h.deliverOperatorComment(r, caller, c, id, in.Board); d.To != "" {
 				view.SentTo = d.To
 			}
