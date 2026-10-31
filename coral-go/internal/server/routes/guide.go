@@ -2,6 +2,7 @@ package routes
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -246,6 +247,47 @@ func (h *BoardHandler) PostGuideRevoked(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "cancelled": n})
+}
+
+type clashRequest struct {
+	SubscriberID string `json:"subscriber_id"`
+	Target       string `json:"target"`
+	A            int64  `json:"a"`
+	B            int64  `json:"b"`
+}
+
+// FileClash: POST /api/board/{project}/clashes {"target": "task:N|goal:N|artifact:<digest>", "a": <message id>, "b": <message id>} (#11457, S6). An agent of the team files that two people, at least one of them
+// a guide, gave different directions on one target; Coral writes ONE question to the Operator from the two stored messages and holds the work on that target. A guide, a Hub viewer and a person cannot file one.
+func (h *BoardHandler) FileClash(w http.ResponseWriter, r *http.Request) {
+	project := urlParam(r, "project")
+	if _, isGuide := guideOf(r); isGuide || cloud.Tunneled(r) || !agentCaller(r) {
+		errForbidden(w, "only an agent of the team files a clash")
+		return
+	}
+	var in clashRequest
+	r.Body = http.MaxBytesReader(w, r.Body, 4<<10)
+	if err := decodeJSONStrict(r, &in); err != nil {
+		errBadRequest(w, `send {"target", "a", "b"}`)
+		return
+	}
+	by := "an agent"
+	if name, ok := actorName(callerActor(r)); ok {
+		by = name
+	}
+	res, err := h.bs.FileClash(r.Context(), project, in.Target, in.A, in.B, by, time.Now())
+	switch {
+	case err == nil:
+		if h.notifyFn != nil && !res.Existed {
+			h.notifyFn(project)
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "ask_id": res.AskID, "existed": res.Existed})
+	case errors.Is(err, board.ErrClashTooMany):
+		writeError(w, http.StatusConflict, "too_many_clashes", err.Error())
+	case errors.Is(err, board.ErrClashTarget), errors.Is(err, board.ErrClashNoTarget), errors.Is(err, board.ErrClashMessages), errors.Is(err, board.ErrClashSame):
+		errBadRequest(w, err.Error())
+	default:
+		errInternalServer(w, "could not file the clash")
+	}
 }
 
 // GuideRoster: GET and PUT /api/board/{project}/guide-roster. Which name goes with which guide, in the text agents read: the Operator's or, through Coral Hub, the owner's alone.

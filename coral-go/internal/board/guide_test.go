@@ -3,6 +3,7 @@ package board
 import (
 	"context"
 	"encoding/json"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -167,4 +168,106 @@ func TestTheCountsThatLimitAGuide(t *testing.T) {
 	assert.Equal(t, 1, n)
 	n, _ = s.CountProposalsSince(ctx, "team", "hub-user-00000001", hourAgo)
 	assert.Equal(t, 0, n)
+}
+
+// S6: a clash is filed by an agent from two stored messages and Coral writes ONE question to the Operator, quoting both with their authors and roles.
+func TestAClashPutsOneQuestionToTheOperatorQuotingBothDirections(t *testing.T) {
+	s := orchStore(t)
+	ctx := context.Background()
+	_, err := s.Subscribe(ctx, "team", "Operator", "Operator", "", nil, "all")
+	require.NoError(t, err)
+	_, err = s.Subscribe(ctx, "team", "Dev", "Developer", "tmux-d", nil, "all")
+	require.NoError(t, err)
+	_, err = s.SetGuideRoster(ctx, "team", map[string]string{"hub-user-1234abcd": "Dana Reyes"})
+	require.NoError(t, err)
+	task, err := s.CreateTask(ctx, "team", "the report", "", "", "Lead", "Dev")
+	require.NoError(t, err)
+	target := "task:" + strconv.FormatInt(task.ID, 10)
+	guide, err := s.PostGuideMessage(ctx, "team", "hub-user-1234abcd", "[Guide Dana Reyes via Coral Hub, hub-user-1234abcd] use option A @all")
+	require.NoError(t, err)
+	op, err := s.PostMessage(ctx, "team", "Operator", "use option B", nil)
+	require.NoError(t, err)
+
+	res, err := s.FileClash(ctx, "team", target, guide.ID, op.ID, "Orchestrator", time.Now())
+	require.NoError(t, err)
+	assert.False(t, res.Existed)
+	ask, err := s.GetMessageByID(ctx, "team", res.AskID)
+	require.NoError(t, err)
+	assert.True(t, ask.IsSystem)
+	assert.Equal(t, "Coral", ask.SubscriberID)
+	for _, want := range []string{target, "guide Dana Reyes said", "the Operator said", "use option A", "use option B", "held"} {
+		assert.Contains(t, ask.Content, want)
+	}
+	assert.NotContains(t, ask.Content, "@all", "a quoted mention does not mention anyone (the @ is followed by a zero-width space)")
+	require.NotNil(t, ask.Ask)
+	assert.Equal(t, []string{"Operator"}, ask.Ask.To)
+	assert.False(t, ask.Ask.Answered)
+
+	// the same target again, the other way round: the same question, nothing new
+	again, err := s.FileClash(ctx, "team", target, op.ID, guide.ID, "Dev", time.Now())
+	require.NoError(t, err)
+	assert.True(t, again.Existed)
+	assert.Equal(t, res.AskID, again.AskID)
+	var n int
+	require.NoError(t, s.db.GetContext(ctx, &n, `SELECT COUNT(*) FROM board_clashes WHERE project = 'team'`))
+	assert.Equal(t, 1, n)
+
+	// the Operator decides: the question closes, and the target can be filed again
+	require.NoError(t, s.CloseAsk(ctx, "team", res.AskID, "Operator", "decided: B"))
+	third, err := s.FileClash(ctx, "team", target, guide.ID, op.ID, "Dev", time.Now())
+	require.NoError(t, err)
+	assert.False(t, third.Existed)
+	assert.NotEqual(t, res.AskID, third.AskID)
+}
+
+func TestWhatIsNotAClashIsRefused(t *testing.T) {
+	s := orchStore(t)
+	ctx := context.Background()
+	_, err := s.Subscribe(ctx, "team", "Operator", "Operator", "", nil, "all")
+	require.NoError(t, err)
+	task, err := s.CreateTask(ctx, "team", "t", "", "", "Lead", "Operator")
+	require.NoError(t, err)
+	target := "task:" + strconv.FormatInt(task.ID, 10)
+	g1, _ := s.PostGuideMessage(ctx, "team", "hub-user-1234abcd", "A")
+	g1b, _ := s.PostGuideMessage(ctx, "team", "hub-user-1234abcd", "B")
+	g2, _ := s.PostGuideMessage(ctx, "team", "hub-user-00000001", "B different")
+	op, _ := s.PostMessage(ctx, "team", "Operator", "C", nil)
+	dev, _ := s.PostMessage(ctx, "team", "Dev", "D", nil)
+	dev2, _ := s.PostMessage(ctx, "team", "Lead", "E", nil)
+	grp := "g1"
+	private, _ := s.PostMessage(ctx, "team", "Operator", "for a group", &grp)
+	sys, _ := s.PostSystemMessage(ctx, "team", "Coral", "a system line", nil)
+	same, _ := s.PostGuideMessage(ctx, "team", "hub-user-00000001", "  a  ")
+	otherBoard, _ := s.PostGuideMessage(ctx, "other", "hub-user-00000001", "elsewhere")
+	for name, c := range map[string]struct {
+		target string
+		a, b   int64
+		want   error
+	}{
+		"the same message twice":        {target, g1.ID, g1.ID, ErrClashMessages},
+		"one author twice":              {target, g1.ID, g1b.ID, ErrClashMessages},
+		"no guide among them":           {target, op.ID, dev.ID, ErrClashMessages},
+		"two agents":                    {target, dev.ID, dev2.ID, ErrClashMessages},
+		"a message for a group":         {target, g2.ID, private.ID, ErrClashMessages},
+		"a system line":                 {target, g2.ID, sys.ID, ErrClashMessages},
+		"a message of another board":    {target, g2.ID, otherBoard.ID, ErrClashMessages},
+		"no such message":               {target, g2.ID, 99999, ErrClashMessages},
+		"the same words":                {target, g1.ID, same.ID, ErrClashSame},
+		"a target that is no form":      {"everything", g1.ID, op.ID, ErrClashTarget},
+		"a task of another board":       {"task:9999", g1.ID, op.ID, ErrClashNoTarget},
+		"an artifact with a bad digest": {"artifact:abc", g1.ID, op.ID, ErrClashTarget},
+	} {
+		_, err := s.FileClash(ctx, "team", c.target, c.a, c.b, "Dev", time.Now())
+		assert.ErrorIs(t, err, c.want, name)
+	}
+	var n int
+	require.NoError(t, s.db.GetContext(ctx, &n, `SELECT COUNT(*) FROM board_clashes`))
+	assert.Equal(t, 0, n, "none of them filed anything")
+	// an artifact target needs no lookup of its own (the digest form is the check), and the cap holds
+	for i := 0; i < MaxOpenClashes; i++ {
+		_, err := s.FileClash(ctx, "team", "artifact:"+strings.Repeat(string("0123456789abcdef"[i]), 64), g1.ID, op.ID, "Dev", time.Now())
+		require.NoError(t, err)
+	}
+	_, err = s.FileClash(ctx, "team", "artifact:"+strings.Repeat("f", 64), g1.ID, op.ID, "Dev", time.Now())
+	assert.ErrorIs(t, err, ErrClashTooMany)
 }

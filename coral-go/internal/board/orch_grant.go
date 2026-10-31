@@ -73,6 +73,18 @@ func (s *Store) ensureOrchSchema(ctx context.Context) error {
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_board_lifecycle_project ON board_lifecycle_log(project, at)`,
 		// The manager's private mark on an artifact (#11457): a guide never reads it, whatever board it is on. Keyed by the artifact's digest alone: the mark follows the content.
+		// A clash between two people's directions on one target (#11457, S6): the ask Coral put to the Operator for it. While that ask is open, the same target is not filed again.
+		`CREATE TABLE IF NOT EXISTS board_clashes (
+			id         INTEGER PRIMARY KEY AUTOINCREMENT,
+			project    TEXT NOT NULL,
+			target     TEXT NOT NULL,
+			ask_id     INTEGER NOT NULL,
+			a_msg      INTEGER NOT NULL,
+			b_msg      INTEGER NOT NULL,
+			filed_by   TEXT NOT NULL,
+			filed_at   TEXT NOT NULL
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_board_clashes_target ON board_clashes(project, target)`,
 		`CREATE TABLE IF NOT EXISTS artifact_private (
 			artifact_id TEXT PRIMARY KEY,
 			set_by      TEXT NOT NULL DEFAULT '',

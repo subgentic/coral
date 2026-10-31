@@ -50,6 +50,8 @@ type teamArtifact struct {
 	WaitsOnThis *board.WaitsOnThis `json:"waits_on_this,omitempty"`
 	// Tags: the team's tags on this stored object (#8583), lowercase words, sorted; absent for none.
 	Tags []string `json:"tags,omitempty"`
+	// Private: the manager marked this stored object private, so no guide reads it (#11457). Present (true) only for the owner's own read; never in anything an agent or a guide reads, and absent when it is not marked.
+	Private bool `json:"private,omitempty"`
 	// Review is the Operator's decision on an artifact tagged for review, with its time (#136584): absent until one is made.
 	Review         *board.ArtifactReview `json:"review,omitempty"`
 	Source         string                `json:"source"`
@@ -241,6 +243,7 @@ func (h *BoardHandler) projectArtifactItems(r *http.Request, project, sessionFil
 	h.linkUploadTasks(r.Context(), project, items)
 	h.attachArtifactTags(r.Context(), project, items)
 	items = filterReadable(r, h.coralDir, items) // an agent's list holds only what the one read check lets it read, so the totals and the cursor count nothing else (#5577)
+	h.attachArtifactPrivate(r, items)
 	return items, scanTruncated, nil
 }
 
@@ -772,6 +775,29 @@ func (h *BoardHandler) addWaitsOnThis(r *http.Request, project string, rows []te
 				v := info
 				rows[i].WaitsOnThis = &v
 			}
+		}
+	}
+}
+
+// attachArtifactPrivate marks the items the manager made private, for the owner's own read only (the person at this computer, or the Hub owner): an agent's list and a guide's never carry the mark. A failure leaves the
+// marks off (the list is the same without them).
+func (h *BoardHandler) attachArtifactPrivate(r *http.Request, items []teamArtifact) {
+	if h.bs == nil || !ownerSeesPrivateMarks(r) {
+		return
+	}
+	ids := make([]string, 0, len(items))
+	for _, it := range items {
+		if id := artifactStoreID(it); id != "" {
+			ids = append(ids, id)
+		}
+	}
+	marks, err := h.bs.PrivateArtifacts(r.Context(), ids)
+	if err != nil || len(marks) == 0 {
+		return
+	}
+	for i := range items {
+		if id := artifactStoreID(items[i]); id != "" && marks[id] {
+			items[i].Private = true
 		}
 	}
 }
