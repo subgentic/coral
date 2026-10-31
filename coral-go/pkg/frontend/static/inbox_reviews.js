@@ -6,7 +6,7 @@ import { boardFetch, keyLabel, splitKey } from './server_base.js';
 let items = [], errors = [], pending = null, lastRead = 0, revision = 0, changed = () => {};
 let activated = false;
 // One row per artifact (#11533): versions (same uploader, team, name) are one item, the newest, with `earlier`.
-const vkey = a => (a.session_id || a.produced_by) ? `${a.team}|${a.session_id}|${a.produced_by}|${a.name}` : a.reviewKey;
+const vkey = a => (a.session_id || a.produced_by) ? JSON.stringify([a.team, a.session_id, a.produced_by, a.name]) : a.reviewKey; // a JSON array: no name or id can run into the next field
 const byAge = (a, b) => String(a.created_at).localeCompare(String(b.created_at)) || a.reviewKey.localeCompare(b.reviewKey);
 /** The versions older than `row`, still for review. */
 export const earlierVersions = row => { const key = row.reviewKey || `${row.team}:${row.id}`, me = items.find(a => a.reviewKey === key) || row; return items.filter(a => a.reviewKey !== key && vkey(a) === vkey(me) && byAge(a, me) < 0); };
