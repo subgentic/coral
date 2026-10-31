@@ -45,7 +45,7 @@ export function mountAgentReviewSettings(host, team, subscriber) {
         },
     });
     const error = document.createElement('p'); error.className = 'goals-failed'; error.setAttribute('role', 'alert'); error.hidden = true; // shown only with its sentence: an empty one was a red-bordered box under the Save bar (#11219)
-    const retry = document.createElement('button'); retry.type = 'button'; retry.className = 'btn'; retry.textContent = 'Try again';
+    const retry = document.createElement('button'); retry.type = 'button'; retry.className = 'btn'; retry.textContent = 'Retry';
     retry.hidden = true; section.append(error, retry);
     const failed = e => { if (!section.isConnected) return; error.textContent = e.message || 'Review settings could not be read.'; error.hidden = false; retry.hidden = false; };
     retry.addEventListener('click', () => { error.textContent = ''; error.hidden = true; retry.hidden = true; view.reload().catch(failed); });

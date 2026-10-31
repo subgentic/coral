@@ -165,7 +165,7 @@ function renderBoardItem(item, prev) {
     const selectedClass = isSelectMode() && isSelected(m.id) ? ' mb-message-selected' : '';
     const snippet = String(m.content || '').replace(/\s+/g, ' ').trim().slice(0, 40);
     const moreLabel = `Actions for the message from ${agent}, ${formatTime(m.created_at)}${snippet ? `: ${snippet}` : ''}`; // each one names its own message (three at one minute are three names)
-    const deleteLabel = `Delete the message from ${agent}, ${formatTime(m.created_at)}`; // names the message: the × alone is read as "times"
+    const deleteLabel = `Delete the message from ${agent}, ${formatTime(m.created_at)}`; // names the message: an icon alone has no name
     const parent = m.reply_to ? bs._allMessages[indexOfId(bs._allMessages, m.reply_to)] : null;
     const parts = rowParts(m, { agent, timeHtml: messageTimeHtml(m.created_at), moreLabel, replyName: m.reply_to ? (parent ? (parent.job_title || 'Unknown') : 'an earlier message') : '', self: OPERATOR_ID.toLowerCase() }); // the table's head, actions and flags (board_table.js)
     const checkbox = isSelectMode() ? `<input type="checkbox" class="check mb-select-checkbox" data-msg-id="${Number(m.id)}" ${isSelected(m.id) ? 'checked' : ''} data-on-click="mb-msg-select">` : '';
@@ -178,7 +178,7 @@ function renderBoardItem(item, prev) {
                 ${externalMessageBadge(m)}${hubUserBadge(m)}${askBadge(m)}
                 ${messageTimeHtml(m.created_at)}
                 ${BOARD_SAVE_BUTTON(bs.currentProject || '', keyLabel(bs.currentProject || ''), String(m.created_at || ''), String(m.job_title || m.subscriber_id || ''))}
-                <button class="btn btn-quiet btn-icon btn-xs mb-delete-msg-btn" data-on-click="mb-msg-delete" data-msg-id="${Number(m.id)}" title="Delete message" aria-label="${escapeAttr(deleteLabel)}">&times;</button>
+                <button class="btn btn-quiet btn-icon btn-xs mb-delete-msg-btn" data-on-click="mb-msg-delete" data-msg-id="${Number(m.id)}" title="Delete message" aria-label="${escapeAttr(deleteLabel)}"><span class="material-icons" aria-hidden="true">delete</span></button>
                 <button type="button" class="mb-msg-more" data-on-click="mb-msg-more" aria-haspopup="dialog" title="Message actions" aria-label="${escapeAttr(moreLabel)}">&hellip;</button>
             </div>
             ${parts.tagsOpen}

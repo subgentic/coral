@@ -2435,6 +2435,10 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
     background: rgba(var(--fx-red-rgb), 0.1);
 }
 
+/* Resume is a safe action, not a destructive one (#11554, the operator's one action set): a paused board's button is the warning colour, as the header's icon is, never the delete red. */
+#mb-pause-btn.mb-action-btn.mb-action-danger { color: var(--warning-text); border-color: rgba(var(--warning-rgb), 0.35); }
+#mb-pause-btn.mb-action-btn.mb-action-danger:hover { color: var(--warning-text); background: rgba(var(--warning-rgb), 0.12); }
+
 /* ── Permissions Editor ──────────────────────────────────── */
 
 .permissions-section {

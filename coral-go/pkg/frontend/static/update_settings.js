@@ -35,7 +35,7 @@ function card(s) {
         title.textContent = 'Updating Coral…'; sub.textContent = 'The update is being installed. Coral restarts when it is done.'; dot.dataset.k = 'warm'; c.dataset.k = 'warm';
     } else if (notice) {
         title.textContent = notice.lead; sub.textContent = notice.rest.trim(); dot.dataset.k = 'bad'; c.dataset.k = 'bad';
-        if (serverHas.check) act = mk('button', 'btn update-act', 'Try again'); // no server route to check now, no button
+        if (serverHas.check) act = mk('button', 'btn update-act', 'Retry'); // no server route to check now, no button
         if (act) act.type = 'button';
         if (act) act.addEventListener('click', async () => { act.disabled = true; await requestCheckNow(); await refreshUpdateStatus(); showUpdatesPane(); });
     } else if (relaunchOffered(s)) {
