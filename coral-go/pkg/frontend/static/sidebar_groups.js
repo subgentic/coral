@@ -7,6 +7,7 @@
  * A tab registers a source: { keys(): the group keys as drawn, defaultFolded(): the keys folded until the reader chooses (optional), redraw(): draws the list again, table(key): { title, rows, node, signature }, isEmpty(): whether the tab's centre is
  * its empty page, showList() and empty(): back to the tab's own page }. A table may also carry { extra: { action, label, icon, title } }, one action button in its head; { chips: [{ action, data, label, count, pressed }], chipsLabel } filter chips above it; { empty: { line, hint } } for the line it is replaced by when it has no row; and { note } a line under it. Each source supplies its shared data_table node and a signature of its displayed rows. */
 import { browserLocal } from './safe_storage.js';
+import { clearPhonePageName } from './phone_bar.js';
 import { escapeHtml, escapeAttr, showView } from './utils.js';
 import { onViewShown } from './view_switch.js';
 import { registerActions, textOf } from './actions.js';
@@ -206,6 +207,7 @@ function drawTable() {
 /** Opens a group as a table in the centre. */
 export function openGroupTable(kind, key, { focus = false } = {}) {
     open = { kind, key };
+    if (kind === 'hub-inbox' && key !== 'tasks') clearPhonePageName(); // the phone bar's Tasks page ends when the Inbox's own tab is anything else (#11401)
     if (!drawTable()) { open = null; return false; }
     showView('group-table-view');
     // a group opened by the person: the keyboard starts at the page's search box (the first control of the toolbar, #7404), else the first row, else the heading (a ring round the word was the arrival's look)

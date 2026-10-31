@@ -24,6 +24,13 @@ const { coralReady } = require('./helpers/wait');
         assert.equal(await title(), 'Tasks', 'the pill says Tasks while the Tasks table is open: ' + await title());
         const lit = () => ev(`[...document.querySelectorAll('.phone-nav-slot.active')].map(e => e.dataset.phoneNav).join(',')`);
         assert.equal(await lit(), 'nav-tasks', 'the bar lights Tasks, not Inbox, on the Tasks page: ' + await lit());
+        // the Inbox's own tab changes (the strip above the table): the page is no longer the Tasks page, so the pill and the bar say Inbox again (QA Reviewer 2's MUST)
+        await ev(`[...document.querySelectorAll('#group-table-view .view-list-name')].find(b => /^Goals/.test(b.textContent.trim())).click(); true`);
+        await waitFor(`[...document.querySelectorAll('.phone-bar-title')].some(e => e.getClientRects().length && /^Inbox$/.test(e.textContent.trim()))`, 'the pill says Inbox once the Inbox tab is Goals', 8000);
+        assert.equal(await lit(), 'nav-inbox', 'the bar lights Inbox once the Inbox tab is Goals: ' + await lit());
+        await tap('nav-tasks');
+        await new Promise(r => setTimeout(r, 500)); // sleep-ok: the Tasks table again
+        assert.equal(await title(), 'Tasks', 'Tasks again after the detour: ' + await title());
         await tap('nav-inbox');
         await waitFor(`[...document.querySelectorAll('.phone-bar-title')].some(e => e.getClientRects().length && /^Inbox$/.test(e.textContent.trim()))`, 'Inbox says Inbox again', 8000);
         assert.equal(await lit(), 'nav-inbox', 'and Inbox lights Inbox: ' + await lit());
