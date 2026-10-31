@@ -13,7 +13,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/subgentic/coral/internal/cloud"
 	"github.com/subgentic/coral/internal/store"
+	"github.com/subgentic/coral/pkg/tunnel"
 )
 
 // #11420: the Operator's comment on an artifact that waits for their review reaches the agent that uploaded it, once, and the agent answers in the thread.
@@ -181,19 +183,40 @@ func TestAnAgentThatDidNotUploadAnArtifactCannotListItsThreads(t *testing.T) {
 	assert.NotContains(t, fmt.Sprint(list), "5,000 rows")
 }
 
-// The owner's comment made through Coral Hub is saved but is not sent to the agent on its own: Send to agent is local only (never through the Hub), and so is this, until the Hub's operator answers.
-func TestTheOwnersCommentThroughCoralHubIsKeptAndNotSentToTheAgent(t *testing.T) {
+// #11428: the owner's comment made through Coral Hub is delivered to the uploader like the one at this computer's dashboard: once, with the reply command. The owner is whoever artifactCommentCaller makes the
+// owner kind (the stamp, the owner marker and the enrolled label); a Coral Hub viewer and a forged stamp are never the owner and send nothing.
+func TestTheOwnersCommentThroughCoralHubReachesTheUploaderOnceAndAViewersNever(t *testing.T) {
 	rig := newCmtRig(t)
 	withLabel(t, cmtHubUser, nil)
 	rig.agent(1, "Dev", false)
 	rig.uploadedBy(1, "team-a")
 	rig.tag("for review")
+
 	code, out := rig.commentAs(cmtAsHubOwner, nil)
 	require.Equal(t, http.StatusCreated, code, fmt.Sprint(out))
-	assert.Nil(t, out["sent_to"])
-	assert.Empty(t, rig.operatorMessages(), "the Hub's owner comment is not sent to an agent")
-	_, list := rig.do("GET", cp(cmtDoc), cmtAsOwner, nil)
-	assert.Len(t, list["comments"], 1, "but it is kept")
+	assert.Equal(t, "Dev", out["sent_to"])
+	msgs := rig.operatorMessages()
+	require.Len(t, msgs, 1, "delivered once")
+	cid := int64(out["id"].(float64))
+	assert.Contains(t, msgs[0].Content, fmt.Sprintf("coral-agent artifact reply coral://artifacts/%s %d", cmtDoc, cid))
+	code, rep := rig.reply(cid, asAgentSession(1), "Done.")
+	require.Equal(t, http.StatusCreated, code, fmt.Sprint(rep))
+	assert.Equal(t, float64(cid), rep["parent_id"], "the uploader answers in that thread")
+
+	// a Hub viewer (every write flag on), a forged stamp and the owner's key with a viewer's stamp send nothing
+	rig.hubOn()
+	before := len(rig.operatorMessages())
+	for who, h := range map[string]map[string]string{
+		"a hub viewer":                 cmtAsHub,
+		"a second hub viewer":          cmtAsHubTwo,
+		"a forged stamp":               cmtAsForged,
+		"the owner's key and a viewer": cmtAsOwnerThroughTunnel,
+	} {
+		code, out := rig.commentAs(h, nil)
+		assert.Contains(t, []int{http.StatusCreated, http.StatusForbidden}, code, who+": "+fmt.Sprint(out))
+		assert.Nil(t, out["sent_to"], who)
+	}
+	assert.Len(t, rig.operatorMessages(), before, "no viewer, guest or forged request sent anything to the agent")
 }
 
 // #11425 (b): what an agent reads is checked for secrets again at the read, as delivery does: a comment stored with a secret in it (written before the check, or by a path that skipped it) is shown redacted.
@@ -249,4 +272,40 @@ func TestAnAgentReadsAnEarlierVersionsCommentsOnlyForAnEarlierVersionItMayRead(t
 	own, carried = seen()
 	assert.Equal(t, 1, own)
 	assert.Equal(t, 1, carried, "an earlier version it uploaded is carried")
+}
+
+// operatorComment is the one place that says a comment is the Operator's own: the owner at this computer's dashboard, or the owner through Coral Hub whose caller was made by the owner check. Each
+// other caller is refused here whatever it carries, so the route's own refusals are not the only thing between a viewer and an agent.
+func TestOperatorCommentSaysOnlyTheOwnerIsTheOperator(t *testing.T) {
+	rig := newCmtRig(t)
+	req := func(via string, human bool) *http.Request {
+		r, _ := http.NewRequest("POST", "http://x/api/artifacts/"+cmtDoc+"/comments", nil)
+		if via != "" {
+			r.Header.Set(tunnel.ViaHeader, via)
+		}
+		if human {
+			r = r.WithContext(context.WithValue(r.Context(), callerKindKey{}, callerDashCookie))
+		}
+		return r
+	}
+	owner := commentCaller{Kind: commentCallerOwner, Issuer: "local", Subject: "o"}
+	hubOwner := commentCaller{Kind: commentCallerOwner, Issuer: "local", Subject: "o", ViaHub: true}
+	for name, tc := range map[string]struct {
+		r    *http.Request
+		c    commentCaller
+		want bool
+	}{
+		"the owner at the dashboard":                         {req("", true), owner, true},
+		"the owner through the Hub, authentic stamp":         {req(cloud.ViaSecret(), false), hubOwner, true},
+		"the owner kind through the Hub with a forged stamp": {req("not-the-secret", false), hubOwner, false},
+		"a Hub viewer": {req(cloud.ViaSecret(), false), commentCaller{Kind: commentCallerHub, Issuer: hubIssuer, Subject: "hub-user-aaaaaaaa"}, false},
+		"an agent":     {req("", false), commentCaller{Kind: commentCallerAgent, Subject: "s"}, false},
+		"nobody":       {req("", true), commentCaller{}, false},
+		"a stamped request that is not the owner's through Hub": {req(cloud.ViaSecret(), false), owner, false},
+		"the owner kind marked ViaHub with no stamp at all":     {req("", true), hubOwner, false},
+		"a team machine's owner (an organisation's issuer)":     {req(cloud.ViaSecret(), false), commentCaller{Kind: commentCallerOwner, Issuer: commentTeamIssuer("org-1"), Subject: "u1", ViaHub: true}, false},
+		"the dashboard owner without a human input caller":      {req("", false), owner, false},
+	} {
+		assert.Equal(t, tc.want, rig.h.operatorComment(tc.r, tc.c), name)
+	}
 }

@@ -15,8 +15,7 @@ import (
 
 // The Operator's comment on an artifact that waits for their review reaches the agent that uploaded it (#11420): "I should be able to interact strictly through the inbox". One board message from the
 // Operator on the same path Send to agent uses (sendMessage: the comment as quoted, untrusted data between markers, redacted, cleaned and capped, with the exact reply command), and the ask that lets the
-// agent answer in that thread. Only the person at this computer, only on an artifact tagged "for review" on the comment's board, only to the agent that uploaded it and is still on that board, never through
-// Coral Hub, and not when the request says notify_agent false. A comment on any other artifact, or by anyone else, sends nothing.
+// agent answer in that thread. The Operator's own comment only (the person at this computer, or the owner through Coral Hub: operatorComment), only on an artifact tagged "for review" on the comment's board, only to the agent that uploaded it and is still on that board, and not when the request says notify_agent false. A comment on any other artifact, or by anyone else, sends nothing.
 
 // forReviewTag is the tag a team puts on an artifact a person must look at (board.StarterArtifactTags).
 const forReviewTag = "for review"
@@ -30,7 +29,7 @@ type autoDelivery struct {
 // deliverOperatorComment sends the Operator's new comment c (on artifact id, board b) to the uploading agent when the rules above hold. Best effort: the comment is already kept, so a failure is logged
 // and the comment stands.
 func (h *SessionsHandler) deliverOperatorComment(r *http.Request, caller commentCaller, c store.ArtifactComment, id, b string) autoDelivery {
-	if caller.Kind != commentCallerOwner || caller.ViaHub || !humanInputCaller(r) || cloud.Tunneled(r) || r.Header.Get(tunnel.ViaHeader) != "" {
+	if !h.operatorComment(r, caller) {
 		return autoDelivery{Reason: "not_owner"}
 	}
 	if b == "" || h.bs == nil || h.ss == nil {
@@ -114,4 +113,18 @@ func (h *SessionsHandler) deliverOperatorComment(r *http.Request, caller comment
 	}
 	slog.Info("[artifact comments] the Operator's comment sent to the uploading agent", "artifact", id, "comment", c.ID, "agent", title, "board", b)
 	return autoDelivery{To: title}
+}
+
+// operatorComment says the comment is the Operator's own: the person at this computer's dashboard, or the owner through Coral Hub. Who the owner is comes from ONE place, artifactCommentCaller: it makes the owner
+// kind (and ViaHub) only for a request that passed the tunnel's owner check on an owner comment route, so a Coral Hub viewer, a guest, a forged stamp and an agent are never the owner here, whatever else they
+// carry; nothing is re-derived from a header in this file. Through the Hub the stamp must also be authentic. A team's machine (#7061), where the owner kind is several people under an organisation's issuer,
+// is not delivered to an agent on its own: the message says "the Operator", and a team's members are not one person.
+func (h *SessionsHandler) operatorComment(r *http.Request, caller commentCaller) bool {
+	if caller.Kind != commentCallerOwner {
+		return false
+	}
+	if r.Header.Get(tunnel.ViaHeader) != "" || cloud.Tunneled(r) {
+		return caller.ViaHub && cloud.TunneledAuthentic(r) && !isCommentTeamIssuer(caller.Issuer)
+	}
+	return !caller.ViaHub && humanInputCaller(r)
 }
