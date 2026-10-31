@@ -28,10 +28,12 @@ const checkHit = input => { const l = el('label', 'dt-check-hit'); l.append(inpu
 export const tableState = () => ({ widths: null, sort: null, selected: new Set(), rowCache: new Map(), anchor: null, ctx: undefined, select: false, confirming: -1 });
 
 // ── cell types ────────────────────────────────────────────────────────────
+/** A title (the hover tooltip) set on pointer enter, and only while `needed()` says the text it carries is cut or hidden. */
+const tipIf = (e, text, needed) => e.addEventListener('pointerenter', () => { e.title = needed() ? text : ''; });
 /** The row's one real button: its text names the row. */
 export function primaryButton(text, label) {
     const b = el('button', 'dt-primary', text); b.type = 'button';
-    b.title = text; // a name the row cuts with an ellipsis is read whole on hover (#8206); a caller with better words sets its own
+    tipIf(b, text, () => b.scrollWidth > b.clientWidth); // a name the row cuts with an ellipsis is read whole on hover (#8206), and only then: a title on a name that fits is a tooltip left behind on scroll (#11566); a caller with better words sets its own
     if (label) b.setAttribute('aria-label', label);
     return b;
 }
@@ -41,7 +43,7 @@ export function chip(word, cls) {
     const c = el('span', `state-label dt-chip goal-chip ${cls || ''}`.trim());
     const dot = el('span', 'goal-dot'); dot.setAttribute('aria-hidden', 'true');
     c.append(dot, el('span', 'state-word', word));
-    c.addEventListener('pointerenter', () => { if (c.lastChild.offsetWidth > 1) c.removeAttribute('title'); else c.title = word; }); // a tooltip only while the word is hidden (a phone's dot): a title that repeats a shown word is left behind on scroll (#11561)
+    tipIf(c, word, () => c.lastChild.offsetWidth <= 1); // a tooltip only while the word is hidden (a phone's dot): a title that repeats a shown word is left behind on scroll (#11561)
     return c;
 }
 export function tag(text) { return el('span', 'chip chip-tag dt-tag', text); }
