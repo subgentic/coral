@@ -17,9 +17,11 @@ const { coralReady } = require('./helpers/wait');
 
             // 1. the phone strip on Home offers the Mobile QR code beside Coral Hub
             const strip = await ev(`(() => { const s = document.getElementById('editions-home') || [...document.querySelectorAll('template')].map(t => t.content.getElementById('editions-home')).find(Boolean); if (!s) return null; const items = [...s.querySelectorAll('.editions-home-item')].map(b => (b.querySelector('strong') || {}).textContent || ''); const q = [...s.querySelectorAll('.editions-home-item')].find(b => /Mobile QR code/.test(b.textContent)); return { items, qrAction: q ? q.getAttribute('data-on-click') : null }; })()`);
-            assert.ok(strip && strip.items.includes('Coral Hub') && strip.items.includes('Mobile QR code'), `${w}: the strip offers Coral Hub and the Mobile QR code: ${JSON.stringify(strip)}`);
-            assert.ok(strip.items.indexOf('Mobile QR code') <= strip.items.indexOf('Coral Hub') + 1, `${w}: the QR code is next to Coral Hub: ${JSON.stringify(strip)}`);
-            assert.equal(strip.qrAction, 'm-mobile-connect-open', `${w}: it opens the Use on your phone dialog`);
+            assert.ok(strip && strip.items.includes('Coral Hub') && !strip.items.includes('Mobile QR code'), `${w}: the strip offers Coral Hub and no Mobile QR code card (the operator removed it, #11414): ${JSON.stringify(strip)}`);
+            assert.equal(strip.qrAction, null, `${w}: nothing in the strip opens the Use on your phone dialog`);
+            // the QR code is still on Home, once, in the Learn more row, and opens the Use on your phone dialog
+            const links = await ev(`(() => { const t = [...document.querySelectorAll('template')].map(t => t.content).find(c => c.querySelector('.welcome-links')) || document; const nav = (document.querySelector('.welcome-links') || t.querySelector('.welcome-links')); const q = nav ? [...nav.querySelectorAll('button')].filter(b => /Mobile QR code/.test(b.textContent)) : []; return { n: q.length, action: q[0] ? q[0].getAttribute('data-on-click') : null, anywhere: ((document.body.innerHTML + [...document.querySelectorAll('template')].map(x => x.innerHTML).join('')).match(/Mobile QR code/g) || []).length }; })()`);
+            assert.deepEqual([links.n, links.action], [1, 'm-mobile-connect-open'], `${w}: Home's Learn more row has one Mobile QR code and it opens the dialog: ${JSON.stringify(links)}`);
 
             // 3. the Docs tab opens on the first click after Settings was closed
             if (!mobile) {
