@@ -29,7 +29,7 @@ func (m *BoardHealthMonitor) goalLines(ctx context.Context, project string, now 
 	for _, g := range goals {
 		l := teamhealth.GoalLine{ID: g.ID, Title: g.Title, State: g.State, BlockedOn: g.BlockedOn, Driver: g.Driver, Done: g.Rollup.Done, Total: g.Rollup.Total}
 		ready := g.Rollup.Total > 0 && g.Rollup.Done == g.Rollup.Total
-		noTaskLeft := g.Rollup.Total == g.Rollup.Done // nothing the team still has to do, with or without tasks
+		noTaskLeft := g.Rollup.Total > 0 && g.Rollup.Total == g.Rollup.Done // every task done: a goal with no task yet needs tasks from the orchestrator, not the operator
 		blockedOnOperator := g.State == board.GoalBlocked && operatorWord.MatchString(g.BlockedOn)
 		doneWhenNeedsOperator := operatorWord.MatchString(g.DoneWhen) && noTaskLeft
 		switch {

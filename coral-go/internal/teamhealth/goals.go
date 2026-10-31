@@ -71,7 +71,7 @@ func goalEntry(g GoalLine) string {
 	}
 	if g.State == "blocked" {
 		if on := clean(StoredText(g.BlockedOn, nil), goalBlockedMax); on != "" {
-			b.WriteString(": " + on)
+			fmt.Fprintf(&b, ", in the goal's words: %q", on) // quoted like the title: it is text someone wrote, not Coral's
 		}
 	}
 	if d := Name(g.Driver); d != "" {

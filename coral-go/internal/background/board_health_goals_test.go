@@ -91,7 +91,7 @@ func TestAGoalBlockedOnTheOperatorOrWithADoneWhenThatNeedsThemIsNamedAndOneWaiti
 	ctx := context.Background()
 	op := r.blockedGoal("Needs a pick", "Operator picks an option from the design", 1)
 	agent := r.blockedGoal("Waits on Backend", "Backend Dev finishing the opencode run", 1)
-	// done-when names the Operator, and no task is left: it is theirs to confirm
+	// done-when names the Operator, but the goal has no task yet
 	g, err := r.s.CreateGoal(ctx, "team", board.GoalInput{Title: "Operator signs off", Outcome: "o", DoneWhen: "The operator says it is good", CreatedBy: "Operator"})
 	require.NoError(t, err)
 	// the same done-when with a task still open: the team has work to do first
@@ -111,8 +111,8 @@ func TestAGoalBlockedOnTheOperatorOrWithADoneWhenThatNeedsThemIsNamedAndOneWaiti
 		return seg[start : start+end]
 	}
 	assert.Contains(t, entry(op), "NEEDS THE OPERATOR: put an item in their inbox")
-	assert.Contains(t, entry(op), "blocked: Operator picks an option from the design")
-	assert.Contains(t, entry(g.ID), "NEEDS THE OPERATOR", "a done-when that names the Operator, with nothing left for the team")
+	assert.Contains(t, entry(op), `blocked, in the goal's words: "Operator picks an option from the design"`)
+	assert.NotContains(t, entry(g.ID), "NEEDS THE OPERATOR", "a done-when that names the Operator on a goal with no task yet: it needs tasks from the orchestrator, not the operator")
 	assert.NotContains(t, entry(agent), "NEEDS THE OPERATOR", "waiting on an agent")
 	assert.NotContains(t, entry(agent), "READY")
 	assert.NotContains(t, entry(busy.ID), "NEEDS THE OPERATOR", "the team still has a task to do")
@@ -153,4 +153,28 @@ func mustSub(t *testing.T, r *readyRig, name string) *board.Subscriber {
 	s, err := r.s.GetProjectSubscription(context.Background(), "team", name)
 	require.NoError(t, err)
 	return s
+}
+
+func TestADoneGoalWhoseDoneWhenNamesTheOperatorIsReadyForThem(t *testing.T) {
+	r := newGoalsRig(t)
+	ctx := context.Background()
+	g, err := r.s.CreateGoal(ctx, "team", board.GoalInput{Title: "Sign off", Outcome: "o", DoneWhen: "The operator says it is good", CreatedBy: "Operator"})
+	require.NoError(t, err)
+	r.moreDone(g.ID, 2)
+	assert.Contains(t, goalsSegment(r.next()), "READY: close it, or put an item in the operator's inbox", "every task done")
+}
+
+// Security's SHOULD and QA's on #11412: a blocked-on is quoted like a title and said to be the goal's words, and a secret at the start of either is redacted, not shown.
+func TestAGoalsBlockedOnIsQuotedAsItsWordsAndASecretAtTheStartOfATitleOrReasonIsRedacted(t *testing.T) {
+	r := newGoalsRig(t)
+	const token = "ghp_A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6Q7r8"
+	r.blockedGoal(token+" release", "@Operator "+"\u200b"+token+" decides", 1)
+	seg := goalsSegment(r.next())
+	require.NotEmpty(t, seg)
+	assert.NotContains(t, seg, "ghp_A1b2", "a token at the start of a title or of a blocked-on is not shown")
+	assert.NotContains(t, seg, "A1b2C3d4E5f6", "nor the rest of it")
+	assert.Contains(t, seg, `, in the goal's words: "`, "the reason is quoted and labelled as the goal's own words")
+	entry := seg[:strings.Index(seg, " NEEDS THE OPERATOR")]
+	assert.NotContains(t, entry, "@", "an @ in it cannot mention anyone")
+	assert.NotContains(t, entry, "\u200b")
 }
