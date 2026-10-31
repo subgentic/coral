@@ -61,8 +61,9 @@ var agentCLIs = map[string]CLIInfo{
 	at.Antigravity: {Binary: "agy", InstallCommand: agyInstallCommand, InstallURL: agyInstallURL, InstallNote: agyInstallNote},
 	at.Gemini:      {Binary: "agy", InstallCommand: agyInstallCommand, InstallURL: agyInstallURL, InstallNote: agyInstallNote},
 	at.Codex:       {Binary: "codex", InstallCommand: "npm install -g @openai/codex", InstallURL: "https://github.com/openai/codex"},
-	at.Opencode:    {Binary: "opencode", InstallCommand: "npm install -g opencode-ai", InstallURL: "https://opencode.ai"},
-	at.Pi:          {Binary: "pi", InstallCommand: "npm install -g --ignore-scripts @earendil-works/pi-coding-agent", InstallURL: "https://pi.dev"},
+	// No --ignore-scripts, unlike Pi: opencode-ai's postinstall script links the platform binary, and without it every command says "postinstall script was not run" (checked on 1.19.5, #137997).
+	at.Opencode: {Binary: "opencode", InstallCommand: "npm install -g opencode-ai", InstallURL: "https://opencode.ai"},
+	at.Pi:       {Binary: "pi", InstallCommand: "npm install -g --ignore-scripts @earendil-works/pi-coding-agent", InstallURL: "https://pi.dev"},
 }
 
 // GetCLIInfo returns CLI info for an agent type, or nil if unknown.

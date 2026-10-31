@@ -42,6 +42,9 @@ type LaunchParams struct {
 	// OpencodeURL and OpencodePasswordFile are Coral's opencode server (internal/opencode): the address the opencode TUI attaches to and the private file its password is read from (#11364).
 	OpencodeURL          string
 	OpencodePasswordFile string
+	// OpencodeMajor is the major version of the opencode build that server is (opencode.Server.Version): 1.x is attached with `opencode attach <url>` and reads its password from OPENCODE_SERVER_PASSWORD;
+	// 2.x with `opencode --server <url>` and OPENCODE_PASSWORD. Zero (not set) is read as 2.x, the form this adapter was first written for.
+	OpencodeMajor int
 }
 
 // CoralEnv returns the Coral environment every launched agent needs, as

@@ -34,6 +34,7 @@ type Config struct {
 	Bin     string // the opencode executable, as it is exec'd
 	DataDir string // Coral's own folder for opencode (<Coral data dir>/opencode): the XDG folders, its database and its credentials are here and nowhere else
 	Args    func(port int) []string
+	Version string        // the version to take the binary for ("1.19.5"), instead of asking it with --version (a test's way to say what its stand-in is)
 	DBFile  string        // this server's own session store (OPENCODE_DB): its conversations are in no other server's reach; "" leaves opencode's own place under the shared data folder
 	Model   string        // the model this server starts on, "provider/model" or "provider/model#variant" (a top-level "model" of a config file Coral writes for it); "" leaves opencode's own
 	Ready   time.Duration // how long one attempt waits for the server to answer an authenticated call (default 20 s)
@@ -45,6 +46,7 @@ type Config struct {
 // the sessions a resume needs, is Coral's folder's, shared by the servers of Coral's agents and never the person's own opencode or its background service.
 type Server struct {
 	URL      string
+	Version  Version // the opencode build this server is: what its launch line and password variable were chosen by
 	password string
 	cmd      *exec.Cmd
 	dir      string // this server's own folder: its pid record and its password file
@@ -54,8 +56,11 @@ type Server struct {
 // keyRe is what an agent's key may be (its Coral session id): it names a folder.
 var keyRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$`)
 
-// PasswordEnv is the environment entry an opencode client of this server needs (OPENCODE_PASSWORD=...): for the pane's environment, never for argv, a log or a pid file.
-func (s *Server) PasswordEnv() string { return "OPENCODE_PASSWORD=" + s.password }
+// PasswordEnv is the environment entry an opencode client of this server needs (<the variable of its version>=...): for the pane's environment, never for argv, a log or a pid file.
+func (s *Server) PasswordEnv() string {
+	vars := PasswordVars(s.Version.Major)
+	return vars[len(vars)-1] + "=" + s.password
+}
 
 // Client is a client of the server.
 func (s *Server) Client() (*Client, error) { return New(s.URL, s.password) }
@@ -90,7 +95,7 @@ func XDGVars(dataDir string) [][2]string {
 }
 
 // serverEnv is the environment of one server: ToolEnv, the server's password, and its own config file when it has a model.
-func serverEnv(inherited []string, dataDir, password, configFile, dbFile string) []string {
+func serverEnv(inherited []string, dataDir string, major int, password, configFile, dbFile string) []string {
 	env := ToolEnv(inherited, dataDir)
 	if configFile != "" {
 		env = append(env, "OPENCODE_CONFIG="+configFile)
@@ -98,7 +103,10 @@ func serverEnv(inherited []string, dataDir, password, configFile, dbFile string)
 	if dbFile != "" {
 		env = append(env, "OPENCODE_DB="+dbFile) // this agent's own session store: the shared XDG_DATA_HOME holds the credentials only
 	}
-	return append(env, "OPENCODE_PASSWORD="+password)
+	for _, name := range PasswordVars(major) { // the variable this build reads: a server given one it ignores is open
+		env = append(env, name+"="+password)
+	}
+	return env
 }
 
 func freeLoopbackPort() (int, error) {
@@ -239,13 +247,24 @@ func Start(ctx context.Context, cfg Config, key string) (*Server, error) {
 		}
 	}
 	stopLeftOver(filepath.Join(dir, "server.json"))
+	// What build this is decides the password variable and the launch line: asked of the binary (its --version, parsed strictly) unless the config says. A launch that cannot tell does not go on.
+	var version Version
+	var verr error
+	if cfg.Version != "" {
+		version, verr = ParseVersion(cfg.Version)
+	} else {
+		version, verr = DetectVersion(ctx, cfg.Bin, cfg.DataDir)
+	}
+	if verr != nil {
+		return nil, verr
+	}
 	var lastErr error
 	for attempt := 0; attempt < startAttempts; attempt++ {
 		port, err := cfg.pickPort()
 		if err != nil {
 			return nil, err
 		}
-		s, err := startOn(ctx, cfg, dir, port)
+		s, err := startOn(ctx, cfg, version, dir, port)
 		if err == nil {
 			return s, nil
 		}
@@ -257,7 +276,7 @@ func Start(ctx context.Context, cfg Config, key string) (*Server, error) {
 	return nil, lastErr
 }
 
-func startOn(ctx context.Context, cfg Config, dir string, port int) (*Server, error) {
+func startOn(ctx context.Context, cfg Config, version Version, dir string, port int) (*Server, error) {
 	raw := make([]byte, 32)
 	if _, err := rand.Read(raw); err != nil {
 		return nil, err
@@ -270,11 +289,11 @@ func startOn(ctx context.Context, cfg Config, dir string, port int) (*Server, er
 	if err != nil {
 		return nil, err
 	}
-	cmd.Env = serverEnv(os.Environ(), cfg.DataDir, password, configFile, cfg.DBFile)
+	cmd.Env = serverEnv(os.Environ(), cfg.DataDir, version.Major, password, configFile, cfg.DBFile)
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("opencode: could not start the server: %w", err)
 	}
-	s := &Server{URL: "http://127.0.0.1:" + strconv.Itoa(port), password: password, cmd: cmd, dir: dir, done: make(chan struct{})}
+	s := &Server{URL: "http://127.0.0.1:" + strconv.Itoa(port), Version: version, password: password, cmd: cmd, dir: dir, done: make(chan struct{})}
 	go func() { _ = cmd.Wait(); close(s.done) }()
 	pidFile := filepath.Join(dir, "server.json")
 	rec, _ := json.Marshal(pidRecord{PID: cmd.Process.Pid, Port: port, Command: strings.Join(append([]string{cfg.Bin}, args...), " "), Started: processStart(cmd.Process.Pid)})

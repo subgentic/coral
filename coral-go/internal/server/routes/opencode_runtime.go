@@ -42,7 +42,7 @@ func (h *SessionsHandler) launchCommand(ctx context.Context, ag agent.Agent, p a
 			h.opencode.Stop(p.SessionID)
 			return "", err
 		}
-		p.OpencodeURL, p.OpencodePasswordFile = srv.URL, file
+		p.OpencodeURL, p.OpencodePasswordFile, p.OpencodeMajor = srv.URL, file, srv.Version.Major
 		h.useResumedSession(p)
 	}
 	return launchCommand(ag, p)

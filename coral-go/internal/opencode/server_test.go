@@ -80,6 +80,23 @@ func TestTheBinaryRunsTestsOnlyUnderGoTestAndIsTheStandInOnlyForServe(t *testing
 	}
 }
 
+// standInPassword is the password the stand-in asks for: the one in OPENCODE_SERVER_PASSWORD (1.x) or OPENCODE_PASSWORD (2.x), like the real builds read theirs.
+func standInPassword() string {
+	if p := os.Getenv("OPENCODE_SERVER_PASSWORD"); p != "" {
+		return p
+	}
+	return os.Getenv("OPENCODE_PASSWORD")
+}
+
+// standInAuthorized is the stand-in's password check; STANDIN_IGNORE_PASSWORD=1 makes it a server that ignores its password variable altogether (opencode 1.x given only OPENCODE_PASSWORD: it is OPEN).
+func standInAuthorized(r *http.Request) bool {
+	if os.Getenv("STANDIN_IGNORE_PASSWORD") == "1" {
+		return true
+	}
+	_, p, ok := r.BasicAuth()
+	return ok && p == standInPassword()
+}
+
 func runStub() {
 	var port string
 	for i, a := range os.Args {
@@ -88,8 +105,12 @@ func runStub() {
 		}
 	}
 	if out := os.Getenv(envFileVar); out != "" {
+		if f, err := os.OpenFile(out+".pids", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600); err == nil { // every stand-in started, so a test can see that none is left
+			fmt.Fprintln(f, os.Getpid())
+			f.Close()
+		}
 		seen := map[string]string{"args": strings.Join(os.Args[1:], " ")}
-		for _, k := range []string{"OPENCODE_PASSWORD", "OPENCODE_CONFIG", "OPENCODE_DB", "OPENCODE_SERVER_URL", "XDG_DATA_HOME", "XDG_CONFIG_HOME", "XDG_CACHE_HOME", "XDG_STATE_HOME", "HOME", "CORAL_SESSION_TOKEN", "CORAL_INITIAL_PASSWORD_FILE", "CORAL_URL", "CORAL_SESSION_NAME", "ANTHROPIC_API_KEY_OF_ANOTHER_AGENT"} {
+		for _, k := range []string{"OPENCODE_PASSWORD", "OPENCODE_SERVER_PASSWORD", "OPENCODE_CONFIG", "OPENCODE_DB", "OPENCODE_SERVER_URL", "XDG_DATA_HOME", "XDG_CONFIG_HOME", "XDG_CACHE_HOME", "XDG_STATE_HOME", "HOME", "CORAL_SESSION_TOKEN", "CORAL_INITIAL_PASSWORD_FILE", "CORAL_URL", "CORAL_SESSION_NAME", "ANTHROPIC_API_KEY_OF_ANOTHER_AGENT"} {
 			seen[k] = os.Getenv(k)
 		}
 		b, _ := json.Marshal(seen)
@@ -97,14 +118,14 @@ func runStub() {
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/session", func(w http.ResponseWriter, r *http.Request) {
-		if _, p, ok := r.BasicAuth(); !ok || p != os.Getenv("OPENCODE_PASSWORD") {
+		if !standInAuthorized(r) {
 			http.Error(w, "no", http.StatusUnauthorized)
 			return
 		}
 		fmt.Fprint(w, `{"data":[]}`)
 	})
 	mux.HandleFunc("/api/session/ses_abc123/message", func(w http.ResponseWriter, r *http.Request) {
-		if _, p, ok := r.BasicAuth(); !ok || p != os.Getenv("OPENCODE_PASSWORD") {
+		if !standInAuthorized(r) {
 			http.Error(w, "no", http.StatusUnauthorized)
 			return
 		}
@@ -117,7 +138,7 @@ func runStub() {
 	})
 	if frames := os.Getenv(eventsFileVar); frames != "" {
 		mux.HandleFunc("/api/event", func(w http.ResponseWriter, r *http.Request) {
-			if _, p, ok := r.BasicAuth(); !ok || p != os.Getenv("OPENCODE_PASSWORD") {
+			if !standInAuthorized(r) {
 				http.Error(w, "no", http.StatusUnauthorized)
 				return
 			}
@@ -161,7 +182,7 @@ func stubConfig(t *testing.T) (Config, string) {
 	require.NoError(t, err)
 	envFile := filepath.Join(t.TempDir(), "env.json")
 	t.Setenv(envFileVar, envFile)
-	cfg := Config{Bin: exe, DataDir: filepath.Join(t.TempDir(), "opencode"), Ready: 10 * time.Second}
+	cfg := Config{Bin: exe, DataDir: filepath.Join(t.TempDir(), "opencode"), Ready: 10 * time.Second, Version: "2.2.4"} // the stand-in cannot answer --version: its version is said
 	// whatever a test leaves running is stopped by the pid Coral recorded for it, when the test ends
 	t.Cleanup(func() {
 		recs, _ := filepath.Glob(filepath.Join(cfg.DataDir, "servers", "*", "server.json"))

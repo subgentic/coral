@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	at "github.com/subgentic/coral/internal/agenttypes"
+	"github.com/subgentic/coral/internal/opencode"
 )
 
 // OpencodeAgent implements the Agent interface for opencode (v2): the TUI in the agent's pane, attached to the one opencode server Coral runs for its data scope (internal/opencode) with `--server <url>`, so
@@ -30,12 +31,21 @@ func IsOpencodeSessionID(id string) bool { return opencodeSessionRe.MatchString(
 var opencodeOwnFlags = map[string]bool{
 	"--server": true, "--session": true, "-s": true, "--continue": true, "-c": true, "--standalone": true, "--fork": true,
 	"--permission-mode": true, "--settings": true, "--session-id": true, "--dangerously-skip-permissions": true, "--full-auto": true,
-	"--approval-mode": true, "--sandbox": true, "--yolo": true, "--password": true, "--username": true,
+	"--approval-mode": true, "--sandbox": true, "--yolo": true, "--password": true, "--username": true, "-p": true, "-u": true,
 }
 
 var opencodeValueFlags = map[string]bool{
 	"--server": true, "--session": true, "-s": true, "--permission-mode": true, "--settings": true, "--session-id": true,
-	"--approval-mode": true, "--sandbox": true, "--password": true, "--username": true,
+	"--approval-mode": true, "--sandbox": true, "--password": true, "--username": true, "-p": true, "-u": true,
+}
+
+// opencodeServerSideFlags are flags `opencode attach` (1.x) does not have: the model is the server's (its config file), so --model is not passed to the TUI that attaches (it would fail the line).
+var opencodeServerSideFlags = map[string]bool{"--model": true, "-m": true}
+
+func init() {
+	for k := range opencodeServerSideFlags {
+		opencodeValueFlags[k] = true
+	}
 }
 
 func (a *OpencodeAgent) LaunchCommand(params LaunchParams) (string, error) {
@@ -50,13 +60,23 @@ func (a *OpencodeAgent) LaunchCommand(params LaunchParams) (string, error) {
 		parts = append(parts, export)
 	}
 	if f := params.OpencodePasswordFile; f != "" {
-		line := opencodePasswordPrefix(f)
+		line := opencodePasswordPrefix(f, params.OpencodeMajor)
 		raw = append(raw, line)
 		parts = append(parts, line)
 	}
-	parts = append(parts, bin, "--server", params.OpencodeURL)
+	// The line is built only from Coral's own address (a loopback URL it made) and a session id that passed IsOpencodeSessionID: the password is never on it (not -p), it is in the pane's environment.
+	attach := opencode.AttachesWithSubcommand(params.OpencodeMajor)
+	if attach {
+		parts = append(parts, bin, "attach", params.OpencodeURL)
+	} else {
+		parts = append(parts, bin, "--server", params.OpencodeURL)
+	}
 	if id := params.ResumeSessionID; id != "" && IsOpencodeSessionID(id) { // an id that is not one is ignored: a fresh session, never an argument made of it
-		parts = append(parts, "--session", id)
+		if attach {
+			parts = append(parts, "-s", id)
+		} else {
+			parts = append(parts, "--session", id)
+		}
 	}
 	skipNext := false
 	for _, flag := range params.Flags {
@@ -64,7 +84,7 @@ func (a *OpencodeAgent) LaunchCommand(params LaunchParams) (string, error) {
 			skipNext = false
 			continue
 		}
-		if name, _, hasValue := strings.Cut(flag, "="); opencodeOwnFlags[name] {
+		if name, _, hasValue := strings.Cut(flag, "="); opencodeOwnFlags[name] || (attach && opencodeServerSideFlags[name]) {
 			skipNext = !hasValue && opencodeValueFlags[name]
 			continue
 		}
@@ -74,14 +94,24 @@ func (a *OpencodeAgent) LaunchCommand(params LaunchParams) (string, error) {
 	return ShellJoin(parts, raw...), nil
 }
 
-// opencodePasswordPrefix sets OPENCODE_PASSWORD in the pane's shell from the private file Coral wrote it to, as the session token is set: the secret is not in the line that is typed.
-func opencodePasswordPrefix(file string) string {
+// opencodePasswordPrefix sets the password variables the opencode TUI of this major version reads (opencode.PasswordVars) in the pane's shell from the private file Coral wrote the password to, as the session token is
+// set: the secret is not in the line that is typed, and never in an argument.
+func opencodePasswordPrefix(file string, major int) string {
 	q := shellQuoteLiteral(file)
+	vars := opencode.PasswordVars(major)
 	switch detectShell() {
 	case ShellPowerShell:
-		return fmt.Sprintf("$env:OPENCODE_PASSWORD = (Get-Content -Raw -LiteralPath %s).Trim();", q)
+		line := fmt.Sprintf("$env:%s = (Get-Content -Raw -LiteralPath %s).Trim();", vars[0], q)
+		for _, v := range vars[1:] {
+			line += fmt.Sprintf(" $env:%s = $env:%s;", v, vars[0])
+		}
+		return line
 	default:
-		return fmt.Sprintf(`export OPENCODE_PASSWORD="$(cat %s)";`, q)
+		line := fmt.Sprintf(`export %s="$(cat %s)";`, vars[0], q)
+		for _, v := range vars[1:] {
+			line += fmt.Sprintf(` export %s="$%s";`, v, vars[0])
+		}
+		return line
 	}
 }
 
