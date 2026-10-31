@@ -78,19 +78,37 @@ func shellBase(shell string) string {
 // isCmdShell reports whether shell names cmd.exe.
 func isCmdShell(shell string) bool { return shellBase(shell) == "cmd" }
 
+// executableDir is the folder this program runs from, symlinks resolved, found once: a running program's own path does not change, and resolving it walks and stats every folder above it
+// (CoralToolsSource runs for every launch). Under 'go test' each of those stats is an entry in the test's input log that cmd/go then resolves, so a package that launches thousands of agents
+// made the Go tool spend minutes per run on them (#413).
+var executableDirOnce struct {
+	sync.Once
+	dir string
+	ok  bool
+}
+
+func executableDir() (string, bool) {
+	executableDirOnce.Do(func() {
+		exe, err := os.Executable()
+		if err != nil {
+			return
+		}
+		if exe, err = filepath.EvalSymlinks(exe); err != nil {
+			return
+		}
+		executableDirOnce.dir, executableDirOnce.ok = filepath.Dir(exe), true
+	})
+	return executableDirOnce.dir, executableDirOnce.ok
+}
+
 // AppBundleBinDir returns the directory containing hook binaries if the
 // current executable is running from a macOS .app bundle or a similar
 // packaged install. Returns empty string if not in a bundle.
 func appBundleBinDir() string {
-	exe, err := os.Executable()
-	if err != nil {
+	dir, ok := executableDir()
+	if !ok {
 		return ""
 	}
-	exe, err = filepath.EvalSymlinks(exe)
-	if err != nil {
-		return ""
-	}
-	dir := filepath.Dir(exe)
 
 	// macOS .app bundle: .../Coral.app/Contents/MacOS/coral
 	if strings.Contains(dir, ".app"+string(os.PathSeparator)+"Contents"+string(os.PathSeparator)+"MacOS") ||
@@ -162,11 +180,9 @@ func CoralToolsSource() (dir, source string) {
 	if d := appBundleBinDir(); d != "" {
 		return d, "this build"
 	}
-	if exe, err := os.Executable(); err == nil {
-		if exe, err = filepath.EvalSymlinks(exe); err == nil {
-			if _, err := os.Stat(filepath.Join(filepath.Dir(exe), "coral-board")); err == nil {
-				return filepath.Dir(exe), "this build (coral-board only)"
-			}
+	if dir, ok := executableDir(); ok {
+		if _, err := os.Stat(filepath.Join(dir, "coral-board")); err == nil {
+			return dir, "this build (coral-board only)"
 		}
 	}
 	if installedFallback.Load() {
