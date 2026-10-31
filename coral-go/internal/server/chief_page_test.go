@@ -232,3 +232,46 @@ func TestResolveNamesTheAgentByItsRenamedDisplayName(t *testing.T) {
 	assert.Equal(t, "Chief", out["display_name"], "after a rename: the renamed display name, as the list says")
 	assert.Equal(t, "Orchestrator", out["board_job_title"], "the job title stays the member's")
 }
+
+// The board whose messages to another team may be labelled "Chief" (#11508) is the one the recorded LIVE session is on, while chief_page is on: never a board picked by its name, never with the page off.
+func TestChiefBoardIDIsTheRecordedLiveSessionsBoardWhileThePageIsOn(t *testing.T) {
+	cfg := newE2EConfig(t, t.TempDir())
+	db, err := storetest.Open(t, cfg.DBPath)
+	require.NoError(t, err)
+	t.Cleanup(func() { db.Close() })
+	stack := newTermStack(t)
+	srv := newTestServer(t, cfg, db, stack.backend, stack.terminal)
+	ss := store.NewSessionStore(db)
+	ctx := context.Background()
+	set := func(k, v string) { require.NoError(t, ss.SetSetting(ctx, k, v)) }
+	live := func(id, team string) {
+		require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: id, AgentType: "claude", AgentName: "chief", WorkingDir: t.TempDir(), BoardName: &team}))
+	}
+	set("chief_team", "chief")
+	set("chief_session", chiefSID)
+	live(chiefSID, "chief")
+	require.Equal(t, "", srv.chiefBoardID(ctx), "chief_page is off")
+	set("chief_page", "true")
+	require.Equal(t, "chief", srv.chiefBoardID(ctx))
+	live(chiefSID, "somewhere-else")
+	require.Equal(t, "", srv.chiefBoardID(ctx), "the recorded session is on another team")
+	live("99999999-2222-4333-8444-555555555555", "chief")
+	live(chiefSID, "chief")
+	set("chief_session", "99999999-2222-4333-8444-555555555555")
+	require.Equal(t, "chief", srv.chiefBoardID(ctx), "the recorded session, whichever it is")
+	set("chief_session", "not-a-session-id")
+	require.Equal(t, "", srv.chiefBoardID(ctx), "no valid session recorded")
+	set("chief_session", chiefSID)
+	set("chief_team", "")
+	require.Equal(t, "", srv.chiefBoardID(ctx), "no team recorded")
+	// Recorded by the board's label: the live row's board is the id.
+	if srv.boardStore != nil {
+		b, err := srv.boardStore.CreateBoard(ctx, "Chief Team", "test")
+		require.NoError(t, err)
+		live(chiefSID, b.ID)
+		set("chief_team", "Chief Team")
+		require.Equal(t, b.ID, srv.chiefBoardID(ctx), "the label, exactly")
+		set("chief_team", "chief team")
+		require.Equal(t, "", srv.chiefBoardID(ctx), "not another spelling")
+	}
+}

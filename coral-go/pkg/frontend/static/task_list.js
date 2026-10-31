@@ -320,9 +320,6 @@ async function _taskQueryFetch(boardKey, pairs) {
     } finally { clearTimeout(timer); }
 }
 
-/** The task query for a board key and [name, value] pairs, for the Inbox's blockers (#11442): the one place the page asks it. */
-export const queryBoardTasks = _taskQueryFetch;
-
 /** Fetch the filtered list's first page (or the next one: `append`), from the phase and cursor it is at. A poll (`refresh`) keeps a list the person paged further. */
 async function _loadFilteredTasks(boardName, { append = false, refresh = false } = {}) {
     const savedFilters = _taskFilters;

@@ -4,10 +4,12 @@
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const { coralReady } = require('./helpers/wait');
+const { guardSettings } = require('./helpers/settings_guard');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     const failures = [];
+    const guard = await guardSettings(); // the suite turns inbox_welcome on and off: it is put back as found, or removed if it was not there (--fail-on-leak)
     const check = (ok, what) => { if (!ok) failures.push(what); };
     const put = v => ev(`fetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ inbox_welcome: '${v}' }) }).then(r => r.status)`);
     const start = async url => { await Page.navigate({ url: BASE + url }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'settings'); await ev(`new Promise(r => setTimeout(r, 800))`); return ev(`location.pathname`); }; // sleep-ok: the landing is a step after the settings are read
@@ -32,7 +34,7 @@ const { coralReady } = require('./helpers/wait');
                 const off = await start('/');
                 check(off === '/agents', at + 'without welcome items the start is Agents: ' + off);
             }
-        } finally { await put('off').catch(() => {}); }
+        } finally { await guard.restore().catch(() => {}); }
     } finally { await client.close(); }
     if (failures.length) { console.error(failures.join('\n')); process.exit(1); }
     console.log('welcome_first_screen_browser: ok');

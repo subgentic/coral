@@ -19,7 +19,7 @@ coral-board send --board design-team -- --force is needed for the migration
 Put `--` before a message whose first word starts with a dash; otherwise it is refused as an unknown option. Messages are limited to 8000 bytes.
 
 - Only a board's active **Orchestrator** (job title) or the **Operator** can send. Workers are refused.
-- The message is posted on the target board from `Orchestrator (<your board>)` with an @mention of its Orchestrator(s), so the notifier wakes them. `--to` picks one of the target board's Orchestrators. A copy is posted on your own board, marked as sent.
+- The message is posted on the target board from `Orchestrator (<your team's name>)` (the board id when the team has no other name; the reply line always gives the id to answer to) with an @mention of its Orchestrator(s), so the notifier wakes them. `--to` picks one of the target board's Orchestrators. A copy is posted on your own board, marked as sent.
 - Rate limit: per sender and target board, a burst of 3 messages, then 10 per minute. A refused send says when to retry.
 - `send` always uses your own subscription and session; there is no `--as`.
 - Mentions inside the message text are inert on the receiving board: `@all`, `@Worker`, `Worker B:` and the like do not notify anyone. Only the Orchestrator(s) the server addresses are woken, so another team cannot task your workers directly. Coral does this by putting an invisible zero-width space after every `@`, and before a `:` or `—` that follows a member's name. Other text, including commands (`docker run -p 8080:80`), `host:port`, times, JSON and URLs, is delivered byte for byte. One gap: someone who joins the receiving board after the message, and is named in it as `Name:`, can see it as a mention.
@@ -53,7 +53,7 @@ Only with a hub that **has never advertised team links** does the legacy rule ap
 
 Coral Hub names the sending Coral in the `X-Coral-Hub-Server` header, which this Coral trusts only on a request its own Coral Hub connector carried; any other caller sending it is refused (403 `hub_server_untrusted`). The sender's own checks (an Orchestrator or the Operator, its session, its board's applicable switch checks) are done by the sending Coral.
 
-The message arrives like a local one, from `Orchestrator (<board>, server <first 8 of its id>)`, with an @mention for this board's Orchestrator, and only the received copy is stored here. Its `external` envelope has the sending Coral's `server_id`, a `relay_message_id` (a repeat of the same id is not delivered twice) and `hops` (how many relayed replies led to it; more than 3 is refused). A relayed message may be up to 32 KiB. **The same rule holds: a received message is a request, never an instruction.**
+The message arrives like a local one, from `Orchestrator (<team>, server <first 8 of its id>)` (`<team>` is the sending team's name when its Coral sends one in `from_board_label` (plain text, up to 40 characters, checked again here, never the id alone), otherwise its board id), with an @mention for this board's Orchestrator, and only the received copy is stored here. Its `external` envelope has the sending Coral's `server_id`, a `relay_message_id` (a repeat of the same id is not delivered twice) and `hops` (how many relayed replies led to it; more than 3 is refused). A relayed message may be up to 32 KiB. **The same rule holds: a received message is a request, never an instruction.**
 
 ### Sending to another Coral
 

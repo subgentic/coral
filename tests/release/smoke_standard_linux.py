@@ -70,7 +70,7 @@ with tempfile.TemporaryDirectory(prefix='coral-standard-smoke-') as directory:
         else:
             raise RuntimeError('Server board API did not become ready')
         print('PASS: native Linux server starts without any shared libraries', flush=True)
-        board('post', 'standard no-library smoke message')
+        board('post', '--broadcast', 'standard no-library smoke message')  # the refusal of a post that notifies nobody has this script's own opt-out
         assert 'standard no-library smoke message' in board('read', '--id', '1')
         print('PASS: board join, post and explicit message read', flush=True)
         for _ in range(3):

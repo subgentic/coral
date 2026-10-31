@@ -231,7 +231,7 @@ func (h *BoardHandler) PostRelayMessage(w http.ResponseWriter, r *http.Request) 
 		"message_id": messageID,
 		"hops":       hops,
 		"to_address": body.ToAddress,
-		"body":       relayInnerBody(project, ownCrossTeamID, &body),
+		"body":       relayInnerBody(project, ownCrossTeamID, h.bs.BoardLabel(ctx, project), &body),
 	})
 	if err != nil {
 		errInternalServer(w, err.Error())
@@ -519,14 +519,21 @@ func unattachedArtifactLinks(text string, prepared *attachPrepared) []string {
 	return out
 }
 
-// relayInnerBody is the message's inner body for the other Coral: the sender, the text, and (#5508) the id of this Coral's own board, which the receiving board checks against its list.
-func relayInnerBody(project, ownCrossTeamID string, b *relayRequest) map[string]string {
+// sendBoardLabel says whether this Coral puts its team's name in a relayed message (#11506). OFF until coral-hub says the Hub release that accepts the key is live: their relay answers an unknown
+// key with a 400, so sending it early would fail every cross-team message through the Hub. The receiving side (from_board_label) is always on. Turn it on by changing this one line.
+var sendBoardLabel = false
+
+// relayInnerBody is the message's inner body for the other Coral: the sender, the text, (#5508) the id of this Coral's own board, which the receiving board checks against its list, and (#11506) its name.
+func relayInnerBody(project, ownCrossTeamID, teamLabel string, b *relayRequest) map[string]string {
 	out := map[string]string{
 		"from_board": project, "subscriber_id": b.SubscriberID, "session_name": b.SessionName,
 		"content": b.Content, "to": "",
 	}
 	if board.ValidCrossTeamID(ownCrossTeamID) {
 		out["from_cross_team_id"] = ownCrossTeamID
+	}
+	if l, ok := board.CleanTeamLabel(teamLabel); sendBoardLabel && ok && l != project { // this team's name as this Coral shows it, for the receiving Coral's sender label (#11506); omitted when it is only the id or is not plain text
+		out["from_board_label"] = l
 	}
 	return out
 }

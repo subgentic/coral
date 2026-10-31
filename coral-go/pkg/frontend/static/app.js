@@ -128,7 +128,7 @@ async function startDashboard() {
 
     await initCloud();   // no-op unless the page's boot data says mode "cloud"
     await initLocalStore();
-    loadSettings().then(initEditions).then(() => importOnce('./welcome_items.js')).then(m => m.landOnWelcome()).catch(e => { console.error('ways to run Coral:', e); settleFirstOffer(); }).finally(() => markReady('settings')); // a settings read that failed never holds the password dialog; the offered screen settles when it closes (#11464)
+    loadSettings().then(initEditions).catch(e => { console.error('ways to run Coral:', e); settleFirstOffer(); }).then(() => importOnce('./welcome_items.js')).then(m => m.landOnWelcome()).catch(e => console.error('welcome landing:', e)).finally(() => markReady('settings')); // a settings read that failed never holds the password dialog; the offered screen settles when it closes (#11464)
     initServersUi();   // reveals hub-only entry points when /api/health reports hub:true
 
     // Single-agent popout mode (/agent/{uuid}): chrome-free workspace only.

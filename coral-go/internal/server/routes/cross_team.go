@@ -477,6 +477,7 @@ func (h *BoardHandler) PostExternalMessage(w http.ResponseWriter, r *http.Reques
 		}
 	}
 	inbound, outbound, err := h.bs.PostCrossTeamMessage(ctx, board.CrossTeamPost{
+		ChiefBoard: h.chiefBoardNow(ctx),
 		Origin: board.MessageOrigin{
 			ServerID: store.LocalServerID, Board: body.FromBoard, Sender: body.SubscriberID, SenderRole: role,
 			TargetServerID: store.LocalServerID, TargetBoard: target,
@@ -717,7 +718,10 @@ func (h *BoardHandler) postRelayedExternalMessage(w http.ResponseWriter, r *http
 		To           string `json:"to"`
 		// FromCrossTeamID is the sending Coral's claim of its board's cross-team id (#5508): checked for its shape before anything compares it, never echoed.
 		FromCrossTeamID string `json:"from_cross_team_id"`
-		Relay           *struct {
+		// FromBoardLabel is the sending team's name as its own Coral shows it (#11506), so the message reads "Orchestrator (Coral Go Team, server ...)" and not the board id. Optional: a hub or a Coral that
+		// does not send it leaves the id, as before. Never trusted: it passes board.CleanTeamLabel here whatever the sender did.
+		FromBoardLabel string `json:"from_board_label"`
+		Relay          *struct {
 			MessageID string `json:"message_id"`
 			Hops      int    `json:"hops"`
 		} `json:"relay"`
@@ -800,7 +804,7 @@ func (h *BoardHandler) postRelayedExternalMessage(w http.ResponseWriter, r *http
 	inbound, duplicate, err := h.bs.PostRelayedCrossTeamMessage(ctx, board.CrossTeamPost{
 		Origin: board.MessageOrigin{
 			ServerID: src, Board: body.FromBoard, Sender: body.SubscriberID, SenderRole: role,
-			TargetServerID: store.LocalServerID, TargetBoard: target,
+			TargetServerID: store.LocalServerID, TargetBoard: target, BoardLabel: relayedTeamLabel(body.FromBoardLabel, body.FromBoard),
 			RelayMessageID: body.Relay.MessageID, Hops: body.Relay.Hops, FromCrossTeamID: validIDOrEmpty(body.FromCrossTeamID),
 		},
 		Mentions: recipients,
@@ -925,4 +929,12 @@ func (h *BoardHandler) checkLocalReplyTo(ctx context.Context, body *externalMess
 		return bad(fmt.Sprintf("message #%d is not one that board %q sent to this board", body.ReplyTo, target))
 	}
 	return nil
+}
+
+// relayedTeamLabel is the sending team's name from a relay's from_board_label (#11506), or "" when the id is to be shown: never trusted, it passes the one rule for a team name, and a name that is only the id adds nothing.
+func relayedTeamLabel(label, id string) string {
+	if l, ok := board.CleanTeamLabel(label); ok && l != id {
+		return l
+	}
+	return ""
 }

@@ -73,6 +73,8 @@ type BoardHandler struct {
 	received receivedLimiter
 	// allowlistFlag reads the global switch that puts the cross-team allowlist in force (#5508).
 	allowlistFlag func(ctx context.Context) bool
+	// chiefBoard reads the board the Operator recorded as Chief's team (chief_team, #11508); nil or "": none.
+	chiefBoard func(ctx context.Context) string
 	// listEdits limits how often one owner session edits a board's list (#5508).
 	listEdits editLimiter
 	// hubSwitches limits Coral Hub's requests to turn a team's cross-team switches on or off (#5572); hubCrossTeamLock reads the local lock.
