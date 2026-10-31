@@ -461,3 +461,11 @@
     .team-tabs-row .team-tab { flex: none; min-height: var(--control-touch-height, 44px); padding: 0 14px; }
     #team-page-view:has(#team-panel-item:not([hidden]), #team-panel-goals:not([hidden]) .goal-main, #team-panel-tasks:not([hidden]) .goals-detail-title, #team-panel-agents:not([hidden]) .goals-detail-title) :is(#team-page-head, #team-tabs-row) { display: none; } /* an item's page (a goal, a task, an agent) is a drill-down with its own bar and its own way back to the tab it came from: the team's bar and strip are not stacked over it (#11314) */
 }
+
+/* Team settings > Guides (#11457): a guide's Hub label, the name agents see, Remove name; Add a guide under the list */
+.gr-list { display: grid; gap: 8px; margin-bottom: 8px; }
+.gr-guide { display: grid; grid-template-columns: minmax(8rem, 13rem) minmax(0, 1fr) auto; gap: 8px; align-items: center; }
+.gr-label { color: var(--text-muted); overflow-wrap: anywhere; }
+.gr-add { display: flex; gap: 8px; flex-wrap: wrap; }
+.gr-add input { flex: 1 1 12rem; min-width: 0; }
+@media (max-width: 600px) { .gr-guide { grid-template-columns: minmax(0, 1fr) auto; } .gr-label { grid-column: 1 / -1; } .gr-guide .btn, .gr-add .btn, .gr-guide input, .gr-add input { min-height: 44px; } }

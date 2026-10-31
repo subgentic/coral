@@ -227,3 +227,10 @@
 .artifact-review-form textarea { width: 100%; min-height: 4.5em; resize: vertical; }
 .artifact-review-form[hidden], .artifact-review[hidden] { display: none; }
 .artifact-review-error { color: var(--error-text, var(--error)); min-height: 1em; }
+
+/* Details > Guides: the Private switch (#11457) */
+.artifact-private { display: grid; gap: 6px; padding-top: 10px; }
+.artifact-private-head { margin: 0; font-size: var(--fs-base); color: var(--text-muted); font-weight: var(--fw-medium); }
+.artifact-private-field { display: flex; gap: 10px; align-items: flex-start; min-height: 44px; }
+.artifact-private-help { color: var(--text-muted); font-size: var(--fs-base); }
+.artifact-private-say { margin: 0; color: var(--text-muted); font-size: var(--fs-base); }
