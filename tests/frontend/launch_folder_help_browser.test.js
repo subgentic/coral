@@ -3,6 +3,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
+const { existing: recentsExist } = require('./helpers/recent_dirs');
 const fs = require('node:fs');
 const { coralReady } = require('./helpers/wait');
 
@@ -33,7 +34,7 @@ const { coralReady } = require('./helpers/wait');
             await ev(`window.hideLaunchModal(); true`);
 
             console.log(`${at}: folders used before: the last three as buttons, the hint gone`);
-            await ev(`(async () => { const b = await import(${S} + 'browser.js'); for (const d of ['/work/one', '/work/two', '/work/three', '/work/four']) b.recordRecentDir(d); return true; })()`);
+            await recentsExist(ev); await ev(`(async () => { const b = await import(${S} + 'browser.js'); for (const d of ['/work/one', '/work/two', '/work/three', '/work/four']) b.recordRecentDir(d); return true; })()`);
             await open();
             assert.equal(await ev(vis('#launch-dir-hint')), false, `${at}: no hint once there are folders`);
             assert.deepEqual(await ev(`[...document.querySelectorAll('#launch-dir-recents button')].map(b => b.textContent + '|' + b.title)`), ['four|/work/four', 'three|/work/three', 'two|/work/two'], `${at}: the three most recent, newest first, named by the folder`);

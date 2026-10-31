@@ -25,7 +25,7 @@ export const NOT_A_TOOLBAR = {
     'gt-toolbar': 'the goals page header', 'hooks-bar': 'a settings row of buttons', 'item-bar': 'the item page\'s footer actions',
     'list-bar-bar': 'the list bar\'s own wrapper (its rows are the toolbar)', 'mb-select-bar': 'the message board selection bar', 'model-chip-bar': 'the composer\'s model chips',
     'preview-toolbar': 'the file preview header', 'prompt-inspection-bar': 'a card header', 'sv-bar': 'the settings save bar', 'terminal-key-bar': 'the phone terminal keys',
-    'top-bar': 'the app\'s top bar',
+    'top-bar': 'the app\'s top bar', 'phone-bar': 'the phone\'s one top bar (phone_bar.js): a menu, a pill and the account, not a list bar',
     'command-pane-toolbar': 'the composer\'s action bar (send, macros): an instance of the row (.toolbar, checked below); its per-pane and phone variants are tighter than the tokens on purpose',
 };
 // the page classes that are instances of the one toolbar (#9216): their row is `.toolbar` (layout.css), their own class says where they sit and what is special about them

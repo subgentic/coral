@@ -14,6 +14,11 @@ const DISMISS_KEY = 'coral-signin-line-dismissed'; // when the note was dismisse
 const DISMISS_MS = 24 * 60 * 60 * 1000;
 const dismissed = () => { const at = Number(browserLocal.get(DISMISS_KEY)); return Number.isFinite(at) && at > 0 && Date.now() - at < DISMISS_MS; };
 
+const _listeners = new Set();
+/** Calls fn(known) whenever a status answer changes what is known of Claude's sign-in; returns the way to stop. */
+export function onSigninChange(fn) { _listeners.add(fn); return () => _listeners.delete(fn); }
+
+let _told; // the value the listeners were last given
 let _known; // the last status's claude_signed_in: true, false, or undefined (not known: no background check or first launch yet)
 let _askedAt = 0;
 
@@ -56,6 +61,7 @@ export function syncSigninLine() { applySigninStatus(_known === undefined ? unde
 /** Shows the line for a status with claude_signed_in === false, hides it otherwise (absent is "not known": nothing to say). */
 export function applySigninStatus(data) {
     _known = data && typeof data.claude_signed_in === 'boolean' ? data.claude_signed_in : undefined;
+    if (_known !== _told) { _told = _known; for (const fn of [..._listeners]) fn(_known); }
     if (_known === false && startupSignedOut(state.currentSession)) { const pill = document.getElementById('waiting-banner'); if (pill && pill.classList.contains('waiting-banner-not-started')) setPill(pill, false, ''); } // the card now says it (only for the agent that is open and whose Claude it is)
     const line = document.getElementById('claude-signin-line');
     if (!line) return;

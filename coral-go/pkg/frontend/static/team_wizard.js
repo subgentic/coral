@@ -119,7 +119,7 @@ function _populateGeneratedTeamDraft(team) {
         banner.id = 'generated-team-banner';
         banner.className = 'notice notice-info generated-team-banner';
         banner.innerHTML = '<span class="material-icons" aria-hidden="true">auto_awesome</span> Your AI-generated team is ready — review and edit before launching.';
-        const sub = document.getElementById('team-stage-sub'); // under the step line, on a row of its own: beside the title it wrapped "New project" (#10660)
+        const sub = document.getElementById('team-stage-sub'); // under the step line, on a row of its own: beside the title it wrapped "New team" (#10660)
         if (sub) sub.after(banner); else stepEl.prepend(banner);
     }
     if (banner) {

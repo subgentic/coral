@@ -96,6 +96,17 @@ export function mountTeamLaunchSettings() {
     lead.textContent = 'Everything on this step is optional. The team starts with the settings shown here.';
     host.querySelector('.settings-panes')?.prepend(lead);
     host.addEventListener('input', syncMenuStates); host.addEventListener('change', syncMenuStates);
+    // the goal switch's state in words, so ticking it twice is seen (#11336: a newcomer clicks it to "tick" it and turns it off)
+    const state = document.createElement('p'); state.className = 'sv-hint team-goal-state'; state.id = 'team-goal-state'; state.setAttribute('role', 'status');
+    const syncGoalState = () => {
+        const sw = document.getElementById('team-save-goal'), task = document.getElementById('team-goal');
+        if (!sw) return;
+        if (!state.isConnected) (sw.closest('.sv-row') || sw.parentNode).after(state);
+        sw.setAttribute('aria-describedby', state.id);
+        state.textContent = !sw.checked ? "Off: the first task will not be saved as a goal." : task && task.value.trim() ? "On: the first task will also be the team's goal." : "On: a first task, once you write one, will also be the team's goal.";
+    };
+    host.addEventListener('input', syncGoalState); host.addEventListener('change', syncGoalState);
+    _view.ready.then(syncGoalState);
     _view.ready.then(syncMenuStates);
 }
 

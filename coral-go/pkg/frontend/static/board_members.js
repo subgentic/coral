@@ -8,6 +8,8 @@ import { isCloud, splitKey, boardFetch } from './server_base.js';
 
 // The team's names for the composer's @ picker (the job title, else the id): refreshed with the members list.
 let mentionNames = [];
+/** The member a newcomer is told to ask first: the Orchestrator, else the first member; '' while the members are not known. */
+export const boardLeadName = () => mentionNames.find(n => n.toLowerCase() === 'orchestrator') || mentionNames[0] || '';
 
 export function attachMentionList() {
     importOnce('./mention_picker.js').then(m => m.attachMentionPicker(document.getElementById('mb-post-input'), () => mentionNames)).catch(() => {}); // the box works without the list
@@ -17,6 +19,7 @@ export async function loadBoardSubscribers(project) {
     try {
         const subs = await fetchSubscribers(project);
         mentionNames = [...new Set(subs.filter(s => !isOperatorId(s.subscriber_id)).map(s => s.job_title || s.subscriber_id).filter(n => typeof n === 'string' && n))];
+        const empty = document.querySelector('#mb-messages .mb-empty-board .mb-empty-ask'); if (empty) { const lead = boardLeadName(); empty.textContent = lead ? `Ask ${lead} to plan the first task` : 'Write the first message'; } // the empty board's button names its lead once the members are in (#11336)
         setBoardMembers([...new Set(subs.map(s => s.job_title || s.subscriber_id).filter(n => typeof n === 'string' && n))].sort().slice(0, 50)); // the From field's names
         // @mentions of these members are highlighted; the bodies on screen are marked in place
         if (setBoardMentionNames(subs.flatMap(s => [s.job_title, s.subscriber_id]))) { highlightMentionsIn(document.getElementById('mb-messages')); retagMentions(document.getElementById('mb-messages'), OPERATOR_ID.toLowerCase()); } // in place: no message is redrawn, so a jump's outline and focus stay

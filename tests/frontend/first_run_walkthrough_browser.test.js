@@ -140,7 +140,7 @@ setInterval(() => {}, 1 << 30);
             await clickVisible('[data-on-click="launch-show"]');
             await waitFor(visible('#launch-step-chooser .launch-type-card'), `${tag}: the choice of what to launch`, { timeout: 8000, diag: `document.body.innerText.slice(0, 300)` });
             const cards = await ev(`[...document.querySelectorAll('#launch-step-chooser .launch-type-card')].map(c => c.querySelector('.launch-type-label').textContent.trim() + ' ' + c.querySelector('.launch-type-desc').textContent.trim())`);
-            assert.deepEqual(cards.slice(0, 3), ['New agent One agent in a folder you choose.', 'New project Launch a team of agents collaborating on a shared board.', 'Open folder Add a project folder to start agents in later.'], `${tag}: step one offers the kinds in this order, each with what it opens (#9253) (${JSON.stringify(cards)})`);
+            assert.deepEqual(cards.slice(0, 3), ['New agent One agent in a folder you choose.', 'New team Launch a team of agents collaborating on a shared board.', 'Open folder Add a project folder to start agents in later.'], `${tag}: step one offers the kinds in this order, each with what it opens (#9253) (${JSON.stringify(cards)})`);
             await ev(`document.querySelector('#launch-step-chooser .launch-type-card[data-arg="agent"]').click(); true`);
         } else { // the phone has no chooser (#11116): a fresh install's home has a card for each kind (the + button appears with the first agent), and the form is the first step
             await clickVisible('.empty-launch[data-on-click="m-show-launch-modal-then-select-launch-type"][data-arg="agent"]');

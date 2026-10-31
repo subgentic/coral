@@ -32,13 +32,13 @@ function taskFields() {
         { key: 'assigned_to', type: 'select', id: 'create-task-assignee', label: 'Assigned to', default: '', options: [{ value: '', label: 'Unassigned' }], visibleWhen: board },
         { key: 'goal_id', type: 'select', id: 'create-task-goal', label: 'Goal', default: '', options: [], visibleWhen: () => board() && _goalShown, messageAsIs: true,
             validate: v => (board() && _goalShown && _requireGoal && !v ? `${chooseGoalLabel}: this board needs a goal on every task.` : '') },
-        { key: 'draft', type: 'toggle', id: 'create-task-draft', label: 'Create as draft', default: false, help: 'Not visible to agents until published.', visibleWhen: board },
+        { key: 'draft', type: 'toggle', id: 'create-task-draft', label: 'Hold back as a draft', default: false, help: 'Agents do not see it until you publish it.', visibleWhen: board },
         // Agent without a board: the task goes to this agent
         { key: 'send', type: 'toggle', id: 'create-task-send', label: 'Tell the agent to claim it', default: true, help: 'A short prompt to run coral-agent task claim (queued if it is busy).', visibleWhen: () => _solo },
-        { key: 'flow', type: 'heading', fold: true, id: 'create-task-flow', label: 'Workflow and prerequisites' },
+        { key: 'flow', type: 'heading', fold: true, id: 'create-task-flow', label: 'Order of work (advanced)' },
         { key: 'blocked_by', type: 'custom', id: 'create-task-deps-field', label: 'Blocked by', default: [], visibleWhen: board,
             render: slot => { const d = el('div', 'dep-picker'); d.id = 'create-task-deps'; slot.append(d); return { get: () => _getSelectedDeps('create-task-deps'), set: ids => _renderDepPicker('create-task-deps', (ids || []).map(Number), null, _dependencies) }; } },
-        { key: 'condition', type: 'select', id: 'create-task-condition', label: 'Proceed when prerequisites', default: 'success', visibleWhen: board,
+        { key: 'condition', type: 'select', id: 'create-task-condition', label: 'Start once the tasks it waits for', default: 'success', visibleWhen: board,
             options: [{ value: 'success', label: 'Succeed' }, { value: 'failure', label: 'Fail' }, { value: 'termination', label: 'Finish (any outcome)' }] },
         { key: 'inputs', type: 'text', id: 'create-task-inputs', label: 'Required upstream artifacts', placeholder: 'build, test_report (comma separated)', default: '', visibleWhen: board },
         { key: 'workflow', type: 'text', id: 'create-task-workflow', label: 'Workflow', placeholder: 'Build -> Test -> Release', default: '', visibleWhen: board },
@@ -57,6 +57,7 @@ function taskView(modal) {
         mode: 'form', fields: taskFields(),
         form: { submit: 'Create', submitId: 'create-task-submit', cancel: 'Cancel', barHost: footer, onSubmit: submitValues, onCancel: hideCreateTaskModal },
     });
+    modal.querySelector('#create-task-bar-back')?.addEventListener('click', hideCreateTaskModal); // a phone's form screen has its ← in the bar (it is not drawn on a wide screen)
     return view;
 }
 

@@ -4,7 +4,7 @@ import { isPhoneLayout } from './phone_layout.js';
 import { scrollBehavior } from './motion.js';
 import { showToast, escapeHtml, escapeAttr, boardNameProblem, OPERATOR_ID } from './utils.js';
 import { loadLiveSessions } from './api.js';
-import { recordRecentDir, getRecentDirs } from './browser.js';
+import { recordRecentDir, getRecentDirs, pruneMissingRecents } from './browser.js';
 import { teamForm, showTeamWorktree, showTeamWorkers } from './team_form.js';
 import { agentNameForm, agentStatus } from './agent_form.js';
 import { cliPathButton } from './prerequisites.js';
@@ -22,7 +22,7 @@ const { launchedMode } = await importOnce('./preset_enforcement.js');
 const { BUILTIN_TEAM_TEMPLATES, DEFAULT_TEAM_KEY, GENERATED_TEAM_KEY, _renderTeamTemplateSelector, _syncTemplateMenu, markTeamTemplate, resetTeamTemplatePicker } = await importOnce('./team_templates_ui.js');
 const { showTeamStep, currentTeamStep, TEAM_STEPS } = await importOnce('./team_steps.js');
 const { mountTeamLaunchSettings, readTeamLaunchSettings, applyTeamBoardSettings, setTeamLaunchMode } = await importOnce('./team_launch_settings.js');
-const { offerSuggestion, syncSuggestionLine, usesSuggestion } = await importOnce('./folder_suggestion.js');
+const { offerSuggestion, offerCreateFolder, syncSuggestionLine, usesSuggestion } = await importOnce('./folder_suggestion.js');
 
 
 const _modeLabel = v => [...(document.getElementById('team-permission-mode')?.options || [])].find(o => o.value === v)?.textContent || v;
@@ -94,7 +94,7 @@ function _syncTeamMembers() {
     });
     const empty = document.querySelector('#team-panel-members .empty-state.empty-state-tight'); if (empty) empty.hidden = rows.length > 0;
     const count = document.getElementById('team-agents-count');
-    if (count) count.textContent = rows.length ? `${rows.length} ${rows.length === 1 ? 'member' : 'members'}. Select one to edit it.` : '';
+    if (count) count.textContent = rows.length ? `${rows.length} ${rows.length === 1 ? 'member' : 'members'}. Select one to edit it. The Orchestrator plans the work and hands tasks to the others.` : '';
     const line = document.getElementById('team-orchestrator-line'); if (line) line.hidden = hasOrchestrator();
     showTeamWorkers(rows.some(r => !isOrchestrator(rowRole(r))));
     _syncTeamGate();
@@ -363,6 +363,7 @@ function _renderTeamDirRecents() {
     const box = document.getElementById('launch-team-dir-recents');
     if (!box) return;
     const dirs = getRecentDirs(_effectiveServer(launch.server)).slice(0, 3);
+    if (!box._pruned) { box._pruned = true; pruneMissingRecents(_effectiveServer(launch.server)).then(changed => { box._pruned = false; if (!changed) return; _renderTeamDirRecents(); const f = document.getElementById('launch-team-dir'); if (f && !f.value && !_settingsFor(_effectiveServer(launch.server)).default_working_dir) offerSuggestion(f, document.getElementById('launch-team-dir-suggest'), 'first-team', { afterCoralMade: true }); }).catch(() => { box._pruned = false; }); } // folders that are gone are dropped once per opening (#11336)
     box.replaceChildren(...(dirs.length ? [Object.assign(document.createElement('span'), { className: 'launch-recent-label', textContent: 'Recent:' })] : []), ...dirs.map(d => {
         const b = document.createElement('button');
         b.type = 'button'; b.className = 'btn btn-small launch-dir-recent'; b.title = d; b.dataset.dir = d; b.dataset.team = '1'; b.setAttribute('data-on-click', 'launch-dir-recent');
@@ -407,7 +408,7 @@ async function _initTeamForm() {
     if (goalEl) goalEl.value = "";
     if (launch.server !== LOCAL_SERVER) _resetDirInputs(['launch-team-dir'], launch.server, s, { switching: true });
     else if (s.default_working_dir && dirInput) dirInput.value = s.default_working_dir;
-    else if (dirInput) { delete dirInput.dataset.suggested; offerSuggestion(dirInput, document.getElementById('launch-team-dir-suggest'), 'first-team'); } // a first team has a folder to say yes to (#11258)
+    else if (dirInput) { delete dirInput.dataset.suggested; offerSuggestion(dirInput, document.getElementById('launch-team-dir-suggest'), 'first-team', { afterCoralMade: true }); } // a first team has a folder to say yes to (#11258), and so does one after the first agent: its own new folder beside the one Coral made (#11336)
     if (dirInput && !dirInput.dataset.suggestWired) { dirInput.dataset.suggestWired = '1'; dirInput.addEventListener('input', () => syncSuggestionLine(dirInput, document.getElementById('launch-team-dir-suggest'))); }
 
     // Show worktree option when directory is a git repo (checked on the target server)
@@ -780,7 +781,11 @@ async function launchTeam() {
 
     try {
         const result = await _launchOn(server, "/api/sessions/launch-team", payload, undefined, { teamFailures: true, fields: { base_branch: document.getElementById('launch-team-base-branch') } });
-        if (result) {
+        const missing = result && result.ok === false && Array.isArray(result.agents) && result.agents.length ? result.agents.find(a => a && /^directory not found/i.test(a.error || '')) : null;
+        if (missing && result.agents.every(a => a && /^directory not found/i.test(a.error || ''))) { // every member stopped on the folder: it is said at the Folder field, on the step that has it, not in a list of members (#11336)
+            const dirInput = document.getElementById('launch-team-dir');
+            showTeamStep('team'); markFieldInvalid(dirInput, missing.error); offerCreateFolder(dirInput);
+        } else if (result) {
             if (result.ok !== false) recordRecentDir(workingDir, server); // not for a team in which nobody started (#122)
             // Check for per-agent errors in the launched array
             const launched = result.agents || result.launched || [];

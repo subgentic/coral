@@ -13,7 +13,7 @@ export const SCREEN_TYPES = {
     form: { back: true, menu: false, bottomNav: false },
 };
 
-export const BUILT = new Set(['A', 'B']);
+export const BUILT = new Set(['A', 'B', 'C', 'D']);
 
 export const PHONE_SCREENS = {
     'mobile-agent-list': { type: 'top-level', nav: 'nav-agents', fab: 'agents', slice: 'A' }, // Home: the agent list (its + makes an agent or a team)
@@ -27,10 +27,10 @@ export const PHONE_SCREENS = {
     'team-page-view': { type: 'drill-down', slice: 'B' },                            // a team and its tabs (a bar: ←, the team, ⋯)
     'messageboard-view': { type: 'drill-down', slice: 'B' },
     'history-session-view': { type: 'drill-down', slice: 'B' },                      // a past chat
-    'servers-view': { type: 'top-level', nav: 'nav-more', slice: 'C' },              // Computers
+    'servers-view': { type: 'top-level', nav: 'nav-more', slice: 'D' },              // Computers (its item pages have no data-phone-item marker yet: it keeps today's chrome until D)
     'artifacts-view': { type: 'top-level', nav: 'nav-more', slice: 'D' },            // the Hub's Artifacts
-    'welcome-screen': { type: 'top-level', slice: 'D' },                             // a wide window's first page: a phone never shows it (#4497)
-    'chats-empty-view': { type: 'top-level', slice: 'D' },
+    'welcome-screen': { type: 'top-level', nav: 'nav-agents', slice: 'D' },                             // a wide window's first page: a phone never shows it (#4497)
+    'chats-empty-view': { type: 'top-level', nav: 'nav-more', slice: 'D' },
     'timeline-view': { type: 'drill-down', slice: 'D' },
     'kanban-view': { type: 'drill-down', slice: 'D' },
 };

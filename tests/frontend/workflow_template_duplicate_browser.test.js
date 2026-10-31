@@ -57,7 +57,7 @@ const STUB = `(() => { const real = window.fetch; window.__saved = [];
             await ev(`window.selectWorkflow(${id}); true`);
             await waitFor(`!!document.querySelector('.wf-more-btn')`, 'the workflow page', 8000);
             await ev(`document.querySelector('.wf-more-btn').click(); true`);
-            const items = await ev(`[...document.querySelectorAll('.wf-more-menu:not([hidden]) .menu-item')].map(b => b.textContent.trim())`);
+            const items = await ev(`[...document.querySelectorAll('.wf-more-menu:not([hidden]) .menu-item:not(.wf-menu-phone)')].map(b => b.textContent.trim())`);
             assert.deepEqual(items, ['Duplicate', 'Delete'], at + 'the More menu: ' + JSON.stringify(items));
             await ev(`document.querySelector('.wf-more-menu:not([hidden]) [data-on-click="wf-duplicate"]').click(); true`);
             await waitFor(`document.getElementById('wf-create-modal').style.display === 'flex' && document.getElementById('wf-input-name').value === 'daily-motivation-copy'`, 'the duplicate dialog', 8000);

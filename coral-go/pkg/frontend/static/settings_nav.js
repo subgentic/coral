@@ -37,6 +37,7 @@ function showSettingsGroup(id, { focus = false, remember = true } = {}) {
     }
     const pick = document.getElementById('settings-group-select');
     if (pick) pick.value = pane.dataset.group;
+    const backName = document.querySelector('#settings-modal .settings-back span:last-child'); if (backName) { backName.textContent = pane.dataset.title || 'Settings'; backName.parentElement.setAttribute('aria-label', 'Back to Settings'); } // a phone's section bar: the arrow and the section's name (its own title is not drawn twice)
     pane.parentElement.scrollTop = 0;
     if (remember) browserLocal.set(storeKey(GROUP_KEY), pane.dataset.group);
     if (focus) tabFor(pane.dataset.group)?.focus();

@@ -466,7 +466,8 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 }
 /* @mentions of a board member (#5964): weight and a tint, never colour alone; the viewer's own name (the Operator) is stronger, with an underline bar as well. Text only: no role change. */
 .mb-mention { font-weight: var(--fw-strong); color: var(--text-primary); background: color-mix(in srgb, var(--accent) 16%, transparent); border-radius: var(--radius-sm); padding: 0 3px; }
-.mb-mention-self { background: color-mix(in srgb, var(--accent) 36%, transparent); box-shadow: inset 0 -2px 0 var(--accent); }
+.mb-mention-self { position: relative; cursor: help; background: color-mix(in srgb, var(--accent) 36%, transparent); box-shadow: inset 0 -2px 0 var(--accent); }
+.mb-mention-self[data-tip-open]::after { content: "That is you"; position: absolute; left: 0; bottom: calc(100% + 4px); z-index: 5; padding: 2px 8px; border-radius: var(--radius-md); background: var(--bg-elevated, var(--bg-secondary)); color: var(--text-primary); border: 1px solid var(--border); font-size: var(--fs-sm); font-weight: var(--fw-medium); white-space: nowrap; box-shadow: var(--shadow-md, none); } /* a tap or Enter on the mention of you (#11336): there is no hover on a touch screen */
 .mb-message-body a:hover,
 .board-artifact-link:hover {
     text-decoration: underline;
@@ -2989,6 +2990,7 @@ input.switch:disabled { opacity: .5; cursor: not-allowed; }
     input.switch:disabled::before { background: GrayText; }
 }
 .field-error { margin: 4px 0 .9rem; color: var(--error-text, var(--error)); font-size: var(--fs-sm, 0.8125rem); line-height: var(--lh-ui); overflow-wrap: anywhere; }
+.field-error .field-error-action { display: block; margin-top: 6px; } /* the button under the words, not after the last wrapped line of them (#11336) */
 
 /* Auto-accept (#3182): the AUTO chip (agent row and header), the menu switch's state and the warning dialog. */
 .auto-accept-chip {
@@ -3190,6 +3192,7 @@ button.terminal-gone-header { margin: 0 4px 0 0; font-size: var(--fs-sm); line-h
 .alerts-offer-banner .btn-icon { margin-left: auto; } /* the x stays at the right edge, on the buttons' row */
 .local-auth-banner { flex: none; } /* where it sits: what it looks like is the one notice's (.notice, layout.css) */ /* #4291 */
 .local-auth-banner[hidden] { display: none; }
+body:has(#set-password-modal) .local-auth-banner { display: none; } /* the password dialog is the answer to it: the strip is not left behind the dialog on a first launch (#11336) */
 .local-auth-banner .material-icons { flex: none; color: var(--error); font-size: var(--fs-2xl); }
 .local-auth-banner.notice-warn .material-icons { color: var(--warning); } /* no password, sign-in on: amber, not red (#10061) */
 .local-auth-banner-text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
@@ -3448,8 +3451,6 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 .saved-jump { position: relative; }
 .saved-jump::before { content: "Saved"; position: absolute; left: 0; top: -22px; background: var(--accent-dim); color: var(--text-on-accent, #fff); font-size: var(--fs-sm); font-weight: var(--fw-strong); border-radius: var(--radius-lg); padding: 0 7px; line-height: 16px; pointer-events: none; }
 /* Keep the bookmark and the view selector at large text sizes on a phone. */
-.saved-bar-wrap .top-bar { flex-wrap: wrap; row-gap: 4px; }
-.saved-bar-wrap .nav-select { order: 3; flex: 1 1 100%; margin: 0; }
 
 /* The install help where an agent CLI is missing (#4569): the vendor's page as a link in the theme's link colour, and a quiet note. */
 .acf-cli-warning .cli-install-link, .acf-cli-warning .cli-install-note { margin: 6px 0 0; }
@@ -3465,6 +3466,7 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 .settings-shell { display: flex; flex: 1; min-width: 0; min-height: 0; }
 .settings-nav { width: 13.5rem; flex: none; border-right: 1px solid var(--border); padding: .6rem; overflow-y: auto; background: var(--bg-tertiary); }
 .settings-nav .settings-group-pick { display: none; }
+.settings-bar-back { display: none; } /* a phone's form screen has its arrow in the bar (#11236, #11239 slice C) */
 .settings-back { display: none; } /* a narrow dialog's way back from a section to the list of sections (#10000) */
 .info-grid.settings-grid .settings-row > dt, .settings-row > dt label { font-size: var(--fs-lg); font-weight: var(--fw-strong); }
 .settings-tabs { display: flex; flex-direction: column; gap: 2px; }
@@ -3577,6 +3579,7 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
     .sd-modal-content .settings-tabs { display: none; }
     .sd-modal-content .settings-nav .settings-group-pick { display: block; }
     .sd-modal-content .settings-group-pick select { width: 100%; max-width: none; min-height: 44px; }
+    .sd-modal-content .settings-group-pick-label { display: block; margin: 0 0 var(--space-xs); color: var(--text-secondary); font-size: var(--fs-sm); } /* the select is the section list: it says so (#11336) */
     .sd-modal-content .settings-panes { padding: .8rem 1rem 1.2rem; }
     .sd-modal-content .launch-note-slot { min-height: 0; } /* on a phone an empty notes slot takes no room (no tall gap under Provider): a note that appears pushes Model and Thinking down (#7912) */
     .sd-modal-content .settings-pane :is(select, input[type="text"], textarea, .btn, .perm-chip) { min-height: 44px; }
@@ -3600,9 +3603,15 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
     .settings-tab .sd-dot { margin-left: auto; margin-right: .6rem; }
     .settings-tab:has(.sd-dot:not([hidden]))::after { margin-left: 0; }
     .settings-tab[aria-selected="true"] { background: none; box-shadow: none; font-weight: var(--fw-regular); }
-    #settings-modal[data-screen="pane"] .modal-header { padding: 0; min-height: 0; }
+    #settings-modal:not([data-screen="pane"]) .modal-header { display: flex; align-items: center; gap: 4px; box-sizing: border-box; height: 56px; min-height: 0; padding: 0 4px; border-bottom: 1px solid var(--border); }
+    #settings-modal:not([data-screen="pane"]) .settings-bar-back { display: inline-grid; place-items: center; flex: none; width: var(--control-touch-height, 44px); height: var(--control-touch-height, 44px); padding: 0; border: 0; border-radius: 22px; background: none; color: var(--text-primary); font-size: var(--fs-2xl); cursor: pointer; } /* the sections' list: ← closes Settings, the title beside it (a bar, not a title over a Close at the bottom only) */
+    #settings-modal .modal-header h3 { margin: 0; }
+    @media (max-height: 500px) { #settings-modal:not([data-screen="pane"]) .modal-header { height: 44px; } } /* a phone turned sideways: the bar is the arrow's height, the form keeps its room (phone_landscape_dialogs) */
+    #settings-modal[data-screen="pane"] .modal-header { position: absolute; width: 1px; height: 1px; margin: 0; padding: 0; min-height: 0; overflow: hidden; border: 0; clip-path: inset(50%); }
+    #settings-modal[data-screen="pane"] .modal-content { padding-top: 0; }
+    #settings-modal[data-screen="pane"] .settings-panes { padding-top: 0; } /* a section: its own bar (the way back) is the first row, not under an empty strip */
     #settings-modal[data-screen="pane"] #settings-title { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; } /* a section is open: its way back says Settings, so the title is not said twice; the dialog keeps its name (#10783) */
-    #settings-modal[data-screen="pane"] .settings-back { display: inline-flex; align-items: center; gap: .4rem; min-height: 44px; margin: -.4rem 0 .4rem -.6rem; }
+    #settings-modal[data-screen="pane"] .settings-back { display: inline-flex; align-items: center; gap: .4rem; min-height: 56px; margin: -.8rem 0 .4rem -.6rem; }
     .settings-panes { padding: .8rem 1rem 1.2rem; }
     /* the (i) stays a 1.5rem circle at every size (#6042, #6750); its 44 px touch target is the invisible ::after below */
     .settings-row > dt > label { flex: 0 1 auto; min-width: 0; } /* the label wraps so its (i) button stays beside it, not on a row of its own (#5057) */
@@ -3686,6 +3695,9 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 .acf-cli-warning > .btn { order: 1; } /* the button is on the status line at the right, the link, the command and the note under them (the DOM has the button last) */
 .launch-cli-slot .acf-cli-warning code { color: var(--text-primary); overflow-wrap: anywhere; }
 .launch-cli-slot .acf-cli-warning .cli-install-link a { color: var(--link-text); }
+.launch-signin-notice { margin: 0 0 var(--space-md); } /* where it sits; the look is the one notice (#11336) */
+.launch-signin-body { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-sm); min-width: 0; }
+.launch-signin-body p { margin: 0; }
 .launch-cli-slot .acf-cli-warning .btn { margin: 0 0 0 auto; }
 .launch-cli-slot .acf-cli-warning .cli-actions { order: 1; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px 8px; margin-left: auto; } /* Check again and Set path (#10013): one group at the right end of the line, wrapping together */
 .launch-cli-slot .acf-cli-warning .cli-actions .btn { margin: 0; }
@@ -4173,3 +4185,6 @@ dialog.team-link-dialog::backdrop { background: rgba(var(--black-rgb), 0.5); }
 @media (max-width: 359px) { .provider-card-body .seg-group { display: none; } .provider-card-body select.seg-source { display: block; } } /* a strip of six levels does not fit: the select under it does */
 
 .account-line { display: flex !important; flex-wrap: wrap; align-items: baseline; gap: 0 12px; } .account-name { flex: 0 0 5em; font-size: var(--fs-md); color: var(--text-primary); } .account-line .settings-hint { flex: 1 1 12em; min-width: 0; } /* Settings > Security > Accounts (#11320): a line per provider, its name and its answer; the answer drops under the name when 12 em is not left beside it (a narrow screen, large text) */
+
+/* The amber no-password banner is one line on a phone (#11336, Mobile Beta Tester: a quarter of the screen until Dismiss was found): its first words, Set a password and Dismiss; the rest of its sentence stays for a screen reader */
+@media (max-width: 767px) { .local-auth-banner [data-auth-state="nopw"] .local-auth-more { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; } .local-auth-banner:has([data-auth-state="nopw"]:not([hidden])) { flex-wrap: wrap; align-items: center; } .local-auth-banner:has([data-auth-state="nopw"]:not([hidden])) > .material-icons { display: none; } .local-auth-banner:has([data-auth-state="nopw"]:not([hidden])) > .btn { flex: none; margin: 0; } .local-auth-banner:has([data-auth-state="nopw"]:not([hidden])) .local-auth-banner-text { flex: 1 1 8em; } }

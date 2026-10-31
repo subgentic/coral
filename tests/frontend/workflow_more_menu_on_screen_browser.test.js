@@ -36,7 +36,7 @@ const { coralReady } = require('./helpers/wait');
             const m = await ev(`(() => { const menu = document.querySelector('.wf-more-menu'), b = menu.getBoundingClientRect(); return { menu: [b.left, b.top, b.right, b.bottom].map(Math.round), vw: innerWidth, vh: innerHeight, items: [...menu.querySelectorAll('button')].map(i => { const r = i.getBoundingClientRect(); return { t: i.textContent.trim(), l: Math.round(r.left), r: Math.round(r.right), t0: Math.round(r.top), b: Math.round(r.bottom) }; }) }; })()`);
             const ok = m.menu[0] >= 0 && m.menu[2] <= m.vw && m.menu[1] >= 0 && m.menu[3] <= m.vh && m.items.length > 0 && m.items.every(i => i.l >= 0 && i.r <= m.vw && i.t0 >= 0 && i.b <= m.vh);
             if (!ok) problems.push(`${tag}: the More menu is inside the screen (${m.vw} x ${m.vh}): ${JSON.stringify(m)}`);
-            const hit = await ev(`(() => { const i = document.querySelector('.wf-more-menu button'); const r = i.getBoundingClientRect(); const t = document.elementFromPoint(Math.min(Math.max(r.left + r.width / 2, 1), innerWidth - 1), r.top + r.height / 2); return !!t && (t === i || i.contains(t)); })()`);
+            const hit = await ev(`(() => { const i = document.querySelector('.wf-more-menu .menu-item-danger'); const r = i.getBoundingClientRect(); const t = document.elementFromPoint(Math.min(Math.max(r.left + r.width / 2, 1), innerWidth - 1), r.top + r.height / 2); return !!t && (t === i || i.contains(t)); })()`);
             if (!hit) problems.push(`${tag}: Delete is what a tap at its centre reaches`);
         }
     } finally {

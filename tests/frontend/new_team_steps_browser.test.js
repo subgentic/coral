@@ -10,6 +10,7 @@ const path = require('node:path');
 const { connect } = require('./agent_view_harness');
 const { install: installNT, N, T, stepLine, openNewTeam, scenarios, stubModels } = require('./helpers/new_team');
 const BASE = require('./test_base').BASE;
+const { existing: recentsExist } = require('./helpers/recent_dirs');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -30,10 +31,10 @@ const BASE = require('./test_base').BASE;
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(); await installNT(ev); await stubModels(ev);
-        await ev(`localStorage.setItem('coral-recent-dirs', JSON.stringify(['/work/payments-app', '/work/website', '/work/docs'])); true`);
+        await recentsExist(ev); await ev(`localStorage.setItem('coral-recent-dirs', JSON.stringify(['/work/payments-app', '/work/website', '/work/docs'])); true`);
         await openNewTeam(ev, waitFor);
 
-        await S.run('the dialog is a role=dialog named exactly "New project" and opens on "Step 1 of 3: Your team"', async () => {
+        await S.run('the dialog is a role=dialog named exactly "New team" and opens on "Step 1 of 3: Your team"', async () => {
             assert.ok(await ev(`!!window.__nt.dlg(${N.team})`), 'no role=dialog named "New team"');
             assert.match(await stepLine(ev), /^Step 1 of 3: Your team/);
         });
