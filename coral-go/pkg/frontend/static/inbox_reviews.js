@@ -5,10 +5,15 @@ import { boardFetch, keyLabel, splitKey } from './server_base.js';
 
 let items = [], errors = [], pending = null, lastRead = 0, revision = 0, changed = () => {};
 let activated = false;
-export const reviewItems = () => items;
+// One row per artifact (#11533): versions (same uploader, team, name) are one item, the newest, with `earlier`.
+const vkey = a => (a.session_id || a.produced_by) ? JSON.stringify([a.team, a.session_id, a.produced_by, a.name]) : a.reviewKey; // a JSON array: no name or id can run into the next field
+const byAge = (a, b) => String(a.created_at).localeCompare(String(b.created_at)) || a.reviewKey.localeCompare(b.reviewKey);
+/** The versions older than `row`, still for review. */
+export const earlierVersions = row => { const key = row.reviewKey || `${row.team}:${row.id}`, me = items.find(a => a.reviewKey === key) || row; return items.filter(a => a.reviewKey !== key && vkey(a) === vkey(me) && byAge(a, me) < 0); };
+export const reviewItems = () => items.filter(a => !items.some(b => vkey(b) === vkey(a) && byAge(a, b) < 0)).map(a => { const earlier = earlierVersions(a); return earlier.length ? { ...a, earlier } : a; });
 /** A review artifact the operator has opened carries the 'read' tag (#9277): it stays in Needs you, shown as read, but it is not counted (the Inbox badge, the Needs you count). Opening it again, or marking it unread, is the same tags route. */
 export const isRead = a => !!(a.tags && a.tags.includes('read'));
-export const unreadReviewItems = () => items.filter(a => !isRead(a));
+export const unreadReviewItems = () => reviewItems().filter(a => !isRead(a));
 export const reviewErrors = () => errors;
 export function onReviewsChanged(fn) { changed = fn; }
 
@@ -59,7 +64,7 @@ export function refreshReviews(force = false) {
                 }
             }
             if (started !== revision) return;
-            items = next.sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)) || a.reviewKey.localeCompare(b.reviewKey));
+            items = next.sort(byAge);
             errors = failed;
         } catch { errors = ['Review artifacts could not be refreshed.']; }
         changed();
@@ -68,7 +73,7 @@ export function refreshReviews(force = false) {
 }
 
 /** The artifact's tags as the server has them now, read right before a write: the tags route replaces the whole list, so a tag someone added since the last refresh would be lost from the row's copy. null when it is no longer a for-review artifact. */
-async function currentTags(row) {
+export async function currentTags(row) {
     for (let offset = 0; offset <= 10000; offset += 200) {
         const r = await boardFetch(row.team, `/artifacts?tag=for%20review&limit=200&offset=${offset}`);
         if (!r.ok) throw new Error(`Could not read the current tags (HTTP ${r.status}).`);
@@ -103,7 +108,8 @@ export async function setReviewRead(row, read) {
 /** The Operator decided a review (Approve): the row is out of the list at once, and a read that was already in flight cannot put it back. */
 export function settleReview(row) {
     revision++;
-    items = items.filter(a => a.reviewKey !== row.reviewKey);
+    const gone = new Set([row.reviewKey || `${row.team}:${row.id}`, ...earlierVersions(row).map(a => a.reviewKey)]); // the versions before it were settled with it (settleEarlierVersions)
+    items = items.filter(a => !gone.has(a.reviewKey));
     changed();
 }
 
