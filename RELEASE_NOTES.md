@@ -1,5 +1,56 @@
 # Release Notes
 
+## v2.0.11 — a Needs you that carries questions, blockers and a welcome, an agent stuck at a dialog says so, comments on any artifact, quieter health checks, an Orchestrator you can let manage its own team, and SSH setup through a jump host
+
+### Changes
+
+#### What you will notice first
+
+- **A new install shows five welcome items in Needs you** (the welcome itself, start your first agent, make a team, connect a computer or the Hub, how agents ask you) that complete themselves as you go; one quiet link hides them all, and they are not counted in the Inbox badge.
+- **An agent's question to you appears in Needs you, and you answer it there.** Every task an agent claims now carries the rule to put what needs you in your Needs you, so a team needs no custom instruction for it. A question you answered somewhere else (in the chat or an artifact comment) can be closed with `coral-board ask close <message-id> --note "where it was answered"`. Only what you must see, decide or approve is tagged for review; logs, patches and notes for other agents are not.
+- **Needs you items say what waits on them**, such as "3 tasks wait on this", and blocking items sort first. A review item says which agent sent it (and its team when more than one team is waiting); on a phone a "For review" row shows its team whole and has the same three actions as the desktop.
+- **An agent stuck at a dialog** (for example "trust this folder") shows **At a dialog** instead of Idle, and after 5 minutes it is in your Needs you (the team's held-notice switch turns that item off).
+- **You can comment on any artifact** (HTML, pictures, PDF, tables, code, video), at least on the whole document. Your comments on a file an agent put up for your review now reach that agent, and it answers in the same thread (`coral-agent artifact comments <link>` reads them). An agent can now read the comment threads only of artifacts it uploaded or was asked into (before, any agent on the board could).
+- **`coral://artifacts/` links are clickable** in task descriptions and results, goal pages, artifact comments and a proposal's instructions, and they open in Coral's viewer.
+
+#### New users
+
+- **No Mobile QR code card on Home any more**: it stays in Settings, by the API key.
+- The New team step line shows the end of the folder path (tap it to see all of it); in New agent, a failed model list says what happened and what to do.
+- Chat says "N team messages have not reached this agent yet" and the Options link says what is behind it.
+- On a phone the bar lights Tasks, not Inbox, on the Tasks page; Docs' "For developers" is folded for a first-time reader, and a search or a link into it opens it.
+- **In New agent, a model you choose is no longer replaced by a default that arrives late on a slow machine.**
+- An agent's row hover card is grouped: the state first with its age, then the work, then agent, model and thinking level on one line, then usage, and it no longer opens over the row's ⋯ button.
+
+#### Agents and the chat
+
+- **Claude installed by its own installer is found** (`~/.local/bin/claude`) even when an agent works in your home folder, and a refusal names the agent and what to do.
+- **An agent that isn't receiving Coral's messages says so on its row, with Record as agent.** After an update, one Needs you item offers Record for all agents, showing each agent's program and PID first, and it records only what it showed. Options says what recording does and what to check, and the row says "Paused: this agent was running before the update, or its process changed".
+- **Team settings can cap how many goals a team has open and require your approval for the goals and tasks its agents add** (all off by default). What an agent proposes waits in Needs you as one line, "X proposes a task|goal", with a "Carries instructions" tag when it has them. Approve makes it as proposed; Edit lets you change the words first; Reject takes a reason the agent is told; opening the row shows the whole words and instructions. Text with hidden characters is marked, never drawn raw, and an edit says how many it holds.
+- **Health checks are quieter.** A check is never sent only to say "no change", the interval row reads "Look every", and a team can ask for an all-is-well note at least every so many minutes (off by default). A health check also lists the team's open goals, with the words of what each is blocked on, and a post on a task tells the assignee and its creator. A check goes out only when something is new (a new finding, a question, an agent idle or stuck), and an agent stopped at a dialog for the team's "After minutes at a dialog" (10 by default) is named first in it.
+- **A team's Orchestrator can wake and put to sleep its own team's agents, if you turn it on** (a team setting, off by default; you pick which agent has it). It cannot type to agents, change permissions, or delete anything. Starting agents is capped per hour and for live agents while it is on, and a working agent is put to sleep only once it has been idle for the minutes you set, and Coral now logs every agent-started agent whether or not it is on.
+- **Chief (preview, off by default):** a one-agent front team with a bare `/chief` page for your phone; set up with `coral-board link` and `coral-board settings set`.
+- **Analytics has a "Typed to agents" tile**: how often you typed into an agent's chat or terminal, one per burst (typing within 30 seconds of the last); "not recorded yet" when recording is off.
+- **OpenCode:** a permission request shows on the agent's card and you answer it there; a request that cannot be shown whole, or that holds hidden characters, can only be rejected, and auto-accept never answers what it cannot read in full. A sleeping OpenCode agent's chat now shows its history, and a left-over OpenCode server of a crashed Coral is stopped on Windows.
+
+#### Computers and SSH setup
+
+- **A computer reached through a ProxyJump host can now be set up from the dialog.** The dialog shows the fingerprints of the jump host and of the computer behind it, so you can check both, and you confirm each computer's key (the jump host's and the far one's) before anything is trusted (before, a jump-host computer showed none and could not be trusted from the dialog). Two people can each set up their own Coral on one computer: the second is told plainly when port 8420 is already in use, and Stop and Remove now confirm by that person's own Coral, so another user's Coral no longer reads as "did not stop".
+- **Approve, Request changes and Send now work through a hub you added computers to by URL or by SSH setup**: the hub signs each of those requests with a secret it keeps for that computer, so the computer can tell it is really you and nobody else on the hub, and no copy of the API key, can approve in your name. A computer set up over SSH gets its secret automatically; for one added by URL, set it in that computer's panel and run `coral hub-owner-secret` on the computer; change it later from the same panel (a new secret stops old requests until the new one is entered at the computer). An agent's session cannot approve through the hub.
+- Setting up a computer over SSH is supported from a macOS or Linux hub, and is not yet tested from a Windows hub.
+
+#### Known issues
+
+- **Windows: in-app update does not work from 2.0.0 through 2.0.6.** If you're on one of those, download and install the MSI by hand; from 2.0.7 on, in-app update works.
+- **macOS: a Coral of 2.0.5 or earlier cannot install updates in-app; install 2.0.6 or later by hand once.**
+- **OpenCode agents are tested on macOS and Linux; OpenCode on Windows is not yet tested end to end.**
+
+#### For developers and releases
+
+- **The static budget stays at 5,840,896 bytes**: this release's tree ships 5,839,270 bytes, 1,626 under it, so further frontend growth needs a raise.
+- SSH setup has an opt-in test against real `sshd` in Docker containers (a jump host and a far computer with two users; build tag `sshdocker`), and its `sshprov` tests now run on Windows too, with the test binary standing in for `ssh`, `ssh-keyscan` and the far computer.
+- Coral's own tests that wait on a page use `coralReady` from the shared wait helper, and the held-notice and settings tests no longer race.
+
 ## v2.0.10 — Approve and Request changes on artifacts, share a file with an agent, OpenCode as a provider, set up a computer over SSH from a self-hosted hub, a CSV viewer, and the phone navigation finished
 
 ### Changes
