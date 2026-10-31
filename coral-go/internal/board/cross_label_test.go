@@ -85,7 +85,7 @@ func TestCleanTeamLabel(t *testing.T) {
 	l, ok := CleanTeamLabel("  Coral Go Team ")
 	require.True(t, ok)
 	require.Equal(t, "Coral Go Team", l, "trimmed")
-	for _, bad := range []string{"", "   ", "@all", "a)", "(", "Operator", "CHIEF", "a: b", "www.x.example", strings.Repeat("a", maxTeamLabelRunes+1), "a" + string(rune(0x200b)) + "b"} {
+	for _, bad := range []string{"", "   ", "@all", "a)", "(", "[", "]", "a[b", "Operator", "CHIEF", "a: b", "www.x.example", strings.Repeat("a", maxTeamLabelRunes+1), "a" + string(rune(0x200b)) + "b"} {
 		l, ok := CleanTeamLabel(bad)
 		require.False(t, ok, bad)
 		require.Empty(t, l, bad)
@@ -126,4 +126,26 @@ func TestChiefBoardMayBeNamedChief(t *testing.T) {
 		require.NoError(t, s.RenameBoard(ctx, chief.ID, name))
 		require.Equal(t, "Orchestrator ("+chief.ID+")", post(chief.ID, chief.ID).SubscriberID, name)
 	}
+}
+
+// A board on ANOTHER Coral whose id equals the recorded Chief board is not Chief (#11508, QA): the exemption is for a local sender only, so a relayed message that names itself Chief shows the id.
+func TestRemoteBoardWithTheChiefBoardsIDIsNotChief(t *testing.T) {
+	remote := MessageOrigin{ServerID: "0123456789abcdef", Board: "chief-board", BoardLabel: "Chief", SenderRole: "Orchestrator"}
+	remote.chiefBoard = true // even if a caller set the flag
+	require.Equal(t, "Orchestrator (chief-board, server 01234567)", SenderLabel(remote))
+	local := MessageOrigin{ServerID: "local", Board: "chief-board", BoardLabel: "Chief", SenderRole: "Orchestrator", chiefBoard: true}
+	require.Equal(t, "Orchestrator (Chief)", SenderLabel(local), "a local recorded Chief board still reads Chief")
+
+	s := testStore(t)
+	ctx := context.Background()
+	_, err := s.Subscribe(ctx, "beta", "Orchestrator", "Orchestrator", "tmux-b", nil, "mentions")
+	require.NoError(t, err)
+	in, _, err := s.PostRelayedCrossTeamMessage(ctx, CrossTeamPost{
+		ChiefBoard: "chief-board",
+		Origin: MessageOrigin{ServerID: "0123456789abcdef", Board: "chief-board", BoardLabel: "Chief", Sender: "Orchestrator", SenderRole: "Orchestrator",
+			TargetServerID: "local", TargetBoard: "beta", RelayMessageID: "m1"},
+		Content: "hi", Mentions: []string{"Orchestrator"},
+	})
+	require.NoError(t, err)
+	require.Equal(t, "Orchestrator (chief-board, server 01234567)", in.SubscriberID)
 }

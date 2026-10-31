@@ -461,7 +461,7 @@ func (s *Store) TargetOrchestrators(ctx context.Context, project, to string) ([]
 // else the id. The reply hint still addresses the id (CrossReplyLine).
 func SenderLabel(o MessageOrigin) string {
 	team := o.Board
-	if l, ok := cleanTeamLabel(o.BoardLabel, o.chiefBoard); ok && l != o.Board {
+	if l, ok := cleanTeamLabel(o.BoardLabel, o.chiefBoard && !o.remote()); ok && l != o.Board {
 		team = l
 	}
 	if o.remote() {
