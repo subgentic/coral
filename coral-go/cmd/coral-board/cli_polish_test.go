@@ -72,7 +72,7 @@ func TestCheckKnownFlagsAcceptsWhatTheCommandsTake(t *testing.T) {
 		{"check", "--quiet"}, {"status"}, {"status", "--json"}, {"status", "--board", "team", "--activity"},
 		{"queue", "--json"}, {"task", "list"}, {"task", "list", "--json"}, {"task", "detail", "4", "--json"}, {"task", "detail"},
 		{"task", "add", "a title", "--body", "x"}, // not in the table: its own parser
-		{"post", "--nope"},                        // post's own check handles its text
+		{"post", "--broadcast", "--nope"},         // post's own check handles its text
 		{"wait", "--timeout", "1m"},
 	} {
 		assert.NoError(t, checkKnownFlags(args), "%v", args)
@@ -120,9 +120,9 @@ func TestPostFilePostsTheFile(t *testing.T) {
 	srv2 := newRecordingServer(t)
 	dir2 := subscribedDataDir(t, srv2.URL)
 	for _, args := range [][]string{
-		{"post", "--file", file, "also text"},
-		{"post", "--file", filepath.Join(t.TempDir(), "missing.txt")},
-		{"post", "--file"},
+		{"post", "--broadcast", "--file", file, "also text"},
+		{"post", "--broadcast", "--file", filepath.Join(t.TempDir(), "missing.txt")},
+		{"post", "--broadcast", "--file"},
 		{"post", "--to"},
 	} {
 		res := runBoard(t, srv2.URL, dir2, args...)
@@ -133,7 +133,7 @@ func TestPostFilePostsTheFile(t *testing.T) {
 
 func TestPostHelpTellsAWindowsUserWhatToDo(t *testing.T) {
 	srv := newRecordingServer(t)
-	res := runBoard(t, srv.URL, subscribedDataDir(t, srv.URL), "post", "--help")
+	res := runBoard(t, srv.URL, subscribedDataDir(t, srv.URL), "post", "--broadcast", "--help")
 	require.Equal(t, 0, res.code)
 	for _, want := range []string{"--file", "$OutputEncoding", "PowerShell 5.1", "byte-order mark", "one final newline"} {
 		assert.Contains(t, res.stdout, want)
@@ -250,10 +250,10 @@ func TestTaskCurrentJSON(t *testing.T) {
 func TestPostRefusesAnUnknownOptionBeforeTheText(t *testing.T) {
 	srv := newRecordingServer(t)
 	dir := subscribedDataDir(t, srv.URL)
-	res := runBoard(t, srv.URL, dir, "post", "--too", "Lead", "hello")
+	res := runBoard(t, srv.URL, dir, "post", "--broadcast", "--too", "Lead", "hello")
 	assert.Equal(t, 2, res.code, res.stderr)
 	assert.Contains(t, res.stderr, "Did you mean --to")
-	res = runBoard(t, srv.URL, dir, "post", "--nope", "hello")
+	res = runBoard(t, srv.URL, dir, "post", "--broadcast", "--nope", "hello")
 	assert.Equal(t, 2, res.code)
 	assert.Contains(t, res.stderr, "unknown option")
 	assert.NotContains(t, res.stderr, "Did you mean")
@@ -300,14 +300,14 @@ func TestPostTreatsFlagsInTextAsText(t *testing.T) {
 		args []string
 		want string
 	}{
-		{[]string{"post", "use --force here"}, "use --force here"},
-		{[]string{"post", "use", "--force", "here"}, "use --force here"},
-		{[]string{"post", "hello", "--fix"}, "hello --fix"},
-		{[]string{"post", "scroll", "to", "--top"}, "scroll to --top"},
-		{[]string{"post", "hello", "--too", "Lead"}, "hello --too Lead"},
-		{[]string{"post", "list", "the", "--files"}, "list the --files"},
-		{[]string{"post", "hello", "--go", "-o", "--no"}, "hello --go -o --no"},
-		{[]string{"post", "run go test --count=1"}, "run go test --count=1"},
+		{[]string{"post", "--broadcast", "use --force here"}, "use --force here"},
+		{[]string{"post", "--broadcast", "use", "--force", "here"}, "use --force here"},
+		{[]string{"post", "--broadcast", "hello", "--fix"}, "hello --fix"},
+		{[]string{"post", "--broadcast", "scroll", "to", "--top"}, "scroll to --top"},
+		{[]string{"post", "--broadcast", "hello", "--too", "Lead"}, "hello --too Lead"},
+		{[]string{"post", "--broadcast", "list", "the", "--files"}, "list the --files"},
+		{[]string{"post", "--broadcast", "hello", "--go", "-o", "--no"}, "hello --go -o --no"},
+		{[]string{"post", "--broadcast", "run go test --count=1"}, "run go test --count=1"},
 		{[]string{"post", "--TO", "Lead", "hello"}, "@Lead hello"},
 		{[]string{"post", "hello", "--TO", "Lead"}, "@Lead hello"},
 	} {
@@ -326,7 +326,7 @@ func TestUsageExitAndFileFolderAndSendTypo(t *testing.T) {
 	assert.Equal(t, 2, res.code, res.stderr)
 	assert.Contains(t, res.stderr, "Unknown command")
 
-	res = runBoard(t, srv.URL, dir, "post", "--file", t.TempDir())
+	res = runBoard(t, srv.URL, dir, "post", "--broadcast", "--file", t.TempDir())
 	assert.Equal(t, 2, res.code)
 	assert.Contains(t, res.stderr, "is a folder")
 	assert.NotContains(t, res.stderr, "Incorrect function")

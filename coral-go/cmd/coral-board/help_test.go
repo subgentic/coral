@@ -144,7 +144,7 @@ func TestHelpFlagsPrintUsageWithoutSideEffects(t *testing.T) {
 		cases = append(cases, []string{"workflow", sub, "--help"}, []string{"workflow", sub, "-h"})
 	}
 	cases = append(cases,
-		[]string{"post", "hello", "--help"},
+		[]string{"post", "--broadcast", "hello", "--help"},
 		[]string{"post", "--to", "Lead", "-h"},
 		[]string{"task", "complete", "12", "--message", "done", "--help"},
 		[]string{"wait", "--from", "Lead", "-h"},
@@ -208,11 +208,11 @@ func TestPostSendsTextThatOnlyContainsHelp(t *testing.T) {
 	srv := newRecordingServer(t)
 	dataDir := subscribedDataDir(t, srv.URL)
 
-	res := runBoard(t, srv.URL, dataDir, "post", "see --help for usage")
+	res := runBoard(t, srv.URL, dataDir, "post", "--broadcast", "see --help for usage")
 	if res.code != 0 {
 		t.Fatalf("exit %d: %s", res.code, res.stderr)
 	}
-	res = runBoard(t, srv.URL, dataDir, "post", "--", "--help is a flag")
+	res = runBoard(t, srv.URL, dataDir, "post", "--broadcast", "--", "--help is a flag")
 	if res.code != 0 {
 		t.Fatalf("exit %d: %s", res.code, res.stderr)
 	}
@@ -228,8 +228,8 @@ func TestFlagShapedTextIsRejected(t *testing.T) {
 	srv := newRecordingServer(t)
 	dataDir := subscribedDataDir(t, srv.URL)
 	for _, args := range [][]string{
-		{"post", "--bogus"},
-		{"post", "-x", "hello"},
+		{"post", "--broadcast", "--bogus"},
+		{"post", "--broadcast", "-x", "hello"},
 		{"post", "--to", "Lead", "--verbose", "hi"},
 		{"task", "complete", "5", "--message", "--bogus"},
 		{"task", "complete", "5", "--message=-x"},
@@ -249,17 +249,17 @@ func TestFlagShapedTextIsRejected(t *testing.T) {
 
 func TestCheckFreeTextAllowsOrdinaryText(t *testing.T) {
 	for _, args := range [][]string{
-		{"post", "see --help for usage"},
-		{"post", "-1 is the answer"},
-		{"post", "- a bullet"},
-		{"post", "-5% latency"},
-		{"post", "--- summary ---"},
-		{"post", "- [x] done"},
-		{"post", "->", "next"},
-		{"post", "-5%", "faster"},
+		{"post", "--broadcast", "see --help for usage"},
+		{"post", "--broadcast", "-1 is the answer"},
+		{"post", "--broadcast", "- a bullet"},
+		{"post", "--broadcast", "-5% latency"},
+		{"post", "--broadcast", "--- summary ---"},
+		{"post", "--broadcast", "- [x] done"},
+		{"post", "--broadcast", "->", "next"},
+		{"post", "--broadcast", "-5%", "faster"},
 		{"task", "complete", "5", "--message", "-5% faster"},
 		{"post", "--to", "Lead", "done"},
-		{"post", "--", "--literal"},
+		{"post", "--broadcast", "--", "--literal"},
 		{"task", "complete", "5", "--message", "fixed --help handling"},
 		{"task", "complete", "5", "--message", "-"},
 		{"unknown-command", "--message", "--x"},

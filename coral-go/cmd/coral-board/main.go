@@ -170,8 +170,10 @@ Commands:
                                Post the text of a UTF-8 file: the same in every
                                shell (PowerShell, cmd.exe and Bash)
   post "<message>" [--to "a,b"] [--task N]
-                               Post a short message (@mention agents);
-                               --task N answers task N (a person's reply on it);
+                               Post a short message (@mention agents): a post
+                               that notifies nobody is refused, so name someone
+                               (@Name or --to) or answer a task (--task N, which
+                               tells its assignee and creator);
                                use -- before text that starts with '-'
   post --ask "@Name <question>"
                                A question that needs an answer from the members

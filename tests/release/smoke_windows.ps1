@@ -287,7 +287,7 @@ try {
     $joined = (& $board join windows-smoke --as Tester 2>&1 | Out-String)
     if ($LASTEXITCODE -eq 0) { Pass "coral-board join (as a person, command-line token)" }
     else { Fail "coral-board join failed: $joined" }
-    & $board post 'windows portable smoke message' 2>&1 | Out-Null
+    & $board post --broadcast 'windows portable smoke message' 2>&1 | Out-Null
     if ($LASTEXITCODE -eq 0) { Pass "coral-board post" }
     else { Fail "coral-board post failed" }
     $read = (& $board read --id 1 2>&1 | Out-String)

@@ -91,6 +91,24 @@ func (s *Store) AskTargets(ctx context.Context, project, poster, content string)
 	return out, nil
 }
 
+var operatorTagRE = regexp.MustCompile(`(?i)(^|[^\p{L}\p{N}])@operator($|[^\p{L}\p{N}-])`)
+
+// NotifiedBy is who a post reaches by its text (#11441): the members other than the poster it explicitly @mentions, "all" when it carries a broadcast tag (@all, @notify-all) and "Operator" when it @mentions the
+// Operator. Empty when it names no one the board can tell: a mention of a name that is no member (an "@param" in the middle of a message passes the unknown-mention check) notifies nobody.
+func (s *Store) NotifiedBy(ctx context.Context, project, poster, content string) []string {
+	out := []string{}
+	if names, err := s.AskTargets(ctx, project, poster, content); err == nil {
+		out = append(out, names...)
+	}
+	if broadcastTagRE.MatchString(content) {
+		out = append(out, "all")
+	}
+	if operatorTagRE.MatchString(content) && !SameIdentity(poster, "Operator") {
+		out = append(out, "Operator")
+	}
+	return out
+}
+
 // CheckReplyTo refuses a reply_to that is no message of the board (and no later than the reply can be: it must exist now).
 func (s *Store) CheckReplyTo(ctx context.Context, project string, replyTo int64) error {
 	var n int

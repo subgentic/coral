@@ -125,6 +125,15 @@ func (h *BoardHandler) PostMessage(w http.ResponseWriter, r *http.Request) {
 			msg = filled // the answer carries ask and reply_to
 		}
 	}
+	// Who the post reaches by its text goes back with it (#11441): coral-board warns when it is no one. The message's own fields are unchanged.
+	if raw, err := json.Marshal(msg); err == nil {
+		var out map[string]any
+		if json.Unmarshal(raw, &out) == nil {
+			out["notified"] = h.bs.NotifiedBy(r.Context(), project, msg.SubscriberID, msg.Content)
+			writeJSON(w, http.StatusOK, out)
+			return
+		}
+	}
 	writeJSON(w, http.StatusOK, msg)
 }
 

@@ -78,7 +78,7 @@ func TestCLICommandsFailLoudlyOnNon2xx(t *testing.T) {
 		dir := subscribedDataDir(t, srv.URL)
 		for _, args := range [][]string{
 			{"join", "team", "--as", "QA"},
-			{"post", "hello world"},
+			{"post", "--broadcast", "hello world"},
 			{"read"},
 			{"read", "--last", "5"},
 			{"check"},
@@ -160,7 +160,7 @@ func TestCLICommandsSucceedOn2xx(t *testing.T) {
 	t.Cleanup(srv.Close)
 	dir := subscribedDataDir(t, srv.URL)
 
-	run := runBoard(t, srv.URL, dir, "post", "hi")
+	run := runBoard(t, srv.URL, dir, "post", "--broadcast", "hi")
 	assert.Equal(t, 0, run.code, "post stderr=%q", run.stderr)
 	assert.Contains(t, run.stdout, "posted")
 	run = runBoard(t, srv.URL, dir, "read")
