@@ -4,12 +4,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"path"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 )
 
 // This test binary is also the stand-in for ssh (and, as the tests are ported, ssh-keyscan and the far computer), so the tests run the same on Windows, where there is no sh, tar or sha256sum to script
@@ -36,7 +38,7 @@ const (
 )
 
 // standInNames are the names a copy of this binary answers to.
-var standInNames = map[string]bool{"ssh": true}
+var standInNames = map[string]bool{"ssh": true, "ssh-keyscan": true}
 
 func standInName(arg0 string) string {
 	return strings.TrimSuffix(strings.ToLower(path.Base(strings.ReplaceAll(arg0, `\`, "/"))), ".exe")
@@ -70,6 +72,7 @@ func TestTheBinaryRunsTestsOnlyUnderGoTestAndIsAStandInOnlyUnderItsName(t *testi
 		{[]string{"sshprov.test", "-v"}, modeRefuse},
 		{[]string{"sshprov.test", "test.run=x"}, modeRefuse},
 		{[]string{"sshprov.test", "", "-test.v"}, modeRefuse},
+		{[]string{"/t/ssh-keyscan", "-p", "22", "box"}, modeStandIn},
 		{[]string{"ssh2", "x"}, modeRefuse},
 		{nil, modeRefuse},
 	} {
@@ -88,6 +91,13 @@ type standCfg struct {
 	BigOut   int    `json:",omitempty"` // this many bytes of "x\n" on stdout, as `yes x | head -c N`
 	EnvFile  string `json:",omitempty"` // the environment it was started with, one NAME=value per line
 	TextFile string `json:",omitempty"` // the last argument, as it was given
+
+	Pipe     bool `json:",omitempty"` // `-W host:port`: join stdin and stdout to that address, as ssh does over the channel
+	HoldSecs int  `json:",omitempty"` // sleep this long (at most 60 s) before anything else, as a connection that stays open
+
+	// KnownHosts is written to the file named by a UserKnownHostsFile=<path> argument (what ssh does with a key it was told to accept), and that path to KnownHostsPath.
+	KnownHosts     string `json:",omitempty"`
+	KnownHostsPath string `json:",omitempty"`
 }
 
 // newStandIn puts a copy of this binary at <dir>/<name> with cfg beside it and returns its path.
@@ -153,6 +163,30 @@ func runStandIn() int {
 	}
 	if cfg.TextFile != "" && len(args) > 0 {
 		_ = os.WriteFile(cfg.TextFile, []byte(args[len(args)-1]), 0o600)
+	}
+	for _, a := range args {
+		if f, ok := strings.CutPrefix(a, "UserKnownHostsFile="); ok && cfg.KnownHosts != "" {
+			_ = os.WriteFile(f, []byte(cfg.KnownHosts), 0o600)
+			if cfg.KnownHostsPath != "" {
+				_ = os.WriteFile(cfg.KnownHostsPath, []byte(f), 0o600)
+			}
+		}
+	}
+	if cfg.HoldSecs > 0 {
+		time.Sleep(time.Duration(min(cfg.HoldSecs, 60)) * time.Second)
+	}
+	if cfg.Pipe {
+		for i, a := range args {
+			if a == "-W" && i+1 < len(args) {
+				c, err := net.Dial("tcp", args[i+1])
+				if err != nil {
+					return 255
+				}
+				go io.Copy(c, os.Stdin)
+				io.Copy(os.Stdout, c)
+				return 0
+			}
+		}
 	}
 	fmt.Fprint(os.Stdout, cfg.Stdout)
 	if cfg.BigOut > 0 {

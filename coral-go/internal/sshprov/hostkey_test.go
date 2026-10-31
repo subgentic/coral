@@ -53,17 +53,10 @@ func TestParseKeyLineIsStrict(t *testing.T) {
 
 func fakeKeyscan(t *testing.T, out string, code int) string {
 	t.Helper()
-	dir := t.TempDir()
-	p := filepath.Join(dir, "ssh-keyscan")
-	body := "#!/bin/sh\ncat <<'EOF_KEYS'\n" + out + "\nEOF_KEYS\nexit " + string(rune('0'+code)) + "\n"
-	if err := os.WriteFile(p, []byte(body), 0o700); err != nil {
-		t.Fatal(err)
-	}
-	return p
+	return newStandIn(t, "ssh-keyscan", standCfg{Stdout: out + "\n", Exit: code})
 }
 
 func TestScanPrefersEd25519AndNamesNonDefaultPorts(t *testing.T) {
-	needShell(t)
 	rsa, _ := blobFor("ssh-rsa", 1)
 	ed, fp := blobFor("ssh-ed25519", 2)
 	out := "# box.example.com:2222 SSH-2.0-OpenSSH\n[box.example.com]:2222 ssh-rsa " + rsa + "\n[box.example.com]:2222 ssh-ed25519 " + ed
@@ -74,7 +67,6 @@ func TestScanPrefersEd25519AndNamesNonDefaultPorts(t *testing.T) {
 }
 
 func TestScanRefusesAnythingThatIsNotAKey(t *testing.T) {
-	needShell(t)
 	ed, _ := blobFor("ssh-ed25519", 2)
 	for name, out := range map[string]string{
 		"empty":         "",
@@ -155,7 +147,7 @@ func realKey(t *testing.T) (typ, blob string) {
 }
 
 func TestTrustSeesHashedKnownHostsToo(t *testing.T) {
-	needShell(t)
+	needRealKeygen(t)
 	typ, blob := realKey(t)
 	typ2, blob2 := realKey(t)
 	path := filepath.Join(t.TempDir(), "known_hosts")
@@ -193,7 +185,6 @@ func TestTrustSeesHashedKnownHostsToo(t *testing.T) {
 }
 
 func TestScanAcceptsAnIPv6Literal(t *testing.T) {
-	needShell(t)
 	ed, _ := blobFor("ssh-ed25519", 2)
 	k, err := (Runner{KeyScan: fakeKeyscan(t, "2001:db8::1 ssh-ed25519 "+ed, 0)}).Scan(context.Background(), "2001:db8::1", 22)
 	if err != nil || k.Host != "2001:db8::1" {
@@ -205,16 +196,11 @@ func TestScanAcceptsAnIPv6Literal(t *testing.T) {
 }
 
 func TestScanAliasReadsTheKeyIntoAFreshTempFileAndDeletesIt(t *testing.T) {
-	needShell(t)
 	ed, fp := blobFor("ssh-ed25519", 3)
 	dir := t.TempDir()
 	log := filepath.Join(dir, "argv")
 	tmpSeen := filepath.Join(dir, "tmpfile")
-	script := "#!/bin/sh\nfor a in \"$@\"; do printf '%s\\n' \"$a\" >> '" + log + "'; case \"$a\" in UserKnownHostsFile=*) f=\"${a#UserKnownHostsFile=}\"; printf '%s' \"$f\" > '" + tmpSeen + "'; printf 'build.internal ssh-ed25519 " + ed + "\\n' > \"$f\";; esac; done\nexit 255\n"
-	ssh := filepath.Join(dir, "ssh")
-	if err := os.WriteFile(ssh, []byte(script), 0o700); err != nil {
-		t.Fatal(err)
-	}
+	ssh := newStandIn(t, "ssh", standCfg{Log: log, Exit: 255, KnownHosts: "build.internal ssh-ed25519 " + ed + "\n", KnownHostsPath: tmpSeen})
 	tg, _ := FromAlias("build-box")
 	keys, err := (Runner{SSH: ssh}).ScanAlias(context.Background(), tg)
 	if err != nil || len(keys) != 1 || keys[0].Fingerprint != fp || keys[0].Host != "build.internal" || keys[0].Type != "ssh-ed25519" {
@@ -243,25 +229,16 @@ func TestScanAliasReadsTheKeyIntoAFreshTempFileAndDeletesIt(t *testing.T) {
 }
 
 func TestScanAliasReturnsEveryHostOfAJumpPathAndNothingElse(t *testing.T) {
-	needShell(t)
 	jump, jfp := blobFor("ssh-ed25519", 4)
 	dest, dfp := blobFor("ssh-ed25519", 5)
 	rsa, _ := blobFor("ssh-rsa", 6)
-	dir := t.TempDir()
-	script := "#!/bin/sh\nfor a in \"$@\"; do case \"$a\" in UserKnownHostsFile=*) f=\"${a#UserKnownHostsFile=}\"; printf 'jump.example.com ssh-ed25519 " + jump + "\\ninner.example.com ssh-rsa " + rsa + "\\ninner.example.com ssh-ed25519 " + dest + "\\n' > \"$f\";; esac; done\nexit 255\n"
-	ssh := filepath.Join(dir, "ssh")
-	if err := os.WriteFile(ssh, []byte(script), 0o700); err != nil {
-		t.Fatal(err)
-	}
+	ssh := newStandIn(t, "ssh", standCfg{Exit: 255, KnownHosts: "jump.example.com ssh-ed25519 " + jump + "\ninner.example.com ssh-rsa " + rsa + "\ninner.example.com ssh-ed25519 " + dest + "\n"})
 	tg, _ := FromAlias("inner")
 	keys, err := (Runner{SSH: ssh}).ScanAlias(context.Background(), tg)
 	if err != nil || len(keys) != 2 || keys[0].Host != "inner.example.com" || keys[0].Fingerprint != dfp || keys[1].Host != "jump.example.com" || keys[1].Fingerprint != jfp {
 		t.Fatalf("ScanAlias = %+v, %v", keys, err)
 	}
-	empty := filepath.Join(dir, "ssh2")
-	if err := os.WriteFile(empty, []byte("#!/bin/sh\nexit 255\n"), 0o700); err != nil {
-		t.Fatal(err)
-	}
+	empty := newStandIn(t, "ssh", standCfg{Exit: 255})
 	if _, err := (Runner{SSH: empty}).ScanAlias(context.Background(), tg); !errors.Is(err, ErrHostKeyScan) {
 		t.Errorf("no stored key: %v", err)
 	}
