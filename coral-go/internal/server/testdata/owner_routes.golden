@@ -13,6 +13,7 @@ GET /api/board/{project}/cross-team/settings view owner-only-hub
 GET /api/board/{project}/settings view owner-sees
 GET /api/board/{project}/tasks/{taskID}/artifact-content view owner-only
 GET /api/custom-models view owner-only
+GET /api/operator-asks view owner-only
 GET /api/saved view owner-only
 GET /api/saved/{id}/message view owner-only
 GET /api/session-artifacts view owner-only

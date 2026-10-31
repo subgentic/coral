@@ -125,6 +125,8 @@ func (s *Server) registerBoardMessageRoutes(r chi.Router, boardHandler *routes.B
 	r.Get("/api/board-seats/foreign", boardHandler.ListForeignSeats)               // the seats of agents launched on another board (#11112)
 	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/messages", boardHandler.PostMessage)
 	r.Get("/api/board/{project}/messages", boardHandler.ReadMessages)
+	r.Get("/api/operator-asks", boardHandler.OperatorAsks)                                                     // the questions agents asked the Operator (post --ask, wait --operator), for Needs you (#11417)
+	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/asks/{messageID}/close", boardHandler.CloseAsk) // close a question answered elsewhere (ask close, #11417)
 	r.Get("/api/board/{project}/messages/all", boardHandler.ListAllMessages)
 	r.Get("/api/board/{project}/messages/search", boardHandler.SearchMessages)
 	r.Post("/api/board/{project}/messages/mark-read", boardHandler.MarkRead)

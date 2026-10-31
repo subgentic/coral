@@ -13,6 +13,7 @@ import { state } from './state.js';
 
 import { reviewItems, unreadReviewItems, reviewErrors, refreshReviews, reviewGroups, markReviewed, setReviewRead, markOpenedRead, isRead } from './inbox_reviews.js';
 import { failedUnread, finishedUnread, refreshRuns, markSeen, runRoute, failureWords } from './automation_runs.js';
+import { operatorAsks, refreshOperatorAsks, askLine, askKey, openAskDialog } from './operator_asks.js';
 import { go, note, backIs, currentRoute } from './nav.js';
 
 import { build, keyRoute, parse as parseRoute, inboxFolderPath, BOARDS_FOLDER, BOARDS_SUB } from './routes.js';
@@ -91,15 +92,17 @@ let page = null; // { kind: 'task', project, id } | { kind: 'saved', id }: the i
 // ── Needs you ────────────────────────────────────────────────────────────
 const waitingSessions = () => (state.liveSessions || []).filter(needsYou).map(askedRow); // an agent that asked something before Coral restarted is listed with its words (#10368)
 const teamOf = s => s.board_project ? teamLabel(identityKey(sessionServer(s), s.board_project)) : ''; // with its computer when a hub has more than one (#8774)
-const needsName = s => s.review ? s.review.produced_by || 'Unknown agent' : s.autorun ? s.autorun.name : resolveSessionIdentity(s);
+const needsName = s => s.review ? s.review.produced_by || 'Unknown agent' : s.autorun ? s.autorun.name : s.operatorAsk ? s.operatorAsk.asker : resolveSessionIdentity(s);
 const reviewRows = () => reviewItems().map(a => ({ review: a, goal: a.goal_id && a.goal_title ? { id: a.goal_id, title: String(a.goal_title), board: a.team } : null, task: a.task_id ? { id: a.task_id, title: String(a.task_title || '') } : null, session_id: a.reviewKey, display_name: a.name, board_project: splitKey(a.team).name, server: splitKey(a.team).server, waiting_kind: 'review', waiting_summary: 'For review', waiting_since: a.created_at }));
 /** A failed run of a job or workflow that nobody has opened (#9296): a row of Needs you like a review, opened on its job's or workflow's page, dismissed (marked opened) without opening it. */
 const runRows = () => failedUnread().map(r => ({ autorun: r, session_id: `automation-run:${r.key}`, display_name: r.name, board_project: '', server: '', waiting_kind: 'run', waiting_summary: failureWords(r) ? `Run failed: ${failureWords(r)}` : 'Run failed', waiting_since: r.finishedAt || r.at }));
-const isItem = s => !!(s.review || s.autorun); // a row that is not an agent: a review or a run, shown as an item
+/** A question an agent asked the Operator (post --ask, wait --operator, #11417): a row of Needs you, opened whole in a dialog with a Reply box. */
+const askRows = () => operatorAsks().map(a => ({ operatorAsk: a, session_id: askKey(a), display_name: a.asker, board_project: a.board, server: '', waiting_kind: 'ask', waiting_summary: askLine(a), waiting_since: a.at }));
+const isItem = s => !!(s.review || s.autorun || s.operatorAsk); // a row that is not an agent: a review, a run or a question to the Operator, shown as an item
 let answered = ''; // what an answer given here went through as, for five minutes: the row is gone and the list says so (#10720)
 document.addEventListener('coral:inbox-answered', e => { answered = e.detail.said; setTimeout(() => { answered = ''; }, 3e5); });
-const allNeeds = () => [...waitingSessions(), ...reviewRows(), ...runRows()];
-const needsText = s => [s.review?.name || '', s.autorun ? `${s.autorun.name} ${s.waiting_summary}` : '', needsName(s),resolveSessionIdentity(s), sessionStateInfo(s).label, askOf(s), teamOf(s), s.goal?.title || '', s.task?.title || ''].join(' ').toLowerCase();
+const allNeeds = () => [...waitingSessions(), ...reviewRows(), ...runRows(), ...askRows()];
+const needsText = s => [s.review?.name || '', s.operatorAsk ? `${s.operatorAsk.asker} ${askLine(s.operatorAsk)}` : '', s.autorun ? `${s.autorun.name} ${s.waiting_summary}` : '', needsName(s),resolveSessionIdentity(s), sessionStateInfo(s).label, askOf(s), teamOf(s), s.goal?.title || '', s.task?.title || ''].join(' ').toLowerCase();
 let needsFilters = NF.loadFilters(), needsBar = null;
 const NO_GOAL = 'No goal';
 const goalLabel = s => (s.goal && s.goal.id && s.goal.title ? String(s.goal.title) : NO_GOAL); // the goal a row's task serves (a review's artifact roll-up, #8579; an agent's task, #7302), or the words for none
@@ -192,6 +195,14 @@ function reviewActions(row) {
 
 /** A failed run opens on its job's or workflow's page; opening it is what clears it from Needs you. */
 function openRun(run) { markSeen(run); go(runRoute(run)); }
+/** A question to the Operator: Reply opens it whole with the box (#11417). */
+function askActions(a) {
+    const box = DT.el('div', 'inbox-review-actions');
+    const reply = DT.el('button', 'btn btn-small', 'Reply'); reply.type = 'button';
+    reply.setAttribute('aria-label', `Reply to ${a.asker}`); reply.addEventListener('click', () => openAskDialog(a, () => $('group-table-view')?.querySelector('input[type=search]')?.focus({ preventScroll: true })));
+    box.append(reply); return box;
+}
+
 function runActions(run) {
     const box = DT.el('div', 'inbox-review-actions');
     const open = DT.el('button', 'btn btn-small', 'Open'); open.type = 'button';
@@ -538,12 +549,12 @@ registerGroupSource('hub-inbox', {
             const total = filteredNeeds().length, hidden = allNeeds().length - total; // what the filters hide is said above the list, with the way to show it (#10399)
             const manyTeams = new Set(allNeeds().map(teamOf).filter(Boolean)).size > 1; // with two or more teams waiting, a one-line row names its team
             return { title: 'Needs you', noun: ['item', 'items'], rows, count: total > rows.length ? `${rows.length} of ${total}` : total, note: reviewErrors().join(' '), empty: { line: NF.isFiltered(needsFilters) ? 'Nothing that needs you matches the search and filters.' : 'Nothing needs your input.', hint: NF.isFiltered(needsFilters) ? undefined : answered || 'An agent that asks a question or wants permission, and a review artifact, appear here. A task assigned to you is under Tasks.' },
-                signature: JSON.stringify([hidden, finishedUnread().length, answered || '', manyTeams, needsOverflow().map(g => [g.name, g.more.map(a => a.reviewKey)]), reviewErrors(), rows.map(s => [sessionServer(s), s.session_id, s.display_name, s.waiting_kind, s.waiting_since, waitingText(s.waiting_since), teamOf(s), askOf(s), goalOf(s) ? s.goal.id : 0, s.task ? [s.task.id, s.task.title] : 0, dirOf(s), s.review ? isRead(s.review) : 0])]), // the words move on with the clock: they are part of what was drawn
-                node: () => { const wrap = DT.el('div', 'inbox-needs-results'); const oneLineNeeds = !rows.some(isItem); const table = DT.dataTable({ label: `Needs you, ${rows.length}`, rows, rowKey: s => `${sessionServer(s)}:${s.session_id}`, state: needsState, rowName: s => s.review ? `${s.review.name}, for review, ${teamOf(s)}` : s.autorun ? `${s.autorun.name}, run failed` : resolveSessionIdentity(s),
-                    open: s => { if (s.review) { openReview(s.review); return; } if (s.autorun) { openRun(s.autorun); return; } window.switchNavTab?.('agents'); Promise.resolve(window.selectLiveSession?.(s.name, s.agent_type, s.session_id, sessionServer(s))).then(() => window.showChatView?.()); }, // a row that needs an answer shows the chat card, not the terminal saved last (#10141)
+                signature: JSON.stringify([hidden, finishedUnread().length, answered || '', manyTeams, needsOverflow().map(g => [g.name, g.more.map(a => a.reviewKey)]), reviewErrors(), rows.map(s => [s.operatorAsk ? [s.operatorAsk.id, s.operatorAsk.text] : 0, sessionServer(s), s.session_id, s.display_name, s.waiting_kind, s.waiting_since, waitingText(s.waiting_since), teamOf(s), askOf(s), goalOf(s) ? s.goal.id : 0, s.task ? [s.task.id, s.task.title] : 0, dirOf(s), s.review ? isRead(s.review) : 0])]), // the words move on with the clock: they are part of what was drawn
+                node: () => { const wrap = DT.el('div', 'inbox-needs-results'); const oneLineNeeds = !rows.some(isItem); const table = DT.dataTable({ label: `Needs you, ${rows.length}`, rows, rowKey: s => `${sessionServer(s)}:${s.session_id}`, state: needsState, rowName: s => s.review ? `${s.review.name}, for review, ${teamOf(s)}` : s.autorun ? `${s.autorun.name}, run failed` : s.operatorAsk ? `${s.operatorAsk.asker}, asks you` : resolveSessionIdentity(s),
+                    open: s => { if (s.review) { openReview(s.review); return; } if (s.autorun) { openRun(s.autorun); return; } if (s.operatorAsk) { openAskDialog(s.operatorAsk); return; } window.switchNavTab?.('agents'); Promise.resolve(window.selectLiveSession?.(s.name, s.agent_type, s.session_id, sessionServer(s))).then(() => window.showChatView?.()); }, // a row that needs an answer shows the chat card, not the terminal saved last (#10141)
                     columns: [
                         { key: 'agent', label: rows.some(isItem) ? 'Item' : 'Agent', primary: true, width: 'grow', ...(rows.some(isItem) ? { min: 24, share: 2 } : {}), sort: true, sortValue: s => resolveSessionIdentity(s), line: 1, ...(oneLineNeeds ? { subtitle: s => askOf(s), subtitleTitle: s => askOf(s) } : {}), // a list of agents: the ask is the row's one second line, under the name (UI/UX: the row's purpose is to decide from the list)
-                            cell: s => { if (s.autorun) { const name = DT.el('span', 'inbox-review-name', s.autorun.name); name.title = s.autorun.name; return name; } if (s.review) { const name = DT.el('span', 'inbox-review-name', s.review.name); name.title = s.review.name; name.dataset.reviewArtifact = s.review.id; if (!isRead(s.review)) return name; const wrap = DT.el('span', 'inbox-review-item'); wrap.append(name, DT.tag('read')); return wrap; } const w = DT.personButton(resolveSessionIdentity(s), `Open ${resolveSessionIdentity(s)}`); Object.assign(w.querySelector('.dt-primary').dataset, { name: s.name, agentType: s.agent_type, sessionId: s.session_id, server: sessionServer(s) }); return w; } },
+                            cell: s => { if (s.operatorAsk) { const name = DT.el('span', 'inbox-review-name', s.operatorAsk.asker); name.title = `${s.operatorAsk.asker} asks you`; return name; } if (s.autorun) { const name = DT.el('span', 'inbox-review-name', s.autorun.name); name.title = s.autorun.name; return name; } if (s.review) { const name = DT.el('span', 'inbox-review-name', s.review.name); name.title = s.review.name; name.dataset.reviewArtifact = s.review.id; if (!isRead(s.review)) return name; const wrap = DT.el('span', 'inbox-review-item'); wrap.append(name, DT.tag('read')); return wrap; } const w = DT.personButton(resolveSessionIdentity(s), `Open ${resolveSessionIdentity(s)}`); Object.assign(w.querySelector('.dt-primary').dataset, { name: s.name, agentType: s.agent_type, sessionId: s.session_id, server: sessionServer(s) }); return w; } },
                         ...(rows.some(askOf) && !oneLineNeeds ? [{ key: 'asks', label: 'Waiting for', width: 'content', max: 20, drop: 2, line: 2, cell: s => {
                             if (s.autorun) { const why = DT.el('span', null, askOf(s)); why.title = askOf(s); return why; } // the whole reason is the tooltip: the line is one
                             if (!s.review) { const ask = askOf(s); if (!ask) return ''; const why = DT.el('span', null, ask); why.title = ask; return why; } // the whole ask is the tooltip: the row is one line
@@ -565,7 +576,7 @@ registerGroupSource('hub-inbox', {
                             cell.title = [goalOf(s) ? `Goal: ${s.goal.title}` : NO_GOAL, s.task ? `Task: ${s.task.title || `#${s.task.id}`}` : ''].filter(Boolean).join(' \u00b7 ');
                             return cell;
                         } }] : []),
-                        ...(rows.some(isItem) ? [{ key: 'review', label: 'Actions', fixed: true, width: rows.some(s => s.review && isRead(s.review)) ? '21rem' : '13.5rem', line: 1, cell: s => (s.review ? reviewActions(s.review) : s.autorun ? runActions(s.autorun) : '') }] : []),
+                        ...(rows.some(isItem) ? [{ key: 'review', label: 'Actions', fixed: true, width: rows.some(s => s.review && isRead(s.review)) ? '21rem' : '13.5rem', line: 1, cell: s => (s.review ? reviewActions(s.review) : s.autorun ? runActions(s.autorun) : s.operatorAsk ? askActions(s.operatorAsk) : '') }] : []),
                         { key: 'waiting', label: 'Waiting', ...(oneLineNeeds ? { width: '9rem' } : { min: rows.some(isItem) ? 12 : 18 }), tone: 'tertiary', align: 'end', sort: true, sortValue: s => s.waiting_since || '', firstDir: 'desc', line: rows.some(isItem) ? 2 : 1, cell: s => waitingText(s.waiting_since) || '' },
                     ], ...(oneLineNeeds ? { oneLine: true, sortBar: false } : {}), ...(oneLineNeeds ? { mail: s => ({ lead: { text: needsName(s), name: needsName(s) }, title: needsName(s), medium: true, starred: !!(s.review && s.review.starred), team: teamOf(s), teamAlways: multipleServers() || manyTeams, nameTeam: true, snippetTip: true, snippet: askOf(s) || sessionStateInfo(s).label, state: askOf(s) || sessionStateInfo(s).label, time: DT.shortTime(s.waiting_since), unread: true, mark: 'attention', answers: answerCell(s) }) } : {}) }); // a phone's row is the mail row: the agent, then the ask on a second line, amber and bold (every row of Needs you is unanswered); a list with a review or a run keeps its own actions. One line a row (Goal #79) for a list of agents: the ask is the row's tooltip, a narrow list drops it, then the team, the folder and the CLI; a list with a review item or a failed run keeps its own folded rows
                     wrap.append(table.el);
@@ -808,6 +819,7 @@ export async function showInbox({ folder = '', quiet = false } = {}) {
         refreshTasks();
         refreshReviews(true);
         refreshRuns(true);
+        refreshOperatorAsks(true); // the questions agents asked the Operator (#11417)
         refreshGoals();
         IA.refreshArtifactCount(() => renderInboxNav(true));
         saved.loadSaved(); // everything's list (the Inbox is the all scope), read for the table and the count

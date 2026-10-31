@@ -435,6 +435,8 @@ var routeTable = cat(
 	// the OWNER's alone (OwnerRefuse): Launch is a tier a Hub grantee can hold, and the reply says what each agent did and how much the Operator touched it. A grantee gets 403 owner_only and the
 	// page says so in one line. Only team and range pass; no text is in the reply.
 	owner(OwnerRefuse, rules(http.MethodGet, TierLaunch, "/api/analytics/activity")),
+	// The questions agents asked the Operator (post --ask, wait --operator), for Needs you (#11417), are the OWNER's alone through the hub: they are the Operator's own board text, and answering them is the board post only the owner makes.
+	owner(OwnerRefuse, rules(http.MethodGet, TierView, "/api/operator-asks")),
 	// Which agents run an older hook set: for the Operator who would resume them (#3665).
 	rules(http.MethodGet, TierLaunch, "/api/system/hooks-status"),
 	// Relaunching this Coral into an update it has already verified and staged (#5280): the status is View, the relaunch is Launch and

@@ -17,7 +17,7 @@ var boardOwnedRows = []struct{ table, col string }{
 	{"board_workflow_presets", "board_id"}, {"health_counters", "project"}, {"health_items", "project"}, {"health_offbooks", "project"}, {"health_goal_size", "project"}, {"boards", "id"},
 	{"board_goals", "board_id"}, {"board_goal_meta", "board_id"}, {"board_goal_events", "board_id"}, {"board_settings_log", "board_id"}, // the goals tables were missing from this census until #7355
 	{"board_goal_requests_in", "board_id"}, {"board_goal_requests_out", "board_id"}, // #7361: a goal request goes with either of its two boards
-	{"board_asks", "project"}, {"board_replies", "project"}, // #7794: a question and the link of a reply go with their board
+	{"board_asks", "project"}, {"board_replies", "project"}, {"board_ask_closed", "project"}, // #7794: a question and the link of a reply go with their board
 	{"artifact_tags", "board_id"}, // #8583: a team's tags of its artifacts
 }
 
@@ -45,6 +45,7 @@ func fillBoard(t *testing.T, s *Store, project string) (taskIDs []int64) {
 	require.NoError(t, err)
 	require.NoError(t, s.RecordAsk(ctx, project, hello, []string{"Dev"}))
 	require.NoError(t, s.RecordReply(ctx, project, hello.ID, hello.ID))
+	require.NoError(t, s.CloseAsk(ctx, project, hello.ID, "Dev", "answered in chat")) // a question closed by hand goes with its board (#11417)
 	first, err := s.CreateTask(ctx, project, "first", "body", "high", "Boss", "Dev")
 	require.NoError(t, err)
 	second, err := s.CreateTaskWithOpts(ctx, project, "second", "body", "high", "Boss", &CreateTaskOpts{BlockedBy: []TaskDep{{TaskID: first.ID, BoardID: project}}}, "Dev")

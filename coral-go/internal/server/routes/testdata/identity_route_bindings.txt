@@ -146,6 +146,7 @@ POST /api/artifacts/{id}/comments | token-session | operator-only
 POST /api/artifacts/{id}/comments/{cid}/reply | token-session
 POST /api/artifacts/{id}/comments/{cid}/send | token-session | operator-only
 POST /api/board/remotes | board-unchecked | operator-only
+POST /api/board/{project}/asks/{messageID}/close | board-claims
 POST /api/board/{project}/cross-team-links | board-claims +token-session | operator-only
 POST /api/board/{project}/cross-team/disable | board-claims | operator-only
 POST /api/board/{project}/cross-team/enable | board-claims | operator-only

@@ -118,6 +118,7 @@ GET /api/goal-links never
 GET /api/goals view
 GET /api/goals/metrics view
 GET /api/health view
+GET /api/operator-asks view
 GET /api/pinned-folders view
 GET /api/saved view
 GET /api/saved/{id}/message view
@@ -277,6 +278,7 @@ POST /api/auth/password/set never
 POST /api/auth/sessions/sign-out-others never
 POST /api/auto-accept/disable-all interact
 POST /api/board/remotes never
+POST /api/board/{project}/asks/{messageID}/close never
 POST /api/board/{project}/cross-team-links never
 POST /api/board/{project}/cross-team/disable launch
 POST /api/board/{project}/cross-team/enable launch

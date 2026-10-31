@@ -341,6 +341,16 @@
 .inbox-review-item { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .inbox-review-item > :not(.inbox-review-name) { flex: none; }
 .inbox-review-item > .inbox-review-name { flex: 0 1 auto; min-width: 0; } /* the name and, once it is opened, its 'read' tag (#9277) */
+.inbox-ask-dialog { max-width: min(36rem, calc(100vw - 32px)); width: 100%; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-primary); color: var(--text-primary); padding: 16px; }
+.inbox-ask-dialog::backdrop { background: rgba(0, 0, 0, .45); }
+.inbox-ask-dialog h2 { margin: 0 0 4px; font-size: var(--fs-lg, 1.1rem); }
+.inbox-ask-sub { margin: 0 0 12px; color: var(--text-tertiary); }
+.inbox-ask-text { margin: 0 0 12px; max-height: 14rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--font-mono, monospace); background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 8px 10px; }
+.inbox-ask-label { display: block; font-weight: 600; margin-bottom: 8px; }
+.inbox-ask-box { display: block; width: 100%; box-sizing: border-box; margin-top: 4px; font-weight: 400; }
+.inbox-ask-error { min-height: 1.2em; margin: 0 0 8px; color: var(--danger, #c0392b); }
+.inbox-ask-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+.inbox-ask-buttons .btn { min-height: 44px; }
 .inbox-review-actions { display: grid; grid-template-columns: max-content max-content; gap: 8px; align-items: center; } /* the star's 20 px is level with the buttons' centre, not their top (#9904) */
 .inbox-review-actions-read { grid-template-columns: max-content max-content max-content; } /* a read item has Unread beside Open and Mark reviewed (#9277) */
 .inbox-review-actions-star { grid-template-columns: max-content max-content max-content; } /* the star is the first of the actions (#9834) */

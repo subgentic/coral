@@ -124,6 +124,7 @@ b GET /api/goal-links
 b GET /api/goals
 b GET /api/goals/metrics
 c GET /api/health
+b GET /api/operator-asks
 c GET /api/pinned-folders
 b GET /api/saved
 b GET /api/remote/{server}/*
@@ -284,6 +285,7 @@ b POST /api/auth/password/set
 b POST /api/auth/sessions/sign-out-others
 b POST /api/auto-accept/disable-all
 b POST /api/board/remotes
+a POST /api/board/{project}/asks/{messageID}/close
 b POST /api/board/{project}/cross-team-links
 b POST /api/board/{project}/cross-team/disable
 b POST /api/board/{project}/cross-team/enable

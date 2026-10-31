@@ -9,6 +9,7 @@ import { needsYou, askedRow } from './asked_before_restart.js';
 import { state } from './state.js';
 import { unreadReviewItems, refreshReviews, onReviewsChanged } from './inbox_reviews.js';
 import { failedUnread, refreshRuns, onRunsChanged } from './automation_runs.js';
+import { operatorAsks, refreshOperatorAsks, onOperatorAsksChanged } from './operator_asks.js';
 import { isCloud, nativeInbox, sessionServer } from './server_base.js';
 import { importOnce } from './import_once.js';
 import { resolveSessionIdentity, sessionStateInfo, askWords } from './session_state.js';
@@ -17,6 +18,7 @@ import './safe_markdown.js'; // the shared Inbox renderer's wrapper: the lazy In
 const INBOX_URL = '/inbox';
 onReviewsChanged(() => updateInboxTab());
 onRunsChanged(() => updateInboxTab()); // a failed run nobody has opened is a Needs you row (#9296)
+onOperatorAsksChanged(() => updateInboxTab()); // a question an agent asked the Operator is a Needs you row (#11417)
 document.addEventListener('coral:asked-dismissed', () => updateInboxTab()); // a question asked before Coral restarted leaves Needs you (#10368)
 
 /** How many agents are waiting for input right now, from the feed's list. */
@@ -32,8 +34,9 @@ export function updateInboxTab() {
     const badge = document.getElementById('nav-tab-hub-inbox-badge');
     if (!badge) return;
     refreshReviews();
+    if (!isCloud()) refreshOperatorAsks(); // the questions asked of the Operator are read from this Coral too (#11417)
     if (!isCloud()) refreshRuns(); // the runs are read from this Coral only, and only once the Inbox or Automations has been shown
-    const n = waitingCount() + unreadReviewItems().length + failedUnread().length; // a review artifact the operator has read stays listed but is not counted (#9277); a failed run nobody has opened is (#9296)
+    const n = waitingCount() + unreadReviewItems().length + failedUnread().length + operatorAsks().length; // a review artifact the operator has read stays listed but is not counted (#9277); a failed run nobody has opened is (#9296)
     const text = n > 9 ? '9+' : n > 0 ? String(n) : ''; // two characters at most: the pill fits the tabs' own 24 px gap, so the gap after Inbox is the same as the others (#9821); the exact count is in the tab's name
     // Only what changed is written: nav_tabs.js redraws the row on any change to it, and this runs for every message of the feed (setting hidden to
     // the value it has is still a change to a MutationObserver).
@@ -41,7 +44,7 @@ export function updateInboxTab() {
     if (badge.hidden !== (n === 0)) badge.hidden = n === 0;
     const phone = document.getElementById('phone-nav-inbox-badge'); // the phone's floating nav carries the same count (#11116)
     if (phone) { if (phone.textContent !== text) phone.textContent = text; if (phone.hidden !== (n === 0)) phone.hidden = n === 0; }
-    const label = n > 0 ? unreadReviewItems().length || failedUnread().length ? `Inbox, ${n} need your attention` : `Inbox, ${n} waiting for input` : null;
+    const label = n > 0 ? unreadReviewItems().length || failedUnread().length || operatorAsks().length ? `Inbox, ${n} need your attention` : `Inbox, ${n} waiting for input` : null;
     if (tab.getAttribute('aria-label') !== label) { if (label) tab.setAttribute('aria-label', label); else tab.removeAttribute('aria-label'); }
     setInboxCount('needs', n);
     _hooks.needs?.(); // the Needs you rows, once the sidebar is loaded and while the Inbox is on screen

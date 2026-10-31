@@ -63,6 +63,7 @@ PATCH /api/board/{project}/goals/{goalID} | (*BoardHandler).UpdateGoal-fm
 PATCH /api/board/{project}/tasks/{taskID} | (*BoardHandler).UpdateTask-fm
 PATCH /api/board/{project}/tasks/{taskID}/amend | (*BoardHandler).AmendTask-fm
 POST /api/board/remotes | (*BoardRemotesHandler).AddSubscription-fm
+POST /api/board/{project}/asks/{messageID}/close | (*BoardHandler).CloseAsk-fm
 POST /api/board/{project}/cross-team-links | (*BoardHandler).AddLocalLinks-fm
 POST /api/board/{project}/cross-team/disable | (*BoardHandler).HubCrossTeamDisable-fm
 POST /api/board/{project}/cross-team/enable | (*BoardHandler).HubCrossTeamEnable-fm

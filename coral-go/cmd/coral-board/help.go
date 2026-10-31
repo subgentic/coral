@@ -14,13 +14,13 @@ var commands = map[string]bool{
 	"subscribers": true, "status": true, "working-mode": true, "leave": true,
 	"delete": true, "export": true, "peek": true, "waiting": true, "task": true, "workflow": true,
 	"wait": true, "send": true, "targets": true, "health": true, "link": true, "unlink": true, "links": true,
-	"queue": true, "goal": true, "reviewer": true, "seats": true,
+	"queue": true, "goal": true, "ask": true, "reviewer": true, "seats": true,
 }
 
 // textFlags take free text that is sent to the server.
 var textFlags = map[string]bool{
 	"message": true, "reason": true, "body": true, "instructions": true,
-	"custom-instructions": true, "workflow-instructions": true,
+	"custom-instructions": true, "note": true, "workflow-instructions": true,
 	// Board goals (#7116): the free-text options of coral-board goal.
 	"title": true, "outcome": true, "done-when": true, "blocked-on": true,
 }
