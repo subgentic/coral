@@ -89,8 +89,12 @@ func newStampWorld(t *testing.T, hubSecret, remoteSecret string) *stampWorld {
 }
 
 func (w *stampWorld) approve(t *testing.T, mutate func(*http.Request)) (int, map[string]any) {
+	return w.decide(t, `{"decision":"approve"}`, mutate)
+}
+
+func (w *stampWorld) decide(t *testing.T, body string, mutate func(*http.Request)) (int, map[string]any) {
 	t.Helper()
-	req, _ := http.NewRequest("POST", w.hub.URL+"/api/remote/ssh-box/api/board/alpha/artifacts/"+w.env.id+"/review", strings.NewReader(`{"decision":"approve"}`))
+	req, _ := http.NewRequest("POST", w.hub.URL+"/api/remote/ssh-box/api/board/alpha/artifacts/"+w.env.id+"/review", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	mutate(req)
 	resp, err := http.DefaultClient.Do(req)
@@ -143,4 +147,20 @@ func TestWithoutBothHalvesThePersonsDecisionIsRefusedNotApproved(t *testing.T) {
 		assert.Equal(t, http.StatusForbidden, code, "%s: %v", name, out)
 		assert.Equal(t, 0, w.approvedMessages(t), name+": the decision went through")
 	}
+}
+
+// #11552: Deny, Ignore and Unignore are the person's decisions through the stream, as Approve is: the person at the hub deny with a reason and the uploader is told once; a script with the hub's key gets none of the three.
+func TestDenyIgnoreAndUnignoreAreThePersonsAloneThroughTheStream(t *testing.T) {
+	w := newStampWorld(t, integrationSecret, integrationSecret)
+	for _, d := range []string{`{"decision":"deny","reason":"no"}`, `{"decision":"ignore"}`, `{"decision":"unignore"}`} {
+		code, out := w.decide(t, d, func(r *http.Request) { r.Header.Set("Authorization", "Bearer the-hubs-own-api-key") })
+		assert.Equal(t, http.StatusForbidden, code, "%s: %v", d, out)
+		assert.Equal(t, "owner_only", out["code"], d)
+	}
+	assert.Equal(t, 0, w.approvedMessages(t))
+	*w.cookie = true
+	code, out := w.decide(t, `{"decision":"deny","reason":"not this one"}`, func(r *http.Request) {})
+	require.Equal(t, http.StatusOK, code, out)
+	assert.Equal(t, "denied", out["state"])
+	assert.Equal(t, 1, w.approvedMessages(t), "the uploader was told once")
 }
