@@ -186,7 +186,7 @@ function canDismissWait(session, kind) {
 }
 
 // The answers that refuse a request where the parser gave the option no kind: the same words as the server's (rejectLabel in prompt_answer.go); "None" and "Nothing" are not refusals.
-const REFUSAL_WORDS = /^(no|reject|deny|denied|decline|disallow|cancel|skip|not now|don['\u2019]?t allow|do not allow)\b/i;
+const REFUSAL_WORDS = /^(no|reject|deny|denied|decline|disallow|cancel|not now|don['\u2019]?t allow|do not allow)\b/i;
 
 function needsInputHtml(info, session) {
     const inp = (info.tool && info.tool.input) || {};

@@ -61,11 +61,11 @@ const ALWAYS = 'Allow always: do not ask again for ls *, git status* and 2 more 
                 assert.equal(r.target, 'echo <U+202E>gnirts', at + agent + ': the marker the server wrote is shown as written');
             }
             // 4b. the refusal is kept by the option's KIND (the server's parse), the words only where it has none: every wording the captured screens have, and the ones UX/UX Engineer asked for
-            for (const word of ['No (recommended)', 'No, cancel', 'No, and tell Codex what to do differently (esc)', 'Reject', 'Deny', "Don't allow", 'Don\u2019t allow', 'Decline', 'Disallow', 'Skip', 'Not now']) {
+            for (const word of ['No (recommended)', 'No, cancel', 'No, and tell Codex what to do differently (esc)', 'Reject', 'Deny', "Don't allow", 'Don\u2019t allow', 'Decline', 'Disallow', 'Not now']) {
                 r = await card('claude', { command: 'x'.repeat(4000), only_reject: true, note: NOTE }, ['Yes', "Yes, and don't ask again", word]);
                 assert.deepEqual(names(r), [word], at + `"${word}" is a refusal and is kept alone: ` + JSON.stringify(names(r)));
             }
-            r = await card('codex', null, ['Yes', 'None of the above', 'Nothing'], { only_reject: true, note: NOTE });
+            r = await card('codex', null, ['Yes', 'None of the above', 'Nothing', 'Skip', 'Skip all approvals this session'], { only_reject: true, note: NOTE });
             assert.deepEqual(names(r), [], at + '"None" and "Nothing" are not refusals');
             r = await card('claude', { command: 'x', only_reject: true, note: NOTE }, [{ label: 'No, allow it', kind: 'allow_once' }, { label: 'Stop here', kind: 'reject' }, { label: 'No, and always', kind: 'allow_always' }]);
             assert.deepEqual(names(r), ['Stop here'], at + 'the kind decides over the words: ' + JSON.stringify(names(r)));

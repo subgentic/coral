@@ -49,10 +49,10 @@ func TestAnApprovalsOptionsCarryTheirKindsFromTheCapturedScreens(t *testing.T) {
 }
 
 func TestMoreWaysACLIWordsARefusalAreRejects(t *testing.T) {
-	for _, l := range []string{"No", "No (recommended)", "No, cancel", "No, and tell Codex what to do differently (esc)", "Reject", "Deny", "Don't allow", "Don\u2019t allow", "Do not allow", "Decline", "Disallow", "Cancel", "Skip", "Not now"} {
+	for _, l := range []string{"No", "No (recommended)", "No, cancel", "No, and tell Codex what to do differently (esc)", "Reject", "Deny", "Don't allow", "Don\u2019t allow", "Do not allow", "Decline", "Disallow", "Cancel", "Not now"} {
 		assert.True(t, isRejectLabel(l), l)
 	}
-	for _, l := range []string{"None of the above", "Nothing", "Nope", "Notify me", "Yes", "Allow once", "Yes, and don't ask again", "Skipper"} {
+	for _, l := range []string{"None of the above", "Nothing", "Nope", "Notify me", "Yes", "Allow once", "Yes, and don't ask again", "Skipper", "Skip", "Skip all approvals this session"} {
 		assert.False(t, isRejectLabel(l), l)
 	}
 }

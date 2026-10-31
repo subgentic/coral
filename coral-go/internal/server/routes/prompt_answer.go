@@ -1041,8 +1041,8 @@ func (h *SessionsHandler) onlyRejectNote(sessionID string, screen promptScreen) 
 }
 
 // rejectLabel matches the answers that refuse a request, where nothing but the words says so: Claude's "No", Codex's "No, and tell Codex what to do differently (esc)", agy's "No, cancel", "Reject", "Deny", "Decline", "Disallow", "Don't allow",
-// "Cancel", "Skip", "Not now" (the captured screens' own words are in testdata; the card has the same list as its fallback, needs_input_card.js).
-var rejectLabel = regexp.MustCompile(`(?i)^(no|reject|deny|denied|decline|disallow|cancel|skip|not now|don['’]?t allow|do not allow)\b`)
+// "Cancel", "Not now" ("Skip" is not one: Codex's "Skip all approvals this session" is a standing choice, not a refusal) (the captured screens' own words are in testdata; the card has the same list as its fallback, needs_input_card.js).
+var rejectLabel = regexp.MustCompile(`(?i)^(no|reject|deny|denied|decline|disallow|cancel|not now|don['’]?t allow|do not allow)\b`)
 
 func isRejectLabel(label string) bool { return rejectLabel.MatchString(strings.TrimSpace(label)) }
 
