@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/subgentic/coral/internal/secfile"
 )
@@ -95,4 +96,17 @@ func ReadFile(dir string) (remoteID, secret string, ok bool, err error) {
 func Installed(dir string) bool {
 	_, _, ok, err := ReadFile(dir)
 	return ok && err == nil
+}
+
+// InstalledAt is when the installed file was last written (its modification time) and whether a valid one is there: what the remote's health answer and its log say about a secret that was installed or
+// replaced, so a silent rotation shows.
+func InstalledAt(dir string) (time.Time, bool) {
+	if _, _, ok, err := ReadFile(dir); err != nil || !ok {
+		return time.Time{}, false
+	}
+	fi, err := os.Lstat(filepath.Join(dir, FileName))
+	if err != nil {
+		return time.Time{}, false
+	}
+	return fi.ModTime().UTC().Truncate(time.Second), true
 }

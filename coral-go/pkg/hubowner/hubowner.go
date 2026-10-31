@@ -4,6 +4,16 @@
 // The hub signs a request it forwards when the person behind it is signed in at the hub (the hub's own identity layer decided that: a dashboard session, never an API key or an agent token). The remote
 // verifies the stamp with a secret that only a human act put on it: the hub's own SSH session or the remote's own command line wrote a 0600 file, never an HTTP route an API key can call. The stamp binds
 // the remote's id, a purpose, the method, the path and query as sent, the SHA-256 of the body, a time and a nonce, so it cannot be moved to another machine, route, body or moment.
+//
+// Threat model, in plain words (#11378, Security's notes):
+//   - The remote's own agents are trusted at the level of the OS user Coral runs as. An agent that runs as that user can read the secret file, as it can read the API key file; the stamp does not stand
+//     between an agent and the computer it runs on. What it stands between is the NETWORK: a script or another computer that holds the hub's API key.
+//   - With sign-in off at the HUB, the hub's own local programs count as its owner (the identity layer calls this computer's same-origin browser a person), so they can have a decision signed. Sign-in at
+//     the hub is what makes "the person signed in" mean one person.
+//   - Replacing the secret is a person's act at the remote (coral hub-owner-secret, which refuses inside an agent's session). Every time the file is written or replaced the remote logs one warning and its
+//     health answer carries the file's time, so a silent rotation shows.
+//   - A stamp covers one request for one of two routes, for 30 seconds, once: a captured stamp is dead after that, after a restart of the remote, and for any other body, route, query or computer.
+
 package hubowner
 
 import (
