@@ -16,9 +16,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/subgentic/coral/internal/board"
+	"github.com/subgentic/coral/internal/cloud"
 	"github.com/subgentic/coral/internal/naming"
 	"github.com/subgentic/coral/internal/ptymanager"
 	"github.com/subgentic/coral/internal/store"
+	"github.com/subgentic/coral/pkg/tunnel"
 )
 
 // #11432: the Operator's grant to a board's orchestrator: the switch, the seat the Operator names, the caps, the log, and the seat's wake and sleep of its own board's agents.
@@ -607,4 +609,132 @@ func TestAnAgentsTeamLaunchIsHeldToTheLiveCap(t *testing.T) {
 	assert.Contains(t, refused["error"], "3 live agents")
 	after, _ := r.ss.CountActiveLiveSessions(ctx)
 	assert.Equal(t, before+1, after)
+}
+
+// QA's MUST on #11432: an agent at a permission prompt (a turn that asked for the person's leave) is never put to sleep.
+func TestSleepRefusesAnAgentAtAPermissionPrompt(t *testing.T) {
+	r := newOrchRig(t)
+	ctx := context.Background()
+	r.usualBoard()
+	code, _ := r.operatorGrant("Orchestrator", nil)
+	require.Equal(t, http.StatusOK, code)
+	d2 := r.sid["Dev2"]
+	for _, ev := range [][2]string{{"prompt_submit", ""}, {"notification", permissionNote}} {
+		_, err := r.h.ts.InsertAgentEvent(ctx, &store.AgentEvent{AgentName: "Dev2", SessionID: &d2, EventType: ev[0], Summary: ev[1]})
+		require.NoError(t, err)
+	}
+	code, out := r.agentPost("Orchestrator", "sleep", "Dev2", "")
+	assert.Equal(t, http.StatusConflict, code)
+	assert.Equal(t, "waiting_for_the_person", out["code"])
+	assert.Contains(t, out["message"], "permission prompt")
+	assert.False(t, r.asleep("Dev2"), "it was not put to sleep")
+}
+
+// QA's MUST on #11432: the seat of one board cannot reach another board by naming it in the path, whether that board's switch is off or on with a seat of its own, and the board of the live row decides, not the path.
+func TestTheSeatCannotActOnAnotherBoardByNamingIt(t *testing.T) {
+	r := newOrchRig(t)
+	r.usualBoard()
+	elsewhere := r.seat("Elsewhere", "Developer", "other-board", "claude", true, 4)
+	r.seat("Boss2", "Orchestrator", "other-board", "claude", false, 5)
+	code, _ := r.operatorGrant("Orchestrator", nil)
+	require.Equal(t, http.StatusOK, code)
+	wake := func() (int, map[string]any) {
+		return r.do("POST", "/api/board/other-board/agents/Elsewhere/wake", "", nil, r.tok["Orchestrator"])
+	}
+	// other-board's switch is off
+	code, out := wake()
+	assert.GreaterOrEqual(t, code, 400)
+	assert.NotEqual(t, http.StatusOK, code, "%v", out)
+	ls, err := r.ss.GetLiveSession(context.Background(), elsewhere)
+	require.NoError(t, err)
+	assert.Equal(t, 1, ls.IsSleeping, "nothing was woken")
+	// other-board's switch on, with its own seat (Boss2): the first board's seat is still not it
+	b, _ := json.Marshal(map[string]any{"enabled": true, "seat_session": r.sid["Boss2"]})
+	code, _ = r.do("PUT", "/api/board/other-board/orchestrator-grant", string(b), operatorClient, "")
+	require.Equal(t, http.StatusOK, code)
+	code, out = wake()
+	assert.Equal(t, http.StatusForbidden, code, "%v", out)
+	ls, _ = r.ss.GetLiveSession(context.Background(), elsewhere)
+	assert.Equal(t, 1, ls.IsSleeping, "still asleep")
+	// the other board's own seat can
+	code, out = r.do("POST", "/api/board/other-board/agents/Elsewhere/wake", "", nil, r.tok["Boss2"])
+	assert.Equal(t, http.StatusOK, code, "%v", out)
+	// and the first board's switch grants nothing on the second: Boss2 is no seat of "team"
+	code, _ = r.agentPost("Boss2", "wake", "Dev", "")
+	assert.GreaterOrEqual(t, code, 400)
+}
+
+// QA's SHOULD: a paused board refuses wake, sleep and (with the switch on) launch.
+func TestAPausedBoardRefusesEveryLifecycleAction(t *testing.T) {
+	r := newOrchRig(t)
+	r.usualBoard()
+	code, _ := r.operatorGrant("Orchestrator", nil)
+	require.Equal(t, http.StatusOK, code)
+	bh := NewBoardHandler(r.h.bs)
+	r.h.SetBoardHandler(bh)
+	bh.SetPaused(orchBoard, true)
+	code, out := r.agentPost("Orchestrator", "wake", "Dev", "")
+	assert.Equal(t, http.StatusConflict, code)
+	assert.Equal(t, "board_paused", out["code"])
+	code, out = r.agentPost("Orchestrator", "sleep", "Dev2", "")
+	assert.Equal(t, http.StatusConflict, code)
+	assert.Equal(t, "board_paused", out["code"])
+	assert.True(t, r.asleep("Dev"))
+	assert.False(t, r.asleep("Dev2"))
+	bh.SetPaused(orchBoard, false)
+	code, _ = r.agentPost("Orchestrator", "wake", "Dev", "")
+	assert.Equal(t, http.StatusOK, code, "resumed: it goes")
+}
+
+// QA's SHOULD: through Coral Hub the grant and the log are the owner's alone: a tunneled request that is not the owner is refused (the Operator's cookie on it included), and nothing changes.
+func TestThroughTheHubOnlyTheOwnerReadsOrWritesTheGrant(t *testing.T) {
+	r := newOrchRig(t)
+	r.usualBoard()
+	viaHub := func(method, path, body string) int {
+		req, _ := http.NewRequest(method, r.server+path, strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set(tunnel.ViaHeader, cloud.ViaSecret())
+		resp, err := operatorClient.Do(req)
+		require.NoError(t, err)
+		resp.Body.Close()
+		return resp.StatusCode
+	}
+	b, _ := json.Marshal(map[string]any{"enabled": true, "seat_session": r.sid["Orchestrator"]})
+	assert.Equal(t, http.StatusForbidden, viaHub("PUT", "/api/board/"+orchBoard+"/orchestrator-grant", string(b)))
+	assert.Equal(t, http.StatusForbidden, viaHub("GET", "/api/board/"+orchBoard+"/orchestrator-grant", ""))
+	assert.Equal(t, http.StatusForbidden, viaHub("GET", "/api/board/"+orchBoard+"/lifecycle-log", ""))
+	g, err := r.h.bs.GetOrchGrant(context.Background(), orchBoard)
+	require.NoError(t, err)
+	assert.False(t, g.Enabled, "nothing was written")
+}
+
+// QA's SHOULD: a name an agent chose for itself cannot mention anyone: the log and the board's line carry it without its @ marks.
+func TestASeatNameCannotMentionAnyoneInTheLogOrTheBoardLine(t *testing.T) {
+	r := newOrchRig(t)
+	ctx := context.Background()
+	r.usualBoard()
+	_, err := r.h.db.ExecContext(ctx, `UPDATE live_sessions SET display_name = ? WHERE session_id = ?`, "@all @Operator Boss", r.sid["Orchestrator"])
+	require.NoError(t, err)
+	code, _ := r.operatorGrant("Orchestrator", nil)
+	require.Equal(t, http.StatusOK, code)
+	code, _ = r.agentPost("Orchestrator", "wake", "Dev", "")
+	require.Equal(t, http.StatusOK, code)
+	log, err := r.h.bs.LifecycleLog(ctx, orchBoard, 10)
+	require.NoError(t, err)
+	require.NotEmpty(t, log)
+	for _, e := range log {
+		assert.NotContains(t, e.Actor, "@", "the log's actor: %q", e.Actor)
+		assert.NotContains(t, e.Target, "@", "the log's target: %q", e.Target)
+	}
+	msgs, err := r.h.bs.ListMessages(ctx, orchBoard, 50, 0, 0)
+	require.NoError(t, err)
+	said := false
+	for _, m := range msgs {
+		if strings.HasPrefix(m.Content, "[Coral] ") && strings.Contains(m.Content, "woke") {
+			said = true
+			assert.NotContains(t, m.Content, "@all", "the board line: %q", m.Content)
+			assert.NotContains(t, m.Content, "@Operator", "the board line: %q", m.Content)
+		}
+	}
+	assert.True(t, said, "the wake is said on the board")
 }

@@ -116,7 +116,7 @@ function settingsGroups(st) {
         ] },
         { id: 'health', domId: 'team-settings-health', label: 'Health check', icon: 'notifications', hint: 'When an agent that stopped working is noticed.', fields: healthFields({ members: () => st.membersReady, hasHeld: () => Boolean(st.healthBase && st.healthBase.held_notice), monitorOff: () => !st.healthMonitorOn, onReset: resetHealth, openSettings: () => window.showSettingsModal?.('agents') }) },
         { id: 'messaging', domId: 'team-settings-messaging', label: 'Messaging', icon: 'chat', hint: 'How the team\'s messages reach its agents.', fields: st.xt.fields() },
-        { id: 'orchestrator', domId: 'team-settings-orchestrator', label: 'Orchestrator access', icon: 'admin_panel_settings', hint: 'What the Orchestrator may do to this team\'s agents.', fields: st.og.fields() },
+        { id: 'orchestrator', domId: 'team-settings-orchestrator', label: 'Orchestrator access', icon: 'security', hint: 'What the Orchestrator may do to this team\'s agents.', fields: st.og.fields() },
         { id: 'prompts', label: 'Prompts', icon: 'description', hint: 'Read-only preview of the prompts agents get.', render: p => { p.innerHTML = '<div class="prompt-inspection-content" aria-live="polite">Loading prompt inspection\u2026</div>'; } },
     ];
 }
