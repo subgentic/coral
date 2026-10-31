@@ -10,6 +10,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/subgentic/coral/internal/secfile/secfiletest"
 )
 
 // #11390: the newest message is kept on disk (redacted, then cut) when it is read, so a list of agents with no server (asleep, or after a Coral restart) shows it without starting one.
@@ -35,8 +37,7 @@ func TestTheNewestMessageIsKeptForAnAgentWithNoServer(t *testing.T) {
 	raw, err := os.ReadFile(filepath.Join(lastDir(cfg.DataDir), "agent-1"))
 	require.NoError(t, err)
 	assert.NotContains(t, string(raw), "stand-in", "the file never held the unredacted text")
-	fi, _ := os.Stat(filepath.Join(lastDir(cfg.DataDir), "agent-1"))
-	assert.Equal(t, os.FileMode(0o600), fi.Mode().Perm())
+	secfiletest.AssertPrivate(t, filepath.Join(lastDir(cfg.DataDir), "agent-1")) // 0600 on Unix, an explicit protected access list on Windows (which has no mode bits)
 	_, ok = fresh.AgentLastMessage("agent-2")
 	assert.False(t, ok, "another agent's is not this one's")
 }
