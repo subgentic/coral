@@ -50,6 +50,7 @@ func (s *Server) configureBoardHandlers(h *routeHandlers) (*routes.BoardHandler,
 	sessStore := store.NewSessionStore(s.db)
 	boardHandler.SetBoardChatFlagsClearer(sessStore.DeleteBoardChatFlags)
 	boardHandler.SetAllowlistFlag(routes.AllowlistEnabled(sessStore))
+	boardHandler.SetChiefBoard(s.chiefBoardID)
 	artifactNudger := routes.NewClaudeArtifactNudger(sessStore, s.terminal)
 	boardHandler.SetArtifactNudger(artifactNudger)
 	sessHandler.SetArtifactNudger(artifactNudger)

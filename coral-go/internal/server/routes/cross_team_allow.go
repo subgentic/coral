@@ -34,6 +34,17 @@ const (
 // the list is stored and editable, and what it would have refused is counted as "would refuse" (shadow rows).
 func (h *BoardHandler) SetAllowlistFlag(fn func(ctx context.Context) bool) { h.allowlistFlag = fn }
 
+// SetChiefBoard tells the handler how to read the board the Operator recorded as Chief's team (#11508), whose messages to another team may be labelled "Chief".
+func (h *BoardHandler) SetChiefBoard(fn func(ctx context.Context) string) { h.chiefBoard = fn }
+
+// chiefBoardNow is the recorded Chief board, "" when not wired.
+func (h *BoardHandler) chiefBoardNow(ctx context.Context) string {
+	if h.chiefBoard == nil {
+		return ""
+	}
+	return h.chiefBoard(ctx)
+}
+
 func (h *BoardHandler) allowlistOn(ctx context.Context) bool {
 	return h.allowlistFlag != nil && h.allowlistFlag(ctx)
 }

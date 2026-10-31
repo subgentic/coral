@@ -477,6 +477,7 @@ func (h *BoardHandler) PostExternalMessage(w http.ResponseWriter, r *http.Reques
 		}
 	}
 	inbound, outbound, err := h.bs.PostCrossTeamMessage(ctx, board.CrossTeamPost{
+		ChiefBoard: h.chiefBoardNow(ctx),
 		Origin: board.MessageOrigin{
 			ServerID: store.LocalServerID, Board: body.FromBoard, Sender: body.SubscriberID, SenderRole: role,
 			TargetServerID: store.LocalServerID, TargetBoard: target,
