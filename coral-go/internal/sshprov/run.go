@@ -102,7 +102,7 @@ var specs = map[Command]spec{
 	CmdRemoveInstalls:   {template: "cd \"$HOME/" + InstallDir + "\" 2>/dev/null && for d in [0-9]*; do [ -d \"$d\" ] && rm -rf -- \"$d\"; done; true"},
 	CmdRemoveAll:        {template: "[ -n \"$HOME\" ] && rm -rf \"$HOME/" + InstallDir + "\""},
 	CmdCheckStopped: {template: "if tmux has-session -t =coral-server 2>/dev/null; then exit 1; fi; out=$(ps -u \"$(id -u)\" -o args= 2>/dev/null) || exit 3; " +
-		"if printf '%s\\n' \"$out\" | grep -F -- \"$HOME/" + InstallDir + "/\" | grep -Eq '/root/coral( |$)'; then exit 2; fi; exit 0"},
+		"if printf '%%s\\n' \"$out\" | grep -F -- \"$HOME/" + InstallDir + "/\" | grep -Eq '/root/coral( |$)'; then exit 2; fi; exit 0"},
 	CmdCheckPort: {template: "if tmux has-session -t =coral-server 2>/dev/null; then exit 0; fi; [ -r /proc/net/tcp ] || exit 3; " +
 		"if grep -Eqs '^ *[0-9]+: [0-9A-Fa-f]+:20E4 [0-9A-Fa-f:]+ 0A ' /proc/net/tcp /proc/net/tcp6; then exit 2; fi; exit 0"},
 	CmdInstallOwnerSecret: {template: "\"$HOME/" + InstallDir + "/%s/root/coral\" hub-owner-secret --home \"$HOME/" + InstallDir + "/data\"", args: []*regexp.Regexp{versionRe}},
@@ -129,7 +129,11 @@ func remoteText(c Command, args ...string) (string, error) {
 		}
 		vals[i] = a
 	}
-	return fmt.Sprintf(s.template, vals...), nil
+	out := fmt.Sprintf(s.template, vals...)
+	if strings.Contains(out, "%!") { // a stray % verb in a template (QA Engineer's MUST on #11429: %!s(MISSING) made the stop check always say "stopped"): never sent
+		return "", fmt.Errorf("%w: the template for command %d is not well formed", ErrNotAllowed, c)
+	}
+	return out, nil
 }
 
 // Runner runs the closed commands over the system ssh with the user's own agent, config and known_hosts. Host-key checking is never turned off: an unknown or changed key stops the run with
