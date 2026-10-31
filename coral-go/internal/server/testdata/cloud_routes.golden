@@ -83,6 +83,7 @@ GET /api/board/{project}/goals view
 GET /api/board/{project}/goals/{goalID} view
 GET /api/board/{project}/groups never
 GET /api/board/{project}/groups/{groupID}/members never
+GET /api/board/{project}/guide-asks view
 GET /api/board/{project}/guide-roster launch
 GET /api/board/{project}/lifecycle-log launch
 GET /api/board/{project}/messages view

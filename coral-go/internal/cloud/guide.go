@@ -16,6 +16,7 @@ import (
 var guideServed = []string{
 	"GET /api/board/{project}/messages",
 	"POST /api/board/{project}/messages",
+	"GET /api/board/{project}/guide-asks",
 	"GET /api/board/{project}/goals",
 	"GET /api/board/{project}/goals/{id}",
 	"POST /api/board/{project}/goals",
@@ -33,6 +34,7 @@ var guideServed = []string{
 // the owner). A route not listed takes none.
 var guideQueryKeys = map[string][]string{
 	"GET /api/board/{project}/messages":   {"limit"},
+	"GET /api/board/{project}/guide-asks": {"limit"},
 	"GET /api/board/{project}/goals":      {"state", "limit", "cursor"},
 	"GET /api/board/{project}/artifacts":  {"tag", "limit", "cursor", "goal"},
 	"GET /api/artifacts/{hex64}":          {"v"},

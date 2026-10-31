@@ -82,6 +82,17 @@ func (h *BoardHandler) PostMessage(w http.ResponseWriter, r *http.Request) {
 		if body, ok = readGuideMessage(w, r); !ok {
 			return
 		}
+		if body.ReplyTo != 0 { // a guide may reply only to a question put to them that is still open (S3): the label is the stamp's, never a field
+			open, err := h.bs.GuideAskOpenFor(r.Context(), project, body.ReplyTo, g.Label, g.Since, time.Now())
+			if err != nil {
+				errInternalServer(w, "could not read the questions put to this guide")
+				return
+			}
+			if !open {
+				errBadRequest(w, "reply_to is not a question put to you that is still open")
+				return
+			}
+		}
 	} else {
 		derr = decodeJSON(r, &body)
 	}
@@ -101,7 +112,14 @@ func (h *BoardHandler) PostMessage(w http.ResponseWriter, r *http.Request) {
 	}
 	// An ask (post --ask, #7794) needs someone to ask, and a reply_to a message of this board: both are checked before anything is posted.
 	var asked []string
-	if derr == nil && body.Ask {
+	guideAsk := ""
+	if derr == nil && body.Guide != "" {
+		label, ok := h.guideAskTarget(w, r, project, body)
+		if !ok {
+			return
+		}
+		guideAsk, asked = label, []string{label}
+	} else if derr == nil && body.Ask {
 		to, err := h.bs.AskTargets(r.Context(), project, body.SubscriberID, clitext.Clean(unescapeLineBreaks(body.Content)))
 		if err != nil {
 			errBadRequest(w, err.Error())
@@ -119,7 +137,11 @@ func (h *BoardHandler) PostMessage(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if len(asked) > 0 {
+	if guideAsk != "" { // a question to a guide: the one asked is their label (the member rules above do not apply: a guide is not a member)
+		if err := h.bs.RecordGuideAsk(r.Context(), project, msg, guideAsk); err != nil {
+			slog.Warn("guide ask not recorded", "board", project, "message", msg.ID, "error", err)
+		}
+	} else if len(asked) > 0 {
 		// The sender is known now (the request proved it): who is asked is decided again from what was stored, so the asker is never among them.
 		if to, err := h.bs.AskTargets(r.Context(), project, msg.SubscriberID, msg.Content); err == nil {
 			if err := h.bs.RecordAsk(r.Context(), project, msg, to); err != nil {
@@ -150,6 +172,8 @@ type postMessageBody struct {
 	// no mention is added (the person reads the task's page), the sender is the one the request proves, exactly as for any post.
 	// Ask makes the post a question to the members it @mentions (#7794), open until each has answered; ReplyTo makes it an answer to that message of the board.
 	Ask bool `json:"ask,omitempty"`
+	// Guide makes the ask a question to a guide of this team (#11457): the guide's hub label, which must be in the team's roster. Only an agent's own post, and only with Ask.
+	Guide string `json:"guide,omitempty"`
 	// DryRun checks the post (size, mentions) and answers {"ok": true, "dry_run": true} without storing anything: "post --assign" asks before it creates the task, so a refused post leaves nothing behind (#9047).
 	DryRun  bool            `json:"dry_run,omitempty"`
 	ReplyTo int64           `json:"reply_to,omitempty"`

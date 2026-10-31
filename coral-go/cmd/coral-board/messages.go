@@ -110,7 +110,7 @@ func cmdPost() {
 	}
 
 	// Parse --to flag and collect remaining args as the message
-	var toNames, filePath, taskArg, assignArg, goalArg, titleArg, priorityArg, replyArg string
+	var toNames, filePath, taskArg, assignArg, goalArg, titleArg, priorityArg, replyArg, guideArg string
 	ask := false
 	var msgParts []string
 	literal := false
@@ -134,6 +134,9 @@ func cmdPost() {
 			ask = true
 		} else if opt == "--reply-to" && i+1 < len(os.Args) {
 			replyArg = os.Args[i+1]
+			i++
+		} else if opt == "--guide" && i+1 < len(os.Args) {
+			guideArg = os.Args[i+1]
 			i++
 		} else if (opt == "--assign" || opt == "--goal" || opt == "--title" || opt == "--priority") && i+1 < len(os.Args) {
 			switch opt {
@@ -184,6 +187,14 @@ func cmdPost() {
 		fmt.Fprintln(os.Stderr, "Error: --goal, --title and --priority are for --assign: post --assign \"Name\" [--goal N] [--title T] [--priority P] \"text\"")
 		os.Exit(2)
 	}
+	if guideArg != "" && !ask {
+		fmt.Fprintln(os.Stderr, "Error: --guide is for a question to a guide: post --ask --guide <label> \"text\"")
+		os.Exit(2)
+	}
+	if guideArg != "" && (assignArg != "" || toNames != "") {
+		fmt.Fprintln(os.Stderr, "Error: a question to a guide (--guide) is for that guide alone: it can't also be --assign or --to")
+		os.Exit(2)
+	}
 	if ask && assignArg != "" {
 		fmt.Fprintln(os.Stderr, "Error: --ask is a question (no work to produce); --assign makes work a task: use one of them")
 		os.Exit(2)
@@ -217,6 +228,9 @@ func cmdPost() {
 	body := map[string]any{"subscriber_id": subscriberID, "content": message}
 	if ask {
 		body["ask"] = true // a question to the members it @mentions, open until each has answered (#7794)
+	}
+	if guideArg != "" {
+		body["guide"] = guideArg // a question to a guide of this team, by the label the Operator's roster has for them (#11457)
 	}
 	if replyArg != "" { // --reply-to N: an answer to message N, which closes a question asked of the sender
 		n, convErr := strconv.ParseInt(replyArg, 10, 64)

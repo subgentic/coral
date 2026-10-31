@@ -49,6 +49,8 @@ func guideBody(w http.ResponseWriter, r *http.Request, v any) bool {
 
 type guideMessageRequest struct {
 	Content string `json:"content"`
+	// ReplyTo is a question put to this guide that is still open (checked by the handler against the stamp's label): an answer to it closes it.
+	ReplyTo int64 `json:"reply_to,omitempty"`
 }
 
 // readGuideMessage reads and checks a guide's post: only content, at most maxGuideMessage characters.
@@ -61,7 +63,55 @@ func readGuideMessage(w http.ResponseWriter, r *http.Request) (postMessageBody, 
 		errBadRequest(w, fmt.Sprintf("a guide's message is at most %d characters", maxGuideMessage))
 		return postMessageBody{}, false
 	}
-	return postMessageBody{Content: in.Content}, true
+	return postMessageBody{Content: in.Content, ReplyTo: in.ReplyTo}, true
+}
+
+// guideAskTarget checks an agent's question to a guide (post --ask --guide <label>) and answers its refusal itself: an agent's own verified post (not a guide, not through Coral Hub), an ask, and a label the
+// team's roster names (the manager's list of its guides), so an agent cannot address a person the manager did not name.
+func (h *BoardHandler) guideAskTarget(w http.ResponseWriter, r *http.Request, project string, body postMessageBody) (string, bool) {
+	if _, isGuide := guideOf(r); isGuide || cloud.Tunneled(r) || !agentCaller(r) {
+		errForbidden(w, "only an agent of the team asks a guide a question")
+		return "", false
+	}
+	if !body.Ask {
+		errBadRequest(w, "--guide is for a question: post --ask --guide <label> \"text\"")
+		return "", false
+	}
+	if !board.ValidGuideLabel(body.Guide) {
+		errBadRequest(w, "a guide is named by the label the Operator's roster has for them (hub-user- and 8 hex digits)")
+		return "", false
+	}
+	roster, err := h.bs.GetGuideRoster(r.Context(), project)
+	if err != nil {
+		errInternalServer(w, "could not read the team's guides")
+		return "", false
+	}
+	if _, ok := roster[body.Guide]; !ok {
+		errBadRequest(w, "that is not a guide of this team: the Operator's roster does not name them")
+		return "", false
+	}
+	return body.Guide, true
+}
+
+// GuideAsks: GET /api/board/{project}/guide-asks, for a guide only: the questions put to the guide's own label that are still open, oldest first (query: limit). The label is the stamp's, so there is no field
+// to ask for another's; the projection is closed (id, asker, content, created_at).
+func (h *BoardHandler) GuideAsks(w http.ResponseWriter, r *http.Request) {
+	project := urlParam(r, "project")
+	g, ok := guideOf(r)
+	if !ok {
+		errNotFound(w, "not found")
+		return
+	}
+	if !guideBoardOK(w, project, g) {
+		return
+	}
+	limit := clampLimit(queryInt(r, "limit", 50), 50, 200)
+	asks, err := h.bs.GuideAsksOpen(r.Context(), project, g.Label, g.Since, time.Now(), limit)
+	if err != nil {
+		errInternalServer(w, "could not read the questions put to this guide")
+		return
+	}
+	writeJSON(w, http.StatusOK, asks)
 }
 
 // guideAuthor is the name the roster gives the guide, cleaned (the roster keeps only clean names).

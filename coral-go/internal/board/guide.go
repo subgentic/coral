@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/subgentic/coral/internal/clitext"
 )
@@ -246,3 +247,76 @@ var artifactDigestRe = regexp.MustCompile(`^[0-9a-f]{64}$`)
 
 // ValidArtifactDigest reports whether s is the 64 lower-case hex digits of an artifact id.
 func ValidArtifactDigest(s string) bool { return artifactDigestRe.MatchString(s) }
+
+// GuideAsk is a question put to a guide, as the guide reads it: a closed projection (these fields and no others).
+type GuideAsk struct {
+	ID        int64  `json:"id"`
+	Asker     string `json:"asker"`
+	Content   string `json:"content"`
+	CreatedAt string `json:"created_at"`
+}
+
+// RecordGuideAsk marks a posted message as a question to a guide: the one asked is the guide's label, who is not a member of the board.
+func (s *Store) RecordGuideAsk(ctx context.Context, project string, msg *Message, label string) error {
+	return s.RecordAsk(ctx, project, msg, []string{label})
+}
+
+// GuideAsksOpen returns the questions put to a guide's label that are still open (not answered by the guide, not closed by hand, asked less than a week ago and at or after the day the grant was
+// accepted), oldest first, up to limit, as GuideAsk. Which label is the caller's: it comes from the connector's stamp, never from a request field.
+func (s *Store) GuideAsksOpen(ctx context.Context, project, label, since string, now time.Time, limit int) ([]GuideAsk, error) {
+	var asks []askRow
+	if err := s.reader().SelectContext(ctx, &asks, `SELECT message_id, asker, asked, created_at FROM board_asks WHERE project = ? AND created_at >= ? AND created_at > ? AND instr(asked, ?) > 0 ORDER BY message_id`,
+		project, since, now.Add(-askMaxAge).UTC().Format(time.RFC3339), `"`+label+`"`); err != nil {
+		return nil, err
+	}
+	subs, err := s.subscriberIndex(ctx, project)
+	if err != nil {
+		return nil, err
+	}
+	out := []GuideAsk{}
+	for _, a := range asks {
+		var to []string
+		if json.Unmarshal([]byte(a.Asked), &to) != nil || !containsString(to, label) {
+			continue
+		}
+		info, err := s.askInfo(ctx, project, a, subs)
+		if err != nil {
+			return nil, err
+		}
+		if !containsString(info.Open, label) {
+			continue
+		}
+		var content string
+		if err := s.reader().GetContext(ctx, &content, `SELECT content FROM board_messages WHERE project = ? AND id = ?`, project, a.MessageID); err != nil {
+			continue
+		}
+		out = append(out, GuideAsk{ID: a.MessageID, Asker: a.Asker, Content: content, CreatedAt: a.CreatedAt})
+		if len(out) >= limit {
+			break
+		}
+	}
+	return out, nil
+}
+
+// GuideAskOpenFor reports whether message id is a question put to this guide label that is still open and was asked since the grant was accepted: the only message a guide may reply to.
+func (s *Store) GuideAskOpenFor(ctx context.Context, project string, id int64, label, since string, now time.Time) (bool, error) {
+	asks, err := s.GuideAsksOpen(ctx, project, label, since, now, 500)
+	if err != nil {
+		return false, err
+	}
+	for _, a := range asks {
+		if a.ID == id {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func containsString(list []string, s string) bool {
+	for _, x := range list {
+		if x == s {
+			return true
+		}
+	}
+	return false
+}

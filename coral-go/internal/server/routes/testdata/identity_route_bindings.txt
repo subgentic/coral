@@ -49,6 +49,7 @@ GET /api/board/{project}/goals | board-claims
 GET /api/board/{project}/goals/{goalID} | board-claims
 GET /api/board/{project}/groups | board-claims
 GET /api/board/{project}/groups/{groupID}/members | board-claims
+GET /api/board/{project}/guide-asks | board-claims
 GET /api/board/{project}/guide-roster | board-claims | operator-only
 GET /api/board/{project}/lifecycle-log | board-claims | operator-only
 GET /api/board/{project}/messages | board-claims

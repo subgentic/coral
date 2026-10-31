@@ -25,7 +25,7 @@ func TestAGuideIsRefusedOnEveryRouteThatIsNotServedForGuides(t *testing.T) {
 		tunnel.HubGuideSinceHeader: "2026-10-31T07:00:00Z", tunnel.HubUserHeader: "hub-user-1234abcd"}
 	// "METHOD pattern" of the routes a guide reaches (cloud.guideServed): the five of slice B. They reach their handlers (guide_routes_test.go in routes checks what each does), so only the others are asked here.
 	served := map[string]bool{
-		"GET /api/board/{project}/messages": true, "POST /api/board/{project}/messages": true, "GET /api/board/{project}/goals": true, "GET /api/board/{project}/goals/{goalID}": true, "POST /api/board/{project}/goals": true,
+		"GET /api/board/{project}/messages": true, "GET /api/board/{project}/guide-asks": true, "POST /api/board/{project}/messages": true, "GET /api/board/{project}/goals": true, "GET /api/board/{project}/goals/{goalID}": true, "POST /api/board/{project}/goals": true,
 		"GET /api/board/{project}/artifacts": true, "GET /api/artifacts/{id}": true, "GET /api/artifacts/{id}/meta": true, "GET /api/artifacts/{id}/comments": true, "GET /api/artifacts/{id}/versions": true,
 		"GET /api/artifacts/series/{series_id}": true, "GET /api/artifacts/series/{series_id}/versions": true, "POST /api/artifacts/{id}/comments": true,
 	}

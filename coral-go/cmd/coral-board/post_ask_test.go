@@ -82,3 +82,29 @@ func TestReadPrintsTheReplyLineOfAMessageFromAnotherBoard(t *testing.T) {
 		t.Errorf("only the message from another board has one:\n%s", out)
 	}
 }
+
+// #11457: post --ask --guide <label> puts a question to a guide of the team; --guide alone, or with --assign or --to, is a usage error that sends nothing.
+func TestPostAskToAGuideSendsTheLabel(t *testing.T) {
+	srv := newRecordingServer(t)
+	dir := subscribedDataDir(t, srv.URL)
+	res := runBoard(t, srv.URL, dir, "post", "--ask", "--guide", "hub-user-1234abcd", "Option A or B?")
+	require.Equal(t, 0, res.code, res.stderr)
+	reqs := srv.requests()
+	require.Len(t, reqs, 1)
+	assert.Contains(t, reqs[0], `"ask":true`)
+	assert.Contains(t, reqs[0], `"guide":"hub-user-1234abcd"`)
+	assert.Contains(t, reqs[0], `"content":"Option A or B?"`)
+
+	srv2 := newRecordingServer(t)
+	dir2 := subscribedDataDir(t, srv2.URL)
+	for name, args := range map[string][]string{
+		"guide without ask":   {"post", "--guide", "hub-user-1234abcd", "hi"},
+		"guide with no value": {"post", "--ask", "--guide"},
+		"guide and assign":    {"post", "--ask", "--guide", "hub-user-1234abcd", "--assign", "Dev A", "--goal", "1", "hi"},
+		"guide and to":        {"post", "--ask", "--guide", "hub-user-1234abcd", "--to", "Dev", "hi"},
+	} {
+		res := runBoard(t, srv2.URL, dir2, args...)
+		assert.Equal(t, 2, res.code, "%s: %q", name, res.stderr)
+	}
+	assert.Empty(t, srv2.requests(), "a bad option sends nothing")
+}

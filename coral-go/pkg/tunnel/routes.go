@@ -197,6 +197,8 @@ var routeTable = cat(
 		"/api/board/{project}/messages",
 		"/api/board/{project}/messages/all",
 		"/api/board/{project}/messages/search",
+		// The questions put to a guide (#11457): served only to a guide, who reads their own label's (the stamp's); View, like the board's other reads.
+		"/api/board/{project}/guide-asks",
 		"/api/board/{project}/subscribers",
 		"/api/board/{project}/paused",
 		"/api/board/{project}/tasks",

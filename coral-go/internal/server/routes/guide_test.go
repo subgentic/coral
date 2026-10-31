@@ -17,6 +17,7 @@ import (
 	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/board/boardtest"
 	"github.com/subgentic/coral/internal/cloud"
+	"github.com/subgentic/coral/internal/store"
 	"github.com/subgentic/coral/pkg/tunnel"
 )
 
@@ -48,7 +49,16 @@ func newGuideRig(t *testing.T) *guideRig {
 	require.NoError(t, err)
 	r := chi.NewRouter()
 	r.Use(cloud.Guard(func() tunnel.Mode { return tunnel.TierLaunch })) // the server's own half of the route policy, as in the real router
-	r.Use(func(next http.Handler) http.Handler {                        // a request marked X-Test-Operator is the Operator, as the identity layer would decide it
+	r.Use(func(next http.Handler) http.Handler {                        // a request marked X-Test-Agent carries an agent session's verified token, as the identity layer would set it
+		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			if req.Header.Get("X-Test-Agent") == "1" {
+				req = req.WithContext(context.WithValue(req.Context(), verifiedSessionKey{}, &store.SessionTokenOwner{SessionID: "s1", SessionName: "claude-s1"}))
+				req = withActor(req, Actor{Kind: ActorToken, Name: "Orchestrator", Session: "claude-s1"})
+			}
+			next.ServeHTTP(w, req)
+		})
+	})
+	r.Use(func(next http.Handler) http.Handler { // a request marked X-Test-Operator is the Operator, as the identity layer would decide it
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			if req.Header.Get("X-Test-Operator") == "1" {
 				req = withActor(req, Actor{Kind: ActorOperator, Name: "Operator"})
@@ -58,6 +68,7 @@ func newGuideRig(t *testing.T) *guideRig {
 	})
 	r.Use(TunnelIdentityGuard(bs, func(*http.Request) bool { return true })) // the Hub operator is allowed: a guide must still never be admitted as one
 	r.Post("/api/board/{project}/messages", h.PostMessage)
+	r.Get("/api/board/{project}/guide-asks", h.GuideAsks)
 	r.Get("/api/board/{project}/messages", h.ReadMessages)
 	r.Post("/api/board/{project}/goals", h.CreateGoal)
 	r.Get("/api/board/{project}/goals", h.ListGoals)
@@ -398,4 +409,81 @@ func TestARosterNameCannotBeAMembersIdOrJobTitleThroughTheRoute(t *testing.T) {
 	}
 	code, _, raw := g.send("PUT", "/api/board/team/guide-roster", map[string]any{"roster": map[string]string{gDana: "Dana"}}, op)
 	assert.Equal(t, http.StatusOK, code, raw)
+}
+
+// Slice D: an agent puts a question to a guide, the guide reads the questions put to their own label and answers one; nobody else reads or answers it.
+func TestAnAgentAsksAGuideAndTheGuideAnswers(t *testing.T) {
+	g := newGuideRig(t)
+	ctx := context.Background()
+	_, err := g.bs.SetGuideRoster(ctx, gBoard, map[string]string{gDana: "Dana Reyes", gSam: "Sam"})
+	require.NoError(t, err)
+	agent := map[string]string{"X-Test-Agent": "1"}
+	code, out, raw := g.send("POST", "/api/board/team/messages", map[string]any{"subscriber_id": "Orchestrator", "content": "Should the report use option A or B?", "ask": true, "guide": gDana}, agent)
+	require.Equal(t, http.StatusOK, code, raw)
+	askID := int64(out["id"].(float64))
+	ask, _ := out["ask"].(map[string]any)
+	require.NotNil(t, ask, "the post is a question")
+	assert.Equal(t, []any{gDana}, ask["to"])
+
+	// only the asked guide reads it, from their own label: another guide, an ordinary reader and another board see none
+	code, _, raw = g.guide(gDana, now(), "GET", "/api/board/team/guide-asks", nil, nil)
+	require.Equal(t, http.StatusOK, code, raw)
+	var mine []map[string]any
+	require.NoError(t, json.Unmarshal([]byte(raw), &mine))
+	require.Len(t, mine, 1)
+	assert.Equal(t, float64(askID), mine[0]["id"])
+	assert.Equal(t, "Orchestrator", mine[0]["asker"])
+	for k := range mine[0] {
+		assert.Contains(t, []string{"id", "asker", "content", "created_at"}, k, "a closed projection")
+	}
+	code, _, raw = g.guide(gSam, now(), "GET", "/api/board/team/guide-asks", nil, nil)
+	require.Equal(t, http.StatusOK, code)
+	assert.Equal(t, "[]\n", raw, "another guide is asked nothing")
+	code, _, _ = g.guide(gDana, now(), "GET", "/api/board/team/guide-asks?for="+gSam, nil, nil)
+	assert.Equal(t, http.StatusForbidden, code, "there is no field to ask for another's")
+	code, _, _ = g.guide(gDana, now(), "GET", "/api/board/other/guide-asks", nil, nil)
+	assert.Equal(t, http.StatusNotFound, code)
+	code, _, _ = g.send("GET", "/api/board/team/guide-asks", nil, map[string]string{tunnel.ViaHeader: cloud.ViaSecret(), tunnel.HubUserHeader: gDana})
+	assert.Equal(t, http.StatusNotFound, code, "a Hub viewer who is not a guide")
+	code, _, raw = g.guide(gDana, time.Now().UTC().Add(time.Hour).Format(time.RFC3339), "GET", "/api/board/team/guide-asks", nil, nil)
+	require.Equal(t, http.StatusOK, code)
+	assert.Equal(t, "[]\n", raw, "a question put before the grant was accepted is not theirs")
+
+	// who may ask: a roster guide, by an agent, with ask
+	for name, c := range map[string]struct {
+		body map[string]any
+		hdr  map[string]string
+		want int
+	}{
+		"a label the roster lacks": {map[string]any{"subscriber_id": "Orchestrator", "content": "x", "ask": true, "guide": "hub-user-ffffffff"}, agent, http.StatusBadRequest},
+		"not a label":              {map[string]any{"subscriber_id": "Orchestrator", "content": "x", "ask": true, "guide": "Dana"}, agent, http.StatusBadRequest},
+		"without ask":              {map[string]any{"subscriber_id": "Orchestrator", "content": "x", "guide": gDana}, agent, http.StatusBadRequest},
+		"a person without a token": {map[string]any{"subscriber_id": "Operator", "content": "x", "ask": true, "guide": gDana}, nil, http.StatusForbidden},
+		"a Hub user":               {map[string]any{"content": "x", "ask": true, "guide": gDana}, map[string]string{tunnel.ViaHeader: cloud.ViaSecret(), tunnel.HubUserHeader: gSam}, http.StatusForbidden},
+	} {
+		code, _, raw := g.send("POST", "/api/board/team/messages", c.body, c.hdr)
+		assert.Equal(t, c.want, code, "%s: %s", name, raw)
+	}
+	code, _, _ = g.guide(gSam, now(), "POST", "/api/board/team/messages", map[string]any{"content": "x", "ask": true, "guide": gDana}, nil)
+	assert.Equal(t, http.StatusBadRequest, code, "a guide cannot ask (the closed body has no such field)")
+
+	// the guide answers it; only it, only while it is open
+	code, _, raw = g.guide(gSam, now(), "POST", "/api/board/team/messages", map[string]any{"content": "I will answer for Dana", "reply_to": askID}, nil)
+	assert.Equal(t, http.StatusBadRequest, code, "another guide cannot answer it: %s", raw)
+	plain, err := g.bs.PostMessage(ctx, gBoard, "Orchestrator", "an ordinary message", nil)
+	require.NoError(t, err)
+	code, _, _ = g.guide(gDana, now(), "POST", "/api/board/team/messages", map[string]any{"content": "x", "reply_to": plain.ID}, nil)
+	assert.Equal(t, http.StatusBadRequest, code, "a reply_to that is no question to them")
+	code, out, raw = g.guide(gDana, now(), "POST", "/api/board/team/messages", map[string]any{"content": "Option B, with the retry note.", "reply_to": askID}, nil)
+	require.Equal(t, http.StatusOK, code, raw)
+	assert.True(t, strings.HasPrefix(out["content"].(string), "[Guide Dana Reyes via Coral Hub, "+gDana+"] "))
+	code, _, raw = g.guide(gDana, now(), "GET", "/api/board/team/guide-asks", nil, nil)
+	require.Equal(t, http.StatusOK, code)
+	assert.Equal(t, "[]\n", raw, "answered, it is no longer open")
+	code, _, _ = g.guide(gDana, now(), "POST", "/api/board/team/messages", map[string]any{"content": "again", "reply_to": askID}, nil)
+	assert.Equal(t, http.StatusBadRequest, code, "an answered question takes no second answer")
+	m, err := g.bs.GetMessageByID(ctx, gBoard, askID)
+	require.NoError(t, err)
+	require.NotNil(t, m.Ask)
+	assert.True(t, m.Ask.Answered, "the question reads as answered on the board")
 }

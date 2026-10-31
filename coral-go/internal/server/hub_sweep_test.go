@@ -142,8 +142,8 @@ func TestHubSweepNoHomeInAnyViewRoute(t *testing.T) {
 		"/api/saved": true, "/api/saved/{id}/message": true, // saved for later is the owner's alone since #5753
 		"/api/artifacts/{id}/versions": true, "/api/artifacts/series/{series_id}": true, "/api/artifacts/series/{series_id}/versions": true, // the owner's version list and series reads (#11354)
 		"/api/board/{project}/proposals": true, "/api/proposals": true, // what agents asked to add is the owner's alone through the hub (#11389)
-		"/api/operator-asks":                      true,                                                                                                                             // the questions agents asked the Operator are the owner's alone (#11417)
-		"/api/board/{project}/orchestrator-grant": true, "/api/board/{project}/lifecycle-log": true, "/api/board/{project}/guide-roster": true, "/api/artifacts/{id}/private": true, // the grant to a board's orchestrator and its log are the owner's alone (#11432)
+		"/api/operator-asks":                      true,                                                                                                                                                                      // the questions agents asked the Operator are the owner's alone (#11417)
+		"/api/board/{project}/orchestrator-grant": true, "/api/board/{project}/lifecycle-log": true, "/api/board/{project}/guide-roster": true, "/api/artifacts/{id}/private": true, "/api/board/{project}/guide-asks": true, /* a guide's own read: for anyone else it is not found */ // the grant to a board's orchestrator and its log are the owner's alone (#11432)
 		"/api/custom-models": true} // the custom models are the owner's alone through the hub (#5996)
 
 	golden, err := os.ReadFile("testdata/cloud_routes.golden")
@@ -160,6 +160,10 @@ func TestHubSweepNoHomeInAnyViewRoute(t *testing.T) {
 			continue
 		}
 		path := repl.Replace(f[1])
+		if f[1] == "/api/board/{project}/guide-asks" { // a guide's own read (#11457): for the owner and for anyone else it is not found, so it is not a route that answers 200 here
+			require.Equal(t, 404, call(h, "GET", path, "", owner).Code, "the owner is not a guide")
+			continue
+		}
 		if f[1] == "/api/artifacts/{id}" {
 			path = "/api/artifacts/" + artifactHex
 		}

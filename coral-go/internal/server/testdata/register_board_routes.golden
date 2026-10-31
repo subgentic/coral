@@ -27,6 +27,7 @@ GET /api/board/{project}/goals | (*BoardHandler).ListGoals-fm
 GET /api/board/{project}/goals/{goalID} | (*BoardHandler).GetGoal-fm
 GET /api/board/{project}/groups | (*BoardHandler).ListGroups-fm
 GET /api/board/{project}/groups/{groupID}/members | (*BoardHandler).ListGroupMembers-fm
+GET /api/board/{project}/guide-asks | (*BoardHandler).GuideAsks-fm
 GET /api/board/{project}/guide-roster | (*BoardHandler).GuideRoster-fm
 GET /api/board/{project}/lifecycle-log | (*SessionsHandler).LifecycleLog-fm
 GET /api/board/{project}/messages | (*BoardHandler).ReadMessages-fm

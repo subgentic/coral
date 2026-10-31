@@ -99,6 +99,7 @@ type guideRoute struct{ method, pattern string }
 var guideRoutes = []guideRoute{
 	{http.MethodGet, "/api/board/{project}/messages"},
 	{http.MethodPost, "/api/board/{project}/messages"},
+	{http.MethodGet, "/api/board/{project}/guide-asks"},
 	{http.MethodGet, "/api/board/{project}/goals"},
 	{http.MethodGet, "/api/board/{project}/goals/{id}"},
 	{http.MethodPost, "/api/board/{project}/goals"},
