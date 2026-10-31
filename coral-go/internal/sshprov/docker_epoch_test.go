@@ -161,7 +161,7 @@ CMD ["sh", "-c", "rm -f /etc/ssh/ssh_host_* && ssh-keygen -A && exec /usr/sbin/s
 	}
 	f.r = Runner{SSH: wrapper, Timeout: 60 * time.Second}
 	oldWait := keyWait
-	keyWait = 150 * time.Second // a Coral on this loaded host took over a minute to start listening; the product waits 90 s
+	keyWait = 45 * time.Second // a Coral on this loaded host took over a minute to start listening; the product waits 90 s
 	t.Cleanup(func() { keyWait = oldWait })
 
 	// wait for both sshd (a few seconds after the container starts)
@@ -323,7 +323,7 @@ func TestSSHDocker(t *testing.T) {
 			if err != nil {
 				t.Logf("  FINDING: ReadAPIKey for %s failed after a start: %v", u.name, err)
 				t.Logf("  tmux sessions of %s: %s", u.name, firstOut(f.exec(u.name, "far", "tmux ls 2>&1")))
-				pane, _ := f.exec(u.name, "far", "tmux capture-pane -p -t =coral-server 2>&1 | tail -25; echo --- coral.log; cat ~/.coral-server/data/coral.log 2>&1 | cut -c1-300; echo --- sockets; awk 'NR>1 {print $2, $4}' /proc/net/tcp; echo --- ; ps -u "+u.name+" -o pid,etime,args 2>&1 | head")
+				pane, _ := f.exec(u.name, "far", "tmux capture-pane -p -t =coral-server 2>&1 | tail -25; echo --- coral.log; cat ~/.coral-server/data/coral.log 2>&1 | cut -c1-300; echo --- sockets; awk 'NR>1 {print $2, $4}' /proc/net/tcp; echo --- ; ps -u "+u.name+" -o pid,etime,time,stat,wchan:22,args 2>&1 | cut -c1-200 | head; echo --- threads; for p in $(pgrep -u "+u.name+" -f 'root/coral --host'); do ls /proc/$p/task | wc -l; grep -E 'State|Threads|voluntary' /proc/$p/status; done; uptime")
 				t.Logf("  DIAG %s's tmux pane and folders:\n%s", u.name, pane)
 				return
 			}
@@ -393,7 +393,7 @@ func TestSSHDocker(t *testing.T) {
 		t.Logf("  DIAG sockets (local address, state 0A = listening) and coral processes after the stop:\n%s", socks)
 		// how long does alice's Coral process take to go after its session was killed? (a stop is confirmed only when it has)
 		began := time.Now()
-		for time.Since(began) < 120*time.Second {
+		for time.Since(began) < 5*time.Second {
 			if out, _ := f.exec("root", "far", "pgrep -u alice -f 'root/coral --host' >/dev/null && echo up"); !strings.Contains(out, "up") {
 				break
 			}
