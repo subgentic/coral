@@ -122,12 +122,16 @@ func inSourceTree(path string) (string, bool) {
 	if root == "" {
 		return "", false
 	}
-	p, cd := comparable(path), comparable(root)
+	p, cd := comparable(path), sourceTreeResolved()
 	if p == cd || strings.HasPrefix(p, cd+string(filepath.Separator)) {
 		return root, true
 	}
 	return "", false
 }
+
+// sourceTreeResolved is the source folder's real path, worked out once, as sourceTree itself is: resolving it walks and stats every folder above it, at every CheckDataPath (about 7,500
+// calls in routes, four stats each in the test's input log that cmd/go resolves again, #413). The path being checked is still resolved at every call.
+var sourceTreeResolved = sync.OnceValue(func() string { return comparable(sourceTree()) })
 
 // protectedResolved is each protected folder with its real path, worked out once: the folders are the person's real ~/.coral, which does not move while a test binary runs, and resolving
 // one walks and stats every folder above it. CheckDataPath runs for every store or socket a test opens (about 7,500 times in routes), and under 'go test' each of those stats is an entry
