@@ -882,6 +882,7 @@ body.hub-no-machine [data-on-click="launch-show"], body.hub-no-machine .sidebar-
 .back-link:hover { text-decoration: underline; }
 /* A detail page's way back and title on a phone are the page's BAR (#11236 approved, #11239 slice B): a 56 px row, the arrow at the left (44 px; the link's words stay its name for a screen reader), the title in the bar at 17/600 on one line, never a blue text link in the content with a big title under a pill */
 @media (max-width: 600px) {
+    .detail-pane .phone-title-row { background: none; border-bottom: 0; min-height: 44px; padding: 0; } /* a document pane's title row is the pane's own head, not a second bar: it took the page bar's darker fill and ended at the close button (a box two thirds wide, #11400) */
     .phone-title-row { flex-wrap: nowrap; column-gap: 4px; min-height: 56px; padding: 0 4px; border-bottom: 1px solid var(--border); background: var(--bg-primary); }
     .phone-title-row > .back-link, .phone-title-row > .sched-back, .phone-title-row > .goals-back { display: inline-grid; place-items: center; width: var(--control-touch-height, 44px); min-width: var(--control-touch-height, 44px); height: var(--control-touch-height, 44px); position: relative; overflow: hidden; text-indent: 200vw; white-space: nowrap; } /* the words are pushed out of the box, not removed: they stay the name */
     .phone-title-row > :is(.back-link, .sched-back, .goals-back) { margin-inline-end: 8px; } /* the title is not against the arrow (#11324) */
