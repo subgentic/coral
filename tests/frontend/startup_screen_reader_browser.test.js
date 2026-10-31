@@ -1,6 +1,6 @@
 // What a screen reader meets at page start (Beta #10372 findings 2 and 7, #10374): (1) no alert is on screen with words in it when the page loads, because a visible role=alert announces itself, interrupting, as the page
 // comes up: the standing "Sign-in is off" notice is a note a person can read, not an alert; the other banners (tmux missing, leftover sessions, wake them, hooks) stay alerts and are hidden until their condition holds; (2) the
-// first Tab stops of the page are its top navigation (Agents, Inbox, Automations ...), the bar that comes first on screen, not the page's cards and footer links; at 1366 x 768, the keyboard-only screen of Beta's pass. The
+// first Tab stops of the page are its top navigation (Inbox, Agents, Automations ..., #11594), the bar that comes first on screen, not the page's cards and footer links; at 1366 x 768, the keyboard-only screen of Beta's pass. The
 // isolated dev server (its Sign-in-off notice is on). Drives Chrome over CDP through agent_view_harness.js.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -27,7 +27,7 @@ const { coralReady } = require('./helpers/wait');
         }
         // A skip link may come first (#219): its whole job is to be the first Tab stop. After it, the top navigation, as before.
         const nav = tabs[0] === 'Skip to main content' ? tabs.slice(1, 4) : tabs.slice(0, 3);
-        check(JSON.stringify(nav) === JSON.stringify(['Agents', 'Inbox', 'Automations']), `the first Tab stops are the top navigation, after a skip link if there is one: ${JSON.stringify(tabs)}`);
+        check(JSON.stringify(nav) === JSON.stringify(['Inbox', 'Agents', 'Automations']), `the first Tab stops are the top navigation, after a skip link if there is one: ${JSON.stringify(tabs)}`);
         // the page start was quiet, but a later change is heard: when the notice appears after the first read, its sentence is announced once
         check(!/Sign-in is off/.test(await ev(`(document.getElementById('notice-live') || {}).textContent || ''`)), 'the start itself said nothing of it');
         await ev(`document.getElementById('local-auth-banner').hidden = true; import((window.__coralStatic || '/static/') + 'local_auth_banner.js').then(m => m.checkLocalAuthBanner()).then(() => true)`);
