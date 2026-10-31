@@ -173,9 +173,13 @@ function accessPicker(s, isBusy, helpId) {
     // The owner's choice, View / Interact / Launch; an option above what the computer announced is disabled (Launch means "up to what the computer allows"). The text under it says why (in the open row).
     const choice = accessChoice(s);
     const local = rank(s.local_mode) >= 0 ? s.local_mode : 'view'; // not announced yet: View
-    return h('label', { className: 'cs-launch' }, h('span', { className: 'sr-only', text: `Hub access for ${s.label || 'this computer'} ` }),
+    const eff = effectiveOf(s);
+    const pick = h('label', { className: 'cs-launch' }, h('span', { className: 'sr-only', text: `Hub access for ${s.label || 'this computer'} ` }),
         h('select', { disabled: isBusy, value: choice, 'aria-describedby': helpId, onchange: e => setAccess(s, e.target.value) },
             ['view', 'interact', 'launch'].map(v => h('option', { value: v, selected: v === choice, disabled: rank(v) > rank(local) && v !== choice, text: MODE_INFO[v].label }))));
+    // The select shows the hub's grant, which for a new computer defaults to Launch while the computer itself allows only View: what applies is the lower of the two, so it is said right here, in the table (#11463 F3).
+    if (rank(eff) >= 0 && rank(eff) < rank(choice)) return h('div', { className: 'cs-access-wrap' }, pick, h('span', { className: 'cs-effective', text: `${MODE_INFO[eff].label}: this computer allows ${MODE_INFO[local].label}` }));
+    return pick;
 }
 
 // A click anywhere else closes an open More.

@@ -12,6 +12,7 @@
 import { state } from './state.js';
 import { isCloud, sessionServer, splitKey } from './server_base.js';
 import { blockedReason } from './hub_access.js';
+import { remoteServers } from './launch_server.js';
 import { pollEvery } from './overload.js';
 
 // Pinned to the route table (testdata/cloud_routes.golden) by TestDashboardModeTextMatchesTheRouteTable (#4526): since #4274
@@ -23,6 +24,8 @@ const LAUNCH = new Set(['agent-restart', 'agent-restart-same', 'agent-attach', '
     'attach-image']); // POST /api/upload writes a file on the host: Launch (#6088)
 // Turning auto-accept on needs Launch, turning it off Interact: the menu item says which by aria-checked.
 const AUTO_ACCEPT = 'agent-auto-accept';
+// The New agent / New team cards of the home screen start something on a computer: dimmed when NO connected computer allows Launch (#11463 F3: at View the four cards looked usable and only said no after the dialog and a click).
+const NEEDS_LAUNCH_ANYWHERE = new Set(['m-show-launch-modal-then-select-launch-type']);
 // What #3942 moved to Launch through the Hub: sleeping a team, pausing a board and deleting a board message.
 // Team sleep and a board's pause and delete act on the machine that holds the board.
 const BOARD = new Set(['mb-post', 'team-sleep', 'board-chat-pause', 'mb-pause', 'mb-msg-delete', 'mb-delete-board', 'team-delete']);
@@ -32,6 +35,7 @@ const BAR = { wake: 'launch', restart: 'launch', unarchive: 'interact' };
 function tierOf(el) {
     if (el.closest('#sleeping-composer')) return BAR[el.dataset.action] || '';
     const a = el.dataset.onClick;
+    if (NEEDS_LAUNCH_ANYWHERE.has(a)) return 'launch-any';
     if (a === 'attach-image') return 'launch'; // before the phone's round buttons: its Add image button is one of them
     if (el.classList.contains('mobile-send-btn')) return 'interact';
     if (a === AUTO_ACCEPT) return el.getAttribute('aria-checked') === 'true' ? 'interact' : 'launch';
@@ -54,7 +58,17 @@ function boardServerOf(el) {
     return b ? splitKey(b).server : (state.currentBoardServer || '');
 }
 
+/** The reason when every connected computer is below Launch (the first one's words), '' when one allows it or none is known. */
+function noComputerLaunches() {
+    const rs = remoteServers(state.servers);
+    let first = '';
+    if (!rs.length) return '';
+    for (const s of rs) { const r = blockedReason(s.id, 'launch'); if (!r) return ''; first = first || r; }
+    return first;
+}
+
 function reasonFor(el, tier) {
+    if (tier === 'launch-any') return noComputerLaunches();
     const a = el.dataset.onClick;
     if (BOARD.has(a)) return blockedReason(boardServerOf(el), tier);
     const r = blockedReason(serverOf(el), tier);

@@ -148,3 +148,4 @@ body.native-inbox [data-native-inbox-hides] { display: none !important; }
 .cloud-access-note { margin: 8px 0 12px; font-size: var(--fs-base); line-height: var(--lh-ui); color: var(--text-secondary); overflow-wrap: anywhere; }
 .cloud-access-note strong { color: var(--text-primary); }
 .cloud-signin-note { margin: 8px 0 0; font-size: var(--fs-base); line-height: var(--lh-ui); color: var(--text-secondary); }
+.cs-effective { display: block; margin: 2px 0 0; font-size: var(--fs-sm); color: var(--text-secondary); }
