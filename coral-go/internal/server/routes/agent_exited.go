@@ -72,7 +72,7 @@ func automatedInputBlocked(ctx context.Context, term any, name, agentType, sessi
 	if !exited {
 		exitLogged.Delete(key)
 		// The agent has not exited, but the foreground of its terminal may not be the agent either (a shell or program a person started): notices go only to the recorded agent process (#389).
-		blocked, _ := ptymanager.NoticeBlocked(ctx, term, name, agentType, sessionID, what)
+		blocked, _ := ptymanager.NoticeBlockedWait(ctx, term, name, agentType, sessionID, what)
 		return blocked
 	}
 	if _, already := exitLogged.LoadOrStore(key, true); !already {
