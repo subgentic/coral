@@ -1,7 +1,7 @@
 // The phone's accessibility P2s from slice A (#11281, from #11260, #11270 and the accessibility pass): at 390 and 320 px, 100% and 200% text, light and dark:
 //  - the Inbox's and Automations' strip is a real tab list: role=tablist, each view a role=tab with aria-selected (one true), aria-controls the page's tabpanel, which is named by the open tab; one Tab stop (roving), Left/Right move the focus
 //    and Enter opens the tab it is on;
-//  - the bottom nav is a landmark named Main and its four buttons say Inbox page, Agents page, Tasks page and Chats page (#11472: the bar is Gmail's; no control shares a name with the drawer's entries);
+//  - the bottom nav is a landmark named Main and its four buttons say Agents page, Inbox page, Automations page and Analytics page (#11472: the bar is Gmail's; no control shares a name with the drawer's entries);
 //  - the Home list's per-row and per-team ⋯ is a 44 px button;
 //  - on a desktop width the view list is a plain column (no tab roles).
 // Drives Chrome over CDP through agent_view_harness.js against an isolated dev server.
@@ -59,7 +59,7 @@ const { coralReady } = require('./helpers/wait');
             const tag = `${w}@${fs} ${theme}`;
             // the nav
             const nav = await ev(`({ label: document.getElementById('phone-nav').getAttribute('aria-label'), tag: document.getElementById('phone-nav').tagName, names: [...document.querySelectorAll('#phone-nav .phone-nav-slot')].map(b => b.getAttribute('aria-label')) })`);
-            assert.deepEqual(nav, { label: 'Main', tag: 'NAV', names: ['Inbox page', 'Agents page', 'Tasks page', 'Chats page'] }, `${tag}: the nav is a landmark named Main and its buttons say Inbox page, Agents page, Tasks page, Chats page (none shares a name with the menu's items)`);
+            assert.deepEqual(nav, { label: 'Main', tag: 'NAV', names: ['Agents page', 'Inbox page', 'Automations page', 'Analytics page'] }, `${tag}: the nav is a landmark named Main and its buttons say Agents page, Inbox page, Automations page, Analytics page (none shares a name with the menu's items)`);
             // Home's ⋯: 44 px, each row and each team
             const k = await ev(`[...document.querySelectorAll('#mobile-session-list .sidebar-kebab-btn')].filter(b => b.getClientRects().length).map(b => { const r = b.getBoundingClientRect(); return [b.getAttribute('aria-label'), Math.round(r.width), Math.round(r.height)]; })`);
             assert.ok(k.length >= 2 && k.every(x => x[1] >= 44 && x[2] >= 44), `${tag}: Home's ⋯ buttons are 44 px: ${JSON.stringify(k)}`);

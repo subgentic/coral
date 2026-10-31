@@ -32,7 +32,7 @@ const { coralReady } = require('./helpers/wait');
             assert.deepEqual(pv, { Ada: 'You: please ship it today', Bo: 'Bo: Done: the suite passes', Cy: 'No messages yet', Di: 'Fix the cold start' }, `${tag}: the preview: ` + JSON.stringify(pv));
             // C: the pill and the +
             const items = await ev(`[...document.querySelectorAll('#phone-nav .phone-nav-slot')].map(b => [b.getAttribute('aria-label'), b.getBoundingClientRect().width, b.getBoundingClientRect().height])`);
-            assert.deepEqual(items.map(i => i[0]), ['Inbox page', 'Agents page', 'Tasks page', 'Chats page'], `${tag}: Inbox, Agents, Tasks, Chats (#11472: Gmail's bottom bar, no More slot)`);
+            assert.deepEqual(items.map(i => i[0]), ['Agents page', 'Inbox page', 'Automations page', 'Analytics page'], `${tag}: Agents, Inbox, Automations, Analytics (#11535: the operator's four tabs, no More slot)`);
             assert.ok(items.every(i => i[1] >= 44 && i[2] >= 44), `${tag}: 44 px targets: ` + JSON.stringify(items));
             const nav = await ev(box(`document.getElementById('phone-nav')`)), fab = await ev(box(`document.getElementById('phone-fab')`));
             assert.ok(nav.b === 844 && nav.l === 0 && nav.r === 390 && nav.h >= 72 && fab.b <= nav.t && fab.r <= 390 && fab.w >= 56, `${tag}: the bar is docked at the bottom, full width, and the + sits above it (#11472, was a floating pill): ` + JSON.stringify({ nav, fab }));
@@ -60,10 +60,10 @@ const { coralReady } = require('./helpers/wait');
                 await ev(`[...document.querySelectorAll('#phone-fab-menu [role=menuitem]')][1].click(); true`);
                 await waitFor(`document.getElementById('phone-fab-menu').hidden && !!document.getElementById('launch-modal') && getComputedStyle(document.getElementById('launch-modal')).display !== 'none'`, 'New team opens the launch dialog', 6000);
                 await ev(`window.hideLaunchModal(); true`);
-                // no More slot (the ☰ in the top bar is the menu, phone_top_menu_browser); Chats opens the chats and is the one that is on
+                // no More slot (the ☰ in the top bar is the menu, phone_top_menu_browser); Analytics opens and is the one that is on (Tasks and Chats are the drawer's rows, #11535)
                 assert.equal(await ev(`document.querySelectorAll('.phone-nav-slot[data-phone-nav=nav-more]').length`), 0, 'no More slot on the bar');
-                await ev(`document.querySelector('.phone-nav-slot[data-phone-nav=nav-chats]').click(); true`);
-                await waitFor(`document.querySelector('.phone-nav-slot.active')?.dataset.phoneNav === 'nav-chats'`, 'Chats is lit', 8000);
+                await ev(`document.querySelector('.phone-nav-slot[data-phone-nav=nav-analytics]').click(); true`);
+                await waitFor(`document.querySelector('.phone-nav-slot.active')?.dataset.phoneNav === 'nav-analytics'`, 'Analytics is lit', 8000);
                 // Inbox: the page opens, the nav stays, Inbox is the one on, no + there
                 await ev(`document.querySelector('.phone-nav-slot[data-phone-nav=nav-inbox]').click(); true`);
                 await waitFor(`document.querySelector('.phone-nav-slot.active')?.dataset.phoneNav === 'nav-inbox' && (getComputedStyle(document.getElementById('inbox-view')).display !== 'none' || document.getElementById('group-table-view')?.dataset.group === 'hub-inbox:needs')`, 'the Inbox', 8000);
