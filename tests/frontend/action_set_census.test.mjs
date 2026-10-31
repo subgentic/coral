@@ -21,6 +21,11 @@ for (const [rel, cls] of [['static/board_window.js', 'mb-delete-msg-btn']]) {
     const t = read(rel), at = t.indexOf(cls), btn = t.slice(at, t.indexOf('</button>', at));
     assert.ok(/material-icons[^>]*>delete</.test(btn) && !/&times;|×/.test(btn), `${rel}: ${cls} is the delete icon, not a ×: ${btn.slice(-120)}`);
 }
+for (const [rel, cls] of [['static/notifications.js', 'notification-toast-close'], ['static/chat_find.js', 'chat-find-close'], ['static/preview_pane.js', 'preview-tab-close'], ['static/update_check.js', 'update-toast-close'], ['static/worktree_dock.js', 'worktree-dock-dismiss'], ['static/artifact_comments.js', 'ac-sheet-close'], ['static/controls.js', 'macro-delete-btn'], ['templates/index.html', 'tmux-missing-banner-close'], ['templates/includes/views/live_session.html', 'composer-error-dismiss']]) {
+    const t = read(rel), at = t.indexOf(cls); assert.ok(at >= 0, `${rel} has ${cls}`);
+    const line = t.slice(at, t.indexOf('\n', at));
+    assert.ok(/ic-(close|delete)/.test(line) && !/&times;|×|✕/.test(line), `${rel}: ${cls} is drawn by the shared icon class, not a typed glyph: ${line.slice(0, 140)}`);
+}
 const css = read('static/css/components.css');
 assert.ok(/#mb-pause-btn\.mb-action-btn\.mb-action-danger\s*\{[^}]*--warning-text/.test(css), 'a paused board\'s Resume is the warning colour, not the delete red');
 console.log('action_set_census: ok (Retry on buttons, delete is an icon, Resume is not red)');

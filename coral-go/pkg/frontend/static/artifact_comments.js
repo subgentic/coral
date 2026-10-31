@@ -157,7 +157,7 @@ export function attachComments(dialog, body, host, opts = {}) {
             sr.addEventListener('click', () => { st.showResolved = !st.showResolved; render(); });
             head.append(sr);
         }
-        const close = btn('ac-sheet-close', '✕', 'Hide the comments'); close.addEventListener('click', () => { userSet(false); toggle.focus(); }); head.append(close);
+        const close = btn('ac-sheet-close ic-close', '', 'Hide the comments'); close.addEventListener('click', () => { userSet(false); toggle.focus(); }); head.append(close);
         panel.append(head);
         const d = st.data;
         if (d.locked) panel.append(el('p', 'ac-note ac-locked', 'Comments are locked: read only.'));

@@ -101,7 +101,7 @@ function _renderTabs() {
             <span class="preview-tab-icon">${_fileIcon(tab)}</span>
             <span class="preview-tab-name" title="${escapeAttr(title)}">${escapeHtml(_tabTitle(tab))}${_isDirty(tab) ? ' •' : ''}</span>
             ${tab.pinned ? '' : `<button class="preview-tab-keep" data-tab-id="${escapeAttr(tab.id)}" aria-label="Pin tab: ${escapeAttr(_tabTitle(tab))}" aria-describedby="preview-keep-note-${escapeAttr(tab.id)}" title="Pin tab">Pin tab</button><span class="sr-only" id="preview-keep-note-${escapeAttr(tab.id)}">This tab is shown in italics because it is a preview: the next one you open replaces it, unless you pin it.</span>`}
-            <button class="preview-tab-close" aria-label="Close ${escapeAttr(_tabTitle(tab))}" data-tab-id="${escapeAttr(tab.id)}" title="Close">&times;</button>
+            <button class="preview-tab-close ic-close" aria-label="Close ${escapeAttr(_tabTitle(tab))}" data-tab-id="${escapeAttr(tab.id)}" title="Close"></button>
         </div>`;
     }
     bar.innerHTML = html;

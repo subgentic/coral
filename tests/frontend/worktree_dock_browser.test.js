@@ -19,7 +19,7 @@ const S = `(window.__coralStatic || '/static/')`;
         const hit = (a, b) => a && b && a.left < b.right - 0.5 && a.right > b.left + 0.5 && a.top < b.bottom - 0.5 && a.bottom > b.top + 0.5;
         const line = document.querySelector('#worktree-dock .worktree-dock-line'); const lb = line && line.getBoundingClientRect();
         return { dock, overlaps: Object.entries(others).filter(([k, o]) => hit(dock, o)).map(([k]) => k), seen: Object.entries(others).filter(([, o]) => o).map(([k]) => k), inside: !!dock && dock.bottom <= innerHeight + 0.5 && dock.left >= -0.5 && dock.right <= innerWidth + 0.5,
-            buttons: [...document.querySelectorAll('#worktree-dock .worktree-dock-line button')].map(b => b.textContent), lineH: lb ? Math.round(lb.height) : null, docH: dock ? Math.round(dock.bottom - dock.top) : null, vh: innerHeight }; })()`;
+            buttons: [...document.querySelectorAll('#worktree-dock .worktree-dock-line button')].map(b => b.classList.contains('ic-close') ? '×' : b.textContent), lineH: lb ? Math.round(lb.height) : null, docH: dock ? Math.round(dock.bottom - dock.top) : null, vh: innerHeight }; })()`;
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [w, h] of [[360, 800], [390, 844]]) {
@@ -56,7 +56,7 @@ const S = `(window.__coralStatic || '/static/')`;
         await coralReady(ev);
         await ev(`localStorage.clear(); window.__copied = null; navigator.clipboard.writeText = t => { window.__copied = t; return Promise.resolve(); }; true`);
         const bar = () => ev(`(() => { const d = document.getElementById('worktree-dock'); if (!d || d.hidden) return null; const q = s => d.querySelector(s);
-            return { title: (q('.worktree-dock-title') || {}).textContent, buttons: [...d.querySelectorAll('.worktree-dock-line button')].map(b => b.textContent), open: (q('.worktree-dock-details') || {}).getAttribute && q('.worktree-dock-details').getAttribute('aria-expanded'), bodyHidden: q('.worktree-dock-body').hidden,
+            return { title: (q('.worktree-dock-title') || {}).textContent, buttons: [...d.querySelectorAll('.worktree-dock-line button')].map(b => b.classList.contains('ic-close') ? '×' : b.textContent), open: (q('.worktree-dock-details') || {}).getAttribute && q('.worktree-dock-details').getAttribute('aria-expanded'), bodyHidden: q('.worktree-dock-body').hidden,
                 items: [...d.querySelectorAll('.worktree-dock-item')].map(i => ({ text: i.querySelector('.worktree-dock-text').textContent, copy: !!i.querySelector('.worktree-dock-copy') })), error: d.classList.contains('error'), focus: document.activeElement && document.activeElement.textContent,
                 live: ((document.getElementById('notice-live') || {}).textContent || '').trim(), alert: ((document.getElementById('notice-alert') || {}).textContent || '').trim(), toasts: document.querySelectorAll('.toast').length }; })()`);
         const say = (w, extra = '') => ev(`document.querySelectorAll('.toast').forEach(t => t.remove()); ['notice-live', 'notice-alert'].forEach(id => { const r = document.getElementById(id); if (r) r.textContent = ''; }); import(${S} + 'worktree_notice.js').then(m => { m.showWorktreeNotice(${JSON.stringify(w)}, 'team'); return true; })`);
