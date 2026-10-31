@@ -87,14 +87,14 @@ func TestPatternsAreListedUpToTheLimitAndTheRestCounted(t *testing.T) {
 }
 
 func TestACharacterThatDrawsAsNothingOrAsASpaceIsWrittenOutAndCannotBeAllowed(t *testing.T) {
-	for name, c := range map[string]string{"hangul filler": "ㅤ", "hangul choseong filler": "ᅟ", "hangul jungseong filler": "ᅠ", "halfwidth hangul filler": "ﾠ", "braille blank": "⠀", "no-break space": " ", "em space": " ", "line separator": " ", "paragraph separator": " ", "ideographic space": "　", "grapheme joiner": "͏", "khmer vowel inherent aq": "឴", "khmer vowel inherent aa": "឵"} {
+	for name, c := range map[string]string{"hangul filler": "\u3164", "hangul choseong filler": "\u115f", "hangul jungseong filler": "\u1160", "halfwidth hangul filler": "\uffa0", "braille blank": "\u2800", "no-break space": "\u00a0", "em space": "\u2003", "line separator": "\u2028", "paragraph separator": "\u2029", "ideographic space": "\u3000", "grapheme joiner": "\u034f", "khmer vowel inherent aq": "\u17b4", "khmer vowel inherent aa": "\u17b5"} {
 		r := Of("cat /etc/pass" + c + "wd")
 		require.True(t, r.Hidden, name)
 		assert.False(t, r.Allowed(), name)
 		assert.NotContains(t, r.Shown, c, "%s: never shown raw", name)
 		assert.Contains(t, r.Shown, "<U+", name)
 	}
-	r := Of("cat /my files/a")
+	r := Of("cat /my\u00a0files/a")
 	assert.Equal(t, "cat /my<U+00A0>files/a", r.Shown, "a no-break space inside a path is shown")
 	assert.False(t, r.Allowed())
 	assert.True(t, Of("cat /my files/a").Allowed(), "an ordinary space is fine")
