@@ -52,6 +52,10 @@ func (h *BoardHandler) CloseAsk(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if body.Undo {
+		if !humanInputCaller(r) { // an Ignore is the Operator's: the agent that asked, the orchestrator and every other token are refused, so no agent reopens what the Operator put away (Security's SHOULD on #11576)
+			writeError(w, http.StatusForbidden, "owner_only", "only the person at this computer can open a question again")
+			return
+		}
 		reopened, err := h.bs.ReopenAsk(r.Context(), project, id)
 		if err != nil {
 			if errors.Is(err, board.ErrAskUnknown) {
