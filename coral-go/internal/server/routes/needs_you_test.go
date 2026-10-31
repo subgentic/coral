@@ -46,7 +46,7 @@ func TestNeedsYouCountsEverySourceAndCleansAndCutsTheLines(t *testing.T) {
 	h.SetNeedsYouAgents(func(*http.Request) ([]NeedsYouItem, error) {
 		return []NeedsYouItem{{Kind: "agent", From: "Dev", Line: "Wants to run a command", Team: "team", ID: "agent:s1", At: time.Now().Add(-time.Minute).UTC().Format(time.RFC3339Nano)}}, nil
 	})
-	q, err := bs.PostMessage(ctx, "team", "Lead", "@Operator may I ‮proceed?\n"+strings.Repeat("long ", 100), nil)
+	q, err := bs.PostMessage(ctx, "team", "Lead", "@Operator may I \u202eproceed?\n"+strings.Repeat("long ", 100), nil)
 	require.NoError(t, err)
 	require.NoError(t, bs.RecordAsk(ctx, "team", q, []string{"Operator"}))
 	_, err = bs.RegisterWait(ctx, "team", "Dev", "claude-x", board.WaitOperator, "", "may I delete the old table?", time.Hour)
@@ -72,7 +72,7 @@ func TestNeedsYouCountsEverySourceAndCleansAndCutsTheLines(t *testing.T) {
 		assert.NotEmpty(t, it["at"])
 	}
 	line := byKind["question"]["line"].(string)
-	assert.NotContains(t, line, "‮", "a hidden character is out")
+	assert.NotContains(t, line, "\u202e", "a hidden character is out")
 	assert.NotContains(t, line, "\n", "one line")
 	assert.LessOrEqual(t, len([]rune(line)), needsYouLineMax, "cut")
 	assert.Equal(t, "Lead", byKind["question"]["from"])
