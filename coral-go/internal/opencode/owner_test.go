@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -101,4 +102,20 @@ func TestAStrangerThatRefusesAWrongPasswordIsNeverSentTheRealOneWhileTheChildLiv
 func processAlive(pid int) bool {
 	p, err := os.FindProcess(pid)
 	return err == nil && p.Signal(syscall.Signal(0)) == nil
+}
+
+func TestAMachineWithoutTheSystemToolsGetsAnErrorThatNamesThem(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
+	_, err := listenerPIDs(context.Background(), 8451)
+	require.Error(t, err)
+	assert.ErrorIs(t, err, errNoOwnerTool)
+	if runtime.GOOS == "windows" {
+		assert.Contains(t, err.Error(), "netstat")
+		return
+	}
+	assert.Contains(t, err.Error(), "neither lsof nor ss is installed", "the two tools it asks")
+	assert.Contains(t, err.Error(), "netstat on Windows")
+	assert.Contains(t, err.Error(), "install lsof or ss", "and what to do")
+	_, err = listenerIsChild(context.Background(), 8451, os.Getpid())
+	require.Error(t, err, "the check fails closed: the password is not sent")
 }

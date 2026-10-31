@@ -18,7 +18,7 @@ import (
 // listens on 127.0.0.1:<port> and every listener must be the child or one of its descendants (a launcher that starts the real server). A stranger that holds the port and answers a wrong password with 401 is
 // then never sent the real one, even if the child stayed alive on another port. Checked on opencode 1.19.5: a build given a held port exits (it does not move), so this is the backstop for a build that does.
 
-var errNoOwnerTool = errors.New("no tool to ask the system who listens on a port (lsof, ss or netstat)")
+var errNoOwnerTool = errors.New("neither lsof nor ss is installed (netstat on Windows), so Coral cannot ask the system who listens on a port: install lsof or ss")
 
 // listenerIsChild reports whether every process listening on TCP port, on any address, is child or a descendant of it, and there is at least one. An error means the system could not be asked (the caller fails
 // closed).
