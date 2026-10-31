@@ -263,9 +263,13 @@ func TestAClosedAskIsOpenedAgainByUndoAndNothingIsPosted(t *testing.T) {
 	q, err := bs.PostMessage(ctx, "team", "Lead", "@Operator may I proceed?", nil)
 	require.NoError(t, err)
 	require.NoError(t, bs.RecordAsk(ctx, "team", q, []string{"Operator"}))
+	tunneled := false
 	call := func(who string, body map[string]any) (int, map[string]any) {
 		raw, _ := json.Marshal(body)
 		req := httptest.NewRequest(http.MethodPost, "/api/board/team/asks/x/close", strings.NewReader(string(raw)))
+		if tunneled {
+			req.Header.Set("X-Coral-Via-Tunnel", "1") // a request the Hub's connector executed
+		}
 		if who == "Operator" {
 			req = asPerson(withActor(req, Actor{Kind: ActorOperator, Name: "Operator"}))
 		} else {
@@ -296,6 +300,12 @@ func TestAClosedAskIsOpenedAgainByUndoAndNothingIsPosted(t *testing.T) {
 	assert.Equal(t, http.StatusForbidden, code, "the agent that asked may not reopen a question the Operator ignored")
 	assert.Equal(t, "owner_only", out["code"])
 	assert.Equal(t, 0, open())
+	tunneled = true
+	code, out = call("Operator", map[string]any{"undo": true})
+	assert.Equal(t, http.StatusForbidden, code, "a request that came through the Hub is not the owner's unless it is stamped as the owner: a grantee cannot reopen it")
+	assert.Equal(t, "owner_only", out["code"])
+	assert.Equal(t, 0, open())
+	tunneled = false
 	code, out = call("Operator", map[string]any{"undo": true})
 	require.Equal(t, http.StatusOK, code)
 	assert.Equal(t, true, out["reopened"])

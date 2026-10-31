@@ -156,7 +156,7 @@ var operatorOnlyRoutes = map[string]string{
 	"POST /api/board/{project}/proposals/{id}/approve":                    "approve what an agent asked to add",
 	"POST /api/board/{project}/proposals/{id}/reject":                     "reject what an agent asked to add",
 	"PUT /api/board/{project}/artifacts/{id}/tags":                        "change an artifact's tags",
-	"POST /api/board/{project}/artifacts/{id}/review":                     "approve an artifact or ask changes of it",
+	"POST /api/board/{project}/artifacts/{id}/review":                     "approve, deny or ignore an artifact or ask changes of it",
 	"POST /api/board/{project}/operator-artifacts":                        "share a file with an agent as the Operator",
 	"POST /api/board/{project}/operator-artifacts/message":                "tell an agent about a file the Operator shared",
 	"PUT /api/board/{project}/subscribers/{subscriberID}/review-settings": "set an agent's Reviews only switch and review areas",
