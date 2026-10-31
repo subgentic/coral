@@ -2,6 +2,7 @@ package ptymanager
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -124,20 +125,16 @@ func TestAPersonsOwnSendAndNonNoticesAreNeverHeld(t *testing.T) {
 	d, err := DeliverNow(context.Background(), in("person send", "the person's own Send now"))
 	require.NoError(t, err)
 	assert.Equal(t, Sent, d, "the person's own send is never held")
-	for _, what := range []string{"initial prompt", "automated /send", "automated /keys"} {
+	for _, what := range []string{"initial prompt", "automated /send", "automated /keys", "auto-accept answer"} {
 		d, err = DeliverAutomated(context.Background(), in(what, "not a notice: "+what))
 		require.NoError(t, err)
 		assert.Equal(t, Sent, d, "%s is not a notice", what)
 	}
-	assert.Len(t, a.sent(), 4)
+	assert.Len(t, a.sent(), 5)
 }
 
 func TestTheHeldSummaryHoldsOnlyCountsAndFixedWords(t *testing.T) {
-	held := map[string]map[uint64]struct{}{
-		"board message":     {1: {}},
-		"some new sender":   {1: {}, 2: {}},
-		"task notification": {1: {}, 2: {}, 3: {}},
-	}
+	held := map[string]int{"board message": 1, "some new sender": 2, "task notification": 3}
 	line := heldSummary(held)
 	assert.Equal(t, "[Coral] While you were talking: 1 board message, 2 notices, 3 tasks. Run coral-board read.", line)
 	assert.False(t, strings.ContainsAny(line, "\n\r"), "one line")
@@ -146,4 +143,44 @@ func TestTheHeldSummaryHoldsOnlyCountsAndFixedWords(t *testing.T) {
 func setNoticeClock(at time.Time) {
 	f := func() time.Time { return at }
 	noticeClock.Store(&f)
+}
+
+// Security's SHOULD 1 on #11387: a pause of hours with a flood of distinct notices keeps a bounded set and still counts right.
+func TestAFloodOfDistinctNoticesWhilePausedStaysBoundedAndCountedRight(t *testing.T) {
+	const sid = "11111111-1387-4000-8000-000000000007"
+	a, in := noticeRig(t, sid)
+	PauseNotices(sid, time.Hour)
+	const n = 100000
+	for i := 0; i < n; i++ {
+		d, err := DeliverAutomated(context.Background(), in("board message", fmt.Sprintf("notice %d", i)))
+		require.NoError(t, err)
+		require.Equal(t, Skipped, d)
+	}
+	_, _, waiting, _ := NoticeStatus(sid)
+	assert.Equal(t, n, waiting, "every distinct notice is counted")
+	notices.Lock()
+	st := notices.m[sid]
+	remembered, counts := len(st.held["board message"]), heldCounts(st.held, st.extra)
+	notices.Unlock()
+	assert.Equal(t, maxHeldDistinct, remembered, "the remembered set stops at the cap")
+	assert.Empty(t, a.sent())
+	assert.Equal(t, "[Coral] While you were talking: 100000 board messages. Run coral-board read.", heldSummary(counts))
+}
+
+// ... and held entries older than heldKeepFor are dropped when the next notice is held, not only at a flush.
+func TestHeldNoticesOlderThanTheKeepTimeAreDroppedWhenTheNextIsHeld(t *testing.T) {
+	const sid = "11111111-1387-4000-8000-000000000008"
+	_, in := noticeRig(t, sid)
+	start := time.Now()
+	setNoticeClock(start)
+	PauseNotices(sid, 12*time.Hour)
+	for i := 0; i < 5; i++ {
+		_, err := DeliverAutomated(context.Background(), in("board message", fmt.Sprintf("old %d", i)))
+		require.NoError(t, err)
+	}
+	setNoticeClock(start.Add(heldKeepFor + time.Minute))
+	_, err := DeliverAutomated(context.Background(), in("board message", "fresh"))
+	require.NoError(t, err)
+	_, _, waiting, _ := NoticeStatus(sid)
+	assert.Equal(t, 1, waiting, "the five old ones are forgotten, only the fresh one waits")
 }

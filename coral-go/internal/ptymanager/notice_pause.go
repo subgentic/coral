@@ -36,6 +36,8 @@ const (
 	heldKeepFor = 15 * time.Minute
 	// heldWhat is the sender name of the line that stands for the held notices.
 	heldWhat = "held notices"
+	// maxHeldDistinct is how many distinct notices of one sender are remembered by hash for one session; past it they are only counted.
+	maxHeldDistinct = 1000
 )
 
 // The seams of the hold, atomic because the timers read them while a test sets them (the census of seams_census_test.go): the clock, the typing window and what types the summary.
@@ -71,13 +73,14 @@ func typeSummary(ctx context.Context, tmpl AutomatedInput, text string) error {
 	return term.SendInput(ctx, terminalinput.Coral, tmpl.Name, text, tmpl.AgentType, tmpl.SessionID)
 }
 
-// notHeld are the senders the hold never touches: an agent's first prompt (a launch is not a notice) and the line that stands for the held ones.
+// notHeld are the senders the hold never touches: an agent's first prompt (a launch is not a notice), the line that stands for the held ones, and an auto-accept answer (a pause is for Coral's notices, never for approvals: an agent on a permission prompt must not wait up to 12 hours).
 func notHeld(what string) bool {
-	return what == "initial prompt" || what == heldWhat || strings.HasPrefix(what, "automated ")
+	return what == "initial prompt" || what == heldWhat || what == "auto-accept answer" || strings.HasPrefix(what, "automated ")
 }
 
 type noticeState struct {
 	until   time.Time                      // an explicit pause ends here (zero: not paused)
+	extra   map[string]int                 // sender -> notices past maxHeldDistinct, counted and not remembered
 	held    map[string]map[uint64]struct{} // sender -> the distinct notices held (by hash of their text: a notice asked again is one)
 	since   time.Time                      // when the first notice was held
 	tmpl    AutomatedInput                 // where and how the summary is typed: the terminal, the names, the sender's own checks
@@ -93,7 +96,7 @@ var notices = struct {
 func stateOf(sessionID string) *noticeState {
 	st := notices.m[sessionID]
 	if st == nil {
-		st = &noticeState{held: map[string]map[uint64]struct{}{}}
+		st = &noticeState{held: map[string]map[uint64]struct{}{}, extra: map[string]int{}}
 		notices.m[sessionID] = st
 	}
 	return st
@@ -136,8 +139,8 @@ func NoticeStatus(sessionID string) (paused bool, until time.Time, waiting int, 
 		if st.until.After(now) {
 			paused, until = true, st.until
 		}
-		for _, set := range st.held {
-			waiting += len(set)
+		for _, n := range heldCounts(st.held, st.extra) {
+			waiting += n
 		}
 	}
 	typing = !paused && terminalinput.PersonTypedWithin(sessionID, typingHold())
@@ -166,12 +169,21 @@ func holdNotice(in AutomatedInput) {
 	notices.Lock()
 	defer notices.Unlock()
 	st := stateOf(in.SessionID)
+	if !st.since.IsZero() && noticeNow().Sub(st.since) > heldKeepFor { // forgotten here too, not only at a flush: a pause for hours does not grow without end
+		st.held, st.extra, st.since = map[string]map[uint64]struct{}{}, map[string]int{}, time.Time{}
+	}
 	set := st.held[in.What]
 	if set == nil {
 		set = map[uint64]struct{}{}
 		st.held[in.What] = set
 	}
-	set[h.Sum64()] = struct{}{}
+	if _, seen := set[h.Sum64()]; !seen {
+		if len(set) < maxHeldDistinct {
+			set[h.Sum64()] = struct{}{}
+		} else {
+			st.extra[in.What]++
+		}
+	}
 	if st.since.IsZero() {
 		st.since = noticeNow()
 	}
@@ -199,11 +211,25 @@ var noticeLabels = map[string][2]string{
 	"agent UI action":    {"request from a panel", "requests from a panel"},
 }
 
+// heldCounts is how many notices each sender held: the remembered ones and those counted past the cap.
+func heldCounts(held map[string]map[uint64]struct{}, extra map[string]int) map[string]int {
+	out := map[string]int{}
+	for what, set := range held {
+		out[what] = len(set) + extra[what]
+	}
+	for what, n := range extra {
+		if _, ok := held[what]; !ok {
+			out[what] = n
+		}
+	}
+	return out
+}
+
 // heldSummary is the one line: "[Coral] While you were talking: 3 board messages, 1 task. Run coral-board read." Counts and fixed words only: nothing a notice said.
-func heldSummary(held map[string]map[uint64]struct{}) string {
+func heldSummary(held map[string]int) string {
 	counts := map[string]int{}
 	order := []string{}
-	for what, set := range held {
+	for what, n := range held {
 		singular, plural := "notice", "notices"
 		if l, ok := noticeLabels[what]; ok {
 			singular, plural = l[0], l[1]
@@ -212,7 +238,7 @@ func heldSummary(held map[string]map[uint64]struct{}) string {
 		if _, seen := counts[key]; !seen {
 			order = append(order, key)
 		}
-		counts[key] += len(set)
+		counts[key] += n
 	}
 	sort.Strings(order)
 	parts := make([]string, 0, len(order))
@@ -231,7 +257,7 @@ func heldSummary(held map[string]map[uint64]struct{}) string {
 func flushHeld(sessionID string) {
 	if noticesHeld(sessionID) {
 		notices.Lock()
-		if st := notices.m[sessionID]; st != nil && len(st.held) > 0 {
+		if st := notices.m[sessionID]; st != nil && (len(st.held) > 0 || len(st.extra) > 0) {
 			scheduleFlushLocked(sessionID, st, 3*time.Second) // still held: look again soon
 		}
 		notices.Unlock()
@@ -239,18 +265,26 @@ func flushHeld(sessionID string) {
 	}
 	notices.Lock()
 	st := notices.m[sessionID]
-	if st == nil || len(st.held) == 0 || st.flusher {
+	if st == nil || (len(st.held) == 0 && len(st.extra) == 0) || st.flusher {
 		notices.Unlock()
 		return
 	}
 	if !st.since.IsZero() && noticeNow().Sub(st.since) > heldKeepFor {
-		st.held, st.since = map[string]map[uint64]struct{}{}, time.Time{}
+		st.held, st.extra, st.since = map[string]map[uint64]struct{}{}, map[string]int{}, time.Time{}
 		notices.Unlock()
 		return
 	}
 	st.flusher = true
-	text, tmpl := heldSummary(st.held), st.tmpl
-	taken := st.held
+	text, tmpl := heldSummary(heldCounts(st.held, st.extra)), st.tmpl
+	taken, takenExtra := map[string][]uint64{}, map[string]int{} // a snapshot: what is held while the line is typed stays held
+	for what, set := range st.held {
+		for k := range set {
+			taken[what] = append(taken[what], k)
+		}
+	}
+	for what, n := range st.extra {
+		takenExtra[what] = n
+	}
 	notices.Unlock()
 
 	done := false
@@ -258,19 +292,24 @@ func flushHeld(sessionID string) {
 		notices.Lock()
 		if cur := notices.m[sessionID]; cur != nil {
 			cur.flusher = false
-			if !done && len(cur.held) > 0 { // the agent could not take it yet (a prompt, a draft): look again
+			if !done && (len(cur.held) > 0 || len(cur.extra) > 0) { // the agent could not take it yet (a prompt, a draft): look again
 				scheduleFlushLocked(sessionID, cur, 3*time.Second)
 			}
 			if done { // what was told is gone; what was held in the meantime stays
-				for what, set := range taken {
-					for k := range set {
+				for what, keys := range taken {
+					for _, k := range keys {
 						delete(cur.held[what], k)
 					}
 					if len(cur.held[what]) == 0 {
 						delete(cur.held, what)
 					}
 				}
-				if len(cur.held) == 0 {
+				for what, n := range takenExtra {
+					if cur.extra[what] -= n; cur.extra[what] <= 0 {
+						delete(cur.extra, what)
+					}
+				}
+				if len(cur.held) == 0 && len(cur.extra) == 0 {
 					cur.since = time.Time{}
 				}
 			}
