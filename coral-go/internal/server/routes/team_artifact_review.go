@@ -66,7 +66,7 @@ func (h *BoardHandler) ReviewArtifact(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !humanInputCaller(r) {
-		commentRefuse(w, http.StatusForbidden, "owner_only", "only the person at this computer can approve an artifact")
+		commentRefuse(w, http.StatusForbidden, "owner_only", "only the person at this computer can decide on an artifact")
 		return
 	}
 	project := urlParam(r, "project")

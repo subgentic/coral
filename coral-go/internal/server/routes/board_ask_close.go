@@ -52,6 +52,9 @@ func (h *BoardHandler) CloseAsk(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if body.Undo {
+		if refuseNonOwner(w, r) { // through the Hub only the account this computer is linked to (a grantee is refused; the Hub's tier table does not offer this route at all)
+			return
+		}
 		if !humanInputCaller(r) { // an Ignore is the Operator's: the agent that asked, the orchestrator and every other token are refused, so no agent reopens what the Operator put away (Security's SHOULD on #11576)
 			writeError(w, http.StatusForbidden, "owner_only", "only the person at this computer can open a question again")
 			return
