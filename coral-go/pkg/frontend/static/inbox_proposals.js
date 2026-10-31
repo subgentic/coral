@@ -3,13 +3,15 @@
  * never as HTML. The Operator's alone: the machine answers a guest or a grantee 403, and then there are no rows. An expired proposal stays in the list, marked, until the Operator dismisses it here. */
 import { importOnce } from './import_once.js';
 import { showToast } from './utils.js';
-import { visibleName } from './artifact_names.js';
 import { loadStyles } from './lazy_styles.js';
+const { markHidden } = await importOnce('./visible_marks.js'); // lazy: its failure is retried
 const { proposalItems, pendingProposals, onProposalsChanged, refreshProposals, dismissExpired, decide } = await importOnce('./proposals_state.js'); // lazy: its failure is retried
 const { el } = await importOnce('./data_table.js');
 await loadStyles('inbox_proposals.css');
 export { proposalItems, pendingProposals, onProposalsChanged, refreshProposals };
 
+/** What an agent wrote, for a place that shows it as one line: every hidden or reordering character written out as <U+202E> (strict: nothing is left alone), a line break a space. */
+export const markedText = t => markHidden(t, { strict: true }).replace(/\s+/g, ' ').trim();
 const kindWord = p => (p.kind === 'goal' ? 'goal' : 'task');
 
 /** What a proposal carries, for the dialog and the row: its words, the instructions and required outputs the assignee will be given (shown in full: the Operator approves what they read), and one line of everything else it sets. */
@@ -26,12 +28,12 @@ export function proposalFacts(p) {
 export const carriesInstructions = p => { const f = proposalFacts(p); return !!(f.instructions || f.outputs.length); };
 
 /** The line a row says: who proposed what. */
-export const proposalSummary = p => `Proposes a ${kindWord(p)}: ${visibleName(p.title)}`;
+export const proposalSummary = p => `Proposes a ${kindWord(p)}: ${markedText(p.title)}`;
 
 /** The one line a row shows of a proposal's words: the first line of its body, cut (the row's CSS cuts it again at the edge with an ellipsis, so it never wraps). */
 export function proposalSnippet(p) {
     const pay = p.payload && typeof p.payload === 'object' ? p.payload : {};
-    const first = String(pay.body || pay.outcome || '').trim().split(/\r?\n/)[0].replace(/\s+/g, ' ');
+    const first = markedText(String(pay.body || pay.outcome || '').trim().split(/\r?\n/)[0]); // marked first, then cut: a mark is never cut in half
     return first.length > 160 ? `${first.slice(0, 160)}…` : first;
 }
 
@@ -40,17 +42,17 @@ export function proposalActions(p) {
     const box = el('div', 'inbox-review-actions inbox-proposal-actions');
     const btn = (label, aria, run) => { const b = el('button', 'btn btn-small', label); b.type = 'button'; b.setAttribute('aria-label', aria); b.addEventListener('click', e => { e.stopPropagation(); run(b); }); return b; };
     if (p.state === 'expired') {
-        box.append(el('span', 'inbox-proposal-expired', 'Expired, nothing was made'), btn('Dismiss', `Dismiss the expired ${kindWord(p)} ${visibleName(p.title)}`, () => dismissExpired(p)));
+        box.append(el('span', 'inbox-proposal-expired', 'Expired, nothing was made'), btn('Dismiss', `Dismiss the expired ${kindWord(p)} ${markedText(p.title)}`, () => dismissExpired(p)));
         return box;
     }
     if (p.state === 'approving') { box.append(el('span', 'inbox-proposal-expired', 'Being approved…')); return box; } // an Approve has it: nothing to press until it finishes (a stuck one is looked into after five minutes)
-    box.append(btn('Approve', `Approve the ${kindWord(p)} ${visibleName(p.title)}`, async b => {
+    box.append(btn('Approve', `Approve the ${kindWord(p)} ${markedText(p.title)}`, async b => {
             b.disabled = true;
             const res = await decide(p, 'approve');
             if (res.ok) showToast(res.text, false, 4000); else { b.disabled = false; showToast(res.text, true, 6000); }
         }),
-        btn('Edit', `Edit and approve the ${kindWord(p)} ${visibleName(p.title)}`, () => openProposalDialog(p, 'edit')),
-        btn('Reject', `Reject the ${kindWord(p)} ${visibleName(p.title)}`, () => openProposalDialog(p, 'reject')));
+        btn('Edit', `Edit and approve the ${kindWord(p)} ${markedText(p.title)}`, () => openProposalDialog(p, 'edit')),
+        btn('Reject', `Reject the ${kindWord(p)} ${markedText(p.title)}`, () => openProposalDialog(p, 'reject')));
     return box;
 }
 
@@ -60,7 +62,7 @@ export function openProposalDialog(p, mode = 'view') {
     const facts = proposalFacts(p), pay = p.payload && typeof p.payload === 'object' ? p.payload : {};
     const d = el('dialog', 'modal-content dlg-form proposal-dialog'); d.id = 'proposal-dialog'; d.setAttribute('aria-labelledby', 'proposal-dialog-title');
     const h = el('h2', null, `${kindWord(p) === 'goal' ? 'A goal' : 'A task'} waiting for your approval`); h.id = 'proposal-dialog-title';
-    const who = el('p', 'proposal-who', `${p.proposer} proposed it for ${p.board_id}.${p.goal_proposal_id ? ' It is for a goal that is also waiting: approve that goal first.' : ''}`);
+    const who = el('p', 'proposal-who', `${markedText(p.proposer)} proposed it for ${p.board_id}.${p.goal_proposal_id ? ' It is for a goal that is also waiting: approve that goal first.' : ''}`);
     const inputs = [];
     const field = (label, value, tall) => { const l = el('label', 'proposal-field'); l.append(el('span', null, label)); const i = el(tall ? 'textarea' : 'input', 'field'); if (tall) i.rows = 4; i.value = value; i.readOnly = mode !== 'edit'; inputs.push(i); l.append(i); return [l, i]; }; // the words are read first: they are changed only after Edit and approve
     const [tl, title] = field('Title', p.title);
