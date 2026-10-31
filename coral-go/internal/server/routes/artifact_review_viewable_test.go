@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -22,6 +23,9 @@ func TestForReviewIsRefusedForWhatNeedsYouCannotShow(t *testing.T) {
 		q := ""
 		for _, tg := range tags {
 			q += "&tag=" + strings.ReplaceAll(tg, " ", "+")
+			if strings.EqualFold(strings.Join(strings.Fields(tg), " "), "for review") {
+				q += "&question=Approve+it%3F"
+			}
 		}
 		req, err := http.NewRequest(http.MethodPost, rig.srv.URL+"/api/agent/artifacts?session_id="+session+q, strings.NewReader(text))
 		require.NoError(t, err)
@@ -77,4 +81,25 @@ func TestForReviewIsRefusedForWhatNeedsYouCannotShow(t *testing.T) {
 	bhTags := &BoardHandler{bs: rig.h.bs}
 	bhTags.attachArtifactTags(ctx, "team-a", items)
 	assert.Equal(t, []string{"internal"}, items[0].Tags, "the unviewable row keeps its other tags and loses 'for review'")
+}
+
+// A listed row carries the question of its upload only while it is tagged for review (#11555); a person editing the tags leaves the stored question alone.
+func TestAListedReviewRowCarriesItsQuestion(t *testing.T) {
+	_, bh := setupBoardTestServer(t)
+	ctx := context.Background()
+	a, b := strings.Repeat("a", 64), strings.Repeat("b", 64)
+	_, err := bh.bs.SetArtifactQuestion(ctx, "team-q", a, "Approve the layout?", "sess-1", time.Now())
+	require.NoError(t, err)
+	_, err = bh.bs.SetArtifactQuestion(ctx, "team-q", b, "Approve the plan?", "sess-1", time.Now())
+	require.NoError(t, err)
+	require.NoError(t, bh.bs.SetArtifactTags(ctx, "team-q", a, []string{"for review"}))
+	require.NoError(t, bh.bs.SetArtifactTags(ctx, "team-q", b, []string{"internal"}))
+	items := []teamArtifact{{managed: a, Name: "a.md", MediaType: "text/markdown"}, {managed: b, Name: "b.md", MediaType: "text/markdown"}}
+	bh.attachArtifactTags(ctx, "team-q", items)
+	assert.Equal(t, "Approve the layout?", items[0].ReviewQuestion)
+	assert.Empty(t, items[1].ReviewQuestion, "not for review: no question on the row")
+	require.NoError(t, bh.bs.SetArtifactTags(ctx, "team-q", b, []string{"for review"})) // the Operator tags it for review by hand
+	items = []teamArtifact{{managed: b, Name: "b.md", MediaType: "text/markdown"}}
+	bh.attachArtifactTags(ctx, "team-q", items)
+	assert.Equal(t, "Approve the plan?", items[0].ReviewQuestion, "a tag edit never dropped the stored question")
 }

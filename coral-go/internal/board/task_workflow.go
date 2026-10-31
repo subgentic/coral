@@ -26,15 +26,17 @@ type TaskArtifact struct {
 	Digest    string `json:"digest,omitempty"`
 	Kind      string `json:"kind,omitempty"`
 	// Tags: the tags an agent asks for on a stored object the result links (#8583). They are applied to the team's tags of that object when the result is recorded and are not kept in the row.
-	Tags         []string `json:"tags,omitempty"`
-	Command      string   `json:"command,omitempty"`
-	Runner       string   `json:"runner,omitempty"`
-	OutputDigest string   `json:"output_digest,omitempty"`
-	StartedAt    string   `json:"started_at,omitempty"`
-	FinishedAt   string   `json:"finished_at,omitempty"`
-	Branch       string   `json:"branch,omitempty"`
-	Remote       string   `json:"remote,omitempty"`
-	Landed       bool     `json:"landed,omitempty"`
+	Tags []string `json:"tags,omitempty"`
+	// Question: with the tag "for review", what the Operator is to decide (#11555): cleaned and kept apart from the row; a result that asks for review without one gets no review tag.
+	Question     string `json:"question,omitempty"`
+	Command      string `json:"command,omitempty"`
+	Runner       string `json:"runner,omitempty"`
+	OutputDigest string `json:"output_digest,omitempty"`
+	StartedAt    string `json:"started_at,omitempty"`
+	FinishedAt   string `json:"finished_at,omitempty"`
+	Branch       string `json:"branch,omitempty"`
+	Remote       string `json:"remote,omitempty"`
+	Landed       bool   `json:"landed,omitempty"`
 	// Seq and AttachedBy are the server's (#5689): the order rows were recorded in on a task, and who recorded each. A value a
 	// client sends is replaced (stampArtifacts), so a patch row's author cannot be forged.
 	Seq        int    `json:"seq,omitempty"`

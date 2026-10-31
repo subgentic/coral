@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 
@@ -32,12 +33,16 @@ func (h *BoardHandler) attachArtifactTags(ctx context.Context, project string, i
 	if err != nil || len(tags) == 0 {
 		return
 	}
-	reviews, _ := h.bs.ArtifactReviews(ctx, project) // when a review was decided (#136584); a read that fails leaves the rows without it
+	questions, _ := h.bs.ArtifactQuestions(ctx, project) // what each upload for review asks (#11555); a read that fails leaves the rows without it
+	reviews, _ := h.bs.ArtifactReviews(ctx, project)     // when a review was decided (#136584); a read that fails leaves the rows without it
 	for i := range items {
 		if items[i].managed != "" {
 			items[i].Tags = tags[items[i].managed]
 			if hasTag(items[i].Tags, tagForReview) && items[i].MediaType != "" && !mediatype.Viewable(items[i].MediaType, items[i].Name) {
 				items[i].Tags = withoutTag(items[i].Tags, tagForReview) // a row Needs you cannot show leaves it, whoever tagged it and whenever (#11553); the stored tag is not changed
+			}
+			if q, ok := questions[items[i].managed]; ok && hasTag(items[i].Tags, tagForReview) {
+				items[i].ReviewQuestion = q.Question
 			}
 			if rv, ok := reviews[items[i].managed]; ok {
 				rv := rv
@@ -134,11 +139,13 @@ func (h *BoardHandler) SetArtifactTags(w http.ResponseWriter, r *http.Request) {
 
 // applyManifestTags records the tags an agent asked for on the stored objects its task result links (#8583), added to the team's tags of each (at most five in all), and takes them out of the rows:
 // the table is where a tag lives, so a person's later change is the only word. A tag that is not one is left out, never an error.
-func (h *BoardHandler) applyManifestTags(ctx context.Context, project string, artifacts []board.TaskArtifact) {
+func (h *BoardHandler) applyManifestTags(ctx context.Context, project, asker string, artifacts []board.TaskArtifact) {
 	for i := range artifacts {
 		a := &artifacts[i]
 		tags := a.Tags
 		a.Tags = nil
+		question := strings.TrimSpace(a.Question)
+		a.Question = "" // the table is where a question lives, as a tag does
 		if len(tags) == 0 || a.Provenance == provenanceUnverified {
 			continue
 		}
@@ -147,6 +154,15 @@ func (h *BoardHandler) applyManifestTags(ctx context.Context, project string, ar
 			continue
 		}
 		clean := board.CleanArtifactTags(tags)
+		if hasTag(clean, tagForReview) {
+			q, ok := board.CleanReviewQuestion(question)
+			if !ok || hasSignInLink(question) || asker == "" {
+				clean = withoutTag(clean, tagForReview) // no question, no review row: the Operator would not know what is asked (#11555)
+				slog.Warn("task artifact not tagged for review: it has no question", "board", project, "artifact", a.Name)
+			} else {
+				_, _ = h.bs.SetArtifactQuestion(ctx, project, id, q, asker, time.Now())
+			}
+		}
 		if len(clean) == 0 {
 			continue
 		}

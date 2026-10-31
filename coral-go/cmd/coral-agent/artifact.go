@@ -20,13 +20,13 @@ import (
 	"github.com/subgentic/coral/internal/mediatype"
 )
 
-const artifactUsageText = `Usage: coral-agent artifact upload <file> [--name NAME] [--media-type TYPE] [--new-version-of <link>] [--task N | --no-task] [--tag WORD]...
+const artifactUsageText = `Usage: coral-agent artifact upload <file> [--name NAME] [--media-type TYPE] [--new-version-of <link>] [--task N | --no-task] [--tag WORD]... [--question TEXT]
        coral-agent artifact download <coral://artifacts/digest> [--output FILE] [--force]
        coral-agent artifact reply <coral://artifacts/digest> <comment-id> <text | ->
        coral-agent artifact comments <coral://artifacts/digest>
 Run coral-agent artifact upload --help, artifact download --help, artifact reply --help or artifact comments --help for one of them.`
 
-const artifactUploadUsageText = `Usage: coral-agent artifact upload <file> [--name NAME] [--media-type TYPE] [--new-version-of <link>] [--task N | --no-task] [--tag WORD]...
+const artifactUploadUsageText = `Usage: coral-agent artifact upload <file> [--name NAME] [--media-type TYPE] [--new-version-of <link>] [--task N | --no-task] [--tag WORD]... [--question TEXT]
 
 An upload is linked to the task you have in progress (the reply says task_id, and this prints
 "Linked to task #N"); the task's page and the team's Artifacts tab then list it. --task N links it to
@@ -42,6 +42,11 @@ bytes as an older version are refused (non-zero), so nobody takes it for the new
 hyphens, 24 characters at most): tag a file "for review" when a person must look at it, decide, or approve it, and logs and
 scratch files "internal"; a file for other agents or for yourself (logs, patches, notes, screenshots for a reviewer) is not
 "for review": that tag is for what the Operator must see, so Needs you does not fill up; do not invent other tags unless the task asks for one. A word that is not a tag is left out.
+
+--question "<what the Operator is to decide>" is REQUIRED with --tag "for review": one line of at most 140 characters (for example
+--question "Approve this phone layout for the Goals list?"). Needs you shows it above the file; without one the tag is refused and
+nothing is stored. Test screenshots, logs and walk evidence are not for review: upload them without the tag and link them in your post.
+The tag is also refused for a file Needs you cannot show inline (it shows Markdown, HTML, an image, a PDF, a CSV or TSV table and other text).
 
 Upload long reports, logs, diffs and evidence instead of pasting them into posts.
 Link the returned coral://artifacts/<digest> in a short board post: a one-line
@@ -117,7 +122,7 @@ func cmdArtifact(args []string) {
 		fmt.Fprintln(os.Stderr, artifactUsageText)
 		clierr.Exit1()
 	}
-	opts, err := splitOptions(args[1:], []string{"name", "media-type", "new-version-of", "task", "tag"}, []string{"no-task"})
+	opts, err := splitOptions(args[1:], []string{"name", "media-type", "new-version-of", "task", "tag", "question"}, []string{"no-task"})
 	if err != nil || len(opts.Positional) != 1 {
 		if err == nil {
 			err = fmt.Errorf("upload needs exactly one file")
@@ -146,7 +151,7 @@ func cmdArtifact(args []string) {
 	}
 	name = mediatype.EnsureExtension(name, file)
 	mediaType := mediatype.Resolve(opts.Values["media-type"], file, name)
-	if err := uploadArtifactTags(serverURL, file, name, mediaType, resolveSessionID(), opts.Values["new-version-of"], task, opts.All["tag"], os.Stdout, os.Stderr); err != nil {
+	if err := uploadArtifactTags(serverURL, file, name, mediaType, resolveSessionID(), opts.Values["new-version-of"], task, opts.All["tag"], opts.Values["question"], os.Stdout, os.Stderr); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		clierr.Exit1()
 	}
@@ -157,12 +162,12 @@ func cmdArtifact(args []string) {
 // an error and prints NO link, so a caller that misses the exit code can't take a refusal for a
 // success (#4004: the CLI used to exit 0 on a refused upload, so dead links were posted).
 func uploadArtifact(serverURL, file, name, mediaType, sid, newVersionOf, task string, stdout, stderr io.Writer) error {
-	return uploadArtifactTags(serverURL, file, name, mediaType, sid, newVersionOf, task, nil, stdout, stderr)
+	return uploadArtifactTags(serverURL, file, name, mediaType, sid, newVersionOf, task, nil, "", stdout, stderr)
 }
 
 // uploadArtifactTags is uploadArtifact with the tags asked for the file (#8583), each sent as a tag parameter.
-func uploadArtifactTags(serverURL, file, name, mediaType, sid, newVersionOf, task string, tags []string, stdout, stderr io.Writer) error {
-	if err := refuseSignInLinkIn("an artifact name or tag", append([]string{name}, tags...)...); err != nil {
+func uploadArtifactTags(serverURL, file, name, mediaType, sid, newVersionOf, task string, tags []string, question string, stdout, stderr io.Writer) error {
+	if err := refuseSignInLinkIn("an artifact name, tag or question", append([]string{name, question}, tags...)...); err != nil {
 		return err
 	}
 	// Its contents: a warning only, and the upload goes ahead.
@@ -172,7 +177,7 @@ func uploadArtifactTags(serverURL, file, name, mediaType, sid, newVersionOf, tas
 		return err
 	}
 	defer f.Close()
-	req, err := http.NewRequest(http.MethodPost, serverURL+"/api/agent/artifacts?session_id="+url.QueryEscape(sid)+tagQuery(tags), f)
+	req, err := http.NewRequest(http.MethodPost, serverURL+"/api/agent/artifacts?session_id="+url.QueryEscape(sid)+tagQuery(tags)+questionQuery(question), f)
 	if err != nil {
 		return err
 	}
@@ -315,6 +320,14 @@ func replyToComment(serverURL, ref, commentID, text string, stdout io.Writer) er
 	}
 	fmt.Fprintf(stdout, "Reply posted (comment %d).\n", reply.ID)
 	return nil
+}
+
+// questionQuery is the question parameter of an upload for review (#11555): "&question=<text>", or nothing.
+func questionQuery(q string) string {
+	if strings.TrimSpace(q) == "" {
+		return ""
+	}
+	return "&question=" + url.QueryEscape(q)
 }
 
 // tagQuery is the tag parameters of an upload: "&tag=<word>" for each.

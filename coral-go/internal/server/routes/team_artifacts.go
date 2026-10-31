@@ -52,6 +52,8 @@ type teamArtifact struct {
 	Tags []string `json:"tags,omitempty"`
 	// Private: the manager marked this stored object private, so no guide reads it (#11457). Present (true) only for the owner's own read; never in anything an agent or a guide reads, and absent when it is not marked.
 	Private bool `json:"private,omitempty"`
+	// ReviewQuestion: what the agent that uploaded this file asks the Operator to decide (#11555), cleaned and at most 140 characters: on a row tagged for review, when its upload said (agent text: show it as text).
+	ReviewQuestion string `json:"review_question,omitempty"`
 	// Review is the Operator's decision on an artifact tagged for review, with its time (#136584): absent until one is made.
 	Review         *board.ArtifactReview `json:"review,omitempty"`
 	Source         string                `json:"source"`

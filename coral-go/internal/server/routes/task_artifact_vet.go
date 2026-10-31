@@ -79,7 +79,14 @@ func (h *BoardHandler) vetTaskArtifacts(r *http.Request, project string, artifac
 			slog.Warn("task artifact link not verified: kept as a plain link", "board", project, "artifact", a.Name, "id", id, "caller", actor.Kind)
 		}
 	}
-	h.applyManifestTags(r.Context(), project, artifacts)
+	asker := "" // who a question is kept for (#11555): the member the token backs, or the Operator; a claimed caller backs nothing, so its review tags are left out
+	switch {
+	case person:
+		asker = "operator"
+	case actor.Kind == ActorToken && actor.Name != "":
+		asker = "member:" + actor.Name
+	}
+	h.applyManifestTags(r.Context(), project, asker, artifacts)
 	return unverified
 }
 

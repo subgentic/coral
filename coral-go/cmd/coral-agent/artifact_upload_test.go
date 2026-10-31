@@ -247,15 +247,20 @@ func TestUploadArtifactSendsEachTagAsAParameter(t *testing.T) {
 		t.Fatal(err)
 	}
 	var got []string
+	var gotQuestion string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		got = r.URL.Query()["tag"]
+		gotQuestion = r.URL.Query().Get("question")
 		w.WriteHeader(http.StatusCreated)
 		_, _ = w.Write([]byte(`{"uri":"coral://artifacts/` + strings.Repeat("a", 64) + `","tags":["for review","internal"]}`))
 	}))
 	defer srv.Close()
 	var out, errOut bytes.Buffer
-	if err := uploadArtifactTags(srv.URL, file, "note.txt", "text/plain", "sess-1", "", "", []string{"for review", "internal", "q4&x=1"}, &out, &errOut); err != nil {
+	if err := uploadArtifactTags(srv.URL, file, "note.txt", "text/plain", "sess-1", "", "", []string{"for review", "internal", "q4&x=1"}, "Approve the Q4 plan?", &out, &errOut); err != nil {
 		t.Fatal(err)
+	}
+	if gotQuestion != "Approve the Q4 plan?" {
+		t.Errorf("the server saw question %q", gotQuestion)
 	}
 	if strings.Join(got, "|") != "for review|internal|q4&x=1" {
 		t.Errorf("the server saw tags %q", got)
@@ -267,8 +272,8 @@ func TestUploadArtifactSendsEachTagAsAParameter(t *testing.T) {
 	if err := uploadArtifact(srv.URL, file, "note.txt", "text/plain", "sess-1", "", "", &out, &errOut); err != nil {
 		t.Fatal(err)
 	}
-	if len(got) != 0 {
-		t.Errorf("no --tag: no tag parameter, saw %q", got)
+	if len(got) != 0 || gotQuestion != "" {
+		t.Errorf("no --tag: no tag or question parameter, saw %q %q", got, gotQuestion)
 	}
 }
 
