@@ -79,7 +79,7 @@ test('the review name is one line: the version, the pages shot and the pages cha
 test('the review upload carries the "for review" tag and the contact sheet, on the release task, and nothing from the environment', () => {
     assert.deepEqual(REVIEW_TAGS, ['ui review', 'for review']);
     assert.deepEqual(reviewUploadArgs('/o/contact-sheet.html', 'UI review v2.0.8: 2 pages shot, 1 changed vs v2.0.7', 11400),
-        ['artifact', 'upload', '/o/contact-sheet.html', '--name', 'UI review v2.0.8: 2 pages shot, 1 changed vs v2.0.7', '--task', '11400', '--tag', 'ui review', '--tag', 'for review']);
+        ['artifact', 'upload', '/o/contact-sheet.html', '--name', 'UI review v2.0.8: 2 pages shot, 1 changed vs v2.0.7', '--task', '11400', '--tag', 'ui review', '--tag', 'for review', '--question', 'Do these screens look right for the release?']);
 });
 
 test('the sheet is uploaded under the review line from the start: Coral keeps the first upload\'s name for bytes it already has', () => {
