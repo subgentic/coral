@@ -323,7 +323,7 @@ func TestSSHDocker(t *testing.T) {
 			if err != nil {
 				t.Logf("  FINDING: ReadAPIKey for %s failed after a start: %v", u.name, err)
 				t.Logf("  tmux sessions of %s: %s", u.name, firstOut(f.exec(u.name, "far", "tmux ls 2>&1")))
-				pane, _ := f.exec(u.name, "far", "tmux capture-pane -p -t =coral-server 2>&1 | tail -25; ls -la ~/.coral-server ~/.coral-server/data 2>&1; ps -u "+u.name+" -o pid,etime,args 2>&1 | head")
+				pane, _ := f.exec(u.name, "far", "tmux capture-pane -p -t =coral-server 2>&1 | tail -25; echo --- coral.log; cat ~/.coral-server/data/coral.log 2>&1 | cut -c1-300; echo --- sockets; awk 'NR>1 {print $2, $4}' /proc/net/tcp; echo --- ; ps -u "+u.name+" -o pid,etime,args 2>&1 | head")
 				t.Logf("  DIAG %s's tmux pane and folders:\n%s", u.name, pane)
 				return
 			}
@@ -389,6 +389,8 @@ func TestSSHDocker(t *testing.T) {
 		before, _ := f.exec("bob", "far", "tmux has-session -t =coral-server 2>&1 && echo alive")
 		err := f.r.StopAndConfirm(ctx, aliceTarget)
 		after, _ := f.exec("bob", "far", "tmux has-session -t =coral-server 2>&1 && echo alive")
+		socks, _ := f.exec("root", "far", "awk 'NR>1 {print $2, $4}' /proc/net/tcp; ps -eo user,pid,etime,args | grep '[r]oot/coral'")
+		t.Logf("  DIAG sockets (local address, state 0A = listening) and coral processes after the stop:\n%s", socks)
 		chk, cerr := f.r.Run(ctx, aliceTarget, CmdCheckStopped)
 		t.Logf("  DIAG CheckStopped after the stop: exit %d, err %v (1: a session, 2: a listener on 8420, 3: cannot tell)", chk.ExitCode, cerr)
 		t.Logf("  bob before: %q, StopAndConfirm(alice) = %v, bob after: %q", firstOut(before, nil), err, firstOut(after, nil))
