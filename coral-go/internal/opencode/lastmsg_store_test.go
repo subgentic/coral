@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -81,4 +82,27 @@ func TestARecordThatIsNotOneIsNotRead(t *testing.T) {
 	require.NoError(t, os.Symlink(target, filepath.Join(lastDir(dir), "linked")))
 	_, ok := PersistedLast(dir, "linked")
 	assert.False(t, ok, "never read through a link")
+}
+
+// With no redactor nothing is kept: never the raw text (QA's SHOULD 1 on c3cca72fc).
+func TestWithNoRedactorNothingIsKept(t *testing.T) {
+	dir := t.TempDir()
+	persistLast(dir, "a-1", Message{Role: "assistant", Text: "ghp_aB3dE5gH7jaB3dE5gH7jaB3dE5gH7jkLmNoP is a token"}, nil)
+	_, ok := PersistedLast(dir, "a-1")
+	assert.False(t, ok)
+	_, err := os.Stat(filepath.Join(lastDir(dir), "a-1"))
+	assert.True(t, os.IsNotExist(err), "no file was written")
+
+	cfg, _ := stubConfig(t)
+	frames := filepath.Join(t.TempDir(), "frames")
+	require.NoError(t, os.WriteFile(frames, []byte("data: {\"id\":\"e1\",\"type\":\"session.idle\",\"properties\":{\"sessionID\":\"ses_abc123\"}}\n\n"), 0o600))
+	t.Setenv(eventsFileVar, frames)
+	m := NewManager(cfg) // a manager built without a redactor
+	defer m.Close()
+	_, err = m.Ensure(context.Background(), "agent-2", "", "", "")
+	require.NoError(t, err)
+	waitFor(t, "the last message", func() bool { _, ok := m.AgentLastMessage("agent-2"); return ok })
+	time.Sleep(200 * time.Millisecond)
+	_, ok = PersistedLast(cfg.DataDir, "agent-2")
+	assert.False(t, ok, "read and shown live, but not written to disk")
 }

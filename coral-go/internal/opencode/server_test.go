@@ -12,7 +12,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -188,20 +187,38 @@ const eventsFileVar = "STANDIN_EVENTS_FOR_TESTS" // a file of SSE frames the sta
 
 const envFileVar = "STANDIN_ENVFILE_FOR_TESTS"
 
-// maxStandIns is the most stand-ins one run of this package may start. A test that goes past it fails at once, and each run stops what it started: nothing here may ever start servers without a bound.
-const maxStandIns = 48
+// What one TEST may do with stand-in servers (per test, so a repeated run, -count=2, starts afresh): it may take stubConfig at most maxStubConfigsPerTest times, and its stand-ins, counted by the pids each one
+// records, may be at most maxStandInProcsPerTest when it ends. A test that loops starting servers fails at once at the first, and one that started too many fails when it ends. The fork bomb of #11377 (a
+// stand-in that re-ran the suite) is stopped by binaryMode, which decides from the arguments alone and never runs the suite for a start it does not know: these are the second line.
+const (
+	maxStubConfigsPerTest  = 4
+	maxStandInProcsPerTest = 16
+)
 
-var standInsStarted atomic.Int32
+var (
+	stubMu     sync.Mutex
+	stubByTest = map[testing.TB]int{}
+)
 
 func stubConfig(t *testing.T) (Config, string) {
 	t.Helper()
-	if n := standInsStarted.Add(1); n > maxStandIns {
-		t.Fatalf("%d stand-in servers started in one run: more than the %d this package ever needs (a start that loops?)", n, maxStandIns)
+	stubMu.Lock()
+	stubByTest[t]++
+	n := stubByTest[t]
+	stubMu.Unlock()
+	t.Cleanup(func() { stubMu.Lock(); delete(stubByTest, t); stubMu.Unlock() })
+	if n > maxStubConfigsPerTest {
+		t.Fatalf("this test took %d stand-in configs: more than the %d any test here needs (a start that loops?)", n, maxStubConfigsPerTest)
 	}
 	exe, err := os.Executable()
 	require.NoError(t, err)
 	envFile := filepath.Join(t.TempDir(), "env.json")
 	t.Setenv(envFileVar, envFile)
+	t.Cleanup(func() {
+		if raw, err := os.ReadFile(envFile + ".pids"); err == nil && len(strings.Fields(string(raw))) > maxStandInProcsPerTest {
+			t.Errorf("this test started %d stand-in processes: more than the %d any test here needs", len(strings.Fields(string(raw))), maxStandInProcsPerTest)
+		}
+	})
 	cfg := Config{Bin: exe, DataDir: filepath.Join(t.TempDir(), "opencode"), Ready: 10 * time.Second, Version: "2.2.4"} // the stand-in cannot answer --version: its version is said
 	// whatever a test leaves running is stopped by the pid Coral recorded for it, when the test ends
 	t.Cleanup(func() {

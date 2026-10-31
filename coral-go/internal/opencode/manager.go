@@ -26,7 +26,7 @@ type Manager struct {
 	reapStop        chan struct{} // closed by Close: the reaper ends
 	reapDone        chan struct{}
 
-	// Redact redacts a text before the newest message is kept on disk; false means it could not be checked, and then nothing is kept. Set before the first Ensure; nil keeps the text as it is.
+	// Redact redacts a text before the newest message is kept on disk; false means it could not be checked, and then nothing is kept. Set before the first Ensure; nil keeps nothing: a manager with no redactor never writes the raw text.
 	Redact func(text string) (string, bool)
 
 	// SkipLast says a message is not one the list shows as the last (what Coral typed into the agent); nil skips none. Set before the first Ensure.

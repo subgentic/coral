@@ -25,17 +25,17 @@ type persistedLast struct {
 	At   string `json:"at"`
 }
 
-// persistLast writes the agent's newest message, redacted by redact (which must say it could: a text that cannot be checked is not kept) and then cut. Best effort: a failure keeps nothing.
+// persistLast writes the agent's newest message, redacted by redact (which must say it could: a text that cannot be checked is not kept, and with no redactor at all nothing is kept) and then cut. Best effort: a failure keeps nothing.
 func persistLast(dataDir, key string, m Message, redact func(string) (string, bool)) {
 	if !keyRe.MatchString(key) || m.Text == "" || (m.Role != "user" && m.Role != "assistant") {
 		return
 	}
-	text := m.Text
-	if redact != nil {
-		var ok bool
-		if text, ok = redact(text); !ok {
-			return
-		}
+	if redact == nil {
+		return // no way to redact: nothing is kept, never the raw text
+	}
+	text, ok := redact(m.Text)
+	if !ok {
+		return
 	}
 	if r := []rune(text); len(r) > persistedLastRunes {
 		text = string(r[:persistedLastRunes])
