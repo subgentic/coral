@@ -146,7 +146,6 @@ body.panel-dragging .preview-pane {
     .preview-pane.preview-phone-full .preview-tab-name { min-width: 0; }
     .preview-pane.preview-phone-full .preview-tab-close { min-width: 44px; min-height: 44px; }
     body:has(.preview-pane.preview-phone-full) .agentic-state.mobile-panel-overlay { z-index: 90; }
-    body:has(.preview-pane.preview-phone-full) :is(header.top-bar, .phone-nav, .phone-fab, .phone-fab-menu) { display: none !important; } /* a full-screen viewer has its own bar and its own ←: the page's phone bar (and its floating nav) is not drawn over its action row, whichever stacking context the pane sits in (v2.0.10 phone walk, #11400) */
 }
 
 .preview-tabs {
