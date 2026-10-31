@@ -83,7 +83,7 @@ export const sheetArtifactName = (m, prevVersion) => reviewName(m, prevVersion) 
 export const uploadArgs = (file, name, taskId, extra = []) => ['artifact', 'upload', file, '--name', name, '--task', String(taskId), '--tag', 'ui review', ...extra];
 
 /** The arguments that put the contact sheet in the operator's Needs you, on the release task. */
-export const reviewUploadArgs = (file, name, taskId) => uploadArgs(file, name, taskId, ['--tag', 'for review']);
+export const reviewUploadArgs = (file, name, taskId) => uploadArgs(file, name, taskId, ['--tag', 'for review', '--question', 'Do these screens look right for the release?']);
 
 /**
  * The goal the run's own task goes under (`task add --self` needs one). goals: the board's goal list as JSON (open ones); wanted: --goal / SCREENS_GOAL, if the runner was told one.

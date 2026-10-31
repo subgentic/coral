@@ -139,7 +139,7 @@ try {
     }
     // 4. the operator's Needs you: the contact sheet once more, tagged "for review" and named for the one-line summary. Last, so the sheet's links are all live when it shows up (the same bytes are another upload record
     //    of the same link). The Inbox lists the board's "for review" files; no mention, no agent: this script is all there is.
-    const rv = await upload(sheetFile, sheetName, ['--tag', 'for review']);
+    const rv = await upload(sheetFile, sheetName, ['--tag', 'for review', '--question', 'Do these screens look right for the release?']);
     if (rv.error) { published.failed.push({ name: 'needs review', error: rv.error }); log('the contact sheet was not put in Needs you:', rv.error); } else { published.review = rv.uri; log('in Needs you:', reviewTitle); }
     const handed = call('coral-board', ['task', 'reassign', id, '--to', assignee], { allowFail: true });
     if (handed.status !== 0) { // this runner may not reassign: the task is completed with the contact sheet in its message, which is where the Operator reads the result
