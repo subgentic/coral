@@ -59,6 +59,8 @@ const BASE = require('./test_base').BASE;
         const bx = sel => ev(`(() => { const e = [...document.querySelectorAll(${JSON.stringify(sel)})].find(x => x.getClientRects().length); if (!e) return null; const b = e.getBoundingClientRect(); return { w: Math.round(b.width), h: Math.round(b.height), t: Math.round(b.top), b: Math.round(b.bottom) }; })()`);
         let hd = await bx('#settings-modal .modal-header'), ar = await bx('#settings-modal .settings-bar-back'), ft = await bx('#settings-modal .modal-footer');
         assert.ok(hd && hd.h === 56 && ar && ar.w >= 44 && ar.h >= 44 && ft && ft.b >= 844 - 24, 'the sections\' list has a 56 px bar with a 44 px arrow and a pinned footer: ' + JSON.stringify({ hd, ar, ft }));
+        // The arrow's line is the glyph's own size, not the font's tall line: on Windows the "←" of a 200%-text bar was 53 px in a 44 px button (text200_dialogs, text200_light, text200_wide in the v2.0.10 windows-tests, #11402)
+        assert.notEqual(await ev(`getComputedStyle(document.querySelector('#settings-modal .settings-bar-back')).lineHeight`), 'normal', 'the settings arrow sets its line height, so a font with a tall line cannot spill out of the 44 px button');
         await ev(`document.querySelector('#settings-modal #settings-tab-agents').click(); true`); await settle(300);
         const bk = await bx('#settings-modal .settings-back');
         assert.ok(bk && bk.h >= 56 && !(await bx('#settings-modal .settings-bar-back')), 'a section has ONE bar: its way back is 56 px and the list\'s arrow is not drawn: ' + JSON.stringify(bk));
