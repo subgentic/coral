@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 
 	at "github.com/subgentic/coral/internal/agenttypes"
 	setreg "github.com/subgentic/coral/internal/settings"
@@ -130,6 +131,17 @@ type CLINotFoundError struct {
 	Binary         string
 	InstallCommand string
 	InstallURL     string
+	// Refused and RefusedPath: a file that was found in a common place and not used, and why (an agent's working folder, a temp folder): the answer says so rather than "not found".
+	Refused     string
+	RefusedPath string
+}
+
+// tildePath writes a path under the user's home folder as ~/...: the answer names places, not the user's name.
+func tildePath(p string) string {
+	if home, _ := os.UserHomeDir(); home != "" && (p == home || strings.HasPrefix(p, home+string(filepath.Separator))) {
+		return "~" + p[len(home):]
+	}
+	return p
 }
 
 func (e *CLINotFoundError) Error() string {
@@ -137,7 +149,19 @@ func (e *CLINotFoundError) Error() string {
 	if e.InstallURL != "" {
 		msg += fmt.Sprintf(" (the vendor's page: %s)", e.InstallURL)
 	}
-	return msg + fmt.Sprintf(". Already installed? Set its path in Settings > CLI paths (the setting %s).", CLIPathSettingKey(e.AgentType))
+	msg += fmt.Sprintf(". After installing, run %s once in a terminal to sign in; on a computer with no screen, use the Hub's Terminal for that", e.Binary)
+	msg += fmt.Sprintf(". Already installed? Set its path in Settings > CLI paths (the setting %s).", CLIPathSettingKey(e.AgentType))
+	if e.Refused != "" {
+		msg += fmt.Sprintf(" Coral found %s and did not use it: it is %s.", tildePath(e.RefusedPath), e.Refused)
+	}
+	var places []string
+	for _, p := range CommonPlaceCandidates(e.Binary) {
+		places = append(places, tildePath(p))
+	}
+	if len(places) > 0 {
+		msg += " Coral looked on the PATH it runs with (the tray app's is the system's own, not your terminal's), in " + strings.Join(places, ", ") + "."
+	}
+	return msg
 }
 
 // FindCLI returns the executable to run for agentType, the way launch finds
@@ -213,14 +237,15 @@ func LaunchCLIScreened(settings map[string]string, agentType string, screen func
 			return abs, nil
 		}
 	}
-	if p := CommonPlaceCLI(info.Binary, screen); p != "" {
-		return p, nil
+	found := CommonPlaceLookup(info.Binary, screen)
+	if found.Path != "" {
+		return found.Path, nil
 	}
 	// Not found on PATH because a PATH folder is an untrusted mount point (Windows): the launch line's bare name would fail in the agent's shell the same way, so say why now (#340).
 	if dir, bad := UntrustedMountDir(info.Binary); bad {
 		return "", &CLIUntrustedMountError{AgentType: agentType, Binary: info.Binary, Dir: dir}
 	}
-	return "", &CLINotFoundError{AgentType: agentType, Binary: info.Binary, InstallCommand: info.InstallCommand, InstallURL: info.InstallURL}
+	return "", &CLINotFoundError{AgentType: agentType, Binary: info.Binary, InstallCommand: info.InstallCommand, InstallURL: info.InstallURL, Refused: found.Refused, RefusedPath: found.RefusedPath}
 }
 
 // resolveBinary returns cliPath if non-empty, otherwise the default binary name.
