@@ -6,7 +6,7 @@
 //                           [--sequences] [--strict | --no-strict] [--tmux | --no-tmux] [--part K/N] [--results-out FILE]
 //
 // It builds coral with -tags "dev fts5" into a temp dir, starts it with a temp CORAL_DATA_DIR on a
-// free non-default port (never ~/.coral, never :8420), starts headless Chrome with a temp profile and
+// free non-default port (never ~/.coral, never :8420 or :8450), starts headless Chrome with a temp profile and
 // a debugging port, runs every CDP and server suite (see suites.mjs) one at a time with a timeout, and
 // prints pass/fail per suite. It refuses to start (exit 2) while any *.test.js/mjs file here has no runner
 // or more than one, so a suite can't be silently skipped.
@@ -198,7 +198,8 @@ const NO_TMUX_HERE = process.platform === 'win32';
 if (tmuxOnly && NO_TMUX_HERE) { console.error('--tmux: Coral has no tmux backend on Windows, so there is nothing to run'); process.exit(2); }
 const tmuxShard = !NO_TMUX_HERE && (tmuxOnly || (!flag('--no-tmux') && !only && !stress && !flag('--sequences') && !part));
 const strictShard = strictOnly || (!flag('--no-strict') && !tmuxOnly && !only && !stress && !flag('--sequences') && !part);
-const PROD_PORT = 8420;
+// The live Coral's default ports: 8450 on Windows, 8420 elsewhere. Both are refused, the same list as Go's testguard (defaultPorts).
+const PROD_PORTS = [8420, 8450];
 const chromePath = arg('--chrome', process.env.CHROME || [
   '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', '/usr/bin/google-chrome', '/usr/bin/chromium', '/usr/bin/chromium-browser',
 ].find(p => fs.existsSync(p)));
@@ -217,7 +218,7 @@ const freePort = async () => {
     const p = await new Promise((res, rej) => {
       const s = net.createServer(); s.listen(0, '127.0.0.1', () => { const q = s.address().port; s.close(() => res(q)); }); s.on('error', rej);
     });
-    if (p !== PROD_PORT) return p; // never the production Coral port, even by chance
+    if (!PROD_PORTS.includes(p)) return p; // never a production Coral port, even by chance
   }
 };
 const sleep = ms => new Promise(r => setTimeout(r, ms));
