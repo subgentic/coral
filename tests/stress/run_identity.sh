@@ -408,7 +408,7 @@ if [[ $STRICT == 1 ]]; then
     [[ $c == 401 ]] && grep -q session_token_required <<<"$b" && pass "STRICT: an agent-tool call with no token is refused (401 session_token_required)" || fail "STRICT: untokened call answered $c $b"
     # ...and the real coral-board from an agent-marked shell whose token was removed: refused, never Operator.
     st0=$(rjson 'd.get("refused",{}).get("session_token_required",0)')
-    out=$(env -i ${WIN_ENV[@]+"${WIN_ENV[@]}"} PATH="$PATH" HOME="$(NP "$TMP/h")" USERPROFILE="$(NP "$TMP/h")" CORAL_DATA_DIR="$(NP "$DATA")" CORAL_URL="$BASE" CORAL_SESSION_NAME="stripped-agent" CORAL_SUBSCRIBER_ID="Operator" "$BIN/coral-board" post "stripped token probe" 2>&1) && rc=0 || rc=$?
+    out=$(env -i ${WIN_ENV[@]+"${WIN_ENV[@]}"} PATH="$PATH" HOME="$(NP "$TMP/h")" USERPROFILE="$(NP "$TMP/h")" CORAL_DATA_DIR="$(NP "$DATA")" CORAL_URL="$BASE" CORAL_SESSION_NAME="stripped-agent" CORAL_SUBSCRIBER_ID="Operator" "$BIN/coral-board" post "@all stripped token probe" 2>&1) && rc=0 || rc=$?
     EXP_TOKEN=$((EXP_TOKEN + 1))
     st1=$(rjson 'd.get("refused",{}).get("session_token_required",0)')
     # The SERVER must have refused it (the counter moved), not merely coral-board failing for another reason.
@@ -421,7 +421,7 @@ if [[ $STRICT == 1 ]]; then
     # A human at a normal shell (no agent markers) signs with the CLI token and acts as the Operator.
     out=$(env -i ${WIN_ENV[@]+"${WIN_ENV[@]}"} PATH="$PATH" HOME="$(NP "$TMP/h")" USERPROFILE="$(NP "$TMP/h")" CORAL_DATA_DIR="$(NP "$DATA")" CORAL_URL="$BASE" "$BIN/coral-board" join id-team-1 --as Operator 2>&1) && rc=0 || rc=$?
     if [[ $rc -eq 0 ]]; then
-        out2=$(env -i ${WIN_ENV[@]+"${WIN_ENV[@]}"} PATH="$PATH" HOME="$(NP "$TMP/h")" USERPROFILE="$(NP "$TMP/h")" CORAL_DATA_DIR="$(NP "$DATA")" CORAL_URL="$BASE" "$BIN/coral-board" post "operator from a plain shell" 2>&1) && rc2=0 || rc2=$?
+        out2=$(env -i ${WIN_ENV[@]+"${WIN_ENV[@]}"} PATH="$PATH" HOME="$(NP "$TMP/h")" USERPROFILE="$(NP "$TMP/h")" CORAL_DATA_DIR="$(NP "$DATA")" CORAL_URL="$BASE" "$BIN/coral-board" post "@all operator from a plain shell" 2>&1) && rc2=0 || rc2=$?
         if [[ $rc2 -eq 0 ]] && api GET "/api/board/id-team-1/messages/all" | grep -q "operator from a plain shell"; then
             pass "STRICT: coral-board from a plain shell signs with the CLI token and posts as the Operator"
         else
