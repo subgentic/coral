@@ -27,10 +27,12 @@ GET /api/board/{project}/goals | (*BoardHandler).ListGoals-fm
 GET /api/board/{project}/goals/{goalID} | (*BoardHandler).GetGoal-fm
 GET /api/board/{project}/groups | (*BoardHandler).ListGroups-fm
 GET /api/board/{project}/groups/{groupID}/members | (*BoardHandler).ListGroupMembers-fm
+GET /api/board/{project}/lifecycle-log | (*SessionsHandler).LifecycleLog-fm
 GET /api/board/{project}/messages | (*BoardHandler).ReadMessages-fm
 GET /api/board/{project}/messages/all | (*BoardHandler).ListAllMessages-fm
 GET /api/board/{project}/messages/check | (*BoardHandler).CheckUnread-fm
 GET /api/board/{project}/messages/search | (*BoardHandler).SearchMessages-fm
+GET /api/board/{project}/orchestrator-grant | (*SessionsHandler).OrchestratorGrant-fm
 GET /api/board/{project}/paused | (*BoardHandler).GetPaused-fm
 GET /api/board/{project}/peek | (*BoardHandler).PeekAgent-fm
 GET /api/board/{project}/queue | (*BoardHandler).MergeQueue-fm
@@ -63,6 +65,8 @@ PATCH /api/board/{project}/goals/{goalID} | (*BoardHandler).UpdateGoal-fm
 PATCH /api/board/{project}/tasks/{taskID} | (*BoardHandler).UpdateTask-fm
 PATCH /api/board/{project}/tasks/{taskID}/amend | (*BoardHandler).AmendTask-fm
 POST /api/board/remotes | (*BoardRemotesHandler).AddSubscription-fm
+POST /api/board/{project}/agents/{subscriber}/sleep | (*SessionsHandler).OrchestratorSleep-fm
+POST /api/board/{project}/agents/{subscriber}/wake | (*SessionsHandler).OrchestratorWake-fm
 POST /api/board/{project}/cross-team-links | (*BoardHandler).AddLocalLinks-fm
 POST /api/board/{project}/cross-team/disable | (*BoardHandler).HubCrossTeamDisable-fm
 POST /api/board/{project}/cross-team/enable | (*BoardHandler).HubCrossTeamEnable-fm
@@ -112,6 +116,7 @@ POST /api/notifications | (*NotificationHandler).Create-fm
 POST /api/tasks/run | (*TasksHandler).SubmitTask-fm
 POST /api/tasks/runs/{runID}/kill | (*TasksHandler).KillTask-fm
 PUT /api/board/{project}/artifacts/{id}/tags | (*BoardHandler).SetArtifactTags-fm
+PUT /api/board/{project}/orchestrator-grant | (*SessionsHandler).OrchestratorGrant-fm
 PUT /api/board/{project}/settings | (*BoardHandler).UpdateBoardSettings-fm
 PUT /api/board/{project}/subscribers/{subscriberID}/review-settings | (*BoardHandler).SetReviewSettings-fm
 PUT /api/board/{project}/tasks/{taskID}/goal | (*BoardHandler).SetTaskGoal-fm

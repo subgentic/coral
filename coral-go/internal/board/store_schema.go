@@ -70,6 +70,9 @@ func (s *Store) ensureSchema(ctx context.Context) error {
 	if err := s.ensureAsksSchema(ctx); err != nil {
 		return err
 	}
+	if err := s.ensureOrchSchema(ctx); err != nil { // the grant to a board's orchestrator and the log of agents' launches, wakes and sleeps (#11432)
+		return err
+	}
 	if err := s.ensureOperatorTouchSchema(ctx); err != nil {
 		return err
 	}

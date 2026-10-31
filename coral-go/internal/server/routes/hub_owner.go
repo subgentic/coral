@@ -127,8 +127,12 @@ var ownerRefusals = map[string]string{
 	tunnel.OwnerRouteKey("POST", "/api/board/{project}/cross-team/files/disable"):   textHubSwitchOwnerOnly,
 	tunnel.OwnerRouteKey("POST", "/api/hub-auto-accept"):                            textHubAutoAcceptOwnerOnly,
 	tunnel.OwnerRouteKey("GET", "/api/analytics/activity"):                          textActivityOwnerOnly,
+	tunnel.OwnerRouteKey("GET", "/api/board/{project}/orchestrator-grant"):          textOrchGrantOwnerOnly,
+	tunnel.OwnerRouteKey("PUT", "/api/board/{project}/orchestrator-grant"):          textOrchGrantOwnerOnly,
+	tunnel.OwnerRouteKey("GET", "/api/board/{project}/lifecycle-log"):               textOrchGrantOwnerOnly,
 }
 
+const textOrchGrantOwnerOnly = "through Coral Hub what a board's orchestrator may do, and the log of it, are for the account this computer is linked to only (#11432)"
 const textActivityOwnerOnly = "through Coral Hub the activity counts are for the account this computer is linked to only (#11225)"
 
 const textCustomModelsOwnerOnly = "through Coral Hub only the account this computer is linked to can add or change custom models (#5996)"

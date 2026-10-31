@@ -88,10 +88,12 @@ a GET /api/board/{project}/goals
 a GET /api/board/{project}/goals/{goalID}
 c GET /api/board/{project}/groups
 c GET /api/board/{project}/groups/{groupID}/members
+b GET /api/board/{project}/lifecycle-log
 a GET /api/board/{project}/messages
 a GET /api/board/{project}/messages/all
 a GET /api/board/{project}/messages/check
 c GET /api/board/{project}/messages/search
+b GET /api/board/{project}/orchestrator-grant
 c GET /api/board/{project}/paused
 b GET /api/board/{project}/spend
 a GET /api/board/{project}/peek
@@ -284,6 +286,8 @@ b POST /api/auth/password/set
 b POST /api/auth/sessions/sign-out-others
 b POST /api/auto-accept/disable-all
 b POST /api/board/remotes
+a POST /api/board/{project}/agents/{subscriber}/sleep
+a POST /api/board/{project}/agents/{subscriber}/wake
 b POST /api/board/{project}/cross-team-links
 b POST /api/board/{project}/cross-team/disable
 b POST /api/board/{project}/cross-team/enable
@@ -430,6 +434,7 @@ b PUT /api/artifacts/{id}/star
 b PUT /api/auth/hub-origins
 b PUT /api/auth/hub-signin
 b PUT /api/board/{project}/artifacts/{id}/tags
+b PUT /api/board/{project}/orchestrator-grant
 b PUT /api/board/{project}/settings
 b PUT /api/board/{project}/subscribers/{subscriberID}/review-settings
 a PUT /api/board/{project}/tasks/{taskID}/goal

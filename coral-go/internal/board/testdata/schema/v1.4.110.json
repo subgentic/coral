@@ -37,6 +37,12 @@
       "type": "index"
     },
     {
+      "name": "idx_board_lifecycle_project",
+      "sql": "CREATE INDEX idx_board_lifecycle_project ON board_lifecycle_log(project, at)",
+      "tbl_name": "board_lifecycle_log",
+      "type": "index"
+    },
+    {
       "name": "idx_board_messages_no_subscriber",
       "sql": "CREATE INDEX idx_board_messages_no_subscriber ON board_messages(id) WHERE subscriber_id IS NULL",
       "tbl_name": "board_messages",
@@ -247,6 +253,12 @@
       "type": "index"
     },
     {
+      "name": "sqlite_autoindex_board_orch_grant_1",
+      "sql": null,
+      "tbl_name": "board_orch_grant",
+      "type": "index"
+    },
+    {
       "name": "sqlite_autoindex_board_rekeys_1",
       "sql": null,
       "tbl_name": "board_rekeys",
@@ -403,6 +415,12 @@
       "type": "table"
     },
     {
+      "name": "board_lifecycle_log",
+      "sql": "CREATE TABLE board_lifecycle_log (\n\t\t\tid      INTEGER PRIMARY KEY AUTOINCREMENT,\n\t\t\tproject TEXT NOT NULL,\n\t\t\tkind    TEXT NOT NULL,\n\t\t\tactor   TEXT NOT NULL,\n\t\t\ttarget  TEXT NOT NULL,\n\t\t\tstatus  TEXT NOT NULL,\n\t\t\tnote    TEXT NOT NULL DEFAULT '',\n\t\t\tat      TEXT NOT NULL\n\t\t)",
+      "tbl_name": "board_lifecycle_log",
+      "type": "table"
+    },
+    {
       "name": "board_mention_index_state",
       "sql": "CREATE TABLE board_mention_index_state (\n\t\t\tid         INTEGER PRIMARY KEY CHECK (id = 1),\n\t\t\tindexed_to INTEGER NOT NULL\n\t\t)",
       "tbl_name": "board_mention_index_state",
@@ -424,6 +442,12 @@
       "name": "board_messages",
       "sql": "CREATE TABLE board_messages (\n\t\t\tid          INTEGER PRIMARY KEY AUTOINCREMENT,\n\t\t\tproject     TEXT NOT NULL,\n\t\t\tsession_id  TEXT NOT NULL,\n\t\t\tcontent     TEXT NOT NULL,\n\t\t\tcreated_at  TEXT NOT NULL\n\t\t, target_group_id TEXT, subscriber_id TEXT, external_json TEXT, origin TEXT, is_system INTEGER NOT NULL DEFAULT 0, hub_user TEXT, task_id INTEGER)",
       "tbl_name": "board_messages",
+      "type": "table"
+    },
+    {
+      "name": "board_orch_grant",
+      "sql": "CREATE TABLE board_orch_grant (\n\t\t\tproject      TEXT PRIMARY KEY,\n\t\t\tenabled      INTEGER NOT NULL DEFAULT 0,\n\t\t\tseat_session TEXT NOT NULL DEFAULT '',\n\t\t\tmax_per_hour INTEGER NOT NULL,\n\t\t\tmax_live     INTEGER NOT NULL,\n\t\t\tidle_min     INTEGER NOT NULL,\n\t\t\tset_by       TEXT NOT NULL DEFAULT '',\n\t\t\tset_at       TEXT NOT NULL DEFAULT ''\n\t\t)",
+      "tbl_name": "board_orch_grant",
       "type": "table"
     },
     {
@@ -1881,6 +1905,117 @@
         }
       ]
     },
+    "board_lifecycle_log": {
+      "columns": [
+        {
+          "cid": 0,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "id",
+          "notnull": 0,
+          "pk": 1,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 1,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "project",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 2,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "kind",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 3,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "actor",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 4,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "target",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 5,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "status",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 6,
+          "dflt_value": "''",
+          "hidden": 0,
+          "name": "note",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 7,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "at",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            {
+              "cid": 1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "project",
+              "seqno": 0
+            },
+            {
+              "cid": 7,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "at",
+              "seqno": 1
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 2
+            }
+          ],
+          "name": "idx_board_lifecycle_project",
+          "origin": "c",
+          "partial": 0,
+          "seq": 0,
+          "unique": 0
+        }
+      ]
+    },
     "board_mention_index_state": {
       "columns": [
         {
@@ -2253,6 +2388,109 @@
           "partial": 1,
           "seq": 0,
           "unique": 0
+        }
+      ]
+    },
+    "board_orch_grant": {
+      "columns": [
+        {
+          "cid": 0,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "project",
+          "notnull": 0,
+          "pk": 1,
+          "type": "TEXT"
+        },
+        {
+          "cid": 1,
+          "dflt_value": "0",
+          "hidden": 0,
+          "name": "enabled",
+          "notnull": 1,
+          "pk": 0,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 2,
+          "dflt_value": "''",
+          "hidden": 0,
+          "name": "seat_session",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 3,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "max_per_hour",
+          "notnull": 1,
+          "pk": 0,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 4,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "max_live",
+          "notnull": 1,
+          "pk": 0,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 5,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "idle_min",
+          "notnull": 1,
+          "pk": 0,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 6,
+          "dflt_value": "''",
+          "hidden": 0,
+          "name": "set_by",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 7,
+          "dflt_value": "''",
+          "hidden": 0,
+          "name": "set_at",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            {
+              "cid": 0,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "project",
+              "seqno": 0
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 1
+            }
+          ],
+          "name": "sqlite_autoindex_board_orch_grant_1",
+          "origin": "pk",
+          "partial": 0,
+          "seq": 0,
+          "unique": 1
         }
       ]
     },

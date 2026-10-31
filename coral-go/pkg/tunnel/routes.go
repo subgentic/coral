@@ -435,6 +435,10 @@ var routeTable = cat(
 	// the OWNER's alone (OwnerRefuse): Launch is a tier a Hub grantee can hold, and the reply says what each agent did and how much the Operator touched it. A grantee gets 403 owner_only and the
 	// page says so in one line. Only team and range pass; no text is in the reply.
 	owner(OwnerRefuse, rules(http.MethodGet, TierLaunch, "/api/analytics/activity")),
+	// The Operator's grant to a board's orchestrator and the log of what agents did to the board's agents (#11432) are the OWNER's alone through the hub (an authentic stamp, the owner marker): the switch lets an agent wake,
+	// sleep and start agents. The orchestrator's own wake and sleep routes are not here: they are agent-only and local, so the hub never reaches them.
+	owner(OwnerRefuse, rules(http.MethodGet, TierLaunch, "/api/board/{project}/orchestrator-grant", "/api/board/{project}/lifecycle-log")),
+	owner(OwnerRefuse, rules(http.MethodPut, TierLaunch, "/api/board/{project}/orchestrator-grant")),
 	// Which agents run an older hook set: for the Operator who would resume them (#3665).
 	rules(http.MethodGet, TierLaunch, "/api/system/hooks-status"),
 	// Relaunching this Coral into an update it has already verified and staged (#5280): the status is View, the relaunch is Launch and

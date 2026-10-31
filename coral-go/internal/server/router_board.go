@@ -107,6 +107,12 @@ func (s *Server) registerBoardAPI(r *chi.Mux, boardHandler *routes.BoardHandler,
 		})
 		s.registerBoardMessageRoutes(r, boardHandler)
 		s.registerBoardTaskRoutes(r, boardHandler)
+		// The Operator's grant to a board's orchestrator (#11432): the switch, the seat and the caps (the Operator's alone), the log, and the seat's wake and sleep of its own board's agents (an agent's, local only).
+		r.With(routes.RefuseSignInLink).Get("/api/board/{project}/orchestrator-grant", sessHandler.OrchestratorGrant)
+		r.With(routes.RefuseSignInLink).Put("/api/board/{project}/orchestrator-grant", sessHandler.OrchestratorGrant)
+		r.Get("/api/board/{project}/lifecycle-log", sessHandler.LifecycleLog)
+		r.With(routes.RefuseSignInLink).Post("/api/board/{project}/agents/{subscriber}/wake", sessHandler.OrchestratorWake)
+		r.With(routes.RefuseSignInLink).Post("/api/board/{project}/agents/{subscriber}/sleep", sessHandler.OrchestratorSleep)
 	})
 
 	// These work without an open board, so they stay outside the board group (#4924): team

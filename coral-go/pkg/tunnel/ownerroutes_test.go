@@ -107,6 +107,9 @@ func TestTheOwnerTableAgreesWithTheHandWrittenListItReplaced(t *testing.T) {
 				continue // every saved-for-later route (#5763): the list, the whole message, and the changes
 			}
 			// The activity counts of the Analytics tabs (#11225) are the owner's alone through the hub: the old list never had them.
+			if strings.HasPrefix(p, "/api/board/") && (strings.HasSuffix(p, "/orchestrator-grant") && (m == http.MethodGet || m == http.MethodPut) || strings.HasSuffix(p, "/lifecycle-log") && m == http.MethodGet) { // the grant to a board's orchestrator and its log are the owner's alone (#11432): the old list never had them
+				continue
+			}
 			if m == http.MethodGet && p == "/api/analytics/activity" {
 				continue
 			}
