@@ -91,4 +91,9 @@ func TestAPostAnswersWithWhoItReaches(t *testing.T) {
 	assert.Equal(t, []any{"all"}, post("@all heads up"))
 	assert.Equal(t, []any{"Operator"}, post("@Operator please decide"))
 	assert.Equal(t, []any{}, post("no mention at all"))
+
+	// the Operator's own post that says @Operator reaches no one by it (QA Engineer's SHOULD on #11441)
+	code, out, b := e.do("POST", "/api/board/p/messages", `{"subscriber_id":"Operator","content":"a note from me, @Operator"}`, map[string]string{"X-Test-Actor": "operator"})
+	require.Equal(t, 200, code, string(b))
+	assert.Equal(t, []any{}, out["notified"], "the Operator is not told of their own post")
 }

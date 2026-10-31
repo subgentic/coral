@@ -113,12 +113,13 @@ func TestAPostThatReachedNoOneIsWarnedAbout(t *testing.T) {
 		args     []string
 		warn     bool
 	}{
-		"nobody was told":            {`,"notified":[]`, []string{"post", "see @param in the docs"}, true},
-		"somebody was":               {`,"notified":["Dev A"]`, []string{"post", "@Dev A ready"}, false},
-		"an older server (no field)": {``, []string{"post", "see @param in the docs"}, false},
-		"the operator's opt-out":     {`,"notified":[]`, []string{"post", "--broadcast", "status"}, false},
-		"an answer on a task":        {`,"notified":[]`, []string{"post", "--task", "7", "done"}, false},
-		"an answer to a message":     {`,"notified":[]`, []string{"post", "--reply-to", "7", "done"}, false},
+		"nobody was told":                       {`,"notified":[]`, []string{"post", "see @param in the docs"}, true},
+		"somebody was":                          {`,"notified":["Dev A"]`, []string{"post", "@Dev A ready"}, false},
+		"an older server (no field)":            {``, []string{"post", "see @param in the docs"}, false},
+		"the operator's opt-out":                {`,"notified":[]`, []string{"post", "--broadcast", "status"}, false},
+		"an answer on a task":                   {`,"notified":[]`, []string{"post", "--task", "7", "done"}, false},
+		"an assign post (the assignee is told)": {`,"notified":[]`, []string{"post", "--assign", "Dev A", "--goal", "1", "build @param"}, false},
+		"an answer to a message":                {`,"notified":[]`, []string{"post", "--reply-to", "7", "done"}, false},
 	} {
 		srv := serve(c.notified)
 		res := runBoard(t, srv.URL, subscribedDataDir(t, srv.URL), c.args...)
