@@ -537,3 +537,4 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 .dt-box.dt-folded td:has(> .inbox-review-name, > .inbox-review-item) > .dt-subtitle { display: none; }
 .dt-box.dt-folded td[data-fold-label]::before { content: attr(data-fold-label) ' '; color: var(--text-secondary); font-weight: var(--fw-regular); } /* a column with foldLabel names its figure where the header row is gone (the phone's Computers, #11463) */
 @media (max-width: 760px) { tr[data-welcome-id] { touch-action: pan-y; } } /* a welcome row of Needs you: the page keeps its vertical pans, a horizontal drag is the swipe's (welcome_swipe.js, #11542) */
+.dt-end .inbox-review-actions { justify-content: end; } /* the Actions column is the last, at the row's right edge: its buttons end there (#11552) */
