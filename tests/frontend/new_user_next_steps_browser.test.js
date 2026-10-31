@@ -8,6 +8,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
 const { install: installNT, openNewTeam } = require('./helpers/new_team');
 const { install: installNA, openNewAgent, stubModels, stepLine } = require('./helpers/new_agent');
 const BASE = require('./test_base').BASE;
+const EXISTS = require('node:os').tmpdir(); // a folder that exists on this machine, and so on the server beside it: /tmp is not one on a Windows runner (v2.0.10 windows-tests)
 const { coralReady } = require('./helpers/wait');
 
 const TEAM = `qa-next-steps-${Date.now() % 100000}`;
@@ -116,14 +117,14 @@ const TEAM = `qa-next-steps-${Date.now() % 100000}`;
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false }); await Emulation.setTouchEmulationEnabled({ enabled: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
         const GONE = '/no-such-folder-for-coral-test', GONE2 = '/another/missing/one';
-        const rc = await ev(`import(${S} + 'browser.js').then(async m => { m.recordRecentDir(${JSON.stringify(GONE2)}); m.recordRecentDir('/tmp'); m.recordRecentDir(${JSON.stringify(GONE)}); const before = m.getRecentDirs(); const changed = await m.pruneMissingRecents(); const again = await m.pruneMissingRecents(); const other = await m.pruneMissingRecents('box-b'); return { before, changed, after: m.getRecentDirs(), again, other }; })`);
-        check(rc.changed === true && JSON.stringify(rc.after) === JSON.stringify(['/tmp']), `missing recents are dropped and an existing one kept: ${JSON.stringify(rc)}`);
+        const rc = await ev(`import(${S} + 'browser.js').then(async m => { m.recordRecentDir(${JSON.stringify(GONE2)}); m.recordRecentDir(${JSON.stringify(EXISTS)}); m.recordRecentDir(${JSON.stringify(GONE)}); const before = m.getRecentDirs(); const changed = await m.pruneMissingRecents(); const again = await m.pruneMissingRecents(); const other = await m.pruneMissingRecents('box-b'); return { before, changed, after: m.getRecentDirs(), again, other }; })`);
+        check(rc.changed === true && JSON.stringify(rc.after) === JSON.stringify([EXISTS]), `missing recents are dropped and an existing one kept: ${JSON.stringify(rc)}`);
         check(rc.again === false && rc.other === false, `nothing more to drop is false, and another server is not asked: ${JSON.stringify([rc.again, rc.other])}`);
-        await ev(`import(${S} + 'browser.js').then(m => { m.recordRecentDir(${JSON.stringify(GONE)}); m.recordRecentDir('/tmp'); return true; })`);
+        await ev(`import(${S} + 'browser.js').then(m => { m.recordRecentDir(${JSON.stringify(GONE)}); m.recordRecentDir(${JSON.stringify(EXISTS)}); return true; })`);
         await installNT(ev); await openNewTeam(ev, waitFor);
         await waitFor(`!document.querySelector('#launch-team-dir-recents [data-dir=${JSON.stringify(GONE)}]')`, 'the missing folder dropped from the recent buttons', 8000).catch(() => {});
         const tb = await ev(`[...document.querySelectorAll('#launch-team-dir-recents button')].map(b => b.dataset.dir)`);
-        check(JSON.stringify(tb) === JSON.stringify(['/tmp']), `New team shows only the recent folder that exists: ${JSON.stringify(tb)}`);
+        check(JSON.stringify(tb) === JSON.stringify([EXISTS]), `New team shows only the recent folder that exists: ${JSON.stringify(tb)}`);
         const fresh = async recents => { // a returning person: a new page whose browser still holds these recent folders
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
             await ev(`import(${S} + 'browser.js').then(m => { for (const k of Object.keys(localStorage)) if (k.includes('coral-recent-dirs')) localStorage.removeItem(k); for (const d of ${JSON.stringify(recents)}) m.recordRecentDir(d); return true; })`);
@@ -133,10 +134,10 @@ const TEAM = `qa-next-steps-${Date.now() % 100000}`;
         const tf = await ev(`({ value: document.getElementById('launch-team-dir').value, buttons: document.querySelectorAll('#launch-team-dir-recents button').length })`);
         check(/\/Coral\/first-team$/.test(tf.value) && tf.buttons === 0, `a person left with only a missing folder is offered the first team's folder, no buttons: ${JSON.stringify(tf)}`);
         // the same for New agent's folder step
-        await fresh(['/tmp', GONE]); await installNA(ev); await openNewAgent(ev, waitFor);
+        await fresh([EXISTS, GONE]); await installNA(ev); await openNewAgent(ev, waitFor);
         await waitFor(`!document.querySelector('#launch-dir-recents [data-dir=${JSON.stringify(GONE)}]')`, 'the missing folder dropped from New agent', 8000).catch(() => {});
         const ab = await ev(`[...document.querySelectorAll('#launch-dir-recents button')].map(b => b.dataset.dir)`);
-        check(JSON.stringify(ab) === JSON.stringify(['/tmp']), `New agent shows only the recent folder that exists: ${JSON.stringify(ab)}`);
+        check(JSON.stringify(ab) === JSON.stringify([EXISTS]), `New agent shows only the recent folder that exists: ${JSON.stringify(ab)}`);
         // (8) the no-password banner is not left behind the password dialog (#11336, Mobile Beta Tester): hidden while the dialog is open, back when it closes
         for (const [w, mobile] of [[1280, false], [390, true]]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: 844, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
@@ -168,14 +169,14 @@ const TEAM = `qa-next-steps-${Date.now() % 100000}`;
         // (10) New agent on a phone (#11336, Mobile Beta Tester): step 2 says what a persona is; step 3's section picker says it is the sections ("Section" above it)
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev); await installNA(ev); await stubModels(ev);
-        await ev(`localStorage.setItem('coral-recent-dirs', JSON.stringify(['/tmp'])); true`);
+        await ev(`localStorage.setItem('coral-recent-dirs', JSON.stringify([${JSON.stringify(EXISTS)}])); true`);
         await openNewAgent(ev, waitFor);
         const seen = {};
         for (let i = 0; i < 4 && !seen.s3; i++) {
             const line = await stepLine(ev);
             if (/Step 2 of 3/.test(line)) seen.s2 = await ev(`(() => { const p = document.querySelector('#launch-step-agent .launch-persona-lead'); return { text: p ? p.textContent : null, shown: !!p && p.getClientRects().length > 0 }; })()`);
             if (/Step 3 of 3/.test(line)) { seen.s3 = await ev(`(() => { const l = document.querySelector('#launch-step-agent .settings-group-pick-label'), sel = document.querySelector('#launch-step-agent .settings-group-pick select'); const lr = l && l.getBoundingClientRect(), sr = sel && sel.getBoundingClientRect(); return { text: l ? l.textContent : null, shown: !!l && l.getClientRects().length > 0, above: !!lr && !!sr && lr.bottom <= sr.top + 1, sameLeft: !!lr && !!sr && Math.abs(lr.left - sr.left) < 2, name: sel ? sel.getAttribute('aria-label') : null, hiddenFromAT: l ? l.getAttribute('aria-hidden') : null }; })()`); break; }
-            await ev(`(() => { const b = [...document.querySelectorAll('[role=dialog] button')].find(x => /^Next$/.test(x.textContent.trim()) && x.getClientRects().length); const f = document.getElementById('launch-dir'); if (f && !f.value) { f.value = '/tmp'; f.dispatchEvent(new Event('input', { bubbles: true })); } if (b) b.click(); return true; })()`);
+            await ev(`(() => { const b = [...document.querySelectorAll('[role=dialog] button')].find(x => /^Next$/.test(x.textContent.trim()) && x.getClientRects().length); const f = document.getElementById('launch-dir'); if (f && !f.value) { f.value = ${JSON.stringify(EXISTS)}; f.dispatchEvent(new Event('input', { bubbles: true })); } if (b) b.click(); return true; })()`);
             await waitFor(`true`, 'a beat', 50).catch(() => {});
         }
         check(seen.s2 && seen.s2.shown && /role you give this agent/.test(seen.s2.text) && /Reviewer or Designer/.test(seen.s2.text), `step 2 says what a persona is: ${JSON.stringify(seen.s2)}`);
