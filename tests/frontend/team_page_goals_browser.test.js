@@ -27,7 +27,7 @@ const GOAL = 'Explore goals with two teams';
         for (const [label, w, h, mobile] of VIEWS) {
             console.log(label);
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(); await installTP(ev);
+            await Page.navigate({ url: BASE + '/agents' }); await Page.loadEventFired(); await install(); await coralReady(); await installTP(ev); // the Agents page: a bare start is the Inbox now (#11594)
             await seed(ev, TEAM);
             if (mobile) await ev(`window.syncMobileAgentList && window.syncMobileAgentList(); true`);
             await openTeam(ev, waitFor, TEAM).catch(() => {}); await settle(400);
