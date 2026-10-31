@@ -799,9 +799,7 @@ func snapshotClaimWorkflow(ctx context.Context, tx *sqlx.Tx, project string, tas
 			return err
 		}
 		w.TeamMode = &mode
-		if mode.Instructions != "" {
-			w.Instructions += "\n\nTeam working instructions:\n" + mode.Instructions
-		}
+		w.Instructions += "\n\nTeam working instructions:\n" + joinModeInstruction(ReviewTagRule, mode.Instructions) // every team, with no setting (#11424): what is the Operator's to look at, and what is not
 	}
 	w.Inputs = inputs
 	return saveWorkflow(ctx, tx, taskID, w)

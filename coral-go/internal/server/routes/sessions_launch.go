@@ -181,6 +181,16 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 		launchFlags = append(append([]string{}, body.Flags...), modelArgs...)
 	}
 	// Everything before this could be refused with nothing made; from here the terminal is made and the agent started whatever the request does (#5213).
+	// An agent's launch onto a board is logged (the switch on or off) and, with the Operator's switch on, held to the board's caps (#11432).
+	var lifeID int64
+	if agentCaller(r) && body.BoardName != "" && (body.BoardServer == "" || body.BoardServer == "local") {
+		id, ok := h.beginAgentLaunch(w, r, body.BoardName, launchTargetName(body.DisplayName, body.AgentType))
+		if !ok {
+			attempt.Finish(tracking.OutcomeFailure, tracking.FailInvalidRequest, 0, 1)
+			return
+		}
+		lifeID = id
+	}
 	lctx, cancel := lifecycleCtx(r.Context())
 	defer cancel()
 	result, err := h.launchSession(lctx, launchSpec{
@@ -190,6 +200,7 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 		AutoByDefault: !agentCaller(r) && autoDefaultAllowed(lctx, r, h.ss), // not for an agent's launch (it may not start a less-restricted agent, #4032), and a Hub request the owner does not let skip prompts asks instead (#5836)
 	})
 	if err != nil {
+		h.endAgentLaunch(r.Context(), body.BoardName, lifeID, false, "")
 		var refused *modelRefusedError
 		if errors.As(err, &refused) { // a model Pi does not list: the request's fault, refused before anything was made (#11105)
 			attempt.Finish(tracking.OutcomeFailure, tracking.FailInvalidRequest, 0, 1)
@@ -205,6 +216,7 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	attempt.Finish(tracking.OutcomeSuccess, "", 1, 0)
+	h.endAgentLaunch(r.Context(), body.BoardName, lifeID, true, launcherWords(h.orchActorOf(r))+" started "+orchName(launchTargetName(body.DisplayName, body.AgentType)))
 
 	// Setup board subscription in background (prompt is passed as CLI arg, not via tmux send-keys)
 	if body.BoardName != "" {

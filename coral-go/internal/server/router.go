@@ -304,8 +304,12 @@ func (s *Server) newRouteHandlers() *routeHandlers {
 	themeHandler.SetDB(s.db)
 	themeHandler.SeedBundledThemes()
 	if !envTrue("CORAL_NO_WELCOME") {
-		projects, _ := s.boardStore.ListProjects(context.Background())
-		seedNewInstallInboxWelcome(s.db, len(projects) > 0) // before the diff-mode seed: its row says an install has run
+		hasBoards := false
+		if s.boardStore != nil { // a board that could not be opened (board_open_error_test.go) has no boards to list
+			projects, _ := s.boardStore.ListProjects(context.Background())
+			hasBoards = len(projects) > 0
+		}
+		seedNewInstallInboxWelcome(s.db, hasBoards) // before the diff-mode seed: its row says an install has run
 	}
 	seedNewInstallDiffMode(s.db) // before the seeds below, whose rows say an install has run
 	// CORAL_NO_DEMO_SEED=1 (test servers): no demo workflow and no scheduled

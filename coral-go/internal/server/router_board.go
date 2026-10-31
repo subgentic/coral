@@ -108,6 +108,12 @@ func (s *Server) registerBoardAPI(r *chi.Mux, boardHandler *routes.BoardHandler,
 		})
 		s.registerBoardMessageRoutes(r, boardHandler)
 		s.registerBoardTaskRoutes(r, boardHandler)
+		// The Operator's grant to a board's orchestrator (#11432): the switch, the seat and the caps (the Operator's alone), the log, and the seat's wake and sleep of its own board's agents (an agent's, local only).
+		r.With(routes.RefuseSignInLink).Get("/api/board/{project}/orchestrator-grant", sessHandler.OrchestratorGrant)
+		r.With(routes.RefuseSignInLink).Put("/api/board/{project}/orchestrator-grant", sessHandler.OrchestratorGrant)
+		r.Get("/api/board/{project}/lifecycle-log", sessHandler.LifecycleLog)
+		r.With(routes.RefuseSignInLink).Post("/api/board/{project}/agents/{subscriber}/wake", sessHandler.OrchestratorWake)
+		r.With(routes.RefuseSignInLink).Post("/api/board/{project}/agents/{subscriber}/sleep", sessHandler.OrchestratorSleep)
 	})
 
 	// These work without an open board, so they stay outside the board group (#4924): team
@@ -126,6 +132,8 @@ func (s *Server) registerBoardMessageRoutes(r chi.Router, boardHandler *routes.B
 	r.Get("/api/board-seats/foreign", boardHandler.ListForeignSeats)               // the seats of agents launched on another board (#11112)
 	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/messages", boardHandler.PostMessage)
 	r.Get("/api/board/{project}/messages", boardHandler.ReadMessages)
+	r.Get("/api/operator-asks", boardHandler.OperatorAsks)                                                     // the questions agents asked the Operator (post --ask, wait --operator), for Needs you (#11417)
+	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/asks/{messageID}/close", boardHandler.CloseAsk) // close a question answered elsewhere (ask close, #11417)
 	r.Get("/api/board/{project}/messages/all", boardHandler.ListAllMessages)
 	r.Get("/api/board/{project}/messages/search", boardHandler.SearchMessages)
 	r.Post("/api/board/{project}/messages/mark-read", boardHandler.MarkRead)

@@ -82,10 +82,12 @@ GET /api/board/{project}/goals view
 GET /api/board/{project}/goals/{goalID} view
 GET /api/board/{project}/groups never
 GET /api/board/{project}/groups/{groupID}/members never
+GET /api/board/{project}/lifecycle-log launch
 GET /api/board/{project}/messages view
 GET /api/board/{project}/messages/all view
 GET /api/board/{project}/messages/check never
 GET /api/board/{project}/messages/search view
+GET /api/board/{project}/orchestrator-grant launch
 GET /api/board/{project}/paused view
 GET /api/board/{project}/peek never
 GET /api/board/{project}/proposals view
@@ -119,6 +121,7 @@ GET /api/goal-links never
 GET /api/goals view
 GET /api/goals/metrics view
 GET /api/health view
+GET /api/operator-asks view
 GET /api/pinned-folders view
 GET /api/proposals view
 GET /api/saved view
@@ -279,7 +282,10 @@ POST /api/auth/password/set never
 POST /api/auth/sessions/sign-out-others never
 POST /api/auto-accept/disable-all interact
 POST /api/board/remotes never
+POST /api/board/{project}/agents/{subscriber}/sleep never
+POST /api/board/{project}/agents/{subscriber}/wake never
 POST /api/board/{project}/artifacts/{id}/review interact
+POST /api/board/{project}/asks/{messageID}/close never
 POST /api/board/{project}/cross-team-links never
 POST /api/board/{project}/cross-team/disable launch
 POST /api/board/{project}/cross-team/enable launch
@@ -430,6 +436,7 @@ PUT /api/artifacts/{id}/star interact
 PUT /api/auth/hub-origins never
 PUT /api/auth/hub-signin never
 PUT /api/board/{project}/artifacts/{id}/tags never
+PUT /api/board/{project}/orchestrator-grant launch
 PUT /api/board/{project}/settings launch
 PUT /api/board/{project}/subscribers/{subscriberID}/review-settings never
 PUT /api/board/{project}/tasks/{taskID}/goal interact

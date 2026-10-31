@@ -15,10 +15,13 @@ GET /api/artifacts/{id}/readers view owner-only
 GET /api/artifacts/{id}/versions view owner-only
 GET /api/board/{project}/artifacts view owner-only
 GET /api/board/{project}/cross-team/settings view owner-only-hub
+GET /api/board/{project}/lifecycle-log launch owner-only
+GET /api/board/{project}/orchestrator-grant launch owner-only
 GET /api/board/{project}/proposals view owner-only
 GET /api/board/{project}/settings view owner-sees
 GET /api/board/{project}/tasks/{taskID}/artifact-content view owner-only
 GET /api/custom-models view owner-only
+GET /api/operator-asks view owner-only
 GET /api/proposals view owner-only
 GET /api/saved view owner-only
 GET /api/saved/{id}/message view owner-only
@@ -49,5 +52,6 @@ POST /api/sessions/live/{name}/notices/resume interact owner-only
 POST /api/system/update/relaunch launch owner-update
 PUT /api/artifacts/{id}/comments/lock interact owner-only
 PUT /api/artifacts/{id}/star interact owner-only
+PUT /api/board/{project}/orchestrator-grant launch owner-only
 PUT /api/board/{project}/settings launch owner-only
 PUT /api/custom-models launch owner-only

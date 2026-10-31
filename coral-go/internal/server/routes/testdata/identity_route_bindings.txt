@@ -49,10 +49,12 @@ GET /api/board/{project}/goals | board-claims
 GET /api/board/{project}/goals/{goalID} | board-claims
 GET /api/board/{project}/groups | board-claims
 GET /api/board/{project}/groups/{groupID}/members | board-claims
+GET /api/board/{project}/lifecycle-log | board-claims | operator-only
 GET /api/board/{project}/messages | board-claims
 GET /api/board/{project}/messages/all | board-claims
 GET /api/board/{project}/messages/check | board-claims
 GET /api/board/{project}/messages/search | board-claims
+GET /api/board/{project}/orchestrator-grant | board-claims | operator-only
 GET /api/board/{project}/paused | board-claims
 GET /api/board/{project}/peek | board-claims
 GET /api/board/{project}/proposals | board-claims | operator-only
@@ -147,7 +149,10 @@ POST /api/artifacts/{id}/comments | token-session | operator-only
 POST /api/artifacts/{id}/comments/{cid}/reply | token-session
 POST /api/artifacts/{id}/comments/{cid}/send | token-session | operator-only
 POST /api/board/remotes | board-unchecked | operator-only
+POST /api/board/{project}/agents/{subscriber}/sleep | board-claims +token-session
+POST /api/board/{project}/agents/{subscriber}/wake | board-claims +token-session
 POST /api/board/{project}/artifacts/{id}/review | board-claims | operator-only
+POST /api/board/{project}/asks/{messageID}/close | board-claims
 POST /api/board/{project}/cross-team-links | board-claims +token-session | operator-only
 POST /api/board/{project}/cross-team/disable | board-claims | operator-only
 POST /api/board/{project}/cross-team/enable | board-claims | operator-only
@@ -243,6 +248,7 @@ POST /api/sessions/live/{sessionID}/wake | unbound | operator-only
 POST /api/sessions/record-agents | unbound | operator-only
 PUT /api/agent/ui/{id} | token-bound
 PUT /api/board/{project}/artifacts/{id}/tags | board-claims | operator-only
+PUT /api/board/{project}/orchestrator-grant | board-claims | operator-only
 PUT /api/board/{project}/settings | board-claims +token-session | operator-only
 PUT /api/board/{project}/subscribers/{subscriberID}/review-settings | board-claims | operator-only
 PUT /api/board/{project}/tasks/{taskID}/goal | board-claims

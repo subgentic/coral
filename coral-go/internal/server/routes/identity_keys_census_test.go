@@ -46,6 +46,7 @@ var notIdentityFields = map[string]string{
 	"created_at":         "a time",
 	"current_session_id": "the session a launch replaces, checked by the launcher against the live session",
 	"resume_session_id":  "the conversation to resume, not a board participant",
+	"seat_session":       "the session the Operator names as a board's orchestrator seat (#11432): written only by the verified Operator, checked on every request against the verified token's session and its live row, never taken as who the caller is",
 	"from_id":            "a message id",
 	"reply_to":           "a message id",
 	"job_type":           "what a scheduled job runs",
