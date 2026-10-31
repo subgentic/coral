@@ -137,7 +137,7 @@ function drawTableRaw(col) {
     if (state.hubConnected || window.__goalsHub) col.append(el('p', 'goals-note', W.otherBoardsNote));
     if (model.failed) {
         const f = el('div', 'goals-failed'); f.setAttribute('role', 'alert');
-        f.append(el('span', null, `${model.failed}${model.goals.length ? ` (${W.asOfText(model.asOf)})` : ''}`), btn('btn btn-small', 'Try again', loadGoals));
+        f.append(el('span', null, `${model.failed}${model.goals.length ? ` (${W.asOfText(model.asOf)})` : ''}`), btn('btn btn-small', 'Retry', loadGoals));
         col.append(f);
     }
     if (model.loading) { col.append(el('p', 'goals-note', 'Loading goals…')); return; }

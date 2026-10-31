@@ -232,7 +232,7 @@ const upToDate = { ...idle, not_ready_reason: 'up_to_date' }; // what the server
                 ['not checked yet', { ...idle, not_ready_reason: 'not_checked' }, { title: 'Coral has not checked for updates yet' }],
                 ['the switch is off', { ...idle, not_ready_reason: 'switch_off' }, { title: 'Automatic update checks are off' }],
                 ['downloading', { ...idle, progress: 64, staged: { version: '1.4.126', staged_at: '', days_ready: 0, verified: false } }, { title: 'Downloading Coral 1.4.126', bar: '64' }],
-                ['failed', { ...idle, state: 'failed', last_result: { at: '2026-10-19T10:00:00Z', from: '1.4.125', to: '1.4.126', result: 'refused', by: 'local' } }, { title: 'Coral found an update (v1.4.126) it could not verify, so it was not installed.', sub: 'Your version is unchanged.', act: 'Try again' }],
+                ['failed', { ...idle, state: 'failed', last_result: { at: '2026-10-19T10:00:00Z', from: '1.4.125', to: '1.4.126', result: 'refused', by: 'local' } }, { title: 'Coral found an update (v1.4.126) it could not verify, so it was not installed.', sub: 'Your version is unchanged.', act: 'Retry' }],
                 ['Homebrew', { ...idle, install_kind: 'homebrew', upgrade_command: 'brew upgrade --cask coral', relaunch: { ...idle.relaunch, reason: 'unsupported_install' } }, { title: 'Homebrew updates this Coral', cmd: 'brew upgrade --cask coral', autoOff: true }],
                 ['Homebrew by its reason alone (no install_kind: an older server)', { ...idle, relaunch: { ...idle.relaunch, reason: 'unsupported_install' } }, { title: 'This install cannot update itself', autoOff: true }],
                 ['a folder it cannot write to', { ...idle, install_kind: 'unwritable', relaunch: { ...idle.relaunch, reason: 'unsupported_install' } }, { title: 'This install cannot update itself', link: 'https://github.com/subgentic/coral/releases', autoOff: true }],
@@ -254,7 +254,7 @@ const upToDate = { ...idle, not_ready_reason: 'up_to_date' }; // what the server
             const aub = await auditRegion(ev, ['#update-fail-banner']);
             check(`${tag}: the notice has 4.5:1 text contrast (${JSON.stringify((aub.fails || []).slice(0, 2))}) and named controls (${JSON.stringify(await axUnnamed('#update-fail-banner'))})`, (aub.fails || []).length === 0 && (await axUnnamed('#update-fail-banner')).length === 0);
             await ev(`window.__upd.calls.length = 0; document.querySelector('#update-fail-banner .update-fail-again').click(); true`); await settle(400);
-            check(`${tag}: Try again asks the updater to check, then reads the status (${JSON.stringify(await ev('window.__upd.calls.map(c => c.method + c.url)'))})`, (calls => calls[0] === 'POST/check' && calls.length >= 2 && calls.slice(1).every(c => c === 'GET/status'))(await ev(`window.__upd.calls.map(c => c.method + c.url)`))); // the check, then the status read (one, or more: the page's own status poll can land in the same moment on a slow machine, #11040)
+            check(`${tag}: Retry asks the updater to check, then reads the status (${JSON.stringify(await ev('window.__upd.calls.map(c => c.method + c.url)'))})`, (calls => calls[0] === 'POST/check' && calls.length >= 2 && calls.slice(1).every(c => c === 'GET/status'))(await ev(`window.__upd.calls.map(c => c.method + c.url)`))); // the check, then the status read (one, or more: the page's own status poll can land in the same moment on a slow machine, #11040)
             await ev(`document.querySelector('#update-fail-banner .update-fail-close').click(); true`); await settle(100);
             await setStatus({ ...idle, state: 'failed', last_result: { at: '2026-10-19T10:00:00Z', from: '1.4.125', to: '1.4.126', result: 'refused', by: 'local' } });
             check(`${tag}: dismissed, it stays away for the same failure`, await ev(`document.getElementById('update-fail-banner').hidden`));
@@ -268,10 +268,10 @@ const upToDate = { ...idle, not_ready_reason: 'up_to_date' }; // what the server
             await load(view, { routes: false });
             await setStatus(staged(3));
             await ev(`window.showSettingsModal('updates'); true`); await waitFor(`!!document.querySelector('#update-pane-body .update-status')`, `${tag}: the pane`, 6000);
-            let bare = await ev(`({ auto: !!document.getElementById('settings-update-auto'), hub: !!document.getElementById('settings-update-hub'), check: !![...document.querySelectorAll('.update-act')].find(b => /Check now|Try again/.test(b.textContent)) })`);
+            let bare = await ev(`({ auto: !!document.getElementById('settings-update-auto'), hub: !!document.getElementById('settings-update-hub'), check: !![...document.querySelectorAll('.update-act')].find(b => /Check now|Retry/.test(b.textContent)) })`);
             check(`${tag}: without server routes the auto switch is not drawn, and the hub switch is not in this pane (it is in Network and Hub) (${JSON.stringify(bare)})`, !bare.auto && !bare.hub);
             await setStatus(upToDate); await ev(`import(${S} + 'update_settings.js').then(m => m.showUpdatesPane())`); await settle(300);
-            bare = await ev(`({ check: !![...document.querySelectorAll('.update-act')].find(b => /Check now|Try again/.test(b.textContent)), title: (document.querySelector('.update-status-text b') || {}).textContent })`);
+            bare = await ev(`({ check: !![...document.querySelectorAll('.update-act')].find(b => /Check now|Retry/.test(b.textContent)), title: (document.querySelector('.update-status-text b') || {}).textContent })`);
             check(`${tag}: and Check now is not offered (${JSON.stringify(bare)})`, !bare.check && bare.title === 'Coral is up to date');
             // the Coral Hub relaunch switch lives in Settings > Network and Hub (#5383): there, it saves to PUT /api/cloud/hub-relaunch {allow} at once; Updates only points to it
             await ev(`window.showSettingsModal('network'); true`); await settle(300);

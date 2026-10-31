@@ -1,5 +1,5 @@
 // An agent's page on the team's Agents tab (Review settings, its Save bar) shows no empty red-bordered box under the bar (#11219, the operator's screenshot): the "could not be read" alert was always in the page, empty, and
-// drawn as a box (display: flex beats the hidden attribute it was meant to have). It is hidden with no text, and shown only with its sentence and Try again when the settings could not be read. Real board on the isolated dev server.
+// drawn as a box (display: flex beats the hidden attribute it was meant to have). It is hidden with no text, and shown only with its sentence and Retry when the settings could not be read. Real board on the isolated dev server.
 const assert = require('node:assert/strict');
 const { safePaused } = require('./helpers/paused');
 const { connect } = require('./agent_view_harness');
@@ -39,13 +39,13 @@ const { coralReady } = require('./helpers/wait');
         assert.deepEqual(await ev(EMPTY_RED), [], 'no empty red-bordered box on the agent page');
         console.log('   ✓');
 
-        console.log('2. The read fails: the box shows its sentence, with Try again');
+        console.log('2. The read fails: the box shows its sentence, with Retry');
         failReads = true;
         await openAgent();
         await waitFor(`!!document.querySelector('p.goals-failed') && !document.querySelector('p.goals-failed').hidden && document.querySelector('p.goals-failed').textContent.trim().length > 0`, 'the error sentence', 15000);
         assert.equal(await ev(`/could not be read/i.test(document.querySelector('p.goals-failed').textContent)`), true, 'it says what happened');
-        assert.equal(await ev(`[...document.querySelectorAll('button')].some(b => b.textContent.trim() === 'Try again' && b.getClientRects().length > 0)`), true, 'with Try again');
+        assert.equal(await ev(`[...document.querySelectorAll('button')].some(b => b.textContent.trim() === 'Retry' && b.getClientRects().length > 0)`), true, 'with Retry');
         console.log('   ✓');
-        console.log('PASS agent settings: no empty red box; the read failure shows its sentence and Try again');
+        console.log('PASS agent settings: no empty red box; the read failure shows its sentence and Retry');
     } finally { await removeBoards(ev, [B]).catch(() => {}); await client.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });

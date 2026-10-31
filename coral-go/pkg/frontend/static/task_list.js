@@ -558,7 +558,7 @@ function _taskFooter(querying, scope, shown, total) {
     const busy = querying ? _filteredList.busy : _boardList.busyMore;
     const error = querying ? _filteredList.error : _boardList.moreError;
     return { text: error || `Showing ${shown} of ${total}`, auto: !error,
-        more: { label: error ? 'Try again' : 'Load more', busy: !!busy, run: loadMoreBoardTasks } };
+        more: { label: error ? 'Retry' : 'Load more', busy: !!busy, run: loadMoreBoardTasks } };
 }
 
 /** The badge: done / all, from the server's totals for the board. */
