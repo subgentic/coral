@@ -1,5 +1,27 @@
 # Release Notes
 
+## v2.0.17 — phone tabs reordered, question rows that read like review rows, and tidier welcome buttons
+
+### Changes
+
+#### What you will notice first
+
+- **The phone's bottom bar is Agents, Inbox, Automations, Analytics, in that order**: Tasks and Chats move to the first rows of the drawer on every screen (the Inbox drawer keeps its folders), and Automations and Analytics leave the drawer's places. The Needs you badge stays on Inbox, and the Tasks page lights Inbox. Through Coral Hub the bar shows Agents and Inbox.
+- **A question to the Operator in Needs you reads like a review row**: the row's name is the question's first line (cleaned and cut), under it who asked and their team, and the whole question is the tooltip. Before, the question could be hidden, leaving only the asker's name and Reply.
+- **The welcome rows' buttons line up on a phone.**
+
+#### Known issues
+
+- **Windows: in-app update does not work from 2.0.0 through 2.0.6.** If you're on one of those, download and install the MSI by hand; from 2.0.7 on, in-app update works.
+- **macOS: a Coral of 2.0.5 or earlier cannot install updates in-app; install 2.0.6 or later by hand once.**
+- **OpenCode agents are tested on macOS and Linux; OpenCode on Windows is not yet tested end to end.**
+- Setting up a computer over SSH is supported from a macOS or Linux hub, and is not yet tested from a Windows hub.
+
+#### For developers and releases
+
+- The static tree is 5,858,946 bytes of the 5,906,432-byte budget, and app.js at start is 396,927 encoded bytes against its 396,965 limit.
+- The server-address test uses a real dead process for its "dead" pid (a made-up pid could be a live process on a Windows runner).
+
 ## v2.0.16 — private marks stay with the authentic owner through Coral Hub
 
 ### Changes
