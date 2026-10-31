@@ -41,6 +41,12 @@ const { coralReady } = require('./helpers/wait');
             const names = await ev(`[...document.querySelectorAll('#group-table-view .inbox-welcome-name')].map(e => ({ t: e.firstChild ? e.firstChild.textContent : '', ws: getComputedStyle(e).whiteSpace, cut: e.scrollWidth > e.clientWidth + 1, lines: Math.round(e.getBoundingClientRect().height / parseFloat(getComputedStyle(e).lineHeight || 20)) }))`);
             check(names.length === 5 && names.every(n => n.ws === 'normal' && !n.cut), `${tag}: no welcome title is cut: ` + JSON.stringify(names));
             if (mobile) check(names.some(n => n.lines > 1), `${tag}: a long title wraps beside its button: ` + JSON.stringify(names));
+            if (mobile) { // the buttons of the five rows line up whatever the title's width (#11536): one left edge and width for the action, one left edge for Dismiss
+                const geo = await ev(`(() => { const rows = [...document.querySelectorAll('#group-table-view tbody tr')]; const box = b => { const r = b.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.width), Math.round(r.height)]; }; return { actions: rows.map(r => r.querySelector('.inbox-welcome-actions .btn-primary')).filter(Boolean).map(box), dismiss: rows.flatMap(r => [...r.querySelectorAll('.inbox-welcome-actions .btn-quiet')].map(box)) }; })()`);
+                check(geo.actions.length === 5 && new Set(geo.actions.map(g => g.join())).size === 1, `${tag}: the five action buttons share one left edge and one size: ` + JSON.stringify(geo.actions));
+                check(geo.dismiss.length === 4 && new Set(geo.dismiss.map(g => g.join())).size === 1, `${tag}: the four Dismiss buttons share one left edge and one size: ` + JSON.stringify(geo.dismiss));
+                check(geo.actions.every(g => g[2] >= 44) && geo.dismiss.every(g => g[2] >= 44), `${tag}: every button is a 44 px target`);
+            }
             await shot(`inbox-welcome-counts-${w}`);
             await press('Hide all welcome items');
             await waitFor(`document.querySelectorAll('#group-table-view .inbox-welcome-name').length === 0`, `${tag}: the items put away`, 8000);
