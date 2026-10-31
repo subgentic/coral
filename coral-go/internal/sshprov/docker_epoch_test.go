@@ -217,6 +217,8 @@ func TestSSHDocker(t *testing.T) {
 		}
 		aliceTarget = tg
 		if _, err := f.r.Run(ctx, tg, CmdUname); !errors.Is(err, ErrHostKey) {
+			t.Logf("  DIAG plain:\n%s", f.raw("far-alice"))
+			t.Logf("  DIAG -v (proxy and host key lines):\n%s", grepLines(f.raw("far-alice", "-v"), "proxy", "Proxy", "known_hosts", "StrictHost", "Host key", "host key", "verification", "denied", "Connection closed", "Permission"))
 			t.Fatalf("before any key is trusted, ssh must refuse on the host key: %v", err)
 		}
 		keys, err := f.r.ScanAlias(ctx, tg)
@@ -394,10 +396,38 @@ func TestSSHDocker(t *testing.T) {
 	})
 }
 
+// raw runs the machine's own ssh the way the runner does (strict, batch) and returns everything it printed, for a failure that the runner reports only as "could not connect".
+func (f *dkFix) raw(alias string, extra ...string) string {
+	args := append([]string{"-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=yes", "-o", "ConnectTimeout=10"}, extra...)
+	args = append(args, "--", alias, "true")
+	cmd := exec.Command("ssh", args...)
+	cmd.Env = minimalEnv()
+	out, err := cmd.CombinedOutput()
+	return "ssh " + strings.Join(args, " ") + " -> " + func() string {
+		if err != nil {
+			return err.Error()
+		}
+		return "ok"
+	}() + "\n" + string(out)
+}
+
 func firstOut(s string, _ error) string {
 	s = strings.TrimSpace(s)
 	if i := strings.IndexByte(s, '\n'); i >= 0 {
 		return s[:i] + " ..."
 	}
 	return s
+}
+
+func grepLines(s string, subs ...string) string {
+	var out []string
+	for _, l := range strings.Split(s, "\n") {
+		for _, sub := range subs {
+			if strings.Contains(l, sub) {
+				out = append(out, l)
+				break
+			}
+		}
+	}
+	return strings.Join(out, "\n")
 }
