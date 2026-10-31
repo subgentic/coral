@@ -45,6 +45,16 @@ func MissingCommandIn(out, binary string) bool {
 	return false
 }
 
+// promptEnd is how a shell's prompt ends, after any trailing blanks: "$", "#", "%" or ">" (bash, sh, zsh, PowerShell's "PS C:\\w>", cmd's
+// "C:\\w>"), and the marks of common custom prompts.
+var promptEnd = regexp.MustCompile(`(?:[$#%>]|❯|λ|»)$`)
+
+// looksLikePrompt reports whether row, the last on the screen, ends like a shell's prompt (QA's ConPTY run on #253: a program's last line of output,
+// "[stub] up", was taken for the prompt and the error above it marked).
+func looksLikePrompt(row string) bool {
+	return promptEnd.MatchString(strings.TrimSpace(row))
+}
+
 // promptPiece reports whether row, right above the prompt's last row (or above another piece), is the prompt wrapped from there: as wide as the
 // pane, and shaped like a prompt, not like a person's output (the coral-go-team Security's Finding B on #253): no "not found" or "not recognized"
 // in it, not one character repeated (a ruler), and no run of spaces (columns, a wide ls line). A row of output taken for the prompt would make an
@@ -100,6 +110,9 @@ func MissingCommandAtBottom(screen, binary string) bool {
 	trimBlank()
 	if len(rows) < 2 {
 		return false // a prompt alone, or nothing: no answer
+	}
+	if !looksLikePrompt(rows[len(rows)-1]) {
+		return false // the bottom is not a shell's prompt (a program's own output, still running): the shell has not answered
 	}
 	rows = rows[:len(rows)-1] // the prompt's last row
 	for len(rows) > 0 && promptPiece(rows[len(rows)-1], width) {
