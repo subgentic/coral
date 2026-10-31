@@ -1344,7 +1344,8 @@
     body.live-session-active:not(.popout-mode) .terminal-header[data-more] .live-view-switch:not([hidden]) { display: none; } /* with the dots open the switch is the line under it, with its words: one of the two on screen, not two controls of one name */
     body.live-session-active:not(.popout-mode) .terminal-header .live-view-switch-menu { min-height: var(--control-touch-height, 44px); gap: 6px; align-items: center; }
     body.live-session-active:not(.popout-mode) .terminal-header .agent-bar-more { order: 3; }
-    body.live-session-active:not(.popout-mode) .terminal-header .terminal-header-actions > :not(.live-view-toggle):not(.live-view-switch):not(.agent-bar-more) { display: none !important; } /* the header's ids set their own display, some with !important (touch.css, mobile.css) */
+    body.live-session-active:not(.popout-mode) .terminal-header .notice-pause-btn:not([hidden]) { display: inline-flex; order: 2; } /* the pause toggle sits beside the view switch, before the ⋯ (#11388) */
+    body.live-session-active:not(.popout-mode) .terminal-header .terminal-header-actions > :not(.live-view-toggle):not(.live-view-switch):not(.agent-bar-more):not(.notice-pause-btn) { display: none !important; } /* the header's ids set their own display, some with !important (touch.css, mobile.css) */
     body.live-session-active:not(.popout-mode) .terminal-header[data-more] { flex-wrap: wrap; } /* only while ⋯ is open: the second line holds Search, the panel and the rest */
     body.live-session-active:not(.popout-mode) .terminal-header[data-more]::before { content: ''; order: 4; flex: 0 0 100%; height: 0; }
     body.live-session-active:not(.popout-mode) .terminal-header[data-more] .terminal-header-actions > :not(.live-view-toggle):not(.live-view-switch):not(.agent-bar-more):not([hidden]):not([style*="display: none"]):not([style*="display:none"]):not(.terminal-branch) { display: inline-flex !important; order: 5; } /* what a mode hid stays hidden */
