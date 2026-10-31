@@ -39,7 +39,9 @@ type BoardHealthMonitor struct {
 	paused func(project string) bool
 
 	mu        sync.Mutex
-	lastCheck map[string]time.Time       // per board
+	lastCheck map[string]time.Time       // per board: when a check last went out
+	lastEval  map[string]time.Time       // per board: when the check was last looked at (it goes out only when something changed or the heartbeat is due, #11431)
+	lastPrint map[string]map[string]bool // per board: the facts the last look found, so the same findings are not said again until the heartbeat
 	landing   *LandingWatch              // the landing alert's view of the repositories (git_poller.go feeds it); nil: the alert has nothing to read
 	offShown  map[string][]offBooksShown // per board: the off-the-books occurrences the check composed last, said once it is delivered (board_health_offbooks.go)
 }
@@ -48,7 +50,7 @@ func NewBoardHealthMonitor(store *board.Store, interval time.Duration) *BoardHea
 	if interval <= 0 {
 		interval = 10 * time.Minute
 	}
-	return &BoardHealthMonitor{store: store, interval: interval, idleAfter: 30 * time.Minute, logger: slog.Default(), now: time.Now, lastCheck: map[string]time.Time{}}
+	return &BoardHealthMonitor{store: store, interval: interval, idleAfter: 30 * time.Minute, logger: slog.Default(), now: time.Now, lastCheck: map[string]time.Time{}, lastEval: map[string]time.Time{}, lastPrint: map[string]map[string]bool{}}
 }
 
 // SetAgents gives the check its view of the agents (hook events, discovery) and the gate to type
@@ -117,10 +119,11 @@ func (m *BoardHealthMonitor) checkProject(ctx context.Context, project string, b
 	m.escalateWaits(ctx, project)
 	m.mu.Lock()
 	last, checked := m.lastCheck[project]
+	evalAt, evaluated := m.lastEval[project]
 	m.mu.Unlock()
-	// The last check is the tick it went out on, not the moment its delivery ended: a delivery that ends a few seconds after its tick left the next tick, one interval later, a few seconds
+	// The last look is the tick it was made on, not the moment its delivery ended: a delivery that ends a few seconds after its tick left the next tick, one interval later, a few seconds
 	// short, and it was skipped, so a 5-minute interval delivered every 10 (Codex Test's finding in #7879).
-	if checked && tick.Sub(last)+tickSlack < time.Duration(hs.IntervalMin)*time.Minute {
+	if evaluated && tick.Sub(evalAt)+tickSlack < time.Duration(hs.IntervalMin)*time.Minute {
 		return
 	}
 	orch, err := m.store.TeamOrchestrator(ctx, project)
@@ -145,8 +148,31 @@ func (m *BoardHealthMonitor) checkProject(ctx context.Context, project string, b
 	if !live {
 		return
 	}
-	text, items, err := m.composeCheck(ctx, project, orch, rcptSub, bySession)
-	if err != nil || (items == 0 && !hs.AllClear) {
+	text, items, facts, err := m.composeCheck(ctx, project, orch, rcptSub, bySession)
+	if err != nil {
+		return
+	}
+	// A check goes out when something changed since the last one (an item came or went, a state changed, a question opened) or the heartbeat is due, so silence means health and a
+	// quiet team is not told "no change" every interval (#11431). The look is remembered either way, so findings that return later are news again.
+	m.mu.Lock()
+	m.lastEval[project] = tick
+	was, told := m.lastPrint[project]
+	news := !told // the first look says so
+	for f := range facts {
+		if !was[f] {
+			news = true // a finding the last look did not have: a new item or state, a question, an agent stuck. One going away is not news: the heartbeat says all is well again.
+		}
+	}
+	if items == 0 || !news {
+		m.lastPrint[project] = facts // nothing to say now, or nothing new: this is what the recipient knows
+	}
+	m.mu.Unlock()
+	heartbeat := time.Duration(hs.HeartbeatMin) * time.Minute
+	due := !checked || tick.Sub(last)+tickSlack >= heartbeat
+	if items == 0 && !hs.AllClear {
+		return
+	}
+	if !news && !due {
 		return
 	}
 	if err := sendUnlessBlocked(ctx, m.limit, m.deliver, rcptAgent, "health-check:"+project, text); err != nil {
@@ -155,6 +181,7 @@ func (m *BoardHealthMonitor) checkProject(ctx context.Context, project string, b
 	}
 	m.mu.Lock()
 	m.lastCheck[project] = tick
+	m.lastPrint[project] = facts
 	m.mu.Unlock()
 	m.markOffBooksShown(ctx, project, text, m.now())
 }
@@ -163,15 +190,15 @@ func (m *BoardHealthMonitor) checkProject(ctx context.Context, project string, b
 // work, a reviewer's growing queue, queue problems; what the orchestrator acknowledged left out while unchanged; then
 // the progress since the last check, the Operator's open questions and the roster. Its count is the items plus what
 // the roster calls for attention.
-func (m *BoardHealthMonitor) composeCheck(ctx context.Context, project, orch string, rcpt *board.Subscriber, bySession map[string]AgentInfo) (string, int, error) {
+func (m *BoardHealthMonitor) composeCheck(ctx context.Context, project, orch string, rcpt *board.Subscriber, bySession map[string]AgentInfo) (string, int, map[string]bool, error) {
 	now := m.now()
 	subs, err := m.store.ListSubscribers(ctx, project)
 	if err != nil {
-		return "", 0, err
+		return "", 0, nil, err
 	}
 	all, err := m.store.ListOpenTaskStates(ctx, project)
 	if err != nil {
-		return "", 0, err
+		return "", 0, nil, err
 	}
 	tasks, parked, backFromPark := m.splitParked(ctx, project, all, now)
 	waits, _ := m.store.ListActiveWaits(ctx, project)
@@ -184,6 +211,7 @@ func (m *BoardHealthMonitor) composeCheck(ctx context.Context, project, orch str
 	reviews, _ := m.store.OpenReviews(ctx, project)
 	reviewers, _ := m.store.Reviewers(ctx, project)
 	idle, agents, idleNoWork := m.idleItems(ctx, subs, bySession, orch, busyAgents(tasks), waiting, now)
+	items = append(items, m.dialogItems(ctx, project, subs, bySession, orch, now)...) // an agent stopped at a dialog goes first (#11431)
 	items = append(items, idle...)
 	items = append(items, m.offBooksItems(ctx, project, orch, subs, bySession, tasks, now)...) // work done off the books (#7793)
 	items = append(items, reviewItems(reviews, reviewers, parked, idleNoWork)...)
@@ -217,7 +245,7 @@ func (m *BoardHealthMonitor) composeCheck(ctx context.Context, project, orch str
 	return teamhealth.Compose(teamhealth.CheckInput{Now: now, Agents: agents, Items: items, Questions: questions, Goals: goals,
 		Progress: teamhealth.Progress{Since: since, Completed: p.Completed, Reviewed: p.Reviewed, Posts: p.Posts},
 		Parked:   len(parked), BackFromPark: backFromPark, Roster: roster,
-		PeekHint: rcpt != nil && rcpt.SubscriberID == orch}), len(items) + attention + reminders, nil
+		PeekHint: rcpt != nil && rcpt.SubscriberID == orch}), len(items) + attention + reminders, healthFacts(items, questions, roster, backFromPark, goals), nil
 }
 
 // splitParked leaves parked tasks out: a parked task raises no item (#4175 step 3). A task whose park ended is back:
@@ -275,6 +303,27 @@ func (m *BoardHealthMonitor) escalationItems(ctx context.Context, project string
 	return items
 }
 
+// dialogItems: 0. an agent (not the orchestrator, who is reading this) stopped at a dialog or permission prompt for the team's N minutes (HeldNotice.AfterMin): named first, whether or not it has work, because nothing
+// moves until a person answers it. It is an item with a stable key and the time the dialog opened, so a new dialog is news (a check goes out) and the same one is not said again until the heartbeat (#11431).
+func (m *BoardHealthMonitor) dialogItems(ctx context.Context, project string, subs []board.Subscriber, bySession map[string]AgentInfo, orch string, now time.Time) []teamhealth.Item {
+	after := time.Duration(m.store.GetHealthSettings(ctx, project).HeldNotice.AfterMin) * time.Minute
+	var items []teamhealth.Item
+	for _, sub := range subs {
+		a, live := bySession[sub.SessionName]
+		if !live || board.SameIdentity(sub.SubscriberID, orch) {
+			continue
+		}
+		sig, known := m.signal(ctx, a.SessionID)
+		if !known || !sig.NeedsInput || sig.InTurn || sig.Since.IsZero() || now.Sub(sig.Since) < after {
+			continue
+		}
+		items = append(items, teamhealth.Item{Rank: 0, Agent: teamhealth.Name(sub.SubscriberID),
+			Problem: fmt.Sprintf("needs input, stopped at a dialog or prompt for %s", teamhealth.Age(now.Sub(sig.Since))),
+			Suggest: "read its terminal to see what it asks, then tell the Operator", Key: "input|" + sub.SubscriberID, State: sig.Since.UTC().Format(time.RFC3339)})
+	}
+	return items
+}
+
 // busyAgents: the assignees of a task in progress or pending.
 func busyAgents(tasks []board.Task) map[string]bool {
 	busy := map[string]bool{}
@@ -310,13 +359,7 @@ func (m *BoardHealthMonitor) idleItems(ctx context.Context, subs []board.Subscri
 			continue
 		}
 		if sig.NeedsInput && !sig.InTurn {
-			problem := "needs input, stopped at a prompt"
-			if !sig.Since.IsZero() {
-				problem = fmt.Sprintf("needs input, stopped at a prompt for %s", teamhealth.Age(now.Sub(sig.Since)))
-			}
-			items = append(items, teamhealth.Item{Rank: 1, Agent: teamhealth.Name(sub.SubscriberID), Problem: problem,
-				Suggest: "read its terminal to see what it asks, then tell the Operator", Key: "input|" + sub.SubscriberID, State: sig.Since.UTC().Format(time.RFC3339)})
-			continue
+			continue // at a dialog: dialogItems names it, at the top, once it has been there long enough (#11431)
 		}
 		if sig.InTurn || sig.NeedsInput || sig.Since.IsZero() || now.Sub(sig.Since) < m.idleAfter {
 			continue
@@ -535,4 +578,32 @@ func poolItems(waits []board.PoolWait, now time.Time) []teamhealth.Item {
 		items = append(items, teamhealth.Item{Rank: 2, Agent: "Board", Problem: problem, Suggest: suggest, Key: fmt.Sprintf("pool|%d", w.TaskID), State: state})
 	}
 	return items
+}
+
+// healthFacts is what a check finds, as a set that gains a member when something worth saying is new and not when only the time did: each item by its stable key and state (never its wording, which carries
+// minutes that grow), the Operator's open questions by who asked and what, what the roster holds for the reader (Roster.Facts), and the tasks back from a park (said once). The same findings are the same set (#11431).
+func healthFacts(items []teamhealth.Item, questions []teamhealth.Question, roster *teamhealth.Roster, backFromPark []int64, goals []teamhealth.GoalLine) map[string]bool {
+	set := map[string]bool{}
+	for _, g := range goals { // a goal the operator has to look at is news when it first carries its reminder (or the reminder changes), not at the next heartbeat (#11412 with #11431)
+		if g.Remind != teamhealth.RemindNone {
+			set[fmt.Sprintf("g:%d|%s", g.ID, g.Remind)] = true
+		}
+	}
+	for _, it := range items {
+		key := it.Key
+		if key == "" {
+			key = fmt.Sprintf("unkeyed|%d|%s", it.Rank, it.Agent)
+		}
+		set["i:"+key+"|"+it.State+fmt.Sprintf("|%t", it.Back)] = true
+	}
+	for _, q := range questions {
+		set["q:"+q.Asker+"|"+q.Text] = true
+	}
+	for _, id := range backFromPark {
+		set[fmt.Sprintf("p:%d", id)] = true
+	}
+	for _, f := range roster.Facts() {
+		set["r:"+f] = true
+	}
+	return set
 }

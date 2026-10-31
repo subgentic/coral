@@ -355,3 +355,37 @@ func formatList(lines []string) string {
 	}
 	return out
 }
+
+// Facts is what in the roster is for the reader, one line each, that changes when something new needs them and not when the clock moved or an agent went from one turn to the next: who waits on whom (and whether
+// the wait is stale), who is blocked, who is asleep with unread tags, and how many agents are idle, offline or unknown. Agents working or waiting are not facts (they come and go every turn), nor is one at a prompt: it is a fact once it has been there the team's N minutes (an item). A
+// check goes out again when it holds a fact the last one did not (#11431).
+func (r *Roster) Facts() []string {
+	if r == nil {
+		return nil
+	}
+	var out []string
+	for _, k := range []string{StateIdle, StateOffline, StateUnknown} {
+		if n := r.Counts[k]; n > 0 {
+			out = append(out, fmt.Sprintf("c:%s=%d", k, n))
+		}
+	}
+	if r.Claimable > 0 {
+		out = append(out, fmt.Sprintf("claimable=%d", r.Claimable))
+	}
+	for _, g := range r.Waits {
+		names := make([]string, 0, len(g.Waiters))
+		for _, w := range g.Waiters {
+			names = append(names, fmt.Sprintf("%s/%t", w.Name, w.Stale))
+		}
+		sort.Strings(names)
+		out = append(out, fmt.Sprintf("w:%s/%t:%s", g.On, g.You, strings.Join(names, ",")))
+	}
+	for _, b := range r.Blocked {
+		out = append(out, "b:"+b.Name)
+	}
+	for _, a := range r.Asleep {
+		out = append(out, fmt.Sprintf("s:%s=%d", a.Name, a.Count))
+	}
+	sort.Strings(out)
+	return out
+}

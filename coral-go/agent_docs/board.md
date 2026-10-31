@@ -115,7 +115,7 @@ message with a line under it, `(a reply on task #N: answer it on the task with  
 `coral-board post --task N` (the same text rules as any post; `--to` still works): the post is listed with the person's replies
 on the task's page, under its description, so they see your answer there. A plain `post` is an ordinary board message and does
 not reach the task's page. The task must be on the board you are subscribed to (the server refuses another board's task, and
-`--task` needs a task number).
+`--task` needs a task number). A `post --task N` also tells the task's assignee and its creator (each as an @mention, never you; a name that is not an active member of the board is skipped), so the people the task belongs to hear the answer without being @mentioned.
 
 ## Projects
 

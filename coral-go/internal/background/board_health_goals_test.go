@@ -124,12 +124,12 @@ func TestOnlyTheOrchestratorsCheckCarriesTheGoals(t *testing.T) {
 	ctx := context.Background()
 	dev, err := r.s.GetProjectSubscription(ctx, "team", "Dev")
 	require.NoError(t, err)
-	text, _, err := r.m.composeCheck(ctx, "team", "Orchestrator", dev, map[string]AgentInfo{})
+	text, _, _, err := r.m.composeCheck(ctx, "team", "Orchestrator", dev, map[string]AgentInfo{})
 	require.NoError(t, err)
 	assert.NotContains(t, text, "Goals:", "the check is the orchestrator's: it is the one who closes goals and reaches the operator")
 	orch, err := r.s.GetProjectSubscription(ctx, "team", "Orchestrator")
 	require.NoError(t, err)
-	text, _, err = r.m.composeCheck(ctx, "team", "Orchestrator", orch, map[string]AgentInfo{})
+	text, _, _, err = r.m.composeCheck(ctx, "team", "Orchestrator", orch, map[string]AgentInfo{})
 	require.NoError(t, err)
 	assert.Contains(t, text, "Goals:")
 }
@@ -143,7 +143,7 @@ func TestAReminderAloneMakesTheCheckGoOutAndTitlesAreCleaned(t *testing.T) {
 	assert.NotContains(t, entry, "@", "an @ in a title cannot mention anyone")
 	assert.NotContains(t, entry, "\u200b")
 	assert.Contains(t, entry, "(at)everyone")
-	_, count, err := r.m.composeCheck(context.Background(), "team", "Orchestrator", mustSub(t, r, "Orchestrator"), map[string]AgentInfo{})
+	_, count, _, err := r.m.composeCheck(context.Background(), "team", "Orchestrator", mustSub(t, r, "Orchestrator"), map[string]AgentInfo{})
 	require.NoError(t, err)
 	assert.Greater(t, count, 0, "a goal reminder counts as something that needs the orchestrator, so the check is sent")
 }
