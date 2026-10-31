@@ -1,0 +1,11 @@
+/* What agents asked to add, waiting in Needs you (#11389): the dialog and the marks on a row. The row itself is the shared data table's. */
+.proposal-dialog { width: min(34rem, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow: auto; display: flex; flex-direction: column; gap: 10px; padding: 16px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg-secondary); color: var(--text-primary); }
+.proposal-dialog::backdrop { background: rgba(var(--black-rgb), 0.5); }
+.proposal-dialog h2 { margin: 0; font-size: var(--fs-xl); }
+.proposal-who, .proposal-extra { margin: 0; color: var(--text-secondary); font-size: var(--fs-md); overflow-wrap: anywhere; }
+.proposal-field { display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-md); }
+.proposal-field .field { width: 100%; box-sizing: border-box; }
+.proposal-status { margin: 0; color: var(--error-text); min-height: 0; }
+.proposal-status:empty { display: none; }
+.proposal-buttons { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.inbox-proposal-expired { color: var(--text-secondary); font-size: var(--fs-md); }
