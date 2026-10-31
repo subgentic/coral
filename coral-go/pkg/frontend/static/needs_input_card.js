@@ -186,6 +186,8 @@ function canDismissWait(session, kind) {
 
 function needsInputHtml(info, session) {
     const inp = (info.tool && info.tool.input) || {};
+    // A request the server says can only be rejected here (too long to show whole, or holding characters that hide what it does, #11395) offers Reject alone, whatever the answers list: the person cannot allow what they cannot read.
+    if (info.kind === "permission" && inp.only_reject === true && info.screen) info = { ...info, screen: { ...info.screen, options: (info.screen.options || []).filter(o => /^reject\b/i.test(String(o.label || ""))) } };
     const screen = info.screen || {};
     const onScreen = (screen.options || []).length > 0;
     const screenQuestion = onScreen ? (screen.question || "") : "";
@@ -233,9 +235,15 @@ function needsInputHtml(info, session) {
         const tool = info.tool && info.tool.tool_name;
         if (tool) kicker = `Permission needed · ${escapeHtml(tool)}`;
         question = screenQuestion || (tool ? `Allow ${tool}?` : (info.summary || "The agent is waiting for you"));
-        const target = inp.command || inp.file_path || inp.path || inp.url || inp.query || inp.pattern || "";
+        const patterns = Array.isArray(inp.patterns) ? inp.patterns.filter(x => typeof x === "string" && x) : [];
+        const more = typeof inp.more_patterns === "string" ? inp.more_patterns : ""; // "and 2 more patterns": the count of the ones the server did not list (opencode, #11395)
+        const target = inp.command || inp.file_path || inp.path || inp.url || inp.query || inp.pattern || patterns.join("\n") || "";
+        if (inp.only_reject === true && typeof inp.note === "string" && inp.note) context += `<div class="cni-context-text cni-note" role="note">${escapeHtml(inp.note)}</div>`; // why only Reject is offered, in the server's words
         if (inp.description && inp.command) context += `<div class="cni-context-text">${escapeHtml(inp.description)}</div>`;
-        if (target) context += `<pre class="cni-target"><code>${escapeHtml(target)}</code></pre>`;
+        // The whole request, as text, wrapped, in a box that scrolls (a keyboard can scroll it once it is long enough to): a command cut short or hidden off to the side is one the person cannot judge (#11395).
+        if (target) context += `<pre class="cni-target"${target.length > 160 ? ` tabindex="0" role="region" aria-label="The whole request, scrollable"` : ""}><code>${escapeHtml(target)}</code></pre>`;
+        if (patterns.length && target !== patterns.join("\n")) context += `<div class="cni-context-text cni-patterns">Covers: ${escapeHtml(patterns.join(", "))}${more ? " " + escapeHtml(more) : ""}</div>`;
+        else if (more) context += `<div class="cni-context-text cni-patterns">${escapeHtml(more)}</div>`;
         else if (info.summary && info.summary !== question) context += `<div class="cni-context-text cni-ask">${escapeHtml(info.summary)}</div>`; // what is asked, from the event, as the Inbox row says it (#10141)
     } else if (info.kind === "prompt") {
         question = screenQuestion || "The agent is waiting for you";
