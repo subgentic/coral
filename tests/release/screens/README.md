@@ -39,9 +39,9 @@ tests/release/screens/run.sh v2.0.7 --dry-run            # also builds the conta
    the contact sheet first (an HTML artifact: changed pages first with before, after and diff images, the rest
    folded), then each shot named `<page>__<width>.png` (`__light` added for the light theme) on the task.
    The sheet is named for the one-line summary (`UI review v2.0.8: 202 pages shot, 116 changed vs v2.0.7.html`).
-   Last, once the shots are up, the sheet is uploaded once more with the tag `for review`: that is what Coral's
-   Inbox lists under **Needs you** for the operator (Coral keeps the first upload's name for the same bytes, so
-   the row shows the summary). No mention and no agent. `--dry-run` writes the request it would send to
+   Last, once the shots are up, the sheet is uploaded once more under its summary name (Coral keeps the first
+   upload's name for the same bytes), with the tag `ui review` only: not `for review`, because evidence is untagged and
+   only a decision is tagged, so a release does not put an item in the operator's **Needs you**. No mention and no agent. `--dry-run` writes the request it would send to
    `published.json` (`needsReview`). The goal is picked from the open ones (see below).
 
 ## The page list is a census

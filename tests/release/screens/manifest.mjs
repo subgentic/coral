@@ -66,8 +66,8 @@ export function taskBody(m, sheetLink) {
     return lines.join('\n');
 }
 
-/** The tags of the contact sheet's final upload: "for review" is what Coral's Needs you reads (the Inbox lists the board's artifacts with it, for the operator to open), "ui review" groups the run's files. */
-export const REVIEW_TAGS = ['ui review', 'for review'];
+/** The tags of the contact sheet's final upload: "ui review" groups the run's files. Not "for review": the operator's rule is that evidence is untagged and only a decision is tagged, so a release's sheet does not land in their Needs you. */
+export const REVIEW_TAGS = ['ui review'];
 
 /** The one line the operator's Needs you row shows (the artifact's name): the version, the pages shot and how many changed against the previous release (pages, not shots: a page at three widths is one). */
 export function reviewName(m, prevVersion) {
@@ -83,7 +83,7 @@ export const sheetArtifactName = (m, prevVersion) => reviewName(m, prevVersion) 
 export const uploadArgs = (file, name, taskId, extra = []) => ['artifact', 'upload', file, '--name', name, '--task', String(taskId), '--tag', 'ui review', ...extra];
 
 /** The arguments that put the contact sheet in the operator's Needs you, on the release task. */
-export const reviewUploadArgs = (file, name, taskId) => uploadArgs(file, name, taskId, ['--tag', 'for review', '--question', 'Do these screens look right for the release?']);
+export const reviewUploadArgs = (file, name, taskId) => uploadArgs(file, name, taskId);
 
 /**
  * The goal the run's own task goes under (`task add --self` needs one). goals: the board's goal list as JSON (open ones); wanted: --goal / SCREENS_GOAL, if the runner was told one.
