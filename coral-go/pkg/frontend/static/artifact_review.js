@@ -3,6 +3,7 @@
  * once decided, the time); the buttons show only for a pending one; through Coral Hub the owner has both: the change-request send is the owner's too (#11354). */
 import { boardFetch, identityKey, decisionNeedsPerson } from './server_base.js';
 import { showToast, announceNotice } from './notifications.js';
+import { markHidden } from './visible_marks.js';
 import { importOnce } from './import_once.js';
 const { createComment, sendComment } = await importOnce('./artifact_comments_api.js'); // lazy, as the viewer's other modules: a failure is retried
 const { resultWords } = await importOnce('./artifact_comment_send.js');
@@ -46,6 +47,7 @@ export async function approveRow(team, row) {
     return out;
 }
 
+const shown = name => markHidden(name, { strict: true }); // the uploader's file name is an agent's text: hidden characters are written out wherever it is drawn or spoken (Security's SHOULD, #11552)
 const settled = row => importOnce('./inbox_reviews.js').then(m => { m.settleReview(row); return m.refreshReviews(true); }).catch(() => {});
 const fromWords = out => (out.delivered && out.asleep ? `${out.to} is asleep: it will see this when it wakes.` : out.delivered ? `${out.to} was told.` : out.reason === 'no_uploader' ? 'No agent is recorded for it, so nobody was told.' : '');
 
@@ -57,16 +59,16 @@ export async function unignoreRow(team, row) { const out = await decide(team, ro
 
 /** Say what an Ignore did: a toast with Undo (30 s, the notices' rule for a toast with an action) and the same words read out politely. */
 export function sayIgnored(team, row) {
-    showToast(`Ignored: ${row.name}`, false, undefined, { action: { label: 'Undo', onClick: () => unignoreRow(team, row).then(() => announceNotice(`${row.name} is back in Needs you.`)).catch(e => showToast(e.message)) } });
-    announceNotice(`Ignored: ${row.name}. Undo is in the notice.`);
+    showToast(`Ignored: ${shown(row.name)}`, false, undefined, { action: { label: 'Undo', onClick: () => unignoreRow(team, row).then(() => announceNotice(`${shown(row.name)} is back in Needs you.`)).catch(e => showToast(e.message)) } });
+    announceNotice(`Ignored: ${shown(row.name)}. Undo is in the notice.`);
 }
-export function sayDenied(name, out) { showToast(`Denied ${name}. ${fromWords(out)}`.trim()); }
+export function sayDenied(name, out) { showToast(`Denied ${shown(name)}. ${fromWords(out)}`.trim()); }
 
 /** The Deny dialog: "Deny this?" with an optional reason (500 characters); the agent is told it was declined. Red text, never a red fill. onDone runs after the deny went through. */
 export function openDenyDialog(team, row, onDone) {
     const dlg = document.createElement('dialog');
     dlg.className = 'modal-content dlg-form inbox-deny-dialog'; dlg.setAttribute('aria-labelledby', 'inbox-deny-title');
-    const title = document.createElement('h2'); title.id = 'inbox-deny-title'; title.textContent = `Deny ${row.name}?`;
+    const title = document.createElement('h2'); title.id = 'inbox-deny-title'; title.textContent = `Deny ${shown(row.name)}?`;
     const sub = document.createElement('p'); sub.textContent = 'This is a final no: the agent is told it was declined and should not send it again as it is. To ask for a new version, use Changes instead.';
     const label = document.createElement('label'); label.textContent = 'Reason (optional, the agent sees it)';
     const box = document.createElement('textarea'); box.className = 'field'; box.rows = 3; box.maxLength = 500; label.append(box);
@@ -80,7 +82,7 @@ export function openDenyDialog(team, row, onDone) {
     dlg.addEventListener('cancel', e => { e.preventDefault(); finish(); });
     go.addEventListener('click', async () => {
         err.textContent = ''; go.disabled = true;
-        try { const out = await denyRow(team, row, box.value.replace(/\s+/g, ' ').trim()); finish(); sayDenied(row.name, out); announceNotice(`Denied ${row.name}.`); onDone?.(); }
+        try { const out = await denyRow(team, row, box.value.replace(/\s+/g, ' ').trim()); finish(); sayDenied(row.name, out); announceNotice(`Denied ${shown(row.name)}.`); onDone?.(); }
         catch (e) { err.textContent = e.message || 'Not saved.'; go.disabled = false; box.focus(); }
     });
     document.body.append(dlg); dlg.showModal(); box.focus();
@@ -88,7 +90,8 @@ export function openDenyDialog(team, row, onDone) {
 }
 
 /** Say what an approval did, in a toast. */
-export function sayApproved(name, out) {
+export function sayApproved(rawName, out) {
+    const name = shown(rawName);
     if (out.delivered && out.asleep) showToast(`Approved. ${out.to} is asleep: it will see this when it wakes.`);
     else if (out.delivered) showToast(`Approved. ${out.to} was told.`);
     else if (out.reason === 'no_uploader') showToast(`Approved ${name}. No agent is recorded for it, so nobody was told.`);

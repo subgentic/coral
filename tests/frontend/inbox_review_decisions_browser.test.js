@@ -51,11 +51,12 @@ const { removeBoards } = require('./helpers/board_cleanup');
             await ev(framesJs(3));
             // the control of an action: a word on the 1440 row, an item of the row's three dots on the phone
             const press = async (n, word) => {
+                const file = typeof n === 'string' ? n : name(n);
                 if (mobile) {
-                    await ev(`document.querySelector('${T} button[aria-label="More actions for ${name(n)}"]').click(); true`);
+                    await ev(`document.querySelector('${T} button[aria-label="More actions for ${file}"]').click(); true`);
                     await waitFor(`document.querySelector('${T} .inbox-row-more-toggle[aria-expanded="true"]')`, at + 'the three dots open', 4000);
-                    await ev(`document.querySelector('${T} .menu-item[aria-label="${word}: ${name(n)}"]').click(); true`);
-                } else await ev(`document.querySelector('${T} button[aria-label="${word}: ${name(n)}"]').click(); true`);
+                    await ev(`document.querySelector('${T} .menu-item[aria-label="${word}: ${file}"]').click(); true`);
+                } else await ev(`document.querySelector('${T} button[aria-label="${word}: ${file}"]').click(); true`);
             };
 
             // Deny: Cancel sends nothing
@@ -94,6 +95,17 @@ const { removeBoards } = require('./helpers/board_cleanup');
             const all = await calls();
             check(all.length === 2 && all[1].body.decision === 'unignore' && all.every(c => c.path.endsWith('/review')), at + 'Undo sends unignore, and every call was the review route: ' + JSON.stringify(all));
             check((await state()).names.includes(name(15)), at + 'the row is back in the list');
+
+            // a file name with a hidden character (an agent's text) is written out wherever the row names it: the button, the dialog title, the toast (Security's SHOULD)
+            await ev(`window.__items.push({ id: (99).toString(16).padStart(64, '0'), name: 'bidi\\u202e.md', media_type: 'text/markdown', size: 30, created_at: new Date().toISOString(), source: 'upload', available: true, tags: ['for review', 'internal'], uri: 'coral://artifacts/' + (99).toString(16).padStart(64, '0'), produced_by: 'Plan Writer', session_id: 's99' }); import(${S} + 'inbox_reviews.js').then(m => m.refreshReviews(true)).then(() => true)`);
+            await waitFor(`!![...document.querySelectorAll('${T} button')].find(b => /^Approve: bidi/.test(b.getAttribute('aria-label') || ''))`, at + 'the row with the hidden character', 8000);
+            const marked = await ev(`(() => { const labels = [...document.querySelectorAll('${T} button')].map(b => b.getAttribute('aria-label') || '').filter(l => /bidi/.test(l)); return { labels, raw: labels.some(l => l.includes('\\u202e')) }; })()`);
+            check(marked.labels.length >= 3 && !marked.raw && marked.labels.every(l => l.includes('<U+202E>')), at + 'the buttons name the file with the hidden character written out: ' + JSON.stringify(marked));
+            await ev(`window.__bidi = true; document.querySelector('${T} button[aria-label="Approve: bidi<U+202E>.md"]').scrollIntoView({ block: 'center' }); true`);
+            await press('bidi<U+202E>.md', 'Deny');
+            await waitFor(`document.querySelector('dialog.inbox-deny-dialog[open]')`, at + 'the Deny dialog of that file opens', 4000);
+            check(await ev(`(() => { const t = document.querySelector('dialog.inbox-deny-dialog h2').textContent; return t === 'Deny bidi<U+202E>.md?' && !t.includes('\\u202e'); })()`), at + 'the dialog title writes the hidden character out');
+            await ev(`[...document.querySelectorAll('dialog.inbox-deny-dialog button')].find(b => b.textContent === 'Cancel').click(); true`);
             await removeBoards(ev, [team]).catch(() => {});
         }
     } finally { await ev(`localStorage.removeItem('coral-inbox-needs-filters'); true`).catch(() => {}); await client.close(); }
