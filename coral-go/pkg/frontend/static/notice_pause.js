@@ -1,6 +1,6 @@
 /* Pause Coral's messages to one agent (#11388, the UI of Lead's per-agent notice pause): while the person talks to an agent, Coral holds what it would type into that agent's box (board notices, task
  * notifications), and says so. The chat header has ONE toggle (Pause Coral messages / Resume Coral messages, 44 px on a touch screen, aria-pressed); while paused a slim bar above the composer says
- * "Coral's messages are paused while you talk. 3 waiting. Resume." with the time left (a pause ends by itself after 30 minutes); while the server holds them only because the person is typing, a quiet hint says why: "Coral's messages wait while you type, and arrive when you stop".
+ * "Coral's messages are paused while you talk. 3 waiting. Resume." with the time left (a pause ends by itself after 30 minutes); while the server holds them only because the person is typing, a quiet hint says why: "Coral's messages wait until you stop typing".
  * The row's fields (the live row): notices_paused (bool), paused_until (RFC3339 or null: a pause that ends by itself), notices_holding (bool: the auto-hold while typing); the number waiting is the row's
  * notices_waiting, else its board_unread (waiting.js). The control is drawn only for a row that carries notices_paused as a boolean (the server's way of saying it has the pause). The two calls are in `api` below, the one place that knows the routes (a different shape from the server is a change here only). */
 import { registerActions } from './actions.js';
@@ -37,7 +37,7 @@ export function timeLeftText(until, now = Date.now()) {
 export function barText(row, now = Date.now()) {
     const p = pauseOf(row), n = Number.isSafeInteger(row && row.notices_waiting) && row.notices_waiting >= 0 ? Math.min(row.notices_waiting, 999) : waitingCount(row); // the server's own count of what the pause holds, else the unread board messages
     if (p.paused) { const left = timeLeftText(p.until, now); return `Coral's messages are paused while you talk. ${n} waiting.${left ? ` ${left}.` : ''}`; }
-    if (p.holding) return "Coral's messages wait while you type, and arrive when you stop";
+    if (p.holding) return "Coral's messages wait until you stop typing";
     return '';
 }
 
