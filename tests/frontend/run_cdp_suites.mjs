@@ -18,8 +18,10 @@
 // --shards N starts N such server+Chrome pairs, each with its own data dir, ports and profile,
 // and runs N suites at once: each shard takes the next suite from one shared queue, so within a shard
 // suites still run one at a time. Output is printed per suite as it finishes. The default is 1 in CI (CI set),
-// with --only, --sequences or --part, and 3 with --stress; a full local run gets one shard per 6 CPUs, 1 to 6
-// (#351: a full run on Windows took 78 min on 1 shard, 27.5 on 3 and 15.5 on 6; each shard is a Coral and a
+// with --only, --sequences or --part, and 3 with --stress; a full local run gets one shard per 4 CPUs, 1 to 12
+// (#415, 48 CPUs: 1,350 s on 6 shards, 1,184 on 8, 1,174 on 10, 1,111 on 12, the CPU never above 90%; past 12 the
+// shards slow each other more than they add, and a smaller machine gets fewer: 8 CPUs, 2 shards. #351: a full
+// run on Windows took 78 min on 1 shard, 27.5 on 3 and 15.5 on 6; each shard is a Coral and a
 // Chrome, about 250 MB).
 //
 // --timeout S (default 180, as CI passes) is a hard wall-clock limit per suite attempt. When it fires (typically a hung
@@ -143,7 +145,7 @@ const intArg = (name, def, min) => {
 const stress = flag('--stress');
 const only = arg('--only', '');
 const timeoutS = intArg('--timeout', 180, 1);
-const localShards = process.env.CI || only || flag('--sequences') || arg('--part', '') ? 1 : Math.min(6, Math.max(1, Math.floor(os.availableParallelism() / 6)));
+const localShards = process.env.CI || only || flag('--sequences') || arg('--part', '') ? 1 : Math.min(12, Math.max(1, Math.floor(os.availableParallelism() / 4)));
 const shards = intArg('--shards', stress ? 3 : localShards, 1);
 const retries = stress ? 0 : intArg('--retries', 1, 0);
 const runs = stress ? intArg('--runs', 3, 1) : 1;
