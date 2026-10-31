@@ -32,6 +32,8 @@ var checkPhrases = map[string]int{
 	"has not claimed #": 20, "silent on #": 10, "idle ": 30, "reviews waiting": 10, "Board": 0,
 	"Since ": 30, "No progress since": 30, "awake agents are working": 5, "Nothing needs you": 5,
 	"Waiting on the operator": 20, "(back": 10, "parked": 10, "Needs you,": 30, "Waiting on ": 20,
+	// the orchestrator's GOALS segment (#11412): new in both, listed from the same goals, so the rest of the check and the databases must still agree with it present
+	"Goals: #": 100, "READY: close it": 30, "NEEDS THE OPERATOR": 50,
 }
 
 var checkSeen map[string]int
@@ -184,6 +186,9 @@ func runCheckOracle(t *testing.T, seed int64) {
 			require.NoError(t, err)
 			bs.ClaimTask(ctx, "team", d, task.ID) // refused for one already working: still working
 		}
+	}
+	if !calm { // goals of every kind on the random boards (#11412): ready, blocked on the Operator, waiting on the team, and one an ask to the Operator names
+		oracleGoals(t, bs, rng, devs)
 	}
 	signals := map[string]agentSignal{}
 	known := map[string]bool{}
@@ -541,8 +546,55 @@ func (m *BoardHealthMonitor) composeCheckBefore4599(ctx context.Context, project
 		}
 	}
 	roster, attention := m.buildRoster(ctx, rosterInputs{project: project, recipient: rcpt, subs: subs, bySession: bySession, waits: waits, tasks: tasks, now: now})
-	return teamhealth.Compose(teamhealth.CheckInput{Now: now, Agents: agents, Items: items, Questions: questions,
+	var goals []teamhealth.GoalLine // the goals segment is new in both (#11412)
+	reminders := 0
+	if rcpt != nil && rcpt.SubscriberID == orch {
+		goals, reminders = m.goalLines(ctx, project, now)
+	}
+	return teamhealth.Compose(teamhealth.CheckInput{Now: now, Agents: agents, Items: items, Questions: questions, Goals: goals,
 		Progress: teamhealth.Progress{Since: since, Completed: p.Completed, Reviewed: p.Reviewed, Posts: p.Posts},
 		Parked:   len(parked), BackFromPark: backFromPark, Roster: roster,
-		PeekHint: rcpt != nil && rcpt.SubscriberID == orch /* #4983: the hint is new in both */}), len(items) + attention, nil
+		PeekHint: rcpt != nil && rcpt.SubscriberID == orch /* #4983: the hint is new in both */}), len(items) + attention + reminders, nil
+}
+
+// oracleGoals gives the random board goals of every kind the GOALS segment tells apart (#11412): every task done, blocked on the Operator, waiting on the team, with no task yet, and a done one that an ask to
+// the Operator names (on some seeds). A step the board refuses ends there, the same on both sides, as in the rest of the oracle.
+func oracleGoals(t *testing.T, bs *board.Store, rng *rand.Rand, devs []string) {
+	t.Helper()
+	ctx := context.Background()
+	_, err := bs.Subscribe(ctx, "team", "Operator", "Operator", "", nil, "all")
+	require.NoError(t, err)
+	goal := func(title, doneWhen string) int64 {
+		g, err := bs.CreateGoal(ctx, "team", board.GoalInput{Title: title, Outcome: "o", DoneWhen: doneWhen, CreatedBy: "Operator"})
+		require.NoError(t, err)
+		return g.ID
+	}
+	task := func(goal int64, dev string, finish bool) {
+		tk, err := bs.CreateTaskWithOpts(ctx, "team", "goal work", "", "medium", "Orchestrator", &board.CreateTaskOpts{GoalID: &goal}, dev)
+		if err != nil || !finish {
+			return
+		}
+		if _, err := bs.ClaimTask(ctx, "team", dev, tk.ID); err != nil {
+			return
+		}
+		_, _ = bs.CompleteTask(ctx, "team", tk.ID, dev, nil)
+	}
+	done := goal("Oracle: done", "d")
+	task(done, devs[0], true)
+	task(done, devs[len(devs)-1], true)
+	blocked := goal("Oracle: needs a pick", "d")
+	task(blocked, devs[0], false)
+	st, on := board.GoalBlocked, "Operator picks an option"
+	_, err = bs.UpdateGoal(ctx, "team", blocked, board.GoalUpdate{State: &st, BlockedOn: &on})
+	require.NoError(t, err)
+	waiting := goal("Oracle: waits on the team", "d")
+	task(waiting, devs[0], false)
+	goal("Oracle: no task yet", "The operator says it is good")
+	if rng.Intn(2) == 0 {
+		q, err := bs.PostMessage(ctx, "team", "Orchestrator", fmt.Sprintf("@Operator goal %d: please check the notes", done), nil)
+		require.NoError(t, err)
+		if to, err := bs.AskTargets(ctx, "team", "Orchestrator", q.Content); err == nil {
+			require.NoError(t, bs.RecordAsk(ctx, "team", q, to))
+		}
+	}
 }

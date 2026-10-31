@@ -316,7 +316,7 @@ func TestAGoalWithTooManyTasksIsOneLineOncePerCrossing(t *testing.T) {
 	h.moreTasks(g, 1)
 	out = h.next()
 	assert.Contains(t, out, line(g, 16, 15))
-	assert.NotContains(t, out, "Secret goal title", "numbers only: never the goal's title")
+	assert.NotContains(t, outsideGoals(out), "Secret goal title", "the off-books line is numbers only: never the goal's title (the GOALS segment names goals, #11412)")
 	assert.NotContains(t, h.next(), "has 16 tasks", "once per crossing")
 
 	h.moreTasks(g, 13)
