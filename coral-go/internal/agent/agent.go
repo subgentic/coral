@@ -243,7 +243,7 @@ func GetAgent(agentType string) Agent {
 // it is a valid agent_type at the API and rejecting it would break terminal
 // sessions.
 func LaunchableAgentTypes() []string {
-	return []string{at.Claude, at.Codex, at.Agy, at.Gemini, at.Pi, at.Terminal}
+	return []string{at.Claude, at.Codex, at.Agy, at.Gemini, at.Pi, at.Opencode, at.Terminal}
 }
 
 // ValidateAgentType checks an agent_type supplied by a caller.

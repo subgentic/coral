@@ -10,6 +10,8 @@ All endpoints are prefixed with `/api/sessions/history`, except the live chat tr
 
 ## Listing & Search
 
+opencode agents are in the list and the search too, but not from a file: their conversations are read through their own servers, so such a row has `source_type` `opencode` and a source of the form `opencode://<session id>` (a label, not a path). It cannot be opened as a transcript file ("this agent's history is kept by its own server; it cannot be opened here"), and it is indexed after a turn ends, not while one is going on.
+
 ### GET `/api/sessions/history`
 
 Paginated, filterable list of historical sessions. Supports both agent sessions and group chats (message board projects).
