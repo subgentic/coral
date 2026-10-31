@@ -382,15 +382,25 @@ func (h *SessionsHandler) sleepNow(ctx context.Context, sess *store.LiveSession)
 // beginAgentLaunch writes an agent's launch onto a board into the board's log (whether or not the switch is on: today's helper launches become visible) and, when the Operator's switch is on, holds it to the
 // board's caps in the same statement. It answers the refusal itself and returns the log row to finish; 0 means nothing was logged (not an agent's launch, or no board to log it on).
 func (h *SessionsHandler) beginAgentLaunch(w http.ResponseWriter, r *http.Request, project, target string) (int64, bool) {
+	id, g, err := h.reserveAgentLaunch(r, project, target)
+	if err != nil {
+		h.refuseCap(w, err, g)
+		return 0, false
+	}
+	return id, true
+}
+
+// reserveAgentLaunch is the log row and cap check of one agent launch; a team launch calls it once per member, so a team cannot start more than the caps allow. The id is 0 when nothing is logged (not an agent's
+// launch, or no board). The error is a cap (refuseCap says it) or a failure to read or write.
+func (h *SessionsHandler) reserveAgentLaunch(r *http.Request, project, target string) (int64, board.OrchGrant, error) {
 	owner, hasSession := VerifiedSession(r.Context())
 	isAgent := hasSession || callerActor(r).Kind == ActorToken
 	if !isAgent || h.bs == nil || project == "" {
-		return 0, true
+		return 0, board.OrchGrant{}, nil
 	}
 	g, err := h.bs.GetOrchGrant(r.Context(), project)
 	if err != nil {
-		errInternalServer(w, "could not read the grant")
-		return 0, false
+		return 0, g, err
 	}
 	actor := ""
 	if hasSession {
@@ -405,11 +415,18 @@ func (h *SessionsHandler) beginAgentLaunch(w http.ResponseWriter, r *http.Reques
 		actor = orchName(callerActor(r).Name)
 	}
 	id, err := h.reserveForBoard(r.Context(), project, board.LifecycleLaunch, actor, orchName(target), g)
-	if err != nil {
-		h.refuseCap(w, err, g)
-		return 0, false
+	return id, g, err
+}
+
+// capRefusal is refuseCap's answer as a team member's entry: the member is not started and says which cap.
+func capRefusal(err error, g board.OrchGrant) (code, msg string) {
+	switch {
+	case errors.Is(err, board.ErrLifecycleCapHour):
+		return "board_hourly_limit", fmt.Sprintf("this board's limit of %d launches and wakes an hour is used up: wait, or the Operator can raise it", g.MaxPerHour)
+	case errors.Is(err, board.ErrLifecycleCapLive):
+		return "board_live_limit", fmt.Sprintf("this board already has %d live agents: put some to sleep, or the Operator can raise the limit", g.MaxLive)
 	}
-	return id, true
+	return "lifecycle_log_failed", "could not write the log"
 }
 
 // endAgentLaunch records how an agent's launch went and, when the switch is on, says it on the board.

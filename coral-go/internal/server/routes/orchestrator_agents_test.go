@@ -57,6 +57,7 @@ func newOrchRig(t *testing.T) *orchRig {
 	rt.Post("/api/board/{project}/agents/{subscriber}/wake", h.OrchestratorWake)
 	rt.Post("/api/board/{project}/agents/{subscriber}/sleep", h.OrchestratorSleep)
 	rt.Post("/api/sessions/launch", h.Launch)
+	rt.Post("/api/sessions/launch-team", h.LaunchTeam)
 	own := httptest.NewServer(rt)
 	t.Cleanup(func() { own.Close(); srv.Close() })
 	return &orchRig{t: t, server: own.URL, h: h, ss: ss, sid: map[string]string{}, tok: map[string]string{}, term: term}
@@ -515,4 +516,57 @@ func TestAnAgentsLaunchIsLoggedAndHeldToTheCapsWhenTheSwitchIsOn(t *testing.T) {
 	started, _ := r.ss.CountActiveLiveSessions(ctx)
 	assert.Equal(t, beforeSkip, started, "nothing more was started")
 
+}
+
+// The Orchestrator's ruling on #11432: a team launch is not a way round the log and the caps. Each member an agent's launch-team starts is logged, and with the switch on counted against the same caps; a member over the cap is not started and says which.
+func TestAnAgentsTeamLaunchIsLoggedAndCountedMemberByMember(t *testing.T) {
+	r := newOrchRig(t)
+	ctx := context.Background()
+	r.usualBoard()
+	work := t.TempDir()
+	team := func(who string, names ...string) (int, map[string]any) {
+		agents := make([]map[string]any, len(names))
+		for i, n := range names {
+			agents[i] = map[string]any{"name": n, "prompt": "work"}
+		}
+		b, _ := json.Marshal(map[string]any{"board_id": orchBoard, "working_dir": work, "agent_type": "claude", "agents": agents})
+		return r.do("POST", "/api/sessions/launch-team", string(b), nil, r.tok[who])
+	}
+	members := func(out map[string]any) []map[string]any {
+		var ms []map[string]any
+		for _, a := range out["agents"].([]any) {
+			ms = append(ms, a.(map[string]any))
+		}
+		return ms
+	}
+	// the switch off: both members start and both are in the log
+	code, out := team("Dev2", "TeamA", "TeamB")
+	require.Equal(t, http.StatusOK, code, out)
+	log, err := r.h.bs.LifecycleLog(ctx, orchBoard, 10)
+	require.NoError(t, err)
+	require.Len(t, log, 2)
+	for _, e := range log {
+		assert.Equal(t, board.LifecycleLaunch, e.Kind)
+		assert.Equal(t, "Dev2", e.Actor)
+		assert.Equal(t, "ok", e.Status)
+	}
+	// the switch on with room for one more this hour: the first member of the next team starts, the second is refused with the cap named
+	code, _ = r.operatorGrant("Orchestrator", map[string]any{"max_per_hour": 3, "max_live": 50})
+	require.Equal(t, http.StatusOK, code)
+	before, _ := r.ss.CountActiveLiveSessions(ctx)
+	code, out = team("Orchestrator", "TeamC", "TeamD")
+	require.Equal(t, http.StatusOK, code, out)
+	ms := members(out)
+	require.Len(t, ms, 2)
+	assert.Nil(t, ms[0]["error"], "the first fits under the cap")
+	assert.Equal(t, "board_hourly_limit", ms[1]["code"])
+	assert.Contains(t, ms[1]["error"], "3 launches and wakes an hour")
+	after, _ := r.ss.CountActiveLiveSessions(ctx)
+	assert.Equal(t, before+1, after, "only the member under the cap started")
+	// a team whose every member is over the cap starts nobody
+	code, out = team("Orchestrator", "TeamE")
+	assert.NotEqual(t, http.StatusOK, code, out)
+	assert.Equal(t, "board_hourly_limit", members(out)[0]["code"])
+	again, _ := r.ss.CountActiveLiveSessions(ctx)
+	assert.Equal(t, after, again)
 }
