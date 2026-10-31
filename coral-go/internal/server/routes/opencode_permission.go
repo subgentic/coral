@@ -21,6 +21,19 @@ func opencodeAsks(mode string) bool { return mode == "default" }
 // opencodeOption is one answer on a card: its words and what it tells the server.
 type opencodeOption struct{ Label, Reply string }
 
+// opencodeKind is what an answer of the card does, by the reply it sends the server: the option's kind, so the only_reject check does not read its words (#11407).
+func opencodeKind(reply string) string {
+	switch reply {
+	case "once":
+		return "allow_once"
+	case "always":
+		return "allow_always"
+	case "reject":
+		return "reject"
+	}
+	return ""
+}
+
 // opencodeCardOptions are a request's answers, in order. A request that could be shown whole and holds nothing hidden (permreview) gets Allow once (the default), Allow always (worded with what it stops asking
 // about) and Reject; one that could not gets Reject ALONE: the server refuses an Allow for it too. The card and the answer both take their options from here, so what is drawn is what is accepted.
 func opencodeCardOptions(p opencode.PermissionRequest) []opencodeOption {
@@ -71,7 +84,7 @@ func (h *SessionsHandler) opencodeNeedsInput(reply map[string]any, sessionID str
 	choices := opencodeCardOptions(p)
 	opts := make([]promptOption, len(choices))
 	for i, o := range choices {
-		opts[i] = promptOption{N: i + 1, Label: o.Label, Selected: i == 0, Action: "select"}
+		opts[i] = promptOption{N: i + 1, Label: o.Label, Selected: i == 0, Action: "select", Kind: opencodeKind(o.Reply)}
 	}
 	reply["prompt_options"] = promptScreen{Question: opencodeQuestion(p), Options: opts, AskID: p.ID}
 }
