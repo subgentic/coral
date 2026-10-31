@@ -283,6 +283,10 @@ type Header struct {
 	HubUserID   string `json:"hub_user_id,omitempty"`
 	// HubService, AskServer and AskBoard are the Hub's own service asking for one per-machine read (#7364, hubservice.go): the sender server and board the request being read about was sent from. Fields of
 	// the stream like HubRole, set from the hub's context only; the connector turns them into headers on the service route and nowhere else.
+	// GuideBoard and GuideLabel are the guide's grant (#11457, hubguide.go): the board it is for and the person's label (hub-user-<8 hex>), with HubRole "guide" and with nothing else. Fields of the stream like HubRole, set from the hub's context only.
+	GuideBoard string `json:"hub_guide_board,omitempty"`
+	GuideLabel string `json:"hub_guide_label,omitempty"`
+	GuideSince string `json:"hub_guide_accepted_at,omitempty"` // when the grant was accepted (RFC 3339 UTC): the start of the board history the guide reads
 	HubService bool   `json:"hub_service,omitempty"`
 	AskServer  string `json:"ask_server,omitempty"`
 	AskBoard   string `json:"ask_board,omitempty"`
@@ -378,8 +382,11 @@ func (h *Header) validate(l Limits) error {
 	if h.HubUser != "" && !ValidHubUser(h.HubUser) {
 		return fmt.Errorf("%w: hub user", ErrBadHeader)
 	}
-	if h.HubRole != "" && h.HubRole != HubRoleOwner {
+	if h.HubRole != "" && h.HubRole != HubRoleOwner && h.HubRole != HubRoleGuide {
 		return fmt.Errorf("%w: hub role", ErrBadHeader)
+	}
+	if !h.guideStreamOK() {
+		return fmt.Errorf("%w: hub guide", ErrBadHeader) // a half-stamp is no stamp, and a guide is only a guide
 	}
 	if h.HubOrg != "" && !ValidHubOrg(h.HubOrg) {
 		return fmt.Errorf("%w: hub org", ErrBadHeader)
@@ -387,7 +394,7 @@ func (h *Header) validate(l Limits) error {
 	if (h.HubService || h.AskServer != "" || h.AskBoard != "") && !(h.HubService && ValidHubAsker(HubAsker{Server: h.AskServer, Board: h.AskBoard})) {
 		return fmt.Errorf("%w: hub service", ErrBadHeader) // a half-stamp is no stamp
 	}
-	if h.HubService && (h.HubUser != "" || h.HubRole != "" || h.HubOrg != "" || h.HubTeamRole != "" || h.HubUserID != "") {
+	if h.HubService && (h.HubUser != "" || h.HubRole != "" || h.GuideBoard != "" || h.GuideLabel != "" || h.GuideSince != "" || h.HubOrg != "" || h.HubTeamRole != "" || h.HubUserID != "") {
 		return fmt.Errorf("%w: hub service with a person's identity", ErrBadHeader) // the service is person-less: a stream for a person is never also the service's
 	}
 	if h.HubTeamRole != "" && !ValidHubTeamRole(h.HubTeamRole) {

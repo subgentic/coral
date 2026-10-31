@@ -16,7 +16,7 @@ import (
 // HubRoleHeader is the local header the connector sets from the stream's HubRole.
 const HubRoleHeader = "X-Coral-Hub-Role"
 
-// HubRoleOwner is the only role there is.
+// HubRoleOwner is the role of the account the machine is enrolled to (the guide role is HubRoleGuide, hubguide.go).
 const HubRoleOwner = "owner"
 
 // The two update routes, as the route table lists them.
@@ -36,8 +36,8 @@ func IsUpdateRoute(method, decodedPath string) bool {
 
 type hubRoleKey struct{}
 
-// WithHubRole returns ctx carrying the viewer's role. Session.RoundTrip sends it with the stream. Only "owner" is kept; anything
-// else is ignored.
+// WithHubRole returns ctx carrying the viewer's role. Session.RoundTrip sends it with the stream. Only "owner" is kept here; anything
+// else is ignored (the guide role comes with its board and label, WithHubGuide).
 func WithHubRole(ctx context.Context, role string) context.Context {
 	if role != HubRoleOwner {
 		return ctx

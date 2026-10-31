@@ -133,6 +133,10 @@ func (l *LocalHandler) checkRequest(h Header) (decoded string, ok bool) {
 	if h.Kind == KindWS {
 		method = http.MethodGet
 	}
+	// A guide (hubguide.go) reaches the routes of its closed table and nothing else, and no WebSocket: refused here as an unknown route is, before the computer's API is asked.
+	if h.HubRole == HubRoleGuide && (!guideStamped(h) || h.Kind == KindWS || !IsGuideRoute(method, decoded)) {
+		return "", false
+	}
 	// A service route (the Hub's per-machine reads, hubservice.go) takes only a stream the Hub's own service stamped with who asked, and that stream takes only a service route: a user at
 	// View, Interact or Launch is refused here, before the computer's API is asked, as a "never" row would be (#7411, Security's MUST 1); the handler's own 403 is the second layer.
 	if svc, stamped := IsServiceRoute(method, decoded), serviceStamped(h); svc || h.HubService {
@@ -267,6 +271,7 @@ func (l *LocalHandler) serveHTTP(ctx context.Context, s *Stream) {
 	}
 	req.Header = l.stamp(scrub(h.Headers, h.Method, dec))
 	stampRole(req.Header, h, h.Method, dec)
+	stampGuide(req.Header, h, h.Method, dec)
 	stampTeam(req.Header, h, h.Method, dec)
 	stampService(req.Header, h, h.Method, dec)
 	stampUploader(req.Header, h, h.Method, dec)
