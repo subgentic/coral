@@ -51,7 +51,7 @@ async function run() {
         if (!standIn.sid) throw new Error('no stand-in agent: ' + standIn.diag);
         SID = standIn.sid;
         for (const e of EVENTS) { const r = await httpJson('POST', `/api/sessions/live/${encodeURIComponent(standIn.name)}/events`, { ...e, session_id: SID }, { 'X-Coral-Session-Token': standIn.token }); if (r.status >= 300) throw new Error('seed ' + r.status); }
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired();
+        await Page.navigate({ url: BASE + '/agents' }); await Page.loadEventFired(); // the Agents page: a bare start is the Inbox now (#11594)
         await waitFor(`typeof window._coralSetLiveSessions === 'function'`, 'the app hooks', { timeout: 10000 });
         await Emulation.setDeviceMetricsOverride({ width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
         // The History session view is shown by selecting a past session; the events route reads by session id, so the view is made visible here and its events loaded as a selection does.

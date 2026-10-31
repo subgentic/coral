@@ -17,6 +17,7 @@
     text-align: left;
 }
 .view-list-current { color: var(--sidebar-row-color-current); font-weight: var(--sidebar-row-weight-current); }
+.view-list-item:is(:hover, :focus-visible):not(:disabled), .view-list-item:is(:hover, :focus-visible):not(:disabled) .view-list-count { color: var(--text-primary); } /* the secondary text on the hover fill was 4.4:1 in the light theme: the Inbox is the start page now (#11594), so the page audit reads it */
 .view-list-current .view-list-count { color: var(--text-primary); } /* on the hover-coloured current row the secondary colour is under 4.5:1 in the light theme */
 /* the red count pill: the same make as the tab strip's unread badge (layout.css .nav-tab-badge) */
 .view-list-count.view-list-alert {

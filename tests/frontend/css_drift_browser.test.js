@@ -42,7 +42,7 @@ function sameComputed(a, b) {
 // component whose live instance needs an agent/session (its styling is class-based).
 const ELEMENTS = [
     { name: 'nav-tabs',            where: 'root',           selector: '.top-nav-tabs' },
-    { name: 'nav-tab',             where: 'root',           selector: '#nav-tab-agents' },
+    { name: 'nav-tab',             where: 'root',           selector: '#nav-tab-hub-inbox' },
     { name: 'top-bar-btn',         where: 'root',           selector: '#panel-toggle-btn' },
     { name: 'machine-health-title',  where: 'health-ok',      selector: '.machine-health-title' },
     { name: 'machine-health-status', where: 'health-ok',      selector: '.machine-health-status' },
@@ -77,7 +77,7 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
     // element exists, so the capture is deterministic.
     const goRoot = async () => {
         const l = Page.loadEventFired(); await Page.navigate({ url: BASE + '/' }); await l; await coralReady();
-        await waitFor(`!!document.querySelector('.top-nav-tabs') && !!document.getElementById('nav-tab-agents')`, 'the top nav', { timeout: 8000 });
+        await waitFor(`!!document.querySelector('.top-nav-tabs') && !!document.getElementById('nav-tab-hub-inbox')`, 'the top nav', { timeout: 8000 });
     };
     const makeSandbox = () => ev(`(() => {
         document.getElementById('__cssdrift')?.remove();
