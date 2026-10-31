@@ -347,7 +347,7 @@ const contrast = (a, b) => {
 
         console.log('7. Enroll page points new machines at Servers');
         const enroll = fs.readFileSync(path.join(__dirname, '../../coral-go/pkg/frontend/templates/cloud/enroll.html'), 'utf8');
-        assert.match(enroll, /A computer connected from the command line starts in View \(read-only\) until you change that in Coral on it; you can limit access further in <a href="\/servers">Computers<\/a>\./);
+        assert.match(enroll, /a computer connected from the command line stays on View until you change that in Coral on it\. You can limit access further in <a href="\/servers">Computers<\/a>\./);
         assert.match(enroll, /<a class="cloud-btn" href="\/servers">Open Computers<\/a>/);
         console.log('   ✓ review note + done-step Open Computers link to /servers');
 
