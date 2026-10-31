@@ -21,19 +21,26 @@ const { coralReady } = require('./helpers/wait');
                 on: (n.querySelector('.phone-nav-slot.active') || {}).dataset ? n.querySelector('.phone-nav-slot.active').dataset.phoneNav : null, pill: n.querySelector('.phone-nav-slot.active .phone-nav-icon') ? getComputedStyle(n.querySelector('.phone-nav-slot.active .phone-nav-icon')).backgroundColor : '', more: n.querySelectorAll('[data-phone-nav=nav-more]').length }; })()`);
         let b = await bar();
         check(b.shown && b.pos === 'fixed' && b.l === 0 && b.r === 390 && b.bottom === 844 && b.h >= 72, 'the bar is docked at the bottom, full width: ' + JSON.stringify(b));
-        check(JSON.stringify(b.labels) === JSON.stringify(['Inbox', 'Agents', 'Tasks', 'Chats']) && b.more === 0, 'four labelled tabs and no More slot: ' + JSON.stringify(b.labels));
+        check(JSON.stringify(b.labels) === JSON.stringify(['Agents', 'Inbox', 'Automations', 'Analytics']) && b.more === 0, 'four labelled tabs and no More slot: ' + JSON.stringify(b.labels));
         check(b.small === 0, 'every tab is a 44 px target');
-        const polish = await ev(`(() => ({ tasksRects: document.querySelectorAll('[data-phone-nav="nav-tasks"] svg rect').length, tasksPath: (document.querySelector('[data-phone-nav="nav-tasks"] svg path') || {}).getAttribute('d') || '', menu: document.getElementById('nav-more-menu').getAttribute('aria-label') }))()`); // #11519
-        check(polish.tasksRects === 0 && /^M4 6l2 2 3-3/.test(polish.tasksPath), 'the Tasks tab draws the checklist, not the stacked bars Computers uses: ' + JSON.stringify(polish));
+        const polish = await ev(`(() => ({ icons: [...document.querySelectorAll('.phone-nav-slot svg')].map(s => s.innerHTML), badge: !!document.querySelector('[data-phone-nav="nav-inbox"] #phone-nav-inbox-badge'), noTasksChats: document.querySelectorAll('[data-phone-nav="nav-tasks"], [data-phone-nav="nav-chats"]').length === 0, menu: document.getElementById('nav-more-menu').getAttribute('aria-label') }))()`); // #11519, #11535
+        check(new Set(polish.icons).size === 4 && polish.icons.every(i => !/<rect/.test(i)), 'the four tabs draw four different icons, none the stacked bars Computers uses: ' + JSON.stringify(polish.icons));
+        check(polish.badge && polish.noTasksChats, 'the Needs you badge is on Inbox, and Tasks and Chats are not tabs (#11535): ' + JSON.stringify({ badge: polish.badge, none: polish.noTasksChats }));
         check(polish.menu === 'Navigation', 'the drawer is named Navigation for a screen reader, not Views: ' + polish.menu);
         check(b.on === 'nav-agents' && b.pill !== 'rgba(0, 0, 0, 0)', 'the current tab (Agents) is in a pill: ' + JSON.stringify({ on: b.on, pill: b.pill }));
         const fab = await ev(`(() => { const f = document.getElementById('phone-fab'), n = document.getElementById('phone-nav'); return f.getBoundingClientRect().bottom <= n.getBoundingClientRect().top; })()`);
         check(fab, 'the + sits above the bar');
         // each tab goes where it says, and is the one that is on
-        for (const [slot, page] of [['nav-tasks', 'Tasks'], ['nav-chats', 'Chats'], ['nav-inbox', 'Needs you'], ['nav-agents', 'Agents']]) {
+        for (const [slot, page] of [['nav-automations', 'Automations'], ['nav-analytics', 'Analytics'], ['nav-inbox', 'Needs you'], ['nav-agents', 'Agents']]) {
             await ev(`document.querySelector('.phone-nav-slot[data-phone-nav=${slot}]').click(); true`);
             await waitFor(`document.querySelector('.phone-nav-slot.active')?.dataset.phoneNav === '${slot}'`, `${page}: its tab is lit`, 8000);
         }
+        // Tasks and Chats are the drawer's first rows on every screen (#11535), and a tap opens the page
+        await ev(`[...document.querySelectorAll('.phone-menu-btn')].find(b => b.getClientRects().length).click(); true`);
+        await waitFor(`!!document.querySelector('#nav-more-menu.nav-drawer:not([hidden]) .nav-drawer-folder')`, 'the drawer opens on Agents', 6000);
+        const rowsIn = await ev(`[...document.querySelectorAll('#nav-more-menu .nav-drawer-folder .nav-drawer-label')].map(e => e.textContent)`);
+        check(rowsIn.includes('Tasks') && rowsIn.includes('Chats'), 'the drawer has Tasks and Chats: ' + JSON.stringify(rowsIn));
+        await ev(`document.getElementById('nav-drawer-scrim').click(); true`);
         // dug into an agent's conversation: no bar
         await ev(`window.selectLiveSession('bar-a', 'claude', 'bar-a-id', 'local'); true`);
         await coralReady(ev, 'agentSelected', 'bar-a-id');

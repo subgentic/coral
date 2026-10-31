@@ -67,8 +67,8 @@ export function setPhonePageName(name) {
     if (!_pageName) _prevSlot = document.querySelector('.phone-nav-slot.active')?.dataset.phoneNav || ''; // the slot the page replaces, for when it is over
     _pageName = name || '';
     if (_pageName) { document.body.dataset.phonePage = _pageName; paintTitle(_pageName); } // phone_screens.js reads it for the lit slot
-    if (_pageName === 'Tasks') lightSlot('nav-tasks');
-    if (_pageName === 'Chats') lightSlot('nav-chats');
+    if (_pageName === 'Tasks') lightSlot('nav-inbox'); // an Inbox page: its folder, so the Inbox tab stays lit
+    if (_pageName === 'Chats') lightSlot('menu'); // no bar slot: the drawer's
 }
 /** The page is over (another tab was chosen, or the Inbox's own tab is no longer Tasks): the pill says the view's name again and the slot the page replaced is lit. */
 export function clearPhonePageName(keep = '') {

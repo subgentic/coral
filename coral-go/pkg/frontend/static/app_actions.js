@@ -214,10 +214,11 @@ registerActions({
     'live-view-switch': () => { const t = document.getElementById('live-view-btn-terminal'); window.setLiveViewMode(t && t.classList.contains('active') ? 'chat' : 'terminal'); }, // a phone's one switch: the view it is not on (#11187)
     'live-view-mode': el => { if (el.dataset.mode === 'chat' || el.dataset.mode === 'terminal') window.setLiveViewMode(el.dataset.mode); },
     'chat-find-toggle': () => window.toggleChatFind(),
-    'phone-nav': el => { // the phone's bottom bar (#11472): Inbox, Agents, Tasks, Chats (the ☰ in the top bar opens the menu: m-top-menu)
+    'phone-nav': el => { // the phone's bottom bar (#11472, #11535): Agents, Inbox, Automations, Analytics; Tasks and Chats are in the drawer (the ☰ in the top bar opens the menu: m-top-menu)
         const arg = el.dataset.arg;
-        if (arg === 'nav-agents') window.switchNavTab('agents');
-        else { window.switchNavTab('hub-inbox'); const page = arg === 'nav-tasks' ? ['tasks', 'Tasks'] : arg === 'nav-chats' ? ['chats', 'Chats'] : ['needs', '']; importOnce('./inbox_tab.js').then(m => m.selectInboxTab(page[0])).then(() => importOnce('./phone_bar.js')).then(p => (page[1] ? p.setPhonePageName(page[1]) : p.clearPhonePageName())); } // the Inbox slot is the Inbox's first folder, Needs you, as Gmail's Inbox is its primary tab // the bar's Tasks is the Tasks table: the pill says Tasks, not the Inbox's name that the tab put there (#11401)
+        const tab = { 'nav-agents': 'agents', 'nav-automations': 'automations', 'nav-analytics': 'tokens' }[arg];
+        if (tab) window.switchNavTab(tab);
+        else { window.switchNavTab('hub-inbox'); importOnce('./inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => importOnce('./phone_bar.js')).then(p => p.clearPhonePageName()); } // the Inbox slot is the Inbox's first folder, Needs you, as Gmail's Inbox is its primary tab // the bar's Tasks is the Tasks table: the pill says Tasks, not the Inbox's name that the tab put there (#11401)
     },
     'phone-fab': (el, event) => { // the + : New agent, New team (the menu is drawn above it)
         event.stopPropagation();

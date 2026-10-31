@@ -19,6 +19,7 @@ function row(icon, label, count, run) {
 }
 
 const slot = name => () => document.querySelector(`.phone-nav-slot[data-phone-nav=${name}]`)?.click(); // the bar's own handler: the same page, the same lit tab
+const inboxPage = (page, words) => () => { window.switchNavTab?.('hub-inbox'); importOnce('./inbox_tab.js').then(m => m.selectInboxTab(page)).then(() => importOnce('./phone_bar.js')).then(p => p.setPhonePageName(words)); }; // Tasks and Chats have no bar slot: the Inbox's page, named in the pill (#11401, #11535)
 
 // The teams: on a hub every team of this computer and of each online computer (GET /api/board/projects, as analytics_spend.js), else this computer's; read when the drawer opens and at most every 30 s; until the read
 // answers the drawer shows the teams of the live agents (#11476).
@@ -51,9 +52,12 @@ export function drawerTop() {
     const out = [el('div', 'nav-drawer-head', 'Coral')];
     if (ctx === 'hub-inbox' || ctx === 'history') { // the Inbox, its Tasks and Chats: the Inbox's folders with their counts
         const c = inboxCountsNow();
-        out.push(row('email', 'Needs you', c.needs, slot('nav-inbox')), row('checklist', 'Tasks', c.tasks, slot('nav-tasks')),
-            row('star', 'Saved', c.saved, () => { window.switchNavTab?.('hub-inbox'); importOnce('./inbox_tab.js').then(m => m.selectInboxTab('saved')); }), row('chat_bubble_outline', 'Chats', 0, slot('nav-chats')));
-    } else if (ctx === 'agents') out.push(row('smart_toy', 'All agents', (state.liveSessions || []).length, () => window.switchNavTab?.('agents')));
+        out.push(row('email', 'Needs you', c.needs, slot('nav-inbox')), row('checklist', 'Tasks', c.tasks, inboxPage('tasks', 'Tasks')),
+            row('star', 'Saved', c.saved, () => { window.switchNavTab?.('hub-inbox'); importOnce('./inbox_tab.js').then(m => m.selectInboxTab('saved')); }), row('chat_bubble_outline', 'Chats', 0, inboxPage('chats', 'Chats')));
+    } else {
+        if (ctx === 'agents') out.push(row('smart_toy', 'All agents', (state.liveSessions || []).length, () => window.switchNavTab?.('agents')));
+        out.push(row('checklist', 'Tasks', inboxCountsNow().tasks, inboxPage('tasks', 'Tasks')), row('chat_bubble_outline', 'Chats', 0, inboxPage('chats', 'Chats'))); // the bar has no Tasks or Chats: every other drawer has them first
+    }
     if (ctx === 'hub-inbox' || ctx === 'history' || ctx === 'agents') { // teams belong with agents and with the Inbox; an Automations, Analytics or Docs drawer is its places only
         const host = el('div', 'nav-drawer-teams'); drawTeams(host); out.push(host);
         readTeamKeys().then(() => { if (host.isConnected) drawTeams(host); });

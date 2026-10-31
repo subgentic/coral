@@ -51,7 +51,7 @@ const BASE = require('./test_base').BASE;
         await ev(`[...document.querySelectorAll('.phone-menu-btn')].find(b => b.getClientRects().length).click(); true`); // the ☰ in the top bar opens the menu (the bar has no More slot, #11472)
         await waitFor(`!!document.querySelector('#nav-more-menu:not([hidden])')`, 'the More menu', 5000);
         const more = await ev(`[...document.querySelectorAll('#nav-more-menu .menu-item, #nav-more-menu .nav-more-item')].filter(e => e.getClientRects().length).map(e => (e.lastElementChild || e).textContent.replace(/\\s+/g, ' ').trim())`);
-        assert.ok(more.some(t => /Computers/.test(t)) && ['Automations', 'Analytics', 'Docs', 'Settings'].every(n => more.some(t => t.includes(n))), 'More lists Computers, Automations, Analytics, Docs and Settings: ' + JSON.stringify(more));
+        assert.ok(more.some(t => /Computers/.test(t)) && ['Docs', 'Settings'].every(n => more.some(t => t.includes(n))) && !more.some(t => /Automations|Analytics/.test(t)), 'More lists Computers, Docs and Settings, and not Automations or Analytics (they are the bar\'s tabs, #11535): ' + JSON.stringify(more));
         assert.ok(!more.some(t => /^(Home|Agents|Inbox)\b/.test(t)), 'and not Agents or Inbox, which the bottom bar has (Chats and Tasks are the Inbox folders at the top of the drawer): ' + JSON.stringify(more));
         await ev(`document.body.click(); true`);
         console.log('PASS the phone model, slice D: Computers');

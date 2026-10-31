@@ -9,9 +9,11 @@ const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '../../cora
 const sw = fs.readFileSync(path.join(root, 'static/view_switch.js'), 'utf8');
 const ids = [...sw.slice(sw.indexOf('const VIEW_IDS'), sw.indexOf('];', sw.indexOf('const VIEW_IDS'))).matchAll(/"([a-z-]+)"/g)].map(m => m[1]);
 const tpl = fs.readFileSync(path.join(root, 'templates/index.html'), 'utf8');
-const slots = new Set([...tpl.matchAll(/data-phone-nav="([a-z-]+)"/g)].map(m => m[1])); // the bar's tabs (#11472); a place of the ☰ menu (Automations, Analytics, Docs, Computers) is a top-level screen with the bar on and no tab lit: its slot is 'menu'
+const slots = new Set([...tpl.matchAll(/data-phone-nav="([a-z-]+)"/g)].map(m => m[1])); // the bar's four tabs (#11535: Agents, Inbox, Automations, Analytics, in that order); a place of the ☰ menu (Docs, Computers, Chats) is a top-level screen with the bar on and no tab lit: its slot is 'menu'
 slots.add('menu');
 const bad = [];
+const order = [...tpl.matchAll(/data-phone-nav="([a-z-]+)"/g)].map(m => m[1]).join();
+if (order !== 'nav-agents,nav-inbox,nav-automations,nav-analytics') bad.push(`the bar's tabs are Agents, Inbox, Automations, Analytics in that order, not ${order}`);
 if (ids.length < 10) bad.push(`could not read VIEW_IDS (${ids.length} found)`);
 for (const id of ids) {
     const s = PHONE_SCREENS[id];

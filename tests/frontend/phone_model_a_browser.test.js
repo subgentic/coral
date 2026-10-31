@@ -61,7 +61,7 @@ const { coralReady } = require('./helpers/wait');
             await ev(`window.switchNavTab('automations'); true`);
             await waitFor(`[...document.querySelectorAll('#scheduler-view .view-list-item, #group-table-view .view-list-item')].some(b => b.getClientRects().length > 0 && /Jobs|Workflows/.test(b.textContent))`, `${tag}: Automations (its folder is the page, Jobs or Workflows, whichever was open last)`, 10000);
             assert.equal(await ev(`document.body.dataset.phoneType`), 'top-level', `${tag}: Automations is a top-level screen`);
-            assert.equal(await lit(), null, `${tag}: the bar is on and none of its four tabs is lit: Automations is a place of the ☰ menu, not a tab (#11472, the More slot is gone)`);
+            assert.equal(await lit(), 'nav-automations', `${tag}: the bar is on and Automations is the tab that is lit (#11535: Automations is one of the bar's four)`);
             const host = await ev(`[...document.querySelectorAll('#scheduler-view .view-list, #group-table-view .view-list')].find(v => v.getClientRects().length > 0 && /Jobs/.test(v.textContent)) ? ([...document.querySelectorAll('#scheduler-view .view-list, #group-table-view .view-list')].find(v => v.getClientRects().length > 0 && /Jobs/.test(v.textContent)).closest('#scheduler-view') ? '#scheduler-view .view-list' : '#group-table-view .view-list') : '#group-table-view .view-list'`);
             s = await strip(host);
             assert.ok(s && s.shown && s.dir === 'row' && !s.select && s.n >= 2 && s.heights.every(h => h >= 44) && s.names.some(n => /Jobs/.test(n)) && s.names.some(n => /Workflows/.test(n)), `${tag}: Jobs and Workflows are tabs, not a select: ` + JSON.stringify(s));
