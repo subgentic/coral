@@ -155,6 +155,7 @@ POST /api/board/{project}/agents/{subscriber}/sleep | board-claims +token-sessio
 POST /api/board/{project}/agents/{subscriber}/wake | board-claims +token-session
 POST /api/board/{project}/artifacts/{id}/review | board-claims | operator-only
 POST /api/board/{project}/asks/{messageID}/close | board-claims
+POST /api/board/{project}/clashes | board-claims +token-session
 POST /api/board/{project}/cross-team-links | board-claims +token-session | operator-only
 POST /api/board/{project}/cross-team/disable | board-claims | operator-only
 POST /api/board/{project}/cross-team/enable | board-claims | operator-only

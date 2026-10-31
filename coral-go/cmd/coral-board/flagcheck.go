@@ -49,7 +49,7 @@ func checkKnownFlags(args []string) error {
 	case "queue":
 		spec = jsonOnly
 	case "ask":
-		spec = clihelp.FlagSpec{Values: []string{"--note", "--board"}, Positional: 2}
+		spec = clihelp.FlagSpec{Values: []string{"--note", "--board"}, Positional: 4}
 	case "goal":
 		if len(rest) == 0 {
 			return nil

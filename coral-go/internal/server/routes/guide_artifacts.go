@@ -3,6 +3,7 @@ package routes
 import (
 	"context"
 	"log/slog"
+	"net/http"
 )
 
 // What a guide reads of the artifacts (#11457). An artifact id is a content hash and a path carries no board, so Coral decides here, in the one read check every artifact route goes through (artifactReadable,
@@ -18,6 +19,14 @@ func artifactStoreID(it teamArtifact) string {
 		return it.ID
 	}
 	return ""
+}
+
+// ownerSeesPrivateMarks reports whether a read may carry the manager's private marks: not an agent's (its token) and not a guide's; the dashboard, the command line and the Hub owner's reads may.
+func ownerSeesPrivateMarks(r *http.Request) bool {
+	if _, guide := guideOf(r); guide {
+		return false
+	}
+	return !agentCaller(r) && callerActor(r).Kind != ActorToken
 }
 
 // guideMayRead says, for each id, whether a guide of board may read it. An id with no record on the board, a private one, and any id when the answer cannot be had, are false.
