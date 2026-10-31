@@ -232,13 +232,6 @@ func nudgeCount(in AutomatedInput) (int, bool) {
 	return n, err == nil && n > 0
 }
 
-// NoteBoardNudgeTold is the flush's own mark, exported so the notifier's tests can stand in for a typed summary.
-func NoteBoardNudgeTold(sessionID string) {
-	notices.Lock()
-	defer notices.Unlock()
-	stateOf(sessionID).toldBoard = true
-}
-
 // TakeBoardNudgeTold reports, once, that a summary which stood for held board nudges was typed for the session: the notifier then takes those messages as told and does not nudge them again (one line, not two).
 func TakeBoardNudgeTold(sessionID string) bool {
 	notices.Lock()

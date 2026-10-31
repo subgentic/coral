@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/subgentic/coral/internal/naming"
-	"github.com/subgentic/coral/internal/ptymanager"
 )
 
 // #11387 (QA's finding A): a nudge Coral held (a pause, the person typing) is told by the one summary line; the notifier then takes those messages as told and does
@@ -32,7 +31,7 @@ func TestASummaryThatToldAHeldNudgeReplacesTheNextNudge(t *testing.T) {
 	n := NewBoardNotifier(bs, &mockRuntime{}, time.Second)
 	n.SetIsPausedFn(func(string) bool { return false })
 	n.now = func() time.Time { return clock }
-	holding := true
+	holding, toldOnce := true, false
 	var typed []string
 	n.deliverNudge = func(_ context.Context, _ AgentRuntime, _ *slog.Logger, _, _, _, _, text, _ string, _, _ bool, _ func(context.Context) bool) (bool, error) {
 		if holding {
@@ -54,7 +53,11 @@ func TestASummaryThatToldAHeldNudgeReplacesTheNextNudge(t *testing.T) {
 	assert.Empty(t, typed)
 
 	holding = false
-	ptymanager.NoteBoardNudgeTold(sid) // the summary line was typed for what was held
+	n.nudgeTold = func(id string) bool { // the summary line was typed for what was held: told once, as ptymanager.TakeBoardNudgeTold is
+		first := id == sid && !toldOnce
+		toldOnce = true
+		return first
+	}
 	pass()
 	assert.Empty(t, typed, "the summary told those two messages: no ordinary nudge for them")
 

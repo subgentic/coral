@@ -29,8 +29,9 @@ type BoardNotifier struct {
 	pauseLogMu   sync.Mutex
 	pauseLogged  map[string]bool // boards a skipped nudge was already logged for, until they are resumed
 	notifiedMu   sync.Mutex
-	notified     map[string]notifyState // session_name -> last nudge since the agent last read
-	heldNudge    map[string]notifyState // session_name -> the nudge Coral held (a pause, the person typing): taken as sent when a summary told it (#11387)
+	notified     map[string]notifyState      // session_name -> last nudge since the agent last read
+	nudgeTold    func(sessionID string) bool // whether a summary told the held nudge (nil: ptymanager.TakeBoardNudgeTold); a test fills it
+	heldNudge    map[string]notifyState      // session_name -> the nudge Coral held (a pause, the person typing): taken as sent when a summary told it (#11387)
 	notifyNowCh  chan struct{}
 	pendingMu    sync.Mutex
 	pendingAll   bool             // a pass over every board is due (NotifyNow)
@@ -473,7 +474,11 @@ func (n *BoardNotifier) nudgeAgent(ctx context.Context, pass *notifyPass, a Agen
 		return
 	}
 	n.notifiedMu.Lock()
-	if ptymanager.TakeBoardNudgeTold(a.SessionID) { // the one summary line stood for the nudge that was held: those messages are told, newer ones still nudge (#11387)
+	told := n.nudgeTold
+	if told == nil {
+		told = ptymanager.TakeBoardNudgeTold
+	}
+	if told(a.SessionID) { // the one summary line stood for the nudge that was held: those messages are told, newer ones still nudge (#11387)
 		if h, ok := n.heldNudge[sessName]; ok {
 			n.notified[sessName] = h
 		}
