@@ -1,3 +1,5 @@
+import { isCloud } from './server_base.js';
+
 /* Shared CodeMirror 6 helpers — used by the file preview pane and the inline
  * diffs in the Files tab, so both render code the same way. */
 
@@ -44,4 +46,29 @@ export function getLangFromPath(fp) {
         md: 'markdown',
     };
     return map[ext.toLowerCase()] || ext.toLowerCase() || 'plaintext';
+}
+
+/** The element an editor mounts into. CodeMirror writes its theme into <style> elements, which the hub's CSP
+ *  (style-src 'self') blocks; inside a shadow root it adopts a constructable stylesheet instead, which the CSP does
+ *  not govern. So in cloud mode the editor lives in a shadow root and the page rules that style it (the same ones
+ *  agentic.css/output.css hold for local mode) come from a stylesheet loaded from /static: no inline style anywhere. */
+export function cmHost(body) {
+    body.replaceChildren();
+    const host = document.createElement('div');
+    host.className = 'inline-preview-cm preview-pane-cm';
+    body.appendChild(host);
+    if (!isCloud() || !host.attachShadow) return host;
+    const root = host.attachShadow({ mode: 'open' });
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = new URL('./css/cm_shadow.css', import.meta.url).href; // inherits a versioned static prefix
+    const mount = document.createElement('div');
+    mount.className = 'cm-shadow-mount';
+    root.append(link, mount);
+    return mount;
+}
+
+/** The editor's colours follow the page's theme (#7654): CodeMirror's own light look in the light theme, One Dark only in the dark one. Taken when the editor is made, as each file or tab opens it afresh. */
+export function cmTheme(cm) {
+    return document.documentElement.getAttribute('data-theme') === 'light' ? [] : [cm.oneDark];
 }

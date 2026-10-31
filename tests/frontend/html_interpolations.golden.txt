@@ -86,17 +86,22 @@
 1	changed_files.js	adds
 1	changed_files.js	agentOnlyCls
 1	changed_files.js	agentsHtml
+2	changed_files.js	branch
 2	changed_files.js	cls
 1	changed_files.js	compareNote
 2	changed_files.js	copyBtn
 1	changed_files.js	dels
+1	changed_files.js	diffSlot
 2	changed_files.js	editBtn
+1	changed_files.js	expandAll
+1	changed_files.js	expandBtn
 1	changed_files.js	f.additions
 1	changed_files.js	f.deletions
 1	changed_files.js	fileIconHtml(name)
 1	changed_files.js	modeSelect
 1	changed_files.js	moreButton(f.filepath, rowName)
 1	changed_files.js	moreButton(filepath, name)
+2	changed_files.js	name
 1	changed_files.js	options
 2	changed_files.js	previewBtn
 2	changed_files.js	shareBtn
@@ -105,6 +110,7 @@
 1	changed_files.js	statusCls
 1	changed_files.js	totals.adds
 1	changed_files.js	totals.dels
+1	changed_files.js	worktreeNoteHtml()
 1	chat_bubbles.js	artifactRef ? '' : `<button type="button" class="menu-item" role="menuitem" data-action="edit"><span class="ma
 1	chat_bubbles.js	editors.map((ed, i) => `<button type="button" class="menu-item" role="menuitem" data-action="editor" data-edit
 2	chat_bubbles.js	line > 0 ? ` (line ${line})` : ""

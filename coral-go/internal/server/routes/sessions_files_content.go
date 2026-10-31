@@ -22,6 +22,7 @@ func (h *SessionsHandler) GetFileContent(w http.ResponseWriter, r *http.Request)
 	name := chi.URLParam(r, "name")
 	fp := r.URL.Query().Get("filepath")
 	sessionID := r.URL.Query().Get("session_id")
+	_ = r.URL.Query().Get("worktree") // follow or launch (#11351): agentCtx reads it under readWorkFile; named here too, because the tunnel's query table is built from what each handler reads
 	if !h.requireAgentSession(w, r, name, sessionID) {
 		return
 	}
