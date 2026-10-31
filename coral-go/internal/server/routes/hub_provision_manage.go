@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/subgentic/coral/internal/config"
+	"github.com/subgentic/coral/internal/httputil"
 	"github.com/subgentic/coral/internal/sshprov"
 	"github.com/subgentic/coral/internal/store"
 )
@@ -75,7 +76,7 @@ func (pr *Provisioner) planManage(w http.ResponseWriter, r *http.Request, req pl
 	}
 	if len(pr.plans) >= provisionMaxPlans {
 		pr.mu.Unlock()
-		writeError(w, http.StatusTooManyRequests, "", "finish or cancel a setup in progress first")
+		httputil.WriteActionLimit(w, 0, "setup_in_progress", "finish or cancel a setup in progress first") // a per-action limit, marked so the dashboard does not take it for an overloaded server (#3434)
 		return
 	}
 	pr.plans[p.ID] = p
