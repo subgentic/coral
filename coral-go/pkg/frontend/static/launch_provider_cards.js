@@ -93,7 +93,7 @@ export async function buildProviderCards({ group, form, server, implicitDefault 
         return box;
     }
 
-    const statusOf = type => { const s = state.get(type); if (s.found === null) return ''; const d = defaults[type]; return `Installed · default ${d ? modelName(type, d, server) : 'model'}`; };
+    const statusOf = type => { const s = state.get(type); if (s.found === null) return ''; const d = defaults[type]; return d ? `Installed · default ${modelName(type, d, server)}` : 'Installed'; };
     const noThinking = (card, label) => { const p = card.querySelector('.provider-no-thinking'); if (!p) return; const wrap = thinkingWrap(), known = Array.isArray(form._thinkingLevels); p.hidden = !(card.classList.contains('is-open') && known && wrap && wrap.hidden); p.textContent = `${label} has no thinking levels, so there is nothing to set.`; };
 
     /** Moving a row blurs what has the focus inside it (the Model field's add form, its select): the provider checks answer late, redraw the cards and move the rows, and Escape then went to the page and not to the form. The focus goes back to what had it. */
