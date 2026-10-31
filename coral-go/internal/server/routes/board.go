@@ -108,6 +108,8 @@ type BoardHandler struct {
 	clearBoardChatFlags func(ctx context.Context, project string) error
 	// sessionAsleep reports whether a live session is asleep, ended or archived: an approval's message waits for it (SetSessionAsleepLookup). Nil: not known.
 	sessionAsleep func(ctx context.Context, sessionID string) bool
+	// needsYouAgents lists the agents waiting on the Operator for GET /api/needs-you (SetNeedsYouAgents). Nil: none.
+	needsYouAgents func(r *http.Request) ([]NeedsYouItem, error)
 	// uploads caches per-session upload records for the artifact views.
 	uploads uploadDirCache
 	// taskCounts keeps each board's artifact count per task for a few seconds (taskArtifactCounts, #8591).

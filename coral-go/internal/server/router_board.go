@@ -45,6 +45,7 @@ func (s *Server) configureBoardHandlers(h *routeHandlers) (*routes.BoardHandler,
 	boardHandler.SetArchivedSessionLookup(routes.ArchivedSessionLookup(store.NewSessionStore(s.db)))
 	boardHandler.SetLiveSessionLookup(routes.LiveSessionLookup(store.NewSessionStore(s.db)))
 	boardHandler.SetSessionAsleepLookup(routes.SessionAsleepLookup(store.NewSessionStore(s.db)))
+	boardHandler.SetNeedsYouAgents(sessHandler.NeedsYouAgents)
 	boardHandler.SetSessionThinkingLookup(routes.SessionThinkingLookup(store.NewSessionStore(s.db)))
 	boardHandler.SetTaskArtifactWriter(s.cfg.CoralDir(), sessHandler.PersistTaskChanges)
 	sessStore := store.NewSessionStore(s.db)
@@ -138,6 +139,7 @@ func (s *Server) registerBoardMessageRoutes(r chi.Router, boardHandler *routes.B
 	r.Post("/api/board/{project}/clashes", boardHandler.FileClash)                                             // #11457, S6: an agent files two people's different directions; Coral asks the Operator to decide
 	r.Get("/api/board/{project}/guide-asks", boardHandler.GuideAsks)                                           // #11457: the questions put to a guide (the guide's own label, from the connector's stamp)
 	r.Get("/api/operator-asks", boardHandler.OperatorAsks)                                                     // the questions agents asked the Operator (post --ask, wait --operator), for Needs you (#11417)
+	r.Get("/api/needs-you", boardHandler.NeedsYou)                                                             // what waits for the Operator, in one read, for the Hub's phone push (#11596): the owner's alone
 	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/asks/{messageID}/close", boardHandler.CloseAsk) // close a question answered elsewhere (ask close, #11417)
 	r.Get("/api/board/{project}/messages/all", boardHandler.ListAllMessages)
 	r.Get("/api/board/{project}/messages/search", boardHandler.SearchMessages)
