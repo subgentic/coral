@@ -375,6 +375,7 @@
     .inbox-review-actions button { min-height: 44px; }
     .inbox-welcome-actions { grid-template-columns: 6.25rem 4.75rem; justify-content: end; } /* the welcome rows' buttons line up in two columns, the action then Dismiss, whatever the title's width (#11536) */
     .inbox-welcome-actions .btn { width: 100%; padding-inline: 4px; }
+    .inbox-swipe-strip { position: absolute; right: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; white-space: nowrap; font-weight: var(--fw-strong); color: var(--text-primary); background: color-mix(in srgb, var(--error) 18%, transparent); border-radius: 0 var(--radius-md) var(--radius-md) 0; pointer-events: none; }
     .inbox-review-actions { column-gap: 6px; }
     .inbox-review-actions-star { column-gap: 4px; } /* the starred glyph is a fourth cell: 8 px gaps put the actions 3 px over the line, under the name (#9904) */
     .inbox-review-metadata { flex-wrap: wrap; max-width: 100%; } /* a phone's second line has the room of its row, and breaks at a gap instead of cutting the team's name (#11414) */
