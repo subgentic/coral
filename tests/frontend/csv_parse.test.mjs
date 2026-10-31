@@ -20,7 +20,7 @@ assert.deepEqual(P('""'), [['']], 'a quoted empty field is a record');
 assert.deepEqual(P('a,"",b'), [['a', '', 'b']]);
 
 // what the RFC leaves open
-assert.deepEqual(P('﻿a,b\n1,2'), [['a', 'b'], ['1', '2']], 'a BOM is dropped');
+assert.deepEqual(P('\ufeffa,b\n1,2'), [['a', 'b'], ['1', '2']], 'a BOM is dropped');
 assert.deepEqual(P('a\n\n\nb\n'), [['a'], ['b']], 'a blank line is no record');
 assert.deepEqual(P('a,b\n1'), [['a', 'b'], ['1']], 'a short record is kept as it is');
 assert.deepEqual(P('a\n1,2,3'), [['a'], ['1', '2', '3']], 'so is a long one');
@@ -79,7 +79,7 @@ assert.ok(g.rows.every(r => r.length <= MAX_COLS) && g.width === 400);
 // a deterministic generator (a small LCG), so a failure is the same every run
 let seed = 20261030;
 const rnd = n => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed % n; };
-const PIECES = ['a', 'b', 'Z', '0', '42', ' ', ',', ';', '"', '""', '\n', '\r\n', '\r', '\t', '=', '+', '@', '-', '<', '&', 'é', '名', '\u0000', '​', "'", '\\'];
+const PIECES = ['a', 'b', 'Z', '0', '42', ' ', ',', ';', '"', '""', '\n', '\r\n', '\r', '\t', '=', '+', '@', '-', '<', '&', '\u00e9', '\u540d', '\u0000', '\u200b', "'", '\\'];
 const randomField = () => { let f = ''; for (let k = rnd(7); k > 0; k--) f += PIECES[rnd(PIECES.length)]; return f; };
 const writeCsv = (rows, delim, eol, always) => rows.map(r => (r.length === 1 && r[0] === '' ? '""' : r.map(f => (always || /["\r\n]/.test(f) || f.includes(delim) || f === '' && r.length === 1 ? `"${f.replace(/"/g, '""')}"` : f)).join(delim))).join(eol) + (rnd(2) ? eol : '');
 
