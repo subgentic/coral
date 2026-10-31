@@ -392,7 +392,7 @@
     </div>
 
     <!-- #3816: the list the phone's current-view dropdown and the row's More button open (nav_tabs.js draws it from the tabs) -->
-    <div id="nav-more-menu" class="menu nav-more-menu" role="menu" aria-label="Views" hidden></div>
+    <div id="nav-more-menu" class="menu nav-more-menu" role="menu" aria-label="Navigation" hidden></div>
 
     {{ template "includes/modals.html" . }}
 
@@ -400,7 +400,7 @@
     <nav class="phone-nav" id="phone-nav" aria-label="Main">
         <button type="button" class="phone-nav-slot" data-phone-nav="nav-inbox" data-on-click="phone-nav" data-arg="nav-inbox" aria-label="Inbox page" title="Inbox"><span class="phone-nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 13l2-8h12l2 8v6H4zM4 13h5l1 2h4l1-2h5"/></svg><span class="chip chip-count phone-nav-badge" id="phone-nav-inbox-badge" hidden></span></span><span class="phone-nav-label">Inbox</span></button>
         <button type="button" class="phone-nav-slot" data-phone-nav="nav-agents" data-on-click="phone-nav" data-arg="nav-agents" aria-label="Agents page" title="Agents"><span class="phone-nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-4 3-6 7-6s7 2 7 6"/></svg></span><span class="phone-nav-label">Agents</span></button>
-        <button type="button" class="phone-nav-slot" data-phone-nav="nav-tasks" data-on-click="phone-nav" data-arg="nav-tasks" aria-label="Tasks page" title="Tasks"><span class="phone-nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="6" rx="2"/><rect x="4" y="14" width="16" height="6" rx="2"/></svg></span><span class="phone-nav-label">Tasks</span></button>
+        <button type="button" class="phone-nav-slot" data-phone-nav="nav-tasks" data-on-click="phone-nav" data-arg="nav-tasks" aria-label="Tasks page" title="Tasks"><span class="phone-nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6l2 2 3-3M12 7h8M4 15l2 2 3-3M12 16h8"/></svg></span><span class="phone-nav-label">Tasks</span></button>
         <button type="button" class="phone-nav-slot" data-phone-nav="nav-chats" data-on-click="phone-nav" data-arg="nav-chats" aria-label="Chats page" title="Chats"><span class="phone-nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/></svg></span><span class="phone-nav-label">Chats</span></button>
     </nav>
     <button type="button" class="phone-fab" id="phone-fab" data-on-click="phone-fab" aria-haspopup="menu" aria-expanded="false" aria-controls="phone-fab-menu" aria-label="New" title="New"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span class="phone-fab-label">New</span></button>
