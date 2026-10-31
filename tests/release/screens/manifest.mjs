@@ -79,14 +79,14 @@ export function reviewName(m, prevVersion) {
  *  upload (the same bytes, which adds the tag) shows the same line in Needs you. */
 export const sheetArtifactName = (m, prevVersion) => reviewName(m, prevVersion) + '.html';
 
-/** The coral-agent arguments of every upload of a run: the file, its name, the release task and the "ui review" tag, then any extra (what a dry run prints). */
+/** The arguments of every upload of a run: the file, its name, the release task and the "ui review" tag, then any extra (what a dry run prints). */
 export const uploadArgs = (file, name, taskId, extra = []) => ['artifact', 'upload', file, '--name', name, '--task', String(taskId), '--tag', 'ui review', ...extra];
 
 /** The arguments that put the contact sheet in the operator's Needs you, on the release task. */
 export const reviewUploadArgs = (file, name, taskId) => uploadArgs(file, name, taskId, ['--tag', 'for review']);
 
 /**
- * The goal the run's own task goes under (`task add --self` needs one). goals: `coral-board goal list --json` (open ones); wanted: --goal / SCREENS_GOAL, if the runner was told one.
+ * The goal the run's own task goes under (`task add --self` needs one). goals: the board's goal list as JSON (open ones); wanted: --goal / SCREENS_GOAL, if the runner was told one.
  * A goal that was named and is open is used; one that was named and is closed is not (a closed goal refuses new tasks: #163 was closed); otherwise the lowest-numbered open goal with "UI review" in its title.
  * Returns { id, why } or { id: null, why } when there is none to use.
  */
