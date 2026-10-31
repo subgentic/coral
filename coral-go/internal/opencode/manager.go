@@ -13,15 +13,18 @@ import (
 type Manager struct {
 	cfg Config
 
-	mu       sync.Mutex
-	servers  map[string]*managed
-	starting map[string]*starting  // servers being started, by key
-	stores   map[string]string     // the store each live or starting server runs on, by key
-	alive    func(key string) bool // the reaper's question (StartReaper): whether an agent is awake; nil until it is set
-	readFail map[string]time.Time  // when a start of a reader for the key last failed
-	closed   bool
-	reapStop chan struct{} // closed by Close: the reaper ends
-	reapDone chan struct{}
+	mu              sync.Mutex
+	servers         map[string]*managed
+	starting        map[string]*starting  // servers being started, by key
+	stores          map[string]string     // the store each live or starting server runs on, by key
+	alive           func(key string) bool // the reaper's question (StartReaper): whether an agent is awake; nil until it is set
+	readFail        map[string]time.Time  // when a start of a reader for the key last failed
+	readerStarting  map[string]bool       // readers admitted whose start is under way (they count against the cap before they run)
+	readerStartAt   map[string]time.Time  // when a reader for the key was last admitted
+	lastReaderStart time.Time             // when any reader was last admitted
+	closed          bool
+	reapStop        chan struct{} // closed by Close: the reaper ends
+	reapDone        chan struct{}
 
 	// Redact redacts a text before the newest message is kept on disk; false means it could not be checked, and then nothing is kept. Set before the first Ensure; nil keeps the text as it is.
 	Redact func(text string) (string, bool)
@@ -37,16 +40,18 @@ type starting struct{ done chan struct{} }
 
 // managed is one agent's server and the loop reading its events.
 type managed struct {
-	srv     *Server
-	cancel  context.CancelFunc
-	done    chan struct{} // closed when the event loop has returned
-	since   time.Time     // when the server came up
-	key     string        // the agent this server is for
-	reader  bool          // started only to read the agent's history (ReadHistory); set before it is published
-	store   string        // the key of the agent whose session store this server runs on (its own, or the one a resumed session is in)
-	dataDir string
-	noted   map[string]bool // sessions whose store has been recorded (under mu)
-	lctx    context.Context // the event loop's: what ends with the server
+	srv      *Server
+	cancel   context.CancelFunc
+	done     chan struct{} // closed when the event loop has returned
+	since    time.Time     // when the server came up
+	key      string        // the agent this server is for
+	idle     *time.Timer   // a reader stops itself when this fires (under mu); nil for a server that is not one
+	lastRead time.Time     // when the history was last read through this reader (under mu)
+	reader   bool          // started only to read the agent's history (ReadHistory); set before it is published
+	store    string        // the key of the agent whose session store this server runs on (its own, or the one a resumed session is in)
+	dataDir  string
+	noted    map[string]bool // sessions whose store has been recorded (under mu)
+	lctx     context.Context // the event loop's: what ends with the server
 
 	mu      sync.Mutex
 	tracker *Tracker
@@ -67,7 +72,7 @@ type managed struct {
 }
 
 func NewManager(cfg Config) *Manager {
-	return &Manager{cfg: cfg, servers: map[string]*managed{}, starting: map[string]*starting{}, stores: map[string]string{}, readFail: map[string]time.Time{}}
+	return &Manager{cfg: cfg, servers: map[string]*managed{}, starting: map[string]*starting{}, stores: map[string]string{}, readFail: map[string]time.Time{}, readerStarting: map[string]bool{}, readerStartAt: map[string]time.Time{}}
 }
 
 // Ensure returns the agent's server, starting it (and the reading of its events) on the first call; a server that has since exited is started again. bin is the opencode binary the person's settings
@@ -513,6 +518,12 @@ func (m *Manager) Close() {
 }
 
 func (g *managed) stop() {
+	g.mu.Lock()
+	if g.idle != nil {
+		g.idle.Stop() // a reader's timer does not outlive it
+		g.idle = nil
+	}
+	g.mu.Unlock()
 	g.cancel()
 	<-g.done
 	g.srv.Stop()
@@ -564,16 +575,24 @@ func (g *managed) loop(ctx context.Context, skip func(Message) bool, redact func
 var errManagerClosed = errors.New("opencode: the server manager is closed")
 
 // readerCap is how many servers may run only to read a sleeping agent's history at once; readerCooldown is how long a failed start of one is not tried again for the same agent (a chat polls every second).
-const (
-	readerCap      = 2
+const readerCap = 2
+
+// The bounds on readers (variables so a test can use small ones): a failed start is not retried for readerCooldown; across the manager at most one reader is started per readerStartGap and one per agent per
+// readerAgentGap (anyone who may open a sleeping agent's chat can cause a start, so the starts are bounded and not only the readers that run); a reader stops itself after readerIdle without a read.
+var (
 	readerCooldown = 30 * time.Second
+	readerStartGap = 5 * time.Second
+	readerAgentGap = 60 * time.Second
+	readerIdle     = 60 * time.Second
 )
 
 // ReadHistory is the history of an agent whose server may not be running (asleep, or just after a Coral restart): from its server when one is up, else from a server started only to read it, on the agent's own
-// session store with the newest session it named (StoredSession), no TUI and no model call. At most readerCap such servers run; a new one makes room by stopping the oldest of an agent that is not awake, or is
-// refused (ok false); a failed start is not retried for readerCooldown; the reaper stops a reader whose agent is asleep after its grace, and a launch replaces one. ok is false when there is nothing to read.
+// session store with the newest session it named (StoredSession), no TUI and no model call. At most readerCap such servers run, counting those being started; a new one makes room by stopping the oldest of an agent
+// that is not awake, or is refused (ok false); starts are bounded too (readerStartGap, readerAgentGap); a failed start is not retried for readerCooldown; a reader stops itself after readerIdle without a read,
+// the reaper stops one whose agent sleeps, and a launch replaces one. ok is false when there is nothing to read.
 func (m *Manager) ReadHistory(ctx context.Context, key, bin string) ([]Message, bool, error) {
 	if msgs, ok, err := m.AgentMessages(ctx, key); ok || err != nil {
+		m.touchReader(key)
 		return msgs, ok, err
 	}
 	ses := StoredSession(m.cfg.DataDir, key)
@@ -583,6 +602,7 @@ func (m *Manager) ReadHistory(ctx context.Context, key, bin string) ([]Message, 
 	if !m.admitReader(key) {
 		return nil, false, nil
 	}
+	defer m.releaseReaderStart(key)
 	if _, err := m.ensure(ctx, key, bin, "", ses, true); err != nil {
 		m.mu.Lock()
 		m.readFail[key] = time.Now()
@@ -590,49 +610,98 @@ func (m *Manager) ReadHistory(ctx context.Context, key, bin string) ([]Message, 
 		return nil, false, nil // a history that cannot be read is an empty chat, not an error
 	}
 	m.UseSession(key, ses)
+	m.touchReader(key)
 	return m.AgentMessages(ctx, key)
 }
 
-// admitReader says whether a server may be started to read key's history now, stopping the oldest reader of an agent that is not awake when the cap is reached.
-func (m *Manager) admitReader(key string) bool {
+// touchReader notes a read through key's server when it is a reader, and (re)arms the timer that stops it after readerIdle without one.
+func (m *Manager) touchReader(key string) {
 	m.mu.Lock()
-	if m.closed || time.Since(m.readFail[key]) < readerCooldown {
-		m.mu.Unlock()
-		return false
-	}
-	if m.servers[key] != nil || m.starting[key] != nil { // one is up or on its way: it is used
-		m.mu.Unlock()
-		return true
-	}
-	type reader struct {
-		key   string
-		since time.Time
-	}
-	var readers []reader
-	for k, g := range m.servers {
-		if g.reader {
-			readers = append(readers, reader{k, g.since})
-		}
-	}
-	alive := m.alive
+	g := m.servers[key]
 	m.mu.Unlock()
-	if len(readers) < readerCap {
-		return true
+	if g == nil || !g.reader {
+		return
 	}
-	// outside the lock: the question may read a database
-	var victim string
-	var oldest time.Time
-	for _, r := range readers {
-		if alive != nil && alive(r.key) {
-			continue // an agent that is awake is not made to give up its server
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.lastRead = time.Now()
+	if g.idle != nil {
+		g.idle.Stop()
+	}
+	g.idle = time.AfterFunc(readerIdle, func() { m.stopIdleReader(key, g) })
+}
+
+// stopIdleReader ends a reader that was not read for readerIdle: only the server it was armed for, only while it is still a reader.
+func (m *Manager) stopIdleReader(key string, g *managed) {
+	g.mu.Lock()
+	idle := time.Since(g.lastRead) >= readerIdle
+	g.mu.Unlock()
+	if !idle {
+		return
+	}
+	if taken, st := m.take(key, g); taken != nil {
+		m.stopReserved(key, taken, st)
+	}
+}
+
+// releaseReaderStart ends the reservation admitReader made for key.
+func (m *Manager) releaseReaderStart(key string) {
+	m.mu.Lock()
+	delete(m.readerStarting, key)
+	m.mu.Unlock()
+}
+
+// admitReader says whether a server may be started to read key's history now, and reserves the start (it counts against the cap until releaseReaderStart): refused after a failed start, while the manager's or the
+// agent's start gap has not passed, or when the cap is reached and no reader of an agent that is not awake can make room (the oldest such is stopped, outside the lock, and the count looked at again).
+func (m *Manager) admitReader(key string) bool {
+	for attempt := 0; attempt < readerCap+1; attempt++ {
+		m.mu.Lock()
+		if m.closed || time.Since(m.readFail[key]) < readerCooldown {
+			m.mu.Unlock()
+			return false
 		}
-		if victim == "" || r.since.Before(oldest) {
-			victim, oldest = r.key, r.since
+		if m.servers[key] != nil || m.starting[key] != nil || m.readerStarting[key] { // one is up or on its way: it is used
+			m.mu.Unlock()
+			return true
 		}
+		if time.Since(m.lastReaderStart) < readerStartGap || time.Since(m.readerStartAt[key]) < readerAgentGap {
+			m.mu.Unlock()
+			return false // starts are bounded: nothing is started for this open
+		}
+		type reader struct {
+			key   string
+			since time.Time
+		}
+		var readers []reader
+		for k, g := range m.servers {
+			if g.reader {
+				readers = append(readers, reader{k, g.since})
+			}
+		}
+		if len(readers)+len(m.readerStarting) < readerCap {
+			now := time.Now()
+			m.readerStarting[key] = true
+			m.readerStartAt[key], m.lastReaderStart = now, now
+			m.mu.Unlock()
+			return true
+		}
+		alive := m.alive
+		m.mu.Unlock()
+		// outside the lock: the question may read a database
+		var victim string
+		var oldest time.Time
+		for _, r := range readers {
+			if alive != nil && alive(r.key) {
+				continue // an agent that is awake is not made to give up its server
+			}
+			if victim == "" || r.since.Before(oldest) {
+				victim, oldest = r.key, r.since
+			}
+		}
+		if victim == "" {
+			return false
+		}
+		m.Stop(victim)
 	}
-	if victim == "" {
-		return false
-	}
-	m.Stop(victim)
-	return true
+	return false
 }

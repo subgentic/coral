@@ -2,12 +2,24 @@ package opencode
 
 import (
 	"context"
+	"fmt"
+	"os"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// noStartGaps lets a test open several readers in a row (the gaps have a test of their own).
+func noStartGaps(t *testing.T) {
+	t.Helper()
+	a, b := readerStartGap, readerAgentGap
+	readerStartGap, readerAgentGap = 0, 0
+	t.Cleanup(func() { readerStartGap, readerAgentGap = a, b })
+}
 
 func readers(m *Manager) (n int) {
 	m.mu.Lock()
@@ -46,6 +58,7 @@ func TestAnAgentWithNoServerHasItsHistoryReadThroughAReaderServer(t *testing.T) 
 }
 
 func TestAtMostTwoReadersRunAndAnAwakeAgentsIsNeverStoppedForANewOne(t *testing.T) {
+	noStartGaps(t)
 	cfg, _ := stubConfig(t)
 	m := NewManager(cfg)
 	defer m.Close()
@@ -125,4 +138,74 @@ func TestAFailedReaderStartIsNotTriedAgainForAWhile(t *testing.T) {
 	second := m.readFail["agent-1"]
 	m.mu.Unlock()
 	assert.Equal(t, first, second, "not tried again inside the cooldown (a chat polls every second)")
+}
+
+// Anyone who may open a sleeping agent's chat can cause a reader to start: the STARTS are bounded, not only the readers that run (Security's SHOULD 3 on ede47c4f9).
+func TestTwentyOpensOfTwentySleepingAgentsInASecondStartNoMoreThanTheGapsAllow(t *testing.T) {
+	cfg, envFile := stubConfig(t)
+	m := NewManager(cfg)
+	defer m.Close()
+	for i := 0; i < 20; i++ {
+		noteAgentSession(cfg.DataDir, fmt.Sprintf("sleeper-%02d", i), "ses_abc123")
+	}
+	var served int
+	for i := 0; i < 20; i++ {
+		if _, ok, _ := m.ReadHistory(context.Background(), fmt.Sprintf("sleeper-%02d", i), ""); ok {
+			served++
+		}
+	}
+	assert.Equal(t, 1, served, "one start per 5 s across the manager: the first open is served, the rest get the empty chat")
+	assert.Equal(t, 1, readers(m))
+	raw, err := os.ReadFile(envFile + ".pids")
+	require.NoError(t, err)
+	assert.Len(t, strings.Fields(string(raw)), 1, "one process was started, not twenty")
+
+	// the same agent again: inside its own gap nothing is started either, even with the manager's gap passed
+	readerStartGap = 0
+	defer func() { readerStartGap = 5 * time.Second }()
+	m.Stop("sleeper-00")
+	_, ok, _ := m.ReadHistory(context.Background(), "sleeper-00", "")
+	assert.False(t, ok, "one start per agent per 60 s")
+}
+
+// Two opens at once must not both pass the count: a reader being started counts against the cap (Security's INFO 4).
+func TestReadersBeingStartedCountAgainstTheCap(t *testing.T) {
+	noStartGaps(t)
+	cfg, envFile := stubConfig(t)
+	t.Setenv(listenDelayVar, "600") // each start takes a moment: the opens overlap
+	m := NewManager(cfg)
+	defer m.Close()
+	m.alive = func(string) bool { return true } // no agent gives up its server
+	var wg sync.WaitGroup
+	for i := 0; i < 8; i++ {
+		key := fmt.Sprintf("racer-%d", i)
+		noteAgentSession(cfg.DataDir, key, "ses_abc123")
+		wg.Add(1)
+		go func() { defer wg.Done(); m.ReadHistory(context.Background(), key, "") }()
+	}
+	wg.Wait()
+	assert.LessOrEqual(t, readers(m), readerCap)
+	raw, _ := os.ReadFile(envFile + ".pids")
+	assert.LessOrEqual(t, len(strings.Fields(string(raw))), readerCap, "no more than the cap were ever started")
+}
+
+// A reader stops itself after readerIdle without a read, and a read keeps it.
+func TestAReaderStopsItselfWhenNobodyReadsIt(t *testing.T) {
+	noStartGaps(t)
+	old := readerIdle
+	readerIdle = 400 * time.Millisecond
+	defer func() { readerIdle = old }()
+	cfg, _ := stubConfig(t)
+	m := NewManager(cfg)
+	defer m.Close()
+	noteAgentSession(cfg.DataDir, "agent-1", "ses_abc123")
+	_, ok, _ := m.ReadHistory(context.Background(), "agent-1", "")
+	require.True(t, ok)
+	for i := 0; i < 4; i++ { // read every 200 ms: it is kept past the idle time
+		time.Sleep(200 * time.Millisecond)
+		_, ok, _ = m.ReadHistory(context.Background(), "agent-1", "")
+		require.True(t, ok)
+		require.Equal(t, 1, readers(m))
+	}
+	waitFor(t, "the idle reader to stop itself", func() bool { return readers(m) == 0 })
 }
