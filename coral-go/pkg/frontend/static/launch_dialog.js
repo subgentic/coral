@@ -268,6 +268,7 @@ async function _onLaunchServerChange(value, { force = false } = {}) {
     if (note) note.textContent = loadError ? `Could not read ${serverLabel(next, state.servers)}: ${loadError}` : '';
     // Re-apply defaults from the (now loaded) settings, then the dependent option sources.
     _resetLaunchDirs(next, { switching: true });
+    if (launch.addTo && launch.addTo.workDir) { const dir = document.getElementById('launch-dir'); if (dir) { dir.value = launch.addTo.workDir; _syncDirNote(); syncRecap(); } } // Add agent to a team keeps the team's folder over the remote's default (#11517)
     const s = _settingsFor(next);
     const typeSelect = document.getElementById('launch-type');
     if (s.default_agent_type && typeSelect) typeSelect.value = s.default_agent_type;
