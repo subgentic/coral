@@ -699,10 +699,21 @@ func (s *Server) registerSystem(r *chi.Mux, h *routeHandlers) {
 		r.Patch("/api/servers/{id}", rsHandler.Update)
 		r.Delete("/api/servers/{id}", rsHandler.Delete)
 		r.Post("/api/servers/{id}/test", rsHandler.Test)
+		// Set a Coral server up on another computer over SSH (#11370): hub mode only, the Operator's.
+		prov := routes.NewProvisioner(rsHandler.Store())
+		r.Get("/api/servers/provision/options", prov.Options)
+		r.Post("/api/servers/provision/plan", prov.Plan)
+		r.Post("/api/servers/provision/{plan}/connect", prov.Connect)
+		r.Post("/api/servers/provision/{plan}/run", prov.Run)
+		r.Get("/api/servers/provision/{plan}", prov.Status)
+		r.Delete("/api/servers/provision/{plan}", prov.Cancel)
 		remoteResolver := routes.NewRemoteResolver(rsHandler.Store())
 		routes.MountRemoteProxy(r, remoteResolver)
 		s.remoteAgents = background.NewRemoteAgentHub(rsHandler.Store(), remoteResolver, remoteAgentHubConfig)
 		rsHandler.SetStatusListener(s.remoteAgents.Refresh) // an edited key shows at once (#3649)
+		rsHandler.SetOnDelete(remoteResolver.Forget)
+		prov.SetOnRemoved(remoteResolver.Forget)
+		prov.SetStatusListener(s.remoteAgents.Refresh) // a server the setup registered shows at once
 		remoteResolver.SetFailureSink(s.remoteAgents)
 		sessHandler.SetRemoteAgents(s.remoteAgents)
 	}

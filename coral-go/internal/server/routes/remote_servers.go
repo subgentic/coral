@@ -25,6 +25,8 @@ type RemoteServersHandler struct {
 	// statusListener, when set, hears the status an edit or a Test just found, so the hub's
 	// worker shows it at once (#3649).
 	statusListener func(id, status string)
+	// onDelete, when set, hears the id of a server that was deleted, so what is kept for it in memory (an ssh stream target and its key) goes too (#11370).
+	onDelete func(id string)
 
 	store         *store.RemoteServerStore
 	healthTimeout time.Duration
@@ -344,6 +346,10 @@ func (h *RemoteServersHandler) Update(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	if cur.Transport == store.RemoteTransportSSH {
+		h.updateSSH(w, r, cur, req)
+		return
+	}
 	upd := store.RemoteServerUpdate{AllowPrivate: req.AllowPrivate}
 	if req.Label != nil {
 		l := strings.TrimSpace(*req.Label)
@@ -412,9 +418,13 @@ func (h *RemoteServersHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 // Delete handles DELETE /api/servers/{id}.
 func (h *RemoteServersHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	if err := h.store.Delete(r.Context(), urlParam(r, "id")); err != nil {
+	id := urlParam(r, "id")
+	if err := h.store.Delete(r.Context(), id); err != nil {
 		remoteErr(w, err)
 		return
+	}
+	if h.onDelete != nil {
+		h.onDelete(id)
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
 }
@@ -439,7 +449,9 @@ func (h *RemoteServersHandler) Test(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var health RemoteHealth
-	if _, verr := validateRemoteURL(cur.URL, cur.AllowPrivate); verr != nil {
+	if cur.Transport == store.RemoteTransportSSH {
+		health = h.testSSH(r.Context(), cur, key)
+	} else if _, verr := validateRemoteURL(cur.URL, cur.AllowPrivate); verr != nil {
 		health = RemoteHealth{Status: store.RemoteStatusUnreachable, Err: verr.Error()}
 	} else {
 		health = CheckRemoteHealth(r.Context(), cur.URL, key, cur.AllowPrivate, h.healthTimeout)
@@ -449,6 +461,9 @@ func (h *RemoteServersHandler) Test(w http.ResponseWriter, r *http.Request) {
 	srv, _ := h.store.Get(r.Context(), id)
 	writeJSON(w, http.StatusOK, viewRemote(srv))
 }
+
+// SetOnDelete sets who hears a deleted server's id.
+func (h *RemoteServersHandler) SetOnDelete(f func(id string)) { h.onDelete = f }
 
 // SetStatusListener sets who hears the status an edit or a Test found (the hub's remote workers).
 func (h *RemoteServersHandler) SetStatusListener(f func(id, status string)) { h.statusListener = f }
