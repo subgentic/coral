@@ -80,7 +80,7 @@ func TestNeedsYouCountsEverySourceAndCleansAndCutsTheLines(t *testing.T) {
 	assert.Equal(t, "may I delete the old table?", byKind["wait"]["line"])
 }
 
-func TestNeedsYouCursorGivesWhatIsAtOrAfterItSoTiesAreNeverLost(t *testing.T) {
+func TestNeedsYouCursorIsAPlaceInTheOrderAndGivesWhatIsStrictlyAfterIt(t *testing.T) {
 	h, bs := operatorAsksRig(t)
 	ctx := context.Background()
 	ask := func(text string) {
@@ -91,27 +91,53 @@ func TestNeedsYouCursorGivesWhatIsAtOrAfterItSoTiesAreNeverLost(t *testing.T) {
 	ask("first?")
 	_, out := readNeedsYou(t, h, "", asPerson)
 	cursor, _ := out["cursor"].(string)
-	require.NotEmpty(t, cursor)
+	require.Contains(t, cursor, "|", "a time and an id")
 	_, out = readNeedsYou(t, h, "?after="+cursor, asPerson)
-	require.Len(t, needsYouItems(out), 1, "the newest item is at the cursor: it comes again, and its id lets a poller skip it")
-	ids := map[string]bool{needsYouItems(out)[0]["id"].(string): true}
-	ask("second?")
+	assert.Empty(t, needsYouItems(out), "nothing after the newest item")
+	assert.Equal(t, cursor, out["cursor"], "and the cursor stays")
+	ask("second?") // recorded to the same second as the first, likely: told apart by id
 	_, out = readNeedsYou(t, h, "?after="+cursor, asPerson)
-	require.Len(t, needsYouItems(out), 2, "a second item in the same instant is not lost")
-	fresh := 0
-	for _, it := range needsYouItems(out) {
-		if !ids[it["id"].(string)] {
-			fresh++
-		}
+	items := needsYouItems(out)
+	require.Len(t, items, 1, "the second item comes once, whether or not it shares the first's second")
+	assert.Contains(t, items[0]["line"], "second?")
+	_, out = readNeedsYou(t, h, "?after="+out["cursor"].(string), asPerson)
+	assert.Empty(t, needsYouItems(out), "and not again")
+	// a bare time is still taken, and includes what is at that time
+	bare := strings.SplitN(cursor, "|", 2)[0]
+	_, out = readNeedsYou(t, h, "?after="+bare, asPerson)
+	assert.NotEmpty(t, needsYouItems(out), "a bare time includes the items at it")
+	for _, bad := range []string{"yesterday", bare + "|", "|abc"} {
+		code, _ := readNeedsYou(t, h, "?after="+bad, asPerson)
+		assert.Equal(t, http.StatusBadRequest, code, bad)
 	}
-	assert.Equal(t, 1, fresh)
-	code, _ := readNeedsYou(t, h, "?after=yesterday", asPerson)
+	code, _ := readNeedsYou(t, h, "?limit=0", asPerson)
 	assert.Equal(t, http.StatusBadRequest, code)
-	code, _ = readNeedsYou(t, h, "?limit=0", asPerson)
-	assert.Equal(t, http.StatusBadRequest, code)
-	_, out = readNeedsYou(t, h, "?after=2999-01-01T00:00:00Z", asPerson)
+	_, out = readNeedsYou(t, h, "?after=2999-01-01T00:00:00Z|x", asPerson)
 	assert.Empty(t, needsYouItems(out), "a cursor from the future gives nothing")
 	assert.EqualValues(t, 2, out["count"])
+}
+
+// QA's MUST on #11604: items that share the cursor's time are told apart by id, so a poller reading until a poll is short reaches every one, once.
+func TestNeedsYouItemsInOneInstantAreAllReachedWithAnyLimit(t *testing.T) {
+	h, _ := operatorAsksRig(t)
+	at := time.Date(2026, 10, 31, 12, 0, 0, 0, time.UTC).Format(time.RFC3339Nano)
+	var rows []NeedsYouItem
+	for _, id := range []string{"agent:c", "agent:a", "agent:b"} {
+		rows = append(rows, NeedsYouItem{Kind: "agent", From: "x", Line: "waits", Team: "team", ID: id, At: at})
+	}
+	h.SetNeedsYouAgents(func(*http.Request) ([]NeedsYouItem, error) { return rows, nil })
+	for _, limit := range []string{"1", "2", "3", "50"} {
+		var got []string
+		cursor := "1970-01-01T00:00:00Z" // a bare time, the first form
+		for poll := 0; poll < 6; poll++ {
+			_, out := readNeedsYou(t, h, "?limit="+limit+"&after="+cursor, asPerson)
+			for _, it := range needsYouItems(out) {
+				got = append(got, it["id"].(string))
+			}
+			cursor = out["cursor"].(string)
+		}
+		assert.Equal(t, []string{"agent:a", "agent:b", "agent:c"}, got, "limit "+limit+": each of the three, once, in order")
+	}
 }
 
 func TestNeedsYouSaysWhenASourceCouldNotBeRead(t *testing.T) {
@@ -215,9 +241,9 @@ func TestNeedsYouABurstBiggerThanTheLimitIsReadInSeveralPollsAndNothingIsSkipped
 		}
 		cursor = out["cursor"].(string)
 	}
-	assert.Len(t, seen, 4, "the item at the cursor and the three of the burst, every one read: %v", seen)
+	assert.Len(t, seen, 3, "the three of the burst, every one read, once: %v", seen)
 	_, out = readNeedsYou(t, h, "?limit=1&after="+out["cursor"].(string), asPerson)
-	assert.Len(t, needsYouItems(out), 1, "the last item stays at the cursor (inclusive), for the poller to skip by id")
+	assert.Empty(t, needsYouItems(out), "and then nothing")
 }
 
 func TestNeedsYouLimitIsCappedAtFifty(t *testing.T) {

@@ -64,12 +64,18 @@ async function httpJson(method, path, body, headers = {}) {
         assert.ok(review && review.line === 'plan.txt', 'the file for review is listed: ' + JSON.stringify(d.items));
         const hex = review.id.split(':')[2];
 
-        // the cursor: at or after, and nothing from the future
+        // the cursor is a place (time|id): nothing is after the newest item, a bare time includes the items at it, nothing comes from the future, a bad one is 400
         const cursor = d.cursor;
-        assert.ok(cursor, 'a cursor');
-        assert.ok((await needs('?after=' + encodeURIComponent(cursor))).items.length >= 1, 'the newest item is at the cursor');
+        assert.ok(cursor && cursor.includes('|'), 'a cursor of a time and an id: ' + cursor);
+        assert.equal((await needs('?after=' + encodeURIComponent(cursor))).items.length, 0, 'nothing after the newest item');
+        assert.ok((await needs('?after=' + encodeURIComponent(cursor.split('|')[0]))).items.length >= 1, 'a bare time includes the items at it');
         assert.equal((await needs('?after=2999-01-01T00:00:00Z')).items.length, 0, 'nothing from the future');
         assert.equal((await person('GET', '/api/needs-you?after=yesterday')).status, 400);
+        // read from the very start in pages of one: every waiting thing arrives once
+        const ids = []; let cur = '1970-01-01T00:00:00Z';
+        for (let n = 0; n < 40; n++) { const page = await needs('?limit=1&after=' + encodeURIComponent(cur)); if (!page.items.length) break; ids.push(page.items[0].id); cur = page.cursor; }
+        assert.equal(new Set(ids).size, ids.length, 'none twice: ' + ids);
+        assert.equal(ids.length, d.count, 'every waiting thing, in pages of one: ' + ids.length + ' of ' + d.count);
 
         // Ignore takes it out of the count and Unignore puts it back; Approve and Deny take it out for good
         const review1 = async decision => person('POST', `/api/board/${B}/artifacts/${hex}/review`, { decision });

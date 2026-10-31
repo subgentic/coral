@@ -37,7 +37,7 @@ type NeedsYouItem struct {
 	At   string `json:"at"`
 }
 
-// needsYouAnswer is the whole answer. Count is every waiting thing. The first read (no ?after=) gives the newest few, newest first, and the cursor is the newest time of all. A poll with ?after=<cursor> gives what is at or after it, OLDEST first, up to the limit, and moves the cursor only to the last item given: the next read gives what is at or after it (a poller skips the ids it has already pushed, so two things in one instant are never lost), and a burst bigger than the limit is read in several polls.
+// needsYouAnswer is the whole answer. Count is every waiting thing. The order of items is (time, id). The first read (no ?after=) gives the newest few, newest first, and the cursor is "<time>|<id>" of the newest item. A poll with ?after=<cursor> gives the items strictly after that place, OLDEST first, up to the limit, and the cursor becomes the last item given: a burst bigger than the limit, and items in one instant, are read in several polls, none skipped and none given twice (a poller reads until a poll is shorter than the limit). A bare time as the cursor is still taken, and includes the items at that time.
 // instant are never lost).
 type needsYouAnswer struct {
 	Count       int            `json:"count"`
@@ -128,14 +128,10 @@ func (h *BoardHandler) NeedsYou(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ctx := r.Context()
-	var after time.Time
-	if v := r.URL.Query().Get("after"); v != "" {
-		t, err := time.Parse(time.RFC3339Nano, v)
-		if err != nil {
-			errBadRequest(w, "after is a cursor from an earlier answer")
-			return
-		}
-		after = t
+	cur, ok := parseNeedsYouCursor(r.URL.Query().Get("after"))
+	if !ok {
+		errBadRequest(w, "after is a cursor from an earlier answer")
+		return
 	}
 	limit := needsYouItemsDefault
 	if v := r.URL.Query().Get("limit"); v != "" {
@@ -204,36 +200,32 @@ func (h *BoardHandler) NeedsYou(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ans := needsYouAnswer{Count: len(items), Counts: map[string]int{"agent": 0, "question": 0, "wait": 0, "proposal": 0, "review": 0}, Items: []NeedsYouItem{}, NotIncluded: needsYouNotIncluded, Unread: unread}
-	var newest string
 	for _, it := range items {
 		ans.Counts[it.Kind]++
-		if it.At > newest {
-			newest = it.At
-		}
 	}
-	if after.IsZero() {
-		// the first read: the newest few, newest first, and the cursor is the newest time of all (what was older is the baseline the poller starts from)
-		ans.Cursor = newest
-		sort.SliceStable(items, func(i, j int) bool { return items[i].At > items[j].At })
-		for _, it := range items {
-			if len(ans.Items) == limit {
-				break
-			}
-			ans.Items = append(ans.Items, it)
+	// the order is (time, id): items recorded to the same second are told apart by id, so a cursor is a place in a total order
+	sort.SliceStable(items, func(i, j int) bool { return needsYouBefore(items[i], items[j]) })
+	if !cur.set {
+		// the first read: the newest few, newest first, and the cursor is the newest item's place (what was older is the baseline the poller starts from)
+		if len(items) > 0 {
+			ans.Cursor = needsYouCursorOf(items[len(items)-1])
+		}
+		for i := len(items) - 1; i >= 0 && len(ans.Items) < limit; i-- {
+			ans.Items = append(ans.Items, items[i])
 		}
 	} else {
-		// a poll: what is at or after the cursor, OLDEST first, up to the limit, and the cursor moves only as far as the last item given: a burst bigger than the limit is read in several polls, never skipped
-		sort.SliceStable(items, func(i, j int) bool { return items[i].At < items[j].At })
-		ans.Cursor = after.UTC().Format(time.RFC3339Nano)
+		// a poll: what is strictly after the cursor's place, OLDEST first, up to the limit, and the cursor moves to the last item given, so a burst bigger than the limit, and items in one instant, are read
+		// in several polls and none is skipped or given twice. A bare time (the first form of the cursor) is still taken, and includes the items at that time.
+		ans.Cursor = cur.raw
 		for _, it := range items {
 			if len(ans.Items) == limit {
 				break
 			}
-			if t, err := time.Parse(time.RFC3339Nano, it.At); err != nil || t.Before(after) {
-				continue // the cursor itself is included: times can tie, so a poller skips ids it has already pushed
+			if !cur.before(it) {
+				continue
 			}
 			ans.Items = append(ans.Items, it)
-			ans.Cursor = it.At
+			ans.Cursor = needsYouCursorOf(it)
 		}
 	}
 	writeJSON(w, http.StatusOK, ans)
@@ -247,3 +239,64 @@ func appendOnce(list []string, s string) []string {
 	}
 	return append(list, s)
 }
+
+// needsYouCursor is a place in the answer's order: a time, and (once an item has been given) that item's id.
+type needsYouCursor struct {
+	set   bool
+	raw   string
+	at    time.Time
+	id    string
+	hasID bool
+}
+
+// parseNeedsYouCursor reads ?after=: empty is no cursor; "<RFC3339 time>|<id>" is the place of an item; a bare time is accepted as before.
+func parseNeedsYouCursor(v string) (needsYouCursor, bool) {
+	if v == "" {
+		return needsYouCursor{}, true
+	}
+	c := needsYouCursor{set: true, raw: v}
+	timePart, id, hasID := strings.Cut(v, "|")
+	t, err := time.Parse(time.RFC3339Nano, timePart)
+	if err != nil || (hasID && id == "") {
+		return needsYouCursor{}, false
+	}
+	c.at, c.id, c.hasID = t, id, hasID
+	return c, true
+}
+
+// before reports whether the item comes strictly after the cursor's place (a bare time: at or after it).
+func (c needsYouCursor) before(it NeedsYouItem) bool {
+	t, err := time.Parse(time.RFC3339Nano, it.At)
+	if err != nil {
+		return false
+	}
+	if t.After(c.at) {
+		return true
+	}
+	if !t.Equal(c.at) {
+		return false
+	}
+	if !c.hasID {
+		return true
+	}
+	return it.ID > c.id
+}
+
+// needsYouBefore orders two items by time, then id.
+func needsYouBefore(a, b NeedsYouItem) bool {
+	ta, ea := time.Parse(time.RFC3339Nano, a.At)
+	tb, eb := time.Parse(time.RFC3339Nano, b.At)
+	if ea != nil || eb != nil { // an item with no readable time sorts first, by id
+		if (ea != nil) != (eb != nil) {
+			return ea != nil
+		}
+		return a.ID < b.ID
+	}
+	if !ta.Equal(tb) {
+		return ta.Before(tb)
+	}
+	return a.ID < b.ID
+}
+
+// needsYouCursorOf is the cursor that points at an item: its time and its id.
+func needsYouCursorOf(it NeedsYouItem) string { return it.At + "|" + it.ID }
