@@ -533,9 +533,9 @@ values are clamped: times are 5 to 1440 minutes, and nudges are 1 to 5.
 |---|---|---|
 | `on` | true | the whole check and every rule |
 | `interval_min` | 10 | minutes between looks: the check goes out only when something changed at a look (a new or changed finding, an agent stopped at a dialog for `held_notice.after_min`, a question, an agent idle, offline or of unknown state, a wait gone stale), never to say "no change"; a finding going away is not news |
-| `heartbeat_min` | 60 | a check goes out at least this often even when nothing changed (5 to 1440), so silence means health; with `all_clear` off a team with nothing to say hears nothing at all |
+| `heartbeat_min` | 0 (never) | 0: a check is never sent to say "no change", only when a look found something new. Set 5 to 1440 and a check also goes out at least that often, so silence means health |
 | `recipient` | "" (the orchestrator) | who gets the check: a member of this team, checked again at each check |
-| `all_clear` | true | send the one-line check at a heartbeat (and the first look) when nothing needs the orchestrator |
+| `all_clear` | true | with `heartbeat_min` set, send the one-line check at a heartbeat when nothing needs the orchestrator (with the heartbeat off nothing is ever sent for a quiet team) |
 | `default_reviewers` | [] | reviewers of a task that names none, or whose names don't count |
 | `auto_delegate.on` | true | review auto-delegation |
 | `claim_nudge` | on, `after_min` 10, `nudges` 2 | nudge an idle agent to claim its work; escalate after the nudges |

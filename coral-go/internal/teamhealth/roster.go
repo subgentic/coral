@@ -365,12 +365,12 @@ func (r *Roster) Facts() []string {
 	}
 	var out []string
 	for _, k := range []string{StateIdle, StateOffline, StateUnknown} {
-		if n := r.Counts[k]; n > 0 {
-			out = append(out, fmt.Sprintf("c:%s=%d", k, n))
+		for i := 1; i <= r.Counts[k]; i++ { // one fact for each agent in the state, so a count that falls only loses facts (not news) and one that rises gains one (news)
+			out = append(out, fmt.Sprintf("c:%s#%d", k, i))
 		}
 	}
-	if r.Claimable > 0 {
-		out = append(out, fmt.Sprintf("claimable=%d", r.Claimable))
+	for i := 1; i <= r.Claimable; i++ {
+		out = append(out, fmt.Sprintf("claimable#%d", i))
 	}
 	for _, g := range r.Waits {
 		names := make([]string, 0, len(g.Waiters))

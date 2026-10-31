@@ -152,8 +152,8 @@ func (m *BoardHealthMonitor) checkProject(ctx context.Context, project string, b
 	if err != nil {
 		return
 	}
-	// A check goes out when something changed since the last one (an item came or went, a state changed, a question opened) or the heartbeat is due, so silence means health and a
-	// quiet team is not told "no change" every interval (#11431). The look is remembered either way, so findings that return later are news again.
+	// A check goes out when something changed since the last one (an item came, a state changed, a question opened) or, when a team has turned the heartbeat on, the heartbeat is due; a quiet
+	// team is never told "no change" (#11431). The look is remembered either way, so findings that return later are news again.
 	m.mu.Lock()
 	m.lastEval[project] = tick
 	was, told := m.lastPrint[project]
@@ -167,12 +167,13 @@ func (m *BoardHealthMonitor) checkProject(ctx context.Context, project string, b
 		m.lastPrint[project] = facts // nothing to say now, or nothing new: this is what the recipient knows
 	}
 	m.mu.Unlock()
-	heartbeat := time.Duration(hs.HeartbeatMin) * time.Minute
-	due := !checked || tick.Sub(last)+tickSlack >= heartbeat
-	if items == 0 && !hs.AllClear {
-		return
-	}
-	if !news && !due {
+	// The heartbeat is off by default (HeartbeatMin 0): a check is never sent to say "no change". A team that turns it on gets a check at least that often, and the one-line all-clear (when that is on) only then.
+	due := hs.HeartbeatMin > 0 && (!checked || tick.Sub(last)+tickSlack >= time.Duration(hs.HeartbeatMin)*time.Minute)
+	if items == 0 {
+		if !hs.AllClear || !due {
+			return
+		}
+	} else if !news && !due {
 		return
 	}
 	if err := sendUnlessBlocked(ctx, m.limit, m.deliver, rcptAgent, "health-check:"+project, text); err != nil {

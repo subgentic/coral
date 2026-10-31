@@ -9,6 +9,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/subgentic/coral/internal/board"
 )
 
 // The orchestrator's check goes out when something changed or the heartbeat is due, not at every interval (#11431): a quiet team hears nothing between heartbeats, a change is said at the next look, the same
@@ -73,19 +75,46 @@ func TestACheckWithNothingToSayAndNoAllClearIsNeverSent(t *testing.T) {
 	assert.Empty(t, h.sent["Orchestrator"], "no finding and the all-clear line off: silence, heartbeat or not")
 }
 
-func TestTheHeartbeatSettingIsClampedAndDefaultsToAnHour(t *testing.T) {
+func TestTheHeartbeatSettingIsOffByDefaultAndClamped(t *testing.T) {
 	h := newCheckHarness(t)
 	ctx := context.Background()
+	assert.Equal(t, 0, board.DefaultHealthSettings().HeartbeatMin, "a check is never sent to say 'no change' unless the team turns the heartbeat on (the operator, #11431)")
 	hs := h.s.GetHealthSettings(ctx, "team")
 	hs.HeartbeatMin = 0
 	require.NoError(t, h.s.SetHealthSettings(ctx, "team", hs))
-	assert.Equal(t, 60, h.s.GetHealthSettings(ctx, "team").HeartbeatMin, "a body that does not carry it: an hour")
+	assert.Equal(t, 0, h.s.GetHealthSettings(ctx, "team").HeartbeatMin, "0 is never")
 	hs.HeartbeatMin = 1
 	require.NoError(t, h.s.SetHealthSettings(ctx, "team", hs))
 	assert.Equal(t, 5, h.s.GetHealthSettings(ctx, "team").HeartbeatMin)
 	hs.HeartbeatMin = 99999
 	require.NoError(t, h.s.SetHealthSettings(ctx, "team", hs))
 	assert.Equal(t, 1440, h.s.GetHealthSettings(ctx, "team").HeartbeatMin)
+}
+
+// With the heartbeat off (the default) a quiet team hears nothing, not even a first line, for a day; a finding is still said once.
+func TestAQuietTeamNeverHearsNoChangeWhenTheHeartbeatIsOff(t *testing.T) {
+	h := newCheckHarness(t)
+	ctx := context.Background()
+	h.member("Orchestrator", "Orchestrator", 1, 0)
+	h.member("Worker", "Developer", 2, 0)
+	hs := h.s.GetHealthSettings(ctx, "team")
+	hs.IntervalMin, hs.HeartbeatMin, hs.AllClear = 10, 0, true
+	hs.BusyNoTask.On = false
+	require.NoError(t, h.s.SetHealthSettings(ctx, "team", hs))
+	sent := func() int { h.mu.Lock(); defer h.mu.Unlock(); return len(h.sent["Orchestrator"]) }
+	start := h.now
+	for m := 0; m <= 24*60; m += 10 {
+		h.now = start.Add(time.Duration(m) * time.Minute)
+		h.m.scan(ctx)
+	}
+	assert.Equal(t, 0, sent(), "a day of looks, nothing to say: not one message")
+	h.member("Idler", "Developer", 4, 40*time.Minute)
+	h.now = start.Add(25 * time.Hour)
+	h.m.scan(ctx)
+	assert.Equal(t, 1, sent(), "a finding is still said at the next look")
+	h.now = start.Add(40 * time.Hour)
+	h.m.scan(ctx)
+	assert.Equal(t, 1, sent(), "and not again, however long it lasts")
 }
 
 // An agent stopped at a dialog for the team's N minutes goes first in the check, with work or without, and it is a change worth sending (#11431, #11430 item 4).
@@ -122,4 +151,33 @@ func TestAnAgentAtADialogGoesFirstAndIsAChangeWorthSending(t *testing.T) {
 
 	h.sig[sid(2)] = agentSignal{NeedsInput: true, Since: start.Add(35 * time.Minute)} // it was answered and another opened (at 35: 15 minutes old at the look at 50)
 	assert.Equal(t, 3, at(50), "a new dialog (it began at another time) is news again")
+}
+
+// One of two findings clears while the other stays, then comes back: that look sends a check (QA Engineer's SHOULD 3 on #11431). What the recipient was told is what the last look held, so a finding that left
+// and returned is news again even though the other one never moved.
+func TestOneOfTwoFindingsClearsThenComesBackAndTheCheckGoesOut(t *testing.T) {
+	h := newCheckHarness(t)
+	ctx := context.Background()
+	h.member("Orchestrator", "Orchestrator", 1, 0)
+	h.member("BlindA", "Developer", 2, 0)
+	h.member("BlindB", "Developer", 3, 0)
+	sid := func(n int) string { return fmt.Sprintf("%08d-0000-0000-0000-000000000000", n) }
+	delete(h.sig, sid(2)) // no signal from either: each is a finding ("state unknown") with a stable key and state
+	delete(h.sig, sid(3))
+	hs := h.s.GetHealthSettings(ctx, "team")
+	hs.IntervalMin, hs.HeartbeatMin, hs.BusyNoTask.On = 10, 0, false
+	require.NoError(t, h.s.SetHealthSettings(ctx, "team", hs))
+	sent := func() int { h.mu.Lock(); defer h.mu.Unlock(); return len(h.sent["Orchestrator"]) }
+	start := h.now
+	at := func(min int) int { h.now = start.Add(time.Duration(min) * time.Minute); h.m.scan(ctx); return sent() }
+
+	assert.Equal(t, 1, at(0), "both findings are new at the first look")
+	assert.Equal(t, 1, at(10), "nothing changed")
+	h.sig[sid(2)] = agentSignal{InTurn: true, Since: start.Add(15 * time.Minute)} // A starts working: its finding clears, B's stays
+	assert.Equal(t, 1, at(20), "a finding going away is not news")
+	assert.Equal(t, 1, at(30), "B has not moved: nothing new")
+	delete(h.sig, sid(2)) // A is lost again: the same finding returns
+	assert.Equal(t, 2, at(40), "a finding that left and came back is news again, though B never moved")
+	assert.Contains(t, h.sent["Orchestrator"][1], "BlindA")
+	assert.Equal(t, 2, at(50), "and not said twice")
 }
