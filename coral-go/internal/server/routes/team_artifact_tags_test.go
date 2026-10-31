@@ -331,3 +331,56 @@ func TestManifestForReviewKeepsOnlyTheAskersOwnUpload(t *testing.T) {
 	tags, _ = e.h.bs.ArtifactTags(ctx, "tag-team")
 	assert.Contains(t, tags[other], "for review", "a person's result may tag any stored file")
 }
+
+// A "for review" tag a task result asked for and did not get is explained to the agent (#11581), in the words of the upload's refusal; the result itself is not refused, and a tag that is kept says nothing.
+func TestManifestForReviewReportsWhyTheTagWasLeftOut(t *testing.T) {
+	e := newTagEnv(t)
+	ctx := context.Background()
+	id := e.ids["report.md"]
+	e.uploadedBy(t, "sess-dev", id)
+	art := func(name, q string) []board.TaskArtifact {
+		return []board.TaskArtifact{{Name: name, URI: "coral://artifacts/" + id, Tags: []string{"for review"}, Question: q}}
+	}
+	notes := e.h.applyManifestTags(ctx, "tag-team", "sess-dev", false, art("report.md", ""))
+	require.Len(t, notes, 1)
+	assert.Contains(t, notes[0], questionRequiredText, "no question: the upload's words")
+	assert.Contains(t, notes[0], "report.md")
+
+	notes = e.h.applyManifestTags(ctx, "tag-team", "sess-other", false, art("report.md", "Approve it?"))
+	require.Len(t, notes, 1)
+	assert.Contains(t, notes[0], "only the agent that uploaded a file", "not the asker's own upload")
+
+	notes = e.h.applyManifestTags(ctx, "tag-team", "", false, art("report.md", "Approve it?"))
+	require.Len(t, notes, 1)
+	assert.Contains(t, notes[0], "not a member of this team", "no credential")
+
+	notes = e.h.applyManifestTags(ctx, "tag-team", "sess-dev", false, art("report.md", "Approve it?"))
+	assert.Empty(t, notes, "a kept tag says nothing")
+
+	// A file the viewer cannot show: the stored type decides, with the words of the upload's 400.
+	zip := storeManagedArtifact(t, e.coralDir, "PK zip bytes", true, false)
+	meta, _ := json.Marshal(agentArtifactMeta{Name: "x.zip", MediaType: "application/zip", Size: 12, Digest: "sha256:" + zip})
+	require.NoError(t, os.WriteFile(filepath.Join(e.coralDir, "artifacts", "objects", zip+".json"), meta, 0o644))
+	e.uploadedBy(t, "sess-dev", zip)
+	notes = e.h.applyManifestTags(ctx, "tag-team", "sess-dev", false, []board.TaskArtifact{{Name: "x.zip", URI: "coral://artifacts/" + zip, Tags: []string{"for review"}, Question: "Approve the build?"}})
+	require.Len(t, notes, 1)
+	assert.Contains(t, notes[0], "cannot be tagged")
+	assert.Contains(t, notes[0], "application/zip")
+	tags, _ := e.h.bs.ArtifactTags(ctx, "tag-team")
+	assert.NotContains(t, tags[zip], "for review")
+}
+
+// The completion answer carries them as "warnings" (and only then).
+func TestWritingTaskVettedAddsTheReviewWarnings(t *testing.T) {
+	rec := httptest.NewRecorder()
+	writeTaskVetted(rec, map[string]any{"id": 5}, taskVet{ReviewNotes: []string{"a: not tagged"}})
+	var out map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &out))
+	assert.Equal(t, []any{"a: not tagged"}, out["warnings"])
+	assert.NotContains(t, out, "artifacts_unverified")
+	rec = httptest.NewRecorder()
+	writeTaskVetted(rec, map[string]any{"id": 5}, taskVet{})
+	out = nil
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &out))
+	assert.NotContains(t, out, "warnings")
+}

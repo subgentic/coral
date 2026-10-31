@@ -49,7 +49,7 @@ func (h *BoardHandler) AttachPatches(w http.ResponseWriter, r *http.Request) {
 		errBadRequest(w, "subscriber_id and valid JSON required")
 		return
 	}
-	unverified := h.vetTaskArtifacts(r, project, body.Artifacts)
+	vetted := h.vetTaskArtifacts(r, project, body.Artifacts)
 	task, reopened, err := h.bs.AttachPatches(r.Context(), project, id, body.SubscriberID, body.Artifacts)
 	if err != nil {
 		switch {
@@ -73,7 +73,7 @@ func (h *BoardHandler) AttachPatches(w http.ResponseWriter, r *http.Request) {
 	if h.notifyFn != nil {
 		h.notifyFn(project)
 	}
-	writeTaskVetted(w, map[string]any{"task": task, "new_round": reopened}, unverified)
+	writeTaskVetted(w, map[string]any{"task": task, "new_round": reopened}, vetted)
 }
 
 // SendBack returns an approved, completed task to its author with a note (#5689): what a fix after approval, or a patch the queue

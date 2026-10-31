@@ -276,10 +276,17 @@ func fetchTasks(st *boardState, goal int64) []map[string]any {
 // links because this team never uploaded those files (#4379).
 func printUnverifiedArtifacts(data []byte) {
 	var r struct {
-		N     int      `json:"artifacts_unverified"`
-		Names []string `json:"artifacts_unverified_names"`
+		N        int      `json:"artifacts_unverified"`
+		Names    []string `json:"artifacts_unverified_names"`
+		Warnings []string `json:"warnings"`
 	}
-	if json.Unmarshal(data, &r) != nil || r.N == 0 {
+	if json.Unmarshal(data, &r) != nil {
+		return
+	}
+	for _, w := range r.Warnings { // a "for review" tag the result asked for and did not get, and why (#11581)
+		fmt.Printf("Warning: %s\n", w)
+	}
+	if r.N == 0 {
 		return
 	}
 	fmt.Printf("Note: %d artifact link(s) are not uploads of this team and were kept as plain links: %s. Upload the file with 'coral-agent artifact upload <file>' and use the link it prints.\n", r.N, strings.Join(r.Names, ", "))
