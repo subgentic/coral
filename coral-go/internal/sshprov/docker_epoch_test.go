@@ -161,7 +161,7 @@ CMD ["sh", "-c", "rm -f /etc/ssh/ssh_host_* && ssh-keygen -A && exec /usr/sbin/s
 	}
 	f.r = Runner{SSH: wrapper, Timeout: 60 * time.Second}
 	oldWait := keyWait
-	keyWait = 20 * time.Second // the answer is the same after 90 s, and 20 is enough for a Coral that starts
+	keyWait = 150 * time.Second // a Coral on this loaded host took over a minute to start listening; the product waits 90 s
 	t.Cleanup(func() { keyWait = oldWait })
 
 	// wait for both sshd (a few seconds after the container starts)
@@ -391,6 +391,16 @@ func TestSSHDocker(t *testing.T) {
 		after, _ := f.exec("bob", "far", "tmux has-session -t =coral-server 2>&1 && echo alive")
 		socks, _ := f.exec("root", "far", "awk 'NR>1 {print $2, $4}' /proc/net/tcp; ps -eo user,pid,etime,args | grep '[r]oot/coral'")
 		t.Logf("  DIAG sockets (local address, state 0A = listening) and coral processes after the stop:\n%s", socks)
+		// how long does alice's Coral process take to go after its session was killed? (a stop is confirmed only when it has)
+		began := time.Now()
+		for time.Since(began) < 120*time.Second {
+			if out, _ := f.exec("root", "far", "pgrep -u alice -f 'root/coral --host' >/dev/null && echo up"); !strings.Contains(out, "up") {
+				break
+			}
+			time.Sleep(time.Second)
+		}
+		gone, _ := f.exec("root", "far", "pgrep -u alice -f 'root/coral --host' >/dev/null && echo up || echo gone")
+		t.Logf("  DIAG alice's Coral process is %s %s after the stop returned", strings.TrimSpace(gone), time.Since(began).Round(time.Second))
 		chk, cerr := f.r.Run(ctx, aliceTarget, CmdCheckStopped)
 		t.Logf("  DIAG CheckStopped after the stop: exit %d, err %v (1: a session, 2: a listener on 8420, 3: cannot tell)", chk.ExitCode, cerr)
 		t.Logf("  bob before: %q, StopAndConfirm(alice) = %v, bob after: %q", firstOut(before, nil), err, firstOut(after, nil))
