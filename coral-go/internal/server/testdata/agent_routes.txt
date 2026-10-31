@@ -132,6 +132,7 @@ b GET /api/goals
 b GET /api/goals/metrics
 c GET /api/health
 b GET /api/operator-asks
+b GET /api/needs-you
 c GET /api/pinned-folders
 b GET /api/saved
 b GET /api/remote/{server}/*

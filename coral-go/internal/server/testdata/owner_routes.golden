@@ -24,6 +24,7 @@ GET /api/board/{project}/settings view owner-sees
 GET /api/board/{project}/tasks/{taskID}/artifact-content view owner-only
 GET /api/chief view owner-only
 GET /api/custom-models view owner-only
+GET /api/needs-you view owner-only
 GET /api/operator-asks view owner-only
 GET /api/proposals view owner-only
 GET /api/saved view owner-only

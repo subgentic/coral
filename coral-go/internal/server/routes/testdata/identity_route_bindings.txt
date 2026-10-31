@@ -78,6 +78,7 @@ GET /api/board/{project}/waits | board-claims
 GET /api/board/{project}/waits/poll | board-claims
 GET /api/board/{project}/working-mode | board-claims
 GET /api/board/{project}/working-mode/presets | board-claims
+GET /api/needs-you | token-session | operator-only
 GET /api/session-artifacts | token-session
 GET /api/sessions/history | unbound | operator-only
 GET /api/sessions/history/counts | unbound | operator-only

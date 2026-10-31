@@ -36,6 +36,7 @@ var routeQueries = map[string]string{
 	"GET /api/goal-links":                         "cursor,limit,request_id",
 	"GET /api/goals":                              "board,cursor,limit,state",
 	"GET /api/goals/metrics":                      "hours",
+	"GET /api/needs-you":                          "after,limit",
 	"GET /api/proposals":                          "project,state",
 	"GET /api/saved":                              "agent,author,conv,kind,limit,q,sort,state,team",
 	"GET /api/scheduled/jobs/{}/runs":             "limit,offset",
