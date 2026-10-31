@@ -19,6 +19,7 @@ import (
 	"github.com/subgentic/coral/internal/config"
 	"github.com/subgentic/coral/internal/httputil"
 	"github.com/subgentic/coral/internal/license"
+	"github.com/subgentic/coral/internal/safego"
 	"github.com/subgentic/coral/internal/sshprov"
 	"github.com/subgentic/coral/internal/store"
 	terms "github.com/subgentic/coral/pkg/license"
@@ -451,10 +452,17 @@ func (pr *Provisioner) Run(w http.ResponseWriter, r *http.Request) {
 	p.mu.Lock()
 	p.cancel = cancel
 	p.mu.Unlock()
-	go func() {
+	safego.Go("provision run", func() {
 		defer cancel()
+		// A panic in a step must not leave the plan "running" until it expires (15 minutes): the plan fails with one fixed sentence, then the panic goes on to safego, which logs it and keeps the server up.
+		defer func() {
+			if r := recover(); r != nil {
+				pr.failPanicked(p)
+				panic(r)
+			}
+		}()
 		pr.runSteps(ctx, p)
-	}()
+	})
 	writeJSON(w, http.StatusAccepted, p.view())
 }
 
@@ -711,4 +719,17 @@ func (pr *Provisioner) Options(w http.ResponseWriter, r *http.Request) {
 		"terms":            map[string]string{"version": license.EULAVersion, "sha256": terms.EULADigest(), "text": license.EULAText},
 		"acceptance_label": setupAcceptanceLabel(),
 	})
+}
+
+// failPanicked fails a plan whose run panicked: the step that was running is failed and the plan says, in one fixed sentence, that it stopped. Nothing of the panic is in the sentence.
+func (pr *Provisioner) failPanicked(p *provisionPlan) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	for i := range p.steps {
+		if p.steps[i].State == stepRunning || p.steps[i].State == stepPending {
+			p.steps[i].State, p.steps[i].Detail = stepFailed, "Something went wrong inside this hub."
+			break
+		}
+	}
+	p.phase, p.failure = phaseFailed, "Something went wrong inside this hub, so the setup stopped. Nothing more was done."
 }

@@ -16,6 +16,7 @@ import (
 	"github.com/coder/websocket"
 
 	"github.com/subgentic/coral/internal/executil"
+	"github.com/subgentic/coral/internal/safego"
 	proxy "github.com/subgentic/coral/pkg/hubproxy"
 )
 
@@ -195,7 +196,7 @@ func (c *sshConn) reap() {
 func (c *sshConn) Read(p []byte) (int, error) {
 	n, err := c.out.Read(p)
 	if err != nil {
-		go c.reap() // the stream ended: collect the exit status (the pipe is drained or broken)
+		safego.Go("ssh stream reap", c.reap) // the stream ended: collect the exit status (the pipe is drained or broken)
 	}
 	return n, err
 }
@@ -206,7 +207,7 @@ func (c *sshConn) Close() error {
 	if c.cmd.Process != nil {
 		c.cmd.Process.Kill()
 	}
-	go c.reap()
+	safego.Go("ssh stream reap", c.reap)
 	return nil
 }
 func (c *sshConn) LocalAddr() net.Addr              { return streamAddr{} }

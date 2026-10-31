@@ -511,3 +511,30 @@ func TestProvisionTooManyPlansIsAMarkedActionLimit(t *testing.T) {
 	assert.Equal(t, "action", w.Header().Get(httputil.ActionLimitHeader), "an unmarked 429 pauses every poller on the page")
 	assert.Contains(t, w.Body.String(), "setup_in_progress")
 }
+
+// A panic in a step fails the plan with one fixed sentence at once, instead of leaving it running until it expires (Security's INFO on #11370); safego still logs it and the server stays up.
+func TestProvisionAPanickingStepFailsThePlanWithAFixedSentence(t *testing.T) {
+	pe := newProvEnv(t, "known", "Linux x86_64", true)
+	pe.p.runSteps = func(context.Context, *provisionPlan) { panic("boom: /home/user/.ssh/id_rsa " + provKey) }
+	_, v := pe.do("POST", "/api/servers/provision/plan", map[string]any{"target": "user@box.example.com"})
+	plan := v["plan"].(string)
+	pe.do("POST", "/api/servers/provision/"+plan+"/connect", nil)
+	code, _ := pe.do("POST", "/api/servers/provision/"+plan+"/run", map[string]any{"accept_terms": true, "terms_sha256": terms.EULADigest()})
+	require.Equal(t, 202, code)
+	failed := pe.waitPhase(t, plan, "failed")
+	assert.Equal(t, "Something went wrong inside this hub, so the setup stopped. Nothing more was done.", failed["error"])
+	raw, _ := json.Marshal(failed)
+	assert.NotContains(t, string(raw), "boom")
+	assert.NotContains(t, string(raw), "id_rsa")
+	assert.NotContains(t, string(raw), provKey)
+	var failedSteps int
+	for _, s := range failed["steps"].([]any) {
+		if s.(map[string]any)["state"] == "failed" {
+			failedSteps++
+		}
+	}
+	assert.Equal(t, 1, failedSteps, "one step is shown as the one that failed")
+	// the plan can be cancelled and the hub still answers
+	code, _ = pe.do("DELETE", "/api/servers/provision/"+plan, nil)
+	assert.Equal(t, 200, code)
+}
