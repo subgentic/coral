@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"strings"
 	"unicode"
-	"unicode/utf8"
 )
 
 // MaxBytes is the most of a request a card shows. A longer one is not allowed from the card.
@@ -22,7 +21,7 @@ type Review struct {
 	Shown string
 	// Cut: the request is longer than MaxBytes; Shown ends where it was cut.
 	Cut bool
-	// Hidden: the request holds a control or format character (Unicode Cc or Cf) other than a newline or a tab.
+	// Hidden: the request holds a control or format character (Unicode Cc or Cf) other than a newline or a tab, a blank-rendering character (hidden), or a run of BlankRun blanks.
 	Hidden bool
 }
 
@@ -42,45 +41,91 @@ func (r Review) Note() string {
 	return ""
 }
 
-// Of reviews one piece of request text.
+// BlankRun is how many blank characters in a row count as hidden: a long run of them pushes what a command does out of the card's sight (a tail after 3,000 spaces).
+const BlankRun = 40
+
+// Of reviews one piece of request text. A blank run of BlankRun or more is written "<N blanks>" and counts as hidden.
 func Of(text string) Review {
 	text = strings.ToValidUTF8(text, "\uFFFD")
 	var r Review
 	var b strings.Builder
-	for _, c := range text {
-		if hidden(c) {
-			r.Hidden = true
-			if b.Len()+len("<U+10FFFF>") > MaxBytes {
-				r.Cut = true
+	runes := []rune(text)
+	for i := 0; i < len(runes); i++ {
+		c := runes[i]
+		var out string
+		switch {
+		case blank(c):
+			j := i
+			for j < len(runes) && blank(runes[j]) {
+				j++
+			}
+			if j-i >= BlankRun {
+				r.Hidden = true
+				out = fmt.Sprintf("<%d blanks>", j-i)
+				i = j - 1
 				break
 			}
-			fmt.Fprintf(&b, "<U+%04X>", c)
-			continue
+			if hidden(c) {
+				r.Hidden = true
+				out = fmt.Sprintf("<U+%04X>", c)
+			} else {
+				out = string(c)
+			}
+		case hidden(c):
+			r.Hidden = true
+			out = fmt.Sprintf("<U+%04X>", c)
+		default:
+			out = string(c)
 		}
-		if b.Len()+utf8.RuneLen(c) > MaxBytes {
+		if b.Len()+len(out) > MaxBytes {
 			r.Cut = true
 			break
 		}
-		b.WriteRune(c)
+		b.WriteString(out)
 	}
 	r.Shown = b.String()
-	if r.Cut { // text that was cut may hold a hidden character beyond the cut: it is not "clean"
-		for _, c := range text {
-			if hidden(c) {
-				r.Hidden = true
-				break
-			}
-		}
+	if r.Cut && !r.Hidden { // text that was cut may hold a hidden character or a blank run beyond the cut: it is not "clean"
+		r.Hidden = anyHidden(runes)
 	}
 	return r
 }
 
-// hidden is a character a card must not show raw: a control (Cc) or format (Cf) character, except a newline and a tab.
+// anyHidden says whether the text holds a hidden character or a blank run of BlankRun or more.
+func anyHidden(runes []rune) bool {
+	run := 0
+	for _, c := range runes {
+		if hidden(c) {
+			return true
+		}
+		if blank(c) {
+			if run++; run >= BlankRun {
+				return true
+			}
+		} else {
+			run = 0
+		}
+	}
+	return false
+}
+
+// blank is a character that draws as empty space (or as nothing): any white space, and the characters hidden() lists as rendering blank.
+func blank(c rune) bool { return unicode.IsSpace(c) || renderBlank(c) }
+
+// renderBlank are characters that draw as nothing but are not Cc or Cf: the Hangul fillers, the Braille blank, the combining grapheme joiner and the Khmer inherent vowels.
+func renderBlank(c rune) bool {
+	switch c {
+	case 0x115F, 0x1160, 0x3164, 0xFFA0, 0x2800, 0x034F, 0x17B4, 0x17B5:
+		return true
+	}
+	return false
+}
+
+// hidden is a character a card must not show raw: a control (Cc) or format (Cf) character, a character that renders blank (renderBlank), or a space of any kind other than U+0020 (Zs, Zl, Zp), except a newline and a tab.
 func hidden(c rune) bool {
-	if c == '\n' || c == '\t' {
+	if c == '\n' || c == '\t' || c == ' ' {
 		return false
 	}
-	return unicode.Is(unicode.Cc, c) || unicode.Is(unicode.Cf, c)
+	return unicode.Is(unicode.Cc, c) || unicode.Is(unicode.Cf, c) || unicode.In(c, unicode.Zs, unicode.Zl, unicode.Zp) || renderBlank(c)
 }
 
 // Patterns reviews a list of patterns the way Of reviews a text: the first MaxPatterns are shown (each reviewed, and the list is Cut when any is), the rest are counted in more.

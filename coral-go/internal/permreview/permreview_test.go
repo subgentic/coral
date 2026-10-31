@@ -85,3 +85,45 @@ func TestPatternsAreListedUpToTheLimitAndTheRestCounted(t *testing.T) {
 	assert.False(t, Merge(Of("fine"), Of("bad\u200b")).Allowed(), "allowed only when every piece is")
 	assert.True(t, Merge(Of("a"), Of("b")).Allowed())
 }
+
+func TestACharacterThatDrawsAsNothingOrAsASpaceIsWrittenOutAndCannotBeAllowed(t *testing.T) {
+	for name, c := range map[string]string{"hangul filler": "ㅤ", "hangul choseong filler": "ᅟ", "hangul jungseong filler": "ᅠ", "halfwidth hangul filler": "ﾠ", "braille blank": "⠀", "no-break space": " ", "em space": " ", "line separator": " ", "paragraph separator": " ", "ideographic space": "　", "grapheme joiner": "͏", "khmer vowel inherent aq": "឴", "khmer vowel inherent aa": "឵"} {
+		r := Of("cat /etc/pass" + c + "wd")
+		require.True(t, r.Hidden, name)
+		assert.False(t, r.Allowed(), name)
+		assert.NotContains(t, r.Shown, c, "%s: never shown raw", name)
+		assert.Contains(t, r.Shown, "<U+", name)
+	}
+	r := Of("cat /my files/a")
+	assert.Equal(t, "cat /my<U+00A0>files/a", r.Shown, "a no-break space inside a path is shown")
+	assert.False(t, r.Allowed())
+	assert.True(t, Of("cat /my files/a").Allowed(), "an ordinary space is fine")
+}
+
+func TestALongRunOfBlanksIsHiddenAndShownAsItsLength(t *testing.T) {
+	r := Of("echo ok" + strings.Repeat(" ", 3000) + "; rm -rf ~")
+	assert.True(t, r.Hidden)
+	assert.False(t, r.Allowed())
+	assert.Equal(t, "echo ok<3000 blanks>; rm -rf ~", r.Shown)
+
+	r = Of("a" + strings.Repeat(" ", BlankRun) + "b")
+	assert.Equal(t, "a<40 blanks>b", r.Shown, "the limit itself counts")
+	assert.False(t, r.Allowed())
+	r = Of("a" + strings.Repeat(" \n", BlankRun/2) + "b")
+	assert.True(t, r.Hidden, "spaces and newlines together are one run")
+
+	r = Of("a" + strings.Repeat(" ", BlankRun-1) + "b")
+	assert.True(t, r.Allowed(), "one short of the limit is ordinary indentation")
+	assert.Equal(t, "a"+strings.Repeat(" ", BlankRun-1)+"b", r.Shown)
+
+	r = Of(strings.Repeat("a", MaxBytes+5) + strings.Repeat(" ", 100))
+	assert.True(t, r.Cut)
+	assert.True(t, r.Hidden, "a blank run beyond the cut is judged too")
+}
+
+func TestTheCleanFourHundredByteCommandIsStillAllowed(t *testing.T) {
+	text := strings.Repeat("go test ./... && ", 30)[:400]
+	r := Of(text)
+	assert.True(t, r.Allowed())
+	assert.Equal(t, text, r.Shown)
+}
