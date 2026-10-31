@@ -12,12 +12,14 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/subgentic/coral/internal/board"
+	"github.com/subgentic/coral/internal/cloud"
 	"github.com/subgentic/coral/internal/config"
 	"github.com/subgentic/coral/internal/hooks"
 	"github.com/subgentic/coral/internal/naming"
@@ -327,6 +329,88 @@ func (h *SessionsHandler) addSessionGoals(ctx context.Context, rows []map[string
 			row["goal"] = nil
 		}
 	}
+}
+
+// addWaitsOnThis gives each row of an agent in a team what waits on it (#11455, the Needs you rows of #11442): its in-progress tasks and the open tasks of every board that wait on them, worked out from the board
+// data and matched by the session's subscriber, never by a display name. A row with nothing in progress has no field. The answer is kept 5 seconds (the list is polled by every open dashboard), and a
+// failed read leaves the rows as they were. A remote server's rows are not asked: their boards are not here.
+func (h *SessionsHandler) addWaitsOnThis(r *http.Request, rows []map[string]any) {
+	if _, agent := VerifiedSession(r.Context()); agent { // scopeRowsForAgent strips it too; an agent's list is never even asked
+		return
+	}
+	if h.bs == nil || len(rows) == 0 || (cloud.Tunneled(r) && !hubOwnerRequest(r).owner) { // through Coral Hub only the authentic owner: the field names task titles of every board (Security, #11455)
+		return
+	}
+	ctx := r.Context()
+	var owners []board.WaitOwner
+	for _, row := range rows {
+		if srv, _ := row["server"].(string); srv != "" && srv != "local" {
+			continue
+		}
+		sid, _ := row["session_id"].(string)
+		agent, _ := row["agent_type"].(string)
+		if sid == "" || agent == "" || row["board_project"] == nil || boardKeyOf(row["board_project"]) == "" {
+			continue
+		}
+		owners = append(owners, board.WaitOwner{Key: sid, SessionName: naming.SessionName(agent, sid), SessionID: sid})
+	}
+	if len(owners) == 0 {
+		return
+	}
+	got, ok := h.waitsMemo.get(owners)
+	if !ok {
+		var err error
+		if got, err = h.bs.WaitsOnSessions(ctx, owners); err != nil {
+			slog.Warn("could not read what waits on the live sessions", "error", err)
+			return
+		}
+		h.waitsMemo.set(owners, got)
+	}
+	for _, row := range rows {
+		if srv, _ := row["server"].(string); srv != "" && srv != "local" {
+			continue
+		}
+		if sid, _ := row["session_id"].(string); sid != "" {
+			if info, ok := got[sid]; ok {
+				v := info
+				row[waitsOnThisField] = &v
+			}
+		}
+	}
+}
+
+// waitsOnMemo keeps the last answer of WaitsOnSessions for a few seconds, for the same set of sessions.
+type waitsOnMemo struct {
+	mu  sync.Mutex
+	at  time.Time
+	key string
+	val map[string]board.WaitsOnThis
+}
+
+const waitsOnKeep = 5 * time.Second
+
+func waitsKey(owners []board.WaitOwner) string {
+	keys := make([]string, 0, len(owners))
+	for _, o := range owners {
+		keys = append(keys, o.Key)
+	}
+	sort.Strings(keys)
+	return strings.Join(keys, ",")
+}
+
+func (m *waitsOnMemo) get(owners []board.WaitOwner) (map[string]board.WaitsOnThis, bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.val != nil && m.key == waitsKey(owners) && time.Since(m.at) < waitsOnKeep {
+		return m.val, true
+	}
+	return nil, false
+}
+
+func (m *waitsOnMemo) set(owners []board.WaitOwner, v map[string]board.WaitsOnThis) {
+	m.mu.Lock()
+	m.at, m.key, m.val = time.Now(), waitsKey(owners), v
+	m.mu.Unlock()
 }
 
 func boardKeyOf(v any) string {

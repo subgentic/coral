@@ -156,6 +156,7 @@ func (h *BoardHandler) ListAllTeamArtifacts(w http.ResponseWriter, r *http.Reque
 		errInternalServer(w, "could not list artifacts")
 		return
 	}
+	h.addWaitsOnThis(r, "", sel.page) // each row names its own board
 	if refs == nil {
 		refs = []teamArtifactTeamRef{}
 	}

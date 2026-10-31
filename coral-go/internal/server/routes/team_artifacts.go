@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/subgentic/coral/internal/querypage"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
@@ -18,6 +19,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/subgentic/coral/internal/board"
+	"github.com/subgentic/coral/internal/cloud"
 	"github.com/subgentic/coral/pkg/hubproxy"
 )
 
@@ -44,6 +46,8 @@ type teamArtifact struct {
 	// GoalID and GoalTitle: the goal of this board the task works toward (#8579); absent for a task with none, and for a row of no task.
 	GoalID    *int64 `json:"goal_id,omitempty"`
 	GoalTitle string `json:"goal_title,omitempty"`
+	// WaitsOnThis: what waits on a "for review" row's task: the open tasks of every board that list it as a blocker, and the goal it would close (#11455). Only on a row tagged for review with a task.
+	WaitsOnThis *board.WaitsOnThis `json:"waits_on_this,omitempty"`
 	// Tags: the team's tags on this stored object (#8583), lowercase words, sorted; absent for none.
 	Tags []string `json:"tags,omitempty"`
 	// Review is the Operator's decision on an artifact tagged for review, with its time (#136584): absent until one is made.
@@ -196,6 +200,7 @@ func (h *BoardHandler) ListTeamArtifacts(w http.ResponseWriter, r *http.Request)
 			}
 		}
 	}
+	h.addWaitsOnThis(r, project, page)
 	if page == nil {
 		page = []teamArtifact{}
 	}
@@ -729,4 +734,44 @@ func sizeOfRecord(n int64) *int64 {
 		return nil
 	}
 	return &n
+}
+
+// addWaitsOnThis gives each "for review" row with a task what waits on that task (#11455), from one read of the board data per board: the Inbox's review rows say what they hold up without the page
+// asking each team for its tasks. A row of a list that merges teams names its own board; project is the board of a list of one. A read that fails leaves the rows as they were.
+func (h *BoardHandler) addWaitsOnThis(r *http.Request, project string, rows []teamArtifact) {
+	if _, agent := VerifiedSession(r.Context()); agent { // an agent's token never gets other boards' task titles, on a row of its own board's list or any other (QA Engineer's MUST, #11455)
+		return
+	}
+	if h.bs == nil || (cloud.Tunneled(r) && !hubOwnerRequest(r).owner) { // the routes are owner-only through Coral Hub already; the same guard here keeps the field from ever reaching another caller (Security, #11455)
+		return
+	}
+	ctx := r.Context()
+	byBoard := map[string][]int64{}
+	for i := range rows {
+		if rows[i].TaskID <= 0 || !hasTag(rows[i].Tags, "for review") {
+			continue
+		}
+		b := rows[i].BoardID
+		if b == "" {
+			b = project
+		}
+		byBoard[b] = append(byBoard[b], rows[i].TaskID)
+	}
+	for b, ids := range byBoard {
+		got, err := h.bs.WaitsOnTasks(ctx, b, ids)
+		if err != nil {
+			slog.Warn("could not read what waits on the review rows", "board", b, "error", err)
+			continue
+		}
+		for i := range rows {
+			rb := rows[i].BoardID
+			if rb == "" {
+				rb = project
+			}
+			if info, ok := got[rows[i].TaskID]; ok && rb == b && rows[i].TaskID > 0 && hasTag(rows[i].Tags, "for review") {
+				v := info
+				rows[i].WaitsOnThis = &v
+			}
+		}
+	}
 }
