@@ -230,6 +230,12 @@ function _applyListHtml(list, html, focusedSid, focusedInMenu) {
         // The pointer has to rest: a card that opened as the pointer passed covered the chat (#9999, the beta tester); the keyboard gets it at once (#9831)
         item.addEventListener("mouseenter", () => { clearTimeout(wait); wait = setTimeout(show, HOVER_CARD_DELAY_MS); });
         item.addEventListener("mouseleave", hide);
+        // A control in the row has a tooltip of its own (the ⋯ button's "More actions"): while the pointer is on one the card is closed and does not open, so the two never show together (#11423, it covered the card's Last action row). Back on the row's own space the card waits again.
+        item.addEventListener("mouseover", (e) => {
+            const onControl = !!(e.target.closest && e.target.closest("button, a, [role=button], [role=menuitem]"));
+            if (onControl) hide();
+            else if (e.relatedTarget && e.relatedTarget.closest && e.relatedTarget.closest("button, a, [role=button], [role=menuitem]") && tip.style.display !== "block") { clearTimeout(wait); wait = setTimeout(show, HOVER_CARD_DELAY_MS); }
+        });
         // The same tip for the keyboard (#9831: a cut name was readable only with a mouse): it shows when the keyboard puts focus on the row or a control in it, goes when focus leaves the row or on Escape, and takes no focus (the row's name for a screen reader is its own, unchanged).
         item.addEventListener("focusin", (e) => { if (e.target.matches(":focus-visible")) show(); });
         item.addEventListener("focusout", (e) => { if (!item.contains(e.relatedTarget)) hide(); });
