@@ -192,8 +192,8 @@ function reviewActions(row) {
         });
         box.append(unread);
     }
-    if (isRead(row) || isPhoneLayout()) { done.classList.add('inbox-review-icon'); done.title = 'Approve'; done.textContent = ''; done.append(DT.el('span', 'material-icons', 'check')); done.firstChild.setAttribute('aria-hidden', 'true'); }
-    if (!decisionNeedsPerson(splitKey(row.team).server)) { box.append(done); if (!isPhoneLayout()) box.append(changes); } // a phone's row has no room for a fourth action: Request changes is in the viewer Open leads to (#136584)
+    if (isRead(row)) { done.classList.add('inbox-review-icon'); done.title = 'Approve'; done.textContent = ''; done.append(DT.el('span', 'material-icons', 'check')); done.firstChild.setAttribute('aria-hidden', 'true'); }
+    if (!decisionNeedsPerson(splitKey(row.team).server)) { box.append(done); if (!(isPhoneLayout() && isRead(row))) box.append(changes); } // the same actions on a phone as on a desktop (#11414): Approve is a word, Request changes an icon; only a read item's row, which also has Mark unread, leaves Request changes to the viewer Open leads to (#136584)
     box.append(errorText); return box;
 }
 
