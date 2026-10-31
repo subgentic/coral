@@ -123,7 +123,7 @@ function removeSeatButton(agent, ctx) {
 function chatButton(agent) {
     const session = agent.availability !== 'offline' && agent.agent_type !== 'terminal' ? sessionOf(agent) : null;
     if (!session) return '';
-    const b = btn('btn btn-small dt-action team-open-chat', 'Open chat');
+    const b = btn('btn btn-small dt-action dt-action-roomy team-open-chat', 'Open chat');
     b.setAttribute('aria-label', `Open chat with ${agent.name}`); // one button per row, each named for whose
     b.addEventListener('click', (e) => { e.stopPropagation(); openChat(session); });
     return b;
@@ -184,7 +184,7 @@ function draw() {
             { key: 'doing', label: 'Doing', line: 2, width: '18rem', dropAt: 52, sort: true, sortValue: doingOf, cell: ag => { const t = doingOf(ag), span = el('span', null, t); if (t) span.title = t; return span; } }, // one line a row (Goal #79): the whole line is the tooltip
             { key: 'provider', label: 'Provider', line: 2, width: '6rem', dropAt: 36, tone: 'tertiary', sort: true, sortValue: providerOf, cell: providerOf },
             ...(searchShown ? [{ key: 'search', label: 'Search', line: 2, width: '12rem', dropAt: 44, tone: 'tertiary', cell: ag => searchChip((model.levels.get(ag.name) || {}).level) || '' }] : []), // a column only while some member is above "own": an empty one was drawn, clipped at the right edge of a phone's table as a stray "…" (#11128)
-            { key: 'chat', label: 'Chat', line: 1, width: '7rem', cell: chatButton },
+            { key: 'chat', label: 'Chat', line: 1, width: 'calc(6.25rem + 26px)', cell: chatButton },
         ], oneLine: true, sortBar: false,
     }).el);
     if (held) { const sel = held.startsWith('row:') ? rowFocusTarget(body, held.slice(4)) : body.querySelector(`.goals-chip[data-filter="${CSS.escape(held.slice(5))}"]`); sel?.focus({ preventScroll: true }); }
