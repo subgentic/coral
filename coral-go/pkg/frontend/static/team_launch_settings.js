@@ -70,7 +70,7 @@ export function mountTeamLaunchSettings() {
     _defaultMode = 'none';
     host.replaceChildren();
     _view = mountSettingsView(host, {
-        mode: 'settings', saveBar: false, group: 'start', label: 'Team settings sections', groupLabel: 'Team settings section',
+        mode: 'settings', saveBar: false, group: 'start', label: 'Team settings sections', groupLabel: 'Team settings section', groupPickText: 'Jump to a section',
         load: async () => startValues(),
         groups: [
             { id: 'start', label: 'Start', icon: 'play_arrow', fields: [

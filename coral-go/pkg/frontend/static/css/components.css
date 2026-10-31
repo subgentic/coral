@@ -2942,26 +2942,6 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 /* The Add/Edit server form in the Servers tab (a page, not a dialog) is a settings_view form; this is its frame, nothing wider than the page at 390 px or 200% text. */
 .servers-form-actions { flex-wrap: wrap; margin-top: var(--space-lg); }
 
-/* Set up a server over SSH (#11370): the steps of the hub's work, the host fingerprints, the terms. Nothing wider than the page at 390 px or 200% text. */
-.ssh-setup { display: flex; flex-direction: column; gap: var(--space-md); }
-.ssh-form { display: flex; flex-direction: column; gap: var(--space-sm); }
-.ssh-label { font: var(--dlg-label); }
-.ssh-input { max-width: 100%; }
-.ssh-help, .ssh-note, .ssh-consent, .ssh-intro { margin: 0; color: var(--text-secondary); font-size: var(--fs-base); max-width: 70ch; }
-.ssh-note, .ssh-consent { color: var(--text-primary); }
-.ssh-subhead { margin: var(--space-md) 0 0; font: var(--dlg-section); }
-.ssh-steps, .ssh-keys { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-sm); }
-.ssh-step { display: flex; gap: var(--space-sm); align-items: flex-start; min-width: 0; }
-.ssh-step-glyph { font-size: var(--fs-xl); color: var(--text-secondary); }
-.ssh-step-ok .ssh-step-glyph { color: var(--success); }
-.ssh-step-failed .ssh-step-glyph { color: var(--error); }
-.ssh-step-body { display: flex; flex-direction: column; min-width: 0; overflow-wrap: anywhere; }
-.ssh-step-state, .ssh-step-detail { color: var(--text-secondary); font-size: var(--fs-sm); }
-.ssh-key { display: flex; flex-wrap: wrap; gap: var(--space-xs) var(--space-sm); min-width: 0; overflow-wrap: anywhere; }
-.ssh-key-fp { font-family: var(--font-mono, monospace); font-size: var(--fs-sm); overflow-wrap: anywhere; }
-.ssh-check { display: flex; gap: var(--space-sm); align-items: flex-start; font-size: var(--fs-base); }
-.ssh-terms { max-height: 14rem; overflow: auto; margin: 0; padding: var(--space-md); border: 1px solid var(--border); border-radius: var(--radius-md); white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; font-size: var(--fs-sm); }
-.ssh-done { margin: 0; font: var(--dlg-section); }
 @media (max-width: 767px), (pointer: coarse) {
     .servers-form-actions .btn, .servers-top .btn { min-height: var(--control-touch-height, 44px); }
 }
@@ -3498,7 +3478,10 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 .settings-tab[hidden] { display: none; }
 .settings-tab .material-icons { font-size: var(--icon-size); flex: none; }
 .menu-item-state { display: block; font-size: var(--fs-sm); font-weight: var(--fw-regular); color: var(--text-primary); } /* muted was 4.1:1 and secondary 4.4:1 on the hovered row (4.5 needed): the team start menu's state words */
-.team-start-lead { margin: 0 0 10px; color: var(--text-secondary); }
+.team-start-lead, .team-goal-state { margin: 0 0 10px; color: var(--text-secondary); font-size: var(--fs-sm); } /* the lines Coral adds to step 3 are the help text's size, not the dialog's body (#11401) */
+.launch-stage-sub .team-sub-path { all: unset; font-weight: var(--fw-strong); color: var(--text-primary); cursor: pointer; text-decoration: underline dotted; overflow-wrap: anywhere; }
+.launch-stage-sub .team-sub-path:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.launch-stage-sub .team-sub-path:disabled { cursor: default; text-decoration: none; }
 .settings-panes { flex: 1; min-width: 0; overflow: auto; padding: 1.1rem 1.6rem 1.5rem; container: settingspane / inline-size; }
 .settings-pane[hidden] { display: none; }
 .settings-pane:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: var(--radius-md); }
@@ -4184,31 +4167,6 @@ dialog.team-link-dialog::backdrop { background: rgba(var(--black-rgb), 0.5); }
 .kbd-or, .kbd-plus { color: var(--text-secondary); font-size: var(--fs-sm); }
 @media (max-width: 639px) { .shortcuts-dialog .modal-body { padding-inline: 0; } .kbd-row { grid-template-columns: 1fr; row-gap: 2px; } } /* a phone has no room for a key column beside the words: the keys sit above their description */ /* the phone dialog already has its own side padding: the description column keeps the width */
 
-/* The provider cards of New Agent's Agent step (#11235, Option B): a radio card for each provider this computer has, the open one holding its Model and Thinking; the ones it has not under "Not installed", with a link and no radio.
-   The ring is for the keyboard only (:focus-visible), so the open card is the one unmistakable state. */
-#launch-agent-pick.provider-cards { display: flex; flex-direction: column; gap: 8px; width: 100%; max-width: none; background: none; border: 0; border-radius: 0; margin: 4px 0 0; padding: 0; overflow: visible; }
-.provider-card, .provider-card-body, #launch-agent-pick.provider-cards { min-width: 0; }
-.provider-card-body select, .provider-card-body .acf-model-row, .provider-card-body .acf-model-picker { min-width: 0; max-width: 100%; }
-.provider-card { border: var(--card-border); border-radius: var(--card-radius); background: var(--bg-primary); }
-.provider-card.is-open { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); } /* the open state is the 2 px accent edge, on the card's own surface: the muted text inside keeps 4.5:1 in the light theme (it was 4.4 on a grey fill) */
-.provider-card-head { display: flex !important; flex-direction: row !important; flex-wrap: wrap; align-items: center; gap: 4px 10px; min-height: var(--control-touch-height, 44px); margin: 0; padding: 6px 14px; cursor: pointer; color: var(--text-primary); border-radius: var(--radius-md); } /* (!important: the dialog's labels are a column of text) */
-.provider-card-head:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
-.provider-card-head input { margin: 0; flex: none; width: auto; }
-.provider-mark { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 24px; height: 24px; border-radius: var(--radius-sm); background: var(--bg-tertiary); color: var(--text-primary); font-size: var(--fs-sm); font-weight: var(--fw-strong); }
-.provider-name { font-weight: var(--fw-strong); color: var(--text-primary); }
-.provider-status { margin-left: auto; min-width: 0; text-align: right; font-size: var(--fs-sm); font-weight: var(--fw-regular); color: var(--text-secondary); }
-.provider-card-body { padding: 0 14px 12px; }
-.provider-no-thinking { margin: 4px 0 0; color: var(--text-secondary); font-size: var(--fs-md); }
-.provider-signin { margin: 12px 0 0; }
-.provider-signin-body { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-sm); min-width: 0; }
-.provider-signin-body p { margin: 0; }
-.provider-signin-cmd { display: block; max-width: 100%; padding: var(--space-sm); border-radius: var(--radius-md); background: var(--bg-primary); color: var(--text-primary); font-family: var(--font-mono); overflow-wrap: anywhere; user-select: all; } /* the command is one click to select (#11364) */
-.provider-signin-actions { display: flex; flex-wrap: wrap; gap: var(--space-sm); }
-.provider-missing { margin-top: 8px; }
-.provider-missing-title { margin: 0 0 6px; }
-.provider-missing-entry { display: flex; flex-wrap: wrap; align-items: center; gap: 0 10px; min-height: var(--control-touch-height, 44px); margin-bottom: 8px; padding: 0 14px; border-style: dashed; background: transparent; }
-.provider-install { margin-left: auto; display: inline-flex; align-items: center; min-height: var(--control-touch-height, 44px); color: var(--link-text); text-decoration: underline; }
-@media (max-width: 359px) { .provider-card-body .seg-group { display: none; } .provider-card-body select.seg-source { display: block; } } /* a strip of six levels does not fit: the select under it does */
 
 .account-line { display: flex !important; flex-wrap: wrap; align-items: baseline; gap: 0 12px; } .account-name { flex: 0 0 5em; font-size: var(--fs-md); color: var(--text-primary); } .account-line .settings-hint { flex: 1 1 12em; min-width: 0; } /* Settings > Security > Accounts (#11320): a line per provider, its name and its answer; the answer drops under the name when 12 em is not left beside it (a narrow screen, large text) */
 

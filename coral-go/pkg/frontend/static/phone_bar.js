@@ -30,10 +30,28 @@ export function mountTopPhoneBar() {
 
 /** The view's name in the pill (nav_tabs.js says it, with the tab's words). A page that is not one of the nav's tabs (Tasks, Goals and Files from Home are a folder's table, a team page's tabs) has none: the pill then says the page's own heading, so it is never empty (QA Reviewer 2's nit on #137846). */
 export function setPhoneBarTitle(words) {
+    _lastWords = words || '';
     _named = !!words;
-    for (const t of document.querySelectorAll('.phone-bar-title')) t.textContent = words || pageHeading();
+    for (const t of document.querySelectorAll('.phone-bar-title')) t.textContent = _pageName || words || pageHeading();
 }
-let _named = false;
+let _named = false, _lastWords = '', _prevSlot = '';
+/** A page the bar's own buttons open inside another view (its Tasks is the Inbox view's Tasks table, #11401): the pill says that page's name, whatever the nav's refreshes put for the view, until another tab is chosen (clearPhonePageName, switchNavTab). */
+let _pageName = '';
+const lightSlot = name => { for (const it of document.querySelectorAll('.phone-nav-slot[data-phone-nav]')) { const on = it.dataset.phoneNav === name; it.classList.toggle('active', on); if (on) it.setAttribute('aria-current', 'page'); else it.removeAttribute('aria-current'); } };
+export function setPhonePageName(name) {
+    if (!_pageName) _prevSlot = document.querySelector('.phone-nav-slot.active')?.dataset.phoneNav || ''; // the slot the page replaces, for when it is over
+    _pageName = name || '';
+    if (_pageName) { document.body.dataset.phonePage = _pageName; for (const t of document.querySelectorAll('.phone-bar-title')) t.textContent = _pageName; } // phone_screens.js reads it for the lit slot
+    if (_pageName === 'Tasks') lightSlot('nav-tasks');
+}
+/** The page is over (another tab was chosen, or the Inbox's own tab is no longer Tasks): the pill says the view's name again and the slot the page replaced is lit. */
+export function clearPhonePageName() {
+    const had = _pageName;
+    _pageName = ''; delete document.body.dataset.phonePage;
+    if (!had) return;
+    for (const t of document.querySelectorAll('.phone-bar-title')) t.textContent = _lastWords || pageHeading();
+    if (_prevSlot) lightSlot(_prevSlot);
+}
 function pageHeading() {
     const h = ['#group-table-view .group-table-head h2', '#group-table-view h2', '#team-page-title', '#servers-tab-title', 'main h1'].map(sel => [...document.querySelectorAll(sel)].find(e => e.getClientRects().length > 0 && e.textContent.trim())).find(Boolean);
     return h ? h.textContent.replace(/\s+/g, ' ').trim() : '';

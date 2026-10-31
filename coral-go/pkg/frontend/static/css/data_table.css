@@ -194,6 +194,7 @@
 .dt-progress-meter::-moz-progress-bar { background: var(--table-progress-fill); }
 
 .dt-table .dt-action { margin: 0; white-space: nowrap; }
+.dt-table td:has(> .dt-action-roomy) { padding-block: 5px; padding-inline-end: var(--table-pad-x); } /* a touch-size button as tall as the row gets room above and below it and from the edge, so the rows' lines are not drawn through it (the team's Open chat, #11401 d) */
 .dt-table td:has(> .dt-action) { overflow: visible; text-overflow: clip; } /* a cell that holds a button never clips it or draws an ellipsis beside it: Open chat was 8 px wider than its 7rem cell's content box and a stray ellipsis stood at its right (#11142) */
 .dt-box.dt-folded .dt-action { min-height: var(--table-touch); }
 

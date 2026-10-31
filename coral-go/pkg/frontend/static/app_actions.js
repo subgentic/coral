@@ -218,7 +218,7 @@ registerActions({
     'phone-nav': el => { // the phone's floating nav (#11116): Home, Inbox, Tasks (More opens the menu: m-top-menu)
         const arg = el.dataset.arg;
         if (arg === 'nav-agents') window.switchNavTab('agents');
-        else { window.switchNavTab('hub-inbox'); if (arg === 'nav-tasks') importOnce('./inbox_tab.js').then(m => m.selectInboxTab('tasks')); }
+        else { window.switchNavTab('hub-inbox'); if (arg === 'nav-tasks') importOnce('./inbox_tab.js').then(m => m.selectInboxTab('tasks')).then(() => importOnce('./phone_bar.js')).then(p => p.setPhonePageName('Tasks')); } // the bar's Tasks is the Tasks table: the pill says Tasks, not the Inbox's name that the tab put there (#11401)
     },
     'phone-fab': (el, event) => { // the + : New agent, New team (the menu is drawn above it)
         event.stopPropagation();

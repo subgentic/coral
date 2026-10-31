@@ -180,7 +180,7 @@ const TEAM = `qa-next-steps-${Date.now() % 100000}`;
             await waitFor(`true`, 'a beat', 50).catch(() => {});
         }
         check(seen.s2 && seen.s2.shown && /role you give this agent/.test(seen.s2.text) && /Reviewer or Designer/.test(seen.s2.text), `step 2 says what a persona is: ${JSON.stringify(seen.s2)}`);
-        check(seen.s3 && seen.s3.shown && seen.s3.text === 'Section' && seen.s3.above && seen.s3.sameLeft && /section$/.test(seen.s3.name || ''), `step 3's picker says Section above it, its name still ends with section: ${JSON.stringify(seen.s3)}`);
+        check(seen.s3 && seen.s3.shown && seen.s3.text === 'Jump to a section' && seen.s3.above && seen.s3.sameLeft && /section$/.test(seen.s3.name || ''), `step 3's picker says Jump to a section above it, its name still ends with section: ${JSON.stringify(seen.s3)}`);
         // (4) plain words
         const root = require('node:path').join(__dirname, '..', '..', 'coral-go', 'pkg', 'frontend', 'static'), read = f => require('node:fs').readFileSync(require('node:path').join(root, f), 'utf8'); // the sources that write the words
         const t = read('task_create.js'), g = read('goals_view.js'), d = read('team_dialogs.js');

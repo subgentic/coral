@@ -7,7 +7,7 @@ import { markHidden } from './visible_marks.js';
 import { askWords } from './session_state.js';
 import { state } from './state.js';
 import { claudeSignedIn, askSigninSoon, isLocalClaude, isLocalAgent, setClaudeSignedIn } from './signin_line.js';
-import { drawCardImages, clearCardImages } from './card_attach.js';
+import { importOnce } from './import_once.js';
 import { PICKER_ACCEPT } from './image_attach.js';
 import { registerActions } from './actions.js';
 
@@ -17,6 +17,7 @@ import { registerActions } from './actions.js';
 // the chat on its own. The PreToolUse hook reports the call as it starts
 // (it arrives with the chat poll's reply as `pending`); the Notification hook sets waiting_for_input. Together
 // they drive a card at the bottom of the chat saying what is being asked.
+let cardAttach = null; // card_attach.js once it has loaded (the first card with a text option loads it)
 export const pendingToolBySession = new Map(); // session_id -> pending tool or null
 // The prompt's options as the terminal shows them right now (numbered, with
 // the digit that answers each), read by the server from a pane capture.
@@ -439,7 +440,7 @@ export function syncNeedsInputCard(container, session) {
     let el = container.querySelector(":scope > .chat-needs-input");
     if (!info) {
         if (el) { const key = cardFocusKey(el); el.remove(); if (key !== null) focusAfterCard(el, null); }
-        clearCardImages(session.session_id); // the question is gone: so are the images that were to answer it
+        if (cardAttach) cardAttach.clearCardImages(session.session_id); // the question is gone: so are the images that were to answer it (none, while the module has not loaded)
         unwatchCardInView();
         return;
     }
@@ -479,7 +480,10 @@ export function syncNeedsInputCard(container, session) {
             if (typing.focused) input.focus();
         }
     }
-    drawCardImages(el, session.session_id); // images added to the answer stay when the card is drawn again
+    if (el.querySelector(".cni-attach")) { // a card that takes an answer in words has the image strip: its code loads with the first one, not at start (#11403)
+        if (cardAttach) cardAttach.drawCardImages(el, session.session_id); // images added to the answer stay when the card is drawn again
+        else importOnce('./card_attach.js').then(m => { cardAttach = m; if (el.isConnected) m.drawCardImages(el, session.session_id); }).catch(() => {});
+    }
     // Same slot as the Working row: below Sent messages, above Queued ones
     const queued = container.querySelector(":scope > .pending-messages.pending-queued");
     if (queued) {

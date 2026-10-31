@@ -36,7 +36,11 @@ const BASE = require('./test_base').BASE;
             await ev(`localStorage.clear(); window.__coralReady.startup('liveList', 'liveListLoaded', 'settings')`);
 
             await openTab('docs');
-            await waitFor(`document.querySelectorAll('${pane('docs')} .sgroup-header').length === 2 && document.querySelectorAll('${pane('docs')} li .row-btn').length > 10`, at + 'the groups and the topics', 15000);
+            await waitFor(`document.querySelectorAll('${pane('docs')} .sgroup-header').length === 2 && document.querySelectorAll('${pane('docs')} li .row-btn').length >= 4`, at + 'the groups and the first topics', 15000);
+            // the first look (#11401 e): Getting started is open and For developers is folded, 32 pages out of the way; the reader opens it and the rest of this suite reads both
+            assert.deepEqual(await ev(`[...document.querySelectorAll('${pane('docs')} .sgroup-header .group-chevron')].map(c => c.getAttribute('aria-expanded'))`), ['true', 'false'], at + 'a first-time reader finds For developers folded');
+            await ev(`document.querySelector('${pane('docs')} .sgroup-header[data-group-name="docs:api"] .group-chevron').click(); true`);
+            await waitFor(`document.querySelectorAll('${pane('docs')} li .row-btn').length > 10`, at + 'For developers opened', 8000);
             assert.deepEqual(await ev(`[...document.querySelectorAll('${pane('docs')} .sgroup-header .group-name-text')].map(e => e.textContent)`), ['Getting started', 'For developers'], at + 'two groups (#10093: the second was called API)');
             // the button is the row: the li around it has no padding and the button is 36 px high (44 on a phone), UI/UX's rule for every sidebar list (#7473)
             assert.deepEqual(await ev(`(() => { const b = document.querySelector('${pane('docs')} li:not(.session-group-header) > .row-btn'), li = b.parentElement, cs = getComputedStyle(li); return { pad: [cs.paddingTop, cs.paddingBottom], h: Math.round(b.getBoundingClientRect().height) >= ${mobile ? 44 : 36}, same: Math.abs(li.getBoundingClientRect().height - b.getBoundingClientRect().height) <= 1 }; })()`), { pad: ['0px', '0px'], h: true, same: true }, at + 'a row is its button, no padding on the li, at least ${mobile ? 44 : 36} px high');

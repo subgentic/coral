@@ -285,7 +285,7 @@ export function mountSettingsView(host, spec) {
         shell = node('div', 'settings-shell sv-shell');
         const label = spec.label || 'Settings sections';
         const nav = node('nav', 'settings-nav'); nav.setAttribute('aria-label', label);
-        const pick = node('div', 'settings-group-pick'); const sel = node('select', 'settings-select'); sel.setAttribute('aria-label', spec.groupLabel || `${label} group`); pick.append(sel);
+        const pick = node('div', 'settings-group-pick'); const sel = node('select', 'settings-select'); sel.setAttribute('aria-label', spec.groupLabel || `${label} group`); pick.append(sel); if (spec.groupPickText) { const l = node('span', 'settings-group-pick-label'); l.setAttribute('aria-hidden', 'true'); l.textContent = spec.groupPickText; pick.prepend(l); } // the phone's picker says what it is (#11401)
         const tabs = node('div', 'settings-tabs'); tabs.setAttribute('role', 'tablist'); tabs.setAttribute('aria-orientation', 'vertical'); tabs.setAttribute('aria-label', label);
         nav.append(pick, tabs);
         const panes = node('div', 'settings-panes');
