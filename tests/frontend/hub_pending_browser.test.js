@@ -60,19 +60,19 @@ const { settle } = require('./helpers/wait');
             await waitFor(`document.body.classList.contains('hub-machine-waiting')`, 'the waiting state', { timeout: 8000 });
             const list = `((document.getElementById('live-sessions-list') && document.getElementById('live-sessions-list').innerText) || (document.getElementById('mobile-agent-list') && document.getElementById('mobile-agent-list').innerText) || '').replace(/\\s+/g, ' ').trim()`;
             await waitFor(`/Waiting for/.test(${list})`, 'the empty list to say so', { timeout: 8000 });
-            const wait = await ev(`({ list: ${list}, pwned: !!window.__pwned, imgs: document.querySelectorAll('#live-sessions-list img, .welcome-waiting img, #mobile-agent-list img').length, home: (document.querySelector('.welcome-waiting-names') || { textContent: 'NO .welcome-waiting-names' }).textContent, shownWaiting: (${shown('.welcome-waiting')}), shownFirst: (${shown('.welcome-first-run')}) })`);
+            const wait = await ev(`({ list: ${list}, pwned: !!window.__pwned, imgs: document.querySelectorAll('#live-sessions-list img, .welcome-waiting img, #mobile-agent-list img').length, home: (document.querySelector('.welcome-waiting') || { textContent: 'NO .welcome-waiting' }).textContent, shownWaiting: (${shown('.welcome-waiting')}), shownFirst: (${shown('.welcome-first-run')}) })`);
             assert.ok(wait.list.includes('Waiting for ' + HOSTILE + ' to connect (expires '), 'the list names the computer, as text: ' + wait.list);
             assert.ok(/Coral is running/.test(wait.list) && /reach this hub/.test(wait.list) && /time left/.test(wait.list), 'the three checks: ' + wait.list);
             assert.ok(!/Connect your first computer/.test(wait.list), 'not the first-run line: ' + wait.list);
             assert.equal(wait.pwned, false, 'the name did not run');
             assert.equal(wait.imgs, 0, 'the name is text, not an element');
             if (w > 700) { // the phone has no home card: its Agents page is the list
-                assert.ok(wait.home.startsWith('Waiting for ' + HOSTILE + ' to connect (expires '), 'the home card: ' + wait.home); assert.equal(wait.shownWaiting, true, 'the home card is the waiting one'); assert.equal(wait.shownFirst, false, 'and not "Connect your first computer"'); await shot('hub-waiting-' + w); }
+                assert.ok(wait.home.includes('Waiting for ' + HOSTILE + ' to connect (expires '), 'the home card: ' + wait.home); assert.equal(wait.shownWaiting, true, 'the home card is the waiting one'); assert.equal(wait.shownFirst, false, 'and not "Connect your first computer"'); await shot('hub-waiting-' + w); }
 
             console.log(`${tag} expired and never connected: "Never connected: start again" with Add a computer`);
             pending = [{ label: 'vps-1', state: 'expired', expires_at: iso(-20), requested_at: iso(-30) }];
             await open(w, h);
-            await waitFor(`/Never connected: start again/.test(${list})`, 'the never-connected line', { timeout: 8000 });
+            await waitFor(`/Never connected: start again \\(vps-1\\)/.test(${list})`, 'the never-connected line', { timeout: 8000 });
             assert.equal(await ev(`!!document.querySelector('#live-sessions-list a.btn[href="/machines/add"], #mobile-agent-list a.btn[href="/machines/add"]')`), true, 'Add a computer');
             assert.equal(await ev(`document.body.classList.contains('hub-machine-waiting')`), false);
             await shot('hub-never-connected-' + w);
