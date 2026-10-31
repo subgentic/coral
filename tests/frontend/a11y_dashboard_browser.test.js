@@ -14,6 +14,7 @@
 //
 // Drives Chrome over CDP (chrome-remote-interface) through agent_view_harness.js; run_cdp_suites.mjs
 // finds CDP suites by that name.
+process.env.CORAL_KEEP_START = '1'; // this suite is about the start page: the harness does not move a bare / to /agents (#11594)
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 

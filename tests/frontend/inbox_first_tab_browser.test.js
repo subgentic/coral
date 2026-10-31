@@ -1,5 +1,6 @@
 // #11594 (the operator): the Inbox is the first tab of the app on a computer, and the page a bare start lands on when no place is kept to reopen (the team, agent or chat the person left on still wins,
 // #10057). The phone keeps its start (the Agents list) and its bottom bar in the order the operator chose (Agents, Inbox, Automations, Analytics). A real page on the isolated dev server, 1280 and 390.
+process.env.CORAL_KEEP_START = '1'; // this suite is about the start page: the harness does not move a bare / to /agents (#11594)
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
