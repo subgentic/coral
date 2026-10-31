@@ -352,12 +352,9 @@
 .inbox-ask-error { min-height: 1.2em; margin: 0 0 8px; color: var(--danger); }
 .inbox-ask-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
 .inbox-ask-buttons .btn { min-height: 44px; }
-.inbox-review-actions { display: grid; grid-template-columns: max-content max-content max-content; gap: 8px; align-items: center; } /* the star's 20 px is level with the buttons' centre, not their top (#9904) */
-.inbox-review-actions-read { grid-template-columns: max-content max-content max-content max-content; } /* a read item has Unread beside Open, Approve and Request changes (#9277, #136584) */
-.inbox-review-actions-star { grid-template-columns: max-content max-content max-content max-content; } /* the star is the first of the actions (#9834) */
-.inbox-review-actions-star.inbox-review-actions-read { grid-template-columns: max-content max-content max-content max-content max-content; }
-.inbox-review-icon { min-width: 44px; padding-inline: 0; justify-content: center; } /* a read item's two actions are icons: the row stays one line, also on a phone */
-.inbox-review-icon .material-icons { width: var(--icon-size); height: var(--icon-size); overflow: hidden; font-size: var(--icon-size); white-space: nowrap; } /* the icon's name is its ligature: without the font it must not widen the button */
+.inbox-review-actions { display: flex; flex-wrap: nowrap; justify-content: flex-end; gap: 8px; align-items: center; } /* the star's 20 px is level with the buttons' centre, not their top (#9904); the words end at the row's right edge (#11552) */
+.inbox-deny, .inbox-deny-confirm { color: var(--error); } /* Deny is red text, never a red fill (#11552) */
+.inbox-row-more { position: relative; display: flex; flex: none; align-items: center; } /* the row's three dots: its menu opens under them */
 .inbox-review-error { grid-column: 1 / -1; white-space: normal; }
 .inbox-review-error:empty { display: none; }
 .inbox-review-metadata { display: flex; flex-wrap: nowrap; align-items: baseline; gap: 0 8px; min-width: 0; max-width: 9rem; } /* one line (#9060): For review, then the task, cut with an ellipsis when it is long (its full words are the link's tooltip) */
@@ -373,10 +370,10 @@
 .inbox-review-more a, .inbox-review-more button { margin-inline-end: 8px; }
 @media (max-width: 760px) {
     .inbox-review-actions button { min-height: 44px; }
-    .inbox-welcome-actions { grid-template-columns: 6.25rem 4.75rem; justify-content: end; } /* the welcome rows' buttons line up in two columns, the action then Dismiss, whatever the title's width (#11536) */
+    .inbox-welcome-actions { display: grid; grid-template-columns: 6.25rem 4.75rem; justify-content: end; } /* the welcome rows' buttons line up in two columns, the action then Dismiss, whatever the title's width (#11536) */
     .inbox-welcome-actions .btn { width: 100%; padding-inline: 4px; }
     .inbox-swipe-strip { position: absolute; right: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; white-space: nowrap; font-weight: var(--fw-strong); color: var(--text-primary); background: color-mix(in srgb, var(--error) 18%, transparent); border-radius: 0 var(--radius-md) var(--radius-md) 0; pointer-events: none; }
-    .inbox-review-actions { column-gap: 6px; }
+    .inbox-review-actions { column-gap: 4px; }
     .inbox-review-actions-star { column-gap: 4px; } /* the starred glyph is a fourth cell: 8 px gaps put the actions 3 px over the line, under the name (#9904) */
     .inbox-review-metadata { flex-wrap: wrap; max-width: 100%; } /* a phone's second line has the room of its row, and breaks at a gap instead of cutting the team's name (#11414) */
     .inbox-review-metadata > .inbox-review-team { flex: 0 1 auto; min-width: 0; }

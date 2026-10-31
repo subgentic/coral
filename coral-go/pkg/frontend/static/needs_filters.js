@@ -11,7 +11,7 @@ export const KIND_LABEL = { permission: 'Permission', question: 'Question', othe
 /** How long it has waited, at least (minutes), as the Filters panel offers it. */
 export const LONGER = ['5', '15', '60', '240'];
 export const LONGER_LABEL = { 5: '5 minutes', 15: '15 minutes', 60: '1 hour', 240: '4 hours' };
-export const SORTS = ['blockers', 'oldest', 'newest'];
+export const SORTS = ['newest', 'oldest', 'blockers'];
 export const SORT_LABEL = { blockers: 'Blocking first', oldest: 'Waiting longest', newest: 'Waiting least' }; // Blocking first (#11442): what holds up the most work, a high-priority task first, then how long it has waited
 
 const model = defineFilters({
@@ -22,7 +22,7 @@ const model = defineFilters({
     agent: { type: 'text', max: 80, chip: v => `Agent: ${v}` },
     goal: { type: 'text', max: 200, chip: v => `Goal: ${v}` }, // the goal a row's task serves, or "No goal" (#8917)
     longer: { type: 'choice', values: LONGER, chip: v => `Waiting longer than ${LONGER_LABEL[v]}` },
-    sort: { type: 'order', values: SORTS, default: 'blockers' },
+    sort: { type: 'order', values: SORTS, default: 'newest' }, // newest first (#11552, the operator); Blocking first is one pick away and, once picked, kept
 });
 export const { EMPTY, clean, isFiltered, isQuery, chips, without } = model;
 

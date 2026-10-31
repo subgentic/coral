@@ -47,7 +47,7 @@ export function proposalActions(p) {
     const box = el('div', 'inbox-review-actions inbox-proposal-actions');
     const btn = (label, aria, run) => { const b = el('button', 'btn btn-small', label); b.type = 'button'; b.setAttribute('aria-label', aria); b.addEventListener('click', e => { e.stopPropagation(); run(b); }); return b; };
     if (p.state === 'expired') {
-        box.append(el('span', 'inbox-proposal-expired', 'Expired, nothing was made'), btn('Dismiss', `Dismiss the expired ${kindWord(p)} ${markedText(p.title)}`, () => dismissExpired(p)));
+        box.append(el('span', 'inbox-proposal-expired', 'Expired, nothing was made'), btn('Ignore', `Ignore the expired ${kindWord(p)} ${markedText(p.title)}`, () => dismissExpired(p)));
         return box;
     }
     if (p.state === 'approving') { box.append(el('span', 'inbox-proposal-expired', 'Being approved…')); return box; } // an Approve has it: nothing to press until it finishes (a stuck one is looked into after five minutes)

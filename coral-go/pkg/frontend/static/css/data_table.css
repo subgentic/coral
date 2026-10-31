@@ -508,7 +508,7 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 .dt-mail-star { width: auto; height: auto; margin-inline-start: 4px; font-size: var(--fs-lg); flex: none; align-self: center; cursor: default; }
 @media (pointer: coarse), (max-width: 767px) { .dt-star:not(.dt-star-on) { display: none; } .dt-star.dt-star-on { pointer-events: none; } }
 @media (max-width: 760px) { /* the starred Needs you row on a phone (#9922) */
-    .inbox-review-actions .btn:not(.inbox-review-icon):not(.dt-star) { padding-inline: 10px; } /* Open, Approve and Request changes (and the star) fit the 13.5 rem Actions column at 360 px, leaving the name its line (#11414) */
+    .inbox-review-actions .btn:not(.btn-icon):not(.dt-star) { padding-inline: 6px; } /* Approve and Changes (and the star and the three dots) fit the Actions column at 360 px, leaving the name its line (#11414) */
     .inbox-review-actions-star > .dt-star { width: 16px; margin-inline-end: -4px; } /* on a phone the starred glyph is not a button: 16 px, and it leans 4 px into the gap (#9922) */
     .dt-box.dt-fold-column.dt-folded tr:has(.inbox-review-actions-star > .dt-star-on) td.dt-line-1.dt-grow { flex-basis: 3.5rem; } /* a starred row name has 3.5 rem of its own, not 5, so the actions stay on its line at 360 px (#9922) */
 }
@@ -537,3 +537,6 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 .dt-box.dt-folded td:has(> .inbox-review-name, > .inbox-review-item) > .dt-subtitle { display: none; }
 .dt-box.dt-folded td[data-fold-label]::before { content: attr(data-fold-label) ' '; color: var(--text-secondary); font-weight: var(--fw-regular); } /* a column with foldLabel names its figure where the header row is gone (the phone's Computers, #11463) */
 @media (max-width: 760px) { tr[data-welcome-id] { touch-action: pan-y; } } /* a welcome row of Needs you: the page keeps its vertical pans, a horizontal drag is the swipe's (welcome_swipe.js, #11542) */
+.dt-end .inbox-review-actions { justify-content: end; } /* the Actions column is the last, at the row's right edge: its buttons end there (#11552) */
+.dt-table td:has(.inbox-row-more) { overflow: visible; text-overflow: clip; } /* the cell of a row's three dots shows its menu: a cell clips what it holds (#11552) */
+#group-table-view[data-group="hub-inbox:needs"] .dt-row-open, #group-table-view[data-group="hub-inbox:needs"] .dt-row-open td { -webkit-user-select: none; user-select: none; } /* a row of Needs you that opens on a click is not text to select (the other lists keep their names copyable): a selection across its cells shows as blue bars between them, and a web view takes a click on a selection for the start of a drag of it, so the row stops opening (#11584) */
