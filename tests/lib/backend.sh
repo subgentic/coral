@@ -146,3 +146,17 @@ coral_test_backend_only() {
         exit 0
     fi
 }
+
+# coral_test_kill_tmux_server: stops the tmux server this runner's test server started, the one on CORAL_DATA_DIR/tmux.sock, and nothing else. Killing the server by pid leaves it (and its
+# agents) running, and a run that failed or was stopped left it for hours. It acts only on that socket: with no CORAL_DATA_DIR, or no socket there, it does nothing, and it never names a
+# default tmux server. It never fails the run. CORAL_TMUX_BIN names the tmux to use (default: tmux on PATH, else the app's own).
+coral_test_kill_tmux_server() {
+    local sock="${CORAL_DATA_DIR:-}/tmux.sock"
+    [[ -n "${CORAL_DATA_DIR:-}" && -S "$sock" ]] || return 0
+    local tmux="${CORAL_TMUX_BIN:-}"
+    [[ -n "$tmux" ]] || tmux="$(command -v tmux 2>/dev/null || true)"
+    [[ -n "$tmux" ]] || { [[ -x /Applications/Coral.app/Contents/MacOS/tmux ]] && tmux=/Applications/Coral.app/Contents/MacOS/tmux; } # the app's own, which a Mac without tmux on PATH uses
+    [[ -n "$tmux" ]] || return 0
+    "$tmux" -S "$sock" kill-server 2>/dev/null || true
+    return 0
+}
