@@ -49,21 +49,23 @@ const BASE = require('./test_base').BASE;
                 escaped: !runs[1].querySelector('b'),
                 noCollapse: m.groupTaskQueueRuns(msgs, false).every(it => it.kind === 'msg'),
             };
-            // Opened rows stay open across a re-render (the chat re-renders on every poll):
-            // opened the way a click does (no inline handler: the Hub's CSP strips those).
-            await new Promise(res => { runs[0].addEventListener('toggle', res, { once: true }); runs[0].open = true; });
-            box.innerHTML = m.groupTaskQueueRuns(msgs).map(it => it.kind === 'queue' ? m.renderTaskQueueRun(it, () => 'T') : '').join('');
-            out.openAfter = box.querySelector('.mb-queue-run[data-queue-run="2"]').open;
-            out.otherClosed = !box.querySelector('.mb-queue-run[data-queue-run="6"]').open;
-            // The row grows at both ends (a newer line; older ones from Load earlier): still open.
+            // A run is open by default (#11585). A closed one stays closed across a re-render (the chat re-renders on every poll), the others stay as they were drawn, and a row that grows keeps its state;
+            // closed and opened the way a click does (no inline handler: the Hub's CSP strips those).
+            const again = () => { box.innerHTML = m.groupTaskQueueRuns(msgs).map(it => it.kind === 'queue' ? m.renderTaskQueueRun(it, () => 'T') : '').join(''); };
+            await new Promise(res => { runs[0].addEventListener('toggle', res, { once: true }); runs[0].querySelector('summary').click(); });
+            again();
+            out.closedAfter = !box.querySelector('.mb-queue-run[data-queue-run="2"]').open;
+            out.otherOpen = box.querySelector('.mb-queue-run[data-queue-run="6"]').open;
             const grown = [{ id: 1.5, subscriber_id: Q, is_system: true, content: '[Task #6 claimed by QA] y' }, ...msgs.slice(1, 4), { id: 4.5, subscriber_id: Q, is_system: true, content: '[Task #9 claimed by QA] z' }];
             box.innerHTML = m.groupTaskQueueRuns(grown).map(it => m.renderTaskQueueRun(it, () => 'T')).join('');
-            out.grownOpen = box.querySelector('.mb-queue-run').open && box.querySelectorAll('.mb-queue-line').length === 5;
-            // Closing it forgets it.
+            out.grownClosed = !box.querySelector('.mb-queue-run').open && box.querySelectorAll('.mb-queue-line').length === 5;
+            // Opening it again is remembered the same way.
             const row = box.querySelector('.mb-queue-run');
-            await new Promise(res => { row.addEventListener('toggle', res, { once: true }); row.open = false; });
-            box.innerHTML = m.groupTaskQueueRuns(msgs).map(it => it.kind === 'queue' ? m.renderTaskQueueRun(it, () => 'T') : '').join('');
-            out.closedAfter = !box.querySelector('.mb-queue-run[data-queue-run="2"]').open;
+            await new Promise(res => { row.addEventListener('toggle', res, { once: true }); row.querySelector('summary').click(); });
+            again();
+            out.openAfter = box.querySelector('.mb-queue-run[data-queue-run="2"]').open;
+            box.innerHTML = m.groupTaskQueueRuns(grown).map(it => m.renderTaskQueueRun(it, () => 'T')).join('');
+            out.grownOpen = box.querySelector('.mb-queue-run').open && box.querySelectorAll('.mb-queue-line').length === 5;
             out.noInlineHandler = !box.innerHTML.includes('ontoggle');
             box.remove();
             return out;
@@ -72,12 +74,12 @@ const BASE = require('./test_base').BASE;
         assert.equal(g.labels[0], '#7 created; Backend Dev took #7; Backend Dev finished #7', 'a short run says what happened to which task and who did it (#10604; #7183 counted it)');
         assert.equal(g.labels[1], 'Task #8 created', 'a single line says its own task and what happened');
         assert.equal(g.lines, 3); assert.deepEqual(g.ids, ['2', '3', '4']);
-        assert.equal(g.openAtFirst, false, 'collapsed by default');
+        assert.equal(g.openAtFirst, true, 'open by default (#11585)');
         assert.ok(g.escaped, 'content is text, never markup');
         assert.ok(g.noCollapse, 'select mode: nothing collapsed');
-        assert.ok(g.openAfter && g.otherClosed, 'an opened row stays open across re-renders');
-        assert.ok(g.grownOpen, 'and when it grows at either end');
-        assert.ok(g.closedAfter, 'a closed row stays closed');
+        assert.ok(g.closedAfter && g.otherOpen, 'a closed row stays closed across re-renders and the others stay as drawn');
+        assert.ok(g.grownClosed, 'and when it grows at either end');
+        assert.ok(g.openAfter && g.grownOpen, 'a row opened again stays open, grown or not');
         assert.ok(g.noInlineHandler, 'no inline handler (the Hub CSP strips them)');
         console.log('   ✓ runs grouped, summarised, escaped, open state kept');
 
