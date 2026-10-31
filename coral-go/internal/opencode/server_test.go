@@ -310,9 +310,6 @@ func TestALeftOverPidIsSignalledOnlyWhenItsCommandAndStartTimeAreTheRecordedOnes
 }
 
 func TestALeftOverServerOfTheSameAgentIsStoppedByItsExactCommand(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("on Windows a left-over server of a crashed Coral is not stopped: isRecordedServer needs ps and answers no there, so nothing is signalled (a known gap, not a test problem)")
-	}
 	cfg, _ := stubConfig(t)
 	first, err := Start(context.Background(), cfg, "agent-1")
 	require.NoError(t, err)
