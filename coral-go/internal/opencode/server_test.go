@@ -195,6 +195,18 @@ const (
 	maxStandInProcsPerTest = 16
 )
 
+// tooManyStubConfigs says whether a test that has taken stubConfig n times has taken too many.
+func tooManyStubConfigs(n int) bool { return n > maxStubConfigsPerTest }
+
+// standInProcs is how many stand-in processes recorded their pid for this test's env file.
+func standInProcs(envFile string) int {
+	raw, err := os.ReadFile(envFile + ".pids")
+	if err != nil {
+		return 0
+	}
+	return len(strings.Fields(string(raw)))
+}
+
 var (
 	stubMu     sync.Mutex
 	stubByTest = map[testing.TB]int{}
@@ -207,7 +219,7 @@ func stubConfig(t *testing.T) (Config, string) {
 	n := stubByTest[t]
 	stubMu.Unlock()
 	t.Cleanup(func() { stubMu.Lock(); delete(stubByTest, t); stubMu.Unlock() })
-	if n > maxStubConfigsPerTest {
+	if tooManyStubConfigs(n) {
 		t.Fatalf("this test took %d stand-in configs: more than the %d any test here needs (a start that loops?)", n, maxStubConfigsPerTest)
 	}
 	exe, err := os.Executable()
@@ -215,8 +227,8 @@ func stubConfig(t *testing.T) (Config, string) {
 	envFile := filepath.Join(t.TempDir(), "env.json")
 	t.Setenv(envFileVar, envFile)
 	t.Cleanup(func() {
-		if raw, err := os.ReadFile(envFile + ".pids"); err == nil && len(strings.Fields(string(raw))) > maxStandInProcsPerTest {
-			t.Errorf("this test started %d stand-in processes: more than the %d any test here needs", len(strings.Fields(string(raw))), maxStandInProcsPerTest)
+		if n := standInProcs(envFile); n > maxStandInProcsPerTest {
+			t.Errorf("this test started %d stand-in processes: more than the %d any test here needs", n, maxStandInProcsPerTest)
 		}
 	})
 	cfg := Config{Bin: exe, DataDir: filepath.Join(t.TempDir(), "opencode"), Ready: 10 * time.Second, Version: "2.2.4"} // the stand-in cannot answer --version: its version is said
