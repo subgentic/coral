@@ -23,6 +23,9 @@ const { coralReady } = require('./helpers/wait');
         check(b.shown && b.pos === 'fixed' && b.l === 0 && b.r === 390 && b.bottom === 844 && b.h >= 72, 'the bar is docked at the bottom, full width: ' + JSON.stringify(b));
         check(JSON.stringify(b.labels) === JSON.stringify(['Inbox', 'Agents', 'Tasks', 'Chats']) && b.more === 0, 'four labelled tabs and no More slot: ' + JSON.stringify(b.labels));
         check(b.small === 0, 'every tab is a 44 px target');
+        const polish = await ev(`(() => ({ tasksRects: document.querySelectorAll('[data-phone-nav="nav-tasks"] svg rect').length, tasksPath: (document.querySelector('[data-phone-nav="nav-tasks"] svg path') || {}).getAttribute('d') || '', menu: document.getElementById('nav-more-menu').getAttribute('aria-label') }))()`); // #11519
+        check(polish.tasksRects === 0 && /^M4 6l2 2 3-3/.test(polish.tasksPath), 'the Tasks tab draws the checklist, not the stacked bars Computers uses: ' + JSON.stringify(polish));
+        check(polish.menu === 'Navigation', 'the drawer is named Navigation for a screen reader, not Views: ' + polish.menu);
         check(b.on === 'nav-agents' && b.pill !== 'rgba(0, 0, 0, 0)', 'the current tab (Agents) is in a pill: ' + JSON.stringify({ on: b.on, pill: b.pill }));
         const fab = await ev(`(() => { const f = document.getElementById('phone-fab'), n = document.getElementById('phone-nav'); return f.getBoundingClientRect().bottom <= n.getBoundingClientRect().top; })()`);
         check(fab, 'the + sits above the bar');
