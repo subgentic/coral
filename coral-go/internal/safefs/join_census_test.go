@@ -319,9 +319,6 @@ var joinSites = map[string]joinEntry{
 	"pkg/frontend/bundle.go\tembeddedFiles":                                                  {1, joinOwn, "a fixed or program-made name in its own folder"},
 	"pkg/frontend/startup_modules.go\tmoduleGraph":                                           {1, joinOwn, "a fixed or program-made name in its own folder"},
 	"pkg/secretbox/secretbox.go\tKeyFilePath":                                                {1, joinFixed, "names from a directory listing or numbers and hashes the program makes"},
-	"pkg/hubowner/file.go\tWriteFile":                                                        {2, joinOwn, "the remote's data folder (the operator's own command line or the setup over SSH names it) joined with the constant file name hub_owner_secret; the temporary name adds 16 random hex digits (#11378)"},
-	"pkg/hubowner/file.go\tReadFile":                                                         {1, joinOwn, "the remote's data folder (the operator's own command line or the setup over SSH names it) joined with the constant file name hub_owner_secret; the temporary name adds 16 random hex digits (#11378)"},
-	"pkg/hubowner/file.go\tInstalledAt":                                                      {1, joinOwn, "the remote's data folder (the operator's own command line or the setup over SSH names it) joined with the constant file name hub_owner_secret; the temporary name adds 16 random hex digits (#11378)"},
 }
 
 func TestEveryJoinOfAVariableNameIsReviewed(t *testing.T) {
