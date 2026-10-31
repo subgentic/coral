@@ -209,3 +209,23 @@ func TestAReaderStopsItselfWhenNobodyReadsIt(t *testing.T) {
 	}
 	waitFor(t, "the idle reader to stop itself", func() bool { return readers(m) == 0 })
 }
+
+// The notes of reader starts and failures do not grow for ever (Security's INFO on afd39c3c7).
+func TestOldNotesOfReaderStartsAndFailuresAreForgotten(t *testing.T) {
+	cfg, _ := stubConfig(t)
+	m := NewManager(cfg)
+	defer m.Close()
+	m.mu.Lock()
+	m.readerStartAt["old-agent"] = time.Now().Add(-time.Hour)
+	m.readFail["old-agent"] = time.Now().Add(-time.Hour)
+	m.readerStartAt["recent-agent"] = time.Now()
+	m.mu.Unlock()
+	m.admitReader("some-agent")
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	_, oldStart := m.readerStartAt["old-agent"]
+	_, oldFail := m.readFail["old-agent"]
+	_, recent := m.readerStartAt["recent-agent"]
+	assert.False(t, oldStart || oldFail, "notes older than ten minutes are dropped")
+	assert.True(t, recent, "a recent one stays: it still bounds a start")
+}

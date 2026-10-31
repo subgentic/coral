@@ -644,6 +644,23 @@ func (m *Manager) stopIdleReader(key string, g *managed) {
 	}
 }
 
+// readerMemoKeep is how long a note of a reader's start or failure is kept: past the gaps it serves no purpose.
+var readerMemoKeep = 10 * time.Minute
+
+// pruneReaderMemos drops the notes of reader starts and failures that are older than readerMemoKeep, so they stay as many as the agents opened lately, not as many as there ever were. The caller holds m.mu.
+func (m *Manager) pruneReaderMemos() {
+	for k, at := range m.readerStartAt {
+		if time.Since(at) > readerMemoKeep {
+			delete(m.readerStartAt, k)
+		}
+	}
+	for k, at := range m.readFail {
+		if time.Since(at) > readerMemoKeep {
+			delete(m.readFail, k)
+		}
+	}
+}
+
 // releaseReaderStart ends the reservation admitReader made for key.
 func (m *Manager) releaseReaderStart(key string) {
 	m.mu.Lock()
@@ -656,6 +673,7 @@ func (m *Manager) releaseReaderStart(key string) {
 func (m *Manager) admitReader(key string) bool {
 	for attempt := 0; attempt < readerCap+1; attempt++ {
 		m.mu.Lock()
+		m.pruneReaderMemos()
 		if m.closed || time.Since(m.readFail[key]) < readerCooldown {
 			m.mu.Unlock()
 			return false
