@@ -49,8 +49,20 @@ const { coralReady } = require('./helpers/wait');
             await waitFor(`!!document.querySelector('#e2e-acf .acf-model-select option[value="e2e-claude-model"]')`, 'the custom model in the form', 8000);
             const txt = await ev(`document.querySelector('#e2e-acf .acf-model-select option[value="e2e-claude-model"]').textContent`);
             await ev(`{ const s = document.querySelector('#e2e-acf .acf-model-select'); s.value = 'e2e-claude-model'; s.dispatchEvent(new Event('change', { bubbles: true })); true }`);
-            const lv = await ev(`[...document.querySelectorAll('#e2e-acf .acf-thinking option')].map(o => o.value).join()`);
-            return txt === 'E2E Claude (custom)' && lv === ',low,high';
+            await waitFor(`[...document.querySelectorAll('#e2e-acf .acf-thinking option')].map(o => o.value).join() === ',low,high'`, 'the custom model\'s levels in the form', 8000);
+            return txt === 'E2E Claude (custom)';
+        })());
+
+        // The list comes from the browser's cache first, the server's answer after: the levels must be there with the cache's list too, not only once the server answers (a CI flake: the form read its levels in between).
+        check('a form drawn from the cached list offers the custom model\'s levels at once, before the server answers', await (async () => {
+            await ev(`(async () => { const m = await import(${S} + 'model_labels.js'); m.writeModelsCache(null, 'claude', await (await fetch('/api/agents/models?type=claude')).json()); window.__realFetch = window.fetch; window.__release = null; const gate = new Promise(r => { window.__release = r; }); window.fetch = (u, ...a) => String(u).includes('/api/agents/models') ? gate.then(() => window.__realFetch(u, ...a)) : window.__realFetch(u, ...a); return true; })()`);
+            await ev(`(async () => { document.getElementById('e2e-acf')?.remove(); const d = document.createElement('div'); d.id = 'e2e-acf2'; document.body.appendChild(d); const f = await import(${S} + 'agent_config_form.js'); f.renderAgentConfigForm('e2e-acf2', {}); return true; })()`);
+            await waitFor(`!!document.querySelector('#e2e-acf2 .acf-model-select option[value="e2e-claude-model"]')`, 'the custom model from the cached list', 8000);
+            await ev(`{ const s = document.querySelector('#e2e-acf2 .acf-model-select'); s.value = 'e2e-claude-model'; s.dispatchEvent(new Event('change', { bubbles: true })); true }`);
+            const lv = await ev(`[...document.querySelectorAll('#e2e-acf2 .acf-thinking option')].map(o => o.value).join()`);
+            const open = await ev(`window.__release()`);
+            await ev(`window.fetch = window.__realFetch; true`);
+            return lv === ',low,high';
         })());
 
         console.log('3. the server refuses what the form would not, and nothing changes');
