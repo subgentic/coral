@@ -16,6 +16,12 @@ async function connect(opts = {}) {
         await Page.enable();
         await Page.addScriptToEvaluateOnNewDocument({ source: `(() => { const t = ${theme}, f = ${font}; try { if (t) localStorage.setItem('coral-theme', t); } catch (e) {} if (f) { const put = () => { if (document.documentElement) document.documentElement.style.setProperty('font-size', f, 'important'); }; /* the element's own style: a page's CSP (the Hub's) blocks an injected style element */ if (document.documentElement) put(); else new MutationObserver((m, o) => { if (document.documentElement) { put(); o.disconnect(); } }).observe(document, { childList: true }); document.addEventListener('DOMContentLoaded', put); } })();` });
     }
+    // A bare "/" starts on the Inbox since #11594, and nearly every suite means the Agents page when it loads "/": the page is given "/agents" typed on purpose before any app script runs (the address a person types for the
+    // list, which nav.js does not move). A suite that is about the start page itself sets process.env.CORAL_KEEP_START = '1' before it calls connect().
+    if (!process.env.CORAL_KEEP_START) {
+        await Page.enable();
+        await Page.addScriptToEvaluateOnNewDocument({ source: `(() => { try { if (location.pathname === '/' && !location.search && !location.hash) history.replaceState(null, '', '/agents'); } catch (e) {} })()` });
+    }
     // Static files that failed to load (#3466): a module the page couldn't fetch fails every later
     // import() of it too, so a "Failed to fetch dynamically imported module" says nothing about why.
     // Record each /static/ request that failed or answered >= 400, and add them to that error.

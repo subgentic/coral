@@ -13,7 +13,8 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
 
 (async () => {
     const client = await CDP({ port: Number(process.env.CDP_PORT || 9222) });
-    const { Page, Runtime, Emulation } = client;
+    process.env.CORAL_KEEP_START = '1'; // this suite is about the start page: the harness does not move a bare / to /agents (#11594)
+const { Page, Runtime, Emulation } = client;
     const ev = async expression => {
         const r = await Runtime.evaluate({ expression, returnByValue: true, awaitPromise: true });
         if (r.exceptionDetails) throw new Error(JSON.stringify(r.exceptionDetails).slice(0, 400));
