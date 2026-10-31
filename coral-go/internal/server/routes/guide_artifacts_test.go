@@ -41,8 +41,9 @@ func gaGuide(label string) map[string]string {
 func newGuideArtifactRig(t *testing.T) *cmtRig {
 	t.Helper()
 	rig := newCmtRig(t)
+	prev := artifactCircle // put back what was there: other tests rely on the circle an earlier test set, and an empty one fails every agent's artifact check closed
 	SetArtifactCircle(NewArtifactCircle(rig.ss, rig.h.bs))
-	t.Cleanup(func() { SetArtifactCircle(ArtifactCircle{}) })
+	t.Cleanup(func() { SetArtifactCircle(prev) })
 	coral := rig.h.cfg.CoralDir()
 	record := func(session, id, boardKey string) {
 		dir := uploadsDir(coral, session)
