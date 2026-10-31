@@ -38,8 +38,8 @@ const { coralReady } = require('./helpers/wait');
         await ev(`window._verifyAllCLIs(); true`);
         await waitFor(`document.getElementById('verify-all-btn').textContent === 'Verify All' && document.getElementById('verify-all-btn').getAttribute('aria-disabled') !== 'true'`, 'Verify All finished');
         const results = await ev(`['claude', 'codex', 'agy', 'pi'].map(t => { const e = document.getElementById('cli-result-' + t); return [e.textContent, e.className.replace('cli-verify-result', '').trim(), e.title]; })`);
-        // a CLI with no path of its own that is not on PATH is "Not installed" and neutral; a refusal says why and what to do, under its result and as its hover (#10083)
-        assert.deepEqual(results, [['2.1.0', 'cli-verify-ok', ''], ['Found', 'cli-verify-ok', ''], ['Not installed', 'cli-verify-none', ''], ['Not allowed', 'cli-verify-fail', 'Not allowed here. Empty the field to use PATH.']]);
+        // a CLI with no path of its own that is not on PATH is "Not installed" and neutral; a refusal says why and what to do, written under its result (#10083; it was also its hover, a tooltip repeating the text beside it, #11566)
+        assert.deepEqual(results, [['2.1.0', 'cli-verify-ok', ''], ['Found', 'cli-verify-ok', ''], ['Not installed', 'cli-verify-none', ''], ['Not allowed', 'cli-verify-fail', '']]);
         assert.equal(await ev(`document.getElementById('cli-result-pi-why').textContent`), 'Not allowed here. Empty the field to use PATH.', 'the reason and the fix are written under the result');
         assert.equal(await ev(`document.getElementById('cli-result-agy-why').hidden`), true, 'a neutral result has no line under it');
         assert.deepEqual((await ev(`window.__checks.slice().sort()`)), ['agy', 'claude', 'codex', 'pi'], 'each CLI was asked once');
