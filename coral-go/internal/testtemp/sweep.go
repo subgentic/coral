@@ -11,7 +11,7 @@ import (
 // cleanup, and left its folder behind. No package's tests run for a day.
 const staleAfter = 24 * time.Hour
 
-// privateName is exactly the name os.MkdirTemp(base, "ct-") gives the private folder: "ct-" and its random digits. Nothing else is touched.
+// privateName is exactly the name makePrivateFolder gives the private folder: "ct-" and its random digits. Nothing else is touched.
 var privateName = regexp.MustCompile(`^ct-[0-9]+$`)
 
 // sweepStale removes, under base (the system temp folder when ""), the private folders earlier runs left: a folder (not a link) named exactly
@@ -22,7 +22,18 @@ func sweepStale(base string, now time.Time) {
 	if base == "" {
 		base = os.TempDir()
 	}
-	entries, err := os.ReadDir(base)
+	// Through an os.Root on base: a name that is a link cannot lead the removal out of the root.
+	root, err := os.OpenRoot(base)
+	if err != nil {
+		return
+	}
+	defer root.Close()
+	d, err := root.Open(".")
+	if err != nil {
+		return
+	}
+	entries, err := d.ReadDir(-1)
+	d.Close()
 	if err != nil {
 		return
 	}
@@ -30,11 +41,10 @@ func sweepStale(base string, now time.Time) {
 		if !privateName.MatchString(e.Name()) {
 			continue
 		}
-		p := filepath.Join(base, e.Name())
-		fi, err := os.Lstat(p)
-		if err != nil || !fi.IsDir() || now.Sub(fi.ModTime()) < staleAfter || !ownedByMe(p, fi) {
+		fi, err := root.Lstat(e.Name())
+		if err != nil || !fi.IsDir() || now.Sub(fi.ModTime()) < staleAfter || !ownedByMe(filepath.Join(base, e.Name()), fi) {
 			continue
 		}
-		_ = os.RemoveAll(p)
+		_ = root.RemoveAll(e.Name())
 	}
 }

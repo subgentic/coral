@@ -13,10 +13,12 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"math/rand/v2"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -77,7 +79,7 @@ func setup() (cleanup func()) {
 // A failure is one line on stderr, and nothing changes.
 func setupIn(base string, stderr io.Writer) (cleanup func()) {
 	sweepStale(base, time.Now())
-	dir, err := os.MkdirTemp(base, "ct-")
+	dir, err := makePrivateFolder(base)
 	if err != nil {
 		fmt.Fprintf(stderr, "testtemp: no private test folder (%v): the tests run in the real temp and home folders\n", err)
 		return func() {}
@@ -152,4 +154,17 @@ func pinGoTool() {
 			os.Setenv("GOENV", filepath.Join(d, "go", "env"))
 		}
 	}
+}
+
+// privateNamePrefix starts every private folder's name; sweepStale matches it with privateName.
+const privateNamePrefix = "ct-"
+
+func randomDigits() string { return strconv.FormatUint(rand.Uint64N(1<<62), 10) }
+
+// makePrivateFolder makes the private folder: in the system temp folder (base "") as os.MkdirTemp does, under a chosen root with the owner-only list set at creation (Windows).
+func makePrivateFolder(base string) (string, error) {
+	if base == "" {
+		return os.MkdirTemp("", privateNamePrefix)
+	}
+	return makePrivateDir(base)
 }

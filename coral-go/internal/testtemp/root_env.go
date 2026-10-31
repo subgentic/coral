@@ -59,11 +59,15 @@ func checkRoot(root string) (clean, reason string) {
 	if sameFolder(clean, home) {
 		return "", "it is the profile folder itself"
 	}
-	if !sameFolder(filepath.Dir(clean), home) {
-		return "", "it is not directly in the profile folder"
-	}
 	if filepath.Base(clean) != rootName {
 		return "", "its last name is not " + rootName
+	}
+	if !sameFolder(filepath.Dir(clean), home) {
+		// Not in the profile: Windows only, and the root must prove itself (root_strict_windows.go, Security #6656), e.g. D:\coral-team-cache\<you>\ct.
+		if reason := checkOutsideRoot(clean); reason != "" {
+			return "", "it is not directly in the profile folder, and as a root elsewhere " + reason
+		}
+		return clean, ""
 	}
 	// Two passes: parallel test binaries (go test runs one per package) can all see the root missing, and the ones that lose the Mkdir get "exists": they go back to the checks below once, on
 	// the folder the winner made, instead of giving up and falling back to the temp folder.
@@ -105,4 +109,40 @@ func sameFolder(a, b string) bool {
 		return strings.EqualFold(a, b)
 	}
 	return a == b
+}
+
+// notProtectedData refuses a resolved root that is, or is inside, the real ~/.coral, that holds a .coral folder, or that is inside the module being tested (the source tree).
+func notProtectedData(real string) string {
+	inside := func(p, dir string) bool {
+		return sameFolder(p, dir) || strings.HasPrefix(strings.ToLower(p), strings.ToLower(dir)+string(filepath.Separator))
+	}
+	if home, err := os.UserHomeDir(); err == nil && home != "" {
+		coral := filepath.Join(home, ".coral")
+		if r, err := filepath.EvalSymlinks(coral); err == nil {
+			coral = r
+		}
+		if inside(real, coral) || inside(coral, real) {
+			return "it is, or is inside or around, the real ~/.coral folder"
+		}
+	}
+	if _, err := os.Lstat(filepath.Join(real, ".coral")); err == nil {
+		return "it holds a .coral folder"
+	}
+	if wd, err := os.Getwd(); err == nil {
+		for d := wd; ; d = filepath.Dir(d) {
+			if _, err := os.Stat(filepath.Join(d, "go.mod")); err == nil {
+				if r, err := filepath.EvalSymlinks(d); err == nil {
+					d = r
+				}
+				if inside(real, d) {
+					return "it is inside the source tree being tested"
+				}
+				break
+			}
+			if filepath.Dir(d) == d {
+				break
+			}
+		}
+	}
+	return ""
 }
