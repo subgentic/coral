@@ -343,11 +343,11 @@
 .inbox-review-item > .inbox-review-name { flex: 0 1 auto; min-width: 0; } /* the name and, once it is opened, its 'read' tag (#9277) */
 .inbox-ask-dialog { color: var(--text-primary); } /* the size, border and ground are the shared dialog rule's */
 .inbox-ask-dialog h2 { margin: 0 0 4px; font-size: var(--fs-lg, 1.1rem); }
-.inbox-ask-sub { margin: 0 0 12px; color: var(--text-tertiary); }
+.inbox-ask-sub { margin: 0 0 12px; color: var(--text-muted); }
 .inbox-ask-text { margin: 0 0 12px; max-height: 14rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--font-mono, monospace); background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 8px 10px; }
-.inbox-ask-label { display: block; font-weight: 600; margin-bottom: 8px; }
-.inbox-ask-box { display: block; width: 100%; box-sizing: border-box; margin-top: 4px; font-weight: 400; }
-.inbox-ask-error { min-height: 1.2em; margin: 0 0 8px; color: var(--danger, #c0392b); }
+.inbox-ask-label { display: block; margin-bottom: 8px; }
+.inbox-ask-box { display: block; width: 100%; box-sizing: border-box; margin-top: 4px; }
+.inbox-ask-error { min-height: 1.2em; margin: 0 0 8px; color: var(--danger); }
 .inbox-ask-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
 .inbox-ask-buttons .btn { min-height: 44px; }
 .inbox-review-actions { display: grid; grid-template-columns: max-content max-content; gap: 8px; align-items: center; } /* the star's 20 px is level with the buttons' centre, not their top (#9904) */
