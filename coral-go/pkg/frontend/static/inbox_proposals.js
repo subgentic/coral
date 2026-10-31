@@ -12,13 +12,18 @@ export { proposalItems, pendingProposals, onProposalsChanged, refreshProposals }
 
 const kindWord = p => (p.kind === 'goal' ? 'goal' : 'task');
 
-/** The fields of a proposal's payload the dialog and the row show. */
+/** What a proposal carries, for the dialog and the row: its words, the instructions and required outputs the assignee will be given (shown in full: the Operator approves what they read), and one line of everything else it sets. */
 export function proposalFacts(p) {
     const pay = p.payload && typeof p.payload === 'object' ? p.payload : {};
-    return p.kind === 'goal'
-        ? { body: pay.outcome || '', extra: pay.done_when ? `Done when: ${pay.done_when}` : '' }
-        : { body: pay.body || '', extra: [pay.assigned_to ? `For ${pay.assigned_to}` : '', pay.priority ? `Priority ${pay.priority}` : ''].filter(Boolean).join(' · ') };
+    if (p.kind === 'goal') return { body: pay.outcome || '', instructions: '', outputs: [], also: pay.done_when ? [`Done when: ${pay.done_when}`] : [] };
+    const wf = pay.workflow && typeof pay.workflow === 'object' ? pay.workflow : {};
+    const blocked = Array.isArray(pay.blocked_by) ? pay.blocked_by.map(b => (b && typeof b === 'object' ? `#${b.task_id}` : `#${b}`)) : [];
+    const also = [pay.assigned_to ? `assigned to ${pay.assigned_to}` : '', pay.priority ? `priority ${pay.priority}` : '', blocked.length ? `blocked by ${blocked.join(', ')}` : '', pay.remind_at ? `a reminder at ${new Date(pay.remind_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}` : '', pay.draft ? 'a draft (not published)' : '', pay.goal_id ? `under goal #${pay.goal_id}` : '', p.goal_proposal_id ? `for the goal waiting as proposal #${p.goal_proposal_id}` : ''].filter(Boolean);
+    return { body: pay.body || '', instructions: String(wf.instructions || ''), outputs: Array.isArray(wf.required_outputs) ? wf.required_outputs.map(String) : [], also };
 }
+
+/** Whether a proposal carries instructions for the assignee (the row says so). */
+export const carriesInstructions = p => { const f = proposalFacts(p); return !!(f.instructions || f.outputs.length); };
 
 /** The line a row says: who proposed what. */
 export const proposalSummary = p => `Proposes a ${kindWord(p)}: ${visibleName(p.title)}`;
@@ -79,7 +84,11 @@ export function openProposalDialog(p, mode = 'view') {
         finish(await decide(p, 'reject', { reason: reason.value.trim() }));
     });
     row.append(close, rejectOpen, approve);
-    d.append(h, who, ...parts, facts.extra ? el('p', 'proposal-extra', facts.extra) : '', reasonRow, status, row);
+    const carried = [];
+    if (facts.instructions) { const b = el('div', 'proposal-carried'); b.append(el('strong', null, 'Instructions it gives the assignee'), el('pre', 'proposal-pre', facts.instructions)); carried.push(b); }
+    if (facts.outputs.length) { const b = el('div', 'proposal-carried'); b.append(el('strong', null, 'Outputs it requires')); const ul = el('ul', 'proposal-outputs'); for (const o of facts.outputs) ul.append(el('li', null, o)); b.append(ul); carried.push(b); }
+    if (facts.also.length) carried.push(el('p', 'proposal-extra', `Also sets: ${facts.also.join('; ')}.`));
+    d.append(h, who, ...parts, ...carried, reasonRow, status, row);
     d.addEventListener('close', () => { d.remove(); });
     document.body.append(d);
     d.showModal();

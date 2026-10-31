@@ -210,7 +210,7 @@ func (h *BoardHandler) CreateTask(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
-		payload, _ := json.Marshal(taskPayload{Title: body.Title, Body: body.Body, Priority: body.Priority, CreatedBy: verifiedName(r, createdBy), AssignedTo: body.AssignedTo, Draft: body.Draft, Workflow: body.Workflow, GoalID: body.GoalID, BlockedBy: body.BlockedBy, RemindAt: body.RemindAt})
+		payload, _ := json.Marshal(taskPayload{Title: body.Title, Body: body.Body, Priority: body.Priority, CreatedBy: verifiedName(r, createdBy), AssignedTo: body.AssignedTo, Draft: body.Draft, Workflow: proposalWorkflow(body.Workflow), GoalID: body.GoalID, BlockedBy: body.BlockedBy, RemindAt: body.RemindAt})
 		h.proposeAnswer(w, r, board.ProposalInput{Board: project, Kind: board.ProposalTask, Title: body.Title, Payload: payload, Proposer: createdBy, GoalProposalID: body.GoalProposalID})
 		return
 	}

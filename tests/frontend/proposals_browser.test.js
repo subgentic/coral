@@ -14,7 +14,7 @@ const { coralReady } = require('./helpers/wait');
 
 const LONGBODY = 'A long body. ' + 'It goes on and on with detail that nobody reads until they must decide. '.repeat(20) + 'THE END OF IT.';
 const PROPOSALS = [
-    { id: 11, board_id: 'team-a', kind: 'task', title: 'Fix the <b>login</b> page', proposer: 'Backend Dev', state: 'pending', created_at: new Date(Date.now() - 600000).toISOString(), payload: { title: 'Fix the <b>login</b> page', body: 'It fails on Safari. @Orchestrator please look <img src=x onerror="window.__pwned=1">', priority: 'high' } },
+    { id: 11, board_id: 'team-a', kind: 'task', title: 'Fix the <b>login</b> page', proposer: 'Backend Dev', state: 'pending', created_at: new Date(Date.now() - 600000).toISOString(), payload: { title: 'Fix the <b>login</b> page', body: 'It fails on Safari. @Orchestrator please look <img src=x onerror="window.__pwned=1">', priority: 'high', assigned_to: 'QA Engineer', blocked_by: [3], draft: true, goal_id: 5, remind_at: new Date(Date.now() + 86400000).toISOString(), workflow: { instructions: 'Read the plan first.\n<b>then</b> run the deploy script.', required_outputs: ['a report', 'the diff'] } } },
     { id: 12, board_id: 'team-a', kind: 'goal', title: 'Ship the beta', proposer: 'Orchestrator', state: 'pending', created_at: new Date(Date.now() - 3600000).toISOString(), payload: { title: 'Ship the beta', outcome: LONGBODY, done_when: 'The release is out' } },
     { id: 13, board_id: 'team-b', kind: 'task', title: 'An old idea', proposer: 'QA Engineer', state: 'expired', created_at: new Date(Date.now() - 9 * 86400000).toISOString(), payload: { title: 'An old idea', body: 'Nobody decided.' } },
     { id: 14, board_id: 'team-b', kind: 'goal', title: 'Being made right now', proposer: 'Lead Developer', state: 'approving', created_at: new Date(Date.now() - 120000).toISOString(), payload: { title: 'Being made right now', outcome: 'x' } },
@@ -82,6 +82,13 @@ const STUB = `(() => {
             await waitFor(`/waits for the goal/.test(document.querySelector('${T}').textContent)`, at + 'the refusal in words', 8000);
             check(at + 'a refusal from the machine is said in the row, which stays', (await rowsOf()).some(r => r.item === 'Fix the <b>login</b> page'));
             await ev(`window.__refuse = null; window.__posts = []; true`);
+            // the dialog shows what the task would carry: the instructions and outputs in full, and one line of the rest
+            check(at + 'a row whose task carries instructions says so', /Carries instructions/.test(byItem['Fix the <b>login</b> page'].what) && !/Carries instructions/.test(byItem['Ship the beta'].what), byItem['Fix the <b>login</b> page'].what);
+            await ev(`window.__posts = []; [...document.querySelectorAll('${T} tbody tr')].find(tr => tr.querySelector('.inbox-review-name').textContent === 'Fix the <b>login</b> page').querySelector('.inbox-review-name').click(); true`);
+            await waitFor(`!!document.querySelector('#proposal-dialog[open]')`, at + 'the dialog for the task', 5000);
+            const carried = await ev(`(() => { const d = document.querySelector('#proposal-dialog'); return { pre: (d.querySelector('.proposal-pre') || {}).textContent, outputs: [...d.querySelectorAll('.proposal-outputs li')].map(li => li.textContent), also: (d.querySelector('.proposal-extra') || {}).textContent, tags: !!d.querySelector('b, img') }; })()`);
+            check(at + 'the dialog shows the instructions in full as text, the required outputs, and what else it sets', carried.pre === 'Read the plan first.\n<b>then</b> run the deploy script.' && JSON.stringify(carried.outputs) === JSON.stringify(['a report', 'the diff']) && /^Also sets: assigned to QA Engineer; priority high; blocked by #3; a reminder at .+; a draft \(not published\); under goal #5\.$/.test(carried.also) && !carried.tags, JSON.stringify(carried));
+            await ev(`document.querySelector('#proposal-dialog').close(); true`);
             // Approve: one request, no edits, the row goes
             await ev(`[...document.querySelectorAll('${T} tbody tr')].find(tr => tr.querySelector('.inbox-review-name').textContent === 'Fix the <b>login</b> page').querySelector('button').click(); true`);
             await waitFor(`!/Fix the <b>login<\\/b> page/.test(document.querySelector('${T}').textContent)`, at + 'the approved row gone', 8000);
