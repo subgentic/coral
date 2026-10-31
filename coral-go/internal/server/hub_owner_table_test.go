@@ -115,7 +115,14 @@ func TestTheOwnerRoutesOfTheTableAreTheReviewedSet(t *testing.T) {
 		"POST /api/artifacts/{hex64}/comments":              "owner-only",
 		"POST /api/artifacts/{hex64}/comments/{id}/resolve": "owner-only",
 		"POST /api/artifacts/{hex64}/comments/{id}/reopen":  "owner-only",
-		"GET /api/board/{project}/settings":                 "owner-sees", "GET /api/system/update": "owner-update", "POST /api/system/update/relaunch": "owner-update",
+		// The owner's version list and series reads, comment edit, delete, lock and the change-request send through the Hub (#11354).
+		"GET /api/artifacts/{hex64}/versions": "owner-only", "GET /api/artifacts/series/{series}": "owner-only", "GET /api/artifacts/series/{series}/versions": "owner-only",
+		"PATCH /api/artifacts/{hex64}/comments/{id}": "owner-sees", "DELETE /api/artifacts/{hex64}/comments/{id}": "owner-sees",
+		"PUT /api/artifacts/{hex64}/comments/lock": "owner-only", "DELETE /api/artifacts/{hex64}/comments/lock": "owner-only", "POST /api/artifacts/{hex64}/comments/{id}/send": "owner-only",
+		// Approve, or ask changes of, a for-review artifact through the Hub is the owner's alone (#136584, #11354).
+		"POST /api/board/{project}/artifacts/{id}/review": "owner-only",
+		"POST /api/sessions/live/{name}/dismiss-wait":     "owner-only",
+		"GET /api/board/{project}/settings":               "owner-sees", "GET /api/system/update": "owner-update", "POST /api/system/update/relaunch": "owner-update",
 	}
 	got := map[string]string{}
 	for _, r := range tunnel.OwnerRoutes() {

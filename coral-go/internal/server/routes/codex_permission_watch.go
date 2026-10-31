@@ -68,7 +68,7 @@ func (h *SessionsHandler) watchCodexPermission(name, workingDir string, event *s
 // finished, was superseded, or was confirmed; false means it is still reviewing.
 func (h *SessionsHandler) confirmCodexPermission(name, workingDir string, event *store.AgentEvent, ids []string) bool {
 	sid, tool := *event.SessionID, *event.ToolName
-	live := h.pending.callsFor(sid, tool, time.Now(), pendingToolTTL)
+	live := h.pending.callsFor(sid, tool, time.Now(), pendingToolTTL, "")
 	found := false
 	for _, id := range ids {
 		for _, cur := range live {
@@ -110,7 +110,7 @@ func (h *SessionsHandler) confirmCodexPermission(name, workingDir string, event 
 	// may have arrived while a capture was in flight.
 	h.codexPermissionMu.Lock()
 	defer h.codexPermissionMu.Unlock()
-	live = h.pending.callsFor(sid, tool, time.Now(), pendingToolTTL)
+	live = h.pending.callsFor(sid, tool, time.Now(), pendingToolTTL, "")
 	found = false
 	for _, id := range ids {
 		for _, cur := range live {

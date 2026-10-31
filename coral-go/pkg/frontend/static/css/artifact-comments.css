@@ -217,3 +217,11 @@
     .av-compare { padding: 8px 12px; }
 }
 .artifact-viewer-download[aria-disabled="true"] { opacity: 0.5; cursor: default; } /* until the artifact's kind is known it has no address (#9941) */
+
+/* The review bar of the artifact viewer (#136584): Approve and Request changes under the header, with the state in words and the change request's small form. */
+.artifact-review { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 16px; border-bottom: 1px solid var(--border); }
+.artifact-review-state { flex: 1 1 auto; color: var(--text-secondary); }
+.artifact-review-form { flex: 1 1 100%; display: flex; flex-direction: column; gap: 6px; }
+.artifact-review-form textarea { width: 100%; min-height: 4.5em; resize: vertical; }
+.artifact-review-form[hidden], .artifact-review[hidden] { display: none; }
+.artifact-review-error { color: var(--error-text, var(--error)); min-height: 1em; }

@@ -365,6 +365,7 @@ b POST /api/sessions/live/team/{boardName}/wake
 b POST /api/sessions/live/wake-all
 b POST /api/sessions/live/{name}/answer-prompt
 b POST /api/sessions/live/{name}/attach
+b POST /api/sessions/live/{name}/dismiss-wait
 b POST /api/sessions/live/{name}/auto-accept/disable
 b POST /api/sessions/live/{name}/auto-accept/enable
 a POST /api/sessions/live/{name}/context-window
@@ -429,6 +430,7 @@ b GET /api/artifacts/resolve
 b PUT /api/artifacts/{id}/star
 b PUT /api/auth/hub-origins
 b PUT /api/auth/hub-signin
+b POST /api/board/{project}/artifacts/{id}/review
 b PUT /api/board/{project}/artifacts/{id}/tags
 b PUT /api/board/{project}/settings
 b PUT /api/board/{project}/subscribers/{subscriberID}/review-settings

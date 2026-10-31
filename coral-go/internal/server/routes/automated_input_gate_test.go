@@ -173,3 +173,32 @@ func TestHumanInputCallerCantBeClaimedByAnAgent(t *testing.T) {
 	assert.False(t, ask(map[string]string{cliauth.CLIAuthHeader: "x"}), "a forged command-line signature")
 	assert.False(t, ask(map[string]string{}), "a bare local caller")
 }
+
+// #11352, Security's #136728: whatever closes a request in the events (a start, a Dismiss), the automated-input gate reads the terminal itself before it types: a screen that still shows a
+// permission dialog gets nothing, even when the state says the request is closed.
+func TestAutomatedMessagesAreNotTypedAtAPermissionDialogEvenWhenTheStateSaysClosed(t *testing.T) {
+	t.Parallel()
+	_, handler, mock, ss := setupSessionsTestServer(t)
+	term := &screenTerminal{fgSessionTerminal: newFGTerminal(mock), screen: permissionMenu}
+	handler.terminal = term
+	ctx := context.Background()
+	name := naming.SessionName("claude", gateSID)
+	board := noticeBoard(t, term, name)
+	mock.addSession(name, "/tmp/test")
+	term.setFG(name, "node")
+	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: gateSID, AgentType: "claude", AgentName: "repo", WorkingDir: "/tmp/test"}))
+	sid := gateSID
+	for _, ev := range []*store.AgentEvent{
+		{AgentName: "repo", SessionID: &sid, EventType: "prompt_submit", Summary: "User submitted prompt"},
+		{AgentName: "repo", SessionID: &sid, EventType: "permission_request", Summary: "Waiting for the user: permission (Bash)", DetailJSON: ptrString(`{"kind":"permission","tool_name":"Bash"}`)},
+		{AgentName: "repo", SessionID: &sid, EventType: "request_resolved", Summary: "The Operator dismissed the wait", DetailJSON: ptrString(`{"dismissed":true}`)},
+	} {
+		_, err := handler.ts.InsertAgentEvent(ctx, ev)
+		require.NoError(t, err)
+	}
+	require.False(t, handler.deriveSingleSessionState(ctx, gateSID, 0).NeedsInput, "the state says the request is closed")
+
+	require.NoError(t, board.sendAutomated(ctx, "team", name, "You have 2 unread messages on the message board."))
+	time.Sleep(300 * time.Millisecond)
+	assert.Empty(t, term.sentTo(name), "the screen still shows the permission dialog: nothing is typed into it")
+}

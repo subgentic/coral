@@ -509,8 +509,24 @@ func (h *SessionsHandler) CreateEvent(w http.ResponseWriter, r *http.Request) {
 	// QA's review). The event comes from the agent's own hook, but its text is the agent's.
 	if body.EventType == "permission_request" || body.EventType == "request_resolved" {
 		if body.EventType == "permission_request" {
+			if d, ok := body.DetailJSON.(map[string]any); ok {
+				dropKeysFold(d, "call_ids", "tool_use_id", "dismissed", "same_input") // encoding/json reads a key in any case: the server's own fields are never the agent's, however spelled
+				dropOtherCases(d, "wants")                                            // only the exact key is cleaned and stored (#6622): another spelling would be read as the words, uncleaned
+			}
 			body.DetailJSON = sanitizeWants(body.DetailJSON) // what the request wants to do: stored as the line the row shows, never raw (#6622)
 			body.DetailJSON = h.tieRequestToItsCall(body.SessionID, body.ToolName, body.DetailJSON)
+		}
+		if body.EventType == "request_resolved" {
+			// An agent's resolution carries only its kind (an allow-list, not a strip: a key in another case would be read as dismissed or same_input) and no call: a start of a call and a dismissal
+			// are the server's and the Operator's own records (#11352, Security's #137007).
+			kept := map[string]any{}
+			if d, ok := body.DetailJSON.(map[string]any); ok {
+				if k, ok := d["kind"].(string); ok {
+					kept["kind"] = k
+				}
+			}
+			body.DetailJSON = kept
+			event.RefID = nil
 		}
 		if d, ok := body.DetailJSON.(map[string]any); ok {
 			if k, _ := d["kind"].(string); !sessionstate.RequestKinds[k] {
@@ -768,4 +784,24 @@ func (h *SessionsHandler) piToolCounts(ctx context.Context, sessionID string) []
 		return out[i].ToolName < out[j].ToolName
 	})
 	return out
+}
+
+// dropKeysFold removes the named keys from d however they are cased: the state reader's JSON decoding matches a field name without regard to case.
+func dropKeysFold(d map[string]any, names ...string) {
+	for k := range d {
+		for _, n := range names {
+			if strings.EqualFold(k, n) {
+				delete(d, k)
+			}
+		}
+	}
+}
+
+// dropOtherCases removes every spelling of name but the exact one.
+func dropOtherCases(d map[string]any, name string) {
+	for k := range d {
+		if k != name && strings.EqualFold(k, name) {
+			delete(d, k)
+		}
+	}
 }

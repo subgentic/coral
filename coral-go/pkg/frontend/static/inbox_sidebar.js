@@ -11,7 +11,7 @@ import { needsYou, askedRow } from './asked_before_restart.js';
  * are in Display options. The hub's own framed /inbox is not this: it keeps the frame, full width (inbox_tab.js). */
 import { state } from './state.js';
 
-import { reviewItems, unreadReviewItems, reviewErrors, refreshReviews, reviewGroups, markReviewed, setReviewRead, markOpenedRead, isRead } from './inbox_reviews.js';
+import { reviewItems, unreadReviewItems, reviewErrors, refreshReviews, reviewGroups, setReviewRead, markOpenedRead, isRead } from './inbox_reviews.js';
 import { failedUnread, finishedUnread, refreshRuns, markSeen, runRoute, failureWords } from './automation_runs.js';
 import { go, note, backIs, currentRoute } from './nav.js';
 
@@ -50,7 +50,7 @@ const IT = await importOnce('./inbox_toolbar.js'); // the folders' toolbar on th
 const NF = await importOnce('./needs_filters.js'); // the Needs you folder's search, pills and Filters (#8604)
 const CF = await importOnce('./chat_filters.js'); // the chat folders' Filters (#8603)
 const IA = await importOnce('./inbox_artifacts.js'); // the Artifacts folder (Goal #62): every team's files in one list
-const { answerCell } = await importOnce('./inbox_answer.js'); // the choices of a question or a permission, answered from the row (#10400)
+const { answerCell, rowActions } = await importOnce('./inbox_answer.js'); // the choices of a question or a permission, answered from the row (#10400)
 const CH = await importOnce('./mailbox_chats.js'); // the chat folders (#7776): All chats, Board history, By CLI, Tags
 const IR = await importOnce('./inbox_read.js'); // which chats, boards and tasks the person has opened since they changed (#9687)
 const { providerName } = await importOnce('./model_labels.js'); // a CLI by its name (Claude, Codex, Antigravity), as the Chats list says it
@@ -152,9 +152,9 @@ const stateOf = t => TV.taskWord(t);
 const inboxTasksState = DT.tableState();
 const needsState = DT.tableState();
 
-async function openReview(row) {
+async function openReview(row, extra = {}) {
     const { openArtifactViewer } = await importOnce('./artifact_viewer.js');
-    openArtifactViewer(row.hex, { server: splitKey(row.team).server, filename: row.name, mediaType: row.media_type, board: splitKey(row.team).name });
+    openArtifactViewer(row.hex, { server: splitKey(row.team).server, filename: row.name, mediaType: row.media_type, board: splitKey(row.team).name, compare: true, ...extra }); // a later version of a series opens with what changed since the one before (#136588)
     markOpenedRead(row.hex).catch(error => sayLive(error.message)); // opening is reading it: the 'read' tag, so it stops counting everywhere (#9277); the viewer does the same for any for-review artifact, once; a failed save is said, and the item keeps counting
 }
 function reviewActions(row) {
@@ -162,12 +162,17 @@ function reviewActions(row) {
     const errorText = DT.el('span', 'inbox-review-error'); errorText.setAttribute('role', 'alert');
     const open = DT.el('button', 'btn btn-small', 'Open'); open.type = 'button';
     open.setAttribute('aria-label', `Open ${row.name}`); open.addEventListener('click', () => openReview(row));
-    const done = DT.el('button', 'btn btn-small', 'Mark reviewed'); done.type = 'button';
-    done.setAttribute('aria-label', `Mark reviewed: ${row.name}`);
+    const done = DT.el('button', 'btn btn-small', 'Approve'); done.type = 'button'; // replaces Mark reviewed (#136584): it clears the row, marks the review approved and tells the agent that uploaded it
+    done.setAttribute('aria-label', `Approve: ${row.name}`);
+    const changes = DT.el('button', 'btn btn-small inbox-review-icon'); changes.type = 'button'; changes.title = 'Request changes'; // an icon, so the row stays one line; its name says what it does
+    changes.append(DT.el('span', 'material-icons', 'rate_review')); changes.firstChild.setAttribute('aria-hidden', 'true');
+    changes.setAttribute('aria-label', `Request changes: ${row.name}`);
+    changes.addEventListener('click', () => openReview(row, { requestChanges: true }));
     done.addEventListener('click', async () => {
         done.disabled = true; errorText.textContent = '';
         try {
-            await markReviewed(row); sayLive(`Reviewed ${row.name}.`);
+            const { approveRow, sayApproved } = await importOnce('./artifact_review.js');
+            sayApproved(row.name, await approveRow(row.team, row)); sayLive(`Approved ${row.name}.`);
             const target = $('group-table-view')?.querySelector('.inbox-review-actions button') || $('group-table-view')?.querySelector('input[type=search]');
             target?.focus({ preventScroll: true });
         } catch (error) { done.disabled = false; errorText.textContent = error.message; }
@@ -186,8 +191,9 @@ function reviewActions(row) {
         });
         box.append(unread);
     }
-    if (isRead(row)) { done.classList.add('inbox-review-icon'); done.title = 'Mark reviewed'; done.textContent = ''; done.append(DT.el('span', 'material-icons', 'done_all')); done.firstChild.setAttribute('aria-hidden', 'true'); }
-    box.append(done, errorText); return box;
+    if (isRead(row) || isPhoneLayout()) { done.classList.add('inbox-review-icon'); done.title = 'Approve'; done.textContent = ''; done.append(DT.el('span', 'material-icons', 'check')); done.firstChild.setAttribute('aria-hidden', 'true'); }
+    box.append(done); if (!isPhoneLayout()) box.append(changes); // a phone's row has no room for a fourth action: Request changes is in the viewer Open leads to (#136584)
+    box.append(errorText); return box;
 }
 
 /** A failed run opens on its job's or workflow's page; opening it is what clears it from Needs you. */
@@ -567,7 +573,7 @@ registerGroupSource('hub-inbox', {
                         } }] : []),
                         ...(rows.some(isItem) ? [{ key: 'review', label: 'Actions', fixed: true, width: rows.some(s => s.review && isRead(s.review)) ? '21rem' : '13.5rem', line: 1, cell: s => (s.review ? reviewActions(s.review) : s.autorun ? runActions(s.autorun) : '') }] : []),
                         { key: 'waiting', label: 'Waiting', ...(oneLineNeeds ? { width: '9rem' } : { min: rows.some(isItem) ? 12 : 18 }), tone: 'tertiary', align: 'end', sort: true, sortValue: s => s.waiting_since || '', firstDir: 'desc', line: rows.some(isItem) ? 2 : 1, cell: s => waitingText(s.waiting_since) || '' },
-                    ], ...(oneLineNeeds ? { oneLine: true, sortBar: false } : {}), ...(oneLineNeeds ? { mail: s => ({ lead: { text: needsName(s), name: needsName(s) }, title: needsName(s), medium: true, starred: !!(s.review && s.review.starred), team: teamOf(s), teamAlways: multipleServers() || manyTeams, nameTeam: true, snippetTip: true, snippet: askOf(s) || sessionStateInfo(s).label, state: askOf(s) || sessionStateInfo(s).label, time: DT.shortTime(s.waiting_since), unread: true, mark: 'attention', answers: answerCell(s) }) } : {}) }); // a phone's row is the mail row: the agent, then the ask on a second line, amber and bold (every row of Needs you is unanswered); a list with a review or a run keeps its own actions. One line a row (Goal #79) for a list of agents: the ask is the row's tooltip, a narrow list drops it, then the team, the folder and the CLI; a list with a review item or a failed run keeps its own folded rows
+                    ], ...(oneLineNeeds ? { oneLine: true, sortBar: false } : {}), ...(oneLineNeeds ? { mail: s => ({ lead: { text: needsName(s), name: needsName(s) }, title: needsName(s), medium: true, starred: !!(s.review && s.review.starred), team: teamOf(s), teamAlways: multipleServers() || manyTeams, nameTeam: true, snippetTip: true, snippet: askOf(s) || sessionStateInfo(s).label, state: askOf(s) || sessionStateInfo(s).label, time: DT.shortTime(s.waiting_since), unread: true, mark: 'attention', answers: answerCell(s, { dismiss: false }), actions: rowActions(s) }) } : {}) }); // a phone's row is the mail row: the agent, then the ask on a second line, amber and bold (every row of Needs you is unanswered); a list with a review or a run keeps its own actions. One line a row (Goal #79) for a list of agents: the ask is the row's tooltip, a narrow list drops it, then the team, the folder and the CLI; a list with a review item or a failed run keeps its own folded rows
                     wrap.append(table.el);
                     if (hidden > 0) {
                         const only = needsFilters.kind && !needsFilters.q && !needsFilters.team && !needsFilters.agent && !needsFilters.goal && !needsFilters.longer && !needsFilters.server;

@@ -414,7 +414,7 @@ export function createArtifactsList({ inbox = false } = {}) {
             importOnce('./preview_pane.js').then(m => m.openArtifactTab(link.hex ? `coral://artifacts/${link.hex}` : item.uri || '', {
                 server: link.server, filename: name, mediaType: item.media_type,
                 contentURL: link.contentURL, externalURL: link.preview ? undefined : link.url,
-                tagging: link.hex ? { project: model.project, tags: item.tags, editable: local(), offer: teamTags, onChange: tags => retag(link.hex, tags) } : undefined, // the tags in the preview's head (#8594)
+                tagging: link.hex ? { project: model.project, tags: item.tags, review: item.review, editable: local(), offer: teamTags, onChange: tags => retag(link.hex, tags) } : undefined, // the tags in the preview's head (#8594)
             }));
             root?.querySelectorAll('tr[data-key]').forEach(r => { if (r.dataset.key === key) r.setAttribute('aria-current', 'true'); else r.removeAttribute('aria-current'); });
             return;
@@ -451,7 +451,7 @@ export function createArtifactsList({ inbox = false } = {}) {
         const actions = [];
         if (link) {
             if (link.inline) actions.push({ label: 'Open', primary: true, run: () => importOnce('./preview_pane.js').then(m => m.openArtifactTab(item.uri || '', { contentURL: item.content_url, mediaType: item.media_type, filename: name, phoneFull: true })) });
-            else if (hex) actions.push({ label: 'Open', primary: true, run: () => importOnce('./artifact_viewer.js').then(m => m.openArtifactViewer(hex, { server: link.server, filename: name, mediaType: item.media_type }), () => window.open(link.url, '_blank', 'noopener,noreferrer')) });
+            else if (hex) actions.push({ label: 'Open', primary: true, run: () => importOnce('./artifact_viewer.js').then(m => m.openArtifactViewer(hex, { server: link.server, filename: name, mediaType: item.media_type, board: splitKey(inbox ? item.board_id : model.project).name }), () => window.open(link.url, '_blank', 'noopener,noreferrer')) });
             if (link.preview) actions.push(isCloud() ? { label: 'Download', run: () => importOnce('./artifact_download.js').then(m => m.downloadArtifact(link.url, m.sanitizeDownloadName(name))).catch(() => showToast('The artifact could not be downloaded', true)) } : { label: 'Download', href: link.url, download: true });
             else actions.push({ label: 'Open link', primary: true, href: link.url });
             actions.push({ label: 'Copy link', run: () => { navigator.clipboard?.writeText(hex ? `coral://artifacts/${hex}` : new URL(link.url, location.href).href).then(() => showToast('Link copied'), () => showToast('The link could not be copied', true)); } });
@@ -464,9 +464,16 @@ export function createArtifactsList({ inbox = false } = {}) {
         }
         const note = hex ? `Star puts it in your Starred list.${hex && local() ? ' Keep stops Coral\u2019s cleanup from deleting the file.' : ''}` : ''; // the two buttons are not the same thing, and their names are close (#10539)
         const editor = hex ? Tags.tagEditor({ project: inbox ? item.board_id : model.project, hex, tags: item.tags, editable: local(), offer: teamTags, onChange: tags => retag(hex, tags) }) : null; // a stored file's tags (#8594)
+        const reviewText = hex ? Tags.reviewWords(item.tags, item.review) : ''; // the review's state in words, with the time of an approval, above the tags (#136584)
+        let head = editor;
+        if (editor && reviewText) {
+            head = document.createElement('div'); head.className = 'artifact-sheet-head';
+            const line = document.createElement('span'); line.className = 'artifact-review-line'; line.setAttribute('role', 'status'); line.textContent = reviewText;
+            head.append(line, editor);
+        }
         const dropped = ['team', 'goal'].filter(k => { const th = root?.querySelector(`th[data-key="${k}"]`); return !!th && getComputedStyle(th).display === 'none'; }).length; // a narrow box drops the row's Team and Task columns: their facts are behind Details, and the button says how many
         openDetailPane({
-            key, opener, note, hiddenFacts: dropped, title: name, host: hooks.detailHost || null, extra: editor, backLabel: inbox ? 'Artifacts' : '', focusClose: inbox, resizable: true, mainMin: inbox ? 0 : 380, // the team page's pane wears the same handle as the Inbox's (detail_pane.js: drag, keys, double click, the width kept; the agent's Artifacts sheet has a host and no handle) (#9410)
+            key, opener, note, hiddenFacts: dropped, title: name, host: hooks.detailHost || null, extra: head, backLabel: inbox ? 'Artifacts' : '', focusClose: inbox, resizable: true, mainMin: inbox ? 0 : 380, // the team page's pane wears the same handle as the Inbox's (detail_pane.js: drag, keys, double click, the width kept; the agent's Artifacts sheet has a host and no handle) (#9410)
             sub: [un ? '' : typeText(item), un ? '' : sizeText(item.size), whenText(item.created_at)].filter(Boolean).join(' · '), subTitle: createdText(item), // the exact time behind the one in words
             facts: facts.filter(([, v]) => v != null && v !== ''),
             details: link && link.preview && hex ? (h, { isStale }) => { // the Operator's "Who can read this" (#5577) is behind Details with the facts, for a stored artifact

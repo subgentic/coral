@@ -175,6 +175,11 @@ function reviewHtml(info) {
         `<div class="cni-review-row"><dt>${escapeHtml(it.question)}</dt><dd>${escapeHtml(it.answer || "—")}</dd></div>`).join("") + `</dl>`;
 }
 
+// A Dismiss is offered for a request of the agent's own kinds (#11352): the same rule as the Inbox row's (dismiss_wait.js, loaded when it is pressed). Through Coral Hub the machine answers anyone but the owner 403.
+function canDismissWait(session, kind) {
+    return !!(session && session.session_id && (kind === "permission" || kind === "question" || kind === "plan"));
+}
+
 function needsInputHtml(info, session) {
     const inp = (info.tool && info.tool.input) || {};
     const screen = info.screen || {};
@@ -257,7 +262,7 @@ function needsInputHtml(info, session) {
         + context
         + reviewHtml(info)
         + controls.body
-        + `<div class="cni-foot"><button type="button" class="cni-link" data-on-click="terminal-view-open">Open terminal</button>${hint}<span class="cni-foot-spacer"></span>${info.signedOut ? `<button type="button" class="btn btn-sm cni-recheck" data-on-click="startup-recheck" data-agent="${escapeAttr(info.agent || "claude")}">Check again</button>` : ""}${controls.foot}</div>`;
+        + `<div class="cni-foot"><button type="button" class="cni-link" data-on-click="terminal-view-open">Open terminal</button>${hint}${!info.readOnly && canDismissWait(session, info.kind) ? `<button type="button" class="cni-link" data-on-click="dismiss-wait" data-session-id="${escapeAttr(session.session_id)}" title="Clear this if the agent is not waiting. Nothing is sent to the agent.">Dismiss</button>` : ""}<span class="cni-foot-spacer"></span>${info.signedOut ? `<button type="button" class="btn btn-sm cni-recheck" data-on-click="startup-recheck" data-agent="${escapeAttr(info.agent || "claude")}">Check again</button>` : ""}${controls.foot}</div>`;
 }
 
 // The sign-in card (#3830): the login happens in the agent's terminal (a browser link and a code

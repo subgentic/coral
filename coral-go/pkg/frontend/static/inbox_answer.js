@@ -8,6 +8,8 @@ import { serverFetch, sessionServer } from './server_base.js';
 import { showToast } from './utils.js';
 import { blockedReason, hubBlocked } from './hub_access.js';
 import { resolveSessionIdentity } from './session_state.js';
+import { importOnce } from './import_once.js';
+const { canDismissWait, dismissButton, dismissWait } = await importOnce('./dismiss_wait.js'); // a lazy module loads the others it needs through importOnce, so a failed load is retried
 
 const MAX_CHOICES = 4;
 // Choices that last past this one answer, or change how the agent runs: never a button on a list row (each CLI's own words: Claude's "Yes, and don't ask again for ..." and "Yes, allow all edits during this session", Codex's "Yes, and don't ask again", Antigravity's "always allow").
@@ -79,7 +81,7 @@ async function answer(s, o, ask, cell) {
 }
 
 /** Draws the choices into the cell once they are read (again after a question changed). */
-function fill(s, cell) {
+function fill(s, cell, withDismiss = true) {
     const key = askKey(s);
     if (!read.has(key)) read.set(key, readAsk(s).catch(() => ({ ask: '', picks: [] })));
     return read.get(key).then(({ ask, picks }) => {
@@ -93,15 +95,30 @@ function fill(s, cell) {
             b.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') e.stopPropagation(); });
             cell.append(b);
         }
+        if (withDismiss && canDismissWait(s, s.waiting_kind)) { // a wait that is no longer true can be cleared here, on this computer only (#11352)
+            const d = dismissButton('btn btn-small inbox-dismiss', s);
+            d.setAttribute('aria-label', `Dismiss the wait of ${resolveSessionIdentity(s)}`);
+            d.addEventListener('click', e => { e.stopPropagation(); dismissWait(s, d); });
+            d.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') e.stopPropagation(); });
+            cell.append(d);
+        }
     });
 }
 
-/** The Answer cell of a Needs you row: empty for a review or a run, for a viewer through the Hub, otherwise the one-time choices once they are read. */
-export function answerCell(s) {
-    if (s.review || s.autorun || !s.agent_type || !s.session_id || s.waiting_kind === 'login') return '';
-    if (blockedReason(sessionServer(s), 'interact')) return '';
+/** Whether a Needs you row offers its agent's answers at all: not a review or a run, not a viewer through the Hub, not a sign-in. */
+const answerable = s => !(s.review || s.autorun || !s.agent_type || !s.session_id || s.waiting_kind === 'login') && !blockedReason(sessionServer(s), 'interact');
+
+/** The actions of a phone Needs you row's ⋯ menu (#137104): the Dismiss of a wait that is no longer true, offered by the rule the desktop row's button follows. */
+export function rowActions(s) {
+    if (!answerable(s) || !canDismissWait(s, s.waiting_kind)) return [];
+    return [{ label: 'Dismiss', title: 'Clear this if the agent is not waiting. Nothing is sent to the agent.', run: b => dismissWait(s, b) }];
+}
+
+/** The Answer cell of a Needs you row: empty for a review or a run, for a viewer through the Hub, otherwise the one-time choices once they are read. `dismiss: false` leaves the Dismiss to the row's ⋯ menu (a phone's). */
+export function answerCell(s, { dismiss = true } = {}) {
+    if (!answerable(s)) return '';
     const cell = document.createElement('span');
     cell.className = 'inbox-answers';
-    fill(s, cell);
+    fill(s, cell, dismiss);
     return cell;
 }

@@ -16,6 +16,17 @@ export async function putTags(project, hex, tags) {
     return Array.isArray(d.tags) ? d.tags : tags;
 }
 
+/** What a file's review says, in words, from its tags and its recorded decision ({state, at}): "Approved Oct 30, 10:42", "Changes requested", "Waiting for your review", "Reviewed"; "" for a file that is not for review (#136584). */
+export function reviewWords(tags, review) {
+    const has = t => Array.isArray(tags) && tags.includes(t);
+    if (has('approved')) {
+        const t = review && review.at ? Date.parse(review.at) : NaN;
+        return Number.isNaN(t) ? 'Approved' : `Approved ${new Date(t).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}`;
+    }
+    if (has('for review')) return has('changes requested') ? 'Changes requested' : 'Waiting for your review';
+    return has('reviewed') ? 'Reviewed' : '';
+}
+
 export function tagChip(tag) { return mk('span', 'chip artifact-tag', tag); }
 
 /** The tags of a table row: at most two chips, then +N; the whole list in the title. null when there are none. */
