@@ -1,5 +1,30 @@
 # Release Notes
 
+## v2.0.18 — swipe a welcome item away on a phone, and a cleaner name on a question row
+
+### Changes
+
+#### What you will notice first
+
+- **On a phone (any touch screen), swipe a welcome item left to dismiss it**: a drag past 40% of the row (or a flick) dismisses it with a toast and Undo for 30 seconds; a shorter drag springs back, and a vertical drag still scrolls the page. The visible Dismiss button stays and offers no Undo. With reduced motion the row does not slide. The strip behind the row reads "Dismiss" in the normal text colour (it was red and hard to read).
+- **A question row with an empty first line shows its asker's name cleaned**: a hidden character in the name (for example a right-to-left override) is now marked there as it is in the line below, instead of showing raw.
+
+#### Agents and the chat
+
+- **The launch form keeps a custom model's thinking levels while it loads**: the cached model list dropped the CLI's thinking levels, so for a moment a custom model had none until the server answered. The cache now keeps them (a cache saved before the update has none, so the first open after updating still shows the short gap once).
+
+#### Known issues
+
+- **Windows: in-app update does not work from 2.0.0 through 2.0.6.** If you're on one of those, download and install the MSI by hand; from 2.0.7 on, in-app update works.
+- **macOS: a Coral of 2.0.5 or earlier cannot install updates in-app; install 2.0.6 or later by hand once.**
+- **OpenCode agents are tested on macOS and Linux; OpenCode on Windows is not yet tested end to end.**
+- Setting up a computer over SSH is supported from a macOS or Linux hub, and is not yet tested from a Windows hub.
+
+#### For developers and releases
+
+- The static tree is 5,862,106 bytes of the 5,906,432-byte budget, and app.js at start is 396,943 encoded bytes against its 396,965 limit (the swipe is a lazy module, loaded on a touch screen only when a row has a Dismiss).
+- The cause of the `custom_models_e2e_browser` flake (#11547) was this cache race, now fixed with a deterministic test.
+
 ## v2.0.17 — phone tabs reordered, question rows that read like review rows, and tidier welcome buttons
 
 ### Changes
