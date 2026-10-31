@@ -31,6 +31,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
         await ev(`window.switchNavTab('hub-inbox'); true`);
         await ev(`import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('artifacts')).then(() => true)`);
         await waitFor(`[...document.querySelectorAll('${T} button')].some(b => /^Ignored \\d+$/.test((b.textContent || '').trim()))`, 'the Ignored pill', 20000);
+        await waitFor(`JSON.stringify([...document.querySelectorAll('${T} button')].map(b => (b.textContent || '').trim()).filter(t => /^(All|For review|Ignored) \\d+$/.test(t))) === JSON.stringify(['All 2', 'For review 1', 'Ignored 1'])`, 'the pill counts settle (the All count is read after the Ignored pill appears)', 15000).catch(() => {});
         check(JSON.stringify(await pills()) === JSON.stringify(['All 2', 'For review 1', 'Ignored 1']), 'the pills: All, For review, Ignored with their counts: ' + JSON.stringify(await pills()));
         await ev(`[...document.querySelectorAll('${T} button')].find(b => /^Ignored \\d+$/.test((b.textContent || '').trim())).click(); true`);
         await waitFor(`document.querySelectorAll('${T} tbody tr').length === 1 && /put-away\\.md/.test(document.querySelector('${T} tbody tr').textContent)`, 'the list is the ignored file alone', 15000);
