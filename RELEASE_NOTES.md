@@ -1,5 +1,49 @@
 # Release Notes
 
+## v2.0.10 — Approve and Request changes on artifacts, share a file with an agent, OpenCode as a provider, set up a computer over SSH from a self-hosted hub, a CSV viewer, and the phone navigation finished
+
+### Changes
+
+#### What you will notice first
+
+- **Approve and Request changes on a for-review artifact**: you can approve an artifact an agent uploaded for review (the artifact's sheet says "Approved" with the time) or send a change request, and the agent gets a notice. A team artifact keeps its versions and series, and its comments can be edited, deleted or locked. Through Coral Hub the owner can do all of it; a guest keeps their own comments, and comment edit and delete belong to the owner and the author. A remote computer's buttons are hidden through `coral --hub`.
+- **Share a file with an agent**: drop files on an agent's Artifacts list, or choose them with Upload a file. The agent gets the file on its board. Through Coral Hub it is the owner's alone, and a board takes at most 30 files a minute.
+- **OpenCode is a provider**: New agent shows it as a card with its install state and models, and with its sign-in command (shown, with Copy and Check again) when OpenCode is not signed in. Each OpenCode agent runs its own server; its working or idle state, your turn, last message and chat come from that server, and a woken or resumed agent shows its chat at once. Bypass permissions means no prompts at all for OpenCode: it edits files and runs commands in its folder without asking (it asks only before something outside it); use it only where that is fine. Coral runs OpenCode with its own data folder, so what your own OpenCode is signed in to is not used: sign in with the command the card shows. OpenCode agents are tested on macOS and Linux; OpenCode on Windows is not yet tested end to end.
+- **Set up a computer over SSH from a self-hosted hub**: the Servers tab has "Set up over SSH" (pick a host from your `~/.ssh/config`, check its host key), and upgrade, stop and uninstall for a computer set up that way. The hub installs its own running release on the far computer and starts it; before it installs, the dialog asks for consent in two lines: "By pressing Set up you accept these Terms of Service for Coral on <that computer>, and for the other Coral installs of the account you use there." [OPERATOR TO CONFIRM this first line: it is a placeholder in the code (a TODO(operator) in server_ssh_setup.js); a change is a one-line follow-up; remove this marker before publishing] and "That computer records who accepted (<the acceptance label>), when, and which version." The hub downloads its own release from GitHub and checks its signature and hash before it installs it; Coral on the far computer listens on that computer's own address only and is reached through SSH. Setting up a computer over SSH is supported from a macOS or Linux hub, and is not yet tested from a Windows hub. Hub mode only; the Operator's alone.
+- **A CSV and TSV viewer**: a `.csv` or `.tsv` file opens as a table with a sticky header, sort (numbers as numbers), a filter, wrapping cells and a Raw toggle; Download is unchanged. Cells are text only (a formula is shown, never run), and it caps at 5,000 rows, 200 columns and 2 MB, with the status saying so.
+- **The phone navigation is finished**: Docs, Analytics and Computers are top-level screens with one shared bar; an open topic, view or job is a drill-down with a 44 px ← ; Settings, New goal and Create task are form screens; a job's and a workflow's page keeps one primary action in its pinned footer.
+- **New team replaces New project everywhere**: the Home card, the chooser, the wizard's title and the legacy Message Board say teams, not projects. New teams are offered their folder, an empty Board has an action, and the team's goal switch says its state in words.
+
+#### New users
+
+- **New agent says when Claude or Pi is not signed in, and how**: a notice at the top of the Provider section, in Pi's words for Pi ("run pi, type /login, choose how to sign in"), naming Pi's default provider.
+- **A folder that does not exist is said at the Folder field**, with the Create this folder button under the error; recent folders that are gone are dropped.
+- **Closing a goal no longer needs a typed reason**; the Sign-in needed card says to finish the terminal's first-run steps, then press Check again; New team's steps say what each state and "Set all workers to" mean; the Operator is explained where a newcomer meets it.
+- **The no-password banner wraps again** when the words and both buttons do not fit, and is hidden while the password dialog is open.
+
+#### Agents and the chat
+
+- **A stale permission card closes**: a request closes when its tool starts or when a later call has run, so the card and the Needs-you row no longer stay for the whole turn; the Operator can Dismiss one from the card and from the Inbox row (through Coral Hub, the owner's alone). A phone Inbox row has a ⋯ menu.
+- **Board notices for an agent that was just launched wait for its process to be recorded** instead of being dropped; a restart no longer marks a subscriber with nothing unread as notified; a tmux agent's record is found by its tmux session's own name.
+- **Paste an image into a question's answer**: when an agent asks a question with a typed answer, paste or add an image in the card (the image button works too); it is sent with your words as one answer. It uses the message box's own uploader, so the limits and the failure words are the same.
+- **An agent row's latest message shows as soon as the agent's first reply stops**, not on the next poll.
+- **Task state labels**: a state is a coloured dot and its word in the same colour, no pill outline.
+- **Files**: inline diffs are back, stacked, with Expand all; the Files panel follows the agent into the git worktree it works in (this applies to your own dashboard page, on this computer or signed in over the network; never to scripts, agents or Coral Hub); Analytics charts count in whole figures, and Burn rate, Cache read/write and Cumulative spend have hints.
+- **Pause Coral's messages to one agent**: a bell in the agent's chat header holds Coral's notices to that agent while you talk to it (30 minutes by default, up to 12 hours), and tells the agent once when the pause ends ("While you were talking: 3 board messages, 1 task"). Your own typing for a minute also holds them. Auto-accept answers are never held.
+
+#### Known issues
+
+- **Windows: in-app update does not work from 2.0.0 through 2.0.6.** If you're on one of those, download and install the MSI by hand; from 2.0.7 on, in-app update works.
+- **macOS: a Coral of 2.0.5 or earlier cannot install updates in-app; install 2.0.6 or later by hand once.**
+- **OpenCode: a sleeping OpenCode agent's chat is empty until you wake it**; its history row stays. This ships fixed in the next release.
+
+#### For developers and releases
+
+- **The macOS arm64 build moves from the `macos-14` runner image to `macos-15`**: GitHub retires `macos-14` on 2026-11-02 and fails its jobs in scheduled brownouts. Signing, notarization and the minimum macOS versions are unchanged.
+- **The static budget rises to 5,840,896 bytes** (`5<<20 + 584<<10`): the operator's raise of 2026-10-30; this release's tree ships 5,775,213 bytes.
+- The README says what Coral is: the inbox for your agents, and an agentic IDE for AI-first development.
+- The stress runners stop their own tmux server on exit; a test that left a process behind now cleans it up.
+
 ## v2.0.9 — board notices go only into an agent's own CLI, the Windows team's batch of safety and launch fixes, Analytics tabs, provider cards for a new agent, and the phone's drill-down team page
 
 ### Changes
