@@ -53,6 +53,8 @@ var settingRows = map[string]struct{ good, bad string }{
 	"welcome_choice":              {`"connected"`, `"maybe"`},
 	"welcome_pending":             {`"False"`, `"nope"`},
 	"home_editions_hidden":        {`"True"`, `"nope"`},
+	"inbox_welcome":               {`"off"`, `"maybe"`},
+	"inbox_welcome_done":          {`"welcome,agent"`, `true`},
 	"uploads_retention_days":      {`30`, `400`},
 	"uploads_max_mb":              {`"500"`, `10`},
 	"call_metrics_retention_days": {`14`, `91`},

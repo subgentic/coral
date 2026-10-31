@@ -1,6 +1,7 @@
 import { multipleServers, serverColumns, serverMatches, syncServerField } from './inbox_servers.js';
 import { keepMenuOnScreen } from './menu_fit.js';
 import { needsYou, askedRow } from './asked_before_restart.js';
+import { welcomeRows, runWelcome, dismissWelcome, hideAllWelcome } from './welcome_items.js';
 /* The dashboard's own Inbox on the shared sidebar (#7472), loaded the first time the Inbox tab is shown (inbox_tab.js keeps the badge and the counts, which are always there).
  *
  * Three groups, the hub's /inbox order: Needs you (the agents waiting for input, from the live list the dashboard already holds), Tasks (the open tasks assigned to the Operator) and Saved (the
@@ -91,14 +92,14 @@ let page = null; // { kind: 'task', project, id } | { kind: 'saved', id }: the i
 // ── Needs you ────────────────────────────────────────────────────────────
 const waitingSessions = () => (state.liveSessions || []).filter(needsYou).map(askedRow); // an agent that asked something before Coral restarted is listed with its words (#10368)
 const teamOf = s => s.board_project ? teamLabel(identityKey(sessionServer(s), s.board_project)) : ''; // with its computer when a hub has more than one (#8774)
-const needsName = s => s.review ? s.review.produced_by || 'Unknown agent' : s.autorun ? s.autorun.name : resolveSessionIdentity(s);
+const needsName = s => s.review ? s.review.produced_by || 'Unknown agent' : s.autorun ? s.autorun.name : s.welcome ? s.welcome.title : resolveSessionIdentity(s);
 const reviewRows = () => reviewItems().map(a => ({ review: a, goal: a.goal_id && a.goal_title ? { id: a.goal_id, title: String(a.goal_title), board: a.team } : null, task: a.task_id ? { id: a.task_id, title: String(a.task_title || '') } : null, session_id: a.reviewKey, display_name: a.name, board_project: splitKey(a.team).name, server: splitKey(a.team).server, waiting_kind: 'review', waiting_summary: 'For review', waiting_since: a.created_at }));
 /** A failed run of a job or workflow that nobody has opened (#9296): a row of Needs you like a review, opened on its job's or workflow's page, dismissed (marked opened) without opening it. */
 const runRows = () => failedUnread().map(r => ({ autorun: r, session_id: `automation-run:${r.key}`, display_name: r.name, board_project: '', server: '', waiting_kind: 'run', waiting_summary: failureWords(r) ? `Run failed: ${failureWords(r)}` : 'Run failed', waiting_since: r.finishedAt || r.at }));
-const isItem = s => !!(s.review || s.autorun); // a row that is not an agent: a review or a run, shown as an item
+const isItem = s => !!(s.review || s.autorun || s.welcome); // a row that is not an agent: a review, a run or a welcome item, shown as an item // a row that is not an agent: a review or a run, shown as an item
 let answered = ''; // what an answer given here went through as, for five minutes: the row is gone and the list says so (#10720)
 document.addEventListener('coral:inbox-answered', e => { answered = e.detail.said; setTimeout(() => { answered = ''; }, 3e5); });
-const allNeeds = () => [...waitingSessions(), ...reviewRows(), ...runRows()];
+const allNeeds = () => [...waitingSessions(), ...reviewRows(), ...runRows(), ...welcomeRows()]; // the welcome items of a new install come last: real work first (#11443)
 const needsText = s => [s.review?.name || '', s.autorun ? `${s.autorun.name} ${s.waiting_summary}` : '', needsName(s),resolveSessionIdentity(s), sessionStateInfo(s).label, askOf(s), teamOf(s), s.goal?.title || '', s.task?.title || ''].join(' ').toLowerCase();
 let needsFilters = NF.loadFilters(), needsBar = null;
 const NO_GOAL = 'No goal';
@@ -200,6 +201,22 @@ function runActions(run) {
     done.setAttribute('aria-label', `Dismiss the failed run of ${run.name}`);
     done.addEventListener('click', () => { markSeen(run); sayLive(`Dismissed the failed run of ${run.name}.`); $('group-table-view')?.querySelector('input[type=search]')?.focus({ preventScroll: true }); });
     box.append(open, done); return box;
+}
+
+/** A welcome item's actions (#11443): its own action, and a quiet Dismiss for all but the welcome itself. */
+function welcomeActions(w) {
+    const box = DT.el('div', 'inbox-review-actions');
+    const go = DT.el('button', 'btn btn-small btn-primary', w.go); go.type = 'button';
+    go.setAttribute('aria-label', `${w.go}: ${w.title}`);
+    go.addEventListener('click', () => runWelcome(w.id));
+    box.append(go);
+    if (w.dismiss) {
+        const no = DT.el('button', 'btn btn-small btn-quiet', 'Dismiss'); no.type = 'button';
+        no.setAttribute('aria-label', `Dismiss: ${w.title}`);
+        no.addEventListener('click', () => { dismissWelcome(w.id); sayLive(`Dismissed: ${w.title}.`); });
+        box.append(no);
+    }
+    return box;
 }
 
 const dockSavedState = DT.tableState();
@@ -537,15 +554,15 @@ registerGroupSource('hub-inbox', {
             const goal = rows.some(goalOf);
             const total = filteredNeeds().length, hidden = allNeeds().length - total; // what the filters hide is said above the list, with the way to show it (#10399)
             const manyTeams = new Set(allNeeds().map(teamOf).filter(Boolean)).size > 1; // with two or more teams waiting, a one-line row names its team
-            return { title: 'Needs you', noun: ['item', 'items'], rows, count: total > rows.length ? `${rows.length} of ${total}` : total, note: reviewErrors().join(' '), empty: { line: NF.isFiltered(needsFilters) ? 'Nothing that needs you matches the search and filters.' : 'Nothing needs your input.', hint: NF.isFiltered(needsFilters) ? undefined : answered || 'An agent that asks a question or wants permission, and a review artifact, appear here. A task assigned to you is under Tasks.' },
+            return { title: 'Needs you', noun: ['item', 'items'], rows, count: total > rows.length ? `${rows.length} of ${total}` : total, note: reviewErrors().join(' '), empty: { line: NF.isFiltered(needsFilters) ? 'Nothing that needs you matches the search and filters.' : 'Nothing needs you', hint: NF.isFiltered(needsFilters) ? undefined : answered || 'An agent that asks a question or wants permission, and a review artifact, appear here. A task assigned to you is under Tasks.', go: NF.isFiltered(needsFilters) ? undefined : { action: 'inbox-go-agents', label: 'Go to Agents' } },
                 signature: JSON.stringify([hidden, finishedUnread().length, answered || '', manyTeams, needsOverflow().map(g => [g.name, g.more.map(a => a.reviewKey)]), reviewErrors(), rows.map(s => [sessionServer(s), s.session_id, s.display_name, s.waiting_kind, s.waiting_since, waitingText(s.waiting_since), teamOf(s), askOf(s), goalOf(s) ? s.goal.id : 0, s.task ? [s.task.id, s.task.title] : 0, dirOf(s), s.review ? isRead(s.review) : 0])]), // the words move on with the clock: they are part of what was drawn
-                node: () => { const wrap = DT.el('div', 'inbox-needs-results'); const oneLineNeeds = !rows.some(isItem); const table = DT.dataTable({ label: `Needs you, ${rows.length}`, rows, rowKey: s => `${sessionServer(s)}:${s.session_id}`, state: needsState, rowName: s => s.review ? `${s.review.name}, for review, ${teamOf(s)}` : s.autorun ? `${s.autorun.name}, run failed` : resolveSessionIdentity(s),
-                    open: s => { if (s.review) { openReview(s.review); return; } if (s.autorun) { openRun(s.autorun); return; } window.switchNavTab?.('agents'); Promise.resolve(window.selectLiveSession?.(s.name, s.agent_type, s.session_id, sessionServer(s))).then(() => window.showChatView?.()); }, // a row that needs an answer shows the chat card, not the terminal saved last (#10141)
+                node: () => { const wrap = DT.el('div', 'inbox-needs-results'); const oneLineNeeds = !rows.some(isItem); const table = DT.dataTable({ label: `Needs you, ${rows.length}`, rows, rowKey: s => `${sessionServer(s)}:${s.session_id}`, state: needsState, rowName: s => s.review ? `${s.review.name}, for review, ${teamOf(s)}` : s.autorun ? `${s.autorun.name}, run failed` : s.welcome ? s.welcome.title : resolveSessionIdentity(s),
+                    open: s => { if (s.review) { openReview(s.review); return; } if (s.autorun) { openRun(s.autorun); return; } if (s.welcome) { runWelcome(s.welcome.id); return; } window.switchNavTab?.('agents'); Promise.resolve(window.selectLiveSession?.(s.name, s.agent_type, s.session_id, sessionServer(s))).then(() => window.showChatView?.()); }, // a row that needs an answer shows the chat card, not the terminal saved last (#10141)
                     columns: [
                         { key: 'agent', label: rows.some(isItem) ? 'Item' : 'Agent', primary: true, width: 'grow', ...(rows.some(isItem) ? { min: 24, share: 2 } : {}), sort: true, sortValue: s => resolveSessionIdentity(s), line: 1, ...(oneLineNeeds ? { subtitle: s => askOf(s), subtitleTitle: s => askOf(s) } : {}), // a list of agents: the ask is the row's one second line, under the name (UI/UX: the row's purpose is to decide from the list)
-                            cell: s => { if (s.autorun) { const name = DT.el('span', 'inbox-review-name', s.autorun.name); name.title = s.autorun.name; return name; } if (s.review) { const name = DT.el('span', 'inbox-review-name', s.review.name); name.title = s.review.name; name.dataset.reviewArtifact = s.review.id; if (!isRead(s.review)) return name; const wrap = DT.el('span', 'inbox-review-item'); wrap.append(name, DT.tag('read')); return wrap; } const w = DT.personButton(resolveSessionIdentity(s), `Open ${resolveSessionIdentity(s)}`); Object.assign(w.querySelector('.dt-primary').dataset, { name: s.name, agentType: s.agent_type, sessionId: s.session_id, server: sessionServer(s) }); return w; } },
+                            cell: s => { if (s.welcome) { const name = DT.el('span', 'inbox-review-name', s.welcome.title); name.title = s.welcome.title; if (s.welcome.optional) name.append(DT.tag('optional')); return name; } if (s.autorun) { const name = DT.el('span', 'inbox-review-name', s.autorun.name); name.title = s.autorun.name; return name; } if (s.review) { const name = DT.el('span', 'inbox-review-name', s.review.name); name.title = s.review.name; name.dataset.reviewArtifact = s.review.id; if (!isRead(s.review)) return name; const wrap = DT.el('span', 'inbox-review-item'); wrap.append(name, DT.tag('read')); return wrap; } const w = DT.personButton(resolveSessionIdentity(s), `Open ${resolveSessionIdentity(s)}`); Object.assign(w.querySelector('.dt-primary').dataset, { name: s.name, agentType: s.agent_type, sessionId: s.session_id, server: sessionServer(s) }); return w; } },
                         ...(rows.some(askOf) && !oneLineNeeds ? [{ key: 'asks', label: 'Waiting for', width: 'content', max: 20, drop: 2, line: 2, cell: s => {
-                            if (s.autorun) { const why = DT.el('span', null, askOf(s)); why.title = askOf(s); return why; } // the whole reason is the tooltip: the line is one
+                            if (s.autorun || s.welcome) { const why = DT.el('span', null, askOf(s)); why.title = askOf(s); return why; } // the whole reason is the tooltip: the line is one
                             if (!s.review) { const ask = askOf(s); if (!ask) return ''; const why = DT.el('span', null, ask); why.title = ask; return why; } // the whole ask is the tooltip: the row is one line
                             const metadata = DT.el('span', 'inbox-review-metadata'); metadata.append(DT.el('span', null, 'For review'), DT.el('span', 'inbox-review-team', teamOf(s)));
                             if (s.task) { const t = DT.link(s.task.title || `Task ${s.task.id}`, () => openItemRoute('tasks', s.review.team, String(s.task.id), `${s.review.team}#${s.task.id}`)); t.classList.add('inbox-review-task'); t.setAttribute('aria-label', `Task: ${s.task.title || s.task.id}`); t.dataset.taskLink = String(s.task.id); t.title = `Task: ${s.task.title || `#${s.task.id}`}`; metadata.append(t); } // the task a review is for opens in the Inbox, in place (#8917): with the item's own words, not under the goal where it read as a second goal (#9060)
@@ -555,7 +572,7 @@ registerGroupSource('hub-inbox', {
                         ...(rows.some(s => s.agent_type) ? [{ key: 'cli', label: 'CLI', ...(oneLineNeeds ? { width: '6rem', dropAt: 36 } : {}), sort: true, sortValue: s => providerName(s.agent_type) || '', line: 2, cell: s => (s.agent_type ? DT.tag(providerName(s.agent_type)) : '') }] : []),
                         ...(rows.some(dirOf) ? [{ key: 'folder', label: 'Folder', ...(oneLineNeeds ? { width: '10rem', dropAt: 52 } : {}), sort: true, sortValue: s => dirOf(s) || '', line: 0, cell: s => dirOf(s) || '' }] : []), // the folder an agent works in tells two of one name apart (#7122)
                         ...serverColumns().map(c => (oneLineNeeds ? { ...c, width: '8rem', dropAt: 52 } : c)),
-                        ...(rows.every(s => s.autorun) ? [] : [{ key: 'team', label: 'Team', ...(oneLineNeeds ? { width: '13rem', dropAt: 36 } : { max: 26, drop: 1 }), sort: true, sortValue: s => teamOf(s), line: 0, cell: s => teamOf(s) }]), // a run belongs to no team: with only runs there is no Team column
+                        ...(rows.every(s => s.autorun || s.welcome) ? [] : [{ key: 'team', label: 'Team', ...(oneLineNeeds ? { width: '13rem', dropAt: 36 } : { max: 26, drop: 1 }), sort: true, sortValue: s => teamOf(s), line: 0, cell: s => teamOf(s) }]), // a run belongs to no team: with only runs there is no Team column
                         ...(goal || rows.some(s => s.review) ? [{ key: 'goal', label: 'Goal', ...(oneLineNeeds ? { width: '10rem', dropAt: 36 } : { min: 16, share: 1, drop: 3 }), sort: true, sortValue: s => (goalOf(s) ? s.goal.title : '\uffff'), line: rows.some(isItem) ? 2 : 0, cell: s => {
                             // a review's goal and task come from its artifact's roll-up (#8579); they open in the Inbox, in place; "No goal" when it serves none
                             if (!s.review) { if (!goalOf(s)) return ''; const l = DT.link(s.goal.title, () => { const team = goalTeamKey(s), id = Number(s.goal.id); if (team && id) go({ view: 'inbox-goals', sub: 'goals', id: team, item: id }); }); l.setAttribute('aria-label', `Goal: ${s.goal.title}`); return l; }
@@ -565,10 +582,11 @@ registerGroupSource('hub-inbox', {
                             cell.title = [goalOf(s) ? `Goal: ${s.goal.title}` : NO_GOAL, s.task ? `Task: ${s.task.title || `#${s.task.id}`}` : ''].filter(Boolean).join(' \u00b7 ');
                             return cell;
                         } }] : []),
-                        ...(rows.some(isItem) ? [{ key: 'review', label: 'Actions', fixed: true, width: rows.some(s => s.review && isRead(s.review)) ? '21rem' : '13.5rem', line: 1, cell: s => (s.review ? reviewActions(s.review) : s.autorun ? runActions(s.autorun) : '') }] : []),
+                        ...(rows.some(isItem) ? [{ key: 'review', label: 'Actions', fixed: true, width: rows.some(s => s.review && isRead(s.review)) ? '21rem' : '13.5rem', line: 1, cell: s => (s.review ? reviewActions(s.review) : s.autorun ? runActions(s.autorun) : s.welcome ? welcomeActions(s.welcome) : '') }] : []),
                         { key: 'waiting', label: 'Waiting', ...(oneLineNeeds ? { width: '9rem' } : { min: rows.some(isItem) ? 12 : 18 }), tone: 'tertiary', align: 'end', sort: true, sortValue: s => s.waiting_since || '', firstDir: 'desc', line: rows.some(isItem) ? 2 : 1, cell: s => waitingText(s.waiting_since) || '' },
                     ], ...(oneLineNeeds ? { oneLine: true, sortBar: false } : {}), ...(oneLineNeeds ? { mail: s => ({ lead: { text: needsName(s), name: needsName(s) }, title: needsName(s), medium: true, starred: !!(s.review && s.review.starred), team: teamOf(s), teamAlways: multipleServers() || manyTeams, nameTeam: true, snippetTip: true, snippet: askOf(s) || sessionStateInfo(s).label, state: askOf(s) || sessionStateInfo(s).label, time: DT.shortTime(s.waiting_since), unread: true, mark: 'attention', answers: answerCell(s) }) } : {}) }); // a phone's row is the mail row: the agent, then the ask on a second line, amber and bold (every row of Needs you is unanswered); a list with a review or a run keeps its own actions. One line a row (Goal #79) for a list of agents: the ask is the row's tooltip, a narrow list drops it, then the team, the folder and the CLI; a list with a review item or a failed run keeps its own folded rows
                     wrap.append(table.el);
+                    if (rows.some(r => r.welcome)) { const hide = DT.el('button', 'btn btn-quiet btn-small inbox-welcome-hide', 'Hide all welcome items'); hide.type = 'button'; hide.addEventListener('click', () => { hideAllWelcome(); sayLive('The welcome items are hidden.'); }); wrap.append(hide); } // one quiet way out (#11443)
                     if (hidden > 0) {
                         const only = needsFilters.kind && !needsFilters.q && !needsFilters.team && !needsFilters.agent && !needsFilters.goal && !needsFilters.longer && !needsFilters.server;
                         const p = DT.el('p', 'goals-note inbox-filter-hidden', `${hidden} hidden by the ${only ? `${NF.KIND_LABEL[needsFilters.kind] || needsFilters.kind} filter` : 'filters'}. `);

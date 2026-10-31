@@ -1,5 +1,6 @@
 import './inbox_servers.js'; // source helpers shared by lazy Inbox filters and lists
 import { needsYou, askedRow } from './asked_before_restart.js';
+import { syncWelcome } from './welcome_items.js';
 /* Inbox tab (#4718, #4811, #7472): on every Coral. Where the hub serves the dashboard it is the Coral Hub's /inbox page (what needs the Operator, what was saved) inside the dashboard, in a
  * frame whose address is the constant below: never built from a URL, a hash or a message, and nothing is posted to or read from the frame. On every other Coral the dashboard builds its own
  * Inbox on the shared sidebar: three groups, Needs you (the agents waiting for input, from the live list the dashboard already holds, each opening that agent), Tasks and Saved for later, whose names
@@ -17,7 +18,8 @@ import './safe_markdown.js'; // the shared Inbox renderer's wrapper: the lazy In
 const INBOX_URL = '/inbox';
 onReviewsChanged(() => updateInboxTab());
 onRunsChanged(() => updateInboxTab()); // a failed run nobody has opened is a Needs you row (#9296)
-document.addEventListener('coral:asked-dismissed', () => updateInboxTab()); // a question asked before Coral restarted leaves Needs you (#10368)
+document.addEventListener('coral:asked-dismissed', () => updateInboxTab());
+document.addEventListener('coral:welcome-changed', () => updateInboxTab()); // a welcome item done, dismissed or hidden redraws Needs you (#11443) // a question asked before Coral restarted leaves Needs you (#10368)
 
 /** How many agents are waiting for input right now, from the feed's list. */
 export function waitingCount() {
@@ -32,6 +34,7 @@ export function updateInboxTab() {
     const badge = document.getElementById('nav-tab-hub-inbox-badge');
     if (!badge) return;
     refreshReviews();
+    syncWelcome(); // a welcome step seen is remembered (#11443); the items are not in the badge
     if (!isCloud()) refreshRuns(); // the runs are read from this Coral only, and only once the Inbox or Automations has been shown
     const n = waitingCount() + unreadReviewItems().length + failedUnread().length; // a review artifact the operator has read stays listed but is not counted (#9277); a failed run nobody has opened is (#9296)
     const text = n > 9 ? '9+' : n > 0 ? String(n) : ''; // two characters at most: the pill fits the tabs' own 24 px gap, so the gap after Inbox is the same as the others (#9821); the exact count is in the tab's name

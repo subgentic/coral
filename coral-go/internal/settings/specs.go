@@ -158,6 +158,8 @@ func init() {
 	// The first-launch screen.
 	register(Spec{Key: "welcome_choice", Kind: KindEnum, Values: []string{"skipped", "connected", "own-hub"}, Apply: ApplyClient, Doc: "What was chosen on the first-launch screen."})
 	boolOff("welcome_pending", ApplyClient, "The first-launch screen is still to be shown.")
+	register(Spec{Key: "inbox_welcome", Kind: KindEnum, Values: []string{"on", "off"}, Default: "off", Apply: ApplyClient, Doc: "The Inbox's welcome items for a new install (on until they are hidden or all done)."})
+	text("inbox_welcome_done", ApplyClient, "The welcome items already done, read or dismissed (comma-separated ids).")
 	boolOff("home_editions_hidden", ApplyClient, "Hide the editions card on Home.")
 
 	// Storage.
