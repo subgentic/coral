@@ -56,6 +56,7 @@ func lsrRows(t *testing.T, h *SessionsHandler, old, full bool) string {
 			delete(r, "asked_before_restart") // new in #10368 (what a sleeping agent asked before Coral restarted): the old implementation has no such field; asked_before_restart_test.go pins it through the list
 			delete(r, "notices_paused")       // new in #11387 (Coral's notices to the agent are paused): the old implementation has no such field; notice_pause_test.go pins it through the list
 			delete(r, "paused_until")         // new in #11387 (when the pause ends)
+			delete(r, "commit_short")         // new in #11580 (the short commit of a detached checkout, in place of the word HEAD): the old implementation has no such field; detached_commit_test.go pins it
 			delete(r, "notices_waiting")      // new in #11387 (how many notices are held)
 			delete(r, "notices_holding")      // new in #11387 (held only while the person types to the agent)
 			delete(r, "last_message")         // new in #11097 (the newest message of the transcript, for the phone list): the old implementation has no such field; last_message_e2e_test.go pins it through the list
