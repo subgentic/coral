@@ -28,6 +28,7 @@ type fakeOpencode struct {
 	msgs     []opencode.Message
 	haveMsgs bool
 	used     []string
+	stored   map[string]string
 	server   OpencodeServer
 	ensured  [][4]string
 }
@@ -45,7 +46,8 @@ func (f *fakeOpencode) AgentTurn(string) (opencode.State, time.Time, bool) {
 func (f *fakeOpencode) AgentMessages(context.Context, string) ([]opencode.Message, bool, error) {
 	return f.msgs, f.haveMsgs, nil
 }
-func (f *fakeOpencode) UseSession(key, session string) { f.used = append(f.used, key+"="+session) }
+func (f *fakeOpencode) StoredSession(key string) string { return f.stored[key] }
+func (f *fakeOpencode) UseSession(key, session string)  { f.used = append(f.used, key+"="+session) }
 func (f *fakeOpencode) AgentLastMessage(string) (opencode.Message, bool) {
 	return f.last, f.haveLast
 }
@@ -220,4 +222,22 @@ func TestALaunchHandsTheServersMajorVersionAndAddressToTheLine(t *testing.T) {
 	_, err := h.launchCommand(context.Background(), agent.GetAgent(at.Opencode), agent.LaunchParams{SessionID: "sid", CLIPath: "/opt/oc", ResumeSessionID: "ses_abc123", Flags: []string{"--model", "openai/gpt-6"}})
 	require.NoError(t, err)
 	assert.Equal(t, [][4]string{{"sid", "/opt/oc", "openai/gpt-6", "ses_abc123"}}, f.ensured, "the server is asked for with the agent's id, its CLI, its model and the session it resumes")
+}
+
+// A woken, restarted or resumed opencode agent picks up the session its agent named, though Coral's id for it is not opencode's (the end-to-end run: the woken agent started a fresh session and its history seemed gone).
+func TestAnOpencodeAgentPicksUpTheSessionItsAgentNamed(t *testing.T) {
+	f := &fakeOpencode{stored: map[string]string{"old-agent": "ses_stored1", "wake-agent": "ses_stored2"}, server: fakeServer{url: "http://127.0.0.1:1", major: 1, file: "/f"}}
+	h := &SessionsHandler{opencode: f}
+	run := func(p agent.LaunchParams) string {
+		f.ensured = nil
+		_, err := h.launchCommand(context.Background(), agent.GetAgent(at.Opencode), p)
+		require.NoError(t, err)
+		require.Len(t, f.ensured, 1)
+		return f.ensured[0][3]
+	}
+	assert.Equal(t, "ses_stored2", run(agent.LaunchParams{SessionID: "wake-agent", ResumeSessionID: "wake-agent"}), "a wake: the agent's own record")
+	assert.Equal(t, "ses_stored1", run(agent.LaunchParams{SessionID: "new-agent", ResumeSessionID: "old-agent"}), "a restart or resume: the agent it came from")
+	assert.Equal(t, "ses_given", run(agent.LaunchParams{SessionID: "wake-agent", ResumeSessionID: "ses_given"}), "an opencode session id that was asked for stays")
+	assert.Equal(t, "", run(agent.LaunchParams{SessionID: "fresh-agent"}), "a new agent starts a new session")
+	assert.Equal(t, "", run(agent.LaunchParams{SessionID: "fresh-agent", ResumeSessionID: "../../x"}), "an id that is neither is not followed")
 }

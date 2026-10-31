@@ -20,6 +20,7 @@ type OpencodeRuntime interface {
 	AgentTurn(key string) (opencode.State, time.Time, bool)
 	AgentMessages(ctx context.Context, key string) ([]opencode.Message, bool, error)
 	UseSession(key, session string)
+	StoredSession(key string) string
 	AgentLastMessage(key string) (opencode.Message, bool)
 	Stop(key string)
 }
@@ -60,6 +61,7 @@ func (h *SessionsHandler) launchCommand(ctx context.Context, ag agent.Agent, p a
 		if h.opencode == nil {
 			return "", fmt.Errorf("opencode: Coral's opencode server is not available")
 		}
+		p.ResumeSessionID = h.opencodeResumeSession(p)
 		srv, err := h.opencode.Ensure(ctx, p.SessionID, p.CLIPath, modelFromFlags(p.Flags), p.ResumeSessionID)
 		if err != nil {
 			return "", err
@@ -177,4 +179,21 @@ func modelFromFlags(flags []string) string {
 		return ""
 	}
 	return model
+}
+
+// opencodeResumeSession is the opencode session a launch picks up: the one it was asked for when that is an opencode session id, else the newest one the agent it resumes (a wake: itself; a restart or resume: the
+// Coral id it came from) named, else none (a fresh session). Coral's own id for an agent is not opencode's, so without this a woken agent started a new session and its history seemed gone.
+func (h *SessionsHandler) opencodeResumeSession(p agent.LaunchParams) string {
+	if agent.IsOpencodeSessionID(p.ResumeSessionID) {
+		return p.ResumeSessionID
+	}
+	for _, key := range []string{p.ResumeSessionID, p.SessionID} {
+		if key == "" {
+			continue
+		}
+		if s := h.opencode.StoredSession(key); s != "" {
+			return s
+		}
+	}
+	return ""
 }

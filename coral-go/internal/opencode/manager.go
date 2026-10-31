@@ -35,6 +35,7 @@ type managed struct {
 	cancel  context.CancelFunc
 	done    chan struct{} // closed when the event loop has returned
 	since   time.Time     // when the server came up
+	key     string        // the agent this server is for
 	store   string        // the key of the agent whose session store this server runs on (its own, or the one a resumed session is in)
 	dataDir string
 	noted   map[string]bool // sessions whose store has been recorded (under mu)
@@ -154,7 +155,7 @@ func (m *Manager) start(ctx context.Context, key, bin, model, store string) (*ma
 	if err != nil {
 		return nil, err
 	}
-	g := &managed{srv: srv, store: store, dataDir: cfg.DataDir, noted: map[string]bool{}, since: time.Now(), done: make(chan struct{}), tracker: NewTracker(), at: map[string]time.Time{}, msgsAt: -1}
+	g := &managed{srv: srv, key: key, store: store, dataDir: cfg.DataDir, noted: map[string]bool{}, since: time.Now(), done: make(chan struct{}), tracker: NewTracker(), at: map[string]time.Time{}, msgsAt: -1}
 	g.lctx, g.cancel = context.WithCancel(context.Background()) // not ctx: the loop lives as long as the server
 	go g.loop(g.lctx, m.SkipLast)
 	return g, nil
@@ -232,6 +233,7 @@ func (g *managed) noteSession(session string) {
 	}
 	g.noted[session] = true
 	noteStore(g.dataDir, session, g.store)
+	noteAgentSession(g.dataDir, g.key, session)
 }
 
 // lastKeptRunes bounds the text of the kept last message; the route redacts it and shows its first characters.
@@ -341,6 +343,9 @@ func (m *Manager) AgentSession(key string) (state State, at time.Time, ok bool) 
 	}
 	return "", g.sessionAt, true
 }
+
+// StoredSession is the newest opencode session the agent named (before a Coral restart, a sleep or a restart of the agent), "" when it has none: what a wake gives its TUI to pick up.
+func (m *Manager) StoredSession(key string) string { return StoredSession(m.cfg.DataDir, key) }
 
 // Keys are the agents that have a server now, in no order.
 func (m *Manager) Keys() []string {

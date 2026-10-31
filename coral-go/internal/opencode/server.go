@@ -167,6 +167,35 @@ func noteStore(dataDir, session, key string) {
 	}
 }
 
+// agentsDir holds, for each agent, the newest opencode session it named (a file stores/agents/<key> holding the session id): a wake, a restart or a Coral restart gives the agent's TUI that session to pick up,
+// because Coral's own id for the agent is not opencode's.
+func agentsDir(dataDir string) string { return filepath.Join(storesDir(dataDir), "agents") }
+
+// noteAgentSession records session as the newest one the agent key has.
+func noteAgentSession(dataDir, key, session string) {
+	if !validSessionID(session) || !keyRe.MatchString(key) {
+		return
+	}
+	if err := os.MkdirAll(agentsDir(dataDir), 0o700); err == nil {
+		_ = writePrivate(filepath.Join(agentsDir(dataDir), key), []byte(session))
+	}
+}
+
+// StoredSession is the newest opencode session the agent key named, "" when none is recorded or the record is not a session id.
+func StoredSession(dataDir, key string) string {
+	if !keyRe.MatchString(key) {
+		return ""
+	}
+	b, err := os.ReadFile(filepath.Join(agentsDir(dataDir), key))
+	if err != nil || len(b) > 256 {
+		return ""
+	}
+	if s := strings.TrimSpace(string(b)); validSessionID(s) {
+		return s
+	}
+	return ""
+}
+
 // storeOf is the key of the agent whose store holds session: "" when it is not known, or the record is not a key, or that store is not there.
 func storeOf(dataDir, session string) string {
 	if !validSessionID(session) {
