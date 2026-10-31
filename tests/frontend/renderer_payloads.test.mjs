@@ -65,7 +65,8 @@ function snapshot(root = document.body) {
 
 function check(label, base, now) {
     for (const t of now.tagsSeen) assert.ok(base.tagsSeen.has(t), `${label}: new element <${t}> appeared`);
-    for (const a of now.attrs) assert.ok(base.attrs.has(a), `${label}: injected attribute "${a}"`);
+    const OWN = new Set(['data-account']); // the phone bar's account button is built by phone_bar.js and carries it; the bottom bar's More slot, which had it in the page, is gone (#11472)
+    for (const a of now.attrs) assert.ok(base.attrs.has(a) || OWN.has(a), `${label}: injected attribute "${a}"`);
     assert.deepStrictEqual(now.handlers.map(h => `${h.name}="${h.src.slice(0, 80)}"`), [], `${label}: an inline handler`);
     // A delegated action's name is a constant: the payload can't add or change one.
     const okActions = new Set(base.actions.map(a => a.name + '|' + a.action));
