@@ -145,6 +145,6 @@ func TestBranchMissingLeavesOutCoralsOwnBranches(t *testing.T) {
 	var missing *BranchMissingError
 	require.ErrorAs(t, err, &missing)
 	assert.Equal(t, []string{"develop", "master"}, missing.Branches)
-	assert.NotContains(t, err.Error(), "coral-team")
-	assert.NotContains(t, err.Error(), "job-run")
+	assert.NotContains(t, strings.ReplaceAll(err.Error(), dir, "<dir>"), "coral-team")
+	assert.NotContains(t, strings.ReplaceAll(err.Error(), dir, "<dir>"), "job-run")
 }

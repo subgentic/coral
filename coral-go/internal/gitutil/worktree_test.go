@@ -32,7 +32,7 @@ func TestRemoveWorktree(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, WorktreeOutcome{State: "removed", Path: wt, Branch: "coral-team/team"}, got)
 	assert.NoDirExists(t, wt)
-	assert.NotContains(t, gitIn(t, repo, "worktree", "list"), "team")
+	assert.Equal(t, 1, worktreeCount(t, repo), "only the main worktree is left")
 	assert.Empty(t, gitIn(t, repo, "branch", "--list", "coral-team/team"), "nothing on the branch: it goes")
 
 	// the repository given as the folder that is none: found from the worktree
@@ -65,7 +65,7 @@ func TestRemoveWorktree(t *testing.T) {
 	got, err = RemoveWorktree(ctx, repo, wt, "")
 	require.NoError(t, err)
 	assert.Equal(t, "removed", got.State)
-	assert.NotContains(t, gitIn(t, repo, "worktree", "list"), "team")
+	assert.Equal(t, 1, worktreeCount(t, repo), "only the main worktree is left")
 
 	// something that is no worktree of any repository is said, in one line
 	_, err = RemoveWorktree(ctx, "", t.TempDir(), "")
@@ -160,7 +160,7 @@ func TestAddTeamWorktreeFailedCheckoutLeavesNoBranch(t *testing.T) {
 	_, err := AddTeamWorktree(ctx, repo, filepath.Join(t.TempDir(), "team"), "coral-team/broken", "master")
 	require.Error(t, err)
 	assert.Empty(t, gitIn(t, repo, "branch", "--list", "coral-team/broken"), "no branch is left behind")
-	assert.NotContains(t, gitIn(t, repo, "worktree", "list"), "team")
+	assert.Equal(t, 1, worktreeCount(t, repo), "only the main worktree is left")
 }
 
 // A base that exists only on the remote starts from the remote's branch.
@@ -215,4 +215,17 @@ func TestRemoveWorktreeNeverTouchesARepositoryThatDoesNotListTheFolder(t *testin
 	require.NoError(t, err)
 	assert.Equal(t, "removed", out.State)
 	assert.NoDirExists(t, listed)
+}
+
+// worktreeCount is how many worktrees the repository lists (the main one included). A test used to assert that the listing did not contain "team", which fails when the temp folder's own
+// path does (a D: team cache folder).
+func worktreeCount(t *testing.T, repo string) int {
+	t.Helper()
+	n := 0
+	for _, l := range strings.Split(gitIn(t, repo, "worktree", "list"), "\n") {
+		if strings.TrimSpace(l) != "" {
+			n++
+		}
+	}
+	return n
 }
