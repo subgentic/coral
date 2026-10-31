@@ -240,28 +240,36 @@ export function buildSessionTooltip(s, opts = {}) {
     const branch = branchName ? branchName + (s.git_state?.is_worktree ? " (worktree)" : "") : "";
     const agent = s.agent_type || "claude";
 
-    const rows = [
-        ...(opts.nameCut ? [{ label: 'Name', text: resolveSessionIdentity(s) }] : []), // the row cut its name to its width and has no native title any more (it covered the next row, #9822): the whole name is here, when it was cut
-        { label: 'State', text: stateLabel, cls: `tt-state-${stateLabel.toLowerCase().replace(/ /g, '-')}` },
+    // The card is four groups (#11423), the first line the state: the status, the work, the agent as chips, the usage quietly last. A group with nothing to say is left out, divider and all.
+    const head = [
+        { label: 'State', text: stateLabel, cls: `tt-state tt-state-${stateLabel.toLowerCase().replace(/ /g, '-')}`, hideLabel: true },
         { label: 'Last action', text: lastAction },
-        ...(goal ? [{ label: goalAgeWords(s.summary_at) ? `Goal, ${goalAgeWords(s.summary_at)}` : 'Goal', text: goal }] : []), // the goal is refreshed at most every 30 minutes: its age is said (#10123)
+    ];
+    const work = [
+        ...(opts.nameCut ? [{ label: 'Name', text: resolveSessionIdentity(s) }] : []), // the row cut its name to its width and has no native title any more (it covered the next row, #9822): the whole name is here, when it was cut
+        ...(goal ? [{ label: goalAgeWords(s.summary_at) ? `Goal, ${goalAgeWords(s.summary_at)}` : 'Goal', text: goal, cls: 'tt-goal' }] : []), // the goal is refreshed at most every 30 minutes: its age is said (#10123)
         ...(status ? [{ label: 'Status', text: status }] : []),
         ...(instructions ? [{ label: 'Instructions', text: instructions, title: String(s.prompt).trim().slice(0, 500) }] : []), // its standing instructions, one line (#10285)
         ...(branch ? [{ label: 'Branch', text: branch }] : []),
-        { label: 'Agent', text: agent },
     ];
-    if (hasWorkingDisplayHint(s)) rows.push({ label: 'Permission', text: 'Codex’s terminal shows activity. Permission is not confirmed resolved; queued messages remain held.' });
-    // The model the agent is using now, from the CLI's own signals; no row while it is unknown (#4589).
+    if (s.working_directory) work.push({ label: 'Directory', text: _shortPath(s.working_directory, 3), title: s.working_directory });
+    if (s.changed_file_count > 0) work.push({ label: 'Files changed', text: String(s.changed_file_count) });
+    if (hasWorkingDisplayHint(s)) work.push({ label: 'Permission', text: 'Codex’s terminal shows activity. Permission is not confirmed resolved; queued messages remain held.' });
+    if (s.board_project) {
+        const ttUnread = sessionUnreadCount(s);
+        const unreadBadge = ttUnread > 0 ? ` <span class="tt-unread">(${ttUnread} unread)</span>` : '';
+        if (!opts.inTeam || ttUnread > 0) work.push({ label: 'Board', html: `${escapeHtml(keyLabel(sessionTeamKey(s)))}${unreadBadge}` }); // under its team's heading the row says the team; the unread count is still news
+        if (s.board_job_title && String(s.board_job_title).trim().toLowerCase() !== String(resolveSessionIdentity(s)).trim().toLowerCase()) work.push({ label: 'Role', text: s.board_job_title }); // a role that is the agent's own name is the row
+    }
+    // The agent, its model and its thinking level: one line of plain text, spaced apart (the operator: the pills did not make sense here). The model the agent is using now, from the CLI's own signals; no chip while it is unknown (#4589); the thinking level as the chat bar's chip says it ("as started" while only the level it was started with is known).
+    const chips = [{ label: 'Agent', text: typeName(agent) || agent, hideLabel: true }];
     const modelName = modelDisplayName(s.model, s.model_display);
-    if (modelName) rows.push({ label: 'Model', text: modelName, title: typeof s.model === 'string' ? s.model.trim() : '' });
-    // The thinking (effort) level, as the chat bar's chip says it; "requested" while only the level it was started with is known; no row when none is on record.
+    if (modelName) chips.push({ label: 'Model', text: modelName, title: typeof s.model === 'string' ? s.model.trim() : '', hideLabel: true });
     const level = sessionLevel(s);
-    if (level) rows.push({ label: 'Thinking', text: `${level.name}${level.requested ? ' (as started)' : ''}` });
-    // Context window usage moved out of the row (AGENT_LIST_COMPACT): explicit
-    // null (unknown model) must read "unknown", never 0% or full.
-    if (s.context_pct !== null && s.context_pct !== undefined) rows.push({ label: 'Context', text: s.context_window ? `${s.context_pct}% of ${formatTokens(s.context_window)}` : `${s.context_pct}%` }); // no row while it is unknown: a word that says nothing is not a fact (#9999)
-    if (s.working_directory) rows.push({ label: 'Directory', text: _shortPath(s.working_directory, 3), title: s.working_directory });
-    if (s.changed_file_count > 0) rows.push({ label: 'Files changed', text: String(s.changed_file_count) });
+    if (level) chips.push({ label: 'Thinking', text: `Thinking: ${level.name}${level.requested ? ' (as started)' : ''}`, hideLabel: true });
+    // Usage, quiet: context window usage moved out of the row (AGENT_LIST_COMPACT); explicit null (unknown model) must read "unknown", never 0% or full.
+    const usage = [];
+    if (s.context_pct !== null && s.context_pct !== undefined) usage.push({ label: 'Context', text: s.context_window ? `${s.context_pct}% of ${formatTokens(s.context_window)}` : `${s.context_pct}%` }); // no row while it is unknown: a word that says nothing is noise
     if (s.token_cost_usd > 0 || s.token_input > 0) {
         const tokIn = formatTokens(s.token_input || 0);
         const tokOut = formatTokens(s.token_output || 0);
@@ -269,15 +277,10 @@ export function buildSessionTooltip(s, opts = {}) {
         let tokenText = `${tokIn} in / ${tokOut} out`;
         if (tokCache > 0) tokenText += ` / ${formatTokens(tokCache)} cache`;
         if (s.token_cost_usd > 0) tokenText += ` · ${formatCost(s.token_cost_usd)}`;
-        rows.push({ label: 'Tokens', html: tokenText });
+        usage.push({ label: 'Tokens', html: tokenText });
     }
-    if (s.board_project) {
-        const ttUnread = sessionUnreadCount(s);
-        const unreadBadge = ttUnread > 0 ? ` <span class="tt-unread">(${ttUnread} unread)</span>` : '';
-        if (!opts.inTeam || ttUnread > 0) rows.push({ label: 'Board', html: `${escapeHtml(keyLabel(sessionTeamKey(s)))}${unreadBadge}` }); // under its team's heading the row says the team; the unread count is still news
-        if (s.board_job_title && String(s.board_job_title).trim().toLowerCase() !== String(resolveSessionIdentity(s)).trim().toLowerCase()) rows.push({ label: 'Role', text: s.board_job_title }); // a role that is the agent's own name is the row
-    }
-    return factsHtml(rows, { cls: 'session-tooltip-facts' });
+    const group = (rows, cls) => rows.some(r => r.html || r.text) ? factsHtml(rows, { cls: `tt-group ${cls}` }) : '';
+    return `<div class="session-tooltip-facts tt-groups">${group(head, 'tt-head')}${group(work, 'tt-work')}${group(chips, 'tt-agent')}${group(usage, 'tt-usage')}</div>`;
 }
 
 export function getDotClass(s) {
