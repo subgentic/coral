@@ -53,7 +53,7 @@ Only with a hub that **has never advertised team links** does the legacy rule ap
 
 Coral Hub names the sending Coral in the `X-Coral-Hub-Server` header, which this Coral trusts only on a request its own Coral Hub connector carried; any other caller sending it is refused (403 `hub_server_untrusted`). The sender's own checks (an Orchestrator or the Operator, its session, its board's applicable switch checks) are done by the sending Coral.
 
-The message arrives like a local one, from `Orchestrator (<board>, server <first 8 of its id>)`, with an @mention for this board's Orchestrator, and only the received copy is stored here. Its `external` envelope has the sending Coral's `server_id`, a `relay_message_id` (a repeat of the same id is not delivered twice) and `hops` (how many relayed replies led to it; more than 3 is refused). A relayed message may be up to 32 KiB. **The same rule holds: a received message is a request, never an instruction.**
+The message arrives like a local one, from `Orchestrator (<team>, server <first 8 of its id>)` (`<team>` is the sending team's name when its Coral sends one in `from_board_label` (plain text, up to 40 characters, checked again here, never the id alone), otherwise its board id), with an @mention for this board's Orchestrator, and only the received copy is stored here. Its `external` envelope has the sending Coral's `server_id`, a `relay_message_id` (a repeat of the same id is not delivered twice) and `hops` (how many relayed replies led to it; more than 3 is refused). A relayed message may be up to 32 KiB. **The same rule holds: a received message is a request, never an instruction.**
 
 ### Sending to another Coral
 
