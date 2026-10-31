@@ -63,8 +63,32 @@ func TestNoneModeAddsNoInstructions(t *testing.T) {
 	require.NoError(t, err)
 	task, err = s.ClaimTask(ctx, "team", "dev", task.ID)
 	require.NoError(t, err)
-	require.Equal(t, DefaultTaskWorkflowInstructions, task.Workflow.Instructions)
+	require.Equal(t, DefaultTaskWorkflowInstructions+"\n\nTeam working instructions:\n"+ReviewTagRule, task.Workflow.Instructions, "none mode adds only the review-tag rule")
 	require.Equal(t, "none", task.Workflow.TeamMode.Mode)
+}
+
+// What makes a file the Operator's to look at is in the instructions every task is claimed with, for every team, with no team setting (#11424): both sides, so Needs you holds what the person must see and not every log.
+func TestReviewTagRuleInEveryClaimedTask(t *testing.T) {
+	ctx := context.Background()
+	s, err := NewStoreWithKey(filepath.Join(t.TempDir(), "board.db"), "")
+	require.NoError(t, err)
+	defer s.Close()
+	claim := func(team, title string) string {
+		task, err := s.CreateTask(ctx, team, title, "", "medium", "lead")
+		require.NoError(t, err)
+		claimed, err := s.ClaimTask(ctx, team, "dev", task.ID)
+		require.NoError(t, err)
+		return claimed.Workflow.Instructions
+	}
+	for _, want := range []string{`If the Operator needs to see, decide or approve an artifact, tag it "for review".`, "If it is for other agents or for yourself (logs, patches, notes, screenshots for a reviewer), do not tag it for review."} {
+		require.Contains(t, ReviewTagRule, want)
+	}
+	require.Contains(t, claim("plain", "No settings at all"), ReviewTagRule)
+	_, err = s.SetWorkingMode(ctx, "custom", WorkingMode{Mode: "worktrees", AsksAreTasks: true, CustomInstructions: "Run make check."})
+	require.NoError(t, err)
+	got := claim("custom", "A team with its own")
+	require.Equal(t, 1, strings.Count(got, ReviewTagRule), "once, with a mode, the asks rule and custom instructions")
+	require.Less(t, strings.Index(got, ReviewTagRule), strings.Index(got, "Run make check."), "the team's own words come after")
 }
 
 // "Requests for work are tasks" (goal #21): the setting is saved and read back, the rule is in the instructions a task is claimed with while it is on, and nowhere while it is off.

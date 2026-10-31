@@ -88,6 +88,8 @@ func TestTaskCreatorCannotEditOrRestorePlannerRequirements(t *testing.T) {
 			if mode == "restore-in-review" {
 				_, err = h.bs.ClaimTask(ctx, "team", "worker", task.ID)
 				require.NoError(t, err)
+				amended, err = h.bs.GetTask(ctx, "team", task.ID) // a claim adds the team working instructions (the review-tag rule, #11424): compare with the claimed task
+				require.NoError(t, err)
 				_, err = h.bs.SubmitCompletionReviewAtRevisionAndCandidate(ctx, "team", task.ID, "worker", "done", "success", "please review", nil, &amended.Revision, "")
 				require.NoError(t, err)
 				_, _, err = h.bs.HandToOrchestrator(ctx, "team", task.ID, "worker")

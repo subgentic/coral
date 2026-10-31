@@ -32,6 +32,10 @@ type AskInfo struct {
 	To       []string `json:"to"`   // the members asked (subscriber ids)
 	Open     []string `json:"open"` // those who have not answered yet
 	Answered bool     `json:"answered"`
+	// Closed: the ask was closed by hand (ask close, #11417) because it was answered elsewhere (in chat, in an artifact comment): nobody owes an answer, whoever has not replied. Who closed it and why.
+	Closed     bool   `json:"closed,omitempty"`
+	ClosedBy   string `json:"closed_by,omitempty"`
+	ClosedNote string `json:"closed_note,omitempty"`
 }
 
 func (s *Store) ensureAsksSchema(ctx context.Context) error {
@@ -50,6 +54,13 @@ func (s *Store) ensureAsksSchema(ctx context.Context) error {
 			reply_to   INTEGER NOT NULL
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_board_replies_to ON board_replies(project, reply_to)`,
+		`CREATE TABLE IF NOT EXISTS board_ask_closed (
+			message_id INTEGER PRIMARY KEY,
+			project    TEXT NOT NULL,
+			closed_by  TEXT NOT NULL,
+			note       TEXT NOT NULL,
+			closed_at  TEXT NOT NULL
+		)`,
 	} {
 		if _, err := s.db.ExecContext(ctx, stmt); err != nil {
 			return err
@@ -226,6 +237,14 @@ func (s *Store) askInfo(ctx context.Context, project string, a askRow, subs map[
 	var to []string
 	_ = json.Unmarshal([]byte(a.Asked), &to)
 	info := &AskInfo{To: to, Open: []string{}}
+	var closed struct {
+		By   string `db:"closed_by"`
+		Note string `db:"note"`
+	}
+	if err := s.reader().GetContext(ctx, &closed, `SELECT closed_by, note FROM board_ask_closed WHERE project = ? AND message_id = ?`, project, a.MessageID); err == nil {
+		info.Closed, info.ClosedBy, info.ClosedNote, info.Answered = true, closed.By, closed.Note, true
+		return info, nil
+	}
 	for _, m := range to {
 		done, err := s.answeredBy(ctx, project, a, m, subs)
 		if err != nil {
@@ -345,4 +364,77 @@ func (s *Store) withAsks(ctx context.Context, project string, msgs []Message, er
 		return nil, fmt.Errorf("asks: %w", ferr)
 	}
 	return msgs, nil
+}
+
+// OpenAsksOf are the unanswered questions of the board asked less than askMaxAge ago that are still owed by member (oldest first), whether or not that member is subscribed to the board: the
+// Operator reads the board without being a member of it until their first post (#11417), and a question to them must show all the same. Each row is one question: Member is the one named.
+func (s *Store) OpenAsksOf(ctx context.Context, project, member string, now time.Time) ([]OpenAsk, error) {
+	var asks []askRow
+	if err := s.reader().SelectContext(ctx, &asks, `SELECT message_id, asker, asked, created_at FROM board_asks WHERE project = ? AND created_at > ? ORDER BY message_id`, project, now.Add(-askMaxAge).UTC().Format(time.RFC3339)); err != nil {
+		return nil, err
+	}
+	if len(asks) == 0 {
+		return nil, nil
+	}
+	subs, err := s.subscriberIndex(ctx, project)
+	if err != nil {
+		return nil, err
+	}
+	var out []OpenAsk
+	for _, a := range asks {
+		var to []string
+		_ = json.Unmarshal([]byte(a.Asked), &to)
+		named := false
+		for _, m := range to {
+			if strings.EqualFold(m, member) {
+				named = true
+			}
+		}
+		if !named {
+			continue
+		}
+		info, err := s.askInfo(ctx, project, a, subs)
+		if err != nil {
+			return nil, err
+		}
+		for _, m := range info.Open {
+			if !strings.EqualFold(m, member) {
+				continue
+			}
+			var content string
+			_ = s.reader().GetContext(ctx, &content, `SELECT content FROM board_messages WHERE project = ? AND id = ?`, project, a.MessageID)
+			at, _ := time.Parse(time.RFC3339, a.CreatedAt)
+			out = append(out, OpenAsk{MessageID: a.MessageID, Asker: a.Asker, Member: m, Content: content, At: at})
+		}
+	}
+	return out, nil
+}
+
+// ErrAskUnknown: no question of the board has that message id.
+var ErrAskUnknown = errors.New("no question of this board has that message id")
+
+// MaxAskCloseNote is the most of a close note kept.
+const MaxAskCloseNote = 300
+
+// AskAsker is who asked the question message id of the board; ErrAskUnknown when there is none.
+func (s *Store) AskAsker(ctx context.Context, project string, messageID int64) (string, error) {
+	var asker string
+	if err := s.reader().GetContext(ctx, &asker, `SELECT asker FROM board_asks WHERE project = ? AND message_id = ?`, project, messageID); err != nil {
+		return "", ErrAskUnknown
+	}
+	return asker, nil
+}
+
+// CloseAsk closes a question by hand: it was answered somewhere the board did not see (chat, an artifact comment), and only the Operator's own reply on the board used to close one, so it stayed open and the
+// health check repeated it (#11417). Nobody owes an answer afterwards. Closing a closed question again keeps the first closing. The caller has decided who may close it.
+func (s *Store) CloseAsk(ctx context.Context, project string, messageID int64, by, note string) error {
+	if _, err := s.AskAsker(ctx, project, messageID); err != nil {
+		return err
+	}
+	note = strings.TrimSpace(note)
+	if r := []rune(note); len(r) > MaxAskCloseNote {
+		note = string(r[:MaxAskCloseNote])
+	}
+	_, err := s.db.ExecContext(ctx, `INSERT OR IGNORE INTO board_ask_closed (message_id, project, closed_by, note, closed_at) VALUES (?, ?, ?, ?, ?)`, messageID, project, by, note, nowUTC())
+	return err
 }

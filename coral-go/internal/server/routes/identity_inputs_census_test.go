@@ -452,6 +452,7 @@ var knownPathParams = map[string]string{
 	"sessionID":    "a session addressed (live, history, or a group member to remove): a target",
 	"boardName":    "the board a team action (kill, reset, sleep status) acts on: a target",
 	"agentName":    "an agent's knowledge file in a team: a target",
+	"subscriber":   "the board member an orchestrator's wake or sleep acts on: a target, resolved from the board's own seats (never a session name the caller supplies); who is calling is the verified token (#11432)",
 	"remoteServer": "a configured remote server's id",
 	"folderName":   "a folder's tag set",
 	"memberID":     "the team member row whose search access the Operator sets: a target (the level a search checks is the caller's own row, never this)",

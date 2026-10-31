@@ -44,6 +44,10 @@ New agents use it unless you choose a model when you launch them.
 3. The **Resume session** dialog asks which **Working Directory** to start in. It fills in the folder the chat ran in, and says so under the box. Keep it, or press **Browse** to pick another folder and **Use this folder**: the dialog warns that the files the chat was using may not be found there. **Resume in** picks how much the agent may do without asking (the last answer on this page lists each one): the chat keeps what it ran with, the note under the folder says which, and you can pick another or the saved default. If the chat belonged to a team, **Rejoin board** puts the agent back on its message board.
 4. Press **Resume**. A live agent starts in that folder and picks the conversation up where it stopped; the old chat stays as it was.
 
+## Get an agent to put something in front of you
+
+Agents put what needs you (a decision, an approval, a file to look at) in your **Inbox**, under **Needs you**. An agent asks with `coral-board post --ask "@Operator <question>"`, or uploads the file tagged **for review**, and only for what you must see, decide or approve (logs, patches, notes and screenshots meant for other agents are not tagged, so Needs you does not fill up): one item per decision, with its recommendation. Your comments on a **for review** file reach the agent that uploaded it whether you make them at this computer's dashboard or through Coral Hub; on a team machine they are not delivered (several people share one issuer). It does not publish the team's work outside Coral without your OK. Every team's agents are told this by default; you do not need to add it to the team's instructions.
+
 ## Give an agent a file
 
 - **A file in its folder:** in the message box, type **@** and the start of the file's name. A list of the files in the agent's folder opens; pick one and its path is put in your message, so the agent knows which file you mean. In a folder with many files, keep typing to narrow the list.

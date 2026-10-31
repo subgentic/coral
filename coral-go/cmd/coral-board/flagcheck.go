@@ -48,6 +48,8 @@ func checkKnownFlags(args []string) error {
 		spec = clihelp.FlagSpec{Bools: []string{"--json", "--team", "--all", "--operator-history"}, Values: []string{"--from", "--since", "--until", "--sort", "--limit", "--cursor", "--mentions"}, Positional: 1}
 	case "queue":
 		spec = jsonOnly
+	case "ask":
+		spec = clihelp.FlagSpec{Values: []string{"--note", "--board"}, Positional: 2}
 	case "goal":
 		if len(rest) == 0 {
 			return nil

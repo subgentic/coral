@@ -67,5 +67,7 @@ export function showScrim(close) {
     const s = el('div', 'nav-drawer-scrim'); s.id = 'nav-drawer-scrim';
     s.addEventListener('click', close);
     document.body.append(s);
+    const menu = document.getElementById('nav-more-menu'); // however the menu is closed (its own handlers, a page that hides it), the scrim goes with it: it never stays over the page
+    if (menu) { const watch = new MutationObserver(() => { if (menu.hidden || !s.isConnected) { watch.disconnect(); s.remove(); } }); watch.observe(menu, { attributes: true, attributeFilter: ['hidden'] }); }
 }
 export function hideScrim() { document.getElementById('nav-drawer-scrim')?.remove(); }

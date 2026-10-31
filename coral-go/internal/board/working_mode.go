@@ -22,6 +22,10 @@ type WorkingMode struct {
 // AsksAreTasksRule is the sentence the setting adds.
 const AsksAreTasksRule = "Ask another agent for work with coral-board post --assign or task add --follow-up; plain posts are for questions, decisions, heads-ups and status."
 
+// ReviewTagRule is the sentence every task is claimed with (#11424), added at the claim to the team working instructions (not part of a team's saved mode, so Settings and the mode API show only what the team chose): what makes a file the person's to look at, and what does not, so Needs you holds the first and not the second. The docs, the upload help and the
+// default prompts say the same.
+const ReviewTagRule = `If the Operator needs to see, decide or approve an artifact, tag it "for review". If it is for other agents or for yourself (logs, patches, notes, screenshots for a reviewer), do not tag it for review.`
+
 func (m *WorkingMode) normalize() error {
 	if m.Mode == "" {
 		m.Mode = "none"

@@ -137,6 +137,7 @@ node board_answer_unit.test.mjs
 node team_label_unit.test.mjs
 node spend_teams_unit.test.mjs
 node switch_row_unit.test.mjs
+node orchestrator_grant_unit.test.mjs
 node board_color_validation.test.js
 node hub_indicator_unit.test.mjs
 node hub_nav.test.mjs
