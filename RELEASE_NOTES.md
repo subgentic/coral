@@ -1,5 +1,34 @@
 # Release Notes
 
+## v2.0.12 — a fresh install that asks one thing at a time, a welcome that really lands on Needs you, and a post that cannot be sent to nobody
+
+### Changes
+
+#### What you will notice first
+
+- **A fresh install shows one prompt at a time, offering Connect to Coral Hub first**, then the set-a-password prompt once that is answered (Skip, Escape or connected), and the amber no-password strip stays away while either is open.
+- **A new install now really lands on Needs you with its welcome items** (v2.0.11 said so, but it did not happen on a real start). The Needs you folder counts them (it said 0 with five on the list) and they sit under their own Welcome filter, not Needs input; their titles wrap beside their button on a phone.
+- **`coral-board post` refuses a post that notifies nobody**: with no `@Name` in the text, no `--to`, no `--task N`, no `--reply-to N` and no `--assign`, it exits non-zero with "this post notifies nobody" and sends no post. A post that names someone the board cannot find is stored and prints a warning that it reached no one (not for `--assign`, `--task` or `--reply-to` posts), and the server's answer to a post lists whom it reached.
+
+#### Agents and the chat
+
+- **Chief (preview, off by default) can now be opened through Coral Hub**: a computer answers an owner-only request about its Chief (whether it is on, its agent and its team), so the Hub can draw the page itself. It needs a Coral Hub that has the matching release.
+- **A Pi agent's provider and model keep the one you chose**: the form's default-model answer no longer arrives after the model list and replaces a working model with an empty one (it was the cause of a flaky model picker).
+- **Claude installed by its own installer is found more safely**: every folder on the way to it (`~/.local`, `~/.local/share` and the installer's own folder) must be owned by you and not writable by anyone else before Coral trusts the file (macOS and Linux).
+
+#### Known issues
+
+- **Windows: in-app update does not work from 2.0.0 through 2.0.6.** If you're on one of those, download and install the MSI by hand; from 2.0.7 on, in-app update works.
+- **macOS: a Coral of 2.0.5 or earlier cannot install updates in-app; install 2.0.6 or later by hand once.**
+- **OpenCode agents are tested on macOS and Linux; OpenCode on Windows is not yet tested end to end.**
+- Setting up a computer over SSH is supported from a macOS or Linux hub, and is not yet tested from a Windows hub.
+
+#### For developers and releases
+
+- **Files nothing loads are out of the shipped static tree**: the platform layer note moves to `pkg/frontend/PLATFORM_LAYER.md` and the icon names list to `tests/frontend/fixtures/`, and a test now fails when anything but a web file ships. The static tree is 5,839,353 bytes of the 5,840,896-byte budget.
+- The live list and the for-review rows of the API now carry what waits on them across every board (`waits_on_this`, owner only); the dashboard does not show it yet.
+- The Windows lane's test fixes: the Settings update switch is not drawn where the install asks a person (Windows) and its test says so, the folder checks accept a backslash path, the OpenCode owner and last-message tests fit what Windows can do (no mode bits, a stand-in that ends before it writes its pid file), and the first-run and welcome suites leave the server's settings as they found them.
+
 ## v2.0.11 — a Needs you that carries questions, blockers and a welcome, an agent stuck at a dialog says so, comments on any artifact, quieter health checks, an Orchestrator you can let manage its own team, and SSH setup through a jump host
 
 ### Changes
