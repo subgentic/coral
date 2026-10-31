@@ -2,14 +2,17 @@ package routes
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/subgentic/coral/internal/board"
+	"github.com/subgentic/coral/internal/store"
 	"github.com/subgentic/coral/pkg/tunnel"
 )
 
@@ -138,5 +141,54 @@ func TestWaitsOnThisThroughTheHubIsTheAuthenticOwnersAlone(t *testing.T) {
 			assert.NotContains(t, rows[0], "waits_on_this", c.name)
 			assert.Nil(t, items[0].WaitsOnThis, c.name)
 		}
+	}
+}
+
+// The review rows of the team list: the Operator's request gets what waits on a "for review" row's task, a verified agent session gets none, on the real handler (QA Engineer's MUST, #11455).
+func TestTeamArtifactListGivesWaitsOnThisToThePersonAndNeverToAnAgent(t *testing.T) {
+	e := newReviewEnv(t, true)
+	ctx := context.Background()
+	e.tag(t, `["for review"]`)
+	tasks, err := e.h.bs.ListTasks(ctx, "alpha")
+	require.NoError(t, err)
+	var work int64
+	for _, tk := range tasks {
+		if tk.Title == "A work" {
+			work = tk.ID
+		}
+	}
+	require.NotZero(t, work)
+	_, err = e.h.bs.CreateTaskWithOpts(ctx, "beta", "Waits on the work, on another board", "", "critical", "Orchestrator", &board.CreateTaskOpts{BlockedBy: []board.TaskDep{{TaskID: work, BoardID: "alpha"}}})
+	require.NoError(t, err)
+
+	r := chi.NewRouter()
+	r.Get("/person/api/board/{project}/artifacts", e.h.ListTeamArtifacts)
+	r.Get("/agent/api/board/{project}/artifacts", func(w http.ResponseWriter, req *http.Request) {
+		req = req.WithContext(context.WithValue(req.Context(), verifiedSessionKey{}, &store.SessionTokenOwner{SessionID: sessAlice}))
+		e.h.ListTeamArtifacts(w, req)
+	})
+	srv := httptest.NewServer(r)
+	t.Cleanup(srv.Close)
+	rowsOf := func(prefix string) []map[string]any {
+		resp, err := http.Get(srv.URL + prefix + "/api/board/alpha/artifacts")
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		require.Equal(t, 200, resp.StatusCode)
+		var out struct {
+			Artifacts []map[string]any `json:"artifacts"`
+		}
+		require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
+		return out.Artifacts
+	}
+	person := rowsOf("/person")
+	require.NotEmpty(t, person)
+	w, ok := person[0]["waits_on_this"].(map[string]any)
+	require.True(t, ok, "the person's list: %v", person[0])
+	assert.EqualValues(t, 1, w["count"])
+	assert.Equal(t, "Waits on the work, on another board", w["top_title"])
+	agent := rowsOf("/agent")
+	require.NotEmpty(t, agent)
+	for _, row := range agent {
+		assert.NotContains(t, row, "waits_on_this", "an agent's token gets no other board's task titles: %v", row)
 	}
 }

@@ -739,6 +739,9 @@ func sizeOfRecord(n int64) *int64 {
 // addWaitsOnThis gives each "for review" row with a task what waits on that task (#11455), from one read of the board data per board: the Inbox's review rows say what they hold up without the page
 // asking each team for its tasks. A row of a list that merges teams names its own board; project is the board of a list of one. A read that fails leaves the rows as they were.
 func (h *BoardHandler) addWaitsOnThis(r *http.Request, project string, rows []teamArtifact) {
+	if _, agent := VerifiedSession(r.Context()); agent { // an agent's token never gets other boards' task titles, on a row of its own board's list or any other (QA Engineer's MUST, #11455)
+		return
+	}
 	if h.bs == nil || (cloud.Tunneled(r) && !hubOwnerRequest(r).owner) { // the routes are owner-only through Coral Hub already; the same guard here keeps the field from ever reaching another caller (Security, #11455)
 		return
 	}

@@ -335,6 +335,9 @@ func (h *SessionsHandler) addSessionGoals(ctx context.Context, rows []map[string
 // data and matched by the session's subscriber, never by a display name. A row with nothing in progress has no field. The answer is kept 5 seconds (the list is polled by every open dashboard), and a
 // failed read leaves the rows as they were. A remote server's rows are not asked: their boards are not here.
 func (h *SessionsHandler) addWaitsOnThis(r *http.Request, rows []map[string]any) {
+	if _, agent := VerifiedSession(r.Context()); agent { // scopeRowsForAgent strips it too; an agent's list is never even asked
+		return
+	}
 	if h.bs == nil || len(rows) == 0 || (cloud.Tunneled(r) && !hubOwnerRequest(r).owner) { // through Coral Hub only the authentic owner: the field names task titles of every board (Security, #11455)
 		return
 	}
