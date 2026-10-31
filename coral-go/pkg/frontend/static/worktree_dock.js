@@ -44,7 +44,7 @@ function paint() {
         const d = button('worktree-dock-details', '', 'Details'); d.setAttribute('aria-expanded', String(open)); d.setAttribute('aria-controls', 'worktree-dock-details'); d.addEventListener('click', toggle);
         line.append(d);
     }
-    const x = button('worktree-dock-dismiss', items.length > 1 ? `Dismiss all ${items.length} worktree notices` : 'Dismiss the worktree notice', '×'); x.addEventListener('click', dismissWorktreeDock);
+    const x = button('worktree-dock-dismiss ic-close', items.length > 1 ? `Dismiss all ${items.length} worktree notices` : 'Dismiss the worktree notice', ''); x.addEventListener('click', dismissWorktreeDock);
     line.append(x);
     const body = document.createElement('div'); body.id = 'worktree-dock-details'; body.className = 'worktree-dock-body'; body.hidden = !open;
     for (const i of items) {

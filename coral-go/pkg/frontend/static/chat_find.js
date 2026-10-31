@@ -37,7 +37,7 @@ function ensureBar() {
         <button type="button" class="chat-find-older" hidden title="Load the rest of the conversation so older messages are searched too">Search older</button>
         <button type="button" class="chat-find-prev" title="Previous match (Shift+Enter)" aria-label="Previous match">&#x2191;</button>
         <button type="button" class="chat-find-next" title="Next match (Enter)" aria-label="Next match">&#x2193;</button>
-        <button type="button" class="chat-find-close" title="Close (Esc)" aria-label="Close find">&times;</button>`;
+        <button type="button" class="chat-find-close ic-close" title="Close (Esc)" aria-label="Close find"></button>`;
     document.body.appendChild(bar);
     const input = bar.querySelector('.chat-find-input');
     input.addEventListener('input', () => runSearch(true));

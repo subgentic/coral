@@ -82,13 +82,12 @@ export function showToast(message, isError = false, duration, opts = {}) {
     }
     const close = document.createElement("button");
     close.type = "button";
-    close.className = "toast-close";
-    // named by its toast, so two toasts on screen are two buttons to a screen reader (#6152); the toast's own words, cut at a word
+    close.className = "toast-close ic-close";
+    // named by its toast (#6152): the toast's own words, cut at a word
     const words = text.replace(/\s+/g, " ").trim();
     const cut = words.lastIndexOf(" ", 40);
     const dismissLabel = (w, c) => (w.length > 40 ? `Dismiss: ${w.slice(0, c > 20 ? c : 40)}…` : `Dismiss: ${w}`);
     close.setAttribute("aria-label", dismissLabel(words, cut));
-    close.textContent = "×";
     close.addEventListener("click", dismiss);
     toast.appendChild(close);
     toast.addEventListener("keydown", (e) => { if (e.key === "Escape") dismiss(); });
@@ -274,7 +273,7 @@ export function showWorkflowNotification(title, message, level = 'info', duratio
     toast.innerHTML = `<div class="notification-toast-body">
             <div class="notification-toast-header">
                 <span class="notification-toast-title">${icon} ${title ? `<strong>${escapeHtml(title)}</strong>` : 'Notification'}</span>
-                <button class="notification-toast-close">✕</button>
+                <button class="notification-toast-close ic-close" aria-label="Dismiss"></button>
             </div>
             ${message ? `<span class="notification-toast-detail">${escapeHtml(plainResult(message)?.words || message)}</span>` : ''}
         </div>`;
@@ -378,7 +377,7 @@ export function showNotificationToast(agentLabel, detail, onClick, { silent = fa
     toast.innerHTML = `<div class="notification-toast-body">
             <div class="notification-toast-header">
                 <span class="notification-toast-title">⏳ <strong>${agentLabel}</strong> needs your answer</span>
-                <button class="notification-toast-close">✕</button>
+                <button class="notification-toast-close ic-close" aria-label="Dismiss"></button>
             </div>
             ${detailHtml}
             <a href="#" class="notification-toast-link">Open agent</a>
