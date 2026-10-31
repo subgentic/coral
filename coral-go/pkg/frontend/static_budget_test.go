@@ -28,7 +28,8 @@ const (
 	// Request changes) 9.1 KB (artifact_review.js), the CSV and TSV viewer 12.5 KB (csv_table.js and csv_parse.js), the changed-files view and inline diff 12.7 KB (changed_files.js, inline_diff.js),
 	// the provider cards with the OpenCode sign-in notice 9.9 KB (launch_provider_cards.js, launch_signin_notice.js), the phone bar of slice D 4.1 KB (phone_bar.js), Dismiss on a stale
 	// permission card 2.7 KB (dismiss_wait.js) and the first-run folder suggestion 2.7 KB (folder_suggestion.js); css 10 KB across components, agentic, mobile, cost_dashboard and goals.
-	staticBudget = 5<<20 + 584<<10
+	// 5.63 MiB (5,906,432 bytes) since the operator said "You can increase the size" (Oct 31, 2026): 64 KiB more, for phone navigation like Gmail (#11472, #11476: about 1.9 KB encoded) and the guide role screens (#11513: about 6 KB), which the v2.0.13 room (about 2.5 KB) could not hold.
+	staticBudget = 5<<20 + 648<<10
 	// fileBudget is the most one embedded file may hold (the CodeMirror bundle, the largest, is ~1 MB).
 	fileBudget = 1536 << 10
 )
