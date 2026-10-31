@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/subgentic/coral/internal/store"
 	"github.com/subgentic/coral/internal/store/storetest"
 )
 
@@ -36,6 +37,28 @@ func TestInboxWelcomeIsSeededForANewInstallOnly(t *testing.T) {
 	assert.False(t, ok, "an install that has run before never sees the welcome items")
 	_, ok = value(t, map[string]string{"welcome_choice": "skipped"}, "")
 	assert.False(t, ok, "nor one that already answered the first-launch screen")
+	// Any session on record, or any team on a board, means the install is not new even with none of the marker rows.
+	{
+		cfg := newE2EConfig(t, t.TempDir())
+		db, err := storetest.Open(t, cfg.DBPath)
+		require.NoError(t, err)
+		t.Cleanup(func() { db.Close() })
+		team := "alpha"
+		require.NoError(t, store.NewSessionStore(db).RegisterLiveSession(context.Background(), &store.LiveSession{SessionID: "11111111-2222-4333-8444-555555555556", AgentType: "claude", AgentName: "a", WorkingDir: t.TempDir(), BoardName: &team}))
+		seedNewInstallInboxWelcome(db, false)
+		var n int
+		require.NoError(t, db.GetContext(context.Background(), &n, `SELECT COUNT(*) FROM user_settings WHERE key = 'inbox_welcome'`))
+		assert.Zero(t, n, "a session on record: not a new install")
+		db2, err := storetest.Open(t, newE2EConfig(t, t.TempDir()).DBPath)
+		require.NoError(t, err)
+		t.Cleanup(func() { db2.Close() })
+		seedNewInstallInboxWelcome(db2, true)
+		require.NoError(t, db2.GetContext(context.Background(), &n, `SELECT COUNT(*) FROM user_settings WHERE key = 'inbox_welcome'`))
+		assert.Zero(t, n, "a team on a board: not a new install")
+		seedNewInstallInboxWelcome(db2, false)
+		require.NoError(t, db2.GetContext(context.Background(), &n, `SELECT COUNT(*) FROM user_settings WHERE key = 'inbox_welcome'`))
+		assert.Equal(t, 1, n, "nothing at all: new")
+	}
 	_, ok = value(t, nil, "1")
 	assert.False(t, ok, "a test server never asks")
 }
