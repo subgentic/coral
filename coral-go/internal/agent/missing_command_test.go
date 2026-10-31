@@ -94,6 +94,10 @@ func TestMissingCommandAtBottomOnQAsLiveScreens(t *testing.T) {
 			t.Errorf("%s: the shell's latest answer is the CLI missing: not marked", name)
 		}
 	}
+	// B: the same error, a blank row, then the program's own "[stub] up" and blank rows, no prompt: the shell has not answered.
+	if conptyB := "claude : The term 'claude' is not recognized as the name of a cmdlet, function, script file, or operable program. Check the spelling of the name, or if a path was included, verify that the path is cor\nrect and try again.\nAt line:1 char:1\n+ claude\n+ ~~~~~~\n    + CategoryInfo          : ObjectNotFound: (claude:String) [], CommandNotFoundException\n    + FullyQualifiedErrorId : CommandNotFoundException\n\n[stub] up\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n"; MissingCommandAtBottom(conptyB, "claude") {
+		t.Error("ConPTY B: no prompt at the bottom, only the program's output: marked")
+	}
 	conptyThenTyped := strings.Replace(conptyA, "PS C:\\Users\\someone\\coral-run\\work>", "PS C:\\Users\\someone\\coral-run\\work> dir\nPS C:\\Users\\someone\\coral-run\\work>", 1)
 	if MissingCommandAtBottom(conptyThenTyped, "claude") {
 		t.Error("the same screen with a typed command after the error: not the latest answer")
@@ -119,6 +123,22 @@ func TestMissingCommandAtBottomTellsTheWrappedPromptFromAPersonsOutput(t *testin
 	} {
 		if got := MissingCommandAtBottom(tc.screen, "codex"); got != tc.want {
 			t.Errorf("%s: %v, want %v", name, got, tc.want)
+		}
+	}
+}
+
+// QA's ConPTY run on #253 (case B): the error, a blank row, then the program's own line "[stub] up" and nothing more. There is no prompt at the
+// bottom, so the shell has not answered: not marked. The prompts the shells end with are each taken for one.
+func TestMissingCommandAtBottomNeedsAPromptAtTheBottom(t *testing.T) {
+	const ps51 = "claude : The term 'claude' is not recognized as the name of a cmdlet, function, script file, or operable program.\n" +
+		"At line:1 char:1\n+ claude\n+ ~~~~~~\n    + CategoryInfo          : ObjectNotFound: (claude:String) [], CommandNotFoundException\n" +
+		"    + FullyQualifiedErrorId : CommandNotFoundException\n\n"
+	if MissingCommandAtBottom(ps51+"[stub] up\n\n\n", "claude") {
+		t.Error("the program's own output at the bottom, no prompt: marked")
+	}
+	for _, prompt := range []string{"PS C:\\w>", "C:\\w>", "user@box:~/w$", "root@box:/# ", "% ", "~/w ❯ ", "λ "} {
+		if !MissingCommandAtBottom(ps51+prompt, "claude") {
+			t.Errorf("prompt %q: not taken for the prompt", prompt)
 		}
 	}
 }
