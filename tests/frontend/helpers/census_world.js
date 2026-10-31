@@ -44,14 +44,22 @@ const DATA_WORLD = `(() => {
     const json = b => Promise.resolve(new Response(JSON.stringify(b), { headers: { 'content-type': 'application/json' } }));
     // the agent's changed files: two, on every OS (the Files panel's rows must each name their buttons, which one row cannot show; #6152)
     const FILES = { files: [{ filepath: 'src/main.go', status: 'M' }, { filepath: 'docs/README.md', status: '??' }], is_git: true };
+    // the chat's Working row has been working for 10 s, always: it shows its quiet digits ("· 10 s", from 5 s) and never the 30 s "Still
+    // working" line. It counts from the send, and the stand-in agent works for the whole suite, so what a scene showed depended on how fast
+    // the suite got there (#416).
+    setInterval(() => { for (const w of document.querySelectorAll('.chat-working')) w.dataset.since = String(Date.now() - 10000); }, 250); // interval-ok: holds every Working row at 10 s for the page's life
     window.fetch = (url, opts = {}) => {
         const u = String(url && url.url || url).replace(/^https?:\\/\\/[^/]+/, ''), path = u.split('?')[0], m = (opts.method || 'GET').toUpperCase();
         // the list read again (a reply ended, the count moved) is the same two, not the stand-in agent's own folder: which of the two a scene showed was a race (#416)
         if (m === 'POST' && /^\\/api\\/sessions\\/live\\/[^/]+\\/files\\/refresh$/.test(path)) return json(FILES);
         if (m === 'GET') {
-            // OpenCode's sign-in status: not known, as the New Agent dialog has it before the server answers. The server would run the OpenCode
-            // CLI on the test machine (up to 6 s), and the scene that answer lands in was a race (#416).
-            if (path === '/api/system/cli-check' && /[?&]type=opencode(&|$)/.test(u) && /[?&]signin=1(&|$)/.test(u)) return json({ type: 'opencode', found: true });
+            // Every agent CLI is installed, runs and is signed in. The server would run the test machine's own CLI for this (its --version, and with
+            // signin=1 its sign-in status command, up to 6 s): a census never runs a real CLI, and what a scene showed no longer depends on the
+            // machine or on which scene the answer landed in (#416).
+            if (path === '/api/system/cli-check') {
+                const type = new URLSearchParams(u.split('?')[1] || '').get('type') || 'claude';
+                return json({ found: true, status: 'available', probe: 'ok', path: '/usr/local/bin/' + type, version: '1.0.0', agent_type: type, ...(/[?&]signin=1(&|$)/.test(u) ? { signed_in: true } : {}) });
+            }
             if (/^\\/api\\/sessions\\/live\\/[^/]+\\/files$/.test(path)) return json(FILES);
             if (path === '/api/workflows') return json({ workflows: [${JSON.stringify(WF)}, ${JSON.stringify(WF2)}, ${JSON.stringify(WF3)}] });
             if (path === '/api/workflows/7') return json(${JSON.stringify(WF)});

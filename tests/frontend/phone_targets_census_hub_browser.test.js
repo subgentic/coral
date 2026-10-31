@@ -44,6 +44,7 @@ const CSP = ["default-src 'self'", "script-src 'self'", "style-src 'self'", "sty
     if(p.pathname==='/api/servers')return json({servers:computers});
     if(p.pathname==='/api/account')return json({artifacts_tab:true,artifacts_frame:true});
     if(p.pathname==='/api/settings'&&m==='GET')return json({settings:{}});
+    if(p.pathname==='/api/system/cli-check'){const t=p.searchParams.get('type')||'claude';return json({found:true,status:'available',probe:'ok',path:'/usr/local/bin/'+t,version:'1.0.0',agent_type:t,...(p.searchParams.get('signin')==='1'?{signed_in:true}:{})});} // every CLI installed and signed in: a census never runs this computer's own CLI (#416)
     const match=p.pathname.match(/^\\/api\\/remote\\/([^/]+)(\\/api\\/.*)$/);
     if(!match)return original(u,o);
     const [_,server,path]=match;window.__remoteRequests.push({server,path,method:m,query:p.search});

@@ -38,6 +38,7 @@ async function setupHubWorld({ client, Page, Emulation, width, height, mobile, i
     if(p.pathname==='/api/sessions/live')return json({sessions:window.__noComputers?[]:[['m1','Review agent'],['m1','Docs agent'],['m2','Build agent']].map(([server,name],i)=>({session_id:'hub-agent-'+i,name:'hub-agent-'+i,display_name:name,agent_type:'claude',working_directory:'/tmp/hub-agent-'+i,server,sleeping:false,archived:false,status:'idle'})),servers:window.__noComputers?[]:computers});
     if(p.pathname==='/api/servers')return json({servers:computers});
     if(p.pathname==='/api/settings'&&m==='GET')return json({settings:{}});
+    if(p.pathname==='/api/system/cli-check'){const t=p.searchParams.get('type')||'claude';return json({found:true,status:'available',probe:'ok',path:'/usr/local/bin/'+t,version:'1.0.0',agent_type:t,...(p.searchParams.get('signin')==='1'?{signed_in:true}:{})});} // every CLI installed and signed in: a census never runs this computer's own CLI (#416)
     const match=p.pathname.match(/^\\/api\\/remote\\/([^/]+)(\\/api\\/.*)$/);
     if(!match)return original(u,o);
     const [_,server,path]=match;window.__remoteRequests.push({server,path,method:m,query:p.search});
