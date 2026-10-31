@@ -373,6 +373,12 @@
       "type": "table"
     },
     {
+      "name": "board_ask_closed",
+      "sql": "CREATE TABLE board_ask_closed (\n\t\t\tmessage_id INTEGER PRIMARY KEY,\n\t\t\tproject    TEXT NOT NULL,\n\t\t\tclosed_by  TEXT NOT NULL,\n\t\t\tnote       TEXT NOT NULL,\n\t\t\tclosed_at  TEXT NOT NULL\n\t\t)",
+      "tbl_name": "board_ask_closed",
+      "type": "table"
+    },
+    {
       "name": "board_asks",
       "sql": "CREATE TABLE board_asks (\n\t\t\tmessage_id INTEGER PRIMARY KEY,\n\t\t\tproject    TEXT NOT NULL,\n\t\t\tasker      TEXT NOT NULL,\n\t\t\tasked      TEXT NOT NULL,\n\t\t\tcreated_at TEXT NOT NULL\n\t\t)",
       "tbl_name": "board_asks",
@@ -921,6 +927,56 @@
           "unique": 1
         }
       ]
+    },
+    "board_ask_closed": {
+      "columns": [
+        {
+          "cid": 0,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "message_id",
+          "notnull": 0,
+          "pk": 1,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 1,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "project",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 2,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "closed_by",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 3,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "note",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 4,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "closed_at",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        }
+      ],
+      "indexes": []
     },
     "board_asks": {
       "columns": [

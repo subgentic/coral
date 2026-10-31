@@ -124,6 +124,8 @@ func main() {
 		cmdTask()
 	case "goal":
 		cmdGoal()
+	case "ask":
+		cmdAsk()
 	case "workflow":
 		cmdWorkflow()
 	case "wait":

@@ -115,6 +115,9 @@ func TestTheOwnerTableAgreesWithTheHandWrittenListItReplaced(t *testing.T) {
 				continue
 			}
 			// The activity counts of the Analytics tabs (#11225) are the owner's alone through the hub: the old list never had them.
+			if m == http.MethodGet && p == "/api/operator-asks" { // the questions asked of the Operator are the owner's alone (#11417): the old list never had them
+				continue
+			}
 			if m == http.MethodGet && p == "/api/analytics/activity" {
 				continue
 			}
