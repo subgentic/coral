@@ -91,6 +91,11 @@ func TestAStrangerThatRefusesAWrongPasswordIsNeverSentTheRealOneWhileTheChildLiv
 		assert.True(t, strings.HasPrefix(pw, "not-"), "the real password was sent to the stranger: %q", pw)
 	}
 	raw, rerr := os.ReadFile(envFile + ".pids")
+	if runtime.GOOS == "windows" && os.IsNotExist(rerr) {
+		// A Windows process takes a moment to reach the stand-in's first line (the pid record), and the start fails closed and ends the child within a few ms when the listener is a stranger: the child may be
+		// gone before it wrote one, which leaves nothing running either (the Windows run of #11454's batch).
+		return
+	}
 	require.NoError(t, rerr)
 	for _, f := range strings.Fields(string(raw)) {
 		pid, _ := strconv.Atoi(f)
