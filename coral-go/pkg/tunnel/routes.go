@@ -277,6 +277,8 @@ var routeTable = cat(
 	// ... and so are its changes (#5763, Security's SHOULD 3 on #5761): a bookmark is the owner's own note, so a hub Interact grantee can neither read, create, mark done nor delete one.
 	// Still Interact for the tier (they move no work); the machine also refuses anyone but the owner.
 	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/saved")),
+	owner(OwnerRefuse, rules(http.MethodGet, TierView, "/api/board/{project}/proposals", "/api/proposals")),                                               // what agents asked to add: the Operator's (#11389)
+	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/board/{project}/proposals/{id}/approve", "/api/board/{project}/proposals/{id}/reject")), // and the Operator's decision
 	owner(OwnerRefuse, rules(http.MethodPatch, TierInteract, "/api/saved/{id}")),
 	owner(OwnerRefuse, rules(http.MethodDelete, TierInteract, "/api/saved/{id}")),
 	// What a viewer sees of a board's settings is the machine's to decide (the health setup is the owner's, #5307): the marker is stamped, the handler gives a non-owner less.

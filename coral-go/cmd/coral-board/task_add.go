@@ -50,6 +50,7 @@ func cmdTaskAdd(st *boardState, args []string) {
 	parent := fs.Int64("parent", 0, "Parent task ID")
 	retryOf := fs.Int64("retry-of", 0, "Finished task ID this new task retries")
 	goal := fs.Int64("goal", 0, "The goal of this board the task serves")
+	goalProposal := fs.Int64("goal-proposal", 0, "The number of a goal proposal still waiting for the Operator's approval: this task waits with it")
 	followUp := fs.Int64("follow-up", 0, "Make this a follow-up of that task: it takes the task's goal, reviewers and assignee unless you give your own")
 	self := fs.Bool("self", false, "Make the task for yourself: it is assigned to you and needs --goal; a repeat of an open title returns that task, and at most 5 can be open (#11247)")
 	goalFrom := fs.Int64("goal-from", 0, "Accept this goal request another team sent: the task is made already linked to its goal (write your own title and body; the request text is not copied)")
@@ -158,12 +159,22 @@ func cmdTaskAdd(st *boardState, args []string) {
 		}
 		workflowBody["reviewers"] = names
 	}
+	if *goalProposal > 0 {
+		reqBody["goal_proposal_id"] = *goalProposal
+	}
 	reqBody["workflow"] = workflowBody
 
 	data, status, err := apiCallRaw("POST", "/"+url.PathEscape(st.Project)+"/tasks", reqBody)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		clierr.Exit1()
+	}
+	if status == http.StatusAccepted { // this team's tasks need the Operator's approval (#11389): the task is a proposal, nothing was created yet
+		var held map[string]any
+		_ = json.Unmarshal(data, &held)
+		msg, _ := held["message"].(string)
+		fmt.Printf("Task proposed: %s\n", strings.TrimSpace(msg))
+		return
 	}
 	if status != http.StatusCreated && status != http.StatusOK {
 		fmt.Fprintf(os.Stderr, "Error creating task: %s\n", clierr.Describe(nil, status, data))

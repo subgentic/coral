@@ -195,6 +195,10 @@ func (s *Server) registerBoardTaskRoutes(r chi.Router, boardHandler *routes.Boar
 	r.Get("/api/board/{project}/goals/{goalID}", boardHandler.GetGoal)
 	r.With(routes.RefuseSignInLink).Patch("/api/board/{project}/goals/{goalID}", boardHandler.UpdateGoal)
 	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/goals/{goalID}/close", boardHandler.CloseGoal)
+	r.Get("/api/board/{project}/proposals", boardHandler.ListProposals) // what agents asked to add and the Operator has not decided (#11389; owner-only through Coral Hub)
+	r.Get("/api/proposals", boardHandler.ListProposals)                 // every board's: the Needs you rows
+	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/proposals/{id}/approve", boardHandler.ApproveProposal)
+	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/proposals/{id}/reject", boardHandler.RejectProposal)
 	r.Put("/api/board/{project}/tasks/{taskID}/goal", boardHandler.SetTaskGoal)
 	// Goal requests between two boards of this computer (#7361): not carried through Coral Hub yet.
 	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/goal-requests", boardHandler.PostGoalRequest)

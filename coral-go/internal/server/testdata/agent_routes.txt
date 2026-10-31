@@ -473,3 +473,7 @@ b TRACE /api/remote/{server}/*
 b GET /api/sessions/history/counts
 b GET /api/sessions/live/{sessionID}/agent-candidate
 b PATCH /api/sessions/history/{sessionID}/flags
+b GET /api/board/{project}/proposals
+b GET /api/proposals
+b POST /api/board/{project}/proposals/{id}/approve
+b POST /api/board/{project}/proposals/{id}/reject

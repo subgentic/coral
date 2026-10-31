@@ -232,6 +232,7 @@ func (s *Store) deleteProject(ctx context.Context, project string, onlyIfUnused 
 		{"DELETE FROM task_ready_notifications WHERE task_id IN " + mine, 1},
 		{"DELETE FROM board_tasks WHERE board_id = ?", 1},
 		{"DELETE FROM board_goals WHERE board_id = ?", 1},
+		{"DELETE FROM board_proposals WHERE board_id = ?", 1},   // what agents asked to add goes with the team (#11389)
 		{"DELETE FROM board_goal_events WHERE board_id = ?", 1}, // after the goals: deleting them writes goal_deleted events of their own (#7355)
 		{"DELETE FROM board_goal_meta WHERE board_id = ?", 1},
 		// A goal request holds another team's text and names both teams: it goes with either of them, so a board made again under the name inherits none (the same class as #7357's events).
