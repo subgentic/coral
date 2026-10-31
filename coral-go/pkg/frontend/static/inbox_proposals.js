@@ -14,6 +14,8 @@ export { proposalItems, pendingProposals, onProposalsChanged, refreshProposals }
 export const markedText = t => markHidden(t, { strict: true }).replace(/\s+/g, ' ').trim();
 /** The same for a block shown whole (the detail): line breaks and blanks are kept, every hidden or reordering character is written out. */
 export const markedBlock = t => markHidden(t, { strict: true });
+/** How many hidden or reordering characters the words hold (what markHidden writes out: not a line break or a tab). */
+export const hiddenCount = t => (String(t == null ? '' : t).replace(/\r\n/g, '\n').match(/[\p{Cc}\p{Cf}]/gu) || []).filter(c => c !== '\n' && c !== '\t').length;
 const kindWord = p => (p.kind === 'goal' ? 'goal' : 'task');
 
 /** What a proposal carries, for the dialog and the row: its words, the instructions and required outputs the assignee will be given (shown in full: the Operator approves what they read), and one line of everything else it sets. */
@@ -75,6 +77,8 @@ export function openProposalDialog(p, mode = 'view') {
     else { const [bl, b] = field('Details', pay.body || '', true); second = b; parts.push(bl); }
     const why = field('Reason (the agent is told)', '', true), reason = why[1]; reason.readOnly = false; inputs.pop(); // the reason is the Operator's own
     const reasonRow = why[0]; reasonRow.hidden = mode !== 'reject';
+    const hidden = el('p', 'proposal-hidden'); hidden.setAttribute('role', 'status'); hidden.hidden = true;
+    const sayHidden = () => { const n = inputs.reduce((sum, [, raw]) => sum + hiddenCount(raw), 0); hidden.hidden = n === 0; hidden.textContent = n ? `These words hold ${n} hidden character${n === 1 ? '' : 's'}.` : ''; };
     const status = el('p', 'proposal-status'); status.setAttribute('role', 'alert');
     const row = el('div', 'modal-actions proposal-buttons');
     const close = el('button', 'btn', 'Close'); close.type = 'button'; close.addEventListener('click', () => d.close());
@@ -96,13 +100,14 @@ export function openProposalDialog(p, mode = 'view') {
         approve.disabled = rejectOpen.disabled = true; status.textContent = '';
         finish(await decide(p, 'reject', { reason: reason.value.trim() }));
     });
-    editOpen.addEventListener('click', () => { editing = true; for (const [i, raw] of inputs) { i.value = raw; i.readOnly = false; } editOpen.hidden = true; approve.textContent = 'Approve with these words'; title.focus(); });
+    editOpen.addEventListener('click', () => { editing = true; for (const [i, raw] of inputs) { i.value = raw; i.readOnly = false; } sayHidden(); editOpen.hidden = true; approve.textContent = 'Approve with these words'; title.focus(); });
     row.append(close, rejectOpen, editOpen, approve);
     const carried = [];
     if (facts.instructions) { const b = el('div', 'proposal-carried'); b.append(el('strong', null, 'Instructions it gives the assignee'), el('pre', 'proposal-pre', markedBlock(facts.instructions))); carried.push(b); }
     if (facts.outputs.length) { const b = el('div', 'proposal-carried'); b.append(el('strong', null, 'Outputs it requires')); const ul = el('ul', 'proposal-outputs'); for (const o of facts.outputs) ul.append(el('li', null, markedBlock(o))); b.append(ul); carried.push(b); }
     if (facts.also.length) carried.push(el('p', 'proposal-extra', markedBlock(`Also sets: ${facts.also.join('; ')}.`)));
-    d.append(h, who, ...parts, ...carried, reasonRow, status, row);
+    d.append(h, who, ...parts, ...carried, hidden, reasonRow, status, row);
+    if (editing) sayHidden();
     d.addEventListener('close', () => { d.remove(); });
     document.body.append(d);
     d.showModal();

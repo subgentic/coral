@@ -110,6 +110,7 @@ const STUB = `(() => {
             await waitFor(`!!document.querySelector('#proposal-dialog[open]')`, at + 'the dialog', 5000);
             const dlg = await ev(`(() => { const d = document.querySelector('#proposal-dialog'); const f = [...d.querySelectorAll('input, textarea')]; return { title: f[0].value, outcome: f[1].value.endsWith('THE END OF IT.'), done: f[2].value, who: d.querySelector('.proposal-who').textContent, focus: document.activeElement === f[0] }; })()`);
             check(at + 'the row Edit opens the dialog: all the words (the whole body) and the proposer, the title focused', dlg.title === 'Ship the beta' && dlg.outcome && dlg.done === 'The release is out' && /Orchestrator proposed it for team-a/.test(dlg.who) && dlg.focus, JSON.stringify(dlg));
+            const cleanBefore = await ev(`document.querySelector('#proposal-dialog .proposal-hidden').hidden`);
             await shot(`proposals-dialog-${view.w}-${view.theme}`);
             await ev(`(() => { const t = document.querySelector('#proposal-dialog input'); t.value = 'Ship the beta, edited'; t.dispatchEvent(new Event('input', { bubbles: true })); [...document.querySelectorAll('#proposal-dialog button')].find(b => /Approve/.test(b.textContent)).click(); return true; })()`);
             await waitFor(`!document.querySelector('#proposal-dialog[open]')`, at + 'the dialog closed', 8000);
@@ -130,6 +131,14 @@ const STUB = `(() => {
             await waitFor(`/<U\\+202E>/.test(document.querySelector('${T}').textContent)`, at + 'the marked row', 8000);
             const marked = await ev(`(() => { const tr = [...document.querySelectorAll('${T} tbody tr')].find(r => /gnp\\.exe/.test(r.textContent)); const body = tr.querySelector('.inbox-proposal-body').textContent; return { text: tr.textContent, body, hidden: /[\\u202E\\u200D]/.test(tr.textContent), aria: [...tr.querySelectorAll('button')].map(b => b.getAttribute('aria-label')).join('|'), cutMark: /<U\\+?[0-9A-F]*$/.test(body.replace(/…$/, '')) }; })()`);
             check(at + 'a title, proposer and body with a right-to-left override or a joiner are written out as <U+202E> and <U+200D>, in the row and its button names, never drawn', !marked.hidden && /Pay<U\+202E>gnp\.exe/.test(marked.text) && /Dev<U\+202E>evil proposes a task/.test(marked.text) && /git<U\+200D>status<U\+202E> now/.test(marked.body) && /Pay<U\+202E>gnp\.exe/.test(marked.aria) && !marked.cutMark && marked.body.endsWith('…'), JSON.stringify(marked).slice(0, 400));
+            // Edit says how many hidden characters the words hold: none until it is pressed, none at all for words without any
+            await ev(`${rowOf('Pay<U+202E>gnp.exe')}.querySelector('.inbox-review-name').click(); true`);
+            await waitFor(`!!document.querySelector('#proposal-dialog[open]')`, at + 'the detail for the hidden count', 5000);
+            const beforeEdit = await ev(`(document.querySelector('#proposal-dialog .proposal-hidden') || { hidden: true }).hidden`);
+            await ev(`[...document.querySelectorAll('#proposal-dialog button')].find(b => b.textContent === 'Edit and approve').click(); true`);
+            const hint = await ev(`(() => { const n = document.querySelector('#proposal-dialog .proposal-hidden'); return { shown: !n.hidden, text: n.textContent }; })()`);
+            await ev(`document.querySelector('#proposal-dialog').close(); true`);
+            check(at + "Edit says 'These words hold 3 hidden characters' when there are some (title 1, body 2), not before it is pressed and not for clean words (the row Edit of the beta goal has none)", beforeEdit === true && hint.shown && hint.text === 'These words hold 3 hidden characters.' && cleanBefore === true, JSON.stringify({ beforeEdit, hint, cleanBefore }));
             // the detail in view mode shows marked words in its fields, and Approve there sends no edit (the marked words are not the proposal's)
             await ev(`window.__posts = []; ${rowOf('Pay<U+202E>gnp.exe')}.querySelector('.inbox-review-name').click(); true`);
             await waitFor(`!!document.querySelector('#proposal-dialog[open]')`, at + 'the detail of the marked proposal', 5000);

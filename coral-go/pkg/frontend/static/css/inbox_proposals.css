@@ -5,6 +5,7 @@
 .proposal-who, .proposal-extra { margin: 0; color: var(--text-secondary); font-size: var(--fs-md); overflow-wrap: anywhere; }
 .proposal-field { display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-md); }
 .proposal-field .field { width: 100%; box-sizing: border-box; }
+.proposal-hidden { margin: 0; color: var(--warning-text); font-size: var(--fs-md); }
 .proposal-status { margin: 0; color: var(--error-text); min-height: 0; }
 .proposal-status:empty { display: none; }
 .proposal-buttons { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
