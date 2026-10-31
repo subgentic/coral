@@ -50,6 +50,15 @@ func gitListFields(git *store.GitSnapshot) (branch, repoName, gitState any) {
 	return branch, repoName, gitState
 }
 
+// detachedCommit is the short commit a row names when its checkout is detached: git reports the branch of a detached checkout as the word HEAD, which every detached agent shares, so the dashboard
+// cannot tell two agents on two worktrees apart (#11580). Nil for a checkout on a branch, or when the commit is unknown.
+func detachedCommit(git *store.GitSnapshot) any {
+	if git == nil || git.Branch != "HEAD" || len(git.CommitHash) < 7 {
+		return nil
+	}
+	return git.CommitHash[:7]
+}
+
 // addCapabilities sets entry["capabilities"] to the stored JSON when present
 // and valid; otherwise the key is left out.
 func addCapabilities(entry map[string]any, raw *string) {

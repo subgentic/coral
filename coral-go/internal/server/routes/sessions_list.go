@@ -506,6 +506,7 @@ func (h *SessionsHandler) agentRow(trace *phaseTrace, agent AgentInfo, lv liveIn
 		"branch":                branchVal,
 		"repo_name":             repoNameVal,
 		"git_state":             worktreeVal,
+		"commit_short":          detachedCommit(git),
 		"waiting_for_input":     state.NeedsInput,
 		"notices_paused":        noticesPaused,
 		"paused_until":          noticesUntil,

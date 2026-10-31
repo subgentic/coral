@@ -3,7 +3,7 @@ import { syncNoticePause } from './notice_pause.js'; // the pause toggle and its
 import { syncWaitingNotice } from './waiting.js'; // what waits for the open agent, with Send now (#7727)
 import { syncQueuedFromRow, syncAnswerFromRow, paint as paintQueued } from './held_sends.js';
 import { syncSendsFromRow } from './pending_messages.js';
-import { _gitStateSummary, _repoBranch, presentationSessionState, goalAgeWords } from './session_state.js';
+import { _gitStateSummary, _repoBranch, _shortPath, presentationSessionState, goalAgeWords } from './session_state.js';
 import { startupSignedOut } from './signin_line.js';
 import { syncAgentKeys } from './agent_keys.js';
 import { setText, setHidden, setTitle, setHtml, setDisplay, setClassName, setPill, setAttr } from './dom_write.js';
@@ -75,17 +75,24 @@ function _syncPhoneDetails() {
     setHidden(box, !any);
 }
 
+/** The top of Files says where the agent lives, always: its folder and its branch (#11580). */
+function _syncWhere() {
+    const el = document.getElementById('files-where');
+    if (!el) return;
+    setText(el, [_shortPath(_details.folder), _details.branch].filter(Boolean).join(' · ')); setTitle(el, _details.folder); setHidden(el, !_details.folder && !_details.branch);
+}
+
 export function updateSessionFolder(dir) {
     _details.folder = dir || '';
-    _syncPhoneDetails();
+    _syncPhoneDetails(); _syncWhere();
     _headerDir = dir || "";
     _syncHeaderFolder();
 }
 
-export function updateSessionBranch(branch, repoName, gitState) {
-    const display = _repoBranch(repoName, branch);
+export function updateSessionBranch(branch, repoName, gitState, commit) {
+    const display = _repoBranch(repoName, branch, commit);
     _details.branch = display || '';
-    _syncPhoneDetails();
+    _syncPhoneDetails(); _syncWhere();
     const el = document.getElementById("session-branch");
     if (el) {
         if (display) {

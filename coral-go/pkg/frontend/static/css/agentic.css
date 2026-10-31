@@ -1995,3 +1995,4 @@ body.panel-dragging .agentic-state {
 /* An open file's note when the file changed on disk under unsaved edits (#10334). */
 .preview-disk-note { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 6px 12px; font-size: var(--fs-sm); color: var(--text-secondary); border-bottom: 1px solid var(--border); }
 .files-legend { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: var(--space-xs) var(--space-md); font-size: var(--fs-sm); color: var(--text-muted); } /* the line also holds Expand all (#11350) */
+.files-where { padding: 6px 12px 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-sm); color: var(--text-secondary); } /* where the agent lives: its folder and branch, at the top of Files (#11580) */
