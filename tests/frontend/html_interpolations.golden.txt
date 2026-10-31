@@ -456,6 +456,10 @@
 1	task_detail_html.js	fields
 1	task_detail_html.js	formatCost(lc.cost_usd, { nullAsZero: true, zeroAsTwo: true, subCent: 'lt', precise: true })
 1	task_detail_html.js	formatCost(task.cost_usd, { nullAsZero: true, zeroAsTwo: true, subCent: 'lt', precise: true })
+1	task_detail_html.js	linked(preview(effective[field] ?? changes[field]))
+1	task_detail_html.js	linked(preview(previous[field]))
+1	task_detail_html.js	linked(task.body)
+1	task_detail_html.js	linked(workflow.instructions || '')
 1	task_detail_html.js	nameHtml
 1	task_detail_html.js	note
 1	task_detail_html.js	note ? `<br>${note}` : ''
