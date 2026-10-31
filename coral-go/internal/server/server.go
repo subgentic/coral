@@ -698,14 +698,8 @@ func (s *Server) chiefBoardID(ctx context.Context) string {
 	if lerr != nil || ls == nil || ls.BoardName == nil || *ls.BoardName == "" {
 		return ""
 	}
-	id := *ls.BoardName
-	if id == team {
+	if id := *ls.BoardName; s.isRecordedTeam(ctx, id, team) {
 		return id
-	}
-	if s.boardStore != nil {
-		if b, err := s.boardStore.GetBoard(ctx, id); err == nil && b != nil && b.Label != "" && b.Label == team {
-			return id
-		}
 	}
 	return ""
 }
