@@ -4,6 +4,7 @@
  * nothing and the rows look as they did. Same board only: a task that waits across boards is not counted. Lazy: loaded by the Needs you folder when it has an item to ask about (inbox_sidebar.js). */
 import { splitKey } from './server_base.js';
 import { queryBoardTasks } from './task_list.js';
+import { visibleName } from './artifact_names.js'; // a title is an agent's text: shown without what hides or reorders it (QA on #11442; the strict mark of visible_marks.js replaces this when it lands)
 
 const OPEN = ['pending', 'blocked', 'in_progress', 'review_pending'];
 const RANK = { critical: 0, high: 1, medium: 2, low: 3 };
@@ -21,10 +22,10 @@ export function dependentsOf(tasks, board, id) {
         && t.blocked_by.some(d => d && Number(d.task_id) === n && (!d.board_id || d.board_id === board) && d.satisfied === false));
 }
 
-function infoOf(waiters, closes) {
+export function infoOf(waiters, closes) {
     if (!waiters.length && !closes) return null;
     const sorted = [...waiters].sort((a, b) => (RANK[a.priority] ?? 2) - (RANK[b.priority] ?? 2) || Number(a.id) - Number(b.id));
-    return { count: sorted.length, first: sorted.length ? String(sorted[0].title || '') : '', high: sorted.some(t => (RANK[t.priority] ?? 2) <= 1), closes: closes || '' };
+    return { count: sorted.length, first: sorted.length ? (visibleName(sorted[0].title) || `task #${sorted[0].id}`) : '', high: sorted.some(t => (RANK[t.priority] ?? 2) <= 1), closes: visibleName(closes) || (closes ? 'a goal' : '') };
 }
 
 /** A review's: the tasks that wait on its task, and the goal it would close (its task is the last open one of that goal). null when nothing waits and no goal closes. */

@@ -104,7 +104,7 @@ const blocksOf = s => (BL ? BL.phraseOf(BL.blockerOf(blocksKey(s))) : '');
 const blocksShortOf = s => (BL ? BL.shortPhraseOf(BL.blockerOf(blocksKey(s))) : ''); // a phone's one-line row
 const blockItems = () => allNeeds().filter(s => !s.autorun).map(s => (s.review
     ? { key: blocksKey(s), kind: 'review', team: s.review.team, taskId: s.task && s.task.id, goalId: s.goal && s.goal.id, goalTitle: s.goal && s.goal.title }
-    : { key: blocksKey(s), kind: 'agent', team: s.board_project ? identityKey(sessionServer(s), s.board_project) : '', names: [s.display_name, s.name] })).filter(i => i.team);
+    : { key: blocksKey(s), kind: 'agent', team: s.board_project ? identityKey(sessionServer(s), s.board_project) : '', names: [s.display_name, s.name, s.board_job_title] })).filter(i => i.team);
 let _blocksAsked = 0;
 function askBlockers() { // at most once a second, and a redraw only when the answer changed
     const items = blockItems();

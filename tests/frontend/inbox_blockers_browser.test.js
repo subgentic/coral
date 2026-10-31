@@ -11,8 +11,11 @@ const { removeBoards } = require('./helpers/board_cleanup');
 const iso = ms => new Date(Date.now() - ms).toISOString();
 const mk = (n, name, team, ageMs) => ({ name: n, session_id: `0000000${n.length}-0000-4000-8000-00000000000${n.length}`, agent_type: 'claude', server: 'local', status: 'idle', display_name: name, working_directory: '/repo/' + n, waiting_for_input: true, waiting_kind: 'permission', waiting_summary: 'Wants to run: go test ./...', waiting_since: iso(ageMs), board_project: team, sleeping: false });
 const AGENTS = [mk('a', 'Backend Dev', 'team-a', 600000), mk('bb', 'Frontend Dev', 'team-a', 120000), mk('ccc', 'Docs Writer', 'team-b', 300000)]; // by age: Backend, Docs, Frontend; Frontend holds up three tasks
+AGENTS[0].board_job_title = 'Release Manager'; // the board's own name for it differs from the display name: its task is assigned to that name
 for (const [i, a] of AGENTS.entries()) a.session_id = `0000000${i + 1}-0000-4000-8000-00000000000${i + 1}`;
 const TASKS_A = [
+    { id: 20, title: 'Cut the release', status: 'in_progress', priority: 'low', assigned_to: 'Release Manager', blocked_by: [] },
+    { id: 21, title: 'Ship\u202e the build\u200b', status: 'pending', priority: 'low', assigned_to: '', blocked_by: [{ task_id: 20, board_id: 'team-a', satisfied: false }] },
     { id: 10, title: 'Frontend work', status: 'in_progress', priority: 'medium', assigned_to: 'Frontend Dev', blocked_by: [] },
     { id: 11, title: 'Tag v2.0.10', status: 'pending', priority: 'high', assigned_to: '', blocked_by: [{ task_id: 10, board_id: 'team-a', satisfied: false }] },
     { id: 12, title: 'Write the notes', status: 'pending', priority: 'medium', assigned_to: '', blocked_by: [{ task_id: 10, board_id: 'team-a', satisfied: false }] },
@@ -48,7 +51,9 @@ const TASKS_A = [
                 check(/Blocks 3 tasks/.test(fe.text), at + 'a phone\'s one-line row says it short: ' + fe.text);
                 check(await ev(`[...document.querySelectorAll('${T} tr')].some(tr => tr.textContent.includes('Frontend Dev') && [...tr.querySelectorAll('[title]')].some(e => /High priority: 3 tasks wait on this/.test(e.title)))`), at + 'and the whole sentence is its tooltip');
             }
-            check(!rows.filter(r => !r.text.includes('Frontend Dev')).some(r => /wait on this|waits on this|Blocks \d|Blocks “/.test(r.text)), at + 'the other two say nothing: one has no task, the other\'s team could not be read');
+            const be = rows.find(r => r.text.includes('Backend Dev'));
+            check(/Blocks 2 tasks/.test(be.text) && !/[\u202e\u200b]/.test(be.text), at + 'an agent the board calls by another name (its job title) still says what waits on it (its task and the one waiting on it): ' + JSON.stringify(be.text));
+            check(!rows.filter(r => r.text.includes('Docs Writer')).some(r => /wait on this|waits on this|Blocks \d|Blocks “/.test(r.text)), at + 'the agent whose team could not be read says nothing');
             check(await ev(`window.__taskCalls.filter(c => /[?&]board=team-/.test(c)).length`) === 2, at + 'one query per team, not per row: ' + await ev(`window.__taskCalls.filter(c => /[?&]board=team-/.test(c)).join(' ')`));
             await shot(`inbox-blockers-${w}`);
             if (!mobile) { // the table fits its box and the agent's name keeps its room (the new column once squeezed it to nothing)
