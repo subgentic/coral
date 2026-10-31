@@ -1,6 +1,6 @@
 // cloud_words.js: the closed permissions summary (permissive switches named, a protective one off marked), the Operator sentence and the spelled code.
 import assert from 'node:assert/strict';
-import { morePermsWords, operatorLine, spellCode, describe, enrolledRetrying, rekeyText, autoAcceptChangedText, severalAccountsText, codeExpired, OFF_TEXT, EXPIRED_TEXT, HUB_ACCESS_URL, LEVEL_NOW } from '../../coral-go/pkg/frontend/static/cloud_words.js';
+import { morePermsWords, operatorLine, spellCode, describe, enrolledRetrying, rekeyText, autoAcceptChangedText, severalAccountsText, codeExpired, codeUncollected, UNCOLLECTED_TEXT, OFF_TEXT, EXPIRED_TEXT, HUB_ACCESS_URL, LEVEL_NOW } from '../../coral-go/pkg/frontend/static/cloud_words.js';
 
 assert.deepEqual(morePermsWords({}, null), { text: 'More Coral Hub permissions: may change cross-team settings', warn: '' }, 'cross-team is on unless turned off');
 assert.equal(morePermsWords({ hub_cross_team_settings: false }, false).text, 'More Coral Hub permissions: none on');
@@ -49,6 +49,13 @@ assert.equal(enrolledRetrying({ state: 'connected', server_id: 's1' }), false);
 assert.equal(enrolledRetrying(null), false);
 assert.equal(codeExpired({ state: 'idle', last_error_code: 'code_expired' }), true);
 assert.equal(codeExpired({ state: 'enrolling', last_error_code: 'code_expired' }), false);
+// #11463 F2: a code that ran out uncollected is not "never approved", and sends nobody to request access
+assert.equal(describe({ state: 'idle', last_error_code: 'code_uncollected' }), UNCOLLECTED_TEXT);
+assert.match(UNCOLLECTED_TEXT, /connect again/);
+assert.doesNotMatch(UNCOLLECTED_TEXT, /closed beta|request access/);
+assert.equal(codeUncollected({ state: 'idle', last_error_code: 'code_uncollected' }), true);
+assert.equal(codeUncollected({ state: 'enrolling', last_error_code: 'code_uncollected' }), false);
+assert.equal(codeExpired({ state: 'idle', last_error_code: 'code_uncollected' }), false, 'the access link is for the never-approved text only');
 
 assert.match(rekeyText({ hub_url: 'https://h.example', remote_server_keys: 2, exposed: true }), /^Other accounts on this computer could read the secret key file.*discards the Coral Hub connection to https:\/\/h\.example .* and 2 remote computers' API keys/s);
 assert.match(rekeyText({ remote_server_keys: 1, message: 'bad file' }), /^Coral can't use its secret key file \(bad file\)\..*1 remote computer's API key/s);

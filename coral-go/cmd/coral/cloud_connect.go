@@ -330,7 +330,7 @@ func (c *cloudClient) connectFlow(ctx context.Context, ui connectUI) int {
 			break
 		}
 		// The code expired, the request was denied, or the Hub stopped answering.
-		if st.LastErrorCode == cloud.ErrCodeExpired {
+		if st.LastErrorCode == cloud.ErrCodeExpired || st.LastErrorCode == cloud.ErrCodeUncollected {
 			// coral-hub's text, a full sentence ending with a link: printed as it is.
 			fmt.Fprintf(ui.out, "Not connected. %s\n", st.LastError)
 		} else {

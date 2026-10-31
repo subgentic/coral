@@ -123,7 +123,9 @@ func applyTunnelState(st *Status, state, msg string, now time.Time) {
 
 // Last error codes (Status.LastErrorCode).
 const (
-	ErrCodeExpired      = "code_expired"
+	ErrCodeExpired = "code_expired"
+	// ErrCodeUncollected: the code expired while this Coral was not polling (it was stopped, the computer slept, the hub could not be reached), so an approval, if there was one, was never collected (#11463 F2).
+	ErrCodeUncollected  = "code_uncollected"
 	ErrCodeAccessDenied = "access_denied"
 	ErrCodeRateLimited  = "rate_limited"
 	// ErrCodeHubUnreachable: the first call to Coral Hub, to start an enrollment, could not reach it (#5962): the dashboard says it in a sentence and counts down to the next try.
@@ -138,6 +140,13 @@ const (
 // Coral Hub's closed beta can't sign in, so their code just expires: the hub gives no
 // distinct answer for that, by design (it would leak who is on the allowlist).
 const codeExpiredMessage = "The code expired before it was approved. If you couldn't sign in at app.coralhub.dev, Coral Hub is in closed beta: request access at https://coralhub.dev/hub.html"
+
+// codeUncollectedMessage is for a code that ran out while this Coral had stopped asking the hub about it (a restart, a sleeping computer, no network). The hub says only "expired" for a code nobody approved and for
+// one approved and never collected, by design, so what Coral can see is its own gap. It does not send the person to request access: they may well have approved it (#11463 F2, coral-hub's walk).
+const codeUncollectedMessage = "The code expired before this computer collected it, because Coral wasn't running or couldn't reach Coral Hub for a while. If you approved it in Coral Hub, connect again: it takes a few seconds"
+
+// pollGap is how much longer than its interval the poll loop may be away from the hub before the code is treated as one that could have been approved unseen: more than a slow answer, less than a sleep.
+func pollGap(interval time.Duration) time.Duration { return 2*interval + 30*time.Second }
 
 // Manager owns the enrollment and the tunnel.
 type Manager struct {
@@ -360,7 +369,7 @@ func (m *Manager) Connect(ctx context.Context) error {
 	pend, _ := m.o.Store.GetEnrollment(ctx, m.o.HubURL)
 	if pend != nil && pend.DeviceCode != "" && now.Add(enrollReuseMargin).Before(pend.ExpiresAt) {
 		m.startPolling(&DeviceCode{DeviceCode: pend.DeviceCode, UserCode: pend.UserCode, VerificationURL: pend.VerificationURL,
-			Interval: pend.Interval, ExpiresAt: pend.ExpiresAt})
+			Interval: pend.Interval, ExpiresAt: pend.ExpiresAt}, true) // an earlier run's code: Coral was not asking while it was down
 		return nil
 	}
 	if pend != nil && now.Before(pend.NextStartAt) {
@@ -404,7 +413,7 @@ func (m *Manager) Connect(ctx context.Context) error {
 	}
 	_ = m.o.Store.SaveEnrollment(ctx, &store.CloudEnrollment{HubURL: m.o.HubURL, DeviceCode: dc.DeviceCode, UserCode: dc.UserCode,
 		VerificationURL: dc.VerificationURL, Interval: dc.Interval, ExpiresAt: dc.ExpiresAt, NextStartAt: next.Add(enrollJitter(enrollMinGap / 10))})
-	m.startPolling(dc)
+	m.startPolling(dc, false)
 	return nil
 }
 
@@ -448,7 +457,7 @@ func (m *Manager) dropPendingCode(ctx context.Context) {
 }
 
 // startPolling shows the code and polls the hub for the user's approval.
-func (m *Manager) startPolling(dc *DeviceCode) {
+func (m *Manager) startPolling(dc *DeviceCode, resumed bool) {
 	m.mu.Lock()
 	m.stopLocked()
 	m.gen++
@@ -458,7 +467,10 @@ func (m *Manager) startPolling(dc *DeviceCode) {
 	m.st = Status{Configured: true, HubURL: m.o.HubURL, State: StateEnrolling,
 		UserCode: dc.UserCode, VerificationURL: dc.VerificationURL, ExpiresAt: dc.ExpiresAt}
 	m.mu.Unlock()
-	go func() { defer safego.Recover("cloud/manager:m.pollEnrollment"); m.pollEnrollment(ectx, gen, dc) }()
+	go func() {
+		defer safego.Recover("cloud/manager:m.pollEnrollment")
+		m.pollEnrollment(ectx, gen, dc, resumed)
+	}()
 }
 
 // CancelEnrollment stops an enrollment in progress: the user code is dropped and
@@ -482,8 +494,17 @@ func (m *Manager) CancelEnrollment(ctx context.Context) {
 
 func (m *Manager) stale(gen int) bool { return gen != m.gen }
 
-func (m *Manager) pollEnrollment(ctx context.Context, gen int, dc *DeviceCode) {
+func (m *Manager) pollEnrollment(ctx context.Context, gen int, dc *DeviceCode, resumed bool) {
 	interval, failures := dc.Interval, 0
+	gapped, last := resumed, m.o.Now() // last: when the hub last answered 'not yet'. gapped: Coral stopped being answered at some point (asleep, offline, restarted), so an approval could have gone uncollected (#11463 F2)
+	expired := func() {
+		m.dropPendingCode(ctx)
+		if gapped {
+			m.finishEnrollCode(gen, codeUncollectedMessage, ErrCodeUncollected)
+			return
+		}
+		m.finishEnrollCode(gen, codeExpiredMessage, ErrCodeExpired)
+	}
 	if m.o.PollInterval > 0 {
 		interval = m.o.PollInterval
 	}
@@ -493,9 +514,11 @@ func (m *Manager) pollEnrollment(ctx context.Context, gen int, dc *DeviceCode) {
 			return
 		case <-time.After(interval):
 		}
+		if now := m.o.Now(); now.Sub(last) > interval+pollGap(interval) {
+			gapped = true
+		}
 		if !m.o.Now().Before(dc.ExpiresAt) {
-			m.dropPendingCode(ctx)
-			m.finishEnrollCode(gen, codeExpiredMessage, ErrCodeExpired)
+			expired()
 			return
 		}
 		en, err := PollEnrollment(ctx, m.hc, m.o.HubURL, dc.DeviceCode)
@@ -538,12 +561,12 @@ func (m *Manager) pollEnrollment(ctx context.Context, gen int, dc *DeviceCode) {
 			m.startTunnel(conn)
 			return
 		case errors.Is(err, ErrAuthorizationPending):
-			failures = 0
+			failures, last = 0, m.o.Now() // the hub answered: nothing was approved yet, as of now
 		case errors.Is(err, ErrSlowDown):
 			interval += 5 * time.Second
+			last = m.o.Now()
 		case errors.Is(err, ErrEnrollmentExpired):
-			m.dropPendingCode(ctx)
-			m.finishEnrollCode(gen, codeExpiredMessage, ErrCodeExpired)
+			expired()
 			return
 		case errors.Is(err, ErrAccessDenied):
 			m.dropPendingCode(ctx)

@@ -734,3 +734,64 @@ func TestHubMovedSurvivesAFailedConnect(t *testing.T) {
 	require.Zero(t, old2.hits.Load())
 	require.NotContains(t, mustJSON(m2.Status()), "hub_moved")
 }
+
+// #11463 F2 (coral-hub's walk): a code approved in Coral Hub but not collected before it expired (Coral was stopped, asleep, offline) said "expired before it was approved ... closed beta: request access",
+// wrong twice. The hub answers only "expired" in both cases, by design, so Coral tells them apart by what it saw itself: a code it was asked about the whole time and never saw approved keeps coral-hub's
+// words; one it stopped being answered about (a restart, a sleep, no network) gets its own, which sends the person to connect again and not to request access.
+func TestExpiryOfACodeCoralWasNotAskingAboutDoesNotSayNeverApproved(t *testing.T) {
+	// 1. a restart: the code is resumed from the store, so Coral was not asking while it was down
+	e := newEnv(t)
+	e.hub.approveAt.Store(1 << 30)
+	m1 := e.manager(e.hub.srv.URL)
+	stop := start(t, m1)
+	require.NoError(t, m1.Connect(context.Background()))
+	waitState(t, m1, StateEnrolling)
+	stop()
+	e.hub.expireAfter.Store(1)
+	m2 := e.manager(e.hub.srv.URL)
+	start(t, m2)
+	require.NoError(t, m2.Connect(context.Background()))
+	waitState(t, m2, StateIdle)
+	st := m2.Status()
+	require.Equal(t, ErrCodeUncollected, st.LastErrorCode)
+	require.Equal(t, codeUncollectedMessage, st.LastError)
+	require.NotContains(t, st.LastError, "closed beta")
+	require.NotContains(t, st.LastError, "request access")
+	require.Contains(t, st.LastError, "connect again")
+
+	// 2. a sleep while it was running: the clock jumps between two polls
+	e2 := newEnv(t)
+	e2.hub.approveAt.Store(1 << 30)
+	var offset atomic.Int64
+	now := func() time.Time { return time.Now().Add(time.Duration(offset.Load())) }
+	m3 := New(Options{
+		HubURL: e2.hub.srv.URL, HTTPClient: e2.hub.srv.Client(), Store: e2.cs, LocalBaseURL: e2.local.srv.URL, MaxMode: func() tunnel.Mode { return tunnel.Mode(e2.mode.Load()) },
+		CoralVersion: "test", PollInterval: 20 * time.Millisecond, Now: now,
+		Backoff: tunnel.Backoff{Min: 20 * time.Millisecond, Max: 100 * time.Millisecond},
+		Logger:  slog.New(slog.NewTextHandler(e2.logs, &slog.HandlerOptions{Level: slog.LevelInfo})),
+	})
+	start(t, m3)
+	require.NoError(t, m3.Connect(context.Background()))
+	waitState(t, m3, StateEnrolling)
+	require.Eventually(t, func() bool { return e2.hub.polls.Load() >= 2 }, 5*time.Second, 10*time.Millisecond) // the loop has run: its clock started before the jump
+	offset.Store(int64(3 * time.Minute))                                                                       // the computer slept three minutes
+	time.Sleep(150 * time.Millisecond)                                                                         // sleep-ok: the next polls see the jump (one that began before it may still be in flight) and are answered "not yet"
+	e2.hub.expireAfter.Store(1)
+	waitState(t, m3, StateIdle)
+	require.Equal(t, ErrCodeUncollected, m3.Status().LastErrorCode, "a three-minute gap between answers is a gap")
+}
+
+// A code Coral asked about the whole time, and that was never approved, keeps coral-hub's required words, closed beta hint included (the other half of F2).
+func TestExpiryOfACodeCoralWasAskingAboutTheWholeTimeKeepsTheClosedBetaWords(t *testing.T) {
+	e := newEnv(t)
+	e.hub.approveAt.Store(1 << 30)
+	m := e.manager(e.hub.srv.URL)
+	start(t, m)
+	require.NoError(t, m.Connect(context.Background()))
+	waitState(t, m, StateEnrolling)
+	time.Sleep(150 * time.Millisecond) // sleep-ok: a few polls are answered "not yet" first
+	e.hub.expireAfter.Store(1)
+	waitState(t, m, StateIdle)
+	require.Equal(t, ErrCodeExpired, m.Status().LastErrorCode)
+	require.Contains(t, m.Status().LastError, "closed beta")
+}

@@ -75,6 +75,7 @@ export function describe(st) {
         case 'off':
             return OFF_TEXT;
         case 'idle':
+            if (codeUncollected(st)) return UNCOLLECTED_TEXT;
             if (codeExpired(st)) return EXPIRED_TEXT + HUB_ACCESS_URL;
             // The two failures of starting a connection are sentences for a person (#5962); the seconds until the next try are counted down beside them (syncRetry), not baked into the words.
             if (st.last_error_code === 'hub_unreachable') return 'Coral could not reach Coral Hub. Check your connection and try again.';
@@ -104,6 +105,14 @@ export function describe(st) {
 // expired code may mean the user could not sign in at all: say so, with where to ask for access.
 export const HUB_ACCESS_URL = 'https://coralhub.dev/hub.html';
 export const EXPIRED_TEXT = "The code expired before it was approved. If you couldn't sign in at app.coralhub.dev, Coral Hub is in closed beta: request access at ";
+
+// A code that ran out while this Coral had stopped being answered about it (restarted, asleep, offline): an approval, if there was one, was never collected. Not the closed-beta text (#11463 F2).
+export const UNCOLLECTED_TEXT = "The code expired before this computer collected it, because Coral wasn't running or couldn't reach Coral Hub for a while. If you approved it in Coral Hub, connect again: it takes a few seconds.";
+
+/** An idle status after a code ran out uncollected (last_error_code code_uncollected, #11463). */
+export function codeUncollected(st) {
+    return st.state === 'idle' && st.last_error_code === 'code_uncollected';
+}
 
 /** An idle status after a code expired (last_error_code, #3285). */
 export function codeExpired(st) {

@@ -146,6 +146,7 @@ const (
 	idle          = `{"configured":true,"hub_url":"https://app.coralhub.dev","state":"idle","max_mode":"view"}`
 	enrolling     = `{"configured":true,"hub_url":"https://app.coralhub.dev","state":"enrolling","user_code":"ABCD-EFGH","verification_url":"https://app.coralhub.dev/enroll?code=ABCD-EFGH","max_mode":"view"}`
 	expired       = `{"configured":true,"hub_url":"https://app.coralhub.dev","state":"idle","last_error":"The code expired before it was approved. If you couldn't sign in at app.coralhub.dev, Coral Hub is in closed beta: request access at https://coralhub.dev/hub.html","last_error_code":"code_expired","max_mode":"view"}`
+	uncollected   = `{"configured":true,"hub_url":"https://app.coralhub.dev","state":"idle","last_error":"The code expired before this computer collected it, because Coral wasn't running or couldn't reach Coral Hub for a while. If you approved it in Coral Hub, connect again: it takes a few seconds","last_error_code":"code_uncollected","max_mode":"view"}`
 	connected     = `{"configured":true,"hub_url":"https://app.coralhub.dev","state":"connected","label":"build-box","max_mode":"view"}`
 )
 
@@ -594,4 +595,23 @@ func TestCloudClientRecordsRetryAfter(t *testing.T) {
 	f.statuses = []string{idle, enrolling, connected}
 	c.connectFlow(context.Background(), connectUI{out: &out, in: bufio.NewReader(strings.NewReader("")), how: "coral cloud connect"})
 	assert.Zero(t, c.retryAfter, "cleared by the next answer")
+}
+
+// #11463 F2: a code that ran out while Coral was not being answered (uncollected) is offered again like an expired one, printed as the full sentence it is (no "Not connected: ... ." doubling), and with no
+// closed-beta hint.
+func TestCloudConnectFlowUncollectedCodeIsOfferedAgainWithoutTheBetaHint(t *testing.T) {
+	fastPoll(t)
+	f := newFakeCoral(t, ready, enrolled)
+	f.statuses = []string{idle, enrolling, uncollected, enrolling, connected}
+	c, _ := newCloudClient(f.srv.URL, "", "connect", io.Discard)
+	require.NotNil(t, c)
+	var out bytes.Buffer
+	ui := connectUI{out: &out, in: bufio.NewReader(strings.NewReader("\n3\ny\n")), ask: true, how: "coral cloud connect"}
+	assert.Equal(t, 0, c.connectFlow(context.Background(), ui), out.String())
+	o := out.String()
+	assert.Contains(t, o, "Not connected. The code expired before this computer collected it")
+	assert.Contains(t, o, "connect again: it takes a few seconds\n", "the sentence as it is, with no period added after it")
+	assert.NotContains(t, o, "closed beta")
+	assert.NotContains(t, o, "request access")
+	assert.Equal(t, 2, f.connects, "a new code after it")
 }
