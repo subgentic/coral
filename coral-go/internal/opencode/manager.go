@@ -45,6 +45,7 @@ type managed struct {
 	tracker *Tracker
 	at      map[string]time.Time // when each session last changed state
 
+	sawState   bool      // the stream has put some session in a state at least once (under mu)
 	session    string    // the opencode session the agent was resumed with: known before the stream names any
 	sessionAt  time.Time // when UseSession was told
 	version    int       // counts the events of the agent's sessions: what a cached read of the history was made at
@@ -347,6 +348,23 @@ func (m *Manager) AgentSession(key string) (state State, at time.Time, ok bool) 
 // StoredSession is the newest opencode session the agent named (before a Coral restart, a sleep or a restart of the agent), "" when it has none: what a wake gives its TUI to pick up.
 func (m *Manager) StoredSession(key string) string { return StoredSession(m.cfg.DataDir, key) }
 
+// AgentIdleSince says an agent whose server is up and whose stream has never put a session in a state (just launched, or just woken and not yet spoken to) is idle since its server came up: no turn is going on. false
+// once the stream has said anything (then its own states decide, and a gap in the stream is unknown, not idle), and for an agent with no server.
+func (m *Manager) AgentIdleSince(key string) (time.Time, bool) {
+	m.mu.Lock()
+	g := m.servers[key]
+	m.mu.Unlock()
+	if g == nil {
+		return time.Time{}, false
+	}
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if g.sawState {
+		return time.Time{}, false
+	}
+	return g.since, true
+}
+
 // Keys are the agents that have a server now, in no order.
 func (m *Manager) Keys() []string {
 	m.mu.Lock()
@@ -489,6 +507,7 @@ func (g *managed) loop(ctx context.Context, skip func(Message) bool) {
 			g.version++
 			if session, to, moved := g.tracker.Apply(e); moved {
 				g.at[session] = time.Now()
+				g.sawState = true
 				g.noteSession(session)
 				if to == StateIdle || to == StateFailed { // a turn ended: its reply is the new last message
 					g.refreshLast(ctx, c, session, skip)

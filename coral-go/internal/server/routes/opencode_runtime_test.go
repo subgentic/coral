@@ -19,18 +19,19 @@ import (
 )
 
 type fakeOpencode struct {
-	state    opencode.State
-	at       time.Time
-	known    bool
-	stopped  []string
-	last     opencode.Message
-	haveLast bool
-	msgs     []opencode.Message
-	haveMsgs bool
-	used     []string
-	stored   map[string]string
-	server   OpencodeServer
-	ensured  [][4]string
+	state     opencode.State
+	at        time.Time
+	known     bool
+	stopped   []string
+	last      opencode.Message
+	haveLast  bool
+	msgs      []opencode.Message
+	haveMsgs  bool
+	used      []string
+	stored    map[string]string
+	idleSince time.Time
+	server    OpencodeServer
+	ensured   [][4]string
 }
 
 func (f *fakeOpencode) Ensure(_ context.Context, key, bin, model, resume string) (OpencodeServer, error) {
@@ -47,7 +48,10 @@ func (f *fakeOpencode) AgentMessages(context.Context, string) ([]opencode.Messag
 	return f.msgs, f.haveMsgs, nil
 }
 func (f *fakeOpencode) StoredSession(key string) string { return f.stored[key] }
-func (f *fakeOpencode) UseSession(key, session string)  { f.used = append(f.used, key+"="+session) }
+func (f *fakeOpencode) AgentIdleSince(string) (time.Time, bool) {
+	return f.idleSince, !f.idleSince.IsZero()
+}
+func (f *fakeOpencode) UseSession(key, session string) { f.used = append(f.used, key+"="+session) }
 func (f *fakeOpencode) AgentLastMessage(string) (opencode.Message, bool) {
 	return f.last, f.haveLast
 }
@@ -247,4 +251,21 @@ func TestAnOpencodeLastMessageTimeIsRFC3339NotEpochMilliseconds(t *testing.T) {
 	m, ok := h.opencodeLastMessage("sid")
 	require.True(t, ok)
 	assert.Equal(t, "2026-10-31T00:12:41.608Z", m.At, "the phone UI reads the time as every other agent's transcript gives it (found on the real 1.19.5)")
+}
+
+// An agent that is up and has never been spoken to is idle (the person's turn), not "check terminal" a minute later; once its stream has spoken, its own states decide.
+func TestAnOpencodeAgentThatIsUpAndHasNeverBeenSpokenToIsIdle(t *testing.T) {
+	up := time.Now().Add(-time.Minute)
+	h := &SessionsHandler{opencode: &fakeOpencode{idleSince: up}}
+	kind, when := h.opencodeTurn("sid")
+	assert.Equal(t, "stop", kind)
+	assert.Equal(t, up, when)
+	in := &SessionStateInput{}
+	h.applyTranscriptState(in, nil, at.Opencode, "name", "sid", "/w")
+	require.Len(t, in.Events, 1, "an event, so the state is not the age of the terminal's log")
+	assert.Zero(t, in.StalenessSeconds)
+
+	h.opencode = &fakeOpencode{}
+	kind, _ = h.opencodeTurn("sid")
+	assert.Empty(t, kind, "no server: nothing is said")
 }

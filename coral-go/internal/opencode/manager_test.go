@@ -460,3 +460,26 @@ func TestAResumedAgentIsKnownToTheHistoryIndexerBeforeItsFirstEvent(t *testing.T
 	_, _, ok = m.AgentSession("agent-2")
 	assert.False(t, ok)
 }
+
+func TestAnAgentIsIdleSinceItsServerCameUpUntilItsStreamHasSpoken(t *testing.T) {
+	cfg, _ := stubConfig(t)
+	frames := filepath.Join(t.TempDir(), "frames")
+	require.NoError(t, os.WriteFile(frames, []byte("data: {\"id\":\"e1\",\"type\":\"session.status\",\"properties\":{\"sessionID\":\"ses_abc123\",\"status\":{\"type\":\"busy\"}}}\n\n"), 0o600))
+	m := NewManager(cfg)
+	defer m.Close()
+	_, ok := m.AgentIdleSince("agent-1")
+	assert.False(t, ok, "no server")
+	_, err := m.Ensure(context.Background(), "agent-1", "", "", "")
+	require.NoError(t, err)
+	since, ok := m.AgentIdleSince("agent-1")
+	require.True(t, ok, "up, nothing said yet")
+	assert.WithinDuration(t, time.Now(), since, 10*time.Second)
+	m.Stop("agent-1")
+
+	t.Setenv(eventsFileVar, frames)
+	_, err = m.Ensure(context.Background(), "agent-1", "", "", "")
+	require.NoError(t, err)
+	waitFor(t, "the stream to speak", func() bool { s, _, ok := m.AgentTurn("agent-1"); return ok && s == StateWorking })
+	_, ok = m.AgentIdleSince("agent-1")
+	assert.False(t, ok, "once the stream has spoken its own states decide")
+}

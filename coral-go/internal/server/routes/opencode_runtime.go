@@ -20,6 +20,7 @@ type OpencodeRuntime interface {
 	AgentTurn(key string) (opencode.State, time.Time, bool)
 	AgentMessages(ctx context.Context, key string) ([]opencode.Message, bool, error)
 	UseSession(key, session string)
+	AgentIdleSince(key string) (time.Time, bool)
 	StoredSession(key string) string
 	AgentLastMessage(key string) (opencode.Message, bool)
 	Stop(key string)
@@ -84,6 +85,9 @@ func (h *SessionsHandler) opencodeTurn(sessionID string) (kind string, at time.T
 	}
 	state, when, ok := h.opencode.AgentTurn(sessionID)
 	if !ok {
+		if since, up := h.opencode.AgentIdleSince(sessionID); up {
+			return "stop", since // up and never spoken to: it is the person's turn, not "check terminal" a minute later (seen on the real 1.19.5)
+		}
 		return "", time.Time{}
 	}
 	switch state {
