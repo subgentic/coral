@@ -28,11 +28,11 @@ assert.equal(B.shortPhraseOf(three), 'Blocks 3 tasks'); assert.equal(B.shortPhra
 
 // a title is an agent's text: the caller's marker writes out what hides or reorders it; a title that marks to nothing is "a task" or "a goal"
 {
-    const mark = x => markHidden(x, { strict: true }), hid = B.infoOf({ count: 1, top_title: 'Tag‮ v2​', priority: 'medium' });
+    const mark = x => markHidden(x, { strict: true }), hid = B.infoOf({ count: 1, top_title: 'Tag\u202e v2\u200b', priority: 'medium' });
     assert.equal(B.phraseOf(hid, mark), '“Tag<U+202E> v2<U+200B>” waits on this', 'a title that hides or reorders text is written out, not drawn');
     assert.equal(B.shortPhraseOf(hid, mark), 'Blocks “Tag<U+202E> v2<U+200B>”');
-    assert.equal(B.phraseOf(B.infoOf({ count: 1, top_title: '‮', priority: 'medium' }), () => ''), '“a task” waits on this');
-    assert.equal(B.phraseOf(B.infoOf({ count: 0, closes_goal: '‮' }), () => ''), 'Closes goal “a goal”');
+    assert.equal(B.phraseOf(B.infoOf({ count: 1, top_title: '\u202e', priority: 'medium' }), () => ''), '“a task” waits on this');
+    assert.equal(B.phraseOf(B.infoOf({ count: 0, closes_goal: '\u202e' }), () => ''), 'Closes goal “a goal”');
 }
 
 // the weight: a high-priority waiter first, then the count, then a goal that closes; nothing is 0
