@@ -39,6 +39,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
         let g = await geo(AGENT), end = await swipe(g, -g.width / 6);
         const mid = await ev(`(() => { const tr = ${rowOf(AGENT)}; return { t: tr.style.transform, strip: !!document.querySelector('.inbox-swipe-strip'), stripText: (document.querySelector('.inbox-swipe-strip') || {}).textContent }; })()`);
         check(/translateX\(-/.test(mid.t) && mid.strip && mid.stripText === 'Dismiss', 'while the finger is down the row follows it and "Dismiss" shows behind it: ' + JSON.stringify(mid));
+        check(await ev(`(() => { const s = document.querySelector('.inbox-swipe-strip'); const probe = document.createElement('i'); probe.style.color = 'var(--text-primary)'; document.body.append(probe); const want = getComputedStyle(probe).color; probe.remove(); return !!s && getComputedStyle(s).color === want; })()`), 'the word on the strip is in the text colour (contrast), not the error red');
         await touch('touchEnd', end, g.y); await frames(40);
         const back = await geo(AGENT);
         check(back.transform === '' && !(await ev(`!!document.querySelector('.inbox-swipe-strip')`)) && (await titles()).includes(AGENT) && !(await ev(`window.__puts`)).length, 'a short drag springs back and dismisses nothing: ' + JSON.stringify(back));
