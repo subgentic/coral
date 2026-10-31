@@ -52,6 +52,9 @@ func Of(text string) Review {
 	runes := []rune(text)
 	for i := 0; i < len(runes); i++ {
 		c := runes[i]
+		if c == '\r' && i+1 < len(runes) && runes[i+1] == '\n' { // a Windows line end is a newline, not a hidden character; a CR on its own (it returns the cursor and draws over what came before) stays hidden
+			continue
+		}
 		var out string
 		switch {
 		case blank(c):
@@ -93,7 +96,10 @@ func Of(text string) Review {
 // anyHidden says whether the text holds a hidden character or a blank run of BlankRun or more.
 func anyHidden(runes []rune) bool {
 	run := 0
-	for _, c := range runes {
+	for i, c := range runes {
+		if c == '\r' && i+1 < len(runes) && runes[i+1] == '\n' {
+			continue
+		}
 		if hidden(c) {
 			return true
 		}

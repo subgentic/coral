@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/subgentic/coral/internal/permreview"
 	"github.com/subgentic/coral/internal/safego"
 )
 
@@ -416,7 +417,7 @@ func autoAcceptRisk(agentType, workDir string, pending *pendingTool, d approvalD
 		}
 	}
 	tool, input := screenAction(agentType, d, capture)
-	if hidesText(strings.ReplaceAll(input, "\x00", "")) { // what the screen shows holds characters that hide what it does (#11399)
+	if permreview.Of(strings.ReplaceAll(input, "\x00", "")).Hidden { // what the screen shows holds characters that hide what it does (#11399)
 		return "what the prompt shows holds a character that can hide what it does, so it cannot be judged"
 	}
 	switch tool {

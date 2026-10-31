@@ -127,3 +127,22 @@ func TestTheCleanFourHundredByteCommandIsStillAllowed(t *testing.T) {
 	assert.True(t, r.Allowed())
 	assert.Equal(t, text, r.Shown)
 }
+
+func TestAWindowsLineEndIsANewlineButALoneCRStaysHidden(t *testing.T) {
+	r := Of("echo a\r\necho b\r\n")
+	if r.Hidden || r.Cut {
+		t.Fatalf("CRLF is a newline: %+v", r)
+	}
+	if r.Shown != "echo a\necho b\n" {
+		t.Fatalf("the CR before a LF is dropped from the shown text: %q", r.Shown)
+	}
+	for _, s := range []string{"echo safe\rrm -rf ~", "echo ok\r", "a\r\r\nb"} {
+		if !Of(s).Hidden {
+			t.Errorf("%q: a CR not followed by a LF hides what it overwrote", s)
+		}
+	}
+	// a request cut at MaxBytes, with a lone CR beyond the cut, is hidden too
+	if !Of(strings.Repeat("x", MaxBytes+10) + "\rrm").Hidden {
+		t.Error("a lone CR after the cut")
+	}
+}
