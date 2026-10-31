@@ -103,7 +103,7 @@ setup() { # NAME
   waitfor_health || return 1
   KEY=$(tr -d '[:space:]' < "$dd/api_key" 2>/dev/null)
   "${CENV[@]}" "$inst/coral-board" join rhsproj --as Tester > "$s/board.out" 2>&1
-  "${CENV[@]}" "$inst/coral-board" post "a message before the update" >> "$s/board.out" 2>&1
+  "${CENV[@]}" "$inst/coral-board" post "@all a message before the update" >> "$s/board.out" 2>&1
   # The run record: how the server was started, which Linux apply reads to start Coral again after the swap. The server writes it itself at startup
   # (cmd/coral/run_record.go: argv, cwd and the allowlisted environment, 0600 in a 0700 folder), so this script no longer writes a stand-in: the old stand-in had no
   # environment, which runrecord.Validate now refuses ("no_run_record", every apply refused as unsupported_install). It waits for the server's own record.

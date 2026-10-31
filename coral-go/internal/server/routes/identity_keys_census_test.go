@@ -29,6 +29,7 @@ var notIdentityFields = map[string]string{
 	"to":                 "who a message is for (a mention list): a target, not who it is from",
 	"to_address":         "a cross-team address",
 	"from_board":         "a board id on a cross-team send; the sender is subscriber_id",
+	"from_board_label":   "the sending team's display name in a relayed message (#11506): cleaned by board.CleanTeamLabel (the board id shows when it fails), shown in the sender label only; the sender is subscriber_id",
 	"from_cross_team_id": "the sending Coral's claim of its board's generated cross-team id (#5508): shape-checked, compared with the receiving board's list, never echoed; the sender is subscriber_id",
 	"target_team":        "a link's target in Coral Hub's snapshot (#5572): a generated board id shape-checked and looked up here; the request is the hub's, never an actor",
 	"target_server":      "a link's target computer in Coral Hub's snapshot (#5572): a server id shape-checked, display only, never an actor",

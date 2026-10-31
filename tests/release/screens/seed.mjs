@@ -65,9 +65,9 @@ board('Backend Dev', 'task', 'complete', tasks.api, '--message', 'Card numbers a
 board('Orchestrator', 'goal', 'add', 'Cut the dashboard load time', '--outcome', 'First paint under a second on the office network');
 
 board('Orchestrator', 'post', '@Frontend Dev the sticky total is yours. Phone first, please.');
-board('Frontend Dev', 'post', LONG);
+board('Frontend Dev', 'post', '--broadcast', LONG); // a seed post to the whole team: coral-board refuses a post that notifies nobody
 board('Backend Dev', 'post', 'The card check is done and merged. Numbers: `4242 4242 4242 4242` passes, anything else returns `card_invalid` with the field name. @QA it is ready to test.');
-board('QA', 'post', '1. Pay button is covered at 390 px.\n2. Promo field is easy to miss.\n3. Everything else passes.');
+board('QA', 'post', '--broadcast', '1. Pay button is covered at 390 px.\n2. Promo field is easy to miss.\n3. Everything else passes.');
 board('Writer', 'post', '@Editor the help page draft is up for a read.');
 
 // ── artifacts: an HTML page, a report ───────────────────────────────────────────────────────────
