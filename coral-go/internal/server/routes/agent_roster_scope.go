@@ -46,7 +46,10 @@ func agentBoardOf(rows []map[string]any, ownerSessionID string) string {
 
 // personTextFields are the row's fields that hold what a person typed to an agent: the messages queued behind a question and the ones typed and not yet in the transcript. An agent's token never
 // gets them, not even on its own row or a board mate's (#10510, Security): a person's words to one agent are not another agent's to read through the list.
-var personTextFields = []string{"held_messages", "pending_sends"}
+var personTextFields = []string{"held_messages", "pending_sends", waitsOnThisField}
+
+// waitsOnThisField is the row's "what waits on this" (#11455): task titles of every board, so it is the Operator's (the dashboard's) alone: an agent's token never gets it, not even on its own row.
+const waitsOnThisField = "waits_on_this"
 
 // withoutPersonText is row as an agent may see it when it may read the row: a copy with the person's own words nulled, or the row itself when it holds none (the rows are shared with other
 // connections: never changed in place).

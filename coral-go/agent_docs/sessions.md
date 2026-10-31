@@ -123,6 +123,8 @@ Routing and identity record for one session ID (used by the popout). `sessionID`
 
 Each row of the live list also has `last_message`: `{role, text, at}` of the newest message with text in the agent's transcript (the first 140 characters, redacted; `null` when there is none). A `role` of `user` is what the person last said to that agent, which is person text: an agent's own token gets `last_message` as `null` for a user-role message on every row it may read (as for `held_messages` and `pending_sends`) and keeps an `assistant`-role one; the Operator and the dashboard get both.
 
+A row of an agent in a team also has `waits_on_this` (#11455) when the agent has a task in progress: `{count, top_title, priority}`, the number of open tasks it holds up (its own in-progress tasks and the open tasks of every board that list them as a blocker), the title and priority of the one that matters most (the highest priority, then the lowest number). It is matched by the session's subscriber, never a display name, kept 5 seconds, and left out of an agent token's view of the roster (it names task titles of every board); a remote server's rows do not have it. A "for review" row of `GET /api/team-artifacts` that has a task carries the same field for its task, plus `closes_goal` (the goal's title) when that task is the last open one of its goal.
+
 ---
 
 ### GET `/api/sessions/resolve`

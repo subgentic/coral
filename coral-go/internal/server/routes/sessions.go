@@ -88,6 +88,8 @@ type SessionsHandler struct {
 	agentOperatorGate func(r *http.Request, action string) bool // #3536: Operator-only choices in a request body
 	// healthOn is the last health state read of every team, for the rows when a read fails (#5119).
 	healthOn healthOnMemo
+	// waitsMemo is the last answer of what waits on the live rows, kept a few seconds (#11455).
+	waitsMemo waitsOnMemo
 	// commentOwner names the owner on new artifact comments (nil: this computer's user, #5176); commentLimit is the per-author write rate limit.
 	commentOwner commentOwnerIdentity
 	commentLimit commentLimiter
