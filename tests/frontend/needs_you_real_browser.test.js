@@ -57,7 +57,7 @@ async function httpJson(method, path, body, headers = {}) {
         assert.equal(d.counts.question, (base.counts.question || 0) + 1);
 
         // a file the agent tags for review
-        const up = await httpJson('POST', `/api/agent/artifacts?session_id=${sid}&tag=for+review`, 'plan ' + Date.now(), { 'X-Artifact-Name': 'plan.txt', 'X-Artifact-Media-Type': 'text/plain', ...tok });
+        const up = await httpJson('POST', `/api/agent/artifacts?session_id=${sid}&tag=for+review&question=${encodeURIComponent('Approve the plan?')}`, 'plan ' + Date.now(), { 'X-Artifact-Name': 'plan.txt', 'X-Artifact-Media-Type': 'text/plain', ...tok });
         assert.ok(up.status < 300, JSON.stringify(up));
         d = await needs();
         const review = mine(d).find(i => i.kind === 'review');
