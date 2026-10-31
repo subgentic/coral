@@ -241,7 +241,7 @@ function runActions(run) {
 
 /** A welcome item's actions (#11443): its own action, and a quiet Dismiss for all but the welcome itself. */
 function welcomeActions(w) {
-    const box = DT.el('div', 'inbox-review-actions');
+    const box = DT.el('div', 'inbox-review-actions inbox-welcome-actions');
     const go = DT.el('button', 'btn btn-small btn-primary', w.go); go.type = 'button';
     go.setAttribute('aria-label', `${w.go}: ${w.title}`);
     go.addEventListener('click', () => runWelcome(w.id));
