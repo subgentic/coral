@@ -47,7 +47,10 @@ type promptOption struct {
 	Label    string `json:"label"`
 	Selected bool   `json:"selected"`
 	Action   string `json:"action"`
-	Wrapped  bool   `json:"wrapped,omitempty"`
+	// Kind is what the option does where something other than its words says so: "allow_once" (the approval table's approve-once option, or an opencode card's Allow once), "allow_always" and "reject" (an
+	// opencode card's own answers). Empty where nothing but the label is known (a screen's other options): optionIsReject then falls back to the label (#11407).
+	Kind    string `json:"kind,omitempty"`
+	Wrapped bool   `json:"wrapped,omitempty"`
 	// Checked: the box of a multi-select option ("[✔]"); the label is what follows the box (#5232).
 	Checked bool `json:"checked,omitempty"`
 }
@@ -578,6 +581,9 @@ func (h *SessionsHandler) readPromptScreenText(ctx context.Context, name, agentT
 		return promptScreen{}, false, "", err
 	}
 	s, ok := parsePromptScreen(text)
+	if ok {
+		markApprovalKinds(agentType, text, &s)
+	}
 	return s, ok, text, nil
 }
 
@@ -670,7 +676,7 @@ func (h *SessionsHandler) AnswerPrompt(w http.ResponseWriter, r *http.Request) {
 		errConflict(w, "The prompt changed. Answer it in the terminal.")
 		return
 	}
-	if note := h.onlyRejectNote(body.SessionID, screen); note != "" && !isRejectLabel(opt.Label) { // a request that cannot be shown whole or hides something is never allowed from here (#11399)
+	if note := h.onlyRejectNote(body.SessionID, screen); note != "" && !optionIsReject(opt) { // a request that cannot be shown whole or hides something is never allowed from here (#11399)
 		writeError(w, http.StatusConflict, "only_reject", note)
 		return
 	}
@@ -1038,3 +1044,28 @@ func (h *SessionsHandler) onlyRejectNote(sessionID string, screen promptScreen) 
 var rejectLabel = regexp.MustCompile(`(?i)^(no|reject|deny|cancel)\b`)
 
 func isRejectLabel(label string) bool { return rejectLabel.MatchString(strings.TrimSpace(label)) }
+
+// optionIsReject says whether answering this option refuses the request. Where the option has a kind (it is the approval table's approve-once option, or one of an opencode card's own answers) the KIND decides:
+// an option that allows is not a reject whatever its words begin with. Only an option with no kind is judged by its label (^(no|reject|deny|cancel)\b: "None" and "Nothing" are not rejects). Security's #11399 INFO 5.
+func optionIsReject(o promptOption) bool {
+	switch o.Kind {
+	case "reject":
+		return true
+	case "allow_once", "allow_always":
+		return false
+	}
+	return isRejectLabel(o.Label)
+}
+
+// markApprovalKinds gives the approve-once option of a recognised tool approval its kind, from the approval table (the digit it answers with), so the only_reject check does not rest on that option's words.
+func markApprovalKinds(agentType, screenText string, s *promptScreen) {
+	d := classifyApproval(agentType, screenText)
+	if !d.Prompt || !d.Approve || d.N <= 0 {
+		return
+	}
+	for i := range s.Options {
+		if s.Options[i].N == d.N {
+			s.Options[i].Kind = "allow_once"
+		}
+	}
+}
