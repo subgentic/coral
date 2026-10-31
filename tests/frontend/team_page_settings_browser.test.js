@@ -88,7 +88,7 @@ const TEAM = `qa-settings-${Date.now() % 100000}`;
                 assert.equal(m.svScroll, 'auto', 'the view scrolls as a whole on a short screen'); assert.equal(m.panes, 'visible', 'the pane is not a small scroll box under the bar');
                 assert.ok(m.paneH >= m.vh * 0.4, `the pane has at least 40% of the screen (${Math.round(m.paneH)} of ${m.vh} px)`);
                 assert.equal(m.selBorder, '1px', 'the group select has the input border, not the browser\'s');
-                await ev(`document.documentElement.style.fontSize = ''; true`);
+                await ev(`document.documentElement.style.fontSize = ''; true`); await settle(400); // the layout of the next scenario is read once the text size is back: it takes a frame or more under load (1 run in 10 at CPU x6 read the 200% layout and took the wide branch; the Windows gate, #11414)
             });
             await S.run(`${label}: the save bar stays reachable: status "No changes to save.", Cancel at the left, Save settings at the right, Save off`, async () => {
                 const b = await bar(); assert.ok(b.save && b.cancel, 'Cancel and Save settings are there');
