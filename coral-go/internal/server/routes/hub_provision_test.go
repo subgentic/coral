@@ -25,6 +25,7 @@ import (
 
 	"github.com/subgentic/coral/internal/httputil"
 	"github.com/subgentic/coral/internal/license"
+	"github.com/subgentic/coral/internal/safego"
 	"github.com/subgentic/coral/internal/sshprov"
 	"github.com/subgentic/coral/internal/store"
 	terms "github.com/subgentic/coral/pkg/license"
@@ -516,6 +517,7 @@ func TestProvisionTooManyPlansIsAMarkedActionLimit(t *testing.T) {
 func TestProvisionAPanickingStepFailsThePlanWithAFixedSentence(t *testing.T) {
 	pe := newProvEnv(t, "known", "Linux x86_64", true)
 	pe.p.runSteps = func(context.Context, *provisionPlan) { panic("boom: /home/user/.ssh/id_rsa " + provKey) }
+	panicsBefore := safego.Panics()
 	_, v := pe.do("POST", "/api/servers/provision/plan", map[string]any{"target": "user@box.example.com"})
 	plan := v["plan"].(string)
 	pe.do("POST", "/api/servers/provision/"+plan+"/connect", nil)
@@ -534,6 +536,12 @@ func TestProvisionAPanickingStepFailsThePlanWithAFixedSentence(t *testing.T) {
 		}
 	}
 	assert.Equal(t, 1, failedSteps, "one step is shown as the one that failed")
+	// the panic still reaches safego (QA Engineer's SHOULD): a guard that swallowed it would leave the count where it was and the server's crash log empty
+	deadline := time.Now().Add(5 * time.Second)
+	for safego.Panics() <= panicsBefore && time.Now().Before(deadline) {
+		time.Sleep(10 * time.Millisecond)
+	}
+	assert.Greater(t, safego.Panics(), panicsBefore, "the recovered panic was swallowed instead of going on to safego")
 	// the plan can be cancelled and the hub still answers
 	code, _ = pe.do("DELETE", "/api/servers/provision/"+plan, nil)
 	assert.Equal(t, 200, code)
