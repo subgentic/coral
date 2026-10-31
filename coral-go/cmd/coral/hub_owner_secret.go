@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/subgentic/coral/internal/agentenv"
 	"github.com/subgentic/coral/internal/config"
 	"golang.org/x/term"
 )
@@ -35,6 +36,13 @@ func hiddenLine(prompt string, stderr io.Writer) (string, bool, error) {
 // runHubOwnerSecretWith is the command with its terminal prompt injected. At a terminal it asks for the setup line the hub showed ("<id> <secret>", not echoed, so it is in no shell history or screen);
 // anywhere else the id and the secret are JSON on stdin.
 func runHubOwnerSecretWith(args []string, stdin io.Reader, stdout, stderr io.Writer, write func(dir, remote, secret string) error, ask func(prompt string, stderr io.Writer) (string, bool, error)) int {
+	// This is the PERSON's act: run from an agent's session (its identity variables are in the environment) it refuses, whatever the agent was told to do.
+	for _, v := range agentenv.IdentityVars {
+		if os.Getenv(v) != "" {
+			fmt.Fprintln(stderr, "coral hub-owner-secret: this is the person's act at this computer: it will not run inside an agent's session")
+			return 1
+		}
+	}
 	fs := flag.NewFlagSet("hub-owner-secret", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	home := fs.String("home", "", "Coral's data folder, if the server was started with --home")

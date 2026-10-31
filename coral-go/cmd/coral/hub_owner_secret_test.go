@@ -9,12 +9,15 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/subgentic/coral/internal/agentenv"
 )
 
 type written struct{ dir, remote, secret string }
 
 // The command's own job: read {remote, secret} from stdin, strictly, and hand it to the writer with the data folder. What the file holds and how it is made is pkg/hubowner's.
 func TestHubOwnerSecretReadsStdinOnlyAndStrictly(t *testing.T) {
+	noAgentEnv(t)
 	var got []written
 	write := func(d, r, s string) error { got = append(got, written{d, r, s}); return nil }
 	secret := strings.Repeat("ab", 32)
@@ -68,6 +71,7 @@ func atTerminal(line string) func(string, io.Writer) (string, bool, error) {
 
 // At a terminal the person pastes the hub's setup line (not echoed); it is read the same strict way, and nothing is taken from stdin.
 func TestHubOwnerSecretAtATerminalTakesTheHubsSetupLine(t *testing.T) {
+	noAgentEnv(t)
 	var got []written
 	write := func(d, r, s string) error { got = append(got, written{d, r, s}); return nil }
 	secret := strings.Repeat("cd", 32)
@@ -99,4 +103,34 @@ func TestHubOwnerSecretAtATerminalTakesTheHubsSetupLine(t *testing.T) {
 	errb.Reset()
 	assert.Equal(t, 1, runHubOwnerSecretWith(nil, strings.NewReader(""), &out, &errb, deny, atTerminal("web "+secret)))
 	assert.NotContains(t, errb.String(), secret)
+}
+
+// The person's act: inside an agent's session (any of its identity variables) the command refuses before it reads anything or writes anything (#11378, Security's SHOULD 1).
+func TestHubOwnerSecretRefusesInsideAnAgentsSession(t *testing.T) {
+	secret := strings.Repeat("ef", 32)
+	good := `{"remote":"ssh-box","secret":"` + secret + `"}`
+	for _, v := range agentenv.IdentityVars {
+		var wrote bool
+		write := func(string, string, string) error { wrote = true; return nil }
+		var out, errb bytes.Buffer
+		t.Setenv(v, "something")
+		assert.Equal(t, 1, runHubOwnerSecretWith(nil, strings.NewReader(good), &out, &errb, write, noTerminal), v)
+		assert.False(t, wrote, v+": the secret was written from an agent's session")
+		assert.Contains(t, errb.String(), "the person's act", v)
+		assert.NotContains(t, errb.String(), secret, v)
+		t.Setenv(v, "")
+	}
+	// without any of them it runs
+	noAgentEnv(t)
+	var wrote bool
+	assert.Equal(t, 0, runHubOwnerSecretWith(nil, strings.NewReader(good), &bytes.Buffer{}, &bytes.Buffer{}, func(string, string, string) error { wrote = true; return nil }, noTerminal))
+	assert.True(t, wrote)
+}
+
+// noAgentEnv clears an agent's identity variables for a test of the person's side (a test run from an agent's own shell inherits them).
+func noAgentEnv(t *testing.T) {
+	t.Helper()
+	for _, v := range agentenv.IdentityVars {
+		t.Setenv(v, "")
+	}
 }
