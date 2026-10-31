@@ -745,7 +745,7 @@ func (h *BoardHandler) queryTeamArtifacts(w http.ResponseWriter, r *http.Request
 		errInternalServer(w, "could not list artifacts")
 		return
 	}
-	h.addWaitsOnThis(r.Context(), project, sel.page)
+	h.addWaitsOnThis(r, project, sel.page)
 	resp := map[string]any{
 		"project": project, "artifacts": sel.page, "limit": limit, "offset": sel.start,
 		"has_more": sel.hasMore, "truncated": truncated, "total": sel.total, "all": all,

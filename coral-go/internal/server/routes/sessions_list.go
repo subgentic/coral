@@ -226,7 +226,7 @@ func (h *SessionsHandler) liveSessionRows(r *http.Request, trace *phaseTrace, fu
 	sessions = append(sessions, h.sleepingRows(allLive, liveSIDs, d.boardSubs)...)
 	h.addBoardLabels(r.Context(), sessions)
 	h.addSessionGoals(r.Context(), sessions)
-	h.addWaitsOnThis(r.Context(), sessions)
+	h.addWaitsOnThis(r, sessions)
 	h.addTeamHealth(r, sessions)
 	return archivedLast(sessions), nil
 }

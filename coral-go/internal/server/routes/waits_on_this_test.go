@@ -2,12 +2,15 @@ package routes
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/subgentic/coral/internal/board"
+	"github.com/subgentic/coral/pkg/tunnel"
 )
 
 // The server says what waits on an Inbox item (#11455): a live row's in-progress tasks and what waits on them on every board, a "for review" artifact row's task and the goal it would close. The browser asks nothing.
@@ -31,14 +34,14 @@ func TestLiveRowsSayWhatWaitsOnTheirAgentOnEveryBoard(t *testing.T) {
 		{"session_id": "sid-none", "agent_type": "claude"},                                       // on no board
 		{"session_id": sessA, "agent_type": "claude", "board_project": "team", "server": "box2"}, // a remote server's row
 	}
-	sh.addWaitsOnThis(ctx, rows)
+	sh.addWaitsOnThis(httptest.NewRequest(http.MethodGet, "/api/sessions/live", nil), rows)
 	got, ok := rows[0]["waits_on_this"].(*board.WaitsOnThis)
 	require.True(t, ok, "%v", rows[0])
 	assert.Equal(t, board.WaitsOnThis{Count: 2, TopTitle: "Ship it from the other board", Priority: "critical"}, *got, "its own task and the one on the other board")
 	assert.NotContains(t, rows[1], "waits_on_this", "nothing in progress: no field")
 	assert.NotContains(t, rows[2], "waits_on_this")
 	assert.NotContains(t, rows[3], "waits_on_this", "a remote server's row is not asked: its boards are not here")
-	(&SessionsHandler{}).addWaitsOnThis(ctx, rows) // no board store: nothing breaks
+	(&SessionsHandler{}).addWaitsOnThis(httptest.NewRequest(http.MethodGet, "/api/sessions/live", nil), rows) // no board store: nothing breaks
 }
 
 // The field names task titles of every board: the Operator's alone, never an agent's, not even on its own row or a board mate's.
@@ -71,13 +74,13 @@ func TestForReviewRowsSayWhatWaitsOnTheirTaskAndTheGoalItCloses(t *testing.T) {
 		{TaskID: up.ID, Tags: []string{"for review"}},                // a list of one team: its project
 		{TaskID: 0, Tags: []string{"for review"}, BoardID: "team"},   // no task
 	}
-	h.addWaitsOnThis(ctx, "team", rows)
+	h.addWaitsOnThis(httptest.NewRequest(http.MethodGet, "/api/team-artifacts", nil), "team", rows)
 	require.NotNil(t, rows[0].WaitsOnThis)
 	assert.Equal(t, board.WaitsOnThis{Count: 1, TopTitle: "Waits on the review", ClosesGoal: "Ship the beta", Priority: "high"}, *rows[0].WaitsOnThis)
 	assert.Nil(t, rows[1].WaitsOnThis, "only a row tagged for review")
 	require.NotNil(t, rows[2].WaitsOnThis, "a row with no board of its own takes the list's")
 	assert.Nil(t, rows[3].WaitsOnThis, "a row with no task")
-	(&BoardHandler{}).addWaitsOnThis(ctx, "team", rows) // no board store: nothing breaks
+	(&BoardHandler{}).addWaitsOnThis(httptest.NewRequest(http.MethodGet, "/api/team-artifacts", nil), "team", rows) // no board store: nothing breaks
 }
 
 func TestWaitsOnMemoKeepsTheAnswerForTheSameSessionsBriefly(t *testing.T) {
@@ -91,4 +94,49 @@ func TestWaitsOnMemoKeepsTheAnswerForTheSameSessionsBriefly(t *testing.T) {
 	assert.Equal(t, 1, got["a"].Count)
 	_, ok = m.get([]board.WaitOwner{{Key: "a"}, {Key: "c"}})
 	assert.False(t, ok, "other sessions are read again")
+}
+
+// Through Coral Hub only the authentic owner gets the field: a viewer or grantee, a forged stamp, or an owner of a machine with no enrolled label gets none, on the live rows and on the review rows alike (Security, #11455).
+func TestWaitsOnThisThroughTheHubIsTheAuthenticOwnersAlone(t *testing.T) {
+	_, h := setupBoardTestServer(t)
+	ctx := context.Background()
+	const sess = "aaaaaaaa-0000-4000-8000-000000011456"
+	subscribeSession(t, h, "team", "Worker A", sess)
+	mine, err := h.bs.CreateTaskWithOpts(ctx, "team", "Build", "", "high", "Orchestrator", nil, "Worker A")
+	require.NoError(t, err)
+	_, err = h.bs.ClaimTask(ctx, "team", "Worker A", mine.ID)
+	require.NoError(t, err)
+	_, err = h.bs.CreateTaskWithOpts(ctx, "other-team", "Waits", "", "critical", "Orchestrator", &board.CreateTaskOpts{BlockedBy: []board.TaskDep{{TaskID: mine.ID, BoardID: "team"}}})
+	require.NoError(t, err)
+	withLabel(t, ownerLabel, nil)
+	sh := &SessionsHandler{bs: h.bs}
+	for _, c := range []struct {
+		name   string
+		header map[string]string
+		want   bool
+	}{
+		{"this computer's dashboard", nil, true},
+		{"the owner through the hub", ownerHeaders(ownerLabel), true},
+		{"a viewer or grantee", granteeHeaders(), false},
+		{"a forged stamp", map[string]string{tunnel.ViaHeader: "x", tunnel.HubRoleHeader: "owner", tunnel.HubUserHeader: ownerLabel}, false},
+		{"another hub user's owner marker", ownerHeaders("hub-user-9999ffff"), false},
+	} {
+		live := httptest.NewRequest(http.MethodGet, "/api/sessions/live", nil)
+		review := httptest.NewRequest(http.MethodGet, "/api/team-artifacts", nil)
+		for k, v := range c.header {
+			live.Header.Set(k, v)
+			review.Header.Set(k, v)
+		}
+		rows := []map[string]any{{"session_id": sess, "agent_type": "claude", "board_project": "team"}}
+		sh.addWaitsOnThis(live, rows)
+		items := []teamArtifact{{TaskID: mine.ID, Tags: []string{"for review"}, BoardID: "team"}}
+		h.addWaitsOnThis(review, "team", items)
+		if c.want {
+			assert.Contains(t, rows[0], "waits_on_this", c.name)
+			assert.NotNil(t, items[0].WaitsOnThis, c.name)
+		} else {
+			assert.NotContains(t, rows[0], "waits_on_this", c.name)
+			assert.Nil(t, items[0].WaitsOnThis, c.name)
+		}
+	}
 }

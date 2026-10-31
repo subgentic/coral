@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/subgentic/coral/internal/board"
+	"github.com/subgentic/coral/internal/cloud"
 	"github.com/subgentic/coral/internal/config"
 	"github.com/subgentic/coral/internal/hooks"
 	"github.com/subgentic/coral/internal/naming"
@@ -333,10 +334,11 @@ func (h *SessionsHandler) addSessionGoals(ctx context.Context, rows []map[string
 // addWaitsOnThis gives each row of an agent in a team what waits on it (#11455, the Needs you rows of #11442): its in-progress tasks and the open tasks of every board that wait on them, worked out from the board
 // data and matched by the session's subscriber, never by a display name. A row with nothing in progress has no field. The answer is kept 5 seconds (the list is polled by every open dashboard), and a
 // failed read leaves the rows as they were. A remote server's rows are not asked: their boards are not here.
-func (h *SessionsHandler) addWaitsOnThis(ctx context.Context, rows []map[string]any) {
-	if h.bs == nil || len(rows) == 0 {
+func (h *SessionsHandler) addWaitsOnThis(r *http.Request, rows []map[string]any) {
+	if h.bs == nil || len(rows) == 0 || (cloud.Tunneled(r) && !hubOwnerRequest(r).owner) { // through Coral Hub only the authentic owner: the field names task titles of every board (Security, #11455)
 		return
 	}
+	ctx := r.Context()
 	var owners []board.WaitOwner
 	for _, row := range rows {
 		if srv, _ := row["server"].(string); srv != "" && srv != "local" {

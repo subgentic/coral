@@ -19,6 +19,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/subgentic/coral/internal/board"
+	"github.com/subgentic/coral/internal/cloud"
 	"github.com/subgentic/coral/pkg/hubproxy"
 )
 
@@ -199,7 +200,7 @@ func (h *BoardHandler) ListTeamArtifacts(w http.ResponseWriter, r *http.Request)
 			}
 		}
 	}
-	h.addWaitsOnThis(r.Context(), project, page)
+	h.addWaitsOnThis(r, project, page)
 	if page == nil {
 		page = []teamArtifact{}
 	}
@@ -737,10 +738,11 @@ func sizeOfRecord(n int64) *int64 {
 
 // addWaitsOnThis gives each "for review" row with a task what waits on that task (#11455), from one read of the board data per board: the Inbox's review rows say what they hold up without the page
 // asking each team for its tasks. A row of a list that merges teams names its own board; project is the board of a list of one. A read that fails leaves the rows as they were.
-func (h *BoardHandler) addWaitsOnThis(ctx context.Context, project string, rows []teamArtifact) {
-	if h.bs == nil {
+func (h *BoardHandler) addWaitsOnThis(r *http.Request, project string, rows []teamArtifact) {
+	if h.bs == nil || (cloud.Tunneled(r) && !hubOwnerRequest(r).owner) { // the routes are owner-only through Coral Hub already; the same guard here keeps the field from ever reaching another caller (Security, #11455)
 		return
 	}
+	ctx := r.Context()
 	byBoard := map[string][]int64{}
 	for i := range rows {
 		if rows[i].TaskID <= 0 || !hasTag(rows[i].Tags, "for review") {
