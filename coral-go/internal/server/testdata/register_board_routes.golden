@@ -81,6 +81,8 @@ POST /api/board/{project}/health/ack | (*BoardHandler).AckHealthItem-fm
 POST /api/board/{project}/hub-notice | (*BoardHandler).PostHubNotice-fm
 POST /api/board/{project}/messages | (*BoardHandler).PostMessage-fm
 POST /api/board/{project}/messages/mark-read | (*BoardHandler).MarkRead-fm
+POST /api/board/{project}/operator-artifacts | (*BoardHandler).UploadOperatorArtifact-fm
+POST /api/board/{project}/operator-artifacts/message | (*BoardHandler).ShareOperatorArtifacts-fm
 POST /api/board/{project}/pause | (*BoardHandler).PauseBoard-fm
 POST /api/board/{project}/relay-messages | (*BoardHandler).PostRelayMessage-fm
 POST /api/board/{project}/reminder | (*BoardHandler).RemindSubscriber-fm

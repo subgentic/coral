@@ -143,6 +143,8 @@ var operatorOnlyRoutes = map[string]string{
 	"POST /api/artifacts/prune":                                           "prune artifacts",
 	"PUT /api/board/{project}/artifacts/{id}/tags":                        "change an artifact's tags",
 	"POST /api/board/{project}/artifacts/{id}/review":                     "approve an artifact or ask changes of it",
+	"POST /api/board/{project}/operator-artifacts":                        "share a file with an agent as the Operator",
+	"POST /api/board/{project}/operator-artifacts/message":                "tell an agent about a file the Operator shared",
 	"PUT /api/board/{project}/subscribers/{subscriberID}/review-settings": "set an agent's Reviews only switch and review areas",
 	"PUT /api/artifacts/{id}/keep":                                        "keep an artifact",
 	"GET /api/artifacts/resolve":                                          "resolve a shortened artifact link",

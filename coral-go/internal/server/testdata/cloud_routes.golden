@@ -295,6 +295,8 @@ POST /api/board/{project}/health/ack never
 POST /api/board/{project}/hub-notice interact
 POST /api/board/{project}/messages interact
 POST /api/board/{project}/messages/mark-read never
+POST /api/board/{project}/operator-artifacts interact
+POST /api/board/{project}/operator-artifacts/message interact
 POST /api/board/{project}/pause launch
 POST /api/board/{project}/relay-messages never
 POST /api/board/{project}/reminder interact

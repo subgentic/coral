@@ -155,6 +155,8 @@ func TestTheBoardRoutesRefuseASignInLinkFromAnyClient(t *testing.T) {
 // writeRoutesWithoutTheGuard are the write routes left without routes.RefuseSignInLink, each with why: their body carries no text a person
 // typed. A new write route under these prefixes fails TestEveryWriteRouteIsGuardedOrSaysWhyNot until it is guarded or listed here.
 var writeRoutesWithoutTheGuard = map[string]string{
+	"POST /api/board/{project}/operator-artifacts":                     "the body is the Operator's file, stored as bytes; its name is checked in the handler (hasSignInLink) and the file is never rendered (#11376)",
+	"POST /api/board/{project}/operator-artifacts/message":             "the body names an agent session and digests this Coral just stored; the message text is made by the server (#11376)",
 	"DELETE /api/saved/{id}":                                           "a delete by id: no text is kept",
 	"DELETE /api/board/remotes":                                        "a delete: no text is kept",
 	"DELETE /api/board/{project}":                                      "a delete: no text is kept",

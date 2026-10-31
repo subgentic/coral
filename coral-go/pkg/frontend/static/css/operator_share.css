@@ -1,0 +1,9 @@
+/* Share a file with an agent (#11376): the button and line above an agent's Artifacts list, and the drop target over it while a file is dragged in. */
+.share-drop { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 8px 16px 0; }
+.share-drop-hint { flex: 1 1 14rem; min-width: 0; color: var(--text-secondary); font-size: var(--fs-md); }
+.share-drop-status { flex: 1 1 100%; margin: 0; min-height: 0; color: var(--text-secondary); font-size: var(--fs-md); overflow-wrap: anywhere; }
+.share-drop-status:empty { display: none; }
+.share-drop-status.share-drop-bad { color: var(--error-text); }
+.goals-page.share-drop-on { position: relative; outline: 2px dashed var(--accent); outline-offset: -4px; }
+.share-drop-target { display: none; position: absolute; inset: 0; z-index: 20; align-items: center; justify-content: center; padding: 16px; text-align: center; background: var(--bg-secondary); color: var(--text-primary); font-size: var(--fs-lg); font-weight: var(--fw-strong); opacity: .97; pointer-events: none; }
+.share-drop-on > .share-drop-target { display: flex; }

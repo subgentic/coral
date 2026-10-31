@@ -322,6 +322,7 @@ var queryIdentityReads = map[string]string{
 	"agent_mcp.go session_id":              queryLookup, // GET live/{name}/mcp-servers?session_id=: names the session whose CLI configuration is listed; an Operator-only route, never an agent token or Coral Hub (#9769)
 	"sessions_waiting.go session_id":       queryLookup, // GET live/{name}/waiting?session_id=: names the exact session to list (validateExactLiveTarget); an Operator-only route (#7554)
 	"shared_images.go session_id":          queryLookup, // DELETE /api/shared-images/{id}?session_id=: the agent whose pasted image it is; the Operator calls it (#5284)
+	"operator_artifacts.go session_id":     queryLookup, // POST /api/board/{project}/operator-artifacts?session_id=: names the agent the Operator's file is for; checked against the board's own subscribers, an Operator-only route, never an agent token or a Hub grantee (#11376)
 	"board_subscribers.go subscriber_id":   queryBoard,
 	"board_task_create.go subscriber_id":   queryBoard,
 	"board_waits.go subscriber_id":         queryBoard,

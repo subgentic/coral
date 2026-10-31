@@ -211,6 +211,8 @@ func (s *Server) registerBoardTaskRoutes(r chi.Router, boardHandler *routes.Boar
 	r.Get("/api/board/{project}/artifacts", boardHandler.ListTeamArtifacts)
 	r.With(routes.RefuseSignInLink).Put("/api/board/{project}/artifacts/{id}/tags", boardHandler.SetArtifactTags)                          // the Operator's and the team owner's (#8583); no tunnel row
 	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/artifacts/{id}/review", boardHandler.ReviewArtifact)                        // the Operator approves an artifact tagged for review, or asks changes (#136584); local only, no tunnel row
+	r.Post("/api/board/{project}/operator-artifacts", boardHandler.UploadOperatorArtifact)                                                 // the Operator shares a file with an agent: stored on the agent's team (#11376; owner-only through Coral Hub)
+	r.Post("/api/board/{project}/operator-artifacts/message", boardHandler.ShareOperatorArtifacts)                                         // and the one message that tells the agent
 	r.With(routes.RefuseSignInLink).Put("/api/board/{project}/subscribers/{subscriberID}/review-settings", boardHandler.SetReviewSettings) // an agent's Reviews only switch and areas: the Operator's (#8957); no tunnel row
 	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/tasks/{taskID}/complete", boardHandler.CompleteTaskByID)
 	r.With(routes.RefuseSignInLink).Post("/api/board/{project}/tasks/{taskID}/submit-review", boardHandler.SubmitCompletionReview)

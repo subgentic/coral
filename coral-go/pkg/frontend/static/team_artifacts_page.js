@@ -526,6 +526,9 @@ export function createArtifactsList({ inbox = false } = {}) {
             if (!external) bar = null;
         }
         root = host.firstChild;
+        if (scope && !scope.standalone && project && !external && !inbox) { // an agent with a team: files can be dropped on its list to share them with it (#11376)
+            importOnce('./operator_share.js').then(m => m.mountOperatorShare(root, { project, session: scope.session, server: scope.server, name: scope.name, reload: () => loadArtifacts({ keep: true }) })).catch(() => {});
+        } else if (root._share) importOnce('./operator_share.js').then(m => m.unmountOperatorShare(root)).catch(() => {}); // an agent with no team: nothing to share with
         watch();
         draw();
         if (scope && sameKey && model.loaded) return Promise.resolve(); // an agent's tab drawn again (another tab and back) keeps its list until Refresh or another agent
