@@ -30,6 +30,7 @@ const CSP = ["default-src 'self'", "script-src 'self'", "style-src 'self'", "sty
             const html = (b.base64Encoded ? Buffer.from(b.body, 'base64').toString('utf8') : b.body).replace('"mode":"local"', '"mode":"cloud"');
             await Fetch.fulfillRequest({ requestId: e.requestId, responseCode: 200, responseHeaders: (e.responseHeaders || []).filter(h => !/^content-(security-policy|length)$/i.test(h.name)).concat([{ name: 'Content-Security-Policy', value: CSP }]), body: Buffer.from(html).toString('base64') });
         });
+  await Page.addScriptToEvaluateOnNewDocument({ source: require('./helpers/scene_ready').FETCH_COUNTER }); // a scene is measured once its fetches are done (#416)
   await Page.addScriptToEvaluateOnNewDocument({source:`(() => {
    window.__cspViolations=[];document.addEventListener('securitypolicyviolation',e=>window.__cspViolations.push(e.violatedDirective));
    try{localStorage.setItem('coral-group-by-server','true');}catch(e){} // the sidebar groups agents under their computer (#6241)
@@ -43,6 +44,7 @@ const CSP = ["default-src 'self'", "script-src 'self'", "style-src 'self'", "sty
     if(p.pathname==='/api/servers')return json({servers:computers});
     if(p.pathname==='/api/account')return json({artifacts_tab:true,artifacts_frame:true});
     if(p.pathname==='/api/settings'&&m==='GET')return json({settings:{}});
+    if(p.pathname==='/api/system/cli-check'){const t=p.searchParams.get('type')||'claude';return json({found:true,status:'available',probe:'ok',path:'/usr/local/bin/'+t,version:'1.0.0',agent_type:t,...(p.searchParams.get('signin')==='1'?{signed_in:true}:{})});} // every CLI installed and signed in: a census never runs this computer's own CLI (#416)
     const match=p.pathname.match(/^\\/api\\/remote\\/([^/]+)(\\/api\\/.*)$/);
     if(!match)return original(u,o);
     const [_,server,path]=match;window.__remoteRequests.push({server,path,method:m,query:p.search});

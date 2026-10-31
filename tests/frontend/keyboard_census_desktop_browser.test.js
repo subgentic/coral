@@ -12,6 +12,7 @@ const VERSIONS = require('./helpers/artifact_versions_stub');
 const { requiredScenes } = require('./helpers/census_required'); // the scenes the suite must visit: one file each, so commits that add scenes do not conflict
 const { STUB, HEX } = require('./helpers/comments_scale');
 const kb = require('./helpers/keyboard_census');
+const { FETCH_COUNTER, sceneReady, KNOWN_SLOW } = require('./helpers/scene_ready');
 const { GOALS_STUB, SHOW_ALL_GOALS } = require('./helpers/goals_stub');
 const { DATA_WORLD, httpJson, UPDATE_STAGED, CLOUD_LINKED, CLOUD_IDLE, CLOUD_WAITING } = require('./helpers/census_world');
 const { INBOX_WORLD } = require('./helpers/inbox_world');
@@ -26,9 +27,8 @@ const BUBBLES = [{ type: 'user', content: 'Is the build green?', key: 'c1', time
     const guard = await guardSettings(); let standIn = null, work = null;
     const results = [];
     const found = [];
-    const sc = async (name, setup, { expect } = {}) => {
-        try { await setup(); if (expect) { await new Promise(r => setTimeout(r, 400)); if (!(await ev(expect))) throw new Error('the scene is not showing (' + expect.slice(0, 80) + ')'); } } catch (e) { results.push({ name, error: String(e && e.message || e).slice(0, 200) }); return; } // sleep-ok: the scene's own transition settles
-        await new Promise(r => setTimeout(r, 500)); // sleep-ok: the scene's own transitions settle
+    const sc = async (name, setup, { expect, knownSlow } = {}) => {
+        try { await setup(); await sceneReady(ev, name, { expect, knownSlow }); } catch (e) { results.push({ name, error: String(e && e.message || e).slice(0, 200) }); return; } // measured once ready (#416)
         const r = await kb.walk(ev, client.Input);
         results.push({ name, stops: r.stops.length, path: r.stops.map(x => x.d).join(' > ') });
         found.push(...kb.problems(name, r));
@@ -48,7 +48,7 @@ const BUBBLES = [{ type: 'user', content: 'Is the build green?', key: 'c1', time
         await httpJson('POST', `/api/board/${TEAM}/subscribe`, { subscriber_id: 'Boss', job_title: 'Orchestrator', session_name: 'boss-session' });
         for (const m of ['Please check the release notes.', 'Then post the summary.']) await httpJson('POST', `/api/board/${TEAM}/messages`, { subscriber_id: 'Boss', content: m });
         for (const [title, priority] of [['Ship the release notes', 'high'], ['Check the migration', 'medium'], ['Tidy the changelog', 'low']]) await httpJson('POST', `/api/board/${TEAM}/tasks`, { subscriber_id: 'Boss', title, body: 'A task for the census.', priority, assignee: 'Boss' });
-        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Page.addScriptToEvaluateOnNewDocument({ source: DATA_WORLD });
+        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Page.addScriptToEvaluateOnNewDocument({ source: DATA_WORLD }); await Page.addScriptToEvaluateOnNewDocument({ source: FETCH_COUNTER });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false }); await Emulation.setTouchEmulationEnabled({ enabled: false });
         await load();
         await sc('home (agent list)', async () => { await ev(`window.__m.add('rowa', 'Row A', 2, {}); window.__m.add('rowb', 'Row B', 2, {}); window.switchNavTab('agents'); true`); await waitFor(`document.querySelectorAll('#live-sessions-list li, [data-section="live-sessions"] .session-list > li').length >= 2`, 'agent rows', 10000); }, { min: 5 });
@@ -107,10 +107,10 @@ const BUBBLES = [{ type: 'user', content: 'Is the build green?', key: 'c1', time
         await sc('board', async () => { await ev(`window.switchNavTab('board'); true`); }, { min: 2, expect: `document.getElementById('messageboard-view').getClientRects().length > 0` });
         await sc('board: a team board', async () => { await tap('#mb-projects-ul [data-project]'); await waitFor(`/Please check the release notes/.test(document.getElementById('mb-messages').textContent)`, 'board messages', 10000); }, { min: 5, expect: `/Please check the release notes/.test(document.getElementById('mb-messages').textContent)` });
         await sc('board: goals', async () => { await ev(GOALS_STUB); await ev(`import((window.__coralStatic || '/static/') + 'state.js').then(m => window.openTeamPage(m.state.boardPageProject, { tab: 'goals' })).then(() => true)`); await waitFor(`!!document.querySelector('#team-panel-goals .goals-chip, #team-panel-goals select')`, 'the goals tab', 10000); await ev(SHOW_ALL_GOALS); await waitFor(`document.querySelectorAll('#team-panel-goals .dt-table tbody tr').length === 5`, 'the goals', 10000); }, { min: 5, expect: `document.querySelectorAll('#team-panel-goals .dt-table tbody tr').length === 5` });
-        await sc('board: a goal', async () => { await tap('#team-panel-goals .dt-table tbody tr .dt-primary'); await waitFor(`!!document.querySelector('#team-panel-goals .goals-close')`, 'the goal\'s tasks', 10000); }, { min: 5, expect: `!!document.querySelector('#team-panel-goals .goals-close')` });
-        await sc('board: close a goal', async () => { await tap('.goals-close'); await waitFor(`!!document.querySelector('dialog.goals-close-dialog[open]')`, 'the Close dialog', 10000); await ev(`(() => { const last = [...document.querySelectorAll('dialog.goals-close-dialog button:not([disabled]), dialog.goals-close-dialog input:not([disabled])')].pop(); last.focus(); return true; })()`); /* the Tab walk starts after the last control that can take focus (Close goal is off until a choice is made, #10717; a disabled button cannot take it), so it comes round to the radios first: with nothing chosen Tab reaches the first radio and the arrows the rest, as in any radio group */ }, { min: 3, expect: `!!document.querySelector('dialog.goals-close-dialog[open]')` });
+        await sc('board: a goal', async () => { await tap('#team-panel-goals .dt-table tbody tr .dt-primary'); await waitFor(`!!document.querySelector('#team-panel-goals .goals-close')`, 'the goal\'s tasks', 10000); }, { min: 5, knownSlow: KNOWN_SLOW.goalUpdating, expect: `!!document.querySelector('#team-panel-goals .goals-close')` });
+        await sc('board: close a goal', async () => { await tap('.goals-close'); await waitFor(`!!document.querySelector('dialog.goals-close-dialog[open]')`, 'the Close dialog', 10000); await ev(`(() => { const last = [...document.querySelectorAll('dialog.goals-close-dialog button:not([disabled]), dialog.goals-close-dialog input:not([disabled])')].pop(); last.focus(); return true; })()`); /* the Tab walk starts after the last control that can take focus (Close goal is off until a choice is made, #10717; a disabled button cannot take it), so it comes round to the radios first: with nothing chosen Tab reaches the first radio and the arrows the rest, as in any radio group */ }, { min: 3, knownSlow: KNOWN_SLOW.goalUpdating, expect: `!!document.querySelector('dialog.goals-close-dialog[open]')` });
         await ev(`document.querySelector('dialog.goals-close-dialog') && document.querySelector('dialog.goals-close-dialog').close(); true`);
-        await sc('board: all tasks done', async () => { await ev(`window.__goals = window.__goals.map(g => g.id === 1 ? { ...g, rollup: { done: 9, active: 0, blocked: 0, queued: 0 } } : g); (async () => { (await import((window.__coralStatic || '/static/') + 'goals_view.js')).loadGoals(); return true; })()`); await waitFor(`!!document.querySelector('#team-panel-goals .goals-alldone')`, 'the all-done strip', 10000); }, { min: 5, expect: `!!document.querySelector('#team-panel-goals .goals-alldone')` });
+        await sc('board: all tasks done', async () => { await ev(`window.__goals = window.__goals.map(g => g.id === 1 ? { ...g, rollup: { done: 9, active: 0, blocked: 0, queued: 0 } } : g); (async () => { (await import((window.__coralStatic || '/static/') + 'goals_view.js')).loadGoals(); return true; })()`); await waitFor(`!!document.querySelector('#team-panel-goals .goals-alldone')`, 'the all-done strip', 10000); }, { min: 5, knownSlow: KNOWN_SLOW.goalUpdating, expect: `!!document.querySelector('#team-panel-goals .goals-alldone')` });
         await ev(`import((window.__coralStatic || '/static/') + 'state.js').then(m => window.openTeamPage(m.state.boardPageProject, { tab: 'messages' })).then(() => true)`); // the other screens read the board's messages again (the team page's Board tab, #8129)
         // the team board's own controls and its task list (#6566): the More menu, the subscribers sheet, the Tasks panel with tasks (its filters open, one task opened)
         const keyEsc = async () => { await client.Input.dispatchKeyEvent({ type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 }); await client.Input.dispatchKeyEvent({ type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 }); await new Promise(r => setTimeout(r, 300)); }; // sleep-ok: the close transition
@@ -140,7 +140,7 @@ const BUBBLES = [{ type: 'user', content: 'Is the build green?', key: 'c1', time
         await ev(`[...document.querySelectorAll('#wf-footer button')].find(b => b.textContent.trim() === 'Cancel').click(); true`);
         await ev(`document.querySelectorAll('.modal.show, dialog[open]').forEach(m => { m.classList.remove('show'); if (m.close) m.close(); }); true`);
         await load();
-        for (const [n, tab, label] of [['analytics', 'tokens', 'Analytics'], ['docs', 'docs', 'Docs'], ['inbox', 'hub-inbox', 'Inbox']]) await sc(n, async () => { await ev(`window.switchNavTab('${tab}'); true`); }, { min: 3 });
+        for (const [n, tab, label, drawn] of [['analytics', 'tokens', 'Analytics'], ['docs', 'docs', 'Docs'], ['inbox', 'hub-inbox', 'Inbox', `!document.getElementById('inbox-local').hidden`]]) await sc(n, async () => { await ev(`window.switchNavTab('${tab}'); true`); }, { min: 3, expect: drawn }); // the Inbox: its own content drawn (its module comes by import(), which no fetch counts)
         // the Inbox's three groups with something in each (#6541, #7472): an agent waiting, the open tasks (one opened to its reply box), the saved messages (their filters open, one message's page and its More menu)
         await sc('inbox: needs you, an agent waiting', async () => {
             await ev(INBOX_WORLD);
