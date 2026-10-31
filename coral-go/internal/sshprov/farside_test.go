@@ -76,25 +76,35 @@ func homeAllowed(home, root string) bool {
 	if root == "" || !filepath.IsAbs(root) || filepath.Dir(root) == root || home == "" || !filepath.IsAbs(home) || filepath.Clean(home) != home {
 		return false
 	}
-	tmp := root
-	if r, err := filepath.EvalSymlinks(tmp); err == nil {
-		tmp = r
+	// Compared as files, not as spellings: Windows names one folder both C:\Users\RUNNER~1\... and C:\Users\runneradmin\..., and /var and /private/var are one folder on a Mac.
+	rootSt, err := os.Stat(root)
+	if err != nil {
+		return false
 	}
-	// resolve links in the deepest part of the path that exists, and keep the rest as written: a home not made yet is judged by where it would be
-	h, rest := home, ""
+	// the deepest part of home that exists, with its links resolved: a home not made yet is judged by where it would be, and a link that leaves root is seen for where it leads
+	e := home
 	for {
-		if r, err := filepath.EvalSymlinks(h); err == nil {
-			h = filepath.Join(r, rest)
+		if _, err := os.Lstat(e); err == nil {
 			break
 		}
-		parent := filepath.Dir(h)
-		if parent == h {
+		parent := filepath.Dir(e)
+		if parent == e {
 			return false
 		}
-		rest, h = filepath.Join(filepath.Base(h), rest), parent
+		e = parent
 	}
-	rel, err := filepath.Rel(filepath.Clean(tmp), h)
-	return err == nil && rel != "." && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
+	r, err := filepath.EvalSymlinks(e)
+	if err != nil {
+		return false
+	}
+	for p := r; ; p = filepath.Dir(p) {
+		if st, err := os.Stat(p); err == nil && os.SameFile(st, rootSt) {
+			return p != r || e != home // home itself being root is not inside it
+		}
+		if filepath.Dir(p) == p {
+			return false
+		}
+	}
 }
 
 // runFar answers one command and returns its exit code.
@@ -158,7 +168,7 @@ func runFar(f farCfg, text string) int {
 			if j := strings.LastIndex(rest, `"; }`); j >= 0 {
 				rest = rest[:j]
 			}
-			rest = strings.ReplaceAll(strings.ReplaceAll(rest, `\"`, ""), "$HOME", f.Home)
+			rest = filepath.FromSlash(strings.ReplaceAll(strings.ReplaceAll(rest, `\"`, ""), "$HOME", f.Home)) // the path as this system writes it
 			appendLine(f.ArgsLog, strings.TrimSpace(rest))
 		}
 		_ = os.WriteFile(filepath.Join(filepath.Dir(f.Home), "started"), []byte(fmt.Sprint(time.Now().UnixNano())), 0o600)

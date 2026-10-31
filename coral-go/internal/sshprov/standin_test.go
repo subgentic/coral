@@ -122,7 +122,13 @@ func newStandIn(t *testing.T, name string, cfg standCfg) string {
 		name += ".exe"
 	}
 	p := filepath.Join(dir, name)
-	if err := os.Link(exe, p); err != nil {
+	// A hard link to the running test binary cannot be deleted on Windows (the image is mapped under every name), so there it is always a copy; elsewhere a link is cheaper.
+	linkErr := errors.New("copy on Windows")
+	if runtime.GOOS != "windows" {
+		linkErr = os.Link(exe, p)
+	}
+	t.Cleanup(func() { removeAllWithRetry(dir) }) // runs before t.TempDir's own removal
+	if linkErr != nil {
 		src, err := os.Open(exe)
 		if err != nil {
 			t.Fatal(err)
@@ -148,6 +154,17 @@ func newStandIn(t *testing.T, name string, cfg standCfg) string {
 		t.Fatal(err)
 	}
 	return p
+}
+
+// removeAllWithRetry removes dir, trying again for a few seconds where the system refuses while a stand-in that was just stopped is still being torn down (Windows: access denied on its .exe). The error
+// after the last try is left to t.TempDir's own cleanup, which reports it.
+func removeAllWithRetry(dir string) {
+	for i := 0; i < 100; i++ {
+		if os.RemoveAll(dir) == nil {
+			return
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
 }
 
 // runStandIn acts as the configured stand-in and returns its exit code. It starts no process and runs no test.
@@ -286,6 +303,12 @@ func TestHomeAllowedIsInsideTheRootNotJustNamedLikeIt(t *testing.T) {
 	} {
 		if got := homeAllowed(home, root); got != want {
 			t.Errorf("homeAllowed(%q, %q) = %v, want %v", home, root, got, want)
+		}
+	}
+	if runtime.GOOS != "windows" { // the same folder under another spelling (Windows' RUNNER~1 and runneradmin; here a link to the root) is inside it
+		alias := filepath.Join(t.TempDir(), "alias")
+		if err := os.Symlink(root, alias); err == nil && (!homeAllowed(filepath.Join(alias, "home"), root) || homeAllowed(alias, root)) {
+			t.Error("the root under another name was not told from the root's inside")
 		}
 	}
 	if runtime.GOOS != "windows" { // a link inside the root that points outside it
