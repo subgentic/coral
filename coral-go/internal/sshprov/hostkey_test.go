@@ -63,6 +63,7 @@ func fakeKeyscan(t *testing.T, out string, code int) string {
 }
 
 func TestScanPrefersEd25519AndNamesNonDefaultPorts(t *testing.T) {
+	needShell(t)
 	rsa, _ := blobFor("ssh-rsa", 1)
 	ed, fp := blobFor("ssh-ed25519", 2)
 	out := "# box.example.com:2222 SSH-2.0-OpenSSH\n[box.example.com]:2222 ssh-rsa " + rsa + "\n[box.example.com]:2222 ssh-ed25519 " + ed
@@ -73,6 +74,7 @@ func TestScanPrefersEd25519AndNamesNonDefaultPorts(t *testing.T) {
 }
 
 func TestScanRefusesAnythingThatIsNotAKey(t *testing.T) {
+	needShell(t)
 	ed, _ := blobFor("ssh-ed25519", 2)
 	for name, out := range map[string]string{
 		"empty":         "",
@@ -153,6 +155,7 @@ func realKey(t *testing.T) (typ, blob string) {
 }
 
 func TestTrustSeesHashedKnownHostsToo(t *testing.T) {
+	needShell(t)
 	typ, blob := realKey(t)
 	typ2, blob2 := realKey(t)
 	path := filepath.Join(t.TempDir(), "known_hosts")
@@ -190,6 +193,7 @@ func TestTrustSeesHashedKnownHostsToo(t *testing.T) {
 }
 
 func TestScanAcceptsAnIPv6Literal(t *testing.T) {
+	needShell(t)
 	ed, _ := blobFor("ssh-ed25519", 2)
 	k, err := (Runner{KeyScan: fakeKeyscan(t, "2001:db8::1 ssh-ed25519 "+ed, 0)}).Scan(context.Background(), "2001:db8::1", 22)
 	if err != nil || k.Host != "2001:db8::1" {
@@ -201,6 +205,7 @@ func TestScanAcceptsAnIPv6Literal(t *testing.T) {
 }
 
 func TestScanAliasReadsTheKeyIntoAFreshTempFileAndDeletesIt(t *testing.T) {
+	needShell(t)
 	ed, fp := blobFor("ssh-ed25519", 3)
 	dir := t.TempDir()
 	log := filepath.Join(dir, "argv")
@@ -238,6 +243,7 @@ func TestScanAliasReadsTheKeyIntoAFreshTempFileAndDeletesIt(t *testing.T) {
 }
 
 func TestScanAliasReturnsEveryHostOfAJumpPathAndNothingElse(t *testing.T) {
+	needShell(t)
 	jump, jfp := blobFor("ssh-ed25519", 4)
 	dest, dfp := blobFor("ssh-ed25519", 5)
 	rsa, _ := blobFor("ssh-rsa", 6)

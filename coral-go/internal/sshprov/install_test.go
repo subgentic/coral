@@ -130,6 +130,7 @@ func newInstallEnv(t *testing.T, pkg []byte, mode string) (*installEnv, string, 
 }
 
 func TestInstallPutsTheVerifiedPackageOnTheFarSideAndIsIdempotent(t *testing.T) {
+	needShell(t)
 	pkg := goodTar(t)
 	e, home, log := newInstallEnv(t, pkg, "")
 	tg, _ := ParseTarget("user@box.example.com")
@@ -182,6 +183,7 @@ func TestInstallPutsTheVerifiedPackageOnTheFarSideAndIsIdempotent(t *testing.T) 
 }
 
 func TestInstallRefusesBeforeTouchingTheFarSide(t *testing.T) {
+	needShell(t)
 	tg, _ := ParseTarget("user@box.example.com")
 	pkg := goodTar(t)
 
@@ -239,6 +241,7 @@ func TestInstallRefusesBeforeTouchingTheFarSide(t *testing.T) {
 }
 
 func TestInstallRefusesAPackageWithBadPathsLocally(t *testing.T) {
+	needShell(t)
 	tg, _ := ParseTarget("user@box.example.com")
 	for name, members := range map[string][]member{
 		"dotdot":         {{name: "../evil", body: "x"}},
@@ -267,6 +270,7 @@ func TestInstallRefusesAPackageWithBadPathsLocally(t *testing.T) {
 }
 
 func TestInstallRefusesAPackageThatChangedOnTheWayAndUnpacksNothing(t *testing.T) {
+	needShell(t)
 	pkg := goodTar(t)
 	e, home, _ := newInstallEnv(t, pkg, "corrupt")
 	tg, _ := ParseTarget("user@box.example.com")
@@ -361,6 +365,7 @@ func TestDownloadReleaseIsHardened(t *testing.T) {
 }
 
 func TestInstallRefusesWhenTheFarSideHasNoRoomAndCopiesNothing(t *testing.T) {
+	needShell(t)
 	pkg := goodTar(t)
 	e, home, log := newInstallEnv(t, pkg, "full")
 	tg, _ := ParseTarget("user@box.example.com")

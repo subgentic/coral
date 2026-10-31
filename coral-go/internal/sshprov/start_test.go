@@ -70,6 +70,7 @@ esac
 }
 
 func TestStartTmuxStartsCoralOnLoopbackOnlyAndOnlyOnce(t *testing.T) {
+	needShell(t)
 	r, home, argsLog, tmuxLog := startSide(t)
 	tg, _ := ParseTarget("user@box.example.com")
 	ctx := context.Background()
@@ -113,6 +114,7 @@ func TestStartTmuxStartsCoralOnLoopbackOnlyAndOnlyOnce(t *testing.T) {
 }
 
 func TestEnsureInstanceIDIsMadeOnceAndIs32Hex(t *testing.T) {
+	needShell(t)
 	r, home, _, _ := startSide(t)
 	tg, _ := ParseTarget("user@box.example.com")
 	a, err := r.EnsureInstanceID(context.Background(), tg)
@@ -139,6 +141,7 @@ func TestEnsureInstanceIDIsMadeOnceAndIs32Hex(t *testing.T) {
 }
 
 func TestReadAPIKeyWaitsForACoralThatIsStartingAndNeverLogsIt(t *testing.T) {
+	needShell(t)
 	r, _, _, _ := startSide(t)
 	oldPoll := keyPoll
 	keyPoll = 100 * time.Millisecond
@@ -155,6 +158,7 @@ func TestReadAPIKeyWaitsForACoralThatIsStartingAndNeverLogsIt(t *testing.T) {
 }
 
 func TestReadAPIKeyGivesUpAndSaysNothingOfTheKey(t *testing.T) {
+	needShell(t)
 	r, _, _, _ := startSide(t)
 	oldPoll, oldWait := keyPoll, keyWait
 	keyPoll, keyWait = 50*time.Millisecond, 400*time.Millisecond
@@ -170,6 +174,7 @@ func TestReadAPIKeyGivesUpAndSaysNothingOfTheKey(t *testing.T) {
 }
 
 func TestReadAPIKeyRefusesAnythingThatIsNotAKey(t *testing.T) {
+	needShell(t)
 	r, home, _, _ := startSide(t)
 	oldPoll, oldWait := keyPoll, keyWait
 	keyPoll, keyWait = 50*time.Millisecond, 300*time.Millisecond
@@ -209,6 +214,7 @@ func TestStoredRoundTripsThroughTheParsers(t *testing.T) {
 }
 
 func TestAcceptTermsGoesOnStdinNeverInArgv(t *testing.T) {
+	needShell(t)
 	r, _, argsLog, _ := startSide(t)
 	tg, _ := ParseTarget("user@box.example.com")
 	payload := []byte(`{"version":"2026-03-26","sha256":"` + strings.Repeat("ab", 32) + `","by":"hub-owner@build-host"}`)
@@ -251,6 +257,7 @@ func TestTmuxNamesAreExactSoAnotherUsersSessionIsNeverTouched(t *testing.T) {
 }
 
 func TestStopAndConfirmReturnsOnlyOnAConfirmedStop(t *testing.T) {
+	needShell(t)
 	oldW, oldP := stopWait, stopPoll
 	stopWait, stopPoll = 300*time.Millisecond, 50*time.Millisecond
 	defer func() { stopWait, stopPoll = oldW, oldP }()

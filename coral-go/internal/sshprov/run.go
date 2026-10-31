@@ -160,7 +160,9 @@ func shQuote(s string) string { return "'" + strings.ReplaceAll(s, "'", `'\''`) 
 // minimalEnv is all ssh is given: the hub's own CORAL_* values and anything else in its environment never reach a user's SendEnv or ProxyCommand. SSH_AUTH_SOCK is the user's agent.
 func minimalEnv() []string {
 	env := []string{"LC_ALL=C"}
-	for _, k := range []string{"HOME", "USER", "PATH", "SSH_AUTH_SOCK"} {
+	// The Windows names are the ones ssh.exe needs to find the user's .ssh folder and to run (USERPROFILE, HOMEDRIVE and HOMEPATH, SystemRoot, USERNAME, TEMP and TMP); they are unset elsewhere, and
+	// nothing of the hub's own (CORAL_*) is ever passed.
+	for _, k := range []string{"HOME", "USER", "PATH", "SSH_AUTH_SOCK", "USERPROFILE", "HOMEDRIVE", "HOMEPATH", "USERNAME", "SystemRoot", "TEMP", "TMP"} {
 		if v, ok := os.LookupEnv(k); ok {
 			env = append(env, k+"="+v)
 		}

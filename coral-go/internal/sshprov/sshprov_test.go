@@ -120,6 +120,7 @@ func fakeSSH(t *testing.T, body string) (string, string) {
 }
 
 func TestRunBuildsOneFixedArgvAndNeverRelaxesHostKeyChecking(t *testing.T) {
+	needShell(t)
 	ssh, log := fakeSSH(t, "echo Linux x86_64")
 	tg, _ := ParseTarget("user@box.example.com:2222")
 	res, err := Runner{SSH: ssh}.Run(context.Background(), tg, CmdUname)
@@ -144,6 +145,7 @@ func TestRunBuildsOneFixedArgvAndNeverRelaxesHostKeyChecking(t *testing.T) {
 }
 
 func TestRunRefusesBeforeConnectingWhenTheCommandIsNotAllowed(t *testing.T) {
+	needShell(t)
 	ssh, log := fakeSSH(t, "true")
 	tg, _ := ParseTarget("user@box.example.com")
 	if _, err := (Runner{SSH: ssh}).Run(context.Background(), tg, CmdSha256, "x'; rm -rf ~; '"); !errors.Is(err, ErrNotAllowed) {
@@ -155,6 +157,7 @@ func TestRunRefusesBeforeConnectingWhenTheCommandIsNotAllowed(t *testing.T) {
 }
 
 func TestRunMapsExitCodes(t *testing.T) {
+	needShell(t)
 	tg, _ := ParseTarget("user@box.example.com")
 	hk, _ := fakeSSH(t, "echo 'Host key verification failed.' >&2; exit 255")
 	if _, err := (Runner{SSH: hk}).Run(context.Background(), tg, CmdUname); !errors.Is(err, ErrHostKey) {
@@ -171,6 +174,7 @@ func TestRunMapsExitCodes(t *testing.T) {
 }
 
 func TestRunCapsWhatItKeeps(t *testing.T) {
+	needShell(t)
 	ssh, _ := fakeSSH(t, "yes x | head -c 300000")
 	tg, _ := ParseTarget("user@box.example.com")
 	res, err := Runner{SSH: ssh}.Run(context.Background(), tg, CmdUname)
@@ -180,6 +184,7 @@ func TestRunCapsWhatItKeeps(t *testing.T) {
 }
 
 func TestRunGivesSSHAMinimalEnvironmentAndQuotesTheText(t *testing.T) {
+	needShell(t)
 	t.Setenv("CORAL_SECRET_THING", "leak")
 	t.Setenv("SSH_AUTH_SOCK", "/tmp/agent.sock")
 	dir := t.TempDir()
@@ -205,5 +210,25 @@ func TestRunGivesSSHAMinimalEnvironmentAndQuotesTheText(t *testing.T) {
 	want := `sh -c 'cd "$HOME/.coral-server" && { sha256sum -- ` + q + ` 2>/dev/null || shasum -a 256 -- ` + q + `; }'`
 	if string(text) != want {
 		t.Errorf("remote text = %s; want %s", text, want)
+	}
+}
+
+// What ssh is given is a short fixed list: the user's own names (also the ones ssh.exe needs on Windows) and never the hub's CORAL_* values; a pure check, no shell.
+func TestMinimalEnvIsTheUsersNamesOnly(t *testing.T) {
+	t.Setenv("CORAL_SECRET_THING", "leak")
+	t.Setenv("USERPROFILE", `C:\Users\user`)
+	t.Setenv("SystemRoot", `C:\Windows`)
+	t.Setenv("AWS_SECRET_ACCESS_KEY", "leak2")
+	env := minimalEnv()
+	joined := strings.Join(env, "\n")
+	for _, bad := range []string{"CORAL_", "AWS_", "leak"} {
+		if strings.Contains(joined, bad) {
+			t.Errorf("the environment carries %q:\n%s", bad, joined)
+		}
+	}
+	for _, want := range []string{"LC_ALL=C", `USERPROFILE=C:\Users\user`, `SystemRoot=C:\Windows`} {
+		if !strings.Contains(joined, want) {
+			t.Errorf("the environment lacks %q:\n%s", want, joined)
+		}
 	}
 }

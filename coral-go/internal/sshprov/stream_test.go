@@ -68,6 +68,7 @@ func portOf(t *testing.T, ts *httptest.Server) int {
 const streamKey = "remote-api-key-123"
 
 func TestStreamTargetReachesTheRemoteOverSSHWAndSendsTheKeyOnlyAsABearer(t *testing.T) {
+	needShell(t)
 	var mu sync.Mutex
 	var seen http.Header
 	var seenPath, seenHost string
@@ -121,6 +122,7 @@ func TestStreamTargetReachesTheRemoteOverSSHWAndSendsTheKeyOnlyAsABearer(t *test
 }
 
 func TestHubProxyTreatsAStreamTargetAsADirectKeyTarget(t *testing.T) {
+	needShell(t)
 	var mu sync.Mutex
 	var seen http.Header
 	remote := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -174,6 +176,7 @@ type resolverFunc func(string) (proxy.Target, error)
 func (f resolverFunc) Resolve(_ context.Context, id string) (proxy.Target, error) { return f(id) }
 
 func TestStreamTargetCarriesAWebSocket(t *testing.T) {
+	needShell(t)
 	remote := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("Authorization") != "Bearer "+streamKey {
 			http.Error(w, "no", http.StatusUnauthorized)
@@ -227,6 +230,7 @@ func TestNewStreamTargetRefusesWhatItCannotUse(t *testing.T) {
 }
 
 func TestStreamTargetCapsConnectionsAndBacksOffAfterAFailedDial(t *testing.T) {
+	needShell(t)
 	dir := t.TempDir()
 	hold := filepath.Join(dir, "ssh")
 	if err := os.WriteFile(hold, []byte("#!/bin/sh\nexec sleep 30\n"), 0o700); err != nil {
@@ -288,6 +292,7 @@ func TestStreamTargetCapsConnectionsAndBacksOffAfterAFailedDial(t *testing.T) {
 }
 
 func TestStreamArgvHasKeepAlive(t *testing.T) {
+	needShell(t)
 	remote := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { io.WriteString(w, "ok") }))
 	defer remote.Close()
 	ssh, log := fakeSSHW(t)
