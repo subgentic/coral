@@ -22,7 +22,7 @@ func TestANewVersionForReviewSupersedesTheOlderOne(t *testing.T) {
 	rig.h.bs = bh.bs
 	ctx := context.Background()
 	up := func(session, text, ref string) string {
-		req, err := http.NewRequest(http.MethodPost, rig.srv.URL+"/api/agent/artifacts?session_id="+session+"&tag=for+review", strings.NewReader(text))
+		req, err := http.NewRequest(http.MethodPost, rig.srv.URL+"/api/agent/artifacts?session_id="+session+"&tag=for+review&question=Approve+the+spec%3F", strings.NewReader(text))
 		require.NoError(t, err)
 		req.Header.Set("X-Artifact-Name", "spec.md")
 		req.Header.Set("X-Artifact-Media-Type", "text/plain")

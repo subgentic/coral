@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 	"unicode"
@@ -125,6 +126,11 @@ func (s *Store) SetArtifactTags(ctx context.Context, boardID, hex string, tags [
 	defer tx.Rollback()
 	if _, err := tx.ExecContext(ctx, `DELETE FROM artifact_tags WHERE board_id = ? AND hex = ?`, boardID, hex); err != nil {
 		return err
+	}
+	if !slices.Contains(tags, tagForReview) { // the tag is gone: the question it came with goes too (#11555)
+		if _, err := tx.ExecContext(ctx, `DELETE FROM artifact_questions WHERE board_id = ? AND hex = ?`, boardID, hex); err != nil {
+			return err
+		}
 	}
 	for _, tag := range tags {
 		if _, err := tx.ExecContext(ctx, `INSERT INTO artifact_tags (board_id, hex, tag) VALUES (?, ?, ?)`, boardID, hex, tag); err != nil {

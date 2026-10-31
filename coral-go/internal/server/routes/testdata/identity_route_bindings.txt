@@ -186,7 +186,7 @@ POST /api/board/{project}/tasks | board-claims +token-session
 POST /api/board/{project}/tasks/claim | board-claims
 POST /api/board/{project}/tasks/current | board-claims
 POST /api/board/{project}/tasks/{taskID}/approve | board-claims +token-session
-POST /api/board/{project}/tasks/{taskID}/attach | board-claims
+POST /api/board/{project}/tasks/{taskID}/attach | board-claims +token-session
 POST /api/board/{project}/tasks/{taskID}/cancel | board-claims +token-session
 POST /api/board/{project}/tasks/{taskID}/complete | board-claims +token-session
 POST /api/board/{project}/tasks/{taskID}/mark-landed | board-claims

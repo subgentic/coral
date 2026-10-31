@@ -213,6 +213,22 @@ func (h *SessionsHandler) uploadAgentArtifact(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	// A file for review says what the Operator is to decide (#11555): one cleaned line, cut at 140, refused when there is none; a link that signs someone in is refused as in a name.
+	var reviewQuestion string
+	if hasTag(board.CleanArtifactTags(r.URL.Query()["tag"]), tagForReview) {
+		raw := r.URL.Query().Get("question")
+		if hasSignInLink(raw) {
+			writeError(w, http.StatusBadRequest, "sign_in_link", signInLinkRefusal)
+			return
+		}
+		q, ok := board.CleanReviewQuestion(raw)
+		if !ok {
+			writeError(w, http.StatusBadRequest, "question_required", questionRequiredText)
+			return
+		}
+		reviewQuestion = q
+	}
+
 	// A new version of an artifact (#6357): worked out under the series lock, which is held until the object, its record and the index are written (the series lock first, the digest's after).
 	var plan *seriesPlan
 	var stamp *seriesStamp
@@ -249,6 +265,13 @@ func (h *SessionsHandler) uploadAgentArtifact(w http.ResponseWriter, r *http.Req
 			var terr error
 			if tags, terr = h.bs.AddArtifactTags(r.Context(), teamBoard, hexID, asked); terr != nil {
 				slog.Warn("[artifacts] the tags of an upload were not recorded", "digest", hexID, "error", terr)
+			}
+		}
+	}
+	if reviewQuestion != "" && h.bs != nil && hasTag(tags, tagForReview) { // kept with the upload's own session: no other agent's tag or question changes it, and a person's edit of the tags does not drop it
+		if teamBoard, _, _ := uploaderOf(sid); teamBoard != "" {
+			if _, qerr := h.bs.SetArtifactQuestion(r.Context(), teamBoard, hexID, reviewQuestion, sid, time.Now()); qerr != nil {
+				slog.Warn("[artifacts] the question of an upload for review was not recorded", "digest", hexID, "error", qerr)
 			}
 		}
 	}
@@ -479,3 +502,6 @@ const tagForReview = "for review"
 func notViewableForReview(name, mediaType string) string {
 	return fmt.Sprintf("%q (%s) cannot be tagged \"for review\": Needs you can only show Markdown, HTML, an image, a PDF, a table (CSV or TSV) or other text inline. Upload it without --tag \"for review\" and link it on the board; tag a Markdown or HTML summary for review if the Operator must read something.", name, mediaType)
 }
+
+// questionRequiredText is the refusal of the "for review" tag on an upload with no question.
+const questionRequiredText = "a file tagged \"for review\" needs --question \"<what the Operator is to decide, one line, at most 140 characters>\" (for example --question \"Approve this phone layout for the Goals list?\"): the review row shows it above the file. Test screenshots and logs are not for review: upload them without the tag and link them in your post."

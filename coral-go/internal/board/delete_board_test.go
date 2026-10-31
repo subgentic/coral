@@ -18,8 +18,9 @@ var boardOwnedRows = []struct{ table, col string }{
 	{"board_proposals", "board_id"}, {"board_goals", "board_id"}, {"board_goal_meta", "board_id"}, {"board_goal_events", "board_id"}, {"board_settings_log", "board_id"}, // the goals tables were missing from this census until #7355
 	{"board_goal_requests_in", "board_id"}, {"board_goal_requests_out", "board_id"}, // #7361: a goal request goes with either of its two boards
 	{"board_asks", "project"}, {"board_replies", "project"}, {"board_ask_closed", "project"}, {"board_orch_grant", "project"}, {"board_clashes", "project"}, {"board_lifecycle_log", "project"}, // #7794: a question and the link of a reply go with their board
-	{"artifact_tags", "board_id"},    // #8583: a team's tags of its artifacts
-	{"artifact_reviews", "board_id"}, // #136584: when the Operator decided a review of a team's artifact
+	{"artifact_tags", "board_id"},      // #8583: a team's tags of its artifacts
+	{"artifact_reviews", "board_id"},   // #136584: when the Operator decided a review of a team's artifact
+	{"artifact_questions", "board_id"}, // #11555: what an upload for review asks the Operator
 }
 
 // Audit trails: what the Hub's operators did and what the health rules did are a record of what happened, not part of the board, so they stay.
@@ -102,6 +103,8 @@ func fillBoard(t *testing.T, s *Store, project string) (taskIDs []int64) {
 	require.NoError(t, s.SetTaskGoal(ctx, project, first.ID, &goal.ID))
 	require.NoError(t, s.SetArtifactTags(ctx, project, strings.Repeat("a", 64), []string{"for review"}))  // a tag the team put on an artifact
 	_, _, err = s.DecideArtifactReview(ctx, project, strings.Repeat("a", 64), ReviewApproved, time.Now()) // and the Operator's decision on it (#136584)
+	require.NoError(t, err)
+	_, err = s.SetArtifactQuestion(ctx, project, strings.Repeat("a", 64), "Approve it?", "sess-1", time.Now()) // and what its upload asked (#11555)
 	require.NoError(t, err)
 	return []int64{first.ID, second.ID}
 }

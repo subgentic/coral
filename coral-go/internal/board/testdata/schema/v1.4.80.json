@@ -253,6 +253,12 @@
       "type": "index"
     },
     {
+      "name": "sqlite_autoindex_artifact_questions_1",
+      "sql": null,
+      "tbl_name": "artifact_questions",
+      "type": "index"
+    },
+    {
       "name": "sqlite_autoindex_artifact_reviews_1",
       "sql": null,
       "tbl_name": "artifact_reviews",
@@ -388,6 +394,12 @@
       "name": "artifact_private",
       "sql": "CREATE TABLE artifact_private (\n\t\t\tartifact_id TEXT PRIMARY KEY,\n\t\t\tset_by      TEXT NOT NULL DEFAULT '',\n\t\t\tset_at      TEXT NOT NULL DEFAULT ''\n\t\t)",
       "tbl_name": "artifact_private",
+      "type": "table"
+    },
+    {
+      "name": "artifact_questions",
+      "sql": "CREATE TABLE artifact_questions (\n\t\tboard_id   TEXT NOT NULL,\n\t\thex        TEXT NOT NULL,\n\t\tquestion   TEXT NOT NULL,\n\t\tsession_id TEXT NOT NULL,\n\t\tasked_at   TEXT NOT NULL,\n\t\tPRIMARY KEY (board_id, hex)\n\t)",
+      "tbl_name": "artifact_questions",
       "type": "table"
     },
     {
@@ -845,6 +857,90 @@
             }
           ],
           "name": "sqlite_autoindex_artifact_private_1",
+          "origin": "pk",
+          "partial": 0,
+          "seq": 0,
+          "unique": 1
+        }
+      ]
+    },
+    "artifact_questions": {
+      "columns": [
+        {
+          "cid": 0,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "board_id",
+          "notnull": 1,
+          "pk": 1,
+          "type": "TEXT"
+        },
+        {
+          "cid": 1,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "hex",
+          "notnull": 1,
+          "pk": 2,
+          "type": "TEXT"
+        },
+        {
+          "cid": 2,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "question",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 3,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "session_id",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 4,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "asked_at",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            {
+              "cid": 0,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "board_id",
+              "seqno": 0
+            },
+            {
+              "cid": 1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "hex",
+              "seqno": 1
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 2
+            }
+          ],
+          "name": "sqlite_autoindex_artifact_questions_1",
           "origin": "pk",
           "partial": 0,
           "seq": 0,

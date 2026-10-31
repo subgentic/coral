@@ -62,8 +62,10 @@ type ReviewChange struct {
 	Changed   bool // false: the object was already in this state, nothing was written
 	prevTags  []string
 	prevState *ArtifactReview
-	board     string
-	hex       string
+	// prevQuestion is the upload's question a decision cleared (#11555), put back by UndoArtifactReview.
+	prevQuestion *ArtifactQuestionRow
+	board        string
+	hex          string
 }
 
 // DecideArtifactReview records the Operator's decision for the object on the board, in one transaction. approve takes "for review", "read" and "changes requested" off and puts "approved" on, which is what takes the
@@ -84,6 +86,12 @@ func (s *Store) DecideArtifactReview(ctx context.Context, boardID, hex, state st
 	set := map[string]bool{}
 	for _, t := range have {
 		set[t] = true
+	}
+	var q ArtifactQuestionRow
+	if qerr := tx.GetContext(ctx, &q, `SELECT question, session_id, asked_at FROM artifact_questions WHERE board_id = ? AND hex = ?`, boardID, hex); qerr == nil {
+		ch.prevQuestion = &q
+	} else if !errors.Is(qerr, sql.ErrNoRows) {
+		return ch, nil, qerr
 	}
 	var cur ArtifactReview
 	err = tx.GetContext(ctx, &cur, `SELECT state, at FROM artifact_reviews WHERE board_id = ? AND hex = ?`, boardID, hex)
@@ -136,6 +144,9 @@ func (s *Store) DecideArtifactReview(ctx context.Context, boardID, hex, state st
 			return ch, nil, err
 		}
 	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM artifact_questions WHERE board_id = ? AND hex = ?`, boardID, hex); err != nil { // the review is decided: what it asked is answered (#11555)
+		return ch, nil, err
+	}
 	if _, err := tx.ExecContext(ctx, `INSERT INTO artifact_reviews (board_id, hex, state, at) VALUES (?, ?, ?, ?)
 		ON CONFLICT(board_id, hex) DO UPDATE SET state = excluded.state, at = excluded.at`, boardID, hex, state, now.UTC().Format(time.RFC3339)); err != nil {
 		return ch, nil, err
@@ -162,6 +173,13 @@ func (s *Store) UndoArtifactReview(ctx context.Context, ch ReviewChange) error {
 	}
 	for _, t := range ch.prevTags {
 		if _, err := tx.ExecContext(ctx, `INSERT INTO artifact_tags (board_id, hex, tag) VALUES (?, ?, ?)`, ch.board, ch.hex, t); err != nil {
+			return err
+		}
+	}
+	if ch.prevQuestion != nil {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO artifact_questions (board_id, hex, question, session_id, asked_at) VALUES (?, ?, ?, ?, ?)
+			ON CONFLICT(board_id, hex) DO UPDATE SET question = excluded.question, session_id = excluded.session_id, asked_at = excluded.asked_at`,
+			ch.board, ch.hex, ch.prevQuestion.Question, ch.prevQuestion.Session, ch.prevQuestion.At); err != nil {
 			return err
 		}
 	}
@@ -203,6 +221,9 @@ func (s *Store) SupersedeArtifactReview(ctx context.Context, boardID, hex string
 		if _, err := tx.ExecContext(ctx, `DELETE FROM artifact_tags WHERE board_id = ? AND hex = ? AND tag = ?`, boardID, hex, t); err != nil {
 			return false, err
 		}
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM artifact_questions WHERE board_id = ? AND hex = ?`, boardID, hex); err != nil { // no longer something to review: nothing is asked (#11555)
+		return false, err
 	}
 	if _, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO artifact_tags (board_id, hex, tag) VALUES (?, ?, ?)`, boardID, hex, ReviewSuperseded); err != nil {
 		return false, err

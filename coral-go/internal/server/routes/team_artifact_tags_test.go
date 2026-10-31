@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -166,20 +167,24 @@ func TestManifestTagsAreAppliedToTheLinkedObjects(t *testing.T) {
 	e := newTagEnv(t)
 	ctx := context.Background()
 	id := e.ids["report.md"]
+	e.uploadedBy(t, "sess-dev", id)
 	arts := []board.TaskArtifact{
-		{Name: "report.md", URI: "coral://artifacts/" + id, Tags: []string{"For Review", "no way!", "internal"}},
+		{Name: "report.md", URI: "coral://artifacts/" + id, Tags: []string{"For Review", "no way!", "internal"}, Question: "Approve the Q4 report?"},
 		{Name: "inline.md", Content: "x", Tags: []string{"internal"}}, // nothing to tag: not a stored object
 		{Name: "unverified", URI: "coral://artifacts/" + e.ids["scratch.log"], Provenance: provenanceUnverified, Tags: []string{"final"}},
 	}
-	e.h.applyManifestTags(ctx, "tag-team", arts)
+	e.h.applyManifestTags(ctx, "tag-team", "sess-dev", false, arts)
 	for _, a := range arts {
 		assert.Nil(t, a.Tags, "the row keeps no tags: %s", a.Name)
 	}
 	tags, err := e.h.bs.ArtifactTags(ctx, "tag-team")
 	require.NoError(t, err)
 	assert.Equal(t, map[string][]string{id: {"for review", "internal"}}, tags, "a word that is not a tag left out; an unverified link and inline content are not tagged")
+	qs, err := e.h.bs.ArtifactQuestions(ctx, "tag-team")
+	require.NoError(t, err)
+	assert.Equal(t, "Approve the Q4 report?", qs[id].Question, "the question is kept apart from the row and the tags (#11555)")
 
-	e.h.applyManifestTags(ctx, "tag-team", []board.TaskArtifact{{Name: "report.md", URI: "coral://artifacts/" + id, Tags: []string{"final", "a", "b", "c"}}})
+	e.h.applyManifestTags(ctx, "tag-team", "sess-dev", false, []board.TaskArtifact{{Name: "report.md", URI: "coral://artifacts/" + id, Tags: []string{"final", "a", "b", "c"}}})
 	tags, _ = e.h.bs.ArtifactTags(ctx, "tag-team")
 	assert.Len(t, tags[id], board.MaxArtifactTags, "added to what the object has, at most five in all")
 	assert.Contains(t, tags[id], "for review")
@@ -203,13 +208,29 @@ func TestAnUploadCarriesItsTags(t *testing.T) {
 		_ = json.NewDecoder(resp.Body).Decode(&out)
 		return resp.StatusCode, out
 	}
-	code, out := up("&tag=For+Review&tag=internal&tag=no+way%21&tag=For+Review", "tagged bytes")
+	code, out := up("&tag=For+Review&tag=internal&tag=no+way%21&tag=For+Review&question=Approve+the+report%3F", "tagged bytes")
 	require.Equal(t, http.StatusCreated, code, out)
 	assert.Equal(t, []any{"for review", "internal"}, out["tags"], "normalised, once each, a word that is not a tag left out")
 	id := strings.TrimPrefix(out["uri"].(string), "coral://artifacts/")
 	tags, err := l.h.bs.ArtifactTags(context.Background(), "alpha")
 	require.NoError(t, err)
 	assert.Equal(t, []string{"for review", "internal"}, tags[id])
+	qs, err := l.h.bs.ArtifactQuestions(context.Background(), "alpha")
+	require.NoError(t, err)
+	assert.Equal(t, "Approve the report?", qs[id].Question, "the upload's question is kept")
+	// For review with no question is refused before anything is stored; another tag needs none.
+	code, out = up("&tag=for+review", "other bytes")
+	require.Equal(t, http.StatusBadRequest, code, out)
+	assert.Equal(t, "question_required", out["code"])
+	code, out = up("&tag=for+review&question=%E2%80%8B", "other bytes")
+	require.Equal(t, http.StatusBadRequest, code, "a question that is empty once cleaned is no question: %v", out)
+	code, out = up("&tag=for+review&question="+strings.Repeat("x", 300), "long bytes")
+	require.Equal(t, http.StatusCreated, code, out)
+	lid := strings.TrimPrefix(out["uri"].(string), "coral://artifacts/")
+	qs, _ = l.h.bs.ArtifactQuestions(context.Background(), "alpha")
+	assert.Len(t, []rune(qs[lid].Question), board.MaxReviewQuestionRunes, "cut at 140 on the server")
+	code, out = up("&tag=internal", "plain bytes")
+	require.Equal(t, http.StatusCreated, code, out)
 
 	code, out = up("", "untagged bytes")
 	require.Equal(t, http.StatusCreated, code, out)
@@ -257,4 +278,56 @@ func TestTagsAndGoalTitlesAreRedactedForAHubViewer(t *testing.T) {
 	assert.NotContains(t, it.GoalTitle, secret, "the goal's title")
 	assert.NotContains(t, strings.Join(it.Tags, " "), secret, "a tag")
 	assert.Equal(t, "internal", it.Tags[0], "an ordinary tag is left as it is")
+}
+
+// A task result that asks for review without a question gets no review tag (#11555): the Operator would not know what is asked. Its other tags still apply.
+func TestManifestForReviewNeedsAQuestion(t *testing.T) {
+	e := newTagEnv(t)
+	ctx := context.Background()
+	id := e.ids["report.md"]
+	e.uploadedBy(t, "sess-dev", id)
+	for _, q := range []string{"", "   ", string(rune(0x200b))} {
+		e.h.applyManifestTags(ctx, "tag-team", "sess-dev", false, []board.TaskArtifact{{Name: "report.md", URI: "coral://artifacts/" + id, Tags: []string{"for review", "internal"}, Question: q}})
+		tags, err := e.h.bs.ArtifactTags(ctx, "tag-team")
+		require.NoError(t, err)
+		assert.Equal(t, []string{"internal"}, tags[id], "no question (%q): no review tag, the other tag stays", q)
+	}
+	qs, _ := e.h.bs.ArtifactQuestions(ctx, "tag-team")
+	assert.Empty(t, qs)
+}
+
+// uploadedBy writes the upload record that makes session the uploader of the stored object id (the record uploadRecordOf trusts only with the object and its sidecar).
+func (e *tagEnv) uploadedBy(t *testing.T, session, id string) {
+	t.Helper()
+	dir := uploadsDir(e.coralDir, session)
+	require.NotEmpty(t, dir)
+	require.NoError(t, os.MkdirAll(dir, 0o755))
+	rec, _ := json.Marshal(agentUploadRecord{agentArtifactMeta: agentArtifactMeta{Name: "m", MediaType: "text/markdown", Size: 999999, Digest: "sha256:" + id}, CreatedAt: "2026-10-31T00:00:00Z", Board: "tag-team"})
+	require.NoError(t, os.WriteFile(filepath.Join(dir, id+".json"), rec, 0o644))
+}
+
+// An agent cannot tag for review, with a question of its own, a file another agent uploaded (#11555, Security's SHOULD A); a person can; and the uploader's own file keeps the tag and the question.
+func TestManifestForReviewKeepsOnlyTheAskersOwnUpload(t *testing.T) {
+	e := newTagEnv(t)
+	ctx := context.Background()
+	id := e.ids["report.md"]
+	e.uploadedBy(t, "sess-owner", id)
+	arts := func() []board.TaskArtifact {
+		return []board.TaskArtifact{{Name: "report.md", URI: "coral://artifacts/" + id, Tags: []string{"for review", "internal"}, Question: "Approve the report?"}}
+	}
+	e.h.applyManifestTags(ctx, "tag-team", "sess-other", false, arts())
+	tags, _ := e.h.bs.ArtifactTags(ctx, "tag-team")
+	assert.Equal(t, []string{"internal"}, tags[id], "another agent's upload: no review tag from a task result")
+	qs, _ := e.h.bs.ArtifactQuestions(ctx, "tag-team")
+	assert.Empty(t, qs, "and no question")
+	e.h.applyManifestTags(ctx, "tag-team", "sess-owner", false, arts())
+	tags, _ = e.h.bs.ArtifactTags(ctx, "tag-team")
+	assert.Contains(t, tags[id], "for review", "the uploader's own file keeps it")
+	qs, _ = e.h.bs.ArtifactQuestions(ctx, "tag-team")
+	assert.Equal(t, "Approve the report?", qs[id].Question)
+
+	other := e.ids["scratch.log"]
+	e.h.applyManifestTags(ctx, "tag-team", "operator", true, []board.TaskArtifact{{Name: "scratch.log", URI: "coral://artifacts/" + other, Tags: []string{"for review"}, Question: "Look at this?"}})
+	tags, _ = e.h.bs.ArtifactTags(ctx, "tag-team")
+	assert.Contains(t, tags[other], "for review", "a person's result may tag any stored file")
 }
