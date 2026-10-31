@@ -58,7 +58,9 @@ func (h *checkHarness) check() string {
 	n := len(h.sent["Orchestrator"])
 	h.mu.Unlock()
 	h.m.mu.Lock()
-	delete(h.m.lastCheck, "team") // the interval is not what is tested
+	delete(h.m.lastCheck, "team") // the interval is not what is tested: nor is whether anything changed, so the look and what it found are forgotten too (#11431)
+	delete(h.m.lastEval, "team")
+	delete(h.m.lastPrint, "team")
 	h.m.mu.Unlock()
 	h.m.scan(context.Background())
 	h.mu.Lock()
@@ -74,12 +76,12 @@ func TestRosterClassifiesEveryAgent(t *testing.T) {
 	h := newCheckHarness(t)
 	ctx := context.Background()
 	h.member("Orchestrator", "Orchestrator", 1, 0)
-	h.member("Worker", "Developer", 2, 0)             // in a turn: working
-	h.member("Waiter", "Developer", 3, 0)             // in a wait: waiting
-	h.member("Idler", "Developer", 4, 40*time.Minute) // awake, no turn, no wait: idle
-	h.member("Prompted", "Developer", 5, 0)           // at a prompt
-	h.sig[fmt.Sprintf("%08d-0000-0000-0000-000000000000", 5)] = agentSignal{NeedsInput: true, Since: h.now}
-	h.member("Blind", "Developer", 6, 0) // no hook events: unknown
+	h.member("Worker", "Developer", 2, 0)                                                                                          // in a turn: working
+	h.member("Waiter", "Developer", 3, 0)                                                                                          // in a wait: waiting
+	h.member("Idler", "Developer", 4, 40*time.Minute)                                                                              // awake, no turn, no wait: idle
+	h.member("Prompted", "Developer", 5, 0)                                                                                        // at a prompt
+	h.sig[fmt.Sprintf("%08d-0000-0000-0000-000000000000", 5)] = agentSignal{NeedsInput: true, Since: h.now.Add(-12 * time.Minute)} // a dialog is named once it has been open the team's N minutes (10 by default, #11431)
+	h.member("Blind", "Developer", 6, 0)                                                                                           // no hook events: unknown
 	delete(h.sig, fmt.Sprintf("%08d-0000-0000-0000-000000000000", 6))
 	h.member("Sleeper", "Developer", 7, 0) // asleep
 	h.sleeping(7)

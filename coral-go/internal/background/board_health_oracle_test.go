@@ -331,7 +331,7 @@ func runCheckOracle(t *testing.T, seed int64) {
 			if i == 0 {
 				results[i].text, results[i].count, results[i].err = m.composeCheckBefore4599(ctx, "team", "Orchestrator", rcpt, bySession)
 			} else {
-				results[i].text, results[i].count, results[i].err = m.composeCheck(ctx, "team", "Orchestrator", rcpt, bySession)
+				results[i].text, results[i].count, _, results[i].err = m.composeCheck(ctx, "team", "Orchestrator", rcpt, bySession)
 			}
 			require.NoError(t, s.Close())
 		}
@@ -458,13 +458,7 @@ func (m *BoardHealthMonitor) composeCheckBefore4599(ctx context.Context, project
 			continue
 		}
 		if sig.NeedsInput && !sig.InTurn {
-			problem := "needs input, stopped at a prompt"
-			if !sig.Since.IsZero() {
-				problem = fmt.Sprintf("needs input, stopped at a prompt for %s", teamhealth.Age(now.Sub(sig.Since)))
-			}
-			items = append(items, teamhealth.Item{Rank: 1, Agent: teamhealth.Name(sub.SubscriberID), Problem: problem,
-				Suggest: "read its terminal to see what it asks, then tell the Operator", Key: "input|" + sub.SubscriberID, State: sig.Since.UTC().Format(time.RFC3339)})
-			continue
+			continue // the second change made to this copy (#11431, with dialogItems): an agent at a dialog is named first, below, once it has been there the team's N minutes, whether or not it has work
 		}
 		if sig.InTurn || sig.NeedsInput || sig.Since.IsZero() || now.Sub(sig.Since) < m.idleAfter {
 			continue
@@ -473,6 +467,20 @@ func (m *BoardHealthMonitor) composeCheckBefore4599(ctx context.Context, project
 		items = append(items, teamhealth.Item{Rank: 2, Agent: teamhealth.Name(sub.SubscriberID),
 			Problem: fmt.Sprintf("idle %s with nothing in progress or assigned", teamhealth.Age(now.Sub(sig.Since))),
 			Suggest: "assign it the next task", Key: "idle|" + sub.SubscriberID, State: sig.Since.UTC().Format(time.RFC3339)})
+	}
+	afterDialog := time.Duration(m.store.GetHealthSettings(ctx, project).HeldNotice.AfterMin) * time.Minute
+	for _, sub := range subs {
+		a, live := bySession[sub.SessionName]
+		if !live || board.SameIdentity(sub.SubscriberID, orch) {
+			continue
+		}
+		sig, known := m.signal(ctx, a.SessionID)
+		if !known || !sig.NeedsInput || sig.InTurn || sig.Since.IsZero() || now.Sub(sig.Since) < afterDialog {
+			continue
+		}
+		items = append(items, teamhealth.Item{Rank: 0, Agent: teamhealth.Name(sub.SubscriberID),
+			Problem: fmt.Sprintf("needs input, stopped at a dialog or prompt for %s", teamhealth.Age(now.Sub(sig.Since))),
+			Suggest: "read its terminal to see what it asks, then tell the Operator", Key: "input|" + sub.SubscriberID, State: sig.Since.UTC().Format(time.RFC3339)})
 	}
 
 	// 3. A reviewer with three or more reviews waiting while another reviewer is idle.

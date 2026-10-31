@@ -14,9 +14,10 @@ import (
 // server (rule 7), and the recipient must be a member of this board (rule 18).
 type HealthSettings struct {
 	On               bool               `json:"on"`
-	IntervalMin      int                `json:"interval_min"` // the check's cadence
-	Recipient        string             `json:"recipient"`    // "" = the team's orchestrator
-	AllClear         bool               `json:"all_clear"`    // send the one-line check when nothing needs the orchestrator
+	IntervalMin      int                `json:"interval_min"`  // the check's cadence
+	Recipient        string             `json:"recipient"`     // "" = the team's orchestrator
+	AllClear         bool               `json:"all_clear"`     // send the one-line check when nothing needs the orchestrator
+	HeartbeatMin     int                `json:"heartbeat_min"` // 0 (the default): a check goes out only when something changed, never to say "no change"; else it also goes out at least this often (#11431)
 	DefaultReviewers []string           `json:"default_reviewers"`
 	AutoDelegate     HealthRuleOn       `json:"auto_delegate"`
 	ClaimNudge       HealthClaimNudge   `json:"claim_nudge"`
@@ -197,7 +198,7 @@ type HealthMentionNudge struct {
 // uses tokens each time and a user may not know what it does); the rules and numbers below are what it uses once it is on.
 func DefaultHealthSettings() HealthSettings {
 	return HealthSettings{
-		On: false, IntervalMin: 10, AllClear: true,
+		On: false, IntervalMin: 10, AllClear: true, HeartbeatMin: 0,
 		AutoDelegate:   HealthRuleOn{On: true},
 		ClaimNudge:     HealthClaimNudge{On: true, AfterMin: 10, Nudges: 2},
 		StatusNudge:    HealthStatusNudge{On: true, AfterMin: 20, EscalateAfterMin: 10},
@@ -219,6 +220,9 @@ func DefaultHealthSettings() HealthSettings {
 // minutes (the landing wait 15 to 10080, the goals-ready and unowned-tasks waits 5 to 10080), nudge counts 1 to 5, at most 8 default reviewers.
 func (h HealthSettings) Clamp() HealthSettings {
 	h.IntervalMin = min(max(h.IntervalMin, 5), 1440)
+	if h.HeartbeatMin != 0 { // 0 is "never" (a body that does not carry the setting means it too); a value that is set is 5 to 1440 minutes
+		h.HeartbeatMin = min(max(h.HeartbeatMin, 5), 1440)
+	}
 	h.ClaimNudge.AfterMin = min(max(h.ClaimNudge.AfterMin, 5), 1440)
 	h.ClaimNudge.Nudges = min(max(h.ClaimNudge.Nudges, 1), 5)
 	h.StatusNudge.AfterMin = min(max(h.StatusNudge.AfterMin, 5), 1440)

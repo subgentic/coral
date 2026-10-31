@@ -85,7 +85,7 @@ func (h *BoardHandler) PostMessage(w http.ResponseWriter, r *http.Request) {
 			errNotFound(w, "Task not found")
 			return
 		}
-		answer = &taskReply{taskID: task.ID} // no creator: no mention is added, and the post is stored with its task_id
+		answer = &taskReply{taskID: task.ID, recipients: []string{deref(task.AssignedTo), task.CreatedBy}} // an agent's post on a task notifies its assignee and its creator, not the poster (#11431)
 	}
 	// An ask (post --ask, #7794) needs someone to ask, and a reply_to a message of this board: both are checked before anything is posted.
 	var asked []string
@@ -148,6 +148,8 @@ type postMessageBody struct {
 type taskReply struct {
 	taskID  int64
 	creator string
+	// recipients, when set, are who an agent's post on the task notifies (its assignee and its creator, never the poster) in place of creator alone (#11431).
+	recipients []string
 	// Out: the mention the reply started with ("" when the creator could not be tagged exactly) and who it notifies.
 	prefix   string
 	notified []string
@@ -199,6 +201,9 @@ func (h *BoardHandler) postMessageCore(w http.ResponseWriter, r *http.Request, p
 		}
 		// The mention of the task's creator goes first, before the text is cleaned and before a hub operator's own prefix is added, so both survive (#5463).
 		m := h.bs.TaskReplyMention(r.Context(), project, reply.creator)
+		if len(reply.recipients) > 0 {
+			m = h.bs.TaskReplyMentions(r.Context(), project, reply.recipients, body.SubscriberID)
+		}
 		reply.prefix, reply.notified = m.Prefix, m.Notified
 		body.Content = m.Prefix + body.Content
 	}

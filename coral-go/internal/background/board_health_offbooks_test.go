@@ -42,6 +42,7 @@ func (h *checkHarness) scanOut() string {
 func (h *checkHarness) settings(mod func(*board.HealthSettings)) {
 	h.t.Helper()
 	hs := h.s.GetHealthSettings(context.Background(), "team")
+	hs.HeartbeatMin = 5 // these tests step 11 minutes and expect a check each step; the quiet behaviour is board_health_quiet_test.go (#11431)
 	mod(&hs)
 	require.NoError(h.t, h.s.SetHealthSettings(context.Background(), "team", hs))
 }
