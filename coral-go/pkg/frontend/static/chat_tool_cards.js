@@ -1,4 +1,5 @@
 /* A chat's tool-call and question cards (moved out of live_chat.js, #5065; no behaviour change). */
+import { markHidden } from './visible_marks.js';
 import { escapeHtml } from './utils.js';
 
 const TOOL_ICONS = {
@@ -42,9 +43,9 @@ function renderPatchLines(patch) {
 }
 
 function toolLabel(tool) {
-    if (tool.description) return tool.description;
-    if (tool.command) return tool.command.split("\n")[0];
-    return tool.input_summary || "";
+    if (tool.description) return markHidden(tool.description);
+    if (tool.command) return markHidden(tool.command).split("\n")[0];
+    return markHidden(tool.input_summary || "");
 }
 
 export function renderToolCard(tool, adapter, index) {
@@ -55,9 +56,9 @@ export function renderToolCard(tool, adapter, index) {
     let bodyHtml = "";
 
     if (tool.command) {
-        bodyHtml += `<pre class="tool-card-command">${escapeHtml(tool.command)}</pre>`;
-    } else if (tool.input_summary && tool.input_summary !== toolLabel(tool)) {
-        bodyHtml += `<div class="tool-card-summary">${escapeHtml(tool.input_summary)}</div>`;
+        bodyHtml += `<pre class="tool-card-command">${escapeHtml(markHidden(tool.command))}</pre>`;
+    } else if (tool.input_summary && markHidden(tool.input_summary) !== toolLabel(tool)) {
+        bodyHtml += `<div class="tool-card-summary">${escapeHtml(markHidden(tool.input_summary))}</div>`;
     }
     if (tool.patch) {
         bodyHtml += `<div class="diff-content">${renderPatchLines(tool.patch)}</div>`;
@@ -85,7 +86,7 @@ export function renderToolCard(tool, adapter, index) {
 export function renderQuestionCard(tool) {
     let bodyHtml = "";
     if (tool.description) {
-        bodyHtml += `<div class="tool-card-description">${escapeHtml(tool.description)}</div>`;
+        bodyHtml += `<div class="tool-card-description">${escapeHtml(markHidden(tool.description))}</div>`;
     }
     if (tool.questions) {
         for (const q of tool.questions) {
