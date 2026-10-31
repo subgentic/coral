@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/subgentic/coral/internal/config"
+	"github.com/subgentic/coral/internal/consoletest"
 )
 
 // #235: with nothing set, the commands look for Coral on the port the server itself listens on by default (8450 on Windows, where
@@ -56,6 +57,8 @@ func TestTheCommandsFindTheRunningServerOfTheirDataFolder(t *testing.T) {
 	}))
 	t.Cleanup(coral.Close)
 	live := strconv.Itoa(os.Getpid())
+	// A process that has ended and been waited for. Not a made-up number: on a Windows runner a fixed pid such as 4242 can be a running process, and the record would then be taken (#11543).
+	dead := deadPID(t)
 
 	fs, base, home := parse()
 	assert.Equal(t, def, runningServerURL(fs, *base, *home), "nothing recorded: the default")
@@ -65,7 +68,7 @@ func TestTheCommandsFindTheRunningServerOfTheirDataFolder(t *testing.T) {
 
 	record(dir, live+"\n"+coral.URL+"\n")
 	assert.Equal(t, coral.URL, runningServerURL(fs, *base, *home), "the recorded address, verified")
-	record(dir, "4242\n"+coral.URL+"\n")
+	record(dir, strconv.Itoa(dead)+"\n"+coral.URL+"\n")
 	assert.Equal(t, def, runningServerURL(fs, *base, *home), "a record whose process is not running is not taken")
 	// A live process whose recorded address does not answer is an error, not the default (the Coral is up somewhere the record does not lead to).
 	record(dir, live+"\n"+closedLoopbackURL(t)+"\n")
@@ -88,9 +91,17 @@ func TestTheCommandsFindTheRunningServerOfTheirDataFolder(t *testing.T) {
 
 	for _, bad := range []string{"http://example.com:8476", "http://10.0.0.5:8476", "http://user:pw@localhost:8476",
 		"http://localhost:8476/x", "http://localhost", "file:///c:/x", "ftp://localhost:21"} {
-		record(dir, "4242\n"+bad+"\n")
+		record(dir, strconv.Itoa(dead)+"\n"+bad+"\n")
 		assert.Equal(t, def, runningServerURL(fs, *base, *home), "%s is not taken", bad)
 	}
+}
+
+// deadPID is the pid of a process that has ended and been waited for.
+func deadPID(t *testing.T) int {
+	t.Helper()
+	cmd := consoletest.HiddenCommand(os.Args[0], "-test.run=^$")
+	require.NoError(t, cmd.Run())
+	return cmd.Process.Pid
 }
 
 // closedLoopbackURL is a loopback address nothing listens on.
