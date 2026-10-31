@@ -26,7 +26,7 @@ function hub({ keys = [], failConnect = false, kind = 'setup' } = {}) {
         }
         if (url === '/api/servers/provision/p1/connect') {
             if (failConnect) return json({ plan: 'p1', kind: planKind, phase: 'failed', error: 'Could not connect.', steps: steps({ connect: 'failed' }) });
-            return json({ plan: 'p1', target: 'rich@box.example.com:22', server_id: 'ssh-box', label: 'Build box', kind: planKind, phase: keys.length ? 'needs_keys' : 'connected', host_keys: keys, system: 'Linux x86_64', steps: steps() });
+            return json({ plan: 'p1', target: 'user@box.example.com:22', server_id: 'ssh-box', label: 'Build box', kind: planKind, phase: keys.length ? 'needs_keys' : 'connected', host_keys: keys, system: 'Linux x86_64', steps: steps() });
         }
         if (url === '/api/servers/provision/p1/run') {
             runBody = body;
@@ -59,10 +59,10 @@ function fresh() { const host = doc.createElement('div'); doc.body.append(host);
     const opts = [...host.querySelectorAll('#ssh-picked option')].map(o => o.value);
     assert.deepEqual(opts, ['', 'build-box', 'second'], 'the SSH config hosts are the choices');
 
-    $(host, '#ssh-host').value = 'rich@box.example.com'; $(host, '#ssh-host').dispatchEvent(new dom.window.Event('input'));
+    $(host, '#ssh-host').value = 'user@box.example.com'; $(host, '#ssh-host').dispatchEvent(new dom.window.Event('input'));
     $(host, 'form').dispatchEvent(new dom.window.Event('submit', { cancelable: true }));
     await until(() => btn(host, 'Connect'), 'the plan');
-    assert.deepEqual(calls.filter(c => c.path.includes('plan')).map(c => c.body), [{ target: 'rich@box.example.com' }]);
+    assert.deepEqual(calls.filter(c => c.path.includes('plan')).map(c => c.body), [{ target: 'user@box.example.com' }]);
     assert.ok(!calls.some(c => c.path.endsWith('/connect')), 'the plan screen connected before the press');
     assert.ok(host.textContent.includes('Nothing has connected yet'));
     assert.equal(host.querySelectorAll('.ssh-step').length, 5, 'the steps are listed');
@@ -114,7 +114,7 @@ function fresh() { const host = doc.createElement('div'); doc.body.append(host);
     const host = fresh();
     mountSshSetup(host, { mode: 'setup', pollMs: 5 });
     await until(() => $(host, '#ssh-host'), 'the form');
-    $(host, '#ssh-host').value = 'rich@box.example.com'; $(host, '#ssh-host').dispatchEvent(new dom.window.Event('input'));
+    $(host, '#ssh-host').value = 'user@box.example.com'; $(host, '#ssh-host').dispatchEvent(new dom.window.Event('input'));
     $(host, 'form').dispatchEvent(new dom.window.Event('submit', { cancelable: true }));
     await until(() => btn(host, 'Connect'), 'the plan');
     btn(host, 'Connect').click();

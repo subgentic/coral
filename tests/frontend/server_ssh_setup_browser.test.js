@@ -10,7 +10,7 @@ const BASE = require('./test_base').BASE;
 const HUB = `(() => {
   const DIGEST = 'b'.repeat(64);
   const steps = (s = {}) => ['connect', 'detect', 'install', 'start', 'register'].map(n => ({ name: n, title: 'Step ' + n + ' of the setup', state: s[n] || 'pending', detail: s[n] === 'ok' ? 'Done well.' : '' }));
-  const row = { id: 'ssh-box', label: 'Build box', url: 'ssh://rich@box.example.com:22', status: 'online', transport: 'ssh', ssh_target: 'rich@box.example.com:22', allow_private: false, created_at: '2026-10-30T10:00:00Z', last_seen: null, last_error: null };
+  const row = { id: 'ssh-box', label: 'Build box', url: 'ssh://user@box.example.com:22', status: 'online', transport: 'ssh', ssh_target: 'user@box.example.com:22', allow_private: false, created_at: '2026-10-30T10:00:00Z', last_seen: null, last_error: null };
   const world = { servers: [row], runBody: null, runs: 0, plans: [], polls: 0 };
   window.__hub = world;
   const real = window.fetch.bind(window);
@@ -21,8 +21,8 @@ const HUB = `(() => {
     if (!u.startsWith('/api/servers/provision')) return real(url, init);
     if (u.endsWith('/options')) return json({ hosts: ['build-box', 'second'], terms: { version: '2026-03-26', sha256: DIGEST, text: 'TERMS OF SERVICE <b>not bold</b>\\n' + 'A long line of terms that has to wrap inside the box and never push the page wider than the screen. '.repeat(40) }, acceptance_label: 'hub-owner@my-mac' });
     if (u.endsWith('/plan')) { world.plans.push(body); const kind = body.action || 'setup';
-      return json({ plan: 'p1', target: body.target || 'rich@box.example.com:22', server_id: body.server_id || 'ssh-box-example-com', label: body.label || 'ssh-box-example-com', kind, phase: 'planned', steps: kind === 'setup' ? steps() : steps().slice(0, 3), delete_data: !!body.delete_data }, 201); }
-    if (u.endsWith('/connect')) return json({ plan: 'p1', target: 'rich@box.example.com:22', server_id: world.plans.at(-1).server_id || 'ssh-box-example-com', label: 'x', kind: world.plans.at(-1).action || 'setup', phase: world.plans.at(-1).action ? 'connected' : 'needs_keys', system: 'Linux x86_64',
+      return json({ plan: 'p1', target: body.target || 'user@box.example.com:22', server_id: body.server_id || 'ssh-box-example-com', label: body.label || 'ssh-box-example-com', kind, phase: 'planned', steps: kind === 'setup' ? steps() : steps().slice(0, 3), delete_data: !!body.delete_data }, 201); }
+    if (u.endsWith('/connect')) return json({ plan: 'p1', target: 'user@box.example.com:22', server_id: world.plans.at(-1).server_id || 'ssh-box-example-com', label: 'x', kind: world.plans.at(-1).action || 'setup', phase: world.plans.at(-1).action ? 'connected' : 'needs_keys', system: 'Linux x86_64',
       host_keys: world.plans.at(-1).action ? [] : [{ host: 'box.example.com', type: 'ssh-ed25519', fingerprint: 'SHA256:' + 'Zq9'.repeat(14) + '<img src=x onerror=window.__pwned=1>' }], steps: steps() });
     if (u.endsWith('/run')) { world.runBody = body; world.runs++; world.polls = 0; return json({ plan: 'p1', kind: world.plans.at(-1).action || 'setup', phase: 'running', steps: steps({ connect: 'ok' }) }, 202); }
     if (method === 'DELETE') return json({ status: 'cancelled' });
@@ -62,7 +62,7 @@ const HUB = `(() => {
             check(`${label}: the SSH config hosts are the choices`, JSON.stringify(await ev(`[...document.querySelectorAll('#ssh-picked option')].map(o => o.value)`)) === JSON.stringify(['', 'build-box', 'second']));
             check(`${label}: the form fits the page`, await ev(noOverflow));
             await shot(`ssh-target-${label}`);
-            await ev(`(() => { const i = document.getElementById('ssh-host'); i.value = 'rich@box.example.com'; i.dispatchEvent(new Event('input')); document.querySelector('.ssh-form').requestSubmit(); return true; })()`);
+            await ev(`(() => { const i = document.getElementById('ssh-host'); i.value = 'user@box.example.com'; i.dispatchEvent(new Event('input')); document.querySelector('.ssh-form').requestSubmit(); return true; })()`);
             await waitFor(`!!${btn('Connect')}`, 'the plan', 8000);
             check(`${label}: the plan lists the five steps and says nothing has connected`, await ev(`document.querySelectorAll('.ssh-step').length === 5 && document.querySelector('.ssh-setup').textContent.includes('Nothing has connected yet')`));
             check(`${label}: the plan fits the page`, await ev(noOverflow));

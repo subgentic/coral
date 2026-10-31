@@ -60,7 +60,7 @@ func TestSSHServerIsProbedThroughItsStreamAndKeepsNoURL(t *testing.T) {
 	e := newRSEnv(t)
 	port := remoteCoral(t, routeSecret)
 	ctx := context.Background()
-	_, err := e.h.store.AddSSH(ctx, "build", "Build box", "rich@box.example.com:2222", port, "inst-1", routeSecret)
+	_, err := e.h.store.AddSSH(ctx, "build", "Build box", "user@box.example.com:2222", port, "inst-1", routeSecret)
 	require.NoError(t, err)
 
 	w := e.do("POST", "/api/servers/build/test", nil)
@@ -74,7 +74,7 @@ func TestSSHServerIsProbedThroughItsStreamAndKeepsNoURL(t *testing.T) {
 		assert.Equal(t, 400, w.Code, "%v: %s", body, w.Body.String())
 	}
 	got, _ := e.h.store.Get(ctx, "build")
-	assert.Equal(t, "ssh://rich@box.example.com:2222", got.URL)
+	assert.Equal(t, "ssh://user@box.example.com:2222", got.URL)
 	assert.Equal(t, store.RemoteTransportSSH, got.Transport)
 
 	// a label edit works; a wrong key is refused by the health check and not saved
@@ -91,7 +91,7 @@ func TestSSHServerIsProbedThroughItsStreamAndKeepsNoURL(t *testing.T) {
 func TestResolverGivesAnSSHServerOneSharedStreamTarget(t *testing.T) {
 	e := newRSEnv(t)
 	ctx := context.Background()
-	_, err := e.h.store.AddSSH(ctx, "build", "Build box", "rich@box.example.com", 8420, "inst-1", routeSecret)
+	_, err := e.h.store.AddSSH(ctx, "build", "Build box", "user@box.example.com", 8420, "inst-1", routeSecret)
 	require.NoError(t, err)
 	r := NewRemoteResolver(e.h.store)
 	a, err := r.Resolve(ctx, "build")
@@ -109,7 +109,7 @@ func TestResolverGivesAnSSHServerOneSharedStreamTarget(t *testing.T) {
 func TestDeletingAnSSHServerDropsItsStreamTarget(t *testing.T) {
 	e := newRSEnv(t)
 	ctx := context.Background()
-	_, err := e.h.store.AddSSH(ctx, "build", "Build box", "rich@box.example.com", 8420, "inst-1", routeSecret)
+	_, err := e.h.store.AddSSH(ctx, "build", "Build box", "user@box.example.com", 8420, "inst-1", routeSecret)
 	require.NoError(t, err)
 	r := NewRemoteResolver(e.h.store)
 	e.h.SetOnDelete(r.Forget)

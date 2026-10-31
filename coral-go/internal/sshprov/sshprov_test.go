@@ -12,8 +12,8 @@ import (
 
 func TestParseTargetAccepts(t *testing.T) {
 	for in, want := range map[string]Target{
-		"rich@box.example.com":      {User: "rich", Host: "box.example.com", Port: 22},
-		"rich@box.example.com:2222": {User: "rich", Host: "box.example.com", Port: 2222},
+		"user@box.example.com":      {User: "user", Host: "box.example.com", Port: 22},
+		"user@box.example.com:2222": {User: "user", Host: "box.example.com", Port: 2222},
 		"_svc-1@10.0.0.7":           {User: "_svc-1", Host: "10.0.0.7", Port: 22},
 		"u@[2001:db8::1]:2200":      {User: "u", Host: "2001:db8::1", Port: 2200},
 		"u@[2001:db8::1]":           {User: "u", Host: "2001:db8::1", Port: 22},
@@ -27,9 +27,9 @@ func TestParseTargetAccepts(t *testing.T) {
 
 func TestParseTargetRefusesWhatSSHOrAShellCouldRead(t *testing.T) {
 	for _, in := range []string{
-		"", "host", "@host", "rich@", "rich@-oProxyCommand=x", "-oProxyCommand=x@host", "rich@host;rm", "rich@host name", "rich@host\n", "rich@$(id)", "rich@`id`",
-		"rich@host:0", "rich@host:65536", "rich@host:22x", "rich@host:", "RICH@host", "rich@ho_st", "rich@-host", "rich@host-", "rich@2001:db8::1", "rich@[fe80::1%eth0]",
-		"rich@[::1", "rich@[1.2.3.4]", "rich@host..com", "a b@host", "rich@host/path", "rich@host\x00", strings.Repeat("a", 40) + "@host", "rich@" + strings.Repeat("a", 300),
+		"", "host", "@host", "user@", "user@-oProxyCommand=x", "-oProxyCommand=x@host", "user@host;rm", "user@host name", "user@host\n", "user@$(id)", "user@`id`",
+		"user@host:0", "user@host:65536", "user@host:22x", "user@host:", "RICH@host", "user@ho_st", "user@-host", "user@host-", "user@2001:db8::1", "user@[fe80::1%eth0]",
+		"user@[::1", "user@[1.2.3.4]", "user@host..com", "a b@host", "user@host/path", "user@host\x00", strings.Repeat("a", 40) + "@host", "user@" + strings.Repeat("a", 300),
 	} {
 		if got, err := ParseTarget(in); err == nil {
 			t.Errorf("ParseTarget(%q) accepted %+v", in, got)
@@ -40,8 +40,8 @@ func TestParseTargetRefusesWhatSSHOrAShellCouldRead(t *testing.T) {
 }
 
 func TestDestinationAndArgsAreOneArgumentEach(t *testing.T) {
-	tg, _ := ParseTarget("rich@[2001:db8::1]:2200")
-	if got := tg.Destination(); got != "rich@2001:db8::1" {
+	tg, _ := ParseTarget("user@[2001:db8::1]:2200")
+	if got := tg.Destination(); got != "user@2001:db8::1" {
 		t.Errorf("Destination = %q", got)
 	}
 	if !reflect.DeepEqual(tg.Args(), []string{"-p", "2200"}) {
@@ -121,7 +121,7 @@ func fakeSSH(t *testing.T, body string) (string, string) {
 
 func TestRunBuildsOneFixedArgvAndNeverRelaxesHostKeyChecking(t *testing.T) {
 	ssh, log := fakeSSH(t, "echo Linux x86_64")
-	tg, _ := ParseTarget("rich@box.example.com:2222")
+	tg, _ := ParseTarget("user@box.example.com:2222")
 	res, err := Runner{SSH: ssh}.Run(context.Background(), tg, CmdUname)
 	if err != nil || strings.TrimSpace(res.Stdout) != "Linux x86_64" {
 		t.Fatalf("Run = %+v, %v", res, err)
@@ -138,14 +138,14 @@ func TestRunBuildsOneFixedArgvAndNeverRelaxesHostKeyChecking(t *testing.T) {
 		t.Errorf("host key checking was relaxed: %v", argv)
 	}
 	n := len(argv)
-	if argv[n-3] != "--" || argv[n-2] != "rich@box.example.com" || argv[n-1] != "sh -c 'uname -sm'" {
+	if argv[n-3] != "--" || argv[n-2] != "user@box.example.com" || argv[n-1] != "sh -c 'uname -sm'" {
 		t.Errorf("the tail of argv is not '-- destination text': %v", argv[n-3:])
 	}
 }
 
 func TestRunRefusesBeforeConnectingWhenTheCommandIsNotAllowed(t *testing.T) {
 	ssh, log := fakeSSH(t, "true")
-	tg, _ := ParseTarget("rich@box.example.com")
+	tg, _ := ParseTarget("user@box.example.com")
 	if _, err := (Runner{SSH: ssh}).Run(context.Background(), tg, CmdSha256, "x'; rm -rf ~; '"); !errors.Is(err, ErrNotAllowed) {
 		t.Fatalf("err = %v", err)
 	}
@@ -155,7 +155,7 @@ func TestRunRefusesBeforeConnectingWhenTheCommandIsNotAllowed(t *testing.T) {
 }
 
 func TestRunMapsExitCodes(t *testing.T) {
-	tg, _ := ParseTarget("rich@box.example.com")
+	tg, _ := ParseTarget("user@box.example.com")
 	hk, _ := fakeSSH(t, "echo 'Host key verification failed.' >&2; exit 255")
 	if _, err := (Runner{SSH: hk}).Run(context.Background(), tg, CmdUname); !errors.Is(err, ErrHostKey) {
 		t.Errorf("host key: %v", err)
@@ -172,7 +172,7 @@ func TestRunMapsExitCodes(t *testing.T) {
 
 func TestRunCapsWhatItKeeps(t *testing.T) {
 	ssh, _ := fakeSSH(t, "yes x | head -c 300000")
-	tg, _ := ParseTarget("rich@box.example.com")
+	tg, _ := ParseTarget("user@box.example.com")
 	res, err := Runner{SSH: ssh}.Run(context.Background(), tg, CmdUname)
 	if err != nil || len(res.Stdout) != maxOutput {
 		t.Errorf("kept %d bytes, err %v", len(res.Stdout), err)
@@ -189,7 +189,7 @@ func TestRunGivesSSHAMinimalEnvironmentAndQuotesTheText(t *testing.T) {
 	if err := os.WriteFile(p, []byte(script), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	tg, _ := ParseTarget("rich@box.example.com")
+	tg, _ := ParseTarget("user@box.example.com")
 	if _, err := (Runner{SSH: p}).Run(context.Background(), tg, CmdSha256, "a/b.tgz"); err != nil {
 		t.Fatal(err)
 	}

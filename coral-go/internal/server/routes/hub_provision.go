@@ -19,6 +19,7 @@ import (
 	"github.com/subgentic/coral/internal/config"
 	"github.com/subgentic/coral/internal/httputil"
 	"github.com/subgentic/coral/internal/license"
+	"github.com/subgentic/coral/internal/safego"
 	"github.com/subgentic/coral/internal/sshprov"
 	"github.com/subgentic/coral/internal/store"
 	terms "github.com/subgentic/coral/pkg/license"
@@ -451,10 +452,10 @@ func (pr *Provisioner) Run(w http.ResponseWriter, r *http.Request) {
 	p.mu.Lock()
 	p.cancel = cancel
 	p.mu.Unlock()
-	go func() {
+	safego.Go("provision run", func() {
 		defer cancel()
 		pr.runSteps(ctx, p)
-	}()
+	})
 	writeJSON(w, http.StatusAccepted, p.view())
 }
 

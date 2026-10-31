@@ -19,10 +19,10 @@ func TestRemoteServers_SSHTransport(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, RemoteTransportHTTP, plain.Transport, "a server added by URL is http")
 
-	srv, err := s.AddSSH(ctx, "build", "Build box", "rich@box.example.com:2222", 8420, "inst-1", plainKey)
+	srv, err := s.AddSSH(ctx, "build", "Build box", "user@box.example.com:2222", 8420, "inst-1", plainKey)
 	require.NoError(t, err)
 	assert.Equal(t, RemoteTransportSSH, srv.Transport)
-	assert.Equal(t, "rich@box.example.com:2222", srv.SSHTarget)
+	assert.Equal(t, "user@box.example.com:2222", srv.SSHTarget)
 	assert.Equal(t, 8420, srv.RemotePort)
 	assert.Equal(t, "inst-1", srv.InstanceID)
 	key, err := s.DecryptedKey(ctx, "build")
@@ -35,11 +35,11 @@ func TestRemoteServers_SSHTransport(t *testing.T) {
 	assert.NotContains(t, string(b), plainKey)
 
 	// never replaces: the same id, and the same machine under another id
-	_, err = s.AddSSH(ctx, "build", "Other", "rich@other.example.com", 8420, "inst-2", "another-key-1234")
+	_, err = s.AddSSH(ctx, "build", "Other", "user@other.example.com", 8420, "inst-2", "another-key-1234")
 	assert.ErrorIs(t, err, ErrRemoteExists)
-	_, err = s.AddSSH(ctx, "build2", "Same machine", "rich@box.example.com:2222", 8420, "inst-1", "another-key-1234")
+	_, err = s.AddSSH(ctx, "build2", "Same machine", "user@box.example.com:2222", 8420, "inst-1", "another-key-1234")
 	assert.ErrorIs(t, err, ErrRemoteInstanceExists)
-	_, err = s.AddSSH(ctx, "web", "Takes a URL server's id", "rich@x.example.com", 8420, "inst-3", "another-key-1234")
+	_, err = s.AddSSH(ctx, "web", "Takes a URL server's id", "user@x.example.com", 8420, "inst-3", "another-key-1234")
 	assert.ErrorIs(t, err, ErrRemoteExists)
 	if key, _ := s.DecryptedKey(ctx, "web"); key != plainKey {
 		t.Errorf("an existing server's key was replaced")
@@ -66,7 +66,7 @@ func TestRemoteServers_SSHTransport(t *testing.T) {
 	_, err = s.Update(ctx, "build", RemoteServerUpdate{URL: &u})
 	assert.ErrorIs(t, err, ErrRemoteTransport)
 	got, _ := s.Get(ctx, "build")
-	assert.Equal(t, "ssh://rich@box.example.com:2222", got.URL)
+	assert.Equal(t, "ssh://user@box.example.com:2222", got.URL)
 	l := "Renamed"
 	got, err = s.Update(ctx, "build", RemoteServerUpdate{Label: &l})
 	require.NoError(t, err)

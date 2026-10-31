@@ -71,7 +71,7 @@ esac
 
 func TestStartTmuxStartsCoralOnLoopbackOnlyAndOnlyOnce(t *testing.T) {
 	r, home, argsLog, tmuxLog := startSide(t)
-	tg, _ := ParseTarget("rich@box.example.com")
+	tg, _ := ParseTarget("user@box.example.com")
 	ctx := context.Background()
 	if err := r.StartTmux(ctx, tg, "2.0.10"); err != nil {
 		t.Fatal(err)
@@ -114,7 +114,7 @@ func TestStartTmuxStartsCoralOnLoopbackOnlyAndOnlyOnce(t *testing.T) {
 
 func TestEnsureInstanceIDIsMadeOnceAndIs32Hex(t *testing.T) {
 	r, home, _, _ := startSide(t)
-	tg, _ := ParseTarget("rich@box.example.com")
+	tg, _ := ParseTarget("user@box.example.com")
 	a, err := r.EnsureInstanceID(context.Background(), tg)
 	if err != nil {
 		t.Fatal(err)
@@ -143,7 +143,7 @@ func TestReadAPIKeyWaitsForACoralThatIsStartingAndNeverLogsIt(t *testing.T) {
 	oldPoll := keyPoll
 	keyPoll = 100 * time.Millisecond
 	defer func() { keyPoll = oldPoll }()
-	tg, _ := ParseTarget("rich@box.example.com")
+	tg, _ := ParseTarget("user@box.example.com")
 	ctx := context.Background()
 	if err := r.StartTmux(ctx, tg, "2.0.10"); err != nil {
 		t.Fatal(err)
@@ -159,7 +159,7 @@ func TestReadAPIKeyGivesUpAndSaysNothingOfTheKey(t *testing.T) {
 	oldPoll, oldWait := keyPoll, keyWait
 	keyPoll, keyWait = 50*time.Millisecond, 400*time.Millisecond
 	defer func() { keyPoll, keyWait = oldPoll, oldWait }()
-	tg, _ := ParseTarget("rich@box.example.com")
+	tg, _ := ParseTarget("user@box.example.com")
 	_, err := r.ReadAPIKey(context.Background(), tg, "2.0.10") // never started: no key
 	if err == nil || strings.Contains(err.Error(), testKey) {
 		t.Fatalf("err = %v", err)
@@ -182,7 +182,7 @@ func TestReadAPIKeyRefusesAnythingThatIsNotAKey(t *testing.T) {
 		if err := os.WriteFile(filepath.Join(data, "api_key"), []byte(bad+"\n"), 0o600); err != nil {
 			t.Fatal(err)
 		}
-		tg, _ := ParseTarget("rich@box.example.com")
+		tg, _ := ParseTarget("user@box.example.com")
 		if key, err := r.ReadAPIKey(context.Background(), tg, "2.0.10"); err == nil {
 			t.Errorf("accepted %q", key)
 		}
@@ -190,7 +190,7 @@ func TestReadAPIKeyRefusesAnythingThatIsNotAKey(t *testing.T) {
 }
 
 func TestStoredRoundTripsThroughTheParsers(t *testing.T) {
-	for _, in := range []string{"rich@box.example.com:22", "rich@box.example.com:2222", "u@10.0.0.7:22", "u@[2001:db8::1]:2200"} {
+	for _, in := range []string{"user@box.example.com:22", "user@box.example.com:2222", "u@10.0.0.7:22", "u@[2001:db8::1]:2200"} {
 		tg, err := ParseTarget(in)
 		if err != nil {
 			t.Fatalf("%s: %v", in, err)
@@ -210,7 +210,7 @@ func TestStoredRoundTripsThroughTheParsers(t *testing.T) {
 
 func TestAcceptTermsGoesOnStdinNeverInArgv(t *testing.T) {
 	r, _, argsLog, _ := startSide(t)
-	tg, _ := ParseTarget("rich@box.example.com")
+	tg, _ := ParseTarget("user@box.example.com")
 	payload := []byte(`{"version":"2026-03-26","sha256":"` + strings.Repeat("ab", 32) + `","by":"hub-owner@build-host"}`)
 	if err := r.AcceptTerms(context.Background(), tg, "2.0.10", payload); err != nil {
 		t.Fatal(err)
@@ -254,7 +254,7 @@ func TestStopAndConfirmReturnsOnlyOnAConfirmedStop(t *testing.T) {
 	oldW, oldP := stopWait, stopPoll
 	stopWait, stopPoll = 300*time.Millisecond, 50*time.Millisecond
 	defer func() { stopWait, stopPoll = oldW, oldP }()
-	tg, _ := ParseTarget("rich@box.example.com")
+	tg, _ := ParseTarget("user@box.example.com")
 	ctx := context.Background()
 
 	r, _, _, tmuxLog := startSide(t)

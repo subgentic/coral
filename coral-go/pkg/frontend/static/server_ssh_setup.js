@@ -182,7 +182,7 @@ export function mountSshSetup(host, { mode = 'setup', server = null, action = nu
             form.append(l, sel);
         }
         const l2 = el('label', 'ssh-label', 'Or type user@host[:port]'); l2.htmlFor = 'ssh-host';
-        const inp = el('input', 'field ssh-input'); inp.id = 'ssh-host'; inp.type = 'text'; inp.value = f.host; inp.placeholder = 'rich@build.example.com'; inp.disabled = !!f.picked;
+        const inp = el('input', 'field ssh-input'); inp.id = 'ssh-host'; inp.type = 'text'; inp.value = f.host; inp.placeholder = 'user@build.example.com'; inp.disabled = !!f.picked;
         inp.autocomplete = 'off'; inp.spellcheck = false; inp.maxLength = 300;
         inp.addEventListener('input', () => { f.host = inp.value; });
         const l3 = el('label', 'ssh-label', 'Display name (optional)'); l3.htmlFor = 'ssh-label';
