@@ -89,3 +89,42 @@ func TestAnotherPathAsksAgainAndAFolderNameIsNotAPathLookup(t *testing.T) {
 		t.Errorf("a full path goes straight to exec.LookPath: %q %v", got, err)
 	}
 }
+
+// A relative answer (a relative PATH entry under GODEBUG=execerrdot=0) is neither remembered nor started; and a name the standard library takes for a path is not a bare name.
+func TestARelativeAnswerIsNotRemembered(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	if err := os.Mkdir("tools", 0o755); err != nil {
+		t.Fatal(err)
+	}
+	name := "zzlookpath-rel"
+	tool(t, filepath.Join(dir, "tools"), name)
+	t.Setenv("PATH", "tools")
+	t.Setenv("GODEBUG", "execerrdot=0")
+	got, err := Path(name)
+	if err != nil || filepath.IsAbs(got) {
+		t.Skipf("this Go answers a relative PATH entry with %q, %v: nothing to test", got, err)
+	}
+	memo.Lock()
+	n := len(memo.m)
+	_, kept := memo.m[os.Getenv("PATH")+"\x00"+os.Getenv("PATHEXT")+"\x00"+name]
+	memo.Unlock()
+	if kept {
+		t.Errorf("a relative answer %q was remembered (%d entries)", got, n)
+	}
+}
+
+func TestIsBare(t *testing.T) {
+	for name, want := range map[string]bool{"git": true, "git.exe": true, "": false, `a\b`: false, "a/b": false, "./git": false} {
+		if got := IsBare(name); got != want {
+			t.Errorf("IsBare(%q) = %v, want %v", name, got, want)
+		}
+	}
+	if runtime.GOOS == "windows" {
+		for _, name := range []string{"C:git", "git.exe:stream"} {
+			if IsBare(name) {
+				t.Errorf("IsBare(%q) on Windows: a colon is path-like", name)
+			}
+		}
+	}
+}

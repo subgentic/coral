@@ -6,12 +6,19 @@
 //   - the answer is kept per name, PATH and PATHEXT: a changed PATH asks again;
 //   - a found program is remembered while its file still exists (one stat per call); a file that is gone asks again;
 //   - "not found" is remembered for NotFoundFor only, so a program installed a moment later is picked up;
-//   - a name with a folder in it is not a PATH lookup: it goes straight to exec.LookPath.
+//   - a name that is not a bare program name (a folder, or on Windows a colon, as the standard library tests it) is not a PATH lookup: it goes straight to exec.LookPath;
+//   - only an absolute answer is remembered or handed to a caller to start: a relative one (a relative PATH entry under GODEBUG=execerrdot=0) would be read against whatever the working
+//     folder is at the next call.
+//
+// Staleness, stated (Security on #413): a NEW program of the same name that appears EARLIER on PATH is not seen until the remembered file goes or the PATH text changes; the standard library
+// would pick it at once. The memo never hands out a program that was not first on PATH when it was found, and a file replaced in place starts as it would at that path anyway.
 package lookpath
 
 import (
 	"os"
 	"os/exec"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -44,7 +51,7 @@ var memo struct {
 
 // Path is exec.LookPath(name) remembered as above.
 func Path(name string) (string, error) {
-	if strings.ContainsAny(name, `/\`) || name == "" {
+	if !IsBare(name) {
 		return exec.LookPath(name)
 	}
 	key := os.Getenv("PATH") + "\x00" + os.Getenv("PATHEXT") + "\x00" + name
@@ -61,6 +68,9 @@ func Path(name string) (string, error) {
 		}
 	}
 	path, err := exec.LookPath(name)
+	if err == nil && !filepath.IsAbs(path) {
+		return path, err // not remembered, and callers that start programs take only an absolute path
+	}
 	memo.Lock()
 	if memo.m == nil {
 		memo.m = map[string]result{}
@@ -68,4 +78,13 @@ func Path(name string) (string, error) {
 	memo.m[key] = result{path, err, now()}
 	memo.Unlock()
 	return path, err
+}
+
+// IsBare reports whether name is a bare program name, to be looked up on PATH: the standard library's test (exec.LookPath treats anything else as a path), which on Windows also counts a colon
+// (C:git, git.exe:stream) as path-like.
+func IsBare(name string) bool {
+	if name == "" || filepath.Base(name) != name {
+		return false
+	}
+	return runtime.GOOS != "windows" || !strings.Contains(name, ":")
 }
