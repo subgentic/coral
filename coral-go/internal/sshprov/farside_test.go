@@ -20,6 +20,7 @@ import (
 // file, and its API key appears 0.3 s after, as the real one did.
 type farCfg struct {
 	Home     string // the far computer's $HOME
+	TempRoot string // os.TempDir() of the test: Home must be inside it
 	Log      string `json:",omitempty"` // the remote text of every command, one per line
 	TmuxLog  string `json:",omitempty"` // what tmux would have been asked
 	ArgsLog  string `json:",omitempty"` // the arguments coral "started" with (one line), plus .accept and .stdin for accept-terms
@@ -59,8 +60,30 @@ var (
 	farShaArgRe  = regexp.MustCompile(`sha256sum -- '([^']*)'`)
 )
 
+// homeAllowed is (given the temp folder the test was started with, which the stand-in cannot ask for itself: its environment is minimal) whether the far computer's home may be written to: absolute, clean and inside the temp folder, so a wrong config can never make the emulator remove or write anywhere else (RemoveAll
+// and the unpack run on it).
+func homeAllowed(home, root string) bool {
+	if root == "" || !filepath.IsAbs(root) || filepath.Dir(root) == root || home == "" || !filepath.IsAbs(home) || filepath.Clean(home) != home {
+		return false
+	}
+	tmp := root
+	if r, err := filepath.EvalSymlinks(tmp); err == nil {
+		tmp = r
+	}
+	h := home
+	if r, err := filepath.EvalSymlinks(filepath.Dir(home)); err == nil {
+		h = filepath.Join(r, filepath.Base(home))
+	}
+	rel, err := filepath.Rel(filepath.Clean(tmp), h)
+	return err == nil && rel != "." && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
+}
+
 // runFar answers one command and returns its exit code.
 func runFar(f farCfg, text string) int {
+	if !homeAllowed(f.Home, f.TempRoot) {
+		fmt.Fprintln(os.Stderr, "sshprov far side: its home is not inside the temp folder")
+		return 2
+	}
 	appendLine(f.Log, text)
 	install := filepath.Join(f.Home, InstallDir)
 	vdir := ""

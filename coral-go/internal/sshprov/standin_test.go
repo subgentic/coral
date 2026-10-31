@@ -1,7 +1,9 @@
 package sshprov
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -82,6 +84,9 @@ func TestTheBinaryRunsTestsOnlyUnderGoTestAndIsAStandInOnlyUnderItsName(t *testi
 	}
 }
 
+// maxStarts is the most a test may start one copy; the stream cap test holds 12, the rest start a handful.
+const maxStarts = 100
+
 // standCfg is what one copy does. It lives in standin.json next to the copy.
 type standCfg struct {
 	Log      string `json:",omitempty"` // every argument is appended, one per line
@@ -132,6 +137,9 @@ func newStandIn(t *testing.T, name string, cfg standCfg) string {
 			t.Fatal(err)
 		}
 	}
+	if cfg.Far != nil {
+		cfg.Far.TempRoot = os.TempDir()
+	}
 	b, _ := json.Marshal(cfg)
 	if err := os.WriteFile(filepath.Join(dir, "standin.json"), b, 0o600); err != nil {
 		t.Fatal(err)
@@ -152,6 +160,17 @@ func runStandIn() int {
 		return 2
 	}
 	args := os.Args[1:]
+	// a second line against a runaway: every start is one line in starts, and a copy started more than maxStarts times refuses (a loop of starts ends here, not in the process table)
+	if f, err := os.OpenFile(filepath.Join(filepath.Dir(exe), "starts"), os.O_CREATE|os.O_APPEND|os.O_RDWR, 0o600); err == nil {
+		fmt.Fprintln(f, "start")
+		f.Seek(0, io.SeekStart)
+		b, _ := io.ReadAll(f)
+		f.Close()
+		if strings.Count(string(b), "\n") > maxStarts {
+			fmt.Fprintln(os.Stderr, "sshprov stand-in: too many starts in one test")
+			return 2
+		}
+	}
 	if cfg.Log != "" {
 		if f, err := os.OpenFile(cfg.Log, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600); err == nil {
 			for _, a := range args {
@@ -199,4 +218,38 @@ func runStandIn() int {
 	}
 	fmt.Fprint(os.Stderr, cfg.Stderr)
 	return cfg.Exit
+}
+
+func TestFarSideWritesOnlyInsideTheTempFolder(t *testing.T) {
+	root := os.TempDir()
+	in := filepath.Join(t.TempDir(), "home")
+	if !homeAllowed(in, root) {
+		t.Errorf("a home in the temp folder was refused: %s", in)
+	}
+	for _, bad := range []string{"", "home", "/", os.TempDir(), "/etc", "/Users/x/.coral-server", in + "/../../x", in + "/", filepath.Join(os.TempDir(), "..", "x")} {
+		if homeAllowed(bad, root) {
+			t.Errorf("accepted %q", bad)
+		}
+	}
+	if homeAllowed(in, "/") || homeAllowed(in, "") || homeAllowed(in, "tmp") {
+		t.Error("a root that is not a real folder was taken")
+	}
+	if code := runFar(farCfg{Home: "/etc", TempRoot: root}, `rm -rf "$HOME/.coral-server"`); code != 2 {
+		t.Errorf("runFar with a home outside the temp folder = %d", code)
+	}
+}
+
+func TestAStandInStartedTooOftenRefuses(t *testing.T) {
+	ssh := newStandIn(t, "ssh", standCfg{})
+	tg, _ := ParseTarget("user@box.example.com")
+	var last error
+	for i := 0; i < maxStarts+5 && last == nil; i++ {
+		res, err := (Runner{SSH: ssh}).Run(context.Background(), tg, CmdUname)
+		if last = err; err == nil && res.ExitCode != 0 {
+			last = errors.New("refused")
+		}
+	}
+	if last == nil {
+		t.Errorf("start %d still answered", maxStarts+5)
+	}
 }
