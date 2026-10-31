@@ -21,7 +21,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
         return { top: Math.round(s.scrollTop), names: rows.map(r => (r.textContent.match(/plan-\\d+\\.md/) || [''])[0]), focusRow: tr ? (tr.textContent.match(/plan-\\d+\\.md/) || [''])[0] : '', focusTag: a ? a.tagName : '', inView: (n) => 0 }; })()`);
     const approve = n => ev(`(() => { const b = document.querySelector('${T} button[aria-label="Approve: ${name(n)}"]'); b.scrollIntoView({ block: 'center' }); return true; })()`);
     try {
-        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
+        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Page.addScriptToEvaluateOnNewDocument({ source: `localStorage.setItem('coral-inbox-needs-filters', JSON.stringify({ sort: 'oldest' }));` }); // the Inbox's list is read before a test can set its order: oldest first, set before the page loads (newest first is the default, #11552)
         for (const [w, h, mobile] of [[1280, 700, false], [390, 700, true]]) {
             const at = `${w} px: `;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });

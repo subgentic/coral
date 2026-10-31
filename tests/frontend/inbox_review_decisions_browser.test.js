@@ -21,7 +21,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
     const toRow = n => ev(`document.querySelector('${T} button[aria-label="Approve: ${name(n)}"]').scrollIntoView({ block: 'center' }); true`);
     const calls = () => ev(`window.__calls`);
     try {
-        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
+        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Page.addScriptToEvaluateOnNewDocument({ source: `localStorage.setItem('coral-inbox-needs-filters', JSON.stringify({ sort: 'oldest' }));` }); // the Inbox's list is read before a test can set its order: oldest first, set before the page loads (newest first is the default, #11552)
         for (const [w, h, mobile] of [[1440, 700, false], [390, 700, true]]) {
             const at = `${w} px: `;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });

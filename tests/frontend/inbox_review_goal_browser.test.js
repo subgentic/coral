@@ -13,7 +13,7 @@ const { coralReady } = require('./helpers/wait');
     const row = name => `[...document.querySelectorAll('#group-table-view tbody tr')].find(r=>r.textContent.includes(${JSON.stringify(name)}))`;
     const rows = `document.querySelectorAll('#group-table-view [data-review-artifact]')`;
     try {
-        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({source:PRELOAD});
+        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({source:PRELOAD}); await Page.addScriptToEvaluateOnNewDocument({ source: `localStorage.setItem('coral-inbox-needs-filters', JSON.stringify({ sort: 'oldest' }));` }); // the Inbox's list is read before a test can set its order: oldest first, set before the page loads (newest first is the default, #11552)
         for (const width of [1440,1600,390]) {
             try {
                 await Emulation.setDeviceMetricsOverride({width,height:900,deviceScaleFactor:1,mobile:width===390});
