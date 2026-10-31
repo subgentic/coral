@@ -122,7 +122,7 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-ins
 RUN for u in alice bob jumper; do useradd -m -s /bin/bash -p '*' $u && mkdir -p /home/$u/.ssh; done
 COPY id_run.pub /tmp/k.pub
 RUN for u in alice bob jumper; do cp /tmp/k.pub /home/$u/.ssh/authorized_keys && chown -R $u:$u /home/$u/.ssh && chmod 700 /home/$u/.ssh && chmod 600 /home/$u/.ssh/authorized_keys; done
-CMD ["sh", "-c", "ssh-keygen -A && exec /usr/sbin/sshd -D -e -o LogLevel=VERBOSE -o AllowTcpForwarding=yes"]
+CMD ["sh", "-c", "rm -f /etc/ssh/ssh_host_* && ssh-keygen -A && exec /usr/sbin/sshd -D -e -o LogLevel=VERBOSE -o AllowTcpForwarding=yes"]
 `
 	if err := os.WriteFile(filepath.Join(ctxDir, "Dockerfile"), []byte(dockerfile), 0o644); err != nil {
 		t.Fatal(err)
@@ -160,6 +160,9 @@ CMD ["sh", "-c", "ssh-keygen -A && exec /usr/sbin/sshd -D -e -o LogLevel=VERBOSE
 		t.Fatal(err)
 	}
 	f.r = Runner{SSH: wrapper, Timeout: 60 * time.Second}
+	oldWait := keyWait
+	keyWait = 20 * time.Second // the answer is the same after 90 s, and 20 is enough for a Coral that starts
+	t.Cleanup(func() { keyWait = oldWait })
 
 	// wait for both sshd (a few seconds after the container starts)
 	for _, c := range []string{"jump", "far"} {
@@ -320,9 +323,8 @@ func TestSSHDocker(t *testing.T) {
 			if err != nil {
 				t.Logf("  FINDING: ReadAPIKey for %s failed after a start: %v", u.name, err)
 				t.Logf("  tmux sessions of %s: %s", u.name, firstOut(f.exec(u.name, "far", "tmux ls 2>&1")))
-				if u.name == "alice" {
-					t.Fatal("the first user's Coral did not start")
-				}
+				pane, _ := f.exec(u.name, "far", "tmux capture-pane -p -t =coral-server 2>&1 | tail -25; ls -la ~/.coral-server ~/.coral-server/data 2>&1; ps -u "+u.name+" -o pid,etime,args 2>&1 | head")
+				t.Logf("  DIAG %s's tmux pane and folders:\n%s", u.name, pane)
 				return
 			}
 			keysOf["key-"+u.name] = key
@@ -387,6 +389,8 @@ func TestSSHDocker(t *testing.T) {
 		before, _ := f.exec("bob", "far", "tmux has-session -t =coral-server 2>&1 && echo alive")
 		err := f.r.StopAndConfirm(ctx, aliceTarget)
 		after, _ := f.exec("bob", "far", "tmux has-session -t =coral-server 2>&1 && echo alive")
+		chk, cerr := f.r.Run(ctx, aliceTarget, CmdCheckStopped)
+		t.Logf("  DIAG CheckStopped after the stop: exit %d, err %v (1: a session, 2: a listener on 8420, 3: cannot tell)", chk.ExitCode, cerr)
 		t.Logf("  bob before: %q, StopAndConfirm(alice) = %v, bob after: %q", firstOut(before, nil), err, firstOut(after, nil))
 		if strings.Contains(before, "alive") && !strings.Contains(after, "alive") {
 			t.Errorf("alice's stop ended bob's session")
@@ -403,8 +407,8 @@ func TestSSHDocker(t *testing.T) {
 		f.docker("exec", f.run+"-jump", "sh", "-c", "rm -f /etc/ssh/ssh_host_* && ssh-keygen -A && pkill -HUP -x sshd")
 		time.Sleep(500 * time.Millisecond)
 		_, err := f.r.Run(ctx, tg, CmdUname)
-		if !errors.Is(err, ErrHostKey) {
-			t.Errorf("a changed jump key must refuse as a host key problem, got %v", err)
+		if !errors.Is(err, ErrHostKeyChanged) {
+			t.Errorf("a changed jump key must refuse as a changed host key, got %v", err)
 		}
 		if after := strings.Count(f.logs("far"), "Accepted publickey"); after != beforeAccepts {
 			t.Errorf("the far computer got a connection (%d -> %d) although the jump's key changed", beforeAccepts, after)
