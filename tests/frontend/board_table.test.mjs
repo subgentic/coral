@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { installDom, importUi } from './helpers/jsdom_env.mjs';
 
 installDom();
-const { snippetOf, taskRefs, tagsOf, dayLabel, sameDay, rowParts, toggleRow, isRowOpen } = await importUi('board_table');
+const { snippetOf, taskRefs, taskOf, tagsOf, dayLabel, sameDay, rowParts, toggleRow, isRowOpen } = await importUi('board_table');
 const { setBoardMentionNames } = await importUi('board_message_text');
 
 setBoardMentionNames(['Backend Dev', 'QA Engineer']);
@@ -28,9 +28,16 @@ assert.deepEqual(t.mentions.map(m => m.name), ['Backend Dev', 'QA Engineer', 'Or
 assert.equal(tagsOf({ content: 'a@b.com no mention' }).mentions.length, 0, 'an email is no mention');
 assert.equal(tagsOf({ content: '`@Backend Dev` in code' }).mentions.length, 0, 'code is not read');
 assert.equal(tagsOf({ content: 'x' }).ask, false);
+// #11586: a post made on a task (--task) is on that task, whatever number its text names
+assert.equal(taskOf({ task_id: 11584, content: 'ahead of #11579' }), '11584', 'the --task link wins over a number in the text');
+assert.equal(tagsOf({ task_id: 11584, content: '@Orchestrator ahead of #11579' }).task, '11584');
+assert.equal(taskOf({ content: 'see #11579' }), '11579', 'a post on no task keeps the first number in its text');
+assert.equal(taskOf({ task_id: null, content: 'see #11579' }), '11579');
+assert.equal(taskOf({ task_id: 0, content: 'no number' }), '');
 
 const { layoutChips, chipsOf } = await importUi('board_table');
 const many = chipsOf({ content: '@Backend Dev @QA Engineer please look at #7790', ask: { open: ['Backend Dev'] } }, tagsOf({ content: '@Backend Dev @QA Engineer please look at #7790', ask: { open: ['Backend Dev'] } }, { replyName: 'Lead Developer' }));
+assert.equal(chipsOf({ task_id: 11584, content: 'ahead of #11579' }, tagsOf({ task_id: 11584, content: 'ahead of #11579' })).filter(c => c.k === 'task').map(c => c.t).join(), '#11584', 'one task chip: the linked one');
 assert.deepEqual(many.map(c => c.t), ['Reply to Lead Developer', '@Backend Dev', '@QA Engineer', '#7790', 'Question']);
 const head = layoutChips(many), full = layoutChips(many, { all: true });
 assert.equal((head.match(/class="chip chip-tag mb-row-tag /g) || []).length + (head.match(/mb-ask-badge/g) || []).length, 3, 'more than three marks: the first mention, the Question badge and a +N pill');

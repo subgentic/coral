@@ -251,7 +251,7 @@ func (h *BoardHandler) postMessageCore(w http.ResponseWriter, r *http.Request, p
 		// The mention of the task's creator goes first, before the text is cleaned and before a hub operator's own prefix is added, so both survive (#5463).
 		m := h.bs.TaskReplyMention(r.Context(), project, reply.creator)
 		if len(reply.recipients) > 0 {
-			m = h.bs.TaskReplyMentions(r.Context(), project, reply.recipients, body.SubscriberID)
+			m = h.bs.TaskReplyMentions(r.Context(), project, reply.recipients, body.SubscriberID, clitext.Clean(unescapeLineBreaks(body.Content)))
 		}
 		reply.prefix, reply.notified = m.Prefix, m.Notified
 		body.Content = m.Prefix + body.Content

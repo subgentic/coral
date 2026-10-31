@@ -54,12 +54,18 @@ export function taskRefs(content) {
     return out;
 }
 
-/** What marks a message in its row: who it mentions (two, then "+N"), the first task it names, that it is a question, and whom it answers. Quiet tags, never louder text. */
+/** The task a message is about: the one it was posted on (--task, its task_id) when it has one, else the first it names in its text (#11586: a post on #11584 that mentions #11579 is on #11584). */
+export function taskOf(m) {
+    const id = m && Number(m.task_id);
+    return Number.isInteger(id) && id > 0 ? String(id) : taskRefs(m && m.content)[0] || '';
+}
+
+/** What marks a message in its row: who it mentions (two, then "+N"), its task (taskOf), that it is a question, and whom it answers. Quiet tags, never louder text. */
 export function tagsOf(m, { replyName = '', self = 'operator' } = {}) {
     const names = mentionedNames(m && m.content);
     return {
         mentions: names.map(n => ({ name: n, self: n.toLowerCase() === self })),
-        task: taskRefs(m && m.content)[0] || '',
+        task: taskOf(m),
         ask: !!(m && m.ask && typeof m.ask === 'object'),
         mine: names.some(n => n.toLowerCase() === self),
         replyName,

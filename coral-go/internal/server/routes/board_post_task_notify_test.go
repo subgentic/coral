@@ -97,3 +97,17 @@ func TestAPostAnswersWithWhoItReaches(t *testing.T) {
 	require.Equal(t, 200, code, string(b))
 	assert.Equal(t, []any{}, out["notified"], "the Operator is not told of their own post")
 }
+
+// A post on a task whose text already tags the assignee does not repeat the tag as a prefix (#11586: "@UX/UX Engineer: @UX/UX Engineer top priority"); both are still told.
+func TestPostOnATaskDoesNotRepeatATagTheTextAlreadyHas(t *testing.T) {
+	e := newReplyEnv(t)
+	e.join("p", "Creator", "Assignee", "Third")
+	id := e.task("p", "Creator")
+	_, err := e.bs.ClaimTask(context.Background(), "p", "Assignee", id)
+	require.NoError(t, err)
+
+	e.postOnTask("p", "Third", id, "@Assignee top priority, ahead of the rest")
+	assert.Equal(t, []string{"@Creator: @Assignee top priority, ahead of the rest"}, e.messagesContent("p", "?task_id="+itoa(id)), "only the creator, whom the text does not tag, is added")
+	assert.Equal(t, []string{"@Creator: @Assignee top priority, ahead of the rest"}, e.inbox("p", "Assignee"), "the assignee is told by the text's own tag")
+	assert.Equal(t, []string{"@Creator: @Assignee top priority, ahead of the rest"}, e.inbox("p", "Creator"), "the creator is told by the prefix")
+}

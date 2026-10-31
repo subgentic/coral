@@ -63,8 +63,10 @@ func (s *Store) TaskReplyMention(ctx context.Context, project, creator string) R
 
 // TaskReplyMentions decides the mentions of an agent's post on a task (#11431): the task's assignee and its creator, each tagged exactly as TaskReplyMention tags one (a name that is not an active member, or
 // whose tag would also tag someone else, is left out), never the poster, and each once. The prefix is the mentions in the order given; Notified is who they reach.
-func (s *Store) TaskReplyMentions(ctx context.Context, project string, names []string, poster string) ReplyMention {
+// A recipient the post's own text already tags (text) is not given a prefix as well (#11586: "@UX/UX Engineer: @UX/UX Engineer ..."): the text's tag reaches them, so they are still in Notified.
+func (s *Store) TaskReplyMentions(ctx context.Context, project string, names []string, poster, text string) ReplyMention {
 	out := ReplyMention{Notified: []string{}}
+	titles, numbered := s.replyTagContext(ctx, project)
 	seen := map[string]bool{strings.ToLower(strings.TrimSpace(poster)): true}
 	for _, name := range names {
 		key := strings.ToLower(strings.TrimSpace(name))
@@ -76,10 +78,32 @@ func (s *Store) TaskReplyMentions(ctx context.Context, project string, names []s
 		if m.Prefix == "" {
 			continue
 		}
-		out.Prefix += m.Prefix
+		if !textTags(text, name, titles, numbered) {
+			out.Prefix += m.Prefix
+		}
 		out.Notified = append(out.Notified, m.Notified...)
 	}
 	return out
+}
+
+// replyTagContext reads the active members' job titles (by subscriber id) and the board's numbered names, what textTags needs.
+func (s *Store) replyTagContext(ctx context.Context, project string) (map[string]string, map[string]bool) {
+	titles := map[string]string{}
+	var subs []struct {
+		SubscriberID string `db:"subscriber_id"`
+		JobTitle     string `db:"job_title"`
+	}
+	if err := s.reader().SelectContext(ctx, &subs, `SELECT subscriber_id, job_title FROM board_subscribers WHERE project = ? AND is_active = 1`, project); err == nil {
+		for _, sub := range subs {
+			titles[sub.SubscriberID] = sub.JobTitle
+		}
+	}
+	return titles, s.numberedNames(ctx, s.reader(), project)
+}
+
+// textTags reports whether text already tags name the way delivery reads a mention (the same test the prefix is checked with).
+func textTags(text, name string, titles map[string]string, numbered map[string]bool) bool {
+	return containsExplicitTag(text, name, titles[name], numbered)
 }
 
 // ListTaskReplies returns the replies to a task, oldest first, at most limit (the partial index on (project, task_id, id) answers it).

@@ -251,3 +251,24 @@ func TestTheRepliesOwnTextCannotRedirectTheCreatorsMention(t *testing.T) {
 	assert.Len(t, creator, 1, "the creator is notified")
 	assert.Empty(t, other, "the numbered agent is not")
 }
+
+// #11586: a post on a task that already tags a recipient in its own text does not get that recipient's "@Name: " prefix too ("@UX/UX Engineer: @UX/UX Engineer top priority").
+func TestTaskReplyMentionsSkipsARecipientTheTextAlreadyTags(t *testing.T) {
+	ctx := context.Background()
+	s := replyStore(t)
+	join(t, s, "p", "Orchestrator", "UX/UX Engineer", "QA Engineer")
+
+	m := s.TaskReplyMentions(ctx, "p", []string{"UX/UX Engineer", "Orchestrator"}, "QA Engineer", "@UX/UX Engineer top priority, ahead of the rest")
+	assert.Equal(t, "@Orchestrator: ", m.Prefix, "only the creator the text does not tag is added")
+	assert.ElementsMatch(t, []string{"UX/UX Engineer", "Orchestrator"}, m.Notified, "the text's own tag reaches the assignee, so both are still notified")
+
+	m = s.TaskReplyMentions(ctx, "p", []string{"UX/UX Engineer", "Orchestrator"}, "QA Engineer", "@Orchestrator @UX/UX Engineer both named")
+	assert.Equal(t, "", m.Prefix, "a text that tags everyone gets no prefix")
+	assert.ElementsMatch(t, []string{"UX/UX Engineer", "Orchestrator"}, m.Notified)
+
+	m = s.TaskReplyMentions(ctx, "p", []string{"UX/UX Engineer", "Orchestrator"}, "QA Engineer", "plain text, nobody named")
+	assert.Equal(t, "@UX/UX Engineer: @Orchestrator: ", m.Prefix, "a text that tags no one keeps both prefixes")
+
+	m = s.TaskReplyMentions(ctx, "p", []string{"UX/UX Engineer"}, "QA Engineer", "email a@UX/UX Engineer is not a tag")
+	assert.Equal(t, "@UX/UX Engineer: ", m.Prefix, "a mid-word @ is not a mention, so the prefix stays")
+}
