@@ -49,7 +49,7 @@ const { install: installNA, N, stubModels } = require('./helpers/new_agent');
             const tag = `${w}px ${theme}`;
             await open(w, h, mobile, theme, ['agy'], false);
             let d = await ev(READ);
-            check(JSON.stringify(d.cards.map(c => c.name)) === JSON.stringify(['Claude', 'Codex', 'Pi']), `${tag}: the installed providers are the cards: ${JSON.stringify(d.cards.map(c => c.name))}`);
+            check(JSON.stringify(d.cards.map(c => c.name)) === JSON.stringify(['Claude', 'Codex', 'Pi', 'OpenCode']), `${tag}: the installed providers are the cards: ${JSON.stringify(d.cards.map(c => c.name))}`);
             check(d.cards.every(c => c.radio), `${tag}: each card has a radio`);
             check(d.cards.every(c => /^Installed · default /.test(c.status)), `${tag}: each says Installed · default <model>: ${JSON.stringify(d.cards.map(c => c.status))}`);
             check(/default claude Big$/.test(d.cards[0].status), `${tag}: Claude says its saved default model: ${d.cards[0].status}`);

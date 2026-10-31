@@ -3,7 +3,7 @@
  * reacts to that select (the missing-CLI line, the model list, the permission mode) still does. When nothing was ever chosen as the default and Claude is missing while another agent is installed, that one is selected. */
 import { serverFetch, normServer, LOCAL_SERVER } from './server_base.js';
 
-const TYPES = [['claude', 'Claude'], ['codex', 'Codex'], ['agy', 'Antigravity'], ['pi', 'Pi']];
+const TYPES = [['claude', 'Claude'], ['codex', 'Codex'], ['agy', 'Antigravity'], ['pi', 'Pi'], ['opencode', 'OpenCode']];
 const ALIAS = { gemini: 'agy', antigravity: 'agy' };
 const PROBE_MS = 1500; // a CLI that is slow to answer is "unknown": it keeps its place and is not marked
 
