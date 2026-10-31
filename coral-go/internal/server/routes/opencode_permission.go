@@ -94,17 +94,17 @@ func opencodeQuestion(p opencode.PermissionRequest) string {
 		if q := quoted(p.Command); q != "" {
 			return "opencode wants to run: " + q
 		}
-		return "opencode wants to run a command (all of it is below)"
+		return "opencode wants to run a command (see below)"
 	case p.Permission == "edit" && p.File != "":
 		if q := quoted(p.File); q != "" {
 			return "opencode wants to edit " + q
 		}
-		return "opencode wants to edit a file (its whole path is below)"
+		return "opencode wants to edit a file (see below)"
 	case p.Permission == "external_directory":
 		if q := quoted(strings.Join(p.Patterns, ", ")); q != "" {
 			return "opencode wants to use a folder outside its own: " + q
 		}
-		return "opencode wants to use a folder outside its own (all of them are below)"
+		return "opencode wants to use a folder outside its own (see below)"
 	case quoted(p.Permission) != "":
 		return "opencode asks to allow: " + p.Permission
 	}
