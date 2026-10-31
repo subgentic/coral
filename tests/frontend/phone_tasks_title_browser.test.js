@@ -1,5 +1,5 @@
 // The phone bar's Tasks (#11401 f, from the Mobile Beta Tester's walk): it opens the Tasks table, and the pill at the top says "Tasks", not "Inbox" (the Inbox's own name stayed in the pill while the Tasks table was open).
-// Inbox says Inbox again, and Tasks again says Tasks. 390 px, the isolated dev server.
+// The bar lights Tasks there (it lit Inbox). Inbox says Inbox again, and Tasks again says Tasks. 390 px, the isolated dev server.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
@@ -22,8 +22,11 @@ const { coralReady } = require('./helpers/wait');
         await new Promise(r => setTimeout(r, 400)); // sleep-ok: the table's heading is drawn after the view switches
         await shot('phone-tasks-title-390');
         assert.equal(await title(), 'Tasks', 'the pill says Tasks while the Tasks table is open: ' + await title());
+        const lit = () => ev(`[...document.querySelectorAll('.phone-nav-slot.active')].map(e => e.dataset.phoneNav).join(',')`);
+        assert.equal(await lit(), 'nav-tasks', 'the bar lights Tasks, not Inbox, on the Tasks page: ' + await lit());
         await tap('nav-inbox');
         await waitFor(`[...document.querySelectorAll('.phone-bar-title')].some(e => e.getClientRects().length && /^Inbox$/.test(e.textContent.trim()))`, 'Inbox says Inbox again', 8000);
+        assert.equal(await lit(), 'nav-inbox', 'and Inbox lights Inbox: ' + await lit());
         await tap('nav-tasks');
         await new Promise(r => setTimeout(r, 600)); // sleep-ok: the second visit to the table
         assert.equal(await title(), 'Tasks', 'and Tasks says Tasks again: ' + await title());
