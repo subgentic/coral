@@ -42,6 +42,7 @@ export const PAGES = [
     { id: 'inbox-needs', world: 'seeded', path: '/inbox/needs' },
     { id: 'inbox-saved', world: 'seeded', path: '/inbox/saved' },
     { id: 'inbox-artifacts', world: 'seeded', path: '/inbox/artifacts' },
+    { id: 'artifact-csv', world: 'seeded', open: 'csvViewer', notes: 'a CSV artifact as a table (#11382): opened from the Inbox\'s Artifacts, there is no address for an artifact\'s preview' },
     { id: 'inbox-chats', world: 'seeded', path: '/inbox/chats' },
     { id: 'inbox-chat-page', world: 'seeded', path: '/inbox/chats/all/{chat}' },
     { id: 'inbox-goals', world: 'seeded', path: '/inbox/goals' },

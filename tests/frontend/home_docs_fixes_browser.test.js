@@ -24,7 +24,7 @@ const { coralReady } = require('./helpers/wait');
             assert.deepEqual([qrOnHome.text, qrOnHome.action], [0, 0], `${w}: Home has no Mobile QR code anywhere, card or link: ${JSON.stringify(qrOnHome)}`);
             // and it is where the operator said: Settings, by the API key. The button opens the same dialog.
             await ev(`window.showSettingsModal('security'); true`);
-            await waitFor(`!!document.querySelector('#settings-modal button[title="Show QR code for mobile connection"]')`, `${w}: Settings has the Mobile QR button by the API key`, 10000);
+            await waitFor(`(() => { const b = document.querySelector('#settings-modal button[title="Show QR code for mobile connection"]'); return !!b && b.getClientRects().length > 0; })()`, `${w}: Settings has the Mobile QR button by the API key`, 10000);
             await ev(`document.querySelector('#settings-modal button[title="Show QR code for mobile connection"]').click(); true`);
             await waitFor(`(() => { const m = document.getElementById('mobile-connect-modal'); return !!m && getComputedStyle(m).display !== 'none'; })()`, `${w}: its button opens the Use on your phone dialog`, 8000);
             await ev(`document.getElementById('mobile-connect-modal').style.display = 'none'; window.hideSettingsModal && window.hideSettingsModal(); true`);
