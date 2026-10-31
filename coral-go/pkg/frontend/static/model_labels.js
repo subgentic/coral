@@ -23,7 +23,7 @@ export function readModelsCache(server, agentType) {
 }
 
 export function writeModelsCache(server, agentType, data) {
-    try { browserLocal.set(`${MODELS_CACHE_PREFIX}${server || LOCAL_SERVER}:${agentType}`, JSON.stringify({ models: data.models, fetched_at: data.fetched_at || null, source: data.source || '' })); } catch { /* per-viewer only */ }
+    try { browserLocal.set(`${MODELS_CACHE_PREFIX}${server || LOCAL_SERVER}:${agentType}`, JSON.stringify({ models: data.models, thinking: Array.isArray(data.thinking) ? data.thinking : undefined, fetched_at: data.fetched_at || null, source: data.source || '' })); } catch { /* per-viewer only */ }
 }
 
 /** Forgets every cached model list (a save of the custom models changes what every picker shows, #5480). */
