@@ -1,0 +1,32 @@
+// The phone bar's Tasks (#11401 f, from the Mobile Beta Tester's walk): it opens the Tasks table, and the pill at the top says "Tasks", not "Inbox" (the Inbox's own name stayed in the pill while the Tasks table was open).
+// Inbox says Inbox again, and Tasks again says Tasks. 390 px, the isolated dev server.
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const { connect } = require('./agent_view_harness');
+const BASE = require('./test_base').BASE;
+const { coralReady } = require('./helpers/wait');
+
+(async () => {
+    const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
+    const shot = async n => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(`${d}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
+    const title = () => ev(`[...document.querySelectorAll('.phone-bar-title')].filter(e => e.getClientRects().length).map(e => e.textContent.trim()).join('|')`);
+    try {
+        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
+        await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
+        const tap = id => ev(`document.querySelector('[data-phone-nav="${id}"]').click(); true`);
+        await tap('nav-inbox');
+        await waitFor(`[...document.querySelectorAll('.phone-bar-title')].some(e => e.getClientRects().length && /^Inbox$/.test(e.textContent.trim()))`, 'the pill says Inbox for the Inbox', 8000);
+        await tap('nav-tasks');
+        await waitFor(`!!document.querySelector('#group-table-view h2, #group-table-view .group-table-head h2')`, 'the Tasks table is open', 8000);
+        await new Promise(r => setTimeout(r, 400)); // sleep-ok: the table's heading is drawn after the view switches
+        await shot('phone-tasks-title-390');
+        assert.equal(await title(), 'Tasks', 'the pill says Tasks while the Tasks table is open: ' + await title());
+        await tap('nav-inbox');
+        await waitFor(`[...document.querySelectorAll('.phone-bar-title')].some(e => e.getClientRects().length && /^Inbox$/.test(e.textContent.trim()))`, 'Inbox says Inbox again', 8000);
+        await tap('nav-tasks');
+        await new Promise(r => setTimeout(r, 600)); // sleep-ok: the second visit to the table
+        assert.equal(await title(), 'Tasks', 'and Tasks says Tasks again: ' + await title());
+        console.log('PASS the phone bar: Tasks says Tasks, Inbox says Inbox');
+    } finally { await client.close(); }
+})().catch(e => { console.error(e); process.exitCode = 1; });

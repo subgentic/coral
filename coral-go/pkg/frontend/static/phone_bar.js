@@ -31,9 +31,13 @@ export function mountTopPhoneBar() {
 /** The view's name in the pill (nav_tabs.js says it, with the tab's words). A page that is not one of the nav's tabs (Tasks, Goals and Files from Home are a folder's table, a team page's tabs) has none: the pill then says the page's own heading, so it is never empty (QA Reviewer 2's nit on #137846). */
 export function setPhoneBarTitle(words) {
     _named = !!words;
-    for (const t of document.querySelectorAll('.phone-bar-title')) t.textContent = words || pageHeading();
+    for (const t of document.querySelectorAll('.phone-bar-title')) t.textContent = _pageName || words || pageHeading();
 }
 let _named = false;
+/** A page the bar's own buttons open inside another view (its Tasks is the Inbox view's Tasks table, #11401): the pill says that page's name, whatever the nav's refreshes put for the view, until another tab is chosen (clearPhonePageName, switchNavTab). */
+let _pageName = '';
+export function setPhonePageName(name) { _pageName = name || ''; if (_pageName) for (const t of document.querySelectorAll('.phone-bar-title')) t.textContent = _pageName; }
+export function clearPhonePageName() { _pageName = ''; }
 function pageHeading() {
     const h = ['#group-table-view .group-table-head h2', '#group-table-view h2', '#team-page-title', '#servers-tab-title', 'main h1'].map(sel => [...document.querySelectorAll(sel)].find(e => e.getClientRects().length > 0 && e.textContent.trim())).find(Boolean);
     return h ? h.textContent.replace(/\s+/g, ' ').trim() : '';
