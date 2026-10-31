@@ -42,7 +42,7 @@ const (
 
 var (
 	commentBoardRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$`)
-	// A text-like artifact: what the viewer shows as text. Anything else (images, archives, binaries) takes no comments.
+	// A text-like artifact: what the viewer shows as text. Only these take a comment pointing into the text; anything else (images, PDFs, archives, binaries) takes comments on the whole document (#11444).
 	commentTextTypes = []string{"text/", "application/json", "application/xml", "application/yaml", "application/x-yaml", "application/javascript", "application/x-sh", "application/toml", "application/csv", "image/svg+xml"}
 	commentTextExts  = map[string]bool{".md": true, ".markdown": true, ".txt": true, ".json": true, ".yaml": true, ".yml": true, ".toml": true, ".csv": true, ".log": true, ".go": true, ".js": true, ".ts": true,
 		".py": true, ".rb": true, ".rs": true, ".java": true, ".c": true, ".h": true, ".cpp": true, ".sh": true, ".html": true, ".htm": true, ".css": true, ".xml": true, ".sql": true, ".diff": true, ".patch": true}
@@ -222,30 +222,40 @@ func (h *SessionsHandler) commentView(c commentCaller, t store.ArtifactComment, 
 
 // commentArtifact checks the id and that the artifact exists and is text-like; it answers the request itself when not and reports false.
 func (h *SessionsHandler) commentArtifact(w http.ResponseWriter, r *http.Request, needText bool) (string, bool) {
-	id := chi.URLParam(r, "id")
+	id, textLike, ok := h.commentArtifactKind(w, r)
+	if !ok {
+		return "", false
+	}
+	if needText && !textLike {
+		commentRefuse(w, http.StatusUnsupportedMediaType, "not_text", "only text-like artifacts take comments")
+		return "", false
+	}
+	return id, true
+}
+
+// commentArtifactKind is the one check of the artifact a comment route is about (a valid id, one this caller may read, one that exists) and whether it is text-like. Every artifact takes a comment on the
+// WHOLE document (#11444: HTML, pictures, PDFs, tables, video, downloads); only a text-like one takes a comment pointing into its text, and the create route says so.
+func (h *SessionsHandler) commentArtifactKind(w http.ResponseWriter, r *http.Request) (id string, textLike, ok bool) {
+	id = chi.URLParam(r, "id")
 	if len(id) != 64 || strings.ToLower(id) != id {
 		errBadRequest(w, "invalid artifact id")
-		return "", false
+		return "", false, false
 	}
 	if _, err := hex.DecodeString(id); err != nil {
 		errBadRequest(w, "invalid artifact id")
-		return "", false
+		return "", false, false
 	}
 	if !artifactReadable(r, h.cfg.CoralDir(), id) { // the one read check (#5577): not yours answers as missing
 		errNotFound(w, "artifact not found")
-		return "", false
+		return "", false, false
 	}
 	var meta agentArtifactMeta
 	data, err := readSmallFile(filepath.Join(h.artifactDir(), id+".json"), 64<<10)
 	if err != nil || json.Unmarshal(data, &meta) != nil {
 		errNotFound(w, "artifact not found")
-		return "", false
+		return "", false, false
 	}
-	if needText && !commentTextLike(meta) {
-		commentRefuse(w, http.StatusUnsupportedMediaType, "not_text", "only text-like artifacts take comments")
-		return "", false
-	}
-	return id, true
+	return id, commentTextLike(meta), true
 }
 
 // readSmallFile reads a sidecar of at most max bytes (a larger file is an error, not a read of all of it).
@@ -536,7 +546,7 @@ func (h *SessionsHandler) createArtifactComment(w http.ResponseWriter, r *http.R
 	if !ok {
 		return
 	}
-	id, ok := h.commentArtifact(w, r, true)
+	id, textLike, ok := h.commentArtifactKind(w, r)
 	if !ok {
 		return
 	}
@@ -574,6 +584,10 @@ func (h *SessionsHandler) createArtifactComment(w http.ResponseWriter, r *http.R
 		}
 		if unchecked {
 			commentRefuse(w, http.StatusServiceUnavailable, "redaction_unavailable", "the selected text could not be checked for secrets, so the comment was not kept")
+			return
+		}
+		if !textLike && !in.Anchor.Whole { // a picture, a PDF, a frame of HTML...: the whole document, not a place in text it does not have
+			commentRefuse(w, http.StatusUnsupportedMediaType, "not_text", "this kind of file takes comments on the whole document only")
 			return
 		}
 		b, _ := json.Marshal(in.Anchor)
