@@ -534,3 +534,4 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 .artifact-sheet-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; } /* the review line above the tags in a team artifact's sheet (#136584) */
 .dt-box.dt-folded .inbox-review-from { display: inline; } /* a For review row of Needs you on a phone (#11456): who uploaded it leads the second line, the line under the name (cut beside the buttons) is not drawn */
 .dt-box.dt-folded td:has(> .inbox-review-name, > .inbox-review-item) > .dt-subtitle { display: none; }
+.dt-box.dt-folded td[data-fold-label]::before { content: attr(data-fold-label) ' '; color: var(--text-secondary); font-weight: var(--fw-regular); } /* a column with foldLabel names its figure where the header row is gone (the phone's Computers, #11463) */

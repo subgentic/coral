@@ -58,6 +58,7 @@ const { settle } = require('./helpers/wait');
         assert.equal(await ev(`document.querySelector('.welcome-connect-btn').target`), '');
         assert.equal(await ev(shown('.welcome-connect-another')), false, 'no Connect another computer link with none connected');
         assert.equal(await ev(`document.querySelector('.welcome-first-run h2').textContent`), 'Connect your first computer');
+        assert.deepEqual(await ev(`(() => { const a = document.querySelector('.welcome-get-coral'); return a && [a.textContent.trim(), a.href, a.target, a.rel]; })()`), ['Get Coral', 'https://coralhub.dev/coral.html#download', '_blank', 'noopener noreferrer'], 'a Get Coral link to the download, in a new tab (#11463 F6)');
         assert.deepEqual(await ev(`[...document.querySelectorAll('.welcome-first-run p')].map(p => p.textContent)`), ['Install Coral on each computer. In Coral, go to Settings > Network and Hub > Connect to Coral Hub, and the computer appears here.']);
         assert.equal(await ev(shown('.welcome-offline')), false);
         const side = await ev(`({ text: document.getElementById('live-sessions-list').innerText.replace(/\\s+/g, ' ').trim(), open: !document.querySelector('[data-section="live-sessions"]').classList.contains('collapsed') })`);
@@ -90,6 +91,9 @@ const { settle } = require('./helpers/wait');
             return { has: !!b, h: r ? Math.round(r.height) : 0, inside: r ? r.right <= innerWidth && r.left >= 0 : false, page: document.documentElement.scrollWidth - document.documentElement.clientWidth }; })()`);
         assert.ok(phone.has && phone.h >= 44 && phone.inside && phone.page <= 0, JSON.stringify(phone));
         assert.equal(await ev(`[...document.querySelectorAll('[data-on-click="launch-show"]')].some(b => b.getClientRects().length > 0)`), false, 'no + New on the phone while nothing can be launched');
+        const note = await ev(`(() => { const n = document.querySelector('#mobile-agent-list .hub-phone-note, #live-sessions-list .hub-phone-note'), g = document.querySelector('#mobile-agent-list .hub-get-coral, #live-sessions-list .hub-get-coral'); return { note: n && getComputedStyle(n).display !== 'none' && n.textContent, get: g && [g.textContent.trim(), g.getAttribute('href'), g.getBoundingClientRect().height >= 44] }; })()`);
+        assert.equal(note.note, 'Coral runs on your computer; open this page there.', 'at phone width the card says where Coral runs (#11463 F6)');
+        assert.deepEqual(note.get, ['Get Coral', 'https://coralhub.dev/coral.html#download', true], 'and has the Get Coral link, a 44 px target');
         await shot('hub-first-run-phone');
 
         console.log('5. Machines that are all offline: "Your machines are offline", not a first run; a usable machine with no agents: "No agents yet"; a list that failed is not a first run');

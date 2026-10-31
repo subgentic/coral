@@ -29,17 +29,16 @@
             <dl id="seen" class="cloud-facts"></dl>
             <h2 class="cloud-sub">Reported by the computer <span class="cloud-note">(not verified)</span></h2>
             <dl id="reported" class="cloud-facts"></dl>
-            <label for="label">Name for this computer</label>
+            <label for="label">Computer name</label>
             <input id="label" type="text" maxlength="100" autocomplete="off">
             <div class="cloud-warn"><strong>Only approve a computer you control.</strong> Approving gives that computer access to your account on this hub, and lets you (and anyone signed in as you) open its terminals and files from the web.</div>
-            <details class="cloud-more"><summary aria-label="How access starts"><span class="material-icons" aria-hidden="true">info</span></summary>
-                <p class="cloud-access-note">Connecting from Coral's dashboard asks what Coral Hub may do on that computer. A computer connected from the command line starts in View (read-only) until you change that in Coral on it; you can limit access further in <a href="/servers">Computers</a>.</p>
-            </details>
+            <p class="cloud-access-note"><strong>Coral Hub starts with View (read-only) access to this computer.</strong> Connecting from Coral's dashboard asks what Coral Hub may do there; a computer connected from the command line stays on View until you change that in Coral on it. You can limit access further in <a href="/servers">Computers</a>.</p>
             <button id="approve" class="cloud-btn primary" type="button">Approve this computer</button>
             <button id="cancel" class="cloud-btn" type="button">Cancel</button>
         </section>
         <section id="done" hidden>
-            <p><strong>Connected.</strong> It appears in the dashboard when it connects.</p>
+            <p><strong>Approved.</strong> It appears in the dashboard when that computer connects, a few seconds after it collects the approval.</p>
+            <p class="cloud-note">If it never connects, the approval runs out after 10 minutes and nothing is added: press Connect to Coral Hub on that computer again. Until then the dashboard lists it as waiting.</p>
             <a class="cloud-btn primary" href="/">Open the dashboard</a>
             <a class="cloud-btn" href="/servers">Open Computers</a>
         </section>

@@ -26,6 +26,7 @@ import { state } from './state.js';
 import { note } from './nav.js';
 import { sessionServer } from './server_base.js';
 import { needsYou } from './asked_before_restart.js';
+import { refreshPending, pendingRows, pendingCard } from './hub_pending.js';
 const { MODES, MODE_INFO, accessChoice, effectiveMode, launchNote, effectiveNote, invalidateServerAccess, serverAccess } = await importOnce('./server_access.js');
 const rank = m => MODES.indexOf(m);
 import { announceNotice } from './notifications.js';
@@ -69,6 +70,7 @@ export const serverView = {
         servers = rows;
         if (before) for (const s of servers) { const was = before.get(s.id); if (was !== undefined && was !== (s.online === true)) announceNotice(`${s.label || 'A computer'} is ${s.online === true ? 'online' : 'offline'}`); }
         loaded = true; loadError = ''; syncRelaunchReads(servers, render);
+        refreshPending().then(changed => { if (changed) render(); }).catch(() => {}); // approved computers that have not connected yet (#11463 F2)
     },
     fail: error => { loadError = error; },
     expand: id => { openPage(id, true); },
@@ -160,10 +162,9 @@ function nameCell(s, live, online) {
     const un = updateNotice(live), warning = un && un.level === 'required' ? un.label : s.needs_relink === true ? 'owner not confirmed' : ''; // the button's name says the state once, and a warning (the #9683 rule: Open <name>, <state word>[, warning: <sentence>])
     return h('div', { className: 'cs-title' },
         h('button', { type: 'button', className: 'cs-toggle cs-open', 'aria-label': `Open ${s.label || 'this computer'}, ${online ? 'online' : 'offline'}${warning ? `, warning: ${warning}` : ''}`, onclick: () => openPage(s.id) },
-            h('span', { className: 'cs-dot ' + (online ? 'online' : 'offline'), 'aria-hidden': 'true' }),
+            // ONE status dot (#11463 F10: the phone row had two, the online/offline one and the health one): the machine's health (#3446) while it is connected; without it (offline, held, reconnecting) the dot says unknown, never a stale ok. The button's name still says online or offline.
+            healthDot(online ? live.machine_health : null, s.label || 'Computer'),
             h('span', { className: 'cs-name', text: s.label || 'Unnamed computer' })),
-        // The machine's health (#3446): the hub relays it while the machine is connected; without it (offline, held, reconnecting) the dot says unknown, never a stale ok.
-        healthDot(online ? live.machine_health : null, s.label || 'Computer'),
         relaunchBadge(h, s.id));
 }
 
@@ -171,9 +172,13 @@ function accessPicker(s, isBusy, helpId) {
     // The owner's choice, View / Interact / Launch; an option above what the computer announced is disabled (Launch means "up to what the computer allows"). The text under it says why (in the open row).
     const choice = accessChoice(s);
     const local = rank(s.local_mode) >= 0 ? s.local_mode : 'view'; // not announced yet: View
-    return h('label', { className: 'cs-launch' }, h('span', { className: 'sr-only', text: `Hub access for ${s.label || 'this computer'} ` }),
+    const eff = effectiveOf(s);
+    const pick = h('label', { className: 'cs-launch' }, h('span', { className: 'sr-only', text: `Hub access for ${s.label || 'this computer'} ` }),
         h('select', { disabled: isBusy, value: choice, 'aria-describedby': helpId, onchange: e => setAccess(s, e.target.value) },
             ['view', 'interact', 'launch'].map(v => h('option', { value: v, selected: v === choice, disabled: rank(v) > rank(local) && v !== choice, text: MODE_INFO[v].label }))));
+    // The select shows the hub's grant, which for a new computer defaults to Launch while the computer itself allows only View: what applies is the lower of the two, so it is said right here, in the table (#11463 F3).
+    if (rank(eff) >= 0 && rank(eff) < rank(choice)) return h('div', { className: 'cs-access-wrap' }, pick, h('span', { className: 'cs-effective', text: `${MODE_INFO[eff].label}: this computer allows ${MODE_INFO[local].label}` }));
+    return pick;
 }
 
 // A click anywhere else closes an open More.
@@ -279,12 +284,12 @@ function serversTable(shown) {
         label: 'Your computers', state: dtState, rows: shown, rowKey: s => s.id, rowName: s => s.label || 'Unnamed computer',
         columns: [
             { key: 'name', label: 'Name', primary: true, width: 'grow', line: 1, sort: true, sortValue: s => sortValue(s, 'name'), cell: cellOf.name },
-            { key: 'status', label: 'Status', line: 2, sort: true, sortValue: s => sortValue(s, 'status'), cell: cellOf.status },
-            { key: 'agents', label: 'Agents', line: 2, width: '4.5rem', align: 'end', sort: 'number', firstDir: 'desc', sortValue: s => sortValue(s, 'agents'), cell: cellOf.agents },
-            { key: 'needs', label: 'Needs you', line: 2, width: '5.5rem', align: 'end', sort: 'number', firstDir: 'desc', sortValue: needsCount, cell: cellOf.needs },
-            { key: 'seen', label: 'Last seen', line: 2, width: '6rem', tone: 'tertiary', sort: 'number', firstDir: 'desc', sortValue: seenValue, cell: cellOf.seen },
-            { key: 'version', label: 'Coral', line: 2, sort: (a, b) => cmpVersion(sortValue(a, 'version'), sortValue(b, 'version')), cell: cellOf.version },
-            { key: 'access', label: 'Hub access', line: 2, sort: 'number', firstDir: 'desc', sortValue: s => sortValue(s, 'access'), cell: cellOf.access },
+            { key: 'status', foldLabel: true, label: 'Status', line: 2, sort: true, sortValue: s => sortValue(s, 'status'), cell: cellOf.status },
+            { key: 'agents', foldLabel: true, label: 'Agents', line: 2, width: '4.5rem', align: 'end', sort: 'number', firstDir: 'desc', sortValue: s => sortValue(s, 'agents'), cell: cellOf.agents },
+            { key: 'needs', foldLabel: true, label: 'Needs you', line: 2, width: '5.5rem', align: 'end', sort: 'number', firstDir: 'desc', sortValue: needsCount, cell: cellOf.needs },
+            { key: 'seen', foldLabel: true, label: 'Last seen', line: 2, width: '6rem', tone: 'tertiary', sort: 'number', firstDir: 'desc', sortValue: seenValue, cell: cellOf.seen },
+            { key: 'version', foldLabel: true, label: 'Coral', line: 2, sort: (a, b) => cmpVersion(sortValue(a, 'version'), sortValue(b, 'version')), cell: cellOf.version },
+            { key: 'access', foldLabel: true, label: 'Hub access', line: 2, sort: 'number', firstDir: 'desc', sortValue: s => sortValue(s, 'access'), cell: cellOf.access },
         ],
         // The names the deep links, the focus keep and the suites read: the table keeps its own classes, these are hooks only (no rule in any stylesheet); they are put back whenever a sort draws the rows again.
         decorateHead: (th, c) => { th.classList.add('cs-th', `cs-col-${c.key}`); th.querySelector('.dt-sort')?.classList.add('cs-sort'); },
@@ -297,6 +302,11 @@ function serversTable(shown) {
 
 
 /** The steps to add a machine, with the download link and what the person will see on that computer. */
+/** Computers approved on the hub that have not connected: what is going on, three things to check, how to start again (hub_pending.js; the labels are text the owner typed). */
+function pendingBlock() {
+    return pendingRows().length ? h('section', { className: 'cs-pending', id: 'cs-pending', 'aria-label': 'Computers waiting to connect' }, pendingCard()) : null;
+}
+
 function enrollBlock() {
     const open = enrollOpen ?? (loaded && servers.length === 0);
     const input = h('input', { type: 'text', className: 'cloud-code', placeholder: 'XXXX-XXXX', value: enrollCode, maxLength: 9, autocomplete: 'off', spellcheck: false, 'aria-label': 'Enrollment code', id: 'cs-enroll-code', oninput: e => { enrollCode = e.target.value; } });
@@ -354,6 +364,7 @@ function render() {
         : h('p', { className: 'empty-state empty-state-tight', text: loadError ? '' : serversFiltered() ? 'No computers match this search.' : 'No computers connected yet.' });
     // replaceChildren() would render a null as the text "null": leave it out.
     host.replaceChildren(...[
+        pendingBlock(),
         enrollBlock(),
         loadError ? h('div', { className: 'servers-form-error', role: 'alert', text: loadError }) : null,
         table].filter(Boolean));

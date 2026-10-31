@@ -542,8 +542,9 @@ export async function launchSession() {
             importOnce('./alerts_offer.js').then(m => m.offerAlertsAfterLaunch()).catch(() => {}); // the first agent is when alerts make sense: once per browser (#10068)
             setTimeout(loadLiveSessions, 2000);
             _refreshAfterLaunch(server, { sessionName: result.session_name, sessionId: result.session_id });
-            if (normServer(server) === LOCAL_SERVER && !added) {
-                _openLaunched(result, type, opener).then(opened => { if (!opened) showToast(`Launched: ${shown}`); }); // the new chat is the answer; when it could not open, the toast says the agent started (#11304)
+            if (!added) {
+                // The new chat is the answer, on this computer or through the Hub (#11463 F12: a launch from the Hub opened nothing, so the person was left on the list to find the row); when it could not open, the toast says the agent started (#11304)
+                _openLaunched(result, type, opener, { server }).then(opened => { if (!opened && normServer(server) === LOCAL_SERVER) showToast(`Launched: ${shown}`); });
             }
         }
     } catch (e) {
@@ -556,11 +557,11 @@ export async function launchSession() {
 
 /** Open what was just launched (#5835): a person who pressed Launch expects to land in the new agent, not on the home screen with a row to find (the first run's biggest drop:
  *  launched, never prompted). The list is read first so the row exists; the composer is focused by selecting it. A failure leaves the toast and the row, as before. */
-export async function _openLaunched(result, type, opener = null, { select = null } = {}) { // select: a seam for the test of a chat that cannot open; true when the new chat opened, false when it could not
+export async function _openLaunched(result, type, opener = null, { select = null, server = LOCAL_SERVER } = {}) { // select: a seam for the test of a chat that cannot open; server: the computer it was launched on (the Hub's launch, #11463); true when the new chat opened, false when it could not
     try {
         await loadLiveSessions();
         const selectLiveSession = select || (await importOnce('./sessions.js')).selectLiveSession;
-        await selectLiveSession(result.session_name, type, result.session_id, LOCAL_SERVER);
+        await selectLiveSession(result.session_name, type, result.session_id, server);
         // The keyboard goes into the new agent's message box, where the person types next: closing the dialog had put it back on the button that opened it (or, on a phone, where that button is gone, on the page).
         // Somewhere else, because the person moved it while the agent opened, it stays (#10247).
         const now = document.activeElement, box = document.getElementById('command-input');
