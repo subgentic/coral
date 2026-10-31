@@ -223,6 +223,39 @@ func TestBulkRecordDryRunNamesEachProgramAndRecordsNothing(t *testing.T) {
 	assert.Equal(t, 100, term.recorded[nameA].PID)
 }
 
+// Security's SHOULD on #11415: Record all sends the session-to-pid pairs it was shown, and the real route records an agent only while its candidate still has that pid.
+func TestBulkRecordOnlyRecordsWhatTheOperatorWasShown(t *testing.T) {
+	srv, term, ss, nameA, nameB := recordFixture(t)
+	cli, err := ss.GetSettingsForCLI(context.Background())
+	require.NoError(t, err)
+	term.paused[nameA], term.paused[nameB] = true, true
+	term.cand[nameA] = ptymanager.AgentCandidate{PID: 100, Start: "s1", Program: "claude", Image: cli["cli_path_claude"]}
+	term.cand[nameB] = ptymanager.AgentCandidate{PID: 200, Start: "s2", Program: "codex", Image: cli["cli_path_codex"]}
+
+	_, preview := postRecordJSON(t, srv+"/api/sessions/record-agents?dry_run=1", map[string]any{})
+	require.Len(t, preview["recorded"], 2)
+
+	// After the preview A's terminal runs another process (the same CLI image, a new pid), and the Operator confirms what they saw.
+	term.cand[nameA] = ptymanager.AgentCandidate{PID: 101, Start: "s1b", Program: "claude", Image: cli["cli_path_claude"]}
+	shown := []map[string]any{{"session": nameA, "pid": 100}, {"session": nameB, "pid": 200}}
+	code, out := postRecordJSON(t, srv+"/api/sessions/record-agents", map[string]any{"agents": shown})
+	require.Equal(t, http.StatusOK, code)
+	recorded, _ := out["recorded"].([]any)
+	left, _ := out["left"].([]any)
+	require.Len(t, recorded, 1)
+	assert.Equal(t, nameB, recorded[0].(map[string]any)["session"])
+	require.Len(t, left, 1)
+	assert.Equal(t, nameA, left[0].(map[string]any)["session"])
+	assert.Contains(t, left[0].(map[string]any)["reason"], "changed since you looked")
+	assert.NotContains(t, term.recorded, nameA, "a process the Operator was not shown is not recorded")
+
+	// An agent that was not in the confirmed list is not recorded either.
+	code, out = postRecordJSON(t, srv+"/api/sessions/record-agents", map[string]any{"agents": []map[string]any{{"session": nameB, "pid": 200}}})
+	require.Equal(t, http.StatusOK, code)
+	assert.Empty(t, out["recorded"])
+	assert.NotContains(t, term.recorded, nameA)
+}
+
 // A program that runs inside a nested shell is recorded only on the Operator's explicit acknowledgement; a direct child needs the plain confirm; bulk never records the nested one.
 func TestRecordingAProgramUnderANestedShellNeedsTheAcknowledgement(t *testing.T) {
 	srv, term, ss, nameA, nameB := recordFixture(t)

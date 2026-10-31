@@ -32,7 +32,7 @@ const { coralReady } = require('./helpers/wait');
             check(`${tag}: another skipped send with nothing unread says nothing, and offers no Record`, (await ev(`document.getElementById('composer-waiting-text').textContent`)) === '' && !(await ev(vis('composer-waiting-record'))));
             await feed({ skipped_send: { why: 'notices paused: the foreground program is not the recorded agent', what: 'board message' } });
             const line = await ev(`document.getElementById('composer-waiting-text').textContent`);
-            check(`${tag}: paused notices are said on the agent view even with nothing unread`, line === 'Board notices are paused for this agent', line);
+            check(`${tag}: paused notices are said on the agent view even with nothing unread, with Record as agent on the line itself`, line === 'Paused: this agent was running before the update, or its process changed' && (await ev(vis('composer-waiting-record-line'))), line);
             await ev(`document.getElementById('composer-waiting-list').hidden = false; document.getElementById('composer-waiting-detail').hidden = false; true`);
             check(`${tag}: behind Options, Record as agent and Record for all agents`, (await ev(vis('composer-waiting-record'))) && (await ev(vis('composer-waiting-record-all'))));
 
@@ -40,7 +40,7 @@ const { coralReady } = require('./helpers/wait');
             await ev(`window.__calls = []; window.__answer = { record: 200 }; window.__realFetch = window.__realFetch || window.fetch; window.fetch = (u, o) => { const s = String(u), json = (b, st = 200) => Promise.resolve(new Response(JSON.stringify(b), { status: st, headers: { 'Content-Type': 'application/json' } }));
                 if (s.includes('/agent-candidate')) { window.__calls.push({ u: s }); return json({ ok: true, paused: true, reason: 'not the recorded agent', candidate: window.__noCandidate ? null : { pid: 4242, start: 'opaque-start-1', program: 'node', under: window.__under || '', folder: '', unidentified: false, ...(window.__cand || {}) }, why_not: window.__noCandidate ? 'several foreground programs' : '' }); }
                 if (s.includes('/record-agent') && !s.includes('/record-agents')) { window.__calls.push({ u: s, body: o && o.body }); return window.__answer.record === 409 ? json({ ok: false, code: 'changed', error: 'the foreground program is no longer that process' }, 409) : json({ ok: true, pid: 4242, program: 'node' }); }
-                if (s.includes('/record-agents')) { window.__calls.push({ u: s, method: o && o.method }); return json({ ok: true, dry_run: /dry_run=1/.test(s), recorded: [{ session: 'claude-a', pid: 1, program: 'claude' }], left: [{ session: 'codex-b', reason: 'ambiguous: the program is node, which runs a script; record it with the button' }] }); }
+                if (s.includes('/record-agents')) { window.__calls.push({ u: s, method: o && o.method, body: o && o.body }); return json({ ok: true, dry_run: /dry_run=1/.test(s), recorded: [{ session: 'claude-a', pid: 1, program: 'claude' }], left: [{ session: 'codex-b', reason: 'ambiguous: the program is node, which runs a script; record it with the button' }] }); }
                 return window.__realFetch(u, o); }; true`);
             const toastSeen = re => waitFor(`[...document.querySelectorAll('.toast, [role=status], [role=alert]')].some(t => ${re}.test(t.textContent))`, `${tag}: the toast ${re}`, 5000);
 
@@ -125,9 +125,19 @@ const { coralReady } = require('./helpers/wait');
             await ev(`document.getElementById('confirm-modal-yes').click(); true`);
             await toastSeen(/Recorded 1 agent\. Left paused: codex-b \(ambiguous/);
             const bulk = await ev(`window.__calls.find(c => /record-agents$/.test(c.u))`);
-            check(`${tag}: confirmed, Record for all agents posts once and says what was recorded and what was left, with why`, !!bulk && bulk.method === 'POST', JSON.stringify(bulk));
+            check(`${tag}: confirmed, Record for all agents posts once, with the session-to-pid pairs it showed, and says what was recorded and what was left, with why`, !!bulk && bulk.method === 'POST' && JSON.stringify(JSON.parse(bulk.body)) === JSON.stringify({ agents: [{ session: 'claude-a', pid: 1 }] }), JSON.stringify(bulk));
             const help = await ev(`(() => { const h = document.getElementById('composer-waiting-record-help'); return { shown: !!h && !h.hidden, text: h ? h.textContent : '' }; })()`);
             check(`${tag}: one help line in Options says what recording does and what to check`, help.shown && /only into the agent process it recorded \(its PID and start time\)/.test(help.text) && /first check that the program running in this terminal is the agent you expect/.test(help.text), JSON.stringify(help));
+            // the Needs you item (#11415): ONE item for all the held agents, which opens the same confirm
+            const item = await ev(`import(${S} + 'waiting.js').then(m => { const rows = window._coralGetLiveSessions(); const it = m.unrecordedItem(rows); return it ? { summary: it.waiting_summary, count: it.unrecorded.count } : null; })`);
+            check(`${tag}: after an update the held agents are ONE Needs you item that counts them`, !!item && item.count === 1 && item.summary === "1 agent isn't receiving Coral's messages", JSON.stringify(item));
+            await ev(`window.__calls = []; window.switchNavTab('hub-inbox'); import(${S} + 'inbox_tab.js').then(m => m.selectInboxTab('needs')); true`);
+            await ev(`import(${S} + 'inbox_tab.js').then(m => m.updateInboxTab()); true`);
+            await waitFor(`/receiving Coral's messages/.test(document.body.innerText)`, `${tag}: the Needs you item is listed`, 8000);
+            await ev(`[...document.querySelectorAll('button')].filter(b => b.textContent === 'Record for all agents' && b.offsetParent && !b.closest('#composer-waiting-detail'))[0].click(); true`);
+            await waitFor(`/Coral will type messages/.test(document.getElementById('confirm-modal-message').textContent) && getComputedStyle(document.getElementById('confirm-modal')).display !== 'none'`, `${tag}: the item opens the Record for all agents confirm`, 5000);
+            check(`${tag}: the Needs you item opens the same confirm`, true);
+            await ev(`window.hideConfirmModal(); true`);
             await ev(`window.fetch = window.__realFetch; true`);
         }
     } finally { await client.close(); }

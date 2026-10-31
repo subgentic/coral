@@ -3,6 +3,7 @@ package routes
 import (
 	"context"
 	"errors"
+	"io"
 	"log/slog"
 	"net/http"
 	"path/filepath"
@@ -163,6 +164,26 @@ type leftAgent struct {
 func (h *SessionsHandler) RecordAgents(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	dryRun := r.URL.Query().Get("dry_run") == "1"
+	// The pairs the Operator was shown (session and pid, from a preview): with them, an agent is recorded only if its current candidate still has exactly that pid, and one not shown is not recorded (#11415, Security). No body: every match, as before.
+	var shown struct {
+		Agents []struct {
+			Session string `json:"session"`
+			PID     int    `json:"pid"`
+		} `json:"agents"`
+	}
+	var confirmed map[string]int
+	if !dryRun {
+		if err := decodeJSONMax(w, r, &shown, 1<<16); err != nil && !errors.Is(err, io.EOF) {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "the list of agents shown could not be read"})
+			return
+		}
+		if shown.Agents != nil {
+			confirmed = make(map[string]int, len(shown.Agents))
+			for _, a := range shown.Agents {
+				confirmed[a.Session] = a.PID
+			}
+		}
+	}
 	rec, can := h.terminal.(ptymanager.AgentRecorder)
 	if !can {
 		writeJSON(w, http.StatusUnprocessableEntity, map[string]any{"ok": false, "code": "not_supported", "error": "this terminal cannot record an agent"})
@@ -197,6 +218,17 @@ func (h *SessionsHandler) RecordAgents(w http.ResponseWriter, r *http.Request) {
 		case why != "":
 			left = append(left, leftAgent{name, why})
 			continue
+		}
+		if confirmed != nil {
+			want, ok := confirmed[name]
+			if !ok {
+				left = append(left, leftAgent{name, "not in the list you confirmed (its notices paused after you looked): record it with the button"})
+				continue
+			}
+			if want != cand.PID {
+				left = append(left, leftAgent{name, "changed since you looked: the program in its terminal is no longer the one you were shown"})
+				continue
+			}
 		}
 		if cand.Unidentified || cand.Image == "" {
 			left = append(left, leftAgent{name, "needs the button: the program could not be identified (its image cannot be read)"})
