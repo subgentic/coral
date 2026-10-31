@@ -34,7 +34,7 @@ func InDir(t *testing.T, body func(t *testing.T, dir string)) {
 	text := string(out)
 	switch {
 	case err != nil:
-		t.Fatalf("%s failed in %s:\n%s", t.Name(), dir, text)
+		t.Fatalf("%s failed in its own folder:\n%s", t.Name(), text)
 	case strings.Contains(text, "--- SKIP: "+t.Name()):
 		t.Skipf("skipped in the child run:\n%s", text)
 	case !strings.Contains(text, "--- PASS: "+t.Name()):

@@ -129,8 +129,28 @@ func inSourceTree(path string) (string, bool) {
 	return "", false
 }
 
+// protectedResolved is each protected folder with its real path, worked out once: the folders are the person's real ~/.coral, which does not move while a test binary runs, and resolving
+// one walks and stats every folder above it. CheckDataPath runs for every store or socket a test opens (about 7,500 times in routes), and under 'go test' each of those stats is an entry
+// in the test's input log that cmd/go resolves again, so resolving the live folder per check cost the Go tool minutes per run on a folder no test should touch (#413). The path being
+// checked is still resolved at every call, so a symlink that points into the protected folder is still caught. A protected folder that becomes a symlink after the first check is not.
+var protectedResolved = sync.OnceValue(func() []protectedDir {
+	var out []protectedDir
+	for _, d := range protectedDirs() {
+		out = append(out, protectedDir{dir: d, real: comparable(d)})
+	}
+	return out
+})
+
+type protectedDir struct{ dir, real string }
+
 func protected(path string) (string, bool) {
-	return protectedIn(path, protectedDirs())
+	p := comparable(path)
+	for _, d := range protectedResolved() {
+		if p == d.real || strings.HasPrefix(p, d.real+string(filepath.Separator)) {
+			return d.dir, true
+		}
+	}
+	return "", false
 }
 
 // protectedIn reports whether path is, or is inside, one of dirs. Both sides
