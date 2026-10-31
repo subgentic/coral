@@ -79,6 +79,7 @@ case "$last" in
       unknown) if grep -q 'box.example.com' '` + known + `' 2>/dev/null; then echo '` + uname + `'; exit 0; fi; echo 'Host key verification failed.' >&2; exit 255;;
     esac;;
   *"command -v tmux"*) exit ` + tm + `;;
+  *"20E4"*) [ -e '` + filepath.Join(dir, "portheld") + `' ] && exit 2; exit 0;;
 esac
 exit 0
 `
@@ -646,4 +647,30 @@ func TestProvisionAPanickingStepFailsThePlanWithAFixedSentence(t *testing.T) {
 	// the plan can be cancelled and the hub still answers
 	code, _ = pe.do("DELETE", "/api/servers/provision/"+plan, nil)
 	assert.Equal(t, 200, code)
+}
+
+// Port 8420 held by another user's Coral: the start step answers with the one sentence that names the port (QA Engineer's gap on #11429), not the general "could not start", and starts nothing.
+func TestProvisionStartStepNamesPort8420WhenAnotherHoldsIt(t *testing.T) {
+	pe := newProvEnv(t, "known", "Linux x86_64", true)
+	require.NoError(t, os.WriteFile(filepath.Join(pe.dir, "portheld"), nil, 0o600))
+	_, v := pe.do("POST", "/api/servers/provision/plan", map[string]any{"target": "user@box.example.com"})
+	plan := v["plan"].(string)
+	pe.do("POST", "/api/servers/provision/"+plan+"/connect", nil)
+	pe.p.version = "2.0.10"
+	_, _, err := pe.p.realStartRemote(context.Background(), pe.p.plan(plan))
+	var ie *sshprov.ErrInstall
+	require.ErrorAs(t, err, &ie)
+	assert.Equal(t, portInUseSentence, ie.Msg)
+	assert.Contains(t, portInUseSentence, "8420")
+	if b, rerr := os.ReadFile(pe.sshLog); rerr == nil {
+		assert.NotContains(t, string(b), "new-session", "nothing was started")
+	}
+	// the same step with 8420 free reaches the start (it is cut short by the fake ssh, which starts nothing): the sentence is for the held port only
+	require.NoError(t, os.Remove(filepath.Join(pe.dir, "portheld")))
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	_, _, err = pe.p.realStartRemote(ctx, pe.p.plan(plan))
+	if errors.As(err, &ie) {
+		assert.NotEqual(t, portInUseSentence, ie.Msg)
+	}
 }

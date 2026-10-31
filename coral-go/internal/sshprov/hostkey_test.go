@@ -243,3 +243,48 @@ func TestScanAliasReturnsEveryHostOfAJumpPathAndNothingElse(t *testing.T) {
 		t.Errorf("no stored key: %v", err)
 	}
 }
+
+// The jump hops of a ProxyJump alias are run by ssh from the config, not from our argv: the scan gives them the same safety through a temporary config (-F, which ssh hands to each hop). The safety lines
+// come FIRST (ssh keeps the first value), forwarding is off for the hops, the owner's config is included after them, and the file is gone afterwards.
+func TestScanAliasGivesTheJumpHopsTheScanSafetyThroughATemporaryConfig(t *testing.T) {
+	ed, _ := blobFor("ssh-ed25519", 3)
+	dir := t.TempDir()
+	copyTo := filepath.Join(dir, "config.copy")
+	seen := filepath.Join(dir, "config.path")
+	ssh := newStandIn(t, "ssh", standCfg{Exit: 255, KnownHosts: "jump.example.com ssh-ed25519 " + ed + "\n", ConfigCopy: copyTo, ConfigPath: seen})
+	tg, _ := FromAlias("far-box")
+	if _, err := (Runner{SSH: ssh, Config: "/home/user/my ssh/config"}).ScanAlias(context.Background(), tg); err != nil {
+		t.Fatal(err)
+	}
+	b, _ := os.ReadFile(copyTo)
+	cfg := string(b)
+	tmpKnown := ""
+	for _, l := range strings.Split(cfg, "\n") {
+		if strings.HasPrefix(strings.TrimSpace(l), "UserKnownHostsFile ") {
+			tmpKnown = strings.Trim(strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(l), "UserKnownHostsFile ")), `"`)
+		}
+	}
+	if !strings.Contains(tmpKnown, "coral-hostkey-") || strings.Contains(tmpKnown, ".ssh") {
+		t.Errorf("the hops' known_hosts is not the scan's temporary one: %q\n%s", tmpKnown, cfg)
+	}
+	for _, want := range []string{"Host *\n", "StrictHostKeyChecking no", "GlobalKnownHostsFile ", "HashKnownHosts no", "BatchMode yes", "ForwardAgent no", "ForwardX11 no", "ClearAllForwardings yes", "PermitLocalCommand no",
+		"GSSAPIAuthentication no", "GSSAPIDelegateCredentials no", "ControlMaster no", "ControlPath none", "ControlPersist no", `Include "/home/user/my ssh/config"`} {
+		if !strings.Contains(cfg, want) {
+			t.Errorf("the temporary config lacks %q:\n%s", want, cfg)
+		}
+	}
+	if i, j := strings.Index(cfg, "ForwardAgent no"), strings.Index(cfg, "Include"); i < 0 || j < 0 || i > j {
+		t.Errorf("the owner's config must come after the safety lines (ssh keeps the first value):\n%s", cfg)
+	}
+	if strings.Contains(cfg, "IdentityAgent") || strings.Contains(cfg, "PreferredAuthentications") {
+		t.Errorf("the hops must be able to sign in as the owner's config says (a jump opens a channel only for someone who did):\n%s", cfg)
+	}
+	p, _ := os.ReadFile(seen)
+	if _, err := os.Stat(string(p)); err == nil {
+		t.Error("the temporary config was left behind")
+	}
+	// a config path that could break out of the quotes is refused before ssh is started
+	if _, err := (Runner{SSH: ssh, Config: "/x\"\nProxyCommand evil"}).ScanAlias(context.Background(), tg); !errors.Is(err, ErrBadTarget) {
+		t.Errorf("a config path with a quote and a newline: %v", err)
+	}
+}
