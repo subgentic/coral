@@ -187,3 +187,17 @@ func TestAssetURLsInheritThePrefix(t *testing.T) {
 		t.Error("preview modules must resolve cm_shadow.css from import.meta.url")
 	}
 }
+
+// #11463 F4 (coral-hub's walk): the sign-in link only works in the browser that asked for it, and the page now says so right under the button, before anyone is waiting for an email.
+func TestSigninPageSaysTheLinkOpensOnTheSameDeviceAndBrowser(t *testing.T) {
+	b, err := Templates.ReadFile("templates/cloud/signin.html")
+	if err != nil {
+		t.Fatal(err)
+	}
+	page := string(b)
+	btn := strings.Index(page, "Email me a sign-in link")
+	note := strings.Index(page, "Open the link on this same device and browser.")
+	if btn < 0 || note < 0 || note < btn {
+		t.Errorf("the line is missing or comes before the button (button at %d, line at %d)", btn, note)
+	}
+}
