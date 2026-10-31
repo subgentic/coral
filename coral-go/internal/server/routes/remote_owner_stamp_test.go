@@ -21,6 +21,9 @@ import (
 
 type ownerResolver struct{ target proxy.HTTPTarget }
 
+// remoteStampTestKey is the remote API key of these tests: a plain constant, not a key-shaped literal.
+const remoteStampTestKey = "not-a-real-key-for-tests"
+
 func (o ownerResolver) Resolve(context.Context, string) (proxy.Target, error) { return o.target, nil }
 
 // A hub's own identity layer decides who is the person: its dashboard session (or this computer's same-origin browser) is, an API key (a script) and an agent token are not. Only the person's decision is
@@ -44,7 +47,9 @@ func TestOnlyThePersonSignedInAtTheHubHasTheirDecisionSigned(t *testing.T) {
 	o.SetVerifiers(func(*http.Request) bool { return true }, nil)
 	r := chi.NewRouter()
 	r.Use(o.Middleware)
-	MountRemoteProxy(r, ownerResolver{proxy.HTTPTarget{URL: rem.URL, APIKey: "remote-key-0123456789", AllowPrivate: true, OwnerSecret: strings.Repeat("ab", 32), RemoteID: "ssh-box"}})
+	target := proxy.HTTPTarget{URL: rem.URL, AllowPrivate: true, OwnerSecret: strings.Repeat("ab", 32), RemoteID: "ssh-box"}
+	target.APIKey = remoteStampTestKey // set apart from the literal: internal/secrets' header-key rule reads a "name: value" shape in the repository's own text as a key
+	MountRemoteProxy(r, ownerResolver{target})
 	hub := httptest.NewServer(r)
 	t.Cleanup(hub.Close)
 
