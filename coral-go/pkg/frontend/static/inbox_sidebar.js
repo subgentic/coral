@@ -252,13 +252,13 @@ function runActions(run) {
     const box = DT.el('div', 'inbox-review-actions');
     const open = DT.el('button', 'btn btn-small', 'Open'); open.type = 'button';
     open.setAttribute('aria-label', `Open ${run.name}, failed run`); open.addEventListener('click', () => openRun(run));
-    const done = DT.el('button', 'btn btn-small', 'Dismiss'); done.type = 'button';
-    done.setAttribute('aria-label', `Dismiss the failed run of ${run.name}`);
-    done.addEventListener('click', () => { markSeen(run); sayLive(`Dismissed the failed run of ${run.name}.`); $('group-table-view')?.querySelector('input[type=search]')?.focus({ preventScroll: true }); });
+    const done = DT.el('button', 'btn btn-small', 'Ignore'); done.type = 'button';
+    done.setAttribute('aria-label', `Ignore the failed run of ${run.name}`);
+    done.addEventListener('click', () => { markSeen(run); sayLive(`Ignored the failed run of ${run.name}.`); $('group-table-view')?.querySelector('input[type=search]')?.focus({ preventScroll: true }); });
     box.append(open, done); return box;
 }
 
-/** A welcome item's actions (#11443): its own action, and a quiet Dismiss for all but the welcome itself. */
+/** A welcome item's actions (#11443): its own action, and a quiet Ignore for all but the welcome itself. */
 function welcomeActions(w) {
     const box = DT.el('div', 'inbox-review-actions inbox-welcome-actions');
     const go = DT.el('button', 'btn btn-small btn-primary', w.go); go.type = 'button';
@@ -266,9 +266,9 @@ function welcomeActions(w) {
     go.addEventListener('click', () => runWelcome(w.id));
     box.append(go);
     if (w.dismiss) {
-        const no = DT.el('button', 'btn btn-small btn-quiet', 'Dismiss'); no.type = 'button';
-        no.setAttribute('aria-label', `Dismiss: ${w.title}`);
-        no.addEventListener('click', () => { dismissWelcome(w.id); sayLive(`Dismissed: ${w.title}.`); });
+        const no = DT.el('button', 'btn btn-small btn-quiet', 'Ignore'); no.type = 'button';
+        no.setAttribute('aria-label', `Ignore: ${w.title}`);
+        no.addEventListener('click', () => { dismissWelcome(w.id); sayLive(`Ignored: ${w.title}.`); });
         box.append(no);
     }
     return box;

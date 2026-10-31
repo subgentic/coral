@@ -28,7 +28,7 @@ export function attachWelcomeSwipe(host) {
         const row = e.pointerType === 'touch' && e.target.closest('tr[data-welcome-id]');
         if (!row || drag) return;
         drag = { row, id: row.dataset.welcomeId, x: e.clientX, y: e.clientY, t: e.timeStamp, dx: 0, on: false, strip: document.createElement('div') };
-        drag.strip.className = 'inbox-swipe-strip'; drag.strip.setAttribute('aria-hidden', 'true'); drag.strip.textContent = 'Dismiss';
+        drag.strip.className = 'inbox-swipe-strip'; drag.strip.setAttribute('aria-hidden', 'true'); drag.strip.textContent = 'Ignore';
     });
     host.addEventListener('pointermove', e => {
         if (!drag || e.pointerType !== 'touch') return;
@@ -54,8 +54,8 @@ export function attachWelcomeSwipe(host) {
             const title = (d.row.querySelector('.inbox-welcome-name')?.firstChild?.textContent || 'the item').trim();
             d.strip.remove(); d.row.style.transform = '';
             dismissWelcome(d.id);
-            showToast(`Dismissed: ${title}`, false, undefined, { action: { label: 'Undo', onClick: () => undo(d.id) } });
-            announceNotice(`Dismissed: ${title}. Undo is in the notice.`); // read out politely: the toast is not a live region of its own
+            showToast(`Ignored: ${title}`, false, undefined, { action: { label: 'Undo', onClick: () => undo(d.id) } });
+            announceNotice(`Ignored: ${title}. Undo is in the notice.`); // read out politely: the toast is not a live region of its own
         } else back(d.row, d.strip);
     };
     host.addEventListener('pointerup', end);
