@@ -68,7 +68,9 @@ export function pollStartupStatus() {
                 dashboardStartupComplete();
                 // One question at a time: set a password (#3948, once, while none is set), then Coral Hub sign-in (#3966, once, for a
                 // computer already linked to Coral Hub). The second waits if the first is still open.
-                importOnce('./password_ui.js').then(m => m.maybePromptSetPassword()).catch(() => {})
+                // On a fresh install the first-launch Connect screen is asked first (#11464): the password waits for its answer, for at most 15 s.
+                importOnce('./editions.js').then(m => Promise.race([m.firstOfferDone, new Promise(r => setTimeout(r, 15000))])).catch(() => {})
+                    .then(() => importOnce('./password_ui.js')).then(m => m.maybePromptSetPassword()).catch(() => {})
                     .then(() => importOnce('./hub_notice.js')).then(m => m.maybeOfferHubSignin()).catch(() => {});
                 loadLiveSessions(dashboardFailed).then(dashboardSessionsLoaded).finally(_settlePollListLoad);
                 return;
