@@ -28,7 +28,7 @@ export function mountOwnerSecret(host, { id, label = id, onClose = () => {}, onC
     }
 
     async function copy(input, say) {
-        try { await navigator.clipboard.writeText(input.value); say.textContent = 'Copied.'; } catch { input.select(); say.textContent = 'Select the line and copy it.'; }
+        try { await navigator.clipboard.writeText(input.value); say.textContent = 'Copied.'; } catch { input.type = 'text'; input.select(); say.textContent = 'Select the line and copy it.'; } // a hidden field cannot be copied from by hand: shown for the fallback
     }
 
     function button(text, cls, fn, disabled = false) {
@@ -53,14 +53,16 @@ export function mountOwnerSecret(host, { id, label = id, onClose = () => {}, onC
             bar.append(button('Cancel', '', finish), button(busy ? 'Working...' : 'Make the line', 'btn-primary', make, busy));
             root.append(bar);
         } else {
-            root.append(el('p', 'ssh-help', `At ${label}, run this command and paste the line when it asks. It is not shown again.`));
+            root.append(el('p', 'ssh-help', `Paste it at ${label} now: run this command there and paste the line when it asks. It is not shown again.`));
             const cmd = el('code', 'ssh-key-fp', 'coral hub-owner-secret'); root.append(cmd);
             const l = el('label', 'ssh-label', 'The line to paste'); l.htmlFor = 'owner-secret-line';
-            const inp = el('input', 'field ssh-input'); inp.id = 'owner-secret-line'; inp.type = 'text'; inp.readOnly = true; inp.value = line; inp.spellcheck = false;
+            const inp = el('input', 'field ssh-input'); inp.id = 'owner-secret-line'; inp.type = 'password'; inp.readOnly = true; inp.autocomplete = 'off'; inp.value = line; inp.spellcheck = false;
             const say = el('span', 'ssh-help'); say.setAttribute('role', 'status');
             root.append(l, inp, say);
             const bar = el('div', 'servers-form-actions');
-            bar.append(button('Copy', '', () => copy(inp, say)), button('Done', 'btn-primary', finish));
+            const show = button('Show', '', () => { const hidden = inp.type === 'password'; inp.type = hidden ? 'text' : 'password'; show.textContent = hidden ? 'Hide' : 'Show'; show.setAttribute('aria-pressed', String(hidden)); });
+            show.setAttribute('aria-pressed', 'false');
+            bar.append(show, button('Copy', '', () => copy(inp, say)), button('Done', 'btn-primary', finish));
             root.append(bar);
             inp.select();
         }
