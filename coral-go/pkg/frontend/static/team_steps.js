@@ -6,6 +6,16 @@ export function currentTeamStep() {
     return document.getElementById('launch-step-team')?.dataset.stage || 'team';
 }
 
+/** The folder in the step line, as the end of its path ("…/Coral/first-team"): a whole path wrapped over four lines on a phone. A tap shows all of it and another shortens it (#11401). Text only: a path is the person's. */
+function folderButton(dir) {
+    const short = dir.length <= 34 ? dir : '…/' + dir.split(/[\\/]+/).filter(Boolean).slice(-2).join('/');
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'team-sub-path'; b.textContent = short; b.setAttribute('aria-expanded', 'false'); b.setAttribute('aria-label', `Folder ${dir}`);
+    if (short === dir) { b.disabled = true; return b; }
+    b.addEventListener('click', () => { const open = b.getAttribute('aria-expanded') !== 'true'; b.setAttribute('aria-expanded', String(open)); b.textContent = open ? dir : short; });
+    return b;
+}
+
 export function showTeamStep(step, { focus = false } = {}) {
     const i = TEAM_STEPS.indexOf(step);
     if (i < 0) return;
@@ -32,7 +42,7 @@ export function showTeamStep(step, { focus = false } = {}) {
             sub.append('. ');
             if (name) { const b = document.createElement('b'); b.textContent = name; sub.append(b); }
             if (name && dir) sub.append(' in ');
-            if (dir) { const b = document.createElement('b'); b.textContent = dir; sub.append(b); }
+            if (dir) sub.append(folderButton(dir));
         }
     }
     const live = document.getElementById('team-step-live');
