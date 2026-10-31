@@ -186,6 +186,7 @@ node analytics_spend_reuse.test.mjs
 node analytics_overview_group.test.mjs
 node dialog_census.test.mjs
 node chip_census.test.mjs
+node state_label_one_builder.test.mjs
 node fetch_share.test.mjs
 node polls_ask_fresh.test.mjs
 node analytics_task_read.test.mjs

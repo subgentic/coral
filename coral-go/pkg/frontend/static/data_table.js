@@ -36,10 +36,12 @@ export function primaryButton(text, label) {
     return b;
 }
 /** A state as a dot and a word (the dot is decoration: the word says it). */
+/** A state as a coloured dot and its word in the same colour: no outline and no fill (the operator, #11356). The one builder for every state in every list (the task, job, goal, run and agent tables, the team pages and the goal's page); on a phone the word is hidden and the dot stands for it (css/goals.css). */
 export function chip(word, cls) {
-    const c = el('span', `chip dt-chip goal-chip ${cls || ''}`.trim());
+    const c = el('span', `state-label dt-chip goal-chip ${cls || ''}`.trim());
     const dot = el('span', 'goal-dot'); dot.setAttribute('aria-hidden', 'true');
-    c.append(dot, document.createTextNode(word));
+    c.title = word;
+    c.append(dot, el('span', 'state-word', word));
     return c;
 }
 export function tag(text) { return el('span', 'chip chip-tag dt-tag', text); }
