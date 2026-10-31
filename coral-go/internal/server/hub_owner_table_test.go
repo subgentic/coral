@@ -118,6 +118,9 @@ func TestTheOwnerRoutesOfTheTableAreTheReviewedSet(t *testing.T) {
 		"POST /api/sessions/live/{name}/notices/pause":  "owner-only", // pausing Coral's notices to an agent (#11387)
 		"POST /api/sessions/live/{name}/notices/resume": "owner-only",
 		"GET /api/operator-asks":                        "owner-only", // the questions agents asked the Operator, for Needs you (#11417)
+		"GET /api/board/{project}/orchestrator-grant":   "owner-only", // the grant to a board's orchestrator (#11432)
+		"PUT /api/board/{project}/orchestrator-grant":   "owner-only",
+		"GET /api/board/{project}/lifecycle-log":        "owner-only",
 		// A comment (or reply), a resolve and a reopen through the Hub are the owner's alone (#7052).
 		"POST /api/artifacts/{hex64}/comments":              "owner-only",
 		"POST /api/artifacts/{hex64}/comments/{id}/resolve": "owner-only",

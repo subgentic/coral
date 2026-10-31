@@ -240,6 +240,8 @@ func (s *Store) deleteProject(ctx context.Context, project string, onlyIfUnused 
 		{"DELETE FROM board_goal_requests_out WHERE board_id = ? OR (to_server = '' AND to_board = ?)", 2},
 		{"DELETE FROM board_asks WHERE project = ?", 1},
 		{"DELETE FROM board_replies WHERE project = ?", 1},
+		{"DELETE FROM board_orch_grant WHERE project = ?", 1}, // the grant to a board's orchestrator and its log go with the board (#11432)
+		{"DELETE FROM board_lifecycle_log WHERE project = ?", 1},
 		{"DELETE FROM board_ask_closed WHERE project = ?", 1},  // a question closed by hand goes with its board (#11417)
 		{"DELETE FROM artifact_tags WHERE board_id = ?", 1},    // a board made again under the name inherits none of its tags
 		{"DELETE FROM artifact_reviews WHERE board_id = ?", 1}, // nor the decisions on its artifacts (#136584)

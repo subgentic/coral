@@ -250,9 +250,19 @@ func (h *SessionsHandler) LaunchTeam(w http.ResponseWriter, r *http.Request) {
 			categories = append(categories, "")
 			continue
 		}
+		// An agent's team launch is logged and held to the board's caps one member at a time, in the same statement as a single launch (#11432): a team is not a way round them.
+		lifeID, lifeGrant, lifeErr := h.reserveAgentLaunch(r, body.BoardName, agentDef.Name)
+		if lifeErr != nil {
+			code, msg := capRefusal(lifeErr, lifeGrant)
+			launched = append(launched, map[string]any{"name": agentDef.Name, "error": msg, "code": code})
+			categories = append(categories, "")
+			continue
+		}
 		// A member that names no mode, flags or capabilities starts in the CLI's normal confirm mode, the "Default" the team form shows (#6415, Codex Test's #6412): the server no longer
 		// widens an empty member to Auto (#5836 still applies to a single launch). What the person chose (flags, capabilities, a saved default) is used as before.
 		entry, category := h.launchTeamMember(ctx, body, agentDef, userSettings, workingDir, worktreePath, teamID, false)
+		_, memberFailed := entry["error"]
+		h.endAgentLaunch(ctx, body.BoardName, lifeID, !memberFailed, launcherWords(h.orchActorOf(r))+" started "+orchName(agentDef.Name))
 		if category != "" && firstFailure == "" {
 			firstFailure = category
 		}
