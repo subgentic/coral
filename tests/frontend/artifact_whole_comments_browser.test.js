@@ -8,6 +8,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { connect } = require('./agent_view_harness');
 const { guardSettings } = require('./helpers/settings_guard');
+const { coralReady } = require('./helpers/wait');
 const BASE = require('./test_base').BASE;
 const DATA = process.env.CORAL_TEST_DATA_DIR || '';
 
@@ -46,7 +47,7 @@ const WIDTHS = [{ label: '1280', width: 1280, height: 800, mobile: false }, { la
             wi++;
             await Emulation.setDeviceMetricsOverride({ width: w.width, height: w.height, deviceScaleFactor: 1, mobile: w.mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
-            await ev(`window.__coralReady.then(() => true)`);
+            await coralReady(ev);
             for (const k of KINDS) {
                 const tag = `${w.label} ${k.name}`;
                 await ev(`import((window.__coralStatic || '/static/') + 'artifact_viewer.js').then(m => m.openArtifactViewer('${k.hex}', { filename: ${JSON.stringify(k.name)}, mediaType: ${JSON.stringify(k.mediaType)} })); true`);
