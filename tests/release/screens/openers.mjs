@@ -65,7 +65,16 @@ export const OPENERS = {
     async jump(page, seed) { await home(page, seed); await page.keyboard.press(process.platform === 'darwin' ? 'Meta+k' : 'Control+k'); await page.locator('#jump-modal').waitFor({ state: 'visible', timeout: 8000 }); },
     async newJob(page, seed) { await page.goto(page.__base + '/automations/jobs', { waitUntil: 'domcontentloaded' }); await page.evaluate(() => window.__coralReady); await clickVisible(page, 'button:has-text("New job")', 'New job button'); await page.locator('#job-modal').waitFor({ state: 'visible' }); },
     async newTask(page, seed) { await page.goto(`${page.__base}/team/${seed.teams[0].name}/tasks`, { waitUntil: 'domcontentloaded' }); await page.evaluate(() => window.__coralReady); await clickVisible(page, 'button:has-text("New task")', 'New task button'); await page.locator('#create-task-modal').waitFor({ state: 'visible' }); },
-    async mobileConnect(page, seed) { await home(page, seed); await fire(page, act('m-mobile-connect-open'), 'Mobile QR code button'); await page.locator('#mobile-connect-modal').waitFor({ state: 'visible' }); },
+    // the Mobile QR code is not on Home any more (the operator, #11414): its button is by the API key in Settings > Security
+    async mobileConnect(page, seed) { await OPENERS.settings(page, seed, { group: 'security' }); await fire(page, `#settings-modal ${act('m-show-mobile-connect-modal')}`, 'Mobile QR button by the API key'); await page.locator('#mobile-connect-modal').waitFor({ state: 'visible' }); },
+    // the CSV viewer (#11382): the seeded phone-pass.csv, opened from the Inbox's Artifacts as a person opens it
+    async csvViewer(page, seed) {
+        await page.goto(page.__base + '/inbox/artifacts', { waitUntil: 'domcontentloaded' }); await page.evaluate(() => window.__coralReady);
+        const row = page.locator('#group-table-view button, #group-table-view a').filter({ hasText: 'phone-pass.csv' }).filter({ visible: true }).first();
+        await row.waitFor({ state: 'visible', timeout: 10000 }).catch(() => { throw new Error('no phone-pass.csv in the Inbox Artifacts (seed.mjs uploads it)'); });
+        await row.click();
+        await page.locator('.csv-view .csv-status').first().waitFor({ state: 'visible', timeout: 10000 }).catch(() => { throw new Error('the CSV table did not open (.csv-view)'); });
+    },
     async teamSettings(page, seed) { await page.goto(`${page.__base}/team/${seed.teams[0].name}`, { waitUntil: 'domcontentloaded' }); await page.evaluate(() => window.__coralReady); 
         const header = page.locator('.team-page-actions button:has-text("Settings"), #team-page-actions button:has-text("Settings")').filter({ visible: true });
         if (await header.count()) await header.first().click();

@@ -177,7 +177,6 @@ registerActions({
     'm-dismiss-default-notice': () => { importOnce('./terminal_backend.js').then(m => m.dismissDefaultNotice()); },
     'm-open-terminal-settings': () => { window.showSettingsModal('terminal'); },
     'm-go-home': () => { window.__coral._goHome(); },
-    'm-mobile-connect-open': (el, event) => { event.preventDefault(); window._showMobileConnectModal(); },
     'm-show-launch-modal-then-select-launch-type': el => { if (["agent", "team"].includes(el.dataset.arg)) { window.showLaunchModal(); window._selectLaunchType(el.dataset.arg); } },
     'm-switch-mobile-tab': el => { if (["agents", "board", "chat"].includes(el.dataset.arg)) { window.switchMobileTab(el.dataset.arg); } },
     'm-switch-nav-tab': el => { if (["agents", "artifacts", "automations", "board", "docs", "history", "hub-inbox", "servers", "tokens"].includes(el.dataset.arg)) { window.switchNavTab(el.dataset.arg); } },
