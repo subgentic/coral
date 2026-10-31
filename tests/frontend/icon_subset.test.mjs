@@ -4,10 +4,11 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { scanIcons, allNames, FRONTEND, candidates, codePoints } from './icon_names.mjs';
 
 const FONTS = path.join(FRONTEND, 'static/vendor/fonts');
-const subset = new Set(fs.readFileSync(path.join(path.dirname(new URL(import.meta.url).pathname), 'fixtures', 'material-icons.names.txt'), 'utf8').split('\n').filter(Boolean));
+const subset = new Set(fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures', 'material-icons.names.txt'), 'utf8').split('\n').filter(Boolean));
 const all = allNames();
 
 const { names, codePoints: points } = scanIcons();
