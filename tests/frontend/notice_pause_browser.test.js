@@ -1,6 +1,6 @@
 // Pause Coral's messages to one agent (#11388, the UI of Lead's per-agent notice pause): the chat header has ONE toggle ("Pause Coral messages", aria-pressed, 44 px on a touch screen); pressing it asks the server to pause
 // (POST .../notices/pause) and the bar above the composer says "Coral's messages are paused while you talk. N waiting." with the time left and a Resume button; Resume (the bar's or the toggle) asks to resume. A row with
-// notices_holding says "Holding Coral's messages while you type" quietly. A sleeping agent has no control. The routes are a stub (notice_pause.js `api`) until Lead's real shape is posted. 1280 and 390 px, light and dark.
+// notices_holding says "Coral's messages wait while you type, and arrive when you stop" quietly. A sleeping agent has no control. The routes are a stub (notice_pause.js `api`) until Lead's real shape is posted. 1280 and 390 px, light and dark.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { coralReady } = require('./helpers/wait');
@@ -52,7 +52,7 @@ const S = `(window.__coralStatic || '/static/')`;
             assert.equal((await view()).bar, false, `${tag}: no bar after Resume`);
             await feed({ notices_holding: true });
             v = await view();
-            assert.ok(v.bar && v.text === "Holding Coral's messages while you type" && !v.resume && v.pressed === 'false', `${tag}: the auto-hold is a quiet hint, with no Resume: ` + JSON.stringify(v));
+            assert.ok(v.bar && v.text === "Coral's messages wait while you type, and arrive when you stop" && !v.resume && v.pressed === 'false', `${tag}: the auto-hold is a quiet hint, with no Resume: ` + JSON.stringify(v));
             await feed({ sleeping: true });
             v = await view();
             assert.ok(!v.btn && !v.bar, `${tag}: a sleeping agent has no control: ` + JSON.stringify(v));
