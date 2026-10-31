@@ -25,7 +25,7 @@ const S = `(window.__coralStatic || '/static/')`;
             const view = () => ev(`(() => { const vis = e => !!e && !e.hidden && e.getClientRects().length > 0; const b = document.getElementById('notice-pause-btn'), bar = document.getElementById('notice-pause-bar'), r = b ? b.getBoundingClientRect() : { width: 0, height: 0 };
                 return { btn: vis(b), pressed: b && b.getAttribute('aria-pressed'), name: b && b.getAttribute('aria-label'), w: Math.round(r.width), h: Math.round(r.height), bar: !!bar && bar.getBoundingClientRect().height > 1, text: bar ? bar.querySelector('.notice-pause-text').textContent : '', resume: vis(bar && bar.querySelector('.notice-pause-resume')) }; })()`);
             const calls = () => ev(`window.__calls`);
-            await ev(`window.__calls = []; window.__realFetch = window.fetch; window.fetch = (u, o) => { const s = String(u); if (s.includes('/notices/')) { window.__calls.push({ u: s, method: (o && o.method) || 'GET', body: o && o.body }); return Promise.resolve(new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'Content-Type': 'application/json' } })); } return window.__realFetch(u, o); }; true`);
+            await ev(`window.__calls = []; window.__realFetch = window.fetch; window.fetch = (u, o) => { const s = String(u); if (s.includes('/notices/')) { window.__calls.push({ u: s, method: (o && o.method) || 'GET', body: o && o.body }); return Promise.resolve(new Response(JSON.stringify(s.includes('/pause') ? { notices_paused: true, paused_until: new Date(Date.now() + 29 * 60000 + 40000).toISOString(), notices_waiting: 0, notices_holding: false } : { notices_paused: false, paused_until: null, notices_waiting: 0, notices_holding: false }), { status: 200, headers: { 'Content-Type': 'application/json' } })); } return window.__realFetch(u, o); }; true`);
 
             // an older Coral (or one behind a hub) sends no notices_paused: no control at all, not a dead one
             await ev(`(() => { const rows = window._coralGetLiveSessions().map(r => { if (r.session_id !== 'talk-agent-id') return r; const { notices_paused, paused_until, notices_holding, notices_waiting, ...rest } = r; return rest; }); window._coralSetLiveSessions(rows); return import(${S} + 'session_header_updates.js').then(m => { m.updateWaitingIndicator(rows.find(r => r.session_id === 'talk-agent-id')); return true; }); })()`);
@@ -38,9 +38,9 @@ const S = `(window.__coralStatic || '/static/')`;
             await ev(`document.getElementById('notice-pause-btn').click(); true`);
             await waitFor(`document.getElementById('notice-pause-btn').getAttribute('aria-pressed') === 'true'`, `${tag}: the toggle is pressed after the server said yes`, 4000);
             const c1 = await calls();
-            assert.ok(c1.length === 1 && c1[0].method === 'POST' && /\/api\/sessions\/live\/talk-agent\/notices\/pause$/.test(c1[0].u) && JSON.parse(c1[0].body).minutes === 0, `${tag}: it asks the server to pause: ` + JSON.stringify(c1));
+            assert.ok(c1.length === 1 && c1[0].method === 'POST' && /\/api\/sessions\/live\/talk-agent\/notices\/pause$/.test(c1[0].u) && JSON.parse(c1[0].body).minutes === 30, `${tag}: it asks the server to pause: ` + JSON.stringify(c1));
             v = await view();
-            assert.ok(v.bar && v.pressed === 'true' && v.name === 'Resume Coral messages' && /paused while you talk\. 0 waiting\. until you resume\./.test(v.text) && v.resume, `${tag}: paused: the bar, its words, a Resume button: ` + JSON.stringify(v));
+            assert.ok(v.bar && v.pressed === 'true' && v.name === 'Resume Coral messages' && /paused while you talk\. 0 waiting\. 30 min left\./.test(v.text) && v.resume, `${tag}: paused: the bar, its words, a Resume button: ` + JSON.stringify(v));
             await feed({ notices_paused: true, paused_until: new Date(Date.now() + 12 * 60000 + 5000).toISOString(), board_unread: 1, notices_waiting: 3 });
             v = await view();
             assert.match(v.text, /^Coral's messages are paused while you talk\. 3 waiting\. 12 min left\.$/, `${tag}: the count and the time left: ` + JSON.stringify(v));
