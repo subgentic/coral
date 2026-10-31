@@ -108,3 +108,28 @@ func TestPostAskToAGuideSendsTheLabel(t *testing.T) {
 	}
 	assert.Empty(t, srv2.requests(), "a bad option sends nothing")
 }
+
+// #11457, S6: ask clash sends the target and the two ids (nothing typed reaches the question) and refuses what is not an id.
+func TestAskClashSendsTheTargetAndTheTwoMessages(t *testing.T) {
+	srv := newRecordingServer(t)
+	dir := subscribedDataDir(t, srv.URL)
+	res := runBoard(t, srv.URL, dir, "ask", "clash", "task:12", "40", "#41")
+	require.Equal(t, 0, res.code, res.stderr+res.stdout)
+	reqs := srv.requests()
+	require.Len(t, reqs, 1)
+	assert.Contains(t, reqs[0], `"target":"task:12"`)
+	assert.Contains(t, reqs[0], `"a":40`)
+	assert.Contains(t, reqs[0], `"b":41`)
+
+	srv2 := newRecordingServer(t)
+	dir2 := subscribedDataDir(t, srv2.URL)
+	for name, args := range map[string][]string{
+		"no ids":            {"ask", "clash", "task:12"},
+		"an id that is not": {"ask", "clash", "task:12", "x", "41"},
+		"a zero id":         {"ask", "clash", "task:12", "0", "41"},
+	} {
+		res := runBoard(t, srv2.URL, dir2, args...)
+		assert.NotEqual(t, 0, res.code, "%s: %q", name, res.stderr)
+	}
+	assert.Empty(t, srv2.requests(), "a bad command sends nothing")
+}

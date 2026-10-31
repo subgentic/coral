@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -68,6 +69,7 @@ func newGuideRig(t *testing.T) *guideRig {
 	})
 	r.Use(TunnelIdentityGuard(bs, func(*http.Request) bool { return true })) // the Hub operator is allowed: a guide must still never be admitted as one
 	r.Post("/api/board/{project}/messages", h.PostMessage)
+	r.Post("/api/board/{project}/clashes", h.FileClash)
 	r.Get("/api/board/{project}/guide-asks", h.GuideAsks)
 	r.Get("/api/board/{project}/messages", h.ReadMessages)
 	r.Post("/api/board/{project}/goals", h.CreateGoal)
@@ -486,4 +488,70 @@ func TestAnAgentAsksAGuideAndTheGuideAnswers(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, m.Ask)
 	assert.True(t, m.Ask.Answered, "the question reads as answered on the board")
+}
+
+// S6 through the route: only an agent of the team files a clash; a guide, a Hub viewer and a person cannot; the body is closed; the answer is the one question to the Operator.
+func TestOnlyAnAgentFilesAClashAndItIsOneQuestionToTheOperator(t *testing.T) {
+	g := newGuideRig(t)
+	ctx := context.Background()
+	_, err := g.bs.Subscribe(ctx, gBoard, "Operator", "Operator", "", nil, "all")
+	require.NoError(t, err)
+	_, err = g.bs.SetGuideRoster(ctx, gBoard, map[string]string{gDana: "Dana Reyes"})
+	require.NoError(t, err)
+	task, err := g.bs.CreateTask(ctx, gBoard, "the report", "", "", "Orchestrator", "Dev")
+	require.NoError(t, err)
+	target := "task:" + strconv.FormatInt(task.ID, 10)
+	guideMsg, err := g.bs.PostGuideMessage(ctx, gBoard, gDana, "do it with option A")
+	require.NoError(t, err)
+	opMsg, err := g.bs.PostMessage(ctx, gBoard, "Operator", "do it with option B", nil)
+	require.NoError(t, err)
+	body := map[string]any{"subscriber_id": "Orchestrator", "target": target, "a": guideMsg.ID, "b": opMsg.ID}
+	agent := map[string]string{"X-Test-Agent": "1"}
+
+	for name, c := range map[string]struct {
+		hdr map[string]string
+		fn  func() (int, string)
+	}{
+		"a guide": {nil, func() (int, string) {
+			c, _, r := g.guide(gDana, now(), "POST", "/api/board/team/clashes", body, nil)
+			return c, r
+		}},
+		"a Hub viewer": {nil, func() (int, string) {
+			c, _, r := g.send("POST", "/api/board/team/clashes", body, map[string]string{tunnel.ViaHeader: cloud.ViaSecret(), tunnel.HubUserHeader: gSam})
+			return c, r
+		}},
+		"a person": {nil, func() (int, string) {
+			c, _, r := g.send("POST", "/api/board/team/clashes", body, map[string]string{"X-Test-Operator": "1"})
+			return c, r
+		}},
+		"no credential": {nil, func() (int, string) { c, _, r := g.send("POST", "/api/board/team/clashes", body, nil); return c, r }},
+	} {
+		code, raw := c.fn()
+		assert.GreaterOrEqual(t, code, 400, "%s: %s", name, raw)
+		assert.Less(t, code, 500, name)
+	}
+	coralLines := func() int {
+		msgs, _ := g.bs.ListMessages(ctx, gBoard, 100, 0, 0)
+		n := 0
+		for _, m := range msgs {
+			if m.SubscriberID == "Coral" {
+				n++
+			}
+		}
+		return n
+	}
+	assert.Equal(t, 0, coralLines(), "none of them filed anything")
+
+	for name, b := range map[string]any{"an extra field": map[string]any{"subscriber_id": "Orchestrator", "target": target, "a": guideMsg.ID, "b": opMsg.ID, "text": "held"}, "no target": map[string]any{"a": 1, "b": 2}} {
+		code, _, _ := g.send("POST", "/api/board/team/clashes", b, agent)
+		assert.Equal(t, http.StatusBadRequest, code, name)
+	}
+	code, out, raw := g.send("POST", "/api/board/team/clashes", body, agent)
+	require.Equal(t, http.StatusOK, code, raw)
+	assert.Equal(t, false, out["existed"])
+	code, out2, _ := g.send("POST", "/api/board/team/clashes", body, agent)
+	require.Equal(t, http.StatusOK, code)
+	assert.Equal(t, true, out2["existed"])
+	assert.Equal(t, out["ask_id"], out2["ask_id"], "one question per target")
+	assert.Equal(t, 1, coralLines(), "exactly one Coral line was written")
 }

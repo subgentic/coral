@@ -274,3 +274,33 @@ func TestTheOperatorsOwnFilesAndReceivedFilesNeverCountForAGuide(t *testing.T) {
 	code, _ = rig.do("GET", "/api/artifacts/"+pasted+"/meta", g, nil)
 	assert.NotEqual(t, http.StatusNotFound, code, "an agent's own upload of the same content on this board counts")
 }
+
+// The owner's own list says which artifacts are private; what an agent or a guide reads never carries the mark. (The meta keeps its fixed fields: a page asks the private route for one artifact.)
+func TestOnlyTheOwnersReadCarriesThePrivateMark(t *testing.T) {
+	rig := newGuideArtifactRig(t)
+	code, out := rig.do("GET", "/api/artifacts/"+gaMine+"/meta", cmtAsOwner, nil)
+	require.Equal(t, http.StatusOK, code)
+	assert.NotContains(t, out, "private", "the meta has its fixed fields only")
+	// the list: marks only on the owner's read
+	h := NewBoardHandler(rig.h.bs)
+	t.Cleanup(h.WaitBackground)
+	items := []teamArtifact{{ID: gaMine}, {ID: gaPrivate}}
+	asOwner := httptest.NewRequest("GET", "/api/board/team-a/artifacts", nil)
+	asOwner = withActor(asOwner, Actor{Kind: ActorOperator, Name: "Operator"})
+	h.attachArtifactPrivate(asOwner, items)
+	assert.False(t, items[0].Private)
+	assert.True(t, items[1].Private, "the owner's list marks it")
+	items = []teamArtifact{{ID: gaMine}, {ID: gaPrivate}}
+	asAgent := httptest.NewRequest("GET", "/api/board/team-a/artifacts", nil)
+	asAgent = withActor(asAgent, Actor{Kind: ActorToken, Name: "Dev", Session: "claude-s1"})
+	h.attachArtifactPrivate(asAgent, items)
+	assert.False(t, items[1].Private, "an agent's list never carries it")
+	asGuide := httptest.NewRequest("GET", "/api/board/team-a/artifacts", nil)
+	for k, v := range gaGuide(gaDana) {
+		asGuide.Header.Set(k, v)
+	}
+	h.attachArtifactPrivate(asGuide, items)
+	assert.False(t, items[1].Private, "a guide's list never carries it")
+	b, _ := json.Marshal(teamArtifact{ID: "x"})
+	assert.NotContains(t, string(b), "private", "absent when not marked")
+}

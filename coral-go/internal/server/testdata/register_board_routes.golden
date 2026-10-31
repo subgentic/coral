@@ -72,6 +72,7 @@ POST /api/board/{project}/agents/{subscriber}/sleep | (*SessionsHandler).Orchest
 POST /api/board/{project}/agents/{subscriber}/wake | (*SessionsHandler).OrchestratorWake-fm
 POST /api/board/{project}/artifacts/{id}/review | (*BoardHandler).ReviewArtifact-fm
 POST /api/board/{project}/asks/{messageID}/close | (*BoardHandler).CloseAsk-fm
+POST /api/board/{project}/clashes | (*BoardHandler).FileClash-fm
 POST /api/board/{project}/cross-team-links | (*BoardHandler).AddLocalLinks-fm
 POST /api/board/{project}/cross-team/disable | (*BoardHandler).HubCrossTeamDisable-fm
 POST /api/board/{project}/cross-team/enable | (*BoardHandler).HubCrossTeamEnable-fm
