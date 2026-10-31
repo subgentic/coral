@@ -29,7 +29,7 @@ export const tableState = () => ({ widths: null, sort: null, selected: new Set()
 
 // ── cell types ────────────────────────────────────────────────────────────
 /** A title (the hover tooltip) set on pointer enter, and only while `needed()` says the text it carries is cut or hidden. */
-const tipIf = (e, text, needed) => e.addEventListener('pointerenter', () => { e.title = needed() ? text : ''; });
+const tipIf = (e, text, needed) => e.addEventListener('pointerenter', () => { if (!e.title || e.title === text) e.title = needed() ? text : ''; }); // a title a caller set with better words is left alone
 /** The row's one real button: its text names the row. */
 export function primaryButton(text, label) {
     const b = el('button', 'dt-primary', text); b.type = 'button';
