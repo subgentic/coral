@@ -221,7 +221,7 @@ const { coralReady } = require('./helpers/wait');
         await waitFor(`document.getElementById('team-drafted-note') && !document.getElementById('team-drafted-note').hidden && /Drafted: 1 member\\./.test(document.getElementById('team-drafted-note').textContent)`, 'the polled draft, straight on the Members step', { timeout: 9000 });
         console.log('PASS team dialogs');
     } finally {
-      await removeBoards(ev, ['crew-1', 'crew-1-2', 'crew-2']);
+      await removeBoards(ev, ['crew-1', 'crew-1-2', 'crew-2', 'crew-dir']);
       await guard.restore().catch(e => console.error('settings restore: ' + (e && e.message)));
       await client.close();
     }
