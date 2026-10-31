@@ -43,11 +43,17 @@ run: dev
 test-server: dev
 	CORAL_DATA_DIR=/tmp/coral-test ./$(BINDIR)/coral --host 0.0.0.0 --port 8450
 
+# The go tool hashes its own value of every environment variable a test reads, so an agent shell's per-session CLAUDE_CODE_SESSION_ID or a token in another shell's environment
+# would give each shell its own test cache entry (#413). TEST_ENV runs go test without that family (testguard drops it inside the test binary as well, so a test never holds a real credential).
+# SHELL and NO_COLOR are hashed too and differ between shells (a Git Bash launched from PowerShell has NO_COLOR=1 and another SHELL): TEST_ENV pins the one and drops the other.
+# PATH is hashed the same way and is not pinned (it is machine-specific): run go test from a shell with a stable PATH, and do not let the CDP runner's node prefix leak into a go test shell.
+TEST_ENV = env -u NO_COLOR $(addprefix -u ,$(shell env | sed -n -E 's/^((CLAUDE|ANTHROPIC|CODEX|GEMINI|PI)_[A-Za-z0-9_]*)=.*/\1/p')) SHELL=/bin/sh
+
 # Run all tests
 .PHONY: test
 test: sync-docs
-	go test ./...
-	$(CGO_OPENSSL_FLAGS) go test -tags fts5 ./...
+	$(TEST_ENV) go test ./...
+	$(TEST_ENV) $(CGO_OPENSSL_FLAGS) go test -tags fts5 ./...
 
 # Race detector on the packages with their own goroutines around process and PTY
 # lifetimes (#3320). Slower than `make test`: run before changing session code.
