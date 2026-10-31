@@ -388,7 +388,7 @@ func (h *SessionsHandler) listArtifactComments(w http.ResponseWriter, r *http.Re
 			}
 			kept := carried[:0]
 			for _, c := range carried {
-				if keep[c.t.Board] {
+				if keep[c.t.Board] && (caller.Kind != commentCallerAgent || h.agentMayReadComments(r.Context(), caller.Subject, c.t.ArtifactID)) { // an earlier version is read by its own id (#11425 c)
 					kept = append(kept, c)
 				}
 			}
@@ -403,6 +403,10 @@ func (h *SessionsHandler) listArtifactComments(w http.ResponseWriter, r *http.Re
 	}
 	if caller.Kind == commentCallerOwner && (caller.ViaHub || r.Header.Get(tunnel.ViaHeader) == "" && !cloud.Tunneled(r)) { // the owner, at this computer or through Coral Hub (#11354), never a viewer or an agent (#6462)
 		h.attachAsks(r.Context(), out)
+	}
+	if caller.Kind == commentCallerAgent && !redactCommentViews(out) { // what an agent reads is checked for secrets again, as delivery does (#11425 b); no check, no list
+		commentRefuse(w, http.StatusServiceUnavailable, "redaction_unavailable", "the comments could not be checked for secrets, so none are shown")
+		return
 	}
 	canCreate, why := commentPolicy(caller, commentCreate, nil, locked, hubWrite)
 	writeJSON(w, http.StatusOK, map[string]any{"comments": out, "locked": locked, "you": map[string]any{"kind": caller.Kind, "name": viewerName(caller), "can_comment": canCreate, "reason": why, "can_lock": caller.Kind == commentCallerOwner},
@@ -836,4 +840,27 @@ func (h *SessionsHandler) agentMayReadComments(ctx context.Context, session, id 
 	}
 	asked, err := h.ss.HasArtifactAsk(ctx, id, session)
 	return err == nil && asked
+}
+
+// redactCommentViews redacts each comment's text and the text it is on in place; false when the redactor is unavailable (nothing is then to be shown).
+func redactCommentViews(views []commentView) bool {
+	for i := range views {
+		body, ok := redactComment(views[i].Body)
+		if !ok {
+			return false
+		}
+		views[i].Body = body
+		if a := views[i].Anchor; a != nil {
+			cp := *a
+			for _, f := range []*string{&cp.Quote, &cp.Prefix, &cp.Suffix} {
+				r, ok := redactComment(*f)
+				if !ok {
+					return false
+				}
+				*f = r
+			}
+			views[i].Anchor = &cp
+		}
+	}
+	return true
 }

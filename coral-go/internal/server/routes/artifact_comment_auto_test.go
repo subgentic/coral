@@ -7,10 +7,13 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/subgentic/coral/internal/store"
 )
 
 // #11420: the Operator's comment on an artifact that waits for their review reaches the agent that uploaded it, once, and the agent answers in the thread.
@@ -19,12 +22,16 @@ import (
 func (rig *cmtRig) uploadedBy(n int, boardID string) { rig.uploadedBySession(sendSid(n), boardID) }
 
 func (rig *cmtRig) uploadedBySession(sid, boardID string) {
+	rig.uploadedBySessionOn(sid, cmtDoc, boardID)
+}
+
+func (rig *cmtRig) uploadedBySessionOn(sid, digest, boardID string) {
 	rig.t.Helper()
 	dir := uploadsDir(rig.h.cfg.CoralDir(), sid)
 	require.NotEmpty(rig.t, dir)
 	require.NoError(rig.t, os.MkdirAll(dir, 0o755))
-	rec, _ := json.Marshal(agentUploadRecord{agentArtifactMeta: agentArtifactMeta{Name: "plan.md", MediaType: "text/markdown", Size: 4, Digest: cmtDoc}, CreatedAt: "2026-10-31T00:00:00Z", Board: boardID})
-	require.NoError(rig.t, os.WriteFile(filepath.Join(dir, cmtDoc+".json"), rec, 0o644))
+	rec, _ := json.Marshal(agentUploadRecord{agentArtifactMeta: agentArtifactMeta{Name: "plan.md", MediaType: "text/markdown", Size: 4, Digest: digest}, CreatedAt: "2026-10-31T00:00:00Z", Board: boardID})
+	require.NoError(rig.t, os.WriteFile(filepath.Join(dir, digest+".json"), rec, 0o644))
 }
 
 func (rig *cmtRig) tag(tags ...string) {
@@ -91,6 +98,10 @@ func TestACommentThatIsNotOnAForReviewUploadOfAnAgentSendsNothing(t *testing.T) 
 		"no agent uploaded it": func(rig *cmtRig) {
 			rig.tag("for review")
 			require.NoError(rig.t, os.RemoveAll(uploadsDir(rig.h.cfg.CoralDir(), sendSid(1))))
+		},
+		"a legacy record that names no board is pinned to none": func(rig *cmtRig) {
+			rig.tag("for review")
+			rig.uploadedBy(1, "")
 		},
 		"it was uploaded on another board": func(rig *cmtRig) {
 			rig.tag("for review")
@@ -183,4 +194,59 @@ func TestTheOwnersCommentThroughCoralHubIsKeptAndNotSentToTheAgent(t *testing.T)
 	assert.Empty(t, rig.operatorMessages(), "the Hub's owner comment is not sent to an agent")
 	_, list := rig.do("GET", cp(cmtDoc), cmtAsOwner, nil)
 	assert.Len(t, list["comments"], 1, "but it is kept")
+}
+
+// #11425 (b): what an agent reads is checked for secrets again at the read, as delivery does: a comment stored with a secret in it (written before the check, or by a path that skipped it) is shown redacted.
+func TestAnAgentReadsCommentsRedactedAgain(t *testing.T) {
+	rig := newCmtRig(t)
+	rig.agent(1, "Dev", false)
+	rig.uploadedBy(1, "team-a")
+	_, err := rig.h.bs.Subscribe(context.Background(), "team-a", "alias-1", "Alias1", "agent-"+sendSid(1), nil, "")
+	require.NoError(t, err)
+	secret := "ghp_" + strings.Repeat("a1B2c3D4e5", 4)
+	anchor, _ := json.Marshal(commentAnchor{Quote: "the key " + secret, Prefix: "p ", Suffix: " s"})
+	_, err = rig.ss.CreateArtifactComment(context.Background(), store.ArtifactComment{ArtifactID: cmtDoc, Board: "team-a", AnchorJSON: string(anchor), Body: "use " + secret + " for it", AuthorIssuer: "local", AuthorSubject: "install-owner-id", AuthorName: "Owner", AuthorKind: commentCallerOwner})
+	require.NoError(t, err)
+
+	code, list := rig.do("GET", cp(cmtDoc), asAgentSession(1), nil)
+	require.Equal(t, http.StatusOK, code, fmt.Sprint(list))
+	require.Len(t, list["comments"], 1)
+	assert.NotContains(t, fmt.Sprint(list), secret, "the secret is in neither the text nor the quote the agent reads")
+	assert.Contains(t, fmt.Sprint(list), "use ", "the rest of the comment is there")
+	// the owner's own view is the stored text, as before (the owner wrote it)
+	_, own := rig.do("GET", cp(cmtDoc), cmtAsOwner, nil)
+	assert.Contains(t, fmt.Sprint(own), secret[:8], "only an agent's read is redacted again")
+}
+
+// #11425 (c): with series=1 an agent also reads the earlier versions' comments, each by its own id: a version it did not upload (and was not asked into) is not read through a newer one.
+func TestAnAgentReadsAnEarlierVersionsCommentsOnlyForAnEarlierVersionItMayRead(t *testing.T) {
+	rig := newCmtRig(t)
+	rig.agent(1, "Dev", false)
+	_, err := rig.h.bs.Subscribe(context.Background(), "team-a", "alias-1", "Alias1", "agent-"+sendSid(1), nil, "")
+	require.NoError(t, err)
+	rig.twoVersions("intro\ntake the lock first\nend\n", "intro\ntake the lock first, then go\nend\n")
+	commentOnQuote(rig, cmtDoc, "the lock", "take ", " first") // on v1
+	code, out := rig.do("POST", cp(cmtPic2), cmtAsOwner, map[string]any{"body": "on v2", "anchor": anchorOf("then go"), "board": "team-a"})
+	require.Equal(t, http.StatusCreated, code, fmt.Sprint(out))
+	rig.uploadedBySessionOn(sendSid(1), cmtPic2, "team-a") // Dev uploaded v2 only
+
+	seen := func() (own, carried int) {
+		code, list := rig.do("GET", cp(cmtPic2)+"?series=1", asAgentSession(1), nil)
+		require.Equal(t, http.StatusOK, code, fmt.Sprint(list))
+		for _, c := range list["comments"].([]any) {
+			if c.(map[string]any)["from_version"] != nil {
+				carried++
+			} else {
+				own++
+			}
+		}
+		return
+	}
+	own, carried := seen()
+	assert.Equal(t, 1, own, "its own version's comment")
+	assert.Equal(t, 0, carried, "v1 is not Dev's to read, so not through v2 either")
+	rig.uploadedBySessionOn(sendSid(1), cmtDoc, "team-a") // now Dev uploaded v1 too
+	own, carried = seen()
+	assert.Equal(t, 1, own)
+	assert.Equal(t, 1, carried, "an earlier version it uploaded is carried")
 }

@@ -53,7 +53,7 @@ func (h *SessionsHandler) deliverOperatorComment(r *http.Request, caller comment
 		if sid == "" {
 			continue
 		}
-		if rec, ok := readUploadRecord(h.cfg.CoralDir(), sid, id); ok && (rec.Board == "" || rec.Board == b) && rec.UploadedBy == "" {
+		if rec, ok := readUploadRecord(h.cfg.CoralDir(), sid, id); ok && rec.Board == b && rec.UploadedBy == "" {
 			up, sessionID = &subs[i], sid
 			break
 		}

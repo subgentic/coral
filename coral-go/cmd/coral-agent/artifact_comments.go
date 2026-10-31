@@ -160,10 +160,14 @@ func formatComments(id string, all []listedComment) string {
 }
 
 func writeComment(b *strings.Builder, indent string, c listedComment) {
-	who := authorLabel(c)
-	fmt.Fprintf(b, "%s%s, %s:\n", indent, who, shorten(c.CreatedAt, 32))
+	when := shorten(c.CreatedAt, 32)
+	if when == "" {
+		when = "time unknown"
+	}
+	fmt.Fprintf(b, "%s%s, %s:\n", indent, authorLabel(c), when)
+	// Every line of the text starts with "| ": a line of someone's comment can never pass for one of the listing's own ("Thread 99 (open)", "to answer: ...", an author line), which never start with it.
 	for _, line := range strings.Split(shorten(c.Body, printedBodyCap), "\n") {
-		fmt.Fprintf(b, "%s  %s\n", indent, line)
+		fmt.Fprintf(b, "%s  | %s\n", indent, line)
 	}
 }
 
