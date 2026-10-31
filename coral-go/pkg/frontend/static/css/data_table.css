@@ -539,3 +539,4 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 @media (max-width: 760px) { tr[data-welcome-id] { touch-action: pan-y; } } /* a welcome row of Needs you: the page keeps its vertical pans, a horizontal drag is the swipe's (welcome_swipe.js, #11542) */
 .dt-end .inbox-review-actions { justify-content: end; } /* the Actions column is the last, at the row's right edge: its buttons end there (#11552) */
 .dt-table td:has(.inbox-row-more) { overflow: visible; text-overflow: clip; } /* the cell of a row's three dots shows its menu: a cell clips what it holds (#11552) */
+.dt-row-open, .dt-row-open td { -webkit-user-select: none; user-select: none; } /* a row that opens on a click is not text to select: a selection across its cells shows as blue bars between them, and a web view takes a click on a selection for the start of a drag of it, so the row stops opening (#11584) */
