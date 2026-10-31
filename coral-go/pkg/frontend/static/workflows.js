@@ -168,7 +168,7 @@ function workflowStepsTable(steps) {
         columns: [ // one line a row (Goal #79): the command is cut with an ellipsis (whole in its tooltip and the editor), a narrow list drops Type
             { key: 'step', label: 'Step', primary: true, width: '12rem', cell: s => { const cell = DT.el('span'); cell.append(DT.el('span', 'sr-only', `Step ${s.position}: `), document.createTextNode(s.name || `Step ${s.position}`)); return cell; } },
             { key: 'type', label: 'Type', width: '6rem', dropAt: 36, cell: s => DT.tag(s.type || 'shell') },
-            { key: 'command', label: 'Command', width: 'grow', cell: s => { const what = (s.type || 'shell') === 'shell' ? s.command : s.prompt; if (!what) return '—'; const code = DT.el('code', 'wf-step-what', String(what).slice(0, 300)); code.title = String(what).slice(0, 300); return code; } },
+            { key: 'command', label: 'Command', width: 'grow', cell: s => { const what = (s.type || 'shell') === 'shell' ? s.command : s.prompt; if (!what) return '—'; const code = DT.el('code', 'wf-step-what', String(what).slice(0, 300)); DT.tipIf(code, String(what).slice(0, 300), () => code.scrollWidth > code.clientWidth); return code; } },
         ],
     }); table.el.classList.add('wf-steps-table'); return table.el;
 }
