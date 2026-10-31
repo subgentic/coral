@@ -136,7 +136,7 @@ function _renderHistoryReply(container, session, data) {
 function _showHistoryError(container) {
     container.innerHTML = `<div class="chat-load-error" role="alert">
                 <span class="chat-error-message">Could not load this conversation. Reload the page to try again.</span>
-                <button type="button" class="btn btn-secondary btn-small chat-retry-btn">Retry</button>
+                <button type="button" class="btn btn-small chat-retry-btn">Retry</button>
             </div>`;
     const retryBtn = container.querySelector('.chat-retry-btn');
     if (retryBtn) {

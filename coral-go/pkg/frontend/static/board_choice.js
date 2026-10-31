@@ -74,7 +74,7 @@ export function chooseBoard(data, name) {
             const detail = document.createElement('span');
             detail.className = 'board-choice-detail';
             detail.textContent = candidateDetail(c);
-            const join = button('Join it', 'btn btn-sm', { board_id: c.board_id });
+            const join = button('Join it', 'btn', { board_id: c.board_id });
             join.dataset.boardId = c.board_id;
             join.setAttribute('aria-label', `Join ${c.board_label || c.board_id}${detail.textContent ? ' (' + detail.textContent + ')' : ''}`);
             row.append(label, detail, join);

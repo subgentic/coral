@@ -206,9 +206,11 @@ export const openGoalId = () => model.openId;
 
 // ── New goal ─────────────────────────────────────────────────────────────
 
-function openCreate() {
+/** The New goal form. From a team's Goals tab it creates on the open team; from the Inbox the caller says where: opts = { project, teams: [{ key, label }], onCreated(project) }. With more than one team the form asks which (the one the caller named is chosen). */
+export function openCreate(opts = {}) {
     if (model.creating) return;
     model.creating = true;
+    let project = opts.project || model.project;
     const dlg = document.createElement('dialog'); dlg.className = 'dlg-confirm goals-dialog'; dlg.setAttribute('aria-labelledby', 'goals-create-title');
     const form = el('form', 'goals-form'); form.noValidate = true;
     const title = el('h3', null, 'New goal'); title.id = 'goals-create-title';
@@ -218,35 +220,42 @@ function openCreate() {
     const dr = el('select'); dr.disabled = true; dr.append(new Option('Loading this board\'s agents…', '')); // the board's own agents: the route refuses a name that is not a subscriber
     const err = el('p', 'goals-field-error'); err.setAttribute('role', 'alert');
     const driverNote = el('p', 'goals-note', W.driverHelp); driverNote.id = 'goal-new-driver-help'; dr.setAttribute('aria-describedby', driverNote.id); // what a driver is
-    const where = el('p', 'goals-note', `Created on this board: ${keyLabel(model.project)}`);
+    const where = el('p', 'goals-note', `Created on this board: ${keyLabel(project)}`);
+    const teams = opts.teams && opts.teams.length > 1 ? opts.teams : null, pick = el('select'); // the Inbox spans teams: which one gets the goal
+    if (teams) for (const t of teams) pick.append(new Option(t.label, t.key));
     const go = btn('btn btn-primary', 'Create goal'); go.type = 'submit';
     const cancel = btn('btn', 'Cancel', () => dlg.close());
     const head = el('div', 'goals-form-head'), back = btn('goals-form-back', null, () => dlg.close()); back.setAttribute('aria-label', 'Back'); back.title = 'Back'; back.append(Object.assign(el('span', null, '\u2190'), {})); back.firstChild.setAttribute('aria-hidden', 'true'); head.append(back, title); // a phone's form screen: ← and the title in a bar, the fields under it, the actions pinned at the bottom (#11236, #11239 slice C)
     const body = el('div', 'goals-form-body'); body.append(field('Title (required)', t, 'goal-new-title'), field('Done when (optional): what a person can check', d, 'goal-new-done'), field('Driver, the agent who looks after it (optional)', dr, 'goal-new-driver'), driverNote, where, err);
+    if (teams) { pick.value = project; body.prepend(field('Team', pick, 'goal-new-team')); }
     form.append(head, body, el('div', 'goals-actions'));
     form.querySelector('.goals-actions').append(cancel, go);
     dlg.append(form); document.body.append(dlg);
-    readJson('/subscribers').then(json => {
+    const loadDrivers = () => { const asked = project; return boardFetch(asked, '/subscribers').then(r => r.ok ? r.json() : Promise.reject(new Error(String(r.status)))).then(json => {
+        if (asked !== project) return; // the team was changed while this answer was on its way: it is the other team's agents (a slower answer must not fill the list)
         const people = toDrivers(json);
         dr.replaceChildren(...people.map(p => new Option(p.label, p.id)), new Option('No driver yet', ''));
         dr.value = people.length && people[0].orchestrator ? people[0].id : ''; // the Orchestrator drives unless the person says otherwise
         dr.disabled = false;
-    }).catch(() => { dr.replaceChildren(new Option('No driver yet', '')); dr.disabled = false; where.textContent += '. This board\'s agents could not be read, so no driver is set.'; });
+    }).catch(() => { if (asked !== project) return; dr.replaceChildren(new Option('No driver yet', '')); dr.disabled = false; where.textContent += '. This board\'s agents could not be read, so no driver is set.'; }); };
+    loadDrivers();
+    pick.addEventListener('change', () => { project = pick.value; where.textContent = `Created on this board: ${keyLabel(project)}`; dr.disabled = true; dr.replaceChildren(new Option('Loading this board\'s agents…', '')); loadDrivers(); });
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
         err.textContent = '';
         if (!t.value.trim()) { err.textContent = 'A goal needs a title.'; t.setAttribute('aria-invalid', 'true'); t.focus(); return; }
         t.removeAttribute('aria-invalid'); go.disabled = true;
         try {
-            const r = await boardFetch(model.project, '/goals', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(createBody({ title: t.value, doneWhen: d.value, driver: dr.value, by: OPERATOR_ID })) });
+            const r = await boardFetch(project, '/goals', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(createBody({ title: t.value, doneWhen: d.value, driver: dr.value, by: OPERATOR_ID })) });
             if (!r.ok) throw await failure(r);
             dlg.close();
+            if (opts.onCreated) { await opts.onCreated(project); return; }
             say('Goal created');
             await loadGoals();
             root.querySelector('.goals-new')?.focus(); // the list was drawn again: focus goes back to the button that opened the dialog
         } catch (ex) { err.textContent = `The goal was not created: ${W.errorWords(ex && ex.code, ex && ex.message)}`; go.disabled = false; }
     });
-    dlg.addEventListener('close', () => { model.creating = false; dlg.remove(); root.querySelector('.goals-new')?.focus(); });
+    dlg.addEventListener('close', () => { model.creating = false; dlg.remove(); (root || document).querySelector('.goals-new')?.focus(); });
     dlg.showModal(); t.focus();
 }
 

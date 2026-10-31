@@ -355,7 +355,7 @@ export async function selectLiveSession(name, agentType, sessionId, server, opts
     }
     updateHeaderContext(agent || agentData || null);
     captureWrapper.classList.remove("loading-skeleton");
-    updateSessionBranch(agent?.branch || null, agent?.repo_name || null, agent?.git_state || null);
+    updateSessionBranch(agent?.branch || null, agent?.repo_name || null, agent?.git_state || null, agent?.commit_short);
     updateSessionFolder(agent?.working_directory || "");
     updateSessionModel(agent || null);
     updateModelChip(agent || null, srv);

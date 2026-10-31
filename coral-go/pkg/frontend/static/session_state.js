@@ -236,7 +236,7 @@ export function buildSessionTooltip(s, opts = {}) {
     const goal = s.summary || "";
     const instructions = s.agent_type !== 'terminal' && String(s.prompt || '').trim() ? oneLine(s.prompt, 120) : '';
     const status = s.status || "";
-    const branchName = s.branch ? _repoBranch(s.repo_name, s.branch) || "" : ""; // no branch on record: no row, not the repository name alone
+    const branchName = s.branch ? _repoBranch(s.repo_name, s.branch, s.commit_short) || "" : ""; // no branch on record: no row, not the repository name alone
     const branch = branchName ? branchName + (s.git_state?.is_worktree ? " (worktree)" : "") : "";
     const agent = s.agent_type || "claude";
 
@@ -299,7 +299,8 @@ export function _gitStateSummary(gs) {
     return parts.join(' ');
 }
 
-export function _repoBranch(repoName, branch) {
+export function _repoBranch(repoName, branch, commit) {
+    if (branch === 'HEAD' && commit) branch = `detached at ${commit}`; // a detached checkout is the word HEAD to git, the same for every agent on a worktree: its commit tells them apart (#11580)
     if (repoName && branch) return `${repoName} : ${branch}`;
     return branch || repoName || '';
 }

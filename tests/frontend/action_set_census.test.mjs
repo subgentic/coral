@@ -30,6 +30,12 @@ for (const [rel, cls] of [['static/changed_files.js', 'file-more-btn'], ['static
     const t = read(rel), at = t.indexOf(cls), line = t.slice(at, t.indexOf('</button>', at));
     assert.ok(/ic-more/.test(line) && !/&hellip;|&#x22EF;|⋯|…/.test(line), `${rel}: ${cls} draws the shared three-dot icon, not a typed glyph: ${line.slice(0, 160)}`);
 }
+const dead = [];
+for (const rel of files) { const t = read(rel); for (const m of t.matchAll(/(?<![\w-])(btn-sm|btn-secondary)(?![\w-])/g)) dead.push(`${rel}:${t.slice(0, m.index).split('\n').length}: ${m[1]}`); }
+assert.deepEqual(dead, [], `btn-sm and btn-secondary have no CSS (a plain .btn): use btn or btn-small\n${dead.join('\n')}`);
+const said = [];
+for (const rel of files) { const t = read(rel); for (const m of t.matchAll(/'Copied!'|"Copied!"|'Not yet: send back'/g)) said.push(`${rel}:${t.slice(0, m.index).split('\n').length}: ${m[0]}`); }
+assert.deepEqual(said, [], `Copy says "Copied", and the task's send back is "Changes":\n${said.join('\n')}`);
 const css = read('static/css/components.css');
 assert.ok(/#mb-pause-btn\.mb-action-btn\.mb-action-danger\s*\{[^}]*--warning-text/.test(css), 'a paused board\'s Resume is the warning colour, not the delete red');
 console.log('action_set_census: ok (Retry on buttons, delete is an icon, Resume is not red)');

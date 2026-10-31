@@ -12,7 +12,7 @@ const { coralReady } = require('./helpers/wait');
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [w, h, narrow] of [[320, 700, true], [390, 844, true], [1280, 800, false]]) {
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile: false }); await Emulation.setTouchEmulationEnabled({ enabled: false }); // a pointer that is not coarse: a narrow window, the Hub's page
-            await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
+            await Page.navigate({ url: BASE + '/agents' }); await Page.loadEventFired(); await install(); // the Agents page: a bare start is the Inbox now (#11594)
             await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
             await ev(`(() => { localStorage.removeItem('coral_collapsed_groups'); window.__m.agents = {};
                 for (let t = 1; t <= 2; t++) for (let a = 1; a <= 2; a++) window.__m.add('t' + t + 'a' + a, 'A', 1, { sleeping: false, session_id: 'sid-' + t + '-' + a, board_project: 'team-' + t });

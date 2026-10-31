@@ -70,7 +70,7 @@ export function fitsCoralFolder(root, value) {
 export function offerCreateFolder(input) {
     const err = input && document.getElementById(`${input.id}-error`);
     if (!err || input.dataset.dirServer || !fitsCoralFolder(input.dataset.coralRoot, input.value)) return false;
-    const b = document.createElement('button'); b.type = 'button'; b.className = 'btn btn-sm field-error-action'; b.textContent = 'Create this folder';
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'btn field-error-action'; b.textContent = 'Create this folder';
     b.addEventListener('click', () => {
         input.dataset.suggested = input.value.trim();
         input.dispatchEvent(new Event('input', { bubbles: true })); // the error goes, the suggestion line says Coral makes it at Launch

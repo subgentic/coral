@@ -21,7 +21,7 @@ export function mountLaunchSigninNotice({ slot, before, form, server }) {
     const icon = el('span', 'material-icons', 'info'); icon.setAttribute('aria-hidden', 'true');
     const body = el('div', 'launch-signin-body');
     const lead = el('p', 'launch-signin-lead');
-    const how = el('button', 'btn btn-sm launch-signin-how', 'How to sign in'); how.type = 'button'; how.setAttribute('aria-expanded', 'false');
+    const how = el('button', 'btn launch-signin-how', 'How to sign in'); how.type = 'button'; how.setAttribute('aria-expanded', 'false');
     const steps = el('p', 'launch-signin-steps'); steps.hidden = true; steps.id = `${slot.id || 'launch'}-signin-steps`;
     how.setAttribute('aria-controls', steps.id);
     how.addEventListener('click', () => { steps.hidden = !steps.hidden; how.setAttribute('aria-expanded', String(!steps.hidden)); });

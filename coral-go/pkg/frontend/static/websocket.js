@@ -443,7 +443,7 @@ function _syncViewedSession(data) {
             }
             updateSessionStatus(s.status);
             updateSessionSummary(s.summary, s.summary_at);
-            updateSessionBranch(s.branch, s.repo_name, s.git_state);
+            updateSessionBranch(s.branch, s.repo_name, s.git_state, s.commit_short);
             updateSessionFolder(s.working_directory || "");
             updateSessionModel(s);
             updateModelChip(s, sessionServer(s));

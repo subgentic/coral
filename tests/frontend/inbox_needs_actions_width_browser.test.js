@@ -1,5 +1,5 @@
 // Needs you's review rows keep all their actions whole whatever width was saved for the Actions column (#9845, QA Engineer's gap 1): the real wiring, the Inbox's Needs you table with a read review artifact (Open, Mark unread, Mark reviewed)
-// and a narrow width kept in this browser for the review column. The column is fixed (inbox_sidebar.js: fixed: true), so the kept width is ignored: it is its 21 rem (a read row's three buttons and its star) and every button is inside its cell and inside the table. 1280 px, the team through the real board API,
+// and a narrow width kept in this browser for the review column. The column is fixed (inbox_sidebar.js: fixed: true), so the kept width is ignored: it is its 24 rem (a read row's four words, the three dots and its star) and every button is inside its cell and inside the table. 1440 px (the four words show from 1360), the team through the real board API,
 // the artifact list stubbed as the server answers. Isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -13,7 +13,7 @@ const { coralReady } = require('./helpers/wait');
     const row = name => `[...document.querySelectorAll('#group-table-view tbody tr')].find(r=>r.textContent.includes(${JSON.stringify(name)}))`;
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
-        await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
+        await Emulation.setDeviceMetricsOverride({ width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
         await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
         assert.equal(await ev(`fetch('/api/board/${team}/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({subscriber_id:'Review Writer',job_title:'Writer'})}).then(r=>r.status)`), 200);
@@ -34,12 +34,12 @@ const { coralReady } = require('./helpers/wait');
         await new Promise(r => setTimeout(r, 500)); // sleep-ok: the table settles after its first draw
         const m = await ev(`(() => { const r = ${row('Review file 02.txt')}, td = r.querySelector('td[data-key="review"]'), th = document.querySelector('#group-table-view th[data-key="review"]'), box = document.querySelector('#group-table-view .dt-box').getBoundingClientRect(), bs = [...td.querySelectorAll('.inbox-review-actions button')].map(b => ({ label: b.getAttribute('aria-label'), r: Math.round(b.getBoundingClientRect().right), w: Math.round(b.getBoundingClientRect().width) }));
             return { buttons: bs.map(b => b.label), lastRight: Math.max(...bs.map(b => b.r)), tdRight: Math.round(td.getBoundingClientRect().right), boxRight: Math.round(box.right), thW: Math.round(th.getBoundingClientRect().width), handle: !!th.querySelector('.dt-resize'), clipped: td.scrollWidth > td.clientWidth + 1, kept: localStorage.getItem('coral-dt-widths:Needs you') }; })()`);
-        assert.deepEqual(m.buttons, ['Star Review file 02.txt', 'Open Review file 02.txt', 'Mark unread: Review file 02.txt', 'Approve: Review file 02.txt', 'Request changes: Review file 02.txt'], 'a read review row has its star and its four actions (the star #9834, Approve and Request changes #136584): ' + JSON.stringify(m));
-        assert.ok(Math.abs(m.thW - 336) <= 3 && !m.handle, 'the Actions column is its declared 21 rem (19 and 2 for the star, #9834; not the 150 px kept for it) and has no handle: ' + JSON.stringify(m));
+        assert.deepEqual(m.buttons, ['Star Review file 02.txt', 'Approve: Review file 02.txt', 'Request changes: Review file 02.txt', 'Deny: Review file 02.txt', 'Ignore: Review file 02.txt', 'More actions for Review file 02.txt', 'Mark unread: Review file 02.txt'], 'a read review row has its star and the approved set (#11552): Approve, Changes, Deny, Ignore, and More with Mark unread in it: ' + JSON.stringify(m));
+        assert.ok(Math.abs(m.thW - 384) <= 3 && !m.handle, 'the Actions column is its declared 24 rem (the four words, the three dots and the star; not the 150 px kept for it) and has no handle: ' + JSON.stringify(m));
         assert.ok(m.lastRight <= m.tdRight + 1 && m.lastRight <= m.boxRight && !m.clipped, 'all three buttons are whole, inside the cell and inside the table: ' + JSON.stringify(m));
         // the Operator's #10443: the last column's right edge dragged in from the right. The box drops Team and the others it has no room for; their <col>s must go with them, or every width after
         // lands on the wrong column (Actions squeezed to 64 px, its buttons cut) and the table ends short of the card.
-        const keys = await ev(`[...document.querySelectorAll('#group-table-view thead th')].filter(t => t.getBoundingClientRect().width > 0).map(t => t.dataset.key)`);
+        const keys = await ev(`[...document.querySelectorAll('#group-table-view thead th')].filter(t => t.getBoundingClientRect().width > 0 && t.querySelector('.dt-resize')).map(t => t.dataset.key)`); // the last column that can be dragged: Actions is last now and fixed, so it has no handle (#11552)
         const last = keys[keys.length - 1];
         const h = await ev(`(() => { const r = document.querySelector('#group-table-view th[data-key="${last}"] .dt-resize').getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; })()`);
         const mouse = (type, x, y) => client.Input.dispatchMouseEvent({ type, x, y, button: 'left', buttons: type === 'mouseReleased' ? 0 : 1, clickCount: 1 });

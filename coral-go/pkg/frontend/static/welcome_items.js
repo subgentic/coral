@@ -50,7 +50,7 @@ export function welcomeRows() {
 }
 
 let _saving = Promise.resolve();
-function save(values) {
+export function save(values) {
     Object.assign(state.settings || (state.settings = {}), values);
     _saving = _saving.then(() => fetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(values) })).catch(() => {}); // kept for this page if it fails: the server shows them again next time
 }

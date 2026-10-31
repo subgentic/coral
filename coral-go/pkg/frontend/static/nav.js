@@ -106,7 +106,7 @@ export function startNav() {
     // The bare start (the address "/", no query; /agents typed on purpose is the list) reopens the place the person left (#10057); a link, a phone (its Home is the Agents list) or a place that is gone is shown as it is.
     if (isHome(route) && (location.pathname === '/' || location.pathname === '') && !location.search && (!location.hash || location.hash === '#') && !isPhoneLayout()) {
         const back = parse(lastPlace() || '', '');
-        if (isPlace(back)) { route = back; restored = true; }
+        if (isPlace(back)) { route = back; restored = true; } else route = { view: 'inbox-folder', folder: 'needs' }; // no place to reopen: a computer starts on the Inbox, the first tab (#11594)
     }
     const kept = lastPlace();
     write(route, true);

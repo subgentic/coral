@@ -118,6 +118,12 @@ function wireDrawer(root, nav) {
     return close;
 }
 
+/** The phone's strip scrolls sideways when its tabs do not fit: `data-overflow` is on the nav while there is more to the right, and the stylesheet draws a chevron at the edge then (#11583: the last tab was cut with only a faint fade). */
+function wireEdge(nav) {
+    const edge = () => nav.toggleAttribute('data-overflow', nav.scrollLeft + nav.clientWidth < nav.scrollWidth - 2);
+    nav._edge = edge; nav.addEventListener('scroll', edge, { passive: true }); new ResizeObserver(edge).observe(nav);
+}
+
 export function build({ id, label, sections, current, onPick, drawer = false, tabs = false }) {
     const root = el('div', drawer ? 'view-list view-list-drawer' : 'view-list'); root.dataset.viewList = id; root._tabs = tabs;
     const nav = el('nav', 'view-list-nav'); nav.setAttribute('aria-label', label);
@@ -126,12 +132,12 @@ export function build({ id, label, sections, current, onPick, drawer = false, ta
     const hint = el('p', 'sr-only', 'Use the arrow keys to move between the views, Home and End for the first and last.'); hint.id = `view-list-hint-${id}`; // the list is one Tab stop: a screen reader says how it moves (#10420)
     nav.setAttribute('aria-describedby', hint.id); root.append(hint);
     const closeDrawer = drawer ? wireDrawer(root, nav) : () => {};
-    wireKeys(nav);
+    wireKeys(nav); if (tabs) wireEdge(nav);
     // a picked view hides with the panel: the focus goes back to the button, not to the page's top
     nav.addEventListener('click', e => { const b = e.target instanceof Element && e.target.closest('.view-list-item'); if (b && !b.disabled) { closeDrawer(); onPick(b.dataset.key); } });
     select?.addEventListener('change', () => onPick(select.value));
-    draw(root, { sections, current });
+    draw(root, { sections, current }); nav._edge?.();
     return root;
 }
 
-export function update(root, spec) { draw(root, spec); }
+export function update(root, spec) { draw(root, spec); root.querySelector('.view-list-nav')._edge?.(); }

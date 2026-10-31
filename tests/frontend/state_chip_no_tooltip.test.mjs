@@ -9,5 +9,5 @@ import { fileURLToPath } from 'node:url';
 const src = fs.readFileSync(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../coral-go/pkg/frontend/static/data_table.js'), 'utf8');
 const at = src.indexOf('export function chip('), body = src.slice(at, src.indexOf('\n}', at));
 assert.ok(at > 0, 'data_table.js has chip()');
-assert.ok(!/^\s*c\.title\s*=/m.test(body) && /pointerenter/.test(body), `chip() sets no title when it is built; only on pointerenter, while its word is hidden (a native tooltip that repeats the visible word is left behind on scroll):\n${body}`);
+assert.ok(!/^\s*c\.title\s*=/m.test(body) && /tipIf\(c, word/.test(body), `chip() sets no title when it is built; only through tipIf (on pointer enter), while its word is hidden (a native tooltip that repeats the visible word is left behind on scroll):\n${body}`);
 console.log('state_chip_no_tooltip: ok');

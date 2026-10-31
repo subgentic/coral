@@ -197,7 +197,7 @@ function lastCell(i, withReason = false) {
         const chip = lastRunCell(i), why = withReason ? failureWords(i.run) : '';
         if (!why || typeof chip === 'string') return chip;
         // Failed: the chip and, beside it on the same line, why in words (the run has it; the list showed only "Failed", #9965)
-        const cell = DT.el('span', 'dt-last-run'); const reason = DT.el('span', 'dt-reason', why); reason.title = why;
+        const cell = DT.el('span', 'dt-last-run'); const reason = DT.el('span', 'dt-reason', why); DT.tipIf(reason, why, () => reason.scrollWidth > reason.clientWidth);
         cell.append(chip, ' ', reason);
         return cell;
     }

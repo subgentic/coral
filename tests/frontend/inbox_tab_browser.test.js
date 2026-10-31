@@ -14,6 +14,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const CDP = require('chrome-remote-interface');
+process.env.CORAL_KEEP_START = '1'; // this suite is about the start page: the harness does not move a bare / to /agents (#11594)
 const { themeJs } = require('./helpers/theme');
 const BASE = require('./test_base').BASE;
 const { safePaused } = require('./helpers/paused');
@@ -74,7 +75,7 @@ const { settle } = require('./helpers/wait');
         await open(1280, 756);
         check('the tab is shown', await visible('nav-tab-hub-inbox'));
         const order = await ev(`[...document.querySelectorAll('.top-nav-tabs > .top-nav-tab')].filter(el => !el.hidden && getComputedStyle(el).display !== 'none').map(el => el.dataset.arg)`);
-        check('right after Agents and before Docs', order.indexOf('hub-inbox') === order.indexOf('agents') + 1 && order.indexOf('hub-inbox') < order.indexOf('docs'), JSON.stringify(order));
+        check('first, before Agents and Docs (#11594)', order.indexOf('hub-inbox') === 0 && order.indexOf('agents') === 1 && order.indexOf('hub-inbox') < order.indexOf('docs'), JSON.stringify(order));
         check('its name is Inbox, with no number yet', (await ev(`document.getElementById('nav-tab-hub-inbox').firstChild.textContent`)) === 'Inbox' && (await badge()).hidden === true);
 
         console.log('3. The badge is the number of agents waiting for input');
@@ -105,7 +106,9 @@ const { settle } = require('./helpers/wait');
         await ev(`document.documentElement.removeAttribute('data-theme'); true`);
 
         console.log('4. Opening the tab loads the page from the constant address, once');
-        check('before it is opened there is no frame at all (no page carries an empty one) and the page was not asked for', (await ev(`document.getElementById('inbox-frame')`)) === null && (await ev(`document.querySelectorAll('iframe').length`)) === 0 && inboxHits === 0, String(await ev(`document.querySelectorAll('iframe').length`)));
+        // a bare start is the Inbox (#11594): where the hub serves the dashboard its frame is drawn by the start itself, once, from the constant address; a local Coral has no frame (its Inbox is the dashboard's own)
+        await waitFor(`${cloud ? "!!document.getElementById('inbox-frame')" : 'true'}`, 'the start page', { soft: true, timeout: 6000 });
+        check('the start page is the Inbox: ' + (cloud ? 'its frame is there and the page was asked for once' : 'no frame, the page was not asked for'), cloud ? (await ev(`!!document.getElementById('inbox-frame')`)) === true && inboxHits === 1 : (await ev(`document.getElementById('inbox-frame')`)) === null && (await ev(`document.querySelectorAll('iframe').length`)) === 0 && inboxHits === 0, String(inboxHits));
         const pathBefore = await ev(`location.pathname + location.search + location.hash`);
         await ev(`document.getElementById('nav-tab-hub-inbox').click(); true`);
         check('the view is shown', await waitFor(`getComputedStyle(document.getElementById('inbox-view')).display !== 'none'`, 'the inbox view', { soft: true, timeout: 6000 }));
@@ -142,7 +145,7 @@ const { settle } = require('./helpers/wait');
         await ev(`document.getElementById('nav-select').click(); true`);
         check('the list has Inbox after Servers', await waitFor(`!!document.querySelector('#nav-more-menu [data-arg="hub-inbox"]')`, 'the Inbox entry', { soft: true, timeout: 5000 }));
         const items = await ev(`[...document.querySelectorAll('#nav-more-menu .nav-more-item')].map(e => e.children[1].textContent.trim())`);
-        check('named Inbox, in order', items.indexOf('Inbox') === items.indexOf('Agents') + 1 && items.indexOf('Inbox') > -1, JSON.stringify(items));
+        check('named Inbox, in order', items.indexOf('Inbox') === items.indexOf('Agents') - 1 && items.indexOf('Inbox') > -1, JSON.stringify(items));
         const entry = await ev(`(() => { const e = document.querySelector('#nav-more-menu [data-arg="hub-inbox"]'); const b = e.querySelector('.nav-tab-badge'); return { count: b ? b.textContent : null, label: e.getAttribute('aria-label'), others: [...document.querySelectorAll('#nav-more-menu .nav-more-item')].filter(x => x !== e && x.querySelector('.nav-tab-badge')).length }; })()`);
         check('the Inbox entry shows the waiting number and says it', entry.count === '3' && /3 waiting for input/.test(entry.label || '') && entry.others === 0, JSON.stringify(entry));
         await ev(`document.querySelector('#nav-more-menu [data-arg="hub-inbox"]').click(); true`);
@@ -156,7 +159,7 @@ const { settle } = require('./helpers/wait');
         cloud = false;
         await open(1280, 756);
         check('the tab is shown', (await visible('nav-tab-hub-inbox')) === true);
-        check('and is in the list of views, right after Agents', (await ev(`[...document.querySelectorAll('.top-nav-tabs > .top-nav-tab[data-arg]')].filter(el => !el.hidden && el.style.display !== 'none').map(el => el.dataset.arg).slice(0, 2).join()`)) === 'agents,hub-inbox');
+        check('and is in the list of views, before Agents', (await ev(`[...document.querySelectorAll('.top-nav-tabs > .top-nav-tab[data-arg]')].filter(el => !el.hidden && el.style.display !== 'none').map(el => el.dataset.arg).slice(0, 2).join()`)) === 'hub-inbox,agents');
         check('there is no frame on a local Coral', (await ev(`document.getElementById('inbox-frame')`)) === null && (await ev(`document.querySelectorAll('iframe').length`)) === 0);
         await ev(`document.getElementById('nav-tab-hub-inbox').click(); true`);
         check('opening it shows the dashboard\'s own Inbox (Needs you, Tasks and Saved in the sidebar), still no frame', await waitFor(`document.getElementById('inbox-local') && !document.getElementById('inbox-local').hidden && /Needs you/.test(document.getElementById('inbox-nav-list').textContent) && /Tasks/.test(document.getElementById('inbox-nav-list').textContent) && /Saved/.test(document.getElementById('inbox-nav-list').textContent)`, 'the local Inbox', { soft: true, timeout: 6000 }) && (await ev(`document.querySelectorAll('iframe').length`)) === 0);

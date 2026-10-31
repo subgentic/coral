@@ -88,9 +88,9 @@ export async function buildProviderCards({ group, form, server, implicitDefault 
         const elsewhere = el('p', 'provider-signin-elsewhere', 'Sign in on the computer that runs this Coral.');
         const cmd = el('code', 'provider-signin-cmd');
         const row = el('div', 'provider-signin-actions');
-        const copy = el('button', 'btn btn-sm provider-signin-copy', 'Copy command'); copy.type = 'button';
+        const copy = el('button', 'btn provider-signin-copy', 'Copy command'); copy.type = 'button';
         copy.addEventListener('click', async () => { const ok = await copyText(signin.command); copy.textContent = ok ? 'Copied' : 'Copy failed'; setTimeout(() => { copy.textContent = 'Copy command'; }, 2000); });
-        const again = el('button', 'btn btn-sm', 'Check again'); again.type = 'button';
+        const again = el('button', 'btn', 'Check again'); again.type = 'button';
         again.addEventListener('click', async () => { again.disabled = true; again.textContent = 'Checking\u2026'; await askSignin(); again.disabled = false; again.textContent = 'Check again'; });
         row.append(copy, again); body.append(lead, how, elsewhere, cmd, row); box.append(icon, body);
         return box;

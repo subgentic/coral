@@ -24,9 +24,11 @@ assert.equal(ids({ longer: '5' }), '2,3', 'waiting at least 5 minutes: the one a
 assert.equal(ids({ longer: '60' }), '3'); assert.equal(ids({ longer: '240' }), '');
 assert.equal(ids({ longer: '15', team: 'team-a' }), '2', 'filters narrow together');
 
-assert.equal(NF.ordered(agents, NF.EMPTY).map(s => s.id).join(), '3,2,1,4', 'longest waiting first, the one with no time last');
+assert.equal(NF.ordered(agents, NF.EMPTY).map(s => s.id).join(), '1,2,3,4', 'the default is newest first (#11552): least waiting first, the one with no time last');
+assert.equal(NF.ordered(agents, { ...NF.EMPTY, sort: 'oldest' }).map(s => s.id).join(), '3,2,1,4', 'longest waiting first when picked, the one with no time last');
 assert.equal(NF.ordered(agents, { ...NF.EMPTY, sort: 'newest' }).map(s => s.id).join(), '1,2,3,4', 'least waiting first, the one with no time still last');
-assert.equal(NF.ordered(agents, { ...NF.EMPTY, sort: 'nonsense' }).map(s => s.id).join(), '3,2,1,4', 'an unknown order is the default');
+assert.equal(NF.ordered(agents, { ...NF.EMPTY, sort: 'nonsense' }).map(s => s.id).join(), '1,2,3,4', 'an unknown order is the default');
+assert.equal(NF.clean({ ...NF.EMPTY, sort: 'oldest' }).sort, 'oldest'); assert.equal(NF.isQuery({ ...NF.EMPTY, sort: 'oldest' }), true, 'a picked order is kept (saved); the default is not');
 assert.equal(agents[0].id, 1, 'the list the caller passed is not reordered');
 
 assert.deepEqual(NF.clean({ kind: 'plan', team: 5, agent: 'x'.repeat(200), longer: '7', sort: 'x' }), { ...NF.EMPTY, agent: 'x'.repeat(80) }, 'what is not valid is dropped');

@@ -17,6 +17,7 @@
     text-align: left;
 }
 .view-list-current { color: var(--sidebar-row-color-current); font-weight: var(--sidebar-row-weight-current); }
+.view-list-item:is(:hover, :focus-visible):not(:disabled), .view-list-item:is(:hover, :focus-visible):not(:disabled) .view-list-count { color: var(--text-primary); } /* the secondary text on the hover fill was 4.4:1 in the light theme: the Inbox is the start page now (#11594), so the page audit reads it */
 .view-list-current .view-list-count { color: var(--text-primary); } /* on the hover-coloured current row the secondary colour is under 4.5:1 in the light theme */
 /* the red count pill: the same make as the tab strip's unread badge (layout.css .nav-tab-badge) */
 .view-list-count.view-list-alert {
@@ -71,6 +72,8 @@
     .view-list .vl-tab .view-list-count.view-list-alert { line-height: var(--lh-label); min-width: 1.5em; } /* the pill's 16 px line cut its digit in half at 200% text (the Mobile Beta Tester): it follows the text */
     .view-list .vl-tab .view-list-icon { display: none; } /* text tabs: the folder's glyph is for the column, not the strip */
     .view-list .vl-tab { display: inline-flex; align-items: center; justify-content: center; gap: 6px; flex: none; width: auto; min-width: var(--control-touch-height, 44px); min-height: var(--control-touch-height, 44px); height: auto; padding: 0 14px; border-radius: 0; background: none; border: 0; border-bottom: 3px solid transparent; color: var(--text-secondary); font-weight: var(--fw-medium); white-space: nowrap; }
+    .view-list { position: relative; } /* the chevron below is drawn on the list, not on the strip (the strip's edge fade would fade it too) */
+    .view-list:has(> .view-list-nav[data-overflow])::after { content: ''; position: absolute; right: 10px; top: calc((var(--control-touch-height, 44px) - 9px) / 2); width: 9px; height: 9px; border-top: 2px solid var(--text-primary); border-right: 2px solid var(--text-primary); transform: rotate(45deg); pointer-events: none; } /* more tabs to the right: a chevron at the edge while there are (#11583) */
     .view-list .vl-tab.view-list-current { color: var(--text-primary); border-bottom-color: var(--accent); font-weight: var(--fw-strong); box-shadow: none; }
 }
 

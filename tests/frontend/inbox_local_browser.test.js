@@ -79,7 +79,7 @@ const hex = i => i.toString(16).padStart(20, '0');
             await open(w, mobile);
             await settle(`document.getElementById('nav-tab-hub-inbox-badge').textContent === '1'`, 'the waiting badge');
             let s = await state();
-            check(`${dev}: the Inbox tab is on a plain local Coral, right after Agents, with the number waiting (1) and says so`, s.tabs.slice(0, 2).join() === 'agents,hub-inbox' && s.navBadge === '1' && s.navLabel === 'Inbox, 1 waiting for input', JSON.stringify([s.tabs, s.navBadge, s.navLabel]));
+            check(`${dev}: the Inbox tab is on a plain local Coral, the first tab, with the number waiting (1) and says so`, s.tabs.slice(0, 2).join() === 'hub-inbox,agents' && s.navBadge === '1' && s.navLabel === 'Inbox, 1 waiting for input', JSON.stringify([s.tabs, s.navBadge, s.navLabel]));
             check(`${dev}: and no Saved tab of its own`, !s.tabs.includes('saved'), JSON.stringify(s.tabs));
 
             // the Inbox, from the nav tab (a click, or the phone's dropdown)

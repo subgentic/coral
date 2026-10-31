@@ -1,4 +1,4 @@
-// Needs you says what waits on a row (#11442): an agent waiting on you whose task holds up others says so ("High priority: 3 tasks wait on this"), blockers sort first (the default "Blocking first"), a row with nothing
+// Needs you says what waits on a row (#11442): an agent waiting on you whose task holds up others says so ("High priority: 3 tasks wait on this"), blockers sort first when "Blocking first" is picked (the default is newest first, #11552), a row with nothing
 // waiting on it looks as it did, and "Waiting longest" gives the old order back. The board's tasks are stubbed. 1280 (the table) and 390 (the phone's rows).
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -39,7 +39,7 @@ AGENTS[0].waits_on_this = { count: 2, top_title: 'Ship the build', priority: 'lo
             await waitFor(`document.querySelectorAll('${T} tbody tr').length === 3`, at + 'the three waiting agents', 10000);
             await waitFor(`/wait on this|Blocks \\d/.test(document.querySelector('${T}').textContent)`, at + 'the blockers phrase', 10000);
             let rows = await rowsOf();
-            check(order(rows)[0] === 'Frontend Dev', at + 'the agent that holds up three tasks is first (Blocking first), though it has waited least: ' + JSON.stringify(order(rows)));
+            check(order(rows).join() === 'Frontend Dev,Docs Writer,Backend Dev', at + 'the default is newest first (#11552): the one that has waited least is first: ' + JSON.stringify(order(rows)));
             const fe = rows.find(r => r.text.includes('Frontend Dev'));
             if (!mobile) { check(/Blocks 3 tasks/.test(fe.text), at + 'its row says what waits on it, short in a one-line list: ' + fe.text); check(await ev(`[...document.querySelectorAll('${T} tr')].some(tr => tr.textContent.includes('Blocks 3 tasks') && [...tr.querySelectorAll('[title]')].some(e => /High priority: 3 tasks wait on this/.test(e.title)))`), at + 'and the whole sentence, a high-priority waiter first, is its tooltip'); }
             else {
@@ -59,11 +59,17 @@ AGENTS[0].waits_on_this = { count: 2, top_title: 'Ship the build', priority: 'lo
             // the sort: Blocking first is the default and the first of the choices; Waiting longest gives the old order back
             const sortSel = `[...document.querySelectorAll('select')].find(s => [...s.options].some(o => o.textContent.trim() === 'Waiting longest'))`;
             const sel = await ev(`(() => { const s = ${sortSel}; return s ? { value: s.value, options: [...s.options].map(o => o.textContent.trim()) } : null; })()`);
-            check(!!sel && sel.options[0] === 'Blocking first' && sel.value === 'blockers', at + 'Blocking first is the first choice and the one on: ' + JSON.stringify(sel));
+            check(!!sel && sel.options[0] === 'Waiting least' && sel.options.includes('Blocking first') && sel.value === 'newest', at + 'Waiting least (newest first) is the first choice and the one on, Blocking first is still a choice: ' + JSON.stringify(sel));
             await ev(`(() => { const s = ${sortSel}; s.value = 'oldest'; s.dispatchEvent(new Event('input', { bubbles: true })); s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
             await waitFor(`(() => { const t = [...document.querySelectorAll('${T} tbody tr')].map(r => r.textContent); return t.length === 3 && t[0].includes('Backend Dev'); })()`, at + 'Waiting longest puts the oldest first', 6000).catch(() => {});
             rows = await rowsOf();
             check(order(rows).join() === 'Backend Dev,Docs Writer,Frontend Dev', at + 'Waiting longest is the old order: ' + JSON.stringify(order(rows)));
+            await ev(`(() => { const s = ${sortSel}; s.value = 'blockers'; s.dispatchEvent(new Event('input', { bubbles: true })); s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
+            await waitFor(`(() => { const t = [...document.querySelectorAll('${T} tbody tr')].map(r => r.textContent); return t.length === 3 && t[0].includes('Frontend Dev') && t[1].includes('Backend Dev'); })()`, at + 'Blocking first puts the blocker first, then the longest waiting', 6000).catch(() => {});
+            rows = await rowsOf();
+            check(order(rows).join() === 'Frontend Dev,Backend Dev,Docs Writer', at + 'a picked Blocking first still orders blockers first: ' + JSON.stringify(order(rows)));
+            const kept = await ev(`JSON.parse(localStorage.getItem('coral-inbox-needs-filters') || '{}').sort`);
+            check(kept === 'blockers', at + 'a picked sort is kept: ' + JSON.stringify(kept));
             check(!(await ev(`document.documentElement.scrollWidth > innerWidth + 1`)), at + 'no sideways scroll');
 
             // a "for review" file on a real team: its task holds up two others, and it is the last open task of its goal's second task

@@ -148,7 +148,7 @@ function answerControlsHtml(info, descriptions = {}, fullLabels = {}) {
     let foot = "";
     if (review) {
         // Submit answers / Cancel: footer actions, Submit primary
-        foot += selects.map((o, i) => `<button type="button" class="cni-answer btn btn-sm ${i === 0 ? "btn-primary" : ""}" data-n="${Number(o.n)}" data-label="${escapeHtml(o.label)}" data-action="select">${escapeHtml(o.label)}</button>`).join("");
+        foot += selects.map((o, i) => `<button type="button" class="cni-answer btn ${i === 0 ? "btn-primary" : ""}" data-n="${Number(o.n)}" data-label="${escapeHtml(o.label)}" data-action="select">${escapeHtml(o.label)}</button>`).join("");
     } else if (selects.length) {
         const withDesc = selects.some(o => descriptions[fullLabels[o.label] || o.label] || descriptions[o.label]);
         const multi = !!(info.screen && info.screen.multi);
@@ -158,15 +158,15 @@ function answerControlsHtml(info, descriptions = {}, fullLabels = {}) {
         body += `<div class="cni-options ${withDesc ? "cni-options-cards" : "cni-options-chips"}${info.kind === "question" && !multi && !withDesc ? " cni-options-stacked" : ""}"${multi ? ` role="group" aria-label="Pick everything that applies"` : ""}>`
             + selects.filter(o => !apart.includes(o)).map(o => button(o, descriptions[fullLabels[o.label] || o.label] || descriptions[o.label], fullLabels[o.label])).join("") + `</div>`;
         const submit = info.screen && info.screen.submit;
-        if (multi && submit) foot += `<button type="button" class="cni-answer btn btn-sm btn-primary cni-submit" data-n="0" data-label="${escapeHtml(submit.label)}" data-action="submit">${escapeHtml(submit.label)}</button>`;
+        if (multi && submit) foot += `<button type="button" class="cni-answer btn btn-primary cni-submit" data-n="0" data-label="${escapeHtml(submit.label)}" data-action="submit">${escapeHtml(submit.label)}</button>`;
     }
     for (const o of texts) {
         const placeholder = /^type something/i.test(o.label) ? "Or type your own answer…" : `${o.label.replace(/\.$/, "")}…`;
         body += `<form class="cni-text-form" data-n="${Number(o.n)}" data-label="${escapeHtml(o.label)}" data-action="text">`
             + `<div class="cni-attach image-attachments" hidden></div>` // the images pasted or added here (card_attach.js, #11386)
             + `<input type="text" class="field cni-text-input" placeholder="${escapeHtml(placeholder)}" aria-label="${escapeHtml(o.label)}">`
-            + `<button type="button" class="btn btn-sm cni-attach-btn" aria-label="Add image" title="Add an image: it is sent with your answer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg></button><input type="file" class="cni-attach-input" accept="${escapeAttr(PICKER_ACCEPT)}" multiple hidden tabindex="-1" aria-hidden="true">`
-            + `<button type="submit" class="btn btn-sm">Send</button></form>`;
+            + `<button type="button" class="btn cni-attach-btn" aria-label="Add image" title="Add an image: it is sent with your answer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg></button><input type="file" class="cni-attach-input" accept="${escapeAttr(PICKER_ACCEPT)}" multiple hidden tabindex="-1" aria-hidden="true">`
+            + `<button type="submit" class="btn">Send</button></form>`;
     }
     for (const o of chats) {
         foot = `<button type="button" class="cni-link cni-answer" data-n="${Number(o.n)}" data-label="${escapeHtml(o.label)}" data-action="chat">${escapeHtml(o.label)} instead</button>` + foot;
@@ -285,7 +285,7 @@ function needsInputHtml(info, session) {
         + context
         + reviewHtml(info)
         + controls.body
-        + `<div class="cni-foot"><button type="button" class="cni-link" data-on-click="terminal-view-open">Open terminal</button>${hint}${!info.readOnly && canDismissWait(session, info.kind) ? `<button type="button" class="cni-link" data-on-click="dismiss-wait" data-session-id="${escapeAttr(session.session_id)}" title="Clear this if the agent is not waiting. Nothing is sent to the agent.">Dismiss</button>` : ""}<span class="cni-foot-spacer"></span>${info.signedOut ? `<button type="button" class="btn btn-sm cni-recheck" data-on-click="startup-recheck" data-agent="${escapeAttr(info.agent || "claude")}">Check again</button>` : ""}${controls.foot}</div>`;
+        + `<div class="cni-foot"><button type="button" class="cni-link" data-on-click="terminal-view-open">Open terminal</button>${hint}${!info.readOnly && canDismissWait(session, info.kind) ? `<button type="button" class="cni-link" data-on-click="dismiss-wait" data-session-id="${escapeAttr(session.session_id)}" title="Clear this if the agent is not waiting. Nothing is sent to the agent.">Dismiss</button>` : ""}<span class="cni-foot-spacer"></span>${info.signedOut ? `<button type="button" class="btn cni-recheck" data-on-click="startup-recheck" data-agent="${escapeAttr(info.agent || "claude")}">Check again</button>` : ""}${controls.foot}</div>`;
 }
 
 // The sign-in card (#3830): the login happens in the agent's terminal (a browser link and a code
@@ -296,7 +296,7 @@ function loginCardHtml(info, name, kicker) {
         + `<div class="cni-question">${escapeHtml(name)} needs you to sign in</div>`
         + reason
         + `<div class="cni-context-text">Sign in from the terminal. Nothing runs until you do.</div>`
-        + `<div class="cni-foot"><button type="button" class="btn btn-sm btn-primary cni-login-open" data-on-click="terminal-view-open">Open terminal</button></div>`;
+        + `<div class="cni-foot"><button type="button" class="btn btn-primary cni-login-open" data-on-click="terminal-view-open">Open terminal</button></div>`;
 }
 
 // The prompt cards Coral itself made (#3622 F1). Only a control inside one of these, and outside
