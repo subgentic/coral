@@ -3,6 +3,7 @@ package routes
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -303,4 +304,33 @@ func TestOnlyTheOwnersReadCarriesThePrivateMark(t *testing.T) {
 	assert.False(t, items[1].Private, "a guide's list never carries it")
 	b, _ := json.Marshal(teamArtifact{ID: "x"})
 	assert.NotContains(t, string(b), "private", "absent when not marked")
+}
+
+// coral-hub Security's trust diff: a guide's reply goes only into a thread of the grant's own board; a parent on another board's thread of a shared artifact looks the same as a missing parent.
+func TestAGuideCannotReplyIntoAnotherBoardsThread(t *testing.T) {
+	rig := newGuideArtifactRig(t)
+	g := gaGuide(gaDana)
+	mine := rig.guideTestOwnerComment(gaMine, gaBoard, "a note on this team's thread")
+	theirs := rig.guideTestOwnerComment(gaMine, gaOther, "a note on another team's thread of the same artifact")
+	code, out := rig.do("POST", cp(gaMine), g, map[string]any{"body": "a reply", "parent_id": mine})
+	assert.Equal(t, http.StatusCreated, code, "into this board's thread: %v", out)
+	codeOther, bodyOther := rig.do("POST", cp(gaMine), g, map[string]any{"body": "a reply", "parent_id": theirs})
+	codeGone, bodyGone := rig.do("POST", cp(gaMine), g, map[string]any{"body": "a reply", "parent_id": 999999})
+	assert.Equal(t, http.StatusBadRequest, codeOther)
+	assert.Equal(t, codeGone, codeOther, "another board's parent is refused like a missing one")
+	assert.Equal(t, bodyGone, bodyOther, "with the same words, so there is nothing to probe")
+	// nothing was written into the other team's thread
+	all, err := rig.ss.ListArtifactComments(context.Background(), gaMine, "", nil)
+	require.NoError(t, err)
+	for _, c := range all {
+		if c.ParentID != nil && *c.ParentID == theirs {
+			t.Errorf("a reply was written into another board's thread: %v", c.Body)
+		}
+	}
+}
+
+func (rig *cmtRig) guideTestOwnerComment(artifact, boardKey, body string) int64 {
+	code, out := rig.do("POST", cp(artifact), cmtAsOwner, map[string]any{"body": body, "anchor": anchorOf("the lock"), "board": boardKey})
+	require.Equal(rig.t, http.StatusCreated, code, fmt.Sprint(out))
+	return int64(out["id"].(float64))
 }
