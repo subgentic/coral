@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -367,5 +368,26 @@ func TestNoRemoteCommandTextHasAFormattingError(t *testing.T) {
 		if strings.Contains(text, "%!") || strings.Contains(s.template, "%!") {
 			t.Errorf("command %d: formatting error in %q", c, text)
 		}
+	}
+}
+
+// The refusal of a malformed template is itself pinned (QA Engineer's gap on #11429): a command whose template has a verb with no argument, or an argument with no verb, is never sent. The spec is added for
+// the test and taken out again.
+func TestRemoteTextRefusesATemplateWithAFormattingError(t *testing.T) {
+	const missing, extra Command = 9990, 9991
+	specs[missing] = spec{template: "echo %d"}                                  // a stray verb: %!d(MISSING)
+	specs[extra] = spec{template: "echo hi", args: []*regexp.Regexp{versionRe}} // an argument no verb takes: %!(EXTRA string=2.0.10)
+	defer delete(specs, missing)
+	defer delete(specs, extra)
+	if text, err := remoteText(missing); !errors.Is(err, ErrNotAllowed) || text != "" {
+		t.Errorf("a stray %%d was sent: %q, %v", text, err)
+	}
+	if text, err := remoteText(extra, "2.0.10"); !errors.Is(err, ErrNotAllowed) || text != "" {
+		t.Errorf("an argument no verb takes was sent: %q, %v", text, err)
+	}
+	// and a well-formed one still goes (so the refusal is about the formatting error, not about any new command)
+	specs[missing] = spec{template: "echo %s", args: []*regexp.Regexp{versionRe}}
+	if text, err := remoteText(missing, "2.0.10"); err != nil || text != "echo 2.0.10" {
+		t.Errorf("a good template: %q, %v", text, err)
 	}
 }
