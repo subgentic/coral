@@ -18,7 +18,7 @@ import (
 // listens on 127.0.0.1:<port> and every listener must be the child or one of its descendants (a launcher that starts the real server). A stranger that holds the port and answers a wrong password with 401 is
 // then never sent the real one, even if the child stayed alive on another port. Checked on opencode 1.19.5: a build given a held port exits (it does not move), so this is the backstop for a build that does.
 
-var errNoOwnerTool = errors.New("neither lsof nor ss is installed (netstat on Windows), so Coral cannot ask the system who listens on a port: install lsof or ss")
+var errNoOwnerTool = errors.New("neither lsof nor ss is installed, so Coral cannot ask the system who listens on a port: install lsof or ss")
 
 // listenerIsChild reports whether every process listening on TCP port, on any address, is child or a descendant of it, and there is at least one. An error means the system could not be asked (the caller fails
 // closed).
@@ -38,18 +38,15 @@ func listenerIsChild(ctx context.Context, port, child int) (bool, error) {
 	return true, nil
 }
 
-// listenerPIDs are the pids of the processes listening on TCP port, from the platform's own tool: lsof (macOS, Linux), else ss (Linux), on Windows netstat.
+// listenerPIDs are the pids of the processes listening on TCP port: on Windows from the system's listener table (systemListenerPIDs), elsewhere from the platform's own tool, lsof (macOS, Linux), else ss
+// (Linux).
 func listenerPIDs(ctx context.Context, port int) ([]int, error) {
 	if port < 1 || port > 65535 {
 		return nil, fmt.Errorf("not a port: %d", port)
 	}
 	p := strconv.Itoa(port)
 	if runtime.GOOS == "windows" {
-		out, err := run(ctx, "netstat", "-ano", "-p", "tcp")
-		if err != nil {
-			return nil, err
-		}
-		return parseNetstat(out, port), nil
+		return systemListenerPIDs(port)
 	}
 	if out, err := run(ctx, "lsof", "-nP", "-iTCP:"+p, "-sTCP:LISTEN", "-Fp"); err == nil || (!errors.Is(err, errNoOwnerTool) && lsofSaysNone(err)) {
 		return parseLsof(out), nil
@@ -108,23 +105,6 @@ func parseSS(out []byte) []int {
 					seen[n] = true
 					pids = append(pids, n)
 				}
-			}
-		}
-	}
-	return pids
-}
-
-// parseNetstat reads `netstat -ano -p tcp`: "TCP  127.0.0.1:4096  0.0.0.0:0  LISTENING  1234" for the port.
-func parseNetstat(out []byte, port int) []int {
-	var pids []int
-	seen := map[int]bool{}
-	suffix := ":" + strconv.Itoa(port)
-	for _, line := range strings.Split(string(out), "\n") {
-		f := strings.Fields(line)
-		if len(f) >= 5 && strings.EqualFold(f[0], "TCP") && strings.HasSuffix(f[1], suffix) && strings.EqualFold(f[3], "LISTENING") {
-			if n, err := strconv.Atoi(f[4]); err == nil && n > 0 && !seen[n] {
-				seen[n] = true
-				pids = append(pids, n)
 			}
 		}
 	}

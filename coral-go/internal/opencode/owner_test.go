@@ -25,8 +25,6 @@ func TestTheSystemToolsAnswersAreParsed(t *testing.T) {
 	assert.Empty(t, parseLsof([]byte("pabc\np-5\np0\n")), "a line that is not a pid is not one")
 	assert.Equal(t, []int{4242}, parseSS([]byte(`LISTEN 0 512 127.0.0.1:4096 0.0.0.0:* users:(("opencode",pid=4242,fd=19))`+"\n")))
 	assert.Equal(t, []int{11, 12}, parseSS([]byte(`LISTEN 0 1 127.0.0.1:1 0.0.0.0:* users:(("a",pid=11,fd=3),("b",pid=12,fd=4))`)))
-	netstat := "  TCP    127.0.0.1:4096     0.0.0.0:0      LISTENING       7777\n  TCP    127.0.0.1:4097     0.0.0.0:0      LISTENING       8888\n  TCP    127.0.0.1:4096     127.0.0.1:5000 ESTABLISHED     9999\n"
-	assert.Equal(t, []int{7777}, parseNetstat([]byte(netstat), 4096), "the port's listener only: not another port, not a connection")
 }
 
 // With a REAL process listening, the system tool names it: the test process (an in-process listener), and a stand-in child (another process).
@@ -110,16 +108,14 @@ func processAlive(pid int) bool {
 }
 
 func TestAMachineWithoutTheSystemToolsGetsAnErrorThatNamesThem(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("on Windows the listener table is read from the system, not from a tool on PATH")
+	}
 	t.Setenv("PATH", t.TempDir())
 	_, err := listenerPIDs(context.Background(), 8451)
 	require.Error(t, err)
 	assert.ErrorIs(t, err, errNoOwnerTool)
-	if runtime.GOOS == "windows" {
-		assert.Contains(t, err.Error(), "netstat")
-		return
-	}
 	assert.Contains(t, err.Error(), "neither lsof nor ss is installed", "the two tools it asks")
-	assert.Contains(t, err.Error(), "netstat on Windows")
 	assert.Contains(t, err.Error(), "install lsof or ss", "and what to do")
 	_, err = listenerIsChild(context.Background(), 8451, os.Getpid())
 	require.Error(t, err, "the check fails closed: the password is not sent")
