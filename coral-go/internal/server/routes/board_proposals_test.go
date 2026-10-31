@@ -404,3 +404,38 @@ func TestAStuckApprovingProposalIsShownAndRecovered(t *testing.T) {
 	}
 	assert.Equal(t, 1, told, "the proposer of the finished one is told once")
 }
+
+// A proposal's proposer and creator are the name the identity layer verified, not the claim: an agent token that claims to be the Operator or another agent proposes as itself.
+func TestAProposalIsMadeInTheVerifiedNameNotTheClaim(t *testing.T) {
+	_, h := setupBoardTestServer(t)
+	registerTaskPlanner(t, h, "team", "Orchestrator")
+	registerTaskPlanner(t, h, "team", "Planner Two") // another planner whose name the body may claim
+	_, err := h.bs.UpdateBoardSettings(context.Background(), "team", board.BoardSettingsUpdate{GoalsNeedApproval: boolp(true), TasksNeedApproval: boolp(true)})
+	require.NoError(t, err)
+	as := func(fn http.HandlerFunc) http.HandlerFunc {
+		return func(w http.ResponseWriter, req *http.Request) {
+			fn(w, withActor(req, Actor{Kind: ActorToken, Name: "Orchestrator"})) // the token's member name, whatever the body claims
+		}
+	}
+	r := chi.NewRouter()
+	r.Post("/api/board/{project}/goals", as(h.CreateGoal))
+	r.Post("/api/board/{project}/tasks", as(h.CreateTask))
+	srv := httptest.NewServer(r)
+	t.Cleanup(srv.Close)
+	post := func(path string, body map[string]any) int {
+		b, _ := json.Marshal(body)
+		resp, err := http.Post(srv.URL+path, "application/json", bytes.NewReader(b))
+		require.NoError(t, err)
+		resp.Body.Close()
+		return resp.StatusCode
+	}
+	assert.Equal(t, http.StatusAccepted, post("/api/board/team/goals", map[string]any{"title": "Claimed goal", "subscriber_id": "Operator", "created_by": "Operator"}))
+	assert.Equal(t, http.StatusAccepted, post("/api/board/team/tasks", map[string]any{"title": "Claimed task", "subscriber_id": "Planner Two", "created_by": "Planner Two"}))
+	props, err := h.bs.ListProposals(context.Background(), "team")
+	require.NoError(t, err)
+	require.Len(t, props, 2)
+	for _, p := range props {
+		assert.Equal(t, "Orchestrator", p.Proposer, "the proposer is the verified name")
+		assert.Contains(t, string(p.Payload), `"created_by":"Orchestrator"`, "and the creator it will be made as")
+	}
+}

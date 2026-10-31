@@ -16,7 +16,7 @@ import { failedUnread, finishedUnread, refreshRuns, markSeen, runRoute, failureW
 import { go, note, backIs, currentRoute } from './nav.js';
 
 import { build, keyRoute, parse as parseRoute, inboxFolderPath, BOARDS_FOLDER, BOARDS_SUB } from './routes.js';
-import { sessionServer, keyLabel, identityKey, splitKey, goalTeamKey, nativeInbox } from './server_base.js';
+import { sessionServer, keyLabel, identityKey, splitKey, goalTeamKey, nativeInbox, LOCAL_SERVER } from './server_base.js';
 import { teamLabel } from './server_status.js';
 import { showView } from './utils.js';
 import { registerActions, textOf } from './actions.js';
@@ -545,10 +545,10 @@ registerGroupSource('hub-inbox', {
                 node: () => { const wrap = DT.el('div', 'inbox-needs-results'); const oneLineNeeds = !rows.some(isItem); const table = DT.dataTable({ label: `Needs you, ${rows.length}`, rows, rowKey: s => `${sessionServer(s)}:${s.session_id}`, state: needsState, rowName: s => s.review ? `${s.review.name}, for review, ${teamOf(s)}` : s.autorun ? `${s.autorun.name}, run failed` : resolveSessionIdentity(s),
                     open: s => { if (s.proposal) { openProposalDialog(s.proposal, 'view'); return; } if (s.review) { openReview(s.review); return; } if (s.autorun) { openRun(s.autorun); return; } window.switchNavTab?.('agents'); Promise.resolve(window.selectLiveSession?.(s.name, s.agent_type, s.session_id, sessionServer(s))).then(() => window.showChatView?.()); }, // a row that needs an answer shows the chat card, not the terminal saved last (#10141)
                     columns: [
-                        { key: 'agent', label: rows.some(isItem) ? 'Item' : 'Agent', primary: true, width: 'grow', ...(rows.some(isItem) ? { min: 24, share: 2 } : {}), sort: true, sortValue: s => resolveSessionIdentity(s), line: 1, ...(oneLineNeeds ? { subtitle: s => askOf(s), subtitleTitle: s => askOf(s) } : {}), // a list of agents: the ask is the row's one second line, under the name (UI/UX: the row's purpose is to decide from the list)
+                        { key: 'agent', label: rows.some(isItem) ? 'Item' : 'Agent', primary: true, width: 'grow', ...(rows.some(s => s.proposal) ? { min: 14, share: 1 } : rows.some(isItem) ? { min: 24, share: 2 } : {}), sort: true, sortValue: s => resolveSessionIdentity(s), line: 1, ...(oneLineNeeds ? { subtitle: s => askOf(s), subtitleTitle: s => askOf(s) } : {}), // a list of agents: the ask is the row's one second line, under the name (UI/UX: the row's purpose is to decide from the list)
                             cell: s => { if (s.proposal) { const name = DT.el('span', 'inbox-review-name', s.proposal.title); name.title = s.proposal.title; return name; } if (s.autorun) { const name = DT.el('span', 'inbox-review-name', s.autorun.name); name.title = s.autorun.name; return name; } if (s.review) { const name = DT.el('span', 'inbox-review-name', s.review.name); name.title = s.review.name; name.dataset.reviewArtifact = s.review.id; if (!isRead(s.review)) return name; const wrap = DT.el('span', 'inbox-review-item'); wrap.append(name, DT.tag('read')); return wrap; } const w = DT.personButton(resolveSessionIdentity(s), `Open ${resolveSessionIdentity(s)}`); Object.assign(w.querySelector('.dt-primary').dataset, { name: s.name, agentType: s.agent_type, sessionId: s.session_id, server: sessionServer(s) }); return w; } },
-                        ...(rows.some(askOf) && !oneLineNeeds ? [{ key: 'asks', label: 'Waiting for', width: 'content', max: 20, drop: 2, line: 2, cell: s => {
-                            if (s.proposal) { const why = DT.el('span', null, `${s.proposal.proposer} proposes a ${s.proposal.kind === 'goal' ? 'goal' : 'task'}`); why.title = [s.proposal.title, s.proposal.payload && (s.proposal.payload.body || s.proposal.payload.outcome) || ''].filter(Boolean).join('\n\n').slice(0, 800); return why; }
+                        ...(rows.some(askOf) && !oneLineNeeds ? [{ key: 'asks', label: rows.some(x => x.proposal) ? 'What was asked' : 'Waiting for', ...(rows.some(x => x.proposal) ? { width: 'grow', min: 22, share: 4 } : { width: 'content', max: 20, drop: 2 }), line: 2, cell: s => {
+                            if (s.proposal) { const pr = s.proposal, wrap = DT.el('span', 'inbox-proposal-what'); wrap.append(DT.el('span', 'inbox-proposal-line', `${pr.proposer} proposes a ${pr.kind === 'goal' ? 'goal' : 'task'}`)); const body = pr.payload && (pr.payload.body || pr.payload.outcome) || ''; if (body) { const t = DT.el('span', 'inbox-proposal-body', body.length > 600 ? `${body.slice(0, 600)}…` : body); t.title = body.length > 600 ? 'Open it to read all of it' : ''; wrap.append(t); } wrap.title = pr.title; return wrap; } // the proposer's name and the proposal's words are text: the row says what is asked
                             if (s.autorun) { const why = DT.el('span', null, askOf(s)); why.title = askOf(s); return why; } // the whole reason is the tooltip: the line is one
                             if (!s.review) { const ask = askOf(s); if (!ask) return ''; const why = DT.el('span', null, ask); why.title = ask; return why; } // the whole ask is the tooltip: the row is one line
                             const metadata = DT.el('span', 'inbox-review-metadata'); metadata.append(DT.el('span', null, 'For review'), DT.el('span', 'inbox-review-team', teamOf(s)));
@@ -569,7 +569,7 @@ registerGroupSource('hub-inbox', {
                             cell.title = [goalOf(s) ? `Goal: ${s.goal.title}` : NO_GOAL, s.task ? `Task: ${s.task.title || `#${s.task.id}`}` : ''].filter(Boolean).join(' \u00b7 ');
                             return cell;
                         } }] : []),
-                        ...(rows.some(isItem) ? [{ key: 'review', label: 'Actions', fixed: true, width: rows.some(s => s.proposal) ? '24rem' : rows.some(s => s.review && isRead(s.review)) ? '21rem' : '13.5rem', line: 1, cell: s => (s.proposal ? proposalActions(s.proposal) : s.review ? reviewActions(s.review) : s.autorun ? runActions(s.autorun) : '') }] : []),
+                        ...(rows.some(isItem) ? [{ key: 'review', label: 'Actions', fixed: true, width: rows.some(s => s.proposal) ? '16rem' : rows.some(s => s.review && isRead(s.review)) ? '21rem' : '13.5rem', line: 1, cell: s => (s.proposal ? proposalActions(s.proposal) : s.review ? reviewActions(s.review) : s.autorun ? runActions(s.autorun) : '') }] : []),
                         { key: 'waiting', label: 'Waiting', ...(oneLineNeeds ? { width: '9rem' } : { min: rows.some(isItem) ? 12 : 18 }), tone: 'tertiary', align: 'end', sort: true, sortValue: s => s.waiting_since || '', firstDir: 'desc', line: rows.some(isItem) ? 2 : 1, cell: s => waitingText(s.waiting_since) || '' },
                     ], ...(oneLineNeeds ? { oneLine: true, sortBar: false } : {}), ...(oneLineNeeds ? { mail: s => ({ lead: { text: needsName(s), name: needsName(s) }, title: needsName(s), medium: true, starred: !!(s.review && s.review.starred), team: teamOf(s), teamAlways: multipleServers() || manyTeams, nameTeam: true, snippetTip: true, snippet: askOf(s) || sessionStateInfo(s).label, state: askOf(s) || sessionStateInfo(s).label, time: DT.shortTime(s.waiting_since), unread: true, mark: 'attention', answers: answerCell(s) }) } : {}) }); // a phone's row is the mail row: the agent, then the ask on a second line, amber and bold (every row of Needs you is unanswered); a list with a review or a run keeps its own actions. One line a row (Goal #79) for a list of agents: the ask is the row's tooltip, a narrow list drops it, then the team, the folder and the CLI; a list with a review item or a failed run keeps its own folded rows
                     wrap.append(table.el);
@@ -811,7 +811,7 @@ export async function showInbox({ folder = '', quiet = false } = {}) {
     } else {
         refreshTasks();
         refreshReviews(true);
-        refreshProposals();
+        refreshProposals(true);
         refreshRuns(true);
         refreshGoals();
         IA.refreshArtifactCount(() => renderInboxNav(true));

@@ -11,7 +11,6 @@ await loadStyles('inbox_proposals.css');
 export { proposalItems, pendingProposals, onProposalsChanged, refreshProposals };
 
 const kindWord = p => (p.kind === 'goal' ? 'goal' : 'task');
-const shortText = (t, n) => { const s = String(t || ''); return s.length > n ? `${s.slice(0, n)}…` : s; };
 
 /** The fields of a proposal's payload the dialog and the row show. */
 export function proposalFacts(p) {
@@ -33,6 +32,7 @@ export function proposalActions(p) {
         box.append(el('span', 'inbox-proposal-expired', 'Expired, nothing was made'), btn('Dismiss', `Dismiss the expired ${kindWord(p)} ${visibleName(p.title)}`, () => dismissExpired(p)));
         return box;
     }
+    if (p.state === 'approving') { box.append(el('span', 'inbox-proposal-expired', 'Being approved…')); return box; } // an Approve has it: nothing to press until it finishes (a stuck one is looked into after five minutes)
     const approve = btn('Approve', `Approve the ${kindWord(p)} ${visibleName(p.title)}`, async b => {
         b.disabled = true; say.textContent = '';
         const res = await decide(p, 'approve');
@@ -48,7 +48,7 @@ export function proposalActions(p) {
 export function openProposalDialog(p, mode = 'view') {
     document.getElementById('proposal-dialog')?.remove();
     const facts = proposalFacts(p), pay = p.payload && typeof p.payload === 'object' ? p.payload : {};
-    const d = el('dialog', 'modal-content proposal-dialog'); d.id = 'proposal-dialog'; d.setAttribute('aria-labelledby', 'proposal-dialog-title');
+    const d = el('dialog', 'modal-content dlg-form proposal-dialog'); d.id = 'proposal-dialog'; d.setAttribute('aria-labelledby', 'proposal-dialog-title');
     const h = el('h2', null, `${kindWord(p) === 'goal' ? 'A goal' : 'A task'} waiting for your approval`); h.id = 'proposal-dialog-title';
     const who = el('p', 'proposal-who', `${p.proposer} proposed it for ${p.board_id}.${p.goal_proposal_id ? ' It is for a goal that is also waiting: approve that goal first.' : ''}`);
     const field = (label, value, tall) => { const l = el('label', 'proposal-field'); l.append(el('span', null, label)); const i = el(tall ? 'textarea' : 'input', 'field'); if (tall) i.rows = 4; i.value = value; l.append(i); return [l, i]; };

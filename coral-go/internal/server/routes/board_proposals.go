@@ -37,8 +37,18 @@ func (h *BoardHandler) needsApproval(r *http.Request, project, kind string) (boo
 	return set.TasksNeedApproval, true
 }
 
+// verifiedName is the name the identity layer verified for the caller (an agent token's member name), and only when there is none the claim: a proposal's proposer and creator cannot pose as the Operator or as
+// another agent in log mode (Security on #11389).
+func verifiedName(r *http.Request, claim string) string {
+	if a := callerActor(r); a.Kind != ActorClaimed && strings.TrimSpace(a.Name) != "" {
+		return a.Name
+	}
+	return claim
+}
+
 // proposeAnswer stores the proposal and answers 202 (or the refusal). payload is what the handler will replay on Approve.
 func (h *BoardHandler) proposeAnswer(w http.ResponseWriter, r *http.Request, in board.ProposalInput) {
+	in.Proposer = verifiedName(r, in.Proposer)
 	p, existed, err := h.bs.CreateProposal(r.Context(), in)
 	if err != nil {
 		if !goalError(w, err) {

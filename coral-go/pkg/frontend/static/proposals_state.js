@@ -23,7 +23,7 @@ export function refreshProposals(force = false) {
     if (!force && Date.now() - lastRead < 20000) return null;
     reading = (async () => {
         try {
-            const r = await serverFetch(LOCAL_SERVER, '/api/proposals?state=pending,expired');
+            const r = await serverFetch(LOCAL_SERVER, '/api/proposals?state=pending,approving,expired');
             lastRead = Date.now();
             if (r.status === 403) items = [];
             else if (r.ok) {
