@@ -309,6 +309,9 @@ func scanConfig(knownHosts, userConfig string) (string, error) {
 		"StrictHostKeyChecking no", "UserKnownHostsFile \"" + filepath.ToSlash(knownHosts) + "\"", "GlobalKnownHostsFile " + os.DevNull,
 		"HashKnownHosts no", "CheckHostIP no", "BatchMode yes",
 		"ForwardAgent no", "ForwardX11 no", "ForwardX11Trusted no", "ClearAllForwardings yes", "PermitLocalCommand no", "RemoteCommand none",
+		// no Kerberos sign-in to an unverified hop and no delegating of the owner's tickets to it, and no connection sharing: a multiplexed master of the owner's would carry a hop through the
+		// owner's own, already verified, connection (so the key would never be stored), and a master started here must not outlive the scan
+		"GSSAPIAuthentication no", "GSSAPIDelegateCredentials no", "ControlMaster no", "ControlPath none", "ControlPersist no",
 	} {
 		b.WriteString("  " + l + "\n")
 	}
