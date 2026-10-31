@@ -27,6 +27,10 @@ const S = `(window.__coralStatic || '/static/')`;
             const calls = () => ev(`window.__calls`);
             await ev(`window.__calls = []; window.__realFetch = window.fetch; window.fetch = (u, o) => { const s = String(u); if (s.includes('/notices/')) { window.__calls.push({ u: s, method: (o && o.method) || 'GET', body: o && o.body }); return Promise.resolve(new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'Content-Type': 'application/json' } })); } return window.__realFetch(u, o); }; true`);
 
+            // an older Coral (or one behind a hub) sends no notices_paused: no control at all, not a dead one
+            await ev(`(() => { const rows = window._coralGetLiveSessions().map(r => { if (r.session_id !== 'talk-agent-id') return r; const { notices_paused, paused_until, notices_holding, notices_waiting, ...rest } = r; return rest; }); window._coralSetLiveSessions(rows); return import(${S} + 'session_header_updates.js').then(m => { m.updateWaitingIndicator(rows.find(r => r.session_id === 'talk-agent-id')); return true; }); })()`);
+            let v0 = await view();
+            assert.ok(!v0.btn && !v0.bar, `${tag}: a row without notices_paused shows no control and no bar: ` + JSON.stringify(v0));
             await feed({});
             let v = await view();
             assert.ok(v.btn && v.pressed === 'false' && v.name === 'Pause Coral messages' && !v.bar, `${tag}: not paused: the toggle is there, unpressed, named; no bar: ` + JSON.stringify(v));
@@ -37,7 +41,7 @@ const S = `(window.__coralStatic || '/static/')`;
             assert.ok(c1.length === 1 && c1[0].method === 'POST' && /\/api\/sessions\/live\/talk-agent\/notices\/pause$/.test(c1[0].u) && JSON.parse(c1[0].body).minutes === 0, `${tag}: it asks the server to pause: ` + JSON.stringify(c1));
             v = await view();
             assert.ok(v.bar && v.pressed === 'true' && v.name === 'Resume Coral messages' && /paused while you talk\. 0 waiting\. until you resume\./.test(v.text) && v.resume, `${tag}: paused: the bar, its words, a Resume button: ` + JSON.stringify(v));
-            await feed({ notices_paused: true, paused_until: new Date(Date.now() + 12 * 60000 + 5000).toISOString(), board_unread: 3 });
+            await feed({ notices_paused: true, paused_until: new Date(Date.now() + 12 * 60000 + 5000).toISOString(), board_unread: 1, notices_waiting: 3 });
             v = await view();
             assert.match(v.text, /^Coral's messages are paused while you talk\. 3 waiting\. 12 min left\.$/, `${tag}: the count and the time left: ` + JSON.stringify(v));
             await shot(`notice-pause-${w}-${theme}`);

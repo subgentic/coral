@@ -2,7 +2,7 @@
  * notifications), and says so. The chat header has ONE toggle (Pause Coral messages / Resume Coral messages, 44 px on a touch screen, aria-pressed); while paused a slim bar above the composer says
  * "Coral's messages are paused while you talk. 3 waiting. Resume." with the time left; while the server holds them only because the person is typing, a quiet hint says "Holding Coral's messages while you type".
  * The row's fields (the live row): notices_paused (bool), paused_until (RFC3339 or null: a pause that ends by itself), notices_holding (bool: the auto-hold while typing); the number waiting is the row's
- * board_unread (waiting.js). The two calls are in `api` below, the one place that knows the routes (a different shape from the server is a change here only). */
+ * notices_waiting, else its board_unread (waiting.js). The control is drawn only for a row that carries notices_paused as a boolean (the server's way of saying it has the pause). The two calls are in `api` below, the one place that knows the routes (a different shape from the server is a change here only). */
 import { registerActions } from './actions.js';
 import { state } from './state.js';
 import { showToast } from './utils.js';
@@ -34,7 +34,7 @@ export function timeLeftText(until, now = Date.now()) {
 
 /** The bar's sentence for a row: '' when nothing is to be said. */
 export function barText(row, now = Date.now()) {
-    const p = pauseOf(row), n = waitingCount(row);
+    const p = pauseOf(row), n = Number.isSafeInteger(row && row.notices_waiting) && row.notices_waiting >= 0 ? Math.min(row.notices_waiting, 999) : waitingCount(row); // the server's own count of what the pause holds, else the unread board messages
     if (p.paused) return `Coral's messages are paused while you talk. ${n} waiting. ${timeLeftText(p.until, now)}.`;
     if (p.holding) return "Holding Coral's messages while you type";
     return '';
@@ -45,7 +45,7 @@ let _timer = 0, _busy = false;
 /** Paint the toggle and the bar from the open agent's row. Written only on a change. */
 export function syncNoticePause(row) {
     const btn = document.getElementById('notice-pause-btn'), bar = document.getElementById('notice-pause-bar');
-    const p = pauseOf(row), sleeping = !row || !!row.sleeping;
+    const p = pauseOf(row), supported = !!row && typeof row.notices_paused === 'boolean', sleeping = !row || !!row.sleeping || !supported; // the server says it has the pause by sending the field: an older Coral (or one behind a hub) shows no dead control
     if (btn) {
         const label = p.paused ? 'Resume Coral messages' : 'Pause Coral messages';
         if (btn.hidden !== sleeping) btn.hidden = sleeping;
