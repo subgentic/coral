@@ -38,6 +38,9 @@ const { coralReady } = require('./helpers/wait');
         assert.ok(a.panelRole === 'tabpanel' && a.panelLabelledby === a.selectedId && !a.panelHoldsStrip, `${tag} ${what}: the panel is a tabpanel named by the open tab and does not hold the strip: ${JSON.stringify(a)}`);
         // Right moves the focus to the next tab and leaves the open one; Enter opens it
         // the page redraws as the lists settle: the focus is put on the open tab until it stays there
+        // the page redraws as the lists settle, and under load that can come between the focus and the key and take the focus away (red 6 of 6 at 4x CPU throttle): wait until the view has stopped changing, then focus and press once
+        await ev(`(() => { const root = document.getElementById('group-table-view'); window.__quiet = Date.now(); if (window.__quietObs) window.__quietObs.disconnect(); window.__quietObs = new MutationObserver(() => { window.__quiet = Date.now(); }); window.__quietObs.observe(root, { subtree: true, childList: true, attributes: true, characterData: true }); return true; })()`);
+        await waitFor(`Date.now() - window.__quiet > 600`, `${tag} ${what}: the view has stopped redrawing`, 10000);
         let first = null;
         await waitFor(`(() => { const cur = document.querySelector('#group-table-view [role=tab][aria-selected=true]'); if (!cur) return false; cur.focus(); return document.activeElement === cur; })()`, `${tag} ${what}: the open tab takes the focus`, 8000);
         first = await ev(`document.activeElement.dataset.key`);
