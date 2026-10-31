@@ -30,6 +30,7 @@ const CSP = ["default-src 'self'", "script-src 'self'", "style-src 'self'", "sty
             const html = (b.base64Encoded ? Buffer.from(b.body, 'base64').toString('utf8') : b.body).replace('"mode":"local"', '"mode":"cloud"');
             await Fetch.fulfillRequest({ requestId: e.requestId, responseCode: 200, responseHeaders: (e.responseHeaders || []).filter(h => !/^content-(security-policy|length)$/i.test(h.name)).concat([{ name: 'Content-Security-Policy', value: CSP }]), body: Buffer.from(html).toString('base64') });
         });
+  await Page.addScriptToEvaluateOnNewDocument({ source: require('./helpers/scene_ready').FETCH_COUNTER }); // a scene is measured once its fetches are done (#416)
   await Page.addScriptToEvaluateOnNewDocument({source:`(() => {
    window.__cspViolations=[];document.addEventListener('securitypolicyviolation',e=>window.__cspViolations.push(e.violatedDirective));
    try{localStorage.setItem('coral-group-by-server','true');}catch(e){} // the sidebar groups agents under their computer (#6241)

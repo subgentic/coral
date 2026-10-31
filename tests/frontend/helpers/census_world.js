@@ -42,11 +42,17 @@ const JOB2 = { ...JOB, id: 6, name: 'Daily job', cron_expr: '0 9 * * *' }, JOB3 
 const DATA_WORLD = `(() => {
     const inner = window.fetch;
     const json = b => Promise.resolve(new Response(JSON.stringify(b), { headers: { 'content-type': 'application/json' } }));
+    // the agent's changed files: two, on every OS (the Files panel's rows must each name their buttons, which one row cannot show; #6152)
+    const FILES = { files: [{ filepath: 'src/main.go', status: 'M' }, { filepath: 'docs/README.md', status: '??' }], is_git: true };
     window.fetch = (url, opts = {}) => {
         const u = String(url && url.url || url).replace(/^https?:\\/\\/[^/]+/, ''), path = u.split('?')[0], m = (opts.method || 'GET').toUpperCase();
+        // the list read again (a reply ended, the count moved) is the same two, not the stand-in agent's own folder: which of the two a scene showed was a race (#416)
+        if (m === 'POST' && /^\\/api\\/sessions\\/live\\/[^/]+\\/files\\/refresh$/.test(path)) return json(FILES);
         if (m === 'GET') {
-            // the agent's changed files: two, on every OS (the Files panel's rows must each name their buttons, which one row cannot show; #6152)
-            if (/^\\/api\\/sessions\\/live\\/[^/]+\\/files$/.test(path)) return json({ files: [{ filepath: 'src/main.go', status: 'M' }, { filepath: 'docs/README.md', status: '??' }], is_git: true });
+            // OpenCode's sign-in status: not known, as the New Agent dialog has it before the server answers. The server would run the OpenCode
+            // CLI on the test machine (up to 6 s), and the scene that answer lands in was a race (#416).
+            if (path === '/api/system/cli-check' && /[?&]type=opencode(&|$)/.test(u) && /[?&]signin=1(&|$)/.test(u)) return json({ type: 'opencode', found: true });
+            if (/^\\/api\\/sessions\\/live\\/[^/]+\\/files$/.test(path)) return json(FILES);
             if (path === '/api/workflows') return json({ workflows: [${JSON.stringify(WF)}, ${JSON.stringify(WF2)}, ${JSON.stringify(WF3)}] });
             if (path === '/api/workflows/7') return json(${JSON.stringify(WF)});
             if (/^\\/api\\/workflows\\/7\\/runs/.test(path)) return json({ runs: [${JSON.stringify(RUN)}, ${JSON.stringify(RUN_OK)}] });
