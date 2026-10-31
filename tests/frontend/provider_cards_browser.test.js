@@ -1,5 +1,5 @@
 // The provider cards of New Agent's Agent step (#11235, the Operator's pick, Option B), at 1440 and 390 px (and 320), in the light and dark themes:
-//  - each installed provider is a radio card saying "Installed · default <model>" (the saved default model when there is one); the open card, and only it, holds its Model (with its refresh) and Thinking;
+//  - each installed provider is a radio card saying "Installed" ("Installed · default <model>" when a default model is saved); the open card, and only it, holds its Model (with its refresh) and Thinking;
 //  - Thinking offers only the levels that provider has, or says "<Provider> has no thinking levels, so there is nothing to set.";
 //  - a provider that is not installed is under "Not installed" with an Install link and no radio;
 //  - nothing says "optional" in the step; the focus ring is for the keyboard (:focus-visible), so a card chosen by the mouse shows only the open state;
@@ -51,7 +51,7 @@ const { install: installNA, N, stubModels } = require('./helpers/new_agent');
             let d = await ev(READ);
             check(JSON.stringify(d.cards.map(c => c.name)) === JSON.stringify(['Claude', 'Codex', 'Pi', 'OpenCode']), `${tag}: the installed providers are the cards: ${JSON.stringify(d.cards.map(c => c.name))}`);
             check(d.cards.every(c => c.radio), `${tag}: each card has a radio`);
-            check(d.cards.every(c => /^Installed · default /.test(c.status)), `${tag}: each says Installed · default <model>: ${JSON.stringify(d.cards.map(c => c.status))}`);
+            check(d.cards.every(c => /^Installed( · default |$)/.test(c.status)), `${tag}: each says Installed (or Installed · default <model>): ${JSON.stringify(d.cards.map(c => c.status))}`);
             check(/default claude Big$/.test(d.cards[0].status), `${tag}: Claude says its saved default model: ${d.cards[0].status}`);
             check(d.cards.filter(c => c.open).length === 1 && d.cards[0].open, `${tag}: one card is open, Claude: ${JSON.stringify(d.cards.map(c => c.open))}`);
             check(d.cards[0].hasModel && d.cards[0].hasRefresh && d.cards[0].hasThinking, `${tag}: the open card holds Model, its refresh and Thinking: ${JSON.stringify(d.cards[0])}`);

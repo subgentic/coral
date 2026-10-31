@@ -241,6 +241,11 @@ var routeTable = cat(
 	// Artifacts and pasted images are the OWNER's alone through the hub (#5575): an artifact can hold anything. The machine refuses anyone but the owner whatever their tier.
 	// A content-addressed agent artifact is named by its full SHA-256; the only query on the content is the link form v=2 (routes_query.go, #3179). Pasted images are artifacts
 	// too (#5284); /api/upload and /api/shared-images stay local only. Upload (POST /api/agent/artifacts) and the artifact list under /api/agent/ stay unlisted (never).
+	// Pausing Coral's notices to one agent, and resuming them (#11387), is the OWNER's alone through the Hub, like the Operator's other controls on that agent: it changes what is typed into the agent.
+	owner(OwnerRefuse, rules(http.MethodPost, TierInteract,
+		"/api/sessions/live/{name}/notices/pause",
+		"/api/sessions/live/{name}/notices/resume",
+	)),
 	owner(OwnerRefuse, rules(http.MethodGet, TierView,
 		"/api/artifacts/{hex64}",
 		// Which artifact a shortened link in an old message means (#9841): link, repeatable, the owner's alone like the reads around it.
@@ -301,6 +306,8 @@ var routeTable = cat(
 	// ... and so are its changes (#5763, Security's SHOULD 3 on #5761): a bookmark is the owner's own note, so a hub Interact grantee can neither read, create, mark done nor delete one.
 	// Still Interact for the tier (they move no work); the machine also refuses anyone but the owner.
 	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/saved")),
+	owner(OwnerRefuse, rules(http.MethodGet, TierView, "/api/board/{project}/proposals", "/api/proposals")),                                               // what agents asked to add: the Operator's (#11389)
+	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/board/{project}/proposals/{id}/approve", "/api/board/{project}/proposals/{id}/reject")), // and the Operator's decision
 	owner(OwnerRefuse, rules(http.MethodPatch, TierInteract, "/api/saved/{id}")),
 	owner(OwnerRefuse, rules(http.MethodDelete, TierInteract, "/api/saved/{id}")),
 	// What a viewer sees of a board's settings is the machine's to decide (the health setup is the owner's, #5307): the marker is stamped, the handler gives a non-owner less.

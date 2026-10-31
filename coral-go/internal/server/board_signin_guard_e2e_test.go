@@ -241,6 +241,8 @@ var writeRoutesWithoutTheGuard = map[string]string{
 	"POST /api/sessions/live/{name}/auto-accept/disable":               "a control: no text is kept",
 	"POST /api/sessions/live/{name}/auto-accept/enable":                "a control: no text is kept",
 	"POST /api/sessions/live/{name}/context-window":                    "a control: no text is kept",
+	"POST /api/sessions/live/{name}/notices/pause":                     "a control: no text is kept",
+	"POST /api/sessions/live/{name}/notices/resume":                    "a control: no text is kept",
 	"POST /api/sessions/live/{name}/files/refresh":                     "a control: no text is kept",
 	"POST /api/sessions/live/{name}/keys":                              "input typed into an agent's terminal: it goes to the agent, not kept for others to read",
 	"POST /api/sessions/live/{name}/kill":                              "a control: no text is kept",

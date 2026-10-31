@@ -1,4 +1,4 @@
-// OpenCode is a provider card in New agent (#11364 part d, on the Option B cards of #11235): a card with the badge O and "Installed · default model", its models grouped by provider with the signed-in
+// OpenCode is a provider card in New agent (#11364 part d, on the Option B cards of #11235): a card with the badge O and "Installed" (or "Installed · default <model>" with a saved default), its models grouped by provider with the signed-in
 // ones first (the shape /api/agents/models gives for opencode: models carry `group`, `groups` is the order), and, when the CLI is not found, a place under "Not installed" with its install link and
 // no radio. Isolated dev server; every answer is stubbed.
 const assert = require('node:assert/strict');
@@ -35,7 +35,7 @@ const GROUPED = `(() => { const R = window.fetch; window.fetch = (u, o = {}) => 
             assert.equal(oc.mark, 'O', 'its badge is O, a letter no other card uses'); assert.equal(oc.name, 'OpenCode');
             if (!missing.length) {
                 assert.deepEqual(cards.radios, ['claude', 'codex', 'agy', 'pi', 'opencode'], 'five radios, OpenCode last');
-                assert.equal(oc.missing, false); assert.match(oc.status || '', /^Installed · default /, 'the status line says installed and the default model: ' + oc.status);
+                assert.equal(oc.missing, false); assert.match(oc.status || '', /^Installed( · default |$)/, 'the status line says installed and the default model: ' + oc.status);
                 await ev(`document.querySelector('#launch-agent-pick input[value="opencode"]').click(); true`);
                 await waitFor(`document.querySelector('.acf-agent-type').value === 'opencode' && document.querySelector('.provider-card.is-open[data-type="opencode"] .acf-model-select optgroup')`, 'the OpenCode models grouped', 8000);
                 const g = await ev(`[...document.querySelectorAll('.provider-card.is-open .acf-model-select optgroup')].map(o => ({ label: o.label, values: [...o.querySelectorAll('option')].map(x => x.value) }))`);

@@ -106,7 +106,8 @@ export function operatorModel(activity) {
     const agents = (a.agents || []).map(g => ({ name: g.name, toOperator: g.to_operator || 0, asks: g.asks_operator || 0, ...(touches ? touchAgent(touches, g.name) : {}) }))
         .map(g => ({ ...g, need: g.toOperator + g.asks + (g.touches || 0) })).filter(g => g.need > 0).sort((x, y) => y.need - x.need || x.name.localeCompare(y.name));
     const done = a.tasks_done == null ? null : Number(a.tasks_done) || 0;
-    return { days, kinds, posts, touches: sumTouches, tasksDone: done, perTask: done > 0 ? sumTouches / done : null, asks: a.operator_asks || null, agents, recorded: !!touches, hub: touches && touches.sources ? Number(touches.sources.hub) || 0 : 0, truncated: !!a.truncated };
+    const typed = touches ? days.reduce((n, d) => n + (d.values.typed || 0), 0) : null; // the Operator's typing into agents (chat box or terminal), one per burst; null: not recorded
+    return { days, kinds, posts, typed, touches: sumTouches, tasksDone: done, perTask: done > 0 ? sumTouches / done : null, asks: a.operator_asks || null, agents, recorded: !!touches, hub: touches && touches.sources ? Number(touches.sources.hub) || 0 : 0, truncated: !!a.truncated };
 }
 const KIND_NAMES = { typed: 'Typed to an agent', answer: 'Answers to a question or prompt', approve: 'Approvals', wake: 'Wakes', restart: 'Restarts', stop: 'Stops' };
 function touchDay(t, day) { const d = (t.days || []).find(x => x.day === day) || {}; const o = {}; for (const k of Object.keys(KIND_NAMES)) o[k] = Number(d[k]) || 0; return o; }

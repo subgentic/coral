@@ -6,9 +6,9 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/binary"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -25,8 +25,10 @@ import (
 
 	"github.com/subgentic/coral/internal/httputil"
 	"github.com/subgentic/coral/internal/license"
+	"github.com/subgentic/coral/internal/safego"
 	"github.com/subgentic/coral/internal/sshprov"
 	"github.com/subgentic/coral/internal/store"
+	"github.com/subgentic/coral/pkg/hubowner"
 	terms "github.com/subgentic/coral/pkg/license"
 )
 
@@ -36,13 +38,15 @@ const (
 )
 
 type provEnv struct {
-	e       *rsEnv
-	p       *Provisioner
-	dir     string
-	router  chi.Router
-	known   string
-	sshLog  string
-	keyBlob string
+	ownerGiven []string // the secrets installOwner was handed
+	ownerErr   error    // what installOwner answers
+	e          *rsEnv
+	p          *Provisioner
+	dir        string
+	router     chi.Router
+	known      string
+	sshLog     string
+	keyBlob    string
 }
 
 // newProvEnv wires a Provisioner to a fake ssh and a fake ssh-keyscan. mode: "known" (the host key is in known_hosts: ssh answers), "unknown" (ssh exits 255 with the host key refusal until the key is trusted),
@@ -81,15 +85,21 @@ exit 0
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "ssh"), []byte(script), 0o700))
 	scan := "#!/bin/sh\necho 'box.example.com ssh-ed25519 " + b64 + "'\n"
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "ssh-keyscan"), []byte(scan), 0o700))
+	pe := &provEnv{}
 	pr := NewProvisioner(e.h.store)
 	pr.runner = sshprov.Runner{SSH: filepath.Join(dir, "ssh"), KeyScan: filepath.Join(dir, "ssh-keyscan")}
 	pr.configs = func() string { return filepath.Join(dir, "config") }
+	pr.eula = func() (bool, bool) { return true, true } // a tier that asks for the terms, and a hub whose own marker holds the current ones
 	pr.known = func() string { return known }
 	pr.install = func(_ context.Context, p *provisionPlan, _ sshprov.Arch) error { // no network in a route test: the installer has its own tests
 		p.setStep("install", stepOK, "Installed.")
 		return nil
 	}
 	pr.startRemote = func(context.Context, *provisionPlan) (string, string, error) { return provInstance, provKey, nil }
+	pr.installOwner = func(_ context.Context, _ *provisionPlan, secret string) error { // what the far Coral's hub-owner-secret would be given on stdin
+		pe.ownerGiven = append(pe.ownerGiven, secret)
+		return pe.ownerErr
+	}
 	pr.checkHealth = func(context.Context, *store.RemoteServer, string) RemoteHealth {
 		return RemoteHealth{Status: store.RemoteStatusOnline, Version: "9.9.9"}
 	}
@@ -100,7 +110,8 @@ exit 0
 	r.Get("/api/servers/provision/options", pr.Options)
 	r.Get("/api/servers/provision/{plan}", pr.Status)
 	r.Delete("/api/servers/provision/{plan}", pr.Cancel)
-	return &provEnv{e: e, p: pr, dir: dir, router: r, known: known, sshLog: log, keyBlob: b64}
+	pe.e, pe.p, pe.dir, pe.router, pe.known, pe.sshLog, pe.keyBlob = e, pr, dir, r, known, log, b64
+	return pe
 }
 
 // do sends the request as the dashboard's person (the identity layer's classification of a signed-in browser).
@@ -184,8 +195,8 @@ func TestProvisionUnknownHostShowsTheScannedKeyAndTrustsOnlyThatAfterAccept(t *t
 	_, err := os.Stat(pe.known)
 	assert.True(t, os.IsNotExist(err), "a key was trusted before the owner accepted it")
 
-	// no acceptance of the terms, or of the keys: nothing runs
-	code, _ = pe.do("POST", "/api/servers/provision/"+plan+"/run", map[string]any{"accept_keys": true})
+	// no acceptance of the keys: nothing runs, whatever else the request says
+	code, _ = pe.do("POST", "/api/servers/provision/"+plan+"/run", map[string]any{})
 	assert.Equal(t, 400, code)
 	code, _ = pe.do("POST", "/api/servers/provision/"+plan+"/run", map[string]any{"accept_terms": true, "terms_sha256": terms.EULADigest()})
 	assert.Equal(t, 400, code)
@@ -456,39 +467,98 @@ func TestTermsPayloadAndLabelMatchWhatTheFarSideAccepts(t *testing.T) {
 	assert.Len(t, p, 3, "no other field: the far side refuses one")
 }
 
-func TestProvisionRunWantsTheDigestOfTheTermsThatWereShown(t *testing.T) {
+// The acceptance the far computer records is this hub's own, made by the server from its EULA marker: a request that names its own terms, or none, changes nothing (Security's #138835).
+func TestProvisionRunUsesTheHubsOwnAcceptanceWhateverTheRequestSends(t *testing.T) {
+	for name, body := range map[string]map[string]any{
+		"none":       {},
+		"wrong":      {"accept_terms": true, "terms_sha256": strings.Repeat("0", 64)},
+		"upper case": {"accept_terms": true, "terms_sha256": strings.ToUpper(terms.EULADigest())},
+		"a version":  {"accept_terms": true, "terms_sha256": terms.EULADigest(), "version": "1999-01-01", "by": "someone-else"},
+	} {
+		pe := newProvEnv(t, "known", "Linux x86_64", true)
+		_, v := pe.do("POST", "/api/servers/provision/plan", map[string]any{"target": "user@box.example.com"})
+		plan := v["plan"].(string)
+		pe.do("POST", "/api/servers/provision/"+plan+"/connect", nil)
+		code, _ := pe.do("POST", "/api/servers/provision/"+plan+"/run", body)
+		require.Equal(t, 202, code, name)
+		pl := pe.p.plan(plan)
+		pl.mu.Lock()
+		got := pl.acceptance
+		pl.mu.Unlock()
+		assert.Equal(t, string(termsPayload(setupAcceptanceLabel())), string(got), "%s: the far Coral is given the hub's own version, digest and label", name)
+	}
+}
+
+// A tier that requires the terms, with no marker for the current ones, does nothing and says one fixed sentence; the request's own digest does not stand in for the marker.
+func TestProvisionRunWithoutTheHubsEULAMarkerDoesNothing(t *testing.T) {
+	pe := newProvEnv(t, "known", "Linux x86_64", true)
+	pe.p.eula = func() (bool, bool) { return true, false }
+	_, v := pe.do("POST", "/api/servers/provision/plan", map[string]any{"target": "user@box.example.com"})
+	plan := v["plan"].(string)
+	pe.do("POST", "/api/servers/provision/"+plan+"/connect", nil)
+	for _, body := range []map[string]any{{}, {"accept_terms": true, "terms_sha256": terms.EULADigest()}} {
+		code, v := pe.do("POST", "/api/servers/provision/"+plan+"/run", body)
+		assert.Equal(t, 409, code)
+		assert.Contains(t, fmt.Sprint(v), noEULAMarker)
+	}
+	_, st := pe.do("GET", "/api/servers/provision/"+plan, nil)
+	assert.Equal(t, "connected", st["phase"], "a refused run changed the plan")
+	assert.Nil(t, pe.p.plan(plan).acceptance)
+	if b, err := os.ReadFile(pe.sshLog); err == nil && strings.Contains(string(b), "package.tar.gz") {
+		t.Error("a run with no marker started work")
+	}
+	// once the hub's own marker is there, the same plan runs
+	pe.p.eula = func() (bool, bool) { return true, true }
+	code, _ := pe.do("POST", "/api/servers/provision/"+plan+"/run", map[string]any{})
+	assert.Equal(t, 202, code)
+}
+
+// startBriefly runs the real start step against the fake ssh, which starts nothing and so never has a key: the step is cut after a second, and what it asked of ssh is in the log.
+func startBriefly(pe *provEnv, plan string) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	pe.p.version = "2.0.10" // a release name the remote command list accepts
+	_, _, _ = pe.p.realStartRemote(ctx, pe.p.plan(plan))
+}
+
+// A tier that skips the EULA installs its own build on the far computer, which skips it too: setup goes ahead with no acceptance passed and no refusal, and the far side is not asked to record one.
+func TestProvisionRunOnATierThatSkipsTheEULAPassesNoAcceptance(t *testing.T) {
+	for name, marker := range map[string]bool{"no marker": false, "a marker": true} {
+		pe := newProvEnv(t, "known", "Linux x86_64", true)
+		pe.p.eula = func() (bool, bool) { return false, marker }
+		_, v := pe.do("POST", "/api/servers/provision/plan", map[string]any{"target": "user@box.example.com"})
+		plan := v["plan"].(string)
+		pe.do("POST", "/api/servers/provision/"+plan+"/connect", nil)
+		code, _ := pe.do("POST", "/api/servers/provision/"+plan+"/run", map[string]any{})
+		require.Equal(t, 202, code, name)
+		assert.Nil(t, pe.p.plan(plan).acceptance, name)
+		_, o := pe.do("GET", "/api/servers/provision/options", nil)
+		assert.Equal(t, false, o["records_acceptance"], name)
+
+		// the start step asks the far Coral to record an acceptance only when Run made one
+		startBriefly(pe, plan)
+		b, _ := os.ReadFile(pe.sshLog)
+		assert.Contains(t, string(b), "tmux has-session", name+": the start step reached ssh, so the absence below means something")
+		assert.NotContains(t, string(b), "accept-terms", name)
+	}
 	pe := newProvEnv(t, "known", "Linux x86_64", true)
 	_, v := pe.do("POST", "/api/servers/provision/plan", map[string]any{"target": "user@box.example.com"})
 	plan := v["plan"].(string)
 	pe.do("POST", "/api/servers/provision/"+plan+"/connect", nil)
-	for name, body := range map[string]map[string]any{
-		"none":       {"accept_terms": true},
-		"wrong":      {"accept_terms": true, "terms_sha256": strings.Repeat("0", 64)},
-		"upper case": {"accept_terms": true, "terms_sha256": strings.ToUpper(terms.EULADigest())},
-	} {
-		code, _ := pe.do("POST", "/api/servers/provision/"+plan+"/run", body)
-		assert.Equal(t, 409, code, name)
-	}
-	_, st := pe.do("GET", "/api/servers/provision/"+plan, nil)
-	assert.Equal(t, "connected", st["phase"], "a refused run changed the plan")
-	if b, err := os.ReadFile(pe.sshLog); err == nil && strings.Contains(string(b), "package.tar.gz") {
-		t.Error("a run with the wrong digest started work")
-	}
-	code, _ := pe.do("POST", "/api/servers/provision/"+plan+"/run", map[string]any{"accept_terms": true, "terms_sha256": terms.EULADigest()})
-	assert.Equal(t, 202, code)
+	pe.do("POST", "/api/servers/provision/"+plan+"/run", map[string]any{})
+	startBriefly(pe, plan)
+	b, _ := os.ReadFile(pe.sshLog)
+	assert.Contains(t, string(b), "accept-terms", "a tier that asks for the terms records the hub's acceptance")
 }
 
-func TestProvisionOptionsListHostsAndTheTermsTheDigestCovers(t *testing.T) {
+func TestProvisionOptionsListHostsAndTheLabelTheAcceptanceIsRecordedUnder(t *testing.T) {
 	pe := newProvEnv(t, "known", "Linux x86_64", true)
 	require.NoError(t, os.WriteFile(filepath.Join(pe.dir, "config"), []byte("Host build-box *.wild !no\nHost -oProxyCommand=x\nHost second\n"), 0o600))
 	code, v := pe.do("GET", "/api/servers/provision/options", nil)
 	require.Equal(t, 200, code)
 	assert.Equal(t, []any{"build-box", "second"}, v["hosts"])
-	tm := v["terms"].(map[string]any)
-	assert.Equal(t, license.EULAVersion, tm["version"])
-	assert.Equal(t, terms.EULADigest(), tm["sha256"])
-	sum := sha256.Sum256([]byte(tm["text"].(string)))
-	assert.Equal(t, terms.EULADigest(), hex.EncodeToString(sum[:]), "the text shown is the text the digest covers")
+	assert.NotContains(t, v, "terms", "the dialog shows no terms and asks for no acceptance")
+	assert.Equal(t, true, v["records_acceptance"])
 	assert.Equal(t, setupAcceptanceLabel(), v["acceptance_label"])
 	// an empty config is an empty list, not null
 	require.NoError(t, os.Remove(filepath.Join(pe.dir, "config")))
@@ -510,4 +580,70 @@ func TestProvisionTooManyPlansIsAMarkedActionLimit(t *testing.T) {
 	require.Equal(t, http.StatusTooManyRequests, w.Code)
 	assert.Equal(t, "action", w.Header().Get(httputil.ActionLimitHeader), "an unmarked 429 pauses every poller on the page")
 	assert.Contains(t, w.Body.String(), "setup_in_progress")
+}
+
+func TestProvisionGivesANewComputerItsOwnerSecretAndStoresTheOtherHalf(t *testing.T) {
+	pe := newProvEnv(t, "known", "Linux x86_64", true)
+	done := runToEnd(t, pe, "done")
+	require.Len(t, pe.ownerGiven, 1, "the secret was installed once")
+	secret := pe.ownerGiven[0]
+	assert.True(t, hubowner.ValidSecret(secret))
+	got, ok, err := pe.e.h.store.OwnerSecret(context.Background(), "ssh-box-example-com")
+	require.NoError(t, err)
+	assert.True(t, ok)
+	assert.Equal(t, secret, got, "the hub holds what the computer was given")
+	srv, _ := pe.e.h.store.Get(context.Background(), "ssh-box-example-com")
+	assert.True(t, srv.OwnerStamp)
+	raw, _ := json.Marshal(done)
+	assert.NotContains(t, string(raw), secret, "the secret is in the plan's answer")
+	assert.NotContains(t, done["steps"].([]any)[4].(map[string]any)["detail"], "not set up")
+}
+
+func TestProvisionRegistersWithoutTheStampWhenTheComputerWillNotTakeTheSecret(t *testing.T) {
+	pe := newProvEnv(t, "known", "Linux x86_64", true)
+	pe.ownerErr = errors.New("coral: hub-owner-secret: refused: /home/rich/.coral-server/secret detail")
+	done := runToEnd(t, pe, "done")
+	srv, err := pe.e.h.store.Get(context.Background(), "ssh-box-example-com")
+	require.NoError(t, err, "the registration stopped for a missing stamp")
+	assert.False(t, srv.OwnerStamp, "a secret the computer did not take was stored")
+	_, ok, _ := pe.e.h.store.OwnerSecret(context.Background(), "ssh-box-example-com")
+	assert.False(t, ok)
+	detail := done["steps"].([]any)[4].(map[string]any)["detail"].(string)
+	assert.Contains(t, detail, "not set up")
+	assert.NotContains(t, detail, "refused", "the cause is not echoed")
+	assert.NotContains(t, detail, "/home/rich")
+}
+
+// A panic in a step fails the plan with one fixed sentence at once, instead of leaving it running until it expires (Security's INFO on #11370); safego still logs it and the server stays up.
+func TestProvisionAPanickingStepFailsThePlanWithAFixedSentence(t *testing.T) {
+	pe := newProvEnv(t, "known", "Linux x86_64", true)
+	pe.p.runSteps = func(context.Context, *provisionPlan) { panic("boom: /home/user/.ssh/id_rsa " + provKey) }
+	panicsBefore := safego.Panics()
+	_, v := pe.do("POST", "/api/servers/provision/plan", map[string]any{"target": "user@box.example.com"})
+	plan := v["plan"].(string)
+	pe.do("POST", "/api/servers/provision/"+plan+"/connect", nil)
+	code, _ := pe.do("POST", "/api/servers/provision/"+plan+"/run", map[string]any{"accept_terms": true, "terms_sha256": terms.EULADigest()})
+	require.Equal(t, 202, code)
+	failed := pe.waitPhase(t, plan, "failed")
+	assert.Equal(t, "Something went wrong inside this hub, so the setup stopped. Nothing more was done.", failed["error"])
+	raw, _ := json.Marshal(failed)
+	assert.NotContains(t, string(raw), "boom")
+	assert.NotContains(t, string(raw), "id_rsa")
+	assert.NotContains(t, string(raw), provKey)
+	var failedSteps int
+	for _, s := range failed["steps"].([]any) {
+		if s.(map[string]any)["state"] == "failed" {
+			failedSteps++
+		}
+	}
+	assert.Equal(t, 1, failedSteps, "one step is shown as the one that failed")
+	// the panic still reaches safego (QA Engineer's SHOULD): a guard that swallowed it would leave the count where it was and the server's crash log empty
+	deadline := time.Now().Add(5 * time.Second)
+	for safego.Panics() <= panicsBefore && time.Now().Before(deadline) {
+		time.Sleep(10 * time.Millisecond)
+	}
+	assert.Greater(t, safego.Panics(), panicsBefore, "the recovered panic was swallowed instead of going on to safego")
+	// the plan can be cancelled and the hub still answers
+	code, _ = pe.do("DELETE", "/api/servers/provision/"+plan, nil)
+	assert.Equal(t, 200, code)
 }

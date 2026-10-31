@@ -25,10 +25,12 @@ import (
 	"github.com/subgentic/coral/internal/opencode"
 	"github.com/subgentic/coral/internal/operatortouch"
 	"github.com/subgentic/coral/internal/ptymanager"
+	"github.com/subgentic/coral/internal/secrets"
 	"github.com/subgentic/coral/internal/server/routes"
 	"github.com/subgentic/coral/internal/serverproof"
 	"github.com/subgentic/coral/internal/store"
 	"github.com/subgentic/coral/internal/terminalinput"
+	"github.com/subgentic/coral/pkg/hubowner"
 )
 
 // The router is built in this order; registration and wiring order are as they were in one
@@ -110,6 +112,7 @@ func (s *Server) useMiddleware(r *chi.Mux) {
 	r.Use(routes.RequestMetrics(s.db))
 	// Identity phase 1 (#3387): who each request is from; mismatches logged, never refused.
 	s.identity = routes.NewIdentityObserver(s.db, s.boardStore, s.keyStore.HasValidSession)
+	s.identity.SetHubOwnerDir(s.cfg.CoralDir(), routes.ProcessStart) // the self-hosted hub's owner stamp (#11378): verified against a secret only a human act writes
 	// In every mode a bare local caller needs a credential (#3421 v2): the API key or a
 	// command-line signature (checked once here, then marked for the cloud routes).
 	s.identity.SetVerifiers(s.keyStore.HasValidKey, func(r *http.Request) (*http.Request, bool) {
@@ -148,7 +151,7 @@ func (s *Server) registerAuth(r *chi.Mux) {
 		// "version" is additive; older hubs ignore unknown fields.
 		// "hub" tells the frontend whether to show the multi-server UI.
 		// "instance_id" names this server run: a command that found its address in the data folder's lock file checks it before it sends a credential (config.VerifiedServer).
-		json.NewEncoder(w).Encode(map[string]any{"status": "ok", "version": config.ReportedVersion(), "hub": s.cfg.HubMode, "instance_id": s.cfg.InstanceID})
+		json.NewEncoder(w).Encode(map[string]any{"status": "ok", "version": config.ReportedVersion(), "hub": s.cfg.HubMode, "instance_id": s.cfg.InstanceID, "hub_owner_stamp": hubowner.Installed(s.cfg.CoralDir()), "hub_owner_stamp_at": stampAt(s.identity)})
 	})
 
 	// Auth endpoints
@@ -223,7 +226,11 @@ func (s *Server) newRouteHandlers() *routeHandlers {
 	runTagStore := store.NewSessionStore(s.db)
 	ptymanager.SetRunTagLookup(func(sessionID string) string { return runTagStore.RunTagOf(context.Background(), sessionID) })
 	s.sessHandler = sessHandler
-	s.opencode = opencode.NewManager(opencode.Config{DataDir: filepath.Join(s.cfg.CoralDir(), "opencode")})          // the binary comes from the person's settings at each launch
+	s.opencode = opencode.NewManager(opencode.Config{DataDir: filepath.Join(s.cfg.CoralDir(), "opencode")}) // the binary comes from the person's settings at each launch
+	s.opencode.Redact = func(text string) (string, bool) {                                                  // the newest message is kept on disk redacted, for the list of an agent with no server
+		out, err := secrets.Redactor().Text([]byte(text))
+		return string(out), err == nil
+	}
 	s.opencode.SkipLast = func(m opencode.Message) bool { return m.Role == "user" && agent.IsCoralDelivery(m.Text) } // a nudge or task notice Coral typed is not what was said
 	sessHandler.SetOpencodeRuntime(routes.OpencodeRuntimeOf(s.opencode))
 	opencodeDir := filepath.Join(s.cfg.CoralDir(), "opencode")
@@ -352,6 +359,8 @@ func (s *Server) registerSessions(r *chi.Mux, h *routeHandlers) {
 	r.Post("/api/sessions/live/{name}/restart", sessHandler.Restart)
 	r.Post("/api/sessions/live/{name}/model", sessHandler.SwitchModel) // the live model and thinking-level switch (#4969)
 	r.Post("/api/sessions/live/{name}/resume", sessHandler.Resume)
+	r.Post("/api/sessions/live/{name}/notices/pause", sessHandler.PauseNotices)   // hold Coral's notices to one agent (#11387): the Operator's, the owner's through the Hub
+	r.Post("/api/sessions/live/{name}/notices/resume", sessHandler.ResumeNotices) // end the pause: what was held is told once
 	r.Post("/api/sessions/live/{name}/attach", sessHandler.Attach)
 	r.With(routes.RefuseSignInLink).Put("/api/sessions/live/{name}/display-name", sessHandler.SetDisplayName)
 	r.With(routes.RefuseSignInLink).Put("/api/sessions/live/{name}/instructions", sessHandler.SetInstructions) // what the agent is told at its next restart (#10133)
@@ -710,6 +719,7 @@ func (s *Server) registerSystem(r *chi.Mux, h *routeHandlers) {
 		r.Patch("/api/servers/{id}", rsHandler.Update)
 		r.Delete("/api/servers/{id}", rsHandler.Delete)
 		r.Post("/api/servers/{id}/test", rsHandler.Test)
+		r.Post("/api/servers/{id}/owner-secret", rsHandler.OwnerSecret)
 		// Set a Coral server up on another computer over SSH (#11370): hub mode only, the Operator's.
 		prov := routes.NewProvisioner(rsHandler.Store())
 		r.Get("/api/servers/provision/options", prov.Options)
@@ -797,6 +807,7 @@ func (s *Server) registerStatic(r *chi.Mux) {
 	// ── Dashboard SPA ───────────────────────────────────────────
 	r.Get("/agent/{sessionID}", s.serveAgentPopout)
 	r.Get("/agent/{server}/{sessionID}", s.serveAgentPopout)
+	r.Get("/chief", s.serveChief)
 	r.Get("/", s.serveIndex)
 	for _, p := range DashboardPagePaths {
 		r.Get(p, s.servePagePath)
@@ -804,4 +815,12 @@ func (s *Server) registerStatic(r *chi.Mux) {
 	// Bare /team and /board name no view: they go to /agents (QA, one rule with the slashes).
 	r.Get("/team", s.servePagePath)
 	r.Get("/board", s.servePagePath)
+}
+
+// stampAt is when the owner stamp secret file was last written, as the health answer says it ("" when none): a rotation shows there, and in the log, every time the file changes (#11378).
+func stampAt(o *routes.IdentityObserver) string {
+	if at, ok := o.HubOwnerStampAt(); ok {
+		return at.Format(time.RFC3339)
+	}
+	return ""
 }

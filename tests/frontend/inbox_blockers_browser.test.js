@@ -78,7 +78,7 @@ const TASKS_A = [
             await ev(`(() => { const original = window.fetch, json = (b, st = 200) => Promise.resolve(new Response(JSON.stringify(b), { status: st, headers: { 'Content-Type': 'application/json' } }));
                 const hex = (1).toString(16).padStart(64, '0');
                 const item = { id: hex, name: 'checkout-mockup.html', media_type: 'text/html', size: 30, created_at: new Date(Date.now() - 4 * 3600000).toISOString(), task_id: 5, goal_id: 7, goal_title: 'Checkout redesign', source: 'upload', available: true, session_id: 'writer-a', produced_by: 'Frontend Dev', tags: ['for review', 'internal'], uri: 'coral://artifacts/' + hex };
-                const tasks = [{ id: 5, title: 'Review the mockup', status: 'review_pending', priority: 'medium', goal_id: 7, blocked_by: [] }, { id: 6, title: 'Tag batch-88', status: 'pending', priority: 'high', goal_id: 8, blocked_by: [{ task_id: 5, board_id: '${team}', satisfied: false }] }, { id: 7, title: 'Write the notes', status: 'pending', priority: 'medium', goal_id: 8, blocked_by: [{ task_id: 5, board_id: '${team}', satisfied: false }] }];
+                const tasks = [{ id: 5, title: 'Review the mockup', status: 'review_pending', priority: 'medium', goal_id: 7, blocked_by: [] }, { id: 6, title: 'Tag\u202e batch-88', status: 'pending', priority: 'high', goal_id: 8, blocked_by: [{ task_id: 5, board_id: '${team}', satisfied: false }] }, { id: 7, title: 'Write the notes', status: 'pending', priority: 'medium', goal_id: 8, blocked_by: [] }];
                 window.fetch = (url, opts = {}) => { const u = new URL(String(url), location.origin);
                     if (u.pathname === '/api/board/${team}/artifacts') return json({ project: '${team}', artifacts: !u.searchParams.has('tag') || u.searchParams.get('tag') === 'for review' ? [item] : [], has_more: false });
                     if (u.pathname === '/api/board/tasks' && u.searchParams.get('board') === '${team}' && u.searchParams.has('status')) return json({ tasks });
@@ -87,9 +87,9 @@ const TASKS_A = [
             await ev(`window.switchNavTab('hub-inbox'); true`);
             await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
             await waitFor(`[...document.querySelectorAll('${T} tbody tr')].some(r => r.textContent.includes('checkout-mockup.html'))`, at + 'the for-review row', 15000);
-            await waitFor(`[...document.querySelectorAll('${T} tbody tr')].some(r => r.textContent.includes('checkout-mockup.html') && /wait on this/.test(r.textContent))`, at + 'the review row says what waits on it', 10000).catch(() => {});
+            await waitFor(`[...document.querySelectorAll('${T} tbody tr')].some(r => r.textContent.includes('checkout-mockup.html') && /waits? on this/.test(r.textContent))`, at + 'the review row says what waits on it', 10000).catch(() => {});
             const rv = (await rowsOf()).find(r => r.text.includes('checkout-mockup.html'));
-            check(!!rv && /High priority: 2 tasks wait on this/.test(rv.text), at + 'a for-review file says its task holds up two tasks, a high-priority one: ' + (rv && rv.text));
+            check(!!rv && rv.text.includes('High priority: “Tag<U+202E> batch-88” waits on this') && !rv.text.includes('\u202e'), at + 'a for-review file says the one task it holds up, a high-priority one, with its title\'s hidden character written out, not drawn: ' + (rv && rv.text));
             check(await ev(`[...document.querySelectorAll('${T} tbody tr')].filter(tr => tr.textContent.includes('checkout-mockup.html')).some(tr => [...tr.querySelectorAll('.inbox-blocks')].some(e => e.getBoundingClientRect().width > 0 && e.offsetParent !== null && /wait/.test(e.textContent)))`), at + 'the phrase is on screen, not only in a hidden cell');
             await shot(`inbox-blockers-review-${w}`);
             check(!(await ev(`document.documentElement.scrollWidth > innerWidth + 1`)), at + 'the review row: no sideways scroll');

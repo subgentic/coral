@@ -1,6 +1,7 @@
 package hubproxy
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/subgentic/coral/pkg/hubowner"
 	"github.com/subgentic/coral/pkg/tunnel"
 )
 
@@ -149,6 +151,22 @@ func (h *Handler) proxyHTTP(w http.ResponseWriter, r *http.Request, id string, t
 		_ = http.NewResponseController(w).SetReadDeadline(time.Now())
 	}}
 	defer deadlines.stop()
+	// The owner stamp (#11378): for one of the two decisions that need a person, made by the person signed in at this hub, on a target that holds a secret. The body is read (at most hubowner.MaxBody) so the
+	// stamp can bind it, and put back; a bigger one is sent unstamped and the remote refuses it.
+	var stampBody []byte
+	var stamper OwnerStamper
+	if s, ok := t.(OwnerStamper); ok && signedInOwner(r.Context()) && hubowner.Allowed(r.Method, dec) {
+		b, err := io.ReadAll(io.LimitReader(r.Body, hubowner.MaxBody+1))
+		if err == nil && len(b) <= hubowner.MaxBody {
+			stamper, stampBody = s, b
+			r.Body, r.ContentLength = io.NopCloser(bytes.NewReader(b)), int64(len(b))
+		} else {
+			r.Body = struct {
+				io.Reader
+				io.Closer
+			}{io.MultiReader(bytes.NewReader(b), r.Body), r.Body}
+		}
+	}
 	request := r.WithContext(ctx)
 	if r.Body == nil || r.Body == http.NoBody {
 		deadlines.bodyProgress(0, true)
@@ -179,6 +197,11 @@ func (h *Handler) proxyHTTP(w http.ResponseWriter, r *http.Request, id string, t
 			}
 			for _, hd := range []string{"Authorization", "Cookie", "Origin", "Referer", "Forwarded", "X-Forwarded-For", "X-Forwarded-Host", "X-Forwarded-Proto", "X-Real-Ip"} {
 				out.Header.Del(hd)
+			}
+			if stamper != nil { // after the allowlist: whatever a browser sent under this name is already gone
+				if v, ok := stamper.OwnerStamp(out.Method, hubowner.Target(out.URL), stampBody); ok {
+					out.Header.Set(hubowner.Header, v)
+				}
 			}
 		},
 		ModifyResponse: func(resp *http.Response) error {

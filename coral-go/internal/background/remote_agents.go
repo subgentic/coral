@@ -60,6 +60,8 @@ type RemoteServerStatus struct {
 	LastError string `json:"last_error,omitempty"`
 	Agents    int    `json:"agents"`
 	Version   string `json:"version,omitempty"`
+	// OwnerStamp: this hub can have Approve, Request changes and the change-request send of this computer signed for it (#11378): the hub holds the secret AND the computer says it holds the other half.
+	OwnerStamp bool `json:"owner_stamp"`
 }
 
 // RemoteAgentSource is consumed by the session routes.
@@ -121,17 +123,18 @@ func (c *RemoteAgentHubConfig) fill() {
 }
 
 type remoteState struct {
-	srv       store.RemoteServer
-	cancel    context.CancelFunc
-	status    string
-	sessions  []map[string]any
-	feedLive  bool
-	feedMsgAt time.Time // last message of any type received on the feed
-	noHealth  bool      // remote predates /api/health (404): liveness uses the list
-	lastDB    time.Time // last SetStatus write (online or failure)
-	lastErr   string    // error message of the last failure write
-	lastSig   string
-	version   string // remote's reported version (best effort)
+	srv        store.RemoteServer
+	cancel     context.CancelFunc
+	status     string
+	sessions   []map[string]any
+	feedLive   bool
+	feedMsgAt  time.Time // last message of any type received on the feed
+	noHealth   bool      // remote predates /api/health (404): liveness uses the list
+	lastDB     time.Time // last SetStatus write (online or failure)
+	lastErr    string    // error message of the last failure write
+	lastSig    string
+	version    string // remote's reported version (best effort)
+	ownerStamp bool   // the remote says it holds the secret that verifies this hub's owner stamps (#11378)
 	// failingSince is when the current run of unreachable probes began while the
 	// server was shown online (zero when none): within OfflineGrace it stays
 	// online (#3649).

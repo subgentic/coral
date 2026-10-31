@@ -3,6 +3,7 @@
  * answer it: Needs you lists the agent with the words "Asked before Coral restarted: <what>", and the chat says the same with Restart and Dismiss. Dismissing is this browser's: it is kept per agent and request. */
 import { needsInputAttention } from './display_activity_hint.js';
 import { browserLocal } from './safe_storage.js';
+import { dialogOf, dialogDue, DIALOG_WORDS } from './at_dialog.js';
 
 const KEY = 'coral-asked-dismissed';
 const read = () => { try { return JSON.parse(browserLocal.get(KEY) || '{}') || {}; } catch { return {}; } };
@@ -30,6 +31,7 @@ export const askedWords = a => `Asked ${a && a.after_restart ? 'before Coral res
 
 /** The row as Needs you shows it: an agent that asked before the restart carries its words, kind and time as a waiting agent's do. */
 export function askedRow(s) {
+    if (dialogDue(s) && !s.waiting_summary) { const d = dialogOf(s); return { ...s, waiting_summary: DIALOG_WORDS, waiting_kind: 'dialog', waiting_since: new Date(d.since).toISOString() }; } // at a dialog for the set minutes (#11430)
     const a = askedBefore(s);
     return a ? { ...s, waiting_summary: askedWords(a), waiting_kind: a.kind, waiting_since: a.at } : s;
 }

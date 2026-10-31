@@ -57,6 +57,7 @@ var allowedSenders = map[string]sender{
 	// The gate's send functions: they run only when nothing waits on the user.
 	"internal/background/agent_exited.go\tdeliverAutomatedIfWanted\tSendInput":               {guardGate, "gate", ""},
 	"internal/server/routes/agent_exited.go\tdeliverAutomatedWhile\tSendInput":               {guardGate, "gate", ""},
+	"internal/ptymanager/notice_pause.go\ttypeSummary\tSendInput":                            {guardGate, "gate: the one line for held notices is the Send of a DeliverAutomated call (#11387)", ""},
 	"internal/server/routes/agent_ui_request.go\tSessionsHandler.agentUIRequest\tSendPrompt": {guardGate, "gate (its send closure)", ""},
 	// AgentLauncher.SendPrompt, which goes through the gate itself.
 	"internal/background/launcher.go\tAgentLauncher.startPromptDelivery\tSendPrompt":            {guardGate, "gated launcher prompt", ""},

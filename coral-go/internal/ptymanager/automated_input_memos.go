@@ -60,6 +60,7 @@ func ForgetSession(name string) {
 	delete(skipped.m, name)
 	skipped.Unlock()
 	forgetSessionMemos(name)
+	forgetNotices(name)
 }
 
 // SkippedSend is the last automated send Coral did not type into a session, and why (SkipPrompt, SkipDraft, ...): what the person sees

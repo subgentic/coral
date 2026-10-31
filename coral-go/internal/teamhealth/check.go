@@ -76,6 +76,8 @@ type CheckInput struct {
 	// PeekHint: the recipient is the orchestrator, who can read another agent's terminal with coral-board peek; the roster check then says so
 	// when an agent is idle, waiting or stuck (#4983). Peek is the orchestrator's: a check sent to someone else leaves the line out.
 	PeekHint bool
+	// Goals are the board's open goals, for the orchestrator's check only (#11412): the check lists them, ready ones first, with what the operator has to do. Empty: no segment.
+	Goals []GoalLine
 }
 
 // parkedNote is the team line's note on parked tasks, or "".
@@ -109,11 +111,20 @@ func Compose(in CheckInput) string {
 	}
 	note := parkedNote(in)
 	team = strings.TrimSuffix(team, ".") + note + "."
+	goals := goalsLine(in.Goals)
 	if len(in.Items) == 0 && len(in.Questions) == 0 {
-		if in.Progress.Completed+in.Progress.Reviewed+in.Progress.Posts == 0 {
-			return fmt.Sprintf("[Coral health check] Nothing needs you; no progress since the last check (%s)%s.", since, note)
+		tail := ""
+		if goals != "" {
+			tail = " " + goals
 		}
-		return fmt.Sprintf("[Coral health check] All %d agents progressing; %s since %s%s.", in.Agents, progressPhrase(in.Progress), since, note)
+		if in.Progress.Completed+in.Progress.Reviewed+in.Progress.Posts == 0 {
+			nothing := "Nothing needs you"
+			if in.goalsRemind() {
+				nothing = "No agent needs you"
+			}
+			return fmt.Sprintf("[Coral health check] %s; no progress since the last check (%s)%s.%s", nothing, since, note, tail)
+		}
+		return fmt.Sprintf("[Coral health check] All %d agents progressing; %s since %s%s.%s", in.Agents, progressPhrase(in.Progress), since, note, tail)
 	}
 	items := append([]Item(nil), in.Items...)
 	sort.SliceStable(items, func(i, j int) bool { return items[i].Rank < items[j].Rank })
@@ -134,6 +145,9 @@ func Compose(in CheckInput) string {
 		}
 		if qLine != "" {
 			parts = append(parts, qLine)
+		}
+		if goals != "" {
+			parts = append(parts, goals)
 		}
 		out := strings.Join(append(parts, team), " ")
 		if len(out) <= MaxCheck || shown == 0 {

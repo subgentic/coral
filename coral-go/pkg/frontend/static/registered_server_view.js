@@ -13,6 +13,7 @@ import { state } from './state.js';
 import { sessionServer } from './server_base.js';
 import { needsYou } from './asked_before_restart.js';
 import { showToast } from './utils.js';
+import { HUB_FEATURES_OFF } from './server_status.js';
 import { mountSettingsView } from './settings_view.js'; // the add and edit form (a startup module)
 import {
     statusMeta, escHtml, describeServerError, formatLastSeen, isValidServerId,
@@ -51,7 +52,7 @@ export const serverView = {
     },
     canRefresh: () => _editing === null && !_ssh && !_busy.size,
     accept: rows => { _servers = rows; _loadError = ''; },
-    fail: error => { _loadError = error; },
+    fail: error => { _loadError = error === HUB_FEATURES_OFF ? '' : error; }, // a Coral that is not a hub has no list of remote computers (404): that is not an error to show a new person, the page says "No remote computers yet" (#11400)
     render,
 };
 
@@ -187,6 +188,7 @@ function pageHtml(s) {
            ${s.transport === 'ssh' ? `<button type="button" class="btn" data-action="ssh-upgrade" data-id="${escHtml(s.id)}"${busy ? ' disabled' : ''}>Upgrade</button>
            <button type="button" class="btn" data-action="ssh-stop" data-id="${escHtml(s.id)}"${busy ? ' disabled' : ''}>Stop Coral</button>
            <button type="button" class="btn btn-danger" data-action="ssh-remove" data-id="${escHtml(s.id)}"${busy ? ' disabled' : ''}>Uninstall</button>` : ''}
+           ${s.transport !== 'ssh' ? `<button type="button" class="btn" data-action="owner-secret" data-id="${escHtml(s.id)}"${busy ? ' disabled' : ''}>${s.owner_stamp ? 'Change the Approve secret' : 'Approve through this hub'}</button>` : ''}
            <button type="button" class="btn btn-danger servers-remove" data-action="delete" data-id="${escHtml(s.id)}"${busy ? ' disabled' : ''}>Remove</button>`;
     return `<section class="servers-page" id="server-row-${escHtml(s.id)}" tabindex="-1" data-id="${escHtml(s.id)}" aria-labelledby="servers-page-name">
         <div class="phone-title-row"><button type="button" class="back-link" id="servers-back" data-action="back"><span>&larr; Computers</span></button>
@@ -250,6 +252,13 @@ function closeSsh() {
 async function mountSsh() {
     const slot = _host && _host.querySelector('#servers-ssh-host');
     if (!slot || !_ssh) return;
+    if (_ssh.mode === 'owner-secret') { // Approve through this hub for a computer added by URL (#11378): its own small panel
+        const { mountOwnerSecret } = await importOnce('./server_owner_secret.js', 'the owner secret panel');
+        if (!_ssh || !slot.isConnected) return;
+        const s = _ssh.server;
+        _sshView = mountOwnerSecret(slot, { id: s.id, label: s.label || s.id, onClose: () => { closeSsh(); _focusNext = 'row'; render(); load && load(); }, onChanged: () => { load && load(); } });
+        return;
+    }
     const { mountSshSetup } = await importOnce('./server_ssh_setup.js', 'the SSH setup');
     if (!_ssh || !slot.isConnected) return;
     const flow = _ssh;
@@ -318,6 +327,12 @@ async function onClick(e) {
     if (!btn) return;
     const action = btn.dataset.action;
     const id = btn.dataset.id;
+    if (action === 'owner-secret') {
+        const s = _servers.find(x => x.id === id);
+        if (!s) return;
+        _ssh = { mode: 'owner-secret', server: { id: s.id, label: s.label } };
+        return render();
+    }
     if (action === 'ssh-setup') { _ssh = { mode: 'setup' }; return render(); }
     if (action === 'ssh-back') { closeSsh(); _focusNext = 'row'; return render(); }
     if (action === 'ssh-upgrade' || action === 'ssh-stop' || action === 'ssh-remove') {

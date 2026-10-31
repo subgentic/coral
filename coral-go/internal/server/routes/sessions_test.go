@@ -2671,6 +2671,8 @@ func setupSessionsTestServerWithConfig(t *testing.T, cfg *config.Config) (*httpt
 	r.Post("/api/sessions/live/{sessionID}/sleep", handler.SleepSession)
 	r.Post("/api/sessions/live/{sessionID}/wake", handler.WakeSession)
 	r.Post("/api/sessions/live/{name}/resume", handler.Resume)
+	r.Post("/api/sessions/live/{name}/notices/pause", handler.PauseNotices)
+	r.Post("/api/sessions/live/{name}/notices/resume", handler.ResumeNotices)
 	r.Get("/api/sessions/live/{name}/info", handler.Info)
 	r.Post("/api/sessions/live/{name}/attach", handler.Attach)
 	r.Get("/api/sessions/live/{name}/file-content", handler.GetFileContent)

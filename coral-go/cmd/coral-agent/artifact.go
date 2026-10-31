@@ -23,7 +23,8 @@ import (
 const artifactUsageText = `Usage: coral-agent artifact upload <file> [--name NAME] [--media-type TYPE] [--new-version-of <link>] [--task N | --no-task] [--tag WORD]...
        coral-agent artifact download <coral://artifacts/digest> [--output FILE] [--force]
        coral-agent artifact reply <coral://artifacts/digest> <comment-id> <text | ->
-Run coral-agent artifact upload --help, artifact download --help or artifact reply --help for one of them.`
+       coral-agent artifact comments <coral://artifacts/digest>
+Run coral-agent artifact upload --help, artifact download --help, artifact reply --help or artifact comments --help for one of them.`
 
 const artifactUploadUsageText = `Usage: coral-agent artifact upload <file> [--name NAME] [--media-type TYPE] [--new-version-of <link>] [--task N | --no-task] [--tag WORD]...
 
@@ -74,6 +75,8 @@ func artifactUsage(rest []string) string {
 			return artifactDownloadUsageText
 		case "reply":
 			return artifactReplyUsageText
+		case "comments":
+			return artifactCommentsUsageText
 		}
 	}
 	return artifactUsageText
@@ -82,6 +85,10 @@ func artifactUsage(rest []string) string {
 func cmdArtifact(args []string) {
 	if len(args) >= 1 && args[0] == "reply" {
 		cmdArtifactReply(args[1:])
+		return
+	}
+	if len(args) >= 1 && args[0] == "comments" {
+		cmdArtifactComments(args[1:])
 		return
 	}
 	if len(args) >= 1 && args[0] == "download" {

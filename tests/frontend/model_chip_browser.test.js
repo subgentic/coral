@@ -198,7 +198,14 @@ const { coralReady } = require('./helpers/wait');
             assert.deepEqual(m.groups[0].items, ['Default', 'Low*', 'Medium', 'High', 'Extra high', 'Max'], 'the levels Opus takes, the requested one marked');
             assert.equal((await menu('model')).open, false, 'only one menu is open at a time');
             if (label !== 'Desktop') { assert.ok(m.rect.l >= 0 && m.rect.r <= m.vw && m.rect.b <= m.vh, 'the sheet is inside the screen: ' + JSON.stringify(m.rect)); assert.ok(m.minItem >= 44, 'items are 44 px: ' + m.minItem); }
-            else { const g = await geometry(); assert.ok(m.rect.l >= g.thinking.l - 1 && m.rect.l <= g.thinking.l + 1, 'the desktop menu opens from its own chip: ' + JSON.stringify({ menu: m.rect, chip: g.thinking })); }
+            else {
+                // The menu sits beside its chip in CSS, so it moves with it; the chips' labels change width when the model list loads, after the menu is open (CI: 14 px apart, 1 run in 10). Both are read in the same instant,
+                // and a shift between the open and the read (the model chip's label gaining width, as the list arriving does) must leave the menu on its chip (#11402).
+                await ev(`document.getElementById('model-chip').style.paddingRight = '14px'; true`);
+                const at = await ev(`(() => { const m = document.getElementById('thinking-chip-menu').getBoundingClientRect(), c = document.getElementById('thinking-chip').getBoundingClientRect(); return { menu: m.left, chip: c.left }; })()`);
+                await ev(`document.getElementById('model-chip').style.paddingRight = ''; true`);
+                assert.ok(Math.abs(at.menu - at.chip) <= 1, 'the desktop menu opens from its own chip: ' + JSON.stringify(at));
+            }
             await shot('thinking-chip-menu-' + label.split(' ')[0].toLowerCase());
             await ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); true`);
             assert.equal(await ev(`document.activeElement.id || (document.activeElement.matches('.mobile-send-options-btn') ? 'send-chevron' : '')`), label === 'Desktop' ? 'thinking-chip' : 'send-chevron', 'Escape gives focus back to its own chip (a phone: the send chevron)');

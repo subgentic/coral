@@ -39,7 +39,9 @@ const AGENTS = [
             await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
             await waitFor(`document.querySelectorAll('${T} .dt-table tbody tr').length === 3 && document.querySelector('${T}').getClientRects().length > 0`, at + 'the three waiting agents', 10000);
             if (!mobile) {
-                check(at + 'a desktop has no ⋯ and keeps its Dismiss button', await ev(`document.querySelectorAll('${T} .dt-mail-more').length === 0 && document.querySelectorAll('${T} .inbox-dismiss').length >= 1`));
+                const deskState = () => ev(`({ more: document.querySelectorAll('${T} .dt-mail-more').length, dismiss: document.querySelectorAll('${T} .inbox-dismiss').length, w: innerWidth })`);
+                await waitFor(`document.querySelectorAll('${T} .dt-mail-more').length === 0 && document.querySelectorAll('${T} .inbox-dismiss').length >= 1`, at + 'the desktop rows settle: no ⋯, the Dismiss button', 4000).catch(async e => { throw new Error(e.message + ' ' + JSON.stringify(await deskState())); });
+                check(at + 'a desktop has no ⋯ and keeps its Dismiss button', true);
                 continue;
             }
             const rows = await ev(`[...document.querySelectorAll('${T} tr.dt-mailed')].map(tr => { const b = tr.querySelector('.dt-mail-more-toggle'), r = b && b.getBoundingClientRect(), box = tr.getBoundingClientRect(); return { title: tr.querySelector('.dt-mail-title').textContent, h: Math.round(box.height), more: !!b, w: r ? Math.round(r.width) : 0, bh: r ? Math.round(r.height) : 0, name: b && b.getAttribute('aria-label'), popup: b && b.getAttribute('aria-haspopup'), expanded: b && b.getAttribute('aria-expanded'), inline: !!tr.querySelector('.inbox-dismiss'), sameLine: Math.abs(tr.querySelector('.dt-mail-title').getBoundingClientRect().top - tr.querySelector('.dt-mail-snippet').getBoundingClientRect().top) < 4, inside: !!(b && !b.closest('.dt-mail-open')) }; })`);

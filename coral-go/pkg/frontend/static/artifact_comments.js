@@ -6,6 +6,7 @@ import { isPhoneLayout, PHONE_QUERY } from './phone_layout.js';
 import { importOnce } from './import_once.js';
 const { buildAnchor } = await importOnce('./artifact_anchor.js');
 const api = await importOnce('./artifact_comments_api.js');
+const { linkArtifactRefsIn } = await importOnce('./artifact_refs.js'); // a coral://artifacts/<hex> in a comment is a link (#11416)
 const { createAsk } = await importOnce('./artifact_comment_ask.js');
 const { createComposer } = await importOnce('./artifact_comment_composer.js');
 const { createHighlights } = await importOnce('./artifact_comment_highlights.js');
@@ -223,7 +224,7 @@ export function attachComments(dialog, body, host, opts = {}) {
         }
         if (resolveBtn) { const row = el('div', 'ac-headrow'); row.append(m, resolveBtn); main.append(row); } // Resolve at the top right: the name line wraps beside it, never under it
         else main.append(m);
-        main.append(editing(c) || el('p', 'ac-body' + (c.deleted ? ' ac-deleted' : ''), c.deleted ? 'Comment deleted' : c.body));
+        main.append(editing(c) || (c.deleted ? el('p', 'ac-body ac-deleted', 'Comment deleted') : linkArtifactRefsIn(el('p', 'ac-body', c.body))));
         if (top && c.fromVersion != null && groupOf(c) !== 'main') main.append(el('p', 'ac-from ac-from-note', groupOf(c) === 'look' ? `From v${c.fromVersion}. The quote is in this version more than once, so it is not pinned to either.` : `On v${c.fromVersion}. Its text is not in this version.`));
         main.append(actions(c, top));
         e.append(main);
