@@ -88,6 +88,11 @@ func (s *Store) SetGuideRoster(ctx context.Context, project string, roster map[s
 		if n == "" {
 			return nil, fmt.Errorf("%w: the name for %s is empty or not a name (no @, link or address; at most %d characters)", ErrGuideRoster, label, MaxGuideName)
 		}
+		if taken, err := s.guideNameTaken(ctx, project, n); err != nil {
+			return nil, err
+		} else if taken {
+			return nil, fmt.Errorf("%w: the name for %s is a member's id or job title on this board", ErrGuideRoster, label)
+		}
 		clean[label] = n
 	}
 	b, err := json.Marshal(clean)
@@ -122,21 +127,68 @@ func (s *Store) PostGuideMessage(ctx context.Context, project, label, content st
 	return s.postMessage(ctx, project, label, content, nil, OriginHubGuide, label, false, nil)
 }
 
-// ListMessagesSince returns the board's latest messages written at or after since (an RFC 3339 UTC time), oldest first, up to limit, leaving out any message addressed to a group of members: a guide
-// reads what the whole board was told from the day the grant was accepted, nothing earlier and nothing private.
-func (s *Store) ListMessagesSince(ctx context.Context, project, since string, limit int) ([]Message, error) {
-	var messages []Message
+// GuideMessage is what a guide reads of a board's message: a closed projection (these fields and no others), so a column added to a message later never reaches a guide by itself. It leaves out the
+// project, the session, the group, the cross-team envelope, the Hub user and the task a message answers.
+type GuideMessage struct {
+	ID           int64   `db:"id" json:"id"`
+	SubscriberID string  `db:"subscriber_id" json:"subscriber_id"`
+	JobTitle     string  `db:"job_title" json:"job_title,omitempty"`
+	Content      string  `db:"content" json:"content"`
+	CreatedAt    string  `db:"created_at" json:"created_at"`
+	Origin       *string `db:"origin" json:"origin,omitempty"`
+	IsSystem     bool    `db:"is_system" json:"is_system"`
+}
+
+// ListGuideMessagesSince returns the board's latest messages written at or after since (an RFC 3339 UTC time), oldest first, up to limit, as GuideMessage: not one addressed to a group, not a cross-team
+// message (its envelope names another team, in either direction) and not Coral Hub's notice about a team link. A guide reads what this team's own members and people said, from the day the grant was accepted.
+func (s *Store) ListGuideMessagesSince(ctx context.Context, project, since string, limit int) ([]GuideMessage, error) {
+	var messages []GuideMessage
 	err := s.reader().SelectContext(ctx, &messages,
 		`SELECT * FROM (
-		    SELECT m.id, m.project, m.subscriber_id, m.session_id, m.content, m.created_at,
-		           COALESCE(s.job_title, m.subscriber_id, 'Unknown') as job_title,
-		           m.target_group_id, m.external_json, m.origin, m.hub_user, m.is_system, m.task_id
+		    SELECT m.id, m.subscriber_id, COALESCE(s.job_title, m.subscriber_id, 'Unknown') as job_title, m.content, m.created_at, m.origin, m.is_system
 		    FROM board_messages m
 		    LEFT JOIN board_subscribers s ON m.project = s.project AND m.subscriber_id = s.subscriber_id
-		    WHERE m.project = ? AND m.created_at >= ? AND m.target_group_id IS NULL
+		    WHERE m.project = ? AND m.created_at >= ? AND m.target_group_id IS NULL AND m.external_json IS NULL AND COALESCE(m.origin, '') != ?
 		    ORDER BY m.id DESC LIMIT ?
-		 ) ORDER BY id ASC`, project, since, limit)
+		 ) ORDER BY id ASC`, project, since, OriginHubNotice, limit)
 	return messages, err
+}
+
+// CountGuideMessagesSince is how many messages a guide's label wrote on a board at or after since: Coral's own ceiling, whatever the Hub's rate caps are.
+func (s *Store) CountGuideMessagesSince(ctx context.Context, project, label, since string) (int, error) {
+	var n int
+	err := s.reader().GetContext(ctx, &n, `SELECT COUNT(*) FROM board_messages WHERE project = ? AND subscriber_id = ? AND origin = ? AND created_at >= ?`, project, label, OriginHubGuide, since)
+	return n, err
+}
+
+// CountProposalsSince is how many proposals a proposer left on a board at or after since, whatever became of them.
+func (s *Store) CountProposalsSince(ctx context.Context, project, proposer, since string) (int, error) {
+	var n int
+	err := s.reader().GetContext(ctx, &n, `SELECT COUNT(*) FROM board_proposals WHERE board_id = ? AND proposer = ? AND created_at >= ?`, project, proposer, since)
+	return n, err
+}
+
+// guideNameTaken reports whether a display name is the id or the job title of a member of the board (compared without case or surrounding space): a guide's name must never read as a member's.
+func (s *Store) guideNameTaken(ctx context.Context, project, name string) (bool, error) {
+	var n int
+	err := s.reader().GetContext(ctx, &n, `SELECT COUNT(*) FROM board_subscribers WHERE project = ? AND (LOWER(TRIM(subscriber_id)) = LOWER(TRIM(?)) OR LOWER(TRIM(job_title)) = LOWER(TRIM(?)))`, project, name, name)
+	return n > 0, err
+}
+
+// GuideDisplayName is the name the board writes for a guide in the text agents read: the roster's, unless a member has taken that name since (an id or a job title of this board), then "a guide".
+func (s *Store) GuideDisplayName(ctx context.Context, project, label string) string {
+	roster, err := s.GetGuideRoster(ctx, project)
+	if err != nil {
+		return GuideName(nil, label)
+	}
+	name := roster[label]
+	if name == "" {
+		return GuideName(nil, label)
+	}
+	if taken, err := s.guideNameTaken(ctx, project, name); err != nil || taken {
+		return GuideName(nil, label)
+	}
+	return name
 }
 
 func shortLabel(s string) string {

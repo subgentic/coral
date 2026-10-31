@@ -2,6 +2,7 @@ package board
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 	"testing"
 	"time"
@@ -79,7 +80,7 @@ func TestAGuideReadsTheBoardFromTheDayTheGrantWasAcceptedAndNothingAddressedToAG
 	require.NoError(t, err)
 	_, err = s.PostMessage(ctx, "other", "Lead", "another board", nil)
 	require.NoError(t, err)
-	got, err := s.ListMessagesSince(ctx, "team", since, 50)
+	got, err := s.ListGuideMessagesSince(ctx, "team", since, 50)
 	require.NoError(t, err)
 	var texts []string
 	for _, m := range got {
@@ -90,7 +91,80 @@ func TestAGuideReadsTheBoardFromTheDayTheGrantWasAcceptedAndNothingAddressedToAG
 		_, err = s.PostMessage(ctx, "team", "Lead", "more", nil)
 		require.NoError(t, err)
 	}
-	got, _ = s.ListMessagesSince(ctx, "team", since, 3)
+	got, _ = s.ListGuideMessagesSince(ctx, "team", since, 3)
 	assert.Len(t, got, 3, "the limit holds")
 	assert.Less(t, got[0].ID, got[2].ID, "oldest first")
+}
+
+// Security's SHOULDs on slice B: a guide reads a closed projection that leaves out cross-team messages and Coral Hub's link notices, a roster name cannot read as a member, and the counts the handlers limit by.
+func TestAGuideReadsAClosedProjectionWithoutCrossTeamMessages(t *testing.T) {
+	s := orchStore(t)
+	ctx := context.Background()
+	since := time.Now().UTC().Add(-time.Hour).Format(time.RFC3339)
+	_, err := s.PostMessage(ctx, "team", "Lead", "plain", nil)
+	require.NoError(t, err)
+	ext, err := s.PostMessage(ctx, "team", "Lead", "a message of another team", nil)
+	require.NoError(t, err)
+	_, err = s.db.ExecContext(ctx, `UPDATE board_messages SET external_json = ? WHERE id = ?`, `{"source":"other"}`, ext.ID)
+	require.NoError(t, err)
+	notice, err := s.PostMessage(ctx, "team", "Coral", "the hub's notice about a link", nil)
+	require.NoError(t, err)
+	_, err = s.db.ExecContext(ctx, `UPDATE board_messages SET origin = ? WHERE id = ?`, OriginHubNotice, notice.ID)
+	require.NoError(t, err)
+	got, err := s.ListGuideMessagesSince(ctx, "team", since, 50)
+	require.NoError(t, err)
+	require.Len(t, got, 1)
+	assert.Equal(t, "plain", got[0].Content)
+	b, err := json.Marshal(got[0])
+	require.NoError(t, err)
+	var keys map[string]any
+	require.NoError(t, json.Unmarshal(b, &keys))
+	for k := range keys {
+		assert.Contains(t, []string{"id", "subscriber_id", "job_title", "content", "created_at", "origin", "is_system"}, k, "a field outside the closed projection")
+	}
+}
+
+func TestARosterNameCannotBeAMembersIdOrJobTitle(t *testing.T) {
+	s := orchStore(t)
+	ctx := context.Background()
+	_, err := s.Subscribe(ctx, "team", "Orchestrator", "Team Lead", "tmux-o", nil, "all")
+	require.NoError(t, err)
+	for _, name := range []string{"Orchestrator", "orchestrator", " TEAM LEAD "} {
+		_, err := s.SetGuideRoster(ctx, "team", map[string]string{"hub-user-1234abcd": name})
+		assert.ErrorIs(t, err, ErrGuideRoster, name)
+	}
+	_, err = s.SetGuideRoster(ctx, "team", map[string]string{"hub-user-1234abcd": "Dana"})
+	require.NoError(t, err)
+	assert.Equal(t, "Dana", s.GuideDisplayName(ctx, "team", "hub-user-1234abcd"))
+	// a member who takes the name later: the board stops writing it
+	_, err = s.Subscribe(ctx, "team", "Dana", "Developer", "tmux-d", nil, "all")
+	require.NoError(t, err)
+	assert.Equal(t, "a guide", s.GuideDisplayName(ctx, "team", "hub-user-1234abcd"), "the name is a member's now")
+	assert.Equal(t, "a guide", s.GuideDisplayName(ctx, "team", "hub-user-ffffffff"), "no name at all")
+}
+
+func TestTheCountsThatLimitAGuide(t *testing.T) {
+	s := orchStore(t)
+	ctx := context.Background()
+	hourAgo := time.Now().UTC().Add(-time.Hour).Format(time.RFC3339)
+	for i := 0; i < 3; i++ {
+		_, err := s.PostGuideMessage(ctx, "team", "hub-user-1234abcd", "x")
+		require.NoError(t, err)
+	}
+	_, err := s.PostGuideMessage(ctx, "team", "hub-user-00000001", "y")
+	require.NoError(t, err)
+	_, err = s.PostGuideMessage(ctx, "other", "hub-user-1234abcd", "z")
+	require.NoError(t, err)
+	_, err = s.PostMessage(ctx, "team", "hub-user-1234abcd", "not a guide's post", nil)
+	require.NoError(t, err)
+	n, err := s.CountGuideMessagesSince(ctx, "team", "hub-user-1234abcd", hourAgo)
+	require.NoError(t, err)
+	assert.Equal(t, 3, n, "this label's guide posts on this board only")
+	_, _, err = s.CreateProposal(ctx, ProposalInput{Board: "team", Kind: ProposalGoal, Title: "g1", Payload: []byte(`{"title":"g1"}`), Proposer: "hub-user-1234abcd"})
+	require.NoError(t, err)
+	n, err = s.CountProposalsSince(ctx, "team", "hub-user-1234abcd", hourAgo)
+	require.NoError(t, err)
+	assert.Equal(t, 1, n)
+	n, _ = s.CountProposalsSince(ctx, "team", "hub-user-00000001", hourAgo)
+	assert.Equal(t, 0, n)
 }

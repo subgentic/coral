@@ -247,17 +247,21 @@ func TestRevokingAGuidesGrantTakesBackOnlyThatGuidesWaitingProposals(t *testing.
 		code, out, _ := g.send("POST", "/api/cloud/guide-revoked", body, hdr)
 		return code, out
 	}
-	hub := map[string]string{tunnel.ViaHeader: cloud.ViaSecret(), tunnel.HubGuideRevokeHeader: "1"}
-	// not from the hub: no stamp, no header, a person's hub user, a guide's own stamp
+	// the Hub's own service stream: the connector's secret, the service marker and the guide's board as the asker
+	hub := map[string]string{tunnel.ViaHeader: cloud.ViaSecret(), tunnel.HubServiceHeader: "1", tunnel.HubAskBoardHeader: gBoard}
+	// not from the hub's service: no stamp, the stamp without the marker, a forged stamp, a half stamp, a person's stream, a guide's own stamp, an owner
 	code, _ := revoke(map[string]string{}, map[string]any{"label": gDana, "board": gBoard})
 	assert.Equal(t, http.StatusForbidden, code, "a local caller")
 	code, _ = revoke(map[string]string{tunnel.ViaHeader: cloud.ViaSecret()}, map[string]any{"label": gDana, "board": gBoard})
-	assert.Equal(t, http.StatusForbidden, code, "the stamp without the revoke header")
-	code, _ = revoke(map[string]string{tunnel.ViaHeader: "1", tunnel.HubGuideRevokeHeader: "1"}, map[string]any{"label": gDana, "board": gBoard})
+	assert.Equal(t, http.StatusForbidden, code, "the stamp without the service marker: a viewer")
+	code, _ = revoke(map[string]string{tunnel.ViaHeader: "1", tunnel.HubServiceHeader: "1", tunnel.HubAskBoardHeader: gBoard}, map[string]any{"label": gDana, "board": gBoard})
 	assert.Equal(t, http.StatusForbidden, code, "a forged stamp")
-	person := map[string]string{tunnel.ViaHeader: cloud.ViaSecret(), tunnel.HubGuideRevokeHeader: "1", tunnel.HubUserHeader: gSam}
-	code, _ = revoke(person, map[string]any{"label": gDana, "board": gBoard})
-	assert.Equal(t, http.StatusBadRequest, code, "a Hub user's request is not the Hub's")
+	code, _ = revoke(map[string]string{tunnel.ViaHeader: cloud.ViaSecret(), tunnel.HubServiceHeader: "1"}, map[string]any{"label": gDana, "board": gBoard})
+	assert.Equal(t, http.StatusForbidden, code, "the marker with no asker is a half stamp")
+	code, _, _ = g.guide(gDana, now(), "POST", "/api/cloud/guide-revoked", map[string]any{"label": gDana, "board": gBoard}, nil)
+	assert.Equal(t, http.StatusForbidden, code, "a guide cannot send its own revoke")
+	code, _ = revoke(map[string]string{tunnel.ViaHeader: cloud.ViaSecret(), tunnel.HubServiceHeader: "1", tunnel.HubAskBoardHeader: "other"}, map[string]any{"label": gDana, "board": gBoard})
+	assert.Equal(t, http.StatusBadRequest, code, "the board in the body is the board the service stamped")
 	for name, body := range map[string]any{"a bad label": map[string]any{"label": "x", "board": gBoard}, "no board": map[string]any{"label": gDana}, "an extra field": map[string]any{"label": gDana, "board": gBoard, "all": true}} {
 		code, _ = revoke(hub, body)
 		assert.Equal(t, http.StatusBadRequest, code, name)
@@ -317,4 +321,81 @@ func TestTheRosterIsTheOperatorsAndTheOwnersAloneAndAGuideNeverReachesIt(t *test
 	assert.Equal(t, http.StatusForbidden, code)
 	got, _ = g.bs.GetGuideRoster(ctx, gBoard)
 	assert.Equal(t, map[string]string{gDana: "Dana Reyes"}, got)
+}
+
+// Security's SHOULDs on slice B: each handler checks the board itself (the guard's check is the first), Coral keeps its own per-label ceilings, a guide's read is a closed projection and a roster name cannot be a member's.
+func TestEachGuideHandlerChecksTheBoardItself(t *testing.T) {
+	g := newGuideRig(t)
+	bs := g.bs
+	h := NewBoardHandler(bs)
+	t.Cleanup(h.WaitBackground)
+	r := chi.NewRouter() // no Guard in front: only the handlers' own checks stand
+	r.Post("/api/board/{project}/messages", h.PostMessage)
+	r.Get("/api/board/{project}/messages", h.ReadMessages)
+	r.Post("/api/board/{project}/goals", h.CreateGoal)
+	srv := httptest.NewServer(r)
+	t.Cleanup(srv.Close)
+	g2 := &guideRig{t: t, bs: bs, srv: srv}
+	for method, path := range map[string]string{"POST /api/board/other/messages": "/api/board/other/messages", "GET /api/board/other/messages": "/api/board/other/messages", "POST /api/board/other/goals": "/api/board/other/goals"} {
+		m, _, _ := strings.Cut(method, " ")
+		code, _, raw := g2.guide(gDana, now(), m, path, map[string]any{"content": "x", "title": "t"}, nil)
+		assert.Equal(t, http.StatusNotFound, code, "%s: %s", method, raw)
+	}
+	for _, p := range []string{"other"} {
+		msgs, _ := bs.ListMessages(context.Background(), p, 10, 0, 0)
+		assert.Empty(t, msgs)
+		props, _ := bs.ListProposals(context.Background(), p, board.ProposalPending)
+		assert.Empty(t, props)
+	}
+}
+
+func TestCoralKeepsItsOwnCeilingsPerGuide(t *testing.T) {
+	g := newGuideRig(t)
+	ctx := context.Background()
+	for i := 0; i < guideMessagesPerHour; i++ {
+		_, err := g.bs.PostGuideMessage(ctx, gBoard, gDana, "earlier")
+		require.NoError(t, err)
+	}
+	code, _, raw := g.guide(gDana, now(), "POST", "/api/board/team/messages", map[string]any{"content": "one too many"}, nil)
+	assert.Equal(t, http.StatusTooManyRequests, code, raw)
+	assert.Contains(t, raw, "guide_limit")
+	code, _, raw = g.guide(gSam, now(), "POST", "/api/board/team/messages", map[string]any{"content": "another guide is not limited by the first"}, nil)
+	assert.Equal(t, http.StatusOK, code, raw)
+	for i := 0; i < guideProposalsPerDay; i++ {
+		_, _, err := g.bs.CreateProposal(ctx, board.ProposalInput{Board: gBoard, Kind: board.ProposalGoal, Title: strings.Repeat("g", i+1), Payload: []byte(`{"title":"g"}`), Proposer: gDana})
+		require.NoError(t, err)
+	}
+	code, _, raw = g.guide(gDana, now(), "POST", "/api/board/team/goals", map[string]any{"title": "the eleventh"}, nil)
+	assert.Equal(t, http.StatusTooManyRequests, code, raw)
+	code, _, raw = g.guide(gSam, now(), "POST", "/api/board/team/goals", map[string]any{"title": "Sam's first"}, nil)
+	assert.Equal(t, http.StatusAccepted, code, raw)
+}
+
+func TestAGuidesReadIsAClosedProjectionWithoutCrossTeamMessages(t *testing.T) {
+	g := newGuideRig(t)
+	ctx := context.Background()
+	_, err := g.bs.PostMessage(ctx, gBoard, "Orchestrator", "plain talk", nil)
+	require.NoError(t, err)
+	code, _, raw := g.guide(gDana, time.Now().UTC().Add(-time.Hour).Format(time.RFC3339), "GET", "/api/board/team/messages", nil, nil)
+	require.Equal(t, http.StatusOK, code, raw)
+	var got []map[string]any
+	require.NoError(t, json.Unmarshal([]byte(raw), &got))
+	require.Len(t, got, 1)
+	for k := range got[0] {
+		assert.Contains(t, []string{"id", "subscriber_id", "job_title", "content", "created_at", "origin", "is_system"}, k)
+	}
+	for _, leaked := range []string{"project", "session_id", "target_group_id", "external", "hub_user", "task_id"} {
+		assert.NotContains(t, got[0], leaked)
+	}
+}
+
+func TestARosterNameCannotBeAMembersIdOrJobTitleThroughTheRoute(t *testing.T) {
+	g := newGuideRig(t)
+	op := map[string]string{"X-Test-Operator": "1"}
+	for _, name := range []string{"Orchestrator", "developer", "Dev"} {
+		code, _, raw := g.send("PUT", "/api/board/team/guide-roster", map[string]any{"roster": map[string]string{gDana: name}}, op)
+		assert.Equal(t, http.StatusBadRequest, code, "%s: %s", name, raw)
+	}
+	code, _, raw := g.send("PUT", "/api/board/team/guide-roster", map[string]any{"roster": map[string]string{gDana: "Dana"}}, op)
+	assert.Equal(t, http.StatusOK, code, raw)
 }

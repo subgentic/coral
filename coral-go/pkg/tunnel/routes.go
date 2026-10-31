@@ -303,6 +303,8 @@ var routeTable = cat(
 	// The Hub's service-only per-machine read of the tasks that came from one accepted goal request (#7364, #7331 section 6): forwarded at View, and the machine answers only a stream the Hub's own service stamped
 	// with who asked (hubservice.go): an owner, a viewer or a local program gets 403 there.
 	service(rules(http.MethodGet, TierView, "/api/goal-links")),
+	// Coral Hub's word that a guide's grant ended (#11457): the Hub's own service stream (its stamp and the guide's board as the asker), never a person's, and View so a computer in any mode takes it: it only takes proposals back.
+	service(rules(http.MethodPost, TierView, "/api/cloud/guide-revoked")),
 	// ... and so are its changes (#5763, Security's SHOULD 3 on #5761): a bookmark is the owner's own note, so a hub Interact grantee can neither read, create, mark done nor delete one.
 	// Still Interact for the tier (they move no work); the machine also refuses anyone but the owner.
 	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/saved")),
@@ -354,8 +356,6 @@ var routeTable = cat(
 		"/api/board/{project}/hub-notice",
 		// Coral Hub's full list of cross-team links (#5572): only with its stamped header (X-Coral-Hub-Links: snapshot), only on a connection whose hub advertised cross_team_links/1.
 		"/api/cloud/cross-team-links",
-		// Coral Hub's word that a guide's grant ended (#11457): only with its stamped header, only to a connector that declared guide_role/1.
-		"/api/cloud/guide-revoked",
 		"/api/board/{project}/subscribe",
 		"/api/board/{project}/reminder",
 		"/api/board/{project}/tasks",

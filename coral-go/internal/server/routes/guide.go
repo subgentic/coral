@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"github.com/go-chi/chi/v5"
@@ -12,6 +13,7 @@ import (
 	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/clitext"
 	"github.com/subgentic/coral/internal/cloud"
+	"github.com/subgentic/coral/internal/httputil"
 	"github.com/subgentic/coral/pkg/tunnel"
 )
 
@@ -64,22 +66,53 @@ func readGuideMessage(w http.ResponseWriter, r *http.Request) (postMessageBody, 
 
 // guideAuthor is the name the roster gives the guide, cleaned (the roster keeps only clean names).
 func (h *BoardHandler) guideAuthor(r *http.Request, project, label string) string {
-	roster, err := h.bs.GetGuideRoster(r.Context(), project)
-	if err != nil {
-		return board.GuideName(nil, label)
+	return h.bs.GuideDisplayName(r.Context(), project, label)
+}
+
+// guideBoardOK is each guide handler's own check of the board (the guard's is the first, this is the second): the path's board must be exactly the stamped one, else it is answered not found, as a board
+// that is not there is. It answers the refusal itself.
+func guideBoardOK(w http.ResponseWriter, project string, g tunnel.HubGuide) bool {
+	if project != g.Board {
+		errNotFound(w, "not found")
+		return false
 	}
-	return board.GuideName(roster, label)
+	return true
+}
+
+// The per-label ceilings Coral keeps itself, under the Hub's own rate caps (20 messages an hour, 5 goals a day): a guide cannot flood a team even if the Hub's counter is wrong or reset.
+const (
+	guideMessagesPerHour = 60
+	guideProposalsPerDay = 10
+)
+
+// guideOverLimit answers 429 (an action limit on this guide, not an overloaded Coral) when the label has used its ceiling; it answers a store failure as 500.
+func guideOverLimit(w http.ResponseWriter, n int, err error, limit int, what string) bool {
+	if err != nil {
+		errInternalServer(w, "could not count what this guide has sent")
+		return true
+	}
+	if n >= limit {
+		httputil.WriteActionLimit(w, 0, "guide_limit", what)
+		return true
+	}
+	return false
 }
 
 // readGuideMessages answers a guide's read of the board: the whole board's messages from the day the grant was accepted, the latest first-limit, no member's read position moved, nothing addressed to a group.
 func (h *BoardHandler) readGuideMessages(w http.ResponseWriter, r *http.Request, project string, g tunnel.HubGuide) {
 	limit := clampLimit(queryInt(r, "limit", 50), 50, 200)
-	messages, err := h.bs.ListMessagesSince(r.Context(), project, g.Since, limit)
+	if !guideBoardOK(w, project, g) {
+		return
+	}
+	messages, err := h.bs.ListGuideMessagesSince(r.Context(), project, g.Since, limit)
 	if err != nil {
 		errInternalServer(w, "could not read the board's messages")
 		return
 	}
-	writeJSON(w, http.StatusOK, emptyIfNil(messages))
+	if messages == nil {
+		messages = []board.GuideMessage{}
+	}
+	writeJSON(w, http.StatusOK, messages)
 }
 
 type guideGoalRequest struct {
@@ -91,6 +124,13 @@ type guideGoalRequest struct {
 // proposeGuideGoal stores a guide's goal as a proposal for the Operator, whatever the board's approval setting: a guide never creates a goal. The proposer is the guide's label, so the Operator's
 // Inbox shows who asked and a revoked grant can take the proposals back.
 func (h *BoardHandler) proposeGuideGoal(w http.ResponseWriter, r *http.Request, project string, g tunnel.HubGuide) {
+	if !guideBoardOK(w, project, g) {
+		return
+	}
+	n, err := h.bs.CountProposalsSince(r.Context(), project, g.Label, time.Now().UTC().Add(-24*time.Hour).Format(time.RFC3339))
+	if guideOverLimit(w, n, err, guideProposalsPerDay, fmt.Sprintf("a guide may propose at most %d goals a day on a team: wait, or ask the Operator", guideProposalsPerDay)) {
+		return
+	}
 	var in guideGoalRequest
 	if !guideBody(w, r, &in) {
 		return
@@ -130,24 +170,21 @@ type guideRevokedRequest struct {
 	Board string `json:"board"`
 }
 
-// PostGuideRevoked: POST /api/cloud/guide-revoked, Coral Hub's word that a guide's grant ended. Hub only: the connector's stamp, the revoke header and no Hub user. It takes back the proposals that
-// label left waiting on that board and answers {"ok": true, "cancelled": n}; sent again it answers the same with 0, so the Hub may resend until it hears. It changes nothing else: a guide's
-// messages stay (they are the board's history) and nothing the Operator approved is undone.
+// PostGuideRevoked: POST /api/cloud/guide-revoked, Coral Hub's word that a guide's grant ended. Hub service only: the connector stamps the service marker and the guide's board as the asker on this route and
+// nowhere else, and this answers nobody else (a person, an owner, an agent, a local program). It takes back the proposals that label left waiting on that board and answers {"ok": true, "cancelled": n};
+// sent again it answers the same with 0, so the Hub may resend until it hears. It changes nothing else: a guide's messages stay (they are the board's history) and nothing the Operator approved is undone.
 func (h *BoardHandler) PostGuideRevoked(w http.ResponseWriter, r *http.Request) {
-	if !cloud.TunneledAuthentic(r) || len(r.Header.Values(tunnel.HubGuideRevokeHeader)) != 1 || r.Header.Get(tunnel.HubGuideRevokeHeader) != "1" {
-		writeError(w, http.StatusForbidden, "hub_only", "only Coral Hub sends this")
-		return
-	}
-	if len(r.Header.Values(tunnel.HubUserHeader)) != 0 {
-		errBadRequest(w, "this comes from Coral Hub itself, never from a person")
+	asker, ok := cloud.ServiceAsker(r)
+	if !ok {
+		writeError(w, http.StatusForbidden, "hub_only", "only Coral Hub's own service sends this")
 		return
 	}
 	var in guideRevokedRequest
 	if !guideBody(w, r, &in) {
 		return
 	}
-	if !board.ValidGuideLabel(in.Label) || !tunnel.ValidGuideBoard(in.Board) {
-		errBadRequest(w, "send the guide's label (hub-user- and 8 hex digits) and the board")
+	if !board.ValidGuideLabel(in.Label) || !tunnel.ValidGuideBoard(in.Board) || in.Board != asker.Board {
+		errBadRequest(w, "send the guide's label (hub-user- and 8 hex digits) and the board the service stamped")
 		return
 	}
 	n, err := h.bs.RejectGuideProposals(r.Context(), in.Board, in.Label)

@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/subgentic/coral/internal/board"
@@ -73,8 +74,11 @@ func (h *BoardHandler) PostMessage(w http.ResponseWriter, r *http.Request) {
 	project := urlParam(r, "project")
 	var body postMessageBody
 	var derr error
-	if _, guide := guideOf(r); guide { // a guide's post is content and nothing else, and at most maxGuideMessage characters (guide.go)
+	if g, guide := guideOf(r); guide { // a guide's post is content and nothing else, and at most maxGuideMessage characters (guide.go)
 		var ok bool
+		if !guideBoardOK(w, project, g) { // the board first, before the body is read
+			return
+		}
 		if body, ok = readGuideMessage(w, r); !ok {
 			return
 		}
@@ -268,6 +272,13 @@ func (h *BoardHandler) postMessageCore(w http.ResponseWriter, r *http.Request, p
 	if isGuide {
 		// A guide (the connector's stamp, the grant's board) posts under their hub label and never as the Operator or a member: the sender is the label, the origin hub_guide, and the text starts with their
 		// name from the roster and their role. Nothing in the body can ask for more (the body holds content only).
+		if !guideBoardOK(w, project, guide) {
+			return nil, false
+		}
+		n, cerr := h.bs.CountGuideMessagesSince(r.Context(), project, guide.Label, time.Now().UTC().Add(-time.Hour).Format(time.RFC3339))
+		if guideOverLimit(w, n, cerr, guideMessagesPerHour, fmt.Sprintf("a guide may post at most %d messages an hour on a team: wait a little", guideMessagesPerHour)) {
+			return nil, false
+		}
 		if _, _, status, msg := h.tunnelChatSender(r, project); status != 0 {
 			writeJSON(w, status, map[string]any{"error": msg, "code": "hub_user_required"})
 			return nil, false

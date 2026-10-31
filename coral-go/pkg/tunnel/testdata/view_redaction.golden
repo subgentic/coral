@@ -122,3 +122,4 @@ GET /api/views redact
 GET /api/views/{id} redact
 GET /ws/coral redact
 GET /ws/terminal/{name} redact
+POST /api/cloud/guide-revoked redact

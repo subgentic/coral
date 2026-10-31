@@ -189,22 +189,13 @@ func TestAGuideStreamReachesOnlyTheGuideTable(t *testing.T) {
 	assert.Empty(t, got[1].Get(HubGuideLabelHeader))
 }
 
-// The revoke (#11457): Coral Hub's word that a guide's grant ended is a POST to one path with one header; the header is dropped everywhere else, and the route is in the route table at a tier the hub's own request meets.
-func TestTheGuideRevokeHeaderIsForwardedOnItsOwnRouteOnly(t *testing.T) {
-	assert.True(t, ForwardsGuideRevoke(http.MethodPost, "/api/cloud/guide-revoked"))
-	for _, c := range [][2]string{{"GET", "/api/cloud/guide-revoked"}, {"POST", "/api/cloud/guide-revoked/x"}, {"POST", "/api/cloud/cross-team-links"}, {"POST", "/api/board/b/messages"}, {"PUT", "/api/cloud/guide-revoked"}} {
-		assert.False(t, ForwardsGuideRevoke(c[0], c[1]), "%s %s", c[0], c[1])
-	}
-	in := http.Header{HubGuideRevokeHeader: {"1"}}
-	assert.Equal(t, "1", scrub(in, http.MethodPost, "/api/cloud/guide-revoked").Get(HubGuideRevokeHeader))
-	assert.Empty(t, scrub(in, http.MethodPost, "/api/board/b/messages").Get(HubGuideRevokeHeader), "a copy sent to any other route is dropped")
-	assert.Empty(t, scrub(in, http.MethodGet, "/api/cloud/guide-revoked").Get(HubGuideRevokeHeader))
-	found := false
-	for _, r := range routeTable {
-		if r.pattern == "/api/cloud/guide-revoked" && r.method == http.MethodPost {
-			found = true
-		}
-	}
-	assert.True(t, found, "the revoke is a route of the table")
-	assert.False(t, IsGuideRoute(http.MethodPost, "/api/cloud/guide-revoked"), "a guide never reaches it")
+// The revoke (#11457) is a route of the Hub's own service, not a person's: only a complete service stamp reaches it, a user (a viewer, an owner, a guide) at any tier does not, and a guide never reaches it.
+func TestTheGuideRevokeIsAServiceRouteOnly(t *testing.T) {
+	const path = "/api/cloud/guide-revoked"
+	assert.True(t, IsServiceRoute(http.MethodPost, path))
+	assert.False(t, IsServiceRoute(http.MethodGet, path))
+	assert.False(t, IsGuideRoute(http.MethodPost, path), "a guide never reaches it")
+	assert.Equal(t, TierNever, Classify(http.MethodPost, path, ""), "the user table refuses it at every tier")
+	assert.NotEqual(t, TierNever, ClassifyService(http.MethodPost, path, ""))
+	assert.Equal(t, TierView, ClassifyService(http.MethodPost, path, ""), "any mode takes it: it only takes proposals back")
 }
