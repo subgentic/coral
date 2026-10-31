@@ -30,13 +30,18 @@ type fakeOpencode struct {
 	used      []string
 	stored    map[string]string
 	read      []string
+	asked     []bool
+	perms     []opencode.PermissionRequest
+	replied   []string
+	replyErr  error
 	idleSince time.Time
 	server    OpencodeServer
 	ensured   [][4]string
 }
 
-func (f *fakeOpencode) Ensure(_ context.Context, key, bin, model, resume string) (OpencodeServer, error) {
+func (f *fakeOpencode) Ensure(_ context.Context, key, bin, model, resume string, ask bool) (OpencodeServer, error) {
 	f.ensured = append(f.ensured, [4]string{key, bin, model, resume})
+	f.asked = append(f.asked, ask)
 	if f.server != nil {
 		return f.server, nil
 	}
@@ -55,6 +60,11 @@ func (f *fakeOpencode) AgentMessages(context.Context, string) ([]opencode.Messag
 func (f *fakeOpencode) StoredSession(key string) string { return f.stored[key] }
 func (f *fakeOpencode) AgentIdleSince(string) (time.Time, bool) {
 	return f.idleSince, !f.idleSince.IsZero()
+}
+func (f *fakeOpencode) AgentPermissions(key string) []opencode.PermissionRequest { return f.perms }
+func (f *fakeOpencode) ReplyPermission(_ context.Context, key, id, reply string) error {
+	f.replied = append(f.replied, key+"|"+id+"|"+reply)
+	return f.replyErr
 }
 func (f *fakeOpencode) UseSession(key, session string) { f.used = append(f.used, key+"="+session) }
 func (f *fakeOpencode) AgentLastMessage(string) (opencode.Message, bool) {

@@ -395,6 +395,9 @@ func DefaultLaunchPermissionMode(agentType string) string {
 	if agentType == "" || agentType == "claude" || agentType == at.Codex {
 		return "auto"
 	}
+	if agentType == at.Opencode {
+		return "bypassPermissions" // opencode's own defaults ask nothing inside its folder: a launch that names no mode starts as it always did, and "default" is the ask-first mode (#11395)
+	}
 	return "default"
 }
 
@@ -422,6 +425,11 @@ func ValidPermissionMode(mode string) bool {
 //   - Codex: -a / --ask-for-approval / --approval-mode untrusted|on-request, -s / --sandbox
 //     read-only|workspace-write (Coral's default for Codex), -c / --config model_reasoning_effort=<level> (a lowercase word)
 func SkipsPermissionPrompts(agentType string, flags []string) bool {
+	if agentType == at.Opencode {
+		// opencode's own defaults allow edits and commands in its folder without asking, and the ask-first mode is a launch setting that no flag carries: any opencode launch counts as skipping, so a Coral Hub request
+		// for one needs the owner's switch, Launch mode and the dashboard's provenance, like Pi's (#11395; checked on 1.19.5, #137997).
+		return true
+	}
 	if agentType == at.Pi {
 		// Pi has no mode that asks: its tools run with the launching user's permissions, with no approval before a call (Pi's security documentation, #5901), so any Pi launch counts
 		// as skipping, whatever its flags: a Coral Hub request for one needs the owner's switch, Launch mode and the dashboard's provenance, like Auto.

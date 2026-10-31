@@ -3,6 +3,7 @@
 package opencode
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -385,3 +386,48 @@ func (c *Client) messagesLegacy(ctx context.Context, sessionID string, opts Mess
 	}
 	return page, nil
 }
+
+// ErrPermissionUnsupported is a server version whose permission reply route Coral has not checked.
+var ErrPermissionUnsupported = errors.New("opencode: answering a permission request is only checked on opencode 1.x")
+
+// ReplyPermission answers an open permission request on the server: reply is "once", "always" or "reject". id must be a request id and dir the folder the request belongs to (the server scopes the reply to it:
+// without it a reply is "not found"); both come from the server's own permission.asked event. 1.x only (POST /permission/<id>/reply, checked on 1.19.5).
+func (c *Client) ReplyPermission(ctx context.Context, id, dir, reply string) error {
+	if !c.legacy {
+		return ErrPermissionUnsupported
+	}
+	if !permIDRe.MatchString(id) {
+		return fmt.Errorf("opencode: not a permission request id: %q", truncate(id, 40))
+	}
+	if reply != "once" && reply != "always" && reply != "reject" {
+		return fmt.Errorf("opencode: %q is not an answer", truncate(reply, 20))
+	}
+	u := *c.base
+	u.Path = strings.TrimRight(u.Path, "/") + "/permission/" + id + "/reply"
+	if d := cleanDir(dir); d != "" {
+		u.RawQuery = url.Values{"directory": {d}}.Encode()
+	}
+	body, _ := json.Marshal(map[string]string{"reply": reply})
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u.String(), bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.SetBasicAuth(Username, c.password)
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	io.Copy(io.Discard, io.LimitReader(resp.Body, 1<<16))
+	if resp.StatusCode == http.StatusNotFound {
+		return ErrPermissionGone
+	}
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("opencode: answering a permission request: HTTP %d", resp.StatusCode)
+	}
+	return nil
+}
+
+// ErrPermissionGone is a request the server no longer has open (answered in the terminal, or the turn ended).
+var ErrPermissionGone = errors.New("opencode: that permission request is no longer open")

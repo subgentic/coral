@@ -3,9 +3,11 @@ package opencode
 import (
 	"context"
 	"errors"
-	"github.com/subgentic/coral/internal/safego"
+	"sort"
 	"sync"
 	"time"
+
+	"github.com/subgentic/coral/internal/safego"
 )
 
 // Manager runs one opencode server per agent (Start, keyed by the agent's name) and reads each one's event stream into the state of its sessions: the working/idle dot and "your turn" of an opencode agent
@@ -57,10 +59,11 @@ type managed struct {
 	tracker *Tracker
 	at      map[string]time.Time // when each session last changed state
 
-	sawState   bool      // the stream has put some session in a state at least once (under mu)
-	session    string    // the opencode session the agent was resumed with: known before the stream names any
-	sessionAt  time.Time // when UseSession was told
-	version    int       // counts the events of the agent's sessions: what a cached read of the history was made at
+	perms      map[string]PermissionRequest // permission requests the server has asked and not had answered (under mu)
+	sawState   bool                         // the stream has put some session in a state at least once (under mu)
+	session    string                       // the opencode session the agent was resumed with: known before the stream names any
+	sessionAt  time.Time                    // when UseSession was told
+	version    int                          // counts the events of the agent's sessions: what a cached read of the history was made at
 	msgs       []Message
 	msgsAt     int        // the version msgs was read at; -1 when never
 	msgsReadAt time.Time  // when the history was last read
@@ -80,13 +83,25 @@ func NewManager(cfg Config) *Manager {
 //
 // The manager's lock is held only around its maps, never across a start (which can take a minute): a slow start of one agent's server never holds up AgentTurn, Stop or another agent's launch. A second
 // Ensure for a key that is starting waits for that start and shares its result.
-func (m *Manager) Ensure(ctx context.Context, key, bin, model, resume string) (*Server, error) {
-	return m.ensure(ctx, key, bin, model, resume, false)
+func (m *Manager) Ensure(ctx context.Context, key, bin, model, resume string, opts ...StartOption) (*Server, error) {
+	var o startOpts
+	for _, f := range opts {
+		f(&o)
+	}
+	return m.ensure(ctx, key, bin, model, resume, false, o)
 }
+
+// StartOption changes how Ensure starts a server.
+type StartOption func(*startOpts)
+
+type startOpts struct{ ask bool }
+
+// WithAsk starts the server with the ask-first permission block in its config (Config.Ask).
+func WithAsk() StartOption { return func(o *startOpts) { o.ask = true } }
 
 // ensure is Ensure; reader says the server is started only to READ an agent's history (ReadHistory), not for the agent to run on: a launch that finds such a server replaces it (it was started without the agent's
 // model), and the reaper and the cap treat it as the lightest kind.
-func (m *Manager) ensure(ctx context.Context, key, bin, model, resume string, reader bool) (*Server, error) {
+func (m *Manager) ensure(ctx context.Context, key, bin, model, resume string, reader bool, o startOpts) (*Server, error) {
 	for {
 		m.mu.Lock()
 		if m.closed {
@@ -126,7 +141,7 @@ func (m *Manager) ensure(ctx context.Context, key, bin, model, resume string, re
 		if dead != nil {
 			dead.stop()
 		}
-		g, err := m.start(ctx, key, bin, model, store)
+		g, err := m.start(ctx, key, bin, model, store, o)
 		if g != nil {
 			g.reader = reader
 		}
@@ -168,9 +183,10 @@ func (m *Manager) pickStore(key, resume string) string {
 }
 
 // start runs one server and the loop reading its events; it touches none of the manager's maps.
-func (m *Manager) start(ctx context.Context, key, bin, model, store string) (*managed, error) {
+func (m *Manager) start(ctx context.Context, key, bin, model, store string, o startOpts) (*managed, error) {
 	cfg := m.cfg
 	cfg.Model = model
+	cfg.Ask = o.ask
 	cfg.DBFile = StoreFile(cfg.DataDir, store)
 	if bin != "" {
 		cfg.Bin = bin
@@ -379,6 +395,98 @@ func (m *Manager) AgentSession(key string) (state State, at time.Time, ok bool) 
 // StoredSession is the newest opencode session the agent named (before a Coral restart, a sleep or a restart of the agent), "" when it has none: what a wake gives its TUI to pick up.
 func (m *Manager) StoredSession(key string) string { return StoredSession(m.cfg.DataDir, key) }
 
+// maxPerms bounds the permission requests remembered for one agent; permTTL is how long an unanswered one is kept (a request whose answer or whose turn's end was missed in a gap of the stream is not offered for ever).
+const (
+	maxPerms = 16
+	permTTL  = 10 * time.Minute
+)
+
+// notePermission follows the permission requests of the event stream: asked adds, replied removes, and a session whose turn ended has none open. The caller holds g.mu.
+func (g *managed) notePermission(e Event) {
+	switch {
+	case e.Ask != nil:
+		if g.perms == nil {
+			g.perms = map[string]PermissionRequest{}
+		}
+		if len(g.perms) >= maxPerms {
+			var oldest string
+			for id, p := range g.perms {
+				if oldest == "" || p.At.Before(g.perms[oldest].At) {
+					oldest = id
+				}
+			}
+			delete(g.perms, oldest)
+		}
+		g.perms[e.Ask.ID] = *e.Ask
+	case e.RepliedID != "":
+		delete(g.perms, e.RepliedID)
+	default:
+		if st, ok := StateOf(e); ok && (st == StateIdle || st == StateFailed) {
+			for id, p := range g.perms {
+				if p.SessionID == e.SessionID {
+					delete(g.perms, id)
+				}
+			}
+		}
+	}
+}
+
+// AgentPermissions are the permission requests the agent's server has open, newest first (none when it has no server or nothing is asked).
+func (m *Manager) AgentPermissions(key string) []PermissionRequest {
+	m.mu.Lock()
+	g := m.servers[key]
+	m.mu.Unlock()
+	if g == nil {
+		return nil
+	}
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	var out []PermissionRequest
+	for id, p := range g.perms {
+		if time.Since(p.At) > permTTL {
+			delete(g.perms, id)
+			continue
+		}
+		out = append(out, p)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].At.After(out[j].At) })
+	return out
+}
+
+// ReplyPermission answers a request the agent's server has open: id must be one it asked (never an id only a caller names), reply "once", "always" or "reject". ErrPermissionGone when it is not open any more.
+func (m *Manager) ReplyPermission(ctx context.Context, key, id, reply string) error {
+	m.mu.Lock()
+	g := m.servers[key]
+	m.mu.Unlock()
+	if g == nil {
+		return ErrPermissionGone
+	}
+	g.mu.Lock()
+	req, ok := g.perms[id]
+	g.mu.Unlock()
+	if !ok {
+		return ErrPermissionGone
+	}
+	c, err := g.srv.Client()
+	if err != nil {
+		return err
+	}
+	rctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	if err := c.ReplyPermission(rctx, id, req.Directory, reply); err != nil {
+		if errors.Is(err, ErrPermissionGone) {
+			g.mu.Lock()
+			delete(g.perms, id)
+			g.mu.Unlock()
+		}
+		return err
+	}
+	g.mu.Lock()
+	delete(g.perms, id)
+	g.mu.Unlock()
+	return nil
+}
+
 // AgentIdleSince says an agent whose server is up and whose stream has never put a session in a state (just launched, or just woken and not yet spoken to) is idle since its server came up: no turn is going on. false
 // once the stream has said anything (then its own states decide, and a gap in the stream is unknown, not idle), and for an agent with no server.
 func (m *Manager) AgentIdleSince(key string) (time.Time, bool) {
@@ -543,6 +651,7 @@ func (g *managed) loop(ctx context.Context, skip func(Message) bool, redact func
 			g.mu.Lock()
 			defer g.mu.Unlock()
 			g.version++
+			g.notePermission(e)
 			if session, to, moved := g.tracker.Apply(e); moved {
 				g.at[session] = time.Now()
 				g.sawState = true
@@ -603,7 +712,7 @@ func (m *Manager) ReadHistory(ctx context.Context, key, bin string) ([]Message, 
 		return nil, false, nil
 	}
 	defer m.releaseReaderStart(key)
-	if _, err := m.ensure(ctx, key, bin, "", ses, true); err != nil {
+	if _, err := m.ensure(ctx, key, bin, "", ses, true, startOpts{}); err != nil {
 		m.mu.Lock()
 		m.readFail[key] = time.Now()
 		m.mu.Unlock()

@@ -617,6 +617,11 @@ func (h *SessionsHandler) AnswerPrompt(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.touch(r, body.SessionID, board.TouchAnswer) // the Operator answers an agent's question (#11225): counted before the keys go, so a typed answer is not counted twice
+	// opencode is answered through its own server, not by typing into its terminal (#11395)
+	if body.AgentType == at.Opencode && body.SessionID != "" && !body.Submit {
+		h.answerOpencodePermission(w, r, body.SessionID, body.N, body.Label, body.AskID)
+		return
+	}
 	// The agent's own terminal is gone: say so, rather than "the prompt changed" (#3211)
 	if body.SessionID != "" {
 		if pane, err := h.terminal.FindSession(r.Context(), name, body.AgentType, body.SessionID); err == nil && pane == nil {

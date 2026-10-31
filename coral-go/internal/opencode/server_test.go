@@ -124,6 +124,29 @@ func runStub() {
 		fmt.Fprint(w, `{"data":[]}`)
 	})
 	// 1.x: the messages are on /session/<id>/message in the {info, parts} shape (what the real 1.19.5 sends); /api/session/<id>/message is an empty list there
+	// POST /permission/<id>/reply?directory=<dir> {"reply": ...}: 1.x's answer to a permission request. Recorded as "id|reply|directory"; an id "per_unknown" is not open (404).
+	mux.HandleFunc("/permission/", func(w http.ResponseWriter, r *http.Request) {
+		if !standInAuthorized(r) || r.Method != http.MethodPost {
+			http.Error(w, "no", http.StatusUnauthorized)
+			return
+		}
+		id := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/permission/"), "/reply")
+		if id == "per_unknown" {
+			http.Error(w, `{"_tag":"PermissionNotFoundError"}`, http.StatusNotFound)
+			return
+		}
+		var body struct {
+			Reply string `json:"reply"`
+		}
+		json.NewDecoder(r.Body).Decode(&body)
+		if out := os.Getenv(envFileVar); out != "" {
+			if f, err := os.OpenFile(out+".replies", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600); err == nil {
+				fmt.Fprintf(f, "%s|%s|%s\n", id, body.Reply, r.URL.Query().Get("directory"))
+				f.Close()
+			}
+		}
+		fmt.Fprint(w, "true")
+	})
 	mux.HandleFunc("/session/ses_abc123/message", func(w http.ResponseWriter, r *http.Request) {
 		if !standInAuthorized(r) {
 			http.Error(w, "no", http.StatusUnauthorized)

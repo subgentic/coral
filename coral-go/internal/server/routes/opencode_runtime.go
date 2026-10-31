@@ -16,7 +16,7 @@ import (
 // OpencodeRuntime is what an opencode agent needs of the server Coral runs for it (opencode.Manager): the server started for the agent (Ensure), the state its event stream gave (AgentTurn), and the end of
 // both with the agent (Stop). The key is the agent's Coral session id.
 type OpencodeRuntime interface {
-	Ensure(ctx context.Context, key, bin, model, resume string) (OpencodeServer, error)
+	Ensure(ctx context.Context, key, bin, model, resume string, ask bool) (OpencodeServer, error)
 	AgentTurn(key string) (opencode.State, time.Time, bool)
 	AgentMessages(ctx context.Context, key string) ([]opencode.Message, bool, error)
 	ReadHistory(ctx context.Context, key, bin string) ([]opencode.Message, bool, error)
@@ -24,6 +24,8 @@ type OpencodeRuntime interface {
 	AgentIdleSince(key string) (time.Time, bool)
 	StoredSession(key string) string
 	AgentLastMessage(key string) (opencode.Message, bool)
+	AgentPermissions(key string) []opencode.PermissionRequest
+	ReplyPermission(ctx context.Context, key, id, reply string) error
 	Stop(key string)
 }
 
@@ -38,8 +40,12 @@ type OpencodeServer interface {
 // managerRuntime is the opencode.Manager as an OpencodeRuntime: Ensure answers with the interface a launch uses.
 type managerRuntime struct{ *opencode.Manager }
 
-func (m managerRuntime) Ensure(ctx context.Context, key, bin, model, resume string) (OpencodeServer, error) {
-	srv, err := m.Manager.Ensure(ctx, key, bin, model, resume)
+func (m managerRuntime) Ensure(ctx context.Context, key, bin, model, resume string, ask bool) (OpencodeServer, error) {
+	var opts []opencode.StartOption
+	if ask {
+		opts = append(opts, opencode.WithAsk())
+	}
+	srv, err := m.Manager.Ensure(ctx, key, bin, model, resume, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -64,7 +70,7 @@ func (h *SessionsHandler) launchCommand(ctx context.Context, ag agent.Agent, p a
 			return "", fmt.Errorf("opencode: Coral's opencode server is not available")
 		}
 		p.ResumeSessionID = h.opencodeResumeSession(p)
-		srv, err := h.opencode.Ensure(ctx, p.SessionID, p.CLIPath, modelFromFlags(p.Flags), p.ResumeSessionID)
+		srv, err := h.opencode.Ensure(ctx, p.SessionID, p.CLIPath, modelFromFlags(p.Flags), p.ResumeSessionID, opencodeAsks(p.PermissionMode))
 		if err != nil {
 			return "", err
 		}
