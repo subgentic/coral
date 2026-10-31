@@ -7,7 +7,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -132,10 +134,15 @@ func TestAnAgentWorkingInsideTheInstallFoldersStillRefusesThem(t *testing.T) {
 
 func TestTheNativeInstallersFilesMustBeTheUsersAndNotWritableByOthers(t *testing.T) {
 	for name, tamper := range map[string]func(r *nativeRig){
-		"a group-writable target":       func(r *nativeRig) { require.NoError(t, os.Chmod(r.version, 0o775)) },
-		"a world-writable target":       func(r *nativeRig) { require.NoError(t, os.Chmod(r.version, 0o757)) },
-		"a group-writable bin folder":   func(r *nativeRig) { require.NoError(t, os.Chmod(filepath.Dir(r.link), 0o775)) },
-		"a world-writable versions dir": func(r *nativeRig) { require.NoError(t, os.Chmod(filepath.Dir(r.version), 0o777)) },
+		"a group-writable target":         func(r *nativeRig) { require.NoError(t, os.Chmod(r.version, 0o775)) },
+		"a world-writable target":         func(r *nativeRig) { require.NoError(t, os.Chmod(r.version, 0o757)) },
+		"a group-writable bin folder":     func(r *nativeRig) { require.NoError(t, os.Chmod(filepath.Dir(r.link), 0o775)) },
+		"a world-writable versions dir":   func(r *nativeRig) { require.NoError(t, os.Chmod(filepath.Dir(r.version), 0o777)) },
+		"a group-writable ~/.local":       func(r *nativeRig) { require.NoError(t, os.Chmod(filepath.Join(r.home, ".local"), 0o775)) },
+		"a group-writable ~/.local/share": func(r *nativeRig) { require.NoError(t, os.Chmod(filepath.Join(r.home, ".local", "share"), 0o775)) },
+		"a world-writable share/<cli> folder": func(r *nativeRig) {
+			require.NoError(t, os.Chmod(filepath.Join(r.home, ".local", "share", "claude"), 0o777))
+		},
 		"a target that is a folder": func(r *nativeRig) {
 			require.NoError(t, os.Remove(r.version))
 			require.NoError(t, os.Mkdir(r.version, 0o755))
@@ -193,4 +200,61 @@ func TestTheNotFoundAnswerSaysWhatItRefusedAndWhereItLooked(t *testing.T) {
 	assert.Contains(t, msg, "~/.claude/local/claude")
 	assert.Contains(t, msg, "the PATH it runs with")
 	assert.NotContains(t, msg, r.home, "paths are written with ~")
+}
+
+// fakeInfo is a FileInfo with the owner and mode a test chooses (the real files of a test are always the test's own).
+type fakeInfo struct {
+	mode os.FileMode
+	uid  uint32
+}
+
+func (f fakeInfo) Name() string       { return "x" }
+func (f fakeInfo) Size() int64        { return 0 }
+func (f fakeInfo) Mode() os.FileMode  { return f.mode }
+func (f fakeInfo) ModTime() time.Time { return time.Time{} }
+func (f fakeInfo) IsDir() bool        { return f.mode.IsDir() }
+func (f fakeInfo) Sys() any           { return &syscall.Stat_t{Uid: f.uid} }
+
+// QA's SHOULD on #11454: another owner is refused, by fileOwnedByMe and in each of the checks that use it.
+func TestAnotherOwnerIsRefusedByEveryCheckOfTheNativeInstallersFiles(t *testing.T) {
+	me, other := uint32(os.Getuid()), uint32(os.Getuid()+1)
+	assert.True(t, fileOwnedByMe(fakeInfo{0o755, me}))
+	assert.False(t, fileOwnedByMe(fakeInfo{0o755, other}))
+	assert.False(t, fileOwnedByMe(plainInfo{}), "an owner that cannot be read is nobody's")
+
+	assert.True(t, privateRegularInfo(fakeInfo{0o755, me}))
+	assert.False(t, privateRegularInfo(fakeInfo{0o755, other}), "a regular file somebody else owns")
+	assert.False(t, privateRegularInfo(fakeInfo{0o775, me}), "group-writable")
+	assert.False(t, privateRegularInfo(fakeInfo{0o757, me}), "world-writable")
+	assert.False(t, privateRegularInfo(fakeInfo{os.ModeDir | 0o755, me}), "a folder is not a regular file")
+
+	assert.True(t, privateDirInfo(fakeInfo{os.ModeDir | 0o755, me}))
+	assert.False(t, privateDirInfo(fakeInfo{os.ModeDir | 0o755, other}), "a folder somebody else owns")
+	assert.False(t, privateDirInfo(fakeInfo{os.ModeDir | 0o775, me}))
+	assert.False(t, privateDirInfo(fakeInfo{0o755, me}), "a file is not a folder")
+}
+
+// plainInfo is a FileInfo with no system information.
+type plainInfo struct{ fakeInfo }
+
+func (plainInfo) Sys() any { return nil }
+
+// QA's gap on #11467: the three parent folders are checked for a typed path under ~/.local/share/<cli>/versions/ too (the file itself, as the Settings check also looks at what a link resolves to), not
+// only for the ~/.local/bin link.
+func TestTheParentFoldersArePrivateForTheVersionFileTypedDirectlyToo(t *testing.T) {
+	for name, parent := range map[string]func(r *nativeRig) string{
+		"~/.local":              func(r *nativeRig) string { return filepath.Join(r.home, ".local") },
+		"~/.local/share":        func(r *nativeRig) string { return filepath.Join(r.home, ".local", "share") },
+		"~/.local/share/claude": func(r *nativeRig) string { return filepath.Join(r.home, ".local", "share", "claude") },
+	} {
+		for mode, perm := range map[string]os.FileMode{"group-writable": 0o775, "world-writable": 0o777} {
+			t.Run(name+" "+mode, func(t *testing.T) {
+				r := newNativeRig(t)
+				r.agentIn("aaaaaaaa-0000-4000-8000-000000000007", r.home)
+				require.Empty(t, r.screen(r.version), "untouched, the version file typed directly passes")
+				require.NoError(t, os.Chmod(parent(r), perm))
+				assert.NotEmpty(t, r.screen(r.version), "the parent folder is writable by others")
+			})
+		}
+	}
 }

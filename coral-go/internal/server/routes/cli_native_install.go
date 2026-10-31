@@ -27,19 +27,30 @@ func nativeInstallerPlace(p string, known map[string]bool) bool {
 	typed := filepath.Join(realOrSelf(filepath.Dir(p)), filepath.Base(p))
 	for cli := range known {
 		bin := filepath.Join(rhome, ".local", "bin", cli)
-		versions := filepath.Join(rhome, ".local", "share", cli, "versions")
+		share := filepath.Join(rhome, ".local", "share", cli)
+		versions := filepath.Join(share, "versions")
+		// Every folder on the way to the installer's files is the user's and not writable by others, not only the two that hold them: anyone who could write ~/.local, ~/.local/share or the CLI's
+		// own share folder could swap the folder under the file (Security's SHOULD, #11467).
+		parentsPrivate := func() bool {
+			for _, d := range []string{filepath.Join(rhome, ".local"), filepath.Join(rhome, ".local", "share"), share} {
+				if !privateDir(d) {
+					return false
+				}
+			}
+			return true
+		}
 		switch {
 		case typed == bin:
 			real := filepath.Clean(realOrSelf(typed))
 			if !underDir(versions, real) {
 				return false // a link to anywhere else is not the installer's
 			}
-			return privateRegular(real) && privateDir(filepath.Dir(typed)) && privateDir(filepath.Dir(real)) && ownedNotWritable(typed)
+			return parentsPrivate() && privateRegular(real) && privateDir(filepath.Dir(typed)) && privateDir(filepath.Dir(real)) && ownedNotWritable(typed)
 		case underDir(versions, typed):
 			if filepath.Clean(realOrSelf(typed)) != typed { // a link inside the versions folder to somewhere else is not the installer's file
 				return false
 			}
-			return privateRegular(typed) && privateDir(filepath.Dir(typed))
+			return parentsPrivate() && privateRegular(typed) && privateDir(filepath.Dir(typed))
 		}
 	}
 	return false
@@ -56,19 +67,29 @@ func fileOwnedByMe(st os.FileInfo) bool {
 	return ok && int(s.Uid) == os.Getuid()
 }
 
-// privateRegular: a regular file (after links) owned by the current user, not writable by group or others.
+// privateRegularInfo: a regular file owned by the current user, not writable by group or others. (On the FileInfo, so a test can give it another owner.)
+func privateRegularInfo(st os.FileInfo) bool {
+	return st.Mode().IsRegular() && fileOwnedByMe(st) && st.Mode().Perm()&0o022 == 0
+}
+
+// privateDirInfo: a folder owned by the current user that group and others cannot write to.
+func privateDirInfo(st os.FileInfo) bool {
+	return st.IsDir() && fileOwnedByMe(st) && st.Mode().Perm()&0o022 == 0
+}
+
+// privateRegular: privateRegularInfo of the file the path leads to (after links).
 func privateRegular(p string) bool {
 	st, err := os.Stat(p)
-	return err == nil && st.Mode().IsRegular() && fileOwnedByMe(st) && st.Mode().Perm()&0o022 == 0
+	return err == nil && privateRegularInfo(st)
 }
 
-// privateDir: a folder owned by the current user that group and others cannot write to.
+// privateDir: privateDirInfo of the folder the path leads to.
 func privateDir(p string) bool {
 	st, err := os.Stat(p)
-	return err == nil && st.IsDir() && fileOwnedByMe(st) && st.Mode().Perm()&0o022 == 0
+	return err == nil && privateDirInfo(st)
 }
 
-// ownedNotWritable: the link itself is the current user's (a link's own mode bits mean nothing on Linux; on macOS they are checked too).
+// ownedNotWritable: the link itself is the current user's (a link's own mode bits mean nothing on Linux).
 func ownedNotWritable(p string) bool {
 	st, err := os.Lstat(p)
 	return err == nil && fileOwnedByMe(st)
