@@ -619,6 +619,14 @@ export function _syncACFModelField(container) {
             syncModelPicker(container);
             return;
         }
+        // The account has no default model for this CLI (empty) and the list already started the form on a model that works (Pi's own default provider is not signed in, #11338): that starting model
+        // stands. Whichever answer came first used to win: a list from the cache beat the settings, and the empty default then cleared the box (a flake of the CI shards, pi_model_groups_browser).
+        const applied = container._defaultModelApplied;
+        if (!defaults[currentType] && applied && applied.type === currentType && modelInput.value === applied.value) {
+            syncModelPicker(container);
+            container.dispatchEvent(new Event('acf-synced', { bubbles: true }));
+            return;
+        }
         modelInput.value = defaults[currentType] || '';
         syncModelPicker(container);
         container.dispatchEvent(new Event('acf-synced', { bubbles: true })); // a summary of the form (New Agent's rows) follows the default arriving

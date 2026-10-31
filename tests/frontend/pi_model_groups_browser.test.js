@@ -26,6 +26,7 @@ const { connect } = require('./agent_view_harness');
             window.fetch = (u, o = {}) => { const url = new URL(String(u), location.origin);
                 if (url.pathname === '/api/agents/models') { const type = url.searchParams.get('type');
                     return Promise.resolve(new Response(JSON.stringify({ agent_type: type, fetched_at: '2026-10-30T20:00:00Z', source: 'account', refreshing: false, ...(window.__serve[type] || { models: [] }) }), { status: 200, headers: { 'content-type': 'application/json' } })); }
+                if (url.pathname === '/api/settings' && (o.method || 'GET') === 'GET' && window.__holdSettings) return new Promise(res => { window.__releaseSettings = () => res(R(u, o)); });  // the account's settings answer, held until a step lets it go
                 return R(u, o); };
             const d = document.createElement('div'); d.id = 'acf-t'; document.body.appendChild(d);
             (async () => { const f = await import((window.__coralStatic || '/static/') + 'agent_config_form.js'); window.__acf = f; f.renderAgentConfigForm('acf-t', {}); return true; })(); return true; })()`);
@@ -34,8 +35,12 @@ const { connect } = require('./agent_view_harness');
             return { groups: [...sel.querySelectorAll('optgroup')].map(g => ({ label: g.label, options: [...g.querySelectorAll('option')].map(o => o.textContent) })), value: sel.value, form: window.__acf.getAgentConfig('acf-t').model }; })()`);
 
         console.log('1. a Pi form lists its models by provider, the signed-in one first, and starts on a model that works');
-        await ev(`window.__acf.setAgentConfig('acf-t', { agentType: 'pi', model: '' }); true`);
-        await waitFor(`document.querySelectorAll('#acf-t .acf-model-select optgroup').length === 2`, 'two provider groups', 5000);
+        // The account has no default model for Pi and its settings answer arrives AFTER the list (the list is a cached or quick answer, the settings a network call: either can be first on a loaded machine, and
+        // the CI shards failed this 4 of 10): here the settings are held until the list has started the form on a model that works, then let go. The empty default must not take that model away.
+        await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'launch_models.js'); m._invalidateDefaultModels(); window.__holdSettings = true; window.__acf.setAgentConfig('acf-t', { agentType: 'pi', model: '' }); return true; })()`);
+        await waitFor(`document.querySelectorAll('#acf-t .acf-model-select optgroup').length === 2 && window.__acf.getAgentConfig('acf-t').model === 'openai/gpt-5.6-luna' && !!window.__releaseSettings`, 'two provider groups, the form started on a model that works, the settings still held', 5000);
+        await ev(`window.__holdSettings = false; window.__releaseSettings(); true`);
+        await waitFor(`document.getElementById('acf-t').dataset.acfDefaults === 'ready'`, 'the settings answered', 5000);
         let b = await pick();
         assert.deepEqual(b.groups, [
             { label: 'openai · signed in', options: ['gpt-5.6-luna', 'gpt-6-luna'] },
