@@ -267,7 +267,7 @@ func TestAClosedAskIsOpenedAgainByUndoAndNothingIsPosted(t *testing.T) {
 		raw, _ := json.Marshal(body)
 		req := httptest.NewRequest(http.MethodPost, "/api/board/team/asks/x/close", strings.NewReader(string(raw)))
 		if who == "Operator" {
-			req = withActor(req, Actor{Kind: ActorOperator, Name: "Operator"})
+			req = asPerson(withActor(req, Actor{Kind: ActorOperator, Name: "Operator"}))
 		} else {
 			req = withActor(req, Actor{Kind: ActorToken, Name: who, Session: "claude-" + who})
 		}
@@ -291,6 +291,10 @@ func TestAClosedAskIsOpenedAgainByUndoAndNothingIsPosted(t *testing.T) {
 	code, out := call("Other", map[string]any{"undo": true})
 	assert.Equal(t, http.StatusForbidden, code, "another member may not undo a close")
 	assert.Equal(t, "not_allowed", out["code"])
+	assert.Equal(t, 0, open())
+	code, out = call("Lead", map[string]any{"undo": true})
+	assert.Equal(t, http.StatusForbidden, code, "the agent that asked may not reopen a question the Operator ignored")
+	assert.Equal(t, "owner_only", out["code"])
 	assert.Equal(t, 0, open())
 	code, out = call("Operator", map[string]any{"undo": true})
 	require.Equal(t, http.StatusOK, code)
