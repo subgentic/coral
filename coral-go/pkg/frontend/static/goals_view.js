@@ -231,12 +231,13 @@ export function openCreate(opts = {}) {
     form.append(head, body, el('div', 'goals-actions'));
     form.querySelector('.goals-actions').append(cancel, go);
     dlg.append(form); document.body.append(dlg);
-    const loadDrivers = () => boardFetch(project, '/subscribers').then(r => r.ok ? r.json() : Promise.reject(new Error(String(r.status)))).then(json => {
+    const loadDrivers = () => { const asked = project; return boardFetch(asked, '/subscribers').then(r => r.ok ? r.json() : Promise.reject(new Error(String(r.status)))).then(json => {
+        if (asked !== project) return; // the team was changed while this answer was on its way: it is the other team's agents (a slower answer must not fill the list)
         const people = toDrivers(json);
         dr.replaceChildren(...people.map(p => new Option(p.label, p.id)), new Option('No driver yet', ''));
         dr.value = people.length && people[0].orchestrator ? people[0].id : ''; // the Orchestrator drives unless the person says otherwise
         dr.disabled = false;
-    }).catch(() => { dr.replaceChildren(new Option('No driver yet', '')); dr.disabled = false; where.textContent += '. This board\'s agents could not be read, so no driver is set.'; });
+    }).catch(() => { if (asked !== project) return; dr.replaceChildren(new Option('No driver yet', '')); dr.disabled = false; where.textContent += '. This board\'s agents could not be read, so no driver is set.'; }); };
     loadDrivers();
     pick.addEventListener('change', () => { project = pick.value; where.textContent = `Created on this board: ${keyLabel(project)}`; dr.disabled = true; dr.replaceChildren(new Option('Loading this board\'s agents…', '')); loadDrivers(); });
     form.addEventListener('submit', async (e) => {
