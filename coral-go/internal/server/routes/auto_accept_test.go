@@ -1124,3 +1124,15 @@ func TestAutoAcceptAnswersOnlyKnownActionTools(t *testing.T) {
 		})
 	}
 }
+
+// Every type auto-accept supports is either in autoAcceptActionTools or named as header-recognised, never both and never neither: a type
+// added to autoAcceptSupported without a list is not approved by default (Security on #260). And a type with neither answers no tool.
+func TestEveryAutoAcceptTypeHasAToolListOrAHeader(t *testing.T) {
+	for typ := range autoAcceptSupported {
+		_, listed := autoAcceptActionTools[typ]
+		header := autoAcceptHeaderRecognised[typ]
+		assert.True(t, listed != header, "%s: a tool list (%v) or header-recognised (%v), exactly one", typ, listed, header)
+	}
+	assert.False(t, autoAcceptActionTool("some-new-cli", "run_command"), "a type with neither is never approved")
+	assert.True(t, autoAcceptActionTool(at.Codex, "anything"), "Codex is header-recognised")
+}
