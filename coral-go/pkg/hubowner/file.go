@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/subgentic/coral/internal/fsreplace"
 	"github.com/subgentic/coral/internal/secfile"
 )
 
@@ -51,7 +52,7 @@ func WriteFile(dir, remoteID, secret string) error {
 	if err := tmp.Close(); err != nil {
 		return err
 	}
-	return os.Rename(name, final)
+	return fsreplace.Rename(name, final)
 }
 
 // ReadFile reads what WriteFile wrote: a regular file (never a link), at most 512 bytes, and on a system with mode bits private to its user. ok is false, with no error, when there is none.
