@@ -9,10 +9,9 @@
 .proposal-status:empty { display: none; }
 .proposal-buttons { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 .inbox-proposal-expired { color: var(--text-secondary); font-size: var(--fs-md); }
-.inbox-proposal-what { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.inbox-proposal-line { font-weight: var(--fw-strong); }
-.inbox-proposal-body { color: var(--text-secondary); font-size: var(--fs-md); white-space: pre-wrap; overflow-wrap: anywhere; }
-.inbox-proposal-flag { color: var(--warning-text); font-size: var(--fs-md); }
+.inbox-proposal-what { display: flex; align-items: center; gap: 8px; min-width: 0; white-space: nowrap; }
+.inbox-proposal-line { font-weight: var(--fw-strong); flex: none; }
+.inbox-proposal-body { color: var(--text-secondary); font-size: var(--fs-md); flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .proposal-carried { display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-md); }
 .proposal-pre { margin: 0; padding: 8px; max-height: 12rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; background: var(--bg-primary); border: 1px solid var(--border); border-radius: var(--radius-md); font: inherit; }
 .proposal-outputs { margin: 0; padding-left: 1.25rem; }

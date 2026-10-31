@@ -1,5 +1,5 @@
 // What agents asked to add to a team waits for the Operator in Needs you (#11389, slice B): a row for each proposal with its title, who proposed it and its words, all as text; Approve, Edit and approve (a dialog with
-// the words, only what changed is sent) and Reject (a reason the agent is told); an expired one says so and can be dismissed; one being approved has no buttons; a refusal from the machine is said in the row; the Inbox
+// the words, only what changed is sent) and Reject (a reason the agent is told); an expired one says so and can be dismissed; one being approved has no buttons; a refusal from the machine is said in the detail; the Inbox
 // badge counts the pending ones. And Team settings holds the three planning limits and saves them to the machine. The proposals routes are stood in for by a page-side stub that records every request; the settings
 // are the real server's. 1280 px dark and 390 px light (touch). Drives Chrome over CDP through the harness; run_cdp_suites.mjs finds it by name.
 const assert = require('node:assert/strict');
@@ -12,7 +12,7 @@ const { setTheme, installAudit, auditRegion } = require('./helpers/contrast');
 const BASE = require('./test_base').BASE;
 const { coralReady } = require('./helpers/wait');
 
-const LONGBODY = 'A long body. ' + 'It goes on and on with detail that nobody reads until they must decide. '.repeat(20) + 'THE END OF IT.';
+const LONGBODY = ('A long body. ' + 'It goes on and on with detail that nobody reads until they must decide. '.repeat(50)).slice(0, 2986) + 'THE END OF IT.'; // 3,000 characters, on one line
 const PROPOSALS = [
     { id: 11, board_id: 'team-a', kind: 'task', title: 'Fix the <b>login</b> page', proposer: 'Backend Dev', state: 'pending', created_at: new Date(Date.now() - 600000).toISOString(), payload: { title: 'Fix the <b>login</b> page', body: 'It fails on Safari. @Orchestrator please look <img src=x onerror="window.__pwned=1">', priority: 'high', assigned_to: 'QA Engineer', blocked_by: [3], draft: true, goal_id: 5, remind_at: new Date(Date.now() + 86400000).toISOString(), workflow: { instructions: 'Read the plan first.\n<b>then</b> run the deploy script.', required_outputs: ['a report', 'the diff'] } } },
     { id: 12, board_id: 'team-a', kind: 'goal', title: 'Ship the beta', proposer: 'Orchestrator', state: 'pending', created_at: new Date(Date.now() - 3600000).toISOString(), payload: { title: 'Ship the beta', outcome: LONGBODY, done_when: 'The release is out' } },
@@ -63,8 +63,10 @@ const STUB = `(() => {
             const byItem = Object.fromEntries(rows.map(r => [r.item, r]));
             check(at + 'a row for each proposal, its title as text (a tag in it stays text)', rows.length === 4 && byItem['Fix the <b>login</b> page'] && byItem['Ship the beta'] && byItem['An old idea'] && byItem['Being made right now'], JSON.stringify(rows.map(r => r.item)));
             check(at + 'the proposer is named and the body is shown, as text: a tag, a mention and an image with a handler do nothing', /Backend Dev proposes a task/.test(byItem['Fix the <b>login</b> page'].what) && byItem['Fix the <b>login</b> page'].what.includes('<img src=x onerror="window.__pwned=1">') && byItem['Fix the <b>login</b> page'].what.includes('@Orchestrator') && await ev(`window.__pwned === 0 && !document.querySelector('${T} b, ${T} img')`), byItem['Fix the <b>login</b> page'].what);
-            check(at + 'a long body is cut at 600 characters with a way to read all of it', /Orchestrator proposes a goal/.test(byItem['Ship the beta'].what) && byItem['Ship the beta'].what.endsWith('…') && !byItem['Ship the beta'].what.includes('THE END OF IT.'), String(byItem['Ship the beta'].what.length));
-            check(at + 'a pending one has Approve, Edit and approve and Reject; an expired one says so and has Dismiss; one being approved has no buttons', JSON.stringify(byItem['Fix the <b>login</b> page'].buttons) === JSON.stringify(['Approve', 'Edit and approve', 'Reject']) && /Expired, nothing was made/.test(byItem['An old idea'].text) && JSON.stringify(byItem['An old idea'].buttons) === JSON.stringify(['Dismiss']) && /Being approved/.test(byItem['Being made right now'].text) && byItem['Being made right now'].buttons.length === 0, JSON.stringify(rows.map(r => r.buttons)));
+            const geoRows = await ev(`(() => Object.fromEntries([...document.querySelectorAll('${T} tbody tr')].map(tr => { const w = tr.querySelector('.inbox-proposal-what'), b = tr.querySelector('.inbox-proposal-body'); return [(tr.querySelector('.inbox-review-name') || {}).textContent, { h: Math.round(tr.getBoundingClientRect().height), nowrap: w ? getComputedStyle(w).whiteSpace === 'nowrap' : null, cut: b ? b.scrollWidth > b.clientWidth && getComputedStyle(b).textOverflow === 'ellipsis' : null, lines: b ? Math.round(b.getBoundingClientRect().height / parseFloat(getComputedStyle(b).lineHeight)) : null }]; })))()`);
+            const longRow = geoRows['Ship the beta'], shortRow = geoRows['Fix the <b>login</b> page'];
+            check(at + 'a 3,000-character body is ONE line cut with an ellipsis: the row is no taller than a short one, and the end is not in the row', LONGBODY.length === 3000 && longRow.h <= shortRow.h && longRow.nowrap && longRow.cut && longRow.lines === 1 && /Orchestrator proposes a goal/.test(byItem['Ship the beta'].what) && !byItem['Ship the beta'].what.includes('THE END OF IT.'), JSON.stringify(geoRows));
+            check(at + 'a pending one has Approve, Edit and Reject; an expired one says so and has Dismiss; one being approved has no buttons', JSON.stringify(byItem['Fix the <b>login</b> page'].buttons) === JSON.stringify(['Approve', 'Edit', 'Reject']) && /Expired, nothing was made/.test(byItem['An old idea'].text) && JSON.stringify(byItem['An old idea'].buttons) === JSON.stringify(['Dismiss']) && /Being approved/.test(byItem['Being made right now'].text) && byItem['Being made right now'].buttons.length === 0, JSON.stringify(rows.map(r => r.buttons)));
             const seen = await ev(`(() => { const w = [...document.querySelectorAll('${T} .inbox-proposal-what')].filter(n => n.getClientRects().length); return { n: w.length, widths: w.map(n => Math.round(n.getBoundingClientRect().width)), narrow: w.filter(n => n.getBoundingClientRect().width < ${view.phone ? 120 : 200}).length }; })()`);
             check(at + 'the proposer and the words are SEEN in the row (not in a hidden column)', seen.n >= 3 && seen.narrow === 0, JSON.stringify(seen));
             const fit = await ev(`(() => { const b = document.querySelector('${T} .dt-box'); return { fits: b.scrollWidth <= b.clientWidth + 1, waiting: [...b.querySelectorAll('thead th')].map(t => t.textContent.trim()).filter(Boolean) }; })()`);
@@ -76,11 +78,19 @@ const STUB = `(() => {
                 check(at + 'no sideways page scroll, and the buttons are 44 px targets', geo.page && geo.small.length === 0, JSON.stringify(geo));
             }
             await shot(`proposals-needs-${view.w}-${view.theme}`);
-            // a refusal is said in the row, and the row stays
-            await ev(`window.__refuse = 'this task waits for the goal it was proposed under: approve that goal first'; true`);
-            await ev(`[...document.querySelectorAll('${T} tbody tr')].find(tr => tr.querySelector('.inbox-review-name').textContent === 'Fix the <b>login</b> page').querySelector('button').click(); true`);
-            await waitFor(`/waits for the goal/.test(document.querySelector('${T}').textContent)`, at + 'the refusal in words', 8000);
-            check(at + 'a refusal from the machine is said in the row, which stays', (await rowsOf()).some(r => r.item === 'Fix the <b>login</b> page'));
+            // opening the row shows the whole body as text, read first; Edit and approve in it opens the words to change
+            const rowOf = name => `[...document.querySelectorAll('${T} tbody tr')].find(tr => tr.querySelector('.inbox-review-name').textContent === ${JSON.stringify(name)})`;
+            await ev(`window.__posts = []; ${rowOf('Ship the beta')}.querySelector('.inbox-review-name').click(); true`);
+            await waitFor(`!!document.querySelector('#proposal-dialog[open]')`, at + 'the detail from the row', 5000);
+            const detail = await ev(`(() => { const d = document.querySelector('#proposal-dialog'); const f = [...d.querySelectorAll('input, textarea')]; const before = f.slice(0, 3).every(x => x.readOnly); return { posts: window.__posts.length, whole: f[1].value.endsWith('THE END OF IT.') && f[1].value.length === 3000, readonly: before, buttons: [...d.querySelectorAll('.proposal-buttons button')].filter(b => !b.hidden).map(b => b.textContent) }; })()`);
+            check(at + 'opening the row shows the whole 3,000-character body as text, read first, with Close, Reject, Edit and approve, Approve; nothing is sent', detail.posts === 0 && detail.whole && detail.readonly && JSON.stringify(detail.buttons) === JSON.stringify(['Close', 'Reject…', 'Edit and approve', 'Approve']), JSON.stringify(detail));
+            await ev(`[...document.querySelectorAll('#proposal-dialog button')].find(b => b.textContent === 'Edit and approve').click(); true`);
+            check(at + 'Edit and approve in the detail opens the words to change', await ev(`(() => { const f = [...document.querySelectorAll('#proposal-dialog input, #proposal-dialog textarea')].slice(0, 3); return f.every(x => !x.readOnly) && document.activeElement === f[0] && [...document.querySelectorAll('#proposal-dialog .proposal-buttons button')].some(b => b.textContent === 'Approve with these words'); })()`));
+            await ev(`document.querySelector('#proposal-dialog').close(); true`);
+            // a refusal from the machine is a toast; the row stays one line and stays in the list
+            await ev(`window.__posts = []; window.__refuse = 'this task waits for the goal it was proposed under: approve that goal first'; ${rowOf('Ship the beta')}.querySelector('button').click(); true`);
+            await waitFor(`/waits for the goal/.test(document.body.textContent)`, at + 'the refusal in words', 8000);
+            check(at + 'a refusal from the machine is said in a toast: the proposal stays, one request was made', await ev(`!!${rowOf('Ship the beta')} && window.__posts.length === 1 && !document.querySelector('${T} .inbox-review-error:not(:empty)')`));
             await ev(`window.__refuse = null; window.__posts = []; true`);
             // the dialog shows what the task would carry: the instructions and outputs in full, and one line of the rest
             check(at + 'a row whose task carries instructions says so', /Carries instructions/.test(byItem['Fix the <b>login</b> page'].what) && !/Carries instructions/.test(byItem['Ship the beta'].what), byItem['Fix the <b>login</b> page'].what);
@@ -89,16 +99,16 @@ const STUB = `(() => {
             const carried = await ev(`(() => { const d = document.querySelector('#proposal-dialog'); return { pre: (d.querySelector('.proposal-pre') || {}).textContent, outputs: [...d.querySelectorAll('.proposal-outputs li')].map(li => li.textContent), also: (d.querySelector('.proposal-extra') || {}).textContent, tags: !!d.querySelector('b, img') }; })()`);
             check(at + 'the dialog shows the instructions in full as text, the required outputs, and what else it sets', carried.pre === 'Read the plan first.\n<b>then</b> run the deploy script.' && JSON.stringify(carried.outputs) === JSON.stringify(['a report', 'the diff']) && /^Also sets: assigned to QA Engineer; priority high; blocked by #3; a reminder at .+; a draft \(not published\); under goal #5\.$/.test(carried.also) && !carried.tags, JSON.stringify(carried));
             await ev(`document.querySelector('#proposal-dialog').close(); true`);
-            // Approve: one request, no edits, the row goes
-            await ev(`[...document.querySelectorAll('${T} tbody tr')].find(tr => tr.querySelector('.inbox-review-name').textContent === 'Fix the <b>login</b> page').querySelector('button').click(); true`);
+            // Approve from the row makes it as proposed: one request, no edits (the Operator's ruling), and the row goes
+            await ev(`${rowOf('Fix the <b>login</b> page')}.querySelector('button').click(); true`);
             await waitFor(`!/Fix the <b>login<\\/b> page/.test(document.querySelector('${T}').textContent)`, at + 'the approved row gone', 8000);
             const posts = await ev(`window.__posts`);
-            check(at + 'Approve is one request for that proposal with no edits, and the row is gone', posts.length === 1 && posts[0].action === 'approve' && posts[0].id === 11 && posts[0].board === 'team-a' && Object.keys(posts[0].body).length === 0, JSON.stringify(posts));
+            check(at + 'Approve on the row is one request for that proposal with no edits, and the row is gone', posts.length === 1 && posts[0].action === 'approve' && posts[0].id === 11 && posts[0].board === 'team-a' && Object.keys(posts[0].body).length === 0, JSON.stringify(posts));
             // Edit and approve: the words in a dialog, only the changed one is sent
-            await ev(`window.__posts = []; [...document.querySelectorAll('${T} tbody tr')].find(tr => tr.querySelector('.inbox-review-name').textContent === 'Ship the beta').querySelectorAll('button')[1].click(); true`);
+            await ev(`window.__posts = []; ${rowOf('Ship the beta')}.querySelectorAll('button')[1].click(); true`);
             await waitFor(`!!document.querySelector('#proposal-dialog[open]')`, at + 'the dialog', 5000);
             const dlg = await ev(`(() => { const d = document.querySelector('#proposal-dialog'); const f = [...d.querySelectorAll('input, textarea')]; return { title: f[0].value, outcome: f[1].value.endsWith('THE END OF IT.'), done: f[2].value, who: d.querySelector('.proposal-who').textContent, focus: document.activeElement === f[0] }; })()`);
-            check(at + 'Edit and approve opens the dialog with all the words (the whole body) and the proposer, the title focused', dlg.title === 'Ship the beta' && dlg.outcome && dlg.done === 'The release is out' && /Orchestrator proposed it for team-a/.test(dlg.who) && dlg.focus, JSON.stringify(dlg));
+            check(at + 'the row Edit opens the dialog: all the words (the whole body) and the proposer, the title focused', dlg.title === 'Ship the beta' && dlg.outcome && dlg.done === 'The release is out' && /Orchestrator proposed it for team-a/.test(dlg.who) && dlg.focus, JSON.stringify(dlg));
             await shot(`proposals-dialog-${view.w}-${view.theme}`);
             await ev(`(() => { const t = document.querySelector('#proposal-dialog input'); t.value = 'Ship the beta, edited'; t.dispatchEvent(new Event('input', { bubbles: true })); [...document.querySelectorAll('#proposal-dialog button')].find(b => /Approve/.test(b.textContent)).click(); return true; })()`);
             await waitFor(`!document.querySelector('#proposal-dialog[open]')`, at + 'the dialog closed', 8000);

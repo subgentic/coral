@@ -28,24 +28,29 @@ export const carriesInstructions = p => { const f = proposalFacts(p); return !!(
 /** The line a row says: who proposed what. */
 export const proposalSummary = p => `Proposes a ${kindWord(p)}: ${visibleName(p.title)}`;
 
-/** The buttons of a row: Approve, Edit and approve, Reject (an expired one has Dismiss). onMore opens the dialog in a mode. */
+/** The one line a row shows of a proposal's words: the first line of its body, cut (the row's CSS cuts it again at the edge with an ellipsis, so it never wraps). */
+export function proposalSnippet(p) {
+    const pay = p.payload && typeof p.payload === 'object' ? p.payload : {};
+    const first = String(pay.body || pay.outcome || '').trim().split(/\r?\n/)[0].replace(/\s+/g, ' ');
+    return first.length > 160 ? `${first.slice(0, 160)}…` : first;
+}
+
+/** The buttons of a row, one line like a review's: Approve makes it as proposed (the Operator's ruling: the one line they read is what they approve, and 'Carries instructions' is on it when there are some), Edit opens the detail with the words open to change, Reject opens it on the reason. An expired one has Dismiss. A refusal is a toast: the row stays one line. */
 export function proposalActions(p) {
     const box = el('div', 'inbox-review-actions inbox-proposal-actions');
-    const say = el('span', 'inbox-review-error'); say.setAttribute('role', 'alert');
-    const btn = (label, aria, run, cls = 'btn btn-small') => { const b = el('button', cls, label); b.type = 'button'; b.setAttribute('aria-label', aria); b.addEventListener('click', e => { e.stopPropagation(); run(b); }); return b; };
+    const btn = (label, aria, run) => { const b = el('button', 'btn btn-small', label); b.type = 'button'; b.setAttribute('aria-label', aria); b.addEventListener('click', e => { e.stopPropagation(); run(b); }); return b; };
     if (p.state === 'expired') {
         box.append(el('span', 'inbox-proposal-expired', 'Expired, nothing was made'), btn('Dismiss', `Dismiss the expired ${kindWord(p)} ${visibleName(p.title)}`, () => dismissExpired(p)));
         return box;
     }
     if (p.state === 'approving') { box.append(el('span', 'inbox-proposal-expired', 'Being approved…')); return box; } // an Approve has it: nothing to press until it finishes (a stuck one is looked into after five minutes)
-    const approve = btn('Approve', `Approve the ${kindWord(p)} ${visibleName(p.title)}`, async b => {
-        b.disabled = true; say.textContent = '';
-        const res = await decide(p, 'approve');
-        if (res.ok) showToast(res.text, false, 4000); else { b.disabled = false; say.textContent = res.text; }
-    });
-    box.append(approve,
-        btn('Edit and approve', `Edit and approve the ${kindWord(p)} ${visibleName(p.title)}`, () => openProposalDialog(p, 'edit')),
-        btn('Reject', `Reject the ${kindWord(p)} ${visibleName(p.title)}`, () => openProposalDialog(p, 'reject')), say);
+    box.append(btn('Approve', `Approve the ${kindWord(p)} ${visibleName(p.title)}`, async b => {
+            b.disabled = true;
+            const res = await decide(p, 'approve');
+            if (res.ok) showToast(res.text, false, 4000); else { b.disabled = false; showToast(res.text, true, 6000); }
+        }),
+        btn('Edit', `Edit and approve the ${kindWord(p)} ${visibleName(p.title)}`, () => openProposalDialog(p, 'edit')),
+        btn('Reject', `Reject the ${kindWord(p)} ${visibleName(p.title)}`, () => openProposalDialog(p, 'reject')));
     return box;
 }
 
@@ -56,18 +61,20 @@ export function openProposalDialog(p, mode = 'view') {
     const d = el('dialog', 'modal-content dlg-form proposal-dialog'); d.id = 'proposal-dialog'; d.setAttribute('aria-labelledby', 'proposal-dialog-title');
     const h = el('h2', null, `${kindWord(p) === 'goal' ? 'A goal' : 'A task'} waiting for your approval`); h.id = 'proposal-dialog-title';
     const who = el('p', 'proposal-who', `${p.proposer} proposed it for ${p.board_id}.${p.goal_proposal_id ? ' It is for a goal that is also waiting: approve that goal first.' : ''}`);
-    const field = (label, value, tall) => { const l = el('label', 'proposal-field'); l.append(el('span', null, label)); const i = el(tall ? 'textarea' : 'input', 'field'); if (tall) i.rows = 4; i.value = value; l.append(i); return [l, i]; };
+    const inputs = [];
+    const field = (label, value, tall) => { const l = el('label', 'proposal-field'); l.append(el('span', null, label)); const i = el(tall ? 'textarea' : 'input', 'field'); if (tall) i.rows = 4; i.value = value; i.readOnly = mode !== 'edit'; inputs.push(i); l.append(i); return [l, i]; }; // the words are read first: they are changed only after Edit and approve
     const [tl, title] = field('Title', p.title);
     const parts = [tl];
     let second = null, third = null;
     if (p.kind === 'goal') { const [ol, o] = field('Outcome', pay.outcome || '', true); const [dl, dw] = field('Done when', pay.done_when || ''); second = o; third = dw; parts.push(ol, dl); }
     else { const [bl, b] = field('Details', pay.body || '', true); second = b; parts.push(bl); }
-    const why = field('Reason (the agent is told)', '', true), reason = why[1];
+    const why = field('Reason (the agent is told)', '', true), reason = why[1]; reason.readOnly = false; inputs.pop();
     const reasonRow = why[0]; reasonRow.hidden = mode !== 'reject';
     const status = el('p', 'proposal-status'); status.setAttribute('role', 'alert');
     const row = el('div', 'modal-actions proposal-buttons');
     const close = el('button', 'btn', 'Close'); close.type = 'button'; close.addEventListener('click', () => d.close());
     const approve = el('button', 'btn btn-primary', mode === 'edit' ? 'Approve with these words' : 'Approve'); approve.type = 'button';
+    const editOpen = el('button', 'btn', 'Edit and approve'); editOpen.type = 'button'; editOpen.hidden = mode !== 'view';
     const rejectOpen = el('button', 'btn btn-danger', mode === 'reject' ? 'Reject' : 'Reject…'); rejectOpen.type = 'button';
     const edits = () => {
         const e = {};
@@ -83,7 +90,8 @@ export function openProposalDialog(p, mode = 'view') {
         approve.disabled = rejectOpen.disabled = true; status.textContent = '';
         finish(await decide(p, 'reject', { reason: reason.value.trim() }));
     });
-    row.append(close, rejectOpen, approve);
+    editOpen.addEventListener('click', () => { for (const i of inputs) i.readOnly = false; editOpen.hidden = true; approve.textContent = 'Approve with these words'; title.focus(); });
+    row.append(close, rejectOpen, editOpen, approve);
     const carried = [];
     if (facts.instructions) { const b = el('div', 'proposal-carried'); b.append(el('strong', null, 'Instructions it gives the assignee'), el('pre', 'proposal-pre', facts.instructions)); carried.push(b); }
     if (facts.outputs.length) { const b = el('div', 'proposal-carried'); b.append(el('strong', null, 'Outputs it requires')); const ul = el('ul', 'proposal-outputs'); for (const o of facts.outputs) ul.append(el('li', null, o)); b.append(ul); carried.push(b); }
