@@ -15,8 +15,8 @@ func TestNeedsPersonIsInTheDocsAndTheHelp(t *testing.T) {
 		topic string
 		wants []string
 	}{
-		{"board", []string{"When the person must see, decide or approve something", `coral-board post --ask "@Operator <question>"`, "Needs you", `--tag "for review"`, "One item per decision, with your recommendation", "comments on a \"for review\" upload reach its uploader", "coral-agent artifact comments <link>", "outside Coral without the person's OK", "a person must look at it, decide, or approve it", "(logs, patches, notes, screenshots for a reviewer) is not tagged for review"}},
-		{"how-do-i", []string{"Get an agent to put something in front of you", `coral-board post --ask "@Operator <question>"`, "Needs you", "for review", "recommendation", "comments on a **for review** file reach the agent that uploaded it", "outside Coral without your OK", "logs, patches, notes and screenshots meant for other agents are not tagged"}},
+		{"board", []string{"When the person must see, decide or approve something", `coral-board post --ask "@Operator <question>"`, "Needs you", `--tag "for review"`, "One item per decision, with your recommendation", "comments on a \"for review\" upload reach its uploader", "coral-agent artifact comments <link>", "a comment made through Coral Hub is not yet", "outside Coral without the person's OK", "a person must look at it, decide, or approve it", "(logs, patches, notes, screenshots for a reviewer) is not tagged for review"}},
+		{"how-do-i", []string{"Get an agent to put something in front of you", `coral-board post --ask "@Operator <question>"`, "Needs you", "for review", "recommendation", "comments on a **for review** file reach the agent that uploaded it when you make them at this computer's dashboard", "a comment made through Coral Hub does not reach it yet", "outside Coral without your OK", "logs, patches, notes and screenshots meant for other agents are not tagged"}},
 		{"artifacts", []string{"a person must look at it, decide, or approve it", "(logs, patches, notes, screenshots for a reviewer) is not tagged for review"}},
 	} {
 		code, out, errOut := runAgentWithToken(t, srv.URL, "docs", tc.topic)
