@@ -14,6 +14,7 @@ const { launch } = await importOnce('./launch_state.js');
 const { _loadServerSettings } = await importOnce('./launch_models.js');
 const { _showCLINotFoundModal } = await importOnce('./cli_dialogs.js');
 const { revealField } = await importOnce('./section_dialog.js');
+const { offerCreateFolder } = await importOnce('./folder_suggestion.js');
 
 function _syncMobileLaunchSections(step) {
     const isMobile = isPhoneLayout();
@@ -142,7 +143,7 @@ export async function _launchOn(server, path, payload, agentType, { dirInput = n
     if (!res.ok) {
         if (agentType && res.error.includes('not found') && res.error.includes('CLI')) _showCLINotFoundModal(agentType, server, { retry }); // retry: the caller's own launch, run when Check again finds the CLI (none: the dialog says to press Launch again)
         else showToast(res.error, true);
-        if (dirInput && res.data && res.data.field === 'working_dir') markFieldInvalid(dirInput, res.error);
+        if (dirInput && res.data && res.data.field === 'working_dir') { markFieldInvalid(dirInput, res.error); if (/^directory not found/i.test(res.error)) offerCreateFolder(dirInput); }
         return null;
     }
     return res.data;

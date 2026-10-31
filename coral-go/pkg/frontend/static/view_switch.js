@@ -5,6 +5,7 @@ import { state } from './state.js';
 import { isCloud, normServer, LOCAL_SERVER } from './server_base.js';
 import { builtScreen, SCREEN_TYPES } from './phone_screens.js';
 import { syncPhoneFab } from './phone_fab.js';
+import { mountTopPhoneBar } from './phone_bar.js';
 
 const VIEW_IDS = [
     "mobile-agent-list",
@@ -75,6 +76,7 @@ export function buildWelcome() {
 }
 
 export function showView(activeId) {
+    mountTopPhoneBar(); // the page's one phone bar (built once; css draws it only on a phone)
     _viewChanges++;
     state.atWelcome = activeId === 'welcome-screen'; // the welcome page is on screen: no agent row is the selected one (session_rows.js, #10035)
     if (activeId === 'welcome-screen') buildWelcome();
@@ -87,7 +89,7 @@ export function showView(activeId) {
     document.body.classList.toggle('live-session-active', activeId === 'live-session-view');
     document.body.classList.toggle('agent-home-active', activeId === 'mobile-agent-list');
     document.body.classList.toggle('team-page-active', activeId === 'team-page-view'); // a phone's team page is a drill-down with its own bar (#11239 slice B): the page's top pill is not drawn
-    const screen = builtScreen(activeId, document.body.getAttribute('data-nav-tab') || ''); // the phone's navigation model (#11236): the screen's declared type says whether the floating nav shows and which of its slots is lit (phone_screens.js)
+    const screen = builtScreen(activeId, document.body.getAttribute('data-nav-tab') || '', document.body.dataset.phonePage || ''); // the phone's navigation model (#11236): the screen's declared type says whether the floating nav shows and which of its slots is lit (phone_screens.js)
     document.body.classList.toggle('phone-nav-on', !!screen && SCREEN_TYPES[screen.type].bottomNav);
     if (screen) document.body.dataset.phoneType = screen.type; else delete document.body.dataset.phoneType;
     document.body.classList.toggle('large-text', parseFloat(getComputedStyle(document.documentElement).fontSize) >= 24); // 150% text and more (the root is 24 px): the nav's count badge is drawn smaller (mobile.css)

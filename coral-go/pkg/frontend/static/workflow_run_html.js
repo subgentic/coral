@@ -32,19 +32,19 @@ function statusIconChar(status) {
 }
 
 /** Why a run failed, as the run page says it: the Jobs pages' words with a capital ("Step 2 (Test) exited with 3"). */
-export function runErrorWords(msg) {
+function runErrorWords(msg) {
     const w = reasonWords({ error_msg: String(msg || '').trim() });
     return w ? w.charAt(0).toUpperCase() + w.slice(1) : '';
 }
 
 /** How a run was started, in words (the server's trigger_type is a code: "ui", "schedule", "api"). */
-export function triggerWords(type) {
+function triggerWords(type) {
     const t = String(type || '').trim();
     return ({ ui: 'Run by you', manual: 'Run by you', schedule: 'On schedule', api: 'Started by an API call', job: 'Run by a job' })[t] || (t ? `Started by ${t}` : 'Started by an API call');
 }
 
 /** The run's elapsed time as words for the meta line: "took 2s" when it has ended, "running 5s" while it goes; '' for a run that has not started. */
-export function runElapsedWords(run) {
+function runElapsedWords(run) {
     if (!run.started_at) return '';
     const end = run.finished_at ? new Date(run.finished_at) : new Date();
     const sec = Math.max(0, Math.round((end - new Date(run.started_at)) / 1000));
@@ -77,7 +77,7 @@ export function runProgressHtml(run, steps) {
 }
 
 /** What a step's output says: an agent step's output is the CLI's result object ({"is_error":false,"result":"..."}), so the person reads its reply text, not the JSON cut at the edge; any other output as it is. */
-export function stepOutputWords(tail) {
+function stepOutputWords(tail) {
     const t = String(tail || '');
     const trimmed = t.trim();
     if (trimmed.startsWith('{') && trimmed.endsWith('}')) {

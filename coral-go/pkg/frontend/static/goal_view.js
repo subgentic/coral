@@ -10,14 +10,17 @@ import { foldWayBack } from './way_back.js';
 import * as W from './goal_words.js';
 import { onGoalsSeq } from './goals_feed.js';
 import { pollEvery } from './overload.js';
+const { linkedText } = await importOnce('./artifact_refs.js');
+const linkedDd = text => { const d = document.createElement('dd'); d.append(linkedText(text)); return d; }; // a coral://artifacts/<hex> in a goal's words is a link (#11416)
 const { openDetailPane, closeDetailPane } = await importOnce('./detail_pane.js'); // the one shared pane (#8914): a goal's task or artifact opens in it, beside the list
 const DT = await importOnce('./data_table.js');
+const { el } = DT;
 const TV = await importOnce('./tasks_view.js');
 const PAGE = 50;
 
 const NOT_YET_KEY = 'coral.goals.notyet';
 /** "Not yet" said to a goal's all-done prompt, per team, goal and task total: it comes back when a task is added or removed. The goal page and the team's Goals row read the same list (#10692). */
-export const goalNotYetKey = (project, g) => `${project}|${g.id}|${W.allTasksOf(g.rollup)}`;
+const goalNotYetKey = (project, g) => `${project}|${g.id}|${W.allTasksOf(g.rollup)}`;
 function notYetList() { try { const v = JSON.parse(browserLocal.get(NOT_YET_KEY) || '[]'); return Array.isArray(v) ? v : []; } catch { return []; } }
 export const goalNotYet = (project, g) => notYetList().includes(goalNotYetKey(project, g));
 
@@ -34,7 +37,6 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
     const drawDetail = drawPage;
     const focusDetail = () => (root.querySelector('.goal-main .goals-back') || root.querySelector('.goals-back') || root.querySelector('#goals-detail-title'))?.focus({ preventScroll: true }); // the keyboard starts at the way back, not at the heading: no ring round plain words (#7404)
     const loadGoals = () => refresh ? refresh() : reload();
-    const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
     const btn = (cls, text, onClick) => { const b = el('button', cls, text); b.type = 'button'; if (onClick) b.addEventListener('click', onClick); return b; };
     const say = text => status?.(text);
 
@@ -91,9 +93,8 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
     const taskTotal = (goal, t) => Math.max(t.rows.length, goal ? goal.rollup.done + goal.rollup.active + goal.rollup.blocked + goal.rollup.queued : 0);
 
     function stateChip(goal) {
-        const chip = el('span', `chip goal-chip goal-state-${goal.state || 'unknown'}`);
-        chip.append(el('span', 'goal-dot'), document.createTextNode(W.stateWord(goal)));
-        return chip;
+        const c = DT.chip(W.stateWord(goal), `goal-state-${goal.state || 'unknown'}`); c.classList.remove('dt-chip');
+        return c;
     }
 
     function rollupBar(rollup) {
@@ -149,8 +150,8 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
         main.append(line);
         if (g.outcome || g.doneWhen) {
             const dl = el('dl', 'facts goals-facts');
-            if (g.outcome) dl.append(el('dt', null, 'Outcome'), el('dd', null, g.outcome));
-            if (g.doneWhen) dl.append(el('dt', null, 'Done when'), el('dd', null, g.doneWhen));
+            if (g.outcome) dl.append(el('dt', null, 'Outcome'), linkedDd(g.outcome));
+            if (g.doneWhen) dl.append(el('dt', null, 'Done when'), linkedDd(g.doneWhen));
             main.append(dl);
         }
         const openLeft = g.rollup.active + g.rollup.blocked + g.rollup.queued;
@@ -373,7 +374,7 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
         const fs = el('fieldset', 'goals-radios'); fs.append(el('legend', null, 'Close it as'));
         const radio = (value, label) => { const l = el('label', 'goals-radio'); const r = el('input'); r.type = 'radio'; r.name = 'goal-close-state'; r.value = value; r.checked = choose === value; l.append(r, el('span', null, label)); return l; };
         fs.append(radio('done', W.closeDoneLabel), radio('dropped', W.closeDroppedLabel));
-        const reason = el('input'); reason.type = 'text'; reason.maxLength = 300; reason.autocomplete = 'off'; reason.id = 'goal-close-reason'; reason.required = true; reason.setAttribute('aria-required', 'true');
+        const reason = el('input'); reason.type = 'text'; reason.maxLength = 300; reason.autocomplete = 'off'; reason.id = 'goal-close-reason';
         const hint = el('span', 'goals-note', W.closeReasonHint); hint.id = 'goal-close-hint'; reason.setAttribute('aria-describedby', hint.id);
         const rl = el('label', 'goals-field'); rl.append(el('span', null, W.closeReasonLabel), reason, hint);
         const err = el('p', 'goals-field-error'); err.setAttribute('role', 'alert'); err.id = 'goal-close-error';
@@ -386,11 +387,11 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
             e.preventDefault();
             err.textContent = '';
             if (!form.querySelector('input[name="goal-close-state"]:checked')) return;
-            if (!reason.value.trim()) { err.textContent = W.closeReasonNeeded; reason.setAttribute('aria-invalid', 'true'); reason.setAttribute('aria-describedby', `${hint.id} ${err.id}`); reason.focus(); return; }
-            reason.removeAttribute('aria-invalid'); reason.setAttribute('aria-describedby', hint.id); go.disabled = true;
+            go.disabled = true;
             const as = form.querySelector('input[name="goal-close-state"]:checked')?.value === 'dropped' ? 'dropped' : 'done';
+            const why = reason.value.trim() || W.closeReasonDefault(as); // the server needs one line; a person is not made to write it
             try {
-                const r = await boardFetch(model.project, `/goals/${g.id}/close`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: OPERATOR_ID, reason: reason.value.trim(), state: as }) });
+                const r = await boardFetch(model.project, `/goals/${g.id}/close`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: OPERATOR_ID, reason: why, state: as }) });
                 if (!r.ok) throw await failure(r);
                 dlg.close();
                 say(W.closedAsText(as, open));

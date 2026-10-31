@@ -27,7 +27,7 @@ const { coralReady } = require('./helpers/wait');
             // create buttons: the verb and the thing, no plus sign
             if (mobile) { // a phone has no New button in a header (#11116): an empty home has a card for each kind, and with agents the + button opens a menu (mobile.css); here the home is empty
                 await waitFor(`[...document.querySelectorAll('#mobile-agent-list .empty-launch strong')].some(e => e.getClientRects().length)`, at + 'the New agent card', 8000);
-                assert.deepEqual(await ev(`[...document.querySelectorAll('#mobile-agent-list .empty-launch strong')].map(e => e.textContent.trim()).slice(0, 2)`), ['New agent', 'New project'], at + 'the create cards are the verb and the thing, no plus sign');
+                assert.deepEqual(await ev(`[...document.querySelectorAll('#mobile-agent-list .empty-launch strong')].map(e => e.textContent.trim()).slice(0, 2)`), ['New agent', 'New team'], at + 'the create cards are the verb and the thing, no plus sign');
             } else {
                 const label = '.sidebar-new-btn-full';
                 await waitFor(`[...document.querySelectorAll(${JSON.stringify(label)})].some(e => e.getClientRects().length)`, at + 'the New agent button', 8000);

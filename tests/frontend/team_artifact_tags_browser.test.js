@@ -63,6 +63,9 @@ const { coralReady } = require('./helpers/wait');
         await waitFor(`[...document.querySelectorAll('#team-panel-artifacts .artifact-tags-row')].some(r => r.textContent === 'for review')`, 'the row chip', 8000);
         await waitFor(`!!document.querySelector('#team-panel-artifacts .team-tb-pills') && /For review 1/.test(document.querySelector('#team-panel-artifacts .team-tb-pills').textContent)`, 'the pill', 8000);
         await shot('artifact-tags-row-and-pill');
+        // The review's state in words in the sheet (Mobile Beta Tester, live: an approved artifact showed only its tag chip): the sheet of the file tagged for review says so, above its tags
+        await ev(`document.querySelector('.detail-head .detail-close, .detail-head [aria-label^="Close"]')?.click(); [...document.querySelectorAll('#team-panel-artifacts [data-artifact-id]')].find(b => b.textContent === 'plan.txt').click(); true`);
+        await waitFor(`document.querySelector('.detail-head .artifact-review-line')?.textContent === 'Waiting for your review'`, 'the review line in the sheet of a file tagged for review', 10000);
         console.log('   ✓');
 
         console.log('4. The pill and the Tag filter narrow the list');
@@ -87,10 +90,16 @@ const { coralReady } = require('./helpers/wait');
         console.log('6. The preview\'s head has the same chips and Add tag');
         await ev(`import((window.__coralStatic || '/static/') + 'preview_pane.js').then(m => m.openArtifactTab('coral://artifacts/${files[0]}', { filename: 'plan.txt', mediaType: 'text/plain', tagging: { project: ${JSON.stringify(B)}, tags: ['for review'], editable: true, offer: () => [], onChange: () => {} } })).then(() => true)`);
         await waitFor(`!!document.querySelector('#preview-toolbar .artifact-tag-add')`, 'Add tag in the preview head', 10000);
+        await new Promise(r => setTimeout(r, 600)); // sleep-ok: the toolbar is drawn again when the file's kind is known; the review line must survive it
+        await waitFor(`document.querySelector('#preview-toolbar .artifact-review-line')?.textContent === 'Waiting for your review'`, 'the preview head says the review state too, after the toolbar was drawn again', 10000);
         assert.equal(await ev(`[...document.querySelectorAll('#preview-toolbar .artifact-tag-list .artifact-tag')].map(t => t.firstChild.textContent).join()`), 'for review');
         await ev(`document.querySelector('#preview-toolbar .artifact-tag-add').click(); [...document.querySelectorAll('#preview-toolbar .artifact-tag-offer')].find(b => b.textContent === 'final').click(); true`);
         await waitFor(`[...document.querySelectorAll('#preview-toolbar .artifact-tag-list .artifact-tag')].some(t => t.textContent.startsWith('final'))`, 'final added from the preview', 8000);
         assert.deepEqual(await tagsOf(files[0]), ['final', 'for review'], 'the server keeps a file\'s tags in alphabetical order');
+        // An approved artifact opened from the Artifacts list says Approved with the time, not only an "approved" chip (Mobile Beta Tester, live; QA's SHOULD)
+        await ev(`import((window.__coralStatic || '/static/') + 'preview_pane.js').then(m => m.openArtifactTab('coral://artifacts/${files[1]}', { filename: 'draft.txt', mediaType: 'text/plain', tagging: { project: ${JSON.stringify(B)}, tags: ['approved'], review: { state: 'approved', at: '2026-10-30T10:42:00Z' }, editable: true, offer: () => [], onChange: () => {} } })).then(() => true)`);
+        await new Promise(r => setTimeout(r, 600)); // sleep-ok: as above
+        await waitFor(`/^Approved .+/.test(document.querySelector('#preview-toolbar .artifact-review-line')?.textContent || '')`, 'Approved with its time in the preview head: ' + JSON.stringify(await ev(`[...document.getElementById('preview-toolbar').children].map(c => c.tagName + '.' + c.className + ':' + c.textContent.slice(0, 40)).join(' | ')`)), 10000);
         await shot('artifact-tags-preview');
         console.log('   ✓');
 
@@ -201,6 +210,28 @@ const { coralReady } = require('./helpers/wait');
         assert.ok(sizes.x >= 44, 'the x inset target: ' + JSON.stringify(sizes));
         await ev(`document.querySelectorAll('.toast').forEach(t => t.remove()); true`);
         await shot('artifact-tags-sheet-box-390');
+        console.log('   ✓');
+
+        console.log('9. An APPROVED file\'s sheet says Approved with the time, above its tags (Mobile Beta Tester, live; QA\'s SHOULD)');
+        await put(files[2], ['for review']);
+        const ok = await api('POST', `/api/board/${B}/artifacts/${files[2]}/review`, { decision: 'approve' });
+        assert.equal(ok.status, 200, JSON.stringify(ok.body));
+        await reload();
+        await sheet('log.txt');
+        await waitFor(`/^Approved .+/.test(document.querySelector('.detail-head .artifact-review-line')?.textContent || '')`, 'Approved with its time in the sheet of the approved file', 10000);
+        assert.deepEqual(await ev(`[...document.querySelectorAll('.detail-head .artifact-tag-list .artifact-tag')].map(t => t.firstChild.textContent)`), ['approved'], 'above its one chip');
+        // the full viewer of that file (the sheet's Open) says it in its head too, and so does the newest of two versions (Mobile Beta Tester: the head of a two-version artifact had no line)
+        const viewerLine = async hex => { await ev(`import((window.__coralStatic || '/static/') + 'artifact_viewer.js').then(m => m.openArtifactViewer('${hex}', { filename: 'log.txt', board: ${JSON.stringify(B)} })); true`); await waitFor(`/^Approved .+/.test(document.querySelector('.artifact-review-state')?.textContent || '')`, 'the viewer head of ' + hex.slice(0, 8) + ' says Approved with its time', 10000); await ev(`document.querySelector('.artifact-viewer-close').click(); true`); };
+        await viewerLine(files[2]);
+        await ev(`[...document.querySelectorAll('.detail-actions button, .detail-pane button')].find(b => b.textContent.trim() === 'Open')?.click(); true`);
+        await waitFor(`/^Approved .+/.test(document.querySelector('.artifact-review-state')?.textContent || '')`, 'the viewer opened by the sheet\'s Open button says Approved with its time', 10000);
+        await ev(`document.querySelector('.artifact-viewer-close').click(); true`);
+        const v1 = await api('POST', `/api/agent/artifacts?session_id=${sid}&tag=for+review`, 'version one of the series ' + Date.now(), { 'X-Artifact-Name': 'spec.md', 'X-Artifact-Media-Type': 'text/markdown' });
+        assert.equal(v1.status, 201, JSON.stringify(v1)); const h1 = /[a-f0-9]{64}/.exec(v1.body.uri)[0];
+        const v2 = await api('POST', `/api/agent/artifacts?session_id=${sid}&tag=for+review`, 'version two of the series ' + Date.now(), { 'X-Artifact-Name': 'spec.md', 'X-Artifact-Media-Type': 'text/markdown', 'X-Artifact-New-Version-Of': 'coral://artifacts/' + h1 });
+        assert.equal(v2.status, 201, JSON.stringify(v2)); const h2 = /[a-f0-9]{64}/.exec(v2.body.uri)[0];
+        assert.equal((await api('POST', `/api/board/${B}/artifacts/${h2}/review`, { decision: 'approve' })).status, 200);
+        await viewerLine(h2);
         console.log('   ✓');
 
         console.log('PASS artifact tags: chips and Add tag in the sheet, row chips, the For review pill and Tag filter, Tag and Untag in the selection bar');

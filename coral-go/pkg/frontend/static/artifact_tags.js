@@ -9,11 +9,22 @@ const { STARTER, MAX_TAGS, MAX_LEN, normalizeTag } = await importOnce('./artifac
 const mk = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 
 /** Replaces the tags of one stored file; resolves to the tags the server kept, rejects with its words. */
-export async function putTags(project, hex, tags) {
+async function putTags(project, hex, tags) {
     const r = await boardFetch(project, `/artifacts/${hex}/tags`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tags }) });
     const d = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(d.error || `Coral said ${r.status}`);
     return Array.isArray(d.tags) ? d.tags : tags;
+}
+
+/** What a file's review says, in words, from its tags and its recorded decision ({state, at}): "Approved Oct 30, 10:42", "Changes requested", "Waiting for your review", "Reviewed"; "" for a file that is not for review (#136584). */
+export function reviewWords(tags, review) {
+    const has = t => Array.isArray(tags) && tags.includes(t);
+    if (has('approved')) {
+        const t = review && review.at ? Date.parse(review.at) : NaN;
+        return Number.isNaN(t) ? 'Approved' : `Approved ${new Date(t).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}`;
+    }
+    if (has('for review')) return has('changes requested') ? 'Changes requested' : 'Waiting for your review';
+    return has('reviewed') ? 'Reviewed' : '';
 }
 
 export function tagChip(tag) { return mk('span', 'chip artifact-tag', tag); }

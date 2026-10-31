@@ -57,15 +57,17 @@ const { coralReady } = require('./helpers/wait');
                 await waitFor(`document.activeElement && document.activeElement.tagName === 'H1' && document.activeElement.textContent !== ${JSON.stringify(h)}`, `${at}: after a doc link the new heading has the focus`, 8000);
             }
         }
-        console.log('Home (a phone has no welcome screen: a desktop does): Mobile QR code');
+        console.log('Home links are links, and the Mobile QR code is a real button in Settings (it left Home, #11414)');
         await open(1280, false, '');
         await ev(`document.querySelector('[data-on-click="m-go-home"]').click(); true`);
-        await waitFor(`!!document.querySelector('.welcome-links button[data-on-click="m-mobile-connect-open"]')`, 'Home\'s links', 8000);
+        await waitFor(`!!document.querySelector('.welcome-links a[href]')`, 'Home\'s links', 8000);
         assert.equal(await ev(`document.querySelectorAll('.welcome-links a[role="button"]').length`), 0, 'no link is posing as a button');
-        await ev(`document.querySelector('.welcome-links button[data-on-click="m-mobile-connect-open"]').focus(); true`);
+        await ev(`window.showSettingsModal('security'); true`);
+        await waitFor(`(() => { const b = document.querySelector('#settings-modal button[title="Show QR code for mobile connection"]'); return !!b && b.getClientRects().length > 0; })()`, 'Settings\' Mobile QR button', 10000);
+        await ev(`document.querySelector('#settings-modal button[title="Show QR code for mobile connection"]').focus(); true`);
         await key(' ', 'Space', 32);
         await waitFor(`(() => { const m = document.getElementById('mobile-connect-modal'); return !!m && getComputedStyle(m).display !== 'none'; })()`, 'the QR dialog opened by Space', 4000);
-        await ev(`window._hideMobileConnectModal && window._hideMobileConnectModal(); true`);
+        await ev(`window._hideMobileConnectModal && window._hideMobileConnectModal(); window.hideSettingsModal && window.hideSettingsModal(); true`);
         console.log('the Remote access switch on a phone');
         for (const zoom of ['', '200%']) {
             await open(390, true, zoom);

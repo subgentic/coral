@@ -13,6 +13,21 @@ import (
 
 const taskNotice = "[Task #4300 completed by QA Engineer] Outcome: success. Live smoke of the local-auth chain: all 4 cases pass."
 
+// forgetDelivered empties what Coral remembers of names' delivered texts, now and when the test ends: the memory is process-wide, so a test run again (-count=3) would otherwise find what its
+// earlier run left.
+func forgetDelivered(t *testing.T, names ...string) {
+	t.Helper()
+	forget := func() {
+		delivered.Lock()
+		defer delivered.Unlock()
+		for _, n := range names {
+			delete(delivered.rings, n)
+		}
+	}
+	forget()
+	t.Cleanup(forget)
+}
+
 // turns flags a list of user turn texts the way the chat reader does, with no timestamps.
 func turns(name string, texts ...string) []bool {
 	return FlagDelivered(texts, make([]time.Time, len(texts)), name)
@@ -22,6 +37,7 @@ func turns(name string, texts ...string) []bool {
 // the whitespace may differ; what the operator typed is not recognised (#4306).
 func TestDeliveredTextIsMatchedAsTheTranscriptRecordsIt(t *testing.T) {
 	name := "claude-delivered-match"
+	forgetDelivered(t, name)
 	noteDeliveredText(name+".0", taskNotice) // a pane target names the session
 
 	assert.Equal(t, []bool{true}, turns(name, taskNotice))
@@ -35,6 +51,7 @@ func TestDeliveredTextIsMatchedAsTheTranscriptRecordsIt(t *testing.T) {
 // The whole text must match: a slash command in front is part of the text, so "/status check the queue" is not "check the queue" (#4306 follow-up).
 func TestDeliveredTextMatchesTheWholeText(t *testing.T) {
 	name := "claude-delivered-whole"
+	forgetDelivered(t, name)
 	body := "check the queue and report every task that is waiting for a reviewer"
 	noteDeliveredText(name, body)
 	assert.Equal(t, []bool{false}, turns(name, "/status "+body), "a slash command makes it a different text")
@@ -45,6 +62,7 @@ func TestDeliveredTextMatchesTheWholeText(t *testing.T) {
 // A short delivered text ("continue") is never recorded or matched: the operator's identical message stays theirs.
 func TestShortDeliveredTextsAreNeverMatched(t *testing.T) {
 	name := "claude-delivered-short"
+	forgetDelivered(t, name)
 	noteDeliveredText(name, "continue")
 	noteDeliveredText(name, strings.Repeat("x", minDeliveredLen-1))
 	assert.False(t, HasDeliveredTexts(name), "nothing under the floor is recorded")
@@ -57,6 +75,7 @@ func TestShortDeliveredTextsAreNeverMatched(t *testing.T) {
 // Each delivery flags at most one turn: an operator who repeats a long text they saw keeps their turn (#4306 follow-up).
 func TestEachDeliveryFlagsOneTurn(t *testing.T) {
 	name := "claude-delivered-countdown"
+	forgetDelivered(t, name)
 	noteDeliveredText(name, taskNotice)
 	assert.Equal(t, []bool{true, false, false}, turns(name, taskNotice, taskNotice, taskNotice), "one delivery, three identical turns: the first only")
 	noteDeliveredText(name, taskNotice)
@@ -75,6 +94,7 @@ func TestOnlyDeliveredSendsAreRecorded(t *testing.T) {
 	ctx := context.Background()
 	a := &fakeAgent{screen: permissionMenu}
 	name := "claude-delivered-gate"
+	forgetDelivered(t, name)
 	d, err := DeliverAutomated(ctx, a.input(name, taskNotice, false))
 	require.NoError(t, err)
 	require.Equal(t, Skipped, d)
@@ -92,6 +112,7 @@ func TestOnlyDeliveredSendsAreRecorded(t *testing.T) {
 // Memory stays bounded: a session remembers its last deliveredTextsPerSession texts, and the number of sessions is capped.
 func TestDeliveredTextsAreBounded(t *testing.T) {
 	name := "claude-delivered-ring"
+	forgetDelivered(t, name)
 	text := func(i int) string { return fmt.Sprintf("a notice that is long enough to be recorded, number %d", i) }
 	for i := 0; i < deliveredTextsPerSession+10; i++ {
 		noteDeliveredText(name, text(i))
@@ -112,6 +133,7 @@ func TestDeliveredTextsAreBounded(t *testing.T) {
 // the same as when every turn is hashed, and an unstamped turn is still checked (#4306 follow-up, Frontend's cost review).
 func TestOldTurnsAreNotHashed(t *testing.T) {
 	name := "claude-delivered-cutoff"
+	forgetDelivered(t, name)
 	now := time.Now()
 	notice := "[Task #4300 completed by QA Engineer] Outcome: success, the cutoff test notice."
 	noteDeliveredText(name, notice)

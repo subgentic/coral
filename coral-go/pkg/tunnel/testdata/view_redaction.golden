@@ -4,10 +4,13 @@ GET /api/agent/ui/{uiid}/content redact
 GET /api/agent/ui/{uiid}/events redact
 GET /api/artifacts redact
 GET /api/artifacts/resolve redact
+GET /api/artifacts/series/{series} redact
+GET /api/artifacts/series/{series}/versions redact
 GET /api/artifacts/{hex64} exempt: byte-exact download: the id is the SHA-256 of the bytes, so any change breaks the link and its check
 GET /api/artifacts/{hex64}/comments redact
 GET /api/artifacts/{hex64}/meta redact
 GET /api/artifacts/{hex64}/readers redact
+GET /api/artifacts/{hex64}/versions redact
 GET /api/board/projects redact
 GET /api/board/tasks redact
 GET /api/board/{project} redact
@@ -19,6 +22,7 @@ GET /api/board/{project}/messages redact
 GET /api/board/{project}/messages/all redact
 GET /api/board/{project}/messages/search redact
 GET /api/board/{project}/paused redact
+GET /api/board/{project}/proposals redact
 GET /api/board/{project}/settings redact
 GET /api/board/{project}/status redact
 GET /api/board/{project}/subscribers redact
@@ -38,6 +42,7 @@ GET /api/goals redact
 GET /api/goals/metrics redact
 GET /api/health exempt: fixed fields (status, version): no free text
 GET /api/pinned-folders redact
+GET /api/proposals redact
 GET /api/saved redact
 GET /api/saved/{id}/message redact
 GET /api/scheduled/jobs redact

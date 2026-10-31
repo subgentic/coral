@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/subgentic/coral/pkg/hubowner"
 	"github.com/subgentic/coral/pkg/secretbox"
 )
 
@@ -32,6 +33,8 @@ var (
 	ErrRemoteNotFound = errors.New("remote server not found")
 	// ErrRemoteExists is returned when adding a duplicate id.
 	ErrRemoteExists = errors.New("remote server already exists")
+	// ErrRemoteTransport is an edit that does not fit how the server is reached (a URL for a server reached over SSH).
+	ErrRemoteTransport = errors.New("this server is reached over SSH and has no URL")
 	// ErrKeyUnreadable wraps any failure to obtain or use the master key or to
 	// decrypt a stored key. Callers map it to status key_unreadable.
 	ErrKeyUnreadable = errors.New("stored remote key is unreadable")
@@ -43,7 +46,8 @@ var (
 
 // ValidateRemoteID checks the slug rules.
 func ValidateRemoteID(id string) error {
-	if id == LocalServerID || !remoteIDRe.MatchString(id) {
+	if id == LocalServerID || id == "provision" || !remoteIDRe.MatchString(id) { // "provision" is the path of the setup routes under /api/servers
+
 		return ErrInvalidRemoteID
 	}
 	return nil
@@ -63,7 +67,20 @@ type RemoteServer struct {
 	// KeyRenewSince is when Coral made its data folder private while this server's key was stored in it (UTC); nil when it never was,
 	// or a different key has been entered since. Settings > Servers shows it until then.
 	KeyRenewSince *string `json:"key_renew_since,omitempty" db:"key_renew_since"`
+	// Transport is "http" (reached by its URL) or "ssh" (reached over the owner's SSH session, #11370). The three after it are set only for ssh and never leave the hub in JSON but the target.
+	Transport  string `json:"transport" db:"transport"`
+	SSHTarget  string `json:"ssh_target,omitempty" db:"ssh_target"`
+	RemotePort int    `json:"-" db:"remote_port"`
+	InstanceID string `json:"-" db:"instance_id"`
+	// OwnerStamp is whether this hub holds a secret to sign owner stamps for this server with (#11378). Whether the remote has installed its half is the live health answer's: hub_owner_stamp.
+	OwnerStamp bool `json:"owner_stamp" db:"owner_stamp"`
 }
+
+// The transports of a registered server.
+const (
+	RemoteTransportHTTP = "http"
+	RemoteTransportSSH  = "ssh"
+)
 
 // RemoteServerStore manages the remote_servers table. API keys are encrypted
 // with a master key that lives outside the database (see internal/secretbox).
@@ -157,6 +174,60 @@ func (s *RemoteServerStore) Add(ctx context.Context, id, label, url, apiKey stri
 	return s.Get(ctx, id)
 }
 
+// AddSSH registers a server the provisioner set up and reaches over SSH (#11370). It is the ONLY way a row gets the ssh transport. The id must be new: an existing id is ErrRemoteExists and nothing
+// of it is touched, and a remote whose instance id is already registered under another id is ErrRemoteInstanceExists (the same machine is not added twice, and a re-run never replaces a key).
+func (s *RemoteServerStore) AddSSH(ctx context.Context, id, label, sshTarget string, remotePort int, instanceID, apiKey string) (*RemoteServer, error) {
+	if err := ValidateRemoteID(id); err != nil {
+		return nil, err
+	}
+	if instanceID == "" || remotePort < 1 || remotePort > 65535 || sshTarget == "" || apiKey == "" {
+		return nil, errors.New("an SSH server needs a target, a port, an instance id and a key")
+	}
+	if other, err := s.FindByInstance(ctx, instanceID); err != nil {
+		return nil, err
+	} else if other != "" {
+		return nil, ErrRemoteInstanceExists
+	}
+	box, err := s.getBox(ctx, true, false)
+	if err != nil {
+		return nil, err
+	}
+	env, err := box.Seal(id, []byte(apiKey))
+	if err != nil {
+		return nil, err
+	}
+	_, err = s.db.ExecContext(ctx,
+		`INSERT INTO remote_servers (id, label, url, api_key, allow_private, status, created_at, transport, ssh_target, remote_port, instance_id)
+		 VALUES (?, ?, ?, ?, 0, ?, ?, 'ssh', ?, ?, ?)`,
+		id, label, "ssh://"+sshTarget, env, RemoteStatusUnknown, nowUTC(), sshTarget, remotePort, instanceID)
+	if err != nil {
+		if strings.Contains(err.Error(), "remote_servers.instance_id") {
+			return nil, ErrRemoteInstanceExists // a second AddSSH for the same machine that passed the check at the same time
+		}
+		if strings.Contains(err.Error(), "UNIQUE") || strings.Contains(err.Error(), "PRIMARY KEY") {
+			return nil, ErrRemoteExists
+		}
+		return nil, err
+	}
+	return s.Get(ctx, id)
+}
+
+// ErrRemoteInstanceExists is a remote machine that is already registered (by its instance id) under another id.
+var ErrRemoteInstanceExists = errors.New("this remote Coral is already registered")
+
+// FindByInstance returns the id of the server registered with this instance id, or "".
+func (s *RemoteServerStore) FindByInstance(ctx context.Context, instanceID string) (string, error) {
+	if instanceID == "" {
+		return "", nil
+	}
+	var id string
+	err := s.db.GetContext(ctx, &id, "SELECT id FROM remote_servers WHERE instance_id = ?", instanceID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil
+	}
+	return id, err
+}
+
 // RemoteServerUpdate holds optional edits; nil fields are left unchanged.
 // APIKey is write-only: setting it re-encrypts it, which also recovers a
 // server whose stored key was unreadable.
@@ -178,6 +249,13 @@ func (s *RemoteServerStore) Update(ctx context.Context, id string, u RemoteServe
 		}
 	}
 	if u.URL != nil {
+		cur, err := s.Get(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		if cur.Transport != RemoteTransportHTTP {
+			return nil, ErrRemoteTransport // a server reached over SSH has no URL to edit: it would turn into a direct one
+		}
 		if _, err := s.db.ExecContext(ctx, "UPDATE remote_servers SET url = ?, status = ?, last_error = NULL WHERE id = ?",
 			strings.TrimRight(*u.URL, "/"), RemoteStatusUnknown, id); err != nil {
 			return nil, err
@@ -239,7 +317,7 @@ func (s *RemoteServerStore) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
-const remoteCols = "id, label, url, allow_private, status, created_at, last_seen, last_error, key_renew_since"
+const remoteCols = "id, label, url, allow_private, status, created_at, last_seen, last_error, key_renew_since, transport, ssh_target, remote_port, instance_id, (owner_secret != '') AS owner_stamp"
 
 // Get returns one server (without its key). Status is key_unreadable when the
 // stored key cannot be decrypted.
@@ -274,6 +352,55 @@ func (s *RemoteServerStore) List(ctx context.Context) ([]RemoteServer, error) {
 		}
 	}
 	return out, nil
+}
+
+// ownerSuffix ends the envelope AAD of a server's owner secret, so it is never the API key's (the id alone) and the two cannot be swapped.
+const ownerSuffix = "#owner-stamp"
+
+func ownerAAD(id string) string { return id + ownerSuffix }
+
+// SetOwnerSecret stores the secret this hub signs the server's owner stamps with (#11378), sealed like the API key. secret is 64 lower-case hex digits (hubowner.NewSecret).
+func (s *RemoteServerStore) SetOwnerSecret(ctx context.Context, id, secret string) error {
+	if !hubowner.ValidSecret(secret) {
+		return errors.New("not a valid owner stamp secret")
+	}
+	if _, err := s.Get(ctx, id); err != nil {
+		return err
+	}
+	box, err := s.getBox(ctx, true, false)
+	if err != nil {
+		return err
+	}
+	env, err := box.Seal(ownerAAD(id), []byte(secret))
+	if err != nil {
+		return err
+	}
+	_, err = s.db.ExecContext(ctx, "UPDATE remote_servers SET owner_secret = ? WHERE id = ?", env, id)
+	return err
+}
+
+// OwnerSecret returns the server's owner stamp secret, for signing only: into a local variable, never stored on a struct, logged or put in an error. ok is false when there is none.
+func (s *RemoteServerStore) OwnerSecret(ctx context.Context, id string) (secret string, ok bool, err error) {
+	var env string
+	if err := s.db.GetContext(ctx, &env, "SELECT owner_secret FROM remote_servers WHERE id = ?", id); errors.Is(err, sql.ErrNoRows) {
+		return "", false, ErrRemoteNotFound
+	} else if err != nil {
+		return "", false, err
+	}
+	if env == "" {
+		return "", false, nil
+	}
+	box, err := s.getBox(ctx, false, false)
+	if err != nil {
+		return "", false, err
+	}
+	pt, err := box.Open(ownerAAD(id), env)
+	if err != nil {
+		return "", false, unreadable(err)
+	}
+	secret = string(pt)
+	secretbox.Zero(pt)
+	return secret, true, nil
 }
 
 // DecryptedKey returns the remote's API key. It is for dialing only: use it
@@ -321,6 +448,16 @@ func (s *RemoteServerStore) SetStatus(ctx context.Context, id, status, errMsg st
 	return err
 }
 
+// rotateUpdate and rotateID map a re-encrypted row back to its column and its server: an AAD that ends in the owner marker is an owner secret, any other an API key.
+func rotateUpdate(aad string) string {
+	if strings.HasSuffix(aad, ownerSuffix) {
+		return "UPDATE remote_servers SET owner_secret = ? WHERE id = ?"
+	}
+	return "UPDATE remote_servers SET api_key = ? WHERE id = ?"
+}
+
+func rotateID(aad string) string { return strings.TrimSuffix(aad, ownerSuffix) }
+
 // RotateMasterKey generates a new master key and re-encrypts every row in one
 // transaction. On any failure the old key file and rows remain valid. Not
 // supported when the key comes from CORAL_SECRET_KEY.
@@ -350,15 +487,19 @@ func (s *RemoteServerStore) RotateMasterKey(ctx context.Context) error {
 	defer tx.Rollback()
 
 	var rows []struct {
-		ID     string `db:"id"`
-		APIKey string `db:"api_key"`
+		ID          string `db:"id"`
+		APIKey      string `db:"api_key"`
+		OwnerSecret string `db:"owner_secret"`
 	}
-	if err := tx.SelectContext(ctx, &rows, "SELECT id, api_key FROM remote_servers"); err != nil {
+	if err := tx.SelectContext(ctx, &rows, "SELECT id, api_key, owner_secret FROM remote_servers"); err != nil {
 		return err
 	}
-	in := make([]secretbox.Row, len(rows))
-	for i, r := range rows {
-		in[i] = secretbox.Row{AAD: r.ID, Envelope: r.APIKey}
+	in := make([]secretbox.Row, 0, 2*len(rows))
+	for _, r := range rows {
+		in = append(in, secretbox.Row{AAD: r.ID, Envelope: r.APIKey})
+		if r.OwnerSecret != "" { // the owner stamp secret (#11378) is under the same master key and moves with it
+			in = append(in, secretbox.Row{AAD: ownerAAD(r.ID), Envelope: r.OwnerSecret})
+		}
 	}
 	out, err := secretbox.Reencrypt(old, next, in)
 	if err != nil {
@@ -368,7 +509,7 @@ func (s *RemoteServerStore) RotateMasterKey(ctx context.Context) error {
 		if s.rotateFailAfter > 0 && i >= s.rotateFailAfter {
 			return errors.New("simulated rotation failure")
 		}
-		if _, err := tx.ExecContext(ctx, "UPDATE remote_servers SET api_key = ? WHERE id = ?", r.Envelope, r.AAD); err != nil {
+		if _, err := tx.ExecContext(ctx, rotateUpdate(r.AAD), r.Envelope, rotateID(r.AAD)); err != nil {
 			return err
 		}
 	}
@@ -384,7 +525,7 @@ func (s *RemoteServerStore) RotateMasterKey(ctx context.Context) error {
 		if rerr == nil {
 			if tx2, terr := s.db.BeginTxx(ctx, nil); terr == nil {
 				for _, r := range back {
-					tx2.ExecContext(ctx, "UPDATE remote_servers SET api_key = ? WHERE id = ?", r.Envelope, r.AAD)
+					tx2.ExecContext(ctx, rotateUpdate(r.AAD), r.Envelope, rotateID(r.AAD))
 				}
 				tx2.Commit()
 			}

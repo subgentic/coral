@@ -13,6 +13,7 @@ import { state } from './state.js';
 import { sessionServer } from './server_base.js';
 import { needsYou } from './asked_before_restart.js';
 import { showToast } from './utils.js';
+import { HUB_FEATURES_OFF } from './server_status.js';
 import { mountSettingsView } from './settings_view.js'; // the add and edit form (a startup module)
 import {
     statusMeta, escHtml, describeServerError, formatLastSeen, isValidServerId,
@@ -32,6 +33,8 @@ let _loadError = '';
 let _formError = '';
 let _draft = null;        // non-secret field values kept across a failed submit
 let _host = null;         // the Servers tab body (#3070); there is no separate dialog
+let _ssh = null;          // the set-up-over-SSH flow (#11370) while it is open: { mode: 'setup' } or { mode: 'manage', server, action, deleteData }; its own module draws into #servers-ssh-host
+let _sshView = null;      // what that module returned ({ unmount })
 
 let load;
 export const serverView = {
@@ -40,16 +43,16 @@ export const serverView = {
         if (_host !== el) el.addEventListener('click', onClick);
         _host = el;
         DT ||= await importOnce('./data_table.js'); _dt ||= DT.tableState();
-        _editing = null; _draft = null; _confirmDelete = null; _formError = ''; _loadError = ''; _open = null;
+        _editing = null; _draft = null; _confirmDelete = null; _formError = ''; _loadError = ''; _open = null; closeSsh();
     },
     leave() {
-        _editing = null; _open = null;
+        _editing = null; _open = null; closeSsh();
         const title = document.getElementById('servers-tab-title'); if (title) title.hidden = false;
         const v = document.getElementById('servers-view'); if (v) v.classList.remove('servers-view-page');
     },
-    canRefresh: () => _editing === null && !_busy.size,
+    canRefresh: () => _editing === null && !_ssh && !_busy.size,
     accept: rows => { _servers = rows; _loadError = ''; },
-    fail: error => { _loadError = error; },
+    fail: error => { _loadError = error === HUB_FEATURES_OFF ? '' : error; }, // a Coral that is not a hub has no list of remote computers (404): that is not an error to show a new person, the page says "No remote computers yet" (#11400)
     render,
 };
 
@@ -182,10 +185,14 @@ function pageHtml(s) {
            <button type="button" class="btn btn-danger" data-action="delete-confirm" data-id="${escHtml(s.id)}">Confirm remove</button>`
         : `<button type="button" class="btn" data-action="test" data-id="${escHtml(s.id)}"${busy ? ' disabled aria-busy="true"' : ''}>${busy ? 'Testing...' : 'Test'}</button>
            <button type="button" class="btn" data-action="edit" data-id="${escHtml(s.id)}"${busy ? ' disabled' : ''}>Edit</button>
+           ${s.transport === 'ssh' ? `<button type="button" class="btn" data-action="ssh-upgrade" data-id="${escHtml(s.id)}"${busy ? ' disabled' : ''}>Upgrade</button>
+           <button type="button" class="btn" data-action="ssh-stop" data-id="${escHtml(s.id)}"${busy ? ' disabled' : ''}>Stop Coral</button>
+           <button type="button" class="btn btn-danger" data-action="ssh-remove" data-id="${escHtml(s.id)}"${busy ? ' disabled' : ''}>Uninstall</button>` : ''}
+           ${s.transport !== 'ssh' ? `<button type="button" class="btn" data-action="owner-secret" data-id="${escHtml(s.id)}"${busy ? ' disabled' : ''}>${s.owner_stamp ? 'Change the Approve secret' : 'Approve through this hub'}</button>` : ''}
            <button type="button" class="btn btn-danger servers-remove" data-action="delete" data-id="${escHtml(s.id)}"${busy ? ' disabled' : ''}>Remove</button>`;
     return `<section class="servers-page" id="server-row-${escHtml(s.id)}" tabindex="-1" data-id="${escHtml(s.id)}" aria-labelledby="servers-page-name">
-        <button type="button" class="back-link" id="servers-back" data-action="back">&larr; Computers</button>
-        <h3 class="servers-page-name" id="servers-page-name">${escHtml(s.label || s.id)} <span class="servers-id">${escHtml(s.id)}</span>${s.allow_private ? ' <span class="chip chip-tag servers-tag" title="Private network addresses are allowed for this computer">private network</span>' : ''}</h3>
+        <div class="phone-title-row"><button type="button" class="back-link" id="servers-back" data-action="back"><span>&larr; Computers</span></button>
+        <h3 class="servers-page-name" id="servers-page-name">${escHtml(s.label || s.id)} <span class="servers-id">${escHtml(s.id)}</span>${s.allow_private ? ' <span class="chip chip-tag servers-tag" title="Private network addresses are allowed for this computer">private network</span>' : ''}</h3></div>
         <p class="item-meta">${statusPill(status)}</p>
         <dl class="facts servers-facts">
             ${factHtml('URL', escHtml(s.url || ''))}
@@ -236,9 +243,32 @@ function mountServerForm(host) {
     _formView.focus(_urlError ? 'url' : adding ? 'id' : 'label');
 }
 
+function closeSsh() {
+    if (_sshView) { try { _sshView.unmount(); } catch { /* already gone */ } }
+    _sshView = null; _ssh = null;
+}
+
+/** Draw the SSH flow into its slot. Its module keeps its own state, so a redraw of the list while it is open does nothing (render() returns early). */
+async function mountSsh() {
+    const slot = _host && _host.querySelector('#servers-ssh-host');
+    if (!slot || !_ssh) return;
+    if (_ssh.mode === 'owner-secret') { // Approve through this hub for a computer added by URL (#11378): its own small panel
+        const { mountOwnerSecret } = await importOnce('./server_owner_secret.js', 'the owner secret panel');
+        if (!_ssh || !slot.isConnected) return;
+        const s = _ssh.server;
+        _sshView = mountOwnerSecret(slot, { id: s.id, label: s.label || s.id, onClose: () => { closeSsh(); _focusNext = 'row'; render(); load && load(); }, onChanged: () => { load && load(); } });
+        return;
+    }
+    const { mountSshSetup } = await importOnce('./server_ssh_setup.js', 'the SSH setup');
+    if (!_ssh || !slot.isConnected) return;
+    const flow = _ssh;
+    _sshView = mountSshSetup(slot, { ...flow, onClose: () => { closeSsh(); _focusNext = 'row'; render(); load && load(); }, onChanged: () => { load && load(); } });
+}
+
 function render() {
     const m = _host;
     if (!m) return;
+    if (_ssh && m.querySelector('#servers-ssh-host')) return; // the flow is open and owns its slot
     const allRemotes = _servers.filter(s => !(s.local || s.id === 'local'));
     syncServersBar(allRemotes, 'server', render); // the search box, from six servers up
     const remotes = allRemotes.filter(serverVisible);
@@ -251,16 +281,22 @@ function render() {
     // A long list pushes "Add server" screens below the fold: with many machines it sits above the list, beside how many answer.
     const many = allRemotes.length > 5;
     const online = allRemotes.filter(s => s.status === 'online').length;
-    const topBar = `<div class="servers-top"><span class="servers-summary">${allRemotes.length} computers, ${online} online${online < allRemotes.length ? `, ${allRemotes.length - online} not` : ''}</span><button type="button" class="btn btn-primary" data-action="add">Add computer</button></div>`;
+    const topBar = `<div class="servers-top"><span class="servers-summary">${allRemotes.length} computers, ${online} online${online < allRemotes.length ? `, ${allRemotes.length - online} not` : ''}</span><button type="button" class="btn" data-action="ssh-setup">Set up over SSH</button><button type="button" class="btn btn-primary" data-action="add">Add computer</button></div>`;
+    if (_ssh) {
+        m.innerHTML = `<button type="button" class="back-link" data-action="ssh-back">&larr; Computers</button><div id="servers-ssh-host"></div>`;
+        const t = document.getElementById('servers-tab-title'); if (t) t.hidden = true;
+        mountSsh();
+        return;
+    }
     const restoreFocus = rememberFocus(m); // a control the redraw replaced (Add server, Test, Edit) gets focus back (#4882)
     const table = '<div id="servers-table-slot"></div>'; // the data_table goes in once the markup is set
-    const back = '<button type="button" class="back-link" id="servers-back" data-action="back">&larr; Computers</button>';
+    const back = '<div class="phone-title-row"><button type="button" class="back-link" id="servers-back" data-action="back"><span>&larr; Computers</span></button></div>';
     const body = _open && page
         ? (_editing === _open ? `<section class="servers-page" id="server-row-${escHtml(_open)}" tabindex="-1" data-id="${escHtml(_open)}">${back}${formHtml()}</section>` : pageHtml(page))
         : `${many && _editing === null ? topBar : ''}
             ${table}
             ${!remotes.length && !_loadError ? `<p class="empty-state empty-state-tight">${serversFiltered() ? 'No computers match this search.' : 'No remote computers yet.'}</p>` : ''}
-            ${_editing !== null ? formHtml() : many ? '' : '<div class="servers-form-actions"><button type="button" class="btn btn-primary" data-action="add">Add computer</button></div>'}`;
+            ${_editing !== null ? formHtml() : many ? '' : '<div class="servers-form-actions"><button type="button" class="btn" data-action="ssh-setup">Set up over SSH</button><button type="button" class="btn btn-primary" data-action="add">Add computer</button></div>'}`;
     m.innerHTML = `${_open && page ? '' : '<div class="servers-intro"><p class="servers-intro-line">Computers whose agents and teams appear in this hub.</p><details class="servers-intro-more"><summary>About API keys</summary><p>The hub stores each computer\'s API key (encrypted); a key grants full control of that computer.</p></details></div>'}
             ${_loadError ? `<div class="servers-form-error" role="alert">${escHtml(_loadError)}</div>` : ''}
             ${body}`;
@@ -269,7 +305,7 @@ function render() {
     if (slot) slot.replaceWith(serversTable(local, remotes));
     const title = document.getElementById('servers-tab-title');
     if (title) title.hidden = !!(_open && page); // a server's page has its back link, "← Servers", for the title
-    const view = document.getElementById('servers-view'); if (view) view.classList.toggle('servers-view-page', !!(_open && page)); // a class, not a :has() rule: the view fills its height when a page is open
+    const view = document.getElementById('servers-view'); if (view) view.classList.toggle('servers-view-page', !!(_open && page)); if (view) view.toggleAttribute('data-phone-item', !!(_open && page)); /* a computer's page is a drill-down on a phone: its own bar, no nav (#11239 slice D) */ // a class, not a :has() rule: the view fills its height when a page is open
     restoreFocus();
     if (keep) {
         const r = document.getElementById(keep.row);
@@ -291,6 +327,20 @@ async function onClick(e) {
     if (!btn) return;
     const action = btn.dataset.action;
     const id = btn.dataset.id;
+    if (action === 'owner-secret') {
+        const s = _servers.find(x => x.id === id);
+        if (!s) return;
+        _ssh = { mode: 'owner-secret', server: { id: s.id, label: s.label } };
+        return render();
+    }
+    if (action === 'ssh-setup') { _ssh = { mode: 'setup' }; return render(); }
+    if (action === 'ssh-back') { closeSsh(); _focusNext = 'row'; return render(); }
+    if (action === 'ssh-upgrade' || action === 'ssh-stop' || action === 'ssh-remove') {
+        const s = _servers.find(x => x.id === id);
+        if (!s) return;
+        _ssh = { mode: 'manage', server: { id: s.id, label: s.label }, action: action.slice(4) };
+        return render();
+    }
     if (action === 'open') { _open = id; _confirmDelete = null; _focusNext = 'back'; return render(); }
     if (action === 'back') { const was = _open; _open = null; _editing = null; _confirmDelete = null; _formError = ''; _urlError = ''; _draft = null; _focusNext = was || 'row'; return render(); }
     if (action === 'add') { _editing = ''; _formError = ''; _urlError = ''; _draft = null; return render(); }

@@ -86,6 +86,10 @@ func TestTheOwnerTableAgreesWithTheHandWrittenListItReplaced(t *testing.T) {
 			if m == http.MethodPost && p == "/api/hub-auto-accept" {
 				continue
 			}
+			// The owner's Dismiss of an agent's stale wait (#11352) is new: the old list never had it.
+			if m == http.MethodPost && strings.HasPrefix(p, "/api/sessions/live/") && strings.HasSuffix(p, "/dismiss-wait") {
+				continue
+			}
 			// The owner's read of one team's cross-team state (#5636) is new: the old list never had it.
 			if m == http.MethodGet && strings.HasSuffix(p, "/cross-team/settings") {
 				continue
@@ -106,8 +110,28 @@ func TestTheOwnerTableAgreesWithTheHandWrittenListItReplaced(t *testing.T) {
 			if p == "/api/saved" || strings.HasPrefix(p, "/api/saved/") && (m == http.MethodGet && strings.HasSuffix(p, "/message") || m == http.MethodPatch || m == http.MethodDelete) {
 				continue // every saved-for-later route (#5763): the list, the whole message, and the changes
 			}
+			// What agents asked to add to a team, and the Operator's decision on it (#11389), are the owner's alone through the hub: the old list never had them.
+			if strings.HasPrefix(p, "/api/board/") && strings.Contains(p, "/proposals") || p == "/api/proposals" {
+				continue
+			}
 			// The activity counts of the Analytics tabs (#11225) are the owner's alone through the hub: the old list never had them.
 			if m == http.MethodGet && p == "/api/analytics/activity" {
+				continue
+			}
+			// The owner's version list and series reads, comment edit, delete and lock, and the change-request send are the owner's alone through the hub (#11354): the old list never had them.
+			if strings.HasPrefix(p, "/api/artifacts/") && (strings.HasSuffix(p, "/versions") || strings.Contains(p, "/artifacts/series/") || strings.Contains(p, "/comments/")) {
+				continue
+			}
+			// Approving a for-review artifact, or asking changes of it, is the owner's alone through the hub (#136584, #11354): the old list never had it.
+			if m == http.MethodPost && strings.HasPrefix(p, "/api/board/") && strings.HasSuffix(p, "/review") && strings.Contains(p, "/artifacts/") {
+				continue
+			}
+			// Sharing a file with an agent as the Operator (#11376) is the owner's alone through the hub: the old list never had it.
+			if m == http.MethodPost && strings.HasPrefix(p, "/api/board/") && (strings.HasSuffix(p, "/operator-artifacts") || strings.HasSuffix(p, "/operator-artifacts/message")) {
+				continue
+			}
+			// Pausing and resuming Coral's notices to an agent (#11387) are the owner's alone: the old list never had them.
+			if m == http.MethodPost && strings.HasPrefix(p, "/api/sessions/live/") && (strings.HasSuffix(p, "/notices/pause") || strings.HasSuffix(p, "/notices/resume")) {
 				continue
 			}
 			// The owner's comment writes (a comment or reply, a resolve, a reopen) are new (#7052): the old list never had them.

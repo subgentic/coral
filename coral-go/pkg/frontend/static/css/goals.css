@@ -12,13 +12,16 @@
 
 .goal-card-meta { color: var(--text-secondary); font-size: var(--fs-md); overflow-wrap: anywhere; }
 
-.goal-chip { --goal-hue: var(--text-muted); border: 1px solid var(--goal-hue); white-space: nowrap; color: var(--text-primary); }
+/* A state is a coloured dot and its word in the same colour at normal weight: no outline, no fill (the operator, #11356). One component for every list (data_table.js chip()); each state has its own colour,
+ * the text one of the theme's -text tokens (4.5:1 on a row in both themes), the dot its plain hue. On a phone the dot alone stands for the state: the word stays in the page, hidden, as its name. */
+.state-label { --goal-hue: var(--text-muted); --goal-text: var(--text-primary); display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; color: var(--goal-text); font-size: var(--fs-md); font-weight: var(--fw-regular); }
 .goal-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--goal-hue); flex: none; }
-/* the word stays in the page's text colour (the accent as text was 4.44:1 on the light theme's panel); the dot and the border carry the state's colour, and the word says it */
-.goal-state-active, .goal-state-task-active { --goal-hue: var(--accent); }
-.goal-state-blocked, .goal-state-task-blocked { --goal-hue: var(--warning); }
-.goal-state-done, .goal-state-task-done { --goal-hue: var(--success); }
-.goal-state-failed { --goal-hue: var(--error); } /* a server that refused its key (#7903) */
+.goal-state-active, .goal-state-task-active { --goal-hue: var(--accent); --goal-text: var(--link-text); }
+.goal-state-task-review { --goal-hue: var(--state-review); --goal-text: var(--state-review); }
+.goal-state-blocked, .goal-state-task-blocked { --goal-hue: var(--warning); --goal-text: var(--warning-text); }
+.goal-state-done, .goal-state-task-done { --goal-hue: var(--success); --goal-text: var(--success-text); }
+.goal-state-failed { --goal-hue: var(--error); --goal-text: var(--error-text); } /* a server that refused its key (#7903) */
+@media (max-width: 600px) { .state-label .state-word { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; } .state-label { position: relative; } }
 
 .goal-rollup { display: flex; height: 6px; border-radius: var(--radius-xs); overflow: hidden; background: var(--bg-tertiary); border: 1px solid var(--text-muted); }
 .goal-rollup-done { background: var(--success); }
@@ -38,6 +41,8 @@
 .goals-dialog::backdrop { background: rgba(var(--black-rgb), 0.5); }
 .goals-form { display: flex; flex-direction: column; gap: 10px; }
 .goals-form h3 { margin: 0; }
+.goals-form-head, .goals-form-body { display: contents; } /* a wide dialog is the same column as before */
+.goals-form-back { display: none; }
 .goals-field { display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-md); }
 .goals-field input, .goals-field select { min-height: 36px; padding: 6px 8px; border: 1px solid var(--control-border); border-radius: var(--radius-md); background: var(--bg-primary); color: var(--text-primary); font: inherit; font-size: var(--fs-xl); }
 .goals-field-error { margin: 0; color: var(--error-text); min-height: 0; }
@@ -50,7 +55,12 @@
     .goals-back { display: inline-flex; align-items: center; min-width: 44px; }
     .goals-chip, .goals-dialog .btn, .goals-new, .goals-failed .btn, .empty-state .btn { min-height: var(--control-touch-height, 44px); }
     dialog.goals-dialog { --dlg-max: 100vw; width: 100vw; height: 100dvh; max-width: none; max-height: none; border-radius: 0; margin: 0; } /* the shared dialog rule caps max-width at var(--dlg-max) !important: a phone's sheet takes the whole width (#11027: it was 371 px) */
-    .goals-form h3 { padding-bottom: 12px; border-bottom: 1px solid var(--border); } /* the title is a bar with a rule under it, as the other phone dialogs' */
+    dialog.goals-dialog[open] { display: flex; flex-direction: column; padding: 0; }
+    dialog.goals-dialog .goals-form { flex: 1 1 auto; min-height: 0; gap: 0; }
+    .goals-form-head { display: flex; align-items: center; gap: 4px; flex: none; min-height: 56px; padding: 0 4px; border-bottom: 1px solid var(--border); } /* the form screen's bar: ← and the title (the Cancel button stays in the footer too) */
+    .goals-form-back { display: inline-grid; place-items: center; flex: none; width: var(--control-touch-height, 44px); height: var(--control-touch-height, 44px); padding: 0; border: 0; border-radius: 22px; background: none; color: var(--text-primary); font-size: var(--fs-2xl); cursor: pointer; }
+    .goals-form-body { display: flex; flex-direction: column; gap: 10px; flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 16px; }
+    .goals-form > .goals-actions { flex: none; padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px)); border-top: 1px solid var(--border); background: var(--bg-secondary); } /* the actions are pinned at the bottom, under the keyboard's reach, however long the form is */
     .goals-field input, .goals-field select { min-height: var(--control-touch-height, 44px); }
     .goals-page.goals-open .goals-require { display: none; } /* an open goal is a screen of its own, the back row first (UI/UX #7113) */
 }

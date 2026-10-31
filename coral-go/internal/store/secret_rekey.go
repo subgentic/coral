@@ -115,6 +115,7 @@ func (s *RemoteServerStore) Rekey(ctx context.Context) error {
 	defer tx.Rollback()
 	for _, q := range []string{
 		"UPDATE remote_servers SET api_key = '', status = '" + RemoteStatusKeyUnreadable + "', last_error = 'The API key was discarded by a re-key: enter it again' WHERE api_key != ''",
+		"UPDATE remote_servers SET owner_secret = '' WHERE owner_secret != ''", // the owner stamp secret (#11378) goes with them: a hub makes a new one when it sets the server up again
 		"DELETE FROM cloud_connection",
 		"DELETE FROM cloud_enrollment",
 	} {

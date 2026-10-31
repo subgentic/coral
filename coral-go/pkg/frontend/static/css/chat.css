@@ -1029,9 +1029,13 @@ h3.cni-question { margin-bottom: 4px; } /* a heading with its text under it (#30
     border-radius: var(--radius-md);
     padding: 8px 10px;
     margin: 0 0 12px;
-    overflow-x: auto;
+    overflow: auto;
+    max-height: 14rem; /* the whole request is in the box and scrolls in it, so a long one does not push the answers off the screen (#11395) */
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
     font-size: var(--fs-base);
 }
+.cni-target code { font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace); }
 .cni-plan {
     max-height: 300px;
     overflow-y: auto;
@@ -1173,10 +1177,18 @@ h3.cni-question { margin-bottom: 4px; } /* a heading with its text under it (#30
 /* Typing an answer / feedback */
 .cni-text-form {
     display: flex;
+    flex-wrap: wrap;
+    align-items: center;
     gap: 8px;
     margin: 0 0 12px;
 }
 .cni-text-input { flex: 1; min-width: 0; }
+.cni-text-form .cni-attach { display: flex; flex-wrap: wrap; gap: 8px; flex: 0 0 100%; padding: 0; border: 0; background: none; } /* the images added to the answer: a row above the box, the message box's chips (#11386) */
+.cni-text-form .cni-attach[hidden] { display: none; }
+.cni-text-form .cni-text-input { flex: 1 1 8em; }
+.cni-text-form .cni-attach:not([hidden]) { margin-top: 8px; }
+.cni-text-form .cni-attach-btn { display: inline-flex; align-items: center; justify-content: center; min-width: 32px; padding: 0 8px; }
+@media (pointer: coarse), (max-width: 767px) { .cni-text-form .cni-attach-btn { min-width: var(--control-touch-height, 44px); min-height: var(--control-touch-height, 44px); } }
 
 /* Review step: each question with its answer */
 .cni-review {

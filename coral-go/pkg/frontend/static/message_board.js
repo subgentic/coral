@@ -38,7 +38,7 @@ async function loadBoardProjects() {
         const badge = document.getElementById('messageboard-count');
         if (badge) badge.textContent = String(projects.length);
     } catch (e) {
-        console.error('Failed to load board projects:', e);
+        console.error('Failed to load board teams:', e);
     }
 }
 
@@ -46,7 +46,7 @@ function renderBoardSidebar(projects) {
     const list = document.getElementById('messageboard-sidebar-list');
     if (!list) return;
     if (!projects.length) {
-        emptyState(list, 'No projects', 'empty-state empty-state-tight', 'li');
+        emptyState(list, 'No teams', 'empty-state empty-state-tight', 'li');
         return;
     }
     list.innerHTML = projects.map(p => {
@@ -152,7 +152,7 @@ async function loadBoardProjectList() {
     const empty = document.getElementById('mb-projects-empty');
     // Show loading indicator while fetching
     empty.style.display = 'none';
-    ul.innerHTML = '<li class="loading-indicator">Loading projects</li>';
+    ul.innerHTML = '<li class="loading-indicator">Loading teams</li>';
     try {
         const projects = await fetchProjects();
         if (!projects.length) {

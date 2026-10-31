@@ -148,6 +148,8 @@ func TestEveryListenerIsCensused(t *testing.T) {
 		"internal/startup/startup_listen.go:listenAll": "the server's listeners, one per ListenHosts(): the host is cfg.Host after applyPrivacySettings, " +
 			"which is loopback unless remote_access_enabled or --remote (TestRemoteOffBindsLoopbackOnly drives it on real sockets)",
 		"internal/startup/pprof.go:startPprofOn": "CORAL_PPROF_ADDR, refused unless a loopback IP (checkLoopbackAddr)",
+		"internal/opencode/server.go:freeLoopbackPort": "binds 127.0.0.1:0 only to learn a free port for an opencode server and closes the socket at once; it serves nothing, and the " +
+			"server it picks the port for is told to listen on 127.0.0.1 (opencode.ServeArgs) and is refused unless it answers a wrong password with 401 or 403",
 		"internal/startup/listen_tcp.go:listenTCP": "the helper Coral's own listeners open their socket through (exclusive on Windows, #224): it takes " +
 			"the caller's address as given, so each caller of listenTCP is censused here by name too",
 	}

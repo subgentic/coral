@@ -30,8 +30,11 @@ const { coralReady } = require('./helpers/wait');
             assert.equal((await api('GET', `/api/board/${board}/goals/${id}`)).body.state, 'active', at + 'one Enter does not close the goal');
             await ev(`document.querySelector('.goals-close-dialog input[value="done"]').click(); true`);
             assert.equal(await ev(`document.querySelector('.goals-close-dialog button[type="submit"]').disabled`), false, at + 'choosing turns Close on');
-            await ev(`document.querySelector('.goals-close-dialog button[type="submit"]').click(); true`);
-            await waitFor(`!!document.querySelector('#inbox-page .goals-reopen')`, at + 'the goal closes', 8000);
+            assert.match(await ev(`document.querySelector('.goals-close-dialog label.goals-field').textContent`), /^Why \(optional\)/, at + 'the reason is optional');
+            assert.equal(await ev(`document.getElementById('goal-close-reason').required`), false, at + 'and not a required field');
+            await ev(`document.getElementById('goal-close-reason').value = ''; document.querySelector('.goals-close-dialog button[type="submit"]').click(); true`); // no reason typed (#11368 item 8)
+            await waitFor(`!!document.querySelector('#inbox-page .goals-reopen')`, at + 'the goal closes with no reason typed', 8000);
+            assert.equal((await api('GET', `/api/board/${board}/goals/${id}`)).body.closed_reason, 'Closed by the Operator.', at + 'the agents are told who closed it');
             await waitFor(`document.querySelector('#inbox-page .goals-progress') && document.querySelector('#inbox-page .goals-progress').textContent === 'Done, 1 task left open'`, at + 'the progress line says what is left open', 5000);
         }
         console.log('\nPASS Close goal chooses nothing for you, and a goal closed with open tasks says so');

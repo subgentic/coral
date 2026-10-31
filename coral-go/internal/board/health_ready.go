@@ -2,6 +2,8 @@ package board
 
 import (
 	"context"
+	"regexp"
+	"strconv"
 	"time"
 )
 
@@ -82,4 +84,25 @@ func (s *Store) UnownedOpenTasks(ctx context.Context, project string, createdBef
 		out = append(out, UnownedTask{ID: r.ID, NoGoal: r.NoGoal, NoAssignee: r.NoAssignee})
 	}
 	return out, nil
+}
+
+// goalNamed matches a goal named in words: "goal 92", "goal #92", "goals 92, 100 and #101". A bare "#92" is as likely a task, so it does not count.
+var goalNamed = regexp.MustCompile(`(?i)\bgoals?\s+#?\d+(?:\s*(?:,|&|and)\s*#?\d+)*`)
+var numberIn = regexp.MustCompile(`\d+`)
+
+// GoalsNamedIn is the goal numbers a text names in words (an ask to the Operator that says which goal it is about), each once, in the order named.
+func GoalsNamedIn(text string) []int64 {
+	var out []int64
+	seen := map[int64]bool{}
+	for _, m := range goalNamed.FindAllString(text, -1) {
+		for _, n := range numberIn.FindAllString(m, -1) {
+			id, err := strconv.ParseInt(n, 10, 64)
+			if err != nil || id <= 0 || seen[id] {
+				continue
+			}
+			seen[id] = true
+			out = append(out, id)
+		}
+	}
+	return out
 }

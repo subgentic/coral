@@ -77,6 +77,9 @@ fs.writeFileSync(path.join(art, 'qa-report.md'), '# Phone pass\n\n| Page | Resul
 const upload = (who, file, ...more) => run('coral-agent', who, 'artifact', 'upload', path.join(art, file), ...more);
 upload('Frontend Dev', 'checkout-mockup.html', '--no-task', '--tag', 'for review');
 upload('QA', 'qa-report.md', '--no-task');
+// a CSV: the viewer's table (sticky header, sortable columns, a filter box, a long cell with its Show all), made up
+fs.writeFileSync(path.join(art, 'phone-pass.csv'), ['Page,Width,Result,Notes', 'Cart,390,pass,', 'Address,390,pass,', 'Payment,390,fail,' + JSON.stringify('The pay button sits under the floating bar until the page is scrolled to its end; the Orchestrator asked for the bar to clear the last row of every page and for the spacing under the button to match the desktop layout.'), 'Confirmation,390,pass,', 'Cart,1440,pass,', 'Payment,1440,pass,'].join('\n') + '\n');
+upload('QA', 'phone-pass.csv', '--no-task');
 
 // ── agent states (typed lines the mock answers; the screens read the agent's real state) ─────────
 const send = (a, command) => api('POST', '/api/sessions/live/' + encodeURIComponent(a.session_name) + '/send', { command, agent_type: 'claude', session_id: a.session_id });

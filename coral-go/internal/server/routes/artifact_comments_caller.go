@@ -156,19 +156,16 @@ func ownerCommentRequest(r *http.Request) bool {
 	return ownerCommentWrite(r)
 }
 
-// ownerCommentWrite reports whether the request is a POST to a route the tunnel table lists as an owner-only comment write (a comment or reply, a resolve, a reopen). The table decides: a route it does not list
-// as owner-only, a PATCH or DELETE, the lock and the agent's reply are never one.
+// ownerCommentWrite reports whether the request is to a route the tunnel table lists as an owner-only comment write (a comment or reply, a resolve, a reopen, an edit, a delete, the lock, the send to an agent, #11354). The table decides: a route it does not list
+// as owner-only and the agent's reply are never one.
 func ownerCommentWrite(r *http.Request) bool {
-	if r.Method != http.MethodPost {
-		return false
-	}
 	pattern, mode := tunnel.OwnerRoute(r.Method, r.URL.Path)
-	if mode == tunnel.OwnerNone || !mode.Refuses() {
-		return false
-	}
 	switch pattern {
-	case "/api/artifacts/{hex64}/comments", "/api/artifacts/{hex64}/comments/{id}/resolve", "/api/artifacts/{hex64}/comments/{id}/reopen":
-		return true
+	case "/api/artifacts/{hex64}/comments", "/api/artifacts/{hex64}/comments/{id}/resolve", "/api/artifacts/{hex64}/comments/{id}/reopen",
+		"/api/artifacts/{hex64}/comments/lock", "/api/artifacts/{hex64}/comments/{id}/send":
+		return mode != tunnel.OwnerNone && mode.Refuses()
+	case "/api/artifacts/{hex64}/comments/{id}": // the edit and delete: the owner's (the stamped marker) or the author's, the comment policy decides which (#11354)
+		return mode == tunnel.OwnerSees
 	}
 	return false
 }

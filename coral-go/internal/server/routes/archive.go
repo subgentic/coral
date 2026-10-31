@@ -49,3 +49,11 @@ func ArchivedSessionLookup(ss *store.SessionStore) func(ctx context.Context, ses
 		return err == nil && archived
 	}
 }
+
+// SessionAsleepLookup returns the lookup BoardHandler.SetSessionAsleepLookup takes: whether the live session is asleep, ended, archived or gone (a message to it waits).
+func SessionAsleepLookup(ss *store.SessionStore) func(ctx context.Context, sessionID string) bool {
+	return func(ctx context.Context, sessionID string) bool {
+		ls, err := ss.GetLiveSession(ctx, sessionID)
+		return err != nil || ls == nil || ls.IsSleeping != 0 || ls.IsArchived != 0 || ls.StoppedAt != nil
+	}
+}

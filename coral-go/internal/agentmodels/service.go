@@ -53,6 +53,8 @@ func Family(agentType string) string {
 		return "agy"
 	case at.Pi:
 		return "pi"
+	case at.Opencode:
+		return "opencode"
 	}
 	return ""
 }
@@ -105,6 +107,8 @@ type Service struct {
 	// piSignedIn asks whether Pi is signed in to one provider, piDefault is the provider Pi starts on ("" when none is set): replaced by tests.
 	piSignedIn func(ctx context.Context, path, provider string) bool
 	piDefault  func() string
+	// opencodeSignedIn gives the providers opencode is signed in to (normalized names), nil when it could not tell: replaced by tests.
+	opencodeSignedIn func(ctx context.Context, path string) map[string]bool
 
 	mu      sync.Mutex
 	entries map[string]*entry
@@ -119,7 +123,8 @@ func NewService(find func(agentType string) (string, error)) *Service {
 		piSignedIn: func(ctx context.Context, path, provider string) bool {
 			return agentsignin.CheckPiProvider(ctx, path, provider) == agentsignin.SignedIn
 		},
-		piDefault: agentsignin.PiProvider}
+		piDefault:        agentsignin.PiProvider,
+		opencodeSignedIn: agentsignin.OpencodeProviders}
 }
 
 // SetFetcher replaces how a CLI is run (tests).
@@ -250,6 +255,9 @@ func (s *Service) runFetch(family, path, key string) {
 	if err == nil && family == "pi" {
 		groups, defaultModel = s.piGroups(models, path)
 	}
+	if err == nil && family == "opencode" {
+		groups = s.opencodeGroups(models, path)
+	}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -315,6 +323,30 @@ func (s *Service) piGroups(models []Model, path string) ([]Group, string) {
 	return groups, first[in[0].Name]
 }
 
+// opencodeGroups lists opencode's providers, the signed-in ones first (one `opencode auth list` for all of them). When opencode cannot say, every provider is listed unmarked.
+func (s *Service) opencodeGroups(models []Model, path string) []Group {
+	var names []string
+	seen := map[string]bool{}
+	for _, m := range models {
+		if m.Group != "" && !seen[m.Group] {
+			seen[m.Group] = true
+			names = append(names, m.Group)
+		}
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), fetchTimeout)
+	defer cancel()
+	signed := s.opencodeSignedIn(ctx, path)
+	var in, out []Group
+	for _, n := range names {
+		if signed[agentsignin.NormalizeProvider(n)] {
+			in = append(in, Group{Name: n, SignedIn: true})
+		} else {
+			out = append(out, Group{Name: n})
+		}
+	}
+	return append(in, out...)
+}
+
 // describe is a failure in Coral's words: never the CLI's own output.
 func describe(err error) string {
 	var exitErr *exec.ExitError
@@ -372,6 +404,13 @@ func FetchFromCLI(ctx context.Context, family, path string) ([]Model, string, er
 			return nil, "", err
 		}
 		m, err := ParseAgyModels(out)
+		return m, "account", err
+	case "opencode":
+		out, err := runCLI(ctx, path, dir, "models")
+		if err != nil {
+			return nil, "", err
+		}
+		m, err := ParseOpencodeModels(out)
 		return m, "account", err
 	case "pi":
 		out, err := runCLI(ctx, path, dir, "--list-models")

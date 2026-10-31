@@ -1,4 +1,6 @@
-// coral-update is Coral's updater program (#5231, #5292). Its argv is fixed: "check" finds the newest promoted release, has the verifier approve
+// coral-update is Coral's updater program (#5231, #5292). Its argv is fixed, with ONE exception (#11370): "verify-package --tag --asset --dir", which a self-hosted hub runs to verify a release it
+// downloaded before it installs that release on another computer over SSH (verify_package.go). That command is never built from a request: the hub passes its own running version as the tag,
+// a fixed per-architecture asset name and a fresh 0700 temp folder, by this program's absolute path, with a minimal environment and a timeout. Otherwise: "check" finds the newest promoted release, has the verifier approve
 // it and stages the package; "apply" is not built yet. It prints one JSON object on stdout, for display only, and takes no URL, version, path, hash
 // or pid from whoever started it: the pins are compiled in, the data folder is resolved as Coral resolves its own, and the installed version is the
 // one this program was built as. It is the only program that links the Sigstore verifier.
@@ -98,6 +100,10 @@ func print(w io.Writer, o output) {
 
 // run is main without the process: args after the program name, the environment, and where the JSON goes. It returns the exit code.
 func run(args []string, getenv func(string) string, stdout io.Writer) int {
+	// verify-package checks a release the self-hosted hub downloaded (#11370); see verify_package.go. It has its own arguments and is not gated by the update switches.
+	if len(args) > 0 && args[0] == "verify-package" {
+		return runVerifyPackage(args[1:], stdout)
+	}
 	// status only reads the updater's own files: no network, and it answers when the feature is off.
 	if (len(args) == 1 && args[0] == "status") || (len(args) == 2 && args[0] == "status" && args[1] == "--json") {
 		return runStatus(args, getenv, stdout)

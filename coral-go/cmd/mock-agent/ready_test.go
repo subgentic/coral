@@ -182,6 +182,42 @@ func TestMockControlsMakeAQuestionAPermissionAndADeafBox(t *testing.T) {
 			t.Error("a digit did not answer it")
 		}
 	})
+	t.Run("a question with a text option: a 3 opens a text line and the next text and Enter answer it (#11393)", func(t *testing.T) {
+		b, kinds := newBox()
+		if h, w := applyControl(b, "MOCK_ASK_QUESTION_TEXT"); !h || !w || !b.promptOpen || !b.question || !b.textOption {
+			t.Fatalf("the question is not open: %+v", b)
+		}
+		b.feed([]byte("3"), func(string) {})
+		if !b.typing || !b.promptOpen {
+			t.Fatalf("a 3 did not open the text line: typing=%v open=%v", b.typing, b.promptOpen)
+		}
+		if want := []string{"question_request"}; !reflect.DeepEqual(*kinds, want) {
+			t.Errorf("a 3 answered the question: hooks %v", *kinds)
+		}
+		b.feed([]byte("make it teal\r"), func(string) {})
+		if want := []string{"question_request", "question_answered_text\x00make it teal"}; !reflect.DeepEqual(*kinds, want) {
+			t.Errorf("hooks %q, want %q", *kinds, want)
+		}
+		if b.promptOpen || b.question || b.typing || b.textOption {
+			t.Errorf("the question is still open: %+v", b)
+		}
+	})
+	t.Run("the plain question has no text option: a 3 answers it as option 3", func(t *testing.T) {
+		b, kinds := newBox()
+		applyControl(b, "MOCK_ASK_QUESTION")
+		b.feed([]byte("3"), func(string) {})
+		if want := []string{"question_request", "question_answered"}; !reflect.DeepEqual(*kinds, want) || b.typing {
+			t.Errorf("hooks %v typing=%v", *kinds, b.typing)
+		}
+	})
+	t.Run("a digit other than 3 answers the text question as that option", func(t *testing.T) {
+		b, kinds := newBox()
+		applyControl(b, "MOCK_ASK_QUESTION_TEXT")
+		b.feed([]byte("2"), func(string) {})
+		if want := []string{"question_request", "question_answered"}; !reflect.DeepEqual(*kinds, want) || b.textOption {
+			t.Errorf("hooks %v textOption=%v", *kinds, b.textOption)
+		}
+	})
 	t.Run("a dismissed question", func(t *testing.T) {
 		b, kinds := newBox()
 		applyControl(b, "MOCK_ASK_QUESTION")

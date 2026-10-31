@@ -227,3 +227,60 @@ func TestAdoptAgentAfterLaunchOnARealPane(t *testing.T) {
 	require.Eventually(t, func() bool { v := verdict(); return !v.OK && v.Reason != "" }, shellWait, 25*time.Millisecond)
 	assert.NotEqual(t, ReasonAdopting, verdict().Reason)
 }
+
+// #137855: the launch call returns before the launch line is typed (and so before the watch begins), and a task created right after it asks for the verdict first: that is "not recorded YET", a wait,
+// never a refusal, for launchGrace; after that, or once the watch has begun and found nothing, it is refused as before. Nothing is typed on this verdict.
+func TestANoticeForASessionJustCreatedForALaunchWaitsUntilItsGraceEnds(t *testing.T) {
+	const session = "claude-launching"
+	t.Cleanup(func() { ForgetAgentProc(session); agentRecs.Lock(); delete(agentRecs.m, session); agentRecs.Unlock() })
+	none := func() (AgentProc, bool) { return AgentProc{}, false }
+	running := table("  600     1 Ss   "+t0+" -zsh", "  700   600 S+   "+t1+" claude")
+	old := launchGrace
+	defer func() { launchGrace = old }()
+
+	assert.Equal(t, ReasonNotRecorded, noticeVerdict(running, 600, session, none).Reason, "a session nobody launched is not waited for")
+
+	NoteLaunching(session)
+	v := noticeVerdict(running, 600, session, none)
+	assert.True(t, v.Wait, "created a moment ago, the line not typed yet: wait")
+	assert.False(t, v.OK, "and nothing is typed")
+	assert.Equal(t, ReasonAdopting, v.Reason)
+
+	launchGrace = time.Millisecond
+	time.Sleep(5 * time.Millisecond)
+	v = noticeVerdict(running, 600, session, none)
+	assert.False(t, v.Wait, "a launch whose line never came is not waited for for ever")
+	assert.Equal(t, ReasonNotRecorded, v.Reason)
+
+	launchGrace = old
+	NoteLaunching(session)
+	assert.True(t, noticeVerdict(running, 600, session, none).Wait)
+	ForgetAgentProc(session)
+	assert.False(t, noticeVerdict(running, 600, session, none).Wait, "a session forgotten (killed, relaunched) is not waited for")
+
+	agentRecs.Lock()
+	agentRecs.m[session] = &agentRec{proc: AgentProc{PID: 700, Start: t1}, adopted: true, launchAt: time.Now()}
+	agentRecs.Unlock()
+	assert.True(t, noticeVerdict(running, 600, session, none).OK, "an adopted process decides, whatever launchAt says")
+}
+
+// #137855: a sender names the agent by the name it knows it by ("solo-agent"), the record is kept under the tmux session's own name ("claude-<id>"): the verdict must find it through the session.
+func TestTheVerdictFindsTheRecordWhateverNameTheSenderKnowsTheAgentBy(t *testing.T) {
+	c := newTestClient(t)
+	ctx := context.Background()
+	const sid = "8f0b2d54-6e7a-4293-9d4e-2a5b6c7d8e93"
+	name := "claude-" + sid
+	createTestSession(t, c, name, t.TempDir())
+	t.Cleanup(func() { ForgetAgentProc(name) })
+	require.NoError(t, c.SendKeysToTarget(ctx, terminalinput.Unclassified, name+".0", "CORAL_SESSION_NAME="+name+" sleep 120"))
+	c.AdoptAgentAfterLaunch(name, name+".0")
+	v, err := c.AgentNoticeVerdict(ctx, "solo-agent", "claude", sid)
+	require.NoError(t, err)
+	assert.True(t, v.Wait, "while the watch is recording the process, a notice asked for by the agent's display name waits (it was told 'not recorded' for good)")
+	assert.Equal(t, ReasonAdopting, v.Reason)
+	require.Eventually(t, func() bool { _, ok := AdoptedAgentProc(name); return ok }, shellWait, 50*time.Millisecond, "the agent's process was never recorded")
+	require.Eventually(t, func() bool {
+		v, err := c.AgentNoticeVerdict(ctx, "solo-agent", "claude", sid)
+		return err == nil && v.OK
+	}, shellWait, 25*time.Millisecond, "asked by the agent's display name, the verdict did not find the record kept under the session's name")
+}

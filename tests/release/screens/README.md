@@ -38,6 +38,11 @@ tests/release/screens/run.sh v2.0.7 --dry-run            # also builds the conta
 8. **Files them** (`publish.mjs`, as a CLI under the identity of whoever runs it):
    the contact sheet first (an HTML artifact: changed pages first with before, after and diff images, the rest
    folded), then each shot named `<page>__<width>.png` (`__light` added for the light theme) on the task.
+   The sheet is named for the one-line summary (`UI review v2.0.8: 202 pages shot, 116 changed vs v2.0.7.html`).
+   Last, once the shots are up, the sheet is uploaded once more with the tag `for review`: that is what Coral's
+   Inbox lists under **Needs you** for the operator (Coral keeps the first upload's name for the same bytes, so
+   the row shows the summary). No mention and no agent. `--dry-run` writes the request it would send to
+   `published.json` (`needsReview`). The goal is picked from the open ones (see below).
 
 ## The page list is a census
 
@@ -59,13 +64,13 @@ A launchd or cron watcher on the release machine works the same way; neither nee
 blocks a release: `run.sh` only warns when filing fails, and its exit code is for the caller to ignore.
 
 The upload is a CLI call under the runner's identity, and an upload links only to a task of the uploader. So
-`publish.mjs` opens its own task: **`coral-board task add "UI review: vX.Y.Z" --self --goal 163`** (#11247, in
+`publish.mjs` opens its own task: **`coral-board task add "UI review: vX.Y.Z" --self --goal <an open goal>`** (#11247, in
 v2.0.7: any member of a board may open a task for itself, with a goal, one per title, at most five open), uploads to
 it, and then hands it to the Operator if the runner may reassign (the orchestrator, the Operator), or completes it
 with the contact sheet's link in the message. A `coral-board` without `--self` (before v2.0.7) falls back to a plain
 add, which only the Operator or an orchestrator may do: then have the orchestrator create the task assigned to the
 runner, and `publish.mjs` finds it (or takes `--task N`). A task of the same title that is already open and the
-runner's is reused; a re-run after it was completed opens a new one. `SCREENS_GOAL` changes the goal (default 163).
+runner's is reused; a re-run after it was completed opens a new one. The goal (`--self` needs one) is `SCREENS_GOAL` / `--goal` when that goal is open (a closed goal refuses new tasks), else the lowest-numbered open goal with "UI review" in its title; with neither the run stops with the reason, and the orchestrator opens a standing goal for it (the shots are kept either way).
 
 ## What a shot may show
 
@@ -80,7 +85,7 @@ print a path; later releases compare neutral with neutral.
 
 Known limits: a failed run keeps `/tmp/coral-screens` (its data folders hold a throwaway API key until the next run
 clears them); a port is picked just before the server starts, so another process could take it in between and the
-run fails at the health check; one run at a time (`/tmp/coral-screens.lock`).
+run fails at the health check; one run at a time (`/tmp/coral-screens.lock`). The work folder and the lock are made mode 0700 by the run, and one that is a link, belongs to another account or has another mode is refused (`run_guard_test.sh` tests that), so a shared `/tmp` cannot hand the run a folder someone else prepared.
 
 ## The upload limit
 

@@ -4,7 +4,7 @@ import { state } from './state.js';
 import { showToast, escapeHtml, escapeAttr, boardNameProblem } from './utils.js';
 import { blockedReason } from './hub_access.js';
 import { loadLiveSessions } from './api.js';
-import { recordRecentDir, setDirServerResolver, getRecentDirs } from './browser.js';
+import { recordRecentDir, setDirServerResolver, getRecentDirs, pruneMissingRecents } from './browser.js';
 import { pinnedFolders } from './pinned_folders.js';
 import { defaultAgentName } from './session_state.js';
 import { serverFetch, identityKey, isHub, normServer, LOCAL_SERVER, keyLabel, noteBoardLabels } from './server_base.js';
@@ -51,7 +51,7 @@ function _launchStage(arg) {
 window._launchStage = _launchStage;
 
 /** Enter in a single-line field of a wizard step is that step's primary button: Next, and Launch on the last step (#11289; a form's Enter). Not in a multi-line field, a select, a button or the folder picker; not with a modifier; and not when the field's own Enter (the folder's) has already acted. */
-export function wireEnterAdvances(step) {
+function wireEnterAdvances(step) {
     if (!step || step.dataset.enterWired) return;
     step.dataset.enterWired = '1';
     step.addEventListener('keydown', e => {
@@ -66,7 +66,7 @@ export function wireEnterAdvances(step) {
 }
 
 /** A suggested role-like name for an agent whose name is left empty: Agent 1, Agent 2 (the next number not taken by a live agent), shown as the field's placeholder and used at launch when the field is empty; Save as persona still needs a typed name. The folder stays the context line (#11289). */
-export function suggestAgentName(input) {
+function suggestAgentName(input) {
     if (!input || input.value.trim()) return;
     const taken = new Set((state.liveSessions || []).map(x => String(x.display_name || x.name || '').trim().toLowerCase()));
     let n = 1; while (taken.has(`agent ${n}`)) n++;
@@ -107,6 +107,7 @@ function _selectLaunchType(type) {
             adoptEnd: { agent: 'launch-note-slot' }, // the provider's notes have their room at the END of the Agent pane, under Thinking: nothing above it moves when a note appears (#8528)
             value: launch.member ? launch.member.value : { agentType: _settingsFor(_effectiveServer(launch.server)).default_agent_type || 'claude' }, // a member's own values (#7861)
         });
+        importOnce('./launch_signin_notice.js').then(m => m.mountLaunchSigninNotice({ slot: document.getElementById('launch-cli-slot'), before: document.getElementById('launch-agent-pick-label')?.parentElement, form: document.getElementById('launch-agent-acf'), server: _effectiveServer(launch.server) })).catch(e => console.error('sign-in notice', e)); // Claude not signed in is said here, with how (#11336)
         // The agent is chosen in this step, not only under More options (#6199): a radio group that follows the form's own select, the installed agents first.
         importOnce('./launch_provider_cards.js').then(m => m.buildProviderCards({ group: document.getElementById('launch-agent-pick'), form: document.getElementById('launch-agent-acf'), server: _effectiveServer(launch.server), implicitDefault: !_settingsFor(_effectiveServer(launch.server)).default_agent_type })).catch(() => {});
         _folderPressed = false; folderForm()?.clearErrors();
@@ -351,6 +352,7 @@ function _renderDirRecents() {
     const box = document.getElementById('launch-dir-recents'), hint = document.getElementById('launch-dir-hint');
     if (!box || !hint) return;
     const dirs = getRecentDirs(_effectiveServer(launch.server)).slice(0, 3);
+    if (!box._pruned) { box._pruned = true; pruneMissingRecents(_effectiveServer(launch.server)).then(changed => { box._pruned = false; if (!changed) return; _renderDirRecents(); const f = document.getElementById('launch-dir'); if (f && !f.value && !launch.member && !launch.addTo && !_settingsFor(_effectiveServer(launch.server)).default_working_dir) offerSuggestion(f, document.getElementById('launch-dir-suggest'), 'first-agent'); }).catch(() => { box._pruned = false; }); } // folders that are gone are dropped once per opening; a person left with none is offered the first-agent folder (#11336)
     box.replaceChildren(...(dirs.length ? [Object.assign(document.createElement('span'), { className: 'launch-recent-label', textContent: 'Recent:' })] : []), ...dirs.map(d => {
         const b = document.createElement('button');
         b.type = 'button'; b.className = 'btn btn-small launch-dir-recent'; b.title = d; b.dataset.dir = d; b.setAttribute('data-on-click', 'launch-dir-recent');

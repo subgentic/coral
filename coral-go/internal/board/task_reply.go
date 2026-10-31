@@ -61,6 +61,27 @@ func (s *Store) TaskReplyMention(ctx context.Context, project, creator string) R
 	return none
 }
 
+// TaskReplyMentions decides the mentions of an agent's post on a task (#11431): the task's assignee and its creator, each tagged exactly as TaskReplyMention tags one (a name that is not an active member, or
+// whose tag would also tag someone else, is left out), never the poster, and each once. The prefix is the mentions in the order given; Notified is who they reach.
+func (s *Store) TaskReplyMentions(ctx context.Context, project string, names []string, poster string) ReplyMention {
+	out := ReplyMention{Notified: []string{}}
+	seen := map[string]bool{strings.ToLower(strings.TrimSpace(poster)): true}
+	for _, name := range names {
+		key := strings.ToLower(strings.TrimSpace(name))
+		if key == "" || seen[key] {
+			continue
+		}
+		seen[key] = true
+		m := s.TaskReplyMention(ctx, project, name)
+		if m.Prefix == "" {
+			continue
+		}
+		out.Prefix += m.Prefix
+		out.Notified = append(out.Notified, m.Notified...)
+	}
+	return out
+}
+
 // ListTaskReplies returns the replies to a task, oldest first, at most limit (the partial index on (project, task_id, id) answers it).
 func (s *Store) ListTaskReplies(ctx context.Context, project string, taskID int64, limit int) ([]Message, error) {
 	var messages []Message

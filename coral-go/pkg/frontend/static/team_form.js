@@ -43,7 +43,7 @@ function mountMembers(modal) {
     const take = sel => parts.querySelector(sel);
     const fields = [
         { key: 'template', type: 'custom', label: 'Start from a template', help: 'Optional. Fills the member list.', wide: true, render: slot => slot.append(take('.team-template-row')) },
-        { key: 'workers', type: 'custom', label: 'Set all workers to', help: "Skips the Orchestrator. Resets each worker's model.", render: slot => slot.append(take('#team-allworkers')) },
+        { key: 'workers', type: 'custom', label: 'Set all workers to', help: "Changes every worker's provider. The Orchestrator keeps its own, and each worker's model goes back to the default.", render: slot => slot.append(take('#team-allworkers')) },
         { key: 'members', type: 'custom', label: 'Members', wide: true, render: slot => { slot.append(take('#team-agents-count'), take('.team-agents-container')); } },
     ];
     _members = mountSettingsView(host, { mode: 'form', fields });
@@ -56,7 +56,7 @@ function mount(modal) {
     const root = host.dataset.coralRoot || '';
     const fields = [
         { key: 'name', type: 'text', id: 'team-board-name', label: 'Team name', required: true, requiredMessage: 'Team name is required', messageAsIs: true, placeholder: 'e.g. auth-feature, sprint-42',
-            help: "A project is a team of agents working on one board. Letters, digits, - and _.", attrs: { maxlength: '64' }, live: ['team-board-name-hint'],
+            help: "A team is a group of agents working on one board. Letters, digits, - and _.", attrs: { maxlength: '64' }, live: ['team-board-name-hint'],
             validate: v => boardNameProblem(String(v || '').trim()), setup: e => e.setAttribute('data-on-input', 'm-validate-team-name') },
         { key: 'dir', type: 'path', id: 'launch-team-dir', label: 'Folder', help: FOLDER_ON_THIS_COMPUTER, required: true, requiredMessage: 'Choose a folder for the team', messageAsIs: true, placeholder: 'Choose a folder', attrs: { 'data-coral-root': root },
             live: [{ id: 'btn-browse-team', wide: true, describes: false }, { id: 'launch-team-dir-recents', wide: true, describes: false }, { id: 'launch-team-dir-suggest', describes: false }, { id: 'dir-browser-team', wide: true, describes: false }] },

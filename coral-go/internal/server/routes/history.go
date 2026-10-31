@@ -700,6 +700,9 @@ func (h *HistoryHandler) GetResumeInfo(w http.ResponseWriter, r *http.Request) {
 }
 
 func nativeResumeID(agentType, sourceFile, fallback string) string {
+	if agent.IsLabelSource(sourceFile) {
+		return "" // a label, not a file: there is no native id in it
+	}
 	switch agentType {
 	case "codex":
 		base := filepath.Base(sourceFile)

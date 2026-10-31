@@ -1,7 +1,8 @@
 // Pure display lease contract: controlled clock/timers, no browser or sleep.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-const source = fs.readFileSync(new URL('../../coral-go/pkg/frontend/static/display_activity_hint.js', import.meta.url), 'utf8');
+const dialog = fs.readFileSync(new URL('../../coral-go/pkg/frontend/static/at_dialog.js', import.meta.url), 'utf8'); // the module has no imports of its own except at_dialog.js (#11430): joined here, since the file is loaded as one data URL
+const source = dialog + fs.readFileSync(new URL('../../coral-go/pkg/frontend/static/display_activity_hint.js', import.meta.url), 'utf8').replace(/^import \{ dialogDue \} from '\.\/at_dialog\.js';\n/, '');
 const { hasWorkingDisplayHint, needsInputAttention, trackDisplayHint } = await import('data:text/javascript;base64,' + Buffer.from(source).toString('base64'));
 let now = Date.parse('2026-10-26T07:00:20Z');
 const row = { session_id: 'fixture', agent_type: 'codex', waiting_for_input: true, waiting_kind: 'permission', waiting_since: '2026-10-26T07:00:00Z', display_activity_hint: 'working', display_activity_hint_at: '2026-10-26T07:00:19Z' };

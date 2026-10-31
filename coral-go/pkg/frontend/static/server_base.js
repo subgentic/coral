@@ -43,7 +43,7 @@ const CLOUD_ALLOWED = /^\/api\/settings\/git-diff-mode$/;
 
 /** The one /api/system route the hub exposes (Launch tier): the New Agent dialog's CLI check. The tunnel's allowlist is `type` (one of these agent types) and `source=cli_recheck`
  *  (pkg/tunnel/routes_query.go, GET /api/system/cli-check), and never a `binary` path; anything else is refused here too, so the UI does not send what the hub would drop. */
-const CLI_CHECK_TYPES = ['claude', 'agy', 'antigravity', 'gemini', 'codex', 'pi'];
+const CLI_CHECK_TYPES = ['claude', 'agy', 'antigravity', 'gemini', 'codex', 'pi', 'opencode'];
 export function cloudCliCheckAllowed(url) {
     let u;
     try { u = new URL(String(url), 'http://x.invalid'); } catch { return false; }
@@ -437,6 +437,15 @@ export function testHooksOn() {
 /** True on the Cloud Hub. */
 export function isCloud() {
     return bootConfig().mode === 'cloud';
+}
+
+/** Whether Approve, Request changes and the change-request send are NOT drawn for `server`. Reached by this self-hosted hub's API key the machine sees a script, not a person, and refuses them (#11372);
+ *  they work only where the hub can sign the signed-in person's decision (#11378): the live server list says owner_stamp when the hub holds the secret for that computer AND the computer says it holds the
+ *  other half. Through Coral Hub (isCloud) the owner's stamp carries the person; the hub's own machine has no key in between. */
+export function decisionNeedsPerson(server) {
+    if (isLocalServer(server) || isCloud()) return false;
+    const live = (state.servers || []).find(s => s && normServer(s.id) === normServer(server));
+    return !(live && live.owner_stamp === true);
 }
 
 /** The Hub-served dashboard draws its own Inbox (Chats folders and Boards) in place of the Hub's framed one, and the top row's Chats and Board tabs go (Goal #100). One switch, set by the Hub's

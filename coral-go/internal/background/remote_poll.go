@@ -141,21 +141,25 @@ func (h *RemoteAgentHub) checkHealth(ctx context.Context, id string) error {
 		return errors.New("remote returned HTTP " + resp.Status)
 	}
 	var body struct {
-		Version string `json:"version"`
+		Version       string `json:"version"`
+		HubOwnerStamp bool   `json:"hub_owner_stamp"`
 	}
 	if err := json.NewDecoder(io.LimitReader(resp.Body, 64<<10)).Decode(&body); err != nil {
 		return errors.New("remote returned an invalid health response")
 	}
-	if body.Version != "" {
-		h.mu.Lock()
-		changed := false
-		if st, ok := h.current(id); ok && st.version != body.Version {
+	h.mu.Lock()
+	changed := false
+	if st, ok := h.current(id); ok {
+		if body.Version != "" && st.version != body.Version {
 			st.version, st.versionAt, changed = body.Version, time.Now(), true
 		}
-		h.mu.Unlock()
-		if changed {
-			h.notify()
+		if st.ownerStamp != body.HubOwnerStamp { // the remote says whether it holds the secret that verifies this hub's owner stamps (#11378)
+			st.ownerStamp, changed = body.HubOwnerStamp, true
 		}
+	}
+	h.mu.Unlock()
+	if changed {
+		h.notify()
 	}
 	return nil
 }
@@ -213,15 +217,21 @@ func (h *RemoteAgentHub) refreshVersion(ctx context.Context, id string) {
 	}
 	defer resp.Body.Close()
 	var body struct {
-		Version string `json:"version"`
+		Version       string `json:"version"`
+		HubOwnerStamp bool   `json:"hub_owner_stamp"`
 	}
 	if json.NewDecoder(io.LimitReader(resp.Body, 64<<10)).Decode(&body) != nil || body.Version == "" {
 		return
 	}
 	h.mu.Lock()
 	changed := false
-	if st, ok := h.current(id); ok && st.version != body.Version {
-		st.version, changed = body.Version, true
+	if st, ok := h.current(id); ok {
+		if st.version != body.Version {
+			st.version, changed = body.Version, true
+		}
+		if st.ownerStamp != body.HubOwnerStamp {
+			st.ownerStamp, changed = body.HubOwnerStamp, true
+		}
 	}
 	h.mu.Unlock()
 	if changed {

@@ -36,10 +36,10 @@ const MODE_WORDS = { shared_checkout: 'Shared checkout', worktrees: 'Worktrees',
 /** What each menu item holds, said under its name (Start: none, Health check: on), so nobody opens one to find out (#9971). */
 function menuStates(v) {
     return {
-        start: v.first_task || v.custom_instructions ? 'set' : 'none',
-        workflow: MODE_WORDS[v.mode] || (v.dependency_guidance ? 'guidance' : 'none'),
-        health: valuesToHealth(v, HEALTH_DEFAULTS).on ? 'on' : 'off',
-        messaging: v.cross_team_messaging || v.cross_team_artifacts ? 'on' : 'off',
+        start: v.first_task || v.custom_instructions ? 'set' : 'optional',
+        workflow: MODE_WORDS[v.mode] || (v.dependency_guidance ? 'guidance' : 'no extra rules'),
+        health: valuesToHealth(v, HEALTH_DEFAULTS).on ? 'on' : 'off: no stuck-agent checks', // an "off" alone told a newcomer nothing (#11368, QA's walk): the word says what is off
+        messaging: v.cross_team_messaging || v.cross_team_artifacts ? 'on: other computers' : 'off: this team only',
     };
 }
 function syncMenuStates() {
@@ -70,7 +70,7 @@ export function mountTeamLaunchSettings() {
     _defaultMode = 'none';
     host.replaceChildren();
     _view = mountSettingsView(host, {
-        mode: 'settings', saveBar: false, group: 'start', label: 'Team settings sections', groupLabel: 'Team settings section',
+        mode: 'settings', saveBar: false, group: 'start', label: 'Team settings sections', groupLabel: 'Team settings section', groupPickText: 'Jump to a section',
         load: async () => startValues(),
         groups: [
             { id: 'start', label: 'Start', icon: 'play_arrow', fields: [
@@ -96,6 +96,17 @@ export function mountTeamLaunchSettings() {
     lead.textContent = 'Everything on this step is optional. The team starts with the settings shown here.';
     host.querySelector('.settings-panes')?.prepend(lead);
     host.addEventListener('input', syncMenuStates); host.addEventListener('change', syncMenuStates);
+    // the goal switch's state in words, so ticking it twice is seen (#11336: a newcomer clicks it to "tick" it and turns it off)
+    const state = document.createElement('p'); state.className = 'sv-hint team-goal-state'; state.id = 'team-goal-state'; state.setAttribute('role', 'status');
+    const syncGoalState = () => {
+        const sw = document.getElementById('team-save-goal'), task = document.getElementById('team-goal');
+        if (!sw) return;
+        if (!state.isConnected) (sw.closest('.sv-row') || sw.parentNode).after(state);
+        sw.setAttribute('aria-describedby', state.id);
+        state.textContent = !sw.checked ? "Off: the first task will not be saved as a goal." : task && task.value.trim() ? "On: the first task will also be the team's goal." : "On: a first task, once you write one, will also be the team's goal.";
+    };
+    host.addEventListener('input', syncGoalState); host.addEventListener('change', syncGoalState);
+    _view.ready.then(syncGoalState);
     _view.ready.then(syncMenuStates);
 }
 

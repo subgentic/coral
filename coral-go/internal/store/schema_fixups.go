@@ -15,6 +15,15 @@ import (
 var columnMigrations = []struct {
 	table, column, definition string
 }{
+	// The secret a self-hosted hub signs its owner stamps for this remote with (#11378): a "v1:" envelope under the master key like api_key, with its own AAD; "" when none. Set only by SetOwnerSecret.
+	{"remote_servers", "owner_secret", "TEXT NOT NULL DEFAULT ''"},
+	// A remote server the hub reaches over the owner's SSH session instead of a URL (#11370): transport is "http" (every server before this, and every one added by URL) or "ssh"; ssh_target is the
+	// target the provisioner reached it by (user@host:port, or a Host name of the owner's SSH config); remote_port is the loopback port the remote listens on; instance_id is the remote's own
+	// instance id, which a re-run compares so it never takes another server's place. Only the provisioner sets them (AddSSH): the registration route has no field for them.
+	{"remote_servers", "transport", "TEXT NOT NULL DEFAULT 'http'"},
+	{"remote_servers", "ssh_target", "TEXT NOT NULL DEFAULT ''"},
+	{"remote_servers", "remote_port", "INTEGER NOT NULL DEFAULT 0"},
+	{"remote_servers", "instance_id", "TEXT NOT NULL DEFAULT ''"},
 	// A job's runs work in a worktree of its folder (0, as every job before this did) or in the folder itself (1): a folder that is not a git repository can be one (#10276).
 	{"scheduled_jobs", "no_worktree", "INTEGER NOT NULL DEFAULT 0"},
 	// How far an agent's chat search reaches (#11048): own, team, all or operator. Every member is "own" until the Operator raises it.

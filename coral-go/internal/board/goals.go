@@ -138,6 +138,16 @@ type GoalInput struct {
 
 // CreateGoal makes a goal on a board. The board is recorded if nothing has used it yet.
 func (s *Store) CreateGoal(ctx context.Context, board string, in GoalInput) (*Goal, error) {
+	if board != "" {
+		if err := s.checkGoalCap(ctx, s.db, board, 0); err != nil { // the team's cap on open goals (#11389), kept for every writer
+			return nil, err
+		}
+	}
+	return s.createGoalUnchecked(ctx, board, in)
+}
+
+// createGoalUnchecked is CreateGoal without the cap: the checks of the text and the driver, and the insert. The cap is checked by CreateGoal, and by CreateGoalApproved with the proposal's own place in it.
+func (s *Store) createGoalUnchecked(ctx context.Context, board string, in GoalInput) (*Goal, error) {
 	if board == "" {
 		return nil, errors.New("a goal needs a board")
 	}

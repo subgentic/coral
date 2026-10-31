@@ -52,6 +52,7 @@ cleanup() {
         kill "$SERVER_PID" 2>/dev/null || true
         wait "$SERVER_PID" 2>/dev/null || true
     fi
+    coral_test_kill_tmux_server  # its tmux server and mock agents, on this run's own socket (they outlived failed runs)
     if coral_test_is_windows && [[ -n "${T:-}" ]]; then
         # A killed Windows server leaves its ConPTY children running: stop this run's own
         # mock agents (by their path in this run's folder, never anything else).

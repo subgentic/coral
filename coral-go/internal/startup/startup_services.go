@@ -223,6 +223,9 @@ func startIndexingServices(ctx context.Context, cfg *config.Config, srv *server.
 		time.Duration(cfg.IndexerIntervalS)*time.Second,
 		time.Duration(cfg.IndexerStartupDelayS)*time.Second,
 	)
+	if m := srv.OpencodeManager(); m != nil {
+		indexer.AddLiveSource(background.NewOpencodeHistory(m)) // opencode keeps no file: its history is read through its servers
+	}
 	safeGo(ctx, "session_indexer", func() { indexer.Run(ctx) })
 	srv.SetIndexer(indexer)
 }
@@ -387,6 +390,9 @@ func startMaintenanceServices(ctx context.Context, db *store.DB, cfg *config.Con
 	// Artifact retention (#3554): off unless the Operator sets artifact_retention_days; the
 	// first run waits for an acknowledged dry run (or 24 hours), and each run is capped.
 	safeGo(ctx, "artifact_retention", func() { srv.RunArtifactRetention(ctx) })
+
+	// At a dialog (#11437): the awake agents' screens are read every 15 s for a prompt that waits for the person.
+	safeGo(ctx, "dialog_watch", func() { srv.RunDialogWatch(ctx) })
 
 	// Thinking tracker — no hook fires for model thinking, so thinking turns
 	// and their durations are read from Claude transcripts into the activity stream

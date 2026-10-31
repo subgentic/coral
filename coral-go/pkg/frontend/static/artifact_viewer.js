@@ -18,6 +18,7 @@ const { makeDetails } = await importOnce('./details_disclosure.js'); // "Who can
 // Asked for when used, not imported: this module loads lazily and may only import startup modules statically.
 const { attachComments, commentBoard } = await importOnce('./artifact_comments.js');
 const { attachVersions } = await importOnce('./artifact_versions.js');
+const { attachReview } = await importOnce('./artifact_review.js');
 
 const HEX_RE = /^[a-f0-9]{64}$/;
 let _dialog = null;
@@ -27,6 +28,7 @@ let _returnFocus = null;
 let _server = undefined; // the server of the artifact on show, for the artifacts it links
 let _comments = null;    // the comments panel of the viewer (#5182)
 let _versions = null;    // the version bar of the viewer (#6472)
+let _review = null;      // Approve and Request changes of a for-review artifact (#136584)
 let _hex = '';           // the artifact on show and what it was opened with, for a version chosen from the bar
 let _lastOpts = {};
 let _details = null;     // the Details button and its panel (the readers' row)
@@ -87,6 +89,7 @@ function _build() {
         sheetOpen: () => _comments.sheetOpen(),
         setSheet: (open) => _comments.setSheet(open),
     });
+    _review = attachReview(d, { reload: () => openArtifactViewer(_hex, { ..._lastOpts, switched: true }) });
     // Back or Forward changes the page under the viewer (#3532 routes): close it with the page.
     window.addEventListener('popstate', () => { if (!_overlay) closeArtifactViewer(); }); // on a phone the viewer has its own history entry (overlay_history.js)
     document.body.appendChild(d);
@@ -124,7 +127,8 @@ export function openArtifactViewer(hex, opts = {}) {
     d.hidden = false;
     if (!wasOpen && isPhoneLayout() && !_overlay) _overlay = pushOverlay(() => closeArtifactViewer({ popped: true })); // Back closes it, above the preview's full screen, under its comments sheet
     _comments.open(hex, opts.server, commentBoard(opts), true); // true: the comments of earlier versions of a series too (the server answers the plain list for an artifact in none)
-    _versions.open(hex, opts.server, { switched: !!opts.switched });
+    _versions.open(hex, opts.server, { switched: !!opts.switched, compare: !!opts.compare });
+    _review.open(hex, { ...opts, board: commentBoard(opts) });
     // "Who can read this", for the Operator (the owner through Coral Hub): drawn only when the machine answers it; anyone else sees nothing.
     _details.clear();
     readersAllowed(hex, opts.server).then(ok => { if (ok && gen === _gen && !d.hidden) _details.add(readersBlock(hex, opts.server, _details)); }).catch(() => {});
@@ -159,6 +163,7 @@ export function openArtifactViewer(hex, opts = {}) {
  function closeArtifactViewer(opts) {
     if (!_dialog || _dialog.hidden) return;
     _versions?.close();
+    _review?.close();
     _comments?.close(); // the sheet (above it) goes first, so Back's order and ours agree
     if (_overlay) { const id = _overlay; _overlay = 0; if (!opts || !opts.popped) popOverlay(id); }
     _abort?.abort();

@@ -57,11 +57,14 @@ func (e AgentEvent) StateEvent() sessionstate.Event {
 	if e.ToolName != nil {
 		ev.ToolName = *e.ToolName
 	}
-	if e.EventType == "tool_use" && e.RefID != nil {
-		ev.ToolUseID = *e.RefID // the call this PostToolUse is for
+	if (e.EventType == "tool_use" || e.EventType == "request_resolved") && e.RefID != nil {
+		ev.ToolUseID = *e.RefID // the call this PostToolUse is for, or whose start resolved a request (#11352)
 	}
 	if t, err := time.Parse(time.RFC3339Nano, e.CreatedAt); err == nil {
 		ev.At = t
+		if e.EventType == "tool_use" && e.DurationMs != nil && *e.DurationMs > 0 {
+			ev.Started = t.Add(-time.Duration(*e.DurationMs) * time.Millisecond) // when the call began (#11352)
+		}
 	}
 	return ev
 }

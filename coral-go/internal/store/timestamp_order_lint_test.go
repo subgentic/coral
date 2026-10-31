@@ -46,6 +46,8 @@ var nanoWriters = map[string]nanoWriter{
 	"tracking/milestones.go":                 {calls: 1, why: "a JSON file, parsed"},
 	"server/routes/token_usage.go":           {calls: 1, why: "a response field, not stored"},
 	"background/health_held.go":              {calls: 1, why: "part of an episode id, not compared"},
+	"agent/opencode_history.go":              {calls: 1, why: "a message's time, parsed back by the History index (the first and last timestamp of a session row), never ordered as text"},
+	"server/routes/opencode_runtime.go":      {calls: 1, why: "an opencode message's time in a chat reply, parsed by the dashboard; never stored or ordered as text"},
 	"server/routes/pending_sends.go":         {calls: 1, why: "a field of the live row (pending_sends.at), parsed by Date.parse; held in memory, never stored or ordered as text"},
 }
 

@@ -1,6 +1,7 @@
 /* Dashboard tab navigation and the home view. */
 
 import { isPhoneLayout } from './phone_layout.js';
+import { clearPhonePageName } from './phone_bar.js';
 import { importOnce } from './import_once.js';
 import { state } from './state.js';
 import { urlSearchFor } from './search_filters.js';
@@ -21,6 +22,7 @@ import { stopCostDashboard } from './app_panels.js';
 let _navGeneration = 0;
 
 export function switchNavTab(tab, opts = {}) {
+    clearPhonePageName(); // a page the phone bar opened inside a view (its Tasks) is over once another tab is chosen (#11401)
     // The Chats tab is the Inbox's chat folders (#7776) on a local Coral: an old link, a shortcut or a Back to the chats opens the Inbox on the folder (All chats unless one is named), and an open chat shows under the Inbox. The hub keeps its Chats tab.
     // The Hub's native Inbox (Goal #100, nativeInbox()) is the same: its Chats and Board tabs are gone from the top bar, so a link, a shortcut or Back to either opens the Inbox (the chat folders, or the Boards folder).
     const routeTab = tab, toBoards = tab === 'board' && nativeInbox(), chatsInInbox = (tab === 'history' && (!isCloud() || nativeInbox())) || toBoards;

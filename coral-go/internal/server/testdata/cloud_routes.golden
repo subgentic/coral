@@ -1,8 +1,8 @@
 DELETE /api/agent/ui/{id} never
 DELETE /api/artifacts/series/{series_id} never
 DELETE /api/artifacts/{id} launch
-DELETE /api/artifacts/{id}/comments/lock never
-DELETE /api/artifacts/{id}/comments/{cid} never
+DELETE /api/artifacts/{id}/comments/lock interact
+DELETE /api/artifacts/{id}/comments/{cid} interact
 DELETE /api/artifacts/{id}/keep never
 DELETE /api/artifacts/{id}/star interact
 DELETE /api/auth/sessions/{id} never
@@ -51,13 +51,13 @@ GET /api/analytics/activity launch
 GET /api/analytics/efficiency never
 GET /api/artifacts view
 GET /api/artifacts/resolve view
-GET /api/artifacts/series/{series_id} never
-GET /api/artifacts/series/{series_id}/versions never
+GET /api/artifacts/series/{series_id} view
+GET /api/artifacts/series/{series_id}/versions view
 GET /api/artifacts/{id} view
 GET /api/artifacts/{id}/comments view
 GET /api/artifacts/{id}/meta view
 GET /api/artifacts/{id}/readers view
-GET /api/artifacts/{id}/versions never
+GET /api/artifacts/{id}/versions view
 GET /api/auth/hub-origins never
 GET /api/auth/hub-signin never
 GET /api/auth/sessions never
@@ -88,6 +88,7 @@ GET /api/board/{project}/messages/check never
 GET /api/board/{project}/messages/search view
 GET /api/board/{project}/paused view
 GET /api/board/{project}/peek never
+GET /api/board/{project}/proposals view
 GET /api/board/{project}/queue never
 GET /api/board/{project}/relay-targets never
 GET /api/board/{project}/reminder never
@@ -119,6 +120,7 @@ GET /api/goals view
 GET /api/goals/metrics view
 GET /api/health view
 GET /api/pinned-folders view
+GET /api/proposals view
 GET /api/saved view
 GET /api/saved/{id}/message view
 GET /api/scheduled/jobs view
@@ -243,7 +245,7 @@ GET /api/worktrees launch
 GET /ws/coral view
 GET /ws/terminal/{name} view
 PATCH /api/agent/tasks/{taskID} never
-PATCH /api/artifacts/{id}/comments/{cid} never
+PATCH /api/artifacts/{id}/comments/{cid} interact
 PATCH /api/board/{project} never
 PATCH /api/board/{project}/goals/{goalID} interact
 PATCH /api/board/{project}/tasks/{taskID} interact
@@ -269,7 +271,7 @@ POST /api/artifacts/{id}/comments interact
 POST /api/artifacts/{id}/comments/{cid}/reopen interact
 POST /api/artifacts/{id}/comments/{cid}/reply never
 POST /api/artifacts/{id}/comments/{cid}/resolve interact
-POST /api/artifacts/{id}/comments/{cid}/send never
+POST /api/artifacts/{id}/comments/{cid}/send launch
 POST /api/auth/hub-signin/dismiss never
 POST /api/auth/password/change never
 POST /api/auth/password/reset never
@@ -277,6 +279,7 @@ POST /api/auth/password/set never
 POST /api/auth/sessions/sign-out-others never
 POST /api/auto-accept/disable-all interact
 POST /api/board/remotes never
+POST /api/board/{project}/artifacts/{id}/review interact
 POST /api/board/{project}/cross-team-links never
 POST /api/board/{project}/cross-team/disable launch
 POST /api/board/{project}/cross-team/enable launch
@@ -294,7 +297,11 @@ POST /api/board/{project}/health/ack never
 POST /api/board/{project}/hub-notice interact
 POST /api/board/{project}/messages interact
 POST /api/board/{project}/messages/mark-read never
+POST /api/board/{project}/operator-artifacts interact
+POST /api/board/{project}/operator-artifacts/message interact
 POST /api/board/{project}/pause launch
+POST /api/board/{project}/proposals/{id}/approve interact
+POST /api/board/{project}/proposals/{id}/reject interact
 POST /api/board/{project}/relay-messages never
 POST /api/board/{project}/reminder interact
 POST /api/board/{project}/resume launch
@@ -357,6 +364,7 @@ POST /api/sessions/live/{name}/attach launch
 POST /api/sessions/live/{name}/auto-accept/disable interact
 POST /api/sessions/live/{name}/auto-accept/enable launch
 POST /api/sessions/live/{name}/context-window never
+POST /api/sessions/live/{name}/dismiss-wait interact
 POST /api/sessions/live/{name}/events never
 POST /api/sessions/live/{name}/files/refresh interact
 POST /api/sessions/live/{name}/goal interact
@@ -364,6 +372,8 @@ POST /api/sessions/live/{name}/keys interact
 POST /api/sessions/live/{name}/kill launch
 POST /api/sessions/live/{name}/model launch
 POST /api/sessions/live/{name}/notes interact
+POST /api/sessions/live/{name}/notices/pause interact
+POST /api/sessions/live/{name}/notices/resume interact
 POST /api/sessions/live/{name}/open-in-editor never
 POST /api/sessions/live/{name}/pending-tool never
 POST /api/sessions/live/{name}/resize interact
@@ -414,7 +424,7 @@ POST /api/workflows/runs/{runID}/seen interact
 POST /api/workflows/{workflowID}/trigger launch
 POST /api/worktrees/remove never
 PUT /api/agent/ui/{id} never
-PUT /api/artifacts/{id}/comments/lock never
+PUT /api/artifacts/{id}/comments/lock interact
 PUT /api/artifacts/{id}/keep never
 PUT /api/artifacts/{id}/star interact
 PUT /api/auth/hub-origins never

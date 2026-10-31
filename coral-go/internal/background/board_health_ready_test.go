@@ -73,7 +73,7 @@ func TestAGoalWhoseTasksAreAllDoneIsOneLineAfterTheWait(t *testing.T) {
 	assert.Contains(t, out, line, "34 minutes: past the wait")
 	assert.Contains(t, out, "ready to close")
 	assert.NotContains(t, out, "off the board's tasks", "a line about the board itself, not an agent's")
-	assert.NotContains(t, out, "Secret goal title", "numbers only, never the goal's title")
+	assert.NotContains(t, outsideGoals(out), "Secret goal title", "the off-books line is numbers only, never the goal's title (the GOALS segment names goals, #11412)")
 	assert.NotContains(t, r.next(), "ready to close", "said once")
 	// Another task, finished: a new moment, a new line (the clock of the check is already past the wait of the new last task's time).
 	r.moreDone(g, 1)
@@ -245,4 +245,15 @@ func TestTheTwoChecksAreOnForATeamThatNeverSetThem(t *testing.T) {
 	assert.Contains(t, out, fmt.Sprintf("Goal #%d: every task (1) is done", g))
 	assert.Contains(t, out, fmt.Sprintf("Open tasks with no goal: #%d", loose[0]))
 	assert.False(t, h.s.GetHealthSettings(context.Background(), "team").Landing.On, "the landing alert stays off")
+}
+
+// outsideGoals is the check without its GOALS segment (#11412), which names each open goal with its cleaned title: what the other lines say about a goal is still numbers only.
+func outsideGoals(check string) string {
+	var keep []string
+	for _, l := range strings.Split(check, " \u2022 ") {
+		if !strings.HasPrefix(l, "Goals: ") {
+			keep = append(keep, l)
+		}
+	}
+	return strings.Join(keep, " \u2022 ")
 }

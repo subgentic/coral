@@ -71,6 +71,7 @@ cleanup() {
         kill "$SERVER_PID" 2>/dev/null || true
         wait "$SERVER_PID" 2>/dev/null || true
     fi
+    coral_test_kill_tmux_server  # its tmux server and mock agents, on this run's own socket (they outlived failed runs)
     coral_test_sandbox_cleanup   # #4354: its check first (a crash path reads the stub marker), then the folders
     coral_test_rm_tree "$TMPDIR_STRESS"
 }

@@ -6,6 +6,7 @@
  *    on and opens the list of all views. Escape and a click outside close it.
  * - Under 640 px (#9021) the top row is one hamburger button: it names the view and opens the views, then Home, Settings (themes, servers, updates) and the account.
  * The buttons drawn here carry the same data-on-click as the tabs, so switching a tab is still the one action. */
+import { setPhoneBarTitle } from './phone_bar.js';
 import { PHONE_QUERY } from './phone_layout.js';
 import { registerActions } from './actions.js';
 import { isHub } from './server_base.js';
@@ -89,9 +90,9 @@ function entry(icon, label, { action, href, onClick } = {}) {
 }
 
 /** What the gear and the account buttons hold, as entries (#9021): the settings, the themes, the update check, the servers; on the Hub the account's pages and Sign out, by clicking the account menu's own items. */
-function menuEntries(viewLabels = new Set()) {
+function menuEntries(viewLabels = new Set(), phoneNav = false) {
     const cloud = document.body.classList.contains('cloud-mode');
-    const out = [entry('home', 'Home', { action: 'm-go-home' })];
+    const out = phoneNav ? [] : [entry('home', 'Home', { action: 'm-go-home' })]; // the floating nav's Home is one tap away
     out.push(entry('settings', 'Settings', { action: 'm-close-top-bar-settings-then-show-settings-modal' }), entry('palette', 'Themes', { action: 'm-close-top-bar-settings-then-show-theme-configurator' }));
     if (!cloud) out.push(entry('system_update', 'Check for updates', { action: 'm-close-top-bar-settings-then-check-for-updates' }));
     if ((isHub() || cloud) && !viewLabels.has('Computers')) out.push(entry('dns', 'Computers', { action: 'm-close-top-bar-settings-then-show-servers-modal' })); // not twice: when the Servers view is one of the views above, two entries are named alike
@@ -119,13 +120,14 @@ function openMenu(btn) {
     if (!menu) return;
     const hamburger = btn.id === 'top-menu-btn' || btn.hasAttribute('data-hamburger'); // the agent row's menu button is the same menu (#11056)
     const all = hamburger || btn.hasAttribute('data-nav-all');
-    const items = all ? availableTabs() : _more;
+    const phoneNav = document.body.classList.contains('phone-nav-on'); // the floating nav has Home, Inbox and Tasks: the menu does not list them again (#11400)
+    const items = (all ? availableTabs() : _more).filter(t => !(hamburger && phoneNav && (t.arg === 'agents' || t.arg === 'hub-inbox')));
     if (!items.length) return;
     menu.classList.toggle('nav-all', all);
     menu.classList.toggle('nav-hamburger', hamburger);
     if (hamburger) {
         const sep = document.createElement('div'); sep.className = 'nav-more-sep'; sep.setAttribute('role', 'separator');
-        menu.replaceChildren(...items.map(makeItem), sep, ...menuEntries(new Set(items.map(t => t.label))));
+        menu.replaceChildren(...items.map(makeItem), sep, ...menuEntries(new Set(items.map(t => t.label)), phoneNav));
         for (const v of menu.querySelectorAll('.nav-more-item:not([role])')) v.setAttribute('role', 'menuitem');
     } else menu.replaceChildren(...items.map(makeItem));
     menu.hidden = false;
@@ -179,6 +181,7 @@ function layoutSelect() {
     const words = cur ? cur.label : (hiddenOn ? (hiddenOn.dataset.label || hiddenOn.textContent).trim() : '');
     label.textContent = words;
     const top = document.getElementById('top-menu-label'); if (top) top.textContent = words;
+    setPhoneBarTitle(words); // the shared bar's pill names the view (phone_bar.js)
     for (const hamburger of document.querySelectorAll('#top-menu-btn, [data-hamburger]:not([data-account])')) { // (the phone's account button opens the same menu under its own name) // the top bar's and, under 640 px while an agent is open, the agent row's (#11056): one menu, one name
     if (hamburger) {
         // What waits for the person is the Inbox tab's own name ("Inbox, 3 waiting for input", set by inbox_tab.js): the closed bar shows a dot for it and the button's name says it in the same words (#9829)

@@ -11,7 +11,7 @@ import { browserLocal } from './safe_storage.js';
 import { importOnce } from './import_once.js';
 const { addTermsInfo } = await importOnce('./analytics_terms.js');
 
-const { dataTable } = await importOnce('./data_table.js'); // the shared table (#7743)
+const { dataTable, el } = await importOnce('./data_table.js'); // the shared table (#7743)
 const { phoneOneLine } = await importOnce('./analytics_views.js'); // a phone: one line a row (#8982)
 
 const TEAM_KEY = 'coral-spend-team';
@@ -20,7 +20,6 @@ const DRIFT = 1.3; // the bar of a day is amber when it is 30% above usual (colo
 const model = { team: '', range: '24h', data: null, loading: false, error: '', seq: 0, metric: 'tokens', grain: 'day', doneGrain: 'day' };
 let root = null, timeRoot = null;
 
-const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 
 /** 517K, 1.2M, 61M: tokens as a person reads them, the one figure format of the Analytics pages (format.js compactFigure, #9516); '' for a figure that is not a number. */
 export function fmtTokens(n) { return Number.isFinite(Number(n)) ? compactFigure(Math.round(Number(n))) : ''; }

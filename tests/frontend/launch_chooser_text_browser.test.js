@@ -7,7 +7,7 @@ const { coralReady } = require('./helpers/wait');
 
 const WORDS = {
     'New agent': 'One agent in a folder you choose.',
-    'New project': 'Launch a team of agents collaborating on a shared board.',
+    'New team': 'Launch a team of agents collaborating on a shared board.',
     'Open folder': 'Add a project folder to start agents in later.',
     'Terminal': 'Open a shell next to your agents.',
 };

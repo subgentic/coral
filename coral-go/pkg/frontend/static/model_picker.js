@@ -48,6 +48,11 @@ function modelOptions(models, groups) {
     return order.map(name => `<optgroup label="${escapeAttr(name + (signed.has(name) ? ' · signed in' : ''))}">${models.filter(m => m.group === name).map(optionHtml).join('')}</optgroup>`).join('') + loose;
 }
 
+/** The server's bare reason ("the CLI didn't answer in time") in words, with what to do next (#11401): the list shown is the last one Coral had. */
+function failedListNote(reason) {
+    return `Couldn't load the model list (${String(reason).trim().replace(/[.\s]+$/, '')}). Press refresh beside the field to try again, or choose Other… and type a model name.`;
+}
+
 function fill(container, agentType, data) {
     const { input, wrap, select, id, note } = parts(container);
     container._thinkingLevels = data && Array.isArray(data.thinking) ? data.thinking : [];   // the levels the server passes this type's CLI (#4969)
@@ -66,7 +71,7 @@ function fill(container, agentType, data) {
         input.value = data.default_model;
         input.dispatchEvent(new Event('input', { bubbles: true }));
     }
-    if (note) note.textContent = data && data.error ? data.error : (data && data.refreshing && container._refreshAsked ? 'Updating the list…' : ''); // a status of a list the person asked to refresh, not of the one that loaded as the form opened (#7912)
+    if (note) note.textContent = data && data.error ? failedListNote(data.error) : (data && data.refreshing && container._refreshAsked ? 'Updating the list…' : ''); // a status of a list the person asked to refresh, not of the one that loaded as the form opened (#7912)
     syncModelPicker(container);
     if (id) id.hidden = false;
 }
@@ -142,6 +147,12 @@ export async function loadModelPicker(container, agentType) {
 }
 
 /** "Add a model…": the small form under the list (shared with the model chip's menu, custom_model_add.js). A new model goes in the operator's custom models and is chosen for this form. */
+/** The person chose a model from the list (or added one) while the form's default model was still on its way: that default must not replace it (agent_config_form.js compares this with the fetch it started). It is NOT the
+ *  field's dirty flag: a later provider switch still resets a listed model to the new provider's default, as before (a typed custom id is what dirty keeps, #11404). */
+function markChosen(container) {
+    container.dataset.acfChosenFetch = container.dataset.acfFetchSeq || '';
+}
+
 function openAdd(container) {
     const { select, add } = parts(container);
     if (!add) return;
@@ -158,7 +169,7 @@ function openAdd(container) {
             await loadModelPicker(container, agentType);   // the catalog has it now (this also closes the form)
             const { input: box, select: sel } = parts(container);
             box.value = id.trim(); container._otherChosen = false;
-            box.dispatchEvent(new Event('input', { bubbles: true }));   // the form's own "the user chose a model" bookkeeping
+            box.dispatchEvent(new Event('input', { bubbles: true })); markChosen(container);   // a model the person added is theirs (the input event above is untrusted)
             syncModelPicker(container, false);
             showToast(`Model added: ${name.trim() || id.trim()}`);
             sel.focus();
@@ -201,7 +212,8 @@ export function wireModelPicker(container) {
         container._otherChosen = select.value === OTHER;   // an empty box under Other… stays Other…, not Default
         if (select.value === OTHER) { if (models_has(container, input.value)) input.value = ''; input.hidden = false; input.focus(); }
         else { input.value = select.value; input.hidden = true; }
-        input.dispatchEvent(new Event('input', { bubbles: true }));   // the form's own "the user chose a model" bookkeeping
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        markChosen(container);   // the form's own "the person chose a model" bookkeeping: the event above is the picker's own, not a keystroke (untrusted), so the form's listener ignores it: without this a default arriving late replaced the choice (#11404)
         syncModelPicker(container, false);
     });
     refresh.addEventListener('click', async () => {

@@ -23,7 +23,12 @@ const (
 	// 5.41 MiB (5,668,864 bytes) since the operator's approval (Oct 29, #11058's raise): 64 KiB more. The v2.0.6 tree is at 5,592,908 bytes (10,420 free) with the agent search levels UI (the Search chip and the Search access
 	// dialog, #11053: about 7 KB) and the phone chat screen in it, and the queued work (the one-row header, the keyboard fix, the Inbox Goals and Artifacts folders, Board history, #11063's model line: 1.5 KB) is more than that room.
 	// 5.5 MiB (5,767,168 bytes) since the operator's approval (Oct 30, 2026): 96 KiB more, for Analytics (the Usage, Operator interaction and Team communication tabs and the cross-team pairs), the Option B provider cards, the phone navigation slices and the new-user fixes. Data Science's measurement: coral://artifacts/3cdd1b52eb860ae1e45e7aefcb140a8adbcf202451de1eb0685b7a90fe3386f3.
-	staticBudget = 5<<20 + 512<<10
+	// 5.57 MiB (5,840,896 bytes) since the operator raised it on 2026-10-30 for v2.0.10: the v2.0.10 tree ships 5,775,213 bytes (main was 5,702,876), and the limit is that total plus 64 KiB of
+	// headroom, rounded up to whole KiB. The main growth, in source bytes of the static files: the SSH setup dialog 18.0 KB (server_ssh_setup.js, hub-11370), artifact review (Approve and
+	// Request changes) 9.1 KB (artifact_review.js), the CSV and TSV viewer 12.5 KB (csv_table.js and csv_parse.js), the changed-files view and inline diff 12.7 KB (changed_files.js, inline_diff.js),
+	// the provider cards with the OpenCode sign-in notice 9.9 KB (launch_provider_cards.js, launch_signin_notice.js), the phone bar of slice D 4.1 KB (phone_bar.js), Dismiss on a stale
+	// permission card 2.7 KB (dismiss_wait.js) and the first-run folder suggestion 2.7 KB (folder_suggestion.js); css 10 KB across components, agentic, mobile, cost_dashboard and goals.
+	staticBudget = 5<<20 + 584<<10
 	// fileBudget is the most one embedded file may hold (the CodeMirror bundle, the largest, is ~1 MB).
 	fileBudget = 1536 << 10
 )

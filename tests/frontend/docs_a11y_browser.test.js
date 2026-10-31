@@ -14,6 +14,7 @@ const { coralReady } = require('./helpers/wait');
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Emulation.setFocusEmulationEnabled({ enabled: true });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
+        await ev(`localStorage.setItem('coral-sidebar-groups-docs', '[]'); true`); // both groups open: a first-time reader has For developers folded (docs_first_look_browser, #11401)
         await ev(`window.switchNavTab('docs'); true`);
         await waitFor(`document.querySelectorAll('#docs-nav-list [data-doc]').length >= 5`, 'the topics', 15000);
         await ev(`window.selectDoc('README'); true`); // the tab opens on its first group's table (#7443): the first topic is opened from it

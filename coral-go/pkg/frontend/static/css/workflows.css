@@ -459,3 +459,6 @@
     .wf-page { padding: 12px; }
     .wf-page .item-bar { position: static; margin-bottom: 0; padding-bottom: calc(var(--space-lg) + env(safe-area-inset-bottom, 0px)); } /* in the flow, after the page's content: a sticky bar pinned to a container that is not the screen would land over a long page */
 }
+
+.wf-menu-phone { display: none; } /* Edit and Edit with Agent are in the More menu only on a phone, where the footer holds one primary action (#11236 approved, #11239 slice D) */
+@media (max-width: 600px) { .wf-detail-actions .wf-foot-secondary { display: none; } .wf-menu-phone { display: block; } }

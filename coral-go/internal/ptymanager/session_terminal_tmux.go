@@ -97,7 +97,11 @@ func (t *TmuxSessionTerminal) SendTerminalInput(ctx context.Context, o terminali
 
 func (t *TmuxSessionTerminal) CreateSession(ctx context.Context, name, workDir string) error {
 	ForgetSession(name) // what Coral remembers of the old process is not true of a new one
-	return t.client.NewSession(ctx, name, workDir)
+	err := t.client.NewSession(ctx, name, workDir)
+	if err == nil {
+		tmux.NoteLaunching(name) // its launch line is typed a moment later: a notice before then waits for the process to be recorded
+	}
+	return err
 }
 
 func (t *TmuxSessionTerminal) KillSession(ctx context.Context, name, agentType, sessionID string) error {

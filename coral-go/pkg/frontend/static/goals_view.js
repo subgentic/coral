@@ -11,6 +11,7 @@ import { toGoalList, mergeGoalLists, toDrivers, createBody, errorOf, LIST_PATH }
 import { importOnce } from './import_once.js';
 const Toolbar = await importOnce('./team_toolbar.js'); // the one toolbar of the team tabs (#7717)
 const DT = await importOnce('./data_table.js'); // the one table (#7743): the goal's column is its folded form
+const { el } = DT;
 const GC = await importOnce('./goal_columns.js');
 
 import * as W from './goal_words.js';
@@ -25,7 +26,6 @@ let root = null;
 let layout = 'cards'; // 'cards': the board's Goals face (cards and the goal beside them); 'page': the team page's Goals tab (a table, and a goal's own page, #7453)
 let hooks = {}; // the page's: openTask(task, goal), onCount(n)
 
-const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 const btn = (cls, text, onClick) => { const b = el('button', cls, text); b.type = 'button'; if (onClick) b.addEventListener('click', onClick); return b; };
 const clock = () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 const say = (t) => { const s = root && root.querySelector('.goals-status'); if (s) { s.textContent = ''; s.textContent = t; } }; // a status region: written once, announced once
@@ -222,7 +222,9 @@ function openCreate() {
     const where = el('p', 'goals-note', `Created on this board: ${keyLabel(model.project)}`);
     const go = btn('btn btn-primary', 'Create goal'); go.type = 'submit';
     const cancel = btn('btn', 'Cancel', () => dlg.close());
-    form.append(title, field('Title (required)', t, 'goal-new-title'), field('Done when (optional): what a person can check', d, 'goal-new-done'), field('Driver (optional)', dr, 'goal-new-driver'), driverNote, where, err, el('div', 'goals-actions'));
+    const head = el('div', 'goals-form-head'), back = btn('goals-form-back', null, () => dlg.close()); back.setAttribute('aria-label', 'Back'); back.title = 'Back'; back.append(Object.assign(el('span', null, '\u2190'), {})); back.firstChild.setAttribute('aria-hidden', 'true'); head.append(back, title); // a phone's form screen: ← and the title in a bar, the fields under it, the actions pinned at the bottom (#11236, #11239 slice C)
+    const body = el('div', 'goals-form-body'); body.append(field('Title (required)', t, 'goal-new-title'), field('Done when (optional): what a person can check', d, 'goal-new-done'), field('Driver, the agent who looks after it (optional)', dr, 'goal-new-driver'), driverNote, where, err);
+    form.append(head, body, el('div', 'goals-actions'));
     form.querySelector('.goals-actions').append(cancel, go);
     dlg.append(form); document.body.append(dlg);
     readJson('/subscribers').then(json => {

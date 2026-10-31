@@ -97,6 +97,7 @@ func (h *SessionsHandler) Restart(w http.ResponseWriter, r *http.Request) {
 	plan.restartSettings()
 	if plan.stored != nil {
 		h.modelSwitches.end(plan.stored.SessionID, "The agent was restarted before the change was confirmed.") // #6219
+		h.stopOpencode(plan.stored.SessionID)                                                                  // the restarted agent has a new id and a new server
 	}
 	cmd, fail := h.restartCommand(ctx, plan)
 	if fail != nil {
@@ -413,7 +414,7 @@ func (h *SessionsHandler) restartCommand(ctx context.Context, p *restartPlan) (s
 		refuse, _ := cliPathRefusal(ctx, cerr)
 		return "", refuse
 	}
-	cmd, err := launchCommand(agent.GetAgent(p.agentType), agent.LaunchParams{
+	cmd, err := h.launchCommand(ctx, agent.GetAgent(p.agentType), agent.LaunchParams{
 		SessionID:       p.newSessionID,
 		SessionName:     p.newSessionName,
 		ProtocolPath:    h.protocolPath(),

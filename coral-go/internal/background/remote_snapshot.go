@@ -69,7 +69,7 @@ func (h *RemoteAgentHub) Snapshot() RemoteSnapshot {
 		if label == "" {
 			label = id
 		}
-		entry := RemoteServerStatus{ID: id, Label: label, Status: status, URL: st.srv.URL, Agents: countUnarchived(st.sessions), Version: st.version}
+		entry := RemoteServerStatus{ID: id, Label: label, Status: status, URL: st.srv.URL, Agents: countUnarchived(st.sessions), Version: st.version, OwnerStamp: st.ownerStamp && st.srv.OwnerStamp}
 		if st.srv.LastSeen != nil {
 			entry.LastSeen = *st.srv.LastSeen
 		}

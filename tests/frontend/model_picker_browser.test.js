@@ -102,6 +102,13 @@ const { coralReady } = require('./helpers/wait');
         await waitFor(`window.__calls.filter(c => c === 'GET /api/agents/models?type=claude').length >= 1`, 'the claude list loaded again', 4000);
         await sleep(700); // sleep-ok: the answer has no completion event
         assert.equal(await ev(`document.querySelector('#acf-t .acf-model-note').textContent`), '', 'a list that loads as the form opens is not announced as updating');
+        // a list the server could not fetch says so in words with a next step, not the server's bare reason (#11401, from the Mobile Beta Tester's walk)
+        await ev(`{ window.__serve.agy = { models: [${JSON.stringify(OPUS)}], refreshing: false, error: "the CLI didn't answer in time" }; const t = document.querySelector('#acf-t .acf-agent-type'); t.value = 'agy'; t.dispatchEvent(new Event('change', { bubbles: true })); true }`);
+        await waitFor(`document.querySelector('#acf-t .acf-model-note').textContent !== ''`, 'the note for a list that failed', 4000);
+        const failNote = await ev(`document.querySelector('#acf-t .acf-model-note').textContent`);
+        assert.match(failNote, /^Couldn.t load the model list \(the CLI didn.t answer in time\)\. .*refresh.*Other/i, `a failed list says what happened and what to do: ${failNote}`);
+        await ev(`{ const t = document.querySelector('#acf-t .acf-agent-type'); t.value = 'claude'; t.dispatchEvent(new Event('change', { bubbles: true })); true }`);
+        await waitFor(`document.querySelector('#acf-t .acf-model-select').options.length === 6`, 'the claude list again after the failed one', 4000);
         await ev(`window.__calls.length = 0; window.__serve.claude = { models: [${JSON.stringify(OPUS)}, ${JSON.stringify(SONNET)}], refreshing: true }; document.querySelector('#acf-t .acf-model-refresh').click(); true`);
         await waitFor(`window.__calls.includes('POST /api/agents/models/refresh?type=claude')`, 'the refresh POST', 3000);
         await ev(`setTimeout(() => { window.__serve.claude = { models: [${JSON.stringify(OPUS)}, ${JSON.stringify(SONNET)}, ${JSON.stringify(HAIKU)}], refreshing: false }; }, 4000); true`);

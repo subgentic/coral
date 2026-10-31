@@ -140,6 +140,8 @@ func TestHubSweepNoHomeInAnyViewRoute(t *testing.T) {
 	ownerOnly := map[string]bool{"/api/artifacts": true, "/api/artifacts/resolve": true, "/api/artifacts/{id}": true, "/api/artifacts/{id}/meta": true, "/api/artifacts/{id}/comments": true, "/api/artifacts/{id}/readers": true,
 		"/api/board/{project}/artifacts": true, "/api/board/{project}/cross-team/settings": true, "/api/session-artifacts": true, "/api/team-artifacts": true, "/api/board/{project}/tasks/{taskID}/artifact-content": true,
 		"/api/saved": true, "/api/saved/{id}/message": true, // saved for later is the owner's alone since #5753
+		"/api/artifacts/{id}/versions": true, "/api/artifacts/series/{series_id}": true, "/api/artifacts/series/{series_id}/versions": true, // the owner's version list and series reads (#11354)
+		"/api/board/{project}/proposals": true, "/api/proposals": true, // what agents asked to add is the owner's alone through the hub (#11389)
 		"/api/custom-models": true} // the custom models are the owner's alone through the hub (#5996)
 
 	golden, err := os.ReadFile("testdata/cloud_routes.golden")
@@ -167,6 +169,9 @@ func TestHubSweepNoHomeInAnyViewRoute(t *testing.T) {
 		}
 		if f[1] == "/api/artifacts/{id}/readers" { // who can read that artifact (#5577)
 			path = "/api/artifacts/" + artifactHex + "/readers"
+		}
+		if f[1] == "/api/artifacts/{id}/versions" { // the version list of that artifact (#11354)
+			path = "/api/artifacts/" + artifactHex + "/versions"
 		}
 		if f[1] == "/api/artifacts/{id}/comments" { // the comments of that artifact (#5176)
 			path = "/api/artifacts/" + artifactHex + "/comments"
@@ -199,7 +204,9 @@ func TestHubSweepNoHomeInAnyViewRoute(t *testing.T) {
 		updateOff := f[1] == "/api/system/update" && rec.Code == 404
 		// GET /api/saved/{id}/message names a bookmark; the rig has none, so the owner's answer is the route's 404 "no such saved message" (#5753).
 		savedAbsent := f[1] == "/api/saved/{id}/message" && rec.Code == 404 && strings.Contains(rec.Body.String(), "no such saved message")
-		if rec.Code == 200 || resolveAnswered || updateOff || savedAbsent || (strings.HasPrefix(f[1], "/api/templates/") && rec.Code == 404 && strings.Contains(rec.Body.String(), "template_not_found")) {
+		// The owner's version list and series reads (#11354) name an artifact in a series; the rig's is in none, so the owner's answer is the route's own 404 (the plain hub caller was refused above).
+		versionsAbsent := ownerOnly[f[1]] && (strings.HasSuffix(f[1], "/versions") || strings.HasPrefix(f[1], "/api/artifacts/series/")) && (rec.Code == 404 || rec.Code == 400)
+		if rec.Code == 200 || versionsAbsent || resolveAnswered || updateOff || savedAbsent || (strings.HasPrefix(f[1], "/api/templates/") && rec.Code == 404 && strings.Contains(rec.Body.String(), "template_not_found")) {
 			answered++
 		}
 		for _, home := range homes {

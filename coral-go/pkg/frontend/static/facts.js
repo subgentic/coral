@@ -4,6 +4,8 @@
  *
  *   factsHtml([{ label: 'Branch', text: 'main' }, { label: 'Board', html: '<b>x</b>', cls: 'tt-state-done', title: 'the hover' }], { cls: 'session-tooltip-facts' }) -> '<dl class="facts ...">...'
  *
+ * A pair with `hideLabel` keeps its label for a screen reader only (the hover card's state and chips).
+ *
  * A node variant (a factsList) joins when the second user needs one. A pair holds `text` (escaped here) or `html` (the caller escaped it), an optional `cls` for the value and an optional `title`. A pair with no text and no html is left out. */
 import { escapeHtml, escapeAttr } from './utils.js';
 
@@ -12,7 +14,7 @@ const shown = (p) => p && (p.html != null && p.html !== '' || p.text != null && 
 export function factsHtml(pairs, { cls = '' } = {}) {
     const rows = pairs.filter(shown).map(p => {
         const value = p.html != null && p.html !== '' ? p.html : escapeHtml(String(p.text));
-        return `<div class="facts-row"><dt>${escapeHtml(p.label)}</dt><dd${p.cls ? ` class="${escapeAttr(p.cls)}"` : ''}${p.title ? ` title="${escapeAttr(p.title)}"` : ''}>${value}</dd></div>`;
+        return `<div class="facts-row"><dt${p.hideLabel ? ' class="sr-only"' : ''}>${escapeHtml(p.label)}</dt><dd${p.cls ? ` class="${escapeAttr(p.cls)}"` : ''}${p.title ? ` title="${escapeAttr(p.title)}"` : ''}>${value}</dd></div>`;
     });
     return `<dl class="facts${cls ? ' ' + cls : ''}">${rows.join('')}</dl>`;
 }

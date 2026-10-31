@@ -42,6 +42,7 @@ func (h *checkHarness) scanOut() string {
 func (h *checkHarness) settings(mod func(*board.HealthSettings)) {
 	h.t.Helper()
 	hs := h.s.GetHealthSettings(context.Background(), "team")
+	hs.HeartbeatMin = 5 // these tests step 11 minutes and expect a check each step; the quiet behaviour is board_health_quiet_test.go (#11431)
 	mod(&hs)
 	require.NoError(h.t, h.s.SetHealthSettings(context.Background(), "team", hs))
 }
@@ -316,7 +317,7 @@ func TestAGoalWithTooManyTasksIsOneLineOncePerCrossing(t *testing.T) {
 	h.moreTasks(g, 1)
 	out = h.next()
 	assert.Contains(t, out, line(g, 16, 15))
-	assert.NotContains(t, out, "Secret goal title", "numbers only: never the goal's title")
+	assert.NotContains(t, outsideGoals(out), "Secret goal title", "the off-books line is numbers only: never the goal's title (the GOALS segment names goals, #11412)")
 	assert.NotContains(t, h.next(), "has 16 tasks", "once per crossing")
 
 	h.moreTasks(g, 13)

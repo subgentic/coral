@@ -22,7 +22,7 @@ func transcriptCwd(sourceFile string) string { cwd, _ := transcriptStart(sourceF
 // transcriptStart is the folder a past session ran in and, where the CLI keeps it in its transcript (Claude's entries carry permissionMode), the permission mode the chat started in, both read from
 // the first 256 KiB of the file (#10291, #10487). Each is "" when the file has none; a mode that is no known mode is not returned.
 func transcriptStart(sourceFile string) (cwd, mode string) {
-	if sourceFile == "" {
+	if sourceFile == "" || agent.IsLabelSource(sourceFile) { // a label (opencode) is never opened as a path
 		return "", ""
 	}
 	f, err := secfile.OpenNoFollow(sourceFile, os.O_RDONLY, 0) // a history file the indexer recorded, never read through a link
