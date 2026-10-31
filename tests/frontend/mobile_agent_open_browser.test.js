@@ -83,7 +83,7 @@ const DEVICES = [
             let taps = 0;
             await tap('.terminal-back-btn'); taps++;
             await waitFor(`getComputedStyle(document.getElementById('mobile-agent-list')).display !== 'none' && getComputedStyle(document.getElementById('phone-nav')).display !== 'none'`, 'the list and its bottom nav', { soft: true });
-            await tap('.phone-nav-slot[data-phone-nav="nav-more"]'); taps++;
+            await tap('#mobile-agent-list .phone-menu-btn'); taps++; // the ☰ in the list's bar opens the drawer (the bottom bar has no More slot, #11472)
             await waitFor(`!!document.querySelector('#nav-more-menu:not([hidden])')`, 'the settings menu', { soft: true });
             assert.ok(taps <= 2, `${d.name}: the menu is two taps from an open agent`);
             const over = await evaluate(`(() => { const m = document.querySelector('#nav-more-menu:not([hidden])'); if (!m) return 'no menu'; const b = m.getBoundingClientRect(); const top = document.elementFromPoint(b.x + b.width/2, b.y + 12); return m.contains(top) ? 'ok' : 'covered by ' + (top && (top.id || top.className)); })()`);
