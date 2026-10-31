@@ -15,11 +15,16 @@ type Manager struct {
 
 	mu       sync.Mutex
 	servers  map[string]*managed
-	starting map[string]*starting // servers being started, by key
-	stores   map[string]string    // the store each live or starting server runs on, by key
+	starting map[string]*starting  // servers being started, by key
+	stores   map[string]string     // the store each live or starting server runs on, by key
+	alive    func(key string) bool // the reaper's question (StartReaper): whether an agent is awake; nil until it is set
+	readFail map[string]time.Time  // when a start of a reader for the key last failed
 	closed   bool
 	reapStop chan struct{} // closed by Close: the reaper ends
 	reapDone chan struct{}
+
+	// Redact redacts a text before the newest message is kept on disk; false means it could not be checked, and then nothing is kept. Set before the first Ensure; nil keeps the text as it is.
+	Redact func(text string) (string, bool)
 
 	// SkipLast says a message is not one the list shows as the last (what Coral typed into the agent); nil skips none. Set before the first Ensure.
 	SkipLast func(Message) bool
@@ -37,6 +42,7 @@ type managed struct {
 	done    chan struct{} // closed when the event loop has returned
 	since   time.Time     // when the server came up
 	key     string        // the agent this server is for
+	reader  bool          // started only to read the agent's history (ReadHistory); set before it is published
 	store   string        // the key of the agent whose session store this server runs on (its own, or the one a resumed session is in)
 	dataDir string
 	noted   map[string]bool // sessions whose store has been recorded (under mu)
@@ -61,7 +67,7 @@ type managed struct {
 }
 
 func NewManager(cfg Config) *Manager {
-	return &Manager{cfg: cfg, servers: map[string]*managed{}, starting: map[string]*starting{}, stores: map[string]string{}}
+	return &Manager{cfg: cfg, servers: map[string]*managed{}, starting: map[string]*starting{}, stores: map[string]string{}, readFail: map[string]time.Time{}}
 }
 
 // Ensure returns the agent's server, starting it (and the reading of its events) on the first call; a server that has since exited is started again. bin is the opencode binary the person's settings
@@ -70,6 +76,12 @@ func NewManager(cfg Config) *Manager {
 // The manager's lock is held only around its maps, never across a start (which can take a minute): a slow start of one agent's server never holds up AgentTurn, Stop or another agent's launch. A second
 // Ensure for a key that is starting waits for that start and shares its result.
 func (m *Manager) Ensure(ctx context.Context, key, bin, model, resume string) (*Server, error) {
+	return m.ensure(ctx, key, bin, model, resume, false)
+}
+
+// ensure is Ensure; reader says the server is started only to READ an agent's history (ReadHistory), not for the agent to run on: a launch that finds such a server replaces it (it was started without the agent's
+// model), and the reaper and the cap treat it as the lightest kind.
+func (m *Manager) ensure(ctx context.Context, key, bin, model, resume string, reader bool) (*Server, error) {
 	for {
 		m.mu.Lock()
 		if m.closed {
@@ -83,8 +95,12 @@ func (m *Manager) Ensure(ctx context.Context, key, bin, model, resume string) (*
 				dead = g
 				delete(m.servers, key)
 			default:
-				m.mu.Unlock()
-				return g.srv, nil
+				if !g.reader || reader { // a launch does not run on a server that was started only to read
+					m.mu.Unlock()
+					return g.srv, nil
+				}
+				dead = g
+				delete(m.servers, key)
 			}
 		}
 		if st := m.starting[key]; st != nil {
@@ -106,6 +122,9 @@ func (m *Manager) Ensure(ctx context.Context, key, bin, model, resume string) (*
 			dead.stop()
 		}
 		g, err := m.start(ctx, key, bin, model, store)
+		if g != nil {
+			g.reader = reader
+		}
 
 		m.mu.Lock()
 		delete(m.starting, key)
@@ -159,7 +178,7 @@ func (m *Manager) start(ctx context.Context, key, bin, model, store string) (*ma
 	}
 	g := &managed{srv: srv, key: key, store: store, dataDir: cfg.DataDir, noted: map[string]bool{}, since: time.Now(), done: make(chan struct{}), tracker: NewTracker(), at: map[string]time.Time{}, msgsAt: -1}
 	g.lctx, g.cancel = context.WithCancel(context.Background()) // not ctx: the loop lives as long as the server
-	safego.Go("opencode:events:"+key, func() { g.loop(g.lctx, m.SkipLast) })
+	safego.Go("opencode:events:"+key, func() { g.loop(g.lctx, m.SkipLast, m.Redact) })
 	return g, nil
 }
 
@@ -221,7 +240,7 @@ func (m *Manager) UseSession(key, session string) {
 	g.session, g.sessionAt = session, time.Now()
 	g.noteSession(session)
 	g.version++
-	g.refreshLast(g.lctx, c, session, m.SkipLast)
+	g.refreshLast(g.lctx, c, session, m.SkipLast, m.Redact)
 	g.mu.Unlock()
 }
 
@@ -246,12 +265,15 @@ func (m *Manager) AgentLastMessage(key string) (Message, bool) {
 	m.mu.Lock()
 	g := m.servers[key]
 	m.mu.Unlock()
-	if g == nil {
-		return Message{}, false
+	if g == nil { // no server (asleep, or a Coral restart): what was kept when it last spoke
+		return PersistedLast(m.cfg.DataDir, key)
 	}
 	g.mu.Lock()
 	defer g.mu.Unlock()
-	return g.last, g.haveLast
+	if g.haveLast {
+		return g.last, true
+	}
+	return PersistedLast(m.cfg.DataDir, key)
 }
 
 // AgentMessages is the history of the agent's newest session, oldest first, read through its server's message API. It is read again only when the event stream has said something since the last read, so a chat
@@ -305,7 +327,7 @@ func (m *Manager) AgentMessages(ctx context.Context, key string) (msgs []Message
 }
 
 // refreshLast reads a session's last message in the background (one read at a time; a turn that ends while one runs is read by the next end). The caller holds g.mu.
-func (g *managed) refreshLast(ctx context.Context, c *Client, session string, skip func(Message) bool) {
+func (g *managed) refreshLast(ctx context.Context, c *Client, session string, skip func(Message) bool, redact func(string) (string, bool)) {
 	if g.refreshing {
 		return
 	}
@@ -315,13 +337,16 @@ func (g *managed) refreshLast(ctx context.Context, c *Client, session string, sk
 		defer cancel()
 		m, ok, err := c.LastMessageSkipping(rctx, session, skip)
 		g.mu.Lock()
-		defer g.mu.Unlock()
 		g.refreshing = false
 		if err == nil && ok {
 			if r := []rune(m.Text); len(r) > lastKeptRunes { // far past what a row shows: it is redacted before it is cut to that
 				m.Text = string(r[:lastKeptRunes])
 			}
 			g.last, g.haveLast = m, true
+		}
+		g.mu.Unlock()
+		if err == nil && ok {
+			persistLast(g.dataDir, g.key, m, redact) // for the list of an agent that has no server later
 		}
 	})
 }
@@ -448,6 +473,7 @@ func (m *Manager) StartReaper(interval, minAge time.Duration, alive func(key str
 		m.mu.Unlock()
 		return
 	}
+	m.alive = alive
 	m.reapStop, m.reapDone = make(chan struct{}), make(chan struct{})
 	stop, done := m.reapStop, m.reapDone
 	m.mu.Unlock()
@@ -493,7 +519,7 @@ func (g *managed) stop() {
 }
 
 // loop reads the event stream until ctx ends. When the stream drops, what it said may be stale: every state is forgotten (Reset) and the stream is read again after a growing pause.
-func (g *managed) loop(ctx context.Context, skip func(Message) bool) {
+func (g *managed) loop(ctx context.Context, skip func(Message) bool, redact func(string) (string, bool)) {
 	defer close(g.done)
 	c, err := g.srv.Client()
 	if err != nil {
@@ -511,7 +537,7 @@ func (g *managed) loop(ctx context.Context, skip func(Message) bool) {
 				g.sawState = true
 				g.noteSession(session)
 				if to == StateIdle || to == StateFailed { // a turn ended: its reply is the new last message
-					g.refreshLast(ctx, c, session, skip)
+					g.refreshLast(ctx, c, session, skip, redact)
 				}
 			}
 		})
@@ -536,3 +562,77 @@ func (g *managed) loop(ctx context.Context, skip func(Message) bool) {
 }
 
 var errManagerClosed = errors.New("opencode: the server manager is closed")
+
+// readerCap is how many servers may run only to read a sleeping agent's history at once; readerCooldown is how long a failed start of one is not tried again for the same agent (a chat polls every second).
+const (
+	readerCap      = 2
+	readerCooldown = 30 * time.Second
+)
+
+// ReadHistory is the history of an agent whose server may not be running (asleep, or just after a Coral restart): from its server when one is up, else from a server started only to read it, on the agent's own
+// session store with the newest session it named (StoredSession), no TUI and no model call. At most readerCap such servers run; a new one makes room by stopping the oldest of an agent that is not awake, or is
+// refused (ok false); a failed start is not retried for readerCooldown; the reaper stops a reader whose agent is asleep after its grace, and a launch replaces one. ok is false when there is nothing to read.
+func (m *Manager) ReadHistory(ctx context.Context, key, bin string) ([]Message, bool, error) {
+	if msgs, ok, err := m.AgentMessages(ctx, key); ok || err != nil {
+		return msgs, ok, err
+	}
+	ses := StoredSession(m.cfg.DataDir, key)
+	if ses == "" {
+		return nil, false, nil
+	}
+	if !m.admitReader(key) {
+		return nil, false, nil
+	}
+	if _, err := m.ensure(ctx, key, bin, "", ses, true); err != nil {
+		m.mu.Lock()
+		m.readFail[key] = time.Now()
+		m.mu.Unlock()
+		return nil, false, nil // a history that cannot be read is an empty chat, not an error
+	}
+	m.UseSession(key, ses)
+	return m.AgentMessages(ctx, key)
+}
+
+// admitReader says whether a server may be started to read key's history now, stopping the oldest reader of an agent that is not awake when the cap is reached.
+func (m *Manager) admitReader(key string) bool {
+	m.mu.Lock()
+	if m.closed || time.Since(m.readFail[key]) < readerCooldown {
+		m.mu.Unlock()
+		return false
+	}
+	if m.servers[key] != nil || m.starting[key] != nil { // one is up or on its way: it is used
+		m.mu.Unlock()
+		return true
+	}
+	type reader struct {
+		key   string
+		since time.Time
+	}
+	var readers []reader
+	for k, g := range m.servers {
+		if g.reader {
+			readers = append(readers, reader{k, g.since})
+		}
+	}
+	alive := m.alive
+	m.mu.Unlock()
+	if len(readers) < readerCap {
+		return true
+	}
+	// outside the lock: the question may read a database
+	var victim string
+	var oldest time.Time
+	for _, r := range readers {
+		if alive != nil && alive(r.key) {
+			continue // an agent that is awake is not made to give up its server
+		}
+		if victim == "" || r.since.Before(oldest) {
+			victim, oldest = r.key, r.since
+		}
+	}
+	if victim == "" {
+		return false
+	}
+	m.Stop(victim)
+	return true
+}

@@ -29,6 +29,7 @@ type fakeOpencode struct {
 	haveMsgs  bool
 	used      []string
 	stored    map[string]string
+	read      []string
 	idleSince time.Time
 	server    OpencodeServer
 	ensured   [][4]string
@@ -43,6 +44,10 @@ func (f *fakeOpencode) Ensure(_ context.Context, key, bin, model, resume string)
 }
 func (f *fakeOpencode) AgentTurn(string) (opencode.State, time.Time, bool) {
 	return f.state, f.at, f.known
+}
+func (f *fakeOpencode) ReadHistory(ctx context.Context, key, bin string) ([]opencode.Message, bool, error) {
+	f.read = append(f.read, key+"|"+bin)
+	return f.msgs, f.haveMsgs, nil
 }
 func (f *fakeOpencode) AgentMessages(context.Context, string) ([]opencode.Message, bool, error) {
 	return f.msgs, f.haveMsgs, nil
