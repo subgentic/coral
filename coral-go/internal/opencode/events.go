@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/subgentic/coral/internal/permreview"
 	"io"
 	"net/http"
 	"regexp"
@@ -40,16 +41,20 @@ type PermissionRequest struct {
 	SessionID  string
 	Permission string
 	Patterns   []string
-	Command    string
-	File       string
-	Directory  string // the folder the request belongs to: the reply is scoped to it
+	Command    string   // the command, as permreview shows it: whole up to permreview.MaxBytes, hidden characters written out
+	File       string   // the file, the same
+	Always     []string // what "Allow always" would stop asking about (the request's own patterns for it), shown the same way
+	Directory  string   // the folder the request belongs to: the reply is scoped to it
 	At         time.Time
+
+	// MorePatterns and MoreAlways count patterns not listed (and N more patterns).
+	MorePatterns, MoreAlways int
+	// Cut: some part of the request is longer than a card shows; Hidden: some part holds a control or format character. Either way it can only be rejected (permreview.Review).
+	Cut, Hidden bool
 }
 
-const (
-	maxPermText     = 500
-	maxPermPatterns = 8
-)
+// Allowed says the request may be allowed from a card: it was shown whole and holds nothing hidden. A request that is not is only ever answered "reject" (ReplyPermission refuses the rest).
+func (p PermissionRequest) Allowed() bool { return !p.Cut && !p.Hidden }
 
 // maxFrame bounds one event frame: a frame over it is dropped, the stream goes on.
 const maxFrame = 1 << 20
@@ -64,6 +69,7 @@ type frame struct {
 	ID         string         `json:"id"`
 	Permission string         `json:"permission"`
 	Patterns   []string       `json:"patterns"`
+	Always     []string       `json:"always"`
 	Metadata   map[string]any `json:"metadata"`
 	RequestID  string         `json:"requestID"`
 	Directory  string         `json:"directory"` // on /global/event's wrapper: the folder the event is for
@@ -279,19 +285,26 @@ func permissionOf(in *frame, dir string) *PermissionRequest {
 	if !permIDRe.MatchString(in.ID) || !validSessionID(sid) {
 		return nil
 	}
-	r := &PermissionRequest{ID: in.ID, SessionID: sid, Permission: cutText(in.Permission, 64), Directory: cleanDir(dir), At: time.Now()}
-	for i, p := range in.Patterns {
-		if i >= maxPermPatterns {
-			break
-		}
-		r.Patterns = append(r.Patterns, cutText(p, maxPermText))
-	}
+	kind := permreview.Of(cutText(in.Permission, 64))
+	r := &PermissionRequest{ID: in.ID, SessionID: sid, Permission: kind.Shown, Directory: cleanDir(dir), At: time.Now()}
+	reviews := []permreview.Review{kind}
+	var pr permreview.Review
+	r.Patterns, r.MorePatterns, pr = permreview.Patterns(in.Patterns)
+	reviews = append(reviews, pr)
+	r.Always, r.MoreAlways, pr = permreview.Patterns(in.Always)
+	reviews = append(reviews, pr)
 	if c, ok := in.Metadata["command"].(string); ok {
-		r.Command = cutText(c, maxPermText)
+		cr := permreview.Of(c)
+		r.Command = cr.Shown
+		reviews = append(reviews, cr)
 	}
 	if f, ok := in.Metadata["filepath"].(string); ok {
-		r.File = cutText(f, maxPermText)
+		fr := permreview.Of(f)
+		r.File = fr.Shown
+		reviews = append(reviews, fr)
 	}
+	m := permreview.Merge(reviews...)
+	r.Cut, r.Hidden = m.Cut, m.Hidden
 	return r
 }
 

@@ -53,19 +53,57 @@ func TestAPermissionFrameThatIsNotWellFormedIsNotARequest(t *testing.T) {
 			assert.Nil(t, e.Ask, name)
 		}
 	}
-	// a long command is cut, control characters are dropped, a relative or hostile folder is not kept
+	// a relative or hostile folder is not kept
 	var got []Event
-	long := strings.Repeat("x", 2000) + `\u001b[31m` // a JSON escape: the frame stays valid JSON, the text holds a control character
-	in := frame(`{"id":"per_abc","sessionID":"ses_abc123","permission":"bash\u0007","metadata":{"command":"`+long+`"}}`, "relative/dir")
+	in := frame(`{"id":"per_abc","sessionID":"ses_abc123","permission":"bash","metadata":{"command":"ls"}}`, "relative/dir")
 	require.NoError(t, ParseStream(context.Background(), strings.NewReader(in), func(e Event) { got = append(got, e) }))
 	require.Len(t, got, 1)
 	require.NotNil(t, got[0].Ask)
-	assert.LessOrEqual(t, len(got[0].Ask.Command), maxPermText)
-	assert.Equal(t, "bash", got[0].Ask.Permission, "a control character is dropped")
 	assert.Equal(t, "", got[0].Ask.Directory, "a folder that is not absolute is not passed back to the server")
 	assert.Equal(t, "", cleanDir("/a\nb"))
 	assert.Equal(t, "", cleanDir(strings.Repeat("/a", 3000)))
 	assert.Equal(t, "/ok/dir", cleanDir("/ok/dir"))
+}
+
+// What the card may show of a request, and whether it may be allowed (Security's MUST on #11395): shown whole up to 4000 bytes; longer, or holding a control or format character, it can only be rejected.
+func askFor(t *testing.T, command string) *PermissionRequest {
+	t.Helper()
+	b, err := json.Marshal(command)
+	require.NoError(t, err)
+	in := `data: {"directory":"/w","payload":{"id":"e","type":"permission.asked","properties":{"id":"per_abc","sessionID":"ses_abc123","permission":"bash","patterns":["x"],"always":["echo *"],"metadata":{"command":` + string(b) + `}}}}` + "\n\n"
+	var got []Event
+	require.NoError(t, ParseStream(context.Background(), strings.NewReader(in), func(e Event) { got = append(got, e) }))
+	require.Len(t, got, 1)
+	require.NotNil(t, got[0].Ask)
+	return got[0].Ask
+}
+
+func TestACleanCommandIsShownWholeAndMayBeAllowedAndAHiddenOrLongOneMayNot(t *testing.T) {
+	clean400 := strings.Repeat("a", 400)
+	r := askFor(t, clean400)
+	assert.Equal(t, clean400, r.Command)
+	assert.True(t, r.Allowed(), "a clean 400-byte command")
+
+	long600 := strings.Repeat("b", 600)
+	r = askFor(t, long600)
+	assert.Equal(t, long600, r.Command, "a 600-byte command is shown whole (the old 500-byte cut hid its tail)")
+	assert.True(t, r.Allowed())
+
+	r = askFor(t, "echo safe \u202e txet nepo")
+	assert.True(t, r.Hidden)
+	assert.False(t, r.Allowed(), "a command holding U+202E (right-to-left override) cannot be allowed")
+	assert.Contains(t, r.Command, "<U+202E>", "and it is written out, not shown raw")
+	assert.NotContains(t, r.Command, "\u202e")
+
+	r = askFor(t, strings.Repeat("c", 5000))
+	assert.True(t, r.Cut)
+	assert.False(t, r.Allowed(), "longer than 4000 bytes")
+	assert.Len(t, r.Command, 4000)
+
+	assert.False(t, askFor(t, "ls \u200b-la").Allowed(), "a zero-width space")
+	assert.False(t, askFor(t, "ls\u001b[2K").Allowed(), "a control character")
+	assert.True(t, askFor(t, "ls\n\t-la").Allowed(), "a newline and a tab are ordinary")
+	assert.Equal(t, []string{"echo *"}, askFor(t, "ls").Always, "what Allow always would stop asking about")
 }
 
 func permManager(t *testing.T, version, frames string) (*Manager, string) {
@@ -161,4 +199,22 @@ func TestTheAskFirstConfigAsksBeforeEditsAndCommandsAndOnlyWhenAsked(t *testing.
 	p, err = writeModelConfig(dir, "", false)
 	require.NoError(t, err)
 	assert.Equal(t, "", p, "no model and no ask: no file")
+}
+
+// An Allow answer to a request that cannot be allowed from a card is refused by the manager itself, whatever the caller sends; Reject is taken.
+func TestAnAllowAnswerToAnUnallowableRequestIsRefusedAndRejectIsTaken(t *testing.T) {
+	hidden := strings.Replace(askedFrame, `"command":"echo hello"`, `"command":"echo hello \u202e"`, 1)
+	m, envFile := permManager(t, "1.19.5", hidden)
+	waitFor(t, "the request", func() bool { return len(m.AgentPermissions("agent-1")) == 1 })
+	req := m.AgentPermissions("agent-1")[0]
+	require.True(t, req.Hidden)
+	for _, reply := range []string{"once", "always"} {
+		assert.ErrorIs(t, m.ReplyPermission(context.Background(), "agent-1", req.ID, reply), ErrPermissionRefused, reply)
+	}
+	_, err := os.Stat(envFile + ".replies")
+	assert.True(t, os.IsNotExist(err), "no Allow reached the server")
+	assert.Len(t, m.AgentPermissions("agent-1"), 1, "the request is still open")
+	require.NoError(t, m.ReplyPermission(context.Background(), "agent-1", req.ID, "reject"))
+	raw, _ := os.ReadFile(envFile + ".replies")
+	assert.Contains(t, string(raw), "|reject|")
 }

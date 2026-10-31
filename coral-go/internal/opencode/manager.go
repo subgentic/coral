@@ -467,6 +467,9 @@ func (m *Manager) ReplyPermission(ctx context.Context, key, id, reply string) er
 	if !ok {
 		return ErrPermissionGone
 	}
+	if reply != "reject" && !req.Allowed() {
+		return ErrPermissionRefused // a request that could not be shown whole, or holds hidden characters, is only ever rejected: whatever the caller says
+	}
 	c, err := g.srv.Client()
 	if err != nil {
 		return err

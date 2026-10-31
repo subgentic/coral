@@ -429,5 +429,8 @@ func (c *Client) ReplyPermission(ctx context.Context, id, dir, reply string) err
 	return nil
 }
 
+// ErrPermissionRefused is an Allow answer to a request that cannot be allowed from a card (too long to show, or holding hidden characters): only Reject is taken.
+var ErrPermissionRefused = errors.New("opencode: that request can only be rejected from here")
+
 // ErrPermissionGone is a request the server no longer has open (answered in the terminal, or the turn ended).
 var ErrPermissionGone = errors.New("opencode: that permission request is no longer open")
