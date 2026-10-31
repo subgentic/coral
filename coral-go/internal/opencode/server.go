@@ -9,15 +9,14 @@ import (
 	"fmt"
 	"github.com/subgentic/coral/internal/fsreplace"
 	"github.com/subgentic/coral/internal/safego"
+	"log/slog"
 	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
-	"runtime"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/subgentic/coral/internal/agentenv"
@@ -43,6 +42,9 @@ type Config struct {
 	Ready   time.Duration // how long one attempt waits for the server to answer an authenticated call (default 20 s)
 
 	pickPort func() (int, error) // a test's way to make a port race
+
+	readIdentity  func(pid int) (started, image string) // how a new server's start time and image are read (default: the platform's); a test's way to stand in for a process that cannot be read at first
+	identityRetry time.Duration                         // how long to wait before reading them a second time when the first read was not complete (default 100 ms)
 }
 
 // Server is one opencode server Coral runs for ONE agent: its own port and its own password, so what one agent's tools can reach is that agent's server and no other's (Security, #11364). Its database, and with it
@@ -54,6 +56,8 @@ type Server struct {
 	cmd      *exec.Cmd
 	dir      string // this server's own folder: its pid record and its password file
 	done     chan struct{}
+	started  string // the process's start time and image taken right after it started (processStart, processImage): Windows ends it only while the pid is still that process
+	image    string
 }
 
 // keyRe is what an agent's key may be (its Coral session id): it names a folder.
@@ -231,8 +235,9 @@ func storeOf(dataDir, session string) string {
 type pidRecord struct {
 	PID     int    `json:"pid"`
 	Port    int    `json:"port"`
-	Command string `json:"command"` // the executable and arguments as exec'd, joined by one space
-	Started string `json:"started"` // ps's start time of the process
+	Command string `json:"command"`         // the executable and arguments as exec'd, joined by one space
+	Started string `json:"started"`         // when the process began (processStart: ps's start time, on Windows its creation time)
+	Image   string `json:"image,omitempty"` // Windows only: the executable the process runs (processImage), checked with the start time before the process is ended
 }
 
 // writePrivate writes data to path as a private file nobody can have planted a link at: a new file in the same folder created exclusively (no following of a link, mode 0600), then renamed over path.
@@ -286,6 +291,12 @@ func Start(ctx context.Context, cfg Config, key string) (*Server, error) {
 	}
 	if cfg.pickPort == nil {
 		cfg.pickPort = freeLoopbackPort
+	}
+	if cfg.readIdentity == nil {
+		cfg.readIdentity = defaultReadIdentity
+	}
+	if cfg.identityRetry == 0 {
+		cfg.identityRetry = 100 * time.Millisecond
 	}
 	dir := filepath.Join(cfg.DataDir, "servers", key)
 	for _, d := range []string{cfg.DataDir, filepath.Join(cfg.DataDir, "servers"), dir, filepath.Join(cfg.DataDir, "config"), filepath.Join(cfg.DataDir, "data"), filepath.Join(cfg.DataDir, "cache"), filepath.Join(cfg.DataDir, "state")} {
@@ -352,9 +363,10 @@ func startOn(ctx context.Context, cfg Config, version Version, dir string, port 
 		return nil, fmt.Errorf("opencode: could not start the server: %w", err)
 	}
 	s := &Server{URL: "http://127.0.0.1:" + strconv.Itoa(port), Version: version, password: password, cmd: cmd, dir: dir, done: make(chan struct{})}
+	s.started, s.image = identityOf(cmd.Process.Pid, cfg.readIdentity, cfg.identityRetry)
 	safego.Go("opencode:wait", func() { defer close(s.done); _ = cmd.Wait() })
 	pidFile := filepath.Join(dir, "server.json")
-	rec, _ := json.Marshal(pidRecord{PID: cmd.Process.Pid, Port: port, Command: strings.Join(append([]string{cfg.Bin}, args...), " "), Started: processStart(cmd.Process.Pid)})
+	rec, _ := json.Marshal(pidRecord{PID: cmd.Process.Pid, Port: port, Command: strings.Join(append([]string{cfg.Bin}, args...), " "), Started: s.started, Image: s.image})
 	_ = writePrivate(pidFile, rec)
 	fail := func(err error) (*Server, error) {
 		s.Stop()
@@ -429,15 +441,36 @@ func startOn(ctx context.Context, cfg Config, version Version, dir string, port 
 	}
 }
 
-// Stop ends the server Coral started, by its own process: never by name.
+// identityOf is the start time and image of a process just started (processStart, processImage), read again once after a moment when the first read found nothing (a process that had only just begun); a Windows
+// process that cannot be read is ended only by its own handle (Server.Stop says so).
+func identityOf(pid int, read func(pid int) (started, image string), retryAfter time.Duration) (started, image string) {
+	started, image = read(pid)
+	if !identityComplete(started, image) {
+		time.Sleep(retryAfter)
+		started, image = read(pid)
+	}
+	return started, image // what is still missing is said once, when Stop has to fall back to Kill
+}
+
+// defaultReadIdentity reads a process's start time and image as the platform keeps them.
+func defaultReadIdentity(pid int) (string, string) { return processStart(pid), processImage(pid) }
+
+// Stop ends the server Coral started, by its own process: never by name. Where there is a signal to ask with (askToEnd) it asks and waits 3 s before it kills; on Windows it ends the process and what it started at once.
 func (s *Server) Stop() {
 	if s == nil || s.cmd == nil || s.cmd.Process == nil {
 		return
 	}
-	_ = s.cmd.Process.Signal(syscall.SIGTERM)
+	select {
+	case <-s.done: // it ended on its own: its pid may be another process's by now, so nothing is asked of it
+	default:
+		askToEnd(s)
+	}
 	select {
 	case <-s.done:
 	case <-time.After(3 * time.Second):
+		if !identityComplete(s.started, s.image) { // the identity could not be read at the start, so only the process itself is killed: anything it started (a shim's child) may keep running
+			slog.Warn("opencode: the server's identity was not read at its start, so only its own process was killed; a process it started may still be running", "pid", s.cmd.Process.Pid)
+		}
 		_ = s.cmd.Process.Kill()
 		<-s.done
 	}
@@ -445,8 +478,8 @@ func (s *Server) Stop() {
 	_ = os.Remove(filepath.Join(s.dir, "password")) // a dead server's password is not kept
 }
 
-// stopLeftOver stops the server a previous Coral recorded, if that process is still there: its pid must show, by ps, the exact command that was recorded and the start time that was recorded. A pid that is
-// another process now (a restart reused it) is never signalled.
+// stopLeftOver stops the server a previous Coral recorded, if that process is still there: its pid must be the process that was recorded (isRecordedServer: by ps, the exact command and the start time; on Windows
+// the start time and the image). A pid that is another process now (a restart reused it) is never ended.
 func stopLeftOver(pidFile string) {
 	b, err := os.ReadFile(pidFile)
 	if err != nil {
@@ -460,32 +493,5 @@ func stopLeftOver(pidFile string) {
 	if !isRecordedServer(rec) {
 		return
 	}
-	if p, err := os.FindProcess(rec.PID); err == nil {
-		_ = p.Signal(syscall.SIGTERM)
-	}
-}
-
-// isRecordedServer reports whether rec.PID is still the process that was recorded: its command line (ps) is exactly the recorded command and it began when the record says. Where ps is not there (Windows) it
-// says no and nothing is signalled.
-func isRecordedServer(rec pidRecord) bool {
-	if runtime.GOOS == "windows" {
-		return false
-	}
-	out, err := exec.Command("ps", "-o", "args=", "-p", strconv.Itoa(rec.PID)).Output()
-	if err != nil || strings.TrimSpace(string(out)) != rec.Command {
-		return false
-	}
-	return processStart(rec.PID) == rec.Started
-}
-
-// processStart is ps's start time of pid ("" where ps is not there or the process is not).
-func processStart(pid int) string {
-	if runtime.GOOS == "windows" {
-		return ""
-	}
-	out, err := exec.Command("ps", "-o", "lstart=", "-p", strconv.Itoa(pid)).Output()
-	if err != nil {
-		return ""
-	}
-	return strings.TrimSpace(string(out))
+	endProcess(rec.PID)
 }
