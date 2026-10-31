@@ -71,7 +71,7 @@ func TestOperatorAsksListsWhatAgentsAskedTheOperatorAndTheirReplyClosesIt(t *tes
 		}
 		return q
 	}
-	toOp := ask("Lead", "@Operator which of the two designs do we ship? ‮evil")
+	toOp := ask("Lead", "@Operator which of the two designs do we ship? \u202eevil")
 	ask("Lead", "@Dev which parser do we keep?") // another member's: never in the Operator's list
 
 	code, rows, _ := readOperatorAsks(t, h, asPerson)
@@ -82,7 +82,7 @@ func TestOperatorAsksListsWhatAgentsAskedTheOperatorAndTheirReplyClosesIt(t *tes
 	assert.Equal(t, "Lead", rows[0]["asker"])
 	assert.EqualValues(t, toOp.ID, rows[0]["id"])
 	assert.Contains(t, rows[0]["text"], "which of the two designs")
-	assert.NotContains(t, rows[0]["text"], "‮", "the text is cleaned")
+	assert.NotContains(t, rows[0]["text"], "\u202e", "the text is cleaned")
 
 	// an operator wait is in the same list
 	_, err = bs.RegisterWait(ctx, "team", "Dev", "claude-x", board.WaitOperator, "", "may I delete the old table?", time.Hour)

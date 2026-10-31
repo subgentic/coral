@@ -14,6 +14,7 @@ import (
 	at "github.com/subgentic/coral/internal/agenttypes"
 	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/clitext"
+	"github.com/subgentic/coral/internal/httputil"
 	"github.com/subgentic/coral/internal/naming"
 	"github.com/subgentic/coral/internal/ptr"
 	"github.com/subgentic/coral/internal/ptymanager"
@@ -353,14 +354,12 @@ func (h *SessionsHandler) reserveForBoard(ctx context.Context, project, kind, ac
 
 // refuseCap answers 429 with which cap was reached and how to raise it; any other error is a 500.
 func (h *SessionsHandler) refuseCap(w http.ResponseWriter, err error, g board.OrchGrant) {
-	switch {
-	case errors.Is(err, board.ErrLifecycleCapHour):
-		orchRefusal(w, http.StatusTooManyRequests, "board_hourly_limit", fmt.Sprintf("this board's limit of %d launches and wakes an hour is used up: wait, or the Operator can raise it", g.MaxPerHour))
-	case errors.Is(err, board.ErrLifecycleCapLive):
-		orchRefusal(w, http.StatusTooManyRequests, "board_live_limit", fmt.Sprintf("this board already has %d live agents: put some to sleep, or the Operator can raise the limit", g.MaxLive))
-	default:
-		errInternalServer(w, "could not write the log")
+	code, msg := capRefusal(err, g)
+	if code == "lifecycle_log_failed" {
+		errInternalServer(w, msg)
+		return
 	}
+	httputil.WriteActionLimitBody(w, 0, map[string]string{"error": msg, "message": msg, "code": code}) // a limit on this board's agents, not an overloaded Coral (the same body orchRefusal writes)
 }
 
 // orchActor is the name the log and the board line carry for the seat: its member name on the board, cleaned.

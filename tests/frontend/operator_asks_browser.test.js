@@ -6,7 +6,7 @@ const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 const { coralReady } = require('./helpers/wait');
 
-const LONG = 'Which of the two \u202edesigns do we ship? ' + 'We have weighed the first against the second at length and the cost of each is clear. '.repeat(4) + 'Reply with 1 or 2. ‮evil';
+const LONG = 'Which of the two \u202edesigns do we ship? ' + 'We have weighed the first against the second at length and the cost of each is clear. '.repeat(4) + 'Reply with 1 or 2. \u202eevil';
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -34,7 +34,7 @@ const LONG = 'Which of the two \u202edesigns do we ship? ' + 'We have weighed th
             const lead = rs.find(r => r.text.includes('Lead')), dev = rs.find(r => r.text.includes('Dev'));
             assert.ok(lead && dev, at + 'the askers are named');
             assert.ok(lead.text.includes('Which of the two <U+202E>designs'), at + 'the question is on the row, with the hidden character written out: ' + lead.text.slice(0, 120));
-            assert.ok(!lead.text.includes('‮'), at + 'a hidden character is written out, never drawn raw');
+            assert.ok(!lead.text.includes('\u202e'), at + 'a hidden character is written out, never drawn raw');
             assert.ok(dev.text.includes('may I delete the old table?'), at + "the wait's question is on the row");
             await waitFor(`document.getElementById('nav-tab-hub-inbox-badge').textContent === '2'`, at + 'the badge counts both', 6000);
 
@@ -44,7 +44,7 @@ const LONG = 'Which of the two \u202edesigns do we ship? ' + 'We have weighed th
             const dlg = await ev(`(() => { const d = document.querySelector('dialog.inbox-ask-dialog'); const r = d.getBoundingClientRect(); const btns = [...d.querySelectorAll('button')].map(b => Math.round(b.getBoundingClientRect().height));
                 return { whole: d.querySelector('.inbox-ask-text').textContent, title: d.querySelector('h2').textContent, fits: r.left >= 0 && r.right <= innerWidth + 1, btns, focus: document.activeElement && document.activeElement.className }; })()`);
             assert.equal(dlg.title, 'Lead asks you', at + 'the title');
-            assert.ok(dlg.whole.includes('Reply with 1 or 2.') && dlg.whole.includes('<U+202E>evil') && !dlg.whole.includes('‮'), at + 'the whole question, marked: ' + dlg.whole.slice(-60));
+            assert.ok(dlg.whole.includes('Reply with 1 or 2.') && dlg.whole.includes('<U+202E>evil') && !dlg.whole.includes('\u202e'), at + 'the whole question, marked: ' + dlg.whole.slice(-60));
             assert.ok(dlg.fits, at + 'the dialog fits the screen'); assert.ok(dlg.btns.every(h => h >= 44), at + 'buttons are 44 px tall: ' + dlg.btns); assert.ok(/inbox-ask-box/.test(dlg.focus), at + 'the box has the focus: ' + dlg.focus);
 
             // empty reply, then a refused post keeps the text, then Send
