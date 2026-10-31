@@ -394,7 +394,19 @@ func startOn(ctx context.Context, cfg Config, version Version, dir string, port 
 		case err == nil && status == 200:
 			return fail(errors.New("opencode: another server answers on this port, one that asks for no password"))
 		case err == nil && (status == 401 || status == 403):
-			// It wants a password. Now the real one: the child must still be running (one that could not listen has exited) and must take it.
+			// It wants a password. Before the real one is sent, the listener on this port must be the child (or its descendant): a stranger that holds the port and refuses a wrong password is never sent it (#11398).
+			owned, oerr := listenerIsChild(ctx, port, s.cmd.Process.Pid)
+			if exited() {
+				_ = os.Remove(pidFile)
+				return nil, errors.New("opencode: the server exited before it answered")
+			}
+			if oerr != nil {
+				return fail(fmt.Errorf("opencode: could not tell who listens on the server's port, so the password is not sent: %w", oerr))
+			}
+			if !owned {
+				return fail(errors.New("opencode: the listener on this port is not the server that was started"))
+			}
+			// Now the real one: the child must still be running (one that could not listen has exited) and must take it.
 			rctx, rcancel := context.WithTimeout(ctx, time.Second)
 			rstatus, rerr := c.ping(rctx)
 			rcancel()

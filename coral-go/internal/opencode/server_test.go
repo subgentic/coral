@@ -194,6 +194,9 @@ func runStub() {
 	if os.Getenv("STANDIN_NO_BIND") == "1" {
 		select {} // alive, never listening: ended by the signal Stop sends
 	}
+	if os.Getenv("STANDIN_BIND_OTHER") == "1" {
+		port = "0" // a build that moved to another port when the one it was given was taken
+	}
 	l, err := net.Listen("tcp", "127.0.0.1:"+port)
 	if err != nil {
 		os.Exit(3)
