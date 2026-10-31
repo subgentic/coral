@@ -6,7 +6,7 @@
 //                           [--sequences] [--strict | --no-strict] [--tmux | --no-tmux] [--part K/N] [--results-out FILE]
 //
 // It builds coral with -tags "dev fts5" into a temp dir, starts it with a temp CORAL_DATA_DIR on a
-// free non-default port (never ~/.coral, never :8420), starts headless Chrome with a temp profile and
+// free non-default port (never ~/.coral, never :8420 or :8450), starts headless Chrome with a temp profile and
 // a debugging port, runs every CDP and server suite (see suites.mjs) one at a time with a timeout, and
 // prints pass/fail per suite. It refuses to start (exit 2) while any *.test.js/mjs file here has no runner
 // or more than one, so a suite can't be silently skipped.
@@ -15,11 +15,16 @@
 // key event sent through Input.dispatchKeyEvent, and a hidden page runs no animation frames (#3707). The preload
 // switches on focus emulation for each CDP connection a suite makes; CDP_KEEP_VISIBLE=0 turns it off.
 //
-// --shards N (default 1) starts N such server+Chrome pairs, each with its own data dir, ports and profile,
+// --shards N starts N such server+Chrome pairs, each with its own data dir, ports and profile,
 // and runs N suites at once: each shard takes the next suite from one shared queue, so within a shard
-// suites still run one at a time. Output is printed per suite as it finishes.
+// suites still run one at a time. Output is printed per suite as it finishes. The default is 1 in CI (CI set),
+// with --only, --sequences or --part, and 3 with --stress; a full local run gets one shard per 4 CPUs, 1 to 12
+// (#415, 48 CPUs: 1,350 s on 6 shards, 1,184 on 8, 1,174 on 10, 1,111 on 12, the CPU never above 90%; past 12 the
+// shards slow each other more than they add, and a smaller machine gets fewer: 8 CPUs, 2 shards. #351: a full
+// run on Windows took 78 min on 1 shard, 27.5 on 3 and 15.5 on 6; each shard is a Coral and a
+// Chrome, about 250 MB).
 //
-// --timeout S (default 120) is a hard wall-clock limit per suite attempt. When it fires (typically a hung
+// --timeout S (default 180, as CI passes) is a hard wall-clock limit per suite attempt. When it fires (typically a hung
 // CDP socket), the suite's whole process group is killed, which closes its CDP client, and that shard's
 // Chrome and Coral server are replaced with fresh ones before its next suite, so a wedged browser can't
 // fail the suites after it. The attempt is reported as TIMEOUT. A shard whose Chrome or server died
@@ -139,8 +144,9 @@ const intArg = (name, def, min) => {
 };
 const stress = flag('--stress');
 const only = arg('--only', '');
-const timeoutS = intArg('--timeout', 120, 1);
-const shards = intArg('--shards', stress ? 3 : 1, 1);
+const timeoutS = intArg('--timeout', 180, 1);
+const localShards = process.env.CI || only || flag('--sequences') || arg('--part', '') ? 1 : Math.min(12, Math.max(1, Math.floor(os.availableParallelism() / 4)));
+const shards = intArg('--shards', stress ? 3 : localShards, 1);
 const retries = stress ? 0 : intArg('--retries', 1, 0);
 const runs = stress ? intArg('--runs', 3, 1) : 1;
 const throttle = stress ? Number(arg('--cpu-throttle', '4')) : 1;
@@ -192,7 +198,8 @@ const NO_TMUX_HERE = process.platform === 'win32';
 if (tmuxOnly && NO_TMUX_HERE) { console.error('--tmux: Coral has no tmux backend on Windows, so there is nothing to run'); process.exit(2); }
 const tmuxShard = !NO_TMUX_HERE && (tmuxOnly || (!flag('--no-tmux') && !only && !stress && !flag('--sequences') && !part));
 const strictShard = strictOnly || (!flag('--no-strict') && !tmuxOnly && !only && !stress && !flag('--sequences') && !part);
-const PROD_PORT = 8420;
+// The live Coral's default ports: 8450 on Windows, 8420 elsewhere. Both are refused, the same list as Go's testguard (defaultPorts).
+const PROD_PORTS = [8420, 8450];
 const chromePath = arg('--chrome', process.env.CHROME || [
   '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', '/usr/bin/google-chrome', '/usr/bin/chromium', '/usr/bin/chromium-browser',
 ].find(p => fs.existsSync(p)));
@@ -211,7 +218,7 @@ const freePort = async () => {
     const p = await new Promise((res, rej) => {
       const s = net.createServer(); s.listen(0, '127.0.0.1', () => { const q = s.address().port; s.close(() => res(q)); }); s.on('error', rej);
     });
-    if (p !== PROD_PORT) return p; // never the production Coral port, even by chance
+    if (!PROD_PORTS.includes(p)) return p; // never a production Coral port, even by chance
   }
 };
 const sleep = ms => new Promise(r => setTimeout(r, ms));
