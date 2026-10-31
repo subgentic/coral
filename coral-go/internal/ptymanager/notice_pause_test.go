@@ -36,6 +36,18 @@ func noticeRig(t *testing.T, sid string) (*fakeAgent, func(what, text string) Au
 	}
 }
 
+// waitFlushed waits until the session's held notices were told and no flush is in flight. ResumeNotices flushes on its own goroutine (time.AfterFunc), so a test that calls flushHeld right after it can find that
+// flush holding the session ("a flush is going on" returns at once) and read what was typed before it was typed: true on a slow runner, never on a fast one (the v2.0.11 go-tests red).
+func waitFlushed(t *testing.T, sid string) {
+	t.Helper()
+	require.Eventually(t, func() bool {
+		notices.Lock()
+		defer notices.Unlock()
+		st := notices.m[sid]
+		return st == nil || (!st.flusher && len(st.held) == 0 && len(st.extra) == 0 && len(st.latest) == 0)
+	}, 5*time.Second, 5*time.Millisecond, "the held notices were told")
+}
+
 func TestPausedNoticesAreHeldAndResumeTellsThemInOneLine(t *testing.T) {
 	const sid = "11111111-1387-4000-8000-000000000001"
 	a, in := noticeRig(t, sid)
@@ -64,10 +76,12 @@ func TestPausedNoticesAreHeldAndResumeTellsThemInOneLine(t *testing.T) {
 	notices.m[sid].until = time.Time{} // the person resumed
 	notices.Unlock()
 	flushHeld(sid)
+	waitFlushed(t, sid)
 	assert.Equal(t, []string{"[Coral] While you were talking: 3 board messages, 2 tasks. Run coral-board read."}, a.sent(), "ONE line, counts and fixed words only")
 	_, _, waiting, _ = NoticeStatus(sid)
 	assert.Zero(t, waiting, "what was told is gone")
 	flushHeld(sid)
+	waitFlushed(t, sid)
 	assert.Len(t, a.sent(), 1, "and is not told twice")
 
 	d, err := DeliverAutomated(context.Background(), in("board message", "A notice after the resume"))
@@ -89,6 +103,7 @@ func TestTheCapEndsAPauseAndAnAskedLengthIsBounded(t *testing.T) {
 	assert.Equal(t, Skipped, d)
 	setNoticeClock(base.Add(11 * time.Minute)) // the cap passed
 	flushHeld(sid)
+	waitFlushed(t, sid)
 	assert.Equal(t, []string{"[Coral] While you were talking: 1 board message. Run coral-board read."}, a.sent(), "the cap resumed it and the held one was told")
 	paused, _, _, _ := NoticeStatus(sid)
 	assert.False(t, paused)
@@ -111,6 +126,7 @@ func TestTypingToAnAgentHoldsItsNoticesForSixtySecondsAfterTheLastKeystroke(t *t
 
 	time.Sleep(150 * time.Millisecond) // sleep-ok: the window is a wall-clock time
 	flushHeld(sid)
+	waitFlushed(t, sid)
 	assert.Equal(t, []string{"[Coral] While you were talking: 1 board message. Run coral-board read."}, a.sent(), "when they stop, one line")
 
 	other := "22222222-1387-4000-8000-000000000004"
@@ -203,6 +219,7 @@ func TestHeldBoardNudgesAreToldAsTheMessagesTheyStateAndTheNotifierIsToldOnce(t 
 
 	ResumeNotices(sid)
 	flushHeld(sid)
+	waitFlushed(t, sid)
 	assert.Equal(t, []string{"[Coral] While you were talking: 3 board messages. Run coral-board read."}, a.sent())
 	assert.True(t, TakeBoardNudgeTold(sid), "the summary stood for the nudge")
 	assert.False(t, TakeBoardNudgeTold(sid), "and says so once")
