@@ -43,7 +43,7 @@ const { coralReady } = require('./helpers/wait');
                         return original(url,opts);
                     };return true;
                 })()`);
-                await ev(`window.switchNavTab('hub-inbox');true`);
+                await ev(`localStorage.setItem('coral-inbox-needs-filters', JSON.stringify({ sort: 'oldest' }));window.switchNavTab('hub-inbox');true`); // this list is read oldest first: with newest first, a list over the page's 12 rows shows File 01 last, behind "more" (#11552)
                 await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m=>m.selectInboxTab('needs')).then(()=>true)`);
                 await waitFor(`!!(${row('Review file 01.txt')})`,'for-review artifact in Needs you',15000);
                 const goals = await ev(`[...document.querySelectorAll('#group-table-view tbody tr')].map(r => ({ name: (r.querySelector('.inbox-review-name') || {}).textContent, goal: (r.querySelector('.inbox-review-goal [data-goal-link]') || {}).textContent || ((r.querySelector('.inbox-review-nogoal') || {}).textContent) || null, task: (r.querySelector('.inbox-review-goal') || {}).title || null, links: r.querySelectorAll('.inbox-review-goal a, .inbox-review-goal button').length,  taskShown: !!(r.querySelector('.inbox-review-task') && r.querySelector('.inbox-review-task').getClientRects().length), inLine2: !!r.querySelector('td[data-key=goal].dt-line-2, td[data-key=goal][class*="line-2"]') }))`);

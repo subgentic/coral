@@ -39,7 +39,7 @@ const { coralReady } = require('./helpers/wait');
         assert.ok(m.lastRight <= m.tdRight + 1 && m.lastRight <= m.boxRight && !m.clipped, 'all three buttons are whole, inside the cell and inside the table: ' + JSON.stringify(m));
         // the Operator's #10443: the last column's right edge dragged in from the right. The box drops Team and the others it has no room for; their <col>s must go with them, or every width after
         // lands on the wrong column (Actions squeezed to 64 px, its buttons cut) and the table ends short of the card.
-        const keys = await ev(`[...document.querySelectorAll('#group-table-view thead th')].filter(t => t.getBoundingClientRect().width > 0).map(t => t.dataset.key)`);
+        const keys = await ev(`[...document.querySelectorAll('#group-table-view thead th')].filter(t => t.getBoundingClientRect().width > 0 && t.querySelector('.dt-resize')).map(t => t.dataset.key)`); // the last column that can be dragged: Actions is last now and fixed, so it has no handle (#11552)
         const last = keys[keys.length - 1];
         const h = await ev(`(() => { const r = document.querySelector('#group-table-view th[data-key="${last}"] .dt-resize').getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; })()`);
         const mouse = (type, x, y) => client.Input.dispatchMouseEvent({ type, x, y, button: 'left', buttons: type === 'mouseReleased' ? 0 : 1, clickCount: 1 });

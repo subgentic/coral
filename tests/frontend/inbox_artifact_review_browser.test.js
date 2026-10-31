@@ -55,7 +55,7 @@ const { coralReady } = require('./helpers/wait');
                     };return true;
                 })()`);
                 await ev(`window.__reviewItems[1].starred = true; true`); // the server's list says it (ListTeamArtifacts sets starred from the artifact_stars table, the same field the Artifacts tab reads): a starred review artifact comes with starred: true, not set by hand on a row (#9834, QA Reviewer 2)
-                await ev(`window.switchNavTab('hub-inbox');true`);
+                await ev(`localStorage.setItem('coral-inbox-needs-filters', JSON.stringify({ sort: 'oldest' }));window.switchNavTab('hub-inbox');true`); // read oldest first: with newest first a list over the page's 12 rows shows File 01 last, behind "more" (#11552)
                 await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m=>m.selectInboxTab('needs')).then(()=>true)`);
                 await waitFor(`!!(${row('Review file 01.txt')})`,'for-review artifact in Needs you',15000);
                 assert.equal(await ev(`${rows}.length`),12,'ten from Writer A and two from Writer B');
