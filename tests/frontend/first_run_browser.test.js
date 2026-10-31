@@ -105,9 +105,10 @@ async function freshServer(standIn) {
 
     // Home -> Launch agent -> a folder -> Launch. Returns the new agent's {session_id, session_name}.
     const launchFromHome = async s => {
-        await waitFor(`/What do you want to work on\\?/.test(document.body.innerText)`, 'the home screen', { timeout: 15000, diag: `document.body.innerText.slice(0, 300)` });
+        // a fresh install lands on Needs you with its welcome items (#11443): its first item starts an agent; an install without them opens on Home
+        await waitFor(`/What do you want to work on\\?/.test(document.body.innerText) || /Start your first agent/.test(document.body.innerText)`, 'the home screen or the welcome items', { timeout: 15000, diag: `document.body.innerText.slice(0, 300)` });
         const before = await ev(`fetch('/api/sessions/live').then(r => r.json()).then(l => (Array.isArray(l) ? l : l.sessions || []).map(x => x.session_id))`);
-        await ev(`document.querySelector('.welcome-launch[data-arg="agent"]').click(); true`);
+        await ev(`(() => { const home = document.querySelector('.welcome-launch[data-arg="agent"]'); const item = [...document.querySelectorAll('#group-table-view button')].find(b => b.textContent === 'New agent'); (home && home.getClientRects().length ? home : item).click(); return true; })()`);
         await waitFor(`(() => { const e = document.getElementById('launch-step-agent'); return !!e && getComputedStyle(e).display !== 'none' && !!document.getElementById('launch-dir'); })()`, 'the Launch dialog (agent step)', { timeout: 10000, diag: `document.body.innerText.slice(0, 300)` });
         await ev(`(() => { const d = document.getElementById('launch-dir'); d.value = ${JSON.stringify(s.dirs.work)}; d.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
         await ev(`document.querySelector('#launch-step-agent [data-on-click="m-launch-session"]').click(); true`);

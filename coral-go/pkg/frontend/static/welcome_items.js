@@ -85,10 +85,18 @@ export function runWelcome(id) {
     if (id === 'asks') { const read = () => mark('asks'); showConfirmModal(WELCOME.asks.title, ASKS_TEXT, read, read, { label: 'Got it', cancelLabel: 'Close', danger: false }); }
 }
 
+/** Whether this page was opened at the bare address (no path, no query). The URL the person typed or tapped, not the live one: by the time the settings have loaded the app has moved to /agents (#11443). */
+function bareStart() {
+    let first = null;
+    try { const timing = typeof PerformanceNavigationTiming === 'undefined' ? null : performance.getEntries().find(e => e instanceof PerformanceNavigationTiming); if (timing) first = new URL(timing.name); } catch { /* no entry for this page: the live address */ }
+    const path = first ? first.pathname : location.pathname, query = first ? first.search : location.search;
+    return (path === '/' || path === '') && !query;
+}
+
 /** A new install opens on the Inbox while it has welcome items, once per tab, only for the bare start (no link, no query). */
 export function landOnWelcome() {
     if (!welcomeOn() || !welcomeRows().length) return;
-    if ((location.pathname !== '/' && location.pathname !== '') || location.search) return;
+    if (!bareStart()) return;
     if (browserSession.get('coral-welcome-landed')) return; // storage that is blocked reads as empty: every start lands, and the items are short-lived
     browserSession.set('coral-welcome-landed', '1');
     window.switchNavTab?.('hub-inbox');
