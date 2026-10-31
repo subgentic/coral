@@ -1,5 +1,24 @@
 # Release Notes
 
+## v2.0.16 — private marks stay with the authentic owner through Coral Hub
+
+### Changes
+
+#### What you will notice first
+
+- Nothing you can see changes in this release; it is one hardening fix.
+
+#### Known issues
+
+- **Windows: in-app update does not work from 2.0.0 through 2.0.6.** If you're on one of those, download and install the MSI by hand; from 2.0.7 on, in-app update works.
+- **macOS: a Coral of 2.0.5 or earlier cannot install updates in-app; install 2.0.6 or later by hand once.**
+- **OpenCode agents are tested on macOS and Linux; OpenCode on Windows is not yet tested end to end.**
+- Setting up a computer over SSH is supported from a macOS or Linux hub, and is not yet tested from a Windows hub.
+
+#### For developers and releases
+
+- Through Coral Hub, an artifact's private mark now goes to the authentic owner alone. The static tree is unchanged at 5,858,269 bytes of the 5,906,432-byte budget.
+
 ## v2.0.15 — a clearer reason when Coral holds its messages while you type, phone navigation polish, and a stricter guide reply
 
 ### Changes
