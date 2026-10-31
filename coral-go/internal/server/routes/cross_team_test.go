@@ -264,3 +264,24 @@ func TestCrossTeamArtifactsSwitch(t *testing.T) {
 	require.Equal(t, true, out["cross_team_artifacts"])
 	require.Equal(t, true, out["cross_team_messaging"], "a separate switch: still its default")
 }
+
+// The board the Operator recorded as Chief's team reads "Chief" in another team's view (#11508); a board merely named Chief does not.
+func TestCrossTeamChiefBoardLabel(t *testing.T) {
+	e := newCrossTeamEnv(t)
+	e.enable("alpha", true)
+	e.enable("beta", true)
+	require.NoError(t, e.h.bs.RenameBoard(context.Background(), "alpha", "Chief"))
+	code, out := e.send("alpha", "Orchestrator", "", "one")
+	require.Equal(t, http.StatusOK, code, out)
+	require.Equal(t, "Orchestrator (alpha)", out["message"].(map[string]any)["subscriber_id"], "named Chief but not recorded")
+	e.h.SetChiefBoard(func(context.Context) string { return "somewhere-else" })
+	e.now = e.now.Add(time.Minute)
+	code, out = e.send("alpha", "Orchestrator", "", "two")
+	require.Equal(t, http.StatusOK, code, out)
+	require.Equal(t, "Orchestrator (alpha)", out["message"].(map[string]any)["subscriber_id"], "another board recorded")
+	e.h.SetChiefBoard(func(context.Context) string { return "alpha" })
+	e.now = e.now.Add(time.Minute)
+	code, out = e.send("alpha", "Orchestrator", "", "three")
+	require.Equal(t, http.StatusOK, code, out)
+	require.Equal(t, "Orchestrator (Chief)", out["message"].(map[string]any)["subscriber_id"], "recorded as chief_team")
+}

@@ -395,6 +395,8 @@ type MessageOrigin struct {
 	// FromCrossTeamID is the sender board's cross-team id (#5508): read from this Coral's own row for a local sender, the sending Coral's validated claim for a relayed one. Ids only; it is what
 	// the owner's suggestions are computed from.
 	FromCrossTeamID string `json:"from_cross_team_id,omitempty"`
+	// chiefBoard is set (never stored or sent) when the sender is the board the Operator recorded as Chief's team (#11508): its name "Chief" is then allowed in the label.
+	chiefBoard bool
 	// Attachments are the files stored on this computer for an inbound message, in the order the sender attached them (#5506); left out when there are none.
 	Attachments []MessageAttachment `json:"attachments,omitempty"`
 }
@@ -418,9 +420,11 @@ const localServerID = "local"
 
 // CrossTeamPost is a validated cross-team message, ready to store.
 type CrossTeamPost struct {
-	Origin   MessageOrigin // Direction and TargetMessageID are filled in
-	Mentions []string      // subscriber ids on the target board to @mention
-	Content  string
+	// ChiefBoard is the board the Operator recorded as Chief's team (chief_team), or "": a sender that is exactly that board may be named Chief in the label (#11508).
+	ChiefBoard string
+	Origin     MessageOrigin // Direction and TargetMessageID are filled in
+	Mentions   []string      // subscriber ids on the target board to @mention
+	Content    string
 }
 
 // ErrNoTargetOrchestrator means the target board has nobody to deliver to.
@@ -457,7 +461,7 @@ func (s *Store) TargetOrchestrators(ctx context.Context, project, to string) ([]
 // else the id. The reply hint still addresses the id (CrossReplyLine).
 func SenderLabel(o MessageOrigin) string {
 	team := o.Board
-	if l, ok := CleanTeamLabel(o.BoardLabel); ok && l != o.Board {
+	if l, ok := cleanTeamLabel(o.BoardLabel, o.chiefBoard); ok && l != o.Board {
 		team = l
 	}
 	if o.remote() {
@@ -476,7 +480,10 @@ const maxTeamLabelRunes = 40
 // CleanTeamLabel is a team name as it may be put inside "Role (...)" in another team's text, and whether it may: the name was chosen by whoever made or renamed that team. It must equal what
 // clitext.CleanName leaves of it (after trimming), be non-empty, at most 40 characters, have none of @ ( ) [ ] : and no "www." link, and not be the name of the Operator or Chief (any
 // spelling normalizeName reads the same). When ok is false the board id is shown instead. The one rule for a name from this Coral and one a relay carries.
-func CleanTeamLabel(name string) (label string, ok bool) {
+func CleanTeamLabel(name string) (label string, ok bool) { return cleanTeamLabel(name, false) }
+
+// cleanTeamLabel is CleanTeamLabel, with allowChief lifting only the Chief-name rule: for the one board the Operator recorded as Chief's team. Every other check still applies.
+func cleanTeamLabel(name string, allowChief bool) (label string, ok bool) {
 	l := strings.TrimSpace(name)
 	if l == "" || l != clitext.CleanName(l) || utf8.RuneCountInString(l) > maxTeamLabelRunes {
 		return "", false
@@ -484,7 +491,7 @@ func CleanTeamLabel(name string) (label string, ok bool) {
 	if strings.ContainsAny(l, "@()[]:") || strings.Contains(strings.ToLower(l), "www.") {
 		return "", false
 	}
-	if IsOperatorName(l) || SameIdentity(l, "Chief") {
+	if IsOperatorName(l) || (!allowChief && SameIdentity(l, "Chief")) {
 		return "", false
 	}
 	return l, true
@@ -521,6 +528,7 @@ func (s *Store) PostCrossTeamMessage(ctx context.Context, p CrossTeamPost) (inbo
 	in := p.Origin
 	in.Direction = "inbound"
 	in.TargetMessageID = 0
+	in.chiefBoard = p.ChiefBoard != "" && !in.remote() && in.Board == p.ChiefBoard
 	if in.BoardLabel == "" && !in.remote() {
 		if l := s.BoardLabel(ctx, in.Board); l != in.Board {
 			in.BoardLabel = l

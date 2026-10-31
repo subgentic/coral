@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -33,6 +34,28 @@ const (
 // SetAllowlistFlag tells the handler how to read the global switch (cross_team_allowlist) that puts the allowlist in force. Off (the default of the release that adds it) leaves today's rules:
 // the list is stored and editable, and what it would have refused is counted as "would refuse" (shadow rows).
 func (h *BoardHandler) SetAllowlistFlag(fn func(ctx context.Context) bool) { h.allowlistFlag = fn }
+
+// SetChiefBoard tells the handler how to read the board the Operator recorded as Chief's team (#11508), whose messages to another team may be labelled "Chief".
+func (h *BoardHandler) SetChiefBoard(fn func(ctx context.Context) string) { h.chiefBoard = fn }
+
+// ChiefBoard reads chief_team: the board key the Operator recorded, "" when none or the settings cannot be read.
+func ChiefBoard(ss *store.SessionStore) func(context.Context) string {
+	return func(ctx context.Context) string {
+		s, err := ss.GetSettings(ctx)
+		if err != nil {
+			return ""
+		}
+		return strings.TrimSpace(setreg.Text(s, "chief_team"))
+	}
+}
+
+// chiefBoardNow is the recorded Chief board, "" when not wired.
+func (h *BoardHandler) chiefBoardNow(ctx context.Context) string {
+	if h.chiefBoard == nil {
+		return ""
+	}
+	return h.chiefBoard(ctx)
+}
 
 func (h *BoardHandler) allowlistOn(ctx context.Context) bool {
 	return h.allowlistFlag != nil && h.allowlistFlag(ctx)
