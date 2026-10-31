@@ -22,23 +22,18 @@ func (h *BoardHandler) CloseAsk(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body struct {
-		SubscriberID string `json:"subscriber_id"`
+		SubscriberID string `json:"subscriber_id"` // accepted for the command line's sake and ignored: the verified caller closes
 		Note         string `json:"note"`
 	}
 	if err := decodeJSON(r, &body); err != nil {
 		errBadRequest(w, "invalid JSON")
 		return
 	}
-	who, ok := attributedTo(w, r, body.SubscriberID)
-	if !ok {
-		return
-	}
-	actor := strings.TrimSpace(body.SubscriberID)
-	if identityActorEnforced() {
-		actor = who
-	}
-	if actor == "" {
-		errBadRequest(w, "subscriber_id required")
+	// Who closes is the identity layer's verified actor in every mode, never the name the body claims: an agent that could name itself the Operator, or the asker, could hide a question from the Operator's
+	// Needs you (Security on #11417). A caller nothing backs (no credential) is refused.
+	actor, verified := actorName(callerActor(r))
+	if !verified {
+		writeError(w, http.StatusForbidden, "unverified", "closing a question needs a verified caller: an agent's token, the Operator, or the Hub")
 		return
 	}
 	note := strings.TrimSpace(clitext.Clean(body.Note))

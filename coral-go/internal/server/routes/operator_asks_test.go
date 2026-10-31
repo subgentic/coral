@@ -163,6 +163,11 @@ func TestAnAskAnsweredElsewhereIsClosedByTheAskerTheOperatorOrTheOrchestratorOnl
 	closeAsk := func(id int64, who, note string) (int, map[string]any) {
 		body, _ := json.Marshal(map[string]any{"subscriber_id": who, "note": note})
 		req := httptest.NewRequest(http.MethodPost, "/api/board/team/asks/x/close", strings.NewReader(string(body)))
+		if who == "Operator" {
+			req = withActor(req, Actor{Kind: ActorOperator, Name: "Operator"})
+		} else {
+			req = withActor(req, Actor{Kind: ActorToken, Name: who, Session: "claude-" + who}) // the verified caller: what the body claims is ignored
+		}
 		rc := chi.NewRouteContext()
 		rc.URLParams.Add("project", "team")
 		rc.URLParams.Add("messageID", fmt.Sprint(id))
@@ -210,4 +215,39 @@ func TestAnAskAnsweredElsewhereIsClosedByTheAskerTheOperatorOrTheOrchestratorOnl
 	assert.Equal(t, "Lead", m.Ask.ClosedBy)
 	assert.Equal(t, "the operator answered in the chat", m.Ask.ClosedNote)
 	assert.True(t, m.Ask.Answered)
+}
+
+// Security's SHOULD on #11417: the caller is the verified actor, whatever the body claims. A token that names itself the Operator or the asker is still who its token says, and a caller nothing backs is refused.
+func TestCloseAskTrustsTheVerifiedActorAndNeverTheClaim(t *testing.T) {
+	h, bs := operatorAsksRig(t)
+	ctx := context.Background()
+	for _, who := range []struct{ id, title string }{{"Lead", "Lead Developer"}, {"Other", "QA"}} {
+		_, err := bs.Subscribe(ctx, "team", who.id, who.title, "", nil, "all")
+		require.NoError(t, err)
+	}
+	q, err := bs.PostMessage(ctx, "team", "Lead", "@Operator may I proceed?", nil)
+	require.NoError(t, err)
+	require.NoError(t, bs.RecordAsk(ctx, "team", q, []string{"Operator"}))
+	call := func(actor *Actor, claim string) int {
+		body, _ := json.Marshal(map[string]any{"subscriber_id": claim, "note": "answered in chat"})
+		req := httptest.NewRequest(http.MethodPost, "/x", strings.NewReader(string(body)))
+		if actor != nil {
+			req = withActor(req, *actor)
+		}
+		rc := chi.NewRouteContext()
+		rc.URLParams.Add("project", "team")
+		rc.URLParams.Add("messageID", fmt.Sprint(q.ID))
+		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rc))
+		w := httptest.NewRecorder()
+		h.CloseAsk(w, req)
+		return w.Code
+	}
+	open := func() int { _, rows, _ := readOperatorAsks(t, h, asPerson); return len(rows) }
+	assert.Equal(t, http.StatusForbidden, call(&Actor{Kind: ActorToken, Name: "Other", Session: "claude-other"}, "Operator"), "a token that claims to be the Operator is the member its token says")
+	assert.Equal(t, http.StatusForbidden, call(&Actor{Kind: ActorToken, Name: "Other", Session: "claude-other"}, "Lead"), "and one that claims to be the asker")
+	assert.Equal(t, http.StatusForbidden, call(nil, "Operator"), "a request no identity backs is refused, whatever it names")
+	assert.Equal(t, http.StatusForbidden, call(&Actor{Kind: ActorClaimed}, "Lead"), "a claimed actor too")
+	assert.Equal(t, 1, open(), "nothing was closed")
+	assert.Equal(t, http.StatusOK, call(&Actor{Kind: ActorToken, Name: "Lead", Session: "claude-lead"}, "Other"), "the asker's own token closes it, whatever it claims")
+	assert.Equal(t, 0, open())
 }
