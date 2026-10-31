@@ -20,7 +20,7 @@ var startedServices = []string{
 	"cloud_connector", "remote_agents", "git_poller", "session_indexer", "job_scheduler", "board_notifier", "board_health_monitor", "health_nudges",
 	"task_reminders", "remote_board_poller", "batch_summarizer", "goal_generator", "session_reconciler", "token_poller",
 	"call_metrics_retention", "token_usage_retention", "token_usage_hour_agg", "db_optimize", "db_integrity", "startup/auto_wake",
-	"uploads_retention", "artifact_retention", "thinking_tracker",
+	"uploads_retention", "artifact_retention", "dialog_watch", "thinking_tracker",
 }
 
 func TestBackgroundServicesStartInTheSameOrder(t *testing.T) {

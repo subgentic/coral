@@ -3,6 +3,7 @@ package routes
 import (
 	"context"
 	"encoding/json"
+	"github.com/subgentic/coral/internal/permreview"
 	"log/slog"
 	"net/http"
 	"sort"
@@ -31,6 +32,10 @@ type pendingTool struct {
 	// Wants is the line a PermissionRequest for this call would carry ("Wants to run: <command>", cleaned as the server stores it), so a request is tied only to the calls it is about (#11352); empty
 	// for a call whose input cannot be compared.
 	Wants string `json:"-"`
+	// Risk is the whole text of each field auto-accept judges (never served: Input is the cut one the chat shows); Unjudged says why the request cannot be judged whole ("" when it can), and auto-accept then
+	// refuses it (#11399).
+	Risk     map[string]string `json:"-"`
+	Unjudged string            `json:"-"`
 }
 
 type pendingTools struct {
@@ -204,9 +209,21 @@ var pendingToolFields = map[string]int{
 
 func trimPendingInput(in map[string]any) map[string]any {
 	out := map[string]any{}
+	var reviews []permreview.Review
 	for k, limit := range pendingToolFields {
 		v, ok := in[k]
 		if !ok || v == nil {
+			continue
+		}
+		if requestFields[k] { // the request itself: whole up to permreview.MaxBytes, hidden characters written out, and a request that does not fit or hides something can only be rejected (#11399)
+			s, isText := v.(string)
+			if !isText {
+				reviews = append(reviews, permreview.Review{Cut: true}) // a value that is not text is not shown: it cannot be allowed from here
+				continue
+			}
+			r := permreview.Of(s)
+			out[k] = r.Shown
+			reviews = append(reviews, r)
 			continue
 		}
 		switch s := v.(type) {
@@ -228,7 +245,30 @@ func trimPendingInput(in map[string]any) map[string]any {
 			out["file_path"] = out["AbsolutePath"]
 		}
 	}
+	if m := permreview.Merge(reviews...); !m.Allowed() {
+		out["only_reject"] = true
+		out["note"] = m.Note()
+	}
 	return out
+}
+
+// requestFields are the tool input fields that say what is being asked: the card shows them whole or says it cannot (#11399).
+var requestFields = map[string]bool{
+	"command": true, "CommandLine": true, "file_path": true, "TargetFile": true, "AbsolutePath": true, "path": true, "url": true, "query": true, "pattern": true, "description": true,
+}
+
+// newPendingTool is the pending tool a PreToolUse hook reports: the cut input the chat shows, and the whole text auto-accept judges (#11399).
+func newPendingTool(toolUseID, toolName string, input map[string]any, at time.Time) pendingTool {
+	risk, unjudged := riskInputOf(input)
+	return pendingTool{
+		Risk:      risk,
+		Unjudged:  unjudged,
+		ToolUseID: toolUseID,
+		ToolName:  toolName,
+		Input:     trimPendingInput(input),
+		At:        at,
+		Wants:     wantsLineOf(toolName, input),
+	}
 }
 
 func truncateUTF8(s string, n int) string {
@@ -284,13 +324,7 @@ func (h *SessionsHandler) SetPendingTool(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	h.hints.forget(body.SessionID) // a blocking tool may open a prompt: read the screen again
-	t := pendingTool{
-		ToolUseID: body.ToolUseID,
-		ToolName:  body.ToolName,
-		Input:     trimPendingInput(body.ToolInput),
-		At:        time.Now(),
-		Wants:     wantsLineOf(body.ToolName, body.ToolInput),
-	}
+	t := newPendingTool(body.ToolUseID, body.ToolName, body.ToolInput, time.Now())
 	h.pending.set(body.SessionID, t)
 	h.noteToolStart(r.Context(), body.SessionID, body.ToolName, body.ToolUseID, body.ToolInput)
 	h.watchForPrompt(body.SessionID, owner.SessionName, t) // agy sends no hook for a permission prompt (#4819)

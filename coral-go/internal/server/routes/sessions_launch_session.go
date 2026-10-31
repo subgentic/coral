@@ -317,9 +317,10 @@ func resolveLaunchCLIScreened(agentType, cliPath string, screen func(string) str
 		return cliPath, nil
 	}
 	// LookPath failed — try common install locations
-	if found := agent.CommonPlaceCLI(checkBin, screen); found != "" {
-		log.Printf("[launch] %s not on PATH, found at %s", logsafe.Path(checkBin), logsafe.Path(found))
-		return found, nil
+	lookup := agent.CommonPlaceLookup(checkBin, screen)
+	if lookup.Path != "" {
+		log.Printf("[launch] %s not on PATH, found at %s", logsafe.Path(checkBin), logsafe.Path(lookup.Path))
+		return lookup.Path, nil
 	}
 	if dir, bad := agent.UntrustedMountDir(checkBin); bad { // on PATH only through a folder Windows will not open: say that, not "install it" (#340)
 		return "", &agent.CLIUntrustedMountError{AgentType: agentType, Binary: checkBin, Dir: dir}
@@ -328,7 +329,7 @@ func resolveLaunchCLIScreened(agentType, cliPath string, screen func(string) str
 	if info := agent.GetCLIInfo(agentType); info != nil {
 		installCmd, installURL = info.InstallCommand, info.InstallURL
 	}
-	return "", &agent.CLINotFoundError{AgentType: agentType, Binary: checkBin, InstallCommand: installCmd, InstallURL: installURL}
+	return "", &agent.CLINotFoundError{AgentType: agentType, Binary: checkBin, InstallCommand: installCmd, InstallURL: installURL, Refused: lookup.Refused, RefusedPath: lookup.RefusedPath}
 }
 
 // launchPath is the launch path for a requested one.

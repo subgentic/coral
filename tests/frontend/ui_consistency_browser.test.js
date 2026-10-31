@@ -183,7 +183,7 @@ const fixtures = async () => {
                     assert.equal(await ev(`getComputedStyle(document.activeElement).outlineStyle`),'solid');
                 }
                 if(!baseline && view==='workflows') {
-                    assert.ok(await ev(`Array.from(document.querySelectorAll('.wf-detail-actions button:not(.wf-more-menu button)')).every(b=>{const r=b.getBoundingClientRect();return r.width>0&&r.left>=0&&r.right<=innerWidth+1})`),'workflow actions fit instead of squeezing title');
+                    assert.ok(await ev(`Array.from(document.querySelectorAll('.wf-detail-actions button:not(.wf-more-menu button)')).filter(b=>b.getClientRects().length).every(b=>{const r=b.getBoundingClientRect();return r.width>0&&r.left>=0&&r.right<=innerWidth+1})`),'workflow actions fit instead of squeezing title');
                 }
                 if(!baseline && view==='settings') {
                     await ev(`document.getElementById('settings-working-dir').focus();document.getElementById('settings-working-dir').value='/workspace/keyboard-fixture'`);

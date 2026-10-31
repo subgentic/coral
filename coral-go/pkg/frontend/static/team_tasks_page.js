@@ -15,6 +15,7 @@ import { goalTitle, refreshGoalTitles, readGoal, readGoalChoices, noGoalLabel } 
 import { taskStatusWord, statusClass } from './goal_words.js';
 import { state } from './state.js';
 const { needsReview } = await importOnce('./review_pool.js');
+const { linkArtifactRefsIn, linkedText } = await importOnce('./artifact_refs.js'); // a coral://artifacts/<hex> in a task's words is a link (#11416)
 import { showToast } from './utils.js';
 import { showConfirmModal } from './confirm_dialog.js';
 import { foldWayBack } from './way_back.js';
@@ -57,7 +58,7 @@ async function renderTaskText(host, text) {
         try { const { artifactLinkPolicy } = await importOnce('./inbox_coral.js'); const policy = await artifactLinkPolicy(text); if (typeof policy === 'function') opts = { linkPolicy: policy }; } catch { /* links stay as the renderer's default has them */ }
         const { node, partial } = renderSafe(text, opts);
         if (partial || !host.isConnected) return; // the renderer did not load: the plain text stays; or the page was left
-        node.classList.add('team-task-md'); host.replaceWith(node);
+        node.classList.add('team-task-md'); linkArtifactRefsIn(node); host.replaceWith(node);
     } catch { /* the plain text stays */ }
 }
 
@@ -425,7 +426,7 @@ export function renderTaskPage(host, task, ctx, mode = 'view') {
     }
     page.append(factsOf(task, ctx));
  if (task.version) { const versions = el('div', 'task-version-slot'); page.append(versions); importOnce('./task_versions.js').then(m => m.taskVersionHistory(ctx.project, task, acts.reload)).then(section => { if (versions.isConnected) versions.append(section); }).catch(() => {}); }
-    if (task.body) { const b = el('div', 'team-task-body'), doc = Object.assign(el('pre', 'team-task-text'), { textContent: task.body }); b.append(el('h3', 'goals-sub', 'Description'), doc); page.append(b); renderTaskText(doc, task.body); }
+    if (task.body) { const b = el('div', 'team-task-body'), doc = Object.assign(el('pre', 'team-task-text'), { textContent: task.body }); linkArtifactRefsIn(doc); b.append(el('h3', 'goals-sub', 'Description'), doc); page.append(b); renderTaskText(doc, task.body); }
     const followUps = followUpsSection(task, ctx); if (followUps) page.append(followUps);
     Promise.all([importOnce('./task_detail_html.js'), importOnce('./task_list.js')]).then(([m, list]) => { // the dialog's other sections, escaped as it escaped them
         if (!page.isConnected) return;
@@ -490,7 +491,7 @@ function factsOf(task, ctx) {
     if (task.completed_at) fact(dl, 'Finished', whenText(task.completed_at));
     if (task.completed_by) fact(dl, task.status === 'skipped' ? 'Cancelled by' : 'Finished by', task.completed_by);
     if (task.workflow && task.workflow.outcome === 'failed') fact(dl, 'Outcome', 'Failed'); // the dialog's "Result: Failed"
-    if (task.completion_message) fact(dl, 'Result', task.completion_message);
+    if (task.completion_message) fact(dl, 'Result', linkedText(task.completion_message));
     else if (task.workflow && task.workflow.outcome === 'failed') fact(dl, 'Result details', 'No failure reason was provided.');
     return dl;
 }

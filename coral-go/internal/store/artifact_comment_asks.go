@@ -150,3 +150,10 @@ func (s *SessionStore) ListArtifactAsks(ctx context.Context, artifactID string) 
 	err := s.reader().SelectContext(ctx, &out, "SELECT "+artifactAskCols+" FROM artifact_comment_asks WHERE artifact_id = ? ORDER BY id", artifactID)
 	return out, err
 }
+
+// HasArtifactAsk says whether the agent session was ever asked into a thread of this artifact (open or ended): what lets an agent that did not upload it read its threads.
+func (s *SessionStore) HasArtifactAsk(ctx context.Context, artifactID, agentSession string) (bool, error) {
+	var n int
+	err := s.reader().GetContext(ctx, &n, "SELECT COUNT(*) FROM artifact_comment_asks WHERE artifact_id = ? AND agent_session = ? LIMIT 1", artifactID, agentSession)
+	return n > 0, err
+}

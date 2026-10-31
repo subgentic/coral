@@ -141,6 +141,10 @@ var operatorOnlyRoutes = map[string]string{
 	// #3554: pruning, and the keep mark that protects an artifact from it.
 	"POST /api/artifacts/retention/ack":                                   "acknowledge artifact retention",
 	"POST /api/artifacts/prune":                                           "prune artifacts",
+	"GET /api/board/{project}/proposals":                                  "read what agents asked to add",
+	"GET /api/proposals":                                                  "read what agents asked to add",
+	"POST /api/board/{project}/proposals/{id}/approve":                    "approve what an agent asked to add",
+	"POST /api/board/{project}/proposals/{id}/reject":                     "reject what an agent asked to add",
 	"PUT /api/board/{project}/artifacts/{id}/tags":                        "change an artifact's tags",
 	"POST /api/board/{project}/artifacts/{id}/review":                     "approve an artifact or ask changes of it",
 	"POST /api/board/{project}/operator-artifacts":                        "share a file with an agent as the Operator",
@@ -212,10 +216,11 @@ var operatorOnlyRoutes = map[string]string{
 	// #3685 (Security's #3670 follow-up): the hub's server registry (each entry holds a remote
 	// Coral's address and API key, and the hub forwards to it), and the board's remote
 	// subscriptions (which remote boards this Coral reads and relays).
-	"POST /api/servers":           "add a remote server",
-	"PATCH /api/servers/{id}":     "change a remote server",
-	"DELETE /api/servers/{id}":    "remove a remote server",
-	"POST /api/servers/{id}/test": "test a remote server",
+	"POST /api/servers":                   "add a remote server",
+	"PATCH /api/servers/{id}":             "change a remote server",
+	"DELETE /api/servers/{id}":            "remove a remote server",
+	"POST /api/servers/{id}/test":         "test a remote server",
+	"POST /api/servers/{id}/owner-secret": "set up Approve through this hub for a computer added by URL",
 	// #11370: setting a server up over SSH runs commands on another computer with the hub user's SSH access.
 	"GET /api/servers/provision/options":         "read what the server setup dialog shows",
 	"POST /api/servers/provision/plan":           "plan setting up a server over SSH",
@@ -253,6 +258,8 @@ var operatorOnlyRoutes = map[string]string{
 	"POST /api/sessions/live/{name}/restart":                          "restart an agent",
 	"POST /api/sessions/live/{name}/model":                            "switch an agent's model or thinking level",
 	"POST /api/sessions/live/{name}/resume":                           "resume an agent",
+	"POST /api/sessions/live/{name}/notices/pause":                    "pause Coral's notices to an agent",
+	"POST /api/sessions/live/{name}/notices/resume":                   "resume Coral's notices to an agent",
 	"POST /api/sessions/live/{name}/attach":                           "attach to an agent's terminal",
 	"POST /api/sessions/live/{name}/resize":                           "resize an agent's terminal",
 	"POST /api/sessions/live/{name}/goal":                             "set an agent's goal",
@@ -362,7 +369,7 @@ var operatorOnlyRoutes = map[string]string{
 // hubModeRoutes are entries the router serves only in hub mode (--hub): ValidateGuardedRoutes
 // lets them be absent otherwise.
 var hubModeRoutes = map[string]bool{
-	"GET /api/servers": true, "POST /api/servers": true, "PATCH /api/servers/{id}": true, "DELETE /api/servers/{id}": true, "POST /api/servers/{id}/test": true,
+	"GET /api/servers": true, "POST /api/servers": true, "PATCH /api/servers/{id}": true, "DELETE /api/servers/{id}": true, "POST /api/servers/{id}/test": true, "POST /api/servers/{id}/owner-secret": true,
 	"GET /api/servers/provision/options": true, "POST /api/servers/provision/plan": true, "POST /api/servers/provision/{plan}/connect": true, "POST /api/servers/provision/{plan}/run": true,
 	"GET /api/servers/provision/{plan}": true, "DELETE /api/servers/provision/{plan}": true,
 	"CONNECT /api/remote/{server}/*": true,

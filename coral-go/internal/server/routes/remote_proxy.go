@@ -18,5 +18,12 @@ import (
 // middleware.
 func MountRemoteProxy(r chi.Router, resolver proxy.Resolver) {
 	h := proxy.New(resolver)
-	r.Handle("/api/remote/{server}/*", http.Handler(h))
+	r.Handle("/api/remote/{server}/*", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		// The person signed in at THIS hub (the identity layer's humanInputCaller: a dashboard session or this computer's own same-origin browser, never an API key or an agent token) may have the decisions that
+		// need a person signed (#11378). The proxy signs only the two allowlisted routes and only for a target that holds a secret.
+		if humanInputCaller(req) {
+			req = req.WithContext(proxy.WithSignedInOwner(req.Context()))
+		}
+		h.ServeHTTP(w, req)
+	}))
 }

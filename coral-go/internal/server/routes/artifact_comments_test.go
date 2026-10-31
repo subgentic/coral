@@ -307,6 +307,7 @@ func TestArtifactCommentsAgentsReadTheirBoardsAndNeverWrite(t *testing.T) {
 	require.Equal(t, 201, code, fmt.Sprint(out))
 	_, err := rig.h.bs.Subscribe(context.Background(), "team-a", "dev", "Developer", "agent-s1", nil, "")
 	require.NoError(t, err)
+	rig.uploadedBySession("s1", "team-a") // an agent reads the threads of an artifact it uploaded (#11420), then only those on its boards
 	code, out = rig.do("GET", cp(cmtDoc), cmtAsAgent, nil)
 	require.Equal(t, 200, code)
 	list := out["comments"].([]any)

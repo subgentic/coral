@@ -67,6 +67,9 @@ func (s *Store) ensureSchema(ctx context.Context) error {
 	if err := s.ensureGoalRequestsSchema(ctx); err != nil {
 		return err
 	}
+	if err := s.ensureProposalsSchema(ctx); err != nil {
+		return err
+	}
 	if err := s.ensureAsksSchema(ctx); err != nil {
 		return err
 	}

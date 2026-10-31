@@ -437,7 +437,7 @@
     flex-wrap: wrap;
 }
     /* Pending image chips are their own row above the box (#6137): beside it they left the box a one-character strip. The box and the send buttons stay on one row under them. */
-        .command-pane .command-pane-body > .image-attachments { flex: 0 0 100%; min-width: 0; box-sizing: border-box; }
+        .command-pane .command-pane-body > .image-attachments { flex: 0 0 100%; min-width: 0; box-sizing: border-box; border: none; background: none; padding: 0 0 6px; } /* the chip, not a grey band across the box with an empty stretch beside it (as on a desktop, #11391) */
     .command-pane .command-pane-body > .composer-hint { flex: 0 0 100%; min-width: 0; box-sizing: border-box; } /* a line above the box (the hooks question, held messages: #6409, #6473) is a row of its own, not a column beside the box */
     .composer-hint.composer-waiting { gap: 0 12px; } /* no blank line between the sentence's row and the controls' */
     .composer-waiting > button, .composer-waiting-detail summary, .composer-waiting-actions > button { min-height: 44px; } /* #7727: What waits, Send now and Show terminal are 44 px high and wrap as a row under the sentence */
@@ -1344,7 +1344,8 @@
     body.live-session-active:not(.popout-mode) .terminal-header[data-more] .live-view-switch:not([hidden]) { display: none; } /* with the dots open the switch is the line under it, with its words: one of the two on screen, not two controls of one name */
     body.live-session-active:not(.popout-mode) .terminal-header .live-view-switch-menu { min-height: var(--control-touch-height, 44px); gap: 6px; align-items: center; }
     body.live-session-active:not(.popout-mode) .terminal-header .agent-bar-more { order: 3; }
-    body.live-session-active:not(.popout-mode) .terminal-header .terminal-header-actions > :not(.live-view-toggle):not(.live-view-switch):not(.agent-bar-more) { display: none !important; } /* the header's ids set their own display, some with !important (touch.css, mobile.css) */
+    body.live-session-active:not(.popout-mode) .terminal-header .notice-pause-btn:not([hidden]) { display: inline-flex; order: 2; } /* the pause toggle sits beside the view switch, before the ⋯ (#11388) */
+    body.live-session-active:not(.popout-mode) .terminal-header .terminal-header-actions > :not(.live-view-toggle):not(.live-view-switch):not(.agent-bar-more):not(.notice-pause-btn) { display: none !important; } /* the header's ids set their own display, some with !important (touch.css, mobile.css) */
     body.live-session-active:not(.popout-mode) .terminal-header[data-more] { flex-wrap: wrap; } /* only while ⋯ is open: the second line holds Search, the panel and the rest */
     body.live-session-active:not(.popout-mode) .terminal-header[data-more]::before { content: ''; order: 4; flex: 0 0 100%; height: 0; }
     body.live-session-active:not(.popout-mode) .terminal-header[data-more] .terminal-header-actions > :not(.live-view-toggle):not(.live-view-switch):not(.agent-bar-more):not([hidden]):not([style*="display: none"]):not([style*="display:none"]):not(.terminal-branch) { display: inline-flex !important; order: 5; } /* what a mode hid stays hidden */
@@ -1373,7 +1374,7 @@
     .phone-bar .phone-bar-title { display: flex; align-items: center; height: 48px; box-sizing: border-box; padding: 0 18px; border: 0; border-radius: 24px; background: var(--bg-secondary); color: var(--text-primary); font-size: var(--fs-lg); font-weight: var(--fw-regular); line-height: var(--lh-label); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } /* a view's name in the pill: the same box as Home's search (48 px, fully rounded, filled, no border); a heading, with no title attribute, so no tooltip lands on it */
     header.top-bar > .phone-bar { display: flex; }
     header.top-bar > :not(.phone-bar) { display: none !important; } /* the old pill, the views menu, Home and the gear: the one bar replaces them on a phone */
-    header.top-bar { padding: calc(8px + env(safe-area-inset-top, 0px)) 8px 4px; gap: 4px; background: var(--bg-primary); border: 0; box-shadow: none; min-height: 0; }
+    header.top-bar { padding: calc(8px + env(safe-area-inset-top, 0px)) 8px 4px; gap: 4px; background: var(--bg-primary); border: 0 solid var(--bg-primary); box-shadow: none; min-height: 0; } /* the notch's band is the padding in the bar's own colour (the border keeps its style and colour, at no width: pwa_head)*/
     .phone-bar .phone-account-btn { position: relative; order: 2; border: 0; background: none; color: var(--text-secondary); cursor: pointer; }
     .phone-bar .phone-account-btn .material-icons { font-size: var(--icon-size); }
     #mobile-agent-list .phone-break { order: 3; display: block; flex: 0 0 100%; height: 0; }

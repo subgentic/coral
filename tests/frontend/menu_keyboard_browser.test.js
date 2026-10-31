@@ -55,13 +55,13 @@ const BASE = require('./test_base').BASE;
             await press('ArrowUp', KEYS.ArrowUp); await waitFor(`!document.getElementById('nav-more-menu').hidden`, 'ArrowUp opens it', 4000);
             assert.equal(await active(), items.at(-1), 'ArrowUp on the button opens the menu on its last entry');
             await press('Escape', KEYS.Escape);
-            // a choice: Inbox. The menu closes, the focus goes back to the button, which now names Inbox
+            // a choice: Automations (the floating nav has Home, Inbox and Tasks, so the menu does not list Inbox, #11400). The menu closes, the focus goes back to the button, which now names Inbox
             await ev(`document.getElementById('${HB}').click(); true`); await waitFor(`!document.getElementById('nav-more-menu').hidden`, 'the menu', 4000);
-            await ev(`[...document.querySelectorAll('#nav-more-menu .nav-more-item')].find(i => i.lastElementChild.textContent.trim() === 'Inbox').focus(); true`);
+            await ev(`[...document.querySelectorAll('#nav-more-menu .nav-more-item')].find(i => i.lastElementChild.textContent.trim() === 'Automations').focus(); true`);
             await press('Enter', 13);
-            await waitFor(`document.getElementById('top-menu-label').textContent === 'Inbox' && document.getElementById('nav-more-menu').hidden`, 'Inbox opens and the menu closes', 6000);
+            await waitFor(`document.getElementById('top-menu-label').textContent === 'Automations' && document.getElementById('nav-more-menu').hidden`, 'Automations opens and the menu closes', 6000);
             assert.equal(await active(), 'top-phone-menu', 'choosing an entry (the view changes, the agent page goes) puts the focus on the top bar\'s button');
-            assert.equal(await ev(`document.getElementById('${HB}').getAttribute('aria-label')`), 'Inbox, menu', 'and the button now names Inbox');
+            assert.equal(await ev(`document.getElementById('${HB}').getAttribute('aria-label')`), 'Automations, menu', 'and the button now names Automations');
             console.log('PASS 390: the hamburger is named by its view and has a menu keyboard');
         } catch (e) { failures.push('390 hamburger: ' + e.message); console.error(failures.at(-1)); }
         // 2. the composer's chevron: state, role, keyboard (#9116)

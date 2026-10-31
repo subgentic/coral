@@ -65,6 +65,10 @@ type BoardSettings struct {
 	Health HealthSettings `json:"health"`
 	// RequireGoal: every new task of this board needs a goal, and none is moved to no goal (#7116). Off by default; the Operator on this computer or the owner through Coral Hub may change it (the operator, 2026-10-24, #7329), never an agent.
 	RequireGoal bool `json:"require_goal"`
+	// MaxOpenGoals caps the goals open at once, goals waiting for approval included (0: no limit); GoalsNeedApproval and TasksNeedApproval hold an agent's new goal or task as a proposal until the Operator approves it (#11389). Off by default.
+	MaxOpenGoals      int  `json:"max_open_goals"`
+	GoalsNeedApproval bool `json:"goals_need_approval"`
+	TasksNeedApproval bool `json:"tasks_need_approval"`
 	// GoalRequests: other teams may ask this one to create a task for one of their goals (#7361, the goal-requests note). Off by default, even with a team link: a link grants messaging, and being asked to create work is a separate grant. The Operator on this computer or the Hub owner sets it, never an agent.
 	GoalRequests bool `json:"goal_requests"`
 	// MessagingStored and ArtifactsStored say that the owner set the switch (to either value), as against the default.
@@ -94,6 +98,10 @@ type BoardSettingsUpdate struct {
 	HealthPatch json.RawMessage `json:"-"`
 	// RequireGoal turns the board's require-a-goal rule on or off (#7116).
 	RequireGoal *bool `json:"require_goal"`
+	// MaxOpenGoals, GoalsNeedApproval and TasksNeedApproval turn the planning limits on or off (#11389).
+	MaxOpenGoals      *int  `json:"max_open_goals"`
+	GoalsNeedApproval *bool `json:"goals_need_approval"`
+	TasksNeedApproval *bool `json:"tasks_need_approval"`
 	// GoalRequests turns taking goal requests from other teams on or off (#7361).
 	GoalRequests *bool `json:"goal_requests"`
 }
@@ -223,6 +231,15 @@ func (s *Store) GetBoardSettings(ctx context.Context, project string) (BoardSett
 			_ = json.Unmarshal([]byte(r.Value), &out.CrossTeamAllowed)
 		case settingRequireGoal:
 			out.RequireGoal = r.Value == "true"
+		case settingMaxOpenGoals:
+			var n int
+			if _, err := fmt.Sscanf(r.Value, "%d", &n); err == nil && n > 0 {
+				out.MaxOpenGoals = min(n, MaxOpenGoalsCeiling)
+			}
+		case settingGoalsNeedApproval:
+			out.GoalsNeedApproval = r.Value == "true"
+		case settingTasksNeedApproval:
+			out.TasksNeedApproval = r.Value == "true"
 		case settingGoalRequests:
 			out.GoalRequests = r.Value == "true"
 		}
@@ -310,6 +327,25 @@ func (s *Store) UpdateBoardSettings(ctx context.Context, project string, u Board
 	}
 	if u.GoalRequests != nil {
 		if err := upsert(tx, settingGoalRequests, fmt.Sprint(*u.GoalRequests)); err != nil {
+			return BoardSettings{}, err
+		}
+	}
+	if u.MaxOpenGoals != nil {
+		n := *u.MaxOpenGoals
+		if n < 0 || n > MaxOpenGoalsCeiling {
+			return BoardSettings{}, fmt.Errorf("max_open_goals is 0 (no limit) to %d", MaxOpenGoalsCeiling)
+		}
+		if err := upsert(tx, settingMaxOpenGoals, fmt.Sprint(n)); err != nil {
+			return BoardSettings{}, err
+		}
+	}
+	if u.GoalsNeedApproval != nil {
+		if err := upsert(tx, settingGoalsNeedApproval, fmt.Sprint(*u.GoalsNeedApproval)); err != nil {
+			return BoardSettings{}, err
+		}
+	}
+	if u.TasksNeedApproval != nil {
+		if err := upsert(tx, settingTasksNeedApproval, fmt.Sprint(*u.TasksNeedApproval)); err != nil {
 			return BoardSettings{}, err
 		}
 	}

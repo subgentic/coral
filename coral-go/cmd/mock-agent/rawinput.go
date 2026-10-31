@@ -50,11 +50,14 @@ type inputBox struct {
 	// is open answers it (option 1, as Claude Code takes it) and is logged; Esc dismisses it.
 	trigger    string
 	promptOpen bool
-	question   bool          // the open prompt is a question (AskUserQuestion), not a permission menu (#10168)
-	noSubmit   bool          // MOCK_STUCK_ENTER: an Enter does not submit, so typed text stays in the box (#10168)
-	busyFor    time.Duration // MOCK_BUSY <seconds>: the turn the line began ends (its Stop) only after this long (#10602); set by applyControl, taken by the submit that read it
-	busy       busyTurn      // the turn MOCK_BUSY keeps open: lines typed during it are held, Escape ends it (#10672)
-	deaf       bool          // MOCK_GO_DEAF: the box takes no more input and draws nothing (a CLI that has stopped reading), so a send is typed and never shows
+	question   bool            // the open prompt is a question (AskUserQuestion), not a permission menu (#10168)
+	textOption bool            // the open question has a "Type something." option (3), as Claude Code's has (MOCK_ASK_QUESTION_TEXT, #11393)
+	typing     bool            // option 3 was taken: the next text and Enter answer the question
+	typed      strings.Builder // the answer being typed
+	noSubmit   bool            // MOCK_STUCK_ENTER: an Enter does not submit, so typed text stays in the box (#10168)
+	busyFor    time.Duration   // MOCK_BUSY <seconds>: the turn the line began ends (its Stop) only after this long (#10602); set by applyControl, taken by the submit that read it
+	busy       busyTurn        // the turn MOCK_BUSY keeps open: lines typed during it are held, Escape ends it (#10672)
+	deaf       bool            // MOCK_GO_DEAF: the box takes no more input and draws nothing (a CLI that has stopped reading), so a send is typed and never shows
 	// notify, when set, hears the menu open ("permission_request") and close ("permission_answered", "permission_dismissed"): the run loop turns them into the hook events Claude Code runs for a tool's
 	// permission prompt, so Coral sees an agent waiting for a person (#8245), not only a menu on its screen.
 	notify func(kind string)
@@ -209,6 +212,34 @@ func (b *inputBox) feed(data []byte, submit func(string)) {
 		}
 		c := rest[0]
 		i++
+		if b.promptOpen && b.typing { // the text line of a question: text goes into the answer, an Enter sends it, an Escape dismisses the question
+			switch c {
+			case '\r':
+				answer := b.typed.String()
+				fmt.Printf("\r\n[mock-agent] PROMPT ANSWERED by text: %q\r\n", answer)
+				b.promptOpen, b.question, b.textOption, b.typing = false, false, false, false
+				b.typed.Reset()
+				b.tell("question_answered_text\x00" + answer)
+			case 0x1b:
+				fmt.Print("\r\n[mock-agent] prompt dismissed\r\n")
+				b.promptOpen, b.question, b.textOption, b.typing = false, false, false, false
+				b.typed.Reset()
+				b.tell("permission_dismissed")
+			case 0x7f, 0x08:
+				if r := []rune(b.typed.String()); len(r) > 0 {
+					b.typed.Reset()
+					b.typed.WriteString(string(r[:len(r)-1]))
+				}
+			default:
+				b.typed.WriteByte(c)
+			}
+			continue
+		}
+		if b.promptOpen && b.textOption && c == '3' { // "Type something.": the menu gives way to a text line
+			b.typing = true
+			fmt.Print("\r\n Type your answer, then Enter:\r\n")
+			continue
+		}
 		if b.promptOpen {
 			switch c {
 			case '\r', '1', '2', '3', '4', '5', '6', '7', '8', '9': // Enter takes the marked option; a digit takes that option, as the CLI's menus do (the dashboard's answer buttons send the digit)
@@ -217,7 +248,7 @@ func (b *inputBox) feed(data []byte, submit func(string)) {
 				} else {
 					fmt.Printf("\r\n[mock-agent] PROMPT ANSWERED by a digit (option %c)\r\n", c)
 				}
-				b.promptOpen = false
+				b.promptOpen, b.textOption = false, false
 				if b.question {
 					b.question = false
 					b.tell("question_answered")
@@ -226,8 +257,7 @@ func (b *inputBox) feed(data []byte, submit func(string)) {
 				}
 			case 0x1b:
 				fmt.Print("\r\n[mock-agent] prompt dismissed\r\n")
-				b.promptOpen = false
-				b.question = false
+				b.promptOpen, b.question, b.textOption = false, false, false
 				b.tell("permission_dismissed")
 			}
 			continue
@@ -355,6 +385,11 @@ func runRawInput(dir, sessionID, settingsFile string, turn func(string)) {
 	box = &inputBox{trigger: os.Getenv("MOCK_AGENT_PROMPT_TRIGGER")}
 	box.notify = func(kind string) {
 		events <- func() {
+			if k, text, ok := strings.Cut(kind, "\x00"); ok && k == "question_answered_text" { // a typed answer (MOCK_ASK_QUESTION_TEXT)
+				hooks.fire("PostToolUse", map[string]any{"tool_name": "AskUserQuestion", "tool_use_id": "toolu_mock_q_" + name, "tool_response": map[string]any{"answers": map[string]any{"Pick a color:": text}}})
+				hooks.fire("Stop", map[string]any{"stop_hook_active": false})
+				return
+			}
 			switch kind {
 			case "permission_request": // the tool call's request, then the notification that follows it, as Claude Code sends them
 				hooks.fire("PermissionRequest", map[string]any{"tool_name": "Bash", "tool_use_id": "toolu_mock_" + name, "tool_input": map[string]any{"command": "rm -rf build", "description": "Remove the build folder"}})

@@ -24,6 +24,9 @@ func healthMonitorStore(t *testing.T) *board.Store {
 	t.Cleanup(func() { _ = s.Close() })
 	// The check is off for a team that has not turned it on (#4962): these tests are about the check, so the team "team" has it on.
 	require.NoError(t, s.SetHealthOn(context.Background(), "team", true))
+	hs := s.GetHealthSettings(context.Background(), "team")
+	hs.HeartbeatMin = 5 // these tests step 11 minutes and expect a check each step; the quiet behaviour is board_health_quiet_test.go (#11431)
+	require.NoError(t, s.SetHealthSettings(context.Background(), "team", hs))
 	return s
 }
 

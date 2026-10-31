@@ -15,9 +15,11 @@ GET /api/artifacts/{id}/readers view owner-only
 GET /api/artifacts/{id}/versions view owner-only
 GET /api/board/{project}/artifacts view owner-only
 GET /api/board/{project}/cross-team/settings view owner-only-hub
+GET /api/board/{project}/proposals view owner-only
 GET /api/board/{project}/settings view owner-sees
 GET /api/board/{project}/tasks/{taskID}/artifact-content view owner-only
 GET /api/custom-models view owner-only
+GET /api/proposals view owner-only
 GET /api/saved view owner-only
 GET /api/saved/{id}/message view owner-only
 GET /api/session-artifacts view owner-only
@@ -37,9 +39,13 @@ POST /api/board/{project}/cross-team/files/disable launch owner-only-hub
 POST /api/board/{project}/cross-team/files/enable launch owner-only-hub
 POST /api/board/{project}/operator-artifacts interact owner-only
 POST /api/board/{project}/operator-artifacts/message interact owner-only
+POST /api/board/{project}/proposals/{id}/approve interact owner-only
+POST /api/board/{project}/proposals/{id}/reject interact owner-only
 POST /api/hub-auto-accept launch owner-only-hub
 POST /api/saved interact owner-only
 POST /api/sessions/live/{name}/dismiss-wait interact owner-only
+POST /api/sessions/live/{name}/notices/pause interact owner-only
+POST /api/sessions/live/{name}/notices/resume interact owner-only
 POST /api/system/update/relaunch launch owner-update
 PUT /api/artifacts/{id}/comments/lock interact owner-only
 PUT /api/artifacts/{id}/star interact owner-only

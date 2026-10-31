@@ -392,6 +392,7 @@ func TestTheOwnersListCarriesEachThreadsAsksAndNobodyElsesDoes(t *testing.T) {
 	// thread (the test identity names a session "agent-<id>", so that is the name its board subscription has) and it has no asks key.
 	_, err := rig.h.bs.Subscribe(context.Background(), "team-a", "agent-reader", "Reader", "agent-"+sendSid(7), nil, "mentions")
 	require.NoError(t, err)
+	rig.uploadedBySession(sendSid(7), "team-a") // it uploaded the artifact: an agent reads the threads of its own upload (#11420)
 	rig.hubOn()
 	listOf := func(h map[string]string) (int, []any) {
 		code, out := rig.do("GET", cp(cmtDoc), h, nil)

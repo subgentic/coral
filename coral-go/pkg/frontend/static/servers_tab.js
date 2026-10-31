@@ -9,10 +9,12 @@
 import { importOnce } from './import_once.js';
 import { state } from './state.js';
 import { isCloud, isHub, normServer, LOCAL_SERVER } from './server_base.js';
+import { isPhoneLayout } from './phone_layout.js';
 
 /** Whether the Servers tab has anything to show. */
  function serversTabAvailable() {
     if (isCloud()) return true;
+    if (isPhoneLayout()) return true; // a phone's More lists Computers on every Coral (it is a top-level screen, #11236; the page says "This computer" and offers Add computer), not only once a remote is configured (#11400)
     if (!isHub()) return false;
     return (state.servers || []).some(s => s && s.id && normServer(s.id) !== LOCAL_SERVER);
 }

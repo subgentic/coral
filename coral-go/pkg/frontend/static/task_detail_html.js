@@ -1,6 +1,7 @@
 import { importOnce } from './import_once.js';
 import { formatCost } from './format.js';
 const { reviewPoolInfo } = await importOnce('./review_pool.js');
+const { linkedHtml } = await importOnce('./artifact_refs.js'); // lazy: its failure is retried
 /* The task detail dialog's markup (moved out of tasks.js, #4996; no behaviour change). */
 import { escapeHtml, escapeAttr } from './utils.js';
 import { _priorityLabel, formatTaskDate, _formatTokenCount } from './task_format.js';
@@ -56,7 +57,7 @@ function _taskRevisionHtml(task) {
             const previous = amendment.previous_snapshot || {};
             const effective = amendment.effective_snapshot || {};
             const changes = amendment.changes || {};
-            const fields = Object.keys(changes).map(field => `<div><strong>${escapeHtml(field === 'workflow_instructions' ? 'Instructions' : 'Description')}</strong>: ${escapeHtml(preview(previous[field]))} → ${escapeHtml(preview(effective[field] ?? changes[field]))}</div>`).join('');
+            const fields = Object.keys(changes).map(field => `<div><strong>${escapeHtml(field === 'workflow_instructions' ? 'Instructions' : 'Description')}</strong>: ${linked(preview(previous[field]))} → ${linked(preview(effective[field] ?? changes[field]))}</div>`).join('');
             return `<div class="task-amendment-entry"><strong>Revision ${Number(amendment.revision)}</strong> · ${escapeHtml(amendment.actor || 'Planner')} · ${escapeHtml(whenWords(amendment.created_at) || '')}<br><span>${escapeHtml(amendment.reason || '')}</span>${fields}</div>`;
         }).join('')}</details>` : ''}
     </div>`;
@@ -71,6 +72,9 @@ function nameAt(text, name) {
     return -1;
 }
 
+/** Team-written words, escaped, with a coral://artifacts/<hex> in them made a link (#11416). */
+function linked(text) { return linkedHtml(text); }
+
 /** A result names the files the task attached (hours.md): each name in the message is a link to its file, the way the Completion artifacts list opens it (#10603, the Beta tester). Plain text stays escaped; the first mention of each name is the link. */
 function _messageWithFiles(message, artifacts) {
     const text = String(message ?? '');
@@ -84,10 +88,10 @@ function _messageWithFiles(message, artifacts) {
         if (!hit) break;
         used.add(hit.name);
         const uri = String(hit.uri), isCoral = uri.startsWith('coral://');
-        out += escapeHtml(rest.slice(0, at)) + (isCoral ? `<a href="#" data-artifact-uri="${escapeAttr(uri)}" title="${escapeAttr(uri)}" data-on-click="task-artifact-open">${escapeHtml(hit.name)}</a>` : `<a href="${escapeAttr(uri)}" title="${escapeAttr(uri)}" target="_blank" rel="noopener noreferrer">${escapeHtml(hit.name)}</a>`);
+        out += linked(rest.slice(0, at)) + (isCoral ? `<a href="#" data-artifact-uri="${escapeAttr(uri)}" title="${escapeAttr(uri)}" data-on-click="task-artifact-open">${escapeHtml(hit.name)}</a>` : `<a href="${escapeAttr(uri)}" title="${escapeAttr(uri)}" target="_blank" rel="noopener noreferrer">${escapeHtml(hit.name)}</a>`);
         rest = rest.slice(at + hit.name.length);
     }
-    return out + escapeHtml(rest);
+    return out + linked(rest);
 }
 
 /** The task's workflow: its gates, inputs, completion candidate and artifacts. */
@@ -108,7 +112,7 @@ function _taskWorkflowHtml(task) {
             return `<div class="task-detail-body">${nameHtml}${a.revision ? ` · ${escapeHtml(a.revision)}` : ''}${a.digest ? ` · ${escapeHtml(a.digest)}` : ''}${uriDisplay ? `<div>${uriDisplay}</div>` : ''}${a.content ? `<pre style="white-space:pre-wrap;overflow-wrap:anywhere">${escapeHtml(a.content)}</pre>` : ''}</div>`;
         };
         html += `<details class="task-detail-section"><summary>${workflow.name || workflow.stage ? `Workflow${workflow.name ? `: ${escapeHtml(workflow.name)}` : ''}${workflow.stage ? ` · ${escapeHtml(workflow.stage)}` : ''}` : 'Instructions for the agent'}</summary>
-            <div class="task-detail-body">${escapeHtml(workflow.instructions || '')}</div>
+            <div class="task-detail-body">${linked(workflow.instructions || '')}</div>
             <div>Required outputs: ${escapeHtml((workflow.required_outputs || []).join(', ') || 'None')}</div>
             <div>Completion gates: ${(workflow.completion_gates || []).length ? `<em>experimental, disabled by default (inactive unless the server enables them)</em> — ` : ''}${escapeHtml((workflow.completion_gates || []).map(g => `${g.name || g.type}${g.check_id ? ` [${g.check_id}]` : ''} (${g.artifact || 'server check'})`).join(', ') || 'None')}</div>
             ${workflow.candidate_revision ? `<div>Candidate revision: <code>${escapeHtml(workflow.candidate_revision)}</code></div>` : ''}
@@ -314,7 +318,7 @@ export function _taskDetailHtml(task, liveCost) {
     if (task.body) {
         html += `<div class="task-detail-section">
             <div class="task-detail-label">Description</div>
-            <div class="task-detail-body">${escapeHtml(task.body)}</div>
+            <div class="task-detail-body">${linked(task.body)}</div>
         </div>`;
     }
 

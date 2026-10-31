@@ -22,37 +22,11 @@ import (
 	proxy "github.com/subgentic/coral/pkg/hubproxy"
 )
 
-// TestHelperSSHW is the fake `ssh -W host:port`: the test binary run as ssh. It joins its stdin and stdout to the address -W names, as ssh would over the channel.
-func TestHelperSSHW(t *testing.T) {
-	if os.Getenv("SSHPROV_FAKE_SSH") != "1" && !strings.Contains(strings.Join(os.Args, " "), "-W") {
-		t.Skip("helper process")
-	}
-	var addr string
-	for i, a := range os.Args {
-		if a == "-W" && i+1 < len(os.Args) {
-			addr = os.Args[i+1]
-		}
-	}
-	c, err := net.Dial("tcp", addr)
-	if err != nil {
-		os.Exit(255)
-	}
-	go io.Copy(c, os.Stdin)
-	io.Copy(os.Stdout, c)
-	os.Exit(0)
-}
-
-// fakeSSHW is a script that logs its argv and runs the helper above.
+// fakeSSHW is the stand-in ssh run as `ssh -W host:port`: it logs its argv and joins its stdin and stdout to the address -W names.
 func fakeSSHW(t *testing.T) (ssh, log string) {
 	t.Helper()
-	dir := t.TempDir()
-	log = filepath.Join(dir, "argv")
-	ssh = filepath.Join(dir, "ssh")
-	script := "#!/bin/sh\nfor a in \"$@\"; do printf '%s\\n' \"$a\" >> '" + log + "'; done\nexec '" + os.Args[0] + "' -test.run=TestHelperSSHW -- \"$@\"\n"
-	if err := os.WriteFile(ssh, []byte(script), 0o700); err != nil {
-		t.Fatal(err)
-	}
-	return ssh, log
+	log = filepath.Join(t.TempDir(), "argv")
+	return newStandIn(t, "ssh", standCfg{Log: log, Pipe: true}), log
 }
 
 func portOf(t *testing.T, ts *httptest.Server) int {
@@ -227,11 +201,7 @@ func TestNewStreamTargetRefusesWhatItCannotUse(t *testing.T) {
 }
 
 func TestStreamTargetCapsConnectionsAndBacksOffAfterAFailedDial(t *testing.T) {
-	dir := t.TempDir()
-	hold := filepath.Join(dir, "ssh")
-	if err := os.WriteFile(hold, []byte("#!/bin/sh\nexec sleep 30\n"), 0o700); err != nil {
-		t.Fatal(err)
-	}
+	hold := newStandIn(t, "ssh", standCfg{HoldSecs: 30})
 	tg, _ := ParseTarget("user@box.example.com")
 	st, _ := NewStreamTarget(Runner{SSH: hold}, tg, 8420, streamKey)
 	var conns []net.Conn
@@ -263,10 +233,7 @@ func TestStreamTargetCapsConnectionsAndBacksOffAfterAFailedDial(t *testing.T) {
 		c.Close()
 	}
 
-	fail := filepath.Join(dir, "ssh-fail")
-	if err := os.WriteFile(fail, []byte("#!/bin/sh\necho 'Connection refused' >&2\nexit 255\n"), 0o700); err != nil {
-		t.Fatal(err)
-	}
+	fail := newStandIn(t, "ssh", standCfg{Stderr: "Connection refused\n", Exit: 255})
 	bad, _ := NewStreamTarget(Runner{SSH: fail}, tg, 8420, streamKey)
 	fc, err := bad.dial(context.Background())
 	if err != nil {

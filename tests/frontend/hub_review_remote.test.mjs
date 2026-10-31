@@ -7,7 +7,13 @@ import { installDom, importUi } from './helpers/jsdom_env.mjs';
 const dom = installDom({ mode: 'local' });
 const server = await importUi('server_base');
 assert.equal(server.isCloud(), false, 'the page is a self-hosted hub dashboard, not the Hub-served one');
-assert.equal(server.decisionNeedsPerson('srv1'), true, 'a remote of the hub: no person reaches it, only the hub key');
+const { state } = await importUi('state');
+state.servers = [{ id: 'srv1', status: 'online' }, { id: 'stamped', status: 'online', owner_stamp: true }, { id: 'half', status: 'online', owner_stamp: false }];
+assert.equal(server.decisionNeedsPerson('srv1'), true, 'a remote of the hub that cannot have its decisions signed: no person reaches it, only the hub key');
+assert.equal(server.decisionNeedsPerson('half'), true, 'the hub holds one half only (the live list says false)');
+assert.equal(server.decisionNeedsPerson('missing'), true, 'a server the live list does not know');
+assert.equal(server.decisionNeedsPerson('stamped'), false, 'both halves of the owner stamp exist: the decisions are drawn (#11378)');
+state.servers = [{ id: 'srv1', status: 'online' }];
 assert.equal(server.decisionNeedsPerson('local'), false, "the hub's own machine: the person is at the dashboard");
 assert.equal(server.decisionNeedsPerson(undefined), false);
 

@@ -108,6 +108,10 @@ var ownerRefusals = map[string]string{
 	tunnel.OwnerRouteKey("PUT", "/api/artifacts/{hex64}/star"):                      textStarOwnerOnly,
 	tunnel.OwnerRouteKey("DELETE", "/api/artifacts/{hex64}/star"):                   textStarOwnerOnly,
 	tunnel.OwnerRouteKey("DELETE", "/api/artifacts/{hex64}"):                        "through Coral Hub only the account this computer is linked to can delete an artifact",
+	tunnel.OwnerRouteKey("GET", "/api/board/{project}/proposals"):                   "through Coral Hub only the account this computer is linked to can decide what an agent asked to add",
+	tunnel.OwnerRouteKey("GET", "/api/proposals"):                                   "through Coral Hub only the account this computer is linked to can decide what an agent asked to add",
+	tunnel.OwnerRouteKey("POST", "/api/board/{project}/proposals/{id}/approve"):     "through Coral Hub only the account this computer is linked to can decide what an agent asked to add",
+	tunnel.OwnerRouteKey("POST", "/api/board/{project}/proposals/{id}/reject"):      "through Coral Hub only the account this computer is linked to can decide what an agent asked to add",
 	tunnel.OwnerRouteKey("POST", "/api/artifacts/{hex64}/comments"):                 textCommentsOwnerOnly,
 	tunnel.OwnerRouteKey("POST", "/api/board/{project}/artifacts/{id}/review"):      "through Coral Hub only the account this computer is linked to can approve an artifact or ask changes of it",
 	tunnel.OwnerRouteKey("POST", "/api/board/{project}/operator-artifacts"):         "through Coral Hub only the account this computer is linked to can share a file with an agent",
@@ -137,8 +141,11 @@ var ownerRefusals = map[string]string{
 	tunnel.OwnerRouteKey("POST", "/api/board/{project}/cross-team/files/disable"):   textHubSwitchOwnerOnly,
 	tunnel.OwnerRouteKey("POST", "/api/hub-auto-accept"):                            textHubAutoAcceptOwnerOnly,
 	tunnel.OwnerRouteKey("GET", "/api/analytics/activity"):                          textActivityOwnerOnly,
+	tunnel.OwnerRouteKey("POST", "/api/sessions/live/{name}/notices/pause"):         textNoticesOwnerOnly,
+	tunnel.OwnerRouteKey("POST", "/api/sessions/live/{name}/notices/resume"):        textNoticesOwnerOnly,
 }
 
+const textNoticesOwnerOnly = "through Coral Hub pausing an agent's notices is for the account this computer is linked to only (#11387)"
 const textActivityOwnerOnly = "through Coral Hub the activity counts are for the account this computer is linked to only (#11225)"
 
 const textCustomModelsOwnerOnly = "through Coral Hub only the account this computer is linked to can add or change custom models (#5996)"

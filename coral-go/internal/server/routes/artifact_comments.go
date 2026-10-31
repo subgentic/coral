@@ -115,6 +115,7 @@ func commentRefuse(w http.ResponseWriter, status int, code, msg string) {
 
 // commentView is one comment as the client sees it. Mine and the can* flags are for the UI only (the server decides again on every write).
 type commentView struct {
+	SentTo     string         `json:"sent_to,omitempty"` // the agent the Operator's comment was sent to on its own (#11420): set only on the answer to the comment's creation
 	ID         int64          `json:"id"`
 	ArtifactID string         `json:"artifact_id"`
 	Board      string         `json:"board"`
@@ -323,6 +324,10 @@ func (h *SessionsHandler) listArtifactComments(w http.ResponseWriter, r *http.Re
 	if !ok {
 		return
 	}
+	if caller.Kind == commentCallerAgent && !h.agentMayReadComments(r.Context(), caller.Subject, id) {
+		commentRefuse(w, http.StatusForbidden, "not_yours", "an agent reads the comments of an artifact it uploaded or was asked into")
+		return
+	}
 	state := r.URL.Query().Get("state")
 	switch state {
 	case "", "all":
@@ -383,7 +388,7 @@ func (h *SessionsHandler) listArtifactComments(w http.ResponseWriter, r *http.Re
 			}
 			kept := carried[:0]
 			for _, c := range carried {
-				if keep[c.t.Board] {
+				if keep[c.t.Board] && (caller.Kind != commentCallerAgent || h.agentMayReadComments(r.Context(), caller.Subject, c.t.ArtifactID)) { // an earlier version is read by its own id (#11425 c)
 					kept = append(kept, c)
 				}
 			}
@@ -398,6 +403,10 @@ func (h *SessionsHandler) listArtifactComments(w http.ResponseWriter, r *http.Re
 	}
 	if caller.Kind == commentCallerOwner && (caller.ViaHub || r.Header.Get(tunnel.ViaHeader) == "" && !cloud.Tunneled(r)) { // the owner, at this computer or through Coral Hub (#11354), never a viewer or an agent (#6462)
 		h.attachAsks(r.Context(), out)
+	}
+	if caller.Kind == commentCallerAgent && !redactCommentViews(out) { // what an agent reads is checked for secrets again, as delivery does (#11425 b); no check, no list
+		commentRefuse(w, http.StatusServiceUnavailable, "redaction_unavailable", "the comments could not be checked for secrets, so none are shown")
+		return
 	}
 	canCreate, why := commentPolicy(caller, commentCreate, nil, locked, hubWrite)
 	writeJSON(w, http.StatusOK, map[string]any{"comments": out, "locked": locked, "you": map[string]any{"kind": caller.Kind, "name": viewerName(caller), "can_comment": canCreate, "reason": why, "can_lock": caller.Kind == commentCallerOwner},
@@ -536,6 +545,8 @@ func (h *SessionsHandler) createArtifactComment(w http.ResponseWriter, r *http.R
 		Anchor   *commentAnchor `json:"anchor"`
 		ParentID *int64         `json:"parent_id"`
 		Board    string         `json:"board"`
+		// NotifyAgent false keeps the Operator's comment on a "for review" artifact from being sent to the agent that uploaded it (#11420); absent means it is sent.
+		NotifyAgent *bool `json:"notify_agent"`
 	}
 	if !readJSONBody(w, r, 3*store.MaxArtifactCommentBody, &in) {
 		return
@@ -591,7 +602,13 @@ func (h *SessionsHandler) createArtifactComment(w http.ResponseWriter, r *http.R
 		slog.Warn("[artifact comments] create failed", "error", err)
 		errInternalServer(w, "could not save the comment")
 	default:
-		writeJSON(w, http.StatusCreated, h.commentView(caller, c, locked, hubWrite))
+		view := h.commentView(caller, c, locked, hubWrite)
+		if in.NotifyAgent == nil || *in.NotifyAgent {
+			if d := h.deliverOperatorComment(r, caller, c, id, in.Board); d.To != "" {
+				view.SentTo = d.To
+			}
+		}
+		writeJSON(w, http.StatusCreated, view)
 	}
 }
 
@@ -810,4 +827,40 @@ func (h *SessionsHandler) attachAsks(ctx context.Context, views []commentView) {
 			views[i].Asks = byComment[views[i].ID]
 		}
 	}
+}
+
+// agentMayReadComments says an agent may read the threads of artifact id (#11420): it uploaded the object (its own upload record), or it was asked into a thread of it. Another agent on the same board reads
+// nothing: what the Operator and the team say about one agent's artifact is that agent's to catch up on, not every agent's.
+func (h *SessionsHandler) agentMayReadComments(ctx context.Context, session, id string) bool {
+	if session == "" {
+		return false
+	}
+	if _, ok := readUploadRecord(h.cfg.CoralDir(), session, id); ok {
+		return true
+	}
+	asked, err := h.ss.HasArtifactAsk(ctx, id, session)
+	return err == nil && asked
+}
+
+// redactCommentViews redacts each comment's text and the text it is on in place; false when the redactor is unavailable (nothing is then to be shown).
+func redactCommentViews(views []commentView) bool {
+	for i := range views {
+		body, ok := redactComment(views[i].Body)
+		if !ok {
+			return false
+		}
+		views[i].Body = body
+		if a := views[i].Anchor; a != nil {
+			cp := *a
+			for _, f := range []*string{&cp.Quote, &cp.Prefix, &cp.Suffix} {
+				r, ok := redactComment(*f)
+				if !ok {
+					return false
+				}
+				*f = r
+			}
+			views[i].Anchor = &cp
+		}
+	}
+	return true
 }

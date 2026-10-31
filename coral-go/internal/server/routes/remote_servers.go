@@ -16,6 +16,7 @@ import (
 	"github.com/subgentic/coral/internal/config"
 	"github.com/subgentic/coral/internal/httputil"
 	"github.com/subgentic/coral/internal/store"
+	"github.com/subgentic/coral/pkg/hubowner"
 	proxy "github.com/subgentic/coral/pkg/hubproxy"
 )
 
@@ -472,4 +473,41 @@ func (h *RemoteServersHandler) tellStatus(id, status string) {
 	if h.statusListener != nil {
 		h.statusListener(id, status)
 	}
+}
+
+// OwnerSecret handles POST /api/servers/{id}/owner-secret (#11378): the way a computer added by URL gets the owner stamp. The hub makes a new secret for it, seals its half, and shows the person the setup
+// line ONCE; the person then runs `coral hub-owner-secret` at that computer and pastes it (a human act at the computer: no route there can do it, whatever key it is called with). It is the person's
+// alone (humanInputCaller: not an API key, not an agent) and calling it again makes a new secret, which stops the old stamps until the computer has the new line. A computer set up over SSH gets its secret
+// from the setup and has no use for this.
+func (h *RemoteServersHandler) OwnerSecret(w http.ResponseWriter, r *http.Request) {
+	if !humanInputCaller(r) {
+		writeError(w, http.StatusForbidden, "operator_only", "only a person at the dashboard can set up Approve through this hub")
+		return
+	}
+	id := urlParam(r, "id")
+	cur, err := h.store.Get(r.Context(), id)
+	if err != nil {
+		remoteErr(w, err)
+		return
+	}
+	if cur.Transport != store.RemoteTransportHTTP {
+		errConflict(w, "this computer was set up over SSH: its secret was installed by the setup")
+		return
+	}
+	secret, err := hubowner.NewSecret()
+	if err != nil {
+		errInternalServer(w, "internal error")
+		return
+	}
+	if err := h.store.SetOwnerSecret(r.Context(), id, secret); err != nil {
+		remoteErr(w, err)
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	writeJSON(w, http.StatusOK, map[string]string{
+		"remote_id":  id,
+		"setup_line": id + " " + secret,
+		"command":    "coral hub-owner-secret",
+		"notice":     "Shown once. Run the command at that computer and paste the line when it asks. Until then this hub's decisions for it are refused.",
+	})
 }

@@ -69,10 +69,10 @@ const { coralReady } = require('./helpers/wait');
         assert.equal(v.open, 'agent'); assert.equal(v.panesVisible, 1, 'one section at a time'); assert.equal(v.title, 'Model'); assert.equal(v.desc, '', 'no pane sub-title (#6012)');
         assert.ok(v.listShown && !v.pickShown, 'a wide dialog has the list, not the selector');
         assert.equal(v.footShown && v.footBottom <= v.contentBottom, true, 'the footer is inside the dialog, at its bottom');
-        // the provider is New Agent's own picker (#8973): the four radios, the agent's own checked, the select behind it enabled; picking another provider is a switch the restart carries
+        // the provider is New Agent's own picker (#8973): the five radios, the agent's own checked, the select behind it enabled; picking another provider is a switch the restart carries
         const pick = await ev(`(() => { const g = document.querySelector('#restart-acf .acf-agent-pick'); return g ? { shown: !g.hidden, role: g.getAttribute('role'), radios: [...g.querySelectorAll('input')].map(i => [i.value, i.checked]), disabled: document.querySelector('#restart-acf .acf-agent-type').disabled, fixedLine: !!document.querySelector('#restart-acf .acf-provider-fixed') } : null; })()`);
         assert.ok(pick && pick.shown && pick.role === 'radiogroup', 'the provider picker is there: ' + JSON.stringify(pick));
-        assert.deepEqual(pick.radios, [['claude', true], ['codex', false], ['agy', false], ['pi', false]], 'the four providers, the agent\'s own chosen');
+        assert.deepEqual(pick.radios, [['claude', true], ['codex', false], ['agy', false], ['pi', false], ['opencode', false]], 'the five providers, the agent\'s own chosen');
         assert.equal(pick.disabled, false, 'the provider can be changed'); assert.equal(pick.fixedLine, false, 'no "launch a new agent" line');
         // the Flags field starts at a known value (the agent's own flags, as the form read them), so the clear on a switch and the restore on the way back are measured and not both ''
         await ev(`{ const c = document.getElementById('restart-acf'), f = c.querySelector('.acf-flags'); f.value = '--origin-flag'; c._acfRestartOrigin.flags = '--origin-flag'; } true`);

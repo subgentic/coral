@@ -2942,6 +2942,25 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 /* The Add/Edit server form in the Servers tab (a page, not a dialog) is a settings_view form; this is its frame, nothing wider than the page at 390 px or 200% text. */
 .servers-form-actions { flex-wrap: wrap; margin-top: var(--space-lg); }
 
+/* Set up a server over SSH (#11370): the steps of the hub's work, the host fingerprints, the terms. Nothing wider than the page at 390 px or 200% text. */
+.ssh-setup { display: flex; flex-direction: column; gap: var(--space-md); }
+.ssh-form { display: flex; flex-direction: column; gap: var(--space-sm); }
+.ssh-label { font: var(--dlg-label); }
+.ssh-input { max-width: 100%; }
+.ssh-help, .ssh-note, .ssh-consent, .ssh-intro { margin: 0; color: var(--text-secondary); font-size: var(--fs-base); max-width: 70ch; }
+.ssh-note, .ssh-consent { color: var(--text-primary); }
+.ssh-subhead { margin: var(--space-md) 0 0; font: var(--dlg-section); }
+.ssh-steps, .ssh-keys { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-sm); }
+.ssh-step { display: flex; gap: var(--space-sm); align-items: flex-start; min-width: 0; }
+.ssh-step-glyph { font-size: var(--fs-xl); color: var(--text-secondary); }
+.ssh-step-ok .ssh-step-glyph { color: var(--success); }
+.ssh-step-failed .ssh-step-glyph { color: var(--error); }
+.ssh-step-body { display: flex; flex-direction: column; min-width: 0; overflow-wrap: anywhere; }
+.ssh-step-state, .ssh-step-detail { color: var(--text-secondary); font-size: var(--fs-sm); }
+.ssh-key { display: flex; flex-wrap: wrap; gap: var(--space-xs) var(--space-sm); min-width: 0; overflow-wrap: anywhere; }
+.ssh-key-fp { font-family: var(--font-mono, monospace); font-size: var(--fs-sm); overflow-wrap: anywhere; }
+.ssh-check { display: flex; gap: var(--space-sm); align-items: flex-start; font-size: var(--fs-base); }
+.ssh-done { margin: 0; font: var(--dlg-section); }
 @media (max-width: 767px), (pointer: coarse) {
     .servers-form-actions .btn, .servers-top .btn { min-height: var(--control-touch-height, 44px); }
 }
@@ -3608,7 +3627,7 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
     .settings-tab:has(.sd-dot:not([hidden]))::after { margin-left: 0; }
     .settings-tab[aria-selected="true"] { background: none; box-shadow: none; font-weight: var(--fw-regular); }
     #settings-modal:not([data-screen="pane"]) .modal-header { display: flex; align-items: center; gap: 4px; box-sizing: border-box; height: 56px; min-height: 0; padding: 0 4px; border-bottom: 1px solid var(--border); }
-    #settings-modal:not([data-screen="pane"]) .settings-bar-back { display: inline-grid; place-items: center; flex: none; width: var(--control-touch-height, 44px); height: var(--control-touch-height, 44px); padding: 0; border: 0; border-radius: 22px; background: none; color: var(--text-primary); font-size: var(--fs-2xl); cursor: pointer; } /* the sections' list: ← closes Settings, the title beside it (a bar, not a title over a Close at the bottom only) */
+    #settings-modal:not([data-screen="pane"]) .settings-bar-back { display: inline-grid; place-items: center; flex: none; width: var(--control-touch-height, 44px); height: var(--control-touch-height, 44px); padding: 0; line-height: 1; border: 0; border-radius: 22px; background: none; color: var(--text-primary); font-size: var(--fs-2xl); cursor: pointer; } /* the sections' list: ← closes Settings, the title beside it (a bar, not a title over a Close at the bottom only) */
     #settings-modal .modal-header h3 { margin: 0; }
     @media (max-height: 500px) { #settings-modal:not([data-screen="pane"]) .modal-header { height: 44px; } } /* a phone turned sideways: the bar is the arrow's height, the form keeps its room (phone_landscape_dialogs) */
     #settings-modal[data-screen="pane"] .modal-header { position: absolute; width: 1px; height: 1px; margin: 0; padding: 0; min-height: 0; overflow: hidden; border: 0; clip-path: inset(50%); }
