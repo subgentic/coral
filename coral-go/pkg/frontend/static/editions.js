@@ -43,9 +43,18 @@ async function _saveSettings(values) {
 }
 
 /** After settings load: the first-launch screen when due (and a hub is configured), and the home section. */
+/** One question at a time (#11464): the first-launch Connect screen comes before the set-a-password dialog. This settles when the screen is not going to be offered, or has been answered (closed). */
+let _settleFirst = () => {};
+export const firstOfferDone = new Promise(r => { _settleFirst = r; });
+export const settleFirstOffer = () => _settleFirst();
+
 export async function initEditions() {
+    try { await offerAtLaunch(); } catch (e) { _settleFirst(); throw e; }
+}
+
+async function offerAtLaunch() {
     syncHomeEditions();
-    if (!_available() || !_pending()) return;
+    if (!_available() || !_pending()) return _settleFirst();
     let st = null;
     try {
         // The connector may still be loading its stored enrollment (#3285): ask again briefly.
@@ -55,21 +64,21 @@ export async function initEditions() {
             if (!st || !st.loading) break;
             await new Promise(res => setTimeout(res, loadingWaitMs()));
         }
-    } catch { return; }
+    } catch { return _settleFirst(); }
     // 'off': this build has no hub to connect to (a dev build, or --cloud-url off). Still
     // loading after ~3 s (a startup credential retrying the hub can take longer): it may be
     // enrolled, so don't ask now; welcome_pending stays and the next launch asks.
-    if (st && (st.state === 'off' || st.loading)) return;
+    if (st && (st.state === 'off' || st.loading)) return _settleFirst();
     // Already connected (with coral cloud connect, before the dashboard was opened): that
     // answers the first-launch question.
     if (st && ['connected', 'connecting', 'retrying'].includes(st.state)) {
         await _saveSettings({ welcome_choice: 'connected', welcome_pending: 'False' });
-        return;
+        return _settleFirst();
     }
     // Not offered at launch (the default, #3459): no popup. welcome_pending stays, so a
     // server later started with the offer still asks once.
-    if (!st || !st.offer_at_launch) return;
-    showHubSetup();
+    if (!st || !st.offer_at_launch) return _settleFirst();
+    showHubSetup(); // the screen's close settles it (_close)
 }
 
 // ── The screen ───────────────────────────────────────────────────────────
@@ -217,6 +226,7 @@ function _onState(st) {
 }
 
 function _close() {
+    _settleFirst(); // the first-launch question is answered: the password dialog may open (#11464)
     _panel?.stop();
     _panel = null;
     const m = document.getElementById('editions-modal');
