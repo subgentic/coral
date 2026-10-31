@@ -61,7 +61,7 @@ function avatar(c) {
  *  size decides sheet(). */
 let panelSeq = 0; // one id per panel (the viewer's and the docked pane's)
 export function attachComments(dialog, body, host, opts = {}) {
-    const st = { groupOpen: {}, series: false, hex: null, server: undefined, board: undefined, source: '', text: false, data: null, showResolved: false, active: null, composing: null, busy: false, error: '', ranges: new Map(), orphan: new Set(), gone: false };
+    const st = { groupOpen: {}, series: false, hex: null, server: undefined, board: undefined, source: '', text: false, whole: false, data: null, showResolved: false, active: null, composing: null, busy: false, error: '', ranges: new Map(), orphan: new Set(), gone: false };
     const panel = el('aside', 'pane pane-aside ac-panel'); panel.setAttribute('aria-label', 'Comments'); panel.hidden = true;
     panel.id = `ac-panel-${++panelSeq}`; // the toggle names it (aria-controls): where the opened comments are
     const toggle = btn('ac-toggle', 'Comments', 'Comments: show the comments'); toggle.hidden = true; toggle.setAttribute('aria-expanded', 'false');
@@ -103,7 +103,7 @@ export function attachComments(dialog, body, host, opts = {}) {
     const ownHex = (c) => c.artifactId || st.hex; // a carried comment's replies, resolving and edits go to the version it was written on
     const openCount = () => threads().filter(t => !t.c.deleted && !t.c.resolved && groupOf(t.c) !== 'earlier').length;
     async function refresh() {
-        if (!st.hex || !st.text) return;
+        if (!st.hex || (!st.text && !st.whole)) return;
         const hex = st.hex;
         try {
             const data = await api.listComments(hex, st.server, st.board, st.series);
@@ -141,7 +141,7 @@ export function attachComments(dialog, body, host, opts = {}) {
     function render() {
         const kept = focusKey();
         panel.replaceChildren();
-        const show = st.text && !st.gone && !!st.data;
+        const show = (st.text || st.whole) && !st.gone && !!st.data;
         panel.hidden = !show; st.shownNow = show; syncToggle();
         syncOn();
         paintToggle();
@@ -181,7 +181,7 @@ export function attachComments(dialog, body, host, opts = {}) {
             d.addEventListener('toggle', () => { st.groupOpen[g] = d.open; });
             li.append(d); wrap.append(li);
         }
-        if (!shownAll.length) wrap.append(el('p', 'empty-state empty-state-tight', 'No open comments. Select some text to add one.'));
+        if (!shownAll.length) wrap.append(el('p', 'empty-state empty-state-tight', st.text ? 'No open comments. Select some text to add one.' : 'No open comments. Use the button below to comment on the whole document.'));
         panel.append(wrap);
         if (st.composing && st.composing.anchor) panel.append(composer());
         else if (d.canComment && !d.locked) {
@@ -336,7 +336,7 @@ export function attachComments(dialog, body, host, opts = {}) {
     let selTimer = 0;
     function selectionAnchor() {
         const sel = window.getSelection();
-        if (!st.data || !st.data.canComment || st.data.locked || !sel || sel.isCollapsed || !sel.rangeCount) return null;
+        if (!st.text || !st.data || !st.data.canComment || st.data.locked || !sel || sel.isCollapsed || !sel.rangeCount) return null; // a document that is not text takes whole-document comments only
         const r = sel.getRangeAt(0);
         if (!body.contains(r.commonAncestorContainer)) return null;
         const before = document.createRange(); before.setStart(body, 0); before.setEnd(r.startContainer, r.startOffset);
@@ -396,8 +396,10 @@ export function attachComments(dialog, body, host, opts = {}) {
         sheetOpen: () => isOpen(), setSheet: (open) => setSheet(open),
         /** A new artifact is on show. */
         // The computer whose artifact it is: the caller's, else the one on show (the rule renderArtifact reads the content by); a bare /api/ route is the hub's own and 404s there (#6245).
-        open(hex, server, board, series = false) { st.series = !!series; region(false); { const hl = window.CSS && CSS.highlights; if (hl) { hl.delete('ac-comment'); hl.delete('ac-active'); } } forget(); st.hex = hex; st.server = server || contextServer(); st.board = board; st.data = null; st.active = null; st.composing = null; st.error = ''; st.text = false; st.gone = false; st.filter = 'open'; st.visibilitySet = false; render(); setSheet(false); },
+        open(hex, server, board, series = false) { st.series = !!series; region(false); { const hl = window.CSS && CSS.highlights; if (hl) { hl.delete('ac-comment'); hl.delete('ac-active'); } } forget(); st.hex = hex; st.server = server || contextServer(); st.board = board; st.data = null; st.active = null; st.composing = null; st.error = ''; st.text = false; st.whole = false; st.gone = false; st.filter = 'open'; st.visibilitySet = false; render(); setSheet(false); },
         /** The document was drawn: `text` says whether it is text the comments apply to. */
+        /** The document drawn is not text the comments can point into (HTML in its frame, a picture, a PDF, a table, a video, a download): the panel is there for a comment on the whole document. */
+        docWhole() { st.source = ''; st.text = false; st.whole = true; refresh(); },
         docRendered(source, text) { st.source = source || ''; st.text = !!text; if (!st.text) { render(); return; } region(true); refresh(); },
         close() { hover(null); setSheet(false); region(false); forget(); st.ranges.clear(); st.hex = null; st.data = null; clearTimeout(selTimer); selBtn.hidden = true; const hl = window.CSS && CSS.highlights; if (hl) { hl.delete('ac-comment'); hl.delete('ac-active'); } render(); },
     };

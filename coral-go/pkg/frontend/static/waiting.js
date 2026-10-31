@@ -2,9 +2,10 @@
  * message stays on the board. The agent view says what is there (the row's board_unread and skipped_send), lists it on request (GET /waiting) and has Send now, the Operator's own action: the server
  * types the board nudge into the agent's input box whether or not it is in the middle of a turn, and never into a prompt that is open or over a draft. */
 import { registerActions } from './actions.js';
+import { markHidden } from './visible_marks.js';
 import { state } from './state.js';
 import { showToast } from './utils.js';
-import { serverFetch, currentServer } from './server_base.js';
+import { serverFetch, currentServer, sessionServer } from './server_base.js';
 import { responseErrorText } from './server_status.js';
 import { whenText } from './when_text.js';
 import { showConfirmModal } from './confirm_dialog.js';
@@ -29,12 +30,25 @@ export function noticesPaused(row) {
     return !!k && /^notices paused\b/i.test(k.why);
 }
 
+/** The line for an agent whose notices are held because its program is not the one Coral recorded (#11415). */
+export const PAUSED_LINE = 'Paused: this agent was running before the update, or its process changed';
+
+/** Agents of this Coral whose notices are held because their program is not the recorded one (#11415): the live rows, awake only. */
+export const unrecordedAgents = rows => (rows || []).filter(r => r && !r.sleeping && !r.archived && sessionServer(r) === 'local' && noticesPaused(r));
+
+/** The ONE Needs you item for them, or null: a row the Inbox draws like a failed run, whose action is the Record for all agents confirm. */
+export function unrecordedItem(rows) {
+    const n = unrecordedAgents(rows).length;
+    if (!n) return null;
+    return { unrecorded: { count: n }, session_id: 'unrecorded-agents', display_name: "Coral's messages", board_project: '', server: '', waiting_kind: 'record', waiting_summary: `${n} agent${n === 1 ? " isn't" : "s aren't"} receiving Coral's messages`, waiting_since: '' };
+}
+
 /** The agent view's line: '' when no board message waits and its notices are not paused (another skipped send alone says nothing here). */
 export function waitingText(row) {
     if (!row || row.sleeping) return '';
     const n = waitingCount(row);
     if (n > 0) return `${n} team message${n === 1 ? ' has' : 's have'} not reached this agent yet`; // short on purpose (#10036): why it waits, the list and the actions are behind Options
-    return noticesPaused(row) ? 'Board notices are paused for this agent' : '';
+    return noticesPaused(row) ? PAUSED_LINE : '';
 }
 
 /** What is said after a Send now, from the server's answer. */
@@ -59,10 +73,12 @@ export function syncWaitingNotice(row) {
     const canSend = on && waitingCount(row) > 0;
     if (send && send.hidden === canSend) send.hidden = !canSend;
     const paused = on && noticesPaused(row); // Record as agent and Record for all agents, the Operator's way to end the pause (#391)
-    for (const id of ['composer-waiting-record', 'composer-waiting-record-all']) {
+    for (const id of ['composer-waiting-record-line', 'composer-waiting-record', 'composer-waiting-record-all']) {
         const b = document.getElementById(id);
         if (b && b.hidden === paused) b.hidden = !paused;
     }
+    const help = document.getElementById('composer-waiting-record-help');
+    if (help && help.hidden === paused) help.hidden = !paused;
     if (!on) closeList();
 }
 
@@ -137,15 +153,11 @@ async function sendNow() {
     } finally { busy = false; }
 }
 
-// The characters that hide or reorder text: the same list as visibleName's UNSAFE in artifact_names.js (#220), plus the line and
-// paragraph separators. Whichever of #220 and this PR merges second imports visibleName instead, so there is one list. Escapes only.
-const HIDDEN = /[\u0000-\u001f\u007f-\u009f\u00ad\u034f\u061c\u180e\u200b-\u200f\u202a-\u202e\u2060-\u206f\ufe00-\ufe0f\ufeff\u{E0000}-\u{E007F}\u{E0100}-\u{E01EF}\u2028\u2029]/gu;
-
-/** Text from the server or a row reduced to one plain line for the confirm: hidden characters (HIDDEN) dropped, blanks collapsed, and
+/** Text from the server or a row reduced to one plain line for the confirm: hidden characters written out (markHidden, strict), blanks collapsed, and
  *  cut on characters (never inside a surrogate pair) with an ellipsis (the server's caps: 64 for a name, 120 for a folder). A folder keeps
  *  its tail, the part nearest the file, behind a leading ellipsis (Security's #4850). */
 function plain(v, max, tail = false) {
-    const chars = [...String(v == null ? '' : v).replace(HIDDEN, '').replace(/\s+/g, ' ').trim()];
+    const chars = [...markHidden(v, { strict: true }).replace(/\s+/g, ' ').trim()]; // a hidden character is written out as <U+XXXX>, not dropped: dropping hides that it was there (#11399's visible_marks.js)
     if (chars.length <= max) return chars.join('');
     return tail ? '…' + chars.slice(chars.length - (max - 1)).join('') : chars.slice(0, max - 1).join('') + '…';
 }
@@ -176,6 +188,15 @@ function recordAllText(r) {
     const left = Array.isArray(r && r.left) ? r.left : [];
     let t = `Recorded ${done} agent${done === 1 ? '' : 's'}.`;
     if (left.length) t += ` Left paused: ${left.map(l => `${plain(l.session, 64)} (${plain(l.reason, 200) || 'no reason given'})`).join('; ')}.`;
+    return t;
+}
+
+/** What Record for all agents asks, from the server's preview (#11415): each agent and the program and pid it will be recorded as, so the Operator can check every one, and the ones that stay paused. */
+export function recordAllConfirmText(r) {
+    const rows = Array.isArray(r && r.recorded) ? r.recorded : [], left = Array.isArray(r && r.left) ? r.left : [];
+    const who = x => `${plain(x.session, 64)}: ${plain(x.program, 64) || 'unknown program'} (pid ${Number(x.pid)})`;
+    let t = `Coral will type messages into these programs, recorded as each agent: ${rows.map(who).join('; ')}. Check that each is the agent you expect.`;
+    if (left.length) t += ` Not recorded here: ${left.map(l => plain(l.session, 64)).join(', ')} (use Record as agent on each).`;
     return t;
 }
 
@@ -220,13 +241,22 @@ async function postRecord(s, c, acknowledged) {
 
 /** Record for all agents (#391, after an update): the server records every agent whose program is its resolved CLI and leaves the rest
  *  paused, each with why; nothing is guessed. */
-async function recordAllAgents() {
+export async function recordAllAgents() {
     if (busy) return;
     busy = true;
     try {
-        const resp = await serverFetch(currentServer(), '/api/sessions/record-agents', { method: 'POST' });
-        if (!resp.ok) { showToast(await responseErrorText(resp, currentServer(), `Not recorded (HTTP ${resp.status}).`)); return; }
-        showToast(recordAllText(await resp.json()));
+        const look = await serverFetch(currentServer(), '/api/sessions/record-agents?dry_run=1', { method: 'POST' }); // what it would record, before anything is
+        if (!look.ok) { showToast(await responseErrorText(look, currentServer(), `The agents could not be read (HTTP ${look.status}).`)); return; }
+        const preview = await look.json();
+        if (!Array.isArray(preview.recorded) || preview.recorded.length === 0) { showToast(recordAllText(preview).replace(/^Recorded 0 agents\./, 'Nothing to record here.')); return; }
+        showConfirmModal('Record for all agents', recordAllConfirmText(preview), async () => {
+            try {
+                const shown = preview.recorded.map(x => ({ session: String(x.session), pid: Number(x.pid) })); // what the Operator was shown: the server records an agent only while its program still has that pid
+                const resp = await serverFetch(currentServer(), '/api/sessions/record-agents', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ agents: shown }) });
+                if (!resp.ok) { showToast(await responseErrorText(resp, currentServer(), `Not recorded (HTTP ${resp.status}).`)); return; }
+                showToast(recordAllText(await resp.json()));
+            } catch (e) { showToast('Not recorded: ' + (e && e.message ? e.message : 'the server did not answer.')); }
+        }, undefined, { label: 'Record all', danger: false });
     } catch (e) {
         showToast('Not recorded: ' + (e && e.message ? e.message : 'the server did not answer.'));
     } finally { busy = false; }

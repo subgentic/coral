@@ -133,10 +133,11 @@ export function openArtifactViewer(hex, opts = {}) {
     _details.clear();
     readersAllowed(hex, opts.server).then(ok => { if (ok && gen === _gen && !d.hidden) _details.add(readersBlock(hex, opts.server, _details)); }).catch(() => {});
     if (!opts.switched) d.querySelector('.artifact-viewer-close').focus(); // a version chosen from the bar keeps the keyboard on the bar
+    let textShown = false; // the strict text view drew it: comments can point into it. Anything else (a frame, a picture, a PDF, a table, a video, a download) takes whole-document comments (#11444).
     Promise.resolve(renderArtifact(body, `coral://artifacts/${hex}`, { server: opts.server, filename: opts.filename, mediaType: opts.mediaType }, {
         signal: _abort.signal,
         isStale: () => gen !== _gen || d.hidden,
-        renderContent: (el, content, path) => { renderArtifactText(el, content, path); _comments.docRendered(content, true); },
+        renderContent: (el, content, path) => { textShown = true; renderArtifactText(el, content, path); _comments.docRendered(content, true); },
         openEntry: (entry) => {
             const m = /^coral:\/\/artifacts\/([a-f0-9]{64})$/i.exec(entry.uri || '');
             if (m) openArtifactViewer(m[1], { server: opts.server, filename: entry.name, mediaType: entry.media_type });
@@ -156,7 +157,7 @@ export function openArtifactViewer(hex, opts = {}) {
             dl.href = target.url; dl.setAttribute('download', target.name);
             dl.onclick = isCloud() ? (e) => { e.preventDefault(); if (dl.getAttribute('aria-disabled') === 'true') return; downloadArtifact(target.url, sanitizeDownloadName(target.name)).catch(err => { title.textContent = err.message; }); } : null;
         },
-    })).then(() => { if (gen === _gen) d.classList.toggle('is-image', !!body.querySelector('.image-panes')); }, () => {}); // a picture opens taller (css), not as a strip of its own height
+    })).then(() => { if (gen !== _gen) return; d.classList.toggle('is-image', !!body.querySelector('.image-panes')); if (!textShown) _comments.docWhole(); }, () => {}); // a picture opens taller (css), not as a strip of its own height
     return true;
 }
 
