@@ -59,6 +59,7 @@ func lsrRows(t *testing.T, h *SessionsHandler, old, full bool) string {
 			delete(r, "notices_waiting")      // new in #11387 (how many notices are held)
 			delete(r, "notices_holding")      // new in #11387 (held only while the person types to the agent)
 			delete(r, "last_message")         // new in #11097 (the newest message of the transcript, for the phone list): the old implementation has no such field; last_message_e2e_test.go pins it through the list
+			delete(r, "at_dialog")            // new in #11437 (an agent at a prompt, read from its screen by the dialog watcher): the old implementation has no such field; dialog_watch_test.go pins it through the list
 		}
 	}
 	b, merr := json.Marshal(rows)
