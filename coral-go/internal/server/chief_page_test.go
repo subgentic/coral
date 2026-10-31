@@ -202,3 +202,33 @@ func TestChiefPageResolvesTheRecordedTeamNameToItsBoard(t *testing.T) {
 	set("chief_team", "ChiefDesk")
 	assert.False(t, shown(), "a name is exact: no guessing by case")
 }
+
+// #11502 (QA's Chief walk, finding 4): the pop-out and /chief name an agent from GET /api/sessions/{id}/resolve, merged over the live row. A name the Operator gave later (session_meta, what the list shows) must win over the
+// name the agent was launched with (live_sessions.display_name, here the team member "Orchestrator"), or the header says Chief on the first paint and Orchestrator once the resolver's record is merged in.
+func TestResolveNamesTheAgentByItsRenamedDisplayName(t *testing.T) {
+	cfg := newE2EConfig(t, t.TempDir())
+	db, err := storetest.Open(t, cfg.DBPath)
+	require.NoError(t, err)
+	t.Cleanup(func() { db.Close() })
+	stack := newTermStack(t)
+	srv := newTestServer(t, cfg, db, stack.backend, stack.terminal)
+	ss := store.NewSessionStore(db)
+	ctx := context.Background()
+	launched := "Orchestrator"
+	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: chiefSID, AgentType: "claude", AgentName: "work", WorkingDir: t.TempDir(), DisplayName: &launched}))
+	resolve := func() map[string]any {
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "/api/sessions/"+chiefSID+"/resolve", nil)
+		req.Host, req.RemoteAddr = "127.0.0.1:8420", "127.0.0.1:50000"
+		srv.Router().ServeHTTP(rec, req)
+		require.Equal(t, http.StatusOK, rec.Code)
+		var out map[string]any
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &out))
+		return out
+	}
+	assert.Equal(t, "Orchestrator", resolve()["display_name"], "before a rename: the name it was launched with")
+	require.NoError(t, ss.SetDisplayName(ctx, chiefSID, "Chief"))
+	out := resolve()
+	assert.Equal(t, "Chief", out["display_name"], "after a rename: the renamed display name, as the list says")
+	assert.Equal(t, "Orchestrator", out["board_job_title"], "the job title stays the member's")
+}
