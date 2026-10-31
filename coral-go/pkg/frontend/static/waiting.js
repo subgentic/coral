@@ -33,7 +33,7 @@ export function noticesPaused(row) {
 export function waitingText(row) {
     if (!row || row.sleeping) return '';
     const n = waitingCount(row);
-    if (n > 0) return `${n} team message${n === 1 ? ' waits' : 's wait'} for this agent`; // short on purpose (#10036): why it waits, the list and the actions are behind Options
+    if (n > 0) return `${n} team message${n === 1 ? ' has' : 's have'} not reached this agent yet`; // short on purpose (#10036): why it waits, the list and the actions are behind Options
     return noticesPaused(row) ? 'Board notices are paused for this agent' : '';
 }
 
