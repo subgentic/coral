@@ -194,6 +194,7 @@
 .dt-progress-meter::-moz-progress-bar { background: var(--table-progress-fill); }
 
 .dt-table .dt-action { margin: 0; white-space: nowrap; }
+.dt-table td:has(> .dt-action-roomy) { padding-block: 5px; padding-inline-end: var(--table-pad-x); } /* a touch-size button as tall as the row gets room above and below it and from the edge, so the rows' lines are not drawn through it (the team's Open chat, #11401 d) */
 .dt-table td:has(> .dt-action) { overflow: visible; text-overflow: clip; } /* a cell that holds a button never clips it or draws an ellipsis beside it: Open chat was 8 px wider than its 7rem cell's content box and a stray ellipsis stood at its right (#11142) */
 .dt-box.dt-folded .dt-action { min-height: var(--table-touch); }
 
@@ -517,6 +518,7 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 /* A Needs you row's answer buttons (#10400): the card's own choices, 44 px on a phone. */
 .inbox-answers { display: inline-flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .inbox-answered { color: var(--text-secondary); }
+.inbox-only-reject { color: var(--text-secondary); font-size: .85em; flex: 1 1 100%; } /* a request that can only be rejected (#11399): said in words, on its own line under the No */
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) { .inbox-answers .inbox-answer { flex: 1 1 0; min-height: var(--control-touch-height, 44px); min-width: var(--control-touch-height, 44px); } }
 .dt-mail-cell:has(> .inbox-answers) { flex-wrap: wrap; }
 .dt-mail-cell > .inbox-answers { flex: 1 1 100%; padding: 0 12px 8px 56px; } /* under the mail line, in line with its text */

@@ -98,7 +98,7 @@ const joiningRoute = "POST /api/board/{project}/subscribe"
 // classified its caller.
 func actorFor(r *http.Request, caller string) (Actor, bool) {
 	switch caller {
-	case callerCLISigned, callerAPIKey, callerDashCookie:
+	case callerCLISigned, callerAPIKey, callerDashCookie, callerHubOwner:
 		return Actor{Kind: ActorOperator, Name: "Operator"}, true
 	case callerHub:
 		return hubActor(r), true

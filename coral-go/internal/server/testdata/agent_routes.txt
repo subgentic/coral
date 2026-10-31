@@ -359,6 +359,7 @@ b POST /api/servers/{id}/test
 b POST /api/servers/provision/plan
 b POST /api/servers/provision/{plan}/connect
 b POST /api/servers/provision/{plan}/run
+b POST /api/servers/{id}/owner-secret
 b POST /api/sessions/history/{sessionID}/resummarize
 b POST /api/sessions/history/{sessionID}/tags
 a POST /api/sessions/launch
@@ -485,3 +486,7 @@ b TRACE /api/remote/{server}/*
 b GET /api/sessions/history/counts
 b GET /api/sessions/live/{sessionID}/agent-candidate
 b PATCH /api/sessions/history/{sessionID}/flags
+b GET /api/board/{project}/proposals
+b GET /api/proposals
+b POST /api/board/{project}/proposals/{id}/approve
+b POST /api/board/{project}/proposals/{id}/reject

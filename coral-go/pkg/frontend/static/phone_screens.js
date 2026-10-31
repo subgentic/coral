@@ -18,7 +18,7 @@ export const BUILT = new Set(['A', 'B', 'C', 'D']);
 export const PHONE_SCREENS = {
     'mobile-agent-list': { type: 'top-level', nav: 'nav-agents', fab: 'agents', slice: 'A' }, // Home: the agent list (its + makes an agent or a team)
     'inbox-view': { type: 'top-level', nav: 'nav-inbox', slice: 'A' },               // Inbox (its folders are the tab strip)
-    'group-table-view': { type: 'top-level', nav: tab => (tab === 'hub-inbox' ? 'nav-inbox' : 'nav-more'), fab: tab => (tab === 'automations' ? 'automations' : null), slice: 'A' }, // a folder page: the Inbox's (lit Inbox) or Automations' (More); the tab that is open says which
+    'group-table-view': { type: 'top-level', nav: (tab, page) => (tab === 'hub-inbox' ? (page === 'Tasks' ? 'nav-tasks' : 'nav-inbox') : 'nav-more'), fab: tab => (tab === 'automations' ? 'automations' : null), slice: 'A' }, // a folder page: the Inbox's (lit Inbox) or Automations' (More); the tab that is open says which
     'scheduler-view': { type: 'top-level', nav: 'nav-more', fab: 'automations', slice: 'A' }, // Automations > Jobs (its + makes a job or a workflow)
     'workflows-view': { type: 'top-level', nav: 'nav-more', fab: 'automations', slice: 'A' }, // Automations > Workflows
     'cost-dashboard-view': { type: 'top-level', nav: 'nav-more', slice: 'C' },       // Analytics
@@ -35,8 +35,8 @@ export const PHONE_SCREENS = {
     'kanban-view': { type: 'drill-down', slice: 'D' },
 };
 
-/** The declared screen of a view, once its slice is built: { type, nav } or null while the view keeps today's chrome. `nav` is the lit slot's name, from a function of the open nav tab where one page serves two tabs. */
-export function builtScreen(viewId, navTab = '') {
+/** The declared screen of a view, once its slice is built: { type, nav } or null while the view keeps today's chrome. `nav` is the lit slot's name, from a function of the open nav tab (and the page the phone bar opened inside it, its Tasks inside the Inbox's view) where one page serves two tabs. */
+export function builtScreen(viewId, navTab = '', page = '') {
     const s = PHONE_SCREENS[viewId];
-    return s && BUILT.has(s.slice) ? { ...s, nav: typeof s.nav === 'function' ? s.nav(navTab) : s.nav, fab: typeof s.fab === 'function' ? s.fab(navTab) : s.fab } : null;
+    return s && BUILT.has(s.slice) ? { ...s, nav: typeof s.nav === 'function' ? s.nav(navTab, page) : s.nav, fab: typeof s.fab === 'function' ? s.fab(navTab) : s.fab } : null;
 }

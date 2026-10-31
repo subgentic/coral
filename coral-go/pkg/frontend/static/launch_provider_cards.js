@@ -7,6 +7,9 @@ import { serverFetch, normServer, LOCAL_SERVER, isLocalServer, isCloud } from '.
 import { importOnce } from './import_once.js';
 import { modelName } from './model_labels.js';
 import { copyText } from './utils.js';
+import { loadStyles } from './lazy_styles.js';
+
+await loadStyles('provider_cards.css'); // the cards' rules are not in the start's stylesheet: they arrive before the first card is drawn (#11403)
 const { _getDefaultModels } = await importOnce('./launch_models.js');
 const { CLI_INSTALL_INSTRUCTIONS } = await importOnce('./cli_check.js');
 

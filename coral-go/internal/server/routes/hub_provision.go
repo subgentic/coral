@@ -22,6 +22,7 @@ import (
 	"github.com/subgentic/coral/internal/safego"
 	"github.com/subgentic/coral/internal/sshprov"
 	"github.com/subgentic/coral/internal/store"
+	"github.com/subgentic/coral/pkg/hubowner"
 	terms "github.com/subgentic/coral/pkg/license"
 )
 
@@ -158,10 +159,12 @@ type Provisioner struct {
 	// startRemote starts the installed Coral in tmux and reads the remote's instance id and API key; checkHealth asks the new server, through its SSH stream, whether it answers. Variables for tests.
 	startRemote func(ctx context.Context, p *provisionPlan) (instanceID, key string, err error)
 	checkHealth func(ctx context.Context, rs *store.RemoteServer, key string) RemoteHealth
-	version     string                  // the release this hub runs and the only one it installs (config.Version; a test sets its own)
-	onRemoved   func(id string)         // a remove took the server out of the registry
-	notify      func(id, status string) // tells the hub's remote workers a server was added (the same hook the registry's edits use)
-	startedAt   time.Time
+	// installOwner puts the secret this hub signs the computer's owner stamps with on the computer (#11378), by the far Coral's own command, the secret on stdin; a variable for tests.
+	installOwner func(ctx context.Context, p *provisionPlan, secret string) error
+	version      string                  // the release this hub runs and the only one it installs (config.Version; a test sets its own)
+	onRemoved    func(id string)         // a remove took the server out of the registry
+	notify       func(id, status string) // tells the hub's remote workers a server was added (the same hook the registry's edits use)
+	startedAt    time.Time
 	// eula says whether this tier asks for the terms and whether this hub's own EULA marker holds the current version and digest. A variable so a test does not read the real marker.
 	eula func() (required, accepted bool)
 }
@@ -184,6 +187,9 @@ func NewProvisioner(s *store.RemoteServerStore) *Provisioner {
 	pr.startRemote = pr.realStartRemote
 	pr.checkHealth = pr.realCheckHealth
 	pr.eula = hubEULAState
+	pr.installOwner = func(ctx context.Context, p *provisionPlan, secret string) error {
+		return pr.runner.InstallOwnerSecret(ctx, p.Target, pr.version, p.ServerID, secret)
+	}
 	return pr
 }
 
@@ -467,6 +473,13 @@ func (pr *Provisioner) Run(w http.ResponseWriter, r *http.Request) {
 	p.mu.Unlock()
 	safego.Go("provision run", func() {
 		defer cancel()
+		// A panic in a step must not leave the plan "running" until it expires (15 minutes): the plan fails with one fixed sentence, then the panic goes on to safego, which logs it and keeps the server up.
+		defer func() {
+			if r := recover(); r != nil {
+				pr.failPanicked(p)
+				panic(r)
+			}
+		}()
 		pr.runSteps(ctx, p)
 	})
 	writeJSON(w, http.StatusAccepted, p.view())
@@ -588,6 +601,10 @@ func (pr *Provisioner) finish(ctx context.Context, p *provisionPlan) error {
 		p.setStep("register", stepOK, "Already registered; nothing was changed.") // a re-run: the key and the row stay as they are
 		return nil
 	}
+	// The owner stamp (#11378): a new secret for this computer, installed on it by its own command line before it is registered, so Approve and Request changes can work through this hub. A failure here does
+	// not stop the registration; the page says the stamp is not set up.
+	ownerSecret, serr := hubowner.NewSecret()
+	ownerOK := serr == nil && pr.installOwner(ctx, p, ownerSecret) == nil
 	if _, err := pr.store.AddSSH(ctx, p.ServerID, p.Label, rs.SSHTarget, rs.RemotePort, instanceID, key); err != nil {
 		switch {
 		case errors.Is(err, store.ErrRemoteExists):
@@ -597,11 +614,18 @@ func (pr *Provisioner) finish(ctx context.Context, p *provisionPlan) error {
 		}
 		return &sshprov.ErrInstall{Step: "register", Msg: "Could not save the server."}
 	}
+	if ownerOK {
+		ownerOK = pr.store.SetOwnerSecret(ctx, p.ServerID, ownerSecret) == nil
+	}
 	_ = pr.store.SetStatus(ctx, p.ServerID, store.RemoteStatusOnline, "")
 	if pr.notify != nil {
 		pr.notify(p.ServerID, store.RemoteStatusOnline)
 	}
-	p.setStep("register", stepOK, "Registered. It appears in your server list.")
+	detail := "Registered. It appears in your server list."
+	if !ownerOK {
+		detail += " Approve and Request changes through this hub are not set up for it."
+	}
+	p.setStep("register", stepOK, detail)
 	return nil
 }
 
@@ -728,4 +752,17 @@ func (pr *Provisioner) Options(w http.ResponseWriter, r *http.Request) {
 		"acceptance_label":   setupAcceptanceLabel(),
 		"records_acceptance": required,
 	})
+}
+
+// failPanicked fails a plan whose run panicked: the step that was running is failed and the plan says, in one fixed sentence, that it stopped. Nothing of the panic is in the sentence.
+func (pr *Provisioner) failPanicked(p *provisionPlan) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	for i := range p.steps {
+		if p.steps[i].State == stepRunning || p.steps[i].State == stepPending {
+			p.steps[i].State, p.steps[i].Detail = stepFailed, "Something went wrong inside this hub."
+			break
+		}
+	}
+	p.phase, p.failure = phaseFailed, "Something went wrong inside this hub, so the setup stopped. Nothing more was done."
 }

@@ -55,6 +55,7 @@ GET /api/board/{project}/messages/check | board-claims
 GET /api/board/{project}/messages/search | board-claims
 GET /api/board/{project}/paused | board-claims
 GET /api/board/{project}/peek | board-claims
+GET /api/board/{project}/proposals | board-claims | operator-only
 GET /api/board/{project}/queue | board-claims
 GET /api/board/{project}/relay-targets | board-claims
 GET /api/board/{project}/reminder | board-claims | operator-only
@@ -167,6 +168,8 @@ POST /api/board/{project}/messages/mark-read | board-claims
 POST /api/board/{project}/operator-artifacts | board-claims | operator-only
 POST /api/board/{project}/operator-artifacts/message | board-claims | operator-only
 POST /api/board/{project}/pause | board-claims | operator-only
+POST /api/board/{project}/proposals/{id}/approve | board-claims | operator-only
+POST /api/board/{project}/proposals/{id}/reject | board-claims | operator-only
 POST /api/board/{project}/relay-messages | board-claims +token-session
 POST /api/board/{project}/reminder | board-claims
 POST /api/board/{project}/resume | board-claims | operator-only

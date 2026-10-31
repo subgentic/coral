@@ -25,8 +25,10 @@ import (
 
 	"github.com/subgentic/coral/internal/httputil"
 	"github.com/subgentic/coral/internal/license"
+	"github.com/subgentic/coral/internal/safego"
 	"github.com/subgentic/coral/internal/sshprov"
 	"github.com/subgentic/coral/internal/store"
+	"github.com/subgentic/coral/pkg/hubowner"
 	terms "github.com/subgentic/coral/pkg/license"
 )
 
@@ -36,13 +38,15 @@ const (
 )
 
 type provEnv struct {
-	e       *rsEnv
-	p       *Provisioner
-	dir     string
-	router  chi.Router
-	known   string
-	sshLog  string
-	keyBlob string
+	ownerGiven []string // the secrets installOwner was handed
+	ownerErr   error    // what installOwner answers
+	e          *rsEnv
+	p          *Provisioner
+	dir        string
+	router     chi.Router
+	known      string
+	sshLog     string
+	keyBlob    string
 }
 
 // newProvEnv wires a Provisioner to a fake ssh and a fake ssh-keyscan. mode: "known" (the host key is in known_hosts: ssh answers), "unknown" (ssh exits 255 with the host key refusal until the key is trusted),
@@ -81,6 +85,7 @@ exit 0
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "ssh"), []byte(script), 0o700))
 	scan := "#!/bin/sh\necho 'box.example.com ssh-ed25519 " + b64 + "'\n"
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "ssh-keyscan"), []byte(scan), 0o700))
+	pe := &provEnv{}
 	pr := NewProvisioner(e.h.store)
 	pr.runner = sshprov.Runner{SSH: filepath.Join(dir, "ssh"), KeyScan: filepath.Join(dir, "ssh-keyscan")}
 	pr.configs = func() string { return filepath.Join(dir, "config") }
@@ -91,6 +96,10 @@ exit 0
 		return nil
 	}
 	pr.startRemote = func(context.Context, *provisionPlan) (string, string, error) { return provInstance, provKey, nil }
+	pr.installOwner = func(_ context.Context, _ *provisionPlan, secret string) error { // what the far Coral's hub-owner-secret would be given on stdin
+		pe.ownerGiven = append(pe.ownerGiven, secret)
+		return pe.ownerErr
+	}
 	pr.checkHealth = func(context.Context, *store.RemoteServer, string) RemoteHealth {
 		return RemoteHealth{Status: store.RemoteStatusOnline, Version: "9.9.9"}
 	}
@@ -101,7 +110,8 @@ exit 0
 	r.Get("/api/servers/provision/options", pr.Options)
 	r.Get("/api/servers/provision/{plan}", pr.Status)
 	r.Delete("/api/servers/provision/{plan}", pr.Cancel)
-	return &provEnv{e: e, p: pr, dir: dir, router: r, known: known, sshLog: log, keyBlob: b64}
+	pe.e, pe.p, pe.dir, pe.router, pe.known, pe.sshLog, pe.keyBlob = e, pr, dir, r, known, log, b64
+	return pe
 }
 
 // do sends the request as the dashboard's person (the identity layer's classification of a signed-in browser).
@@ -570,4 +580,70 @@ func TestProvisionTooManyPlansIsAMarkedActionLimit(t *testing.T) {
 	require.Equal(t, http.StatusTooManyRequests, w.Code)
 	assert.Equal(t, "action", w.Header().Get(httputil.ActionLimitHeader), "an unmarked 429 pauses every poller on the page")
 	assert.Contains(t, w.Body.String(), "setup_in_progress")
+}
+
+func TestProvisionGivesANewComputerItsOwnerSecretAndStoresTheOtherHalf(t *testing.T) {
+	pe := newProvEnv(t, "known", "Linux x86_64", true)
+	done := runToEnd(t, pe, "done")
+	require.Len(t, pe.ownerGiven, 1, "the secret was installed once")
+	secret := pe.ownerGiven[0]
+	assert.True(t, hubowner.ValidSecret(secret))
+	got, ok, err := pe.e.h.store.OwnerSecret(context.Background(), "ssh-box-example-com")
+	require.NoError(t, err)
+	assert.True(t, ok)
+	assert.Equal(t, secret, got, "the hub holds what the computer was given")
+	srv, _ := pe.e.h.store.Get(context.Background(), "ssh-box-example-com")
+	assert.True(t, srv.OwnerStamp)
+	raw, _ := json.Marshal(done)
+	assert.NotContains(t, string(raw), secret, "the secret is in the plan's answer")
+	assert.NotContains(t, done["steps"].([]any)[4].(map[string]any)["detail"], "not set up")
+}
+
+func TestProvisionRegistersWithoutTheStampWhenTheComputerWillNotTakeTheSecret(t *testing.T) {
+	pe := newProvEnv(t, "known", "Linux x86_64", true)
+	pe.ownerErr = errors.New("coral: hub-owner-secret: refused: /home/rich/.coral-server/secret detail")
+	done := runToEnd(t, pe, "done")
+	srv, err := pe.e.h.store.Get(context.Background(), "ssh-box-example-com")
+	require.NoError(t, err, "the registration stopped for a missing stamp")
+	assert.False(t, srv.OwnerStamp, "a secret the computer did not take was stored")
+	_, ok, _ := pe.e.h.store.OwnerSecret(context.Background(), "ssh-box-example-com")
+	assert.False(t, ok)
+	detail := done["steps"].([]any)[4].(map[string]any)["detail"].(string)
+	assert.Contains(t, detail, "not set up")
+	assert.NotContains(t, detail, "refused", "the cause is not echoed")
+	assert.NotContains(t, detail, "/home/rich")
+}
+
+// A panic in a step fails the plan with one fixed sentence at once, instead of leaving it running until it expires (Security's INFO on #11370); safego still logs it and the server stays up.
+func TestProvisionAPanickingStepFailsThePlanWithAFixedSentence(t *testing.T) {
+	pe := newProvEnv(t, "known", "Linux x86_64", true)
+	pe.p.runSteps = func(context.Context, *provisionPlan) { panic("boom: /home/user/.ssh/id_rsa " + provKey) }
+	panicsBefore := safego.Panics()
+	_, v := pe.do("POST", "/api/servers/provision/plan", map[string]any{"target": "user@box.example.com"})
+	plan := v["plan"].(string)
+	pe.do("POST", "/api/servers/provision/"+plan+"/connect", nil)
+	code, _ := pe.do("POST", "/api/servers/provision/"+plan+"/run", map[string]any{"accept_terms": true, "terms_sha256": terms.EULADigest()})
+	require.Equal(t, 202, code)
+	failed := pe.waitPhase(t, plan, "failed")
+	assert.Equal(t, "Something went wrong inside this hub, so the setup stopped. Nothing more was done.", failed["error"])
+	raw, _ := json.Marshal(failed)
+	assert.NotContains(t, string(raw), "boom")
+	assert.NotContains(t, string(raw), "id_rsa")
+	assert.NotContains(t, string(raw), provKey)
+	var failedSteps int
+	for _, s := range failed["steps"].([]any) {
+		if s.(map[string]any)["state"] == "failed" {
+			failedSteps++
+		}
+	}
+	assert.Equal(t, 1, failedSteps, "one step is shown as the one that failed")
+	// the panic still reaches safego (QA Engineer's SHOULD): a guard that swallowed it would leave the count where it was and the server's crash log empty
+	deadline := time.Now().Add(5 * time.Second)
+	for safego.Panics() <= panicsBefore && time.Now().Before(deadline) {
+		time.Sleep(10 * time.Millisecond)
+	}
+	assert.Greater(t, safego.Panics(), panicsBefore, "the recovered panic was swallowed instead of going on to safego")
+	// the plan can be cancelled and the hub still answers
+	code, _ = pe.do("DELETE", "/api/servers/provision/"+plan, nil)
+	assert.Equal(t, 200, code)
 }

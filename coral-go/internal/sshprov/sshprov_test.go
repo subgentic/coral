@@ -106,22 +106,9 @@ func TestRemoteTextIsClosed(t *testing.T) {
 	}
 }
 
-// fakeSSH writes a script that records its argv one per line and acts as the remote.
-func fakeSSH(t *testing.T, body string) (string, string) {
-	t.Helper()
-	dir := t.TempDir()
-	log := filepath.Join(dir, "argv")
-	script := "#!/bin/sh\nfor a in \"$@\"; do printf '%s\\n' \"$a\" >> '" + log + "'; done\n" + body + "\n"
-	p := filepath.Join(dir, "ssh")
-	if err := os.WriteFile(p, []byte(script), 0o700); err != nil {
-		t.Fatal(err)
-	}
-	return p, log
-}
-
 func TestRunBuildsOneFixedArgvAndNeverRelaxesHostKeyChecking(t *testing.T) {
-	needShell(t)
-	ssh, log := fakeSSH(t, "echo Linux x86_64")
+	log := filepath.Join(t.TempDir(), "argv")
+	ssh := newStandIn(t, "ssh", standCfg{Log: log, Stdout: "Linux x86_64\n"})
 	tg, _ := ParseTarget("user@box.example.com:2222")
 	res, err := Runner{SSH: ssh}.Run(context.Background(), tg, CmdUname)
 	if err != nil || strings.TrimSpace(res.Stdout) != "Linux x86_64" {
@@ -145,8 +132,8 @@ func TestRunBuildsOneFixedArgvAndNeverRelaxesHostKeyChecking(t *testing.T) {
 }
 
 func TestRunRefusesBeforeConnectingWhenTheCommandIsNotAllowed(t *testing.T) {
-	needShell(t)
-	ssh, log := fakeSSH(t, "true")
+	log := filepath.Join(t.TempDir(), "argv")
+	ssh := newStandIn(t, "ssh", standCfg{Log: log})
 	tg, _ := ParseTarget("user@box.example.com")
 	if _, err := (Runner{SSH: ssh}).Run(context.Background(), tg, CmdSha256, "x'; rm -rf ~; '"); !errors.Is(err, ErrNotAllowed) {
 		t.Fatalf("err = %v", err)
@@ -157,25 +144,23 @@ func TestRunRefusesBeforeConnectingWhenTheCommandIsNotAllowed(t *testing.T) {
 }
 
 func TestRunMapsExitCodes(t *testing.T) {
-	needShell(t)
 	tg, _ := ParseTarget("user@box.example.com")
-	hk, _ := fakeSSH(t, "echo 'Host key verification failed.' >&2; exit 255")
+	hk := newStandIn(t, "ssh", standCfg{Stderr: "Host key verification failed.\n", Exit: 255})
 	if _, err := (Runner{SSH: hk}).Run(context.Background(), tg, CmdUname); !errors.Is(err, ErrHostKey) {
 		t.Errorf("host key: %v", err)
 	}
-	cn, _ := fakeSSH(t, "echo 'Permission denied (publickey).' >&2; exit 255")
+	cn := newStandIn(t, "ssh", standCfg{Stderr: "Permission denied (publickey).\n", Exit: 255})
 	if _, err := (Runner{SSH: cn}).Run(context.Background(), tg, CmdUname); !errors.Is(err, ErrConnect) || errors.Is(err, ErrHostKey) {
 		t.Errorf("connect: %v", err)
 	}
-	no, _ := fakeSSH(t, "exit 1")
+	no := newStandIn(t, "ssh", standCfg{Exit: 1})
 	if res, err := (Runner{SSH: no}).Run(context.Background(), tg, CmdHasTmux); err != nil || res.ExitCode != 1 {
 		t.Errorf("tmux absent is a result, not an error: %+v %v", res, err)
 	}
 }
 
 func TestRunCapsWhatItKeeps(t *testing.T) {
-	needShell(t)
-	ssh, _ := fakeSSH(t, "yes x | head -c 300000")
+	ssh := newStandIn(t, "ssh", standCfg{BigOut: 300000})
 	tg, _ := ParseTarget("user@box.example.com")
 	res, err := Runner{SSH: ssh}.Run(context.Background(), tg, CmdUname)
 	if err != nil || len(res.Stdout) != maxOutput {
@@ -184,16 +169,11 @@ func TestRunCapsWhatItKeeps(t *testing.T) {
 }
 
 func TestRunGivesSSHAMinimalEnvironmentAndQuotesTheText(t *testing.T) {
-	needShell(t)
 	t.Setenv("CORAL_SECRET_THING", "leak")
 	t.Setenv("SSH_AUTH_SOCK", "/tmp/agent.sock")
 	dir := t.TempDir()
 	envFile := filepath.Join(dir, "env")
-	script := "#!/bin/sh\nenv > '" + envFile + "'\nfor a in \"$@\"; do last=\"$a\"; done\nprintf '%s' \"$last\" > '" + envFile + ".text'\n"
-	p := filepath.Join(dir, "ssh")
-	if err := os.WriteFile(p, []byte(script), 0o700); err != nil {
-		t.Fatal(err)
-	}
+	p := newStandIn(t, "ssh", standCfg{EnvFile: envFile, TextFile: envFile + ".text"})
 	tg, _ := ParseTarget("user@box.example.com")
 	if _, err := (Runner{SSH: p}).Run(context.Background(), tg, CmdSha256, "a/b.tgz"); err != nil {
 		t.Fatal(err)

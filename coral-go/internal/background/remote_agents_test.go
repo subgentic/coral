@@ -36,6 +36,16 @@ func (f *fakeRegistry) put(id, url string) {
 	f.servers[id] = store.RemoteServer{ID: id, Label: strings.ToUpper(id), URL: url, AllowPrivate: true, Status: "unknown"}
 }
 
+// putOwner is put for a server this hub holds an owner stamp secret for (#11378).
+func (f *fakeRegistry) putOwner(id, url string) {
+	f.put(id, url)
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	s := f.servers[id]
+	s.OwnerStamp = true
+	f.servers[id] = s
+}
+
 func (f *fakeRegistry) remove(id string) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -88,13 +98,14 @@ type fakeRemote struct {
 	noFeed   bool
 	feedConn chan *websocket.Conn
 
-	healthDelay time.Duration
-	noHealthAPI bool // an older remote: /api/health is 404
-	feedDeaf    bool // the feed socket is never read, so pings go unanswered
-	listGets    int
-	healthGets  int
-	feedQuery   string        // raw query of the last /ws/coral request
-	stop        chan struct{} // closed at cleanup: ends the feeds (a hijacked socket's request context isn't)
+	healthDelay   time.Duration
+	noHealthAPI   bool // an older remote: /api/health is 404
+	hubOwnerStamp bool // /api/health says the remote holds the secret that verifies a hub's owner stamps (#11378)
+	feedDeaf      bool // the feed socket is never read, so pings go unanswered
+	listGets      int
+	healthGets    int
+	feedQuery     string        // raw query of the last /ws/coral request
+	stop          chan struct{} // closed at cleanup: ends the feeds (a hijacked socket's request context isn't)
 }
 
 func (fr *fakeRemote) counts() (list, health int) {
@@ -109,7 +120,7 @@ func newFakeRemote(t *testing.T, sessions ...map[string]any) *fakeRemote {
 	mux.HandleFunc("/api/health", func(w http.ResponseWriter, r *http.Request) {
 		fr.mu.Lock()
 		fr.healthGets++
-		d, missing := fr.healthDelay, fr.noHealthAPI
+		d, missing, stamp := fr.healthDelay, fr.noHealthAPI, fr.hubOwnerStamp
 		fr.mu.Unlock()
 		if missing {
 			http.NotFound(w, r)
@@ -122,7 +133,7 @@ func newFakeRemote(t *testing.T, sessions ...map[string]any) *fakeRemote {
 				return
 			}
 		}
-		json.NewEncoder(w).Encode(map[string]any{"status": "ok", "version": "fake-1"})
+		json.NewEncoder(w).Encode(map[string]any{"status": "ok", "version": "fake-1", "hub_owner_stamp": stamp})
 	})
 	mux.HandleFunc("/api/sessions/live", func(w http.ResponseWriter, r *http.Request) {
 		fr.mu.Lock()
@@ -605,4 +616,34 @@ func TestHub_AgentCountExcludesArchived(t *testing.T) {
 	startHub(t, h)
 	require.Eventually(t, func() bool { return len(h.Snapshot().Sessions) == 2 }, 3*time.Second, 20*time.Millisecond)
 	assert.Equal(t, 1, h.Snapshot().Servers[0].Agents, "the archived agent is still listed but not counted")
+}
+
+// A hub offers Approve and Request changes for a computer only when BOTH halves of the owner stamp exist: it holds the secret for that computer, and the computer says it holds the secret too (#11378).
+func TestHub_OwnerStampCapabilityNeedsBothHalves(t *testing.T) {
+	both := newFakeRemote(t)
+	both.hubOwnerStamp = true
+	hubOnly := newFakeRemote(t)
+	remoteOnly := newFakeRemote(t)
+	remoteOnly.hubOwnerStamp = true
+	neither := newFakeRemote(t)
+	reg := newFakeRegistry()
+	reg.putOwner("both", both.URL)
+	reg.putOwner("hubonly", hubOnly.URL)
+	reg.put("remoteonly", remoteOnly.URL)
+	reg.put("neither", neither.URL)
+	h := feedHub(reg, time.Hour)
+	startHub(t, h)
+	require.Eventually(t, func() bool {
+		for _, s := range h.Snapshot().Servers {
+			if s.Version == "" {
+				return false
+			}
+		}
+		return len(h.Snapshot().Servers) == 4
+	}, 3*time.Second, 10*time.Millisecond)
+	got := map[string]bool{}
+	for _, s := range h.Snapshot().Servers {
+		got[s.ID] = s.OwnerStamp
+	}
+	assert.Equal(t, map[string]bool{"both": true, "hubonly": false, "remoteonly": false, "neither": false}, got)
 }

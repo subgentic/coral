@@ -13,7 +13,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -128,6 +127,29 @@ func runStub() {
 		fmt.Fprint(w, `{"data":[]}`)
 	})
 	// 1.x: the messages are on /session/<id>/message in the {info, parts} shape (what the real 1.19.5 sends); /api/session/<id>/message is an empty list there
+	// POST /permission/<id>/reply?directory=<dir> {"reply": ...}: 1.x's answer to a permission request. Recorded as "id|reply|directory"; an id "per_unknown" is not open (404).
+	mux.HandleFunc("/permission/", func(w http.ResponseWriter, r *http.Request) {
+		if !standInAuthorized(r) || r.Method != http.MethodPost {
+			http.Error(w, "no", http.StatusUnauthorized)
+			return
+		}
+		id := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/permission/"), "/reply")
+		if id == "per_unknown" {
+			http.Error(w, `{"_tag":"PermissionNotFoundError"}`, http.StatusNotFound)
+			return
+		}
+		var body struct {
+			Reply string `json:"reply"`
+		}
+		json.NewDecoder(r.Body).Decode(&body)
+		if out := os.Getenv(envFileVar); out != "" {
+			if f, err := os.OpenFile(out+".replies", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600); err == nil {
+				fmt.Fprintf(f, "%s|%s|%s\n", id, body.Reply, r.URL.Query().Get("directory"))
+				f.Close()
+			}
+		}
+		fmt.Fprint(w, "true")
+	})
 	mux.HandleFunc("/session/ses_abc123/message", func(w http.ResponseWriter, r *http.Request) {
 		if !standInAuthorized(r) {
 			http.Error(w, "no", http.StatusUnauthorized)
@@ -175,6 +197,9 @@ func runStub() {
 	if os.Getenv("STANDIN_NO_BIND") == "1" {
 		select {} // alive, never listening: ended by the signal Stop sends
 	}
+	if os.Getenv("STANDIN_BIND_OTHER") == "1" {
+		port = "0" // a build that moved to another port when the one it was given was taken
+	}
 	l, err := net.Listen("tcp", "127.0.0.1:"+port)
 	if err != nil {
 		os.Exit(3)
@@ -191,20 +216,50 @@ const eventsFileVar = "STANDIN_EVENTS_FOR_TESTS" // a file of SSE frames the sta
 
 const envFileVar = "STANDIN_ENVFILE_FOR_TESTS"
 
-// maxStandIns is the most stand-ins one run of this package may start. A test that goes past it fails at once, and each run stops what it started: nothing here may ever start servers without a bound.
-const maxStandIns = 48
+// What one TEST may do with stand-in servers (per test, so a repeated run, -count=2, starts afresh): it may take stubConfig at most maxStubConfigsPerTest times, and its stand-ins, counted by the pids each one
+// records, may be at most maxStandInProcsPerTest when it ends. A test that loops starting servers fails at once at the first, and one that started too many fails when it ends. The fork bomb of #11377 (a
+// stand-in that re-ran the suite) is stopped by binaryMode, which decides from the arguments alone and never runs the suite for a start it does not know: these are the second line.
+const (
+	maxStubConfigsPerTest  = 4
+	maxStandInProcsPerTest = 16
+)
 
-var standInsStarted atomic.Int32
+// tooManyStubConfigs says whether a test that has taken stubConfig n times has taken too many.
+func tooManyStubConfigs(n int) bool { return n > maxStubConfigsPerTest }
+
+// standInProcs is how many stand-in processes recorded their pid for this test's env file.
+func standInProcs(envFile string) int {
+	raw, err := os.ReadFile(envFile + ".pids")
+	if err != nil {
+		return 0
+	}
+	return len(strings.Fields(string(raw)))
+}
+
+var (
+	stubMu     sync.Mutex
+	stubByTest = map[testing.TB]int{}
+)
 
 func stubConfig(t *testing.T) (Config, string) {
 	t.Helper()
-	if n := standInsStarted.Add(1); n > maxStandIns {
-		t.Fatalf("%d stand-in servers started in one run: more than the %d this package ever needs (a start that loops?)", n, maxStandIns)
+	stubMu.Lock()
+	stubByTest[t]++
+	n := stubByTest[t]
+	stubMu.Unlock()
+	t.Cleanup(func() { stubMu.Lock(); delete(stubByTest, t); stubMu.Unlock() })
+	if tooManyStubConfigs(n) {
+		t.Fatalf("this test took %d stand-in configs: more than the %d any test here needs (a start that loops?)", n, maxStubConfigsPerTest)
 	}
 	exe, err := os.Executable()
 	require.NoError(t, err)
 	envFile := filepath.Join(t.TempDir(), "env.json")
 	t.Setenv(envFileVar, envFile)
+	t.Cleanup(func() {
+		if n := standInProcs(envFile); n > maxStandInProcsPerTest {
+			t.Errorf("this test started %d stand-in processes: more than the %d any test here needs", n, maxStandInProcsPerTest)
+		}
+	})
 	cfg := Config{Bin: exe, DataDir: filepath.Join(t.TempDir(), "opencode"), Ready: 10 * time.Second, Version: "2.2.4"} // the stand-in cannot answer --version: its version is said
 	// whatever a test leaves running is stopped by the pid Coral recorded for it, when the test ends
 	t.Cleanup(func() {

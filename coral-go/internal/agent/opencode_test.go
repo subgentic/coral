@@ -158,3 +158,13 @@ func TestOpencodeLaunchLineInPowerShellReadsThePasswordFromTheFile(t *testing.T)
 		assert.NotContains(t, cmd, "hunter2", "major %d", major)
 	}
 }
+
+// #11395: opencode's own defaults ask nothing inside its folder, so a launch that names no mode starts as it always did (and counts as skipping, for a Coral Hub request); "default" is the ask-first mode, which is
+// a launch setting no flag carries.
+func TestOpencodeDefaultsToNoQuestionsAndEveryOpencodeLaunchCountsAsSkipping(t *testing.T) {
+	assert.Equal(t, "bypassPermissions", DefaultLaunchPermissionMode(at.Opencode))
+	assert.Equal(t, "default", DefaultLaunchPermissionMode(at.Pi), "other agents are unchanged")
+	assert.Equal(t, "auto", DefaultLaunchPermissionMode(at.Claude))
+	assert.True(t, SkipsPermissionPrompts(at.Opencode, nil), "no flag: still skipping, so a Hub request needs the owner's switch")
+	assert.True(t, SkipsPermissionPrompts(at.Opencode, []string{"--model", "openai/gpt-6"}))
+}

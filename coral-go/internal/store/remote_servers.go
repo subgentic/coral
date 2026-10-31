@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/subgentic/coral/pkg/hubowner"
 	"github.com/subgentic/coral/pkg/secretbox"
 )
 
@@ -71,6 +72,8 @@ type RemoteServer struct {
 	SSHTarget  string `json:"ssh_target,omitempty" db:"ssh_target"`
 	RemotePort int    `json:"-" db:"remote_port"`
 	InstanceID string `json:"-" db:"instance_id"`
+	// OwnerStamp is whether this hub holds a secret to sign owner stamps for this server with (#11378). Whether the remote has installed its half is the live health answer's: hub_owner_stamp.
+	OwnerStamp bool `json:"owner_stamp" db:"owner_stamp"`
 }
 
 // The transports of a registered server.
@@ -314,7 +317,7 @@ func (s *RemoteServerStore) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
-const remoteCols = "id, label, url, allow_private, status, created_at, last_seen, last_error, key_renew_since, transport, ssh_target, remote_port, instance_id"
+const remoteCols = "id, label, url, allow_private, status, created_at, last_seen, last_error, key_renew_since, transport, ssh_target, remote_port, instance_id, (owner_secret != '') AS owner_stamp"
 
 // Get returns one server (without its key). Status is key_unreadable when the
 // stored key cannot be decrypted.
@@ -349,6 +352,55 @@ func (s *RemoteServerStore) List(ctx context.Context) ([]RemoteServer, error) {
 		}
 	}
 	return out, nil
+}
+
+// ownerSuffix ends the envelope AAD of a server's owner secret, so it is never the API key's (the id alone) and the two cannot be swapped.
+const ownerSuffix = "#owner-stamp"
+
+func ownerAAD(id string) string { return id + ownerSuffix }
+
+// SetOwnerSecret stores the secret this hub signs the server's owner stamps with (#11378), sealed like the API key. secret is 64 lower-case hex digits (hubowner.NewSecret).
+func (s *RemoteServerStore) SetOwnerSecret(ctx context.Context, id, secret string) error {
+	if !hubowner.ValidSecret(secret) {
+		return errors.New("not a valid owner stamp secret")
+	}
+	if _, err := s.Get(ctx, id); err != nil {
+		return err
+	}
+	box, err := s.getBox(ctx, true, false)
+	if err != nil {
+		return err
+	}
+	env, err := box.Seal(ownerAAD(id), []byte(secret))
+	if err != nil {
+		return err
+	}
+	_, err = s.db.ExecContext(ctx, "UPDATE remote_servers SET owner_secret = ? WHERE id = ?", env, id)
+	return err
+}
+
+// OwnerSecret returns the server's owner stamp secret, for signing only: into a local variable, never stored on a struct, logged or put in an error. ok is false when there is none.
+func (s *RemoteServerStore) OwnerSecret(ctx context.Context, id string) (secret string, ok bool, err error) {
+	var env string
+	if err := s.db.GetContext(ctx, &env, "SELECT owner_secret FROM remote_servers WHERE id = ?", id); errors.Is(err, sql.ErrNoRows) {
+		return "", false, ErrRemoteNotFound
+	} else if err != nil {
+		return "", false, err
+	}
+	if env == "" {
+		return "", false, nil
+	}
+	box, err := s.getBox(ctx, false, false)
+	if err != nil {
+		return "", false, err
+	}
+	pt, err := box.Open(ownerAAD(id), env)
+	if err != nil {
+		return "", false, unreadable(err)
+	}
+	secret = string(pt)
+	secretbox.Zero(pt)
+	return secret, true, nil
 }
 
 // DecryptedKey returns the remote's API key. It is for dialing only: use it
@@ -396,6 +448,16 @@ func (s *RemoteServerStore) SetStatus(ctx context.Context, id, status, errMsg st
 	return err
 }
 
+// rotateUpdate and rotateID map a re-encrypted row back to its column and its server: an AAD that ends in the owner marker is an owner secret, any other an API key.
+func rotateUpdate(aad string) string {
+	if strings.HasSuffix(aad, ownerSuffix) {
+		return "UPDATE remote_servers SET owner_secret = ? WHERE id = ?"
+	}
+	return "UPDATE remote_servers SET api_key = ? WHERE id = ?"
+}
+
+func rotateID(aad string) string { return strings.TrimSuffix(aad, ownerSuffix) }
+
 // RotateMasterKey generates a new master key and re-encrypts every row in one
 // transaction. On any failure the old key file and rows remain valid. Not
 // supported when the key comes from CORAL_SECRET_KEY.
@@ -425,15 +487,19 @@ func (s *RemoteServerStore) RotateMasterKey(ctx context.Context) error {
 	defer tx.Rollback()
 
 	var rows []struct {
-		ID     string `db:"id"`
-		APIKey string `db:"api_key"`
+		ID          string `db:"id"`
+		APIKey      string `db:"api_key"`
+		OwnerSecret string `db:"owner_secret"`
 	}
-	if err := tx.SelectContext(ctx, &rows, "SELECT id, api_key FROM remote_servers"); err != nil {
+	if err := tx.SelectContext(ctx, &rows, "SELECT id, api_key, owner_secret FROM remote_servers"); err != nil {
 		return err
 	}
-	in := make([]secretbox.Row, len(rows))
-	for i, r := range rows {
-		in[i] = secretbox.Row{AAD: r.ID, Envelope: r.APIKey}
+	in := make([]secretbox.Row, 0, 2*len(rows))
+	for _, r := range rows {
+		in = append(in, secretbox.Row{AAD: r.ID, Envelope: r.APIKey})
+		if r.OwnerSecret != "" { // the owner stamp secret (#11378) is under the same master key and moves with it
+			in = append(in, secretbox.Row{AAD: ownerAAD(r.ID), Envelope: r.OwnerSecret})
+		}
 	}
 	out, err := secretbox.Reencrypt(old, next, in)
 	if err != nil {
@@ -443,7 +509,7 @@ func (s *RemoteServerStore) RotateMasterKey(ctx context.Context) error {
 		if s.rotateFailAfter > 0 && i >= s.rotateFailAfter {
 			return errors.New("simulated rotation failure")
 		}
-		if _, err := tx.ExecContext(ctx, "UPDATE remote_servers SET api_key = ? WHERE id = ?", r.Envelope, r.AAD); err != nil {
+		if _, err := tx.ExecContext(ctx, rotateUpdate(r.AAD), r.Envelope, rotateID(r.AAD)); err != nil {
 			return err
 		}
 	}
@@ -459,7 +525,7 @@ func (s *RemoteServerStore) RotateMasterKey(ctx context.Context) error {
 		if rerr == nil {
 			if tx2, terr := s.db.BeginTxx(ctx, nil); terr == nil {
 				for _, r := range back {
-					tx2.ExecContext(ctx, "UPDATE remote_servers SET api_key = ? WHERE id = ?", r.Envelope, r.AAD)
+					tx2.ExecContext(ctx, rotateUpdate(r.AAD), r.Envelope, rotateID(r.AAD))
 				}
 				tx2.Commit()
 			}

@@ -49,8 +49,8 @@ type sshStream struct {
 	t   *sshprov.StreamTarget
 }
 
-func (c *sshStreams) get(rs *store.RemoteServer, key string) (proxy.Target, error) {
-	sum := sha256.Sum256([]byte(rs.SSHTarget + "\x00" + strconv.Itoa(rs.RemotePort) + "\x00" + key))
+func (c *sshStreams) get(rs *store.RemoteServer, key, ownerSecret string) (proxy.Target, error) {
+	sum := sha256.Sum256([]byte(rs.SSHTarget + "\x00" + strconv.Itoa(rs.RemotePort) + "\x00" + key + "\x00" + ownerSecret))
 	sig := string(sum[:])
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -61,6 +61,7 @@ func (c *sshStreams) get(rs *store.RemoteServer, key string) (proxy.Target, erro
 	if err != nil {
 		return nil, err
 	}
+	t.WithOwnerStamp(rs.ID, ownerSecret)
 	if c.m == nil {
 		c.m = map[string]sshStream{}
 	}

@@ -13,6 +13,7 @@ import (
 	"github.com/subgentic/coral/internal/httputil"
 	"github.com/subgentic/coral/internal/sshprov"
 	"github.com/subgentic/coral/internal/store"
+	"github.com/subgentic/coral/pkg/hubowner"
 )
 
 // Managing a server that was set up over SSH (#11370): upgrade it to this hub's release, stop it, or remove it. It is the same three-step flow as a setup (plan, connect, run) on the same routes: the plan
@@ -234,7 +235,7 @@ func (pr *Provisioner) upgradeSteps(ctx context.Context, p *provisionPlan) {
 		pr.fail(p, "verify", "The new release was started, but it did not answer as expected.")
 		return
 	}
-	p.setStep("verify", stepOK, "It answers on the new release.")
+	p.setStep("verify", stepOK, "It answers on the new release."+pr.ensureOwnerSecret(ctx, p, row))
 	_ = pr.store.SetStatus(ctx, p.ServerID, store.RemoteStatusOnline, "")
 	if pr.notify != nil {
 		pr.notify(p.ServerID, store.RemoteStatusOnline)
@@ -244,3 +245,16 @@ func (pr *Provisioner) upgradeSteps(ctx context.Context, p *provisionPlan) {
 
 // SetOnRemoved sets who hears the id of a server a remove took out of the registry (what is kept for it in memory goes too).
 func (pr *Provisioner) SetOnRemoved(f func(id string)) { pr.onRemoved = f }
+
+// ensureOwnerSecret gives a computer set up before the owner stamp existed (#11378) its secret, once: a computer this hub already holds one for keeps it (a rotation is a person's act, not an upgrade's).
+// It returns the words to add to the step, empty when nothing needs saying.
+func (pr *Provisioner) ensureOwnerSecret(ctx context.Context, p *provisionPlan, row *store.RemoteServer) string {
+	if row.OwnerStamp {
+		return ""
+	}
+	secret, err := hubowner.NewSecret()
+	if err != nil || pr.installOwner(ctx, p, secret) != nil || pr.store.SetOwnerSecret(ctx, p.ServerID, secret) != nil {
+		return " Approve and Request changes through this hub are not set up for it."
+	}
+	return " Approve and Request changes now work through this hub."
+}

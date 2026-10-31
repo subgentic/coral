@@ -1785,7 +1785,7 @@ body .terminal-header { flex-wrap: wrap; height: auto; min-height: 36px; row-gap
 .agent-phone-details .facts dd { overflow-wrap: anywhere; }
 @media (max-height: 500px) { .agent-phone-details { display: none !important; } }
 /* The folder's full path, in a tip under the header (the header is the positioned ancestor, as for the branch's): on keyboard focus of the name everywhere, on hover where the primary pointer is not coarse. */
-.terminal-header[data-folder]:not([data-tip-off]):has(.terminal-identity:focus-visible)::after { content: attr(data-folder); }
+.terminal-header[data-folder][data-tip-kbd]:not([data-tip-off]):has(.terminal-identity:focus-visible)::after { content: attr(data-folder); } /* only when a key put the focus there (data-tip-kbd, session_header_updates.js, #11391): a script's focus on a touch screen counts as focus-visible and left the path over the first message */
 @media not all and (pointer: coarse) { .terminal-header[data-folder]:not([data-tip-off]):has(.terminal-identity:hover)::after { content: attr(data-folder); } }
 .terminal-header[data-folder]::after { content: none; position: absolute; left: 8px; top: calc(100% + 2px); z-index: 40; box-sizing: border-box; width: max-content; max-width: min(36rem, calc(100vw - 2rem)); padding: 4px 8px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-secondary); box-shadow: 0 4px 14px rgba(var(--black-rgb), 0.25); color: var(--text-primary); font-family: var(--font-mono); font-size: var(--fs-sm); white-space: normal; overflow-wrap: anywhere; pointer-events: none; }
 .terminal-identity:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: var(--radius-xs); }

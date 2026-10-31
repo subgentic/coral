@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/subgentic/coral/internal/config"
+	"github.com/subgentic/coral/internal/opencode"
 	"github.com/subgentic/coral/internal/store"
 	"github.com/subgentic/coral/internal/store/storetest"
 )
@@ -116,5 +117,43 @@ func TestWSTerminalRefusesAnAgentSessionBeforeTheUpgrade(t *testing.T) {
 	}
 	if err != nil && resp != nil {
 		assert.NotEqual(t, http.StatusForbidden, resp.StatusCode, "the Operator is not refused as an agent")
+	}
+}
+
+// An opencode agent's permission card is answered through its server (#11395), but the route's gate is the same as for any agent's prompt: an agent's token (its own, or another agent's) is refused before the
+// handler runs, in default and strict mode, and the server is never asked to reply.
+func TestAgentTokenIsRefusedOnAnOpencodeAnswerBeforeTheServerIsAsked(t *testing.T) {
+	for _, strict := range []bool{false, true} {
+		db, err := storetest.Open(t, filepath.Join(t.TempDir(), "s.db"))
+		require.NoError(t, err)
+		token, err := db.MintSessionToken(context.Background(), "sid-dev", "opencode-dev")
+		require.NoError(t, err)
+		o := NewIdentityObserver(db, nil, func(*http.Request) bool { return false })
+		if strict {
+			o.SetVerifiers(func(*http.Request) bool { return false }, func(r *http.Request) (*http.Request, bool) { return r, false })
+			o.SetStrict()
+		}
+		f := &fakeOpencode{perms: []opencode.PermissionRequest{openBash}}
+		h := &SessionsHandler{opencode: f}
+		r := chi.NewRouter()
+		r.Use(o.Middleware)
+		r.Post("/api/sessions/live/{name}/answer-prompt", func(w http.ResponseWriter, req *http.Request) {
+			h.answerOpencodePermission(w, req, "sid", 3, "Reject", "per_bash1")
+		})
+		body := `{"session_id":"sid","agent_type":"opencode","n":3,"label":"Reject","ask_id":"per_bash1"}`
+		req := httptest.NewRequest("POST", "/api/sessions/live/oc/answer-prompt", strings.NewReader(body))
+		req.Header.Set(store.SessionTokenHeader, token)
+		rec := httptest.NewRecorder()
+		r.ServeHTTP(rec, req)
+		assert.Equal(t, http.StatusForbidden, rec.Code, "strict=%v", strict)
+		assert.Contains(t, rec.Body.String(), "forbidden_for_agent")
+		assert.Empty(t, f.replied, "an agent's token never reaches the server's reply (strict=%v)", strict)
+		if !strict { // the dashboard presents no token: the answer goes through
+			rec = httptest.NewRecorder()
+			r.ServeHTTP(rec, httptest.NewRequest("POST", "/api/sessions/live/oc/answer-prompt", strings.NewReader(body)))
+			assert.Equal(t, http.StatusOK, rec.Code)
+			assert.Equal(t, []string{"sid|per_bash1|reject"}, f.replied)
+		}
+		db.Close()
 	}
 }

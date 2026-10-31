@@ -5,6 +5,10 @@
  * Everything it shows from the hub is set as text, never as markup. The hub keeps the scanned host keys itself: what is sent back is only "I accept these", never a key, and never terms: the acceptance the
  * far computer records is the person's own (made when they opened Coral), made by the hub from its own marker. Nothing here is a secret: the remote's API key is read and kept by the hub and never reaches this page. */
 
+import { loadStyles } from './lazy_styles.js';
+
+await loadStyles('ssh_setup.css'); // the page's rules are not in the start's stylesheet: they arrive before it is drawn (#11403)
+
 const POLL_MS = 1000;
 
 const STEP_WORDS = { pending: 'Waiting', running: 'Working', ok: 'Done', failed: 'Failed', skipped: 'Skipped' };

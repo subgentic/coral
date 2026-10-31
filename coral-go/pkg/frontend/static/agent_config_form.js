@@ -606,9 +606,12 @@ export function _syncACFModelField(container) {
         syncModelPicker(container);
         return;
     }
+    const seq = String((Number(container.dataset.acfFetchSeq) || 0) + 1); container.dataset.acfFetchSeq = seq; // which default fetch this is: a model the person lists while it is pending is theirs (model_picker.js markChosen, #11404)
+    container.dataset.acfDefaults = 'pending'; // the default model is on its way: it fills the box unless the person (or a loaded value) owns it; a suite waits for this to end before it sets a value by script (#11404)
     _getDefaultModels(_acfServer(container)).then(defaults => {
         // If the user started typing during the fetch, don't clobber their input.
         if (container.dataset.acfModelDirty === 'true' || container.dataset.acfModelClassifying === 'true') return;
+        if (container.dataset.acfChosenFetch === seq) return; // chosen from the list while this fetch was pending
         // Re-check the agent type — the user may have switched again mid-fetch.
         const currentType = typeSel?.value || 'claude';
         if (currentType === 'terminal') {
@@ -619,7 +622,7 @@ export function _syncACFModelField(container) {
         modelInput.value = defaults[currentType] || '';
         syncModelPicker(container);
         container.dispatchEvent(new Event('acf-synced', { bubbles: true })); // a summary of the form (New Agent's rows) follows the default arriving
-    });
+    }).finally(() => { if (container.dataset.acfFetchSeq === seq) container.dataset.acfDefaults = 'ready'; }); // ready only when the LATEST default fetch ends (a switch of provider starts another)
 }
 window.renderAgentConfigForm = renderAgentConfigForm;
 

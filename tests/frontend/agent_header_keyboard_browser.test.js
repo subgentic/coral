@@ -34,7 +34,7 @@ const { axName } = require('./helpers/ax_tree');
             if (mobile) check(idxId >= 0 && idxSwitch > idxId && idxMore === idxSwitch + 1, `Tab goes the name, then the one Chat/Terminal switch, then the dots, as they are drawn left to right: ${JSON.stringify(names)}`);
             else check(idxId >= 0 && idxChat > idxId && idxTerm === idxChat + 1, `Tab goes the name, then the Chat and Terminal toggle (the first of the actions): ${JSON.stringify(names)}`);
             // the folder: a tip on the name's keyboard focus, dismissed with Escape, and said to a screen reader
-            await key('Shift'); await ev(`document.getElementById('terminal-header-identity').focus(); true`); await new Promise(r => setTimeout(r, 120)); // sleep-ok: a key press first, so the focus is a keyboard focus (focus-visible)
+            await key('Tab'); await ev(`document.getElementById('terminal-header-identity').focus(); true`); await new Promise(r => setTimeout(r, 120)); // sleep-ok: a Tab first, so the focus is a keyboard focus (focus-visible; only a navigation key arms the folder tip, #11391)
             const onName = (await act()).id === 'terminal-header-identity';
             check(onName, 'Tab reaches the name');
             if (onName) {
@@ -42,7 +42,7 @@ const { axName } = require('./helpers/ax_tree');
                 await ev(`document.activeElement.setAttribute('data-axp', 'x'); true`); const ax = await axName(client, '[data-axp="x"]');
                 check(!!ax && (ax.description || '').includes(FOLDER), `a screen reader is told the folder (the name's description), the tip is not heard: ${JSON.stringify(ax)}`);
                 await key('Escape'); check(await tip() === 'none', `Escape dismisses the tip (WCAG 1.4.13): ${await tip()}`); check((await act()).id === 'terminal-header-identity', 'and the keyboard stays on the name');
-                await ev(`document.getElementById(${JSON.stringify(mobile ? 'live-view-switch' : 'live-view-btn-chat')}).focus(); true`); await key('Shift'); await ev(`document.getElementById('terminal-header-identity').focus(); true`); await new Promise(r => setTimeout(r, 120)); check(JSON.stringify(await tip()) === JSON.stringify(`"${FOLDER}"`), `the tip is back when the keyboard returns to the name: ${await tip()}`); // sleep-ok: the focus returns to the name
+                await ev(`document.getElementById(${JSON.stringify(mobile ? 'live-view-switch' : 'live-view-btn-chat')}).focus(); true`); await key('Tab'); await ev(`document.getElementById('terminal-header-identity').focus(); true`); await new Promise(r => setTimeout(r, 120)); check(JSON.stringify(await tip()) === JSON.stringify(`"${FOLDER}"`), `the tip is back when the keyboard returns to the name: ${await tip()}`); // sleep-ok: the focus returns to the name
             }
             // the view toggle: Tab, Space and Enter switch the view, aria-pressed says which, the keyboard stays
             if (mobile) { // a phone's one switch (#11187): Enter shows the terminal and the button now says Show chat; Space goes back; the keyboard stays on it
@@ -74,7 +74,7 @@ const { axName } = require('./helpers/ax_tree');
         // forced colours: the name's keyboard focus is outlined
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
         await client.Emulation.setEmulatedMedia({ features: [{ name: 'forced-colors', value: 'active' }] }); await settle();
-        await key('Shift'); await ev(`document.getElementById('terminal-header-identity').focus(); true`); await new Promise(r => setTimeout(r, 120)); // sleep-ok: keyboard focus
+        await key('Tab'); await ev(`document.getElementById('terminal-header-identity').focus(); true`); await new Promise(r => setTimeout(r, 120)); // sleep-ok: keyboard focus
         const onName2 = (await act()).id === 'terminal-header-identity';
         const fc = await ev(`(() => { const e = document.getElementById('terminal-header-identity'), cs = getComputedStyle(e); return { outline: cs.outlineStyle + ' ' + cs.outlineWidth, focused: document.activeElement === e }; })()`);
         if (!onName2 || !fc.focused || /^none/.test(fc.outline) || / 0px$/.test(fc.outline)) problems.push('forced colours: the name\'s keyboard focus shows an outline: ' + JSON.stringify(fc));

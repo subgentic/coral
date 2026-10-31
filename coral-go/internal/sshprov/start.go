@@ -3,6 +3,7 @@ package sshprov
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"regexp"
 	"strconv"
@@ -86,6 +87,23 @@ func (r Runner) StopAndConfirm(ctx context.Context, t Target) error {
 		case <-time.After(stopPoll):
 		}
 	}
+}
+
+// InstallOwnerSecret installs the secret the hub signs its owner stamps for this computer with (#11378): the far Coral's own `hub-owner-secret` command writes it (0600) under the id this hub knows the
+// computer by. Both go on stdin; nothing of them is in argv, a log or an error.
+func (r Runner) InstallOwnerSecret(ctx context.Context, t Target, version, remoteID, secret string) error {
+	payload, err := json.Marshal(map[string]string{"remote": remoteID, "secret": secret})
+	if err != nil {
+		return err
+	}
+	res, err := r.RunInput(ctx, t, bytes.NewReader(payload), CmdInstallOwnerSecret, version)
+	if err != nil {
+		return err
+	}
+	if res.ExitCode != 0 {
+		return errors.New("sshprov: the far computer did not take the secret")
+	}
+	return nil
 }
 
 // StartTmux starts the installed Coral of version in a tmux session called coral-server, once: a session that exists is left as it is.
