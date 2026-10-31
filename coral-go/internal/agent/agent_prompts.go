@@ -7,8 +7,12 @@ import (
 	"strings"
 )
 
+// DefaultNeedsPersonGuidance is what every team's agents are told about reaching the person (#11424): a decision, an approval or a file to look at goes where the person looks, their Needs you, with no team
+// instruction needed. The same words are in the shipped docs (board.md, how-do-i.md), the artifact upload help and a docs test.
+const DefaultNeedsPersonGuidance = "When the person must look at something, decide, or approve it: ask with coral-board post --ask \"@Operator <question>\" (it appears in their Needs you), or upload the file with coral-agent artifact upload <file> --tag \"for review\". Tag a file \"for review\" only when the Operator needs to see, decide or approve it; a file for other agents or for yourself (logs, patches, notes, screenshots for a reviewer) is not tagged for review, so Needs you does not fill up. One item per decision, with your recommendation. Do not publish the team's work outside Coral without the person's OK."
+
 // DefaultBoardPostingGuidance keeps the four default board prompts consistent.
-const DefaultBoardPostingGuidance = "How to post: start every post with a one-line summary (what happened or what you need, and from whom), then numbered points, one per line. Answer numbered posts by number. Name people with @Name; put SHAs, branches and paths in backticks. Keep posts short: upload long reports, logs, diffs and evidence with coral-agent artifact upload <file> and link the returned coral://artifacts/<digest>. For short posts containing backticks, use coral-board post - <<'EOF' ... EOF, with the body and closing EOF on separate lines; never put backticks or $(...) inside a double-quoted post argument."
+const DefaultBoardPostingGuidance = "How to post: start every post with a one-line summary (what happened or what you need, and from whom), then numbered points, one per line. Answer numbered posts by number. Name people with @Name; put SHAs, branches and paths in backticks. Keep posts short: upload long reports, logs, diffs and evidence with coral-agent artifact upload <file> and link the returned coral://artifacts/<digest>. For short posts containing backticks, use coral-board post - <<'EOF' ... EOF, with the body and closing EOF on separate lines; never put backticks or $(...) inside a double-quoted post argument." + " " + DefaultNeedsPersonGuidance
 
 // Default board system-prompt fragments (used by all agents).
 const DefaultOrchestratorSystemPrompt = "Post a message with coral-board post \"<your introduction>\" that introduces yourself, " +

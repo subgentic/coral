@@ -38,8 +38,9 @@ series_id, version and versions. Same bytes as the newest version add nothing (e
 bytes as an older version are refused (non-zero), so nobody takes it for the newest.
 
 --tag puts a word on the file in your team's Artifacts tab (repeat it, at most 5 in all; lowercase letters, digits, spaces and
-hyphens, 24 characters at most): tag a file "for review" when a person must look at it before the task can close, and logs and
-scratch files "internal"; do not invent other tags unless the task asks for one. A word that is not a tag is left out.
+hyphens, 24 characters at most): tag a file "for review" when a person must look at it, decide, or approve it, and logs and
+scratch files "internal"; a file for other agents or for yourself (logs, patches, notes, screenshots for a reviewer) is not
+"for review": that tag is for what the Operator must see, so Needs you does not fill up; do not invent other tags unless the task asks for one. A word that is not a tag is left out.
 
 Upload long reports, logs, diffs and evidence instead of pasting them into posts.
 Link the returned coral://artifacts/<digest> in a short board post: a one-line
