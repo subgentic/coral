@@ -3,7 +3,7 @@
  * horizontal ones. The visible Dismiss button stays the real control (keyboard, screen reader): a swipe is a shortcut to the same dismissWelcome, and only a swipe offers Undo (in the toast, which stays 30 seconds: the notices' rule for a toast with an action). Lazy: the Inbox loads
  * it for a touch screen when a row has a Dismiss (inbox_sidebar.js), nothing at start. With reduced motion the row neither slides nor springs. */
 import { state } from './state.js';
-import { dismissWelcome } from './welcome_items.js';
+import { dismissWelcome, save } from './welcome_items.js';
 import { showToast, announceNotice } from './notifications.js';
 
 const START_PX = 10, COMMIT = 0.4, FLICK = 0.5, FLICK_MIN_PX = 40; // FLICK: px per ms
@@ -13,8 +13,7 @@ const calm = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 /** Put an item back: it comes off the dismissed list and the items are on again (a dismissal that was the last one had turned them off). */
 function undo(id) {
     const rest = String((state.settings || {}).inbox_welcome_done || '').split(',').map(s => s.trim()).filter(x => x && x !== id).join(',');
-    Object.assign(state.settings || (state.settings = {}), { inbox_welcome_done: rest, inbox_welcome: 'on' });
-    fetch('/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ inbox_welcome_done: rest, inbox_welcome: 'on' }) }).catch(() => {});
+    save({ inbox_welcome_done: rest, inbox_welcome: 'on' }); // welcome_items' own saver: in order with the dismissal's save, and the page's settings follow
     document.dispatchEvent(new CustomEvent('coral:welcome-changed'));
 }
 
