@@ -145,7 +145,7 @@ CMD ["sh", "-c", "ssh-keygen -A && exec /usr/sbin/sshd -D -e -o LogLevel=VERBOSE
 	// the user's SSH config for the run: the far computer is only reached through the jump
 	// ssh finds ~/.ssh/config through the passwd entry, not $HOME, so the run's config is given with -F by a one-line wrapper (a ProxyJump's own ssh gets the same -F from its parent, as the user's config would
 	// reach it). The known_hosts file is in the config, as a user's is, so the inner ssh of the jump reads it too.
-	cfg := "Host *\n  IdentityFile " + filepath.Join(sshDir, "id_run") + "\n  IdentitiesOnly yes\n  UserKnownHostsFile " + f.known + "\n\n" +
+	cfg := "Host *\n  IdentityFile " + filepath.Join(sshDir, "id_run") + "\n  IdentitiesOnly yes\n  UserKnownHostsFile " + f.known + "\n  GlobalKnownHostsFile /dev/null\n\n" +
 		"Host jump\n  HostName " + f.jumpIP + "\n  User jumper\n\n" +
 		"Host far-alice\n  HostName " + f.farIP + "\n  User alice\n  ProxyJump jump\n\n" +
 		"Host far-bob\n  HostName " + f.farIP + "\n  User bob\n  ProxyJump jump\n"
@@ -229,7 +229,17 @@ func TestSSHDocker(t *testing.T) {
 		}
 		keys, err := f.r.ScanAlias(ctx, tg)
 		if err != nil {
-			t.Fatalf("ScanAlias through the jump: %v", err)
+			// FINDING (real sshd): the alias scan passes UserKnownHostsFile and StrictHostKeyChecking=no to the OUTER ssh only; the jump's own ssh (started by ProxyJump from the config) does not get them, so
+			// it refuses the jump's unknown key and nothing is stored: the dialog can show no fingerprint for a ProxyJump alias. The rest of the run goes on with the keys scanned directly.
+			t.Errorf("FINDING: ScanAlias through a ProxyJump found no key: %v", err)
+			keys = nil
+			for _, h := range []string{f.jumpIP, f.farIP} {
+				k, serr := f.r.Scan(ctx, h, 22)
+				if serr != nil {
+					t.Fatalf("direct scan of %s: %v", h, serr)
+				}
+				keys = append(keys, k)
+			}
 		}
 		hosts := map[string]bool{}
 		for _, k := range keys {
