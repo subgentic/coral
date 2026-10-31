@@ -86,9 +86,16 @@ func (h *SessionsHandler) NeedsYouAgents(r *http.Request) ([]NeedsYouItem, error
 	return out, nil
 }
 
-// needsYouLine is agent text as one line: cleaned, white space collapsed, cut at needsYouLineMax characters.
+// needsYouWithheld stands in for a line when the secrets redactor is unavailable.
+const needsYouWithheld = "(text withheld)"
+
+// needsYouLine is agent text as one line: secrets redacted, cleaned, white space collapsed, cut at needsYouLineMax characters.
 func needsYouLine(s string) string {
-	s = strings.Join(strings.Fields(clitext.Clean(s)), " ")
+	red, ok := redactComment(s) // secrets out BEFORE the cut: a cut can walk a token's boundary; with no redactor nothing is sent (Security's SHOULD on #11596)
+	if !ok {
+		return needsYouWithheld
+	}
+	s = strings.Join(strings.Fields(clitext.Clean(red)), " ")
 	if utf8.RuneCountInString(s) <= needsYouLineMax {
 		return s
 	}

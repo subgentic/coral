@@ -172,3 +172,21 @@ func TestNeedsYouCountsOnlyUnreadFilesForReview(t *testing.T) {
 	n, _ = count()
 	assert.Equal(t, 0, n, "a denied file is not waiting")
 }
+
+// Security's SHOULD on #11596: a line is agent text that goes to a phone through the Hub, so a secret in it is redacted before it is cut, in a question, a proposal's title and a file's name alike.
+func TestNeedsYouRedactsSecretsInEveryLineBeforeTheCut(t *testing.T) {
+	h, bs := operatorAsksRig(t)
+	ctx := context.Background()
+	token := "ghp_" + strings.Repeat("aB3dE5gH7j", 4) // a GitHub token's shape
+	q, err := bs.PostMessage(ctx, "team", "Lead", "@Operator "+strings.Repeat("x", needsYouLineMax-20)+" my token is "+token+" ok?", nil)
+	require.NoError(t, err)
+	require.NoError(t, bs.RecordAsk(ctx, "team", q, []string{"Operator"}))
+	_, _, err = bs.CreateProposal(ctx, board.ProposalInput{Board: "team", Kind: board.ProposalTask, Title: "use " + token, Payload: json.RawMessage(`{"title":"t"}`), Proposer: "Lead"})
+	require.NoError(t, err)
+	code, out := readNeedsYou(t, h, "", asPerson)
+	require.Equal(t, http.StatusOK, code)
+	raw, _ := json.Marshal(out)
+	assert.NotContains(t, string(raw), token, "the whole token is gone")
+	assert.NotContains(t, string(raw), token[:20], "and so is the part a cut would leave")
+	assert.EqualValues(t, 2, out["count"])
+}
