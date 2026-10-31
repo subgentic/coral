@@ -160,7 +160,7 @@ func (h *BoardHandler) CreateGoal(w http.ResponseWriter, r *http.Request) {
 			}
 			return
 		}
-		payload, _ := json.Marshal(goalPayload{Title: body.Title, Outcome: body.Outcome, DoneWhen: body.DoneWhen, State: body.State, Driver: body.Driver, CreatedBy: actor})
+		payload, _ := json.Marshal(goalPayload{Title: body.Title, Outcome: body.Outcome, DoneWhen: body.DoneWhen, State: body.State, Driver: body.Driver, CreatedBy: verifiedName(r, actor)})
 		h.proposeAnswer(w, r, board.ProposalInput{Board: project, Kind: board.ProposalGoal, Title: body.Title, Payload: payload, Proposer: actor})
 		return
 	}

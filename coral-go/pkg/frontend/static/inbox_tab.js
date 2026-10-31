@@ -9,6 +9,7 @@ import { needsYou, askedRow } from './asked_before_restart.js';
 import { state } from './state.js';
 import { unreadReviewItems, refreshReviews, onReviewsChanged } from './inbox_reviews.js';
 import { failedUnread, refreshRuns, onRunsChanged } from './automation_runs.js';
+import { pendingProposals, refreshProposals, onProposalsChanged } from './proposals_state.js';
 import { isCloud, nativeInbox, sessionServer } from './server_base.js';
 import { importOnce } from './import_once.js';
 import { resolveSessionIdentity, sessionStateInfo, askWords } from './session_state.js';
@@ -16,6 +17,7 @@ import './safe_markdown.js'; // the shared Inbox renderer's wrapper: the lazy In
 
 const INBOX_URL = '/inbox';
 onReviewsChanged(() => updateInboxTab());
+onProposalsChanged(() => updateInboxTab()); // what agents asked to add and wait for the Operator's approval is a Needs you row (#11389)
 onRunsChanged(() => updateInboxTab()); // a failed run nobody has opened is a Needs you row (#9296)
 document.addEventListener('coral:asked-dismissed', () => updateInboxTab()); // a question asked before Coral restarted leaves Needs you (#10368)
 
@@ -32,8 +34,9 @@ export function updateInboxTab() {
     const badge = document.getElementById('nav-tab-hub-inbox-badge');
     if (!badge) return;
     refreshReviews();
+    refreshProposals(); // after the Inbox was first opened, and at most once in 20 seconds (proposals_state.js)
     if (!isCloud()) refreshRuns(); // the runs are read from this Coral only, and only once the Inbox or Automations has been shown
-    const n = waitingCount() + unreadReviewItems().length + failedUnread().length; // a review artifact the operator has read stays listed but is not counted (#9277); a failed run nobody has opened is (#9296)
+    const n = waitingCount() + unreadReviewItems().length + failedUnread().length + pendingProposals().length; // a review artifact the operator has read stays listed but is not counted (#9277); a failed run nobody has opened is (#9296)
     const text = n > 9 ? '9+' : n > 0 ? String(n) : ''; // two characters at most: the pill fits the tabs' own 24 px gap, so the gap after Inbox is the same as the others (#9821); the exact count is in the tab's name
     // Only what changed is written: nav_tabs.js redraws the row on any change to it, and this runs for every message of the feed (setting hidden to
     // the value it has is still a change to a MutationObserver).

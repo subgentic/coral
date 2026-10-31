@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -37,8 +38,18 @@ func (h *BoardHandler) needsApproval(r *http.Request, project, kind string) (boo
 	return set.TasksNeedApproval, true
 }
 
+// verifiedName is the name the identity layer verified for the caller (an agent token's member name), and only when there is none the claim: a proposal's proposer and creator cannot pose as the Operator or as
+// another agent in log mode (Security on #11389).
+func verifiedName(r *http.Request, claim string) string {
+	if a := callerActor(r); a.Kind != ActorClaimed && strings.TrimSpace(a.Name) != "" {
+		return a.Name
+	}
+	return claim
+}
+
 // proposeAnswer stores the proposal and answers 202 (or the refusal). payload is what the handler will replay on Approve.
 func (h *BoardHandler) proposeAnswer(w http.ResponseWriter, r *http.Request, in board.ProposalInput) {
+	in.Proposer = verifiedName(r, in.Proposer)
 	p, existed, err := h.bs.CreateProposal(r.Context(), in)
 	if err != nil {
 		if !goalError(w, err) {
@@ -80,6 +91,26 @@ type taskPayload struct {
 	GoalID     *int64             `json:"goal_id,omitempty"`
 	BlockedBy  json.RawMessage    `json:"blocked_by,omitempty"`
 	RemindAt   string             `json:"remind_at,omitempty"`
+}
+
+// proposalWorkflow is the part of a task's workflow a proposal carries, and the only part: the instructions and the required outputs (the words the assignee reads and acts on, which the Operator is shown in
+// full before approving), and the server's own note of how the creator's name was backed. Everything else an agent could put in a workflow (inputs, artifacts, completion gates, a name, a stage, a review or
+// parent link, amendments) is dropped on the way in: the Operator approves what they were shown, and nothing else rides along (Security on #11394).
+func proposalWorkflow(wf board.TaskWorkflow) board.TaskWorkflow {
+	return board.TaskWorkflow{Instructions: wf.Instructions, RequiredOutputs: wf.RequiredOutputs, CreatedIdentity: wf.CreatedIdentity}
+}
+
+// decodeTaskPayload reads a stored task proposal strictly: a field this version does not know is refused (a proposal made by something else, or tampered with, is never approved on a guess), and the workflow is
+// cut to what a proposal may carry again.
+func decodeTaskPayload(raw []byte) (taskPayload, error) {
+	var t taskPayload
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&t); err != nil {
+		return taskPayload{}, &board.GoalError{Code: "unknown_proposal_field", Message: "this proposal carries something Coral does not know, so it is not approved: reject it"}
+	}
+	t.Workflow = proposalWorkflow(t.Workflow)
+	return t, nil
 }
 
 // taskCreation is what makes a task: the store call, the reminder and the announcement. The create route and Approve share it.
@@ -301,9 +332,9 @@ func (h *BoardHandler) makeFromProposal(ctx context.Context, project string, p *
 		}
 		return goal.ID, goal.Title, nil
 	default:
-		var t taskPayload
-		if err := json.Unmarshal([]byte(p.Payload), &t); err != nil {
-			return 0, "", errors.New("the proposal's task could not be read")
+		t, err := decodeTaskPayload([]byte(p.Payload))
+		if err != nil {
+			return 0, "", err
 		}
 		opts := &board.CreateTaskOpts{Draft: t.Draft, Workflow: t.Workflow, GoalID: t.GoalID}
 		if goalFor > 0 {
