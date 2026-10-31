@@ -285,7 +285,7 @@ var joinSites = map[string]joinEntry{
 	"internal/server/routes/system_security.go\tSystemHandler.DatabaseSecurityStatus":        {1, joinOwn, "a fixed or program-made name in its own folder"},
 	"internal/server/routes/system_team_import.go\tSystemHandler.ImportTeam":                 {1, joinFixed, "names from a directory listing or numbers and hashes the program makes"},
 	"internal/server/routes/task_artifact_vet.go\tBoardHandler.objectIsStored":               {1, joinID, "an object id is checked with objectNameRe (64 hex digits) or a session id with IsSafeID before the join (#5305)"},
-	"internal/server/routes/task_artifact_vet.go\tBoardHandler.objectSidecarDigest":          {1, joinID, "an object id is checked with objectNameRe (64 hex digits) or a session id with IsSafeID before the join (#5305)"},
+	"internal/server/routes/task_artifact_vet.go\tBoardHandler.objectSidecar":                {1, joinID, "an object id is checked with objectNameRe (64 hex digits) or a session id with IsSafeID before the join (#5305)"},
 	"internal/server/routes/team_artifacts.go\tenrichTeamArtifact":                           {1, joinID, "an object id is checked with objectNameRe (64 hex digits) or a session id with IsSafeID before the join (#5305)"},
 	"internal/server/routes/team_artifacts.go\tuploadDirCache.list":                          {1, joinFixed, "names from a directory listing or numbers and hashes the program makes"},
 	"internal/server/routes/themes.go\tThemesHandler.ImportTheme":                            {1, joinOwn, "a name made safe (base name, safeNameRE, safefs.CheckName) before the join"},
