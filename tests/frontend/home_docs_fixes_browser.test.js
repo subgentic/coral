@@ -19,9 +19,15 @@ const { coralReady } = require('./helpers/wait');
             const strip = await ev(`(() => { const s = document.getElementById('editions-home') || [...document.querySelectorAll('template')].map(t => t.content.getElementById('editions-home')).find(Boolean); if (!s) return null; const items = [...s.querySelectorAll('.editions-home-item')].map(b => (b.querySelector('strong') || {}).textContent || ''); const q = [...s.querySelectorAll('.editions-home-item')].find(b => /Mobile QR code/.test(b.textContent)); return { items, qrAction: q ? q.getAttribute('data-on-click') : null }; })()`);
             assert.ok(strip && strip.items.includes('Coral Hub') && !strip.items.includes('Mobile QR code'), `${w}: the strip offers Coral Hub and no Mobile QR code card (the operator removed it, #11414): ${JSON.stringify(strip)}`);
             assert.equal(strip.qrAction, null, `${w}: nothing in the strip opens the Use on your phone dialog`);
-            // the QR code is still on Home, once, in the Learn more row, and opens the Use on your phone dialog
-            const links = await ev(`(() => { const t = [...document.querySelectorAll('template')].map(t => t.content).find(c => c.querySelector('.welcome-links')) || document; const nav = (document.querySelector('.welcome-links') || t.querySelector('.welcome-links')); const q = nav ? [...nav.querySelectorAll('button')].filter(b => /Mobile QR code/.test(b.textContent)) : []; return { n: q.length, action: q[0] ? q[0].getAttribute('data-on-click') : null, anywhere: ((document.body.innerHTML + [...document.querySelectorAll('template')].map(x => x.innerHTML).join('')).match(/Mobile QR code/g) || []).length }; })()`);
-            assert.deepEqual([links.n, links.action], [1, 'm-mobile-connect-open'], `${w}: Home's Learn more row has one Mobile QR code and it opens the dialog: ${JSON.stringify(links)}`);
+            // the QR code is not on Home at all (the operator, #11414): not the card, not a link in the Learn more row. It stays in Settings, by the API key.
+            const qrOnHome = await ev(`(() => { const html = document.body.innerHTML + [...document.querySelectorAll('template')].map(x => x.innerHTML).join(''); return { text: (html.match(/Mobile QR code/g) || []).length, action: (html.match(/m-mobile-connect-open/g) || []).length }; })()`);
+            assert.deepEqual([qrOnHome.text, qrOnHome.action], [0, 0], `${w}: Home has no Mobile QR code anywhere, card or link: ${JSON.stringify(qrOnHome)}`);
+            // and it is where the operator said: Settings, by the API key. The button opens the same dialog.
+            await ev(`window.showSettingsModal('security'); true`);
+            await waitFor(`!!document.querySelector('#settings-modal button[title="Show QR code for mobile connection"]')`, `${w}: Settings has the Mobile QR button by the API key`, 10000);
+            await ev(`document.querySelector('#settings-modal button[title="Show QR code for mobile connection"]').click(); true`);
+            await waitFor(`(() => { const m = document.getElementById('mobile-connect-modal'); return !!m && getComputedStyle(m).display !== 'none'; })()`, `${w}: its button opens the Use on your phone dialog`, 8000);
+            await ev(`document.getElementById('mobile-connect-modal').style.display = 'none'; window.hideSettingsModal && window.hideSettingsModal(); true`);
 
             // 3. the Docs tab opens on the first click after Settings was closed
             if (!mobile) {
