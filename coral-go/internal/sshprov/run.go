@@ -38,6 +38,7 @@ const (
 	// CmdUnpack unpacks that package into <install>/<version>/root and records its SHA-256 in <install>/<version>/package.sha256; arg 0 is the version.
 	CmdUnpack
 	// CmdStartTmux starts the installed Coral of version arg 0 in a tmux session named coral-server, listening on loopback only, with its data under the install folder; nothing is done if the session exists.
+	// Its standard input is /dev/null: a tmux pane is a terminal, and a Coral with a terminal asks "Enable remote access? [y/N]" before it listens and waits for an answer nobody gives (the setup then timed out waiting for its API key).
 	CmdStartTmux
 	// CmdEnsureInstanceID makes the provisioner's instance id file (32 hex digits, once) and prints it.
 	CmdEnsureInstanceID
@@ -86,7 +87,7 @@ var specs = map[Command]spec{
 	CmdReceive:        {template: "umask 077 && cat > \"$HOME/" + InstallDir + "/%s/package.tar.gz\"", args: []*regexp.Regexp{versionRe}, timeout: 15 * time.Minute},
 	CmdTarList:        {template: "cd \"$HOME/" + InstallDir + "/%s\" && tar -tzf package.tar.gz", args: []*regexp.Regexp{versionRe}, timeout: 2 * time.Minute},
 	CmdStartTmux: {template: "umask 077 && mkdir -p \"$HOME/" + InstallDir + "/data\" && { tmux has-session -t =coral-server 2>/dev/null || tmux new-session -d -s coral-server " +
-		"\"exec \\\"$HOME/" + InstallDir + "/%[1]s/root/coral\\\" --host 127.0.0.1 --port 8420 --no-browser --cloud-url off --backend tmux --home \\\"$HOME/" + InstallDir + "/data\\\"\"; }", args: []*regexp.Regexp{versionRe}},
+		"\"exec \\\"$HOME/" + InstallDir + "/%[1]s/root/coral\\\" --host 127.0.0.1 --port 8420 --no-browser --cloud-url off --backend tmux --home \\\"$HOME/" + InstallDir + "/data\\\" </dev/null\"; }", args: []*regexp.Regexp{versionRe}},
 	CmdEnsureInstanceID: {template: "umask 077 && mkdir -p \"$HOME/" + InstallDir + "\" && f=\"$HOME/" + InstallDir + "/instance-id\" && { [ -s \"$f\" ] || head -c 16 /dev/urandom | od -An -tx1 | tr -d ' \\n' > \"$f\"; } && cat \"$f\""},
 	CmdReadAPIKey:       {template: "\"$HOME/" + InstallDir + "/%s/root/coral\" api-key --home \"$HOME/" + InstallDir + "/data\" 2>/dev/null", args: []*regexp.Regexp{versionRe}},
 	CmdAcceptTerms:      {template: "\"$HOME/" + InstallDir + "/%s/root/coral\" accept-terms", args: []*regexp.Regexp{versionRe}},

@@ -39,6 +39,7 @@ fi
 if [ "$1" = "accept-terms" ]; then echo "$@" >> '` + argsLog + `.accept'; cat > '` + argsLog + `.stdin'; exit "${COMMA_EXIT:-0}"; fi
 echo "$@" >> '` + argsLog + `'
 home=""; while [ $# -gt 0 ]; do [ "$1" = "--home" ] && home="$2"; shift; done
+if [ -e '` + filepath.Join(dir, "blockstdin") + `' ]; then read ignored; fi # a Coral with a terminal asks "Enable remote access?" and waits for an answer; with stdin from /dev/null it reads end of file at once
 sleep 0.3; mkdir -p "$home"; printf '%s\n' '` + testKey + `' > "$home/api_key"
 sleep 20
 `
@@ -52,7 +53,12 @@ case "$1" in
   kill-session) [ -e '` + filepath.Join(dir, "stuck") + `' ] && exit 0; rm -f '` + filepath.Join(dir, "session") + `'; exit 0;;
   new-session) touch '` + filepath.Join(dir, "session") + `'
     while [ $# -gt 0 ]; do cmd="$1"; shift; done
-    nohup sh -c "$cmd" >/dev/null 2>&1 &
+    if [ -e '` + filepath.Join(dir, "blockstdin") + `' ]; then # a pane is a terminal: its stdin is something nobody types into (a FIFO that is open and silent)
+      mkfifo '` + filepath.Join(dir, "silent") + `' 2>/dev/null; exec 3<>'` + filepath.Join(dir, "silent") + `'
+      nohup sh -c "$cmd" <&3 >/dev/null 2>&1 &
+    else
+      nohup sh -c "$cmd" >/dev/null 2>&1 &
+    fi
     exit 0;;
 esac
 `
@@ -308,5 +314,24 @@ func TestStopAndConfirmReturnsOnlyOnAConfirmedStop(t *testing.T) {
 	start := time.Now()
 	if err := r.StopAndConfirm(ctx, tg); !errors.Is(err, ErrNotStopped) || time.Since(start) > 3*time.Second {
 		t.Errorf("a check that cannot tell must refuse at once: %v after %v", err, time.Since(start))
+	}
+}
+
+// The far Coral is started in a tmux pane, which is a terminal: a Coral that has one asks "Enable remote access? [y/N]" before it listens and waits for an answer nobody gives, so setup waited its 90 s for
+// the API key and failed on every computer (found on a bare ubuntu:22.04, #138997). The start command gives it /dev/null as standard input, so it cannot ask.
+func TestStartTmuxGivesCoralNoTerminalToAskAt(t *testing.T) {
+	needShell(t)
+	r, _, argsLog, _ := startSide(t)
+	if err := os.WriteFile(filepath.Join(filepath.Dir(argsLog), "blockstdin"), nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	tg, _ := ParseTarget("user@box.example.com")
+	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+	defer cancel()
+	if err := r.StartTmux(ctx, tg, "2.0.10"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.ReadAPIKey(ctx, tg, "2.0.10"); err != nil {
+		t.Fatalf("Coral did not come up (it waited on its standard input): %v", err)
 	}
 }
