@@ -125,7 +125,7 @@ export function showGoalInvalid(select, line, message) {
     line.textContent = ''; line.hidden = false; line.textContent = message;
     select.setAttribute('aria-invalid', 'true'); select.setAttribute('aria-describedby', line.id); select.focus(); line.scrollIntoView({ block: 'nearest' }); // at large text the refusal under the select would sit behind the dialog's footer (#7313)
 }
-export function clearGoalInvalid(select) {
+function clearGoalInvalid(select) {
     select.removeAttribute('aria-invalid'); select.removeAttribute('aria-describedby');
     const line = select.closest('label')?.nextElementSibling;
     if (line && line.classList.contains('task-goal-error')) { line.hidden = true; line.textContent = ''; }

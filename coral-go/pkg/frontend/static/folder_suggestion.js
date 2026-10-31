@@ -7,7 +7,7 @@ import { LOCAL_SERVER } from './server_base.js';
 const SAFE = /[^A-Za-z0-9._-]+/g;
 
 /** <root>/Coral/<name> with the root's own separator, or '' when there is no root. */
-export function suggestedFolder(root, name) {
+function suggestedFolder(root, name) {
     const r = String(root || '').replace(/[\\/]+$/, '');
     if (!r) return '';
     const sep = r.includes('\\') && !r.includes('/') ? '\\' : '/';

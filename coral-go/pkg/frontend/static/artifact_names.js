@@ -37,7 +37,7 @@ export function artifactLabel(hex) {
 }
 
 /** Remember a name already read (from a /meta answer another view fetched). */
-export function rememberArtifactName(hex, name) {
+function rememberArtifactName(hex, name) {
     names.set(hex, cleanArtifactName(name));
 }
 

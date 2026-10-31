@@ -29,7 +29,7 @@ export function historyRoute(id, query = '') {
 }
 
 /** A Hub with no computer online (yet) has nothing to read history from: an empty answer, not a failure. Its readers show an empty list and log nothing (#11073); every other error stays an error. */
-export class NoComputersError extends Error { constructor() { super('No computers online.'); this.code = 'no_computers'; } }
+class NoComputersError extends Error { constructor() { super('No computers online.'); this.code = 'no_computers'; } }
 
 export function historyUrl(url) {
     const server = historyServer();

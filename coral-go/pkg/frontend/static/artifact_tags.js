@@ -9,7 +9,7 @@ const { STARTER, MAX_TAGS, MAX_LEN, normalizeTag } = await importOnce('./artifac
 const mk = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 
 /** Replaces the tags of one stored file; resolves to the tags the server kept, rejects with its words. */
-export async function putTags(project, hex, tags) {
+async function putTags(project, hex, tags) {
     const r = await boardFetch(project, `/artifacts/${hex}/tags`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tags }) });
     const d = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(d.error || `Coral said ${r.status}`);
