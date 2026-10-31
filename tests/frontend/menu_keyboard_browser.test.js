@@ -42,7 +42,8 @@ const BASE = require('./test_base').BASE;
             assert.equal(first, items[0], 'the focus is on the first entry: ' + first + ' of ' + JSON.stringify(items));
             // Saved for later is the Inbox's folder, not an entry of the top bar (#9929, the Operator): the hamburger has no entry for it, and so no bookmark or star drawing for one
             const savedEntries = await ev(`[...document.querySelectorAll('#nav-more-menu .nav-more-item')].filter(i => /^Saved/.test(i.lastElementChild.textContent.trim())).length`);
-            assert.equal(savedEntries, 0, 'the hamburger has no Saved entry: ' + JSON.stringify(items));
+            const drawer = await ev(`document.getElementById('nav-more-menu').classList.contains('nav-drawer') && ['hub-inbox', 'history'].includes(document.querySelector('.top-nav-tab.active')?.dataset.arg)`); // #11476: the phone drawer follows its screen: Saved is an Inbox folder, listed from the Inbox and Chats, not from Agents // #11472: on a phone the ☰ is the drawer, whose Inbox folders include Saved (one entry, with its count); wider than a phone the menu has none (#9929)
+            assert.equal(savedEntries, drawer ? 1 : 0, (drawer ? 'the phone drawer lists the Inbox folder Saved once, from the Inbox: ' : 'the hamburger has no Saved entry: ') + JSON.stringify(items));
             await press('ArrowDown', KEYS.ArrowDown); assert.equal(await active(), items[1], 'ArrowDown goes to the next entry');
             await press('End', KEYS.End); assert.equal(await active(), items.at(-1), 'End goes to the last');
             await press('ArrowDown', KEYS.ArrowDown); assert.equal(await active(), items[0], 'ArrowDown wraps to the first');

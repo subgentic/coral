@@ -22,11 +22,11 @@ const { coralReady } = require('./helpers/wait');
         await waitFor(`!document.getElementById('nav-more-menu').hidden`, 'the menu from the account button', 8000);
         assert.ok((await menuItems()).includes('Settings'), 'the account button opens a menu with Settings: ' + JSON.stringify(await menuItems()));
         await closeMenu();
-        await ev(`document.querySelector('.phone-nav [data-phone-nav="nav-more"]').click(); true`);
-        await waitFor(`!document.getElementById('nav-more-menu').hidden`, 'the menu from More', 8000);
-        assert.ok((await menuItems()).includes('Settings'), 'the More button (the three dots) opens a menu with Settings: ' + JSON.stringify(await menuItems()));
+        await ev(`[...document.querySelectorAll('.phone-menu-btn')].find(e => e.getClientRects().length > 0).click(); true`); // the bottom bar has no More slot any more (#11472): the ☰ in the top bar opens the drawer, which lists Settings below its divider
+        await waitFor(`!document.getElementById('nav-more-menu').hidden`, 'the drawer from the ☰', 8000);
+        assert.ok((await menuItems()).includes('Settings'), 'the ☰ drawer lists Settings: ' + JSON.stringify(await menuItems()));
         await ev(`[...document.querySelectorAll('#nav-more-menu [role=menuitem]')].find(e => (e.lastElementChild || e).textContent.trim() === 'Settings').click(); true`);
-        await waitFor(`!!document.querySelector('#settings-modal, [id^=settings-modal]') && getComputedStyle(document.querySelector('#settings-modal')).display !== 'none'`, 'Settings opens from More', 10000);
-        console.log('PASS Settings: the account button is named and has a tooltip; More lists Settings and opens it');
+        await waitFor(`!!document.querySelector('#settings-modal, [id^=settings-modal]') && getComputedStyle(document.querySelector('#settings-modal')).display !== 'none'`, 'Settings opens from the drawer', 10000);
+        console.log('PASS Settings: the account button is named and has a tooltip; the ☰ drawer lists Settings and opens it');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });

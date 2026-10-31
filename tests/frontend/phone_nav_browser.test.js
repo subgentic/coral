@@ -32,10 +32,10 @@ const { coralReady } = require('./helpers/wait');
             assert.deepEqual(pv, { Ada: 'You: please ship it today', Bo: 'Bo: Done: the suite passes', Cy: 'No messages yet', Di: 'Fix the cold start' }, `${tag}: the preview: ` + JSON.stringify(pv));
             // C: the pill and the +
             const items = await ev(`[...document.querySelectorAll('#phone-nav .phone-nav-slot')].map(b => [b.getAttribute('aria-label'), b.getBoundingClientRect().width, b.getBoundingClientRect().height])`);
-            assert.deepEqual(items.map(i => i[0]), ['Home page', 'Inbox page', 'Tasks page', 'More pages'], `${tag}: Home, Inbox, Tasks, More pages`);
+            assert.deepEqual(items.map(i => i[0]), ['Inbox page', 'Agents page', 'Tasks page', 'Chats page'], `${tag}: Inbox, Agents, Tasks, Chats (#11472: Gmail's bottom bar, no More slot)`);
             assert.ok(items.every(i => i[1] >= 44 && i[2] >= 44), `${tag}: 44 px targets: ` + JSON.stringify(items));
             const nav = await ev(box(`document.getElementById('phone-nav')`)), fab = await ev(box(`document.getElementById('phone-fab')`));
-            assert.ok(nav.b <= 844 - 14 && fab.b <= 844 - 14 && nav.r < fab.l && fab.r <= 390 && nav.h === 64 && fab.w >= 56, `${tag}: the pill and the + float above the bottom, side by side: ` + JSON.stringify({ nav, fab }));
+            assert.ok(nav.b === 844 && nav.l === 0 && nav.r === 390 && nav.h >= 72 && fab.b <= nav.t && fab.r <= 390 && fab.w >= 56, `${tag}: the bar is docked at the bottom, full width, and the + sits above it (#11472, was a floating pill): ` + JSON.stringify({ nav, fab }));
             assert.equal(await ev(`document.querySelector('.phone-nav-slot.active').dataset.phoneNav`), 'nav-agents', `${tag}: Home is the one that is on`);
             // the list keeps room: the last card can scroll above the pill
             const room = await ev(`(() => { const l = document.getElementById('mobile-session-list'), c = getComputedStyle(l); return parseFloat(c.paddingBottom); })()`);
@@ -60,16 +60,13 @@ const { coralReady } = require('./helpers/wait');
                 await ev(`[...document.querySelectorAll('#phone-fab-menu [role=menuitem]')][1].click(); true`);
                 await waitFor(`document.getElementById('phone-fab-menu').hidden && !!document.getElementById('launch-modal') && getComputedStyle(document.getElementById('launch-modal')).display !== 'none'`, 'New team opens the launch dialog', 6000);
                 await ev(`window.hideLaunchModal(); true`);
-                // More opens the menu above the pill
-                await ev(`document.querySelector('.phone-nav-slot[data-phone-nav=nav-more]').click(); true`);
-                await waitFor(`!document.getElementById('nav-more-menu').hidden && document.querySelectorAll('#nav-more-menu .nav-more-item').length > 3`, 'More opens the menu', 4000);
-                const mm = await ev(box(`document.getElementById('nav-more-menu')`)), mb = await ev(box(`document.querySelector('.phone-nav-slot[data-phone-nav=nav-more]')`));
-                assert.ok(mm.b <= mb.t && mm.t >= 0, `More: the menu is above the button: ` + JSON.stringify({ mm, mb }));
-                assert.equal(await ev(`document.querySelector('.phone-nav-slot[data-phone-nav=nav-more]').getAttribute('aria-label')`), 'More pages', 'More keeps its own name');
-                await ev(`document.querySelector('.phone-nav-slot[data-phone-nav=nav-more]').click(); true`);
+                // no More slot (the ☰ in the top bar is the menu, phone_top_menu_browser); Chats opens the chats and is the one that is on
+                assert.equal(await ev(`document.querySelectorAll('.phone-nav-slot[data-phone-nav=nav-more]').length`), 0, 'no More slot on the bar');
+                await ev(`document.querySelector('.phone-nav-slot[data-phone-nav=nav-chats]').click(); true`);
+                await waitFor(`document.querySelector('.phone-nav-slot.active')?.dataset.phoneNav === 'nav-chats'`, 'Chats is lit', 8000);
                 // Inbox: the page opens, the nav stays, Inbox is the one on, no + there
                 await ev(`document.querySelector('.phone-nav-slot[data-phone-nav=nav-inbox]').click(); true`);
-                await waitFor(`getComputedStyle(document.getElementById('inbox-view')).display !== 'none' && document.querySelector('.phone-nav-slot.active')?.dataset.phoneNav === 'nav-inbox'`, 'the Inbox', 8000);
+                await waitFor(`document.querySelector('.phone-nav-slot.active')?.dataset.phoneNav === 'nav-inbox' && (getComputedStyle(document.getElementById('inbox-view')).display !== 'none' || document.getElementById('group-table-view')?.dataset.group === 'hub-inbox:needs')`, 'the Inbox', 8000);
                 assert.equal(await ev(`getComputedStyle(document.getElementById('phone-nav')).display`), 'flex', 'the nav stays on the Inbox');
                 assert.equal(await ev(`getComputedStyle(document.getElementById('phone-fab')).display`), 'none', 'the + is the Agents page\'s');
                 await ev(`document.querySelector('.phone-nav-slot[data-phone-nav=nav-agents]').click(); true`);

@@ -64,6 +64,8 @@ const _counts = { needs: 0, tasks: 0, saved: 0 }, _high = { tasks: 0 };
 const _hooks = {};
 /** The Inbox's sidebar (inbox_sidebar.js) tells this file what to call when the list of agents waiting changes (needs) and when a count does (counts). */
 export function onInboxHooks(h) { Object.assign(_hooks, h); }
+/** The count of each Inbox folder right now (the phone's drawer shows them at the right, #11472). */
+export const inboxCountsNow = () => ({ ..._counts });
 export function setInboxCount(kind, n, high = 0) {
     if (!(kind in _counts)) return;
     n = Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;

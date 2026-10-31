@@ -11,6 +11,7 @@ import { PHONE_QUERY } from './phone_layout.js';
 import { registerActions } from './actions.js';
 import { isHub } from './server_base.js';
 import { MENU_KEYS, menuMove } from './menu_keys.js';
+import { drawerTop, showScrim, hideScrim } from './phone_drawer.js';
 
 const ICONS = { agents: 'smart_toy', history: 'chat_bubble_outline', workflows: 'account_tree', jobs: 'schedule', automations: 'schedule', tokens: 'insights',
     docs: 'menu_book', servers: 'dns', 'hub-inbox': 'notifications', board: 'forum', artifacts: 'inventory_2' };
@@ -110,7 +111,8 @@ let _menuFor = null;     // the button that opened the menu
 
 function closeMenu() {
     const menu = document.getElementById('nav-more-menu');
-    if (menu) menu.hidden = true;
+    if (menu) { menu.hidden = true; menu.classList.remove('nav-drawer'); }
+    hideScrim();
     document.querySelectorAll('[data-on-click="m-nav-more"], [data-on-click="m-top-menu"]').forEach(b => b.setAttribute('aria-expanded', 'false'));
     _menuFor = null;
 }
@@ -120,14 +122,17 @@ function openMenu(btn) {
     if (!menu) return;
     const hamburger = btn.id === 'top-menu-btn' || btn.hasAttribute('data-hamburger'); // the agent row's menu button is the same menu (#11056)
     const all = hamburger || btn.hasAttribute('data-nav-all');
-    const phoneNav = document.body.classList.contains('phone-nav-on'); // the floating nav has Home, Inbox and Tasks: the menu does not list them again (#11400)
-    const items = (all ? availableTabs() : _more).filter(t => !(hamburger && phoneNav && (t.arg === 'agents' || t.arg === 'hub-inbox')));
+    const phoneNav = document.body.classList.contains('phone-nav-on'); // the bottom bar has Inbox, Agents, Tasks and Chats: the menu does not list them again (#11400, #11472)
+    const items = (all ? availableTabs() : _more).filter(t => !(hamburger && phoneNav && (t.arg === 'agents' || t.arg === 'hub-inbox' || t.arg === 'history')));
     if (!items.length) return;
     menu.classList.toggle('nav-all', all);
     menu.classList.toggle('nav-hamburger', hamburger);
     if (hamburger) {
         const sep = document.createElement('div'); sep.className = 'nav-more-sep'; sep.setAttribute('role', 'separator');
-        menu.replaceChildren(...items.map(makeItem), sep, ...menuEntries(new Set(items.map(t => t.label)), phoneNav));
+        const drawer = isPhone(); // on a phone the ☰ is a left drawer: the Inbox's folders and the teams, a divider, then the less-used places (#11472)
+        menu.classList.toggle('nav-drawer', drawer);
+        menu.replaceChildren(...(drawer ? drawerTop() : []), ...(drawer ? [] : items.map(makeItem)), ...(drawer ? [sep] : []), ...(drawer ? items.map(makeItem) : [sep]), ...menuEntries(new Set(items.map(t => t.label)), phoneNav));
+        if (drawer) showScrim(closeMenu);
         for (const v of menu.querySelectorAll('.nav-more-item:not([role])')) v.setAttribute('role', 'menuitem');
     } else menu.replaceChildren(...items.map(makeItem));
     menu.hidden = false;

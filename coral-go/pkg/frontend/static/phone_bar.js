@@ -32,7 +32,32 @@ export function mountTopPhoneBar() {
 export function setPhoneBarTitle(words) {
     _lastWords = words || '';
     _named = !!words;
-    for (const t of document.querySelectorAll('.phone-bar-title')) t.textContent = _pageName || words || pageHeading();
+    paintTitle(_pageName || words || pageHeading());
+}
+
+/** The search each top-level view has in the sidebar (hidden on a phone): the bar's pill is a search field for it (#11476, Gmail's "Search in mail"). It types into that field, so the view filters as it does anywhere. */
+const SEARCH_OF = { 'hub-inbox': 'inbox-search', history: 'history-search', automations: 'automations-search', tokens: 'analytics-search', docs: 'docs-search' };
+const searchTarget = () => { const id = SEARCH_OF[document.querySelector('.top-nav-tab.active')?.dataset.arg || '']; return id ? document.getElementById(id) : null; };
+
+/** The title in every bar's pill, and where the view has a search, the field in it: the title stays for a screen reader and the field's placeholder says what it searches. */
+function paintTitle(words) {
+    for (const t of document.querySelectorAll('.phone-bar-title')) {
+        let txt = t.querySelector('.phone-bar-title-text');
+        if (!txt) { txt = document.createElement('span'); txt.className = 'phone-bar-title-text'; t.replaceChildren(txt); }
+        if (txt.textContent !== words) txt.textContent = words;
+        const target = searchTarget();
+        let input = t.querySelector('.phone-bar-search');
+        if (!target) { input?.remove(); continue; }
+        if (!input) {
+            input = document.createElement('input'); input.type = 'search'; input.className = 'phone-bar-search'; input.autocomplete = 'off'; input.enterKeyHint = 'search';
+            input.addEventListener('input', () => { const to = searchTarget(); if (to && to.value !== input.value) { to.value = input.value; to.dispatchEvent(new Event('input', { bubbles: true })); } });
+            t.append(input);
+        }
+        const label = `Search ${words}`; // what the field says; its name adds where it is, so it never shares one with the sidebar's own search (two controls, one name: the census, QA #11476)
+        if (input.placeholder !== label) { input.placeholder = label; input.setAttribute('aria-label', `${label} from the top bar`); }
+        if (input._for !== target.id) { input._for = target.id; input.value = target.value; } // another view's search: its own words, even while the field has the focus
+        else if (document.activeElement !== input && input.value !== target.value) input.value = target.value; // the view's own search words, kept when the tab is left and come back to
+    }
 }
 let _named = false, _lastWords = '', _prevSlot = '';
 /** A page the bar's own buttons open inside another view (its Tasks is the Inbox view's Tasks table, #11401): the pill says that page's name, whatever the nav's refreshes put for the view, until another tab is chosen (clearPhonePageName, switchNavTab). */
@@ -41,15 +66,17 @@ const lightSlot = name => { for (const it of document.querySelectorAll('.phone-n
 export function setPhonePageName(name) {
     if (!_pageName) _prevSlot = document.querySelector('.phone-nav-slot.active')?.dataset.phoneNav || ''; // the slot the page replaces, for when it is over
     _pageName = name || '';
-    if (_pageName) { document.body.dataset.phonePage = _pageName; for (const t of document.querySelectorAll('.phone-bar-title')) t.textContent = _pageName; } // phone_screens.js reads it for the lit slot
+    if (_pageName) { document.body.dataset.phonePage = _pageName; paintTitle(_pageName); } // phone_screens.js reads it for the lit slot
     if (_pageName === 'Tasks') lightSlot('nav-tasks');
+    if (_pageName === 'Chats') lightSlot('nav-chats');
 }
 /** The page is over (another tab was chosen, or the Inbox's own tab is no longer Tasks): the pill says the view's name again and the slot the page replaced is lit. */
-export function clearPhonePageName() {
+export function clearPhonePageName(keep = '') {
     const had = _pageName;
+    if (keep && had.toLowerCase() === keep) return; // the Inbox's own tab is the page the bar opened (Tasks, Chats): it stays
     _pageName = ''; delete document.body.dataset.phonePage;
     if (!had) return;
-    for (const t of document.querySelectorAll('.phone-bar-title')) t.textContent = _lastWords || pageHeading();
+    paintTitle(_lastWords || pageHeading());
     if (_prevSlot) lightSlot(_prevSlot);
 }
 function pageHeading() {

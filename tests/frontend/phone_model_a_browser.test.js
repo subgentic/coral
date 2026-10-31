@@ -1,5 +1,5 @@
 // The phone's navigation model, slice A (#11236 approved, #11239): the screen types (phone_screens.js) and ONE tab strip. At 390 and 320 px, 100% and 200% text, light and dark:
-//  - Home, Inbox and Automations are top-level screens: the floating nav is on each, with its own slot lit (Home, Inbox, More);
+//  - Home, Inbox and Automations are top-level screens: the floating nav is on each, with its own slot lit (Inbox, Agents; none for Automations, which the ☰ menu opens: #11472);
 //  - the Inbox's folders and Automations' Jobs / Workflows are a strip of 44 px text tabs under the bar (the current one with an accent underline), not a select and not a drawer's button, and a tab switches the view;
 //  - nothing scrolls sideways but the strip itself.
 // Drives Chrome over CDP through agent_view_harness.js against an isolated dev server.
@@ -61,7 +61,7 @@ const { coralReady } = require('./helpers/wait');
             await ev(`window.switchNavTab('automations'); true`);
             await waitFor(`[...document.querySelectorAll('#scheduler-view .view-list-item, #group-table-view .view-list-item')].some(b => b.getClientRects().length > 0 && /Jobs|Workflows/.test(b.textContent))`, `${tag}: Automations (its folder is the page, Jobs or Workflows, whichever was open last)`, 10000);
             assert.equal(await ev(`document.body.dataset.phoneType`), 'top-level', `${tag}: Automations is a top-level screen`);
-            assert.equal(await lit(), 'nav-more', `${tag}: the nav is on and More is lit`);
+            assert.equal(await lit(), null, `${tag}: the bar is on and none of its four tabs is lit: Automations is a place of the ☰ menu, not a tab (#11472, the More slot is gone)`);
             const host = await ev(`[...document.querySelectorAll('#scheduler-view .view-list, #group-table-view .view-list')].find(v => v.getClientRects().length > 0 && /Jobs/.test(v.textContent)) ? ([...document.querySelectorAll('#scheduler-view .view-list, #group-table-view .view-list')].find(v => v.getClientRects().length > 0 && /Jobs/.test(v.textContent)).closest('#scheduler-view') ? '#scheduler-view .view-list' : '#group-table-view .view-list') : '#group-table-view .view-list'`);
             s = await strip(host);
             assert.ok(s && s.shown && s.dir === 'row' && !s.select && s.n >= 2 && s.heights.every(h => h >= 44) && s.names.some(n => /Jobs/.test(n)) && s.names.some(n => /Workflows/.test(n)), `${tag}: Jobs and Workflows are tabs, not a select: ` + JSON.stringify(s));
