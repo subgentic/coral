@@ -58,7 +58,7 @@ func (h *BoardHandler) SubmitCompletionReview(w http.ResponseWriter, r *http.Req
 		errBadRequest(w, fmt.Sprintf("reviewers is 1 or %d", board.MaxReviewersWanted))
 		return
 	}
-	unverified := h.vetTaskArtifacts(r, project, body.Artifacts)
+	vetted := h.vetTaskArtifacts(r, project, body.Artifacts)
 	task, err := h.bs.SubmitCompletionReviewAtRevisionAndCandidate(r.Context(), project, id, body.SubscriberID, body.Message, body.Outcome, body.Reason, body.Artifacts, body.ExpectedRevision, body.CandidateRevision)
 	if err != nil {
 		if strings.Contains(err.Error(), "revision") {
@@ -84,7 +84,7 @@ func (h *BoardHandler) SubmitCompletionReview(w http.ResponseWriter, r *http.Req
 			return
 		}
 		h.afterTaskCompleted(project, author, done, msg, "completed without review: no orchestrator on the team")
-		writeTaskVetted(w, done, unverified)
+		writeTaskVetted(w, done, vetted)
 		return
 	}
 	if err != nil {
@@ -121,7 +121,7 @@ func (h *BoardHandler) SubmitCompletionReview(w http.ResponseWriter, r *http.Req
 		h.notifyFn(project)
 	}
 	task, _ = h.bs.GetTask(ctx, project, id)
-	writeTaskVetted(w, task, unverified)
+	writeTaskVetted(w, task, vetted)
 }
 
 // DelegateReview gives a task in review to reviewers: one review task each, in their queue

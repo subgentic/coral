@@ -33,3 +33,12 @@ func TestPrintUnverifiedArtifacts(t *testing.T) {
 	assert.Contains(t, out, "coral-agent artifact upload")
 	assert.Empty(t, stdoutOf(t, func() { printUnverifiedArtifacts([]byte(`{"title":"t"}`)) }), "nothing when all are verified")
 }
+
+// #11581: a "for review" tag a result asked for and did not get is printed, with why.
+func TestPrintReviewWarnings(t *testing.T) {
+	out := stdoutOf(t, func() {
+		printUnverifiedArtifacts([]byte(`{"title":"t","warnings":["\"x.zip\": not tagged \"for review\": needs a question"]}`))
+	})
+	assert.Contains(t, out, `Warning: "x.zip": not tagged "for review": needs a question`)
+	assert.NotContains(t, out, "not uploads of this team")
+}

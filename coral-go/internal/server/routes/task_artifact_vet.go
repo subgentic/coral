@@ -42,9 +42,9 @@ const (
 // team's file its own by naming its id); a person's only needs the object to exist. A link that
 // fails is kept, as the agent wrote it, marked unverified. Any provenance the client sent is
 // cleared first. It returns the names of the links it marked unverified, each also logged.
-func (h *BoardHandler) vetTaskArtifacts(r *http.Request, project string, artifacts []board.TaskArtifact) []string {
+func (h *BoardHandler) vetTaskArtifacts(r *http.Request, project string, artifacts []board.TaskArtifact) taskVet {
 	if len(artifacts) == 0 {
-		return nil
+		return taskVet{}
 	}
 	actor := callerActor(r)
 	person := actor.Kind == ActorOperator || actor.Kind == ActorHub
@@ -88,8 +88,14 @@ func (h *BoardHandler) vetTaskArtifacts(r *http.Request, project string, artifac
 			asker = owner.SessionID
 		}
 	}
-	h.applyManifestTags(r.Context(), project, asker, person, artifacts)
-	return unverified
+	notes := h.applyManifestTags(r.Context(), project, asker, person, artifacts)
+	return taskVet{Unverified: unverified, ReviewNotes: notes}
+}
+
+// taskVet is what vetting a result's artifacts found: the links kept as plain links, and the "for review" tags left out (each with why).
+type taskVet struct {
+	Unverified  []string
+	ReviewNotes []string
 }
 
 // objectIsStored reports whether the store holds id as a regular file (not a link to one).
@@ -105,28 +111,34 @@ func (h *BoardHandler) objectIsStored(id string) bool {
 	return err == nil && st.Mode().IsRegular()
 }
 
-// objectSidecarDigest is the digest the object's metadata sidecar records ("" when unreadable).
-func (h *BoardHandler) objectSidecarDigest(id string) string {
+// objectSidecar is the object's metadata sidecar (ok false when unreadable or not a regular file).
+func (h *BoardHandler) objectSidecar(id string) (agentArtifactMeta, bool) {
 	if !objectNameRe.MatchString(id) { // an id read from a file or a message is a 64-digit hex name before it is joined onto a folder (#5305)
-		return ""
+		return agentArtifactMeta{}, false
 	}
 	dir := h.artifactObjectDir()
 	if dir == "" {
-		return ""
+		return agentArtifactMeta{}, false
 	}
 	path := filepath.Join(dir, id+".json")
 	st, err := os.Lstat(path)
 	if err != nil || !st.Mode().IsRegular() || st.Size() > maxArtifactMetaBytes {
-		return ""
+		return agentArtifactMeta{}, false
 	}
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return ""
+		return agentArtifactMeta{}, false
 	}
 	var meta agentArtifactMeta
 	if json.Unmarshal(data, &meta) != nil {
-		return ""
+		return agentArtifactMeta{}, false
 	}
+	return meta, true
+}
+
+// objectSidecarDigest is the digest the object's metadata sidecar records ("" when unreadable).
+func (h *BoardHandler) objectSidecarDigest(id string) string {
+	meta, _ := h.objectSidecar(id)
 	return meta.Digest
 }
 

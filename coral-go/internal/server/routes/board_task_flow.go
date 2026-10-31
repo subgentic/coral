@@ -106,7 +106,7 @@ func (h *BoardHandler) CompleteTaskByID(w http.ResponseWriter, r *http.Request) 
 	if body.Message != nil && h.refuseShortArtifactRefs(w, r, body.Message) { // #9841
 		return
 	}
-	unverified := h.vetTaskArtifacts(r, project, body.Artifacts)
+	vetted := h.vetTaskArtifacts(r, project, body.Artifacts)
 	task, err := h.bs.CompleteTaskWithArtifactsAtRevisionAndCandidate(r.Context(), project, taskID, body.SubscriberID, body.Message, body.Outcome, body.Artifacts, body.ExpectedRevision, body.CandidateRevision)
 	if err != nil {
 		if strings.Contains(err.Error(), "revision") {
@@ -129,14 +129,14 @@ func (h *BoardHandler) CompleteTaskByID(w http.ResponseWriter, r *http.Request) 
 	}
 	h.endOwnWaits(r.Context(), project, body.SubscriberID) // it is working, not parked (#7765)
 	h.afterTaskCompleted(project, body.SubscriberID, task, completionMsg, "")
-	writeTaskVetted(w, task, unverified)
+	writeTaskVetted(w, task, vetted)
 }
 
 // writeTaskVetted answers with the task, plus artifacts_unverified (how many managed links were
 // kept as plain links, and their names) when vetTaskArtifacts marked any: the agent can upload the
 // file and complete again.
-func writeTaskVetted(w http.ResponseWriter, task any, unverified []string) {
-	if len(unverified) == 0 {
+func writeTaskVetted(w http.ResponseWriter, task any, v taskVet) {
+	if len(v.Unverified) == 0 && len(v.ReviewNotes) == 0 {
 		writeJSON(w, http.StatusOK, task)
 		return
 	}
@@ -146,9 +146,14 @@ func writeTaskVetted(w http.ResponseWriter, task any, unverified []string) {
 		writeJSON(w, http.StatusOK, task)
 		return
 	}
-	out["artifacts_unverified"] = len(unverified)
-	out["artifacts_unverified_names"] = unverified
-	out["artifacts_unverified_help"] = "these coral://artifacts links are not uploads of this team: they are kept as plain links. Upload the file with coral-agent artifact upload and use its link."
+	if len(v.Unverified) > 0 {
+		out["artifacts_unverified"] = len(v.Unverified)
+		out["artifacts_unverified_names"] = v.Unverified
+		out["artifacts_unverified_help"] = "these coral://artifacts links are not uploads of this team: they are kept as plain links. Upload the file with coral-agent artifact upload and use its link."
+	}
+	if len(v.ReviewNotes) > 0 { // a "for review" tag the result asked for and did not get (#11581): each line is why, in the words of the upload's refusal
+		out["warnings"] = v.ReviewNotes
+	}
 	writeJSON(w, http.StatusOK, out)
 }
 

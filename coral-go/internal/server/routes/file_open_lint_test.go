@@ -49,7 +49,7 @@ var reviewedFileOpens = map[string]string{
 	"team_artifacts.go:readArtifactSidecar:ReadFile":                      "a managed artifact's hex name, lower-cased and checked",
 	"artifact_comments.go:readSmallFile:Open":                             "an artifact's sidecar by its 64-hex name (checked lower-case hex before the call), read to a byte cap",
 	"team_artifacts.go:uploadDirCache.list:ReadFile":                      "names read from the server's uploads folder",
-	"task_artifact_vet.go:BoardHandler.objectSidecarDigest:ReadFile":      "a managed artifact's 64-hex id (managedArtifactID), Lstat'ed as a regular file under the bound first (#4379)",
+	"task_artifact_vet.go:BoardHandler.objectSidecar:ReadFile":            "a managed artifact's 64-hex id (managedArtifactID), Lstat'ed as a regular file under the bound first (#4379)",
 	"cross_team_attach.go:BoardHandler.crossTeamRecord:ReadFile":          "a 64-hex id under <data>/artifacts/<kind>/<hash of the board>, Lstat'ed as a regular file under the bound first (#4379)",
 	"cross_team_pending.go:readPending:ReadFile":                          "a file in <data>/artifacts/pending/<hash of the board>, listed from that folder, Lstat'ed as a regular file under the bound first (#4440)",
 	"cross_team_attach.go:BoardHandler.objectMeta:ReadFile":               "a managed artifact's 64-hex id (managedArtifactID), Lstat'ed as a regular file under the bound first (#4379)",
