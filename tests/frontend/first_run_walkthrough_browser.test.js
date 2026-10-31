@@ -132,8 +132,10 @@ setInterval(() => {}, 1 << 30);
         assert.deepEqual(jobs.filter(x => x.enabled), [], `${tag}: a fresh data folder has an enabled scheduled job, which would start an agent and spend CLI credit on a new install (${JSON.stringify(jobs)})`);
         assert.ok(jobs.length === 0 || jobs.every(x => /^Example/.test(x.description)), `${tag}: a seeded job says it is an example (${JSON.stringify(jobs)})`);
         console.log(`   ✓ ${tag}: no scheduled job is on in a fresh install (${jobs.length} example job(s), off)`);
+        // a fresh install opens on Needs you with its welcome items (#11490): Home is one tap away
+        await waitFor(`/What do you want to work on\\?/.test(document.body.innerText) || /Start your first agent/.test(document.body.innerText)`, `${tag}: the home screen`, { timeout: 15000, diag: `document.body.innerText.slice(0, 300)` });
+        if (await ev(`!/What do you want to work on/.test(document.body.innerText)`)) await ev(`window.switchNavTab('agents'); true`);
         await waitFor(`/What do you want to work on\\?/.test(document.body.innerText)`, `${tag}: the home screen`, { timeout: 15000, diag: `document.body.innerText.slice(0, 300)` });
-
         // 3. New Agent in two steps: the choice, then the form
         const before = (await live()).map(x => x.session_id);
         if (!mobile) {
@@ -227,6 +229,9 @@ setInterval(() => {}, 1 << 30);
         assert.equal(put, 200, `${tag}: the stored skip is accepted`);
         await Page.navigate({ url: s.base + '/' }); await Page.loadEventFired();
         await ready(s);
+        // a fresh install opens on Needs you with its welcome items (#11490): Home is one tap away
+        await waitFor(`/What do you want to work on\\?/.test(document.body.innerText) || /Start your first agent/.test(document.body.innerText)`, `${tag}: the home screen`, { timeout: 15000, diag: `document.body.innerText.slice(0, 300)` });
+        if (await ev(`!/What do you want to work on/.test(document.body.innerText)`)) await ev(`window.switchNavTab('agents'); true`);
         await waitFor(`/What do you want to work on\\?/.test(document.body.innerText)`, `${tag}: the home screen`, { timeout: 15000, diag: `document.body.innerText.slice(0, 300)` });
         // the first-launch offer would open a moment after the settings load: it does not (a bounded look, the offer's own wait for a loading connector is about 3 s)
         for (let i = 0; i < 40; i++) { assert.ok(!await ev(visible('[data-editions="skip"]')), `${tag}: the Coral Hub offer opened although the question was answered in the terminal`); await sleep(100); }
