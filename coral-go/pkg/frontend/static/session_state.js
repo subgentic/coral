@@ -1,4 +1,5 @@
 import { hasWorkingDisplayHint, trackDisplayHint } from './display_activity_hint.js';
+import { dialogOf } from './at_dialog.js';
 /* Moved out of render.js as it was (#3795): no behaviour change. */
 import { isPhoneLayout } from './phone_layout.js';
 import { modelDisplayName } from './model_names.js';
@@ -133,6 +134,8 @@ function formatStaleness(seconds) {
     // Waiting on a teammate's reply, a task or a commit (coral-board wait): calm, like
     // task_idle; nobody's input is needed (#3471). The label names what it waits on.
     waiting_on:     { label: 'Waiting on the board', dot: 'task-idle', pill: 'Waiting', pillClass: 'neutral', chip: 'idle', attention: false },
+    // Standing at a dialog Coral saw on the screen (a trust-this-folder prompt): not idle, and calm until it has stood the set minutes (then Needs you, #11430).
+    at_dialog:      { label: 'At a dialog',    dot: 'waiting',   pill: 'At a dialog',    pillClass: '',          chip: 'needs-input', attention: false },
     idle:           { label: 'Idle',           dot: 'stale',     pill: null,             pillClass: '',          chip: 'idle',        attention: false },
 };
 
@@ -176,6 +179,7 @@ function waitingOnLabel(w) {
 export function presentationSessionState(s, opts) {
     const key = deriveSessionState(s, opts);
     trackDisplayHint(s);
+    if (['idle', 'your_turn', 'task_idle', 'waiting_on'].includes(key) && dialogOf(s)) return 'at_dialog'; // not Idle while it stands at a dialog (#11430)
     return key === 'needs_input' && hasWorkingDisplayHint(s) ? 'working' : key;
 }
 
