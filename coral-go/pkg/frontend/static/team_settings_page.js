@@ -10,6 +10,7 @@ const { bindInfo } = await importOnce('./info_toggle.js');
 const { refusalOf, answeredLocally } = await importOnce('./owner_refusal.js');
 const { requireGoalSentence } = await importOnce('./task_goals.js');
 const { createMessaging, XT_KEYS } = await importOnce('./team_cross_team_fields.js');
+const { createOrchestratorGrant, OG_KEYS } = await importOnce('./team_orchestrator_grant.js');
 const { healthFields, healthToValues, saveHealth, HEALTH_KEYS } = await importOnce('./team_health_fields.js');
 const { HEALTH_DEFAULTS } = await importOnce('./team_health_settings.js');
 const { jsonError, presetNameText, presetInstructionsText, presetLabel, renderInspection } = await importOnce('./team_working_mode.js');
@@ -62,6 +63,7 @@ function openSettingsState(team, options) {
     // The recipient list: the team's active members (just the default and the saved name when the list cannot be read).
     st.membersReady = boardFetch(team, '/subscribers').then(async r => (r.ok ? (await r.json()).filter(m => m.is_active !== 0) : [])).catch(() => []);
     st.xt = createMessaging(team); // the Messaging group: its fields, its lines and its save
+    st.og = createOrchestratorGrant(team, () => st.membersReady); // the Orchestrator access group (#11432)
     st.modeOptions = () => (st.presets.length ? st.presets.map(p => ({ value: p.id, label: presetNameText(p) })) : DEFAULT_MODES);
     st.modeSelect = () => st.view.host.querySelector('select[name="mode"]');
     st.q = sel => st.view.host.querySelector(sel);
@@ -114,6 +116,7 @@ function settingsGroups(st) {
         ] },
         { id: 'health', domId: 'team-settings-health', label: 'Health check', icon: 'notifications', hint: 'When an agent that stopped working is noticed.', fields: healthFields({ members: () => st.membersReady, hasHeld: () => Boolean(st.healthBase && st.healthBase.held_notice), monitorOff: () => !st.healthMonitorOn, onReset: resetHealth, openSettings: () => window.showSettingsModal?.('agents') }) },
         { id: 'messaging', domId: 'team-settings-messaging', label: 'Messaging', icon: 'chat', hint: 'How the team\'s messages reach its agents.', fields: st.xt.fields() },
+        { id: 'orchestrator', domId: 'team-settings-orchestrator', label: 'Orchestrator access', icon: 'admin_panel_settings', hint: 'What the Orchestrator may do to this team\'s agents.', fields: st.og.fields() },
         { id: 'prompts', label: 'Prompts', icon: 'description', hint: 'Read-only preview of the prompts agents get.', render: p => { p.innerHTML = '<div class="prompt-inspection-content" aria-live="polite">Loading prompt inspection\u2026</div>'; } },
     ];
 }
@@ -143,8 +146,10 @@ function loadSettings(st) {
             // The board settings could not be loaded: through Coral Hub the owner-only settings can be refused (#5323): the Messaging group says why, in our words (and the Health check is not drawn).
             xtValues = await st.xt.load({ refusal: boardSettingsResponse ? await refusalOf(boardSettingsResponse, answeredLocally(st.team)) : '' });
         }
+        const orch = await st.og.load().catch(() => ({ values: null })); // the Operator's switch for the Orchestrator: not given to a page that may not read it (the group is then not drawn)
+        if (!orch.values) st.view.removeGroup('orchestrator');
         st.q('.prompt-inspection-content').innerHTML = inspectionResponse.ok ? renderInspection(await inspectionResponse.json(), st.workingMode) : `<p class="sv-help">Prompt inspection: ${escapeHtml(await refusalOf(inspectionResponse, answeredLocally(st.team)))}</p>`;
-        return { mode: st.workingMode.mode || 'none', dependency_guidance: Boolean(st.workingMode.dependency_guidance), asks_are_tasks: Boolean(st.workingMode.asks_are_tasks), ...xtValues, custom_instructions: st.workingMode.custom_instructions || '', require_goal: Boolean(boardSettings?.require_goal), ...(st.healthBase ? healthToValues(st.healthBase) : {}) };
+        return { mode: st.workingMode.mode || 'none', dependency_guidance: Boolean(st.workingMode.dependency_guidance), asks_are_tasks: Boolean(st.workingMode.asks_are_tasks), ...xtValues, custom_instructions: st.workingMode.custom_instructions || '', require_goal: Boolean(boardSettings?.require_goal), ...(st.healthBase ? healthToValues(st.healthBase) : {}), ...(orch.values || {}) };
     };
 }
 
@@ -183,8 +188,11 @@ function saveSettings(st) {
         if (XT_KEYS.some(k => k in changes)) {
             try { await st.xt.save(); saved.push(...XT_KEYS); } catch (error) { failures.push(error.message); }
         }
+        if (OG_KEYS.some(k => k in changes)) {
+            try { await st.og.save(values); saved.push(...OG_KEYS); } catch (error) { failures.push(error.message); }
+        }
         if (failures.length) throw Object.assign(new Error(failures[0]), { saved, fields: fieldErrors });
-        return { note: modeChanged ? 'Saved. Working mode applies on first claim.' : null, rebase: saved.filter(k => HEALTH_KEYS.includes(k) || XT_KEYS.includes(k)) };
+        return { note: modeChanged ? 'Saved. Working mode applies on first claim.' : null, rebase: saved.filter(k => HEALTH_KEYS.includes(k) || XT_KEYS.includes(k) || OG_KEYS.includes(k)) };
     };
 }
 
@@ -192,6 +200,7 @@ function wirePage(st) {
     st.page.view = st.view; // the page's settings_view (a test reads what changed through it)
     st.page.hasUnsaved = () => st.view.isDirty(); // read live by the leave-the-page question (team_working_mode.js)
     st.xt.bind(st.view);
+    st.og.bind(st.view);
     st.view.say('Loading\u2026');
     st.view.ready.then(() => { st.syncModeDescription(); st.xt.drawn(); }).catch(() => {}); // the line under the list follows the mode the load set
     st.view.ready.catch(error => { st.view.say(error.message, true); const c = st.q('.prompt-inspection-content'); if (c) c.textContent = 'Prompt inspection could not be loaded.'; st.xt.load({}).then(() => st.xt.drawn()).catch(() => {}); });

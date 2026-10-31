@@ -104,8 +104,8 @@ func (h *SessionsHandler) OrchestratorGrant(w http.ResponseWriter, r *http.Reque
 		errInternalServer(w, "could not save the grant")
 		return
 	}
-	if cur.Enabled != g.Enabled || cur.SeatSession != g.SeatSession {
-		if id, err := h.bs.ReserveLifecycle(r.Context(), project, "grant", "Operator", orchGrantWords(g), nil); err == nil {
+	if cur.Enabled != g.Enabled || cur.SeatSession != g.SeatSession || cur.MaxPerHour != g.MaxPerHour || cur.MaxLive != g.MaxLive || cur.IdleMin != g.IdleMin {
+		if id, err := h.bs.ReserveLifecycle(r.Context(), project, "grant", "Operator", h.orchGrantWords(r.Context(), g), nil); err == nil {
 			_ = h.bs.FinishLifecycle(r.Context(), id, "ok", "")
 		}
 	}
@@ -113,11 +113,20 @@ func (h *SessionsHandler) OrchestratorGrant(w http.ResponseWriter, r *http.Reque
 	writeJSON(w, http.StatusOK, saved)
 }
 
-func orchGrantWords(g board.OrchGrant) string {
+// orchGrantWords is what the log row says of a change: the switch, the seat's name on the board (cleaned) and the caps, so the log shows who could act and how far.
+func (h *SessionsHandler) orchGrantWords(ctx context.Context, g board.OrchGrant) string {
+	words := "switch off"
 	if g.Enabled {
-		return "switch on"
+		words = "switch on"
 	}
-	return "switch off"
+	if g.SeatSession != "" {
+		seat := "a session that is gone"
+		if sess, err := h.ss.GetLiveSession(ctx, g.SeatSession); err == nil && sess != nil {
+			seat = h.orchActor(sess)
+		}
+		words += ", seat " + seat
+	}
+	return words + fmt.Sprintf(", %d an hour, %d live, idle %d min", g.MaxPerHour, g.MaxLive, g.IdleMin)
 }
 
 // LifecycleLog answers GET /api/board/{project}/lifecycle-log.

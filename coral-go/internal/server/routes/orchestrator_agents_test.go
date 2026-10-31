@@ -392,6 +392,23 @@ func TestEveryActionIsLoggedAndSaidOnTheBoard(t *testing.T) {
 		kinds = append(kinds, e.Kind+" "+e.Actor+" "+e.Target+" "+e.Status)
 	}
 	assert.ElementsMatch(t, []string{"wake Orchestrator Dev ok", "sleep Orchestrator Dev2 ok"}, kinds)
+	// Security's SHOULD: the grant's own row names the seat and the caps; a change of caps alone is a row of its own
+	grants := func() []string {
+		var out []string
+		l, err := r.h.bs.LifecycleLog(ctx, orchBoard, 50)
+		require.NoError(t, err)
+		for _, e := range l {
+			if e.Kind == "grant" {
+				out = append(out, e.Target)
+			}
+		}
+		return out
+	}
+	assert.Equal(t, []string{"switch on, seat Orchestrator, 10 an hour, 8 live, idle 5 min"}, grants())
+	code, _ = r.operatorGrant("Orchestrator", map[string]any{"max_live": 12})
+	require.Equal(t, http.StatusOK, code)
+	assert.Len(t, grants(), 2)
+	assert.Contains(t, grants()[0], "12 live")
 	msgs, err := r.h.bs.ListMessages(ctx, orchBoard, 50, 0, 0)
 	require.NoError(t, err)
 	var lines []string
@@ -569,4 +586,25 @@ func TestAnAgentsTeamLaunchIsLoggedAndCountedMemberByMember(t *testing.T) {
 	assert.Equal(t, "board_hourly_limit", members(out)[0]["code"])
 	again, _ := r.ss.CountActiveLiveSessions(ctx)
 	assert.Equal(t, after, again)
+}
+
+// Security's SHOULD on #11432: the live cap holds for a team launch too: a board with room for one more live agent starts one member of a team and refuses the rest with the cap named.
+func TestAnAgentsTeamLaunchIsHeldToTheLiveCap(t *testing.T) {
+	r := newOrchRig(t)
+	ctx := context.Background()
+	r.usualBoard() // Orchestrator and Dev2 awake, Dev asleep: two live
+	code, _ := r.operatorGrant("Orchestrator", map[string]any{"max_per_hour": 50, "max_live": 3})
+	require.Equal(t, http.StatusOK, code)
+	b, _ := json.Marshal(map[string]any{"board_id": orchBoard, "working_dir": t.TempDir(), "agent_type": "claude", "agents": []map[string]any{{"name": "LiveA", "prompt": "work"}, {"name": "LiveB", "prompt": "work"}}})
+	before, _ := r.ss.CountActiveLiveSessions(ctx)
+	code, out := r.do("POST", "/api/sessions/launch-team", string(b), nil, r.tok["Orchestrator"])
+	require.Equal(t, http.StatusOK, code, out)
+	ms := out["agents"].([]any)
+	require.Len(t, ms, 2)
+	assert.Nil(t, ms[0].(map[string]any)["error"], "one fits under the live cap of 3")
+	refused := ms[1].(map[string]any)
+	assert.Equal(t, "board_live_limit", refused["code"])
+	assert.Contains(t, refused["error"], "3 live agents")
+	after, _ := r.ss.CountActiveLiveSessions(ctx)
+	assert.Equal(t, before+1, after)
 }
