@@ -70,7 +70,7 @@ func TestAnAgentAtTheTrustScreenIsAtADialogWithNoMessageWaiting(t *testing.T) {
 	got, ok := atDialogOf(t, server.URL, sid).(map[string]any)
 	require.True(t, ok, "the same prompt on two passes: at a dialog")
 	assert.Equal(t, t0.Format(time.RFC3339), got["since"], "since is when it was first seen")
-	assert.EqualValues(t, atDialogMinutes, got["after_min"], "the default, for an agent on no board")
+	assert.EqualValues(t, 5, got["after_min"], "5 minutes, this field's own default")
 	assert.Equal(t, true, got["notify"])
 	assert.NotContains(t, got, "question", "no text of the prompt is served")
 	assert.NotContains(t, got, "options")
@@ -143,7 +143,7 @@ func TestAnAnswerSentClearsTheDialogAtOnce(t *testing.T) {
 	assert.Nil(t, atDialogOf(t, server.URL, sid), "answered: not a dialog, with no wait for the next pass")
 }
 
-func TestTheDialogMinutesAreTheTeamsHeldNoticeSetting(t *testing.T) {
+func TestTheDialogMinutesAreFiveWhateverTheHealthSettingAndTheTeamsSwitchTurnsItOff(t *testing.T) {
 	_, h, terminal, ss := setupSessionsTestServer(t)
 	const sid = "00000000-0000-0000-0000-00000000d1a4"
 	ctx := context.Background()
@@ -159,8 +159,8 @@ func TestTheDialogMinutesAreTheTeamsHeldNoticeSetting(t *testing.T) {
 	h.dialogPass(ctx, t0.Add(15*time.Second))
 	got, ok := h.dialogs.field(sid).(map[string]any)
 	require.True(t, ok)
-	assert.EqualValues(t, 25, got["after_min"], "the team's held_notice.after_min")
-	assert.Equal(t, false, got["notify"], "and its on switch: a team that turned the notice off is not sent a Needs you item")
+	assert.EqualValues(t, 5, got["after_min"], "5 minutes, separate from the health setting's 25")
+	assert.Equal(t, false, got["notify"], "the team's held_notice switch: a team that turned the notice off is not sent a Needs you item")
 }
 
 // #11437 (d): the captured Claude folder-trust screen is read as a prompt by the parser the watcher uses, with its choices; no board message and no hook is needed for that.

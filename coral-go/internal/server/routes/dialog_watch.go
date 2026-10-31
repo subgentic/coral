@@ -40,9 +40,9 @@ type dialogWatch struct {
 	offset int                    // where the next pass starts in the list of agents
 }
 
-// atDialogMinutes is how long an agent may wait at a dialog before it is a Needs you item when its team has no say: the team's own setting for it is held_notice.after_min (board.HealthSettings), the one
-// that already tells the Operator about an agent whose messages waited at a dialog.
-const atDialogMinutes = 10
+// atDialogMinutes is how long an agent may wait at a dialog before it is a Needs you item: 5, this field's own default, separate from the team's health settings (held_notice.after_min is 10 and is
+// about the health check's own message). The team's held_notice On switch still turns the Needs you item off (notify).
+const atDialogMinutes = 5
 
 func (w *dialogWatch) observe(sid string, screen promptScreen, shown bool, now time.Time, afterMin int, notify bool) {
 	w.mu.Lock()
@@ -153,11 +153,10 @@ func (h *SessionsHandler) dialogPass(ctx context.Context, now time.Time) {
 // liveAgent is the part of a live session a pass needs.
 type liveAgent struct{ sid, name, agentType, board string }
 
-// dialogMinutes is the team's held_notice setting for the agent's board: how long, and whether it is on; an agent on no board gets the default.
+// dialogMinutes is how long an agent may wait at a dialog (always atDialogMinutes) and whether its team has the notice on (held_notice.On); an agent on no board has it on.
 func (h *SessionsHandler) dialogMinutes(ctx context.Context, project string) (int, bool) {
 	if h.bs == nil || project == "" {
 		return atDialogMinutes, true
 	}
-	s := h.bs.GetHealthSettings(ctx, project).HeldNotice
-	return s.AfterMin, s.On
+	return atDialogMinutes, h.bs.GetHealthSettings(ctx, project).HeldNotice.On
 }
