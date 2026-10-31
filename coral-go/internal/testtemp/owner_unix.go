@@ -15,3 +15,9 @@ func ownedByMe(_ string, fi os.FileInfo) bool {
 
 // ownerOnly is a no-op on Unix: os.MkdirTemp makes the folder 0700 already.
 func ownerOnly(string) (changed bool, err error) { return false, nil }
+
+// ownerOnlyAcl reports whether dir is closed to group and others.
+func ownerOnlyAcl(dir string) bool {
+	fi, err := os.Stat(dir)
+	return err == nil && fi.Mode().Perm()&0o077 == 0
+}
