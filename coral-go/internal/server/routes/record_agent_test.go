@@ -196,6 +196,33 @@ func TestBulkRecordRecordsTheAgentsWhoseProgramIsTheirCLIAndListsTheRest(t *test
 	assert.Len(t, out["left"], 1)
 }
 
+// Record for all agents shows what it will record before the Operator confirms (#11415): ?dry_run=1 lists each agent's program and pid, and the ones it would leave, and records nothing.
+func TestBulkRecordDryRunNamesEachProgramAndRecordsNothing(t *testing.T) {
+	srv, term, ss, nameA, nameB := recordFixture(t)
+	cliA, err := ss.GetSettingsForCLI(context.Background())
+	require.NoError(t, err)
+	term.paused[nameA], term.paused[nameB] = true, true
+	term.cand[nameA] = ptymanager.AgentCandidate{PID: 100, Start: "s1", Program: "claude", Image: cliA["cli_path_claude"]}
+	term.cand[nameB] = ptymanager.AgentCandidate{PID: 200, Start: "s2", Program: "node", Image: "/usr/bin/node"}
+
+	code, out := postRecordJSON(t, srv+"/api/sessions/record-agents?dry_run=1", map[string]any{})
+	require.Equal(t, http.StatusOK, code)
+	assert.Equal(t, true, out["dry_run"])
+	recorded, _ := out["recorded"].([]any)
+	require.Len(t, recorded, 1)
+	first := recorded[0].(map[string]any)
+	assert.Equal(t, nameA, first["session"])
+	assert.EqualValues(t, 100, first["pid"])
+	assert.Equal(t, "claude", first["program"])
+	assert.Len(t, out["left"], 1)
+	assert.Empty(t, term.recorded, "a preview records nothing")
+
+	// The real run afterwards still records the same agent.
+	_, out = postRecordJSON(t, srv+"/api/sessions/record-agents", map[string]any{})
+	assert.Len(t, out["recorded"], 1)
+	assert.Equal(t, 100, term.recorded[nameA].PID)
+}
+
 // A program that runs inside a nested shell is recorded only on the Operator's explicit acknowledgement; a direct child needs the plain confirm; bulk never records the nested one.
 func TestRecordingAProgramUnderANestedShellNeedsTheAcknowledgement(t *testing.T) {
 	srv, term, ss, nameA, nameB := recordFixture(t)

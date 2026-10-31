@@ -63,6 +63,8 @@ export function syncWaitingNotice(row) {
         const b = document.getElementById(id);
         if (b && b.hidden === paused) b.hidden = !paused;
     }
+    const help = document.getElementById('composer-waiting-record-help');
+    if (help && help.hidden === paused) help.hidden = !paused;
     if (!on) closeList();
 }
 
@@ -179,6 +181,15 @@ export function recordAllText(r) {
     return t;
 }
 
+/** What Record for all agents asks, from the server's preview (#11415): each agent and the program and pid it will be recorded as, so the Operator can check every one, and the ones that stay paused. */
+export function recordAllConfirmText(r) {
+    const rows = Array.isArray(r && r.recorded) ? r.recorded : [], left = Array.isArray(r && r.left) ? r.left : [];
+    const who = x => `${plain(x.session, 64)}: ${plain(x.program, 64) || 'unknown program'} (pid ${Number(x.pid)})`;
+    let t = `Coral will type messages into these programs, recorded as each agent: ${rows.map(who).join('; ')}. Check that each is the agent you expect.`;
+    if (left.length) t += ` Not recorded here: ${left.map(l => plain(l.session, 64)).join(', ')} (use Record as agent on each).`;
+    return t;
+}
+
 const recordUrl = (s, tail) => `/api/sessions/live/${encodeURIComponent(s.session_id)}/${tail}`;
 
 /** Record as agent (#391): read the one candidate the server offers, ask, and record it with the start it gave; a candidate that changed
@@ -224,9 +235,17 @@ async function recordAllAgents() {
     if (busy) return;
     busy = true;
     try {
-        const resp = await serverFetch(currentServer(), '/api/sessions/record-agents', { method: 'POST' });
-        if (!resp.ok) { showToast(await responseErrorText(resp, currentServer(), `Not recorded (HTTP ${resp.status}).`)); return; }
-        showToast(recordAllText(await resp.json()));
+        const look = await serverFetch(currentServer(), '/api/sessions/record-agents?dry_run=1', { method: 'POST' }); // what it would record, before anything is
+        if (!look.ok) { showToast(await responseErrorText(look, currentServer(), `The agents could not be read (HTTP ${look.status}).`)); return; }
+        const preview = await look.json();
+        if (!Array.isArray(preview.recorded) || preview.recorded.length === 0) { showToast(recordAllText(preview).replace(/^Recorded 0 agents\./, 'Nothing to record here.')); return; }
+        showConfirmModal('Record for all agents', recordAllConfirmText(preview), async () => {
+            try {
+                const resp = await serverFetch(currentServer(), '/api/sessions/record-agents', { method: 'POST' });
+                if (!resp.ok) { showToast(await responseErrorText(resp, currentServer(), `Not recorded (HTTP ${resp.status}).`)); return; }
+                showToast(recordAllText(await resp.json()));
+            } catch (e) { showToast('Not recorded: ' + (e && e.message ? e.message : 'the server did not answer.')); }
+        }, undefined, { label: 'Record all', danger: false });
     } catch (e) {
         showToast('Not recorded: ' + (e && e.message ? e.message : 'the server did not answer.'));
     } finally { busy = false; }

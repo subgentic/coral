@@ -40,7 +40,7 @@ const { coralReady } = require('./helpers/wait');
             await ev(`window.__calls = []; window.__answer = { record: 200 }; window.__realFetch = window.__realFetch || window.fetch; window.fetch = (u, o) => { const s = String(u), json = (b, st = 200) => Promise.resolve(new Response(JSON.stringify(b), { status: st, headers: { 'Content-Type': 'application/json' } }));
                 if (s.includes('/agent-candidate')) { window.__calls.push({ u: s }); return json({ ok: true, paused: true, reason: 'not the recorded agent', candidate: window.__noCandidate ? null : { pid: 4242, start: 'opaque-start-1', program: 'node', under: window.__under || '', folder: '', unidentified: false, ...(window.__cand || {}) }, why_not: window.__noCandidate ? 'several foreground programs' : '' }); }
                 if (s.includes('/record-agent') && !s.includes('/record-agents')) { window.__calls.push({ u: s, body: o && o.body }); return window.__answer.record === 409 ? json({ ok: false, code: 'changed', error: 'the foreground program is no longer that process' }, 409) : json({ ok: true, pid: 4242, program: 'node' }); }
-                if (s.includes('/record-agents')) { window.__calls.push({ u: s, method: o && o.method }); return json({ ok: true, recorded: [{ session: 'claude-a', pid: 1, program: 'claude' }], left: [{ session: 'codex-b', reason: 'ambiguous: the program is node, which runs a script; record it with the button' }] }); }
+                if (s.includes('/record-agents')) { window.__calls.push({ u: s, method: o && o.method }); return json({ ok: true, dry_run: /dry_run=1/.test(s), recorded: [{ session: 'claude-a', pid: 1, program: 'claude' }], left: [{ session: 'codex-b', reason: 'ambiguous: the program is node, which runs a script; record it with the button' }] }); }
                 return window.__realFetch(u, o); }; true`);
             const toastSeen = re => waitFor(`[...document.querySelectorAll('.toast, [role=status], [role=alert]')].some(t => ${re}.test(t.textContent))`, `${tag}: the toast ${re}`, 5000);
 
@@ -112,10 +112,22 @@ const { coralReady } = require('./helpers/wait');
             check(`${tag}: ticked, it records with acknowledge_nested`, JSON.stringify(JSON.parse(urec.body)) === JSON.stringify({ pid: 4242, start: 'opaque-start-1', acknowledge_nested: true }), JSON.stringify(urec));
             await ev(`window.__cand = null; true`);
 
+            // Record for all agents (#11415): the operator is shown each agent's program and pid first; nothing is recorded until Record all is pressed
             await ev(`window.__calls = []; document.getElementById('composer-waiting-record-all').click(); true`);
+            await waitFor(`/Coral will type messages into these programs/.test(document.getElementById('confirm-modal-message').textContent) && getComputedStyle(document.getElementById('confirm-modal')).display !== 'none'`, `${tag}: the bulk confirm`, 5000);
+            const bulkAsk = await ev(`({ msg: document.getElementById('confirm-modal-message').textContent, title: document.getElementById('confirm-modal-title').textContent, calls: window.__calls.map(c => c.u) })`);
+            check(`${tag}: Record for all agents first reads a preview (dry_run) and records nothing`, bulkAsk.calls.length === 1 && /record-agents\?dry_run=1$/.test(bulkAsk.calls[0]), JSON.stringify(bulkAsk.calls));
+            check(`${tag}: the confirm names each agent with its program and pid, says to check, and lists the ones it leaves`, bulkAsk.title === 'Record for all agents' && bulkAsk.msg.includes('claude-a: claude (pid 1)') && /Check that each is the agent you expect/.test(bulkAsk.msg) && /Not recorded here: codex-b/.test(bulkAsk.msg), bulkAsk.msg);
+            await ev(`window.hideConfirmModal(); true`);
+            check(`${tag}: cancelling records nothing`, (await ev(`window.__calls.filter(c => /record-agents$/.test(c.u)).length`)) === 0);
+            await ev(`document.getElementById('composer-waiting-record-all').click(); true`);
+            await waitFor(`/Coral will type messages/.test(document.getElementById('confirm-modal-message').textContent) && getComputedStyle(document.getElementById('confirm-modal')).display !== 'none'`, `${tag}: the bulk confirm again`, 5000);
+            await ev(`document.getElementById('confirm-modal-yes').click(); true`);
             await toastSeen(/Recorded 1 agent\. Left paused: codex-b \(ambiguous/);
             const bulk = await ev(`window.__calls.find(c => /record-agents$/.test(c.u))`);
-            check(`${tag}: Record for all agents posts once and says what was recorded and what was left, with why`, !!bulk && bulk.method === 'POST', JSON.stringify(bulk));
+            check(`${tag}: confirmed, Record for all agents posts once and says what was recorded and what was left, with why`, !!bulk && bulk.method === 'POST', JSON.stringify(bulk));
+            const help = await ev(`(() => { const h = document.getElementById('composer-waiting-record-help'); return { shown: !!h && !h.hidden, text: h ? h.textContent : '' }; })()`);
+            check(`${tag}: one help line in Options says what recording does and what to check`, help.shown && /only into the agent process it recorded \(its PID and start time\)/.test(help.text) && /first check that the program running in this terminal is the agent you expect/.test(help.text), JSON.stringify(help));
             await ev(`window.fetch = window.__realFetch; true`);
         }
     } finally { await client.close(); }
