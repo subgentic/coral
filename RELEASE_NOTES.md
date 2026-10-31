@@ -1,5 +1,34 @@
 # Release Notes
 
+## v2.0.19 — Needs you keeps your place after Approve, a question for every review, and one set of action buttons
+
+### Changes
+
+#### What you will notice first
+
+- **Approving an item in Needs you keeps your place**: after Approve the list no longer jumps to the top. The page and the list stay where they were, and the focus goes to the next row (the previous one at the end).
+- **Goals rows on a phone**: a long title gets two lines, with a second line under it that says the tasks ("2 done · 1 left"); a computer keeps its Tasks column. A goal row has no Close goal button any more: closing is on the goal's own page, on a computer too.
+- **One set of action buttons**: a button that retries a failed read says "Retry" (it said "Try again" in ten places); a board message's delete and a macro's remove are the delete icon, not a ×; a paused board's Resume is the warning colour, not the delete red; every close control (toasts, the update toast, the tmux banner, the composer error, the find bar, the preview tab, the comments sheet and the worktree dock) is one close icon, and the desktop toast's Dismiss is bigger to hit (24 x 22 px); More (a changed file's row, a board message's phone header) is one icon.
+- **No ghost "Active" over the State header**: a state chip no longer carries a tooltip that repeats its word, which the browser could leave on screen when a table scrolled under a resting pointer.
+
+#### Agents and the chat
+
+- **A file for review carries a one-line question**: `coral-agent artifact upload --tag "for review"` needs `--question "<what the Operator is to decide>"` (cleaned to one line and cut at 140 characters; empty is refused with `question_required`). The question is stored with the review (Needs you shows it from the next release), and goes when the review is decided, the tag is removed or a newer version replaces the file. Only the agent's own upload (or a person) keeps the tag and question; another agent's file gets neither.
+- **A file for review must be something Needs you can show**: a binary, or a type the dashboard cannot display inline, is refused with `not_viewable` and the reply says what it shows (`.patch` and `.diff` are stored as text and can be shown). An older stored row that cannot be shown leaves the for-review list; its tag is untouched.
+
+#### Known issues
+
+- **Windows: in-app update does not work from 2.0.0 through 2.0.6.** If you're on one of those, download and install the MSI by hand; from 2.0.7 on, in-app update works.
+- **macOS: a Coral of 2.0.5 or earlier cannot install updates in-app; install 2.0.6 or later by hand once.**
+- **OpenCode agents are tested on macOS and Linux; OpenCode on Windows is not yet tested end to end.**
+- Setting up a computer over SSH is supported from a macOS or Linux hub, and is not yet tested from a Windows hub.
+
+#### For developers and releases
+
+- The static tree is 5,864,182 bytes of the 5,906,432-byte budget, and app.js at start is unchanged at 396,943 encoded bytes against its 396,965 limit (the close and More icons are drawn in CSS, so the markup carries no text).
+- New census and suites: `action_set_census`, `state_chip_no_tooltip`, `close_icon_browser`, `more_icon_browser`, `team_goal_row_browser`, `inbox_keep_place_browser`.
+- The `feed_message` and `task_detail` goldens were regenerated for the new chip title and close icon, and `team_artifact_tags_browser`'s review uploads now carry a question.
+
 ## v2.0.18 — swipe a welcome item away on a phone, and a cleaner name on a question row
 
 ### Changes
