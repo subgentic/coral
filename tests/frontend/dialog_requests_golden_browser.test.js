@@ -37,7 +37,10 @@ const GOLDEN = path.join(__dirname, 'fixtures', 'dialog_requests_golden.json');
         const last = () => ev(`window.__reqs.length`);
         const take = async (n0, what) => { await waitFor(`window.__reqs.length > ${n0}`, what, 8000); return ev(`window.__reqs[${n0}]`); };
         // Set a field of an agent config form: type or select (value + input + change), a chip (click), a pattern box.
-        const set = (acf, cls, v) => ev(`(() => { const e = document.querySelector('#${acf} ${cls}'); if (!e) throw new Error('no ${cls} in ${acf}'); e.value = ${JSON.stringify(v)}; e.dispatchEvent(new Event('input', { bubbles: true })); e.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
+        // A model set by script is not the person's own (only a keystroke or the picker marks it), so a default that is still on its way would replace it: wait for the form's default to arrive first (acfDefaults, #11404).
+        const settled = acf => waitFor(`document.getElementById('${acf}').dataset.acfDefaults !== 'pending'`, `the ${acf} default model has arrived`, 8000);
+        const set = async (acf, cls, v) => { if (cls === '.acf-model' || cls === '.acf-agent-type') await settled(acf); return setNow(acf, cls, v); };
+        const setNow = (acf, cls, v) => ev(`(() => { const e = document.querySelector('#${acf} ${cls}'); if (!e) throw new Error('no ${cls} in ${acf}'); e.value = ${JSON.stringify(v)}; e.dispatchEvent(new Event('input', { bubbles: true })); e.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
         const chip = (acf, type, cap) => ev(`(() => { const e = document.querySelector('#${acf} [data-type="${type}"][data-cap="${cap}"]'); if (!e) throw new Error('no chip'); e.click(); return true; })()`);
         const click = sel => ev(`(() => { const e = [...document.querySelectorAll(${JSON.stringify(sel)})].find(x => x.getClientRects().length) || document.querySelector(${JSON.stringify(sel)}); if (!e) throw new Error('no ' + ${JSON.stringify(sel)}); e.click(); return true; })()`);
         const fill = (id, v) => ev(`(() => { const e = document.getElementById(${JSON.stringify(id)}); e.value = ${JSON.stringify(v)}; e.dispatchEvent(new Event('input', { bubbles: true })); e.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);

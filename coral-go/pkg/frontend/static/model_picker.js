@@ -147,6 +147,12 @@ export async function loadModelPicker(container, agentType) {
 }
 
 /** "Add a model…": the small form under the list (shared with the model chip's menu, custom_model_add.js). A new model goes in the operator's custom models and is chosen for this form. */
+/** The person chose a model from the list (or added one) while the form's default model was still on its way: that default must not replace it (agent_config_form.js compares this with the fetch it started). It is NOT the
+ *  field's dirty flag: a later provider switch still resets a listed model to the new provider's default, as before (a typed custom id is what dirty keeps, #11404). */
+function markChosen(container) {
+    container.dataset.acfChosenFetch = container.dataset.acfFetchSeq || '';
+}
+
 function openAdd(container) {
     const { select, add } = parts(container);
     if (!add) return;
@@ -163,7 +169,7 @@ function openAdd(container) {
             await loadModelPicker(container, agentType);   // the catalog has it now (this also closes the form)
             const { input: box, select: sel } = parts(container);
             box.value = id.trim(); container._otherChosen = false;
-            box.dispatchEvent(new Event('input', { bubbles: true }));   // the form's own "the user chose a model" bookkeeping
+            box.dispatchEvent(new Event('input', { bubbles: true })); markChosen(container);   // a model the person added is theirs (the input event above is untrusted)
             syncModelPicker(container, false);
             showToast(`Model added: ${name.trim() || id.trim()}`);
             sel.focus();
@@ -206,7 +212,8 @@ export function wireModelPicker(container) {
         container._otherChosen = select.value === OTHER;   // an empty box under Other… stays Other…, not Default
         if (select.value === OTHER) { if (models_has(container, input.value)) input.value = ''; input.hidden = false; input.focus(); }
         else { input.value = select.value; input.hidden = true; }
-        input.dispatchEvent(new Event('input', { bubbles: true }));   // the form's own "the user chose a model" bookkeeping
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        markChosen(container);   // the form's own "the person chose a model" bookkeeping: the event above is the picker's own, not a keystroke (untrusted), so the form's listener ignores it: without this a default arriving late replaced the choice (#11404)
         syncModelPicker(container, false);
     });
     refresh.addEventListener('click', async () => {
