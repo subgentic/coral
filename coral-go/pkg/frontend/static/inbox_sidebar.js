@@ -240,14 +240,14 @@ function reviewActions(row) {
 
 /** A failed run opens on its job's or workflow's page; opening it is what clears it from Needs you. */
 function openRun(run) { markSeen(run); go(runRoute(run)); }
-/** A question to the Operator: Reply opens it whole with the box (#11417). */
+/** A question to the Operator: Answer opens it whole with the reply box (#11417). */
 function askActions(a) {
     const box = DT.el('div', 'inbox-review-actions');
-    const reply = DT.el('button', 'btn btn-small', 'Reply'); reply.type = 'button';
-    reply.setAttribute('aria-label', `Reply to ${a.asker}`); reply.addEventListener('click', () => openAskDialog(a, () => $('group-table-view')?.querySelector('input[type=search]')?.focus({ preventScroll: true })));
+    const who = markHidden(a.asker, { strict: true });
+    const reply = DT.el('button', 'btn btn-small', 'Answer'); reply.type = 'button'; // Answer, as the approved action set names it (#11552); the dialog it opens still has the reply box
+    reply.setAttribute('aria-label', `Answer the question of ${who}`); reply.addEventListener('click', () => openAskDialog(a, () => $('group-table-view')?.querySelector('input[type=search]')?.focus({ preventScroll: true })));
     box.append(reply);
     if (a.kind === 'ask') { // a wait has no ask row to close: only a question is ignorable
-        const who = markHidden(a.asker, { strict: true });
         const no = DT.el('button', 'btn btn-small btn-quiet', 'Ignore'); no.type = 'button'; no.setAttribute('aria-label', `Ignore the question of ${who}`);
         const failed = DT.el('span', 'inbox-review-error'); failed.setAttribute('role', 'alert');
         no.addEventListener('click', () => { no.disabled = true; failed.textContent = ''; const settle = keepPlace(no);

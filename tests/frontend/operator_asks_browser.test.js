@@ -28,9 +28,9 @@ const LONG = 'Which of the two \u202edesigns do we ship? ' + 'We have weighed th
                     return orig(u, o); }; return true; })()`);
             await ev(`window.switchNavTab('hub-inbox'); true`);
             await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 2`, at + 'two rows of Needs you', 10000);
-            const rows = () => ev(`[...document.querySelectorAll('#group-table-view tbody tr')].map(r => ({ text: r.textContent, reply: !!r.querySelector('button[aria-label^="Reply to"]') }))`);
+            const rows = () => ev(`[...document.querySelectorAll('#group-table-view tbody tr')].map(r => ({ text: r.textContent, reply: !!r.querySelector('button[aria-label^="Answer the question of"]') }))`);
             let rs = await rows();
-            assert.ok(rs.every(r => r.reply), at + 'each row has a Reply button: ' + JSON.stringify(rs));
+            assert.ok(rs.every(r => r.reply), at + 'each row has an Answer button: ' + JSON.stringify(rs));
             const lead = rs.find(r => r.text.includes('Lead')), dev = rs.find(r => r.text.includes('Dev'));
             assert.ok(lead && dev, at + 'the askers are named');
             assert.ok(lead.text.includes('Which of the two <U+202E>designs'), at + 'the question is on the row, with the hidden character written out: ' + lead.text.slice(0, 120));
@@ -43,7 +43,7 @@ const LONG = 'Which of the two \u202edesigns do we ship? ' + 'We have weighed th
             await waitFor(`document.getElementById('nav-tab-hub-inbox-badge').textContent === '2'`, at + 'the badge counts both', 6000);
 
             // opens whole
-            await ev(`document.querySelector('button[aria-label="Reply to Lead"]').click(); true`);
+            await ev(`document.querySelector('button[aria-label="Answer the question of Lead"]').click(); true`);
             await waitFor(`document.querySelector('dialog.inbox-ask-dialog[open]')`, at + 'the dialog opens', 4000);
             const dlg = await ev(`(() => { const d = document.querySelector('dialog.inbox-ask-dialog'); const r = d.getBoundingClientRect(); const btns = [...d.querySelectorAll('button')].map(b => Math.round(b.getBoundingClientRect().height));
                 return { whole: d.querySelector('.inbox-ask-text').textContent, title: d.querySelector('h2').textContent, fits: r.left >= 0 && r.right <= innerWidth + 1, btns, focus: document.activeElement && document.activeElement.className }; })()`);
@@ -70,7 +70,7 @@ const LONG = 'Which of the two \u202edesigns do we ship? ' + 'We have weighed th
             await waitFor(`document.getElementById('nav-tab-hub-inbox-badge').textContent === '1'`, at + 'the badge counts one', 6000);
 
             // the wait: a plain post to its asker, no reply_to
-            await ev(`document.querySelector('button[aria-label="Reply to Dev"]').click(); true`);
+            await ev(`document.querySelector('button[aria-label="Answer the question of Dev"]').click(); true`);
             await waitFor(`document.querySelector('dialog.inbox-ask-dialog[open]')`, at + 'the wait opens', 4000);
             assert.ok((await ev(`document.querySelector('.inbox-ask-sub').textContent`)).includes('waiting for your reply'), at + 'a wait says it is waiting');
             await ev(`document.querySelector('.inbox-ask-box').value = 'yes, delete it'; true`);
@@ -85,7 +85,7 @@ const LONG = 'Which of the two \u202edesigns do we ship? ' + 'We have weighed th
             await ev(`window.__asks = [{ board: 'team', kind: 'ask', id: 50, asker: 'Lead', text: 'short question', at: '2026-10-31T03:00:00Z' }]; (async () => (await import(${S} + 'operator_asks.js')).refreshOperatorAsks(true))(); true`);
             await waitFor(`document.querySelectorAll('#group-table-view tbody tr').length === 1`, at + 'a new question appears on the next read', 6000);
             const before = await ev(`window.__posts.length`);
-            await ev(`document.querySelector('button[aria-label="Reply to Lead"]').click(); true`);
+            await ev(`document.querySelector('button[aria-label="Answer the question of Lead"]').click(); true`);
             await waitFor(`document.querySelector('dialog.inbox-ask-dialog[open]')`, at + 'opens again', 4000);
             await ev(`document.querySelector('dialog.inbox-ask-dialog').dispatchEvent(new Event('cancel', { cancelable: true })); true`);
             await waitFor(`!document.querySelector('dialog.inbox-ask-dialog')`, at + 'Escape closes it', 4000);
