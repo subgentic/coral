@@ -77,6 +77,7 @@ node data_table_compare.test.mjs
 node inbox_a11y.test.mjs
 node tasks_view_census.test.mjs
 node inbox_tasks_toolbar.test.mjs
+node inbox_blockers.test.mjs
 node filter_model.test.mjs
 node data_table_prepaint_fold.test.mjs
 node data_table_scan.test.mjs

@@ -11,8 +11,8 @@ export const KIND_LABEL = { permission: 'Permission', question: 'Question', othe
 /** How long it has waited, at least (minutes), as the Filters panel offers it. */
 export const LONGER = ['5', '15', '60', '240'];
 export const LONGER_LABEL = { 5: '5 minutes', 15: '15 minutes', 60: '1 hour', 240: '4 hours' };
-export const SORTS = ['oldest', 'newest'];
-export const SORT_LABEL = { oldest: 'Waiting longest', newest: 'Waiting least' };
+export const SORTS = ['blockers', 'oldest', 'newest'];
+export const SORT_LABEL = { blockers: 'Blocking first', oldest: 'Waiting longest', newest: 'Waiting least' }; // Blocking first (#11442): what holds up the most work, a high-priority task first, then how long it has waited
 
 const model = defineFilters({
     server: serverFilter,
@@ -22,7 +22,7 @@ const model = defineFilters({
     agent: { type: 'text', max: 80, chip: v => `Agent: ${v}` },
     goal: { type: 'text', max: 200, chip: v => `Goal: ${v}` }, // the goal a row's task serves, or "No goal" (#8917)
     longer: { type: 'choice', values: LONGER, chip: v => `Waiting longer than ${LONGER_LABEL[v]}` },
-    sort: { type: 'order', values: SORTS, default: 'oldest' },
+    sort: { type: 'order', values: SORTS, default: 'blockers' },
 });
 export const { EMPTY, clean, isFiltered, isQuery, chips, without } = model;
 
@@ -51,8 +51,9 @@ export function matches(s, f, ctx, now = Date.now()) {
 }
 
 /** The waiting agents in the order the filters ask for (a new array): longest waiting first by default; one with no time goes last either way. */
-export function ordered(sessions, f) {
+export function ordered(sessions, f, weightOf = () => 0) {
     const c = clean(f), at = s => { const t = Date.parse(s.waiting_since || ''); return Number.isFinite(t) ? t : null; };
     const dir = c.sort === 'newest' ? -1 : 1;
-    return [...sessions].sort((a, b) => { const x = at(a), y = at(b); if (x === null && y === null) return 0; if (x === null) return 1; if (y === null) return -1; return dir * (x - y); });
+    const byAge = (a, b) => { const x = at(a), y = at(b); if (x === null && y === null) return 0; if (x === null) return 1; if (y === null) return -1; return dir * (x - y); };
+    return [...sessions].sort((a, b) => (c.sort === 'blockers' ? (weightOf(b) - weightOf(a)) || byAge(a, b) : byAge(a, b)));
 }
