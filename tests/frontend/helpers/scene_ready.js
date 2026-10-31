@@ -8,8 +8,9 @@
 //     which no fetch counts);
 //   - no element on screen marked aria-busy (a list that is loading says so);
 //   - no animation running that will end (an endless one, a spinner or a pulse, never ends and is not waited for).
-// It is given READY_CAP ms. A scene still not ready by then fails the census, unless the scene is marked knownSlow with its reason: a scene
-// measured early must never pass silently (the Orchestrator on #416).
+// It is given READY_CAP ms. A scene still not ready by then fails the census: a scene measured early must never pass silently (the
+// Orchestrator on #416). The one exception is knownSlow, which names its reason and the one aria-busy element the scene keeps busy; the
+// scene must still be ready otherwise.
 
 /** Installed with the harness's PRELOAD (Page.addScriptToEvaluateOnNewDocument), after it: counts the page's fetches, the harness's mocked
  *  ones included (they are the page's requests too), and notes when the page's content last changed (elements added or removed, text, and
@@ -56,12 +57,12 @@ async function until(ev, expr, cap) {
 }
 
 /** sceneReady waits for a scene opened by its setup: its expect (when given) and then quiet for two samples in a row. It throws, naming what
- *  was still going on, when the scene is not ready within READY_CAP. knownSlow is the exception, always with its reason: a string, and the
- *  scene is measured as it is at the cap; or { why, busy }, and only that aria-busy is left out, so the scene is measured as soon as everything
- *  else is quiet and still fails if anything else is not. */
+ *  was still going on, when the scene is not ready within READY_CAP. knownSlow is { why, busy }: its reason and a selector of the aria-busy
+ *  element the scene keeps busy. Only that aria-busy is left out: the scene is measured as soon as everything else is quiet and still fails
+ *  at the cap if anything else is not. There is no way to measure a scene at the cap as it is. */
 async function sceneReady(ev, name, { expect, knownSlow } = {}) {
-    const start = Date.now(), ignore = knownSlow && typeof knownSlow === 'object' ? knownSlow : {};
-    if (knownSlow !== undefined && !(typeof knownSlow === 'string' ? knownSlow : ignore.why)) throw new Error('knownSlow needs its reason');
+    const start = Date.now(), ignore = knownSlow || {};
+    if (knownSlow !== undefined && !(typeof knownSlow === 'object' && typeof knownSlow.why === 'string' && knownSlow.why && typeof knownSlow.busy === 'string' && knownSlow.busy)) throw new Error('knownSlow is { why, busy }: its reason and the aria-busy selector it leaves out');
     if (!(await ev('!!window.__qaFetch'))) throw new Error('FETCH_COUNTER is not installed on this page, so its fetches and changes are not seen'); // a census adds it with its PRELOAD
     if (expect && !(await until(ev, expect, READY_CAP))) throw new Error(`the scene is not showing (${expect.slice(0, 80)})`);
     const expr = quiet(ignore);
@@ -72,7 +73,6 @@ async function sceneReady(ev, name, { expect, knownSlow } = {}) {
         if (calm >= 2) return Date.now() - start;
         await new Promise(r => setTimeout(r, SAMPLE_EVERY)); // sleep-ok: the sampling interval of a bounded wait
     }
-    if (typeof knownSlow === 'string') return Date.now() - start;
     throw new Error(`not ready after ${READY_CAP} ms (${why} still going on): measured now, it would be measured early; mark it knownSlow with its reason if that is expected`);
 }
 
