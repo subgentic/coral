@@ -385,9 +385,21 @@ func shellWords(seg string) []string {
 func autoAcceptRisk(agentType, workDir string, pending *pendingTool, d approvalDecision, capture string) string {
 	pendingPath := false // the PreToolUse input names the file: it is the path, the screen only shows it
 	if pending != nil {
-		cmd, ok := pending.Input["command"].(string)
+		if pending.Unjudged != "" { // the request cannot be read whole (longer than Coral keeps, not text, or hiding characters): never auto-accepted (#11399)
+			return pending.Unjudged
+		}
+		// The whole text, not the cut one the chat shows; a pending tool made without it (a test, an older caller) reads its input.
+		field := func(k string) (string, bool) {
+			if pending.Risk != nil {
+				s, ok := pending.Risk[k]
+				return s, ok
+			}
+			s, ok := pending.Input[k].(string)
+			return s, ok
+		}
+		cmd, ok := field("command")
 		if !ok {
-			cmd, ok = pending.Input["CommandLine"].(string)
+			cmd, ok = field("CommandLine")
 		}
 		if ok {
 			if why := shellRisk(cmd, workDir); why != "" {
@@ -395,7 +407,7 @@ func autoAcceptRisk(agentType, workDir string, pending *pendingTool, d approvalD
 			}
 		}
 		for _, k := range []string{"file_path", "notebook_path", "path", "TargetFile", "AbsolutePath"} {
-			if p, ok := pending.Input[k].(string); ok && strings.TrimSpace(p) != "" {
+			if p, ok := field(k); ok && strings.TrimSpace(p) != "" {
 				pendingPath = true
 				if why := fileRisk(pending.ToolName, p, workDir); why != "" {
 					return why
@@ -404,6 +416,9 @@ func autoAcceptRisk(agentType, workDir string, pending *pendingTool, d approvalD
 		}
 	}
 	tool, input := screenAction(agentType, d, capture)
+	if hidesText(strings.ReplaceAll(input, "\x00", "")) { // what the screen shows holds characters that hide what it does (#11399)
+		return "what the prompt shows holds a character that can hide what it does, so it cannot be judged"
+	}
 	switch tool {
 	case "command", "Bash", "run_command":
 		// A command wrapped over several screen lines: try it joined both ways.
