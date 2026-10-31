@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -264,15 +265,24 @@ func (h *BoardHandler) FileClash(w http.ResponseWriter, r *http.Request) {
 		errForbidden(w, "only an agent of the team files a clash")
 		return
 	}
+	by, isMember := callerActor(r).Member() // the member name the token's session holds on THIS board: an agent of another team holds none here
+	if !isMember {
+		errForbidden(w, "only a member of this team files a clash on its board")
+		return
+	}
 	var in clashRequest
 	r.Body = http.MaxBytesReader(w, r.Body, 4<<10)
 	if err := decodeJSONStrict(r, &in); err != nil {
 		errBadRequest(w, `send {"target", "a", "b"}`)
 		return
 	}
-	by := "an agent"
-	if name, ok := actorName(callerActor(r)); ok {
-		by = name
+	if strings.HasPrefix(in.Target, "artifact:") && !h.artifactOnBoard(r.Context(), strings.TrimPrefix(in.Target, "artifact:"), project) {
+		errBadRequest(w, board.ErrClashNoTarget.Error())
+		return
+	}
+	n, cerr := h.bs.CountClashesBy(r.Context(), project, by, time.Now().UTC().Add(-time.Hour).Format(time.RFC3339))
+	if guideOverLimit(w, n, cerr, board.MaxClashesPerAgentHour, fmt.Sprintf("an agent may file at most %d clashes an hour: the Operator has the open ones to decide", board.MaxClashesPerAgentHour)) {
+		return
 	}
 	res, err := h.bs.FileClash(r.Context(), project, in.Target, in.A, in.B, by, time.Now())
 	switch {
@@ -288,6 +298,23 @@ func (h *BoardHandler) FileClash(w http.ResponseWriter, r *http.Request) {
 	default:
 		errInternalServer(w, "could not file the clash")
 	}
+}
+
+// artifactOnBoard reports whether some record of the artifact (an upload, a received file) is on the board. An unreadable store or an unknown dir answers no.
+func (h *BoardHandler) artifactOnBoard(ctx context.Context, digest, project string) bool {
+	if h.coralDir == "" || !objectNameRe.MatchString(digest) {
+		return false
+	}
+	recs, err := artifactRecordsOf(ctx, h.coralDir, digest)
+	if err != nil {
+		return false
+	}
+	for _, rec := range recs[digest] {
+		if rec.board == project {
+			return true
+		}
+	}
+	return false
 }
 
 // GuideRoster: GET and PUT /api/board/{project}/guide-roster. Which name goes with which guide, in the text agents read: the Operator's or, through Coral Hub, the owner's alone.

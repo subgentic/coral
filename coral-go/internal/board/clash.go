@@ -33,6 +33,16 @@ var (
 	ErrClashTooMany  = errors.New("this board already has the most clashes open it can hold: the Operator has to decide some first")
 )
 
+// MaxClashesPerAgentHour is the most clashes one agent may file in an hour.
+const MaxClashesPerAgentHour = 5
+
+// CountClashesBy is how many clashes one agent filed on a board at or after since.
+func (s *Store) CountClashesBy(ctx context.Context, project, by, since string) (int, error) {
+	var n int
+	err := s.reader().GetContext(ctx, &n, `SELECT COUNT(*) FROM board_clashes WHERE project = ? AND filed_by = ? AND filed_at >= ?`, project, shortLabel(by), since)
+	return n, err
+}
+
 // ClashResult says what filing did: the ask that now holds the target, and whether it was already there.
 type ClashResult struct {
 	AskID   int64 `json:"ask_id"`

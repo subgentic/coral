@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -34,6 +36,7 @@ type guideRig struct {
 	t   *testing.T
 	bs  *board.Store
 	srv *httptest.Server
+	h   *BoardHandler
 }
 
 func newGuideRig(t *testing.T) *guideRig {
@@ -42,6 +45,7 @@ func newGuideRig(t *testing.T) *guideRig {
 	require.NoError(t, err)
 	t.Cleanup(func() { bs.Close() })
 	h := NewBoardHandler(bs)
+	h.SetTaskArtifactWriter(t.TempDir(), nil) // the artifact store's folder (a clash on an artifact checks its records)
 	t.Cleanup(h.WaitBackground)
 	ctx := context.Background()
 	_, err = bs.Subscribe(ctx, gBoard, "Orchestrator", "Orchestrator", "tmux-orch", nil, "mentions")
@@ -52,9 +56,13 @@ func newGuideRig(t *testing.T) *guideRig {
 	r.Use(cloud.Guard(func() tunnel.Mode { return tunnel.TierLaunch })) // the server's own half of the route policy, as in the real router
 	r.Use(func(next http.Handler) http.Handler {                        // a request marked X-Test-Agent carries an agent session's verified token, as the identity layer would set it
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			if req.Header.Get("X-Test-Agent") == "1" {
+			if v := req.Header.Get("X-Test-Agent"); v != "" { // "1": a member of this team; "other": a verified agent whose session holds no member name on this board (another team's)
+				name := "Orchestrator"
+				if v == "other" {
+					name = ""
+				}
 				req = req.WithContext(context.WithValue(req.Context(), verifiedSessionKey{}, &store.SessionTokenOwner{SessionID: "s1", SessionName: "claude-s1"}))
-				req = withActor(req, Actor{Kind: ActorToken, Name: "Orchestrator", Session: "claude-s1"})
+				req = withActor(req, Actor{Kind: ActorToken, Name: name, Session: "claude-s1"})
 			}
 			next.ServeHTTP(w, req)
 		})
@@ -81,7 +89,7 @@ func newGuideRig(t *testing.T) *guideRig {
 	r.Post("/api/cloud/guide-revoked", h.PostGuideRevoked)
 	srv := httptest.NewServer(r)
 	t.Cleanup(srv.Close)
-	return &guideRig{t: t, bs: bs, srv: srv}
+	return &guideRig{t: t, bs: bs, srv: srv, h: h}
 }
 
 // guide sends a request as the connector would stamp it for a guide of gBoard.
@@ -555,4 +563,66 @@ func TestOnlyAnAgentFilesAClashAndItIsOneQuestionToTheOperator(t *testing.T) {
 	assert.Equal(t, true, out2["existed"])
 	assert.Equal(t, out["ask_id"], out2["ask_id"], "one question per target")
 	assert.Equal(t, 1, coralLines(), "exactly one Coral line was written")
+}
+
+// Security's MUST and SHOULDs on S6: an agent of another team cannot file a clash on this board; one agent files a few an hour; an artifact target is on the board.
+func TestAnAgentOfAnotherTeamCannotFileAClashHere(t *testing.T) {
+	g := newGuideRig(t)
+	ctx := context.Background()
+	_, err := g.bs.Subscribe(ctx, gBoard, "Operator", "Operator", "", nil, "all")
+	require.NoError(t, err)
+	guideMsg, err := g.bs.PostGuideMessage(ctx, gBoard, gDana, "use option A")
+	require.NoError(t, err)
+	opMsg, err := g.bs.PostMessage(ctx, gBoard, "Operator", "use option B", nil)
+	require.NoError(t, err)
+	art := strings.Repeat("a", 64)
+	body := func(target string) map[string]any {
+		return map[string]any{"subscriber_id": "Orchestrator", "target": target, "a": guideMsg.ID, "b": opMsg.ID}
+	}
+	coralLines := func() int {
+		msgs, _ := g.bs.ListMessages(ctx, gBoard, 100, 0, 0)
+		n := 0
+		for _, m := range msgs {
+			if m.SubscriberID == "Coral" {
+				n++
+			}
+		}
+		return n
+	}
+	// a verified agent that holds no member name on this board: refused, nothing written
+	code, _, raw := g.send("POST", "/api/board/team/clashes", body("artifact:"+art), map[string]string{"X-Test-Agent": "other"})
+	assert.Equal(t, http.StatusForbidden, code, raw)
+	assert.Equal(t, 0, coralLines())
+
+	// an artifact that is not on this board (no record, or a record of another board) is not a target
+	member := map[string]string{"X-Test-Agent": "1"}
+	code, _, raw = g.send("POST", "/api/board/team/clashes", body("artifact:"+art), member)
+	assert.Equal(t, http.StatusBadRequest, code, raw)
+	coral := g.h.coralDir
+	record := func(session, id, boardKey string) {
+		dir := uploadsDir(coral, session)
+		require.NoError(t, os.MkdirAll(dir, 0o755))
+		b, _ := json.Marshal(agentUploadRecord{agentArtifactMeta: agentArtifactMeta{Name: "f", MediaType: "text/plain", Size: 4, Digest: id}, CreatedAt: time.Now().UTC().Format(time.RFC3339), Board: boardKey})
+		require.NoError(t, os.WriteFile(filepath.Join(dir, id+".json"), b, 0o644))
+	}
+	record("s-b", art, "other-team")
+	code, _, raw = g.send("POST", "/api/board/team/clashes", body("artifact:"+art), member)
+	assert.Equal(t, http.StatusBadRequest, code, "another board's artifact: %s", raw)
+	assert.Equal(t, 0, coralLines())
+	record("s-a", art, gBoard)
+	code, _, raw = g.send("POST", "/api/board/team/clashes", body("artifact:"+art), member)
+	assert.Equal(t, http.StatusOK, code, "this board's artifact: %s", raw)
+
+	// one agent files at most five an hour
+	for i := 1; i < board.MaxClashesPerAgentHour; i++ {
+		d := strings.Repeat(string("0123456789abcdef"[i]), 64)
+		record("s-a", d, gBoard)
+		code, _, raw = g.send("POST", "/api/board/team/clashes", body("artifact:"+d), member)
+		require.Equal(t, http.StatusOK, code, raw)
+	}
+	d := strings.Repeat("e", 64)
+	record("s-a", d, gBoard)
+	code, _, raw = g.send("POST", "/api/board/team/clashes", body("artifact:"+d), member)
+	assert.Equal(t, http.StatusTooManyRequests, code, raw)
+	assert.Contains(t, raw, "guide_limit")
 }
