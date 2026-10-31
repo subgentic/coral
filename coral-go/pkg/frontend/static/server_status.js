@@ -10,6 +10,8 @@ import { MORE_DOTS_SVG } from './html_escape.js';
 import { LOCAL_SERVER, normServer, isHub, keyLabel, splitKey } from './server_base.js';
 import { launchBlockReason } from './launch_server.js';
 import { OUTCOME_UNKNOWN_LINE, isOutcomeUnknown } from './outcome_unknown.js';
+/** What the list of remote computers says on a Coral that is not a hub (its route answers 404): the Computers page shows nothing for it, not a red error (#11400). */
+export const HUB_FEATURES_OFF = 'Hub features are not enabled on this computer, or the computer no longer exists.';
 
  const STATUS_META = {
     online:           { label: 'Online',           cls: 'online',       hint: 'Connected' },
@@ -244,7 +246,7 @@ function serverLaunchActionsHtml(e) {
     const id = normServer(e.id);
     const local = id === LOCAL_SERVER;
     const blocked = launchBlockReason(id, isHub(), state.servers);
-    const actions = [['agent', 'New agent'], ['team', 'New project']];
+    const actions = [['agent', 'New agent'], ['team', 'New team']];
     if (local) actions.push(['folder', 'Open folder']);
     const btn = ([kind, label]) => `<button type="button" class="btn${kind === 'agent' ? ' btn-primary' : ''} server-launch-btn" data-server-launch="${escHtml(kind)}" data-server-id="${escHtml(e.id)}"`
         + (blocked ? ` disabled aria-disabled="true" title="${escHtml(blocked)}"` : '') + `>${label}</button>`;
@@ -328,7 +330,7 @@ export function describeServerError(httpStatus, body) {
         if (st === 'unreachable') return `Could not reach the computer${msg ? ' (' + msg + ')' : ''}. Check the URL, and tick "Allow private network" if it is on your LAN or tailnet.`;
         return msg ? `The computer check failed: ${msg}` : 'The computer check failed.';
     }
-    if (httpStatus === 404) return 'Hub features are not enabled on this computer, or the computer no longer exists.';
+    if (httpStatus === 404) return HUB_FEATURES_OFF;
     return msg || `Request failed (HTTP ${httpStatus}).`;
 }
 

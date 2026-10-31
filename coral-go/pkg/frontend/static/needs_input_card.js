@@ -3,9 +3,12 @@ import { standingOptions } from './standing_option.js';
 /* Moved out of live_chat.js as it was (#3837): no behaviour change. */
 import { deriveSessionState } from './render.js';
 import { escapeHtml, escapeAttr, renderMarkdown } from './utils.js';
+import { markHidden } from './visible_marks.js';
 import { askWords } from './session_state.js';
 import { state } from './state.js';
 import { claudeSignedIn, askSigninSoon, isLocalClaude, isLocalAgent, setClaudeSignedIn } from './signin_line.js';
+import { importOnce } from './import_once.js';
+import { PICKER_ACCEPT } from './image_attach.js';
 import { registerActions } from './actions.js';
 
 // ── Needs input ──────────────────────────────────────────────────────────
@@ -14,6 +17,7 @@ import { registerActions } from './actions.js';
 // the chat on its own. The PreToolUse hook reports the call as it starts
 // (it arrives with the chat poll's reply as `pending`); the Notification hook sets waiting_for_input. Together
 // they drive a card at the bottom of the chat saying what is being asked.
+let cardAttach = null; // card_attach.js once it has loaded (the first card with a text option loads it)
 export const pendingToolBySession = new Map(); // session_id -> pending tool or null
 // The prompt's options as the terminal shows them right now (numbered, with
 // the digit that answers each), read by the server from a pane capture.
@@ -159,7 +163,9 @@ function answerControlsHtml(info, descriptions = {}, fullLabels = {}) {
     for (const o of texts) {
         const placeholder = /^type something/i.test(o.label) ? "Or type your own answer…" : `${o.label.replace(/\.$/, "")}…`;
         body += `<form class="cni-text-form" data-n="${Number(o.n)}" data-label="${escapeHtml(o.label)}" data-action="text">`
+            + `<div class="cni-attach image-attachments" hidden></div>` // the images pasted or added here (card_attach.js, #11386)
             + `<input type="text" class="field cni-text-input" placeholder="${escapeHtml(placeholder)}" aria-label="${escapeHtml(o.label)}">`
+            + `<button type="button" class="btn btn-sm cni-attach-btn" aria-label="Add image" title="Add an image: it is sent with your answer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg></button><input type="file" class="cni-attach-input" accept="${escapeAttr(PICKER_ACCEPT)}" multiple hidden tabindex="-1" aria-hidden="true">`
             + `<button type="submit" class="btn btn-sm">Send</button></form>`;
     }
     for (const o of chats) {
@@ -175,8 +181,23 @@ function reviewHtml(info) {
         `<div class="cni-review-row"><dt>${escapeHtml(it.question)}</dt><dd>${escapeHtml(it.answer || "—")}</dd></div>`).join("") + `</dl>`;
 }
 
+// A Dismiss is offered for a request of the agent's own kinds (#11352): the same rule as the Inbox row's (dismiss_wait.js, loaded when it is pressed). Through Coral Hub the machine answers anyone but the owner 403.
+function canDismissWait(session, kind) {
+    return !!(session && session.session_id && (kind === "permission" || kind === "question" || kind === "plan"));
+}
+
+// The answers that refuse a request where the parser gave the option no kind: the same words as the server's (rejectLabel in prompt_answer.go); "None" and "Nothing" are not refusals.
+const REFUSAL_WORDS = /^(no|reject|deny|denied|decline|disallow|cancel|not now|don['\u2019]?t allow|do not allow)\b/i;
+
 function needsInputHtml(info, session) {
     const inp = (info.tool && info.tool.input) || {};
+    // A request the server says can only be rejected here (too long to show whole, or holding characters that hide what it does, #11395) offers Reject alone, whatever the answers list: the person cannot allow what they cannot read.
+    // A request the server says can only be rejected here (longer than a card shows, or holding characters that hide what it does) offers the refusing answers alone, for every agent: the pending tool the hook
+    // reported (Claude, Pi, opencode: input.only_reject) or the prompt read from the screen (Codex, agy, Gemini: screen.only_reject). The server refuses an Allow for it as well (#11399).
+    const refuses = o => o.kind === "reject" || (o.kind !== "allow_once" && o.kind !== "allow_always" && REFUSAL_WORDS.test(String(o.label || ""))); // the server's parsed kind decides; the words only where it has none
+    const onlyReject = info.kind === "permission" && (inp.only_reject === true || (info.screen && info.screen.only_reject === true));
+    if (onlyReject && info.screen) info = { ...info, screen: { ...info.screen, options: (info.screen.options || []).filter(refuses) } };
+    const onlyRejectNote = typeof inp.note === "string" && inp.note ? inp.note : (info.screen && typeof info.screen.note === "string" ? info.screen.note : "");
     const screen = info.screen || {};
     const onScreen = (screen.options || []).length > 0;
     const screenQuestion = onScreen ? (screen.question || "") : "";
@@ -224,9 +245,16 @@ function needsInputHtml(info, session) {
         const tool = info.tool && info.tool.tool_name;
         if (tool) kicker = `Permission needed · ${escapeHtml(tool)}`;
         question = screenQuestion || (tool ? `Allow ${tool}?` : (info.summary || "The agent is waiting for you"));
-        const target = inp.command || inp.file_path || inp.path || inp.url || inp.query || inp.pattern || "";
+        const patterns = Array.isArray(inp.patterns) ? inp.patterns.filter(x => typeof x === "string" && x) : [];
+        const more = typeof inp.more_patterns === "string" ? inp.more_patterns : ""; // "and 2 more patterns": the count of the ones the server did not list (opencode, #11395)
+        const screenTarget = info.screen && typeof info.screen.target === "string" ? info.screen.target : ""; // the lines above the screen's question, where the CLI shows what it asks (Codex, agy, Gemini send no tool input)
+        const target = markHidden(inp.command || inp.file_path || inp.path || inp.url || inp.query || inp.pattern || patterns.join("\n") || screenTarget || "", { strict: true });
+        if (onlyReject && onlyRejectNote) context += `<div class="cni-context-text cni-note" role="note">${escapeHtml(onlyRejectNote)}</div>`; // why only Reject is offered, in the server's words
         if (inp.description && inp.command) context += `<div class="cni-context-text">${escapeHtml(inp.description)}</div>`;
-        if (target) context += `<pre class="cni-target"><code>${escapeHtml(target)}</code></pre>`;
+        // The whole request, as text, wrapped, in a box that scrolls (a keyboard can scroll it once it is long enough to): a command cut short or hidden off to the side is one the person cannot judge (#11395).
+        if (target) context += `<pre class="cni-target"${target.length > 160 ? ` tabindex="0" role="region" aria-label="The whole request, scrollable"` : ""}><code>${escapeHtml(target)}</code></pre>`;
+        if (patterns.length && target !== patterns.join("\n")) context += `<div class="cni-context-text cni-patterns">Covers: ${escapeHtml(patterns.join(", "))}${more ? " " + escapeHtml(more) : ""}</div>`;
+        else if (more) context += `<div class="cni-context-text cni-patterns">${escapeHtml(more)}</div>`;
         else if (info.summary && info.summary !== question) context += `<div class="cni-context-text cni-ask">${escapeHtml(info.summary)}</div>`; // what is asked, from the event, as the Inbox row says it (#10141)
     } else if (info.kind === "prompt") {
         question = screenQuestion || "The agent is waiting for you";
@@ -234,7 +262,7 @@ function needsInputHtml(info, session) {
         if (info.signedOut) {
             kicker = "Sign-in needed";
             question = `${agentDisplayName(session)} is not signed in`;
-            context = `<div class="cni-context-text">Open the terminal and sign in, then check again.</div>`;
+            context = `<div class="cni-context-text">Open the terminal and finish what it asks, such as choosing a theme and signing in. Then press Check again.</div>`;
         } else {
             question = "The agent may be waiting at a startup prompt";
             context = `<div class="cni-context-text">For example, trusting this folder or signing in. Open the terminal, answer it there, then come back and type your first message.</div>`;
@@ -257,7 +285,7 @@ function needsInputHtml(info, session) {
         + context
         + reviewHtml(info)
         + controls.body
-        + `<div class="cni-foot"><button type="button" class="cni-link" data-on-click="terminal-view-open">Open terminal</button>${hint}<span class="cni-foot-spacer"></span>${info.signedOut ? `<button type="button" class="btn btn-sm cni-recheck" data-on-click="startup-recheck" data-agent="${escapeAttr(info.agent || "claude")}">Check again</button>` : ""}${controls.foot}</div>`;
+        + `<div class="cni-foot"><button type="button" class="cni-link" data-on-click="terminal-view-open">Open terminal</button>${hint}${!info.readOnly && canDismissWait(session, info.kind) ? `<button type="button" class="cni-link" data-on-click="dismiss-wait" data-session-id="${escapeAttr(session.session_id)}" title="Clear this if the agent is not waiting. Nothing is sent to the agent.">Dismiss</button>` : ""}<span class="cni-foot-spacer"></span>${info.signedOut ? `<button type="button" class="btn btn-sm cni-recheck" data-on-click="startup-recheck" data-agent="${escapeAttr(info.agent || "claude")}">Check again</button>` : ""}${controls.foot}</div>`;
 }
 
 // The sign-in card (#3830): the login happens in the agent's terminal (a browser link and a code
@@ -412,6 +440,7 @@ export function syncNeedsInputCard(container, session) {
     let el = container.querySelector(":scope > .chat-needs-input");
     if (!info) {
         if (el) { const key = cardFocusKey(el); el.remove(); if (key !== null) focusAfterCard(el, null); }
+        if (cardAttach) cardAttach.clearCardImages(session.session_id); // the question is gone: so are the images that were to answer it (none, while the module has not loaded)
         unwatchCardInView();
         return;
     }
@@ -438,18 +467,22 @@ export function syncNeedsInputCard(container, session) {
         el.dataset.key = key;
     } else if (el.dataset.key !== key) {
         // Keep an answer being typed if the card re-renders
-        const open = Array.from(el.querySelectorAll(".cni-text-form")).find(f => f.querySelector("input").value || document.activeElement === f.querySelector("input"));
-        const typing = open ? { n: open.dataset.n, value: open.querySelector("input").value, focused: document.activeElement === open.querySelector("input") } : null;
+        const open = Array.from(el.querySelectorAll(".cni-text-form")).find(f => f.querySelector("input.cni-text-input").value || document.activeElement === f.querySelector("input.cni-text-input"));
+        const typing = open ? { n: open.dataset.n, value: open.querySelector("input.cni-text-input").value, focused: document.activeElement === open.querySelector("input.cni-text-input") } : null;
         el.dataset.key = key; el._shape = shape;
         const focusKey = cardFocusKey(el);
         el.innerHTML = needsInputHtml(info, session);
         if (focusKey !== null) focusAfterCard(el, focusKey);
         const form = typing && el.querySelector(`.cni-text-form[data-n="${typing.n}"]`);
         if (form) {
-            const input = form.querySelector("input");
+            const input = form.querySelector("input.cni-text-input");
             input.value = typing.value;
             if (typing.focused) input.focus();
         }
+    }
+    if (el.querySelector(".cni-attach")) { // a card that takes an answer in words has the image strip: its code loads with the first one, not at start (#11403)
+        if (cardAttach) cardAttach.drawCardImages(el, session.session_id); // images added to the answer stay when the card is drawn again
+        else importOnce('./card_attach.js').then(m => { cardAttach = m; if (el.isConnected) m.drawCardImages(el, session.session_id); }).catch(() => {});
     }
     // Same slot as the Working row: below Sent messages, above Queued ones
     const queued = container.querySelector(":scope > .pending-messages.pending-queued");

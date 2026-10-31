@@ -3,14 +3,17 @@ package routes
 import (
 	"context"
 	"encoding/json"
+	"github.com/subgentic/coral/internal/permreview"
 	"log/slog"
 	"net/http"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 	"unicode/utf8"
 
 	at "github.com/subgentic/coral/internal/agenttypes"
+	"github.com/subgentic/coral/internal/sessionstate"
 	setreg "github.com/subgentic/coral/internal/settings"
 	"github.com/subgentic/coral/internal/shellkill"
 	"github.com/subgentic/coral/internal/store"
@@ -26,6 +29,13 @@ type pendingTool struct {
 	ToolName  string         `json:"tool_name"`
 	Input     map[string]any `json:"input"`
 	At        time.Time      `json:"at"`
+	// Wants is the line a PermissionRequest for this call would carry ("Wants to run: <command>", cleaned as the server stores it), so a request is tied only to the calls it is about (#11352); empty
+	// for a call whose input cannot be compared.
+	Wants string `json:"-"`
+	// Risk is the whole text of each field auto-accept judges (never served: Input is the cut one the chat shows); Unjudged says why the request cannot be judged whole ("" when it can), and auto-accept then
+	// refuses it (#11399).
+	Risk     map[string]string `json:"-"`
+	Unjudged string            `json:"-"`
 }
 
 type pendingTools struct {
@@ -34,6 +44,32 @@ type pendingTools struct {
 	// calls are all the tool calls a session has started and not finished (tool_use_id -> the call), so a permission request can be tied to the calls it may be for (#6687): the slot above
 	// holds only the newest, and agents run tool calls in parallel.
 	calls map[string]map[string]pendingTool
+	// requestOpen are the sessions with a permission request of the agent's own open (#11352): its tool's PreToolUse that comes next says the permission was given. Only the marker is kept; the
+	// request itself is in the event log.
+	requestOpen map[string]bool
+}
+
+// requestIsOpen reports whether the session has a request of its own marked open.
+func (p *pendingTools) requestIsOpen(sessionID string) bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.requestOpen[sessionID]
+}
+
+// markRequest notes that a session has a request open (open) or no longer has (not open); it reports whether one was open before.
+func (p *pendingTools) markRequest(sessionID string, open bool) bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	was := p.requestOpen[sessionID]
+	if open {
+		if p.requestOpen == nil {
+			p.requestOpen = map[string]bool{}
+		}
+		p.requestOpen[sessionID] = true
+	} else {
+		delete(p.requestOpen, sessionID)
+	}
+	return was
 }
 
 // maxCallsPerSession bounds what is remembered of one session's calls in flight.
@@ -68,7 +104,7 @@ func (p *pendingTools) set(sessionID string, t pendingTool) {
 			}
 			delete(cs, oldest)
 		}
-		cs[t.ToolUseID] = pendingTool{ToolUseID: t.ToolUseID, ToolName: t.ToolName, At: t.At}
+		cs[t.ToolUseID] = pendingTool{ToolUseID: t.ToolUseID, ToolName: t.ToolName, At: t.At, Wants: t.Wants}
 	}
 }
 
@@ -84,12 +120,12 @@ func (p *pendingTools) callDone(sessionID, toolUseID string) {
 }
 
 // callsFor are the ids of the session's calls of tool still in flight that started within maxAge: the calls a permission request for tool may be about.
-func (p *pendingTools) callsFor(sessionID, tool string, now time.Time, maxAge time.Duration) []string {
+func (p *pendingTools) callsFor(sessionID, tool string, now time.Time, maxAge time.Duration, wants string) []string {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	var ids []string
 	for id, c := range p.calls[sessionID] {
-		if c.ToolName == tool && !c.At.IsZero() && now.Sub(c.At) <= maxAge {
+		if c.ToolName == tool && !c.At.IsZero() && now.Sub(c.At) <= maxAge && (wants == "" || c.Wants == "" || c.Wants == wants) { // a call whose input is not the request's is not what it waits for
 			ids = append(ids, id)
 		}
 	}
@@ -173,9 +209,21 @@ var pendingToolFields = map[string]int{
 
 func trimPendingInput(in map[string]any) map[string]any {
 	out := map[string]any{}
+	var reviews []permreview.Review
 	for k, limit := range pendingToolFields {
 		v, ok := in[k]
 		if !ok || v == nil {
+			continue
+		}
+		if requestFields[k] { // the request itself: whole up to permreview.MaxBytes, hidden characters written out, and a request that does not fit or hides something can only be rejected (#11399)
+			s, isText := v.(string)
+			if !isText {
+				reviews = append(reviews, permreview.Review{Cut: true}) // a value that is not text is not shown: it cannot be allowed from here
+				continue
+			}
+			r := permreview.Of(s)
+			out[k] = r.Shown
+			reviews = append(reviews, r)
 			continue
 		}
 		switch s := v.(type) {
@@ -197,7 +245,30 @@ func trimPendingInput(in map[string]any) map[string]any {
 			out["file_path"] = out["AbsolutePath"]
 		}
 	}
+	if m := permreview.Merge(reviews...); !m.Allowed() {
+		out["only_reject"] = true
+		out["note"] = m.Note()
+	}
 	return out
+}
+
+// requestFields are the tool input fields that say what is being asked: the card shows them whole or says it cannot (#11399).
+var requestFields = map[string]bool{
+	"command": true, "CommandLine": true, "file_path": true, "TargetFile": true, "AbsolutePath": true, "path": true, "url": true, "query": true, "pattern": true, "description": true,
+}
+
+// newPendingTool is the pending tool a PreToolUse hook reports: the cut input the chat shows, and the whole text auto-accept judges (#11399).
+func newPendingTool(toolUseID, toolName string, input map[string]any, at time.Time) pendingTool {
+	risk, unjudged := riskInputOf(input)
+	return pendingTool{
+		Risk:      risk,
+		Unjudged:  unjudged,
+		ToolUseID: toolUseID,
+		ToolName:  toolName,
+		Input:     trimPendingInput(input),
+		At:        at,
+		Wants:     wantsLineOf(toolName, input),
+	}
 }
 
 func truncateUTF8(s string, n int) string {
@@ -253,13 +324,9 @@ func (h *SessionsHandler) SetPendingTool(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	h.hints.forget(body.SessionID) // a blocking tool may open a prompt: read the screen again
-	t := pendingTool{
-		ToolUseID: body.ToolUseID,
-		ToolName:  body.ToolName,
-		Input:     trimPendingInput(body.ToolInput),
-		At:        time.Now(),
-	}
+	t := newPendingTool(body.ToolUseID, body.ToolName, body.ToolInput, time.Now())
 	h.pending.set(body.SessionID, t)
+	h.noteToolStart(r.Context(), body.SessionID, body.ToolName, body.ToolUseID, body.ToolInput)
 	h.watchForPrompt(body.SessionID, owner.SessionName, t) // agy sends no hook for a permission prompt (#4819)
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
@@ -277,6 +344,12 @@ func (h *SessionsHandler) notePendingToolEvent(sessionID, eventType, toolUseID s
 	case "stop", "prompt_submit", "session_reset", "session_end":
 		h.pending.callDone(sessionID, "")
 	}
+	switch eventType { // the session's own request: open from its PermissionRequest until the turn moves on (#11352)
+	case "permission_request":
+		h.pending.markRequest(sessionID, true)
+	case "stop", "prompt_submit", "session_reset", "session_end", "request_resolved":
+		h.pending.markRequest(sessionID, false)
+	}
 	// A PostToolUse for another tool than the pending one is a late one of an earlier call: the pending tool still runs, and whatever it waits on is
 	// still open. It changes nothing (it would otherwise mark the session as waiting for nothing, and a prompt answer is refused, #5254).
 	if eventType == "tool_use" && toolUseID != "" {
@@ -293,6 +366,79 @@ func (h *SessionsHandler) notePendingToolEvent(sessionID, eventType, toolUseID s
 	case "stop", "prompt_submit", "session_reset", "session_end":
 		h.pending.clear(sessionID, "")
 	}
+}
+
+// noteToolStart records, when a call starts while the session has a permission request of its own open and the start says the request was answered, that it was resolved (#11352): the card and the
+// Inbox row must not wait for a PostToolUse that comes minutes later with a long command. Claude's only. Whether a start answers a request is the state derivation's own rule (Security's #136728):
+// the call the request waits for starts; a call that began half a minute or more after the request; or, for a request whose call was not known, a start of the same tool with the same input as the
+// request's wants (checked here, and written as same_input). The candidate event is derived first, and only one that closes the request is written: the PreToolUse of every other call writes nothing.
+func (h *SessionsHandler) noteToolStart(ctx context.Context, sessionID, toolName, toolUseID string, input map[string]any) {
+	if sessionID == "" || toolUseID == "" || h.ts == nil || h.ss == nil || !h.pending.requestIsOpen(sessionID) {
+		return
+	}
+	ls, err := h.ss.GetLiveSession(ctx, sessionID)
+	if err != nil || ls == nil || ls.AgentType != at.Claude {
+		return
+	}
+	events, err := h.ts.GetSessionStateEvents(ctx, []string{sessionID})
+	if err != nil {
+		return
+	}
+	var in sessionstate.Input
+	for _, ev := range events[sessionID] {
+		in.Events = append(in.Events, ev.StateEvent())
+	}
+	st := sessionstate.Derive(in)
+	if !st.NeedsInput {
+		h.pending.markRequest(sessionID, false) // nothing is open any more: the marker was stale
+		return
+	}
+	same := startMatchesWants(toolName, input, st.WaitingWants)
+	candidate := sessionstate.Event{Type: "request_resolved", ToolName: toolName, ToolUseID: toolUseID, SameInput: same, At: time.Now()}
+	in.Events = append(in.Events, candidate)
+	if sessionstate.Derive(in).NeedsInput {
+		return // this start does not answer it: a sibling, or another call's
+	}
+	id, sid := toolUseID, sessionID
+	detail := `{"same_input":false}`
+	if same {
+		detail = `{"same_input":true}`
+	}
+	ev := &store.AgentEvent{AgentName: ls.AgentName, SessionID: &sid, EventType: "request_resolved", Summary: "A call started: the permission was given", DetailJSON: &detail, RefID: &id}
+	if toolName != "" {
+		ev.ToolName = &toolName
+	}
+	if _, err := h.ts.InsertAgentEvent(ctx, ev); err != nil {
+		slog.Warn("could not record that a permission request was resolved by a call's start", "session_id", sessionID, "error", err)
+		return
+	}
+	h.pending.markRequest(sessionID, false)
+	h.kickFeedForRequestChange(sessionID, "request_resolved")
+}
+
+// wantsLineOf is the line a PermissionRequest for a call would carry, made as the hook makes it and cleaned as the server stores it: "Wants to run: <command>" for a Bash command. "" for any other tool or
+// an input without a command: nothing to compare.
+func wantsLineOf(tool string, input map[string]any) string {
+	if tool != "Bash" {
+		return ""
+	}
+	cmd, _ := input["command"].(string)
+	cmd = strings.TrimSpace(cmd)
+	if cmd == "" {
+		return ""
+	}
+	if len(cmd) > 1<<10 { // the hook cuts one input to 1 KiB before the server cleans it
+		cmd = cmd[:1<<10]
+	}
+	line, _ := waitingLine("Wants to run: " + strings.ToValidUTF8(cmd, "")).(string)
+	return line
+}
+
+// startMatchesWants reports whether a call that starts (its tool and input) is what an open request's wants names. Any other tool, an input without a command, or no wants is not a match: such a request
+// stays open until it is answered or dismissed.
+func startMatchesWants(tool string, input map[string]any, wants string) bool {
+	line := wantsLineOf(tool, input)
+	return wants != "" && line != "" && line == wants
 }
 
 // requestCallMaxAge is how recent a call's PreToolUse must be for a permission request to be about it.
@@ -316,7 +462,8 @@ func (h *SessionsHandler) tieRequestToItsCall(sessionID, tool string, detail any
 	delete(d, "tool_use_id")
 	delete(d, "call_ids")
 	if sessionID != "" && tool != "" {
-		if ids := h.pending.callsFor(sessionID, tool, time.Now(), requestCallMaxAge); len(ids) > 0 && len(ids) <= maxRequestCalls {
+		wants, _ := d["wants"].(string)
+		if ids := h.pending.callsFor(sessionID, tool, time.Now(), requestCallMaxAge, wants); len(ids) > 0 && len(ids) <= maxRequestCalls {
 			d["call_ids"] = ids
 		}
 	}

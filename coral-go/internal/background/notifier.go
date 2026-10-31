@@ -29,7 +29,9 @@ type BoardNotifier struct {
 	pauseLogMu   sync.Mutex
 	pauseLogged  map[string]bool // boards a skipped nudge was already logged for, until they are resumed
 	notifiedMu   sync.Mutex
-	notified     map[string]notifyState // session_name -> last nudge since the agent last read
+	notified     map[string]notifyState      // session_name -> last nudge since the agent last read
+	nudgeTold    func(sessionID string) bool // whether a summary told the held nudge (nil: ptymanager.TakeBoardNudgeTold); a test fills it
+	heldNudge    map[string]notifyState      // session_name -> the nudge Coral held (a pause, the person typing): taken as sent when a summary told it (#11387)
 	notifyNowCh  chan struct{}
 	pendingMu    sync.Mutex
 	pendingAll   bool             // a pass over every board is due (NotifyNow)
@@ -72,6 +74,7 @@ func NewBoardNotifier(boardStore *board.Store, runtime AgentRuntime, interval ti
 		interval:    interval,
 		logger:      slog.Default().With("service", "board_notifier"),
 		notified:    make(map[string]notifyState),
+		heldNudge:   make(map[string]notifyState),
 		notifyNowCh: make(chan struct{}, 1),
 		remindAfter: defaultRemindAfter,
 		now:         time.Now,
@@ -112,10 +115,15 @@ func (n *BoardNotifier) SeedFromDB(ctx context.Context) {
 	n.notifiedMu.Lock()
 	defer n.notifiedMu.Unlock()
 	now := n.now()
+	seeded := 0
 	for sessName, state := range states {
+		if state.Count == 0 {
+			continue // nothing was unread: it was not nudged, so a fresh message after the restart is nudged at once (a mentions-only subscriber was never nudged until the reminder window, #137219)
+		}
 		n.notified[sessName] = notifyState{count: state.Count, latestID: state.LatestID, at: now}
+		seeded++
 	}
-	n.logger.Info("seeded notifier from DB", "sessions", len(states))
+	n.logger.Info("seeded notifier from DB", "sessions", len(states), "with_unread", seeded)
 }
 
 // seedStates are the unread states of the agents running now (#3875): the passes only nudge
@@ -471,6 +479,16 @@ func (n *BoardNotifier) nudgeAgent(ctx context.Context, pass *notifyPass, a Agen
 		return
 	}
 	n.notifiedMu.Lock()
+	told := n.nudgeTold
+	if told == nil {
+		told = ptymanager.TakeBoardNudgeTold
+	}
+	if told(a.SessionID) { // the one summary line stood for the nudge that was held: those messages are told, newer ones still nudge (#11387)
+		if h, ok := n.heldNudge[sessName]; ok {
+			n.notified[sessName] = h
+		}
+	}
+	delete(n.heldNudge, sessName)
 	last, notified := n.notified[sessName]
 	n.notifiedMu.Unlock()
 	if !nudgeDue(last, notified, sub, unread, latestID, n.now(), ptymanager.JitterAround(n.remindAfter, sessName)) {
@@ -523,6 +541,12 @@ func (n *BoardNotifier) nudgeAgent(ctx context.Context, pass *notifyPass, a Agen
 		skipped, err = deliver()
 	}
 	if skipped {
+		n.notifiedMu.Lock()
+		if n.heldNudge == nil {
+			n.heldNudge = make(map[string]notifyState)
+		}
+		n.heldNudge[sessName] = notifyState{count: unread, latestID: latestID, at: n.now()}
+		n.notifiedMu.Unlock()
 		return
 	}
 	if err != nil {

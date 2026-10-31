@@ -42,6 +42,7 @@ export const PAGES = [
     { id: 'inbox-needs', world: 'seeded', path: '/inbox/needs' },
     { id: 'inbox-saved', world: 'seeded', path: '/inbox/saved' },
     { id: 'inbox-artifacts', world: 'seeded', path: '/inbox/artifacts' },
+    { id: 'artifact-csv', world: 'seeded', open: 'csvViewer', notes: 'a CSV artifact as a table (#11382): opened from the Inbox\'s Artifacts, there is no address for an artifact\'s preview' },
     { id: 'inbox-chats', world: 'seeded', path: '/inbox/chats' },
     { id: 'inbox-chat-page', world: 'seeded', path: '/inbox/chats/all/{chat}' },
     { id: 'inbox-goals', world: 'seeded', path: '/inbox/goals' },
@@ -97,6 +98,7 @@ export const NOT_PHOTOGRAPHED = {
         'default-prompts-modal': 'opened from Settings > Agents; settings-agents covers the section it opens from',
         'custom-view-modal': 'a developer feature behind Settings',
         'macro-modal': 'a keyboard feature behind Settings',
+        'shortcuts-modal': 'the keyboard shortcuts list, opened with a key a phone does not have; a static list with no data, and tests/frontend/keyboard_shortcuts_browser.test.js covers it',
         'task-detail-modal': 'the task page (team-task-page) is this view',
         'jump-status': 'a status line inside the jump dialog (dialog-jump)',
         'team-wizard-modal': null, // covered: dialog-new-team

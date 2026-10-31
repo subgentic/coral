@@ -21,6 +21,8 @@ import (
 type SessionIndexer struct {
 	store        *store.SessionStore
 	scanners     []agent.HistoryScanner
+	liveMu       sync.Mutex   // guards liveSources only: never held across a read
+	liveSources  []LiveSource // histories that are not files (opencode)
 	interval     time.Duration
 	startupDelay time.Duration
 	logger       *slog.Logger
@@ -121,11 +123,45 @@ func (idx *SessionIndexer) Run(ctx context.Context) error {
 	}
 }
 
+// LiveSource is a history that is not in a file: sessions of agents that keep none (opencode, whose messages come through its server's API, #11383). ExtractLive returns the sessions whose row changed since
+// the pass before (known maps each SourceFile to the time it was last indexed): one that did not change is not returned, and a source reads nothing for it.
+type LiveSource interface {
+	ExtractLive(ctx context.Context, knownMtimes map[string]float64) []agent.IndexedSession
+}
+
+// AddLiveSource adds a source of history that is not a file. Call it before Run.
+func (idx *SessionIndexer) AddLiveSource(s LiveSource) {
+	idx.liveMu.Lock()
+	defer idx.liveMu.Unlock()
+	idx.liveSources = append(idx.liveSources, s)
+}
+
+// collectLive asks the live sources for their changed sessions. It runs BEFORE a pass takes runMu: a source may read many agents' servers one after another (seconds), and a pass's lock must never be held across
+// that. What it knows of the last pass is read afresh; if another pass writes meanwhile the worst case is a session read once more.
+func (idx *SessionIndexer) collectLive(ctx context.Context) []agent.IndexedSession {
+	idx.liveMu.Lock()
+	sources := append([]LiveSource(nil), idx.liveSources...)
+	idx.liveMu.Unlock()
+	if len(sources) == 0 {
+		return nil
+	}
+	known, err := idx.store.GetHistoryMtimes(ctx, agent.HistoryIndexVersion)
+	if err != nil {
+		return nil
+	}
+	var out []agent.IndexedSession
+	for _, src := range sources {
+		out = append(out, src.ExtractLive(ctx, known)...)
+	}
+	return out
+}
+
 // indexerFTSBatch is how many sessions' search text one pass collects before writing it (store.UpsertFTSBatch).
 const indexerFTSBatch = 100
 
 // RunOnce performs a single indexing pass over all registered scanners.
 func (idx *SessionIndexer) RunOnce(ctx context.Context) error {
+	live := idx.collectLive(ctx) // before the lock: it may take a while
 	idx.runMu.Lock()
 	defer idx.runMu.Unlock()
 	started := time.Now()
@@ -151,6 +187,8 @@ func (idx *SessionIndexer) RunOnce(ctx context.Context) error {
 		}
 		allSessions = append(allSessions, sessions...)
 	}
+
+	allSessions = append(allSessions, live...)
 
 	// Batch-lookup agent names from live_sessions
 	sessionIDs := make([]string, 0, len(allSessions))

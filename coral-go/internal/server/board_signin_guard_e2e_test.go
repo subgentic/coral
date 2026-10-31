@@ -33,6 +33,7 @@ var signInGuardedRoutes = []string{
 	"POST /api/board/{project}/working-mode/presets",
 	"PUT /api/board/{project}/working-mode/presets/{presetID}",
 	"PUT /api/board/{project}/artifacts/{id}/tags",
+	"POST /api/board/{project}/artifacts/{id}/review",
 	"PUT /api/board/{project}/subscribers/{subscriberID}/review-settings",
 	"POST /api/board/{project}/tasks/{taskID}/review",
 	"POST /api/board/{project}/tasks/{taskID}/attach",
@@ -154,6 +155,8 @@ func TestTheBoardRoutesRefuseASignInLinkFromAnyClient(t *testing.T) {
 // writeRoutesWithoutTheGuard are the write routes left without routes.RefuseSignInLink, each with why: their body carries no text a person
 // typed. A new write route under these prefixes fails TestEveryWriteRouteIsGuardedOrSaysWhyNot until it is guarded or listed here.
 var writeRoutesWithoutTheGuard = map[string]string{
+	"POST /api/board/{project}/operator-artifacts":                     "the body is the Operator's file, stored as bytes; its name is checked in the handler (hasSignInLink) and the file is never rendered (#11376)",
+	"POST /api/board/{project}/operator-artifacts/message":             "the body names an agent session and digests this Coral just stored; the message text is made by the server (#11376)",
 	"DELETE /api/saved/{id}":                                           "a delete by id: no text is kept",
 	"DELETE /api/board/remotes":                                        "a delete: no text is kept",
 	"DELETE /api/board/{project}":                                      "a delete: no text is kept",
@@ -233,10 +236,13 @@ var writeRoutesWithoutTheGuard = map[string]string{
 	"POST /api/sessions/live/team/{boardName}/wake":                    "a control: no text is kept",
 	"POST /api/sessions/live/wake-all":                                 "a control: no text is kept",
 	"POST /api/sessions/live/{name}/answer-prompt":                     "input typed into an agent's terminal: it goes to the agent, not kept for others to read",
+	"POST /api/sessions/live/{name}/dismiss-wait":                      "ids only (session_id, agent_type): no text is kept",
 	"POST /api/sessions/live/{name}/attach":                            "a control: no text is kept",
 	"POST /api/sessions/live/{name}/auto-accept/disable":               "a control: no text is kept",
 	"POST /api/sessions/live/{name}/auto-accept/enable":                "a control: no text is kept",
 	"POST /api/sessions/live/{name}/context-window":                    "a control: no text is kept",
+	"POST /api/sessions/live/{name}/notices/pause":                     "a control: no text is kept",
+	"POST /api/sessions/live/{name}/notices/resume":                    "a control: no text is kept",
 	"POST /api/sessions/live/{name}/files/refresh":                     "a control: no text is kept",
 	"POST /api/sessions/live/{name}/keys":                              "input typed into an agent's terminal: it goes to the agent, not kept for others to read",
 	"POST /api/sessions/live/{name}/kill":                              "a control: no text is kept",

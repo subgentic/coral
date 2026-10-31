@@ -242,6 +242,17 @@ func (h *SessionsHandler) uploadAgentArtifact(w http.ResponseWriter, r *http.Req
 			}
 		}
 	}
+	if plan != nil && h.bs != nil && hasTag(tags, "for review") { // a new version of the series for review: the older versions' reviews are closed, this one is the pending one (#136588)
+		if teamBoard, _, _ := uploaderOf(sid); teamBoard != "" && teamBoard == plan.board {
+			for _, m := range plan.rows { // the versions before this one, read under the series lock (a new series: the artifact it is a version of); the series index does not hold them yet
+				if m.Digest != hexID && m.Board == teamBoard {
+					if _, err := h.bs.SupersedeArtifactReview(r.Context(), teamBoard, m.Digest, time.Now()); err != nil {
+						slog.Warn("[artifacts] an older version's review was not closed", "digest", m.Digest, "error", err)
+					}
+				}
+			}
+		}
+	}
 	// The name and type viewers get: the first upload's, when these bytes were stored before.
 	reply := map[string]any{
 		"uri":        "coral://artifacts/" + hexID,
@@ -318,6 +329,11 @@ var errStoreFull = errors.New("artifact store is full")
 // storeArtifact). An object that is already stored makes it a free duplicate. It refuses a new
 // object that would take the store past its cap. fresh reports whether the object is new.
 func storeArtifactFile(coralDir, sessionID, name, mediaType, tmpPath, hexID string, size int64, stamp *seriesStamp, taskID int64) (agentArtifactMeta, bool, error) {
+	return storeArtifactFileAs(coralDir, sessionID, name, mediaType, tmpPath, hexID, size, stamp, taskID, nil)
+}
+
+// storeArtifactFileAs is storeArtifactFile with a say in the upload record: `shape` (nil for an agent's own upload) changes it before it is written (the Operator's share, which names the Operator as its uploader).
+func storeArtifactFileAs(coralDir, sessionID, name, mediaType, tmpPath, hexID string, size int64, stamp *seriesStamp, taskID int64, shape func(*agentUploadRecord)) (agentArtifactMeta, bool, error) {
 	defer lockArtifact(hexID)()
 	mine := agentArtifactMeta{Name: name, MediaType: mediaType, Size: size, Digest: "sha256:" + hexID}
 	st := storeFor(coralDir)
@@ -350,6 +366,9 @@ func storeArtifactFile(coralDir, sessionID, name, mediaType, tmpPath, hexID stri
 	if up := uploadsDir(coralDir, sessionID); up != "" {
 		if os.MkdirAll(up, 0o700) == nil {
 			ur := newUploadRecord(mine, sessionID, "", "")
+			if shape != nil {
+				shape(&ur)
+			}
 			if stamp != nil { // a version of a series: the record says which (#6357)
 				ur.SeriesID, ur.Version, ur.Previous = stamp.ID, stamp.Version, stamp.Previous
 			}
@@ -432,3 +451,13 @@ var artifactIDRe = regexp.MustCompile(`^[0-9a-f]{64}$`)
 
 // validArtifactID reports whether id is an artifact id (artifactIDRe).
 func validArtifactID(id string) bool { return artifactIDRe.MatchString(id) }
+
+// hasTag reports whether tags holds tag.
+func hasTag(tags []string, tag string) bool {
+	for _, t := range tags {
+		if t == tag {
+			return true
+		}
+	}
+	return false
+}

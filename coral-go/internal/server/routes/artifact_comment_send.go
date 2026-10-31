@@ -154,8 +154,11 @@ type sendResult struct {
 
 // POST /api/artifacts/{id}/comments/{cid}/send {agents: [names]}
 func (h *SessionsHandler) sendArtifactComment(w http.ResponseWriter, r *http.Request) {
-	if cloud.Tunneled(r) || r.Header.Get(tunnel.ViaHeader) != "" {
-		commentRefuse(w, http.StatusForbidden, "not_through_hub", "Send to agent is not available through Coral Hub")
+	if cloud.Tunneled(r) && refuseNonOwner(w, r) { // through Coral Hub the owner's alone (#11354): the table marks it, the machine refuses a guest or grantee here
+		return
+	}
+	if r.Header.Get(tunnel.ViaHeader) != "" && !cloud.TunneledAuthentic(r) {
+		commentRefuse(w, http.StatusForbidden, "forged_tunnel_stamp", "not allowed")
 		return
 	}
 	caller, status, code := h.artifactCommentCaller(r)

@@ -39,6 +39,9 @@ import (
 
 // SessionsHandler handles all live session API endpoints.
 type SessionsHandler struct {
+	dialogs  dialogWatch     // the prompts seen on awake agents' screens (#11437)
+	opencode OpencodeRuntime // the opencode servers, one per agent; nil until the server wires it
+
 	// piModelCheck says a Pi model is not one Pi lists (#11105); nil until the server wires it.
 	piModelCheck func(ctx context.Context, model string) string
 	// searchRate is the per-member rate limit of the agent search, refusals counted (#11048).
@@ -771,6 +774,12 @@ func lastMessageField(m *lastMessageSource, _ bool) map[string]any {
 
 // lastMessageOf reads a session's last message (cached by its file, see jsonl.LastMessage); nil when it has none.
 func (h *SessionsHandler) lastMessageOf(sessionID, workingDir, agentType string, started bool) map[string]any {
+	if agentType == at.Opencode && lastMessageEnabled && sessionID != "" { // no transcript: the server's last turn
+		if m, ok := h.opencodeLastMessage(sessionID); ok {
+			return lastMessageField(&m, false)
+		}
+		return nil
+	}
 	if !lastMessageEnabled || h.jsonl == nil || sessionID == "" {
 		return nil
 	}
@@ -786,6 +795,9 @@ func lastMessageRow(h *SessionsHandler, sessionID, workingDir, agentType string,
 	if !skipExpensive {
 		return h.lastMessageOf(sessionID, workingDir, agentType, started)
 	}
+	if agentType == at.Opencode {
+		return h.lastMessageOf(sessionID, workingDir, agentType, started) // already only what the manager kept: it reads no file
+	}
 	if !lastMessageEnabled || h.jsonl == nil {
 		return nil
 	}
@@ -794,6 +806,23 @@ func lastMessageRow(h *SessionsHandler, sessionID, workingDir, agentType string,
 	}
 	return nil
 }
+
+// noteEventForLastMessage is what an agent's hook event means for its row's last_message (#11354): the CLI is running, so a transcript it has not written yet is looked for at the next read, not after the
+// remembered miss; and the end of a turn (stop) of a session whose row has no last message yet sends the list at once, once for the session, so the first reply is on the row within a build, not at the next tick.
+func (h *SessionsHandler) noteEventForLastMessage(sessionID, eventType string) {
+	if h.jsonl == nil || sessionID == "" {
+		return
+	}
+	h.jsonl.ForgetLastMessageMiss(sessionID)
+	if eventType == "stop" {
+		if _, has := h.jsonl.CachedLastMessage(sessionID); !has && firstStopKicked.add(sessionID) { // once for a session: an agent with no transcript at all does not send the list at every turn
+			h.kickWS()
+		}
+	}
+}
+
+// firstStopKicked remembers the sessions whose first stop has sent the list (bounded, as refusedEventSenders is: after 10,000 sessions in one server run the kick no longer fires and a first reply waits for the list's next tick, which is the behaviour before it).
+var firstStopKicked = &onceSet{max: 10000}
 
 // SessionReader is the transcript reader this handler uses: other handlers that read the same session files (the spend read) share it, so a file is parsed once.
 func (h *SessionsHandler) SessionReader() *jsonl.SessionReader { return h.jsonl }

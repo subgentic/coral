@@ -279,11 +279,11 @@ func TestHowDoIAnswersContinueAFileAndThePermissionModes(t *testing.T) {
 	for _, mode := range []string{"**Default:**", "**Plan:**", "**Accept edits:**", "**Auto:**", "**Bypass permissions:**", "**Don't ask:**"} {
 		assert.Contains(t, text, mode, "one line for each mode")
 	}
-	for _, cli := range []string{"**Claude**", "**Codex**", "**Antigravity**", "**Gemini**", "**Pi**"} {
+	for _, cli := range []string{"**Claude**", "**Codex**", "**Antigravity**", "**Gemini**", "**Pi**", "**opencode**"} {
 		assert.Contains(t, text, cli, "Auto says where the CLIs differ")
 	}
 	assert.Contains(t, text, "**Resume in**", "the Resume dialog's mode row is named")
-	assert.GreaterOrEqual(t, strings.Count(text, "On **Antigravity**, **Gemini** and **Pi** it means what Auto means there"), 2, "Bypass permissions and Don't ask say what they mean on the CLIs with no checks")
+	assert.GreaterOrEqual(t, strings.Count(text, "On **Antigravity**, **Gemini**, **Pi** and **opencode** it means what Auto means there"), 2, "Bypass permissions and Don't ask say what they mean on the CLIs with no checks")
 	static := filepath.Join("..", "..", "..", "pkg", "frontend")
 	read := func(rel ...string) string {
 		b, err := os.ReadFile(filepath.Join(append([]string{static}, rel...)...))
@@ -303,8 +303,8 @@ func TestHowDoIAnswersContinueAFileAndThePermissionModes(t *testing.T) {
 	assert.Contains(t, fields, "docs: { topic: 'how-do-i', answer: 'What the permission modes allow' }", "Learn more beside Default permission mode opens that answer in Docs")
 }
 
-// #10605 and #10595: the launch choice is New project, not New team: no shipped agent doc names the old button.
-func TestAgentDocsNameNewProjectNotNewTeam(t *testing.T) {
+// #10605, #10595 and #11336: the launch choice is New team, not New project: no shipped agent doc names the old button.
+func TestAgentDocsNameNewTeamNotNewProject(t *testing.T) {
 	entries, err := os.ReadDir(filepath.Join("..", "..", "..", "agent_docs"))
 	require.NoError(t, err)
 	for _, e := range entries {
@@ -313,7 +313,7 @@ func TestAgentDocsNameNewProjectNotNewTeam(t *testing.T) {
 		}
 		b, err := os.ReadFile(filepath.Join("..", "..", "..", "agent_docs", e.Name()))
 		require.NoError(t, err)
-		assert.NotContains(t, string(b), "New team", e.Name()+" names the old button: it is New project")
+		assert.NotContains(t, string(b), "New project", e.Name()+" names the old button: it is New team")
 	}
 }
 

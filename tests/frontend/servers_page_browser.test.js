@@ -112,7 +112,11 @@ const SERVERS = [
             assert.match(p.name, /^LAN box lan/, at + 'the name and id');
             assert.equal(p.back, '← Computers');
             assert.equal(p.focus, 'servers-back', at + 'the focus goes to the way back');
-            assert.deepEqual(p.buttons, ['Test', 'Edit', 'Remove'], at + 'the bar');
+            if (w <= 600) { // slice D (#11239): a computer's page is a drill-down on a phone: one bar (a 44 px arrow, the name beside it), no bottom nav
+                const dd = await ev(`(() => { const row = document.querySelector('#servers-view .phone-title-row'), back = document.getElementById('servers-back').getBoundingClientRect(), name = document.getElementById('servers-page-name').getBoundingClientRect(), nav = getComputedStyle(document.getElementById('phone-nav')).display; return { item: document.getElementById('servers-view').hasAttribute('data-phone-item'), rowH: row ? Math.round(row.getBoundingClientRect().height) : 0, w: Math.round(back.width), h: Math.round(back.height), beside: name.left >= back.right - 2 && name.top < back.bottom, nav }; })()`);
+                assert.ok(dd.item && dd.rowH >= 56 && dd.w >= 44 && dd.h >= 44 && dd.beside && dd.nav === 'none', at + "a computer's page is a drill-down (one 56 px bar, a 44 px arrow beside the name, no nav): " + JSON.stringify(dd));
+            }
+            assert.deepEqual(p.buttons, ['Test', 'Edit', 'Approve through this hub', 'Remove'], at + 'the bar: a computer added by URL that the hub holds no owner secret for offers to set it up (#11378)');
             assert.equal(p.remove, true, at + 'Remove is the danger button');
             assert.equal(p.small, false, at + 'the normal button size');
             assert.ok(p.barBottomGap <= 1, at + 'the bar is at the foot of the page: ' + p.barBottomGap);
@@ -123,7 +127,23 @@ const SERVERS = [
             assert.equal(await ev(`document.getElementById('servers-tab-title').checkVisibility()`), false, at + 'the page has no "Computers" title: its back link says it');
             assert.ok(p.overflow <= 0, at + 'no sideways scroll');
             await shot(`servers-page-${w}`);
-            ok(at + 'the page: facts, a way back, Test, Edit and Remove pinned at the foot, Remove the danger button');
+            ok(at + 'the page: facts, a way back, Test, Edit, Approve through this hub and Remove pinned at the foot, Remove the danger button');
+
+            // 2b. the owner-stamp button follows what the hub holds and how the computer was added (#11378): none for a computer set up over SSH (its setup installed the secret),
+            // 'Change the Approve secret' for one the hub already holds a secret for, so the one label 'Approve through this hub' is only where there is none
+            const barFor = async (mutate) => {
+                await ev(`(() => { window.__list = ${JSON.stringify(SERVERS)}.map(${mutate}); window.switchNavTab('agents'); window.switchNavTab('servers'); return true; })()`);
+                await waitFor(`!!document.querySelector('#server-row-lan [data-action=open]')`, 'the table again');
+                await ev(`document.querySelector('#server-row-lan [data-action=open]').click(); true`);
+                await waitFor(`!!document.getElementById('servers-page-name')`, 'the page again');
+                return ev(`[...document.querySelectorAll('.servers-page .item-bar button')].map(b => b.textContent.trim())`);
+            };
+            assert.deepEqual(await barFor(`s => s.id === 'lan' ? { ...s, owner_stamp: true } : s`), ['Test', 'Edit', 'Change the Approve secret', 'Remove'], at + 'a computer the hub holds a secret for');
+            const viaSsh = await barFor(`s => s.id === 'lan' ? { ...s, transport: 'ssh', ssh_target: 'rich@192.168.1.50:22', url: 'ssh://rich@192.168.1.50:22' } : s`);
+            assert.deepEqual(viaSsh, ['Test', 'Edit', 'Upgrade', 'Stop Coral', 'Uninstall', 'Remove'], at + 'a computer set up over SSH has no Approve button: its setup installed the secret');
+            assert.deepEqual(await barFor(`s => s`), ['Test', 'Edit', 'Approve through this hub', 'Remove'], at + 'back to the plain computer');
+            await waitFor(`document.activeElement && document.activeElement.id === 'servers-back'`, 'the focus on the way back').catch(() => {});
+            ok(at + 'the Approve through this hub button: only where the hub holds no secret, not for an SSH computer');
 
             // 3. Test stays on the page and sends the test; Edit opens the form in the page, Cancel returns to it
             await ev(`document.querySelector('.servers-page [data-action=test]').click(); true`);

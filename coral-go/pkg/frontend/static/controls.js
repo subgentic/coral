@@ -38,17 +38,17 @@ import { _getXtermModule, sleepingBlocked } from './control_runtime.js';
 import { activeUploadPromisesBySession, getPendingAttachments, clearAttachments, openImagePicker, removeAttachment, openAttachment } from './image_composer.js';
 
 /** What the composer says when the server still refuses the target after the list was read again: the page's view of this agent is out of date (#10813). */
-export const TARGET_CHANGED_MESSAGE = 'This agent was restarted or renamed, so your message was not sent. Reload the page, then send it again.';
+const TARGET_CHANGED_MESSAGE = 'This agent was restarted or renamed, so your message was not sent. Reload the page, then send it again.';
 
 /** True when a send was refused because the name or type sent is not the session's stored one (the server's code session_target_mismatch). */
-export async function _isTargetMismatch(resp) {
+async function _isTargetMismatch(resp) {
     if (resp.status !== 400) return false;
     try { const b = await resp.clone().json(); return !!b && b.code === 'session_target_mismatch'; } catch { return false; }
 }
 
 /** The session's row in a fresh list that differs from the name and type just sent, or null when the list cannot be read, no longer has it, or still says the same.
  *  A read already under way when the refusal came may be older than the restart, so the list is read a second time before giving up. */
-export async function _refetchedTarget(sessionId, server, sentName, sentType) {
+async function _refetchedTarget(sessionId, server, sentName, sentType) {
     for (let i = 0; i < 2; i++) {
         try { await loadLiveSessions(); } catch { return null; }
         const row = (state.liveSessions || []).find(s => s && s.session_id === sessionId && sessionServer(s) === server);
@@ -439,7 +439,7 @@ export function showMacroModal() {
     document.getElementById("macro-label-input").focus();
 }
 
-export function hideMacroModal() {
+function hideMacroModal() {
     document.getElementById("macro-modal").style.display = "none";
 }
 
@@ -667,7 +667,7 @@ export function refreshGoal() {
 // Asks the server's goal generator for a fresh goal line. It reads the
 // agent's transcript in the background; nothing is typed into the agent's
 // terminal. The new goal arrives on the normal session updates.
-export function requestGoal(name, agentType, sessionId) {
+function requestGoal(name, agentType, sessionId) {
     serverFetch(serverForSession(name, sessionId), `/api/sessions/live/${encodeURIComponent(name)}/goal`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },

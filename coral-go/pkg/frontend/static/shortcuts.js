@@ -6,7 +6,7 @@ import { sessionTeamKey } from './server_base.js';
 import { isTerminalToggleKey } from './terminal_leave_key.js';
 
 // The list is the one place that names the keys, in the person's own: a Mac shows Cmd and Option, any other computer Ctrl and Alt (#10579). Each row is [keys, what, group]; the group is the heading it sits under in the dialog (#11246).
-export const SHORTCUT_GROUPS = ['Navigation', 'Chat', 'Search', 'Dialogs'];
+const SHORTCUT_GROUPS = ['Navigation', 'Chat', 'Search', 'Dialogs'];
 export const shortcutList = (mac = onMac()) => {
     const c = mac ? 'Cmd+' : 'Ctrl+', o = mac ? 'Option' : 'Alt';
     return [[mac ? 'Cmd+Option+N' : 'Alt+N', 'New agent', 'Navigation'], [`${c}P or ${c}K`, 'Jump to an agent, chat, team or goal', 'Navigation'], [`${c}Shift+P or F1`, 'The command list', 'Navigation'], [`${c},`, 'Settings', 'Navigation'], [`${c}B`, 'Show or hide the sidebar', 'Navigation'],
@@ -17,7 +17,7 @@ export const shortcutList = (mac = onMac()) => {
 // A row's keys as chips: "Cmd+P or Cmd+K" is two alternatives of two keys each. A bare Up or Down after "Option+Down or" is the same modifiers with the other arrow. A Mac shows its glyphs; any other computer the words.
 const GLYPH = { Cmd: '⌘', Option: '⌥', Shift: '⇧', Ctrl: '⌃', Down: '↓', Up: '↑', Escape: 'Esc' };
 const GLYPH_NAME = { '⌘': 'Command', '⌥': 'Option', '⇧': 'Shift', '⌃': 'Control', '↓': 'Down arrow', '↑': 'Up arrow' }; // a glyph has no name a screen reader says right: the command sign is read as a place of interest
-export const keyChips = (keys, mac = onMac()) => {
+const keyChips = (keys, mac = onMac()) => {
     const alts = [];
     for (const a of keys.split(' or ')) {
         const parts = a === '+' ? [a] : a.split(/\+(?=.)/);
@@ -36,7 +36,7 @@ const dialogOpen = () => [...document.querySelectorAll('.modal-overlay, [role="d
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 
 /** The dialog's body: a heading and a list for each group, a row being the keys (<dt>, one <kbd> chip a key) beside what they do (<dd>). */
-export function buildShortcuts(mac = onMac()) {
+function buildShortcuts(mac = onMac()) {
     const frag = document.createDocumentFragment(), rows = shortcutList(mac);
     for (const group of SHORTCUT_GROUPS) {
         const sec = el('section', 'kbd-group'), h = el('h4', 'group-head', group), dl = el('dl', 'kbd-list');
@@ -78,7 +78,7 @@ export async function showShortcuts() {
     if (!body.dataset.syncWired) { body.dataset.syncWired = '1'; window.addEventListener('resize', sync); }
 }
 
-export function newAgentShortcut() {
+function newAgentShortcut() {
     window.showLaunchModal?.();
     window._selectLaunchType?.('agent');
 }

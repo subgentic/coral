@@ -24,6 +24,8 @@ const { coralReady } = require('./helpers/wait');
                 if (s.includes('/api/settings') && o && o.method === 'PUT') { window.__puts.push(JSON.parse(o.body)); return json({ ok: true }); }
                 return window.__realFetch(u, o); };
                 T.state.settings = { ...T.state.settings, inbox_welcome: 'on', inbox_welcome_done: '' }; T.state.liveSessions = []; T.state.servers = []; true`);
+            // a button of the list, pressed once it is there: the list is redrawn when the proposals and the settings are read, so a button found a moment ago may be gone
+            const press = async (label, sel = '#group-table-view button', nth = 0) => { await waitFor(`[...document.querySelectorAll(${JSON.stringify(sel)})].filter(b => b.textContent === ${JSON.stringify(label)}).length > ${nth}`, `${tag}: the ${label} button`, 8000); await ev(`[...document.querySelectorAll(${JSON.stringify(sel)})].filter(b => b.textContent === ${JSON.stringify(label)})[${nth}].click(); true`); };
             const open = () => ev(`window.switchNavTab('hub-inbox'); import(${S} + 'inbox_tab.js').then(m => { m.updateInboxTab(); return m.selectInboxTab('needs'); }).then(() => true)`);
             const titles = () => ev(`[...document.querySelectorAll('#group-table-view .inbox-review-name')].map(e => e.firstChild ? e.firstChild.textContent : '')`);
             await open();
@@ -37,7 +39,7 @@ const { coralReady } = require('./helpers/wait');
             if (mobile) check(await ev(`[...document.querySelectorAll('#group-table-view .inbox-review-actions button')].every(b => b.getBoundingClientRect().height >= 44)`), `${tag}: every action is a 44 px target`);
 
             // the actions do what they say
-            await ev(`[...document.querySelectorAll('#group-table-view .inbox-review-actions button')].find(b => b.textContent === 'New agent').click(); true`);
+            await press('New agent');
             await waitFor(`(() => { const m = document.getElementById('launch-modal'); return !!m && getComputedStyle(m).display !== 'none'; })()`, `${tag}: New agent opens the launch dialog`, 5000);
             await ev(`window.hideLaunchModal(); true`);
             // an agent appears: its item completes itself and is remembered
@@ -48,18 +50,18 @@ const { coralReady } = require('./helpers/wait');
             await ev(`window.__teams = [{ name: 'alpha' }]; true`);
             await waitFor(`(import(${S} + 'inbox_tab.js').then(m => m.updateInboxTab()), !/Make a team/.test(document.getElementById('group-table-view').textContent))`, `${tag}: Make a team completes itself`, 15000);
             // Read it, then Got it
-            await ev(`[...document.querySelectorAll('#group-table-view .inbox-review-actions button')].find(b => b.textContent === 'Read it').click(); true`);
+            await press('Read it');
             await waitFor(`(() => { const t = document.getElementById('confirm-modal-message'), m = document.getElementById('confirm-modal'); return !!t && !!m && /permission to allow/.test(t.textContent) && getComputedStyle(m).display !== 'none'; })()`, `${tag}: Read it shows how agents ask`, 5000);
             await ev(`document.getElementById('confirm-modal-yes').click(); true`);
             await waitFor(`!/How agents ask you/.test(document.getElementById('group-table-view').textContent)`, `${tag}: reading it clears the item`, 6000);
             // Dismiss the optional one; the welcome is left, then hidden for good
-            await ev(`[...document.querySelectorAll('#group-table-view .inbox-review-actions button')].filter(b => b.textContent === 'Dismiss')[0].click(); true`);
+            await press('Dismiss');
             await waitFor(`!/Connect a second/.test(document.getElementById('group-table-view').textContent)`, `${tag}: Dismiss puts an item away`, 6000);
             await waitFor(`/Welcome to Coral/.test(document.getElementById('group-table-view').textContent)`, `${tag}: the welcome is still there`, 6000);
-            await ev(`[...document.querySelectorAll('#group-table-view button')].find(b => b.textContent === 'Hide all welcome items')?.click(); true`);
+            await press('Hide all welcome items');
             await waitFor(`/Nothing needs you/.test(document.getElementById('group-table-view').textContent)`, `${tag}: the empty Needs you says Nothing needs you`, 6000);
             check(await ev(`window.__puts.some(p => p.inbox_welcome === 'off')`), `${tag}: hiding is kept in the settings`);
-            await ev(`[...document.querySelectorAll('#group-table-view button')].find(b => b.textContent === 'Go to Agents').click(); true`);
+            await press('Go to Agents');
             await waitFor(`(() => { const t = document.querySelector('.top-nav-tab.active'); if (t && t.dataset.arg === 'agents') return true; const m = document.getElementById('mobile-agent-list'); return !!m && getComputedStyle(m).display !== 'none'; })()`, `${tag}: Go to Agents`, 5000);
 
             // an install that has run before: no setting, no items

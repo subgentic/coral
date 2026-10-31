@@ -203,6 +203,8 @@
 .sched-settings { margin: 6px 0 12px; }
 .sched-settings > summary { cursor: pointer; color: var(--text-secondary); min-height: 28px; font-size: var(--fs-md); font-weight: var(--fw-medium); }
 .sched-more { position: relative; }
+.sched-menu-phone { display: none; } /* Edit and Turn off are in the More menu only on a phone, where the footer holds one primary action (#11236 approved, #11239 slice D) */
+@media (max-width: 600px) { .sched-actions .sched-foot-secondary { display: none; } .sched-menu-phone { display: block; } }
 .sched-more-menu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 5; } /* where it sits: what it looks like is the one menu's (.menu, layout.css) */
 .item-bar .btn { margin: 0; } /* the bar's gap is the bar's own */
 @media (pointer: coarse), (max-width: 767px) {

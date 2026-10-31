@@ -34,7 +34,7 @@ const S = `(window.__coralStatic || '/static/')`;
         await ev(`document.querySelector('#group-table-view tbody tr .dt-primary').click(); true`);
         await waitFor(`!!document.querySelector('#scheduler-detail .sched-more-btn')`, 'the job page', 8000);
         assert.deepEqual(await ev(`[...document.querySelectorAll('#scheduler-detail .sched-actions > .btn')].map(b => b.textContent.trim())`).then(a => a.filter(t => /^(Turn off|Pause)$/.test(t))), ['Turn off'], 'the main row says Turn off, not Pause');
-        assert.deepEqual(await ev(`[...document.querySelectorAll('#scheduler-detail .sched-more-menu .menu-item')].map(b => b.textContent.trim())`), ['Delete'], 'More holds Delete');
+        assert.deepEqual(await ev(`[...document.querySelectorAll('#scheduler-detail .sched-more-menu .menu-item:not(.sched-menu-phone)')].map(b => b.textContent.trim())`), ['Delete'], 'More holds Delete (Edit and Turn off are in it too on a phone only: .sched-menu-phone)');
         // 1. See result, and the way back
         await waitFor(`!!document.querySelector('#scheduler-detail [data-on-click="job-run-session"]')`, 'the run row\'s link', 8000);
         assert.equal(await ev(`document.querySelector('#scheduler-detail [data-on-click="job-run-session"]').textContent.trim()`), 'See result');

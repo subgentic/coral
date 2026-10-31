@@ -255,6 +255,14 @@ async function _renderArtifactInto(body, uri, options, ctx, source, kind) {
                 _renderSandboxed(body, { content, name: filename, isStale: ctx.isStale });
                 return;
             }
+            const delimited = [type, declaredType].some(v => v === 'text/tab-separated-values') || filenameHints.some(n => /\.tsv$/i.test(n)) ? 'tsv'
+                : [type, declaredType].some(v => v === 'text/csv' || v === 'application/csv' || v === 'text/x-csv') || filenameHints.some(n => /\.csv$/i.test(n)) ? 'csv' : '';
+            if (delimited && !isMarkdown && !isJSON) { // a table, with a Raw view that is the original text (#11382); the module loads only for such a file
+                const { renderCsvTable } = await importOnce('./csv_table.js');
+                if (ctx.isStale()) return;
+                renderCsvTable(body, content, { name: filename, tsv: delimited === 'tsv', raw: host => ctx.renderContent(host, content, artifactPath) });
+                return;
+            }
             const manifest = isJSON ? _parseManifest(content) : null;
             if (manifest) {
                 ctx.setMeta({ title: 'Artifact manifest', filename: filename || 'manifest.json' });

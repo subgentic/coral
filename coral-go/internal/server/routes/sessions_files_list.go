@@ -81,7 +81,7 @@ func (h *SessionsHandler) Files(w http.ResponseWriter, r *http.Request) {
 	}
 
 	files, found, err := h.gs.GetChangedFiles(r.Context(), name, sidPtr, diffMode)
-	if err == nil && found && filesCacheFresh(files, h.filesCacheMaxAge(r.Context()), time.Now()) {
+	if r.URL.Query().Get("worktree") == "" && err == nil && found && filesCacheFresh(files, h.filesCacheMaxAge(r.Context()), time.Now()) {
 		out := map[string]any{"agent_name": name, "files": hubVisibleFiles(r, files), "diff_mode": diffMode}
 		if workdir := h.resolveGitRoot(agentCtx(r), name, "", ptr.Value(sidPtr)); workdir != "" {
 			out["compare"] = map[string]any{"mode": diffMode, "label": gitutil.CompareLabel(r.Context(), workdir, diffMode)}
@@ -157,7 +157,7 @@ func (h *SessionsHandler) refreshFilesInner(w http.ResponseWriter, r *http.Reque
 		gcancel()
 		if err != nil && r.Context().Err() == nil {
 			// the folder's recently changed files stand in for the changes (#10256), inside the file viewer's bounds
-			writeJSON(w, http.StatusOK, map[string]any{"agent_name": name, "files": hubVisibleFiles(r, recentFilesInPlainFolder(workdir, !localDashboard(r))), "diff_mode": h.getDiffMode(r.Context()), "is_git": false})
+			writeJSON(w, http.StatusOK, h.withWorktree(r, name, sessionID, map[string]any{"agent_name": name, "files": hubVisibleFiles(r, recentFilesInPlainFolder(workdir, !localDashboard(r))), "diff_mode": h.getDiffMode(r.Context()), "is_git": false}))
 			return
 		}
 	}
@@ -321,8 +321,10 @@ func (h *SessionsHandler) refreshFilesInner(w http.ResponseWriter, r *http.Reque
 	if diffMode == "" {
 		diffMode = "branch_point"
 	}
-	h.gs.ReplaceChangedFiles(r.Context(), name, workdir, files, sidPtr, diffMode)
+	if !followOn(agentCtx(r)) { // the cache is the launch folder's list (the poller writes it): a followed worktree's is not kept in its place (#11351)
+		h.gs.ReplaceChangedFiles(r.Context(), name, workdir, files, sidPtr, diffMode)
+	}
 
-	writeJSON(w, http.StatusOK, map[string]any{"agent_name": name, "files": hubVisibleFiles(r, files), "diff_mode": diffMode,
-		"compare": map[string]any{"mode": diffMode, "label": gitutil.CompareLabel(r.Context(), workdir, diffMode)}})
+	writeJSON(w, http.StatusOK, h.withWorktree(r, name, sessionID, map[string]any{"agent_name": name, "files": hubVisibleFiles(r, files), "diff_mode": diffMode,
+		"compare": map[string]any{"mode": diffMode, "label": gitutil.CompareLabel(r.Context(), workdir, diffMode)}}))
 }

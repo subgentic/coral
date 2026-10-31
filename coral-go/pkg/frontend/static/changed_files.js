@@ -1,6 +1,7 @@
 /* Changed files panel — load and render per-agent file diffs */
 
 import { state } from './state.js';
+import { worktreeMode, setWorktreeMode } from './agent_file_api.js';
 import { deriveSessionState } from './render.js';
 import { escapeHtml, escapeAttr, showToast, refusedTooLarge } from './utils.js';
 import { registerActions, textOf } from './actions.js';
@@ -13,6 +14,8 @@ import { importOnce } from './import_once.js';
 import { serverFetch, serverForSession, sessionServer, currentServer, isCloud, dropBody } from './server_base.js';
 
 let _currentFiles = [];
+let _worktree = null; // the worktree the agent works in, when it is not its launch folder: { path, name, branch, followed, launch } (#11351)
+const _expandedFiles = new Set(); // the paths whose diff is open under their row (#11350): kept across the list's redraws, and by path so a file that moves in the list keeps it
 let _actionsOpenFor = ''; // the path whose row has its Copy, Preview and Edit open on a phone (#7652): kept across the list's redraws
 // A phone's row has one "More" button in place of the three icon buttons, so the name keeps the row (#7652); it opens them on a line under the row.
 const moreButton = (path, name) => { const label = `More for ${name}`; return `<button type="button" class="btn btn-quiet btn-icon btn-xs file-more-btn" data-on-click="file-more" data-path="${escapeAttr(path)}" aria-expanded="${escapeAttr(String(_actionsOpenFor === path))}" aria-label="${escapeAttr(label)}" title="More"><span aria-hidden="true">&#x22EF;</span></button>`; }; // the midline ellipsis as text: no icon font name to subset
@@ -270,14 +273,15 @@ export async function loadChangedFiles(agentName, sessionId, quiet = false) { //
     try {
         const params = new URLSearchParams();
         const sid = sessionId || (state.currentSession && state.currentSession.session_id);
-        if (sid) params.set("session_id", sid);
+        if (sid) { params.set("session_id", sid); params.set("worktree", worktreeMode(sid)); }
         const qs = params.toString() ? `?${params}` : "";
         const resp = await serverFetch(serverForSession(agentName), `/api/sessions/live/${encodeURIComponent(agentName)}/files${qs}`);
         _filesRefused = !resp.ok && await refusedTooLarge(resp);
         if (!resp.ok) { dropBody(resp); throw new Error(`files fetch failed: ${resp.status}`); }
         const data = await resp.json();
-        if (quiet && JSON.stringify(data.files || []) === JSON.stringify(_currentFiles)) return;
+        if (quiet && JSON.stringify(data.files || []) === JSON.stringify(_currentFiles) && JSON.stringify(data.worktree || null) === JSON.stringify(_worktree)) return;
         _currentFiles = data.files || [];
+        _worktree = data.worktree && typeof data.worktree === 'object' ? data.worktree : null;
         _notGit = data.is_git === false;
         _compareLabel = (data.compare && typeof data.compare.label === 'string') ? data.compare.label : '';
         if (data.diff_mode) _cloudDiffMode = data.diff_mode;
@@ -491,6 +495,70 @@ async function setGitDiffMode(mode) {
     refreshChangedFiles();
 }
 
+// The diffs under the rows (#11350). A row's chevron opens or closes its own; Expand all stacks every file's in the list's order and Collapse all closes them. Done in place: the list is not drawn again.
+const fileOf = path => _currentFiles.find(f => f.filepath === path);
+const slotOf = (list, path) => [...list.querySelectorAll('.file-diff')].find(e => e.dataset.filepath === path);
+function showExpanded(list, files) {
+    importOnce('./inline_diff.js').then(m => { for (const f of files) if (_expandedFiles.has(f.filepath)) { const slot = slotOf(list, f.filepath); if (slot) m.showFileDiff(slot, f); } }).catch(() => {});
+}
+function paintExpansion(list, path) {
+    const open = _expandedFiles.has(path);
+    const btn = [...list.querySelectorAll('.file-expand-btn')].find(b => b.dataset.path === path);
+    if (btn) {
+        const name = splitPath(path).name;
+        btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+        btn.title = `${open ? 'Hide' : 'Show'} the changes`;
+        btn.setAttribute('aria-label', `${open ? 'Hide' : 'Show'} the changes in ${name}`);
+        const icon = btn.querySelector('.material-icons');
+        if (icon) icon.textContent = open ? 'keyboard_arrow_up' : 'keyboard_arrow_down';
+    }
+    const slot = slotOf(list, path);
+    const f = fileOf(path);
+    if (!slot || !f) return;
+    importOnce('./inline_diff.js').then(m => (open ? m.showFileDiff(slot, f) : m.hideFileDiff(slot))).catch(() => {});
+}
+function paintExpandAll() {
+    const btn = document.querySelector('#changed-files-list .files-expand-all');
+    if (!btn) return;
+    const text = _currentFiles.length > 0 && _currentFiles.every(f => _expandedFiles.has(f.filepath)) ? 'Collapse all' : 'Expand all';
+    if (btn.textContent !== text) { btn.textContent = text; btn.setAttribute('aria-label', `${text} the changes`); }
+}
+function toggleFileExpanded(path) {
+    const list = document.getElementById('changed-files-list');
+    if (!list || !path) return;
+    if (_expandedFiles.has(path)) _expandedFiles.delete(path); else _expandedFiles.add(path);
+    paintExpansion(list, path);
+    paintExpandAll();
+}
+function toggleAllExpanded() {
+    const list = document.getElementById('changed-files-list');
+    if (!list) return;
+    const all = _currentFiles.length > 0 && _currentFiles.every(f => _expandedFiles.has(f.filepath));
+    for (const f of _currentFiles) { if (all) _expandedFiles.delete(f.filepath); else _expandedFiles.add(f.filepath); paintExpansion(list, f.filepath); }
+    paintExpandAll();
+}
+
+// Which worktree the list is from (#11351): the agent's own, once it works in one, named with its branch and a way back to the folder it was launched in; or the launch folder, with the worktree offered.
+function worktreeNoteHtml() {
+    if (!_worktree || !_worktree.name) return '';
+    const name = escapeHtml(String(_worktree.name)), branch = _worktree.branch ? ` <span class="files-worktree-branch">${escapeHtml(String(_worktree.branch))}</span>` : '';
+    return _worktree.followed
+        ? `<div class="files-worktree" role="status"><span>Following the agent in the worktree <strong>${name}</strong>${branch}</span><button type="button" class="btn btn-quiet btn-xs" data-on-click="worktree-launch">Back to launch folder</button></div>`
+        : `<div class="files-worktree" role="status"><span>The agent is working in the worktree <strong>${name}</strong>${branch}</span><button type="button" class="btn btn-quiet btn-xs" data-on-click="worktree-follow">Follow it</button></div>`;
+}
+
+// The switch between the two: the list is read again from the other folder, and the diffs opened under the rows of the first are closed.
+function switchWorktree(mode) {
+    const s = state.currentSession;
+    if (!s || !s.session_id) return;
+    setWorktreeMode(s.session_id, mode);
+    _expandedFiles.clear();
+    _currentFiles = [];
+    _worktree = null;
+    renderChangedFiles();
+    refreshChangedFiles();
+}
+
 function _getGitDiffMode() {
     if (isCloud()) return _cloudDiffMode || 'branch_point';
     return (state.settings || {}).git_diff_mode || 'branch_point';
@@ -508,7 +576,7 @@ export async function refreshChangedFiles(quiet = false) { // quiet: the panel's
         const body = {};
         if (sessionId) body.session_id = sessionId;
         const resp = await serverFetch(
-            currentServer(), `/api/sessions/live/${encodeURIComponent(agentName)}/files/refresh`,
+            currentServer(), `/api/sessions/live/${encodeURIComponent(agentName)}/files/refresh?worktree=${worktreeMode(sessionId)}`,
             {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -518,8 +586,9 @@ export async function refreshChangedFiles(quiet = false) { // quiet: the panel's
 
         if (resp.ok) {
             const data = await resp.json();
-            if (quiet && JSON.stringify(data.files || []) === JSON.stringify(_currentFiles)) return;
+            if (quiet && JSON.stringify(data.files || []) === JSON.stringify(_currentFiles) && JSON.stringify(data.worktree || null) === JSON.stringify(_worktree)) return;
             _currentFiles = data.files || [];
+            _worktree = data.worktree && typeof data.worktree === 'object' ? data.worktree : null;
             _notGit = data.is_git === false;
             _compareLabel = (data.compare && typeof data.compare.label === 'string') ? data.compare.label : '';
             if (data.diff_mode) _cloudDiffMode = data.diff_mode;
@@ -548,7 +617,7 @@ export async function refreshChangedFiles(quiet = false) { // quiet: the panel's
         const shell = state.currentSession && state.currentSession.agent_type === 'terminal'; // a terminal has no changes to list: no talk of git for a shell (#10077)
         if (titleEl) { titleEl.textContent = shell ? 'No changes to list' : 'Not a git folder'; titleEl._html = ''; }
         if (countEl) countEl.textContent = '';
-        list.innerHTML = `<div class="empty-state empty-state-tight">${shell ? 'A terminal does not track changed files. Start an agent in this folder to see its changes.' : 'No files changed here this week. Changes show once the folder is a git repository, and an agent can also share a file with you as an artifact.'}</div>`;
+        list.innerHTML = worktreeNoteHtml() + `<div class="empty-state empty-state-tight">${shell ? 'A terminal does not track changed files. Start an agent in this folder to see its changes.' : 'No files changed here this week. Changes show once the folder is a git repository, and an agent can also share a file with you as an artifact.'}</div>`;
         return;
     }
 
@@ -588,16 +657,16 @@ export async function refreshChangedFiles(quiet = false) { // quiet: the panel's
 
     if (files.length === 0) {
         // The comparison choice is in the header above, with the count: not drawn a second time under "No changed files" (#5991).
-        list.innerHTML = _filesRefused
+        list.innerHTML = worktreeNoteHtml() + (_filesRefused
             ? '<div class="empty-state empty-state-tight">Too many changed files to show through Coral Hub; open the agent on the computer.</div>'
-            : `<div class="empty-state empty-state-tight">No changed files</div>`;
+            : `<div class="empty-state empty-state-tight">No changed files</div>`);
         return;
     }
 
     const starred = new Set(_getStarredFiles());
     const heldMore = list.contains(document.activeElement) && document.activeElement.classList.contains('file-more-btn') ? document.activeElement.dataset.path : ''; // the list is drawn again on every poll: the row's More button that had the keyboard gets it back (#7652)
     // What the colours mean, said once as the list's own first line, so the header keeps its height when the first file arrives (#10386, Beta; #10054)
-    list.innerHTML = files.map((f) => {
+    list.innerHTML = files.map((f, i) => {
         const { dir, name } = splitPath(f.filepath);
         const statusCls = getStatusClass(f.status);
         const statusLabel = getStatusLabel(f.status);
@@ -618,13 +687,17 @@ export async function refreshChangedFiles(quiet = false) { // quiet: the panel's
         const previewBtn = `<button class="btn btn-quiet btn-icon btn-xs file-action-btn" data-on-click="file-preview" data-path="${escapeAttr(f.filepath)}" ${plain ? '' : 'data-diff="1"'} title="Preview" aria-label="${escapeAttr(previewLabel)}"><span class="material-icons" aria-hidden="true">visibility</span></button>`;
         const editBtn = `<button class="btn btn-quiet btn-icon btn-xs file-action-btn" data-on-click="file-edit" data-path="${escapeAttr(f.filepath)}" ${plain ? '' : 'data-diff="1"'} title="Edit" aria-label="${escapeAttr(editLabel)}"><span class="material-icons" aria-hidden="true">edit</span></button>`;
         const shareBtn = shareButton(f.filepath, rowName);
+        const open = !plain && _expandedFiles.has(f.filepath);
+        const expandTitle = `${open ? 'Hide' : 'Show'} the changes`, expandLabel = `${expandTitle} in ${rowName}`;
+        const expandBtn = plain ? '' : `<button type="button" class="btn btn-quiet btn-icon btn-xs file-expand-btn" data-on-click="file-expand" data-path="${escapeAttr(f.filepath)}" aria-expanded="${escapeAttr(String(open))}" aria-controls="file-diff-${Number(i)}" title="${escapeAttr(expandTitle)}" aria-label="${escapeAttr(expandLabel)}"><span class="material-icons" aria-hidden="true">${open ? 'keyboard_arrow_up' : 'keyboard_arrow_down'}</span></button>`;
+        const diffSlot = plain ? '' : `<div class="file-diff" id="file-diff-${Number(i)}" data-filepath="${escapeAttr(f.filepath)}"${open ? '' : ' hidden'}></div>`;
 
         // Clicking the row opens its diff in the preview pane; the buttons
         // copy the path, preview the file, and open it in the editor.
         return `<div class="file-item ${statusCls}${agentOnlyCls}${escapeAttr(_actionsOpenFor === f.filepath ? ' actions-open' : '')}" title="${escapeAttr(rowTitle)}"
                      data-filepath="${escapeAttr(f.filepath)}"
                      data-on-click="file-open" data-path="${escapeAttr(f.filepath)}" ${plain ? '' : 'data-diff="1"'}>
-            ${starBtn}
+            ${expandBtn}${starBtn}
             <span class="file-type-icon">${fileIconHtml(name)}</span>
             <div class="file-path-wrap">
                 <span class="file-name">${escapeHtml(name)}</span>
@@ -634,10 +707,15 @@ export async function refreshChangedFiles(quiet = false) { // quiet: the panel's
             ${stats}
             ${moreButton(f.filepath, rowName)}
             <div class="file-action-btns">${copyBtn}${previewBtn}${editBtn}${shareBtn}</div>
-        </div>`;
+        </div>${diffSlot}`;
     }).join('');
-    list.insertAdjacentHTML('afterbegin', '<div class="files-legend">New files are green, deleted ones red, the rest changed.</div>');
+    const allOpen = !plain && files.every(f => _expandedFiles.has(f.filepath)), expandAllText = allOpen ? 'Collapse all' : 'Expand all', expandAllLabel = `${expandAllText} the changes`;
+    // Expand all (#11350) is on the list's first line, not in the header: the header keeps its size when the first list arrives (#7671).
+    const expandAll = plain ? '' : `<button type="button" class="btn btn-quiet btn-xs files-expand-all" data-on-click="files-expand-all" aria-label="${escapeAttr(expandAllLabel)}">${escapeHtml(expandAllText)}</button>`;
+    list.insertAdjacentHTML('afterbegin', `${worktreeNoteHtml()}<div class="files-legend"><span>New files are green, deleted ones red, the rest changed.</span>${expandAll}</div>`);
     if (heldMore) [...list.querySelectorAll('.file-more-btn')].find(b => b.dataset.path === heldMore)?.focus({ preventScroll: true });
+    paintExpandAll();
+    if (!plain && _expandedFiles.size) showExpanded(list, files); // the diffs that were open are drawn again from what was read (#11350)
 }
 
 // The changed and starred files' markup (#3645): data-on-* names, never code. The path is the file's
@@ -645,6 +723,10 @@ export async function refreshChangedFiles(quiet = false) { // quiet: the panel's
 const pathOf = el => textOf(el.dataset.path, 4096);
 const diffOpts = el => (el.dataset.diff === '1' ? [0, { diff: true }] : []);
 registerActions({
+    'file-expand': (el, event) => { event.stopPropagation(); toggleFileExpanded(pathOf(el)); },
+    'files-expand-all': () => toggleAllExpanded(),
+    'worktree-launch': () => switchWorktree('launch'),
+    'worktree-follow': () => switchWorktree('follow'),
     'file-open': el => { const p = pathOf(el); if (p) openFilePreview(p, ...diffOpts(el)); },
     'file-star': (el, event) => { event.stopPropagation(); const p = pathOf(el); if (p) toggleStarFile(p); },
     'file-more': (el, event) => { event.stopPropagation(); const p = pathOf(el); if (!p) return; _actionsOpenFor = _actionsOpenFor === p ? '' : p; const row = el.closest('.file-item'); if (row) row.classList.toggle('actions-open', _actionsOpenFor === p); el.setAttribute('aria-expanded', String(_actionsOpenFor === p)); },

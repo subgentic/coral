@@ -177,7 +177,6 @@ registerActions({
     'm-dismiss-default-notice': () => { importOnce('./terminal_backend.js').then(m => m.dismissDefaultNotice()); },
     'm-open-terminal-settings': () => { window.showSettingsModal('terminal'); },
     'm-go-home': () => { window.__coral._goHome(); },
-    'm-mobile-connect-open': (el, event) => { event.preventDefault(); window._showMobileConnectModal(); },
     'm-show-launch-modal-then-select-launch-type': el => { if (["agent", "team"].includes(el.dataset.arg)) { window.showLaunchModal(); window._selectLaunchType(el.dataset.arg); } },
     'm-switch-mobile-tab': el => { if (["agents", "board", "chat"].includes(el.dataset.arg)) { window.switchMobileTab(el.dataset.arg); } },
     'm-switch-nav-tab': el => { if (["agents", "artifacts", "automations", "board", "docs", "history", "hub-inbox", "servers", "tokens"].includes(el.dataset.arg)) { window.switchNavTab(el.dataset.arg); } },
@@ -218,7 +217,7 @@ registerActions({
     'phone-nav': el => { // the phone's floating nav (#11116): Home, Inbox, Tasks (More opens the menu: m-top-menu)
         const arg = el.dataset.arg;
         if (arg === 'nav-agents') window.switchNavTab('agents');
-        else { window.switchNavTab('hub-inbox'); if (arg === 'nav-tasks') importOnce('./inbox_tab.js').then(m => m.selectInboxTab('tasks')); }
+        else { window.switchNavTab('hub-inbox'); if (arg === 'nav-tasks') importOnce('./inbox_tab.js').then(m => m.selectInboxTab('tasks')).then(() => importOnce('./phone_bar.js')).then(p => p.setPhonePageName('Tasks')); } // the bar's Tasks is the Tasks table: the pill says Tasks, not the Inbox's name that the tab put there (#11401)
     },
     'phone-fab': (el, event) => { // the + : New agent, New team (the menu is drawn above it)
         event.stopPropagation();
@@ -227,6 +226,7 @@ registerActions({
         if (open) { menu.querySelector('[role=menuitem]')?.focus(); document.addEventListener('click', () => { menu.hidden = true; el.setAttribute('aria-expanded', 'false'); }, { once: true }); }
     },
     'phone-fab-new': el => { const menu = document.getElementById('phone-fab-menu'); menu.hidden = true; document.getElementById('phone-fab').setAttribute('aria-expanded', 'false'); window.showLaunchModal(); window._selectLaunchType(el.dataset.arg); },
+    'dismiss-wait': el => { const sid = el.dataset.sessionId, s = (state.liveSessions || []).find(x => x.session_id === sid); if (s) importOnce('./dismiss_wait.js').then(m => m.dismissWait(s, el)); },
     'agent-bar-more': el => { const open = el.getAttribute('aria-expanded') !== 'true'; if (open) openAgentBarMore(el); else closeAgentBarMore(); }, // a phone's agent row (#11056): the controls that do not fit the one row, and the Details, open under it; they close with an outside tap, Escape and the other parts of the agent page (#11284)
     'agentic-panel-toggle': el => (el.dataset.open === '0' ? window.toggleAgenticPanel(false) : window.toggleAgenticPanel()),
     'agentic-tab': el => { if (AGENTIC_TABS.has(el.dataset.tab)) window.switchAgenticTab(el.dataset.tab, 'top'); },

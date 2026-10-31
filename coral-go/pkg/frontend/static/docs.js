@@ -5,7 +5,7 @@ import { registerActions, textOf } from './actions.js';
 import { apiFetch } from './api.js';
 import { loadHighlight } from './vendor_loader.js';
 import { note, currentRoute } from './nav.js';
-import { registerGroupSource, groupHeaderHtml, isGroupFolded, syncPaneGroupToggle, refreshGroupTable, openFirstGroupTable, setBackLink } from './sidebar_groups.js';
+import { registerGroupSource, groupHeaderHtml, isGroupFolded, unfoldGroup, syncPaneGroupToggle, refreshGroupTable, openFirstGroupTable, setBackLink } from './sidebar_groups.js';
 import { onViewShown } from './view_switch.js';
 import { isPhoneLayout } from './phone_layout.js';
 import { foldWayBack } from './way_back.js';
@@ -120,6 +120,7 @@ export function filterDocs(value) {
 
 registerGroupSource('docs', {
     keys: () => docGroups().map(g => g.key),
+    defaultFolded: () => docsQuery ? [] : ['api'], // a first-time reader sees Getting started, not 32 API pages under it; a search shows its hits wherever they are (#11401)
     redraw: () => renderDocNav(),
     table: key => {
         const g = docGroups().find(x => x.key === key);
@@ -283,6 +284,7 @@ export function openDoc(name) {
 export async function selectDoc(name, { noteRoute = true, focusHeading = false } = {}) {
     const acted = focusHeading || isPhoneLayout() || !!document.activeElement?.closest?.('#docs-content'); // a person chose this page from a link, or on a phone from the list that is gone once it opens: they are told where they landed (#7162); a wide screen's sidebar keeps its focus
     selectedDoc = name;
+    const g = groupOfDoc(name); if (g) unfoldGroup('docs', g.key); // a topic of a folded group (an API page from a link or a route) is shown in its group
     const hadFocus = !!document.activeElement?.closest?.('#docs-nav-list'); // the list is drawn again: focus goes back to the topic that was opened
     showView('docs-view'); // a group's table may be on screen: the document is the page now
     renderDocNav();

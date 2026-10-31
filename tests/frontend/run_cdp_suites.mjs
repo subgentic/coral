@@ -315,7 +315,7 @@ const STUB_MARKER = path.join(tmp, 'REAL_CLI_WAS_CALLED');
 // CORAL_TEST_STUB_CLIS: each test server points cli_path_<type> at the built mock-agent (below), so a
 // suite that opens the Launch dialog, probes a CLI version or lists models uses the mock; the stub only
 // fires on a genuine PATH fallback.
-const CLI_TYPES = ['claude', 'codex', 'gemini', 'agy', 'pi', 'antigravity'];
+const CLI_TYPES = ['claude', 'codex', 'gemini', 'agy', 'pi', 'antigravity', 'opencode'];
 const EXE = process.platform === 'win32' ? '.exe' : ''; // go build -o <dir>/ names a program coral.exe on Windows
 const MOCK_AGENT = path.join(tmp, 'mock-agent' + EXE);
 // Each shard gets its OWN stub dir on its server's PATH (writeStubs, in startShard). A stub ALWAYS exits

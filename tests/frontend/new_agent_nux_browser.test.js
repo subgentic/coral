@@ -1,7 +1,7 @@
 // The New agent wizard for a new user, on a desktop (#11289, QA Engineer's walkthrough #11256), at 1440 px with the keyboard and the mouse:
 //  1. Escape in the Browse folder picker closes the picker only; a second Escape closes the dialog.
 //  2. Enter in a single-line field is the step's primary button: the folder's Enter goes to the persona, the persona's name field's Enter goes to the agent step (and where Launch is the primary button, it launches); Enter in a multi-line field is a new line, not Next.
-//  3. The first step says there is a team to make ("Start a team instead"), a click goes to the team form; New agent from the sidebar opens the chooser with New agent and New project as equals.
+//  3. The first step says there is a team to make ("Start a team instead"), a click goes to the team form; New agent from the sidebar opens the chooser with New agent and New team as equals.
 //  4. An agent whose name is left empty is offered a role-like name (Agent 1, then the next number not taken), not the folder's; a name typed is kept.
 // Drives Chrome over CDP through agent_view_harness.js against an isolated dev server.
 const assert = require('node:assert/strict');
@@ -62,7 +62,7 @@ const { coralReady } = require('./helpers/wait');
         await ev(`document.querySelector('.sidebar-new-btn-full').click(); true`); await settle(500);
         assert.deepEqual(await stepsShown(), ['chooser'], 'New agent opens the chooser');
         const choices = await ev(`document.getElementById('launch-step-chooser').innerText.replace(/\\s+/g, ' ')`);
-        assert.ok(/New agent/.test(choices) && /New project/.test(choices), 'New agent and New project are both on the chooser: ' + choices);
+        assert.ok(/New agent/.test(choices) && /New team/.test(choices), 'New agent and New team are both on the chooser: ' + choices);
         await close();
 
         // 4. a role-like name

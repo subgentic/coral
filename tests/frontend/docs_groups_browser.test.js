@@ -13,6 +13,7 @@ const { coralReady } = require('./helpers/wait');
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 820, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
+        await ev(`localStorage.setItem('coral-sidebar-groups-docs', '[]'); true`); // both groups open, as for a reader who opened For developers: a first-time reader has it folded (docs_first_look_browser, #11401)
         await ev(`window.switchNavTab('docs'); true`);
         await waitFor(`document.querySelectorAll('#docs-nav-list [data-doc]').length > 10`, 'the topics', 12000);
         const groups = await ev(`(() => { const out = []; let cur = null; for (const li of document.querySelectorAll('#docs-nav-list > li')) { const h = li.querySelector('.group-header-label, .group-title, h3, [data-group]'); const btn = li.querySelector('[data-doc]'); if (btn) { if (cur) cur.docs.push(btn.dataset.doc); } else { cur = { label: li.textContent.replace(/\\s+/g, ' ').trim(), docs: [] }; out.push(cur); } } return out; })()`);

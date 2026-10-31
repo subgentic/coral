@@ -392,6 +392,7 @@ func TestTheOwnersListCarriesEachThreadsAsksAndNobodyElsesDoes(t *testing.T) {
 	// thread (the test identity names a session "agent-<id>", so that is the name its board subscription has) and it has no asks key.
 	_, err := rig.h.bs.Subscribe(context.Background(), "team-a", "agent-reader", "Reader", "agent-"+sendSid(7), nil, "mentions")
 	require.NoError(t, err)
+	rig.uploadedBySession(sendSid(7), "team-a") // it uploaded the artifact: an agent reads the threads of its own upload (#11420)
 	rig.hubOn()
 	listOf := func(h map[string]string) (int, []any) {
 		code, out := rig.do("GET", cp(cmtDoc), h, nil)
@@ -411,15 +412,17 @@ func TestTheOwnersListCarriesEachThreadsAsksAndNobodyElsesDoes(t *testing.T) {
 		assert.Contains(t, []int{http.StatusForbidden, http.StatusUnauthorized}, code, name)
 		assert.Empty(t, c, name)
 	}
-	// the owner signed in at Coral Hub (the stamp, the owner role and the enrolled label) may read the comments, and still gets no asks
+	// the owner signed in at Coral Hub (the stamp, the owner role and the enrolled label) may read the comments, and gets the asks as the owner at this computer does (#11354: the change-request send is the owner's through the Hub)
 	withLabel(t, cmtHubUser, nil)
 	code, hubSeen := listOf(cmtAsHubOwner)
 	if code == http.StatusOK {
 		require.NotEmpty(t, hubSeen, "the hub-signed-in owner reads the thread")
+		sawAsks := false
 		for _, c := range hubSeen {
 			_, has := c.(map[string]any)["asks"]
-			assert.False(t, has, "not through Coral Hub")
+			sawAsks = sawAsks || has
 		}
+		assert.True(t, sawAsks, "the Hub's owner sees who was asked, as the owner at this computer does")
 	} else {
 		assert.Contains(t, []int{http.StatusForbidden, http.StatusUnauthorized}, code)
 	}

@@ -25,11 +25,18 @@ type Event struct {
 	// carry no call id, #6687): one call, or all the parallel calls of the tool that were in flight. Empty when not known.
 	ToolUseID string
 	CallIDs   []string
+	// SameInput: a request_resolved the server wrote for a PreToolUse whose tool and input are the ones the open request's wants name (#11352). Only then does a start close a request whose calls
+	// were not known; a start by tool name alone never does.
+	SameInput bool
+	// Dismissed: a request_resolved the Operator wrote to clear a wait that is no longer true (#11352). It clears whatever request is open.
+	Dismissed bool
 	// Wants is what a permission_request wants to do ("Wants to run: <command>"), as the server stored it: already cleaned, redacted and cut (#6622). It is display text only: no
 	// classifier reads it, so an agent's command cannot say "needs your permission" to them.
 	Wants string
 	// At is when the event was recorded (zero when unknown).
 	At time.Time
+	// Started is when a tool_use's call began (its PreToolUse), when the event says how long it took; zero when unknown (#11352).
+	Started time.Time
 }
 
 // NewEvent builds an Event from a stored event, reading its kind from detailJSON.
@@ -43,6 +50,8 @@ func NewEvent(eventType, summary string, detailJSON *string) Event {
 		NotificationType string   `json:"notification_type"`
 		Wants            string   `json:"wants"`
 		CallIDs          []string `json:"call_ids"`
+		Dismissed        bool     `json:"dismissed"`
+		SameInput        bool     `json:"same_input"`
 	}
 	if json.Unmarshal([]byte(*detailJSON), &d) == nil {
 		if eventType == "permission_request" && len(d.Wants) <= maxWantsBytes {
@@ -55,6 +64,8 @@ func NewEvent(eventType, summary string, detailJSON *string) Event {
 				}
 			}
 		}
+		e.Dismissed = eventType == "request_resolved" && d.Dismissed
+		e.SameInput = eventType == "request_resolved" && d.SameInput
 		e.Kind = d.Kind
 		if !RequestKinds[e.Kind] {
 			e.Kind = "" // agent-controlled: only the known kinds
@@ -205,7 +216,12 @@ type deriver struct {
 type requestWait struct {
 	tool  string
 	calls map[string]bool
+	at    time.Time // when the request was opened (zero when unknown)
 }
+
+// requestMargin is how long after a request a call must have begun before its start says the request was passed (Security's #136728): a parallel sibling can be recorded seconds after the
+// request it ran beside, so the rule is for the real case only, a call that began half a minute or more after the request. It applies to a PreToolUse and a PostToolUse alike.
+const requestMargin = 30 * time.Second
 
 func (d *deriver) clearRequest() {
 	d.state.NeedsInput = false
@@ -291,7 +307,7 @@ func (d *deriver) apply(event Event) bool {
 			d.pending[event.ToolName]++
 			d.open++
 			if len(event.CallIDs) > 0 {
-				w := &requestWait{tool: event.ToolName, calls: map[string]bool{}}
+				w := &requestWait{tool: event.ToolName, calls: map[string]bool{}, at: event.At}
 				for _, id := range event.CallIDs {
 					w.calls[id] = true
 				}
@@ -299,11 +315,24 @@ func (d *deriver) apply(event Event) bool {
 			}
 		}
 	case "request_resolved":
+		if event.Dismissed {
+			// The Operator cleared the wait (#11352): whatever request is open is gone, as for a turn's end, and nothing was typed to the agent.
+			if d.state.NeedsInput {
+				d.clearRequest()
+				d.latestType = "tool_use"
+				d.state.AwaitingUser = false
+			}
+			return true
+		}
 		// An elicitation was answered (accept, decline or cancel): the agent goes on.
 		if d.state.NeedsInput && d.state.WaitingKind == "elicitation" {
 			d.clearRequest()
 			d.latestType = "tool_use"
 			d.state.AwaitingUser = false
+		}
+		// A call began (its PreToolUse, the id in ToolUseID) while a request of the agent's was open: the permission was given, or the agent went on (#11352).
+		if event.ToolUseID != "" {
+			return d.toolStarted(event)
 		}
 	case "session_end":
 		d.latestType = ""
@@ -316,10 +345,69 @@ func (d *deriver) apply(event Event) bool {
 	return true
 }
 
+// toolStarted takes the start of a call while requests are open. It closes the request that waits for this very call, and any request opened more than requestMargin before it (the call that began
+// is not a sibling of the request: Claude starts no call while a prompt of its own is open). With no request open it changes nothing, and reports false so its time sets nothing either.
+func (d *deriver) toolStarted(event Event) bool {
+	if d.open == 0 {
+		return false
+	}
+	kept := d.waits[:0]
+	for _, w := range d.waits {
+		if w.calls[event.ToolUseID] || (!w.at.IsZero() && !event.At.IsZero() && event.At.After(w.at.Add(requestMargin))) {
+			if d.pending[w.tool] > 0 {
+				d.pending[w.tool]--
+			}
+			d.open--
+			continue
+		}
+		kept = append(kept, w)
+	}
+	d.waits = kept
+	// A request whose calls were not known closes only when the server checked that the tool that started is the one it asks for, with the same input (SameInput): never by the tool's name.
+	if event.SameInput {
+		known := 0
+		for _, w := range d.waits {
+			if w.tool == event.ToolName {
+				known++
+			}
+		}
+		if unknown := d.pending[event.ToolName] - known; unknown > 0 && d.open-len(d.waits) > 0 {
+			if max := d.open - len(d.waits); unknown > max {
+				unknown = max
+			}
+			d.pending[event.ToolName] -= unknown
+			d.open -= unknown
+		}
+	}
+	if d.open > 0 {
+		return true
+	}
+	d.latestType = "tool_use"
+	d.clearRequest()
+	d.state.AwaitingUser = false
+	return true
+}
+
 // toolUsed: a tool finished. It answers its own tool's request (an approval); a
 // request for another tool stays open.
 func (d *deriver) toolUsed(event Event) {
 	if d.open > 0 {
+		// A call that BEGAN after a request was opened proves the agent is past it: Claude starts no call while a prompt of its own is open, so the request was refused, or answered in the terminal
+		// and the agent went on (#11352). Its siblings began before it (a parallel call finishing first leaves it open, #6687); a start the event does not give proves nothing.
+		if !event.Started.IsZero() && len(d.waits) == d.open {
+			kept := d.waits[:0]
+			for _, w := range d.waits {
+				if !w.calls[event.ToolUseID] && !w.at.IsZero() && event.Started.After(w.at.Add(requestMargin)) {
+					if d.pending[w.tool] > 0 {
+						d.pending[w.tool]--
+					}
+					d.open--
+					continue
+				}
+				kept = append(kept, w)
+			}
+			d.waits = kept
+		}
 		if event.ToolUseID != "" && len(d.waits) == d.open {
 			// Every open request has its calls: a PostToolUse answers one only through a call it waits for, and the request closes when the last of them finishes. Another call's, of the same
 			// tool or not, changes nothing.

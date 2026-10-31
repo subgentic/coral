@@ -61,6 +61,9 @@ type HTTPTarget struct {
 	URL          string
 	APIKey       string
 	AllowPrivate bool
+	// OwnerSecret and RemoteID sign the owner stamp (#11378, owner.go): the secret only a human act installed on the remote, and the id the remote was registered under. Empty: no stamp.
+	OwnerSecret string
+	RemoteID    string
 }
 
 // Validate implements Validator.

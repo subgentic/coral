@@ -154,6 +154,7 @@
     .goals-table-page .goals-back, .inbox-board-head .goals-back { min-height: 44px; min-width: 44px; } /* a short label ("Goals") is still a 44 px target both ways */
     .team-task-extra summary { min-height: 44px; display: flex; align-items: center; } /* the dialog's folded sections are 44 px targets on a phone */
     .detail-pane { position: fixed; inset: 0; z-index: 30; width: auto; border-left: 0; }
+    body.phone-nav-on .detail-pane { padding-bottom: calc(92px + env(safe-area-inset-bottom, 0px)); } /* the floating nav (64 px, 18 px from the bottom) is over the sheet: its action row sits above it, not under it (the v2.0.10 phone walk, #11400) */
     .detail-close { width: 44px; height: 44px; }
     .detail-grip { display: none; }
     .detail-back { min-height: 44px; min-width: 44px; }
@@ -163,7 +164,7 @@
 }
 
 /* The Agents tab (stage 3): a quiet line and Refresh, status chips with counts on one line (they scroll sideways when too many), Remind as a quiet button in its row */
-.team-state-bad { --goal-hue: var(--error); }
+.team-state-bad { --goal-hue: var(--error); --goal-text: var(--error-text); }
 .team-agent-tasks { margin: 0; padding-left: 18px; }
 /* The Settings tab (stage 3): one page of four sections, rows with the label and hint at the left and the control at the right, and a bar pinned under it (the status line, Cancel at the left, Save settings at the right). */
 .team-settings-page { flex: 1; min-height: 0; display: flex; flex-direction: column; container-type: inline-size; }
@@ -341,10 +342,10 @@
 .inbox-review-item { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .inbox-review-item > :not(.inbox-review-name) { flex: none; }
 .inbox-review-item > .inbox-review-name { flex: 0 1 auto; min-width: 0; } /* the name and, once it is opened, its 'read' tag (#9277) */
-.inbox-review-actions { display: grid; grid-template-columns: max-content max-content; gap: 8px; align-items: center; } /* the star's 20 px is level with the buttons' centre, not their top (#9904) */
-.inbox-review-actions-read { grid-template-columns: max-content max-content max-content; } /* a read item has Unread beside Open and Mark reviewed (#9277) */
-.inbox-review-actions-star { grid-template-columns: max-content max-content max-content; } /* the star is the first of the actions (#9834) */
-.inbox-review-actions-star.inbox-review-actions-read { grid-template-columns: max-content max-content max-content max-content; }
+.inbox-review-actions { display: grid; grid-template-columns: max-content max-content max-content; gap: 8px; align-items: center; } /* the star's 20 px is level with the buttons' centre, not their top (#9904) */
+.inbox-review-actions-read { grid-template-columns: max-content max-content max-content max-content; } /* a read item has Unread beside Open, Approve and Request changes (#9277, #136584) */
+.inbox-review-actions-star { grid-template-columns: max-content max-content max-content max-content; } /* the star is the first of the actions (#9834) */
+.inbox-review-actions-star.inbox-review-actions-read { grid-template-columns: max-content max-content max-content max-content max-content; }
 .inbox-review-icon { min-width: 44px; padding-inline: 0; justify-content: center; } /* a read item's two actions are icons: the row stays one line, also on a phone */
 .inbox-review-icon .material-icons { width: var(--icon-size); height: var(--icon-size); overflow: hidden; font-size: var(--icon-size); white-space: nowrap; } /* the icon's name is its ligature: without the font it must not widen the button */
 .inbox-review-error { grid-column: 1 / -1; white-space: normal; }
@@ -360,7 +361,10 @@
 .inbox-review-more a, .inbox-review-more button { margin-inline-end: 8px; }
 @media (max-width: 760px) {
     .inbox-review-actions button { min-height: 44px; }
+    .inbox-review-actions { column-gap: 6px; }
     .inbox-review-actions-star { column-gap: 4px; } /* the starred glyph is a fourth cell: 8 px gaps put the actions 3 px over the line, under the name (#9904) */
+    .inbox-review-metadata { flex-wrap: wrap; max-width: 100%; } /* a phone's second line has the room of its row, and breaks at a gap instead of cutting the team's name (#11414) */
+    .inbox-review-metadata > .inbox-review-team { flex: 0 1 auto; min-width: 0; }
     .inbox-review-team { display: block; white-space: normal; overflow-wrap: anywhere; font-size: var(--table-tertiary-size); font-weight: var(--table-tertiary-weight); line-height: var(--lh-label); color: var(--table-tertiary-color); }
 }
 /* A team no board has (#8848): its name and the way back, none of a team's tabs, panels or actions */

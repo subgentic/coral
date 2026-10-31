@@ -288,7 +288,11 @@ func (p *PTYSessionTerminal) CreateSession(_ context.Context, name, workDir stri
 		agentType = parts[0]
 		sessionID = parts[1]
 	}
-	return p.backend.Spawn(name, agentType, workDir, sessionID, "", 200, 50)
+	err := p.backend.Spawn(name, agentType, workDir, sessionID, "", 200, 50)
+	if err == nil {
+		tmux.NoteLaunching(name) // its launch line is typed a moment later: a notice before then waits for the process to be recorded
+	}
+	return err
 }
 
 func (p *PTYSessionTerminal) KillSession(ctx context.Context, name, agentType, sessionID string) error {

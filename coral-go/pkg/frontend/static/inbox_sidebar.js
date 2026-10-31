@@ -12,12 +12,12 @@ import { welcomeRows, runWelcome, dismissWelcome, hideAllWelcome } from './welco
  * are in Display options. The hub's own framed /inbox is not this: it keeps the frame, full width (inbox_tab.js). */
 import { state } from './state.js';
 
-import { reviewItems, unreadReviewItems, reviewErrors, refreshReviews, reviewGroups, markReviewed, setReviewRead, markOpenedRead, isRead } from './inbox_reviews.js';
+import { reviewItems, unreadReviewItems, reviewErrors, refreshReviews, reviewGroups, setReviewRead, markOpenedRead, isRead } from './inbox_reviews.js';
 import { failedUnread, finishedUnread, refreshRuns, markSeen, runRoute, failureWords } from './automation_runs.js';
 import { go, note, backIs, currentRoute } from './nav.js';
 
 import { build, keyRoute, parse as parseRoute, inboxFolderPath, BOARDS_FOLDER, BOARDS_SUB } from './routes.js';
-import { sessionServer, keyLabel, identityKey, splitKey, goalTeamKey, nativeInbox } from './server_base.js';
+import { sessionServer, keyLabel, identityKey, splitKey, goalTeamKey, nativeInbox, decisionNeedsPerson, LOCAL_SERVER } from './server_base.js';
 import { teamLabel } from './server_status.js';
 import { showView } from './utils.js';
 import { registerActions, textOf } from './actions.js';
@@ -35,6 +35,7 @@ const { coralInboxAdapter, savedExpandFor, listInboxGoals } = await importOnce('
 const { openedFrom, backLabelFor } = await importOnce('./inbox_back_label.js'); // the Back words of the Inbox's task and goal screens (#8861)
 const saved = await importOnce('./saved.js');
 const DT = await importOnce('./data_table.js'); // the one table (#7743): the Tasks group's page is its Tasks columns
+const { el } = DT;
 const { starControl } = await importOnce('./artifact_star.js'); // a star on a review artifact's row (#9834)
 const TF = await importOnce('./task_filters.js');
 const TV = await importOnce('./tasks_view.js'); // the one Tasks view
@@ -51,10 +52,11 @@ const IT = await importOnce('./inbox_toolbar.js'); // the folders' toolbar on th
 const NF = await importOnce('./needs_filters.js'); // the Needs you folder's search, pills and Filters (#8604)
 const CF = await importOnce('./chat_filters.js'); // the chat folders' Filters (#8603)
 const IA = await importOnce('./inbox_artifacts.js'); // the Artifacts folder (Goal #62): every team's files in one list
-const { answerCell } = await importOnce('./inbox_answer.js'); // the choices of a question or a permission, answered from the row (#10400)
+const { answerCell, rowActions } = await importOnce('./inbox_answer.js'); // the choices of a question or a permission, answered from the row (#10400)
 const CH = await importOnce('./mailbox_chats.js'); // the chat folders (#7776): All chats, Board history, By CLI, Tags
 const IR = await importOnce('./inbox_read.js'); // which chats, boards and tasks the person has opened since they changed (#9687)
 const { providerName } = await importOnce('./model_labels.js'); // a CLI by its name (Claude, Codex, Antigravity), as the Chats list says it
+const { proposalItems, pendingProposals, refreshProposals, onProposalsChanged, proposalActions, openProposalDialog, proposalSummary, carriesInstructions } = await importOnce('./inbox_proposals.js'); // what agents asked to add, waiting for the Operator (#11389)
 const { waitingText } = await importOnce('./waiting_text.js'); // a lazy module imports only what loads at startup (import_hygiene): this one loads with it
 
 const $ = id => document.getElementById(id);
@@ -92,15 +94,17 @@ let page = null; // { kind: 'task', project, id } | { kind: 'saved', id }: the i
 // ── Needs you ────────────────────────────────────────────────────────────
 const waitingSessions = () => (state.liveSessions || []).filter(needsYou).map(askedRow); // an agent that asked something before Coral restarted is listed with its words (#10368)
 const teamOf = s => s.board_project ? teamLabel(identityKey(sessionServer(s), s.board_project)) : ''; // with its computer when a hub has more than one (#8774)
-const needsName = s => s.review ? s.review.produced_by || 'Unknown agent' : s.autorun ? s.autorun.name : s.welcome ? s.welcome.title : resolveSessionIdentity(s);
+const needsName = s => s.proposal ? s.proposal.proposer : s.review ? s.review.produced_by || 'Unknown agent' : s.autorun ? s.autorun.name : s.welcome ? s.welcome.title : resolveSessionIdentity(s);
 const reviewRows = () => reviewItems().map(a => ({ review: a, goal: a.goal_id && a.goal_title ? { id: a.goal_id, title: String(a.goal_title), board: a.team } : null, task: a.task_id ? { id: a.task_id, title: String(a.task_title || '') } : null, session_id: a.reviewKey, display_name: a.name, board_project: splitKey(a.team).name, server: splitKey(a.team).server, waiting_kind: 'review', waiting_summary: 'For review', waiting_since: a.created_at }));
 /** A failed run of a job or workflow that nobody has opened (#9296): a row of Needs you like a review, opened on its job's or workflow's page, dismissed (marked opened) without opening it. */
 const runRows = () => failedUnread().map(r => ({ autorun: r, session_id: `automation-run:${r.key}`, display_name: r.name, board_project: '', server: '', waiting_kind: 'run', waiting_summary: failureWords(r) ? `Run failed: ${failureWords(r)}` : 'Run failed', waiting_since: r.finishedAt || r.at }));
-const isItem = s => !!(s.review || s.autorun || s.welcome); // a row that is not an agent: a review, a run or a welcome item, shown as an item // a row that is not an agent: a review or a run, shown as an item
+/** What agents asked to add to a team, waiting for the Operator (#11389): a row of Needs you like a review, opened in its dialog. */
+const proposalRows = () => proposalItems().map(p => ({ proposal: p, session_id: p.rowKey, display_name: p.proposer, board_project: splitKey(p.board_id).name, server: LOCAL_SERVER, waiting_kind: 'proposal', waiting_summary: proposalSummary(p), waiting_since: p.created_at }));
+const isItem = s => !!(s.review || s.autorun || s.proposal || s.welcome); // a row that is not an agent: a review, a run, a proposal or a welcome item, shown as an item // a row that is not an agent: a review or a run, shown as an item
 let answered = ''; // what an answer given here went through as, for five minutes: the row is gone and the list says so (#10720)
 document.addEventListener('coral:inbox-answered', e => { answered = e.detail.said; setTimeout(() => { answered = ''; }, 3e5); });
-const allNeeds = () => [...waitingSessions(), ...reviewRows(), ...runRows(), ...welcomeRows()]; // the welcome items of a new install come last: real work first (#11443)
-const needsText = s => [s.review?.name || '', s.autorun ? `${s.autorun.name} ${s.waiting_summary}` : '', needsName(s),resolveSessionIdentity(s), sessionStateInfo(s).label, askOf(s), teamOf(s), s.goal?.title || '', s.task?.title || ''].join(' ').toLowerCase();
+const allNeeds = () => [...waitingSessions(), ...reviewRows(), ...runRows(), ...proposalRows(), ...welcomeRows()]; // the welcome items of a new install come last: real work first (#11443)
+const needsText = s => [s.proposal ? `${s.proposal.title} ${s.proposal.proposer}` : '', s.review?.name || '', s.autorun ? `${s.autorun.name} ${s.waiting_summary}` : '', needsName(s),resolveSessionIdentity(s), sessionStateInfo(s).label, askOf(s), teamOf(s), s.goal?.title || '', s.task?.title || ''].join(' ').toLowerCase();
 let needsFilters = NF.loadFilters(), needsBar = null;
 const NO_GOAL = 'No goal';
 const goalLabel = s => (s.goal && s.goal.id && s.goal.title ? String(s.goal.title) : NO_GOAL); // the goal a row's task serves (a review's artifact roll-up, #8579; an agent's task, #7302), or the words for none
@@ -111,7 +115,7 @@ const needsRows = () => {
     const all = filteredNeeds(), visible = new Set(reviewGroups(all.filter(s => s.review).map(s => s.review)).flatMap(g => g.rows.map(a => a.reviewKey)));
     return all.filter(s => !s.review || visible.has(s.review.reviewKey));
 };
-const kindShown = k => (k !== 'review' || reviewItems().length || needsFilters.kind === 'review') && (k !== 'run' || failedUnread().length || needsFilters.kind === 'run'); // a pill for what is not there is not drawn, unless it is the one on
+const kindShown = k => (k !== 'review' || reviewItems().length || needsFilters.kind === 'review') && (k !== 'run' || failedUnread().length || needsFilters.kind === 'run') && (k !== 'proposal' || proposalItems().length || needsFilters.kind === 'proposal'); // a pill for what is not there is not drawn, unless it is the one on
 /** The Needs you folder's toolbar (#8604): the search, the kind pills (All, Permission, Question, Needs input), the Filters icon (Team, Agent, Waiting longer than, Sort), the chips of what is on. */
 function inboxNeedsToolbar() {
     if (!needsBar) {
@@ -153,9 +157,9 @@ const stateOf = t => TV.taskWord(t);
 const inboxTasksState = DT.tableState();
 const needsState = DT.tableState();
 
-async function openReview(row) {
+async function openReview(row, extra = {}) {
     const { openArtifactViewer } = await importOnce('./artifact_viewer.js');
-    openArtifactViewer(row.hex, { server: splitKey(row.team).server, filename: row.name, mediaType: row.media_type, board: splitKey(row.team).name });
+    openArtifactViewer(row.hex, { server: splitKey(row.team).server, filename: row.name, mediaType: row.media_type, board: splitKey(row.team).name, compare: true, ...extra }); // a later version of a series opens with what changed since the one before (#136588)
     markOpenedRead(row.hex).catch(error => sayLive(error.message)); // opening is reading it: the 'read' tag, so it stops counting everywhere (#9277); the viewer does the same for any for-review artifact, once; a failed save is said, and the item keeps counting
 }
 function reviewActions(row) {
@@ -163,12 +167,17 @@ function reviewActions(row) {
     const errorText = DT.el('span', 'inbox-review-error'); errorText.setAttribute('role', 'alert');
     const open = DT.el('button', 'btn btn-small', 'Open'); open.type = 'button';
     open.setAttribute('aria-label', `Open ${row.name}`); open.addEventListener('click', () => openReview(row));
-    const done = DT.el('button', 'btn btn-small', 'Mark reviewed'); done.type = 'button';
-    done.setAttribute('aria-label', `Mark reviewed: ${row.name}`);
+    const done = DT.el('button', 'btn btn-small', 'Approve'); done.type = 'button'; // replaces Mark reviewed (#136584): it clears the row, marks the review approved and tells the agent that uploaded it
+    done.setAttribute('aria-label', `Approve: ${row.name}`);
+    const changes = DT.el('button', 'btn btn-small inbox-review-icon'); changes.type = 'button'; changes.title = 'Request changes'; // an icon, so the row stays one line; its name says what it does
+    changes.append(DT.el('span', 'material-icons', 'rate_review')); changes.firstChild.setAttribute('aria-hidden', 'true');
+    changes.setAttribute('aria-label', `Request changes: ${row.name}`);
+    changes.addEventListener('click', () => openReview(row, { requestChanges: true }));
     done.addEventListener('click', async () => {
         done.disabled = true; errorText.textContent = '';
         try {
-            await markReviewed(row); sayLive(`Reviewed ${row.name}.`);
+            const { approveRow, sayApproved } = await importOnce('./artifact_review.js');
+            sayApproved(row.name, await approveRow(row.team, row)); sayLive(`Approved ${row.name}.`);
             const target = $('group-table-view')?.querySelector('.inbox-review-actions button') || $('group-table-view')?.querySelector('input[type=search]');
             target?.focus({ preventScroll: true });
         } catch (error) { done.disabled = false; errorText.textContent = error.message; }
@@ -187,8 +196,9 @@ function reviewActions(row) {
         });
         box.append(unread);
     }
-    if (isRead(row)) { done.classList.add('inbox-review-icon'); done.title = 'Mark reviewed'; done.textContent = ''; done.append(DT.el('span', 'material-icons', 'done_all')); done.firstChild.setAttribute('aria-hidden', 'true'); }
-    box.append(done, errorText); return box;
+    if (isRead(row)) { done.classList.add('inbox-review-icon'); done.title = 'Approve'; done.textContent = ''; done.append(DT.el('span', 'material-icons', 'check')); done.firstChild.setAttribute('aria-hidden', 'true'); }
+    if (!decisionNeedsPerson(splitKey(row.team).server)) { box.append(done); if (!(isPhoneLayout() && isRead(row))) box.append(changes); } // the same actions on a phone as on a desktop (#11414): Approve is a word, Request changes an icon; only a read item's row, which also has Mark unread, leaves Request changes to the viewer Open leads to (#136584)
+    box.append(errorText); return box;
 }
 
 /** A failed run opens on its job's or workflow's page; opening it is what clears it from Needs you. */
@@ -358,7 +368,7 @@ function inboxSavedToolbar() {
 const savedCounts = () => saved.savedView().totals;
 
 // ── The sidebar list ─────────────────────────────────────────────────────
-const countOf = key => key === 'needs' ? waitingSessions().length + unreadReviewItems().length + failedUnread().length : key === 'tasks' ? taskRows().length : key === 'goals' ? goals.length : key === 'artifacts' ? IA.artifactCount() ?? undefined : key === 'saved' ? savedCounts().open : undefined;
+const countOf = key => key === 'needs' ? waitingSessions().length + unreadReviewItems().length + failedUnread().length + pendingProposals().length : key === 'tasks' ? taskRows().length : key === 'goals' ? goals.length : key === 'artifacts' ? IA.artifactCount() ?? undefined : key === 'saved' ? savedCounts().open : undefined;
 /** The folders of the Inbox (#7785, the mailbox mock): one view list, a name and a count each. Needs you, Tasks and Saved open their table in the centre; */
 const FOLDER_ICONS = { needs: 'notifications', tasks: 'checklist', goals: 'flag', saved: 'saved-bookmark', artifacts: 'inventory_2',
     chats: 'chat_bubble_outline', [BOARDS_FOLDER]: 'forum', 'chats-notes': 'edit_note', 'chats-starred': 'star', 'chats-active': 'bolt', 'chats-archived': 'folder' }; // UI/UX's existing subset choices (#8866); tagged folders keep their colour dot
@@ -415,7 +425,7 @@ function renderInboxNav(force = false) {
         needs.map(s => [sessionServer(s), s.session_id, s.display_name, s.waiting_kind, s.waiting_since, teamOf(s), askOf(s)]), tk.map(t => [t.project, t.id, t.title, t.priority, t.status, t.board, t.updated_at, t.artifact_count]), sv.map(f => [f.id, f.which, f.saved, f.state])]);
     if (!force && key === _navKey) return;
     _navKey = key;
-    if (needsRows().some(s => s.waiting_since) && !_poll) _poll = pollEvery(() => { refreshReviews(); renderInboxNav(true); }, 30000); // "waiting 4 min" in the Needs you table moves on while the tab is open
+    if (needsRows().some(s => s.waiting_since) && !_poll) _poll = pollEvery(() => { refreshReviews(); refreshProposals(); renderInboxNav(true); }, 30000); // "waiting 4 min" in the Needs you table moves on while the tab is open
     if (_folders && list.contains(_folders)) VL.update(_folders, { sections, current: here });
     else { _folders = VL.build({ id: 'inbox-folders', label: 'Inbox views', sections, current: here, onPick: pickFolder }); list.replaceChildren(_folders); }
     const pageList = page && $('inbox-page')?.querySelector('[data-view-list="inbox-goal-folders"], [data-view-list="inbox-item-folders"]'); // an opened item's own folder list (a phone's select) follows the counts too: it was drawn once, with the counts of that moment (#8681)
@@ -554,14 +564,15 @@ registerGroupSource('hub-inbox', {
             const goal = rows.some(goalOf);
             const total = filteredNeeds().length, hidden = allNeeds().length - total; // what the filters hide is said above the list, with the way to show it (#10399)
             const manyTeams = new Set(allNeeds().map(teamOf).filter(Boolean)).size > 1; // with two or more teams waiting, a one-line row names its team
-            return { title: 'Needs you', noun: ['item', 'items'], rows, count: total > rows.length ? `${rows.length} of ${total}` : total, note: reviewErrors().join(' '), empty: { line: NF.isFiltered(needsFilters) ? 'Nothing that needs you matches the search and filters.' : 'Nothing needs you', hint: NF.isFiltered(needsFilters) ? undefined : answered || 'An agent that asks a question or wants permission, and a review artifact, appear here. A task assigned to you is under Tasks.', go: NF.isFiltered(needsFilters) ? undefined : { action: 'inbox-go-agents', label: 'Go to Agents' } },
-                signature: JSON.stringify([hidden, finishedUnread().length, answered || '', manyTeams, needsOverflow().map(g => [g.name, g.more.map(a => a.reviewKey)]), reviewErrors(), rows.map(s => [sessionServer(s), s.session_id, s.display_name, s.waiting_kind, s.waiting_since, waitingText(s.waiting_since), teamOf(s), askOf(s), goalOf(s) ? s.goal.id : 0, s.task ? [s.task.id, s.task.title] : 0, dirOf(s), s.review ? isRead(s.review) : 0])]), // the words move on with the clock: they are part of what was drawn
+            return { title: 'Needs you', noun: ['item', 'items'], rows, count: total > rows.length ? `${rows.length} of ${total}` : total, note: reviewErrors().join(' '), empty: { line: NF.isFiltered(needsFilters) ? 'Nothing that needs you matches the search and filters.' : 'Nothing needs your input.', hint: NF.isFiltered(needsFilters) ? undefined : answered || 'An agent that asks a question or wants permission, and a review artifact, appear here. A task assigned to you is under Tasks.', go: NF.isFiltered(needsFilters) ? undefined : { action: 'inbox-go-agents', label: 'Go to Agents' } },
+                signature: JSON.stringify([hidden, finishedUnread().length, answered || '', manyTeams, needsOverflow().map(g => [g.name, g.more.map(a => a.reviewKey)]), reviewErrors(), rows.map(s => [sessionServer(s), s.session_id, s.display_name, s.waiting_kind, s.waiting_since, waitingText(s.waiting_since), teamOf(s), askOf(s), goalOf(s) ? s.goal.id : 0, s.task ? [s.task.id, s.task.title] : 0, dirOf(s), s.review ? isRead(s.review) : 0, s.proposal ? s.proposal.state : 0])]), // the words move on with the clock: they are part of what was drawn
                 node: () => { const wrap = DT.el('div', 'inbox-needs-results'); const oneLineNeeds = !rows.some(isItem); const table = DT.dataTable({ label: `Needs you, ${rows.length}`, rows, rowKey: s => `${sessionServer(s)}:${s.session_id}`, state: needsState, rowName: s => s.review ? `${s.review.name}, for review, ${teamOf(s)}` : s.autorun ? `${s.autorun.name}, run failed` : s.welcome ? s.welcome.title : resolveSessionIdentity(s),
-                    open: s => { if (s.review) { openReview(s.review); return; } if (s.autorun) { openRun(s.autorun); return; } if (s.welcome) { runWelcome(s.welcome.id); return; } window.switchNavTab?.('agents'); Promise.resolve(window.selectLiveSession?.(s.name, s.agent_type, s.session_id, sessionServer(s))).then(() => window.showChatView?.()); }, // a row that needs an answer shows the chat card, not the terminal saved last (#10141)
+                    open: s => { if (s.proposal) { openProposalDialog(s.proposal, 'view'); return; } if (s.review) { openReview(s.review); return; } if (s.autorun) { openRun(s.autorun); return; } if (s.welcome) { runWelcome(s.welcome.id); return; } window.switchNavTab?.('agents'); Promise.resolve(window.selectLiveSession?.(s.name, s.agent_type, s.session_id, sessionServer(s))).then(() => window.showChatView?.()); }, // a row that needs an answer shows the chat card, not the terminal saved last (#10141)
                     columns: [
-                        { key: 'agent', label: rows.some(isItem) ? 'Item' : 'Agent', primary: true, width: 'grow', ...(rows.some(isItem) ? { min: 24, share: 2 } : {}), sort: true, sortValue: s => resolveSessionIdentity(s), line: 1, ...(oneLineNeeds ? { subtitle: s => askOf(s), subtitleTitle: s => askOf(s) } : {}), // a list of agents: the ask is the row's one second line, under the name (UI/UX: the row's purpose is to decide from the list)
-                            cell: s => { if (s.welcome) { const name = DT.el('span', 'inbox-review-name', s.welcome.title); name.title = s.welcome.title; if (s.welcome.optional) name.append(DT.tag('optional')); return name; } if (s.autorun) { const name = DT.el('span', 'inbox-review-name', s.autorun.name); name.title = s.autorun.name; return name; } if (s.review) { const name = DT.el('span', 'inbox-review-name', s.review.name); name.title = s.review.name; name.dataset.reviewArtifact = s.review.id; if (!isRead(s.review)) return name; const wrap = DT.el('span', 'inbox-review-item'); wrap.append(name, DT.tag('read')); return wrap; } const w = DT.personButton(resolveSessionIdentity(s), `Open ${resolveSessionIdentity(s)}`); Object.assign(w.querySelector('.dt-primary').dataset, { name: s.name, agentType: s.agent_type, sessionId: s.session_id, server: sessionServer(s) }); return w; } },
-                        ...(rows.some(askOf) && !oneLineNeeds ? [{ key: 'asks', label: 'Waiting for', width: 'content', max: 20, drop: 2, line: 2, cell: s => {
+                        { key: 'agent', label: rows.some(isItem) ? 'Item' : 'Agent', primary: true, width: 'grow', ...(rows.some(s => s.proposal) ? { min: 14, share: 1 } : rows.some(isItem) ? { min: 24, share: 2 } : {}), sort: true, sortValue: s => resolveSessionIdentity(s), line: 1, ...(oneLineNeeds ? { subtitle: s => askOf(s), subtitleTitle: s => askOf(s) } : {}), // a list of agents: the ask is the row's one second line, under the name (UI/UX: the row's purpose is to decide from the list)
+                            cell: s => { if (s.welcome) { const name = DT.el('span', 'inbox-review-name', s.welcome.title); name.title = s.welcome.title; if (s.welcome.optional) name.append(DT.tag('optional')); return name; } if (s.proposal) { const name = DT.el('span', 'inbox-review-name', s.proposal.title); name.title = s.proposal.title; return name; } if (s.autorun) { const name = DT.el('span', 'inbox-review-name', s.autorun.name); name.title = s.autorun.name; return name; } if (s.review) { const name = DT.el('span', 'inbox-review-name', s.review.name); name.title = s.review.name; name.dataset.reviewArtifact = s.review.id; if (!isRead(s.review)) return name; const wrap = DT.el('span', 'inbox-review-item'); wrap.append(name, DT.tag('read')); return wrap; } const w = DT.personButton(resolveSessionIdentity(s), `Open ${resolveSessionIdentity(s)}`); Object.assign(w.querySelector('.dt-primary').dataset, { name: s.name, agentType: s.agent_type, sessionId: s.session_id, server: sessionServer(s) }); return w; } },
+                        ...(rows.some(askOf) && !oneLineNeeds ? [{ key: 'asks', label: rows.some(x => x.proposal) ? 'What was asked' : 'Waiting for', ...(rows.some(x => x.proposal) ? { width: 'grow', min: 22, share: 4 } : { width: 'content', max: 20, drop: 2 }), line: 2, cell: s => {
+                            if (s.proposal) { const pr = s.proposal, wrap = DT.el('span', 'inbox-proposal-what'); wrap.append(DT.el('span', 'inbox-proposal-line', `${pr.proposer} proposes a ${pr.kind === 'goal' ? 'goal' : 'task'}`)); if (carriesInstructions(pr)) wrap.append(DT.el('span', 'inbox-proposal-flag', 'Carries instructions: open it to read them')); const body = pr.payload && (pr.payload.body || pr.payload.outcome) || ''; if (body) { const t = DT.el('span', 'inbox-proposal-body', body.length > 600 ? `${body.slice(0, 600)}…` : body); t.title = body.length > 600 ? 'Open it to read all of it' : ''; wrap.append(t); } wrap.title = pr.title; return wrap; } // the proposer's name and the proposal's words are text: the row says what is asked
                             if (s.autorun || s.welcome) { const why = DT.el('span', null, askOf(s)); why.title = askOf(s); return why; } // the whole reason is the tooltip: the line is one
                             if (!s.review) { const ask = askOf(s); if (!ask) return ''; const why = DT.el('span', null, ask); why.title = ask; return why; } // the whole ask is the tooltip: the row is one line
                             const metadata = DT.el('span', 'inbox-review-metadata'); metadata.append(DT.el('span', null, 'For review'), DT.el('span', 'inbox-review-team', teamOf(s)));
@@ -582,9 +593,9 @@ registerGroupSource('hub-inbox', {
                             cell.title = [goalOf(s) ? `Goal: ${s.goal.title}` : NO_GOAL, s.task ? `Task: ${s.task.title || `#${s.task.id}`}` : ''].filter(Boolean).join(' \u00b7 ');
                             return cell;
                         } }] : []),
-                        ...(rows.some(isItem) ? [{ key: 'review', label: 'Actions', fixed: true, width: rows.some(s => s.review && isRead(s.review)) ? '21rem' : '13.5rem', line: 1, cell: s => (s.review ? reviewActions(s.review) : s.autorun ? runActions(s.autorun) : s.welcome ? welcomeActions(s.welcome) : '') }] : []),
+                        ...(rows.some(isItem) ? [{ key: 'review', label: 'Actions', fixed: true, width: rows.some(s => s.proposal) ? '16rem' : rows.some(s => s.review && isRead(s.review)) ? '21rem' : '13.5rem', line: 1, cell: s => (s.proposal ? proposalActions(s.proposal) : s.review ? reviewActions(s.review) : s.autorun ? runActions(s.autorun) : s.welcome ? welcomeActions(s.welcome) : '') }] : []),
                         { key: 'waiting', label: 'Waiting', ...(oneLineNeeds ? { width: '9rem' } : { min: rows.some(isItem) ? 12 : 18 }), tone: 'tertiary', align: 'end', sort: true, sortValue: s => s.waiting_since || '', firstDir: 'desc', line: rows.some(isItem) ? 2 : 1, cell: s => waitingText(s.waiting_since) || '' },
-                    ], ...(oneLineNeeds ? { oneLine: true, sortBar: false } : {}), ...(oneLineNeeds ? { mail: s => ({ lead: { text: needsName(s), name: needsName(s) }, title: needsName(s), medium: true, starred: !!(s.review && s.review.starred), team: teamOf(s), teamAlways: multipleServers() || manyTeams, nameTeam: true, snippetTip: true, snippet: askOf(s) || sessionStateInfo(s).label, state: askOf(s) || sessionStateInfo(s).label, time: DT.shortTime(s.waiting_since), unread: true, mark: 'attention', answers: answerCell(s) }) } : {}) }); // a phone's row is the mail row: the agent, then the ask on a second line, amber and bold (every row of Needs you is unanswered); a list with a review or a run keeps its own actions. One line a row (Goal #79) for a list of agents: the ask is the row's tooltip, a narrow list drops it, then the team, the folder and the CLI; a list with a review item or a failed run keeps its own folded rows
+                    ], ...(oneLineNeeds ? { oneLine: true, sortBar: false } : {}), ...(oneLineNeeds ? { mail: s => ({ lead: { text: needsName(s), name: needsName(s) }, title: needsName(s), medium: true, starred: !!(s.review && s.review.starred), team: teamOf(s), teamAlways: multipleServers() || manyTeams, nameTeam: true, snippetTip: true, snippet: askOf(s) || sessionStateInfo(s).label, state: askOf(s) || sessionStateInfo(s).label, time: DT.shortTime(s.waiting_since), unread: true, mark: 'attention', answers: answerCell(s, { dismiss: false }), actions: rowActions(s) }) } : {}) }); // a phone's row is the mail row: the agent, then the ask on a second line, amber and bold (every row of Needs you is unanswered); a list with a review or a run keeps its own actions. One line a row (Goal #79) for a list of agents: the ask is the row's tooltip, a narrow list drops it, then the team, the folder and the CLI; a list with a review item or a failed run keeps its own folded rows
                     wrap.append(table.el);
                     if (rows.some(r => r.welcome)) { const hide = DT.el('button', 'btn btn-quiet btn-small inbox-welcome-hide', 'Hide all welcome items'); hide.type = 'button'; hide.addEventListener('click', () => { hideAllWelcome(); sayLive('The welcome items are hidden.'); }); wrap.append(hide); } // one quiet way out (#11443)
                     if (hidden > 0) {
@@ -703,7 +714,6 @@ export function filterInbox(value) {
 }
 
 // ── Saved message page ──────────────────────
-const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = String(text); return e; };
 function openPageShell(kindLabel, groupKey) {
     const host = $('inbox-page');
     host.hidden = false;
@@ -825,6 +835,7 @@ export async function showInbox({ folder = '', quiet = false } = {}) {
     } else {
         refreshTasks();
         refreshReviews(true);
+        refreshProposals(true);
         refreshRuns(true);
         refreshGoals();
         IA.refreshArtifactCount(() => renderInboxNav(true));

@@ -175,6 +175,10 @@ func (h *SessionsHandler) addNeedsInput(r *http.Request, reply map[string]any, n
 	if sessionID == "" || r.URL.Query().Get("before") != "" {
 		return
 	}
+	if agentType == at.Opencode { // its server says what it waits for: the card comes from there, not from hooks or the screen
+		h.opencodeNeedsInput(reply, sessionID)
+		return
+	}
 	var pending any
 	t, hasPending := h.pending.get(sessionID, time.Now())
 	if hasPending {

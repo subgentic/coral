@@ -33,6 +33,7 @@ GET /api/board/{project}/messages/check | (*BoardHandler).CheckUnread-fm
 GET /api/board/{project}/messages/search | (*BoardHandler).SearchMessages-fm
 GET /api/board/{project}/paused | (*BoardHandler).GetPaused-fm
 GET /api/board/{project}/peek | (*BoardHandler).PeekAgent-fm
+GET /api/board/{project}/proposals | (*BoardHandler).ListProposals-fm
 GET /api/board/{project}/queue | (*BoardHandler).MergeQueue-fm
 GET /api/board/{project}/relay-targets | (*BoardHandler).ListRelayTargets-fm
 GET /api/board/{project}/reminder | (*BoardHandler).GetSubscriberReminder-fm
@@ -63,6 +64,7 @@ PATCH /api/board/{project}/goals/{goalID} | (*BoardHandler).UpdateGoal-fm
 PATCH /api/board/{project}/tasks/{taskID} | (*BoardHandler).UpdateTask-fm
 PATCH /api/board/{project}/tasks/{taskID}/amend | (*BoardHandler).AmendTask-fm
 POST /api/board/remotes | (*BoardRemotesHandler).AddSubscription-fm
+POST /api/board/{project}/artifacts/{id}/review | (*BoardHandler).ReviewArtifact-fm
 POST /api/board/{project}/cross-team-links | (*BoardHandler).AddLocalLinks-fm
 POST /api/board/{project}/cross-team/disable | (*BoardHandler).HubCrossTeamDisable-fm
 POST /api/board/{project}/cross-team/enable | (*BoardHandler).HubCrossTeamEnable-fm
@@ -80,7 +82,11 @@ POST /api/board/{project}/health/ack | (*BoardHandler).AckHealthItem-fm
 POST /api/board/{project}/hub-notice | (*BoardHandler).PostHubNotice-fm
 POST /api/board/{project}/messages | (*BoardHandler).PostMessage-fm
 POST /api/board/{project}/messages/mark-read | (*BoardHandler).MarkRead-fm
+POST /api/board/{project}/operator-artifacts | (*BoardHandler).UploadOperatorArtifact-fm
+POST /api/board/{project}/operator-artifacts/message | (*BoardHandler).ShareOperatorArtifacts-fm
 POST /api/board/{project}/pause | (*BoardHandler).PauseBoard-fm
+POST /api/board/{project}/proposals/{id}/approve | (*BoardHandler).ApproveProposal-fm
+POST /api/board/{project}/proposals/{id}/reject | (*BoardHandler).RejectProposal-fm
 POST /api/board/{project}/relay-messages | (*BoardHandler).PostRelayMessage-fm
 POST /api/board/{project}/reminder | (*BoardHandler).RemindSubscriber-fm
 POST /api/board/{project}/resume | (*BoardHandler).ResumeBoard-fm

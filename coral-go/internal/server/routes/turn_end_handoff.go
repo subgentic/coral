@@ -60,6 +60,11 @@ func (h *SessionsHandler) TurnEndHandoff(w http.ResponseWriter, r *http.Request)
 		writeJSON(w, http.StatusOK, none)
 		return
 	}
+	if ptymanager.NoticesHeld(owner.SessionID) {
+		// Coral's notices to this agent are paused, or the person is typing to it (#11387): the hand-off is one of them. The messages stay unread; the next turn end after the hold, or the reminder, hands them over.
+		writeJSON(w, http.StatusOK, none)
+		return
+	}
 	board := *ls.BoardName
 	if h.boardHandler != nil && h.boardHandler.IsPaused(board) {
 		// A paused board delivers nothing to read, so "N new messages, run coral-board read" at every turn end was a loop that led nowhere (#11198): they wait for the board to be resumed.

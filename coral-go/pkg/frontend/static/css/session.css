@@ -234,6 +234,20 @@
 .session-tooltip-facts { max-width: 360px; }
 .session-tooltip-facts dt { white-space: nowrap; }
 .session-tooltip-facts dd { word-break: break-word; }
+/* The card in four groups (#11423): the state first and larger, the work, the agent as one plain line, the usage quiet; a divider between groups, no extra words */
+.tt-groups { display: flex; flex-direction: column; }
+.tt-group { margin: 0; padding-block: 8px; border-top: 1px solid var(--border); }
+.tt-groups > .tt-group:first-child { border-top: 0; padding-top: 0; }
+.tt-groups > .tt-group:last-child { padding-bottom: 0; }
+.tt-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.tt-head .facts-row { display: flex; align-items: baseline; gap: 6px; }
+.tt-head dd.tt-state { font-size: var(--fs-xl); font-weight: var(--fw-strong); }
+.tt-head .facts-row:last-child dt, .tt-head .facts-row:last-child dd { color: var(--text-muted); font-size: var(--fs-base); font-weight: var(--fw-regular); }
+.tt-goal { font-weight: var(--fw-medium); }
+.tt-agent { display: flex; flex-wrap: wrap; gap: 2px 16px; }
+.tt-agent .facts-row { display: block; }
+.tt-usage { color: var(--text-muted); font-size: var(--fs-base); font-variant-numeric: tabular-nums; }
+.tt-usage dd { font-size: var(--fs-base); }
 
 .tt-state-working           { color: var(--working); font-weight: var(--fw-strong); }
 .tt-state-needs-input       { color: var(--warning); font-weight: var(--fw-strong); }
@@ -1785,7 +1799,7 @@ body .terminal-header { flex-wrap: wrap; height: auto; min-height: 36px; row-gap
 .agent-phone-details .facts dd { overflow-wrap: anywhere; }
 @media (max-height: 500px) { .agent-phone-details { display: none !important; } }
 /* The folder's full path, in a tip under the header (the header is the positioned ancestor, as for the branch's): on keyboard focus of the name everywhere, on hover where the primary pointer is not coarse. */
-.terminal-header[data-folder]:not([data-tip-off]):has(.terminal-identity:focus-visible)::after { content: attr(data-folder); }
+.terminal-header[data-folder][data-tip-kbd]:not([data-tip-off]):has(.terminal-identity:focus-visible)::after { content: attr(data-folder); } /* only when a key put the focus there (data-tip-kbd, session_header_updates.js, #11391): a script's focus on a touch screen counts as focus-visible and left the path over the first message */
 @media not all and (pointer: coarse) { .terminal-header[data-folder]:not([data-tip-off]):has(.terminal-identity:hover)::after { content: attr(data-folder); } }
 .terminal-header[data-folder]::after { content: none; position: absolute; left: 8px; top: calc(100% + 2px); z-index: 40; box-sizing: border-box; width: max-content; max-width: min(36rem, calc(100vw - 2rem)); padding: 4px 8px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-secondary); box-shadow: 0 4px 14px rgba(var(--black-rgb), 0.25); color: var(--text-primary); font-family: var(--font-mono); font-size: var(--fs-sm); white-space: normal; overflow-wrap: anywhere; pointer-events: none; }
 .terminal-identity:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: var(--radius-xs); }
@@ -1802,3 +1816,12 @@ body .terminal-header { flex-wrap: wrap; height: auto; min-height: 36px; row-gap
 
 /* The agent row's status sentence (#10801): the phone's list shows it as the row's second line (mobile.css); the sidebar says it with the state pill, so it is not drawn there. */
 .session-status-line { display: none; }
+
+/* Pause Coral's messages (#11388): the header's toggle is a bell that goes quiet; the bar above the composer says what is held and for how long. A touch screen's toggle is a 44 px target. */
+.notice-pause-btn.notice-pause-on { color: var(--warning); }
+.notice-pause-line { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 6px 10px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-secondary); color: var(--text-primary); }
+.notice-pause-resume[hidden] { display: none; }
+.notice-pause-line.notice-pause-idle { position: absolute; width: 1px; height: 1px; min-height: 0; margin: 0; padding: 0; border: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; } /* idle: out of the flow (a flex item of height 0 still took the column's gap: 6 px of composer) but in the page, so its words are announced when they come */
+.notice-pause-line.notice-pause-hold { border-color: transparent; background: none; color: var(--text-secondary); padding-block: 2px; } /* the auto-hold while typing is a quiet line, not a state the person set */
+.notice-pause-text { flex: 1 1 12rem; min-width: 0; }
+@media (pointer: coarse), (max-width: 767px) { .btn-icon.btn-xs.notice-pause-btn { width: var(--control-touch-height, 44px); min-width: var(--control-touch-height, 44px); height: var(--control-touch-height, 44px); min-height: var(--control-touch-height, 44px); } .notice-pause-resume { min-height: var(--control-touch-height, 44px); } } /* .btn-icon.btn-xs is a 24 px square: this is the one touch-sized exception */

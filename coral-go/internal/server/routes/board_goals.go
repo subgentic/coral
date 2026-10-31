@@ -40,7 +40,7 @@ func goalError(w http.ResponseWriter, err error) bool {
 	switch ge.Code {
 	case board.ErrGoalNotFound.Code, board.ErrGoalTaskNotFound.Code:
 		status = http.StatusNotFound
-	case board.ErrGoalClosed.Code, board.ErrGoalAlreadyClosed.Code, board.ErrGoalNotClosed.Code:
+	case board.ErrGoalClosed.Code, board.ErrGoalAlreadyClosed.Code, board.ErrGoalNotClosed.Code, "goal_limit":
 		status = http.StatusConflict
 	}
 	writeError(w, status, ge.Code, ge.Message)
@@ -147,6 +147,21 @@ func (h *BoardHandler) CreateGoal(w http.ResponseWriter, r *http.Request) {
 	}
 	actor, ok := h.goalActor(w, r, project, claim)
 	if !ok {
+		return
+	}
+	if hold, ok := h.needsApproval(r, project, board.ProposalGoal); !ok {
+		errInternalServer(w, "could not read the board's settings")
+		return
+	} else if hold { // this team's goals need the Operator's approval (#11389): an agent's goal is a proposal until it is approved
+		in := board.GoalInput{Title: body.Title, Outcome: body.Outcome, DoneWhen: body.DoneWhen, State: body.State, Driver: body.Driver, CreatedBy: actor}
+		if err := board.ValidateGoalInput(in); err != nil {
+			if !goalError(w, err) {
+				errBadRequest(w, err.Error())
+			}
+			return
+		}
+		payload, _ := json.Marshal(goalPayload{Title: body.Title, Outcome: body.Outcome, DoneWhen: body.DoneWhen, State: body.State, Driver: body.Driver, CreatedBy: verifiedName(r, actor)})
+		h.proposeAnswer(w, r, board.ProposalInput{Board: project, Kind: board.ProposalGoal, Title: body.Title, Payload: payload, Proposer: actor})
 		return
 	}
 	g, err := h.bs.CreateGoal(r.Context(), project, board.GoalInput{Title: body.Title, Outcome: body.Outcome, DoneWhen: body.DoneWhen, State: body.State, Driver: body.Driver, CreatedBy: actor})

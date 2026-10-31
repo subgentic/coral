@@ -34,6 +34,8 @@ type waitTimings struct {
 	// treeGrace is how long what a killed tmux agent started is given to end on the hangup and SIGTERM before it is killed (tmux_tree_unix.go). A test that proves the signals themselves ended it, not the SIGKILL
 	// after the grace, lengthens it so that a stall of the machine cannot let the kill come first (#8025).
 	treeGrace time.Duration
+	// noticeHoldMax and noticeHoldStep: how long a notice for an agent that was just launched is held until its process is recorded, and how often it is checked again (NoticeBlockedWait).
+	noticeHoldMax, noticeHoldStep time.Duration
 }
 
 var waitsP atomic.Pointer[waitTimings]
@@ -53,6 +55,8 @@ func init() {
 		launchFallback:        2 * time.Minute,
 		launchEvery:           time.Second,
 		treeGrace:             3 * time.Second,
+		noticeHoldMax:         15 * time.Second,
+		noticeHoldStep:        200 * time.Millisecond,
 	})
 }
 

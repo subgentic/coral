@@ -141,11 +141,15 @@ document.addEventListener("submit", (e) => {
     if (!form) return;
     e.preventDefault();
     if (!ownPromptCard(form)) return;
-    const input = form.querySelector("input");
-    const text = input.value.trim();
-    if (!text) {
-        input.focus();
-        return;
-    }
-    sendPromptAnswer(ownPromptCard(form), Number(form.dataset.n), form.dataset.label, "text", text);
+    const input = form.querySelector("input.cni-text-input");
+    const sid = state.currentSession && state.currentSession.session_id;
+    importOnce('./card_attach.js').then(A => { // loaded already when the card drew its image strip (#11403)
+        if (sid && A.cardImagesUploading(sid)) { showToast("An image is still uploading. Send when it is done.", true); return; }
+        const text = [...(sid ? A.answerLead(sid) : []), input.value.trim()].filter(Boolean).join(" "); // the images' links and their one hint, then the typed words: what the message box sends
+        if (!text) {
+            input.focus();
+            return;
+        }
+        sendPromptAnswer(ownPromptCard(form), Number(form.dataset.n), form.dataset.label, "text", text).then(ok => { if (ok && sid) A.clearCardImages(sid); });
+    }).catch(() => showToast("Could not send the answer. Use the terminal.", true));
 });

@@ -1,0 +1,497 @@
+package opencode
+
+import (
+	"context"
+	"crypto/rand"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"github.com/subgentic/coral/internal/fsreplace"
+	"github.com/subgentic/coral/internal/safego"
+	"log/slog"
+	"net"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"regexp"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/subgentic/coral/internal/agentenv"
+	"github.com/subgentic/coral/internal/executil"
+	"github.com/subgentic/coral/internal/secfile"
+)
+
+// ServeArgs are the arguments that start an opencode server for Coral on a loopback port (`opencode serve --hostname 127.0.0.1 --port <port>`, confirmed on v2.2.4 by Pi Tester, #11364); the password comes in
+// OPENCODE_PASSWORD (the server has no password flag), never in the arguments.
+func ServeArgs(port int) []string {
+	return []string{"serve", "--hostname", "127.0.0.1", "--port", strconv.Itoa(port)}
+}
+
+// Config is how Coral runs an opencode server.
+type Config struct {
+	Bin     string // the opencode executable, as it is exec'd
+	DataDir string // Coral's own folder for opencode (<Coral data dir>/opencode): the XDG folders, its database and its credentials are here and nowhere else
+	Args    func(port int) []string
+	Version string        // the version to take the binary for ("1.19.5"), instead of asking it with --version (a test's way to say what its stand-in is)
+	DBFile  string        // this server's own session store (OPENCODE_DB): its conversations are in no other server's reach; "" leaves opencode's own place under the shared data folder
+	Ask     bool          // ask first: the server's config asks before an edit and before a command (PermissionAsk); false leaves opencode's own defaults (no questions inside the folder)
+	Model   string        // the model this server starts on, "provider/model" or "provider/model#variant" (a top-level "model" of a config file Coral writes for it); "" leaves opencode's own
+	Ready   time.Duration // how long one attempt waits for the server to answer an authenticated call (default 20 s)
+
+	pickPort func() (int, error) // a test's way to make a port race
+
+	readIdentity  func(pid int) (started, image string) // how a new server's start time and image are read (default: the platform's); a test's way to stand in for a process that cannot be read at first
+	identityRetry time.Duration                         // how long to wait before reading them a second time when the first read was not complete (default 100 ms)
+}
+
+// Server is one opencode server Coral runs for ONE agent: its own port and its own password, so what one agent's tools can reach is that agent's server and no other's (Security, #11364). Its database, and with it
+// the sessions a resume needs, is Coral's folder's, shared by the servers of Coral's agents and never the person's own opencode or its background service.
+type Server struct {
+	URL      string
+	Version  Version // the opencode build this server is: what its launch line and password variable were chosen by
+	password string
+	cmd      *exec.Cmd
+	dir      string // this server's own folder: its pid record and its password file
+	done     chan struct{}
+	started  string // the process's start time and image taken right after it started (processStart, processImage): Windows ends it only while the pid is still that process
+	image    string
+}
+
+// keyRe is what an agent's key may be (its Coral session id): it names a folder.
+var keyRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$`)
+
+// PasswordEnv is the environment entry an opencode client of this server needs (<the variable of its version>=...): for the pane's environment, never for argv, a log or a pid file.
+func (s *Server) PasswordEnv() string {
+	vars := PasswordVars(s.Version.Major)
+	return vars[len(vars)-1] + "=" + s.password
+}
+
+// Client is a client of the server.
+func (s *Server) Client() (*Client, error) {
+	c, err := New(s.URL, s.password)
+	if err != nil {
+		return nil, err
+	}
+	return c.ForVersion(s.Version.Major), nil
+}
+
+// ToolEnv is the environment opencode runs in for Coral, the server and anything that asks it about its own credentials (`opencode auth list`, `opencode auth login`): the one an agent gets (agentenv.Filter:
+// Coral's own variables, tokens, keys and the identity of whatever started Coral are not passed on), without any OPENCODE_ or XDG_ name of the person's own or any CORAL_ one, plus Coral's XDG folders. Its
+// credential store is Coral's, never the person's own opencode's: what is signed in there is what an agent's server has.
+func ToolEnv(inherited []string, dataDir string) []string {
+	var env []string
+	for _, kv := range agentenv.Filter(inherited) {
+		name, _, _ := strings.Cut(kv, "=")
+		// nothing of Coral's reaches opencode either: agentenv.Filter keeps the CORAL_ variables an agent's tools read (CORAL_URL, CORAL_SESSION_NAME ...), which opencode has no use for
+		if strings.HasPrefix(strings.ToUpper(name), "OPENCODE_") || strings.HasPrefix(name, "XDG_") || strings.HasPrefix(strings.ToUpper(name), "CORAL_") {
+			continue
+		}
+		env = append(env, kv)
+	}
+	for _, kv := range XDGVars(dataDir) {
+		env = append(env, kv[0]+"="+kv[1])
+	}
+	return env
+}
+
+// XDGVars are the folders opencode keeps its config, credentials, cache and state in when it runs for Coral: under Coral's own opencode folder, shared by the servers of Coral's agents and by nothing of the person's.
+func XDGVars(dataDir string) [][2]string {
+	return [][2]string{
+		{"XDG_CONFIG_HOME", filepath.Join(dataDir, "config")},
+		{"XDG_DATA_HOME", filepath.Join(dataDir, "data")},
+		{"XDG_CACHE_HOME", filepath.Join(dataDir, "cache")},
+		{"XDG_STATE_HOME", filepath.Join(dataDir, "state")},
+	}
+}
+
+// serverEnv is the environment of one server: ToolEnv, the server's password, and its own config file when it has a model.
+func serverEnv(inherited []string, dataDir string, major int, password, configFile, dbFile string) []string {
+	env := ToolEnv(inherited, dataDir)
+	if configFile != "" {
+		env = append(env, "OPENCODE_CONFIG="+configFile)
+	}
+	if dbFile != "" {
+		env = append(env, "OPENCODE_DB="+dbFile) // this agent's own session store: the shared XDG_DATA_HOME holds the credentials only
+	}
+	for _, name := range PasswordVars(major) { // the variable this build reads: a server given one it ignores is open
+		env = append(env, name+"="+password)
+	}
+	return env
+}
+
+func freeLoopbackPort() (int, error) {
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		return 0, err
+	}
+	defer l.Close()
+	return l.Addr().(*net.TCPAddr).Port, nil
+}
+
+// modelRe is a model as opencode's config takes it: provider/model, with an optional #variant (the effort). It never holds a space, a quote or a control character, and never starts with a dash.
+var modelRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:@\[\]+-]{0,63}/[A-Za-z0-9._:@\[\]+/-]{1,127}(#[A-Za-z0-9._-]{1,32})?$`)
+
+// ValidModel reports whether m can be the model of a server's config.
+func ValidModel(m string) bool { return modelRe.MatchString(m) }
+
+// writeModelConfig writes the config file of one server (a top-level "model", nothing else) into its own folder, and returns its path; "" when there is no model to set. The file is the server's alone: the person's
+// own opencode.json is never read or changed.
+func writeModelConfig(dir, model string, ask bool) (string, error) {
+	if model == "" && !ask {
+		return "", nil
+	}
+	if model != "" && !ValidModel(model) {
+		return "", fmt.Errorf("opencode: %q is not a model (provider/model, with an optional #variant)", model)
+	}
+	conf := map[string]any{"$schema": "https://opencode.ai/config.json"}
+	if model != "" {
+		conf["model"] = model
+	}
+	if ask {
+		// ask first: opencode asks before an edit and before a command (its own defaults allow both), and its server tells Coral so on the event stream (permission.asked) and takes the answer on
+		// POST /permission/<id>/reply (checked on 1.19.5, #11395). Anything outside the folder it asks about already.
+		conf["permission"] = map[string]string{"edit": "ask", "bash": "ask"}
+	}
+	b, err := json.Marshal(conf)
+	if err != nil {
+		return "", err
+	}
+	p := filepath.Join(dir, "opencode.json")
+	return p, writePrivate(p, b)
+}
+
+// StoreFile is the session store of the agent whose server folder is key's: servers/<key>/opencode.db. Every server has its own, so one agent's server can never list or read another's conversations;
+// only the credentials (the shared XDG_DATA_HOME) are common.
+func StoreFile(dataDir, key string) string {
+	return filepath.Join(dataDir, "servers", key, "opencode.db")
+}
+
+// storesDir holds, for each opencode session a server has named, which agent's store the session is in (a file stores/<session id> holding that agent's key): a restart or resume gives the agent a new Coral
+// id, and the session it picks up is found in the store it was made in.
+func storesDir(dataDir string) string { return filepath.Join(dataDir, "stores") }
+
+// noteStore records that session is in key's store.
+func noteStore(dataDir, session, key string) {
+	if !validSessionID(session) || !keyRe.MatchString(key) {
+		return
+	}
+	if err := os.MkdirAll(storesDir(dataDir), 0o700); err == nil {
+		_ = writePrivate(filepath.Join(storesDir(dataDir), session), []byte(key))
+	}
+}
+
+// agentsDir holds, for each agent, the newest opencode session it named (a file stores/agents/<key> holding the session id): a wake, a restart or a Coral restart gives the agent's TUI that session to pick up,
+// because Coral's own id for the agent is not opencode's.
+func agentsDir(dataDir string) string { return filepath.Join(storesDir(dataDir), "agents") }
+
+// noteAgentSession records session as the newest one the agent key has.
+func noteAgentSession(dataDir, key, session string) {
+	if !validSessionID(session) || !keyRe.MatchString(key) {
+		return
+	}
+	if err := os.MkdirAll(agentsDir(dataDir), 0o700); err == nil {
+		_ = writePrivate(filepath.Join(agentsDir(dataDir), key), []byte(session))
+	}
+}
+
+// StoredSession is the newest opencode session the agent key named, "" when none is recorded or the record is not a session id.
+func StoredSession(dataDir, key string) string {
+	if !keyRe.MatchString(key) {
+		return ""
+	}
+	b, err := os.ReadFile(filepath.Join(agentsDir(dataDir), key))
+	if err != nil || len(b) > 256 {
+		return ""
+	}
+	if s := strings.TrimSpace(string(b)); validSessionID(s) {
+		return s
+	}
+	return ""
+}
+
+// storeOf is the key of the agent whose store holds session: "" when it is not known, or the record is not a key, or that store is not there.
+func storeOf(dataDir, session string) string {
+	if !validSessionID(session) {
+		return ""
+	}
+	b, err := os.ReadFile(filepath.Join(storesDir(dataDir), session))
+	if err != nil || len(b) > 256 {
+		return ""
+	}
+	key := strings.TrimSpace(string(b))
+	if !keyRe.MatchString(key) {
+		return ""
+	}
+	if fi, err := os.Stat(StoreFile(dataDir, key)); err != nil || !fi.Mode().IsRegular() {
+		return ""
+	}
+	return key
+}
+
+// pidRecord is what Coral keeps of a server it started, to stop it after a crash: the pid and the port, the exact command it was started with and when the process began: never the password.
+type pidRecord struct {
+	PID     int    `json:"pid"`
+	Port    int    `json:"port"`
+	Command string `json:"command"`         // the executable and arguments as exec'd, joined by one space
+	Started string `json:"started"`         // when the process began (processStart: ps's start time, on Windows its creation time)
+	Image   string `json:"image,omitempty"` // Windows only: the executable the process runs (processImage), checked with the start time before the process is ended
+}
+
+// writePrivate writes data to path as a private file nobody can have planted a link at: a new file in the same folder created exclusively (no following of a link, mode 0600), then renamed over path.
+func writePrivate(path string, data []byte) error {
+	raw := make([]byte, 6)
+	if _, err := rand.Read(raw); err != nil {
+		return err
+	}
+	tmp := path + "." + hex.EncodeToString(raw) + ".tmp"
+	f, err := secfile.OpenNoFollow(tmp, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	if err != nil {
+		return err
+	}
+	if _, err := f.Write(data); err != nil {
+		f.Close()
+		os.Remove(tmp)
+		return err
+	}
+	if err := f.Close(); err != nil {
+		os.Remove(tmp)
+		return err
+	}
+	if err := fsreplace.Rename(tmp, path); err != nil {
+		os.Remove(tmp)
+		return err
+	}
+	return nil
+}
+
+// PasswordFile writes the password to a private file in this server's own folder (0600, the owner's alone) and returns its path: the agent's pane reads OPENCODE_PASSWORD from it, so the secret is never in the
+// line typed into the pane.
+func (s *Server) PasswordFile() (string, error) {
+	p := filepath.Join(s.dir, "password")
+	return p, writePrivate(p, []byte(s.password))
+}
+
+// startAttempts is how many ports one Start tries before it gives up.
+const startAttempts = 3
+
+// Start runs the opencode server of the agent key and returns when it answers an authenticated call. A server a previous Coral left running for that key is stopped first (the exact command and start time match
+// required). A port another process took between the choosing and the listening is not trusted: the child must be alive and answer with this server's password, or the next port is tried.
+func Start(ctx context.Context, cfg Config, key string) (*Server, error) {
+	if cfg.Bin == "" || cfg.DataDir == "" || !keyRe.MatchString(key) {
+		return nil, errors.New("opencode: a binary, a data folder and an agent key are needed")
+	}
+	if cfg.Args == nil {
+		cfg.Args = ServeArgs
+	}
+	if cfg.Ready <= 0 {
+		cfg.Ready = 20 * time.Second
+	}
+	if cfg.pickPort == nil {
+		cfg.pickPort = freeLoopbackPort
+	}
+	if cfg.readIdentity == nil {
+		cfg.readIdentity = defaultReadIdentity
+	}
+	if cfg.identityRetry == 0 {
+		cfg.identityRetry = 100 * time.Millisecond
+	}
+	dir := filepath.Join(cfg.DataDir, "servers", key)
+	for _, d := range []string{cfg.DataDir, filepath.Join(cfg.DataDir, "servers"), dir, filepath.Join(cfg.DataDir, "config"), filepath.Join(cfg.DataDir, "data"), filepath.Join(cfg.DataDir, "cache"), filepath.Join(cfg.DataDir, "state")} {
+		if err := os.MkdirAll(d, 0o700); err != nil {
+			return nil, err
+		}
+	}
+	stopLeftOver(filepath.Join(dir, "server.json"))
+	// What build this is decides the password variable and the launch line: asked of the binary (its --version, parsed strictly) unless the config says. A launch that cannot tell does not go on.
+	// The binary is resolved ONCE and that path is what is asked for its version and what is started: PATH changing in between can never make the version that of another binary.
+	resolved, lerr := exec.LookPath(cfg.Bin)
+	if lerr != nil {
+		return nil, fmt.Errorf("opencode: %w", lerr)
+	}
+	cfg.Bin = resolved
+	var version Version
+	var verr error
+	if cfg.Version != "" {
+		version, verr = ParseVersion(cfg.Version)
+	} else {
+		version, verr = DetectVersion(ctx, cfg.Bin, cfg.DataDir)
+	}
+	if verr != nil {
+		return nil, verr
+	}
+	var lastErr error
+	for attempt := 0; attempt < startAttempts; attempt++ {
+		port, err := cfg.pickPort()
+		if err != nil {
+			return nil, err
+		}
+		s, err := startOn(ctx, cfg, version, dir, port)
+		if err == nil {
+			return s, nil
+		}
+		lastErr = err
+		if ctx.Err() != nil {
+			break
+		}
+	}
+	return nil, lastErr
+}
+
+// startOn starts one server on port and trusts it only when it proves itself (below).
+//
+// A stranger that holds the chosen port: checked on opencode 1.19.5 (a python listener on 127.0.0.1:<port>, #138222): `opencode serve --port <port>` EXITS at once with a ServeError and does not move to another
+// port, so s.done fires, this attempt is thrown away and the next has a new password, port and server; and once opencode listens, a plain bind, SO_REUSEADDR and SO_REUSEPORT on the same port are all refused, so a
+// stranger cannot share it. A build that fell back to another port while a stranger answered on this one could be told apart only by who owns the listener (#11398).
+func startOn(ctx context.Context, cfg Config, version Version, dir string, port int) (*Server, error) {
+	raw := make([]byte, 32)
+	if _, err := rand.Read(raw); err != nil {
+		return nil, err
+	}
+	password := hex.EncodeToString(raw)
+	args := cfg.Args(port)
+	cmd := executil.Command(context.Background(), cfg.Bin, args...) // not ctx: the server outlives one request
+	cmd.Dir = cfg.DataDir
+	configFile, err := writeModelConfig(dir, cfg.Model, cfg.Ask)
+	if err != nil {
+		return nil, err
+	}
+	cmd.Env = serverEnv(os.Environ(), cfg.DataDir, version.Major, password, configFile, cfg.DBFile)
+	if err := cmd.Start(); err != nil {
+		return nil, fmt.Errorf("opencode: could not start the server: %w", err)
+	}
+	s := &Server{URL: "http://127.0.0.1:" + strconv.Itoa(port), Version: version, password: password, cmd: cmd, dir: dir, done: make(chan struct{})}
+	s.started, s.image = identityOf(cmd.Process.Pid, cfg.readIdentity, cfg.identityRetry)
+	safego.Go("opencode:wait", func() { defer close(s.done); _ = cmd.Wait() })
+	pidFile := filepath.Join(dir, "server.json")
+	rec, _ := json.Marshal(pidRecord{PID: cmd.Process.Pid, Port: port, Command: strings.Join(append([]string{cfg.Bin}, args...), " "), Started: s.started, Image: s.image})
+	_ = writePrivate(pidFile, rec)
+	fail := func(err error) (*Server, error) {
+		s.Stop()
+		return nil, err
+	}
+	c, err := s.Client()
+	if err != nil {
+		return fail(err)
+	}
+	// The probe sends a WRONG password first: only a server that refuses it is one that wants a password, and the real one goes to the port only after that, so a stranger that won the port race never sees it.
+	bad, err := New(s.URL, "not-"+password)
+	if err != nil {
+		return fail(err)
+	}
+	exited := func() bool {
+		select {
+		case <-s.done:
+			return true
+		default:
+			return false
+		}
+	}
+	deadline := time.Now().Add(cfg.Ready)
+	for {
+		select {
+		case <-s.done:
+			_ = os.Remove(pidFile)
+			return nil, errors.New("opencode: the server exited before it answered")
+		case <-ctx.Done():
+			return fail(ctx.Err())
+		default:
+		}
+		actx, cancel := context.WithTimeout(ctx, time.Second)
+		status, err := bad.ping(actx)
+		cancel()
+		switch {
+		case err == nil && status == 200:
+			return fail(errors.New("opencode: another server answers on this port, one that asks for no password"))
+		case err == nil && (status == 401 || status == 403):
+			// It wants a password. Before the real one is sent, the listener on this port must be the child (or its descendant): a stranger that holds the port and refuses a wrong password is never sent it (#11398).
+			owned, oerr := listenerIsChild(ctx, port, s.cmd.Process.Pid)
+			if exited() {
+				_ = os.Remove(pidFile)
+				return nil, errors.New("opencode: the server exited before it answered")
+			}
+			if oerr != nil {
+				return fail(fmt.Errorf("opencode: could not tell who listens on the server's port, so the password is not sent: %w", oerr))
+			}
+			if !owned {
+				return fail(errors.New("opencode: the listener on this port is not the server that was started"))
+			}
+			// Now the real one: the child must still be running (one that could not listen has exited) and must take it.
+			rctx, rcancel := context.WithTimeout(ctx, time.Second)
+			rstatus, rerr := c.ping(rctx)
+			rcancel()
+			if exited() {
+				_ = os.Remove(pidFile)
+				return nil, errors.New("opencode: the server exited before it answered")
+			}
+			if rerr == nil && rstatus == 200 {
+				return s, nil
+			}
+			return fail(errors.New("opencode: another server answers on this port"))
+		}
+		if time.Now().After(deadline) {
+			return fail(errors.New("opencode: the server did not answer in time"))
+		}
+		select {
+		case <-s.done:
+		case <-time.After(50 * time.Millisecond):
+		}
+	}
+}
+
+// identityOf is the start time and image of a process just started (processStart, processImage), read again once after a moment when the first read found nothing (a process that had only just begun); a Windows
+// process that cannot be read is ended only by its own handle (Server.Stop says so).
+func identityOf(pid int, read func(pid int) (started, image string), retryAfter time.Duration) (started, image string) {
+	started, image = read(pid)
+	if !identityComplete(started, image) {
+		time.Sleep(retryAfter)
+		started, image = read(pid)
+	}
+	return started, image // what is still missing is said once, when Stop has to fall back to Kill
+}
+
+// defaultReadIdentity reads a process's start time and image as the platform keeps them.
+func defaultReadIdentity(pid int) (string, string) { return processStart(pid), processImage(pid) }
+
+// Stop ends the server Coral started, by its own process: never by name. Where there is a signal to ask with (askToEnd) it asks and waits 3 s before it kills; on Windows it ends the process and what it started at once.
+func (s *Server) Stop() {
+	if s == nil || s.cmd == nil || s.cmd.Process == nil {
+		return
+	}
+	select {
+	case <-s.done: // it ended on its own: its pid may be another process's by now, so nothing is asked of it
+	default:
+		askToEnd(s)
+	}
+	select {
+	case <-s.done:
+	case <-time.After(3 * time.Second):
+		if !identityComplete(s.started, s.image) { // the identity could not be read at the start, so only the process itself is killed: anything it started (a shim's child) may keep running
+			slog.Warn("opencode: the server's identity was not read at its start, so only its own process was killed; a process it started may still be running", "pid", s.cmd.Process.Pid)
+		}
+		_ = s.cmd.Process.Kill()
+		<-s.done
+	}
+	_ = os.Remove(filepath.Join(s.dir, "server.json"))
+	_ = os.Remove(filepath.Join(s.dir, "password")) // a dead server's password is not kept
+}
+
+// stopLeftOver stops the server a previous Coral recorded, if that process is still there: its pid must be the process that was recorded (isRecordedServer: by ps, the exact command and the start time; on Windows
+// the start time and the image). A pid that is another process now (a restart reused it) is never ended.
+func stopLeftOver(pidFile string) {
+	b, err := os.ReadFile(pidFile)
+	if err != nil {
+		return
+	}
+	defer os.Remove(pidFile)
+	var rec pidRecord
+	if json.Unmarshal(b, &rec) != nil || rec.PID <= 1 || rec.Command == "" || rec.Started == "" {
+		return
+	}
+	if !isRecordedServer(rec) {
+		return
+	}
+	endProcess(rec.PID)
+}

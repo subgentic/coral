@@ -1,5 +1,5 @@
 // New team step 3 says what it is and what each menu holds (#9971 b, UI/UX's triage): one line at the top (everything here is optional), and under each menu item its state
-// (Start: none, Workflow: none, Health check: off, Messaging: off), kept up as the settings change, so nobody opens a menu to find out. The tab keeps its name. 1280 px, isolated dev server.
+// (Start: optional, Workflow: no extra rules, Health check: off: no stuck-agent checks, Messaging: off: this team only; #11368 gave the bare 'none' and 'off' their meaning), kept up as the settings change, so nobody opens a menu to find out. The tab keeps its name. 1280 px, isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { install: installNT, T, openNewTeam, stubModels, N } = require('./helpers/new_team');
@@ -22,7 +22,7 @@ const { coralReady } = require('./helpers/wait');
         assert.equal(r.lead, 'Everything on this step is optional. The team starts with the settings shown here.');
         // the template the helper picks names a working mode: Workflow says it (None when the team has none)
         const mode = await ev(`(() => { const s = [...document.querySelectorAll('#team-start-host select')].find(x => [...x.options].some(o => o.textContent.trim() === 'Worktrees')); return s.options[s.selectedIndex].textContent.trim(); })()`);
-        assert.deepEqual(r.states, { Start: 'none', Workflow: mode === 'None' ? 'none' : mode, 'Health check': 'off', Messaging: 'off' }, JSON.stringify(r));
+        assert.deepEqual(r.states, { Start: 'optional', Workflow: mode === 'None' ? 'no extra rules' : mode, 'Health check': 'off: no stuck-agent checks', Messaging: 'off: this team only' }, JSON.stringify(r));
         assert.deepEqual(r.names, ['Start', 'Workflow', 'Health check', 'Messaging'], 'each tab keeps its name');
         // a change shows in the menu
         await ev(`(() => { const g = document.getElementById('team-goal'); g.value = 'Ship it'; g.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);

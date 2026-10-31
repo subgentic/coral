@@ -154,7 +154,15 @@ func cmdGoalAdd(st *boardState, args []string) {
 	set("done_when", *doneWhen, "goal done-when")
 	set("state", *state, "goal state")
 	set("driver", *driver, "goal driver")
-	data := goalCall("POST", goalPath(st, 0, ""), body, "creating the goal", http.StatusCreated, http.StatusOK)
+	data := goalCall("POST", goalPath(st, 0, ""), body, "creating the goal", http.StatusCreated, http.StatusOK, http.StatusAccepted)
+	var held struct {
+		Pending bool   `json:"pending"`
+		Message string `json:"message"`
+	}
+	if json.Unmarshal(data, &held) == nil && held.Pending { // this team's goals need the Operator's approval (#11389): the goal is a proposal, nothing was created yet
+		fmt.Printf("Goal proposed: %s\n", strings.TrimSpace(held.Message))
+		return
+	}
 	var g map[string]any
 	_ = json.Unmarshal(data, &g)
 	id, _ := g["id"].(float64)

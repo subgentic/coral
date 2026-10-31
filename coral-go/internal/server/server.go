@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/subgentic/coral/internal/cloud"
+	"github.com/subgentic/coral/internal/opencode"
 	"github.com/subgentic/coral/internal/operatortouch"
 	"github.com/subgentic/coral/internal/safego"
 	"html/template"
@@ -70,6 +71,7 @@ type Server struct {
 	boardHandler    *routes.BoardHandler
 	historyHandler  *routes.HistoryHandler
 	sessHandler     *routes.SessionsHandler
+	opencode        *opencode.Manager       // one opencode server per opencode agent; stopped with the server
 	touches         *operatortouch.Recorder // the Operator's touches of agents, shared by the handlers that record them (#11225)
 	sysHandler      *routes.SystemHandler   // the update notice's source is set where the updater is built (registerCloud, #9726)
 	remoteAgents    *background.RemoteAgentHub
@@ -243,6 +245,9 @@ const closeWait = 5 * time.Second
 // server has stopped; it is safe to call more than once.
 func (s *Server) Close() {
 	s.closeOnce.Do(func() {
+		if s.opencode != nil {
+			s.opencode.Close() // every opencode server Coral started ends with it, by its own pid
+		}
 		if s.bgStop != nil {
 			s.bgStop()
 		}
@@ -323,6 +328,9 @@ func (s *Server) SetScheduler(sched *background.JobScheduler) {
 		s.schedHandler.SetScheduler(sched)
 	}
 }
+
+// OpencodeManager is the manager of the opencode servers (the history indexer reads their sessions through it).
+func (s *Server) OpencodeManager() *opencode.Manager { return s.opencode }
 
 // SetIndexer injects the session indexer for manual refresh triggers.
 func (s *Server) SetIndexer(idx routes.Indexer) {
@@ -413,6 +421,13 @@ func (s *Server) AutoWakeAfterRestart(ctx context.Context) {
 func (s *Server) AgentsSlept(ctx context.Context, sessionIDs []string) {
 	if s.sessHandler != nil {
 		s.sessHandler.AgentsSlept(ctx, sessionIDs)
+	}
+}
+
+// RunDialogWatch reads the awake agents' screens for a prompt that waits for the person (#11437) until ctx ends.
+func (s *Server) RunDialogWatch(ctx context.Context) {
+	if s.sessHandler != nil {
+		s.sessHandler.RunDialogWatch(ctx)
 	}
 }
 
@@ -642,6 +657,40 @@ func (s *Server) serveIndex(w http.ResponseWriter, r *http.Request) {
 	render := func(out io.Writer) error { return s.indexTmpl.Execute(out, data) }
 	if err := s.indexPage.serve(w, r, data.CoralRoot+"\x00"+data.StaticBase, render); err != nil {
 		log.Printf("Error rendering index template: %v", err)
+		http.Error(w, "Template render error", http.StatusInternalServerError)
+	}
+}
+
+// serveChief is the Operator's phone page for one agent (#11450): the agent popout, with nothing of the app around it. It is a view over the existing routes and
+// adds no data of its own. It answers only while chief_page is on (404 otherwise); the agent is the session the Operator RECORDED (chief_session) on the team they recorded
+// (chief_team), read on every request, never a team picked by its name: a team an agent made is not Chief.
+func (s *Server) serveChief(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	ss := store.NewSessionStore(s.db)
+	st, err := ss.GetSettings(ctx)
+	if err != nil || !setreg.Bool(st, "chief_page") {
+		http.NotFound(w, r)
+		return
+	}
+	sessionID, team := strings.TrimSpace(setreg.Text(st, "chief_session")), strings.TrimSpace(setreg.Text(st, "chief_team"))
+	if parsed, perr := uuid.Parse(sessionID); perr != nil || parsed.String() != sessionID || team == "" {
+		sessionID = ""
+	} else if ls, lerr := ss.GetLiveSession(ctx, sessionID); lerr != nil || ls == nil || ls.BoardName == nil || *ls.BoardName != team {
+		sessionID = ""
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Content-Security-Policy", dashboardCSPFor(r.Host))
+	w.Header().Set("Referrer-Policy", "same-origin")
+	w.Header().Set("Cache-Control", "no-store")
+	if sessionID == "" || s.indexTmpl == nil {
+		w.Write([]byte(`<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Chief</title></head><body style="font-family:system-ui,sans-serif;padding:24px"><p>Chief is not set up on this computer.</p></body></html>`))
+		return
+	}
+	data := templateData{CoralRoot: s.cfg.CoralRoot, EntryMode: "agent", TargetSessionID: sessionID, Chief: true, StaticBase: s.staticBase(), ModulePreloads: frontend.StartupModules(), BootJSON: testHooksBoot()}
+	var page renderedPage
+	render := func(out io.Writer) error { return s.indexTmpl.Execute(out, data) }
+	if err := page.serve(w, r, "", render); err != nil {
+		log.Printf("Error rendering the Chief page: %v", err)
 		http.Error(w, "Template render error", http.StatusInternalServerError)
 	}
 }

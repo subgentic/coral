@@ -25,7 +25,7 @@ export function ensureStarredArtifacts(done) {
 }
 
 /** Forget what was read (an artifact was starred or unstarred somewhere): the next draw reads again. */
-export function forgetStarredArtifacts() { state.at = 0; }
+function forgetStarredArtifacts() { state.at = 0; }
 document.addEventListener('artifact-star-changed', forgetStarredArtifacts);
 
 export const starredArtifactsSignature = () => JSON.stringify([state.busy, state.error, state.total, state.rows.map(r => [r.id, r.name, r.board_id, r.created_at])]);

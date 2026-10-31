@@ -98,24 +98,39 @@ func TestTheOwnerRoutesOfTheTableAreTheReviewedSet(t *testing.T) {
 	want := map[string]string{
 		"GET /api/artifacts": "owner-only", "GET /api/artifacts/resolve": "owner-only", "GET /api/artifacts/{hex64}": "owner-only", "GET /api/artifacts/{hex64}/meta": "owner-only", "GET /api/artifacts/{hex64}/comments": "owner-only", "GET /api/artifacts/{hex64}/readers": "owner-only",
 		"DELETE /api/artifacts/{hex64}": "owner-only", "PUT /api/artifacts/{hex64}/star": "owner-only", "DELETE /api/artifacts/{hex64}/star": "owner-only", // the star (#9819)
-		"GET /api/board/{project}/artifacts": "owner-only", "GET /api/board/{project}/tasks/{id}/artifact-content": "owner-only",
+		"GET /api/board/{project}/proposals":               "owner-only",
+		"GET /api/proposals":                               "owner-only",
+		"POST /api/board/{project}/proposals/{id}/approve": "owner-only",
+		"POST /api/board/{project}/proposals/{id}/reject":  "owner-only",
+		"GET /api/board/{project}/artifacts":               "owner-only", "GET /api/board/{project}/tasks/{id}/artifact-content": "owner-only",
 		"GET /api/session-artifacts": "owner-only", "GET /api/team-artifacts": "owner-only", "GET /api/settings/prompt-inspection": "owner-only", "PUT /api/board/{project}/settings": "owner-only",
 		"POST /api/board/{project}/cross-team/enable": "owner-only-hub", "POST /api/board/{project}/cross-team/disable": "owner-only-hub",
 		"POST /api/board/{project}/cross-team/files/enable": "owner-only-hub", "POST /api/board/{project}/cross-team/files/disable": "owner-only-hub",
 		"GET /api/board/{project}/cross-team/settings": "owner-only-hub",
 		"GET /api/custom-models":                       "owner-only", "PUT /api/custom-models": "owner-only", // #5996
-		"GET /api/saved":              "owner-only",
-		"GET /api/saved/{id}/message": "owner-only",
-		"POST /api/saved":             "owner-only",
-		"PATCH /api/saved/{id}":       "owner-only",
-		"DELETE /api/saved/{id}":      "owner-only",
-		"POST /api/hub-auto-accept":   "owner-only-hub",
-		"GET /api/analytics/activity": "owner-only", // the activity counts of the Analytics tabs (#11225)
+		"GET /api/saved":                                "owner-only",
+		"GET /api/saved/{id}/message":                   "owner-only",
+		"POST /api/saved":                               "owner-only",
+		"PATCH /api/saved/{id}":                         "owner-only",
+		"DELETE /api/saved/{id}":                        "owner-only",
+		"POST /api/hub-auto-accept":                     "owner-only-hub",
+		"GET /api/analytics/activity":                   "owner-only", // the activity counts of the Analytics tabs (#11225)
+		"POST /api/sessions/live/{name}/notices/pause":  "owner-only", // pausing Coral's notices to an agent (#11387)
+		"POST /api/sessions/live/{name}/notices/resume": "owner-only",
 		// A comment (or reply), a resolve and a reopen through the Hub are the owner's alone (#7052).
 		"POST /api/artifacts/{hex64}/comments":              "owner-only",
 		"POST /api/artifacts/{hex64}/comments/{id}/resolve": "owner-only",
 		"POST /api/artifacts/{hex64}/comments/{id}/reopen":  "owner-only",
-		"GET /api/board/{project}/settings":                 "owner-sees", "GET /api/system/update": "owner-update", "POST /api/system/update/relaunch": "owner-update",
+		// The owner's version list and series reads, comment edit, delete, lock and the change-request send through the Hub (#11354).
+		"GET /api/artifacts/{hex64}/versions": "owner-only", "GET /api/artifacts/series/{series}": "owner-only", "GET /api/artifacts/series/{series}/versions": "owner-only",
+		"PATCH /api/artifacts/{hex64}/comments/{id}": "owner-sees", "DELETE /api/artifacts/{hex64}/comments/{id}": "owner-sees",
+		"PUT /api/artifacts/{hex64}/comments/lock": "owner-only", "DELETE /api/artifacts/{hex64}/comments/lock": "owner-only", "POST /api/artifacts/{hex64}/comments/{id}/send": "owner-only",
+		// Approve, or ask changes of, a for-review artifact through the Hub is the owner's alone (#136584, #11354).
+		"POST /api/board/{project}/artifacts/{id}/review":      "owner-only",
+		"POST /api/sessions/live/{name}/dismiss-wait":          "owner-only",
+		"POST /api/board/{project}/operator-artifacts":         "owner-only",
+		"POST /api/board/{project}/operator-artifacts/message": "owner-only",
+		"GET /api/board/{project}/settings":                    "owner-sees", "GET /api/system/update": "owner-update", "POST /api/system/update/relaunch": "owner-update",
 	}
 	got := map[string]string{}
 	for _, r := range tunnel.OwnerRoutes() {

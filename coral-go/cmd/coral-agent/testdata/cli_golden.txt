@@ -256,7 +256,8 @@ exit 0
 Usage: coral-agent artifact upload <file> [--name NAME] [--media-type TYPE] [--new-version-of <link>] [--task N | --no-task] [--tag WORD]...
        coral-agent artifact download <coral://artifacts/digest> [--output FILE] [--force]
        coral-agent artifact reply <coral://artifacts/digest> <comment-id> <text | ->
-Run coral-agent artifact upload --help, artifact download --help or artifact reply --help for one of them.
+       coral-agent artifact comments <coral://artifacts/digest>
+Run coral-agent artifact upload --help, artifact download --help, artifact reply --help or artifact comments --help for one of them.
 --- stderr
 === coral-agent help docs
 exit 0
@@ -424,7 +425,8 @@ exit 1
 Usage: coral-agent artifact upload <file> [--name NAME] [--media-type TYPE] [--new-version-of <link>] [--task N | --no-task] [--tag WORD]...
        coral-agent artifact download <coral://artifacts/digest> [--output FILE] [--force]
        coral-agent artifact reply <coral://artifacts/digest> <comment-id> <text | ->
-Run coral-agent artifact upload --help, artifact download --help or artifact reply --help for one of them.
+       coral-agent artifact comments <coral://artifacts/digest>
+Run coral-agent artifact upload --help, artifact download --help, artifact reply --help or artifact comments --help for one of them.
 === coral-agent docs --bogus
 exit 0
 --- stdout

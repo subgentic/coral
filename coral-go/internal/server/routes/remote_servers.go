@@ -16,6 +16,7 @@ import (
 	"github.com/subgentic/coral/internal/config"
 	"github.com/subgentic/coral/internal/httputil"
 	"github.com/subgentic/coral/internal/store"
+	"github.com/subgentic/coral/pkg/hubowner"
 	proxy "github.com/subgentic/coral/pkg/hubproxy"
 )
 
@@ -25,6 +26,8 @@ type RemoteServersHandler struct {
 	// statusListener, when set, hears the status an edit or a Test just found, so the hub's
 	// worker shows it at once (#3649).
 	statusListener func(id, status string)
+	// onDelete, when set, hears the id of a server that was deleted, so what is kept for it in memory (an ssh stream target and its key) goes too (#11370).
+	onDelete func(id string)
 
 	store         *store.RemoteServerStore
 	healthTimeout time.Duration
@@ -344,6 +347,10 @@ func (h *RemoteServersHandler) Update(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	if cur.Transport == store.RemoteTransportSSH {
+		h.updateSSH(w, r, cur, req)
+		return
+	}
 	upd := store.RemoteServerUpdate{AllowPrivate: req.AllowPrivate}
 	if req.Label != nil {
 		l := strings.TrimSpace(*req.Label)
@@ -412,9 +419,13 @@ func (h *RemoteServersHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 // Delete handles DELETE /api/servers/{id}.
 func (h *RemoteServersHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	if err := h.store.Delete(r.Context(), urlParam(r, "id")); err != nil {
+	id := urlParam(r, "id")
+	if err := h.store.Delete(r.Context(), id); err != nil {
 		remoteErr(w, err)
 		return
+	}
+	if h.onDelete != nil {
+		h.onDelete(id)
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
 }
@@ -439,7 +450,9 @@ func (h *RemoteServersHandler) Test(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var health RemoteHealth
-	if _, verr := validateRemoteURL(cur.URL, cur.AllowPrivate); verr != nil {
+	if cur.Transport == store.RemoteTransportSSH {
+		health = h.testSSH(r.Context(), cur, key)
+	} else if _, verr := validateRemoteURL(cur.URL, cur.AllowPrivate); verr != nil {
 		health = RemoteHealth{Status: store.RemoteStatusUnreachable, Err: verr.Error()}
 	} else {
 		health = CheckRemoteHealth(r.Context(), cur.URL, key, cur.AllowPrivate, h.healthTimeout)
@@ -450,6 +463,9 @@ func (h *RemoteServersHandler) Test(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, viewRemote(srv))
 }
 
+// SetOnDelete sets who hears a deleted server's id.
+func (h *RemoteServersHandler) SetOnDelete(f func(id string)) { h.onDelete = f }
+
 // SetStatusListener sets who hears the status an edit or a Test found (the hub's remote workers).
 func (h *RemoteServersHandler) SetStatusListener(f func(id, status string)) { h.statusListener = f }
 
@@ -457,4 +473,41 @@ func (h *RemoteServersHandler) tellStatus(id, status string) {
 	if h.statusListener != nil {
 		h.statusListener(id, status)
 	}
+}
+
+// OwnerSecret handles POST /api/servers/{id}/owner-secret (#11378): the way a computer added by URL gets the owner stamp. The hub makes a new secret for it, seals its half, and shows the person the setup
+// line ONCE; the person then runs `coral hub-owner-secret` at that computer and pastes it (a human act at the computer: no route there can do it, whatever key it is called with). It is the person's
+// alone (humanInputCaller: not an API key, not an agent) and calling it again makes a new secret, which stops the old stamps until the computer has the new line. A computer set up over SSH gets its secret
+// from the setup and has no use for this.
+func (h *RemoteServersHandler) OwnerSecret(w http.ResponseWriter, r *http.Request) {
+	if !humanInputCaller(r) {
+		writeError(w, http.StatusForbidden, "operator_only", "only a person at the dashboard can set up Approve through this hub")
+		return
+	}
+	id := urlParam(r, "id")
+	cur, err := h.store.Get(r.Context(), id)
+	if err != nil {
+		remoteErr(w, err)
+		return
+	}
+	if cur.Transport != store.RemoteTransportHTTP {
+		errConflict(w, "this computer was set up over SSH: its secret was installed by the setup")
+		return
+	}
+	secret, err := hubowner.NewSecret()
+	if err != nil {
+		errInternalServer(w, "internal error")
+		return
+	}
+	if err := h.store.SetOwnerSecret(r.Context(), id, secret); err != nil {
+		remoteErr(w, err)
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	writeJSON(w, http.StatusOK, map[string]string{
+		"remote_id":  id,
+		"setup_line": id + " " + secret,
+		"command":    "coral hub-owner-secret",
+		"notice":     "Shown once. Run the command at that computer and paste the line when it asks. Until then this hub's decisions for it are refused.",
+	})
 }

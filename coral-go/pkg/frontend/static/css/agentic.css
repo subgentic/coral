@@ -1172,6 +1172,18 @@ body.panel-dragging .agentic-state {
     border-bottom: 1px solid var(--border);
 }
 
+/* Which worktree the list is from (#11351). */
+.files-worktree { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: var(--space-xs) var(--space-md); font-size: var(--fs-sm); color: var(--text-secondary); }
+.files-worktree > span { min-width: 0; overflow-wrap: anywhere; }
+.files-worktree-branch { font-family: var(--font-mono); color: var(--text-muted); }
+/* The diff under a changed file's row (#11350): the row's chevron opens it, Expand all stacks every file's. The preview pane is untouched. */
+.file-expand-btn { flex: none; }
+.file-diff { margin: 0 0 6px 20px; padding-right: 6px; border-left: 2px solid var(--border); min-width: 0; }
+.file-diff[hidden] { display: none; }
+.file-diff-body { min-width: 0; } /* no box of its own: the stack reads top to bottom in the panel's one scroll (the Mobile Beta Tester's walk on #11350: a long file's last hunks were out of sight) */
+.file-diff-note { margin: 4px 8px; font-size: var(--fs-sm); color: var(--text-secondary); }
+.file-diff-error { color: var(--error); }
+.files-expand-all { flex: none; }
 .file-item {
     display: flex;
     align-items: center;
@@ -1613,6 +1625,17 @@ body.panel-dragging .agentic-state {
     min-width: 0;
 }
 
+.create-task-bar-back { display: none; }
+/* Create task on a phone is a form screen (#11236 approved, #11239 slice C): the whole screen, a 56 px bar with a 44 px ← and the title, the fields scroll, Cancel and Create are pinned at the bottom */
+@media (max-width: 600px) {
+    #create-task-modal { padding: 0; }
+    #create-task-modal .modal-content.dlg-form { --dlg-max: 100vw; width: 100vw; max-width: none; height: 100dvh; max-height: none; margin: 0; border-radius: 0; display: flex; flex-direction: column; padding: 0; }
+    #create-task-modal .modal-header { flex: none; justify-content: flex-start; gap: 4px; box-sizing: border-box; height: 56px; min-height: 0; padding: 0 4px; border-bottom: 1px solid var(--border); }
+    #create-task-modal .create-task-bar-back { display: inline-grid; place-items: center; flex: none; width: var(--control-touch-height, 44px); height: var(--control-touch-height, 44px); padding: 0; border: 0; border-radius: 22px; background: none; color: var(--text-primary); font-size: var(--fs-2xl); cursor: pointer; }
+    #create-task-modal .modal-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+    #create-task-modal .modal-footer { flex: none; padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px)); }
+}
+
 /* Generated agent panels */
 #agentic-panel-agent-ui { overflow:auto; min-width:0; padding:12px; }
 .agent-ui-card { margin-bottom:16px; min-width:0; flex-shrink:0; }
@@ -1971,4 +1994,4 @@ body.panel-dragging .agentic-state {
 
 /* An open file's note when the file changed on disk under unsaved edits (#10334). */
 .preview-disk-note { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 6px 12px; font-size: var(--fs-sm); color: var(--text-secondary); border-bottom: 1px solid var(--border); }
-.files-legend { padding: var(--space-xs) var(--space-md); font-size: var(--fs-sm); color: var(--text-muted); }
+.files-legend { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: var(--space-xs) var(--space-md); font-size: var(--fs-sm); color: var(--text-muted); } /* the line also holds Expand all (#11350) */

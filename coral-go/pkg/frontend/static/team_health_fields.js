@@ -12,14 +12,14 @@ const [G_LO, G_HI] = HEALTH_LIMITS.goalTasks;
 const [L_LO, L_HI] = HEALTH_LIMITS.landingWait;
 const [R_LO, R_HI] = HEALTH_LIMITS.releaseWait;
 /** The server's rule for a tag pattern (ReleaseTagPatternValid): letters, digits, . _ - / and the glob characters * ? [ ] ^, at most 60, not starting with -; empty is the default. */
-export const tagPatternProblem = (value) => {
+const tagPatternProblem = (value) => {
     const p = String(value || '').trim();
     if (!p) return '';
     return p.length > 60 || p[0] === '-' || !/^[A-Za-z0-9._/*?[\]^-]+$/.test(p) ? `"${p.slice(0, 40)}" is not a tag pattern Coral reads (letters, digits, . _ - / and the glob characters * ? [ ]; at most 60 characters).` : '';
 };
 const [C_LO, C_HI] = HEALTH_LIMITS.checkWait;
 /** The server's words for a branch name it will not read (LandingBranchValid): letters, digits and . _ - /, at most 100, not starting with - or /, no .., not ending in / or .lock; empty is the default. */
-export const branchProblem = (value) => {
+const branchProblem = (value) => {
     const b = String(value || '').trim();
     if (!b) return '';
     const bad = b.length > 100 || b[0] === '-' || b[0] === '/' || b.includes('..') || b.endsWith('/') || b.endsWith('.lock') || !/^[A-Za-z0-9._/-]+$/.test(b);
@@ -29,7 +29,7 @@ const RULES = ['claim_nudge', 'status_nudge', 'mention_renudge', 'held_notice', 
 
 /** The health object as the flat values of the fields. */
 export function healthToValues(h) {
-    const v = { on: !!h.on, interval_min: h.interval_min, recipient: h.recipient || '', all_clear: !!h.all_clear, default_reviewers: (h.default_reviewers || []).join(', '), auto_delegate_on: !!(h.auto_delegate && h.auto_delegate.on) };
+    const v = { on: !!h.on, interval_min: h.interval_min, heartbeat_min: h.heartbeat_min ?? 0, recipient: h.recipient || '', all_clear: !!h.all_clear, default_reviewers: (h.default_reviewers || []).join(', '), auto_delegate_on: !!(h.auto_delegate && h.auto_delegate.on) };
     for (const k of RULES) if (h[k]) for (const [p, val] of Object.entries(h[k])) v[`${k}_${p}`] = val;
     return v;
 }
@@ -39,6 +39,7 @@ export function valuesToHealth(v, base) {
     const h = JSON.parse(JSON.stringify(base));
     h.on = !!v.on;
     h.interval_min = Number.isInteger(v.interval_min) ? v.interval_min : base.interval_min; // a number that is not a whole number keeps what was read
+    h.heartbeat_min = Number.isInteger(v.heartbeat_min) ? v.heartbeat_min : (base.heartbeat_min ?? 0);
     h.recipient = v.recipient || '';
     h.all_clear = !!v.all_clear;
     h.default_reviewers = String(v.default_reviewers || '').split(',').map(s => s.trim()).filter((s, i, a) => s && a.indexOf(s) === i);
@@ -77,12 +78,13 @@ export function healthFields(ctx) {
             note.append(link, '. It takes effect after Coral restarts.'); slot.append(note);
         } },
         { key: 'on', type: 'toggle', label: 'Send health check', help: 'Checks on stuck or idle agents. Uses tokens each time.' },
-        { key: 'interval_min', type: 'number', label: 'Check every', unit: 'minutes', min: LO, max: HI, integer: true, compact: true, disabledWhen: v => !v.on },
+        { key: 'interval_min', type: 'number', label: 'Look every', unit: 'minutes', min: LO, max: HI, integer: true, compact: true, disabledWhen: v => !v.on },
+        { key: 'heartbeat_min', type: 'number', label: 'Say all is well at least every', unit: 'minutes', min: 0, max: HI, integer: true, compact: true, help: '0 = never (the default): the check goes out only when something changed.', disabledWhen: v => !v.on },
         { key: 'recipient', type: 'select', label: 'Send it to', disabledWhen: v => !v.on, options: async () => {
             const members = await ctx.members();
             return [{ value: '', label: 'The orchestrator (default)' }, ...members.map(m => ({ value: m.subscriber_id, label: `${m.subscriber_id}${m.job_title ? ` (${m.job_title})` : ''}` }))];
         } },
-        { key: 'all_clear', type: 'toggle', label: 'Post when all is well', help: 'So a quiet team is not mistaken for a stopped check.', disabledWhen: v => !v.on },
+        { key: 'all_clear', type: 'toggle', label: 'Post when all is well', help: 'The one-line check at each heartbeat, so a quiet team is not mistaken for a stopped check.', disabledWhen: v => !v.on },
         { key: 'health_reviews', type: 'heading', label: 'Reviews' },
         { key: 'auto_delegate_on', type: 'toggle', label: 'Hand reviews to the default reviewers', help: 'When a task is submitted for review and nobody is assigned, Coral delegates it to the default reviewers; with none named, reviews wait for the orchestrator. Works whether or not the health check is on.' },
         { key: 'default_reviewers', type: 'text', label: 'Default reviewers', wide: true, help: `Names of agents on this team, up to ${HEALTH_LIMITS.reviewers}, separated by commas.`, placeholder: `Agent names (up to ${HEALTH_LIMITS.reviewers})`,
@@ -138,7 +140,7 @@ export function healthFields(ctx) {
 }
 
 /** The server's own words for a refused setting start with the API path ("health.unowned_tasks.nudge: ..."): the field's label stands there instead ("Also tell: ..."), and a path no field has is left out, so no API name reaches the screen (#9016). */
-export function plainRefusal(words) {
+function plainRefusal(words) {
     const hit = /^(?:health\.)?([a-z]+(?:_[a-z]+)*(?:\.[a-z_]+)?):\s+([\s\S]+)$/.exec(String(words || ''));
     if (!hit) return words;
     const field = healthFields({}).find(f => f.key === hit[1].replace('.', '_') && f.label && f.type !== 'heading');

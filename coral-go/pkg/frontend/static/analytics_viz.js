@@ -54,15 +54,16 @@ export function legend(series) {
 export function stackedBars(rows, series, { fmt = String, selected = -1, onPick = null, phone = false, label = 'Chart' } = {}) {
     const W = phone ? 360 : 760, H = phone ? 220 : 240, pl = 40, pb = 24, pt = 10, iw = W - pl - 6, ih = H - pb - pt;
     const totals = rows.map(r => series.reduce((n, s) => n + (r.values[s.key] || 0), 0));
-    const max = niceMax(Math.max(0, ...totals));
+    const { max, lines } = axisFor(totals, 4);
     const svg = sv('svg', { viewBox: `0 0 ${W} ${H}`, class: 'atab-svg', 'aria-hidden': 'true', focusable: 'false' });
     const pid = 'atab-p' + (++ids);
     const defs = sv('defs'); const pat = sv(SVG_PATTERN, { id: pid, width: 5, height: 5, patternUnits: 'userSpaceOnUse', patternTransform: 'rotate(45)' });
     pat.append(sv('rect', { width: 2, height: 5, class: 'atab-stripe' })); defs.append(pat); svg.append(defs);
-    for (let g = 0; g <= 4; g++) {
-        const y = pt + ih - ih * g / 4;
-        svg.append(sv('line', { x1: pl, x2: W - 6, y1: y, y2: y, class: 'atab-grid' }), sv('text', { x: pl - 6, y: y + 4, 'text-anchor': 'end', class: 'atab-axis' }, fmt(max * g / 4)));
+    for (let g = 0; g <= lines; g++) {
+        const y = pt + ih - ih * g / Math.max(lines, 1);
+        svg.append(sv('line', { x1: pl, x2: W - 6, y1: y, y2: y, class: 'atab-grid' }), sv('text', { x: pl - 6, y: y + 4, 'text-anchor': 'end', class: 'atab-axis' }, fmt(max * g / Math.max(lines, 1))));
     }
+    if (lines === 0) svg.append(sv('text', { x: pl + iw / 2, y: pt + ih / 2, 'text-anchor': 'middle', class: 'atab-axis atab-empty' }, 'Nothing in this period'));
     const bw = iw / Math.max(rows.length, 1), step = Math.max(1, Math.ceil(rows.length / (phone ? 4 : 8)));
     rows.forEach((r, i) => {
         const x = pl + i * bw + bw * 0.15, w = bw * 0.7;
@@ -88,6 +89,15 @@ function niceMax(v) {
     if (!(v > 0)) return 1;
     const p = 10 ** Math.floor(Math.log10(v)), n = v / p;
     return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * p;
+}
+
+/** The top of an axis and how many gridlines it has. A count of at most 10 gets a gridline for each step of 1, 2 or 5 (whole figures that differ: 0, 1, 2, 3, never 0, 1, 1, 2); nothing counted gets one gridline, the 0.
+ *  Any other figure keeps its round top (niceMax) and `parts` gridlines. */
+function axisFor(values, parts) {
+    const top = Math.max(0, ...values);
+    if (top === 0) return { max: 1, lines: 0 };
+    if (Number.isInteger(top) && top <= 10) { const step = top <= parts ? 1 : top <= 2 * parts ? 2 : 5; return { max: Math.ceil(top / step) * step, lines: Math.ceil(top / step) }; }
+    return { max: niceMax(top), lines: parts };
 }
 
 /** The previous/next day buttons (44 px, and the keyboard's) and the sentence for the day picked: `texts[i]` is what day i says. */
@@ -120,9 +130,9 @@ export function rankedBars(rows) {
 /** A line over days: points [{label, value}] where a null value leaves a gap in the line; the last point is marked and named. */
 export function lineChart(points, { fmt = String, phone = false } = {}) {
     const W = 340, H = 176, pl = 40, pb = 30, pt = 12, iw = W - pl - 14, ih = H - pb - pt;
-    const vals = points.map(p => p.value).filter(v => v != null), max = niceMax(Math.max(0, ...vals));
+    const vals = points.map(p => p.value).filter(v => v != null), { max, lines } = axisFor(vals, 3), L = Math.max(lines, 1);
     const svg = sv('svg', { viewBox: `0 0 ${W} ${H}`, class: 'atab-svg', 'aria-hidden': 'true', focusable: 'false' });
-    for (let g = 0; g <= 3; g++) { const y = pt + ih - ih * g / 3; svg.append(sv('line', { x1: pl, x2: W - 14, y1: y, y2: y, class: 'atab-grid' }), sv('text', { x: pl - 6, y: y + 4, 'text-anchor': 'end', class: 'atab-axis' }, fmt(max * g / 3))); }
+    for (let g = 0; g <= lines; g++) { const y = pt + ih - ih * g / L; svg.append(sv('line', { x1: pl, x2: W - 14, y1: y, y2: y, class: 'atab-grid' }), sv('text', { x: pl - 6, y: y + 4, 'text-anchor': 'end', class: 'atab-axis' }, fmt(max * g / L))); }
     const n = points.length, xy = points.map((p, i) => p.value == null ? null : [pl + (n > 1 ? iw * i / (n - 1) : iw / 2), pt + ih - ih * p.value / max]);
     let d = '', pen = false;
     xy.forEach(q => { if (!q) { pen = false; return; } d += (pen ? 'L' : 'M') + q[0].toFixed(1) + ',' + q[1].toFixed(1); pen = true; });

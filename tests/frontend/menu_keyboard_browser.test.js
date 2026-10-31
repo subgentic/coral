@@ -12,7 +12,7 @@ const BASE = require('./test_base').BASE;
     const { settle, coralReady } = require('./helpers/wait').bind(ev);
     const vis = sel => `[...document.querySelectorAll(${JSON.stringify(sel)})].filter(e => e.getClientRects().length > 0 && e.getBoundingClientRect().width > 0)`;
     const shot = async name => { const dir = process.env.CORAL_SCREENSHOT_DIR || (process.env.RUNNER_TEMP && path.join(process.env.RUNNER_TEMP, 'out')); if (!dir) return; fs.mkdirSync(dir, { recursive: true }); for (const theme of ['light', 'dark']) { await setTheme(ev, theme); fs.writeFileSync(path.join(dir, `${name}-${theme}.png`), Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); } await setTheme(ev, 'dark'); };
-    let HB = 'top-menu-btn'; // the hamburger on screen: under 640 px, while an agent is open, it is the agent row's own menu button (#11056)
+    let HB = 'top-phone-menu'; // the hamburger on screen: under 640 px, while an agent is open, it is the agent row's own menu button (#11056)
     const open = async width => {
         await Emulation.setDeviceMetricsOverride({ width, height: 844, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady('startup', 'liveList', 'liveListLoaded', 'settings');
@@ -32,8 +32,8 @@ const BASE = require('./test_base').BASE;
             await open(390);
             // the chat's bar has no ☰ since #11239 slice B: the hamburger is a top-level page's (the page pill's): Automations here
                 await ev(`window.switchNavTab('automations'); true`);
-                await waitFor(`document.getElementById('top-menu-btn') && document.getElementById('top-menu-btn').getClientRects().length > 0`, 'the page pill with its hamburger', 10000);
-                HB = 'top-menu-btn';
+                await waitFor(`document.getElementById('top-phone-menu') && document.getElementById('top-phone-menu').getClientRects().length > 0`, 'the page pill with its hamburger', 10000);
+                HB = 'top-phone-menu';
             await waitFor(`document.getElementById('${HB}').getAttribute('aria-label') === 'Automations, menu'`, 'the hamburger is named by the view it shows (Automations here: the chat has no hamburger since #11239 slice B)', 6000);
             await ev(`document.getElementById('${HB}').focus(); true`);
             await press('ArrowDown', KEYS.ArrowDown);
@@ -55,13 +55,13 @@ const BASE = require('./test_base').BASE;
             await press('ArrowUp', KEYS.ArrowUp); await waitFor(`!document.getElementById('nav-more-menu').hidden`, 'ArrowUp opens it', 4000);
             assert.equal(await active(), items.at(-1), 'ArrowUp on the button opens the menu on its last entry');
             await press('Escape', KEYS.Escape);
-            // a choice: Inbox. The menu closes, the focus goes back to the button, which now names Inbox
+            // a choice: Automations (the floating nav has Home, Inbox and Tasks, so the menu does not list Inbox, #11400). The menu closes, the focus goes back to the button, which now names Inbox
             await ev(`document.getElementById('${HB}').click(); true`); await waitFor(`!document.getElementById('nav-more-menu').hidden`, 'the menu', 4000);
-            await ev(`[...document.querySelectorAll('#nav-more-menu .nav-more-item')].find(i => i.lastElementChild.textContent.trim() === 'Inbox').focus(); true`);
+            await ev(`[...document.querySelectorAll('#nav-more-menu .nav-more-item')].find(i => i.lastElementChild.textContent.trim() === 'Automations').focus(); true`);
             await press('Enter', 13);
-            await waitFor(`document.getElementById('top-menu-label').textContent === 'Inbox' && document.getElementById('nav-more-menu').hidden`, 'Inbox opens and the menu closes', 6000);
-            assert.equal(await active(), 'top-menu-btn', 'choosing an entry (the view changes, the agent page goes) puts the focus on the top bar\'s button');
-            assert.equal(await ev(`document.getElementById('${HB}').getAttribute('aria-label')`), 'Inbox, menu', 'and the button now names Inbox');
+            await waitFor(`document.getElementById('top-menu-label').textContent === 'Automations' && document.getElementById('nav-more-menu').hidden`, 'Automations opens and the menu closes', 6000);
+            assert.equal(await active(), 'top-phone-menu', 'choosing an entry (the view changes, the agent page goes) puts the focus on the top bar\'s button');
+            assert.equal(await ev(`document.getElementById('${HB}').getAttribute('aria-label')`), 'Automations, menu', 'and the button now names Automations');
             console.log('PASS 390: the hamburger is named by its view and has a menu keyboard');
         } catch (e) { failures.push('390 hamburger: ' + e.message); console.error(failures.at(-1)); }
         // 2. the composer's chevron: state, role, keyboard (#9116)

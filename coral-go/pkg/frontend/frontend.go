@@ -27,6 +27,8 @@ type PageData struct {
 	CoralRoot       string
 	EntryMode       string
 	TargetSessionID string
+	// Chief marks the /chief page (#11450): the one-agent phone page, the popout with nothing of the app around it.
+	Chief bool
 	// TargetServer is the registered remote the popout agent lives on; empty
 	// means the hub itself (legacy /agent/{id}).
 	TargetServer string

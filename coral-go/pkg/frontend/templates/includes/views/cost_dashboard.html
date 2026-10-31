@@ -7,7 +7,7 @@
     <p id="cost-status" class="sr-only" role="status" aria-live="polite"></p><!-- said when a view is chosen -->
     <div class="cost-header">
         <div class="cost-header-left">
-            <button type="button" class="back-link cost-phone-back" data-on-click="analytics-phone-back">&larr; Analytics</button>
+            <button type="button" class="back-link cost-phone-back" data-on-click="analytics-phone-back"><span>&larr; Analytics</span></button>
             <div class="cost-title-block">
                 <h2 id="cost-view-title" tabindex="-1">Overview</h2>
                 <p class="cost-view-question" id="cost-view-question">What am I spending?</p>
@@ -53,12 +53,14 @@
         <div class="cost-card">
             <div class="cost-card-label">Cache read</div>
             <div class="cost-card-value" id="cost-cache-read">0</div>
+            <div class="cost-card-hint">read back from the provider's cache; billed lower</div>
             <div class="cost-card-change" id="cost-change-cache-read"></div>
             <div class="cost-card-sparkline" aria-hidden="true" id="cost-spark-cache-read"></div>
         </div>
         <div class="cost-card">
             <div class="cost-card-label">Cache write</div>
             <div class="cost-card-value" id="cost-cache-write">0</div>
+            <div class="cost-card-hint">saved to the cache for later turns</div>
             <div class="cost-card-change" id="cost-change-cache-write"></div>
             <div class="cost-card-sparkline" aria-hidden="true" id="cost-spark-cache-write"></div>
         </div>
@@ -71,6 +73,7 @@
         <div class="cost-card cost-card-burn">
             <div class="cost-card-label">Burn rate</div>
             <div class="cost-card-value" id="cost-burn-rate">$0.00/hr</div>
+            <div class="cost-card-hint">spend per hour over this range</div>
         </div>
     </div>
 
@@ -101,6 +104,7 @@
     <!-- Cumulative Spend Chart -->
     <div class="cost-section" data-cview="overview">
         <h3 class="group-head group-head-lg cost-section-title">Cumulative spend</h3>
+        <p class="cost-note">The running total of spend across this range.</p>
         <div id="cost-spend-chart" class="cost-chart-container">
             <div class="empty-state">Loading chart data...</div>
         </div>

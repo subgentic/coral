@@ -222,6 +222,8 @@ func (d *DB) ensureSchema(ctx context.Context) error {
 	// Indexes on migrated columns cannot live in schemaSQL (see above).
 	// sourceDedup's NOT IN subquery reads every jsonl session id.
 	d.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_token_usage_source ON token_usage(source, session_id)`)
+	// A remote machine is registered once (#11370): two AddSSH calls for the same instance cannot both pass the check, the second hits this. After the column migrations, which add instance_id.
+	d.ExecContext(ctx, `CREATE UNIQUE INDEX IF NOT EXISTS idx_remote_servers_instance ON remote_servers(instance_id) WHERE instance_id != ''`)
 	if err := d.ensureTokenUsageRollup(ctx); err != nil {
 		return err
 	}

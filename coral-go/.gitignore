@@ -5,6 +5,7 @@ cli-token
 # Binaries built here by hand (go build -o <name> ./cmd/<name>/) that the root
 # .gitignore doesn't already list. launch-coral was once committed by accident (7ec8e9c6).
 /launch-coral
+/coral-update
 /coral-agent
 /coral-coordination-report
 /coral-hook-session-start

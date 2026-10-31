@@ -109,6 +109,9 @@ function settingsGroups(st) {
             { key: 'dependency_guidance', type: 'toggle', label: 'Guidance for dependent tasks', help: 'Tells agents how to work when a task waits on another.' },
             { key: 'asks_are_tasks', type: 'toggle', label: 'Requests for work are tasks', help: 'When an agent needs another agent to do something, it creates a task. Plain posts are for questions and status.' },
             { key: 'require_goal', type: 'toggle', label: 'Require a goal', help: requireGoalSentence },
+            { key: 'max_open_goals', type: 'number', id: 'tsr-max-goals', label: 'Open goals', unit: 'at most (0 is no limit)', min: 0, max: 1000, step: 1, compact: true, attrs: { inputmode: 'numeric' }, help: 'A goal past the limit is refused. Goals waiting for your approval count.' },
+            { key: 'goals_need_approval', type: 'toggle', label: 'New goals need my approval', help: 'An agent\'s new goal waits in Needs you until you approve it. Yours are never held.' },
+            { key: 'tasks_need_approval', type: 'toggle', label: 'New tasks need my approval', help: 'An agent\'s new task waits in Needs you until you approve it. Yours are never held.' },
             { key: 'custom_instructions', type: 'textarea', label: 'Additional instructions', help: 'Team-specific conventions, given to agents with each task.', wide: true, rows: 4, placeholder: 'Team-specific conventions' },
             { key: 'presets', type: 'custom', label: 'Presets', help: 'A preset saves with Save preset, not Save settings.', wide: true, render: slot => { slot.innerHTML = PRESET_EDITOR; } },
         ] },
@@ -144,7 +147,7 @@ function loadSettings(st) {
             xtValues = await st.xt.load({ refusal: boardSettingsResponse ? await refusalOf(boardSettingsResponse, answeredLocally(st.team)) : '' });
         }
         st.q('.prompt-inspection-content').innerHTML = inspectionResponse.ok ? renderInspection(await inspectionResponse.json(), st.workingMode) : `<p class="sv-help">Prompt inspection: ${escapeHtml(await refusalOf(inspectionResponse, answeredLocally(st.team)))}</p>`;
-        return { mode: st.workingMode.mode || 'none', dependency_guidance: Boolean(st.workingMode.dependency_guidance), asks_are_tasks: Boolean(st.workingMode.asks_are_tasks), ...xtValues, custom_instructions: st.workingMode.custom_instructions || '', require_goal: Boolean(boardSettings?.require_goal), ...(st.healthBase ? healthToValues(st.healthBase) : {}) };
+        return { mode: st.workingMode.mode || 'none', dependency_guidance: Boolean(st.workingMode.dependency_guidance), asks_are_tasks: Boolean(st.workingMode.asks_are_tasks), ...xtValues, custom_instructions: st.workingMode.custom_instructions || '', require_goal: Boolean(boardSettings?.require_goal), max_open_goals: Number(boardSettings?.max_open_goals) || 0, goals_need_approval: Boolean(boardSettings?.goals_need_approval), tasks_need_approval: Boolean(boardSettings?.tasks_need_approval), ...(st.healthBase ? healthToValues(st.healthBase) : {}) };
     };
 }
 
@@ -170,6 +173,16 @@ function saveSettings(st) {
                 const response = await fetch(st.boardSettingsURL, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'Operator', require_goal: values.require_goal }) });
                 if (!response.ok) failures.push(await jsonError(response, 'Could not save require a goal.'));
                 else saved.push('require_goal');
+            } catch (error) { failures.push(error.message); }
+        }
+        const PLAN_KEYS = ['max_open_goals', 'goals_need_approval', 'tasks_need_approval']; // the planning limits (#11389): the cap and the two approval switches, one save
+        if (PLAN_KEYS.some(k => k in changes)) {
+            try {
+                const body = { subscriber_id: 'Operator' };
+                for (const k of PLAN_KEYS) if (k in changes) body[k] = k === 'max_open_goals' ? Math.max(0, Math.min(1000, Math.round(Number(values[k]) || 0))) : Boolean(values[k]);
+                const response = await fetch(st.boardSettingsURL, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+                if (!response.ok) failures.push(await jsonError(response, 'Could not save the planning limits.'));
+                else saved.push(...PLAN_KEYS.filter(k => k in changes));
             } catch (error) { failures.push(error.message); }
         }
         if (HEALTH_KEYS.some(k => k in changes)) {

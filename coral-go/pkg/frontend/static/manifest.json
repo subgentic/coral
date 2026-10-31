@@ -2,7 +2,7 @@
   "id": "/",
   "name": "Coral",
   "short_name": "Coral",
-  "description": "The control plane for the coding agents you already have.",
+  "description": "The inbox for your agents, and an agentic IDE built for AI-first development.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

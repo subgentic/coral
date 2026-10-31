@@ -61,6 +61,12 @@
       "type": "index"
     },
     {
+      "name": "idx_board_proposals_board",
+      "sql": "CREATE INDEX idx_board_proposals_board ON board_proposals(board_id, state, id)",
+      "tbl_name": "board_proposals",
+      "type": "index"
+    },
+    {
       "name": "idx_board_replies_to",
       "sql": "CREATE INDEX idx_board_replies_to ON board_replies(project, reply_to)",
       "tbl_name": "board_replies",
@@ -229,6 +235,12 @@
       "type": "index"
     },
     {
+      "name": "sqlite_autoindex_artifact_reviews_1",
+      "sql": null,
+      "tbl_name": "artifact_reviews",
+      "type": "index"
+    },
+    {
       "name": "sqlite_autoindex_artifact_tags_1",
       "sql": null,
       "tbl_name": "artifact_tags",
@@ -349,6 +361,12 @@
       "type": "index"
     },
     {
+      "name": "artifact_reviews",
+      "sql": "CREATE TABLE artifact_reviews (\n\t\tboard_id TEXT NOT NULL,\n\t\thex      TEXT NOT NULL,\n\t\tstate    TEXT NOT NULL,\n\t\tat       TEXT NOT NULL,\n\t\tPRIMARY KEY (board_id, hex)\n\t)",
+      "tbl_name": "artifact_reviews",
+      "type": "table"
+    },
+    {
       "name": "artifact_tags",
       "sql": "CREATE TABLE artifact_tags (\n\t\t\tboard_id TEXT NOT NULL,\n\t\t\thex      TEXT NOT NULL,\n\t\t\ttag      TEXT NOT NULL,\n\t\t\tPRIMARY KEY (board_id, hex, tag)\n\t\t)",
       "tbl_name": "artifact_tags",
@@ -424,6 +442,12 @@
       "name": "board_messages",
       "sql": "CREATE TABLE board_messages (\n\t\t\tid          INTEGER PRIMARY KEY AUTOINCREMENT,\n\t\t\tproject     TEXT NOT NULL,\n\t\t\tsession_id  TEXT NOT NULL,\n\t\t\tcontent     TEXT NOT NULL,\n\t\t\tcreated_at  TEXT NOT NULL\n\t\t, target_group_id TEXT, subscriber_id TEXT, external_json TEXT, origin TEXT, is_system INTEGER NOT NULL DEFAULT 0, hub_user TEXT, task_id INTEGER)",
       "tbl_name": "board_messages",
+      "type": "table"
+    },
+    {
+      "name": "board_proposals",
+      "sql": "CREATE TABLE board_proposals (\n\t\t\tid               INTEGER PRIMARY KEY AUTOINCREMENT,\n\t\t\tboard_id         TEXT NOT NULL,\n\t\t\tkind             TEXT NOT NULL CHECK (kind IN ('goal', 'task')),\n\t\t\ttitle            TEXT NOT NULL,\n\t\t\tnorm_title       TEXT NOT NULL,\n\t\t\tpayload          TEXT NOT NULL,\n\t\t\tproposer         TEXT NOT NULL DEFAULT '',\n\t\t\tgoal_proposal_id INTEGER,\n\t\t\tstate            TEXT NOT NULL DEFAULT 'pending' CHECK (state IN ('pending', 'approving', 'approved', 'rejected', 'expired')),\n\t\t\treason           TEXT NOT NULL DEFAULT '',\n\t\t\tcreated_at       TEXT NOT NULL,\n\t\t\texpires_at       TEXT NOT NULL,\n\t\t\tdecided_at       TEXT,\n\t\t\tcreated_ref      INTEGER,\n\t\t\tnotified         INTEGER NOT NULL DEFAULT 0,\n\t\t\tclaimed_at       TEXT,\n\t\t\tclaim_title      TEXT NOT NULL DEFAULT ''\n\t\t)",
+      "tbl_name": "board_proposals",
       "type": "table"
     },
     {
@@ -716,6 +740,81 @@
     }
   ],
   "tables": {
+    "artifact_reviews": {
+      "columns": [
+        {
+          "cid": 0,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "board_id",
+          "notnull": 1,
+          "pk": 1,
+          "type": "TEXT"
+        },
+        {
+          "cid": 1,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "hex",
+          "notnull": 1,
+          "pk": 2,
+          "type": "TEXT"
+        },
+        {
+          "cid": 2,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "state",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 3,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "at",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            {
+              "cid": 0,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "board_id",
+              "seqno": 0
+            },
+            {
+              "cid": 1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "hex",
+              "seqno": 1
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 2
+            }
+          ],
+          "name": "sqlite_autoindex_artifact_reviews_1",
+          "origin": "pk",
+          "partial": 0,
+          "seq": 0,
+          "unique": 1
+        }
+      ]
+    },
     "artifact_tags": {
       "columns": [
         {
@@ -2251,6 +2350,206 @@
           "name": "idx_board_messages_task",
           "origin": "c",
           "partial": 1,
+          "seq": 0,
+          "unique": 0
+        }
+      ]
+    },
+    "board_proposals": {
+      "columns": [
+        {
+          "cid": 0,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "id",
+          "notnull": 0,
+          "pk": 1,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 1,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "board_id",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 2,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "kind",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 3,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "title",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 4,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "norm_title",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 5,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "payload",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 6,
+          "dflt_value": "''",
+          "hidden": 0,
+          "name": "proposer",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 7,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "goal_proposal_id",
+          "notnull": 0,
+          "pk": 0,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 8,
+          "dflt_value": "'pending'",
+          "hidden": 0,
+          "name": "state",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 9,
+          "dflt_value": "''",
+          "hidden": 0,
+          "name": "reason",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 10,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "created_at",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 11,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "expires_at",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 12,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "decided_at",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 13,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "created_ref",
+          "notnull": 0,
+          "pk": 0,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 14,
+          "dflt_value": "0",
+          "hidden": 0,
+          "name": "notified",
+          "notnull": 1,
+          "pk": 0,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 15,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "claimed_at",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 16,
+          "dflt_value": "''",
+          "hidden": 0,
+          "name": "claim_title",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            {
+              "cid": 1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "board_id",
+              "seqno": 0
+            },
+            {
+              "cid": 8,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "state",
+              "seqno": 1
+            },
+            {
+              "cid": 0,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "id",
+              "seqno": 2
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 3
+            }
+          ],
+          "name": "idx_board_proposals_board",
+          "origin": "c",
+          "partial": 0,
           "seq": 0,
           "unique": 0
         }

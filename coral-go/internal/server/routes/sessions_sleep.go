@@ -209,6 +209,7 @@ func (h *SessionsHandler) SleepSession(w http.ResponseWriter, r *http.Request) {
 
 	h.modelSwitches.end(sessionID, "The agent was put to sleep before the change was confirmed.") // #6219
 	h.ss.SetSessionSleeping(ctx, sessionID, true)
+	h.stopOpencode(sessionID)
 
 	// Kill tmux session to free resources
 	if err := h.terminal.KillSessionOnly(ctx, sess.AgentName, sess.AgentType, sessionID); err != nil {
@@ -292,6 +293,7 @@ func (h *SessionsHandler) ArchiveSession(w http.ResponseWriter, r *http.Request)
 			errInternalServer(w, err.Error())
 			return
 		}
+		h.stopOpencode(sessionID)
 		if err := h.terminal.KillSessionOnly(ctx, sess.AgentName, sess.AgentType, sessionID); err != nil {
 			log.Printf("Failed to kill tmux for session %s during archive: %v", sessionID[:min(8, len(sessionID))], err)
 		}
@@ -347,6 +349,7 @@ func (h *SessionsHandler) SleepAll(w http.ResponseWriter, r *http.Request) {
 	killed := 0
 	for _, ls := range active {
 		h.ss.SetSessionSleeping(ctx, ls.SessionID, true)
+		h.stopOpencode(ls.SessionID)
 		if ls.BoardName != nil && *ls.BoardName != "" {
 			boards[*ls.BoardName] = true
 		}

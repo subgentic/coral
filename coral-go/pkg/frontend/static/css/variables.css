@@ -47,6 +47,7 @@
     --warning-rgb: 212, 160, 48;
     --error:       #e05545;
     --error-text:  #f0705f; /* red as text on its own tint (a priority chip): 4.5:1 or more on the dark panels (#4851); --error itself is 4.0 on the tint */
+    --state-review: var(--xterm-magenta); /* In review: its own colour beside In progress's blue (#11356); 4.5:1 or more as text in both themes */
     --success-text: var(--success); /* green and amber as text on a grey panel or on their own tint: the light theme has darker ones that hold 4.5:1 (#5791) */
     --warning-text: var(--warning);
     --border-subtle:  rgba(255, 255, 255, 0.04); /* a row's hairline inside a table or list (#5146) */

@@ -216,7 +216,7 @@ func TestArtifactCommentsOwnerNeverDeletesOrEditsAnotherAuthors(t *testing.T) {
 	code, _ = rig.do("DELETE", fmt.Sprintf("%s/%d", cp(cmtDoc), hubID), cmtAsHubTwo, nil)
 	assert.Equal(t, 403, code, "a hub viewer cannot delete another hub viewer's")
 	code, _ = rig.do("DELETE", fmt.Sprintf("%s/%d", cp(cmtDoc), hubID), cmtAsHub, nil)
-	assert.Equal(t, 200, code, "the author deletes their own")
+	assert.Equal(t, 200, code, "the author deletes their own: a guest loses nothing to the owner's gain (#11354)")
 	// Through the Hub a resolve is the owner's alone now (#7052): another hub viewer cannot resolve a thread either.
 	code, out = rig.do("POST", fmt.Sprintf("%s/%d/resolve", cp(cmtDoc), mine), cmtAsHubTwo, nil)
 	assert.Equal(t, 403, code)
@@ -234,7 +234,7 @@ func TestArtifactCommentsAStampedRequestIsNeverTheOwner(t *testing.T) {
 	require.Equal(t, 200, code)
 	assert.Equal(t, "owner", out["you"].(map[string]any)["kind"], "the Hub's owner reads as the owner (#7052 round 3)")
 	assert.Equal(t, true, out["you"].(map[string]any)["can_comment"])
-	assert.Equal(t, false, out["you"].(map[string]any)["can_lock"], "the lock is not a route of the table")
+	assert.Equal(t, true, out["you"].(map[string]any)["can_lock"], "the lock is a route of the table now (#11354): the Hub's owner may lock")
 	assert.Equal(t, true, out["comments"].([]any)[0].(map[string]any)["mine"], "the owner's own comment is theirs")
 	for _, c := range []struct{ method, path string }{
 		{"POST", cp(cmtDoc)}, {"PATCH", fmt.Sprintf("%s/%d", cp(cmtDoc), id)}, {"DELETE", fmt.Sprintf("%s/%d", cp(cmtDoc), id)},
@@ -307,6 +307,7 @@ func TestArtifactCommentsAgentsReadTheirBoardsAndNeverWrite(t *testing.T) {
 	require.Equal(t, 201, code, fmt.Sprint(out))
 	_, err := rig.h.bs.Subscribe(context.Background(), "team-a", "dev", "Developer", "agent-s1", nil, "")
 	require.NoError(t, err)
+	rig.uploadedBySession("s1", "team-a") // an agent reads the threads of an artifact it uploaded (#11420), then only those on its boards
 	code, out = rig.do("GET", cp(cmtDoc), cmtAsAgent, nil)
 	require.Equal(t, 200, code)
 	list := out["comments"].([]any)
@@ -740,14 +741,27 @@ func TestArtifactCommentsThroughTheHubOnlyTheOwnerMayWrite(t *testing.T) {
 		}
 	}
 	assert.Equal(t, before, count(), "nothing was stored by any of them")
-	// The routes the Hub does not list: an edit, a delete and the lock stay refused even for the owner's marker.
+	// The lock is the owner's alone through the Hub (#11354): a hub viewer is refused; an edit or delete of the OWNER's comment by a hub viewer is refused by the comment policy (not the author), never served.
 	withLabel(t, cmtHubUser, nil)
-	code, _ := rig.do("PATCH", fmt.Sprintf("%s/%d", cp(cmtDoc), id), cmtAsHubOwner, map[string]any{"body": "x"})
-	assert.Equal(t, 403, code)
-	code, _ = rig.do("DELETE", fmt.Sprintf("%s/%d", cp(cmtDoc), id), cmtAsHubOwner, nil)
-	assert.Equal(t, 403, code)
+	for _, c := range []struct{ method, path string }{{"PUT", cp(cmtDoc) + "/lock"}, {"DELETE", cp(cmtDoc) + "/lock"}} {
+		code, out := rig.do(c.method, c.path, cmtAsHub, map[string]any{"body": "x"})
+		assert.Equal(t, 403, code, "a hub viewer: "+c.method+" "+c.path)
+		assert.Equal(t, "owner_only", out["code"])
+	}
+	rig.hubOn()
+	for _, c := range []struct{ method, path string }{{"PATCH", fmt.Sprintf("%s/%d", cp(cmtDoc), id)}, {"DELETE", fmt.Sprintf("%s/%d", cp(cmtDoc), id)}} {
+		code, out := rig.do(c.method, c.path, cmtAsHub, map[string]any{"body": "x"})
+		assert.Equal(t, 403, code, "a hub viewer cannot touch the owner's comment: "+c.method)
+		assert.Equal(t, "comments_forbidden", out["code"], "by the comment policy, not as a non-owner")
+	}
+	code, _ := rig.do("PATCH", fmt.Sprintf("%s/%d", cp(cmtDoc), id), cmtAsHubOwner, map[string]any{"body": "edited by the owner"})
+	assert.Equal(t, 200, code, "the owner edits their comment through the Hub")
 	code, _ = rig.do("PUT", cp(cmtDoc)+"/lock", cmtAsHubOwner, nil)
-	assert.Equal(t, 403, code)
+	assert.Equal(t, 200, code, "the owner locks through the Hub")
+	code, _ = rig.do("DELETE", cp(cmtDoc)+"/lock", cmtAsHubOwner, nil)
+	assert.Equal(t, 200, code, "and unlocks")
+	code, _ = rig.do("DELETE", fmt.Sprintf("%s/%d", cp(cmtDoc), id), cmtAsHubOwner, nil)
+	assert.Equal(t, 200, code, "and deletes it")
 }
 
 // The hub owner and the person at this computer are one identity, so they spend one budget of writes a minute.
@@ -815,15 +829,15 @@ func TestArtifactCommentsOwnerReadThroughTheHubIsExactlyWhatTheHubMayDo(t *testi
 	you := out["you"].(map[string]any)
 	assert.Equal(t, "owner", you["kind"])
 	assert.Equal(t, true, you["can_comment"])
-	assert.Equal(t, false, you["can_lock"], "the lock is the computer's")
+	assert.Equal(t, true, you["can_lock"], "the lock is the owner's, here too (#11354)")
 	require.Len(t, list, 2)
 	for _, c := range list {
 		assert.Equal(t, true, c["mine"], "both are the owner's: the Hub's owner and the computer's owner are one owner")
 		can := c["can"].(map[string]any)
 		assert.Equal(t, true, can["reply"])
 		assert.Equal(t, true, can["resolve"])
-		assert.Equal(t, false, can["edit"], "edit is not in the table")
-		assert.Equal(t, false, can["delete"], "delete is not in the table")
+		assert.Equal(t, true, can["edit"], "the owner's edit is a route of the table (#11354)")
+		assert.Equal(t, true, can["delete"], "and so is the delete")
 		assert.NotContains(t, c, "asks", "never in a Hub answer")
 		assert.Equal(t, "You", c["author"].(map[string]any)["name"])
 	}
@@ -869,6 +883,7 @@ func TestArtifactCommentCallerNeedsTheOwnerChecksAndTheListedRoutes(t *testing.T
 	owner := map[string]string{tunnel.ViaHeader: cloud.ViaSecret(), tunnel.HubUserHeader: cmtHubUser, tunnel.HubRoleHeader: "owner"}
 	for _, r := range []struct{ method, path string }{
 		{"GET", cp(cmtDoc)}, {"POST", cp(cmtDoc)}, {"POST", cp(cmtDoc) + "/1/resolve"}, {"POST", cp(cmtDoc) + "/1/reopen"},
+		{"PATCH", cp(cmtDoc) + "/1"}, {"DELETE", cp(cmtDoc) + "/1"}, {"PUT", cp(cmtDoc) + "/lock"}, {"DELETE", cp(cmtDoc) + "/lock"}, {"POST", cp(cmtDoc) + "/1/send"}, // the owner's edit, delete, lock and send (#11354)
 	} {
 		assert.Equal(t, commentCallerHub, call(r.method, r.path, noMarker).Kind, "no owner marker: a hub viewer, "+r.method+" "+r.path)
 		assert.Equal(t, commentCallerHub, call(r.method, r.path, otherUser).Kind, "another hub user's marker: a hub viewer, "+r.method+" "+r.path)
@@ -877,7 +892,7 @@ func TestArtifactCommentCallerNeedsTheOwnerChecksAndTheListedRoutes(t *testing.T
 	// Owner routes that are not the comments' own: never the comments owner request, whatever the marker.
 	for _, r := range []struct{ method, path string }{
 		{"GET", "/api/artifacts/" + cmtDoc}, {"GET", "/api/artifacts"}, {"GET", "/api/artifacts/" + cmtDoc + "/meta"}, {"GET", "/api/artifacts/" + cmtDoc + "/readers"}, {"DELETE", "/api/artifacts/" + cmtDoc},
-		{"PATCH", cp(cmtDoc) + "/1"}, {"DELETE", cp(cmtDoc) + "/1"}, {"PUT", cp(cmtDoc) + "/lock"},
+		{"POST", cp(cmtDoc) + "/1/reply"}, // an agent's reply is never a person's
 	} {
 		assert.False(t, ownerCommentRequest(httptest.NewRequest(r.method, r.path, nil)), r.method+" "+r.path)
 		assert.Equal(t, commentCallerHub, call(r.method, r.path, owner).Kind, "not a comments owner route: "+r.method+" "+r.path)
@@ -954,4 +969,38 @@ func TestArtifactCommentsOnATeamMachineAreByThePersonAndTheOrganisation(t *testi
 	assert.Contains(t, raw.String(), `"name":"`+cmtHubUser+`"`, "to everyone else, the label they are shown by")
 	assert.Contains(t, raw.String(), `"name":"You"`, "and to the reader, their own comment (since #7052's owner read) is 'You', not their label")
 	assert.NotContains(t, raw.String(), `"name":"`+userB+`"`)
+}
+
+// #11354: the change-request send is the owner's alone through the Hub: a hub viewer (a guest or a grantee) is refused by the machine before the handler, the Hub's owner reaches the handler (and meets its own
+// checks: an unknown agent is a refusal of its own, never owner_only), and an agent's reply stays refused through the tunnel.
+func TestArtifactCommentsTheSendThroughTheHubIsTheOwnersAlone(t *testing.T) {
+	rig := newCmtRig(t)
+	id := rig.ownerComment("please change this")
+	withLabel(t, cmtHubUser, nil)
+	path := fmt.Sprintf("%s/%d/send", cp(cmtDoc), id)
+	code, out := rig.do("POST", path, cmtAsHub, map[string]any{"agents": []string{"Writer"}})
+	assert.Equal(t, 403, code)
+	assert.Equal(t, "owner_only", out["code"], "a hub viewer: refused before the handler")
+	code, out = rig.do("POST", path, cmtAsHubOwner, map[string]any{"agents": []string{"Writer"}})
+	assert.NotEqual(t, "owner_only", out["code"], "the Hub's owner is not refused as a non-owner: %d %v", code, out)
+	assert.NotEqual(t, "not_through_hub", out["code"], "and the route is no longer refused for the Hub: %d %v", code, out)
+	code, _ = rig.do("POST", fmt.Sprintf("%s/%d/reply", cp(cmtDoc), id), cmtAsHubOwner, map[string]any{"body": "x"})
+	assert.Equal(t, 403, code, "an agent's reply is never a person's, through the Hub either")
+}
+
+// #11354, the operator's decision (2026-10-30): the owner gets more through the Hub and a guest loses nothing: a hub viewer allowed to comment edits and deletes their OWN comment (the author is the stored identity,
+// never a value of the request), and cannot touch another's; the lock and the send stay the owner's alone.
+func TestArtifactCommentsAHubGuestStillEditsAndDeletesTheirOwn(t *testing.T) {
+	rig := newCmtRig(t)
+	rig.hubOn()
+	mine := rig.hubComment(cmtHubUser, "my words", "")
+	theirs := rig.hubComment("hub-user-9999ffff", "someone else's", "")
+	code, _ := rig.do("PATCH", fmt.Sprintf("%s/%d", cp(cmtDoc), mine), cmtAsHub, map[string]any{"body": "my better words"})
+	assert.Equal(t, 200, code, "the guest edits their own")
+	code, out := rig.do("PATCH", fmt.Sprintf("%s/%d", cp(cmtDoc), theirs), cmtAsHub, map[string]any{"body": "mine now", "author": "hub-user-9999ffff"})
+	assert.Equal(t, 403, code, "not another guest's, whatever the request says: %v", out)
+	code, _ = rig.do("DELETE", fmt.Sprintf("%s/%d", cp(cmtDoc), theirs), cmtAsHub, nil)
+	assert.Equal(t, 403, code, "nor delete it")
+	code, _ = rig.do("DELETE", fmt.Sprintf("%s/%d", cp(cmtDoc), mine), cmtAsHub, nil)
+	assert.Equal(t, 200, code, "and deletes their own")
 }

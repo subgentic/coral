@@ -35,7 +35,7 @@ const { coralReady } = require('./helpers/wait');
             const modelKey = (sections.find(s => /model|agent/i.test(s.split(':')[1]) && !/persona/i.test(s)) || '').split(':')[0];
             if (modelKey) await section(modelKey);
             const dup = await ev(`(() => { const sel = document.querySelector('#launch-agent-acf .acf-agent-type'); const lab = sel && sel.closest('label'); return { selectInDom: !!sel, labelShown: !!lab && lab.getClientRects().length > 0, radios: document.querySelectorAll('#launch-agent-pick input[type=radio]').length }; })()`);
-            check(`${tag}: the agent is named once: the radio group shows, and the form's "Agent Type" select is not on screen`, dup.radios === 4 && dup.selectInDom && !dup.labelShown, JSON.stringify([dup, sections]));
+            check(`${tag}: the agent is named once: the radio group shows (five providers since OpenCode), and the form's "Agent Type" select is not on screen`, dup.radios === 5 && dup.selectInDom && !dup.labelShown, JSON.stringify([dup, sections]));
             await ev(`document.querySelector('#launch-agent-pick input[value="codex"]').click(); true`);
             check(`${tag}: choosing in the group still drives the hidden select`, (await ev(`document.querySelector('#launch-agent-acf .acf-agent-type').value`)) === 'codex');
 

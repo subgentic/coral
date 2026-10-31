@@ -20,8 +20,8 @@ import { importOnce } from './import_once.js';
 export const HUB_LINKS_URL = 'https://app.coralhub.dev/team-links'; // the constant of team_cross_team_fields.js: the Hub refuses a query on it
 export const NOT_DELIVERED_SENTENCE = "That team isn't on that computer (it may have been deleted). Revoke this link, and link the team again if it was re-created."; // coral-hub Security's exact words (corrected 06:32: a re-created board does not revive a link, links name generated ids)
 /** The first release that ships links (the operator, #9875 point 1): a computer on an older one is never a link target, it needs an update; the Hub also caps which computers connect by a minimum version. */
-export const LINK_MIN_VERSION = '2.0.3';
-export const GENERATED_TEAM_ID = /^b-[0-9a-z]{10}$/; // a Hub link names a team by its generated board id, never by a name
+const LINK_MIN_VERSION = '2.0.3';
+const GENERATED_TEAM_ID = /^b-[0-9a-z]{10}$/; // a Hub link names a team by its generated board id, never by a name
 
 const mk = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 const pick = (o, ...names) => { for (const n of names) if (o && o[n] != null && o[n] !== '') return o[n]; return ''; };

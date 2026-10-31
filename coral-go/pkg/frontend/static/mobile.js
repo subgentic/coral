@@ -6,6 +6,7 @@ import { syncDisplayMenu } from './session_rows.js';
 import { showView, escapeAttr } from './utils.js';
 import { note, backIs } from './nav.js';
 import { switchRow } from './switch_row.js';
+import { buildPhoneBar } from './phone_bar.js';
 
 function isMobile() {
     return isPhoneLayout(); // a narrow window, or a phone turned to landscape (phone_layout.js, #6683)
@@ -118,8 +119,6 @@ function _listHeader(agentList) {
     header = document.createElement('div');
     header.className = 'mobile-list-header';
     header.innerHTML = `
-            <button class="btn btn-quiet btn-icon phone-menu-btn" type="button" data-on-click="m-top-menu" data-hamburger aria-haspopup="menu" aria-expanded="false" aria-controls="nav-more-menu" aria-label="Menu"><span class="material-icons" aria-hidden="true">menu</span></button>
-            <button class="phone-account-btn" type="button" data-on-click="m-top-menu" data-hamburger data-account aria-haspopup="menu" aria-expanded="false" aria-controls="nav-more-menu" aria-label="Settings and account" title="Settings and account"><span class="material-icons" aria-hidden="true">account_circle</span><span class="sr-only" id="phone-hub-state"></span></button>
             <span class="phone-break" aria-hidden="true"></span>
             <h2 class="mobile-list-title">Agents</h2>
             <div class="phone-chips" role="group" aria-label="Show">
@@ -134,9 +133,6 @@ function _listHeader(agentList) {
                 <svg class="group-toggle-expand" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4l5 5 5-5M7 20l5-5 5 5"/></svg>
             </button>
             <button class="btn btn-small btn-primary" data-on-click="launch-show">New</button>
-            <div class="mobile-search-row" id="mobile-search-row">
-                <input type="search" class="field field-search sidebar-search-input mobile-search-input" placeholder="Search agents and messages" autocomplete="off" aria-label="Search agents and messages" data-on-input="agent-search-filter" data-on-keydown="agent-search-key">
-            </div>
             <span class="sr-only" role="status" aria-live="polite" data-agent-list-live></span>
             <div class="list-display-panel" id="mobile-display-panel" data-display-panel role="group" aria-label="Display options" data-on-keydown="display-panel-key" hidden>
                 <div class="agent-list-bar" id="mobile-agent-list-bar" hidden></div>
@@ -147,8 +143,11 @@ function _listHeader(agentList) {
                 </div>
             </div>
         `;
+    const searchRow = document.createElement('div'); searchRow.className = 'mobile-search-row'; searchRow.id = 'mobile-search-row';
+    searchRow.innerHTML = `<input type="search" class="field field-search sidebar-search-input mobile-search-input" placeholder="Search agents and messages" autocomplete="off" aria-label="Search agents and messages" data-on-input="agent-search-filter" data-on-keydown="agent-search-key">`;
+    header.prepend(buildPhoneBar({ pill: searchRow })); // the same bar every top-level view has (phone_bar.js): ☰, the search in the pill, the account
     agentList.prepend(header);
-    const hubWords = document.body.getAttribute('data-hub-label'); if (hubWords) header.querySelector('#phone-hub-state').textContent = `, ${hubWords}`; // the hub's state, if it was read before this header was built (hub_indicator.js)
+    const hubWords = document.body.getAttribute('data-hub-label'); if (hubWords) header.querySelector('.phone-hub-state').textContent = `, ${hubWords}`; // the hub's state, if it was read before this header was built (hub_indicator.js)
     return header;
 }
 
@@ -167,7 +166,7 @@ export function syncMobileAgentList() {
     if (phoneBox && sideBox && !phoneBox.value) phoneBox.value = sideBox.value; // a search typed on a wide screen is still in the box
     syncDisplayMenu();   // the phone's copy of the ≡ menu (#3991)
 
-    const allChats = document.getElementById('agent-search-all-chats'), row = agentList.querySelector('#mobile-search-row');
+    const allChats = document.getElementById('agent-search-all-chats'), row = agentList.querySelector('.phone-bar'); /* under the shared bar (phone_bar.js), not inside its pill */
     if (allChats && row && allChats.previousElementSibling !== row) { // the line that sends the words to the chats' search (render.js syncSearchAllChats) sits under the pill, so its placeholder is true
         if (!_allChatsHome) _allChatsHome = { parent: allChats.parentElement, next: allChats.nextSibling };
         row.after(allChats);

@@ -80,7 +80,7 @@ func commentKindMay(c commentCaller, action string, hubWrite bool) (bool, string
 //	caller             read   create  edit/delete  resolve  lock
 //	owner              yes    yes     own only     yes      yes
 //	hub viewer         yes    flag    own, flag    flag     no
-//	agent of a board   yes*   no      no           no       no      (* the comments made on a board it is on; the route filters)
+//	agent of a board   yes*   no      no           no       no      (* the comments made on a board it is on, of an artifact it uploaded or was asked into: the route filters, #11420)
 //	anyone else        no     no      no           no       no
 //
 // While locked, every write is refused except the OWNER's delete of their own comment (and the lock and unlock themselves): taking back what you wrote is not commenting. Nobody deletes or

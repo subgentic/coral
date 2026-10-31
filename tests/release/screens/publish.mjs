@@ -1,6 +1,6 @@
 // Files a run on the board: the release task "UI review: vX.Y.Z", the contact sheet and every shot as Coral artifacts on it. A plain script: coral-board and coral-agent are called as a CLI under the
 // identity of whoever runs it (the operator's or DevOps's), no agent turn and no model is involved.
-//   node publish.mjs --out DIR --version 2.0.7 --sha SHA [--prev DIR] [--goal 163] [--assignee Operator] [--task N] [--all] [--dry-run]
+//   node publish.mjs --out DIR --version 2.0.7 --sha SHA [--prev DIR] [--goal N] [--assignee Operator] [--task N] [--all] [--dry-run]
 // The link of an artifact is the SHA-256 of its bytes, so every link is known before anything is uploaded: the contact sheet (which links every shot) goes up FIRST, then the shots, and each
 // upload's answer is checked against the link the sheet holds. Nothing here ever blocks a release: a failure is reported and the exit code says so, and run.sh only warns.
 //
@@ -10,15 +10,15 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { buildManifest, taskBody, taskTitle, expectedLink, artifactName } from './manifest.mjs';
+import { buildManifest, taskBody, taskTitle, expectedLink, artifactName, reviewName, sheetArtifactName, reviewUploadArgs, uploadArgs, pickGoal } from './manifest.mjs';
 import { buildSheet } from './sheet.mjs';
 
 const arg = name => { const i = process.argv.indexOf('--' + name); return i > 0 ? process.argv[i + 1] : undefined; };
 const flag = name => process.argv.includes('--' + name);
-const out = arg('out'), version = arg('version'), sha = arg('sha') || 'unknown', prevDir = arg('prev'), goal = arg('goal') || process.env.SCREENS_GOAL || '163', assignee = arg('assignee') || process.env.SCREENS_ASSIGNEE || 'Operator';
+const out = arg('out'), version = arg('version'), sha = arg('sha') || 'unknown', prevDir = arg('prev'), wantedGoal = arg('goal') || process.env.SCREENS_GOAL || '', assignee = arg('assignee') || process.env.SCREENS_ASSIGNEE || 'Operator';
 const dry = flag('dry-run'), all = flag('all');
 const perHour = Number(process.env.SCREENS_UPLOADS_PER_HOUR || 80), maxWaitMs = Number(process.env.SCREENS_MAX_WAIT_MIN || 300) * 60000;
-if (!out || !version) { console.error('usage: publish.mjs --out DIR --version X.Y.Z --sha SHA [--prev DIR] [--goal 163] [--assignee Operator] [--task N] [--all] [--dry-run]'); process.exit(2); }
+if (!out || !version) { console.error('usage: publish.mjs --out DIR --version X.Y.Z --sha SHA [--prev DIR] [--goal N] [--assignee Operator] [--task N] [--all] [--dry-run]'); process.exit(2); }
 const bin = program => (process.env.SCREENS_BIN ? path.join(process.env.SCREENS_BIN, program) : program);
 const log = (...a) => console.error('[publish]', ...a);
 
@@ -46,11 +46,13 @@ for (const a of manifest.artifacts) {
 const sheetFile = path.join(out, 'contact-sheet.html');
 const writeSheet = () => fs.writeFileSync(sheetFile, buildSheet({ manifest, links, dir: out, prevDir: prevDir && fs.existsSync(prevDir) ? prevDir : null }));
 writeSheet();
-const sheetName = `UI review ${manifest.tag}: contact sheet.html`;
+const prevVersion = prevDir && fs.existsSync(prevDir) ? path.basename(prevDir.replace(/\/+$/, '')) : ''; // the cache folder is named for the release (~/.cache/coral-screens/2.0.7)
+const cmp = /^\d+\.\d+\.\d+/.test(prevVersion) ? prevVersion : '';
+const reviewTitle = reviewName(manifest, cmp), sheetName = sheetArtifactName(manifest, cmp);
 let sheetLink = expectedLink(fs.readFileSync(sheetFile));
 log(`${manifest.shotCount} shots, ${manifest.pageCount} pages, ${manifest.failed.length} not photographed; ${toUpload.length} to upload; sheet ${(fs.statSync(sheetFile).size / 1e6).toFixed(1)} MB`);
 if (dry) {
-    fs.writeFileSync(path.join(out, 'published.json'), JSON.stringify({ dryRun: true, title: taskTitle(version), body: taskBody(manifest, sheetLink), sheetLink }, null, 2));
+    fs.writeFileSync(path.join(out, 'published.json'), JSON.stringify({ dryRun: true, title: taskTitle(version), body: taskBody(manifest, sheetLink), sheetLink, needsReview: { program: 'coral-agent', args: reviewUploadArgs(sheetFile, sheetName, '<the release task>') } }, null, 2));
     log('dry run: nothing uploaded; see manifest.json, contact-sheet.html, published.json');
     process.exit(0);
 }
@@ -88,10 +90,14 @@ try {
     if (!id) {
         // The runner makes its own task: `task add --self` (any agent may open work for itself, with a goal: #11247); a coral-board that does not know the switch, or a server that refuses it, falls back to a plain add,
         // which only the Operator or an orchestrator may do.
+        let goals = []; try { goals = JSON.parse(call('coral-board', ['goal', 'list', '--json']).stdout); } catch (e) { log('could not read the goals:', String(e.message || e).slice(0, 120)); }
+        const picked = pickGoal(goals, wantedGoal); // a goal that is open: #163 was closed and refused the task
+        if (picked.id == null) throw new Error(picked.why);
+        const goal = picked.id; log('filing under', picked.why);
         const base = ['task', 'add', title, '--goal', goal, '--body', taskBody(manifest, sheetLink), '--priority', 'medium'];
         let add = call('coral-board', [...base, '--self'], { allowFail: true });
         if (add.status !== 0 && /flag provided but not defined|unknown flag|unknown option|not defined: -self/i.test(add.stderr + add.stdout)) add = call('coral-board', [...base, ...(me ? ['--assignee', me] : [])], { allowFail: true });
-        if (add.status !== 0) throw new Error(`this identity cannot create the task (${(add.stderr || add.stdout || '').trim().split('\n')[0]}). Ask the orchestrator to create "${title}" on goal #${goal} assigned to ${me || 'the runner'}, then run again (or pass --task N)`);
+        if (add.status !== 0) throw new Error(`this identity cannot create the task (${(add.stderr || add.stdout || '').trim().split('\n')[0]}). Ask the orchestrator to create "${title}" on an open goal assigned to ${me || 'the runner'}, then run again (or pass --task N)`);
         id = Number((add.stdout.match(/(?:Created Task|Task) #(\d+)/) || [])[1]);
         if (!id) throw new Error('no task id in: ' + add.stdout.trim().slice(0, 120));
     }
@@ -100,7 +106,7 @@ try {
     const upload = async (file, name, extra = []) => {
         for (;;) {
             await room();
-            const r = call('coral-agent', ['artifact', 'upload', file, '--name', name, '--task', id, '--tag', 'ui review', ...extra], { allowFail: true });
+            const r = call('coral-agent', uploadArgs(file, name, id, extra), { allowFail: true });
             if (r.status !== 0) {
                 const text = (r.stderr || r.stdout || '').trim();
                 const retry = text.match(/Retry-After: (\d+)/);
@@ -131,6 +137,10 @@ try {
         const v = await upload(sheetFile, sheetName, ['--new-version-of', published.sheet]);
         if (v.error) log('the corrected sheet was not uploaded:', v.error); else published.sheet = v.uri;
     }
+    // 4. the operator's Needs you: the contact sheet once more, tagged "for review" and named for the one-line summary. Last, so the sheet's links are all live when it shows up (the same bytes are another upload record
+    //    of the same link). The Inbox lists the board's "for review" files; no mention, no agent: this script is all there is.
+    const rv = await upload(sheetFile, sheetName, ['--tag', 'for review']);
+    if (rv.error) { published.failed.push({ name: 'needs review', error: rv.error }); log('the contact sheet was not put in Needs you:', rv.error); } else { published.review = rv.uri; log('in Needs you:', reviewTitle); }
     const handed = call('coral-board', ['task', 'reassign', id, '--to', assignee], { allowFail: true });
     if (handed.status !== 0) { // this runner may not reassign: the task is completed with the contact sheet in its message, which is where the Operator reads the result
         call('coral-board', ['task', 'complete', id, '--message', taskBody(manifest, published.sheet)], { allowFail: true });

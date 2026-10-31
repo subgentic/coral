@@ -390,6 +390,9 @@ func (h *SessionsHandler) resolveChatTarget(r *http.Request, name, agentType, se
 // window) and counts the rest: every index is the message's number in the whole transcript, and a page that reaches
 // before the window is read from the file (#4620).
 func (h *SessionsHandler) readChatTranscript(ctx context.Context, id string, t chatTarget) *jsonl.Transcript {
+	if t.agentType == at.Opencode {
+		return h.opencodeTranscript(ctx, id) // no transcript file: the agent's server has the history
+	}
 	if t.sessionID == "" {
 		return h.jsonl.ReadTranscriptContext(ctx, id, t.workingDir, t.agentType)
 	}

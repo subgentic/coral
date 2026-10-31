@@ -15,6 +15,7 @@
  *   state: tableState(), kept by the caller across redraws: the sort, and the selection (a set of row keys, kept while the rows are filtered or paged, cleared when selectable.contextKey changes).
  * Folded (the table's own box narrower than foldAt rem, 40 by default; 'fit' measures the unfolded columns; also at 200% text): fold 'column' is the two-line row (line 1 and line 2 cells), fold 'labeled' is the name, then "label value" lines
  * (the Analytics tables); scroll: a table of many columns scrolls sideways inside its box, shaded where more is to come, rather than being cut off; the header row is hidden and a "Sort by" select takes its place. Everything is built with the DOM and textContent: titles and names are written by agents. */
+import { importOnce } from './import_once.js';
 import { whenText, shortWhen } from './when_text.js';
 import { browserLocal } from './safe_storage.js';
 
@@ -35,10 +36,12 @@ export function primaryButton(text, label) {
     return b;
 }
 /** A state as a dot and a word (the dot is decoration: the word says it). */
+/** A state as a coloured dot and its word in the same colour: no outline and no fill (the operator, #11356). The one builder for every state in every list (the task, job, goal, run and agent tables, the team pages and the goal's page); on a phone the word is hidden and the dot stands for it (css/goals.css). */
 export function chip(word, cls) {
-    const c = el('span', `chip dt-chip goal-chip ${cls || ''}`.trim());
+    const c = el('span', `state-label dt-chip goal-chip ${cls || ''}`.trim());
     const dot = el('span', 'goal-dot'); dot.setAttribute('aria-hidden', 'true');
-    c.append(dot, document.createTextNode(word));
+    c.title = word;
+    c.append(dot, el('span', 'state-word', word));
     return c;
 }
 export function tag(text) { return el('span', 'chip chip-tag dt-tag', text); }
@@ -108,10 +111,28 @@ export const compareBy = (col) => { // exported for its unit test (data_table_co
 };
 
 /** The phone's mail row (#9545, UI/UX's spec): a 44 px leading target holding a 32 px avatar, the title and the first words of what it says on one line, the time at the right, and under the line (Needs you only) the ask.
- *  A caller opts in with `mail(row) -> { lead: { text, name?, square?, icon? }, title, snippet?, state?, ask?, time?, unread?, mark?, data?, tip?, team?, teamAlways?, nameTeam?, snippetTip? }` (nameTeam: the team is in the button's name but not drawn on the line, so Needs you is one line, #9986) (state: the word the row shows for what it is in (a task's Queued, In review), said in the button's name after the title, so a screen reader hears <name>, <state> (#9747)) (team: after the title in tertiary, always when teamAlways, else only for a title two rows share) (data: attributes for the open button, as `{ taskId: 5 }` is data-task-id="5"); on a phone the row is this cell alone (the columns are the desktop's), and its button is the row's open control.
+ *  A caller opts in with `mail(row) -> { actions?: [{ label, title?, run(button) }] (a ⋯ button at the row's right opens them, #137104), lead: { text, name?, square?, icon? }, title, snippet?, state?, ask?, time?, unread?, mark?, data?, tip?, team?, teamAlways?, nameTeam?, snippetTip? }` (nameTeam: the team is in the button's name but not drawn on the line, so Needs you is one line, #9986) (state: the word the row shows for what it is in (a task's Queued, In review), said in the button's name after the title, so a screen reader hears <name>, <state> (#9747)) (team: after the title in tertiary, always when teamAlways, else only for a title two rows share) (data: attributes for the open button, as `{ taskId: 5 }` is data-task-id="5"); on a phone the row is this cell alone (the columns are the desktop's), and its button is the row's open control.
  *  `unread` makes the title 600 (a read one is 500) and draws an accent dot under the time that is named "Unread" for a screen reader: a list says it only where a read state exists (Needs you; chats, boards and tasks through inbox_read.js, #9687). `mark: 'attention'` is the amber dot under the time and outranks the unread dot (one dot a row). A desktop table takes `unread(row)` for the same look as a `dt-unread` row. Text is set with textContent only. */
 const MAIL_QUERY = '(max-width: 767px)';
-const mailCell = (m, label, open, pick, showTeam = false) => { // open: the row opens (a button), pick: a function that selects it, or null, showTeam: the team is drawn after the title (always for Needs you, and for a title two rows share)
+let rowMenus = 0;
+/** A phone mail row's ⋯ (#137104): a 44 px button at the row's right that opens the one menu (menu_button.js: arrow keys, Escape back to the button, Tab or a tap elsewhere closes) of the row's actions. `actions`: [{ label, title, run(button) }].
+ *  The button is the row's own control, a sibling of the row's button (a button holds no button); a press on it never opens or selects the row. */
+function rowMore(actions, label) {
+    const id = `dt-mail-more-${++rowMenus}`, wrap = el('span', 'dt-mail-more');
+    const toggle = el('button', 'btn btn-quiet btn-icon dt-mail-more-toggle'); toggle.type = 'button'; toggle.id = id;
+    toggle.setAttribute('aria-haspopup', 'menu'); toggle.setAttribute('aria-expanded', 'false'); toggle.setAttribute('aria-controls', `${id}-menu`); toggle.setAttribute('aria-label', `More actions for ${label}`);
+    toggle.innerHTML = '<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="3" cy="8" r="1.5"/><circle cx="8" cy="8" r="1.5"/><circle cx="13" cy="8" r="1.5"/></svg>'; // the phone agent bar's ⋯ (#11056)
+    const menu = el('div', 'menu dt-mail-menu'); menu.id = `${id}-menu`; menu.hidden = true; menu.setAttribute('role', 'menu'); menu.setAttribute('aria-label', `Actions for ${label}`);
+    for (const a of actions) {
+        const b = el('button', 'menu-item', a.label); b.type = 'button'; b.setAttribute('role', 'menuitem'); if (a.title) b.title = a.title;
+        b.addEventListener('click', async e => { e.stopPropagation(); (await importOnce('./menu_button.js')).closeMenus({ restoreFocus: true }); a.run(b); });
+        menu.append(b);
+    }
+    toggle.addEventListener('click', async e => { e.stopPropagation(); (await importOnce('./menu_button.js')).toggleMenu(toggle); });
+    wrap.append(toggle, menu);
+    return wrap;
+}
+const mailCell = (m, label, open, pick, showTeam = false, gap = false) => { // open: the row opens (a button), pick: a function that selects it, or null, showTeam: the team is drawn after the title (always for Needs you, and for a title two rows share)
     const td = el('td', 'dt-mail-cell'); td.setAttribute('role', 'cell');
     const lead = el(pick ? 'button' : 'span', 'dt-mail-lead');
     if (pick) { lead.type = 'button'; lead.setAttribute('role', 'checkbox'); lead.setAttribute('aria-label', `Select ${label}`); lead.setAttribute('aria-checked', 'false'); lead.addEventListener('click', pick); } else lead.setAttribute('aria-hidden', 'true'); // a list that can be selected: the avatar is its checkbox (a tap, no gesture), as the desktop's is
@@ -137,6 +158,8 @@ const mailCell = (m, label, open, pick, showTeam = false) => { // open: the row 
     else if (m.unread) { const dot = el('span', 'dt-mail-dot dt-mail-new'); dot.append(el('span', 'sr-only', 'Unread')); side.append(dot); } // the dot is the signal, the 600 only reinforces it, and neither is colour alone
     body.append(text, ' ', side);
     td.append(lead, body);
+    if (m.actions && m.actions.length) td.append(rowMore(m.actions, label)); // a row's ⋯ menu, after the row's button and before its choices
+    else if (gap) { const g = el('span', 'dt-mail-more-gap'); g.setAttribute('aria-hidden', 'true'); td.append(g); }
     if (m.answers) td.append(m.answers); // a Needs you row's choices, under the line (#10400)
     return td;
 };
@@ -406,6 +429,7 @@ export function dataTable(cfg) {
         const list = sortedRows();
         const cols = columns.length + (sel ? 1 : 0);
         let lastGroup = null;
+        const mails = mailOn() ? list.map(r => cfg.mail(r)) : null, gap = !!mails && mails.some(m => m.actions && m.actions.length); // a list with a ⋯ on any row reserves its 44 px on every row, so the times line up (#137104)
         list.forEach((r, i) => {
             if (cfg.groupBy && !st.sort) { // the rows come in the caller's order: a divider where their group changes (a day), none once the person has sorted
                 const g = cfg.groupBy(r);
@@ -427,9 +451,9 @@ export function dataTable(cfg) {
                 td.append(cb.hidden ? cb : checkHit(cb)); tr.append(td);
             }
             if (mailOn()) {
-                const m = cfg.mail(r), showTeam = !!m.team && (m.teamAlways || dupTitles().has(m.title));
+                const m = mails[i], showTeam = !!m.team && (m.teamAlways || dupTitles().has(m.title));
                 const pick = sel && eligible(r) ? () => { const cb = tr.querySelector('.dt-check input'); if (!cb) return; if (!st.select) { st.select = true; st.mailSelect = true; syncSelectMode(); } cb.dispatchEvent(new MouseEvent('click', { bubbles: true })); } : null;
-                tr.classList.add('dt-mailed'); tr.append(mailCell(m, nameOf(r), !!cfg.open, pick, showTeam));
+                tr.classList.add('dt-mailed'); tr.append(mailCell(m, nameOf(r), !!cfg.open, pick, showTeam, gap));
             } else for (const c of columns) tr.append(cellOf(c, r, tr));
             if (cfg.open) {
                 tr.classList.add('dt-row-open');

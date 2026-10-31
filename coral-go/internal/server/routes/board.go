@@ -29,7 +29,8 @@ func taskClaimNudge(taskID int64) string {
 
 // BoardHandler handles message board HTTP endpoints.
 type BoardHandler struct {
-	selfTaskMu sync.Mutex // makes the one-per-title check and the creation of a self task one step (#11247)
+	proposalNow func() time.Time // a test's clock for the proposal sweeps (expiry and stuck claims); nil is time.Now
+	selfTaskMu  sync.Mutex       // makes the one-per-title check and the creation of a self task one step (#11247)
 	// goalReqWake is when each target board had its Orchestrators last woken for a goal request (#7361): one wake per few minutes, with the count, so a loop cannot make a paid turn per request.
 	goalReqWake sync.Map
 	// goalLinks limits the Hub service's reads of GET /api/goal-links per asker (#7411).
@@ -39,12 +40,13 @@ type BoardHandler struct {
 	bs                            *board.Store
 	terminal                      ptymanager.SessionTerminal
 	mu                            sync.RWMutex
-	paused                        map[string]bool         // in-memory set of paused project names
-	touches                       *operatortouch.Recorder // the Operator's touches, counted for the Analytics tab (#11225); nil: not recorded
-	sleepPausedAt                 map[string]time.Time    // when each sleep pause was made in this process (zero for one restored at startup): a lift on what an agent was seen doing earlier must not undo a later one (#11204)
-	sleepPaused                   map[string]bool         // the paused boards whose pause sleep or Coral's restart put there, which auto-wake lifts (#286)
-	pauseMu                       sync.Mutex              // one pause change at a time, its check, maps and stored row together (Security on #119)
-	notifyFn                      func(project string)    // triggers an immediate notification pass for project's board
+	paused                        map[string]bool                                      // in-memory set of paused project names
+	touches                       *operatortouch.Recorder                              // the Operator's touches, counted for the Analytics tab (#11225); nil: not recorded
+	sleepPausedAt                 map[string]time.Time                                 // when each sleep pause was made in this process (zero for one restored at startup): a lift on what an agent was seen doing earlier must not undo a later one (#11204)
+	sleepPaused                   map[string]bool                                      // the paused boards whose pause sleep or Coral's restart put there, which auto-wake lifts (#286)
+	pauseMu                       sync.Mutex                                           // one pause change at a time, its check, maps and stored row together (Security on #119)
+	notifyFn                      func(project string)                                 // triggers an immediate notification pass for project's board
+	reviewPost                    func(ctx context.Context, project, msg string) error // a test's replacement for posting the approval message (team_artifact_review.go)
 	coralDir                      string
 	alsoMu                        sync.Mutex    // serialises adding a later receipt to a received row (#4449)
 	autoAttach                    *AutoAttacher // #3515: an agent's linked images and Markdown
@@ -102,6 +104,8 @@ type BoardHandler struct {
 	liveSessionType func(ctx context.Context, sessionID string) (agentType string, ok bool, err error)
 	// clearBoardChatFlags removes the deleted board's mailbox flags from the separate sessions database.
 	clearBoardChatFlags func(ctx context.Context, project string) error
+	// sessionAsleep reports whether a live session is asleep, ended or archived: an approval's message waits for it (SetSessionAsleepLookup). Nil: not known.
+	sessionAsleep func(ctx context.Context, sessionID string) bool
 	// uploads caches per-session upload records for the artifact views.
 	uploads uploadDirCache
 	// taskCounts keeps each board's artifact count per task for a few seconds (taskArtifactCounts, #8591).
@@ -139,6 +143,11 @@ func (h *BoardHandler) SetSessionThinkingLookup(fn func(ctx context.Context, ses
 // SetLiveSessionLookup tells the board how to find a live session's agent type (#3864).
 func (h *BoardHandler) SetLiveSessionLookup(fn func(ctx context.Context, sessionID string) (string, bool, error)) {
 	h.liveSessionType = fn
+}
+
+// SetSessionAsleepLookup tells the board how to find whether a session is asleep, ended or archived (the approval of an artifact says so).
+func (h *BoardHandler) SetSessionAsleepLookup(fn func(ctx context.Context, sessionID string) bool) {
+	h.sessionAsleep = fn
 }
 
 // SetBoardChatFlagsClearer wires the sessions database's cleanup after a board is deleted.

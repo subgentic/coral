@@ -24,7 +24,7 @@ const { coralReady } = require('./helpers/wait');
     try {
         await setupHubWorld({ client, Page, Emulation, width: 1280, height: 800, mobile: false });
         const run = async tag => {
-            const ACCOUNT = tag === 'phone' ? '#top-menu-btn' : '[aria-label="Account menu"]'; // under 640 px the account is an entry of the hamburger's menu (#9021): the hamburger is the opener
+            const ACCOUNT = tag === 'phone' ? '#top-phone-menu' : '[aria-label="Account menu"]'; // under 640 px the account is an entry of the hamburger's menu (#9021): the hamburger is the opener
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired();
         await waitFor(`typeof window.switchNavTab==='function' && !!window.__coralReady`, 'dashboard'); await coralReady(ev, 'startup', 'liveList', 'settings');
                 const nav = async tab => { await ev(`window.switchNavTab('${tab}'); true`); };

@@ -231,6 +231,9 @@ func ComposeLines(in CheckInput) []string {
 	if len(in.Questions) > 0 {
 		lines = append(lines, questionsLine(in))
 	}
+	if g := goalsLine(in.Goals); g != "" {
+		lines = append(lines, g) // the open goals and what the operator has to do about them (#11412)
+	}
 	hintAt := len(lines) // the hint goes before the progress line
 	progressed := in.Progress.Completed+in.Progress.Reviewed+in.Progress.Posts > 0
 	since := in.Progress.Since.Format("15:04")
@@ -246,9 +249,9 @@ func ComposeLines(in CheckInput) []string {
 		if r.Awake() == 1 {
 			who = "The 1 awake agent is working."
 		}
-		lines = append(lines, who+" Nothing needs you.")
+		lines = append(lines, who+" "+nothingNeedsYou(in))
 	case !r.NeedsAttention() && len(in.Items) == 0 && len(in.Questions) == 0:
-		lines = append(lines, "Nothing needs you.")
+		lines = append(lines, nothingNeedsYou(in))
 	}
 	// The peek hint is a pointer, not a fact: it is left out first when the check would not fit (the other lines then drop as before).
 	if hint := in.peekLine(items); hint != "" {
@@ -328,6 +331,14 @@ func fitLines(lines []string) []string {
 }
 
 // roster check: Compose's one-line form.
+// nothingNeedsYou is the roster check's all-clear: not "Nothing needs you" while a goal needs the operator (#11412).
+func nothingNeedsYou(in CheckInput) string {
+	if in.goalsRemind() {
+		return "No agent needs you."
+	}
+	return "Nothing needs you."
+}
+
 func composeRoster(in CheckInput) string {
 	return strings.Join(ComposeLines(in), " • ")
 }
@@ -342,5 +353,39 @@ func formatList(lines []string) string {
 	for _, l := range lines[1:] {
 		out += "\n- " + l
 	}
+	return out
+}
+
+// Facts is what in the roster is for the reader, one line each, that changes when something new needs them and not when the clock moved or an agent went from one turn to the next: who waits on whom (and whether
+// the wait is stale), who is blocked, who is asleep with unread tags, and how many agents are idle, offline or unknown. Agents working or waiting are not facts (they come and go every turn), nor is one at a prompt: it is a fact once it has been there the team's N minutes (an item). A
+// check goes out again when it holds a fact the last one did not (#11431).
+func (r *Roster) Facts() []string {
+	if r == nil {
+		return nil
+	}
+	var out []string
+	for _, k := range []string{StateIdle, StateOffline, StateUnknown} {
+		for i := 1; i <= r.Counts[k]; i++ { // one fact for each agent in the state, so a count that falls only loses facts (not news) and one that rises gains one (news)
+			out = append(out, fmt.Sprintf("c:%s#%d", k, i))
+		}
+	}
+	for i := 1; i <= r.Claimable; i++ {
+		out = append(out, fmt.Sprintf("claimable#%d", i))
+	}
+	for _, g := range r.Waits {
+		names := make([]string, 0, len(g.Waiters))
+		for _, w := range g.Waiters {
+			names = append(names, fmt.Sprintf("%s/%t", w.Name, w.Stale))
+		}
+		sort.Strings(names)
+		out = append(out, fmt.Sprintf("w:%s/%t:%s", g.On, g.You, strings.Join(names, ",")))
+	}
+	for _, b := range r.Blocked {
+		out = append(out, "b:"+b.Name)
+	}
+	for _, a := range r.Asleep {
+		out = append(out, fmt.Sprintf("s:%s=%d", a.Name, a.Count))
+	}
+	sort.Strings(out)
 	return out
 }

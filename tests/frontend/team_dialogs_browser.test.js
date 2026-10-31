@@ -167,6 +167,27 @@ const { coralReady } = require('./helpers/wait');
         assert.notEqual(await ev(`getComputedStyle(document.getElementById('launch-modal')).display`), 'none', 'the launch dialog stays open');
         await ev(`document.querySelector('body > .modal:not([id]) [data-action=close]').click(); true`);
 
+        // A folder that does not exist (#11336): every member stops on it. It is said at the Folder field, on the step that has it, with "Create this folder" when the path is <root>/Coral/<name>,
+        // not in the list of members; a path elsewhere gets the error and no button.
+        for (const [dir, offered] of [['/home/me/Coral/new-team', true], ['/home/me/projects/new-team', false]]) {
+            await openTeam();
+            await ev(`window._addTeamAgent('Orchestrator', 'First.'); true`);
+            await ev(`(() => { window.__teamLaunches.length = 0; const d = document.getElementById('launch-team-dir'); d.dataset.coralRoot = '/home/me'; delete d.dataset.suggested; window.__launchAnswer = { status: 422, body: { ok: false, code: 'team_launch_failed', error: 'no agent in the team started', agents: [{ name: 'A', error: 'directory not found: ${dir}' }, { name: 'B', error: 'directory not found: ${dir}' }] } }; document.getElementById('team-board-name').value = 'crew-dir'; d.value = '${dir}'; window._validateTeamName(); window.launchTeam(); return true; })()`);
+            await waitFor(`!!document.getElementById('launch-team-dir-error')`, 'the error at the Folder field');
+            const e = await ev(`(() => { const d = document.getElementById('launch-team-dir'), er = document.getElementById('launch-team-dir-error'), b = er.querySelector('button'); return { text: er.textContent, invalid: d.getAttribute('aria-invalid'), focused: document.activeElement === d, dialogs: document.querySelectorAll('body > .modal:not([id]) ul li').length, btn: b ? b.textContent : null, inStep: !!d.closest('#launch-step-team') && d.getClientRects().length > 0 }; })()`);
+            assert.match(e.text, /^Folder not found: /, 'the error names the folder: ' + e.text);
+            assert.equal(e.invalid, 'true'); assert.ok(e.focused, 'the field has the focus'); assert.ok(e.inStep, 'and its step is showing'); assert.equal(e.dialogs, 0, 'no list of failed members');
+            assert.equal(e.btn, offered ? 'Create this folder' : null, `${dir}: the button is ${offered ? '' : 'not '}offered`);
+            if (offered) {
+                await ev(`document.querySelector('#launch-team-dir-error button').click(); true`);
+                assert.equal(await ev(`!document.getElementById('launch-team-dir-error') && document.getElementById('launch-team-dir').dataset.suggested`), dir, 'Create marks the folder as the one Coral makes and takes the error away');
+                await ev(`window.__launchAnswer = { status: 200, body: { agents: [{ name: 'A', session_id: 's' }] } }; window.__teamLaunches.length = 0; window.launchTeam(); true`);
+                await waitFor(`window.__teamLaunches.length === 1`, 'the launch after Create');
+                assert.equal(await ev(`window.__teamLaunches[0].create_dir`), true, 'the next launch sends create_dir');
+            }
+            await ev(`document.querySelectorAll('.modal.show, #launch-modal').forEach(m => m.id === 'launch-modal' && window.hideLaunchModal && window.hideLaunchModal()); true`);
+        }
+
         // A team launched on another server: the first task goes to that server's board, and the team opens under its server-qualified key (#5989).
         const remote = await ev(`(async () => { const m = await import((window.__coralStatic || '/static/') + 'team_dialogs.js'); const urls = []; const real = window.fetch;
             window.fetch = (u, o = {}) => { const p = new URL(String(u), location.href); if (p.pathname.endsWith('/messages') && (o.method || 'GET') === 'POST') { urls.push(p.pathname); return Promise.resolve(new Response('{}', { status: 200 })); } return real(u, o); };
@@ -200,7 +221,7 @@ const { coralReady } = require('./helpers/wait');
         await waitFor(`document.getElementById('team-drafted-note') && !document.getElementById('team-drafted-note').hidden && /Drafted: 1 member\\./.test(document.getElementById('team-drafted-note').textContent)`, 'the polled draft, straight on the Members step', { timeout: 9000 });
         console.log('PASS team dialogs');
     } finally {
-      await removeBoards(ev, ['crew-1', 'crew-1-2', 'crew-2']);
+      await removeBoards(ev, ['crew-1', 'crew-1-2', 'crew-2', 'crew-dir']);
       await guard.restore().catch(e => console.error('settings restore: ' + (e && e.message)));
       await client.close();
     }

@@ -241,6 +241,11 @@ var routeTable = cat(
 	// Artifacts and pasted images are the OWNER's alone through the hub (#5575): an artifact can hold anything. The machine refuses anyone but the owner whatever their tier.
 	// A content-addressed agent artifact is named by its full SHA-256; the only query on the content is the link form v=2 (routes_query.go, #3179). Pasted images are artifacts
 	// too (#5284); /api/upload and /api/shared-images stay local only. Upload (POST /api/agent/artifacts) and the artifact list under /api/agent/ stay unlisted (never).
+	// Pausing Coral's notices to one agent, and resuming them (#11387), is the OWNER's alone through the Hub, like the Operator's other controls on that agent: it changes what is typed into the agent.
+	owner(OwnerRefuse, rules(http.MethodPost, TierInteract,
+		"/api/sessions/live/{name}/notices/pause",
+		"/api/sessions/live/{name}/notices/resume",
+	)),
 	owner(OwnerRefuse, rules(http.MethodGet, TierView,
 		"/api/artifacts/{hex64}",
 		// Which artifact a shortened link in an old message means (#9841): link, repeatable, the owner's alone like the reads around it.
@@ -267,6 +272,30 @@ var routeTable = cat(
 		"/api/artifacts/{hex64}/comments/{id}/resolve",
 		"/api/artifacts/{hex64}/comments/{id}/reopen",
 	)),
+	// The rest of the owner's artifact work through the Hub (#11354, the operator's rule: the owner gets everything): the version list and series reads (their handlers already refuse a non-owner), the edit and
+	// delete of a comment and the lock (the comment policy still decides: the owner edits and deletes what they wrote, the lock is the owner's), and the change-request send, which hands the owner's own words (redacted,
+	// cut, quoted as untrusted data) to an agent: agent input, so Launch, as the other routes that type into an agent. A series DELETE stays unlisted (it removes every version) and so does an agent's reply (POST
+	// .../{id}/reply is never a person's).
+	owner(OwnerRefuse, rules(http.MethodGet, TierView,
+		"/api/artifacts/{hex64}/versions",
+		"/api/artifacts/series/{series}",
+		"/api/artifacts/series/{series}/versions",
+	)),
+	owner(OwnerRefuse, rules(http.MethodPut, TierInteract, "/api/artifacts/{hex64}/comments/lock")),
+	owner(OwnerRefuse, rules(http.MethodDelete, TierInteract, "/api/artifacts/{hex64}/comments/lock")),
+	// The edit and delete are the owner's AND the comment's author's (the operator, 2026-10-30: the owner gets more, a guest loses nothing): the machine stamps the owner marker and the handler decides. A Hub viewer allowed
+	// to comment (artifact_comments_hub_write on) edits and deletes only a comment whose stored author is that same Hub viewer; the owner only their own too (the comment policy), never another's.
+	owner(OwnerSees, rules(http.MethodPatch, TierInteract, "/api/artifacts/{hex64}/comments/{id}")),
+	owner(OwnerSees, rules(http.MethodDelete, TierInteract, "/api/artifacts/{hex64}/comments/{id}")),
+	owner(OwnerRefuse, rules(http.MethodPost, TierLaunch, "/api/artifacts/{hex64}/comments/{id}/send")),
+	// The Operator's review of a for-review artifact (#136584, #11354: the owner gets everything through the Hub): Approve takes it out of Needs you and posts ONE fixed-sentence board message to the agent that uploaded it
+	// (the artifact's name quoted as cleaned data), "changes" only records the state (the comment itself is the comment route above; its send to an agent stays unlisted). The OWNER's alone: a guest or a grantee is refused
+	// by the machine before the handler runs. Interact, as a comment is: it moves no work and runs nothing.
+	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/board/{project}/artifacts/{id}/review")),
+	// The Operator's Dismiss of a stale wait (#11352) is the OWNER's alone through the hub (the operator's rule: the owner gets everything): a guest or a grantee gets 403 owner_only. It clears Coral's
+	// own record of a wait and types nothing, presses nothing in the agent's terminal, so Interact; the machine's own mode still caps it.
+	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/sessions/live/{name}/dismiss-wait")),
+	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/board/{project}/operator-artifacts", "/api/board/{project}/operator-artifacts/message")), // a file the Operator shares with an agent (#11376)
 	// Saved for later (#4510) is the OWNER's alone through the hub (#5753, Shared Inbox, Security's condition 3): the list holds the bookmarks of the owner's chats, and the whole
 	// message of a bookmark (the text of its source, redacted and cut to 64 KiB; the source is the stored bookmark's, never a ref from the request) is read from its own route. The
 	// changes (POST, PATCH, DELETE) stay as they were (Interact).
@@ -277,6 +306,8 @@ var routeTable = cat(
 	// ... and so are its changes (#5763, Security's SHOULD 3 on #5761): a bookmark is the owner's own note, so a hub Interact grantee can neither read, create, mark done nor delete one.
 	// Still Interact for the tier (they move no work); the machine also refuses anyone but the owner.
 	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/saved")),
+	owner(OwnerRefuse, rules(http.MethodGet, TierView, "/api/board/{project}/proposals", "/api/proposals")),                                               // what agents asked to add: the Operator's (#11389)
+	owner(OwnerRefuse, rules(http.MethodPost, TierInteract, "/api/board/{project}/proposals/{id}/approve", "/api/board/{project}/proposals/{id}/reject")), // and the Operator's decision
 	owner(OwnerRefuse, rules(http.MethodPatch, TierInteract, "/api/saved/{id}")),
 	owner(OwnerRefuse, rules(http.MethodDelete, TierInteract, "/api/saved/{id}")),
 	// What a viewer sees of a board's settings is the machine's to decide (the health setup is the owner's, #5307): the marker is stamped, the handler gives a non-owner less.

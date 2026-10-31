@@ -194,6 +194,7 @@
 .dt-progress-meter::-moz-progress-bar { background: var(--table-progress-fill); }
 
 .dt-table .dt-action { margin: 0; white-space: nowrap; }
+.dt-table td:has(> .dt-action-roomy) { padding-block: 5px; padding-inline-end: var(--table-pad-x); } /* a touch-size button as tall as the row gets room above and below it and from the edge, so the rows' lines are not drawn through it (the team's Open chat, #11401 d) */
 .dt-table td:has(> .dt-action) { overflow: visible; text-overflow: clip; } /* a cell that holds a button never clips it or draws an ellipsis beside it: Open chat was 8 px wider than its 7rem cell's content box and a stray ellipsis stood at its right (#11142) */
 .dt-box.dt-folded .dt-action { min-height: var(--table-touch); }
 
@@ -408,6 +409,10 @@
 .dt-mail-avatar.material-icons { font-size: var(--fs-lg); }
 .dt-mail-square { border-radius: var(--radius-lg); }
 .dt-box .dt-mail-open.dt-primary, .dt-box .dt-mail-open { display: flex; width: auto; overflow: visible; white-space: normal; flex: 1; align-items: center; gap: 8px; min-width: 0; min-height: calc(var(--table-touch) + 12px); margin: 0; padding: 0 12px 0 4px; border: 0; background: none; color: var(--table-primary-color); font: inherit; font-feature-settings: "calt" 0; text-align: left; text-decoration: none; cursor: pointer; } /* the font shorthand resets the feature settings: a name like 2x4 is read as written, as every .dt-primary is */
+.dt-mail-more { position: relative; flex: none; display: flex; align-items: center; } /* a row's ⋯ (#137104): the row's own control beside its button, never inside it */
+.dt-mail-more-toggle { flex: none; width: var(--table-touch); min-height: var(--table-touch); }
+.dt-mail-more-gap { flex: none; width: var(--table-touch); } /* the room of a ⋯ on a row that has none, in a list where another has one */
+.dt-mail-menu { position: absolute; right: 8px; top: calc(100% - 8px); z-index: 30; }
 .dt-mail-open:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .dt-mail-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .dt-mail-line { display: flex; gap: 8px; min-width: 0; font-size: var(--fs-md); }
@@ -502,6 +507,7 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 .dt-mail-star { width: auto; height: auto; margin-inline-start: 4px; font-size: var(--fs-lg); flex: none; align-self: center; cursor: default; }
 @media (pointer: coarse), (max-width: 767px) { .dt-star:not(.dt-star-on) { display: none; } .dt-star.dt-star-on { pointer-events: none; } }
 @media (max-width: 760px) { /* the starred Needs you row on a phone (#9922) */
+    .inbox-review-actions .btn:not(.inbox-review-icon):not(.dt-star) { padding-inline: 10px; } /* Open, Approve and Request changes (and the star) fit the 13.5 rem Actions column at 360 px, leaving the name its line (#11414) */
     .inbox-review-actions-star > .dt-star { width: 16px; margin-inline-end: -4px; } /* on a phone the starred glyph is not a button: 16 px, and it leans 4 px into the gap (#9922) */
     .dt-box.dt-fold-column.dt-folded tr:has(.inbox-review-actions-star > .dt-star-on) td.dt-line-1.dt-grow { flex-basis: 3.5rem; } /* a starred row name has 3.5 rem of its own, not 5, so the actions stay on its line at 360 px (#9922) */
 }
@@ -513,12 +519,16 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 /* A Needs you row's answer buttons (#10400): the card's own choices, 44 px on a phone. */
 .inbox-answers { display: inline-flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .inbox-answered { color: var(--text-secondary); }
+.inbox-only-reject { color: var(--text-secondary); font-size: .85em; flex: 1 1 100%; } /* a request that can only be rejected (#11399): said in words, on its own line under the No */
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) { .inbox-answers .inbox-answer { flex: 1 1 0; min-height: var(--control-touch-height, 44px); min-width: var(--control-touch-height, 44px); } }
 .dt-mail-cell:has(> .inbox-answers) { flex-wrap: wrap; }
 .dt-mail-cell > .inbox-answers { flex: 1 1 100%; padding: 0 12px 8px 56px; } /* under the mail line, in line with its text */
 .dt-mail-cell > .inbox-answers:empty { display: none; }
+@media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) { .inbox-answers .inbox-dismiss, .inbox-answers:not(:has(.inbox-answer)) { display: none; } } /* a phone's Needs you row stays one line: the Dismiss is on the agent's card there (#11352) */
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) { .dt-mail-cell > .inbox-answers { padding-left: 0; padding-right: 0; } } /* a phone's choices have no indent (#10874) */ /* no choices read (yet): no padded empty line under the row, which made it 64 px, not the one line of 56 */
 
 /* The team of a chat's agent, in a table of chats when two or more teams exist (#10134): a dot in the team's colour (the person's pick, else neutral) and its name. */
 .dt-team { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
 .dt-team-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; background: var(--team-accent, var(--text-muted)); }
+.artifact-review-line { color: var(--text-secondary); font-size: var(--fs-sm, 0.8125rem); margin-inline-end: 8px; } /* the review's state in words, in the preview's head (#136584) */
+.artifact-sheet-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; } /* the review line above the tags in a team artifact's sheet (#136584) */
