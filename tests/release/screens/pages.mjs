@@ -97,6 +97,7 @@ export const NOT_PHOTOGRAPHED = {
         'default-prompts-modal': 'opened from Settings > Agents; settings-agents covers the section it opens from',
         'custom-view-modal': 'a developer feature behind Settings',
         'macro-modal': 'a keyboard feature behind Settings',
+        'shortcuts-modal': 'the keyboard shortcuts list, opened with a key a phone does not have; a static list with no data, and tests/frontend/keyboard_shortcuts_browser.test.js covers it',
         'task-detail-modal': 'the task page (team-task-page) is this view',
         'jump-status': 'a status line inside the jump dialog (dialog-jump)',
         'team-wizard-modal': null, // covered: dialog-new-team
