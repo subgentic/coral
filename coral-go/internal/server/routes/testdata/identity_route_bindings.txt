@@ -217,6 +217,8 @@ POST /api/sessions/live/{name}/keys | unbound | operator-only
 POST /api/sessions/live/{name}/kill | unbound | operator-only
 POST /api/sessions/live/{name}/model | unbound | operator-only
 POST /api/sessions/live/{name}/notes | token-bound
+POST /api/sessions/live/{name}/notices/pause | unbound | operator-only
+POST /api/sessions/live/{name}/notices/resume | unbound | operator-only
 POST /api/sessions/live/{name}/open-in-editor | unbound | operator-only
 POST /api/sessions/live/{name}/pending-tool | token-session
 POST /api/sessions/live/{name}/resize | unbound | operator-only

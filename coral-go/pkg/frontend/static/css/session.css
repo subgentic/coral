@@ -1802,3 +1802,12 @@ body .terminal-header { flex-wrap: wrap; height: auto; min-height: 36px; row-gap
 
 /* The agent row's status sentence (#10801): the phone's list shows it as the row's second line (mobile.css); the sidebar says it with the state pill, so it is not drawn there. */
 .session-status-line { display: none; }
+
+/* Pause Coral's messages (#11388): the header's toggle is a bell that goes quiet; the bar above the composer says what is held and for how long. A touch screen's toggle is a 44 px target. */
+.notice-pause-btn.notice-pause-on { color: var(--warning); }
+.notice-pause-line { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 6px 10px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-secondary); color: var(--text-primary); }
+.notice-pause-resume[hidden] { display: none; }
+.notice-pause-line.notice-pause-idle { height: 0; min-height: 0; margin: 0; padding: 0; border: 0; overflow: hidden; } /* empty, but in the page: its words are announced when they come */
+.notice-pause-line.notice-pause-hold { border-color: transparent; background: none; color: var(--text-secondary); padding-block: 2px; } /* the auto-hold while typing is a quiet line, not a state the person set */
+.notice-pause-text { flex: 1 1 12rem; min-width: 0; }
+@media (pointer: coarse), (max-width: 767px) { .btn-icon.btn-xs.notice-pause-btn { width: var(--control-touch-height, 44px); min-width: var(--control-touch-height, 44px); height: var(--control-touch-height, 44px); min-height: var(--control-touch-height, 44px); } .notice-pause-resume { min-height: var(--control-touch-height, 44px); } } /* .btn-icon.btn-xs is a 24 px square: this is the one touch-sized exception */

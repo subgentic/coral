@@ -241,6 +241,11 @@ var routeTable = cat(
 	// Artifacts and pasted images are the OWNER's alone through the hub (#5575): an artifact can hold anything. The machine refuses anyone but the owner whatever their tier.
 	// A content-addressed agent artifact is named by its full SHA-256; the only query on the content is the link form v=2 (routes_query.go, #3179). Pasted images are artifacts
 	// too (#5284); /api/upload and /api/shared-images stay local only. Upload (POST /api/agent/artifacts) and the artifact list under /api/agent/ stay unlisted (never).
+	// Pausing Coral's notices to one agent, and resuming them (#11387), is the OWNER's alone through the Hub, like the Operator's other controls on that agent: it changes what is typed into the agent.
+	owner(OwnerRefuse, rules(http.MethodPost, TierInteract,
+		"/api/sessions/live/{name}/notices/pause",
+		"/api/sessions/live/{name}/notices/resume",
+	)),
 	owner(OwnerRefuse, rules(http.MethodGet, TierView,
 		"/api/artifacts/{hex64}",
 		// Which artifact a shortened link in an old message means (#9841): link, repeatable, the owner's alone like the reads around it.
