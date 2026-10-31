@@ -3,7 +3,6 @@
 package hooks
 
 import (
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"github.com/subgentic/coral/internal/winuser"
@@ -11,20 +10,17 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"unsafe"
 
 	"golang.org/x/sys/windows"
 
 	"github.com/subgentic/coral/internal/agentenv"
 	"github.com/subgentic/coral/internal/cliauth"
+	"github.com/subgentic/coral/internal/tcplisten"
 )
 
-var procGetExtendedTcpTable = windows.NewLazySystemDLL("iphlpapi.dll").NewProc("GetExtendedTcpTable")
-
 const (
-	tcpTableOwnerPIDListener = 3 // TCP_TABLE_OWNER_PID_LISTENER
-	afInet                   = 2
-	afInet6                  = 23
+	afInet  = tcplisten.AFInet
+	afInet6 = tcplisten.AFInet6
 )
 
 // listenerPIDs, pidOwner, coralFolders, tcpRows, selfSID and fileOwner are the system lookups; a test replaces them.
@@ -289,58 +285,13 @@ func tcpListenerPIDs(host string, port int) ([]uint32, error) {
 
 // tcpListeners is the listener table of family af.
 func tcpListeners(af uint32) ([]listenRow, error) {
-	raw, err := tcpTable(af)
+	got, err := tcplisten.Rows(af)
 	if err != nil {
 		return nil, err
 	}
-	var rows []listenRow
-	if af == afInet {
-		for i := 0; i+24 <= len(raw); i += 24 { // MIB_TCPROW_OWNER_PID: state, localAddr, localPort, remoteAddr, remotePort, pid
-			rows = append(rows, listenRow{
-				addr: net.IP(append([]byte(nil), raw[i+4:i+8]...)),
-				port: int(binary.BigEndian.Uint16(raw[i+8 : i+10])),
-				pid:  binary.LittleEndian.Uint32(raw[i+20 : i+24]),
-			})
-		}
-		return rows, nil
-	}
-	for i := 0; i+56 <= len(raw); i += 56 { // MIB_TCP6ROW_OWNER_PID: localAddr[16], scope, localPort, remoteAddr[16], scope, remotePort, state, pid
-		rows = append(rows, listenRow{
-			addr: net.IP(append([]byte(nil), raw[i:i+16]...)),
-			port: int(binary.BigEndian.Uint16(raw[i+20 : i+22])),
-			pid:  binary.LittleEndian.Uint32(raw[i+52 : i+56]),
-		})
+	rows := make([]listenRow, 0, len(got))
+	for _, r := range got {
+		rows = append(rows, listenRow{addr: r.Addr, port: r.Port, pid: r.PID})
 	}
 	return rows, nil
-}
-
-// tcpTable is the listener table of family af, its rows as raw bytes (after the entry count).
-func tcpTable(af uint32) ([]byte, error) {
-	var size uint32
-	procGetExtendedTcpTable.Call(0, uintptr(unsafe.Pointer(&size)), 0, uintptr(af), tcpTableOwnerPIDListener, 0)
-	for attempt := 0; attempt < 4; attempt++ {
-		if size == 0 {
-			size = 4096
-		}
-		buf := make([]byte, size)
-		r, _, _ := procGetExtendedTcpTable.Call(uintptr(unsafe.Pointer(&buf[0])), uintptr(unsafe.Pointer(&size)), 0, uintptr(af), tcpTableOwnerPIDListener, 0)
-		switch windows.Errno(r) {
-		case 0:
-			n := binary.LittleEndian.Uint32(buf[0:4])
-			rowSize := uint32(24)
-			if af == afInet6 {
-				rowSize = 56
-			}
-			end := 4 + n*rowSize
-			if end > uint32(len(buf)) {
-				end = uint32(len(buf))
-			}
-			return buf[4:end], nil
-		case windows.ERROR_INSUFFICIENT_BUFFER:
-			continue // the table grew: size now holds the new size
-		default:
-			return nil, windows.Errno(r)
-		}
-	}
-	return nil, errors.New("GetExtendedTcpTable: the table kept growing")
 }
