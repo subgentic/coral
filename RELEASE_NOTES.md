@@ -1,5 +1,42 @@
 # Release Notes
 
+## v2.0.13 — cross-team messages that name the sending team, Inbox rows that count what waits on them across boards, and a guide role that ships dark
+
+### Changes
+
+#### What you will notice first
+
+This release also carries everything v2.0.12 was to ship: v2.0.12 was tagged but never published, so its changes are listed here.
+
+- **A fresh install shows one prompt at a time, offering Connect to Coral Hub first**, then the set-a-password prompt once that is answered (Skip, Escape or connected), and the amber no-password strip stays away while either is open.
+- **A new install now really lands on Needs you with its welcome items** (v2.0.11 said so, but it did not happen on a real start). The Needs you folder counts them (it said 0 with five on the list) and they sit under their own Welcome filter, not Needs input; their titles wrap beside their button on a phone.
+- **`coral-board post` refuses a post that notifies nobody**: with no `@Name` in the text, no `--to`, no `--task N`, no `--reply-to N` and no `--assign`, it exits non-zero with "this post notifies nobody" and sends no post. A post that names someone the board cannot find is stored and prints a warning that it reached no one (not for `--assign`, `--task` or `--reply-to` posts), and the server's answer to a post lists whom it reached.
+- **A cross-team message names the sender's team** (for example "Orchestrator (Dev team)") instead of its board id; a name of more than 40 characters, one with `@`, `(`, `)`, `[`, `]`, `:` or a `www.` link, or one that looks like the Operator or Chief, still shows the id. A message relayed through Coral Hub shows the team once Coral Hub's matching release is out: this Coral reads the label, and does not send its own yet.
+- **Inbox rows count what waits on them across every team on this Coral**, not only the same team: a task of another team that waits on this item now counts.
+- **A failed welcome landing on first launch no longer releases the password dialog over the Connect screen.**
+- **Adding an agent to a team on a remote computer keeps the team's folder.**
+
+#### Agents and the chat
+
+- **A Pi agent's provider and model keep the one you chose**: the form's default-model answer no longer arrives after the model list and replaces a working model with an empty one (it was the cause of a flaky model picker).
+- **Claude installed by its own installer is found more safely**: every folder on the way to it (`~/.local`, `~/.local/share` and the installer's own folder) must be owned by you and not writable by anyone else before Coral trusts the file (macOS and Linux).
+- **Chief (preview, off by default) can be opened through Coral Hub**: a computer answers an owner-only request about its Chief (whether it is on, its agent and its team), so the Hub can draw the page itself. It needs a Coral Hub that has the matching release.
+- **Chief (preview, off by default) is easier to set up and name**: `chief_team` can be the team's name as you see it (or its board id), `coral-board link` now says that messaging has to be on for each team too, Chief's messages carry the Chief team's own name on the receiving side (even when the team is named Chief), a remote board that only shares the recorded Chief board's id is not treated as Chief, and an agent is found by its renamed display name (the header no longer falls back to the name it was launched with).
+- **Guide role (ships dark until Coral Hub turns it on):** this Coral can host a guide for a team, a person you invite who can read the team's board, post to it, propose goals (they wait for your approval) and comment on the team's agents' own files; you keep the names agents see them by in a roster (owner only). `coral-board post --ask --guide <label> "text"` puts a question to a guide, for that guide alone (it cannot also be `--assign` or `--to`). It does nothing until Coral Hub sends guide stamps.
+
+#### Known issues
+
+- **Windows: in-app update does not work from 2.0.0 through 2.0.6.** If you're on one of those, download and install the MSI by hand; from 2.0.7 on, in-app update works.
+- **macOS: a Coral of 2.0.5 or earlier cannot install updates in-app; install 2.0.6 or later by hand once.**
+- **OpenCode agents are tested on macOS and Linux; OpenCode on Windows is not yet tested end to end.**
+- Setting up a computer over SSH is supported from a macOS or Linux hub, and is not yet tested from a Windows hub.
+
+#### For developers and releases
+
+- **The release carries v2.0.12's content**: the v2.0.12 tag has no release (its Linux smoke test posted with no recipient and the new refusal stopped it); the smoke and stress scripts, the update rehearsal and the release screens' seed now name a recipient or use `--broadcast`. The platform layer note moved to `pkg/frontend/PLATFORM_LAYER.md`, the icon names list to `tests/frontend/fixtures/`, and a test fails when anything but a web file ships; the live list and the for-review rows of the API carry what waits on them across every board (`waits_on_this`, owner only).
+- The static tree is 5,838,375 bytes of the 5,840,896-byte budget; the Inbox waiters change saved about 2.5 KB.
+- The Windows icon-subset test reads its fixture through `fileURLToPath` (a file URL's `.pathname` doubled the drive letter there).
+
 ## v2.0.12 — a fresh install that asks one thing at a time, a welcome that really lands on Needs you, and a post that cannot be sent to nobody
 
 ### Changes
