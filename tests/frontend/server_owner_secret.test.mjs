@@ -35,6 +35,14 @@ const fresh = () => { const h = doc.createElement('div'); doc.body.append(h); re
     assert.deepEqual(calls, [{ url: '/api/servers/web/owner-secret', method: 'POST' }]);
     assert.equal(host.querySelector('#owner-secret-line').value, 'web ' + SECRET);
     assert.equal(host.querySelector('#owner-secret-line').readOnly, true);
+    assert.equal(host.querySelector('#owner-secret-line').type, 'password', 'the line is hidden until the person asks to see it (a screen, a recording)');
+    assert.match(host.textContent, /Paste it at Workstation now/);
+    btn(host, 'Show').click();
+    assert.equal(host.querySelector('#owner-secret-line').type, 'text');
+    assert.equal(btn(host, 'Hide').getAttribute('aria-pressed'), 'true');
+    btn(host, 'Hide').click();
+    assert.equal(host.querySelector('#owner-secret-line').type, 'password');
+    assert.equal(btn(host, 'Show').getAttribute('aria-pressed'), 'false');
     assert.ok(host.textContent.includes('coral hub-owner-secret'));
     assert.match(host.textContent, /not shown again/);
     assert.equal(changed, 1, 'the server list was told the hub now holds a secret');
@@ -50,6 +58,7 @@ const fresh = () => { const h = doc.createElement('div'); doc.body.append(h); re
     Object.defineProperty(dom.window.navigator, 'clipboard', { value: { writeText: async () => { throw new Error('no'); } }, configurable: true });
     btn(host, 'Copy').click();
     await until(() => /Select the line/.test(host.querySelector('[role="status"]').textContent), 'the fallback');
+    assert.equal(host.querySelector('#owner-secret-line').type, 'text', 'the fallback must show the line to be selected by hand');
 
     btn(host, 'Done').click();
     assert.equal(closed, 1);
