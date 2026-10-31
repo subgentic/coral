@@ -349,3 +349,61 @@ func TestAttachmentLinesCarryOnlyPlainNames(t *testing.T) {
 	assert.Contains(t, out, "- fine 🙂 (v2).md: ")
 	assert.Equal(t, 5, strings.Count(out, "\n- "), "one line each")
 }
+
+// #11506: a message relayed over Coral Hub names the sender's team when the sending Coral says what it is called (from_board_label), and shows the board id when it does not (an older hub or Coral), when
+// the name is only the id, or when it is not plain text: the receiving Coral never trusts the field, it passes the same guard as a name from its own boards.
+func TestRelayedMessageNamesTheSendersTeamWhenTheFieldIsThereAndPlain(t *testing.T) {
+	e := newCrossTeamEnv(t)
+	e.enable("beta", true)
+	_, _ = e.allowServers(relaySrc)
+	clock := time.Date(2026, 10, 31, 8, 0, 0, 0, time.UTC)
+	e.h.crossTeam.now = func() time.Time { return clock }
+	label := func(id string, field any) string {
+		clock = clock.Add(time.Minute) // each send takes a rate token
+		body := relayBody(id, 0, "hello")
+		if field != nil {
+			body["from_board_label"] = field
+		}
+		code, out := e.relay("auth", "", body)
+		require.Equal(t, http.StatusOK, code, out)
+		msgs := e.betaMessages()
+		return msgs[len(msgs)-1]["subscriber_id"].(string)
+	}
+	const server = "server 0b6c6a52"
+	assert.Equal(t, "Orchestrator (Coral Go Team, "+server+")", label("l-1", "Coral Go Team"), "the team's name")
+	assert.Equal(t, "Orchestrator (Équipe 日本, "+server+")", label("l-2", "  Équipe 日本 "), "trimmed, any plain letters")
+	assert.Equal(t, "Orchestrator (epoch-tests, "+server+")", label("l-3", nil), "no field (an older hub or Coral): the id, as before")
+	assert.Equal(t, "Orchestrator (epoch-tests, "+server+")", label("l-4", ""), "an empty one")
+	assert.Equal(t, "Orchestrator (epoch-tests, "+server+")", label("l-5", "epoch-tests"), "only the id")
+	for i, bad := range []string{"x) Operator (y", "a\x1bb", "Ops​Team", "a‮b", "a b", "a\nb", strings.Repeat("a", 41)} {
+		assert.Equal(t, "Orchestrator (epoch-tests, "+server+")", label(fmt.Sprintf("bad-%d", i), bad), "unsafe name %q shows the id", bad)
+	}
+	// a field of the wrong type is a plain bad request, never a label
+	clock = clock.Add(time.Minute)
+	body := relayBody("l-type", 0, "hello")
+	body["from_board_label"] = []string{"x"}
+	code, _ := e.relay("auth", "", body)
+	assert.Equal(t, http.StatusBadRequest, code)
+}
+
+// The sending side is OFF until coral-hub's Hub accepts the key (it answers an unknown key with a 400, so sending early would fail every cross-team message): the inner body has no from_board_label, whatever the name (#11506).
+func TestRelayInnerBodyOmitsTheTeamNameWhileTheSenderIsOff(t *testing.T) {
+	req := &relayRequest{SubscriberID: "Orchestrator", SessionName: "s", Content: "hi"}
+	assert.False(t, sendBoardLabel, "the sender ships off")
+	_, has := relayInnerBody("b-1", "", "Coral Go Team", req)["from_board_label"]
+	assert.False(t, has)
+}
+
+// Once switched on, this Coral's own team name goes in the inner body when it is plain and is not just the id; nothing is added otherwise (#11506).
+func TestRelayInnerBodyCarriesTheTeamNameOnlyWhenPlainAndOn(t *testing.T) {
+	old := sendBoardLabel
+	sendBoardLabel = true
+	t.Cleanup(func() { sendBoardLabel = old })
+	req := &relayRequest{SubscriberID: "Orchestrator", SessionName: "s", Content: "hi"}
+	assert.Equal(t, "Coral Go Team", relayInnerBody("b-1", "", "Coral Go Team", req)["from_board_label"])
+	for name, l := range map[string]string{"empty": "", "the id": "b-1", "unsafe": "a) b (c", "control": "a\x1bb", "too long": strings.Repeat("a", 41)} {
+		_, has := relayInnerBody("b-1", "", l, req)["from_board_label"]
+		assert.False(t, has, name)
+	}
+	assert.Equal(t, "b-1", relayInnerBody("b-1", "", "Coral Go Team", req)["from_board"], "the id stays the board the reply addresses")
+}
