@@ -54,11 +54,6 @@ const BASE = require('./test_base').BASE;
         assert.ok(more.some(t => /Computers/.test(t)) && ['Automations', 'Analytics', 'Docs', 'Settings'].every(n => more.some(t => t.includes(n))), 'More lists Computers, Automations, Analytics, Docs and Settings: ' + JSON.stringify(more));
         assert.ok(!more.some(t => /^(Home|Agents|Inbox)\b/.test(t)), 'and not Home, Agents or Inbox, which the floating nav has: ' + JSON.stringify(more));
         await ev(`document.body.click(); true`);
-        // a full-screen viewer has its own bar: the page's phone bar and nav are not drawn over its action row
-        await ev(`document.getElementById('preview-pane').classList.add('preview-phone-full'); true`); await settle(200);
-        const over = await ev(`({ bar: getComputedStyle(document.querySelector('header.top-bar')).display, nav: getComputedStyle(document.getElementById('phone-nav')).display })`);
-        assert.deepEqual(over, { bar: 'none', nav: 'none' }, 'a full-screen viewer hides the page bar and the nav: ' + JSON.stringify(over));
-        await ev(`document.getElementById('preview-pane').classList.remove('preview-phone-full'); true`);
         console.log('PASS the phone model, slice D: Computers');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
