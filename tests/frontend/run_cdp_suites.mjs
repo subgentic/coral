@@ -836,7 +836,9 @@ async function runAttempt(t, shard) {
       // Anything the suite left running in its process group (a helper it spawned) goes with it; then give
       // the output pipes a moment to drain, without waiting on a straggler that kept stdout open.
       killTree(p); untrack(p);
+      const tKilled = Date.now();
       for (const end = Date.now() + 2000; !closed && Date.now() < end; await sleep(50)) { /* drain */ }
+      const tDrained = Date.now();
       const status = timedOut ? 'timeout' : code === 0 ? 'pass' : 'fail';
       // What the suite left in the server's shared state (#4830): reported, and the settings put back so the next suite starts from what this one found.
       let leaks = [], restored = 0, cleaned = null, rows = [];
@@ -859,7 +861,8 @@ async function runAttempt(t, shard) {
         } catch (e) { leaks = [`could not read the shared state after the suite: ${e.message.split('\n')[0]}`]; }
       }
       stepLog({ suite: t, shard: shard.n, status, health: shard._healthMs ?? null, clear: tCleared - tStart, clearSteps: shard._clearSteps || null,
-        snapshot: started - tCleared, toFirstOutput: firstOut ? firstOut - started : null, run: tExit - started, after: Date.now() - tExit });
+        snapshot: started - tCleared, toFirstOutput: firstOut ? firstOut - started : null, run: tExit - started, after: Date.now() - tExit,
+        afterSteps: { kill: tKilled - tExit, drain: tDrained - tKilled, state: Date.now() - tDrained }, healthSteps: shard._healthSteps || null });
       resolve({ status, code: timedOut ? 'timeout' : code, secs, shard: shard.n, log: shard.log, leaks, rows, restored, cleaned, out: timedOut ? `${out}\n[runner] TIMEOUT: killed after ${limitS}s` : out });
     });
   });
@@ -869,8 +872,11 @@ async function runAttempt(t, shard) {
 // a suite closed (Browser.close) can still be shutting down when the next suite starts.
 async function healthy(sh) {
   const ok = async url => { try { return (await fetch(url, { signal: AbortSignal.timeout(3000) })).status < 500; } catch { return false; } };
+  const h0 = Date.now();
   const chromeOk = alive(sh.chrome) && await ok(`http://127.0.0.1:${sh.env.CDP_PORT}/json/version`);
+  const h1 = Date.now();
   const coralOk = alive(sh.coral) && await ok(`${sh.env.CORAL_TEST_URL}/api/health`);
+  sh._healthSteps = { chrome: h1 - h0, coral: Date.now() - h1 }; // CDP_STEP_TIMES
   return chromeOk && coralOk ? '' : !chromeOk ? 'its Chrome is gone' : 'its Coral server is gone';
 }
 
