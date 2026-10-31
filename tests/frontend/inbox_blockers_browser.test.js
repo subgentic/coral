@@ -1,5 +1,5 @@
 // Needs you says what waits on a row (#11442): an agent waiting on you whose task holds up others says so ("High priority: 3 tasks wait on this"), blockers sort first (the default "Blocking first"), a row with nothing
-// waiting on it and a team whose tasks cannot be read look as they did, and "Waiting longest" gives the old order back. The board's tasks are stubbed. 1280 (the table) and 390 (the phone's rows).
+// waiting on it looks as it did, and "Waiting longest" gives the old order back. The board's tasks are stubbed. 1280 (the table) and 390 (the phone's rows).
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
@@ -11,15 +11,10 @@ const { removeBoards } = require('./helpers/board_cleanup');
 const iso = ms => new Date(Date.now() - ms).toISOString();
 const mk = (n, name, team, ageMs) => ({ name: n, session_id: `0000000${n.length}-0000-4000-8000-00000000000${n.length}`, agent_type: 'claude', server: 'local', status: 'idle', display_name: name, working_directory: '/repo/' + n, waiting_for_input: true, waiting_kind: 'permission', waiting_summary: 'Wants to run: go test ./...', waiting_since: iso(ageMs), board_project: team, sleeping: false });
 const AGENTS = [mk('a', 'Backend Dev', 'team-a', 600000), mk('bb', 'Frontend Dev', 'team-a', 120000), mk('ccc', 'Docs Writer', 'team-b', 300000)]; // by age: Backend, Docs, Frontend; Frontend holds up three tasks
-AGENTS[0].board_job_title = 'Release Manager'; // the board's own name for it differs from the display name: its task is assigned to that name
 for (const [i, a] of AGENTS.entries()) a.session_id = `0000000${i + 1}-0000-4000-8000-00000000000${i + 1}`;
-const TASKS_A = [
-    { id: 20, title: 'Cut the release', status: 'in_progress', priority: 'low', assigned_to: 'Release Manager', blocked_by: [] },
-    { id: 21, title: 'Ship\u202e the build\u200b', status: 'pending', priority: 'low', assigned_to: '', blocked_by: [{ task_id: 20, board_id: 'team-a', satisfied: false }] },
-    { id: 10, title: 'Frontend work', status: 'in_progress', priority: 'medium', assigned_to: 'Frontend Dev', blocked_by: [] },
-    { id: 11, title: 'Tag v2.0.10', status: 'pending', priority: 'high', assigned_to: '', blocked_by: [{ task_id: 10, board_id: 'team-a', satisfied: false }] },
-    { id: 12, title: 'Write the notes', status: 'pending', priority: 'medium', assigned_to: '', blocked_by: [{ task_id: 10, board_id: 'team-a', satisfied: false }] },
-];
+// the server's field (#11455), counted across every board: Frontend Dev holds up three tasks, one of them on another team's board; Backend Dev holds up two; Docs Writer has nothing in progress, so no field
+AGENTS[1].waits_on_this = { count: 3, top_title: 'Tag v2.0.10', priority: 'high' };
+AGENTS[0].waits_on_this = { count: 2, top_title: 'Ship the build', priority: 'low' };
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -37,7 +32,7 @@ const TASKS_A = [
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
             await ev(INBOX_WORLD);
-            await ev(`(() => { window.__taskCalls = []; const real = window.fetch; window.fetch = (u, o) => { const p = String(u); if (/\\/api\\/board\\/tasks\\?/.test(p)) { window.__taskCalls.push(p); if (/board=team-b/.test(p)) return Promise.resolve(new Response('no', { status: 500 })); return Promise.resolve(new Response(JSON.stringify({ tasks: ${JSON.stringify(TASKS_A)} }), { status: 200, headers: { 'Content-Type': 'application/json' } })); } return real(u, o); }; return true; })()`);
+            await ev(`(() => { window.__taskCalls = []; const real = window.fetch; window.fetch = (u, o) => { if (/\\/api\\/board\\/tasks\\?.*[?&]board=/.test(String(u))) window.__taskCalls.push(String(u)); return real(u, o); }; return true; })()`); // the rows carry what waits on them: nothing asks the tasks of a team (a query that names a board; the Tasks folder's own, by assignee, is another)
             await ev(`(async () => { const { state } = await import((window.__coralStatic || '/static/') + 'state.js'); const m = await import((window.__coralStatic || '/static/') + 'inbox_tab.js'); state.liveSessions = ${JSON.stringify(AGENTS)}; m.updateInboxTab(); return true; })()`);
             await ev(`localStorage.removeItem('coral-inbox-needs-filters'); window.switchNavTab('hub-inbox'); true`);
             await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`);
@@ -52,9 +47,9 @@ const TASKS_A = [
                 check(await ev(`[...document.querySelectorAll('${T} tr')].some(tr => tr.textContent.includes('Frontend Dev') && [...tr.querySelectorAll('[title]')].some(e => /High priority: 3 tasks wait on this/.test(e.title)))`), at + 'and the whole sentence is its tooltip');
             }
             const be = rows.find(r => r.text.includes('Backend Dev'));
-            check(/Blocks 2 tasks/.test(be.text) && !/[\u202e\u200b]/.test(be.text), at + 'an agent the board calls by another name (its job title) still says what waits on it (its task and the one waiting on it): ' + JSON.stringify(be.text));
-            check(!rows.filter(r => r.text.includes('Docs Writer')).some(r => /wait on this|waits on this|Blocks \d|Blocks “/.test(r.text)), at + 'the agent whose team could not be read says nothing');
-            check(await ev(`window.__taskCalls.filter(c => /[?&]board=team-/.test(c)).length`) === 2, at + 'one query per team, not per row: ' + await ev(`window.__taskCalls.filter(c => /[?&]board=team-/.test(c)).join(' ')`));
+            check(/Blocks 2 tasks/.test(be.text), at + 'an agent with its own count says it: ' + JSON.stringify(be.text));
+            check(!rows.filter(r => r.text.includes('Docs Writer')).some(r => /wait on this|waits on this|Blocks \d|Blocks “/.test(r.text)), at + 'the agent with nothing in progress (no field) says nothing');
+            check(await ev(`window.__taskCalls.length`) === 0, at + 'no task query for a team (the rows carry the field): ' + await ev(`window.__taskCalls.join(' ')`));
             await shot(`inbox-blockers-${w}`);
             if (!mobile) { // the table fits its box and the agent's name keeps its room (the new column once squeezed it to nothing)
                 const box = await ev(`(() => { const b = document.querySelector('${T} .dt-box'), h = [...b.querySelectorAll('thead th')].find(x => /^Agent/.test(x.textContent.trim())); return { box: b.clientWidth, sw: b.scrollWidth, agent: h ? Math.round(h.getBoundingClientRect().width) : null }; })()`);
@@ -77,11 +72,9 @@ const TASKS_A = [
             await ev(`fetch('/api/board/${team}/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'Review Writer', job_title: 'Writer' }) }).then(r => r.status)`);
             await ev(`(() => { const original = window.fetch, json = (b, st = 200) => Promise.resolve(new Response(JSON.stringify(b), { status: st, headers: { 'Content-Type': 'application/json' } }));
                 const hex = (1).toString(16).padStart(64, '0');
-                const item = { id: hex, name: 'checkout-mockup.html', media_type: 'text/html', size: 30, created_at: new Date(Date.now() - 4 * 3600000).toISOString(), task_id: 5, goal_id: 7, goal_title: 'Checkout redesign', source: 'upload', available: true, session_id: 'writer-a', produced_by: 'Frontend Dev', tags: ['for review', 'internal'], uri: 'coral://artifacts/' + hex };
-                const tasks = [{ id: 5, title: 'Review the mockup', status: 'review_pending', priority: 'medium', goal_id: 7, blocked_by: [] }, { id: 6, title: 'Tag\u202e batch-88', status: 'pending', priority: 'high', goal_id: 8, blocked_by: [{ task_id: 5, board_id: '${team}', satisfied: false }] }, { id: 7, title: 'Write the notes', status: 'pending', priority: 'medium', goal_id: 8, blocked_by: [] }];
+                const item = { id: hex, name: 'checkout-mockup.html', media_type: 'text/html', size: 30, created_at: new Date(Date.now() - 4 * 3600000).toISOString(), task_id: 5, goal_id: 7, goal_title: 'Checkout redesign', waits_on_this: { count: 1, top_title: 'Tag\u202e batch-88', priority: 'high', closes_goal: 'Checkout redesign' }, source: 'upload', available: true, session_id: 'writer-a', produced_by: 'Frontend Dev', tags: ['for review', 'internal'], uri: 'coral://artifacts/' + hex };
                 window.fetch = (url, opts = {}) => { const u = new URL(String(url), location.origin);
                     if (u.pathname === '/api/board/${team}/artifacts') return json({ project: '${team}', artifacts: !u.searchParams.has('tag') || u.searchParams.get('tag') === 'for review' ? [item] : [], has_more: false });
-                    if (u.pathname === '/api/board/tasks' && u.searchParams.get('board') === '${team}' && u.searchParams.has('status')) return json({ tasks });
                     return original(url, opts); };
                 return true; })()`);
             await ev(`window.switchNavTab('hub-inbox'); true`);

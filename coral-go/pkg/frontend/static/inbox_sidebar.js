@@ -109,21 +109,15 @@ const askRows = () => operatorAsks().map(a => ({ operatorAsk: a, session_id: ask
 /** After an update, agents whose notices are held until they are recorded: ONE item that opens the Record for all agents confirm (#11415). */
 const recordRows = () => { const it = unrecordedItem(state.liveSessions); return it ? [it] : []; };
 const isItem = s => !!(s.review || s.autorun || s.proposal || s.operatorAsk || s.unrecorded || s.welcome); // a row that is not an agent: a review or a run, shown as an item
-// What waits on each row (#11442): inbox_blockers.js (lazy) asks the team's open tasks and the rows say it; until it has answered, or when it cannot, the rows say nothing and look as they did.
+// What waits on each row (#11442, #11455): the server's waits_on_this on an agent row and on a review row, said by inbox_blockers.js (lazy); until it has loaded, or on a row without the field, the row says nothing and looks as it did.
 let BL = null;
-const blocksKey = s => (s.review ? s.review.reviewKey : s.session_id);
 const markTitle = t => markHidden(t, { strict: true }); // a task's or a goal's title is an agent's text: what hides or reorders it is written out (#11442, #11399)
-const blocksOf = s => (BL ? BL.phraseOf(BL.blockerOf(blocksKey(s)), markTitle) : '');
-const blocksShortOf = s => (BL ? BL.shortPhraseOf(BL.blockerOf(blocksKey(s)), markTitle) : ''); // a phone's one-line row
-const blockItems = () => allNeeds().filter(s => !s.autorun && !s.proposal && !s.operatorAsk && !s.unrecorded && !s.welcome).map(s => (s.review
-    ? { key: blocksKey(s), kind: 'review', team: s.review.team, taskId: s.task && s.task.id, goalId: s.goal && s.goal.id, goalTitle: s.goal && s.goal.title }
-    : { key: blocksKey(s), kind: 'agent', team: s.board_project ? identityKey(sessionServer(s), s.board_project) : '', names: [s.display_name, s.name, s.board_job_title] })).filter(i => i.team);
-let _blocksAsked = 0;
-function askBlockers() { // at most once a second, and a redraw only when the answer changed
-    const items = blockItems();
-    if (!items.length || Date.now() - _blocksAsked < 1000) return;
-    _blocksAsked = Date.now();
-    importOnce('./inbox_blockers.js').then(m => { BL = m; return m.refreshBlockers(items); }).then(changed => { if (changed) refreshGroupTable('hub-inbox'); }).catch(() => {});
+const waitsOf = s => (BL ? BL.infoOf(s.review ? s.review.waits_on_this : s.waits_on_this) : null);
+const blocksOf = s => (BL ? BL.phraseOf(waitsOf(s), markTitle) : '');
+const blocksShortOf = s => (BL ? BL.shortPhraseOf(waitsOf(s), markTitle) : ''); // a phone's one-line row
+function askBlockers() { // loaded once, when a row carries the field; the table is drawn again with the phrases
+    if (BL || !allNeeds().some(s => (s.review || s).waits_on_this)) return;
+    importOnce('./inbox_blockers.js').then(m => { BL = m; refreshGroupTable('hub-inbox'); }).catch(() => {});
 }
 let answered = ''; // what an answer given here went through as, for five minutes: the row is gone and the list says so (#10720)
 document.addEventListener('coral:inbox-answered', e => { answered = e.detail.said; setTimeout(() => { answered = ''; }, 3e5); });
@@ -133,7 +127,7 @@ let needsFilters = NF.loadFilters(), needsBar = null;
 const NO_GOAL = 'No goal';
 const goalLabel = s => (s.goal && s.goal.id && s.goal.title ? String(s.goal.title) : NO_GOAL); // the goal a row's task serves (a review's artifact roll-up, #8579; an agent's task, #7302), or the words for none
 const needsCtx = { text: needsText, teamOf, nameOf: needsName, goalOf: goalLabel };
-const filteredNeeds = () => NF.ordered(allNeeds().filter(s => NF.matches(s, needsFilters, needsCtx) && serverMatches(s, needsFilters)), needsFilters, s => (BL ? BL.weightOf(BL.blockerOf(blocksKey(s))) : 0));
+const filteredNeeds = () => NF.ordered(allNeeds().filter(s => NF.matches(s, needsFilters, needsCtx) && serverMatches(s, needsFilters)), needsFilters, s => (BL ? BL.weightOf(waitsOf(s)) : 0));
 const needsOverflow = () => reviewGroups(filteredNeeds().filter(s => s.review).map(s => s.review)).filter(g => g.more.length);
 const needsRows = () => {
     const all = filteredNeeds(), visible = new Set(reviewGroups(all.filter(s => s.review).map(s => s.review)).flatMap(g => g.rows.map(a => a.reviewKey)));
@@ -465,7 +459,7 @@ function renderInboxNav(force = false) {
         needs.map(s => [sessionServer(s), s.session_id, s.display_name, s.waiting_kind, s.waiting_since, teamOf(s), askOf(s)]), tk.map(t => [t.project, t.id, t.title, t.priority, t.status, t.board, t.updated_at, t.artifact_count]), sv.map(f => [f.id, f.which, f.saved, f.state])]);
     if (!force && key === _navKey) return;
     _navKey = key;
-    if (needsRows().some(s => s.waiting_since) && !_poll) _poll = pollEvery(() => { refreshReviews(); refreshProposals(); askBlockers(); renderInboxNav(true); }, 30000); // "waiting 4 min" in the Needs you table moves on while the tab is open
+    if (needsRows().some(s => s.waiting_since) && !_poll) _poll = pollEvery(() => { refreshReviews(); refreshProposals(); renderInboxNav(true); }, 30000); // "waiting 4 min" in the Needs you table moves on while the tab is open
     if (_folders && list.contains(_folders)) VL.update(_folders, { sections, current: here });
     else { _folders = VL.build({ id: 'inbox-folders', label: 'Inbox views', sections, current: here, onPick: pickFolder }); list.replaceChildren(_folders); }
     const pageList = page && $('inbox-page')?.querySelector('[data-view-list="inbox-goal-folders"], [data-view-list="inbox-item-folders"]'); // an opened item's own folder list (a phone's select) follows the counts too: it was drawn once, with the counts of that moment (#8681)
