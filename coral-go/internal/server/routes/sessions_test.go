@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/subgentic/coral/internal/testtemp"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -3261,13 +3262,13 @@ func TestWriteBoardStateFileIsPrivate(t *testing.T) {
 // land in the working directory (it used to, leaving thousands of
 // board_state_*.json files in this package directory after test runs).
 func TestWriteBoardStateFileWithoutDataDirWritesNothing(t *testing.T) {
-	dir := t.TempDir()
-	t.Chdir(dir)
-	writeBoardStateFile("no-dir-session", "fixture-board", "Fixture", &config.Config{})
-	removeBoardStateFile("no-dir-session", &config.Config{})
-	entries, err := os.ReadDir(dir)
-	require.NoError(t, err)
-	require.Empty(t, entries)
+	testtemp.InDir(t, func(t *testing.T, dir string) {
+		writeBoardStateFile("no-dir-session", "fixture-board", "Fixture", &config.Config{})
+		removeBoardStateFile("no-dir-session", &config.Config{})
+		entries, err := os.ReadDir(dir)
+		require.NoError(t, err)
+		require.Empty(t, entries)
+	})
 }
 
 func TestWriteBoardStateFileNilConfigUsesHomeCoralDir(t *testing.T) {
