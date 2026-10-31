@@ -19,7 +19,7 @@ func HideWindow(cmd *exec.Cmd) {
 
 // Command is like exec.CommandContext but hides console windows on Windows.
 func Command(ctx context.Context, name string, args ...string) *exec.Cmd {
-	cmd := exec.CommandContext(ctx, name, args...)
+	cmd := command(ctx, name, args...)
 	HideWindow(cmd)
 	return cmd
 }

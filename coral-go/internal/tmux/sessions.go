@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 	"github.com/subgentic/coral/internal/logsafe"
+	"github.com/subgentic/coral/internal/lookpath"
 	"log"
 	"os"
-	"os/exec"
 	"regexp"
 	"strconv"
 	"strings"
@@ -302,7 +302,7 @@ func (c *Client) attachBinary() string {
 	if bin == "" || bin == "tmux" {
 		return "tmux"
 	}
-	if p, err := exec.LookPath("tmux"); err == nil && sameFile(p, bin) {
+	if p, err := lookpath.Path("tmux"); err == nil && sameFile(p, bin) {
 		return "tmux"
 	}
 	return quoteIfNeeded(bin)

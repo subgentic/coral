@@ -2,6 +2,7 @@ package executil
 
 import (
 	"fmt"
+	"github.com/subgentic/coral/internal/lookpath"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -54,7 +55,7 @@ func (e Editor) macApp() string {
 }
 
 func (e Editor) cliPath() string {
-	p, err := exec.LookPath(e.cli)
+	p, err := lookpath.Path(e.cli)
 	if err != nil {
 		return ""
 	}

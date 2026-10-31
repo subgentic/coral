@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"github.com/subgentic/coral/internal/logsafe"
+	"github.com/subgentic/coral/internal/lookpath"
 	"log"
 	"os"
 	"os/exec"
@@ -149,14 +150,14 @@ func BinaryFromEnv() string {
 		if filepath.IsAbs(p) && executableFileExists(p) {
 			return p
 		}
-		if resolved, err := exec.LookPath(p); err == nil {
+		if resolved, err := lookpath.Path(p); err == nil {
 			return resolved
 		}
 	}
 	if p, _ := bundledTmux(); p != "" {
 		return p
 	}
-	if p, err := exec.LookPath("tmux"); err == nil {
+	if p, err := lookpath.Path("tmux"); err == nil {
 		return p
 	}
 	for _, p := range commonTmuxPaths {

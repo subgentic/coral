@@ -4,8 +4,8 @@ package agent
 
 import (
 	"fmt"
+	"github.com/subgentic/coral/internal/lookpath"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 
@@ -162,7 +162,7 @@ func FindCLI(settings map[string]string, agentType string) (string, error) {
 // FindCLIForLaunch is FindCLI without the node check: an agent's launch line carries its own (NodePathPrefix), and the agent's shell may have a node Coral's process does not.
 func FindCLIForLaunch(settings map[string]string, agentType string) (string, error) {
 	if p := ResolveCLIPath(settings, agentType); p != "" {
-		resolved, err := exec.LookPath(p)
+		resolved, err := lookpath.Path(p)
 		if err == nil {
 			err = CheckRunnable(resolved)
 		}
@@ -178,7 +178,7 @@ func FindCLIForLaunch(settings map[string]string, agentType string) (string, err
 	if info := GetCLIInfo(agentType); info != nil && info.Binary != "" {
 		bin = info.Binary
 	}
-	if p, err := exec.LookPath(bin); err == nil {
+	if p, err := lookpath.Path(bin); err == nil {
 		return p, nil
 	}
 	if p := CommonPlaceCLI(bin, nil); p != "" {
@@ -206,7 +206,7 @@ func LaunchCLIScreened(settings map[string]string, agentType string, screen func
 	if ResolveCLIPath(settings, agentType) != "" {
 		return FindCLIForLaunch(settings, agentType)
 	}
-	if p, err := exec.LookPath(info.Binary); err == nil {
+	if p, err := lookpath.Path(info.Binary); err == nil {
 		if abs, aerr := filepath.Abs(p); aerr == nil {
 			return abs, nil
 		}

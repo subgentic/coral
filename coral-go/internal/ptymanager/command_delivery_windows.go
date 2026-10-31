@@ -6,8 +6,8 @@ import (
 	"crypto/rand"
 	"encoding/binary"
 	"fmt"
+	"github.com/subgentic/coral/internal/lookpath"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 
@@ -74,7 +74,7 @@ func handoffShell() string {
 	if filepath.IsAbs(sh[0]) {
 		return sh[0]
 	}
-	if p, err := exec.LookPath(sh[0]); err == nil {
+	if p, err := lookpath.Path(sh[0]); err == nil {
 		return p
 	}
 	return sh[0]

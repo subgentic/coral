@@ -3,8 +3,8 @@
 package background
 
 import (
+	"github.com/subgentic/coral/internal/lookpath"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -49,7 +49,7 @@ func gitInstallRoot(gitExe string) string {
 
 func findWorkflowShell() string {
 	var roots []string
-	if git, err := exec.LookPath("git"); err == nil {
+	if git, err := lookpath.Path("git"); err == nil {
 		if root := gitInstallRoot(git); root != "" {
 			roots = append(roots, root)
 		}
@@ -68,7 +68,7 @@ func findWorkflowShell() string {
 			return p
 		}
 	}
-	if p, err := exec.LookPath("sh"); err == nil {
+	if p, err := lookpath.Path("sh"); err == nil {
 		if abs, err := filepath.Abs(p); err == nil {
 			return abs
 		}

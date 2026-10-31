@@ -3,6 +3,7 @@ package tmux
 import (
 	"context"
 	"fmt"
+	"github.com/subgentic/coral/internal/lookpath"
 	"log"
 	"os"
 	"os/exec"
@@ -49,7 +50,7 @@ func (c *Client) resolveTmuxBin() string {
 			return c.TmuxBin
 		}
 		logDiscovery("cached absolute tmux path is not usable: path=%q err=%v", c.TmuxBin, err)
-	} else if _, err := exec.LookPath(c.TmuxBin); err == nil {
+	} else if _, err := lookpath.Path(c.TmuxBin); err == nil {
 		return c.TmuxBin
 	} else {
 		logDiscovery("cached tmux binary not found on PATH: bin=%q err=%v", c.TmuxBin, err)
@@ -92,7 +93,7 @@ func IsAvailable() (string, bool) {
 		logDiscovery("discovery found bundled tmux: %s", p)
 		return p, true
 	}
-	if p, err := exec.LookPath("tmux"); err == nil {
+	if p, err := lookpath.Path("tmux"); err == nil {
 		logDiscovery("discovery found tmux on PATH: %s", p)
 		return p, true
 	}
@@ -115,7 +116,7 @@ func tmuxFromEnv() string {
 	if p == "" {
 		return ""
 	}
-	if resolved, err := exec.LookPath(p); err == nil {
+	if resolved, err := lookpath.Path(p); err == nil {
 		return resolved
 	}
 	if executableFileExists(p) {
@@ -156,7 +157,7 @@ func tmuxFromLoginShell() string {
 		if p == "" {
 			continue
 		}
-		if resolved, err := exec.LookPath(p); err == nil {
+		if resolved, err := lookpath.Path(p); err == nil {
 			return resolved
 		}
 		if executableFileExists(p) {

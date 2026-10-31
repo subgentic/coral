@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"github.com/subgentic/coral/internal/lookpath"
 	"github.com/subgentic/coral/internal/safefs"
 	"os"
 	"os/exec"
@@ -23,7 +24,7 @@ var (
 // Available returns true if git is installed and accessible on PATH.
 func Available() bool {
 	gitAvailableOnce.Do(func() {
-		_, err := exec.LookPath("git")
+		_, err := lookpath.Path("git")
 		gitAvailable = err == nil
 	})
 	return gitAvailable
