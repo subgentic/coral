@@ -52,19 +52,19 @@ export function syncNoticePause(row) {
         if (btn.getAttribute('aria-pressed') !== String(p.paused)) btn.setAttribute('aria-pressed', String(p.paused));
         if (btn.getAttribute('aria-label') !== label) { btn.setAttribute('aria-label', label); btn.title = label; }
         btn.classList.toggle('notice-pause-on', p.paused);
-        const icon = btn.querySelector('.material-icons'); const ic = p.paused ? 'notifications_off' : 'notifications_active';
+        const icon = btn.querySelector('.material-icons'); const ic = p.paused ? 'pause_circle' : 'notifications';
         if (icon && icon.textContent !== ic) icon.textContent = ic;
     }
     if (bar) {
         const text = sleeping ? '' : barText(row), on = text !== '';
         const t = bar.querySelector('.notice-pause-text');
         if (t && t.textContent !== text) t.textContent = text;
-        if (bar.hidden === on) bar.hidden = !on;
+        if (bar.classList.contains('notice-pause-idle') === on) bar.classList.toggle('notice-pause-idle', !on); // never hidden: a live region that is shown and filled in one turn is not announced (the way waiting.js keeps its line)
         bar.classList.toggle('notice-pause-hold', on && !p.paused);
         const resume = bar.querySelector('.notice-pause-resume'); if (resume && resume.hidden === p.paused) resume.hidden = !p.paused;
     }
     clearInterval(_timer); _timer = 0;
-    if (p.paused && p.until) _timer = setInterval(() => { if (state.currentSession) syncNoticePause(state.currentSession); }, 30000); // the time left follows the clock
+    if (p.paused && p.until) _timer = setInterval(() => { if (state.currentSession) syncNoticePause(state.currentSession); }, 30000); // the time left follows the clock // interval-ok: a 30 s repaint of one line from the row in memory, no request
 }
 
 async function toggle() {

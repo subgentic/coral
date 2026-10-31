@@ -9,7 +9,6 @@ const S = `(window.__coralStatic || '/static/')`;
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
-    const sleep = ms => new Promise(r => setTimeout(r, ms)); // sleep-ok: a selection and a repaint settle over frames; there is no event
     const shot = async n => { const d = process.env.CORAL_SCREENSHOT_DIR; if (!d) return; require('node:fs').mkdirSync(d, { recursive: true }); require('node:fs').writeFileSync(`${d}/${n}.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
@@ -18,12 +17,13 @@ const S = `(window.__coralStatic || '/static/')`;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
             await ev(`document.documentElement.setAttribute('data-theme', '${theme}'); localStorage.setItem('coral-live-view-mode', 'chat'); window.__m.add('talk-agent', 'T', 3, { sleeping: false }); true`);
-            await sleep(600);
-            await ev(`window.selectLiveSession('talk-agent', 'claude', 'talk-agent-id', 'local'); true`); await sleep(600);
+            await waitFor(`(window._coralGetLiveSessions() || []).some(r => r.session_id === 'talk-agent-id')`, `${tag}: the agent's row`, 8000);
+            await ev(`window.selectLiveSession('talk-agent', 'claude', 'talk-agent-id', 'local'); true`);
+            await waitFor(`!!document.getElementById('notice-pause-btn') && document.getElementById('notice-pause-btn').closest('.terminal-header').getClientRects().length > 0`, `${tag}: the chat header`, 8000);
             const feed = extra => ev(`(() => { const rows = window._coralGetLiveSessions().map(r => r.session_id === 'talk-agent-id' ? { ...r, notices_paused: false, paused_until: null, notices_holding: false, board_unread: 0, ...${JSON.stringify(extra)} } : r); window._coralSetLiveSessions(rows);
                 return import(${S} + 'session_header_updates.js').then(m => { m.updateWaitingIndicator(rows.find(r => r.session_id === 'talk-agent-id')); return true; }); })()`);
             const view = () => ev(`(() => { const vis = e => !!e && !e.hidden && e.getClientRects().length > 0; const b = document.getElementById('notice-pause-btn'), bar = document.getElementById('notice-pause-bar'), r = b ? b.getBoundingClientRect() : { width: 0, height: 0 };
-                return { btn: vis(b), pressed: b && b.getAttribute('aria-pressed'), name: b && b.getAttribute('aria-label'), w: Math.round(r.width), h: Math.round(r.height), bar: vis(bar), text: bar ? bar.querySelector('.notice-pause-text').textContent : '', resume: vis(bar && bar.querySelector('.notice-pause-resume')) }; })()`);
+                return { btn: vis(b), pressed: b && b.getAttribute('aria-pressed'), name: b && b.getAttribute('aria-label'), w: Math.round(r.width), h: Math.round(r.height), bar: !!bar && bar.getBoundingClientRect().height > 1, text: bar ? bar.querySelector('.notice-pause-text').textContent : '', resume: vis(bar && bar.querySelector('.notice-pause-resume')) }; })()`);
             const calls = () => ev(`window.__calls`);
             await ev(`window.__calls = []; window.__realFetch = window.fetch; window.fetch = (u, o) => { const s = String(u); if (s.includes('/notices/')) { window.__calls.push({ u: s, method: (o && o.method) || 'GET', body: o && o.body }); return Promise.resolve(new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'Content-Type': 'application/json' } })); } return window.__realFetch(u, o); }; true`);
 
