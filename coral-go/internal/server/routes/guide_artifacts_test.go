@@ -304,3 +304,31 @@ func TestOnlyTheOwnersReadCarriesThePrivateMark(t *testing.T) {
 	b, _ := json.Marshal(teamArtifact{ID: "x"})
 	assert.NotContains(t, string(b), "private", "absent when not marked")
 }
+
+// Through Coral Hub the private mark goes to the authentic owner alone: a tunnelled View grantee, a forged stamp and another hub user's marker get none, even on a route the Hub might one day send them (Security, #11532).
+func TestThroughTheHubOnlyTheAuthenticOwnerSeesThePrivateMark(t *testing.T) {
+	rig := newGuideArtifactRig(t)
+	h := NewBoardHandler(rig.h.bs)
+	t.Cleanup(h.WaitBackground)
+	withLabel(t, ownerLabel, nil)
+	for _, c := range []struct {
+		name   string
+		header map[string]string
+		want   bool
+	}{
+		{"this computer's dashboard", nil, true},
+		{"the owner through the hub", ownerHeaders(ownerLabel), true},
+		{"a viewer or grantee", granteeHeaders(), false},
+		{"a forged stamp", map[string]string{tunnel.ViaHeader: "x", tunnel.HubRoleHeader: "owner", tunnel.HubUserHeader: ownerLabel}, false},
+		{"another hub user's owner marker", ownerHeaders("hub-user-9999ffff"), false},
+	} {
+		req := httptest.NewRequest("GET", "/api/board/team-a/artifacts", nil)
+		req = withActor(req, Actor{Kind: ActorOperator, Name: "Operator"})
+		for k, v := range c.header {
+			req.Header.Set(k, v)
+		}
+		items := []teamArtifact{{ID: gaMine}, {ID: gaPrivate}}
+		h.attachArtifactPrivate(req, items)
+		assert.Equal(t, c.want, items[1].Private, c.name)
+	}
+}

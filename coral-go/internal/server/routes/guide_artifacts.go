@@ -4,6 +4,8 @@ import (
 	"context"
 	"log/slog"
 	"net/http"
+
+	"github.com/subgentic/coral/internal/cloud"
 )
 
 // What a guide reads of the artifacts (#11457). An artifact id is a content hash and a path carries no board, so Coral decides here, in the one read check every artifact route goes through (artifactReadable,
@@ -21,9 +23,12 @@ func artifactStoreID(it teamArtifact) string {
 	return ""
 }
 
-// ownerSeesPrivateMarks reports whether a read may carry the manager's private marks: not an agent's (its token) and not a guide's; the dashboard, the command line and the Hub owner's reads may.
+// ownerSeesPrivateMarks reports whether a read may carry the manager's private marks: not an agent's (its token) and not a guide's; the dashboard, the command line and the Hub owner's reads may. Through Coral Hub only the authentic owner (hubOwnerRequest) does: a View grantee never sees them, whatever route the Hub sends them to (Security, #11532).
 func ownerSeesPrivateMarks(r *http.Request) bool {
 	if _, guide := guideOf(r); guide {
+		return false
+	}
+	if cloud.Tunneled(r) && !hubOwnerRequest(r).owner {
 		return false
 	}
 	return !agentCaller(r) && callerActor(r).Kind != ActorToken
