@@ -19,7 +19,7 @@ const BASE = require('../test_base').BASE;
 const TEAM = 'census-' + Date.now().toString(36);
 const S = `(window.__coralStatic || '/static/')`;
 const { INBOX_WORLD } = require('./inbox_world');
-const { DATA_WORLD, httpJson, UPDATE_STAGED, CLOUD_LINKED, CLOUD_IDLE, CLOUD_WAITING } = require('./census_world');
+const { DATA_WORLD, LIVE_WORLD, httpJson, UPDATE_STAGED, CLOUD_LINKED, CLOUD_IDLE, CLOUD_WAITING } = require('./census_world');
 
 const VERSIONS = require('./artifact_versions_stub');
 const { coralReady } = require('./wait');
@@ -37,13 +37,13 @@ module.exports = part => (async () => {
     const click = js => ev(`(${js}) ; true`);
     const load = async () => { await Page.navigate({ url: 'about:blank' }); await Page.loadEventFired(); await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings'); };
     try {
-        standIn = await launchStandIn(httpJson, { displayName: 'Census Agent' });
+        standIn = await launchStandIn(httpJson, { displayName: 'Census Agent', fillLines: 120 });
         await httpJson('POST', `/api/board/${TEAM}/subscribe`, { subscriber_id: 'Boss', job_title: 'Orchestrator', session_name: 'boss-session' });
         await httpJson('POST', `/api/board/${TEAM}/messages`, { subscriber_id: 'Boss', content: 'Please check the release notes.' });
         await httpJson('POST', `/api/board/${TEAM}/messages`, { subscriber_id: 'Boss', content: 'Then post the summary.' });
         await httpJson('POST', `/api/board/${TEAM}/messages`, { subscriber_id: 'Boss', content: 'And tell me when it is done.' });
         for (const [title, priority] of [['Ship the release notes', 'high'], ['Check the migration', 'medium'], ['Tidy the changelog', 'low']]) await httpJson('POST', `/api/board/${TEAM}/tasks`, { subscriber_id: 'Boss', title, body: 'A task for the census.', priority, assignee: 'Boss' });
-        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Page.addScriptToEvaluateOnNewDocument({ source: DATA_WORLD }); await Page.addScriptToEvaluateOnNewDocument({ source: require('./scene_ready').FETCH_COUNTER }); // a scene is measured once its fetches are done (#416)
+        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Page.addScriptToEvaluateOnNewDocument({ source: DATA_WORLD }); await Page.addScriptToEvaluateOnNewDocument({ source: LIVE_WORLD }); await Page.addScriptToEvaluateOnNewDocument({ source: require('./scene_ready').FETCH_COUNTER }); // a scene is measured once its fetches are done (#416)
         await Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 1, mobile: true }); await Emulation.setTouchEmulationEnabled({ enabled: true });
         await load();
         if (part === 'a') {

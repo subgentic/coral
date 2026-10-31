@@ -92,4 +92,39 @@ const DATA_WORLD = `(() => {
 })();`;
 async function httpJson(method, p, body) { const r = await fetch(BASE + p, { method, headers: { 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) }); let data = null; try { data = await r.json(); } catch { /* no body */ } return { status: r.status, data }; }
 
-module.exports = { WF, RUN, RUN_OK, RUN_LIVE, JOB, UPDATE_STAGED, CLOUD_LINKED, CLOUD_IDLE, CLOUD_WAITING, DATA_WORLD, httpJson };
+/** Installed by the censuses after DATA_WORLD (Page.addScriptToEvaluateOnNewDocument): the census owns its live agent list (#417). It is the
+ *  agents the scenes add with window.__m (the harness's mocked /api/sessions/live). The server's feed on /ws/coral also sent its own list (the
+ *  real stand-in agent), and a full update from it replaced the mocked one: in one run of three the sidebar lost the mocked agents and showed
+ *  the stand-in's group for the rest of the suite. Here the feed cannot add or drop a row: its full update carries the mocked agents, its diff
+ *  changes only theirs. Every other part of the feed (servers, machine health, goals) is left as it is. */
+const LIVE_WORLD = `(() => {
+    if (window.__qaLiveWorld) return;
+    window.__qaLiveWorld = true;
+    const mocked = () => window.__m ? Object.values(window.__m.agents).map(a => window.__m.entry(a)) : [];
+    const feed = (text) => {
+        let data; try { data = JSON.parse(text); } catch { return text; }
+        if (!data || typeof data !== 'object') return text;
+        const mine = new Set(mocked().flatMap(r => [r.session_id, r.name]));
+        if (data.type === 'coral_update' && Array.isArray(data.sessions)) data.sessions = mocked();
+        else if (data.type === 'coral_diff') {
+            if (Array.isArray(data.changed)) data.changed = data.changed.filter(r => mine.has(r.session_id));
+            if (Array.isArray(data.removed)) data.removed = []; // the feed removes real agents, which are not in this list; a mocked one goes only when a scene removes it
+        } else return text;
+        return JSON.stringify(data);
+    };
+    const Real = window.WebSocket;
+    function W(url, protocols) {
+        const ws = protocols === undefined ? new Real(url) : new Real(url, protocols);
+        if (!String(url).includes('/ws/coral')) return ws;
+        let handler = null;
+        Object.defineProperty(ws, 'onmessage', { configurable: true, get: () => handler, set: (h) => {
+            handler = h;
+            Real.prototype.__lookupSetter__('onmessage').call(ws, h ? (e) => h.call(ws, typeof e.data === 'string' ? new MessageEvent('message', { data: feed(e.data), origin: e.origin }) : e) : null);
+        } });
+        return ws;
+    }
+    W.prototype = Real.prototype; W.CONNECTING = 0; W.OPEN = 1; W.CLOSING = 2; W.CLOSED = 3;
+    window.WebSocket = W;
+})()`;
+
+module.exports = { WF, RUN, RUN_OK, RUN_LIVE, JOB, UPDATE_STAGED, CLOUD_LINKED, CLOUD_IDLE, CLOUD_WAITING, DATA_WORLD, LIVE_WORLD, httpJson };

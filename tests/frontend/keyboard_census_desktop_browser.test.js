@@ -14,7 +14,7 @@ const { STUB, HEX } = require('./helpers/comments_scale');
 const kb = require('./helpers/keyboard_census');
 const { FETCH_COUNTER, sceneReady, KNOWN_SLOW } = require('./helpers/scene_ready');
 const { GOALS_STUB, SHOW_ALL_GOALS } = require('./helpers/goals_stub');
-const { DATA_WORLD, httpJson, UPDATE_STAGED, CLOUD_LINKED, CLOUD_IDLE, CLOUD_WAITING } = require('./helpers/census_world');
+const { DATA_WORLD, LIVE_WORLD, httpJson, UPDATE_STAGED, CLOUD_LINKED, CLOUD_IDLE, CLOUD_WAITING } = require('./helpers/census_world');
 const { INBOX_WORLD } = require('./helpers/inbox_world');
 const BASE = require('./test_base').BASE;
 const { coralReady } = require('./helpers/wait');
@@ -44,11 +44,11 @@ const BUBBLES = [{ type: 'user', content: 'Is the build green?', key: 'c1', time
         // The agent's folder is the Files list of the terminal view, and that list is the git changes of the folder's repository. The runner's tmp dir can sit inside a repository (epoch's does): Chrome's profile files and coral.log are then
         // changed files that arrive during the Tab walk, and each is a control no press reached (#10924, red on epoch). So the agent works in a folder that is its own repository, with one file in it, whatever the tmp dir is inside.
         work = fs.mkdtempSync(path.join(os.tmpdir(), 'coral-census-k-')); execFileSync('git', ['init', '-q', work]); fs.writeFileSync(path.join(work, 'notes.txt'), 'x\n');
-        standIn = await launchStandIn(httpJson, { displayName: 'Census Agent', workingDir: work });
+        standIn = await launchStandIn(httpJson, { displayName: 'Census Agent', workingDir: work, fillLines: 120 });
         await httpJson('POST', `/api/board/${TEAM}/subscribe`, { subscriber_id: 'Boss', job_title: 'Orchestrator', session_name: 'boss-session' });
         for (const m of ['Please check the release notes.', 'Then post the summary.']) await httpJson('POST', `/api/board/${TEAM}/messages`, { subscriber_id: 'Boss', content: m });
         for (const [title, priority] of [['Ship the release notes', 'high'], ['Check the migration', 'medium'], ['Tidy the changelog', 'low']]) await httpJson('POST', `/api/board/${TEAM}/tasks`, { subscriber_id: 'Boss', title, body: 'A task for the census.', priority, assignee: 'Boss' });
-        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Page.addScriptToEvaluateOnNewDocument({ source: DATA_WORLD }); await Page.addScriptToEvaluateOnNewDocument({ source: FETCH_COUNTER });
+        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Page.addScriptToEvaluateOnNewDocument({ source: DATA_WORLD }); await Page.addScriptToEvaluateOnNewDocument({ source: LIVE_WORLD }); await Page.addScriptToEvaluateOnNewDocument({ source: FETCH_COUNTER });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false }); await Emulation.setTouchEmulationEnabled({ enabled: false });
         await load();
         await sc('home (agent list)', async () => { await ev(`window.__m.add('rowa', 'Row A', 2, {}); window.__m.add('rowb', 'Row B', 2, {}); window.switchNavTab('agents'); true`); await waitFor(`document.querySelectorAll('#live-sessions-list li, [data-section="live-sessions"] .session-list > li').length >= 2`, 'agent rows', 10000); }, { min: 5 });

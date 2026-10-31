@@ -16,7 +16,7 @@ const { KNOWN_SLOW } = require('./scene_ready');
 const { requiredScenes } = require('./census_required'); // the scenes the suite must visit: one file each, so commits that add scenes do not conflict
 const { INBOX_WORLD } = require('./inbox_world');
 const { STUB, HEX } = require('./comments_scale');
-const { DATA_WORLD, httpJson, UPDATE_STAGED, CLOUD_LINKED, CLOUD_IDLE, CLOUD_WAITING } = require('./census_world');
+const { DATA_WORLD, LIVE_WORLD, httpJson, UPDATE_STAGED, CLOUD_LINKED, CLOUD_IDLE, CLOUD_WAITING } = require('./census_world');
 const BASE = require('../test_base').BASE;
 const { coralReady } = require('./wait');
 const TEAM = 'census-d-' + Date.now().toString(36);
@@ -32,11 +32,11 @@ module.exports = part => (async () => {
     const tap = sel => tapSel(ev, sel);
     const load = async () => { await Page.navigate({ url: 'about:blank' }); await Page.loadEventFired(); await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'settings'); };
     try {
-        standIn = await launchStandIn(httpJson, { displayName: 'Census Agent' });
+        standIn = await launchStandIn(httpJson, { displayName: 'Census Agent', fillLines: 120 });
         await httpJson('POST', `/api/board/${TEAM}/subscribe`, { subscriber_id: 'Boss', job_title: 'Orchestrator', session_name: 'boss-session' });
         for (const m of ['Please check the release notes.', 'Then post the summary.']) await httpJson('POST', `/api/board/${TEAM}/messages`, { subscriber_id: 'Boss', content: m });
         for (const [title, priority] of [['Ship the release notes', 'high'], ['Check the migration', 'medium'], ['Tidy the changelog', 'low']]) await httpJson('POST', `/api/board/${TEAM}/tasks`, { subscriber_id: 'Boss', title, body: 'A task for the census.', priority, assignee: 'Boss' });
-        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Page.addScriptToEvaluateOnNewDocument({ source: DATA_WORLD }); await Page.addScriptToEvaluateOnNewDocument({ source: require('./scene_ready').FETCH_COUNTER }); // a scene is measured once its fetches are done (#416)
+        await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Page.addScriptToEvaluateOnNewDocument({ source: DATA_WORLD }); await Page.addScriptToEvaluateOnNewDocument({ source: LIVE_WORLD }); await Page.addScriptToEvaluateOnNewDocument({ source: require('./scene_ready').FETCH_COUNTER }); // a scene is measured once its fetches are done (#416)
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false }); await Emulation.setTouchEmulationEnabled({ enabled: false });
         await load();
         if (part === 'a') {

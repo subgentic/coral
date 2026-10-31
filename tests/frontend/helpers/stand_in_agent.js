@@ -32,7 +32,10 @@ process.on('beforeExit', async () => { for (const stop of [...PENDING]) await st
 // suites' own JSON helpers do. It returns {sid, name, token, launch, ms, diag, stop}; token is
 // '' when it never came, and diag then explains why. Always call stop() (in a finally): it
 // kills the session, restores cli_path_claude and removes the script's folder.
-async function launchStandIn(api, { workingDir = '', displayName = 'Stand-in Agent', deadlineMs = TOKEN_DEADLINE_MS } = {}) {
+// fillLines: lines it prints before its ready line, so its screen is taller than any terminal. The censuses use it: whether the terminal's
+// viewport scrolls (and so is a Tab stop) then no longer depends on the size the terminal and its pane ended up at (#417).
+async function launchStandIn(api, { workingDir = '', displayName = 'Stand-in Agent', deadlineMs = TOKEN_DEADLINE_MS, fillLines = 0 } = {}) {
+    fillLines = Math.max(0, Math.floor(Number(fillLines) || 0));
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'coral-standin-'));
     // The agent's folder is what its Files list shows (the git changes of the folder's repository). The runner's tmp dir is not a folder to give it: on epoch it sits inside a repository, so Chrome's profile files and coral.log are
     // changed files that arrive and go while a census walks the list, each a button no press reached or a name used twice (#10959, #10924). Unless the suite names its own folder, the agent gets one that is its own repository with a
@@ -59,6 +62,7 @@ async function launchStandIn(api, { workingDir = '', displayName = 'Stand-in Age
             `if "%CORAL_SESSION_TOKEN%"=="" (echo stand-in: no CORAL_SESSION_TOKEN 1>&2 & type nul > ${q(tokenFile + '.none')} & ping -n 600 127.0.0.1 >nul & exit /b 0)`,
             `<nul set /p "=%CORAL_SESSION_TOKEN%" > ${q(tokenFile + '.tmp')}`,
             `move /y ${q(tokenFile + '.tmp')} ${q(tokenFile)} >nul`,
+            ...(fillLines ? [`for /l %%i in (1,1,${fillLines}) do echo stand-in line %%i`] : []),
             'echo stand-in agent ready', // a real agent draws its screen (#5911): the suites that wait for text in the terminal need some
             'ping -n 600 127.0.0.1 >nul', '',
         ].join('\r\n'));
@@ -69,6 +73,7 @@ async function launchStandIn(api, { workingDir = '', displayName = 'Stand-in Age
             `: > '${ranFile}'`,
             `[ -n "$CORAL_SESSION_TOKEN" ] || { echo "stand-in: no CORAL_SESSION_TOKEN" >&2; : > '${tokenFile}.none'; exec sleep 600; }`,
             `printf '%s' "$CORAL_SESSION_TOKEN" > '${tokenFile}.tmp' && mv '${tokenFile}.tmp' '${tokenFile}'`,
+            ...(fillLines ? [`i=1; while [ $i -le ${fillLines} ]; do echo "stand-in line $i"; i=$((i+1)); done`] : []),
             'echo "stand-in agent ready"', // a real agent draws its screen (#5911): the suites that wait for text in the terminal need some
             'exec sleep 600', '',
         ].join('\n'), { mode: 0o755 });
