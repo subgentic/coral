@@ -17,6 +17,9 @@ import (
 // ProposalTTL is marked expired, and is kept so the Operator sees it (never silently deleted). The store holds the rules every writer must keep (the cap, the one-per-title merge, the claim); who may
 // propose, decide, and the notices are the handlers'.
 
+// proposalCols are the columns every read of a proposal takes.
+const proposalCols = `id, board_id, kind, title, payload, proposer, goal_proposal_id, state, reason, created_at, expires_at, decided_at, created_ref, notified, claimed_at, claim_title`
+
 const (
 	settingMaxOpenGoals         = "max_open_goals"
 	settingGoalsNeedApproval    = "goals_need_approval"
@@ -66,6 +69,8 @@ type Proposal struct {
 	DecidedAt      *string  `db:"decided_at" json:"decided_at,omitempty"`
 	CreatedRef     *int64   `db:"created_ref" json:"created_ref,omitempty"` // the id of the goal or task it became
 	Notified       bool     `db:"notified" json:"-"`
+	ClaimedAt      *string  `db:"claimed_at" json:"-"`  // when an Approve took it (state approving)
+	ClaimTitle     string   `db:"claim_title" json:"-"` // the title the goal or task was to have, so a recovery can look for it
 }
 
 // JSONText is a JSON value kept as text in a column: it scans from the column's string and writes itself out as the JSON it holds.
@@ -121,7 +126,9 @@ func (s *Store) ensureProposalsSchema(ctx context.Context) error {
 			expires_at       TEXT NOT NULL,
 			decided_at       TEXT,
 			created_ref      INTEGER,
-			notified         INTEGER NOT NULL DEFAULT 0
+			notified         INTEGER NOT NULL DEFAULT 0,
+			claimed_at       TEXT,
+			claim_title      TEXT NOT NULL DEFAULT ''
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_board_proposals_board ON board_proposals(board_id, state, id)`,
 	} {
@@ -226,7 +233,7 @@ func (s *Store) CreateProposal(ctx context.Context, in ProposalInput) (*Proposal
 		return nil, false, err
 	}
 	var dup Proposal
-	err := s.db.GetContext(ctx, &dup, `SELECT id, board_id, kind, title, payload, proposer, goal_proposal_id, state, reason, created_at, expires_at, decided_at, created_ref, notified FROM board_proposals WHERE board_id = ? AND kind = ? AND norm_title = ? AND state IN ('pending', 'approving') ORDER BY id LIMIT 1`, in.Board, in.Kind, normTitle(title))
+	err := s.db.GetContext(ctx, &dup, `SELECT id, board_id, kind, title, payload, proposer, goal_proposal_id, state, reason, created_at, expires_at, decided_at, created_ref, notified, claimed_at, claim_title FROM board_proposals WHERE board_id = ? AND kind = ? AND norm_title = ? AND state IN ('pending', 'approving') ORDER BY id LIMIT 1`, in.Board, in.Kind, normTitle(title))
 	if err == nil {
 		return &dup, true, nil
 	}
@@ -259,7 +266,7 @@ func (s *Store) CreateProposal(ctx context.Context, in ProposalInput) (*Proposal
 // GetProposal is one proposal of a board.
 func (s *Store) GetProposal(ctx context.Context, project string, id int64) (*Proposal, error) {
 	var p Proposal
-	err := s.db.GetContext(ctx, &p, `SELECT id, board_id, kind, title, payload, proposer, goal_proposal_id, state, reason, created_at, expires_at, decided_at, created_ref, notified FROM board_proposals WHERE board_id = ? AND id = ?`, project, id)
+	err := s.db.GetContext(ctx, &p, `SELECT id, board_id, kind, title, payload, proposer, goal_proposal_id, state, reason, created_at, expires_at, decided_at, created_ref, notified, claimed_at, claim_title FROM board_proposals WHERE board_id = ? AND id = ?`, project, id)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrProposalNotFound
 	}
@@ -271,7 +278,7 @@ func (s *Store) GetProposal(ctx context.Context, project string, id int64) (*Pro
 
 // ListProposals are a board's proposals in the states named (all of them when none), oldest first; project "" lists every board's (the Operator's Needs you).
 func (s *Store) ListProposals(ctx context.Context, project string, states ...string) ([]Proposal, error) {
-	q := `SELECT id, board_id, kind, title, payload, proposer, goal_proposal_id, state, reason, created_at, expires_at, decided_at, created_ref, notified FROM board_proposals WHERE 1 = 1`
+	q := `SELECT id, board_id, kind, title, payload, proposer, goal_proposal_id, state, reason, created_at, expires_at, decided_at, created_ref, notified, claimed_at, claim_title FROM board_proposals WHERE 1 = 1`
 	var args []any
 	if project != "" {
 		q += ` AND board_id = ?`
@@ -295,7 +302,7 @@ func (s *Store) ListProposals(ctx context.Context, project string, states ...str
 func (s *Store) ExpireProposals(ctx context.Context, now time.Time) ([]Proposal, error) {
 	cut := now.UTC().Format(time.RFC3339)
 	var due []Proposal
-	if err := s.db.SelectContext(ctx, &due, `SELECT id, board_id, kind, title, payload, proposer, goal_proposal_id, state, reason, created_at, expires_at, decided_at, created_ref, notified FROM board_proposals WHERE state = 'pending' AND expires_at <= ?`, cut); err != nil {
+	if err := s.db.SelectContext(ctx, &due, `SELECT id, board_id, kind, title, payload, proposer, goal_proposal_id, state, reason, created_at, expires_at, decided_at, created_ref, notified, claimed_at, claim_title FROM board_proposals WHERE state = 'pending' AND expires_at <= ?`, cut); err != nil {
 		return nil, err
 	}
 	var out []Proposal
@@ -313,8 +320,9 @@ func (s *Store) ExpireProposals(ctx context.Context, now time.Time) ([]Proposal,
 }
 
 // ClaimProposal takes a pending proposal for approval, once: the one caller that gets it makes the goal or task. Another Approve, or a Reject, then sees it is not pending.
-func (s *Store) ClaimProposal(ctx context.Context, project string, id int64) (*Proposal, error) {
-	res, err := s.db.ExecContext(ctx, `UPDATE board_proposals SET state = 'approving' WHERE board_id = ? AND id = ? AND state = 'pending' AND expires_at > ?`, project, id, time.Now().UTC().Format(time.RFC3339))
+func (s *Store) ClaimProposal(ctx context.Context, project string, id int64, madeTitle string) (*Proposal, error) {
+	now := time.Now().UTC().Format(time.RFC3339)
+	res, err := s.db.ExecContext(ctx, `UPDATE board_proposals SET state = 'approving', claimed_at = ?, claim_title = ? WHERE board_id = ? AND id = ? AND state = 'pending' AND expires_at > ?`, now, madeTitle, project, id, now)
 	if err != nil {
 		return nil, err
 	}
@@ -408,4 +416,35 @@ func ValidateGoalInput(in GoalInput) error {
 		return err
 	}
 	return nil
+}
+
+// ProposalClaimTimeout is how long a proposal may stay claimed (approving) before it is looked at again: a process that stopped between the claim and the finish leaves it there.
+const ProposalClaimTimeout = 5 * time.Minute
+
+// StuckProposals are the proposals claimed more than ProposalClaimTimeout before now and never finished.
+func (s *Store) StuckProposals(ctx context.Context, now time.Time) ([]Proposal, error) {
+	var out []Proposal
+	err := s.db.SelectContext(ctx, &out, `SELECT `+proposalCols+` FROM board_proposals WHERE state = 'approving' AND claimed_at IS NOT NULL AND claimed_at <= ?`, now.Add(-ProposalClaimTimeout).UTC().Format(time.RFC3339))
+	return out, err
+}
+
+// MadeFor is the id of the goal or task a stuck proposal's Approve made before it stopped, found by the title it was to have, its proposer and the time of the claim (0 when nothing was made).
+func (s *Store) MadeFor(ctx context.Context, p *Proposal) (int64, error) {
+	if p.ClaimedAt == nil || p.ClaimTitle == "" {
+		return 0, nil
+	}
+	table := "board_tasks"
+	title := p.ClaimTitle
+	if p.Kind == ProposalGoal {
+		table = "board_goals"
+		if t, err := goalLine("title", p.ClaimTitle, MaxGoalTitle); err == nil {
+			title = t // a goal's title is stored cleaned
+		}
+	}
+	var id int64
+	err := s.db.GetContext(ctx, &id, `SELECT id FROM `+table+` WHERE board_id = ? AND title = ? AND created_by = ? AND created_at >= ? ORDER BY id LIMIT 1`, p.Board, title, p.Proposer, *p.ClaimedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, nil
+	}
+	return id, err
 }

@@ -149,7 +149,7 @@ func (h *BoardHandler) CreateGoal(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if hold, ok := h.needsApproval(r, project, board.ProposalGoal, actor); !ok {
+	if hold, ok := h.needsApproval(r, project, board.ProposalGoal); !ok {
 		errInternalServer(w, "could not read the board's settings")
 		return
 	} else if hold { // this team's goals need the Operator's approval (#11389): an agent's goal is a proposal until it is approved

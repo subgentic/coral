@@ -21,9 +21,10 @@ import (
 // is told once, on the path every board notice takes (so a paused board delays it). Approve, Reject and the lists are the Operator's alone: on this computer a person, through Coral Hub the owner (OwnerRefuse).
 // The Operator is never held up; an agent's own self task is exempt; a proposal waits at most 7 days and is then shown as expired.
 
-// needsApproval reports whether this request's new goal or task is held for the Operator: the setting is on, and the caller is an agent (not a person, not the Operator's own name).
-func (h *BoardHandler) needsApproval(r *http.Request, project, kind, actor string) (bool, bool) {
-	if humanInputCaller(r) || board.IsOperatorName(actor) {
+// needsApproval reports whether this request's new goal or task is held for the Operator: the setting is on, and the caller is an agent. The Operator is who the identity layer VERIFIED (the dashboard, the signed
+// command line, an API key, the Hub operator), never a name the request claims: in log mode a claimed created_by "Operator" backs nothing (Security on #11389).
+func (h *BoardHandler) needsApproval(r *http.Request, project, kind string) (bool, bool) {
+	if humanInputCaller(r) || callerActor(r).IsOperator() {
 		return false, true
 	}
 	set, err := h.bs.PlanningSettings(r.Context(), project)
@@ -41,7 +42,7 @@ func (h *BoardHandler) proposeAnswer(w http.ResponseWriter, r *http.Request, in 
 	p, existed, err := h.bs.CreateProposal(r.Context(), in)
 	if err != nil {
 		if !goalError(w, err) {
-			errInternalServer(w, err.Error())
+			proposalInternal(w, "a proposal could not be stored", err)
 		}
 		return
 	}
@@ -50,6 +51,12 @@ func (h *BoardHandler) proposeAnswer(w http.ResponseWriter, r *http.Request, in 
 		msg = fmt.Sprintf("waiting for the Operator's approval (#%d): the same %s is already waiting", p.ID, in.Kind)
 	}
 	writeJSON(w, http.StatusAccepted, map[string]any{"pending": true, "proposal_id": p.ID, "id": p.ID, "kind": in.Kind, "existed": existed, "message": msg, "not_saved": false})
+}
+
+// proposalInternal answers a store failure with one fixed sentence and logs the error: the text of a database error never reaches the caller.
+func proposalInternal(w http.ResponseWriter, what string, err error) {
+	slog.Warn("[proposals] "+what, "error", err)
+	errInternalServer(w, "the proposals could not be read or written: try again")
 }
 
 // goalPayload and taskPayload are what a proposal holds: the finished inputs of the create route, replayed by Approve.
@@ -154,7 +161,8 @@ func (h *BoardHandler) tellOnce(ctx context.Context, project string, p *board.Pr
 
 // sweepExpired marks what is past its time as expired and tells each proposer once.
 func (h *BoardHandler) sweepExpired(ctx context.Context) {
-	expired, err := h.bs.ExpireProposals(ctx, time.Now())
+	h.recoverStuck(ctx)
+	expired, err := h.bs.ExpireProposals(ctx, h.sweepNow())
 	if err != nil {
 		slog.Warn("[proposals] expiry sweep failed", "error", err)
 		return
@@ -177,17 +185,17 @@ func (h *BoardHandler) ListProposals(w http.ResponseWriter, r *http.Request) {
 	var states []string
 	for _, s := range strings.Split(r.URL.Query().Get("state"), ",") {
 		switch s = strings.TrimSpace(s); s {
-		case board.ProposalPending, board.ProposalApproved, board.ProposalRejected, board.ProposalExpired:
+		case board.ProposalPending, board.ProposalApproving, board.ProposalApproved, board.ProposalRejected, board.ProposalExpired:
 			states = append(states, s)
 		case "":
 		default:
-			errBadRequest(w, "state is pending, approved, rejected or expired")
+			errBadRequest(w, "state is pending, approving, approved, rejected or expired")
 			return
 		}
 	}
 	rows, err := h.bs.ListProposals(r.Context(), project, states...)
 	if err != nil {
-		errInternalServer(w, err.Error())
+		proposalInternal(w, "the proposals could not be listed", err)
 		return
 	}
 	if rows == nil {
@@ -236,7 +244,18 @@ func (h *BoardHandler) ApproveProposal(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	p, err := h.bs.ClaimProposal(r.Context(), project, id) // from here this call alone makes it
+	madeTitle := cur.Title
+	if edit.Title != nil {
+		madeTitle = *edit.Title
+	} else {
+		var raw struct {
+			Title string `json:"title"`
+		}
+		if json.Unmarshal([]byte(cur.Payload), &raw) == nil && raw.Title != "" {
+			madeTitle = raw.Title // the title as the creating route stored it, which a recovery looks for
+		}
+	}
+	p, err := h.bs.ClaimProposal(r.Context(), project, id, madeTitle) // from here this call alone makes it
 	if err != nil {
 		proposalRefuse(w, err)
 		return
@@ -245,7 +264,8 @@ func (h *BoardHandler) ApproveProposal(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		_ = h.bs.ReleaseProposal(r.Context(), project, id) // nothing was made: it can be decided again
 		if !goalError(w, err) {
-			errBadRequest(w, err.Error())
+			slog.Warn("[proposals] an approved proposal could not be made", "board", project, "proposal", id, "error", err)
+			errBadRequest(w, fmt.Sprintf("this %s could not be made: check its words and try again", p.Kind))
 		}
 		return
 	}
@@ -319,7 +339,7 @@ func (h *BoardHandler) makeFromProposal(ctx context.Context, project string, p *
 func proposalRefuse(w http.ResponseWriter, err error) {
 	var ge *board.GoalError
 	if !errors.As(err, &ge) {
-		errInternalServer(w, err.Error())
+		proposalInternal(w, "a decision failed", err)
 		return
 	}
 	status := http.StatusConflict
@@ -371,4 +391,40 @@ func proposalText(text string, names []string, n int) string {
 	text = proposalSchemeLike.ReplaceAllString(text, "$1:/ /")
 	text = sendDashes.ReplaceAllString(text, "- - -")
 	return board.DefuseMentions(text, names)
+}
+
+// recoverStuck looks at proposals claimed by an Approve more than five minutes ago that never finished (a process stopped between the claim and the finish): when the goal or task was made, the proposal is
+// finished with it (and the proposer told); when nothing was made, it is pending again.
+func (h *BoardHandler) recoverStuck(ctx context.Context) {
+	stuck, err := h.bs.StuckProposals(ctx, h.sweepNow())
+	if err != nil {
+		slog.Warn("[proposals] stuck proposals could not be listed", "error", err)
+		return
+	}
+	for i := range stuck {
+		p := &stuck[i]
+		ref, err := h.bs.MadeFor(ctx, p)
+		if err != nil {
+			slog.Warn("[proposals] could not check what a stuck proposal made", "proposal", p.ID, "error", err)
+			continue
+		}
+		if ref > 0 {
+			if err := h.bs.FinishProposal(ctx, p.Board, p.ID, ref); err == nil {
+				p.State, p.CreatedRef = board.ProposalApproved, &ref
+				h.tellOnce(ctx, p.Board, p, board.ProposalApproved, "")
+				slog.Info("[proposals] a stuck proposal was finished", "board", p.Board, "proposal", p.ID, "ref", ref)
+			}
+			continue
+		}
+		if err := h.bs.ReleaseProposal(ctx, p.Board, p.ID); err == nil {
+			slog.Info("[proposals] a stuck proposal is pending again", "board", p.Board, "proposal", p.ID)
+		}
+	}
+}
+
+func (h *BoardHandler) sweepNow() time.Time {
+	if h.proposalNow != nil {
+		return h.proposalNow()
+	}
+	return time.Now()
 }

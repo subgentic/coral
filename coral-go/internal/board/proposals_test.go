@@ -91,7 +91,7 @@ func TestTheSameProposalIsOneRowAndAnApprovedGoalKeepsItsPlaceUnderTheCap(t *tes
 	require.NoError(t, err)
 	assert.True(t, existed)
 	assert.Equal(t, a.ID, b.ID)
-	claimed, err := s.ClaimProposal(ctx, "team", a.ID)
+	claimed, err := s.ClaimProposal(ctx, "team", a.ID, "Ship the beta")
 	require.NoError(t, err)
 	g, err := s.CreateGoalApproved(ctx, "team", claimed.ID, GoalInput{Title: "Ship the beta", CreatedBy: "Orchestrator"})
 	require.NoError(t, err, "the proposal's own place under the cap is not counted twice")
@@ -114,7 +114,7 @@ func TestAProposalIsClaimedByOneApproveOnly(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			if _, err := s.ClaimProposal(ctx, "team", p.ID); err == nil {
+			if _, err := s.ClaimProposal(ctx, "team", p.ID, "Only once"); err == nil {
 				wins <- struct{}{}
 			}
 		}()
@@ -131,9 +131,9 @@ func TestAProposalIsClaimedByOneApproveOnly(t *testing.T) {
 	require.NoError(t, s.ReleaseProposal(ctx, "team", p.ID))
 	_, err = s.RejectProposal(ctx, "team", p.ID, "now it can")
 	require.NoError(t, err)
-	_, err = s.ClaimProposal(ctx, "team", p.ID)
+	_, err = s.ClaimProposal(ctx, "team", p.ID, "Only once")
 	assert.ErrorIs(t, err, ErrProposalNotOpen, "a rejected one is decided")
-	_, err = s.ClaimProposal(ctx, "team", 9999)
+	_, err = s.ClaimProposal(ctx, "team", 9999, "x")
 	assert.ErrorIs(t, err, ErrProposalNotFound)
 }
 
@@ -176,4 +176,41 @@ func TestATaskProposalWaitsForItsGoalProposal(t *testing.T) {
 	require.NoError(t, err)
 	_, err = s.GoalOfProposal(ctx, "team", g.ID)
 	assert.ErrorIs(t, err, ErrProposalGoalGone, "a rejected goal takes its tasks' chance with it")
+}
+
+func TestAClaimNeverFinishedIsFoundAndLookedIntoAfterFiveMinutes(t *testing.T) {
+	s := testStore(t)
+	ctx := context.Background()
+	p, _, err := s.CreateProposal(ctx, proposalOf("Half done"))
+	require.NoError(t, err)
+	claimed, err := s.ClaimProposal(ctx, "team", p.ID, "Half done")
+	require.NoError(t, err)
+	stuck, err := s.StuckProposals(ctx, time.Now())
+	require.NoError(t, err)
+	assert.Empty(t, stuck, "not before five minutes")
+	stuck, err = s.StuckProposals(ctx, time.Now().Add(ProposalClaimTimeout+time.Minute))
+	require.NoError(t, err)
+	require.Len(t, stuck, 1)
+	assert.Equal(t, ProposalApproving, stuck[0].State)
+	ref, err := s.MadeFor(ctx, &stuck[0])
+	require.NoError(t, err)
+	assert.Zero(t, ref, "nothing was made for it")
+	// the goal was made, and the process stopped before it was marked
+	g, err := s.createGoalUnchecked(ctx, "team", GoalInput{Title: "Half done", CreatedBy: "Orchestrator"})
+	require.NoError(t, err)
+	ref, err = s.MadeFor(ctx, &stuck[0])
+	require.NoError(t, err)
+	assert.Equal(t, g.ID, ref, "found by its title, its proposer and the time of the claim")
+	// a goal of the same title made by someone else is not it
+	other, _, _ := s.CreateProposal(ctx, proposalOf("Another"))
+	_, err = s.ClaimProposal(ctx, "team", other.ID, "Another")
+	require.NoError(t, err)
+	_, err = s.createGoalUnchecked(ctx, "team", GoalInput{Title: "Another", CreatedBy: "Someone else"})
+	require.NoError(t, err)
+	otherRow, err := s.GetProposal(ctx, "team", other.ID)
+	require.NoError(t, err)
+	ref, err = s.MadeFor(ctx, otherRow)
+	require.NoError(t, err)
+	assert.Zero(t, ref)
+	_ = claimed
 }

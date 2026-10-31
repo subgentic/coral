@@ -200,7 +200,7 @@ func (h *BoardHandler) CreateTask(w http.ResponseWriter, r *http.Request) {
 	if h.refuseArchivedAssignee(w, r.Context(), project, body.AssignedTo) {
 		return
 	}
-	if hold, ok := h.needsApproval(r, project, board.ProposalTask, createdBy); !ok {
+	if hold, ok := h.needsApproval(r, project, board.ProposalTask); !ok {
 		errInternalServer(w, "could not read the board's settings")
 		return
 	} else if (hold && !body.Self) || body.GoalProposalID != nil { // this team's tasks need the Operator's approval (#11389), and a task for a goal still waiting waits with it; an agent's own self task is exempt

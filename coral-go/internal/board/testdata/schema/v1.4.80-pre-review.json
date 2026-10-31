@@ -434,7 +434,7 @@
     },
     {
       "name": "board_proposals",
-      "sql": "CREATE TABLE board_proposals (\n\t\t\tid               INTEGER PRIMARY KEY AUTOINCREMENT,\n\t\t\tboard_id         TEXT NOT NULL,\n\t\t\tkind             TEXT NOT NULL CHECK (kind IN ('goal', 'task')),\n\t\t\ttitle            TEXT NOT NULL,\n\t\t\tnorm_title       TEXT NOT NULL,\n\t\t\tpayload          TEXT NOT NULL,\n\t\t\tproposer         TEXT NOT NULL DEFAULT '',\n\t\t\tgoal_proposal_id INTEGER,\n\t\t\tstate            TEXT NOT NULL DEFAULT 'pending' CHECK (state IN ('pending', 'approving', 'approved', 'rejected', 'expired')),\n\t\t\treason           TEXT NOT NULL DEFAULT '',\n\t\t\tcreated_at       TEXT NOT NULL,\n\t\t\texpires_at       TEXT NOT NULL,\n\t\t\tdecided_at       TEXT,\n\t\t\tcreated_ref      INTEGER,\n\t\t\tnotified         INTEGER NOT NULL DEFAULT 0\n\t\t)",
+      "sql": "CREATE TABLE board_proposals (\n\t\t\tid               INTEGER PRIMARY KEY AUTOINCREMENT,\n\t\t\tboard_id         TEXT NOT NULL,\n\t\t\tkind             TEXT NOT NULL CHECK (kind IN ('goal', 'task')),\n\t\t\ttitle            TEXT NOT NULL,\n\t\t\tnorm_title       TEXT NOT NULL,\n\t\t\tpayload          TEXT NOT NULL,\n\t\t\tproposer         TEXT NOT NULL DEFAULT '',\n\t\t\tgoal_proposal_id INTEGER,\n\t\t\tstate            TEXT NOT NULL DEFAULT 'pending' CHECK (state IN ('pending', 'approving', 'approved', 'rejected', 'expired')),\n\t\t\treason           TEXT NOT NULL DEFAULT '',\n\t\t\tcreated_at       TEXT NOT NULL,\n\t\t\texpires_at       TEXT NOT NULL,\n\t\t\tdecided_at       TEXT,\n\t\t\tcreated_ref      INTEGER,\n\t\t\tnotified         INTEGER NOT NULL DEFAULT 0,\n\t\t\tclaimed_at       TEXT,\n\t\t\tclaim_title      TEXT NOT NULL DEFAULT ''\n\t\t)",
       "tbl_name": "board_proposals",
       "type": "table"
     },
@@ -2404,6 +2404,24 @@
           "notnull": 1,
           "pk": 0,
           "type": "INTEGER"
+        },
+        {
+          "cid": 15,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "claimed_at",
+          "notnull": 0,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 16,
+          "dflt_value": "''",
+          "hidden": 0,
+          "name": "claim_title",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
         }
       ],
       "indexes": [

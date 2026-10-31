@@ -329,3 +329,78 @@ func TestAProposalNotDecidedInSevenDaysExpiresAndIsKept(t *testing.T) {
 	assert.Equal(t, http.StatusConflict, code, "an expired one cannot be approved")
 	assert.Empty(t, e.goals(t))
 }
+
+// Security's #11389 MUST: the Operator is who the identity layer verified, not a name the request claims. In log mode a claimed "Operator" backs nothing, so an agent that says it is the Operator is still held.
+func TestAnAgentClaimingToBeTheOperatorIsStillHeld(t *testing.T) {
+	e := newProposalEnv(t)
+	e.settings(t, board.BoardSettingsUpdate{GoalsNeedApproval: boolp(true), TasksNeedApproval: boolp(true)})
+	for _, claim := range []map[string]any{
+		{"title": "Sneaky goal", "subscriber_id": "Operator"},
+		{"title": "Sneaky goal two", "created_by": "Operator"},
+	} {
+		code, out := e.call(t, "", "POST", "/api/board/team/goals", claim)
+		assert.Equal(t, http.StatusAccepted, code, "a goal that claims the Operator is a proposal: "+propJSON(out))
+	}
+	for _, claim := range []map[string]any{
+		{"title": "Sneaky task", "subscriber_id": "Operator"},
+		{"title": "Sneaky task two", "created_by": "Operator"},
+	} {
+		code, out := e.call(t, "", "POST", "/api/board/team/tasks", claim)
+		assert.Equal(t, http.StatusAccepted, code, "a task that claims the Operator is a proposal: "+propJSON(out))
+	}
+	assert.Empty(t, e.goals(t), "no goal was made")
+	_, tasks := e.call(t, "", "GET", "/api/board/team/tasks", nil)
+	assert.Empty(t, tasks["tasks"], "no task was made")
+	_, props := e.call(t, "person", "GET", "/api/board/team/proposals?state=pending", nil)
+	assert.Len(t, props["proposals"], 4)
+}
+
+// The self-task exemption holds only through the self-task checks: a self task for another agent is refused, not held and not made.
+func TestASelfTaskForAnotherAgentIsRefusedWhenApprovalIsOn(t *testing.T) {
+	e := newProposalEnv(t)
+	e.settings(t, board.BoardSettingsUpdate{TasksNeedApproval: boolp(true)})
+	_, err := e.h.bs.Subscribe(context.Background(), "team", "Dev", "Backend Dev", "", nil, "all")
+	require.NoError(t, err)
+	code, g := e.call(t, "person", "POST", "/api/board/team/goals", map[string]any{"title": "Own work", "subscriber_id": "Operator"})
+	require.Equal(t, http.StatusCreated, code, g)
+	code, out := e.call(t, "", "POST", "/api/board/team/tasks", map[string]any{"title": "For someone else", "subscriber_id": "Dev", "self": true, "assigned_to": "Orchestrator", "goal_id": g["id"]})
+	assert.Equal(t, http.StatusForbidden, code, "refused: "+propJSON(out))
+	_, props := e.call(t, "person", "GET", "/api/board/team/proposals", nil)
+	assert.Empty(t, props["proposals"], "nothing was held either")
+}
+
+// A proposal claimed by an Approve that never finished shows as approving, and after five minutes it is looked into: finished when its goal was made, pending again when nothing was.
+func TestAStuckApprovingProposalIsShownAndRecovered(t *testing.T) {
+	e := newProposalEnv(t)
+	e.settings(t, board.BoardSettingsUpdate{GoalsNeedApproval: boolp(true)})
+	_, a := e.call(t, "", "POST", "/api/board/team/goals", map[string]any{"title": "Never made", "subscriber_id": "Orchestrator"})
+	_, b := e.call(t, "", "POST", "/api/board/team/goals", map[string]any{"title": "Made but not marked", "subscriber_id": "Orchestrator"})
+	aid, bid := int64(a["proposal_id"].(float64)), int64(b["proposal_id"].(float64))
+	ctx := context.Background()
+	_, err := e.h.bs.ClaimProposal(ctx, "team", aid, "Never made")
+	require.NoError(t, err)
+	_, err = e.h.bs.ClaimProposal(ctx, "team", bid, "Made but not marked")
+	require.NoError(t, err)
+	_, err = e.h.bs.CreateGoal(ctx, "team", board.GoalInput{Title: "Made but not marked", CreatedBy: "Orchestrator"})
+	require.NoError(t, err)
+
+	_, shown := e.call(t, "person", "GET", "/api/board/team/proposals?state=approving", nil)
+	assert.Len(t, shown["proposals"], 2, "the Operator's list shows what is being approved")
+
+	e.h.proposalNow = func() time.Time { return time.Now().Add(10 * time.Minute) }
+	_, after := e.call(t, "person", "GET", "/api/board/team/proposals?state=pending,approving,approved", nil)
+	states := map[string]string{}
+	for _, p := range after["proposals"].([]any) {
+		row := p.(map[string]any)
+		states[row["title"].(string)] = row["state"].(string)
+	}
+	assert.Equal(t, "pending", states["Never made"], "nothing was made: it can be decided again")
+	assert.Equal(t, "approved", states["Made but not marked"], "its goal exists: it is finished with it")
+	told := 0
+	for _, n := range e.notices(t) {
+		if strings.Contains(n, "approved your goal") {
+			told++
+		}
+	}
+	assert.Equal(t, 1, told, "the proposer of the finished one is told once")
+}
