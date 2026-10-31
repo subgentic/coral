@@ -88,10 +88,12 @@ type provisionPlan struct {
 	phase    string
 	steps    []provisionStep
 	keys     []sshprov.HostKey // held here: what is trusted is THIS, never a key from a request
-	system   string
-	created  time.Time
-	cancel   context.CancelFunc
-	failure  string
+	// acceptance is what the far Coral is given on stdin: this hub's own terms version and digest and who. It is made by the server from the hub's own marker, never from the request; nil on a tier that skips the EULA.
+	acceptance []byte
+	system     string
+	created    time.Time
+	cancel     context.CancelFunc
+	failure    string
 }
 
 const (
@@ -160,7 +162,15 @@ type Provisioner struct {
 	onRemoved   func(id string)         // a remove took the server out of the registry
 	notify      func(id, status string) // tells the hub's remote workers a server was added (the same hook the registry's edits use)
 	startedAt   time.Time
+	// eula says whether this tier asks for the terms and whether this hub's own EULA marker holds the current version and digest. A variable so a test does not read the real marker.
+	eula func() (required, accepted bool)
 }
+
+// hubEULAState is this hub's own acceptance: the tier (dev and dropboxers skip the EULA and install their own build, which skips it too) and the marker the person's own acceptance wrote.
+func hubEULAState() (required, accepted bool) { return config.EULARequired(), license.IsEULAAccepted() }
+
+// noEULAMarker is the one sentence for a tier that requires the terms when this hub has no acceptance of the current ones (it cannot happen to a person who is using Coral).
+const noEULAMarker = "This hub has not accepted Coral's terms yet, so it cannot record an acceptance on another computer. Open this hub's own window, accept the terms there, and try again."
 
 // SetStatusListener sets who hears that a server was registered (the hub's remote workers, as for the registry's own edits).
 func (pr *Provisioner) SetStatusListener(f func(id, status string)) { pr.notify = f }
@@ -173,6 +183,7 @@ func NewProvisioner(s *store.RemoteServerStore) *Provisioner {
 	pr.install = pr.realInstall
 	pr.startRemote = pr.realStartRemote
 	pr.checkHealth = pr.realCheckHealth
+	pr.eula = hubEULAState
 	return pr
 }
 
@@ -374,16 +385,16 @@ func (pr *Provisioner) fail(p *provisionPlan, step, sentence string) {
 }
 
 type runRequest struct {
-	AcceptKeys  bool `json:"accept_keys"`  // the fingerprints shown are the ones the owner means to trust
-	AcceptTerms bool `json:"accept_terms"` // Set up: the terms the dialog shows are accepted
-	// TermsSHA256 is the digest of the terms text the dialog showed. The hub compares it with its own terms before it runs anything: an acceptance is of the text that was in front of the person.
+	AcceptKeys bool `json:"accept_keys"` // the fingerprints shown are the ones the owner means to trust
+	// AcceptTerms and TermsSHA256 are what an older page sent. They are ignored: the acceptance the far computer records is this hub's own, from its EULA marker, never one a request names.
+	AcceptTerms bool   `json:"accept_terms"`
 	TermsSHA256 string `json:"terms_sha256"`
 	// Confirm is the server's id, typed by the person, for a remove.
 	Confirm string `json:"confirm"`
 }
 
-// Run handles POST /api/servers/provision/{plan}/run. Pressing Set up is the acceptance of the terms the dialog shows (accept_terms must be true); keys held under the plan are trusted only when the
-// owner accepted them (accept_keys), and it is THOSE keys, scanned by the hub, that are written.
+// Run handles POST /api/servers/provision/{plan}/run. A setup or an upgrade carries the acceptance this hub's own EULA marker holds (the person accepted when they opened Coral; the far computer records it as
+// hub-owner@<this computer>), made here and never taken from the request; keys held under the plan are trusted only when the owner accepted them (accept_keys), and it is THOSE keys, scanned by the hub, that are written.
 func (pr *Provisioner) Run(w http.ResponseWriter, r *http.Request) {
 	if !humanInputCaller(r) { // Set up is the person's acceptance of the terms and of the host keys: never a script's
 		provisionPersonOnly(w)
@@ -400,15 +411,17 @@ func (pr *Provisioner) Run(w http.ResponseWriter, r *http.Request) {
 		errBadRequest(w, "invalid request body")
 		return
 	}
-	// A setup and an upgrade put Coral on the computer and record the terms: they need the press and the digest of the text that was shown. Stop and remove do not touch the terms.
+	// A setup and an upgrade put Coral on the computer and record this hub's acceptance of the terms there. Stop and remove do not touch the terms. On a tier that requires the EULA the marker must hold the
+	// current version and digest, else nothing is done; on a tier that skips it (dev, dropboxers) the build on the far computer skips it too, so nothing is recorded and nothing is refused.
+	var acceptance []byte
 	if k := p.kind(); k == kindSetup || k == kindUpgrade {
-		if !req.AcceptTerms {
-			errBadRequest(w, "Set up needs the terms accepted")
+		required, accepted := pr.eula()
+		if required && !accepted {
+			errConflict(w, noEULAMarker)
 			return
 		}
-		if req.TermsSHA256 != terms.EULADigest() {
-			errConflict(w, "The terms changed since you read them. Reload this page and read them again.")
-			return
+		if required {
+			acceptance = termsPayload(setupAcceptanceLabel())
 		}
 	}
 	if p.kind() == kindRemove && req.Confirm != p.ServerID {
@@ -420,10 +433,10 @@ func (pr *Provisioner) Run(w http.ResponseWriter, r *http.Request) {
 	var keys []sshprov.HostKey
 	switch {
 	case p.phase == phaseConnected:
-		p.phase = phaseRunning
+		p.phase, p.acceptance = phaseRunning, acceptance
 	case p.phase == phaseKeys && req.AcceptKeys:
 		keys = append(keys, p.keys...)
-		p.phase = phaseTrusting
+		p.phase, p.acceptance = phaseTrusting, acceptance
 	case p.phase == phaseKeys:
 		p.mu.Unlock()
 		errBadRequest(w, "confirm the host key first")
@@ -594,12 +607,14 @@ func (pr *Provisioner) finish(ctx context.Context, p *provisionPlan) error {
 
 func (pr *Provisioner) realStartRemote(ctx context.Context, p *provisionPlan) (string, string, error) {
 	fail := func(msg string) error { return &sshprov.ErrInstall{Step: "start", Msg: msg} }
-	// Set up was pressed with the terms shown (Run checked accept_terms): the far Coral is given THAT acceptance, on stdin, bound to this release's terms. It is the only way a first start with no terminal gets past them.
-	by := setupAcceptanceLabel()
-	if err := pr.runner.AcceptTerms(ctx, p.Target, pr.version, termsPayload(by)); err != nil {
-		return "", "", fail("Could not record your acceptance of the terms on that computer.")
+	// The far Coral is given this hub's own acceptance (Run made it from the hub's EULA marker), on stdin, bound to this release's terms. It is the only way a first start with no terminal gets past them. A tier
+	// that skips the EULA has none to give, and its build on the far computer skips it too.
+	if p.acceptance != nil {
+		if err := pr.runner.AcceptTerms(ctx, p.Target, pr.version, p.acceptance); err != nil {
+			return "", "", fail("Could not record your acceptance of the terms on that computer.")
+		}
+		slog.Info("[provision] terms acceptance recorded for a setup", "plan", p.ID, "version", license.EULAVersion, "by", setupAcceptanceLabel(), "at", time.Now().UTC().Format(time.RFC3339))
 	}
-	slog.Info("[provision] terms accepted for a setup", "plan", p.ID, "version", license.EULAVersion, "by", by, "at", time.Now().UTC().Format(time.RFC3339))
 	if err := pr.runner.StartTmux(ctx, p.Target, pr.version); err != nil {
 		return "", "", fail("Could not start Coral on that computer.")
 	}
@@ -700,16 +715,17 @@ func newPlanID() string {
 	return hex.EncodeToString(raw[:])
 }
 
-// Options handles GET /api/servers/provision/options: what the setup dialog needs before a plan: the Host names of the hub user's SSH config (names only, concrete ones), the terms the person is about to
-// accept (version, digest and text, so the dialog shows exactly what the digest it sends back covers), and the label the acceptance is recorded under.
+// Options handles GET /api/servers/provision/options: what the setup dialog needs before a plan: the Host names of the hub user's SSH config (names only, concrete ones), the label the acceptance is recorded
+// under, and whether one is recorded at all (not on a tier that skips the EULA).
 func (pr *Provisioner) Options(w http.ResponseWriter, r *http.Request) {
 	hosts, _ := sshprov.ConfigHosts(pr.configs())
 	if hosts == nil {
 		hosts = []string{}
 	}
+	required, _ := pr.eula()
 	writeJSON(w, http.StatusOK, map[string]any{
-		"hosts":            hosts,
-		"terms":            map[string]string{"version": license.EULAVersion, "sha256": terms.EULADigest(), "text": license.EULAText},
-		"acceptance_label": setupAcceptanceLabel(),
+		"hosts":              hosts,
+		"acceptance_label":   setupAcceptanceLabel(),
+		"records_acceptance": required,
 	})
 }

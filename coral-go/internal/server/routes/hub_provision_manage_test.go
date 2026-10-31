@@ -200,11 +200,11 @@ func TestManageUpgradeInstallsRestartsAndChecksTheNewVersion(t *testing.T) {
 	plan := v["plan"].(string)
 	_, st := me.do("POST", "/api/servers/provision/"+plan+"/connect", nil)
 	require.Equal(t, "connected", st["phase"])
-	// an upgrade records the terms, so it wants the press and the digest like a setup
-	code, _ := me.do("POST", "/api/servers/provision/"+plan+"/run", map[string]any{})
-	assert.Equal(t, 400, code)
-	code, _ = me.do("POST", "/api/servers/provision/"+plan+"/run", map[string]any{"accept_terms": true, "terms_sha256": strings.Repeat("0", 64)})
+	// an upgrade records the hub's acceptance like a setup, so with no marker for the current terms it does nothing
+	me.p.eula = func() (bool, bool) { return true, false }
+	code, _ := me.do("POST", "/api/servers/provision/"+plan+"/run", map[string]any{"accept_terms": true, "terms_sha256": terms.EULADigest()})
 	assert.Equal(t, 409, code)
+	me.p.eula = func() (bool, bool) { return true, true }
 
 	// after the restart the new release answers
 	me.p.checkHealth = func(context.Context, *store.RemoteServer, string) RemoteHealth {

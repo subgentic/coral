@@ -2960,7 +2960,6 @@ input.check.mb-select-checkbox { margin-right: 8px; } /* the page class that pla
 .ssh-key { display: flex; flex-wrap: wrap; gap: var(--space-xs) var(--space-sm); min-width: 0; overflow-wrap: anywhere; }
 .ssh-key-fp { font-family: var(--font-mono, monospace); font-size: var(--fs-sm); overflow-wrap: anywhere; }
 .ssh-check { display: flex; gap: var(--space-sm); align-items: flex-start; font-size: var(--fs-base); }
-.ssh-terms { max-height: 14rem; overflow: auto; margin: 0; padding: var(--space-md); border: 1px solid var(--border); border-radius: var(--radius-md); white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; font-size: var(--fs-sm); }
 .ssh-done { margin: 0; font: var(--dlg-section); }
 @media (max-width: 767px), (pointer: coarse) {
     .servers-form-actions .btn, .servers-top .btn { min-height: var(--control-touch-height, 44px); }

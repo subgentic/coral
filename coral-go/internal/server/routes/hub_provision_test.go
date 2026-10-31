@@ -6,9 +6,9 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/binary"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -84,6 +84,7 @@ exit 0
 	pr := NewProvisioner(e.h.store)
 	pr.runner = sshprov.Runner{SSH: filepath.Join(dir, "ssh"), KeyScan: filepath.Join(dir, "ssh-keyscan")}
 	pr.configs = func() string { return filepath.Join(dir, "config") }
+	pr.eula = func() (bool, bool) { return true, true } // a tier that asks for the terms, and a hub whose own marker holds the current ones
 	pr.known = func() string { return known }
 	pr.install = func(_ context.Context, p *provisionPlan, _ sshprov.Arch) error { // no network in a route test: the installer has its own tests
 		p.setStep("install", stepOK, "Installed.")
@@ -184,8 +185,8 @@ func TestProvisionUnknownHostShowsTheScannedKeyAndTrustsOnlyThatAfterAccept(t *t
 	_, err := os.Stat(pe.known)
 	assert.True(t, os.IsNotExist(err), "a key was trusted before the owner accepted it")
 
-	// no acceptance of the terms, or of the keys: nothing runs
-	code, _ = pe.do("POST", "/api/servers/provision/"+plan+"/run", map[string]any{"accept_keys": true})
+	// no acceptance of the keys: nothing runs, whatever else the request says
+	code, _ = pe.do("POST", "/api/servers/provision/"+plan+"/run", map[string]any{})
 	assert.Equal(t, 400, code)
 	code, _ = pe.do("POST", "/api/servers/provision/"+plan+"/run", map[string]any{"accept_terms": true, "terms_sha256": terms.EULADigest()})
 	assert.Equal(t, 400, code)
@@ -456,39 +457,98 @@ func TestTermsPayloadAndLabelMatchWhatTheFarSideAccepts(t *testing.T) {
 	assert.Len(t, p, 3, "no other field: the far side refuses one")
 }
 
-func TestProvisionRunWantsTheDigestOfTheTermsThatWereShown(t *testing.T) {
+// The acceptance the far computer records is this hub's own, made by the server from its EULA marker: a request that names its own terms, or none, changes nothing (Security's #138835).
+func TestProvisionRunUsesTheHubsOwnAcceptanceWhateverTheRequestSends(t *testing.T) {
+	for name, body := range map[string]map[string]any{
+		"none":       {},
+		"wrong":      {"accept_terms": true, "terms_sha256": strings.Repeat("0", 64)},
+		"upper case": {"accept_terms": true, "terms_sha256": strings.ToUpper(terms.EULADigest())},
+		"a version":  {"accept_terms": true, "terms_sha256": terms.EULADigest(), "version": "1999-01-01", "by": "someone-else"},
+	} {
+		pe := newProvEnv(t, "known", "Linux x86_64", true)
+		_, v := pe.do("POST", "/api/servers/provision/plan", map[string]any{"target": "user@box.example.com"})
+		plan := v["plan"].(string)
+		pe.do("POST", "/api/servers/provision/"+plan+"/connect", nil)
+		code, _ := pe.do("POST", "/api/servers/provision/"+plan+"/run", body)
+		require.Equal(t, 202, code, name)
+		pl := pe.p.plan(plan)
+		pl.mu.Lock()
+		got := pl.acceptance
+		pl.mu.Unlock()
+		assert.Equal(t, string(termsPayload(setupAcceptanceLabel())), string(got), "%s: the far Coral is given the hub's own version, digest and label", name)
+	}
+}
+
+// A tier that requires the terms, with no marker for the current ones, does nothing and says one fixed sentence; the request's own digest does not stand in for the marker.
+func TestProvisionRunWithoutTheHubsEULAMarkerDoesNothing(t *testing.T) {
+	pe := newProvEnv(t, "known", "Linux x86_64", true)
+	pe.p.eula = func() (bool, bool) { return true, false }
+	_, v := pe.do("POST", "/api/servers/provision/plan", map[string]any{"target": "user@box.example.com"})
+	plan := v["plan"].(string)
+	pe.do("POST", "/api/servers/provision/"+plan+"/connect", nil)
+	for _, body := range []map[string]any{{}, {"accept_terms": true, "terms_sha256": terms.EULADigest()}} {
+		code, v := pe.do("POST", "/api/servers/provision/"+plan+"/run", body)
+		assert.Equal(t, 409, code)
+		assert.Contains(t, fmt.Sprint(v), noEULAMarker)
+	}
+	_, st := pe.do("GET", "/api/servers/provision/"+plan, nil)
+	assert.Equal(t, "connected", st["phase"], "a refused run changed the plan")
+	assert.Nil(t, pe.p.plan(plan).acceptance)
+	if b, err := os.ReadFile(pe.sshLog); err == nil && strings.Contains(string(b), "package.tar.gz") {
+		t.Error("a run with no marker started work")
+	}
+	// once the hub's own marker is there, the same plan runs
+	pe.p.eula = func() (bool, bool) { return true, true }
+	code, _ := pe.do("POST", "/api/servers/provision/"+plan+"/run", map[string]any{})
+	assert.Equal(t, 202, code)
+}
+
+// startBriefly runs the real start step against the fake ssh, which starts nothing and so never has a key: the step is cut after a second, and what it asked of ssh is in the log.
+func startBriefly(pe *provEnv, plan string) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	pe.p.version = "2.0.10" // a release name the remote command list accepts
+	_, _, _ = pe.p.realStartRemote(ctx, pe.p.plan(plan))
+}
+
+// A tier that skips the EULA installs its own build on the far computer, which skips it too: setup goes ahead with no acceptance passed and no refusal, and the far side is not asked to record one.
+func TestProvisionRunOnATierThatSkipsTheEULAPassesNoAcceptance(t *testing.T) {
+	for name, marker := range map[string]bool{"no marker": false, "a marker": true} {
+		pe := newProvEnv(t, "known", "Linux x86_64", true)
+		pe.p.eula = func() (bool, bool) { return false, marker }
+		_, v := pe.do("POST", "/api/servers/provision/plan", map[string]any{"target": "user@box.example.com"})
+		plan := v["plan"].(string)
+		pe.do("POST", "/api/servers/provision/"+plan+"/connect", nil)
+		code, _ := pe.do("POST", "/api/servers/provision/"+plan+"/run", map[string]any{})
+		require.Equal(t, 202, code, name)
+		assert.Nil(t, pe.p.plan(plan).acceptance, name)
+		_, o := pe.do("GET", "/api/servers/provision/options", nil)
+		assert.Equal(t, false, o["records_acceptance"], name)
+
+		// the start step asks the far Coral to record an acceptance only when Run made one
+		startBriefly(pe, plan)
+		b, _ := os.ReadFile(pe.sshLog)
+		assert.Contains(t, string(b), "tmux has-session", name+": the start step reached ssh, so the absence below means something")
+		assert.NotContains(t, string(b), "accept-terms", name)
+	}
 	pe := newProvEnv(t, "known", "Linux x86_64", true)
 	_, v := pe.do("POST", "/api/servers/provision/plan", map[string]any{"target": "user@box.example.com"})
 	plan := v["plan"].(string)
 	pe.do("POST", "/api/servers/provision/"+plan+"/connect", nil)
-	for name, body := range map[string]map[string]any{
-		"none":       {"accept_terms": true},
-		"wrong":      {"accept_terms": true, "terms_sha256": strings.Repeat("0", 64)},
-		"upper case": {"accept_terms": true, "terms_sha256": strings.ToUpper(terms.EULADigest())},
-	} {
-		code, _ := pe.do("POST", "/api/servers/provision/"+plan+"/run", body)
-		assert.Equal(t, 409, code, name)
-	}
-	_, st := pe.do("GET", "/api/servers/provision/"+plan, nil)
-	assert.Equal(t, "connected", st["phase"], "a refused run changed the plan")
-	if b, err := os.ReadFile(pe.sshLog); err == nil && strings.Contains(string(b), "package.tar.gz") {
-		t.Error("a run with the wrong digest started work")
-	}
-	code, _ := pe.do("POST", "/api/servers/provision/"+plan+"/run", map[string]any{"accept_terms": true, "terms_sha256": terms.EULADigest()})
-	assert.Equal(t, 202, code)
+	pe.do("POST", "/api/servers/provision/"+plan+"/run", map[string]any{})
+	startBriefly(pe, plan)
+	b, _ := os.ReadFile(pe.sshLog)
+	assert.Contains(t, string(b), "accept-terms", "a tier that asks for the terms records the hub's acceptance")
 }
 
-func TestProvisionOptionsListHostsAndTheTermsTheDigestCovers(t *testing.T) {
+func TestProvisionOptionsListHostsAndTheLabelTheAcceptanceIsRecordedUnder(t *testing.T) {
 	pe := newProvEnv(t, "known", "Linux x86_64", true)
 	require.NoError(t, os.WriteFile(filepath.Join(pe.dir, "config"), []byte("Host build-box *.wild !no\nHost -oProxyCommand=x\nHost second\n"), 0o600))
 	code, v := pe.do("GET", "/api/servers/provision/options", nil)
 	require.Equal(t, 200, code)
 	assert.Equal(t, []any{"build-box", "second"}, v["hosts"])
-	tm := v["terms"].(map[string]any)
-	assert.Equal(t, license.EULAVersion, tm["version"])
-	assert.Equal(t, terms.EULADigest(), tm["sha256"])
-	sum := sha256.Sum256([]byte(tm["text"].(string)))
-	assert.Equal(t, terms.EULADigest(), hex.EncodeToString(sum[:]), "the text shown is the text the digest covers")
+	assert.NotContains(t, v, "terms", "the dialog shows no terms and asks for no acceptance")
+	assert.Equal(t, true, v["records_acceptance"])
 	assert.Equal(t, setupAcceptanceLabel(), v["acceptance_label"])
 	// an empty config is an empty list, not null
 	require.NoError(t, os.Remove(filepath.Join(pe.dir, "config")))

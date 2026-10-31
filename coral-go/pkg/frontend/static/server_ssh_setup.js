@@ -1,9 +1,9 @@
 /* Set a Coral server up on another computer over SSH, and upgrade, stop or remove one set up that way (#11370).
  *
  * The self-hosted hub does the work (internal/server/routes/hub_provision*.go); this page only walks the person through the three presses and shows each step:
- *   1. plan: the host and the steps, nothing connects;  2. connect: the host key, shown as fingerprints;  3. run: the terms, and the press that accepts them.
- * Everything it shows from the hub is set as text, never as markup. The hub keeps the scanned host keys itself: what is sent back is only "I accept these" and the digest of the terms text that was
- * shown, never a key. Nothing here is a secret: the remote's API key is read and kept by the hub and never reaches this page. */
+ *   1. plan: the host and the steps, nothing connects;  2. connect: the host key, shown as fingerprints;  3. run: the one press that does it.
+ * Everything it shows from the hub is set as text, never as markup. The hub keeps the scanned host keys itself: what is sent back is only "I accept these", never a key, and never terms: the acceptance the
+ * far computer records is the person's own (made when they opened Coral), made by the hub from its own marker. Nothing here is a secret: the remote's API key is read and kept by the hub and never reaches this page. */
 
 const POLL_MS = 1000;
 
@@ -106,7 +106,6 @@ export function mountSshSetup(host, { mode = 'setup', server = null, action = nu
     async function run() {
         st.busy = true; st.error = ''; draw();
         const body = {};
-        if (needsTerms()) { body.accept_terms = true; body.terms_sha256 = st.options.terms.sha256; }
         if (st.plan.host_keys && st.plan.host_keys.length) body.accept_keys = true;
         if (kind() === REMOVE) body.confirm = st.typed.trim();
         const r = await api('POST', `/api/servers/provision/${encodeURIComponent(st.plan.plan)}/run`, body);
@@ -213,7 +212,6 @@ export function mountSshSetup(host, { mode = 'setup', server = null, action = nu
 
     function drawReady(root) {
         const p = st.plan;
-        const tm = st.options.terms;
         root.append(el('p', 'ssh-intro', `Connected to ${p.target}. ${p.system ? p.system + '.' : ''}`.trim()));
         const keys = p.host_keys || [];
         if (keys.length) {
@@ -240,12 +238,8 @@ export function mountSshSetup(host, { mode = 'setup', server = null, action = nu
                 ? 'If it fails after Coral was stopped, Coral on that computer stays stopped, and the computer stays in this hub\'s list.'
                 : 'Agents running in that Coral end when it stops.'));
         }
-        if (needsTerms()) {
-            root.append(el('h5', 'ssh-subhead', `Terms of Service (version ${tm.version})`));
-            const pre = el('pre', 'ssh-terms'); pre.textContent = tm.text; pre.tabIndex = 0; pre.setAttribute('aria-label', 'The Terms of Service');
-            root.append(pre);
-            // TODO(operator): the first line below (the terms also covering the other Coral installs of the account used on that computer) is a placeholder until the operator answers. The second line is the operator's, as written (2026-10-30).
-            root.append(el('p', 'ssh-consent', `By pressing ${words().go} you accept these Terms of Service for Coral on ${p.target}, and for the other Coral installs of the account you use there.`));
+        // No acceptance is asked for here: the person accepted the Terms of Service when they opened Coral, and the hub records THAT on the computer (the hub makes it from its own acceptance, never from this page).
+        if (needsTerms() && st.options.records_acceptance) {
             root.append(el('p', 'ssh-consent', `That computer records who accepted (${st.options.acceptance_label}), when, and which version.`));
         }
         let typedOk = true;

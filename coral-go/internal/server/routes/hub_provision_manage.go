@@ -217,10 +217,11 @@ func (pr *Provisioner) upgradeSteps(ctx context.Context, p *provisionPlan) {
 		pr.fail(p, "restart", "The running Coral did not stop, or that could not be checked, so the new release was not started.")
 		return
 	}
-	by := setupAcceptanceLabel()
-	if err := pr.runner.AcceptTerms(ctx, p.Target, pr.version, termsPayload(by)); err != nil {
-		pr.fail(p, "restart", "Could not record your acceptance of the terms on that computer.")
-		return
+	if p.acceptance != nil { // this hub's own acceptance, made by Run; none on a tier that skips the EULA
+		if err := pr.runner.AcceptTerms(ctx, p.Target, pr.version, p.acceptance); err != nil {
+			pr.fail(p, "restart", "Could not record your acceptance of the terms on that computer.")
+			return
+		}
 	}
 	if err := pr.runner.StartTmux(ctx, p.Target, pr.version); err != nil {
 		pr.fail(p, "restart", "Could not start the new release.")
