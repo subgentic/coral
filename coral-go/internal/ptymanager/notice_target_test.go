@@ -100,9 +100,7 @@ func (s scriptedTerm) AgentNoticeTarget(context.Context, string, string, string)
 func TestANoticeForAnAgentJustLaunchedIsHeldUntilItsProcessIsRecorded(t *testing.T) {
 	const name = "claude-6a1b2c3d-4e5f-4061-8a7b-9c0d1e2f3a4d"
 	t.Cleanup(func() { clearSkipped(name); noticeLogged.Delete(name + "\x00starting") })
-	step, max := noticeHoldStep, noticeHoldMax
-	defer func() { noticeHoldStep, noticeHoldMax = step, max }()
-	noticeHoldStep, noticeHoldMax = 20*time.Millisecond, 5*time.Second
+	setWaits(t, func(w *waitTimings) { w.noticeHoldStep, w.noticeHoldMax = 20*time.Millisecond, 5*time.Second })
 
 	var asked atomic.Int32
 	began := time.Now()
@@ -114,7 +112,7 @@ func TestANoticeForAnAgentJustLaunchedIsHeldUntilItsProcessIsRecorded(t *testing
 	_, shown := SkippedOf(name)
 	assert.False(t, shown, "a launch moments ago is never shown as a pause")
 
-	noticeHoldMax = 150 * time.Millisecond
+	setWaits(t, func(w *waitTimings) { w.noticeHoldMax = 150 * time.Millisecond })
 	asked.Store(0)
 	blocked, why = NoticeBlockedWait(context.Background(), scriptedTerm{readyAt: time.Now().Add(time.Hour), asked: &asked}, name, "claude", "", "task notification")
 	assert.True(t, blocked, "the record never landed: withheld")
@@ -127,9 +125,7 @@ func TestANoticeForAnAgentJustLaunchedIsHeldUntilItsProcessIsRecorded(t *testing
 func TestAHeldNoticeStopsWhenItsContextEnds(t *testing.T) {
 	const name = "claude-6a1b2c3d-4e5f-4061-8a7b-9c0d1e2f3a4e"
 	t.Cleanup(func() { clearSkipped(name); noticeLogged.Delete(name + "\x00starting") })
-	step := noticeHoldStep
-	defer func() { noticeHoldStep = step }()
-	noticeHoldStep = 20 * time.Millisecond
+	setWaits(t, func(w *waitTimings) { w.noticeHoldStep = 20 * time.Millisecond })
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
 	var asked atomic.Int32

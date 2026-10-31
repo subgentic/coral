@@ -92,28 +92,23 @@ func NoticeBlocked(ctx context.Context, term any, name, agentType, sessionID, wh
 	return blocked, why
 }
 
-// noticeHoldMax and noticeHoldStep bound how long a notice for an agent that was just launched is held, and how often it is checked again (variables for tests).
-var (
-	noticeHoldMax  = 15 * time.Second
-	noticeHoldStep = 200 * time.Millisecond
-)
-
 // NoticeBlockedWait is NoticeBlocked for a notice that must not be lost: when the only reason is that the agent's process is still being recorded (a launch moments ago), the notice is held and the check
-// repeated every noticeHoldStep, up to noticeHoldMax, until the process is recorded; nothing is typed before then, so this only delays. If the record never lands the notice is withheld as before and the cause is
+// repeated every waits().noticeHoldStep, up to waits().noticeHoldMax, until the process is recorded; nothing is typed before then, so this only delays. If the record never lands the notice is withheld as before and the cause is
 // logged once. The caller's goroutine waits, never the launch.
 func NoticeBlockedWait(ctx context.Context, term any, name, agentType, sessionID, what string) (blocked bool, why string) {
-	deadline := time.Now().Add(noticeHoldMax)
+	w := waits() // read once: one hold sees one set of timings
+	deadline := time.Now().Add(w.noticeHoldMax)
 	for {
 		blocked, wait, why := noticeCheck(ctx, term, name, agentType, sessionID, what)
 		if !blocked || !wait {
 			return blocked, why
 		}
-		if time.Now().Add(noticeHoldStep).After(deadline) || ctx.Err() != nil {
+		if time.Now().Add(w.noticeHoldStep).After(deadline) || ctx.Err() != nil {
 			return noticePaused(name, what, why, false) // the record never landed: shown and logged once, as any pause
 		}
 		select {
 		case <-ctx.Done():
-		case <-time.After(noticeHoldStep):
+		case <-time.After(w.noticeHoldStep):
 		}
 	}
 }
