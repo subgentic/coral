@@ -124,6 +124,14 @@ func runStub() {
 		}
 		fmt.Fprint(w, `{"data":[]}`)
 	})
+	// 1.x: the messages are on /session/<id>/message in the {info, parts} shape (what the real 1.19.5 sends); /api/session/<id>/message is an empty list there
+	mux.HandleFunc("/session/ses_abc123/message", func(w http.ResponseWriter, r *http.Request) {
+		if !standInAuthorized(r) {
+			http.Error(w, "no", http.StatusUnauthorized)
+			return
+		}
+		fmt.Fprint(w, `[{"info":{"id":"m1","sessionID":"ses_abc123","role":"assistant","time":{"created":1793405453115,"completed":1793405455382}},"parts":[{"type":"step-start"},{"type":"text","text":"hello from the 1.x stand-in"},{"type":"step-finish"}]}]`)
+	})
 	mux.HandleFunc("/api/session/ses_abc123/message", func(w http.ResponseWriter, r *http.Request) {
 		if !standInAuthorized(r) {
 			http.Error(w, "no", http.StatusUnauthorized)

@@ -11,6 +11,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -27,6 +28,7 @@ type Client struct {
 	base     *url.URL
 	password string
 	http     *http.Client
+	legacy   bool   // a 1.x server: its messages are on /session/<id>/message in the {info, parts} shape (its /api/session/<id>/message answers an empty list: checked on 1.19.5)
 	events   string // the event stream's path: /api/event, or /event on 1.x (see EventPath)
 }
 
@@ -146,6 +148,9 @@ func validSessionID(id string) bool {
 func (c *Client) Messages(ctx context.Context, sessionID string, opts MessagesOpts) (Page, error) {
 	if !validSessionID(sessionID) {
 		return Page{}, fmt.Errorf("opencode: not a session id: %q", sessionID)
+	}
+	if c.legacy {
+		return c.messagesLegacy(ctx, sessionID, opts)
 	}
 	q := url.Values{}
 	if opts.Desc {
@@ -298,5 +303,85 @@ func EventPath(major int) string {
 func (c *Client) ForVersion(major int) *Client {
 	cp := *c
 	cp.events = EventPath(major)
+	cp.legacy = major == 1
 	return &cp
+}
+
+// legacyMessage is a message as a 1.x server sends it: its info, and its parts (text, tool calls, step markers).
+type legacyMessage struct {
+	Info struct {
+		ID   string `json:"id"`
+		Role string `json:"role"`
+		Time struct {
+			Created float64 `json:"created"`
+		} `json:"time"`
+	} `json:"info"`
+	Parts []struct {
+		Type string `json:"type"`
+		Text string `json:"text"`
+	} `json:"parts"`
+}
+
+var cursorRe = regexp.MustCompile(`^[A-Za-z0-9_=-]{1,512}$`)
+
+// messagesLegacy is Messages for a 1.x server: GET /session/<id>/message?limit=N&before=<cursor> gives the newest N messages, oldest first among them, and the cursor of the older page in the X-Next-Cursor header
+// (absent on the oldest). A page is turned the way the caller asked: newest first when Desc.
+func (c *Client) messagesLegacy(ctx context.Context, sessionID string, opts MessagesOpts) (Page, error) {
+	q := url.Values{}
+	if opts.Limit > 0 {
+		q.Set("limit", strconv.Itoa(opts.Limit))
+	}
+	if opts.Cursor != "" {
+		q.Set("before", opts.Cursor)
+	}
+	resp, err := c.get(ctx, "/session/"+sessionID+"/message", q, "application/json")
+	if err != nil {
+		return Page{}, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		io.Copy(io.Discard, io.LimitReader(resp.Body, 1<<16))
+		return Page{}, fmt.Errorf("opencode: messages of %s: HTTP %d", sessionID, resp.StatusCode)
+	}
+	raw, err := io.ReadAll(io.LimitReader(resp.Body, maxBody+1))
+	if err != nil {
+		return Page{}, err
+	}
+	if len(raw) > maxBody {
+		return Page{}, errors.New("opencode: the answer is too large")
+	}
+	var list []legacyMessage
+	if err := json.Unmarshal(raw, &list); err != nil {
+		return Page{}, fmt.Errorf("opencode: messages of %s: %w", sessionID, err)
+	}
+	var page Page
+	for _, m := range list {
+		if m.Info.Role != "user" && m.Info.Role != "assistant" {
+			continue
+		}
+		var parts []string
+		for _, p := range m.Parts {
+			if p.Type == "text" && p.Text != "" {
+				parts = append(parts, p.Text)
+			}
+		}
+		text := strings.Join(parts, "\n")
+		if text == "" {
+			continue // a turn of tool calls and step markers alone says nothing
+		}
+		at := ""
+		if m.Info.Time.Created > 0 {
+			at = strconv.FormatInt(int64(m.Info.Time.Created), 10)
+		}
+		page.Messages = append(page.Messages, Message{ID: m.Info.ID, Role: m.Info.Role, Text: text, At: at})
+	}
+	if opts.Desc {
+		for i, j := 0, len(page.Messages)-1; i < j; i, j = i+1, j-1 {
+			page.Messages[i], page.Messages[j] = page.Messages[j], page.Messages[i]
+		}
+	}
+	if next := resp.Header.Get("X-Next-Cursor"); cursorRe.MatchString(next) {
+		page.Next = next
+	}
+	return page, nil
 }
