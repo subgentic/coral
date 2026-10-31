@@ -145,7 +145,7 @@ var buildLazy = buildLazyFile
 
 // buildLazyFile builds entry (source text) into the file name, with the options of the startup bundle's final build.
 func buildLazyFile(static fs.FS, entry, name string, plugin api.Plugin) (lazyOutput, error) {
-	res := api.Build(api.BuildOptions{
+	res := build(api.BuildOptions{
 		Stdin:             &api.StdinOptions{Contents: entry, Sourcefile: name, Loader: api.LoaderJS, ResolveDir: "/"},
 		Bundle:            true,
 		Format:            api.FormatESModule,

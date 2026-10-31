@@ -316,7 +316,7 @@ func bundleBuild(static fs.FS, entry, sourcefile string, final bool, registered 
 		opts.Sourcemap = api.SourceMapLinked
 		opts.SourcesContent = api.SourcesContentInclude
 	}
-	return api.Build(opts)
+	return build(opts)
 }
 
 // embeddedFiles resolves './x.js' and '../x.js' against the importing file inside fsys: esbuild reads no disk.
@@ -382,7 +382,7 @@ func exportNames(static fs.FS, m string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	r := api.Build(api.BuildOptions{
+	r := build(api.BuildOptions{
 		Stdin:    &api.StdinOptions{Contents: string(data), Sourcefile: m, Loader: api.LoaderJS},
 		Bundle:   false,
 		Format:   api.FormatESModule,

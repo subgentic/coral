@@ -4,6 +4,7 @@ import (
 	"io/fs"
 	"log"
 	"runtime/debug"
+	"sync"
 	"time"
 
 	"github.com/subgentic/coral/internal/safego"
@@ -16,6 +17,46 @@ var (
 	releaseDelay = 2 * time.Second
 	bundleSource = frontend.PrebuiltOrBuild // the embedded prebuilt family when it is of this tree, else a build (#8760)
 )
+
+// bundleCache is the family built in this process, with the input hash it was built for (frontend.BundleInputHash: the static tree and the
+// shell). A server built after the first, for the same tree, reuses it instead of building it again: a running Coral starts one server, so it
+// builds once as before, while a test binary starts hundreds, and each one ran about 300 esbuild passes over the same files (in internal/server's
+// tests, 657 builds and about 76,000 walks of the package folder that go test records as inputs). Only a family that built is kept: a failed
+// build is tried again by the next server. The lock is held through a build, so servers started together wait for one build, not one each.
+var bundleCache struct {
+	mu  sync.Mutex
+	key string
+	b   *frontend.Bundle
+	how string
+}
+
+// reusedHow is what the start-up log says for a family the process had already built.
+const reusedHow = "reused (built earlier in this process)"
+
+// cachedBundle is bundleSource through bundleCache. A tree whose input hash can't be read is built as before and not kept.
+func cachedBundle(static fs.FS, index []byte) (*frontend.Bundle, string, error) {
+	key, err := frontend.BundleInputHash(static, index)
+	if err != nil {
+		return bundleSource(static, index)
+	}
+	bundleCache.mu.Lock()
+	defer bundleCache.mu.Unlock()
+	if bundleCache.b != nil && bundleCache.key == key {
+		return bundleCache.b, reusedHow, nil
+	}
+	b, how, err := bundleSource(static, index)
+	if err == nil && b != nil {
+		bundleCache.key, bundleCache.b, bundleCache.how = key, b, how
+	}
+	return b, how, err
+}
+
+// resetBundleCache forgets the kept family (tests that swap bundleSource, or count builds).
+func resetBundleCache() {
+	bundleCache.mu.Lock()
+	bundleCache.key, bundleCache.b, bundleCache.how = "", nil, ""
+	bundleCache.mu.Unlock()
+}
 
 // buildBundleFamily builds the bundled family (#4228: app.js's module graph, the lazy modules and the shell's stylesheets as a few files, next to the unchanged files) from the
 // static tree, sets the build id and the bundled prefix on s when it built, and returns the family's file system (nil when the family is off or did not build: the original
@@ -31,7 +72,7 @@ func (s *Server) buildBundleFamily(staticSub fs.FS) fs.FS {
 	}
 	var bundleFS fs.FS
 	index, _ := fs.ReadFile(frontend.Templates, "templates/index.html")
-	b, how, err := bundleSource(staticSub, index)
+	b, how, err := cachedBundle(staticSub, index)
 	if err != nil {
 		log.Printf("bundled dashboard unavailable, serving the original files: %v", err)
 	} else {
@@ -44,8 +85,9 @@ func (s *Server) buildBundleFamily(staticSub fs.FS) fs.FS {
 		s.staticVersion = bundleVersion(s.staticVersion, b)
 		s.bundleBase = "/static/bb/" + s.staticVersion + "/"
 	}
-	// Whether or not the build succeeded: the garbage is the same. A prebuilt family left none (a release reads it back: no esbuild, no 300 MB peak, #8760).
-	if how != "prebuilt" {
+	// Whether or not the build succeeded: the garbage is the same. A prebuilt family left none (a release reads it back: no esbuild, no 300 MB peak, #8760), nor
+	// did one this process had already built.
+	if how != "prebuilt" && how != reusedHow {
 		// the delay and the call are read now, not when the goroutine runs: a test that swaps them for its own must not have an earlier server's goroutine call its hook late (#8785)
 		// A timer, not a goroutine asleep: a test binary builds a server per test, and a sleeping goroutine each is what testleak reports at the end (#4167).
 		delay, free := releaseDelay, freeOSMemory
