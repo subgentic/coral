@@ -184,7 +184,9 @@ func (h *SessionsHandler) uploadAgentArtifact(w http.ResponseWriter, r *http.Req
 	// metadata, or refused when its format can't be stripped (finding 5). Its id is then the
 	// hash of the stored bytes.
 	stripped := false
+	sniffedImage := false
 	if head, herr := readHead(tmpPath, 16); herr == nil && sniffImageFamily(head) != "" {
+		sniffedImage = true
 		data, rerr := os.ReadFile(tmpPath)
 		if rerr != nil {
 			errInternalServer(w, "could not store the artifact")
@@ -203,6 +205,12 @@ func (h *SessionsHandler) uploadAgentArtifact(w http.ResponseWriter, r *http.Req
 			sum := sha256.Sum256(clean)
 			hexID, size, stripped = hex.EncodeToString(sum[:]), int64(len(clean)), true
 		}
+	}
+
+	// "for review" puts the file in the Operator's Needs you, which can only show what the dashboard shows inline: a patch, a log or a binary stored as octet-stream is refused with the tag, before it is stored (#11553).
+	if hasTag(board.CleanArtifactTags(r.URL.Query()["tag"]), tagForReview) && !sniffedImage && !mediatype.Viewable(mediaType, name) {
+		writeError(w, http.StatusBadRequest, "not_viewable", notViewableForReview(name, mediaType))
+		return
 	}
 
 	// A new version of an artifact (#6357): worked out under the series lock, which is held until the object, its record and the index are written (the series lock first, the digest's after).
@@ -462,4 +470,12 @@ func hasTag(tags []string, tag string) bool {
 		}
 	}
 	return false
+}
+
+// tagForReview is the tag that puts an artifact in Needs you.
+const tagForReview = "for review"
+
+// notViewableForReview is the refusal of the "for review" tag on a file Needs you cannot show.
+func notViewableForReview(name, mediaType string) string {
+	return fmt.Sprintf("%q (%s) cannot be tagged \"for review\": Needs you can only show Markdown, HTML, an image, a PDF, a table (CSV or TSV) or other text inline. Upload it without --tag \"for review\" and link it on the board; tag a Markdown or HTML summary for review if the Operator must read something.", name, mediaType)
 }
