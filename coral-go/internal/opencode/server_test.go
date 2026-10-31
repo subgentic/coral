@@ -137,17 +137,26 @@ func runStub() {
 		fmt.Fprint(w, `{"items":[{"id":"m1","type":"assistant","text":"hello from the stand-in"}]}`)
 	})
 	if frames := os.Getenv(eventsFileVar); frames != "" {
-		mux.HandleFunc("/api/event", func(w http.ResponseWriter, r *http.Request) {
-			if !standInAuthorized(r) {
-				http.Error(w, "no", http.StatusUnauthorized)
-				return
+		// 1.x streams a turn's state on /event and a thinner durable stream on /api/event (no session.status, no session.idle: checked on 1.19.5); 2.x on /api/event. STANDIN_SILENT_API_EVENT=1 is the 1.x shape.
+		stream := func(silent bool) http.HandlerFunc {
+			return func(w http.ResponseWriter, r *http.Request) {
+				if !standInAuthorized(r) {
+					http.Error(w, "no", http.StatusUnauthorized)
+					return
+				}
+				w.Header().Set("Content-Type", "text/event-stream")
+				if silent {
+					fmt.Fprint(w, "data: {\"type\":\"server.connected\",\"properties\":{}}\n\n")
+				} else {
+					b, _ := os.ReadFile(frames)
+					w.Write(b)
+				}
+				w.(http.Flusher).Flush()
+				<-r.Context().Done() // the stream stays open until the reader leaves
 			}
-			b, _ := os.ReadFile(frames)
-			w.Header().Set("Content-Type", "text/event-stream")
-			w.Write(b)
-			w.(http.Flusher).Flush()
-			<-r.Context().Done() // the stream stays open until the reader leaves
-		})
+		}
+		mux.HandleFunc("/api/event", stream(os.Getenv("STANDIN_SILENT_API_EVENT") == "1"))
+		mux.HandleFunc("/event", stream(false))
 	}
 	if ms, _ := strconv.Atoi(os.Getenv(listenDelayVar)); ms > 0 {
 		time.Sleep(time.Duration(ms) * time.Millisecond) // a server that is slow to come up

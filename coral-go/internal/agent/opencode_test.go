@@ -112,3 +112,18 @@ func TestTheAttachLineTakesNoSessionThatIsNotOne(t *testing.T) {
 		assert.NotContains(t, cmd, id+"'", "%q", id)
 	}
 }
+
+// 1.x's attach runs in the folder it is given: without --dir the agent's tools worked in Coral's own opencode data folder (the end-to-end run, #137997). The folder is one argument, quoted.
+func TestOpencode1xIsAttachedInTheAgentsOwnFolder(t *testing.T) {
+	cmd, err := (&OpencodeAgent{}).LaunchCommand(LaunchParams{OpencodeURL: "http://127.0.0.1:4711", OpencodeMajor: 1, WorkingDir: "/Users/a b/it's here"})
+	require.NoError(t, err)
+	assert.Contains(t, cmd, "--dir ")
+	assert.Contains(t, cmd, "it", "the folder is on the line")
+	assert.NotContains(t, cmd, "--dir /Users/a b/", "a folder with a space is quoted, not bare")
+	none, err := (&OpencodeAgent{}).LaunchCommand(LaunchParams{OpencodeURL: "http://127.0.0.1:4711", OpencodeMajor: 1})
+	require.NoError(t, err)
+	assert.NotContains(t, none, "--dir")
+	two, err := (&OpencodeAgent{}).LaunchCommand(LaunchParams{OpencodeURL: "http://127.0.0.1:4711", OpencodeMajor: 2, WorkingDir: "/w"})
+	require.NoError(t, err)
+	assert.NotContains(t, two, "--dir", "2.x's TUI is not changed by what was found on 1.x")
+}

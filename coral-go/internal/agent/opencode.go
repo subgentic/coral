@@ -68,6 +68,9 @@ func (a *OpencodeAgent) LaunchCommand(params LaunchParams) (string, error) {
 	attach := opencode.AttachesWithSubcommand(params.OpencodeMajor)
 	if attach {
 		parts = append(parts, bin, "attach", params.OpencodeURL)
+		if params.WorkingDir != "" { // the TUI runs in the agent's folder (the server's own is Coral's): without this the agent's tools work in Coral's opencode data folder (found on the real build, #137997)
+			parts = append(parts, "--dir", params.WorkingDir)
+		}
 	} else {
 		parts = append(parts, bin, "--server", params.OpencodeURL)
 	}

@@ -63,7 +63,13 @@ func (s *Server) PasswordEnv() string {
 }
 
 // Client is a client of the server.
-func (s *Server) Client() (*Client, error) { return New(s.URL, s.password) }
+func (s *Server) Client() (*Client, error) {
+	c, err := New(s.URL, s.password)
+	if err != nil {
+		return nil, err
+	}
+	return c.ForVersion(s.Version.Major), nil
+}
 
 // ToolEnv is the environment opencode runs in for Coral, the server and anything that asks it about its own credentials (`opencode auth list`, `opencode auth login`): the one an agent gets (agentenv.Filter:
 // Coral's own variables, tokens, keys and the identity of whatever started Coral are not passed on), without any OPENCODE_ or XDG_ name of the person's own or any CORAL_ one, plus Coral's XDG folders. Its

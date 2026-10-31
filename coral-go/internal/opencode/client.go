@@ -27,6 +27,7 @@ type Client struct {
 	base     *url.URL
 	password string
 	http     *http.Client
+	events   string // the event stream's path: /api/event, or /event on 1.x (see EventPath)
 }
 
 // ErrNotLoopback is a base URL whose host is not this computer.
@@ -42,7 +43,7 @@ func New(base, password string) (*Client, error) {
 	if ip := net.ParseIP(host); (ip == nil || !ip.IsLoopback()) && host != "localhost" {
 		return nil, ErrNotLoopback
 	}
-	return &Client{base: u, password: password, http: &http.Client{Timeout: 30 * time.Second}}, nil
+	return &Client{base: u, password: password, http: &http.Client{Timeout: 30 * time.Second}, events: "/api/event"}, nil
 }
 
 // Message is one message of a session as Coral keeps it: who said it, its text and when.
@@ -281,4 +282,20 @@ read:
 		newest[i], newest[j] = newest[j], newest[i]
 	}
 	return newest, nil
+}
+
+// EventPath is where a server of this major version streams the events that say a turn began and ended. On 1.x the durable stream at /api/event carries messages and sessions' updates but NOT session.status or
+// session.idle (checked on 1.19.5): those are on /event, which is the one a state is read from there.
+func EventPath(major int) string {
+	if major == 1 {
+		return "/event"
+	}
+	return "/api/event"
+}
+
+// ForVersion is the client of a server of this major version: the event stream is read where that version streams the turn's state.
+func (c *Client) ForVersion(major int) *Client {
+	cp := *c
+	cp.events = EventPath(major)
+	return &cp
 }

@@ -151,12 +151,12 @@ func readLine(br *bufio.Reader, limit int) (line string, tooLong bool, err error
 	return strings.TrimRight(string(buf), "\r\n"), tooLong, err
 }
 
-// Events connects to the server's event stream (GET /api/event) and calls fn for each event until it ends.
+// Events connects to the server's event stream (GET /api/event, or /event on 1.x: EventPath) and calls fn for each event until it ends.
 func (c *Client) Events(ctx context.Context, fn func(Event)) error {
 	cl := *c.http
 	cl.Timeout = 0 // a stream has no end of its own
 	u := *c.base
-	u.Path = strings.TrimRight(u.Path, "/") + "/api/event"
+	u.Path = strings.TrimRight(u.Path, "/") + c.events
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
 	if err != nil {
 		return err
