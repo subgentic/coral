@@ -1088,3 +1088,51 @@ func TestAutoAcceptStopOnOneAgentWinsOverItsEnableInFlight(t *testing.T) {
 	require.Equal(t, http.StatusOK, code)
 	assert.False(t, r.state(sid).Enabled)
 }
+
+// Auto-accept answers only a known ACTION tool's approval (an allow-list, not a list of question tools to skip): a tool it does not know,
+// here a made-up question tool whose prompt reads exactly like an approval ("Do you want to proceed?", Yes / No), is left for the user and
+// recorded as skipped. The same screen for Bash is answered (the control), and so is a Claude MCP tool; agy's unknown tool is skipped too.
+func TestAutoAcceptAnswersOnlyKnownActionTools(t *testing.T) {
+	for _, tc := range []struct {
+		agent, tool, screen string
+		answered            bool
+	}{
+		{at.Claude, "AskUser", "claude_bash", false},
+		{at.Claude, "Bash", "claude_bash", true},
+		{at.Claude, "mcp__files__write", "claude_bash", true},
+		{at.Agy, "ask_user", "agy_command", false},
+		{at.Agy, "run_command", "agy_command", true},
+	} {
+		t.Run(tc.agent+" "+tc.tool, func(t *testing.T) {
+			r := newAutoAcceptRig(t)
+			sid := r.agent(tc.agent, "dev", autoAcceptScreen(t, tc.screen))
+			r.enable("dev", sid)
+			r.h.pending.set(sid, pendingTool{ToolName: tc.tool, Input: map[string]any{"command": "touch probe.txt", "CommandLine": "touch probe.txt"}, At: r.now})
+			if tc.agent == at.Claude {
+				r.notify("dev", sid, "Notification: Claude needs your permission to use "+tc.tool)
+			}
+			r.run()
+			sent := len(r.keys(tc.agent, sid)) + r.enters(tc.agent, sid)
+			if tc.answered {
+				assert.NotZero(t, sent, "a known action is answered")
+				return
+			}
+			assert.Zero(t, sent, "an unknown tool is not answered")
+			ev := r.events(sid, "auto_accept_skipped")
+			require.Len(t, ev, 1)
+			assert.Contains(t, ev[0].Summary, "not a known action")
+		})
+	}
+}
+
+// Every type auto-accept supports is either in autoAcceptActionTools or named as header-recognised, never both and never neither: a type
+// added to autoAcceptSupported without a list is not approved by default (Security on #260). And a type with neither answers no tool.
+func TestEveryAutoAcceptTypeHasAToolListOrAHeader(t *testing.T) {
+	for typ := range autoAcceptSupported {
+		_, listed := autoAcceptActionTools[typ]
+		header := autoAcceptHeaderRecognised[typ]
+		assert.True(t, listed != header, "%s: a tool list (%v) or header-recognised (%v), exactly one", typ, listed, header)
+	}
+	assert.False(t, autoAcceptActionTool("some-new-cli", "run_command"), "a type with neither is never approved")
+	assert.True(t, autoAcceptActionTool(at.Codex, "anything"), "Codex is header-recognised")
+}
