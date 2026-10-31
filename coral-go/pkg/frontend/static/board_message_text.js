@@ -3,6 +3,7 @@ import { escapeHtml, escapeAttr } from './html_escape.js';
 import { renderMarkdown, _renderMarkdownUncached, FENCED_WITH_LANG } from './markdown.js';
 import { artifactLabel, learnArtifactNames } from './artifact_names.js';
 import { ARTIFACT_REF } from './artifact_refs.js';
+import { isGuidePost, guideText } from './guide_names.js';
 
 /** Board message text with literal "\n" escapes turned into line breaks,
  *  for messages with none (agents posting through a shell pass them). Same
@@ -62,6 +63,10 @@ export function hubUserBadge(m) {
         const title = 'Sent through Coral Hub, which did not say which of its users sent it. Not an agent, and not you at this computer.';
         return `<span class="chip chip-tag mb-external-badge mb-hub-user-badge is-unknown" title="${escapeAttr(title)}">Coral Hub, user not identified</span>`;
     }
+    if (isGuidePost(m)) { // a guide: a text tag, named for a screen reader as "from a guide" (the row's author is their name, #11457)
+        const title = 'A guide posted this through Coral Hub: a person with access to this team, not an agent and not you.';
+        return `<span class="chip chip-tag mb-external-badge mb-hub-user-badge mb-guide-badge" title="${escapeAttr(title)}" aria-label="from a guide">guide</span>`;
+    }
     if (!m || m.origin !== 'hub_user') return '';
     const who = String(m.subscriber_id || '');
     const title = `Sent through Coral Hub by a Hub user${who ? ` (${who})` : ''}, not by an agent or by you at this computer.`;
@@ -73,6 +78,7 @@ export function hubUserBadge(m) {
  *  dashboard shows that as a badge instead, so the prefix is dropped there. */
 export function boardMessageDisplayText(m) {
     const text = String((m && m.content) || '');
+    if (isGuidePost(m)) return guideText(m);
     if (m && m.origin === 'hub_operator') return text.replace(/^\[Operator via Coral Hub, hub-user-[0-9a-f]{8}\] /, '');
     return text;
 }

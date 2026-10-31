@@ -3,6 +3,7 @@
 // a name; owner only, so a page that may not read it has no group (the server decides who may write; this page draws what it is told and says what the server refused). Labels are the only thing the Hub sends: no email.
 import { importOnce } from './import_once.js';
 import { boardFetch } from './server_base.js';
+import { setGuideRoster } from './guide_names.js';
 const { refusalOf, answeredLocally } = await importOnce('./owner_refusal.js');
 export const GR_KEYS = ['gr_roster'];
 export const MAX_GUIDES = 20, MAX_NAME = 40;
@@ -61,6 +62,7 @@ export function createGuideRoster(team) {
             if (!r || !r.ok) return { refusal: r ? await refusalOf(r, answeredLocally(team)) : 'Unavailable', values: null };
             const j = await r.json().catch(() => ({}));
             rows = Object.entries(j.roster || {}).map(([l, n]) => [l, String(n)]).sort((a, b) => (a[0] < b[0] ? -1 : 1));
+            setGuideRoster(team, j.roster || {}); // the Board names a guide's posts by it
             draw();
             return { values: { gr_roster: canon() } };
         },
@@ -74,6 +76,7 @@ export function createGuideRoster(team) {
             }
             const j = await r.json().catch(() => ({ roster }));
             rows = Object.entries(j.roster || roster).map(([l, n]) => [l, String(n)]).sort((a, b) => (a[0] < b[0] ? -1 : 1));
+            setGuideRoster(team, j.roster || roster);
             draw();
             return canon();
         },

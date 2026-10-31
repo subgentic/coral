@@ -174,7 +174,7 @@ function renderBoardItem(item, prev) {
             ${parts.toggle}
             <div class="mb-message-header">
                 ${checkbox}
-                <span class="mb-agent-name">${m.icon ? escapeHtml(m.icon) + ' ' : ''}${escapeHtml(authorLabel(m, agent))}</span>
+                <span class="mb-agent-name">${m.icon ? escapeHtml(m.icon) + ' ' : ''}${escapeHtml(authorLabel(m, agent, bs.currentProject || ''))}</span>
                 ${externalMessageBadge(m)}${hubUserBadge(m)}${askBadge(m)}
                 ${messageTimeHtml(m.created_at)}
                 ${BOARD_SAVE_BUTTON(bs.currentProject || '', keyLabel(bs.currentProject || ''), String(m.created_at || ''), String(m.job_title || m.subscriber_id || ''))}

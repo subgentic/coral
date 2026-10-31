@@ -383,7 +383,7 @@ function _renderBoardPanelMessages(msgsEl, scrollToBottom) {
             ${parts.toggle}
             <div class="mb-message-header">
                 ${checkbox}
-                <span class="mb-agent-name">${m.icon ? escapeHtml(m.icon) + ' ' : ''}${escapeHtml(authorLabel(m, agent))}</span>
+                <span class="mb-agent-name">${m.icon ? escapeHtml(m.icon) + ' ' : ''}${escapeHtml(authorLabel(m, agent, _activeBoardChat || ''))}</span>
                 ${externalMessageBadge(m)}${hubUserBadge(m)}${askBadge(m)}
                 <span class="mb-message-time">${_formatTime(m.created_at)}</span>
             </div>
