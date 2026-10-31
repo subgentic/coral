@@ -621,7 +621,7 @@ export function _syncACFModelField(container) {
         modelInput.value = defaults[currentType] || '';
         syncModelPicker(container);
         container.dispatchEvent(new Event('acf-synced', { bubbles: true })); // a summary of the form (New Agent's rows) follows the default arriving
-    }).finally(() => { container.dataset.acfDefaults = 'ready'; });
+    }).finally(() => { if (container.dataset.acfFetchSeq === seq) container.dataset.acfDefaults = 'ready'; }); // ready only when the LATEST default fetch ends (a switch of provider starts another)
 }
 window.renderAgentConfigForm = renderAgentConfigForm;
 
