@@ -65,29 +65,38 @@ func checkRoot(root string) (clean, reason string) {
 	if filepath.Base(clean) != rootName {
 		return "", "its last name is not " + rootName
 	}
-	fi, err := os.Lstat(clean)
-	switch {
-	case err == nil:
-		if fi.Mode().Type() != os.ModeDir {
-			return "", "it is not a real folder (a file, link or junction)"
+	// Two passes: parallel test binaries (go test runs one per package) can all see the root missing, and the ones that lose the Mkdir get "exists": they go back to the checks below once, on
+	// the folder the winner made, instead of giving up and falling back to the temp folder.
+	for attempt := 0; attempt < 2; attempt++ {
+		fi, err := os.Lstat(clean)
+		switch {
+		case err == nil:
+			if fi.Mode().Type() != os.ModeDir {
+				return "", "it is not a real folder (a file, link or junction)"
+			}
+			if !ownedByMe(clean, fi) {
+				return "", "it is not owned by this user"
+			}
+			if !ownerOnlyAcl(clean) {
+				return "", "its access list grants others"
+			}
+			return clean, ""
+		case os.IsNotExist(err):
+			err := os.Mkdir(clean, 0o700)
+			if err == nil {
+				if _, err := ownerOnly(clean); err != nil || !ownerOnlyAcl(clean) {
+					return "", "it could not be kept to this user"
+				}
+				return clean, ""
+			}
+			if !os.IsExist(err) {
+				return "", "it could not be made"
+			}
+		default:
+			return "", "it could not be read"
 		}
-		if !ownedByMe(clean, fi) {
-			return "", "it is not owned by this user"
-		}
-		if !ownerOnlyAcl(clean) {
-			return "", "its access list grants others"
-		}
-	case os.IsNotExist(err):
-		if err := os.Mkdir(clean, 0o700); err != nil {
-			return "", "it could not be made"
-		}
-		if _, err := ownerOnly(clean); err != nil || !ownerOnlyAcl(clean) {
-			return "", "it could not be kept to this user"
-		}
-	default:
-		return "", "it could not be read"
 	}
-	return clean, ""
+	return "", "it could not be made"
 }
 
 // sameFolder compares two cleaned paths; Windows and macOS file systems ignore case.
