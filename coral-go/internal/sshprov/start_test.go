@@ -5,7 +5,6 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -13,65 +12,21 @@ import (
 
 const testKey = "test-api-key-0123456789abcdef"
 
-// startSide is a far computer with a fake tmux (it records the session and runs the command in the background) and a fake coral (it records its arguments, makes its API key a moment after it
-// starts, and prints it for `api-key`), all inside a temp HOME.
+// startSide is a far computer (the stand-in ssh, see farside_test.go) with its tmux and coral recorded in files: coral's arguments, the tmux session, and an API key that appears 0.3 s after coral
+// starts.
 func startSide(t *testing.T) (r Runner, home, argsLog, tmuxLog string) {
 	t.Helper()
-	if runtime.GOOS == "windows" {
-		t.Skip("shell scripts")
-	}
 	dir := t.TempDir()
 	home = filepath.Join(dir, "home")
-	bin := filepath.Join(dir, "bin")
-	root := filepath.Join(home, ".coral-server", "2.0.10", "root")
-	for _, d := range []string{bin, root} {
-		if err := os.MkdirAll(d, 0o755); err != nil {
-			t.Fatal(err)
-		}
+	if err := os.MkdirAll(home, 0o755); err != nil {
+		t.Fatal(err)
 	}
 	argsLog, tmuxLog = filepath.Join(dir, "coral.args"), filepath.Join(dir, "tmux.log")
-	coral := `#!/bin/sh
-if [ "$1" = "api-key" ]; then
-  home=""; while [ $# -gt 0 ]; do [ "$1" = "--home" ] && home="$2"; shift; done
-  [ -s "$home/api_key" ] || exit 1
-  cat "$home/api_key"; exit 0
-fi
-if [ "$1" = "hub-owner-secret" ]; then echo "$@" >> '` + argsLog + `.owner'; cat > '` + argsLog + `.owner.stdin'; exit "${COMMA_EXIT:-0}"; fi
-if [ "$1" = "accept-terms" ]; then echo "$@" >> '` + argsLog + `.accept'; cat > '` + argsLog + `.stdin'; exit "${COMMA_EXIT:-0}"; fi
-echo "$@" >> '` + argsLog + `'
-home=""; while [ $# -gt 0 ]; do [ "$1" = "--home" ] && home="$2"; shift; done
-sleep 0.3; mkdir -p "$home"; printf '%s\n' '` + testKey + `' > "$home/api_key"
-sleep 20
-`
-	if err := os.WriteFile(filepath.Join(root, "coral"), []byte(coral), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	tmux := `#!/bin/sh
-echo "$@" >> '` + tmuxLog + `'
-case "$1" in
-  has-session) [ -e '` + filepath.Join(dir, "session") + `' ] && exit 0; exit 1;;
-  kill-session) [ -e '` + filepath.Join(dir, "stuck") + `' ] && exit 0; rm -f '` + filepath.Join(dir, "session") + `'; exit 0;;
-  new-session) touch '` + filepath.Join(dir, "session") + `'
-    while [ $# -gt 0 ]; do cmd="$1"; shift; done
-    nohup sh -c "$cmd" >/dev/null 2>&1 &
-    exit 0;;
-esac
-`
-	if err := os.WriteFile(filepath.Join(bin, "tmux"), []byte(tmux), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	ssh := filepath.Join(dir, "ssh")
-	// /proc/net/tcp is Linux's: the check after a stop is answered here from files the tests make (listening, cannot-tell)
-	proc := "case \"$last\" in *\"/proc/net/tcp\"*) if tmux has-session -t =coral-server 2>/dev/null; then exit 1; fi; [ -e '" + filepath.Join(dir, "noproc") + "' ] && exit 3; [ -e '" + filepath.Join(dir, "listening") + "' ] && exit 2; exit 0;; esac\n"
-	script := "#!/bin/sh\nfor a in \"$@\"; do last=\"$a\"; done\nPATH='" + bin + ":'\"$PATH\"; export PATH\n" + proc + "HOME='" + home + "'; export HOME\nPATH='" + bin + ":'\"$PATH\"; export PATH\neval \"$last\"\n"
-	if err := os.WriteFile(ssh, []byte(script), 0o700); err != nil {
-		t.Fatal(err)
-	}
+	ssh := newStandIn(t, "ssh", standCfg{Far: &farCfg{Home: home, TmuxLog: tmuxLog, ArgsLog: argsLog, Key: testKey}})
 	return Runner{SSH: ssh}, home, argsLog, tmuxLog
 }
 
 func TestStartTmuxStartsCoralOnLoopbackOnlyAndOnlyOnce(t *testing.T) {
-	needShell(t)
 	r, home, argsLog, tmuxLog := startSide(t)
 	tg, _ := ParseTarget("user@box.example.com")
 	ctx := context.Background()
@@ -109,13 +64,12 @@ func TestStartTmuxStartsCoralOnLoopbackOnlyAndOnlyOnce(t *testing.T) {
 	if b, _ := os.ReadFile(tmuxLog); strings.Count(string(b), "new-session") != 1 || !strings.Contains(string(b), "coral-server") {
 		t.Errorf("tmux log:\n%s", b)
 	}
-	if st, err := os.Stat(filepath.Join(home, ".coral-server", "data")); err != nil || st.Mode().Perm()&0o077 != 0 {
+	if st, err := os.Stat(filepath.Join(home, ".coral-server", "data")); err != nil || permsApply() && st.Mode().Perm()&0o077 != 0 {
 		t.Errorf("the data folder: %v %v", st, err)
 	}
 }
 
 func TestEnsureInstanceIDIsMadeOnceAndIs32Hex(t *testing.T) {
-	needShell(t)
 	r, home, _, _ := startSide(t)
 	tg, _ := ParseTarget("user@box.example.com")
 	a, err := r.EnsureInstanceID(context.Background(), tg)
@@ -129,7 +83,7 @@ func TestEnsureInstanceIDIsMadeOnceAndIs32Hex(t *testing.T) {
 	if err != nil || b != a {
 		t.Errorf("a re-run gave %q, %v; the first was %q", b, err, a)
 	}
-	if st, err := os.Stat(filepath.Join(home, ".coral-server", "instance-id")); err != nil || st.Mode().Perm() != 0o600 {
+	if st, err := os.Stat(filepath.Join(home, ".coral-server", "instance-id")); err != nil || permsApply() && st.Mode().Perm() != 0o600 {
 		t.Errorf("instance-id file: %v %v", st, err)
 	}
 	// a file with anything else in it is not an id
@@ -142,7 +96,6 @@ func TestEnsureInstanceIDIsMadeOnceAndIs32Hex(t *testing.T) {
 }
 
 func TestReadAPIKeyWaitsForACoralThatIsStartingAndNeverLogsIt(t *testing.T) {
-	needShell(t)
 	r, _, _, _ := startSide(t)
 	oldPoll := keyPoll
 	keyPoll = 100 * time.Millisecond
@@ -159,7 +112,6 @@ func TestReadAPIKeyWaitsForACoralThatIsStartingAndNeverLogsIt(t *testing.T) {
 }
 
 func TestReadAPIKeyGivesUpAndSaysNothingOfTheKey(t *testing.T) {
-	needShell(t)
 	r, _, _, _ := startSide(t)
 	oldPoll, oldWait := keyPoll, keyWait
 	keyPoll, keyWait = 50*time.Millisecond, 400*time.Millisecond
@@ -175,7 +127,6 @@ func TestReadAPIKeyGivesUpAndSaysNothingOfTheKey(t *testing.T) {
 }
 
 func TestReadAPIKeyRefusesAnythingThatIsNotAKey(t *testing.T) {
-	needShell(t)
 	r, home, _, _ := startSide(t)
 	oldPoll, oldWait := keyPoll, keyWait
 	keyPoll, keyWait = 50*time.Millisecond, 300*time.Millisecond
@@ -215,7 +166,6 @@ func TestStoredRoundTripsThroughTheParsers(t *testing.T) {
 }
 
 func TestAcceptTermsGoesOnStdinNeverInArgv(t *testing.T) {
-	needShell(t)
 	r, _, argsLog, _ := startSide(t)
 	tg, _ := ParseTarget("user@box.example.com")
 	payload := []byte(`{"version":"2026-03-26","sha256":"` + strings.Repeat("ab", 32) + `","by":"hub-owner@build-host"}`)
@@ -258,7 +208,6 @@ func TestTmuxNamesAreExactSoAnotherUsersSessionIsNeverTouched(t *testing.T) {
 }
 
 func TestStopAndConfirmReturnsOnlyOnAConfirmedStop(t *testing.T) {
-	needShell(t)
 	oldW, oldP := stopWait, stopPoll
 	stopWait, stopPoll = 300*time.Millisecond, 50*time.Millisecond
 	defer func() { stopWait, stopPoll = oldW, oldP }()
