@@ -139,7 +139,7 @@ func (h *BoardHandler) SetArtifactTags(w http.ResponseWriter, r *http.Request) {
 
 // applyManifestTags records the tags an agent asked for on the stored objects its task result links (#8583), added to the team's tags of each (at most five in all), and takes them out of the rows:
 // the table is where a tag lives, so a person's later change is the only word. A tag that is not one is left out, never an error.
-func (h *BoardHandler) applyManifestTags(ctx context.Context, project, asker string, artifacts []board.TaskArtifact) {
+func (h *BoardHandler) applyManifestTags(ctx context.Context, project, asker string, person bool, artifacts []board.TaskArtifact) {
 	for i := range artifacts {
 		a := &artifacts[i]
 		tags := a.Tags
@@ -156,9 +156,9 @@ func (h *BoardHandler) applyManifestTags(ctx context.Context, project, asker str
 		clean := board.CleanArtifactTags(tags)
 		if hasTag(clean, tagForReview) {
 			q, ok := board.CleanReviewQuestion(question)
-			if !ok || hasSignInLink(question) || asker == "" {
+			if !ok || hasSignInLink(question) || asker == "" || !(person || h.askerUploaded(asker, id)) {
 				clean = withoutTag(clean, tagForReview) // no question, no review row: the Operator would not know what is asked (#11555)
-				slog.Warn("task artifact not tagged for review: it has no question", "board", project, "artifact", a.Name)
+				slog.Warn("task artifact not tagged for review: no question, or not the asker's own upload", "board", project, "artifact", a.Name)
 			} else {
 				_, _ = h.bs.SetArtifactQuestion(ctx, project, id, q, asker, time.Now())
 			}
@@ -170,4 +170,13 @@ func (h *BoardHandler) applyManifestTags(ctx context.Context, project, asker str
 			slog.Warn("task artifact tags not recorded", "board", project, "artifact", a.Name, "error", err)
 		}
 	}
+}
+
+// askerUploaded says the session uploaded the stored object itself (its own upload record): an agent cannot tag for review, with a question of its own, a file another agent uploaded (#11555).
+func (h *BoardHandler) askerUploaded(session, id string) bool {
+	if session == "" || session == "operator" {
+		return false
+	}
+	_, ok := h.uploadRecordOf(session, id)
+	return ok
 }

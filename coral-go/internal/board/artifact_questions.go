@@ -25,6 +25,13 @@ func CleanReviewQuestion(s string) (q string, ok bool) {
 	return q, q != ""
 }
 
+// ArtifactQuestionRow is a stored question as the table holds it (with the asking session).
+type ArtifactQuestionRow struct {
+	Question string `db:"question"`
+	Session  string `db:"session_id"`
+	At       string `db:"asked_at"`
+}
+
 // ArtifactQuestion is the stored question of one object on a board and the session that asked it.
 type ArtifactQuestion struct {
 	Question string `db:"question" json:"question"`
