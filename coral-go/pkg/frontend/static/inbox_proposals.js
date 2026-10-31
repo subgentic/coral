@@ -12,6 +12,8 @@ export { proposalItems, pendingProposals, onProposalsChanged, refreshProposals }
 
 /** What an agent wrote, for a place that shows it as one line: every hidden or reordering character written out as <U+202E> (strict: nothing is left alone), a line break a space. */
 export const markedText = t => markHidden(t, { strict: true }).replace(/\s+/g, ' ').trim();
+/** The same for a block shown whole (the detail): line breaks and blanks are kept, every hidden or reordering character is written out. */
+export const markedBlock = t => markHidden(t, { strict: true });
 const kindWord = p => (p.kind === 'goal' ? 'goal' : 'task');
 
 /** What a proposal carries, for the dialog and the row: its words, the instructions and required outputs the assignee will be given (shown in full: the Operator approves what they read), and one line of everything else it sets. */
@@ -63,14 +65,15 @@ export function openProposalDialog(p, mode = 'view') {
     const d = el('dialog', 'modal-content dlg-form proposal-dialog'); d.id = 'proposal-dialog'; d.setAttribute('aria-labelledby', 'proposal-dialog-title');
     const h = el('h2', null, `${kindWord(p) === 'goal' ? 'A goal' : 'A task'} waiting for your approval`); h.id = 'proposal-dialog-title';
     const who = el('p', 'proposal-who', `${markedText(p.proposer)} proposed it for ${p.board_id}.${p.goal_proposal_id ? ' It is for a goal that is also waiting: approve that goal first.' : ''}`);
-    const inputs = [];
-    const field = (label, value, tall) => { const l = el('label', 'proposal-field'); l.append(el('span', null, label)); const i = el(tall ? 'textarea' : 'input', 'field'); if (tall) i.rows = 4; i.value = value; i.readOnly = mode !== 'edit'; inputs.push(i); l.append(i); return [l, i]; }; // the words are read first: they are changed only after Edit and approve
+    const inputs = []; // [field, the raw words]: a field shows the words marked until Edit opens them, then the raw words
+    let editing = mode === 'edit';
+    const field = (label, value, tall) => { const l = el('label', 'proposal-field'); l.append(el('span', null, label)); const i = el(tall ? 'textarea' : 'input', 'field'); if (tall) i.rows = 4; i.value = editing ? value : markedBlock(value); i.readOnly = !editing; inputs.push([i, value]); l.append(i); return [l, i]; }; // the words are read first: they are changed only after Edit and approve
     const [tl, title] = field('Title', p.title);
     const parts = [tl];
     let second = null, third = null;
     if (p.kind === 'goal') { const [ol, o] = field('Outcome', pay.outcome || '', true); const [dl, dw] = field('Done when', pay.done_when || ''); second = o; third = dw; parts.push(ol, dl); }
     else { const [bl, b] = field('Details', pay.body || '', true); second = b; parts.push(bl); }
-    const why = field('Reason (the agent is told)', '', true), reason = why[1]; reason.readOnly = false; inputs.pop();
+    const why = field('Reason (the agent is told)', '', true), reason = why[1]; reason.readOnly = false; inputs.pop(); // the reason is the Operator's own
     const reasonRow = why[0]; reasonRow.hidden = mode !== 'reject';
     const status = el('p', 'proposal-status'); status.setAttribute('role', 'alert');
     const row = el('div', 'modal-actions proposal-buttons');
@@ -80,6 +83,7 @@ export function openProposalDialog(p, mode = 'view') {
     const rejectOpen = el('button', 'btn btn-danger', mode === 'reject' ? 'Reject' : 'Reject…'); rejectOpen.type = 'button';
     const edits = () => {
         const e = {};
+        if (!editing) return e; // a field that shows marked words is not an edit
         if (title.value.trim() !== p.title) e.title = title.value.trim();
         if (p.kind === 'goal') { if (second.value !== (pay.outcome || '')) e.outcome = second.value; if (third.value !== (pay.done_when || '')) e.done_when = third.value; }
         else if (second.value !== (pay.body || '')) e.body = second.value;
@@ -92,12 +96,12 @@ export function openProposalDialog(p, mode = 'view') {
         approve.disabled = rejectOpen.disabled = true; status.textContent = '';
         finish(await decide(p, 'reject', { reason: reason.value.trim() }));
     });
-    editOpen.addEventListener('click', () => { for (const i of inputs) i.readOnly = false; editOpen.hidden = true; approve.textContent = 'Approve with these words'; title.focus(); });
+    editOpen.addEventListener('click', () => { editing = true; for (const [i, raw] of inputs) { i.value = raw; i.readOnly = false; } editOpen.hidden = true; approve.textContent = 'Approve with these words'; title.focus(); });
     row.append(close, rejectOpen, editOpen, approve);
     const carried = [];
-    if (facts.instructions) { const b = el('div', 'proposal-carried'); b.append(el('strong', null, 'Instructions it gives the assignee'), el('pre', 'proposal-pre', facts.instructions)); carried.push(b); }
-    if (facts.outputs.length) { const b = el('div', 'proposal-carried'); b.append(el('strong', null, 'Outputs it requires')); const ul = el('ul', 'proposal-outputs'); for (const o of facts.outputs) ul.append(el('li', null, o)); b.append(ul); carried.push(b); }
-    if (facts.also.length) carried.push(el('p', 'proposal-extra', `Also sets: ${facts.also.join('; ')}.`));
+    if (facts.instructions) { const b = el('div', 'proposal-carried'); b.append(el('strong', null, 'Instructions it gives the assignee'), el('pre', 'proposal-pre', markedBlock(facts.instructions))); carried.push(b); }
+    if (facts.outputs.length) { const b = el('div', 'proposal-carried'); b.append(el('strong', null, 'Outputs it requires')); const ul = el('ul', 'proposal-outputs'); for (const o of facts.outputs) ul.append(el('li', null, markedBlock(o))); b.append(ul); carried.push(b); }
+    if (facts.also.length) carried.push(el('p', 'proposal-extra', markedBlock(`Also sets: ${facts.also.join('; ')}.`)));
     d.append(h, who, ...parts, ...carried, reasonRow, status, row);
     d.addEventListener('close', () => { d.remove(); });
     document.body.append(d);
