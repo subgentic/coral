@@ -97,6 +97,12 @@ func setupIn(base string, stderr io.Writer) (cleanup func()) {
 	for k, v := range map[string]string{"TMPDIR": tmp, "TMP": tmp, "TEMP": tmp, "GOTMPDIR": tmp, "HOME": home, "USERPROFILE": home, "CORAL_DATA_DIR": data} {
 		os.Setenv(k, v)
 	}
+	// testguard pointed the agent CLIs' folder variables (CODEX_HOME, CLAUDE_CONFIG_DIR, ...) at a sandbox while HOME was still the person's. HOME is private now, so the default under it applies again.
+	for _, k := range strings.Split(os.Getenv("TESTGUARD_SANDBOXED_POINTERS"), ",") {
+		if k != "" {
+			os.Unsetenv(k)
+		}
+	}
 	return func() { os.Unsetenv(Marker); release(); os.RemoveAll(dir) }
 }
 
