@@ -24,6 +24,7 @@ type Manager struct {
 	readerStarting  map[string]bool       // readers admitted whose start is under way (they count against the cap before they run)
 	readerStartAt   map[string]time.Time  // when a reader for the key was last admitted
 	lastReaderStart time.Time             // when any reader was last admitted
+	forgotten       map[string]bool       // agents that were deleted (Forget): nothing is started or read for them
 	closed          bool
 	reapStop        chan struct{} // closed by Close: the reaper ends
 	reapDone        chan struct{}
@@ -107,6 +108,10 @@ func (m *Manager) ensure(ctx context.Context, key, bin, model, resume string, re
 		if m.closed {
 			m.mu.Unlock()
 			return nil, errManagerClosed
+		}
+		if m.forgotten[key] {
+			m.mu.Unlock()
+			return nil, errForgotten
 		}
 		var dead *managed
 		if g := m.servers[key]; g != nil {
