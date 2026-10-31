@@ -186,6 +186,11 @@ func runFar(f farCfg, text string) int {
 		b, _ := io.ReadAll(os.Stdin)
 		_ = os.WriteFile(f.ArgsLog+".stdin", b, 0o600)
 		return 0
+	case has(`root/coral" hub-owner-secret`): // the owner stamp's secret on stdin, never in argv (#11378): what was asked and what came in are kept for the test
+		appendLine(f.ArgsLog+".owner", "hub-owner-secret --home "+filepath.Join(install, "data"))
+		b, _ := io.ReadAll(os.Stdin)
+		_ = os.WriteFile(f.ArgsLog+".owner.stdin", b, 0o600)
+		return 0
 	case has("tmux kill-session"):
 		appendLine(f.TmuxLog, "kill-session -t =coral-server")
 		if !f.flag("stuck") {
