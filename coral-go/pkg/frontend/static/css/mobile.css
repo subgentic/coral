@@ -1373,7 +1373,7 @@
     .phone-bar .phone-bar-title { display: flex; align-items: center; height: 48px; box-sizing: border-box; padding: 0 18px; border: 0; border-radius: 24px; background: var(--bg-secondary); color: var(--text-primary); font-size: var(--fs-lg); font-weight: var(--fw-regular); line-height: var(--lh-label); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } /* a view's name in the pill: the same box as Home's search (48 px, fully rounded, filled, no border); a heading, with no title attribute, so no tooltip lands on it */
     header.top-bar > .phone-bar { display: flex; }
     header.top-bar > :not(.phone-bar) { display: none !important; } /* the old pill, the views menu, Home and the gear: the one bar replaces them on a phone */
-    header.top-bar { padding: calc(8px + env(safe-area-inset-top, 0px)) 8px 4px; gap: 4px; background: var(--bg-primary); border: 0; box-shadow: none; min-height: 0; }
+    header.top-bar { padding: calc(8px + env(safe-area-inset-top, 0px)) 8px 4px; gap: 4px; background: var(--bg-primary); border: 0 solid var(--bg-primary); box-shadow: none; min-height: 0; } /* the notch's band is the padding in the bar's own colour (the border keeps its style and colour, at no width: pwa_head)*/
     .phone-bar .phone-account-btn { position: relative; order: 2; border: 0; background: none; color: var(--text-secondary); cursor: pointer; }
     .phone-bar .phone-account-btn .material-icons { font-size: var(--icon-size); }
     #mobile-agent-list .phone-break { order: 3; display: block; flex: 0 0 100%; height: 0; }
