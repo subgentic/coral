@@ -288,6 +288,16 @@
                         </div>
                         <a class="btn btn-primary welcome-connect-btn" href="/machines/add">Add a computer</a>
                     </section>
+                    <!-- A computer was approved on the hub and has not connected yet (hub_pending.js, body.hub-machine-waiting): this stands in for "Connect your first computer", which would read as if the approval did nothing (#11463 F2). The names are filled in as text. -->
+                    <section class="welcome-connect welcome-waiting" aria-labelledby="welcome-waiting-title">
+                        <span class="welcome-connect-icon material-icons" aria-hidden="true">device_hub</span>
+                        <div class="welcome-connect-copy">
+                            <h2 id="welcome-waiting-title">Waiting for a computer to connect</h2>
+                            <p class="welcome-waiting-names"></p>
+                            <p>Check that Coral is running on it, that it can reach this hub's address, and that there is still time left on the approval.</p>
+                        </div>
+                        <a class="btn btn-primary welcome-connect-btn" href="/machines/add">Add a computer</a>
+                    </section>
                     <section class="welcome-connect welcome-offline" aria-labelledby="welcome-offline-title">
                         <span class="welcome-connect-icon material-icons" aria-hidden="true">cloud</span>
                         <div class="welcome-connect-copy">

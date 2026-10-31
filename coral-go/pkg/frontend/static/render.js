@@ -25,7 +25,7 @@ import { morphHtml } from './dom_morph.js';
 import { pinnedFolders } from './pinned_folders.js';
 import { LOCAL_SERVER } from './server_base.js';
 import { machineState } from './launch_server.js';
-import { syncHubFirstRun, hubEmptyListHtml } from './hub_first_run.js';
+import { syncHubFirstRun, hubEmptyListHtml, fillHubPending } from './hub_first_run.js';
 import './format.js';
 import { registerLiveListRenderer, redrawLiveList, liveListEl } from './list_hooks.js';
 import { buildSessionTooltip } from './session_state.js';
@@ -336,6 +336,7 @@ function _renderLiveSessions(sessions) {
     if (!sessions.length && !archived.length && !pinsShown) {
         // Coral Hub with no machine connected: say what to do (the same list is the phone's Agents page), not just that there is nothing
         list.innerHTML = (!unfilteredCount && hubEmptyListHtml(machineState())) || `<li class="empty-state empty-state-tight empty-plain">${emptyListHtml(unfilteredCount)}</li>${unfilteredCount ? '' : PHONE_WELCOME}`;
+        fillHubPending(list); // a waiting computer's name, as text (#11463)
         syncGroupToggle(); // no groups drawn: the header toggle goes
         return;
     }

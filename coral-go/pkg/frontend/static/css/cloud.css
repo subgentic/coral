@@ -57,6 +57,9 @@ body.cloud-mode [data-history-local-only] { display: none !important; }
 .cs-actions { display: flex; flex-wrap: nowrap; gap: 6px; align-items: center; justify-content: flex-end; }
 .cs-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; background: #6e7681; }
 .cs-dot.online { background: var(--fx-green); } .cs-dot.offline { background: var(--fx-amber); }
+.cs-pending { margin: 0 0 18px; padding: 14px; border-radius: var(--radius-lg); border: 1px solid var(--border); background: var(--bg-secondary); overflow-wrap: anywhere; }
+.cs-pending-row { margin: 0 0 6px; font-weight: var(--fw-strong); }
+.cs-pending-checks { margin: 0 0 10px; padding-left: 20px; color: var(--text-secondary); }
 .cs-enroll { margin: 0 0 18px; padding: 14px; border-radius: var(--radius-lg); border: 1px dashed var(--border, var(--fx-navy-line)); }
 .cs-enroll.cs-enroll-closed { padding: 0; border: 0; } .cs-enroll-title #cs-enroll-toggle { margin-left: 0; } /* closed it is only the Add a computer button, not a dashed box around one button (#6359) */
 .cs-enroll-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 220px); gap: 16px; align-items: start; }

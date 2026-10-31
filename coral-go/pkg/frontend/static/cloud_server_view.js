@@ -26,6 +26,7 @@ import { state } from './state.js';
 import { note } from './nav.js';
 import { sessionServer } from './server_base.js';
 import { needsYou } from './asked_before_restart.js';
+import { refreshPending, waitingRows, expiredRows, waitingText, WAITING_CHECKS, NEVER_CONNECTED, NEVER_CONNECTS_HELP } from './hub_pending.js';
 const { MODES, MODE_INFO, accessChoice, effectiveMode, launchNote, effectiveNote, invalidateServerAccess, serverAccess } = await importOnce('./server_access.js');
 const rank = m => MODES.indexOf(m);
 import { announceNotice } from './notifications.js';
@@ -69,6 +70,7 @@ export const serverView = {
         servers = rows;
         if (before) for (const s of servers) { const was = before.get(s.id); if (was !== undefined && was !== (s.online === true)) announceNotice(`${s.label || 'A computer'} is ${s.online === true ? 'online' : 'offline'}`); }
         loaded = true; loadError = ''; syncRelaunchReads(servers, render);
+        refreshPending().then(changed => { if (changed) render(); }).catch(() => {}); // approved computers that have not connected yet (#11463 F2)
     },
     fail: error => { loadError = error; },
     expand: id => { openPage(id, true); },
@@ -297,6 +299,22 @@ function serversTable(shown) {
 
 
 /** The steps to add a machine, with the download link and what the person will see on that computer. */
+/** Computers approved on the hub that have not connected: what is going on, three things to check, and for an expired one a way to start again. Labels are text the owner typed: textContent only. */
+function pendingBlock() {
+    const waiting = waitingRows(), expired = expiredRows();
+    if (!waiting.length && !expired.length) return null;
+    const kids = [];
+    for (const p of waiting) kids.push(h('p', { className: 'cs-pending-row', text: waitingText(p) }));
+    if (waiting.length) {
+        kids.push(h('p', { className: 'cs-meta', text: 'Check these:' }), h('ul', { className: 'cs-pending-checks' }, ...WAITING_CHECKS.map(c => h('li', { text: c }))));
+    }
+    for (const p of expired) kids.push(h('p', { className: 'cs-pending-row cs-pending-expired' }, h('strong', { text: NEVER_CONNECTED }), ` (${p.label || 'a computer'})`));
+    if (expired.length) {
+        kids.push(h('p', { className: 'cs-meta', text: NEVER_CONNECTS_HELP }), h('button', { type: 'button', className: 'btn btn-primary btn-small', text: 'Add a computer', onclick: () => { enrollOpen = true; render(); document.getElementById('cs-enroll-code')?.focus(); } }));
+    }
+    return h('section', { className: 'cs-pending', id: 'cs-pending', 'aria-label': 'Computers waiting to connect' }, ...kids);
+}
+
 function enrollBlock() {
     const open = enrollOpen ?? (loaded && servers.length === 0);
     const input = h('input', { type: 'text', className: 'cloud-code', placeholder: 'XXXX-XXXX', value: enrollCode, maxLength: 9, autocomplete: 'off', spellcheck: false, 'aria-label': 'Enrollment code', id: 'cs-enroll-code', oninput: e => { enrollCode = e.target.value; } });
@@ -354,6 +372,7 @@ function render() {
         : h('p', { className: 'empty-state empty-state-tight', text: loadError ? '' : serversFiltered() ? 'No computers match this search.' : 'No computers connected yet.' });
     // replaceChildren() would render a null as the text "null": leave it out.
     host.replaceChildren(...[
+        pendingBlock(),
         enrollBlock(),
         loadError ? h('div', { className: 'servers-form-error', role: 'alert', text: loadError }) : null,
         table].filter(Boolean));

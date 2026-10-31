@@ -631,6 +631,8 @@ body.panel-dragging .sidebar {
 .welcome-connect { display: none; align-items: center; flex-wrap: wrap; gap: 14px 16px; padding: 20px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg-secondary); }
 /* Coral Hub with no machine connected (#4586): the connect card stands in for the launch cards, which have nowhere to launch. */
 body.hub-no-machine .welcome-first-run, body.hub-machines-offline .welcome-offline { display: flex; }
+body.hub-machine-waiting .welcome-waiting { display: flex; }
+body.hub-machine-waiting .welcome-first-run { display: none; }
 body.hub-no-machine .welcome-launch-list, body.hub-no-machine .welcome-header p, body.hub-machines-offline .welcome-launch-list, body.hub-machines-offline .welcome-header p { display: none; }
 .welcome-connect-icon { display: flex; align-items: center; justify-content: center; width: 2.625rem; height: 2.625rem; border-radius: 11px; background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); flex: none; }
 .welcome-connect-copy { flex: 1 1 14rem; min-width: 0; }
