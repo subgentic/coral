@@ -23,6 +23,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/subgentic/coral/internal/httputil"
 	"github.com/subgentic/coral/internal/license"
 	"github.com/subgentic/coral/internal/sshprov"
 	"github.com/subgentic/coral/internal/store"
@@ -493,4 +494,20 @@ func TestProvisionOptionsListHostsAndTheTermsTheDigestCovers(t *testing.T) {
 	require.NoError(t, os.Remove(filepath.Join(pe.dir, "config")))
 	_, v = pe.do("GET", "/api/servers/provision/options", nil)
 	assert.Equal(t, []any{}, v["hosts"])
+}
+
+// The 429 for too many setups at once is a per-action limit: marked, so the dashboard does not pause every poller for it (#3434).
+func TestProvisionTooManyPlansIsAMarkedActionLimit(t *testing.T) {
+	pe := newProvEnv(t, "known", "Linux x86_64", true)
+	for i := 0; i < provisionMaxPlans; i++ {
+		code, _ := pe.do("POST", "/api/servers/provision/plan", map[string]any{"target": "rich@host" + strings.Repeat("b", i+1) + ".example.com"})
+		require.Equal(t, 201, code)
+	}
+	req := httptest.NewRequest("POST", "/api/servers/provision/plan", strings.NewReader(`{"target":"rich@one-more.example.com"}`))
+	req = req.WithContext(context.WithValue(req.Context(), callerKindKey{}, callerDashCookie))
+	w := httptest.NewRecorder()
+	pe.router.ServeHTTP(w, req)
+	require.Equal(t, http.StatusTooManyRequests, w.Code)
+	assert.Equal(t, "action", w.Header().Get(httputil.ActionLimitHeader), "an unmarked 429 pauses every poller on the page")
+	assert.Contains(t, w.Body.String(), "setup_in_progress")
 }
