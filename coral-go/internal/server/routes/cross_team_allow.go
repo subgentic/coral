@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -37,17 +36,6 @@ func (h *BoardHandler) SetAllowlistFlag(fn func(ctx context.Context) bool) { h.a
 
 // SetChiefBoard tells the handler how to read the board the Operator recorded as Chief's team (#11508), whose messages to another team may be labelled "Chief".
 func (h *BoardHandler) SetChiefBoard(fn func(ctx context.Context) string) { h.chiefBoard = fn }
-
-// ChiefBoard reads chief_team: the board key the Operator recorded, "" when none or the settings cannot be read.
-func ChiefBoard(ss *store.SessionStore) func(context.Context) string {
-	return func(ctx context.Context) string {
-		s, err := ss.GetSettings(ctx)
-		if err != nil {
-			return ""
-		}
-		return strings.TrimSpace(setreg.Text(s, "chief_team"))
-	}
-}
 
 // chiefBoardNow is the recorded Chief board, "" when not wired.
 func (h *BoardHandler) chiefBoardNow(ctx context.Context) string {

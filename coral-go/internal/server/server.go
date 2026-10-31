@@ -681,6 +681,35 @@ func (s *Server) chiefRecorded(ctx context.Context) (enabled bool, sessionID, te
 	return true, sessionID, team
 }
 
+// chiefBoardID is the id of the board Chief's recorded session is on, or "": the one board whose messages to another team may be labelled "Chief" (#11508). It is what chiefRecorded decides, resolved
+// to the board of the LIVE row: the chief_page setting is on, chief_session is a valid session id that is live, and the board that row is on is the recorded chief_team (written as its id or, exactly, its
+// label). Never a board picked by its name alone: a team an agent made is not Chief.
+func (s *Server) chiefBoardID(ctx context.Context) string {
+	ss := store.NewSessionStore(s.db)
+	st, err := ss.GetSettings(ctx)
+	if err != nil || !setreg.Bool(st, "chief_page") {
+		return ""
+	}
+	sessionID, team := strings.TrimSpace(setreg.Text(st, "chief_session")), strings.TrimSpace(setreg.Text(st, "chief_team"))
+	if parsed, perr := uuid.Parse(sessionID); perr != nil || parsed.String() != sessionID || team == "" {
+		return ""
+	}
+	ls, lerr := ss.GetLiveSession(ctx, sessionID)
+	if lerr != nil || ls == nil || ls.BoardName == nil || *ls.BoardName == "" {
+		return ""
+	}
+	id := *ls.BoardName
+	if id == team {
+		return id
+	}
+	if s.boardStore != nil {
+		if b, err := s.boardStore.GetBoard(ctx, id); err == nil && b != nil && b.Label != "" && b.Label == team {
+			return id
+		}
+	}
+	return ""
+}
+
 // chiefState answers GET /api/chief: {enabled, session_id, team} of chiefRecorded, for the Hub's own Chief page (#11470). Through Coral Hub it is the computer owner's alone (the route table's owner-only
 // mark; the machine refuses a viewer, a guest or a guide here before any setting is read). No data of its own: the session id is the one the page is already addressed by.
 func (s *Server) chiefState(w http.ResponseWriter, r *http.Request) {
