@@ -347,7 +347,7 @@ func TestDownloadReleaseIsHardened(t *testing.T) {
 	if b, _ := os.ReadFile(dst); string(b) != "0123456789" {
 		t.Errorf("body %q", b)
 	}
-	if st, _ := os.Stat(dst); st.Mode().Perm() != 0o600 {
+	if st, _ := os.Stat(dst); permsApply() && st.Mode().Perm() != 0o600 {
 		t.Errorf("mode %v", st.Mode())
 	}
 	for _, p := range []string{"/big", "/redirect", "/redirect-http", "/missing"} {

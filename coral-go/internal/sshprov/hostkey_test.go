@@ -107,7 +107,7 @@ func TestTrustWritesTheConfirmedKeyAt0600AndNeverOverwrites(t *testing.T) {
 	}
 	st, _ := os.Stat(path)
 	dst, _ := os.Stat(filepath.Dir(path))
-	if st.Mode().Perm() != 0o600 || dst.Mode().Perm() != 0o700 {
+	if permsApply() && (st.Mode().Perm() != 0o600 || dst.Mode().Perm() != 0o700) {
 		t.Errorf("modes: file %v folder %v", st.Mode().Perm(), dst.Mode().Perm())
 	}
 	if b, _ := os.ReadFile(path); string(b) != k.Line()+"\n" {
