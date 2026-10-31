@@ -23,6 +23,7 @@ import './saved_marks.js';
 import './pasted_content.js';
 import './chat_page.js';
 import { ownPromptCard } from './needs_input_card.js';
+import { answerLead, cardImagesUploading, clearCardImages } from './card_attach.js';
 import './pending_messages.js';
 import './safe_storage.js';
 import './chat_thumbs.js';
@@ -141,11 +142,13 @@ document.addEventListener("submit", (e) => {
     if (!form) return;
     e.preventDefault();
     if (!ownPromptCard(form)) return;
-    const input = form.querySelector("input");
-    const text = input.value.trim();
+    const input = form.querySelector("input.cni-text-input");
+    const sid = state.currentSession && state.currentSession.session_id;
+    if (sid && cardImagesUploading(sid)) { showToast("An image is still uploading. Send when it is done.", true); return; }
+    const text = [...(sid ? answerLead(sid) : []), input.value.trim()].filter(Boolean).join(" "); // the images' links and their one hint, then the typed words: what the message box sends
     if (!text) {
         input.focus();
         return;
     }
-    sendPromptAnswer(ownPromptCard(form), Number(form.dataset.n), form.dataset.label, "text", text);
+    sendPromptAnswer(ownPromptCard(form), Number(form.dataset.n), form.dataset.label, "text", text).then(ok => { if (ok && sid) clearCardImages(sid); });
 });
