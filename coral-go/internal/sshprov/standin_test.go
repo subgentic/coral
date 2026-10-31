@@ -87,6 +87,9 @@ func TestTheBinaryRunsTestsOnlyUnderGoTestAndIsAStandInOnlyUnderItsName(t *testi
 // maxStarts is the most a test may start one copy; the stream cap test holds 12, the rest start a handful.
 const maxStarts = 100
 
+// startsOverCap is the cap's decision, pure: starts holds one line per start (this one included), and the copy refuses when there are more than maxStarts.
+func startsOverCap(starts []byte) bool { return strings.Count(string(starts), "\n") > maxStarts }
+
 // standCfg is what one copy does. It lives in standin.json next to the copy.
 type standCfg struct {
 	Log      string `json:",omitempty"` // every argument is appended, one per line
@@ -166,7 +169,7 @@ func runStandIn() int {
 		f.Seek(0, io.SeekStart)
 		b, _ := io.ReadAll(f)
 		f.Close()
-		if strings.Count(string(b), "\n") > maxStarts {
+		if startsOverCap(b) {
 			fmt.Fprintln(os.Stderr, "sshprov stand-in: too many starts in one test")
 			return 2
 		}
@@ -251,5 +254,44 @@ func TestAStandInStartedTooOftenRefuses(t *testing.T) {
 	}
 	if last == nil {
 		t.Errorf("start %d still answered", maxStarts+5)
+	}
+}
+
+// The cap's decision and the home guard's, pure, so each can be mutated (a > turned >=, a prefix check turned into a path check) and caught without running a start loop or a removal.
+func TestStartsOverCapDecidesAtTheBoundary(t *testing.T) {
+	lines := func(n int) []byte { return []byte(strings.Repeat("start\n", n)) }
+	for n, want := range map[int]bool{0: false, 1: false, maxStarts - 1: false, maxStarts: false, maxStarts + 1: true, maxStarts * 10: true} {
+		if got := startsOverCap(lines(n)); got != want {
+			t.Errorf("%d starts: over = %v, want %v", n, got, want)
+		}
+	}
+	if startsOverCap(nil) || startsOverCap([]byte("start")) {
+		t.Error("an empty or unterminated log counted as over")
+	}
+}
+
+func TestHomeAllowedIsInsideTheRootNotJustNamedLikeIt(t *testing.T) {
+	root := t.TempDir()
+	sibling := root + "-other" // shares the root's name as a prefix, is not inside it
+	for home, want := range map[string]bool{
+		filepath.Join(root, "home"):           true,
+		filepath.Join(root, "a", "b", "home"): true,
+		root:                                  false,
+		filepath.Dir(root):                    false,
+		filepath.Join(sibling, "home"):        false,
+		filepath.Join(root, "..", "x"):        false,
+		filepath.Join(root, "home") + string(filepath.Separator): false, // not clean
+		"relative/home": false,
+		"":              false,
+	} {
+		if got := homeAllowed(home, root); got != want {
+			t.Errorf("homeAllowed(%q, %q) = %v, want %v", home, root, got, want)
+		}
+	}
+	if runtime.GOOS != "windows" { // a link inside the root that points outside it
+		outside := t.TempDir()
+		if err := os.Symlink(outside, filepath.Join(root, "link")); err == nil && homeAllowed(filepath.Join(root, "link", "home"), root) {
+			t.Error("a home reached through a link that leaves the root was allowed")
+		}
 	}
 }

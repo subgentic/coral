@@ -70,9 +70,18 @@ func homeAllowed(home, root string) bool {
 	if r, err := filepath.EvalSymlinks(tmp); err == nil {
 		tmp = r
 	}
-	h := home
-	if r, err := filepath.EvalSymlinks(filepath.Dir(home)); err == nil {
-		h = filepath.Join(r, filepath.Base(home))
+	// resolve links in the deepest part of the path that exists, and keep the rest as written: a home not made yet is judged by where it would be
+	h, rest := home, ""
+	for {
+		if r, err := filepath.EvalSymlinks(h); err == nil {
+			h = filepath.Join(r, rest)
+			break
+		}
+		parent := filepath.Dir(h)
+		if parent == h {
+			return false
+		}
+		rest, h = filepath.Join(filepath.Base(h), rest), parent
 	}
 	rel, err := filepath.Rel(filepath.Clean(tmp), h)
 	return err == nil && rel != "." && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
