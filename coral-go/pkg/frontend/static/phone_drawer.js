@@ -4,7 +4,7 @@
 import { state } from './state.js';
 import { importOnce } from './import_once.js';
 import { inboxCountsNow } from './inbox_tab.js';
-import { identityKey, sessionServer } from './server_base.js';
+import { identityKey, sessionServer, serverFetch } from './server_base.js';
 import { teamLabel } from './server_status.js';
 
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
@@ -20,17 +20,43 @@ function row(icon, label, count, run) {
 
 const slot = name => () => document.querySelector(`.phone-nav-slot[data-phone-nav=${name}]`)?.click(); // the bar's own handler: the same page, the same lit tab
 
-/** The nodes above the divider: the heading, the Inbox's folders and the teams. */
+// The teams: on a hub every team of this computer and of each online computer (GET /api/board/projects, as analytics_spend.js), else this computer's; read when the drawer opens and at most every 30 s; until the read
+// answers the drawer shows the teams of the live agents (#11476).
+const boards = { keys: [], at: 0, sig: '', reading: null };
+function readTeamKeys() {
+    const servers = ['local', ...(state.hub ? (state.servers || []).filter(x => x && x.id && x.id !== 'local' && x.status === 'online').map(x => x.id) : [])], sig = servers.join();
+    if (boards.reading || (sig === boards.sig && Date.now() - boards.at < 30000)) return boards.reading || Promise.resolve(false);
+    boards.reading = Promise.all(servers.map(async server => {
+        try {
+            const r = await serverFetch(server, '/api/board/projects');
+            const rows = r.ok ? await r.json() : [];
+            return Array.isArray(rows) ? rows.filter(x => x && x.board_id).map(x => identityKey(server, x.board_id)) : [];
+        } catch { return []; }
+    })).then(lists => { boards.keys = [...new Set(lists.flat())].sort(); boards.at = Date.now(); boards.sig = sig; boards.reading = null; return true; });
+    return boards.reading;
+}
+const liveTeamKeys = () => [...new Set((state.liveSessions || []).filter(s => s && s.board_project).map(s => identityKey(sessionServer(s), s.board_project)))];
+function drawTeams(host) {
+    const keys = boards.keys.length ? boards.keys : liveTeamKeys();
+    const n = k => (state.liveSessions || []).filter(s => s && s.board_project && identityKey(sessionServer(s), s.board_project) === k).length;
+    host.replaceChildren(...(keys.length ? [el('div', 'nav-drawer-group', 'Teams'), ...keys.map(k => row('group', teamLabel(k), n(k), () => window.openTeamPage?.(k)))] : []));
+}
+
+/** The context the drawer opens from: the open tab's own options come first (the Inbox's folders; Agents' teams), the rest of the places are below the divider. */
+const contextOf = () => document.querySelector('.top-nav-tab.active')?.dataset.arg || '';
+
+/** The nodes above the divider: the heading, then what belongs to the screen it opened from. */
 export function drawerTop() {
-    const c = inboxCountsNow();
+    const ctx = contextOf();
     const out = [el('div', 'nav-drawer-head', 'Coral')];
-    out.push(row('email', 'Needs you', c.needs, slot('nav-inbox')), row('checklist', 'Tasks', c.tasks, slot('nav-tasks')),
-        row('star', 'Saved', c.saved, () => { window.switchNavTab?.('hub-inbox'); importOnce('./inbox_tab.js').then(m => m.selectInboxTab('saved')); }), row('chat_bubble_outline', 'Chats', 0, slot('nav-chats')));
-    const teams = new Map();
-    for (const s of state.liveSessions || []) if (s && s.board_project) { const k = identityKey(sessionServer(s), s.board_project); teams.set(k, { name: s.board_project, n: (teams.get(k)?.n || 0) + 1 }); }
-    if (teams.size) {
-        out.push(el('div', 'nav-drawer-group', 'Teams'));
-        for (const [k, t] of [...teams].sort((a, b) => a[1].name.localeCompare(b[1].name))) out.push(row('group', teamLabel(k) || t.name, t.n, () => window.openTeamPage?.(t.name)));
+    if (ctx === 'hub-inbox' || ctx === 'history') { // the Inbox, its Tasks and Chats: the Inbox's folders with their counts
+        const c = inboxCountsNow();
+        out.push(row('email', 'Needs you', c.needs, slot('nav-inbox')), row('checklist', 'Tasks', c.tasks, slot('nav-tasks')),
+            row('star', 'Saved', c.saved, () => { window.switchNavTab?.('hub-inbox'); importOnce('./inbox_tab.js').then(m => m.selectInboxTab('saved')); }), row('chat_bubble_outline', 'Chats', 0, slot('nav-chats')));
+    } else if (ctx === 'agents') out.push(row('smart_toy', 'All agents', (state.liveSessions || []).length, () => window.switchNavTab?.('agents')));
+    if (ctx === 'hub-inbox' || ctx === 'history' || ctx === 'agents') { // teams belong with agents and with the Inbox; an Automations, Analytics or Docs drawer is its places only
+        const host = el('div', 'nav-drawer-teams'); drawTeams(host); out.push(host);
+        readTeamKeys().then(() => { if (host.isConnected) drawTeams(host); });
     }
     return out;
 }
