@@ -339,6 +339,7 @@
 /* Keep review actions together; phone team metadata shares the second line with the review state. */
 /* Open below is the artifact's keyboard and touch target; its title does not need a duplicate button line. */
 .inbox-review-name { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.inbox-review-name.inbox-welcome-name { white-space: normal; overflow-wrap: anywhere; } /* a welcome title is a sentence the person reads before the button: it wraps beside its button on a phone instead of being cut (#11482) */
 .inbox-review-item { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .inbox-review-item > :not(.inbox-review-name) { flex: none; }
 .inbox-review-item > .inbox-review-name { flex: 0 1 auto; min-width: 0; } /* the name and, once it is opened, its 'read' tag (#9277) */
