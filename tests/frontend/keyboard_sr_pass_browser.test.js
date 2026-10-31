@@ -134,7 +134,7 @@ const { coralReady } = require('./helpers/wait');
         const on = await ax(`${P} input[name=on]`);
         assert.equal(on.name, 'Send health check'); assert.match(on.desc, /Uses tokens each time\./); // the hint (the page has no (i) explanation behind it)
         const every = await ax(`${P} input[name=interval_min]`);
-        assert.equal(every.name, 'Check every minutes'); assert.equal(every.desc, '5 to 1440');
+        assert.equal(every.name, 'Look every minutes'); assert.equal(every.desc, '5 to 1440');
         const rev = await ax(`${P} input[name=default_reviewers]`);
         assert.equal(rev.name, 'Default reviewers'); assert.match(rev.desc, /^Names of agents on this team/);
         const claim = await ax(`${P} input[name=claim_nudge_on]`);

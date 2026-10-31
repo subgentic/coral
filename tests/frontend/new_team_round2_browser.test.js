@@ -29,11 +29,11 @@ const BASE = require('./test_base').BASE;
                 return { info: [...p.querySelectorAll('.settings-info-btn')].filter(vis).length, onHelp: help('on'), clearHelp: help('all_clear'), everyOff: row('interval_min').hasAttribute('data-disabled'), clearOff: row('all_clear').hasAttribute('data-disabled'), recipient: !!row('recipient') }; })()`);
             const off = await probe();
             assert.equal(off.info, 0, 'no (i) icon'); assert.deepEqual(off.onHelp, [true, 'Checks on stuck or idle agents. Uses tokens each time.'], 'the first switch has its line on the page');
-            assert.deepEqual(off.clearHelp, [true, 'So a quiet team is not mistaken for a stopped check.'], 'Post when all is well has its own line');
-            assert.equal(off.everyOff, true, 'Check every is off while Send health check is off'); assert.equal(off.clearOff, true, 'and so is Post when all is well'); assert.equal(off.recipient, false, 'who gets the check is not asked: it goes to the Orchestrator');
+            assert.deepEqual(off.clearHelp, [true, 'The one-line check at each heartbeat, so a quiet team is not mistaken for a stopped check.'], 'Post when all is well has its own line');
+            assert.equal(off.everyOff, true, 'Look every is off while Send health check is off'); assert.equal(off.clearOff, true, 'and so is Post when all is well'); assert.equal(off.recipient, false, 'who gets the check is not asked: it goes to the Orchestrator');
             await ev(`(() => { const d = window.__nt.dlg(${N.team}); const i = [...d.querySelectorAll('input[type=checkbox]')].find(x => x.name === 'on'); i.click(); return true; })()`); await settle(250);
             const on = await probe();
-            assert.equal(on.everyOff, false, 'Check every is on once Send is on'); assert.equal(on.clearOff, false, 'and Post when all is well');
+            assert.equal(on.everyOff, false, 'Look every is on once Send is on'); assert.equal(on.clearOff, false, 'and Post when all is well');
         });
         await S.run('Edit member: the persona select is labelled "Start from a persona" (optional) and the Behavior prompt is not mono', async () => {
             await t.click('button', /^Back$/i); await t.step(2); await settle(200);
