@@ -193,42 +193,47 @@ function keepPlace(button) {
         to?.focus({ preventScroll: true });
     };
 }
+/** Four words, the item's name, the task link and the goal need about 1360 px of window (the sidebar takes 320 of it): narrower, and on a phone, Deny and Ignore are in the row's menu. */
+const compactActions = () => isPhoneLayout() || !matchMedia('(min-width: 1360px)').matches;
+let moreMenus = 0;
+/** A row's less used actions in one menu behind a three-dot button (menu_button.js: arrow keys, Escape back to the button, Tab or a tap elsewhere closes). items: [{ label, title, run(button) }]. */
+function moreMenu(items, label) {
+    const id = `inbox-more-${++moreMenus}`, wrap = DT.el('span', 'inbox-row-more'), toggle = DT.el('button', 'btn btn-quiet btn-icon inbox-row-more-toggle');
+    toggle.type = 'button'; toggle.id = id; toggle.setAttribute('aria-haspopup', 'menu'); toggle.setAttribute('aria-expanded', 'false'); toggle.setAttribute('aria-controls', `${id}-menu`); toggle.setAttribute('aria-label', `More actions for ${label}`);
+    toggle.innerHTML = '<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="3" cy="8" r="1.5"/><circle cx="8" cy="8" r="1.5"/><circle cx="13" cy="8" r="1.5"/></svg>';
+    const menu = DT.el('div', 'menu dt-mail-menu'); menu.id = `${id}-menu`; menu.hidden = true; menu.setAttribute('role', 'menu'); menu.setAttribute('aria-label', `Actions for ${label}`);
+    for (const it of items) {
+        const b = DT.el('button', 'menu-item', it.label); b.type = 'button'; b.setAttribute('role', 'menuitem'); b.setAttribute('aria-label', `${it.label}: ${label}`); if (it.title) b.title = it.title; // the word, then the file: the same name the row's own buttons have
+        b.addEventListener('click', async e => { e.stopPropagation(); (await importOnce('./menu_button.js')).closeMenus({ restoreFocus: true }); it.run(b); });
+        menu.append(b);
+    }
+    toggle.addEventListener('click', async e => { e.stopPropagation(); (await importOnce('./menu_button.js')).toggleMenu(toggle); });
+    wrap.append(toggle, menu); return wrap;
+}
+
+/** A review row's actions, the one set on every screen (#11552, approved by the operator): Approve, Changes, Deny, Ignore as words, in that order; Mark unread (a read row) in More, and on a phone Deny and Ignore too. The row itself opens the file. Each action that clears the row keeps the person's place. */
 function reviewActions(row) {
-    const box = DT.el('div', 'inbox-review-actions');
+    const compact = compactActions(), box = DT.el('div', 'inbox-review-actions');
     const errorText = DT.el('span', 'inbox-review-error'); errorText.setAttribute('role', 'alert');
-    const open = DT.el('button', 'btn btn-small', 'Open'); open.type = 'button';
-    open.setAttribute('aria-label', `Open ${row.name}`); open.addEventListener('click', () => openReview(row));
-    const done = DT.el('button', 'btn btn-small', 'Approve'); done.type = 'button'; // replaces Mark reviewed (#136584): it clears the row, marks the review approved and tells the agent that uploaded it
-    done.setAttribute('aria-label', `Approve: ${row.name}`);
-    const changes = DT.el('button', 'btn btn-small inbox-review-icon'); changes.type = 'button'; changes.title = 'Request changes'; // an icon, so the row stays one line; its name says what it does
-    changes.append(DT.el('span', 'material-icons', 'rate_review')); changes.firstChild.setAttribute('aria-hidden', 'true');
-    changes.setAttribute('aria-label', `Request changes: ${row.name}`);
-    changes.addEventListener('click', () => openReview(row, { requestChanges: true }));
-    done.addEventListener('click', async () => {
-        done.disabled = true; errorText.textContent = '';
-        const settle = keepPlace(done);
-        try {
-            const { approveRow, sayApproved } = await importOnce('./artifact_review.js');
-            sayApproved(row.name, await approveRow(row.team, row)); sayLive(`Approved ${row.name}.`);
-            await settle();
-        } catch (error) { done.disabled = false; errorText.textContent = error.message; }
-    });
+    const failed = (b, error) => { if (b.isConnected) b.disabled = false; errorText.textContent = error.message; };
+    const word = (text, name, cls, run) => { const b = DT.el('button', `btn btn-small ${cls}`.trim(), text); b.type = 'button'; b.setAttribute('aria-label', `${name}: ${row.name}`); b.addEventListener('click', () => run(b)); return b; };
+    const approve = b => { b.disabled = true; errorText.textContent = ''; const settle = keepPlace(b); // replaces Mark reviewed (#136584): it clears the row, marks the review approved and tells the agent that uploaded it
+        return importOnce('./artifact_review.js').then(async ({ approveRow, sayApproved }) => { sayApproved(row.name, await approveRow(row.team, row)); sayLive(`Approved ${row.name}.`); await settle(); }).catch(error => failed(b, error)); };
+    const deny = b => { const settle = keepPlace(b); return importOnce('./artifact_review.js').then(({ openDenyDialog }) => openDenyDialog(row.team, row, async () => { sayLive(`Denied ${row.name}.`); await settle(); })).catch(error => failed(b, error)); };
+    const ignore = b => { b.disabled = true; errorText.textContent = ''; const settle = keepPlace(b);
+        return importOnce('./artifact_review.js').then(async ({ ignoreRow, sayIgnored }) => { await ignoreRow(row.team, row); sayIgnored(row.team, row); sayLive(`Ignored ${row.name}.`); await settle(); }).catch(error => failed(b, error)); };
+    const unread = b => { b.disabled = true; errorText.textContent = ''; return setReviewRead(row, false).then(() => sayLive(`Marked ${row.name} unread.`)).catch(error => failed(b, error)); };
     const star = starControl(row, { hex: row.hex, name: row.name }); // the review artifact's star: a glyph when starred, a button at a hover (#9834)
     if (star) { box.append(star); box.classList.add('inbox-review-actions-star'); }
-    box.append(open);
-    if (isRead(row)) {
-        box.classList.add('inbox-review-actions-read');
-        const unread = DT.el('button', 'btn btn-small inbox-review-icon'); unread.type = 'button'; unread.title = 'Mark unread'; // an icon, so a phone's row stays one line; its name says what it does
-        unread.append(DT.el('span', 'material-icons', 'replay')); unread.firstChild.setAttribute('aria-hidden', 'true');
-        unread.setAttribute('aria-label', `Mark unread: ${row.name}`);
-        unread.addEventListener('click', async () => {
-            unread.disabled = true; errorText.textContent = '';
-            try { await setReviewRead(row, false); sayLive(`Marked ${row.name} unread.`); } catch (error) { unread.disabled = false; errorText.textContent = error.message; }
-        });
-        box.append(unread);
+    const menu = [];
+    if (!decisionNeedsPerson(splitKey(row.team).server)) { // through Coral Hub a guest cannot decide
+        box.append(word('Approve', 'Approve', 'btn-primary', approve), word('Changes', 'Request changes', '', () => openReview(row, { requestChanges: true })));
+        box.lastChild.title = 'Request changes';
+        if (compact) menu.push({ label: 'Deny', title: 'A final no: the agent is told', run: deny }, { label: 'Ignore', title: 'Take it out of Needs you; nobody is told', run: ignore });
+        else box.append(word('Deny', 'Deny', 'btn-quiet inbox-deny', deny), word('Ignore', 'Ignore', 'btn-quiet', ignore));
     }
-    if (isRead(row)) { done.classList.add('inbox-review-icon'); done.title = 'Approve'; done.textContent = ''; done.append(DT.el('span', 'material-icons', 'check')); done.firstChild.setAttribute('aria-hidden', 'true'); }
-    if (!decisionNeedsPerson(splitKey(row.team).server)) { box.append(done); if (!(isPhoneLayout() && isRead(row))) box.append(changes); } // the same actions on a phone as on a desktop (#11414): Approve is a word, Request changes an icon; only a read item's row, which also has Mark unread, leaves Request changes to the viewer Open leads to (#136584)
+    if (isRead(row)) { box.classList.add('inbox-review-actions-read'); menu.push({ label: 'Mark unread', title: 'Count it in Needs you again', run: unread }); }
+    if (menu.length) box.append(moreMenu(menu, row.name));
     box.append(errorText); return box;
 }
 
@@ -619,7 +624,7 @@ registerGroupSource('hub-inbox', {
                     columns: [
                         { key: 'agent', label: rows.some(isItem) ? 'Item' : 'Agent', primary: true, width: 'grow', ...(rows.some(s => s.proposal) ? { min: 14, share: 1 } : rows.some(isItem) ? { min: 24, share: 2 } : {}), sort: true, sortValue: s => resolveSessionIdentity(s), line: 1, ...(oneLineNeeds || rows.some(s => s.review || s.operatorAsk) ? { subtitle: s => (s.operatorAsk ? fromOf(s, true) : s.review ? fromOf(s, manyTeams) : oneLineNeeds ? askOf(s) : ''), subtitleTitle: s => (s.review || s.operatorAsk ? fromOf(s, true) : oneLineNeeds ? askOf(s) : '') } : {}), // a list of agents: the ask is the row's one second line, under the name (UI/UX: the row's purpose is to decide from the list); a file for review says who uploaded it there, and its team when two or more teams wait (#11456)
                             cell: s => { if (s.operatorAsk) { const name = DT.el('span', 'inbox-review-name', askLine(s.operatorAsk) || markHidden(s.operatorAsk.asker, { strict: true })); name.title = askWhole(s.operatorAsk); return name; } // a question to the Operator reads like a review row: its first line, then who asked and their team
-                             if (s.welcome) { const name = DT.el('span', 'inbox-review-name inbox-welcome-name', s.welcome.title); DT.tipIf(name, s.welcome.title, () => name.scrollWidth > name.clientWidth); if (s.welcome.optional) name.append(DT.tag('optional')); return name; } if (s.unrecorded) { const name = DT.el('span', 'inbox-review-name', s.display_name); DT.tipIf(name, s.display_name, () => name.scrollWidth > name.clientWidth); return name; } if (s.proposal) { const name = DT.el('span', 'inbox-review-name', markedText(s.proposal.title)); DT.tipIf(name, markedText(s.proposal.title), () => name.scrollWidth > name.clientWidth); return name; } if (s.autorun) { const name = DT.el('span', 'inbox-review-name', s.autorun.name); DT.tipIf(name, s.autorun.name, () => name.scrollWidth > name.clientWidth); return name; } if (s.review) { const name = DT.el('span', 'inbox-review-name', s.review.name); DT.tipIf(name, s.review.name, () => name.scrollWidth > name.clientWidth); name.dataset.reviewArtifact = s.review.id; if (!isRead(s.review)) return name; const wrap = DT.el('span', 'inbox-review-item'); wrap.append(name, DT.tag('read')); return wrap; } const w = DT.personButton(resolveSessionIdentity(s), `Open ${resolveSessionIdentity(s)}`); Object.assign(w.querySelector('.dt-primary').dataset, { name: s.name, agentType: s.agent_type, sessionId: s.session_id, server: sessionServer(s) }); return w; } },
+                             if (s.welcome) { const name = DT.el('span', 'inbox-review-name inbox-welcome-name', s.welcome.title); DT.tipIf(name, s.welcome.title, () => name.scrollWidth > name.clientWidth); if (s.welcome.optional) name.append(DT.tag('optional')); return name; } if (s.unrecorded) { const name = DT.el('span', 'inbox-review-name', s.display_name); DT.tipIf(name, s.display_name, () => name.scrollWidth > name.clientWidth); return name; } if (s.proposal) { const name = DT.el('span', 'inbox-review-name', markedText(s.proposal.title)); DT.tipIf(name, markedText(s.proposal.title), () => name.scrollWidth > name.clientWidth); return name; } if (s.autorun) { const name = DT.el('span', 'inbox-review-name', s.autorun.name); DT.tipIf(name, s.autorun.name, () => name.scrollWidth > name.clientWidth); return name; } if (s.review) { const name = DT.primaryButton(s.review.name, `Open ${s.review.name}`); name.classList.add('inbox-review-name'); name.dataset.reviewArtifact = s.review.id; if (!isRead(s.review)) return name; const wrap = DT.el('span', 'inbox-review-item'); wrap.append(name, DT.tag('read')); return wrap; } const w = DT.personButton(resolveSessionIdentity(s), `Open ${resolveSessionIdentity(s)}`); Object.assign(w.querySelector('.dt-primary').dataset, { name: s.name, agentType: s.agent_type, sessionId: s.session_id, server: sessionServer(s) }); return w; } },
                         ...(rows.some(askOf) && !oneLineNeeds ? [{ key: 'asks', label: rows.some(x => x.proposal) ? 'What was asked' : 'Waiting for', ...(rows.some(x => x.proposal) ? { width: 'grow', min: 22, share: 4 } : { width: 'content', max: 20, drop: 2 }), line: 2, cell: s => {
                             if (s.proposal) { const pr = s.proposal, wrap = DT.el('span', 'inbox-proposal-what'); wrap.append(DT.el('span', 'inbox-proposal-line', `${markedText(pr.proposer)} proposes a ${pr.kind === 'goal' ? 'goal' : 'task'}`)); const snip = proposalSnippet(pr); if (snip) wrap.append(DT.el('span', 'inbox-proposal-body', snip)); if (carriesInstructions(pr)) wrap.append(DT.tag('Carries instructions')); wrap.title = markedText(pr.title); return wrap; } // the proposer's name and the proposal's words are text: the row says what is asked
                             if (s.autorun || s.unrecorded || s.welcome) { const why = DT.el('span', null, askOf(s)); why.title = askOf(s); return why; } // the whole reason is the tooltip: the line is one
@@ -644,7 +649,7 @@ registerGroupSource('hub-inbox', {
                         } }] : []),
                         ...(rows.some(blocksOf) ? [{ key: 'blocks', label: 'Blocks', ...(oneLineNeeds ? { width: '9rem', dropAt: 52 } : { width: 'content', max: 30, drop: 4 }), line: 2, cell: s => { const p = blocksOf(s); if (!p) return ''; const e = DT.el('span', 'inbox-blocks', oneLineNeeds ? blocksShortOf(s) : p); e.title = p; return e; } }] : []), // a list of agents is one line a row: the short form fits its 9 rem, the whole sentence is the tooltip // what waits on the row (#11442)
                         { key: 'waiting', label: 'Waiting', ...(oneLineNeeds ? { width: '9rem' } : { min: rows.some(isItem) ? 12 : 18 }), tone: 'tertiary', align: 'end', sort: true, sortValue: s => s.waiting_since || '', firstDir: 'desc', line: rows.some(isItem) ? 2 : 1, cell: s => waitingText(s.waiting_since) || '' },
-                        ...(rows.some(isItem) ? [{ key: 'review', label: 'Actions', fixed: true, align: 'end', width: rows.some(s => s.proposal) ? '15rem' : rows.some(s => s.review && isRead(s.review)) ? '21rem' : '13.5rem', line: 1, cell: s => (s.proposal ? proposalActions(s.proposal) : s.review ? reviewActions(s.review) : s.autorun ? runActions(s.autorun) : s.operatorAsk ? askActions(s.operatorAsk) : s.unrecorded ? unrecordedActions() : s.welcome ? welcomeActions(s.welcome) : '') }] : []),
+                        ...(rows.some(isItem) ? [{ key: 'review', label: 'Actions', fixed: true, align: 'end', width: rows.some(s => s.proposal) ? '15rem' : rows.some(s => s.review) ? (compactActions() ? '13.5rem' : rows.some(s => s.review && isRead(s.review)) ? '24rem' : '20.5rem') : '13.5rem', line: 1, cell: s => (s.proposal ? proposalActions(s.proposal) : s.review ? reviewActions(s.review) : s.autorun ? runActions(s.autorun) : s.operatorAsk ? askActions(s.operatorAsk) : s.unrecorded ? unrecordedActions() : s.welcome ? welcomeActions(s.welcome) : '') }] : []),
                     ], ...(oneLineNeeds ? { oneLine: true, sortBar: false } : {}), ...(oneLineNeeds ? { mail: s => ({ lead: { text: needsName(s), name: needsName(s) }, title: needsName(s), medium: true, starred: !!(s.review && s.review.starred), team: teamOf(s), teamAlways: multipleServers() || manyTeams, nameTeam: true, snippetTip: true, snippet: [blocksShortOf(s), askOf(s) || sessionStateInfo(s).label].filter(Boolean).join(' \u00b7 '), snippetTitle: [blocksOf(s), askOf(s) || sessionStateInfo(s).label].filter(Boolean).join(' \u00b7 '), state: askOf(s) || sessionStateInfo(s).label, time: DT.shortTime(s.waiting_since), unread: true, mark: 'attention', answers: answerCell(s, { dismiss: false }), actions: rowActions(s) }) } : {}) }); // a phone's row is the mail row: the agent, then the ask on a second line, amber and bold (every row of Needs you is unanswered); a list with a review or a run keeps its own actions. One line a row (Goal #79) for a list of agents: the ask is the row's tooltip, a narrow list drops it, then the team, the folder and the CLI; a list with a review item or a failed run keeps its own folded rows
                     wrap.append(table.el);
                     if (rows.some(r => r.welcome)) { const hide = DT.el('button', 'btn btn-quiet btn-small inbox-welcome-hide', 'Hide all welcome items'); hide.type = 'button'; hide.addEventListener('click', () => { hideAllWelcome(); sayLive('The welcome items are hidden.'); }); wrap.append(hide); } // one quiet way out (#11443)

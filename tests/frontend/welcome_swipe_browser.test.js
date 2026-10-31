@@ -4,6 +4,7 @@
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { coralReady, framesJs } = require('./helpers/wait');
+const { installGuard, reached } = require('./helpers/silent_dismiss');
 
 (async () => {
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
@@ -23,6 +24,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
             if (s.includes('/api/settings') && o && o.method === 'PUT') { window.__puts.push(JSON.parse(o.body)); return json({ ok: true }); }
             return window.__realFetch(u, o); };
             T.state.settings = { ...T.state.settings, inbox_welcome: 'on', inbox_welcome_done: '' }; T.state.liveSessions = []; T.state.servers = []; true`);
+        await installGuard(ev); // nothing a dismissal does reaches an agent (the operator's rule, #11552)
         await ev(`window.switchNavTab('hub-inbox'); import(${S} + 'inbox_tab.js').then(m => { m.updateInboxTab(); return m.selectInboxTab('needs'); }).then(() => true)`);
         await waitFor(`document.querySelectorAll('#group-table-view .inbox-welcome-name').length === 5`, 'five welcome items', 8000);
         await waitFor(`!!document.querySelector('.inbox-needs-results')._welcomeSwipe`, 'the swipe is attached (lazy, for a touch screen)', 8000);
@@ -69,6 +71,8 @@ const { coralReady, framesJs } = require('./helpers/wait');
         await ev(`document.querySelectorAll('.toast').forEach(t => t.remove()); [...${rowOf('Make a team so agents can work together')}.querySelectorAll('button')].find(b => b.textContent.trim() === 'Dismiss').click(); true`);
         await waitFor(`![...document.querySelectorAll('#group-table-view .inbox-welcome-name')].some(e => e.firstChild.textContent === 'Make a team so agents can work together')`, 'the Dismiss button dismisses', 6000).catch(() => {});
         check(!(await titles()).includes('Make a team so agents can work together') && !(await ev(`[...document.querySelectorAll('.toast')].some(t => /Undo/.test(t.textContent))`)), 'the Dismiss button still works and offers no Undo');
+
+        check(!(await reached(ev)).length, 'the swipe, its Undo and the Dismiss button sent nothing to an agent: ' + JSON.stringify(await reached(ev)));
 
         // reduced motion: the drag still dismisses, and a short one does not animate back
         await Emulation.setEmulatedMedia({ features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });

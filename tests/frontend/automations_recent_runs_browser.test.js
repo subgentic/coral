@@ -4,6 +4,7 @@
 // or Open takes it out. What was opened is the server's (seen_at, POST .../seen: #9315), so another screen's open is read on the next refresh. 1280 and 390 px, a stubbed server (jobs, workflows and the two recent-runs reads), light and dark. Drives Chrome over CDP through agent_view_harness.js.
 const assert = require('node:assert/strict');
 const { SIZING } = require('./helpers/table_sizing');
+const { installGuard, reached } = require('./helpers/silent_dismiss');
 const { connect } = require('./agent_view_harness');
 const { setTheme } = require('./helpers/contrast');
 const { oneLinePerRow } = require('./helpers/row_lines');
@@ -108,8 +109,10 @@ const STUB = `(() => {
             await waitFor(`document.querySelector('#group-table-title') && document.querySelector('#group-table-title').textContent === 'Recent runs'`, `${at}See them opens Recent runs`, 8000);
             await ev(`history.back(); true`);
             await waitFor(`!!document.querySelector('.inbox-runs-finished') && document.querySelectorAll('#group-table-view tbody tr[data-key]').length === 2`, `${at}back in Needs you`, 8000);
+            await installGuard(ev); // a dismissal sends nothing to an agent (the operator's rule, #11552)
             await ev(`document.querySelector('#group-table-view button[aria-label^="Dismiss the failed run of nightly-build-job"]').click(); true`);
             await waitFor(`document.querySelectorAll('#group-table-view tbody tr[data-key]').length === 1`, `${at}Dismiss takes the run out`, 8000);
+            assert.deepEqual(await reached(ev), [], `${at}Dismiss sent nothing to an agent`);
             assert.equal(await ev(`document.getElementById('nav-tab-hub-inbox-badge').textContent`), '1', `${at}and the badge goes down`);
             assert.equal(await pathname().then(p => /^\/automations\//.test(p)), false, `${at}Dismiss does not open the run`);
             await ev(`document.querySelector('#group-table-view button[aria-label^="Open nightly-build, failed run"]').click(); true`);
