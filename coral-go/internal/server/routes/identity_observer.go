@@ -105,6 +105,7 @@ type IdentityObserver struct {
 	recent       []IdentityMismatch
 	lastLog      map[string]time.Time
 	now          func() time.Time
+	stamps       *hubOwnerStamps // the hub's owner stamp (#11378): nil until SetHubOwnerDir
 }
 
 // NewIdentityObserver returns the observer; hasSession reports a valid dashboard cookie.
@@ -284,6 +285,10 @@ func (o *IdentityObserver) Middleware(next http.Handler) http.Handler {
 				o.countOperatorCall("(no token)", r.Method+" "+route)
 			}
 		}
+		stamped, stampOK := o.checkOwnerStamp(w, r, caller) // the hub's owner stamp (#11378): refused, never ignored, unless it is genuine
+		if !stampOK {
+			return
+		}
 		r = r.WithContext(context.WithValue(r.Context(), callerKindKey{}, caller))
 		// In every mode (#3421 v2, operator decision) a credential that is PRESENT must be
 		// valid: a command-line signature, an API key, a Coral Hub stamp. A wrong one is
@@ -322,6 +327,10 @@ func (o *IdentityObserver) Middleware(next http.Handler) http.Handler {
 						"Coral is locked: open it from the Coral app, or run 'coral open' to sign in this browser. Agents: use coral-agent docs, or send X-Coral-Session-Token")
 				}
 				return
+			}
+			if stamped { // the API key was valid and the stamp genuine: the hub's signed-in person (humanInputCaller), and still the Operator for the rest
+				r2 = r2.WithContext(context.WithValue(r2.Context(), callerKindKey{}, callerHubOwner))
+				caller = callerHubOwner
 			}
 			o.serveAs(w, r2, next, caller)
 			return
@@ -423,6 +432,9 @@ func humanInputCaller(r *http.Request) bool {
 		// Only the connector's own per-process stamp: any process can send an
 		// X-Coral-Via-Tunnel header (Backend's #3431 review).
 		return cloud.TunneledAuthentic(r)
+	case callerHubOwner:
+		// An API-key request with a genuine owner stamp (identity_hub_owner.go): the hub's signed-in person.
+		return true
 	case callerCLISigned:
 		// Only a signature the middleware checked: any process can send the
 		// header. Unchecked (strict mode off), the CLI's input is gated like a
