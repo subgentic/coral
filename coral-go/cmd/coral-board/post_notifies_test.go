@@ -86,3 +86,12 @@ func TestTheRefusalSuggestsWhoOwnsTheTaskTheTextNames(t *testing.T) {
 	res = runBoard(t, srv.URL, dir, "post", "Nothing about #99 here")
 	assert.NotContains(t, res.stderr, "did you mean", "a task that cannot be read suggests nothing")
 }
+
+// --assign makes a task for someone, who is told: a post with it and no @Name is not refused (QA Engineer's SHOULD on #11441).
+func TestAnAssignPostWithNoMentionIsNotRefused(t *testing.T) {
+	srv := newRecordingServer(t)
+	res := runBoard(t, srv.URL, subscribedDataDir(t, srv.URL), "post", "--assign", "Dev A", "--goal", "1", "build the parser")
+	require.Equal(t, 0, res.code, res.stderr)
+	assert.NotContains(t, res.stderr, "notifies nobody")
+	assert.NotEmpty(t, srv.requests(), "the task and the post were sent")
+}
