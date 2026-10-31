@@ -1004,3 +1004,45 @@ func TestArtifactCommentsAHubGuestStillEditsAndDeletesTheirOwn(t *testing.T) {
 	code, _ = rig.do("DELETE", fmt.Sprintf("%s/%d", cp(cmtDoc), mine), cmtAsHub, nil)
 	assert.Equal(t, 200, code, "and deletes their own")
 }
+
+// Every kind of artifact takes a comment on the WHOLE document (#11444: HTML in its frame, a picture, a PDF, a table, a video, a download); only a text-like one takes a comment pointing into its text.
+func TestArtifactCommentsWholeDocumentOnEveryKindOfArtifact(t *testing.T) {
+	t.Parallel()
+	rig := newCmtRig(t)
+	for i, k := range []struct{ name, mediaType string }{
+		{"shot.png", "image/png"}, {"spec.pdf", "application/pdf"}, {"clip.mp4", "video/mp4"}, {"bundle.zip", "application/zip"},
+		{"page.html", "text/html"}, {"data.csv", "text/csv"}, {"main.go", "text/x-go"}, {"blob.bin", "application/octet-stream"},
+	} {
+		id := fmt.Sprintf("%064x", 0xc0de0000+i)
+		rig.artifact(id, k.name, k.mediaType)
+		code, out := rig.do("POST", cp(id), cmtAsOwner, map[string]any{"body": "on the whole of " + k.name, "anchor": map[string]any{"whole": true}})
+		require.Equal(t, 201, code, "%s: %v", k.name, out)
+		anchor, _ := out["anchor"].(map[string]any)
+		assert.Equal(t, true, anchor["whole"], "%s: stored as a whole-document comment", k.name)
+		pid := int64(out["id"].(float64))
+		if k.mediaType != "text/html" && k.mediaType != "text/csv" && k.mediaType != "text/x-go" { // text-like ones take a text anchor; the others say what they take
+			code, out = rig.do("POST", cp(id), cmtAsOwner, map[string]any{"body": "x", "anchor": anchorOf("y")})
+			assert.Equal(t, 415, code, k.name)
+			assert.Contains(t, fmt.Sprint(out), "whole document", k.name+": the refusal says what the file does take")
+		}
+		if i > 1 { // the thread's own actions on the first two kinds (a picture and a PDF); the author rate limit is 20 writes a minute
+			continue
+		}
+		code, _ = rig.do("POST", cp(id), cmtAsOwner, map[string]any{"body": "a reply", "parent_id": pid})
+		assert.Equal(t, 201, code, "%s: a thread takes replies", k.name)
+		code, list := rig.do("GET", cp(id), cmtAsOwner, nil)
+		require.Equal(t, 200, code)
+		assert.Len(t, list["comments"], 2, "%s: listed", k.name)
+		code, _ = rig.do("POST", cp(id)+"/"+fmt.Sprint(pid)+"/resolve", cmtAsOwner, map[string]any{})
+		assert.Equal(t, 200, code, "%s: Resolve works", k.name)
+		code, _ = rig.do("PUT", cp(id)+"/lock", cmtAsOwner, map[string]any{"scope": "artifact"})
+		assert.Equal(t, 200, code, "%s: Lock works", k.name)
+	}
+	// a text anchor is still taken by a text-like artifact, and an anchor that is neither is a bad request, as before
+	code, _ := rig.do("POST", cp(cmtDoc), cmtAsOwner, map[string]any{"body": "fine", "anchor": anchorOf("q")})
+	assert.Equal(t, 201, code)
+	code, _ = rig.do("POST", cp(cmtPic), cmtAsOwner, map[string]any{"body": "x"})
+	assert.Equal(t, 400, code, "no anchor at all")
+	code, _ = rig.do("POST", cp(cmtPic), cmtAsOwner, map[string]any{"body": "x", "anchor": map[string]any{}})
+	assert.Equal(t, 400, code, "an empty anchor")
+}

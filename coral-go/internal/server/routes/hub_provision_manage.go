@@ -225,6 +225,10 @@ func (pr *Provisioner) upgradeSteps(ctx context.Context, p *provisionPlan) {
 		}
 	}
 	if err := pr.runner.StartTmux(ctx, p.Target, pr.version); err != nil {
+		if errors.Is(err, sshprov.ErrPortInUse) {
+			pr.fail(p, "restart", portInUseSentence)
+			return
+		}
 		pr.fail(p, "restart", "Could not start the new release.")
 		return
 	}

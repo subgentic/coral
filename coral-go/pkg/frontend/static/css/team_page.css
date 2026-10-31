@@ -361,11 +361,13 @@
 .inbox-review-error:empty { display: none; }
 .inbox-review-metadata { display: flex; flex-wrap: nowrap; align-items: baseline; gap: 0 8px; min-width: 0; max-width: 9rem; } /* one line (#9060): For review, then the task, cut with an ellipsis when it is long (its full words are the link's tooltip) */
 .inbox-review-metadata > * { flex: none; }
+.inbox-review-from { display: none; font-weight: var(--fw-strong); } /* a phone only (#11456): the line under the name is the way a wide table says it; data_table.css shows it when the table is folded */
 .inbox-review-metadata > .inbox-review-task { flex: 0 1 auto; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .inbox-review-team { display: none; }
 .inbox-review-goal { display: flex; flex-direction: column; min-width: 0; align-items: flex-start; } /* a review's goal, its task under it (#8917) */
 .inbox-review-task, .inbox-review-nogoal { font-size: var(--table-tertiary-size); font-weight: var(--table-tertiary-weight); }
 .inbox-review-nogoal { color: var(--text-muted); }
+.inbox-blocks { color: var(--text-primary); font-weight: var(--fw-medium); } /* what waits on a Needs you row (#11442): the row's second line, a little louder than the rest of it so a blocker is told from a nice-to-have */
 .inbox-review-more { margin: 12px 0; }
 .inbox-review-more a, .inbox-review-more button { margin-inline-end: 8px; }
 @media (max-width: 760px) {

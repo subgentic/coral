@@ -68,7 +68,7 @@ export function attachReview(d, { reload }) {
             <button type="submit" class="btn btn-primary">Send request</button>
             <button type="button" class="btn artifact-review-cancel">Cancel</button>
         </form>`;
-    d.querySelector('.artifact-viewer-header').after(bar);
+    (d.querySelector('.artifact-viewer-from') || d.querySelector('.artifact-viewer-header')).after(bar); // after who sent it, which sits under the name (#11456)
     const $ = s => bar.querySelector(s);
     const stateEl = $('.artifact-review-state'), approve = $('.artifact-review-approve'), changes = $('.artifact-review-changes');
     const form = $('.artifact-review-form'), text = $('#artifact-review-text'), error = $('.artifact-review-error');

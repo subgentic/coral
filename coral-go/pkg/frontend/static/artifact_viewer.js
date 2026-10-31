@@ -58,6 +58,7 @@ function _build() {
             <a class="btn artifact-viewer-newtab" target="_blank" rel="noopener noreferrer" hidden>Open in new tab</a>
             <a class="btn artifact-viewer-download" rel="noopener noreferrer" download>Download</a>
         </div>
+        <div class="artifact-viewer-from" hidden></div>
         <div class="artifact-viewer-readers" hidden></div>
         <div class="artifact-viewer-main"><div class="artifact-viewer-body"></div></div>
         <div class="modal-actions modal-footer artifact-viewer-foot"><button type="button" class="btn artifact-viewer-close">Close</button></div>
@@ -110,6 +111,7 @@ export function openArtifactViewer(hex, opts = {}) {
     const url = serverUrl(artifactPath(hex), opts.server);
     const title = d.querySelector('.artifact-viewer-title');
     title.textContent = visibleName(opts.filename) || 'Artifact'; // the uploader's text, without what hides or reorders it (Security on #220)
+    const fromLine = d.querySelector('.artifact-viewer-from'); fromLine.textContent = visibleName(opts.from) || ''; fromLine.hidden = !fromLine.textContent; // who uploaded a file opened for review (#11456), as text
     const dl = d.querySelector('.artifact-viewer-download');
     const newTab = d.querySelector('.artifact-viewer-newtab');
     newTab.hidden = true; newTab.removeAttribute('href'); // its address comes with the kind (typeKnown): a manifest's own bytes are a list, not what to open
@@ -133,10 +135,11 @@ export function openArtifactViewer(hex, opts = {}) {
     _details.clear();
     readersAllowed(hex, opts.server).then(ok => { if (ok && gen === _gen && !d.hidden) _details.add(readersBlock(hex, opts.server, _details)); }).catch(() => {});
     if (!opts.switched) d.querySelector('.artifact-viewer-close').focus(); // a version chosen from the bar keeps the keyboard on the bar
+    let textShown = false; // the strict text view drew it: comments can point into it. Anything else (a frame, a picture, a PDF, a table, a video, a download) takes whole-document comments (#11444).
     Promise.resolve(renderArtifact(body, `coral://artifacts/${hex}`, { server: opts.server, filename: opts.filename, mediaType: opts.mediaType }, {
         signal: _abort.signal,
         isStale: () => gen !== _gen || d.hidden,
-        renderContent: (el, content, path) => { renderArtifactText(el, content, path); _comments.docRendered(content, true); },
+        renderContent: (el, content, path) => { textShown = true; renderArtifactText(el, content, path); _comments.docRendered(content, true); },
         openEntry: (entry) => {
             const m = /^coral:\/\/artifacts\/([a-f0-9]{64})$/i.exec(entry.uri || '');
             if (m) openArtifactViewer(m[1], { server: opts.server, filename: entry.name, mediaType: entry.media_type });
@@ -156,7 +159,7 @@ export function openArtifactViewer(hex, opts = {}) {
             dl.href = target.url; dl.setAttribute('download', target.name);
             dl.onclick = isCloud() ? (e) => { e.preventDefault(); if (dl.getAttribute('aria-disabled') === 'true') return; downloadArtifact(target.url, sanitizeDownloadName(target.name)).catch(err => { title.textContent = err.message; }); } : null;
         },
-    })).then(() => { if (gen === _gen) d.classList.toggle('is-image', !!body.querySelector('.image-panes')); }, () => {}); // a picture opens taller (css), not as a strip of its own height
+    })).then(() => { if (gen !== _gen) return; d.classList.toggle('is-image', !!body.querySelector('.image-panes')); if (!textShown) _comments.docWhole(); }, () => {}); // a picture opens taller (css), not as a strip of its own height
     return true;
 }
 

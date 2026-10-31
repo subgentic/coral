@@ -303,6 +303,10 @@ func (s *Server) newRouteHandlers() *routeHandlers {
 	themeHandler := routes.NewThemesHandler(s.cfg)
 	themeHandler.SetDB(s.db)
 	themeHandler.SeedBundledThemes()
+	if !envTrue("CORAL_NO_WELCOME") {
+		projects, _ := s.boardStore.ListProjects(context.Background())
+		seedNewInstallInboxWelcome(s.db, len(projects) > 0) // before the diff-mode seed: its row says an install has run
+	}
 	seedNewInstallDiffMode(s.db) // before the seeds below, whose rows say an install has run
 	// CORAL_NO_DEMO_SEED=1 (test servers): no demo workflow and no scheduled
 	// job for it, so a test server never runs a real agent on its own (#3136).

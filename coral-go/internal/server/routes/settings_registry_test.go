@@ -53,6 +53,8 @@ var settingRows = map[string]struct{ good, bad string }{
 	"welcome_choice":              {`"connected"`, `"maybe"`},
 	"welcome_pending":             {`"False"`, `"nope"`},
 	"home_editions_hidden":        {`"True"`, `"nope"`},
+	"inbox_welcome":               {`"off"`, `"maybe"`},
+	"inbox_welcome_done":          {`"welcome,agent"`, `true`},
 	"chief_page":                  {`"true"`, `"nope"`},
 	"chief_team":                  {`"chief"`, `true`},
 	"chief_session":               {`"11111111-2222-4333-8444-555555555555"`, `true`},

@@ -761,6 +761,23 @@ func markWelcomePending(db *store.DB) {
 	}
 }
 
+// seedNewInstallInboxWelcome turns on the Inbox's welcome items (#11443) for an install that has never run: the same test as seedNewInstallDiffMode (no row that says it has),
+// so it runs before that seed and before the demo workflow and the first-launch screen are marked. An install that has run keeps none and never sees them; the dashboard clears
+// the setting when the person hides them or they are all done.
+// An install with any session on record or any team on a board is not new, whatever else it lacks (hasBoards: the board database is a separate file).
+func seedNewInstallInboxWelcome(db *store.DB, hasBoards bool) {
+	if db == nil || hasBoards {
+		return
+	}
+	if _, err := db.Exec(`INSERT INTO user_settings (key, value)
+		SELECT 'inbox_welcome', 'on'
+		WHERE NOT EXISTS (SELECT 1 FROM user_settings WHERE key IN ('demo_workflows_seeded', 'welcome_pending', 'welcome_choice', 'git_diff_mode', 'inbox_welcome'))
+		AND NOT EXISTS (SELECT 1 FROM live_sessions) AND NOT EXISTS (SELECT 1 FROM session_index)
+		ON CONFLICT(key) DO NOTHING`); err != nil {
+		log.Printf("inbox welcome items: %v", err)
+	}
+}
+
 // seedNewInstallDiffMode stores 'Since my last commit' (uncommitted) as the compare mode of a
 // new install (#10806). An install that has run before keeps what it had: with no stored value
 // that is the branch point, so the server default stays branch_point and only this seed, which runs
