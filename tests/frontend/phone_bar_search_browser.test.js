@@ -18,11 +18,13 @@ const { coralReady } = require('./helpers/wait');
         await ev(`window.switchNavTab('hub-inbox'); true`);
         await waitFor(`[...document.querySelectorAll('.phone-bar-search')].some(e => e.getClientRects().length)`, 'the Inbox has a search in its bar', 8000);
         let f = await field();
-        check(f && /^Search /.test(f.placeholder) && f.h >= 44 && f.label === f.placeholder, 'the pill is a search field with a name and a 44 px height: ' + JSON.stringify(f));
+        check(f && /^Search /.test(f.placeholder) && f.h >= 44 && f.label === f.placeholder + ' from the top bar', 'the pill is a search field with a name and a 44 px height: ' + JSON.stringify(f));
         await ev(`window.__seen = []; document.getElementById('inbox-search').addEventListener('input', e => window.__seen.push(e.target.value)); [...document.querySelectorAll('.phone-bar-search')].find(e => e.getClientRects().length).focus(); true`);
         await client.Input.insertText({ text: 'abc' });
         await waitFor(`document.getElementById('inbox-search').value === 'abc'`, 'what is typed goes into the Inbox search', 5000);
         check(await ev(`window.__seen.includes('abc')`), 'the view\'s own search heard it as typing');
+        // two controls never share a name: the sidebar's own search (display: none on a phone, but still in the page) has its own
+        check(await ev(`(() => { const names = [...document.querySelectorAll('input[type=search]')].map(i => i.getAttribute('aria-label')).filter(Boolean); return new Set(names).size === names.length; })()`), 'no two search fields share an accessible name');
         // another view has its own words
         await ev(`window.switchNavTab('automations'); true`);
         await waitFor(`[...document.querySelectorAll('.phone-bar-search')].some(e => e.getClientRects().length && /Automations/.test(e.placeholder))`, 'Automations has its own field', 8000);

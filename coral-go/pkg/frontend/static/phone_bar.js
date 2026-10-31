@@ -53,8 +53,8 @@ function paintTitle(words) {
             input.addEventListener('input', () => { const to = searchTarget(); if (to && to.value !== input.value) { to.value = input.value; to.dispatchEvent(new Event('input', { bubbles: true })); } });
             t.append(input);
         }
-        const label = `Search ${words}`;
-        if (input.placeholder !== label) { input.placeholder = label; input.setAttribute('aria-label', label); }
+        const label = `Search ${words}`; // what the field says; its name adds where it is, so it never shares one with the sidebar's own search (two controls, one name: the census, QA #11476)
+        if (input.placeholder !== label) { input.placeholder = label; input.setAttribute('aria-label', `${label} from the top bar`); }
         if (input._for !== target.id) { input._for = target.id; input.value = target.value; } // another view's search: its own words, even while the field has the focus
         else if (document.activeElement !== input && input.value !== target.value) input.value = target.value; // the view's own search words, kept when the tab is left and come back to
     }
