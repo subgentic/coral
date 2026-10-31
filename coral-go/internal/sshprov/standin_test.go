@@ -95,6 +95,8 @@ type standCfg struct {
 	Pipe     bool `json:",omitempty"` // `-W host:port`: join stdin and stdout to that address, as ssh does over the channel
 	HoldSecs int  `json:",omitempty"` // sleep this long (at most 60 s) before anything else, as a connection that stays open
 
+	Far *farCfg `json:",omitempty"` // act as the far computer (farside_test.go): the last argument is the remote text
+
 	// KnownHosts is written to the file named by a UserKnownHostsFile=<path> argument (what ssh does with a key it was told to accept), and that path to KnownHostsPath.
 	KnownHosts     string `json:",omitempty"`
 	KnownHostsPath string `json:",omitempty"`
@@ -171,6 +173,9 @@ func runStandIn() int {
 				_ = os.WriteFile(cfg.KnownHostsPath, []byte(f), 0o600)
 			}
 		}
+	}
+	if cfg.Far != nil && len(args) > 0 {
+		return runFar(*cfg.Far, strings.ReplaceAll(strings.TrimSuffix(strings.TrimPrefix(args[len(args)-1], "sh -c '"), "'"), `'\''`, "'"))
 	}
 	if cfg.HoldSecs > 0 {
 		time.Sleep(time.Duration(min(cfg.HoldSecs, 60)) * time.Second)
