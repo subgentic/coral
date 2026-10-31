@@ -9,7 +9,6 @@ import (
 	"github.com/jmoiron/sqlx"
 	"strings"
 	"time"
-	"unicode"
 	"unicode/utf8"
 
 	"github.com/subgentic/coral/internal/clitext"
@@ -474,18 +473,39 @@ func SenderLabel(o MessageOrigin) string {
 // maxTeamLabelRunes is the longest team name the sender label carries; a longer one shows the board id.
 const maxTeamLabelRunes = 40
 
-// plainTeamLabel says a team name is safe to put inside "Role (...)" in another team's text: it was chosen by whoever made that team, so it may hold no control, format (zero-width,
-// bidi) or line-separator character, no parenthesis (it could close the label and add words that pass for the rest of a line), and is not long. Anything else shows the board id.
+// plainTeamLabel says a team name is safe to put inside "Role (...)" in another team's text: it was chosen by whoever made or renamed that team. It must be what clitext.CleanName
+// leaves of it (no control, format, bidi or invisible character, one line), not empty, at most 40 characters, with none of @ ( ) [ ] : (a mention, a label that closes early, a
+// "Who: words" line, a link's scheme) and no "www." link, and not the name of the Operator or Chief (any spelling normalizeName reads the same). Anything else shows the board id.
 func plainTeamLabel(l string) bool {
-	if utf8.RuneCountInString(l) > maxTeamLabelRunes {
+	if l == "" || l != clitext.CleanName(l) || utf8.RuneCountInString(l) > maxTeamLabelRunes {
 		return false
 	}
-	for _, r := range l {
-		if r == '(' || r == ')' || unicode.IsControl(r) || unicode.In(r, unicode.Cf, unicode.Zl, unicode.Zp) {
-			return false
+	if strings.ContainsAny(l, "@()[]:") || strings.Contains(strings.ToLower(l), "www.") {
+		return false
+	}
+	return !IsOperatorName(l) && !SameIdentity(l, "Chief")
+}
+
+// senderKey is the label stored as the inbound message's sender (its subscriber_id and job title). It is SenderLabel unless that would equal the id of a member of the target board
+// (any spelling normalizeName reads the same): the sender's identity key must never be one a member of that board has, or the message would count as theirs (an answer to an ask looks
+// at the sender). The id form is then stored and the name stays in the envelope's board_label for display.
+func (s *Store) senderKey(ctx context.Context, in MessageOrigin) (string, error) {
+	from := SenderLabel(in)
+	if in.BoardLabel == "" {
+		return from, nil
+	}
+	subs, err := s.ListSubscribers(ctx, in.TargetBoard)
+	if err != nil {
+		return "", err
+	}
+	for _, sub := range subs {
+		if SameIdentity(sub.SubscriberID, from) {
+			plain := in
+			plain.BoardLabel = ""
+			return SenderLabel(plain), nil
 		}
 	}
-	return true
+	return from, nil
 }
 
 // PostCrossTeamMessage stores the inbound message on the target board (from
@@ -521,7 +541,10 @@ func (s *Store) PostCrossTeamMessage(ctx context.Context, p CrossTeamPost) (inbo
 	}
 	inContent := strings.TrimSpace(strings.Join(mentions, " ") + " " + DefuseMentions(p.Content, targetNames))
 	mirrorContent := DefuseMentions(p.Content, senderNames)
-	from := SenderLabel(in)
+	from, err := s.senderKey(ctx, in)
+	if err != nil {
+		return nil, nil, err
+	}
 	now := nowUTC()
 
 	tx, err := s.db.BeginTxx(ctx, nil)
