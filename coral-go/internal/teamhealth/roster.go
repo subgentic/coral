@@ -231,6 +231,9 @@ func ComposeLines(in CheckInput) []string {
 	if len(in.Questions) > 0 {
 		lines = append(lines, questionsLine(in))
 	}
+	if g := goalsLine(in.Goals); g != "" {
+		lines = append(lines, g) // the open goals and what the operator has to do about them (#11412)
+	}
 	hintAt := len(lines) // the hint goes before the progress line
 	progressed := in.Progress.Completed+in.Progress.Reviewed+in.Progress.Posts > 0
 	since := in.Progress.Since.Format("15:04")
@@ -246,9 +249,9 @@ func ComposeLines(in CheckInput) []string {
 		if r.Awake() == 1 {
 			who = "The 1 awake agent is working."
 		}
-		lines = append(lines, who+" Nothing needs you.")
+		lines = append(lines, who+" "+nothingNeedsYou(in))
 	case !r.NeedsAttention() && len(in.Items) == 0 && len(in.Questions) == 0:
-		lines = append(lines, "Nothing needs you.")
+		lines = append(lines, nothingNeedsYou(in))
 	}
 	// The peek hint is a pointer, not a fact: it is left out first when the check would not fit (the other lines then drop as before).
 	if hint := in.peekLine(items); hint != "" {
@@ -328,6 +331,14 @@ func fitLines(lines []string) []string {
 }
 
 // roster check: Compose's one-line form.
+// nothingNeedsYou is the roster check's all-clear: not "Nothing needs you" while a goal needs the operator (#11412).
+func nothingNeedsYou(in CheckInput) string {
+	if in.goalsRemind() {
+		return "No agent needs you."
+	}
+	return "Nothing needs you."
+}
+
 func composeRoster(in CheckInput) string {
 	return strings.Join(ComposeLines(in), " • ")
 }

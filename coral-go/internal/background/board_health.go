@@ -209,10 +209,15 @@ func (m *BoardHealthMonitor) composeCheck(ctx context.Context, project, orch str
 	p, _ := m.store.ProgressSince(ctx, project, since)
 	questions := m.operatorQuestions(ctx, project)
 	roster, attention := m.buildRoster(ctx, rosterInputs{project: project, recipient: rcpt, subs: subs, bySession: bySession, waits: waits, tasks: tasks, now: now})
-	return teamhealth.Compose(teamhealth.CheckInput{Now: now, Agents: agents, Items: items, Questions: questions,
+	var goals []teamhealth.GoalLine // the open goals and what the operator has to do: the orchestrator's check only (#11412)
+	reminders := 0
+	if rcpt != nil && rcpt.SubscriberID == orch {
+		goals, reminders = m.goalLines(ctx, project, now)
+	}
+	return teamhealth.Compose(teamhealth.CheckInput{Now: now, Agents: agents, Items: items, Questions: questions, Goals: goals,
 		Progress: teamhealth.Progress{Since: since, Completed: p.Completed, Reviewed: p.Reviewed, Posts: p.Posts},
 		Parked:   len(parked), BackFromPark: backFromPark, Roster: roster,
-		PeekHint: rcpt != nil && rcpt.SubscriberID == orch}), len(items) + attention, nil
+		PeekHint: rcpt != nil && rcpt.SubscriberID == orch}), len(items) + attention + reminders, nil
 }
 
 // splitParked leaves parked tasks out: a parked task raises no item (#4175 step 3). A task whose park ended is back:
