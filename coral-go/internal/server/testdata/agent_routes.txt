@@ -116,6 +116,7 @@ a GET /api/board/{project}/waits/poll
 c GET /api/board/{project}/working-mode
 c GET /api/board/{project}/working-mode/presets
 c GET /api/call-metrics/summary
+b GET /api/chief
 b GET /api/cloud/owner-label
 c GET /api/cloud/status
 b GET /api/custom-models

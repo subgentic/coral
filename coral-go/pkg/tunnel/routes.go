@@ -281,6 +281,9 @@ var routeTable = cat(
 		"/api/artifacts/series/{series}",
 		"/api/artifacts/series/{series}/versions",
 	)),
+	// Chief through Coral Hub (#11470): which agent the Operator recorded as Chief ({enabled, session_id, team}), for the Hub's own Chief page to open. An API read, the owner's alone: the machine refuses anyone
+	// else (a viewer, a guest, a guide) before it reads a setting. The Hub never asks the machine for the page itself (no machine-supplied HTML on the Hub's origin).
+	owner(OwnerRefuse, rules(http.MethodGet, TierView, "/api/chief")),
 	owner(OwnerRefuse, rules(http.MethodPut, TierInteract, "/api/artifacts/{hex64}/comments/lock")),
 	owner(OwnerRefuse, rules(http.MethodDelete, TierInteract, "/api/artifacts/{hex64}/comments/lock")),
 	// The edit and delete are the owner's AND the comment's author's (the operator, 2026-10-30: the owner gets more, a guest loses nothing): the machine stamps the owner marker and the handler decides. A Hub viewer allowed

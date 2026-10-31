@@ -20,6 +20,7 @@ GET /api/board/{project}/orchestrator-grant launch owner-only
 GET /api/board/{project}/proposals view owner-only
 GET /api/board/{project}/settings view owner-sees
 GET /api/board/{project}/tasks/{taskID}/artifact-content view owner-only
+GET /api/chief view owner-only
 GET /api/custom-models view owner-only
 GET /api/operator-asks view owner-only
 GET /api/proposals view owner-only

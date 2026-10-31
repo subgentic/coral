@@ -47,6 +47,7 @@ var operatorOnlyRoutes = map[string]string{
 	"GET /api/sessions/live/{name}/memory/{id}":         "read one of an agent's instruction or memory files",
 	"GET /api/board/{project}/spend":                    "read a team's tokens, commits, tool calls and task times (it names every member and their work)",
 	"GET /api/operator-asks":                            "read the questions agents asked the Operator (their text)",
+	"GET /api/chief":                                    "read which agent the Operator recorded as Chief (#11470)",
 	"GET /api/board/{project}/orchestrator-grant":       "read what a board's orchestrator may do",
 	"PUT /api/board/{project}/orchestrator-grant":       "change what a board's orchestrator may do (wake, sleep and start agents)",
 	"GET /api/board/{project}/lifecycle-log":            "read what agents did to a board's agents",

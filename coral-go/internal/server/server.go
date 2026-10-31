@@ -3,6 +3,7 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/subgentic/coral/internal/cloud"
@@ -661,22 +662,49 @@ func (s *Server) serveIndex(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// chiefRecorded is what the Operator recorded as Chief (#11450), read on every request and the one place that decides it: whether the page is on (the chief_page setting) and, only when the session they
+// recorded (chief_session) is a live one on the team they recorded (chief_team), that session and team. Never a team picked by its name: a team an agent made is not Chief. A session that is not live on
+// the recorded team comes back empty, with enabled still true.
+func (s *Server) chiefRecorded(ctx context.Context) (enabled bool, sessionID, team string) {
+	ss := store.NewSessionStore(s.db)
+	st, err := ss.GetSettings(ctx)
+	if err != nil || !setreg.Bool(st, "chief_page") {
+		return false, "", ""
+	}
+	sessionID, team = strings.TrimSpace(setreg.Text(st, "chief_session")), strings.TrimSpace(setreg.Text(st, "chief_team"))
+	if parsed, perr := uuid.Parse(sessionID); perr != nil || parsed.String() != sessionID || team == "" {
+		return true, "", ""
+	}
+	if ls, lerr := ss.GetLiveSession(ctx, sessionID); lerr != nil || ls == nil || ls.BoardName == nil || *ls.BoardName != team {
+		return true, "", ""
+	}
+	return true, sessionID, team
+}
+
+// chiefState answers GET /api/chief: {enabled, session_id, team} of chiefRecorded, for the Hub's own Chief page (#11470). Through Coral Hub it is the computer owner's alone (the route table's owner-only
+// mark; the machine refuses a viewer, a guest or a guide here before any setting is read). No data of its own: the session id is the one the page is already addressed by.
+func (s *Server) chiefState(w http.ResponseWriter, r *http.Request) {
+	if routes.RefuseNonOwner(w, r) {
+		return
+	}
+	enabled, sessionID, team := s.chiefRecorded(r.Context())
+	w.Header().Set("Cache-Control", "no-store")
+	writeChiefJSON(w, map[string]any{"enabled": enabled, "session_id": sessionID, "team": team})
+}
+
+func writeChiefJSON(w http.ResponseWriter, v any) {
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(v)
+}
+
 // serveChief is the Operator's phone page for one agent (#11450): the agent popout, with nothing of the app around it. It is a view over the existing routes and
 // adds no data of its own. It answers only while chief_page is on (404 otherwise); the agent is the session the Operator RECORDED (chief_session) on the team they recorded
 // (chief_team), read on every request, never a team picked by its name: a team an agent made is not Chief.
 func (s *Server) serveChief(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	ss := store.NewSessionStore(s.db)
-	st, err := ss.GetSettings(ctx)
-	if err != nil || !setreg.Bool(st, "chief_page") {
+	enabled, sessionID, _ := s.chiefRecorded(r.Context())
+	if !enabled {
 		http.NotFound(w, r)
 		return
-	}
-	sessionID, team := strings.TrimSpace(setreg.Text(st, "chief_session")), strings.TrimSpace(setreg.Text(st, "chief_team"))
-	if parsed, perr := uuid.Parse(sessionID); perr != nil || parsed.String() != sessionID || team == "" {
-		sessionID = ""
-	} else if ls, lerr := ss.GetLiveSession(ctx, sessionID); lerr != nil || ls == nil || ls.BoardName == nil || *ls.BoardName != team {
-		sessionID = ""
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Content-Security-Policy", dashboardCSPFor(r.Host))
