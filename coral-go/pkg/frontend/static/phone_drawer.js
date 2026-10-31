@@ -1,5 +1,5 @@
-/* The phone's ☰ drawer (#11472, Gmail's): a left drawer of OPTIONS in the current context, never the list of tabs (the bottom bar has those). The top of it is the Inbox's folders with their counts at the right
- * (Needs you, Tasks, Saved, Chats) and the teams; below a divider (nav_tabs.js adds them) are the less-used places: Automations, Analytics, Docs, Computers, Settings, Themes, Check for updates. It is the one
+/* The phone's ☰ drawer (#11472, Gmail's): a left drawer of OPTIONS in the current context, never the list of tabs (the bottom bar has those). The top of it is, from the Inbox or Chats, the Inbox's folders with their counts at the right
+ * (Needs you, Tasks, Saved, Chats) and the teams; from every other screen Tasks and Chats (the bar has neither, #11535) and, from Agents, All agents and the teams; below a divider (nav_tabs.js adds them) are the less-used places: Docs, Computers, Settings, Themes, Check for updates (Automations and Analytics are bar tabs). It is the one
  * menu (#nav-more-menu) drawn as a panel: this file builds what is above the divider and the scrim behind it; css/mobile.css draws both. */
 import { state } from './state.js';
 import { importOnce } from './import_once.js';
