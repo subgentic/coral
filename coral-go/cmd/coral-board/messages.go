@@ -230,7 +230,7 @@ func cmdPost() {
 
 	// A post that notifies nobody is a handoff that stalls (#11441): it needs an @Name (or --to, which adds one), an answer on a task (--task tells its assignee and creator, #11431) or to a message
 	// (--reply-to tells the original poster), a task it makes (--assign names who has it), or the operator's own --broadcast (undocumented to agents).
-	if !broadcast && !postNotifiesSomeone(message, taskArg, replyArg, assigned != nil) {
+	if !broadcast && guideArg == "" && !postNotifiesSomeone(message, taskArg, replyArg, assigned != nil) { // --guide puts the question to a guide: that is who it notifies
 		fmt.Fprintln(os.Stderr, postNotifiesNobody(st, message, subscriberID))
 		clierr.Exit1()
 	}

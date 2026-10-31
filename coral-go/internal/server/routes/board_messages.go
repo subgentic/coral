@@ -163,7 +163,11 @@ func (h *BoardHandler) PostMessage(w http.ResponseWriter, r *http.Request) {
 	if raw, err := json.Marshal(msg); err == nil {
 		var out map[string]any
 		if json.Unmarshal(raw, &out) == nil {
-			out["notified"] = h.bs.NotifiedBy(r.Context(), project, msg.SubscriberID, msg.Content)
+			notified := h.bs.NotifiedBy(r.Context(), project, msg.SubscriberID, msg.Content)
+			if guideAsk != "" {
+				notified = append(notified, guideAsk) // a question to a guide reaches that guide (#11457)
+			}
+			out["notified"] = notified
 			writeJSON(w, http.StatusOK, out)
 			return
 		}

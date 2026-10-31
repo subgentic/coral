@@ -424,6 +424,7 @@ func TestAnAgentAsksAGuideAndTheGuideAnswers(t *testing.T) {
 	ask, _ := out["ask"].(map[string]any)
 	require.NotNil(t, ask, "the post is a question")
 	assert.Equal(t, []any{gDana}, ask["to"])
+	assert.Contains(t, out["notified"], gDana, "the answer says the question reached the guide, so the CLI does not warn that it reached no one")
 
 	// only the asked guide reads it, from their own label: another guide, an ordinary reader and another board see none
 	code, _, raw = g.guide(gDana, now(), "GET", "/api/board/team/guide-asks", nil, nil)
