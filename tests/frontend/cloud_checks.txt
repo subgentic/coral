@@ -277,3 +277,4 @@ node hub_review_remote.test.mjs
 node server_ssh_setup.test.mjs
 node server_owner_secret.test.mjs
 node action_set_census.test.mjs
+node state_chip_no_tooltip.test.mjs

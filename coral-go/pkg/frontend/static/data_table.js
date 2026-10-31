@@ -40,8 +40,8 @@ export function primaryButton(text, label) {
 export function chip(word, cls) {
     const c = el('span', `state-label dt-chip goal-chip ${cls || ''}`.trim());
     const dot = el('span', 'goal-dot'); dot.setAttribute('aria-hidden', 'true');
-    c.title = word;
     c.append(dot, el('span', 'state-word', word));
+    c.addEventListener('pointerenter', () => { if (c.lastChild.offsetWidth > 1) c.removeAttribute('title'); else c.title = word; }); // a tooltip only while the word is hidden (a phone's dot): a title that repeats a shown word is left behind on scroll (#11561)
     return c;
 }
 export function tag(text) { return el('span', 'chip chip-tag dt-tag', text); }
