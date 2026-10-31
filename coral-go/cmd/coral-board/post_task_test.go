@@ -31,7 +31,7 @@ func TestPostTaskSendsTheTaskId(t *testing.T) {
 
 	srv3 := newRecordingServer(t)
 	dir3 := subscribedDataDir(t, srv3.URL)
-	require.Equal(t, 0, runBoard(t, srv3.URL, dir3, "post", "plain").code)
+	require.Equal(t, 0, runBoard(t, srv3.URL, dir3, "post", "--broadcast", "plain").code)
 	assert.NotContains(t, srv3.requests()[0], "task_id", "a plain post has no task")
 }
 

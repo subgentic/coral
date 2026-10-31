@@ -297,7 +297,7 @@ func post(baseURL, board, sessionName, message string) {
 	// Like a real agent's tool call (#3387): post through coral-board, which adds the
 	// session token from its inherited environment; the mock never touches the token.
 	if cb := coralBoard(); cb != "" {
-		cmd := exec.Command(cb, "post", message)
+		cmd := exec.Command(cb, "post", "--broadcast", message) // the stand-in has no one to tell: the operator's opt-out (#11441)
 		cmd.Env = append(os.Environ(), "CORAL_URL="+baseURL)
 		if out, err := cmd.CombinedOutput(); err != nil {
 			fmt.Fprintf(os.Stderr, "[mock-agent] coral-board post failed: %v %s\n", err, out)

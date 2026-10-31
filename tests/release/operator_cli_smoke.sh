@@ -33,7 +33,7 @@ curl -sf "http://127.0.0.1:$port/api/health" >/dev/null || { echo "operator_cli_
 board() { "${clean[@]}" "$bin/coral-board" "$@"; }
 fail() { echo "operator_cli_smoke: FAIL: $*" >&2; tail -20 "$home/server.log" >&2; exit 1; }
 board join operator-smoke --as Tester > "$home/join.out" 2>&1 || fail "coral-board join as the signed Operator: $(tail -2 "$home/join.out")"
-board post "operator smoke message" > "$home/post.out" 2>&1 || fail "coral-board post as the signed Operator: $(tail -2 "$home/post.out")"
+board post --broadcast "operator smoke message" > "$home/post.out" 2>&1 || fail "coral-board post as the signed Operator: $(tail -2 "$home/post.out")"
 board read --id 1 > "$home/read.out" 2>&1 || fail "coral-board read --id 1: $(tail -2 "$home/read.out")"
 grep -q "operator smoke message" "$home/read.out" || fail "the posted message is not in read --id 1: $(head -3 "$home/read.out")"
 echo "operator_cli_smoke: ok (join, post and read as the signed Operator on :$port)"

@@ -54,7 +54,7 @@ func TestEveryBoardCommandEscapesTheBoardName(t *testing.T) {
 	saveState(&boardState{Project: board, JobTitle: "Dev"})
 
 	for _, args := range [][]string{
-		{"post", "hello"},
+		{"post", "--broadcast", "hello"},
 		{"read"},
 		{"read", "--all"},
 		{"read", "--last", "5"},

@@ -187,7 +187,7 @@ func checkFreeText(args []string) error {
 			if opt := foldOpt(rest[i], postFlags); isPostValueOption(opt) {
 				i++
 				continue
-			} else if opt == "--ask" {
+			} else if opt == "--ask" || rest[i] == "--broadcast" { // --broadcast is the operator's own opt-out, not listed anywhere an agent reads
 				continue
 			}
 			if clihelp.IsFlagLike(rest[i]) {

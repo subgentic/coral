@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 )
@@ -111,7 +112,7 @@ func cmdPost() {
 
 	// Parse --to flag and collect remaining args as the message
 	var toNames, filePath, taskArg, assignArg, goalArg, titleArg, priorityArg, replyArg string
-	ask := false
+	ask, broadcast := false, false
 	var msgParts []string
 	literal := false
 	for i := 2; i < len(os.Args); i++ {
@@ -132,6 +133,8 @@ func cmdPost() {
 			i++
 		} else if opt == "--ask" {
 			ask = true
+		} else if os.Args[i] == "--broadcast" {
+			broadcast = true // a status post meant for no one: the operator's own opt-out of the refusal below, for their scripts. Not in the help, the docs or the error, and not offered as a "did you mean" (#11441)
 		} else if opt == "--reply-to" && i+1 < len(os.Args) {
 			replyArg = os.Args[i+1]
 			i++
@@ -213,6 +216,13 @@ func cmdPost() {
 	}
 
 	subscriberID := resolveSubscriberID()
+
+	// A post that notifies nobody is a handoff that stalls (#11441): it needs an @Name (or --to, which adds one), an answer on a task (--task tells its assignee and creator, #11431) or to a message
+	// (--reply-to tells the original poster), a task it makes (--assign names who has it), or the operator's own --broadcast (undocumented to agents).
+	if !broadcast && !postNotifiesSomeone(message, taskArg, replyArg, assigned != nil) {
+		fmt.Fprintln(os.Stderr, postNotifiesNobody(st, message, subscriberID))
+		clierr.Exit1()
+	}
 
 	body := map[string]any{"subscriber_id": subscriberID, "content": message}
 	if ask {
@@ -663,4 +673,43 @@ func printAskLines(m map[string]any) {
 	if to, ok := m["reply_to"].(float64); ok && to > 0 {
 		fmt.Printf("  (a reply to message #%.0f)\n", to)
 	}
+}
+
+// postMention is an @Name in a post: an @ that starts a word (not the middle of an address) and is followed by a name's first character.
+var postMention = regexp.MustCompile(`(?:^|[^A-Za-z0-9_@.])@[A-Za-z0-9]`)
+
+// postNotifiesSomeone says whether the post reaches anyone: it @mentions a name, or it is an answer on a task or to a message, or it makes a task for someone.
+func postNotifiesSomeone(message, taskArg, replyArg string, assigns bool) bool {
+	return assigns || strings.TrimSpace(taskArg) != "" || strings.TrimSpace(replyArg) != "" || postMention.MatchString(message)
+}
+
+// taskRef is a task number the post names (#12).
+var taskRef = regexp.MustCompile(`(?:^|[^A-Za-z0-9&])#(\d{1,9})\b`)
+
+// postNotifiesNobody is the refusal, with a suggestion when the text names a task: the people it belongs to (its assignee, else its creator, never the poster) are the ones a result of it is for.
+func postNotifiesNobody(st *boardState, message, poster string) string {
+	msg := "Error: this post notifies nobody: add @Name, --to, or --task"
+	seen := map[string]bool{strings.ToLower(poster): true}
+	var names []string
+	for _, m := range taskRef.FindAllStringSubmatch(message, 3) {
+		task, status, err := apiCall("GET", "/"+url.PathEscape(st.Project)+"/tasks/"+m[1], nil)
+		if err != nil || status != 200 {
+			continue
+		}
+		if inner, ok := task["task"].(map[string]any); ok {
+			task = inner
+		}
+		for _, k := range []string{"assigned_to", "created_by"} {
+			name, _ := task[k].(string)
+			if name = strings.TrimSpace(name); name != "" && !seen[strings.ToLower(name)] && clitext.Clean(name) == name {
+				seen[strings.ToLower(name)] = true
+				names = append(names, "@"+name)
+				break // the assignee, else the creator
+			}
+		}
+	}
+	if len(names) > 0 {
+		msg += ". The text names a task: did you mean " + strings.Join(names, " ") + "?"
+	}
+	return msg
 }

@@ -32,14 +32,14 @@ func postedContent(t *testing.T, rs *recordingServer) string {
 // included, with --to's mentions in front and only the trailing newline dropped.
 func TestPostDashReadsStdinVerbatim(t *testing.T) {
 	text := "Ready: `abc123` and $(make test) stay as text.\n'single' \"double\" \\ back\n\n- a bullet\n"
-	for _, args := range [][]string{{"post", "-"}, {"post", "--to", "Lead", "-"}, {"post", "-", "--to", "Lead"}} {
+	for _, args := range [][]string{{"post", "--broadcast", "-"}, {"post", "--to", "Lead", "-"}, {"post", "-", "--to", "Lead"}} {
 		srv := newRecordingServer(t)
 		res := runBoardInput(t, srv.URL, subscribedDataDir(t, srv.URL), strings.NewReader(text), args...)
 		if res.code != 0 {
 			t.Fatalf("%v: exit %d, stderr %q", args, res.code, res.stderr)
 		}
 		want := strings.TrimRight(text, "\n")
-		if len(args) > 2 {
+		if strings.Contains(strings.Join(args, " "), "--to") {
 			want = "@Lead " + want
 		}
 		if got := postedContent(t, srv); got != want {
@@ -56,7 +56,7 @@ func TestPostDashReadsStdinVerbatim(t *testing.T) {
 func TestPostDashRefusesEmptyStdin(t *testing.T) {
 	for _, in := range []string{"", "\n", "  \n\t\n"} {
 		srv := newRecordingServer(t)
-		res := runBoardInput(t, srv.URL, subscribedDataDir(t, srv.URL), strings.NewReader(in), "post", "-")
+		res := runBoardInput(t, srv.URL, subscribedDataDir(t, srv.URL), strings.NewReader(in), "post", "--broadcast", "-")
 		if res.code != 2 || !strings.Contains(res.stderr, "empty") {
 			t.Errorf("stdin %q: exit %d, stderr %q; want exit 2 saying it's empty", in, res.code, res.stderr)
 		}
@@ -66,7 +66,7 @@ func TestPostDashRefusesEmptyStdin(t *testing.T) {
 	}
 
 	srv := newRecordingServer(t)
-	res := runBoardInput(t, srv.URL, subscribedDataDir(t, srv.URL), strings.NewReader("ignored"), "post", "--", "-")
+	res := runBoardInput(t, srv.URL, subscribedDataDir(t, srv.URL), strings.NewReader("ignored"), "post", "--broadcast", "--", "-")
 	if res.code != 0 {
 		t.Fatalf("post -- -: exit %d, stderr %q", res.code, res.stderr)
 	}
@@ -178,7 +178,7 @@ func TestPostAllowsMessagesMerelyContainingShellSyntax(t *testing.T) {
 		"@Lead the result is $(cat /tmp/x.txt)",
 	} {
 		srv := newRecordingServer(t)
-		res := runBoard(t, srv.URL, subscribedDataDir(t, srv.URL), "post", content)
+		res := runBoard(t, srv.URL, subscribedDataDir(t, srv.URL), "post", "--broadcast", content)
 		if res.code != 0 {
 			t.Errorf("content %q: exit %d, stderr %q; want success", content, res.code, res.stderr)
 		}
@@ -200,7 +200,7 @@ func TestPostAllowsMessagesMerelyContainingShellSyntax(t *testing.T) {
 	// Markdown fence: not refused
 	srv := newRecordingServer(t)
 	fence := "```go\npackage main\n```"
-	res := runBoard(t, srv.URL, subscribedDataDir(t, srv.URL), "post", fence)
+	res := runBoard(t, srv.URL, subscribedDataDir(t, srv.URL), "post", "--broadcast", fence)
 	if res.code != 0 {
 		t.Errorf("markdown fence: exit %d, stderr %q; want success", res.code, res.stderr)
 	}

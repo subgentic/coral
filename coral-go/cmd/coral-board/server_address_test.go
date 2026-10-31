@@ -19,7 +19,7 @@ func TestBoardFindsTheRunningCoralFromItsLockFile(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "board_state_help-test.json"), state, 0o644))
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "coral-server.lock"), []byte(strconv.Itoa(os.Getpid())+"\n"+srv.URL+"\n"), 0o600))
 
-	res := runBoardNoURL(t, dir, "post", "found by the lock")
+	res := runBoardNoURL(t, dir, "post", "--broadcast", "found by the lock")
 	require.Equal(t, 0, res.code, res.stderr)
 	assert.Equal(t, "found by the lock", postedContent(t, srv))
 }

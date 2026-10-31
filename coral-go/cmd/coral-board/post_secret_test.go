@@ -21,12 +21,14 @@ func TestPostAndSendRefuseASignInLink(t *testing.T) {
 	require.NoError(t, os.WriteFile(file, []byte("Opened the link:\n"+link+"\n"), 0o600))
 
 	for name, run := range map[string]func() boardRun{
-		"post, an argument": func() boardRun { return runBoard(t, srv.URL, dir, "post", "result: "+link) },
-		"post, upper case":  func() boardRun { return runBoard(t, srv.URL, dir, "post", "LOGIN_TOKEN=abc123") },
-		"post, URL-encoded": func() boardRun { return runBoard(t, srv.URL, dir, "post", "next=%2F%3Flogin_token%3Dabc123") },
-		"post --file":       func() boardRun { return runBoard(t, srv.URL, dir, "post", "--file", file) },
+		"post, an argument": func() boardRun { return runBoard(t, srv.URL, dir, "post", "--broadcast", "result: "+link) },
+		"post, upper case":  func() boardRun { return runBoard(t, srv.URL, dir, "post", "--broadcast", "LOGIN_TOKEN=abc123") },
+		"post, URL-encoded": func() boardRun {
+			return runBoard(t, srv.URL, dir, "post", "--broadcast", "next=%2F%3Flogin_token%3Dabc123")
+		},
+		"post --file": func() boardRun { return runBoard(t, srv.URL, dir, "post", "--broadcast", "--file", file) },
 		"post - (stdin)": func() boardRun {
-			return runBoardInput(t, srv.URL, dir, strings.NewReader("output:\n"+link+"\n"), "post", "-")
+			return runBoardInput(t, srv.URL, dir, strings.NewReader("output:\n"+link+"\n"), "post", "--broadcast", "-")
 		},
 		"post --assign":          func() boardRun { return runBoard(t, srv.URL, dir, "post", "--assign", "Dev A", "@Dev A try "+link) },
 		"send --board, argument": func() boardRun { return runBoard(t, srv.URL, dir, "send", "--board", "other", link) },
@@ -40,7 +42,7 @@ func TestPostAndSendRefuseASignInLink(t *testing.T) {
 	}
 	assert.Empty(t, srv.requests(), "a refused message sends nothing")
 
-	res := runBoard(t, srv.URL, dir, "post", "the login token test passed: 300/300, no link in this post")
+	res := runBoard(t, srv.URL, dir, "post", "--broadcast", "the login token test passed: 300/300, no link in this post")
 	require.Equal(t, 0, res.code, res.stderr)
 	require.Len(t, srv.requests(), 1, "a message about sign-in links, with no token in it, is posted")
 }
