@@ -54,6 +54,9 @@ const (
 	// CmdCheckStopped is the check after a stop: exit 0 only when there is no tmux session named exactly coral-server and nothing listens on port 8420 (read from /proc/net/tcp and tcp6, Linux); 1 for a
 	// session, 2 for a listener, 3 when it cannot tell (no /proc/net/tcp): all of them are "not confirmed".
 	CmdCheckStopped
+	// CmdInstallOwnerSecret runs the Coral of version arg 0's `hub-owner-secret` with the id and the secret as JSON on STDIN (never argv): the human act that installs the secret its owner stamps are
+	// verified with (#11378).
+	CmdInstallOwnerSecret
 	// CmdFreeKB prints the free space, in KiB, of the file system that holds the home folder (the install folder lives under it).
 	CmdFreeKB
 	// CmdReadInstalledSum prints that recorded SHA-256, if the release is installed; arg 0 is the version.
@@ -95,7 +98,8 @@ var specs = map[Command]spec{
 	CmdRemoveAll:        {template: "[ -n \"$HOME\" ] && rm -rf \"$HOME/" + InstallDir + "\""},
 	CmdCheckStopped: {template: "if tmux has-session -t =coral-server 2>/dev/null; then exit 1; fi; [ -r /proc/net/tcp ] || exit 3; " +
 		"if grep -Eqs '^ *[0-9]+: [0-9A-Fa-f]+:20E4 [0-9A-Fa-f:]+ 0A ' /proc/net/tcp /proc/net/tcp6; then exit 2; fi; exit 0"},
-	CmdFreeKB: {template: "df -Pk \"$HOME\" | awk 'NR==2 {print $4}'"},
+	CmdInstallOwnerSecret: {template: "\"$HOME/" + InstallDir + "/%s/root/coral\" hub-owner-secret --home \"$HOME/" + InstallDir + "/data\"", args: []*regexp.Regexp{versionRe}},
+	CmdFreeKB:             {template: "df -Pk \"$HOME\" | awk 'NR==2 {print $4}'"},
 	// The recorded sum goes FIRST: a re-unpack that is interrupted leaves no sum next to a half-written root, so the next run does not say "already installed". It is written last.
 	CmdUnpack: {template: "umask 077 && cd \"$HOME/" + InstallDir + "/%[1]s\" && rm -f package.sha256 && rm -rf root && mkdir root && tar -xzf package.tar.gz --no-same-owner -C root && " +
 		"{ sha256sum package.tar.gz 2>/dev/null || shasum -a 256 package.tar.gz; } | cut -d' ' -f1 > package.sha256", args: []*regexp.Regexp{versionRe}, timeout: 5 * time.Minute},

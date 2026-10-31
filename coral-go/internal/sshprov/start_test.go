@@ -36,6 +36,7 @@ if [ "$1" = "api-key" ]; then
   [ -s "$home/api_key" ] || exit 1
   cat "$home/api_key"; exit 0
 fi
+if [ "$1" = "hub-owner-secret" ]; then echo "$@" >> '` + argsLog + `.owner'; cat > '` + argsLog + `.owner.stdin'; exit "${COMMA_EXIT:-0}"; fi
 if [ "$1" = "accept-terms" ]; then echo "$@" >> '` + argsLog + `.accept'; cat > '` + argsLog + `.stdin'; exit "${COMMA_EXIT:-0}"; fi
 echo "$@" >> '` + argsLog + `'
 home=""; while [ $# -gt 0 ]; do [ "$1" = "--home" ] && home="$2"; shift; done
@@ -308,5 +309,29 @@ func TestStopAndConfirmReturnsOnlyOnAConfirmedStop(t *testing.T) {
 	start := time.Now()
 	if err := r.StopAndConfirm(ctx, tg); !errors.Is(err, ErrNotStopped) || time.Since(start) > 3*time.Second {
 		t.Errorf("a check that cannot tell must refuse at once: %v after %v", err, time.Since(start))
+	}
+}
+
+func TestInstallOwnerSecretGoesOnStdinNeverInArgv(t *testing.T) {
+	r, home, argsLog, _ := startSide(t)
+	tg, _ := ParseTarget("rich@box.example.com")
+	secret := strings.Repeat("ab", 32)
+	if err := r.InstallOwnerSecret(context.Background(), tg, "2.0.10", "ssh-box", secret); err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(argsLog + ".owner.stdin")
+	if err != nil || string(got) != `{"remote":"ssh-box","secret":"`+secret+`"}` {
+		t.Fatalf("stdin = %q, %v", got, err)
+	}
+	args, _ := os.ReadFile(argsLog + ".owner")
+	if strings.TrimSpace(string(args)) != "hub-owner-secret --home "+filepath.Join(home, ".coral-server", "data") {
+		t.Errorf("coral got arguments: %q", args)
+	}
+	text, err := remoteText(CmdInstallOwnerSecret, "2.0.10")
+	if err != nil || strings.Contains(text, secret) || strings.Contains(text, "ssh-box") {
+		t.Errorf("the remote text carries the payload: %q %v", text, err)
+	}
+	if _, err := r.RunInput(context.Background(), tg, strings.NewReader("x"), CmdInstallOwnerSecret, "../x"); !errors.Is(err, ErrNotAllowed) {
+		t.Errorf("a version that is a path: %v", err)
 	}
 }

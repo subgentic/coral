@@ -17,6 +17,7 @@ import (
 
 	"github.com/subgentic/coral/internal/executil"
 	"github.com/subgentic/coral/internal/safego"
+	"github.com/subgentic/coral/pkg/hubowner"
 	proxy "github.com/subgentic/coral/pkg/hubproxy"
 )
 
@@ -27,15 +28,16 @@ import (
 //
 // Only this package makes one (the fields are unexported): the normal registration path (POST /api/servers) builds a target from a URL and has no way to name a stream.
 type StreamTarget struct {
-	r      Runner
-	target Target
-	port   int
-	apiKey string
-	once   sync.Once
-	tr     *http.Transport
-	slots  chan struct{} // one per ssh process alive: the cap on streams
-	mu     sync.Mutex
-	failed time.Time // when a dial last failed: dials are refused for streamBackoff after it
+	r                    Runner
+	target               Target
+	port                 int
+	apiKey               string
+	once                 sync.Once
+	tr                   *http.Transport
+	slots                chan struct{} // one per ssh process alive: the cap on streams
+	ownerID, ownerSecret string        // the hub's owner stamp for this remote (#11378), set by WithOwnerStamp
+	mu                   sync.Mutex
+	failed               time.Time // when a dial last failed: dials are refused for streamBackoff after it
 }
 
 // streamCap bounds the ssh processes one target keeps (the dashboard, the poller and the feed each hold a few); streamBackoff is how long dials are refused after one failed, so a dead host or a
@@ -78,6 +80,21 @@ func (s *StreamTarget) transport() *http.Transport {
 		}
 	})
 	return s.tr
+}
+
+// WithOwnerStamp gives the target the id the remote knows itself by and the secret the hub signs its owner stamps with (#11378); the hub's proxy asks it to sign the requests that need a person.
+func (s *StreamTarget) WithOwnerStamp(remoteID, secret string) *StreamTarget {
+	s.ownerID, s.ownerSecret = remoteID, secret
+	return s
+}
+
+// OwnerStamp implements hubproxy.OwnerStamper.
+func (s *StreamTarget) OwnerStamp(method, target string, body []byte) (string, bool) {
+	if s.ownerSecret == "" || s.ownerID == "" {
+		return "", false
+	}
+	v, err := hubowner.Sign(s.ownerSecret, s.ownerID, method, target, body, time.Now())
+	return v, err == nil
 }
 
 // Close ends the idle ssh streams.
