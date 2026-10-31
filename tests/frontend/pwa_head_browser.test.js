@@ -1,5 +1,6 @@
 // The installed app's page (#10095, Mobile #10089): the manifest is served with an id, a scope and separate any and maskable icons that all load; the viewport runs edge to edge; the browser bar's
 // colour (theme-color) follows the page's Light or Dark, also when the theme changes while the page is open. 390 and 1280 px; real isolated server.
+process.env.CORAL_KEEP_START = '1'; // its own early script reads the bare "/" before the page is parsed: the runner's start-on-Agents shim (#11594) would move it
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
