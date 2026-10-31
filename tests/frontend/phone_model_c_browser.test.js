@@ -27,7 +27,7 @@ const BASE = require('./test_base').BASE;
             await settle(300);
             let d = await state('docs-view');
             assert.ok(d.type === 'top-level' && d.nav === 'flex' && !d.item && d.pad >= 100 && d.page, `${tag}: Docs' list is a top-level screen with the nav and room under it: ` + JSON.stringify(d));
-            assert.equal(await lit(), 'nav-more', `${tag}: More is lit on Docs`);
+            assert.equal(await lit(), null, `${tag}: no tab is lit on Docs: it is a place of the ☰ menu (#11472, the More slot is gone)`);
             await shot(`model-c-docs-list-${w}-${fs}-${theme}`);
             await ev(`window.selectDoc(document.querySelector('#docs-nav-list [data-doc]').dataset.doc); true`);
             await waitFor(`document.getElementById('docs-view').hasAttribute('data-phone-item') && document.querySelectorAll('#docs-content h1, #docs-content h2').length >= 1`, `${tag}: a topic`, 10000);
@@ -43,7 +43,7 @@ const BASE = require('./test_base').BASE;
             await waitFor(`!document.getElementById('cost-dashboard-view').hasAttribute('data-phone-item')`, `${tag}: the list`, 5000); await settle(300);
             d = await state('cost-dashboard-view');
             assert.ok(d.type === 'top-level' && d.nav === 'flex' && !d.item && d.pad >= 100 && d.page, `${tag}: Analytics' list is a top-level screen with the nav and room under it: ` + JSON.stringify(d));
-            assert.equal(await lit(), 'nav-more', `${tag}: More is lit on Analytics`);
+            assert.equal(await lit(), null, `${tag}: no tab is lit on Analytics: it is a place of the ☰ menu (#11472)`);
             for (let i = 0; i < 6; i++) { await ev(`import(${S} + 'analytics_views.js').then(m => { m.selectView('provider'); return true; })`); await settle(500); if (await ev(`document.getElementById('cost-dashboard-view').hasAttribute('data-phone-item')`)) break; }
             await waitFor(`document.getElementById('cost-dashboard-view').hasAttribute('data-phone-item') && document.getElementById('cost-dashboard-view').getClientRects().length > 0`, `${tag}: an analytics view`, 8000);
             await settle(300);

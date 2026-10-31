@@ -43,10 +43,12 @@ export function setPhonePageName(name) {
     _pageName = name || '';
     if (_pageName) { document.body.dataset.phonePage = _pageName; for (const t of document.querySelectorAll('.phone-bar-title')) t.textContent = _pageName; } // phone_screens.js reads it for the lit slot
     if (_pageName === 'Tasks') lightSlot('nav-tasks');
+    if (_pageName === 'Chats') lightSlot('nav-chats');
 }
 /** The page is over (another tab was chosen, or the Inbox's own tab is no longer Tasks): the pill says the view's name again and the slot the page replaced is lit. */
-export function clearPhonePageName() {
+export function clearPhonePageName(keep = '') {
     const had = _pageName;
+    if (keep && had.toLowerCase() === keep) return; // the Inbox's own tab is the page the bar opened (Tasks, Chats): it stays
     _pageName = ''; delete document.body.dataset.phonePage;
     if (!had) return;
     for (const t of document.querySelectorAll('.phone-bar-title')) t.textContent = _lastWords || pageHeading();

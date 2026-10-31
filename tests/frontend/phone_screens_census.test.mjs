@@ -9,7 +9,8 @@ const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '../../cora
 const sw = fs.readFileSync(path.join(root, 'static/view_switch.js'), 'utf8');
 const ids = [...sw.slice(sw.indexOf('const VIEW_IDS'), sw.indexOf('];', sw.indexOf('const VIEW_IDS'))).matchAll(/"([a-z-]+)"/g)].map(m => m[1]);
 const tpl = fs.readFileSync(path.join(root, 'templates/index.html'), 'utf8');
-const slots = new Set([...tpl.matchAll(/data-phone-nav="([a-z-]+)"/g)].map(m => m[1]));
+const slots = new Set([...tpl.matchAll(/data-phone-nav="([a-z-]+)"/g)].map(m => m[1])); // the bar's tabs (#11472); a place of the ☰ menu (Automations, Analytics, Docs, Computers) is a top-level screen with the bar on and no tab lit: its slot is 'menu'
+slots.add('menu');
 const bad = [];
 if (ids.length < 10) bad.push(`could not read VIEW_IDS (${ids.length} found)`);
 for (const id of ids) {

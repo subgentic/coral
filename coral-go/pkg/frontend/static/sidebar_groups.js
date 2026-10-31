@@ -207,7 +207,7 @@ function drawTable() {
 /** Opens a group as a table in the centre. */
 export function openGroupTable(kind, key, { focus = false } = {}) {
     open = { kind, key };
-    if (kind === 'hub-inbox' && key !== 'tasks') clearPhonePageName(); // the phone bar's Tasks page ends when the Inbox's own tab is anything else (#11401)
+    if (kind === 'hub-inbox') clearPhonePageName(key); // the phone bar's Tasks page ends when the Inbox's own tab is anything else (#11401)
     if (!drawTable()) { open = null; return false; }
     showView('group-table-view');
     // a group opened by the person: the keyboard starts at the page's search box (the first control of the toolbar, #7404), else the first row, else the heading (a ring round the word was the arrival's look)

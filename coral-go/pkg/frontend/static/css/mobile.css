@@ -1418,22 +1418,26 @@
    Home, Inbox (with the waiting count), Tasks and More are a pill 18 px above the bottom; the + is a separate rounded button at the right and opens New agent and New team. Under 601 px, on the Agents page and the Inbox, and not
    while the keyboard is up (the + only on the Agents page). The lists keep room under them (96 px). */
 .phone-nav, .phone-fab, .phone-fab-menu { display: none; }
+:root { --phone-bar-h: 72px; } /* the docked bottom bar's height without the safe area (#11472) */
 @media (max-width: 600px) {
-    body.phone-nav-on:not(.keyboard-open):not(.popout-mode) .phone-nav { position: fixed; left: 14px; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); z-index: 40; display: flex; align-items: center; justify-content: space-around; gap: 2px; width: 268px; height: 64px; padding: 0 6px; border-radius: 32px; background: var(--bg-secondary); box-shadow: 0 2px 14px rgba(var(--black-rgb), 0.22); }
-    .phone-nav-slot { position: relative; display: grid; place-items: center; flex: none; width: 56px; height: 44px; padding: 0; border: 0; border-radius: 22px; background: none; color: var(--text-primary); cursor: pointer; }
-    @media (max-width: 359px) { .phone-nav-slot { width: 48px; } body.phone-nav-on:not(.keyboard-open):not(.popout-mode) .phone-nav { width: 212px; } } /* the + (64 px at the right) never covers the nav's last slot at 320 px: four 48 px slots end before it begins (the Mobile Beta Tester: a tap on More hit New) */
-    .phone-nav-slot.active { background: var(--bg-hover); }
+    /* The bottom tab bar (#11472, Gmail's): docked, not floating, full width; four labelled slots, the current one in a pill; the badge on the Inbox icon. Only on the high-level screens (body.phone-nav-on): a dug-into screen has none. */
+    body.phone-nav-on:not(.keyboard-open):not(.popout-mode) .phone-nav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; display: flex; align-items: stretch; justify-content: space-around; min-height: calc(var(--phone-bar-h) + env(safe-area-inset-bottom, 0px)); padding: 8px 4px calc(8px + env(safe-area-inset-bottom, 0px)); background: var(--bg-secondary); border-top: 1px solid var(--border); box-sizing: border-box; }
+    .phone-nav-slot { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; flex: 1 1 0; min-width: 0; min-height: 56px; padding: 0; border: 0; background: none; color: var(--text-muted); cursor: pointer; }
+    .phone-nav-icon { position: relative; display: grid; place-items: center; width: 64px; height: 32px; border-radius: 16px; }
+    .phone-nav-label { font-size: var(--fs-sm); line-height: 1.2; }
+    .phone-nav-slot.active { color: var(--text-primary); }
+    .phone-nav-slot.active .phone-nav-icon { background: var(--bg-hover); }
+    .phone-nav-slot.active .phone-nav-label { font-weight: var(--fw-strong); }
     .phone-nav-slot svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-    .phone-nav-slot[data-phone-nav="nav-more"] svg { fill: currentColor; stroke: none; }
-    .phone-nav-badge { position: absolute; top: 0; right: 6px; background: var(--warning); color: var(--bg-primary); } 
+    .phone-nav-badge { position: absolute; top: -4px; right: 6px; background: var(--warning); color: var(--bg-primary); }
     body.large-text .phone-nav-badge { transform: scale(0.5); transform-origin: top right; } /* at 200% text the count stays a badge on the icon's corner: it does not grow over the icon (the Mobile Beta Tester) */
     .phone-nav-badge[hidden] { display: none; }
-    body.agent-home-active:not(.keyboard-open):not(.popout-mode) .phone-fab, body[data-phone-fab="automations"]:not(.keyboard-open):not(.popout-mode) .phone-fab { position: fixed; right: 16px; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); z-index: 40; display: grid; place-items: center; width: 64px; height: 64px; padding: 0; border: 0; border-radius: 20px; background: var(--accent); color: var(--text-on-accent); box-shadow: 0 2px 14px rgba(var(--black-rgb), 0.22); cursor: pointer; }
+    body.agent-home-active:not(.keyboard-open):not(.popout-mode) .phone-fab, body[data-phone-fab="automations"]:not(.keyboard-open):not(.popout-mode) .phone-fab { position: fixed; right: 16px; bottom: calc(var(--phone-bar-h) + 16px + env(safe-area-inset-bottom, 0px)); z-index: 41; display: grid; place-items: center; width: 64px; height: 64px; padding: 0; border: 0; border-radius: 20px; background: var(--accent); color: var(--text-on-accent); box-shadow: 0 2px 14px rgba(var(--black-rgb), 0.22); cursor: pointer; }
     .phone-fab svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; }
-    body.phone-nav-on #mobile-agent-list, body.phone-nav-on #group-table-view, body.phone-nav-on #inbox-view:not([data-phone-item]), body.phone-nav-on #scheduler-view:not([data-phone-item]), body.phone-nav-on #workflows-view:not([data-phone-item]), body.phone-nav-on #docs-view:not([data-phone-item]), body.phone-nav-on #cost-dashboard-view:not([data-phone-item]), body.phone-nav-on #servers-view:not([data-phone-item]) { padding-bottom: 112px; } /* the empty page's cards scroll clear of the nav too (the Mobile Beta Tester, #11116) */
+    body.phone-nav-on #mobile-agent-list, body.phone-nav-on #group-table-view, body.phone-nav-on #inbox-view:not([data-phone-item]), body.phone-nav-on #scheduler-view:not([data-phone-item]), body.phone-nav-on #workflows-view:not([data-phone-item]), body.phone-nav-on #docs-view:not([data-phone-item]), body.phone-nav-on #cost-dashboard-view:not([data-phone-item]), body.phone-nav-on #servers-view:not([data-phone-item]) { padding-bottom: calc(var(--phone-bar-h) + 40px + env(safe-area-inset-bottom, 0px)); } /* the empty page's cards scroll clear of the bar too (the Mobile Beta Tester, #11116) */
     body:has(#inbox-view[data-phone-item]) .phone-nav { display: none; } /* a task or a message opened in the Inbox is a page of its own: the nav goes while it is open */
     body.agent-home-active:has(#mobile-agent-list .empty-launch) .phone-fab { display: none; } /* an empty page has its own New agent button */
-    body.agent-home-active .phone-fab-menu:not([hidden]), body[data-phone-fab="automations"] .phone-fab-menu:not([hidden]) { position: fixed; right: 16px; bottom: calc(92px + env(safe-area-inset-bottom, 0px)); z-index: 41; display: flex; flex-direction: column; min-width: 180px; }
+    body.agent-home-active .phone-fab-menu:not([hidden]), body[data-phone-fab="automations"] .phone-fab-menu:not([hidden]) { position: fixed; right: 16px; bottom: calc(var(--phone-bar-h) + 88px + env(safe-area-inset-bottom, 0px)); z-index: 42; display: flex; flex-direction: column; min-width: 180px; }
 }
 
 @media (max-width: 600px) {

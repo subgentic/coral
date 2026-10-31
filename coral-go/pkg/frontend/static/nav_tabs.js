@@ -120,8 +120,8 @@ function openMenu(btn) {
     if (!menu) return;
     const hamburger = btn.id === 'top-menu-btn' || btn.hasAttribute('data-hamburger'); // the agent row's menu button is the same menu (#11056)
     const all = hamburger || btn.hasAttribute('data-nav-all');
-    const phoneNav = document.body.classList.contains('phone-nav-on'); // the floating nav has Home, Inbox and Tasks: the menu does not list them again (#11400)
-    const items = (all ? availableTabs() : _more).filter(t => !(hamburger && phoneNav && (t.arg === 'agents' || t.arg === 'hub-inbox')));
+    const phoneNav = document.body.classList.contains('phone-nav-on'); // the bottom bar has Inbox, Agents, Tasks and Chats: the menu does not list them again (#11400, #11472)
+    const items = (all ? availableTabs() : _more).filter(t => !(hamburger && phoneNav && (t.arg === 'agents' || t.arg === 'hub-inbox' || t.arg === 'history')));
     if (!items.length) return;
     menu.classList.toggle('nav-all', all);
     menu.classList.toggle('nav-hamburger', hamburger);
