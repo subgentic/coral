@@ -60,8 +60,8 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
             check(`${path} shows its tab, and again after a reload`, first.url === path && first.tab === tabId && again.url === path && again.tab === tabId, JSON.stringify({ first, again }));
         }
         await open('/');
-        check('/ is the Agents page', (await url()) === '/agents' && (await tab()) === 'nav-tab-agents', await url());
-        check('history.state is the route', JSON.stringify(await ev('history.state.coralRoute')) === JSON.stringify({ view: 'agents' }), JSON.stringify(await ev('history.state')));
+        check('/ is the Inbox, the first tab, when no place is kept (#11594)', (await url()) === '/inbox/needs' && (await tab()) === 'nav-tab-hub-inbox', await url());
+        check('history.state is the route', JSON.stringify(await ev('history.state.coralRoute')) === JSON.stringify({ view: 'inbox-folder', folder: 'needs' }), JSON.stringify(await ev('history.state')));
 
         console.log('2. Tabs are history entries: Back and Forward');
         await open('/agents');
@@ -108,7 +108,7 @@ const check = (label, ok, detail) => { results.push(!!ok); console.log(`[${ok ? 
         console.log('5. A malformed path goes home');
         for (const bad of ['/agents/not-a-uuid', '/team/%E2%80%AEevil', '/board/a%00b', '/docs/a/b', '/chats/a/b', '/workflows/x', '/board/%2E%2E']) {
             await open(bad);
-            check(`${bad} goes to /agents`, (await url()) === '/agents' && (await tab()) === 'nav-tab-agents', await url());
+            check(`${bad} goes to a start page (the Agents list, or the Inbox when the server sent it to /)`, ((await url()) === '/agents' && (await tab()) === 'nav-tab-agents') || ((await url()) === '/inbox/needs' && (await tab()) === 'nav-tab-hub-inbox'), await url());
         }
 
         console.log('6. Docs: a doc is a page; Back shows the one before');

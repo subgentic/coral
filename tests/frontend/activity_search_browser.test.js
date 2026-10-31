@@ -54,7 +54,7 @@ async function run() {
         const liveList = await (await fetch(BASE + '/api/sessions/live')).json().catch(() => []);
         AGENT = ((Array.isArray(liveList) ? liveList : liveList.sessions || []).find(x => x.session_id === SID) || {}).name || standIn.name;
         for (const e of EVENTS) { const r = await httpJson('POST', `/api/sessions/live/${encodeURIComponent(AGENT)}/events`, { ...e, session_id: SID }, { 'X-Coral-Session-Token': standIn.token }); if (r.status >= 300) throw new Error('seed ' + r.status); }
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired();
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await waitFor(`typeof window.switchNavTab === 'function'`, 'the app hooks', { timeout: 10000 }); await ev(`window.switchNavTab('agents'); true`); // a bare start is the Inbox now (#11594): this suite is about the Agents page
         await waitFor(`typeof window._coralSetLiveSessions === 'function'`, 'the app hooks', { timeout: 10000 });
         await Emulation.setDeviceMetricsOverride({ width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
         await ev(`(async () => {

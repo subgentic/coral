@@ -64,6 +64,7 @@ const STATES = {
         await Page.navigate({ url: BASE + '/' });
         await loaded;
         await coralReady();
+        await ev(`window.switchNavTab('agents'); true`); // a bare start is the Inbox now (#11594): this suite is about the Agents page
         const mod = `import((window.__coralStatic || '/static/') + 'hub_indicator.js')`;
         // Show a state and let the button's 0.15 s colour transition finish before it is read.
         const show = async name => { await ev(`(async () => { window.__hubStatus = ${JSON.stringify(STATES[name])}; (await ${mod}).renderIndicator(window.__hubStatus); return true; })()`);

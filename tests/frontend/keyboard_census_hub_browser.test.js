@@ -62,6 +62,7 @@ const { coralReady } = require('./helpers/wait');
         await ev(`try { localStorage.removeItem('coral-last-place'); } catch {} true`); // the dashboard reopens the place the person left (#10057): this scene is the Home of a Hub with no computer
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired();
         await waitFor(`typeof window.switchNavTab==='function' && !!window.__coralReady`, 'dashboard'); await coralReady(ev, 'startup', 'liveList', 'settings');
+        await ev(`window.switchNavTab('agents'); true`); // a bare start is the Inbox now (#11594): this scene is the Agents home
         await sc(`${tag}: hub: home, no computer connected`, async () => { await waitFor(`/Connect your first computer/.test(document.body.textContent) && !!document.querySelector('a[href="/machines/add"]')`, 'the connect panel', 10000); }, { expect: `[...document.querySelectorAll('a[href="/machines/add"]')].some(a => a.getClientRects().length > 0)` });
         await Page.removeScriptToEvaluateOnNewDocument({ identifier: noComputers.identifier });
         };

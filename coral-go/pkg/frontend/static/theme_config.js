@@ -74,15 +74,15 @@ function renderModal() {
                     <option value="">Load theme...</option>
                     ${themeOptions}
                 </select>
-                <button class="btn btn-sm" data-on-click="theme-load">Load</button>
-                <button class="btn btn-sm btn-danger" data-on-click="theme-delete">Delete</button>
+                <button class="btn" data-on-click="theme-load">Load</button>
+                <button class="btn btn-danger" data-on-click="theme-delete">Delete</button>
                 <span class="toolbar-spacer"></span>
-                ${isCloud() ? '' : '<button class="btn btn-sm" data-on-click="theme-import">Import</button>'}
-                <button class="btn btn-sm" data-on-click="theme-export">Export</button>
+                ${isCloud() ? '' : '<button class="btn" data-on-click="theme-import">Import</button>'}
+                <button class="btn" data-on-click="theme-export">Export</button>
             </div>
             ${isCloud() ? '' : `<div class="toolbar toolbar-stretch toolbar-nowrap toolbar-pad-bare theme-generate-bar">
                 <input type="text" id="theme-ai-prompt" class="settings-input" placeholder="Describe your theme... (e.g. &quot;cyberpunk neon with pink and teal&quot;)">
-                <button class="btn btn-sm btn-primary" id="theme-generate-btn" data-on-click="theme-generate">Generate</button>
+                <button class="btn btn-primary" id="theme-generate-btn" data-on-click="theme-generate">Generate</button>
             </div>`}
             <div class="theme-editor-scroll">
                 ${groups}

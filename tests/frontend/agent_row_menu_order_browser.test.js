@@ -12,7 +12,7 @@ const { coralReady } = require('./helpers/wait');
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Emulation.setFocusEmulationEnabled({ enabled: true });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
-        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install();
+        await Page.navigate({ url: BASE + '/agents' }); await Page.loadEventFired(); await install(); // the Agents page: a bare start is the Inbox now (#11594)
         await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
         await ev(`window.__m.add('proj1', 'A', 2, { sleeping: false, session_id: 'w-sid', display_name: 'Writer', board_project: 'team-x' }); window._coralSetLiveSessions(Object.values(window.__m.agents).map(a => window.__m.entry(a))); true`);
         await waitFor(`!!document.querySelector('.session-group-item .sidebar-kebab-btn')`, 'the agent row', 10000);

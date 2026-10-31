@@ -15,7 +15,7 @@ export function boardRenameControl(team, { onRenamed } = {}) {
     wrap.className = 'board-rename';
     const toggle = document.createElement('button');
     toggle.type = 'button';
-    toggle.className = 'btn btn-sm board-rename-toggle';
+    toggle.className = 'btn board-rename-toggle';
     toggle.textContent = 'Rename board';
     toggle.setAttribute('aria-expanded', 'false');
     toggle.setAttribute('aria-controls', `board-rename-form-${n}`);
@@ -40,11 +40,11 @@ export function boardRenameControl(team, { onRenamed } = {}) {
     input.setAttribute('aria-describedby', `board-rename-error-${n}`);
     const save = document.createElement('button');
     save.type = 'button';
-    save.className = 'btn btn-sm btn-primary';
+    save.className = 'btn btn-primary';
     save.textContent = 'Rename';
     const cancel = document.createElement('button');
     cancel.type = 'button';
-    cancel.className = 'btn btn-sm';
+    cancel.className = 'btn';
     cancel.textContent = 'Cancel';
     const error = document.createElement('p');
     error.className = 'board-rename-error';

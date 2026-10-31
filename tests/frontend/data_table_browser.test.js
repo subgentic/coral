@@ -70,9 +70,17 @@ const { coralReady } = require('./helpers/wait');
         await Emulation.setEmulatedMedia({ features: [] });
         await ev(`(() => { const s = document.querySelector('#dt-host .dt-sortbar-select'); s.value = 'n'; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
         assert.deepEqual(await names(), ['alpha', 'Delta', 'Bravo', 'Charlie'], 'the Sort by select sorts');
-        // a name cut by its row (an ellipsis) can be read whole: every primary name carries its text as a title (#8206)
-        const titles = await ev(`[...document.querySelectorAll('#dt-host tbody tr .dt-primary')].map(b => [b.textContent, b.title])`);
-        assert.ok(titles.length > 0 && titles.every(([t, title]) => title === t), 'each primary name has its full text as a title: ' + JSON.stringify(titles));
+        // a name cut by its row (an ellipsis) can be read whole, and only then (#8206, #11566): a name that fits has no tooltip, a cut one has its full text on hover
+        const hover = sel => ev(`[...document.querySelectorAll(${JSON.stringify(sel)})].map(b => { b.dispatchEvent(new Event('pointerenter')); return [b.textContent, b.title, b.scrollWidth > b.clientWidth]; })`);
+        const fits = await hover('#dt-host tbody tr .dt-primary');
+        assert.ok(fits.length > 0 && fits.every(([t, title, cut]) => !cut && title === ''), 'a name that fits has no title: ' + JSON.stringify(fits));
+        const cutOne = await ev(`(() => { const b = document.querySelector('#dt-host tbody tr .dt-primary'), name = b.textContent; b.textContent = 'a-name-too-long-for-a-row-'.repeat(8); b.dispatchEvent(new Event('pointerenter')); const out = { cut: b.scrollWidth > b.clientWidth, title: b.title, name }; b.textContent = name; return out; })()`);
+        const own = await ev(`(() => { const b = document.querySelector('#dt-host tbody tr .dt-primary'); b.title = 'Nightly build \u2014 runs at 02:00 every day'; b.dispatchEvent(new Event('pointerenter')); return b.title; })()`);
+        assert.equal(own, 'Nightly build \u2014 runs at 02:00 every day', 'a title a caller set with better words survives a hover (the table names with a what-it-does tooltip)');
+        assert.ok(cutOne.cut && cutOne.title === cutOne.name, 'a name cut by its row has its full text as a title: ' + JSON.stringify(cutOne));
+        // a cut name that is widened again loses its tooltip on the next hover (QA Reviewer 2's INFO): the text fits, so a title repeating it would be a ghost
+        const widened = await ev(`(() => { const b = document.querySelectorAll('#dt-host tbody tr .dt-primary')[2], name = b.textContent; b.textContent = 'a-name-too-long-for-a-row-'.repeat(8); b.dispatchEvent(new Event('pointerenter')); const had = b.title; b.textContent = name; b.dispatchEvent(new Event('pointerenter')); return { had, now: b.title, cut: b.scrollWidth > b.clientWidth }; })()`);
+        assert.ok(widened.had !== '' && !widened.cut && widened.now === '', 'a name that fits again has no title on the next hover: ' + JSON.stringify(widened));
         // a name too long for the phone's row ends in an ellipsis: the 44 px button is not a flex box (text-overflow does nothing on one, and the name was cut off mid-letter, #8149)
         const clip = await ev(`(() => { const td = document.querySelector('#dt-host tbody tr .dt-primary').parentElement; const b = td.querySelector('.dt-primary').cloneNode(true); b.textContent = 'a-name-too-long-for-a-phone-row-'.repeat(8); td.append(b); const s = getComputedStyle(b); const out = { display: s.display, to: s.textOverflow, over: b.scrollWidth > b.clientWidth, h: Math.round(b.getBoundingClientRect().height) }; b.remove(); return out; })()`);
         assert.ok(!/flex/.test(clip.display) && clip.to === 'ellipsis' && clip.over && clip.h >= 44, 'a long name is cut with an ellipsis and stays a 44 px target: ' + JSON.stringify(clip));
