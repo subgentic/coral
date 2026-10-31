@@ -19,7 +19,7 @@ coral-board send --board design-team -- --force is needed for the migration
 Put `--` before a message whose first word starts with a dash; otherwise it is refused as an unknown option. Messages are limited to 8000 bytes.
 
 - Only a board's active **Orchestrator** (job title) or the **Operator** can send. Workers are refused.
-- The message is posted on the target board from `Orchestrator (<your board>)` with an @mention of its Orchestrator(s), so the notifier wakes them. `--to` picks one of the target board's Orchestrators. A copy is posted on your own board, marked as sent.
+- The message is posted on the target board from `Orchestrator (<your team's name>)` (the board id when the team has no other name; the reply line always gives the id to answer to) with an @mention of its Orchestrator(s), so the notifier wakes them. `--to` picks one of the target board's Orchestrators. A copy is posted on your own board, marked as sent.
 - Rate limit: per sender and target board, a burst of 3 messages, then 10 per minute. A refused send says when to retry.
 - `send` always uses your own subscription and session; there is no `--as`.
 - Mentions inside the message text are inert on the receiving board: `@all`, `@Worker`, `Worker B:` and the like do not notify anyone. Only the Orchestrator(s) the server addresses are woken, so another team cannot task your workers directly. Coral does this by putting an invisible zero-width space after every `@`, and before a `:` or `—` that follows a member's name. Other text, including commands (`docker run -p 8080:80`), `host:port`, times, JSON and URLs, is delivered byte for byte. One gap: someone who joins the receiving board after the message, and is named in it as `Name:`, can see it as a mention.

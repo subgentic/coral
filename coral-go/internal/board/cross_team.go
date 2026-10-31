@@ -376,9 +376,11 @@ func (s *Store) UpdateBoardSettings(ctx context.Context, project string, u Board
 // message. Server ids are carried even on a single server so that coral-hub
 // can route by them later.
 type MessageOrigin struct {
-	Direction  string `json:"direction"` // "inbound" on the target board, "outbound" on the sender's mirror
-	ServerID   string `json:"server_id"`
-	Board      string `json:"board"`
+	Direction string `json:"direction"` // "inbound" on the target board, "outbound" on the sender's mirror
+	ServerID  string `json:"server_id"`
+	Board     string `json:"board"`
+	// BoardLabel is the sender board's name as its own Coral shows it (#11498), stored so the label reads "Orchestrator (Coral Go Team)" and not the board id; Board stays the id the reply hint addresses.
+	BoardLabel string `json:"board_label,omitempty"`
 	Sender     string `json:"sender"`
 	SenderRole string `json:"sender_role"`
 	// The receiving side of the message.
@@ -450,17 +452,21 @@ func (s *Store) TargetOrchestrators(ctx context.Context, project, to string) ([]
 	return out, nil
 }
 
-// SenderLabel is how a cross-team message is shown on the receiving board,
-// e.g. "Orchestrator (coral-go-team)".
+// SenderLabel is how a cross-team message is shown on the receiving board, e.g. "Orchestrator (Coral Go Team)": the sender board's name when it has one that is not just its id,
+// else the id. The reply hint still addresses the id (CrossReplyLine).
 func SenderLabel(o MessageOrigin) string {
+	team := o.Board
+	if l := strings.TrimSpace(o.BoardLabel); l != "" && l != o.Board && !strings.ContainsAny(l, "\r\n") {
+		team = l
+	}
 	if o.remote() {
 		id := o.ServerID
 		if len(id) > 8 {
 			id = id[:8]
 		}
-		return fmt.Sprintf("%s (%s, server %s)", o.SenderRole, o.Board, id)
+		return fmt.Sprintf("%s (%s, server %s)", o.SenderRole, team, id)
 	}
-	return fmt.Sprintf("%s (%s)", o.SenderRole, o.Board)
+	return fmt.Sprintf("%s (%s)", o.SenderRole, team)
 }
 
 // PostCrossTeamMessage stores the inbound message on the target board (from
@@ -472,6 +478,11 @@ func (s *Store) PostCrossTeamMessage(ctx context.Context, p CrossTeamPost) (inbo
 	in := p.Origin
 	in.Direction = "inbound"
 	in.TargetMessageID = 0
+	if in.BoardLabel == "" && !in.remote() {
+		if l := s.BoardLabel(ctx, in.Board); l != in.Board {
+			in.BoardLabel = l
+		}
+	}
 	inJSON, err := json.Marshal(in)
 	if err != nil {
 		return nil, nil, err
