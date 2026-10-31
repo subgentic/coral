@@ -110,6 +110,7 @@ GET /api/board/{project}/waits/poll never
 GET /api/board/{project}/working-mode view
 GET /api/board/{project}/working-mode/presets view
 GET /api/call-metrics/summary view
+GET /api/chief view
 GET /api/cloud/owner-label never
 GET /api/cloud/status never
 GET /api/custom-models view

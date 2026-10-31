@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -10,8 +11,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/subgentic/coral/internal/cloud"
+	"github.com/subgentic/coral/internal/server/routes"
 	"github.com/subgentic/coral/internal/store"
 	"github.com/subgentic/coral/internal/store/storetest"
+	"github.com/subgentic/coral/pkg/tunnel"
 )
 
 const chiefSID = "11111111-2222-4333-8444-555555555555"
@@ -82,4 +86,76 @@ func TestChiefPageServesOnlyTheRecordedAgentWhileTheSettingIsOn(t *testing.T) {
 	set("chief_page", "false")
 	code, _ = get()
 	assert.Equal(t, http.StatusNotFound, code, "turned off again: a 404")
+}
+
+// Chief through Coral Hub (#11470): the Hub draws its own Chief page, so it asks the machine only WHICH agent is Chief: GET /api/chief answers {enabled, session_id, team}, and through the Hub only to the computer's
+// OWNER. A viewer, a guest, a guide, a forged stamp or another hub account is refused before any setting is read. The answer is chiefRecorded's, the same one the local page uses: the setting on, and the
+// recorded session live on the recorded team.
+func TestChiefStateThroughCoralHubIsTheOwnersAlone(t *testing.T) {
+	const owner, other = "hub-user-0a1b2c3d", "hub-user-ffffffff"
+	cfg := newE2EConfig(t, t.TempDir())
+	db, err := storetest.Open(t, cfg.DBPath)
+	require.NoError(t, err)
+	t.Cleanup(func() { db.Close() })
+	stack := newTermStack(t)
+	srv := newTestServer(t, cfg, db, stack.backend, stack.terminal)
+	// after the server is built: its own wiring sets these two at startup
+	routes.SetHubOwnerRecord(func(context.Context) (string, string, error) { return tunnel.OwnerKindPersonal, "", nil })
+	routes.SetHubOwnerLabel(func(context.Context) (string, error) { return owner, nil })
+	t.Cleanup(func() { routes.SetHubOwnerRecord(nil); routes.SetHubOwnerLabel(nil) })
+	ss := store.NewSessionStore(db)
+	ctx := context.Background()
+	call := func(h map[string]string) (int, map[string]any, string) {
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "/api/chief", nil)
+		req.Host, req.RemoteAddr = "127.0.0.1:8420", "127.0.0.1:50000" // the connector is this computer
+		for k, v := range h {
+			req.Header.Set(k, v)
+		}
+		srv.Router().ServeHTTP(rec, req)
+		b, _ := io.ReadAll(rec.Result().Body)
+		var out map[string]any
+		_ = json.Unmarshal(b, &out)
+		return rec.Code, out, string(b)
+	}
+	ownerStamp := map[string]string{tunnel.ViaHeader: cloud.ViaSecret(), tunnel.HubRoleHeader: tunnel.HubRoleOwner, tunnel.HubUserHeader: owner}
+	team := "chief"
+	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: chiefSID, AgentType: "claude", AgentName: "chief", WorkingDir: t.TempDir(), BoardName: &team}))
+	for k, v := range map[string]string{"chief_page": "true", "chief_team": "chief", "chief_session": chiefSID} {
+		require.NoError(t, ss.SetSetting(ctx, k, v))
+	}
+
+	for name, h := range map[string]map[string]string{
+		"a hub viewer (no owner marker)":          {tunnel.ViaHeader: cloud.ViaSecret()},
+		"a viewer with a hub user":                {tunnel.ViaHeader: cloud.ViaSecret(), tunnel.HubUserHeader: owner},
+		"a forged tunnel stamp claiming owner":    {tunnel.ViaHeader: "1", tunnel.HubRoleHeader: tunnel.HubRoleOwner, tunnel.HubUserHeader: owner},
+		"the owner marker of a different account": {tunnel.ViaHeader: cloud.ViaSecret(), tunnel.HubRoleHeader: tunnel.HubRoleOwner, tunnel.HubUserHeader: other},
+	} {
+		code, out, raw := call(h)
+		if h[tunnel.ViaHeader] == "1" { // a stamp that is not the connector's own: the sign-in layer refuses it outright, before this route
+			assert.Equal(t, http.StatusUnauthorized, code, name)
+		} else {
+			assert.Equal(t, http.StatusForbidden, code, name)
+			assert.Equal(t, "owner_only", out["code"], name)
+		}
+		assert.NotContains(t, raw, chiefSID, name+": nothing of the recorded agent")
+	}
+
+	code, out, _ := call(ownerStamp)
+	assert.Equal(t, http.StatusOK, code)
+	assert.Equal(t, map[string]any{"enabled": true, "session_id": chiefSID, "team": "chief"}, out, "the owner is told the recorded Chief")
+
+	// the same checks as the local page, on every request
+	elsewhere := "somewhere-else"
+	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: chiefSID, AgentType: "claude", AgentName: "chief", WorkingDir: t.TempDir(), BoardName: &elsewhere}))
+	_, out, _ = call(ownerStamp)
+	assert.Equal(t, map[string]any{"enabled": true, "session_id": "", "team": ""}, out, "the recorded session is no longer on the recorded team: no agent")
+	require.NoError(t, ss.SetSetting(ctx, "chief_page", "false"))
+	_, out, _ = call(ownerStamp)
+	assert.Equal(t, map[string]any{"enabled": false, "session_id": "", "team": ""}, out, "setting off: not enabled, nothing named")
+
+	// at this computer (no tunnel) the route answers the dashboard as any local read, and the page route is as before
+	code, out, _ = call(nil)
+	assert.Equal(t, http.StatusOK, code)
+	assert.Equal(t, false, out["enabled"])
 }

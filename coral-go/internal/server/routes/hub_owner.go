@@ -141,6 +141,7 @@ var ownerRefusals = map[string]string{
 	tunnel.OwnerRouteKey("POST", "/api/board/{project}/cross-team/files/disable"):   textHubSwitchOwnerOnly,
 	tunnel.OwnerRouteKey("POST", "/api/hub-auto-accept"):                            textHubAutoAcceptOwnerOnly,
 	tunnel.OwnerRouteKey("GET", "/api/analytics/activity"):                          textActivityOwnerOnly,
+	tunnel.OwnerRouteKey("GET", "/api/chief"):                                       "through Coral Hub Chief is for the account this computer is linked to only (#11470)",
 	tunnel.OwnerRouteKey("POST", "/api/sessions/live/{name}/notices/pause"):         textNoticesOwnerOnly,
 	tunnel.OwnerRouteKey("POST", "/api/sessions/live/{name}/notices/resume"):        textNoticesOwnerOnly,
 	tunnel.OwnerRouteKey("GET", "/api/operator-asks"):                               textOperatorAsksOwnerOnly,
@@ -164,6 +165,9 @@ const textHubAutoAcceptOwnerOnly = "through Coral Hub only the account this comp
 const textCommentsOwnerOnly = "through Coral Hub only the account this computer is linked to can comment on artifacts (#7052)"
 
 const textArtifactsOwnerOnly = "through Coral Hub artifacts and pasted images are for the account this computer is linked to only"
+
+// RefuseNonOwner is refuseNonOwner for a handler outside this package (Chief's state, #11470): the same check, in the route table's words.
+func RefuseNonOwner(w http.ResponseWriter, r *http.Request) bool { return refuseNonOwner(w, r) }
 
 // refuseNonOwner answers 403 owner_only, in the route's words, to a request that came through Coral Hub on a route the table marks owner-only from anyone but the owner, and says it did.
 // Every owner-only handler calls it first; a request from this computer is refused only on the routes that are the Hub owner's alone (OwnerHubOnly). A route that is not in the table, or has no sentence, is refused in general words:

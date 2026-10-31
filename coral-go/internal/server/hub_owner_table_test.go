@@ -121,6 +121,7 @@ func TestTheOwnerRoutesOfTheTableAreTheReviewedSet(t *testing.T) {
 		"GET /api/board/{project}/orchestrator-grant":   "owner-only", // the grant to a board's orchestrator (#11432)
 		"PUT /api/board/{project}/orchestrator-grant":   "owner-only",
 		"GET /api/board/{project}/lifecycle-log":        "owner-only",
+		"GET /api/chief":                                "owner-only", // the recorded Chief, for the Hub's own Chief page (#11470)
 		// A comment (or reply), a resolve and a reopen through the Hub are the owner's alone (#7052).
 		"POST /api/artifacts/{hex64}/comments":              "owner-only",
 		"POST /api/artifacts/{hex64}/comments/{id}/resolve": "owner-only",

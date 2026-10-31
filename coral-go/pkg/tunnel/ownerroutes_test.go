@@ -137,6 +137,10 @@ func TestTheOwnerTableAgreesWithTheHandWrittenListItReplaced(t *testing.T) {
 			if m == http.MethodPost && strings.HasPrefix(p, "/api/sessions/live/") && (strings.HasSuffix(p, "/notices/pause") || strings.HasSuffix(p, "/notices/resume")) {
 				continue
 			}
+			// Chief's state (#11470) is the owner's alone through the hub: the old list never had it.
+			if m == http.MethodGet && p == "/api/chief" {
+				continue
+			}
 			// The owner's comment writes (a comment or reply, a resolve, a reopen) are new (#7052): the old list never had them.
 			if m == http.MethodPost && strings.HasPrefix(p, "/api/artifacts/") && (strings.HasSuffix(p, "/comments") || strings.HasSuffix(p, "/resolve") || strings.HasSuffix(p, "/reopen")) {
 				continue

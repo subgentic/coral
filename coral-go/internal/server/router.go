@@ -816,6 +816,7 @@ func (s *Server) registerStatic(r *chi.Mux) {
 	r.Get("/agent/{sessionID}", s.serveAgentPopout)
 	r.Get("/agent/{server}/{sessionID}", s.serveAgentPopout)
 	r.Get("/chief", s.serveChief)
+	r.Get("/api/chief", s.chiefState) // the recorded Chief for the Hub (#11470); owner-only through it
 	r.Get("/", s.serveIndex)
 	for _, p := range DashboardPagePaths {
 		r.Get(p, s.servePagePath)
