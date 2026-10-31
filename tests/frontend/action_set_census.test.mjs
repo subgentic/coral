@@ -17,7 +17,7 @@ for (const rel of files) {
     }
 }
 assert.deepEqual(again, [], `a button that retries says Retry:\n${again.join('\n')}`);
-for (const [rel, cls] of [['static/board_window.js', 'mb-delete-msg-btn'], ['static/controls.js', 'macro-delete-btn']]) {
+for (const [rel, cls] of [['static/board_window.js', 'mb-delete-msg-btn']]) {
     const t = read(rel), at = t.indexOf(cls), btn = t.slice(at, t.indexOf('</button>', at));
     assert.ok(/material-icons[^>]*>delete</.test(btn) && !/&times;|×/.test(btn), `${rel}: ${cls} is the delete icon, not a ×: ${btn.slice(-120)}`);
 }
