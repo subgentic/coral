@@ -61,7 +61,7 @@ export async function replyToAsk(a, text) {
 /** The question whole, with a Reply box: a modal dialog (focus kept inside it, Escape closes it). */
 export function openAskDialog(a, onDone) {
     const dlg = document.createElement('dialog');
-    dlg.className = 'inbox-ask-dialog';
+    dlg.className = 'modal-content dlg-form inbox-ask-dialog'; // the shared dialog rule sizes it (--dlg-max, dlg-form), not a width of its own
     dlg.setAttribute('aria-labelledby', 'inbox-ask-title');
     const title = document.createElement('h2'); title.id = 'inbox-ask-title'; title.textContent = `${a.asker} asks you`;
     const sub = document.createElement('p'); sub.className = 'inbox-ask-sub'; sub.textContent = `On the ${a.board} board${a.kind === 'wait' ? ', waiting for your reply' : ''}.`;

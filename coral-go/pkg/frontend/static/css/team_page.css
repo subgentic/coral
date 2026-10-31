@@ -341,8 +341,7 @@
 .inbox-review-item { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .inbox-review-item > :not(.inbox-review-name) { flex: none; }
 .inbox-review-item > .inbox-review-name { flex: 0 1 auto; min-width: 0; } /* the name and, once it is opened, its 'read' tag (#9277) */
-.inbox-ask-dialog { max-width: min(36rem, calc(100vw - 32px)); width: 100%; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-primary); color: var(--text-primary); padding: 16px; }
-.inbox-ask-dialog::backdrop { background: rgba(0, 0, 0, .45); }
+.inbox-ask-dialog { color: var(--text-primary); } /* the size, border and ground are the shared dialog rule's */
 .inbox-ask-dialog h2 { margin: 0 0 4px; font-size: var(--fs-lg, 1.1rem); }
 .inbox-ask-sub { margin: 0 0 12px; color: var(--text-tertiary); }
 .inbox-ask-text { margin: 0 0 12px; max-height: 14rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--font-mono, monospace); background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 8px 10px; }
