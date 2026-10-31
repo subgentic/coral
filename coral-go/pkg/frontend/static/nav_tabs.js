@@ -7,11 +7,11 @@
  * - Under 640 px (#9021) the top row is one hamburger button: it names the view and opens the views, then Home, Settings (themes, servers, updates) and the account.
  * The buttons drawn here carry the same data-on-click as the tabs, so switching a tab is still the one action. */
 import { setPhoneBarTitle } from './phone_bar.js';
+import { importOnce } from './import_once.js';
 import { PHONE_QUERY } from './phone_layout.js';
 import { registerActions } from './actions.js';
 import { isHub } from './server_base.js';
 import { MENU_KEYS, menuMove } from './menu_keys.js';
-import { drawerTop, showScrim, hideScrim } from './phone_drawer.js';
 
 const ICONS = { agents: 'smart_toy', history: 'chat_bubble_outline', workflows: 'account_tree', jobs: 'schedule', automations: 'schedule', tokens: 'insights',
     docs: 'menu_book', servers: 'dns', 'hub-inbox': 'notifications', board: 'forum', artifacts: 'inventory_2' };
@@ -108,16 +108,17 @@ function menuEntries(viewLabels = new Set(), phoneNav = false) {
 
 let _more = [];          // the tabs the row's More menu lists right now
 let _menuFor = null;     // the button that opened the menu
+let _drawer = null;      // phone_drawer.js, loaded the first time a phone opens the ☰ (it is not in the start: page_weight)
 
 function closeMenu() {
     const menu = document.getElementById('nav-more-menu');
     if (menu) { menu.hidden = true; menu.classList.remove('nav-drawer'); }
-    hideScrim();
+    if (_drawer) _drawer.hideScrim();
     document.querySelectorAll('[data-on-click="m-nav-more"], [data-on-click="m-top-menu"]').forEach(b => b.setAttribute('aria-expanded', 'false'));
     _menuFor = null;
 }
 
-function openMenu(btn) {
+function openMenu(btn, focusKey = false) { // focusKey: true (opened by Enter or Space: the first item), or the arrow that opened it (ArrowUp: the last)
     const menu = document.getElementById('nav-more-menu');
     if (!menu) return;
     const hamburger = btn.id === 'top-menu-btn' || btn.hasAttribute('data-hamburger'); // the agent row's menu button is the same menu (#11056)
@@ -130,9 +131,10 @@ function openMenu(btn) {
     if (hamburger) {
         const sep = document.createElement('div'); sep.className = 'nav-more-sep'; sep.setAttribute('role', 'separator');
         const drawer = isPhone(); // on a phone the ☰ is a left drawer: the Inbox's folders and the teams, a divider, then the less-used places (#11472)
+        if (drawer && !_drawer) { importOnce('./phone_drawer.js').then(m => { _drawer = m; openMenu(btn, focusKey); }); return; } // the drawer's code arrives on the first tap, then the same tap's menu opens
         menu.classList.toggle('nav-drawer', drawer);
-        menu.replaceChildren(...(drawer ? drawerTop() : []), ...(drawer ? [] : items.map(makeItem)), ...(drawer ? [sep] : []), ...(drawer ? items.map(makeItem) : [sep]), ...menuEntries(new Set(items.map(t => t.label)), phoneNav));
-        if (drawer) showScrim(closeMenu);
+        menu.replaceChildren(...(drawer ? _drawer.drawerTop() : []), ...(drawer ? [] : items.map(makeItem)), ...(drawer ? [sep] : []), ...(drawer ? items.map(makeItem) : [sep]), ...menuEntries(new Set(items.map(t => t.label)), phoneNav));
+        if (drawer) _drawer.showScrim(closeMenu);
         for (const v of menu.querySelectorAll('.nav-more-item:not([role])')) v.setAttribute('role', 'menuitem');
     } else menu.replaceChildren(...items.map(makeItem));
     menu.hidden = false;
@@ -150,6 +152,7 @@ function openMenu(btn) {
     else { menu.style.left = 'auto'; menu.style.right = Math.max(8, window.innerWidth - r.right) + 'px'; }
     btn.setAttribute('aria-expanded', 'true');
     _menuFor = btn;
+    if (focusKey === true) menu.querySelector('.nav-more-item')?.focus(); else if (focusKey) { const it = [...menu.querySelectorAll('.nav-more-item')].filter(x => x.getClientRects().length); it[menuMove(focusKey, it.length, -1)]?.focus(); } // opened by the keyboard (Enter or Space): the focus goes to the first item, as the Settings menu's did; Escape gives it back to the button
 }
 
 // Desktop and tablet: show every tab, then take tabs off the end (not the active one) until the row fits.
@@ -212,8 +215,7 @@ registerActions({
     'm-top-menu': (el, event) => {
         event.stopPropagation();
         if (_menuFor === el) { closeMenu(); return; }
-        closeMenu(); openMenu(el);
-        if (event.detail === 0) document.querySelector('#nav-more-menu .nav-more-item')?.focus(); // opened by the keyboard (Enter or Space): the focus goes to the first item, as the Settings menu's did; Escape gives it back to the button
+        closeMenu(); openMenu(el, event.detail === 0);
     },
     'm-nav-more': (el, event) => {
         event.stopPropagation();
@@ -263,7 +265,7 @@ if (typeof document !== 'undefined') {
             const button = e.target.closest?.('[data-on-click="m-top-menu"], [data-on-click="m-nav-more"]');
             if (!button || (e.key !== 'ArrowDown' && e.key !== 'ArrowUp')) return;
             e.preventDefault();
-            if (_menuFor !== button) { closeMenu(); openMenu(button); }
+            if (_menuFor !== button) { closeMenu(); openMenu(button, e.key); return; }
             const items = entries();
             items[menuMove(e.key, items.length, -1)]?.focus();
         });

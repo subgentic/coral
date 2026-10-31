@@ -4,7 +4,7 @@
  * Detection is the step itself: an agent exists, a team exists, a computer or the Hub is connected. They are not alarms: not in the Inbox badge, no toast, no alert, and they sit under real work. */
 import { state } from './state.js';
 import { serverFetch, currentServer } from './server_base.js';
-import { showConfirmModal } from './confirm_dialog.js';
+import { importOnce } from './import_once.js';
 import { registerActions } from './actions.js';
 import { browserSession } from './safe_storage.js';
 
@@ -16,7 +16,6 @@ export const WELCOME = {
     connect: { title: 'Connect a second computer or the Hub', text: 'Run agents on another computer, or reach this one from your phone.', go: 'Connect', dismiss: true, optional: true },
     asks: { title: 'How agents ask you for things', text: 'Approvals, dialogs and review artifacts all land here. A short read, then it clears.', go: 'Read it', dismiss: true },
 };
-const ASKS_TEXT = 'When an agent needs a decision it appears in Needs you with its question: a permission to allow, a question to answer, a plan to approve, or a dialog in its terminal that needs one click. A review artifact an agent made waits there too, marked For review. Answer from the list or open the agent. Once answered, the item leaves.';
 
 export const welcomeOn = () => (state.settings || {}).inbox_welcome === 'on';
 const doneList = () => new Set(String((state.settings || {}).inbox_welcome_done || '').split(',').map(s => s.trim()).filter(id => WELCOME_IDS.includes(id)));
@@ -82,7 +81,7 @@ export function runWelcome(id) {
     if (id === 'welcome') { mark('welcome'); return; }
     if (id === 'agent' || id === 'team') { window.showLaunchModal?.(); window._selectLaunchType?.(id); return; }
     if (id === 'connect') { window.switchNavTab?.('servers'); return; }
-    if (id === 'asks') { const read = () => mark('asks'); showConfirmModal(WELCOME.asks.title, ASKS_TEXT, read, read, { label: 'Got it', cancelLabel: 'Close', danger: false }); }
+    if (id === 'asks') importOnce('./welcome_asks.js').then(m => m.readAsks(WELCOME.asks.title, () => mark('asks'))); // the long read arrives when it is opened, not at start (page_weight)
 }
 
 /** Whether this page was opened at the bare address (no path, no query). The URL the person typed or tapped, not the live one: by the time the settings have loaded the app has moved to /agents (#11443). */
