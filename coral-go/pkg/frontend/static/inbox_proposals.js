@@ -7,6 +7,7 @@ import { loadStyles } from './lazy_styles.js';
 const { markHidden } = await importOnce('./visible_marks.js'); // lazy: its failure is retried
 const { proposalItems, pendingProposals, onProposalsChanged, refreshProposals, dismissExpired, decide } = await importOnce('./proposals_state.js'); // lazy: its failure is retried
 const { el } = await importOnce('./data_table.js');
+const { linkArtifactRefsIn } = await importOnce('./artifact_refs.js'); // a coral://artifacts/<hex> in the instructions is a link (#11416)
 await loadStyles('inbox_proposals.css');
 export { proposalItems, pendingProposals, onProposalsChanged, refreshProposals };
 
@@ -103,7 +104,7 @@ export function openProposalDialog(p, mode = 'view') {
     editOpen.addEventListener('click', () => { editing = true; for (const [i, raw] of inputs) { i.value = raw; i.readOnly = false; } sayHidden(); editOpen.hidden = true; approve.textContent = 'Approve with these words'; title.focus(); });
     row.append(close, rejectOpen, editOpen, approve);
     const carried = [];
-    if (facts.instructions) { const b = el('div', 'proposal-carried'); b.append(el('strong', null, 'Instructions it gives the assignee'), el('pre', 'proposal-pre', markedBlock(facts.instructions))); carried.push(b); }
+    if (facts.instructions) { const b = el('div', 'proposal-carried'); b.append(el('strong', null, 'Instructions it gives the assignee'), linkArtifactRefsIn(el('pre', 'proposal-pre', markedBlock(facts.instructions)))); carried.push(b); }
     if (facts.outputs.length) { const b = el('div', 'proposal-carried'); b.append(el('strong', null, 'Outputs it requires')); const ul = el('ul', 'proposal-outputs'); for (const o of facts.outputs) ul.append(el('li', null, markedBlock(o))); b.append(ul); carried.push(b); }
     if (facts.also.length) carried.push(el('p', 'proposal-extra', markedBlock(`Also sets: ${facts.also.join('; ')}.`)));
     d.append(h, who, ...parts, ...carried, hidden, reasonRow, status, row);
