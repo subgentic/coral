@@ -86,3 +86,14 @@ func widerThanOwner(dir string, me *windows.SID) (bool, error) {
 	}
 	return false, nil
 }
+
+// ownerOnlyAcl reports whether dir's access list grants no one besides this user, SYSTEM and Administrators: the same test ownerOnly makes before it changes anything. A list that cannot be
+// read counts as not owner-only.
+func ownerOnlyAcl(dir string) bool {
+	me, err := currentUser()
+	if err != nil {
+		return false
+	}
+	wider, err := widerThanOwner(dir, me)
+	return err == nil && !wider
+}

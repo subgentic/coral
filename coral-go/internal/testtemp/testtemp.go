@@ -56,6 +56,9 @@ func startedByGoTest(args []string) bool {
 // bytes on macOS and 108 on Linux. macOS's own temp folder (/var/folders/xx/.../T/) takes about 50 of them before the private folder
 // adds its own (the coral-go-team's dry run on #177: "File name too long" in internal/tmux).
 func privateBase() string {
+	if root := rootFromEnv(); root != "" {
+		return root
+	}
 	if runtime.GOOS == "windows" {
 		return ""
 	}
