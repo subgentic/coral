@@ -55,7 +55,7 @@ func newManageEnv(t *testing.T) *manageEnv {
 	require.NoError(t, os.WriteFile(filepath.Join(farCoral, "coral"), []byte("#!/bin/sh\ncat >/dev/null\nexit 0\n"), 0o755)) // accept-terms reads its stdin
 
 	me := &manageEnv{provEnv: pe, home: home, tmuxLog: tmuxLog, version: "0.0.1"}
-	_, err := pe.e.h.store.AddSSH(context.Background(), "ssh-box", "Build box", "rich@box.example.com:22", 8420, provInstance, provKey)
+	_, err := pe.e.h.store.AddSSH(context.Background(), "ssh-box", "Build box", "user@box.example.com:22", 8420, provInstance, provKey)
 	require.NoError(t, err)
 	pe.p.install = func(_ context.Context, p *provisionPlan, _ sshprov.Arch) error {
 		me.mu.Lock()
@@ -105,7 +105,7 @@ func TestManagePlanValidation(t *testing.T) {
 		"an alias too":      {map[string]any{"server_id": "ssh-box", "action": "stop", "alias": "x"}, 400},
 		"delete with stop":  {map[string]any{"server_id": "ssh-box", "action": "stop", "delete_data": true}, 400},
 		"action alone":      {map[string]any{"action": "remove"}, 400},
-		"delete_data alone": {map[string]any{"delete_data": true, "target": "rich@box.example.com"}, 400},
+		"delete_data alone": {map[string]any{"delete_data": true, "target": "user@box.example.com"}, 400},
 	} {
 		code, v := me.do("POST", "/api/servers/provision/plan", c.body)
 		assert.Equal(t, c.code, code, "%s: %v", name, v)
@@ -113,7 +113,7 @@ func TestManagePlanValidation(t *testing.T) {
 	code, v := me.plan(t, "stop", nil)
 	require.Equal(t, 201, code, "%v", v)
 	assert.Equal(t, "stop", v["kind"])
-	assert.Equal(t, "rich@box.example.com:22", v["target"], "the target is the registry's")
+	assert.Equal(t, "user@box.example.com:22", v["target"], "the target is the registry's")
 	code, _ = me.plan(t, "remove", nil)
 	assert.Equal(t, 409, code, "two things at once for one server")
 }

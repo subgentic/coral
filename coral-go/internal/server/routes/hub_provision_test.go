@@ -144,17 +144,17 @@ func (pe *provEnv) waitPhase(t *testing.T, plan, want string) map[string]any {
 func TestProvisionPlanValidatesAndConnectsNothing(t *testing.T) {
 	pe := newProvEnv(t, "known", "Linux x86_64", true)
 	for _, bad := range []map[string]any{
-		{}, {"target": "x"}, {"target": "rich@-oProxyCommand=x"}, {"target": "rich@box.example.com;id"}, {"target": "rich@box.example.com", "alias": "x"},
-		{"alias": "not-in-config"}, {"alias": "-oProxyCommand=x"}, {"target": "rich@box.example.com", "mode": "systemd"},
+		{}, {"target": "x"}, {"target": "user@-oProxyCommand=x"}, {"target": "user@box.example.com;id"}, {"target": "user@box.example.com", "alias": "x"},
+		{"alias": "not-in-config"}, {"alias": "-oProxyCommand=x"}, {"target": "user@box.example.com", "mode": "systemd"},
 	} {
 		code, v := pe.do("POST", "/api/servers/provision/plan", bad)
 		assert.Equal(t, 400, code, "%v %v", bad, v)
 	}
-	code, v := pe.do("POST", "/api/servers/provision/plan", map[string]any{"target": "rich@box.example.com:2222", "label": "Build box"})
+	code, v := pe.do("POST", "/api/servers/provision/plan", map[string]any{"target": "user@box.example.com:2222", "label": "Build box"})
 	require.Equal(t, 201, code, "%v", v)
 	assert.Equal(t, "planned", v["phase"])
 	assert.Equal(t, "ssh-box-example-com", v["server_id"])
-	assert.Equal(t, "rich@box.example.com:2222", v["target"])
+	assert.Equal(t, "user@box.example.com:2222", v["target"])
 	assert.Len(t, v["steps"], 5)
 	if b, err := os.ReadFile(pe.sshLog); err == nil && len(b) > 0 {
 		t.Errorf("a plan started ssh: %s", b)
@@ -165,13 +165,13 @@ func TestProvisionRefusesAnIdThatIsTaken(t *testing.T) {
 	pe := newProvEnv(t, "known", "Linux x86_64", true)
 	_, err := pe.e.h.store.AddSSH(context.Background(), "ssh-box-example-com", "Taken", "u@other", 8420, "inst-1", routeSecret)
 	require.NoError(t, err)
-	code, _ := pe.do("POST", "/api/servers/provision/plan", map[string]any{"target": "rich@box.example.com"})
+	code, _ := pe.do("POST", "/api/servers/provision/plan", map[string]any{"target": "user@box.example.com"})
 	assert.Equal(t, 409, code)
 }
 
 func TestProvisionUnknownHostShowsTheScannedKeyAndTrustsOnlyThatAfterAccept(t *testing.T) {
 	pe := newProvEnv(t, "unknown", "Linux x86_64", true)
-	_, v := pe.do("POST", "/api/servers/provision/plan", map[string]any{"target": "rich@box.example.com"})
+	_, v := pe.do("POST", "/api/servers/provision/plan", map[string]any{"target": "user@box.example.com"})
 	plan := v["plan"].(string)
 
 	code, v := pe.do("POST", "/api/servers/provision/"+plan+"/connect", nil)
@@ -211,7 +211,7 @@ func TestProvisionUnknownHostShowsTheScannedKeyAndTrustsOnlyThatAfterAccept(t *t
 	srv, err := pe.e.h.store.Get(context.Background(), "ssh-box-example-com")
 	require.NoError(t, err)
 	assert.Equal(t, "ssh", srv.Transport)
-	assert.Equal(t, "rich@box.example.com:22", srv.SSHTarget)
+	assert.Equal(t, "user@box.example.com:22", srv.SSHTarget)
 	assert.Equal(t, 8420, srv.RemotePort)
 	assert.Equal(t, provInstance, srv.InstanceID)
 	assert.Equal(t, "online", srv.Status)
@@ -225,7 +225,7 @@ func TestProvisionUnknownHostShowsTheScannedKeyAndTrustsOnlyThatAfterAccept(t *t
 
 func TestProvisionRefusesAChangedHostKeyAndNeverOffersIt(t *testing.T) {
 	pe := newProvEnv(t, "changed", "Linux x86_64", true)
-	_, v := pe.do("POST", "/api/servers/provision/plan", map[string]any{"target": "rich@box.example.com"})
+	_, v := pe.do("POST", "/api/servers/provision/plan", map[string]any{"target": "user@box.example.com"})
 	plan := v["plan"].(string)
 	code, v := pe.do("POST", "/api/servers/provision/"+plan+"/connect", nil)
 	require.Equal(t, 200, code)
@@ -249,7 +249,7 @@ func TestProvisionDetectStopsOnAnUnsupportedSystemOrNoTmux(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			pe := newProvEnv(t, "known", c.uname, c.tmux)
-			_, v := pe.do("POST", "/api/servers/provision/plan", map[string]any{"target": "rich@box.example.com"})
+			_, v := pe.do("POST", "/api/servers/provision/plan", map[string]any{"target": "user@box.example.com"})
 			plan := v["plan"].(string)
 			_, v = pe.do("POST", "/api/servers/provision/"+plan+"/connect", nil)
 			require.Equal(t, "connected", v["phase"], "%v", v)
@@ -265,13 +265,13 @@ func TestProvisionLimitsPlansAndCancels(t *testing.T) {
 	pe := newProvEnv(t, "known", "Linux x86_64", true)
 	var first string
 	for i := 0; i < provisionMaxPlans; i++ {
-		code, v := pe.do("POST", "/api/servers/provision/plan", map[string]any{"target": "rich@host" + strings.Repeat("a", i+1) + ".example.com"})
+		code, v := pe.do("POST", "/api/servers/provision/plan", map[string]any{"target": "user@host" + strings.Repeat("a", i+1) + ".example.com"})
 		require.Equal(t, 201, code)
 		if i == 0 {
 			first = v["plan"].(string)
 		}
 	}
-	code, _ := pe.do("POST", "/api/servers/provision/plan", map[string]any{"target": "rich@one-more.example.com"})
+	code, _ := pe.do("POST", "/api/servers/provision/plan", map[string]any{"target": "user@one-more.example.com"})
 	assert.Equal(t, http.StatusTooManyRequests, code)
 	code, _ = pe.do("DELETE", "/api/servers/provision/"+first, nil)
 	assert.Equal(t, 200, code)
@@ -302,7 +302,7 @@ func mustB64(t *testing.T, s string) []byte {
 // A script with the hub's API key is automation, not the person who accepts the terms or pins a host key.
 func TestProvisionConnectAndRunAreAPersonsNotAScripts(t *testing.T) {
 	pe := newProvEnv(t, "unknown", "Linux x86_64", true)
-	_, v := pe.do("POST", "/api/servers/provision/plan", map[string]any{"target": "rich@box.example.com"})
+	_, v := pe.do("POST", "/api/servers/provision/plan", map[string]any{"target": "user@box.example.com"})
 	plan := v["plan"].(string)
 	code, v := pe.send(false, "POST", "/api/servers/provision/"+plan+"/connect", nil)
 	assert.Equal(t, 403, code, "%v", v)
@@ -322,7 +322,7 @@ func TestProvisionConnectAndRunAreAPersonsNotAScripts(t *testing.T) {
 // Two Set up requests at once start one run, and the keys are written once.
 func TestProvisionTwoRunsAtOnceStartOne(t *testing.T) {
 	pe := newProvEnv(t, "known", "Linux x86_64", true)
-	_, v := pe.do("POST", "/api/servers/provision/plan", map[string]any{"target": "rich@box.example.com"})
+	_, v := pe.do("POST", "/api/servers/provision/plan", map[string]any{"target": "user@box.example.com"})
 	plan := v["plan"].(string)
 	_, v = pe.do("POST", "/api/servers/provision/"+plan+"/connect", nil)
 	require.Equal(t, "connected", v["phase"], "%v", v)
@@ -357,7 +357,7 @@ func TestProvisionInstallFailureIsAFixedSentence(t *testing.T) {
 	pe.p.install = func(context.Context, *provisionPlan, sshprov.Arch) error {
 		return &sshprov.ErrInstall{Step: "install", Msg: "The release could not be verified, so nothing was installed."}
 	}
-	_, v := pe.do("POST", "/api/servers/provision/plan", map[string]any{"target": "rich@box.example.com"})
+	_, v := pe.do("POST", "/api/servers/provision/plan", map[string]any{"target": "user@box.example.com"})
 	plan := v["plan"].(string)
 	pe.do("POST", "/api/servers/provision/"+plan+"/connect", nil)
 	code, _ := pe.do("POST", "/api/servers/provision/"+plan+"/run", map[string]any{"accept_terms": true, "terms_sha256": terms.EULADigest()})
@@ -370,9 +370,9 @@ func TestProvisionInstallFailureIsAFixedSentence(t *testing.T) {
 	// an error that is not the installer's own words is not shown
 	pe2 := newProvEnv(t, "known", "Linux x86_64", true)
 	pe2.p.install = func(context.Context, *provisionPlan, sshprov.Arch) error {
-		return errors.New("scp: /home/rich/.ssh/id_rsa: permission denied")
+		return errors.New("scp: /home/user/.ssh/id_rsa: permission denied")
 	}
-	_, v = pe2.do("POST", "/api/servers/provision/plan", map[string]any{"target": "rich@box.example.com"})
+	_, v = pe2.do("POST", "/api/servers/provision/plan", map[string]any{"target": "user@box.example.com"})
 	plan = v["plan"].(string)
 	pe2.do("POST", "/api/servers/provision/"+plan+"/connect", nil)
 	pe2.do("POST", "/api/servers/provision/"+plan+"/run", map[string]any{"accept_terms": true, "terms_sha256": terms.EULADigest()})
@@ -384,7 +384,7 @@ func TestProvisionInstallFailureIsAFixedSentence(t *testing.T) {
 
 func runToEnd(t *testing.T, pe *provEnv, want string) map[string]any {
 	t.Helper()
-	_, v := pe.do("POST", "/api/servers/provision/plan", map[string]any{"target": "rich@box.example.com"})
+	_, v := pe.do("POST", "/api/servers/provision/plan", map[string]any{"target": "user@box.example.com"})
 	plan := v["plan"].(string)
 	_, v = pe.do("POST", "/api/servers/provision/"+plan+"/connect", nil)
 	require.Equal(t, "connected", v["phase"], "%v", v)
@@ -432,7 +432,7 @@ func TestProvisionNeverTakesAnotherServersPlaceOrKey(t *testing.T) {
 func TestProvisionStartFailureIsAFixedSentenceAndHidesTheCause(t *testing.T) {
 	pe := newProvEnv(t, "known", "Linux x86_64", true)
 	pe.p.startRemote = func(context.Context, *provisionPlan) (string, string, error) {
-		return "", "", errors.New("tmux: /home/rich/.ssh/secret: no server running " + provKey)
+		return "", "", errors.New("tmux: /home/user/.ssh/secret: no server running " + provKey)
 	}
 	failed := runToEnd(t, pe, "failed")
 	assert.Equal(t, "Could not start Coral on that computer.", failed["error"])
@@ -458,7 +458,7 @@ func TestTermsPayloadAndLabelMatchWhatTheFarSideAccepts(t *testing.T) {
 
 func TestProvisionRunWantsTheDigestOfTheTermsThatWereShown(t *testing.T) {
 	pe := newProvEnv(t, "known", "Linux x86_64", true)
-	_, v := pe.do("POST", "/api/servers/provision/plan", map[string]any{"target": "rich@box.example.com"})
+	_, v := pe.do("POST", "/api/servers/provision/plan", map[string]any{"target": "user@box.example.com"})
 	plan := v["plan"].(string)
 	pe.do("POST", "/api/servers/provision/"+plan+"/connect", nil)
 	for name, body := range map[string]map[string]any{
@@ -500,10 +500,10 @@ func TestProvisionOptionsListHostsAndTheTermsTheDigestCovers(t *testing.T) {
 func TestProvisionTooManyPlansIsAMarkedActionLimit(t *testing.T) {
 	pe := newProvEnv(t, "known", "Linux x86_64", true)
 	for i := 0; i < provisionMaxPlans; i++ {
-		code, _ := pe.do("POST", "/api/servers/provision/plan", map[string]any{"target": "rich@host" + strings.Repeat("b", i+1) + ".example.com"})
+		code, _ := pe.do("POST", "/api/servers/provision/plan", map[string]any{"target": "user@host" + strings.Repeat("b", i+1) + ".example.com"})
 		require.Equal(t, 201, code)
 	}
-	req := httptest.NewRequest("POST", "/api/servers/provision/plan", strings.NewReader(`{"target":"rich@one-more.example.com"}`))
+	req := httptest.NewRequest("POST", "/api/servers/provision/plan", strings.NewReader(`{"target":"user@one-more.example.com"}`))
 	req = req.WithContext(context.WithValue(req.Context(), callerKindKey{}, callerDashCookie))
 	w := httptest.NewRecorder()
 	pe.router.ServeHTTP(w, req)

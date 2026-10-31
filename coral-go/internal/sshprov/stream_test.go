@@ -79,7 +79,7 @@ func TestStreamTargetReachesTheRemoteOverSSHWAndSendsTheKeyOnlyAsABearer(t *test
 	}))
 	defer remote.Close()
 	ssh, log := fakeSSHW(t)
-	tg, _ := ParseTarget("rich@box.example.com:2222")
+	tg, _ := ParseTarget("user@box.example.com:2222")
 	st, err := NewStreamTarget(Runner{SSH: ssh}, tg, portOf(t, remote), streamKey)
 	if err != nil {
 		t.Fatal(err)
@@ -108,7 +108,7 @@ func TestStreamTargetReachesTheRemoteOverSSHWAndSendsTheKeyOnlyAsABearer(t *test
 	if strings.Contains(argv, streamKey) {
 		t.Errorf("the key is in argv:\n%s", argv)
 	}
-	for _, want := range []string{"-W\n127.0.0.1:", "StrictHostKeyChecking=yes", "-p\n2222\n", "--\nrich@box.example.com\n"} {
+	for _, want := range []string{"-W\n127.0.0.1:", "StrictHostKeyChecking=yes", "-p\n2222\n", "--\nuser@box.example.com\n"} {
 		if !strings.Contains(argv, want) {
 			t.Errorf("argv lacks %q:\n%s", want, argv)
 		}
@@ -132,7 +132,7 @@ func TestHubProxyTreatsAStreamTargetAsADirectKeyTarget(t *testing.T) {
 	}))
 	defer remote.Close()
 	ssh, _ := fakeSSHW(t)
-	tg, _ := ParseTarget("rich@box.example.com")
+	tg, _ := ParseTarget("user@box.example.com")
 	st, _ := NewStreamTarget(Runner{SSH: ssh}, tg, portOf(t, remote), streamKey)
 	defer st.Close()
 	r := chi.NewRouter()
@@ -191,7 +191,7 @@ func TestStreamTargetCarriesAWebSocket(t *testing.T) {
 	}))
 	defer remote.Close()
 	ssh, _ := fakeSSHW(t)
-	tg, _ := ParseTarget("rich@box.example.com")
+	tg, _ := ParseTarget("user@box.example.com")
 	st, _ := NewStreamTarget(Runner{SSH: ssh}, tg, portOf(t, remote), streamKey)
 	defer st.Close()
 	c, err := st.DialWS(context.Background(), "/ws/coral", "", nil)
@@ -214,7 +214,7 @@ func TestStreamTargetCarriesAWebSocket(t *testing.T) {
 }
 
 func TestNewStreamTargetRefusesWhatItCannotUse(t *testing.T) {
-	tg, _ := ParseTarget("rich@box.example.com")
+	tg, _ := ParseTarget("user@box.example.com")
 	for _, c := range []struct {
 		t    Target
 		port int
@@ -232,7 +232,7 @@ func TestStreamTargetCapsConnectionsAndBacksOffAfterAFailedDial(t *testing.T) {
 	if err := os.WriteFile(hold, []byte("#!/bin/sh\nexec sleep 30\n"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	tg, _ := ParseTarget("rich@box.example.com")
+	tg, _ := ParseTarget("user@box.example.com")
 	st, _ := NewStreamTarget(Runner{SSH: hold}, tg, 8420, streamKey)
 	var conns []net.Conn
 	for i := 0; i < streamCap; i++ {
@@ -291,7 +291,7 @@ func TestStreamArgvHasKeepAlive(t *testing.T) {
 	remote := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { io.WriteString(w, "ok") }))
 	defer remote.Close()
 	ssh, log := fakeSSHW(t)
-	tg, _ := ParseTarget("rich@box.example.com")
+	tg, _ := ParseTarget("user@box.example.com")
 	st, _ := NewStreamTarget(Runner{SSH: ssh}, tg, portOf(t, remote), streamKey)
 	defer st.Close()
 	req, _ := http.NewRequest("GET", "http://x.invalid/api/health", nil)

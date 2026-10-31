@@ -132,7 +132,7 @@ func newInstallEnv(t *testing.T, pkg []byte, mode string) (*installEnv, string, 
 func TestInstallPutsTheVerifiedPackageOnTheFarSideAndIsIdempotent(t *testing.T) {
 	pkg := goodTar(t)
 	e, home, log := newInstallEnv(t, pkg, "")
-	tg, _ := ParseTarget("rich@box.example.com")
+	tg, _ := ParseTarget("user@box.example.com")
 	got, err := e.in.Install(context.Background(), tg, ArchAMD64)
 	if err != nil {
 		t.Fatalf("Install: %v (%v)", err, e.steps)
@@ -182,7 +182,7 @@ func TestInstallPutsTheVerifiedPackageOnTheFarSideAndIsIdempotent(t *testing.T) 
 }
 
 func TestInstallRefusesBeforeTouchingTheFarSide(t *testing.T) {
-	tg, _ := ParseTarget("rich@box.example.com")
+	tg, _ := ParseTarget("user@box.example.com")
 	pkg := goodTar(t)
 
 	e, _, log := newInstallEnv(t, pkg, "")
@@ -239,7 +239,7 @@ func TestInstallRefusesBeforeTouchingTheFarSide(t *testing.T) {
 }
 
 func TestInstallRefusesAPackageWithBadPathsLocally(t *testing.T) {
-	tg, _ := ParseTarget("rich@box.example.com")
+	tg, _ := ParseTarget("user@box.example.com")
 	for name, members := range map[string][]member{
 		"dotdot":         {{name: "../evil", body: "x"}},
 		"nested dotdot":  {{name: "a/../../evil", body: "x"}},
@@ -269,7 +269,7 @@ func TestInstallRefusesAPackageWithBadPathsLocally(t *testing.T) {
 func TestInstallRefusesAPackageThatChangedOnTheWayAndUnpacksNothing(t *testing.T) {
 	pkg := goodTar(t)
 	e, home, _ := newInstallEnv(t, pkg, "corrupt")
-	tg, _ := ParseTarget("rich@box.example.com")
+	tg, _ := ParseTarget("user@box.example.com")
 	_, err := e.in.Install(context.Background(), tg, ArchAMD64)
 	if err == nil || !strings.Contains(err.Error(), "is not the one that was verified") {
 		t.Fatalf("err = %v", err)
@@ -363,7 +363,7 @@ func TestDownloadReleaseIsHardened(t *testing.T) {
 func TestInstallRefusesWhenTheFarSideHasNoRoomAndCopiesNothing(t *testing.T) {
 	pkg := goodTar(t)
 	e, home, log := newInstallEnv(t, pkg, "full")
-	tg, _ := ParseTarget("rich@box.example.com")
+	tg, _ := ParseTarget("user@box.example.com")
 	_, err := e.in.Install(context.Background(), tg, ArchAMD64)
 	if err == nil || !strings.Contains(err.Error(), "not enough free disk space") {
 		t.Fatalf("err = %v", err)
