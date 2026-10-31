@@ -146,7 +146,7 @@ export function syncEmptyState(container) {
 export async function sendPromptAnswer(card, n, label, action, text) {
     const session = state.currentSession;
     if (!session || session.type !== "live") return false;
-    const controls = card ? Array.from(card.querySelectorAll(".cni-answer, .cni-text-form button, .cni-text-form input")) : [];
+    const controls = card ? Array.from(card.querySelectorAll(".cni-answer, .cni-text-form button, .cni-text-form input:not(.cni-attach-input)")) : [];
     // A disabled control loses focus: remember which one had it, and put it back (a toggle keeps it) or, when the card goes with the answer, move it to the message box (#5252).
     const hadFocus = card && card.contains(document.activeElement) ? document.activeElement : null;
     controls.forEach(c => { c.disabled = true; });

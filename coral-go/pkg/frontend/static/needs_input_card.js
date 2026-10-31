@@ -6,6 +6,8 @@ import { escapeHtml, escapeAttr, renderMarkdown } from './utils.js';
 import { askWords } from './session_state.js';
 import { state } from './state.js';
 import { claudeSignedIn, askSigninSoon, isLocalClaude, isLocalAgent, setClaudeSignedIn } from './signin_line.js';
+import { drawCardImages, clearCardImages } from './card_attach.js';
+import { PICKER_ACCEPT } from './image_attach.js';
 import { registerActions } from './actions.js';
 
 // ── Needs input ──────────────────────────────────────────────────────────
@@ -159,7 +161,9 @@ function answerControlsHtml(info, descriptions = {}, fullLabels = {}) {
     for (const o of texts) {
         const placeholder = /^type something/i.test(o.label) ? "Or type your own answer…" : `${o.label.replace(/\.$/, "")}…`;
         body += `<form class="cni-text-form" data-n="${Number(o.n)}" data-label="${escapeHtml(o.label)}" data-action="text">`
+            + `<div class="cni-attach image-attachments" hidden></div>` // the images pasted or added here (card_attach.js, #11386)
             + `<input type="text" class="field cni-text-input" placeholder="${escapeHtml(placeholder)}" aria-label="${escapeHtml(o.label)}">`
+            + `<button type="button" class="btn btn-sm cni-attach-btn" aria-label="Add image" title="Add an image: it is sent with your answer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg></button><input type="file" class="cni-attach-input" accept="${escapeAttr(PICKER_ACCEPT)}" multiple hidden tabindex="-1" aria-hidden="true">`
             + `<button type="submit" class="btn btn-sm">Send</button></form>`;
     }
     for (const o of chats) {
@@ -412,6 +416,7 @@ export function syncNeedsInputCard(container, session) {
     let el = container.querySelector(":scope > .chat-needs-input");
     if (!info) {
         if (el) { const key = cardFocusKey(el); el.remove(); if (key !== null) focusAfterCard(el, null); }
+        clearCardImages(session.session_id); // the question is gone: so are the images that were to answer it
         unwatchCardInView();
         return;
     }
@@ -438,19 +443,20 @@ export function syncNeedsInputCard(container, session) {
         el.dataset.key = key;
     } else if (el.dataset.key !== key) {
         // Keep an answer being typed if the card re-renders
-        const open = Array.from(el.querySelectorAll(".cni-text-form")).find(f => f.querySelector("input").value || document.activeElement === f.querySelector("input"));
-        const typing = open ? { n: open.dataset.n, value: open.querySelector("input").value, focused: document.activeElement === open.querySelector("input") } : null;
+        const open = Array.from(el.querySelectorAll(".cni-text-form")).find(f => f.querySelector("input.cni-text-input").value || document.activeElement === f.querySelector("input.cni-text-input"));
+        const typing = open ? { n: open.dataset.n, value: open.querySelector("input.cni-text-input").value, focused: document.activeElement === open.querySelector("input.cni-text-input") } : null;
         el.dataset.key = key; el._shape = shape;
         const focusKey = cardFocusKey(el);
         el.innerHTML = needsInputHtml(info, session);
         if (focusKey !== null) focusAfterCard(el, focusKey);
         const form = typing && el.querySelector(`.cni-text-form[data-n="${typing.n}"]`);
         if (form) {
-            const input = form.querySelector("input");
+            const input = form.querySelector("input.cni-text-input");
             input.value = typing.value;
             if (typing.focused) input.focus();
         }
     }
+    drawCardImages(el, session.session_id); // images added to the answer stay when the card is drawn again
     // Same slot as the Working row: below Sent messages, above Queued ones
     const queued = container.querySelector(":scope > .pending-messages.pending-queued");
     if (queued) {
