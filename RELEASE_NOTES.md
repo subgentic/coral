@@ -1,5 +1,32 @@
 # Release Notes
 
+## v2.0.14 — phone navigation like Gmail, Coral Hub's first-run pages that explain themselves, and the guide role's screens
+
+### Changes
+
+#### What you will notice first
+
+- **Phone navigation like Gmail**: a docked bottom tab bar, and the ☰ is a left drawer of options (not tabs). Search sits in the top bar, the drawer follows the screen you are on (for example it lists Saved from the Inbox and Chats, not from Agents), and it holds the Hub's teams. On a phone the drawer's code loads the first time you open the ☰, so the first tap opens it a moment later.
+- **A computer approved in Coral Hub that has not connected yet is no longer nowhere** (with a Coral Hub that lists waiting computers): the Computers page, the empty agent list and the home card say it is waiting, and when its code ran out before it was collected, Coral says so (it used to say "expired before it was approved" and "closed beta: request access", both wrong). An answer that arrives after your computer slept mid-ask is still counted.
+- **The Computers table says what access applies**: a new computer's Hub grant is Launch while the computer itself allows View, so the effective mode is View; the access cell now says so under the grant.
+- **The first-run pages say where Coral comes from and what to do**: a "Get Coral" link to the download in the home card and in the empty agent list (opens in a new tab), and at phone width "Coral runs on your computer; open this page there."; the sign-in page says "Open the link on this same device and browser." under "Email me a sign-in link"; the connect page calls its name field "Computer name"; and a sign-in link refused because another user of this computer opened it has its own page that names the cause instead of saying it "has been used".
+
+#### Agents and the chat
+
+- **Guide role screens (the screens are in this release; the guide itself stays dark until Coral Hub turns it on):** a roster in Team settings for the names agents see your guides by, a "Private" switch on an artifact that hides it from guides, a guide's name and tag on their posts, and the clash rule: when a guide and the Operator or another guide disagree, an agent of that team files it (`coral-board ask clash <task|goal|artifact> <message> <message>`, at most five an hour per agent) and Coral asks you once, quoting both with their authors; the work on it is held by an instruction to the agents until you answer, not by a lock Coral enforces.
+
+#### Known issues
+
+- **Windows: in-app update does not work from 2.0.0 through 2.0.6.** If you're on one of those, download and install the MSI by hand; from 2.0.7 on, in-app update works.
+- **macOS: a Coral of 2.0.5 or earlier cannot install updates in-app; install 2.0.6 or later by hand once.**
+- **OpenCode agents are tested on macOS and Linux; OpenCode on Windows is not yet tested end to end.**
+- Setting up a computer over SSH is supported from a macOS or Linux hub, and is not yet tested from a Windows hub.
+
+#### For developers and releases
+
+- **The static budget rises 64 KiB to 5,906,432 bytes** (`5<<20 + 648<<10`), for the phone navigation and the guide screens. This release's tree ships 5,858,265 bytes, 48,167 under it.
+- **The first-load limit holds**: the phone drawer's code and the long "How agents ask you for things" text load when first needed instead of at start, so app.js at start is 396,953 encoded bytes against its 396,965 limit.
+
 ## v2.0.13 — cross-team messages that name the sending team, Inbox rows that count what waits on them across boards, and a guide role that ships dark
 
 ### Changes
