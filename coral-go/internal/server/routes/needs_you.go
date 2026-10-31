@@ -37,7 +37,7 @@ type NeedsYouItem struct {
 	At   string `json:"at"`
 }
 
-// needsYouAnswer is the whole answer. Count is every waiting thing; Items are the newest few (or those after the cursor); Cursor is the newest time of all of them, to be sent back as ?after=: the next read gives what is at or after it (a poller skips the ids it has already pushed, so two things in one
+// needsYouAnswer is the whole answer. Count is every waiting thing. The first read (no ?after=) gives the newest few, newest first, and the cursor is the newest time of all. A poll with ?after=<cursor> gives what is at or after it, OLDEST first, up to the limit, and moves the cursor only to the last item given: the next read gives what is at or after it (a poller skips the ids it has already pushed, so two things in one instant are never lost), and a burst bigger than the limit is read in several polls.
 // instant are never lost).
 type needsYouAnswer struct {
 	Count       int            `json:"count"`
@@ -59,6 +59,11 @@ func (h *SessionsHandler) NeedsYouAgents(r *http.Request) ([]NeedsYouItem, error
 	if err != nil {
 		return nil, err
 	}
+	return needsYouAgentItems(rows, time.Now()), nil
+}
+
+// needsYouAgentItems is the live list's rows reduced to the agents that wait on the Operator: awake, not archived, waiting for input. A row with no start time of its wait is given now (it is waiting now).
+func needsYouAgentItems(rows []map[string]any, now time.Time) []NeedsYouItem {
 	var out []NeedsYouItem
 	for _, row := range rows {
 		if wait, _ := row["waiting_for_input"].(bool); !wait {
@@ -81,9 +86,12 @@ func (h *SessionsHandler) NeedsYouAgents(r *http.Request) ([]NeedsYouItem, error
 		}
 		team, _ := row["board_project"].(string)
 		at, _ := row["waiting_since"].(string)
-		out = append(out, NeedsYouItem{Kind: "agent", From: needsYouLine(name), Line: needsYouLine(line), Team: team, ID: "agent:" + sid, At: needsYouTime(at)})
+		if at = needsYouTime(at); at == "" {
+			at = now.UTC().Format(time.RFC3339Nano)
+		}
+		out = append(out, NeedsYouItem{Kind: "agent", From: needsYouLine(name), Line: needsYouLine(line), Team: team, ID: "agent:" + sid, At: at})
 	}
-	return out, nil
+	return out
 }
 
 // needsYouWithheld stands in for a line when the secrets redactor is unavailable.
@@ -203,18 +211,30 @@ func (h *BoardHandler) NeedsYou(w http.ResponseWriter, r *http.Request) {
 			newest = it.At
 		}
 	}
-	ans.Cursor = newest
-	sort.SliceStable(items, func(i, j int) bool { return items[i].At > items[j].At })
-	for _, it := range items {
-		if len(ans.Items) == limit {
-			break
+	if after.IsZero() {
+		// the first read: the newest few, newest first, and the cursor is the newest time of all (what was older is the baseline the poller starts from)
+		ans.Cursor = newest
+		sort.SliceStable(items, func(i, j int) bool { return items[i].At > items[j].At })
+		for _, it := range items {
+			if len(ans.Items) == limit {
+				break
+			}
+			ans.Items = append(ans.Items, it)
 		}
-		if !after.IsZero() {
+	} else {
+		// a poll: what is at or after the cursor, OLDEST first, up to the limit, and the cursor moves only as far as the last item given: a burst bigger than the limit is read in several polls, never skipped
+		sort.SliceStable(items, func(i, j int) bool { return items[i].At < items[j].At })
+		ans.Cursor = after.UTC().Format(time.RFC3339Nano)
+		for _, it := range items {
+			if len(ans.Items) == limit {
+				break
+			}
 			if t, err := time.Parse(time.RFC3339Nano, it.At); err != nil || t.Before(after) {
 				continue // the cursor itself is included: times can tie, so a poller skips ids it has already pushed
 			}
+			ans.Items = append(ans.Items, it)
+			ans.Cursor = it.At
 		}
-		ans.Items = append(ans.Items, it)
 	}
 	writeJSON(w, http.StatusOK, ans)
 }

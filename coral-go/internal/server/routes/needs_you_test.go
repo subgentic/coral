@@ -190,3 +190,66 @@ func TestNeedsYouRedactsSecretsInEveryLineBeforeTheCut(t *testing.T) {
 	assert.NotContains(t, string(raw), token[:20], "and so is the part a cut would leave")
 	assert.EqualValues(t, 2, out["count"])
 }
+
+// QA's SHOULD on #11596: a poll that finds more new items than the limit returns the OLDEST first and the cursor moves only as far as the last one given, so reading until a poll is short loses nothing.
+func TestNeedsYouABurstBiggerThanTheLimitIsReadInSeveralPollsAndNothingIsSkipped(t *testing.T) {
+	h, bs := operatorAsksRig(t)
+	ctx := context.Background()
+	ask := func(text string) {
+		q, err := bs.PostMessage(ctx, "team", "Lead", "@Operator "+text, nil)
+		require.NoError(t, err)
+		require.NoError(t, bs.RecordAsk(ctx, "team", q, []string{"Operator"}))
+		time.Sleep(1100 * time.Millisecond) // the ask's time is kept to the second
+	}
+	ask("zero?")
+	_, out := readNeedsYou(t, h, "", asPerson)
+	cursor := out["cursor"].(string)
+	for _, t2 := range []string{"one?", "two?", "three?"} {
+		ask(t2)
+	}
+	seen := map[string]bool{}
+	for poll := 0; poll < 6; poll++ {
+		_, out = readNeedsYou(t, h, "?limit=2&after="+cursor, asPerson)
+		for _, it := range needsYouItems(out) {
+			seen[it["id"].(string)] = true
+		}
+		cursor = out["cursor"].(string)
+	}
+	assert.Len(t, seen, 4, "the item at the cursor and the three of the burst, every one read: %v", seen)
+	_, out = readNeedsYou(t, h, "?limit=1&after="+out["cursor"].(string), asPerson)
+	assert.Len(t, needsYouItems(out), 1, "the last item stays at the cursor (inclusive), for the poller to skip by id")
+}
+
+func TestNeedsYouLimitIsCappedAtFifty(t *testing.T) {
+	h, bs := operatorAsksRig(t)
+	ctx := context.Background()
+	for i := 0; i < 55; i++ {
+		q, err := bs.PostMessage(ctx, "team", "Lead", "@Operator ask", nil)
+		require.NoError(t, err)
+		require.NoError(t, bs.RecordAsk(ctx, "team", q, []string{"Operator"}))
+	}
+	_, out := readNeedsYou(t, h, "?limit=1000", asPerson)
+	assert.Len(t, needsYouItems(out), needsYouItemsMax)
+	assert.EqualValues(t, 55, out["count"])
+}
+
+// The agents' filter: awake, not archived, waiting for input; a row with no time for its wait gets one.
+func TestNeedsYouAgentItemsAreTheAwakeWaitingOnes(t *testing.T) {
+	now := time.Date(2026, 10, 31, 12, 0, 0, 0, time.UTC)
+	row := func(sid string, wait, sleeping, archived bool, since any) map[string]any {
+		return map[string]any{"session_id": sid, "display_name": "Agent " + sid, "waiting_for_input": wait, "sleeping": sleeping, "archived": archived, "waiting_summary": "Wants to run a command", "board_project": "team", "waiting_since": since}
+	}
+	got := needsYouAgentItems([]map[string]any{
+		row("a", true, false, false, "2026-10-31T11:00:00Z"),
+		row("b", true, true, false, "2026-10-31T11:00:00Z"),
+		row("c", true, false, true, "2026-10-31T11:00:00Z"),
+		row("d", false, false, false, nil),
+		row("e", true, false, false, nil),
+	}, now)
+	require.Len(t, got, 2, "the sleeping, archived and not-waiting agents are not waiting on the Operator: %v", got)
+	assert.Equal(t, "agent:a", got[0].ID)
+	assert.Equal(t, "2026-10-31T11:00:00Z", got[0].At[:20])
+	assert.Equal(t, "agent:e", got[1].ID)
+	assert.Equal(t, now.Format(time.RFC3339Nano), got[1].At, "no start time: waiting now")
+	assert.Equal(t, "Wants to run a command", got[0].Line)
+}
