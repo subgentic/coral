@@ -32,7 +32,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
             }
             const names = { deny: `deny-${tag}.md`, ignore: `ignore-${tag}.md`, keep: `keep-${tag}.md` };
             for (const n of Object.values(names)) {
-                const up = await api('POST', `/api/agent/artifacts?session_id=${sid}&tag=for+review`, `content of ${n} ${Date.now()}`, { 'X-Artifact-Name': n, 'X-Artifact-Media-Type': 'text/markdown' });
+                const up = await api('POST', `/api/agent/artifacts?session_id=${sid}&tag=for+review&question=Approve+this%3F`, `content of ${n} ${Date.now()}`, { 'X-Artifact-Name': n, 'X-Artifact-Media-Type': 'text/markdown' });
                 check(up.status < 300, at + `uploaded ${n}: ${JSON.stringify(up.body).slice(0, 120)}`);
             }
             await ev(`localStorage.removeItem('coral-inbox-needs-filters'); window.switchNavTab('hub-inbox'); true`);

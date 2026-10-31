@@ -25,7 +25,7 @@ const { coralReady, framesJs } = require('./helpers/wait');
         if (!sid) throw new Error('no session: ' + JSON.stringify(launch));
         await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: 'Ign Writer', job_title: 'Writer', session_name: sname });
         const ids = {};
-        for (const n of ['keep-me.md', 'put-away.md']) { const up = await api('POST', `/api/agent/artifacts?session_id=${sid}&tag=for+review`, `content of ${n} ${Date.now()}`, { 'X-Artifact-Name': n, 'X-Artifact-Media-Type': 'text/markdown' }); ids[n] = String(up.body.id || up.body.digest).replace(/^sha256:/, ''); }
+        for (const n of ['keep-me.md', 'put-away.md']) { const up = await api('POST', `/api/agent/artifacts?session_id=${sid}&tag=for+review&question=Approve+this%3F`, `content of ${n} ${Date.now()}`, { 'X-Artifact-Name': n, 'X-Artifact-Media-Type': 'text/markdown' }); ids[n] = String(up.body.id || up.body.digest).replace(/^sha256:/, ''); }
         check((await api('POST', `/api/board/${B}/artifacts/${ids['put-away.md']}/review`, { decision: 'ignore' })).status === 200, 'the file was ignored through the real route');
 
         await ev(`window.switchNavTab('hub-inbox'); true`);
