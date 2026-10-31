@@ -36,6 +36,10 @@ const LONG = 'Which of the two \u202edesigns do we ship? ' + 'We have weighed th
             assert.ok(lead.text.includes('Which of the two <U+202E>designs'), at + 'the question is on the row, with the hidden character written out: ' + lead.text.slice(0, 120));
             assert.ok(!lead.text.includes('\u202e'), at + 'a hidden character is written out, never drawn raw');
             assert.ok(dev.text.includes('may I delete the old table?'), at + "the wait's question is on the row");
+            // a question reads like a review row (#11534): the first line is the row's name, then who asked and their team under it, wherever the width drops columns
+            const leadRow = await ev(`(() => { const r = [...document.querySelectorAll('#group-table-view tbody tr')].find(x => x.textContent.includes('Lead')); const n = r.querySelector('.inbox-review-name'), sub = r.querySelector('.cell-subtitle, [class*="subtitle"]'); return { name: n ? n.textContent : '', sub: sub ? sub.textContent : '' }; })()`);
+            assert.ok(leadRow.name.startsWith('Which of the two'), at + "the row's name is the question's first line: " + JSON.stringify(leadRow));
+            assert.ok(/^from Lead/.test(leadRow.sub) && leadRow.sub.includes('team'), at + 'under it, who asked and their team: ' + JSON.stringify(leadRow));
             await waitFor(`document.getElementById('nav-tab-hub-inbox-badge').textContent === '2'`, at + 'the badge counts both', 6000);
 
             // opens whole
