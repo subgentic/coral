@@ -613,7 +613,7 @@ async function startShard(n, gen = 0, strict = false, backend = MAIN_BACKEND) {
   // CORAL_TEST_TMUX_SOCKET: this shard's own tmux socket (<data>/tmux.sock), for suites that compare
   // the pane with the dashboard (#3422). CORAL_TEST_LOG: this shard's Coral log, which a suite reads
   // only to explain its own failure (helpers/stand_in_agent.js, #3502).
-  return { n, gen, log, coral, chrome, throttler, strict, backend, data, tmuxSock, serverEnv, pprofPort, env: { ...testEnv, CORAL_TEST_URL: `http://127.0.0.1:${port}`, CDP_PORT: String(cdp), CORAL_CDP_PORT: String(cdp), CDP_CPU_THROTTLE: String(throttle),
+  return { n, gen, log, coral, chrome, throttler, strict, backend, data, tmuxSock, serverEnv, pprofPort, env: { ...testEnv, NODE_OPTIONS: [testEnv.NODE_OPTIONS, `--require=${path.join(import.meta.dirname, 'helpers', 'start_on_agents.js')}`].filter(Boolean).join(' '), CORAL_TEST_URL: `http://127.0.0.1:${port}`, CDP_PORT: String(cdp), CORAL_CDP_PORT: String(cdp), CDP_CPU_THROTTLE: String(throttle),
     CORAL_TEST_TMUX_SOCKET: path.join(data, 'tmux.sock'), CORAL_TEST_LOG: log, CORAL_TEST_DATA_DIR: data, CORAL_TEST_BIN: bin /* the built coral, for a suite that starts a server of its own (first_run_browser) */, /* helpers/settings_guard.js restores the shard's settings exactly through this */ ...(strict ? { CORAL_TEST_STRICT: '1' } : {}) } };
 }
 
