@@ -11,7 +11,7 @@ const files = fs.readdirSync(path.join(fe, 'static')).filter(f => f.endsWith('.j
 const again = [];
 for (const rel of files) {
     const t = read(rel);
-    for (const m of t.matchAll(/(btn\(|el\('button'|textContent = |<button[^>]*>)[^\n]{0,80}?['">]Try again['"<]/g)) {
+    for (const m of t.matchAll(/(btn\(|mk\(|el\('button'|textContent = |<button[^>]*)[^\n]{0,80}?['">]Try again['"<]/g)) {
         if (rel === 'static/inbox_item_page.js') continue; // the Inbox's own buttons are #11552's
         again.push(`${rel}: ${m[0].slice(0, 100)}`);
     }
