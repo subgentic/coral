@@ -1,5 +1,29 @@
 # Release Notes
 
+## v2.0.15 — a clearer reason when Coral holds its messages while you type, phone navigation polish, and a stricter guide reply
+
+### Changes
+
+#### What you will notice first
+
+- **The line under the composer now says why Coral's messages are held**: it reads "Coral's messages wait until you stop typing" (it said "Holding Coral's messages while you type").
+- **Phone navigation polish**: the bottom bar's Tasks tab draws the same checklist icon the drawer uses (it drew Computers' stacked bars), and a screen reader hears the drawer named "Navigation" instead of "Views".
+
+#### Agents and the chat
+
+- **A guide's comment reply must be on the guide's own board**: a reply to a comment that belongs to another board is refused (the guide role still ships dark until Coral Hub turns it on).
+
+#### Known issues
+
+- **Windows: in-app update does not work from 2.0.0 through 2.0.6.** If you're on one of those, download and install the MSI by hand; from 2.0.7 on, in-app update works.
+- **macOS: a Coral of 2.0.5 or earlier cannot install updates in-app; install 2.0.6 or later by hand once.**
+- **OpenCode agents are tested on macOS and Linux; OpenCode on Windows is not yet tested end to end.**
+- Setting up a computer over SSH is supported from a macOS or Linux hub, and is not yet tested from a Windows hub.
+
+#### For developers and releases
+
+- The static tree is 5,858,269 bytes of the 5,906,432-byte budget, and app.js at start is 396,956 encoded bytes against its 396,965 limit (the hint's wording was shortened to stay under it).
+
 ## v2.0.14 — phone navigation like Gmail, Coral Hub's first-run pages that explain themselves, and the guide role's screens
 
 ### Changes
