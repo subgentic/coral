@@ -45,8 +45,8 @@ func newManageEnv(t *testing.T) *manageEnv {
 	require.NoError(t, os.WriteFile(filepath.Join(home, ".coral-server", "instance-id"), []byte(provInstance+"\n"), 0o600))
 	require.NoError(t, os.WriteFile(filepath.Join(home, ".coral-server", "data", "api_key"), []byte(provKey+"\n"), 0o600))
 	require.NoError(t, os.WriteFile(filepath.Join(bin, "tmux"), []byte("#!/bin/sh\necho \"$@\" >> '"+tmuxLog+"'\n[ \"$1\" = has-session ] && exit 1\nexit 0\n"), 0o755))
-	// the check after a stop reads /proc/net/tcp, which a Mac has not: it is answered here (a file named stuck means Coral will not stop)
-	script := "#!/bin/sh\nfor a in \"$@\"; do last=\"$a\"; done\ncase \"$last\" in *\"uname -sm\"*) echo 'Linux x86_64'; exit 0;; *\"command -v tmux\"*) exit 0;; *\"/proc/net/tcp\"*) [ -e '" + filepath.Join(pe.dir, "stuck") + "' ] && exit 1; exit 0;; esac\nHOME='" + home + "'; export HOME\nPATH='" + bin + ":'\"$PATH\"; export PATH\neval \"$last\"\n"
+	// the checks read ps and /proc/net/tcp, which a Mac has not or answers otherwise: they are answered here (a file named stuck means Coral will not stop; nothing holds 8420)
+	script := "#!/bin/sh\nfor a in \"$@\"; do last=\"$a\"; done\ncase \"$last\" in *\"uname -sm\"*) echo 'Linux x86_64'; exit 0;; *\"command -v tmux\"*) exit 0;; *\"ps -u\"*) [ -e '" + filepath.Join(pe.dir, "stuck") + "' ] && exit 1; exit 0;; *\"/proc/net/tcp\"*) [ -e '" + filepath.Join(pe.dir, "portheld") + "' ] && exit 2; exit 0;; esac\nHOME='" + home + "'; export HOME\nPATH='" + bin + ":'\"$PATH\"; export PATH\neval \"$last\"\n"
 	require.NoError(t, os.WriteFile(filepath.Join(pe.dir, "ssh"), []byte(script), 0o700))
 	pe.p.runner = sshprov.Runner{SSH: filepath.Join(pe.dir, "ssh")}
 	pe.p.version = "2.0.10"
@@ -306,4 +306,21 @@ func TestManageUpgradeGivesAnOlderComputerItsOwnerSecretOnceAndNeverRotatesIt(t 
 	assert.Len(t, me.ownerGiven, 1, "an upgrade rotated a secret the hub already held")
 	again, _, _ := me.e.h.store.OwnerSecret(context.Background(), "ssh-box")
 	assert.Equal(t, first, again)
+}
+
+// An upgrade whose restart finds 8420 held by another user's Coral fails with the sentence that names the port (QA Engineer's gap on #11429): this user's Coral was stopped, so nothing is deleted, and no
+// new session is started.
+func TestManageUpgradeNamesPort8420WhenAnotherHoldsItAndStartsNothing(t *testing.T) {
+	defer sshprov.SetStopTimingForTest(200*time.Millisecond, 20*time.Millisecond)()
+	me := newManageEnv(t)
+	require.NoError(t, os.WriteFile(filepath.Join(me.dir, "portheld"), nil, 0o600))
+	_, v := me.plan(t, "upgrade", nil)
+	plan := v["plan"].(string)
+	me.connectAndRun(t, plan, map[string]any{}, 202)
+	failed := me.waitPhase(t, plan, "failed")
+	assert.Equal(t, portInUseSentence, failed["error"])
+	b, _ := os.ReadFile(me.tmuxLog)
+	assert.Contains(t, string(b), "kill-session", "this user's Coral was stopped first")
+	assert.NotContains(t, string(b), "new-session", "and nothing was started over the other user's Coral")
+	assert.True(t, farHas(filepath.Join(me.home, ".coral-server", "data", "api_key")), "the data was not touched")
 }

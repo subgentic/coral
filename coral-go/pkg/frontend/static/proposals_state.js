@@ -28,7 +28,7 @@ export function refreshProposals(force = false) {
             if (r.status === 403) items = [];
             else if (r.ok) {
                 const hide = dismissed(), rows = (await r.json()).proposals || [];
-                items = rows.filter(p => !(p.state === 'expired' && hide.has(`${p.board_id}:${p.id}`))).map(p => ({ ...p, rowKey: `proposal:${p.board_id}:${p.id}`, proposer: visibleName(p.proposer) || 'An agent' }));
+                items = rows.filter(p => !(p.state === 'expired' && hide.has(`${p.board_id}:${p.id}`))).map(p => ({ ...p, rowKey: `proposal:${p.board_id}:${p.id}`, proposer: visibleName(p.proposer) ? String(p.proposer) : 'An agent' }));
             }
         } catch { /* keep the rows as they are */ }
         reading = null;

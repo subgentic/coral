@@ -275,7 +275,7 @@ var writeRoutesWithoutTheGuard = map[string]string{
 // is treated as any listed route.
 var writeRoutesFromOtherRows = map[string]string{
 	"POST /api/sessions/live/{sessionID}/record-agent": "#226: a process id, its start time and a yes/no; no text",
-	"POST /api/sessions/record-agents":                 "#226: no body; the server walks the live sessions",
+	"POST /api/sessions/record-agents":                 "#226: the agents a dry run listed, or ?all=1; the server walks the live sessions",
 }
 
 // Every write route under the board, saved-item, notification and one-shot task prefixes either refuses a sign-in link (routes.RefuseSignInLink

@@ -1,5 +1,6 @@
 import './inbox_servers.js'; // source helpers shared by lazy Inbox filters and lists
 import { needsYou, askedRow } from './asked_before_restart.js';
+import { unrecordedItem } from './waiting.js';
 /* Inbox tab (#4718, #4811, #7472): on every Coral. Where the hub serves the dashboard it is the Coral Hub's /inbox page (what needs the Operator, what was saved) inside the dashboard, in a
  * frame whose address is the constant below: never built from a URL, a hash or a message, and nothing is posted to or read from the frame. On every other Coral the dashboard builds its own
  * Inbox on the shared sidebar: three groups, Needs you (the agents waiting for input, from the live list the dashboard already holds, each opening that agent), Tasks and Saved for later, whose names
@@ -23,7 +24,7 @@ document.addEventListener('coral:asked-dismissed', () => updateInboxTab()); // a
 
 /** How many agents are waiting for input right now, from the feed's list. */
 export function waitingCount() {
-    return (state.liveSessions || []).filter(needsYou).length;
+    return (state.liveSessions || []).filter(needsYou).length + (unrecordedItem(state.liveSessions) ? 1 : 0); // the agents held until recorded are one item (#11415)
 }
 
 /** Keep the tab's badge (and, where the dashboard builds its own Inbox, the Needs you list) in step with the live list. Safe to call often (after each list update). */

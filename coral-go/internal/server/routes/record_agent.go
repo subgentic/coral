@@ -3,6 +3,7 @@ package routes
 import (
 	"context"
 	"errors"
+	"io"
 	"log/slog"
 	"net/http"
 	"path/filepath"
@@ -159,9 +160,34 @@ type leftAgent struct {
 
 // RecordAgents: POST /api/sessions/record-agents (Operator only), after an update. Every agent whose notices are paused and whose single foreground program is its resolved CLI is
 // recorded. The match is the program's image path against the resolved CLI path, or (Windows) that it ran behind the recognised launcher cmd of the CLI (a shim's node), or an interpreter (node, bun, deno) running exactly the CLI file (the npm bin: for the one-time update of already-running agents); anything else (a script run by node, a wrapper, two programs, an unreadable image) is left paused
-// and listed.
+// and listed. With ?dry_run=1 nothing is recorded: the answer lists what each agent WOULD be recorded as (its program and pid) and what would be left, so the Operator checks each one before confirming (#11415).
 func (h *SessionsHandler) RecordAgents(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	dryRun := r.URL.Query().Get("dry_run") == "1"
+	// The pairs the Operator was shown (session and pid, from a preview): with them, an agent is recorded only if its current candidate still has exactly that pid, and one not shown is not recorded (#11415, Security). No list: refused unless ?all=1 asks for every match.
+	var shown struct {
+		Agents []struct {
+			Session string `json:"session"`
+			PID     int    `json:"pid"`
+		} `json:"agents"`
+	}
+	var confirmed map[string]int
+	if !dryRun {
+		if err := decodeJSONMax(w, r, &shown, 1<<16); err != nil && !errors.Is(err, io.EOF) {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "the list of agents shown could not be read"})
+			return
+		}
+		if shown.Agents == nil && r.URL.Query().Get("all") != "1" {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "code": "read_first", "error": "read the dry run first (POST this route with ?dry_run=1), then send the agents it listed; to record every match without a list, send ?all=1"})
+			return
+		}
+		if shown.Agents != nil {
+			confirmed = make(map[string]int, len(shown.Agents))
+			for _, a := range shown.Agents {
+				confirmed[a.Session] = a.PID
+			}
+		}
+	}
 	rec, can := h.terminal.(ptymanager.AgentRecorder)
 	if !can {
 		writeJSON(w, http.StatusUnprocessableEntity, map[string]any{"ok": false, "code": "not_supported", "error": "this terminal cannot record an agent"})
@@ -197,6 +223,17 @@ func (h *SessionsHandler) RecordAgents(w http.ResponseWriter, r *http.Request) {
 			left = append(left, leftAgent{name, why})
 			continue
 		}
+		if confirmed != nil {
+			want, ok := confirmed[name]
+			if !ok {
+				left = append(left, leftAgent{name, "not in the list you confirmed (its notices paused after you looked): record it with the button"})
+				continue
+			}
+			if want != cand.PID {
+				left = append(left, leftAgent{name, "changed since you looked: the program in its terminal is no longer the one you were shown"})
+				continue
+			}
+		}
 		if cand.Unidentified || cand.Image == "" {
 			left = append(left, leftAgent{name, "needs the button: the program could not be identified (its image cannot be read)"})
 			continue
@@ -215,6 +252,10 @@ func (h *SessionsHandler) RecordAgents(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		cand.CLIPath = cli
+		if dryRun {
+			recorded = append(recorded, recordedAgent{name, cand.PID, programName(cand)})
+			continue
+		}
 		got, rerr := rec.RecordAgent(ctx, name, ls.AgentType, ls.SessionID, cand)
 		if errors.Is(rerr, ptymanager.ErrNeedsAcknowledgement) {
 			left = append(left, leftAgent{name, "needs the button: the program moved inside a nested shell"})
@@ -225,6 +266,10 @@ func (h *SessionsHandler) RecordAgents(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		recorded = append(recorded, recordedAgent{name, got.PID, got.Program})
+	}
+	if dryRun {
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "dry_run": true, "recorded": recorded, "left": left})
+		return
 	}
 	slog.Info("the Operator recorded the agents' processes after an update", "recorded", len(recorded), "left", len(left))
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "recorded": recorded, "left": left})
