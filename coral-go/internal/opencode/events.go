@@ -37,6 +37,7 @@ type frame struct {
 	Status     any    `json:"status"`
 	Properties *frame `json:"properties"`
 	Data       *frame `json:"data"`
+	Payload    *frame `json:"payload"` // /global/event wraps each event: {"directory": ..., "project": ..., "payload": {the event}}
 }
 
 func (f *frame) status() string {
@@ -55,6 +56,9 @@ func parseFrame(sseType, data string) (Event, bool) {
 	var f frame
 	if json.Unmarshal([]byte(data), &f) != nil {
 		return Event{}, false
+	}
+	if f.Payload != nil && f.Type == "" {
+		f = *f.Payload // the global stream's wrapper: the event is inside
 	}
 	e := Event{Type: f.Type, SessionID: f.SessionID, Status: f.status()}
 	for _, in := range []*frame{f.Properties, f.Data} {

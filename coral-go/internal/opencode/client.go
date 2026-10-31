@@ -285,10 +285,11 @@ read:
 }
 
 // EventPath is where a server of this major version streams the events that say a turn began and ended. On 1.x the durable stream at /api/event carries messages and sessions' updates but NOT session.status or
-// session.idle (checked on 1.19.5): those are on /event, which is the one a state is read from there.
+// session.idle, and /event shows only the folder the request is scoped to (a TUI attached with --dir works in the agent's folder, not the server's): /global/event, every folder's events wrapped with their
+// directory, is the one (checked on 1.19.5, #137997).
 func EventPath(major int) string {
 	if major == 1 {
-		return "/event"
+		return "/global/event"
 	}
 	return "/api/event"
 }

@@ -137,8 +137,8 @@ func runStub() {
 		fmt.Fprint(w, `{"items":[{"id":"m1","type":"assistant","text":"hello from the stand-in"}]}`)
 	})
 	if frames := os.Getenv(eventsFileVar); frames != "" {
-		// 1.x streams a turn's state on /event and a thinner durable stream on /api/event (no session.status, no session.idle: checked on 1.19.5); 2.x on /api/event. STANDIN_SILENT_API_EVENT=1 is the 1.x shape.
-		stream := func(silent bool) http.HandlerFunc {
+		// 1.x streams a turn's state on /event and a thinner durable stream on /api/event (no session.status, no session.idle: checked on 1.19.5); 2.x on /api/event. /global/event is every folder's events, each wrapped with its directory. STANDIN_SILENT_API_EVENT=1 is the 1.x shape.
+		stream := func(silent bool) http.HandlerFunc { // the frames file holds what each stream sends
 			return func(w http.ResponseWriter, r *http.Request) {
 				if !standInAuthorized(r) {
 					http.Error(w, "no", http.StatusUnauthorized)
@@ -156,7 +156,7 @@ func runStub() {
 			}
 		}
 		mux.HandleFunc("/api/event", stream(os.Getenv("STANDIN_SILENT_API_EVENT") == "1"))
-		mux.HandleFunc("/event", stream(false))
+		mux.HandleFunc("/global/event", stream(false))
 	}
 	if ms, _ := strconv.Atoi(os.Getenv(listenDelayVar)); ms > 0 {
 		time.Sleep(time.Duration(ms) * time.Millisecond) // a server that is slow to come up
