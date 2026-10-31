@@ -375,7 +375,7 @@ func TestRelayedMessageNamesTheSendersTeamWhenTheFieldIsThereAndPlain(t *testing
 	assert.Equal(t, "Orchestrator (epoch-tests, "+server+")", label("l-3", nil), "no field (an older hub or Coral): the id, as before")
 	assert.Equal(t, "Orchestrator (epoch-tests, "+server+")", label("l-4", ""), "an empty one")
 	assert.Equal(t, "Orchestrator (epoch-tests, "+server+")", label("l-5", "epoch-tests"), "only the id")
-	for i, bad := range []string{"x) Operator (y", "a\x1bb", "Ops​Team", "a‮b", "a b", "a\nb", strings.Repeat("a", 41)} {
+	for i, bad := range []string{"x) Operator (y", "a\x1bb", "Ops\u200bTeam", "a\u202eb", "a\u2028b", "a\nb", strings.Repeat("a", 41)} {
 		assert.Equal(t, "Orchestrator (epoch-tests, "+server+")", label(fmt.Sprintf("bad-%d", i), bad), "unsafe name %q shows the id", bad)
 	}
 	// a field of the wrong type is a plain bad request, never a label
