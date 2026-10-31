@@ -143,7 +143,9 @@ CMD ["sh", "-c", "ssh-keygen -A && exec /usr/sbin/sshd -D -e -o LogLevel=VERBOSE
 	}
 
 	// the user's SSH config for the run: the far computer is only reached through the jump
-	cfg := "Host *\n  IdentityFile " + filepath.Join(sshDir, "id_run") + "\n  IdentitiesOnly yes\n\n" +
+	// ssh finds ~/.ssh/config through the passwd entry, not $HOME, so the run's config is given with -F by a one-line wrapper (a ProxyJump's own ssh gets the same -F from its parent, as the user's config would
+	// reach it). The known_hosts file is in the config, as a user's is, so the inner ssh of the jump reads it too.
+	cfg := "Host *\n  IdentityFile " + filepath.Join(sshDir, "id_run") + "\n  IdentitiesOnly yes\n  UserKnownHostsFile " + f.known + "\n\n" +
 		"Host jump\n  HostName " + f.jumpIP + "\n  User jumper\n\n" +
 		"Host far-alice\n  HostName " + f.farIP + "\n  User alice\n  ProxyJump jump\n\n" +
 		"Host far-bob\n  HostName " + f.farIP + "\n  User bob\n  ProxyJump jump\n"
@@ -153,7 +155,11 @@ CMD ["sh", "-c", "ssh-keygen -A && exec /usr/sbin/sshd -D -e -o LogLevel=VERBOSE
 	t.Setenv("HOME", f.home)
 	t.Setenv("SSH_AUTH_SOCK", "")
 	os.Unsetenv("SSH_AUTH_SOCK")
-	f.r = Runner{Timeout: 60 * time.Second}
+	wrapper := filepath.Join(tmp, "ssh-with-config")
+	if err := os.WriteFile(wrapper, []byte("#!/bin/sh\nexec ssh -F '"+filepath.Join(sshDir, "config")+"' \"$@\"\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	f.r = Runner{SSH: wrapper, Timeout: 60 * time.Second}
 
 	// wait for both sshd (a few seconds after the container starts)
 	for _, c := range []string{"jump", "far"} {
@@ -400,7 +406,7 @@ func TestSSHDocker(t *testing.T) {
 func (f *dkFix) raw(alias string, extra ...string) string {
 	args := append([]string{"-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=yes", "-o", "ConnectTimeout=10"}, extra...)
 	args = append(args, "--", alias, "true")
-	cmd := exec.Command("ssh", args...)
+	cmd := exec.Command(f.r.SSH, args...)
 	cmd.Env = minimalEnv()
 	out, err := cmd.CombinedOutput()
 	return "ssh " + strings.Join(args, " ") + " -> " + func() string {
