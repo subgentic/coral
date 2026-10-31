@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/subgentic/coral/internal/board"
+	"github.com/subgentic/coral/internal/httputil"
 	"github.com/subgentic/coral/internal/mediatype"
 	"github.com/subgentic/coral/internal/naming"
 	"github.com/subgentic/coral/internal/safefs"
@@ -185,8 +186,7 @@ func (h *BoardHandler) UploadOperatorArtifact(w http.ResponseWriter, r *http.Req
 	case shareSlots <- struct{}{}:
 		defer func() { <-shareSlots }()
 	default:
-		w.Header().Set("Retry-After", "2")
-		writeError(w, http.StatusTooManyRequests, "busy", "files are already arriving; try again in a moment")
+		httputil.WriteActionLimit(w, 2, "busy", "files are already arriving; try again in a moment") // a per-action limit: marked, with its Retry-After (#3434)
 		return
 	}
 	if h.isPaused(project) { // nothing reaches the agents of a paused board: say so before a byte is read, in the board's own words
@@ -194,8 +194,7 @@ func (h *BoardHandler) UploadOperatorArtifact(w http.ResponseWriter, r *http.Req
 		return
 	}
 	if !shareLimit.allow(project, shareLimitPerMinute, time.Now()) {
-		w.Header().Set("Retry-After", "60")
-		writeError(w, http.StatusTooManyRequests, "rate_limited", "too many files in a minute; try again shortly")
+		httputil.WriteActionLimit(w, 60, "rate_limited", "too many files in a minute; try again shortly")
 		return
 	}
 	name := strings.TrimSpace(r.Header.Get("X-Artifact-Name"))

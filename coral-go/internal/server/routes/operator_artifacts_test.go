@@ -168,7 +168,7 @@ func TestAFileNameCannotSpeakForTheOperatorOrMentionAnyone(t *testing.T) {
 	assert.NotContains(t, tail, `"`, "a quote cannot close a quotation")
 	assert.NotContains(t, tail, "coral://", "a link in a name is broken")
 	assert.NotContains(t, tail, "----", "a run of hyphens is broken up")
-	assert.NotContains(t, strings.ReplaceAll(tail, "​", ""), "@Bob", "an @ in a name mentions nobody")
+	assert.NotContains(t, strings.ReplaceAll(tail, "\u200b", ""), "@Bob", "an @ in a name mentions nobody")
 	assert.Equal(t, 1, strings.Count(msgs[0], "coral://artifacts/"), "the only link is the file's own")
 }
 
