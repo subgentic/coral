@@ -4,6 +4,7 @@
 // Written failing-first by QA (#7499): by role and accessible name (helpers/team_page.js). Isolated dev server.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
+const { framesJs } = require('./helpers/wait'); // bounded frame waits for the page script below (a hidden page never runs animation frames)
 const { install: installTP, seed, openTeam, goTab, scenarios } = require('./helpers/team_page');
 const BASE = require('./test_base').BASE;
 const { removeBoards } = require('./helpers/board_cleanup');
@@ -91,6 +92,9 @@ const TEAM = `qa-settings-${Date.now() % 100000}`;
                 await ev(`document.documentElement.style.fontSize = ''; true`);
             });
             await S.run(`${label}: the save bar stays reachable: status "No changes to save.", Cancel at the left, Save settings at the right, Save off`, async () => {
+                // The bar is measured before and after the pane is scrolled, so it must have stopped moving first: the text size is back from the 200% scenario (no inline size) and the bar's top is the same on three frames in a row.
+                // Waiting for that and not for a time: a fixed sleep only moves the race (1 run in 10 at CPU x6 here, twice on the Windows gate, measured the bar while it was still settling).
+                assert.equal(await ev(`(async () => { const bar = () => { const e = document.querySelector('#team-settings-workspace .sv-bar, #team-settings-workspace .team-settings-bar, .team-settings-modal .sv-bar'); return e ? Math.round(e.getBoundingClientRect().top * 10) : null; }; let prev = null, same = 0; for (let i = 0; i < 120; i++) { await ${framesJs(1)}; const y = bar(); if (document.documentElement.style.fontSize === '' && y !== null && y === prev) { if (++same >= 3) return true; } else same = 0; prev = y; } return false; })()`), true, 'the save bar has stopped moving');
                 const b = await bar(); assert.ok(b.save && b.cancel, 'Cancel and Save settings are there');
                 assert.match(b.status, /No changes to save/, `the status says there is nothing to save (got ${JSON.stringify(b.status)})`);
                 assert.equal(b.save.disabled, true, 'Save settings is off'); assert.ok(b.cancel.x < b.save.x, 'Cancel is left of Save settings');
