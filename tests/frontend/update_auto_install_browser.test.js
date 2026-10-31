@@ -114,14 +114,23 @@ const stagedFrom = (source, relaunch = {}) => { const st = staged('1.4.160', {},
         await ev(`window.showSettingsModal('updates'); true`);
         await settle(600);
         const box = () => ev(`(() => { const c = document.getElementById('settings-update-auto-install'); return c ? { checked: c.checked, label: document.body.textContent.includes('Install updates automatically when idle') ? 'Install updates automatically when idle' : '' } : null; })()`);
-        let b = await box();
-        check('settings: "Install updates automatically when idle" is there and on (' + JSON.stringify(b) + ')', b && b.checked && /Install updates automatically when idle/.test(b.label));
-        await ev(`document.getElementById('settings-update-auto-install').click(); true`);
-        await ev(`(window.applySettings || window.saveSettingsModal || (() => {}))(); true`);
-        await settle(500);
-        await ev(`import(${S} + 'update_settings.js').then(m => m.applyUpdatePrefs && m.applyUpdatePrefs()).then(() => true)`);
-        const saved = await ev(`window.__saved`);
-        check('settings: turning it off saves update_auto_install=false as an ordinary setting (' + JSON.stringify(saved) + ')', saved.some(s => /"update_auto_install":false/.test(s)));
+        if (process.platform !== 'win32') { // a Windows server says the install asks a person, so the page does not draw this switch there (update_settings.js, #11170); the case below pins that on every platform
+            let b = await box();
+            check('settings: "Install updates automatically when idle" is there and on (' + JSON.stringify(b) + ')', b && b.checked && /Install updates automatically when idle/.test(b.label));
+            await ev(`document.getElementById('settings-update-auto-install').click(); true`);
+            await ev(`(window.applySettings || window.saveSettingsModal || (() => {}))(); true`);
+            await settle(500);
+            await ev(`import(${S} + 'update_settings.js').then(m => m.applyUpdatePrefs && m.applyUpdatePrefs()).then(() => true)`);
+            const saved = await ev(`window.__saved`);
+            check('settings: turning it off saves update_auto_install=false as an ordinary setting (' + JSON.stringify(saved) + ')', saved.some(s => /"update_auto_install":false/.test(s)));
+        }
+        // an install that asks a person (Windows, relaunch.reason local_approval_needed): the switch is not drawn, and the check-for-updates switch still is
+        await ev(`window.closeSettingsModal && window.closeSettingsModal(); true`); await settle(300);
+        await setStatus(staged('1.4.160', AUTO('soon', 'idle'), { reason: 'local_approval_needed' }));
+        await ev(`window.showSettingsModal('updates'); true`);
+        await settle(600);
+        const win = await box();
+        check('settings: where the install asks a person (Windows) "Install updates automatically when idle" is not drawn (' + JSON.stringify(win) + ')', win === null);
     } finally {
         await guard.restore();
         await client.close();
