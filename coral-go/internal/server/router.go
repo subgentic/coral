@@ -807,6 +807,7 @@ func (s *Server) registerStatic(r *chi.Mux) {
 	// ── Dashboard SPA ───────────────────────────────────────────
 	r.Get("/agent/{sessionID}", s.serveAgentPopout)
 	r.Get("/agent/{server}/{sessionID}", s.serveAgentPopout)
+	r.Get("/chief", s.serveChief)
 	r.Get("/", s.serveIndex)
 	for _, p := range DashboardPagePaths {
 		r.Get(p, s.servePagePath)
