@@ -14,6 +14,7 @@ import { visibleName } from './artifact_names.js';
 import { importOnce } from './import_once.js';
 import { pushOverlay, popOverlay } from './overlay_history.js';
 const { readersAllowed, readersBlock } = await importOnce('./artifact_readers.js'); // lazy: its failure is retried
+const { privateBlock } = await importOnce('./artifact_private.js'); // the owner's Private switch, beside it (#11457)
 const { makeDetails } = await importOnce('./details_disclosure.js'); // "Who can read this" behind the one Details button (#7775)
 // Asked for when used, not imported: this module loads lazily and may only import startup modules statically.
 const { attachComments, commentBoard } = await importOnce('./artifact_comments.js');
@@ -133,7 +134,7 @@ export function openArtifactViewer(hex, opts = {}) {
     _review.open(hex, { ...opts, board: commentBoard(opts) });
     // "Who can read this", for the Operator (the owner through Coral Hub): drawn only when the machine answers it; anyone else sees nothing.
     _details.clear();
-    readersAllowed(hex, opts.server).then(ok => { if (ok && gen === _gen && !d.hidden) _details.add(readersBlock(hex, opts.server, _details)); }).catch(() => {});
+    readersAllowed(hex, opts.server).then(ok => { if (ok && gen === _gen && !d.hidden) { _details.add(readersBlock(hex, opts.server, _details)); _details.add(privateBlock(hex, opts.server, _details)); } }).catch(() => {});
     if (!opts.switched) d.querySelector('.artifact-viewer-close').focus(); // a version chosen from the bar keeps the keyboard on the bar
     let textShown = false; // the strict text view drew it: comments can point into it. Anything else (a frame, a picture, a PDF, a table, a video, a download) takes whole-document comments (#11444).
     Promise.resolve(renderArtifact(body, `coral://artifacts/${hex}`, { server: opts.server, filename: opts.filename, mediaType: opts.mediaType }, {
