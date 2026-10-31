@@ -4182,3 +4182,5 @@ dialog.team-link-dialog::backdrop { background: rgba(var(--black-rgb), 0.5); }
 .ic-close::before, .ic-delete::before { font-size: 1.25em; } /* the glyph follows the button's own size (the shared icon rule is in fonts.css) */
 .ic-close::before { content: 'close'; }
 .ic-delete::before { content: 'delete'; }
+/* One More icon (#11564): three dots drawn in CSS from the control's own colour, not a typed ⋯ or … (two glyphs at two weights). 15 x 5 px, centred; the button keeps its size. */
+.ic-more::before { content: ''; display: block; width: 15px; height: 5px; background: radial-gradient(circle at center, currentColor 1.5px, transparent 1.7px) 0 0 / 5px 5px repeat-x; }

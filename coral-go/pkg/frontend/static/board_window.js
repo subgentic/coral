@@ -179,7 +179,7 @@ function renderBoardItem(item, prev) {
                 ${messageTimeHtml(m.created_at)}
                 ${BOARD_SAVE_BUTTON(bs.currentProject || '', keyLabel(bs.currentProject || ''), String(m.created_at || ''), String(m.job_title || m.subscriber_id || ''))}
                 <button class="btn btn-quiet btn-icon btn-xs mb-delete-msg-btn" data-on-click="mb-msg-delete" data-msg-id="${Number(m.id)}" title="Delete message" aria-label="${escapeAttr(deleteLabel)}"><span class="material-icons" aria-hidden="true">delete</span></button>
-                <button type="button" class="mb-msg-more" data-on-click="mb-msg-more" aria-haspopup="dialog" title="Message actions" aria-label="${escapeAttr(moreLabel)}">&hellip;</button>
+                <button type="button" class="mb-msg-more ic-more" data-on-click="mb-msg-more" aria-haspopup="dialog" title="Message actions" aria-label="${escapeAttr(moreLabel)}"></button>
             </div>
             ${parts.tagsOpen}
             <div class="mb-message-body" id="mbd-${Number(m.id)}">${renderBoardMessageBody(m)}</div>

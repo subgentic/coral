@@ -26,6 +26,10 @@ for (const [rel, cls] of [['static/notifications.js', 'notification-toast-close'
     const line = t.slice(at, t.indexOf('\n', at));
     assert.ok(/ic-(close|delete)/.test(line) && !/&times;|×|✕/.test(line), `${rel}: ${cls} is drawn by the shared icon class, not a typed glyph: ${line.slice(0, 140)}`);
 }
+for (const [rel, cls] of [['static/changed_files.js', 'file-more-btn'], ['static/board_window.js', 'mb-msg-more']]) {
+    const t = read(rel), at = t.indexOf(cls), line = t.slice(at, t.indexOf('</button>', at));
+    assert.ok(/ic-more/.test(line) && !/&hellip;|&#x22EF;|⋯|…/.test(line), `${rel}: ${cls} draws the shared three-dot icon, not a typed glyph: ${line.slice(0, 160)}`);
+}
 const css = read('static/css/components.css');
 assert.ok(/#mb-pause-btn\.mb-action-btn\.mb-action-danger\s*\{[^}]*--warning-text/.test(css), 'a paused board\'s Resume is the warning colour, not the delete red');
 console.log('action_set_census: ok (Retry on buttons, delete is an icon, Resume is not red)');
