@@ -17,12 +17,12 @@ cd "$top" || exit 2
 echo "sshdocker $ID: $(git rev-parse --short HEAD) -> $H:$ROOT/$D"
 git archive --format=tar HEAD coral-go tests | gzip |
   ssh -o BatchMode=yes "$H" "umask 022; rm -rf -- '$ROOT/$D' && mkdir -p '$ROOT/$D' && cd '$ROOT/$D' && tar xzf - 2>/dev/null" || exit 1
-ssh -o BatchMode=yes "$H" "ROOT='$ROOT' D='$D' bash -s" <<'REMOTE'
+ssh -o BatchMode=yes "$H" "ROOT='$ROOT' D='$D' NOTEL='${SSHDOCKER_NO_TELEMETRY:-0}' bash -s" <<'REMOTE'
 umask 022
 N=$ROOT
 export PATH=$HOME/go-install/go/bin:$PATH GOCACHE=$N/coralgo-cache/gocache GOMODCACHE=$N/coralgo-cache/gomodcache TMPDIR=$N/coralgo-tmp
 unset CORAL_CLOUD_URL CORAL_DIR CORAL_DATA_DIR CORAL_URL TMUX SSH_AUTH_SOCK
-export CORAL_TELEMETRY_DISABLED=1 SSHDOCKER=1
+export CORAL_TELEMETRY_DISABLED=1 SSHDOCKER=1 SSHDOCKER_NO_TELEMETRY='$NOTEL'
 cd $N/$D/coral-go || exit 1
 echo "before: containers=$(docker ps -aq | wc -l) networks=$(docker network ls -q | wc -l) load=$(cut -d' ' -f1-3 /proc/loadavg)"
 nice -n 10 ionice -c3 go test -tags sshdocker -run TestSSHDocker -p 1 -count=1 -v -timeout 25m ./internal/sshprov/ 2>&1

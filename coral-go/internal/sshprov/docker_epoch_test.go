@@ -117,12 +117,16 @@ func dkFixture(t *testing.T) *dkFix {
 	if err := os.WriteFile(filepath.Join(ctxDir, "id_run.pub"), pub, 0o644); err != nil {
 		t.Fatal(err)
 	}
+	extra := ""
+	if os.Getenv("SSHDOCKER_NO_TELEMETRY") == "1" { // a variant of the run: the far Coral gets the variable the team's own runs set, to tell a slow start from the network
+		extra = "RUN echo CORAL_TELEMETRY_DISABLED=1 >> /etc/environment\n"
+	}
 	dockerfile := `FROM ubuntu:22.04
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends openssh-server tmux ca-certificates procps && rm -rf /var/lib/apt/lists/* && mkdir -p /run/sshd
 RUN for u in alice bob jumper; do useradd -m -s /bin/bash -p '*' $u && mkdir -p /home/$u/.ssh; done
 COPY id_run.pub /tmp/k.pub
 RUN for u in alice bob jumper; do cp /tmp/k.pub /home/$u/.ssh/authorized_keys && chown -R $u:$u /home/$u/.ssh && chmod 700 /home/$u/.ssh && chmod 600 /home/$u/.ssh/authorized_keys; done
-CMD ["sh", "-c", "rm -f /etc/ssh/ssh_host_* && ssh-keygen -A && exec /usr/sbin/sshd -D -e -o LogLevel=VERBOSE -o AllowTcpForwarding=yes"]
+` + extra + `CMD ["sh", "-c", "rm -f /etc/ssh/ssh_host_* && ssh-keygen -A && exec /usr/sbin/sshd -D -e -o LogLevel=VERBOSE -o AllowTcpForwarding=yes"]
 `
 	if err := os.WriteFile(filepath.Join(ctxDir, "Dockerfile"), []byte(dockerfile), 0o644); err != nil {
 		t.Fatal(err)
