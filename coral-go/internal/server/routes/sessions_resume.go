@@ -210,7 +210,7 @@ func (h *SessionsHandler) resumeCommand(ctx context.Context, p *restartPlan, age
 		refuse, _ := cliPathRefusal(ctx, cerr)
 		return "", refuse
 	}
-	cmd, err := launchCommand(agentImpl, agent.LaunchParams{
+	cmd, err := h.launchCommand(ctx, agentImpl, agent.LaunchParams{
 		SessionID:       p.newSessionID,
 		SessionName:     p.newSessionName,
 		ProtocolPath:    h.protocolPath(),

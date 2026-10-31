@@ -39,6 +39,8 @@ import (
 
 // SessionsHandler handles all live session API endpoints.
 type SessionsHandler struct {
+	opencode OpencodeRuntime // the opencode servers, one per agent; nil until the server wires it
+
 	// piModelCheck says a Pi model is not one Pi lists (#11105); nil until the server wires it.
 	piModelCheck func(ctx context.Context, model string) string
 	// searchRate is the per-member rate limit of the agent search, refusals counted (#11048).
@@ -771,6 +773,12 @@ func lastMessageField(m *lastMessageSource, _ bool) map[string]any {
 
 // lastMessageOf reads a session's last message (cached by its file, see jsonl.LastMessage); nil when it has none.
 func (h *SessionsHandler) lastMessageOf(sessionID, workingDir, agentType string, started bool) map[string]any {
+	if agentType == at.Opencode && lastMessageEnabled && sessionID != "" { // no transcript: the server's last turn
+		if m, ok := h.opencodeLastMessage(sessionID); ok {
+			return lastMessageField(&m, false)
+		}
+		return nil
+	}
 	if !lastMessageEnabled || h.jsonl == nil || sessionID == "" {
 		return nil
 	}
@@ -785,6 +793,9 @@ func (h *SessionsHandler) lastMessageOf(sessionID, workingDir, agentType string,
 func lastMessageRow(h *SessionsHandler, sessionID, workingDir, agentType string, skipExpensive, started bool) map[string]any {
 	if !skipExpensive {
 		return h.lastMessageOf(sessionID, workingDir, agentType, started)
+	}
+	if agentType == at.Opencode {
+		return h.lastMessageOf(sessionID, workingDir, agentType, started) // already only what the manager kept: it reads no file
 	}
 	if !lastMessageEnabled || h.jsonl == nil {
 		return nil

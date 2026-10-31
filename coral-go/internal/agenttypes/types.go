@@ -11,6 +11,7 @@ const (
 	Gemini      = "gemini"
 	Codex       = "codex"
 	Pi          = "pi"
+	Opencode    = "opencode"
 	Terminal    = "terminal"
 )
 

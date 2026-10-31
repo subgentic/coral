@@ -188,5 +188,6 @@ func (h *SessionsHandler) markEndedAfterFailedSend(ctx context.Context, name, ag
 		slog.Warn("could not mark an exited agent as ended", "session_id", sessionID, "error", err)
 		return false
 	}
+	h.stopOpencode(sessionID) // the CLI has exited: its server has no agent
 	return true
 }

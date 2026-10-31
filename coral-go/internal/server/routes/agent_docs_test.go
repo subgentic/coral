@@ -279,11 +279,11 @@ func TestHowDoIAnswersContinueAFileAndThePermissionModes(t *testing.T) {
 	for _, mode := range []string{"**Default:**", "**Plan:**", "**Accept edits:**", "**Auto:**", "**Bypass permissions:**", "**Don't ask:**"} {
 		assert.Contains(t, text, mode, "one line for each mode")
 	}
-	for _, cli := range []string{"**Claude**", "**Codex**", "**Antigravity**", "**Gemini**", "**Pi**"} {
+	for _, cli := range []string{"**Claude**", "**Codex**", "**Antigravity**", "**Gemini**", "**Pi**", "**opencode**"} {
 		assert.Contains(t, text, cli, "Auto says where the CLIs differ")
 	}
 	assert.Contains(t, text, "**Resume in**", "the Resume dialog's mode row is named")
-	assert.GreaterOrEqual(t, strings.Count(text, "On **Antigravity**, **Gemini** and **Pi** it means what Auto means there"), 2, "Bypass permissions and Don't ask say what they mean on the CLIs with no checks")
+	assert.GreaterOrEqual(t, strings.Count(text, "On **Antigravity**, **Gemini**, **Pi** and **opencode** it means what Auto means there"), 2, "Bypass permissions and Don't ask say what they mean on the CLIs with no checks")
 	static := filepath.Join("..", "..", "..", "pkg", "frontend")
 	read := func(rel ...string) string {
 		b, err := os.ReadFile(filepath.Join(append([]string{static}, rel...)...))

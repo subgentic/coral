@@ -211,6 +211,21 @@ func ParseAgyModels(b []byte) ([]Model, error) {
 	return result(models)
 }
 
+// ParseOpencodeModels reads `opencode models`: one "provider/model" per line (opencode/big-pickle, openai/gpt-6). The value is the line, which opencode's model setting takes (with a #variant for an effort);
+// the provider is the group a picker lists it under, as for Pi. A line that is not one such id (a notice, a header) is skipped, and no model at all is ErrNoModels.
+func ParseOpencodeModels(b []byte) ([]Model, error) {
+	var models []Model
+	for _, line := range strings.Split(string(b), "\n") {
+		id := strings.TrimSpace(line)
+		provider, name, ok := strings.Cut(id, "/")
+		if !ok || provider == "" || name == "" || strings.ContainsAny(id, " \t#") || !ValidModelValue(id) {
+			continue
+		}
+		models = append(models, Model{Value: id, DisplayName: name, Group: provider})
+	}
+	return result(models)
+}
+
 // ParsePiModels reads pi --list-models' table ("provider  model  context  max-out  thinking
 // images"); the value is "provider/model", which pi's --model takes. Without that header (pi
 // prints a sentence when no provider is set up) there are no models.

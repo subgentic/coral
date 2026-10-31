@@ -29,6 +29,8 @@ func IsResumeID(agentType, id string) bool {
 	switch GetAgent(agentType).AgentType() {
 	case at.Codex:
 		return true
+	case at.Opencode:
+		return IsOpencodeSessionID(id)
 	default: // claude (incl. "" and unknown), agy, gemini, terminal, pi: always UUIDs
 		return isCanonicalUUID(id)
 	}

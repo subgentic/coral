@@ -18,6 +18,7 @@ export const CLI_INSTALL_INSTRUCTIONS = {
     gemini: AGY,
     codex: { name: 'codex', label: 'Codex', cmd: 'npm install -g @openai/codex', url: 'https://github.com/openai/codex' },
     pi: { name: 'pi', label: 'Pi', cmd: 'npm install -g --ignore-scripts @earendil-works/pi-coding-agent', url: 'https://pi.dev' },
+    opencode: { name: 'opencode', label: 'opencode', cmd: 'npm install -g opencode-ai', url: 'https://opencode.ai' },
 };
 
 export function _checkAgentCLI(agentType, warning = document.getElementById('cli-check-warning'), force = false) {
