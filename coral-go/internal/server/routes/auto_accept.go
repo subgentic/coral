@@ -97,11 +97,16 @@ var autoAcceptActionTools = map[string]map[string]bool{
 // agyActionTools are agy's and Antigravity's action tools.
 var agyActionTools = map[string]bool{"run_command": true, "write_to_file": true, "replace_file_content": true, "view_file": true}
 
-// autoAcceptActionTool reports whether tool is an action auto-accept may approve for agentType (true for a type with no list: Codex).
+// autoAcceptHeaderRecognised are the supported types with no tool list: their approval prompts are recognised by their own header alone
+// (classifyApproval), and no PreToolUse record is needed.
+var autoAcceptHeaderRecognised = map[string]bool{at.Codex: true}
+
+// autoAcceptActionTool reports whether tool is an action auto-accept may approve for agentType: a listed tool, or any for a header-recognised
+// type (Codex). A type with neither is never approved (TestEveryAutoAcceptTypeHasAToolListOrAHeader).
 func autoAcceptActionTool(agentType, tool string) bool {
 	list, ok := autoAcceptActionTools[agentType]
 	if !ok {
-		return true
+		return autoAcceptHeaderRecognised[agentType]
 	}
 	if agentType == at.Claude && strings.HasPrefix(tool, "mcp__") {
 		return true
