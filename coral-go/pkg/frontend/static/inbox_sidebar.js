@@ -245,7 +245,16 @@ function askActions(a) {
     const box = DT.el('div', 'inbox-review-actions');
     const reply = DT.el('button', 'btn btn-small', 'Reply'); reply.type = 'button';
     reply.setAttribute('aria-label', `Reply to ${a.asker}`); reply.addEventListener('click', () => openAskDialog(a, () => $('group-table-view')?.querySelector('input[type=search]')?.focus({ preventScroll: true })));
-    box.append(reply); return box;
+    box.append(reply);
+    if (a.kind === 'ask') { // a wait has no ask row to close: only a question is ignorable
+        const who = markHidden(a.asker, { strict: true });
+        const no = DT.el('button', 'btn btn-small btn-quiet', 'Ignore'); no.type = 'button'; no.setAttribute('aria-label', `Ignore the question of ${who}`);
+        const failed = DT.el('span', 'inbox-review-error'); failed.setAttribute('role', 'alert');
+        no.addEventListener('click', () => { no.disabled = true; failed.textContent = ''; const settle = keepPlace(no);
+            importOnce('./ask_ignore.js').then(async ({ ignoreAsk }) => { await ignoreAsk(a, who); sayLive(`Ignored the question of ${who}.`); await settle(); }).catch(error => { no.disabled = false; failed.textContent = error.message; }); });
+        box.append(no, failed);
+    }
+    return box;
 }
 
 function runActions(run) {
