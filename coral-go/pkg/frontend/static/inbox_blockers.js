@@ -4,7 +4,6 @@
  * nothing and the rows look as they did. Same board only: a task that waits across boards is not counted. Lazy: loaded by the Needs you folder when it has an item to ask about (inbox_sidebar.js). */
 import { splitKey } from './server_base.js';
 import { queryBoardTasks } from './task_list.js';
-import { visibleName } from './artifact_names.js'; // a title is an agent's text: shown without what hides or reorders it (QA on #11442; the strict mark of visible_marks.js replaces this when it lands)
 
 const OPEN = ['pending', 'blocked', 'in_progress', 'review_pending'];
 const RANK = { critical: 0, high: 1, medium: 2, low: 3 };
@@ -25,7 +24,7 @@ export function dependentsOf(tasks, board, id) {
 export function infoOf(waiters, closes) {
     if (!waiters.length && !closes) return null;
     const sorted = [...waiters].sort((a, b) => (RANK[a.priority] ?? 2) - (RANK[b.priority] ?? 2) || Number(a.id) - Number(b.id));
-    return { count: sorted.length, first: sorted.length ? (visibleName(sorted[0].title) || `task #${sorted[0].id}`) : '', high: sorted.some(t => (RANK[t.priority] ?? 2) <= 1), closes: visibleName(closes) || (closes ? 'a goal' : '') };
+    return { count: sorted.length, first: sorted.length ? String(sorted[0].title || '') : '', high: sorted.some(t => (RANK[t.priority] ?? 2) <= 1), closes: closes || '' };
 }
 
 /** A review's: the tasks that wait on its task, and the goal it would close (its task is the last open one of that goal). null when nothing waits and no goal closes. */
@@ -47,17 +46,18 @@ export function agentInfo(tasks, { board, names }) {
 }
 
 /** The phrase for a row: one waiter named, several counted, a high-priority one first, the goal it closes last. */
-export function phraseOf(info) {
+export function phraseOf(info, mark = t => t) {
     if (!info) return '';
-    const core = info.count === 1 ? `“${info.first}” waits on this` : info.count > 1 ? `${info.count} tasks wait on this` : '';
-    const text = core ? (info.high ? 'High priority: ' : '') + core + (info.closes ? ` · closes goal “${info.closes}”` : '') : `Closes goal “${info.closes}”`;
+    const first = mark(info.first).trim() || 'a task', closes = mark(info.closes).trim() || 'a goal'; // a title is an agent's text: the caller's mark writes out what hides or reorders it (markHidden strict, #11399; passed in so this lazy module imports nothing new)
+    const core = info.count === 1 ? `“${first}” waits on this` : info.count > 1 ? `${info.count} tasks wait on this` : '';
+    const text = core ? (info.high ? 'High priority: ' : '') + core + (info.closes ? ` · closes goal “${closes}”` : '') : `Closes goal “${closes}”`;
     return text;
 }
 
 /** The same, short, for a one-line row on a phone, where the whole sentence is cut off: "Blocks 3 tasks", "Blocks “Tag v2.0.10”", "Closes a goal". The whole sentence is the row's tooltip. */
-export function shortPhraseOf(info) {
+export function shortPhraseOf(info, mark = t => t) {
     if (!info) return '';
-    if (info.count === 1) return `Blocks “${info.first}”`;
+    if (info.count === 1) return `Blocks “${mark(info.first).trim() || 'a task'}”`;
     if (info.count > 1) return `Blocks ${info.count} tasks`;
     return 'Closes a goal';
 }

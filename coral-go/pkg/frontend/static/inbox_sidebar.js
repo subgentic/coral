@@ -29,6 +29,7 @@ import { setHidden } from './dom_write.js';
 import { syncDisplayPanels } from './display_panel.js';
 import { onViewShown } from './view_switch.js';
 import { importOnce } from './import_once.js';
+import { markHidden } from './visible_marks.js';
 import { onInboxHooks, setInboxCount, askOf } from './inbox_tab.js';
 const { coralInboxAdapter, savedExpandFor, listInboxGoals } = await importOnce('./inbox_coral.js');
 const { openedFrom, backLabelFor } = await importOnce('./inbox_back_label.js'); // the Back words of the Inbox's task and goal screens (#8861)
@@ -100,8 +101,9 @@ const isItem = s => !!(s.review || s.autorun); // a row that is not an agent: a 
 // What waits on each row (#11442): inbox_blockers.js (lazy) asks the team's open tasks and the rows say it; until it has answered, or when it cannot, the rows say nothing and look as they did.
 let BL = null;
 const blocksKey = s => (s.review ? s.review.reviewKey : s.session_id);
-const blocksOf = s => (BL ? BL.phraseOf(BL.blockerOf(blocksKey(s))) : '');
-const blocksShortOf = s => (BL ? BL.shortPhraseOf(BL.blockerOf(blocksKey(s))) : ''); // a phone's one-line row
+const markTitle = t => markHidden(t, { strict: true }); // a task's or a goal's title is an agent's text: what hides or reorders it is written out (#11442, #11399)
+const blocksOf = s => (BL ? BL.phraseOf(BL.blockerOf(blocksKey(s)), markTitle) : '');
+const blocksShortOf = s => (BL ? BL.shortPhraseOf(BL.blockerOf(blocksKey(s)), markTitle) : ''); // a phone's one-line row
 const blockItems = () => allNeeds().filter(s => !s.autorun).map(s => (s.review
     ? { key: blocksKey(s), kind: 'review', team: s.review.team, taskId: s.task && s.task.id, goalId: s.goal && s.goal.id, goalTitle: s.goal && s.goal.title }
     : { key: blocksKey(s), kind: 'agent', team: s.board_project ? identityKey(sessionServer(s), s.board_project) : '', names: [s.display_name, s.name, s.board_job_title] })).filter(i => i.team);

@@ -6,6 +6,7 @@ import { installDom, importUi } from './helpers/jsdom_env.mjs';
 
 installDom({ mode: 'local' });
 const B = await importUi('inbox_blockers');
+const { markHidden } = await importUi('visible_marks');
 
 const t = (id, title, o = {}) => ({ id, title, status: 'pending', priority: 'medium', blocked_by: [], goal_id: 0, assigned_to: '', ...o });
 const dep = (task_id, o = {}) => ({ task_id, board_id: 'b', satisfied: false, ...o });
@@ -41,7 +42,7 @@ let a = B.agentInfo(TASKS, { board: 'b', names: ['frontend dev'] });
 assert.equal(a.count, 3, 'its task and the two that wait on it'); assert.equal(B.phraseOf(a), '3 tasks wait on this');
 assert.equal(B.agentInfo(TASKS, { board: 'b', names: ['Backend Dev'] }), null, 'an agent with no task in progress says nothing');
 assert.equal(B.agentInfo(TASKS, { board: 'b', names: [] }), null);
-assert.equal(B.phraseOf(B.infoOf ? B.infoOf([{ id: 1, title: 'Tag\u202e v2\u200b', priority: 'medium' }], '') : { count: 1, first: 'Tag v2', high: false, closes: '' }), '“Tag v2” waits on this', 'a title is shown without what hides or reorders text');
+{ const mark = x => markHidden(x, { strict: true }), hid = B.infoOf([{ id: 1, title: 'Tag\u202e v2\u200b', priority: 'medium' }], ''); assert.equal(B.phraseOf(hid, mark), '“Tag<U+202E> v2<U+200B>” waits on this', 'a title that hides or reorders text is written out, not drawn'); assert.equal(B.shortPhraseOf(hid, mark), 'Blocks “Tag<U+202E> v2<U+200B>”'); assert.equal(B.phraseOf(B.infoOf([{ id: 1, title: '\u202e', priority: 'medium' }], ''), x => ''), '“a task” waits on this', 'a title that cleans to nothing is a task'); }
 
 // the short form for a one-line phone row
 assert.equal(B.shortPhraseOf(r), 'Closes a goal'); assert.equal(B.shortPhraseOf(a), 'Blocks 3 tasks'); assert.equal(B.shortPhraseOf(one), 'Blocks “Tag batch-88 release”'); assert.equal(B.shortPhraseOf(null), '');
