@@ -50,6 +50,11 @@ const STUB = `
             // a key puts the focus there (a key goes first, then the focus): the keyboard's tip is shown, as before
             await ev(`document.getElementById('terminal-header-identity').blur(); document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true })); document.getElementById('terminal-header-identity').focus(); true`);
             if (!shown(await tip())) problems.push(`${at}: the keyboard's folder tip is gone: ${await tip()}`);
+            // an Enter that sends (or typing), then the page's focus on the name: no tip
+            await ev(`document.getElementById('terminal-header-identity').blur(); document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); document.getElementById('terminal-header-identity').focus(); true`);
+            if (shown(await tip())) problems.push(`${at}: the folder tip shows after an Enter (a send) and the page's focus on the name: ${await tip()}`);
+            await ev(`document.getElementById('terminal-header-identity').blur(); document.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', bubbles: true })); document.getElementById('terminal-header-identity').focus(); true`);
+            if (shown(await tip())) problems.push(`${at}: the folder tip shows after typing a letter and the page's focus on the name: ${await tip()}`);
             // a tap takes the keyboard's state away: the next script focus shows nothing
             await ev(`document.getElementById('terminal-header-identity').blur(); document.dispatchEvent(new Event('touchstart', { bubbles: true })); document.getElementById('terminal-header-identity').focus(); true`);
             if (shown(await tip())) problems.push(`${at}: the folder tip shows on a script focus after a touch: ${await tip()}`);
