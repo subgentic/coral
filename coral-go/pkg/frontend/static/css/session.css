@@ -234,7 +234,7 @@
 .session-tooltip-facts { max-width: 360px; }
 .session-tooltip-facts dt { white-space: nowrap; }
 .session-tooltip-facts dd { word-break: break-word; }
-/* The card in four groups (#11423): the state first and larger, the work, the agent as chips, the usage quiet; a divider between groups, no extra words */
+/* The card in four groups (#11423): the state first and larger, the work, the agent as one plain line, the usage quiet; a divider between groups, no extra words */
 .tt-groups { display: flex; flex-direction: column; }
 .tt-group { margin: 0; padding-block: 8px; border-top: 1px solid var(--border); }
 .tt-groups > .tt-group:first-child { border-top: 0; padding-top: 0; }
@@ -244,8 +244,8 @@
 .tt-head dd.tt-state { font-size: var(--fs-xl); font-weight: var(--fw-strong); }
 .tt-head .facts-row:last-child dt, .tt-head .facts-row:last-child dd { color: var(--text-muted); font-size: var(--fs-base); font-weight: var(--fw-regular); }
 .tt-goal { font-weight: var(--fw-medium); }
-.tt-chips { display: flex; flex-wrap: wrap; gap: 6px; }
-.tt-chips .facts-row { display: block; }
+.tt-agent { display: flex; flex-wrap: wrap; gap: 2px 16px; }
+.tt-agent .facts-row { display: block; }
 .tt-usage { color: var(--text-muted); font-size: var(--fs-base); font-variant-numeric: tabular-nums; }
 .tt-usage dd { font-size: var(--fs-base); }
 

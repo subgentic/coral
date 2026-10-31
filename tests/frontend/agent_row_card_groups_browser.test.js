@@ -1,5 +1,5 @@
 // The agent row's hover card in four groups (#11423, operator feedback: "a flat list of 11 rows with no hierarchy"): the state first and larger with the age beside it; the work (goal, branch, directory, files changed);
-// the agent, its model and its thinking level as one row of chips; the usage (context, tokens) quiet and last; a divider between groups; every field still there. And the ⋯ button's own tooltip ("More actions") must never
+// the agent, its model and its thinking level as one line of plain text (no pills); the usage (context, tokens) quiet and last; a divider between groups; every field still there. And the ⋯ button's own tooltip ("More actions") must never
 // share the screen with the card: the card is closed while the pointer is on a control of the row and opens again on the row's own space. 1280 px, a desktop sidebar.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
@@ -18,7 +18,7 @@ const { connect } = require('./agent_view_harness');
         const st = t.querySelector('.tt-state'), goal = t.querySelector('.tt-goal'), usage = t.querySelector('.tt-usage dd');
         return { rect: { l: r.left, t: r.top, r: r.right, b: r.bottom }, kinds: groups.map(g => [...g.classList].find(c => c.startsWith('tt-') && c !== 'tt-group')), dts: [...t.querySelectorAll('dt')].map(d => d.textContent),
             stateSize: st ? fs(st) : 0, workSize: goal ? fs(goal) : 0, usageSize: usage ? fs(usage) : 0,
-            dividers: groups.map(g => parseFloat(getComputedStyle(g).borderTopWidth)), chipTops: [...t.querySelectorAll('.tt-kind')].map(c => Math.round(c.getBoundingClientRect().top)), chips: [...t.querySelectorAll('.tt-kind')].map(c => c.textContent),
+            dividers: groups.map(g => parseFloat(getComputedStyle(g).borderTopWidth)), chipTops: [...t.querySelectorAll('.tt-agent dd')].map(c => Math.round(c.getBoundingClientRect().top)), chips: [...t.querySelectorAll('.tt-agent dd')].map(c => c.textContent), pills: [...t.querySelectorAll('.tt-agent dd')].map(c => getComputedStyle(c).borderRadius + '|' + getComputedStyle(c).backgroundColor),
             ago: t.querySelector('.tt-head').textContent }; })()`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
@@ -32,10 +32,10 @@ const { connect } = require('./agent_view_harness');
         const p = await rowPoint('g1', null, 40); await move(p.x, p.y);
         await waitFor(`[...document.querySelectorAll('#live-sessions-list .session-tooltip')].some(e => getComputedStyle(e).display === 'block')`, 'the card opens after its delay', 4000);
         const c = await card();
-        check(c && JSON.stringify(c.kinds) === JSON.stringify(['tt-head', 'tt-work', 'tt-chips', 'tt-usage']), 'four groups in order: status, work, agent, usage: ' + JSON.stringify(c && c.kinds));
+        check(c && JSON.stringify(c.kinds) === JSON.stringify(['tt-head', 'tt-work', 'tt-agent', 'tt-usage']), 'four groups in order: status, work, agent, usage: ' + JSON.stringify(c && c.kinds));
         check(c && c.stateSize >= 16 && c.stateSize > c.workSize && c.workSize > c.usageSize, 'the state is the largest line and the usage the quietest: ' + JSON.stringify(c && [c.stateSize, c.workSize, c.usageSize]));
         check(c && c.dividers[0] === 0 && c.dividers.slice(1).every(w => w >= 1), 'a divider between groups and none above the first: ' + JSON.stringify(c && c.dividers));
-        check(c && c.chips.join('|') === 'claude|Opus 5.5|Medium' && new Set(c.chipTops).size === 1, 'agent, model and thinking are chips on one line: ' + JSON.stringify(c && [c.chips, c.chipTops]));
+        check(c && c.chips.join('|') === 'Claude|Opus 5.5|Thinking: Medium' && new Set(c.chipTops).size === 1 && c.pills.every(x => /^0px\|rgba\(0, 0, 0, 0\)$/.test(x)), 'agent, model and thinking are plain text on one line, no pills: ' + JSON.stringify(c && [c.chips, c.chipTops, c.pills]));
         check(c && /Last action/.test(c.ago) && /1m ago|1 min/.test(c.ago), 'the age is beside the state: ' + JSON.stringify(c && c.ago));
         for (const l of ['State', 'Last action', 'Goal', 'Branch', 'Agent', 'Model', 'Thinking', 'Context', 'Directory', 'Files changed', 'Tokens']) check(c && c.dts.includes(l), `no field lost: ${l} is still there (for a screen reader at least)`);
         { const d = process.env.CORAL_SCREENSHOT_DIR; if (d) { require('node:fs').mkdirSync(d, { recursive: true }); require('node:fs').writeFileSync(`${d}/hover-card-grouped.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); } }
@@ -54,7 +54,7 @@ const { connect } = require('./agent_view_harness');
         const q = await rowPoint('g2', null, 40); await move(q.x, q.y);
         await waitFor(`[...document.querySelectorAll('#live-sessions-list .session-tooltip')].some(e => getComputedStyle(e).display === 'block')`, 'the bare agent card opens', 4000);
         const b = await card();
-        check(b && JSON.stringify(b.kinds) === JSON.stringify(['tt-head', 'tt-work', 'tt-chips']) || b && JSON.stringify(b.kinds) === JSON.stringify(['tt-head', 'tt-chips']), 'a group with nothing in it is left out: ' + JSON.stringify(b && b.kinds));
+        check(b && JSON.stringify(b.kinds) === JSON.stringify(['tt-head', 'tt-work', 'tt-agent']) || b && JSON.stringify(b.kinds) === JSON.stringify(['tt-head', 'tt-agent']), 'a group with nothing in it is left out: ' + JSON.stringify(b && b.kinds));
         assert.equal(found.length, 0, '\n' + found.join('\n'));
         console.log('PASS the hover card is grouped, status first, and never shares the screen with the ⋯ tooltip');
     } finally { await client.close(); }

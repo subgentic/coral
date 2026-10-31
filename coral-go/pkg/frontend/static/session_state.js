@@ -257,12 +257,12 @@ export function buildSessionTooltip(s, opts = {}) {
         if (!opts.inTeam || ttUnread > 0) work.push({ label: 'Board', html: `${escapeHtml(keyLabel(sessionTeamKey(s)))}${unreadBadge}` }); // under its team's heading the row says the team; the unread count is still news
         if (s.board_job_title && String(s.board_job_title).trim().toLowerCase() !== String(resolveSessionIdentity(s)).trim().toLowerCase()) work.push({ label: 'Role', text: s.board_job_title }); // a role that is the agent's own name is the row
     }
-    // The agent, its model and its thinking level: one row of chips. The model the agent is using now, from the CLI's own signals; no chip while it is unknown (#4589); the thinking level as the chat bar's chip says it ("as started" while only the level it was started with is known).
-    const chips = [{ label: 'Agent', text: agent, cls: 'tt-kind chip chip-tag', hideLabel: true }];
+    // The agent, its model and its thinking level: one line of plain text, spaced apart (the operator: the pills did not make sense here). The model the agent is using now, from the CLI's own signals; no chip while it is unknown (#4589); the thinking level as the chat bar's chip says it ("as started" while only the level it was started with is known).
+    const chips = [{ label: 'Agent', text: typeName(agent) || agent, hideLabel: true }];
     const modelName = modelDisplayName(s.model, s.model_display);
-    if (modelName) chips.push({ label: 'Model', text: modelName, cls: 'tt-kind chip chip-tag', title: typeof s.model === 'string' ? s.model.trim() : '', hideLabel: true });
+    if (modelName) chips.push({ label: 'Model', text: modelName, title: typeof s.model === 'string' ? s.model.trim() : '', hideLabel: true });
     const level = sessionLevel(s);
-    if (level) chips.push({ label: 'Thinking', text: `${level.name}${level.requested ? ' (as started)' : ''}`, cls: 'tt-kind chip chip-tag', hideLabel: true });
+    if (level) chips.push({ label: 'Thinking', text: `Thinking: ${level.name}${level.requested ? ' (as started)' : ''}`, hideLabel: true });
     // Usage, quiet: context window usage moved out of the row (AGENT_LIST_COMPACT); explicit null (unknown model) must read "unknown", never 0% or full.
     const usage = [];
     if (s.context_pct !== null && s.context_pct !== undefined) usage.push({ label: 'Context', text: s.context_window ? `${s.context_pct}% of ${formatTokens(s.context_window)}` : `${s.context_pct}%` }); // no row while it is unknown: a word that says nothing is noise
@@ -276,7 +276,7 @@ export function buildSessionTooltip(s, opts = {}) {
         usage.push({ label: 'Tokens', html: tokenText });
     }
     const group = (rows, cls) => rows.some(r => r.html || r.text) ? factsHtml(rows, { cls: `tt-group ${cls}` }) : '';
-    return `<div class="session-tooltip-facts tt-groups">${group(head, 'tt-head')}${group(work, 'tt-work')}${group(chips, 'tt-chips')}${group(usage, 'tt-usage')}</div>`;
+    return `<div class="session-tooltip-facts tt-groups">${group(head, 'tt-head')}${group(work, 'tt-work')}${group(chips, 'tt-agent')}${group(usage, 'tt-usage')}</div>`;
 }
 
 export function getDotClass(s) {
