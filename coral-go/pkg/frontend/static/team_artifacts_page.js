@@ -30,6 +30,7 @@ const { HEX_RE, managedHex, itemKey: artifactKey, isUnverified, readableName, si
 
 const Tags = await importOnce('./artifact_tags.js');
 const { REVIEW, STARTER } = await importOnce('./artifact_tag_rules.js');
+const IGNORED = 'ignored'; // the tag Ignore on a review row puts on a file (the review route's own word)
 // Paste into an agent's chat when it does not know how to publish an artifact.
 const AGENT_ARTIFACT_PROMPT = `To publish an artifact in Coral (so it shows in the Artifacts tab): run coral-agent artifact upload <file> (prints JSON whose "uri" is the coral://artifacts/<digest> reference).
 It appears in the Artifacts tab right away. A team agent's upload also appears in Team Artifacts.
@@ -317,9 +318,8 @@ export function createArtifactsList({ inbox = false } = {}) {
         toolbarRow?.querySelector('.dt-select-toggle')?.remove();
         Toolbar.mountSelection(toolbarRow, null);
         if (!model.scope && toolbarRow && !external) { // All | For review N (#8594): the one tag people look for, one press away; nothing while the team has none
-            const n = Number(model.tagCounts[REVIEW]) || 0, on = model.filters.tag === REVIEW;
-            Toolbar.adopt(toolbarRow, n || on ? { pills: { label: 'Show artifacts', items: [{ key: 'all', label: 'All', count: model.counts ? model.counts.all : model.items.length }, { key: 'review', label: 'For review', count: n }], current: on ? 'review' : 'all',
-                onPick: key => setFilters({ ...model.filters, tag: key === 'review' ? REVIEW : '' }) } } : {});
+            const pills = reviewPills();
+            Toolbar.adopt(toolbarRow, pills ? { pills } : {});
         }
         if (model.items.length || artifactState.selected.size) {
             const by = !model.scope && !inbox ? model.filters.group : ''; // the team's list read by task or goal: a head per group, its files together (an agent's list is not grouped)
@@ -457,6 +457,7 @@ export function createArtifactsList({ inbox = false } = {}) {
             else actions.push({ label: 'Open link', primary: true, href: link.url });
             actions.push({ label: 'Copy link', run: () => { navigator.clipboard?.writeText(hex ? `coral://artifacts/${hex}` : new URL(link.url, location.href).href).then(() => showToast('Link copied'), () => showToast('The link could not be copied', true)); } });
             if (hex) actions.push({ label: item.starred ? 'Starred' : 'Star', title: item.starred ? 'Starred (click to remove the star)' : 'Star: add it to your Starred list (it can still be cleaned up)', pressed: !!item.starred, run: b => toggleStar(hex, name, b, item) });
+            if (hex && (item.tags || []).includes(IGNORED)) actions.push({ label: 'Unignore', title: 'Put it back in Needs you', run: () => importOnce('./artifact_review.js').then(async m => { const out = await m.unignoreRow(inbox ? item.board_id : model.project, { id: hex }); retag(hex, out.tags || (item.tags || []).filter(t => t !== IGNORED).concat(REVIEW)); showToast(`Back in Needs you: ${name}`); }).catch(e => showToast(e.message, true)) });
             if (hex && local()) {
                 const on = model.kept.has(hex);
                 actions.push({ label: on ? 'Kept' : 'Keep', title: on ? 'Kept: Coral\u2019s cleanup never deletes this file (click to release)' : 'Keep: Coral\u2019s cleanup never deletes this file', pressed: on, run: b => toggleKeep(hex, name, b) });
@@ -507,8 +508,11 @@ export function createArtifactsList({ inbox = false } = {}) {
     }
     /** The For review pill of the Inbox folder's toolbar: All and For review with the team tags' count, or nothing while no file carries it. */
     function reviewPills() {
-        const n = Number(model.tagCounts[REVIEW]) || 0, on = model.filters.tag === REVIEW;
-        return n || on ? { label: 'Show artifacts', items: [{ key: 'all', label: 'All', count: model.counts ? model.counts.all : model.items.length }, { key: 'review', label: 'For review', count: n }], current: on ? 'review' : 'all', onPick: key => setFilters({ ...model.filters, tag: key === 'review' ? REVIEW : '' }) } : null;
+        const n = Number(model.tagCounts[REVIEW]) || 0, ig = Number(model.tagCounts[IGNORED]) || 0, tag = model.filters.tag;
+        if (!n && !ig && tag !== REVIEW && tag !== IGNORED) return null;
+        const current = tag === REVIEW ? 'review' : tag === IGNORED ? 'ignored' : 'all';
+        const items = [{ key: 'all', label: 'All', count: model.counts ? model.counts.all : model.items.length }, { key: 'review', label: 'For review', count: n }, ...(ig || tag === IGNORED ? [{ key: 'ignored', label: 'Ignored', count: ig }] : [])]; // an item put away from Needs you with Ignore (#11579): here to find again and Unignore
+        return { label: 'Show artifacts', items, current, onPick: key => setFilters({ ...model.filters, tag: key === 'review' ? REVIEW : key === 'ignored' ? IGNORED : '' }) };
     }
 
     function showArtifacts(host, project, h = {}, scope = null) {
