@@ -248,6 +248,12 @@ func Start(ctx context.Context, cfg Config, key string) (*Server, error) {
 	}
 	stopLeftOver(filepath.Join(dir, "server.json"))
 	// What build this is decides the password variable and the launch line: asked of the binary (its --version, parsed strictly) unless the config says. A launch that cannot tell does not go on.
+	// The binary is resolved ONCE and that path is what is asked for its version and what is started: PATH changing in between can never make the version that of another binary.
+	resolved, lerr := exec.LookPath(cfg.Bin)
+	if lerr != nil {
+		return nil, fmt.Errorf("opencode: %w", lerr)
+	}
+	cfg.Bin = resolved
 	var version Version
 	var verr error
 	if cfg.Version != "" {

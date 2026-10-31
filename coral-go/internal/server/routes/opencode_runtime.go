@@ -16,13 +16,40 @@ import (
 // OpencodeRuntime is what an opencode agent needs of the server Coral runs for it (opencode.Manager): the server started for the agent (Ensure), the state its event stream gave (AgentTurn), and the end of
 // both with the agent (Stop). The key is the agent's Coral session id.
 type OpencodeRuntime interface {
-	Ensure(ctx context.Context, key, bin, model, resume string) (*opencode.Server, error)
+	Ensure(ctx context.Context, key, bin, model, resume string) (OpencodeServer, error)
 	AgentTurn(key string) (opencode.State, time.Time, bool)
 	AgentMessages(ctx context.Context, key string) ([]opencode.Message, bool, error)
 	UseSession(key, session string)
 	AgentLastMessage(key string) (opencode.Message, bool)
 	Stop(key string)
 }
+
+// OpencodeServer is what a launch needs of an agent's server: where the TUI attaches, the major version of the build (it decides the attach form and the password variable), and the private file the password is
+// read from.
+type OpencodeServer interface {
+	ServerURL() string
+	ServerMajor() int
+	PasswordFile() (string, error)
+}
+
+// managerRuntime is the opencode.Manager as an OpencodeRuntime: Ensure answers with the interface a launch uses.
+type managerRuntime struct{ *opencode.Manager }
+
+func (m managerRuntime) Ensure(ctx context.Context, key, bin, model, resume string) (OpencodeServer, error) {
+	srv, err := m.Manager.Ensure(ctx, key, bin, model, resume)
+	if err != nil {
+		return nil, err
+	}
+	return managerServer{srv}, nil
+}
+
+type managerServer struct{ *opencode.Server }
+
+func (s managerServer) ServerURL() string { return s.URL }
+func (s managerServer) ServerMajor() int  { return s.Version.Major }
+
+// OpencodeRuntimeOf is the manager as the runtime the sessions handler takes.
+func OpencodeRuntimeOf(m *opencode.Manager) OpencodeRuntime { return managerRuntime{m} }
 
 // SetOpencodeRuntime gives the sessions handler the opencode server manager; nil until the server wires it, and an opencode agent then cannot be launched.
 func (h *SessionsHandler) SetOpencodeRuntime(rt OpencodeRuntime) { h.opencode = rt }
@@ -42,7 +69,7 @@ func (h *SessionsHandler) launchCommand(ctx context.Context, ag agent.Agent, p a
 			h.opencode.Stop(p.SessionID)
 			return "", err
 		}
-		p.OpencodeURL, p.OpencodePasswordFile, p.OpencodeMajor = srv.URL, file, srv.Version.Major
+		p.OpencodeURL, p.OpencodePasswordFile, p.OpencodeMajor = srv.ServerURL(), file, srv.ServerMajor()
 		h.useResumedSession(p)
 	}
 	return launchCommand(ag, p)

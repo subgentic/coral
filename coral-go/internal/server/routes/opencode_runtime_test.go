@@ -28,9 +28,15 @@ type fakeOpencode struct {
 	msgs     []opencode.Message
 	haveMsgs bool
 	used     []string
+	server   OpencodeServer
+	ensured  [][4]string
 }
 
-func (f *fakeOpencode) Ensure(context.Context, string, string, string, string) (*opencode.Server, error) {
+func (f *fakeOpencode) Ensure(_ context.Context, key, bin, model, resume string) (OpencodeServer, error) {
+	f.ensured = append(f.ensured, [4]string{key, bin, model, resume})
+	if f.server != nil {
+		return f.server, nil
+	}
 	return nil, assert.AnError
 }
 func (f *fakeOpencode) AgentTurn(string) (opencode.State, time.Time, bool) {
@@ -185,4 +191,33 @@ func TestTheModelOfALaunchIsTheLastValidModelFlag(t *testing.T) {
 	} {
 		assert.Equal(t, want, modelFromFlags(strings.Fields(flags)), flags)
 	}
+}
+
+type fakeServer struct {
+	url   string
+	major int
+	file  string
+}
+
+func (f fakeServer) ServerURL() string             { return f.url }
+func (f fakeServer) ServerMajor() int              { return f.major }
+func (f fakeServer) PasswordFile() (string, error) { return f.file, nil }
+
+// The one place that decides the attach form: the server's major version reaches the launch line (Security's INFO on 719782483).
+func TestALaunchHandsTheServersMajorVersionAndAddressToTheLine(t *testing.T) {
+	for major, want := range map[int]string{1: "opencode attach http://127.0.0.1:4711", 2: "opencode --server http://127.0.0.1:4711"} {
+		h := &SessionsHandler{opencode: &fakeOpencode{server: fakeServer{url: "http://127.0.0.1:4711", major: major, file: "/data/opencode/pw"}}}
+		cmd, err := h.launchCommand(context.Background(), agent.GetAgent(at.Opencode), agent.LaunchParams{SessionID: "sid", ResumeSessionID: "ses_abc123", Flags: []string{"--model", "openai/gpt-6"}})
+		require.NoError(t, err)
+		assert.Contains(t, cmd, want, "major %d", major)
+		assert.Contains(t, cmd, "/data/opencode/pw", "the password is read from the server's private file")
+		if major == 1 {
+			assert.NotContains(t, cmd, "gpt-6", "1.x's attach has no --model")
+		}
+	}
+	f := &fakeOpencode{server: fakeServer{url: "http://127.0.0.1:4711", major: 1, file: "/f"}}
+	h := &SessionsHandler{opencode: f}
+	_, err := h.launchCommand(context.Background(), agent.GetAgent(at.Opencode), agent.LaunchParams{SessionID: "sid", CLIPath: "/opt/oc", ResumeSessionID: "ses_abc123", Flags: []string{"--model", "openai/gpt-6"}})
+	require.NoError(t, err)
+	assert.Equal(t, [][4]string{{"sid", "/opt/oc", "openai/gpt-6", "ses_abc123"}}, f.ensured, "the server is asked for with the agent's id, its CLI, its model and the session it resumes")
 }
