@@ -8,6 +8,7 @@
  * The buttons drawn here carry the same data-on-click as the tabs, so switching a tab is still the one action. */
 import { setPhoneBarTitle } from './phone_bar.js';
 import { importOnce } from './import_once.js';
+import { showToast } from './utils.js';
 import { PHONE_QUERY } from './phone_layout.js';
 import { registerActions } from './actions.js';
 import { isHub } from './server_base.js';
@@ -113,12 +114,12 @@ let _drawer = null;      // phone_drawer.js, loaded the first time a phone opens
 function closeMenu() {
     const menu = document.getElementById('nav-more-menu');
     if (menu) { menu.hidden = true; menu.classList.remove('nav-drawer'); }
-    if (_drawer) _drawer.hideScrim();
+    _drawer?.hideScrim();
     document.querySelectorAll('[data-on-click="m-nav-more"], [data-on-click="m-top-menu"]').forEach(b => b.setAttribute('aria-expanded', 'false'));
     _menuFor = null;
 }
 
-function openMenu(btn, focusKey = false) { // focusKey: true (opened by Enter or Space: the first item), or the arrow that opened it (ArrowUp: the last)
+function openMenu(btn, focusKey) { // focusKey: true (opened by Enter or Space: the first item), or the arrow that opened it (ArrowUp: the last)
     const menu = document.getElementById('nav-more-menu');
     if (!menu) return;
     const hamburger = btn.id === 'top-menu-btn' || btn.hasAttribute('data-hamburger'); // the agent row's menu button is the same menu (#11056)
@@ -131,7 +132,7 @@ function openMenu(btn, focusKey = false) { // focusKey: true (opened by Enter or
     if (hamburger) {
         const sep = document.createElement('div'); sep.className = 'nav-more-sep'; sep.setAttribute('role', 'separator');
         const drawer = isPhone(); // on a phone the ☰ is a left drawer: the Inbox's folders and the teams, a divider, then the less-used places (#11472)
-        if (drawer && !_drawer) { importOnce('./phone_drawer.js').then(m => { _drawer = m; openMenu(btn, focusKey); }); return; } // the drawer's code arrives on the first tap, then the same tap's menu opens
+        if (drawer && !_drawer) { importOnce('./phone_drawer.js').then(m => { _drawer = m; openMenu(btn, focusKey); }).catch(() => showToast("Menu didn't open.")); return; } // the drawer's code arrives on the first tap, then the same tap's menu opens
         menu.classList.toggle('nav-drawer', drawer);
         menu.replaceChildren(...(drawer ? _drawer.drawerTop() : []), ...(drawer ? [] : items.map(makeItem)), ...(drawer ? [sep] : []), ...(drawer ? items.map(makeItem) : [sep]), ...menuEntries(new Set(items.map(t => t.label)), phoneNav));
         if (drawer) _drawer.showScrim(closeMenu);
