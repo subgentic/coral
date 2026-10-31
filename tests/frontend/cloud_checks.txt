@@ -279,3 +279,4 @@ node server_owner_secret.test.mjs
 node action_set_census.test.mjs
 node state_chip_no_tooltip.test.mjs
 node title_repeats_census.test.mjs
+node sw_register_push_exempt.test.mjs
