@@ -579,6 +579,17 @@ func (h *SessionsHandler) createArtifactComment(w http.ResponseWriter, r *http.R
 			return
 		}
 		in.Body, in.Anchor, in.ParentID, in.Board = gin.Body, gin.Anchor, gin.ParentID, g.Board
+		if in.ParentID != nil { // a reply goes only into a thread of the grant's own board: the store checks the artifact, and on an artifact several teams share this is the check of the board. A parent of another board answers as a missing one (the store's own refusal), so a guide cannot probe another team's thread.
+			parent, found, perr := h.ss.GetArtifactComment(r.Context(), id, *in.ParentID)
+			if perr != nil {
+				errInternalServer(w, "could not save the comment")
+				return
+			}
+			if !found || parent.Board != g.Board {
+				errBadRequest(w, "that comment cannot be replied to")
+				return
+			}
+		}
 		n, cerr := h.ss.CountArtifactCommentsBy(r.Context(), guideIssuer, g.Label, time.Now().UTC().Add(-time.Hour))
 		if guideOverLimit(w, n, cerr, guideCommentsPerHour, fmt.Sprintf("a guide may write at most %d comments an hour: wait a little", guideCommentsPerHour)) {
 			return
