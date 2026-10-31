@@ -93,7 +93,7 @@ const BASE = require('./test_base').BASE;
             await ev(`(() => { const d = window.__nt.dlg(${N.member}); const g = [...d.querySelectorAll('[role=radiogroup]')].find(e => /mode$/i.test(window.__na.name(e))); const r = window.__na.radios(g).find(x => /^Plan/i.test(window.__na.radioName(x))); r.click(); return true; })()`); await settle(200); await save();
             const orchBefore = await rowText('Orchestrator'), w1Before = await rowText(r0[1]);
             assert.match(w1Before, /small|High/i, 'the worker shows its model and thinking before'); assert.match(w1Before, /Plan/i, 'and its mode');
-            assert.match(await ev(`window.__na.text(window.__nt.dlg(${N.team}))`), /Skips the Orchestrator\.\s*Resets each worker's model\./, 'the line says who it leaves out');
+            assert.match(await ev(`window.__na.text(window.__nt.dlg(${N.team}))`), /Changes every worker's provider\.\s*The Orchestrator keeps its own, and each worker's model goes back to the default\./, 'the line says what changes, who it leaves out and what happens to the model (#11368)');
             const ok = await ev(`(() => { const s = window.__nt.find(window.__nt.dlg(${N.team}), 'select', ${N.bulk}); if (!s) return false; const o = [...s.options].find(o => /Codex/.test(o.textContent)); if (!o) return false; s.value = o.value; s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
             assert.ok(ok, 'a Set all workers to select with Codex'); await settle(500);
             assert.equal(await rowText('Orchestrator'), orchBefore, 'the Orchestrator keeps its own provider, model and thinking');

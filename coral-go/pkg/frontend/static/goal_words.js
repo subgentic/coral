@@ -127,8 +127,9 @@ export const readyToClose = (goal) => String(goal && goal.state || '').toLowerCa
 export const closeTitle = 'Close this goal?';
 export const closeDoneLabel = 'Done: what we wanted is true';
 export const closeDroppedLabel = 'Dropped: we are no longer doing it';
-export const closeReasonLabel = 'Why (required): a line the agents will see';
-export const closeReasonNeeded = 'A reason is needed: the agents read it.';
+export const closeReasonLabel = 'Why (optional): a line the agents will see';
+/** What the agents are told when the reason is left empty (the server needs one line; the person does not have to write it, #11368 item 8). */
+export const closeReasonDefault = state => state === 'dropped' ? 'Dropped by the Operator.' : 'Closed by the Operator.';
 export const alreadyClosedText = 'It was already closed.';
 /** The warning in the Close dialog when tasks are open: "2 of its 5 tasks are still open (2 queued)." and what closing does about them. */
 export function closeWarning(rollup) {
@@ -144,7 +145,7 @@ export const allDoneAsk = (doneWhen) => `${doneWhen ? `Done when: ${doneWhen}. `
 export const notYetHint = 'Not yet hides this until a task is added.';
 export const notYetSaid = 'Hidden until a task is added.';
 /** A closed-ready goal's card sentence: the rollup's, and a quiet "ready to close?". */
-export const closeReasonHint = '300 characters at most.';
+export const closeReasonHint = '300 characters at most. Left empty, the agents are told who closed it.';
 /** Said once, politely, when the all-done strip first appears for a goal. */
 export const allDoneSaid = (n, title) => `All ${n} ${n === 1 ? 'task' : 'tasks'} of ${title} ${n === 1 ? 'is' : 'are'} done`;
 
