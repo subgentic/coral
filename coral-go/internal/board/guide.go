@@ -98,6 +98,17 @@ func (s *Store) SetGuideRoster(ctx context.Context, project string, roster map[s
 	return clean, err
 }
 
+// RejectGuideProposals declines every proposal a guide's label left waiting on a board (the grant ended): one statement, idempotent, and it returns how many it took back. Approved ones stay: the
+// Operator decided them.
+func (s *Store) RejectGuideProposals(ctx context.Context, project, label string) (int64, error) {
+	res, err := s.db.ExecContext(ctx, `UPDATE board_proposals SET state = 'rejected', reason = ?, decided_at = ? WHERE board_id = ? AND proposer = ? AND state = 'pending'`,
+		"the guide's access to this team ended", nowUTC(), project, label)
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
+}
+
 // GuideName is the name the roster gives a label, or "a guide" when it names none.
 func GuideName(roster map[string]string, label string) string {
 	if n := roster[label]; n != "" {

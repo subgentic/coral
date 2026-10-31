@@ -72,7 +72,15 @@ func (h *BoardHandler) MarkRead(w http.ResponseWriter, r *http.Request) {
 func (h *BoardHandler) PostMessage(w http.ResponseWriter, r *http.Request) {
 	project := urlParam(r, "project")
 	var body postMessageBody
-	derr := decodeJSON(r, &body)
+	var derr error
+	if _, guide := guideOf(r); guide { // a guide's post is content and nothing else, and at most maxGuideMessage characters (guide.go)
+		var ok bool
+		if body, ok = readGuideMessage(w, r); !ok {
+			return
+		}
+	} else {
+		derr = decodeJSON(r, &body)
+	}
 	var answer *taskReply
 	if derr == nil && len(body.TaskID) > 0 && string(body.TaskID) != "null" {
 		id, perr := strconv.ParseInt(strings.TrimSpace(string(body.TaskID)), 10, 64)
@@ -256,7 +264,18 @@ func (h *BoardHandler) postMessageCore(w http.ResponseWriter, r *http.Request, p
 	// text says so, so an agent can tell it from the local Operator. Without the header
 	// it is never the Operator.
 	origin, hubUser, hubOperator := "", "", false
-	if cloud.Tunneled(r) {
+	guide, isGuide := guideOf(r)
+	if isGuide {
+		// A guide (the connector's stamp, the grant's board) posts under their hub label and never as the Operator or a member: the sender is the label, the origin hub_guide, and the text starts with their
+		// name from the roster and their role. Nothing in the body can ask for more (the body holds content only).
+		if _, _, status, msg := h.tunnelChatSender(r, project); status != 0 {
+			writeJSON(w, status, map[string]any{"error": msg, "code": "hub_user_required"})
+			return nil, false
+		}
+		subscriberID, origin, hubUser = guide.Label, board.OriginHubGuide, guide.Label
+		body.Content = guidePrefix(h.guideAuthor(r, project, guide.Label), guide.Label) + body.Content
+		body.As = ""
+	} else if cloud.Tunneled(r) {
 		user, hubOrigin, status, msg := h.tunnelChatSender(r, project)
 		if status != 0 {
 			writeJSON(w, status, map[string]any{"error": msg, "code": "hub_user_required"})
@@ -304,7 +323,9 @@ func (h *BoardHandler) postMessageCore(w http.ResponseWriter, r *http.Request, p
 	if reply != nil {
 		taskID = &reply.taskID
 	}
-	if hubUser != "" {
+	if isGuide {
+		msg, err = h.bs.PostGuideMessage(r.Context(), project, guide.Label, body.Content)
+	} else if hubUser != "" {
 		msg, err = h.bs.PostHubMessageForTask(r.Context(), project, hubUser, body.Content, body.TargetGroupID, hubOperator, taskID)
 	} else {
 		msg, err = h.bs.PostMessageForTask(r.Context(), project, subscriberID, body.Content, body.TargetGroupID, origin, taskID)
@@ -402,6 +423,10 @@ func (h *BoardHandler) ReadMessages(w http.ResponseWriter, r *http.Request) {
 		// A paused board delivers nothing, and says so: a bare empty list read as "No new messages" while the Stop hook counted unread ones, for hours after a restart (#11198).
 		w.Header().Set(BoardPausedHeader, "true")
 		writeJSON(w, http.StatusOK, []board.Message{})
+		return
+	}
+	if g, ok := guideOf(r); ok {
+		h.readGuideMessages(w, r, project, g)
 		return
 	}
 	if cloud.Tunneled(r) {

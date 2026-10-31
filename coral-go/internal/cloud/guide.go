@@ -2,6 +2,7 @@ package cloud
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/subgentic/coral/pkg/tunnel"
 )
@@ -12,7 +13,20 @@ import (
 
 // guideServed lists the guide-table routes this server answers for a guide, as "METHOD pattern" (the table's own spelling). A route in the table and not in this list is refused: the server's
 // slices add theirs as each is built and read.
-var guideServed = []string{}
+var guideServed = []string{
+	"GET /api/board/{project}/messages",
+	"POST /api/board/{project}/messages",
+	"GET /api/board/{project}/goals",
+	"GET /api/board/{project}/goals/{id}",
+	"POST /api/board/{project}/goals",
+}
+
+// guideQueryKeys are the query parameters a guide's read may carry, per route (the closed filter: nothing else reaches the handler, so a guide cannot steer a read with a parameter the route also takes for
+// the owner). A route not listed takes none.
+var guideQueryKeys = map[string][]string{
+	"GET /api/board/{project}/messages": {"limit"},
+	"GET /api/board/{project}/goals":    {"state", "limit", "cursor"},
+}
 
 // guideClaimed reports whether the request says, by any header, that it is a guide's.
 func guideClaimed(r *http.Request) bool {
@@ -59,24 +73,60 @@ func GuideCaller(r *http.Request) (tunnel.HubGuide, bool) {
 	return g, true
 }
 
-// guideAllowed reports whether a request that claims to be a guide's may go on: an authentic complete stamp, a route of the closed table, and a route this server serves for a guide.
+// guideAllowed reports whether a request that claims to be a guide's may go on: an authentic complete stamp, a route of the closed table, a route this server serves for a guide, only the query
+// parameters that route allows, and the grant's own board in the path. A guide asking for another board's path is answered not-found by GuideNotFound, as an unknown route is.
 func guideAllowed(r *http.Request) bool { return guideAllowedWith(r, guideServed) }
 
 func guideAllowedWith(r *http.Request, served []string) bool {
-	if _, ok := GuideCaller(r); !ok {
+	g, ok := GuideCaller(r)
+	if !ok || !tunnel.IsGuideRoute(r.Method, r.URL.Path) {
 		return false
 	}
-	if !tunnel.IsGuideRoute(r.Method, r.URL.Path) {
-		return false
+	method := r.Method
+	if method == http.MethodHead {
+		method = http.MethodGet
 	}
-	for _, g := range tunnel.GuideRoutes() {
-		if r.Method == g.Method || (r.Method == http.MethodHead && g.Method == http.MethodGet) {
-			for _, s := range served {
-				if s == g.Method+" "+g.Pattern && tunnel.MatchGuidePattern(g.Pattern, r.URL.Path) {
-					return true
-				}
+	for _, gr := range tunnel.GuideRoutes() {
+		if gr.Method != method || !tunnel.MatchGuidePattern(gr.Pattern, r.URL.Path) {
+			continue
+		}
+		key := gr.Method + " " + gr.Pattern
+		servedHere := false
+		for _, sv := range served {
+			if sv == key {
+				servedHere = true
 			}
 		}
+		if !servedHere {
+			return false
+		}
+		allowed := guideQueryKeys[key]
+		for k := range r.URL.Query() {
+			ok := false
+			for _, a := range allowed {
+				if a == k {
+					ok = true
+				}
+			}
+			if !ok {
+				return false
+			}
+		}
+		_ = g
+		return true
+	}
+	return false
+}
+
+// GuideNotFound reports whether a guide's request names a board that is not the grant's: the path's board must be exactly the stamped one. Guard answers it as a route that does not exist.
+func GuideNotFound(r *http.Request) bool {
+	g, ok := GuideCaller(r)
+	if !ok {
+		return false
+	}
+	segs := strings.Split(strings.TrimPrefix(r.URL.Path, "/"), "/")
+	if len(segs) >= 3 && segs[0] == "api" && segs[1] == "board" {
+		return segs[2] != g.Board
 	}
 	return false
 }

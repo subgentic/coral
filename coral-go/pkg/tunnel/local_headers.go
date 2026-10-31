@@ -39,8 +39,9 @@ var forwardRequestHeaders = map[string]bool{
 	// POST /api/board/{project}/hub-notice, trusted only on a request this connector stamped.
 	"X-Coral-Hub-Notice": true,
 	// The sending team of a relayed message or file, and the marker of a link snapshot (#5572): each forwarded only on its own routes (scrub).
-	"X-Coral-Hub-Source-Team": true,
-	"X-Coral-Hub-Links":       true,
+	"X-Coral-Hub-Source-Team":  true,
+	"X-Coral-Hub-Links":        true,
+	"X-Coral-Hub-Guide-Revoke": true,
 	// The client's request id for the six routes that start something (#5841): forwarded only on those routes (scrub).
 	"Idempotency-Key": true,
 }
@@ -125,6 +126,18 @@ func stampsLinksSession(method, decodedPath string) bool {
 	return ForwardsHubLinks(method, decodedPath) || ForwardsHubServer(method, decodedPath)
 }
 
+// The guide revoke (#11457): when the hub ends a guide's grant it tells this computer with POST HubGuideRevokePath, the header HubGuideRevokeHeader set to "1" (forwarded only on that path), and a body
+// holding only the guide's label and the board. The hub sends it only to a connector that declared CapGuideRole, and resends it on every connect until it is answered.
+const (
+	HubGuideRevokePath   = "/api/cloud/guide-revoked"
+	HubGuideRevokeHeader = "X-Coral-Hub-Guide-Revoke"
+)
+
+// ForwardsGuideRevoke reports whether X-Coral-Hub-Guide-Revoke is forwarded: a POST to HubGuideRevokePath, and nothing else.
+func ForwardsGuideRevoke(method, decodedPath string) bool {
+	return method == http.MethodPost && decodedPath == HubGuideRevokePath
+}
+
 // HubNoticeHeader marks a notice Coral Hub posts about a team link (#3489). The hub sets
 // it only on its own notice requests and strips it from browser requests.
 const HubNoticeHeader = "X-Coral-Hub-Notice"
@@ -164,6 +177,9 @@ func scrub(h http.Header, method, decodedPath string) http.Header {
 	}
 	if !ForwardsHubLinks(method, decodedPath) {
 		out.Del(HubLinksHeader)
+	}
+	if !ForwardsGuideRevoke(method, decodedPath) {
+		out.Del(HubGuideRevokeHeader)
 	}
 	// Never from the hub: the connector's own, below (stampLinks).
 	out.Del(HubLinksSessionHeader)

@@ -354,6 +354,8 @@ var routeTable = cat(
 		"/api/board/{project}/hub-notice",
 		// Coral Hub's full list of cross-team links (#5572): only with its stamped header (X-Coral-Hub-Links: snapshot), only on a connection whose hub advertised cross_team_links/1.
 		"/api/cloud/cross-team-links",
+		// Coral Hub's word that a guide's grant ended (#11457): only with its stamped header, only to a connector that declared guide_role/1.
+		"/api/cloud/guide-revoked",
 		"/api/board/{project}/subscribe",
 		"/api/board/{project}/reminder",
 		"/api/board/{project}/tasks",
@@ -470,7 +472,8 @@ var routeTable = cat(
 	owner(OwnerRefuse, rules(http.MethodGet, TierView, "/api/operator-asks")),
 	// The Operator's grant to a board's orchestrator and the log of what agents did to the board's agents (#11432) are the OWNER's alone through the hub (an authentic stamp, the owner marker): the switch lets an agent wake,
 	// sleep and start agents. The orchestrator's own wake and sleep routes are not here: they are agent-only and local, so the hub never reaches them.
-	owner(OwnerRefuse, rules(http.MethodGet, TierLaunch, "/api/board/{project}/orchestrator-grant", "/api/board/{project}/lifecycle-log")),
+	owner(OwnerRefuse, rules(http.MethodGet, TierLaunch, "/api/board/{project}/orchestrator-grant", "/api/board/{project}/lifecycle-log", "/api/board/{project}/guide-roster")),
+	owner(OwnerRefuse, rules(http.MethodPut, TierLaunch, "/api/board/{project}/guide-roster")),
 	owner(OwnerRefuse, rules(http.MethodPut, TierLaunch, "/api/board/{project}/orchestrator-grant")),
 	// Which agents run an older hook set: for the Operator who would resume them (#3665).
 	rules(http.MethodGet, TierLaunch, "/api/system/hooks-status"),

@@ -82,6 +82,7 @@ GET /api/board/{project}/goals view
 GET /api/board/{project}/goals/{goalID} view
 GET /api/board/{project}/groups never
 GET /api/board/{project}/groups/{groupID}/members never
+GET /api/board/{project}/guide-roster launch
 GET /api/board/{project}/lifecycle-log launch
 GET /api/board/{project}/messages view
 GET /api/board/{project}/messages/all view
@@ -340,6 +341,7 @@ POST /api/cloud/connect never
 POST /api/cloud/connect/cancel never
 POST /api/cloud/cross-team-links interact
 POST /api/cloud/disconnect never
+POST /api/cloud/guide-revoked interact
 POST /api/cloud/owner-label/arm never
 POST /api/cloud/redeem never
 POST /api/cloud/rekey never
@@ -436,6 +438,7 @@ PUT /api/artifacts/{id}/star interact
 PUT /api/auth/hub-origins never
 PUT /api/auth/hub-signin never
 PUT /api/board/{project}/artifacts/{id}/tags never
+PUT /api/board/{project}/guide-roster launch
 PUT /api/board/{project}/orchestrator-grant launch
 PUT /api/board/{project}/settings launch
 PUT /api/board/{project}/subscribers/{subscriberID}/review-settings never

@@ -21,9 +21,12 @@ func TestAGuideIsRefusedOnEveryRouteThatIsNotServedForGuides(t *testing.T) {
 	srv, _, _ := strictServer(t, false)
 	h := srv.Router()
 	param := regexp.MustCompile(`\{[^}]+\}`)
-	stamp := map[string]string{tunnel.ViaHeader: cloud.ViaSecret(), tunnel.HubRoleHeader: "guide", tunnel.HubGuideBoardHeader: "team", tunnel.HubGuideLabelHeader: "hub-user-1234abcd",
+	stamp := map[string]string{tunnel.ViaHeader: cloud.ViaSecret(), tunnel.HubRoleHeader: "guide", tunnel.HubGuideBoardHeader: "1", tunnel.HubGuideLabelHeader: "hub-user-1234abcd",
 		tunnel.HubGuideSinceHeader: "2026-10-31T07:00:00Z", tunnel.HubUserHeader: "hub-user-1234abcd"}
-	served := map[string]bool{} // "METHOD pattern" of the routes a guide reaches today (none until slice B)
+	// "METHOD pattern" of the routes a guide reaches (cloud.guideServed): the five of slice B. They reach their handlers (guide_routes_test.go in routes checks what each does), so only the others are asked here.
+	served := map[string]bool{
+		"GET /api/board/{project}/messages": true, "POST /api/board/{project}/messages": true, "GET /api/board/{project}/goals": true, "GET /api/board/{project}/goals/{goalID}": true, "POST /api/board/{project}/goals": true,
+	}
 	n := 0
 	require.NoError(t, chi.Walk(h, func(method, route string, _ http.Handler, _ ...func(http.Handler) http.Handler) error {
 		if method == http.MethodConnect || method == http.MethodTrace {
@@ -40,8 +43,11 @@ func TestAGuideIsRefusedOnEveryRouteThatIsNotServedForGuides(t *testing.T) {
 		if served[method+" "+route] {
 			return nil
 		}
-		assert.Equal(t, http.StatusForbidden, rec.Code, "%s %s answers a guide (%d) and is not in the served list", method, route, rec.Code)
-		assert.Contains(t, rec.Body.String(), cloud.GuardRefusedCode, "%s %s", method, route)
+		// refused by the table (403) or answered as an unknown route (404: the path names a board that is not the grant's)
+		assert.Contains(t, []int{http.StatusForbidden, http.StatusNotFound}, rec.Code, "%s %s answers a guide (%d) and is not in the served list", method, route, rec.Code)
+		if rec.Code == http.StatusForbidden {
+			assert.Contains(t, rec.Body.String(), cloud.GuardRefusedCode, "%s %s", method, route)
+		}
 		return nil
 	}))
 	require.Greater(t, n, 200, "the walk met the router's routes")

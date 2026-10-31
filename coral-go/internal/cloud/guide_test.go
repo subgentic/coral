@@ -59,11 +59,31 @@ func TestGuideCallerNeedsTheConnectorsSecretAndACompleteSingleStamp(t *testing.T
 
 func TestGuardRefusesAnyClaimToBeAGuideThatIsNotWholeAuthenticAndServed(t *testing.T) {
 	h := guardServer(t)
-	// nothing is served for a guide yet (slice A): even a perfect stamp on a table route is refused
-	for _, target := range []string{"/api/board/x/messages", "/api/board/x/goals", "/api/artifacts/" + strings.Repeat("a", 64)} {
+	board := "/api/board/dev%20team"
+	// the routes served for a guide pass with a perfect stamp, on the grant's board
+	for _, target := range []string{board + "/messages", board + "/messages?limit=20", board + "/goals?state=proposed&limit=5", board + "/goals/12"} {
+		assert.Equal(t, http.StatusNoContent, serveGuard(h, http.MethodGet, target, guideStampHeaders()).Code, target)
+	}
+	// the writes need the route table's tier as for anyone: refused at View, through at Launch
+	assert.Equal(t, http.StatusForbidden, serveGuard(h, http.MethodPost, board+"/messages", guideStampHeaders()).Code, "the viewer's tier still applies to a guide")
+	hl := Guard(func() tunnel.Mode { return tunnel.TierLaunch })(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusNoContent) }))
+	assert.Equal(t, http.StatusNoContent, serveGuard(hl, http.MethodPost, board+"/messages", guideStampHeaders()).Code)
+	assert.Equal(t, http.StatusNoContent, serveGuard(hl, http.MethodPost, board+"/goals", guideStampHeaders()).Code)
+	// a route of the table that is not served yet, and a route outside it, are refused
+	for _, target := range []string{"/api/artifacts/" + strings.Repeat("a", 64), "/api/artifacts/" + strings.Repeat("a", 64) + "/comments", board + "/artifacts", board + "/settings", "/api/health"} {
 		rec := serveGuard(h, http.MethodGet, target, guideStampHeaders())
 		assert.Equal(t, http.StatusForbidden, rec.Code, target)
 		assert.Contains(t, rec.Body.String(), GuardRefusedCode)
+	}
+	// a query parameter the route does not allow is refused (the closed filter)
+	for _, target := range []string{board + "/messages?all=true", board + "/messages?subscriber_id=Operator", board + "/messages?limit=5&since=0", board + "/goals?subscriber_id=x", board + "/goals/12?x=1"} {
+		assert.Equal(t, http.StatusForbidden, serveGuard(h, http.MethodGet, target, guideStampHeaders()).Code, target)
+	}
+	// another board's path is not found, as an unknown route is, whatever the route
+	for _, target := range []string{"/api/board/other/messages", "/api/board/other/goals", "/api/board/dev%20teams/messages", "/api/board/Dev%20Team/messages"} {
+		rec := serveGuard(h, http.MethodGet, target, guideStampHeaders())
+		assert.Equal(t, http.StatusNotFound, rec.Code, target)
+		assert.NotContains(t, rec.Body.String(), GuardRefusedCode, target)
 	}
 	// a forged copy from a browser or an agent (no secret), the guide headers alone, and a lone role header
 	for name, hdr := range map[string]map[string]string{
@@ -71,9 +91,9 @@ func TestGuardRefusesAnyClaimToBeAGuideThatIsNotWholeAuthenticAndServed(t *testi
 		"board only":              {tunnel.HubGuideBoardHeader: "x"},
 		"label only":              {tunnel.HubGuideLabelHeader: "hub-user-1234abcd"},
 		"start only":              {tunnel.HubGuideSinceHeader: "2026-10-31T07:00:00Z"},
-		"a full stamp, no secret": {tunnel.HubRoleHeader: "guide", tunnel.HubGuideBoardHeader: "x", tunnel.HubGuideLabelHeader: "hub-user-1234abcd", tunnel.HubGuideSinceHeader: "2026-10-31T07:00:00Z"},
+		"a full stamp, no secret": {tunnel.HubRoleHeader: "guide", tunnel.HubGuideBoardHeader: "dev team", tunnel.HubGuideLabelHeader: "hub-user-1234abcd", tunnel.HubGuideSinceHeader: "2026-10-31T07:00:00Z"},
 	} {
-		assert.Equal(t, http.StatusForbidden, serveGuard(h, http.MethodGet, "/api/board/x/messages", hdr).Code, name)
+		assert.Equal(t, http.StatusForbidden, serveGuard(h, http.MethodGet, board+"/messages", hdr).Code, name)
 	}
 	// a request that says nothing of a guide is judged as before
 	assert.Equal(t, http.StatusNoContent, serveGuard(h, http.MethodGet, "/api/health", nil).Code)

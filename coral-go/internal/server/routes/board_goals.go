@@ -125,6 +125,10 @@ func goalID(w http.ResponseWriter, r *http.Request) (int64, bool) {
 // CreateGoal: POST /api/board/{project}/goals
 func (h *BoardHandler) CreateGoal(w http.ResponseWriter, r *http.Request) {
 	project := urlParam(r, "project")
+	if g, ok := guideOf(r); ok { // a guide's goal is a proposal, whatever the board's setting (guide.go)
+		h.proposeGuideGoal(w, r, project, g)
+		return
+	}
 	var body struct {
 		Title        string `json:"title"`
 		Outcome      string `json:"outcome"`

@@ -27,6 +27,7 @@ GET /api/board/{project}/goals | (*BoardHandler).ListGoals-fm
 GET /api/board/{project}/goals/{goalID} | (*BoardHandler).GetGoal-fm
 GET /api/board/{project}/groups | (*BoardHandler).ListGroups-fm
 GET /api/board/{project}/groups/{groupID}/members | (*BoardHandler).ListGroupMembers-fm
+GET /api/board/{project}/guide-roster | (*BoardHandler).GuideRoster-fm
 GET /api/board/{project}/lifecycle-log | (*SessionsHandler).LifecycleLog-fm
 GET /api/board/{project}/messages | (*BoardHandler).ReadMessages-fm
 GET /api/board/{project}/messages/all | (*BoardHandler).ListAllMessages-fm
@@ -123,6 +124,7 @@ POST /api/notifications | (*NotificationHandler).Create-fm
 POST /api/tasks/run | (*TasksHandler).SubmitTask-fm
 POST /api/tasks/runs/{runID}/kill | (*TasksHandler).KillTask-fm
 PUT /api/board/{project}/artifacts/{id}/tags | (*BoardHandler).SetArtifactTags-fm
+PUT /api/board/{project}/guide-roster | (*BoardHandler).GuideRoster-fm
 PUT /api/board/{project}/orchestrator-grant | (*SessionsHandler).OrchestratorGrant-fm
 PUT /api/board/{project}/settings | (*BoardHandler).UpdateBoardSettings-fm
 PUT /api/board/{project}/subscribers/{subscriberID}/review-settings | (*BoardHandler).SetReviewSettings-fm
