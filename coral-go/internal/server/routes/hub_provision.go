@@ -172,6 +172,9 @@ type Provisioner struct {
 // hubEULAState is this hub's own acceptance: the tier (dev and dropboxers skip the EULA and install their own build, which skips it too) and the marker the person's own acceptance wrote.
 func hubEULAState() (required, accepted bool) { return config.EULARequired(), license.IsEULAAccepted() }
 
+// portInUseSentence is the answer when 8420 on the far computer is held by something that is not this user's Coral (usually another user's: every Coral set up from here listens on 8420).
+const portInUseSentence = "Port 8420 is already in use on that computer, perhaps by another user's Coral, so Coral was not started."
+
 // noEULAMarker is the one sentence for a tier that requires the terms when this hub has no acceptance of the current ones (it cannot happen to a person who is using Coral).
 const noEULAMarker = "This hub has not accepted Coral's terms yet, so it cannot record an acceptance on another computer. Open this hub's own window, accept the terms there, and try again."
 
@@ -640,6 +643,9 @@ func (pr *Provisioner) realStartRemote(ctx context.Context, p *provisionPlan) (s
 		slog.Info("[provision] terms acceptance recorded for a setup", "plan", p.ID, "version", license.EULAVersion, "by", setupAcceptanceLabel(), "at", time.Now().UTC().Format(time.RFC3339))
 	}
 	if err := pr.runner.StartTmux(ctx, p.Target, pr.version); err != nil {
+		if errors.Is(err, sshprov.ErrPortInUse) {
+			return "", "", fail(portInUseSentence)
+		}
 		return "", "", fail("Could not start Coral on that computer.")
 	}
 	id, err := pr.runner.EnsureInstanceID(ctx, p.Target)

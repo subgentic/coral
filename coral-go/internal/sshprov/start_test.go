@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -282,5 +283,136 @@ func TestInstallOwnerSecretGoesOnStdinNeverInArgv(t *testing.T) {
 	}
 	if _, err := r.RunInput(context.Background(), tg, strings.NewReader("x"), CmdInstallOwnerSecret, "../x"); !errors.Is(err, ErrNotAllowed) {
 		t.Errorf("a version that is a path: %v", err)
+	}
+}
+
+// Another user's Coral holds 8420: that is not THIS user's stop failing (the old check read the port and said "did not stop"), and a start of this user's own is refused before anything is started.
+func TestAnotherUsersCoralOn8420IsNotThisUsersStopAndBlocksThisUsersStart(t *testing.T) {
+	oldW, oldP := stopWait, stopPoll
+	stopWait, stopPoll = 300*time.Millisecond, 50*time.Millisecond
+	defer func() { stopWait, stopPoll = oldW, oldP }()
+	tg, _ := ParseTarget("user@box.example.com")
+	ctx := context.Background()
+
+	r, home, _, tmuxLog := startSide(t)
+	dir := filepath.Dir(home)
+	if err := os.WriteFile(filepath.Join(dir, "portheld"), nil, 0o600); err != nil { // the other user's Coral
+		t.Fatal(err)
+	}
+	if err := r.StopAndConfirm(ctx, tg); err != nil {
+		t.Errorf("this user has nothing running, so their stop is confirmed whatever another user holds: %v", err)
+	}
+	if err := r.StartTmux(ctx, tg, "2.0.10"); !errors.Is(err, ErrPortInUse) {
+		t.Errorf("a start with 8420 held by another: %v", err)
+	}
+	if b, _ := os.ReadFile(tmuxLog); strings.Contains(string(b), "new-session") {
+		t.Errorf("a session was started although 8420 is held:\n%s", b)
+	}
+	// without the other Coral the start goes ahead, and a re-run (the session exists) is not refused
+	if err := os.Remove(filepath.Join(dir, "portheld")); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.StartTmux(ctx, tg, "2.0.10"); err != nil {
+		t.Fatalf("start: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "portheld"), nil, 0o600); err != nil { // this user's own Coral now holds it: the session exists
+		t.Fatal(err)
+	}
+	if err := r.StartTmux(ctx, tg, "2.0.10"); err != nil {
+		t.Errorf("a re-run with this user's own session must not be refused for its own port: %v", err)
+	}
+}
+
+// The stop check looks at this user's processes and never at a port, and the port check never kills anything: their texts.
+func TestStopCheckReadsOnlyThisUsersProcessesAndPortCheckOnlyThePort(t *testing.T) {
+	stop, err := remoteText(CmdCheckStopped)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{`ps -u "$(id -u)"`, "-t =coral-server", "/root/coral"} {
+		if !strings.Contains(stop, want) {
+			t.Errorf("the stop check lacks %q: %s", want, stop)
+		}
+	}
+	if strings.Contains(stop, "/proc/net/tcp") || strings.Contains(stop, "20E4") {
+		t.Errorf("the stop check reads the port, which another user's Coral can hold: %s", stop)
+	}
+	port, err := remoteText(CmdCheckPort)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(port, "20E4") || !strings.Contains(port, "-t =coral-server") || strings.Contains(port, "kill") {
+		t.Errorf("the port check: %s", port)
+	}
+}
+
+// No command's text may carry a formatting verb that did not get its argument ("%!s(MISSING)", "%!(EXTRA ...)"): the stop check once did and so always said "stopped" (#11429, QA Engineer's MUST).
+func TestNoRemoteCommandTextHasAFormattingError(t *testing.T) {
+	samples := []string{"2.0.10", "a/b.tgz"}
+	for c, s := range specs {
+		args := make([]string, len(s.args))
+		for i, re := range s.args {
+			for _, cand := range samples {
+				if re.MatchString(cand) {
+					args[i] = cand
+				}
+			}
+			if args[i] == "" {
+				t.Fatalf("command %d: no sample fits argument %d", c, i+1)
+			}
+		}
+		text, err := remoteText(c, args...)
+		if err != nil {
+			t.Errorf("command %d: %v", c, err)
+		}
+		if strings.Contains(text, "%!") || strings.Contains(s.template, "%!") {
+			t.Errorf("command %d: formatting error in %q", c, text)
+		}
+	}
+}
+
+// The refusal of a malformed template is itself pinned (QA Engineer's gap on #11429): a command whose template has a verb with no argument, or an argument with no verb, is never sent. The spec is added for
+// the test and taken out again.
+func TestRemoteTextRefusesATemplateWithAFormattingError(t *testing.T) {
+	const missing, extra Command = 9990, 9991
+	specs[missing] = spec{template: "echo %d"}                                  // a stray verb: %!d(MISSING)
+	specs[extra] = spec{template: "echo hi", args: []*regexp.Regexp{versionRe}} // an argument no verb takes: %!(EXTRA string=2.0.10)
+	defer delete(specs, missing)
+	defer delete(specs, extra)
+	if text, err := remoteText(missing); !errors.Is(err, ErrNotAllowed) || text != "" {
+		t.Errorf("a stray %%d was sent: %q, %v", text, err)
+	}
+	if text, err := remoteText(extra, "2.0.10"); !errors.Is(err, ErrNotAllowed) || text != "" {
+		t.Errorf("an argument no verb takes was sent: %q, %v", text, err)
+	}
+	// and a well-formed one still goes (so the refusal is about the formatting error, not about any new command)
+	specs[missing] = spec{template: "echo %s", args: []*regexp.Regexp{versionRe}}
+	if text, err := remoteText(missing, "2.0.10"); err != nil || text != "echo 2.0.10" {
+		t.Errorf("a good template: %q, %v", text, err)
+	}
+}
+
+// Backend Dev's root cause for v2.0.10: the far Coral is started in a tmux pane, which is a terminal, so a Coral that finds someone to ask asks "Enable remote access?" and waits for an answer nobody gives:
+// no listener, no key, and setup's wait for the key fails. The start command gives it standard input from /dev/null. The far side here (the stand-in) lets Coral get going only when the command did that, so
+// taking the redirect out makes the key never come (the ported FIFO test of be-ssh-start-stdin).
+func TestStartTmuxGivesCoralNoTerminalToAskAt(t *testing.T) {
+	text, err := remoteText(CmdStartTmux, "2.0.10")
+	if err != nil {
+		t.Fatal(err)
+	}
+	i, j := strings.Index(text, "--home"), strings.Index(text, "</dev/null")
+	if j < 0 || j < i {
+		t.Fatalf("the start command does not give Coral standard input from /dev/null after its arguments: %s", text)
+	}
+	oldPoll, oldWait := keyPoll, keyWait
+	keyPoll, keyWait = 50*time.Millisecond, 2*time.Second
+	defer func() { keyPoll, keyWait = oldPoll, oldWait }()
+	r, _, _, _ := startSide(t)
+	tg, _ := ParseTarget("user@box.example.com")
+	if err := r.StartTmux(context.Background(), tg, "2.0.10"); err != nil {
+		t.Fatal(err)
+	}
+	if key, err := r.ReadAPIKey(context.Background(), tg, "2.0.10"); err != nil || key != testKey {
+		t.Errorf("Coral did not get going (it would have been waiting at a prompt): %q, %v", key, err)
 	}
 }

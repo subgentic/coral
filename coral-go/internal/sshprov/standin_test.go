@@ -105,6 +105,10 @@ type standCfg struct {
 
 	Far *farCfg `json:",omitempty"` // act as the far computer (farside_test.go): the last argument is the remote text
 
+	// ConfigCopy: the file named by a -F <path> argument is copied there while it exists (the scan's temporary config is deleted afterwards), and its path written to ConfigPath.
+	ConfigCopy string `json:",omitempty"`
+	ConfigPath string `json:",omitempty"`
+
 	// KnownHosts is written to the file named by a UserKnownHostsFile=<path> argument (what ssh does with a key it was told to accept), and that path to KnownHostsPath.
 	KnownHosts     string `json:",omitempty"`
 	KnownHostsPath string `json:",omitempty"`
@@ -122,7 +126,13 @@ func newStandIn(t *testing.T, name string, cfg standCfg) string {
 		name += ".exe"
 	}
 	p := filepath.Join(dir, name)
-	if err := os.Link(exe, p); err != nil {
+	// A hard link to the running test binary cannot be deleted on Windows (the image is mapped under every name), so there it is always a copy; elsewhere a link is cheaper.
+	linkErr := errors.New("copy on Windows")
+	if runtime.GOOS != "windows" {
+		linkErr = os.Link(exe, p)
+	}
+	t.Cleanup(func() { removeAllWithRetry(dir) }) // runs before t.TempDir's own removal
+	if linkErr != nil {
 		src, err := os.Open(exe)
 		if err != nil {
 			t.Fatal(err)
@@ -148,6 +158,17 @@ func newStandIn(t *testing.T, name string, cfg standCfg) string {
 		t.Fatal(err)
 	}
 	return p
+}
+
+// removeAllWithRetry removes dir, trying again for a few seconds where the system refuses while a stand-in that was just stopped is still being torn down (Windows: access denied on its .exe). The error
+// after the last try is left to t.TempDir's own cleanup, which reports it.
+func removeAllWithRetry(dir string) {
+	for i := 0; i < 100; i++ {
+		if os.RemoveAll(dir) == nil {
+			return
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
 }
 
 // runStandIn acts as the configured stand-in and returns its exit code. It starts no process and runs no test.
@@ -188,7 +209,15 @@ func runStandIn() int {
 	if cfg.TextFile != "" && len(args) > 0 {
 		_ = os.WriteFile(cfg.TextFile, []byte(args[len(args)-1]), 0o600)
 	}
-	for _, a := range args {
+	for i, a := range args {
+		if a == "-F" && i+1 < len(args) && cfg.ConfigCopy != "" {
+			if b, err := os.ReadFile(args[i+1]); err == nil {
+				_ = os.WriteFile(cfg.ConfigCopy, b, 0o600)
+			}
+			if cfg.ConfigPath != "" {
+				_ = os.WriteFile(cfg.ConfigPath, []byte(args[i+1]), 0o600)
+			}
+		}
 		if f, ok := strings.CutPrefix(a, "UserKnownHostsFile="); ok && cfg.KnownHosts != "" {
 			_ = os.WriteFile(f, []byte(cfg.KnownHosts), 0o600)
 			if cfg.KnownHostsPath != "" {
@@ -288,10 +317,51 @@ func TestHomeAllowedIsInsideTheRootNotJustNamedLikeIt(t *testing.T) {
 			t.Errorf("homeAllowed(%q, %q) = %v, want %v", home, root, got, want)
 		}
 	}
+	if runtime.GOOS != "windows" { // the same folder under another spelling (Windows' RUNNER~1 and runneradmin; here a link to the root) is inside it
+		alias := filepath.Join(t.TempDir(), "alias")
+		if err := os.Symlink(root, alias); err == nil && (!homeAllowed(filepath.Join(alias, "home"), root) || homeAllowed(alias, root)) {
+			t.Error("the root under another name was not told from the root's inside")
+		}
+	}
 	if runtime.GOOS != "windows" { // a link inside the root that points outside it
 		outside := t.TempDir()
 		if err := os.Symlink(outside, filepath.Join(root, "link")); err == nil && homeAllowed(filepath.Join(root, "link", "home"), root) {
 			t.Error("a home reached through a link that leaves the root was allowed")
 		}
+	}
+}
+
+// A test that forgets ArgsLog must not leave what came in on stdin (a secret, for hub-owner-secret) or a log line in the working directory: the paths would be just ".stdin", ".accept" and ".owner" there.
+func TestFarSideKeepsNothingInTheWorkingFolderWithoutAnArgsLog(t *testing.T) {
+	cwd, _ := os.Getwd()
+	work := t.TempDir()
+	if err := os.Chdir(work); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Chdir(cwd)
+	in := filepath.Join(t.TempDir(), "in")
+	if err := os.WriteFile(in, []byte(`{"secret":"s3cret"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	stdin, err := os.Open(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer stdin.Close()
+	old := os.Stdin
+	os.Stdin = stdin
+	defer func() { os.Stdin = old }()
+	home := filepath.Join(t.TempDir(), "home")
+	cfg := farCfg{Home: home, TempRoot: os.TempDir()}
+	for _, text := range []string{`"$HOME/.coral-server/2.0.10/root/coral" accept-terms`, `"$HOME/.coral-server/2.0.10/root/coral" hub-owner-secret --home "$HOME/.coral-server/data"`} {
+		if _, err := stdin.Seek(0, io.SeekStart); err != nil {
+			t.Fatal(err)
+		}
+		if code := runFar(cfg, text); code != 0 {
+			t.Fatalf("%s: exit %d", text, code)
+		}
+	}
+	if ents, _ := os.ReadDir(work); len(ents) != 0 {
+		t.Errorf("the far side left files in the working folder: %v", ents)
 	}
 }

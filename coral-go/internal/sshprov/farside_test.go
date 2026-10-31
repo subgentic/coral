@@ -29,8 +29,8 @@ type farCfg struct {
 	UnameOut string `json:",omitempty"`
 }
 
-// state is kept in the folder above Home, where a test flips it: session (a coral-server session exists), stuck (a kill does nothing), listening (something holds port 8420), noproc (the check cannot
-// tell), started (when coral started, in unix nanoseconds).
+// state is kept in the folder above Home, where a test flips it: session (a coral-server session exists), stuck (a kill does nothing), listening (a process of this user still runs Coral after the stop), noproc (the check cannot
+// tell), portheld (another user holds 8420), started (when coral started, in unix nanoseconds).
 func (f farCfg) flag(name string) bool {
 	_, err := os.Stat(filepath.Join(filepath.Dir(f.Home), name))
 	return err == nil
@@ -45,8 +45,18 @@ func (f farCfg) setFlag(name string, on bool) {
 	}
 }
 
+// keepStdin reads all of stdin and, only when the test named a place for it (ArgsLog set, so the path is not just ".stdin" in the working directory), writes it there at 0600: a secret on stdin is never left in the
+// source tree by a test that forgot to name one.
+func keepStdin(path string) {
+	b, _ := io.ReadAll(os.Stdin)
+	if strings.HasPrefix(filepath.Base(path), ".") {
+		return
+	}
+	_ = os.WriteFile(path, b, 0o600)
+}
+
 func appendLine(path, line string) {
-	if path == "" {
+	if path == "" || strings.HasPrefix(filepath.Base(path), ".") {
 		return
 	}
 	if fh, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600); err == nil {
@@ -66,25 +76,35 @@ func homeAllowed(home, root string) bool {
 	if root == "" || !filepath.IsAbs(root) || filepath.Dir(root) == root || home == "" || !filepath.IsAbs(home) || filepath.Clean(home) != home {
 		return false
 	}
-	tmp := root
-	if r, err := filepath.EvalSymlinks(tmp); err == nil {
-		tmp = r
+	// Compared as files, not as spellings: Windows names one folder both C:\Users\RUNNER~1\... and C:\Users\runneradmin\..., and /var and /private/var are one folder on a Mac.
+	rootSt, err := os.Stat(root)
+	if err != nil {
+		return false
 	}
-	// resolve links in the deepest part of the path that exists, and keep the rest as written: a home not made yet is judged by where it would be
-	h, rest := home, ""
+	// the deepest part of home that exists, with its links resolved: a home not made yet is judged by where it would be, and a link that leaves root is seen for where it leads
+	e := home
 	for {
-		if r, err := filepath.EvalSymlinks(h); err == nil {
-			h = filepath.Join(r, rest)
+		if _, err := os.Lstat(e); err == nil {
 			break
 		}
-		parent := filepath.Dir(h)
-		if parent == h {
+		parent := filepath.Dir(e)
+		if parent == e {
 			return false
 		}
-		rest, h = filepath.Join(filepath.Base(h), rest), parent
+		e = parent
 	}
-	rel, err := filepath.Rel(filepath.Clean(tmp), h)
-	return err == nil && rel != "." && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
+	r, err := filepath.EvalSymlinks(e)
+	if err != nil {
+		return false
+	}
+	for p := r; ; p = filepath.Dir(p) {
+		if st, err := os.Stat(p); err == nil && os.SameFile(st, rootSt) {
+			return p != r || e != home // home itself being root is not inside it
+		}
+		if filepath.Dir(p) == p {
+			return false
+		}
+	}
 }
 
 // runFar answers one command and returns its exit code.
@@ -118,13 +138,21 @@ func runFar(f farCfg, text string) int {
 		return 0
 	case has("command -v tmux"), has("systemctl --user"):
 		return 0
-	case has("[ -r /proc/net/tcp ]"):
+	case has(`ps -u "$(id -u)"`): // the check after a stop: the session, then THIS user's own Coral process (the flag listening), never the port
 		switch {
 		case f.flag("session"):
 			return 1
 		case f.flag("noproc"):
 			return 3
 		case f.flag("listening"):
+			return 2
+		}
+		return 0
+	case has("[ -r /proc/net/tcp ]"): // the check before a start: this user's session means nothing to check; otherwise 8420 held by another (the flag portheld)
+		if f.flag("session") {
+			return 0
+		}
+		if f.flag("portheld") {
 			return 2
 		}
 		return 0
@@ -148,10 +176,14 @@ func runFar(f farCfg, text string) int {
 			if j := strings.LastIndex(rest, `"; }`); j >= 0 {
 				rest = rest[:j]
 			}
-			rest = strings.ReplaceAll(strings.ReplaceAll(rest, `\"`, ""), "$HOME", f.Home)
+			rest = filepath.FromSlash(strings.ReplaceAll(strings.ReplaceAll(rest, `\"`, ""), "$HOME", f.Home)) // the path as this system writes it
 			appendLine(f.ArgsLog, strings.TrimSpace(rest))
 		}
-		_ = os.WriteFile(filepath.Join(filepath.Dir(f.Home), "started"), []byte(fmt.Sprint(time.Now().UnixNano())), 0o600)
+		// A tmux pane is a terminal: a Coral started in one with its standard input still on it asks "Enable remote access? [y/N]" on a computer where it has never run, and waits for an answer nobody gives, so
+		// nothing listens and no key appears (Backend Dev's root cause, v2.0.10). The command gives it </dev/null; without that the emulated Coral never gets going.
+		if strings.Contains(text, "</dev/null") {
+			_ = os.WriteFile(filepath.Join(filepath.Dir(f.Home), "started"), []byte(fmt.Sprint(time.Now().UnixNano())), 0o600)
+		}
 		return 0
 	case has("instance-id\" && { [ -s"):
 		if err := os.MkdirAll(install, 0o700); err != nil {
@@ -183,13 +215,11 @@ func runFar(f farCfg, text string) int {
 		return cat(p)
 	case has(`root/coral" accept-terms`):
 		appendLine(f.ArgsLog+".accept", "accept-terms")
-		b, _ := io.ReadAll(os.Stdin)
-		_ = os.WriteFile(f.ArgsLog+".stdin", b, 0o600)
+		keepStdin(f.ArgsLog + ".stdin")
 		return 0
 	case has(`root/coral" hub-owner-secret`): // the owner stamp's secret on stdin, never in argv (#11378): what was asked and what came in are kept for the test
 		appendLine(f.ArgsLog+".owner", "hub-owner-secret --home "+filepath.Join(install, "data"))
-		b, _ := io.ReadAll(os.Stdin)
-		_ = os.WriteFile(f.ArgsLog+".owner.stdin", b, 0o600)
+		keepStdin(f.ArgsLog + ".owner.stdin")
 		return 0
 	case has("tmux kill-session"):
 		appendLine(f.TmuxLog, "kill-session -t =coral-server")

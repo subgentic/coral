@@ -52,8 +52,9 @@ const (
 	CmdRemoveInstalls
 	// CmdRemoveAll deletes the whole install folder: releases, data (the key, the history), the instance id.
 	CmdRemoveAll
-	// CmdCheckStopped is the check after a stop: exit 0 only when there is no tmux session named exactly coral-server and nothing listens on port 8420 (read from /proc/net/tcp and tcp6, Linux); 1 for a
-	// session, 2 for a listener, 3 when it cannot tell (no /proc/net/tcp): all of them are "not confirmed".
+	// CmdCheckStopped is the check after a stop: exit 0 only when there is no tmux session named exactly coral-server and no process of THIS user is running a Coral from the install folder (read from ps);
+	// 1 for a session, 2 for such a process, 3 when it cannot tell (no ps -u): all of them are "not confirmed". It is the user's own process that counts, never the port: another user of the same computer
+	// may hold 8420 with their own Coral, and that is not this user's stop failing.
 	CmdCheckStopped
 	// CmdInstallOwnerSecret runs the Coral of version arg 0's `hub-owner-secret` with the id and the secret as JSON on STDIN (never argv): the human act that installs the secret its owner stamps are
 	// verified with (#11378).
@@ -62,6 +63,9 @@ const (
 	CmdFreeKB
 	// CmdReadInstalledSum prints that recorded SHA-256, if the release is installed; arg 0 is the version.
 	CmdReadInstalledSum
+	// CmdCheckPort is the check before a start: exit 0 when this user's coral-server session exists (a start leaves it as it is) or nothing listens on port 8420 (read from /proc/net/tcp and tcp6, Linux),
+	// 2 when something does (another user's Coral, or any program), 3 when it cannot tell (the start then goes ahead as it always did).
+	CmdCheckPort
 )
 
 // InstallDir is where everything the provisioner puts on the remote lives, under the remote user's home. Never outside it.
@@ -97,7 +101,9 @@ var specs = map[Command]spec{
 	CmdStopTmux:         {template: "tmux kill-session -t =coral-server 2>/dev/null; true"},
 	CmdRemoveInstalls:   {template: "cd \"$HOME/" + InstallDir + "\" 2>/dev/null && for d in [0-9]*; do [ -d \"$d\" ] && rm -rf -- \"$d\"; done; true"},
 	CmdRemoveAll:        {template: "[ -n \"$HOME\" ] && rm -rf \"$HOME/" + InstallDir + "\""},
-	CmdCheckStopped: {template: "if tmux has-session -t =coral-server 2>/dev/null; then exit 1; fi; [ -r /proc/net/tcp ] || exit 3; " +
+	CmdCheckStopped: {template: "if tmux has-session -t =coral-server 2>/dev/null; then exit 1; fi; out=$(ps -u \"$(id -u)\" -o args= 2>/dev/null) || exit 3; " +
+		"if printf '%%s\\n' \"$out\" | grep -F -- \"$HOME/" + InstallDir + "/\" | grep -Eq '/root/coral( |$)'; then exit 2; fi; exit 0"},
+	CmdCheckPort: {template: "if tmux has-session -t =coral-server 2>/dev/null; then exit 0; fi; [ -r /proc/net/tcp ] || exit 3; " +
 		"if grep -Eqs '^ *[0-9]+: [0-9A-Fa-f]+:20E4 [0-9A-Fa-f:]+ 0A ' /proc/net/tcp /proc/net/tcp6; then exit 2; fi; exit 0"},
 	CmdInstallOwnerSecret: {template: "\"$HOME/" + InstallDir + "/%s/root/coral\" hub-owner-secret --home \"$HOME/" + InstallDir + "/data\"", args: []*regexp.Regexp{versionRe}},
 	CmdFreeKB:             {template: "df -Pk \"$HOME\" | awk 'NR==2 {print $4}'"},
@@ -123,7 +129,11 @@ func remoteText(c Command, args ...string) (string, error) {
 		}
 		vals[i] = a
 	}
-	return fmt.Sprintf(s.template, vals...), nil
+	out := fmt.Sprintf(s.template, vals...)
+	if strings.Contains(out, "%!") { // a stray % verb in a template (QA Engineer's MUST on #11429: %!s(MISSING) made the stop check always say "stopped"): never sent
+		return "", fmt.Errorf("%w: the template for command %d is not well formed", ErrNotAllowed, c)
+	}
+	return out, nil
 }
 
 // Runner runs the closed commands over the system ssh with the user's own agent, config and known_hosts. Host-key checking is never turned off: an unknown or changed key stops the run with
@@ -135,6 +145,8 @@ type Runner struct {
 	Timeout time.Duration
 	// KeyScan is the ssh-keyscan program of the host-key step; empty means "ssh-keyscan" from the PATH.
 	KeyScan string
+	// Config is the owner's ssh config that the alias scan includes (ScanAlias); empty means DefaultConfigPath().
+	Config string
 }
 
 // Result is what a command printed and how it ended.
