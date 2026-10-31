@@ -49,6 +49,18 @@ const STUB = `
             check(!s.connect && s.password && !s.banner, `${tag}: then only the password dialog shows (the strip stays away): ${JSON.stringify(s)}`);
         }
         await Page.removeScriptToEvaluateOnNewDocument({ identifier });
+        // A welcome landing that throws (here: the Inbox switch it calls is broken) must not release the password dialog over the Connect screen (#11496): the landing has its own catch, and only a failed settings read settles the first offer
+        const broken = STUB.replace("welcome_pending: 'True' }", "welcome_pending: 'True', inbox_welcome: 'on', inbox_welcome_done: '' }") + "\n  Object.defineProperty(window, 'switchNavTab', { configurable: true, get() { return () => { throw new Error('the landing is broken on purpose'); }; }, set() {} });";
+        const { identifier: poison } = await Page.addScriptToEvaluateOnNewDocument({ source: broken });
+        await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
+        await Page.navigate({ url: BASE + '/auth' }); await Page.loadEventFired(); await ev(`try { sessionStorage.clear(); } catch (e) {} true`);
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired();
+        await waitFor(`(() => { const m = document.getElementById('editions-modal'); return !!m && m.style.display !== 'none'; })()`, 'a failing landing: Connect to Coral Hub is still offered', { timeout: 10000 });
+        await new Promise(r => setTimeout(r, 2500)); // sleep-ok: a negative: the password dialog must still wait behind the Connect screen
+        check(await ev(`!document.getElementById('set-password-modal')`), 'a landing that throws released the password dialog over the Connect screen');
+        await ev(`document.querySelector('#editions-modal [data-editions="skip"]').click(); true`);
+        await waitFor(`!!document.getElementById('set-password-modal')`, 'a failing landing: the password dialog opens once the Connect screen is answered', { timeout: 10000 });
+        await Page.removeScriptToEvaluateOnNewDocument({ identifier: poison });
         assert.equal(found.length, 0, '\n' + found.join('\n'));
         console.log('PASS one first-launch prompt at a time: Connect to Coral Hub, then the password');
     } finally {
