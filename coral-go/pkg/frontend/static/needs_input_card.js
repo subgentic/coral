@@ -3,6 +3,7 @@ import { standingOptions } from './standing_option.js';
 /* Moved out of live_chat.js as it was (#3837): no behaviour change. */
 import { deriveSessionState } from './render.js';
 import { escapeHtml, escapeAttr, renderMarkdown } from './utils.js';
+import { markHidden } from './visible_marks.js';
 import { askWords } from './session_state.js';
 import { state } from './state.js';
 import { claudeSignedIn, askSigninSoon, isLocalClaude, isLocalAgent, setClaudeSignedIn } from './signin_line.js';
@@ -187,7 +188,11 @@ function canDismissWait(session, kind) {
 function needsInputHtml(info, session) {
     const inp = (info.tool && info.tool.input) || {};
     // A request the server says can only be rejected here (too long to show whole, or holding characters that hide what it does, #11395) offers Reject alone, whatever the answers list: the person cannot allow what they cannot read.
-    if (info.kind === "permission" && inp.only_reject === true && info.screen) info = { ...info, screen: { ...info.screen, options: (info.screen.options || []).filter(o => /^reject\b/i.test(String(o.label || ""))) } };
+    // A request the server says can only be rejected here (longer than a card shows, or holding characters that hide what it does) offers the refusing answers alone, for every agent: the pending tool the hook
+    // reported (Claude, Pi, opencode: input.only_reject) or the prompt read from the screen (Codex, agy, Gemini: screen.only_reject). The server refuses an Allow for it as well (#11399).
+    const onlyReject = info.kind === "permission" && (inp.only_reject === true || (info.screen && info.screen.only_reject === true));
+    if (onlyReject && info.screen) info = { ...info, screen: { ...info.screen, options: (info.screen.options || []).filter(o => /^(no|reject|deny|cancel)\b/i.test(String(o.label || ""))) } };
+    const onlyRejectNote = typeof inp.note === "string" && inp.note ? inp.note : (info.screen && typeof info.screen.note === "string" ? info.screen.note : "");
     const screen = info.screen || {};
     const onScreen = (screen.options || []).length > 0;
     const screenQuestion = onScreen ? (screen.question || "") : "";
@@ -237,8 +242,9 @@ function needsInputHtml(info, session) {
         question = screenQuestion || (tool ? `Allow ${tool}?` : (info.summary || "The agent is waiting for you"));
         const patterns = Array.isArray(inp.patterns) ? inp.patterns.filter(x => typeof x === "string" && x) : [];
         const more = typeof inp.more_patterns === "string" ? inp.more_patterns : ""; // "and 2 more patterns": the count of the ones the server did not list (opencode, #11395)
-        const target = inp.command || inp.file_path || inp.path || inp.url || inp.query || inp.pattern || patterns.join("\n") || "";
-        if (inp.only_reject === true && typeof inp.note === "string" && inp.note) context += `<div class="cni-context-text cni-note" role="note">${escapeHtml(inp.note)}</div>`; // why only Reject is offered, in the server's words
+        const screenTarget = info.screen && typeof info.screen.target === "string" ? info.screen.target : ""; // the lines above the screen's question, where the CLI shows what it asks (Codex, agy, Gemini send no tool input)
+        const target = markHidden(inp.command || inp.file_path || inp.path || inp.url || inp.query || inp.pattern || patterns.join("\n") || screenTarget || "");
+        if (onlyReject && onlyRejectNote) context += `<div class="cni-context-text cni-note" role="note">${escapeHtml(onlyRejectNote)}</div>`; // why only Reject is offered, in the server's words
         if (inp.description && inp.command) context += `<div class="cni-context-text">${escapeHtml(inp.description)}</div>`;
         // The whole request, as text, wrapped, in a box that scrolls (a keyboard can scroll it once it is long enough to): a command cut short or hidden off to the side is one the person cannot judge (#11395).
         if (target) context += `<pre class="cni-target"${target.length > 160 ? ` tabindex="0" role="region" aria-label="The whole request, scrollable"` : ""}><code>${escapeHtml(target)}</code></pre>`;
