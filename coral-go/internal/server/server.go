@@ -675,7 +675,7 @@ func (s *Server) chiefRecorded(ctx context.Context) (enabled bool, sessionID, te
 	if parsed, perr := uuid.Parse(sessionID); perr != nil || parsed.String() != sessionID || team == "" {
 		return true, "", ""
 	}
-	if ls, lerr := ss.GetLiveSession(ctx, sessionID); lerr != nil || ls == nil || ls.BoardName == nil || *ls.BoardName != team {
+	if ls, lerr := ss.GetLiveSession(ctx, sessionID); lerr != nil || ls == nil || ls.BoardName == nil || !s.isRecordedTeam(ctx, *ls.BoardName, team) {
 		return true, "", ""
 	}
 	return true, sessionID, team
@@ -721,6 +721,19 @@ func (s *Server) serveChief(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Error rendering the Chief page: %v", err)
 		http.Error(w, "Template render error", http.StatusInternalServerError)
 	}
+}
+
+// isRecordedTeam: the board a live row is on (its id) is the team the Operator recorded, which they may have written as the board's id or as its name (its label, exact: what they see in the dashboard and
+// type in coral-board link). The row's own board is the one compared, so a team of that name that the recorded session is not on is not Chief (#11499, QA's Chief walk).
+func (s *Server) isRecordedTeam(ctx context.Context, boardID, recorded string) bool {
+	if boardID == recorded {
+		return true
+	}
+	if s.boardStore == nil {
+		return false
+	}
+	b, err := s.boardStore.GetBoard(ctx, boardID)
+	return err == nil && b != nil && b.Label != "" && b.Label == recorded
 }
 
 // serveAgentPopout renders the dashboard bundle in single-agent mode. A valid

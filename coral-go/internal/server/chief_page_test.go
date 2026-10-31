@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -158,4 +159,46 @@ func TestChiefStateThroughCoralHubIsTheOwnersAlone(t *testing.T) {
 	code, out, _ = call(nil)
 	assert.Equal(t, http.StatusOK, code)
 	assert.Equal(t, false, out["enabled"])
+}
+
+// QA's Chief walk (#11499): the Operator records the team by its NAME (what they see and type), while a live row's board_name holds the board's ID. The name is resolved through the board's label; an id still works; a name that is not
+// the label of the board the recorded session is on, or is the label of another board, is not Chief.
+func TestChiefPageResolvesTheRecordedTeamNameToItsBoard(t *testing.T) {
+	cfg := newE2EConfig(t, t.TempDir())
+	db, err := storetest.Open(t, cfg.DBPath)
+	require.NoError(t, err)
+	t.Cleanup(func() { db.Close() })
+	stack := newTermStack(t)
+	srv := newTestServer(t, cfg, db, stack.backend, stack.terminal)
+	ss := store.NewSessionStore(db)
+	ctx := context.Background()
+	get := func() string {
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "/chief", nil)
+		req.Host, req.RemoteAddr = "127.0.0.1:8420", "127.0.0.1:50000"
+		srv.Router().ServeHTTP(rec, req)
+		b, _ := io.ReadAll(rec.Result().Body)
+		return string(b)
+	}
+	set := func(k, v string) { require.NoError(t, ss.SetSetting(ctx, k, v)) }
+	chiefBoard, err := srv.BoardStore().CreateBoard(ctx, "chiefdesk", "test")
+	require.NoError(t, err)
+	other, err := srv.BoardStore().CreateBoard(ctx, "devteam", "test")
+	require.NoError(t, err)
+	id := chiefBoard.ID
+	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: chiefSID, AgentType: "claude", AgentName: "chief", WorkingDir: t.TempDir(), BoardName: &id}))
+	set("chief_page", "true")
+	set("chief_session", chiefSID)
+	shown := func() bool { return strings.Contains(get(), `data-target-session-id="`+chiefSID+`"`) }
+
+	set("chief_team", "chiefdesk")
+	assert.True(t, shown(), "the team's name, as the Operator types it, resolves to its board")
+	set("chief_team", chiefBoard.ID)
+	assert.True(t, shown(), "the board id still works")
+	set("chief_team", "devteam")
+	assert.False(t, shown(), "the label of another board is not the recorded session's team")
+	set("chief_team", other.ID)
+	assert.False(t, shown(), "nor is its id")
+	set("chief_team", "ChiefDesk")
+	assert.False(t, shown(), "a name is exact: no guessing by case")
 }
