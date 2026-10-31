@@ -1,6 +1,8 @@
 package agent
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -9,6 +11,15 @@ import (
 
 	at "github.com/subgentic/coral/internal/agenttypes"
 )
+
+// passwordLines are the two lines the pane's shell is given for a password file: the server's own variable read from the file, and a second variable set from the first. The line is the shell's (detectShell): `export`
+// and `$(cat ...)` for a POSIX shell, `$env:` and Get-Content for PowerShell, which is what a Windows pane has.
+func passwordLines(file string) (read, copied string) {
+	if detectShell() == ShellPowerShell {
+		return "$env:OPENCODE_SERVER_PASSWORD = (Get-Content -Raw -LiteralPath '" + file + "').Trim()", "$env:OPENCODE_PASSWORD = $env:OPENCODE_SERVER_PASSWORD"
+	}
+	return `export OPENCODE_SERVER_PASSWORD="$(cat '` + file + `')"`, `export OPENCODE_PASSWORD="$OPENCODE_SERVER_PASSWORD"`
+}
 
 // #11364: the opencode TUI is attached to Coral's own server, resumes by its own session id, and gets the server's password from a private file, never in the line.
 func TestOpencodeLaunchAttachesToCoralsServerAndNeverPutsThePasswordInTheLine(t *testing.T) {
@@ -20,8 +31,9 @@ func TestOpencodeLaunchAttachesToCoralsServerAndNeverPutsThePasswordInTheLine(t 
 	require.NoError(t, err)
 	assert.Contains(t, cmd, "--server http://127.0.0.1:4711")
 	assert.Contains(t, cmd, "--session ses_abc123_DEF-9")
-	assert.Contains(t, cmd, `OPENCODE_SERVER_PASSWORD="$(cat '/data/opencode/password')"`, "read from the private file by the pane's shell")
-	assert.Contains(t, cmd, `export OPENCODE_PASSWORD="$OPENCODE_SERVER_PASSWORD"`, "a build whose version is not said gets both variables")
+	read, copied := passwordLines("/data/opencode/password")
+	assert.Contains(t, cmd, read, "read from the private file by the pane's shell")
+	assert.Contains(t, cmd, copied, "a build whose version is not said gets both variables")
 	assert.NotContains(t, cmd, "--standalone", "never the person's own or a private server of its own")
 	assert.Contains(t, cmd, "opencode --server")
 }
@@ -76,7 +88,8 @@ func TestOpencode1xIsAttachedWithTheSubcommandAndItsOwnPasswordVariable(t *testi
 	assert.Contains(t, cmd, "-s ses_abc123_DEF-9")
 	assert.NotContains(t, cmd, "--server")
 	assert.NotContains(t, cmd, "--session")
-	assert.Contains(t, cmd, `export OPENCODE_SERVER_PASSWORD="$(cat '/data/opencode/password')"`, "the variable 1.x reads, from the private file")
+	read, _ := passwordLines("/data/opencode/password")
+	assert.Contains(t, cmd, read, "the variable 1.x reads, from the private file")
 	assert.NotContains(t, cmd, "OPENCODE_PASSWORD", "1.x does not read it")
 	for _, secret := range []string{"hunter2", "hunter3", " -p ", "--password"} {
 		assert.NotContains(t, cmd, secret, "no password on any command line, and a person's own is dropped")
@@ -95,8 +108,9 @@ func TestOpencode2xIsAttachedWithServerAndBothPasswordVariables(t *testing.T) {
 	assert.Contains(t, cmd, "opencode --server http://127.0.0.1:4711")
 	assert.Contains(t, cmd, "--session ses_abc123")
 	assert.NotContains(t, cmd, "attach")
-	assert.Contains(t, cmd, `export OPENCODE_SERVER_PASSWORD="$(cat '/data/opencode/password')"`)
-	assert.Contains(t, cmd, `export OPENCODE_PASSWORD="$OPENCODE_SERVER_PASSWORD"`)
+	read, copied := passwordLines("/data/opencode/password")
+	assert.Contains(t, cmd, read)
+	assert.Contains(t, cmd, copied)
 	assert.Contains(t, cmd, "--model openai/gpt-6", "2.x's TUI takes it")
 
 	again, err := (&OpencodeAgent{}).LaunchCommand(LaunchParams{OpencodeURL: "http://127.0.0.1:4711", OpencodeMajor: 0})
@@ -126,4 +140,21 @@ func TestOpencode1xIsAttachedInTheAgentsOwnFolder(t *testing.T) {
 	two, err := (&OpencodeAgent{}).LaunchCommand(LaunchParams{OpencodeURL: "http://127.0.0.1:4711", OpencodeMajor: 2, WorkingDir: "/w"})
 	require.NoError(t, err)
 	assert.NotContains(t, two, "--dir", "2.x's TUI is not changed by what was found on 1.x")
+}
+
+// The same launch line in PowerShell (a Windows pane's shell) on any platform: the password is read from the private file into $env:, never typed, and 1.x gets only its own variable. CORAL_SHELL must name a real file,
+// so a stand-in named pwsh.exe is made.
+func TestOpencodeLaunchLineInPowerShellReadsThePasswordFromTheFile(t *testing.T) {
+	pwsh := filepath.Join(t.TempDir(), "pwsh.exe")
+	require.NoError(t, os.WriteFile(pwsh, []byte("stand-in"), 0o755))
+	t.Setenv("CORAL_SHELL", pwsh)
+	require.Equal(t, ShellPowerShell, detectShell())
+	for major, wantCopy := range map[int]bool{0: true, 1: false, 2: true} {
+		cmd, err := (&OpencodeAgent{}).LaunchCommand(LaunchParams{OpencodeURL: "http://127.0.0.1:4711", OpencodePasswordFile: "C:\\data\\opencode\\password", OpencodeMajor: major, Flags: []string{"-p", "hunter2"}})
+		require.NoError(t, err)
+		assert.Contains(t, cmd, "$env:OPENCODE_SERVER_PASSWORD = (Get-Content -Raw -LiteralPath 'C:\\data\\opencode\\password').Trim();", "major %d", major)
+		assert.Equal(t, wantCopy, strings.Contains(cmd, "$env:OPENCODE_PASSWORD = $env:OPENCODE_SERVER_PASSWORD;"), "major %d", major)
+		assert.NotContains(t, cmd, "export ", "major %d: no POSIX syntax in a PowerShell line", major)
+		assert.NotContains(t, cmd, "hunter2", "major %d", major)
+	}
 }
