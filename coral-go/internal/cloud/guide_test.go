@@ -1,0 +1,100 @@
+package cloud
+
+import (
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/subgentic/coral/pkg/tunnel"
+)
+
+// #11457: the server repeats the connector's decision for a guide. A request that claims to be one in any way is judged by guideAllowed; a forged, repeated or incomplete stamp is a refusal.
+
+func guideStampHeaders() map[string]string {
+	return map[string]string{tunnel.ViaHeader: ViaSecret(), tunnel.HubRoleHeader: "guide", tunnel.HubGuideBoardHeader: "dev team", tunnel.HubGuideLabelHeader: "hub-user-1234abcd", tunnel.HubGuideSinceHeader: "2026-10-31T07:00:00Z", tunnel.HubUserHeader: "hub-user-1234abcd"}
+}
+
+func guideReq(method, target string, hdr map[string]string) *http.Request {
+	r := httptest.NewRequest(method, target, nil)
+	for k, v := range hdr {
+		r.Header.Set(k, v)
+	}
+	return r
+}
+
+func TestGuideCallerNeedsTheConnectorsSecretAndACompleteSingleStamp(t *testing.T) {
+	g, ok := GuideCaller(guideReq("GET", "/api/board/x/messages", guideStampHeaders()))
+	require.True(t, ok)
+	assert.Equal(t, tunnel.HubGuide{Board: "dev team", Label: "hub-user-1234abcd", Since: "2026-10-31T07:00:00Z"}, g)
+	for name, mut := range map[string]func(h map[string]string){
+		"no secret":        func(h map[string]string) { delete(h, tunnel.ViaHeader) },
+		"a forged secret":  func(h map[string]string) { h[tunnel.ViaHeader] = "1" },
+		"another role":     func(h map[string]string) { h[tunnel.HubRoleHeader] = "owner" },
+		"no board":         func(h map[string]string) { delete(h, tunnel.HubGuideBoardHeader) },
+		"no label":         func(h map[string]string) { delete(h, tunnel.HubGuideLabelHeader) },
+		"no start":         func(h map[string]string) { delete(h, tunnel.HubGuideSinceHeader) },
+		"a bad label":      func(h map[string]string) { h[tunnel.HubGuideLabelHeader] = "someone" },
+		"a bad start":      func(h map[string]string) { h[tunnel.HubGuideSinceHeader] = "yesterday" },
+		"a board with a /": func(h map[string]string) { h[tunnel.HubGuideBoardHeader] = "a/b" },
+		"another hub user": func(h map[string]string) { h[tunnel.HubUserHeader] = "hub-user-00000000" },
+	} {
+		h := guideStampHeaders()
+		mut(h)
+		_, ok := GuideCaller(guideReq("GET", "/api/board/x/messages", h))
+		assert.False(t, ok, name)
+	}
+	r := guideReq("GET", "/api/board/x/messages", guideStampHeaders())
+	r.Header.Add(tunnel.HubRoleHeader, "guide")
+	_, ok = GuideCaller(r)
+	assert.False(t, ok, "a repeated role header is no stamp")
+	r = guideReq("GET", "/api/board/x/messages", guideStampHeaders())
+	r.Header.Add(tunnel.HubGuideBoardHeader, "other")
+	_, ok = GuideCaller(r)
+	assert.False(t, ok, "a repeated board header is no stamp")
+}
+
+func TestGuardRefusesAnyClaimToBeAGuideThatIsNotWholeAuthenticAndServed(t *testing.T) {
+	h := guardServer(t)
+	// nothing is served for a guide yet (slice A): even a perfect stamp on a table route is refused
+	for _, target := range []string{"/api/board/x/messages", "/api/board/x/goals", "/api/artifacts/" + strings.Repeat("a", 64)} {
+		rec := serveGuard(h, http.MethodGet, target, guideStampHeaders())
+		assert.Equal(t, http.StatusForbidden, rec.Code, target)
+		assert.Contains(t, rec.Body.String(), GuardRefusedCode)
+	}
+	// a forged copy from a browser or an agent (no secret), the guide headers alone, and a lone role header
+	for name, hdr := range map[string]map[string]string{
+		"role only":               {tunnel.HubRoleHeader: "guide"},
+		"board only":              {tunnel.HubGuideBoardHeader: "x"},
+		"label only":              {tunnel.HubGuideLabelHeader: "hub-user-1234abcd"},
+		"start only":              {tunnel.HubGuideSinceHeader: "2026-10-31T07:00:00Z"},
+		"a full stamp, no secret": {tunnel.HubRoleHeader: "guide", tunnel.HubGuideBoardHeader: "x", tunnel.HubGuideLabelHeader: "hub-user-1234abcd", tunnel.HubGuideSinceHeader: "2026-10-31T07:00:00Z"},
+	} {
+		assert.Equal(t, http.StatusForbidden, serveGuard(h, http.MethodGet, "/api/board/x/messages", hdr).Code, name)
+	}
+	// a request that says nothing of a guide is judged as before
+	assert.Equal(t, http.StatusNoContent, serveGuard(h, http.MethodGet, "/api/health", nil).Code)
+	assert.Equal(t, http.StatusNoContent, serveGuard(h, http.MethodGet, "/api/board/x/messages", map[string]string{tunnel.ViaHeader: ViaSecret()}).Code, "an ordinary viewer is not a guide")
+}
+
+func TestGuideAllowedWithAServedRoute(t *testing.T) {
+	served := []string{"GET /api/board/{project}/messages"}
+	assert.True(t, guideAllowedWith(guideReq("GET", "/api/board/x/messages", guideStampHeaders()), served))
+	assert.True(t, guideAllowedWith(guideReq("HEAD", "/api/board/x/messages", guideStampHeaders()), served))
+	assert.False(t, guideAllowedWith(guideReq("POST", "/api/board/x/messages", guideStampHeaders()), served), "a route in the table and not served")
+	assert.False(t, guideAllowedWith(guideReq("GET", "/api/board/x/goals", guideStampHeaders()), served))
+	assert.False(t, guideAllowedWith(guideReq("GET", "/api/board/x/settings", guideStampHeaders()), []string{"GET /api/board/{project}/settings"}), "a served entry that is not in the table never opens a route")
+}
+
+func TestEveryServedGuideRouteIsInTheGuideTable(t *testing.T) {
+	in := map[string]bool{}
+	for _, g := range tunnel.GuideRoutes() {
+		in[g.Method+" "+g.Pattern] = true
+	}
+	for _, s := range guideServed {
+		assert.True(t, in[s], "%s is served for a guide but is not in the guide table", s)
+	}
+}
