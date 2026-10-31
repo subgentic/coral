@@ -10,6 +10,8 @@ import { foldWayBack } from './way_back.js';
 import * as W from './goal_words.js';
 import { onGoalsSeq } from './goals_feed.js';
 import { pollEvery } from './overload.js';
+const { linkedText } = await importOnce('./artifact_refs.js');
+const linkedDd = text => { const d = document.createElement('dd'); d.append(linkedText(text)); return d; }; // a coral://artifacts/<hex> in a goal's words is a link (#11416)
 const { openDetailPane, closeDetailPane } = await importOnce('./detail_pane.js'); // the one shared pane (#8914): a goal's task or artifact opens in it, beside the list
 const DT = await importOnce('./data_table.js');
 const TV = await importOnce('./tasks_view.js');
@@ -149,8 +151,8 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
         main.append(line);
         if (g.outcome || g.doneWhen) {
             const dl = el('dl', 'facts goals-facts');
-            if (g.outcome) dl.append(el('dt', null, 'Outcome'), el('dd', null, g.outcome));
-            if (g.doneWhen) dl.append(el('dt', null, 'Done when'), el('dd', null, g.doneWhen));
+            if (g.outcome) dl.append(el('dt', null, 'Outcome'), linkedDd(g.outcome));
+            if (g.doneWhen) dl.append(el('dt', null, 'Done when'), linkedDd(g.doneWhen));
             main.append(dl);
         }
         const openLeft = g.rollup.active + g.rollup.blocked + g.rollup.queued;

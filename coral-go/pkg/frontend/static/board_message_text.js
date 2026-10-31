@@ -2,6 +2,7 @@
 import { escapeHtml, escapeAttr } from './html_escape.js';
 import { renderMarkdown, _renderMarkdownUncached, FENCED_WITH_LANG } from './markdown.js';
 import { artifactLabel, learnArtifactNames } from './artifact_names.js';
+import { ARTIFACT_REF } from './artifact_refs.js';
 
 /** Board message text with literal "\n" escapes turned into line breaks,
  *  for messages with none (agents posting through a shell pass them). Same
@@ -218,7 +219,7 @@ export function highlightMentionsIn(container) {
 // An exact coral://artifacts/<64 hex> in a post's text (not in a link, code or a code block) is a link to that artifact, as a named Markdown link is: the board's own artifact pass
 // (resolveBoardArtifacts) points it at the board's server and opens the viewer on a plain click. The shown label is "artifact" and the first 8 characters (the Inbox's label); the full id is in the
 // accessible name (which starts with the visible words) and the tooltip. The href is only ever the exact shape, built here from validated hex.
-const ARTIFACT_REF = /(^|[^A-Za-z0-9/])coral:\/\/artifacts\/([a-f0-9]{64})(?![A-Za-z0-9])/gi;
+// the rule is artifact_refs.js's, shared by every surface that shows team-written text (#11416): coral://artifacts/ and exactly 64 lowercase hex digits
 
 /** The sanitized HTML with each bare coral://artifacts/<64 hex> made a link. */
 export function linkArtifactRefsHtml(html) {
