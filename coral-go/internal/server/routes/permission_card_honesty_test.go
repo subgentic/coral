@@ -28,8 +28,8 @@ func TestEveryAgentsPermissionCardShowsTheWholeRequestOrOffersOnlyReject(t *test
 		{"a clean command of 400 bytes", "echo " + strings.Repeat("x", 395), false},
 		{"a clean command of 600 bytes", "echo " + strings.Repeat("x", 595), false},
 		{"a command longer than the card shows", "echo " + strings.Repeat("x", 4100), true},
-		{"a right-to-left override", "echo ok ‮", true},
-		{"a zero-width space", "echo o​k", true},
+		{"a right-to-left override", "echo ok \u202e", true},
+		{"a zero-width space", "echo o\u200bk", true},
 		{"a tail after a run of blanks", "echo ok" + strings.Repeat(" ", 100) + "rm", true},
 		{"a Windows line end", "echo a\r\necho b", false},
 	}
@@ -83,7 +83,7 @@ func TestEveryAgentsPermissionCardShowsTheWholeRequestOrOffersOnlyReject(t *test
 					note, _ = reply.Pending.Input["note"].(string)
 				}
 				assert.Equal(t, tc.onlyReject, only, "only Reject is offered exactly when the request is cut or hides something")
-				assert.False(t, strings.ContainsAny(shown, "‮​\r"), "a hidden character is written out, never drawn raw")
+				assert.False(t, strings.ContainsAny(shown, "\u202e\u200b\r"), "a hidden character is written out, never drawn raw")
 				if tc.onlyReject {
 					assert.NotEmpty(t, note, "and the card says why in words")
 				} else {
@@ -91,7 +91,7 @@ func TestEveryAgentsPermissionCardShowsTheWholeRequestOrOffersOnlyReject(t *test
 					assert.Contains(t, shown, strings.TrimSpace(strings.Split(strings.ReplaceAll(tc.command, "\r", ""), "\n")[0]), "the whole request is shown")
 					assert.Contains(t, shown, strings.TrimSpace(tc.command[strings.LastIndex(tc.command, "\n")+1:]), "to its last line")
 				}
-				if strings.Contains(tc.command, "‮") {
+				if strings.Contains(tc.command, "\u202e") {
 					assert.Contains(t, shown, "<U+202E>")
 				}
 

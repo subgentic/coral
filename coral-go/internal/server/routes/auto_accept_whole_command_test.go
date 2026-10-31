@@ -23,17 +23,17 @@ func TestAutoAcceptReadsTheWholeCommandAndRefusesWhatItCannotRead(t *testing.T) 
 		"the same tail at 600 bytes is seen too":         {map[string]any{"command": "echo " + strings.Repeat("x", 600) + "; rm -rf ~"}, false},
 		"a clean command longer than the cut":            {map[string]any{"command": "echo " + strings.Repeat("x", 4100)}, true},
 		"a command longer than auto-accept reads":        {map[string]any{"command": "echo " + strings.Repeat("x", riskMaxBytes+10)}, false},
-		"a right-to-left override":                       {map[string]any{"command": "echo ok ‮"}, false},
-		"a zero-width space":                             {map[string]any{"command": "echo o​k"}, false},
+		"a right-to-left override":                       {map[string]any{"command": "echo ok \u202e"}, false},
+		"a zero-width space":                             {map[string]any{"command": "echo o\u200bk"}, false},
 		"a tail after a run of blanks":                   {map[string]any{"command": "echo ok" + strings.Repeat(" ", 3000) + "true"}, false},
 		"a command that is not text":                     {map[string]any{"command": []any{"echo", "ok"}}, false},
-		"a path with a hidden character":                 {map[string]any{"file_path": "notes‮.txt"}, false},
+		"a path with a hidden character":                 {map[string]any{"file_path": "notes\u202e.txt"}, false},
 		"a clean path":                                   {map[string]any{"file_path": "notes.txt"}, true},
 		"a Windows line end (CR then LF) is a newline":   {map[string]any{"command": "echo ok\r\necho more\r\n"}, true},
 		"a lone CR hides what it overwrote":              {map[string]any{"command": "echo safe\rrm -rf ~"}, false},
 		"a CR at the very end is alone":                  {map[string]any{"command": "echo ok\r"}, false},
 		"a newline and a tab are plain text":             {map[string]any{"command": "echo ok\n\techo more"}, true},
-		"Windsurf's CommandLine with a hidden character": {map[string]any{"CommandLine": "echo ok‮"}, false},
+		"Windsurf's CommandLine with a hidden character": {map[string]any{"CommandLine": "echo ok\u202e"}, false},
 	} {
 		t.Run(name, func(t *testing.T) {
 			r := newAutoAcceptRig(t)
@@ -62,6 +62,6 @@ func TestPendingRiskKeepsTheWholeTextAndSaysWhyWhenItCannot(t *testing.T) {
 	assert.Equal(t, long, p.Risk["command"], "the whole text is kept for the risk rules")
 	assert.Less(t, len(p.Input["command"].(string)), len(long), "the chat's copy is still cut")
 	assert.Empty(t, p.Unjudged)
-	p = newPendingTool("t", "Bash", map[string]any{"command": "ok‮"}, time.Now())
+	p = newPendingTool("t", "Bash", map[string]any{"command": "ok\u202e"}, time.Now())
 	assert.Contains(t, p.Unjudged, "hide what it does")
 }
