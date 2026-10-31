@@ -41,6 +41,9 @@ func (h *SessionsHandler) PauseNotices(w http.ResponseWriter, r *http.Request) {
 		errBadRequest(w, "minutes must not be negative")
 		return
 	}
+	if most := int(ptymanager.MaxNoticePause / time.Minute); body.Minutes > most { // before the multiply: an absurd length must not overflow into a short one
+		body.Minutes = most
+	}
 	ptymanager.PauseNotices(sessionID, time.Duration(body.Minutes)*time.Minute)
 	defer h.kickWS()
 	writeJSON(w, http.StatusOK, noticePayload(sessionID))

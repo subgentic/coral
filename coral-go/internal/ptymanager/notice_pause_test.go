@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/terminalinput"
 )
 
@@ -160,7 +161,7 @@ func TestAFloodOfDistinctNoticesWhilePausedStaysBoundedAndCountedRight(t *testin
 	assert.Equal(t, n, waiting, "every distinct notice is counted")
 	notices.Lock()
 	st := notices.m[sid]
-	remembered, counts := len(st.held["board message"]), heldCounts(st.held, st.extra)
+	remembered, counts := len(st.held["board message"]), heldCounts(st.held, st.extra, st.latest)
 	notices.Unlock()
 	assert.Equal(t, maxHeldDistinct, remembered, "the remembered set stops at the cap")
 	assert.Empty(t, a.sent())
@@ -183,4 +184,26 @@ func TestHeldNoticesOlderThanTheKeepTimeAreDroppedWhenTheNextIsHeld(t *testing.T
 	require.NoError(t, err)
 	_, _, waiting, _ := NoticeStatus(sid)
 	assert.Equal(t, 1, waiting, "the five old ones are forgotten, only the fresh one waits")
+}
+
+// QA on #11387: the notifier's real nudge says how many messages are unread, and its sender is "board nudge": three of them held while paused read
+// "3 board messages" (the largest count they stated, not the number of nudges), and once the summary is typed the notifier is told once.
+func TestHeldBoardNudgesAreToldAsTheMessagesTheyStateAndTheNotifierIsToldOnce(t *testing.T) {
+	const sid = "11111111-1387-4000-8000-000000000009"
+	a, in := noticeRig(t, sid)
+	PauseNotices(sid, time.Hour)
+	for _, n := range []int{1, 3, 2} {
+		d, err := DeliverAutomated(context.Background(), in("board nudge", board.NudgeText(n)))
+		require.NoError(t, err)
+		require.Equal(t, Skipped, d)
+	}
+	_, _, waiting, _ := NoticeStatus(sid)
+	assert.Equal(t, 3, waiting, "the largest unread count the nudges stated")
+	assert.False(t, TakeBoardNudgeTold(sid), "nothing is told while it is held")
+
+	ResumeNotices(sid)
+	flushHeld(sid)
+	assert.Equal(t, []string{"[Coral] While you were talking: 3 board messages. Run coral-board read."}, a.sent())
+	assert.True(t, TakeBoardNudgeTold(sid), "the summary stood for the nudge")
+	assert.False(t, TakeBoardNudgeTold(sid), "and says so once")
 }

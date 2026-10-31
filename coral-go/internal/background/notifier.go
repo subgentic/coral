@@ -30,6 +30,7 @@ type BoardNotifier struct {
 	pauseLogged  map[string]bool // boards a skipped nudge was already logged for, until they are resumed
 	notifiedMu   sync.Mutex
 	notified     map[string]notifyState // session_name -> last nudge since the agent last read
+	heldNudge    map[string]notifyState // session_name -> the nudge Coral held (a pause, the person typing): taken as sent when a summary told it (#11387)
 	notifyNowCh  chan struct{}
 	pendingMu    sync.Mutex
 	pendingAll   bool             // a pass over every board is due (NotifyNow)
@@ -72,6 +73,7 @@ func NewBoardNotifier(boardStore *board.Store, runtime AgentRuntime, interval ti
 		interval:    interval,
 		logger:      slog.Default().With("service", "board_notifier"),
 		notified:    make(map[string]notifyState),
+		heldNudge:   make(map[string]notifyState),
 		notifyNowCh: make(chan struct{}, 1),
 		remindAfter: defaultRemindAfter,
 		now:         time.Now,
@@ -471,6 +473,12 @@ func (n *BoardNotifier) nudgeAgent(ctx context.Context, pass *notifyPass, a Agen
 		return
 	}
 	n.notifiedMu.Lock()
+	if ptymanager.TakeBoardNudgeTold(a.SessionID) { // the one summary line stood for the nudge that was held: those messages are told, newer ones still nudge (#11387)
+		if h, ok := n.heldNudge[sessName]; ok {
+			n.notified[sessName] = h
+		}
+	}
+	delete(n.heldNudge, sessName)
 	last, notified := n.notified[sessName]
 	n.notifiedMu.Unlock()
 	if !nudgeDue(last, notified, sub, unread, latestID, n.now(), ptymanager.JitterAround(n.remindAfter, sessName)) {
@@ -523,6 +531,12 @@ func (n *BoardNotifier) nudgeAgent(ctx context.Context, pass *notifyPass, a Agen
 		skipped, err = deliver()
 	}
 	if skipped {
+		n.notifiedMu.Lock()
+		if n.heldNudge == nil {
+			n.heldNudge = make(map[string]notifyState)
+		}
+		n.heldNudge[sessName] = notifyState{count: unread, latestID: latestID, at: n.now()}
+		n.notifiedMu.Unlock()
 		return
 	}
 	if err != nil {

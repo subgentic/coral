@@ -136,3 +136,26 @@ func TestTurnEndHandoffWaitsWhileNoticesArePaused(t *testing.T) {
 	ptymanager.ResumeNotices(sid)
 	assert.Equal(t, true, ask()["handoff"], "resumed: the unread messages are handed over")
 }
+
+// QA on #11387 (finding C): an absurd `minutes` is cut at 12 hours before it is multiplied, so it cannot overflow into a short or negative pause.
+func TestAnAbsurdPauseLengthIsCutAtTwelveHoursNotOverflowed(t *testing.T) {
+	server, _, terminal, ss := setupSessionsTestServer(t)
+	ctx := context.Background()
+	sid := "eeeeeeee-1387-1d00-0000-000000000001"
+	terminal.addSession("claude-"+sid, "/w")
+	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: sid, AgentType: "claude", AgentName: "echo", WorkingDir: "/w"}))
+	t.Cleanup(func() { ptymanager.ResumeNotices(sid) })
+	for _, minutes := range []string{"4611686018427387904", "153722867280912930", "9223372036854775807", "721"} {
+		req, _ := http.NewRequest("POST", server.URL+"/api/sessions/live/echo/notices/pause", strings.NewReader(`{"agent_type":"claude","session_id":"`+sid+`","minutes":`+minutes+`}`))
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := operatorClient.Do(req)
+		require.NoError(t, err)
+		var out map[string]any
+		require.NoError(t, json.NewDecoder(resp.Body).Decode(&out))
+		resp.Body.Close()
+		require.Equal(t, http.StatusOK, resp.StatusCode, minutes)
+		until, err := time.Parse(time.RFC3339, out["paused_until"].(string))
+		require.NoError(t, err, minutes)
+		assert.WithinDuration(t, time.Now().Add(ptymanager.MaxNoticePause), until, 5*time.Second, "minutes %s", minutes)
+	}
+}

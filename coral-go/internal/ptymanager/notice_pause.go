@@ -15,7 +15,9 @@ import (
 	"errors"
 	"fmt"
 	"hash/fnv"
+	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -79,13 +81,15 @@ func notHeld(what string) bool {
 }
 
 type noticeState struct {
-	until   time.Time                      // an explicit pause ends here (zero: not paused)
-	extra   map[string]int                 // sender -> notices past maxHeldDistinct, counted and not remembered
-	held    map[string]map[uint64]struct{} // sender -> the distinct notices held (by hash of their text: a notice asked again is one)
-	since   time.Time                      // when the first notice was held
-	tmpl    AutomatedInput                 // where and how the summary is typed: the terminal, the names, the sender's own checks
-	flusher bool                           // a flush of this session is running
-	timer   *time.Timer                    // the next look at whether the hold has ended (none while nothing is held)
+	until     time.Time                      // an explicit pause ends here (zero: not paused)
+	latest    map[string]int                 // sender -> the largest "You have N unread" a held board nudge said: a nudge states a count, so that count is what is told, never the number of nudges
+	toldBoard bool                           // a summary that stood for held board nudges was typed: the notifier does not nudge the same messages again
+	extra     map[string]int                 // sender -> notices past maxHeldDistinct, counted and not remembered
+	held      map[string]map[uint64]struct{} // sender -> the distinct notices held (by hash of their text: a notice asked again is one)
+	since     time.Time                      // when the first notice was held
+	tmpl      AutomatedInput                 // where and how the summary is typed: the terminal, the names, the sender's own checks
+	flusher   bool                           // a flush of this session is running
+	timer     *time.Timer                    // the next look at whether the hold has ended (none while nothing is held)
 }
 
 var notices = struct {
@@ -96,7 +100,7 @@ var notices = struct {
 func stateOf(sessionID string) *noticeState {
 	st := notices.m[sessionID]
 	if st == nil {
-		st = &noticeState{held: map[string]map[uint64]struct{}{}, extra: map[string]int{}}
+		st = &noticeState{held: map[string]map[uint64]struct{}{}, extra: map[string]int{}, latest: map[string]int{}}
 		notices.m[sessionID] = st
 	}
 	return st
@@ -139,7 +143,7 @@ func NoticeStatus(sessionID string) (paused bool, until time.Time, waiting int, 
 		if st.until.After(now) {
 			paused, until = true, st.until
 		}
-		for _, n := range heldCounts(st.held, st.extra) {
+		for _, n := range heldCounts(st.held, st.extra, st.latest) {
 			waiting += n
 		}
 	}
@@ -170,7 +174,18 @@ func holdNotice(in AutomatedInput) {
 	defer notices.Unlock()
 	st := stateOf(in.SessionID)
 	if !st.since.IsZero() && noticeNow().Sub(st.since) > heldKeepFor { // forgotten here too, not only at a flush: a pause for hours does not grow without end
-		st.held, st.extra, st.since = map[string]map[uint64]struct{}{}, map[string]int{}, time.Time{}
+		st.held, st.extra, st.latest, st.since = map[string]map[uint64]struct{}{}, map[string]int{}, map[string]int{}, time.Time{}
+	}
+	if n, ok := nudgeCount(in); ok { // a board nudge states how many messages are unread: keep the largest
+		if n > st.latest[in.What] {
+			st.latest[in.What] = n
+		}
+		if st.since.IsZero() {
+			st.since = noticeNow()
+		}
+		st.tmpl = AutomatedInput{Term: in.Term, Name: in.Name, AgentType: in.AgentType, SessionID: in.SessionID, Ready: in.Ready}
+		scheduleFlushLocked(in.SessionID, st, 3*time.Second)
+		return
 	}
 	set := st.held[in.What]
 	if set == nil {
@@ -199,9 +214,46 @@ func scheduleFlushLocked(sessionID string, st *noticeState, d time.Duration) {
 	st.timer = time.AfterFunc(d, func() { flushHeld(sessionID) })
 }
 
+// boardNudgeWhat is the sender of the notifier's "You have N unread messages" nudge.
+const boardNudgeWhat = "board nudge"
+
+var nudgeCountRe = regexp.MustCompile(`^You have (\d{1,9}) unread messages? on the message board`)
+
+// nudgeCount is the unread count a board nudge states (ok false for any other notice).
+func nudgeCount(in AutomatedInput) (int, bool) {
+	if in.What != boardNudgeWhat {
+		return 0, false
+	}
+	m := nudgeCountRe.FindStringSubmatch(in.Text)
+	if m == nil {
+		return 0, false
+	}
+	n, err := strconv.Atoi(m[1])
+	return n, err == nil && n > 0
+}
+
+// NoteBoardNudgeTold is the flush's own mark, exported so the notifier's tests can stand in for a typed summary.
+func NoteBoardNudgeTold(sessionID string) {
+	notices.Lock()
+	defer notices.Unlock()
+	stateOf(sessionID).toldBoard = true
+}
+
+// TakeBoardNudgeTold reports, once, that a summary which stood for held board nudges was typed for the session: the notifier then takes those messages as told and does not nudge them again (one line, not two).
+func TakeBoardNudgeTold(sessionID string) bool {
+	notices.Lock()
+	defer notices.Unlock()
+	if st := notices.m[sessionID]; st != nil && st.toldBoard {
+		st.toldBoard = false
+		return true
+	}
+	return false
+}
+
 // noticeLabels turn a sender into the words the summary uses.
 var noticeLabels = map[string][2]string{
 	"board message":      {"board message", "board messages"},
+	"board nudge":        {"board message", "board messages"},
 	"remote board nudge": {"board message", "board messages"},
 	"task notification":  {"task", "tasks"},
 	"task reminder":      {"task", "tasks"},
@@ -212,14 +264,17 @@ var noticeLabels = map[string][2]string{
 }
 
 // heldCounts is how many notices each sender held: the remembered ones and those counted past the cap.
-func heldCounts(held map[string]map[uint64]struct{}, extra map[string]int) map[string]int {
+func heldCounts(held map[string]map[uint64]struct{}, extra, latest map[string]int) map[string]int {
 	out := map[string]int{}
+	for what, n := range latest {
+		out[what] += n
+	}
 	for what, set := range held {
-		out[what] = len(set) + extra[what]
+		out[what] += len(set) + extra[what]
 	}
 	for what, n := range extra {
 		if _, ok := held[what]; !ok {
-			out[what] = n
+			out[what] += n
 		}
 	}
 	return out
@@ -257,7 +312,7 @@ func heldSummary(held map[string]int) string {
 func flushHeld(sessionID string) {
 	if noticesHeld(sessionID) {
 		notices.Lock()
-		if st := notices.m[sessionID]; st != nil && (len(st.held) > 0 || len(st.extra) > 0) {
+		if st := notices.m[sessionID]; st != nil && (len(st.held) > 0 || len(st.extra) > 0 || len(st.latest) > 0) {
 			scheduleFlushLocked(sessionID, st, 3*time.Second) // still held: look again soon
 		}
 		notices.Unlock()
@@ -265,17 +320,17 @@ func flushHeld(sessionID string) {
 	}
 	notices.Lock()
 	st := notices.m[sessionID]
-	if st == nil || (len(st.held) == 0 && len(st.extra) == 0) || st.flusher {
+	if st == nil || (len(st.held) == 0 && len(st.extra) == 0 && len(st.latest) == 0) || st.flusher {
 		notices.Unlock()
 		return
 	}
 	if !st.since.IsZero() && noticeNow().Sub(st.since) > heldKeepFor {
-		st.held, st.extra, st.since = map[string]map[uint64]struct{}{}, map[string]int{}, time.Time{}
+		st.held, st.extra, st.latest, st.since = map[string]map[uint64]struct{}{}, map[string]int{}, map[string]int{}, time.Time{}
 		notices.Unlock()
 		return
 	}
 	st.flusher = true
-	text, tmpl := heldSummary(heldCounts(st.held, st.extra)), st.tmpl
+	text, tmpl := heldSummary(heldCounts(st.held, st.extra, st.latest)), st.tmpl
 	taken, takenExtra := map[string][]uint64{}, map[string]int{} // a snapshot: what is held while the line is typed stays held
 	for what, set := range st.held {
 		for k := range set {
@@ -285,14 +340,18 @@ func flushHeld(sessionID string) {
 	for what, n := range st.extra {
 		takenExtra[what] = n
 	}
+	takenLatest := map[string]int{}
+	for what, n := range st.latest {
+		takenLatest[what] = n
+	}
 	notices.Unlock()
 
-	done := false
+	done, sent := false, false
 	defer func() {
 		notices.Lock()
 		if cur := notices.m[sessionID]; cur != nil {
 			cur.flusher = false
-			if !done && (len(cur.held) > 0 || len(cur.extra) > 0) { // the agent could not take it yet (a prompt, a draft): look again
+			if !done && (len(cur.held) > 0 || len(cur.extra) > 0 || len(cur.latest) > 0) { // the agent could not take it yet (a prompt, a draft): look again
 				scheduleFlushLocked(sessionID, cur, 3*time.Second)
 			}
 			if done { // what was told is gone; what was held in the meantime stays
@@ -309,7 +368,15 @@ func flushHeld(sessionID string) {
 						delete(cur.extra, what)
 					}
 				}
-				if len(cur.held) == 0 && len(cur.extra) == 0 {
+				for what, n := range takenLatest {
+					if cur.latest[what] == n { // a bigger count that arrived while the line was typed stays
+						delete(cur.latest, what)
+					}
+				}
+				if sent && takenLatest[boardNudgeWhat] > 0 {
+					cur.toldBoard = true
+				}
+				if len(cur.held) == 0 && len(cur.extra) == 0 && len(cur.latest) == 0 {
 					cur.since = time.Time{}
 				}
 			}
@@ -330,6 +397,7 @@ func flushHeld(sessionID string) {
 			return typeSummary(ctx, tmpl, text)
 		},
 	})
+	sent = err == nil && d == Sent
 	if err != nil || d == Sent { // typed, or an error that no later try mends (the agent exited): either way it is over
 		done = true
 	}
