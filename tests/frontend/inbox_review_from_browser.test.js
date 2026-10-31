@@ -37,7 +37,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
             const tail = t => (mobile ? '' : ` · ${t}`);
             const a = by('checkout-mockup.html'), b = by('guide-role-design.html'), c = by('orphan-notes.html');
             check(a.sub === `from Lead Developer${tail(t1)}`, at + 'a file with a task says who sent it and its team: ' + JSON.stringify(a.sub));
-            check(b.sub === `from Frontend Dev${tail(t1)}`, at + 'a file with no task says who sent it too, with nothing that hides or reorders text: ' + JSON.stringify(b.sub));
+            check(b.sub === `from Frontend<U+202E> Dev<U+200B>${tail(t1)}`, at + 'a file with no task says who sent it too, what hides or reorders the name written out, not drawn: ' + JSON.stringify(b.sub));
             check(c.sub === `sender unknown${tail(t2)}`, at + 'a file with no uploader on record says so: ' + JSON.stringify(c.sub));
             check(a.visible && b.visible && c.visible, at + 'the line is on screen on every row, once');
             check(!mobile || (a.text.includes(t1) && c.text.includes(t2)), at + 'a phone row still names the team after it');

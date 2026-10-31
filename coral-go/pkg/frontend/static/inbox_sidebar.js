@@ -29,7 +29,7 @@ import { setHidden } from './dom_write.js';
 import { syncDisplayPanels } from './display_panel.js';
 import { onViewShown } from './view_switch.js';
 import { importOnce } from './import_once.js';
-import { visibleName } from './artifact_names.js';
+import { markHidden } from './visible_marks.js';
 import { onInboxHooks, setInboxCount, askOf } from './inbox_tab.js';
 const { coralInboxAdapter, savedExpandFor, listInboxGoals } = await importOnce('./inbox_coral.js');
 const { openedFrom, backLabelFor } = await importOnce('./inbox_back_label.js'); // the Back words of the Inbox's task and goal screens (#8861)
@@ -93,7 +93,7 @@ let page = null; // { kind: 'task', project, id } | { kind: 'saved', id }: the i
 // ── Needs you ────────────────────────────────────────────────────────────
 const waitingSessions = () => (state.liveSessions || []).filter(needsYou).map(askedRow); // an agent that asked something before Coral restarted is listed with its words (#10368)
 const teamOf = s => s.board_project ? teamLabel(identityKey(sessionServer(s), s.board_project)) : ''; // with its computer when a hub has more than one (#8774)
-const fromOf = (s, withTeam) => { if (!s.review) return ''; const who = visibleName(s.review.produced_by), team = withTeam ? teamOf(s) : ''; return [who ? `from ${who}` : 'sender unknown', team].filter(Boolean).join(' \u00b7 '); }; // who uploaded a file for review, from the upload's record (the server cleans the name), and its team (#11456)
+const fromOf = (s, withTeam) => { if (!s.review) return ''; const who = markHidden(s.review.produced_by, { strict: true }).trim(), team = withTeam ? teamOf(s) : ''; return [who ? `from ${who}` : 'sender unknown', team].filter(Boolean).join(' \u00b7 '); }; // who uploaded a file for review, from the upload's record, what hides or reorders the name written out (markHidden strict), and its team (#11456)
 const needsName = s => s.review ? s.review.produced_by || 'Unknown agent' : s.autorun ? s.autorun.name : resolveSessionIdentity(s);
 const reviewRows = () => reviewItems().map(a => ({ review: a, goal: a.goal_id && a.goal_title ? { id: a.goal_id, title: String(a.goal_title), board: a.team } : null, task: a.task_id ? { id: a.task_id, title: String(a.task_title || '') } : null, session_id: a.reviewKey, display_name: a.name, board_project: splitKey(a.team).name, server: splitKey(a.team).server, waiting_kind: 'review', waiting_summary: 'For review', waiting_since: a.created_at }));
 /** A failed run of a job or workflow that nobody has opened (#9296): a row of Needs you like a review, opened on its job's or workflow's page, dismissed (marked opened) without opening it. */
