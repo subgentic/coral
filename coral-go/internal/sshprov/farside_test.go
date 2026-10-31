@@ -45,8 +45,18 @@ func (f farCfg) setFlag(name string, on bool) {
 	}
 }
 
+// keepStdin reads all of stdin and, only when the test named a place for it (ArgsLog set, so the path is not just ".stdin" in the working directory), writes it there at 0600: a secret on stdin is never left in the
+// source tree by a test that forgot to name one.
+func keepStdin(path string) {
+	b, _ := io.ReadAll(os.Stdin)
+	if strings.HasPrefix(filepath.Base(path), ".") {
+		return
+	}
+	_ = os.WriteFile(path, b, 0o600)
+}
+
 func appendLine(path, line string) {
-	if path == "" {
+	if path == "" || strings.HasPrefix(filepath.Base(path), ".") {
 		return
 	}
 	if fh, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600); err == nil {
@@ -183,13 +193,11 @@ func runFar(f farCfg, text string) int {
 		return cat(p)
 	case has(`root/coral" accept-terms`):
 		appendLine(f.ArgsLog+".accept", "accept-terms")
-		b, _ := io.ReadAll(os.Stdin)
-		_ = os.WriteFile(f.ArgsLog+".stdin", b, 0o600)
+		keepStdin(f.ArgsLog + ".stdin")
 		return 0
 	case has(`root/coral" hub-owner-secret`): // the owner stamp's secret on stdin, never in argv (#11378): what was asked and what came in are kept for the test
 		appendLine(f.ArgsLog+".owner", "hub-owner-secret --home "+filepath.Join(install, "data"))
-		b, _ := io.ReadAll(os.Stdin)
-		_ = os.WriteFile(f.ArgsLog+".owner.stdin", b, 0o600)
+		keepStdin(f.ArgsLog + ".owner.stdin")
 		return 0
 	case has("tmux kill-session"):
 		appendLine(f.TmuxLog, "kill-session -t =coral-server")

@@ -295,3 +295,38 @@ func TestHomeAllowedIsInsideTheRootNotJustNamedLikeIt(t *testing.T) {
 		}
 	}
 }
+
+// A test that forgets ArgsLog must not leave what came in on stdin (a secret, for hub-owner-secret) or a log line in the working directory: the paths would be just ".stdin", ".accept" and ".owner" there.
+func TestFarSideKeepsNothingInTheWorkingFolderWithoutAnArgsLog(t *testing.T) {
+	cwd, _ := os.Getwd()
+	work := t.TempDir()
+	if err := os.Chdir(work); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Chdir(cwd)
+	in := filepath.Join(t.TempDir(), "in")
+	if err := os.WriteFile(in, []byte(`{"secret":"s3cret"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	stdin, err := os.Open(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer stdin.Close()
+	old := os.Stdin
+	os.Stdin = stdin
+	defer func() { os.Stdin = old }()
+	home := filepath.Join(t.TempDir(), "home")
+	cfg := farCfg{Home: home, TempRoot: os.TempDir()}
+	for _, text := range []string{`"$HOME/.coral-server/2.0.10/root/coral" accept-terms`, `"$HOME/.coral-server/2.0.10/root/coral" hub-owner-secret --home "$HOME/.coral-server/data"`} {
+		if _, err := stdin.Seek(0, io.SeekStart); err != nil {
+			t.Fatal(err)
+		}
+		if code := runFar(cfg, text); code != 0 {
+			t.Fatalf("%s: exit %d", text, code)
+		}
+	}
+	if ents, _ := os.ReadDir(work); len(ents) != 0 {
+		t.Errorf("the far side left files in the working folder: %v", ents)
+	}
+}
