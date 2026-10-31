@@ -29,6 +29,9 @@ func TestAutoAcceptReadsTheWholeCommandAndRefusesWhatItCannotRead(t *testing.T) 
 		"a command that is not text":                     {map[string]any{"command": []any{"echo", "ok"}}, false},
 		"a path with a hidden character":                 {map[string]any{"file_path": "notes\u202e.txt"}, false},
 		"a clean path":                                   {map[string]any{"file_path": "notes.txt"}, true},
+		"a Windows line end (CR then LF) is a newline":   {map[string]any{"command": "echo ok\r\necho more\r\n"}, true},
+		"a lone CR hides what it overwrote":              {map[string]any{"command": "echo safe\rrm -rf ~"}, false},
+		"a CR at the very end is alone":                  {map[string]any{"command": "echo ok\r"}, false},
 		"a newline and a tab are plain text":             {map[string]any{"command": "echo ok\n\techo more"}, true},
 		"Windsurf's CommandLine with a hidden character": {map[string]any{"CommandLine": "echo ok\u202e"}, false},
 	} {

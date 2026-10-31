@@ -3,6 +3,7 @@ package routes
 import (
 	"context"
 	"encoding/json"
+	"github.com/subgentic/coral/internal/permreview"
 	"log/slog"
 	"net/http"
 	"sort"
@@ -208,9 +209,21 @@ var pendingToolFields = map[string]int{
 
 func trimPendingInput(in map[string]any) map[string]any {
 	out := map[string]any{}
+	var reviews []permreview.Review
 	for k, limit := range pendingToolFields {
 		v, ok := in[k]
 		if !ok || v == nil {
+			continue
+		}
+		if requestFields[k] { // the request itself: whole up to permreview.MaxBytes, hidden characters written out, and a request that does not fit or hides something can only be rejected (#11399)
+			s, isText := v.(string)
+			if !isText {
+				reviews = append(reviews, permreview.Review{Cut: true}) // a value that is not text is not shown: it cannot be allowed from here
+				continue
+			}
+			r := permreview.Of(s)
+			out[k] = r.Shown
+			reviews = append(reviews, r)
 			continue
 		}
 		switch s := v.(type) {
@@ -232,7 +245,16 @@ func trimPendingInput(in map[string]any) map[string]any {
 			out["file_path"] = out["AbsolutePath"]
 		}
 	}
+	if m := permreview.Merge(reviews...); !m.Allowed() {
+		out["only_reject"] = true
+		out["note"] = m.Note()
+	}
 	return out
+}
+
+// requestFields are the tool input fields that say what is being asked: the card shows them whole or says it cannot (#11399).
+var requestFields = map[string]bool{
+	"command": true, "CommandLine": true, "file_path": true, "TargetFile": true, "AbsolutePath": true, "path": true, "url": true, "query": true, "pattern": true, "description": true,
 }
 
 // newPendingTool is the pending tool a PreToolUse hook reports: the cut input the chat shows, and the whole text auto-accept judges (#11399).

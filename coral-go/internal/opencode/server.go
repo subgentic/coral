@@ -38,6 +38,7 @@ type Config struct {
 	Args    func(port int) []string
 	Version string        // the version to take the binary for ("1.19.5"), instead of asking it with --version (a test's way to say what its stand-in is)
 	DBFile  string        // this server's own session store (OPENCODE_DB): its conversations are in no other server's reach; "" leaves opencode's own place under the shared data folder
+	Ask     bool          // ask first: the server's config asks before an edit and before a command (PermissionAsk); false leaves opencode's own defaults (no questions inside the folder)
 	Model   string        // the model this server starts on, "provider/model" or "provider/model#variant" (a top-level "model" of a config file Coral writes for it); "" leaves opencode's own
 	Ready   time.Duration // how long one attempt waits for the server to answer an authenticated call (default 20 s)
 
@@ -134,14 +135,23 @@ func ValidModel(m string) bool { return modelRe.MatchString(m) }
 
 // writeModelConfig writes the config file of one server (a top-level "model", nothing else) into its own folder, and returns its path; "" when there is no model to set. The file is the server's alone: the person's
 // own opencode.json is never read or changed.
-func writeModelConfig(dir, model string) (string, error) {
-	if model == "" {
+func writeModelConfig(dir, model string, ask bool) (string, error) {
+	if model == "" && !ask {
 		return "", nil
 	}
-	if !ValidModel(model) {
+	if model != "" && !ValidModel(model) {
 		return "", fmt.Errorf("opencode: %q is not a model (provider/model, with an optional #variant)", model)
 	}
-	b, err := json.Marshal(map[string]string{"$schema": "https://opencode.ai/config.json", "model": model})
+	conf := map[string]any{"$schema": "https://opencode.ai/config.json"}
+	if model != "" {
+		conf["model"] = model
+	}
+	if ask {
+		// ask first: opencode asks before an edit and before a command (its own defaults allow both), and its server tells Coral so on the event stream (permission.asked) and takes the answer on
+		// POST /permission/<id>/reply (checked on 1.19.5, #11395). Anything outside the folder it asks about already.
+		conf["permission"] = map[string]string{"edit": "ask", "bash": "ask"}
+	}
+	b, err := json.Marshal(conf)
 	if err != nil {
 		return "", err
 	}
@@ -333,7 +343,7 @@ func startOn(ctx context.Context, cfg Config, version Version, dir string, port 
 	args := cfg.Args(port)
 	cmd := executil.Command(context.Background(), cfg.Bin, args...) // not ctx: the server outlives one request
 	cmd.Dir = cfg.DataDir
-	configFile, err := writeModelConfig(dir, cfg.Model)
+	configFile, err := writeModelConfig(dir, cfg.Model, cfg.Ask)
 	if err != nil {
 		return nil, err
 	}
@@ -384,7 +394,19 @@ func startOn(ctx context.Context, cfg Config, version Version, dir string, port 
 		case err == nil && status == 200:
 			return fail(errors.New("opencode: another server answers on this port, one that asks for no password"))
 		case err == nil && (status == 401 || status == 403):
-			// It wants a password. Now the real one: the child must still be running (one that could not listen has exited) and must take it.
+			// It wants a password. Before the real one is sent, the listener on this port must be the child (or its descendant): a stranger that holds the port and refuses a wrong password is never sent it (#11398).
+			owned, oerr := listenerIsChild(ctx, port, s.cmd.Process.Pid)
+			if exited() {
+				_ = os.Remove(pidFile)
+				return nil, errors.New("opencode: the server exited before it answered")
+			}
+			if oerr != nil {
+				return fail(fmt.Errorf("opencode: could not tell who listens on the server's port, so the password is not sent: %w", oerr))
+			}
+			if !owned {
+				return fail(errors.New("opencode: the listener on this port is not the server that was started"))
+			}
+			// Now the real one: the child must still be running (one that could not listen has exited) and must take it.
 			rctx, rcancel := context.WithTimeout(ctx, time.Second)
 			rstatus, rerr := c.ping(rctx)
 			rcancel()

@@ -18,6 +18,7 @@ import (
 	at "github.com/subgentic/coral/internal/agenttypes"
 	"github.com/subgentic/coral/internal/clitext"
 	"github.com/subgentic/coral/internal/naming"
+	"github.com/subgentic/coral/internal/permreview"
 	"github.com/subgentic/coral/internal/ptymanager"
 	"github.com/subgentic/coral/internal/terminalinput"
 )
@@ -46,7 +47,10 @@ type promptOption struct {
 	Label    string `json:"label"`
 	Selected bool   `json:"selected"`
 	Action   string `json:"action"`
-	Wrapped  bool   `json:"wrapped,omitempty"`
+	// Kind is what the option does where something other than its words says so: "allow_once" (the approval table's approve-once option, or an opencode card's Allow once), "allow_always" and "reject" (an
+	// opencode card's own answers). Empty where nothing but the label is known (a screen's other options): optionIsReject then falls back to the label (#11407).
+	Kind    string `json:"kind,omitempty"`
+	Wrapped bool   `json:"wrapped,omitempty"`
 	// Checked: the box of a multi-select option ("[✔]"); the label is what follows the box (#5232).
 	Checked bool `json:"checked,omitempty"`
 }
@@ -81,6 +85,11 @@ type promptScreen struct {
 	// The few lines above the question (a permission prompt's command): with the question and the labels,
 	// what tells this prompt from the next one the agent opens (samePrompt).
 	context string
+	// Target is the lines above the question (a permission prompt's command) as permreview shows them: whole up to its limit, hidden characters written out. OnlyReject and Note: the request holds a character
+	// that hides what it does, or is longer than a card shows, so only Reject is offered and an Allow answer is refused (#11399). A cut the CLI itself makes on its screen cannot be known.
+	Target     string `json:"target,omitempty"`
+	OnlyReject bool   `json:"only_reject,omitempty"`
+	Note       string `json:"note,omitempty"`
 	// AskID names this ask: a short digest of its title, question, the lines above it and its option labels (not the selection). An answer that carries the id it was drawn for is refused
 	// when the screen now shows another ask (#10400): a row or card drawn for one command cannot answer the next one.
 	AskID string `json:"ask_id,omitempty"`
@@ -144,8 +153,17 @@ func parsePromptScreen(capture string) (promptScreen, bool) {
 	if !ok {
 		return s, false
 	}
+	// Judged on the raw text, before cleanPromptScreen drops what hides: the terminal still holds it.
+	rv := permreview.Merge(permreview.Of(s.context), permreview.Of(s.Question), permreview.Of(s.Title))
+	target := permreview.Of(s.context).Shown
 	s = cleanPromptScreen(s)
 	s.AskID = askID(s)
+	if s.context != "" {
+		s.Target = target
+	}
+	if !rv.Allowed() {
+		s.OnlyReject, s.Note = true, rv.Note()
+	}
 	return s, true
 }
 
@@ -563,6 +581,9 @@ func (h *SessionsHandler) readPromptScreenText(ctx context.Context, name, agentT
 		return promptScreen{}, false, "", err
 	}
 	s, ok := parsePromptScreen(text)
+	if ok {
+		markApprovalKinds(agentType, text, &s)
+	}
 	return s, ok, text, nil
 }
 
@@ -617,6 +638,11 @@ func (h *SessionsHandler) AnswerPrompt(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.touch(r, body.SessionID, board.TouchAnswer) // the Operator answers an agent's question (#11225): counted before the keys go, so a typed answer is not counted twice
+	// opencode is answered through its own server, not by typing into its terminal (#11395)
+	if body.AgentType == at.Opencode && body.SessionID != "" && !body.Submit {
+		h.answerOpencodePermission(w, r, body.SessionID, body.N, body.Label, body.AskID)
+		return
+	}
 	// The agent's own terminal is gone: say so, rather than "the prompt changed" (#3211)
 	if body.SessionID != "" {
 		if pane, err := h.terminal.FindSession(r.Context(), name, body.AgentType, body.SessionID); err == nil && pane == nil {
@@ -648,6 +674,10 @@ func (h *SessionsHandler) AnswerPrompt(w http.ResponseWriter, r *http.Request) {
 	opt := screen.Options[body.N-1]
 	if normalizeLabel(opt.Label) != normalizeLabel(body.Label) {
 		errConflict(w, "The prompt changed. Answer it in the terminal.")
+		return
+	}
+	if note := h.onlyRejectNote(body.SessionID, screen); note != "" && !optionIsReject(opt) { // a request that cannot be shown whole or hides something is never allowed from here (#11399)
+		writeError(w, http.StatusConflict, "only_reject", note)
 		return
 	}
 	// A typed answer is one line: Enter submits the field
@@ -992,4 +1022,59 @@ func (h *SessionsHandler) waitPromptScreen(ctx context.Context, name, agentType,
 func wrapsInto(above, below string) bool {
 	first, _, _ := strings.Cut(below, " ")
 	return utf8.RuneCountInString(above)+1+utf8.RuneCountInString(first) > utf8.RuneCountInString(below)
+}
+
+// onlyRejectNote is the sentence that says the open request can only be rejected here ("" when it can be allowed): the pending tool the hook reported, or the screen's own prompt.
+func (h *SessionsHandler) onlyRejectNote(sessionID string, screen promptScreen) string {
+	if screen.OnlyReject {
+		return screen.Note
+	}
+	if sessionID != "" {
+		if t, ok := h.pending.get(sessionID, time.Now()); ok {
+			if only, _ := t.Input["only_reject"].(bool); only {
+				note, _ := t.Input["note"].(string)
+				return note
+			}
+		}
+	}
+	return ""
+}
+
+// rejectLabel matches the answers that refuse a request, where nothing but the words says so: Claude's "No", Codex's "No, and tell Codex what to do differently (esc)", agy's "No, cancel", "Reject", "Deny", "Decline", "Disallow", "Don't allow",
+// "Cancel", "Not now" ("Skip" is not one: Codex's "Skip all approvals this session" is a standing choice, not a refusal) (the captured screens' own words are in testdata; the card has the same list as its fallback, needs_input_card.js).
+var rejectLabel = regexp.MustCompile(`(?i)^(no|reject|deny|denied|decline|disallow|cancel|not now|don['’]?t allow|do not allow)\b`)
+
+func isRejectLabel(label string) bool { return rejectLabel.MatchString(strings.TrimSpace(label)) }
+
+// allowLabel matches an answer that allows: the Yes rows of an approval.
+var allowLabel = regexp.MustCompile(`(?i)^(yes|allow|approve|proceed|run)\b`)
+
+// optionIsReject says whether answering this option refuses the request. Where the option has a kind (it is the approval table's approve-once option, or one of an opencode card's own answers) the KIND decides:
+// an option that allows is not a reject whatever its words begin with. Only an option with no kind is judged by its label (^(no|reject|deny|cancel)\b: "None" and "Nothing" are not rejects). Security's #11399 INFO 5.
+func optionIsReject(o promptOption) bool {
+	switch o.Kind {
+	case "reject":
+		return true
+	case "allow_once", "allow_always":
+		return false
+	}
+	return isRejectLabel(o.Label)
+}
+
+// markApprovalKinds gives the approve-once option of a recognised tool approval its kind, from the approval table (the digit it answers with), so the only_reject check does not rest on that option's words.
+func markApprovalKinds(agentType, screenText string, s *promptScreen) {
+	d := classifyApproval(agentType, screenText)
+	if !d.Prompt || !d.Approve || d.N <= 0 {
+		return
+	}
+	for i := range s.Options {
+		switch {
+		case s.Options[i].N == d.N:
+			s.Options[i].Kind = "allow_once"
+		case isRejectLabel(s.Options[i].Label):
+			s.Options[i].Kind = "reject" // a refusal of a recognised approval: the card keeps it by this, not by its words (#11399)
+		case allowLabel.MatchString(strings.TrimSpace(s.Options[i].Label)):
+			s.Options[i].Kind = "allow_always" // the other Yes rows (don't ask again, always allow, switch mode): they last past this one answer
+		}
+	}
 }

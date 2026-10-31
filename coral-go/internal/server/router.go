@@ -25,6 +25,7 @@ import (
 	"github.com/subgentic/coral/internal/opencode"
 	"github.com/subgentic/coral/internal/operatortouch"
 	"github.com/subgentic/coral/internal/ptymanager"
+	"github.com/subgentic/coral/internal/secrets"
 	"github.com/subgentic/coral/internal/server/routes"
 	"github.com/subgentic/coral/internal/serverproof"
 	"github.com/subgentic/coral/internal/store"
@@ -223,7 +224,11 @@ func (s *Server) newRouteHandlers() *routeHandlers {
 	runTagStore := store.NewSessionStore(s.db)
 	ptymanager.SetRunTagLookup(func(sessionID string) string { return runTagStore.RunTagOf(context.Background(), sessionID) })
 	s.sessHandler = sessHandler
-	s.opencode = opencode.NewManager(opencode.Config{DataDir: filepath.Join(s.cfg.CoralDir(), "opencode")})          // the binary comes from the person's settings at each launch
+	s.opencode = opencode.NewManager(opencode.Config{DataDir: filepath.Join(s.cfg.CoralDir(), "opencode")}) // the binary comes from the person's settings at each launch
+	s.opencode.Redact = func(text string) (string, bool) {                                                  // the newest message is kept on disk redacted, for the list of an agent with no server
+		out, err := secrets.Redactor().Text([]byte(text))
+		return string(out), err == nil
+	}
 	s.opencode.SkipLast = func(m opencode.Message) bool { return m.Role == "user" && agent.IsCoralDelivery(m.Text) } // a nudge or task notice Coral typed is not what was said
 	sessHandler.SetOpencodeRuntime(routes.OpencodeRuntimeOf(s.opencode))
 	opencodeDir := filepath.Join(s.cfg.CoralDir(), "opencode")

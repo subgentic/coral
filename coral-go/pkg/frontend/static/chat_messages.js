@@ -1,4 +1,5 @@
 /* Drawing a chat's messages (moved out of live_chat.js, #5065; no behaviour change; the copy button's click listener stays in live_chat.js, which registers it after its own earlier ones). */
+import { markHidden } from './visible_marks.js';
 import { appendContent, appendTurnFinal, appendWork, htmlToElement } from './chat_content.js';
 import { makeBubble } from './chat_bubbles.js';
 import { unwrapPastedContent } from './pasted_content.js';
@@ -17,7 +18,7 @@ import { visibleName } from './artifact_names.js';
 // agent wrote it (not the rendered text).
 // The button of a message the person sent: its menu (message_menu.js) loads when it is first opened, not at start (page weight).
 // Each button names its message, so a list of them is not a list of the same name (#10451): "Message actions: first words of the message".
-const messageMenuButton = text => { const words = String(text || '').trim().split(/\s+/).filter(Boolean).slice(0, 6).join(' '); const label = words ? `Message actions: ${words}` : 'Message actions'; return `<button type="button" class="btn btn-quiet btn-icon btn-xs chat-msg-menu-btn" title="Message actions" aria-label="${escapeAttr(label)}" aria-haspopup="menu" aria-expanded="false" aria-controls="chat-msg-menu"><svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="3" cy="8" r="1.4"/><circle cx="8" cy="8" r="1.4"/><circle cx="13" cy="8" r="1.4"/></svg></button>`; };
+const messageMenuButton = text => { const words = markHidden(text || '').trim().split(/\s+/).filter(Boolean).slice(0, 6).join(' '); const label = words ? `Message actions: ${words}` : 'Message actions'; return `<button type="button" class="btn btn-quiet btn-icon btn-xs chat-msg-menu-btn" title="Message actions" aria-label="${escapeAttr(label)}" aria-haspopup="menu" aria-expanded="false" aria-controls="chat-msg-menu"><svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="3" cy="8" r="1.4"/><circle cx="8" cy="8" r="1.4"/><circle cx="13" cy="8" r="1.4"/></svg></button>`; };
 const COPY_BUTTON = `<button type="button" class="btn btn-quiet btn-icon btn-xs chat-copy-btn" title="Copy" aria-label="Copy message"><span class="material-icons" aria-hidden="true">content_copy</span></button>`;
 
 export const bubbleSource = new WeakMap();
@@ -58,7 +59,7 @@ function renderOneMessage(msg, container, agentType) {
         appendContent(container, makeBubble("chat-note", "Interrupted"));
     } else if (msg.type === "user" && msg.local_command === true) {
         // A slash command the CLI ran by itself ("/model sonnet"): a small note of what was typed, not a bubble (#5488). Seeing it here is how the message the person sent is known to be taken.
-        appendContent(container, makeBubble("chat-note chat-local-command", escapeHtml(String(msg.content || ""))));
+        appendContent(container, makeBubble("chat-note chat-local-command", escapeHtml(markHidden(msg.content || ""))));
 	} else if (msg.type === "user" && isCoralDelivery(msg)) {
 		const text = unwrapPastedContent(msg.content);
 		appendCoralNotice(container, normalizeNudgeText(text), isCoralHealthNudge(text));
@@ -66,14 +67,14 @@ function renderOneMessage(msg, container, agentType) {
         // Images pasted in the dashboard lead the turn as "<path> coral://artifacts/<hex>" pairs (#5284): shown as artifact thumbnails, not as the text of a path and a link.
         const lead = splitSharedImages(unwrapPastedContent(msg.content));
         const bubble = makeBubble("chat-bubble human",
-            `<div class="role-label">You</div><div class="message-text prose">${renderMarkdown(lead.rest, CHAT_MARKDOWN, 'chat')}</div>${attachmentChips(msg.attachments)}${sharedImageChips(lead.images)}${messageMenuButton(lead.rest)}${msg.key ? SAVE_BUTTON : ""}${messageTimeHtml(msg.timestamp)}`);
+            `<div class="role-label">You</div><div class="message-text prose">${renderMarkdown(markHidden(lead.rest), CHAT_MARKDOWN, 'chat')}</div>${attachmentChips(msg.attachments)}${sharedImageChips(lead.images)}${messageMenuButton(lead.rest)}${msg.key ? SAVE_BUTTON : ""}${messageTimeHtml(msg.timestamp)}`);
         if (msg.key) { bubble.dataset.msgKey = msg.key; bubble.dataset.said = msg.timestamp || ""; } // Save for Later finds the message again by this (#4510)
         wireThumbs(bubble);
         appendContent(container, bubble);
     } else if (msg.type === "assistant") {
         if (msg.text) {
             const bubble = makeBubble(`chat-bubble assistant${msg.phase === "commentary" ? " commentary" : ""}`,
-                `<div class="message-text prose">${renderMarkdown(msg.text, CHAT_MARKDOWN, 'chat')}</div>${msg.key ? SAVE_BUTTON : ""}${COPY_BUTTON}${messageMenuButton(msg.text)}${messageTimeHtml(msg.timestamp)}`); // a reply has the sent message's menu too (#10540)
+                `<div class="message-text prose">${renderMarkdown(markHidden(msg.text), CHAT_MARKDOWN, 'chat')}</div>${msg.key ? SAVE_BUTTON : ""}${COPY_BUTTON}${messageMenuButton(msg.text)}${messageTimeHtml(msg.timestamp)}`); // a reply has the sent message's menu too (#10540)
             bubbleSource.set(bubble, msg.text);
             if (msg.key) { bubble.dataset.msgKey = msg.key; bubble.dataset.said = msg.timestamp || ""; } // Save for Later finds the message again by this (#4510)
             // Prose in a message that also makes tool calls is a one-line preamble ("Checking the CSS first."): it goes
@@ -98,7 +99,7 @@ function renderOneMessage(msg, container, agentType) {
         const target = toolUseId
             ? container.querySelector(`[data-tool-use-id="${CSS.escape(toolUseId)}"]`)
             : null;
-        const outputHtml = `<pre class="tool-output-inline${msg.is_error ? " tool-result-error" : ""}">${escapeHtml(msg.content || "")}</pre>`;
+        const outputHtml = `<pre class="tool-output-inline${msg.is_error ? " tool-result-error" : ""}">${escapeHtml(markHidden(msg.content || ""))}</pre>`;
         const markTrimmed = card => {
             if (!msg.trimmed || !Number.isInteger(msg._index)) return card;
             card.dataset.trimResult = String(msg._index);
