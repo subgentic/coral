@@ -4,7 +4,7 @@
  * headers, the first column the button that opens the item, a dash for an empty cell). The item's page says "← <group>" to go back to the table (backLinkHtml). The Agents list's teams already do
  * this (a team's name opens the team, its chevron folds: group_cards.js); this is the same header for the tabs that have groups of their own (Chats by day, Jobs by state).
  *
- * A tab registers a source: { keys(): the group keys as drawn, redraw(): draws the list again, table(key): { title, rows, node, signature }, isEmpty(): whether the tab's centre is
+ * A tab registers a source: { keys(): the group keys as drawn, defaultFolded(): the keys folded until the reader chooses (optional), redraw(): draws the list again, table(key): { title, rows, node, signature }, isEmpty(): whether the tab's centre is
  * its empty page, showList() and empty(): back to the tab's own page }. A table may also carry { extra: { action, label, icon, title } }, one action button in its head; { chips: [{ action, data, label, count, pressed }], chipsLabel } filter chips above it; { empty: { line, hint } } for the line it is replaced by when it has no row; and { note } a line under it. Each source supplies its shared data_table node and a signature of its displayed rows. */
 import { browserLocal } from './safe_storage.js';
 import { escapeHtml, escapeAttr, showView } from './utils.js';
@@ -25,9 +25,14 @@ export function registerGroupSource(kind, source) { sources.set(kind, source); }
 export { foldWayBack } from './way_back.js';
 
 function folded(kind) {
-    try { const v = JSON.parse(browserLocal.get(KEY(kind)) || '[]'); return Array.isArray(v) ? v : []; } catch { return []; }
+    const raw = browserLocal.get(KEY(kind));
+    if (raw == null) return (sources.get(kind)?.defaultFolded?.() || []); // nothing chosen yet: the groups the tab folds for a first-time reader (Docs: For developers, #11401); once folded or opened by hand the choice is kept
+    try { const v = JSON.parse(raw || '[]'); return Array.isArray(v) ? v : []; } catch { return []; }
 }
 export function isGroupFolded(kind, key) { return folded(kind).includes(key); }
+
+/** Open a group that is folded, without drawing: a topic that is opened (a link, a route, a table row) must be in a list that shows it (#11401). */
+export function unfoldGroup(kind, key) { const keys = folded(kind); if (keys.includes(key)) setFolded(kind, keys.filter(k => k !== key)); }
 
 function setFolded(kind, keys) { browserLocal.set(KEY(kind), JSON.stringify(keys)); }
 
