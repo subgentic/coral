@@ -90,6 +90,12 @@ const LONG = 'Which of the two \u202edesigns do we ship? ' + 'We have weighed th
             await ev(`document.querySelector('dialog.inbox-ask-dialog').dispatchEvent(new Event('cancel', { cancelable: true })); true`);
             await waitFor(`!document.querySelector('dialog.inbox-ask-dialog')`, at + 'Escape closes it', 4000);
             assert.equal(await ev(`window.__posts.length`), before, at + 'nothing was sent');
+
+            // a question with no first line: the row's name falls back to the asker, with a hidden character in their name written out like the subtitle's (#11545)
+            await ev(`window.__asks = [{ board: 'team', kind: 'ask', id: 51, asker: 'Lead\u202e', text: '   ', at: '2026-10-31T04:00:00Z' }]; (async () => (await import(${S} + 'operator_asks.js')).refreshOperatorAsks(true))(); true`);
+            await waitFor(`document.querySelector('#group-table-view tbody tr .inbox-review-name') && /^Lead/.test(document.querySelector('#group-table-view tbody tr .inbox-review-name').textContent)`, at + 'the empty question shows its asker as the name', 6000);
+            const fb = await ev(`(() => { const r = document.querySelector('#group-table-view tbody tr'); return { name: r.querySelector('.inbox-review-name').textContent, row: r.textContent }; })()`);
+            assert.ok(fb.name.includes('<U+202E>') && !fb.row.includes('\u202e'), at + 'the fallback name has the hidden character written out, never drawn raw: ' + JSON.stringify(fb));
         }
         console.log('PASS operator asks in Needs you: the rows, the badge, the whole question, the reply, and a refused post that keeps the text');
     } finally { await client.close(); }
