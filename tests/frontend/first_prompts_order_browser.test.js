@@ -1,12 +1,11 @@
 // A fresh headless install asked three things at once (coral-hub's QA walk F7, #11464): the amber "no password" strip, the set-a-password dialog and the Connect to Coral Hub screen stacked, with Settings behind them.
 // One prompt at a time now, and on a fresh install Connect to Coral Hub comes first: the password dialog waits until the Connect screen is answered (Skip, Escape or connected), and the strip is not drawn while either is open.
-// At 1280 and 390 px. The cloud and auth-status routes are stubbed in the page; the first launch is marked through the settings route (the runners set CORAL_NO_WELCOME=1).
+// At 1280 and 390 px. The cloud, auth-status and settings routes are stubbed in the page (the first launch is marked in the page's read of the settings and the answer is swallowed), so the server's rows are never touched.
 const assert = require('node:assert/strict');
 const CDP = require('chrome-remote-interface');
 const BASE = require('./test_base').BASE;
 const CDP_PORT = parseInt(process.env.CDP_PORT || '9222', 10);
 
-const put = body => fetch(BASE + '/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 const STUB = `
   window.__coralEditionsLoadingWaitMs = 20;
   const realFetch = window.fetch.bind(window);
@@ -14,6 +13,9 @@ const STUB = `
   window.fetch = (url, opts = {}) => {
     const path = String(url).replace(/^https?:\\/\\/[^/]+/, '').split('?')[0];
     if (path === '/api/cloud/status') return json({ state: 'idle', hub_url: 'https://app.coralhub.dev', configured: true, max_mode: 'view', offer_at_launch: true });
+    // the first launch is marked in the page's own read of the settings, and the screen's answer is swallowed: the server's rows are never touched (a suite leaves what it found)
+    if (path === '/api/settings' && (opts.method || 'GET').toUpperCase() === 'GET') return realFetch(url, opts).then(async r => { const b = await r.json(); b.settings = { ...(b.settings || {}), welcome_pending: 'True' }; return json(b); });
+    if (path === '/api/settings' && (opts.method || 'GET').toUpperCase() === 'PUT') return json({ ok: true });
     if (path === '/api/system/auth-status') return json({ authenticated: true, password_set: false, local: true, method: 'session', strict_local_auth: true });
     return realFetch(url, opts);
   };`;
@@ -26,12 +28,10 @@ const STUB = `
     const { waitFor, coralReady } = require('./helpers/wait').bind(ev);
     const found = [];
     const check = (ok, msg) => { if (!ok) found.push(msg); };
-    const was = (await (await fetch(BASE + '/api/settings')).json()).settings || {};
     try {
         const { identifier } = await Page.addScriptToEvaluateOnNewDocument({ source: STUB });
         for (const [w, h, mobile] of [[1280, 800, false], [390, 844, true]]) {
             const tag = `${w}px`;
-            await put({ welcome_pending: 'True' }); // a fresh install (the first launch not yet answered)
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile });
             await ev(`try { localStorage.clear(); sessionStorage.clear(); } catch (e) {} true`).catch(() => {});
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired();
@@ -52,7 +52,6 @@ const STUB = `
         assert.equal(found.length, 0, '\n' + found.join('\n'));
         console.log('PASS one first-launch prompt at a time: Connect to Coral Hub, then the password');
     } finally {
-        await put({ welcome_pending: 'False' }).catch(() => {}); // as editions_browser leaves it: answering the screen stores welcome_choice, which the runner puts back
         await client.close();
     }
 })().catch(e => { console.error(e.message); process.exit(1); });
