@@ -39,7 +39,7 @@ const { coralReady } = require('./helpers/wait');
             }
             // an open menu is never under a banner: open one (the hamburger on a phone; on a desktop the first control that says it opens a menu) and it must open
             await ev(`(() => { const hb = document.getElementById('top-phone-menu'); const b = hb && getComputedStyle(hb).display !== 'none' ? hb : [...document.querySelectorAll('[aria-haspopup="menu"]')].find(x => x.getClientRects().length && !x.closest('#notices')); if (b) b.click(); return true; })()`);
-            const menuOpen = await ev(`[...document.querySelectorAll('.menu:not([hidden])')].some(m => m.getClientRects().length > 0)`);
+            const menuOpen = await waitFor(`[...document.querySelectorAll('.menu:not([hidden])')].some(m => m.getClientRects().length > 0)`, 'the menu opens (a phone loads the drawer on the first tap)', 4000).then(() => true, () => false); // the drawer's code arrives on the first tap (#11523)
             assert.ok(menuOpen, `${at}: a menu opened (this test is about banners under an open menu)`);
             await waitFor(`document.getElementById('notices').style.visibility === 'hidden'`, 'the banners step aside while the menu is open');
             const items = await rects('.menu:not([hidden]) .menu-item');
