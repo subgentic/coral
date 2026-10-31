@@ -153,6 +153,14 @@ func crossTeamReadOpen(ctx context.Context, from, to string) bool { return false
 type artifactRecord struct {
 	owner artifactPrincipal
 	board string
+	// agentUpload is true only for a record an AGENT made by uploading: not an image the Operator pasted or attached in the dashboard (UploadedBy, Source), and not a file received from another team. A guide's read
+	// counts only these (#11457): the Operator's own files and other teams' files are never a guide's, whatever board name they carry.
+	agentUpload bool
+}
+
+// isAgentUploadRecord reports whether an upload record was made by an agent's own upload: it names no dashboard uploader and is not a pasted image.
+func isAgentUploadRecord(rec agentUploadRecord) bool {
+	return rec.UploadedBy == "" && rec.Source == ""
 }
 
 // artifactRecordsOf lists the records of artifact id (wantID != "") or of every artifact (wantID == "") by digest: the sessions' upload records, and the boards' received rows, whose owner is the
@@ -169,7 +177,7 @@ func artifactRecordsOf(ctx context.Context, coralDir, wantID string) (map[string
 		}
 		if wantID != "" {
 			if rec, ok := readUploadRecord(coralDir, s.Name(), wantID); ok {
-				out[wantID] = append(out[wantID], artifactRecord{owner: recordPrincipal(rec), board: rec.Board})
+				out[wantID] = append(out[wantID], artifactRecord{owner: recordPrincipal(rec), board: rec.Board, agentUpload: isAgentUploadRecord(rec)})
 			}
 			continue
 		}
@@ -183,7 +191,7 @@ func artifactRecordsOf(ctx context.Context, coralDir, wantID string) (map[string
 				continue
 			}
 			if rec, ok := readUploadRecord(coralDir, s.Name(), name[:64]); ok {
-				out[name[:64]] = append(out[name[:64]], artifactRecord{owner: recordPrincipal(rec), board: rec.Board})
+				out[name[:64]] = append(out[name[:64]], artifactRecord{owner: recordPrincipal(rec), board: rec.Board, agentUpload: isAgentUploadRecord(rec)})
 			}
 		}
 	}

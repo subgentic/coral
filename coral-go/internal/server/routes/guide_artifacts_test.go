@@ -215,3 +215,62 @@ func TestOnlyTheOwnerMarksAnArtifactPrivateAndAGuideNeverReachesIt(t *testing.T)
 func storeComment(artifact, boardKey, body string) store.ArtifactComment {
 	return store.ArtifactComment{ArtifactID: artifact, Board: boardKey, AnchorJSON: `{"whole":true}`, Body: body, AuthorIssuer: guideIssuer, AuthorSubject: gaDana, AuthorName: "Dana", AuthorKind: commentCallerGuide}
 }
+
+// Security's MUST on slice C: the Operator's own pasted or attached files, and files received from another team, never count for a guide, whatever board name their record carries. Only an agent's own upload on the grant's board does.
+func TestTheOperatorsOwnFilesAndReceivedFilesNeverCountForAGuide(t *testing.T) {
+	rig := newGuideArtifactRig(t)
+	coral := rig.h.cfg.CoralDir()
+	const (
+		pasted    = "aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111"
+		shared    = "bbbb2222bbbb2222bbbb2222bbbb2222bbbb2222bbbb2222bbbb2222bbbb2222"
+		received  = "cccc3333cccc3333cccc3333cccc3333cccc3333cccc3333cccc3333cccc3333"
+		attached  = "dddd4444dddd4444dddd4444dddd4444dddd4444dddd4444dddd4444dddd4444"
+		pasteOnly = "eeee5555eeee5555eeee5555eeee5555eeee5555eeee5555eeee5555eeee5555"
+	)
+	for _, id := range []string{pasted, shared, received, attached, pasteOnly} {
+		rig.artifact(id, "f.txt", "text/plain")
+	}
+	record := func(session, id string, mod func(r *agentUploadRecord)) {
+		dir := uploadsDir(coral, session)
+		require.NoError(t, os.MkdirAll(dir, 0o755))
+		rec := agentUploadRecord{agentArtifactMeta: agentArtifactMeta{Name: "f", MediaType: "text/plain", Size: 4, Digest: id}, CreatedAt: time.Now().UTC().Format(time.RFC3339), Board: gaBoard}
+		mod(&rec)
+		b, _ := json.Marshal(rec)
+		require.NoError(t, os.WriteFile(filepath.Join(dir, id+".json"), b, 0o644))
+	}
+	record("s-op", pasted, func(r *agentUploadRecord) { r.UploadedBy, r.Source = "owner", sourcePaste })
+	record("s-op", shared, func(r *agentUploadRecord) { r.UploadedBy, r.Source = "owner", sourceOperatorShare })
+	record("s-op", pasteOnly, func(r *agentUploadRecord) { r.Source = sourcePaste }) // a record that names only its source
+	record("s-op", attached, func(r *agentUploadRecord) { r.UploadedBy = "owner" })
+	recvDir := filepath.Join(coral, "artifacts", "received", strings.Repeat("e", 32))
+	require.NoError(t, os.MkdirAll(recvDir, 0o755))
+	row, _ := json.Marshal(crossTeamArtifactRecord{ID: received, Name: "f", Size: 4, Board: gaBoard, OtherBoard: gaOther, Server: "local", By: "Dev"})
+	require.NoError(t, os.WriteFile(filepath.Join(recvDir, received+".json"), row, 0o644))
+
+	g := gaGuide(gaDana)
+	for name, id := range map[string]string{"a pasted image": pasted, "the Operator's share": shared, "an attached file": attached, "a record naming only its source": pasteOnly, "a received file": received} {
+		for _, suffix := range []string{"", "/meta", "/comments"} {
+			code, _ := rig.do("GET", "/api/artifacts/"+id+suffix, g, nil)
+			assert.Equal(t, http.StatusNotFound, code, "%s%s", name, suffix)
+		}
+		code, _ := rig.do("POST", cp(id), g, map[string]any{"body": "x", "anchor": anchorOf("q")})
+		assert.Equal(t, http.StatusNotFound, code, name)
+	}
+	// the list: none of them, and an agent's own upload of the same board still counts
+	req := httptest.NewRequest("GET", "/api/board/team-a/artifacts", nil)
+	for k, v := range g {
+		req.Header.Set(k, v)
+	}
+	var ids []string
+	for _, it := range filterReadable(req, coral, []teamArtifact{{ID: pasted}, {ID: shared}, {ID: attached}, {ID: pasteOnly}, {ID: received}, {ID: gaMine}}) {
+		ids = append(ids, it.ID)
+	}
+	assert.Equal(t, []string{gaMine}, ids)
+	// the owner still reads them all
+	code, _ := rig.do("GET", "/api/artifacts/"+pasted+"/meta", cmtAsOwner, nil)
+	assert.Equal(t, http.StatusOK, code)
+	// and the same bytes also uploaded by an agent on the board: readable (some record is an agent's own)
+	record("s-a", pasted, func(r *agentUploadRecord) {})
+	code, _ = rig.do("GET", "/api/artifacts/"+pasted+"/meta", g, nil)
+	assert.NotEqual(t, http.StatusNotFound, code, "an agent's own upload of the same content on this board counts")
+}

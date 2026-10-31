@@ -6,7 +6,7 @@ import (
 )
 
 // What a guide reads of the artifacts (#11457). An artifact id is a content hash and a path carries no board, so Coral decides here, in the one read check every artifact route goes through (artifactReadable,
-// filterReadable): a guide reads an artifact only when some record of it is on the grant's own board, and only when the manager did not mark it private. Every other case answers as an artifact that does
+// filterReadable): a guide reads an artifact only when some record of it is an agent's upload on the grant's own board (never the Operator's own pasted or attached file, never a file received from another team), and only when the manager did not mark it private. Every other case answers as an artifact that does
 // not exist (the check's 404), so a guide cannot tell a private artifact, another board's artifact and a missing one apart. An error on the way is a refusal.
 
 // artifactStoreID is the store digest of a listed item, or "" for an item with no artifact of the store (a link the team never uploaded: nothing of the store to read).
@@ -51,7 +51,7 @@ func guideMayRead(ctx context.Context, coralDir, boardKey string, ids []string) 
 			continue
 		}
 		for _, rec := range recs[id] {
-			if rec.board == boardKey {
+			if rec.agentUpload && rec.board == boardKey { // an agent's upload on this board: never the Operator's own pasted or attached file, never a file received from another team
 				out[id] = true
 				break
 			}
