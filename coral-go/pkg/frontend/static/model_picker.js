@@ -68,6 +68,7 @@ function fill(container, agentType, data) {
     wrap.hidden = false;
     if (data && typeof data.default_model === 'string' && data.default_model && input.value.trim() === '' && !container._defaultModelUsed) { // Pi's own default provider is not signed in and another is: the form starts on a model that works (#11338)
         container._defaultModelUsed = true;
+        container._defaultModelApplied = { type: agentType, value: data.default_model }; // what the list put in the box and for which CLI: an empty account default that arrives later must not take it away (agent_config_form.js)
         input.value = data.default_model;
         input.dispatchEvent(new Event('input', { bubbles: true }));
     }
