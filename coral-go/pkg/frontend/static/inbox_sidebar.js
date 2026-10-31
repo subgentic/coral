@@ -29,6 +29,7 @@ import { setHidden } from './dom_write.js';
 import { syncDisplayPanels } from './display_panel.js';
 import { onViewShown } from './view_switch.js';
 import { importOnce } from './import_once.js';
+import { visibleName } from './artifact_names.js';
 import { onInboxHooks, setInboxCount, askOf } from './inbox_tab.js';
 const { coralInboxAdapter, savedExpandFor, listInboxGoals } = await importOnce('./inbox_coral.js');
 const { openedFrom, backLabelFor } = await importOnce('./inbox_back_label.js'); // the Back words of the Inbox's task and goal screens (#8861)
@@ -92,6 +93,7 @@ let page = null; // { kind: 'task', project, id } | { kind: 'saved', id }: the i
 // ── Needs you ────────────────────────────────────────────────────────────
 const waitingSessions = () => (state.liveSessions || []).filter(needsYou).map(askedRow); // an agent that asked something before Coral restarted is listed with its words (#10368)
 const teamOf = s => s.board_project ? teamLabel(identityKey(sessionServer(s), s.board_project)) : ''; // with its computer when a hub has more than one (#8774)
+const fromOf = (s, withTeam) => { if (!s.review) return ''; const who = visibleName(s.review.produced_by), team = withTeam ? teamOf(s) : ''; return [who ? `from ${who}` : 'sender unknown', team].filter(Boolean).join(' \u00b7 '); }; // who uploaded a file for review, from the upload's record (the server cleans the name), and its team (#11456)
 const needsName = s => s.review ? s.review.produced_by || 'Unknown agent' : s.autorun ? s.autorun.name : resolveSessionIdentity(s);
 const reviewRows = () => reviewItems().map(a => ({ review: a, goal: a.goal_id && a.goal_title ? { id: a.goal_id, title: String(a.goal_title), board: a.team } : null, task: a.task_id ? { id: a.task_id, title: String(a.task_title || '') } : null, session_id: a.reviewKey, display_name: a.name, board_project: splitKey(a.team).name, server: splitKey(a.team).server, waiting_kind: 'review', waiting_summary: 'For review', waiting_since: a.created_at }));
 /** A failed run of a job or workflow that nobody has opened (#9296): a row of Needs you like a review, opened on its job's or workflow's page, dismissed (marked opened) without opening it. */
@@ -170,7 +172,7 @@ const needsState = DT.tableState();
 
 async function openReview(row, extra = {}) {
     const { openArtifactViewer } = await importOnce('./artifact_viewer.js');
-    openArtifactViewer(row.hex, { server: splitKey(row.team).server, filename: row.name, mediaType: row.media_type, board: splitKey(row.team).name, compare: true, ...extra }); // a later version of a series opens with what changed since the one before (#136588)
+    openArtifactViewer(row.hex, { server: splitKey(row.team).server, filename: row.name, mediaType: row.media_type, board: splitKey(row.team).name, compare: true, from: fromOf({ review: row, board_project: splitKey(row.team).name, server: splitKey(row.team).server }, true), ...extra }); // a later version of a series opens with what changed since the one before (#136588)
     markOpenedRead(row.hex).catch(error => sayLive(error.message)); // opening is reading it: the 'read' tag, so it stops counting everywhere (#9277); the viewer does the same for any for-review artifact, once; a failed save is said, and the item keeps counting
 }
 function reviewActions(row) {
@@ -565,12 +567,12 @@ registerGroupSource('hub-inbox', {
                 node: () => { const wrap = DT.el('div', 'inbox-needs-results'); const oneLineNeeds = !rows.some(isItem); const table = DT.dataTable({ label: `Needs you, ${rows.length}`, rows, rowKey: s => `${sessionServer(s)}:${s.session_id}`, state: needsState, rowName: s => s.review ? `${s.review.name}, for review, ${teamOf(s)}` : s.autorun ? `${s.autorun.name}, run failed` : resolveSessionIdentity(s),
                     open: s => { if (s.review) { openReview(s.review); return; } if (s.autorun) { openRun(s.autorun); return; } window.switchNavTab?.('agents'); Promise.resolve(window.selectLiveSession?.(s.name, s.agent_type, s.session_id, sessionServer(s))).then(() => window.showChatView?.()); }, // a row that needs an answer shows the chat card, not the terminal saved last (#10141)
                     columns: [
-                        { key: 'agent', label: rows.some(isItem) ? 'Item' : 'Agent', primary: true, width: 'grow', ...(rows.some(isItem) ? { min: 24, share: 2 } : {}), sort: true, sortValue: s => resolveSessionIdentity(s), line: 1, ...(oneLineNeeds ? { subtitle: s => askOf(s), subtitleTitle: s => askOf(s) } : {}), // a list of agents: the ask is the row's one second line, under the name (UI/UX: the row's purpose is to decide from the list)
+                        { key: 'agent', label: rows.some(isItem) ? 'Item' : 'Agent', primary: true, width: 'grow', ...(rows.some(isItem) ? { min: 24, share: 2 } : {}), sort: true, sortValue: s => resolveSessionIdentity(s), line: 1, ...(oneLineNeeds || rows.some(s => s.review) ? { subtitle: s => (s.review ? fromOf(s, manyTeams) : askOf(s)), subtitleTitle: s => (s.review ? fromOf(s, true) : askOf(s)) } : {}), // a list of agents: the ask is the row's one second line, under the name (UI/UX: the row's purpose is to decide from the list); a file for review says who uploaded it there, and its team when two or more teams wait (#11456)
                             cell: s => { if (s.autorun) { const name = DT.el('span', 'inbox-review-name', s.autorun.name); name.title = s.autorun.name; return name; } if (s.review) { const name = DT.el('span', 'inbox-review-name', s.review.name); name.title = s.review.name; name.dataset.reviewArtifact = s.review.id; if (!isRead(s.review)) return name; const wrap = DT.el('span', 'inbox-review-item'); wrap.append(name, DT.tag('read')); return wrap; } const w = DT.personButton(resolveSessionIdentity(s), `Open ${resolveSessionIdentity(s)}`); Object.assign(w.querySelector('.dt-primary').dataset, { name: s.name, agentType: s.agent_type, sessionId: s.session_id, server: sessionServer(s) }); return w; } },
                         ...(rows.some(askOf) && !oneLineNeeds ? [{ key: 'asks', label: 'Waiting for', width: 'content', max: 20, drop: 2, line: 2, cell: s => {
                             if (s.autorun) { const why = DT.el('span', null, askOf(s)); why.title = askOf(s); return why; } // the whole reason is the tooltip: the line is one
                             if (!s.review) { const ask = askOf(s); if (!ask) return ''; const why = DT.el('span', null, ask); why.title = ask; return why; } // the whole ask is the tooltip: the row is one line
-                            const metadata = DT.el('span', 'inbox-review-metadata'); metadata.append(DT.el('span', null, 'For review'), DT.el('span', 'inbox-review-team', teamOf(s)));
+                            const metadata = DT.el('span', 'inbox-review-metadata'); metadata.append(DT.el('span', 'inbox-review-from', fromOf(s, false)), DT.el('span', null, 'For review'), DT.el('span', 'inbox-review-team', teamOf(s))); // on a phone the uploader leads this line (the line under the name is cut beside the buttons); elsewhere it is the one under the name (#11456)
                             if (s.task) { const t = DT.link(s.task.title || `Task ${s.task.id}`, () => openItemRoute('tasks', s.review.team, String(s.task.id), `${s.review.team}#${s.task.id}`)); t.classList.add('inbox-review-task'); t.setAttribute('aria-label', `Task: ${s.task.title || s.task.id}`); t.dataset.taskLink = String(s.task.id); t.title = `Task: ${s.task.title || `#${s.task.id}`}`; metadata.append(t); } // the task a review is for opens in the Inbox, in place (#8917): with the item's own words, not under the goal where it read as a second goal (#9060)
                             return metadata;
                         } }] : []), // no row has a question: no empty column
