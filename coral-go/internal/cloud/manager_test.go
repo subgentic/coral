@@ -34,6 +34,7 @@ type fakeHub struct {
 	tunnels     atomic.Int64 // /tunnel attempts
 	approveAt   atomic.Int64 // poll calls before success (pending until reached)
 	polls       atomic.Int64
+	pollHook    atomic.Pointer[func()] // run inside a poll that is about to be answered 'not yet': the moment a sleeping computer wakes with an ask in flight
 	revoked     atomic.Bool
 	deny        atomic.Bool  // poll answers access_denied
 	expireAfter atomic.Int64 // >0: polls from this one on answer expired_token
@@ -97,6 +98,9 @@ func newFakeHub(t *testing.T) *fakeHub {
 			return
 		}
 		if h.polls.Add(1) < h.approveAt.Load() {
+			if f := h.pollHook.Load(); f != nil {
+				(*f)()
+			}
 			w.WriteHeader(400)
 			w.Write([]byte(`{"error":"authorization_pending"}`))
 			return
@@ -794,4 +798,30 @@ func TestExpiryOfACodeCoralWasAskingAboutTheWholeTimeKeepsTheClosedBetaWords(t *
 	waitState(t, m, StateIdle)
 	require.Equal(t, ErrCodeExpired, m.Status().LastErrorCode)
 	require.Contains(t, m.Status().LastError, "closed beta")
+}
+
+// The computer sleeps while an ask is in flight: the answer arrives after the wake and says "not yet", but it is an answer to an ask made before the sleep, so the gap is still seen (the race behind a flaky CI run, #11463 F2).
+func TestAnAnswerThatArrivesAfterASleepStillCountsTheGap(t *testing.T) {
+	e := newEnv(t)
+	e.hub.approveAt.Store(1 << 30)
+	var offset atomic.Int64
+	now := func() time.Time { return time.Now().Add(time.Duration(offset.Load())) }
+	m := New(Options{
+		HubURL: e.hub.srv.URL, HTTPClient: e.hub.srv.Client(), Store: e.cs, LocalBaseURL: e.local.srv.URL, MaxMode: func() tunnel.Mode { return tunnel.Mode(e.mode.Load()) },
+		CoralVersion: "test", PollInterval: 20 * time.Millisecond, Now: now,
+		Backoff: tunnel.Backoff{Min: 20 * time.Millisecond, Max: 100 * time.Millisecond},
+		Logger:  slog.New(slog.NewTextHandler(e.logs, &slog.HandlerOptions{Level: slog.LevelInfo})),
+	})
+	var once atomic.Bool
+	hook := func() {
+		if e.hub.polls.Load() >= 2 && once.CompareAndSwap(false, true) {
+			offset.Store(int64(3 * time.Minute)) // the clock jumps between the ask and its answer
+			e.hub.expireAfter.Store(1)           // and the code is gone by the next ask
+		}
+	}
+	e.hub.pollHook.Store(&hook)
+	start(t, m)
+	require.NoError(t, m.Connect(context.Background()))
+	waitState(t, m, StateIdle)
+	require.Equal(t, ErrCodeUncollected, m.Status().LastErrorCode)
 }
