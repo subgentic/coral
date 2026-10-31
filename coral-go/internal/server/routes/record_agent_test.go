@@ -178,7 +178,7 @@ func TestBulkRecordRecordsTheAgentsWhoseProgramIsTheirCLIAndListsTheRest(t *test
 	term.cand[nameA] = ptymanager.AgentCandidate{PID: 100, Start: "s1", Program: "claude", Image: cliA["cli_path_claude"]} // the resolved CLI itself
 	term.cand[nameB] = ptymanager.AgentCandidate{PID: 200, Start: "s2", Program: "node", Image: "/usr/bin/node"}           // node running a script: ambiguous
 
-	code, out := postRecordJSON(t, srv+"/api/sessions/record-agents", map[string]any{})
+	code, out := postRecordJSON(t, srv+"/api/sessions/record-agents?all=1", map[string]any{})
 	require.Equal(t, http.StatusOK, code)
 	recorded, _ := out["recorded"].([]any)
 	left, _ := out["left"].([]any)
@@ -191,7 +191,7 @@ func TestBulkRecordRecordsTheAgentsWhoseProgramIsTheirCLIAndListsTheRest(t *test
 	assert.NotContains(t, term.recorded, nameB, "the ambiguous one is not recorded")
 
 	// An agent whose notices already go is not touched; a second run records nothing more.
-	_, out = postRecordJSON(t, srv+"/api/sessions/record-agents", map[string]any{})
+	_, out = postRecordJSON(t, srv+"/api/sessions/record-agents?all=1", map[string]any{})
 	assert.Empty(t, out["recorded"])
 	assert.Len(t, out["left"], 1)
 }
@@ -218,7 +218,7 @@ func TestBulkRecordDryRunNamesEachProgramAndRecordsNothing(t *testing.T) {
 	assert.Empty(t, term.recorded, "a preview records nothing")
 
 	// The real run afterwards still records the same agent.
-	_, out = postRecordJSON(t, srv+"/api/sessions/record-agents", map[string]any{})
+	_, out = postRecordJSON(t, srv+"/api/sessions/record-agents?all=1", map[string]any{})
 	assert.Len(t, out["recorded"], 1)
 	assert.Equal(t, 100, term.recorded[nameA].PID)
 }
@@ -249,6 +249,13 @@ func TestBulkRecordOnlyRecordsWhatTheOperatorWasShown(t *testing.T) {
 	assert.Contains(t, left[0].(map[string]any)["reason"], "changed since you looked")
 	assert.NotContains(t, term.recorded, nameA, "a process the Operator was not shown is not recorded")
 
+	// With no list and no ?all=1 the route refuses and says to read the dry run first (v2.0.11, Security).
+	code, out = postRecordJSON(t, srv+"/api/sessions/record-agents", map[string]any{})
+	assert.Equal(t, http.StatusBadRequest, code)
+	assert.Equal(t, "read_first", out["code"])
+	assert.Contains(t, out["error"], "dry run first")
+	assert.NotContains(t, term.recorded, nameA, "a refused request records nothing")
+
 	// An agent that was not in the confirmed list is not recorded either.
 	code, out = postRecordJSON(t, srv+"/api/sessions/record-agents", map[string]any{"agents": []map[string]any{{"session": nameB, "pid": 200}}})
 	require.Equal(t, http.StatusOK, code)
@@ -278,7 +285,7 @@ func TestRecordingAProgramUnderANestedShellNeedsTheAcknowledgement(t *testing.T)
 	assert.NotContains(t, term.recorded, nameA, "nothing was recorded")
 
 	// The bulk action never records it, even though its image is the CLI; the direct child is recorded.
-	code, bulk := postRecordJSON(t, srv+"/api/sessions/record-agents", map[string]any{})
+	code, bulk := postRecordJSON(t, srv+"/api/sessions/record-agents?all=1", map[string]any{})
 	require.Equal(t, http.StatusOK, code)
 	recorded, _ := bulk["recorded"].([]any)
 	left, _ := bulk["left"].([]any)
@@ -303,7 +310,7 @@ func TestBulkRecordFollowsTheLauncherShim(t *testing.T) {
 	term.cand[nameA] = ptymanager.AgentCandidate{PID: 100, Start: "s1", Program: "node.exe", Image: `C:\Program Files\nodejs\node.exe`, Launched: true}
 	term.cand[nameB] = ptymanager.AgentCandidate{PID: 200, Start: "s2", Program: "node.exe", Image: `C:\Program Files\nodejs\node.exe`}
 
-	code, out := postRecordJSON(t, srv+"/api/sessions/record-agents", map[string]any{})
+	code, out := postRecordJSON(t, srv+"/api/sessions/record-agents?all=1", map[string]any{})
 	require.Equal(t, http.StatusOK, code)
 	recorded, _ := out["recorded"].([]any)
 	require.Len(t, recorded, 1)
@@ -314,7 +321,7 @@ func TestBulkRecordFollowsTheLauncherShim(t *testing.T) {
 	// Launched never overrides Under: a nested shell's program needs the button.
 	term.paused[nameB] = true
 	term.cand[nameB] = ptymanager.AgentCandidate{PID: 300, Start: "s3", Program: "node.exe", Under: "cmd", Launched: true}
-	_, out = postRecordJSON(t, srv+"/api/sessions/record-agents", map[string]any{})
+	_, out = postRecordJSON(t, srv+"/api/sessions/record-agents?all=1", map[string]any{})
 	assert.Empty(t, out["recorded"])
 	assert.NotContains(t, term.recorded, nameB)
 }
@@ -330,7 +337,7 @@ func TestBulkRecordsAnInterpreterRunningExactlyTheCLI(t *testing.T) {
 	term.cand[nameA] = ptymanager.AgentCandidate{PID: 100, Start: "s1", Program: "node", Image: "/usr/bin/node", Script: cli}
 	term.cand[nameB] = ptymanager.AgentCandidate{PID: 200, Start: "s2", Program: "node", Image: "/usr/bin/node", Script: cli + ".other"}
 
-	code, out := postRecordJSON(t, srv+"/api/sessions/record-agents", map[string]any{})
+	code, out := postRecordJSON(t, srv+"/api/sessions/record-agents?all=1", map[string]any{})
 	require.Equal(t, http.StatusOK, code)
 	recorded, _ := out["recorded"].([]any)
 	require.Len(t, recorded, 1)
@@ -339,10 +346,10 @@ func TestBulkRecordsAnInterpreterRunningExactlyTheCLI(t *testing.T) {
 
 	// A non-interpreter image never matches, whatever its (rewritable) command line said; a nested shell's program is never bulk-recorded.
 	term.cand[nameB] = ptymanager.AgentCandidate{PID: 300, Start: "s3", Program: "bash", Image: "/bin/bash", Script: cli}
-	_, out = postRecordJSON(t, srv+"/api/sessions/record-agents", map[string]any{})
+	_, out = postRecordJSON(t, srv+"/api/sessions/record-agents?all=1", map[string]any{})
 	assert.Empty(t, out["recorded"])
 	term.cand[nameB] = ptymanager.AgentCandidate{PID: 400, Start: "s4", Program: "node", Image: "/usr/bin/node", Script: cli, Under: "bash"}
-	_, out = postRecordJSON(t, srv+"/api/sessions/record-agents", map[string]any{})
+	_, out = postRecordJSON(t, srv+"/api/sessions/record-agents?all=1", map[string]any{})
 	assert.Empty(t, out["recorded"])
 	assert.NotContains(t, term.recorded, nameB)
 }
@@ -390,7 +397,7 @@ func TestAnUnidentifiedProgramNeedsTheAcknowledgementAndBulkLeavesIt(t *testing.
 	term.cand[nameA] = ptymanager.AgentCandidate{PID: 100, Start: "s1", Program: "an unknown program (pid 100)", Unidentified: true, Script: settings["cli_path_claude"]}
 	term.cand[nameB] = ptymanager.AgentCandidate{PID: 200, Start: "s2", Program: "claude", Image: settings["cli_path_codex"]}
 
-	_, out := postRecordJSON(t, srv+"/api/sessions/record-agents", map[string]any{})
+	_, out := postRecordJSON(t, srv+"/api/sessions/record-agents?all=1", map[string]any{})
 	recorded, _ := out["recorded"].([]any)
 	require.Len(t, recorded, 1)
 	assert.Equal(t, nameB, recorded[0].(map[string]any)["session"])

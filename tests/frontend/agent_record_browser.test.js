@@ -85,11 +85,11 @@ const { coralReady } = require('./helpers/wait');
             // Security's #4835: the name is the image's and the folder is shown next to it, both cleaned of bidi and control characters and capped
             await ev(`(() => { const rlo = String.fromCharCode(0x202e), nl = String.fromCharCode(10); window.__cand = { program: 'pe' + rlo + 'rl', folder: '/tmp/' + nl + 'd'.repeat(200) + '/node_modules/bin' }; return true; })()`);
             await ev(`window.__calls = []; document.getElementById('composer-waiting-record').click(); true`);
-            await waitFor(`/Record perl/.test(document.getElementById('confirm-modal-message').textContent) && getComputedStyle(document.getElementById('confirm-modal')).display !== 'none'`, `${tag}: the confirm with a folder`, 5000);
+            await waitFor(`/Record pe<U\\+202E>rl/.test(document.getElementById('confirm-modal-message').textContent) && getComputedStyle(document.getElementById('confirm-modal')).display !== 'none'`, `${tag}: the confirm with a folder`, 5000);
             const where = await ev(`({ msg: document.getElementById('confirm-modal-message').textContent, box: !!document.getElementById('confirm-modal-ack') })`);
             const folderShown = (where.msg.match(/, from (.*?), as /) || [])[1] || '';
-            check(`${tag}: the confirm names the image and its folder, cleaned (no bidi or line break) and the folder capped at 120 keeping its tail behind a leading ellipsis; no box for a direct child`,
-                where.msg.startsWith('Record perl (pid 4242), from …d') && folderShown.length === 120 && folderShown.startsWith('…') && folderShown.endsWith('/node_modules/bin') && !/[\u0000-\u001f\u202a-\u202e]/.test(where.msg) && !where.box, JSON.stringify({ ...where, folderLen: folderShown.length }));
+            check(`${tag}: the confirm names the image and its folder, a hidden character written out as <U+202E> and not dropped (#11399's markHidden, strict; Security's INFO), no raw bidi or line break and the folder capped at 120 keeping its tail behind a leading ellipsis; no box for a direct child`,
+                where.msg.startsWith('Record pe<U+202E>rl (pid 4242), from …d') && folderShown.length === 120 && folderShown.startsWith('…') && folderShown.endsWith('/node_modules/bin') && !/[\u0000-\u001f\u202a-\u202e]/.test(where.msg) && !where.box, JSON.stringify({ ...where, folderLen: folderShown.length }));
             await ev(`window.hideConfirmModal(); true`);
 
             // the cut counts characters, so a name of 70 emoji is cut to 63 and the ellipsis, never inside a surrogate pair

@@ -164,7 +164,7 @@ type leftAgent struct {
 func (h *SessionsHandler) RecordAgents(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	dryRun := r.URL.Query().Get("dry_run") == "1"
-	// The pairs the Operator was shown (session and pid, from a preview): with them, an agent is recorded only if its current candidate still has exactly that pid, and one not shown is not recorded (#11415, Security). No body: every match, as before.
+	// The pairs the Operator was shown (session and pid, from a preview): with them, an agent is recorded only if its current candidate still has exactly that pid, and one not shown is not recorded (#11415, Security). No list: refused unless ?all=1 asks for every match.
 	var shown struct {
 		Agents []struct {
 			Session string `json:"session"`
@@ -175,6 +175,10 @@ func (h *SessionsHandler) RecordAgents(w http.ResponseWriter, r *http.Request) {
 	if !dryRun {
 		if err := decodeJSONMax(w, r, &shown, 1<<16); err != nil && !errors.Is(err, io.EOF) {
 			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "the list of agents shown could not be read"})
+			return
+		}
+		if shown.Agents == nil && r.URL.Query().Get("all") != "1" {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "code": "read_first", "error": "read the dry run first (POST this route with ?dry_run=1), then send the agents it listed; to record every match without a list, send ?all=1"})
 			return
 		}
 		if shown.Agents != nil {
