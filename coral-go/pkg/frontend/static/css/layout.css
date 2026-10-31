@@ -977,7 +977,8 @@ body.hub-no-machine [data-on-click="launch-show"], body.hub-no-machine .sidebar-
 .menu-item-text { display: flex; flex-direction: column; min-width: 0; }
 .menu-item-hint { font-size: var(--fs-sm); font-weight: var(--fw-regular); color: var(--text-secondary); white-space: normal; } /* the second line of a menu row that needs a word of explanation (#10077) */
 .menu-item { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 32px; padding: 6px 12px; border: 0; border-radius: var(--radius-md); background: none; color: var(--text-primary); font: inherit; font-size: var(--fs-md); font-weight: var(--fw-medium); text-align: left; text-decoration: none; cursor: pointer; transition: background-color 0.15s ease, color 0.15s ease; /* not the button rule's all: a menu measured with visibility hidden then shown would fade its items' visibility in, and focus() on the first one (a keyboard open) would find it still hidden */ }
-.menu-item:hover, .menu-item:focus-visible { background: var(--bg-hover); }
+.menu-item:focus-visible { background: var(--bg-hover); }
+@media (hover: hover) { .menu-item:hover { background: var(--bg-hover); } } /* a touch screen has no hover: the row under the finger that opened the menu stays boxed after the tap (the first row of an Actions menu, #11472) */
 .menu-item[hidden] { display: none; }
 .menu-item-danger { color: var(--error-text); }
 /* a pinned bar is at the foot of the screen: its menus open upward, whole (the job page's More was cut by the window) */
