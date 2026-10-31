@@ -195,7 +195,7 @@ func (ks *KeyStore) handleLoginToken(w http.ResponseWriter, r *http.Request) boo
 				return true
 			}
 			log.Printf("[auth] a sign-in link was opened by another user of this computer, or by a process whose user could not be told: refused (the link still works for you)")
-			writeLinkUsed(w)
+			writeLinkOtherUser(w)
 			return true
 		case !supported:
 			ks.unknownPeer.Do(func() {

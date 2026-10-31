@@ -257,14 +257,14 @@ var authPageTmpl = template.Must(template.New("auth").Parse(`{{define "hubwarn"}
 // linkUsedPage is what a used or expired sign-in link gets (#9961, the beta tester on a phone: it was one line of
 // monospace on a black page). The markup is fixed and has no user data (the token is never echoed): the sign-in
 // page's own card, what happened, the one command that fixes it, and the way to the sign-in page.
-const linkUsedPage = `<!DOCTYPE html>
+const linkPageTemplate = `<!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="dark light">
 <meta name="referrer" content="no-referrer">
-<title>This sign-in link has been used</title>
+<title>{{TITLE}}</title>
 <link rel="icon" type="image/png" href="/static/favicon.png">
 <link rel="stylesheet" href="/static/css/fonts.css">
 <link rel="stylesheet" href="/static/css/variables.css">
@@ -289,8 +289,8 @@ const linkUsedPage = `<!DOCTYPE html>
 <body>
 <main class="card">
   <div class="brand"><img src="/static/icon-192.png" alt="" width="44" height="44">Coral</div>
-  <h1>This sign-in link has been used</h1>
-  <p class="sub">A sign-in link works once, and for 10 minutes. To get a new one, run this in a terminal on the computer that runs Coral:</p>
+  <h1>{{TITLE}}</h1>
+  <p class="sub">{{SUB}}</p>
   <code class="code">coral open</code>
   <a class="btn btn-primary wide" href="/auth">Go to the sign-in page</a>
 </main>
@@ -334,9 +334,33 @@ func writeLinkRetry(w http.ResponseWriter, r *http.Request, try int) {
 	_, _ = w.Write([]byte(page))
 }
 
-// writeLinkUsed answers a sign-in link that was used, expired or opened by another user of this computer: the
-// same page for all three, so it says nothing about which (#9961).
-func writeLinkUsed(w http.ResponseWriter) {
+// The two texts of the sign-in link page. Fixed words, no user data. A used or expired link and one that is not a link at all say the same thing, so a visitor learns nothing about which (#9961); a link
+// opened by ANOTHER USER of this computer gets its own, because that refusal is decided before the link is looked at (the peer check runs first): it says nothing about the token, only who asked, and it names
+// the fix a service user needs (#11463 F5, coral-hub's walk: Coral run as root, a browser tunnel arriving as another user, every fresh link "used").
+const (
+	linkUsedTitle = "This sign-in link has been used"
+	linkUsedSub   = "A sign-in link works once, and for 10 minutes. To get a new one, run this in a terminal on the computer that runs Coral:"
+
+	linkOtherUserTitle = "This sign-in link was opened by a different user"
+	linkOtherUserSub   = "A sign-in link only works from the user account that runs Coral, and this one was opened from another account on this computer, or by a connection Coral could not tell the user of (for example a browser tunnelled in as a different user). Run this as the user that runs Coral, then open the link it prints from that same account:"
+)
+
+var (
+	linkUsedPage      = linkPage(linkUsedTitle, linkUsedSub)
+	linkOtherUserPage = linkPage(linkOtherUserTitle, linkOtherUserSub)
+)
+
+func linkPage(title, sub string) string {
+	return strings.NewReplacer("{{TITLE}}", html.EscapeString(title), "{{SUB}}", html.EscapeString(sub)).Replace(linkPageTemplate)
+}
+
+// writeLinkUsed answers a sign-in link that was used, expired or never made: the same page for all of them, so it says nothing about which (#9961).
+func writeLinkUsed(w http.ResponseWriter) { writeLinkPage(w, linkUsedPage) }
+
+// writeLinkOtherUser answers a sign-in link opened by another user of this computer (see above).
+func writeLinkOtherUser(w http.ResponseWriter) { writeLinkPage(w, linkOtherUserPage) }
+
+func writeLinkPage(w http.ResponseWriter, page string) {
 	h := w.Header()
 	h.Set("Content-Type", "text/html; charset=utf-8")
 	h.Set("Cache-Control", "no-store")
@@ -344,5 +368,5 @@ func writeLinkUsed(w http.ResponseWriter) {
 	h.Set("X-Frame-Options", "DENY")
 	h.Set("Referrer-Policy", "no-referrer")
 	w.WriteHeader(http.StatusForbidden)
-	_, _ = w.Write([]byte(linkUsedPage))
+	_, _ = w.Write([]byte(page))
 }
