@@ -130,9 +130,9 @@ const TEAM = `qa-next-steps-${Date.now() % 100000}`;
             await ev(`import(${S} + 'browser.js').then(m => { for (const k of Object.keys(localStorage)) if (k.includes('coral-recent-dirs')) localStorage.removeItem(k); for (const d of ${JSON.stringify(recents)}) m.recordRecentDir(d); return true; })`);
         };
         await fresh([GONE]); await installNT(ev); await openNewTeam(ev, waitFor);
-        await waitFor(`/\\/Coral\\/first-team/.test(document.getElementById('launch-team-dir').value)`, 'the first folder offered once the stale one is dropped', 8000).catch(() => {});
+        await waitFor(`/[\\\\/]Coral[\\\\/]first-team/.test(document.getElementById('launch-team-dir').value)`, 'the first folder offered once the stale one is dropped', 8000).catch(() => {});
         const tf = await ev(`({ value: document.getElementById('launch-team-dir').value, buttons: document.querySelectorAll('#launch-team-dir-recents button').length })`);
-        check(/\/Coral\/first-team$/.test(tf.value) && tf.buttons === 0, `a person left with only a missing folder is offered the first team's folder, no buttons: ${JSON.stringify(tf)}`);
+        check(/[\\/]Coral[\\/]first-team$/.test(tf.value) && tf.buttons === 0, `a person left with only a missing folder is offered the first team's folder, no buttons: ${JSON.stringify(tf)}`);
         // the same for New agent's folder step
         await fresh([EXISTS, GONE]); await installNA(ev); await openNewAgent(ev, waitFor);
         await waitFor(`!document.querySelector('#launch-dir-recents [data-dir=${JSON.stringify(GONE)}]')`, 'the missing folder dropped from New agent', 8000).catch(() => {});
