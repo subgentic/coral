@@ -180,6 +180,19 @@ async function openReview(row, extra = {}) {
     openArtifactViewer(row.hex, { server: splitKey(row.team).server, filename: row.name, mediaType: row.media_type, board: splitKey(row.team).name, compare: true, from: fromOf({ review: row, board_project: splitKey(row.team).name, server: splitKey(row.team).server }, true), ...extra }); // a later version of a series opens with what changed since the one before (#136588)
     markOpenedRead(row.hex).catch(error => sayLive(error.message)); // opening is reading it: the 'read' tag, so it stops counting everywhere (#9277); the viewer does the same for any for-review artifact, once; a failed save is said, and the item keeps counting
 }
+/** A row's action clears it from the list: the list is drawn again, and the person keeps their place (#11558). Called before the write, it notes where the page and the list are scrolled and the row beside this one (the next, or the
+ * previous at the end); the function it returns, called after the write, waits for the redraw (the frame the row is gone, before it is painted), puts the scroll back and puts the focus on that neighbour's first button. */
+function keepPlace(button) {
+    const tr = button.closest('tr'), near = tr && (tr.nextElementSibling || tr.previousElementSibling), key = near && near.dataset.key, spots = [document.scrollingElement];
+    for (let e = tr; e; e = e.parentElement) if (e.scrollTop > 0) spots.push(e);
+    const tops = spots.map(e => e.scrollTop);
+    return async () => {
+        for (let i = 0; i < 90 && tr && tr.isConnected; i++) await new Promise(r => requestAnimationFrame(r));
+        spots.forEach((e, i) => { e.scrollTop = tops[i]; });
+        const next = key && $('group-table-view')?.querySelector(`tr[data-key="${CSS.escape(key)}"]`), to = next ? [...next.querySelectorAll('button, .dt-primary')].find(b => b.getBoundingClientRect().width && !b.classList.contains('dt-star')) : $('group-table-view')?.querySelector('input[type=search]'); // the first control that is drawn (a phone row's star is not)
+        to?.focus({ preventScroll: true });
+    };
+}
 function reviewActions(row) {
     const box = DT.el('div', 'inbox-review-actions');
     const errorText = DT.el('span', 'inbox-review-error'); errorText.setAttribute('role', 'alert');
@@ -193,11 +206,11 @@ function reviewActions(row) {
     changes.addEventListener('click', () => openReview(row, { requestChanges: true }));
     done.addEventListener('click', async () => {
         done.disabled = true; errorText.textContent = '';
+        const settle = keepPlace(done);
         try {
             const { approveRow, sayApproved } = await importOnce('./artifact_review.js');
             sayApproved(row.name, await approveRow(row.team, row)); sayLive(`Approved ${row.name}.`);
-            const target = $('group-table-view')?.querySelector('.inbox-review-actions button') || $('group-table-view')?.querySelector('input[type=search]');
-            target?.focus({ preventScroll: true });
+            await settle();
         } catch (error) { done.disabled = false; errorText.textContent = error.message; }
     });
     const star = starControl(row, { hex: row.hex, name: row.name }); // the review artifact's star: a glyph when starred, a button at a hover (#9834)
