@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -128,5 +129,31 @@ func TestPrivateFolderUnderTheRootIsMadeAndRemoved(t *testing.T) {
 	cleanup()
 	if entries, _ := os.ReadDir(root); len(entries) != 0 {
 		t.Errorf("removed by the cleanup: %v", entries)
+	}
+}
+
+// Parallel test binaries all see the root missing at the same moment: the ones that lose the Mkdir must still accept the folder the winner made, not fall back to the temp folder.
+func TestRootEnvIsAcceptedByEveryCallerWhenTheyRaceToMakeIt(t *testing.T) {
+	home := profile(t)
+	root := filepath.Join(home, rootName)
+	const callers = 24
+	start := make(chan struct{})
+	reasons := make([]string, callers)
+	cleans := make([]string, callers)
+	var wg sync.WaitGroup
+	for i := 0; i < callers; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			<-start
+			cleans[i], reasons[i] = checkRoot(root)
+		}(i)
+	}
+	close(start)
+	wg.Wait()
+	for i := range reasons {
+		if reasons[i] != "" || cleans[i] != root {
+			t.Errorf("caller %d: %q %q", i, cleans[i], reasons[i])
+		}
 	}
 }
