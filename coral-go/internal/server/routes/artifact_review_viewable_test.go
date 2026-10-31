@@ -98,8 +98,13 @@ func TestAListedReviewRowCarriesItsQuestion(t *testing.T) {
 	bh.attachArtifactTags(ctx, "team-q", items)
 	assert.Equal(t, "Approve the layout?", items[0].ReviewQuestion)
 	assert.Empty(t, items[1].ReviewQuestion, "not for review: no question on the row")
-	require.NoError(t, bh.bs.SetArtifactTags(ctx, "team-q", b, []string{"for review"})) // the Operator tags it for review by hand
+	// An edit that keeps the tag leaves the question; one that removes it clears it (a later hand tag has none).
+	require.NoError(t, bh.bs.SetArtifactTags(ctx, "team-q", a, []string{"for review", "internal"}))
+	items = []teamArtifact{{managed: a, Name: "a.md", MediaType: "text/markdown"}}
+	bh.attachArtifactTags(ctx, "team-q", items)
+	assert.Equal(t, "Approve the layout?", items[0].ReviewQuestion, "a tag edit that keeps for review does not drop the question")
+	require.NoError(t, bh.bs.SetArtifactTags(ctx, "team-q", b, []string{"for review"})) // the Operator tags it by hand: b's question went when it was untagged (it never had the tag)
 	items = []teamArtifact{{managed: b, Name: "b.md", MediaType: "text/markdown"}}
 	bh.attachArtifactTags(ctx, "team-q", items)
-	assert.Equal(t, "Approve the plan?", items[0].ReviewQuestion, "a tag edit never dropped the stored question")
+	assert.Empty(t, items[0].ReviewQuestion, "no question: the row shows the file name as before")
 }
