@@ -2,6 +2,8 @@
  * where they found it. The choices are read the way the chat reads them (the chat reply's prompt_options for that agent) and answered through the same route as the chat card (POST .../answer-prompt: the server re-reads the
  * terminal and sends the digit only if the option is still on screen under that label). A question the card cannot answer by one choice (a multi-select, a review step, a text answer, many choices) has no buttons: Open
  * stays for the full card. The labels are the CLI's own words, set as text.
+ * A request that can only be rejected (cut, or holding a hidden character, or not text: the reply's only_reject, on prompt_options or on the pending tool, #11399) has no Allow on a row: only the No form of the card's
+ * answers is a button, and the row says so; the server refuses an Allow for it too.
  * A row never grants more than this one time (#10400, Security): the choices that say "don't ask again", "always", "allow all", "this session", "switch to ..." are left to Open. The click re-reads the card and
  * sends only when it is still the ask the row was drawn for (the ask_id the chat reply carries, checked again by the server); otherwise the row is drawn again and says so. A viewer through the Hub has no buttons. */
 import { serverFetch, sessionServer } from './server_base.js';
@@ -20,21 +22,25 @@ const LASTING = /don.?t ask|always|allow all|all edits|session|conversation|swit
 const ONE_TIME = /^(?:(?:yes|allow|approve)(?:,? (?:once|this once|proceed|continue|run command))?|(?:no|deny|reject)(?:,? (?:cancel|and tell \w+ what to do differently))?)$/i;
 const PERMISSION_WORDS = /^(yes|allow|approve)\b/i, SCOPE = /project|director|folder|repositor|\ball\b|\bfrom\b|\/|~/i;
 const KEY_HINT = /\s*\((?:[a-z]|esc|enter|tab|shift\+tab|ctrl\+[a-z])\)$/i; // only a key in brackets is a hint: any other bracket ("(always)", "(all projects)") stays in the label, so the full match fails
+// The answers of a request that can only be rejected: the No form of each CLI's words (the server accepts only these, 409 only_reject, for the rest).
+const REJECT_FORM = /^(?:no|deny|reject|cancel)\b/i;
 const wholeLabel = label => label.trim().replace(KEY_HINT, '').replace(/[.!\s]+$/, '');
 const plainlyOneTime = (label, permission) => permission ? ONE_TIME.test(wholeLabel(label)) : !LASTING.test(label) && !SCOPE.test(label); // a question card's own choices (Red, Blue) pass the words that mark a lasting or wide one
 const read = new Map(); // server:session:waiting_since -> the choices, read once per ask
 
-/** The card's one-time choices and the ask they belong to: { ask, picks } ({ ask: '', picks: [] } when the card cannot be answered by one choice). */
+/** The card's one-time choices and the ask they belong to: { ask, picks, onlyReject } ({ ask: '', picks: [] } when the card cannot be answered by one choice). onlyReject: the request can only be rejected, and picks are then only the No form. */
 async function readAsk(s) {
     const params = new URLSearchParams({ after: '0', limit: '1', session_id: s.session_id, agent_type: s.agent_type || '' });
     const resp = await serverFetch(sessionServer(s), `/api/sessions/live/${encodeURIComponent(s.name)}/chat?${params}`);
-    const none = { ask: '', picks: [] };
-    if (!resp.ok) return none;
-    const po = (await resp.json().catch(() => null) || {}).prompt_options;
+    if (!resp.ok) return { ask: '', picks: [], onlyReject: false };
+    const reply = await resp.json().catch(() => null) || {};
+    const po = reply.prompt_options;
+    const onlyReject = !!(po && po.only_reject) || !!(reply.pending && reply.pending.input && reply.pending.input.only_reject === true);
+    const none = { ask: '', picks: [], onlyReject };
     if (!po || po.multi || (po.review || []).length) return none;
     const permission = (po.options || []).some(o => PERMISSION_WORDS.test(String(o.label || ''))); // a permission card: only a plain Yes or No is a button; a question's own choices (Red, Blue) are
-    const picks = (po.options || []).filter(o => (o.action || 'select') === 'select' && o.label && Number.isInteger(Number(o.n)) && plainlyOneTime(String(o.label), permission));
-    return picks.length >= 1 && picks.length <= MAX_CHOICES ? { ask: String(po.ask_id || ''), picks } : none;
+    const picks = (po.options || []).filter(o => (o.action || 'select') === 'select' && o.label && Number.isInteger(Number(o.n)) && plainlyOneTime(String(o.label), permission) && (!onlyReject || REJECT_FORM.test(wholeLabel(String(o.label)))));
+    return picks.length >= 1 && picks.length <= MAX_CHOICES ? { ask: String(po.ask_id || ''), picks, onlyReject } : none;
 }
 
 const askKey = s => `${sessionServer(s)}:${s.session_id}:${s.waiting_since || ''}`;
@@ -83,8 +89,8 @@ async function answer(s, o, ask, cell) {
 /** Draws the choices into the cell once they are read (again after a question changed). */
 function fill(s, cell, withDismiss = true) {
     const key = askKey(s);
-    if (!read.has(key)) read.set(key, readAsk(s).catch(() => ({ ask: '', picks: [] })));
-    return read.get(key).then(({ ask, picks }) => {
+    if (!read.has(key)) read.set(key, readAsk(s).catch(() => ({ ask: '', picks: [], onlyReject: false })));
+    return read.get(key).then(({ ask, picks, onlyReject }) => {
         cell.replaceChildren();
         for (const o of picks) {
             const b = document.createElement('button');
@@ -94,6 +100,12 @@ function fill(s, cell, withDismiss = true) {
             b.addEventListener('click', e => { e.stopPropagation(); answer(s, o, ask, cell); });
             b.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') e.stopPropagation(); });
             cell.append(b);
+        }
+        if (onlyReject) { // said in words, set as text: the full request is under Open
+            const note = document.createElement('span');
+            note.className = 'inbox-only-reject';
+            note.textContent = 'It can only be rejected here. Open the agent to read it.';
+            cell.append(note);
         }
         if (withDismiss && canDismissWait(s, s.waiting_kind)) { // a wait that is no longer true can be cleared here, on this computer only (#11352)
             const d = dismissButton('btn btn-small inbox-dismiss', s);

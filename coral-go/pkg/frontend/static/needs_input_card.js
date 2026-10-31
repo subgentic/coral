@@ -3,6 +3,7 @@ import { standingOptions } from './standing_option.js';
 /* Moved out of live_chat.js as it was (#3837): no behaviour change. */
 import { deriveSessionState } from './render.js';
 import { escapeHtml, escapeAttr, renderMarkdown } from './utils.js';
+import { markHidden } from './visible_marks.js';
 import { askWords } from './session_state.js';
 import { state } from './state.js';
 import { claudeSignedIn, askSigninSoon, isLocalClaude, isLocalAgent, setClaudeSignedIn } from './signin_line.js';
@@ -185,8 +186,18 @@ function canDismissWait(session, kind) {
     return !!(session && session.session_id && (kind === "permission" || kind === "question" || kind === "plan"));
 }
 
+// The answers that refuse a request where the parser gave the option no kind: the same words as the server's (rejectLabel in prompt_answer.go); "None" and "Nothing" are not refusals.
+const REFUSAL_WORDS = /^(no|reject|deny|denied|decline|disallow|cancel|not now|don['\u2019]?t allow|do not allow)\b/i;
+
 function needsInputHtml(info, session) {
     const inp = (info.tool && info.tool.input) || {};
+    // A request the server says can only be rejected here (too long to show whole, or holding characters that hide what it does, #11395) offers Reject alone, whatever the answers list: the person cannot allow what they cannot read.
+    // A request the server says can only be rejected here (longer than a card shows, or holding characters that hide what it does) offers the refusing answers alone, for every agent: the pending tool the hook
+    // reported (Claude, Pi, opencode: input.only_reject) or the prompt read from the screen (Codex, agy, Gemini: screen.only_reject). The server refuses an Allow for it as well (#11399).
+    const refuses = o => o.kind === "reject" || (o.kind !== "allow_once" && o.kind !== "allow_always" && REFUSAL_WORDS.test(String(o.label || ""))); // the server's parsed kind decides; the words only where it has none
+    const onlyReject = info.kind === "permission" && (inp.only_reject === true || (info.screen && info.screen.only_reject === true));
+    if (onlyReject && info.screen) info = { ...info, screen: { ...info.screen, options: (info.screen.options || []).filter(refuses) } };
+    const onlyRejectNote = typeof inp.note === "string" && inp.note ? inp.note : (info.screen && typeof info.screen.note === "string" ? info.screen.note : "");
     const screen = info.screen || {};
     const onScreen = (screen.options || []).length > 0;
     const screenQuestion = onScreen ? (screen.question || "") : "";
@@ -234,9 +245,16 @@ function needsInputHtml(info, session) {
         const tool = info.tool && info.tool.tool_name;
         if (tool) kicker = `Permission needed · ${escapeHtml(tool)}`;
         question = screenQuestion || (tool ? `Allow ${tool}?` : (info.summary || "The agent is waiting for you"));
-        const target = inp.command || inp.file_path || inp.path || inp.url || inp.query || inp.pattern || "";
+        const patterns = Array.isArray(inp.patterns) ? inp.patterns.filter(x => typeof x === "string" && x) : [];
+        const more = typeof inp.more_patterns === "string" ? inp.more_patterns : ""; // "and 2 more patterns": the count of the ones the server did not list (opencode, #11395)
+        const screenTarget = info.screen && typeof info.screen.target === "string" ? info.screen.target : ""; // the lines above the screen's question, where the CLI shows what it asks (Codex, agy, Gemini send no tool input)
+        const target = markHidden(inp.command || inp.file_path || inp.path || inp.url || inp.query || inp.pattern || patterns.join("\n") || screenTarget || "", { strict: true });
+        if (onlyReject && onlyRejectNote) context += `<div class="cni-context-text cni-note" role="note">${escapeHtml(onlyRejectNote)}</div>`; // why only Reject is offered, in the server's words
         if (inp.description && inp.command) context += `<div class="cni-context-text">${escapeHtml(inp.description)}</div>`;
-        if (target) context += `<pre class="cni-target"><code>${escapeHtml(target)}</code></pre>`;
+        // The whole request, as text, wrapped, in a box that scrolls (a keyboard can scroll it once it is long enough to): a command cut short or hidden off to the side is one the person cannot judge (#11395).
+        if (target) context += `<pre class="cni-target"${target.length > 160 ? ` tabindex="0" role="region" aria-label="The whole request, scrollable"` : ""}><code>${escapeHtml(target)}</code></pre>`;
+        if (patterns.length && target !== patterns.join("\n")) context += `<div class="cni-context-text cni-patterns">Covers: ${escapeHtml(patterns.join(", "))}${more ? " " + escapeHtml(more) : ""}</div>`;
+        else if (more) context += `<div class="cni-context-text cni-patterns">${escapeHtml(more)}</div>`;
         else if (info.summary && info.summary !== question) context += `<div class="cni-context-text cni-ask">${escapeHtml(info.summary)}</div>`; // what is asked, from the event, as the Inbox row says it (#10141)
     } else if (info.kind === "prompt") {
         question = screenQuestion || "The agent is waiting for you";

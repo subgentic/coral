@@ -7,8 +7,7 @@ const dom = installDom({ mode: 'local' });
 const doc = dom.window.document;
 const { mountSshSetup } = await importUi('server_ssh_setup');
 
-const DIGEST = 'a'.repeat(64);
-const options = { hosts: ['build-box', 'second'], terms: { version: '2026-03-26', sha256: DIGEST, text: 'TERMS <b>bold</b> TEXT' }, acceptance_label: 'hub-owner@my-mac' };
+const options = { hosts: ['build-box', 'second'], acceptance_label: 'hub-owner@my-mac', records_acceptance: true };
 const steps = (states = {}) => ['connect', 'detect', 'install', 'start', 'register'].map(n => ({ name: n, title: `Step ${n}`, state: states[n] || 'pending', detail: n === 'detect' && states.detect === 'ok' ? 'Linux x86_64, tmux found.' : '' }));
 
 let calls, polls, planKind, runBody;
@@ -71,8 +70,9 @@ function fresh() { const host = doc.createElement('div'); doc.body.append(host);
     await until(() => $(host, '#ssh-keys-ok'), 'the fingerprints');
     assert.equal(host.querySelector('.ssh-key-fp').textContent, 'SHA256:abc<img src=x onerror=alert(1)>');
     assert.equal(host.querySelector('img'), null, 'a fingerprint from the hub became markup');
-    assert.equal(host.querySelector('.ssh-terms').textContent, 'TERMS <b>bold</b> TEXT', 'the terms are text, and are the text the digest covers');
-    assert.equal(host.querySelector('.ssh-terms').querySelector('b'), null);
+    assert.equal(host.querySelector('.ssh-terms'), null, 'no terms are shown: the person accepted them when they opened Coral');
+    assert.ok(!/By pressing|you accept/.test(host.textContent), 'the dialog asks for no acceptance');
+    assert.equal(host.querySelector('.ssh-consent').textContent, 'That computer records who accepted (hub-owner@my-mac), when, and which version.', 'the one line is information');
     assert.ok(host.textContent.includes('hub-owner@my-mac'), 'the record names the hub computer');
     const go = btn(host, 'Set up');
     assert.equal(go.disabled, true, 'Set up is pressed only after the fingerprints are confirmed');
@@ -81,7 +81,7 @@ function fresh() { const host = doc.createElement('div'); doc.body.append(host);
 
     btn(host, 'Set up').click();
     await until(() => runBody, 'the run');
-    assert.deepEqual(runBody, { accept_terms: true, terms_sha256: DIGEST, accept_keys: true }, 'only the acceptance and the digest of the terms shown are sent: no key');
+    assert.deepEqual(runBody, { accept_keys: true }, 'only the key confirmation is sent: no key, and no terms (the hub makes the acceptance from its own)');
     await until(() => host.textContent.includes('Done. The computer is in your list.'), 'the progress to finish');
     assert.ok(changed >= 1, 'the server list was not told');
     btn(host, 'Close').click();
@@ -105,7 +105,7 @@ function fresh() { const host = doc.createElement('div'); doc.body.append(host);
     assert.equal(btn(host, 'Set up').disabled, false);
     btn(host, 'Set up').click();
     await until(() => runBody, 'the run');
-    assert.deepEqual(runBody, { accept_terms: true, terms_sha256: DIGEST });
+    assert.deepEqual(runBody, {}, 'no terms are sent: the hub makes the acceptance');
 }
 
 // ── a failure says the hub's fixed sentence, and nothing is run ──────────────────────────────────
@@ -157,7 +157,7 @@ function fresh() { const host = doc.createElement('div'); doc.body.append(host);
     assert.deepEqual(runBody, { confirm: 'ssh-box' }, 'a remove sends the typed name and no terms');
 }
 
-// ── upgrade: says it is a downgrade over a newer one, shows the terms, and that a failure leaves it stopped ──
+// ── upgrade: says it is a downgrade over a newer one, says what is recorded, and that a failure leaves it stopped ──
 {
     hub();
     const host = fresh();
@@ -168,10 +168,11 @@ function fresh() { const host = doc.createElement('div'); doc.body.append(host);
     assert.match(host.textContent, /even over a newer one/);
     assert.match(host.textContent, /downgrade/);
     assert.match(host.textContent, /stays stopped/);
-    assert.ok(host.querySelector('.ssh-terms'), 'an upgrade records the terms again');
+    assert.equal(host.querySelector('.ssh-terms'), null, 'an upgrade shows no terms either');
+    assert.ok(host.querySelector('.ssh-consent'), 'but says what the computer records');
     btn(host, 'Upgrade').click();
     await until(() => runBody, 'the run');
-    assert.deepEqual(runBody, { accept_terms: true, terms_sha256: DIGEST });
+    assert.deepEqual(runBody, {}, 'no terms are sent: the hub makes the acceptance');
 }
 
 // ── cancel asks the hub to drop the plan ─────────────────────────────────────────────────────────

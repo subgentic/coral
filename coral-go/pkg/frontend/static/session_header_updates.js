@@ -1,4 +1,5 @@
 /* Live updates to the open agent's header: its folder, branch, waiting state, goal and status (moved out of render.js, #4996; no behaviour change). */
+import { syncNoticePause } from './notice_pause.js'; // the pause toggle and its bar (#11388)
 import { syncWaitingNotice } from './waiting.js'; // what waits for the open agent, with Send now (#7727)
 import { syncQueuedFromRow, syncAnswerFromRow, paint as paintQueued } from './held_sends.js';
 import { syncSendsFromRow } from './pending_messages.js';
@@ -34,6 +35,18 @@ function _syncHeaderFolder() {
 // Escape puts the folder tip away without moving the keyboard (WCAG 1.4.13, #9899); it is back when the keyboard or the pointer leaves the name and returns.
 function _tipOff(on) { const h = document.querySelector('#live-session-view .terminal-header'); if (h) { if (on) h.setAttribute('data-tip-off', ''); else h.removeAttribute('data-tip-off'); } }
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && e.target && e.target.id === 'terminal-header-identity') _tipOff(true); });
+// The tip on focus is the KEYBOARD's (WCAG 1.4.13, #9899): it shows when a key put the focus on the name, not when the page's own script did (it opens an agent with the focus on its name, and after a send): there Chrome counts the focus as visible
+// and the path stayed over the first message on a phone (#11391). A key press arms it, a touch or a click disarms it, and the focus on the name takes the state of the moment.
+let _byKey = false;
+// Only a navigation key arms it (Tab, Shift+Tab, the arrows): an Enter that sends, or typing, is not the keyboard moving to the name, and the page focuses the name after a send.
+const _navKeys = new Set(['Tab', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
+document.addEventListener('keydown', e => { _byKey = _navKeys.has(e.key); }, true);
+for (const t of ['pointerdown', 'touchstart', 'mousedown']) document.addEventListener(t, () => { _byKey = false; }, true);
+document.addEventListener('focusin', e => {
+    if (!e.target || e.target.id !== 'terminal-header-identity') return;
+    const h = document.querySelector('#live-session-view .terminal-header');
+    if (h) { if (_byKey) h.setAttribute('data-tip-kbd', ''); else h.removeAttribute('data-tip-kbd'); }
+});
 for (const t of ['focusout', 'mouseout']) document.addEventListener(t, e => { if (e.target && e.target.id === 'terminal-header-identity') _tipOff(false); });
 
 /** The model, thinking level and context of the open agent, in the Details disclosure (#9686: the agent row is one line and no longer says them; #9837: neither does the header; the composer's chips still change them). */
@@ -110,6 +123,7 @@ export function updateSessionBranch(branch, repoName, gitState) {
 export function updateWaitingIndicator(s) {
     syncAgentKeys(s); // Stop in place of Send, and the strip that a question opens (#6802)
     syncWaitingNotice(s);
+    syncNoticePause(s);
     syncSendsFromRow(s); // what another screen sent and the transcript does not have yet (#10467)
     syncQueuedFromRow(s); syncAnswerFromRow(s); paintQueued(); // the person's own messages held behind a question (#6611), and what another device answered (#10301)
     const dot = document.getElementById("session-status-dot");

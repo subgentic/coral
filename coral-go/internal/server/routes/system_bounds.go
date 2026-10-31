@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/subgentic/coral/internal/agent"
@@ -106,13 +107,42 @@ func untrustedLocationOf(ctx context.Context, cfg *config.Config, ss *store.Sess
 	if ss != nil {
 		if live, err := ss.GetAllLiveSessions(ctx); err == nil {
 			for _, s := range live {
-				if inside(s.WorkingDir) {
-					return "in an agent's working folder"
+				if !inside(s.WorkingDir) {
+					continue
 				}
+				// An agent working in the home folder (or above it) holds every user-level install under it; only the native installer's own places are exempt from that, under Security's conditions
+				// (nativeInstallerPlace); every other path under home stays refused, and a working folder BELOW home (~/.local, ~/.local/bin, a project) refuses as before (#11454).
+				if homeOrAbove(s.WorkingDir) && nativeInstallerPlace(p, knownCLIBinaries()) {
+					continue
+				}
+				return workingFolderReason(s)
 			}
 		}
 	}
 	return ""
+}
+
+// homeOrAbove says dir is the user's home folder or a folder above it.
+func homeOrAbove(dir string) bool {
+	home, err := os.UserHomeDir()
+	if err != nil || home == "" || dir == "" {
+		return false
+	}
+	return within(realOrSelf(dir), realOrSelf(home))
+}
+
+// workingFolderReason is the refusal for a CLI inside a live agent's working folder, in words that name the agent and the way out. It starts with "in an agent's working folder", which the Settings page
+// and the tests match.
+func workingFolderReason(s store.LiveSession) string {
+	name := s.AgentName
+	if s.DisplayName != nil && strings.TrimSpace(*s.DisplayName) != "" {
+		name = strings.TrimSpace(*s.DisplayName)
+	}
+	folder := s.WorkingDir
+	if home, _ := os.UserHomeDir(); home != "" && (folder == home || strings.HasPrefix(folder, home+string(filepath.Separator))) {
+		folder = "~" + folder[len(home):]
+	}
+	return "in an agent's working folder: the agent " + strconv.Quote(cleanCommentName(name)) + " works in " + folder + ". Archive that agent (an asleep one counts too) or restart it in a project folder, then check again"
 }
 
 // cliTempDirs are the temp folders a checked binary may not be in (a var for tests, which run

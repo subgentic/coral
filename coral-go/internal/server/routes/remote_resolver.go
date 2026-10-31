@@ -49,14 +49,16 @@ func (r *RemoteResolver) Resolve(ctx context.Context, id string) (proxy.Target, 
 		}
 		return proxy.HTTPTarget{}, err
 	}
+	// The secret this hub signs the server's owner stamps with (#11378), when it has one: unreadable is the same as none (nothing is stamped, and the remote refuses the decision as it always did).
+	ownerSecret, _, _ := r.store.OwnerSecret(ctx, id)
 	if rs.Transport == store.RemoteTransportSSH {
-		t, err := r.streams.get(rs, key)
+		t, err := r.streams.get(rs, key, ownerSecret)
 		if err != nil {
 			return proxy.HTTPTarget{}, err
 		}
 		return t, nil
 	}
-	return proxy.HTTPTarget{URL: rs.URL, APIKey: key, AllowPrivate: rs.AllowPrivate}, nil
+	return proxy.HTTPTarget{URL: rs.URL, APIKey: key, AllowPrivate: rs.AllowPrivate, OwnerSecret: ownerSecret, RemoteID: rs.ID}, nil
 }
 
 func (r *RemoteResolver) MarkStatus(ctx context.Context, id, status, errMsg string) {

@@ -40,6 +40,8 @@ func checkKnownFlags(args []string) error {
 		spec = clihelp.FlagSpec{Bools: []string{"--one-way"}, Positional: 2}
 	case "links":
 		spec = clihelp.FlagSpec{Positional: 1}
+	case "settings":
+		spec = clihelp.FlagSpec{Positional: 3}
 	case "status":
 		spec = clihelp.FlagSpec{Bools: []string{"--activity", "--json"}, Values: []string{"--board"}}
 	case "search":

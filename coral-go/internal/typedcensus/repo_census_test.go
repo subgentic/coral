@@ -52,6 +52,7 @@ func TestAliasedTerminalInputImports(t *testing.T) {
 var coralOriginFiles = map[string]string{
 	"internal/background/agent_exited.go":            "deliverAutomatedIfWanted: the background senders' one gate; its callers are in background's census",
 	"internal/ptymanager/automated_input_deliver.go": "the automated-input gate itself (DeliverAutomated, DeliverNow)",
+	"internal/ptymanager/notice_pause.go":            "the one line for the notices held while an agent's notices are paused (#11387): counts and fixed words only (heldSummary), a typed builder in ptymanager's census, typed through the gate",
 	"internal/server/routes/agent_exited.go":         "deliverAutomated: the routes senders' one gate; its callers are in routes' census",
 	"internal/server/routes/agent_ui_request.go":     "the UI panel request: the person's own request, typed as their own send is",
 	"internal/server/routes/sessions_input.go":       "POST /send and /keys from a caller that is not a person: the caller's own input, through the gate",

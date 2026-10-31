@@ -24,6 +24,9 @@ func TestRekeyReplacesARefusedKeyAndDiscardsItsSecrets(t *testing.T) {
 	_, err := rs.Add(ctx, "r1", "Remote", "https://r1.example.com", plainKey, false)
 	require.NoError(t, err)
 	require.NoError(t, cs.Save(ctx, "https://hub.example.com", "srv_1", "Laptop", "hub-token"))
+	_, err = rs.AddSSH(ctx, "r2", "Remote 2", "u@r2.example.com:22", 8420, "inst-r2", plainKey)
+	require.NoError(t, err)
+	require.NoError(t, rs.SetOwnerSecret(ctx, "r2", ownerSecretA))
 	other := NewRemoteServerStore(db, dir) // another store in this process, with the old key cached
 	_, err = other.DecryptedKey(ctx, "r1")
 	require.NoError(t, err)
@@ -37,7 +40,7 @@ func TestRekeyReplacesARefusedKeyAndDiscardsItsSecrets(t *testing.T) {
 	st, err = rs.KeyState(ctx)
 	require.NoError(t, err)
 	assert.Equal(t, "refused", st.State)
-	assert.Equal(t, 1, st.RemoteServerKeys)
+	assert.Equal(t, 2, st.RemoteServerKeys)
 	assert.Equal(t, "https://hub.example.com", st.HubURL)
 	_, err = secretbox.LoadKey(dir)
 	require.ErrorIs(t, err, secretbox.ErrKeyPermissions, "refused before")
@@ -56,6 +59,9 @@ func TestRekeyReplacesARefusedKeyAndDiscardsItsSecrets(t *testing.T) {
 	var apiKey string
 	require.NoError(t, db.GetContext(ctx, &apiKey, "SELECT api_key FROM remote_servers WHERE id = 'r1'"))
 	assert.Empty(t, apiKey, "the old API key is gone")
+	var ownerEnv string
+	require.NoError(t, db.GetContext(ctx, &ownerEnv, "SELECT owner_secret FROM remote_servers WHERE id = 'r2'"))
+	assert.Empty(t, ownerEnv, "the old owner stamp secret is gone with the keys (#11378)")
 	r, err := rs.Get(ctx, "r1")
 	require.NoError(t, err)
 	assert.Equal(t, RemoteStatusKeyUnreadable, r.Status, "the server stays, its key to be entered again")

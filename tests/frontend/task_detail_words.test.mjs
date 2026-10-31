@@ -9,7 +9,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const source = fs.readFileSync(path.join(here, '../../coral-go/pkg/frontend/static/task_detail_html.js'), 'utf8');
 const escape = value => String(value ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
 const context = vm.createContext({
-  escapeHtml: escape, escapeAttr: escape, _priorityRank: {}, formatTaskDate: String, _verifyLine: () => '', whenWords: String,
+  escapeHtml: escape, escapeAttr: escape, linkedHtml: text => escape(text), _priorityRank: {}, formatTaskDate: String, _verifyLine: () => '', whenWords: String,
   _getBoardProject: () => 'p', boardKeyName: String, keyLabel: String, identityKey: String, splitKey: () => ({ server: '' }),
   formatCost: String, _formatTokenCount: String, _priorityLabel: String, _claimedFor: () => '', serverUrl: String, artifactPath: String, contextServer: () => '', reviewPoolInfo: () => null,
 });

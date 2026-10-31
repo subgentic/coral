@@ -303,9 +303,20 @@ func windowsCommonDirs(appData, localAppData string) []string {
 // FindCLIInCommonPaths searches common install locations for a CLI binary.
 // Returns the full path if found, empty string if not.
 func FindCLIInCommonPaths(binary string) string {
+	for _, path := range CommonPlaceCandidates(binary) {
+		if _, err := os.Stat(path); err == nil {
+			return path
+		}
+	}
+	return ""
+}
+
+// CommonPlaceCandidates are the fixed places a CLI of this name may be installed, in the order they are tried (never resolved, never a walk: a path is the link itself, so the file an updater
+// moves is followed at each use).
+func CommonPlaceCandidates(binary string) []string {
 	home, _ := os.UserHomeDir()
 	if home == "" {
-		return ""
+		return nil
 	}
 
 	var candidates []string
@@ -346,18 +357,16 @@ func FindCLIInCommonPaths(binary string) string {
 			}
 		}
 	}
+	// Claude Code's own installer: ~/.local/bin/claude (above) is a link to ~/.local/share/claude/versions/<n> that its updater rewrites; an older one wrote ~/.claude/local/claude.
+	if binary == "claude" && runtime.GOOS != "windows" {
+		candidates = append(candidates, filepath.Join(home, ".claude", "local", "claude"))
+	}
 
 	// Also check app bundle directory
 	if binDir := appBundleBinDir(); binDir != "" {
 		candidates = append(candidates, filepath.Join(binDir, binary))
 	}
-
-	for _, path := range candidates {
-		if _, err := os.Stat(path); err == nil {
-			return path
-		}
-	}
-	return ""
+	return candidates
 }
 
 // FormatPromptFileArg returns shell-appropriate syntax for reading a prompt

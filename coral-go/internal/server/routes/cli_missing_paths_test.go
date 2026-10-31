@@ -129,8 +129,15 @@ func TestACodexInTheTempFolderOrAnAgentsFolderIsNotPickedUpFromACommonPlace(t *t
 	agent.UntrustedMountDir = func(string) (string, bool) { return "", false }
 	t.Cleanup(func() { agent.UntrustedMountDir = untrustedMountDirReal })
 
-	// The common place of this computer is a folder inside an agent's working folder.
+	// The common place of this computer is a folder inside an agent's working folder. On Unix the working folder is ~/.local, a folder BELOW the home folder: an agent working in the home folder
+	// itself is no refusal (the home folder holds every install, #11454), one working in a folder that holds the place is.
 	work := t.TempDir()
+	home := ""
+	if runtime.GOOS != "windows" {
+		home = t.TempDir()
+		work = filepath.Join(home, ".local")
+		require.NoError(t, os.MkdirAll(work, 0o755))
+	}
 	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: "33333333-4444-4555-8666-777777777777", AgentType: "claude", AgentName: "w", WorkingDir: work}))
 	var dir, name string
 	if runtime.GOOS == "windows" {
@@ -138,8 +145,8 @@ func TestACodexInTheTempFolderOrAnAgentsFolderIsNotPickedUpFromACommonPlace(t *t
 		t.Setenv("LOCALAPPDATA", local)
 		dir, name = filepath.Join(local, "npm"), "codex.cmd"
 	} else {
-		t.Setenv("HOME", work)
-		dir, name = filepath.Join(work, ".local", "bin"), "codex"
+		t.Setenv("HOME", home)
+		dir, name = filepath.Join(work, "bin"), "codex"
 	}
 	require.NoError(t, os.MkdirAll(dir, 0o755))
 	body := "#!/bin/sh\nexit 0\n"
@@ -152,7 +159,7 @@ func TestACodexInTheTempFolderOrAnAgentsFolderIsNotPickedUpFromACommonPlace(t *t
 	prevTemp := cliTempDirs
 	cliTempDirs = func() []string { return nil } // the tests run in a temp folder; the check below is for the working folder alone
 	t.Cleanup(func() { cliTempDirs = prevTemp })
-	assert.Equal(t, "in an agent's working folder", handler.commonPlaceScreen(ctx)(filepath.Join(dir, name)))
+	assert.Contains(t, handler.commonPlaceScreen(ctx)(filepath.Join(dir, name)), "in an agent's working folder") // the wording after it names the agent and the way out (#11454)
 	assert.Empty(t, handler.commonPlaceScreen(ctx)(filepath.Join(t.TempDir(), "elsewhere")), "a folder no agent works in passes the screen")
 	// Unscreened it would be found (the file is there, runnable), so the refusals below are the screens' doing.
 	assert.NotEmpty(t, agent.FindCLIInCommonPaths("codex"), "the planted file is in a common place")

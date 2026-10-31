@@ -142,6 +142,8 @@ func main() {
 		cmdLink(true)
 	case "links":
 		cmdLinks()
+	case "settings":
+		cmdSettings()
 	default:
 		fmt.Fprintf(os.Stderr, "Unknown command: %s\n", cmd)
 		printUsage()
@@ -238,6 +240,8 @@ Commands:
                                The Operator only: remove the link (--one-way:
                                only <team> messaging <other>)
   links [<team>]               The Operator only: who a team's links allow
+  settings set <key> <value>   The Operator only: save one Coral setting (the server
+                               checks the key and value). Not for an agent's terminal
   wait [--from <agent>] [--task <id>] [--commit <hash>] [--operator <question>]
        [--reason <text>]
        [--timeout <dur>] [--status] [--cancel] [--block]

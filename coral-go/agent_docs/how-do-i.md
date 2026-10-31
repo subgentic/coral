@@ -61,6 +61,8 @@ New agents use it unless you choose a model when you launch them.
 - **Bypass permissions:** everything except protected paths, with the safety checks off. Only for isolated containers and virtual machines. On **Antigravity**, **Gemini**, **Pi** and **opencode** it means what Auto means there: no prompts and no safety checks (Pi always acts on its own; opencode edits files and runs commands in its folder without asking, and asks only before something outside it).
 - **Don't ask:** only tools you approved ahead of time. Best for locked-down CI and scripts. Codex does not have it: its Auto is the same launch. On **Antigravity**, **Gemini**, **Pi** and **opencode** it means what Auto means there: no prompts and no safety checks (Pi always acts on its own; opencode edits files and runs commands in its folder without asking, and asks only before something outside it).
 
+**opencode** needs `lsof` or `ss` (`netstat` on Windows) on the machine: Coral uses it to check that the program on the server's port is the one it started before it sends the server its password. A machine without them cannot start an opencode agent.
+
 **Not set** starts a new agent in Auto and a new team member in Default. With such a default, an orchestrator's launches of other agents are refused until you pick Default or start them yourself.
 
 ## Open Coral on your phone

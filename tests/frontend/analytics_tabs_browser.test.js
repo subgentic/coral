@@ -86,14 +86,15 @@ const TURNS = [{ timestamp: day(7) + 'T14:12:00.000Z', model: 'claude-fable-5-1'
             await run(`${at}: Usage chart text is at least 9 px as drawn`, async () => { const k = await ev(`(() => { const svg = document.querySelector('#cost-usage svg.atab-svg'); const r = svg.getBoundingClientRect().width / svg.viewBox.baseVal.width; return parseFloat(getComputedStyle(svg.querySelector('text')).fontSize) * r; })()`); assert.ok(k >= 9, 'axis text ' + k.toFixed(1) + ' px'); });
             await shot(`usage-${w}-${theme}`);
 
-            await open('operator'); await waitFor(`document.querySelectorAll('#cost-operator .atab-kpi').length >= 6`, 'Operator drawn ' + at, 10000);
+            await open('operator'); await waitFor(`document.querySelectorAll('#cost-operator .atab-kpi').length >= 7`, 'Operator drawn ' + at, 10000);
             await run(`${at}: Operator interaction says what is not recorded yet, and the Operator's posts and asks are there`, async () => {
                 assert.match(await text('#cost-operator .atab-pending'), /Not recorded yet\./);
                 assert.equal(await ev(`document.querySelectorAll('#cost-operator .atab-trend').length`), 0, 'no trend line while the touches are not recorded');
                 assert.match(await text('#cost-operator'), /The trend needs every kind of touch/);
                 const k = await ev(`[...document.querySelectorAll('#cost-operator .atab-kpi')].map(x => x.textContent.replace(/\\s+/g, ' ').trim())`);
-                assert.ok(/Operator board posts\s*21/.test(k[0].replace(/(\\d)(\\D)/, '$1 $2')) || /Operator board posts/.test(k[0]), k[0]); assert.ok(/Asks to the Operator4/.test(k[2]) || /Asks to the Operator/.test(k[2]), k[2]);
-                assert.ok(/Touches \(all kinds\)/.test(k[5]) && /not recorded yet/.test(k[5]), 'the touches KPI is pending, not zero: ' + k[5]);
+                assert.ok(/Operator board posts\s*21/.test(k[0].replace(/(\\d)(\\D)/, '$1 $2')) || /Operator board posts/.test(k[0]), k[0]); assert.ok(/Asks to the Operator4/.test(k[3]) || /Asks to the Operator/.test(k[3]), k[3]);
+                assert.ok(/Typed to agents/.test(k[1]) && /not recorded yet/.test(k[1]), 'typing is pending, not zero, until it is recorded: ' + k[1]);
+                assert.ok(/Touches \(all kinds\)/.test(k[6]) && /not recorded yet/.test(k[6]), 'the touches KPI is pending, not zero: ' + k[6]);
                 assert.ok(await ev(`!!document.querySelector('#cost-operator .atab-kpi-pending')`));
                 assert.equal(await ev(`document.querySelectorAll('#cost-operator .atab-legend li').length`), 1, 'only the recorded kind is in the legend until the rest is');
             });
@@ -103,6 +104,9 @@ const TURNS = [{ timestamp: day(7) + 'T14:12:00.000Z', model: 'claude-fable-5-1'
                 assert.equal(await ev(`document.querySelectorAll('#cost-operator .atab-pending').length`), 0);
                 assert.ok(await ev(`!!document.querySelector('#cost-operator .atab-trend svg path.atab-line')`), 'the autonomy line is drawn');
                 assert.match(await text('#cost-operator .atab-trend'), /touches per task done in the 7 days to .*, against .* in the 7 days to .*Fewer is more autonomy/);
+                const nd = ACTIVITY.days.length;
+                const typedTile = await ev(`(() => { const t = [...document.querySelectorAll('#cost-operator .atab-kpi')].find(k => /Typed to agents/.test(k.textContent)); return t ? t.textContent.replace(/\\s+/g, ' ').trim() : ''; })()`);
+                assert.ok(typedTile.startsWith('Typed to agents' + (nd * 3) + 'in') && /chat or terminal/.test(typedTile), 'the typed tile counts the typing, ' + nd + ' days of 3: ' + typedTile);
                 await shot(`operator-recorded-${w}-${theme}`);
                 assert.match(await text('#cost-operator .atab-kpi-pending, #cost-operator .atab-kpis'), /5 of them through Coral Hub/, 'the Hub share is said as such');
                 await ev(`window.__activity = ${JSON.stringify(ACTIVITY)}; (async () => { const m = await import((window.__coralStatic || '/static/') + 'cost_dashboard.js'); await m._refreshCostDashboard({ force: true }); return true; })()`);
@@ -163,7 +167,7 @@ const TURNS = [{ timestamp: day(7) + 'T14:12:00.000Z', model: 'claude-fable-5-1'
             await open('operator'); await ev(refresh);
             await waitFor(`/not recorded yet/.test((document.querySelector('#cost-operator .atab-kpi-v') || {}).textContent || '')`, 'the missing fields', 8000);
             let k = await kpis('cost-operator');
-            for (const name of ['Operator board posts', 'Posts per task done', 'Asks to the Operator', 'Median wait for an answer', 'Slowest wait']) assert.equal(k[name], 'not recorded yet', name + ': ' + JSON.stringify(k));
+            for (const name of ['Operator board posts', 'Typed to agents', 'Posts per task done', 'Asks to the Operator', 'Median wait for an answer', 'Slowest wait']) assert.equal(k[name], 'not recorded yet', name + ': ' + JSON.stringify(k));
             await open('comm'); await ev(refresh);
             await waitFor(`/not recorded yet/.test(document.getElementById('cost-comm').textContent)`, 'the missing fields on Communication', 8000);
             k = await kpis('cost-comm');

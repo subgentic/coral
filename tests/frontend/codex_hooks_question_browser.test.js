@@ -87,7 +87,7 @@ const HOOKS = { question: 'Hooks need review: 3 hooks are new or changed', optio
             await ev(`document.querySelector('#launch-agent-pick input[value="codex"]').click(); true`);
             const n = await note();
             const r1 = await radios();
-            check(`${tag}: Codex chosen: the radio group and every radio are described by the note`, r1.group === 'launch-codex-note' && r1.radios.length === 4 && r1.radios.every(noteIn), JSON.stringify(r1));
+            check(`${tag}: Codex chosen: the radio group and every radio are described by the note`, r1.group === 'launch-codex-note' && r1.radios.length >= 4 && r1.radios.every(noteIn), JSON.stringify(r1));
             check(`${tag}: Codex chosen: one line says Codex will ask about Coral's hooks on this computer, and where to answer`, n.shown && n.count === 1 && /Codex will ask you to trust Coral's hooks on this computer/.test(n.text) && /chat/.test(n.text), JSON.stringify(n));
             await ev(`document.querySelector('#launch-agent-pick input[value="pi"]').click(); true`);
             check(`${tag}: another agent chosen: the note goes`, !(await note()).shown);

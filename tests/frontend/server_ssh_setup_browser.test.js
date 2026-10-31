@@ -1,6 +1,6 @@
-// The set-up-over-SSH dialog of the Servers tab (#11370) in a real page at 1280 and 390 px: the flow from the button through the plan, the host fingerprints, the terms and the Set up press to the finished
+// The set-up-over-SSH dialog of the Servers tab (#11370) in a real page at 1280 and 390 px: the flow from the button through the plan, the host fingerprints and the Set up press to the finished
 // steps, and a registered ssh server's Uninstall. The page's own modules run; only the hub's /api/servers routes are answered by a script in the page (a fake hub, as the other Servers suites do).
-// Checks: nothing wider than the page, the fingerprint and the terms are text, Set up is disabled until the key box is ticked, Remove until the name is typed, what is sent holds no key, the steps and the
+// Checks: nothing wider than the page, the fingerprint is text and no terms or acceptance are asked for, Set up is disabled until the key box is ticked, Remove until the name is typed, what is sent holds no key, the steps and the
 // failure are in a live region or an alert. Screenshots with CORAL_SCREENSHOT_DIR. Drives Chrome over CDP through agent_view_harness.js against the isolated dev server.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -8,7 +8,6 @@ const { connect } = require('./agent_view_harness');
 const BASE = require('./test_base').BASE;
 
 const HUB = `(() => {
-  const DIGEST = 'b'.repeat(64);
   const steps = (s = {}) => ['connect', 'detect', 'install', 'start', 'register'].map(n => ({ name: n, title: 'Step ' + n + ' of the setup', state: s[n] || 'pending', detail: s[n] === 'ok' ? 'Done well.' : '' }));
   const row = { id: 'ssh-box', label: 'Build box', url: 'ssh://user@box.example.com:22', status: 'online', transport: 'ssh', ssh_target: 'user@box.example.com:22', allow_private: false, created_at: '2026-10-30T10:00:00Z', last_seen: null, last_error: null };
   const world = { servers: [row], runBody: null, runs: 0, plans: [], polls: 0 };
@@ -19,7 +18,7 @@ const HUB = `(() => {
     const u = String(url), method = (init && init.method) || 'GET', body = init && init.body ? JSON.parse(init.body) : null;
     if (u === '/api/servers' && method === 'GET') return json(world.servers);
     if (!u.startsWith('/api/servers/provision')) return real(url, init);
-    if (u.endsWith('/options')) return json({ hosts: ['build-box', 'second'], terms: { version: '2026-03-26', sha256: DIGEST, text: 'TERMS OF SERVICE <b>not bold</b>\\n' + 'A long line of terms that has to wrap inside the box and never push the page wider than the screen. '.repeat(40) }, acceptance_label: 'hub-owner@my-mac' });
+    if (u.endsWith('/options')) return json({ hosts: ['build-box', 'second'], acceptance_label: 'hub-owner@my-mac', records_acceptance: true });
     if (u.endsWith('/plan')) { world.plans.push(body); const kind = body.action || 'setup';
       return json({ plan: 'p1', target: body.target || 'user@box.example.com:22', server_id: body.server_id || 'ssh-box-example-com', label: body.label || 'ssh-box-example-com', kind, phase: 'planned', steps: kind === 'setup' ? steps() : steps().slice(0, 3), delete_data: !!body.delete_data }, 201); }
     if (u.endsWith('/connect')) return json({ plan: 'p1', target: 'user@box.example.com:22', server_id: world.plans.at(-1).server_id || 'ssh-box-example-com', label: 'x', kind: world.plans.at(-1).action || 'setup', phase: world.plans.at(-1).action ? 'connected' : 'needs_keys', system: 'Linux x86_64',
@@ -72,10 +71,10 @@ const HUB = `(() => {
             await ev(`${btn('Connect')}.click(); true`);
             await waitFor(`!!document.getElementById('ssh-keys-ok')`, 'the fingerprints', 8000); await settle(200);
             check(`${label}: a fingerprint is text, not an element`, await ev(`document.querySelector('.ssh-key-fp').textContent.includes('<img src=x onerror=') && !document.querySelector('#servers-tab-body img') && !window.__pwned`));
-            check(`${label}: the terms are text`, await ev(`document.querySelector('.ssh-terms').textContent.includes('<b>not bold</b>') && !document.querySelector('.ssh-terms b')`));
+            check(`${label}: the dialog shows no terms and asks for no acceptance`, await ev(`!document.querySelector('.ssh-terms') && !/By pressing|you accept/.test(document.querySelector('.ssh-setup').textContent)`));
             check(`${label}: Set up is disabled until the fingerprints are confirmed`, await ev(`${btn('Set up')}.disabled === true`));
-            check(`${label}: the terms box scrolls inside itself and the page does not widen`, await ev(`(() => { const t = document.querySelector('.ssh-terms'); return t.scrollHeight > t.clientHeight && ${noOverflow}; })()`));
-            check(`${label}: the record line names the hub computer`, await ev(`document.querySelector('.ssh-setup').textContent.includes('hub-owner@my-mac')`));
+            check(`${label}: the page does not widen`, await ev(`${noOverflow}`));
+            check(`${label}: the one line says what the computer records, as information`, await ev(`document.querySelector('.ssh-consent').textContent === 'That computer records who accepted (hub-owner@my-mac), when, and which version.'`));
             await shot(`ssh-keys-terms-${label}`);
             await ev(`(() => { const c = document.getElementById('ssh-keys-ok'); c.click(); return true; })()`); await settle(100);
             check(`${label}: ticking the box enables Set up`, await ev(`${btn('Set up')}.disabled === false`));
@@ -87,7 +86,7 @@ const HUB = `(() => {
             await waitFor(`!!document.querySelector('.ssh-progress[role="status"]')`, 'the progress', 8000);
             await waitFor(`document.querySelector('.ssh-setup').textContent.includes('Done. The computer is in your list.')`, 'done', 12000); await settle(200);
             const sent = await ev(`JSON.stringify(window.__hub.runBody)`);
-            check(`${label}: Set up sent the acceptance, the digest of the terms shown and the key box, no key`, sent === JSON.stringify({ accept_terms: true, terms_sha256: 'b'.repeat(64), accept_keys: true }), sent);
+            check(`${label}: Set up sent only the key box: no key, no terms`, sent === JSON.stringify({ accept_keys: true }), sent);
             check(`${label}: the finished steps are all done`, await ev(`[...document.querySelectorAll('.ssh-step')].every(li => li.classList.contains('ssh-step-ok'))`));
             await shot(`ssh-done-${label}`);
             await ev(`${btn('Close')}.click(); true`);

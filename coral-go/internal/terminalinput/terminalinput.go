@@ -20,7 +20,9 @@ package terminalinput
 import (
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 	"unicode/utf8"
@@ -180,9 +182,46 @@ func LastPersonInput() time.Time {
 	return time.Unix(0, n)
 }
 
+// personBySession is when a person's input last went to each agent session (its id): what "the person is typing to THIS agent" is read from (#11387: Coral's notices wait while they are). Only the time, per
+// session id, bounded: the long quiet ones are forgotten.
+var personBySession sync.Map
+
+// PersonTypedWithin reports whether a person's own input (the dashboard's terminal or chat box, a signed command line) went to the session within d.
+func PersonTypedWithin(sessionID string, d time.Duration) bool {
+	if sessionID == "" {
+		return false
+	}
+	v, ok := personBySession.Load(sessionID)
+	return ok && time.Since(time.Unix(0, v.(int64))) <= d
+}
+
+// notePersonTyped stamps the session a target names (claude-<uuid>, or a tmux pane claude-<uuid>:0.0); a target that names none (a plain terminal's) is ignored.
+func notePersonTyped(target string) {
+	if i := strings.IndexByte(target, ':'); i >= 0 {
+		target = target[:i]
+	}
+	m := sessionIDInName.FindStringSubmatch(target)
+	if m == nil {
+		return
+	}
+	now := time.Now().UnixNano()
+	personBySession.Store(strings.ToLower(m[1]), now)
+	n := 0
+	personBySession.Range(func(k, v any) bool {
+		n++
+		if n > 2000 && time.Duration(now-v.(int64)) > time.Hour {
+			personBySession.Delete(k)
+		}
+		return true
+	})
+}
+
+var sessionIDInName = regexp.MustCompile(`(?i)-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$`)
+
 func Record(o Origin, target string, kind Kind, data string) {
 	if o == Person {
 		lastPerson.Store(time.Now().UnixNano())
+		notePersonTyped(target)
 		if f := personSink.Load(); f != nil {
 			(*f)(target) // only that a person typed to this target: never the data (#11225)
 		}

@@ -38,6 +38,7 @@ const (
 	// CmdUnpack unpacks that package into <install>/<version>/root and records its SHA-256 in <install>/<version>/package.sha256; arg 0 is the version.
 	CmdUnpack
 	// CmdStartTmux starts the installed Coral of version arg 0 in a tmux session named coral-server, listening on loopback only, with its data under the install folder; nothing is done if the session exists.
+	// Its standard input is /dev/null: a tmux pane is a terminal, and a Coral with a terminal asks "Enable remote access? [y/N]" before it listens and waits for an answer nobody gives (the setup then timed out waiting for its API key).
 	CmdStartTmux
 	// CmdEnsureInstanceID makes the provisioner's instance id file (32 hex digits, once) and prints it.
 	CmdEnsureInstanceID
@@ -54,6 +55,9 @@ const (
 	// CmdCheckStopped is the check after a stop: exit 0 only when there is no tmux session named exactly coral-server and nothing listens on port 8420 (read from /proc/net/tcp and tcp6, Linux); 1 for a
 	// session, 2 for a listener, 3 when it cannot tell (no /proc/net/tcp): all of them are "not confirmed".
 	CmdCheckStopped
+	// CmdInstallOwnerSecret runs the Coral of version arg 0's `hub-owner-secret` with the id and the secret as JSON on STDIN (never argv): the human act that installs the secret its owner stamps are
+	// verified with (#11378).
+	CmdInstallOwnerSecret
 	// CmdFreeKB prints the free space, in KiB, of the file system that holds the home folder (the install folder lives under it).
 	CmdFreeKB
 	// CmdReadInstalledSum prints that recorded SHA-256, if the release is installed; arg 0 is the version.
@@ -86,7 +90,7 @@ var specs = map[Command]spec{
 	CmdReceive:        {template: "umask 077 && cat > \"$HOME/" + InstallDir + "/%s/package.tar.gz\"", args: []*regexp.Regexp{versionRe}, timeout: 15 * time.Minute},
 	CmdTarList:        {template: "cd \"$HOME/" + InstallDir + "/%s\" && tar -tzf package.tar.gz", args: []*regexp.Regexp{versionRe}, timeout: 2 * time.Minute},
 	CmdStartTmux: {template: "umask 077 && mkdir -p \"$HOME/" + InstallDir + "/data\" && { tmux has-session -t =coral-server 2>/dev/null || tmux new-session -d -s coral-server " +
-		"\"exec \\\"$HOME/" + InstallDir + "/%[1]s/root/coral\\\" --host 127.0.0.1 --port 8420 --no-browser --cloud-url off --backend tmux --home \\\"$HOME/" + InstallDir + "/data\\\"\"; }", args: []*regexp.Regexp{versionRe}},
+		"\"exec \\\"$HOME/" + InstallDir + "/%[1]s/root/coral\\\" --host 127.0.0.1 --port 8420 --no-browser --cloud-url off --backend tmux --home \\\"$HOME/" + InstallDir + "/data\\\" </dev/null\"; }", args: []*regexp.Regexp{versionRe}},
 	CmdEnsureInstanceID: {template: "umask 077 && mkdir -p \"$HOME/" + InstallDir + "\" && f=\"$HOME/" + InstallDir + "/instance-id\" && { [ -s \"$f\" ] || head -c 16 /dev/urandom | od -An -tx1 | tr -d ' \\n' > \"$f\"; } && cat \"$f\""},
 	CmdReadAPIKey:       {template: "\"$HOME/" + InstallDir + "/%s/root/coral\" api-key --home \"$HOME/" + InstallDir + "/data\" 2>/dev/null", args: []*regexp.Regexp{versionRe}},
 	CmdAcceptTerms:      {template: "\"$HOME/" + InstallDir + "/%s/root/coral\" accept-terms", args: []*regexp.Regexp{versionRe}},
@@ -95,7 +99,8 @@ var specs = map[Command]spec{
 	CmdRemoveAll:        {template: "[ -n \"$HOME\" ] && rm -rf \"$HOME/" + InstallDir + "\""},
 	CmdCheckStopped: {template: "if tmux has-session -t =coral-server 2>/dev/null; then exit 1; fi; [ -r /proc/net/tcp ] || exit 3; " +
 		"if grep -Eqs '^ *[0-9]+: [0-9A-Fa-f]+:20E4 [0-9A-Fa-f:]+ 0A ' /proc/net/tcp /proc/net/tcp6; then exit 2; fi; exit 0"},
-	CmdFreeKB: {template: "df -Pk \"$HOME\" | awk 'NR==2 {print $4}'"},
+	CmdInstallOwnerSecret: {template: "\"$HOME/" + InstallDir + "/%s/root/coral\" hub-owner-secret --home \"$HOME/" + InstallDir + "/data\"", args: []*regexp.Regexp{versionRe}},
+	CmdFreeKB:             {template: "df -Pk \"$HOME\" | awk 'NR==2 {print $4}'"},
 	// The recorded sum goes FIRST: a re-unpack that is interrupted leaves no sum next to a half-written root, so the next run does not say "already installed". It is written last.
 	CmdUnpack: {template: "umask 077 && cd \"$HOME/" + InstallDir + "/%[1]s\" && rm -f package.sha256 && rm -rf root && mkdir root && tar -xzf package.tar.gz --no-same-owner -C root && " +
 		"{ sha256sum package.tar.gz 2>/dev/null || shasum -a 256 package.tar.gz; } | cut -d' ' -f1 > package.sha256", args: []*regexp.Regexp{versionRe}, timeout: 5 * time.Minute},
@@ -160,7 +165,9 @@ func shQuote(s string) string { return "'" + strings.ReplaceAll(s, "'", `'\''`) 
 // minimalEnv is all ssh is given: the hub's own CORAL_* values and anything else in its environment never reach a user's SendEnv or ProxyCommand. SSH_AUTH_SOCK is the user's agent.
 func minimalEnv() []string {
 	env := []string{"LC_ALL=C"}
-	for _, k := range []string{"HOME", "USER", "PATH", "SSH_AUTH_SOCK"} {
+	// The Windows names are the ones ssh.exe needs to find the user's .ssh folder and to run (USERPROFILE, HOMEDRIVE and HOMEPATH, SystemRoot, USERNAME, TEMP and TMP); they are unset elsewhere, and
+	// nothing of the hub's own (CORAL_*) is ever passed.
+	for _, k := range []string{"HOME", "USER", "PATH", "SSH_AUTH_SOCK", "USERPROFILE", "HOMEDRIVE", "HOMEPATH", "USERNAME", "SystemRoot", "TEMP", "TMP"} {
 		if v, ok := os.LookupEnv(k); ok {
 			env = append(env, k+"="+v)
 		}

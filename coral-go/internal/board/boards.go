@@ -330,7 +330,7 @@ var boardKeyColumns = [][2]string{
 	{"board_groups", "project"}, {"board_tasks", "board_id"}, {"task_dependencies", "blocked_by_board_id"},
 	{"board_settings", "project"}, {"hub_operator_actions", "project"}, {"board_waits", "project"},
 	{"board_working_modes", "board_id"}, {"board_workflow_presets", "board_id"}, {"board_goals", "board_id"}, {"board_goal_meta", "board_id"}, {"board_goal_events", "board_id"}, {"board_settings_log", "board_id"}, {"cross_team_switch_log", "project"},
-	{"board_goal_requests_in", "board_id"}, {"board_goal_requests_in", "from_board"}, {"board_goal_requests_out", "board_id"}, {"board_goal_requests_out", "to_board"},
+	{"board_proposals", "board_id"}, {"board_goal_requests_in", "board_id"}, {"board_goal_requests_in", "from_board"}, {"board_goal_requests_out", "board_id"}, {"board_goal_requests_out", "to_board"},
 }
 
 // rekeyUnusableBoards gives every board whose key can't be an id in a URL ("." , "..", a

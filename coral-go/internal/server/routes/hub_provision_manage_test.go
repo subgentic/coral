@@ -200,11 +200,11 @@ func TestManageUpgradeInstallsRestartsAndChecksTheNewVersion(t *testing.T) {
 	plan := v["plan"].(string)
 	_, st := me.do("POST", "/api/servers/provision/"+plan+"/connect", nil)
 	require.Equal(t, "connected", st["phase"])
-	// an upgrade records the terms, so it wants the press and the digest like a setup
-	code, _ := me.do("POST", "/api/servers/provision/"+plan+"/run", map[string]any{})
-	assert.Equal(t, 400, code)
-	code, _ = me.do("POST", "/api/servers/provision/"+plan+"/run", map[string]any{"accept_terms": true, "terms_sha256": strings.Repeat("0", 64)})
+	// an upgrade records the hub's acceptance like a setup, so with no marker for the current terms it does nothing
+	me.p.eula = func() (bool, bool) { return true, false }
+	code, _ := me.do("POST", "/api/servers/provision/"+plan+"/run", map[string]any{"accept_terms": true, "terms_sha256": terms.EULADigest()})
 	assert.Equal(t, 409, code)
+	me.p.eula = func() (bool, bool) { return true, true }
 
 	// after the restart the new release answers
 	me.p.checkHealth = func(context.Context, *store.RemoteServer, string) RemoteHealth {
@@ -275,4 +275,35 @@ func TestManageNothingIsDeletedOrRestartedWhenTheStopIsNotConfirmed(t *testing.T
 		assert.Empty(t, me.removed, action)
 		me.mu.Unlock()
 	}
+}
+
+// An upgrade gives a computer set up before the owner stamp existed its secret, once, and never rotates one it holds (#11378).
+func TestManageUpgradeGivesAnOlderComputerItsOwnerSecretOnceAndNeverRotatesIt(t *testing.T) {
+	me := newManageEnv(t)
+	want := config.ReportedVersion()
+	me.p.checkHealth = func(context.Context, *store.RemoteServer, string) RemoteHealth {
+		if b, _ := os.ReadFile(me.tmuxLog); strings.Contains(string(b), "new-session") {
+			return RemoteHealth{Status: store.RemoteStatusOnline, Version: want}
+		}
+		return RemoteHealth{Status: store.RemoteStatusOnline, Version: "0.0.1"}
+	}
+	run := func() {
+		_, v := me.plan(t, "upgrade", nil)
+		plan := v["plan"].(string)
+		me.connectAndRun(t, plan, map[string]any{"accept_terms": true, "terms_sha256": terms.EULADigest()}, 202)
+		me.waitPhase(t, plan, "done")
+		me.do("DELETE", "/api/servers/provision/"+plan, nil) // a finished plan holds its server until it is dropped or expires
+	}
+	run()
+	require.Len(t, me.ownerGiven, 1)
+	first, ok, err := me.e.h.store.OwnerSecret(context.Background(), "ssh-box")
+	require.NoError(t, err)
+	require.True(t, ok)
+	assert.Equal(t, me.ownerGiven[0], first)
+	// a second upgrade (the tmux log now has a session, health says the new version at once) installs nothing and keeps the secret
+	_ = os.Remove(me.tmuxLog)
+	run()
+	assert.Len(t, me.ownerGiven, 1, "an upgrade rotated a secret the hub already held")
+	again, _, _ := me.e.h.store.OwnerSecret(context.Background(), "ssh-box")
+	assert.Equal(t, first, again)
 }

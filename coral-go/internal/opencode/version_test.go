@@ -5,7 +5,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"syscall"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -84,7 +83,7 @@ func TestAServerThatIgnoresItsPasswordIsRefusedAndLeavesNoProcess(t *testing.T) 
 	for _, f := range strings.Fields(string(raw)) {
 		pid, _ := strconv.Atoi(f)
 		require.Positive(t, pid)
-		assert.Eventually(t, func() bool { return syscall.Kill(pid, 0) != nil }, 5_000_000_000, 20_000_000, "process %d is still running", pid)
+		assert.Eventually(t, func() bool { return !testProcessAlive(pid) }, 5_000_000_000, 20_000_000, "process %d is still running", pid)
 	}
 	_, statErr := os.Stat(StoreFile(cfg.DataDir, "agent-1") + ".never")
 	_ = statErr

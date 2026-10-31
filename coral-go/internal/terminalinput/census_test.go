@@ -324,6 +324,7 @@ var reviewedOrigins = map[string]bool{
 	"internal/background/workflow_steps.go	WorkflowRunner.executeAgentInteractive	SendPrompt	?":                      true, // AgentLauncher.SendPrompt, a method of its own that hands the prompt to the automated-input gate (Coral's text)
 	"internal/ptymanager/automated_input_deliver.go	inputGate.typeNow	SendPrompt	Coral":                              true,
 	"internal/server/routes/sessions_waiting.go	SessionsHandler.SendWaitingNow	SendInput	Coral":                      true, // the Operator's Send now (#7727): Coral's nudge text, a person's choice
+	"internal/ptymanager/notice_pause.go	typeSummary	SendInput	Coral":                                                true, // the one line that stands for held notices (#11387): Coral's own, typed through DeliverAutomated
 	"internal/ptymanager/manager.go	PTYBackend.SendHumanInput	SendInput	Person":                                      true,
 	"internal/ptymanager/manager.go	PTYBackend.SendLine	SendLineCtx	o":                                               true,
 	"internal/ptymanager/manager.go	PTYBackend.SendLineCtx	SendInput	Internal":                                       true,

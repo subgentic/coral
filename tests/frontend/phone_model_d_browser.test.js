@@ -20,6 +20,7 @@ const BASE = require('./test_base').BASE;
             await waitFor(`getComputedStyle(document.getElementById('servers-view')).display !== 'none' && document.getElementById('servers-view').getClientRects().length > 0`, `${tag}: the Computers page`, 10000); await settle(500);
             const d = await ev(`(() => { const v = document.getElementById('servers-view'), bar = [...document.querySelectorAll('.phone-bar')].find(b => b.getClientRects().length), slot = document.querySelector('.phone-nav-slot.active'); return { type: document.body.dataset.phoneType, nav: getComputedStyle(document.getElementById('phone-nav')).display, lit: slot ? slot.dataset.phoneNav : null, pad: parseFloat(getComputedStyle(v).paddingBottom), bar: !!bar, title: bar ? bar.querySelector('.phone-bar-title').textContent.trim() : null, page: document.documentElement.scrollWidth <= innerWidth }; })()`);
             assert.ok(d.type === 'top-level' && d.nav === 'flex' && d.lit === 'nav-more' && d.pad >= 100 && d.bar && d.title === 'Computers' && d.page, `${tag}: Computers is a top-level screen (shared bar, nav with More lit, room under the content, no sideways scroll): ` + JSON.stringify(d));
+            assert.equal(await ev(`document.querySelectorAll('#servers-view .servers-form-error').length`), 0, `${tag}: a Coral that is not a hub shows no red error on Computers (its list route answers 404: not a hub is not a failure, #11400)`);
             await shot(`model-d-computers-${w}-${fs}-${theme}`);
         }
         // a job's page: ONE primary action in the pinned footer: More and Run now; Edit and Turn off are in the More menu (Delete as before)
@@ -45,6 +46,14 @@ const BASE = require('./test_base').BASE;
         await ev(`document.querySelector('#wf-detail-container .wf-more-btn').click(); true`); await settle(250);
         const wm = await ev(`[...document.querySelectorAll('#wf-detail-container .wf-more-menu .menu-item')].filter(e => e.getClientRects().length).map(e => e.textContent.trim())`);
         assert.deepEqual(wm, ['Edit with Agent', 'Edit', 'Duplicate', 'Delete'], 'the More menu holds the rest: ' + JSON.stringify(wm));
+        // More (#11400, the v2.0.10 phone walk): the floating nav has Home, Inbox and Tasks, so the menu does not list them again; Computers is in it on every Coral (it is a top-level screen), with Automations, Analytics and Docs
+        await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev); await settle(500);
+        await ev(`document.querySelector('.phone-nav-slot[data-phone-nav="nav-more"]').click(); true`);
+        await waitFor(`!!document.querySelector('#nav-more-menu:not([hidden])')`, 'the More menu', 5000);
+        const more = await ev(`[...document.querySelectorAll('#nav-more-menu .menu-item, #nav-more-menu .nav-more-item')].filter(e => e.getClientRects().length).map(e => (e.lastElementChild || e).textContent.replace(/\\s+/g, ' ').trim())`);
+        assert.ok(more.some(t => /Computers/.test(t)) && ['Automations', 'Analytics', 'Docs', 'Settings'].every(n => more.some(t => t.includes(n))), 'More lists Computers, Automations, Analytics, Docs and Settings: ' + JSON.stringify(more));
+        assert.ok(!more.some(t => /^(Home|Agents|Inbox)\b/.test(t)), 'and not Home, Agents or Inbox, which the floating nav has: ' + JSON.stringify(more));
+        await ev(`document.body.click(); true`);
         console.log('PASS the phone model, slice D: Computers');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

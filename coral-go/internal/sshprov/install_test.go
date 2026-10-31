@@ -13,7 +13,6 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -56,30 +55,17 @@ func goodTar(t *testing.T) []byte {
 
 func sha(b []byte) string { s := sha256.Sum256(b); return hex.EncodeToString(s[:]) }
 
-// farSide is a fake ssh that runs the remote command in a temp HOME on this machine, with the real sh, tar and sha256sum: the far computer. mode "corrupt" cuts the package short on its way.
+// farSide is the stand-in ssh as the far computer: the remote command is answered in Go in a temp HOME on this machine (farside_test.go). mode "corrupt" cuts the package short on its way; "full" says
+// the disk has no room.
 func farSide(t *testing.T, mode string) (ssh, home, log string) {
 	t.Helper()
-	if runtime.GOOS == "windows" {
-		t.Skip("shell script")
-	}
 	dir := t.TempDir()
 	home = filepath.Join(dir, "home")
 	if err := os.MkdirAll(home, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	log = filepath.Join(dir, "ssh.log")
-	pre := ""
-	if mode == "full" {
-		pre = `case "$last" in *"df -Pk"*) echo 100; exit 0;; esac`
-	}
-	if mode == "corrupt" {
-		pre = `case "$last" in *"cat >"*) head -c 100 | eval "$last"; exit $?;; esac`
-	}
-	script := "#!/bin/sh\nfor a in \"$@\"; do last=\"$a\"; done\nprintf '%s\\n' \"$last\" >> '" + log + "'\nHOME='" + home + "'; export HOME\n" + pre + "\neval \"$last\"\n"
-	ssh = filepath.Join(dir, "ssh")
-	if err := os.WriteFile(ssh, []byte(script), 0o700); err != nil {
-		t.Fatal(err)
-	}
+	ssh = newStandIn(t, "ssh", standCfg{Far: &farCfg{Home: home, Log: log, Mode: mode}})
 	return ssh, home, log
 }
 
@@ -119,7 +105,7 @@ func newInstallEnv(t *testing.T, pkg []byte, mode string) (*installEnv, string, 
 			if tag != "v2.0.10" || asset != "coral-linux-amd64-2.0.10.tar.gz" {
 				t.Errorf("helper asked for %s %s", tag, asset)
 			}
-			if st, err := os.Stat(dir); err != nil || st.Mode().Perm() != 0o700 {
+			if st, err := os.Stat(dir); err != nil || permsApply() && st.Mode().Perm() != 0o700 {
 				t.Errorf("the download folder is not 0700: %v %v", st, err)
 			}
 			return sha(e.pkg), nil
@@ -144,11 +130,11 @@ func TestInstallPutsTheVerifiedPackageOnTheFarSideAndIsIdempotent(t *testing.T) 
 	if b, err := os.ReadFile(filepath.Join(root, "root", "coral")); err != nil || !strings.Contains(string(b), "echo coral") {
 		t.Errorf("coral was not unpacked: %v %q", err, b)
 	}
-	if st, err := os.Stat(filepath.Join(root, "root", "coral")); err != nil || st.Mode().Perm()&0o700 != 0o700 || st.Mode().Perm()&0o077 != 0 {
+	if st, err := os.Stat(filepath.Join(root, "root", "coral")); err != nil || permsApply() && (st.Mode().Perm()&0o700 != 0o700 || st.Mode().Perm()&0o077 != 0) {
 		t.Errorf("mode of coral: %v %v", st, err)
 	}
 	for _, d := range []string{filepath.Join(home, ".coral-server"), root} {
-		if st, err := os.Stat(d); err != nil || st.Mode().Perm() != 0o700 {
+		if st, err := os.Stat(d); err != nil || permsApply() && st.Mode().Perm() != 0o700 {
 			t.Errorf("%s is not 0700: %v %v", d, st, err)
 		}
 	}
@@ -343,7 +329,7 @@ func TestDownloadReleaseIsHardened(t *testing.T) {
 	if b, _ := os.ReadFile(dst); string(b) != "0123456789" {
 		t.Errorf("body %q", b)
 	}
-	if st, _ := os.Stat(dst); st.Mode().Perm() != 0o600 {
+	if st, _ := os.Stat(dst); permsApply() && st.Mode().Perm() != 0o600 {
 		t.Errorf("mode %v", st.Mode())
 	}
 	for _, p := range []string{"/big", "/redirect", "/redirect-http", "/missing"} {

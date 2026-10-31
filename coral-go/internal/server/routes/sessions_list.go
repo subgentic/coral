@@ -485,6 +485,7 @@ func (h *SessionsHandler) agentRow(trace *phaseTrace, agent AgentInfo, lv liveIn
 		displayHint, displayHintAt = h.displayActivityHint(agent.AgentType, agent.TmuxSession, sid, state, d.stateEvents[sid], time.Now())
 	}
 	// what a sleeping agent had open when it went away: {text, kind, at}, nil for any other (#10368)
+	noticesPaused, noticesUntil, noticesWaiting, noticesHolding := noticeFields(agent.SessionID) // the hold on Coral's notices (#11387)
 	askedBefore := askedBeforeRestart(d.stateEvents[sid], lv.sleeping[sid], lv.archived[sid], lv.afterRestart[sid])
 	entry := map[string]any{
 		"name":                  listedName(lv.names[sid], agent.AgentName),
@@ -505,6 +506,10 @@ func (h *SessionsHandler) agentRow(trace *phaseTrace, agent AgentInfo, lv liveIn
 		"repo_name":             repoNameVal,
 		"git_state":             worktreeVal,
 		"waiting_for_input":     state.NeedsInput,
+		"notices_paused":        noticesPaused,
+		"paused_until":          noticesUntil,
+		"notices_waiting":       noticesWaiting,
+		"notices_holding":       noticesHolding,
 		"needs_login":           state.NeedsLogin,
 		"awaiting_user":         state.AwaitingUser,
 		"not_started":           state.NotStarted,
@@ -527,6 +532,7 @@ func (h *SessionsHandler) agentRow(trace *phaseTrace, agent AgentInfo, lv liveIn
 		"board_job_title":       boardJobTitle(d.boardSubs, lv.boardNames, tmuxName, sid),
 		"board_unread":          boardUnread,
 		"skipped_send":          skippedSendField(tmuxName, boardUnread), // the last automated send Coral did not type and why ({why, what, at, since}), null at none (#7727)
+		"at_dialog":             h.dialogs.field(sid),                    // {since, after_min, notify} while the same prompt has been on the agent's screen for two passes (#11437), null otherwise
 		"board_is_orchestrator": boardSubscriberFlag(boardSub),
 		"board_subscriber_id":   boardSubscriberID(boardSub),
 		"log_path":              agent.LogPath,
