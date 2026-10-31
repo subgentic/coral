@@ -391,6 +391,9 @@ func startMaintenanceServices(ctx context.Context, db *store.DB, cfg *config.Con
 	// first run waits for an acknowledged dry run (or 24 hours), and each run is capped.
 	safeGo(ctx, "artifact_retention", func() { srv.RunArtifactRetention(ctx) })
 
+	// At a dialog (#11437): the awake agents' screens are read every 15 s for a prompt that waits for the person.
+	safeGo(ctx, "dialog_watch", func() { srv.RunDialogWatch(ctx) })
+
 	// Thinking tracker — no hook fires for model thinking, so thinking turns
 	// and their durations are read from Claude transcripts into the activity stream
 	thinkingTracker := background.NewThinkingTracker(sessStore, taskStore, 2*time.Second)

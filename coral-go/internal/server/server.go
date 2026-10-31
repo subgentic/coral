@@ -424,6 +424,13 @@ func (s *Server) AgentsSlept(ctx context.Context, sessionIDs []string) {
 	}
 }
 
+// RunDialogWatch reads the awake agents' screens for a prompt that waits for the person (#11437) until ctx ends.
+func (s *Server) RunDialogWatch(ctx context.Context) {
+	if s.sessHandler != nil {
+		s.sessHandler.RunDialogWatch(ctx)
+	}
+}
+
 // RunArtifactRetention runs #3554's artifact retention job (off unless the Operator sets
 // artifact_retention_days) until ctx ends.
 func (s *Server) RunArtifactRetention(ctx context.Context) {

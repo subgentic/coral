@@ -735,7 +735,8 @@ func (h *SessionsHandler) AnswerPrompt(w http.ResponseWriter, r *http.Request) {
 	h.refreshAfterConfirmedAnswer(r.Context(), body.AgentType, body.SessionID)
 	h.retrySkippedBoardNudge(r.Context(), body.SessionID, naming.SessionName(body.AgentType, body.SessionID), "request_resolved")
 	at := h.answers.note(body.SessionID, opt.Label)
-	h.kickWS() // every screen showing the card takes the answer now
+	h.kickWS()                     // every screen showing the card takes the answer now
+	h.forgetDialog(body.SessionID) // the prompt was answered: it is not a dialog the agent is stuck at (#11437); the next pass reads the screen again
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "answered": opt.Label, "at": at})
 }
 
@@ -993,6 +994,7 @@ func (h *SessionsHandler) submitMulti(w http.ResponseWriter, r *http.Request, na
 	}
 	h.refreshAfterConfirmedAnswer(r.Context(), agentType, sessionID)
 	h.retrySkippedBoardNudge(r.Context(), sessionID, naming.SessionName(agentType, sessionID), "request_resolved")
+	h.forgetDialog(sessionID)
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "answered": before.Submit.Label})
 }
 
