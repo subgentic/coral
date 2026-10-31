@@ -457,7 +457,7 @@ func (s *Store) TargetOrchestrators(ctx context.Context, project, to string) ([]
 // else the id. The reply hint still addresses the id (CrossReplyLine).
 func SenderLabel(o MessageOrigin) string {
 	team := o.Board
-	if l := strings.TrimSpace(o.BoardLabel); l != "" && l != o.Board && plainTeamLabel(l) {
+	if l, ok := CleanTeamLabel(o.BoardLabel); ok && l != o.Board {
 		team = l
 	}
 	if o.remote() {
@@ -473,17 +473,21 @@ func SenderLabel(o MessageOrigin) string {
 // maxTeamLabelRunes is the longest team name the sender label carries; a longer one shows the board id.
 const maxTeamLabelRunes = 40
 
-// plainTeamLabel says a team name is safe to put inside "Role (...)" in another team's text: it was chosen by whoever made or renamed that team. It must be what clitext.CleanName
-// leaves of it (no control, format, bidi or invisible character, one line), not empty, at most 40 characters, with none of @ ( ) [ ] : (a mention, a label that closes early, a
-// "Who: words" line, a link's scheme) and no "www." link, and not the name of the Operator or Chief (any spelling normalizeName reads the same). Anything else shows the board id.
-func plainTeamLabel(l string) bool {
+// CleanTeamLabel is a team name as it may be put inside "Role (...)" in another team's text, and whether it may: the name was chosen by whoever made or renamed that team. It must equal what
+// clitext.CleanName leaves of it (after trimming), be non-empty, at most 40 characters, have none of @ ( ) [ ] : and no "www." link, and not be the name of the Operator or Chief (any
+// spelling normalizeName reads the same). When ok is false the board id is shown instead. The one rule for a name from this Coral and one a relay carries.
+func CleanTeamLabel(name string) (label string, ok bool) {
+	l := strings.TrimSpace(name)
 	if l == "" || l != clitext.CleanName(l) || utf8.RuneCountInString(l) > maxTeamLabelRunes {
-		return false
+		return "", false
 	}
 	if strings.ContainsAny(l, "@()[]:") || strings.Contains(strings.ToLower(l), "www.") {
-		return false
+		return "", false
 	}
-	return !IsOperatorName(l) && !SameIdentity(l, "Chief")
+	if IsOperatorName(l) || SameIdentity(l, "Chief") {
+		return "", false
+	}
+	return l, true
 }
 
 // senderKey is the label stored as the inbound message's sender (its subscriber_id and job title). It is SenderLabel unless that would equal the id of a member of the target board

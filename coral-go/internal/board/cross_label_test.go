@@ -80,3 +80,14 @@ func TestCrossTeamStoredSenderNeverEqualsAMemberID(t *testing.T) {
 	require.NoError(t, json.Unmarshal(in.External, &o))
 	require.Equal(t, "Name", o.BoardLabel, "the name stays for display")
 }
+
+func TestCleanTeamLabel(t *testing.T) {
+	l, ok := CleanTeamLabel("  Coral Go Team ")
+	require.True(t, ok)
+	require.Equal(t, "Coral Go Team", l, "trimmed")
+	for _, bad := range []string{"", "   ", "@all", "a)", "(", "Operator", "CHIEF", "a: b", "www.x.example", strings.Repeat("a", maxTeamLabelRunes+1), "a" + string(rune(0x200b)) + "b"} {
+		l, ok := CleanTeamLabel(bad)
+		require.False(t, ok, bad)
+		require.Empty(t, l, bad)
+	}
+}
