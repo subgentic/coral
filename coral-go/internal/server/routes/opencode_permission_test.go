@@ -190,3 +190,24 @@ func TestAnOpencodeAnswerPassesTheExactTargetGateBeforeTheServerIsAsked(t *testi
 	assert.Equal(t, http.StatusOK, post("oc-open", "opencode", sid), "the control: the exact target is answered")
 	assert.Equal(t, []string{sid + "|per_bash1|once"}, f.replied)
 }
+
+// The heading quotes a short request and points at the box for a long one: a 3,900-byte command in the heading filled the screen on the real build and pushed the answers out of sight.
+func TestTheCardHeadingNeverRepeatsALongRequest(t *testing.T) {
+	long := strings.Repeat("w000-abcdefg ", 300)
+	multi := "git status\ngit log"
+	for _, p := range []opencode.PermissionRequest{
+		{Permission: "bash", Command: long},
+		{Permission: "bash", Command: multi},
+		{Permission: "edit", File: "/work/" + strings.Repeat("d/", 100) + "f.txt"},
+		{Permission: "external_directory", Patterns: []string{long}},
+	} {
+		q := opencodeQuestion(p)
+		assert.LessOrEqual(t, len(q), 160, "%s: %q", p.Permission, q[:min(len(q), 60)])
+		assert.Contains(t, q, "below", "%s: it points at the box", p.Permission)
+		assert.NotContains(t, q, "w000", p.Permission)
+	}
+	assert.Equal(t, "opencode wants to run: echo hello", opencodeQuestion(openBash), "a short one is quoted whole")
+	assert.Equal(t, "opencode wants to run: "+strings.Repeat("a", maxQuestionBytes), opencodeQuestion(opencode.PermissionRequest{Permission: "bash", Command: strings.Repeat("a", maxQuestionBytes)}), "at the limit")
+	assert.Contains(t, opencodeQuestion(opencode.PermissionRequest{Permission: "bash", Command: strings.Repeat("a", maxQuestionBytes+1)}), "below", "one over")
+	assert.Equal(t, "opencode asks to allow an action", opencodeQuestion(opencode.PermissionRequest{Permission: strings.Repeat("k", 200)}))
+}

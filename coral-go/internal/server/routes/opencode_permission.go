@@ -76,16 +76,36 @@ func (h *SessionsHandler) opencodeNeedsInput(reply map[string]any, sessionID str
 	reply["prompt_options"] = promptScreen{Question: opencodeQuestion(p), Options: opts, AskID: p.ID}
 }
 
-// opencodeQuestion is what the card asks: what opencode wants to do, in Coral's words (never the server's text as a sentence: the command or the file is quoted).
+// maxQuestionBytes is the most of a command, file or folder list the card's heading quotes. The box under it holds the whole request and scrolls; a heading that repeated 4,000 bytes would fill the screen and push the answers out of sight.
+const maxQuestionBytes = 120
+
+// quoted is s for the heading: whole when it is one short line, else "" (the heading then points at the box).
+func quoted(s string) string {
+	if s == "" || len(s) > maxQuestionBytes || strings.ContainsAny(s, "\n\r") {
+		return ""
+	}
+	return s
+}
+
+// opencodeQuestion is what the card asks: what opencode wants to do, in Coral's words (never the server's text as a sentence: a short command or file is quoted, a long one is in the box below).
 func opencodeQuestion(p opencode.PermissionRequest) string {
 	switch {
 	case p.Permission == "bash" && p.Command != "":
-		return "opencode wants to run: " + p.Command
+		if q := quoted(p.Command); q != "" {
+			return "opencode wants to run: " + q
+		}
+		return "opencode wants to run a command (all of it is below)"
 	case p.Permission == "edit" && p.File != "":
-		return "opencode wants to edit " + p.File
+		if q := quoted(p.File); q != "" {
+			return "opencode wants to edit " + q
+		}
+		return "opencode wants to edit a file (its whole path is below)"
 	case p.Permission == "external_directory":
-		return "opencode wants to use a folder outside its own: " + strings.Join(p.Patterns, ", ")
-	case p.Permission != "":
+		if q := quoted(strings.Join(p.Patterns, ", ")); q != "" {
+			return "opencode wants to use a folder outside its own: " + q
+		}
+		return "opencode wants to use a folder outside its own (all of them are below)"
+	case quoted(p.Permission) != "":
 		return "opencode asks to allow: " + p.Permission
 	}
 	return "opencode asks to allow an action"
