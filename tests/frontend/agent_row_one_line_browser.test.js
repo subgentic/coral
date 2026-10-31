@@ -95,7 +95,7 @@ const { connect } = require('./agent_view_harness');
                 assert.ok(!hd.stateWord && /\S/.test(hd.dotName || ''), `the header draws only the dot: no state word, the dot named for the state ${JSON.stringify(hd)}`);
                 assert.equal(hd.tabOrder[0], 'terminal-header-identity', `the Tab order starts at the name ${JSON.stringify(hd.tabOrder)}`); assert.ok(/^live-view-btn-/.test(hd.tabOrder[hd.tabOrder.length - 1]), `and ends in the Chat/Terminal toggle, as it is drawn ${JSON.stringify(hd.tabOrder)}`);
                 // the folder's full path is a tip on the name: on keyboard focus, and on hover at a mouse (not a native title)
-                await ev(`document.getElementById('terminal-header-identity').focus(); true`);
+                await ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true })); document.getElementById('terminal-header-identity').focus(); true`); // a key puts the focus there: the tip is the keyboard's (#11391); a script's focus alone shows none
                 const tip = await ev(`(() => { const h = document.querySelector('#live-session-view .terminal-header'); return { content: getComputedStyle(h, '::after').content, native: [...h.querySelectorAll('[title]')].filter(e => !e.closest('#agent-phone-details') && /work/.test(e.title)).length }; })()`);
                 assert.equal(tip.content, '"/work/coral-project"', `focus on the name shows the folder as a tip ${JSON.stringify(tip)}`); assert.equal(tip.native, 0, 'and it is not a native title');
                 await shot('agent-header-folder-tip-1280');
