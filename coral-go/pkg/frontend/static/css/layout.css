@@ -647,6 +647,9 @@ body.cloud-mode:not(.hub-no-machine) .welcome-connect-another { display: block; 
 /* With no computer connected nothing can be launched (#6351): no New Agent buttons, and on a wide screen the agent list says one line, the home's panel being the one place that explains; the phone, which has no home, keeps the panel in the list. */
 body.hub-no-machine [data-on-click="launch-show"], body.hub-no-machine .sidebar-footer { display: none; }
 .hub-connect-short { display: none; }
+.hub-phone-note { display: none; color: var(--text-secondary); } /* a phone cannot run Coral: the card says where it runs (#11463 F6) */
+@media (max-width: 767px) { .hub-phone-note { display: block; } }
+.welcome-get-coral, .hub-get-coral { text-decoration: none; }
 @media (min-width: 768px) and (min-height: 501px), (min-width: 768px) and (pointer: fine), (min-width: 951px) { .hub-connect-none > :not(.hub-connect-short) { display: none; } .hub-connect-none > .hub-connect-short { display: block; color: var(--text-secondary); } }
 .empty-state.hub-connect-empty { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding: 16px 12px; font-style: normal; }
 .hub-connect-empty strong { color: var(--text-primary); font-size: var(--fs-md); }

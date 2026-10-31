@@ -80,6 +80,20 @@ const HUB_PRELOAD = `(() => {
         await ev(`window.switchNavTab('servers'); true`);
         await waitFor(`!!document.querySelector('.cs-launch select')`, 'the table', 10000);
         assert.equal(await ev(`!!document.querySelector('.cs-effective')`), false, 'no note when nothing limits it');
+
+        console.log('3. A phone: every figure of a Computers row is named, and there is one status dot');
+        await set('view', 'launch');
+        await client.Emulation.setDeviceMetricsOverride({ width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
+        await client.Emulation.setTouchEmulationEnabled({ enabled: true });
+        await ev(`window.switchNavTab('servers'); true`);
+        await waitFor(`!!document.querySelector('.cs-table td.dt-line-2[data-fold-label]')`, 'the labelled cells', 10000);
+        const ph = await ev(`(() => { const tr = document.querySelector('.cs-table tr.cs-row'); const cells = [...tr.querySelectorAll('td.dt-line-2[data-fold-label]')].map(td => [td.dataset.foldLabel, getComputedStyle(td, '::before').content]);
+            const name = tr.querySelector('td.cs-col-name'); const vis = e => getComputedStyle(e).display !== 'none' && e.getClientRects().length > 0;
+            return { cells, dots: [...name.querySelectorAll('.cs-dot, .machine-health-dot')].filter(vis).length, wide: document.documentElement.scrollWidth - document.documentElement.clientWidth }; })()`);
+        assert.deepEqual(ph.cells.map(c => c[0]), ['Status', 'Agents', 'Needs you', 'Last seen', 'Coral', 'Hub access'], 'each cell is named: ' + JSON.stringify(ph.cells));
+        assert.ok(ph.cells.every(c => c[1].includes(c[0])), 'the name is drawn before the figure: ' + JSON.stringify(ph.cells));
+        assert.equal(ph.dots, 1, 'one status dot in the name cell');
+        assert.ok(ph.wide <= 0, 'no sideways scroll: ' + ph.wide);
         console.log('   ✓');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

@@ -34,7 +34,8 @@ export function hubEmptyListHtml(m) {
     }
     if (m === 'none') {
         return '<li class="empty-state hub-connect-empty hub-connect-none"><span class="hub-connect-short">No computers connected yet</span><strong>Connect your first computer</strong> <span>Install Coral on each computer. In Coral, go to Settings &gt; Network and Hub &gt; Connect to Coral Hub, and the computer appears here.</span> '
-            + '<a class="btn btn-primary btn-small" href="/machines/add">Add a computer</a></li>';
+            + '<a class="btn btn-primary btn-small" href="/machines/add">Add a computer</a> '
+            + '<span class="hub-phone-note">Coral runs on your computer; open this page there.</span> <a class="btn btn-small hub-get-coral" href="https://coralhub.dev/coral.html#download" target="_blank" rel="noopener noreferrer">Get Coral</a> </li>';
     }
     if (m === 'offline') return '<li class="empty-state hub-connect-empty"><strong>Your computers are offline</strong> <span>Keep Coral running on a connected computer to see its agents here.</span></li>';
     if (m === 'ready') return '<li class="empty-state hub-connect-empty"><strong>No agents yet</strong> <span>Start an agent on a connected computer to see it here.</span></li>';

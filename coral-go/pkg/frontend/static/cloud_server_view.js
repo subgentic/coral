@@ -162,10 +162,9 @@ function nameCell(s, live, online) {
     const un = updateNotice(live), warning = un && un.level === 'required' ? un.label : s.needs_relink === true ? 'owner not confirmed' : ''; // the button's name says the state once, and a warning (the #9683 rule: Open <name>, <state word>[, warning: <sentence>])
     return h('div', { className: 'cs-title' },
         h('button', { type: 'button', className: 'cs-toggle cs-open', 'aria-label': `Open ${s.label || 'this computer'}, ${online ? 'online' : 'offline'}${warning ? `, warning: ${warning}` : ''}`, onclick: () => openPage(s.id) },
-            h('span', { className: 'cs-dot ' + (online ? 'online' : 'offline'), 'aria-hidden': 'true' }),
+            // ONE status dot (#11463 F10: the phone row had two, the online/offline one and the health one): the machine's health (#3446) while it is connected; without it (offline, held, reconnecting) the dot says unknown, never a stale ok. The button's name still says online or offline.
+            healthDot(online ? live.machine_health : null, s.label || 'Computer'),
             h('span', { className: 'cs-name', text: s.label || 'Unnamed computer' })),
-        // The machine's health (#3446): the hub relays it while the machine is connected; without it (offline, held, reconnecting) the dot says unknown, never a stale ok.
-        healthDot(online ? live.machine_health : null, s.label || 'Computer'),
         relaunchBadge(h, s.id));
 }
 
@@ -285,12 +284,12 @@ function serversTable(shown) {
         label: 'Your computers', state: dtState, rows: shown, rowKey: s => s.id, rowName: s => s.label || 'Unnamed computer',
         columns: [
             { key: 'name', label: 'Name', primary: true, width: 'grow', line: 1, sort: true, sortValue: s => sortValue(s, 'name'), cell: cellOf.name },
-            { key: 'status', label: 'Status', line: 2, sort: true, sortValue: s => sortValue(s, 'status'), cell: cellOf.status },
-            { key: 'agents', label: 'Agents', line: 2, width: '4.5rem', align: 'end', sort: 'number', firstDir: 'desc', sortValue: s => sortValue(s, 'agents'), cell: cellOf.agents },
-            { key: 'needs', label: 'Needs you', line: 2, width: '5.5rem', align: 'end', sort: 'number', firstDir: 'desc', sortValue: needsCount, cell: cellOf.needs },
-            { key: 'seen', label: 'Last seen', line: 2, width: '6rem', tone: 'tertiary', sort: 'number', firstDir: 'desc', sortValue: seenValue, cell: cellOf.seen },
-            { key: 'version', label: 'Coral', line: 2, sort: (a, b) => cmpVersion(sortValue(a, 'version'), sortValue(b, 'version')), cell: cellOf.version },
-            { key: 'access', label: 'Hub access', line: 2, sort: 'number', firstDir: 'desc', sortValue: s => sortValue(s, 'access'), cell: cellOf.access },
+            { key: 'status', foldLabel: true, label: 'Status', line: 2, sort: true, sortValue: s => sortValue(s, 'status'), cell: cellOf.status },
+            { key: 'agents', foldLabel: true, label: 'Agents', line: 2, width: '4.5rem', align: 'end', sort: 'number', firstDir: 'desc', sortValue: s => sortValue(s, 'agents'), cell: cellOf.agents },
+            { key: 'needs', foldLabel: true, label: 'Needs you', line: 2, width: '5.5rem', align: 'end', sort: 'number', firstDir: 'desc', sortValue: needsCount, cell: cellOf.needs },
+            { key: 'seen', foldLabel: true, label: 'Last seen', line: 2, width: '6rem', tone: 'tertiary', sort: 'number', firstDir: 'desc', sortValue: seenValue, cell: cellOf.seen },
+            { key: 'version', foldLabel: true, label: 'Coral', line: 2, sort: (a, b) => cmpVersion(sortValue(a, 'version'), sortValue(b, 'version')), cell: cellOf.version },
+            { key: 'access', foldLabel: true, label: 'Hub access', line: 2, sort: 'number', firstDir: 'desc', sortValue: s => sortValue(s, 'access'), cell: cellOf.access },
         ],
         // The names the deep links, the focus keep and the suites read: the table keeps its own classes, these are hooks only (no rule in any stylesheet); they are put back whenever a sort draws the rows again.
         decorateHead: (th, c) => { th.classList.add('cs-th', `cs-col-${c.key}`); th.querySelector('.dt-sort')?.classList.add('cs-sort'); },
