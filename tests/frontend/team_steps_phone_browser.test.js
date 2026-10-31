@@ -26,7 +26,7 @@ const LONG = '/private/tmp/claude-501/-Users-someone-Software-coral-coral-go/8e4
             const help = [...document.querySelectorAll('#launch-step-team .sv-help, #launch-step-team .settings-hint, #launch-step-team .sv-row-help')].find(e => e.offsetParent && e.textContent.includes('first task')) || null;
             const pick = document.querySelector('#launch-step-team .settings-group-pick'), lab = pick && pick.querySelector('.settings-group-pick-label');
             const fs = e => e ? parseFloat(getComputedStyle(e).fontSize) : null;
-            return { lines: Math.round(sub.getBoundingClientRect().height / lh), text: sub.textContent, pathText: path ? path.textContent : null, expanded: path ? path.getAttribute('aria-expanded') : null, label: path ? path.getAttribute('aria-label') : null,
+            return { lines: Math.round(sub.getBoundingClientRect().height / lh), text: sub.textContent, pathText: path ? path.textContent : null, expanded: path ? path.getAttribute('aria-expanded') : null, label: path ? path.getAttribute('aria-label') : null, hit: path ? (() => { const x = getComputedStyle(path, '::after'); return { pos: x.position, content: x.content, h: Math.round(parseFloat(x.height)) }; })() : null,
                 pickLabel: lab && getComputedStyle(lab).display !== 'none' ? lab.textContent.trim() : null, leadPx: fs(lead), statePx: fs(state), helpPx: fs(help) };
         })()`);
         const a = await q();
@@ -34,6 +34,7 @@ const LONG = '/private/tmp/claude-501/-Users-someone-Software-coral-coral-go/8e4
         assert.ok(a.lines <= 2, `the step line is at most two lines (was 4): ${a.lines}: ${a.text}`);
         assert.ok(a.pathText && a.pathText.length < 40 && a.pathText.endsWith('first-team') && a.pathText.startsWith('…'), `the folder is the end of its path: ${JSON.stringify(a.pathText)}`);
         assert.equal(a.expanded, 'false', 'the shortened path is a button that says it is closed');
+        assert.ok(a.hit && a.hit.pos === 'absolute' && a.hit.content !== 'none' && a.hit.h >= 44, `a line of text is 17 px: the button's 44 px target is its invisible ::after: ${JSON.stringify(a.hit)}`);
         assert.ok(a.label && a.label.includes(LONG), `its name has the whole path: ${a.label}`);
         assert.equal(a.pickLabel, 'Jump to a section', `step 3's picker says what it is: ${a.pickLabel}`);
         assert.ok(a.helpPx && a.leadPx <= a.helpPx + 3 && a.statePx <= a.helpPx + 3, `the lines Coral adds are the help text's size (${a.helpPx}px): lead ${a.leadPx}, goal state ${a.statePx}`);

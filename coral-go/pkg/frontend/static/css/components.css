@@ -3481,7 +3481,8 @@ a.ibx-open, a.ibx-open:visited { color: var(--link-text); }
 .team-start-lead, .team-goal-state { margin: 0 0 10px; color: var(--text-secondary); font-size: var(--fs-sm); } /* the lines Coral adds to step 3 are the help text's size, not the dialog's body (#11401) */
 .launch-stage-sub .team-sub-path { all: unset; font-weight: var(--fw-strong); color: var(--text-primary); cursor: pointer; text-decoration: underline dotted; overflow-wrap: anywhere; }
 .launch-stage-sub .team-sub-path:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.launch-stage-sub .team-sub-path:disabled { cursor: default; text-decoration: none; }
+.launch-stage-sub span.team-sub-path { cursor: default; text-decoration: none; } /* the whole path, nothing to open (#11482 gate) */
+@media (max-width: 767px), (pointer: coarse) { .launch-stage-sub button.team-sub-path { position: relative; } .launch-stage-sub button.team-sub-path::after { content: ''; position: absolute; inset: -14px 0; } } /* a line of text is 17 px: its 44 px target is the invisible ::after, as a dense icon button's (touch_targets) */
 .settings-panes { flex: 1; min-width: 0; overflow: auto; padding: 1.1rem 1.6rem 1.5rem; container: settingspane / inline-size; }
 .settings-pane[hidden] { display: none; }
 .settings-pane:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: var(--radius-md); }

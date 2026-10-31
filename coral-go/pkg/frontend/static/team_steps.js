@@ -9,9 +9,9 @@ export function currentTeamStep() {
 /** The folder in the step line, as the end of its path ("…/Coral/first-team"): a whole path wrapped over four lines on a phone. A tap shows all of it and another shortens it (#11401). Text only: a path is the person's. */
 function folderButton(dir) {
     const short = dir.length <= 34 ? dir : '…/' + dir.split(/[\\/]+/).filter(Boolean).slice(-2).join('/');
+    if (short === dir) { const t = document.createElement('span'); t.className = 'team-sub-path'; t.textContent = dir; return t; } // a path that is all there is nothing to open: text, not a disabled button (a 47 x 17 target nobody can press)
     const b = document.createElement('button');
     b.type = 'button'; b.className = 'team-sub-path'; b.textContent = short; b.setAttribute('aria-expanded', 'false'); b.setAttribute('aria-label', `Folder ${dir}`);
-    if (short === dir) { b.disabled = true; return b; }
     b.addEventListener('click', () => { const open = b.getAttribute('aria-expanded') !== 'true'; b.setAttribute('aria-expanded', String(open)); b.textContent = open ? dir : short; });
     return b;
 }
