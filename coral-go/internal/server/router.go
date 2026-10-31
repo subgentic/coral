@@ -341,6 +341,8 @@ func (s *Server) registerSessions(r *chi.Mux, h *routeHandlers) {
 	r.Post("/api/sessions/live/{name}/restart", sessHandler.Restart)
 	r.Post("/api/sessions/live/{name}/model", sessHandler.SwitchModel) // the live model and thinking-level switch (#4969)
 	r.Post("/api/sessions/live/{name}/resume", sessHandler.Resume)
+	r.Post("/api/sessions/live/{name}/notices/pause", sessHandler.PauseNotices)   // hold Coral's notices to one agent (#11387): the Operator's, the owner's through the Hub
+	r.Post("/api/sessions/live/{name}/notices/resume", sessHandler.ResumeNotices) // end the pause: what was held is told once
 	r.Post("/api/sessions/live/{name}/attach", sessHandler.Attach)
 	r.With(routes.RefuseSignInLink).Put("/api/sessions/live/{name}/display-name", sessHandler.SetDisplayName)
 	r.With(routes.RefuseSignInLink).Put("/api/sessions/live/{name}/instructions", sessHandler.SetInstructions) // what the agent is told at its next restart (#10133)

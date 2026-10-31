@@ -364,6 +364,8 @@ POST /api/sessions/live/{name}/keys interact
 POST /api/sessions/live/{name}/kill launch
 POST /api/sessions/live/{name}/model launch
 POST /api/sessions/live/{name}/notes interact
+POST /api/sessions/live/{name}/notices/pause interact
+POST /api/sessions/live/{name}/notices/resume interact
 POST /api/sessions/live/{name}/open-in-editor never
 POST /api/sessions/live/{name}/pending-tool never
 POST /api/sessions/live/{name}/resize interact

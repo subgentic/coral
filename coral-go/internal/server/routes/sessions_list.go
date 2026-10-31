@@ -485,6 +485,7 @@ func (h *SessionsHandler) agentRow(trace *phaseTrace, agent AgentInfo, lv liveIn
 		displayHint, displayHintAt = h.displayActivityHint(agent.AgentType, agent.TmuxSession, sid, state, d.stateEvents[sid], time.Now())
 	}
 	// what a sleeping agent had open when it went away: {text, kind, at}, nil for any other (#10368)
+	noticesPaused, noticesUntil, noticesWaiting, noticesHolding := noticeFields(agent.SessionID) // the hold on Coral's notices (#11387)
 	askedBefore := askedBeforeRestart(d.stateEvents[sid], lv.sleeping[sid], lv.archived[sid], lv.afterRestart[sid])
 	entry := map[string]any{
 		"name":                  listedName(lv.names[sid], agent.AgentName),
@@ -505,6 +506,10 @@ func (h *SessionsHandler) agentRow(trace *phaseTrace, agent AgentInfo, lv liveIn
 		"repo_name":             repoNameVal,
 		"git_state":             worktreeVal,
 		"waiting_for_input":     state.NeedsInput,
+		"notices_paused":        noticesPaused,
+		"paused_until":          noticesUntil,
+		"notices_waiting":       noticesWaiting,
+		"notices_holding":       noticesHolding,
 		"needs_login":           state.NeedsLogin,
 		"awaiting_user":         state.AwaitingUser,
 		"not_started":           state.NotStarted,

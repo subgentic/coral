@@ -1,0 +1,309 @@
+package ptymanager
+
+// Pausing Coral's notices to one agent (#11387; the operator: "User is talking to orchestrator, but screen keeps advancing due to notifications from Coral"). Two reasons hold Coral's own automated text
+// back from an agent's terminal, and neither drops it:
+//  1. the person paused it (PauseNotices: until they resume, or a cap), and
+//  2. the person typed to that agent within the last TypingHold (terminalinput.PersonTypedWithin): no toggle for the common case.
+//
+// A held notice is NOT typed and is counted, by what it was (a board message, a task, ...), never by its text. When the hold ends (the person resumes, the cap passes, or they stop typing for TypingHold)
+// ONE short line is typed instead of the many: "[Coral] While you were talking: 3 board messages, 1 task. Run coral-board read." The person's own typing and sends are never held (DeliverNow), nor are an
+// agent's first prompt or a script's own /send, which are not notices. The line is typed through DeliverAutomated like any notice, so every rule of it applies (an exited agent's shell, a recorded process
+// only, a prompt or draft on the screen, a person's send in flight).
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"hash/fnv"
+	"sort"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"time"
+
+	"github.com/subgentic/coral/internal/naming"
+	"github.com/subgentic/coral/internal/terminalinput"
+)
+
+const (
+	// DefaultNoticePause is how long a pause lasts when no length is given: a forgotten pause does not silence an agent for ever.
+	DefaultNoticePause = 30 * time.Minute
+	// MaxNoticePause is the longest a pause may be asked to last.
+	MaxNoticePause = 12 * time.Hour
+	// TypingHold is how long after the person's last keystroke to an agent Coral's notices to it wait.
+	TypingHold = 60 * time.Second
+	// heldKeepFor is how long held notices wait for a moment they can be told: past it they are forgotten (the agent is gone, or never free).
+	heldKeepFor = 15 * time.Minute
+	// heldWhat is the sender name of the line that stands for the held notices.
+	heldWhat = "held notices"
+)
+
+// The seams of the hold, atomic because the timers read them while a test sets them (the census of seams_census_test.go): the clock, the typing window and what types the summary.
+var (
+	noticeClock  atomic.Pointer[func() time.Time]
+	typingWindow atomic.Int64 // nanoseconds; 0: TypingHold
+	summarySend  atomic.Pointer[func(ctx context.Context, tmpl AutomatedInput, text string) error]
+)
+
+func noticeNow() time.Time {
+	if f := noticeClock.Load(); f != nil {
+		return (*f)()
+	}
+	return time.Now()
+}
+
+func typingHold() time.Duration {
+	if n := typingWindow.Load(); n > 0 {
+		return time.Duration(n)
+	}
+	return TypingHold
+}
+
+// typeSummary types the summary line into the agent's terminal.
+func typeSummary(ctx context.Context, tmpl AutomatedInput, text string) error {
+	if f := summarySend.Load(); f != nil {
+		return (*f)(ctx, tmpl, text)
+	}
+	term, ok := tmpl.Term.(SessionTerminal)
+	if !ok {
+		return errors.New("no terminal to type the held notices into")
+	}
+	return term.SendInput(ctx, terminalinput.Coral, tmpl.Name, text, tmpl.AgentType, tmpl.SessionID)
+}
+
+// notHeld are the senders the hold never touches: an agent's first prompt (a launch is not a notice) and the line that stands for the held ones.
+func notHeld(what string) bool {
+	return what == "initial prompt" || what == heldWhat || strings.HasPrefix(what, "automated ")
+}
+
+type noticeState struct {
+	until   time.Time                      // an explicit pause ends here (zero: not paused)
+	held    map[string]map[uint64]struct{} // sender -> the distinct notices held (by hash of their text: a notice asked again is one)
+	since   time.Time                      // when the first notice was held
+	tmpl    AutomatedInput                 // where and how the summary is typed: the terminal, the names, the sender's own checks
+	flusher bool                           // a flush of this session is running
+	timer   *time.Timer                    // the next look at whether the hold has ended (none while nothing is held)
+}
+
+var notices = struct {
+	sync.Mutex
+	m map[string]*noticeState
+}{m: map[string]*noticeState{}}
+
+func stateOf(sessionID string) *noticeState {
+	st := notices.m[sessionID]
+	if st == nil {
+		st = &noticeState{held: map[string]map[uint64]struct{}{}}
+		notices.m[sessionID] = st
+	}
+	return st
+}
+
+// PauseNotices holds Coral's notices to the session for d (DefaultNoticePause when d is not positive, at most MaxNoticePause) and says until when.
+func PauseNotices(sessionID string, d time.Duration) time.Time {
+	if sessionID == "" {
+		return time.Time{}
+	}
+	if d <= 0 {
+		d = DefaultNoticePause
+	}
+	if d > MaxNoticePause {
+		d = MaxNoticePause
+	}
+	notices.Lock()
+	defer notices.Unlock()
+	st := stateOf(sessionID)
+	st.until = noticeNow().Add(d)
+	return st.until
+}
+
+// ResumeNotices ends a pause. What was held is told once, now when the agent is free, else as soon as it is.
+func ResumeNotices(sessionID string) {
+	notices.Lock()
+	if st := notices.m[sessionID]; st != nil {
+		st.until = time.Time{}
+	}
+	notices.Unlock()
+	time.AfterFunc(0, func() { flushHeld(sessionID) })
+}
+
+// NoticeStatus is what the live row shows: whether an explicit pause is on and until when, how many notices wait, and whether the hold is only the person's typing.
+func NoticeStatus(sessionID string) (paused bool, until time.Time, waiting int, typing bool) {
+	notices.Lock()
+	defer notices.Unlock()
+	now := noticeNow()
+	if st := notices.m[sessionID]; st != nil {
+		if st.until.After(now) {
+			paused, until = true, st.until
+		}
+		for _, set := range st.held {
+			waiting += len(set)
+		}
+	}
+	typing = !paused && terminalinput.PersonTypedWithin(sessionID, typingHold())
+	return
+}
+
+// NoticesHeld reports whether Coral's notices to the session are held now (a pause, or the person typing to it): the turn-end hand-off, which is a hook reply and not a typed notice, waits too.
+func NoticesHeld(sessionID string) bool { return noticesHeld(sessionID) }
+
+// noticesHeld reports whether Coral's notices to the session are held now: paused, or the person typed to it within TypingHold.
+func noticesHeld(sessionID string) bool {
+	if sessionID == "" {
+		return false
+	}
+	notices.Lock()
+	st := notices.m[sessionID]
+	paused := st != nil && st.until.After(noticeNow())
+	notices.Unlock()
+	return paused || terminalinput.PersonTypedWithin(sessionID, typingHold())
+}
+
+// holdNotice counts a notice that was not typed, by what it was, and keeps where the summary will be typed.
+func holdNotice(in AutomatedInput) {
+	h := fnv.New64a()
+	h.Write([]byte(in.Text))
+	notices.Lock()
+	defer notices.Unlock()
+	st := stateOf(in.SessionID)
+	set := st.held[in.What]
+	if set == nil {
+		set = map[uint64]struct{}{}
+		st.held[in.What] = set
+	}
+	set[h.Sum64()] = struct{}{}
+	if st.since.IsZero() {
+		st.since = noticeNow()
+	}
+	st.tmpl = AutomatedInput{Term: in.Term, Name: in.Name, AgentType: in.AgentType, SessionID: in.SessionID, Ready: in.Ready}
+	scheduleFlushLocked(in.SessionID, st, 3*time.Second)
+}
+
+// scheduleFlushLocked arranges a look at whether the hold has ended, in d (notices.Lock held). A timer, not a goroutine that lives on: nothing runs while nothing is held.
+func scheduleFlushLocked(sessionID string, st *noticeState, d time.Duration) {
+	if st.timer != nil {
+		st.timer.Stop()
+	}
+	st.timer = time.AfterFunc(d, func() { flushHeld(sessionID) })
+}
+
+// noticeLabels turn a sender into the words the summary uses.
+var noticeLabels = map[string][2]string{
+	"board message":      {"board message", "board messages"},
+	"remote board nudge": {"board message", "board messages"},
+	"task notification":  {"task", "tasks"},
+	"task reminder":      {"task", "tasks"},
+	"board wait timeout": {"board wait", "board waits"},
+	"health check":       {"health check", "health checks"},
+	"health nudge":       {"health check", "health checks"},
+	"agent UI action":    {"request from a panel", "requests from a panel"},
+}
+
+// heldSummary is the one line: "[Coral] While you were talking: 3 board messages, 1 task. Run coral-board read." Counts and fixed words only: nothing a notice said.
+func heldSummary(held map[string]map[uint64]struct{}) string {
+	counts := map[string]int{}
+	order := []string{}
+	for what, set := range held {
+		singular, plural := "notice", "notices"
+		if l, ok := noticeLabels[what]; ok {
+			singular, plural = l[0], l[1]
+		}
+		key := singular + "|" + plural
+		if _, seen := counts[key]; !seen {
+			order = append(order, key)
+		}
+		counts[key] += len(set)
+	}
+	sort.Strings(order)
+	parts := make([]string, 0, len(order))
+	for _, key := range order {
+		singular, plural, _ := strings.Cut(key, "|")
+		word := plural
+		if counts[key] == 1 {
+			word = singular
+		}
+		parts = append(parts, fmt.Sprintf("%d %s", counts[key], word))
+	}
+	return "[Coral] While you were talking: " + strings.Join(parts, ", ") + ". Run coral-board read."
+}
+
+// flushHeld types the one line for what a session held, if its hold has ended and the agent can take it; otherwise leaves it for the next pass. Held notices older than heldKeepFor are forgotten.
+func flushHeld(sessionID string) {
+	if noticesHeld(sessionID) {
+		notices.Lock()
+		if st := notices.m[sessionID]; st != nil && len(st.held) > 0 {
+			scheduleFlushLocked(sessionID, st, 3*time.Second) // still held: look again soon
+		}
+		notices.Unlock()
+		return
+	}
+	notices.Lock()
+	st := notices.m[sessionID]
+	if st == nil || len(st.held) == 0 || st.flusher {
+		notices.Unlock()
+		return
+	}
+	if !st.since.IsZero() && noticeNow().Sub(st.since) > heldKeepFor {
+		st.held, st.since = map[string]map[uint64]struct{}{}, time.Time{}
+		notices.Unlock()
+		return
+	}
+	st.flusher = true
+	text, tmpl := heldSummary(st.held), st.tmpl
+	taken := st.held
+	notices.Unlock()
+
+	done := false
+	defer func() {
+		notices.Lock()
+		if cur := notices.m[sessionID]; cur != nil {
+			cur.flusher = false
+			if !done && len(cur.held) > 0 { // the agent could not take it yet (a prompt, a draft): look again
+				scheduleFlushLocked(sessionID, cur, 3*time.Second)
+			}
+			if done { // what was told is gone; what was held in the meantime stays
+				for what, set := range taken {
+					for k := range set {
+						delete(cur.held[what], k)
+					}
+					if len(cur.held[what]) == 0 {
+						delete(cur.held, what)
+					}
+				}
+				if len(cur.held) == 0 {
+					cur.since = time.Time{}
+				}
+			}
+		}
+		notices.Unlock()
+	}()
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	d, err := DeliverAutomated(ctx, AutomatedInput{
+		Term: tmpl.Term, Name: tmpl.Name, AgentType: tmpl.AgentType, SessionID: tmpl.SessionID,
+		Text: text, What: heldWhat, Paste: true, Ready: tmpl.Ready,
+		Send: func(ctx context.Context) error {
+			if tmpl.Ready != nil {
+				if err := tmpl.Ready(ctx); err != nil {
+					return err
+				}
+			}
+			return typeSummary(ctx, tmpl, text)
+		},
+	})
+	if err != nil || d == Sent { // typed, or an error that no later try mends (the agent exited): either way it is over
+		done = true
+	}
+}
+
+// forgetNotices drops a session's pause and what it held when the session ends.
+func forgetNotices(name string) {
+	if id := naming.SessionIDFromName(sessionOfTarget(name)); id != "" {
+		notices.Lock()
+		if st := notices.m[id]; st != nil && st.timer != nil {
+			st.timer.Stop()
+		}
+		delete(notices.m, id)
+		notices.Unlock()
+	}
+}

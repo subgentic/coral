@@ -127,8 +127,11 @@ var ownerRefusals = map[string]string{
 	tunnel.OwnerRouteKey("POST", "/api/board/{project}/cross-team/files/disable"):   textHubSwitchOwnerOnly,
 	tunnel.OwnerRouteKey("POST", "/api/hub-auto-accept"):                            textHubAutoAcceptOwnerOnly,
 	tunnel.OwnerRouteKey("GET", "/api/analytics/activity"):                          textActivityOwnerOnly,
+	tunnel.OwnerRouteKey("POST", "/api/sessions/live/{name}/notices/pause"):         textNoticesOwnerOnly,
+	tunnel.OwnerRouteKey("POST", "/api/sessions/live/{name}/notices/resume"):        textNoticesOwnerOnly,
 }
 
+const textNoticesOwnerOnly = "through Coral Hub pausing an agent's notices is for the account this computer is linked to only (#11387)"
 const textActivityOwnerOnly = "through Coral Hub the activity counts are for the account this computer is linked to only (#11225)"
 
 const textCustomModelsOwnerOnly = "through Coral Hub only the account this computer is linked to can add or change custom models (#5996)"

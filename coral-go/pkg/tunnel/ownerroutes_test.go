@@ -110,6 +110,10 @@ func TestTheOwnerTableAgreesWithTheHandWrittenListItReplaced(t *testing.T) {
 			if m == http.MethodGet && p == "/api/analytics/activity" {
 				continue
 			}
+			// Pausing and resuming Coral's notices to an agent (#11387) are the owner's alone: the old list never had them.
+			if m == http.MethodPost && strings.HasPrefix(p, "/api/sessions/live/") && (strings.HasSuffix(p, "/notices/pause") || strings.HasSuffix(p, "/notices/resume")) {
+				continue
+			}
 			// The owner's comment writes (a comment or reply, a resolve, a reopen) are new (#7052): the old list never had them.
 			if m == http.MethodPost && strings.HasPrefix(p, "/api/artifacts/") && (strings.HasSuffix(p, "/comments") || strings.HasSuffix(p, "/resolve") || strings.HasSuffix(p, "/reopen")) {
 				continue

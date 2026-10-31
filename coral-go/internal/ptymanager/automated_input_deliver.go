@@ -34,6 +34,14 @@ func DeliverAutomated(ctx context.Context, in AutomatedInput) (Delivery, error) 
 	if in.Send == nil {
 		return Sent, errors.New("automated input without a send function")
 	}
+	if in.SessionID == "" {
+		in.SessionID = naming.SessionIDFromName(in.Name)
+	}
+	if !in.force && !notHeld(in.What) && noticesHeld(in.SessionID) {
+		// The person paused Coral's notices to this agent, or is typing to it (#11387): the notice is counted and not typed; one line tells them when the hold ends.
+		holdNotice(in)
+		return Skipped, nil
+	}
 	unlock := gate.lockSession(in.Name)
 	defer unlock()
 	if !in.force && PersonSendActive(in.SessionID) {

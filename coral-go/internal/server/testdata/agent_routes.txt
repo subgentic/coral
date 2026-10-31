@@ -376,6 +376,8 @@ b POST /api/sessions/live/{name}/keys
 b POST /api/sessions/live/{name}/kill
 b POST /api/sessions/live/{name}/model
 a POST /api/sessions/live/{name}/notes
+b POST /api/sessions/live/{name}/notices/pause
+b POST /api/sessions/live/{name}/notices/resume
 b POST /api/sessions/live/{name}/open-in-editor
 a POST /api/sessions/live/{name}/pending-tool
 b POST /api/sessions/live/{name}/resize
