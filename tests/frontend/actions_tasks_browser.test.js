@@ -153,15 +153,15 @@ const { pinnedBarProbe } = require('./helpers/pinned_bar');
         await ev(`(() => { const inner = window.fetch; window.fetch = (u, o) => /\\/artifacts\\?task=/.test(String(u && u.url || u)) ? Promise.resolve(new Response(JSON.stringify({ artifacts: [{ task_id: ${made.claimed}, name: 'report.md', uri: 'coral://artifacts/${'c'.repeat(64)}', media_type: 'text/markdown' }], total: 1 }), { headers: { 'content-type': 'application/json' } })) : inner(u, o); return true; })()`);
         await ev(`${barBtn('Complete')}.click(); true`);
         await until(`!!document.getElementById('task-complete-message') && !!${barBtn('Back')}`, 'the completion form again');
-        // plain words (#10337): Mark as done, what was finished; no revision, no verification; Not yet: send back, beside Complete, tells the agent what is missing and leaves the task open
+        // plain words (#10337): Mark as done, what was finished; no revision, no verification; Changes, beside Complete, tells the agent what is missing and leaves the task open
         const words = await ev(`(() => { const f = document.querySelector('#team-panel-item .task-completion-form'); return { title: (f.querySelector('.task-completion-title') || {}).textContent, label: document.getElementById('task-complete-message').closest('label').textContent.trim(), text: f.textContent, placeholder: document.getElementById('task-complete-message').placeholder, buttons: ${BAR()}.map(b => b.textContent) }; })()`);
         check('the Complete form says Mark as done and What was finished?, with no revision or verification', words.title === 'Mark as done' && /^What was finished\?/.test(words.label) && !/revision/i.test(words.text) && !/verified/i.test(words.placeholder + words.text), JSON.stringify(words));
         await until(`/Results so far: report\\.md/.test(document.querySelector('#team-panel-item .task-completion-links')?.textContent || '')`, 'the task\'s result linked in the form', 5000);
-        check('Not yet: send back is beside Complete', words.buttons.includes('Not yet: send back') && words.buttons.indexOf('Not yet: send back') < words.buttons.indexOf('Complete'), JSON.stringify(words.buttons));
+        check('Changes is beside Complete', words.buttons.includes('Changes') && words.buttons.indexOf('Changes') < words.buttons.indexOf('Complete'), JSON.stringify(words.buttons));
         await ev(`const ta = document.getElementById('task-complete-message'); ta.value = 'the tests are missing'; true`);
-        await ev(`${barBtn('Not yet: send back')}.click(); true`);
+        await ev(`${barBtn('Changes')}.click(); true`);
         await until(`fetch('/api/board/${BOARD}/messages/all?limit=20').then(r => r.json()).then(j => JSON.stringify(j).includes('Not done yet') && JSON.stringify(j).includes('the tests are missing'))`, 'the message to the agent', 5000);
-        check('Not yet: send back posts what is missing to the agent and leaves the task open', !(await ev(`!!document.getElementById('task-complete-message')`)) && (await task(made.claimed)).status !== 'completed', JSON.stringify(await task(made.claimed)));
+        check('Changes posts what is missing to the agent and leaves the task open', !(await ev(`!!document.getElementById('task-complete-message')`)) && (await task(made.claimed)).status !== 'completed', JSON.stringify(await task(made.claimed)));
         await ev(`${barBtn('Complete')}.click(); true`);
         await until(`!!document.getElementById('task-complete-message') && !!${barBtn('Back')}`, 'the completion form for the last step');
         await ev(`${BAR()}.filter(b => b.textContent === 'Complete').pop().click(); true`);

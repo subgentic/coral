@@ -62,7 +62,7 @@ function stepsField() {
         render: slot => {
             slot.setAttribute('role', 'group'); slot.setAttribute('aria-labelledby', 'wf-steps-label');
             const list = el('div', 'wf-step-rows');
-            const add = el('button', 'btn btn-sm wf-add-step-btn'); add.type = 'button';
+            const add = el('button', 'btn wf-add-step-btn'); add.type = 'button';
             const plus = el('span', 'material-icons', 'add'); plus.setAttribute('aria-hidden', 'true'); plus.style.fontSize = 'var(--fs-lg)';
             add.append(plus, ' Add step');
             slot.append(list, add);

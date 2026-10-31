@@ -132,7 +132,7 @@ registerActions({
     'm-launch-session': el => { window.launchSession(); },
     'm-launch-team': el => { window.launchTeam(); },
     'm-mobile-connect-backdrop': (el, event) => { if (event.target === el) window._hideMobileConnectModal(); },
-    'm-mobile-connect-copy': el => { const u = document.getElementById('mobile-connect-url'); if (!u) return; navigator.clipboard.writeText(u.textContent); el.textContent = 'Copied!'; setTimeout(() => { el.textContent = 'Copy'; }, 1500); },
+    'm-mobile-connect-copy': el => { const u = document.getElementById('mobile-connect-url'); if (!u) return; navigator.clipboard.writeText(u.textContent); el.textContent = 'Copied'; setTimeout(() => { el.textContent = 'Copy'; }, 1500); },
     'm-on-agent-board-change': el => { window._onAgentBoardChange(); },
     'm-on-launch-server-change': el => { window._onLaunchServerChange(el.value); },
     'm-open-folder-backdrop': (el, event) => { if (event.target === el) window.hideOpenFolderModal(); },

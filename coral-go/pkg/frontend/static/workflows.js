@@ -217,7 +217,7 @@ function renderWorkflowDetail(wf, runs) {
         </div>
         <div class="item-bar wf-detail-actions">
             <div class="wf-more">
-                <button class="btn btn-sm wf-more-btn" type="button" data-on-click="wf-more" aria-expanded="false" aria-controls="wf-more-menu-${Number(wf.id)}" aria-label="More for ${escAttr(wf.name)}">More</button>
+                <button class="btn wf-more-btn" type="button" data-on-click="wf-more" aria-expanded="false" aria-controls="wf-more-menu-${Number(wf.id)}" aria-label="More for ${escAttr(wf.name)}">More</button>
                 <div class="menu wf-more-menu" id="wf-more-menu-${Number(wf.id)}" hidden>
                     <button class="menu-item wf-menu-phone" data-on-click="wf-edit-agent" data-workflow-id="${Number(wf.id)}">Edit with Agent</button>
                     <button class="menu-item wf-menu-phone" data-on-click="wf-edit" data-workflow-id="${Number(wf.id)}">Edit</button>
@@ -225,11 +225,11 @@ function renderWorkflowDetail(wf, runs) {
                     <button class="menu-item menu-item-danger" data-on-click="wf-delete" data-workflow-id="${Number(wf.id)}" data-name="${escAttr(wf.name)}">Delete</button>
                 </div>
             </div>
-            <button class="btn btn-sm wf-foot-secondary" data-on-click="wf-edit-agent" data-workflow-id="${Number(wf.id)}">
+            <button class="btn wf-foot-secondary" data-on-click="wf-edit-agent" data-workflow-id="${Number(wf.id)}">
                 <span class="material-icons" style="font-size:var(--fs-lg)" aria-hidden="true">smart_toy</span> Edit with Agent
             </button>
-            <button class="btn btn-sm wf-foot-secondary" data-on-click="wf-edit" data-workflow-id="${Number(wf.id)}">Edit</button>
-            <button class="btn btn-sm btn-primary" data-on-click="wf-trigger" data-workflow-id="${Number(wf.id)}">
+            <button class="btn wf-foot-secondary" data-on-click="wf-edit" data-workflow-id="${Number(wf.id)}">Edit</button>
+            <button class="btn btn-primary" data-on-click="wf-trigger" data-workflow-id="${Number(wf.id)}">
                 <span class="material-icons" style="font-size:var(--fs-lg)" aria-hidden="true">play_arrow</span> Run
             </button>
         </div>
@@ -314,13 +314,13 @@ function renderRunDetail(run) {
     const stepsHtml = steps.map((s, i) => runStepHtml(run, s, i, steps.length)).join('');
 
     const killBtn = isActive
-        ? `<button class="btn btn-sm" style="color:var(--error-text)" data-on-click="wf-kill-run" data-run-id="${Number(run.id)}">
+        ? `<button class="btn" style="color:var(--error-text)" data-on-click="wf-kill-run" data-run-id="${Number(run.id)}">
             <span class="material-icons" style="font-size:var(--fs-lg)" aria-hidden="true">stop</span> Kill
           </button>`
         : '';
 
     const retriggerBtn = !isActive && run.workflow_id
-        ? `<button class="btn btn-sm btn-primary" data-on-click="wf-trigger" data-workflow-id="${Number(run.workflow_id)}">
+        ? `<button class="btn btn-primary" data-on-click="wf-trigger" data-workflow-id="${Number(run.workflow_id)}">
             <span class="material-icons" style="font-size:var(--fs-lg)" aria-hidden="true">replay</span> Re-run
           </button>`
         : '';

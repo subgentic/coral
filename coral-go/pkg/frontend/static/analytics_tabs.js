@@ -131,7 +131,7 @@ function drawUsage(m) {
     const drill = V.panel(row.label, `${fmt(row.total)} that day`, list);
     if (m.group === 'agent' && rank.length) {
         const top = rank.find(r => r.key !== '__other') || rank[0];
-        const b = el('button', 'btn btn-sm atab-drill', `Biggest turns of ${top.name}`); b.type = 'button';
+        const b = el('button', 'btn atab-drill', `Biggest turns of ${top.name}`); b.type = 'button';
         b.addEventListener('click', () => loadTurns(top.name, row.day));
         drill.append(b);
         if (m.turns && m.turns.agent === top.name && m.turns.day === row.day) drill.append(turnsTable(m.turns));

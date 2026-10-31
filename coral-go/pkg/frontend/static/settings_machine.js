@@ -29,7 +29,7 @@ export function _wireApiKeyControls(input) {
     });
     copy?.addEventListener('click', async () => {
         const ok = await copyText(input.value);
-        copy.textContent = ok ? 'Copied!' : 'Copy failed';
+        copy.textContent = ok ? 'Copied' : 'Copy failed';
         setTimeout(() => { copy.textContent = 'Copy'; }, 1500);
     });
 }

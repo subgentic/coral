@@ -460,7 +460,7 @@ export function renderTaskPage(host, task, ctx, mode = 'view') {
                 requestAnimationFrame(() => document.querySelector('#confirm-modal .modal-actions .btn:not(#confirm-modal-yes)')?.focus());
             };
             form.node.addEventListener('keydown', e => { if (e.key === 'Escape' && !e.defaultPrevented) { e.preventDefault(); e.stopPropagation(); leave(); } });
-            bar.append(btn('btn', 'Back', leave), ...(form.canSendBack ? [btn('btn', 'Not yet: send back', () => form.sendBack())] : []), btn('btn btn-primary', 'Complete', () => form.submit()));
+            bar.append(btn('btn', 'Back', leave), ...(form.canSendBack ? [btn('btn', 'Changes', () => form.sendBack())] : []), btn('btn btn-primary', 'Complete', () => form.submit()));
         });
         page.append(bar);
         focus = null;

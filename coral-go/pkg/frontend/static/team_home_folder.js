@@ -38,7 +38,7 @@ export function teamHomeFolderControl(team, { canChange = true } = {}) {
         input.setAttribute('aria-describedby', `team-home-folder-error-${n}`);
         const save = document.createElement('button');
         save.type = 'button';
-        save.className = 'btn btn-sm btn-primary team-home-folder-change';
+        save.className = 'btn btn-primary team-home-folder-change';
         save.textContent = 'Change folder';
         const error = document.createElement('p');
         error.className = 'board-rename-error';

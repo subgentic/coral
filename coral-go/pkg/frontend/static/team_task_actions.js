@@ -202,7 +202,7 @@ export function completeForm(task, ctx) {
         box.append(req);
     }
     const hubWhy = blockedReason(splitKey(ctx.project).server, 'interact'); // a Hub viewer below Interact cannot post to the board: no send back for them (#10337)
-    if (canSendBack(task, hubWhy) && !required.length) box.append(el('p', 'task-completion-hint', `Not finished? Write what is missing here, then press Not yet: send back to tell ${task.assigned_to}.`));
+    if (canSendBack(task, hubWhy) && !required.length) box.append(el('p', 'task-completion-hint', `Not finished? Write what is missing here, then press Changes to tell ${task.assigned_to}.`));
     const details = el('details', 'task-completion-evidence'); if (required.length) details.open = true;
     details.append(el('summary', null, required.length ? 'Evidence and artifacts (required)' : 'Add evidence or artifact metadata (optional)'));
     const name = Object.assign(input('task-artifact-name'), { placeholder: 'build or test_report' });
@@ -245,7 +245,7 @@ export function completeForm(task, ctx) {
             showToast(e.message || 'Failed to complete task', true);
         }
     }
-    /** "Not yet: send back": what is missing, written in the box, goes to the agent that has the task as an Operator message on the board; the task stays open. With nothing written it just goes back. */
+    /** "Changes" (send back): what is missing, written in the box, goes to the agent that has the task as an Operator message on the board; the task stays open. With nothing written it just goes back. */
     async function sendBack() {
         const text = message.value.trim();
         if (!text || !task.assigned_to) { ctx.redraw(task, 'view'); return; }

@@ -170,13 +170,13 @@
                                 <!-- Popout-only states (dashboard never shows these) -->
                                 <div class="session-ended-content" id="popout-ended" style="display:none">
                                     <p>This agent has ended.</p>
-                                    <a class="btn btn-secondary" id="popout-open-history" target="_blank" rel="noopener noreferrer" hidden>Open transcript in Coral</a>
+                                    <a class="btn" id="popout-open-history" target="_blank" rel="noopener noreferrer" hidden>Open transcript in Coral</a>
                                     <a class="btn btn-primary" id="popout-restarted-link" target="_blank" rel="noopener noreferrer" hidden>A restarted agent is running — open it</a>
                                 </div>
                                 <div class="session-ended-content" id="popout-not-found" style="display:none">
                                     <p>No agent with this id</p>
                                     <button class="btn btn-primary" id="popout-retry-btn" type="button" data-on-click="popout-retry">Retry</button>
-                                    <a class="btn btn-secondary" id="popout-open-dashboard" href="/">Open Coral</a>
+                                    <a class="btn" id="popout-open-dashboard" href="/">Open Coral</a>
                                 </div>
                             </div>
                             <div id="xterm-disconnected-badge" class="chip xterm-disconnected-badge" role="status" aria-live="assertive">Disconnected — reconnecting...</div>
@@ -187,11 +187,11 @@
                             <div id="sleeping-composer" class="sleeping-composer" hidden>
                                 <span class="sleeping-composer-label"><span aria-hidden="true" id="sleeping-composer-icon">🌙</span> <span id="sleeping-composer-text">This agent is sleeping</span></span>
                                 <span class="sleeping-composer-hint" id="sleeping-composer-hint" hidden></span><!-- an ended agent: what Wake and Restart each do (sleeping_view.js, #10439) -->
-                                <span class="sleeping-composer-asked" id="sleeping-composer-asked" hidden><span id="sleeping-composer-asked-text"></span> <button class="btn btn-secondary btn-small" id="sleeping-asked-dismiss" type="button" data-action="dismiss-asked">Dismiss</button></span><!-- a question the agent asked before Coral restarted (asked_before_restart.js, #10368): its CLI is gone, so Restart (or Wake) and Dismiss, no answer buttons -->
+                                <span class="sleeping-composer-asked" id="sleeping-composer-asked" hidden><span id="sleeping-composer-asked-text"></span> <button class="btn btn-small" id="sleeping-asked-dismiss" type="button" data-action="dismiss-asked">Dismiss</button></span><!-- a question the agent asked before Coral restarted (asked_before_restart.js, #10368): its CLI is gone, so Restart (or Wake) and Dismiss, no answer buttons -->
                                 <span class="sleeping-composer-actions">
                                     <button class="btn btn-primary btn-small" id="sleeping-unarchive-btn" type="button" data-action="unarchive" hidden>Unarchive</button>
                                     <button class="btn btn-primary btn-small" id="sleeping-wake-btn" type="button" data-action="wake">Wake</button>
-                                    <button class="btn btn-secondary btn-small" id="sleeping-restart-btn" type="button" data-action="restart" title="Start a fresh session with new settings instead of resuming">Restart…</button>
+                                    <button class="btn btn-small" id="sleeping-restart-btn" type="button" data-action="restart" title="Start a fresh session with new settings instead of resuming">Restart…</button>
                                 </span>
                             </div>
                             <div id="agent-keys-status" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>

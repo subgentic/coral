@@ -49,7 +49,7 @@ registerActions({
         const cmd = textOf(el.dataset.cmd, 8192);
         if (!cmd) return;
         navigator.clipboard.writeText(cmd);
-        el.textContent = 'Copied!';
+        el.textContent = 'Copied';
         setTimeout(() => { el.textContent = 'Copy'; }, 1500);
     },
     'preset-pick': el => {

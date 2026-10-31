@@ -94,7 +94,6 @@ export function applySleepingView(sleeping, { manageInput = true, archived } = {
     if (wake) {
         // Archived: Unarchive is the primary action, Wake the second.
         wake.classList.toggle('btn-primary', !archived);
-        wake.classList.toggle('btn-secondary', archived);
     }
     const restart = document.getElementById('sleeping-restart-btn');
     if (restart) restart.hidden = archived;
