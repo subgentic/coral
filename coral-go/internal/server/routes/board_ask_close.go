@@ -24,6 +24,7 @@ func (h *BoardHandler) CloseAsk(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		SubscriberID string `json:"subscriber_id"` // accepted for the command line's sake and ignored: the verified caller closes
 		Note         string `json:"note"`
+		Undo         bool   `json:"undo"` // open the question again (the Operator's Undo of an Ignore, #11552): no note, the same callers, nothing posted
 	}
 	if err := decodeJSON(r, &body); err != nil {
 		errBadRequest(w, "invalid JSON")
@@ -37,7 +38,7 @@ func (h *BoardHandler) CloseAsk(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	note := strings.TrimSpace(clitext.Clean(body.Note))
-	if note == "" {
+	if note == "" && !body.Undo {
 		errBadRequest(w, "a note is required: say where it was answered")
 		return
 	}
@@ -48,6 +49,19 @@ func (h *BoardHandler) CloseAsk(w http.ResponseWriter, r *http.Request) {
 	}
 	if !h.mayCloseAsk(r, project, actor, asker) {
 		writeError(w, http.StatusForbidden, "not_allowed", "only the asker, the Operator or the board's orchestrator may close a question")
+		return
+	}
+	if body.Undo {
+		reopened, err := h.bs.ReopenAsk(r.Context(), project, id)
+		if err != nil {
+			if errors.Is(err, board.ErrAskUnknown) {
+				errNotFound(w, "no question of this board has that message id")
+				return
+			}
+			errInternalServer(w, "could not open the question again")
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "reopened": reopened})
 		return
 	}
 	if err := h.bs.CloseAsk(r.Context(), project, id, actor, note); err != nil {

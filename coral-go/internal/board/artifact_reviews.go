@@ -15,6 +15,8 @@ import (
 const (
 	ReviewApproved         = "approved"
 	ReviewChangesRequested = "changes requested"
+	ReviewDenied           = "denied"  // the Operator's final no (#11552): the row leaves Needs you and a later approve or changes is refused; a new version of the file is a new row
+	tagIgnored             = "ignored" // the Operator took it out of Needs you with no verdict and no message; Unignore puts "for review" back
 	tagForReview           = "for review"
 	tagRead                = "read"
 	tagReviewed            = "reviewed"
@@ -95,7 +97,7 @@ func (s *Store) DecideArtifactReview(ctx context.Context, boardID, hex, state st
 	default:
 		return ch, nil, err
 	}
-	if ch.prevState != nil && ch.prevState.State == state && (state == ReviewApproved || set[tagForReview]) {
+	if ch.prevState != nil && ch.prevState.State == state && (state == ReviewApproved || state == ReviewDenied || set[tagForReview]) {
 		return ch, have, nil // already decided this way
 	}
 	if state == ReviewChangesRequested && ch.prevState != nil && ch.prevState.State == ReviewApproved {
@@ -119,6 +121,12 @@ func (s *Store) DecideArtifactReview(ctx context.Context, boardID, hex, state st
 		next[tagForReview] = true
 		next[ReviewChangesRequested] = true
 		delete(next, tagRead) // it is something to read again: the agent changes it
+	case ReviewDenied:
+		delete(next, tagForReview)
+		delete(next, tagRead)
+		delete(next, ReviewChangesRequested)
+		delete(next, tagReviewed)
+		next[ReviewDenied] = true
 	}
 	if len(next) > MaxArtifactTags {
 		return ch, have, ErrArtifactTag
@@ -212,4 +220,50 @@ func (s *Store) SupersedeArtifactReview(ctx context.Context, boardID, hex string
 		return false, err
 	}
 	return true, tx.Commit()
+}
+
+// IgnoreArtifactReview takes an artifact out of Needs you with no verdict (#11552): "for review" is replaced by "ignored" and every other tag stays (read, changes requested), so Unignore (on false) puts
+// it back exactly as it was. No review row is written and the caller posts nothing. Ignoring twice changes nothing; an artifact that is not waiting for a review (or, to unignore, is not ignored) is
+// ErrNotForReview.
+func (s *Store) IgnoreArtifactReview(ctx context.Context, boardID, hex string, ignore bool) (ReviewChange, []string, error) {
+	ch := ReviewChange{board: boardID, hex: hex}
+	tx, err := s.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return ch, nil, err
+	}
+	defer tx.Rollback()
+	var have []string
+	if err := tx.SelectContext(ctx, &have, `SELECT tag FROM artifact_tags WHERE board_id = ? AND hex = ? ORDER BY tag`, boardID, hex); err != nil {
+		return ch, nil, err
+	}
+	ch.prevTags = have
+	set := map[string]bool{}
+	for _, t := range have {
+		set[t] = true
+	}
+	from, to := tagForReview, tagIgnored
+	if !ignore {
+		from, to = tagIgnored, tagForReview
+	}
+	if ignore && set[tagIgnored] && !set[tagForReview] {
+		return ch, have, nil // ignored already
+	}
+	if !set[from] {
+		return ch, have, ErrNotForReview
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM artifact_tags WHERE board_id = ? AND hex = ? AND tag = ?`, boardID, hex, from); err != nil {
+		return ch, nil, err
+	}
+	if _, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO artifact_tags (board_id, hex, tag) VALUES (?, ?, ?)`, boardID, hex, to); err != nil {
+		return ch, nil, err
+	}
+	var tags []string
+	if err := tx.SelectContext(ctx, &tags, `SELECT tag FROM artifact_tags WHERE board_id = ? AND hex = ? ORDER BY tag`, boardID, hex); err != nil {
+		return ch, nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return ch, nil, err
+	}
+	ch.Changed = true
+	return ch, tags, nil
 }

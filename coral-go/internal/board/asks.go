@@ -456,3 +456,17 @@ func (s *Store) CloseAsk(ctx context.Context, project string, messageID int64, b
 	_, err := s.db.ExecContext(ctx, `INSERT OR IGNORE INTO board_ask_closed (message_id, project, closed_by, note, closed_at) VALUES (?, ?, ?, ?, ?)`, messageID, project, by, note, nowUTC())
 	return err
 }
+
+// ReopenAsk undoes CloseAsk (#11552): the Operator's Ignore of a question has an Undo. It reports whether a closing was removed; an open question is left as it is. It does not touch an answer: a question the
+// Operator replied to stays answered.
+func (s *Store) ReopenAsk(ctx context.Context, project string, messageID int64) (bool, error) {
+	if _, err := s.AskAsker(ctx, project, messageID); err != nil {
+		return false, err
+	}
+	res, err := s.db.ExecContext(ctx, `DELETE FROM board_ask_closed WHERE project = ? AND message_id = ?`, project, messageID)
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	return n > 0, err
+}

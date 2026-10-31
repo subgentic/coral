@@ -251,3 +251,56 @@ func TestCloseAskTrustsTheVerifiedActorAndNeverTheClaim(t *testing.T) {
 	assert.Equal(t, http.StatusOK, call(&Actor{Kind: ActorToken, Name: "Lead", Session: "claude-lead"}, "Other"), "the asker's own token closes it, whatever it claims")
 	assert.Equal(t, 0, open())
 }
+
+// #11552: the Operator's Ignore on a question is a close, and its Undo is an undo of that close: the question is open again, the same caller rules apply, and neither way posts anything to the board.
+func TestAClosedAskIsOpenedAgainByUndoAndNothingIsPosted(t *testing.T) {
+	h, bs := operatorAsksRig(t)
+	ctx := context.Background()
+	for _, who := range []struct{ id, title string }{{"Lead", "Lead Developer"}, {"Other", "QA"}} {
+		_, err := bs.Subscribe(ctx, "team", who.id, who.title, "", nil, "all")
+		require.NoError(t, err)
+	}
+	q, err := bs.PostMessage(ctx, "team", "Lead", "@Operator may I proceed?", nil)
+	require.NoError(t, err)
+	require.NoError(t, bs.RecordAsk(ctx, "team", q, []string{"Operator"}))
+	call := func(who string, body map[string]any) (int, map[string]any) {
+		raw, _ := json.Marshal(body)
+		req := httptest.NewRequest(http.MethodPost, "/api/board/team/asks/x/close", strings.NewReader(string(raw)))
+		if who == "Operator" {
+			req = withActor(req, Actor{Kind: ActorOperator, Name: "Operator"})
+		} else {
+			req = withActor(req, Actor{Kind: ActorToken, Name: who, Session: "claude-" + who})
+		}
+		rc := chi.NewRouteContext()
+		rc.URLParams.Add("project", "team")
+		rc.URLParams.Add("messageID", fmt.Sprint(q.ID))
+		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rc))
+		w := httptest.NewRecorder()
+		h.CloseAsk(w, req)
+		var out map[string]any
+		_ = json.Unmarshal(w.Body.Bytes(), &out)
+		return w.Code, out
+	}
+	open := func() int { _, rows, _ := readOperatorAsks(t, h, asPerson); return len(rows) }
+	posts := func() int { m, err := bs.ListMessages(ctx, "team", 100, 0, 0); require.NoError(t, err); return len(m) }
+	before := posts()
+
+	code, _ := call("Operator", map[string]any{"note": "Dismissed by the operator"})
+	require.Equal(t, http.StatusOK, code)
+	require.Equal(t, 0, open())
+	code, out := call("Other", map[string]any{"undo": true})
+	assert.Equal(t, http.StatusForbidden, code, "another member may not undo a close")
+	assert.Equal(t, "not_allowed", out["code"])
+	assert.Equal(t, 0, open())
+	code, out = call("Operator", map[string]any{"undo": true})
+	require.Equal(t, http.StatusOK, code)
+	assert.Equal(t, true, out["reopened"])
+	assert.Equal(t, 1, open(), "open again")
+	code, out = call("Operator", map[string]any{"undo": true})
+	assert.Equal(t, http.StatusOK, code)
+	assert.Equal(t, false, out["reopened"], "undoing what is not closed changes nothing")
+	m, err := bs.GetMessageByID(ctx, "team", q.ID)
+	require.NoError(t, err)
+	assert.False(t, m.Ask.Closed)
+	assert.Equal(t, before, posts(), "close and undo post nothing")
+}
