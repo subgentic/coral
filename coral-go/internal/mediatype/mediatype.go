@@ -14,6 +14,32 @@ const Generic = "application/octet-stream"
 var portable = map[string]string{
 	".md":       "text/markdown; charset=utf-8",
 	".markdown": "text/markdown; charset=utf-8",
+	".patch":    "text/plain; charset=utf-8", // a diff is text: stored as octet-stream it could not be shown inline (#11553)
+	".diff":     "text/plain; charset=utf-8",
+}
+
+// viewableExt are the extensions the dashboard's viewer shows as text when the stored type says nothing (artifact_preview.js).
+var viewableExt = map[string]bool{".md": true, ".markdown": true, ".txt": true, ".log": true, ".json": true, ".xml": true, ".csv": true, ".tsv": true, ".yml": true, ".yaml": true,
+	".toml": true, ".ini": true, ".conf": true, ".sh": true, ".js": true, ".ts": true, ".go": true, ".py": true, ".rs": true, ".css": true, ".html": true, ".htm": true}
+
+// Viewable reports whether the dashboard can show an artifact of this media type and name inline (what Needs you offers to read): text of any kind (Markdown, HTML, CSV and TSV tables, plain),
+// JSON and XML, an image, audio or video, or a PDF; a type that says nothing (octet-stream) only by a name the viewer reads as text. Any other binary (a zip, an executable) is not.
+func Viewable(mediaType, name string) bool {
+	t := strings.TrimSpace(mediaType)
+	if parsed, _, err := mime.ParseMediaType(t); err == nil {
+		t = parsed
+	}
+	t = strings.ToLower(t)
+	switch {
+	case t == "" || IsGeneric(t):
+		return viewableExt[strings.ToLower(filepath.Ext(strings.TrimSpace(name)))]
+	case strings.HasPrefix(t, "text/"), strings.HasPrefix(t, "image/"), strings.HasPrefix(t, "audio/"), strings.HasPrefix(t, "video/"):
+		return true
+	case t == "application/json", t == "application/xml", t == "application/pdf", t == "application/xhtml+xml", t == "application/csv",
+		strings.HasSuffix(t, "+json"), strings.HasSuffix(t, "+xml"):
+		return true
+	}
+	return false
 }
 
 // IsGeneric reports whether a declared media type carries no information.

@@ -10,7 +10,19 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/subgentic/coral/internal/board"
+	"github.com/subgentic/coral/internal/mediatype"
 )
+
+// withoutTag is tags without drop, in a new slice (the stored list is shared); nil when none is left.
+func withoutTag(tags []string, drop string) []string {
+	var out []string
+	for _, t := range tags {
+		if t != drop {
+			out = append(out, t)
+		}
+	}
+	return out
+}
 
 // Artifact tags (#8583, Goal #61): the team's words on its stored artifacts ("for review", "internal"). A tag belongs to a team's use of an object (board.Store.ArtifactTags).
 
@@ -24,6 +36,9 @@ func (h *BoardHandler) attachArtifactTags(ctx context.Context, project string, i
 	for i := range items {
 		if items[i].managed != "" {
 			items[i].Tags = tags[items[i].managed]
+			if hasTag(items[i].Tags, tagForReview) && items[i].MediaType != "" && !mediatype.Viewable(items[i].MediaType, items[i].Name) {
+				items[i].Tags = withoutTag(items[i].Tags, tagForReview) // a row Needs you cannot show leaves it, whoever tagged it and whenever (#11553); the stored tag is not changed
+			}
 			if rv, ok := reviews[items[i].managed]; ok {
 				rv := rv
 				items[i].Review = &rv
