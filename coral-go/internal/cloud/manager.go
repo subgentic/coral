@@ -514,10 +514,11 @@ func (m *Manager) pollEnrollment(ctx context.Context, gen int, dc *DeviceCode, r
 			return
 		case <-time.After(interval):
 		}
-		if now := m.o.Now(); now.Sub(last) > interval+pollGap(interval) {
+		sent := m.o.Now() // when this ask goes out: an answer that arrives after a sleep is still an answer from before it, so 'last' is this, not the time of the answer
+		if sent.Sub(last) > interval+pollGap(interval) {
 			gapped = true
 		}
-		if !m.o.Now().Before(dc.ExpiresAt) {
+		if !sent.Before(dc.ExpiresAt) {
 			expired()
 			return
 		}
@@ -561,10 +562,10 @@ func (m *Manager) pollEnrollment(ctx context.Context, gen int, dc *DeviceCode, r
 			m.startTunnel(conn)
 			return
 		case errors.Is(err, ErrAuthorizationPending):
-			failures, last = 0, m.o.Now() // the hub answered: nothing was approved yet, as of now
+			failures, last = 0, sent // the hub answered: nothing was approved yet, as of when it was asked
 		case errors.Is(err, ErrSlowDown):
 			interval += 5 * time.Second
-			last = m.o.Now()
+			last = sent
 		case errors.Is(err, ErrEnrollmentExpired):
 			expired()
 			return
