@@ -8,7 +8,7 @@ about 2,200 icons and the dashboard names about 150 of them, so this keeps only 
     python3 tools/subset_icons.py --source /path/to/full/material-icons.woff2 [--dry-run]
 
   --source   the full upstream font (Google Fonts, fonts.gstatic.com/s/materialicons/v145/); it is not kept in the repository
-  writes     pkg/frontend/static/vendor/fonts/material-icons.woff2 (the subset) and material-icons.names.txt (the icons in it)
+  writes     pkg/frontend/static/vendor/fonts/material-icons.woff2 (the subset) and tests/frontend/fixtures/material-icons.names.txt (the icons in it; a fixture, not shipped)
   refreshes  tools/material-icons-all-names.txt (every ligature name of the full font, which the scan and its test compare against)
 
 Needs: fonttools and brotli (pip install fonttools brotli; both MIT) and node. Run it again whenever a new icon is used: the node
@@ -82,7 +82,7 @@ def main():
     if missing:
         sys.exit('lost icons in the subset: %s' % missing)
     out = os.path.join(FONTS, 'material-icons.woff2')
-    outnames = os.path.join(FONTS, 'material-icons.names.txt')
+    outnames = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'tests', 'frontend', 'fixtures', 'material-icons.names.txt')  # a test fixture, not shipped (#11492's audit)
     full.flavor = 'woff2'
     if a.dry_run:
         with tempfile.TemporaryDirectory() as d:

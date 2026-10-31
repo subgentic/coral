@@ -211,3 +211,39 @@ func TestStaticImagesAreReferenced(t *testing.T) {
 		}
 	}
 }
+
+// nonWebAllowed are the files in the static tree that are not web assets, kept on purpose (#11492's audit found ~12 KB of notes and lists shipped in every binary for nothing).
+var nonWebAllowed = map[string]string{
+	"vendor/README.md":                  "read by tools/audit-frontend-deps.py (the weekly vulnerability audit) and kept equal to the vendored files by tests/frontend/vendor_manifest.mjs",
+	"vendor/fonts/README.md":            "the fonts' licences and sources: the notice that goes with the font files",
+	"vendor/xterm/addon-canvas.LICENSE": "the licence text of a vendored library",
+	".gitkeep":                          "12 bytes: keeps static/ a directory the embed can name in a fresh checkout",
+}
+
+// webExt are the extensions of what a browser loads from the static tree.
+var webExt = map[string]bool{".js": true, ".css": true, ".html": true, ".json": true, ".png": true, ".svg": true, ".ico": true, ".woff2": true}
+
+// TestStaticTreeHoldsOnlyWebFiles fails on a file in the embedded static tree that a browser does not load: a README, a notes file (a CLAUDE.md), a name list. Notes and test data live outside static/ (the
+// platform notes in pkg/frontend, the icon-name list in tests/frontend/fixtures); a licence or a file another tool reads is named above with its reason. The synced agent docs (static/agent_docs) are not web files
+// either, and are counted by the budget above.
+func TestStaticTreeHoldsOnlyWebFiles(t *testing.T) {
+	_ = fs.WalkDir(Static, "static", func(p string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return nil
+		}
+		rel := strings.TrimPrefix(p, "static/")
+		if strings.HasPrefix(rel, "agent_docs/") {
+			return nil
+		}
+		if _, ok := nonWebAllowed[rel]; ok || webExt[strings.ToLower(path.Ext(rel))] {
+			return nil
+		}
+		t.Errorf("%s is not a web file and every Coral binary carries it: move it outside static/ (notes next to the package, test data under tests/), or name it in nonWebAllowed with the reason it must ship", rel)
+		return nil
+	})
+	for rel := range nonWebAllowed {
+		if _, err := fs.Stat(Static, "static/"+rel); err != nil {
+			t.Errorf("nonWebAllowed names %s, which is no longer in the static tree: remove the entry", rel)
+		}
+	}
+}

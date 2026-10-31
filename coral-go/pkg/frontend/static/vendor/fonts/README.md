@@ -6,7 +6,7 @@ referrer reaches a third party; CSP: no external font/style hosts).
 | File | Font | Licence | Source |
 |---|---|---|---|
 | `jakarta-latin.woff2`, `jakarta-latin-ext.woff2` | Plus Jakarta Sans (400-700, latin and latin-ext subsets) | SIL Open Font License 1.1 | Google Fonts, `fonts.gstatic.com/s/plusjakartasans/v12/` |
-| `material-icons.woff2` | Material Icons (regular), **subset** to the icons the dashboard's source names (`material-icons.names.txt`) | Apache License 2.0 | Google Fonts, `fonts.gstatic.com/s/materialicons/v145/`, reduced by `coral-go/tools/subset_icons.py` (fonttools, MIT) |
+| `material-icons.woff2` | Material Icons (regular), **subset** to the icons the dashboard's source names (listed in `tests/frontend/fixtures/material-icons.names.txt`) | Apache License 2.0 | Google Fonts, `fonts.gstatic.com/s/materialicons/v145/`, reduced by `coral-go/tools/subset_icons.py` (fonttools, MIT) |
 
 Cyrillic and Vietnamese subsets of Plus Jakarta Sans are not bundled; those characters fall back to the
 system font. Add them with a matching `@font-face` in `css/fonts.css` if needed.
