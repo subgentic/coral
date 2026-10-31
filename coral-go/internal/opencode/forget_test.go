@@ -167,3 +167,18 @@ func TestForgetOnlyTakesAnAgentKeyAndOnlyPointersThatNameThatKey(t *testing.T) {
 	require.NoError(t, m.Forget("agent-1"))
 	assert.True(t, exists(filepath.Join(storesDir(cfg.DataDir), "ses_other99")), "agent-10 is not agent-1")
 }
+
+// #11608: a Manager with no data folder refuses to forget, as Start refuses to start: with an empty folder the removals would run relative to the working folder and take a servers/<key> there.
+func TestForgetWithNoDataFolderTouchesNothing(t *testing.T) {
+	work := t.TempDir()
+	t.Chdir(work)
+	const key = "a1b2c3d4e5f6"
+	require.NoError(t, os.MkdirAll(filepath.Join("servers", key), 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join("servers", key, "keep.txt"), []byte("x"), 0o600))
+	m := NewManager(Config{})
+	err := m.Forget(key)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "data folder")
+	assert.True(t, exists(filepath.Join(work, "servers", key, "keep.txt")), "a folder in the working directory is not removed")
+	assert.False(t, m.isForgotten(key), "and nothing is marked forgotten")
+}

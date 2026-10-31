@@ -33,6 +33,9 @@ func (m *Manager) Forget(key string) error {
 	if !keyRe.MatchString(key) {
 		return fmt.Errorf("opencode: not an agent key: %q", key)
 	}
+	if m.cfg.DataDir == "" { // as Start: with no folder every removal below would run relative to the working folder (#11608)
+		return errors.New("opencode: a data folder is needed to forget an agent")
+	}
 	m.mu.Lock()
 	if m.forgotten == nil || len(m.forgotten) >= 4096 { // keys are ids that are never reused: the set only has to outlast a start or a read already under way
 		m.forgotten = map[string]bool{}
