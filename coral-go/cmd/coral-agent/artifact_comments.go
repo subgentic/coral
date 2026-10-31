@@ -145,7 +145,11 @@ func formatComments(id string, all []listedComment) string {
 		writeComment(&b, "  ", r)
 		rs := replies[r.ID]
 		sort.SliceStable(rs, func(i, j int) bool { return rs[i].ID < rs[j].ID })
-		for _, c := range rs {
+		for i, c := range rs {
+			if b.Len() > printedTotalCap || lines > printedMaxLines { // the cap holds inside a thread too: a thread of hundreds of replies cannot fill the listing
+				fmt.Fprintf(&b, "    ... %d more replies were left out\n", len(rs)-i)
+				break
+			}
 			writeComment(&b, "    ", c)
 			lines++
 		}

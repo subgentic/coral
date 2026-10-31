@@ -128,3 +128,26 @@ func TestFormatCommentsCleansWhatOtherPeopleWrote(t *testing.T) {
 		t.Fatalf("a comment is cut at 1500 characters")
 	}
 }
+
+// A thread of hundreds of replies cannot fill the listing: the cap holds inside the thread and says how many replies were left out.
+func TestFormatCommentsCapsRepliesInsideAThread(t *testing.T) {
+	root := int64(1)
+	all := []listedComment{{ID: 1, Body: "root", CreatedAt: "t"}}
+	for i := 0; i < 200; i++ {
+		all = append(all, listedComment{ID: int64(i + 2), ParentID: &root, Body: strings.Repeat("r", 400), CreatedAt: "t"})
+	}
+	s := formatComments(replyDigest, all)
+	if len(s) > 2*24000 {
+		t.Fatalf("the listing is %d bytes: the cap did not hold inside the thread", len(s))
+	}
+	if !strings.Contains(s, "more replies were left out") {
+		t.Fatalf("the cut is not said:\n%.200s", s)
+	}
+	if got := strings.Count(s, strings.Repeat("r", 400)); got < 1 || got >= 200 {
+		t.Fatalf("%d replies were printed", got)
+	}
+	short := formatComments(replyDigest, all[:4])
+	if strings.Contains(short, "left out") {
+		t.Fatal("a short thread is printed whole")
+	}
+}
