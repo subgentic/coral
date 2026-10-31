@@ -18,6 +18,7 @@ import (
 	at "github.com/subgentic/coral/internal/agenttypes"
 	"github.com/subgentic/coral/internal/clitext"
 	"github.com/subgentic/coral/internal/naming"
+	"github.com/subgentic/coral/internal/permreview"
 	"github.com/subgentic/coral/internal/ptymanager"
 	"github.com/subgentic/coral/internal/terminalinput"
 )
@@ -81,6 +82,11 @@ type promptScreen struct {
 	// The few lines above the question (a permission prompt's command): with the question and the labels,
 	// what tells this prompt from the next one the agent opens (samePrompt).
 	context string
+	// Target is the lines above the question (a permission prompt's command) as permreview shows them: whole up to its limit, hidden characters written out. OnlyReject and Note: the request holds a character
+	// that hides what it does, or is longer than a card shows, so only Reject is offered and an Allow answer is refused (#11399). A cut the CLI itself makes on its screen cannot be known.
+	Target     string `json:"target,omitempty"`
+	OnlyReject bool   `json:"only_reject,omitempty"`
+	Note       string `json:"note,omitempty"`
 	// AskID names this ask: a short digest of its title, question, the lines above it and its option labels (not the selection). An answer that carries the id it was drawn for is refused
 	// when the screen now shows another ask (#10400): a row or card drawn for one command cannot answer the next one.
 	AskID string `json:"ask_id,omitempty"`
@@ -144,8 +150,17 @@ func parsePromptScreen(capture string) (promptScreen, bool) {
 	if !ok {
 		return s, false
 	}
+	// Judged on the raw text, before cleanPromptScreen drops what hides: the terminal still holds it.
+	rv := permreview.Merge(permreview.Of(s.context), permreview.Of(s.Question), permreview.Of(s.Title))
+	target := permreview.Of(s.context).Shown
 	s = cleanPromptScreen(s)
 	s.AskID = askID(s)
+	if s.context != "" {
+		s.Target = target
+	}
+	if !rv.Allowed() {
+		s.OnlyReject, s.Note = true, rv.Note()
+	}
 	return s, true
 }
 
@@ -655,6 +670,10 @@ func (h *SessionsHandler) AnswerPrompt(w http.ResponseWriter, r *http.Request) {
 		errConflict(w, "The prompt changed. Answer it in the terminal.")
 		return
 	}
+	if note := h.onlyRejectNote(body.SessionID, screen); note != "" && !isRejectLabel(opt.Label) { // a request that cannot be shown whole or hides something is never allowed from here (#11399)
+		writeError(w, http.StatusConflict, "only_reject", note)
+		return
+	}
 	// A typed answer is one line: Enter submits the field
 	text := strings.Join(strings.Fields(body.Text), " ")
 	if opt.Action == "text" && text == "" {
@@ -998,3 +1017,24 @@ func wrapsInto(above, below string) bool {
 	first, _, _ := strings.Cut(below, " ")
 	return utf8.RuneCountInString(above)+1+utf8.RuneCountInString(first) > utf8.RuneCountInString(below)
 }
+
+// onlyRejectNote is the sentence that says the open request can only be rejected here ("" when it can be allowed): the pending tool the hook reported, or the screen's own prompt.
+func (h *SessionsHandler) onlyRejectNote(sessionID string, screen promptScreen) string {
+	if screen.OnlyReject {
+		return screen.Note
+	}
+	if sessionID != "" {
+		if t, ok := h.pending.get(sessionID, time.Now()); ok {
+			if only, _ := t.Input["only_reject"].(bool); only {
+				note, _ := t.Input["note"].(string)
+				return note
+			}
+		}
+	}
+	return ""
+}
+
+// rejectLabel matches the answers that refuse a request: Claude's "No", Codex's "No, and tell Codex what to do differently", "Reject", "Deny", "Cancel".
+var rejectLabel = regexp.MustCompile(`(?i)^(no|reject|deny|cancel)\b`)
+
+func isRejectLabel(label string) bool { return rejectLabel.MatchString(strings.TrimSpace(label)) }
