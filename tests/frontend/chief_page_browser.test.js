@@ -1,6 +1,6 @@
 // The Chief page (/chief, #11450): the agent popout with nothing of Coral around it, for the Operator's phone: the chat, the composer and the cards an agent's asks make; no terminal switch, header actions, macro toolbar or
 // tools pane. The server's gate (setting, recorded session) is Go's TestChiefPageServesOnlyTheRecordedAgentWhileTheSettingIsOn; this suite is the page's face at 390 px: the dashboard's pop-out mode with the page's marker
-// (body data-chief), against the fixture rows of agent_view_harness.js.
+// (body data-chief="true"), against the fixture rows of agent_view_harness.js.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { coralReady } = require('./helpers/wait');
@@ -22,7 +22,7 @@ const { coralReady } = require('./helpers/wait');
         const before = {};
         for (const sel of ['.terminal-header', '#command-input', '.live-view-switch', '.command-pane-toolbar', '#agentic-state']) before[sel] = await ev(shown(sel));
         // the page's marker, as the server puts it on /chief
-        await ev(`document.body.dataset.chief = '1'; true`);
+        await ev(`document.body.dataset.chief = 'true'; true`);
         check(await ev(shown('.terminal-header')) && await ev(shown('#command-input')), 'the header (the agent\'s name) and the composer stay');
         for (const sel of ['.live-view-switch', '.command-pane-toolbar', '#agentic-state', '.terminal-header-actions', '.agent-bar-more', '.live-view-toggle']) check(!(await ev(shown(sel))), `${sel} is not on the Chief page`);
         check(await ev(`document.documentElement.scrollWidth <= document.documentElement.clientWidth`), 'no sideways scroll at 390 px');

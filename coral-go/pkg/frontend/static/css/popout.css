@@ -137,14 +137,14 @@ body.popout-mode.popout-terminal-blocked .mobile-send-more {
 /* ── The Chief page (/chief, #11450) ─────────────────────────────────── */
 /* The popout with even less: the chat, the composer and the cards an agent's asks make (a question, a permission, a review: the dashboard's own, whole, never a shorter copy). No terminal switch, no header actions
    or menu, no macro toolbar, no tools pane: the one agent's conversation and nothing else of Coral. */
-body[data-chief] .terminal-header-actions,
-body[data-chief] .live-view-switch,
-body[data-chief] .live-view-switch-menu,
-body[data-chief] .live-view-toggle,
-body[data-chief] .agent-bar-more,
-body[data-chief] .command-pane-toolbar,
-body[data-chief] #terminal-header-branch,
-body[data-chief] #agentic-state,
-body[data-chief] .task-bar-resize-handle {
+body[data-chief="true"] .terminal-header-actions,
+body[data-chief="true"] .live-view-switch,
+body[data-chief="true"] .live-view-switch-menu,
+body[data-chief="true"] .live-view-toggle,
+body[data-chief="true"] .agent-bar-more,
+body[data-chief="true"] .command-pane-toolbar,
+body[data-chief="true"] #terminal-header-branch,
+body[data-chief="true"] #agentic-state,
+body[data-chief="true"] .task-bar-resize-handle {
     display: none !important;
 }

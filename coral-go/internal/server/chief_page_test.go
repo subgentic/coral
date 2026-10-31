@@ -77,7 +77,7 @@ func TestChiefPageServesOnlyTheRecordedAgentWhileTheSettingIsOn(t *testing.T) {
 	live(chiefSID, "chief")
 	_, body = get()
 	assert.Contains(t, body, `data-target-session-id="`+chiefSID+`"`, "the recorded session on the recorded team is shown")
-	assert.Contains(t, body, `data-chief="1"`)
+	assert.Contains(t, body, `data-chief="true"`)
 
 	set("chief_page", "false")
 	code, _ = get()

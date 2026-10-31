@@ -240,7 +240,7 @@
 .tt-groups > .tt-group:first-child { border-top: 0; padding-top: 0; }
 .tt-groups > .tt-group:last-child { padding-bottom: 0; }
 .tt-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
-.tt-head .facts-row { display: flex; align-items: baseline; gap: 6px; }
+.tt-head .facts-row { display: flex; align-items: baseline; gap: 12px; }
 .tt-head dd.tt-state { font-size: var(--fs-xl); font-weight: var(--fw-strong); }
 .tt-head .facts-row:last-child dt, .tt-head .facts-row:last-child dd { color: var(--text-muted); font-size: var(--fs-base); font-weight: var(--fw-regular); }
 .tt-goal { font-weight: var(--fw-medium); }
