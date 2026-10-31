@@ -29,7 +29,7 @@ export const tableState = () => ({ widths: null, sort: null, selected: new Set()
 
 // ── cell types ────────────────────────────────────────────────────────────
 /** A title (the hover tooltip) set on pointer enter, and only while `needed()` says the text it carries is cut or hidden. */
-const tipIf = (e, text, needed) => e.addEventListener('pointerenter', () => { if (!e.title || e.title === text) e.title = needed() ? text : ''; }); // a title a caller set with better words is left alone
+export const tipIf = (e, text, needed) => e.addEventListener('pointerenter', () => { if (!e.title || e.title === text) e.title = needed() ? text : ''; }); // a title a caller set with better words is left alone
 /** The row's one real button: its text names the row. */
 export function primaryButton(text, label) {
     const b = el('button', 'dt-primary', text); b.type = 'button';
@@ -154,7 +154,7 @@ const mailCell = (m, label, open, pick, showTeam = false, gap = false) => { // o
     { const sn = el('span', 'dt-mail-snippet', m.snippet || ''); if (m.snippetTip && m.snippet) sn.title = m.snippetTitle || m.snippet; line.append(' ', sn); } // snippetTip: the whole words are the snippet's hover (snippetTitle: longer words than the line shows, #11442) where the line cuts it (Needs you's ask, #9495, #9986) // a space between the words: the row reads as words, not run together
     if (m.live) { const dot = el('span', 'dt-mail-live'); dot.setAttribute('role', 'img'); dot.setAttribute('aria-label', m.live); dot.title = m.live; line.append(dot); } // a live chat's state: a dot after the title (names stay in one column), its word the label (Active now) (#9740)
     text.append(line);
-    if (m.ask) { text.classList.add('dt-mail-two'); const ask = el('span', 'dt-mail-ask', m.ask); ask.title = m.ask; text.append(ask); } // the whole ask is the line's title, so a cut one can be read (#9495)
+    if (m.ask) { text.classList.add('dt-mail-two'); const ask = el('span', 'dt-mail-ask', m.ask); tipIf(ask, m.ask, () => ask.scrollHeight > ask.clientHeight || ask.scrollWidth > ask.clientWidth); text.append(ask); } // the whole ask is the line's title, so a cut one can be read (#9495)
     const side = el('span', 'dt-mail-side'); side.append(el('span', 'dt-mail-time', m.time || ''));
     if (m.mark) { const dot = el('span', `dt-mail-dot dt-mail-${m.mark}`); dot.setAttribute('aria-hidden', 'true'); side.append(dot); }
     else if (m.unread) { const dot = el('span', 'dt-mail-dot dt-mail-new'); dot.append(el('span', 'sr-only', 'Unread')); side.append(dot); } // the dot is the signal, the 600 only reinforces it, and neither is colour alone

@@ -16,6 +16,20 @@ for (const f of files) {
     for (const m of t.matchAll(REPEAT)) bad.push(`${path.relative(fe, f)}:${t.slice(0, m.index).split('\n').length}: title="${m[1]}" on an element that says ${m[1]}`);
 }
 assert.deepEqual(bad, [], `a title that repeats the shown text:\n${bad.join('\n')}`);
+// a title set in script beside the same text: `x.title = Y` where Y is also the text written nearby. A line that may be cut sets it through tipIf (on pointer enter, only while cut); a text that is always
+// shown has none. The chat's own notice line has its own expand toggle and is the one exception.
+const SCRIPT_OK = new Set(['pending_messages.js']);
+const scripted = [];
+for (const f of files.filter(f => f.endsWith('.js') && !SCRIPT_OK.has(path.basename(f)))) {
+    const lines = fs.readFileSync(f, 'utf8').split('\n');
+    lines.forEach((l, i) => {
+        for (const m of l.matchAll(/(\w+)\.title = ([\w.]+);/g)) {
+            const v = m[2].replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), ctx = lines.slice(Math.max(0, i - 1), i + 2).join(' ');
+            if (m[2].length > 1 && new RegExp(`\\.textContent = ${v}[;\\s]|el\\('[a-z]+', '[^']*', ${v}\\)|\\.innerText = ${v}`).test(ctx)) scripted.push(`${path.relative(fe, f)}:${i + 1}: ${l.trim().slice(0, 110)}`);
+        }
+    });
+}
+assert.deepEqual(scripted, [], `a title set in script beside the same text: use tipIf (only while cut) or drop it:\n${scripted.join('\n')}`);
 const dt = fs.readFileSync(path.join(fe, 'static/data_table.js'), 'utf8');
 const at = dt.indexOf('export function primaryButton('), body = dt.slice(at, dt.indexOf('\n}', at));
 assert.ok(!/^\s*b\.title\s*=/m.test(body) && /tipIf\(b, text/.test(body), `primaryButton sets its title only when its text is cut:\n${body}`);

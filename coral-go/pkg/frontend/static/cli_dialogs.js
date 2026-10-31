@@ -38,7 +38,7 @@ async function _checkOneCLI(inputId, resultId) {
     }
     resultEl.textContent = words.text;
     resultEl.classList.add(words.cls);
-    if (words.hint) { resultEl.title = words.hint; why.textContent = words.hint; why.hidden = false; resultEl.setAttribute('aria-describedby', why.id); } else resultEl.removeAttribute('aria-describedby');
+    if (words.hint) { why.textContent = words.hint; why.hidden = false; resultEl.setAttribute('aria-describedby', why.id); } else resultEl.removeAttribute('aria-describedby');
 }
 
 /** The line under a result that says why a path was refused and what to do (made once, text only). */
