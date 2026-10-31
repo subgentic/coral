@@ -141,7 +141,7 @@ function tableHtml(t, n = 0, lead = '', bar = false) {
     const top = (t.headless || inRow ? lead : `<div class="group-table-head">${lead}<h2 id="${escapeAttr(tid)}" tabindex="-1">${escapeHtml(t.title)}</h2>${count == null ? '' : `<span class="session-group-count">${count}</span>`}${bar ? '' : extraHtml(t.extra)}</div>`) + (bar && !n ? '' : chipsHtml(t)); // the page's toolbar line has the first table's chips and the create actions
     const status = t.status ? `<p class="item-meta group-table-status" role="status">${escapeHtml(t.status)}</p>` : ''; // one line under the title for what just happened (a job deleted: the page it returns to says so, #9298)
     // A group with nothing in it says so in one line (its chips, if it has them, stay: they are how the list is widened)
-    if (!t.rows.length && t.empty) return top + status + `<div class="empty-state"><p class="empty-state-line">${escapeHtml(t.empty.line)}</p>${t.empty.hint ? `<p class="empty-state-hint">${escapeHtml(t.empty.hint)}</p>` : ''}${startCardsHtml(t.empty.cards)}</div>`;
+    if (!t.rows.length && t.empty) return top + status + `<div class="empty-state"><p class="empty-state-line">${escapeHtml(t.empty.line)}</p>${t.empty.hint ? `<p class="empty-state-hint">${escapeHtml(t.empty.hint)}</p>` : ''}${t.empty.go && t.empty.go.action === 'inbox-go-agents' ? `<p class="empty-state-hint"><button type="button" class="btn" data-on-click="inbox-go-agents">${escapeHtml(t.empty.go.label)}</button></p>` : ''}${startCardsHtml(t.empty.cards)}</div>`;
     return top + status + '<div class="group-table-node"></div>' + (t.note ? `<p class="empty-state-hint group-table-note">${escapeHtml(t.note)}</p>` : '');
 }
 

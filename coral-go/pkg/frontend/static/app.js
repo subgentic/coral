@@ -2,7 +2,7 @@
 
 import { isPhoneLayout } from './phone_layout.js';
 import './update_banner.js';
-import './import_once.js';
+import { importOnce } from './import_once.js';
 import './lazy_styles.js'; // the stylesheets of a lazy tab, loaded with it (#10706)
 import './update_flag.js';
 import { startChatPrefetch } from './chat_page.js';
@@ -128,7 +128,7 @@ async function startDashboard() {
 
     await initCloud();   // no-op unless the page's boot data says mode "cloud"
     await initLocalStore();
-    loadSettings().then(initEditions).catch(e => console.error('ways to run Coral:', e)).finally(() => markReady('settings'));
+    loadSettings().then(initEditions).then(() => importOnce('./welcome_items.js')).then(m => m.landOnWelcome()).catch(e => console.error('ways to run Coral:', e)).finally(() => markReady('settings'));
     initServersUi();   // reveals hub-only entry points when /api/health reports hub:true
 
     // Single-agent popout mode (/agent/{uuid}): chrome-free workspace only.

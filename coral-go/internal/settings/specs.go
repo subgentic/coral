@@ -158,6 +158,8 @@ func init() {
 	// The first-launch screen.
 	register(Spec{Key: "welcome_choice", Kind: KindEnum, Values: []string{"skipped", "connected", "own-hub"}, Apply: ApplyClient, Doc: "What was chosen on the first-launch screen."})
 	boolOff("welcome_pending", ApplyClient, "The first-launch screen is still to be shown.")
+	register(Spec{Key: "inbox_welcome", Kind: KindEnum, Values: []string{"on", "off"}, Default: "off", Apply: ApplyClient, Doc: "The Inbox's welcome items for a new install (on until they are hidden or all done)."})
+	text("inbox_welcome_done", ApplyClient, "The welcome items already done, read or dismissed (comma-separated ids).")
 	// The Operator's phone page for one agent (#11450): off by default; the team and session the Operator recorded as Chief, checked on every request.
 	boolOff("chief_page", ApplyLive, "Serve /chief, the phone page for the one agent recorded as Chief.")
 	text("chief_team", ApplyLive, "The team the Chief agent is on.")
