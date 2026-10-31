@@ -104,10 +104,10 @@ const { coralReady } = require('./helpers/wait');
                     { const d = process.env.CORAL_SCREENSHOT_DIR; if (d) { fs.mkdirSync(d, { recursive: true }); fs.writeFileSync(path.join(d, `needs-review-${width}.png`), Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); } } // the picture of the sizing
                 }
                 assert.equal(await ev(`document.querySelector('#group-table-view .inbox-folder-head .session-group-count').textContent`),'12 of 13','heading explains the cap');
-                const names = await ev(`(() => {const r=${row('Review file 01.txt')},name=r.querySelector('.inbox-review-name');return {title:name.title,text:name.textContent,open:r.querySelector('.inbox-review-actions button:not(.dt-star)').getAttribute('aria-label')};})()`);
-                assert.equal(names.title,'Review file 01.txt','ellipsis keeps the full filename in its tooltip');
-                assert.equal(names.text,names.title,'assistive text keeps the same full filename');
-                assert.equal(names.open,'Open '+names.title,'Open action retains the full filename');
+                const names = await ev(`(() => {const r=${row('Review file 01.txt')},name=r.querySelector('.inbox-review-name');name.dispatchEvent(new Event('pointerenter'));return {cut:name.scrollWidth>name.clientWidth,title:name.title,text:name.textContent,open:r.querySelector('.inbox-review-actions button:not(.dt-star)').getAttribute('aria-label')};})()`);
+                assert.equal(names.title,names.cut?'Review file 01.txt':'','a cut filename keeps its full name in its tooltip, one that fits has none (#11566)');
+                assert.equal(names.text,'Review file 01.txt','assistive text keeps the same full filename');
+                assert.equal(names.open,'Open '+names.text,'Open action retains the full filename');
                 { const st = await ev(`(() => { const r = ${row('Review file 01.txt')}, b = r.querySelector('.inbox-review-actions .dt-star'); return b ? { label: b.getAttribute('aria-label'), pressed: b.getAttribute('aria-pressed'), op: getComputedStyle(b).opacity, shown: getComputedStyle(b).display !== 'none' } : null; })()`);
                   assert.ok(st && st.label === 'Star Review file 01.txt' && st.pressed === 'false', `${width}: a review row has the star, named for the file: ` + JSON.stringify(st)); // Needs you's artifact rows take the star too (#9834): a button at a hover, nothing on touch
                   if (width >= 768) assert.equal(st.op, '0', width + ': it is hidden at rest and shows on a hover'); else assert.equal(st.shown, false, '390: no star control on touch'); }

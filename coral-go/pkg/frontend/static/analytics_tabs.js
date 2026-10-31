@@ -100,7 +100,7 @@ function draw(key) {
     root.append(filterBar(key));
     if (m.status === 'guest') root.append(say(GUEST_LINE));
     else if (m.status === 'noteam') root.append(say('No team has a board yet. Start a team and its numbers appear here.'));
-    else if (m.status === 'error') { const p = say('This could not be read.'); const b = el('button', 'btn btn-sm', 'Try again'); b.type = 'button'; b.addEventListener('click', () => reload(key)); p.append(' ', b); root.append(p); }
+    else if (m.status === 'error') { const p = say('This could not be read.'); const b = el('button', 'btn btn-small', 'Retry'); b.type = 'button'; b.addEventListener('click', () => reload(key)); p.append(' ', b); root.append(p); }
     else if (!m.data) root.append(say('Loading…'));
     else root.append(...({ usage: drawUsage, operator: drawOperator, comm: drawComm }[key])(m));
     const focus = host.contains(document.activeElement) ? document.activeElement.getAttribute('aria-label') : null;
@@ -131,7 +131,7 @@ function drawUsage(m) {
     const drill = V.panel(row.label, `${fmt(row.total)} that day`, list);
     if (m.group === 'agent' && rank.length) {
         const top = rank.find(r => r.key !== '__other') || rank[0];
-        const b = el('button', 'btn btn-sm atab-drill', `Biggest turns of ${top.name}`); b.type = 'button';
+        const b = el('button', 'btn atab-drill', `Biggest turns of ${top.name}`); b.type = 'button';
         b.addEventListener('click', () => loadTurns(top.name, row.day));
         drill.append(b);
         if (m.turns && m.turns.agent === top.name && m.turns.day === row.day) drill.append(turnsTable(m.turns));

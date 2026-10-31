@@ -19,12 +19,9 @@ export function goalColumns(ctx = {}, keys = ['state', 'goal', 'team', 'progress
             cell: g => g.noGoal ? '' : DT.chip(W.stateWord(g), `goal-state-${g.state || 'unknown'}`) },
         goal: { key: 'goal', label: 'Goal', primary: true, width: 'grow', sort: true, sortValue: g => g.title, line: 1,
             cell: g => { const b = DT.primaryButton(g.title || `Goal ${g.id}`); b.dataset.goalId = String(g.id); if (g.noGoal) b.classList.add('goals-no-goal');
-                if (!ctx.closeReady || g.noGoal || !W.readyToClose(g) || ctx.notYet?.(g)) return b; // a goal the person said Not yet to on its page is quiet here too (#10692)
-                // every task of an active goal is done: the title line ends with one chip, state then action, that goes straight to the close dialog (#10604); it was a Close button and a question stacked under the title (#11224)
-                const w = DT.el('span', 'dt-title-cell'), c = DT.el('button', 'btn btn-small goals-ready-close'); c.append(DT.el('span', 'goals-ready-state', 'All tasks done \u00b7 '), DT.el('span', 'goals-ready-label', 'Close goal'), DT.el('span', 'material-icons goals-ready-icon', 'check')); // a phone's chip says only 'Close goal', a very narrow one only a check (the title keeps its room); the name keeps the whole
-                c.querySelector('.goals-ready-icon').setAttribute('aria-hidden', 'true');
-                c.type = 'button'; c.title = 'Close goal'; c.setAttribute('aria-label', `All tasks done \u00b7 Close goal: ${g.title || g.id}`); c.addEventListener('click', e => { e.stopPropagation(); ctx.closeReady(g); });
-                w.append(b, c); return w; } }, // one line a row (Goal #79): the title alone; the outcome is in the goal's preview and page
+                const n = total(g), left = W.openTasksOf(g.rollup || {}); if (g.noGoal || !n) return b;
+                const w = DT.el('span', 'goals-title-cell'); // a phone's row: the title (two lines) and under it the tasks, '2 done \u00b7 1 left' (#11549); the Tasks column does this on a computer and the cell hides this line then
+                w.append(b, DT.el('span', 'goals-row-tasks', left ? `${done(g)} done \u00b7 ${left} left` : `${done(g)} done`)); return w; } }, // closing is on the goal's own page, not a button here (#11549, the operator)
         team: { key: 'team', label: 'Team', sort: true, sortValue: team, line: 2, width: '9rem', dropAt: 36,
             cell: g => ctx.openTeam ? DT.link(team(g), () => ctx.openTeam(g)) : team(g) },
         progress: { key: 'progress', label: ctx.progressLabel || 'Progress', sort: 'number', sortValue: g => total(g) ? done(g) / total(g) : 0, line: 2, tone: 'tertiary', width: '8rem', dropAt: 36,

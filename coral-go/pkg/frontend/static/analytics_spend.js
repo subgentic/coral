@@ -176,7 +176,7 @@ function drawSpend() {
     if (!model.team) { body.append(el('p', 'empty-state', 'Open a team to see how many tokens its commits take.')); return; }
     if (model.error) {
         const e = el('div', 'empty-state spend-error'); e.setAttribute('role', 'alert'); e.append(el('span', null, model.error + ' '));
-        const b = el('button', 'btn btn-small', 'Try again'); b.type = 'button'; b.addEventListener('click', () => loadSpend()); e.append(b); body.append(e); return;
+        const b = el('button', 'btn btn-small', 'Retry'); b.type = 'button'; b.addEventListener('click', () => loadSpend()); e.append(b); body.append(e); return;
     }
     if (model.loading && !model.data) { body.append(el('p', 'empty-state', 'Loading…')); return; }
     const data = model.data; if (!data) return;

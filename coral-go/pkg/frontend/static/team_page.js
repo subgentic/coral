@@ -152,7 +152,7 @@ function syncStop() {
         if (host === moreMenu) { const r = el('hr', 'overflow-menu-divider team-more-add team-more-stop-sep'); r.dataset.stop = 'sep'; host.append(r); }
         items.forEach((it, i) => {
             if (host === menu && it.danger && !items[i - 1]?.danger) { const r = el('hr', 'overflow-menu-divider'); r.dataset.stop = 'sep'; host.append(r); }
-            const b = el('button', `${cls}${it.danger ? ' menu-item-danger' : ''}`); const label = el('span', 'menu-item-text', it.label); if (it.hint && !it.why) label.append(el('span', 'menu-item-hint', it.hint)); b.append(label); b.type = 'button'; b.dataset.stop = it.key; if (it.why) { b.disabled = true; b.setAttribute('aria-disabled', 'true'); b.title = it.why; b.append(' ', el('span', 'overflow-menu-note', it.why)); } b.addEventListener('click', () => { if (it.why) return; importOnce('./menu_button.js').then(x => x.closeMenus()); it.run(); });
+            const b = el('button', `${cls}${it.danger ? ' menu-item-danger' : ''}`); const label = el('span', 'menu-item-text', it.label); if (it.hint && !it.why) label.append(el('span', 'menu-item-hint', it.hint)); b.append(label); b.type = 'button'; b.dataset.stop = it.key; if (it.why) { b.disabled = true; b.setAttribute('aria-disabled', 'true'); b.append(' ', el('span', 'overflow-menu-note', it.why)); } b.addEventListener('click', () => { if (it.why) return; importOnce('./menu_button.js').then(x => x.closeMenus()); it.run(); });
             host.append(b);
         });
     }

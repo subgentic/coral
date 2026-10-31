@@ -1,5 +1,4 @@
-// #10692 (follow-up to #10604): a goal the person said Not yet to on its page stops asking "All tasks done: close the goal?" on its row in the team's Goals tab, and loses the row's Close. The goal page and the row read the same Not yet list.
-// A real board on the isolated dev server (removed again).
+// #10692, #11549: a goal the person said Not yet to on its page stays quiet on its row (the row has no Close goal button since #11549, so the row is quiet before and after); the goal page keeps its all-done strip and its Not yet. A real board on the isolated dev server (removed again).
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
@@ -26,7 +25,7 @@ const B = 'goal-notyet-' + Date.now().toString(36);
         await ev(`window.switchNavTab('agents'); window.openTeamPage(${JSON.stringify(B)}, { tab: 'goals' }); true`);
         await waitFor(`document.querySelectorAll('#team-panel-goals tbody tr.dt-row').length >= 1`, 'the goals', 20000);
         const before = await rowOf('Ship the pilot');
-        assert.deepEqual(before, { note: true, close: 1 }, `before Not yet the row asks: ${JSON.stringify(before)}`);
+        assert.deepEqual(before, { note: false, close: 0 }, `the row has no Close goal button: ${JSON.stringify(before)}`);
 
         // open the goal's page and say Not yet to its all-done strip
         await ev(`document.querySelector('#team-panel-goals tbody tr.dt-row button[data-goal-id]').click(); true`);

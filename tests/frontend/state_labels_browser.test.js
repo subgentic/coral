@@ -27,7 +27,7 @@ const { coralReady } = require('./helpers/wait');
         document.body.append(host); return true; })()`;
     const probe = `(() => { const host = document.getElementById('state-fixture'); const rows = [...host.querySelectorAll('tbody tr')];
         const px = v => parseFloat(v) || 0;
-        return rows.map(tr => [...tr.querySelectorAll('.goal-chip')].map(c => { const cs = getComputedStyle(c), w = c.querySelector('.state-word') || c, ws = getComputedStyle(w), d = c.querySelector('.goal-dot'), r = w.getBoundingClientRect(), dr = d.getBoundingClientRect();
+        return rows.map(tr => [...tr.querySelectorAll('.goal-chip')].map(c => { c.dispatchEvent(new Event('pointerenter')); const cs = getComputedStyle(c), w = c.querySelector('.state-word') || c, ws = getComputedStyle(w), d = c.querySelector('.goal-dot'), r = w.getBoundingClientRect(), dr = d.getBoundingClientRect();
             return { word: c.textContent, color: cs.color, weight: cs.fontWeight, border: ['Top','Right','Bottom','Left'].map(s => px(cs['border' + s + 'Width'])).reduce((a, b) => a + b, 0), bg: cs.backgroundColor, radius: cs.borderRadius, dotColor: getComputedStyle(d).backgroundColor, dot: [Math.round(dr.width), Math.round(dr.height)], wordW: Math.round(r.width), wordH: Math.round(r.height), title: c.title, textContent: c.textContent, wordClip: ws.clipPath, aria: d.getAttribute('aria-hidden') }; })); })()`;
 
     try {

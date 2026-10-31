@@ -164,7 +164,7 @@ function draw() {
     const a = document.activeElement;
     const held = a && body.contains(a) ? (a.closest('tr[data-key]')?.dataset.key && a.classList.contains('dt-primary') ? `row:${a.closest('tr').dataset.key}` : a.dataset.filter ? `chip:${a.dataset.filter}` : '') : '';
     body.replaceChildren();
-    if (model.failed) { const f = el('div', 'goals-failed'); f.setAttribute('role', 'alert'); f.append(el('span', null, model.failed), btn('btn btn-small', 'Try again', () => load())); body.append(f); }
+    if (model.failed) { const f = el('div', 'goals-failed'); f.setAttribute('role', 'alert'); f.append(el('span', null, model.failed), btn('btn btn-small', 'Retry', () => load())); body.append(f); }
     if (model.loading) { body.append(el('p', 'goals-note', 'Checking agents…')); return; }
     const data = model.data;
     if (!data) return;

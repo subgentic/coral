@@ -124,7 +124,7 @@ async function renderAccess(status, gen, signal) {
         const label = document.createElement('strong'); label.textContent = 'API Key: ';
         const code = document.createElement('code'); code.textContent = key.key; code.style.userSelect = 'all';
         const copy = button('Copy', async () => {
-            try { await navigator.clipboard.writeText(key.key); copy.textContent = 'Copied!'; }
+            try { await navigator.clipboard.writeText(key.key); copy.textContent = 'Copied'; }
             catch { copy.textContent = 'Select key to copy'; }
         });
         copy.classList.add('btn-small'); copy.style.marginLeft = '6px';

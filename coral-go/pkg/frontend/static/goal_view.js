@@ -270,7 +270,7 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
         const tasks = model.tasks.get(g.id);
         if (!rowsAgree(g)) list.setAttribute('aria-busy', 'true');
         if (!tasks) { list.append(el('p', 'goals-note', 'Loading tasks\u2026')); return; }
-        if (tasks.failed !== undefined) { const f = el('div', 'goals-failed'); f.setAttribute('role', 'alert'); f.append(el('span', null, W.failedText(tasks.failed).replace('Goals', 'Tasks')), btn('btn btn-small', 'Try again', () => loadTasks(g.id))); list.append(f); return; }
+        if (tasks.failed !== undefined) { const f = el('div', 'goals-failed'); f.setAttribute('role', 'alert'); f.append(el('span', null, W.failedText(tasks.failed).replace('Goals', 'Tasks')), btn('btn btn-small', 'Retry', () => loadTasks(g.id))); list.append(f); return; }
         if (!tasks.rows.length) { list.append(el('p', 'goals-note', 'No tasks yet')); return; }
         const shown = tasks.rows.slice(0, tasks.shown);
         const groups = [['Open', shown.filter(t => !isDone(t))], ['Done', shown.filter(isDone).sort((a, b) => b.id - a.id)]]; // the newest done task first
@@ -425,7 +425,7 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
         } catch (e) {
             if (disposed) return;
             const problem = el('div', 'goals-failed'); problem.setAttribute('role', 'alert');
-            problem.append(el('span', null, W.failedText(e.message)), btn('btn btn-small', 'Try again', reload));
+            problem.append(el('span', null, W.failedText(e.message)), btn('btn btn-small', 'Retry', reload));
             if (!current) { root.replaceChildren(backButton(backLabel, back), problem); }
             else { root.querySelector(':scope > .goals-failed')?.remove(); root.prepend(problem); }
         } finally { reading = false; if (again && !disposed) { again = false; reload(); } }

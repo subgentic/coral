@@ -98,7 +98,7 @@ function showUpdateToast(data, coming = false) {
                     ${data.channel === "agentic" && data.approved === false ? '<span class="update-toast-current update-toast-unapproved">Not yet approved.</span>' : ""}
                 </span>
                 <button type="button" class="update-toast-more" data-on-click="notice-more" aria-expanded="false" aria-label="Show details" title="Show details"><span class="material-icons" aria-hidden="true">expand_more</span></button>
-                <button class="update-toast-close" data-on-click="update-dismiss" data-version="${escapeAttr(data.latest)}" title="Dismiss">&times;</button>
+                <button class="update-toast-close ic-close" data-on-click="update-dismiss" data-version="${escapeAttr(data.latest)}" title="Dismiss"></button>
             </div>
             ${notesHtml}
             ${downloadBtn}
