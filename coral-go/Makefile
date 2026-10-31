@@ -48,6 +48,11 @@ test-server: dev
 # SHELL and NO_COLOR are hashed too and differ between shells (a Git Bash launched from PowerShell has NO_COLOR=1 and another SHELL): TEST_ENV pins the one and drops the other.
 # PATH is hashed the same way and is not pinned (it is machine-specific): run go test from a shell with a stable PATH, and do not let the CDP runner's node prefix leak into a go test shell.
 TEST_ENV = env -u NO_COLOR $(addprefix -u ,$(shell env | sed -n -E 's/^((CLAUDE|ANTHROPIC|CODEX|GEMINI|PI)_[A-Za-z0-9_]*)=.*/\1/p')) SHELL=/bin/sh
+# On Windows the test folders are made directly in the profile (CORAL_TEST_ROOT, see internal/testtemp): the Go tool resolves the path of every file call a test logs, and a shallower root costs less.
+# Windows only: on macOS the tests make Unix sockets below their temp folder and a socket path is limited to 104 bytes.
+ifeq ($(OS),Windows_NT)
+TEST_ENV += CORAL_TEST_ROOT=$(USERPROFILE)\ct
+endif
 
 # Run all tests
 .PHONY: test
