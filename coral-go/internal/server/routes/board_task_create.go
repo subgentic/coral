@@ -78,18 +78,19 @@ func taskActor(r *http.Request, fromBody string) string {
 func (h *BoardHandler) CreateTask(w http.ResponseWriter, r *http.Request) {
 	project := urlParam(r, "project")
 	var body struct {
-		Title        string             `json:"title"`
-		Body         string             `json:"body"`
-		Priority     string             `json:"priority"`
-		CreatedBy    string             `json:"created_by"`
-		SubscriberID string             `json:"subscriber_id"`
-		AssignedTo   string             `json:"assigned_to"`
-		BlockedBy    json.RawMessage    `json:"blocked_by,omitempty"`
-		Draft        bool               `json:"draft,omitempty"`
-		Workflow     board.TaskWorkflow `json:"workflow,omitempty"`
-		RemindAt     string             `json:"remind_at,omitempty"` // RFC 3339: a one-time reminder (#4175 step 3)
-		GoalID       *int64             `json:"goal_id,omitempty"`   // a goal of this board the task works toward (#7087)
-		Self         bool               `json:"self,omitempty"`      // a task the caller makes for ITSELF (#11247): any member may, with a goal, one per title, at most maxOpenSelfTasks open
+		Title          string             `json:"title"`
+		Body           string             `json:"body"`
+		Priority       string             `json:"priority"`
+		CreatedBy      string             `json:"created_by"`
+		SubscriberID   string             `json:"subscriber_id"`
+		AssignedTo     string             `json:"assigned_to"`
+		BlockedBy      json.RawMessage    `json:"blocked_by,omitempty"`
+		Draft          bool               `json:"draft,omitempty"`
+		Workflow       board.TaskWorkflow `json:"workflow,omitempty"`
+		RemindAt       string             `json:"remind_at,omitempty"`        // RFC 3339: a one-time reminder (#4175 step 3)
+		GoalID         *int64             `json:"goal_id,omitempty"`          // a goal of this board the task works toward (#7087)
+		GoalProposalID *int64             `json:"goal_proposal_id,omitempty"` // the pending goal proposal this task is for: it waits for that goal (#11389)
+		Self           bool               `json:"self,omitempty"`             // a task the caller makes for ITSELF (#11247): any member may, with a goal, one per title, at most maxOpenSelfTasks open
 	}
 	if err := decodeJSON(r, &body); err != nil {
 		errBadRequest(w, "invalid JSON")
@@ -199,23 +200,31 @@ func (h *BoardHandler) CreateTask(w http.ResponseWriter, r *http.Request) {
 	if h.refuseArchivedAssignee(w, r.Context(), project, body.AssignedTo) {
 		return
 	}
-	task, err := h.bs.CreateTaskWithOpts(r.Context(), project, body.Title, body.Body, body.Priority, createdBy, opts, body.AssignedTo)
-	if err != nil {
-		if !goalError(w, err) {
-			errBadRequest(w, err.Error())
+	if hold, ok := h.needsApproval(r, project, board.ProposalTask); !ok {
+		errInternalServer(w, "could not read the board's settings")
+		return
+	} else if (hold && !body.Self) || body.GoalProposalID != nil { // this team's tasks need the Operator's approval (#11389), and a task for a goal still waiting waits with it; an agent's own self task is exempt
+		if body.GoalProposalID != nil {
+			if gp, err := h.bs.GetProposal(r.Context(), project, *body.GoalProposalID); err != nil || gp.Kind != board.ProposalGoal || gp.State != board.ProposalPending {
+				errNotFound(w, "goal_proposal_id is a goal of this team that is waiting for approval")
+				return
+			}
 		}
+		payload, _ := json.Marshal(taskPayload{Title: body.Title, Body: body.Body, Priority: body.Priority, CreatedBy: createdBy, AssignedTo: body.AssignedTo, Draft: body.Draft, Workflow: body.Workflow, GoalID: body.GoalID, BlockedBy: body.BlockedBy, RemindAt: body.RemindAt})
+		h.proposeAnswer(w, r, board.ProposalInput{Board: project, Kind: board.ProposalTask, Title: body.Title, Payload: payload, Proposer: createdBy, GoalProposalID: body.GoalProposalID})
 		return
 	}
-	if !remindAt.IsZero() {
-		if err := h.bs.SetTaskRemindAt(r.Context(), project, task.ID, remindAt); err != nil {
-			errInternalServer(w, err.Error())
+	task, err := h.makeTask(r.Context(), project, taskCreation{Title: body.Title, Body: body.Body, Priority: body.Priority, CreatedBy: createdBy, AssignedTo: body.AssignedTo, Opts: opts, RemindAt: remindAt})
+	if err != nil {
+		if task == nil {
+			if !goalError(w, err) {
+				errBadRequest(w, err.Error())
+			}
 			return
 		}
-		at := remindAt.UTC().Format(time.RFC3339)
-		task.RemindAt = &at
+		errInternalServer(w, err.Error()) // the task was made, its reminder was not
+		return
 	}
-
-	h.announceCreatedTask(project, task)
 	writeJSON(w, http.StatusCreated, task)
 }
 

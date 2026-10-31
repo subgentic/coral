@@ -110,6 +110,10 @@ func TestTheOwnerTableAgreesWithTheHandWrittenListItReplaced(t *testing.T) {
 			if p == "/api/saved" || strings.HasPrefix(p, "/api/saved/") && (m == http.MethodGet && strings.HasSuffix(p, "/message") || m == http.MethodPatch || m == http.MethodDelete) {
 				continue // every saved-for-later route (#5763): the list, the whole message, and the changes
 			}
+			// What agents asked to add to a team, and the Operator's decision on it (#11389), are the owner's alone through the hub: the old list never had them.
+			if strings.HasPrefix(p, "/api/board/") && strings.Contains(p, "/proposals") || p == "/api/proposals" {
+				continue
+			}
 			// The activity counts of the Analytics tabs (#11225) are the owner's alone through the hub: the old list never had them.
 			if m == http.MethodGet && p == "/api/analytics/activity" {
 				continue
