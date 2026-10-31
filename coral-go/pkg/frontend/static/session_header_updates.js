@@ -34,6 +34,16 @@ function _syncHeaderFolder() {
 // Escape puts the folder tip away without moving the keyboard (WCAG 1.4.13, #9899); it is back when the keyboard or the pointer leaves the name and returns.
 function _tipOff(on) { const h = document.querySelector('#live-session-view .terminal-header'); if (h) { if (on) h.setAttribute('data-tip-off', ''); else h.removeAttribute('data-tip-off'); } }
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && e.target && e.target.id === 'terminal-header-identity') _tipOff(true); });
+// The tip on focus is the KEYBOARD's (WCAG 1.4.13, #9899): it shows when a key put the focus on the name, not when the page's own script did (it opens an agent with the focus on its name, and after a send): there Chrome counts the focus as visible
+// and the path stayed over the first message on a phone (#11391). A key press arms it, a touch or a click disarms it, and the focus on the name takes the state of the moment.
+let _byKey = false;
+document.addEventListener('keydown', () => { _byKey = true; }, true);
+for (const t of ['pointerdown', 'touchstart', 'mousedown']) document.addEventListener(t, () => { _byKey = false; }, true);
+document.addEventListener('focusin', e => {
+    if (!e.target || e.target.id !== 'terminal-header-identity') return;
+    const h = document.querySelector('#live-session-view .terminal-header');
+    if (h) { if (_byKey) h.setAttribute('data-tip-kbd', ''); else h.removeAttribute('data-tip-kbd'); }
+});
 for (const t of ['focusout', 'mouseout']) document.addEventListener(t, e => { if (e.target && e.target.id === 'terminal-header-identity') _tipOff(false); });
 
 /** The model, thinking level and context of the open agent, in the Details disclosure (#9686: the agent row is one line and no longer says them; #9837: neither does the header; the composer's chips still change them). */
