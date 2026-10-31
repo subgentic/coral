@@ -95,3 +95,40 @@ func TestAnAssignPostWithNoMentionIsNotRefused(t *testing.T) {
 	assert.NotContains(t, res.stderr, "notifies nobody")
 	assert.NotEmpty(t, srv.requests(), "the task and the post were sent")
 }
+
+// The server's answer says who a post reaches; when it is no one the CLI says so (the post is stored: this is a warning, not a refusal) (#11441).
+func TestAPostThatReachedNoOneIsWarnedAbout(t *testing.T) {
+	serve := func(notified string) *httptest.Server {
+		return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			if r.URL.Path == "/api/health" {
+				w.Write([]byte(`{"status":"ok","version":"test"}`))
+				return
+			}
+			w.Write([]byte(`{"id":5` + notified + `}`))
+		}))
+	}
+	for name, c := range map[string]struct {
+		notified string
+		args     []string
+		warn     bool
+	}{
+		"nobody was told":            {`,"notified":[]`, []string{"post", "see @param in the docs"}, true},
+		"somebody was":               {`,"notified":["Dev A"]`, []string{"post", "@Dev A ready"}, false},
+		"an older server (no field)": {``, []string{"post", "see @param in the docs"}, false},
+		"the operator's opt-out":     {`,"notified":[]`, []string{"post", "--broadcast", "status"}, false},
+		"an answer on a task":        {`,"notified":[]`, []string{"post", "--task", "7", "done"}, false},
+		"an answer to a message":     {`,"notified":[]`, []string{"post", "--reply-to", "7", "done"}, false},
+	} {
+		srv := serve(c.notified)
+		res := runBoard(t, srv.URL, subscribedDataDir(t, srv.URL), c.args...)
+		srv.Close()
+		require.Equal(t, 0, res.code, "%s: the post is stored either way: %q", name, res.stderr)
+		assert.Contains(t, res.stdout, "Message #5 posted", name)
+		if c.warn {
+			assert.Contains(t, res.stderr, "Warning: this post reached no one (@param is no member of this team)", name)
+		} else {
+			assert.NotContains(t, res.stderr, "reached no one", name)
+		}
+	}
+}

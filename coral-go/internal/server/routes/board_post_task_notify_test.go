@@ -72,3 +72,23 @@ func (e *replyEnv) messagesContent(project, query string) []string {
 	}
 	return out
 }
+
+// The answer to a post says who its text reaches (#11441): coral-board warns when it is no one.
+func TestAPostAnswersWithWhoItReaches(t *testing.T) {
+	e := newReplyEnv(t)
+	e.join("p", "Dev A", "Dev B", "Poster")
+	post := func(content string) []any {
+		code, out, b := e.do("POST", "/api/board/p/messages", `{"subscriber_id":"Poster","content":`+jsonText(content)+`}`, map[string]string{"X-Test-Actor": "token:Poster"})
+		require.Equal(t, 200, code, string(b))
+		n, ok := out["notified"].([]any)
+		require.True(t, ok, "the field is always there: %s", string(b))
+		return n
+	}
+	assert.Equal(t, []any{"Dev A"}, post("@Dev A the result is ready"))
+	assert.ElementsMatch(t, []any{"Dev A", "Dev B"}, post("@Dev A @Dev B both of you"))
+	assert.Equal(t, []any{}, post("see the @param in the docs"), "an @word that names no member reaches no one")
+	assert.Equal(t, []any{}, post("a note to myself @Poster"), "the poster is never one of them")
+	assert.Equal(t, []any{"all"}, post("@all heads up"))
+	assert.Equal(t, []any{"Operator"}, post("@Operator please decide"))
+	assert.Equal(t, []any{}, post("no mention at all"))
+}

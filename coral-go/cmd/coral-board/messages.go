@@ -270,6 +270,9 @@ func cmdPost() {
 	}
 	if id, ok := result["id"]; ok {
 		fmt.Printf("Message #%.0f posted to '%s'\n", id, st.Project)
+		if list, ok := result["notified"].([]any); ok && len(list) == 0 && !broadcast && taskArg == "" && replyArg == "" && assigned == nil {
+			fmt.Fprintln(os.Stderr, postReachedNoOne(message)) // posted, but nobody was told (#11441): a name that is no member of the team
+		}
 		if a, ok := result["ask"].(map[string]any); ok {
 			fmt.Printf("  A question to %s: open until each has answered (they answer with  coral-board post --reply-to %.0f \"...\"  or a post that @mentions you).\n", joinAnyStrings(a["to"]), id)
 		}
@@ -713,3 +716,19 @@ func postNotifiesNobody(st *boardState, message, poster string) string {
 	}
 	return msg
 }
+
+// postReachedNoOne is the warning for a post the server stored that notifies nobody: its @words name no member of the team.
+func postReachedNoOne(message string) string {
+	var names []string
+	for _, m := range postMentionWord.FindAllString(message, 3) {
+		names = append(names, strings.TrimLeft(m, " \t\n([,;:\"'"))
+	}
+	which := ""
+	if len(names) > 0 {
+		which = " (" + strings.Join(names, ", ") + " is no member of this team)"
+	}
+	return "Warning: this post reached no one" + which + ": add @Name for a member, or the handoff stalls."
+}
+
+// postMentionWord is an @word as the text writes it.
+var postMentionWord = regexp.MustCompile(`(?:^|[^A-Za-z0-9_@.])@[A-Za-z0-9][A-Za-z0-9_-]*`)
