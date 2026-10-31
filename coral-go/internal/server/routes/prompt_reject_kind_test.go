@@ -25,10 +25,10 @@ func TestAnOptionThatAllowsIsNotARejectWhateverItsWordsBeginWith(t *testing.T) {
 }
 
 func TestAnOptionWithNoKindIsJudgedByItsLabel(t *testing.T) {
-	for _, label := range []string{"No", "no", "No, and tell Codex what to do differently (esc)", "Reject", "Deny", "Cancel", "  No  "} {
+	for _, label := range []string{"No", "no", "No, and tell Codex what to do differently (esc)", "Reject", "Deny", "Cancel", "Not now", "Decline", "Don't allow", "  No  "} {
 		assert.True(t, optionIsReject(promptOption{Label: label}), label)
 	}
-	for _, label := range []string{"None", "Nothing", "Nope", "Not now", "Notify me", "Yes", "Yes, and don't ask again", "Allow once", ""} {
+	for _, label := range []string{"None", "Nothing", "Nope", "Notify me", "Yes", "Yes, and don't ask again", "Allow once", ""} {
 		assert.False(t, optionIsReject(promptOption{Label: label}), "%q is not a reject", label)
 	}
 }
@@ -43,11 +43,10 @@ func TestTheApprovalTableMarksTheApproveOnceOption(t *testing.T) {
 		kinds[o.N] = o.Kind
 	}
 	assert.Equal(t, "allow_once", kinds[1], "the approve-once option")
-	for n, k := range kinds {
-		if n != 1 {
-			assert.Empty(t, k, "the other options have no kind: their labels decide")
-		}
-	}
+	// the other rows carry their kinds too (#11399): the Yes rows that last past this answer, and the refusal, so the card does not rest on their words
+	assert.Equal(t, "allow_always", kinds[2])
+	assert.Equal(t, "allow_always", kinds[3])
+	assert.Equal(t, "reject", kinds[4])
 	for _, o := range s.Options {
 		if o.Kind == "allow_once" {
 			o.Label = "No, go ahead" // words that look like a refusal on an option the table knows allows

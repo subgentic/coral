@@ -26,7 +26,7 @@ const ALWAYS = 'Allow always: do not ask again for ls *, git status* and 2 more 
                 const row = { session_id: sid, name: 'work', agent_type: ${JSON.stringify(agentType)}, waiting_for_input: true, waiting_summary: 'Wants to use bash' }; st.liveSessions = [row];
                 NI.pendingToolBySession.clear(); NI.promptOptionsBySession.clear(); NI.loginBySession.clear();
                 if (${JSON.stringify(input)}) NI.pendingToolBySession.set(sid, { tool_use_id: 'perm_1', tool_name: 'Bash', input: ${JSON.stringify(input)} });
-                NI.promptOptionsBySession.set(sid, { ...${JSON.stringify(extra || {})}, question: 'Do you want to proceed?', options: ${JSON.stringify(labels)}.map((label, i) => ({ n: i + 1, label, action: 'select', selected: i === 0 })), ask_id: 'perm_1' });
+                NI.promptOptionsBySession.set(sid, { ...${JSON.stringify(extra || {})}, question: 'Do you want to proceed?', options: ${JSON.stringify(labels)}.map((o, i) => ({ n: i + 1, ...(typeof o === 'string' ? { label: o } : o), action: 'select', selected: i === 0 })), ask_id: 'perm_1' });
                 document.getElementById('q-box')?.remove(); const box = document.body.appendChild(Object.assign(document.createElement('div'), { id: 'q-box', className: 'chat-messages chat-prose' }));
                 box.style.cssText = 'position:fixed;left:0;top:0;width:' + Math.min(innerWidth, 560) + 'px;max-height:100vh;overflow:auto;z-index:99999;background:var(--bg-primary);padding:12px;box-sizing:border-box';
                 NI.syncNeedsInputCard(box, row);
@@ -60,6 +60,20 @@ const ALWAYS = 'Allow always: do not ask again for ls *, git status* and 2 more 
                 assert.deepEqual(names(r), ['No'], at + agent + ': only_reject: No alone'); assert.ok(r.text.includes(NOTE), at + agent + ': the note is on the card');
                 assert.equal(r.target, 'echo <U+202E>gnirts', at + agent + ': the marker the server wrote is shown as written');
             }
+            // 4b. the refusal is kept by the option's KIND (the server's parse), the words only where it has none: every wording the captured screens have, and the ones UX/UX Engineer asked for
+            for (const word of ['No (recommended)', 'No, cancel', 'No, and tell Codex what to do differently (esc)', 'Reject', 'Deny', "Don't allow", 'Don\u2019t allow', 'Decline', 'Disallow', 'Skip', 'Not now']) {
+                r = await card('claude', { command: 'x'.repeat(4000), only_reject: true, note: NOTE }, ['Yes', "Yes, and don't ask again", word]);
+                assert.deepEqual(names(r), [word], at + `"${word}" is a refusal and is kept alone: ` + JSON.stringify(names(r)));
+            }
+            r = await card('codex', null, ['Yes', 'None of the above', 'Nothing'], { only_reject: true, note: NOTE });
+            assert.deepEqual(names(r), [], at + '"None" and "Nothing" are not refusals');
+            r = await card('claude', { command: 'x', only_reject: true, note: NOTE }, [{ label: 'No, allow it', kind: 'allow_once' }, { label: 'Stop here', kind: 'reject' }, { label: 'No, and always', kind: 'allow_always' }]);
+            assert.deepEqual(names(r), ['Stop here'], at + 'the kind decides over the words: ' + JSON.stringify(names(r)));
+            // 4c. in a request no character is left alone: a zero-width joiner inside a word is written out (a chat bubble keeps it for emoji)
+            r = await card('claude', { command: 'git\u200dstatus' }, YNA);
+            assert.equal(r.target, 'git<U+200D>status', at + 'strict: ' + JSON.stringify(r.target));
+            r = await card('codex', null, YNA, { target: 'git\u200dstatus' });
+            assert.equal(r.target, 'git<U+200D>status', at + 'strict, a screen agent: ' + JSON.stringify(r.target));
             // 5. no target on the screen and no pending tool: nothing is invented
             r = await card('codex', null, YNA, {});
             assert.equal(r.target, null, at + 'no request text, no box');

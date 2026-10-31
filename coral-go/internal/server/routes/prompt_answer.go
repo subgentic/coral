@@ -1040,10 +1040,14 @@ func (h *SessionsHandler) onlyRejectNote(sessionID string, screen promptScreen) 
 	return ""
 }
 
-// rejectLabel matches the answers that refuse a request: Claude's "No", Codex's "No, and tell Codex what to do differently", "Reject", "Deny", "Cancel".
-var rejectLabel = regexp.MustCompile(`(?i)^(no|reject|deny|cancel)\b`)
+// rejectLabel matches the answers that refuse a request, where nothing but the words says so: Claude's "No", Codex's "No, and tell Codex what to do differently (esc)", agy's "No, cancel", "Reject", "Deny", "Decline", "Disallow", "Don't allow",
+// "Cancel", "Skip", "Not now" (the captured screens' own words are in testdata; the card has the same list as its fallback, needs_input_card.js).
+var rejectLabel = regexp.MustCompile(`(?i)^(no|reject|deny|denied|decline|disallow|cancel|skip|not now|don['’]?t allow|do not allow)\b`)
 
 func isRejectLabel(label string) bool { return rejectLabel.MatchString(strings.TrimSpace(label)) }
+
+// allowLabel matches an answer that allows: the Yes rows of an approval.
+var allowLabel = regexp.MustCompile(`(?i)^(yes|allow|approve|proceed|run)\b`)
 
 // optionIsReject says whether answering this option refuses the request. Where the option has a kind (it is the approval table's approve-once option, or one of an opencode card's own answers) the KIND decides:
 // an option that allows is not a reject whatever its words begin with. Only an option with no kind is judged by its label (^(no|reject|deny|cancel)\b: "None" and "Nothing" are not rejects). Security's #11399 INFO 5.
@@ -1064,8 +1068,13 @@ func markApprovalKinds(agentType, screenText string, s *promptScreen) {
 		return
 	}
 	for i := range s.Options {
-		if s.Options[i].N == d.N {
+		switch {
+		case s.Options[i].N == d.N:
 			s.Options[i].Kind = "allow_once"
+		case isRejectLabel(s.Options[i].Label):
+			s.Options[i].Kind = "reject" // a refusal of a recognised approval: the card keeps it by this, not by its words (#11399)
+		case allowLabel.MatchString(strings.TrimSpace(s.Options[i].Label)):
+			s.Options[i].Kind = "allow_always" // the other Yes rows (don't ask again, always allow, switch mode): they last past this one answer
 		}
 	}
 }
