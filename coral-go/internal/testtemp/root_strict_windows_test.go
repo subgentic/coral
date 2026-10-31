@@ -154,3 +154,46 @@ func TestSweepDoesNotFollowAJunctionOutOfTheRoot(t *testing.T) {
 		t.Errorf("the sweep reached through the junction: %v", err)
 	}
 }
+
+// Only allow (0) and deny (1) entries are read; any other kind is refused, so a callback allow for Everyone cannot hide behind the SID test (Security, #6675 fix 1).
+func TestAnEntryOfAnotherKindIsRefused(t *testing.T) {
+	sd, err := windows.SecurityDescriptorFromString("O:" + me(t).String() + "D:P(A;OICI;GA;;;" + me(t).String() + ")(XA;OICI;GA;;;WD;(Member_of{SID(BA)}))")
+	if err != nil {
+		t.Skipf("no conditional entries here: %v", err)
+	}
+	if reason := checkDescriptor(sd, me(t)); !strings.Contains(reason, "kind") {
+		t.Errorf("a callback allow for Everyone: %q", reason)
+	}
+}
+
+// A root that would land in the source tree is refused before anything is made there (Security, #6675 fix 2).
+func TestOutsideRootInTheSourceTreeIsRefusedAndNotMade(t *testing.T) {
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	root := filepath.Join(wd, rootName)
+	if reason := checkOutsideRoot(root); !strings.Contains(reason, "source tree") {
+		t.Errorf("in the source tree: %q", reason)
+	}
+	if _, err := os.Lstat(root); err == nil {
+		os.Remove(root)
+		t.Error("the root was made in the source tree before it was refused")
+	}
+}
+
+// The folder that holds ct must be the user's own: the Windows folder is owned by TrustedInstaller.
+func TestOutsideRootInAFolderAnotherAccountOwnsIsRefused(t *testing.T) {
+	windir := os.Getenv("SystemRoot")
+	if windir == "" {
+		t.Skip("no SystemRoot")
+	}
+	root := filepath.Join(windir, rootName)
+	if reason := checkOutsideRoot(root); reason == "" {
+		os.Remove(root)
+		t.Fatal("a root in the Windows folder was accepted")
+	}
+	if _, err := os.Lstat(root); err == nil {
+		t.Error("a root was made in the Windows folder")
+	}
+}

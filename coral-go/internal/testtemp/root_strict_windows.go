@@ -7,6 +7,8 @@ import (
 	"unsafe"
 
 	"golang.org/x/sys/windows"
+
+	"github.com/subgentic/coral/internal/testguard/protectedpath"
 )
 
 // checkOutsideRoot is the rule for a root that is not directly in the profile (D:\coral-team-cache\<you>\ct): there is no profile folder to make another account's swap impossible, so the
@@ -46,9 +48,23 @@ func checkOutsideRoot(clean string) string {
 	if fi, err := os.Lstat(filepath.Dir(clean)); err != nil || fi.Mode().Type() != os.ModeDir {
 		return "its parent folder is not a real folder"
 	}
+	// Before anything is made: not in, around or holding ~/.coral, not in the source tree. The nearest existing parent is checked too, so a root that does not exist yet is judged by where it
+	// would land.
+	if reason := protectedpath.Refusal(clean); reason != "" {
+		return reason
+	}
+	if reason := protectedpath.Refusal(filepath.Dir(clean)); reason != "" {
+		return reason
+	}
 	me, err := currentUser()
 	if err != nil {
 		return "the current user is not known"
+	}
+	// The folder that holds ct must be this user's too. Rename window, stated: the root is checked by its own handle, but a person who can rename or replace the PARENT (it is not protected
+	// the way the root is) could swap the whole branch between this check and the first use; owning the parent (and its list being the owner's to set) is what bounds that, and the path
+	// is resolved again below.
+	if !ownedByMe(filepath.Dir(clean), nil) {
+		return "the folder that holds it is not owned by this user"
 	}
 	if err := createOwnerOnly(clean, me); err != nil {
 		return "it could not be made"
@@ -60,7 +76,10 @@ func checkOutsideRoot(clean string) string {
 	if err != nil || !strings.EqualFold(real, clean) {
 		return "a link or junction is in its path"
 	}
-	return notProtectedData(real)
+	if reason := protectedpath.Refusal(real); reason != "" {
+		return reason
+	}
+	return ""
 }
 
 func isLetter(b byte) bool { return b >= 'a' && b <= 'z' || b >= 'A' && b <= 'Z' }
@@ -174,8 +193,12 @@ func checkDescriptor(sd *windows.SECURITY_DESCRIPTOR, me *windows.SID) string {
 		if err := windows.GetAce(dacl, i, &ace); err != nil {
 			return "its access list could not be read"
 		}
-		if ace.Header.AceType != windows.ACCESS_ALLOWED_ACE_TYPE {
-			continue
+		switch ace.Header.AceType {
+		case windows.ACCESS_DENIED_ACE_TYPE:
+			continue // a deny entry is not a reason to refuse
+		case windows.ACCESS_ALLOWED_ACE_TYPE:
+		default:
+			return "its access list has an entry of a kind that is not read here (a callback or object entry)"
 		}
 		sid := (*windows.SID)(unsafe.Pointer(&ace.SidStart))
 		if !sid.Equals(me) && (system == nil || !sid.Equals(system)) && (admins == nil || !sid.Equals(admins)) {

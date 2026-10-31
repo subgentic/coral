@@ -110,39 +110,3 @@ func sameFolder(a, b string) bool {
 	}
 	return a == b
 }
-
-// notProtectedData refuses a resolved root that is, or is inside, the real ~/.coral, that holds a .coral folder, or that is inside the module being tested (the source tree).
-func notProtectedData(real string) string {
-	inside := func(p, dir string) bool {
-		return sameFolder(p, dir) || strings.HasPrefix(strings.ToLower(p), strings.ToLower(dir)+string(filepath.Separator))
-	}
-	if home, err := os.UserHomeDir(); err == nil && home != "" {
-		coral := filepath.Join(home, ".coral")
-		if r, err := filepath.EvalSymlinks(coral); err == nil {
-			coral = r
-		}
-		if inside(real, coral) || inside(coral, real) {
-			return "it is, or is inside or around, the real ~/.coral folder"
-		}
-	}
-	if _, err := os.Lstat(filepath.Join(real, ".coral")); err == nil {
-		return "it holds a .coral folder"
-	}
-	if wd, err := os.Getwd(); err == nil {
-		for d := wd; ; d = filepath.Dir(d) {
-			if _, err := os.Stat(filepath.Join(d, "go.mod")); err == nil {
-				if r, err := filepath.EvalSymlinks(d); err == nil {
-					d = r
-				}
-				if inside(real, d) {
-					return "it is inside the source tree being tested"
-				}
-				break
-			}
-			if filepath.Dir(d) == d {
-				break
-			}
-		}
-	}
-	return ""
-}
