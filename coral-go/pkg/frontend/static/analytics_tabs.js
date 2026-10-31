@@ -166,6 +166,7 @@ function drawOperator(m) {
     const a = o.asks;
     const kpis = V.kpiStrip([
         kv('Operator board posts', D.countWords(o.posts), 'posts signed as the Operator'),
+        kv('Typed to agents', o.recorded ? D.fmtCount(o.typed) : D.NOT_RECORDED, !o.recorded ? '' : 'in an agent’s chat or terminal; a burst counts once'),
         kv('Posts per task done', D.perTaskWords(o.posts, o.tasksDone), o.tasksDone == null ? '' : `${o.tasksDone} tasks done in the period`),
         kv('Asks to the Operator', D.countWords(a && a.asked), a ? `${a.answered} answered` : ''),
         kv('Median wait for an answer', D.waitWords(a, 'median_s'), 'from the ask to the first reply'),

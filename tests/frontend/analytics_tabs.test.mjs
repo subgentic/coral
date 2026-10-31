@@ -25,6 +25,7 @@ const o = D.operatorModel(act);
 assert.equal(o.recorded, false); assert.deepEqual(o.kinds.map(k => k.key), ['posts']);
 assert.deepEqual(o.agents.map(g => g.name), ['A'], 'an agent that never needed the Operator is not listed');
 const o2 = D.operatorModel({ ...act, touches: { kinds: {}, days: [{ day: '2026-10-29', typed: 5, approve: 1 }], agents: [{ name: 'B', typed: 7 }] } });
+assert.equal(o2.typed, 5, 'the typed touches of the period'); assert.equal(D.operatorModel(act).typed, null, 'no recording: not 0');
 assert.equal(o2.recorded, true); assert.equal(o2.touches, 3 + 1 + 5 + 1, 'posts plus every recorded kind'); assert.equal(o2.agents[0].name, 'B', 'typed touches rank an agent');
 assert.equal(o2.hub, 0, 'no Hub share when the read has no sources');
 assert.equal(D.operatorModel({ ...act, touches: { days: [], agents: [], sources: { local: 4, hub: 3 } } }).hub, 3, 'the touches made through Coral Hub are counted as such');
