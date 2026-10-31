@@ -241,3 +241,10 @@ func TestAnOpencodeAgentPicksUpTheSessionItsAgentNamed(t *testing.T) {
 	assert.Equal(t, "", run(agent.LaunchParams{SessionID: "fresh-agent"}), "a new agent starts a new session")
 	assert.Equal(t, "", run(agent.LaunchParams{SessionID: "fresh-agent", ResumeSessionID: "../../x"}), "an id that is neither is not followed")
 }
+
+func TestAnOpencodeLastMessageTimeIsRFC3339NotEpochMilliseconds(t *testing.T) {
+	h := &SessionsHandler{opencode: &fakeOpencode{last: opencode.Message{Role: "assistant", Text: "done", At: "1793405561608"}, haveLast: true}}
+	m, ok := h.opencodeLastMessage("sid")
+	require.True(t, ok)
+	assert.Equal(t, "2026-10-31T00:12:41.608Z", m.At, "the phone UI reads the time as every other agent's transcript gives it (found on the real 1.19.5)")
+}

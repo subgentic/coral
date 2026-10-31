@@ -126,7 +126,7 @@ func (h *SessionsHandler) opencodeLastMessage(sessionID string) (jsonl.LastMessa
 		return jsonl.LastMessage{}, false
 	}
 	// one line, as the transcript readers give it; not cut here: lastMessageField redacts it and then shows its first characters, so a secret is never cut in two before it is looked for
-	return jsonl.LastMessage{Role: m.Role, Text: strings.Join(strings.Fields(m.Text), " "), At: m.At}, true
+	return jsonl.LastMessage{Role: m.Role, Text: strings.Join(strings.Fields(m.Text), " "), At: opencodeTime(m.At)}, true // the time as the transcript readers give it (RFC 3339), not epoch milliseconds
 }
 
 // opencodeTranscript is an opencode agent's chat: its newest session's messages from its server, in the shape the chat reads (what was said, by the person and by the agent; tool rows are not kept by the API's
