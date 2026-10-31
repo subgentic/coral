@@ -35,7 +35,7 @@ process.on('beforeExit', async () => { for (const stop of [...PENDING]) await st
 // fillLines: lines it prints before its ready line, so its screen is taller than any terminal. The censuses use it: whether the terminal's
 // viewport scrolls (and so is a Tab stop) then no longer depends on the size the terminal and its pane ended up at (#417).
 async function launchStandIn(api, { workingDir = '', displayName = 'Stand-in Agent', deadlineMs = TOKEN_DEADLINE_MS, fillLines = 0 } = {}) {
-    fillLines = Math.max(0, Math.floor(Number(fillLines) || 0));
+    fillLines = Number.isSafeInteger(fillLines) && fillLines > 0 ? fillLines : 0; // it goes into the script's text: a whole number or none
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'coral-standin-'));
     // The agent's folder is what its Files list shows (the git changes of the folder's repository). The runner's tmp dir is not a folder to give it: on epoch it sits inside a repository, so Chrome's profile files and coral.log are
     // changed files that arrive and go while a census walks the list, each a button no press reached or a name used twice (#10959, #10924). Unless the suite names its own folder, the agent gets one that is its own repository with a
