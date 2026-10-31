@@ -24,6 +24,9 @@ const { coralReady } = require('./helpers/wait');
         // the page's marker, as the server puts it on /chief
         await ev(`document.body.dataset.chief = 'true'; true`);
         check(await ev(shown('.terminal-header')) && await ev(shown('#command-input')), 'the header (the agent\'s name) and the composer stay');
+        // QA's walk (#11499, finding 4): a display name the Operator gave is the header's name, not the job title or the team (the row has display_name Chief and the job title Orchestrator)
+        await ev(`window._coralSetLiveSessions(window._coralGetLiveSessions().map(r => r.session_id === 'chief-a-id' ? { ...r, display_name: 'Chief', board_job_title: 'Orchestrator', board_project: 'chiefdesk' } : r)); true`);
+        await waitFor(`document.getElementById('terminal-header-label') && document.getElementById('terminal-header-label').textContent.trim() === 'Chief'`, 'the header names the agent by its display name', 6000);
         for (const sel of ['.live-view-switch', '.command-pane-toolbar', '#agentic-state', '.terminal-header-actions', '.agent-bar-more', '.live-view-toggle']) check(!(await ev(shown(sel))), `${sel} is not on the Chief page`);
         check(await ev(`document.documentElement.scrollWidth <= document.documentElement.clientWidth`), 'no sideways scroll at 390 px');
         check(before['#command-input'] === true, 'the fixture shows the composer without the marker too (so hiding it would show)');

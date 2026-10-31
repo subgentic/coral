@@ -99,6 +99,9 @@ func runLink(unlink bool, args []string, out io.Writer) error {
 	default:
 		fmt.Fprintf(out, "Linked %s and %s: each may message the other (%s).\n", t, o, files)
 	}
+	if !unlink { // a link is not the switch: each team's messaging is off until the Operator turns it on (QA's Chief walk, #11499)
+		fmt.Fprintln(out, "Messaging has to be on for each team as well: turn it on in Team settings > Messaging for both, or a message between them is refused.")
+	}
 	if enforced, _ := result["enforced"].(bool); !enforced {
 		fmt.Fprintln(out, "Links are recorded but not required yet: teams on this computer can still message each other until \"Require a link between teams on this computer\" is turned on.")
 	}

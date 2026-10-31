@@ -122,7 +122,7 @@ func (h *SessionsHandler) ResolveSession(w http.ResponseWriter, r *http.Request)
 		"name":              ls.AgentName,
 		"tmux_session":      tmuxSession,
 		"working_directory": ls.WorkingDir,
-		"display_name":      ls.DisplayName,
+		"display_name":      h.renamedDisplayName(r.Context(), ls),
 		"auto_name":         nil,
 		"board_project":     ls.BoardName,
 		"board_label":       h.boardLabel(ptr.Value(ls.BoardName)),
@@ -361,4 +361,15 @@ func (h *SessionsHandler) verifiedSessionForPIDs(ctx context.Context, pids []int
 		}
 	}
 	return nil
+}
+
+// renamedDisplayName is the name the list shows for the agent: the one the Operator gave it later (session_meta, what GET /api/sessions/live and the feed carry), else the one it was launched with. The
+// pop-out and /chief merge this record over the live row, so a launch name here beat the rename once the record arrived (#11502, QA's Chief walk).
+func (h *SessionsHandler) renamedDisplayName(ctx context.Context, ls *store.LiveSession) any {
+	if names, err := h.ss.GetDisplayNames(ctx, []string{ls.SessionID}); err == nil {
+		if n := strings.TrimSpace(names[ls.SessionID]); n != "" {
+			return n
+		}
+	}
+	return ls.DisplayName
 }

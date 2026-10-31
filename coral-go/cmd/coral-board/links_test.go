@@ -39,7 +39,7 @@ func TestLinkUnlinkAndLinksTalkToTheLinksRoute(t *testing.T) {
 	if gotMethod != "POST" || gotPath != "/api/board/alpha/cross-team-links" || gotBody["with"] != "beta" || gotBody["both"] != true || gotBody["files"] != true {
 		t.Errorf("the default link: %s %s %v", gotMethod, gotPath, gotBody)
 	}
-	if !strings.Contains(out.String(), "Linked alpha and beta: each may message the other (files on)") || !strings.Contains(out.String(), "not required yet") {
+	if !strings.Contains(out.String(), "Linked alpha and beta: each may message the other (files on)") || !strings.Contains(out.String(), "not required yet") || !strings.Contains(out.String(), "Team settings > Messaging") {
 		t.Errorf("output %q", out.String())
 	}
 
