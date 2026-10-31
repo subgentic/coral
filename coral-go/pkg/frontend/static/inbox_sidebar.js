@@ -16,7 +16,7 @@ import { failedUnread, finishedUnread, refreshRuns, markSeen, runRoute, failureW
 import { go, note, backIs, currentRoute } from './nav.js';
 
 import { build, keyRoute, parse as parseRoute, inboxFolderPath, BOARDS_FOLDER, BOARDS_SUB } from './routes.js';
-import { sessionServer, keyLabel, identityKey, splitKey, goalTeamKey, nativeInbox } from './server_base.js';
+import { sessionServer, keyLabel, identityKey, splitKey, goalTeamKey, nativeInbox, decisionNeedsPerson } from './server_base.js';
 import { teamLabel } from './server_status.js';
 import { showView } from './utils.js';
 import { registerActions, textOf } from './actions.js';
@@ -192,7 +192,7 @@ function reviewActions(row) {
         box.append(unread);
     }
     if (isRead(row) || isPhoneLayout()) { done.classList.add('inbox-review-icon'); done.title = 'Approve'; done.textContent = ''; done.append(DT.el('span', 'material-icons', 'check')); done.firstChild.setAttribute('aria-hidden', 'true'); }
-    box.append(done); if (!isPhoneLayout()) box.append(changes); // a phone's row has no room for a fourth action: Request changes is in the viewer Open leads to (#136584)
+    if (!decisionNeedsPerson(splitKey(row.team).server)) { box.append(done); if (!isPhoneLayout()) box.append(changes); } // a phone's row has no room for a fourth action: Request changes is in the viewer Open leads to (#136584)
     box.append(errorText); return box;
 }
 
