@@ -29,8 +29,8 @@ type farCfg struct {
 	UnameOut string `json:",omitempty"`
 }
 
-// state is kept in the folder above Home, where a test flips it: session (a coral-server session exists), stuck (a kill does nothing), listening (something holds port 8420), noproc (the check cannot
-// tell), started (when coral started, in unix nanoseconds).
+// state is kept in the folder above Home, where a test flips it: session (a coral-server session exists), stuck (a kill does nothing), listening (a process of this user still runs Coral after the stop), noproc (the check cannot
+// tell), portheld (another user holds 8420), started (when coral started, in unix nanoseconds).
 func (f farCfg) flag(name string) bool {
 	_, err := os.Stat(filepath.Join(filepath.Dir(f.Home), name))
 	return err == nil
@@ -138,13 +138,21 @@ func runFar(f farCfg, text string) int {
 		return 0
 	case has("command -v tmux"), has("systemctl --user"):
 		return 0
-	case has("[ -r /proc/net/tcp ]"):
+	case has(`ps -u "$(id -u)"`): // the check after a stop: the session, then THIS user's own Coral process (the flag listening), never the port
 		switch {
 		case f.flag("session"):
 			return 1
 		case f.flag("noproc"):
 			return 3
 		case f.flag("listening"):
+			return 2
+		}
+		return 0
+	case has("[ -r /proc/net/tcp ]"): // the check before a start: this user's session means nothing to check; otherwise 8420 held by another (the flag portheld)
+		if f.flag("session") {
+			return 0
+		}
+		if f.flag("portheld") {
 			return 2
 		}
 		return 0

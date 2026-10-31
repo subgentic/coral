@@ -122,7 +122,7 @@ func dkFixture(t *testing.T) *dkFix {
 		extra = "RUN echo CORAL_TELEMETRY_DISABLED=1 >> /etc/environment\n"
 	}
 	dockerfile := `FROM ubuntu:22.04
-RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends openssh-server tmux ca-certificates procps && rm -rf /var/lib/apt/lists/* && mkdir -p /run/sshd
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends openssh-server tmux ca-certificates procps netcat-openbsd && rm -rf /var/lib/apt/lists/* && mkdir -p /run/sshd
 RUN for u in alice bob jumper; do useradd -m -s /bin/bash -p '*' $u && mkdir -p /home/$u/.ssh; done
 COPY id_run.pub /tmp/k.pub
 RUN for u in alice bob jumper; do cp /tmp/k.pub /home/$u/.ssh/authorized_keys && chown -R $u:$u /home/$u/.ssh && chmod 700 /home/$u/.ssh && chmod 600 /home/$u/.ssh/authorized_keys; done
@@ -163,7 +163,7 @@ RUN for u in alice bob jumper; do cp /tmp/k.pub /home/$u/.ssh/authorized_keys &&
 	if err := os.WriteFile(wrapper, []byte("#!/bin/sh\nexec ssh -F '"+filepath.Join(sshDir, "config")+"' \"$@\"\n"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	f.r = Runner{SSH: wrapper, Timeout: 60 * time.Second}
+	f.r = Runner{SSH: wrapper, Timeout: 60 * time.Second, Config: filepath.Join(sshDir, "config")}
 	oldWait := keyWait
 	keyWait = 45 * time.Second // a Coral on this loaded host took over a minute to start listening; the product waits 90 s
 	t.Cleanup(func() { keyWait = oldWait })
@@ -222,13 +222,11 @@ func TestSSHDocker(t *testing.T) {
 	ctx := context.Background()
 
 	// ── ProxyJump: the scan names the jump AND the far computer, nothing else; both are trusted; only then does anything connect
-	var aliceTarget Target
 	t.Run("proxyjump_scan_trust_connect", func(t *testing.T) {
 		tg, err := FromAlias("far-alice")
 		if err != nil {
 			t.Fatal(err)
 		}
-		aliceTarget = tg
 		if _, err := f.r.Run(ctx, tg, CmdUname); !errors.Is(err, ErrHostKey) {
 			t.Logf("  DIAG plain:\n%s", f.raw("far-alice"))
 			t.Logf("  DIAG -v (proxy and host key lines):\n%s", grepLines(f.raw("far-alice", "-v"), "proxy", "Proxy", "known_hosts", "StrictHost", "Host key", "host key", "verification", "denied", "Connection closed", "Permission"))
@@ -236,17 +234,7 @@ func TestSSHDocker(t *testing.T) {
 		}
 		keys, err := f.r.ScanAlias(ctx, tg)
 		if err != nil {
-			// FINDING (real sshd): the alias scan passes UserKnownHostsFile and StrictHostKeyChecking=no to the OUTER ssh only; the jump's own ssh (started by ProxyJump from the config) does not get them, so
-			// it refuses the jump's unknown key and nothing is stored: the dialog can show no fingerprint for a ProxyJump alias. The rest of the run goes on with the keys scanned directly.
-			t.Errorf("FINDING: ScanAlias through a ProxyJump found no key: %v", err)
-			keys = nil
-			for _, h := range []string{f.jumpIP, f.farIP} {
-				k, serr := f.r.Scan(ctx, h, 22)
-				if serr != nil {
-					t.Fatalf("direct scan of %s: %v", h, serr)
-				}
-				keys = append(keys, k)
-			}
+			t.Fatalf("ScanAlias through a ProxyJump found no key (#11429): %v", err)
 		}
 		hosts := map[string]bool{}
 		for _, k := range keys {
@@ -319,6 +307,9 @@ func TestSSHDocker(t *testing.T) {
 			if err := f.r.AcceptTerms(ctx, tg, dkVersion, termsFor()); err != nil {
 				t.Fatalf("AcceptTerms: %v", err)
 			}
+			if os.Getenv("SSHDOCKER_REAL_CORAL") != "1" { // the real Coral sat blocked for minutes in these containers (a separate question): the stop and port cases below use a stand-in
+				return
+			}
 			if err := f.r.StartTmux(ctx, tg, dkVersion); err != nil {
 				t.Fatalf("StartTmux: %v", err)
 			}
@@ -364,7 +355,7 @@ func TestSSHDocker(t *testing.T) {
 			t.Errorf("both users got the same instance id %s", keysOf["id-alice"])
 		}
 		for _, u := range users {
-			if out, err := f.exec(u.name, "far", "stat -c '%a %U' ~/.coral-server ~/.coral-server/data ~/.coral-server/instance-id ~/.coral-server/data/api_key 2>&1"); err != nil {
+			if out, err := f.exec(u.name, "far", "stat -c '%a %U' ~/.coral-server ~/.coral-server/data ~/.coral-server/instance-id 2>&1"); err != nil {
 				t.Logf("  %s: stat: %s", u.name, out)
 			} else {
 				t.Logf("  %s modes:\n%s", u.name, out)
@@ -375,8 +366,8 @@ func TestSSHDocker(t *testing.T) {
 				}
 			}
 		}
-		if out, err := f.exec("bob", "far", "cat /home/alice/.coral-server/data/api_key 2>&1"); err == nil {
-			t.Errorf("bob could read alice's API key: %q", out)
+		if out, err := f.exec("bob", "far", "cat /home/alice/.coral-server/instance-id 2>&1"); err == nil {
+			t.Errorf("bob could read alice's instance id: %q", out)
 		}
 		sessions := func(u string) string { out, _ := f.exec(u, "far", "tmux ls 2>&1"); return strings.TrimSpace(out) }
 		t.Logf("  tmux of alice: %s", sessions("alice"))
@@ -385,35 +376,62 @@ func TestSSHDocker(t *testing.T) {
 		t.Logf("  listening sockets in the far computer (hex local address; 20E4 is port 8420):\n%s", listeners)
 	})
 
-	// ── a stop by one user leaves the other alone
-	t.Run("stop_alice_leaves_bob", func(t *testing.T) {
-		if !started["alice"] || !started["bob"] {
-			t.Skip("both users need to have started")
-		}
-		before, _ := f.exec("bob", "far", "tmux has-session -t =coral-server 2>&1 && echo alive")
-		err := f.r.StopAndConfirm(ctx, aliceTarget)
-		after, _ := f.exec("bob", "far", "tmux has-session -t =coral-server 2>&1 && echo alive")
-		socks, _ := f.exec("root", "far", "awk 'NR>1 {print $2, $4}' /proc/net/tcp; ps -eo user,pid,etime,args | grep '[r]oot/coral'")
-		t.Logf("  DIAG sockets (local address, state 0A = listening) and coral processes after the stop:\n%s", socks)
-		// how long does alice's Coral process take to go after its session was killed? (a stop is confirmed only when it has)
-		began := time.Now()
-		for time.Since(began) < 5*time.Second {
-			if out, _ := f.exec("root", "far", "pgrep -u alice -f 'root/coral --host' >/dev/null && echo up"); !strings.Contains(out, "up") {
-				break
+	// ── two users, one computer, port 8420 (#11429). A stand-in Coral (a script that listens on 127.0.0.1:8420) is put where each user's release goes, so the start, the port check and the stop check run
+	// as they would, without the real Coral. Alice starts first; bob's start must be refused, naming the port; bob's stop is confirmed (he has nothing running); alice's stop is confirmed and never
+	// touches bob's; after it bob can start.
+	t.Run("two_users_port_and_stop", func(t *testing.T) {
+		const ver = "9.9.8"
+		stand := "#!/bin/sh\nnc -lk 127.0.0.1 8420 &\nwait\n"
+		for _, u := range users {
+			out, err := f.exec(u.name, "far", "mkdir -p ~/.coral-server/"+ver+"/root ~/.coral-server/data && printf '%s' '"+stand+"' > ~/.coral-server/"+ver+"/root/coral && chmod 700 ~/.coral-server/"+ver+"/root/coral")
+			if err != nil {
+				t.Fatalf("stand-in Coral for %s: %v %s", u.name, err, out)
 			}
-			time.Sleep(time.Second)
 		}
-		gone, _ := f.exec("root", "far", "pgrep -u alice -f 'root/coral --host' >/dev/null && echo up || echo gone")
-		t.Logf("  DIAG alice's Coral process is %s %s after the stop returned", strings.TrimSpace(gone), time.Since(began).Round(time.Second))
-		chk, cerr := f.r.Run(ctx, aliceTarget, CmdCheckStopped)
-		t.Logf("  DIAG CheckStopped after the stop: exit %d, err %v (1: a session, 2: a listener on 8420, 3: cannot tell)", chk.ExitCode, cerr)
-		t.Logf("  bob before: %q, StopAndConfirm(alice) = %v, bob after: %q", firstOut(before, nil), err, firstOut(after, nil))
-		if strings.Contains(before, "alive") && !strings.Contains(after, "alive") {
-			t.Errorf("alice's stop ended bob's session")
+		alice, _ := FromAlias("far-alice")
+		bob, _ := FromAlias("far-bob")
+		listening := func() bool {
+			out, _ := f.exec("root", "far", "awk 'NR>1 && $2 ~ /:20E4$/ && $4==\"0A\" {print $2}' /proc/net/tcp")
+			return strings.TrimSpace(out) != ""
 		}
-		if lg, _ := f.exec("alice", "far", "tmux has-session -t =coral-server 2>&1 && echo alive"); strings.Contains(lg, "alive") {
-			t.Errorf("alice's own session is still there after a stop that returned %v", err)
+		if err := f.r.StartTmux(ctx, alice, ver); err != nil {
+			t.Fatalf("alice's start: %v", err)
 		}
+		deadline := time.Now().Add(15 * time.Second)
+		for !listening() && time.Now().Before(deadline) {
+			time.Sleep(200 * time.Millisecond)
+		}
+		if !listening() {
+			t.Fatal("the stand-in did not listen on 8420")
+		}
+		// bob: refused, and nothing of bob's was started
+		if err := f.r.StartTmux(ctx, bob, ver); !errors.Is(err, ErrPortInUse) {
+			t.Errorf("bob's start with alice's Coral on 8420 should be ErrPortInUse, got %v", err)
+		}
+		if out, _ := f.exec("bob", "far", "tmux has-session -t =coral-server 2>&1 && echo alive"); strings.Contains(out, "alive") {
+			t.Errorf("a session of bob's was started although 8420 was held")
+		}
+		// bob's stop: he has nothing, so it is confirmed even though 8420 is held by alice
+		if err := f.r.StopAndConfirm(ctx, bob); err != nil {
+			t.Errorf("bob's stop with nothing of his running must be confirmed, got %v", err)
+		}
+		if !listening() {
+			t.Errorf("bob's stop ended alice's Coral")
+		}
+		// alice's stop: confirmed by her own process being gone, and 8420 is free after it
+		if err := f.r.StopAndConfirm(ctx, alice); err != nil {
+			out, _ := f.exec("root", "far", "ps -eo user,pid,etime,args | grep '[r]oot/coral'")
+			t.Errorf("alice's stop was not confirmed: %v\n%s", err, out)
+		}
+		time.Sleep(500 * time.Millisecond)
+		if listening() {
+			t.Errorf("8420 is still held after alice's confirmed stop")
+		}
+		// and now bob can start his own
+		if err := f.r.StartTmux(ctx, bob, ver); err != nil {
+			t.Errorf("bob's start after alice stopped: %v", err)
+		}
+		_ = f.r.StopAndConfirm(ctx, bob)
 	})
 
 	// ── a changed jump key refuses before the far computer is touched

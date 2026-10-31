@@ -105,6 +105,10 @@ type standCfg struct {
 
 	Far *farCfg `json:",omitempty"` // act as the far computer (farside_test.go): the last argument is the remote text
 
+	// ConfigCopy: the file named by a -F <path> argument is copied there while it exists (the scan's temporary config is deleted afterwards), and its path written to ConfigPath.
+	ConfigCopy string `json:",omitempty"`
+	ConfigPath string `json:",omitempty"`
+
 	// KnownHosts is written to the file named by a UserKnownHostsFile=<path> argument (what ssh does with a key it was told to accept), and that path to KnownHostsPath.
 	KnownHosts     string `json:",omitempty"`
 	KnownHostsPath string `json:",omitempty"`
@@ -205,7 +209,15 @@ func runStandIn() int {
 	if cfg.TextFile != "" && len(args) > 0 {
 		_ = os.WriteFile(cfg.TextFile, []byte(args[len(args)-1]), 0o600)
 	}
-	for _, a := range args {
+	for i, a := range args {
+		if a == "-F" && i+1 < len(args) && cfg.ConfigCopy != "" {
+			if b, err := os.ReadFile(args[i+1]); err == nil {
+				_ = os.WriteFile(cfg.ConfigCopy, b, 0o600)
+			}
+			if cfg.ConfigPath != "" {
+				_ = os.WriteFile(cfg.ConfigPath, []byte(args[i+1]), 0o600)
+			}
+		}
 		if f, ok := strings.CutPrefix(a, "UserKnownHostsFile="); ok && cfg.KnownHosts != "" {
 			_ = os.WriteFile(f, []byte(cfg.KnownHosts), 0o600)
 			if cfg.KnownHostsPath != "" {

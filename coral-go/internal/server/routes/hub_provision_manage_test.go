@@ -45,8 +45,8 @@ func newManageEnv(t *testing.T) *manageEnv {
 	require.NoError(t, os.WriteFile(filepath.Join(home, ".coral-server", "instance-id"), []byte(provInstance+"\n"), 0o600))
 	require.NoError(t, os.WriteFile(filepath.Join(home, ".coral-server", "data", "api_key"), []byte(provKey+"\n"), 0o600))
 	require.NoError(t, os.WriteFile(filepath.Join(bin, "tmux"), []byte("#!/bin/sh\necho \"$@\" >> '"+tmuxLog+"'\n[ \"$1\" = has-session ] && exit 1\nexit 0\n"), 0o755))
-	// the check after a stop reads /proc/net/tcp, which a Mac has not: it is answered here (a file named stuck means Coral will not stop)
-	script := "#!/bin/sh\nfor a in \"$@\"; do last=\"$a\"; done\ncase \"$last\" in *\"uname -sm\"*) echo 'Linux x86_64'; exit 0;; *\"command -v tmux\"*) exit 0;; *\"/proc/net/tcp\"*) [ -e '" + filepath.Join(pe.dir, "stuck") + "' ] && exit 1; exit 0;; esac\nHOME='" + home + "'; export HOME\nPATH='" + bin + ":'\"$PATH\"; export PATH\neval \"$last\"\n"
+	// the checks read ps and /proc/net/tcp, which a Mac has not or answers otherwise: they are answered here (a file named stuck means Coral will not stop; nothing holds 8420)
+	script := "#!/bin/sh\nfor a in \"$@\"; do last=\"$a\"; done\ncase \"$last\" in *\"uname -sm\"*) echo 'Linux x86_64'; exit 0;; *\"command -v tmux\"*) exit 0;; *\"ps -u\"*) [ -e '" + filepath.Join(pe.dir, "stuck") + "' ] && exit 1; exit 0;; *\"/proc/net/tcp\"*) exit 0;; esac\nHOME='" + home + "'; export HOME\nPATH='" + bin + ":'\"$PATH\"; export PATH\neval \"$last\"\n"
 	require.NoError(t, os.WriteFile(filepath.Join(pe.dir, "ssh"), []byte(script), 0o700))
 	pe.p.runner = sshprov.Runner{SSH: filepath.Join(pe.dir, "ssh")}
 	pe.p.version = "2.0.10"

@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -207,9 +208,15 @@ func Trust(path string, k HostKey) error {
 
 // ScanAlias is the host-key step for a Host name of the owner's SSH config, where the real host, port, jump hosts and key file are the config's business (not ours to resolve). After the owner has
 // confirmed they want to connect, ONE ssh runs into a FRESH temporary known_hosts file (never the owner's) with StrictHostKeyChecking=no, and the key it stored there is parsed strictly, the file
-// deleted, and the keys returned to be shown. ssh stores the key before it authenticates, and the scan offers NO credential (no password, no key, no agent), so it never signs in to a host nobody
-// has verified yet: the connection is refused after the key exchange and the non-zero exit is expected. Trust then writes each key the owner confirmed, and every later connection is strict.
-// Hashing is off so the stored name is readable. A ProxyJump chain stores one key per host: ALL of them are returned (one per host, its best type), and the caller confirms and trusts each.
+// deleted, and the keys returned to be shown. ssh stores the key before it authenticates, and the scan offers NO credential to the host being scanned (no password, no key, no agent), so it never signs
+// in to a host nobody has verified yet: the connection is refused after the key exchange and the non-zero exit is expected. Trust then writes each key the owner confirmed, and every later connection
+// is strict. Hashing is off so the stored name is readable. A ProxyJump chain stores one key per host: ALL of them are returned (one per host, its best type), and the caller confirms and trusts each.
+//
+// A ProxyJump is the exception to "no credential", and it has to be: the far host's key is only seen through a channel the jump opens, and a jump opens one only for someone who signed in. The jump
+// hops are run by ssh itself from the config, so they are given the same safety through a temporary config (-F, which ssh passes on to each hop): the same temporary known_hosts, no strict checking,
+// batch mode, and NO forwarding of the agent, X11 or anything else (a ForwardAgent of the owner's own Host line must never reach a jump nobody has verified). The hops sign in as the owner's
+// config says, as `ssh far-host` would for them; a signature is bound to that connection's session, so an impostor jump cannot reuse it. The temporary config includes the owner's (r.Config) after
+// these lines, so the owner's Host blocks still say where the hosts are and which key to use, and ssh takes the first value it finds for each option.
 func (r Runner) ScanAlias(ctx context.Context, t Target) ([]HostKey, error) {
 	if t.Alias == "" || !aliasRe.MatchString(t.Alias) {
 		return nil, errors.Join(ErrHostKeyScan, ErrBadTarget)
@@ -224,7 +231,20 @@ func (r Runner) ScanAlias(ctx context.Context, t Target) ([]HostKey, error) {
 	if ssh == "" {
 		ssh = "ssh"
 	}
-	argv := withoutStrict(append([]string{}, sshOptions...))
+	cfgPath := filepath.Join(dir, "ssh_config")
+	userCfg := r.Config
+	if userCfg == "" {
+		userCfg = DefaultConfigPath()
+	}
+	cfg, err := scanConfig(tmp, userCfg)
+	if err != nil {
+		return nil, err
+	}
+	if err := os.WriteFile(cfgPath, []byte(cfg), 0o600); err != nil {
+		return nil, err
+	}
+	argv := []string{"-F", cfgPath}
+	argv = append(argv, withoutStrict(append([]string{}, sshOptions...))...)
 	argv = append(argv, "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile="+tmp, "-o", "GlobalKnownHostsFile=/dev/null", "-o", "HashKnownHosts=no", "-o", "CheckHostIP=no",
 		"-o", "PreferredAuthentications=none", "-o", "PubkeyAuthentication=no", "-o", "IdentityAgent=none", "-o", "IdentitiesOnly=yes",
 		"--", t.Destination(), "true")
@@ -274,6 +294,29 @@ func (r Runner) ScanAlias(ctx context.Context, t Target) ([]HostKey, error) {
 		keys = append(keys, pick[n])
 	}
 	return keys, nil
+}
+
+// scanConfig is the temporary ssh config of the alias scan (see ScanAlias): the safety lines first (ssh keeps the first value of an option), then the owner's own config.
+func scanConfig(knownHosts, userConfig string) (string, error) {
+	for _, p := range []string{knownHosts, userConfig} {
+		if p == "" || strings.ContainsAny(p, "\"\r\n\x00") {
+			return "", errors.Join(ErrHostKeyScan, ErrBadTarget)
+		}
+	}
+	var b strings.Builder
+	b.WriteString("# Coral's host key scan: these lines come first, so they win over the owner's.\nHost *\n")
+	for _, l := range []string{
+		"StrictHostKeyChecking no", "UserKnownHostsFile \"" + filepath.ToSlash(knownHosts) + "\"", "GlobalKnownHostsFile " + os.DevNull,
+		"HashKnownHosts no", "CheckHostIP no", "BatchMode yes",
+		"ForwardAgent no", "ForwardX11 no", "ForwardX11Trusted no", "ClearAllForwardings yes", "PermitLocalCommand no", "RemoteCommand none",
+	} {
+		b.WriteString("  " + l + "\n")
+	}
+	b.WriteString("Include \"" + filepath.ToSlash(userConfig) + "\"\n")
+	if runtime.GOOS != "windows" {
+		b.WriteString("Include /etc/ssh/ssh_config\n") // -F makes ssh ignore the system-wide config, so it is brought back
+	}
+	return b.String(), nil
 }
 
 // maxAliasHosts bounds the hosts of one alias's path (the target and its jump hosts).
