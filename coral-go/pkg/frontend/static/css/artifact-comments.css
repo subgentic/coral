@@ -131,6 +131,8 @@
 @media (max-width: 767px), (pointer: coarse) and (max-height: 500px) and (max-width: 950px) { .preview-toolbar .ac-toggle:not([hidden]) { min-height: 44px; min-width: 44px; } } /* a touch target (the rule above is more specific than the phone's own) */
 
 /* "Who can read this" (artifact_readers.js): a small disclosure under the viewer's header and in an Artifacts row's details. */
+.artifact-viewer-from { flex: none; padding: 0 16px 8px; font-size: var(--fs-sm); color: var(--text-secondary); overflow-wrap: anywhere; }
+.artifact-viewer-from[hidden] { display: none; }
 .artifact-viewer-readers { flex: none; padding: 0 16px; }
 .artifact-viewer-readers[hidden] { display: none; }
 .artifact-readers { font-size: var(--fs-sm, 0.8125rem); margin: 8px 0 0; }
