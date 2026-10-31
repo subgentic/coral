@@ -319,6 +319,18 @@ const goalKey = g => `${g.board_id}#${g.id}`;
 const goalTeam = g => teamLabel(g.board_id); // with its computer when a hub has more than one: two teams called alpha are two (#8774)
 let goalFilters = GF.loadFilters(), goalBar = null;
 const goalRows = () => GF.ordered(goals.filter(g => GF.matches(g, goalFilters, goalTeam) && serverMatches(g, goalFilters)), goalFilters);
+/** New goal at the right of the Goals toolbar (#11593, the operator): the existing New goal form (goals_view.js, lazy), on the team the Team filter names, else the first; with more than one team the form asks which. */
+function newGoalAction() {
+    const b = DT.el('button', 'btn btn-primary goals-new', 'New goal'); b.type = 'button';
+    b.addEventListener('click', async () => {
+        const [{ fetchProjects }, GV] = await Promise.all([importOnce('./board_fetch.js'), importOnce('./goals_view.js')]);
+        let list = []; try { list = (await fetchProjects()).map(p => ({ key: String(p.project), label: teamLabel(p.project, p.board_label || '') })).filter(t => t.key); } catch { /* the teams the goals name are the fallback */ }
+        if (!list.length) list = [...new Set(goals.map(g => g.board_id))].map(k => ({ key: k, label: goalTeam({ board_id: k }) }));
+        list.sort((x, y) => x.label.localeCompare(y.label));
+        GV.openCreate({ project: list.some(t => t.key === goalFilters.team) ? goalFilters.team : list[0]?.key, teams: list, onCreated: () => refreshGoals() });
+    });
+    return b;
+}
 /** The Goals folder's toolbar (#8596): the search, the Filters icon beside it (Team, Driver, Updated since, Sort), the state pills, and the chips of what is on. */
 function inboxGoalsToolbar() {
     if (!goalBar) {
@@ -348,6 +360,7 @@ function inboxGoalsToolbar() {
         pills: { label: 'Show goals that are', current: goalFilters.state || 'all',
             items: [{ key: 'all', label: 'All', count: rows.length }, ...GF.STATES.map((key, i) => ({ key, label: GF.STATE_LABEL[key], count: counts[i] }))],
             onPick: key => { goalFilters = { ...goalFilters, state: key === 'all' ? '' : key }; GF.saveFilters(goalFilters); renderInboxNav(true); } },
+        action: newGoalAction(),
     });
     return { node, signature: JSON.stringify([goalFilters, teams, drivers, counts, rows.length]) };
 }
