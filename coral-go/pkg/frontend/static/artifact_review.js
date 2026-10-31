@@ -39,16 +39,34 @@ async function decide(team, row, decision) {
     return body;
 }
 
+/** Approving a version settles the ones before it quietly: their 'for review' tag comes off (no review, no message); resolves { settled, failed }. */
+async function settleEarlierVersions(m, row) {
+    let settled = 0, failed = 0;
+    for (const e of m.earlierVersions(row)) {
+        try {
+            const current = await m.currentTags(e);
+            if (current !== null) {
+                const r = await boardFetch(e.team, `/artifacts/${encodeURIComponent(e.id)}/tags`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tags: current.filter(t => t !== 'for review') }) });
+                if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            }
+            settled++;
+        } catch { failed++; }
+    }
+    return { settled, failed };
+}
+
 /** Approve a review row of Needs you (or the viewer): it is decided, the Inbox list follows. Resolves the server's answer ({delivered, to, reason}). */
 export async function approveRow(team, row) {
     const out = await decide(team, row, 'approve');
-    importOnce('./inbox_reviews.js').then(m => { m.settleReview(row); return m.refreshReviews(true); }).catch(() => {});
+    const m = await importOnce('./inbox_reviews.js').catch(() => null);
+    if (m) { out.earlier = await settleEarlierVersions(m, row).catch(() => ({ settled: 0, failed: 0 })); m.settleReview(row); m.refreshReviews(true).catch(() => {}); } // the versions before the approved one are settled with it (#11533)
     return out;
 }
 
 /** Say what an approval did, in a toast. */
 export function sayApproved(name, out) {
-    if (out.delivered && out.asleep) showToast(`Approved. ${out.to} is asleep: it will see this when it wakes.`);
+    if (out.earlier && out.earlier.failed) showToast(`Approved ${name}, but ${out.earlier.failed} earlier version${out.earlier.failed === 1 ? '' : 's'} could not be cleared: ${out.earlier.failed === 1 ? 'it' : 'they'} stay${out.earlier.failed === 1 ? 's' : ''} in Needs you.`, true);
+    else if (out.delivered && out.asleep) showToast(`Approved. ${out.to} is asleep: it will see this when it wakes.`);
     else if (out.delivered) showToast(`Approved. ${out.to} was told.`);
     else if (out.reason === 'no_uploader') showToast(`Approved ${name}. No agent is recorded for it, so nobody was told.`);
     else showToast(`Approved ${name}.`);
