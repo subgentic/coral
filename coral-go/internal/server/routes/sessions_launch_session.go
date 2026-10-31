@@ -6,10 +6,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/subgentic/coral/internal/lookpath"
 	"log"
 	"log/slog"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -309,7 +309,7 @@ func resolveLaunchCLIScreened(agentType, cliPath string, screen func(string) str
 	if checkBin == "" {
 		return cliPath, nil
 	}
-	resolved, err := lookpath.Path(checkBin)
+	resolved, err := exec.LookPath(checkBin)
 	if err == nil {
 		if cliPath == "" {
 			cliPath = resolved
