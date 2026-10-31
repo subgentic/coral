@@ -31,6 +31,10 @@ type pendingTool struct {
 	// Wants is the line a PermissionRequest for this call would carry ("Wants to run: <command>", cleaned as the server stores it), so a request is tied only to the calls it is about (#11352); empty
 	// for a call whose input cannot be compared.
 	Wants string `json:"-"`
+	// Risk is the whole text of each field auto-accept judges (never served: Input is the cut one the chat shows); Unjudged says why the request cannot be judged whole ("" when it can), and auto-accept then
+	// refuses it (#11399).
+	Risk     map[string]string `json:"-"`
+	Unjudged string            `json:"-"`
 }
 
 type pendingTools struct {
@@ -231,6 +235,20 @@ func trimPendingInput(in map[string]any) map[string]any {
 	return out
 }
 
+// newPendingTool is the pending tool a PreToolUse hook reports: the cut input the chat shows, and the whole text auto-accept judges (#11399).
+func newPendingTool(toolUseID, toolName string, input map[string]any, at time.Time) pendingTool {
+	risk, unjudged := riskInputOf(input)
+	return pendingTool{
+		Risk:      risk,
+		Unjudged:  unjudged,
+		ToolUseID: toolUseID,
+		ToolName:  toolName,
+		Input:     trimPendingInput(input),
+		At:        at,
+		Wants:     wantsLineOf(toolName, input),
+	}
+}
+
 func truncateUTF8(s string, n int) string {
 	if len(s) <= n {
 		return s
@@ -284,13 +302,7 @@ func (h *SessionsHandler) SetPendingTool(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	h.hints.forget(body.SessionID) // a blocking tool may open a prompt: read the screen again
-	t := pendingTool{
-		ToolUseID: body.ToolUseID,
-		ToolName:  body.ToolName,
-		Input:     trimPendingInput(body.ToolInput),
-		At:        time.Now(),
-		Wants:     wantsLineOf(body.ToolName, body.ToolInput),
-	}
+	t := newPendingTool(body.ToolUseID, body.ToolName, body.ToolInput, time.Now())
 	h.pending.set(body.SessionID, t)
 	h.noteToolStart(r.Context(), body.SessionID, body.ToolName, body.ToolUseID, body.ToolInput)
 	h.watchForPrompt(body.SessionID, owner.SessionName, t) // agy sends no hook for a permission prompt (#4819)
