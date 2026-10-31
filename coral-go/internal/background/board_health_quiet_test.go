@@ -89,6 +89,9 @@ func TestTheHeartbeatSettingIsOffByDefaultAndClamped(t *testing.T) {
 	hs.HeartbeatMin = 99999
 	require.NoError(t, h.s.SetHealthSettings(ctx, "team", hs))
 	assert.Equal(t, 1440, h.s.GetHealthSettings(ctx, "team").HeartbeatMin)
+	hs.HeartbeatMin = -30
+	require.NoError(t, h.s.SetHealthSettings(ctx, "team", hs))
+	assert.Equal(t, 0, h.s.GetHealthSettings(ctx, "team").HeartbeatMin, "a negative number is never, not the shortest heartbeat")
 }
 
 // With the heartbeat off (the default) a quiet team hears nothing, not even a first line, for a day; a finding is still said once.
@@ -180,4 +183,25 @@ func TestOneOfTwoFindingsClearsThenComesBackAndTheCheckGoesOut(t *testing.T) {
 	assert.Equal(t, 2, at(40), "a finding that left and came back is news again, though B never moved")
 	assert.Contains(t, h.sent["Orchestrator"][1], "BlindA")
 	assert.Equal(t, 2, at(50), "and not said twice")
+}
+
+// One idle agent, then a second: the second is news, so a check goes out at that look (QA Engineer's SHOULD 3 on #11431, the count rising from 1 to 2).
+func TestAnIdleAgentThenASecondOneIsACheck(t *testing.T) {
+	h := newCheckHarness(t)
+	ctx := context.Background()
+	h.member("Orchestrator", "Orchestrator", 1, 0)
+	h.member("IdlerA", "Developer", 2, 40*time.Minute)
+	hs := h.s.GetHealthSettings(ctx, "team")
+	hs.IntervalMin, hs.HeartbeatMin = 10, 0
+	require.NoError(t, h.s.SetHealthSettings(ctx, "team", hs))
+	sent := func() int { h.mu.Lock(); defer h.mu.Unlock(); return len(h.sent["Orchestrator"]) }
+	start := h.now
+	at := func(min int) int { h.now = start.Add(time.Duration(min) * time.Minute); h.m.scan(ctx); return sent() }
+
+	assert.Equal(t, 1, at(0), "the first idle agent is new")
+	assert.Equal(t, 1, at(10), "still one idle agent: nothing new")
+	h.member("IdlerB", "Developer", 3, 40*time.Minute)
+	assert.Equal(t, 2, at(20), "a second idle agent: a check at that look")
+	assert.Contains(t, h.sent["Orchestrator"][1], "IdlerB")
+	assert.Equal(t, 2, at(30), "and nothing more while both stay idle")
 }

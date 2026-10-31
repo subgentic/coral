@@ -220,7 +220,9 @@ func DefaultHealthSettings() HealthSettings {
 // minutes (the landing wait 15 to 10080, the goals-ready and unowned-tasks waits 5 to 10080), nudge counts 1 to 5, at most 8 default reviewers.
 func (h HealthSettings) Clamp() HealthSettings {
 	h.IntervalMin = min(max(h.IntervalMin, 5), 1440)
-	if h.HeartbeatMin != 0 { // 0 is "never" (a body that does not carry the setting means it too); a value that is set is 5 to 1440 minutes
+	if h.HeartbeatMin <= 0 { // 0 is "never", and so is a negative number (a body that does not carry the setting means it too); a value that is set is 5 to 1440 minutes
+		h.HeartbeatMin = 0
+	} else {
 		h.HeartbeatMin = min(max(h.HeartbeatMin, 5), 1440)
 	}
 	h.ClaimNudge.AfterMin = min(max(h.ClaimNudge.AfterMin, 5), 1440)

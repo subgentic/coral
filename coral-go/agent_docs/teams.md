@@ -532,8 +532,8 @@ values are clamped: times are 5 to 1440 minutes, and nudges are 1 to 5.
 | Setting | Default | What it does |
 |---|---|---|
 | `on` | true | the whole check and every rule |
-| `interval_min` | 10 | minutes between looks: the check goes out only when something changed at a look (a new or changed finding, an agent stopped at a dialog for `held_notice.after_min`, a question, an agent idle, offline or of unknown state, a wait gone stale), never to say "no change"; a finding going away is not news |
-| `heartbeat_min` | 0 (never) | 0: a check is never sent to say "no change", only when a look found something new. Set 5 to 1440 and a check also goes out at least that often, so silence means health |
+| `interval_min` | 10 | minutes between looks: the check goes out only when something changed at a look (a new or changed finding, an agent stopped at a dialog for `held_notice.after_min`, a question, an agent idle, offline or of unknown state, a wait gone stale), never to say "no change"; a finding going away is not news; a goal reminder (a goal that needs the Operator) is said once, when it first appears or changes, then only at a heartbeat if one is set |
+| `heartbeat_min` | 0 (never; a negative number means never too) | 0: a check is never sent to say "no change", only when a look found something new. Set 5 to 1440 and a check also goes out at least that often, so silence means health |
 | `recipient` | "" (the orchestrator) | who gets the check: a member of this team, checked again at each check |
 | `all_clear` | true | with `heartbeat_min` set, send the one-line check at a heartbeat when nothing needs the orchestrator (with the heartbeat off nothing is ever sent for a quiet team) |
 | `default_reviewers` | [] | reviewers of a task that names none, or whose names don't count |
