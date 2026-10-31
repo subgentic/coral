@@ -78,10 +78,14 @@ func readyReply(prompt string) string {
 // questionMenu is drawn like Claude Code's AskUserQuestion, as Coral's PromptOnScreen reads a menu.
 const questionMenu = "\r\n Pick a color:\r\n \u276f 1. Red\r\n   2. Blue\r\n\r\n Enter to select \u00b7 Esc to cancel\r\n"
 
+// questionTextMenu is the same question with Claude Code's two extra options: "Type something." (3) takes a line of text that the next Enter answers, "Chat about this" (4) is the other free-text way out.
+const questionTextMenu = "\r\n Pick a color:\r\n \u276f 1. Red\r\n   2. Blue\r\n   3. Type something.\r\n   4. Chat about this\r\n\r\n Enter to select \u00b7 Esc to cancel\r\n"
+
 // applyControl handles the lines a tester types to make the mock do something on demand (#10168), whatever mode it is in; it reports whether the line was one:
 //
 //	MOCK_ASK_PERMISSION  a permission menu opens and the PermissionRequest and Notification hooks fire: a Needs you row ("permission")
 //	MOCK_ASK_QUESTION    a question opens ("Pick a color:", Red or Blue) with the AskUserQuestion permission request: a Needs you row ("question")
+//	MOCK_ASK_QUESTION_TEXT  the same question with "3. Type something." and "4. Chat about this": a 3 opens a text line and the next text and Enter answer it, so the dashboard's answer box can be tested without a real agent (#11393)
 //	MOCK_GO_DEAF         the mock stops reading: its box stays on screen but takes nothing and it answers nothing: a send is accepted and no reply ever comes (the chat stays blank)
 //	MOCK_STUCK_ENTER     the box takes text but an Enter does not submit it: the next send is refused (a message not submitted, then "an earlier message is still in the box"): the send-error box
 //	MOCK_BUSY [seconds]  the turn stays open (30 s without a number): the agent is working and sends no Stop until then, so a tester can reach Stop and queue sends (#10602)
@@ -116,6 +120,12 @@ func applyControl(box *inputBox, line string) (handled, waiting bool) {
 		box.promptOpen, box.question = true, true
 		drawBox(box)
 		fmt.Print(questionMenu)
+		box.tell("question_request")
+		return true, true
+	case "MOCK_ASK_QUESTION_TEXT":
+		box.promptOpen, box.question, box.textOption, box.typing = true, true, true, false
+		drawBox(box)
+		fmt.Print(questionTextMenu)
 		box.tell("question_request")
 		return true, true
 	case "MOCK_STUCK_ENTER":
