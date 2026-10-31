@@ -1,3 +1,4 @@
+import { dialogDue } from './at_dialog.js';
 /* Presentation evidence only: never import this into send/approval/queue logic.
  * The backend wait remains authoritative while a Codex footer quiets attention. */
 export const DISPLAY_HINT_MAX_AGE_MS = 10_000;
@@ -36,5 +37,5 @@ export function trackDisplayHint(s) {
 }
 export function needsInputAttention(s) {
     trackDisplayHint(s);
-    return !!s?.waiting_for_input && !hasWorkingDisplayHint(s);
+    return (!!s?.waiting_for_input && !hasWorkingDisplayHint(s)) || dialogDue(s); // an agent at a dialog for the set minutes needs one click too (#11430)
 }

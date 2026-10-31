@@ -1,4 +1,5 @@
 import { needsInputAttention } from './display_activity_hint.js';
+import { dialogDue, DIALOG_WORDS } from './at_dialog.js';
 import { refreshNeedsInputCard } from './needs_input_card.js';
 /* WebSocket connection for real-time coral updates */
 
@@ -254,7 +255,7 @@ export const CODEX_REVIEW_HOLD_MS = 6000;
 /** The needs-input toast, and the opt-in desktop alert, for row s. */
 function _raiseNeedsInputAlert(s, id) {
     const label = escapeHtml(withTeam(resolveSessionIdentity(s), s)); // the role or the name the row shows (the row's own words), not the folder twice; two teams: "Orchestrator (team-a)" (#10134)
-    const detail = s.waiting_summary ? escapeHtml(askWords(s.waiting_summary)) : null;
+    const detail = s.waiting_summary ? escapeHtml(askWords(s.waiting_summary)) : dialogDue(s) ? escapeHtml(DIALOG_WORDS) : null; // an agent at a dialog says it needs one click (#11430)
     const sessionName = s.name;
     const agentType = s.agent_type;
     const sessionId = s.session_id;
