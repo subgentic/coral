@@ -238,3 +238,23 @@ func TestAnotherOwnerIsRefusedByEveryCheckOfTheNativeInstallersFiles(t *testing.
 type plainInfo struct{ fakeInfo }
 
 func (plainInfo) Sys() any { return nil }
+
+// QA's gap on #11467: the three parent folders are checked for a typed path under ~/.local/share/<cli>/versions/ too (the file itself, as the Settings check also looks at what a link resolves to), not
+// only for the ~/.local/bin link.
+func TestTheParentFoldersArePrivateForTheVersionFileTypedDirectlyToo(t *testing.T) {
+	for name, parent := range map[string]func(r *nativeRig) string{
+		"~/.local":              func(r *nativeRig) string { return filepath.Join(r.home, ".local") },
+		"~/.local/share":        func(r *nativeRig) string { return filepath.Join(r.home, ".local", "share") },
+		"~/.local/share/claude": func(r *nativeRig) string { return filepath.Join(r.home, ".local", "share", "claude") },
+	} {
+		for mode, perm := range map[string]os.FileMode{"group-writable": 0o775, "world-writable": 0o777} {
+			t.Run(name+" "+mode, func(t *testing.T) {
+				r := newNativeRig(t)
+				r.agentIn("aaaaaaaa-0000-4000-8000-000000000007", r.home)
+				require.Empty(t, r.screen(r.version), "untouched, the version file typed directly passes")
+				require.NoError(t, os.Chmod(parent(r), perm))
+				assert.NotEmpty(t, r.screen(r.version), "the parent folder is writable by others")
+			})
+		}
+	}
+}
