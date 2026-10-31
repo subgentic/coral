@@ -391,3 +391,28 @@ func TestRemoteTextRefusesATemplateWithAFormattingError(t *testing.T) {
 		t.Errorf("a good template: %q, %v", text, err)
 	}
 }
+
+// Backend Dev's root cause for v2.0.10: the far Coral is started in a tmux pane, which is a terminal, so a Coral that finds someone to ask asks "Enable remote access?" and waits for an answer nobody gives:
+// no listener, no key, and setup's wait for the key fails. The start command gives it standard input from /dev/null. The far side here (the stand-in) lets Coral get going only when the command did that, so
+// taking the redirect out makes the key never come (the ported FIFO test of be-ssh-start-stdin).
+func TestStartTmuxGivesCoralNoTerminalToAskAt(t *testing.T) {
+	text, err := remoteText(CmdStartTmux, "2.0.10")
+	if err != nil {
+		t.Fatal(err)
+	}
+	i, j := strings.Index(text, "--home"), strings.Index(text, "</dev/null")
+	if j < 0 || j < i {
+		t.Fatalf("the start command does not give Coral standard input from /dev/null after its arguments: %s", text)
+	}
+	oldPoll, oldWait := keyPoll, keyWait
+	keyPoll, keyWait = 50*time.Millisecond, 2*time.Second
+	defer func() { keyPoll, keyWait = oldPoll, oldWait }()
+	r, _, _, _ := startSide(t)
+	tg, _ := ParseTarget("user@box.example.com")
+	if err := r.StartTmux(context.Background(), tg, "2.0.10"); err != nil {
+		t.Fatal(err)
+	}
+	if key, err := r.ReadAPIKey(context.Background(), tg, "2.0.10"); err != nil || key != testKey {
+		t.Errorf("Coral did not get going (it would have been waiting at a prompt): %q, %v", key, err)
+	}
+}

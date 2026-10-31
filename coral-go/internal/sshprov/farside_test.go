@@ -179,7 +179,11 @@ func runFar(f farCfg, text string) int {
 			rest = filepath.FromSlash(strings.ReplaceAll(strings.ReplaceAll(rest, `\"`, ""), "$HOME", f.Home)) // the path as this system writes it
 			appendLine(f.ArgsLog, strings.TrimSpace(rest))
 		}
-		_ = os.WriteFile(filepath.Join(filepath.Dir(f.Home), "started"), []byte(fmt.Sprint(time.Now().UnixNano())), 0o600)
+		// A tmux pane is a terminal: a Coral started in one with its standard input still on it asks "Enable remote access? [y/N]" on a computer where it has never run, and waits for an answer nobody gives, so
+		// nothing listens and no key appears (Backend Dev's root cause, v2.0.10). The command gives it </dev/null; without that the emulated Coral never gets going.
+		if strings.Contains(text, "</dev/null") {
+			_ = os.WriteFile(filepath.Join(filepath.Dir(f.Home), "started"), []byte(fmt.Sprint(time.Now().UnixNano())), 0o600)
+		}
 		return 0
 	case has("instance-id\" && { [ -s"):
 		if err := os.MkdirAll(install, 0o700); err != nil {
