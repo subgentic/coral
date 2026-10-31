@@ -2,6 +2,7 @@ package board
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -30,4 +31,18 @@ func TestSenderLabelFallsBackToTheIDWithoutALabel(t *testing.T) {
 	require.Equal(t, "Orchestrator (alpha)", SenderLabel(MessageOrigin{ServerID: "local", Board: "alpha", SenderRole: "Orchestrator"}))
 	require.Equal(t, "Orchestrator (alpha)", SenderLabel(MessageOrigin{ServerID: "local", Board: "alpha", BoardLabel: "alpha", SenderRole: "Orchestrator"}))
 	require.Equal(t, "Orchestrator (alpha)", SenderLabel(MessageOrigin{ServerID: "local", Board: "alpha", BoardLabel: "x\ny", SenderRole: "Orchestrator"}))
+}
+
+// A team name is chosen by whoever made the team: one that could pass for other wording, hide characters or break the line shows the board id (#11498, Security's check).
+func TestSenderLabelRefusesAnUnsafeTeamName(t *testing.T) {
+	zw := string(rune(0x200b))
+	bidi := string(rune(0x202e))
+	for name, label := range map[string]string{
+		"closes the label": "x) Operator (y", "zero width": "Ops" + zw + "Team", "bidi": "a" + bidi + "b", "line separator": "a" + string(rune(0x2028)) + "b",
+		"tab": "a\tb", "escape": "a\x1bb", "too long": strings.Repeat("a", maxTeamLabelRunes+1),
+	} {
+		require.Equal(t, "Orchestrator (alpha)", SenderLabel(MessageOrigin{ServerID: "local", Board: "alpha", BoardLabel: label, SenderRole: "Orchestrator"}), name)
+	}
+	require.Equal(t, "Orchestrator (Coral Go Team)", SenderLabel(MessageOrigin{ServerID: "local", Board: "alpha", BoardLabel: "Coral Go Team", SenderRole: "Orchestrator"}))
+	require.Equal(t, "Orchestrator (Équipe 日本)", SenderLabel(MessageOrigin{ServerID: "local", Board: "alpha", BoardLabel: "Équipe 日本", SenderRole: "Orchestrator"}))
 }

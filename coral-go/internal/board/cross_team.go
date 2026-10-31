@@ -9,6 +9,8 @@ import (
 	"github.com/jmoiron/sqlx"
 	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/subgentic/coral/internal/clitext"
 )
@@ -456,7 +458,7 @@ func (s *Store) TargetOrchestrators(ctx context.Context, project, to string) ([]
 // else the id. The reply hint still addresses the id (CrossReplyLine).
 func SenderLabel(o MessageOrigin) string {
 	team := o.Board
-	if l := strings.TrimSpace(o.BoardLabel); l != "" && l != o.Board && !strings.ContainsAny(l, "\r\n") {
+	if l := strings.TrimSpace(o.BoardLabel); l != "" && l != o.Board && plainTeamLabel(l) {
 		team = l
 	}
 	if o.remote() {
@@ -467,6 +469,23 @@ func SenderLabel(o MessageOrigin) string {
 		return fmt.Sprintf("%s (%s, server %s)", o.SenderRole, team, id)
 	}
 	return fmt.Sprintf("%s (%s)", o.SenderRole, team)
+}
+
+// maxTeamLabelRunes is the longest team name the sender label carries; a longer one shows the board id.
+const maxTeamLabelRunes = 40
+
+// plainTeamLabel says a team name is safe to put inside "Role (...)" in another team's text: it was chosen by whoever made that team, so it may hold no control, format (zero-width,
+// bidi) or line-separator character, no parenthesis (it could close the label and add words that pass for the rest of a line), and is not long. Anything else shows the board id.
+func plainTeamLabel(l string) bool {
+	if utf8.RuneCountInString(l) > maxTeamLabelRunes {
+		return false
+	}
+	for _, r := range l {
+		if r == '(' || r == ')' || unicode.IsControl(r) || unicode.In(r, unicode.Cf, unicode.Zl, unicode.Zp) {
+			return false
+		}
+	}
+	return true
 }
 
 // PostCrossTeamMessage stores the inbound message on the target board (from
