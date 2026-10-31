@@ -82,7 +82,7 @@ let _status = null;
 function phoneState(state, label) {
     const bd = document.body; // only a change is written (a poll every 15 s)
     if (state) { if (bd.getAttribute('data-hub-state') !== state) bd.setAttribute('data-hub-state', state); if (bd.getAttribute('data-hub-label') !== label) bd.setAttribute('data-hub-label', label); } else { bd.removeAttribute('data-hub-state'); bd.removeAttribute('data-hub-label'); }
-    const t = document.getElementById('phone-hub-state'), words = state ? `, ${label}` : ''; if (t && t.textContent !== words) t.textContent = words;
+    const words = state ? `, ${label}` : ''; for (const t of document.querySelectorAll('.phone-hub-state')) if (t.textContent !== words) t.textContent = words; /* every bar's avatar says it (phone_bar.js) */
 }
 
 function hide(b) {

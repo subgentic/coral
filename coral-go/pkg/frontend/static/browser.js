@@ -2,7 +2,7 @@
 
 import { escapeHtml, escapeAttr } from './utils.js';
 import { registerActions, textOf } from './actions.js';
-import { serverFetch, LOCAL_SERVER, normServer } from './server_base.js';
+import { serverFetch, LOCAL_SERVER, normServer, isCloud } from './server_base.js';
 import { recentDirsKey, machineBlock } from './launch_server.js';
 import { browserLocal } from './safe_storage.js';
 
@@ -43,6 +43,26 @@ export function recordRecentDir(path, server = LOCAL_SERVER) {
     try {
         browserLocal.set(recentDirsKey(server), JSON.stringify(dirs));
     } catch (_) {}
+}
+
+/** Drop the recent folders that are gone from this computer (#11336 item 9: the browser keeps them when the data folder is wiped, so a person was offered buttons to folders that do not exist).
+ *  Only for this computer's own dashboard: there the folder list answers 403 for a folder that does not exist, is not a folder or is a network path, and for nothing else; a server that is
+ *  another computer, or Coral Hub, is not asked. A network error or any other answer keeps the folder. Resolves true when the list changed. */
+export async function pruneMissingRecents(server = LOCAL_SERVER) {
+    if (normServer(server) !== LOCAL_SERVER || isCloud()) return false;
+    const dirs = getRecentDirs(server);
+    if (!dirs.length) return false;
+    const gone = new Set();
+    await Promise.all(dirs.map(async d => {
+        try {
+            const r = await serverFetch(server, `/api/filesystem/list?path=${encodeURIComponent(d)}`, { cache: 'no-store' });
+            if (r.status === 403) gone.add(d);
+        } catch { /* cannot ask: keep it */ }
+    }));
+    if (!gone.size) return false;
+    const now = getRecentDirs(server).filter(d => !gone.has(d)); // read again: a launch while we asked may have added one
+    try { browserLocal.set(recentDirsKey(server), JSON.stringify(now)); } catch (_) { return false; }
+    return true;
 }
 
 function renderRecentDirs() {

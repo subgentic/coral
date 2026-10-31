@@ -39,12 +39,13 @@ const { coralReady } = require('./helpers/wait');
         if (offer.h < 44) problems.push(`the button is not a 44 px target: ${JSON.stringify(offer)}`);
         if (!offer.inView || !offer.below) problems.push(`the button is not in view under the folder's error: ${JSON.stringify(offer)}`);
         await ev(`window.hideJobModal(); true`);
-        // Settings: a group open shows "Settings" once
+        // Settings: a group open has ONE title, the section's own name in its bar (slice C, #11239: the bar's arrow is named "Back to Settings" for a screen reader; "Settings" is not drawn twice)
         await ev(`window.showSettingsModal(); true`);
         await waitFor(`!!document.querySelector('#settings-modal .settings-tab') && document.querySelector('#settings-modal .settings-tab').getClientRects().length > 0`, 'the Settings sections', 8000);
         await ev(`document.querySelector('#settings-modal .settings-tab').click(); true`); await sleep(600); /* sleep-ok: the group screen draws */
         const titles = await ev(`[...document.querySelectorAll('#settings-modal #settings-title, #settings-modal .settings-back')].filter(e => { const r = e.getBoundingClientRect(), c = getComputedStyle(e); return r.width > 1 && r.height > 1 && c.visibility !== 'hidden'; }).map(e => e.textContent.replace(/arrow_back/, '').trim())`);
-        if (titles.length !== 1 || titles[0] !== 'Settings') problems.push(`the Settings sheet shows its title ${titles.length} times with a group open: ${JSON.stringify(titles)}`);
+        if (titles.length !== 1 || titles[0] !== 'General') problems.push(`the Settings sheet shows one title, the section's name, with a group open: ${JSON.stringify(titles)}`);
+        if (await ev(`document.querySelector('#settings-modal .settings-back').getAttribute('aria-label')`) !== 'Back to Settings') problems.push('the section bar\'s arrow is named Back to Settings');
         assert.deepEqual(problems, [], 'Mobile pass 40 at 390:\n  ' + problems.join('\n  '));
         console.log('PASS phone pass 40');
     } finally { await client.close(); }

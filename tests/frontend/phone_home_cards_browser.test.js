@@ -29,6 +29,10 @@ const { coralReady } = require('./helpers/wait');
         for (const [fs, theme] of [[16, 'light'], [16, 'dark'], [32, 'light']]) {
             await open(390, fs, theme);
             const tag = `390@${fs} ${theme}`;
+            { // the row's ⋯ is not drawn over the preview's text (the phone walk, item 4: it sat on the last characters of a one-line preview)
+                const hit = await ev(`[...document.querySelectorAll('#mobile-session-list .session-group-item')].map(row => { const k = row.querySelector('.sidebar-kebab-btn'), p = row.querySelector('.session-preview'); if (!k || !p || !k.getClientRects().length || !p.textContent.trim()) return null; const kb = k.getBoundingClientRect(), r = document.createRange(); r.selectNodeContents(p); const over = [...r.getClientRects()].filter(b => b.width > 0 && b.left < kb.right - 1 && b.right > kb.left + 1 && b.top < kb.bottom - 1 && b.bottom > kb.top + 1).length; return over ? row.dataset.name || row.textContent.trim().slice(0, 20) : null; }).filter(Boolean)`);
+                assert.deepEqual(hit, [], `${tag}: no row's ⋯ sits on its preview text: ` + JSON.stringify(hit));
+            }
             { // the pill filters agents by name; the line under it sends the same words to the chats' search (the Mobile Beta Tester's "0 of 6 agents" for words from a chat)
                 await ev(`(() => { const i = document.querySelector('#mobile-agent-list .mobile-search-input'); i.value = 'build'; i.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
                 await waitFor(`!document.getElementById('agent-search-all-chats').hidden`, `${tag}: the all-chats line appears`, 4000);

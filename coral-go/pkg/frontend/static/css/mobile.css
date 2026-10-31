@@ -1357,16 +1357,25 @@
    avatar (the team's colour, the agent's initial) with the state as a dot on its corner, the name, the short time at the right and a two-line preview (the goal until the last message is a field of the row). No borders, soft
    surfaces. Wider screens keep the sidebar's row (the avatar, the time and the preview are drawn by this block only). */
 .session-avatar, .session-time, .session-preview, .phone-menu-btn, .phone-account-btn, .phone-break, .phone-chips { display: none; }
+.phone-bar { display: none; }
+#mobile-agent-list .phone-bar { display: flex; align-items: center; gap: 4px; flex: 1 0 100%; min-width: 0; } /* Home's list is the page up to 767 px, and its search is in this bar: the bar is there at every width the list is (the ☰ and the avatar are drawn only on a phone, below) */
+#mobile-agent-list .phone-bar .phone-bar-pill { flex: 1 1 0; min-width: 0; margin: 0; }
 @media (max-width: 300px) { body.live-session-active:not(.popout-mode) .terminal-header { flex-wrap: wrap; } } /* a phone at 200% zoom is 195 px wide: the row wraps before ⋯ is cut off (phone_layout) */
 @media (max-width: 600px) {
     body.agent-home-active header.top-bar { display: none; }
     body.agent-home-active { --top-bar-height: env(safe-area-inset-top, 0px); }
     #mobile-agent-list .mobile-list-header { padding: calc(8px + env(safe-area-inset-top, 0px)) 8px 4px; gap: 4px; flex-wrap: wrap; justify-content: flex-start; align-items: center; }
-    #mobile-agent-list .phone-menu-btn, #mobile-agent-list .phone-account-btn { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 44px; height: 44px; min-width: 44px; padding: 0; border-radius: 50%; }
-    #mobile-agent-list .phone-menu-btn { order: 0; }
+    .phone-bar .phone-menu-btn, .phone-bar .phone-account-btn { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 44px; height: 44px; min-width: 44px; padding: 0; border-radius: 50%; }
+    .phone-bar .phone-menu-btn { order: 0; }
     #mobile-agent-list .mobile-search-row { order: 1; flex: 1 1 0; min-width: 0; }
-    #mobile-agent-list .phone-account-btn { position: relative; order: 2; border: 0; background: none; color: var(--text-secondary); cursor: pointer; }
-    #mobile-agent-list .phone-account-btn .material-icons { font-size: var(--icon-size); }
+    .phone-bar { order: 0; display: flex; align-items: center; gap: 4px; flex: 1 0 100%; min-width: 0; }
+    .phone-bar .phone-bar-pill { order: 1; flex: 1 1 0; min-width: 0; margin: 0; }
+    .phone-bar .phone-bar-title { display: flex; align-items: center; height: 48px; box-sizing: border-box; padding: 0 18px; border: 0; border-radius: 24px; background: var(--bg-secondary); color: var(--text-primary); font-size: var(--fs-lg); font-weight: var(--fw-regular); line-height: var(--lh-label); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } /* a view's name in the pill: the same box as Home's search (48 px, fully rounded, filled, no border); a heading, with no title attribute, so no tooltip lands on it */
+    header.top-bar > .phone-bar { display: flex; }
+    header.top-bar > :not(.phone-bar) { display: none !important; } /* the old pill, the views menu, Home and the gear: the one bar replaces them on a phone */
+    header.top-bar { padding: calc(8px + env(safe-area-inset-top, 0px)) 8px 4px; gap: 4px; background: var(--bg-primary); border: 0; box-shadow: none; min-height: 0; }
+    .phone-bar .phone-account-btn { position: relative; order: 2; border: 0; background: none; color: var(--text-secondary); cursor: pointer; }
+    .phone-bar .phone-account-btn .material-icons { font-size: var(--icon-size); }
     #mobile-agent-list .phone-break { order: 3; display: block; flex: 0 0 100%; height: 0; }
     #mobile-agent-list .mobile-list-header .mobile-search-input { height: 48px; border-radius: 24px; border: 0; background: var(--bg-secondary); padding: 0 18px; font-size: var(--fs-lg); }
     #mobile-agent-list .mobile-list-title { order: 4; font-size: var(--fs-2xl); font-weight: var(--fw-regular); margin: 0 auto 0 8px; }
@@ -1395,7 +1404,7 @@
     #mobile-session-list .session-group-item .session-name-spacer { display: none; }
     #mobile-session-list .session-time { display: block; flex: none; font-size: var(--fs-md); color: var(--text-secondary); white-space: nowrap; }
     #mobile-session-list .session-status-line { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); margin: 0; } /* still text for a screen reader and find-in-page: the dot and the preview are what the card shows */
-    #mobile-session-list .session-preview { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-top: 2px; padding-right: 36px; font-size: var(--fs-lg); color: var(--text-secondary); overflow-wrap: anywhere; }
+    #mobile-session-list .session-preview { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-top: 2px; padding-right: 56px; font-size: var(--fs-lg); color: var(--text-secondary); overflow-wrap: anywhere; } /* the ⋯ (24 px, 20 px from the card edge, drawn at the card's bottom right) is under the text of a one-line preview: the text ends 56 px short of the edge (the phone walk, item 4) */
     #mobile-session-list .session-line2 { display: none; } /* the preview is the summary here */
     #mobile-session-list .session-model { margin-left: 0; padding-left: 0; font-size: var(--fs-md); }
     #mobile-session-list .session-group-item.needs-attention .session-label { font-weight: var(--fw-strong); }
@@ -1420,7 +1429,7 @@
     .phone-nav-badge[hidden] { display: none; }
     body.agent-home-active:not(.keyboard-open):not(.popout-mode) .phone-fab, body[data-phone-fab="automations"]:not(.keyboard-open):not(.popout-mode) .phone-fab { position: fixed; right: 16px; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); z-index: 40; display: grid; place-items: center; width: 64px; height: 64px; padding: 0; border: 0; border-radius: 20px; background: var(--accent); color: var(--text-on-accent); box-shadow: 0 2px 14px rgba(var(--black-rgb), 0.22); cursor: pointer; }
     .phone-fab svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; }
-    body.phone-nav-on #mobile-agent-list, body.phone-nav-on #group-table-view, body.phone-nav-on #inbox-view:not([data-phone-item]), body.phone-nav-on #scheduler-view:not([data-phone-item]), body.phone-nav-on #workflows-view:not([data-phone-item]) { padding-bottom: 112px; } /* the empty page's cards scroll clear of the nav too (the Mobile Beta Tester, #11116) */
+    body.phone-nav-on #mobile-agent-list, body.phone-nav-on #group-table-view, body.phone-nav-on #inbox-view:not([data-phone-item]), body.phone-nav-on #scheduler-view:not([data-phone-item]), body.phone-nav-on #workflows-view:not([data-phone-item]), body.phone-nav-on #docs-view:not([data-phone-item]), body.phone-nav-on #cost-dashboard-view:not([data-phone-item]), body.phone-nav-on #servers-view:not([data-phone-item]) { padding-bottom: 112px; } /* the empty page's cards scroll clear of the nav too (the Mobile Beta Tester, #11116) */
     body:has(#inbox-view[data-phone-item]) .phone-nav { display: none; } /* a task or a message opened in the Inbox is a page of its own: the nav goes while it is open */
     body.agent-home-active:has(#mobile-agent-list .empty-launch) .phone-fab { display: none; } /* an empty page has its own New agent button */
     body.agent-home-active .phone-fab-menu:not([hidden]), body[data-phone-fab="automations"] .phone-fab-menu:not([hidden]) { position: fixed; right: 16px; bottom: calc(92px + env(safe-area-inset-bottom, 0px)); z-index: 41; display: flex; flex-direction: column; min-width: 180px; }
@@ -1448,13 +1457,13 @@
 }
 
 @media (max-width: 600px) { /* the hub's state on the Agents page (its top bar is the page's own first row): a dot on the account button, the colours of the top bar's indicator (hub_indicator.js) */
-    body[data-hub-state] #mobile-agent-list .phone-account-btn::after { content: ''; position: absolute; right: 6px; bottom: 6px; width: 12px; height: 12px; box-sizing: border-box; border-radius: 50%; border: 2px solid var(--bg-primary); background: var(--text-muted); }
-    body[data-hub-state="connected"] #mobile-agent-list .phone-account-btn::after { background: var(--success); }
-    body[data-hub-state="disconnected"] #mobile-agent-list .phone-account-btn::after { background: var(--warning); }
+    body[data-hub-state] .phone-bar .phone-account-btn::after { content: ''; position: absolute; right: 6px; bottom: 6px; width: 12px; height: 12px; box-sizing: border-box; border-radius: 50%; border: 2px solid var(--bg-primary); background: var(--text-muted); }
+    body[data-hub-state="connected"] .phone-bar .phone-account-btn::after { background: var(--success); }
+    body[data-hub-state="disconnected"] .phone-bar .phone-account-btn::after { background: var(--warning); }
 }
 @media (max-width: 600px) {
     body[data-phone-fab="automations"] .automations-create, body[data-phone-fab="automations"] .automations-act { display: none; } /* the + at the bottom right makes a job or a workflow: the toolbar's create buttons are not drawn (#11239 slice A) */
-    body:has(#scheduler-view[data-phone-item]) .phone-nav, body:has(#scheduler-view[data-phone-item]) .phone-fab, body:has(#workflows-view[data-phone-item]) .phone-nav, body:has(#workflows-view[data-phone-item]) .phone-fab { display: none; } /* a job or a workflow opened is a page of its own (a drill-down): no nav and no + over its footer */
+    body:has(#scheduler-view[data-phone-item]:not([style*="display: none"])) .phone-nav, body:has(#scheduler-view[data-phone-item]:not([style*="display: none"])) .phone-fab, body:has(#workflows-view[data-phone-item]:not([style*="display: none"])) .phone-nav, body:has(#workflows-view[data-phone-item]:not([style*="display: none"])) .phone-fab, body:has(#docs-view[data-phone-item]:not([style*="display: none"])) .phone-nav, body:has(#cost-dashboard-view[data-phone-item]:not([style*="display: none"])) .phone-nav, body:has(#servers-view[data-phone-item]:not([style*="display: none"])) .phone-nav { display: none; } /* a job or a workflow opened is a page of its own (a drill-down): no nav and no + over its footer */
 }
 
 /* The Home list's per-row and per-team ⋯ is a 44 px button on a phone (#11281), not a 24 px box with a hidden hit area: the rows are 44 px high already */
@@ -1464,5 +1473,5 @@
 }
 
 @media (max-width: 600px) {
-    body:has(:is(#inbox-view, #scheduler-view, #workflows-view, #docs-view, #cost-dashboard-view)[data-phone-item]:not([style*="display: none"])) header.top-bar { display: none; } /* an item opened is a drill-down: its own bar (the arrow and the title) replaces the page's pill (#11239 slice B) */
+    body:has(:is(#inbox-view, #scheduler-view, #workflows-view, #docs-view, #cost-dashboard-view, #servers-view)[data-phone-item]:not([style*="display: none"])) header.top-bar { display: none; } /* an item opened is a drill-down: its own bar (the arrow and the title) replaces the page's pill (#11239 slice B) */
 }

@@ -219,14 +219,16 @@ function renderWorkflowDetail(wf, runs) {
             <div class="wf-more">
                 <button class="btn btn-sm wf-more-btn" type="button" data-on-click="wf-more" aria-expanded="false" aria-controls="wf-more-menu-${Number(wf.id)}" aria-label="More for ${escAttr(wf.name)}">More</button>
                 <div class="menu wf-more-menu" id="wf-more-menu-${Number(wf.id)}" hidden>
+                    <button class="menu-item wf-menu-phone" data-on-click="wf-edit-agent" data-workflow-id="${Number(wf.id)}">Edit with Agent</button>
+                    <button class="menu-item wf-menu-phone" data-on-click="wf-edit" data-workflow-id="${Number(wf.id)}">Edit</button>
                     <button class="menu-item" data-on-click="wf-duplicate" data-workflow-id="${Number(wf.id)}">Duplicate</button>
                     <button class="menu-item menu-item-danger" data-on-click="wf-delete" data-workflow-id="${Number(wf.id)}" data-name="${escAttr(wf.name)}">Delete</button>
                 </div>
             </div>
-            <button class="btn btn-sm" data-on-click="wf-edit-agent" data-workflow-id="${Number(wf.id)}">
+            <button class="btn btn-sm wf-foot-secondary" data-on-click="wf-edit-agent" data-workflow-id="${Number(wf.id)}">
                 <span class="material-icons" style="font-size:var(--fs-lg)" aria-hidden="true">smart_toy</span> Edit with Agent
             </button>
-            <button class="btn btn-sm" data-on-click="wf-edit" data-workflow-id="${Number(wf.id)}">Edit</button>
+            <button class="btn btn-sm wf-foot-secondary" data-on-click="wf-edit" data-workflow-id="${Number(wf.id)}">Edit</button>
             <button class="btn btn-sm btn-primary" data-on-click="wf-trigger" data-workflow-id="${Number(wf.id)}">
                 <span class="material-icons" style="font-size:var(--fs-lg)" aria-hidden="true">play_arrow</span> Run
             </button>

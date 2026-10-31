@@ -27,15 +27,15 @@ const { coralReady } = require('./helpers/wait');
         try {
             await open(390);
             await ev(`window.switchNavTab('hub-inbox'); true`); // the Agents page has the menu button in its own header (#11096): the top bar is the other pages'
-            await waitFor(`!!document.getElementById('top-menu-btn') && document.getElementById('top-menu-btn').getClientRects().length > 0`, 'the top bar on the Inbox', 6000);
+            await waitFor(`!!document.getElementById('top-phone-menu') && document.getElementById('top-phone-menu').getClientRects().length > 0`, 'the top bar on the Inbox', 6000);
             const top = await ev(`${vis('.top-bar button, .top-bar a')}.map(b => ({ id: b.id, label: b.getAttribute('aria-label'), w: Math.round(b.getBoundingClientRect().width), h: Math.round(b.getBoundingClientRect().height) }))`);
-            assert.deepEqual(top.map(b => b.id), ['top-menu-btn'], 'the top row is one button: ' + JSON.stringify(top));
+            assert.deepEqual(top.map(b => b.id), ['top-phone-menu', ''], 'the top row is the shared bar (phone_bar.js, #11236): the ☰ and the account, with the view\'s name in the pill between them: ' + JSON.stringify(top));
             assert.ok(top[0].w >= 44 && top[0].h >= 44, 'a 44 px target: ' + JSON.stringify(top[0]));
-            await waitFor(`document.getElementById('top-menu-label').textContent === 'Inbox'`, 'the button names the view it is on (the Inbox)', 6000); // it follows the switch: it said Agents only because the read came before the redraw
+            await waitFor(`document.querySelector('#top-phone-bar .phone-bar-title').textContent === 'Inbox'`, 'the pill names the view it is on (the Inbox)', 6000); // it follows the switch: it said Agents only because the read came before the redraw
             assert.equal(await ev(`${vis('#nav-select')}.length`), 0, 'the view dropdown is inside it');
             await shot('top-menu-closed-390');
             // 2. its menu
-            await ev(`document.getElementById('top-menu-btn').click(); true`);
+            await ev(`document.getElementById('top-phone-menu').click(); true`);
             await waitFor(`!document.getElementById('nav-more-menu').hidden`, 'the menu', 4000);
             const items = await ev(`[...document.querySelectorAll('#nav-more-menu [role=menuitem]')].map(i => ({ t: i.lastElementChild.textContent.trim(), h: Math.round(i.getBoundingClientRect().height) }))`);
             for (const want of ['Agents', 'Inbox', 'Home', 'Settings', 'Themes']) assert.ok(items.some(i => i.t === want), `the menu has ${want}: ` + JSON.stringify(items.map(i => i.t)));
@@ -43,14 +43,14 @@ const { coralReady } = require('./helpers/wait');
             const views = await ev(`[...document.querySelectorAll('#nav-more-menu [data-on-click="m-switch-nav-tab"]')].map(i => ({ t: i.lastElementChild.textContent.trim(), icon: i.firstElementChild.textContent.trim() }))`);
             assert.ok(views.some(v => v.t === 'Automations'), 'the views list has Automations: ' + JSON.stringify(views));
             assert.deepEqual(views.filter(v => !v.icon || v.icon === 'circle'), [], 'every view has its own glyph, none the plain circle that stands for a view with none: ' + JSON.stringify(views));
-            assert.equal(await ev(`document.getElementById('top-menu-btn').getAttribute('aria-expanded')`), 'true');
+            assert.equal(await ev(`document.getElementById('top-phone-menu').getAttribute('aria-expanded')`), 'true');
             await shot('top-menu-open-390');
             // 3. Escape
             await client.Input.dispatchKeyEvent({ type: 'keyDown', key: 'Escape', code: 'Escape' }); await client.Input.dispatchKeyEvent({ type: 'keyUp', key: 'Escape', code: 'Escape' });
             await waitFor(`document.getElementById('nav-more-menu').hidden`, 'Escape closes the menu', 4000);
-            assert.equal(await ev(`document.activeElement && document.activeElement.id`), 'top-menu-btn', 'the focus is back on the button');
+            assert.equal(await ev(`document.activeElement && document.activeElement.id`), 'top-phone-menu', 'the focus is back on the button');
             // 4. a view from it
-            await ev(`document.getElementById('top-menu-btn').click(); true`); await waitFor(`!document.getElementById('nav-more-menu').hidden`, 'the menu again', 4000);
+            await ev(`document.getElementById('top-phone-menu').click(); true`); await waitFor(`!document.getElementById('nav-more-menu').hidden`, 'the menu again', 4000);
             await ev(`[...document.querySelectorAll('#nav-more-menu [role=menuitem]')].find(i => i.lastElementChild.textContent.trim() === 'Inbox').click(); true`);
             await waitFor(`document.getElementById('top-menu-label').textContent === 'Inbox' && document.getElementById('nav-more-menu').hidden`, 'the Inbox opens from the menu and the menu closes', 6000);
             console.log('PASS 390: the top row is one hamburger with the views, Home, Settings; Escape closes it');
@@ -81,7 +81,7 @@ const { coralReady } = require('./helpers/wait');
         try {
             await open(700);
             assert.equal(await ev(`${vis('#nav-select')}.length`), 1, '700 px keeps the view dropdown');
-            assert.equal(await ev(`${vis('#top-menu-btn')}.length`), 0, 'and has no hamburger');
+            assert.equal(await ev(`${vis('#top-phone-menu')}.length`), 0, 'and has no hamburger');
             console.log('PASS 700: the dropdown and the buttons stay');
         } catch (e) { failures.push('700: ' + e.message); console.error(failures.at(-1)); }
         assert.deepEqual(failures, []);

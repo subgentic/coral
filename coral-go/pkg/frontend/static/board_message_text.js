@@ -166,6 +166,30 @@ export function mentionedNames(text) {
     return out;
 }
 
+/** The mention of the viewer (the Operator): a person who has just met "Operator" is told it is them (#11336). Hover shows the title; a tap or Enter shows the same words in a bubble (a touch screen has no
+ *  hover); a screen reader gets a button named "@Operator, that is you" (the words are not in the message's text, so copying or searching a message is unchanged). */
+const SELF_TIP = 'That is you';
+function markSelfMention(span) {
+    span.title = SELF_TIP;
+    span.tabIndex = 0;
+    span.setAttribute('role', 'button');
+    span.setAttribute('aria-expanded', 'false');
+    span.setAttribute('aria-label', `${span.textContent}, ${SELF_TIP.toLowerCase()}`);
+}
+const setSelfTip = (span, open) => { span.toggleAttribute('data-tip-open', open); span.setAttribute('aria-expanded', String(open)); };
+const closeSelfTips = except => { for (const s of document.querySelectorAll('.mb-mention-self[data-tip-open]')) if (s !== except) setSelfTip(s, false); };
+if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') { // (the pure parts of this module are also read where there is no page, or a stand-in for one)
+    document.addEventListener('click', e => {
+        const self = e.target instanceof Element ? e.target.closest('.mb-mention-self') : null;
+        closeSelfTips(self);
+        if (self) setSelfTip(self, !self.hasAttribute('data-tip-open'));
+    });
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Escape') closeSelfTips(null);
+        else if ((e.key === 'Enter' || e.key === ' ') && e.target instanceof Element && e.target.matches('.mb-mention-self')) { e.preventDefault(); const was = e.target.hasAttribute('data-tip-open'); closeSelfTips(e.target); setSelfTip(e.target, !was); }
+    });
+}
+
 /** Wrap the member mentions in the text nodes under `root` (a fragment or an element) in place; true when anything changed. Skips code, pre, links and what is already a mention. */
 function wrapMentionsIn(root) {
     if (!_mentionRe) return false;
@@ -189,6 +213,7 @@ function wrapMentionsIn(root) {
             const span = document.createElement('span');
             span.className = 'mb-mention' + (m[2].toLowerCase() === SELF_MENTION ? ' mb-mention-self' : '');
             span.textContent = '@' + m[2];
+            if (m[2].toLowerCase() === SELF_MENTION) markSelfMention(span);
             frag.append(span);
             at = start + 1 + m[2].length;
             changed = true;

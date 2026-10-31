@@ -25,7 +25,7 @@
                         <div class="launch-type-icon">
                             <span class="material-icons launch-type-glyph" aria-hidden="true">groups</span>
                         </div>
-                        <div class="launch-type-label">New project</div>
+                        <div class="launch-type-label">New team</div>
                         <div class="launch-type-desc">Launch a team of agents collaborating on a shared board.</div>
                     </button>
                     <!-- #3630: pin a folder to the Agents list, ready to launch into -->
@@ -97,7 +97,7 @@
                     </div>
                     <div class="launch-page-agent">
                     <div id="launch-persona-top" class="launch-persona-top">
-                        <p class="launch-persona-lead">A persona is a saved name and prompt. Pick one, or skip.</p>
+                        <p class="launch-persona-lead">A persona is the role you give this agent, such as Reviewer or Designer: a name and instructions. Pick a saved one, write your own below, or skip.</p>
                         <div class="launch-field-head"><label for="launch-persona-select">Start from a persona</label> <span class="launch-optional">optional</span></div>
                         <div class="launch-persona-row">
                             <div id="agent-preset-selector" class="agent-preset-selector"></div>
@@ -128,7 +128,7 @@
                     </div>
                     <div class="settings-shell launch-shell">
                         <nav class="settings-nav" aria-label="New agent sections">
-                            <div class="settings-group-pick"><select class="settings-select" aria-label="New agent section"></select></div>
+                            <div class="settings-group-pick"><span class="settings-group-pick-label" aria-hidden="true">Section</span><select class="settings-select" aria-label="New agent section"></select></div>
                             <div class="settings-tabs" role="tablist" aria-orientation="vertical" aria-label="New agent sections"></div>
                         </nav>
                         <div class="settings-panes">
@@ -222,7 +222,7 @@
                 <div class="sd-step-header">
                     <div class="sd-step-title-row">
                         <button class="launch-back-btn" data-on-click="m-select-launch-type" data-arg="back" title="Back" aria-label="Back to the choices">&larr;</button>
-                        <h3 id="launch-team-title"><span id="launch-team-title-text">New project</span></h3>
+                        <h3 id="launch-team-title"><span id="launch-team-title-text">New team</span></h3>
                     </div>
                     <p id="team-stage-sub" class="sd-sub launch-stage-sub">Step 1 of 3: Your team</p>
                 </div>
@@ -476,7 +476,7 @@
                 <div class="launch-page-agent">
                 <div class="settings-shell launch-shell">
                     <nav class="settings-nav" aria-label="Restart sections">
-                        <div class="settings-group-pick"><select class="settings-select" aria-label="Restart section"></select></div>
+                        <div class="settings-group-pick"><span class="settings-group-pick-label" aria-hidden="true">Section</span><select class="settings-select" aria-label="Restart section"></select></div>
                         <div class="settings-tabs" role="tablist" aria-orientation="vertical" aria-label="Restart sections"></div>
                     </nav>
                     <div id="restart-acf" class="settings-panes"></div>
@@ -589,6 +589,7 @@
     <div id="settings-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="settings-title" style="display:none">
         <div class="modal-content dlg-flow settings-modal-content">
             <div class="modal-header">
+                <button type="button" class="settings-bar-back" data-on-click="m-hide-settings-modal" aria-label="Close Settings" title="Close"><span aria-hidden="true">&larr;</span></button>
                 <h3 id="settings-title">Settings</h3>
             </div>
             <div class="modal-body settings-modal-body">
@@ -984,6 +985,7 @@
     <div id="create-task-modal" class="modal" role="dialog" aria-labelledby="create-task-heading" aria-modal="true" style="display:none">
         <div class="modal-content dlg-form">
             <div class="modal-header">
+                <button type="button" class="create-task-bar-back" id="create-task-bar-back" aria-label="Back" title="Back"><span aria-hidden="true">&larr;</span></button>
                 <h3 id="create-task-heading">Create task</h3>
             </div>
             <div class="modal-body" id="create-task-form"></div>

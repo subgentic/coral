@@ -51,7 +51,7 @@ const { coralReady } = require('./helpers/wait');
         await waitFor(`!!document.getElementById('jump-modal') && getComputedStyle(document.getElementById('jump-modal')).display !== 'none'`, 'the command list', 5000);
         let box = await shown();
         assert.equal(box.title, 'Commands');
-        for (const c of ['Settings', 'New agent', 'New project', 'Go to Inbox', 'Go to Agents', 'Go to Automations', 'Show or hide the sidebar', 'Search all chats']) assert.ok(box.options.includes(c), `the command list has ${c}: ${JSON.stringify(box.options)}`);
+        for (const c of ['Settings', 'New agent', 'New team', 'Go to Inbox', 'Go to Agents', 'Go to Automations', 'Show or hide the sidebar', 'Search all chats']) assert.ok(box.options.includes(c), `the command list has ${c}: ${JSON.stringify(box.options)}`);
         await Input.insertText({ text: 'automations' }); await sleep(400); // sleep-ok: a redraw settles over frames; there is no completion event
         await key('Enter', 'Enter', 0, '\r'); await sleep(500); // sleep-ok: a redraw settles over frames; there is no completion event
         assert.equal(await ev(`document.body.getAttribute('data-nav-tab')`), 'automations', 'a command runs');
