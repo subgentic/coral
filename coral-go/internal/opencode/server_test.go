@@ -19,6 +19,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/subgentic/coral/internal/linktest"
 	"github.com/subgentic/coral/internal/secfile/secfiletest"
 )
 
@@ -455,7 +456,7 @@ func TestThePrivateWriterRefusesALinkAndReplacesByRename(t *testing.T) {
 	target := filepath.Join(dir, "secret-target")
 	require.NoError(t, os.WriteFile(target, []byte("keep"), 0o600))
 	p := filepath.Join(dir, "password")
-	require.NoError(t, os.Symlink(target, p)) // a link planted where the password goes
+	linktest.Symlink(t, target, p) // a link planted where the password goes
 	require.NoError(t, writePrivate(p, []byte("pw")), "a link at the final name is replaced by rename, never written through")
 	b, _ := os.ReadFile(target)
 	assert.Equal(t, "keep", string(b), "what the link pointed at is untouched")

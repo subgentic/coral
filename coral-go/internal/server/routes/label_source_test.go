@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -16,6 +17,18 @@ import (
 	"github.com/subgentic/coral/internal/store"
 )
 
+// labelFolder makes the folder a label's relative path opens (./opencode:) in dir and says whether it could. Windows refuses a name ending in ':' ("The filename, directory name,
+// or volume label syntax is incorrect"), so nothing can be planted there and the tests check only that the label is still never opened; elsewhere it must be made.
+func labelFolder(t *testing.T, dir string) bool {
+	t.Helper()
+	err := os.MkdirAll(filepath.Join(dir, "opencode:"), 0o700)
+	if runtime.GOOS == "windows" && err != nil {
+		return false
+	}
+	require.NoError(t, err)
+	return true
+}
+
 // An opencode agent's history row has a LABEL for its source (opencode://<id>), not a file. Opened as a path it is a relative one, ./opencode:/<id> in the folder Coral was started from: a file planted
 // there must never be read as the row's transcript (Security's #137942).
 func TestAFilePlantedAtALabelSourcesRelativePathIsNeverRead(t *testing.T) {
@@ -23,11 +36,12 @@ func TestAFilePlantedAtALabelSourcesRelativePathIsNeverRead(t *testing.T) {
 	label := agent.OpencodeSourcePrefix + id
 	dir := t.TempDir()
 	t.Chdir(dir)
-	require.NoError(t, os.MkdirAll(filepath.Join(dir, "opencode:"), 0o700))
-	planted := filepath.Join(dir, "opencode:", id)
-	require.NoError(t, os.WriteFile(planted, []byte(`{"cwd":"/planted/dir","permissionMode":"plan","type":"user","message":{"role":"user","content":"PLANTED-SECRET"}}`+"\n"), 0o600))
-	_, err := os.Stat(label)
-	require.NoError(t, err, "the label does resolve to the planted file as a path: that is the hazard")
+	if labelFolder(t, dir) {
+		planted := filepath.Join(dir, "opencode:", id)
+		require.NoError(t, os.WriteFile(planted, []byte(`{"cwd":"/planted/dir","permissionMode":"plan","type":"user","message":{"role":"user","content":"PLANTED-SECRET"}}`+"\n"), 0o600))
+		_, err := os.Stat(label)
+		require.NoError(t, err, "the label does resolve to the planted file as a path: that is the hazard")
+	}
 
 	assert.True(t, agent.IsLabelSource(label))
 	assert.False(t, agent.IsLabelSource("/home/u/.claude/projects/x.jsonl"))
@@ -55,10 +69,11 @@ func TestChatSearchNeverReadsAFilePlantedAtALabelSourcesRelativePath(t *testing.
 	label := agent.OpencodeSourcePrefix + id
 	cwd := t.TempDir()
 	t.Chdir(cwd)
-	require.NoError(t, os.MkdirAll(filepath.Join(cwd, "opencode:"), 0o700))
-	writeClaudeJSONLTranscript(t, filepath.Join(cwd, "opencode:", id), []map[string]any{
-		{"type": "user", "timestamp": "2026-09-30T10:00:00Z", "message": map[string]any{"content": "quokka PLANTED-MARKER"}},
-	})
+	if labelFolder(t, cwd) {
+		writeClaudeJSONLTranscript(t, filepath.Join(cwd, "opencode:", id), []map[string]any{
+			{"type": "user", "timestamp": "2026-09-30T10:00:00Z", "message": map[string]any{"content": "quokka PLANTED-MARKER"}},
+		})
+	}
 	// the row is typed as a transcript-reading agent so that, without the guard, the planted file WOULD be parsed
 	ts := "2026-09-30T10:00:00Z"
 	require.NoError(t, ss.UpsertSessionIndex(ctx, &store.SessionIndex{SessionID: id, SourceType: "claude", SourceFile: label, LastTimestamp: &ts, DisplaySummary: "quokka parser"}))
