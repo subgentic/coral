@@ -151,7 +151,11 @@ export async function buildProviderCards({ group, form, server, implicitDefault 
             if (type === signin.type) body.prepend(signinBox());
             strip.append(head); panel.append(body); cards.set(type, head); bodies.set(type, body);
         }
-        group.append(strip, panel);
+        const wrap = el('div', 'provider-tabs-wrap'), edge = el('button', 'provider-strip-edge'); edge.type = 'button'; edge.hidden = true; edge.tabIndex = -1; edge.setAttribute('aria-hidden', 'true'); edge.setAttribute('aria-label', 'Scroll tabs'); // the arrow keys move between the tabs: the chevron is for a finger, and only scrolls
+        edge.addEventListener('click', () => strip.scrollBy({ left: Math.max(96, strip.clientWidth * 0.6), behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }));
+        const more = () => { edge.hidden = !(strip.scrollLeft + strip.clientWidth < strip.scrollWidth - 2); };
+        strip.addEventListener('scroll', more, { passive: true }); new ResizeObserver(more).observe(strip);
+        wrap.append(strip, edge); group.append(wrap, panel); more();
         if (missing.length) {
             const sec = el('div', 'provider-missing'); sec.setAttribute('role', 'group');
             const h = el('h5', 'group-head provider-missing-title', 'Not installed'); h.id = `${group.id}-missing`; sec.setAttribute('aria-labelledby', h.id);
