@@ -18,3 +18,20 @@ func platformCanonical(p string) string {
 	}
 	return strings.ToLower(p)
 }
+
+// localFixedPath says p, as git listed it, is a plain folder on a local fixed drive ("C:\..." or "C:/..."): not a network share (\\host\share, //host/share), not a \\?\ or \\.\ form,
+// not a mapped network, removable or optical drive. Only such a path is resolved, opened or run in (Security's SHOULD 1 on #272: anything else could make Windows authenticate to
+// another host). It is decided from the text and the drive's type; nothing at the path is touched.
+func localFixedPath(p string) bool {
+	if len(p) < 3 || !(p[0] >= 'A' && p[0] <= 'Z' || p[0] >= 'a' && p[0] <= 'z') || p[1] != ':' || (p[2] != '\\' && p[2] != '/') {
+		return false
+	}
+	if strings.ContainsAny(p, "\x00") {
+		return false
+	}
+	root, err := windows.UTF16PtrFromString(p[:2] + `\`)
+	if err != nil {
+		return false
+	}
+	return windows.GetDriveType(root) == windows.DRIVE_FIXED
+}
