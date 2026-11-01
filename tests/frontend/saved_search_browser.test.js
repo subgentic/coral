@@ -35,7 +35,7 @@ async function run() {
     const chip = async i => { await settle(`document.querySelectorAll('.inbox-folder-toolbar .team-tb-pills .goals-chip').length > ${i}`, `pill ${i}`); return ev(`document.querySelectorAll('.inbox-folder-toolbar .team-tb-pills .goals-chip')[${i}].click(); true`); }; // Open (0) and Done (1): the pills of the page toolbar (#8602)
     const setQuery = text => ev(`(() => { const e = document.getElementById('inbox-search'); e.value = ${JSON.stringify(text)}; e.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
     let phone = false; // a phone's table fills the screen and its search box is on the list screen behind it, so the text is set in the box without typing
-    const type = async (text) => { if (phone) return setQuery(text); await ev(`document.getElementById('inbox-search').focus(); true`); await Input.insertText({ text }); }; // the sidebar's one search box, the server matches
+    const type = async (text) => { if (phone) return setQuery(text); await ev(`document.getElementById('inbox-saved-search').focus(); true`); await Input.insertText({ text }); }; // the page's own search box (the sidebar's is not shown above a tab with one, #11859); the server matches
     // A filter select's options arrive with the saved list (setOptions), a moment after the rows. Picking a value it does not hold yet sets nothing, so the
     // pick waits for the option itself, not for a chip or a count (#5216: the phone run once picked before sv-a-1 existed). A failure says which it was.
     const pickOption = async (id, value) => {

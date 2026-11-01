@@ -37,7 +37,9 @@ export function setPhoneBarTitle(words) {
 
 /** The search each top-level view has in the sidebar (hidden on a phone): the bar's pill is a search field for it (#11476, Gmail's "Search in mail"). It types into that field, so the view filters as it does anywhere. */
 const SEARCH_OF = { 'hub-inbox': 'inbox-search', history: 'history-search', automations: 'automations-search', tokens: 'analytics-search', docs: 'docs-search' };
-const searchTarget = () => { const id = SEARCH_OF[document.querySelector('.top-nav-tab.active')?.dataset.arg || '']; return id ? document.getElementById(id) : null; };
+const searchTarget = () => { const id = SEARCH_OF[document.querySelector('.top-nav-tab.active')?.dataset.arg || ''], e = id ? document.getElementById(id) : null; return e && !e.closest('[hidden]') ? e : null; }; // a search box the view hides (the page has its own) is not one the bar mirrors (#11859)
+/** The pill's search field follows the view's: drawn again when the Inbox's tab changes and the sidebar's box is shown or hidden. */
+export const repaintPhoneBarSearch = () => paintTitle(_pageName || _lastWords || pageHeading());
 
 /** The title in every bar's pill, and where the view has a search, the field in it: the title stays for a screen reader and the field's placeholder says what it searches. */
 function paintTitle(words) {

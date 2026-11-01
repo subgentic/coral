@@ -127,9 +127,9 @@ const norm = p => p.replace(/^\/api\/remote\/[^/]+/, '').replace(/\/sessions\/hi
             const n = ui.folders;
             for (let i = 0; i < n; i++) { await ev(`(() => { const els = [...document.querySelectorAll('#inbox-nav-list button')]; els[${i}] && els[${i}].click(); return true; })()`); await ev(`window.__quiet()`); }
             tabbed = ['the Inbox tab was driven: ' + n + ' folders'];
-            // the Inbox's two search fields, each typed in key by key on a chat folder and then committed with Enter: the sidebar's box (its action is inbox-search-filter, app_actions.js) and the table toolbar's field
+            // the Inbox's search field, typed in key by key on a chat folder and then committed with Enter: the table toolbar's field (the sidebar's box, whose action is inbox-search-filter in app_actions.js, is not shown above it, #11859)
             await ev(`(() => { const all = [...document.querySelectorAll('#inbox-nav-list button')].find(b => /all chats/i.test(b.textContent)); all && all.click(); return true; })()`); await ev(`window.__quiet()`);
-            for (const [i, [id, label]] of [['inbox-search', 'the sidebar box'], ['inbox-chats-search', 'the toolbar field']].entries()) {
+            for (const [i, [id, label]] of [['inbox-chats-search', 'the toolbar field']].entries()) { // the sidebar's box is not shown above a tab with a search of its own (#11859): one field to type in
                 // empty first (the two fields share one search), outside the marks; then focus
                 const found = await ev(`(() => { const e = document.getElementById(${JSON.stringify(id)}); if (!e || !e.getClientRects().length) return false; e.value = ''; e.dispatchEvent(new Event('input', { bubbles: true })); e.focus(); return true; })()`);
                 assert.equal(found, true, `the Inbox has ${label} (#${id})`);
@@ -150,7 +150,7 @@ const norm = p => p.replace(/^\/api\/remote\/[^/]+/, '').replace(/\/sessions\/hi
                 await ev(`window.__census.push({ m: 'MARK', p: 'held-${i}', keys: [] }); true`);
                 fieldsTyped.push({ label, i });
             }
-            tabbed.push('a 6-letter search was typed into the Inbox\'s sidebar box and its toolbar field, each committed with Enter');
+            tabbed.push('a 6-letter search was typed into the Inbox\'s toolbar field and committed with Enter');
         } else console.log('   (the cloud Inbox tab is still the Hub frame: ' + JSON.stringify(ui) + '; the folders were driven through their module)');
         const inboxAll = shape(await take());
         const between = (a, b) => { const from = inboxAll.findIndex(r => r.m === 'MARK' && r.p === a), to = inboxAll.findIndex(r => r.m === 'MARK' && r.p === b); return from >= 0 && to > from ? inboxAll.slice(from + 1, to) : null; };

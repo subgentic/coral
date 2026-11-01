@@ -893,7 +893,7 @@ function setGroup(key, { auto = false } = {}) {
         if (input.placeholder !== (g.short || g.search)) input.placeholder = g.short || g.search;
         if (input.getAttribute('aria-label') !== g.search) input.setAttribute('aria-label', g.search); // the name stays whole whatever the placeholder says (a placeholder as short as the box's default no longer skips it)
         if (input.value !== text) input.value = text;
-        const hubPage = nativeInbox() && !!HUB_FRAMES[key]; input.disabled = hubPage; setHidden(input.closest('.sidebar-search'), hubPage); // a Hub page has its own search: the shell's box is not shown above it, so there is one (#11838)
+        const hubPage = nativeInbox() && !!HUB_FRAMES[key]; input.disabled = hubPage; setHidden(input.closest('.sidebar-search'), hubPage || !!g); importOnce('./phone_bar.js').then(m => m.repaintPhoneBarSearch()); // a tab with its own search box (a Hub page, and each of the Inbox's own tabs) has one search: this box is not shown above it, and the phone's top bar drops its field (#11838, #11859)
     }
     const btn = document.querySelector('.sidebar-pane[data-pane="hub-inbox"] [data-display-button]');
     if (btn) { setHidden(btn, key !== 'saved'); syncDisplayPanels(); }
