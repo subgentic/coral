@@ -208,3 +208,16 @@ func TestAuthRouteLockedFlagOnlyChangesTheWords(t *testing.T) {
 	assert.NotContains(t, odd, `id="how-in"`, "only locked=1 is the flag")
 	assert.NotContains(t, odd, "<script>alert")
 }
+
+// #11865 (Beta #11837 moment 1): the first screen is "Create a password" and it did not say it can be skipped: the skip was in the second sentence. On a computer only one person uses, the page now opens with it:
+// no password is needed, open Coral from the Coral app or run coral open, and it opens signed in; the password is for a web browser and keeps other people and other devices out. Words only: nothing the page takes
+// changed, and no "Continue without a password" button exists.
+func TestAuthPageSaysAtOnceThatAPasswordCanBeSkipped(t *testing.T) {
+	local := AuthPage(PageState{Local: true})
+	assert.Contains(t, local, "<h1>Create a password</h1>")
+	assert.Contains(t, local, `Only you use this computer? You do not need one: open Coral from the Coral app, or run <b>coral open</b> in a terminal, and it opens signed in. A password is for opening Coral in a web browser; it keeps other people and other devices out.`)
+	assert.NotContains(t, local, "The Coral app opens without one", "said once, in the sentence above")
+	assert.NotContains(t, strings.ToLower(local), "continue without a password", "words only: no button that skips the password")
+	// another device cannot skip it from here: its sentence is the setup code's
+	assert.NotContains(t, AuthPage(PageState{}), "You do not need one")
+}

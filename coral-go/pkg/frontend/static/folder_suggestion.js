@@ -54,6 +54,10 @@ export function syncSuggestionLine(input, line) { showLine(input, line, usesSugg
 function showLine(input, line, on) {
     if (!line) return;
     if (line.hidden === on) line.hidden = !on;
+    if (on && line.dataset.pathHint) { // New team: the suggested folder with ~ for the home folder, so the user name is not the first thing read; the whole path is the tooltip (#11865)
+        const v = input.value.trim(), root = String(input.dataset.coralRoot || '').replace(/\/+$/, ''), hint = line.dataset.hint ||= line.textContent;
+        line.textContent = `${root && v.startsWith(root + '/') ? '~' + v.slice(root.length) : v}. ${hint}`; line.title = v;
+    }
     const ids = (input.getAttribute('aria-describedby') || '').split(/\s+/).filter(x => x && x !== line.id);
     if (on) ids.push(line.id);
     if (ids.length) input.setAttribute('aria-describedby', ids.join(' ')); else input.removeAttribute('aria-describedby');

@@ -182,7 +182,7 @@ var authPageTmpl = template.Must(template.New("auth").Parse(`{{define "hubwarn"}
 {{else}}
   <section id="panel-create" class="panel">
     <h1>Create a password</h1>
-    <p class="sub">{{if .Local}}A password keeps other people and other devices out of Coral when it is opened in a web browser. Only you use this computer? The Coral app opens without one.{{else}}Coral has no password yet. Choose one to open it in this browser, with the setup code from the computer that runs Coral.{{end}}</p>
+    <p class="sub">{{if .Local}}Only you use this computer? You do not need one: open Coral from the Coral app, or run <b>coral open</b> in a terminal, and it opens signed in. A password is for opening Coral in a web browser; it keeps other people and other devices out.{{else}}Coral has no password yet. Choose one to open it in this browser, with the setup code from the computer that runs Coral.{{end}}</p>
 {{if or .Locked (not .Local)}}
     <div class="howin" id="how-in" role="note">
       <b>Two ways to sign in</b>

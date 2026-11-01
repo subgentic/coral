@@ -1,13 +1,16 @@
 /* Review artifacts use the same owner-protected team list and tags routes as Artifacts.
  * After the Inbox first opens, keep its badge updated on other tabs without eager startup reads. */
 import { fetchProjects } from './board_fetch.js';
-import { boardFetch, keyLabel, splitKey } from './server_base.js';
+import { boardFetch, keyLabel, serverUrl, splitKey } from './server_base.js';
 
 let items = [], saved = [], errors = [], pending = null, lastRead = 0, revision = 0, changed = () => {};
 let activated = false;
 // One row per artifact (#11533): versions (same uploader, team, name) are one item, the newest, with `earlier`.
 const vkey = a => (a.session_id || a.produced_by) ? JSON.stringify([a.team, a.session_id, a.produced_by, a.name]) : a.reviewKey; // a JSON array: no name or id can run into the next field
 const byAge = (a, b) => String(a.created_at).localeCompare(String(b.created_at)) || a.reviewKey.localeCompare(b.reviewKey);
+/** Which version of its file this artifact is (0 for a file with one version), from the server's own numbering: the row says "· version 2" so a file an agent named "...v1.md" is not mistaken for the first (#11865). */
+const _ver = new Map();
+export const versionOfFile = (hex, server) => { const k = `${server || ''}:${hex}`; if (!_ver.has(k)) _ver.set(k, fetch(serverUrl(`/api/artifacts/${hex}/versions`, server)).then(r => (r.ok ? r.json() : [])).then(d => (Array.isArray(d) && d.length > 1 ? d.find(v => v.digest === hex)?.version || 0 : 0)).catch(() => 0)); return _ver.get(k); };
 /** The versions older than `row`, still for review. */
 export const earlierVersions = row => { const key = row.reviewKey || `${row.team}:${row.id}`, me = items.find(a => a.reviewKey === key) || row; return items.filter(a => a.reviewKey !== key && vkey(a) === vkey(me) && byAge(a, me) < 0); };
 // Worked out once per change, not once per call (#11633): this is asked for by the badge, the folder count, the pills, the rows and the labels on every update, and the old way compared every item with every other
