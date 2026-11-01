@@ -74,6 +74,7 @@ GET /api/board/remotes/proxy/{remoteServer}/{project}/subscribers never
 GET /api/board/tasks view
 GET /api/board/{project} view
 GET /api/board/{project}/artifacts view
+GET /api/board/{project}/branches view
 GET /api/board/{project}/cross-team-candidates never
 GET /api/board/{project}/cross-team-links never
 GET /api/board/{project}/cross-team-state never

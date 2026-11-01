@@ -21,8 +21,8 @@ const { closeDetailPane } = await importOnce('./detail_pane.js'); // a lazy modu
 const { el } = await importOnce('./team_table.js');
 const { quietFocus } = await importOnce('./quiet_focus.js');
 
-const PHONE_MORE = ['knowledge', 'messages']; // (the last three of TEAM_TABS: the row is its first four, Goals, Agents, Tasks, Artifacts, in the operator's order, #8791) // the tabs a phone puts behind its More menu (CSS hides their tabs under 761 px)
-const LABEL = { goals: 'Goals', messages: 'Board', tasks: 'Tasks', agents: 'Agents', artifacts: 'Artifacts', knowledge: 'Knowledge' };
+const PHONE_MORE = ['knowledge', 'branches', 'messages']; // (the last three of TEAM_TABS: the row is its first four, Goals, Agents, Tasks, Artifacts, in the operator's order, #8791) // the tabs a phone puts behind its More menu (CSS hides their tabs under 761 px)
+const LABEL = { goals: 'Goals', messages: 'Board', tasks: 'Tasks', agents: 'Agents', artifacts: 'Artifacts', knowledge: 'Knowledge', branches: 'Branches' };
 const S = { team: '', tab: 'goals', item: null, counts: {}, built: false, countSeq: 0, navSeq: 0, noGoal: false }; // noGoal: the next Tasks tab opens filtered to the tasks that serve no goal (the Goals table's last row, #7717)
 const $ = (id) => document.getElementById(id);
 
@@ -384,6 +384,10 @@ async function fillTab(tab, item = 0) {
             const m = await importOnce('./team_knowledge_page.js');
             if (stale()) return;
             await m.showKnowledge(host, team, { onCount: (n) => { S.counts.knowledge = n || null; drawCounts(); } });
+        } else if (tab === 'branches') {
+            const m = await importOnce('./branches_tab.js');
+            if (stale()) return;
+            await m.showTeamBranches(host, team); // the repositories the team's agents work in, read-only (goal #11)
         }
     } catch (e) { console.error('team page tab', tab, e); host.textContent = ''; host.append(el('p', 'goals-note', 'This tab could not be shown. Reload the page and try again.')); }
 }

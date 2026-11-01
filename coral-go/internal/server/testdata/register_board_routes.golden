@@ -18,6 +18,7 @@ GET /api/board/remotes/proxy/{remoteServer}/{project}/subscribers | (*BoardRemot
 GET /api/board/tasks | (*BoardHandler).ListAllTasks-fm
 GET /api/board/{project} | (*BoardHandler).GetBoardInfo-fm
 GET /api/board/{project}/artifacts | (*BoardHandler).ListTeamArtifacts-fm
+GET /api/board/{project}/branches | (*SessionsHandler).TeamBranches-fm
 GET /api/board/{project}/cross-team-candidates | (*BoardHandler).GetCrossTeamCandidates-fm
 GET /api/board/{project}/cross-team-links | (*BoardHandler).ListLocalLinks-fm
 GET /api/board/{project}/cross-team-state | (*BoardHandler).GetCrossTeamState-fm

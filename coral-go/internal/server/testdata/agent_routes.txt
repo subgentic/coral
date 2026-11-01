@@ -171,6 +171,7 @@ c GET /api/sessions/live/{name}/file-original
 c GET /api/sessions/live/{name}/files
 c GET /api/sessions/live/{name}/git
 c GET /api/sessions/live/{name}/branches
+c GET /api/board/{project}/branches
 b GET /api/sessions/live/{name}/mcp-servers
 b GET /api/sessions/live/{name}/waiting
 c GET /api/sessions/live/{name}/history/context

@@ -31,6 +31,8 @@ func (f *fakeBranches) Holds(_ branches.Repo, i int, dir string) bool {
 	return ok && n == i
 }
 
+func (f *fakeBranches) Same(a, b branches.Repo) bool { return a.Base == b.Base }
+
 func (f *fakeBranches) For(dir string) (branches.Repo, int, bool) {
 	f.asked = append(f.asked, dir)
 	if dir == "" {
@@ -150,4 +152,37 @@ func TestNoSnapshotIsSaidPlainly(t *testing.T) {
 	code, body := r.get("dev-a", "aaaaaaaa-0423-4000-8000-000000000001", asBranchesDashboard)
 	require.Equal(t, http.StatusOK, code)
 	assert.Equal(t, false, body["available"])
+}
+
+// The team view: the repositories the team's live agents work in, with its agents on their worktrees; another team's agents are not shown; an agent's token reads only its own team's.
+func TestTheTeamViewShowsItsAgentsRepositoriesAndOnlyItsOwnTeam(t *testing.T) {
+	r := newBranchesRig(t)
+	r.src.dirs = map[string]int{"/work/repo": 0, "/work/feature": 1}
+	rt := chi.NewRouter()
+	rt.Get("/api/board/{project}/branches", r.h.TeamBranches)
+	get := func(team string, mod func(*http.Request) *http.Request) (int, map[string]any) {
+		req := httptest.NewRequest(http.MethodGet, "/api/board/"+team+"/branches", nil)
+		if mod != nil {
+			req = mod(req)
+		}
+		rec := httptest.NewRecorder()
+		rt.ServeHTTP(rec, req)
+		var body map[string]any
+		_ = json.Unmarshal(rec.Body.Bytes(), &body)
+		return rec.Code, body
+	}
+	code, body := get("team-a", asBranchesDashboard)
+	require.Equal(t, http.StatusOK, code)
+	repos := body["repos"].([]any)
+	require.Len(t, repos, 1, "both agents work in the same repository: one section")
+	raw, _ := json.Marshal(body)
+	assert.Contains(t, string(raw), `"name":"dev-a"`)
+	assert.Contains(t, string(raw), `"name":"dev-a2"`)
+	assert.NotContains(t, string(raw), "dev-b", "another team's agent")
+	assert.NotContains(t, string(raw), "/work/", "no folder path")
+
+	code, _ = get("team-a", asBranchesAgent("bbbbbbbb-0423-4000-8000-000000000003"))
+	assert.Equal(t, http.StatusForbidden, code, "an agent of team B")
+	code, _ = get("team-a", asBranchesAgent("aaaaaaaa-0423-4000-8000-000000000002"))
+	assert.Equal(t, http.StatusOK, code, "an agent of team A")
 }
