@@ -184,3 +184,86 @@ func (d *deviationHarness) checkNoReset() string {
 	got := d.sent["Orchestrator"]
 	return got[len(got)-1]
 }
+
+// answered gives subscriber three earlier answered waits (resolved) of took each, on the given kind and target.
+func (d *deviationHarness) answered(subscriber, kind, target string, took time.Duration) {
+	d.t.Helper()
+	at := time.Now().Add(-5 * time.Hour)
+	for i := 0; i < 3; i++ {
+		_, err := d.raw.ExecContext(context.Background(), `INSERT INTO board_waits(project, subscriber_id, session_name, wait_type, target_id, reason, status, created_at, resolved_at, expires_at) VALUES ('team',?,'s',?,?,'','resolved',?,?,?)`,
+			subscriber, kind, target, ts(at.Add(time.Duration(i)*time.Hour)), ts(at.Add(time.Duration(i)*time.Hour+took)), ts(at.Add(10*time.Hour)))
+		require.NoError(d.t, err)
+	}
+}
+
+// QA's SHOULDs on slice 3: a wait on the recipient is its own line and not a deviation too; a wait on the Operator is not one even with a history of answers.
+func TestDeviationCSkipsWaitsOnTheRecipientAndOnTheOperatorEvenWithHistory(t *testing.T) {
+	d := newDeviationHarness(t)
+	ctx := context.Background()
+	d.member("Orchestrator", "Orchestrator", 1, 0)
+	d.member("Dev", "Developer", 2, 0)
+	d.member("Waiter", "Developer", 3, 0)
+	d.answered("Dev", "message", "Orchestrator", 5*time.Minute)
+	d.answered("Waiter", "operator", "", 5*time.Minute)
+	d.wait(2, "Dev", "message", "Orchestrator")
+	d.wait(3, "Waiter", "operator", "")
+	_, err := d.raw.ExecContext(ctx, `UPDATE board_waits SET created_at=? WHERE status='active'`, ts(time.Now().Add(-20*time.Minute)))
+	require.NoError(t, err)
+	out := d.check()
+	assert.Contains(t, out, "Dev has waited 21 min on YOU", "the wait on the recipient is its own line")
+	assert.NotContains(t, out, "an answer usually takes", "and not a deviation as well, nor is the Operator's wait, though both have a history of answers")
+}
+
+// The serving rule's second half (Security's INFO): a wait on a task is served when the task is done, even though the wait row is still active.
+func TestActionListTaskWaitStillActiveIsNotListedOnceTheTaskIsDone(t *testing.T) {
+	d := newDeviationHarness(t)
+	ctx := context.Background()
+	d.member("Orchestrator", "Orchestrator", 1, 0)
+	d.member("Security Reviewer", "Security", 2, 0)
+	d.member("Dev", "Developer", 3, 0)
+	task, err := d.s.CreateTask(ctx, "team", "owned", "", "medium", "Operator", "Security Reviewer")
+	require.NoError(t, err)
+	d.wait(3, "Dev", "task", fmt.Sprint(task.ID))
+	d.now = time.Now().UTC().Add(20 * time.Minute)
+	assert.Contains(t, d.check(), "Dev has waited 20 min on Security Reviewer", "listed while the task is open")
+	_, err = d.s.ClaimTask(ctx, "team", "Security Reviewer", task.ID)
+	require.NoError(t, err)
+	_, err = d.s.CompleteTask(ctx, "team", task.ID, "Security Reviewer", nil)
+	require.NoError(t, err)
+	_, err = d.raw.ExecContext(ctx, `UPDATE board_waits SET status='active', resolved_at=NULL WHERE subscriber_id='Dev'`) // the wait row outlives the task in this case
+	require.NoError(t, err)
+	assert.NotContains(t, d.check(), "Dev has waited", "the task is done: the wait is served")
+}
+
+// What was said is kept across a restart and cleared when the task is gone: a restart does not say it again, and a finding that ended is new if it comes back.
+func TestDeviationSaidOnceSurvivesARestartAndIsClearedWhenTheTaskIsGone(t *testing.T) {
+	d := newDeviationHarness(t)
+	ctx := context.Background()
+	d.member("Orchestrator", "Orchestrator", 1, 0)
+	d.member("Dev", "Developer", 2, 0)
+	d.finished("Dev", 5, 10*time.Minute)
+	id := d.running("Dev", 49*time.Minute)
+	assert.Contains(t, d.check(), fmt.Sprintf("#%d has been in progress", id))
+	counters := func() int {
+		esc, err := d.s.HealthEscalations(ctx, "team")
+		require.NoError(t, err)
+		n := 0
+		for _, e := range esc {
+			if strings.HasPrefix(e.Rule, deviationRulePrefix) {
+				n++
+			}
+		}
+		return n
+	}
+	assert.Equal(t, 1, counters(), "said: kept in the health counters")
+	// a restart: a new monitor on the same board remembers nothing in memory, and still does not say it again
+	fresh := NewBoardHealthMonitor(d.s, 10*time.Minute)
+	fresh.now, fresh.discover, fresh.signal, fresh.deliver = d.m.now, d.m.discover, d.m.signal, d.m.deliver
+	d.m = fresh
+	assert.NotContains(t, d.check(), fmt.Sprintf("#%d has been in progress", id), "a restart does not say it again")
+	// the task is finished: its counter is cleared by the next look
+	_, err := d.s.CompleteTask(ctx, "team", id, "Dev", nil)
+	require.NoError(t, err)
+	d.check()
+	assert.Zero(t, counters(), "cleared when the task is gone, so the same finding later is new")
+}

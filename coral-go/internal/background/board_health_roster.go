@@ -142,15 +142,7 @@ func (m *BoardHealthMonitor) buildRoster(ctx context.Context, in rosterInputs) (
 				if target.sub != nil && !you && !at.IsZero() {
 					// silent: the awaited member has not mentioned the waiter since the wait began (Stale is that, said apart) and, for a wait on a task, the task is still open. A post that
 					// mentions nobody, or someone else, does not serve the wait (#11729, Security's INFO)
-					entry.TargetSilent = !entry.Stale
-					if w.WaitType == "task" {
-						var id int64
-						if _, err := fmt.Sscanf(w.TargetID, "%d", &id); err == nil {
-							if _, open := taskByID[id]; !open {
-								entry.TargetSilent = false // the task is done
-							}
-						}
-					}
+					entry.TargetSilent = !entry.Stale // a wait on a task whose task is done has no member target (resolveWait reads the open tasks), so it is never silent: the done task serves it
 				}
 				if !entry.Actionable(you, in.rules) {
 					continue // young, or being served by someone who has posted: not a line of the list, and nothing for the reader (#11729)
