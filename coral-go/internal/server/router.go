@@ -531,6 +531,11 @@ func (s *Server) registerCloud(r *chi.Mux) {
 		touchPrune := background.NewOperatorTouchPrune(s.boardStore)
 		s.goBackground(func(ctx context.Context) { _ = touchPrune.Run(ctx) }) // touches older than 90 days (#11225)
 	}
+	// a park whose end passed gives its task the slot back: settled for the reads that do not settle it themselves (#11659)
+	if s.boardStore != nil {
+		parkSweep := background.NewParkSweep(s.boardStore)
+		s.goBackground(func(ctx context.Context) { _ = parkSweep.Run(ctx) })
+	}
 	// the goal events the feed names are pruned to the newest thousand per board (#7355)
 	if s.boardStore != nil {
 		prune := background.NewGoalEventsPrune(s.boardStore)

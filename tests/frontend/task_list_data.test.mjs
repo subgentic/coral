@@ -61,3 +61,12 @@ assert.equal(canComplete({ status: 'blocked' }, ''), false, 'a blocked task');
 assert.equal(canComplete({ status: 'draft' }, ''), false, 'a draft');
 assert.equal(canComplete(null, ''), false);
 console.log('task_list_data: ok');
+
+// #11659: a parked task in progress is Waiting with its reason; the live one keeps 'Claimed · Working'.
+assert.deepEqual(word({ status: 'in_progress', claimed_at: 'x', parked_reason: 'waiting on Security' }), ['pending', 'Waiting: waiting on Security', 'Waiting'], 'parked: Waiting and why');
+assert.deepEqual(word({ status: 'in_progress', claimed_at: 'x' }), ['in-progress', 'Claimed · Working', 'Claimed'], 'live: unchanged');
+assert.deepEqual(word({ status: 'in_progress', claimed_at: 'x', parked_reason: 'later', parked_until: new Date(Date.now() - 1000).toISOString() }), ['in-progress', 'Claimed · Working', 'Claimed'], 'a parking that ended is live again');
+console.log('task_list_data: parked tasks read Waiting');
+// #11659: the reason is agent text: a hidden character in it is written out, never drawn (markHidden strict), in the hover and in the spoken name.
+assert.equal(taskStatus({ status: 'in_progress', claimed_at: 'x', parked_reason: 'wait\u202Eevil\u200Bzero' }).detail, 'Waiting: wait<U+202E>evil<U+200B>zero', 'hidden characters in a parked reason are written out');
+console.log('task_list_data: the parked reason is marked');

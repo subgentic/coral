@@ -66,6 +66,9 @@ type TaskListItem struct {
 	CostUSD         *float64 `db:"cost_usd" json:"cost_usd,omitempty"`
 	Outcome         string   `db:"outcome" json:"outcome,omitempty"`
 	ReviewRequested bool     `db:"review_requested" json:"review_requested,omitempty"`
+	// ParkedReason and ParkedUntil: a parked task (park.go) holds no slot, so a list says "Waiting" for it, not "In progress" (#11659).
+	ParkedReason *string `db:"parked_reason" json:"parked_reason,omitempty"`
+	ParkedUntil  *string `db:"parked_until" json:"parked_until,omitempty"`
 	// WorkedBy: who did the work, as Task.WorkedBy says it (the author a review took the task from, else who completed it, else the assignee).
 	WorkedBy string `db:"worked_by" json:"worked_by,omitempty"`
 	// UpdatedAt: when the task last changed (updatedAtSQL); the Tasks tab's Updated column.
@@ -113,6 +116,7 @@ const taskListColumns = `t.id, t.revision, t.board_id, t.title,
 	t.completed_at, t.session_id, t.goal_id, t.cost_usd,
 	COALESCE(w.lst_outcome, '') AS outcome,
 	COALESCE(w.lst_review_requested, 0) AS review_requested,
+	t.parked_reason, t.parked_until,
 	CASE WHEN COALESCE(w.lst_author, '') != '' THEN w.lst_author
 	     WHEN t.status = 'completed' AND COALESCE(t.completed_by, '') != '' THEN t.completed_by
 	     ELSE COALESCE(t.assigned_to, '') END AS worked_by,
@@ -134,6 +138,9 @@ func (s *Store) ListTaskPage(ctx context.Context, project string, q TaskListQuer
 	}
 	if limit > TaskListMaxLimit {
 		limit = TaskListMaxLimit
+	}
+	if _, err := s.ReleaseLapsedParks(ctx, project); err != nil { // a park whose end passed: one task in progress per owner before the list says so (#11659)
+		return nil, err
 	}
 	page := &TaskListPage{Tasks: []TaskListItem{}}
 	var err error

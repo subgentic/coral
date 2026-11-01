@@ -32,11 +32,14 @@ export const taskStateWord = (state) => {
     return word(s.replace(/_/g, ' '));
 };
 
+/** A task parked now (the server's rule, Task.Parked): it has a reason and no end, or an end still ahead. Parked tasks keep their status and owner but hold no slot (#7819). */
+export const isParked = (t) => !!(t && t.parked_reason && (!t.parked_until || !(Date.parse(t.parked_until) <= Date.now())));
 /** A task's state as the team page's tables say it (#7453): Queued, In progress, In review, Blocked, Done; `review` is a task with its completion review pending. */
-export function taskStatusWord(status, review) {
+export function taskStatusWord(status, review, parked) {
     const s = String(status || '').toLowerCase();
     if (['completed', 'skipped'].includes(s)) return 'Done';
     if (review || s === 'review_pending') return 'In review';
+    if (parked) return 'Waiting'; // set aside on purpose (parked): it holds no slot, so it is not the agent's one In progress task (#11659)
     if (s === 'in_progress') return 'In progress';
     if (['blocked', 'parked'].includes(s)) return 'Blocked';
     if (['pending', 'draft'].includes(s)) return 'Queued';

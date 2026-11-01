@@ -180,7 +180,7 @@ function inboxNeedsToolbar() {
 
 // ── Tasks ────────────────────────────────────────────────────────────────
 const RANK = { high: 0, medium: 1, low: 2 };
-const TASK_GLYPH = { Queued: 'schedule', 'In progress': 'hourglass_top', Blocked: 'block', 'In review': 'rate_review', Done: 'check_circle' }; // a phone row's leading glyph: the task's state
+const TASK_GLYPH = { Waiting: 'schedule', Queued: 'schedule', 'In progress': 'hourglass_top', Blocked: 'block', 'In review': 'rate_review', Done: 'check_circle' }; // a phone row's leading glyph: the task's state
 const stateOf = t => TV.taskWord(t);
 const inboxTasksState = DT.tableState();
 const needsState = DT.tableState();
@@ -383,7 +383,7 @@ function inboxTaskToolbar() {
     taskBar.set({ ...taskFilters, q: queries.tasks });
     syncServerField(taskBar);
     if (!inboxTasksState.selected.size) Toolbar.mountSelection(taskBar.node.querySelector('.list-bar-search-row'), null);
-    const states = ['Queued', 'In progress', 'In review', 'Blocked'];
+    const states = ['Queued', 'Waiting', 'In progress', 'In review', 'Blocked'];
     const rows = tasks.filter(taskMatches);
     const active = document.activeElement;
     const held = taskBar.node.contains(active) ? (active.matches('.team-tb-select') ? 'select' : active.dataset.filter) : null;

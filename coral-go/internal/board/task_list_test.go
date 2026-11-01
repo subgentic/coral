@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -286,4 +287,32 @@ func TestListTaskPage_CursorIsBoundToItsBoard(t *testing.T) {
 	_, id, err := decodeTaskCursor(encodeTaskCursor("a|b", "a", "", 9), "a|b", "a")
 	require.NoError(t, err)
 	assert.Equal(t, int64(9), id)
+}
+
+// #11659: a parked task in progress holds no slot, so the list says why it is set aside and until when; the live task carries neither.
+func TestListTaskPage_ParkedTasksCarryTheirReason(t *testing.T) {
+	ctx := context.Background()
+	s := testStore(t)
+	parked, err := s.CreateTask(ctx, "team", "Parked", "b", "medium", "lead", "worker")
+	require.NoError(t, err)
+	_, err = s.ClaimTask(ctx, "team", "worker", parked.ID)
+	require.NoError(t, err)
+	_, err = s.ParkTask(ctx, "team", parked.ID, "waiting on the operator", time.Time{})
+	require.NoError(t, err)
+	live, err := s.CreateTask(ctx, "team", "Live", "b", "medium", "lead", "worker")
+	require.NoError(t, err)
+	_, err = s.ClaimTask(ctx, "team", "worker", live.ID)
+	require.NoError(t, err, "a parked task holds no slot: the next claim goes through")
+
+	page, err := s.ListTaskPage(ctx, "team", TaskListQuery{})
+	require.NoError(t, err)
+	byID := map[int64]TaskListItem{}
+	for _, it := range page.Tasks {
+		byID[it.ID] = it
+	}
+	require.NotNil(t, byID[parked.ID].ParkedReason, "the list says the task is parked")
+	require.Equal(t, "waiting on the operator", *byID[parked.ID].ParkedReason)
+	require.Nil(t, byID[parked.ID].ParkedUntil, "parked until unparked: no end")
+	require.Nil(t, byID[live.ID].ParkedReason, "the live task is not parked")
+	require.Equal(t, "in_progress", byID[live.ID].Status)
 }
