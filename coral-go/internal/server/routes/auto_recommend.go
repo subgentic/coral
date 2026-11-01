@@ -306,6 +306,32 @@ func hiddenIn(v any) bool {
 	return false
 }
 
+// recordHasOption reports whether the live call's own record lists, at the picked position, the picked label: the questions of the record must hold the question on the screen, with an options
+// list whose n-th label (the "(Recommended)" mark included) is the label on the screen. What the screen shows (the capture can drop or alter characters) is then also what the agent asked.
+func (h *SessionsHandler) recordHasOption(sessionID string, now time.Time, question string, n int, label string) bool {
+	t, ok := h.pending.get(sessionID, now)
+	if !ok {
+		return false
+	}
+	qs, _ := t.Input["questions"].([]any)
+	squeeze := func(x string) string { return strings.Join(strings.Fields(x), " ") }
+	for _, q := range qs {
+		m, _ := q.(map[string]any)
+		text, _ := m["question"].(string)
+		if m == nil || squeeze(text) != squeeze(question) {
+			continue
+		}
+		opts, _ := m["options"].([]any)
+		if n < 1 || n > len(opts) {
+			return false
+		}
+		o, _ := opts[n-1].(map[string]any)
+		l, _ := o["label"].(string)
+		return o != nil && squeeze(l) == squeeze(label)
+	}
+	return false
+}
+
 // recordMatches reports whether the live call's own questions carry the question on the screen, and nothing in them is a risk word (they hold the descriptions whole). A record that kept no
 // questions (too long to keep, or a tool that sends none) cannot be compared: no pick.
 func recordMatches(questions, onScreen string) bool {
@@ -397,7 +423,7 @@ func (r *AutoRecommender) pass(ctx context.Context, a liveAgent, screen promptSc
 		return
 	}
 	call, questions := r.h.liveQuestion(a.sid, now)
-	if call == "" || !recordMatches(questions, screen.Question) {
+	if call == "" || !recordMatches(questions, screen.Question) || !r.h.recordHasOption(a.sid, now, screen.Question, rec.N, rec.Label) {
 		r.unbind(a.sid)
 		return
 	}
@@ -436,7 +462,7 @@ func (r *AutoRecommender) pick(ctx context.Context, a liveAgent, b recBound, now
 	if rec.Why != "" || rec.N < 1 || rec.N > len(screen.Options) || screen.Options[rec.N-1].N != rec.N {
 		return
 	}
-	if call, questions := h.liveQuestion(a.sid, now); call != b.call || !recordMatches(questions, screen.Question) {
+	if call, questions := h.liveQuestion(a.sid, now); call != b.call || !recordMatches(questions, screen.Question) || !h.recordHasOption(a.sid, now, screen.Question, rec.N, rec.Label) {
 		return
 	}
 	if h.personPresent(a.sid, now) {
