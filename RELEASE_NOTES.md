@@ -1,5 +1,26 @@
 # Release Notes
 
+## v2.0.25 — the Artifacts badge counts files, and the phone toolbar is the bar only while you select
+
+### Changes
+
+#### What you will notice first
+
+- **The Artifacts badge counts files, as the list does**: three files with five versions say 3, not 5 (the badge's count read now asks for the newest version of each file).
+- **On a phone, the toolbar is the selection bar and nothing else while rows are selected**: the toolbar's own sort and filter icon button no longer sits on a blank row under the bar.
+
+#### Known issues
+
+- **Windows: in-app update does not work from 2.0.0 through 2.0.6.** If you're on one of those, download and install the MSI by hand; from 2.0.7 on, in-app update works.
+- **macOS: a Coral of 2.0.5 or earlier cannot install updates in-app; install 2.0.6 or later by hand once.**
+- **OpenCode agents are tested on macOS and Linux; OpenCode on Windows is not yet tested end to end.**
+- Setting up a computer over SSH is supported from a macOS or Linux hub, and is not yet tested from a Windows hub.
+
+#### For developers and releases
+
+- The static tree is 5,905,951 bytes of the 5,906,432-byte budget.
+- `inbox_artifact_count_browser` fails on a count of versions; `needs_phone_rows_browser` asserts at 390 and 360 px that no control other than the bar is shown in the toolbar while rows are selected.
+
 ## v2.0.24 — the Agent step as folder tabs, a picture box that fills its pane, the health check as an action list, and an Orchestrator seat that holds
 
 ### Changes
