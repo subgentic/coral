@@ -105,7 +105,7 @@ func fillBoard(t *testing.T, s *Store, project string) (taskIDs []int64) {
 	_, _, err = s.DecideArtifactReview(ctx, project, strings.Repeat("a", 64), ReviewApproved, time.Now()) // and the Operator's decision on it (#136584)
 	require.NoError(t, err)
 	require.NoError(t, s.SetGoalImages(ctx, project, goal.ID, []GoalImage{{Hex: strings.Repeat("b", 64), Name: "shot.png", ContentType: "image/png"}})) // and the pictures of its goal (#11650)
-	_, err = s.SetArtifactQuestion(ctx, project, strings.Repeat("a", 64), "Approve it?", "sess-1", time.Now()) // and what its upload asked (#11555)
+	_, err = s.SetArtifactQuestion(ctx, project, strings.Repeat("a", 64), "Approve it?", "sess-1", time.Now())                                          // and what its upload asked (#11555)
 	require.NoError(t, err)
 	return []int64{first.ID, second.ID}
 }
