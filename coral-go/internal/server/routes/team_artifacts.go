@@ -54,6 +54,8 @@ type teamArtifact struct {
 	Private bool `json:"private,omitempty"`
 	// ReviewQuestion: what the agent that uploaded this file asks the Operator to decide (#11555), cleaned and at most 140 characters: on a row tagged for review, when its upload said (agent text: show it as text).
 	ReviewQuestion string `json:"review_question,omitempty"`
+	// EarlierVersions: how many older versions of this file (the same team, uploader and name) a collapsed list leaves out (#11700): only on a list asked with versions=newest, and absent for none.
+	EarlierVersions int `json:"earlier_versions,omitempty"`
 	// Review is the Operator's decision on an artifact tagged for review, with its time (#136584): absent until one is made.
 	Review         *board.ArtifactReview `json:"review,omitempty"`
 	Source         string                `json:"source"`
@@ -115,7 +117,7 @@ func parseBoundedInt(raw string, def, min, max int) (int, bool) {
 // results. It reads only task workflow records and, for the returned page, the
 // small metadata sidecar of Coral-managed objects (and stats the blob); it never scans the artifact
 // directory or loads artifact bytes.
-// GET /api/board/{project}/artifacts?limit=&offset=[&q=&kind=&origin=&by=&board=&kept=&since=&until=&sort=&cursor=]
+// GET /api/board/{project}/artifacts?limit=&offset=[&q=&kind=&origin=&by=&board=&kept=&since=&until=&sort=&cursor=&versions=newest]
 //
 // With only limit, offset and session_id the reply is the plain list. Any of the others makes it a query (team_artifacts_query.go,
 // #4572): the reply then also has total, and next_cursor when there is another page.

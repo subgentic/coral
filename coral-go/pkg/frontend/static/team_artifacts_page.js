@@ -153,9 +153,12 @@ export function createArtifactsList({ inbox = false } = {}) {
             if (!(scope && scope.standalone)) for (const [k, v] of Object.entries(toParams(model.filters))) params.set(k, v); // the search, the filters and the sort are the server's to apply
             else if (model.filters.sort) params.set(SORT_PARAM, model.filters.sort); // an agent without a team has no filters, but its list is sorted by the server too (#8945)
             if (!append) params.set('offset', '0'); else if (model.cursor) params.set('cursor', model.cursor); else params.set('offset', String(model.items.length));
+            if (!(scope && scope.standalone)) params.set('versions', 'newest'); // one row per file: the newest version, its earlier ones counted (#11700)
             if (scope) params.set('session_id', scope.session); // one agent's list: the same query, scoped to the agent (its totals are the agent's)
             const inboxData = inbox ? await readInboxArtifacts(params, model.filters, ctrl.signal) : null;
-            const r = await (inbox ? Promise.resolve({ ok: true, json: async () => inboxData }) : scope && scope.standalone ? fetch(serverUrl(`/api/session-artifacts?${params}`, scope.server), { signal: ctrl.signal }) : boardFetch(project, `/artifacts?${params}`, { signal: ctrl.signal }));
+            const fetchList = () => (inbox ? Promise.resolve({ ok: true, json: async () => inboxData }) : scope && scope.standalone ? fetch(serverUrl(`/api/session-artifacts?${params}`, scope.server), { signal: ctrl.signal }) : boardFetch(project, `/artifacts?${params}`, { signal: ctrl.signal }));
+            let r = await fetchList();
+            if (r.status === 400 && !inbox && params.has('versions')) { params.delete('versions'); r = await fetchList(); } // a computer on an older Coral does not know versions: its list is whole;
             if (!r.ok && r.status === 404 && !inbox && !scope && ((await r.clone().json().catch(() => null)) || {}).code === 'board_not_found') { model.notFound = true; throw new Error(`No team named ${splitKey(project).name}`); } // a mistyped team name is not an empty team (#8821)
             if (!r.ok) { if (await isOwnerLabelRefusal(r)) throw new Error(OWNER_LABEL_TEXT); throw new Error(`Unable to load ${inbox ? '' : scope ? 'agent ' : 'team '}artifacts (${r.status}).`); }
             const data = await r.json();
@@ -333,8 +336,9 @@ export function createArtifactsList({ inbox = false } = {}) {
                 details: model.scope ? detailsLink : null,
                 star: item => { const hex = managedHex(item); return hex ? starControl(item, { hex, name: readableName(item) }) : null; },
                 nameBadge: item => {
-                    const badge = originBadge(item); if (!badge) return null;
-                    const note = DT.tag(badge); note.classList.add('dt-note', 'team-artifact-badge', `team-artifact-badge-${isUnverified(item) ? 'unverified' : item.source === 'shared' ? 'shared' : 'received'}`);
+                    const origin = originBadge(item), n = item.earlier_versions, badge = origin || (n > 0 ? `${n} earlier version${n > 1 ? 's' : ''}` : ''); if (!badge) return null;
+                    const note = DT.tag(badge); note.classList.add('dt-note', 'team-artifact-badge');
+                    if (origin) note.classList.add(`team-artifact-badge-${isUnverified(item) ? 'unverified' : item.source === 'shared' ? 'shared' : 'received'}`);
                     if (isUnverified(item)) note.classList.add('dt-warning'); return note;
                 },
                 ...(inbox ? { mail: item => ({ lead: { icon: 'description', square: true, name: String(readableName(item)).split('.').pop() }, title: readableName(item), starred: !!item.starred, snippet: [placeOf(item), taskText(item)].filter(Boolean).join(' · '), time: DT.timeCell(item.updated_at || item.created_at).textContent, tip: [multipleServers() ? `${item.team || keyLabel(item.board_id)} \u00b7 ${serverLabel(serverOf(item))}` : placeOf(item), taskText(item)].filter(Boolean).join(' \u00b7 ') }) } : {}), // a phone's row (#9583): its hover names the team and the computer, as the dropped columns did: a file glyph, the name, its team and task, when it changed

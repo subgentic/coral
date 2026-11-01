@@ -27,10 +27,10 @@ import (
 // (so % and _ are ordinary characters), the rest are enum words, names compared for equality, and times.
 
 var teamArtifactParamNames = map[string]bool{"limit": true, "offset": true, "session_id": true,
-	"q": true, "kind": true, "origin": true, "by": true, "board": true, "kept": true, "starred": true, "task": true, "goal": true, "tag": true, "since": true, "until": true, "sort": true, "cursor": true}
+	"q": true, "kind": true, "origin": true, "by": true, "board": true, "kept": true, "starred": true, "task": true, "goal": true, "tag": true, "since": true, "until": true, "sort": true, "cursor": true, "versions": true}
 
 // teamArtifactQueryParams are the parameters that make the reply a query (the others are the list's original ones).
-var teamArtifactQueryParams = []string{"q", "kind", "origin", "by", "board", "kept", "starred", "task", "goal", "tag", "since", "until", "sort", "cursor"}
+var teamArtifactQueryParams = []string{"q", "kind", "origin", "by", "board", "kept", "starred", "task", "goal", "tag", "since", "until", "sort", "cursor", "versions"}
 
 var (
 	teamArtifactKinds   = []string{"image", "pdf", "text", "other"}
@@ -67,6 +67,7 @@ type teamArtifactQuery struct {
 	since    *time.Time
 	until    *time.Time
 	sortName string
+	collapse bool // versions=newest (#11700): the versions of one file are one row, the newest; the totals and the tag counts follow
 	cursor   *teamArtifactCursor
 	finger   string
 }
@@ -272,9 +273,17 @@ func parseTeamArtifactQuery(vals url.Values) (*teamArtifactQuery, error) {
 		}
 		q.sortName = v
 	}
+	if v, ok, serr := taSingle("versions", vals["versions"]); serr != nil {
+		return nil, serr
+	} else if ok {
+		if v != "newest" && v != "all" {
+			return nil, taErr("versions is newest or all")
+		}
+		q.collapse = v == "newest"
+	}
 	// What a cursor is tied to: every filter and the sort (not limit, offset or the cursor itself).
 	fp := sha256.New()
-	fmt.Fprintf(fp, "%s|%v|%v|%v|%v|%v|%v|%v|%v|%v|%v|%v|%s|%s", q.q, q.kinds, q.origins, q.by, q.boards, q.kept, q.starred, q.task, q.goal, q.tags, q.since, q.until, q.sortName, vals.Get("session_id"))
+	fmt.Fprintf(fp, "%s|%v|%v|%v|%v|%v|%v|%v|%v|%v|%v|%v|%v|%s|%s", q.q, q.kinds, q.origins, q.by, q.boards, q.kept, q.starred, q.task, q.goal, q.tags, q.since, q.until, q.collapse, q.sortName, vals.Get("session_id"))
 	if scope := vals.Get(crossTeamScopeParam); scope != "" { // the cross-team list: its cursors are its own (a team route's is refused there) and tied to the teams asked for
 		fmt.Fprintf(fp, "|%s|%v", scope, vals["team"])
 	}
@@ -665,6 +674,9 @@ func (h *BoardHandler) selectTeamArtifacts(r *http.Request, items []teamArtifact
 		}
 	}
 	counts := teamTagCounts(items) // over the whole list, as the Tag filter offers its words (after redaction for a Hub viewer)
+	if q.collapse {
+		counts = teamTagCountsByFile(items) // files, not versions (#11700)
+	}
 	var set []teamArtifact
 	for _, it := range items {
 		if q.cheapMatch(it, kept, starred) {
@@ -688,6 +700,9 @@ func (h *BoardHandler) selectTeamArtifacts(r *http.Request, items []teamArtifact
 			}
 		}
 		set = out
+	}
+	if q.collapse {
+		set = collapseVersions(set) // after the filters: a version that matches stands for its file, as Needs you does (#11700)
 	}
 	sort.SliceStable(set, func(i, j int) bool { return artifactAfter(q.sortName, keyOf(set[j]), keyOf(set[i])) })
 	sel := &teamArtifactSelection{total: len(set), tags: counts}
@@ -740,6 +755,9 @@ func (h *BoardHandler) selectTeamArtifacts(r *http.Request, items []teamArtifact
 // queryTeamArtifacts answers a query over items (the collected, merged list). It writes the reply.
 func (h *BoardHandler) queryTeamArtifacts(w http.ResponseWriter, r *http.Request, project string, items []teamArtifact, truncated bool, limit, offset int, sessionFilter string, q *teamArtifactQuery) {
 	all := len(items)
+	if q != nil && q.collapse {
+		all = len(collapseVersions(items)) // the unfiltered total counts files, not versions (#11700)
+	}
 	sel, err := h.selectTeamArtifacts(r, items, limit, offset, q)
 	if err != nil {
 		errInternalServer(w, "could not list artifacts")
@@ -760,4 +778,58 @@ func (h *BoardHandler) queryTeamArtifacts(w http.ResponseWriter, r *http.Request
 		resp["session_id"] = sessionFilter
 	}
 	writeJSON(w, http.StatusOK, resp)
+}
+
+// artifactVersionKey names the file a row is a version of: the same team, the same uploader (session and producer) and the same name, as Needs you groups them (#11533, #11539). "" for a row that is
+// nobody's version: a link rather than an upload, one with no uploader, or one named by its digest (a name that says nothing, so two of them are not one file). A JSON array, so a '|' in a name or an
+// id can't make two keys one.
+func artifactVersionKey(it teamArtifact) string {
+	if it.managed == "" || it.Name == "" || digestLikeName.MatchString(it.Name) || (it.SessionID == nil && it.ProducedBy == nil) {
+		return ""
+	}
+	b, err := json.Marshal([]string{it.BoardID, ptrOr(it.SessionID), ptrOr(it.ProducedBy), it.Name})
+	if err != nil {
+		return ""
+	}
+	return string(b)
+}
+
+// newerVersion: a is a later upload than b (by time, then id, so it is total).
+func newerVersion(a, b teamArtifact) bool {
+	ta, oka := parseArtifactTime(a.CreatedAt)
+	tb, okb := parseArtifactTime(b.CreatedAt)
+	if oka && okb && !ta.Equal(tb) {
+		return ta.After(tb)
+	}
+	if a.CreatedAt != b.CreatedAt && (!oka || !okb) {
+		return a.CreatedAt > b.CreatedAt
+	}
+	return a.ID > b.ID
+}
+
+// collapseVersions makes the versions of one file one row: the newest, with EarlierVersions the number it stands for (#11700). The rows keep the order they came in; items is not changed.
+func collapseVersions(items []teamArtifact) []teamArtifact {
+	newest := map[string]int{}
+	count := map[string]int{}
+	for i, it := range items {
+		k := artifactVersionKey(it)
+		if k == "" {
+			continue
+		}
+		count[k]++
+		if j, ok := newest[k]; !ok || newerVersion(it, items[j]) {
+			newest[k] = i
+		}
+	}
+	out := make([]teamArtifact, 0, len(items))
+	for i, it := range items {
+		if k := artifactVersionKey(it); k != "" {
+			if newest[k] != i {
+				continue
+			}
+			it.EarlierVersions = count[k] - 1
+		}
+		out = append(out, it)
+	}
+	return out
 }

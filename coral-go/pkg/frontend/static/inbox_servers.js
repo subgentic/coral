@@ -42,7 +42,8 @@ export async function readInboxArtifacts(params, filters = {}, signal) {
         if (team) query.set('team', team.name);
         if (prior?.cursor) query.set('cursor', prior.cursor);
         else query.set('offset', String(prior?.offset || 0));
-        const response = await serverFetch(server, `/api/team-artifacts?${query}`, { signal });
+        let response = await serverFetch(server, `/api/team-artifacts?${query}`, { signal });
+        if (response.status === 400 && query.has('versions')) { query.delete('versions'); response = await serverFetch(server, `/api/team-artifacts?${query}`, { signal }); } // an older Coral does not know versions (#11700)
         if (response.status === 403 && await isOwnerOnlyAnswer(response)) { ownerOnly.add(server); return emptyArtifacts(server); } // a grantee on that computer: its artifacts are View plus owner-only, so it adds none and is not asked again this session (#11071)
         if (!response.ok) throw new Error(`${serverLabel(server)} artifacts could not be read (${response.status}).`);
         const data = await response.json();
