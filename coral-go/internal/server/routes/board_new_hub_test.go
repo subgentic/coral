@@ -88,3 +88,19 @@ func TestNewBoardThroughTheHubIsTheOwnersAlone(t *testing.T) {
 	rec = do(true, guest, "", "/api/board/owned/subscribe", routes[0].body)
 	assert.Equal(t, http.StatusOK, rec.Code, "a guest joining a board that exists is unchanged: %s", rec.Body.String())
 }
+
+// The machine can only tell the owner from a guest on a route the owner table stamps (the connector drops the marker everywhere else, and a browser's own is dropped too), so every route that refuses a guest a new
+// board must be in the table (#11636): a route left out would refuse the real owner. The stamp itself, and the drop of a forged one, are held per table row through the real connector in pkg/tunnel
+// (TestTheRealConnectorStampsEveryOwnerRouteOfTheTableAndNothingElse).
+func TestEveryRouteThatRefusesAGuestANewBoardCarriesTheOwnerStamp(t *testing.T) {
+	for _, rt := range []struct{ method, path string }{
+		{"POST", "/api/board/t/subscribe"},
+		{"POST", "/api/board/t/messages"},
+		{"POST", "/api/board/t/tasks"},
+		{"POST", "/api/board/t/goals"},
+		{"PUT", "/api/board/t/working-mode"},
+		{"POST", "/api/board/t/working-mode/presets"},
+	} {
+		assert.True(t, tunnel.IsOwnerRoute(rt.method, rt.path), "%s %s refuses a Hub guest a new board, so the owner table must stamp it", rt.method, rt.path)
+	}
+}
