@@ -277,6 +277,7 @@ func (h *SessionsHandler) dialogTimeout(ctx context.Context, a liveAgent, after 
 	h.forgetDialog(a.sid)
 	if !h.waitInputBox(ctx, pane, a, screen) {
 		h.recordDialogClosed(ctx, a, first, now, plan.how, timeoutNoBox)
+		h.postDialogClosedLine(ctx, a, first, now, plan.how, timeoutNoBox)
 		return timeoutNoBox
 	}
 	time.Sleep(promptSettle)
@@ -287,6 +288,7 @@ func (h *SessionsHandler) dialogTimeout(ctx context.Context, a liveAgent, after 
 			outcome = timeoutDone
 		}
 		h.recordDialogClosed(ctx, a, first, now, plan.how, outcome)
+		h.postDialogClosedLine(ctx, a, first, now, plan.how, outcome) // after the notice's tries: "not told" only once they end
 		return outcome
 	})
 }
