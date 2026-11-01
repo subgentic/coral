@@ -85,5 +85,7 @@ func TestEveryTypedSenderIsInTheCensus(t *testing.T) {
 		typedcensus.S("sessions_waiting.go", `ptymanager.DeliverNow(`, 1, "Send now: board.NudgeText (census)"),
 		typedcensus.S("sessions_waiting.go", `name, text, ls.AgentType`, 1, "Send now's send: board.NudgeText (census)"),
 		typedcensus.S("dialog_timeout.go", `dialogTimeoutNotice, "dialog timeout notice"`, 1, "census: dialog timeout (fixed, no digit)"),
+		typedcensus.S("dialog_timeout_opencode.go", `dialogTimeoutNotice, "dialog timeout notice"`, 1, "census: dialog timeout (fixed, no digit)"),
+		typedcensus.S("agent_exited.go", `text, what, wanted)`, 1, "deliverAutomatedWhile: forwards the text of its callers, listed here"),
 	})
 }
