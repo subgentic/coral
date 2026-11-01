@@ -107,6 +107,12 @@ func (r *PTYRuntime) AgentShellIdle(_ context.Context, name, _, _ string) (bool,
 	return r.backend.ShellIdle(name)
 }
 
+// AgentTextRefused implements ptymanager.TextTargetChecker: no text at all into a terminal that could run it or where another program reads it.
+func (r *PTYRuntime) AgentTextRefused(_ context.Context, name, _, _ string) (bool, string) {
+	refused, why, _ := r.backend.AgentTextRefused(name)
+	return refused, why
+}
+
 // AgentNoticeTarget says whether a board nudge may be typed into the agent's terminal: only while the recorded agent process is its foreground program (ptymanager.NoticeBlocked, #389).
 func (r *PTYRuntime) AgentNoticeTarget(_ context.Context, name, _, _ string) (ok, wait bool, why string, known bool) {
 	v, found := r.backend.AgentNoticeVerdict(name)
