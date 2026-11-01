@@ -167,8 +167,8 @@ export async function buildProviderCards({ group, form, server, implicitDefault 
 
     select.addEventListener('change', () => { if (select.value !== start) chosen = true; sync(); });
     form.addEventListener('acf-synced', () => { const open = cards.get(typeNow()); if (open && !open.classList.contains('is-missing')) noThinking(open, TYPES.find(([t]) => t === typeNow())?.[1] || ''); });
+    group.hidden = false; // shown BEFORE the cards are drawn: keepFocus puts the keyboard back in the Model field (an open add form) after the redraw, and a hidden group takes no focus (#11763)
     draw();
-    group.hidden = false;
     form.classList.add('has-agent-pick'); // the group is the one place that names the provider: the form's own select stays (hidden by css) and follows it (#6407)
     _getDefaultModels(server).then(d => { if (group._pickToken !== gen) return; defaults = d || {}; for (const [type, card] of cards) { const s = card.querySelector('.provider-status'); if (s) s.textContent = statusOf(type); } }).catch(() => {});
     const found = await Promise.all(TYPES.map(([t]) => Promise.race([probe(server, t), new Promise(r => setTimeout(() => r({ found: null }), PROBE_MS))])));

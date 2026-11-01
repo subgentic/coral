@@ -107,6 +107,10 @@ const STUB = `(() => { const R = window.fetch; window.__asks = 0; window.__puts 
         await waitFor(`!!document.querySelector('#launch-agent-acf .acf-model-add form')`, 'launch dialog: the form', 3000);
         if (process.env.CORAL_SCREENSHOT_DIR) { fs.mkdirSync(process.env.CORAL_SCREENSHOT_DIR, { recursive: true }); fs.writeFileSync(`${process.env.CORAL_SCREENSHOT_DIR}/picker-add-launch-dialog.png`, Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); }
         await waitFor(`!!document.activeElement && !!document.activeElement.closest('#launch-agent-acf .acf-model-add form')`, 'launch dialog: the keyboard is in the form (the dialog moves its focus as it settles, and a key sent before that goes elsewhere)', 5000);
+        // the list of the same provider is loaded again right after (a late CLI check, the dialog drawing again): the form stays and so does the keyboard in it (#11763: it was closed, the focus fell to the page, and a person using the keyboard lost their place)
+        await ev(`import((window.__coralStatic || '/static/') + 'model_picker.js').then(m => m.loadModelPicker(document.querySelector('#launch-agent-acf'), document.querySelector('#launch-agent-acf .acf-agent-type')?.value || 'claude')).then(() => true)`);
+        await new Promise(r => setTimeout(r, 400)); // sleep-ok: the reload's answer is drawn over a few frames
+        assert.equal(await ev(`!!document.querySelector('#launch-agent-acf .acf-model-add form') && !!document.activeElement && !!document.activeElement.closest('#launch-agent-acf .acf-model-add form')`), true, 'launch dialog: after the same list is loaded again the add form is still open and the keyboard is still in it');
         await key('Escape', 'Escape', 27);
         await waitFor(`!document.querySelector('#launch-agent-acf .acf-model-add form')`, 'launch dialog: Escape closed the form', 3000);
         assert.equal(await ev(`!!document.querySelector('#launch-modal.active, #launch-modal[style*="flex"]') || getComputedStyle(document.getElementById('launch-modal')).display !== 'none'`), true, 'the dialog is still open');
