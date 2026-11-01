@@ -24,9 +24,10 @@ export function attachWelcomeSwipe(host) {
     let drag = null;
     const back = (row, strip) => { row.style.transition = calm() ? 'none' : 'transform .15s ease-out'; row.style.transform = ''; strip.remove(); };
     host.addEventListener('pointerdown', e => {
-        const row = e.pointerType === 'touch' && e.target.closest('tr[data-welcome-id]');
+        const row = e.pointerType === 'touch' && e.target.closest('tr[data-welcome-id], tr[data-key]');
+        if (row && !row.dataset.welcomeId && !row.querySelector('.inbox-review-actions')?._ignore) return; // a row with nothing to ignore is not swiped (#11642)
         if (!row || drag) return;
-        drag = { row, id: row.dataset.welcomeId, x: e.clientX, y: e.clientY, t: e.timeStamp, dx: 0, on: false, strip: document.createElement('div') };
+        drag = { row, id: row.dataset.welcomeId, box: row.querySelector('.inbox-review-actions'), x: e.clientX, y: e.clientY, t: e.timeStamp, dx: 0, on: false, strip: document.createElement('div') };
         drag.strip.className = 'inbox-swipe-strip'; drag.strip.setAttribute('aria-hidden', 'true'); drag.strip.textContent = 'Ignore';
     });
     host.addEventListener('pointermove', e => {
@@ -50,8 +51,9 @@ export function attachWelcomeSwipe(host) {
         const wide = d.row.getBoundingClientRect().width || 1, fast = -d.dx / Math.max(1, e.timeStamp - d.t), mute = ev => ev.stopPropagation();
         d.row.addEventListener('click', mute, true); setTimeout(() => d.row.removeEventListener('click', mute, true), 100); // the lift of the finger is not a tap on a button
         if (e.type === 'pointerup' && (-d.dx > wide * COMMIT || (fast > FLICK && -d.dx > FLICK_MIN_PX))) {
-            const title = (d.row.querySelector('.inbox-welcome-name')?.firstChild?.textContent || 'the item').trim();
             d.strip.remove(); d.row.style.transform = '';
+            if (!d.id) { d.box._ignore(d.row); return; } // a review, a question or a failed run: the row's own Ignore, which says it and offers Undo itself (#11642)
+            const title = (d.row.querySelector('.inbox-welcome-name')?.firstChild?.textContent || 'the item').trim();
             dismissWelcome(d.id);
             showToast(`Ignored: ${title}`, false, undefined, { action: { label: 'Undo', onClick: () => undo(d.id) } });
             announceNotice(`Ignored: ${title}. Undo is in the notice.`); // read out politely: the toast is not a live region of its own
