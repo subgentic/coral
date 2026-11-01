@@ -1,5 +1,5 @@
 // A width kept from 2.0.27 never leaves Needs you with a narrow Item and an empty middle (#11886, the operator's report: Item at 250 px with its names cut while the Blocks column took the empty middle, and the pills read
-// "All 0 / For review 0" over listed For review rows: the pills are a separate question, see the task). Widths kept as the operator had them (Item 250, Blocks 64, Waiting 90) are fitted on load: the name column takes what the others leave, Blocks shows its whole header, the
+// "All 0 / For review 0" over listed For review rows: the pills are a separate question, the pills say 'For review 0 of 2' for a list whose rows are all read, the operator's ruling). Widths kept as the operator had them (Item 250, Blocks 64, Waiting 90) are fitted on load: the name column takes what the others leave, Blocks shows its whole header, the
 // table fits its panel; an over-wide kept layout is fitted, never scrolled off. The files are page stubs (all read). 1440, 1280 and 1024 px.
 const fs = require('node:fs');
 const { connect } = require('./agent_view_harness');
@@ -58,6 +58,8 @@ const AGENTS = []; // the operator's table is files for review and questions: no
             check(!!item && item.w >= m.boxW - others - 4, at + 'the name column takes what the others leave (no empty middle): ' + JSON.stringify({ item: item && item.w, others, box: m.boxW }));
             if (kept.agent === 250 && w >= 1280) check(!!item && item.w > 300, at + 'the name column is wider than the 250 px kept for it (it was left at 250 with an empty middle): ' + (item && item.w));
             for (const h of m.heads) check(!h.cut, at + `the ${h.label} header is whole: ` + JSON.stringify(h));
+            const pills = await ev(`[...document.querySelectorAll('${T} button.goals-chip, #group-table-view button.goals-chip')].map(b => b.textContent.replace(/\\s+/g, ' ').trim())`);
+            check(pills.includes('All 0 of 2') && pills.includes('For review 0 of 2'), at + 'the pills say how many rows are listed when read ones are in them (one number, and the list\'s size): ' + JSON.stringify(pills));
             if (kept.agent === 250) await shot(`needs-kept-widths-${w}`);
         }
     } finally { await removeBoards(ev, [team]).catch(() => {}); await client.close(); }
