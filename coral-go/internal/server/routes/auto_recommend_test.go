@@ -2,6 +2,7 @@ package routes
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -77,9 +78,9 @@ func TestRecommendedOptionRefusals(t *testing.T) {
 		"lower case mark":                 recQuestion("Which color?", "Red (recommended)", "Green"),
 		"one marked, one in lower case":   recQuestion("Which color?", "Red (Recommended)", "Green (recommended)"),
 		"the mark in the middle":          recQuestion("Which color?", "Red (Recommended) please", "Green"),
-		"bidi character in the label":     recQuestion("Which color?", "Re‮d (Recommended)", "Green"),
-		"zero-width character in a label": recQuestion("Which color?", "Red (Recommended)", "Gr​en"),
-		"bidi character in the question":  recQuestion("Which⁦ color?", "Red (Recommended)", "Green"),
+		"bidi character in the label":     recQuestion("Which color?", "Re\u202ed (Recommended)", "Green"),
+		"zero-width character in a label": recQuestion("Which color?", "Red (Recommended)", "Gr\u200ben"),
+		"bidi character in the question":  recQuestion("Which\u2066 color?", "Red (Recommended)", "Green"),
 		"homoglyph Recommended":           recQuestion("Which color?", "Red (Recommеnded)", "Green"), // a Cyrillic е
 		"risk word in the question":       recQuestion("Delete the build folder?", "Yes (Recommended)", "No"),
 		"risk word in a label":            recQuestion("Which step?", "Push to origin (Recommended)", "Wait"),
@@ -100,7 +101,7 @@ func TestRecommendedOptionRefusesAHiddenCharacterOnlyTheRawScreenHas(t *testing.
 	clean := recQuestion("Which color?", "Red (Recommended)", "Green")
 	s := parsedQuestion(t, clean)
 	assert.Empty(t, recommendedOption(s, clean).Why)
-	for _, hidden := range []string{"​", "‮", "⁦", ""} {
+	for _, hidden := range []string{"\u200b", "\u202e", "\u2066", ""} {
 		raw := strings.Replace(clean, "Red (Recommended)", "Re"+hidden+"d (Recommended)", 1)
 		assert.NotEmpty(t, recommendedOption(s, raw).Why, "%q", hidden)
 	}
@@ -404,8 +405,12 @@ func TestAutoRecommendSettingIsOperatorOnlyAndOffByDefault(t *testing.T) {
 	_, err := h.bs.Subscribe(ctx, "team", "Dev", "Developer", "claude-a", nil, "all")
 	require.NoError(t, err)
 	require.False(t, h.bs.GetHealthSettings(ctx, "team").AutoRecommend.On, "off by default")
-	put := func(mod func(*http.Request)) int {
-		body := `{"subscriber_id":"Operator","health":{"on":true,"auto_recommend":{"on":true,"grace_min":99}}}`
+	put := func(mod func(*http.Request), grace ...int) int {
+		g := 4
+		if len(grace) > 0 {
+			g = grace[0]
+		}
+		body := fmt.Sprintf(`{"subscriber_id":"Operator","health":{"on":true,"auto_recommend":{"on":true,"grace_min":%d}}}`, g)
 		req := httptest.NewRequest(http.MethodPut, "/api/board/team/settings", strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
 		rctx := chi.NewRouteContext()
@@ -424,7 +429,24 @@ func TestAutoRecommendSettingIsOperatorOnlyAndOffByDefault(t *testing.T) {
 	assert.Equal(t, http.StatusOK, put(func(r *http.Request) { r.Header.Set("User-Agent", "Mozilla/5.0") }), "the dashboard")
 	got := h.bs.GetHealthSettings(ctx, "team").AutoRecommend
 	assert.True(t, got.On)
-	assert.Equal(t, board.AutoRecommendGraceMax, got.GraceMin, "99 minutes is kept under the dialog timeout's minimum")
+	assert.Equal(t, 4, got.GraceMin)
+	// Out of range is refused with a 400, as the dialog timeout's wait is, and nothing is saved.
+	dash := func(r *http.Request) { r.Header.Set("User-Agent", "Mozilla/5.0") }
+	assert.Equal(t, http.StatusBadRequest, put(dash, 99), "over the maximum")
+	assert.Equal(t, http.StatusBadRequest, put(dash, -2), "under the minimum")
+	assert.Equal(t, 4, h.bs.GetHealthSettings(ctx, "team").AutoRecommend.GraceMin, "unchanged")
+}
+
+// QA's #422 finding: the ConPTY capture drops zero-width characters, so a label the record itself carries with one is refused.
+func TestRecordLabelsWithAHiddenCharacterAreRefused(t *testing.T) {
+	r := newRecRig(t, "0014", recQuestion("Which color?", "Red (Recommended)", "Green"))
+	tool := r.call(r.callID, "AskUserQuestion", 0)
+	tool.Input["questions"].([]any)[0].(map[string]any)["options"] = []any{map[string]any{"label": "Re\u200bd (Recommended)", "description": "x"}}
+	r.h.pending.set(r.sid, tool)
+	r.passes(10 * time.Minute)
+	assert.Empty(t, r.raw(), "the screen is clean (the capture dropped it) but the record's label is not")
+	assert.True(t, hiddenIn(map[string]any{"a": []any{"x\u202ey"}}))
+	assert.False(t, hiddenIn(map[string]any{"a": []any{"line one\nline two"}}), "a newline in a description is not hidden")
 }
 
 func TestCapLabelMakesAnAgentWrittenLabelSafeForAnEvent(t *testing.T) {
