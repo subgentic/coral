@@ -138,6 +138,8 @@ func (h *BoardHandler) CreateGoal(w http.ResponseWriter, r *http.Request) {
 		Driver       string `json:"driver"`
 		SubscriberID string `json:"subscriber_id"`
 		CreatedBy    string `json:"created_by"`
+		// Images are the pictures the Operator just uploaded for this team's goal (#11650), at most 4: the Operator's alone.
+		Images []string `json:"images"`
 	}
 	if err := decodeJSON(r, &body); err != nil {
 		errBadRequest(w, "invalid JSON")
@@ -153,6 +155,18 @@ func (h *BoardHandler) CreateGoal(w http.ResponseWriter, r *http.Request) {
 	actor, ok := h.goalActor(w, r, project, claim)
 	if !ok {
 		return
+	}
+	var pictures []commentImage
+	if len(body.Images) > 0 {
+		if actor != "Operator" || (cloud.Tunneled(r) && !hubOwnerRequest(r).owner) { // through Coral Hub the owner's alone, as the upload route is
+			errForbidden(w, "only the Operator can attach pictures to a goal")
+			return
+		}
+		var why string
+		if pictures, why = checkedPictures(h.artifactObjectDir(), goalImageScope(project), body.Images); why != "" {
+			errBadRequest(w, why)
+			return
+		}
 	}
 	if hold, ok := h.needsApproval(r, project, board.ProposalGoal); !ok {
 		errInternalServer(w, "could not read the board's settings")
@@ -175,6 +189,17 @@ func (h *BoardHandler) CreateGoal(w http.ResponseWriter, r *http.Request) {
 			errInternalServer(w, err.Error())
 		}
 		return
+	}
+	if len(pictures) > 0 {
+		kept := make([]board.GoalImage, len(pictures))
+		for i, p := range pictures {
+			kept[i] = board.GoalImage{Hex: p.Hex, Name: p.Name, ContentType: p.ContentType}
+		}
+		if err := h.bs.SetGoalImages(r.Context(), project, g.ID, kept); err != nil {
+			slog.Warn("[goals] the pictures of a goal were not kept", "board", project, "goal", g.ID, "error", err)
+		} else {
+			g.Images = kept
+		}
 	}
 	h.announceGoalDriver(project, actor, g, "")
 	writeJSON(w, http.StatusCreated, g)

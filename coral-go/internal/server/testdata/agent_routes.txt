@@ -288,6 +288,7 @@ a POST /api/artifacts/{id}/comments/{cid}/reply
 b POST /api/artifacts/{id}/comments/{cid}/reopen
 b POST /api/artifacts/{id}/comments/{cid}/resolve
 b POST /api/artifacts/{id}/comments/{cid}/send
+b POST /api/artifacts/{id}/comment-images
 b POST /api/auth/hub-signin/dismiss
 b POST /api/auth/password/change
 b POST /api/auth/password/reset
@@ -459,6 +460,7 @@ b POST /api/board/{project}/asks/{messageID}/buttons/{buttonID}/claim
 b POST /api/board/{project}/asks/{messageID}/buttons/{buttonID}/settle
 b POST /api/board/{project}/operator-artifacts
 b POST /api/board/{project}/operator-artifacts/message
+b POST /api/board/{project}/goal-images
 b PUT /api/board/{project}/artifacts/{id}/tags
 b PUT /api/board/{project}/guide-roster
 b PUT /api/board/{project}/orchestrator-grant

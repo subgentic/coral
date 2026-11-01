@@ -148,6 +148,7 @@ POST /api/agent/tasks/{taskID}/complete | token-bound
 POST /api/agent/tasks/{taskID}/publish | token-bound
 POST /api/agent/ui-request | unbound | operator-only
 POST /api/agent/ui/{id}/events | token-bound
+POST /api/artifacts/{id}/comment-images | token-session | operator-only
 POST /api/artifacts/{id}/comments | token-session | operator-only
 POST /api/artifacts/{id}/comments/{cid}/reply | token-session
 POST /api/artifacts/{id}/comments/{cid}/send | token-session | operator-only
@@ -166,6 +167,7 @@ POST /api/board/{project}/cross-team/files/disable | board-claims | operator-onl
 POST /api/board/{project}/cross-team/files/enable | board-claims | operator-only
 POST /api/board/{project}/external-artifacts | board-claims
 POST /api/board/{project}/external-messages | board-claims +token-session
+POST /api/board/{project}/goal-images | board-claims | operator-only
 POST /api/board/{project}/goal-requests | board-claims +token-session
 POST /api/board/{project}/goal-requests/{requestID}/accept | board-claims
 POST /api/board/{project}/goal-requests/{requestID}/decline | board-claims

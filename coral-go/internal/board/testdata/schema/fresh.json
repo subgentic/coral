@@ -277,6 +277,12 @@
       "type": "index"
     },
     {
+      "name": "sqlite_autoindex_board_goal_images_1",
+      "sql": null,
+      "tbl_name": "board_goal_images",
+      "type": "index"
+    },
+    {
       "name": "sqlite_autoindex_board_goal_meta_1",
       "sql": null,
       "tbl_name": "board_goal_meta",
@@ -454,6 +460,12 @@
       "name": "board_goal_events",
       "sql": "CREATE TABLE board_goal_events (\n\t\t\tid       INTEGER PRIMARY KEY AUTOINCREMENT,\n\t\t\tboard_id TEXT NOT NULL,\n\t\t\tgoal_id  INTEGER NOT NULL,\n\t\t\tkind     TEXT NOT NULL,\n\t\t\tseq      INTEGER NOT NULL,\n\t\t\tat       TEXT NOT NULL\n\t\t)",
       "tbl_name": "board_goal_events",
+      "type": "table"
+    },
+    {
+      "name": "board_goal_images",
+      "sql": "CREATE TABLE board_goal_images (\n\t\t\tboard_id     TEXT NOT NULL,\n\t\t\tgoal_id      INTEGER NOT NULL,\n\t\t\tpos          INTEGER NOT NULL,\n\t\t\thex          TEXT NOT NULL,\n\t\t\tname         TEXT NOT NULL,\n\t\t\tcontent_type TEXT NOT NULL,\n\t\t\tPRIMARY KEY (board_id, goal_id, pos)\n\t\t)",
+      "tbl_name": "board_goal_images",
       "type": "table"
     },
     {
@@ -1664,6 +1676,107 @@
           "partial": 0,
           "seq": 0,
           "unique": 0
+        }
+      ]
+    },
+    "board_goal_images": {
+      "columns": [
+        {
+          "cid": 0,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "board_id",
+          "notnull": 1,
+          "pk": 1,
+          "type": "TEXT"
+        },
+        {
+          "cid": 1,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "goal_id",
+          "notnull": 1,
+          "pk": 2,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 2,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "pos",
+          "notnull": 1,
+          "pk": 3,
+          "type": "INTEGER"
+        },
+        {
+          "cid": 3,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "hex",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 4,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "name",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        },
+        {
+          "cid": 5,
+          "dflt_value": null,
+          "hidden": 0,
+          "name": "content_type",
+          "notnull": 1,
+          "pk": 0,
+          "type": "TEXT"
+        }
+      ],
+      "indexes": [
+        {
+          "columns": [
+            {
+              "cid": 0,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "board_id",
+              "seqno": 0
+            },
+            {
+              "cid": 1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "goal_id",
+              "seqno": 1
+            },
+            {
+              "cid": 2,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 1,
+              "name": "pos",
+              "seqno": 2
+            },
+            {
+              "cid": -1,
+              "coll": "BINARY",
+              "desc": 0,
+              "key": 0,
+              "name": null,
+              "seqno": 3
+            }
+          ],
+          "name": "sqlite_autoindex_board_goal_images_1",
+          "origin": "pk",
+          "partial": 0,
+          "seq": 0,
+          "unique": 1
         }
       ]
     },

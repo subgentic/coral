@@ -275,6 +275,7 @@ POST /api/agents/models/refresh never
 POST /api/artifacts/prune never
 POST /api/artifacts/received/unlisted/delete never
 POST /api/artifacts/retention/ack never
+POST /api/artifacts/{id}/comment-images interact
 POST /api/artifacts/{id}/comments interact
 POST /api/artifacts/{id}/comments/{cid}/reopen interact
 POST /api/artifacts/{id}/comments/{cid}/reply never
@@ -301,6 +302,7 @@ POST /api/board/{project}/cross-team/files/disable launch
 POST /api/board/{project}/cross-team/files/enable launch
 POST /api/board/{project}/external-artifacts interact
 POST /api/board/{project}/external-messages interact
+POST /api/board/{project}/goal-images interact
 POST /api/board/{project}/goal-requests never
 POST /api/board/{project}/goal-requests/{requestID}/accept never
 POST /api/board/{project}/goal-requests/{requestID}/decline never
