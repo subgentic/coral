@@ -66,12 +66,16 @@ func (h *SessionsHandler) nudgeUnansweredComments(ctx context.Context, now time.
 		if !due || (h.boardHandler != nil && h.boardHandler.IsPaused(a.Board)) {
 			continue
 		}
-		if err := h.typeReplyNudge(ctx, a.Board, sessionName, typedReplyNudge(a.ArtifactID, a.CommentID)); err != nil {
-			slog.Warn("[artifact comments] a reminder to answer in the thread was not typed", "artifact", a.ArtifactID, "comment", a.CommentID, "error", err)
+		// Marked BEFORE it is typed, so a failure to record cannot make the pass type it again every 30 seconds; a send that fails takes the mark back and is tried on a later pass.
+		marked, merr := h.ss.MarkAskNudged(ctx, a.ID, now)
+		if merr != nil || !marked {
 			continue
 		}
-		if _, err := h.ss.MarkAskNudged(ctx, a.ID, now); err != nil {
-			slog.Warn("[artifact comments] a reminder was typed but not recorded", "error", err)
+		if err := h.typeReplyNudge(ctx, a.Board, sessionName, typedReplyNudge(a.ArtifactID, a.CommentID)); err != nil {
+			slog.Warn("[artifact comments] a reminder to answer in the thread was not typed", "artifact", a.ArtifactID, "comment", a.CommentID, "error", err)
+			if cerr := h.ss.ClearAskNudged(ctx, a.ID); cerr != nil {
+				slog.Warn("[artifact comments] a reminder's mark was not taken back", "error", cerr)
+			}
 		}
 	}
 }

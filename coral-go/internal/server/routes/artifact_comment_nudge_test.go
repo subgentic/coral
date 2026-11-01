@@ -139,3 +139,65 @@ func (rig *cmtRig) askViews(t *testing.T, cid int64) []map[string]any {
 	t.Fatalf("no comment %d", cid)
 	return nil
 }
+
+// Security's INFOs on #11722: the reminder is marked BEFORE it is typed (so a failure to record cannot type it again every pass), a send that fails takes the mark back and a later pass tries again, and asks of
+// sleeping or gone sessions do not fill the batch and starve newer ones.
+func TestAReminderIsMarkedBeforeItIsTypedAndTakenBackWhenTheSendFails(t *testing.T) {
+	rig := newCmtRig(t)
+	rig.agent(1, "Dev", false)
+	ctx := context.Background()
+	cid := rig.ownerComment("Question.")
+	code, _ := rig.send(cid, "Dev")
+	require.Equal(t, http.StatusOK, code)
+	var duringSend, calls int
+	fail := true
+	rig.h.replyNudgeSend = func(c context.Context, project, session, text string) error {
+		calls++
+		waiting, err := rig.ss.AwaitingAsks(c, time.Now().Add(time.Hour), 10)
+		require.NoError(t, err)
+		duringSend = len(waiting) // 0 when the mark was made before typing
+		if fail {
+			return fmt.Errorf("the write failed")
+		}
+		return nil
+	}
+	rig.h.nudgeUnansweredComments(ctx, time.Now().Add(11*time.Minute))
+	assert.Equal(t, 1, calls)
+	assert.Equal(t, 0, duringSend, "marked before it was typed: nothing was waiting while the send ran")
+	waiting, err := rig.ss.AwaitingAsks(ctx, time.Now().Add(time.Hour), 10)
+	require.NoError(t, err)
+	assert.Len(t, waiting, 1, "the send failed: the mark was taken back, the ask waits again")
+	fail = false
+	rig.h.nudgeUnansweredComments(ctx, time.Now().Add(12*time.Minute))
+	assert.Equal(t, 2, calls, "a later pass tries again")
+	rig.h.nudgeUnansweredComments(ctx, time.Now().Add(13*time.Minute))
+	assert.Equal(t, 2, calls, "typed once, then never again")
+}
+
+func TestAsksOfSleepingOrGoneSessionsDoNotStarveANewerOne(t *testing.T) {
+	rig := newCmtRig(t)
+	ctx := context.Background()
+	rig.agent(1, "Asleep", true)
+	rig.agent(2, "Awake", false)
+	for _, c := range []string{"one", "two", "three"} {
+		cid := rig.ownerComment(c)
+		_, _, err := rig.ss.CreateArtifactAsk(ctx, cid, cmtDoc, "team-a", sendSid(1), "Asleep", time.Now())
+		require.NoError(t, err)
+	}
+	cid := rig.ownerComment("for the awake one")
+	_, _, err := rig.ss.CreateArtifactAsk(ctx, cid, cmtDoc, "team-a", sendSid(2), "Awake", time.Now())
+	require.NoError(t, err)
+	// the batch of ONE: the three older asks belong to a sleeper and a stranger, so the awake agent's is still the one looked at
+	got, err := rig.ss.AwaitingAsks(ctx, time.Now(), 1)
+	require.NoError(t, err)
+	require.Len(t, got, 1)
+	assert.Equal(t, sendSid(2), got[0].AgentSession)
+	// a session that is not live at all is not in the batch either
+	_, _, err = rig.ss.CreateArtifactAsk(ctx, cid, cmtDoc, "team-a", "00000000-0000-4000-8000-00000000dead", "Gone", time.Now())
+	require.NoError(t, err)
+	got, err = rig.ss.AwaitingAsks(ctx, time.Now(), 10)
+	require.NoError(t, err)
+	for _, a := range got {
+		assert.Equal(t, sendSid(2), a.AgentSession, "only the live awake agent's ask waits")
+	}
+}

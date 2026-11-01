@@ -167,10 +167,12 @@ func (s *SessionStore) MarkAsksSeen(ctx context.Context, artifactID, agentSessio
 	return err
 }
 
-// AwaitingAsks are the asks still open at now that the agent has not answered (no reply in the thread) and that Coral has not reminded it about, oldest first, at most limit (#11722).
+// AwaitingAsks are the asks still open at now that the agent has not answered (no reply in the thread) and that Coral has not reminded it about, oldest first, at most limit (#11722). Only asks of a session that is
+// live, awake and not archived: an agent that sleeps or is gone cannot be typed into, and its asks must not fill the batch and starve newer ones.
 func (s *SessionStore) AwaitingAsks(ctx context.Context, now time.Time, limit int) ([]ArtifactAsk, error) {
 	var out []ArtifactAsk
-	err := s.reader().SelectContext(ctx, &out, "SELECT "+artifactAskCols+" FROM artifact_comment_asks WHERE closed_at IS NULL AND expires_at > ? AND replies = 0 AND nudged_at IS NULL ORDER BY id LIMIT ?", now.UTC().Format(ISOFormat), limit)
+	err := s.reader().SelectContext(ctx, &out, "SELECT "+artifactAskCols+` FROM artifact_comment_asks WHERE closed_at IS NULL AND expires_at > ? AND replies = 0 AND nudged_at IS NULL
+		AND agent_session IN (SELECT session_id FROM live_sessions WHERE COALESCE(is_archived, 0) = 0 AND COALESCE(is_sleeping, 0) = 0 AND agent_type != 'terminal') ORDER BY id LIMIT ?`, now.UTC().Format(ISOFormat), limit)
 	return out, err
 }
 
@@ -182,4 +184,10 @@ func (s *SessionStore) MarkAskNudged(ctx context.Context, askID int64, now time.
 	}
 	n, _ := res.RowsAffected()
 	return n == 1, nil
+}
+
+// ClearAskNudged takes back MarkAskNudged for a reminder that could not be typed, so the next pass tries it again (#11722).
+func (s *SessionStore) ClearAskNudged(ctx context.Context, askID int64) error {
+	_, err := s.db.ExecContext(ctx, `UPDATE artifact_comment_asks SET nudged_at = NULL WHERE id = ? AND replies = 0`, askID)
+	return err
 }
