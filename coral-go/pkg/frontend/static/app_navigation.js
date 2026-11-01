@@ -54,10 +54,10 @@ export function switchNavTab(tab, opts = {}) {
     if (layout) layout.classList.toggle('sidebar-hidden', fullWidthTabs.has(tab));
 
     // Update the nav buttons: page navigation, so the current one is aria-current="page".
-    document.querySelectorAll('.top-nav-tab').forEach(btn => { btn.classList.remove('active'); btn.removeAttribute('aria-current'); });
+    if (!opts.initial) document.querySelectorAll('.top-nav-tab').forEach(btn => { btn.classList.remove('active'); btn.removeAttribute('aria-current'); }); // the startup default marks none: the start route's tab is marked by startNav (#11612)
     if (document.body.getAttribute('data-nav-tab') !== tab) document.body.setAttribute('data-nav-tab', tab); // what a page-scoped note (the Claude sign-in line) follows
     const activeTab = document.getElementById(`nav-tab-${tab}`);
-    if (activeTab) { activeTab.classList.add('active'); activeTab.setAttribute('aria-current', 'page'); }
+    if (activeTab && !opts.initial) { activeTab.classList.add('active'); activeTab.setAttribute('aria-current', 'page'); }
 
     // The sidebar shows the pane of the tab (its header, list and pinned action: sidebar.js)
     showSidebarPane(tab);
