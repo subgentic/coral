@@ -1,5 +1,42 @@
 # Release Notes
 
+## v2.0.23 — Needs you in three lines, a one-line phone bar, and parked tasks that say Waiting
+
+### Changes
+
+#### What you will notice first
+
+- **A Needs you row is three lines**: the top line is who it is from and the file's name (with the muted "N earlier versions" note), with how long it has waited at the right (on a wide screen the buttons take that place at hover); under it, the question cut at two lines ("For review" when the file came with none; a failed run shows its reason). Team, goal, the task link and the "Waiting for" column are no longer on a review, question or run row; the goal and task are in the viewer's Details. A long choice on an agent's question wraps inside its column.
+- **The phone's selection bar is one line, like Gmail**: Cancel as an X, "N selected", then icon buttons Approve, Ignore and Save for later, and a ⋯ menu with Changes, Mark read and Mark unread; every target is 44 px and named. The bar stays at the top of the screen while the list scrolls.
+- **Needs you says one number**: the heading, the All pill and the kind pills count what the badge counts (read files and the welcome tips are left out); the list still shows every row.
+- **A parked task reads "Waiting", not "In progress"**, in every task list (the dock's status detail says "Waiting: <reason>").
+- **The Artifacts list shows one row per file**, like Needs you, with "N earlier versions" on the row (a computer on an older Coral still lists every version).
+- **Where an agent is now**: a Claude agent that moved into its own worktree of the repository it was launched in shows that worktree's folder, branch (or commit) and changed files in the header, the top of Files and the Directory detail (the team's agents used to show the launch folder's). Other agents, and a folder that is not a worktree of the same repository, keep the launch folder; the folder is re-checked at every poll.
+- **Smaller fixes**: a toast starts below the Inbox's tab strip on a phone; the sidebar no longer scrolls past its last folder into a blank area and the folder list ends within 24 px of its last item; no ghost tooltip floats over a preview or a frame; the Files panel's Compare select stays the same element while the panel redraws, so a Tab walk or an open list is not lost; the viewer opened from a Needs you row names a hidden character in the goal's or task's title in its Details.
+
+#### Agents and the chat
+
+- **Parks are for a wait outside the team**: an agent holds at most 2 parked tasks, counting a park that has not ended (a third is refused: release one or finish one), a park whose reason names a reviewer is refused (`submit-review` frees the slot), and a park that waits on the Operator carries their open Inbox question (`coral-board task park <id> --reason "..." --ask MESSAGE_ID`). The new `coral-board task release` puts not-now work back in the queue (unassigned or kept). The orchestrator's health check names an agent with a park over 24 hours or more parks than the cap; parks over the cap are reported, never touched. A park whose end passes no longer gives its owner a second task in progress (the lapsed task queues behind the one claimed meanwhile).
+- **An agent is reminded, once, to answer a relayed comment in its thread**: ten minutes without a reply, or a board post that names the file without a reply in the thread, types one reminder with the exact reply command into the agent. The thread's asked-agents line says "seen by <agent>" and "reminded". A sleeping or gone agent is looked at again later; a paused board is not typed into.
+- **An Orchestrator's launch starts ask-first** where the saved default skips the prompts (it was refused); any other agent is refused as before, and a Codex stays refused.
+- **A member name starts and ends with a letter or a digit**: joining as "Security Reviewer 2:" is refused (400 `invalid_member_name`), and a post that would reach the shorter member ("@Security Reviewer 2" reached "Security Reviewer") is refused naming the nearer one. A closing bracket, `)` or `]`, may end a name ("Dev (night)").
+- **A goal made from an approved proposal tells its driver once**, as a goal made directly does.
+- **Cross-team switches say which they are**: the board settings carry `cross_team_messaging_set` and `cross_team_artifacts_set`, and a send refused because a team's switch is on only by default says so and what to do (ask the Operator). The settings page shows "on (default)" in a later release.
+- **OpenCode custom models**: `opencode` is a family a custom model can be added for (`PUT /api/custom-models`); the page for it comes in a later release.
+
+#### Known issues
+
+- **Windows: in-app update does not work from 2.0.0 through 2.0.6.** If you're on one of those, download and install the MSI by hand; from 2.0.7 on, in-app update works.
+- **macOS: a Coral of 2.0.5 or earlier cannot install updates in-app; install 2.0.6 or later by hand once.**
+- **OpenCode agents are tested on macOS and Linux; OpenCode on Windows is not yet tested end to end.**
+- Setting up a computer over SSH is supported from a macOS or Linux hub, and is not yet tested from a Windows hub.
+
+#### For developers and releases
+
+- The static tree is 5,905,057 bytes of the 5,906,432-byte budget. Held for the next release because of the budget: goal pictures with their server half, approval presets, the agent tabs page, the Hub's health action list, the image preview, the sharing switch's page and the remote ask buttons.
+- A failed run's reason line is drawn whenever a run is listed (it vanished when only failed runs were on the list). The refusal for a switch that is on only by default no longer points at the "on (default)" label, whose page is held.
+- A model switch's background run is counted and the switch tests wait for it; `inbox_approve_then_open_real_browser` has no animation-frame waits; the line separators in the agent's-folder code are escapes, the git common-directory join is reviewed in the safefs census, and suites that read the old rows, the old refusal words, the planted member names or the artifact preview's frame title follow the new ones (`automations_recent_runs`, `operator_asks`, `needs_phone_rows`, `team_messaging_same_coral`, `parked_waiting`, `custom_models_e2e`, `label_injection`, `html_builders_golden`, `hub_artifacts_tab`, `inbox_cloud_census`, `inbox_approve_then_open_real`).
+
 ## v2.0.22 — Needs you reads like a mailbox: hover actions, phone rows, Save for later, and buttons on questions
 
 ### Changes
