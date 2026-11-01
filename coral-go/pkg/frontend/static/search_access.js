@@ -4,6 +4,7 @@
 import { teamFetch, isCloud } from './server_base.js';
 import { importOnce } from './import_once.js';
 import { whenText } from './when_text.js';
+import { el as mk } from './dom_el.js';
 const { stateChip } = await importOnce('./team_table.js');
 
 export const LEVELS = [
@@ -15,7 +16,6 @@ export const LEVELS = [
 const WORD = { team: 'team', all: 'all teams', operator: 'all + operator history' };
 /** A name written by an agent or a person, as plain visible text: control and bidi characters become spaces, one line, 60 characters at most (the same class as desktop_notify.js's safeName). */
 const visibleName = v => { const t = String(v == null ? '' : v).replace(/[\u0000-\u001f\u007f-\u009f\u061c\u200b-\u200f\u202a-\u202e\u2060-\u2064\u2066-\u2069\ufeff]/g, ' ').replace(/\s+/g, ' ').trim(); return t.length > 60 ? t.slice(0, 59) + '\u2026' : t; };
-const mk = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 
 /** The chip of a level above "own" (null at "own": no chip); the top level is drawn as a warning. */
 export function searchChip(level) {

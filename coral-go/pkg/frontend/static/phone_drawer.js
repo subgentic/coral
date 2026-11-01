@@ -6,8 +6,8 @@ import { importOnce } from './import_once.js';
 import { inboxCountsNow } from './inbox_tab.js';
 import { identityKey, sessionServer, serverFetch } from './server_base.js';
 import { teamLabel } from './server_status.js';
+import { el } from './dom_el.js';
 
-const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 
 function row(icon, label, count, run) {
     const b = el('button', 'menu-item nav-more-item nav-drawer-folder'); b.type = 'button'; b.setAttribute('role', 'menuitem');

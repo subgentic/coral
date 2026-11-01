@@ -6,8 +6,8 @@
 import { showToast } from './utils.js';
 import { isCloud } from './server_base.js';
 import { sendJson } from './api.js';
+import { el } from './dom_el.js';
 
-const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 
 async function hubSigninState() {
     try {

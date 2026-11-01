@@ -4,8 +4,8 @@
  * the moment it needs it (needs_input_card.js). "How to sign in" opens the steps; a person who signs in first does not need them. */
 import { claudeSignedIn, askSigninSoon, onSigninChange } from './signin_line.js';
 import { serverFetch, LOCAL_SERVER, normServer } from './server_base.js';
+import { el } from './dom_el.js';
 
-const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 const WORDS = {
     claude: { lead: "Claude isn't signed in on this computer.", steps: 'Open a terminal, run claude and follow the steps. Or launch now: the agent’s chat then shows Open terminal and Check again.' },
     pi: { lead: "Pi isn't signed in to its default provider on this computer.", steps: 'Open a terminal, run pi, type /login, choose how to sign in, then pick a provider. Or launch now: Pi shows No API key found for the provider and waits for you to sign in.' },

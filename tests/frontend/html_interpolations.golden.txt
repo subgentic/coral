@@ -2,11 +2,10 @@
 1	agent_config_form.js	agentHTML
 1	agent_config_form.js	autoPermissionsHTML
 1	agent_config_form.js	body
-4	agent_config_form.js	flagsInput
+1	agent_config_form.js	flagsInput
 1	agent_config_form.js	modelPickerHtml()
 1	agent_config_form.js	nameHTML
 1	agent_config_form.js	permEditorHTML(false)
-3	agent_config_form.js	permEditorHTML(true)
 1	agent_config_form.js	presetHTML
 1	agent_config_form.js	thinkingPickerHtml()
 1	agent_config_form.js	title
@@ -146,6 +145,8 @@
 1	commits.js	shortHash
 1	commits.js	subject
 1	commits.js	ts
+3	controls.js	SVGO.o0
+4	controls.js	SVGO.o3
 1	controls.js	macroButtons
 1	controls.js	modeButtons
 1	controls.js	navButtons
@@ -193,9 +194,18 @@
 3	group_cards.js	CHEVRON_DECO
 2	group_cards.js	FOLDER_GROUP_ICON
 5	group_cards.js	MORE_DOTS_SVG
+25	group_cards.js	SVGO.o0
+8	group_cards.js	SVGO.o1
+2	group_cards.js	SVGO.o2
+2	group_cards.js	SVGO.o4
+2	group_cards.js	SVGO.o5
 2	group_cards.js	_chevron(boardName, boardCollapsed)
 2	group_cards.js	_collapseAttrs(collapsed)
 1	group_cards.js	_collapseAttrs(wfCollapsed)
+2	group_cards.js	_mk0
+2	group_cards.js	_mk1
+2	group_cards.js	_mk2
+2	group_cards.js	_mk3
 2	group_cards.js	_pinMenuItem(groupName, groupDirRaw)
 2	group_cards.js	_rowNameWithServer(boardName)
 2	group_cards.js	_rowNameWithServer(groupName)
@@ -214,10 +224,12 @@
 2	group_cards.js	killAllItem(boardName)
 2	group_cards.js	sleepLabel
 1	group_cards.js	sleepingClass
+2	group_cards.js	sorted.length ? `<button class="menu-item menu-item-danger overflow-menu-item overflow-menu-danger" data-on-cl
 2	group_cards.js	tagDots
 2	group_cards.js	teamHealthBtn(boardName, boardSessions)
 1	group_cards.js	wfKebab
 1	group_cards.js	wfRunId ? ' · Run #' + wfRunId : ''
+1	group_cards.js	wfRunId ? `<button class="menu-item overflow-menu-item" data-on-click="wf-run-open" data-run-id="${Number(wfRu
 1	group_cards.js	wfSubline
 1	history_list.js	facts
 1	history_list.js	facts ? `<div class="session-row-bottom chat-row-facts">${facts}</div>` : ""
@@ -233,6 +245,7 @@
 1	launch_core.js	failList
 1	launch_core.js	started
 1	list_card_parts.js	PIN_ICON
+1	list_card_parts.js	SVGO.o5
 4	list_card_parts.js	icon
 1	list_card_parts.js	name
 1	list_card_parts.js	prefix
@@ -320,8 +333,15 @@
 1	server_status.js	serverDetailsHtml(e)
 1	server_status.js	serverLaunchActionsHtml(e)
 1	server_status.js	updateBadgeHtml(e)
+2	session_rows.js	!instructionsOffered(s, isCloud()) ? '' : `<button class="menu-item overflow-menu-item" data-on-click="agent-i
 1	session_rows.js	MORE_DOTS_SVG
+17	session_rows.js	SVGO.o0
+8	session_rows.js	SVGO.o1
+4	session_rows.js	SVGO.o2
+2	session_rows.js	SVGO.o4
 2	session_rows.js	_archiveItem
+2	session_rows.js	_mk0
+2	session_rows.js	_mk1
 1	session_rows.js	agentNameColor(s) ? ` style="--agent-name-color:${agentNameColor(s)}"` : ''
 1	session_rows.js	attentionClass
 1	session_rows.js	autoAcceptChip(s)

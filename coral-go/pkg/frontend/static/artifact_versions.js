@@ -2,8 +2,8 @@
  * every version (a listbox, newest first), and "Compare with v2". Compare draws the text's lines that were added and removed since the version before (Changes) or the two versions side by side. All
  * text is set with textContent. The server's list is GET /api/artifacts/{digest}/versions (an artifact in no series is a 404: no bar). A switch and a compare are said once in a polite line. */
 import { serverUrl, artifactPath } from './server_base.js';
+import { el } from './dom_el.js';
 
-const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 const btn = (cls, text, label) => { const b = el('button', 'btn btn-small ' + cls, text); b.type = 'button'; if (label) b.setAttribute('aria-label', label); return b; };
 const sr = (text) => el('span', 'sr-only', text);
 

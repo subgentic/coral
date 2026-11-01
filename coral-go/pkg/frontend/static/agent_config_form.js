@@ -12,7 +12,9 @@ const { initSectionDialog } = await importOnce('./section_dialog.js');
 const { segmentSelect } = await importOnce('./segmented.js');
 const { launchFlags } = await importOnce('./launch_flags.js');
 import { escapeHtml, escapeAttr } from './utils.js';
-import { mountSettingsView } from './settings_view.js'; // the persona page's Behavior prompt is a field of it (a startup module)
+import { mountSettingsView } from './settings_view.js';
+const _mk0 = "<details class=\"acf-tools-details\"><summary title=\"Which tools this agent may use without asking, and which it may not.\">Tool permissions <span class=\"acf-perms-summary settings-hint\"></span></summary>";
+const _mk1 = "<label title=\"Extra command-line options passed to the agent's CLI, for example --verbose.\">Flags <span class=\"launch-optional\">optional</span>"; // the persona page's Behavior prompt is a field of it (a startup module)
 
 // ── Permissions Editor ─────────────────────────────────────────────────
 const CAPABILITY_LABELS = {
@@ -393,32 +395,32 @@ function drawSectionedAcf(container, uid, opts, { f: { showPreset, showName, pro
     for (const [, el] of adoptedEnd) container.after(el);
     if (opts.wizard) {
         // New Agent's three steps (#7391): step 2 is the persona page (the prompt here, the persona and name adopted above it), step 3 is these three panes: the provider group adopted into Agent, the Mode as cards, the tool chips in a closed disclosure.
-        const toolsHTML = `<details class="acf-tools-details"><summary title="Which tools this agent may use without asking, and which it may not.">Tool permissions <span class="acf-perms-summary settings-hint"></span></summary>${permEditorHTML(true)}</details>`;
+        const toolsHTML = `${_mk0}${permEditorHTML(true)}</details>`;
         container.innerHTML = [
             `<div class="acf-persona-page" data-adopt="persona"><div class="acf-prompt-host" data-rows="8"></div></div>`,
             pane('agent', 'Agent', 'smart_toy', '', topHTML),
             pane('permissions', 'Permissions', 'lock', '', `${autoPermissionsHTML}${toolsHTML}`),
-            pane('advanced', 'Advanced', 'tune', '', `<label title="Extra command-line options passed to the agent's CLI, for example --verbose.">Flags <span class="launch-optional">optional</span>${flagsInput}</label>`),
+            pane('advanced', 'Advanced', 'tune', '', `${_mk1}${flagsInput}</label>`),
         ].join('');
     } else if (opts.restart) {
         // Restart (#7391): New Agent's steps without the first, the agent being fixed. Step 1 is the persona page (the name, read-only, and the prompt); step 2 is the tabs Model (with Thinking), Permissions, Advanced. The Provider is said in a line; its select stays, hidden, for the form's reads.
-        const toolsHTML = `<details class="acf-tools-details"><summary title="Which tools this agent may use without asking, and which it may not.">Tool permissions <span class="acf-perms-summary settings-hint"></span></summary>${permEditorHTML(true)}</details>`;
+        const toolsHTML = `${_mk0}${permEditorHTML(true)}</details>`;
         const agentHTML = topHTML.replace('<label>Agent Type:', '<label class="acf-provider-label" hidden><span class="acf-provider-head">Provider</span>');
         container.innerHTML = [
             `<div class="acf-persona-page"><p class="launch-field-head"><span>Name</span></p><p class="acf-restart-name"></p><div class="acf-prompt-host" data-rows="8"></div></div>`,
             pane('agent', 'Model', 'smart_toy', '', `<div class="acf-pick-head"><span id="${escapeAttr(uid)}-pick-label">Provider</span></div><div id="${escapeAttr(uid)}-pick" class="launch-agent-pick acf-agent-pick" role="radiogroup" aria-labelledby="${escapeAttr(uid)}-pick-label" hidden></div>${agentHTML}`),
             pane('permissions', 'Permissions', 'lock', '', `${autoPermissionsHTML}${toolsHTML}`),
-            pane('advanced', 'Advanced', 'tune', '', `<label title="Extra command-line options passed to the agent's CLI, for example --verbose.">Flags <span class="launch-optional">optional</span>${flagsInput}</label>`),
+            pane('advanced', 'Advanced', 'tune', '', `${_mk1}${flagsInput}</label>`),
         ].join('');
     } else {
         // The team member and Add-agent-to-board dialogs (#7391): the same panes as New Agent's step 3, and one Persona pane (the persona, the name, the prompt) where New Agent has a page.
-        const toolsHTML = `<details class="acf-tools-details"><summary title="Which tools this agent may use without asking, and which it may not.">Tool permissions <span class="acf-perms-summary settings-hint"></span></summary>${permEditorHTML(true)}</details>`;
+        const toolsHTML = `${_mk0}${permEditorHTML(true)}</details>`;
         const promptHTML = `<div class="acf-prompt-host" data-rows="10"></div>`;
         container.innerHTML = [
             pane('persona', 'Persona', 'badge', '', `${(showPreset || showName) ? `${presetHTML}${nameHTML}` : ''}${promptHTML}`),
             pane('agent', 'Agent', 'smart_toy', '', topHTML.replace('<label>Agent Type:', '<label class="acf-provider-label"><span class="acf-provider-head">Provider</span>')),
             pane('permissions', 'Permissions', 'lock', '', `${autoPermissionsHTML}${toolsHTML}`),
-            pane('advanced', 'Advanced', 'tune', '', `<label title="Extra command-line options passed to the agent's CLI, for example --verbose.">Flags <span class="launch-optional">optional</span>${flagsInput}</label>`),
+            pane('advanced', 'Advanced', 'tune', '', `${_mk1}${flagsInput}</label>`),
         ].join('');
         container.dataset.acfPersonaPane = '1';
     }

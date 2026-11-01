@@ -16,6 +16,7 @@ import { effectiveLiveViewMode, setLiveViewMode, jumpToLiveMessage } from './liv
 import { buildListBar } from './list_bar.js';
 import { importOnce } from './import_once.js';
 import { selectInboxTab, rememberInboxGroup } from './inbox_tab.js';
+const _mk0 = ", and Chats shows only this computer's, so the message cannot be opened from here. The saved text above is kept.";
 // This module is loaded lazily, so its own parts are loaded the same way (a static import of a module not loaded at startup could not be retried: import_hygiene).
 const { KINDS, KIND_LABEL, SORTS, SORT_LABEL, makeModel: savedModel, clean: cleanSaved, isFiltered: savedFiltered, toQuery: savedQuery, keeps: savedKeeps, loadFilters: loadSavedFilters, saveFilters: saveSavedFilters, teamKeyOf, setTeamNames } = await importOnce('./saved_filters.js');
 
@@ -198,7 +199,7 @@ function verify(shown) {
             checks.set(uid(it), { state: 'gone', why: GONE_WHY[it.kind === 'board' ? 'board' : it.reason] });
         } else if (it.kind !== 'board' && !liveAgent(it) && normServer(it.server) !== LOCAL_SERVER) {
             // An ended agent's transcript is in the History of the server that had it, which this hub cannot browse for another server: the item is kept, not opened.
-            checks.set(uid(it), { state: 'noopen', why: `This agent has ended. Its history is on ${serverName(it.server)}, and Chats shows only this computer's, so the message cannot be opened from here. The saved text above is kept.` });
+            checks.set(uid(it), { state: 'noopen', why: `This agent has ended. Its history is on ${serverName(it.server)}${_mk0}` });
         }
     }
 }
@@ -211,7 +212,7 @@ async function probe(it) {
     }
     const live = liveAgent(it);
     // An ended agent's transcript is in the History of the server that had it, which this hub cannot browse for another server (Chats is this computer's): the item is kept, not opened.
-    if (!live && normServer(it.server) !== LOCAL_SERVER) return { state: 'noopen', why: `This agent has ended. Its history is on ${serverName(it.server)}, and Chats shows only this computer's, so the message cannot be opened from here. The saved text above is kept.` };
+    if (!live && normServer(it.server) !== LOCAL_SERVER) return { state: 'noopen', why: `This agent has ended. Its history is on ${serverName(it.server)}${_mk0}` };
     const url = live ? `/api/sessions/live/${encodeURIComponent(live.name)}/chat?session_id=${encodeURIComponent(it.ref)}&agent_type=${encodeURIComponent(live.agent_type || it.agent_type || '')}&find_key=${encodeURIComponent(it.key)}`
         : `/api/sessions/history/${encodeURIComponent(it.ref)}?find_key=${encodeURIComponent(it.key)}`;
     const r = await serverFetch(live ? it.server : LOCAL_SERVER, url);

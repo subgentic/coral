@@ -1,7 +1,7 @@
 /* Edit instructions (#10133, Beta Tester #10130): the text an agent is given each time it starts, its Behavior prompt, edited from its row's menu. It is saved for the next restart and the running agent is not touched; the dialog says so
  * above the box and in the toast. A native <dialog> like the reminder's: Escape closes it, Tab stays inside, the focus goes back to what opened it. A refusal is said in the dialog and it stays open. An empty box clears the instructions. */
 const MAX_BYTES = 20000;
-const mk = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+import { el as mk } from './dom_el.js';
 let dialog = null;
 const close = () => { if (dialog && dialog.open) dialog.close(); };
 const bytes = s => new TextEncoder().encode(s).length;
