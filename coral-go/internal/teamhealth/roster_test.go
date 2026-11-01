@@ -28,13 +28,14 @@ func TestActionListOpensWithWhatToDoOldestFirstAndEndsWithCounts(t *testing.T) {
 			{On: "Security Reviewer", Waiters: []WaitEntry{{Name: "Frontend Dev", Age: min10(37), TargetSilent: true}, {Name: "Lead Developer", Age: min10(17), Stale: true}}},
 			{On: "Orchestrator", You: true, Waiters: []WaitEntry{{Name: "QA Engineer", Age: min10(12), Reply: 140100}, {Name: "DevOps Engineer", Age: min10(19)}}},
 		},
-		Asleep: []AsleepUnread{{Name: "Digital Ocean Expert", Count: 2, Since: time.Date(2026, 10, 18, 7, 23, 0, 0, time.UTC)}},
 	}
-	lines := ComposeLines(listIn(r))
+	in := listIn(r)
+	in.Items = []Item{{Rank: 2, Age: 42 * time.Minute, Agent: "Digital Ocean Expert", Problem: "asleep with 2 messages for it unread since 07:23", Suggest: "wake it", Key: "asleep|Digital Ocean Expert", State: "2|0"}}
+	lines := ComposeLines(in)
 	assert.Equal(t, "[Coral health check] 08:05Z · Orchestrator, act on these (oldest first):", lines[0])
 	assert.Equal(t, "1) DevOps Engineer has waited 19 min on YOU. Answer them.", lines[1], "what waits on the recipient is first, oldest first")
 	assert.Equal(t, "2) QA Engineer has waited 12 min on YOU (their last message is #140100). Answer them.", lines[2])
-	assert.Equal(t, "3) Digital Ocean Expert is asleep with 2 messages tagged to it unread since 07:23. Wake it.", lines[3], "then the oldest of the rest: 42 min")
+	assert.Equal(t, "3) Digital Ocean Expert: asleep with 2 messages for it unread since 07:23. Suggest: wake it. [ack "+ItemID("asleep|Digital Ocean Expert")+"]", lines[3], "then the oldest of the rest: 42 min")
 	assert.Equal(t, "4) Frontend Dev has waited 37 min on Security Reviewer; Security Reviewer has not mentioned them since. Ask Security Reviewer what is holding it, or check Security Reviewer.", lines[4])
 	assert.Equal(t, "5) Lead Developer has waited 17 min although Security Reviewer has posted a message mentioning them since: check Lead Developer.", lines[5])
 	assert.Equal(t, "Since 07:55: 55 posts.", lines[len(lines)-2], "post volume is a count, never 'progressing'")
@@ -189,4 +190,13 @@ func TestNameIssuesAreLinesAndFacts(t *testing.T) {
 	assert.Equal(t, before, r.Facts(), "the age ticking is not news")
 	r.NameIssues = append(r.NameIssues, NameIssue{Name: "Third", Posts: 1, Window: 30 * time.Minute})
 	assert.NotEqual(t, before, r.Facts(), "a new one is")
+}
+
+// Broadcasts to sleepers are counted in the header (#11803), and are no line and no news.
+func TestSleeperBroadcastsAreCountedInTheHeaderOnly(t *testing.T) {
+	r := &Roster{Recipient: "O", Counts: counts(1, 0, 0, 0, 2, 0), SleeperBroadcasts: 3}
+	assert.Equal(t, "1 working · 0 waiting · 2 asleep (3 broadcasts unread) · 0 claimable tasks", r.headerCounts())
+	assert.False(t, r.NeedsAttention(), "a broadcast is no reason to speak")
+	r.SleeperBroadcasts = 0
+	assert.Equal(t, "1 working · 0 waiting · 2 asleep · 0 claimable tasks", r.headerCounts())
 }
