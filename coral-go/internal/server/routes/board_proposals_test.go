@@ -479,3 +479,33 @@ func TestATaskProposalCarriesOnlyWhatTheOperatorIsShown(t *testing.T) {
 	_, tasks = e.call(t, "", "GET", "/api/board/team/tasks", nil)
 	assert.Len(t, tasks["tasks"], 1, "no second task")
 }
+
+// A goal made from an approved proposal tells its driver once, as a goal made directly does (#11663, the follow-up of #11649): the goal is made in the store by the approval, not by the goal route.
+func TestAnApprovedGoalProposalTellsItsDriverOnce(t *testing.T) {
+	e := newProposalEnv(t)
+	_, err := e.h.bs.Subscribe(context.Background(), "team", "Dev", "Developer", "", nil, "mentions")
+	require.NoError(t, err)
+	e.settings(t, board.BoardSettingsUpdate{GoalsNeedApproval: boolp(true)})
+	code, out := e.call(t, "", "POST", "/api/board/team/goals", map[string]any{"title": "Ship the beta", "outcome": "People use it", "driver": "Dev", "subscriber_id": "Orchestrator"})
+	require.Equal(t, http.StatusAccepted, code, out)
+	id := int64(out["proposal_id"].(float64))
+	told := func() []string {
+		var out []string
+		for _, n := range e.notices(t) {
+			if strings.Contains(n, "@Dev [Goal #") {
+				out = append(out, n)
+			}
+		}
+		return out
+	}
+	assert.Empty(t, told(), "a proposal is not yet a goal: the driver is told nothing")
+	code, ok := e.call(t, "person", "POST", "/api/board/team/proposals/"+itoa(id)+"/approve", nil)
+	require.Equal(t, http.StatusOK, code, ok)
+	msgs := told()
+	require.Len(t, msgs, 1, "%v", msgs)
+	assert.Contains(t, msgs[0], "Ship the beta")
+	assert.Contains(t, msgs[0], "coral-board goal show "+itoa(int64(ok["created_id"].(float64))))
+	code, _ = e.call(t, "person", "POST", "/api/board/team/proposals/"+itoa(id)+"/approve", nil)
+	assert.Equal(t, http.StatusConflict, code)
+	assert.Len(t, told(), 1, "a second Approve tells nothing more")
+}
