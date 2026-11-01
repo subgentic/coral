@@ -201,3 +201,54 @@ func TestAsksOfSleepingOrGoneSessionsDoNotStarveANewerOne(t *testing.T) {
 		assert.Equal(t, sendSid(2), a.AgentSession, "only the live awake agent's ask waits")
 	}
 }
+
+// QA's SHOULDs on #11722: a paused board's ask is not reminded (nothing is typed into the agents of a paused board) and is, once the board is resumed; and the short form of the file's id (its first 12 characters, as
+// a shortened link) counts as naming it, an 11-character prefix or another file's id does not.
+func TestAPausedBoardsAskIsNotRemindedUntilItIsResumed(t *testing.T) {
+	rig := newCmtRig(t)
+	rig.agent(1, "Dev", false)
+	typed := &typedNudges{}
+	rig.h.replyNudgeSend = typed.send
+	bh := NewBoardHandler(rig.h.bs)
+	rig.h.boardHandler = bh
+	ctx := context.Background()
+	cid := rig.ownerComment("Question.")
+	code, _ := rig.send(cid, "Dev")
+	require.Equal(t, http.StatusOK, code)
+	bh.SetPaused("team-a", true)
+	rig.h.nudgeUnansweredComments(ctx, time.Now().Add(30*time.Minute))
+	assert.Equal(t, 0, typed.count(), "a paused board: nothing is typed into its agents")
+	waiting, err := rig.ss.AwaitingAsks(ctx, time.Now().Add(time.Hour), 10)
+	require.NoError(t, err)
+	assert.Len(t, waiting, 1, "and the ask is still waiting, not marked as reminded")
+	bh.SetPaused("team-a", false)
+	rig.h.nudgeUnansweredComments(ctx, time.Now().Add(31*time.Minute))
+	assert.Equal(t, 1, typed.count(), "resumed: reminded")
+}
+
+func TestTheShortFormOfTheFilesIDInABoardPostCountsAsNamingIt(t *testing.T) {
+	rig := newCmtRig(t)
+	rig.agent(1, "Dev", false)
+	typed := &typedNudges{}
+	rig.h.replyNudgeSend = typed.send
+	ctx := context.Background()
+	cid := rig.ownerComment("Question.")
+	code, _ := rig.send(cid, "Dev")
+	require.Equal(t, http.StatusOK, code)
+	now := time.Now()
+	post := func(text string) {
+		_, err := rig.h.bs.PostMessage(ctx, "team-a", "Dev", text, nil)
+		require.NoError(t, err)
+	}
+	// 11 characters of the id, and another file's id: not it
+	post("see coral://artifacts/" + cmtDoc[:11] + " for the answer") // only the newest post is read, so one at a time
+	rig.h.nudgeUnansweredComments(ctx, now.Add(time.Minute))
+	assert.Equal(t, 0, typed.count(), "11 characters is not the short form")
+	post("see coral://artifacts/" + cmtPic + " for the answer")
+	rig.h.nudgeUnansweredComments(ctx, now.Add(90*time.Second))
+	assert.Equal(t, 0, typed.count(), "another file's id is another file")
+	// the first 12 characters: it
+	post("see coral://artifacts/" + cmtDoc[:12] + " for the answer")
+	rig.h.nudgeUnansweredComments(ctx, now.Add(2*time.Minute))
+	assert.Equal(t, 1, typed.count(), "the 12-character short form names the file")
+}
