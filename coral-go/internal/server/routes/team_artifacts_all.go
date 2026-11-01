@@ -157,6 +157,7 @@ func (h *BoardHandler) ListAllTeamArtifacts(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	h.addWaitsOnThis(r, "", sel.page) // each row names its own board
+	h.attachSeriesVersions(sel.page, "")
 	if refs == nil {
 		refs = []teamArtifactTeamRef{}
 	}

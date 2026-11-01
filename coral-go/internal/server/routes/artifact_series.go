@@ -201,6 +201,17 @@ func digestSeries(coralDir, digest string) (seriesID string, n int, ok bool) {
 	return "", 0, false
 }
 
+// digestSeriesOnBoard is digestSeries for one team: the first record of the artifact that names a series AND was uploaded on that board. The same bytes uploaded by two teams are one digest with two records,
+// each in its own team's series; a row of the team's list must carry its own team's (#11890).
+func digestSeriesOnBoard(coralDir, digest, board string) (seriesID string, n int, ok bool) {
+	for _, r := range recordsOfDigest(coralDir, digest) {
+		if seriesIDRe.MatchString(r.rec.SeriesID) && r.rec.Board == board {
+			return r.rec.SeriesID, r.rec.Version, true
+		}
+	}
+	return "", 0, false
+}
+
 // seriesMember is a version as the records say it is.
 type seriesMember struct {
 	Digest   string

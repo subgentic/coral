@@ -54,6 +54,10 @@ type teamArtifact struct {
 	Private bool `json:"private,omitempty"`
 	// ReviewQuestion: what the agent that uploaded this file asks the Operator to decide (#11555), cleaned and at most 140 characters: on a row tagged for review, when its upload said (agent text: show it as text).
 	ReviewQuestion string `json:"review_question,omitempty"`
+	// Version and Versions: which version of its series this artifact is and how many the series has (#11890), present only for an artifact in a series of two or more; the Needs you row says "version 2"
+	// from them, with no request of its own. They come from the upload records, the authority (digestSeries, seriesMembers).
+	Version  int `json:"version,omitempty"`
+	Versions int `json:"versions,omitempty"`
 	// EarlierVersions: how many older versions of this file (the same team, uploader and name) a collapsed list leaves out (#11700): only on a list asked with versions=newest, and absent for none.
 	EarlierVersions int `json:"earlier_versions,omitempty"`
 	// Review is the Operator's decision on an artifact tagged for review, with its time (#136584): absent until one is made.
@@ -207,6 +211,7 @@ func (h *BoardHandler) ListTeamArtifacts(w http.ResponseWriter, r *http.Request)
 		}
 	}
 	h.addWaitsOnThis(r, project, page)
+	h.attachSeriesVersions(page, project)
 	if page == nil {
 		page = []teamArtifact{}
 	}
@@ -802,6 +807,39 @@ func (h *BoardHandler) attachArtifactPrivate(r *http.Request, items []teamArtifa
 	for i := range items {
 		if id := artifactStoreID(items[i]); id != "" && marks[id] {
 			items[i].Private = true
+		}
+	}
+}
+
+// attachSeriesVersions puts Version and Versions on the rows of a page that are versions of a series of two or more (#11890). Nothing is read while the store has no series; a series is counted once per page.
+func (h *BoardHandler) attachSeriesVersions(rows []teamArtifact, project string) {
+	if h.coralDir == "" || len(rows) == 0 {
+		return
+	}
+	if es, err := os.ReadDir(filepath.Join(h.coralDir, "artifacts", "series")); err != nil || len(es) == 0 {
+		return
+	}
+	count := map[string]int{}
+	for i := range rows {
+		id := artifactStoreID(rows[i])
+		if id == "" {
+			continue
+		}
+		board := project // the same bytes can be uploaded by two teams into two series: the row is its own team's (all-teams rows say theirs)
+		if board == "" {
+			board = rows[i].Team
+		}
+		sid, n, ok := digestSeriesOnBoard(h.coralDir, id, board)
+		if !ok {
+			continue
+		}
+		c, seen := count[sid]
+		if !seen {
+			c = len(seriesMembers(h.coralDir, sid))
+			count[sid] = c
+		}
+		if c > 1 {
+			rows[i].Version, rows[i].Versions = n, c
 		}
 	}
 }

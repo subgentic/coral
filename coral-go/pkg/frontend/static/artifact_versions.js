@@ -100,6 +100,7 @@ export function attachVersions(dialog, hooks) {
         bar.replaceChildren();
         const i = cur();
         bar.hidden = !st.rows || i < 0;
+        hooks.version?.(bar.hidden ? 0 : st.rows[i].version);
         dialog.classList.toggle('av-has-versions', !bar.hidden);
         if (bar.hidden) return;
         const rows = st.rows, row = rows[i], total = rows.length, latest = i === total - 1;

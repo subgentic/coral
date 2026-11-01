@@ -27,6 +27,8 @@ const { coralReady } = require('./helpers/wait');
                     const style=document.createElement('style'); style.textContent='*,*::before,*::after{transition:none!important;animation:none!important}';document.head.append(style);
                     window.__reviewWrites=[];window.__reviewFail=false;window.__decisions=[];window.__comments=[];
                     window.__reviewItems=Array.from({length:13},(_,i)=>({id:(i+1).toString(16).padStart(64,'0'),name:'Review file '+String(i+1).padStart(2,'0')+'.txt',media_type:'text/plain',size:30,created_at:new Date(Date.now()-(20-i)*60000).toISOString(),task_id:0,source:'upload',available:true,session_id:i<11?'writer-a':'writer-b',produced_by:i<11?'Writer A':'Writer B',tags:['for review','internal'],uri:'coral://artifacts/'+(i+1).toString(16).padStart(64,'0')}));
+                    window.__reviewItems[2].version=3; window.__reviewItems[2].versions=3; // file 03 is the third version of its file; versions 1 and 2 were decided long ago (#11890): the list says so, no request does
+                    window.__versionCalls=[];
                     const original=window.fetch, json=(body,status=200)=>Promise.resolve(new Response(JSON.stringify(body),{status,headers:{'Content-Type':'application/json'}}));
                     window.fetch=(url,opts={})=>{
                         const u=new URL(String(url),location.origin);
@@ -42,6 +44,7 @@ const { coralReady } = require('./helpers/wait');
                             else{it.tags=[...new Set(it.tags.concat('for review','changes requested'))].filter(t=>t!=='read');}  // the real route takes 'read' off: it is something to read again (artifact_reviews.go)
                             return json({id,state:body.decision==='approve'?'approved':'changes requested',changed:true,tags:it.tags,review:it.review||null,delivered:body.decision==='approve',to:'Writer'});
                         }
+                        if(u.pathname.endsWith('/versions'))window.__versionCalls.push(u.pathname);
                         if(u.pathname.startsWith('/api/artifacts/')&&u.pathname.endsWith('/versions')&&window.__twoVersions){const d=u.pathname.split('/')[3],old=(99).toString(16).padStart(64,'0');return json([{digest:old,version:1,versions:2,is_latest:false,name:'Review file 01.txt',size:30,media_type:'text/plain',at:new Date(Date.now()-3600000).toISOString(),uploader:'Writer A',role:'Writer'},{digest:d,version:2,versions:2,is_latest:true,name:'Review file 01.txt',size:30,media_type:'text/plain',at:new Date().toISOString(),uploader:'Writer A',role:'Writer'}]);}
                         if(u.pathname.startsWith('/api/artifacts/')&&u.pathname.endsWith('/comments')&&opts.method==='POST'){const b=JSON.parse(opts.body);window.__comments.push(b);return json({id:7,body:b.body,anchor:b.anchor,author_kind:'owner',author_name:'You',state:'open',created_at:new Date().toISOString(),replies:[]},201);}
                         if(u.pathname.startsWith('/api/artifacts/')&&u.pathname.endsWith('/comments/7/send')){const b=JSON.parse(opts.body);window.__comments.push({sent:b.agents});return json({ok:true,results:[{agent:b.agents[0],state:'sent',ask_id:1}]});}
@@ -58,6 +61,10 @@ const { coralReady } = require('./helpers/wait');
                 await ev(`localStorage.setItem('coral-inbox-needs-filters', JSON.stringify({ sort: 'oldest' }));window.switchNavTab('hub-inbox');true`); // read oldest first: with newest first a list over the page's 12 rows shows File 01 last, behind "more" (#11552)
                 await ev(`import((window.__coralStatic||'/static/')+'inbox_tab.js').then(m=>m.selectInboxTab('needs')).then(()=>true)`);
                 await waitFor(`!!(${row('Review file 01.txt')})`,'for-review artifact in Needs you',15000);
+                assert.equal(await ev(`(${row('Review file 03.txt')}).querySelector('.inbox-review-version').textContent`),' · version 3','the Needs you row adds the version after the name, from the list (#11890): the name is the agent\'s, Coral numbers the versions');
+                assert.equal(await ev(`(${row('Review file 03.txt')}).querySelector('.inbox-review-earlier')?.textContent||''`),'2 earlier versions','and says how many came before it, though none of them is still waiting');
+                assert.equal(await ev(`(${row('Review file 01.txt')}).querySelector('.inbox-review-version').hidden`),true,'a file with one version says nothing');
+                assert.deepEqual(await ev(`window.__versionCalls`),[],'no row asks the server for its version: 13 files, 0 requests (#11890)');
                 assert.equal(await ev(`${rows}.length`),12,'ten from Writer A and two from Writer B');
                 assert.match(await ev(`document.getElementById('group-table-view').textContent`),/1 more/,'overflow remains discoverable');
                 assert.equal(await ev(`document.getElementById('nav-tab-hub-inbox-badge').textContent`),'9+','all pending artifacts count: the pill reads 9+ past nine (#9821)');
@@ -165,6 +172,7 @@ const { coralReady } = require('./helpers/wait');
                     await ev(`window.__twoVersions=true;import((window.__coralStatic||'/static/')+'artifact_viewer.js').then(m=>m.openArtifactViewer('${(1).toString(16).padStart(64,'0')}',{filename:'Review file 01.txt',board:'${team}',server:undefined}));true`);
                     await waitFor(`!!document.querySelector('.artifact-viewer .av-compare, .artifact-viewer .av-current')`,'the versions bar of a two-version artifact',8000);
                     await new Promise(r=>setTimeout(r,800)); // sleep-ok: the version bar's own reload settles
+                    assert.equal(await ev(`document.querySelector('.artifact-viewer-title').textContent`),'Review file 01.txt · version 2','the viewer title adds the version after the name (#11890)');
                     await waitFor(`/^Approved .+/.test(document.querySelector('.artifact-review-state')?.textContent||'')`,'the head of a two-version approved artifact says Approved with its time',8000);
                     const vis = await ev(`(() => { const b = document.querySelector('.artifact-review'), r = b.getBoundingClientRect(), cs = getComputedStyle(b); return { h: Math.round(r.height), w: Math.round(r.width), display: cs.display, hidden: b.hidden, parent: b.parentElement.className, prev: b.previousElementSibling?.className, next: b.nextElementSibling?.className }; })()`);
                     assert.ok(vis.h > 0 && vis.w > 0 && vis.display !== 'none', 'the review bar of a two-version artifact is on the screen: ' + JSON.stringify(vis));
