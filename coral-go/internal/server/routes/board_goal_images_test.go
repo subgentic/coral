@@ -169,3 +169,42 @@ func TestAGoalWithPicturesThroughTheHubIsTheOwnersAlone(t *testing.T) {
 	assert.Equal(t, http.StatusCreated, create([]string{p}, hubOwnerHdr), "the owner through the Hub can")
 	assert.Equal(t, http.StatusCreated, create([]string{pic()}, nil), "this computer's person can")
 }
+
+// Five different pictures on a goal are refused (QA's SHOULD on #11650), four are taken.
+func TestAFifthPictureOnAGoalIsRefused(t *testing.T) {
+	_, h, _ := teamArtifactServer(t)
+	old := uploaderLookup
+	uploaderLookup = func(_ context.Context, sessionID string) (string, string, string) { return "alpha", "Alice", "worker" }
+	t.Cleanup(func() { uploaderLookup = old })
+	subscribeSession(t, h, "alpha", "Alice", sessAlice)
+	r := chi.NewRouter()
+	asPerson := func(fn http.HandlerFunc) http.HandlerFunc {
+		return func(w http.ResponseWriter, req *http.Request) {
+			fn(w, req.WithContext(context.WithValue(req.Context(), callerKindKey{}, callerDashCookie)))
+		}
+	}
+	r.Post("/api/board/{project}/goal-images", asPerson(h.UploadGoalImage))
+	r.Post("/api/board/{project}/goals", asPerson(h.CreateGoal))
+	srv := httptest.NewServer(r)
+	t.Cleanup(srv.Close)
+	call := goalCall(t, srv.URL)
+	var hexes []string
+	for i := 0; i < 5; i++ {
+		req, err := http.NewRequest("POST", srv.URL+"/api/board/alpha/goal-images", bytes.NewReader(shadePNG(t, uint8(60+i))))
+		require.NoError(t, err)
+		req.Header.Set("Content-Type", "image/png")
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		var out map[string]any
+		_ = json.NewDecoder(resp.Body).Decode(&out)
+		resp.Body.Close()
+		require.Equal(t, http.StatusCreated, resp.StatusCode, "%v", out)
+		hexes = append(hexes, out["hex"].(string))
+	}
+	code, out := call("POST", "/api/board/alpha/goals", map[string]any{"title": "Five", "subscriber_id": "Operator", "images": hexes})
+	assert.Equal(t, http.StatusBadRequest, code, "%v", out)
+	assert.Contains(t, out["error"], "at most 4")
+	code, out = call("POST", "/api/board/alpha/goals", map[string]any{"title": "Four", "subscriber_id": "Operator", "images": hexes[:4]})
+	assert.Equal(t, http.StatusCreated, code, "four are taken: %v", out)
+	assert.Len(t, out["images"], 4)
+}

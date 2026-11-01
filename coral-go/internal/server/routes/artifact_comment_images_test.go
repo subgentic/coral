@@ -198,3 +198,21 @@ func TestAMarkedUpPictureIsTheNextVersionOfThePicture(t *testing.T) {
 	code, _ = rig.upload(cmtAsOwner, "image/png", "?version_of="+rig.doc, shadePNG(t, 93))
 	assert.Equal(t, http.StatusNotFound, code, "a stored file that is not a picture just added is no series to extend")
 }
+
+// Five different pictures are refused (QA's SHOULD on #11650), four are taken: the limit is on the count, not only on a repeat.
+func TestAFifthPictureOnACommentIsRefused(t *testing.T) {
+	rig := newImageRig(t)
+	var hexes []string
+	for i := 0; i < 5; i++ {
+		code, out := rig.upload(cmtAsOwner, "image/png", "", shadePNG(t, uint8(40+i)))
+		require.Equal(t, http.StatusCreated, code, "%v", out)
+		hexes = append(hexes, out["hex"].(string))
+	}
+	require.Len(t, map[string]bool{hexes[0]: true, hexes[1]: true, hexes[2]: true, hexes[3]: true, hexes[4]: true}, 5, "five different pictures")
+	code, out := rig.comment(cmtAsOwner, map[string]any{"body": "five", "images": hexes, "anchor": map[string]any{"whole": true}})
+	assert.Equal(t, http.StatusBadRequest, code, "%v", out)
+	assert.Contains(t, fmt.Sprint(out["error"]), "at most 4")
+	code, out = rig.comment(cmtAsOwner, map[string]any{"body": "four", "images": hexes[:4], "anchor": map[string]any{"whole": true}})
+	assert.Equal(t, http.StatusCreated, code, "four are taken: %v", out)
+	assert.Len(t, out["images"], 4)
+}
