@@ -315,6 +315,9 @@ func (h *SessionsHandler) waitInputBox(ctx context.Context, pane string, a liveA
 	}
 }
 
+// dialogRecordTimeout bounds the writes that record a close (the agent event, and the team line).
+const dialogRecordTimeout = 10 * time.Second
+
 // closeSent says the close went (outcome closed_*): only then is the dialog gone.
 func closeSent(outcome string) bool {
 	return outcome == timeoutDone || outcome == timeoutNotTyped || outcome == timeoutNoBox
@@ -326,6 +329,9 @@ func (h *SessionsHandler) recordDialogClosed(ctx context.Context, a liveAgent, f
 	if h.ts == nil {
 		return
 	}
+	// A context of its own: the close already happened, so its record is written even when the pass's context ended meanwhile (a stop, a slow delivery).
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), dialogRecordTimeout)
+	defer cancel()
 	sid := a.sid
 	sent := closeSent(outcome)
 	fields := map[string]any{"minutes": int(now.Sub(first) / time.Minute), "how": how, "outcome": outcome, "closed_by": "dialog_timeout"}

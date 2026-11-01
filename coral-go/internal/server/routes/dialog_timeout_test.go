@@ -481,3 +481,15 @@ func TestAFailedCloseLeavesTheWaitOpen(t *testing.T) {
 	assert.Empty(t, typed, "no notice for a close that did not go")
 	assert.Equal(t, timeoutNotDue, r.h.opencodeDialogTimeout(context.Background(), r.agent, 15*time.Minute, now), "never retried")
 }
+
+// The record of a close is written on a context of its own: a pass whose context ended (a stop, a delivery that ran to its deadline) still leaves the event, and the wait resolved.
+func TestACloseIsRecordedWhenThePassContextHasEnded(t *testing.T) {
+	r := newTimeoutRig(t, "claude", "permission", claudeScreen(t, "permission_menu"))
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	r.h.recordDialogClosed(ctx, r.agent, r.t0, r.t0.Add(16*time.Minute), dialogDeclined, timeoutNotTyped)
+	evs := r.closeEvents()
+	require.Len(t, evs, 1)
+	assert.Equal(t, timeoutNotTyped, evs[0]["outcome"])
+	assert.False(t, r.h.deriveSingleSessionState(context.Background(), r.sid, 0).NeedsInput)
+}
