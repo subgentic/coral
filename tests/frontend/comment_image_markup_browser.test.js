@@ -90,6 +90,7 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
 
             // Cancel: nothing changes, nothing uploads
             await ev(`${markBtn}.click(); true`); await waitFor(`!!${dlg} && ${dlg}.open`, at + 'opens', 8000);
+            assert.equal(await ev(`(() => { const n = ${dlg}.querySelector('.markup-kept'); return n && n.getClientRects().length > 0 ? n.textContent : null; })()`), 'The original is kept as an earlier version and the team\'s agents can see it. To hide something, remove the original instead.', at + 'the quiet line about the original is shown by Done');
             await ev(`[...document.querySelectorAll('.markup-foot button')].find(b => b.textContent === 'Cancel').click(); true`);
             await waitFor(`!${dlg}`, at + 'closed', 5000);
             assert.equal(await ev(`window.__up.length`), 1, at + 'Cancel uploads nothing');

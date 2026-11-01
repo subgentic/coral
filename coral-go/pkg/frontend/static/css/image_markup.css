@@ -8,11 +8,13 @@ dialog.markup-dialog:not([open]) { display: none; }
 .markup-stage { display: flex; justify-content: center; min-height: 0; }
 .markup-canvas { display: block; max-width: 100%; max-height: min(64vh, 640px); width: auto; height: auto; touch-action: none; cursor: crosshair; border-radius: var(--radius-md); }
 .markup-status { margin: 0; min-height: 1.4em; color: var(--text-secondary); font-size: var(--fs-sm); }
+.markup-kept { margin: 0; color: var(--text-secondary); font-size: var(--fs-sm); }
 .markup-foot { display: flex; justify-content: flex-end; gap: 8px; }
 @media (max-width: 600px) {
-    dialog.modal-content.markup-dialog { --dlg-max: 100vw; inset: 0; margin: 0; width: 100vw; max-width: none; height: 100dvh; max-height: none; border-radius: 0; grid-template-rows: auto minmax(0, 1fr) auto auto auto; padding-bottom: max(12px, env(safe-area-inset-bottom, 0px)); }
+    dialog.modal-content.markup-dialog { --dlg-max: 100vw; inset: 0; margin: 0; width: 100vw; max-width: none; height: 100dvh; max-height: none; border-radius: 0; grid-template-rows: auto minmax(0, 1fr) auto auto auto auto; padding-bottom: max(12px, env(safe-area-inset-bottom, 0px)); }
     .markup-controls { order: 4; }
     .markup-canvas { max-height: 100%; }
     .markup-tools .btn, .markup-controls .btn, .markup-foot .btn { min-height: 44px; }
-    .markup-foot { order: 5; }
+    .markup-kept { order: 5; }
+    .markup-foot { order: 6; }
 }

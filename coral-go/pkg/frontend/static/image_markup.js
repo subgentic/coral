@@ -6,6 +6,7 @@ import { loadStyles } from './lazy_styles.js';
 await loadStyles('image_markup.css');
 
 const MARK = '#e5484d', MAX_EDGE = 2048;
+const KEPT = 'The original is kept as an earlier version and the team\'s agents can see it. To hide something, remove the original instead.';
 const TOOLS = [['pen', 'Pen'], ['arrow', 'Arrow'], ['box', 'Box']];
 
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
@@ -54,8 +55,9 @@ export async function openMarkup(blob) {
         const cancel = el('button', 'btn', 'Cancel'); cancel.type = 'button';
         const done = el('button', 'btn btn-primary', 'Done'); done.type = 'button'; done.disabled = true;
         const bar = el('div', 'markup-controls'); bar.append(tools, undo);
+        const keptNote = el('p', 'markup-kept', KEPT);
         const foot = el('div', 'markup-foot'); foot.append(cancel, done);
-        dlg.append(title, bar, el('div', 'markup-stage'), say, foot); dlg.querySelector('.markup-stage').append(canvas);
+        dlg.append(title, bar, el('div', 'markup-stage'), say, keptNote, foot); dlg.querySelector('.markup-stage').append(canvas);
         const ctx = canvas.getContext('2d'), width = Math.max(3, Math.round(Math.max(pic.w, pic.h) / 150));
         const marks = []; let live = null;
         const paint = () => { ctx.clearRect(0, 0, pic.w, pic.h); ctx.drawImage(pic.bmp, 0, 0, pic.w, pic.h); for (const s of marks) drawShape(ctx, s, width); if (live) drawShape(ctx, live, width); };

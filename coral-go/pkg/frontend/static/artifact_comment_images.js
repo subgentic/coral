@@ -9,7 +9,7 @@ const HINT = 'Pictures are shared with this team\'s agents as they are; nothing 
 const MAX_BYTES = 25 * 1024 * 1024; // a larger file is refused here with the reason; the server's own cap is the one that counts
 const typeOf = f => String((f && f.type) || '').toLowerCase();
 
-/** The tray of one comment being written. `upload(blob, versionOf)` stores (versionOf only on a marked-up copy; a route that has no versions may ignore it) a picture and resolves its { hex, name, contentType, size }; `onChange()` is told whenever the pictures or their state change. */
+/** The tray of one comment being written. `upload(blob, versionOf)` stores (versionOf only on a marked-up copy) a picture and resolves its { hex, name, contentType, size }; `onChange()` is told whenever the pictures or their state change. */
 export function createImageTray({ upload, onChange = () => {} }) {
     const node = el('div', 'ac-images'); node.hidden = true;
     const list = el('ul', 'ac-thumbs'); list.setAttribute('aria-label', 'Pictures to send with this comment');
