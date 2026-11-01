@@ -12,6 +12,7 @@ import (
 
 	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/naming"
+	"github.com/subgentic/coral/internal/terminalinput"
 )
 
 // The team line (goal #14, part (b)): the team is told, once per episode, which task and goal wait with an agent at a dialog, and again when the timeout closed it; the line carries no screen
@@ -118,4 +119,19 @@ func TestTheClosedLineIsPostedWhenThePassContextHasEnded(t *testing.T) {
 	lines := r.teamLines()
 	require.Len(t, lines, 1)
 	assert.Contains(t, lines[0], "The agent was NOT told (closed_notice_not_typed)")
+}
+
+// A dialog the timeout left alone over a person's unsent text is said once, with its reason and no text of anyone's (Security's #6815).
+func TestTheTeamIsToldWhenADialogWasLeftAloneOverUnsentText(t *testing.T) {
+	r := newTimeoutRig(t, "claude", "permission", claudeScreen(t, "permission_menu"))
+	task, goal := r.onTeam()
+	terminalinput.Record(terminalinput.Person, r.name, terminalinput.Text, "a reply not sent yet")
+	t.Cleanup(func() { terminalinput.Record(terminalinput.Person, r.name, terminalinput.Keys, "C-u") })
+	assert.Equal(t, timeoutUnsentText, r.try())
+	assert.Equal(t, timeoutUnsentText, r.try())
+	lines := r.teamLines()
+	require.Len(t, lines, 1, "once per episode")
+	assert.Equal(t, fmt.Sprintf("[Coral health] Coral left Dev's dialog alone after 16 min: unsent text in its terminal. task #%d on goal #%d waits for a person at their terminal.", task, goal), lines[0])
+	assert.NotContains(t, lines[0], "not sent yet")
+	assert.Empty(t, r.keys())
 }
