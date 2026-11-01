@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/subgentic/coral/internal/agent"
+	"github.com/subgentic/coral/internal/board"
 	setreg "github.com/subgentic/coral/internal/settings"
 )
 
@@ -227,4 +228,23 @@ func agentLaunchInheritsSkippingDefault(agentType string, flags []string, userSe
 // agentLaunchInheritsSkippingDefaultMessage is the refusal's words: the Operator's saved default is not an agent's to use.
 func agentLaunchInheritsSkippingDefaultMessage(agentType, mode string) string {
 	return "an agent cannot start a " + agentType + " agent in the Operator's saved default permission mode (" + mode + "): it skips the permission prompts, and an agent never starts a less-restricted agent; ask the Operator to start it"
+}
+
+// orchestratorLaunchAsksFirst says an agent's launch of agentType, which would have inherited a saved default that skips the prompts, may go on in the ask-first mode instead of being refused (#11713): the caller is the
+// active Orchestrator of the board its session is subscribed to (the person's helper, who launches agents for them), and the type can ask first and still reach Coral (a Codex that asks first cannot, so its refusal stands).
+// The launch is then never less restricted than the Orchestrator itself, and the Operator raises it later. Any other agent is refused as before.
+func (h *SessionsHandler) orchestratorLaunchAsksFirst(r *http.Request, agentType string) bool {
+	if agentType == "codex" || h.bs == nil {
+		return false
+	}
+	owner, ok := VerifiedSession(r.Context())
+	if !ok || owner == nil {
+		return false
+	}
+	sub, err := h.bs.GetSubscriptionBySessionName(r.Context(), owner.SessionName)
+	if err != nil || sub == nil || sub.IsActive == 0 {
+		return false
+	}
+	orch, err := h.bs.TeamOrchestrator(r.Context(), sub.Project)
+	return err == nil && board.SameIdentity(orch, sub.SubscriberID)
 }
