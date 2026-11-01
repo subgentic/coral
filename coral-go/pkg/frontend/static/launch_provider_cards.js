@@ -109,6 +109,8 @@ export async function buildProviderCards({ group, form, server, implicitDefault 
         const open = cards.get(typeNow());
         const into = open && !open.classList.contains('is-missing') ? bodies.get(open.dataset.type) : hold;
         keepFocus(() => { for (const row of [modelRow, thinkingRow]) if (row && row.parentNode !== into) { const tail = into.querySelector(':scope > .provider-no-thinking'); if (tail) into.insertBefore(row, tail); else into.append(row); } }); // before the "no thinking levels" sentence: it says so under the rows
+        // Thinking is the panel's one select (the segmented strip is hidden here): the segmented control made its select aria-hidden and tabindex -1, which is right while the strip is the control and wrong now, so the select is reachable by Tab and read by a screen reader (#11709)
+        const think = thinkingRow && thinkingRow.querySelector('select.acf-thinking'); if (think && into !== hold) { think.removeAttribute('aria-hidden'); think.tabIndex = 0; }
         // the thinking sentence sits after the rows: the row hides itself when the provider has no levels
         if (open && into !== hold) noThinking(open, TYPES.find(([t]) => t === typeNow())?.[1] || '');
     }

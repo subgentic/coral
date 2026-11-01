@@ -82,7 +82,7 @@ const BASE = require('./test_base').BASE;
             await key('End'); assert.equal((await cur()).name, 'Advanced', 'End');
             await key('Home');
         });
-        await S.run('Provider, Thinking and Mode are radiogroups: one aria-checked, one tab stop, arrows move the choice and the focus, Space chooses', async () => {
+        await S.run('Provider and Mode are radiogroups: one aria-checked, one tab stop, arrows move the choice and the focus, Space chooses; Thinking is one named select a key changes', async () => {
             const group = async (rx, tabName) => {
                 await ev(`(() => { const t = [...window.__na.dialog().querySelectorAll('[role=tab]')].find(x => window.__na.name(x) === ${JSON.stringify(tabName)}); t.click(); return true; })()`); await settle(200);
                 const info = await ev(`(() => { const g = [...window.__na.dialog().querySelectorAll('[role=radiogroup]')].filter(window.__na.vis).find(e => ${rx}.test(window.__na.name(e))); if (!g) return null; return window.__na.radios(g).map(r => ({ n: window.__na.radioName(r), c: window.__na.isChecked(r) ? 'true' : 'false', t: r.tabIndex, native: r.tagName === 'INPUT' })); })()`);
@@ -97,7 +97,11 @@ const BASE = require('./test_base').BASE;
                 await key('ArrowDown'); assert.equal((await checked()).i, (a.i + 1) % a.n, `${rx}: ArrowDown also moves to the next`);
                 await key('ArrowUp');
             };
-            await group(N.provider, 'Agent'); await group(N.thinking, 'Agent'); await group(N.mode, 'Permissions');
+            await group(N.provider, 'Agent'); await group(N.mode, 'Permissions');
+            // Thinking is one select (the operator approved it as that, #11709): named, reachable, and a key moves it
+            await ev(`(() => { const t = [...window.__na.dialog().querySelectorAll('[role=tab]')].find(x => window.__na.name(x) === 'Agent'); t.click(); return true; })()`); await settle(200);
+            const th = await ev(`(() => { const sel = [...window.__na.dialog().querySelectorAll('select.acf-thinking')].filter(window.__na.vis)[0]; if (!sel) return null; sel.focus(); return { name: window.__na.name(sel), options: [...sel.options].map(o => o.textContent.trim()), tab: sel.tabIndex, hidden: sel.getAttribute('aria-hidden'), focused: document.activeElement === sel }; })()`);
+            assert.ok(th && N.thinking.test(th.name) && th.options.length >= 2 && th.options.every(Boolean) && th.tab >= 0 && th.hidden !== 'true' && th.focused, `Thinking: one select, named for what it is, every level named, in the Tab order and not hidden from a screen reader (the segmented control hides its own select): ${JSON.stringify(th)}`); // a key moves a select differently on each platform (an arrow opens it on a Mac), so what is asserted is that it can be reached and read
         });
         await S.run('no control in any step or tab is without an accessible name, and every tab panel that is shown has a name', async () => {
             const bad = async () => ev(`(() => { const d = window.__na.dialog(); return [...d.querySelectorAll('button, input, select, textarea, [role=radio], [role=tab], summary')].filter(window.__na.vis).filter(e => e.type !== 'hidden' && !window.__na.name(e)).map(e => e.tagName.toLowerCase() + (e.className ? '.' + String(e.className).split(' ')[0] : '')); })()`);
