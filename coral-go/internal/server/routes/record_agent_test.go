@@ -435,11 +435,11 @@ func TestRecordAsAgentUsesOnlyTheServerResolvedCLIPath(t *testing.T) {
 	assert.Equal(t, resolved, term.wantCLI[nameA], "the path the server resolved from its settings")
 	assert.NotEqual(t, evil, term.wantCLI[nameA])
 
-	// Bulk: the same, per agent.
+	// Bulk (?all=1: with no list the route asks to read the dry run first, v2.0.11): the same, per agent.
 	term.paused[nameA], term.paused[nameB] = true, true
 	term.cand[nameA] = ptymanager.AgentCandidate{PID: 100, Start: "s2", Program: "true", Image: resolved}
 	term.cand[nameB] = ptymanager.AgentCandidate{PID: 200, Start: "s3", Program: "true", Image: resolved}
-	code, _ = postRecordJSON(t, srv+"/api/sessions/record-agents", map[string]any{"cli_path": evil, "CLIPath": evil})
+	code, _ = postRecordJSON(t, srv+"/api/sessions/record-agents?all=1", map[string]any{"cli_path": evil, "CLIPath": evil})
 	require.Equal(t, http.StatusOK, code)
 	for _, n := range []string{nameA, nameB} {
 		assert.Equal(t, resolved, term.wantCLI[n], n)
