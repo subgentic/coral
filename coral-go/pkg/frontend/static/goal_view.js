@@ -126,6 +126,8 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
 
     function drawGoalMain(main, g) {
         main.append(backButton(backLabel, () => closeGoal())); // says where it goes: the Inbox passes the screen it was opened from (#8861)
+        const row = el('div', 'goal-back-row'); // the header: the way back, the team link, the actions at the right (#11823), and under them the title
+        row.append(main.querySelector('.goals-back'));
         if (teamLink) {
             const link = el('a', 'goal-team-link', 'Open on team page'); link.href = teamLink;
             link.setAttribute('aria-label', `Open ${keyLabel(team)} on team page`);
@@ -134,12 +136,16 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
                 e.preventDefault();
                 importOnce('./task_goals.js').then(m => m.openGoalOnTeamPage(team, id));
             });
-            const row = el('div', 'goal-back-row');
-            row.append(main.querySelector('.goals-back'), link); main.append(row);
+            row.append(link);
         }
+        // Add task and Close goal (Reopen for a closed one), at the top right of the page's header
+        const acts = el('div', 'goal-head-actions');
+        acts.append(btn('btn goals-add-task', 'Add task', () => { (window.showCreateTaskModal || (() => {}))({ project: model.project, goal_id: g.id, onCreated: loadGoals }); }));
+        if (W.isOpenGoal(g)) { const cb = btn('btn btn-primary goals-close', 'Close goal', () => openClose(g)); cb.setAttribute('aria-label', `Close goal: ${g.title}`); acts.append(cb); } // named for its goal: the Close dialog's own button is just Close goal
+        else if (W.isClosedGoal(g)) acts.append(btn('btn goals-reopen', 'Reopen', () => reopenGoal(g)));
+        row.append(acts); main.append(row);
         const h = el('h2', 'goals-detail-title', g.title); h.tabIndex = -1; h.id = 'goals-detail-title';
-        const backRow = main.querySelector(':scope > .goal-back-row');
-        (backRow || main).append(h); // with the team link the title is in the way-back row: a phone puts the back beside it and the link under (team_page.css), as on the task page
+        row.append(h); // the title is in the header row: a phone puts the back beside it and the link and actions under (team_page.css), as on the task page
         foldWayBack(main, '.goals-back', '.goals-detail-title');
         const line = el('div', 'goals-detail-line'); line.append(stateChip(g));
         const meta = W.driverLine(g.driver, whenText(g.updatedAt)); if (meta) line.append(el('span', 'goal-card-meta', meta));
@@ -171,12 +177,6 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
         if (total) main.append(rollupBar(g.rollup));
         main.append(el('p', 'goals-note goals-updating', rowsAgree(g) ? '' : 'Updating…')); // the column says it too, and is aria-busy
         main.append(drawTabs(g)); // the Tasks | Artifacts strip and the list under the goal's details (#8914)
-        // The pinned bar: Add task and Close goal (Reopen for a closed one), always at the bottom of the page.
-        const bar = el('div', 'goals-pinbar');
-        bar.append(btn('btn goals-add-task', 'Add task', () => { (window.showCreateTaskModal || (() => {}))({ project: model.project, goal_id: g.id, onCreated: loadGoals }); }));
-        if (W.isOpenGoal(g)) { const cb = btn('btn btn-primary goals-close', 'Close goal', () => openClose(g)); cb.setAttribute('aria-label', `Close goal: ${g.title}`); bar.append(cb); } // named for its goal: the Close dialog's own button is just Close goal
-        else if (W.isClosedGoal(g)) bar.append(btn('btn goals-reopen', 'Reopen', () => reopenGoal(g)));
-        main.append(bar);
         return h;
     }
 
