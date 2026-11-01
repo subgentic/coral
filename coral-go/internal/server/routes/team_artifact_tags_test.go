@@ -384,3 +384,43 @@ func TestWritingTaskVettedAddsTheReviewWarnings(t *testing.T) {
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &out))
 	assert.NotContains(t, out, "warnings")
 }
+
+// An agent cannot tag its own file as the Operator would (#11645): "read" would keep a file for review out of Needs you, "ignored", "denied", "saved" and the decisions say the Operator already acted. The upload and the
+// task result both leave them out and keep the other tags; the Operator's own route still sets them.
+func TestAnAgentCannotTagItsUploadWithTheOperatorsStates(t *testing.T) {
+	l := newLinkRig(t)
+	old := uploaderLookup
+	t.Cleanup(func() { uploaderLookup = old })
+	uploaderLookup = func(ctx context.Context, sid string) (string, string, string) { return "alpha", "Backend", "Backend" }
+	req, err := http.NewRequest(http.MethodPost, l.srv.URL+"/api/agent/artifacts?session_id=s1&tag=for+review&tag=read&tag=ignored&tag=saved&tag=denied&tag=approved&tag=internal&question=Approve+it%3F", strings.NewReader("mine"))
+	require.NoError(t, err)
+	req.Header.Set("X-Artifact-Name", "report.md")
+	req.Header.Set("X-Artifact-Media-Type", "text/markdown")
+	resp, err := agentClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	var out map[string]any
+	_ = json.NewDecoder(resp.Body).Decode(&out)
+	require.Equal(t, http.StatusCreated, resp.StatusCode, out)
+	assert.Equal(t, []any{"for review", "internal"}, out["tags"], "the Operator's words are left out of the answer")
+	id := strings.TrimPrefix(out["uri"].(string), "coral://artifacts/")
+	tags, err := l.h.bs.ArtifactTags(context.Background(), "alpha")
+	require.NoError(t, err)
+	assert.Equal(t, []string{"for review", "internal"}, tags[id])
+
+	// A task result says so, once, and records the rest.
+	e := newTagEnv(t)
+	rid := e.ids["report.md"]
+	e.uploadedBy(t, "sess-dev", rid)
+	notes := e.h.applyManifestTags(context.Background(), "tag-team", "sess-dev", false, []board.TaskArtifact{
+		{Name: "report.md", URI: "coral://artifacts/" + rid, Tags: []string{"read", "final", "saved"}},
+	})
+	mt, _ := e.h.bs.ArtifactTags(context.Background(), "tag-team")
+	assert.Equal(t, []string{"final"}, mt[rid])
+	require.Len(t, notes, 1, "%v", notes)
+	assert.Contains(t, notes[0], "read, saved", "the answer names the tags that were left out")
+
+	// The Operator's route sets them.
+	code, _ := e.put(t, "tag-team", rid, `{"tags":["read","saved"]}`)
+	assert.Equal(t, http.StatusOK, code)
+}
