@@ -12,6 +12,7 @@ import { state } from './state.js';
 import { unreadReviewItems, refreshReviews, onReviewsChanged } from './inbox_reviews.js';
 import { failedUnread, refreshRuns, onRunsChanged } from './automation_runs.js';
 import { pendingProposals, refreshProposals, onProposalsChanged } from './proposals_state.js';
+import { goalDoneCount } from './goal_done.js';
 import { operatorAsks, refreshOperatorAsks, onOperatorAsksChanged } from './operator_asks.js';
 import { isCloud, nativeInbox, sessionServer } from './server_base.js';
 import { importOnce } from './import_once.js';
@@ -43,7 +44,7 @@ export function updateInboxTab() {
     syncWelcome(); // a welcome step seen is remembered (#11443); the items are not in the badge
     refreshProposals(); // after the Inbox was first opened, and at most once in 20 seconds (proposals_state.js)
     if (!isCloud()) refreshRuns(); // the runs are read from this Coral only, and only once the Inbox or Automations has been shown
-    const n = waitingCount() + unreadReviewItems().length + failedUnread().length + pendingProposals().length + operatorAsks().length; // a review artifact the operator has read stays listed but is not counted (#9277); a failed run nobody has opened is (#9296)
+    const n = waitingCount() + unreadReviewItems().length + failedUnread().length + pendingProposals().length + operatorAsks().length + goalDoneCount(); // a goal that looks done is one item (#11825); a review artifact the operator has read stays listed but is not counted (#9277); a failed run nobody has opened is (#9296)
     const text = n > 9 ? '9+' : n > 0 ? String(n) : ''; // two characters at most: the pill fits the tabs' own 24 px gap, so the gap after Inbox is the same as the others (#9821); the exact count is in the tab's name
     // Only what changed is written: nav_tabs.js redraws the row on any change to it, and this runs for every message of the feed (setting hidden to
     // the value it has is still a change to a MutationObserver).
