@@ -15,17 +15,19 @@ const { coralReady } = require('./helpers/wait');
             await ev(`import((window.__coralStatic || '/static/') + 'password_ui.js').then(m => m.maybePromptSetPassword()).then(() => true)`);
             await waitFor(`!!document.getElementById('set-password-modal')`, `${w}: the prompt`, 10000);
             const d = await ev(`(() => { const m = document.getElementById('set-password-modal'); const vis = e => e.getClientRects().length > 0;
-                return { title: m.querySelector('h3').textContent.trim(), lead: m.querySelector('.pw-lead').textContent.trim(), note: m.querySelector('.pw-not-now').textContent.trim(), text: m.innerText.replace(/\\s+/g, ' '),
+                return { title: m.querySelector('h3').textContent.trim(), lead: m.querySelector('.pw-lead').textContent.trim(), note: (m.querySelector('.pw-not-now') || {}).textContent || '', text: m.innerText.replace(/\\s+/g, ' '),
                     primary: [...m.querySelectorAll('button.btn-primary')].filter(vis).map(b => b.textContent.trim()), buttons: [...m.querySelectorAll('.modal-footer button')].filter(vis).map(b => ({ t: b.textContent.trim(), h: Math.round(b.getBoundingClientRect().height) })) }; })()`);
             assert.equal(d.title, 'Protect Coral with a password', `${w}: the title says what it is`);
             assert.equal(d.lead, 'A password keeps other people and other devices out of Coral when it is opened in a web browser.', `${w}: it says what the password protects`);
-            assert.equal(d.note, 'Only you use this computer? You can skip this: the Coral app opens without a password. You can set one later in Settings, Security and privacy.', `${w}: it says it can be skipped on a single-user computer`);
+            assert.equal(d.note, '', `${w}: no line about skipping (#11892: a password is always created)`);
+            assert.doesNotMatch(d.text, /skip|without a password|Only you use this computer|Not now/i, `${w}: nothing reads as a way around it: ${d.text}`);
             assert.doesNotMatch(d.text, /\btray\b|open command|strict|local sign-in|\bcli\b/i, `${w}: no jargon: ${d.text}`);
             assert.deepEqual(d.primary, ['Set password'], `${w}: one clear primary action`);
-            assert.deepEqual(d.buttons.map(b => b.t), ['Not now', 'Set password'], `${w}: the way out and the one action`);
+            assert.deepEqual(d.buttons.map(b => b.t), ['Set password'], `${w}: one button, the one action: no way out`);
             if (mobile) assert.ok(d.buttons.every(b => b.h >= 44), `${w}: 44 px targets: ${JSON.stringify(d.buttons)}`);
-            await ev(`document.getElementById('set-password-later').click(); true`);
+            await ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); true`);
+            assert.equal(await ev(`!!document.getElementById('set-password-modal')`), true, `${w}: Escape does not close it`);
         }
-        console.log('PASS the first-run password dialog: plain words, skippable, one primary action');
+        console.log('PASS the first-run password dialog: plain words, no way past it, one primary action');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });

@@ -15,7 +15,6 @@ const FAKE = `(() => {
         if (new URL(String(url), location.origin).pathname !== '/api/system/auth-status') return inner(url, opts);
         return Promise.resolve(new Response(JSON.stringify({ authenticated: true, method: 'session', local: true, ...window.__auth }), { status: 200, headers: { 'content-type': 'application/json' } }));
     };
-    try { localStorage.setItem('coral-password-not-now', '1'); } catch (e) {} // Not now was pressed: the modal does not open by itself
 })();`;
 
 (async () => {
@@ -32,6 +31,8 @@ const FAKE = `(() => {
             const at = `${w} px: `;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev);
+            await waitFor(`!!document.getElementById('set-password-modal')`, at + 'the prompt opens by itself while no password is set (#11892: no Not now)', 15000);
+            await ev(`document.getElementById('set-password-modal').remove(); true`); // this suite is about the bar behind it
             await waitFor(`!document.getElementById('local-auth-banner').hidden`, at + 'the bar when strict is on and no password is set', 15000);
             let b = await bar();
             assert.ok(b.shown && b.role === 'note' && /No password/.test(b.text) && b.buttons.length === 2 && b.buttons[0] === 'Set a password' && b.buttons[1] === 'Dismiss', at + 'a bar says no password, with Set a password and a Dismiss (#11258: remembered; local_auth_banner_dismiss covers it): ' + JSON.stringify(b));
@@ -58,7 +59,7 @@ const FAKE = `(() => {
             // it opens the password form
             await ev(`document.getElementById('local-auth-banner').querySelector('button').click(); true`);
             await waitFor(`!!document.getElementById('set-password-modal')`, at + 'the password form', 6000);
-            await ev(`document.getElementById('set-password-later').click(); true`); await sleep(200); // sleep-ok: the form closes
+            await ev(`document.getElementById('set-password-modal').remove(); true`); await sleep(200); // sleep-ok: the form is taken away (it has no Not now, #11892)
             assert.equal(await ev(`!document.getElementById('set-password-modal')`), true);
             // a password is set: the bar goes
             await ev(`window.__auth = { strict_local_auth: true, password_set: true }; document.dispatchEvent(new CustomEvent('coral:password-changed')); true`); await sleep(600); // sleep-ok: the bar asks again

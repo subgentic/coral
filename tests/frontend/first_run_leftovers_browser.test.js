@@ -27,7 +27,7 @@ const { coralReady } = require('./helpers/wait');
             await new Promise(r => setTimeout(r, 200)); // sleep-ok: the advice is drawn on the input event
             const shown = await ev(`Math.round(document.getElementById('set-password-strength').closest('.pw-strength').getBoundingClientRect().height)`);
             if (!(shown > 0)) problems.push(`${tag}: the advice appears once a password is typed (it is ${shown} px)`);
-            await ev(`document.getElementById('set-password-later').click(); true`);
+            await ev(`document.getElementById('set-password-modal').remove(); true`); // no Not now (#11892): this check goes on without the dialog
             // the same spacing in Settings' Change password form
             const cp = await ev(`(async () => { const R = window.fetch; window.fetch = (u, o = {}) => { const p = String(u); if (p.startsWith('/api/system/auth-status')) return Promise.resolve(new Response(JSON.stringify({ authenticated: true, method: 'session', password_set: true, local: true }), { status: 200, headers: { 'content-type': 'application/json' } })); if (p.startsWith('/api/auth/sessions') && !o.method) return Promise.resolve(new Response(JSON.stringify({ sessions: [], recent: [] }), { status: 200, headers: { 'content-type': 'application/json' } })); return R(u, o); };
                 await window.showSettingsModal('security'); for (let i = 0; i < 40 && !document.getElementById('sec-change'); i++) await new Promise(r => setTimeout(r, 100)); // sleep-ok: Settings draws its row after its fetches

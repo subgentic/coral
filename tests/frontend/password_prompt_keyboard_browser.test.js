@@ -15,7 +15,7 @@ const { coralReady } = require('./helpers/wait');
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         for (const [label, w, h, font] of [['200% text', 1280, 800, '32px'], ['200% text, short', 1280, 520, '32px'], ['640 px', 640, 420, '']]) {
             const check = (ok, msg) => { if (!ok) problems.push(`${label}: ${msg}`); };
-            for (const closeBy of ['Not now', 'Escape']) {
+            for (const closeBy of ['Set password', 'Escape']) {
                 await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile: false });
                 await Page.navigate({ url: process.env.CORAL_TEST_URL + '/' }); await Page.loadEventFired(); await install();
                 await coralReady(ev, 'startup', 'liveList', 'settings');
@@ -23,6 +23,7 @@ const { coralReady } = require('./helpers/wait');
                 await ev(`document.activeElement && document.activeElement.blur(); import((window.__coralStatic || '/static/') + 'password_ui.js').then(m => { m.showSetPasswordModal({ local: true }); return true; })`);
                 await waitFor(`!!document.getElementById('set-password-modal')`, `${label}: the dialog`, 8000);
                 await new Promise(r => setTimeout(r, 400)); // sleep-ok: the dialog draws
+                await ev(`(() => { const R = window.fetch; window.fetch = (u, o) => String(u).startsWith('/api/auth/password/set') ? Promise.resolve(new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } })) : R(u, o); return true; })()`); // the password is not really set on the shared test server
                 // Tab through its stops: each focused field is above the footer
                 const seen = [];
                 for (let i = 0; i < 6; i++) { await key('Tab'); const wh = await where(); if (!wh.inModal) break; const g = await geom(); seen.push({ id: wh.id, ...g }); }
@@ -30,7 +31,9 @@ const { coralReady } = require('./helpers/wait');
                 check(fields.length === 2, `Tab reaches both fields: ${JSON.stringify(seen.map(s => s.id))}`);
                 for (const s of fields) check(s.bottom <= s.footTop - 12 && s.top >= 0, `${s.id} is in view with room above the footer, not flush against it (its label and the meter are not under it): ${JSON.stringify(s)}`);
                 // close it
-                if (closeBy === 'Escape') await key('Escape'); else await ev(`document.getElementById('set-password-later').click(); true`);
+                // #11892: Escape does not close it (a password is always created); setting a password does, and the keyboard goes to the page behind
+                if (closeBy === 'Escape') { await key('Escape'); await new Promise(r => setTimeout(r, 300)); /* sleep-ok: a close would come at once */ check(await ev(`!!document.getElementById('set-password-modal')`), 'Escape: the dialog stays open'); continue; }
+                await ev(`(() => { for (const id of ['set-password-new', 'set-password-confirm']) { const i = document.getElementById(id); i.value = 'a good password'; i.dispatchEvent(new Event('input', { bubbles: true })); } document.getElementById('set-password-form').requestSubmit(); return true; })()`);
                 await new Promise(r => setTimeout(r, 400)); // sleep-ok: the dialog closes
                 const after = await where();
                 check(!(await ev(`!!document.getElementById('set-password-modal')`)), `${closeBy}: the dialog is closed`);
