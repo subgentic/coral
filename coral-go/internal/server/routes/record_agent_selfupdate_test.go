@@ -2,7 +2,6 @@ package routes
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -10,6 +9,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/subgentic/coral/internal/consoletest"
 )
 
 func touch(t *testing.T, path string) string {
@@ -66,7 +67,7 @@ func dirLink(t *testing.T, target, path string) {
 	if runtime.GOOS != "windows" {
 		t.Skip("cannot create links here")
 	}
-	if out, err := exec.Command("cmd", "/c", "mklink", "/J", path, target).CombinedOutput(); err != nil {
+	if out, err := consoletest.HiddenCommand("cmd", "/c", "mklink", "/J", path, target).CombinedOutput(); err != nil {
 		t.Skipf("cannot create a junction here: %v %s", err, out)
 	}
 }
