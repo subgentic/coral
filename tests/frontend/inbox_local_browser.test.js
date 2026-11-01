@@ -64,7 +64,7 @@ const hex = i => i.toString(16).padStart(20, '0');
             await coralReady(ev);
             await ev(`localStorage.removeItem('coral.inbox.tab'); true`); // a fresh browser: the Inbox opens on Needs you
             await ev(`(() => { const jobs = { 'qa-a-id': 'QA Engineer', 'fe-a-id': 'Frontend Dev', 'qa-b-id': 'QA Engineer' }; const waiting = ${JSON.stringify(waiting)};
-                const entry = window.__m.entry.bind(window.__m); window.__m.entry = a => ({ ...entry(a), board_job_title: jobs[a.session_id] || '', waiting_for_input: waiting.includes(a.session_id), waiting_kind: waiting.includes(a.session_id) ? 'permission' : null });
+                const entry = window.__m.entry.bind(window.__m); window.__m.entry = a => ({ ...entry(a), board_job_title: jobs[a.session_id] || '', waiting_for_input: waiting.includes(a.session_id), waiting_kind: waiting.includes(a.session_id) ? 'needs_input' : null }); // not a permission: a permission row opens its card in a dialog over the Inbox (#11864, 3a), this suite is about a row that opens the agent
                 window.__m.add('QA Alpha', 'A', 4, { sleeping: false, board_project: 'team-a', session_id: 'qa-a-id' });
                 window.__m.add('FE Alpha', 'B', 4, { sleeping: false, board_project: 'team-a', session_id: 'fe-a-id' });
                 window.__m.add('QA Beta', 'C', 4, { sleeping: false, board_project: 'team-b', session_id: 'qa-b-id' });
