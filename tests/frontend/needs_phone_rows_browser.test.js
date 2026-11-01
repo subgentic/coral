@@ -1,6 +1,6 @@
-// #11642 (the operator, on the phone's Needs you rows): each row's main button is one size at one place, the right edge, the same on every row; no Ignore (or Dismiss) button on a phone row: a swipe to the left ignores it
-// with Undo, and Ignore stays in the three-dot menu. Welcome items, a file for review and a question alike, at 390 and 360 px. The review artifacts, the questions and the welcome setting are put in the page as the
-// server answers them (the artifact list and /api/operator-asks stubbed, the welcome items from the page's settings); the swipe is a real touch drag through CDP.
+// #11671 (the operator, Gmail-style rows on a phone; it replaces #11642's per-row button there): a phone's Needs you row carries no button. A tap opens it, a long press selects it (a check appears, a tap adds more),
+// a swipe to the left ignores it (with Undo), and a bar that takes the toolbar's line acts on the selection: Approve, Changes, Ignore, Save for later, Mark read or unread, Cancel, one request per item through the same
+// routes as a row's own buttons. A selection that does not fit an action turns it off (a question cannot be approved, Changes is for one file). Welcome, review and question rows at 390 and 360 px, real touch through CDP.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
@@ -20,58 +20,67 @@ const { coralReady } = require('./helpers/wait');
             assert.equal(await ev(`fetch('/api/board/${team}/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({subscriber_id:'Review Writer',job_title:'Writer'})}).then(r=>r.status)`), 200);
             await ev(`(() => {
                 const mk = n => ({ id: n.toString(16).padStart(64, '0'), name: 'Phone review ' + n + '.txt', media_type: 'text/plain', size: 30, created_at: new Date(Date.now() - (10 - n) * 60000).toISOString(), tags: ['for review'], available: true, uri: 'coral://artifacts/' + n.toString(16).padStart(64, '0'), produced_by: 'Review Writer', session_id: 'rw-1', task_id: n });
-                window.__reviewItems = [mk(1), mk(2)]; window.__asks = [{ board: '${team}', kind: 'ask', id: 71, asker: 'Lead', text: 'Which port should the test server use?', at: '2026-10-31T01:00:00Z' }, { board: '${team}', kind: 'ask', id: 72, asker: 'Docs', text: 'Which heading style?', at: '2026-10-31T02:00:00Z' }];
+                window.__reviewItems = [mk(1), mk(2), mk(3)]; window.__asks = [{ board: '${team}', kind: 'ask', id: 71, asker: 'Lead', text: 'Which port should the test server use?', at: '2026-10-31T01:00:00Z' }];
                 window.__calls = []; const original = window.fetch.bind(window), json = (b, status = 200) => Promise.resolve(new Response(JSON.stringify(b), { status, headers: { 'Content-Type': 'application/json' } }));
                 window.fetch = (u, o = {}) => { const url = String(u), x = new URL(url, location.origin), method = o.method || 'GET';
                     if (x.pathname === '/api/board/${team}/artifacts') { const items = window.__reviewItems.filter(a => !x.searchParams.has('tag') || a.tags.includes(x.searchParams.get('tag'))); return json({ project: '${team}', artifacts: items, has_more: false }); }
                     const rv = x.pathname.match(/^\\/api\\/board\\/${team}\\/artifacts\\/([0-9a-f]+)\\/review$/);
-                    if (rv && method === 'POST') { const body = JSON.parse(o.body); window.__calls.push({ review: rv[1], body }); return json({ ok: true }); }
+                    if (rv && method === 'POST') { const body = JSON.parse(o.body); window.__calls.push({ review: rv[1], decision: body.decision }); if (['approve', 'ignore', 'save'].includes(body.decision)) window.__reviewItems = window.__reviewItems.filter(a => a.id !== rv[1]); return json({ ok: true }); }
                     if (url === '/api/operator-asks') return json(window.__asks);
                     const m = url.match(/\\/api\\/board\\/${team}\\/asks\\/(\\d+)\\/close$/);
-                    if (m && method === 'POST') { const body = JSON.parse(o.body); window.__calls.push({ id: Number(m[1]), body }); window.__asks = window.__asks.filter(a => a.id !== Number(m[1])); return json({ ok: true, closed_by: 'Operator' }); }
+                    if (m && method === 'POST') { const body = JSON.parse(o.body); window.__calls.push({ ask: Number(m[1]), undo: !!body.undo }); if (!body.undo) window.__asks = window.__asks.filter(a => a.id !== Number(m[1])); return json({ ok: true, closed_by: 'Operator' }); }
                     return original(u, o); };
-                window.__T = null; return true; })()`);
+                return true; })()`);
             await ev(`import((window.__coralStatic || '/static/') + 'state.js').then(m => { m.state.settings = { ...m.state.settings, inbox_welcome: 'on', inbox_welcome_done: '' }; return true; })`);
             await ev(`window.switchNavTab('hub-inbox'); import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => { m.updateInboxTab(); return m.selectInboxTab('needs'); }).then(() => true)`);
-            await waitFor(`document.querySelectorAll('${T} tbody tr').length >= 5 && !!document.querySelector('${T} button[aria-label^="Approve"]') && !!document.querySelector('${T} button[aria-label^="Answer the question"]')`, at + 'welcome, review and question rows', 15000);
+            await waitFor(`document.querySelectorAll('${T} tbody tr').length >= 8`, at + 'welcome, review and question rows', 15000);
             await new Promise(r => setTimeout(r, 500)); // sleep-ok: the table settles after its first draw
-            const rows = await ev(`[...document.querySelectorAll('${T} tbody tr')].map(r => { const main = r.querySelector('.inbox-main-action'), b = main && main.getBoundingClientRect(); return { name: (r.querySelector('.inbox-review-name') || r).textContent.trim().slice(0, 30), main: main ? { x: Math.round(b.left * 10) / 10, w: Math.round(b.width * 10) / 10, right: Math.round(b.right * 10) / 10, label: main.textContent } : null, ignoreButtons: [...r.querySelectorAll('button:not(.menu-item)')].filter(x => /^(Ignore|Dismiss)/.test(x.textContent.trim()) || /^(Ignore|Dismiss)\\b/.test(x.getAttribute('aria-label') || '')).length }; }).filter(r => r.main || r.ignoreButtons)`);
-            assert.ok(rows.length >= 5, at + 'welcome, review and question rows are all there: ' + JSON.stringify(rows));
-            const kinds = new Set(rows.map(r => r.main && r.main.label));
-            assert.ok(kinds.has('Approve') && kinds.has('Answer') && [...kinds].some(k => k && !['Approve', 'Answer'].includes(k)), at + 'review, question and welcome rows: ' + JSON.stringify([...kinds]));
-            assert.equal(new Set(rows.map(r => r.main.x)).size, 1, at + 'the main button is at the same x on every row: ' + JSON.stringify(rows));
-            assert.equal(new Set(rows.map(r => r.main.w)).size, 1, at + 'and the same width on every row: ' + JSON.stringify(rows));
-            // the right edge is the Actions cell's own content edge, to 8 px (QA's SHOULD, #11655): without the margin-inline-start:auto rules a row whose buttons are fewer ends short of it
-            const edge = await ev(`[...document.querySelectorAll('${T} tbody tr')].filter(r => r.querySelector('.inbox-main-action')).map(r => { const td = r.querySelector('.inbox-review-actions').closest('td, .dt-td'), c = td.getBoundingClientRect(), pad = parseFloat(getComputedStyle(td).paddingRight) || 0, m = r.querySelector('.inbox-main-action').getBoundingClientRect(); return { cell: Math.round((c.right - pad) * 10) / 10, main: Math.round(m.right * 10) / 10 }; })`);
-            assert.ok(edge.length >= 5 && edge.every(e => Math.abs(e.cell - e.main) <= 8), at + 'every main button ends within 8 px of its cell edge: ' + JSON.stringify(edge));
-            const clip = await ev(`[...document.querySelectorAll('${T} .inbox-main-action')].map(b => [b.textContent, b.scrollWidth, b.clientWidth])`); assert.ok(clip.every(c => c[1] <= c[2] + 1), at + 'every main button shows its whole word: ' + JSON.stringify(clip));
-            assert.ok(rows.every(r => r.ignoreButtons === 0), at + 'no Ignore or Dismiss button on a phone row: ' + JSON.stringify(rows));
-            // Ignore stays in the menu
-            await ev(`document.querySelector('${T} button[aria-label^="More actions for the question of Lead"]').click(); true`);
-            await waitFor(`!!document.querySelector('${T} .inbox-row-more .menu:not([hidden]) .menu-item')`, at + 'the menu opens', 5000);
-            const menu = await ev(`[...document.querySelectorAll('${T} .inbox-row-more .menu:not([hidden]) .menu-item')].map(b => b.textContent)`);
-            assert.deepEqual(menu, ['Ignore'], at + 'the question row\'s menu has Ignore: ' + JSON.stringify(menu));
-            await ev(`document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); document.body.click(); true`);
-            // a real swipe to the left ignores the question, with Undo
-            const rect = await ev(`(() => { const row = [...document.querySelectorAll('${T} tbody tr')].find(x => x.querySelector('button[aria-label="Answer the question of Lead"]')); row.scrollIntoView({ block: 'center' }); const r = row.getBoundingClientRect(); return { x: r.left, y: r.top + r.height / 2, w: r.width }; })()`);
-            const touch = (type, x, y) => client.Input.dispatchTouchEvent({ type, touchPoints: type === 'touchEnd' ? [] : [{ x, y, id: 1 }] });
-            await touch('touchStart', rect.x + rect.w - 20, rect.y);
-            for (let i = 1; i <= 8; i++) await touch('touchMove', rect.x + rect.w - 20 - i * (rect.w * 0.07), rect.y);
-            await touch('touchEnd', 0, 0);
-            await waitFor(`window.__calls.some(c => c.id)`, at + 'the swipe closed the question', 8000);
-            const call = await ev('window.__calls.find(c => c.id)');
-            assert.ok(call.id === 71 && !call.body.undo, at + 'it is Lead\'s question, closed, not undone: ' + JSON.stringify(call));
-            const toast = await waitFor(`[...document.querySelectorAll('.toast')].some(t => /Ignored the question of Lead/.test(t.textContent) && [...t.querySelectorAll('button')].some(b => b.textContent.trim() === 'Undo'))`, at + 'a toast with Undo', 8000);
-            // and a swipe on a review file
-            await new Promise(r => setTimeout(r, 800)); // sleep-ok: the list is redrawn once the closed question is gone
-            const r2 = await ev(`(() => { const row = [...document.querySelectorAll('${T} tbody tr')].find(x => x.querySelector('button[aria-label^="Approve: Phone review 1"]')); row.scrollIntoView({ block: 'center' }); const r = row.getBoundingClientRect(); return { x: r.left, y: r.top + r.height / 2, w: r.width }; })()`);
-            await touch('touchStart', r2.x + r2.w - 20, r2.y);
-            for (let i = 1; i <= 8; i++) await touch('touchMove', r2.x + r2.w - 20 - i * (r2.w * 0.07), r2.y);
-            await touch('touchEnd', 0, 0);
-            await waitFor(`window.__calls.some(c => c.review && c.body.decision === 'ignore')`, at + 'the review file was ignored through the review route', 8000);
-            await waitFor(`[...document.querySelectorAll('.toast')].some(t => /Ignored: Phone review 1/.test(t.textContent) && [...t.querySelectorAll('button')].some(b => b.textContent.trim() === 'Undo'))`, at + 'the review file is ignored with Undo', 8000);
+
+            const rowOf = name => `[...document.querySelectorAll('${T} tbody tr')].find(r => r.textContent.includes(${JSON.stringify(name)}))`;
+            const point = async name => ev(`(() => { const r = ${rowOf(name)}; r.scrollIntoView({ block: 'center' }); const b = r.getBoundingClientRect(); return { x: b.left + b.width * 0.35, y: b.top + b.height * 0.35 }; })()`); // the row's own box, off its two links
+            const touch = (type, p) => client.Input.dispatchTouchEvent({ type, touchPoints: type === 'touchEnd' ? [] : [{ x: p.x, y: p.y, id: 1 }] });
+            const tap = async name => { const p = await point(name); await touch('touchStart', p); await new Promise(r => setTimeout(r, 60)); await touch('touchEnd', p); await new Promise(r => setTimeout(r, 250)); }; // sleep-ok: a tap, and the table redraws
+            const press = async name => { const p = await point(name); await touch('touchStart', p); await new Promise(r => setTimeout(r, 700)); await touch('touchEnd', p); await new Promise(r => setTimeout(r, 300)); }; // sleep-ok: a long press is a held finger
+            const bar = () => ev(`(() => { const b = document.querySelector('${T} .dt-bar, .gt-toolbar .dt-bar'); if (!b || b.hidden || !b.getClientRects().length) return null; return { count: (b.querySelector('.dt-bar-count') || {}).textContent, actions: [...b.querySelectorAll('button')].map(x => ({ label: x.textContent, off: x.disabled })) }; })()`);
+            const selected = () => ev(`[...document.querySelectorAll('${T} tbody tr.dt-selected')].map(r => r.textContent.slice(0, 20))`);
+
+            // no button is on a phone row
+            const visible = await ev(`[...document.querySelectorAll('${T} tbody tr button')].filter(b => { const c = (b.closest('.dt-td') || b).getBoundingClientRect(); return c.width > 2 && c.height > 2 && getComputedStyle(b).visibility !== 'hidden'; }).map(b => b.getAttribute('aria-label') || b.textContent)`);
+            assert.deepEqual(visible.filter(l => !/^(Open |Task: )/.test(l)), [], at + 'a phone row carries no action button (only its name and its task link, which open things): ' + JSON.stringify(visible));
+            // a tap opens the question
+            await tap('Which port should the test server use?');
+            await waitFor(`!!document.querySelector('dialog[open]')`, at + 'a tap opens the question', 6000);
+            await ev(`document.querySelector('dialog[open]').dispatchEvent(new Event('cancel', { cancelable: true })); const d = document.querySelector('dialog[open]'); if (d) d.close(); true`); await new Promise(r => setTimeout(r, 300)); // sleep-ok: the dialog closes
+            assert.equal(await bar(), null, at + 'no selection bar before a selection');
+            // a long press selects a review file; a tap adds the question; the bar shows what fits
+            await press('Phone review 1.txt');
+            { const sel = await selected(); assert.ok(sel.length === 1 && sel[0].startsWith('Phone review 1.txt'), at + 'a long press selects that row and only it: ' + JSON.stringify(sel)); }
+            let b = await bar();
+            assert.ok(b && b.count === '1 selected', at + 'the bar says 1 selected: ' + JSON.stringify(b));
+            assert.deepEqual(b.actions.map(a => a.label), ['Approve', 'Changes', 'Ignore', 'Save for later', 'Mark read', 'Mark unread', 'Cancel'], at + 'the actions: ' + JSON.stringify(b.actions));
+            assert.ok(!b.actions.find(a => a.label === 'Approve').off && !b.actions.find(a => a.label === 'Changes').off, at + 'a file can be approved or sent back');
+            await tap('Which port should the test server use?');
+            b = await bar(); assert.equal(b.count, '2 selected', at + 'a tap adds a row (it does not open it): ' + JSON.stringify(b)); assert.equal(await ev(`!document.querySelector('dialog[open]')`), true, at + 'and opens nothing');
+            const off = l => b.actions.find(a => a.label === l).off;
+            assert.ok(off('Approve') && off('Changes') && off('Save for later') && !off('Ignore'), at + 'a question cannot be approved, sent back or saved; it can be ignored: ' + JSON.stringify(b.actions));
+            // Ignore both: one request each, one toast with Undo, then Undo puts both back
+            await ev(`[...document.querySelectorAll('.dt-bar button')].find(x => x.textContent === 'Ignore').click(); true`);
+            await waitFor(`window.__calls.some(c => c.ask === 71 && !c.undo) && window.__calls.some(c => c.review && c.decision === 'ignore')`, at + 'one request per item', 8000);
+            await waitFor(`[...document.querySelectorAll('.toast')].some(t => /Ignored 2/.test(t.textContent) && [...t.querySelectorAll('button')].some(x => x.textContent.trim() === 'Undo'))`, at + 'one toast with Undo', 8000);
+            assert.equal(await bar(), null, at + 'the selection is over');
+            await ev(`[...document.querySelectorAll('.toast')].find(t => /Ignored 2/.test(t.textContent)).querySelectorAll('button').forEach(x => { if (x.textContent.trim() === 'Undo') x.click(); }); true`);
+            await waitFor(`window.__calls.some(c => c.ask === 71 && c.undo) && window.__calls.some(c => c.review && c.decision === 'unignore')`, at + 'Undo is one request per item too', 8000);
+            // two files: Approve both; Cancel leaves with nothing sent
+            await waitFor(`!!(${rowOf('Phone review 2.txt')})`, at + 'the rows are back', 8000);
+            await press('Phone review 2.txt'); await tap('Phone review 3.txt');
+            b = await bar(); assert.equal(b.count, '2 selected', at + 'two files selected'); assert.ok(!off('Approve') && b.actions.find(a => a.label === 'Changes').off, at + 'Changes is off for two files: ' + JSON.stringify(b.actions));
+            await ev(`window.__calls = []; [...document.querySelectorAll('.dt-bar button')].find(x => x.textContent === 'Cancel').click(); true`); await new Promise(r => setTimeout(r, 300)); // sleep-ok: the bar leaves
+            assert.equal(await bar(), null, at + 'Cancel leaves selection'); assert.deepEqual(await selected(), [], at + 'nothing is selected'); assert.equal(await ev('window.__calls.length'), 0, at + 'and nothing was sent');
+            await press('Phone review 2.txt'); await tap('Phone review 3.txt');
+            await ev(`[...document.querySelectorAll('.dt-bar button')].find(x => x.textContent === 'Approve').click(); true`);
+            await waitFor(`window.__calls.filter(c => c.review && c.decision === 'approve').length === 2`, at + 'Approve is one request per file', 8000);
             await removeBoards(ev, [team]).catch(() => {});
         }
-        console.log('\nPASS the phone rows: one main button, no Ignore button, a swipe ignores');
+        console.log('\nPASS the phone rows: no buttons, tap opens, long press selects, the bar acts on the selection');
     } finally { await removeBoards(ev, [team]).catch(() => {}); await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

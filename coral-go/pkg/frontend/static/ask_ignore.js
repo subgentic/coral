@@ -20,3 +20,8 @@ export async function ignoreAsk(a, who) {
     showToast(`Ignored the question of ${who}`, false, undefined, { action: { label: 'Undo', onClick: () => close(a, { undo: true }).then(() => { refreshOperatorAsks(true); announceNotice(`The question of ${who} is back in Needs you.`); }).catch(e => showToast(e.message, true)) } });
     announceNotice(`Ignored the question of ${who}. Undo is in the notice.`);
 }
+
+/** The bulk Ignore of a phone's selection (#11671): the same close route and Undo, with one toast for the whole selection (said by the caller). */
+export const closeAsk = a => close(a, { note: NOTE });
+export const reopenAsk = a => close(a, { undo: true }).then(() => refreshOperatorAsks(true));
+export { refreshOperatorAsks };

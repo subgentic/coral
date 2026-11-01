@@ -18,7 +18,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
     const SCROLLER = `(() => { for (let e = document.querySelector('${T} tbody'); e; e = e.parentElement) { const o = getComputedStyle(e).overflowY; if ((o === 'auto' || o === 'scroll') && e.scrollHeight > e.clientHeight + 1) return e; } return document.scrollingElement; })()`;
     const state = () => ev(`(() => { const s = ${SCROLLER}, rows = [...document.querySelectorAll('${T} tbody tr')], a = document.activeElement, tr = a && a.closest ? a.closest('tr') : null;
         return { top: Math.round(s.scrollTop), names: rows.map(r => (r.textContent.match(/plan-\\d+\\.md/) || [''])[0]), focusRow: tr ? (tr.textContent.match(/plan-\\d+\\.md/) || [''])[0] : '' }; })()`);
-    const toRow = n => ev(`document.querySelector('${T} button[aria-label="Approve: ${name(n)}"]').scrollIntoView({ block: 'center' }); true`);
+    const toRow = n => ev(`document.querySelector('${T} button[aria-label="Approve: ${name(n)}"]').closest('tr').scrollIntoView({ block: 'center' }); true`); // the row, not its button: a phone's buttons are out of sight (#11671), and scrolling to one scrolls to nowhere
     const calls = () => ev(`window.__calls`);
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD }); await Page.addScriptToEvaluateOnNewDocument({ source: `localStorage.setItem('coral-inbox-needs-filters', JSON.stringify({ sort: 'oldest' }));` }); // the Inbox's list is read before a test can set its order: oldest first, set before the page loads (newest first is the default, #11552)

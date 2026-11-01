@@ -1,5 +1,5 @@
 // The Actions column is the last one in Needs you, at the right edge of the row, its buttons right-aligned (#11552, the operator's request: "as people expect"); Blocks, Waiting and the others stay to its left. 1280 px: the table's
-// last visible column is Actions and its last button ends at the cell's right edge; 390 px: a phone row's buttons end at the row's right edge. Review artifacts through the real board API (the team), the artifact list stubbed as the
+// last visible column is Actions and its last button ends at the cell's right edge; 390 px: a phone row has no visible button (#11671). Review artifacts through the real board API (the team), the artifact list stubbed as the
 // server answers, like inbox_needs_actions_width_browser. Isolated dev server.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -59,9 +59,9 @@ const { coralReady } = require('./helpers/wait');
 
         // 390: the phone's row: Approve, Changes and More (Deny, Ignore); its buttons end at the row's right edge
         await load(390, 844, true);
-        const phone = await ev(`(() => { const r = ${row('Review file 02.txt')}, box = r.getBoundingClientRect(), bs = [...r.querySelectorAll('.inbox-review-actions button')].map(b => b.getBoundingClientRect()).filter(b => b.width > 0);
-            return { n: bs.length, gap: Math.round(box.right - Math.max(...bs.map(b => b.right))), left: Math.round(Math.min(...bs.map(b => b.left)) - box.left) }; })()`);
-        check(phone.n >= 3 && phone.gap >= 0 && phone.gap <= 20 && phone.left >= 0, '390: the row\'s buttons end at the row\'s right edge and none is cut off on the left: ' + JSON.stringify(phone));
+        // #11671: a phone's row carries no visible button (tap opens, long press selects, swipe ignores); its buttons stay in the page, out of sight, for a screen reader and the keyboard
+        const phone = await ev(`(() => { const r = ${row('Review file 02.txt')}, cell = r.querySelector('.inbox-review-actions').closest('.dt-td'), c = cell.getBoundingClientRect(); return { n: r.querySelectorAll('.inbox-review-actions button').length, cellW: Math.round(c.width), cellH: Math.round(c.height) }; })()`);
+        check(phone.n >= 3 && phone.cellW <= 20 && phone.cellH <= 44, '390: the row keeps its buttons in the page but none is on screen: ' + JSON.stringify(phone));
         check(JSON.stringify(await labels('Review file 01.txt')) === JSON.stringify(['Approve: Review file 01.txt', 'Request changes: Review file 01.txt', 'More actions for Review file 01.txt']), '390: an unread phone row has Approve, Changes and More: ' + JSON.stringify(await labels('Review file 01.txt')));
         await ev(`${row('Review file 02.txt')}.querySelector('.inbox-row-more-toggle').click(); true`);
         await waitFor(`!!document.querySelector('.inbox-row-more-toggle[aria-expanded="true"]')`, '390: the More menu opens', 4000).catch(() => {});
