@@ -34,7 +34,7 @@ export function isPanelEvent(m) {
 /** A locked frame for the panel host: scripts only, an opaque origin, no referrer. */
 export function createPanelFrame(title) {
     const frame = document.createElement('iframe');
-    frame.title = title || 'Agent panel';
+    frame.setAttribute('aria-label', title || 'Agent panel'); // a title would be a tooltip over the content
     frame.setAttribute('sandbox', 'allow-scripts');
     frame.setAttribute('referrerpolicy', 'no-referrer');
     frame.setAttribute('allow', ''); // no camera, microphone, geolocation, clipboard...

@@ -24,7 +24,7 @@ export function showArtifactsTabContent() {
     const frame = document.createElement('iframe');
     frame.id = 'artifacts-frame';
     frame.className = 'inbox-frame';
-    frame.title = 'Artifacts';
+    frame.setAttribute('aria-label', 'Artifacts'); // a title would be a tooltip over the content
     frame.setAttribute('referrerpolicy', 'no-referrer');
     frame.setAttribute('allow', ''); // no camera, microphone, geolocation or other powerful features
     frame.setAttribute('src', ARTIFACTS_URL);

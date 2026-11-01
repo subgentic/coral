@@ -125,7 +125,7 @@ export function showInboxTabContent({ folder = '', quiet = false } = {}) {
     const frame = document.createElement('iframe');
     frame.id = 'inbox-frame';
     frame.className = 'inbox-frame';
-    frame.title = 'Inbox';
+    frame.setAttribute('aria-label', 'Inbox'); // a title would be a tooltip over the content
     frame.setAttribute('referrerpolicy', 'no-referrer');
     frame.setAttribute('allow', ''); // no camera, microphone, geolocation or other powerful features
     frame.setAttribute('src', INBOX_URL);
