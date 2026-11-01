@@ -14,6 +14,7 @@ import (
 	"github.com/subgentic/coral/internal/agent"
 	"github.com/subgentic/coral/internal/naming"
 	"github.com/subgentic/coral/internal/ptymanager"
+	"github.com/subgentic/coral/internal/store"
 )
 
 // #11831: what a Hermes agent is told at launch is a file (agent.HermesFirstMessagePath), not the command line; its start types it as the agent's first message, once, and removes it.
@@ -139,4 +140,46 @@ func TestAHermesFirstMessageWaitsForTheWelcomeLine(t *testing.T) {
 		}
 		return false
 	}, 5*time.Second, 20*time.Millisecond)
+}
+
+// #11852 (b): a Hermes that never shows the welcome line (worded differently by another version) must not leave the agent silently without its protocol: nothing is typed (the input box is not known to be
+// there), and the agent's feed gets a notice that says so, which changes no state.
+func TestAHermesThatNeverShowsItsWelcomeLineGetsANoticeAndNothingTyped(t *testing.T) {
+	_, h, mock, ss := setupSessionsTestServer(t)
+	term := &loginScreenTerminal{mockSessionTerminal: mock}
+	h.terminal = term
+	h.hermesFirstWait = 300 * time.Millisecond
+	data := h.cfg.CoralDir()
+	ctx := context.Background()
+	sid := "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d"
+	name := naming.SessionName("hermes", sid)
+	require.NoError(t, ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: sid, AgentType: "hermes", AgentName: "repo", WorkingDir: "/tmp/p"}))
+	mock.mu.Lock()
+	mock.sessions[name] = &ptymanager.PaneInfo{SessionName: name, Target: name, CurrentPath: "/tmp/p"}
+	mock.mu.Unlock()
+	writeFirstMessage(t, data, "", sid, "You were automatically joined to message board \"team-a\". Go.")
+	term.set("Some other version's banner\n> \n")
+
+	h.deliverHermesFirstMessage("", name)
+	var notice string
+	require.Eventually(t, func() bool {
+		s := sid
+		evs, err := h.ts.ListAgentEvents(ctx, "repo", 20, &s)
+		require.NoError(t, err)
+		for _, e := range evs {
+			if e.EventType == "agent_notice" {
+				notice = e.Summary
+				return true
+			}
+		}
+		return false
+	}, 5*time.Second, 20*time.Millisecond)
+	assert.Contains(t, notice, "first message")
+	assert.Contains(t, notice, "not typed")
+	for _, s := range sentTo(mock, name) {
+		assert.NotContains(t, s, "automatically joined")
+	}
+	st := h.deriveSingleSessionState(ctx, sid, 0)
+	assert.False(t, st.Working)
+	assert.False(t, st.NeedsInput, "the notice changes no state")
 }

@@ -169,10 +169,16 @@ func (h *SessionsHandler) deliverHermesFirstMessage(team, target string) {
 		return
 	}
 	safego.Go("routes:hermesFirstMessage", func() {
-		ctx, cancel := context.WithTimeout(context.Background(), hermesFirstMessageWait)
+		wait := h.hermesFirstWait
+		if wait <= 0 {
+			wait = hermesFirstMessageWait
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), wait)
 		defer cancel()
 		if !h.waitForHermesWelcome(ctx, name, sid) {
+			// Never typed: Hermes may word its welcome line differently, and the input box is not known to be there, so the text is not sent blind (it could answer a menu). The agent's feed says so instead.
 			slog.Warn("hermes: Hermes was not ready for its first message", "session", sid[:8])
+			h.noteHermesFirstMessageNotTyped(sid)
 			return
 		}
 		if err := deliverAutomated(ctx, h.terminal, name, at.Hermes, sid, text, "first message"); err != nil {
@@ -217,4 +223,25 @@ func (h *SessionsHandler) hermesTurnGoing(ctx context.Context, sessionID string)
 		return false
 	}
 	return h.deriveSingleSessionState(ctx, sessionID, 0).Working
+}
+
+// noteHermesFirstMessageNotTyped puts a notice in the agent's feed that its first message was not typed. Its type (agent_notice) is one no state rule reads, so it changes no state.
+func (h *SessionsHandler) noteHermesFirstMessageNotTyped(sessionID string) {
+	if h.ts == nil || h.ss == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	ls, err := h.ss.GetLiveSession(ctx, sessionID)
+	if err != nil || ls == nil {
+		return
+	}
+	sid := sessionID
+	if _, err := h.ts.InsertAgentEvent(ctx, &store.AgentEvent{
+		AgentName: ls.AgentName, SessionID: &sid, EventType: "agent_notice",
+		Summary:   "Hermes did not show its welcome line, so its first message (the board protocol and its task) was not typed: open its terminal and send it by hand",
+		CreatedAt: time.Now().UTC().Format(store.ISOFormat),
+	}); err != nil {
+		slog.Debug("hermes: the notice was not recorded", "error", err)
+	}
 }
