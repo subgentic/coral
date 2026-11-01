@@ -479,7 +479,7 @@ function placeAcfCliLine(container, opts) {
 }
 
 function wireAcfAgentType(container) {
-    container.dataset.acfLastType = container.querySelector('.acf-agent-type')?.value || 'claude';
+    container._acfLastType = container.querySelector('.acf-agent-type')?.value || 'claude';
     container.querySelector('.acf-agent-type')?.addEventListener('change', () => {
         const agentType = container.querySelector('.acf-agent-type')?.value || 'claude';
         keepModelPerProvider(container, agentType);
@@ -587,18 +587,15 @@ function mountAgentRows(container) {
 //   • hides the field entirely for the terminal agent,
 //   • pre-fills the input with the user's default for that type, but only
 //     when the user hasn't touched the field (dirty flag off).
-/** Each provider keeps its own Model (#11786): a model typed under Pi is Pi's, not Claude's. On a change of provider the one box puts away what the old provider had and takes what the new one had, or goes back to its default. */
-function keepModelPerProvider(container, type) {
-    const was = container.dataset.acfLastType || '', box = container.querySelector('.acf-model');
-    container.dataset.acfLastType = type;
+/** Each provider keeps its own Model (#11786). */
+function keepModelPerProvider(c, type) {
+    const was = c._acfLastType, box = c.querySelector('.acf-model'), d = c.dataset, kept = (c._acfModels ||= {});
+    c._acfLastType = type;
     if (!box || !was || was === type) return;
-    const kept = (container._acfModels ||= {});
-    kept[was] = { value: box.value, dirty: container.dataset.acfModelDirty === 'true', other: !!container._otherChosen };
-    const back = kept[type];
-    box.value = back ? back.value : '';
-    container.dataset.acfModelDirty = back?.dirty ? 'true' : 'false'; container.dataset.acfModelClassifying = 'false';
-    container._otherChosen = !!back?.other;
-    syncModelPicker(container, false);
+    kept[was] = { v: box.value, own: d.acfModelDirty === 'true' || !!d.acfChosenFetch && d.acfChosenFetch === d.acfFetchSeq, other: c._otherChosen }; // typed or picked: theirs on return
+    const back = kept[type] || {};
+    box.value = back.v || ''; d.acfModelDirty = String(!!back.own); d.acfModelClassifying = 'false'; c._otherChosen = !!back.other;
+    syncModelPicker(c, false);
 }
 
 export function _syncACFModelField(container) {

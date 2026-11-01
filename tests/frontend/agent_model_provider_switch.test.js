@@ -26,6 +26,16 @@ const BASE = require('./test_base').BASE;
     const back = await ev(`(async()=>{const s=document.querySelector('.acf-agent-type'); s.value='claude'; s.dispatchEvent(new Event('change',{bubbles:true})); await new Promise(r=>setTimeout(r,120)); // sleep-ok: the form's model default fetch and redraw, as in the steps above
     return {type:s.value,model:document.querySelector('.acf-model').value,dirty:document.getElementById('fixture').dataset.acfModelDirty}; })()`);
     assert.deepEqual(back,{type:'claude',model:'my-custom-codex-model',dirty:'true'}); // and back on Claude it returns
+    // a model picked from Claude's list is Claude's own: away to Codex and back, the default that was on its way when the person returned does not replace it (#11786)
+    const picked = await ev(`(async()=>{ const wait = async f => { for (let i = 0; i < 150 && !f(); i++) await new Promise(r => setTimeout(r, 20)); }, f = document.getElementById('fixture'), R = window.fetch;
+        window.fetch = async (url, o) => String(url).includes('/api/agents/models') && String(url).includes('type=claude') ? new Response(JSON.stringify({agent_type:'claude',models:[{value:'claude-mid'}],refreshing:false})) : R(url, o);
+        for (const k of Object.keys(localStorage)) if (k.startsWith('coral-models:v1:')) localStorage.removeItem(k);
+        window.renderAgentConfigForm('fixture',{value:{agentType:'claude'}}); await wait(() => f.dataset.acfDefaults === 'ready' && [...f.querySelectorAll('.acf-model-select option')].some(o => o.value === 'claude-mid'));
+        const sel = f.querySelector('.acf-model-select'); sel.value = 'claude-mid'; sel.dispatchEvent(new Event('change',{bubbles:true}));
+        const t = f.querySelector('.acf-agent-type'); t.value = 'codex'; t.dispatchEvent(new Event('change',{bubbles:true})); await wait(() => f.dataset.acfDefaults === 'ready');
+        t.value = 'claude'; t.dispatchEvent(new Event('change',{bubbles:true})); await wait(() => f.dataset.acfDefaults === 'ready'); await new Promise(r => setTimeout(r, 50));
+        window.fetch = R; return {type:t.value,model:f.querySelector('.acf-model').value}; })()`);
+    assert.deepEqual(picked,{type:'claude',model:'claude-mid'});
     fs.writeFileSync(require('node:os').tmpdir() + '/coral-1492-provider-switch.png', Buffer.from((await Page.captureScreenshot()).data,'base64'));
     console.log(JSON.stringify({claudeToCodex,codexToClaude,unchanged,custom,back}));
   } finally { await client.close(); }

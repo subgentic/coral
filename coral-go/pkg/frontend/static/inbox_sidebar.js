@@ -256,7 +256,7 @@ function needsBulkActions() {
 }
 
 /** A review row's actions, the one set on every screen (#11552, approved by the operator): Approve, Changes, Deny, Ignore as words, in that order; Mark unread (a read row) in More, and on a phone Deny and Ignore too. The row itself opens the file. Each action that clears the row keeps the person's place. */
-export function reviewActions(row, inSaved = false) { // inSaved (#11641): a saved file keeps Approve, Changes and Deny; its menu has Move to Needs you, not Ignore and Save
+export function reviewActions(row, inSaved = false) { // inSaved (#11641, #11799): a saved file has the same actions as a Needs you row; its menu has Move to Needs you, not Save for later
     const compact = compactActions(), box = DT.el('div', `inbox-review-actions inbox-slots${compact ? ' inbox-slots-compact' : ''}`);
     const file = markHidden(row.name, { strict: true }); // what a button, a menu and a spoken line call the file: hidden characters written out (Security's SHOULD, #11552)
     const errorText = DT.el('span', 'inbox-review-error'); errorText.setAttribute('role', 'alert');
@@ -279,12 +279,10 @@ export function reviewActions(row, inSaved = false) { // inSaved (#11641): a sav
     if (!decisionNeedsPerson(splitKey(row.team).server)) { // through Coral Hub a guest cannot decide
         box.append(word('Approve', 'Approve', 'btn-primary', approve), word('Changes', 'Request changes', '', () => openReview(row, { requestChanges: true })));
         box.lastChild.title = 'Request changes';
-        if (inSaved) { if (compact) menu.push({ label: 'Deny', title: 'A final no: the agent is told', run: deny }); else box.append(word('Deny', 'Deny', 'btn-quiet inbox-deny', deny)); menu.push({ label: 'Move to Needs you', title: 'Put it back in Needs you as it was', run: unsave }); }
-        else {
-            if (compact) menu.push({ label: 'Deny', title: 'A final no: the agent is told', run: deny }, { label: 'Ignore', title: 'Take it out of Needs you; nobody is told', run: ignore });
-            else box.append(word('Deny', 'Deny', 'btn-quiet inbox-deny', deny), word('Ignore', 'Ignore', 'btn-quiet', ignore));
-            if (!bookmark) menu.push({ label: 'Save for later', title: 'Keep it in Saved, out of Needs you; nobody is told', run: save });
-        }
+        if (compact) menu.push({ label: 'Deny', title: 'A final no: the agent is told', run: deny }, { label: 'Ignore', title: 'Take it out of Needs you; nobody is told', run: ignore });
+        else box.append(word('Deny', 'Deny', 'btn-quiet inbox-deny', deny), word('Ignore', 'Ignore', 'btn-quiet', ignore));
+        if (inSaved) menu.push({ label: 'Move to Needs you', title: 'Put it back in Needs you as it was', run: unsave });
+        else if (!bookmark) menu.push({ label: 'Save for later', title: 'Keep it in Saved, out of Needs you; nobody is told', run: save });
     }
     if (isRead(row) && !inSaved) { box.classList.add('inbox-review-actions-read'); menu.push({ label: 'Mark unread', title: 'Count it in Needs you again', run: unread }); }
     if (menu.length) { const more = moreMenu(menu, file); more.setAttribute('data-slot', 'dots'); box.append(more); }
@@ -639,7 +637,7 @@ function savedListSpec(where = '') {
                     return b; } },
             ] }).el };
     if (!files.length) return spec;
-    return { ...spec, count: rows.length + files.length, empty: rows.length ? spec.empty : null, signature: JSON.stringify([spec.signature, files.map(a => [a.reviewKey, a.name])]), node: () => { const wrap = DT.el('div', 'saved-files-wrap'), host = DT.el('div', 'saved-files'); wrap.append(host); if (rows.length) wrap.append(DT.el('h3', 'saved-files-title', 'Saved messages'), spec.node()); importOnce('./saved_files.js').then(m => m.fillSavedFiles(host, files, { DT, reviewActions, openReview, shown: a => markHidden(a.name, { strict: true }), subtitleOf: a => subOf({ review: a, board_project: splitKey(a.team).name, server: splitKey(a.team).server }, true) })).catch(() => {}); return wrap; } };
+    return { ...spec, count: rows.length + files.length, empty: rows.length ? spec.empty : null, signature: JSON.stringify([spec.signature, files.map(a => [a.reviewKey, a.name])]), node: () => { const wrap = DT.el('div', 'saved-files-wrap'), host = DT.el('div', 'saved-files'); wrap.append(host); if (rows.length) wrap.append(DT.el('h3', 'saved-files-title', 'Saved messages'), spec.node()); importOnce('./saved_files.js').then(m => m.fillSavedFiles(host, files, { DT, reviewActions: a => hoverWrap(a, reviewActions(a, true)), openReview, shown: a => markHidden(a.name, { strict: true }), subtitleOf: a => subOf({ review: a, board_project: splitKey(a.team).name, server: splitKey(a.team).server }, true) })).catch(() => {}); return wrap; } };
 }
 
 /** A message of the agent's Saved tab, as a sheet over the dock panel (the pane the Artifacts tab uses, detail_pane.js): what the Inbox's page holds (the text, why it cannot be opened, Read the whole message) with Open (the chat) and Remove from saved in its bar. Back, the close button and Escape return to the Saved table, the focus on the row. */

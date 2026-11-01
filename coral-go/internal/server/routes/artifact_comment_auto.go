@@ -103,7 +103,7 @@ func (h *SessionsHandler) deliverOperatorComment(r *http.Request, caller comment
 		slog.Warn("[artifact comments] ask not recorded", "error", err)
 		return autoDelivery{Reason: "failed"}
 	}
-	msg := sendMessage(title, "the owner", h.sendVersionLine(id), sendReplyCommand(id, rootID), text, snippet, names)
+	msg := sendMessage(title, "the owner", h.sendVersionLine(id), sendReplyCommand(id, rootID), text, snippet, names, commentPictureLinks(c.ImagesJSON)...)
 	if _, err := h.bs.PostDefusedMessage(ctx, b, board.OperatorName, msg); err != nil {
 		slog.Warn("[artifact comments] message not posted", "board", b, "error", err)
 		return autoDelivery{Reason: "failed"}

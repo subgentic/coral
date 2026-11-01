@@ -132,9 +132,6 @@ func (in CheckInput) actions(items []Item) []action {
 		}
 		out = append(out, action{rank: 5, text: l + ": nothing to nudge until it resets or its plan changes."})
 	}
-	for _, a := range r.Asleep {
-		out = append(out, action{age: in.Now.Sub(a.Since), text: fmt.Sprintf("%s is asleep with %s tagged to it unread since %s. Wake it.", a.Name, plural(a.Count, "message", "messages"), a.Since.UTC().Format("15:04"))})
-	}
 	if r.Counts[StateAsleep] >= rules.Sleeping {
 		names := make([]string, 0, len(r.Open))
 		for n, c := range r.Open {

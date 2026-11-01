@@ -11,8 +11,7 @@ import (
 	"github.com/subgentic/coral/internal/teamhealth"
 )
 
-// The roster of the orchestrator's check (#4583): what each agent is doing, who waits on whom, who sleeps with tagged messages
-// unread, and the one escalation a long wait earns.
+// The roster of the orchestrator's check (#4583): what each agent is doing, who waits on whom, who sleeps with a message for it unread, and the one escalation a long wait earns.
 
 // waitEscalateAfter is how long an agent waits on someone before that someone is told, once.
 const waitEscalateAfter = 10 * time.Minute
@@ -75,6 +74,7 @@ type rosterInputs struct {
 	tasks     []board.Task // open, not parked
 	now       time.Time
 	rules     teamhealth.Rules // the action list's thresholds (#11729)
+	sleepers  map[string]sleeperTags
 }
 
 // buildRoster classifies every agent but the recipient from its real state and groups the waits by who they wait on.
@@ -107,10 +107,7 @@ func (m *BoardHealthMonitor) buildRoster(ctx context.Context, in rosterInputs) (
 		switch {
 		case sleeping[sub.SubscriberID]:
 			r.Counts[teamhealth.StateAsleep]++
-			if n, since, err := m.store.UnreadTagged(ctx, in.project, sub.SubscriberID); err == nil && n > 0 {
-				r.Asleep = append(r.Asleep, teamhealth.AsleepUnread{Name: name, Count: n, Since: since})
-				attention++
-			}
+			r.SleeperBroadcasts += in.sleepers[sub.SubscriberID].tags.Broadcasts() // what is for a sleeper is an item (sleeperItems); the rest is only counted (#11803)
 		case !live:
 			r.Counts[teamhealth.StateOffline]++
 		default:

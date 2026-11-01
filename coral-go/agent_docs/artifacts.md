@@ -230,6 +230,8 @@ Who may do what (one policy, `commentPolicy`; the server refuses with `403` and 
 
 Limits: 8192 bytes a comment, 2048 for the quoted text, 200 for its context, 500 live comments per artifact, 20 writes a minute per author (`429`, `Retry-After`).
 
+**Pictures in a comment (#11650).** The person writing a comment can attach up to 4 pictures (PNG, JPEG or WebP, 25 MB each; a comment with pictures may have no words). `POST /api/artifacts/{id}/comment-images` (the raw file as the body, `Content-Type` its type, optional `X-Artifact-Name`, `?board=` when several teams hold the file, `?version_of=<a picture just added to this file>` for a marked-up copy as the next version of that picture) stores each as an artifact of the commented file's team and answers `{hex, name, content_type, size}`; the comment then names them in `images: [hex, ...]` and every list and answer carries `images: [{hex, name, content_type}]` in the order sent, drawn from `/api/artifacts/{hex}/raw`. The server decides the type from the file's own bytes (a declared type that disagrees is `415 image_type_mismatch`, a file that is not one of the three is `415 image_type`), removes camera metadata as for any image, and a comment can only name pictures its person just added for that file. It is the person's alone: an agent token, a guest and a guide are refused. When a comment is sent to you, the message ends with the pictures' `coral://artifacts/<hex>` links: read each with `coral-agent artifact download <link>`. You cannot add pictures to a comment.
+
 ## More
 
 - [Personal Tasks](agent-tasks.md): `coral-agent task` commands and manifests

@@ -35,9 +35,9 @@ EXTRA = {
     'GET /api/artifacts/resolve': {'link'},
     # The Team Artifacts list's query (#4572): parseTeamArtifactQuery reads these from a url.Values it is handed, not from the request,
     # which the scan above does not follow. Search, filters, sort and cursor paging on the existing route.
-    'GET /api/board/{}/artifacts': {'q', 'kind', 'origin', 'by', 'board', 'kept', 'starred', 'task', 'goal', 'tag', 'since', 'until', 'sort', 'cursor'},
+    'GET /api/board/{}/artifacts': {'q', 'kind', 'origin', 'by', 'board', 'kept', 'starred', 'task', 'goal', 'tag', 'since', 'until', 'sort', 'cursor', 'versions'},
     # The cross-team artifact list (Goal #62): ListAllTeamArtifacts hands the team route's query parser a url.Values it parsed itself, plus team, limit and offset, which the scan above does not follow.
-    'GET /api/team-artifacts': {'team', 'q', 'kind', 'origin', 'by', 'board', 'kept', 'starred', 'task', 'goal', 'tag', 'since', 'until', 'sort', 'cursor', 'limit', 'offset'},
+    'GET /api/team-artifacts': {'team', 'q', 'kind', 'origin', 'by', 'board', 'kept', 'starred', 'task', 'goal', 'tag', 'since', 'until', 'sort', 'cursor', 'limit', 'offset', 'versions'},
     # The board message search (#4745): SearchMessages reads these from a url.Values it parsed itself (a mistyped query string is refused,
     # not dropped), which the scan above does not follow.
     'GET /api/board/{}/messages/search': {'q', 'from', 'mentions', 'since', 'until', 'sort', 'limit', 'cursor', 'for_subscriber'},
@@ -87,6 +87,9 @@ DROP = {
 ENUM = {
     # diff=fields (#3281) only changes the feed's shape (partial rows for a dashboard); only that exact value passes.
     'GET /ws/coral': {'feed': ['hub'], 'diff': ['fields']},
+    # One row per file (#11700, coral-hub's ask #11782): versions accepts only newest through the tunnel. The handler also takes "all", which the Hub has no use for; any other word is refused here as it is by the handler.
+    'GET /api/board/{}/artifacts': {'versions': ['newest']},
+    'GET /api/team-artifacts': {'versions': ['newest']},
     # The artifact link form (#3168): only v=2 passes; any other value or a second v is refused.
     'GET /api/artifacts/{}': {'v': ['2']},
     # The token-usage summary without its per-session list (#9820, coral-hub): include accepts only totals; any other word is refused here as it is by the handler.

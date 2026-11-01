@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { toGoal, toGoalList, mergeGoalLists, toTask, toTaskList, toTaskPage, toDrivers, createBody, errorOf, LIST_PATH } from '../../coral-go/pkg/frontend/static/goals_adapter.js';
 
 const g = toGoal({ id: 4, goal_uid: 'u', board_id: 'b', title: 'T', outcome: 'O', done_when: 'D', state: 'BLOCKED', blocked_on: 'the Operator', driver: 'QA', created_at: 'x', updated_at: '2026-10-24T12:00:00Z', rollup: { done: 5, active: 2, blocked: 1, queued: 1, total: 9 } });
-assert.deepEqual(g, { id: 4, title: 'T', outcome: 'O', doneWhen: 'D', state: 'blocked', blockedOn: 'the Operator', driver: 'QA', updatedAt: '2026-10-24T12:00:00Z', rollup: { done: 5, active: 2, blocked: 1, queued: 1 } });
-assert.deepEqual(toGoal({ id: 1, title: 'Only a title' }), { id: 1, title: 'Only a title', outcome: '', doneWhen: '', state: '', blockedOn: '', driver: '', updatedAt: '', rollup: { done: 0, active: 0, blocked: 0, queued: 0 } }, 'omitted fields are empty, never missing');
+assert.deepEqual(g, { id: 4, title: 'T', outcome: 'O', doneWhen: 'D', state: 'blocked', blockedOn: 'the Operator', driver: 'QA', images: [], updatedAt: '2026-10-24T12:00:00Z', rollup: { done: 5, active: 2, blocked: 1, queued: 1 } });
+assert.deepEqual(toGoal({ id: 1, title: 'Only a title' }), { id: 1, title: 'Only a title', outcome: '', doneWhen: '', state: '', blockedOn: '', driver: '', images: [], updatedAt: '', rollup: { done: 0, active: 0, blocked: 0, queued: 0 } }, 'omitted fields are empty, never missing');
 assert.equal(toGoal(null).id, 0); assert.deepEqual(toGoal({ rollup: { done: -1, active: 'x', blocked: 2.9, queued: null } }).rollup, { done: 0, active: 0, blocked: 2, queued: 0 });
 
 const list = toGoalList({ goals: [{ id: 1, updated_at: '2026-10-24T10:00:00Z' }, { id: 2, updated_at: '2026-10-24T12:00:00Z' }, { id: 3, updated_at: '2026-10-24T12:00:00Z' }], require_goal: true });
@@ -29,6 +29,12 @@ assert.equal(toTaskPage({ tasks: [] }).cursor, '', 'no cursor: nothing more'); a
 assert.deepEqual(errorOf({ error: 'a goal needs a title', code: 'goal_title_required' }), { code: 'goal_title_required', message: 'a goal needs a title' });
 assert.deepEqual(errorOf(null), { code: '', message: '' });
 assert.deepEqual(createBody({ title: ' T ', doneWhen: ' D ', driver: ' ', by: 'Operator' }), { title: 'T', subscriber_id: 'Operator', done_when: 'D' });
+// #11653: the Description is the outcome, and the stored pictures are named in order; nothing blank is sent
+assert.deepEqual(createBody({ title: 'T', description: ' Line one\nLine two ', images: ['a'.repeat(64), 'b'.repeat(64)], by: 'Operator' }), { title: 'T', outcome: 'Line one\nLine two', images: ['a'.repeat(64), 'b'.repeat(64)], subscriber_id: 'Operator' });
+assert.deepEqual(createBody({ title: 'T', description: '  ', images: [] }), { title: 'T' }, 'a blank Description and no pictures send neither');
+const withPics = toGoal({ id: 2, images: [{ hex: 'c'.repeat(64), name: 'one.png', content_type: 'image/png' }, { hex: 'not a hex', name: 'x' }, null] });
+assert.deepEqual(withPics.images, [{ hex: 'c'.repeat(64), name: 'one.png' }], 'a goal\'s pictures keep only stored artifacts, in order');
+assert.deepEqual(toGoal({ id: 3, images: 'x' }).images, [], 'a shape that is not a list is no pictures');
 assert.deepEqual(toDrivers([{ subscriber_id: 'qa-eng', job_title: 'QA' }, { subscriber_id: 'orch', job_title: 'Orchestrator' }, { subscriber_id: 'orch', job_title: 'Orchestrator' }, { subscriber_id: 'plain' }, { job_title: 'no id' }]), [{ id: 'orch', label: 'Orchestrator (orch)', orchestrator: true }, { id: 'qa-eng', label: 'QA (qa-eng)', orchestrator: false }, { id: 'plain', label: 'plain', orchestrator: false }], 'the Orchestrator first, a name once, an entry with no id left out, the id alone when there is no role');
 assert.deepEqual(toDrivers(null), []); assert.deepEqual(toDrivers({}), []);
 assert.equal(LIST_PATH, '/goals?state=proposed,active,blocked,done,dropped&limit=200');

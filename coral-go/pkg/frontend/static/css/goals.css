@@ -111,3 +111,4 @@
 .goals-title-cell { display: flex; flex-direction: column; min-width: 0; }
 .goals-row-tasks { display: none; font-size: var(--fs-sm); color: var(--text-muted); font-variant-numeric: tabular-nums; }
 @container (max-width: 36rem) { .goals-title-cell .goals-row-tasks { display: block; } } /* the clamp and the wrap are in data_table.css (the census keeps .dt-* rules there) */
+
