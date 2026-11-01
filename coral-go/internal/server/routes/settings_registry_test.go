@@ -57,6 +57,7 @@ var settingRows = map[string]struct{ good, bad string }{
 	"inbox_welcome_done":          {`"welcome,agent"`, `true`},
 	"chief_page":                  {`"true"`, `"nope"`},
 	"chief_actions":               {`"act"`, `"bypassPermissions"`},
+	"goal_done_hidden":            {`"[\"team|1|2\"]"`, `true`},
 	"chief_team":                  {`"chief"`, `true`},
 	"chief_session":               {`"11111111-2222-4333-8444-555555555555"`, `true`},
 	"chief_name":                  {`"Ada"`, `true`},

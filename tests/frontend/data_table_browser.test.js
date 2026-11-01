@@ -182,7 +182,7 @@ const { coralReady } = require('./helpers/wait');
         assert.equal(await ev(`document.querySelector('#dt-host th[data-key="who"]').getAttribute('aria-sort')`), 'none', 'a drag does not sort');
         assert.equal(await ev(`document.querySelector('#dt-host th[data-key="who"] .dt-resize').getAttribute('aria-valuenow')`), String(w1.who), 'the separator says its width');
         await drag('who', -1000);
-        assert.ok((await W('who')) >= 64 && (await W('who')) <= 70, 'a column never gets narrower than its minimum: ' + await W('who'));
+        assert.ok((await W('who')) >= 64 && (await W('who')) <= 90, 'a column never gets narrower than its minimum (64 px, or what its whole head needs): ' + await W('who'));
         await drag('who', 120);
         const kept = await W('who');
         assert.deepEqual(Object.keys(JSON.parse(await ev(`localStorage.getItem(${JSON.stringify(KEY)})`))).includes('who'), true, 'the width is kept in this browser');

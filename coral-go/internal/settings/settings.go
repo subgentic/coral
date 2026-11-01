@@ -298,3 +298,6 @@ func ChiefPermissionMode(m map[string]string) string {
 	}
 	return "default"
 }
+
+// GoalDoneHidden is the setting that lists the goals the Operator hid from Needs you with Not yet or Ignore (#11825).
+const GoalDoneHidden = "goal_done_hidden"

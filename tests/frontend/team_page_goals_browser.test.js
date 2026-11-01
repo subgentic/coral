@@ -7,7 +7,6 @@ const { connect } = require('./agent_view_harness');
 const { install: installTP, seed, openTeam, goTab, scenarios } = require('./helpers/team_page');
 const BASE = require('./test_base').BASE;
 const { removeBoards } = require('./helpers/board_cleanup');
-const { assertPinnedBar } = require('./helpers/pinned_bar');
 
 const VIEWS = [['1280x800', 1280, 800, false], ['390x844', 390, 844, true]];
 const TEAM = `qa-goals-${Date.now() % 100000}`;
@@ -70,9 +69,9 @@ const GOAL = 'Explore goals with two teams';
                 assert.equal(await ev(`window.__tp.page().querySelectorAll('.goal-list .dt-primary').length`), 3, 'the goal\'s three tasks are rows of the list under the strip');
                 assert.ok(await ev(`!!window.__tp.find('button', /^Add task$/i)`), 'Add task');
                 assert.ok(await ev(`!!window.__tp.find('button', /^Close goal/i)`), 'Close goal');
-                if (!mobile) { const bar = await assertPinnedBar(ev, '#team-panel-goals .goals-pinbar, .goals-table-page .goals-pinbar, .goals-pinbar', "a goal's page"); assert.match(bar.names.at(-1), /^Close goal/, 'Close goal is the primary, last (named for its goal)'); }
-                const pinned = await ev(`(() => { const b = window.__tp.find('button', /^Close goal/i); const r = b.getBoundingClientRect(); return { bottom: Math.round(innerHeight - r.bottom), pos: getComputedStyle(b.closest('[class*=bar], footer, [role=toolbar]') || b.parentElement).position }; })()`);
-                assert.ok(pinned.bottom <= 24, `the bar is pinned at the bottom of the screen (its buttons are ${pinned.bottom} px above it)`);
+                const head = await ev(`(() => { const h = document.querySelector('.goal-back-row'), names = h ? [...h.querySelectorAll('.goal-head-actions .btn')].map(b => b.textContent.trim()) : []; return { names, primary: !!h && !!h.querySelector('.goal-head-actions .btn:last-child.btn-primary'), bar: !!document.querySelector('.goals-pinbar') }; })()`);
+                assert.deepEqual(head.names.map(n => n.replace(/^(Close goal).*/, '$1')), ['Add task', 'Close goal'], "the goal's actions are in its header (#11823)");
+                assert.ok(head.primary && !head.bar, 'Close goal is the primary, last, and there is no bar at the bottom of the page');
             });
             await S.run(`${label}: Back returns to the list with the focus on the goal's row (not the page)`, async () => {
                 await click('button, a', /^(\u2190\s*)?Goals$/, 'back link');
