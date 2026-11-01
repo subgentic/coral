@@ -271,10 +271,10 @@ func TestTheDialogTimeoutWaitsForItsMinutes(t *testing.T) {
 // A person at the agent keeps Coral's hands off: a focused dashboard terminal view of it, or typing in its terminal, in the last 2 minutes.
 func TestADashboardTerminalFocusedOnTheAgentBlocksTheTimeout(t *testing.T) {
 	r := newTimeoutRig(t, "claude", "permission", claudeScreen(t, "permission_menu"))
-	r.h.focus.note(r.sid, true, r.t0.Add(15*time.Minute))
+	r.h.focus.note(r.sid, "ws-a", true, r.t0.Add(15*time.Minute))
 	assert.Equal(t, timeoutPresent, r.try())
 	assert.Empty(t, r.keys())
-	r.h.focus.note(r.sid, true, r.t0.Add(13*time.Minute)) // the last report is older than 2 minutes: nobody is looking
+	r.h.focus.note(r.sid, "ws-a", true, r.t0.Add(13*time.Minute)) // the last report is older than 2 minutes: nobody is looking
 	assert.Equal(t, timeoutDone, r.try())
 }
 
@@ -428,9 +428,56 @@ func TestTheDialogTimeoutRejectsAnOpencodeRequestThroughItsServer(t *testing.T) 
 	typed, _ := r.term.counts()
 	assert.Equal(t, []string{dialogTimeoutNotice}, typed)
 	assert.Equal(t, timeoutNotDue, r.h.opencodeDialogTimeout(context.Background(), r.agent, 15*time.Minute, now), "the newer one has not waited 15 minutes")
-	r.h.focus.note(r.sid, true, now.Add(-time.Minute))
+	r.h.focus.note(r.sid, "ws-a", true, now.Add(-time.Minute))
 	assert.Equal(t, timeoutPresent, r.h.opencodeDialogTimeout(context.Background(), r.agent, 5*time.Minute, now), "a person at it: hands off")
 	assert.Len(t, f.replied, 1)
 }
 
 func r0Screen(t *testing.T) string { return claudeScreen(t, "permission_menu") }
+
+// Security's SHOULD 1 on #420: presence is per view. A focused view stays present while another view of the same agent (a second tab, a phone, a Hub mirror) says it is not focused; only
+// the focused view's own blur, or its socket closing, ends it.
+func TestAFocusedViewStaysPresentWhileAnotherViewIsNotFocused(t *testing.T) {
+	var f terminalFocus
+	now := time.Date(2026, 11, 1, 5, 0, 0, 0, time.UTC)
+	f.note("sid", "view-a", true, now)
+	f.note("sid", "view-b", false, now)
+	assert.True(t, f.within("sid", dialogPresence, now), "view A is focused: present")
+	f.note("sid", "view-b", true, now)
+	f.closed("sid", "view-b")
+	assert.True(t, f.within("sid", dialogPresence, now), "view B's socket closing leaves view A")
+	f.note("sid", "view-a", false, now)
+	assert.False(t, f.within("sid", dialogPresence, now), "view A blurred: nobody")
+	f.note("sid", "view-a", true, now)
+	f.closed("sid", "view-a")
+	assert.False(t, f.within("sid", dialogPresence, now), "view A's socket closed")
+	assert.Empty(t, f.m, "nothing is kept for an agent with no view")
+	f.note("sid", "", true, now)
+	assert.False(t, f.within("sid", dialogPresence, now), "a report from no view counts for nothing")
+}
+
+// Security's SHOULD 2 on #420: a close that did not go (opencode did not take the reject) is recorded as an event of its own and does not resolve the agent's wait; it is not retried.
+func TestAFailedCloseLeavesTheWaitOpen(t *testing.T) {
+	r := newTimeoutRig(t, "claude", "permission", r0Screen(t))
+	r.agent.agentType = "opencode"
+	r.mock.addSession(naming.SessionName("opencode", r.sid), "/tmp/project")
+	r.show(r.idle)
+	f := &fakeOpencode{perms: []opencode.PermissionRequest{{ID: "per_old", Permission: "bash", Command: "ls", At: r.t0}}, replyErr: fmt.Errorf("the server went away")}
+	r.h.opencode = f
+	now := r.t0.Add(16 * time.Minute)
+	assert.Equal(t, timeoutSendFailed, r.h.opencodeDialogTimeout(context.Background(), r.agent, 15*time.Minute, now))
+	assert.Empty(t, r.closeEvents(), "no request_resolved")
+	evs, err := r.h.ts.ListAgentEvents(context.Background(), "chat", 200, &r.sid)
+	require.NoError(t, err)
+	var failed int
+	for _, e := range evs {
+		if e.EventType == "dialog_close_failed" {
+			failed++
+		}
+	}
+	assert.Equal(t, 1, failed, "the failure is recorded")
+	assert.True(t, r.h.deriveSingleSessionState(context.Background(), r.sid, 0).NeedsInput, "the wait stays open")
+	typed, _ := r.term.counts()
+	assert.Empty(t, typed, "no notice for a close that did not go")
+	assert.Equal(t, timeoutNotDue, r.h.opencodeDialogTimeout(context.Background(), r.agent, 15*time.Minute, now), "never retried")
+}

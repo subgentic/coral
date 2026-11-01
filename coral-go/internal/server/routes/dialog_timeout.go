@@ -91,33 +91,59 @@ func dialogScreenExcluded(text string) bool {
 	return login
 }
 
-// terminalFocus is, per agent (session id), when a dashboard terminal view of it last said it was focused; its zero value is ready.
+// terminalFocus is, per agent (session id) and per dashboard terminal VIEW of it (its socket), when that view last said it was focused; its zero value is ready. One view's report never
+// touches another's: a second tab, a phone or a Hub mirror that is not focused does not clear the view a person is looking at (Security's SHOULD 1 on #420).
 type terminalFocus struct {
 	mu sync.Mutex
-	m  map[string]time.Time
+	m  map[string]map[string]time.Time // session id -> view -> last focused report
 }
 
-func (f *terminalFocus) note(sid string, focused bool, now time.Time) {
-	if sid == "" {
+// note records a view's report: focused stamps it, not focused drops it.
+func (f *terminalFocus) note(sid, view string, focused bool, now time.Time) {
+	if sid == "" || view == "" {
 		return
 	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if !focused {
-		delete(f.m, sid)
+		f.dropLocked(sid, view)
 		return
 	}
 	if f.m == nil {
-		f.m = map[string]time.Time{}
+		f.m = map[string]map[string]time.Time{}
 	}
-	f.m[sid] = now
+	if f.m[sid] == nil {
+		f.m[sid] = map[string]time.Time{}
+	}
+	f.m[sid][view] = now
 }
 
+// closed drops a view whose socket closed.
+func (f *terminalFocus) closed(sid, view string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.dropLocked(sid, view)
+}
+
+func (f *terminalFocus) dropLocked(sid, view string) {
+	if views := f.m[sid]; views != nil {
+		delete(views, view)
+		if len(views) == 0 {
+			delete(f.m, sid)
+		}
+	}
+}
+
+// within says ANY view of the agent reported focus within d.
 func (f *terminalFocus) within(sid string, d time.Duration, now time.Time) bool {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	t, ok := f.m[sid]
-	return ok && now.Sub(t) < d
+	for _, t := range f.m[sid] {
+		if now.Sub(t) < d {
+			return true
+		}
+	}
+	return false
 }
 
 // keepOnly drops the views of agents that are no longer live.
@@ -289,19 +315,34 @@ func (h *SessionsHandler) waitInputBox(ctx context.Context, pane string, a liveA
 	}
 }
 
-// recordDialogClosed writes the agent event of a close, and marks the agent's request resolved (as the Operator's dismissal does): the dialog it waited on is gone.
+// closeSent says the close went (outcome closed_*): only then is the dialog gone.
+func closeSent(outcome string) bool {
+	return outcome == timeoutDone || outcome == timeoutNotTyped || outcome == timeoutNoBox
+}
+
+// recordDialogClosed writes the agent event of a try that sent or failed to send a close. Only a close that was sent resolves the agent's request (as the Operator's dismissal does); one that
+// failed (send_failed, opencode's reject not taken) is recorded as an event of its own and the wait stays open (Security's SHOULD 2 on #420).
 func (h *SessionsHandler) recordDialogClosed(ctx context.Context, a liveAgent, first, now time.Time, how, outcome string) {
 	if h.ts == nil {
 		return
 	}
 	sid := a.sid
-	detail, _ := json.Marshal(map[string]any{"minutes": int(now.Sub(first) / time.Minute), "how": how, "outcome": outcome, "closed_by": "dialog_timeout", "dismissed": true})
+	sent := closeSent(outcome)
+	fields := map[string]any{"minutes": int(now.Sub(first) / time.Minute), "how": how, "outcome": outcome, "closed_by": "dialog_timeout"}
+	eventType, summary := "dialog_close_failed", "Coral could not close a dialog that waited past the team's limit"
+	if sent {
+		fields["dismissed"] = true
+		eventType, summary = "request_resolved", "Coral closed a dialog that waited past the team's limit"
+	}
+	detail, _ := json.Marshal(fields)
 	dj := string(detail)
-	ev := &store.AgentEvent{AgentName: a.name, SessionID: &sid, EventType: "request_resolved", Summary: "Coral closed a dialog that waited past the team's limit", DetailJSON: &dj}
+	ev := &store.AgentEvent{AgentName: a.name, SessionID: &sid, EventType: eventType, Summary: summary, DetailJSON: &dj}
 	if _, err := h.ts.InsertAgentEvent(ctx, ev); err != nil {
 		slog.Warn("dialog timeout: recording the close failed", "session", sid, "error", err)
 		return
 	}
-	h.pending.markRequest(sid, false)
-	h.kickFeedForRequestChange(sid, "request_resolved")
+	if sent {
+		h.pending.markRequest(sid, false)
+		h.kickFeedForRequestChange(sid, "request_resolved")
+	}
 }

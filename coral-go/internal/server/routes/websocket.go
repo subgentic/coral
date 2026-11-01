@@ -557,6 +557,7 @@ func (h *SessionsHandler) WSTerminal(w http.ResponseWriter, r *http.Request) {
 	}
 
 	defer h.backend.Unsubscribe(name, subID)
+	defer h.focus.closed(sessionID, subID) // this view's focus report goes with its socket; other views of the agent keep theirs
 
 	t := &terminalStream{h: h, ctx: ctx, conn: conn, name: name, agentType: agentType, sessionID: sessionID, viaHub: cloud.Tunneled(r), subID: subID,
 		sizeCheck: make(chan int64, 1)}
@@ -731,7 +732,7 @@ func (t *terminalStream) handleFrame(msg terminalFrame) {
 		t.composerSend(msg)
 		return
 	case "terminal_focus":
-		t.h.focus.note(t.sessionID, msg.Focused, time.Now()) // only that a view is focused, and when: nothing typed, nothing answered
+		t.h.focus.note(t.sessionID, t.subID, msg.Focused, time.Now()) // only that this view is focused, and when: nothing typed, nothing answered
 		return
 	case "terminal_input":
 		if strings.ContainsAny(msg.Data, "\r\n") {
