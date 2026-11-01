@@ -49,7 +49,7 @@ const { coralReady } = require('./helpers/wait');
                 await mount(shape, name.startsWith('no flexible')); const before = await widths();
                 await press(key, k, 3); const after = await widths(), d = moved(before, after);
                 const lastKey = shape[shape.length - 1], others = Object.keys(d).filter(kk => kk !== key && kk !== 'name' && kk !== lastKey);
-                check(`${name}: ${k} x3 on the ${key} separator changes only ${key}`, others.length === 0 && Object.keys(d).includes(key), JSON.stringify(d));
+                check(`${name}: ${k} x3 on the ${key} separator changes only ${key}${key === 'name' && k === 'ArrowRight' ? ' (or nothing: the table fits its box, so the name has no room to grow, #11835)' : ''}`, others.length === 0 && (Object.keys(d).includes(key) || (key === 'name' && k === 'ArrowRight' && Object.keys(d).length === 0)), JSON.stringify(d));
             }
             // the Operator's #10443: the last column's right edge dragged left (and by keys) fills to the box's edge: the table is not short of its box, no scrollbar over empty space, the last column holds the room
             for (const how of ['drag', 'keys']) {
@@ -64,7 +64,7 @@ const { coralReady } = require('./helpers/wait');
                 check(`${name}, a column dropped by the narrow box: dragging the last column moves it and not the others (the colgroup keeps its slots)`, Object.keys(d).every(k => k === 'updated') && Object.keys(before.cols).length < 5, JSON.stringify({ d, shown: Object.keys(before.cols) }));
             }
             await mount(shape, name.startsWith('no flexible')); const w0 = await widths(); await drag('name', 200); const w1 = await widths();
-            check(`${name}: the name column widened past the box: the table scrolls inside its box and the others keep their widths`, w1.sw > w1.cw && Object.keys(moved(w0, w1)).every(k => k === 'name'), JSON.stringify({ sw: w1.sw, cw: w1.cw, moved: moved(w0, w1) }));
+            check(`${name}: the name column widened past the box: the table still fits its box (no scrolling) and the others keep their widths (#11835)`, w1.sw <= w1.cw + 1 && Object.keys(moved(w0, w1)).every(k => k === 'name'), JSON.stringify({ sw: w1.sw, cw: w1.cw, moved: moved(w0, w1) }));
         }
     } finally { await client.close(); }
     if (results.some(r => !r)) { console.error(`${results.filter(r => !r).length} of ${results.length} failed`); process.exit(1); }
