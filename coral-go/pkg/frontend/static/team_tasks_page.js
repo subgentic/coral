@@ -12,7 +12,7 @@ const TV = await importOnce('./tasks_view.js'); // the one Tasks view: a task li
 const TB = await importOnce('./task_bulk.js'); // what the selection bar does to the selected tasks
 const Toolbar = await importOnce('./team_toolbar.js'); // the one toolbar of the team tabs (#7717)
 import { goalTitle, refreshGoalTitles, readGoal, readGoalChoices, noGoalLabel } from './task_goals.js';
-import { taskStatusWord, statusClass } from './goal_words.js';
+import { taskStatusWord, statusClass, isParked } from './goal_words.js';
 import { state } from './state.js';
 const { needsReview } = await importOnce('./review_pool.js');
 const { linkArtifactRefsIn, linkedText } = await importOnce('./artifact_refs.js'); // a coral://artifacts/<hex> in a task's words is a link (#11416)
@@ -40,7 +40,7 @@ const startFilter = () => (browserLocal.get(HIDE_KEY) === 'false' ? 'all' : 'ope
 const model = { dt: DT.tableState(), choices: null, project: '', filters: { ...TF.EMPTY }, q: emptyQuery(), seq: 0, moreLoaded: false, extraPages: 0, rows: [], cursor: '', totalOpen: null, totalDone: null, filter: startFilter(), loading: false, failed: '', loadingMore: false, moreFailed: '' };
 let root = null, hooks = {};
 const say = (t) => { const s = root && root.querySelector('.team-tasks-status'); if (s) { s.textContent = ''; s.textContent = t; } };
-const bucket = (t) => { const w = taskStatusWord(t.status, t.review_requested); return { 'Queued': 'queued', 'In progress': 'active', 'Blocked': 'blocked', 'In review': 'review', 'Done': 'done' }[w] || 'queued'; };
+const bucket = (t) => { const w = taskStatusWord(t.status, t.review_requested, isParked(t)); return { 'Queued': 'queued', 'Waiting': 'queued', 'In progress': 'active', 'Blocked': 'blocked', 'In review': 'review', 'Done': 'done' }[w] || 'queued'; };
 const btn = (cls, text, onClick) => { const b = el('button', cls, text); b.type = 'button'; if (onClick) b.addEventListener('click', onClick); return b; };
 
 async function readJson(path) {
@@ -390,7 +390,7 @@ export function renderTaskPage(host, task, ctx, mode = 'view') {
     const page = el('div', 'goals-page goals-table-page team-task-page');
     const h = el('h2', 'goals-detail-title', `#${task.id} ${task.title}`); h.tabIndex = -1; h.id = 'team-task-title';
     if (task.version > 1) { const edited = el('span', 'text-muted-sm', ` edited, v${task.version}`); h.append(edited); }
- const word = taskStatusWord(task.status, task.review_requested || (task.workflow && task.workflow.completion_review));
+ const word = taskStatusWord(task.status, task.review_requested || (task.workflow && task.workflow.completion_review), isParked(task));
     const line = el('div', 'goals-detail-line'); line.append(stateChip(word, statusClass(word)));
     // what a queued task waits on, until it is claimed (#10200): the tasks it depends on while any is open, else the agent it is for (#10222)
     const openBlockers = (Array.isArray(task.blocked_by) ? task.blocked_by : []).filter(d => d && d.satisfied === false).map(d => (d.board_id && ctx.project && d.board_id !== ctx.project ? `${keyLabel(String(d.board_id))} #${Number(d.task_id)}` : `#${Number(d.task_id)}`)); // a blocker on another board names it (#10287)

@@ -16,7 +16,7 @@ import { morphHtml } from './dom_morph.js';
 import { goalTitle, refreshGoalTitles } from './task_goals.js';
 import * as DT from './data_table.js';
 import * as TV from './tasks_view.js';
-import { taskStatusWord, statusClass } from './goal_words.js';
+import { taskStatusWord, statusClass, isParked } from './goal_words.js';
 import { whenText } from './when_text.js';
 
 const dockTaskTableState = DT.tableState();
@@ -522,12 +522,12 @@ function _taskTable(tasks, footer) {
         const [stateCol, taskCol, whoCol] = columns;
         stateCol.sort = false;
         stateCol.width = 'content'; // the dock knows a review is asked for from the task's workflow, which the shared word reads from review_requested
-        stateCol.cell = t => { const word = taskStatusWord(t.status, reviewRequested(t)), chip = DT.chip(word, statusClass(word)), st = taskStatus(t); chip.classList.add('board-task-status-wrap'); chip.title = st.detail; chip.setAttribute('aria-label', spoken(word, st)); return chip; };
+        stateCol.cell = t => { const word = taskStatusWord(t.status, reviewRequested(t), isParked(t)), chip = DT.chip(word, statusClass(word)), st = taskStatus(t); chip.classList.add('board-task-status-wrap'); chip.title = st.detail; chip.setAttribute('aria-label', spoken(word, st)); return chip; };
         taskCol.firstDir = 'desc';
         taskCol.cell = t => {
             const cell = DT.el('span', 'dt-title-cell'), description = span('board-task-desc dt-title-content');
             const name = t.title || t.description || '';
-            const b = DT.primaryButton(name, `${t._source === 'subagent' ? 'Open subagent' : 'Open task'}: ${name}, ${spoken(taskStatusWord(t.status, reviewRequested(t)), taskStatus(t))}`);
+            const b = DT.primaryButton(name, `${t._source === 'subagent' ? 'Open subagent' : 'Open task'}: ${name}, ${spoken(taskStatusWord(t.status, reviewRequested(t), isParked(t)), taskStatus(t))}`);
             b.classList.add('board-task-open', 'board-task-name');
             cell.title = t._source === 'subagent' ? _subagentTooltip(t) : t.body || t.body_preview || '';
             description.title = cell.title;
