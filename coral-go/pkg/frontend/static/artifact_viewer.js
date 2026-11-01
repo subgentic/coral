@@ -131,7 +131,7 @@ export function openArtifactViewer(hex, opts = {}) {
     if (!wasOpen && isPhoneLayout()) document.querySelectorAll('#toast-host > .toast:not(.error):not(.has-action)').forEach(t => t.remove()); // a plain toast was announced and sat over the viewer's header and versions at the top of a phone (#11621)
     if (!wasOpen && isPhoneLayout() && !_overlay) _overlay = pushOverlay(() => closeArtifactViewer({ popped: true })); // Back closes it, above the preview's full screen, under its comments sheet
     _comments.open(hex, opts.server, commentBoard(opts), true); // true: the comments of earlier versions of a series too (the server answers the plain list for an artifact in none)
-    _versions.open(hex, opts.server, { switched: !!opts.switched, compare: !!opts.compare });
+    _versions.open(hex, opts.server, { switched: !!opts.switched });
     _review.open(hex, { ...opts, board: commentBoard(opts) });
     // "Who can read this", for the Operator (the owner through Coral Hub): drawn only when the machine answers it; anyone else sees nothing.
     _details.clear();
