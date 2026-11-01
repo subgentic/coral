@@ -44,3 +44,5 @@
 .provider-tabs-wrap { position: relative; }
 .provider-strip-edge { position: absolute; z-index: 2; right: 0; top: 0; width: var(--control-touch-height, 44px); min-width: var(--control-touch-height, 44px); height: var(--control-touch-height, 44px); padding: 0; background: linear-gradient(to right, transparent, var(--bg-secondary, var(--bg-primary)) 40%); border: 0; cursor: pointer; }
 .provider-strip-edge::before { content: ''; position: absolute; right: 16px; top: calc((100% - 9px) / 2); width: 9px; height: 9px; border-top: 2px solid var(--text-primary); border-right: 2px solid var(--text-primary); transform: rotate(45deg); }
+.provider-panel .acf-model-refresh-text { display: none; }
+@media (min-width: 768px) and (pointer: fine) { .provider-panel .acf-model-refresh { width: auto; padding: 0 10px; gap: 6px; } .provider-panel .acf-model-refresh-text { display: inline; font-size: var(--fs-sm); } }
