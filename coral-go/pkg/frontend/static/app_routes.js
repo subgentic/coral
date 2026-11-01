@@ -118,6 +118,7 @@ function registerRouteHandlers() {
             return;
         }
         switchNavTab('hub-inbox', { fromHistory: true, folder: r.folder });
+        if (r.need) (await importOnce('./inbox_link.js')).openNeed(r.need); // a link to one item of Needs you (#11797): the Inbox is on Needs you, the item opens on its card
     });
 
     route('board', async r => { // the old board page is gone (#8061): /board/<team> opens the team page's Messages tab, in its place in the history
