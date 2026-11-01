@@ -649,7 +649,17 @@ export async function refreshChangedFiles(quiet = false) { // quiet: the panel's
             ${stats}
             ${modeSelect}${compareNote}`;
         // The list is redrawn on every poll: the header is written only when it says something new, so its select and counts are not replaced under a person's pointer or a layout pass (#7671).
-        if (titleEl._html !== html) { titleEl.innerHTML = html; titleEl._html = html; }
+        if (titleEl._html !== html) {
+            const sel = titleEl.querySelector('.diff-mode-select');
+            if (sel && titleEl._select === options) { // only the count, the stats, the note or the select's hover words changed: they are rewritten around the select, which stays the same element (its focus, an open list, a Tab walk over it) (#11658)
+                const frag = document.createElement('template'); frag.innerHTML = html;
+                const fresh = frag.content.querySelector('.diff-mode-select'), before = [], after = []; let past = false;
+                for (const n of frag.content.childNodes) { if (n === fresh) past = true; else (past ? after : before).push(n); }
+                for (const n of [...titleEl.childNodes]) if (n !== sel) n.remove();
+                sel.before(...before); sel.after(...after); sel.title = fresh.title;
+            } else titleEl.innerHTML = html;
+            titleEl._html = html; titleEl._select = options;
+        }
     }
     if (countEl && !plain) {
         countEl.textContent = files.length > 0 ? String(files.length) : '';
