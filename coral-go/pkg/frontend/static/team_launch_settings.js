@@ -7,6 +7,7 @@ const { mountSettingsView } = await importOnce('./settings_view.js');
 const { healthFields, healthToValues, valuesToHealth } = await importOnce('./team_health_fields.js');
 const { HEALTH_DEFAULTS } = await importOnce('./team_health_settings.js');
 const { requireGoalSentence } = await importOnce('./task_goals.js');
+const { approvalField, presetFlags, wireApproval, NEW_TEAM_APPROVAL } = await importOnce('./team_approval_presets.js'); // how much the Operator approves: a new team starts on 'Operator approves goals' (#11657)
 
 const ASKS_ARE_TASKS_HINT = 'When an agent needs another agent to do something, it creates a task. Plain posts are for questions and status.';
 const WORKFLOW_HINT = 'Guidance the agents get on how to share the folder. It does not create worktrees.';
@@ -15,7 +16,7 @@ let _view = null;
 let _defaultMode = 'none'; // the working mode a new team starts with: 'none', or the one the chosen team template names (#8919)
 
 // What a new team starts with: nothing from the last team stays.
-const startValues = () => ({ first_task: '', save_goal: true, custom_instructions: '', mode: _defaultMode, dependency_guidance: false, asks_are_tasks: true, require_goal: false, ...healthToValues(HEALTH_DEFAULTS), cross_team_messaging: false, cross_team_artifacts: false });
+const startValues = () => ({ first_task: '', save_goal: true, custom_instructions: '', mode: _defaultMode, dependency_guidance: false, asks_are_tasks: true, planning_approval: NEW_TEAM_APPROVAL, require_goal: true, ...healthToValues(HEALTH_DEFAULTS), cross_team_messaging: false, cross_team_artifacts: false });
 
 // The health check's own rows, less who gets it: at launch that is the Orchestrator (a list of one is noise); another recipient is in Team settings.
 const healthRows = () => healthFields({
@@ -37,7 +38,7 @@ const MODE_WORDS = { shared_checkout: 'Shared checkout', worktrees: 'Worktrees',
 function menuStates(v) {
     return {
         start: v.first_task || v.custom_instructions ? 'set' : 'optional',
-        workflow: MODE_WORDS[v.mode] || (v.dependency_guidance ? 'guidance' : 'no extra rules'),
+        workflow: MODE_WORDS[v.mode] || (v.planning_approval === 'tasks' ? 'you approve tasks' : v.planning_approval === 'goals' ? 'you approve goals' : v.dependency_guidance ? 'guidance' : 'no extra rules'), // a new team starts on 'you approve goals' (#11657)
         health: valuesToHealth(v, HEALTH_DEFAULTS).on ? 'on' : 'off: no stuck-agent checks', // an "off" alone told a newcomer nothing (#11368, QA's walk): the word says what is off
         messaging: v.cross_team_messaging || v.cross_team_artifacts ? 'on: other computers' : 'off: this team only',
     };
@@ -82,7 +83,8 @@ export function mountTeamLaunchSettings() {
                 { key: 'mode', type: 'select', label: 'Working mode', help: WORKFLOW_HINT, options: [{ value: 'none', label: 'None' }, { value: 'shared_checkout', label: 'Shared checkout' }, { value: 'worktrees', label: 'Worktrees' }, { value: 'task_queue', label: 'Task queue' }] },
                 { key: 'dependency_guidance', type: 'toggle', label: 'Guidance for dependent tasks' },
                 { key: 'asks_are_tasks', type: 'toggle', label: 'Requests for work are tasks', help: ASKS_ARE_TASKS_HINT },
-                { key: 'require_goal', type: 'toggle', label: 'Require a goal', help: requireGoalSentence },
+                approvalField({ custom: false, id: 'team-approval' }),
+                { key: 'require_goal', type: 'toggle', label: 'Require a goal', help: requireGoalSentence, disabledWhen: v => (v.planning_approval === 'auto' ? false : 'The approval choice above needs it: without a goal on every task, an agent could add tasks that skip the gate.') },
             ] },
             { id: 'health', label: 'Health check', icon: 'health_and_safety', fields: healthRows() },
             { id: 'messaging', label: 'Messaging', icon: 'forum', fields: [
@@ -95,6 +97,7 @@ export function mountTeamLaunchSettings() {
     const lead = document.createElement('p'); lead.className = 'team-start-lead';
     lead.textContent = 'Everything on this step is optional. The team starts with the settings shown here.';
     host.querySelector('.settings-panes')?.prepend(lead);
+    wireApproval(_view, host, { flagKeys: ['require_goal'], follow: false, autoClearsRequireGoal: true }); // a choice sets Require a goal as it needs; the two approval switches are Team settings'
     host.addEventListener('input', syncMenuStates); host.addEventListener('change', syncMenuStates);
     // the goal switch's state in words, so ticking it twice is seen (#11336: a newcomer clicks it to "tick" it and turns it off)
     const state = document.createElement('p'); state.className = 'sv-hint team-goal-state'; state.id = 'team-goal-state'; state.setAttribute('role', 'status');
@@ -125,6 +128,9 @@ export function readTeamLaunchSettings() {
     out.save_goal = !!v.save_goal; // the first task's goal (team_dialogs.js): on by default
     const board = {};
     if (v.require_goal) board.require_goal = true;
+    const flags = presetFlags(v.planning_approval) || {}; // the choice is a name for the team's flags: they are what is saved, never the name
+    if (flags.goals_need_approval) board.goals_need_approval = true;
+    if (flags.tasks_need_approval) board.tasks_need_approval = true;
     const h = valuesToHealth(v, HEALTH_DEFAULTS);
     if (h.on) out.health_monitor = true;
     if (JSON.stringify(h) !== JSON.stringify(HEALTH_DEFAULTS)) board.health = h;
@@ -146,7 +152,7 @@ export async function applyTeamBoardSettings(teamKey, board) {
     try {
         const resp = await boardFetch(teamKey, '/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: 'Operator', ...board }) });
         if (resp.ok) return '';
-        const names = { require_goal: 'Require a goal', health: 'the health check', cross_team_messaging: 'messaging', cross_team_artifacts: 'file sharing' };
+        const names = { require_goal: 'Require a goal', goals_need_approval: 'goal approval', tasks_need_approval: 'task approval', health: 'the health check', cross_team_messaging: 'messaging', cross_team_artifacts: 'file sharing' };
         return `The team started, but these settings were not saved: ${Object.keys(board).map(k => names[k] || k).join(', ')}. Set them in Team settings.`;
     } catch {
         return 'The team started, but its settings were not saved. Set them in Team settings.';
