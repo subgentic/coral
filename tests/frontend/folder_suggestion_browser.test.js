@@ -19,7 +19,7 @@ const { existing: recentsExist } = require('./helpers/recent_dirs');
             if (o.method === 'POST' && (p === '/api/sessions/launch' || p === '/api/sessions/launch-team')) { window.__posts.push({ p, body: JSON.parse(o.body) }); return Promise.resolve(new Response(JSON.stringify({ error: 'stopped by the test', field: 'working_dir' }), { status: 400, headers: { 'Content-Type': 'application/json' } })); }
             return R(u, o); }; return true; })()`);
         const clearRecents = () => ev(`(() => { for (const k of Object.keys(localStorage)) if (/recent/i.test(k)) localStorage.removeItem(k); return true; })()`);
-        const dirState = id => ev(`(() => { const i = document.getElementById(${JSON.stringify(id)}), n = document.getElementById(${JSON.stringify(id + '-suggest')}); return { value: i.value, note: !!n && !n.hidden && n.getClientRects().length > 0 && /Coral creates this folder/.test(n.textContent), described: (i.getAttribute('aria-describedby') || '').includes(${JSON.stringify(id + '-suggest')}) }; })()`);
+        const dirState = (id, words = /Coral creates this folder/) => ev(`(() => { const i = document.getElementById(${JSON.stringify(id)}), n = document.getElementById(${JSON.stringify(id + '-suggest')}); return { value: i.value, note: !!n && !n.hidden && n.getClientRects().length > 0 && ${words}.test(n.textContent), text: n ? n.textContent : '', tip: n ? n.title : '', label: (document.querySelector('label[for=' + ${JSON.stringify(id)} + ']') || {}).textContent || '', described: (i.getAttribute('aria-describedby') || '').includes(${JSON.stringify(id + '-suggest')}) }; })()`);
 
         await S.run('New agent with no recent folder: the field is ~/Coral/first-agent and a line says Coral makes it', async () => {
             await clearRecents(); await openNewAgent(ev, waitFor);
@@ -59,8 +59,12 @@ const { existing: recentsExist } = require('./helpers/recent_dirs');
             await clearRecents();
             await ev(`(async () => { await window.showLaunchModal(); window._selectLaunchType('team'); return true; })()`);
             await waitFor(`!!document.getElementById('launch-team-dir') && document.getElementById('launch-team-dir').getClientRects().length > 0`, 'New team step 1', 8000);
-            const s = await dirState('launch-team-dir');
+            const s = await dirState('launch-team-dir', /Coral creates it for you/);
             assert.ok(/[\\/]Coral[\\/]first-team$/.test(s.value) && s.note && s.described, JSON.stringify(s));
+            // #11865: the folder is said with ~ for the home folder (the user name is not the first thing read), the whole path is the tooltip, and the words say what the folder is for
+            assert.equal(s.text, "~/Coral/first-team. The team's agents work in this folder. Coral creates it for you. Choose another folder to work on a project you already have.", JSON.stringify(s));
+            assert.equal(s.tip, s.value, 'the whole path is the tooltip');
+            assert.match(s.label, /^Folder for this team/, 'the field is named for what it is: ' + s.label);
         });
         S.finish();
     } finally { try { await client.close(); } catch (e) {} }

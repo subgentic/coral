@@ -208,3 +208,19 @@ func TestAuthRouteLockedFlagOnlyChangesTheWords(t *testing.T) {
 	assert.NotContains(t, odd, `id="how-in"`, "only locked=1 is the flag")
 	assert.NotContains(t, odd, "<script>alert")
 }
+
+// #11865 (Beta #11837 moment 1), the Operator's decision (21:46Z): a password is always created; the first screen gives no skip and no wording that suggests one. The page says why a password is needed, in one
+// sentence, and nothing about a way around it: no "do not need one", no "opens without", no "continue without", no button that skips.
+func TestAuthPageSaysWhyAPasswordIsNeededAndOffersNoSkip(t *testing.T) {
+	create := AuthPage(PageState{Local: true})
+	assert.Contains(t, create, "<h1>Create a password</h1>")
+	assert.Contains(t, create, `A password keeps other people and other devices out of Coral when it is opened in a web browser.`)
+	for _, skip := range []string{"do not need one", "You do not need", "opens without", "without one", "continue without", "skip", "Only you use this computer"} {
+		assert.NotContains(t, strings.ToLower(create), strings.ToLower(skip), "the create screen suggests no way around the password: "+skip)
+	}
+	assert.Contains(t, create, "It keeps other people and other devices out of Coral in a web browser. Your password manager can save it.", "the note under the form says why too")
+	// the sign-in and forgot-password panel (a computer with a password) says why, and not that the app opens without one
+	signin := AuthPage(PageState{PasswordSet: true, Local: true, Strict: true})
+	assert.NotContains(t, strings.ToLower(signin), "opens without a password", "the forgot-password note no longer says the app opens without one")
+	assert.Contains(t, signin, `<p class="note">A password keeps other people and other devices out of Coral when it is opened in a web browser.</p>`)
+}
