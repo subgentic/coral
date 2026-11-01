@@ -144,7 +144,7 @@ function _renderSandboxed(body, { url, content, name, isStale }) {
         ? 'Linked preview: scripts and interactive features are disabled. Some sites block embedding; if the preview stays blank, use Open link.'
         : 'HTML preview: scripts and external resources are disabled. Download the file for the original.';
     const frame = document.createElement('iframe');
-    frame.title = `Preview of ${name || 'artifact'}`;
+    frame.setAttribute('aria-label', `Preview of ${name || 'artifact'}`); // the frame's name for a screen reader; a title would show as a tooltip over the content (a ghost tooltip)
     lockFrame(frame); // empty sandbox + csp: no scripts, same-origin privilege, forms, popups, downloads or navigation
     wrapper.append(note);
     if (url) {
