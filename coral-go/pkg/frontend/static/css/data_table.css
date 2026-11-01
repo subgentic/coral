@@ -499,6 +499,13 @@ button.dt-mail-lead:focus-visible { outline: 2px solid var(--accent); outline-of
 [data-theme="light"] #group-table-view[data-group="hub-inbox:needs"] .dt-box.dt-folded .dt-row.dt-unread { background: var(--table-bg); }
 [data-theme="light"] #group-table-view[data-group="hub-inbox:needs"] .dt-box.dt-folded .dt-row.dt-read { background: color-mix(in srgb, var(--text-primary) 4%, var(--table-bg)); }
 
+/* Gmail's hover actions (#11669, the operator): on a wide screen with a pointer a Needs you row's actions are drawn at its hover or keyboard focus, in their own slots; the rest of the time that space says how long it has waited. They are only transparent otherwise: still in the Tab order and in the page for a screen reader. */
+.inbox-actions-hover { position: relative; }
+.inbox-actions-hover > .inbox-review-actions { opacity: 0; }
+.inbox-actions-hover > .inbox-row-when { position: absolute; inset: 0 0 0 auto; display: flex; align-items: center; color: var(--text-muted); pointer-events: none; white-space: nowrap; }
+.dt-row:hover .inbox-actions-hover > .inbox-review-actions, .dt-row:focus-within .inbox-actions-hover > .inbox-review-actions, .dt-row[aria-current="true"] .inbox-actions-hover > .inbox-review-actions, .inbox-actions-hover:has([aria-expanded="true"]) > .inbox-review-actions { opacity: 1; }
+.dt-row:hover .inbox-actions-hover > .inbox-row-when, .dt-row:focus-within .inbox-actions-hover > .inbox-row-when, .dt-row[aria-current="true"] .inbox-actions-hover > .inbox-row-when, .inbox-actions-hover:has([aria-expanded="true"]) > .inbox-row-when { opacity: 0; }
+
 /* A column with nothing in it on any row is not drawn (#9846): its head and its cells; the header draws it again when a row has a value. */
 .dt-table .dt-col-unused, .dt-table .dt-col-tight { display: none; }
 
