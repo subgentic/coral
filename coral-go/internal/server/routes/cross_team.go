@@ -304,6 +304,12 @@ func (h *BoardHandler) UpdateBoardSettings(w http.ResponseWriter, r *http.Reques
 			errBadRequest(w, msg)
 			return
 		}
+		if _, dialog := named["dialog_timeout"]; dialog {
+			if msg := body.Health.DialogTimeout.Problem(); msg != "" {
+				errBadRequest(w, msg)
+				return
+			}
+		}
 		for field, who := range map[string]string{"landing": body.Health.Landing.Nudge, "release": body.Health.Release.Nudge} {
 			if who = strings.TrimSpace(who); who != "" && (field == "landing" && landing || field == "release" && release) {
 				if sub, err := h.bs.GetProjectSubscription(r.Context(), urlParam(r, "project"), who); err != nil || sub == nil {

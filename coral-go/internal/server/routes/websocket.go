@@ -689,6 +689,8 @@ type terminalFrame struct {
 	// still typed, as before ids existed, and gets no answer.
 	RawID json.RawMessage `json:"id"`
 	ID    *int64          `json:"-"`
+	// Focused, on terminal_focus: whether this view of the terminal has the keyboard focus in a visible page (the dialog timeout's presence rule: a person looking at it keeps Coral's hands off).
+	Focused bool `json:"focused"`
 }
 
 // parseTerminalFrame decodes a client frame; ok is false for one that isn't JSON (it is skipped).
@@ -727,6 +729,9 @@ func (t *terminalStream) handleFrame(msg terminalFrame) {
 	switch msg.Type {
 	case "composer_send":
 		t.composerSend(msg)
+		return
+	case "terminal_focus":
+		t.h.focus.note(t.sessionID, msg.Focused, time.Now()) // only that a view is focused, and when: nothing typed, nothing answered
 		return
 	case "terminal_input":
 		if strings.ContainsAny(msg.Data, "\r\n") {
