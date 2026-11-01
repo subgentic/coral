@@ -1,5 +1,40 @@
 # Release Notes
 
+## v2.0.22 — Needs you reads like a mailbox: hover actions, phone rows, Save for later, and buttons on questions
+
+### Changes
+
+#### What you will notice first
+
+- **Needs you reads like a mailbox**: the "read" pill is gone. An unread row's name is bold on a slightly lighter row; a read row is regular weight with muted text (a phone's folded row is tinted whole), in the dark and light themes. A screen reader still hears ", unread" or ", read". Unread is what counts in the badge.
+- **On a wide screen the row's buttons appear on hover**: with a pointer, a row shows Approve, Changes, Deny, Ignore and the three dots only at its hover, at keyboard focus inside it, or while its three dots are open, always in the same slots; the rest of the time that space shows how long it has waited, and the Waiting column is gone. The buttons are still in the Tab order. A touch screen and a phone keep their buttons.
+- **Phone Needs you rows work like Gmail's**: a phone row carries no button. A tap opens it, a long press selects it (a check appears; a tap adds more and opens nothing), a swipe left ignores it (with Undo), and the bar that takes the toolbar's line says "N selected" and acts on the selection: Approve, Changes (one file), Ignore, Save for later. Approving several files asks first ("Approve N files?"); one file is approved at once.
+- **Save for later**: on a review row the star is now a bookmark button named "Save for later: <file>" (a toast with Undo, nothing sent to the agent); a phone keeps it in the three dots. A row can be dragged onto Saved, which has "Files for review" above its messages. A saved file is still waiting for a decision (Approve, Changes and Deny work on it) but Needs you skips it and its counts follow. Starring stays in the Artifacts list.
+- **A question to you can carry buttons**: an agent can offer up to three, each drawn with the agent's own label and, beside it, what a click does in the app's words ("Opens the New agent dialog", "Opens task #N", "Opens a file", "Replies ..."), so a label like "Cancel" cannot hide a wake. Nothing runs until you click one, and a button is used once.
+- **A Needs you row for a file with several versions opens the newest version itself**, not the diff (a diff opens only when you press Compare).
+- **A goal page keeps its scroll position when its tab changes** (Tasks to Artifacts and back); it used to jump to the top.
+- **The sidebar's expand or collapse is one choice for every tab** (it was kept per tab).
+- **A goal made with, or moved to, an agent as driver tells that agent once**, with `coral-board goal show <id>`; nothing is said when the driver is the writer, unchanged or cleared.
+
+#### Agents and the chat
+
+- **`coral-board post --ask --button 'Label=action' "@Operator <question>"`** declares the buttons (repeatable, up to three). The actions are `open:new-agent`, `open:task:<n>`, `open:artifact:<digest>`, `reply` and `wake:<member>`; a label may not hold a quote, backtick, guillemet or square bracket. `--button` is refused (exit 2, nothing sent) without `--ask`, with `--guide`, past three, or with no value; the server refuses the whole post for a bad one. An unsettled open or wake button is free again after a minute. The agent docs say what a button is.
+- **An agent never sets the Operator's tag states**: `read`, `ignored`, `saved`, `denied`, `approved`, `changes requested` and `superseded` are dropped from the tags of an agent's upload and of a task result (the answer names the ones left out); the Operator's own set-tags route still takes them. A new version settles an older one that was saved for later.
+- **Through Coral Hub only the owner starts a new board**: the six routes that can start a board (subscribe, message, task, goal, working mode, preset) now carry the owner stamp, so the owner is no longer refused through a real Hub. A guest still joins boards that exist and posts there; only naming a board that does not exist is refused (403 `owner_only`).
+
+#### Known issues
+
+- **Windows: in-app update does not work from 2.0.0 through 2.0.6.** If you're on one of those, download and install the MSI by hand; from 2.0.7 on, in-app update works.
+- **macOS: a Coral of 2.0.5 or earlier cannot install updates in-app; install 2.0.6 or later by hand once.**
+- **OpenCode agents are tested on macOS and Linux; OpenCode on Windows is not yet tested end to end.**
+- Setting up a computer over SSH is supported from a macOS or Linux hub, and is not yet tested from a Windows hub.
+
+#### For developers and releases
+
+- The static tree is 5,896,206 bytes of the 5,906,432-byte budget.
+- The click on a question's button is claimed once from the stored row by the person alone (`POST /api/board/{team}/asks/{id}/buttons/{buttonID}/claim` and `.../settle`, owner-only through Coral Hub); the review route takes `save` and `unsave`. Census files, route goldens and the Hub owner table follow.
+- Test fixes: the background run in the Hub provision test is waited for before the test returns, `tab_family_browser` waits for the current tab's weight and underline to arrive, `inbox_artifact_phone_browser` waits for the rows' name buttons to hold still (the Inbox's Artifacts list keeps its strip counts where they are instead of drawing the rows again), `inbox_ask_buttons_real_browser` no longer depends on the live list's lag, the phone-row suites (`automations_recent_runs`, `inbox_welcome_counts`, `needs_phone_rows`, `one_line_rows`) follow the new rows, and two hidden characters in a test table are escapes. The button-asks cap answers through `httputil.WriteActionLimit` (code `too_many_button_asks`).
+
 ## v2.0.21 — the right tab is current from the first moment, and phone fixes for the new Inbox
 
 ### Changes
