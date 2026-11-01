@@ -22,7 +22,7 @@ const SHARED_INPUT = [['cli_path_agy', 'cli_path_gemini'], ['default_model_agy',
 
 // What a missing setting reads as in its field.
 // default_permission_mode: unset shows Auto (Claude's default, #5836), so a dialog saved without touching it does not turn the default into a saved mode
-const FIELD_DEFAULT = { artifact_retention_kinds: 'diffs', artifact_retention_days: '0', default_permission_mode: 'auto',
+const FIELD_DEFAULT = { artifact_retention_kinds: 'diffs', artifact_retention_days: '0', default_permission_mode: 'auto', chief_actions: 'ask_first',
     // unset shows this window's default size (a phone's is smaller, #6577), so a dialog saved without touching it does not turn the default into a chosen size
     get terminal_font_size() { return String(defaultTerminalFont()); } };
 

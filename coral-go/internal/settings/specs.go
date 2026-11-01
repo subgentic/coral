@@ -169,6 +169,7 @@ func init() {
 	register(Spec{Key: "chief_avatar", Kind: KindEnum, Values: []string{"1", "2", "3", "4", "5", "6", "7", "8"}, Default: "1", Apply: ApplyLive, Doc: "Which of the eight avatar colours Chief's avatar is."})
 	register(Spec{Key: "chief_avatar_letter", Kind: KindText, MaxLen: 8, Apply: ApplyLive, Doc: "The one letter on Chief's avatar; empty is the first letter of its name."})
 	register(Spec{Key: "chief_fronts", Kind: KindText, MaxLen: 80, Apply: ApplyLive, Doc: "The team Chief fronts, as the Operator names it."})
+	register(Spec{Key: ChiefActions, Kind: KindEnum, Values: []string{ChiefAsksFirst, ChiefActs}, Default: ChiefAsksFirst, Apply: ApplyLive, Doc: "What Chief may do without asking: ask_first (Default permission mode, the default) or act (Accept edits; a shell command still asks). Applies when Chief restarts."})
 	boolOff("home_editions_hidden", ApplyClient, "Hide the editions card on Home.")
 
 	// Storage.

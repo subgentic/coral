@@ -14,7 +14,7 @@ import (
 	"github.com/subgentic/coral/internal/store"
 )
 
-// Security's INFO a on #11450: the three settings that make an agent the Operator's Chief (chief_page, chief_team, chief_session) are the Operator's. An agent's token can neither write them nor
+// Security's INFO a on #11450: the settings that make an agent the Operator's Chief (chief_page, chief_team, chief_session, and chief_actions, #11798) are the Operator's. An agent's token can neither write them nor
 // change what /chief shows; the Operator's signed command line can.
 func TestAnAgentTokenCannotWriteTheChiefSettings(t *testing.T) {
 	srv, ts, dir := strictServer(t, true)
@@ -46,7 +46,7 @@ func TestAnAgentTokenCannotWriteTheChiefSettings(t *testing.T) {
 		require.NoError(t, err)
 		return st[key]
 	}
-	for key, value := range map[string]string{"chief_page": `"true"`, "chief_team": `"chief"`, "chief_session": `"11111111-2222-4333-8444-555555555555"`, "chief_name": `"Boss"`, "chief_avatar": `"3"`, "chief_avatar_letter": `"B"`, "chief_fronts": `"Dev team"`} {
+	for key, value := range map[string]string{"chief_page": `"true"`, "chief_team": `"chief"`, "chief_session": `"11111111-2222-4333-8444-555555555555"`, "chief_name": `"Boss"`, "chief_avatar": `"3"`, "chief_avatar_letter": `"B"`, "chief_fronts": `"Dev team"`, "chief_actions": `"act"`} {
 		assert.Equal(t, http.StatusForbidden, put(true, `{"`+key+`": `+value+`}`), "an agent token writing %s", key)
 		assert.Empty(t, stored(key), "%s is not stored", key)
 	}
