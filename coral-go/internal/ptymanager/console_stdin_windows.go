@@ -206,6 +206,9 @@ func probeStdin(pid int) stdinKind {
 	var in windows.Handle
 	var ok bool
 	if wow {
+		if !hostIsAMD64() {
+			return stdinUnreadable // a 32-bit process on another host (ARM64): its layout is not guessed, so it counts as a reader (Security's #6931)
+		}
 		in, ok = stdin32(h) // a 32-bit process (git-credential-manager is one): its own 32-bit block
 	} else {
 		in, ok = stdin64(h)
@@ -213,8 +216,8 @@ func probeStdin(pid int) stdinKind {
 	if !ok {
 		return stdinUnreadable
 	}
-	if in == 0 {
-		return stdinNotConsole // no standard input at all
+	if noStdin(in) {
+		return stdinNotConsole // no standard input at all: never duplicated as a handle
 	}
 	var dup windows.Handle
 	if err := windows.DuplicateHandle(h, in, windows.CurrentProcess(), &dup, 0, false, windows.DUPLICATE_SAME_ACCESS); err != nil {
@@ -262,8 +265,29 @@ func stdin32(h windows.Handle) (windows.Handle, bool) {
 	if !readProcess(h, uintptr(params32)+params32StandardInput, unsafe.Pointer(&in), unsafe.Sizeof(in)) {
 		return 0, false
 	}
-	return windows.Handle(in), true
+	return handle32(in), true
 }
+
+// handle32 is a 32-bit process's handle value as one of this process: INVALID_HANDLE_VALUE (0xFFFFFFFF) stays INVALID_HANDLE_VALUE, never the 64-bit value 0xFFFFFFFF; 0 stays 0.
+func handle32(v uint32) windows.Handle {
+	if v == 0xFFFFFFFF {
+		return windows.InvalidHandle
+	}
+	return windows.Handle(v)
+}
+
+// noStdin says a standard-input value is no handle: 0, or INVALID_HANDLE_VALUE (in GetCurrentProcess's own pseudo-handle value: duplicating it would give this process's own handle).
+func noStdin(h windows.Handle) bool { return h == 0 || h == windows.InvalidHandle }
+
+// imageFileMachineAMD64 is IMAGE_FILE_MACHINE_AMD64.
+const imageFileMachineAMD64 = 0x8664
+
+// hostIsAMD64 says Windows itself runs on x64 (IsWow64Process2's native machine), the only host whose 32-bit (WoW64) layout is read; anything else, or a host that cannot say, keeps
+// the 32-bit process a reader.
+var hostIsAMD64 = sync.OnceValue(func() bool {
+	var process, native uint16
+	return windows.IsWow64Process2(windows.CurrentProcess(), &process, &native) == nil && native == imageFileMachineAMD64
+})
 
 // probeOpenHook, when set, answers for the probe's OpenProcess first: an error is what the open would have failed with (a test's access denied).
 var probeOpenHook atomic.Pointer[func(pid int) error]
