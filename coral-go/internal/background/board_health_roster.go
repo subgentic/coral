@@ -134,15 +134,22 @@ func (m *BoardHealthMonitor) buildRoster(ctx context.Context, in rosterInputs) (
 					entry.Reply = id // the waiter's last message, so the orchestrator can answer it (#11729)
 				}
 				entry.Reason = waitReason(w)
-				if target.sub != nil && !isRecipient(target.sub, in.recipient) && !at.IsZero() {
-					// silent: the awaited member has posted nothing since the wait began; one that has is serving it (#11729)
-					if _, when, err := m.store.LastPostBy(ctx, in.project, target.sub.SubscriberID); err == nil && !when.After(at) {
-						entry.TargetSilent = true
-					}
-				}
 				if len(senders) > 0 && !at.IsZero() {
 					if when, err := m.store.MentionedBy(ctx, in.project, sub.SubscriberID, sub.JobTitle, at, senders...); err == nil && !when.IsZero() {
 						entry.Stale = true
+					}
+				}
+				if target.sub != nil && !you && !at.IsZero() {
+					// silent: the awaited member has not mentioned the waiter since the wait began (Stale is that, said apart) and, for a wait on a task, the task is still open. A post that
+					// mentions nobody, or someone else, does not serve the wait (#11729, Security's INFO)
+					entry.TargetSilent = !entry.Stale
+					if w.WaitType == "task" {
+						var id int64
+						if _, err := fmt.Sscanf(w.TargetID, "%d", &id); err == nil {
+							if _, open := taskByID[id]; !open {
+								entry.TargetSilent = false // the task is done
+							}
+						}
 					}
 				}
 				if !entry.Actionable(you, in.rules) {
@@ -333,6 +340,8 @@ func waitReason(w board.RegisteredWait) string {
 		}
 	}
 	if t := teamhealth.StoredText(w.Reason, nil); t != "" && t != teamhealth.NotShown {
+		// the reason sits inside double quotes Coral puts around it, so none of its own may close them: a quote in it is an apostrophe (Security's SHOULD on #11729 slice 2)
+		t = strings.NewReplacer(`"`, "'", "\u201c", "'", "\u201d", "'", "\u201e", "'", "\u00ab", "'", "\u00bb", "'").Replace(t)
 		return `"` + t + `"`
 	}
 	return ""

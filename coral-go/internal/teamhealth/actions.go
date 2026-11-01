@@ -14,7 +14,7 @@ import (
 
 // Rules are the thresholds of the action list; a zero field is its default.
 type Rules struct {
-	StuckWait   time.Duration // a wait this long on someone who has posted nothing since (default 10 min)
+	StuckWait   time.Duration // a wait this long on someone who has not mentioned the waiter since (default 10 min)
 	Overloaded  int           // more open tasks than this on one agent ... (default 5)
 	Sleeping    int           // ... while at least this many agents sleep (default 1)
 	StaleReview time.Duration // a task in review this long (default 24 h)
@@ -62,7 +62,7 @@ type action struct {
 }
 
 // Actionable reports whether a wait is a line of the list: one on the recipient (you), one the awaited party has mentioned the waiter about without it waking (Stale), or a long one on a member who has
-// posted nothing since. A wait that is being served, or is young, is not.
+// not mentioned the waiter since (and a wait on a task needs the task open). A wait that is being served, or is young, is not.
 func (w WaitEntry) Actionable(you bool, rules Rules) bool {
 	return you || w.Stale || (w.TargetSilent && w.Age > rules.withDefaults().StuckWait)
 }
@@ -95,7 +95,10 @@ func (in CheckInput) actions(items []Item) []action {
 			case w.Stale:
 				out = append(out, action{age: w.Age, text: fmt.Sprintf("%s has waited %s although %s has posted a message mentioning them since: check %s.", w.Name, minutes(w.Age), g.On, w.Name)})
 			default:
-				l := fmt.Sprintf("%s has waited %s on %s; %s has posted nothing since", w.Name, minutes(w.Age), g.On, g.On)
+				l := fmt.Sprintf("%s has waited %s on %s; %s has not mentioned them since", w.Name, minutes(w.Age), g.On, g.On)
+				if strings.HasPrefix(w.Reason, "task #") {
+					l += " and the task is not done"
+				}
 				if w.Reason != "" {
 					l += " (for " + w.Reason + ")"
 				}
