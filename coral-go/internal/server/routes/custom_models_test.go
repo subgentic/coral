@@ -345,3 +345,44 @@ func TestAgentModelsCatalogHasAListForEveryTypeOfAFamily(t *testing.T) {
 	}
 	assert.NotContains(t, withCustom["claude"], "agy-custom")
 }
+
+// OpenCode's custom models (#11727, for #11709): the family is accepted, the model is kept with no levels (OpenCode's CLI takes none from Coral), listed back, and offered in OpenCode's own model list after the CLI's,
+// and in the curated catalog. The id is held to the same rule as every other family's.
+func TestAnOpencodeCustomModelIsSavedAndOfferedAgain(t *testing.T) {
+	h := customRig(t)
+	code, out := putCustom(t, h, `{"models":[{"family":"opencode","value":"acme/house-model-2","display_name":"House model","efforts":[]}]}`)
+	require.Equal(t, http.StatusOK, code, "%v", out)
+	got := getCustom(t, h)
+	require.Len(t, got["models"], 1, "listed back")
+	m := got["models"].([]any)[0].(map[string]any)
+	assert.Equal(t, "opencode", m["family"])
+	assert.Equal(t, "acme/house-model-2", m["value"])
+	assert.Contains(t, got["limits"].(map[string]any)["families"], "opencode", "Settings offers the family")
+	assert.Equal(t, []any{}, m["efforts"], "no levels, as Antigravity")
+	// levels are refused: OpenCode's CLI is given none from Coral
+	code, out = putCustom(t, h, `{"models":[{"family":"opencode","value":"acme/house-model-2","display_name":"x","efforts":["high"]}]}`)
+	assert.Equal(t, http.StatusBadRequest, code, "%v", out)
+	// the same id rule as the others: a flag-shaped or spaced id is refused
+	for _, bad := range []string{"--help", "a b", "-x", ""} {
+		code, _ = putCustom(t, h, `{"models":[{"family":"opencode","value":`+jsonString(bad)+`,"display_name":"x","efforts":[]}]}`)
+		assert.Equal(t, http.StatusBadRequest, code, "%q", bad)
+	}
+	// the curated catalog the launch dialog reads carries it under opencode
+	code, out = putCustom(t, h, `{"models":[{"family":"opencode","value":"acme/house-model-2","display_name":"House model","efforts":[]}]}`)
+	require.Equal(t, http.StatusOK, code, "%v", out)
+	rec := httptest.NewRecorder()
+	h.GetAgentModels(rec, httptest.NewRequest(http.MethodGet, "/api/agent-models", nil))
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	var catalog map[string][]string
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &catalog))
+	assert.Contains(t, catalog["opencode"], "acme/house-model-2", "offered again in the catalog: %v", catalog["opencode"])
+	// another family's list does not carry it
+	assert.Empty(t, agentmodels.MergeCustomValues(nil, "claude", mustCustom(t, h)), "a claude list has none of OpenCode's")
+}
+
+func mustCustom(t *testing.T, h *SystemHandler) []agentmodels.Custom {
+	t.Helper()
+	c, err := h.loadCustomModels(context.Background())
+	require.NoError(t, err)
+	return c
+}
