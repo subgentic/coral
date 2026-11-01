@@ -19,6 +19,7 @@ import (
 	"github.com/subgentic/coral/internal/ptymanager"
 	"github.com/subgentic/coral/internal/store"
 	"github.com/subgentic/coral/internal/terminalinput"
+	"github.com/subgentic/coral/internal/tmux"
 )
 
 // Goal #14 (B), design #6550 with Security's #6548: an agent's single-select question is answered with its one clean "(Recommended)" option only when every condition holds.
@@ -600,4 +601,42 @@ func TestAutoRecommendIsHeldByAPersonsUnsentText(t *testing.T) {
 	r.passes(10 * time.Minute)
 	assert.Empty(t, r.raw(), "no pick over a person's draft")
 	assert.Empty(t, r.typed())
+}
+
+// QA's final matrix: right after a pick a hook child may read the terminal for a moment; the gate holds the notice for that passing reason and the notice is asked again (deliverNoticeRetrying), so
+// the agent is told.
+type flakyGateRig struct {
+	*mockSessionTerminal
+	left *int // refusals still to give (a program the agent started reads the terminal)
+}
+
+func (f flakyGateRig) AgentShellIdle(context.Context, string, string, string) (bool, string, bool) {
+	return false, "claude", true
+}
+
+func (f flakyGateRig) AgentNoticeTarget(context.Context, string, string, string) (bool, bool, string, bool) {
+	if *f.left > 0 {
+		*f.left--
+		return false, false, tmux.ReasonChildReads, true
+	}
+	return true, false, "", true
+}
+
+func TestAutoRecommendNoticeIsAskedAgainWhileAHookChildReadsTheTerminal(t *testing.T) {
+	every := noticeRetryEvery
+	noticeRetryEvery = 5 * time.Millisecond
+	t.Cleanup(func() { noticeRetryEvery = every })
+	r := newRecRig(t, "0018", recQuestion("Which color?", "Red (Recommended)", "Green"))
+	refusals := 0
+	r.term.onRaw = func(string) {
+		r.term.setOutput(r.pane, recIdle)
+		refusals = 2
+		r.h.terminal = flakyGateRig{mockSessionTerminal: r.term, left: &refusals}
+	}
+	r.passes(4 * time.Minute)
+	require.Equal(t, []string{"1"}, r.raw())
+	assert.Equal(t, []string{autoRecommendNotice}, r.typed(), "the notice was typed once the child had gone")
+	for _, e := range r.allEvents(t) {
+		assert.NotEqual(t, "auto_recommend_notice_not_typed", e.EventType, "the agent was told")
+	}
 }
