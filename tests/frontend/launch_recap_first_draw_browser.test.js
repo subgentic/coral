@@ -44,6 +44,10 @@ const { install: installNA, stubModels } = require('./helpers/new_agent');
         short(await recap(), 'resized to 390 px, with nothing touched: ');
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false }); await settle(600);
         r = await recap(); assert.ok(!r.text.includes('\u2026'), 'and back to 1280 px the whole folder again: ' + JSON.stringify(r));
+        // ten opens of the dialog leave one width listener on the page, not ten (#11794)
+        const n = await ev(`(async () => { let n = 0; const mm = window.matchMedia.bind(window); window.matchMedia = q => { const m = mm(q); if (q === '(max-width: 599px)') { const add = m.addEventListener.bind(m); m.addEventListener = (t, f, o) => { if (t === 'change') n++; return add(t, f, o); }; } return m; };
+            for (let i = 0; i < 10; i++) { await window.showLaunchModal(); window._selectLaunchType('agent'); await new Promise(r => setTimeout(r, 150)); const f = document.getElementById('launch-agent-acf'); if (f) delete f.dataset.recapWired; /* a dialog drawn from scratch each time */ const d = document.querySelector('dialog[open]'); if (d) d.close(); await new Promise(r => setTimeout(r, 100)); } return n; })()`); // sleep-ok: the dialog builds and closes
+        assert.ok(n === 1 || n === 0, 'ten opens add at most one width listener: ' + n);
         console.log('\nPASS the footer recap shortens a long folder from its first draw and follows the width');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
