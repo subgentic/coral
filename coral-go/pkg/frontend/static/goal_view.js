@@ -315,15 +315,43 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
         return wrap;
     }
 
+    /** Where the goal page is scrolled, read before it is drawn again: the goal's own column (a wide window; a new node each drawing, so it is given back its position) and every scrolling box around the page (a phone; the nodes stay).
+     * restore(main) puts both back once the page has its content; a panel that fills in later (the Artifacts list mounts after its tab is drawn) is waited for, until the box is tall enough, the person scrolls or two seconds pass. */
+    let stopRestore = null; // the restore still waiting for a panel to fill: a page drawn again, or a person's own scroll, ends it
+    function scrollPlace(col) {
+        if (stopRestore) stopRestore();
+        const mainTop = col.querySelector('.goal-main')?.scrollTop || 0, boxes = [];
+        for (let e = col; e; e = e.parentElement) if (e.scrollTop > 0) boxes.push([e, e.scrollTop]);
+        const se = document.scrollingElement;
+        if (se && se.scrollTop > 0 && !boxes.some(([e]) => e === se)) boxes.push([se, se.scrollTop]);
+        return {
+            restore(main) {
+                const targets = boxes.slice();
+                if (mainTop) targets.push([main, mainTop]);
+                const put = () => { let pending = false; for (const [e, top] of targets) { if (e.scrollTop !== top) e.scrollTop = top; if (e.scrollTop < top - 1) pending = true; } return pending; };
+                if (!put() || typeof ResizeObserver !== 'function') return;
+                let done = false;
+                const ro = new ResizeObserver(() => { if (!put()) stop(); });
+                const stop = () => { if (done) return; done = true; if (stopRestore === stop) stopRestore = null; ro.disconnect(); clearTimeout(timer); for (const ev of ['wheel', 'touchstart', 'keydown', 'pointerdown']) window.removeEventListener(ev, stop, true); };
+                const timer = setTimeout(stop, 2000);
+                stopRestore = stop;
+                for (const ev of ['wheel', 'touchstart', 'keydown', 'pointerdown']) window.addEventListener(ev, stop, { capture: true, passive: true });
+                ro.observe(main);
+            },
+        };
+    }
+
     function drawGoalPageRaw(col) {
         const g = goalById(model.openId);
         const keep = document.activeElement && document.activeElement.id === 'goals-detail-title', keepBack = document.activeElement && document.activeElement.classList && document.activeElement.classList.contains('goals-back') && col.contains(document.activeElement);
+        const place = scrollPlace(col); // the person's place (#11646): the page is drawn again for a tab, and the box that scrolled it is a new one
         col.replaceChildren();
         const split = el('div', 'goal-split'); split.dataset.goal = String(g.id); split.classList.toggle('goal-split-open', !previewEl.hidden);
         const main = el('div', 'goal-main');
         split.append(main, previewEl); col.append(split);
         const h = drawGoalMain(main, g);
         markPreviewRow();
+        place.restore(main);
         if (keep) h.focus();
         else if (keepBack) main.querySelector('.goals-back')?.focus({ preventScroll: true });
     }
