@@ -41,7 +41,9 @@ const { coralReady } = require('./helpers/wait');
             assert.ok(kinds.has('Approve') && kinds.has('Answer') && [...kinds].some(k => k && !['Approve', 'Answer'].includes(k)), at + 'review, question and welcome rows: ' + JSON.stringify([...kinds]));
             assert.equal(new Set(rows.map(r => r.main.x)).size, 1, at + 'the main button is at the same x on every row: ' + JSON.stringify(rows));
             assert.equal(new Set(rows.map(r => r.main.w)).size, 1, at + 'and the same width on every row: ' + JSON.stringify(rows));
-            assert.ok(rows.every(r => r.main.right <= w - 4 && r.main.right >= w - 40), at + 'at the right edge: ' + JSON.stringify(rows));
+            // the right edge is the Actions cell's own content edge, to 8 px (QA's SHOULD, #11655): without the margin-inline-start:auto rules a row whose buttons are fewer ends short of it
+            const edge = await ev(`[...document.querySelectorAll('${T} tbody tr')].filter(r => r.querySelector('.inbox-main-action')).map(r => { const td = r.querySelector('.inbox-review-actions').closest('td, .dt-td'), c = td.getBoundingClientRect(), pad = parseFloat(getComputedStyle(td).paddingRight) || 0, m = r.querySelector('.inbox-main-action').getBoundingClientRect(); return { cell: Math.round((c.right - pad) * 10) / 10, main: Math.round(m.right * 10) / 10 }; })`);
+            assert.ok(edge.length >= 5 && edge.every(e => Math.abs(e.cell - e.main) <= 8), at + 'every main button ends within 8 px of its cell edge: ' + JSON.stringify(edge));
             const clip = await ev(`[...document.querySelectorAll('${T} .inbox-main-action')].map(b => [b.textContent, b.scrollWidth, b.clientWidth])`); assert.ok(clip.every(c => c[1] <= c[2] + 1), at + 'every main button shows its whole word: ' + JSON.stringify(clip));
             assert.ok(rows.every(r => r.ignoreButtons === 0), at + 'no Ignore or Dismiss button on a phone row: ' + JSON.stringify(rows));
             // Ignore stays in the menu
