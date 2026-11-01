@@ -39,7 +39,7 @@ const { coralReady } = require('./helpers/wait');
                         if(u.pathname.startsWith('/api/artifacts/')&&u.pathname.endsWith('/star')&&u.pathname.split('/').length===5&&(opts.method==='PUT'||opts.method==='DELETE')){ const id=u.pathname.split('/')[3], it=window.__reviewItems.find(x=>x.id===id); if(!it)return json({error:'not found'},404); it.starred=opts.method==='PUT'; window.__starCalls=(window.__starCalls||[]).concat(opts.method+' '+id); return json({starred:it.starred}); } // what the server does: the next list says it
                         if(u.pathname.startsWith('/api/board/${team}/artifacts/')&&u.pathname.endsWith('/review')&&opts.method==='POST'){
                             if(window.__reviewFail)return json({error:'Review save failed'},500);
-                            const id=u.pathname.split('/').at(-2),body=JSON.parse(opts.body),it=window.__reviewItems.find(a=>a.id===id);window.__decisions.push({id,decision:body.decision});
+                            const id=u.pathname.split('/').at(-2),body=JSON.parse(opts.body),it=window.__reviewItems.find(a=>a.id===id);window.__decisions.push({id,decision:body.decision,note:body.note});
                             if(body.decision==='approve'){it.tags=it.tags.filter(t=>t!=='for review'&&t!=='read'&&t!=='changes requested').concat('approved');it.review={state:'approved',at:new Date().toISOString()};}
                             else{it.tags=[...new Set(it.tags.concat('for review','changes requested'))].filter(t=>t!=='read');}  // the real route takes 'read' off: it is something to read again (artifact_reviews.go)
                             return json({id,state:body.decision==='approve'?'approved':'changes requested',changed:true,tags:it.tags,review:it.review||null,delivered:body.decision==='approve',to:'Writer'});
@@ -183,6 +183,19 @@ const { coralReady } = require('./helpers/wait');
                 assert.match(await ev(`document.getElementById('nav-tab-hub-inbox').getAttribute('aria-label')`),/^Inbox, 12 /,'twelve left: the pill says 9+, the name says 12');
                 assert.ok(await ev(`!!(${row('Review file 11.txt')})`),'overflow promotes next artifact');
                 assert.equal(await ev(`document.querySelector('#group-table-view .inbox-folder-head .session-group-count').textContent`),'12','heading and badge agree after review');
+                if(width===1280){
+                    // #11888: Approve with a note, from the row's More menu: a dialog with one short note; the approval goes out once with the note, the row leaves Needs you
+                    await ev(`(()=>{const r=${row('Review file 02.txt')};r.querySelector('.inbox-review-actions .dt-menu-toggle, .inbox-review-actions button[aria-haspopup=menu], .inbox-review-actions [data-slot=dots] button').click();return true;})()`);
+                    const item=`[...(${row('Review file 02.txt')}).querySelectorAll('.menu-item')].find(b=>/^Approve with a note/.test(b.textContent.trim()))`; // this row's own menu: every row has one in the page
+                    await waitFor(`!!${item}`,'the More menu offers Approve with a note',4000);
+                    await ev(`${item}.click();true`);
+                    await waitFor(`!!document.querySelector('dialog.inbox-approve-note-dialog[open]')`,'the note dialog',4000);
+                    await ev(`window.__decisions.length=0;(()=>{const t=document.querySelector('dialog.inbox-approve-note-dialog textarea');t.value='Almost: fix the heading, no need to show me again.';t.dispatchEvent(new Event('input',{bubbles:true}));document.querySelector('.inbox-approve-note-confirm').click();return true;})()`);
+                    await waitFor(`window.__decisions.some(d=>d.decision==='approve')`,'the approval with the note was sent',8000);
+                    assert.deepEqual(await ev(`window.__decisions`),[{id:(2).toString(16).padStart(64,'0'),decision:'approve',note:'Almost: fix the heading, no need to show me again.'}],'one approval, carrying the note');
+                    await waitFor(`!(${row('Review file 02.txt')})`,'the approved row leaves Needs you');
+                    assert.ok(await ev(`!document.querySelector('dialog.inbox-approve-note-dialog')`),'and the dialog is closed');
+                }
                 if(dir){for(const theme of ['light','dark']){await ev(`document.documentElement.setAttribute('data-theme','${theme}');true`);fs.writeFileSync(path.join(dir,`inbox-reviewed-${width}-${theme}.png`),Buffer.from((await Page.captureScreenshot({format:'png'})).data,'base64'));}}
                 console.log('PASS review artifacts '+width);
             } catch(error){failures.push(width+': '+error.message);console.error(failures.at(-1));}
