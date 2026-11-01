@@ -347,7 +347,7 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
         const ul = el('ul', 'goal-pics'); ul.setAttribute('aria-label', 'Pictures of this goal');
         const server = splitKey(model.project).server;
         for (const p of g.images) {
-            const li = el('li', 'goal-pic'), a = el('a', 'goal-pic-link'); a.href = serverUrl(`/api/artifacts/${p.hex}/raw`, server); a.target = '_blank'; a.rel = 'noopener';
+            const li = el('li', 'goal-pic'), a = el('a', 'goal-pic-link'); a.href = serverUrl(`/api/artifacts/${p.hex}?v=2`, server); a.target = '_blank'; a.rel = 'noopener';
             const img = el('img', 'goal-pic-img'); img.src = a.href; img.alt = p.name || 'Picture of the goal'; img.loading = 'lazy'; img.decoding = 'async';
             a.append(img); li.append(a); ul.append(li);
         }

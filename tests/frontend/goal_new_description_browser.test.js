@@ -1,6 +1,6 @@
 // The New goal form's Description and pictures (#11653, the operator's request): a multi-line Description (the goal's outcome field, 2,000 characters, a live count near the limit), pictures picked, pasted or dropped with the comment
 // box's tray (stored as they are added, on the goal's team, and named in `images` on create), and no 'Driver: the agent who looks after it' line under the Driver. The goal's page says Description, keeps its line breaks and draws
-// its pictures under it. Real board and goals on the isolated dev server; the two routes of Backend Dev's #11650 slice (POST /api/board/{team}/goal-images, `images` on create and on the goal) are a stub. 1280 and 390 px.
+// its pictures under it (from /api/artifacts/{hex}?v=2: there is no /raw route). Real board and goals on the isolated dev server; the two routes of Backend Dev's #11650 slice (POST /api/board/{team}/goal-images, `images` on create and on the goal) are a stub. 1280 and 390 px.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { removeBoards } = require('./helpers/board_cleanup');
@@ -50,7 +50,7 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         const { Fetch } = client;
         safePaused(client, ({ requestId }) => Fetch.fulfillRequest({ requestId, responseCode: 200, responseHeaders: [{ name: 'Content-Type', value: 'image/png' }], body: PNG }));
-        await Fetch.enable({ patterns: [{ urlPattern: '*/api/artifacts/eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee*/raw*' }] });
+        await Fetch.enable({ patterns: [{ urlPattern: '*/api/artifacts/eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee*' }] });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'liveListLoaded', 'settings');
         for (const [sid, jt] of [['orch', 'Orchestrator'], ['be', 'Backend Dev']]) assert.ok((await api('POST', `/api/board/${B}/subscribe`, { subscriber_id: sid, job_title: jt, session_name: sid + '-s' })).status < 300);
