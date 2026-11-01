@@ -52,6 +52,13 @@ func (s *Server) configureBoardHandlers(h *routeHandlers) (*routes.BoardHandler,
 	boardHandler.SetBoardChatFlagsClearer(sessStore.DeleteBoardChatFlags)
 	boardHandler.SetAllowlistFlag(routes.AllowlistEnabled(sessStore))
 	boardHandler.SetChiefBoard(s.chiefBoardID)
+	boardHandler.SetGoalDoneHidden(func(ctx context.Context) []string {
+		st, err := sessStore.GetSettings(ctx)
+		if err != nil {
+			return nil
+		}
+		return routes.GoalDoneHiddenFrom(st)
+	})
 	artifactNudger := routes.NewClaudeArtifactNudger(sessStore, s.terminal)
 	boardHandler.SetArtifactNudger(artifactNudger)
 	sessHandler.SetArtifactNudger(artifactNudger)

@@ -199,7 +199,16 @@ func (h *BoardHandler) NeedsYou(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	ans := needsYouAnswer{Count: len(items), Counts: map[string]int{"agent": 0, "question": 0, "wait": 0, "proposal": 0, "review": 0}, Items: []NeedsYouItem{}, NotIncluded: needsYouNotIncluded, Unread: unread}
+	hiddenGoals := h.goalDoneHiddenSet(ctx)
+	for _, p := range projects {
+		if gi, err := h.goalDoneItems(ctx, p.Project, hiddenGoals); err != nil {
+			unread = appendOnce(unread, "goals")
+		} else {
+			items = append(items, gi...)
+		}
+	}
+
+	ans := needsYouAnswer{Count: len(items), Counts: map[string]int{"agent": 0, "question": 0, "wait": 0, "proposal": 0, "review": 0, "goal_done": 0}, Items: []NeedsYouItem{}, NotIncluded: needsYouNotIncluded, Unread: unread}
 	for _, it := range items {
 		ans.Counts[it.Kind]++
 	}
