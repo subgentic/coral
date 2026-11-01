@@ -2,6 +2,7 @@ package routes
 
 import (
 	"errors"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -136,10 +137,10 @@ func (h *BoardHandler) postButtonReply(r *http.Request, project string, askID in
 	if err != nil {
 		return 0, err
 	}
+	_ = h.bs.SetAskButtonReply(ctx, project, b.ID, msg.ID) // first: from here the claim is never given back, so a second click cannot post a second reply
 	if err := h.bs.RecordReply(ctx, project, msg.ID, askID); err != nil {
-		return 0, err
+		slog.Warn("button reply not linked to its question", "board", project, "message", msg.ID, "error", err)
 	}
-	_ = h.bs.SetAskButtonReply(ctx, project, b.ID, msg.ID)
 	if h.notifyFn != nil {
 		h.notifyFn(project)
 	}

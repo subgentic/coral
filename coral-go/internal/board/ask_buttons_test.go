@@ -1,8 +1,10 @@
 package board
 
 import (
+	"context"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -67,4 +69,27 @@ func TestParseAskButtonsCapsAndDuplicates(t *testing.T) {
 	assert.Equal(t, []int{1, 2, 3}, []int{out[0].Pos, out[1].Pos, out[2].Pos})
 	_, err = ParseAskButtons([]string{"A=reply", "bad"}, nil)
 	assert.Error(t, err, "one bad button refuses all")
+}
+
+func TestAnUnsettledClaimIsFreeAgainAfterAMinute(t *testing.T) {
+	s := testStore(t)
+	ctx := context.Background()
+	msg, err := s.PostMessage(ctx, "alpha", "Lead", "@Operator ok?", nil)
+	require.NoError(t, err)
+	require.NoError(t, s.RecordAsk(ctx, "alpha", msg, []string{"Operator"}))
+	require.NoError(t, s.RecordAskButtons(ctx, "alpha", msg.ID, []AskButton{{Label: "Wake", Action: ActionWake, Arg: "Dev"}, {Label: "Open", Action: ActionOpenNewAgent}, {Label: "Yes", Action: ActionReply}}, time.Now()))
+	got, err := s.AskButtonsOf(ctx, "alpha", []int64{msg.ID})
+	require.NoError(t, err)
+	b := got[msg.ID]
+	t0 := time.Now()
+	_, err = s.ClaimAskButton(ctx, "alpha", msg.ID, b[0].ID, t0)
+	require.NoError(t, err)
+	_, err = s.ClaimAskButton(ctx, "alpha", msg.ID, b[1].ID, t0.Add(30*time.Second))
+	assert.ErrorIs(t, err, ErrButtonUsed, "within the minute the first claim still holds the question")
+	_, err = s.ClaimAskButton(ctx, "alpha", msg.ID, b[1].ID, t0.Add(2*time.Minute))
+	assert.NoError(t, err, "a claim nobody settled for a minute is free: the question is not stuck")
+	// a reply that was posted is never freed
+	require.NoError(t, s.SetAskButtonReply(ctx, "alpha", b[1].ID, 99))
+	_, err = s.ClaimAskButton(ctx, "alpha", msg.ID, b[2].ID, t0.Add(10*time.Minute))
+	assert.ErrorIs(t, err, ErrButtonUsed, "a button that posted its reply stays used")
 }

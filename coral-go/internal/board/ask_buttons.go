@@ -21,6 +21,8 @@ const (
 	AskButtonLabelMax = 32 // characters in a label
 	AskButtonsOpenMax = 10 // asks with buttons an agent may have open at once
 
+	ButtonClaimTTL = time.Minute // an open or wake claim the page never settled is free again after this
+
 	ButtonPending = "pending"
 	ButtonUsed    = "used"
 
@@ -73,6 +75,8 @@ func ParseAskButton(n int, raw string, signIn func(string) bool) (AskButton, err
 		return bad("the label has hidden or control characters")
 	case strings.ContainsRune(label, '@'):
 		return bad("the label has an @")
+	case strings.ContainsAny(label, "\"'`\u2018\u2019\u201c\u201d\u00ab\u00bb[]"):
+		return bad("the label has a quote or a bracket (it is posted inside quotes as the Operator's click, and must not be able to close them)")
 	case buttonLinkRE.MatchString(label) || (signIn != nil && signIn(label)):
 		return bad("the label has a link")
 	}
@@ -209,6 +213,11 @@ func (s *Store) AskIsClosed(ctx context.Context, project string, messageID int64
 func (s *Store) ClaimAskButton(ctx context.Context, project string, messageID, buttonID int64, now time.Time) (AskButton, error) {
 	b, err := s.AskButtonByID(ctx, project, messageID, buttonID)
 	if err != nil {
+		return b, err
+	}
+	// A claim the page never settled (a closed tab, a crash) is free again after a minute, so it cannot leave a question with no usable button. A reply is never freed: it was posted.
+	if _, err := s.db.ExecContext(ctx, `UPDATE board_ask_buttons SET state = ?, used_at = '' WHERE project = ? AND message_id = ? AND state = ? AND reply_message_id = 0 AND action <> ? AND used_at <> '' AND used_at < ?`,
+		ButtonPending, project, messageID, ButtonUsed, ActionReply, now.Add(-ButtonClaimTTL).UTC().Format(time.RFC3339)); err != nil {
 		return b, err
 	}
 	res, err := s.db.ExecContext(ctx, `UPDATE board_ask_buttons SET state = ?, used_at = ?
