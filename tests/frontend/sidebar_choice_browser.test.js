@@ -30,6 +30,16 @@ const { coralReady } = require('./helpers/wait');
                 }
             }
         }
+        // the operator's order (QA's SHOULD): collapse on Agents, expand in the Inbox, back to Agents: it stays open, and the other way round
+        for (const w of [1000, 1100, 1280]) {
+            await Emulation.setDeviceMetricsOverride({ width: w, height: 800, deviceScaleFactor: 1, mobile: false });
+            await Page.navigate({ url: BASE + '/agents' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'settings');
+            const set = async (t, rail) => { await tab(t); if (await railed() !== rail) { await ev('toggleSidebarRail(); true'); await new Promise(r => setTimeout(r, 300)); } assert.equal(await railed(), rail, `${w} px: ${rail ? 'collapsed' : 'expanded'} on ${t}`); }; // sleep-ok: the columns settle
+            await set('agents', true); await set('hub-inbox', false); await tab('agents');
+            assert.equal(await railed(), false, `${w} px: collapsed on Agents, expanded in the Inbox: back on Agents it stays expanded`);
+            await set('agents', false); await set('hub-inbox', true); await tab('agents');
+            assert.equal(await railed(), true, `${w} px: expanded on Agents, collapsed in the Inbox: back on Agents it stays collapsed`);
+        }
         console.log('\nPASS the sidebar keeps the person\'s expand or collapse across tabs');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });

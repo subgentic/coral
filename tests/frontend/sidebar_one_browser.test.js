@@ -1,6 +1,6 @@
 // One sidebar for every tab (#7443, UI/UX's one-sidebar design): the header's parts (search, Hide) are in the same pixels on the Agents, Chats and Automations tabs at 1280 and 1024 px; every text in
 // the sidebar is the page's font; a group's name opens it as a table in the centre while its chevron only folds it, and the item opened from the table says "‹ <group>" to go back; Hide turns
-// the column into a 56 px rail that is the tab's own; the Automations tab's "New job" is on its folder's toolbar; no sideways scroll at 390 px. Drives Chrome over CDP through
+// the column into a 56 px rail that is one choice for every tab (#11629); the Automations tab's "New job" is on its folder's toolbar; no sideways scroll at 390 px. Drives Chrome over CDP through
 // agent_view_harness.js with the history list and the jobs answered at the page's fetch.
 // The main panes follow UI/UX's part-2 rules (audit c2596330): a group's table is titled 20/700 with its count (11/600) and its columns are Chat, Agent, When, Ran and Job, Schedule, Last run, Next;
 // an item's page has its own "← group" link, a 17/700 title and a line under it; the job page's actions are a pinned bar with the primary last; and every text on those pages is on the scale.
@@ -194,7 +194,7 @@ const STUB = `(() => {
             await ev(`document.querySelector('#scheduler-detail .back-link').click(); true`);
             await waitFor(`document.getElementById('group-table-view').checkVisibility()`, at + 'back is the jobs table', 8000);
 
-            // Hide turns the column into the tab's own rail
+            // Hide turns the column into the rail, and the choice is one for every tab (#11629: it was each tab's own, and Agents railed again after the person opened it in the Inbox)
             await openTab('history');
             await ev(`document.querySelector('${pane('history')} .sidebar-hide-btn').click(); true`);
             await waitFor(`document.querySelector('.layout').classList.contains('sidebar-collapsed')`, at + 'the rail', 4000);
@@ -203,10 +203,10 @@ const STUB = `(() => {
             assert.equal(await ev(`document.getElementById('sidebar-rail-new').hidden`), true, at + 'Chats has no pinned action, so no rail action');
             await shot(`sidebar-one-rail-chats-${w}`);
             await openTab('automations');
-            assert.equal(await ev(`document.querySelector('.layout').classList.contains('sidebar-collapsed')`), false, at + "the rail is each tab's own: Automations is open");
+            assert.equal(await ev(`document.querySelector('.layout').classList.contains('sidebar-collapsed')`), true, at + 'the rail is one choice for every tab: Automations is the rail too');
             assert.equal(await ev(`document.getElementById('sidebar-rail-new').hidden`), true, at + 'Automations has no pinned action (New job is on its folder\'s toolbar), so no rail action');
             await openTab('history');
-            assert.equal(await ev(`document.querySelector('.layout').classList.contains('sidebar-collapsed')`), true, at + 'Chats is still the rail');
+            assert.equal(await ev(`document.querySelector('.layout').classList.contains('sidebar-collapsed')`), true, at + 'Chats is the rail, as chosen');
             await ev(`document.querySelector('.sidebar-rail-btn').click(); true`);
             await waitFor(`!document.querySelector('.layout').classList.contains('sidebar-collapsed')`, at + 'the rail opens again', 4000);
 
@@ -240,6 +240,6 @@ const STUB = `(() => {
             }
             await setTheme(ev, 'dark'); await ev(`document.documentElement.style.fontSize = ''; true`);
         }
-        console.log('PASS one sidebar: the header is the same on every tab, groups open tables, the rail is the tab\'s own');
+        console.log('PASS one sidebar: the header is the same on every tab, groups open tables, the rail is one choice for every tab');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
