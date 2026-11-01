@@ -53,6 +53,7 @@ var routeQueries = map[string]string{
 	"GET /api/sessions/history/{}/git":            "limit",
 	"GET /api/sessions/live":                      "compact",
 	"GET /api/sessions/live/{}":                   "agent_type,session_id",
+	"GET /api/sessions/live/{}/branches":          "agent_type,session_id,worktree",
 	"GET /api/sessions/live/{}/capture":           "agent_type,session_id",
 	"GET /api/sessions/live/{}/changes.diff":      "session_id,worktree",
 	"GET /api/sessions/live/{}/chat":              "after,agent_type,before,find_key,limit,offset,session_id,trim,working_directory*",

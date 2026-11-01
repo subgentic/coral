@@ -1,5 +1,5 @@
 /* The agent's side panel tabs say their words (UI/UX's 170 list, item 1, #7621): at 1280 px and up each tab shows its word beside its icon when ALL the words fit the row on one line (a panel dragged narrow,
- * or text at 200%, falls back to icons alone, whose name is the title and the aria-label: no word is clipped and the row does not wrap), and the four rarely used tabs (Browse, Notes, Activity, Agent UI) sit behind one
+ * or text at 200%, falls back to icons alone, whose name is the title and the aria-label: no word is clipped and the row does not wrap), and the five rarely used tabs (Browse, Notes, Activity, Agent UI, Branches) sit behind one
  * More menu. They stay the real tab buttons (their panels, counts and handlers are the old ones): in More they are only drawn out of the way (.tab-more) and out of the tab order, and the menu's items
  * open them through switchAgenticTab. When the open tab is one of those, More carries its word and is the selected one: the open tab is always seen. */
 import { registerActions } from './actions.js';
@@ -8,7 +8,7 @@ import { setText, setHidden, setAttr, setTitle, setHtml } from './dom_write.js';
 import { menuMove } from './menu_keys.js';
 import { watchScrollCue } from './scroll_cue.js';
 
-const RARE = ['browse', 'notes', 'activity', 'agent-ui'];
+const RARE = ['browse', 'notes', 'activity', 'agent-ui', 'branches'];
 const WIDE = window.matchMedia('(min-width: 1280px)');
 const $ = id => document.getElementById(id);
 const strip = () => document.querySelector('#agentic-block-top .agentic-state-tabs');
