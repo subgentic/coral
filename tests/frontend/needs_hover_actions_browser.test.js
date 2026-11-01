@@ -49,7 +49,19 @@ const { removeBoards } = require('./helpers/board_cleanup');
                 const over = [await rowState(1), await rowState(2), await rowState(3)];
                 check(over[1].actions === 1 && over[1].when === 0, at + 'hovering a row shows its actions and hides its time: ' + JSON.stringify(over[1]));
                 check(over[0].actions === 0 && over[2].actions === 0, at + 'the other rows stay at rest');
+                // a click on a row's three dots, then the pointer moves to another row: the clicked row goes back to rest (no highlight, no buttons), the way it was before the click (the operator, #11800)
+                const dotsAt = await ev(`(() => { const b = document.querySelector('${T} .inbox-row-more-toggle'), r = b.getBoundingClientRect(); return { n: b.getAttribute('aria-label').replace(/^.*(plan-\\d).*$/, '$1'), x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
+                await client.Input.dispatchMouseEvent({ type: 'mouseMoved', x: dotsAt.x, y: dotsAt.y });
+                for (const type of ['mousePressed', 'mouseReleased']) await client.Input.dispatchMouseEvent({ type, x: dotsAt.x, y: dotsAt.y, button: 'left', clickCount: 1 });
+                await waitFor(`!!document.querySelector('${T} .menu:not([hidden])')`, at + 'the three dots open', 5000);
+                for (const type of ['mousePressed', 'mouseReleased']) await client.Input.dispatchMouseEvent({ type, x: dotsAt.x, y: dotsAt.y, button: 'left', clickCount: 1 }); // the same button again closes it
+                await waitFor(`!document.querySelector('${T} .menu:not([hidden])')`, at + 'and close', 5000);
+                await client.Input.dispatchMouseEvent({ type: 'mouseMoved', x: idle[2].x + 20, y: idle[2].y }); await ev(framesJs(3));
+                const after = [await rowState(dotsAt.n.slice(-1)), await rowState(3)], lit = await ev(`[...document.querySelectorAll('${T} tbody tr')].find(r => r.textContent.includes('${dotsAt.n}.md')).getAttribute('aria-current')`);
+                check(after[0].actions === 0 && after[1].actions === 1, at + 'after the dots were clicked and the pointer moved on, only the hovered row shows its actions: ' + JSON.stringify(after));
+                check(lit !== 'true', at + 'and the clicked row is not left as the current row: ' + lit);
                 await client.Input.dispatchMouseEvent({ type: 'mouseMoved', x: 5, y: 5 }); await ev(framesJs(3));
+                await client.Input.dispatchKeyEvent({ type: 'keyDown', key: 'Shift', code: 'ShiftLeft' }); await client.Input.dispatchKeyEvent({ type: 'keyUp', key: 'Shift', code: 'ShiftLeft' }); // a key press: the focus that follows is the keyboard's (:focus-visible), as a Tab's would be
                 await ev(`document.querySelector('${T} button[aria-label="Approve: plan-3.md"]').focus(); true`); await ev(framesJs(3));
                 const focus = [await rowState(1), await rowState(3)];
                 check(focus[1].actions === 1 && focus[1].when === 0 && focus[0].actions === 0, at + 'keyboard focus inside a row shows its actions: ' + JSON.stringify(focus));
