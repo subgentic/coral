@@ -352,6 +352,12 @@
 .inbox-ask-error { min-height: 1.2em; margin: 0 0 8px; color: var(--danger); }
 .inbox-ask-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
 .inbox-ask-buttons .btn { min-height: 44px; }
+.inbox-ask-offers { margin: 0 0 12px; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-md, 8px); background: var(--bg-secondary); }
+.inbox-ask-offers-head { margin: 0 0 8px; color: var(--text-muted); }
+.inbox-ask-offers-list { display: flex; flex-direction: column; gap: 8px; }
+.inbox-ask-offer { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; min-width: 0; }
+.inbox-ask-offer .btn { min-height: 44px; max-width: 100%; overflow-wrap: anywhere; }
+.inbox-ask-offer-what { color: var(--text-muted); min-width: 0; overflow-wrap: anywhere; }
 .inbox-review-actions { display: flex; flex-wrap: nowrap; justify-content: flex-end; gap: 8px; align-items: center; } /* the star's 20 px is level with the buttons' centre, not their top (#9904); the words end at the row's right edge (#11552) */
 dialog.inbox-deny-dialog { position: fixed; inset: 0; margin: auto; height: fit-content; color: var(--text-primary); } /* centred with the side gutter: the base reset gives every dialog margin 0, which pinned this one to the top left corner (#11621) */
 .inbox-deny, .inbox-deny-confirm { color: var(--error); } /* Deny is red text, never a red fill (#11552) */

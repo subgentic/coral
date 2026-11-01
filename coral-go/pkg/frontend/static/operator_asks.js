@@ -4,6 +4,8 @@
  * for an ask): it answers the ask, ends a wait, and tells the asker by the post itself. The text is the agent's, so it is written out through markHidden (strict) before it is drawn, then cut. */
 import { markHidden } from './visible_marks.js';
 import { OPERATOR_ID } from './utils.js';
+import { state } from './state.js';
+import { showToast } from './notifications.js';
 
 const FRESH_MS = 15000, LINE_MAX = 140;
 let asks = [], pending = null, lastRead = 0;
@@ -58,8 +60,55 @@ export async function replyToAsk(a, text) {
     refreshOperatorAsks(true);
 }
 
+// ── Buttons an agent put on a question (#11445, #11643) ─────────────────────────────────────────────────
+// The agent DECLARES up to three buttons; nothing runs until the Operator clicks one here. The label is the agent's text, so it is drawn with textContent after markHidden (strict), and the ACTION is named in
+// our own words beside it, so a label like "Cancel" cannot hide that it wakes an agent. A click claims the button on the server, which answers with the STORED action: the page runs only that, never anything it
+// holds itself. A reply is run by the server (posted as the Operator, said to be a click, the question closed); open and wake run here through the routes the dashboard already uses, then the page settles.
+
+/** The buttons of a question that can still be used: only a question (not a wait) has them, and a used one is gone. */
+export const buttonsOf = a => (a && a.kind === 'ask' && Array.isArray(a.buttons) ? a.buttons.filter(b => b && b.state === 'pending' && Number.isFinite(Number(b.id)) && typeof b.label === 'string' && typeof b.action === 'string') : []);
+
+/** What a click does, in the app's own words (never the agent's). */
+export function buttonWords(b) {
+    switch (b.action) {
+        case 'open:new-agent': return 'Opens the New agent dialog';
+        case 'open:task': return `Opens task #${Number(b.arg) || '?'}`;
+        case 'open:artifact': return 'Opens a file';
+        case 'reply': return `Replies "${markHidden(b.label, { strict: true })}" as you`;
+        case 'wake': return `Wakes ${markHidden(b.arg, { strict: true })}`;
+        default: return 'Does something this version does not know';
+    }
+}
+
+const buttonUrl = (a, b, verb) => `/api/board/${encodeURIComponent(a.board)}/asks/${encodeURIComponent(a.id)}/buttons/${encodeURIComponent(b.id)}/${verb}`;
+async function buttonCall(a, b, verb, body) {
+    const resp = await fetch(buttonUrl(a, b, verb), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
+    let data = null; try { data = await resp.json(); } catch { /* no body */ }
+    if (!resp.ok) throw new Error((data && (data.message || data.error)) || `Not done (HTTP ${resp.status}).`);
+    return data || {};
+}
+/** Claim the button: the server answers with its stored action, argument and label. */
+export const claimButton = (a, b) => buttonCall(a, b, 'claim');
+/** Tell the server what became of an open or wake the page ran: done closes the question, failed gives the button back. */
+export const settleButton = (a, b, outcome) => buttonCall(a, b, 'settle', { outcome });
+
+/** Wake the member the button names: a sleeping agent of this Coral, through the route the dashboard's own Wake uses. The member is found on the question's own board (its subscriber, whose session name is
+ * "<cli>-<session id>"), never by name alone across teams. Rejects in words when there is nothing to wake. */
+export async function wakeMember(a, name) {
+    const who = markHidden(name, { strict: true });
+    const r = await fetch(`/api/board/${encodeURIComponent(a.board)}/subscribers`);
+    const subs = r.ok ? await r.json().catch(() => []) : [];
+    const sub = (Array.isArray(subs) ? subs : []).find(x => x && x.subscriber_id === name);
+    if (!sub || !sub.session_name) throw new Error(`${who} is not a member of this team that Coral can wake.`);
+    const live = (state.liveSessions || []).find(s => `${s.agent_type}-${s.session_id}` === sub.session_name);
+    if (!live) throw new Error(`${who} is not running on this computer.`);
+    if (!live.sleeping) throw new Error(`${who} is not asleep.`);
+    const resp = await fetch(`/api/sessions/live/${encodeURIComponent(live.session_id)}/wake`, { method: 'POST' });
+    if (!resp.ok) throw new Error(`Could not wake ${who} (HTTP ${resp.status}).`);
+}
+
 /** The question whole, with a Reply box: a modal dialog (focus kept inside it, Escape closes it). */
-export function openAskDialog(a, onDone) {
+export function openAskDialog(a, onDone, runners = {}) {
     const dlg = document.createElement('dialog');
     dlg.className = 'modal-content dlg-form inbox-ask-dialog'; // the shared dialog rule sizes it (--dlg-max, dlg-form), not a width of its own
     dlg.setAttribute('aria-labelledby', 'inbox-ask-title');
@@ -74,8 +123,44 @@ export function openAskDialog(a, onDone) {
     const send = document.createElement('button'); send.type = 'button'; send.className = 'btn btn-primary'; send.textContent = 'Send reply';
     const close = document.createElement('button'); close.type = 'button'; close.className = 'btn'; close.textContent = 'Close';
     row.append(send, close);
-    dlg.append(title, sub, whole, label, err, row);
     const finish = () => { dlg.close(); dlg.remove(); if (onDone) onDone(); };
+    const offers = buttonsOf(a);
+    let offered = null;
+    if (offers.length) { // what the asker offered: one tap per choice, each with what it does
+        offered = document.createElement('section'); offered.className = 'inbox-ask-offers'; offered.setAttribute('aria-label', `Buttons ${markHidden(a.asker, { strict: true })} offered`);
+        const head = document.createElement('p'); head.className = 'inbox-ask-offers-head'; head.textContent = `${markHidden(a.asker, { strict: true })} offered these. Nothing runs until you tap one.`;
+        const list = document.createElement('div'); list.className = 'inbox-ask-offers-list';
+        const choices = [];
+        for (const b of offers) {
+            const item = document.createElement('div'); item.className = 'inbox-ask-offer';
+            const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'btn'; btn.textContent = markHidden(b.label, { strict: true }); btn.dataset.buttonId = String(b.id);
+            const what = document.createElement('span'); what.className = 'inbox-ask-offer-what'; what.textContent = buttonWords(b);
+            btn.setAttribute('aria-label', `${markHidden(b.label, { strict: true })}: ${what.textContent}`); btn.title = what.textContent;
+            btn.addEventListener('click', async () => {
+                err.textContent = ''; choices.forEach(c => { c.disabled = true; }); send.disabled = true;
+                try {
+                    const got = await claimButton(a, b); // the stored action, whatever the label says
+                    if (got.action === 'reply') { asks = asks.filter(x => askKey(x) !== askKey(a)); fire(); refreshOperatorAsks(true); finish(); showToast(`Sent: ${markHidden(got.label, { strict: true })}`); return; }
+                    finish(); // the dialog is modal: it goes before the page it opens
+                    try {
+                        if (got.action === 'open:new-agent') { if (!window.showLaunchModal) throw new Error('The New agent dialog is not available here.'); window.showLaunchModal(); }
+                        else if (got.action === 'open:task') { if (!runners.task) throw new Error('Tasks cannot be opened here.'); runners.task(a, String(got.arg)); }
+                        else if (got.action === 'open:artifact') { if (!runners.artifact) throw new Error('Files cannot be opened here.'); await runners.artifact(a, String(got.arg)); }
+                        else if (got.action === 'wake') { await wakeMember(a, String(got.arg)); showToast(`Woke ${markHidden(got.arg, { strict: true })}.`); }
+                        else throw new Error('This button does something this version does not know.');
+                        await settleButton(a, b, 'done'); // closes the question
+                    } catch (e) {
+                        showToast(e.message || 'That did not work.', true);
+                        await settleButton(a, b, 'failed').catch(() => {}); // the button is given back
+                    }
+                    refreshOperatorAsks(true);
+                } catch (e) { err.textContent = e.message || 'Not done.'; choices.forEach(c => { c.disabled = false; }); send.disabled = false; }
+            });
+            choices.push(btn); item.append(btn, what); list.append(item);
+        }
+        offered.append(head, list);
+    }
+    dlg.append(title, sub, whole, ...(offered ? [offered] : []), label, err, row);
     close.addEventListener('click', finish);
     dlg.addEventListener('cancel', e => { e.preventDefault(); finish(); });
     send.addEventListener('click', async () => {
