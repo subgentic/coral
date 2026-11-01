@@ -270,6 +270,7 @@ export function reviewActions(row, inSaved = false) { // inSaved (#11641, #11799
     const word = (text, name, cls, run) => { const b = DT.el('button', `btn btn-small ${cls}`.trim(), text); b.type = 'button'; b.setAttribute('data-slot', text.toLowerCase()); b.setAttribute('aria-label', `${name}: ${file}`); b.addEventListener('click', () => run(b)); if (text === 'Approve') b.classList.add('inbox-main-action'); return b; }; // a button's place is its column (data-slot): the same x on every row (#11630)
     const approve = b => { b.disabled = true; errorText.textContent = ''; const settle = keepPlace(b); // replaces Mark reviewed (#136584): it clears the row, marks the review approved and tells the agent that uploaded it
         return importOnce('./artifact_review.js').then(async ({ approveRow, sayApproved }) => { sayApproved(row.name, await approveRow(row.team, row)); sayLive(`Approved ${file}.`); await settle(); }).catch(error => failed(b, error)); };
+    const approveNote = b => { const settle = keepPlace(b); return importOnce('./artifact_review.js').then(({ openApproveNoteDialog }) => openApproveNoteDialog(row.team, row, async () => { sayLive(`Approved ${file} with a note.`); await settle(); })).catch(error => failed(b, error)); }; // #11888: approved with one short comment for the agent, not shown again
     const deny = b => { const settle = keepPlace(b); return importOnce('./artifact_review.js').then(({ openDenyDialog }) => openDenyDialog(row.team, row, async () => { sayLive(`Denied ${file}.`); await settle(); })).catch(error => failed(b, error)); };
     const ignore = b => { b.disabled = true; errorText.textContent = ''; const settle = keepPlace(b);
         return importOnce('./artifact_review.js').then(async ({ ignoreRow, sayIgnored }) => { await ignoreRow(row.team, row); sayIgnored(row.team, row); sayLive(`Ignored ${file}.`); await settle(); }).catch(error => failed(b, error)); };
@@ -285,6 +286,7 @@ export function reviewActions(row, inSaved = false) { // inSaved (#11641, #11799
     if (!decisionNeedsPerson(splitKey(row.team).server)) { // through Coral Hub a guest cannot decide
         box.append(word('Approve', 'Approve', 'btn-primary', approve), word('Changes', 'Request changes', '', () => openReview(row, { requestChanges: true })));
         box.lastChild.title = 'Request changes';
+        menu.push({ label: 'Approve with a note', title: 'Approve it with one short comment for the agent; it is not shown again', run: approveNote });
         if (compact) menu.push({ label: 'Deny', title: 'A final no: the agent is told', run: deny }, { label: 'Ignore', title: 'Take it out of Needs you; nobody is told', run: ignore });
         else box.append(word('Deny', 'Deny', 'btn-quiet inbox-deny', deny), word('Ignore', 'Ignore', 'btn-quiet', ignore));
         if (inSaved) menu.push({ label: 'Move to Needs you', title: 'Put it back in Needs you as it was', run: unsave });

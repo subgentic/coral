@@ -33,8 +33,8 @@ export async function reviewStateOf(team, hex) {
 
 const timeWords = at => { const t = Date.parse(at); return Number.isNaN(t) ? '' : new Date(t).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }); };
 
-async function decide(team, row, decision, reason) {
-    const r = await boardFetch(team, `/artifacts/${encodeURIComponent(row.id)}/review`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(reason ? { decision, reason } : { decision }) });
+async function decide(team, row, decision, reason, note) {
+    const r = await boardFetch(team, `/artifacts/${encodeURIComponent(row.id)}/review`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(reason ? { decision, reason } : note ? { decision, note } : { decision }) });
     const body = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(body.message || body.error || `Could not save the review (HTTP ${r.status}).`);
     return body;
@@ -57,8 +57,8 @@ async function settleEarlierVersions(m, row) {
 }
 
 /** Approve a review row of Needs you (or the viewer): it is decided, the Inbox list follows. Resolves the server's answer ({delivered, to, reason}). */
-export async function approveRow(team, row) {
-    const out = await decide(team, row, 'approve');
+export async function approveRow(team, row, note = '') { // note (#11888): one short comment that goes to the agent in the approval's one notice; the approval is final
+    const out = await decide(team, row, 'approve', undefined, String(note || '').replace(/\s+/g, ' ').trim());
     const m = await importOnce('./inbox_reviews.js').catch(() => null);
     if (m) { out.earlier = await settleEarlierVersions(m, row).catch(() => ({ settled: 0, failed: 0 })); m.settleReview(row); m.refreshReviews(true).catch(() => {}); } // the versions before the approved one are settled with it (#11533)
     return out;
@@ -94,7 +94,7 @@ export function openDenyDialog(team, row, onDone) {
     const dlg = document.createElement('dialog');
     dlg.className = 'modal-content dlg-form inbox-deny-dialog'; dlg.setAttribute('aria-labelledby', 'inbox-deny-title');
     const title = document.createElement('h2'); title.id = 'inbox-deny-title'; title.textContent = `Deny ${shown(row.name)}?`;
-    const sub = document.createElement('p'); sub.textContent = 'This is a final no: the agent is told it was declined and should not send it again as it is. To ask for a new version, use Changes instead.';
+    const sub = document.createElement('p'); sub.textContent = 'This is a final no: the agent is told it was denied and should not send it again, in any wording. To ask for a new version, use Changes instead.';
     const label = document.createElement('label'); label.textContent = 'Reason (optional, the agent sees it)';
     const box = document.createElement('textarea'); box.className = 'field'; box.rows = 3; box.maxLength = 500; label.append(box);
     const err = document.createElement('p'); err.className = 'inbox-ask-error'; err.setAttribute('role', 'alert');
@@ -108,6 +108,32 @@ export function openDenyDialog(team, row, onDone) {
     go.addEventListener('click', async () => {
         err.textContent = ''; go.disabled = true;
         try { const out = await denyRow(team, row, box.value.replace(/\s+/g, ' ').trim()); finish(); sayDenied(row.name, out); announceNotice(`Denied ${shown(row.name)}.`); onDone?.(); }
+        catch (e) { err.textContent = e.message || 'Not saved.'; go.disabled = false; box.focus(); }
+    });
+    document.body.append(dlg); dlg.showModal(); box.focus();
+    return dlg;
+}
+
+/** The Approve with a note dialog (#11888): a file that is almost right is approved with one short comment (500 characters) and not shown again; the agent is told, with the note, and no further review is expected.
+ *  onDone runs with the server's answer after the approval went through. */
+export function openApproveNoteDialog(team, row, onDone) {
+    const dlg = document.createElement('dialog');
+    dlg.className = 'modal-content dlg-form inbox-approve-note-dialog'; dlg.setAttribute('aria-labelledby', 'inbox-approve-note-title');
+    const title = document.createElement('h2'); title.id = 'inbox-approve-note-title'; title.textContent = `Approve ${shown(row.name)} with a note`;
+    const sub = document.createElement('p'); sub.textContent = 'It is approved and leaves Needs you for good. The agent is told, with your note, and does not send it back for another review.';
+    const label = document.createElement('label'); label.textContent = 'Note (the agent sees it)';
+    const box = document.createElement('textarea'); box.className = 'field'; box.rows = 3; box.maxLength = 500; label.append(box);
+    const err = document.createElement('p'); err.className = 'inbox-ask-error'; err.setAttribute('role', 'alert');
+    const buttons = document.createElement('div'); buttons.className = 'inbox-ask-buttons';
+    const go = document.createElement('button'); go.type = 'button'; go.className = 'btn btn-primary inbox-approve-note-confirm'; go.textContent = 'Approve';
+    const cancel = document.createElement('button'); cancel.type = 'button'; cancel.className = 'btn'; cancel.textContent = 'Cancel';
+    buttons.append(go, cancel); dlg.append(title, sub, label, err, buttons);
+    const finish = () => { dlg.close(); dlg.remove(); };
+    cancel.addEventListener('click', finish);
+    dlg.addEventListener('cancel', e => { e.preventDefault(); finish(); });
+    go.addEventListener('click', async () => {
+        err.textContent = ''; go.disabled = true;
+        try { const out = await approveRow(team, row, box.value); finish(); sayApproved(row.name, out); announceNotice(`Approved ${shown(row.name)}.`); onDone?.(out); }
         catch (e) { err.textContent = e.message || 'Not saved.'; go.disabled = false; box.focus(); }
     });
     document.body.append(dlg); dlg.showModal(); box.focus();
@@ -130,6 +156,7 @@ export function attachReview(d, { reload }) {
     bar.className = 'artifact-review'; bar.hidden = true;
     bar.innerHTML = `<span class="artifact-review-state" role="status"></span>
         <button type="button" class="btn btn-primary artifact-review-approve">Approve</button>
+        <button type="button" class="btn artifact-review-note">Approve with a note</button>
         <button type="button" class="btn artifact-review-changes" aria-expanded="false">Request changes</button>
         <form class="artifact-review-form" hidden>
             <label for="artifact-review-text">What should change?</label>
@@ -140,7 +167,7 @@ export function attachReview(d, { reload }) {
         </form>`;
     (d.querySelector('.artifact-viewer-from') || d.querySelector('.artifact-viewer-header')).after(bar); // after who sent it, which sits under the name (#11456)
     const $ = s => bar.querySelector(s);
-    const stateEl = $('.artifact-review-state'), approve = $('.artifact-review-approve'), changes = $('.artifact-review-changes');
+    const stateEl = $('.artifact-review-state'), approve = $('.artifact-review-approve'), changes = $('.artifact-review-changes'), approveNote = $('.artifact-review-note');
     const form = $('.artifact-review-form'), text = $('#artifact-review-text'), error = $('.artifact-review-error');
     let cur = null, gen = 0, sending = false, done = false;
     const show = (s) => {
@@ -148,7 +175,7 @@ export function attachReview(d, { reload }) {
         const waiting = !!s && (s.state === 'pending' || s.state === 'changes');
         const pending = waiting && !decisionNeedsPerson(s.server); // a remote of a self-hosted hub: the decision is made on that machine's own dashboard (#11372)
         bar.hidden = !s;
-        approve.hidden = changes.hidden = !pending;
+        approve.hidden = changes.hidden = approveNote.hidden = !pending;
         if (!pending) form.hidden = true;
         stateEl.textContent = !s ? '' : s.state === 'approved' ? `Approved${s.at ? ' ' + timeWords(s.at) : ''}` : s.state === 'reviewed' ? 'Reviewed' : s.state === 'changes' ? 'Changes requested' : waiting && !pending ? 'Waiting for your review. Approve it on that computer\'s own dashboard.' : 'Waiting for your review';
     };
@@ -160,6 +187,11 @@ export function attachReview(d, { reload }) {
         approve.disabled = true;
         try { const out = await approveRow(cur.team, cur.row); sayApproved(cur.row.name || 'the artifact', out); show({ ...cur, state: 'approved', at: out.review?.at || new Date().toISOString() }); }
         catch (e) { showToast(e.message, true); } finally { approve.disabled = false; }
+    });
+    approveNote.addEventListener('click', () => {
+        if (!cur) return;
+        const was = cur;
+        openApproveNoteDialog(was.team, was.row, out => show({ ...was, state: 'approved', at: out?.review?.at || new Date().toISOString() }));
     });
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
