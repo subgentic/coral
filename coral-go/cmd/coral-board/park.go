@@ -15,7 +15,7 @@ import (
 // cmdTaskPark: coral-board task park <id> --reason "..." [--until DATE], and task unpark <id>
 // (#4175 step 3). The orchestrator or the Operator only; the server decides.
 func cmdTaskPark(st *boardState, args []string, unpark bool) {
-	usage := `Usage: coral-board task park <id> --reason "why" [--until "2026-10-19 21:58" | 2026-10-19 | 3d]
+	usage := `Usage: coral-board task park <id> --reason "why" [--until "2026-10-19 21:58" | 2026-10-19 | 3d] [--ask MESSAGE_ID]
        coral-board task unpark <id>`
 	if len(args) < 1 {
 		fmt.Fprintln(os.Stderr, usage)
@@ -39,12 +39,16 @@ func cmdTaskPark(st *boardState, args []string, unpark bool) {
 	fs := flag.NewFlagSet("task-park", flag.ContinueOnError)
 	reason := fs.String("reason", "", "Why it is set aside (required)")
 	until := fs.String("until", "", "When it comes back by itself (optional)")
+	ask := fs.Int64("ask", 0, "The id of your open question to the Operator (post it with: coral-board post --ask \"@Operator ...\"); a park that waits on the Operator needs it")
 	clihelp.ParseFlags(fs, args[1:], func() string { return commandUsage(os.Args[1], os.Args[2:]) })
 	if *reason == "" {
 		fmt.Fprintln(os.Stderr, usage)
 		clierr.Exit1()
 	}
 	body := map[string]any{"reason": flagText(*reason, "park reason")}
+	if *ask > 0 {
+		body["ask_id"] = *ask
+	}
 	if *until != "" {
 		at, err := parseWhen(*until, time.Now())
 		if err != nil {

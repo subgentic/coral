@@ -334,6 +334,7 @@ a POST /api/board/{project}/tasks/{taskID}/reply
 a POST /api/board/{project}/tasks/{taskID}/park
 a POST /api/board/{project}/tasks/{taskID}/publish
 a POST /api/board/{project}/tasks/{taskID}/reassign
+a POST /api/board/{project}/tasks/{taskID}/release
 a POST /api/board/{project}/tasks/{taskID}/reject
 a POST /api/board/{project}/tasks/{taskID}/release-review
 a POST /api/board/{project}/tasks/{taskID}/reminder

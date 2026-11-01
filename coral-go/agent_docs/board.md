@@ -1257,10 +1257,12 @@ their prerequisites removed. These commands do not complete or cancel upstream t
 ### Park a Task
 
 ```
-POST   /api/board/{project}/tasks/{id}/park   {"reason": "waiting on the operator", "until": "2026-10-19T21:58:00Z"}
+POST   /api/board/{project}/tasks/{id}/park   {"reason": "waiting on the billing team", "until": "2026-10-19T21:58:00Z", "ask_id": 123}
 DELETE /api/board/{project}/tasks/{id}/park
-coral-board task park <id> --reason "why" [--until "2026-10-19 21:58" | 2026-10-19 | 21:58 | 3d]
+POST   /api/board/{project}/tasks/{id}/release   {"keep_assigned": false}
+coral-board task park <id> --reason "why" [--until "2026-10-19 21:58" | 2026-10-19 | 21:58 | 3d] [--ask MESSAGE_ID]
 coral-board task unpark <id>
+coral-board task release <id> [--keep]
 ```
 
 Sets an open task aside on purpose: while it is parked it gets no reminder, no claim or status
@@ -1270,6 +1272,16 @@ passes (at most 90 days ahead), or with unpark. Only the team's orchestrator (by
 token) or the Operator may park or unpark: an agent can't park its own task to hide that it is
 stuck (**403**). The reason is stored cleaned (one line, at most 120 characters, no secrets, no
 `@`); the board line says who parked it and until when, never the reason.
+
+A park is only for a wait **outside the team** (the Operator, another team) (#11660). Work that is not for now is
+**released** (`coral-board task release <id>`: back to pending, unassigned, or with `--keep` still its owner's; the
+task's assignee, an orchestrator or the Operator may release). A wait on a reviewer is `submit-review`, which frees the
+slot: a park whose reason says review, reviewer or QA, or names a member who reviews, is refused (**400**
+`park_reviewer`). A park that waits on the Operator must carry their Inbox question: post it with
+`coral-board post --ask "@Operator ..."` and park with `--ask <that message's id>` (**400** `park_needs_ask`). An agent
+holds at most **2** parked tasks: a third is refused (**409** `park_cap`: release one to the queue or finish one);
+changing the reason of a task that is parked already is never refused. Parks made before the cap are left as they
+are. The orchestrator's health check names an agent that holds a park older than 24 hours, or more parks than the cap.
 
 ### Task Status Workflow
 
