@@ -1,5 +1,29 @@
 # Release Notes
 
+## v2.0.26 — each agent keeps its own model, one Messaging state, and a picture zoom that reads its real scale
+
+### Changes
+
+#### What you will notice first
+
+- **In New agent's folder tabs, each provider keeps its own Model**: a model typed under Pi used to stay in the box when you switched to Claude, whose Model select showed it and whose footer said it would launch Claude with it. On a change of provider the form now puts away what the old provider had and restores what the new one had, or that provider's default; switching back to Pi finds its model still there.
+- **A model picked from the list survives a provider round trip**: going from Claude to Codex and back kept the model you typed but replaced one you picked with the default that was on its way; it now keeps both.
+- **Messaging switches have one state each, the same on Team settings and on New team step 3**: each switch reads on or off and nothing else (no "On (default)", "Set on" or "Message teams here" wording). One line covers the other reach, teams on this computer, which need the explicit on for messaging and for files: "not allowed yet" with an Allow button (it stores the explicit on for the switches that are on, in one request), then "allowed", or "not allowed while both switches are off" when nothing is on. New team step 3 draws both switches on, as a team launched with no change acts; a switch left on is not stored (the default stays a default), one turned off is sent off.
+- **The picture zoom reads the picture's real scale**: a 1600 px picture drawn 280 px wide said 100%; it now says 18% (the drawn width over the picture's own, times the zoom; Fit is the picture at its fitted size), and it updates when the picture loads or the box resizes. The zoom buttons sit above the picture in a 44 px strip, so a tall picture starts under them.
+- **The New agent footer recap follows the window's width**: a window that becomes a phone's width afterwards (a rotation, a resized window) cuts a long folder at once instead of keeping the whole path on four lines.
+
+#### Known issues
+
+- **Windows: in-app update does not work from 2.0.0 through 2.0.6.** If you're on one of those, download and install the MSI by hand; from 2.0.7 on, in-app update works.
+- **macOS: a Coral of 2.0.5 or earlier cannot install updates in-app; install 2.0.6 or later by hand once.**
+- **OpenCode agents are tested on macOS and Linux; OpenCode on Windows is not yet tested end to end.**
+- Setting up a computer over SSH is supported from a macOS or Linux hub, and is not yet tested from a Windows hub.
+
+#### For developers and releases
+
+- The static tree is 5,906,418 bytes of the 5,906,432-byte budget: 14 bytes of room.
+- The footer recap adds its width listener once per page, whatever happens to the dialog; suites follow the new Messaging words (`team_cross_team_default`, `team_messaging_reach`, `team_messaging_same_coral`, `new_team_launch`, `hub_cross_team_owner`), and the `settings_html_pin` golden and the interpolation census are regenerated.
+
 ## v2.0.25 — the Artifacts badge counts files, and the phone toolbar is the bar only while you select
 
 ### Changes
