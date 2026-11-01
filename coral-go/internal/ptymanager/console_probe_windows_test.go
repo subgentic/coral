@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"testing"
 	"time"
+	"unsafe"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -297,4 +298,21 @@ func TestA32BitShellOnTheConsoleIsAReader(t *testing.T) {
 	b.mu.RUnlock()
 	var got stdinKind
 	assert.Eventually(t, func() bool { got = probeStdin(pid); return got == stdinConsole }, 10*time.Second, 100*time.Millisecond, "got %v", got)
+}
+
+// Security's #6931: the 32-bit offsets are pinned (they are not the 64-bit ones), INVALID_HANDLE_VALUE and 0 are "no standard input" in both layouts and never a handle to duplicate,
+// and this host is x64 (where the 32-bit layout is read).
+func TestThe32BitLayoutIsPinnedAndNoHandleIsNeverDuplicated(t *testing.T) {
+	assert.Equal(t, 0x10, peb32ProcessParameters)
+	assert.Equal(t, 0x18, params32StandardInput)
+	assert.Equal(t, uintptr(0x20), unsafe.Offsetof(windows.PEB{}.ProcessParameters), "the 64-bit PEB: not the 32-bit offset")
+	assert.Equal(t, uintptr(0x20), unsafe.Offsetof(windows.RTL_USER_PROCESS_PARAMETERS{}.StandardInput), "the 64-bit parameters: not the 32-bit offset")
+	assert.Equal(t, windows.InvalidHandle, handle32(0xFFFFFFFF))
+	assert.Equal(t, windows.Handle(0x68), handle32(0x68))
+	assert.True(t, noStdin(0))
+	assert.True(t, noStdin(handle32(0xFFFFFFFF)))
+	assert.False(t, noStdin(0x68))
+	if runtime.GOARCH == "amd64" {
+		assert.True(t, hostIsAMD64(), "this x64 test host reads 32-bit blocks")
+	}
 }
