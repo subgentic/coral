@@ -4,11 +4,11 @@
 .chief-avatar[data-color="5"] { background: var(--avatar-5); } .chief-avatar[data-color="6"] { background: var(--avatar-6); } .chief-avatar[data-color="7"] { background: var(--avatar-7); } .chief-avatar[data-color="8"] { background: var(--avatar-8); }
 body[data-chief="true"] .chat-bubble.assistant { position: relative; margin-left: 36px; }
 body[data-chief="true"] .chat-bubble.assistant::before { content: var(--chief-letter, "C"); position: absolute; left: -36px; top: 2px; display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; background: var(--chief-color, var(--avatar-1)); color: var(--on-avatar); font-size: var(--fs-sm); font-weight: var(--fw-strong); }
-.chief-setup { display: grid; gap: 12px; }
+.chief-setup { display: grid; gap: 12px; font-size: var(--fs-md); --sv-status-size: var(--fs-md); } /* the dialog's type scale: 13/400 for its lines, 13/500 for the save status (the token, not a rule on .sv), 14/600 for the name (settings_dialog_stable) */
 .chief-setup-intro { margin: 0; color: var(--text-secondary); }
 .chief-preview { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px 0; }
 .chief-preview .chief-avatar { margin-right: 0; width: 40px; height: 40px; font-size: var(--fs-lg); }
-.chief-preview-name { font-weight: var(--fw-strong); }
+.chief-preview-name { font-size: var(--fs-lg); font-weight: var(--fw-strong); }
 .chief-preview-fronts { color: var(--text-secondary); }
 .chief-swatches { display: flex; flex-wrap: wrap; gap: 8px; }
 .chief-swatch { width: 44px; height: 44px; border-radius: 50%; border: 2px solid transparent; background: var(--avatar-1); cursor: pointer; padding: 0; }
