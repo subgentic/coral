@@ -2,6 +2,7 @@ package routes
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -56,18 +57,33 @@ func TestASelfUpdatedImageIsTheCLIOnlyInTheExactShape(t *testing.T) {
 	}
 }
 
+// dirLink makes path a link to the folder target: a symbolic link, or on Windows without the privilege a junction.
+func dirLink(t *testing.T, target, path string) {
+	t.Helper()
+	if err := os.Symlink(target, path); err == nil {
+		return
+	}
+	if runtime.GOOS != "windows" {
+		t.Skip("cannot create links here")
+	}
+	if out, err := exec.Command("cmd", "/c", "mklink", "/J", path, target).CombinedOutput(); err != nil {
+		t.Skipf("cannot create a junction here: %v %s", err, out)
+	}
+}
+
 func TestASelfUpdatedImageThatIsALinkOrAFolderIsNotTheCLI(t *testing.T) {
 	root := t.TempDir()
 	dir := filepath.Join(root, "bin")
 	cli := touch(t, filepath.Join(dir, "claude.exe"))
 	elsewhere := touch(t, filepath.Join(root, "elsewhere", "claude.exe"))
 
-	// a link in the CLI's folder, with the right name, to a program somewhere else
+	// a file link in the CLI's folder, with the right name, to a program somewhere else (needs the symbolic link privilege on Windows)
 	link := filepath.Join(dir, "claude.exe.old.3.1234")
-	if err := os.Symlink(elsewhere, link); err != nil {
-		t.Skipf("cannot create symbolic links here: %v", err)
+	if err := os.Symlink(elsewhere, link); err == nil {
+		assert.False(t, isSelfUpdatedImage(link, cli), "a link: it resolves to another folder")
+	} else {
+		t.Logf("no file symbolic links here (%v): that case is not run", err)
 	}
-	assert.False(t, isSelfUpdatedImage(link, cli), "a link: it resolves to another folder")
 
 	// a folder with the right name
 	asDir := filepath.Join(dir, "claude.exe.old.4.1234")
@@ -76,15 +92,16 @@ func TestASelfUpdatedImageThatIsALinkOrAFolderIsNotTheCLI(t *testing.T) {
 
 	// the image reached through a link to ANOTHER folder: the folders differ after resolving
 	viaLink := filepath.Join(root, "viaLink")
-	require.NoError(t, os.Symlink(filepath.Join(root, "elsewhere"), viaLink))
+	dirLink(t, filepath.Join(root, "elsewhere"), viaLink)
 	touch(t, filepath.Join(root, "elsewhere", "claude.exe.old.5.1234"))
 	assert.False(t, isSelfUpdatedImage(filepath.Join(viaLink, "claude.exe.old.5.1234"), cli), "a link in the image's path to a different folder")
 
-	// the CLI reached through a link to its folder: the same folder after resolving
+	// the CLI reached through a link to its folder
 	linkedDir := filepath.Join(root, "binLink")
-	require.NoError(t, os.Symlink(dir, linkedDir))
+	dirLink(t, dir, linkedDir)
 	real := touch(t, filepath.Join(dir, "claude.exe.old.6.1234"))
-	assert.True(t, isSelfUpdatedImage(real, filepath.Join(linkedDir, "claude.exe")), "the CLI given through a link to the same folder")
+	// safefs.Resolve refuses a path through a junction or an untrusted mount ("cannot be traversed"), so the CLI given that way is not resolved: no match (condition 5: unreadable fails the other way)
+	assert.False(t, isSelfUpdatedImage(real, filepath.Join(linkedDir, "claude.exe")), "a CLI path through a link: not resolvable here, so no match")
 }
 
 func TestSameImageTakesTheRenamedBinaryOnlyOnWindows(t *testing.T) {
