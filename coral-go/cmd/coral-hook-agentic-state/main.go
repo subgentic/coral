@@ -193,6 +193,14 @@ func bindTranscripts(d map[string]any, sessionID, agyConversation string) {
 			}
 		}
 	}
+	if strings.HasPrefix(os.Getenv("CORAL_SESSION_NAME"), "hermes-") && transcriptlink.IsSessionID(sessionID) {
+		// Hermes keys its session rows by its own id, which every payload of its hooks names (fromHermes kept it only in the Hermes form): the link is what the chat reads them by (#11831).
+		if id := hooks.StrVal(d, "session_id"); id != "" && id != sessionID {
+			if err := transcriptlink.BindHermes(hooks.CoralDir(), sessionID, id); err != nil {
+				hooks.DebugLog(fmt.Sprintf("HERMES_LINK_FAILED: %v", err))
+			}
+		}
+	}
 	if agyConversation != "" && transcriptlink.IsSessionID(sessionID) {
 		// agy keys its transcript by its own conversation id: the link is what chat, history search and token usage find it by (#7764).
 		if err := transcriptlink.BindAgy(sessionID, agyConversation); err != nil {

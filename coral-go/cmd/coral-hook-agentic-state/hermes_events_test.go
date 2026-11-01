@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/subgentic/coral/internal/agent"
+	"github.com/subgentic/coral/internal/transcriptlink"
 )
 
 // #11831: Coral's entries in Hermes's config.yaml run this binary with --hermes <event>; fromHermes reads an allow-list of keys and nothing else.
@@ -143,4 +144,21 @@ func TestAHermesHookWithNoWorkdirPostsNothing(t *testing.T) {
 		res = runFlow(t, flowRun{cli: "hermes", args: []string{"--hermes", "pre_llm_call"}, stdin: flowPayload(t, map[string]any{}), env: []string{"CORAL_HERMES_WORKDIR=" + bad}})
 		assert.Empty(t, res.Requests, bad)
 	}
+}
+
+// The hook binds the Coral session to the Hermes session its payload names, so the chat reads that session's rows; only a Hermes launch (a hermes- session name) and only a Hermes-form id bind.
+func TestAHermesHookBindsTheSessionToItsHermesSession(t *testing.T) {
+	data := t.TempDir()
+	run := func(cli, id string) {
+		runFlow(t, flowRun{cli: cli, args: []string{"--hermes", "pre_llm_call"}, stdin: flowPayload(t, map[string]any{"session_id": id}), env: []string{"CORAL_DATA_DIR=" + data, "CORAL_HERMES_WORKDIR=/work/dev"}})
+	}
+	run("hermes", "d7b90358")
+	assert.Equal(t, "", transcriptlink.HermesSession(data, flowSessionID), "a banner id binds nothing")
+	run("claude", hermesTestID)
+	assert.Equal(t, "", transcriptlink.HermesSession(data, flowSessionID), "only a hermes- session binds")
+	run("hermes", hermesTestID)
+	assert.Equal(t, hermesTestID, transcriptlink.HermesSession(data, flowSessionID))
+	next := "local-" + strings.Repeat("b2", 32)
+	run("hermes", next)
+	assert.Equal(t, next, transcriptlink.HermesSession(data, flowSessionID), "/new: the link follows")
 }
