@@ -2,7 +2,9 @@
  * what is already stored and the marked-up version of a picture (a second version of the same artifact) has its first version's hex to follow. A phone's picker offers the photos. Everything the person or the server wrote is set as
  * text or as an attribute, never as HTML. The tray is kept by the composing state, so a redraw of the panel gives the same node back with its pictures. */
 import { importOnce } from './import_once.js';
+import { loadStyles } from './lazy_styles.js';
 const api = await importOnce('./artifact_comments_api.js'); // lazy: its failure is retried
+await loadStyles('pictures.css'); // the picture rules load with this module, before anything draws (page_weight: not at start)
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 
 const HINT = 'Pictures are shared with this team\'s agents as they are; nothing is hidden.';

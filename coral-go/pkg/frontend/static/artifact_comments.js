@@ -2,6 +2,7 @@ import { plural } from './format.js';
 /* Comments in the artifact viewer (#5182, phase 1): a side panel (a bottom sheet on a phone) of the artifact's threads, highlights of what each is about, a Comment button by a text selection,
  * a composer, and the actions the server says this viewer may use. Everything shown is text (textContent, never HTML). The server is the gate: a control the viewer cannot use is hidden, a write
  * it refuses shows the server's one-line reason. Where a comment sits is artifact_anchor.js; the routes are artifact_comments_api.js. */
+import { loadStyles } from './lazy_styles.js';
 import { isPhoneLayout, PHONE_QUERY } from './phone_layout.js';
 import { importOnce } from './import_once.js';
 const { buildAnchor } = await importOnce('./artifact_anchor.js');
@@ -18,6 +19,7 @@ import { boardKeyName, sessionTeamKey, contextServer } from './server_base.js';
 import { browserLocal } from './safe_storage.js';
 import { boardOfPage } from './dock_page.js';
 import { el } from './dom_el.js';
+await loadStyles('pictures.css'); // the picture rules load with this module, before anything draws (page_weight: not at start)
 
 const OPEN_KEY = 'coral-artifact-comments-open'; // explicit choice shared by the viewer and docked preview, at every width
 

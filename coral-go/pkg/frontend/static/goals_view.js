@@ -2,6 +2,7 @@
  * on the right (outcome, done when, the rollup, its tasks with Open task and Open the agent); on a phone the two are two screens with a back row. First cut: read, plus New goal.
  * The routes' JSON becomes the model in goals_adapter.js, the words come from goal_words.js; everything drawn here is built with the DOM and textContent (no text from a goal or a task is read as markup).
  * Lazy: message_board.js imports it when the Goals face is chosen. */
+import { loadStyles } from './lazy_styles.js';
 import { state } from './state.js';
 import { boardFetch, keyLabel, splitKey, LOCAL_SERVER } from './server_base.js';
 import { OPERATOR_ID, showToast } from './utils.js';
@@ -17,6 +18,7 @@ const GC = await importOnce('./goal_columns.js');
 import * as W from './goal_words.js';
 const GOAL_DESCRIPTION_MAX = 2000; // the server's cap on a goal's outcome (MaxGoalOutcome)
 const { mountGoal } = await importOnce('./goal_view.js');
+await loadStyles('pictures.css'); // the picture rules load with this module, before anything draws (page_weight: not at start)
 let detail = null, detailHost = null, detailId = 0;
 function clearDetail() { detail?.dispose(); detail = null; detailHost = null; detailId = 0; }
 

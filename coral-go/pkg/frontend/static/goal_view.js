@@ -1,4 +1,5 @@
 // One goal's detail view, shared by the team Goals list and other page hosts.
+import { loadStyles } from './lazy_styles.js';
 import { openTask } from './task_navigation.js';
 import { boardFetch, keyLabel, serverUrl, splitKey } from './server_base.js';
 import { OPERATOR_ID, copyText, showToast } from './utils.js';
@@ -16,6 +17,7 @@ const { openDetailPane, closeDetailPane } = await importOnce('./detail_pane.js')
 const DT = await importOnce('./data_table.js');
 const { el } = DT;
 const TV = await importOnce('./tasks_view.js');
+await loadStyles('pictures.css'); // the picture rules load with this module, before anything draws (page_weight: not at start)
 const PAGE = 50;
 
 const NOT_YET_KEY = 'coral.goals.notyet';
