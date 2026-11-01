@@ -84,12 +84,14 @@ func TestTagCountsOfVersionsCountFiles(t *testing.T) {
 // End to end: three uploads of one file name and one of another by the same agent are 4 rows as before, and with versions=newest 2 rows, whose total, all and tag counts count files (#11700).
 func TestTeamArtifactsListWithVersionsNewestCountsFiles(t *testing.T) {
 	e := newTagEnv(t) // report.md, scratch.log and final.pdf, each once
-	for i, text := range []string{"report v2", "report v3"} {
+	versionIDs := []string{e.ids["report.md"]}
+	for _, text := range []string{"report v2", "report v3"} {
 		id := storeManagedArtifact(t, e.coralDir, text, true, true)
 		completeWithArtifacts(t, e.h, "tag-team", "Report again "+text, []board.TaskArtifact{{Name: "report.md", URI: "coral://artifacts/" + id}})
-		_ = i
+		versionIDs = append(versionIDs, id)
 	}
-	for _, id := range []string{e.ids["report.md"]} {
+	// every version of report.md, and one other file, are tagged for review: 4 tagged versions, 2 tagged files
+	for _, id := range append(versionIDs, e.ids["final.pdf"]) {
 		code, _ := e.put(t, "tag-team", id, `{"tags":["for review"]}`)
 		require.Equal(t, 200, code)
 	}
@@ -110,6 +112,9 @@ func TestTeamArtifactsListWithVersionsNewestCountsFiles(t *testing.T) {
 		}
 	}
 	assert.Equal(t, float64(2), earlier, "the newest report.md says how many it stands for")
-	assert.Equal(t, map[string]any{"for review": float64(1)}, versioned["tag_counts"])
+	assert.Equal(t, map[string]any{"for review": float64(2)}, versioned["tag_counts"], "files, not versions: report.md's three tagged versions are one file")
+	assert.Equal(t, map[string]any{"for review": float64(4)}, all["tag_counts"], "without versions=newest the counts are of versions, as before")
+	review := e.list(t, "limit=50&versions=newest&tag=for%20review", 200)
+	assert.Equal(t, float64(2), review["total"], "the For review pill and its list agree: two files")
 	e.list(t, "versions=bogus", 400)
 }
