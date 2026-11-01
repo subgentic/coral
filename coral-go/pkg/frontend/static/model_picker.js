@@ -44,8 +44,9 @@ function modelOptions(models, groups) {
     const order = (Array.isArray(groups) ? groups : []).map(g => g && g.name).filter(Boolean);
     for (const m of models) if (m.group && !order.includes(m.group)) order.push(m.group);
     const signed = new Set((Array.isArray(groups) ? groups : []).filter(g => g && g.signed_in).map(g => g.name));
-    const loose = models.filter(m => !m.group).map(optionHtml).join('');
-    return order.map(name => `<optgroup label="${escapeAttr(name + (signed.has(name) ? ' · signed in' : ''))}">${models.filter(m => m.group === name).map(optionHtml).join('')}</optgroup>`).join('') + loose;
+    const mine = models.filter(m => !m.group && m.custom === true), loose = models.filter(m => !m.group && m.custom !== true).map(optionHtml).join('');
+    const own = mine.length ? `<optgroup label="Added by you">${mine.map(optionHtml).join('')}</optgroup>` : ''; // the models the person added (#11727): their own group at the top, not inside a provider's
+    return own + order.map(name => `<optgroup label="${escapeAttr(name + (signed.has(name) ? ' · signed in' : ''))}">${models.filter(m => m.group === name).map(optionHtml).join('')}</optgroup>`).join('') + loose;
 }
 
 /** The server's bare reason ("the CLI didn't answer in time") in words, with what to do next (#11401): the list shown is the last one Coral had. */
