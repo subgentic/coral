@@ -325,8 +325,9 @@ func TestAutoRecommendNeverTypesAtAProgramThatIsNotTheCLI(t *testing.T) {
 // noticeGateRig is the mock terminal whose foreground program is not the agent (or is, when ok).
 type noticeGateRig struct {
 	*mockSessionTerminal
-	ok  bool
-	why string
+	ok   bool
+	wait bool // the agent process is still being recorded: the gate waits
+	why  string
 }
 
 func (n noticeGateRig) AgentShellIdle(context.Context, string, string, string) (bool, string, bool) {
@@ -334,7 +335,7 @@ func (n noticeGateRig) AgentShellIdle(context.Context, string, string, string) (
 }
 
 func (n noticeGateRig) AgentNoticeTarget(context.Context, string, string, string) (bool, bool, string, bool) {
-	return n.ok, false, n.why, true
+	return n.ok, n.wait, n.why, true
 }
 
 func TestAutoRecommendCaps(t *testing.T) {
@@ -500,4 +501,34 @@ func (r *recRig) allEvents(t *testing.T) []store.AgentEvent {
 	evs, err := r.h.ts.ListAgentEvents(r.ctx, r.pane, 50, nil)
 	require.NoError(t, err)
 	return evs
+}
+
+// Security's #6787: the event and the team line that say the agent was not told have a deadline of their own, so they still go out when the notice waited until its deadline.
+func TestAutoRecommendSaysItEvenWhenTheNoticeRanOutOfTime(t *testing.T) {
+	old := autoRecommendNoticeWait
+	autoRecommendNoticeWait = 150 * time.Millisecond
+	t.Cleanup(func() { autoRecommendNoticeWait = old })
+	r := newRecRig(t, "0013", recQuestion("Which color?", "Red (Recommended)", "Green"))
+	r.term.onRaw = func(string) {
+		r.term.setOutput(r.pane, recIdle)
+		r.h.terminal = noticeGateRig{mockSessionTerminal: r.term, wait: true, why: "starting"} // the gate waits until the notice's deadline
+	}
+	start := time.Now()
+	r.passes(4 * time.Minute)
+	assert.Less(t, time.Since(start), 5*time.Second)
+	require.Equal(t, []string{"1"}, r.raw())
+	var event bool
+	for _, e := range r.allEvents(t) {
+		event = event || e.EventType == "auto_recommend_notice_not_typed"
+	}
+	assert.True(t, event, "the agent event, although the notice's own deadline had passed")
+	res, err := r.h.bs.QueryMessages(r.ctx, &board.MessageQuery{Project: r.board, Limit: 20})
+	require.NoError(t, err)
+	var line string
+	for _, m := range res.Messages {
+		if strings.Contains(m.Content, "NOT told") {
+			line = m.Content
+		}
+	}
+	assert.NotEmpty(t, line, "and the team line")
 }

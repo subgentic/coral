@@ -42,10 +42,15 @@ const (
 	autoRecommendPerAgent = 3
 	autoRecommendPerTeam  = 6
 	autoRecommendWindow   = time.Hour
-	autoRecommendPasses   = 2 // the same bound question seen in this many passes before it is picked
-	// autoRecommendNoticeWait bounds how long the notice waits for the CLI's input prompt after a pick.
+	autoRecommendPasses   = 2   // the same bound question seen in this many passes before it is picked
+	autoRecommendLabelMax = 120 // the label an event carries
+)
+
+// autoRecommendNoticeWait bounds how long the notice waits for the CLI's input prompt after a pick (a variable so a test can shorten it); autoRecommendTellWait is the fresh, short deadline of
+// the event and the team line that say it was not typed: they must not share the notice's deadline, or they fail exactly when it ran out.
+var (
 	autoRecommendNoticeWait = 90 * time.Second
-	autoRecommendLabelMax   = 120 // the label an event carries
+	autoRecommendTellWait   = 10 * time.Second
 )
 
 // autoRecommendTools are the tools whose call is a question to the person; nothing else binds a pick.
@@ -452,12 +457,14 @@ func (r *AutoRecommender) pick(ctx context.Context, a liveAgent, b recBound, now
 		defer cancel()
 		delivery, err := deliverAutomatedOutcome(nctx, h.terminal, pane, a.agentType, a.sid, autoRecommendNotice, "recommended-pick notice", nil)
 		line := "[Coral] " + who + "'s question was answered with the option it marked Recommended (the operator's setting; nobody was at the terminal). The agent was told so."
+		tctx, tcancel := context.WithTimeout(context.WithoutCancel(ctx), autoRecommendTellWait)
+		defer tcancel()
 		if err != nil || delivery != ptymanager.Sent {
 			slog.Warn("auto-recommend: the notice was not typed", "session", a.sid, "error", err)
-			recordAutoAcceptEvent(nctx, h.ts, a.name, a.sid, "auto_recommend_notice_not_typed", "The agent was not told that Coral answered its question", "", map[string]any{"agent_type": a.agentType})
+			recordAutoAcceptEvent(tctx, h.ts, a.name, a.sid, "auto_recommend_notice_not_typed", "The agent was not told that Coral answered its question", "", map[string]any{"agent_type": a.agentType})
 			line = "[Coral] " + who + "'s question was answered with the option it marked Recommended (the operator's setting; nobody was at the terminal). The agent was NOT told (auto_recommend_notice_not_typed): its own log reads as if a person answered."
 		}
-		if _, err := h.bs.PostSystemMessage(nctx, a.board, board.CoralSender, line, nil); err != nil {
+		if _, err := h.bs.PostSystemMessage(tctx, a.board, board.CoralSender, line, nil); err != nil {
 			slog.Warn("auto-recommend: the team line failed", "board", a.board, "error", err)
 		}
 	}()
