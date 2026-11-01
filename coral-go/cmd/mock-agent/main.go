@@ -10,7 +10,7 @@
 // MOCK_AGENT_REPLY_DELAY=<seconds> keeps each turn's prompt in the transcript at once and writes the reply after the delay (a slow first answer); MOCK_AGENT_EXIT_ON_INPUT=1 makes it die
 // when it is first asked something, before any reply (#6050).
 // MOCK_AGENT_READY=1 (ready.go, #10010) is a CLI that is up and waiting: the input box, the first hook event and a canned reply in the transcript for each message.
-// In raw-input mode (so in ready mode) a line typed to it makes it act on demand (#10168): MOCK_ASK_QUESTION, MOCK_ASK_PERMISSION (a Needs you row; Enter answers), MOCK_STUCK_ENTER (the next sends are refused), MOCK_GO_DEAF (no reply ever), MOCK_EXIT.
+// In raw-input mode (so in ready mode) a line typed to it makes it act on demand (#10168): MOCK_ASK_QUESTION, MOCK_ASK_PERMISSION (a Needs you row; Enter answers), MOCK_STUCK_ENTER (the next sends are refused), MOCK_GO_DEAF (no reply ever), MOCK_EXIT, MOCK_DIALOG <name> (a scripted Claude-style dialog, dialogs.go).
 package main
 
 import (
@@ -37,6 +37,10 @@ func main() {
 	// kept that child running in every suite that launched mocks (#5330).
 	if answerInfoCall(os.Args[1:], os.Stdout) {
 		return
+	}
+	// The program a scripted dialog's spec says another program draws (dialogs.go, runStranger).
+	if len(os.Args) == 5 && os.Args[1] == "--qa-stranger" {
+		os.Exit(runStrangerChild(os.Args[2], os.Args[3], os.Args[4]))
 	}
 
 	// A one-shot "--print" call (Coral's goal generator, #4204) is answered as the claude CLI
