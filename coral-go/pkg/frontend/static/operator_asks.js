@@ -6,6 +6,7 @@ import { markHidden } from './visible_marks.js';
 import { OPERATOR_ID } from './utils.js';
 import { state } from './state.js';
 import { showToast } from './notifications.js';
+import { isCloud, isLocalServer } from './server_base.js';
 
 const FRESH_MS = 15000, LINE_MAX = 140;
 let asks = [], pending = null, lastRead = 0;
@@ -64,6 +65,9 @@ export async function replyToAsk(a, text) {
 // The agent DECLARES up to three buttons; nothing runs until the Operator clicks one here. The label is the agent's text, so it is drawn with textContent after markHidden (strict), and the ACTION is named in
 // our own words beside it, so a label like "Cancel" cannot hide that it wakes an agent. A click claims the button on the server, which answers with the STORED action: the page runs only that, never anything it
 // holds itself. A reply is run by the server (posted as the Operator, said to be a click, the question closed); open and wake run here through the routes the dashboard already uses, then the page settles.
+
+/** Whether the question came from another computer, or the page is the Hub's (#11757, Security's INFO on #11643): the claim and settle routes are not served through Coral Hub, so a button there would only fail with an error. */
+export const fromAnotherComputer = a => isCloud() || (!!a && typeof a.server === 'string' && a.server !== '' && !isLocalServer(a.server));
 
 /** The buttons of a question that can still be used: only a question (not a wait) has them, and a used one is gone. */
 export const buttonsOf = a => (a && a.kind === 'ask' && Array.isArray(a.buttons) ? a.buttons.filter(b => b && b.state === 'pending' && Number.isFinite(Number(b.id)) && typeof b.label === 'string' && typeof b.action === 'string') : []);
@@ -127,7 +131,7 @@ export function openAskDialog(a, onDone, runners = {}) {
     const close = document.createElement('button'); close.type = 'button'; close.className = 'btn'; close.textContent = 'Close';
     row.append(send, close);
     const finish = () => { dlg.close(); dlg.remove(); if (onDone) onDone(); };
-    const offers = buttonsOf(a);
+    const offers = fromAnotherComputer(a) ? [] : buttonsOf(a); // a question from another computer through the Hub keeps the plain Reply and Close
     let offered = null;
     if (offers.length) { // what the asker offered: one tap per choice, each with what it does
         offered = document.createElement('section'); offered.className = 'inbox-ask-offers'; offered.setAttribute('aria-label', `Buttons ${markHidden(a.asker, { strict: true })} offered`);
