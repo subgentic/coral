@@ -266,3 +266,84 @@ func TestTheLaunchLineNamesTheTeamsHome(t *testing.T) {
 	_, err = os.Stat(filepath.Join(home, "config.yaml"))
 	assert.NoError(t, err)
 }
+
+// #11831 (the tester's re-run): a home whose config.yaml carries telemetry.shared_metrics offer_version 2 never shows the telemetry question, so Coral seeds "No thanks" (enabled and send false) instead of
+// pressing Enter; a person who already answered in their own config keeps their answer.
+func TestTheTelemetryQuestionIsAnsweredNoInTheSeededConfig(t *testing.T) {
+	r := hermesRig(t)
+	home, err := PrepareHermesHome(r.data, "t", r.person, time.Now()) // no config of the person's at all
+	require.NoError(t, err)
+	sm := func(cfg map[string]any) map[string]any {
+		tel, _ := cfg["telemetry"].(map[string]any)
+		out, _ := tel["shared_metrics"].(map[string]any)
+		return out
+	}
+	assert.Equal(t, map[string]any{"offer_version": 2, "enabled": false, "send": false}, sm(readYAML(t, filepath.Join(home, "config.yaml"))))
+
+	// a person's config with the question not yet answered, and other telemetry settings kept
+	r2 := hermesRig(t)
+	require.NoError(t, os.WriteFile(filepath.Join(r2.person, "config.yaml"), []byte("telemetry:\n  other: keep\n  shared_metrics:\n    enabled: true\n    interval: 60\n"), 0o600))
+	h2, err := PrepareHermesHome(r2.data, "t", r2.person, time.Now())
+	require.NoError(t, err)
+	cfg := readYAML(t, filepath.Join(h2, "config.yaml"))
+	assert.Equal(t, "keep", cfg["telemetry"].(map[string]any)["other"])
+	got := sm(cfg)
+	assert.Equal(t, 2, got["offer_version"])
+	assert.Equal(t, false, got["enabled"], "an unanswered offer is answered No, whatever the old flag said")
+	assert.Equal(t, false, got["send"])
+	assert.Equal(t, 60, got["interval"])
+
+	// the person already answered the current offer (Share): their answer stands
+	r3 := hermesRig(t)
+	require.NoError(t, os.WriteFile(filepath.Join(r3.person, "config.yaml"), []byte("telemetry:\n  shared_metrics:\n    offer_version: 2\n    enabled: true\n    send: true\n"), 0o600))
+	h3, err := PrepareHermesHome(r3.data, "t", r3.person, time.Now())
+	require.NoError(t, err)
+	assert.Equal(t, map[string]any{"offer_version": 2, "enabled": true, "send": true}, sm(readYAML(t, filepath.Join(h3, "config.yaml"))))
+
+	// telemetry that is not a mapping is replaced rather than crashed on
+	r4 := hermesRig(t)
+	require.NoError(t, os.WriteFile(filepath.Join(r4.person, "config.yaml"), []byte("telemetry: off\n"), 0o600))
+	h4, err := PrepareHermesHome(r4.data, "t", r4.person, time.Now())
+	require.NoError(t, err)
+	assert.Equal(t, false, sm(readYAML(t, filepath.Join(h4, "config.yaml")))["enabled"])
+}
+
+// Security's ruling on #11831: Hermes runs a hook even after its script changed, so Coral installs its hook only when the tool is a real file that nobody but the user (and root) can change, folders on the way
+// included; with any doubt no hook is installed (the agent's state then comes from the screen alone). The check guards against a mistake, not against an agent that chooses to rewrite its own home.
+func TestTheHookIsInstalledOnlyWhenNobodyElseCanChangeTheTool(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Unix modes")
+	}
+	hooksOf := func(r hermesRigT) int {
+		home, err := PrepareHermesHome(r.data, "t", r.person, time.Now())
+		require.NoError(t, err)
+		hooks, _ := readYAML(t, filepath.Join(home, "config.yaml"))["hooks"].(map[string]any)
+		var list hermesAllowlist
+		require.NoError(t, json.Unmarshal([]byte(readAll(t, filepath.Join(home, "shell-hooks-allowlist.json"))), &list))
+		assert.Len(t, list.Approvals, len(hooks), "the allowlist and the config agree")
+		return len(hooks)
+	}
+	r := hermesRig(t)
+	require.NoError(t, os.Chmod(r.tools, 0o700))
+	assert.Equal(t, len(hermesHookEvents), hooksOf(r), "a tool only its owner can change")
+
+	// the tool itself writable by everyone
+	require.NoError(t, os.Chmod(filepath.Join(r.tools, "coral-hook-agentic-state"), 0o777))
+	assert.Zero(t, hooksOf(r))
+	require.NoError(t, os.Chmod(filepath.Join(r.tools, "coral-hook-agentic-state"), 0o755))
+	assert.Equal(t, len(hermesHookEvents), hooksOf(r))
+
+	// the folder it is in writable by others (a file there could be replaced)
+	require.NoError(t, os.Chmod(r.tools, 0o777))
+	assert.Zero(t, hooksOf(r))
+	require.NoError(t, os.Chmod(r.tools, 0o700))
+
+	// the tool a link to a file others can write
+	r2 := hermesRig(t)
+	elsewhere := filepath.Join(t.TempDir(), "real-tool")
+	require.NoError(t, os.WriteFile(elsewhere, []byte("#!/bin/sh\n"), 0o777))
+	require.NoError(t, os.Chmod(elsewhere, 0o777))
+	require.NoError(t, os.Remove(filepath.Join(r2.tools, "coral-hook-agentic-state")))
+	require.NoError(t, os.Symlink(elsewhere, filepath.Join(r2.tools, "coral-hook-agentic-state")))
+	assert.Zero(t, hooksOf(r2))
+}

@@ -6,8 +6,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -98,6 +100,10 @@ func writeHomeFile(home, name string, data []byte) error {
 func hermesHookCommand(event string) string {
 	cmd := ResolveHookCommand("coral-hook-agentic-state --hermes " + event)
 	if !strings.HasPrefix(cmd, `"`) {
+		return ""
+	}
+	if err := hermesToolTrusted(filepath.FromSlash(hookToolPath("coral-hook-agentic-state"))); err != nil {
+		slog.Info("hermes: Coral's hook is not installed for this launch", "why", err)
 		return ""
 	}
 	return cmd
@@ -194,6 +200,7 @@ func writeHermesConfig(home, personHome string, commands map[string]string) erro
 		kept = append(kept, top.Content[i], top.Content[i+1])
 	}
 	top.Content = kept
+	seedTelemetryAnswer(top)
 	if len(commands) > 0 {
 		hooks := &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
 		for _, ev := range hermesHookEvents {
@@ -256,3 +263,44 @@ func writeHermesAllowlist(home string, commands map[string]string, now time.Time
 	}
 	return writeHomeFile(home, "shell-hooks-allowlist.json", b)
 }
+
+// seedTelemetryAnswer answers Hermes's first-run telemetry question "No thanks" in the config itself: a home whose telemetry.shared_metrics has offer_version 2 never shows the question (the tester's re-run,
+// #11715), so nothing has to press Enter. A person who already answered the current offer in their own config keeps their answer; an unanswered one gets enabled and send false, and the settings next to them stay.
+func seedTelemetryAnswer(top *yaml.Node) {
+	mapping := func(parent *yaml.Node, key string) *yaml.Node {
+		for i := 0; i+1 < len(parent.Content); i += 2 {
+			if parent.Content[i].Value == key {
+				if parent.Content[i+1].Kind != yaml.MappingNode {
+					parent.Content[i+1] = &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
+				}
+				return parent.Content[i+1]
+			}
+		}
+		m := &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
+		parent.Content = append(parent.Content, &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: key}, m)
+		return m
+	}
+	sm := mapping(mapping(top, "telemetry"), "shared_metrics")
+	for i := 0; i+1 < len(sm.Content); i += 2 {
+		if sm.Content[i].Value == "offer_version" {
+			if n, err := strconv.Atoi(sm.Content[i+1].Value); err == nil && n >= hermesTelemetryOffer {
+				return // already answered this offer: their answer stands
+			}
+		}
+	}
+	set := func(key, tag, value string) {
+		for i := 0; i+1 < len(sm.Content); i += 2 {
+			if sm.Content[i].Value == key {
+				sm.Content[i+1] = &yaml.Node{Kind: yaml.ScalarNode, Tag: tag, Value: value}
+				return
+			}
+		}
+		sm.Content = append(sm.Content, &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: key}, &yaml.Node{Kind: yaml.ScalarNode, Tag: tag, Value: value})
+	}
+	set("offer_version", "!!int", strconv.Itoa(hermesTelemetryOffer))
+	set("enabled", "!!bool", "false")
+	set("send", "!!bool", "false")
+}
+
+// hermesTelemetryOffer is the telemetry offer's version in Hermes v0.22.5.
+const hermesTelemetryOffer = 2
