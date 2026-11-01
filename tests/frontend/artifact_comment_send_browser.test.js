@@ -50,8 +50,9 @@ const MD = ['# Migration plan', '', '## Steps', '', '1. Add the new columns behi
             return real(u, o);
         };
         return true; })()`;
-    const open = async (board, you) => {
+    const open = async (board, you, noAsks) => {
         await ev(STUB);
+        if (noAsks) await ev(`window.__cs[0].asks = []; true`);
         if (you) await ev(`window.__you = ${JSON.stringify(you)}; true`);
         await ev(`(async () => { const v = await import(${S} + 'artifact_viewer.js'); v.openArtifactViewer(${JSON.stringify(HEX)}, { filename: 'plan.md', ${board ? `board: '${board}'` : ''} }); return true; })()`);
         await waitFor(`!!document.querySelector('#artifact-viewer .artifact-viewer-markdown')`, 'the document', 8000);
@@ -74,8 +75,15 @@ const MD = ['# Migration plan', '', '## Steps', '', '1. Add the new columns behi
             await ev(`try { localStorage.removeItem('coral-artifact-comments-open'); } catch {} true`);
 
             console.log(`${tag}: the action`);
+            await open('ask-team', undefined, true); // a comment nobody was asked into says so beside the link (#11861)
+            check(`${tag}: a comment nobody was asked into says "Not sent to an agent yet"`, (await ev(`document.querySelector('.ac-card[data-id="1"] .ac-ask-status')?.textContent || ''`)) === 'Not sent to an agent yet', await ev(`document.querySelector('.ac-card[data-id="1"] .ac-ask-status')?.textContent || ''`));
+            check(`${tag}: and says it at rest, not only on hover: the line is drawn while the actions row is hidden (#11871)`, await ev(`(() => { const c = document.querySelector('.ac-card[data-id="1"]'), st = c.querySelector('.ac-ask-status'), row = c.querySelector('.ac-actions'); return !c.matches(':hover') && !c.matches(':focus-within') && st.getClientRects().length > 0 && st.getBoundingClientRect().height > 0 && getComputedStyle(st).opacity === '1' && !st.closest('.ac-actions') && (innerWidth < 768 || row.getBoundingClientRect().height === 0 || getComputedStyle(row).opacity === '0'); })()`));
+            await ev(`document.querySelector('#artifact-viewer [data-dialog-close], #artifact-viewer .artifact-viewer-close')?.click(); true`);
+            await sleep(300); // sleep-ok: the viewer closes over a frame
             await open('ask-team');
             check(`${tag}: an open thread of the owner shows "Send to agent"; a reply and a resolved thread do not`, (await ev(`!!${sendBtn(1)}`)) && !(await ev(`!!${sendBtn(3)}`)) && !(await ev(`!!document.querySelector('.ac-card[data-id="1"] .ac-reply .ac-ask-open')`)));
+            // does the agent have it? said beside the link (#11861): nothing sent yet says so
+            check(`${tag}: a comment an agent was asked into says who has it, beside Send to agent (#11861)`, (await ev(`document.querySelector('.ac-card[data-id="1"] .ac-ask-status')?.textContent || ''`)) === 'Sent to reviewer (already asked, 2 replies so far, seen by reviewer, reminded)', await ev(`document.querySelector('.ac-card[data-id="1"] .ac-ask-status')?.textContent || ''`));
             // the resolved thread is not drawn until "Show resolved": the check above passed for want of a card (#8366: removing the resolved test from canAsk survived)
             await ev(`document.querySelector('.ac-showresolved').click(); true`);
             check(`${tag}: with the resolved threads shown, the resolved one is on the page and has no "Send to agent"`, (await ev(`!!document.querySelector('.ac-card[data-id="3"]')`)) && !(await ev(`!!${sendBtn(3)}`)));
@@ -121,6 +129,7 @@ const MD = ['# Migration plan', '', '## Steps', '', '1. Add the new columns behi
             b = await block();
             check(`${tag}: reopened, an agent asked into this thread says "Asked just now" and is off`, /Asked just now/.test(b.agents[0].text) && b.agents[0].disabled && /Already asked/.test(b.agents[1].text) && !b.agents.find(a => a.role === 'UI Dev').checked, JSON.stringify(b.agents[0]));
             await ev(`document.querySelector('.ac-ask .ac-cancel').click(); true`);
+            check(`${tag}: once asked, the card says who has it (#11861)`, /^Sent to .*\(asked just now\)/.test(await ev(`document.querySelector('.ac-card[data-id="1"] .ac-ask-status')?.textContent || ''`)), await ev(`document.querySelector('.ac-card[data-id="1"] .ac-ask-status')?.textContent || ''`));
 
             // refusals: nobody asked (409 with results), and an answer with only an error
             await ev(`window.__send = { status: 409, body: { ok: false, results: [{ agent: 'Docs Writer', state: 'unavailable' }] } }; window.__asked = 0; true`);

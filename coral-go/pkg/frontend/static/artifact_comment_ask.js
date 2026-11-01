@@ -63,5 +63,5 @@ export function createAsk({ st, panel, render, announce, refresh, ownHex }) {
         redrawAsk();
         panel.querySelector('.ac-ask .ac-cancel')?.focus();
     }
-    return { canAsk, openAsk, askBlock };
+    return { canAsk, openAsk, askBlock, askedNow };
 }
