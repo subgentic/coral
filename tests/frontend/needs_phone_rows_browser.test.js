@@ -57,8 +57,17 @@ const { coralReady } = require('./helpers/wait');
             assert.equal(await bar(), null, at + 'no selection bar before a selection');
             // a swipe like a phone's: a finger from 350 px to 40 px (a driver's drag, a few moves) on a review file and on a welcome item (not the welcome itself, which has no Ignore) ignores it (#11765)
             const drag = async (name, from = 350, to = 40) => { const p = await point(name); const y = p.y; await touch('touchStart', { x: from, y }); for (let i = 1; i <= 5; i++) { await touch('touchMove', { x: from + (to - from) * i / 5, y }); await new Promise(r => setTimeout(r, 16)); } await touch('touchEnd', { x: to, y }); await new Promise(r => setTimeout(r, 500)); }; // sleep-ok: a finger's moves and the row leaving
+            // five folder switches, then ONE drag is ONE request and ONE toast (the swipe's listeners are on the page's persistent list box: they were added again with every table build and stacked, QA Reviewer 2's MUST)
+            for (let i = 0; i < 5; i++) {
+                await ev(`import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab('tasks')).then(() => true)`); await new Promise(r => setTimeout(r, 150)); // sleep-ok: the folder draws
+                await ev(`import((window.__coralStatic || '/static/') + 'inbox_tab.js').then(m => m.selectInboxTab('needs')).then(() => true)`); await new Promise(r => setTimeout(r, 250)); // sleep-ok: the folder draws
+            }
+            await waitFor(`!!(${rowOf('Phone review 5.txt')})`, at + 'Needs you is back after the folder switches', 8000);
+            await ev('window.__calls = []; true');
             await drag('Phone review 5.txt');
             await waitFor(`window.__calls.some(c => c.review === '${(5).toString(16).padStart(64, '0')}' && c.decision === 'ignore')`, at + 'a drag from 350 to 40 px ignores the review file', 6000);
+            assert.equal(await ev(`window.__calls.filter(c => c.review === '${(5).toString(16).padStart(64, '0')}' && c.decision === 'ignore').length`), 1, at + 'after the folder switches one drag is one ignore request');
+            assert.equal(await ev(`[...document.querySelectorAll('.toast')].filter(t => /Ignored: Phone review 5/.test(t.textContent)).length`), 1, at + 'and one toast');
             assert.ok(await ev(`!${rowOf('Phone review 5.txt')}`), at + 'and its row is gone');
             await drag('Connect a second computer or the Hub');
             await waitFor(`(window.__puts || []).some(b => /connect/.test(String(b.inbox_welcome_done || '')))`, at + 'a drag from 350 to 40 px ignores a welcome item (its id is saved as done)', 6000);

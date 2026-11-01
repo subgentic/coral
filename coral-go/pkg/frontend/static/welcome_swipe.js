@@ -17,16 +17,18 @@ function undo(id) {
     document.dispatchEvent(new CustomEvent('coral:welcome-changed'));
 }
 
-/** Listen on the list's box for drags of the rows that carry data-welcome-id (a row with a Dismiss). Once per box. */
+/** Listen for drags of the rows that carry data-welcome-id (a row with a Dismiss) or an Ignore of their own. The listeners sit on the list's persistent outer box (the Inbox's #group-table-view, with its gutter) and are added ONCE: each table build calls this with its new box, which only becomes the one the listeners read (#11765: they were added again per build, and after five folder switches one swipe ignored a file eight times). */
 export function attachWelcomeSwipe(host) {
-    if (host._welcomeSwipe) return;
-    host._welcomeSwipe = true;
+    const scope = host.closest('#group-table-view') || host; // the list's own box and the gutter around it
+    scope._swipeHost = host; // the table on screen now
+    if (scope._welcomeSwipe) return;
+    scope._welcomeSwipe = true;
+    const cur = () => (scope._swipeHost && scope._swipeHost.isConnected ? scope._swipeHost : null);
     let drag = null;
     const back = (row, strip) => { row.style.transition = calm() ? 'none' : 'transform .15s ease-out'; row.style.transform = ''; strip.remove(); };
-    const scope = host.closest('#group-table-view') || host; // the list's own box and the gutter around it
     scope.addEventListener('pointerdown', e => {
         // a finger that starts in the list's side gutter (a 360 px phone has 16 px of it right of the row, and a driver drags from the edge) is on the row at that height (#11765)
-        const rowAt = y => [...host.querySelectorAll('tr[data-welcome-id], tr[data-key]')].find(r => { const b = r.getBoundingClientRect(); return y >= b.top && y <= b.bottom; });
+        const rowAt = y => [...(cur() || scope).querySelectorAll('tr[data-welcome-id], tr[data-key]')].find(r => { const b = r.getBoundingClientRect(); return y >= b.top && y <= b.bottom; });
         const row = e.pointerType === 'touch' && (e.target.closest('tr[data-welcome-id], tr[data-key]') || (scope.contains(e.target) && !e.target.closest('button, a, input, select, textarea, .dt-bar, .gt-toolbar') ? rowAt(e.clientY) : null));
         if (row && !row.dataset.welcomeId && !row.querySelector('.inbox-review-actions')?._ignore) return; // a row with nothing to ignore is not swiped (#11642)
         if (!row || drag) return;
@@ -40,9 +42,9 @@ export function attachWelcomeSwipe(host) {
             if (Math.abs(dy) > START_PX && Math.abs(dy) > Math.abs(dx)) { drag = null; return; } // mostly vertical: the page's
             if (-dx < START_PX) return;
             drag.on = true; drag.row.style.transition = 'none'; drag.row.setPointerCapture?.(e.pointerId);
-            const box = drag.row.getBoundingClientRect(), at = host.getBoundingClientRect();
+            const h = cur() || scope, box = drag.row.getBoundingClientRect(), at = h.getBoundingClientRect();
             Object.assign(drag.strip.style, { top: `${box.top - at.top}px`, height: `${box.height}px` });
-            host.style.position ||= 'relative'; host.append(drag.strip);
+            h.style.position ||= 'relative'; h.append(drag.strip);
         }
         drag.dx = Math.min(0, dx);
         drag.row.style.transform = `translateX(${drag.dx}px)`; drag.strip.style.width = `${-drag.dx}px`;
