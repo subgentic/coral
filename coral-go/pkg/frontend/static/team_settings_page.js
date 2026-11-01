@@ -13,6 +13,7 @@ const { createMessaging, XT_KEYS } = await importOnce('./team_cross_team_fields.
 const { createOrchestratorGrant, OG_KEYS } = await importOnce('./team_orchestrator_grant.js');
 const { createGuideRoster, GR_KEYS } = await importOnce('./team_guide_roster.js');
 const { healthFields, healthToValues, saveHealth, HEALTH_KEYS } = await importOnce('./team_health_fields.js');
+const { approvalField, presetOf, wireApproval } = await importOnce('./team_approval_presets.js'); // how much the Operator approves: three names for the flags below (#11657)
 const { HEALTH_DEFAULTS } = await importOnce('./team_health_settings.js');
 const { jsonError, presetNameText, presetInstructionsText, presetLabel, renderInspection } = await importOnce('./team_working_mode.js');
 
@@ -36,6 +37,7 @@ export async function showTeamSettingsPage(team, options = {}) {
     st.view = mountSettingsView(st.page, settingsViewOptions(st));
     wirePage(st);
     wireModeRow(st);
+    wireApproval(st.view, st.host);
     wirePresetEditor(st);
     wirePromptPreview(st);
     return st.view;
@@ -86,7 +88,7 @@ function settingsViewOptions(st) {
             await showTeamSettingsPage(st.team, st.options);
             const h = st.host.querySelector('.settings-pane:not([hidden]) .settings-pane-title'); if (h) { h.tabIndex = -1; h.focus({ preventScroll: true }); } // the button that had the focus is gone: it goes to the open group's heading
         } },
-        readOnly: key => (key === 'require_goal' && !answeredLocally(st.team) ? true : false), // only this computer changes it (the route refuses it through Coral Hub)
+        readOnly: key => ((key === 'require_goal' || key === 'planning_approval') && !answeredLocally(st.team) ? true : false), // only this computer changes it (the route refuses it through Coral Hub); the planning approval sets it, so it is read only there too
         groups: settingsGroups(st),
         load: loadSettings(st),
         save: saveSettings(st),
@@ -112,6 +114,7 @@ function settingsGroups(st) {
                 options: async () => { await st.dataReady.catch(() => {}); return st.modeOptions(); } },
             { key: 'dependency_guidance', type: 'toggle', label: 'Guidance for dependent tasks', help: 'Tells agents how to work when a task waits on another.' },
             { key: 'asks_are_tasks', type: 'toggle', label: 'Requests for work are tasks', help: 'When an agent needs another agent to do something, it creates a task. Plain posts are for questions and status.' },
+            approvalField({ id: 'tsr-approval' }),
             { key: 'require_goal', type: 'toggle', label: 'Require a goal', help: requireGoalSentence },
             { key: 'max_open_goals', type: 'number', id: 'tsr-max-goals', label: 'Open goals', unit: 'at most (0 is no limit)', min: 0, max: 1000, step: 1, compact: true, attrs: { inputmode: 'numeric' }, help: 'A goal past the limit is refused. Goals waiting for your approval count.' },
             { key: 'goals_need_approval', type: 'toggle', label: 'New goals need my approval', help: 'An agent\'s new goal waits in Needs you until you approve it. Yours are never held.' },
@@ -157,7 +160,7 @@ function loadSettings(st) {
         const guides = await st.gr.load().catch(() => ({ values: null })); // the owner's roster: not given to a page that may not read it (the group is then not drawn)
         if (!guides.values) st.view.removeGroup('guides');
         st.q('.prompt-inspection-content').innerHTML = inspectionResponse.ok ? renderInspection(await inspectionResponse.json(), st.workingMode) : `<p class="sv-help">Prompt inspection: ${escapeHtml(await refusalOf(inspectionResponse, answeredLocally(st.team)))}</p>`;
-        return { mode: st.workingMode.mode || 'none', dependency_guidance: Boolean(st.workingMode.dependency_guidance), asks_are_tasks: Boolean(st.workingMode.asks_are_tasks), ...xtValues, custom_instructions: st.workingMode.custom_instructions || '', require_goal: Boolean(boardSettings?.require_goal), max_open_goals: Number(boardSettings?.max_open_goals) || 0, goals_need_approval: Boolean(boardSettings?.goals_need_approval), tasks_need_approval: Boolean(boardSettings?.tasks_need_approval), ...(st.healthBase ? healthToValues(st.healthBase) : {}), ...(orch.values || {}), ...(guides.values || {}) };
+        return { mode: st.workingMode.mode || 'none', dependency_guidance: Boolean(st.workingMode.dependency_guidance), asks_are_tasks: Boolean(st.workingMode.asks_are_tasks), ...xtValues, custom_instructions: st.workingMode.custom_instructions || '', require_goal: Boolean(boardSettings?.require_goal), max_open_goals: Number(boardSettings?.max_open_goals) || 0, goals_need_approval: Boolean(boardSettings?.goals_need_approval), tasks_need_approval: Boolean(boardSettings?.tasks_need_approval), planning_approval: presetOf({ goals_need_approval: boardSettings?.goals_need_approval, tasks_need_approval: boardSettings?.tasks_need_approval, require_goal: boardSettings?.require_goal }), ...(st.healthBase ? healthToValues(st.healthBase) : {}), ...(orch.values || {}), ...(guides.values || {}) };
     };
 }
 
@@ -212,6 +215,7 @@ function saveSettings(st) {
         if (GR_KEYS.some(k => k in changes)) {
             try { const kept = await st.gr.save(); st.view.set('gr_roster', kept); saved.push(...GR_KEYS); } catch (error) { failures.push(error.message); }
         }
+        if ('planning_approval' in changes && ['require_goal', ...PLAN_KEYS].every(k => !(k in changes) || saved.includes(k))) saved.push('planning_approval'); // the row is a name for those switches: it is saved when they are
         if (failures.length) throw Object.assign(new Error(failures[0]), { saved, fields: fieldErrors });
         return { note: modeChanged ? 'Saved. Working mode applies on first claim.' : null, rebase: saved.filter(k => HEALTH_KEYS.includes(k) || XT_KEYS.includes(k) || OG_KEYS.includes(k) || GR_KEYS.includes(k)) };
     };

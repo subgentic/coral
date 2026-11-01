@@ -27,6 +27,7 @@ node board_queue_words.test.mjs
 node board_you_words.test.mjs
 node goal_words.test.mjs
 node goals_adapter.test.mjs
+node team_approval_presets.test.mjs
 node waiting_text.test.mjs
 node content_disposition.test.mjs
 node storage_lint.test.js
