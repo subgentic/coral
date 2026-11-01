@@ -142,7 +142,7 @@ func TestTheOwnerTableAgreesWithTheHandWrittenListItReplaced(t *testing.T) {
 				continue
 			}
 			// A picture for a new goal's description (#11650) is the owner's alone: the old list never had it.
-			if m == http.MethodPost && strings.HasPrefix(p, "/api/board/") && strings.HasSuffix(p, "/goal-images") {
+			if m == http.MethodPost && strings.HasPrefix(p, "/api/board/") && (strings.HasSuffix(p, "/goal-images") || strings.HasSuffix(p, "/goals")) { // and the goal create, which names them
 				continue
 			}
 			// Chief's state (#11470) is the owner's alone through the hub: the old list never had it.

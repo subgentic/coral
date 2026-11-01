@@ -12,6 +12,9 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/subgentic/coral/internal/cloud"
+	"github.com/subgentic/coral/pkg/tunnel"
 )
 
 // #11650: the Operator's pictures for a new goal's description. The route is the Operator's alone, checks the file's own bytes, keeps the picture with the team; the create names only pictures just uploaded for
@@ -109,4 +112,60 @@ func TestAGoalCarriesThePicturesTheOperatorAdded(t *testing.T) {
 	require.NoError(t, err)
 	code, _ = call("POST", "/api/board/beta/goals", map[string]any{"title": "Borrowed", "subscriber_id": "Operator", "images": []string{p1}})
 	assert.Equal(t, http.StatusBadRequest, code, "a picture uploaded for another team")
+}
+
+// Through Coral Hub a goal create that names pictures is the owner's alone (Security's INFO on #11650), as the upload is: a guest's create with images is refused, one without images is as before, and the owner's passes.
+func TestAGoalWithPicturesThroughTheHubIsTheOwnersAlone(t *testing.T) {
+	_, h, _ := teamArtifactServer(t)
+	old := uploaderLookup
+	uploaderLookup = func(_ context.Context, sessionID string) (string, string, string) { return "alpha", "Alice", "worker" }
+	oldLabel := hubOwnerLabel
+	const owner, guest = "hub-user-0000beef", "hub-user-1234abcd"
+	hubOwnerLabel = func(context.Context) (string, error) { return owner, nil }
+	t.Cleanup(func() { uploaderLookup = old; hubOwnerLabel = oldLabel })
+	subscribeSession(t, h, "alpha", "Alice", sessAlice)
+	r := chi.NewRouter()
+	person := func(fn http.HandlerFunc) http.HandlerFunc {
+		return func(w http.ResponseWriter, req *http.Request) {
+			if req.Header.Get(tunnel.ViaHeader) == "" {
+				req = req.WithContext(context.WithValue(req.Context(), callerKindKey{}, callerDashCookie))
+			}
+			fn(w, req)
+		}
+	}
+	r.Post("/api/board/{project}/goal-images", person(h.UploadGoalImage))
+	r.Post("/api/board/{project}/goals", person(h.CreateGoal))
+	srv := httptest.NewServer(r)
+	t.Cleanup(srv.Close)
+	do := func(path string, body []byte, ct string, hdr map[string]string) (int, map[string]any) {
+		req, err := http.NewRequest("POST", srv.URL+path, bytes.NewReader(body))
+		require.NoError(t, err)
+		req.Header.Set("Content-Type", ct)
+		for k, v := range hdr {
+			req.Header.Set(k, v)
+		}
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		var out map[string]any
+		_ = json.NewDecoder(resp.Body).Decode(&out)
+		return resp.StatusCode, out
+	}
+	pic := func() string {
+		code, out := do("/api/board/alpha/goal-images", shadePNG(t, uint8(len(srv.URL))), "image/png", nil)
+		require.Equal(t, http.StatusCreated, code, "%v", out)
+		return out["hex"].(string)
+	}
+	create := func(images []string, hdr map[string]string) int {
+		b, _ := json.Marshal(map[string]any{"title": "Through the Hub", "subscriber_id": "Operator", "images": images})
+		code, _ := do("/api/board/alpha/goals", b, "application/json", hdr)
+		return code
+	}
+	hubGuestHdr := map[string]string{tunnel.ViaHeader: cloud.ViaSecret(), tunnel.HubUserHeader: guest}
+	hubOwnerHdr := map[string]string{tunnel.ViaHeader: cloud.ViaSecret(), tunnel.HubUserHeader: owner, tunnel.HubRoleHeader: tunnel.HubRoleOwner}
+	p := pic()
+	assert.Equal(t, http.StatusForbidden, create([]string{p}, hubGuestHdr), "a Hub guest cannot attach a picture to a goal")
+	assert.Equal(t, http.StatusCreated, create(nil, hubGuestHdr), "a goal with no pictures is as before for a guest")
+	assert.Equal(t, http.StatusCreated, create([]string{p}, hubOwnerHdr), "the owner through the Hub can")
+	assert.Equal(t, http.StatusCreated, create([]string{pic()}, nil), "this computer's person can")
 }

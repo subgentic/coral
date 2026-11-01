@@ -158,7 +158,7 @@ func (h *BoardHandler) CreateGoal(w http.ResponseWriter, r *http.Request) {
 	}
 	var pictures []commentImage
 	if len(body.Images) > 0 {
-		if actor != "Operator" {
+		if actor != "Operator" || (cloud.Tunneled(r) && !hubOwnerRequest(r).owner) { // through Coral Hub the owner's alone, as the upload route is
 			errForbidden(w, "only the Operator can attach pictures to a goal")
 			return
 		}
