@@ -53,7 +53,7 @@ const BASE = require('./test_base').BASE;
             out.shown = $('set-password-new').type;
             document.querySelector('#set-password-modal .pw-toggle').click();
             out.hiddenAgain = $('set-password-new').type;
-            out.meterEmpty = getComputedStyle(document.querySelector('#set-password-modal .pw-strength')).display; out.notNowNote = document.querySelector('#set-password-modal .pw-not-now')?.textContent || ''; { const n = document.querySelector('#set-password-modal .pw-not-now'), l = document.querySelector('#set-password-modal label'); out.noteGap = Math.round(l.getBoundingClientRect().top - n.getBoundingClientRect().bottom); out.notNowInView = $('set-password-later').getBoundingClientRect().bottom <= innerHeight; }
+            out.meterEmpty = getComputedStyle(document.querySelector('#set-password-modal .pw-strength')).display; out.skipWords = document.querySelector('#set-password-modal').textContent;
             type('set-password-new', 'a');
             out.meterTyped = getComputedStyle(document.querySelector('#set-password-modal .pw-strength')).visibility;
             out.weak = { level: document.querySelector('#set-password-modal .pw-strength').getAttribute('data-level'), disabled: $('set-password-save').disabled };
@@ -67,23 +67,18 @@ const BASE = require('./test_base').BASE;
             await waitFor(() => !$('set-password-modal'), 'the prompt closes after a set (err=' + $('set-password-error').textContent + ', hidden=' + $('set-password-error').hidden + ', calls=' + JSON.stringify(calls) + ', btn=' + $('set-password-save').textContent + ')');
             out.setCall = calls[calls.length - 1];
 
-            // 2. Not now: final on this computer, asked again from another
+            // 2. no way past it (#11892, the Operator): no Not now, Escape does nothing, and an old Not now flag from an earlier version is ignored
             status = { authenticated: true, method: 'session', password_set: false, local: true };
             await ui.maybePromptSetPassword(); await waitFor(() => $('set-password-modal'), 'prompt again'); out.lead2 = document.querySelector('#set-password-modal .pw-lead').textContent;
-            $('set-password-later').click();
-            out.flagAfterLocalNotNow = localStorage.getItem('coral-password-not-now');
-            await ui.maybePromptSetPassword(); await sleep(50);
-            out.promptAfterLocalNotNow = !!$('set-password-modal');
-            localStorage.removeItem('coral-password-not-now');
+            out.laterButton = !!$('set-password-later'); out.buttons = [...document.querySelectorAll('#set-password-modal .modal-footer button')].map(b => b.textContent.trim());
+            document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+            out.openAfterEscape = !!$('set-password-modal');
+            $('set-password-modal').remove();
+            localStorage.setItem('coral-password-not-now', '1'); sessionStorage.setItem('coral-password-not-now', '1');
+            await ui.maybePromptSetPassword(); await waitFor(() => $('set-password-modal'), 'asked despite an old Not now flag'); out.askedDespiteFlags = true;
+            $('set-password-modal').remove();
             status = { authenticated: true, method: 'key', password_set: false, local: false };
-            await ui.maybePromptSetPassword(); await waitFor(() => $('set-password-modal'), 'remote prompt');
-            document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));   // Escape is Not now
-            out.flagAfterRemoteNotNow = localStorage.getItem('coral-password-not-now');
-            await ui.maybePromptSetPassword(); await sleep(50);
-            out.remoteAskedAgain = !!$('set-password-modal'); // not again in this session (#10930: it came back on every page load); a new session asks again
-            sessionStorage.removeItem('coral-password-not-now');
-            await ui.maybePromptSetPassword(); await waitFor(() => $('set-password-modal'), 'remote asked in a new session');
-            out.remoteAskedNewSession = true;
+            await ui.maybePromptSetPassword(); await waitFor(() => $('set-password-modal'), 'remote prompt'); out.remoteAsked = true; // left open: the 409 step below types into it
             // 409: a password already exists -> closes quietly; 429 shows the server's words and stays open
             reply['/api/auth/password/set'] = { status: 409, body: { code: 'password_set', error: 'A password is already set' } };
             type('set-password-new', 'x'); type('set-password-confirm', 'x'); submit();
@@ -95,7 +90,18 @@ const BASE = require('./test_base').BASE;
             type('set-password-new', 'x'); type('set-password-confirm', 'x'); submit();
             await waitFor(() => !$('set-password-error').hidden, '429 message');
             out.err429 = $('set-password-error').textContent; out.saveEnabledAfter429 = !$('set-password-save').disabled;
-            $('set-password-later').click();
+            // a failed save on the required prompt: the server's words, Try again, where to go if it keeps failing, and still no way out (#11892)
+            reply['/api/auth/password/set'] = { status: 500, body: { error: 'The password could not be saved: disk full' } };
+            type('set-password-new', 'x'); type('set-password-confirm', 'x'); submit();
+            await waitFor(() => /disk full/.test($('set-password-error').textContent), '500 message');
+            out.fail = { err: $('set-password-error').textContent, btn: $('set-password-save').textContent, enabled: !$('set-password-save').disabled, note: $('set-password-failed').hidden ? '' : $('set-password-failed').textContent, buttons: [...document.querySelectorAll('#set-password-modal .modal-footer button')].map(b => b.textContent.trim()) };
+            document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); out.fail.stillOpen = !!$('set-password-modal');
+            $('set-password-modal').remove();
+            // opened from Settings or the sign-in bar (not the first-run prompt) it has a Cancel and Escape: the person chose to open it
+            ui.showSetPasswordModal(); await waitFor(() => $('set-password-modal'), 'the dialog opened on purpose');
+            out.optionalButtons = [...document.querySelectorAll('#set-password-modal .modal-footer button')].map(b => b.textContent.trim());
+            document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); out.optionalEscape = !$('set-password-modal');
+            ui.showSetPasswordModal(); await waitFor(() => $('set-password-modal'), 'the dialog again'); $('set-password-cancel').click(); out.optionalCancel = !$('set-password-modal');
             // signed out or already set: no prompt
             for (const st of [{ authenticated: false, password_set: false, local: true }, { authenticated: true, password_set: true, local: true }]) {
                 status = st; await ui.maybePromptSetPassword(); await sleep(30); if ($('set-password-modal')) out.promptWhen = JSON.stringify(st);
@@ -160,13 +166,16 @@ const BASE = require('./test_base').BASE;
         assert.doesNotMatch(out.lead1 + out.lead2, /nothing changed|now asks browsers/);
         assert.deepEqual(out.weak, { level: 'weak', disabled: false }, 'the meter advises and never blocks');
         assert.equal(out.meterEmpty, 'none', 'no strength bar is drawn before anything is typed (#9971) and it holds no room: it sits under Confirm, so typing moves nothing above it (#10281, #11304)'); assert.equal(out.meterTyped, 'visible', 'the bar shows once something is typed');
-        assert.equal(out.notNowNote, 'Only you use this computer? You can skip this: the Coral app opens without a password. You can set one later in Settings, Security and privacy.', 'the prompt says what no password leaves you with, and the paragraph does not open with the button\'s name (#10892)');
-        assert.ok(out.noteGap >= 8, 'room between that line and the Password label (' + out.noteGap + ' px)'); assert.equal(out.notNowInView, true, 'Not now is within the screen')
+        assert.doesNotMatch(out.skipWords, /skip|without a password|Only you use this computer|Not now/i, 'the prompt says nothing that reads as a way around the password (#11892)');
         assert.equal(out.emptyErr, 'Enter a password.'); assert.equal(out.callsAfterEmpty, 0);
         assert.match(out.mismatchErr, /do not match/); assert.equal(out.callsAfterMismatch, 0, 'nothing is sent for a mismatch');
         assert.deepEqual(out.setCall, { url: '/api/auth/password/set', body: { password: '  a b  ' } }, 'sent exactly as typed, spaces kept');
-        assert.equal(out.flagAfterLocalNotNow, '1', 'Not now is final on this computer'); assert.equal(out.promptAfterLocalNotNow, false);
-        assert.equal(out.flagAfterRemoteNotNow, null, 'from another computer Not now is not kept for good'); assert.equal(out.remoteAskedAgain, false, 'but it is kept for this session: the prompt does not come back on every page load (#10930)'); assert.ok(out.remoteAskedNewSession, 'and a new session asks again');
+        assert.equal(out.laterButton, false, 'no Not now button'); assert.deepEqual(out.buttons, ['Set password'], 'the one action is the only button');
+        assert.equal(out.openAfterEscape, true, 'Escape does not close it: a password is always created'); assert.ok(out.askedDespiteFlags, 'an old Not now flag does not keep the prompt away'); assert.ok(out.remoteAsked, 'another computer is asked too');
+        assert.match(out.fail.err, /disk full/, 'the server\'s words'); assert.equal(out.fail.btn, 'Retry', 'a button to try again (the census: a button that retries says Retry)'); assert.ok(out.fail.enabled);
+        assert.equal(out.fail.note, 'If this keeps failing, run coral reset-password in a terminal on this computer.', 'and where to go if it keeps failing');
+        assert.deepEqual(out.fail.buttons, ['Retry'], 'no way out beside it'); assert.ok(out.fail.stillOpen, 'Escape does not close it');
+        assert.deepEqual(out.optionalButtons, ['Cancel', 'Set password'], 'opened on purpose it has a Cancel'); assert.ok(out.optionalEscape && out.optionalCancel, 'and Escape and Cancel close it');
         assert.ok(out.closedOn409);
         assert.equal(out.err429, 'Too many attempts. Try again in 30 s.'); assert.ok(out.saveEnabledAfter429);
         assert.equal(out.promptWhen, undefined, 'no prompt when signed out or a password is set: ' + out.promptWhen);
@@ -180,6 +189,6 @@ const BASE = require('./test_base').BASE;
         assert.deepEqual(out.changeCall, { url: '/api/auth/password/change', body: { current: 'old pw', password: 'n' } });
         assert.equal(out.signOutCall, '/api/auth/sessions/sign-out-others');
         assert.ok(out.needSignInNote, 'a 403 password_session_required shows nothing under the browsers row, not a note (#7040)'); assert.ok(out.noSignedOutPanel, 'and never the signed-out panel');
-        console.log('PASS browser password: prompt, Not now rules, settings list as text, change, sign out others');
+        console.log('PASS browser password: prompt with no way past it, settings list as text, change, sign out others');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });

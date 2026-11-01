@@ -125,7 +125,7 @@ const BASE = require('./test_base').BASE;
             pu.showSetPasswordModal({ local: true });
             await hn.maybeOfferHubSignin(); await sleep(80);
             out.waitsForPassword = !$('hub-signin-notice');
-            $('set-password-later').click();
+            $('set-password-modal').remove(); document.dispatchEvent(new CustomEvent('coral:password-prompt-closed')); // the prompt has no Not now (#11892): it goes when the password is set, as the page's own close says
             await waitFor(() => $('hub-signin-notice'), 'the notice after the password prompt closes'); out.afterPassword = true;
             $('hub-notice-no').click();
             window.fetch = RealFetch; row.remove(); document.querySelectorAll('.modal').forEach(m => { if (/notice|set-password/.test(m.id)) m.remove(); });

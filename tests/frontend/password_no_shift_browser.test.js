@@ -29,7 +29,7 @@ const { coralReady } = require('./helpers/wait');
             await type(''); await new Promise(r => setTimeout(r, 200)); // sleep-ok: the line is cleared
             const back = await top();
             if (back !== base) problems.push(`${tag}: cleared, the Confirm field is at ${back}, it was at ${base}`);
-            await ev(`document.getElementById('set-password-later').click(); true`);
+            await ev(`document.getElementById('set-password-modal').remove(); true`); // no Not now (#11892)
         }
     } finally { await client.close(); }
     assert.deepEqual(problems, [], 'the Set a password dialog:\n  ' + problems.join('\n  '));

@@ -7,13 +7,11 @@ import { showToast } from './utils.js';
 import { postJson } from './api.js';
 import { importOnce } from './import_once.js';
 import { pollEvery } from './overload.js';
-import { browserLocal, browserSession } from './safe_storage.js';
 import { el } from './dom_el.js';
 
 // The pure rules are a lazy module of their own (a lazily loaded module may only statically import startup modules).
 const { passwordProblem, strengthOf } = await importOnce('./password_rules.js');
 
-const NOT_NOW_KEY = 'coral-password-not-now';
 
 // sendJson and postJson live in api.js now (a startup module); they are re-exported here for the modules that destructure them from this one.
 export { sendJson, postJson } from './api.js';
@@ -78,9 +76,6 @@ export function errorText(res, fallback) {
 
 // ── The one-time prompt ──────────────────────────────────────────────────────────────────────────────
 
-const _notNowGet = () => { try { return browserLocal.get(NOT_NOW_KEY) === '1'; } catch { return false; } };
-const _laterGet = () => { try { return browserSession.get(NOT_NOW_KEY) === '1'; } catch { return false; } }; // this tab's session: a browser on another computer is asked again in a new session, not on every page load (#10930)
-const _notNowSet = () => { try { browserLocal.set(NOT_NOW_KEY, '1'); } catch { /* private mode: asked again, harmless */ } };
 
 /** GET /api/system/auth-status, or null when it cannot be read. */
 async function authStatus() {
@@ -90,14 +85,12 @@ async function authStatus() {
     } catch { return null; }
 }
 
-/** Ask a signed-in browser to set a password when none is set. "Not now" is final on this computer (the server's own
- *  `local` check says which), and asks again on each visit from another computer. */
+/** Ask a signed-in browser to set a password when none is set. There is no way past it: a password is always created (the Operator, #11892). */
 export async function maybePromptSetPassword() {
     if (document.getElementById('set-password-modal')) return;
     const st = await authStatus();
     if (!st || st.authenticated === false || st.password_set !== false) return;
-    if ((st.local === true && _notNowGet()) || _laterGet()) return;
-    showSetPasswordModal({ local: st.local === true });
+    showSetPasswordModal({ required: true });
 }
 
 const coarse = () => window.matchMedia?.('(pointer: coarse)').matches; // a touch screen: no search box takes the focus (its keyboard covers the page)
@@ -115,7 +108,8 @@ function pageControl() {
     return null;
 }
 
-export function showSetPasswordModal({ local = false } = {}) {
+/** `required`: the first-run prompt, which has no way past it (a password is always created, #11892). Opened from Settings or the sign-in bar it has a Cancel and Escape, because the person chose to open it. */
+export function showSetPasswordModal({ required = false } = {}) {
     const existing = document.getElementById('set-password-modal'); // two callers can race (startup, Settings): one prompt
     if (existing) return existing;
     const opener = document.activeElement;
@@ -126,7 +120,6 @@ export function showSetPasswordModal({ local = false } = {}) {
     const body = el('div', 'modal-body');
     // One wording for everyone (a new install and an upgrade alike): what the password is for. The server has no first-run marker, and nobody needs "nothing changed here" (#6010).
     body.append(el('p', 'pw-lead', 'A password keeps other people and other devices out of Coral when it is opened in a web browser.'));
-    body.append(el('p', 'pw-note pw-not-now', 'Only you use this computer? You can skip this: the Coral app opens without a password. You can set one later in Settings, Security and privacy.'));
     const form = el('form', 'pw-form'); form.autocomplete = 'on'; form.id = 'set-password-form';
     const pw = passwordField({ id: 'set-password-new', label: 'Password', autocomplete: 'new-password', name: 'new-password' });
     pw.input.setAttribute('aria-describedby', 'set-password-strength');
@@ -134,11 +127,12 @@ export function showSetPasswordModal({ local = false } = {}) {
     const confirm = passwordField({ id: 'set-password-confirm', label: 'Confirm password', autocomplete: 'new-password', name: 'confirm-password' });
     const err = el('p', 'pw-error'); err.id = 'set-password-error'; err.setAttribute('role', 'alert'); err.hidden = true;
     form.append(usernameStub(), pw.root, confirm.root, meter.root, err); // the advice sits under both fields: its reserved room is no gap between them (#11304)
-    body.append(form, el('p', 'pw-note', 'Forgot it? Run coral reset-password in a terminal on this computer.'));
+    const failed = el('p', 'pw-note', 'If this keeps failing, run coral reset-password in a terminal on this computer.'); failed.id = 'set-password-failed'; failed.hidden = true;
+    body.append(form, failed, el('p', 'pw-note', 'Forgot it? Run coral reset-password in a terminal on this computer.'));
     const foot = el('div', 'modal-actions modal-footer');
-    const later = el('button', 'btn', 'Not now'); later.type = 'button'; later.id = 'set-password-later';
     const save = el('button', 'btn btn-primary', 'Set password'); save.type = 'submit'; save.setAttribute('form', 'set-password-form'); save.id = 'set-password-save';
-    foot.append(later, save);
+    let cancel = null; if (!required) { cancel = el('button', 'btn', 'Cancel'); cancel.type = 'button'; cancel.id = 'set-password-cancel'; }
+    foot.append(...(cancel ? [cancel] : []), save);
     content.append(head, body, foot); modal.append(content);
     document.body.append(modal);
 
@@ -167,9 +161,8 @@ export function showSetPasswordModal({ local = false } = {}) {
         if (back) back.focus();
         document.dispatchEvent(new CustomEvent('coral:password-prompt-closed'));
     };
-    const notNow = () => { if (local) _notNowSet(); else try { browserSession.set(NOT_NOW_KEY, '1'); } catch { /* asked again: harmless */ } close(); };
     const onKey = e => {
-        if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); notNow(); return; }
+        if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); if (!required) close(); return; } // the first-run prompt has no way out but a password (#11892)
         if (e.key !== 'Tab') return;
         const items = [...modal.querySelectorAll('input:not([hidden]), button')].filter(x => !x.disabled);
         if (!items.length) return;
@@ -179,7 +172,7 @@ export function showSetPasswordModal({ local = false } = {}) {
     };
     document.addEventListener('keydown', onKey, true);
     pw.input.addEventListener('input', () => meter.update(pw.input.value));
-    later.addEventListener('click', notNow);
+    cancel?.addEventListener('click', close);
     form.addEventListener('submit', async e => {
         e.preventDefault();
         const problem = passwordProblem(pw.input.value, confirm.input.value);
@@ -196,7 +189,7 @@ export function showSetPasswordModal({ local = false } = {}) {
             return;
         }
         err.hidden = false; err.textContent = errorText(res, 'Could not set the password.');
-        save.disabled = false; save.textContent = 'Set password';
+        save.disabled = false; save.textContent = 'Retry'; failed.hidden = false; // the server's words, a way to try again, and where to go if it keeps failing: no way out (#11892)
     });
     pw.input.focus();
     return modal;
