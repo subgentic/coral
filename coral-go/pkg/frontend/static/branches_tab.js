@@ -5,6 +5,7 @@ import { serverFetch, serverForSession } from './server_base.js';
 import { emptyState } from './dom_write.js';
 
 const REFRESH_MS = 60000; // the snapshot is read again at most once a minute on the server
+const FIRST_READ_MS = 15000; // a repository is first read on the server's next pass after the tab asks
 let generation = 0;
 let timer = null;
 const panel = () => document.getElementById('agentic-panel-branches');
@@ -25,7 +26,7 @@ export async function loadBranches() {
     } catch { /* drawn as unavailable below */ }
     if (mine !== generation || state.currentSession?.session_id !== s.session_id) return; // another agent was chosen meanwhile
     draw(el, data);
-    timer = setTimeout(loadBranches, REFRESH_MS);
+    timer = setTimeout(loadBranches, data && data.available !== false && !data.found ? FIRST_READ_MS : REFRESH_MS); // a repository is read once its tab asks: look again soon
 }
 
 function text(tag, className, value) {
@@ -35,19 +36,23 @@ function text(tag, className, value) {
     return e;
 }
 
+/** A worktree's changed files, as words: not read at all when it is not on a local drive, and "not counted" (not 0) when the untracked scan did not finish. */
+function changes(w) {
+    if (w.not_local) return 'not on a local drive: not read';
+    if (w.unreadable) return 'changes not readable';
+    const untracked = w.untracked_unknown ? 'untracked not counted' : `${w.untracked}${w.untracked_more ? '+' : ''} untracked`;
+    return `${w.changed} changed, ${untracked}`;
+}
+
 /** The numbers of one worktree, as words. */
 function numbers(w) {
-    const parts = [];
-    if (w.ahead || w.behind) parts.push(`${w.ahead} ahead, ${w.behind} behind`);
-    else parts.push('even with the base');
-    if (w.unreadable) parts.push('changes not readable');
-    else parts.push(`${w.changed} changed, ${w.untracked}${w.untracked_more ? '+' : ''} untracked`);
-    return parts.join(' · ');
+    const where = (w.ahead || w.behind) ? `${w.ahead} ahead, ${w.behind} behind` : 'even with the base';
+    return `${where} · ${changes(w)}`;
 }
 
 function draw(el, data) {
     if (!data || data.available === false) { emptyState(el, 'Branches are not available from this computer.'); return; }
-    if (!data.found) { emptyState(el, "This agent's folder is not in a git repository Coral reads."); return; }
+    if (!data.found) { emptyState(el, "Reading this agent's repository. If nothing shows, its folder is not in a git repository Coral reads."); return; }
     if (data.unreadable) { emptyState(el, 'Coral could not read this repository.'); return; }
     const head = text('p', 'branches-note', data.base ? `Counted against ${data.base}.` : 'No base branch found: counts are not shown.');
     const list = document.createElement('ul');
@@ -62,7 +67,7 @@ function draw(el, data) {
         if (w.main) title.append(' ', text('span', 'branches-mark', 'main worktree'));
         row.append(title);
         if (data.base) row.append(text('div', 'branches-meta', numbers(w)));
-        else row.append(text('div', 'branches-meta', w.unreadable ? 'changes not readable' : `${w.changed} changed, ${w.untracked}${w.untracked_more ? '+' : ''} untracked`));
+        else row.append(text('div', 'branches-meta', changes(w)));
         if (w.nothing_to_merge) row.append(text('div', 'branches-mark', 'no commits left to merge'));
         const others = (w.agents || []).filter(a => !w.current || a.session_id !== state.currentSession?.session_id).map(a => a.name);
         if (others.length) row.append(text('div', 'branches-meta', `Agents here: ${others.join(', ')}`));
