@@ -17,7 +17,17 @@ const { coralReady } = require('./helpers/wait');
     const choose = (id) => ev(`(() => { const s = ${q('select[name=planning_approval]')}; s.value = ${JSON.stringify(id)}; s.dispatchEvent(new Event('input', { bubbles: true })); s.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
     const toggle = (name) => ev(`${q(`[name=${name}]`)}.click(); true`);
     const serverFlags = () => ev(`fetch('/api/board/${TEAM}/settings').then(r => r.json()).then(s => ({ goals: !!s.goals_need_approval, tasks: !!s.tasks_need_approval, requireGoal: !!s.require_goal }))`);
-    const save = async () => { await ev(`[...document.querySelectorAll('#team-settings-workspace button')].find(b => /^Save settings/.test(b.textContent.trim())).click(); true`); await waitFor(`!document.querySelector('#team-settings-workspace .sv')?.classList.contains('sv-dirty') && !!document.querySelector('#team-settings-workspace .sv[data-ready]')`, 'the save to finish', 15000); };
+    const dirty = `(document.querySelector('#team-settings-workspace .sv')?.dataset.dirty === '1')`; // the view marks its root data-dirty (there is no sv-dirty class: the old wait on it was always true)
+    // Save only once the view knows it changed (a click on a still-disabled Save does nothing), then wait for the machine to hold the new flags: the form going clean is not proof the save landed (CI read the old value back)
+    const save = async (want) => {
+        await waitFor(dirty, 'the form to be dirty before Save', 15000);
+        await ev(`[...document.querySelectorAll('#team-settings-workspace button')].find(b => /^Save settings/.test(b.textContent.trim())).click(); true`);
+        await waitFor(`!${dirty} && !!document.querySelector('#team-settings-workspace .sv[data-ready]')`, 'the save to finish', 15000);
+        if (!want) return;
+        let got; const end = Date.now() + 15000;
+        while (Date.now() < end) { got = await serverFlags(); if (JSON.stringify(got) === JSON.stringify(want)) break; await new Promise(r => setTimeout(r, 100)); } // sleep-ok: polling the saved flags
+        assert.deepEqual(got, want, 'saved through the existing settings route');
+    };
     try {
         await Page.enable(); await Page.addScriptToEvaluateOnNewDocument({ source: PRELOAD });
         await Emulation.setDeviceMetricsOverride({ width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
@@ -37,15 +47,13 @@ const { coralReady } = require('./helpers/wait');
         r = await row();
         assert.deepEqual([r.goals, r.tasks, r.requireGoal], [true, false, true], 'Operator approves goals: goals on, tasks off, Require a goal on');
         assert.match(r.help, /every task needs a goal/, 'the sentence follows the choice');
-        await save();
-        assert.deepEqual(await serverFlags(), { goals: true, tasks: false, requireGoal: true }, 'saved through the existing settings route');
+        await save({ goals: true, tasks: false, requireGoal: true });
         assert.equal((await row()).value, 'goals', 'the row still says it after the save');
 
         await choose('tasks');
         r = await row();
         assert.deepEqual([r.goals, r.tasks, r.requireGoal], [true, true, true], 'Operator approves tasks: both on');
-        await save();
-        assert.deepEqual(await serverFlags(), { goals: true, tasks: true, requireGoal: true });
+        await save({ goals: true, tasks: true, requireGoal: true });
 
         await toggle('require_goal');
         assert.equal((await row()).value, 'custom', 'a switch changed by hand: the row follows to Custom');
@@ -58,8 +66,7 @@ const { coralReady } = require('./helpers/wait');
         r = await row();
         assert.deepEqual([r.goals, r.tasks, r.requireGoal], [false, false, true], 'Fully autonomous turns both approvals off and leaves Require a goal as it is');
         assert.match(r.help, /planning only/, 'it says it is planning only');
-        await save();
-        assert.deepEqual(await serverFlags(), { goals: false, tasks: false, requireGoal: true });
+        await save({ goals: false, tasks: false, requireGoal: true });
         assert.equal(await ev(`${q('select[name=planning_approval]')}.value`), 'auto');
         console.log('   ✓ Team settings');
 
