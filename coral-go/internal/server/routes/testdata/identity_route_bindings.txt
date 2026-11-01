@@ -47,6 +47,7 @@ GET /api/board/{project} | board-claims
 GET /api/board/{project}/artifacts | board-claims +token-session
 GET /api/board/{project}/artifacts/{digest}/edit | board-claims | operator-only
 GET /api/board/{project}/artifacts/{digest}/edit/send | board-claims +token-session | operator-only
+GET /api/board/{project}/branches | board-claims +token-session
 GET /api/board/{project}/cross-team-candidates | board-claims +token-session | operator-only
 GET /api/board/{project}/cross-team-links | board-claims +token-session | operator-only
 GET /api/board/{project}/cross-team-state | board-claims +token-session | operator-only

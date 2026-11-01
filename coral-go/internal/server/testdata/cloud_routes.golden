@@ -89,6 +89,7 @@ GET /api/board/{project} view
 GET /api/board/{project}/artifacts view
 GET /api/board/{project}/artifacts/{digest}/edit view
 GET /api/board/{project}/artifacts/{digest}/edit/send view
+GET /api/board/{project}/branches view
 GET /api/board/{project}/cross-team-candidates never
 GET /api/board/{project}/cross-team-links never
 GET /api/board/{project}/cross-team-state never

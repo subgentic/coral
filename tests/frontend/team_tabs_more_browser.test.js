@@ -1,6 +1,6 @@
 // The team page's tabs on a phone were Goals, Agents, Tasks and Artifacts with Knowledge and Board behind a More menu (Goal #60, audit #8572 point 5). The phone's navigation model (#11236, #11239 slice B) makes them ONE
 // strip: every tab (Goals, Agents, Tasks, Artifacts, Knowledge, Board) in a row of 44 px tabs under the bar, scrolling sideways with a fade, the open tab kept in view; no More tab and no menu of tabs. The page itself never scrolls
-// sideways. Right from the last tab wraps to the first and Left from the first to the last; a tap on Board opens the Board and the strip shows it. Desktop: all six, no More. Isolated dev server, 1280 and 390 px.
+// sideways. Right from the last tab wraps to the first and Left from the first to the last; a tap on Board opens the Board and the strip shows it. Desktop: all seven, no More. Isolated dev server, 1280 and 390 px.
 const assert = require('node:assert/strict');
 const { connect } = require('./agent_view_harness');
 const { install: installTP, seed, openTeam } = require('./helpers/team_page');
@@ -28,7 +28,7 @@ const TEAM = `qa-tabs-more-${Date.now() % 100000}`;
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(); await installTP(ev);
             await seed(ev, TEAM); await ev(`window.syncMobileAgentList && window.syncMobileAgentList(); true`); await openTeam(ev, waitFor, TEAM); await settle(400);
             let s = await state();
-            check(`${label}: all six tabs, no More tab`, ['goals', 'agents', 'tasks', 'artifacts', 'knowledge', 'messages'].every(t => s.tabs.includes(t)) && !s.more, JSON.stringify(s));
+            check(`${label}: all seven tabs, no More tab`, ['goals', 'agents', 'tasks', 'artifacts', 'knowledge', 'messages', 'branches'].every(t => s.tabs.includes(t)) && !s.more, JSON.stringify(s));
             if (!mobile) continue;
             check(`${label}: each tab is 44 px, the page does not scroll sideways, the strip has its fade`, s.h.every(x => x >= 44) && s.page && (!s.scrolls || s.fade), JSON.stringify(s));
             // the last tab: Right wraps to the first, a tap opens Board and the strip shows it

@@ -17,6 +17,7 @@ import (
 type BranchesSource interface {
 	For(dir string) (branches.Repo, int, bool)
 	Holds(repo branches.Repo, i int, dir string) bool
+	Same(a, b branches.Repo) bool // the same repository (the team view groups by it)
 }
 
 // SetBranches wires the snapshot in.
@@ -93,7 +94,66 @@ func (h *SessionsHandler) Branches(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"available": true, "found": true, "base": repo.Base, "more": repo.More, "unreadable": repo.Unreadable,
-		"at": repo.At.UTC().Format(time.RFC3339), "worktrees": rows,
+		"available": true, "found": true, "base": repo.Base, "more": repo.More, "unreadable": repo.Unreadable, "remote": repo.Remote, "remote_unknown": repo.RemoteUnknown,
+		"pr_note": repo.PRNote, "at": repo.At.UTC().Format(time.RFC3339), "worktrees": rows,
 	})
+}
+
+// TeamBranches answers GET /api/board/{project}/branches: the repositories the team's live agents work in, one section each, with which of the team's agents work in which worktree.
+// The same rules as an agent's tab: no git runs for it, no folder path is served; an agent's token reads only its own team's (the board its own session is on).
+func (h *SessionsHandler) TeamBranches(w http.ResponseWriter, r *http.Request) {
+	project := chi.URLParam(r, "project")
+	if owner, isAgent := VerifiedSession(r.Context()); isAgent {
+		me, err := h.ss.GetLiveSession(r.Context(), owner.SessionID)
+		if err != nil || me == nil || me.BoardName == nil || *me.BoardName != project {
+			errForbidden(w, "an agent reads the branches of its own team only")
+			return
+		}
+	}
+	if h.branches == nil {
+		writeJSON(w, http.StatusOK, map[string]any{"available": false})
+		return
+	}
+	lives, err := h.ss.GetAllLiveSessions(r.Context())
+	if err != nil {
+		errInternalServer(w, "Could not read the team's agents.")
+		return
+	}
+	type section struct {
+		repo branches.Repo
+		rows []branchWorktree
+	}
+	var sections []*section
+	for _, ls := range lives {
+		if ls.IsArchived == 1 || ls.WorkingDir == "" || ls.BoardName == nil || *ls.BoardName != project {
+			continue
+		}
+		repo, own, ok := h.branches.For(ls.WorkingDir)
+		if !ok || own < 0 {
+			continue
+		}
+		var sec *section
+		for _, s := range sections {
+			if h.branches.Same(s.repo, repo) {
+				sec = s
+				break
+			}
+		}
+		if sec == nil {
+			sec = &section{repo: repo, rows: make([]branchWorktree, len(repo.Worktrees))}
+			for i, wt := range repo.Worktrees {
+				sec.rows[i] = branchWorktree{Worktree: wt}
+			}
+			sections = append(sections, sec)
+		}
+		if own < len(sec.rows) {
+			sec.rows[own].Agents = append(sec.rows[own].Agents, branchAgent{Name: ls.AgentName, SessionID: ls.SessionID, AgentType: ls.AgentType})
+		}
+	}
+	out := make([]map[string]any, 0, len(sections))
+	for _, s := range sections {
+		out = append(out, map[string]any{"base": s.repo.Base, "more": s.repo.More, "unreadable": s.repo.Unreadable, "remote": s.repo.Remote, "remote_unknown": s.repo.RemoteUnknown,
+			"pr_note": s.repo.PRNote, "at": s.repo.At.UTC().Format(time.RFC3339), "worktrees": s.rows})
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"available": true, "repos": out})
 }
