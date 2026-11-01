@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	at "github.com/subgentic/coral/internal/agenttypes"
 	"github.com/subgentic/coral/internal/terminalinput"
 )
 
@@ -138,7 +139,7 @@ func (c *Client) SendPrompt(ctx context.Context, o terminalinput.Origin, agentNa
 		return MarkDeliveryUnknown(fmt.Errorf("paste-buffer failed: %w", err))
 	}
 	select {
-	case <-time.After(promptSubmitDelay):
+	case <-time.After(max(promptSubmitDelay, at.MinSubmitGap(agentType))):
 	case <-dctx.Done():
 		return MarkDeliveryUnknown(fmt.Errorf("pasted the prompt but timed out before Enter: %w", dctx.Err()))
 	}
