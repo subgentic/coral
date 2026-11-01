@@ -3,6 +3,7 @@
 package ptymanager
 
 import (
+	"bytes"
 	"os"
 	"runtime"
 	"testing"
@@ -12,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/windows"
 
+	"github.com/subgentic/coral/internal/consoletest"
 	"github.com/subgentic/coral/internal/naming"
 	"github.com/subgentic/coral/internal/tmux"
 )
@@ -39,18 +41,18 @@ func TestAProbeThatDoesNotReturnNeverHoldsTheCaller(t *testing.T) {
 	defer close(release)
 
 	start := time.Now()
-	assert.Equal(t, stdinUnreadable, classifyProcess(stdinKey{1, 1}, 100*time.Millisecond), "no answer in time: a reader")
+	assert.Equal(t, stdinUnreadable, classifyKind(stdinKey{1, 1}, 100*time.Millisecond), "no answer in time: a reader")
 	assert.Less(t, time.Since(start), time.Second)
 	before := runtime.NumGoroutine()
-	assert.Equal(t, stdinUnreadable, classifyProcess(stdinKey{1, 1}, 50*time.Millisecond))
+	assert.Equal(t, stdinUnreadable, classifyKind(stdinKey{1, 1}, 50*time.Millisecond))
 	assert.Equal(t, before, runtime.NumGoroutine(), "the same process again: no second worker")
 
 	for i := 2; i <= stdinWorkersMax; i++ {
-		classifyProcess(stdinKey{i, 1}, time.Millisecond)
+		classifyKind(stdinKey{i, 1}, time.Millisecond)
 	}
 	before = runtime.NumGoroutine()
 	start = time.Now()
-	assert.Equal(t, stdinUnreadable, classifyProcess(stdinKey{99, 1}, time.Second), "every worker busy: a reader, at once")
+	assert.Equal(t, stdinUnreadable, classifyKind(stdinKey{99, 1}, time.Second), "every worker busy: a reader, at once")
 	assert.Less(t, time.Since(start), 100*time.Millisecond)
 	assert.Equal(t, before, runtime.NumGoroutine(), "no worker beyond the cap")
 }
@@ -64,10 +66,10 @@ func TestAnAnsweredProbeIsKeptForItsProcess(t *testing.T) {
 		stdinProbeHook.Store(nil)
 		resetStdinMemo(t)
 	})
-	assert.Equal(t, stdinConsole, classifyProcess(stdinKey{7, 70}, time.Second))
-	assert.Equal(t, stdinConsole, classifyProcess(stdinKey{7, 70}, time.Second))
+	assert.Equal(t, stdinConsole, classifyKind(stdinKey{7, 70}, time.Second))
+	assert.Equal(t, stdinConsole, classifyKind(stdinKey{7, 70}, time.Second))
 	assert.Equal(t, 1, calls, "one probe per process")
-	classifyProcess(stdinKey{7, 71}, time.Second)
+	classifyKind(stdinKey{7, 71}, time.Second)
 	assert.Equal(t, 2, calls, "a new process with the same pid is probed again")
 }
 
@@ -144,5 +146,76 @@ func TestOnlyAnInvalidHandleAnswerSaysNotTheConsole(t *testing.T) {
 		stdinProbeHook.Store(nil)
 		resetStdinMemo(t)
 	})
-	assert.Equal(t, stdinUnreadable, classifyProcess(stdinKey{5, 5}, time.Second), "a probe that panics is a reader, and the process goes on")
+	assert.Equal(t, stdinUnreadable, classifyKind(stdinKey{5, 5}, time.Second), "a probe that panics is a reader, and the process goes on")
+}
+
+// processGone: a process that is there is not gone; one that has exited is; one whose creation time is not the one the walk saw (a reused pid) is.
+func TestAProcessIsGoneWhenItEndedOrItsPidNamesAnother(t *testing.T) {
+	me := os.Getpid()
+	start, ok := processStart(me)
+	require.True(t, ok)
+	assert.False(t, processGone(me, start))
+	assert.False(t, processGone(me, 0))
+	assert.True(t, processGone(me, start+1), "another creation time: not the process the walk saw")
+
+	cmd := consoletest.HiddenCommand("cmd.exe", "/c", "exit 0")
+	require.NoError(t, cmd.Start())
+	pid := cmd.Process.Pid
+	require.NoError(t, cmd.Wait())
+	assert.True(t, processGone(pid, 0), "it has ended")
+}
+
+// Live (QA's #6908): an agent whose children start and end all the time (hooks with a pipe as their input) is never refused for them.
+func TestShortLivedChildrenOfTheAgentNeverRefuseIt(t *testing.T) {
+	naming.SetDefaultLogDir(t.TempDir())
+	resetStdinMemo(t)
+	t.Cleanup(func() { resetStdinMemo(t) })
+	b := NewPTYBackend()
+	t.Cleanup(func() { _ = b.Close() })
+	name := "claude-0425-hooks"
+	require.NoError(t, b.Spawn(name, "claude", t.TempDir(), "0425", `powershell.exe -NoProfile -Command "while ($true) { '' | cmd.exe /d /c exit }"`, 120, 40))
+	b.mu.RLock()
+	p := b.sessions[name].proc.(*windowsPTY)
+	b.mu.RUnlock()
+	root := p.cpty.Pid()
+	start, ok := processStart(root)
+	require.True(t, ok)
+	p.agent.mu.Lock()
+	p.agent.proc, p.agent.adopted = winProc{pid: root, start: start, known: true}, true
+	p.agent.mu.Unlock()
+	time.Sleep(time.Second) // the loop is running
+	refusals := 0
+	for i := 0; i < 100; i++ {
+		if refused, why, _ := b.AgentTextRefused(name); refused {
+			refusals++
+			t.Logf("refused: %s", why)
+		}
+	}
+	assert.Zero(t, refusals, "children that come and go with a pipe as their input never hold the agent's text")
+}
+
+// classifyKind is classifyProcess's answer alone.
+func classifyKind(key stdinKey, wait time.Duration) stdinKind {
+	k, _ := classifyProcess(key, wait)
+	return k
+}
+
+// Deterministic (QA's #6908): a child the walk saw that has ended by the time it is probed is "gone", never "unreadable" (which would count as a reader).
+func TestAChildThatEndedBeforeItsProbeIsGoneNotUnreadable(t *testing.T) {
+	resetStdinMemo(t)
+	t.Cleanup(func() { resetStdinMemo(t) })
+	cmd := consoletest.HiddenCommand("cmd.exe", "/c", "ping -n 30 127.0.0.1 >nul")
+	cmd.Stdin = bytes.NewReader(nil)
+	require.NoError(t, cmd.Start())
+	pid := cmd.Process.Pid
+	start, ok := processStart(pid) // what the walk's snapshot saw
+	require.True(t, ok)
+	_ = cmd.Process.Kill()
+	_ = cmd.Wait() // it has ended before its probe
+	l := &liveProcs{deadline: time.Now().Add(stdinWalkBudget)}
+	assert.Equal(t, stdinGone, l.stdin(pid, start))
+	stdinMemo.Lock()
+	n := len(stdinMemo.m)
+	stdinMemo.Unlock()
+	assert.Zero(t, n, "nothing is kept for it as a reader")
 }

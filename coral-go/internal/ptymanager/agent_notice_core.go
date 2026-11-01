@@ -42,8 +42,9 @@ type procSource interface {
 	info(pid int) winProc
 	// commandLine is a process's command line, only to be compared (isLauncherCommandLine) and dropped; ok is false when it cannot be read (or is longer than launcherCmdMaxLine).
 	commandLine(pid int) (cmdline string, ok bool)
-	// stdin is what a process's standard input is: the console, something else, or not readable.
-	stdin(pid int) stdinKind
+	// stdin is what a process's standard input is: the console, something else, not readable, or gone. start is its creation time as the walk saw it: a pid that names another
+	// process now is gone.
+	stdin(pid int, start int64) stdinKind
 }
 
 // stdinKind is what a process's standard input handle is (read from the process's own parameters, never guessed from its name).
@@ -53,6 +54,7 @@ const (
 	stdinUnreadable stdinKind = iota // could not be told: counted as reading the console (fail closed)
 	stdinNotConsole                  // a pipe, a file, the NUL device, or no standard input
 	stdinConsole                     // the console device: the program can read what is typed into the terminal
+	stdinGone                        // the process has ended (or its pid names a newer process): it reads nothing, and the walk goes on below it
 )
 
 // consoleHelpers are programs a CLI starts with the console as their standard input that are known not to read it. A name here counts only when the handle test says console AND the
@@ -90,8 +92,8 @@ func consoleReaderBelow(src procSource, rec winProc) (winProc, bool) {
 			if n.depth+1 >= maxWinWalkDepth {
 				return p, true
 			}
-			switch src.stdin(c) {
-			case stdinNotConsole:
+			switch src.stdin(c, p.start) {
+			case stdinNotConsole, stdinGone: // a hook the agent ran that ended between the snapshot and its probe is not a reader (QA's #6908)
 			case stdinConsole:
 				if !(n.pid == rec.pid && p.known && consoleHelpers[p.name]) {
 					return p, true

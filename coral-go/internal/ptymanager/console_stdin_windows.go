@@ -55,29 +55,101 @@ var stdinMemo = struct {
 	workers int
 }{m: map[stdinKey]*stdinEntry{}}
 
-func (l *liveProcs) stdin(pid int) stdinKind {
+func (l *liveProcs) stdin(pid int, seen int64) stdinKind {
+	if processGone(pid, seen) {
+		return stdinGone
+	}
 	start, ok := processStart(pid)
 	if !ok {
-		return stdinUnreadable
+		return stdinUnreadable // alive (processGone said so) and its times cannot be read: fail closed
 	}
-	wait := time.Until(l.deadline)
-	if l.deadline.IsZero() {
-		wait = stdinWalkBudget
+	deadline := l.deadline
+	if deadline.IsZero() {
+		deadline = time.Now().Add(stdinWalkBudget)
 	}
-	if wait <= 0 {
-		return stdinUnreadable // the walk's budget is spent
+	key := stdinKey{pid, start}
+	for try := 0; ; try++ {
+		wait := time.Until(deadline)
+		if wait <= 0 {
+			return stdinUnreadable // the walk's budget is spent: a reader
+		}
+		k, answered := classifyProcess(key, wait)
+		if k != stdinUnreadable || !answered {
+			return k // an answer, or none in time or no free worker: a reader (Security's #6911 point 2)
+		}
+		// The probe answered "unreadable": is the process still there? (Security's #6911 point 1)
+		if processGone(pid, start) {
+			forgetStdin(key) // stored as gone, never as a reader (point 4)
+			return stdinGone // it ended while it was probed: a hook that ran and finished
+		}
+		// A process moments old may not have its parameters yet: probed once more, inside the budget (point 3).
+		if try > 0 || time.Since(filetimeTime(start)) > youngProcess || time.Until(deadline) <= youngRetry {
+			return stdinUnreadable // alive and unreadable: a reader
+		}
+		forgetStdin(key)
+		time.Sleep(youngRetry)
 	}
-	return classifyProcess(stdinKey{pid, start}, wait)
 }
 
-// classifyProcess is the memoized answer for the process key, waiting at most wait for a probe; no answer in time, or no free worker, is a reader.
-func classifyProcess(key stdinKey, wait time.Duration) stdinKind {
+// youngProcess and youngRetry: a process this young whose probe fails is probed once more after youngRetry.
+const (
+	youngProcess = 500 * time.Millisecond
+	youngRetry   = 100 * time.Millisecond
+)
+
+// forgetStdin drops the memo's answer for key, once it is answered (a probe still running keeps its entry).
+func forgetStdin(key stdinKey) {
+	stdinMemo.Lock()
+	defer stdinMemo.Unlock()
+	if e := stdinMemo.m[key]; e != nil {
+		select {
+		case <-e.done:
+			delete(stdinMemo.m, key)
+		default:
+		}
+	}
+}
+
+// filetimeTime is a Windows file time (100 ns steps since 1601) as a time.
+func filetimeTime(ft int64) time.Time {
+	f := windows.Filetime{HighDateTime: uint32(ft >> 32), LowDateTime: uint32(ft)}
+	return time.Unix(0, f.Nanoseconds())
+}
+
+// processGone says pid names no running process, or a process created at another time than start (0: not compared): it has ended, or its pid was reused. A process that is there
+// but cannot be opened (access denied) is not gone: it stays unreadable, a reader.
+func processGone(pid int, start int64) bool {
+	h, err := windows.OpenProcess(windows.PROCESS_QUERY_LIMITED_INFORMATION, false, uint32(pid))
+	if err != nil {
+		return errors.Is(err, windows.ERROR_INVALID_PARAMETER) // no such process
+	}
+	defer windows.CloseHandle(h)
+	var code uint32
+	if windows.GetExitCodeProcess(h, &code) == nil && code != stillActiveCode {
+		return true
+	}
+	if start == 0 {
+		return false
+	}
+	var created, exited, kernel, user windows.Filetime
+	if windows.GetProcessTimes(h, &created, &exited, &kernel, &user) != nil {
+		return false
+	}
+	return int64(created.HighDateTime)<<32|int64(created.LowDateTime) != start
+}
+
+// stillActiveCode is the exit code GetExitCodeProcess reports for a process that has not ended (STILL_ACTIVE).
+const stillActiveCode = 259
+
+// classifyProcess is the memoized answer for the process key, waiting at most wait for a probe; no answer in time, or no free worker, is a reader. answered says the probe itself
+// gave the answer (and not the wait or the pool).
+func classifyProcess(key stdinKey, wait time.Duration) (stdinKind, bool) {
 	stdinMemo.Lock()
 	e := stdinMemo.m[key]
 	if e == nil {
 		if stdinMemo.workers >= stdinWorkersMax {
 			stdinMemo.Unlock()
-			return stdinUnreadable
+			return stdinUnreadable, false
 		}
 		if len(stdinMemo.m) >= stdinMemoMax {
 			for k, old := range stdinMemo.m {
@@ -109,9 +181,9 @@ func classifyProcess(key stdinKey, wait time.Duration) stdinKind {
 	defer t.Stop()
 	select {
 	case <-e.done:
-		return e.kind
+		return e.kind, true
 	case <-t.C:
-		return stdinUnreadable
+		return stdinUnreadable, false
 	}
 }
 

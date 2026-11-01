@@ -67,7 +67,7 @@ func (f *fakeProcs) commandLine(pid int) (string, bool) {
 }
 
 // stdin is what withStdin set for pid; a process without one has no console input (the tests written before the console-reader check keep their meaning).
-func (f *fakeProcs) stdin(pid int) stdinKind {
+func (f *fakeProcs) stdin(pid int, _ int64) stdinKind {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if k, ok := f.stdins[pid]; ok {

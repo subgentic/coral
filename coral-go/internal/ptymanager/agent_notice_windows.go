@@ -110,7 +110,13 @@ func (p *windowsPTY) NoticeVerdict() (tmux.NoticeVerdict, error) {
 	if err != nil {
 		return tmux.NoticeVerdict{}, err
 	}
-	return p.agent.verdict(src, root), nil
+	v := p.agent.verdict(src, root)
+	if v.Reason == tmux.ReasonChildReads { // a refusal for a program below the agent is looked at once more, in a fresh snapshot, before it stands (Security's #6911 point 5)
+		if again, err := newLiveProcs(); err == nil {
+			v = p.agent.verdict(again, root)
+		}
+	}
+	return v, nil
 }
 
 // AgentCandidate is the single program in the terminal, shown to the Operator before "record as agent" (#391). Start is the creation time as a decimal string; Image is the program's path.
@@ -205,5 +211,10 @@ func (p *windowsPTY) TextRefused() (bool, string, error) {
 	}
 	rec, adopted, _ := p.agent.snapshot()
 	refused, why := decideWinText(src, root, rec, adopted)
+	if refused && why == tmux.ReasonChildReads { // once more, in a fresh snapshot, before it stands (Security's #6911 point 5)
+		if again, err := newLiveProcs(); err == nil {
+			refused, why = decideWinText(again, root, rec, adopted)
+		}
+	}
 	return refused, why, nil
 }
