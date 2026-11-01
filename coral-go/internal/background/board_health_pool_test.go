@@ -75,5 +75,5 @@ func TestTheCheckHasALineForAReviewThatWaitedInThePool(t *testing.T) {
 	assert.Contains(t, text, "the review of #")
 	assert.Contains(t, text, "min in the pool; no reviewer covers go")
 	assert.NotContains(t, text, "Change the Go code", "the check holds numbers and areas, never a title")
-	assert.Contains(t, text, "Needs you")
+	assert.Contains(t, text, "act on these")
 }

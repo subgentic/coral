@@ -30,6 +30,11 @@ type WaitEntry struct {
 	Age  time.Duration // how long it has waited
 	// Stale: the awaited party has posted a message mentioning the waiter since the wait began, yet the waiter has not woken.
 	Stale bool
+	// TargetSilent: the awaited member has posted nothing at all since the wait began (a wait on something that is not a member is never silent: nothing can be computed). A wait whose
+	// target has posted is being served and is not listed (#11729).
+	TargetSilent bool
+	Reply        int64  // the waiter's last message number, so the orchestrator can answer it (0: none)
+	Reason       string // what it waits for, a fixed phrase or the task number (#11729), through Name or ShownText
 }
 
 // WaitGroup is the agents waiting on one party.
@@ -54,12 +59,28 @@ type AsleepUnread struct {
 
 // Roster is everything the check says about the agents.
 type Roster struct {
+	legacy    bool   // the check before the action list (#11729), kept for the tests that pin it
 	Recipient string // the recipient's own name, shown as "YOU (<name>)"
 	Counts    map[string]int
 	Claimable int // pending tasks nobody holds, that can be claimed
 	Waits     []WaitGroup
 	Blocked   []BlockedEntry
 	Asleep    []AsleepUnread
+	// Open is each agent's open (not parked) tasks, and Reviews the tasks waiting in review: the overloaded and stale-review rules (#11729).
+	Open    map[string]int
+	Reviews []ReviewAge
+	// NameIssues: members mentions may not reach (#11729 rule 4).
+	NameIssues []NameIssue
+}
+
+// NameIssue is a member that mentions may not reach: its name starts or ends with punctuation (Edge), or no mention has reached it for Window while Posts posts @-addressed a part of its name; Age
+// is how long ago the oldest of those posts was (0 for an Edge issue).
+type NameIssue struct {
+	Name   string // a member name, through Name
+	Edge   bool
+	Posts  int
+	Window time.Duration
+	Age    time.Duration
 }
 
 // Awake is how many agents are awake (every state but asleep and offline).
@@ -105,95 +126,6 @@ func (r *Roster) headerCounts() string {
 	return strings.Join(parts, " · ")
 }
 
-// waitLines: the groups, the recipient's first, then the larger, then by name; each group's waiters longest first.
-func (r *Roster) waitLines() []string {
-	groups := append([]WaitGroup(nil), r.Waits...)
-	sort.SliceStable(groups, func(i, j int) bool {
-		a, b := groups[i], groups[j]
-		if a.You != b.You {
-			return a.You
-		}
-		if len(a.Waiters) != len(b.Waiters) {
-			return len(a.Waiters) > len(b.Waiters)
-		}
-		return a.On < b.On
-	})
-	var lines []string
-	for _, g := range groups {
-		ws := append([]WaitEntry(nil), g.Waiters...)
-		sort.SliceStable(ws, func(i, j int) bool {
-			if ws[i].Age != ws[j].Age {
-				return ws[i].Age > ws[j].Age
-			}
-			return ws[i].Name < ws[j].Name
-		})
-		var parts []string
-		for i, w := range ws {
-			if i == maxWaiters {
-				parts = append(parts, fmt.Sprintf("…+%d more", len(ws)-maxWaiters))
-				break
-			}
-			p := fmt.Sprintf("%s %s", w.Name, shortAge(w.Age))
-			if w.Stale {
-				p += fmt.Sprintf(" (STALE: %s has posted a message mentioning them since the wait started)", staleWho(g))
-			}
-			parts = append(parts, p)
-		}
-		who := g.On
-		if g.You {
-			who = "YOU (" + r.Recipient + ")"
-		}
-		lines = append(lines, fmt.Sprintf("Waiting on %s, %d: %s", who, len(g.Waiters), strings.Join(parts, ", ")))
-	}
-	return lines
-}
-
-func staleWho(g WaitGroup) string {
-	if g.You {
-		return "you"
-	}
-	return g.On
-}
-
-// blockedLine: who is stopped by a usage limit, and when it resets (the CLI's own reset time, as a duration; never its text).
-func (r *Roster) blockedLine() string {
-	if len(r.Blocked) == 0 {
-		return ""
-	}
-	bs := append([]BlockedEntry(nil), r.Blocked...)
-	sort.SliceStable(bs, func(i, j int) bool { return bs[i].Name < bs[j].Name })
-	var parts []string
-	for i, b := range bs {
-		if i == maxWaiters {
-			parts = append(parts, fmt.Sprintf("…+%d more", len(bs)-maxWaiters))
-			break
-		}
-		if b.Resets > 0 {
-			parts = append(parts, fmt.Sprintf("%s (resets in %s)", b.Name, Age(b.Resets)))
-		} else {
-			parts = append(parts, b.Name+" (reset time not shown)")
-		}
-	}
-	return fmt.Sprintf("Blocked by a usage limit, %d: %s. Nothing to nudge: it cannot work until the limit resets or its plan changes.", len(bs), strings.Join(parts, ", "))
-}
-
-func (r *Roster) asleepLine() string {
-	if len(r.Asleep) == 0 {
-		return ""
-	}
-	as := append([]AsleepUnread(nil), r.Asleep...)
-	sort.SliceStable(as, func(i, j int) bool { return as[i].Since.Before(as[j].Since) })
-	var parts []string
-	for i, a := range as {
-		if i == maxWaiters {
-			parts = append(parts, fmt.Sprintf("…+%d more", len(as)-maxWaiters))
-			break
-		}
-		parts = append(parts, fmt.Sprintf("%s (%d tagged since %s)", a.Name, a.Count, a.Since.UTC().Format("15:04")))
-	}
-	return "Asleep with unread tagged messages: " + strings.Join(parts, ", ")
-}
-
 // shortAge is a wait's age as the roster says it ("19m", "1h05m").
 func shortAge(d time.Duration) string {
 	m := int(d.Minutes())
@@ -206,61 +138,13 @@ func shortAge(d time.Duration) string {
 	return fmt.Sprintf("%dh%02dm", m/60, m%60)
 }
 
-// ComposeLines writes the check as a header line and a short list of lines, in priority order (the first is the header). Compose is
-// the same text on one line, which is how it is typed: a newline would be an Enter in the agent's terminal.
+// ComposeLines writes the check as the action list (actions.go): a header line, the lines for the orchestrator, what is for the Operator, the counts last. Compose is the same text on one
+// line, which is how it is typed: a newline would be an Enter in the agent's terminal.
 func ComposeLines(in CheckInput) []string {
 	if in.Roster == nil {
 		return []string{Compose(in)}
 	}
-	r := in.Roster
-	var lines []string
-	lines = append(lines, fmt.Sprintf("[Coral health check] %s · %s", in.Now.UTC().Format("15:04Z"), r.headerCounts()))
-	lines = append(lines, r.waitLines()...)
-	if l := r.blockedLine(); l != "" {
-		lines = append(lines, l)
-	}
-	if l := r.asleepLine(); l != "" {
-		lines = append(lines, l)
-	}
-	items := append([]Item(nil), in.Items...)
-	sort.SliceStable(items, func(i, j int) bool { return items[i].Rank < items[j].Rank })
-	itemLines := itemTexts(items)
-	if len(itemLines) > 0 {
-		lines = append(lines, fmt.Sprintf("Needs you, %d: %s", len(itemLines), strings.Join(itemLines, " ")))
-	}
-	if len(in.Questions) > 0 {
-		lines = append(lines, questionsLine(in))
-	}
-	if g := goalsLine(in.Goals); g != "" {
-		lines = append(lines, g) // the open goals and what the operator has to do about them (#11412)
-	}
-	hintAt := len(lines) // the hint goes before the progress line
-	progressed := in.Progress.Completed+in.Progress.Reviewed+in.Progress.Posts > 0
-	since := in.Progress.Since.Format("15:04")
-	switch {
-	case !progressed:
-		lines = append(lines, fmt.Sprintf("No progress since the last check (%s)%s.", since, parkedNote(in)))
-	default:
-		lines = append(lines, fmt.Sprintf("Since %s: %s%s.", since, progressPhrase(in.Progress), parkedNote(in)))
-	}
-	switch {
-	case r.AllWorking() && len(in.Items) == 0 && len(in.Questions) == 0:
-		who := fmt.Sprintf("All %d awake agents are working.", r.Awake())
-		if r.Awake() == 1 {
-			who = "The 1 awake agent is working."
-		}
-		lines = append(lines, who+" "+nothingNeedsYou(in))
-	case !r.NeedsAttention() && len(in.Items) == 0 && len(in.Questions) == 0:
-		lines = append(lines, nothingNeedsYou(in))
-	}
-	// The peek hint is a pointer, not a fact: it is left out first when the check would not fit (the other lines then drop as before).
-	if hint := in.peekLine(items); hint != "" {
-		withHint := append(append(append([]string(nil), lines[:hintAt]...), hint), lines[hintAt:]...)
-		if len(strings.Join(withHint, " • ")) <= MaxCheck {
-			return withHint
-		}
-	}
-	return fitLines(lines)
+	return composeActionList(in)
 }
 
 // peekLine is the line that tells the orchestrator how to see why an agent is idle, waiting or stuck: its terminal, with coral-board peek. It names
@@ -315,21 +199,6 @@ func (in CheckInput) peekLine(items []Item) string {
 	return fmt.Sprintf(`To see why, read their terminal: coral-board peek "%s" --lines 30.`, name)
 }
 
-// fitLines keeps the check within MaxCheck: the header stays, and lines from the end are left out first, counted.
-func fitLines(lines []string) []string {
-	joined := func(ls []string) string { return strings.Join(ls, " • ") }
-	if len(joined(lines)) <= MaxCheck {
-		return lines
-	}
-	for keep := len(lines) - 1; keep >= 1; keep-- {
-		out := append(append([]string(nil), lines[:keep]...), fmt.Sprintf("(%d more lines not shown.)", len(lines)-keep))
-		if len(joined(out)) <= MaxCheck {
-			return out
-		}
-	}
-	return []string{strings.ToValidUTF8(lines[0][:min(len(lines[0]), MaxCheck)], "")}
-}
-
 // roster check: Compose's one-line form.
 // nothingNeedsYou is the roster check's all-clear: not "Nothing needs you" while a goal needs the operator (#11412).
 func nothingNeedsYou(in CheckInput) string {
@@ -382,6 +251,9 @@ func (r *Roster) Facts() []string {
 	}
 	for _, b := range r.Blocked {
 		out = append(out, "b:"+b.Name)
+	}
+	for _, ni := range r.NameIssues {
+		out = append(out, fmt.Sprintf("n:%s/%t/%d", ni.Name, ni.Edge, ni.Posts)) // a new one is news; its age ticking is not (#11729)
 	}
 	for _, a := range r.Asleep {
 		out = append(out, fmt.Sprintf("s:%s=%d", a.Name, a.Count))
