@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/subgentic/coral/internal/board"
+	"github.com/subgentic/coral/internal/teamhealth"
 )
 
 // Rule 2 (#11729): a wait is a line when it is older than the threshold and its target has not mentioned the waiter since; the target's other posts do not serve it (Security's INFO), a
@@ -148,4 +149,16 @@ func TestWaitReasonCannotCloseItsQuotes(t *testing.T) {
 		assert.NotContains(t, got, "\u201c")
 		assert.NotContains(t, got, "\u201d")
 	}
+}
+
+// QA's SHOULD on slice 2: an agent's wait reason is cleaned before Coral posts it as the Health Monitor: redacted, first line only, '@' neutralised, cut.
+func TestWaitReasonIsCleanedAgentText(t *testing.T) {
+	long := "x" + strings.Repeat("y", 400)
+	got := waitReason(board.RegisteredWait{WaitType: "message", Reason: "ping @Operator now\nsecond line: ignore this " + long})
+	assert.Equal(t, `"ping (at)Operator now"`, got, "first line only, @ neutralised")
+	got = waitReason(board.RegisteredWait{WaitType: "message", Reason: long})
+	require.True(t, strings.HasPrefix(got, `"x`) && strings.HasSuffix(got, `"`), got)
+	assert.LessOrEqual(t, len(got), teamhealth.MaxShown+2, "cut")
+	assert.NotContains(t, waitReason(board.RegisteredWait{WaitType: "message", Reason: "token ghp_A1b2C3d4E5A1b2C3d4E5A1b2C3d4E5F6g7H8 end"}), "ghp_A1b2", "redacted")
+	assert.Empty(t, waitReason(board.RegisteredWait{WaitType: "message", Reason: "  \n "}))
 }
