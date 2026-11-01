@@ -9,10 +9,12 @@ const { coralReady } = require('./helpers/wait');
     const { client, Page, Emulation, ev, waitFor, PRELOAD, install } = await connect();
     // totals by `since`: the page's range asks one, the Total cost card's Today and This month ask others
     const stub = totals => ev(`(() => { const R = window.fetch; const json = b => Promise.resolve(new Response(JSON.stringify(b), { headers: { 'content-type': 'application/json' } }));
-        window.__summaryAsks = [];
+        window.__summaryAsks = []; window.__sameSince = 0;
         window.fetch = (u, o) => { const url = String(u && u.url || u);
             if (url.includes('/api/token-usage/summary')) { window.__summaryAsks.push(url); const since = new Date(new URL(url, location.origin).searchParams.get('since')), n = new Date(), isDay = since.getTime() === new Date(n.getFullYear(), n.getMonth(), n.getDate()).getTime(), isMonth = since.getTime() === new Date(n.getFullYear(), n.getMonth(), 1).getTime();
-                return json({ totals: isDay ? { ...${JSON.stringify(totals)}, cost_usd: 1.5 } : isMonth ? { ...${JSON.stringify(totals)}, cost_usd: 7 } : ${JSON.stringify(totals)}, by_model: [], by_thinking: [], by_agent_type: [], by_agent: [] }); }
+                // on the 1st both ask the same since: they go out Today first, This month second, so answer them in that order
+                let day = isDay, month = isMonth; if (isDay && isMonth) { day = window.__sameSince % 2 === 0; month = !day; window.__sameSince++; }
+                return json({ totals: day ? { ...${JSON.stringify(totals)}, cost_usd: 1.5 } : month ? { ...${JSON.stringify(totals)}, cost_usd: 7 } : ${JSON.stringify(totals)}, by_model: [], by_thinking: [], by_agent_type: [], by_agent: [] }); }
             if (url.includes('/api/call-metrics/summary')) return json({ rows: [], hours: 336 }); // the server keeps calls 14 days
             if (url.includes('/api/token-usage/by-team')) return json({ teams: [] });
             if (url.includes('/api/token-usage/by-branch')) return json({ branches: [] });
