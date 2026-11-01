@@ -18,11 +18,12 @@ type Rules struct {
 	Overloaded  int           // more open tasks than this on one agent ... (default 5)
 	Sleeping    int           // ... while at least this many agents sleep (default 1)
 	StaleReview time.Duration // a task in review this long (default 24 h)
+	Mention     time.Duration // the window of the mentions-not-reaching rule (default 30 min); the roster builder reads it
 }
 
 // DefaultRules are coral-hub's proposed defaults.
 func DefaultRules() Rules {
-	return Rules{StuckWait: 10 * time.Minute, Overloaded: 5, Sleeping: 1, StaleReview: 24 * time.Hour}
+	return Rules{StuckWait: 10 * time.Minute, Overloaded: 5, Sleeping: 1, StaleReview: 24 * time.Hour, Mention: 30 * time.Minute}
 }
 
 func (r Rules) withDefaults() Rules {
@@ -38,6 +39,9 @@ func (r Rules) withDefaults() Rules {
 	}
 	if r.StaleReview <= 0 {
 		r.StaleReview = d.StaleReview
+	}
+	if r.Mention <= 0 {
+		r.Mention = d.Mention
 	}
 	return r
 }
@@ -144,6 +148,13 @@ func (in CheckInput) actions(items []Item) []action {
 		if rv.Age > rules.StaleReview {
 			out = append(out, action{age: rv.Age, text: fmt.Sprintf("Task #%d has been in review with %s for %s. Ask %s, or give the review to someone else.", rv.Task, rv.With, age(rv.Age), rv.With)})
 		}
+	}
+	for _, ni := range r.NameIssues {
+		if ni.Edge {
+			out = append(out, action{rank: 4, text: ni.Name + ": its name starts or ends with punctuation, so mentions may not reach it. Check its name."})
+			continue
+		}
+		out = append(out, action{age: ni.Age, text: fmt.Sprintf("%s: no mention has reached it in %s while %s a part of its name. Check its name (rename it, or tell the senders the full name).", ni.Name, age(ni.Window), plural(ni.Posts, "post addresses", "posts address"))})
 	}
 	sort.SliceStable(out, func(i, j int) bool {
 		a, b := out[i], out[j]

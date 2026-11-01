@@ -197,6 +197,7 @@ type HealthActionList struct {
 	OverloadedTasks    int `json:"overloaded_tasks"`
 	OverloadedSleeping int `json:"overloaded_sleeping"`
 	StaleReviewHours   int `json:"stale_review_hours"`
+	MentionMin         int `json:"mention_min"` // no mention has reached a member for this long while posts @-address a part of its name (default 30)
 }
 
 func (a HealthActionList) clamp() HealthActionList {
@@ -210,6 +211,7 @@ func (a HealthActionList) clamp() HealthActionList {
 	a.OverloadedTasks = pick(a.OverloadedTasks, 5, 1, 100)
 	a.OverloadedSleeping = pick(a.OverloadedSleeping, 1, 1, 50)
 	a.StaleReviewHours = pick(a.StaleReviewHours, 24, 1, 720)
+	a.MentionMin = pick(a.MentionMin, 30, 5, 1440)
 	return a
 }
 
@@ -234,7 +236,7 @@ func DefaultHealthSettings() HealthSettings {
 		UploadNoTask:   HealthRuleOn{On: true},
 		GoalSize:       HealthGoalSize{On: true, Limit: 15},
 		AskReminder:    HealthMentionNudge{On: true, AfterMin: 15},
-		ActionList:     HealthActionList{StuckWaitMin: 10, OverloadedTasks: 5, OverloadedSleeping: 1, StaleReviewHours: 24},
+		ActionList:     HealthActionList{StuckWaitMin: 10, OverloadedTasks: 5, OverloadedSleeping: 1, StaleReviewHours: 24, MentionMin: 30},
 		Landing:        HealthLanding{On: false, Branch: "main", WaitMin: 120},
 		Release:        HealthRelease{On: false, Branch: "main", TagPattern: "v*", WaitMin: 1440},
 		GoalsReady:     HealthWaitCheck{On: true, WaitMin: GoalsReadyWaitMin},
