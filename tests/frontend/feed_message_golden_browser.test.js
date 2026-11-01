@@ -51,6 +51,7 @@ const STEPS = [
         await Emulation.setDeviceMetricsOverride({ width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
         await Page.navigate({ url: BASE }); await Page.loadEventFired(); await install();
         await coralReady(ev, 'startup', 'liveList', 'settings');
+        await waitFor(`!!document.querySelector('.top-nav-tab[aria-current="page"]')`, 'the start tab is marked (startNav marks it after the first paint, #11612: a slow page is still without one)', 20000); // the step after the start reads the page: wait for the start to be done, not for a moment that a fast machine reaches first
         await ev(`(async () => {
             const st = window.__coralStatic || '/static/';
             const T = window.T = { state: (await import(st + 'state.js')).state, ws: await import(st + 'websocket.js') };
@@ -69,7 +70,7 @@ const STEPS = [
                 header: [(q('session-name') || {}).textContent, (q('terminal-header-label') || {}).textContent, (q('command-input') || {}).placeholder].join(' | '),
                 current: cs ? [cs.name, cs.session_id, cs.tmux_session, cs.display_name, cs.summary].join('/') : null,
                 toasts: [...document.querySelectorAll('[class*="toast"]')].map(e => e.textContent.replace(/\\s+/g, ' ').trim()).filter(Boolean).join(' || '),
-                calls: window.__calls.join(' ; '), sched: window.__sched, prevWaiting: JSON.stringify(Object.fromEntries(Object.entries(T.state.prevWaitingState || {}).sort())) }; })()`;
+                calls: window.__calls.join(' ; '), sched: window.__sched > 0 /* whether a sidebar render was scheduled: not how many frames the page asked for in the window, which follows how much of its own start is still running (a slow CI runner counted more than a Mac, #11612) */, prevWaiting: JSON.stringify(Object.fromEntries(Object.entries(T.state.prevWaitingState || {}).sort())) }; })()`;
         for (const [name, msg, setup] of STEPS) {
             await ev(`window.__calls.length = 0; window.__sched = 0; document.querySelectorAll('[class*="toast"]').forEach(e => e.remove()); ${setup || ''} T.ws.handleCoralMessage(${JSON.stringify(msg)}); true`);
             await ev(`new Promise(r => setTimeout(r, 80))`); // sleep-ok: a resync and the toasts land over a few frames; there is no completion event
