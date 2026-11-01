@@ -14,7 +14,7 @@ import (
 
 // What a process's standard input is (consoleReaderBelow): read from the process's own parameters (its PEB's RTL_USER_PROCESS_PARAMETERS.StandardInput), the handle duplicated into this
 // process, then its file type and, for a character device, whether it is a console handle (GetConsoleMode succeeds only on one). Anything that cannot be read or told apart is
-// stdinUnreadable, which counts as reading the console. A 32-bit process (its parameters have another layout) is not read and so counts as one too.
+// stdinUnreadable, which counts as reading the console. A 32-bit process is read from its own 32-bit parameter block (stdin32).
 //
 // Never a call that waits on the handle: the object's name (NtQueryObject) is not asked, because on a console handle another process is reading from (a cmd at its prompt, in
 // ReadConsole) it does not return until that read ends. GetFileType and GetConsoleMode answer at once. And no caller waits on a probe for long: each runs on a worker, at most
@@ -200,30 +200,69 @@ func probeStdin(pid int) stdinKind {
 	}
 	defer windows.CloseHandle(h)
 	var wow bool
-	if err := windows.IsWow64Process(h, &wow); err != nil || wow {
+	if err := windows.IsWow64Process(h, &wow); err != nil {
 		return stdinUnreadable
 	}
-	var pbi windows.PROCESS_BASIC_INFORMATION
-	if err := windows.NtQueryInformationProcess(h, windows.ProcessBasicInformation, unsafe.Pointer(&pbi), uint32(unsafe.Sizeof(pbi)), nil); err != nil || pbi.PebBaseAddress == nil {
+	var in windows.Handle
+	var ok bool
+	if wow {
+		in, ok = stdin32(h) // a 32-bit process (git-credential-manager is one): its own 32-bit block
+	} else {
+		in, ok = stdin64(h)
+	}
+	if !ok {
 		return stdinUnreadable
 	}
-	var peb windows.PEB
-	if !readProcess(h, uintptr(unsafe.Pointer(pbi.PebBaseAddress)), unsafe.Pointer(&peb), unsafe.Sizeof(peb)) || peb.ProcessParameters == nil {
-		return stdinUnreadable
-	}
-	var params windows.RTL_USER_PROCESS_PARAMETERS
-	if !readProcess(h, uintptr(unsafe.Pointer(peb.ProcessParameters)), unsafe.Pointer(&params), unsafe.Sizeof(params)) {
-		return stdinUnreadable
-	}
-	if params.StandardInput == 0 {
+	if in == 0 {
 		return stdinNotConsole // no standard input at all
 	}
 	var dup windows.Handle
-	if err := windows.DuplicateHandle(h, params.StandardInput, windows.CurrentProcess(), &dup, 0, false, windows.DUPLICATE_SAME_ACCESS); err != nil {
+	if err := windows.DuplicateHandle(h, in, windows.CurrentProcess(), &dup, 0, false, windows.DUPLICATE_SAME_ACCESS); err != nil {
 		return stdinUnreadable
 	}
 	defer windows.CloseHandle(dup)
 	return classifyStdin(dup)
+}
+
+// stdin64 is a 64-bit process's standard input handle, from its PEB's RTL_USER_PROCESS_PARAMETERS.
+func stdin64(h windows.Handle) (windows.Handle, bool) {
+	var pbi windows.PROCESS_BASIC_INFORMATION
+	if err := windows.NtQueryInformationProcess(h, windows.ProcessBasicInformation, unsafe.Pointer(&pbi), uint32(unsafe.Sizeof(pbi)), nil); err != nil || pbi.PebBaseAddress == nil {
+		return 0, false
+	}
+	var peb windows.PEB
+	if !readProcess(h, uintptr(unsafe.Pointer(pbi.PebBaseAddress)), unsafe.Pointer(&peb), unsafe.Sizeof(peb)) || peb.ProcessParameters == nil {
+		return 0, false
+	}
+	var params windows.RTL_USER_PROCESS_PARAMETERS
+	if !readProcess(h, uintptr(unsafe.Pointer(peb.ProcessParameters)), unsafe.Pointer(&params), unsafe.Sizeof(params)) {
+		return 0, false
+	}
+	return params.StandardInput, true
+}
+
+// The 32-bit layouts a WoW64 process keeps its parameters in: PEB32.ProcessParameters at 0x10, and in RTL_USER_PROCESS_PARAMETERS32 (MaximumLength, Length, Flags, DebugFlags,
+// ConsoleHandle, ConsoleFlags, then the standard handles) StandardInput at 0x18. Each is a 32-bit value.
+const (
+	peb32ProcessParameters = 0x10
+	params32StandardInput  = 0x18
+)
+
+// stdin32 is a 32-bit (WoW64) process's standard input handle, from its own 32-bit PEB (ProcessWow64Information gives its address) and RTL_USER_PROCESS_PARAMETERS32.
+func stdin32(h windows.Handle) (windows.Handle, bool) {
+	var peb32 uintptr
+	if err := windows.NtQueryInformationProcess(h, windows.ProcessWow64Information, unsafe.Pointer(&peb32), uint32(unsafe.Sizeof(peb32)), nil); err != nil || peb32 == 0 {
+		return 0, false
+	}
+	var params32 uint32
+	if !readProcess(h, peb32+peb32ProcessParameters, unsafe.Pointer(&params32), unsafe.Sizeof(params32)) || params32 == 0 {
+		return 0, false
+	}
+	var in uint32
+	if !readProcess(h, uintptr(params32)+params32StandardInput, unsafe.Pointer(&in), unsafe.Sizeof(in)) {
+		return 0, false
+	}
+	return windows.Handle(in), true
 }
 
 // probeOpenHook, when set, answers for the probe's OpenProcess first: an error is what the open would have failed with (a test's access denied).

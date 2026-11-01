@@ -5,6 +5,7 @@ package ptymanager
 import (
 	"bytes"
 	"os"
+	"path/filepath"
 	"runtime"
 	"testing"
 	"time"
@@ -252,4 +253,48 @@ func TestALiveChildThatCannotBeOpenedIsAReader(t *testing.T) {
 	src, err = newLiveProcs()
 	require.NoError(t, err)
 	assert.Equal(t, stdinNotConsole, src.stdin(child, func() int64 { s, _ := processStart(child); return s }()), "the same child, opened: a pipe")
+}
+
+// A 32-bit process (git-credential-manager is one) is judged by its real standard input, read from its own 32-bit block: Windows' own 32-bit cmd with a pipe, or NUL, is not a reader.
+func TestA32BitProcessIsJudgedByItsRealStandardInput(t *testing.T) {
+	cmd32 := filepath.Join(os.Getenv("SystemRoot"), "SysWOW64", "cmd.exe")
+	if _, err := os.Stat(cmd32); err != nil {
+		t.Skipf("no 32-bit cmd on this Windows: %v", err)
+	}
+	for name, withPipe := range map[string]bool{"a pipe": true, "NUL": false} {
+		t.Run(name, func(t *testing.T) {
+			cmd := consoletest.HiddenCommand(cmd32, "/c", "ping -n 30 127.0.0.1 >nul")
+			if withPipe {
+				cmd.Stdin = bytes.NewReader(nil)
+			}
+			require.NoError(t, cmd.Start())
+			t.Cleanup(func() { _ = cmd.Process.Kill(); _ = cmd.Wait() })
+			h, err := windows.OpenProcess(windows.PROCESS_QUERY_LIMITED_INFORMATION, false, uint32(cmd.Process.Pid))
+			require.NoError(t, err)
+			var wow bool
+			require.NoError(t, windows.IsWow64Process(h, &wow))
+			windows.CloseHandle(h)
+			require.True(t, wow, "the test's process is a 32-bit one")
+			var got stdinKind
+			assert.Eventually(t, func() bool { got = probeStdin(cmd.Process.Pid); return got == stdinNotConsole }, 5*time.Second, 50*time.Millisecond, "got %v", got)
+		})
+	}
+}
+
+// The console case for a 32-bit process: a terminal whose shell is the 32-bit cmd reads the console.
+func TestA32BitShellOnTheConsoleIsAReader(t *testing.T) {
+	cmd32 := filepath.Join(os.Getenv("SystemRoot"), "SysWOW64", "cmd.exe")
+	if _, err := os.Stat(cmd32); err != nil {
+		t.Skipf("no 32-bit cmd on this Windows: %v", err)
+	}
+	naming.SetDefaultLogDir(t.TempDir())
+	b := NewPTYBackend()
+	t.Cleanup(func() { _ = b.Close() })
+	name := "claude-0425-cmd32"
+	require.NoError(t, b.Spawn(name, "claude", t.TempDir(), "0425", `"`+cmd32+`" /d /q`, 120, 40))
+	b.mu.RLock()
+	pid := b.sessions[name].proc.(*windowsPTY).cpty.Pid()
+	b.mu.RUnlock()
+	var got stdinKind
+	assert.Eventually(t, func() bool { got = probeStdin(pid); return got == stdinConsole }, 10*time.Second, 100*time.Millisecond, "got %v", got)
 }
