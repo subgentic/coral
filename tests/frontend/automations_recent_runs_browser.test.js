@@ -110,12 +110,15 @@ const STUB = `(() => {
             await ev(`history.back(); true`);
             await waitFor(`!!document.querySelector('.inbox-runs-finished') && document.querySelectorAll('#group-table-view tbody tr[data-key]').length === 2`, `${at}back in Needs you`, 8000);
             await installGuard(ev); // a dismissal sends nothing to an agent (the operator's rule, #11552)
-            await ev(`document.querySelector('#group-table-view button[aria-label^="Ignore the failed run of nightly-build-job"]').click(); true`);
+            // a phone's row has no button (#11671): Ignore is in the row's three-dot menu (or a swipe), and a tap on the row opens it
+            if (mobile) await ev(`document.querySelector('#group-table-view button.menu-item[aria-label^="Ignore: nightly-build-job"]').click(); true`);
+            else await ev(`document.querySelector('#group-table-view button[aria-label^="Ignore the failed run of nightly-build-job"]').click(); true`);
             await waitFor(`document.querySelectorAll('#group-table-view tbody tr[data-key]').length === 1`, `${at}Ignore takes the run out`, 8000);
             assert.deepEqual(await reached(ev), [], `${at}Ignore sent nothing to an agent`);
             assert.equal(await ev(`document.getElementById('nav-tab-hub-inbox-badge').textContent`), '1', `${at}and the badge goes down`);
             assert.equal(await pathname().then(p => /^\/automations\//.test(p)), false, `${at}Ignore does not open the run`);
-            await ev(`document.querySelector('#group-table-view button[aria-label^="Open nightly-build, failed run"]').click(); true`);
+            if (mobile) await ev(`document.querySelector('#group-table-view button[aria-label^="Open nightly-build, failed run"]').closest('tr').click(); true`);
+            else await ev(`document.querySelector('#group-table-view button[aria-label^="Open nightly-build, failed run"]').click(); true`);
             await waitFor(`location.pathname === '/automations/workflows/7/runs/202'`, `${at}Open goes to the workflow's run page`, 8000);
             assert.equal(await ev(`document.getElementById('nav-tab-hub-inbox-badge').hidden`), true, `${at}and the badge is gone: nothing needs you`);
 
