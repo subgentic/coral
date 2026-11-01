@@ -116,7 +116,7 @@
     body.keyboard-open .ac-title { display: none; }
     body.keyboard-open .ac-showresolved { order: 1; flex: 1 1 0; }
     body.keyboard-open .ac-sheet-close { order: 2; }
-    .ac-panel .ac-showresolved, .ac-panel .ac-replybox, .ac-panel .ac-resolve, .ac-panel .ac-act, .ac-panel .ac-jump, .ac-whole, .ac-lock, .ac-cancel, .ac-send, .ac-add-image, .ac-thumb-remove, .ac-ask-label, .ac-ask-go { min-height: 44px; }
+    .ac-panel .ac-showresolved, .ac-panel .ac-replybox, .ac-panel .ac-resolve, .ac-panel .ac-act, .ac-panel .ac-jump, .ac-whole, .ac-lock, .ac-cancel, .ac-send, .ac-add-image, .ac-thumb-remove, .ac-thumb-markup, .ac-ask-label, .ac-ask-go { min-height: 44px; }
     .ac-panel .ac-resolve { padding: 0 14px; }
     .ac-act, .ac-jump { padding: 2px 12px; }
 }

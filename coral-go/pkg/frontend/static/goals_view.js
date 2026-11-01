@@ -243,8 +243,8 @@ export function openCreate(opts = {}) {
         dr.disabled = false;
     }).catch(() => { if (asked !== project) return; dr.replaceChildren(new Option('No driver yet', '')); dr.disabled = false; where.textContent += '. This board\'s agents could not be read, so no driver is set.'; }); };
     loadDrivers();
-    const uploadImage = async blob => { // a team route: the picture is stored before the goal exists, on the team the goal is for
-        const r = await boardFetch(project, '/goal-images', { method: 'POST', headers: { 'Content-Type': blob.type }, body: blob });
+    const uploadImage = async (blob, versionOf) => { // a team route: the picture is stored before the goal exists, on the team the goal is for
+        const r = await boardFetch(project, `/goal-images${versionOf ? `?version_of=${encodeURIComponent(versionOf)}` : ''}`, { method: 'POST', headers: { 'Content-Type': blob.type }, body: blob });
         let j = {}; try { j = await r.json(); } catch { /* an answer that is not JSON has no reason */ }
         if (!r.ok || !/^[0-9a-f]{64}$/.test(String(j.hex || ''))) throw new Error((j && typeof j.error === 'string' && j.error) || `The picture was not stored (HTTP ${r.status}).`);
         return { hex: j.hex, name: String(j.name || ''), contentType: String(j.content_type || blob.type), size: Number(j.size) || blob.size };
