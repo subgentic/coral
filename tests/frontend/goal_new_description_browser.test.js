@@ -22,7 +22,7 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
             const url = String(u), method = (o && o.method) || 'GET';
             if (url.includes('/api/board/${B}/goal-images')) {
                 const ct = o && o.headers && o.headers['Content-Type'];
-                window.__up.push({ method, ct, size: o && o.body && o.body.size });
+                window.__up.push({ method, url, ct, size: o && o.body && o.body.size });
                 if (window.__fail) return json({ error: 'That picture is too large.' }, 413);
                 const hex = 'e'.repeat(63) + (++window.__n).toString(16);
                 return json({ hex, name: 'picture-' + window.__n + '.png', content_type: ct, size: (o.body && o.body.size) || 0 }, 201);
@@ -88,6 +88,14 @@ const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwA
             await ev(`(() => { const f = document.querySelector('.goals-dialog form'); f.dispatchEvent(new DragEvent('dragover', { dataTransfer: window.__dt([window.__file('dropped.webp', 'image/webp')]), bubbles: true, cancelable: true })); f.dispatchEvent(new DragEvent('drop', { dataTransfer: window.__dt([window.__file('dropped.webp', 'image/webp')]), bubbles: true, cancelable: true })); return true; })()`);
             await waitFor(`document.querySelectorAll('.goals-dialog .ac-thumb-img').length === 3`, at + 'a dropped picture', 5000); await settled();
             assert.deepEqual(await ev(`window.__up.map(x => x.ct)`), ['image/png', 'image/png', 'image/webp'], at + 'each went up raw with its type');
+            // Mark up (#11654): the first picture's marked copy goes up with version_of=<its hex> and takes its place; the editor says the original is kept
+            await ev(`document.querySelector('.goals-dialog .ac-thumb-markup').click(); true`);
+            await waitFor(`!!document.querySelector('dialog.markup-dialog[open]')`, at + 'the editor opens', 8000);
+            assert.match(await ev(`document.querySelector('.markup-kept').textContent`), /^The original is kept as an earlier version/, at + 'the kept-original line');
+            await ev(`(() => { const c = document.querySelector('.markup-canvas'), p = (type, x) => c.dispatchEvent(new PointerEvent(type, { pointerId: 1, pointerType: 'touch', clientX: x, clientY: 0, bubbles: true, cancelable: true })); p('pointerdown', 0); p('pointermove', 1); p('pointerup', 1); [...document.querySelectorAll('.markup-foot button')].find(b => b.textContent === 'Done').click(); return true; })()`);
+            await waitFor(`window.__up.length === 4`, at + 'the marked upload', 5000); await settled();
+            assert.match(await ev(`window.__up[3].url`), /\/goal-images\?version_of=e{63}1$/, at + 'goal-images with version_of the first picture');
+            assert.equal(await ev(`document.querySelectorAll('.goals-dialog .ac-thumb-img').length`), 3, at + 'still three pictures');
             // a failed one blocks Create until it is removed
             await ev(`window.__fail = true; true`);
             await pick([['toolarge.png', 'image/png']]);
