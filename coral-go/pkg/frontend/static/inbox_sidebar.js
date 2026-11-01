@@ -511,9 +511,16 @@ function renderInboxNav(force = false) {
     const pageList = page && $('inbox-page')?.querySelector('[data-view-list="inbox-goal-folders"], [data-view-list="inbox-item-folders"]'); // an opened item's own folder list (a phone's select) follows the counts too: it was drawn once, with the counts of that moment (#8681)
     if (pageList) VL.update(pageList, { sections, current: here });
     setHidden(document.querySelector('.sidebar-header[data-header="hub-inbox"] [data-group-toggle]'), true); // folders do not fold: the collapse-all button has nothing to fold
+    syncLeadStrip(sections, here);
     refreshGroupTable('hub-inbox');
 }
 
+// The folder strip's COUNTS are not in the signature that rebuilds a phone's table (the lead's signature below): they are written into the strip where it is (syncLeadStrip), so a count that arrives does not draw the rows again (#11692).
+/** The folder strip a phone's table carries on top of its rows follows the counts where it is, instead of the table being drawn again for it (#11692). */
+function syncLeadStrip(sections, here) {
+    const strip = $('group-table-view')?.querySelector('[data-view-list="inbox-folders-page"]');
+    if (strip) VL.update(strip, { sections, current: here });
+}
 /** A count arrived (the Artifacts folder's): the folder list and an open item's own list follow it, and nothing else is drawn. The table on screen is not touched: renderInboxNav ends by drawing it again, and for the Artifacts folder that
  *  emptied the list and built it a second time within a few milliseconds when the count came in (#11692: a visible flash, and a click that landed between the two). The folder going away (a grantee) still takes the full draw. */
 function renderFolderCounts() {
@@ -521,6 +528,7 @@ function renderFolderCounts() {
     if (!list || !_folders || !list.contains(_folders) || (group === 'artifacts' && nativeInbox() && IA.artifactsOwnerOnly())) { renderInboxNav(true); return; }
     const here = navCurrent(), sections = folderSections();
     VL.update(_folders, { sections, current: here });
+    syncLeadStrip(sections, here);
     const pageList = page && $('inbox-page')?.querySelector('[data-view-list="inbox-goal-folders"], [data-view-list="inbox-item-folders"]');
     if (pageList) VL.update(pageList, { sections, current: here });
 }
@@ -749,7 +757,7 @@ registerGroupSource('hub-inbox', {
         if (key === 'saved') return savedListSpec();
         return null;
     },
-    lead: () => { const here = navCurrent(), sections = folderSections(); return { signature: JSON.stringify([here, sections]), node: () => VL.build({ id: 'inbox-folders-page', label: 'Inbox views', sections, current: here, onPick: pickFolder, drawer: true, tabs: true }) }; }, // a phone: the folders are one select on top of the table
+    lead: () => { const here = navCurrent(), sections = folderSections(); return { signature: JSON.stringify([here, sections.map(sec => [sec.title, sec.items.map(i => i.key)])]), node: () => VL.build({ id: 'inbox-folders-page', label: 'Inbox views', sections, current: here, onPick: pickFolder, drawer: true, tabs: true }) }; }, // a phone: the folders are one select on top of the table
     isEmpty: () => false, // the tab opens its group's table itself (showInbox)
     showList: () => { closePage(false); window.switchNavTab?.('hub-inbox'); },
     empty: () => { closePage(false); window.switchNavTab?.('hub-inbox'); },

@@ -39,6 +39,10 @@ const STUB = `(() => {
             // the count is read and told to the sidebar (its callback runs as the number is set); on a phone the folder list is a select, so what is checked is the number the module holds and, below, the table
             assert.equal(await ev(`import(${S} + 'inbox_artifacts.js').then(m => m.refreshArtifactCount().then(() => m.artifactCount()))`), 77, at + 'the new count arrived');
             await new Promise(r => setTimeout(r, 400)); // sleep-ok: a redraw the count caused would have happened by now
+            // and the next ordinary redraw of the Inbox (a chat count, the 30 s poll: here the badge's own update) draws the rows no more than the count did: on a phone the folder strip on top of the table has the counts
+            // too, and they were part of what told the page to rebuild, so the rows were drawn again a moment later, when something else redrew the Inbox
+            await ev(`import(${S} + 'inbox_tab.js').then(m => { m.updateInboxTab(); return true; })`);
+            await new Promise(r => setTimeout(r, 400)); // sleep-ok: a redraw that follows would have happened by now
             const r = await ev(`(() => { const host = document.getElementById('group-table-view'); return { same: host.querySelector('tbody tr') === window.__row0, n: host.querySelectorAll('tbody tr').length, n0: window.__n0, changes: window.__changes }; })()`);
             assert.ok(r.same, at + 'the first row is the same element: the table was not built again: ' + JSON.stringify(r));
             assert.equal(r.changes, 0, at + 'nothing was added to or taken from the table when the count arrived: ' + JSON.stringify(r));
