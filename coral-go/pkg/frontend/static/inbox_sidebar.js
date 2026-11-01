@@ -738,6 +738,13 @@ async function openDockSavedSheet(id, opener) {
     });
 }
 
+/** Needs you, narrowed to one goal's rows (a goal page's "Review them", #11885): the page's own Goal filter, set to the goal's title. */
+export function showNeedsForGoal(title) {
+    needsFilters = NF.clean({ ...NF.EMPTY, goal: String(title || '') }); NF.saveFilters(needsFilters); queries.needs = '';
+    const input = $('inbox-search'); if (input && group === 'needs') input.value = '';
+    renderInboxNav(true);
+}
+
 /** The dock's Saved tab (#saved-table, saved.js render): the same table for the page's scope, drawn into the dock; the keyboard stays on the control it was on when it is still there. */
 export function drawDockSaved(host) {
     const held = host.contains(document.activeElement) ? document.activeElement : null;

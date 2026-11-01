@@ -149,6 +149,8 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
         copyBtn.title = 'Copies a line to paste to an agent: it runs coral-board goal brief for this goal';
         line.append(copyBtn);
         main.append(line);
+        const waitNote = el('p', 'goals-note goal-reviews-waiting'); waitNote.hidden = true; main.append(waitNote); // files for review on this goal that were never answered (Beta #11837 G): said while any wait, whatever the goal's state
+        waitingReviews(g).then(list => { if (!list.length || !waitNote.isConnected) return; waitNote.append(document.createTextNode(`${W.waitingReviewsLine(list.length)} `), btn('btn btn-quiet btn-small goal-reviews-link', 'Review them', () => showNeeds(g))); waitNote.hidden = false; }).catch(() => {});
         if (g.outcome || g.doneWhen || g.images.length) {
             const dl = el('dl', 'facts goals-facts');
             if (g.outcome) dl.append(el('dt', null, 'Description'), linkedDd(g.outcome)); // the outcome field, which the New goal form's Description fills (#11653)
@@ -365,6 +367,21 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
 
     // ── closing and reopening (#7272, UI/UX's #7270) ─────
 
+    /** The files for review on this goal that no one has decided (still in Needs you, read ones too): D and G of Beta #11837, a goal can be closed or read Done with its files never answered. */
+    let reviewsReadAt = 0;
+    async function waitingReviews(g) {
+        const R = await importOnce('./inbox_reviews.js');
+        if (Date.now() - reviewsReadAt > 30000) { reviewsReadAt = Date.now(); await R.refreshReviews(true); } // the Inbox's list is only read once the Inbox was shown: a goal page asks for it itself, at most every 30 seconds
+        else await R.refreshReviews();
+        return R.reviewItems().filter(a => String(a.goal_id) === String(g.id) && a.team === model.project);
+    }
+    async function showNeeds(g) {
+        window.switchNavTab?.('hub-inbox');
+        const T = await importOnce('./inbox_tab.js');
+        await T.selectInboxTab('needs');
+        (await importOnce('./inbox_sidebar.js')).showNeedsForGoal(g.title);
+    }
+
     async function reopenGoal(g) {
         try {
             const r = await boardFetch(model.project, `/goals/${g.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscriber_id: OPERATOR_ID, state: 'active' }) });
@@ -423,6 +440,7 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
         });
         dlg.addEventListener('close', () => { model.creating = false; dlg.remove(); (root.querySelector('.goals-close') || root.querySelector('.goals-detail-col'))?.focus(); });
         dlg.showModal(); (form.querySelector('input[name="goal-close-state"]:checked') || form.querySelector('input[name="goal-close-state"]')).focus();
+        waitingReviews(g).then(list => { if (!list.length || !dlg.isConnected) return; const w = el('div', 'goals-warning goals-reviews-warning'); w.append(el('strong', null, W.waitingReviewsHead(list.length)), document.createTextNode(` ${W.waitingReviewsStay(list.length)}`)); form.insertBefore(w, fs); }).catch(() => {}); // not drawn when the Inbox's list cannot be read
     }
 
 

@@ -147,3 +147,7 @@ export function agentBriefLine(goal) {
     const shown = title.length > 80 ? title.slice(0, 79).trimEnd() + '\u2026' : title;
     return `Goal #${id}${shown ? ` (${shown})` : ''}: run coral-board goal brief ${id}`;
 }
+/** Files for review on a goal that are still waiting for the person (#11885, Beta #11837 D and G): said in the Close goal dialog and on the goal's page. */
+export const waitingReviewsHead = n => `${n} ${n === 1 ? 'file' : 'files'} for review on this goal ${n === 1 ? 'is' : 'are'} still waiting for you.`;
+export const waitingReviewsStay = n => `${n === 1 ? 'It stays' : 'They stay'} in Needs you after the goal is closed.`;
+export const waitingReviewsLine = n => `${n} ${n === 1 ? 'file' : 'files'} for this goal ${n === 1 ? 'is' : 'are'} waiting for your review.`;
