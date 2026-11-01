@@ -49,7 +49,7 @@ const WORLD = `(() => {
             await ev(`document.documentElement.setAttribute('data-theme', '${theme}'); localStorage.removeItem('coral.inbox.tab'); localStorage.removeItem('coral-team-artifacts-filters:@inbox'); ${WORLD}`);
             await ev(`window.switchNavTab('hub-inbox'); true`);
             await ev(`import((window.__coralStatic || '/static/') + 'inbox_sidebar.js').then(m => m.openInboxGroup('artifacts')).then(() => true)`);
-            await waitFor(`document.getElementById('group-table-view').dataset.group === 'hub-inbox:artifacts' && document.querySelectorAll('#group-table-view tbody tr').length >= 30`, `${tag}: the rows`, 10000);
+            await waitFor(`document.getElementById('group-table-view').dataset.group === 'hub-inbox:artifacts' && document.querySelectorAll('#group-table-view tbody tr').length >= 30 && document.querySelectorAll('#group-table-view tbody .dt-primary').length >= 2`, `${tag}: the rows, and their name buttons`, 10000); // the rows can be there a moment before their buttons are (a slow runner)
             await ev(`document.querySelectorAll('#group-table-view tbody .dt-primary')[1].click(); true`);
             await waitFor(`(() => { const p = document.querySelector('.inbox-detail-pane'); return !!p && !p.hidden && /alpha-report/.test(p.textContent); })()`, `${tag}: the pane`, 8000);
             await settle(600); await shot(`inbox-artifact-${w}-${theme}`);
