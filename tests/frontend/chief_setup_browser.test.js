@@ -29,7 +29,7 @@ const SID = '11111111-2222-4333-8444-555555555555';
             const at = `${w} px: `;
             await Emulation.setDeviceMetricsOverride({ width: w, height: h, deviceScaleFactor: 1, mobile }); await Emulation.setTouchEmulationEnabled({ enabled: mobile });
             await Page.navigate({ url: BASE + '/' }); await Page.loadEventFired(); await install(); await coralReady(ev, 'startup', 'liveList', 'settings');
-            await api('PUT', '/api/settings', { chief_page: 'false', chief_name: '', chief_avatar: '1', chief_avatar_letter: '', chief_fronts: '', chief_session: '', chief_team: '' });
+            await api('PUT', '/api/settings', { chief_page: 'false', chief_name: '', chief_avatar: '1', chief_avatar_letter: '', chief_fronts: '', chief_session: '', chief_team: '', chief_actions: 'ask_first' });
             await ev(STUB);
             await ev(`(async () => { await window.showSettingsModal('chief'); return true; })()`);
             await waitFor(`!!document.querySelector('${host} .sv[data-ready]')`, at + 'the Chief screen', 10000);
@@ -79,6 +79,7 @@ const SID = '11111111-2222-4333-8444-555555555555';
             assert.equal(await ev(`getComputedStyle(document.getElementById('bub'), '::before').backgroundColor === getComputedStyle(document.getElementById('chief-avatar-head')).backgroundColor`), true, at + 'in the same colour');
             console.log(`   ✓ ${w} px`);
         }
+        await api('PUT', '/api/settings', { chief_page: 'false', chief_name: '', chief_avatar: '1', chief_avatar_letter: '', chief_fronts: '', chief_session: '', chief_team: '', chief_actions: 'ask_first' }); // put the Chief settings back (no leaked rows)
         console.log('PASS Settings > Chief: name, avatar, agent, team and page in one screen; /api/chief and the /chief header and chat show it');
     } finally { await client.close(); }
 })().catch(e => { console.error(e); process.exit(1); });
