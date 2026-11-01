@@ -43,7 +43,7 @@ export async function buildProviderCards({ group, form, server, implicitDefault 
     const gen = (group._pickToken = (group._pickToken || 0) + 1);
     delete group.dataset.probed;
     group.classList.add('provider-cards'); group.classList.remove('launch-agent-pick');
-    const rowOf = k => { const q = `.sv-row[data-key="${k}"]`, a = [...form.querySelectorAll(q)]; if (a.length > 1) a.filter(r => group.contains(r)).forEach(r => r.remove()); return form.querySelector(q); }; // stale rows of a reopened dialog (#11821)
+    const rowOf = k => { const q = `.sv-row[data-key="${k}"]`, a = [...form.querySelectorAll(q)]; if (a.length > 1 && !document.getElementById('launch-modal')?.hasAttribute('data-member')) a.filter(r => group.contains(r)).forEach(r => r.remove()); return form.querySelector(q); }; // New agent's reopened dialog: stale rows (#11821); not Add/Edit member, whose form reads the first row
     const modelRow = rowOf('model'), thinkingRow = rowOf('thinking');
     const hold = el('div', 'provider-hold'); hold.hidden = true; // the rows wait here when no card is open
     const thinkingWrap = () => form.querySelector('.acf-thinking-wrap');
