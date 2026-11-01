@@ -111,7 +111,8 @@ type SessionsHandler struct {
 	cfg         *config.Config
 	terminal    ptymanager.SessionTerminal
 	jsonl       *jsonl.SessionReader
-	backend     ptymanager.TerminalBackend // nil = use tmux directly
+	currentDir  func(ctx context.Context, a background.AgentInfo) string // where an agent is now, when that is another worktree of its repository (#11704)
+	backend     ptymanager.TerminalBackend                               // nil = use tmux directly
 
 	boardHandler  *BoardHandler          // for sleep/wake board pausing
 	schedStore    *store.ScheduleStore   // for active runs in websocket
@@ -347,7 +348,9 @@ func defaultModelFromSettings(settings map[string]string, agentType, requestMode
 
 // NewSessionsHandler creates a SessionsHandler with the given dependencies.
 func NewSessionsHandler(db *store.DB, cfg *config.Config, backend ptymanager.TerminalBackend, terminal ptymanager.SessionTerminal, bs *board.Store) *SessionsHandler {
+	reader := jsonl.NewSessionReader()
 	return &SessionsHandler{
+		currentDir:     background.NewCurrentDirFinder(reader.CurrentDirectory),
 		autoWake:       autoWaker{sleep: background.SleepCtx, now: time.Now},
 		exits:          exitWatch{after: defaultAfter},
 		startupScreens: loginScreens{stampDecides: true},
@@ -362,7 +365,7 @@ func NewSessionsHandler(db *store.DB, cfg *config.Config, backend ptymanager.Ter
 		bs:                bs,
 		cfg:               cfg,
 		terminal:          terminal,
-		jsonl:             jsonl.NewSessionReader(),
+		jsonl:             reader,
 		boardStatus:       newReplyCache(0),
 		backend:           backend,
 		logStatusCache:    make(map[string]cachedLogStatus),
