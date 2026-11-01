@@ -646,6 +646,12 @@ func (h *SessionsHandler) AnswerPrompt(w http.ResponseWriter, r *http.Request) {
 		writeExactTargetError(w, status, message)
 		return
 	}
+	// One prompt is answered or closed by one sender at a time: a person's answer waits for Coral's own close or pick to finish, and each re-reads the screen inside the lock (agent_lock.go)
+	lockKey := body.SessionID
+	if lockKey == "" {
+		lockKey = "name:" + name
+	}
+	defer h.lockAgent(lockKey)()
 	h.touch(r, body.SessionID, board.TouchAnswer)    // the Operator answers an agent's question (#11225): counted before the keys go, so a typed answer is not counted twice
 	if body.SessionID != "" && humanInputCaller(r) { // the Inbox's numbers (#7512): the wait's kind and age, never the agent or the answer
 		st := h.deriveSingleSessionState(r.Context(), body.SessionID, 0)
