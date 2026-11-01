@@ -289,7 +289,7 @@ func TestChiefLookCleansWhatTheOperatorChose(t *testing.T) {
 		"a colour that is not one of the eight":       {map[string]string{"chief_avatar": "9"}, ChiefLook{Avatar: "1"}},
 		"a colour written as words":                   {map[string]string{"chief_avatar": "red"}, ChiefLook{Avatar: "1"}},
 		"a name cut at 40":                            {map[string]string{"chief_name": long}, ChiefLook{Name: long[:40], Avatar: "1"}},
-		"a reordering mark and a control are dropped": {map[string]string{"chief_name": "Ch‮ie\x00f"}, ChiefLook{Name: "Chief", Avatar: "1"}},
+		"a reordering mark and a control are dropped": {map[string]string{"chief_name": "Ch\u202eie\x00f"}, ChiefLook{Name: "Chief", Avatar: "1"}},
 		"a letter that is a symbol is not one":        {map[string]string{"chief_avatar_letter": "<"}, ChiefLook{Avatar: "1"}},
 		"only the first letter counts":                {map[string]string{"chief_avatar_letter": "ab"}, ChiefLook{Avatar: "1", Letter: "A"}},
 	} {
