@@ -98,7 +98,9 @@ type Goal struct {
 	ClosedAt     *string `db:"closed_at" json:"closed_at,omitempty"`
 	ClosedReason string  `db:"closed_reason" json:"closed_reason,omitempty"`
 	// OrchestratorToldAt is when the team's Orchestrator was told this goal was made (#11866), once; nil when it was not (the Orchestrator made it, or the team has none).
-	OrchestratorToldAt *string    `db:"orchestrator_told_at" json:"orchestrator_told_at,omitempty"`
+	OrchestratorToldAt *string `db:"orchestrator_told_at" json:"orchestrator_told_at,omitempty"`
+	// MadeByOrchestrator is set on the way out (never stored) when the team's Orchestrator wrote this goal itself (#11887): the goal page says so instead of "nobody was told".
+	MadeByOrchestrator bool       `db:"-" json:"made_by_orchestrator,omitempty"`
 	Rollup             GoalRollup `db:"-" json:"rollup"`
 	// FollowUpsOpen: the open tasks of the goal that were made as follow-ups of another task (task add --follow-up); filled where one goal is read (GetGoal), never in a list.
 	FollowUpsOpen int `db:"-" json:"follow_ups_open,omitempty"`

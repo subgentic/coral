@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { toGoal, toGoalList, mergeGoalLists, toTask, toTaskList, toTaskPage, toDrivers, createBody, errorOf, LIST_PATH } from '../../coral-go/pkg/frontend/static/goals_adapter.js';
 
 const g = toGoal({ id: 4, goal_uid: 'u', board_id: 'b', title: 'T', outcome: 'O', done_when: 'D', state: 'BLOCKED', blocked_on: 'the Operator', driver: 'QA', created_at: 'x', updated_at: '2026-10-24T12:00:00Z', rollup: { done: 5, active: 2, blocked: 1, queued: 1, total: 9 } });
-assert.deepEqual(g, { id: 4, title: 'T', outcome: 'O', doneWhen: 'D', state: 'blocked', blockedOn: 'the Operator', driver: 'QA', images: [], updatedAt: '2026-10-24T12:00:00Z', toldAt: '', rollup: { done: 5, active: 2, blocked: 1, queued: 1 } });
-assert.deepEqual(toGoal({ id: 1, title: 'Only a title' }), { id: 1, title: 'Only a title', outcome: '', doneWhen: '', state: '', blockedOn: '', driver: '', images: [], updatedAt: '', toldAt: '', rollup: { done: 0, active: 0, blocked: 0, queued: 0 } }, 'omitted fields are empty, never missing');
+assert.deepEqual(g, { id: 4, title: 'T', outcome: 'O', doneWhen: 'D', state: 'blocked', blockedOn: 'the Operator', driver: 'QA', images: [], updatedAt: '2026-10-24T12:00:00Z', madeByOrchestrator: false, toldAt: '', rollup: { done: 5, active: 2, blocked: 1, queued: 1 } });
+assert.deepEqual(toGoal({ id: 1, title: 'Only a title' }), { id: 1, title: 'Only a title', outcome: '', doneWhen: '', state: '', blockedOn: '', driver: '', images: [], updatedAt: '', madeByOrchestrator: false, toldAt: '', rollup: { done: 0, active: 0, blocked: 0, queued: 0 } }, 'omitted fields are empty, never missing');
 assert.equal(toGoal({ id: 2, title: 'Told', orchestrator_told_at: '2026-11-01T20:00:00Z' }).toldAt, '2026-11-01T20:00:00Z', 'when the Orchestrator was told the goal was made (#11880)');
 assert.equal(toGoal(null).id, 0); assert.deepEqual(toGoal({ rollup: { done: -1, active: 'x', blocked: 2.9, queued: null } }).rollup, { done: 0, active: 0, blocked: 2, queued: 0 });
 
@@ -40,3 +40,4 @@ assert.deepEqual(toDrivers([{ subscriber_id: 'qa-eng', job_title: 'QA' }, { subs
 assert.deepEqual(toDrivers(null), []); assert.deepEqual(toDrivers({}), []);
 assert.equal(LIST_PATH, '/goals?state=proposed,active,blocked,done,dropped&limit=200');
 console.log('goals_adapter: ok');
+assert.equal(toGoal({ id: 3, title: 'Own', made_by_orchestrator: true }).madeByOrchestrator, true, 'a goal the Orchestrator wrote itself (#11887)');

@@ -274,7 +274,7 @@ export function mountGoal(host, { team, id, back, onTask, goal, refresh, status,
         if (!rowsAgree(g)) list.setAttribute('aria-busy', 'true');
         if (!tasks) { list.append(el('p', 'goals-note', 'Loading tasks\u2026')); return; }
         if (tasks.failed !== undefined) { const f = el('div', 'goals-failed'); f.setAttribute('role', 'alert'); f.append(el('span', null, W.failedText(tasks.failed).replace('Goals', 'Tasks')), btn('btn btn-small', 'Retry', () => loadTasks(g.id))); list.append(f); return; }
-        if (!tasks.rows.length) { list.append(el('p', 'goals-note', 'No tasks yet.' + (g.toldAt ? ` The Orchestrator was told ${whenText(g.toldAt)} and has not planned it.` : ' Nobody has been told about this goal.'))); return; } // who has the goal, said where the person looks (#11880)
+        if (!tasks.rows.length) { list.append(el('p', 'goals-note', 'No tasks yet.' + (g.madeByOrchestrator ? ' The Orchestrator made this goal and has not planned it.' : g.toldAt ? ` The Orchestrator was told ${whenText(g.toldAt)} and has not planned it.` : ' Nobody has been told about this goal.'))); return; } // who has the goal, said where the person looks (#11880)
         const shown = tasks.rows.slice(0, tasks.shown);
         const groups = [['Open', shown.filter(t => !isDone(t))], ['Done', shown.filter(isDone).sort((a, b) => b.id - a.id)]]; // the newest done task first
         for (const [name, rows] of groups) {

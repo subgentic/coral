@@ -137,3 +137,30 @@ func TestAProposedGoalTellsTheOrchestratorWhenItBecomesActive(t *testing.T) {
 	require.Equal(t, 200, code)
 	assert.Equal(t, 1, toldNew(), "no flood of old goals")
 }
+
+// #11887: a goal the team's Orchestrator wrote itself says so in the goal's own JSON (made_by_orchestrator), on the reply that made it, the goal read and the list; a goal anyone else made does not. The Orchestrator is
+// told nothing about its own goal, so the page cannot say "nobody was told" there.
+func TestAGoalTheOrchestratorMadeSaysSo(t *testing.T) {
+	server, h := setupBoardTestServer(t)
+	registerTaskPlanner(t, h, "team", "Orchestrator")
+	call := goalCall(t, server.URL)
+	code, own := call("POST", "/api/board/team/goals", map[string]any{"title": "Mine", "outcome": "o", "done_when": "d", "subscriber_id": "Orchestrator"})
+	require.Equal(t, http.StatusCreated, code, "%v", own)
+	assert.Equal(t, true, own["made_by_orchestrator"], "the reply says so")
+	assert.Empty(t, own["orchestrator_told_at"], "and nobody was told")
+	code, other := call("POST", "/api/board/team/goals", map[string]any{"title": "Theirs", "outcome": "o", "done_when": "d", "subscriber_id": "Operator"})
+	require.Equal(t, http.StatusCreated, code, "%v", other)
+	assert.Nil(t, other["made_by_orchestrator"], "a goal the Operator made does not say it")
+	code, got := call("GET", "/api/board/team/goals/"+itoa(int64(own["id"].(float64))), nil)
+	require.Equal(t, 200, code)
+	assert.Equal(t, true, got["made_by_orchestrator"], "the goal read says so")
+	code, list := call("GET", "/api/board/team/goals", nil)
+	require.Equal(t, 200, code)
+	made := map[string]any{}
+	for _, it := range list["goals"].([]any) {
+		m := it.(map[string]any)
+		made[m["title"].(string)] = m["made_by_orchestrator"]
+	}
+	assert.Equal(t, true, made["Mine"], "the list says so")
+	assert.Nil(t, made["Theirs"])
+}
