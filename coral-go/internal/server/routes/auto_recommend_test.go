@@ -158,6 +158,7 @@ type recRig struct {
 	present  bool
 	callID   string
 	question string
+	labels   []string // the screen's selectable options, as the record lists them
 }
 
 const recIdle = screenIdleList
@@ -167,9 +168,16 @@ func (r *recRig) call(id, tool string, at time.Duration) pendingTool {
 	return r.callAbout(id, tool, at, r.question)
 }
 
-func (r *recRig) callAbout(id, tool string, at time.Duration, question string) pendingTool {
-	return pendingTool{ToolUseID: id, ToolName: tool, At: r.t0.Add(at), Input: map[string]any{"questions": []any{map[string]any{
-		"question": question, "options": []any{map[string]any{"label": "Red", "description": "A description of the option"}}}}}}
+// callAbout is call for another question; its options are labels (the rig's own when none are given), in the screen's order.
+func (r *recRig) callAbout(id, tool string, at time.Duration, question string, labels ...string) pendingTool {
+	if len(labels) == 0 {
+		labels = r.labels
+	}
+	var opts []any
+	for _, l := range labels {
+		opts = append(opts, map[string]any{"label": l, "description": "A description of the option"})
+	}
+	return pendingTool{ToolUseID: id, ToolName: tool, At: r.t0.Add(at), Input: map[string]any{"questions": []any{map[string]any{"question": question, "options": opts}}}}
 }
 
 func newRecRig(t *testing.T, sidSuffix, capture string) *recRig {
@@ -186,6 +194,11 @@ func newRecRig(t *testing.T, sidSuffix, capture string) *recRig {
 	require.NoError(t, h.bs.SetHealthSettings(r.ctx, r.board, hs))
 	r.rec = NewAutoRecommender(h)
 	r.question = parsedQuestion(t, capture).Question
+	for _, o := range parsedQuestion(t, capture).Options {
+		if o.Action == "select" {
+			r.labels = append(r.labels, o.Label)
+		}
+	}
 	h.pending.set(r.sid, r.call(r.callID, "AskUserQuestion", 0))
 	// The pick clears the question; the notice then waits for the CLI's prompt.
 	term.onRaw = func(string) { term.setOutput(r.pane, recIdle) }
@@ -306,7 +319,7 @@ func TestAutoRecommendAChangedQuestionStartsTheGraceAgain(t *testing.T) {
 	r := newRecRig(t, "0008", recQuestion("Which color?", "Red (Recommended)", "Green"))
 	r.passes(2*time.Minute + 30*time.Second)
 	r.term.setOutput(r.pane, recQuestion("Which shape?", "Round (Recommended)", "Square"))
-	r.h.pending.set(r.sid, r.callAbout(r.callID, "AskUserQuestion", 0, "Which shape?"))
+	r.h.pending.set(r.sid, r.callAbout(r.callID, "AskUserQuestion", 0, "Which shape?", "Round (Recommended)", "Square"))
 	r.pass(3*time.Minute + 15*time.Second)
 	r.pass(3*time.Minute + 30*time.Second)
 	assert.Empty(t, r.raw(), "another ask: the wait starts over")
@@ -359,7 +372,7 @@ func TestAutoRecommendCaps(t *testing.T) {
 		r2.h.pending.callDone(r2.sid, r2.callID)
 		r2.callID = "toolu_" + string(rune('a'+i))
 		qn := "Question " + string(rune('0'+i)) + " or not?"
-		r2.h.pending.set(r2.sid, r2.callAbout(r2.callID, "AskUserQuestion", at, qn))
+		r2.h.pending.set(r2.sid, r2.callAbout(r2.callID, "AskUserQuestion", at, qn, "Red (Recommended)", "Green"))
 		r2.term.setOutput(r2.pane, recQuestion(qn, "Red (Recommended)", "Green"))
 		for end := at + 4*time.Minute; at <= end; at += 15 * time.Second {
 			r2.pass(at)
@@ -553,4 +566,25 @@ func TestAutoRecommendSaysItEvenWhenTheNoticeRanOutOfTime(t *testing.T) {
 		}
 	}
 	assert.NotEmpty(t, line, "and the team line")
+}
+
+// Security's ruling on QA's U+200B finding: the pick is bound to the record's own option list: the n-th option of the record's question must be the picked label, "(Recommended)" included.
+func TestRecordMustListThePickedLabelAtThePickedPosition(t *testing.T) {
+	for name, labels := range map[string][]string{
+		"the mark is on another option":      {"Red", "Green (Recommended)"},
+		"the label differs":                  {"Crimson (Recommended)", "Green"},
+		"the mark is missing":                {"Red", "Green"},
+		"fewer options than the pick's slot": {},
+	} {
+		r := newRecRig(t, "0015", recQuestion("Which color?", "Red (Recommended)", "Green"))
+		if len(labels) == 0 {
+			r.h.pending.set(r.sid, pendingTool{ToolUseID: r.callID, ToolName: "AskUserQuestion", At: r.t0, Input: map[string]any{"questions": []any{map[string]any{"question": r.question}}}})
+		} else {
+			r.h.pending.set(r.sid, r.callAbout(r.callID, "AskUserQuestion", 0, r.question, labels...))
+		}
+		r.passes(10 * time.Minute)
+		assert.Empty(t, r.raw(), name)
+	}
+	assert.True(t, newRecRig(t, "0016", recQuestion("Which color?", "Red (Recommended)", "Green")).h.recordHasOption(
+		"00000000-0000-0000-0000-0000000e0016", time.Date(2026, 10, 31, 6, 0, 0, 0, time.UTC), "Which color?", 1, "Red (Recommended)"))
 }
