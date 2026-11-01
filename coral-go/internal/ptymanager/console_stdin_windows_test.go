@@ -55,8 +55,8 @@ func TestAChildsStandardInputIsReadFromTheChild(t *testing.T) {
 			require.NoError(t, cmd.Start())
 			t.Cleanup(func() { _ = cmd.Process.Kill(); _ = cmd.Wait() })
 			var got stdinKind
-			assert.Eventually(t, func() bool { got = processStdin(cmd.Process.Pid); return got == stdinNotConsole }, 5*time.Second, 50*time.Millisecond, "got %v", got)
+			assert.Eventually(t, func() bool { got = probeStdin(cmd.Process.Pid); return got == stdinNotConsole }, 5*time.Second, 50*time.Millisecond, "got %v", got)
 		})
 	}
-	assert.Equal(t, stdinUnreadable, processStdin(0), "no such process")
+	assert.Equal(t, stdinUnreadable, probeStdin(0), "no such process")
 }
