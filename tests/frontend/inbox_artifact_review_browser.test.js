@@ -39,7 +39,7 @@ const { coralReady } = require('./helpers/wait');
                             if(window.__reviewFail)return json({error:'Review save failed'},500);
                             const id=u.pathname.split('/').at(-2),body=JSON.parse(opts.body),it=window.__reviewItems.find(a=>a.id===id);window.__decisions.push({id,decision:body.decision});
                             if(body.decision==='approve'){it.tags=it.tags.filter(t=>t!=='for review'&&t!=='read'&&t!=='changes requested').concat('approved');it.review={state:'approved',at:new Date().toISOString()};}
-                            else{it.tags=[...new Set(it.tags.concat('for review','changes requested'))];}
+                            else{it.tags=[...new Set(it.tags.concat('for review','changes requested'))].filter(t=>t!=='read');}  // the real route takes 'read' off: it is something to read again (artifact_reviews.go)
                             return json({id,state:body.decision==='approve'?'approved':'changes requested',changed:true,tags:it.tags,review:it.review||null,delivered:body.decision==='approve',to:'Writer'});
                         }
                         if(u.pathname.startsWith('/api/artifacts/')&&u.pathname.endsWith('/versions')&&window.__twoVersions){const d=u.pathname.split('/')[3],old=(99).toString(16).padStart(64,'0');return json([{digest:old,version:1,versions:2,is_latest:false,name:'Review file 01.txt',size:30,media_type:'text/plain',at:new Date(Date.now()-3600000).toISOString(),uploader:'Writer A',role:'Writer'},{digest:d,version:2,versions:2,is_latest:true,name:'Review file 01.txt',size:30,media_type:'text/plain',at:new Date().toISOString(),uploader:'Writer A',role:'Writer'}]);}
@@ -145,6 +145,10 @@ const { coralReady } = require('./helpers/wait');
                     assert.equal(await ev(`window.__decisions.filter(d=>d.decision==='changes').length`),1,'two taps sent one request');
                     assert.equal(await ev(`window.__comments.filter(c=>c.body).length`),1,'and made one comment');
                     assert.ok(await ev(`!!(${row('Review file 01.txt')})`),'a row with changes requested stays in Needs you');
+                    // #11860 (Beta #8): the viewer reloads itself after the request, and that reload is not a new opening: the file is not marked read again, so it counts and shows unread
+                    await require('./helpers/wait').settle(ev, 400, 300);
+                    assert.equal(await ev(`window.__reviewItems.find(a=>a.id==='${(1).toString(16).padStart(64,'0')}').tags.includes('read')`),false,'Request changes leaves the file unread: the viewer reloading does not read it again: ' + await ev(`JSON.stringify(window.__reviewWrites)`));
+                    assert.equal(await ev(`/, unread/.test((${row('Review file 01.txt')}).textContent)`),true,'and its row says unread');
                     await ev(`document.querySelector('.artifact-viewer-close').click();true`);
                 }
                 await ev(`window.__reviewFail=true;[...(${row('Review file 01.txt')}).querySelectorAll('button')].find(b=>(b.getAttribute('aria-label')||'').startsWith('Approve')).click();true`);

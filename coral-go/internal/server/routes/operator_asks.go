@@ -29,12 +29,14 @@ const (
 
 type operatorAskRow struct {
 	Board string `json:"board"`
-	Kind  string `json:"kind"`
-	ID    int64  `json:"id"` // the question's message id (kind ask) or the wait's id (kind wait)
-	Asker string `json:"asker"`
-	Text  string `json:"text"`
-	Cut   bool   `json:"cut,omitempty"`
-	At    string `json:"at"`
+	// BoardLabel is the team's name for a person to read (#11860: the panel said the internal board id); "" when the board has none, and the page then says the id.
+	BoardLabel string `json:"board_label,omitempty"`
+	Kind       string `json:"kind"`
+	ID         int64  `json:"id"` // the question's message id (kind ask) or the wait's id (kind wait)
+	Asker      string `json:"asker"`
+	Text       string `json:"text"`
+	Cut        bool   `json:"cut,omitempty"`
+	At         string `json:"at"`
 	// Buttons the asker declared on a question (#11643), in order, with their state (pending, used); the Operator's click claims one through the claim route.
 	Buttons []board.AskButton `json:"buttons,omitempty"`
 }
@@ -67,7 +69,7 @@ func (h *BoardHandler) OperatorAsks(w http.ResponseWriter, r *http.Request) {
 		withButtons, _ := h.bs.AskButtonsOf(ctx, p.Project, ids)
 		for _, a := range asks {
 			text, cut := operatorAskText(a.Content)
-			rows = append(rows, operatorAskRow{Board: p.Project, Kind: "ask", ID: a.MessageID, Asker: clitext.CleanName(a.Asker), Text: text, Cut: cut, At: a.At.UTC().Format(time.RFC3339), Buttons: withButtons[a.MessageID]})
+			rows = append(rows, operatorAskRow{Board: p.Project, BoardLabel: clitext.CleanName(p.BoardLabel), Kind: "ask", ID: a.MessageID, Asker: clitext.CleanName(a.Asker), Text: text, Cut: cut, At: a.At.UTC().Format(time.RFC3339), Buttons: withButtons[a.MessageID]})
 		}
 		waits, err := h.bs.ListOperatorQuestions(ctx, p.Project)
 		if err != nil {
@@ -75,7 +77,7 @@ func (h *BoardHandler) OperatorAsks(w http.ResponseWriter, r *http.Request) {
 		}
 		for _, q := range waits {
 			text, cut := operatorAskText(q.Reason)
-			rows = append(rows, operatorAskRow{Board: p.Project, Kind: "wait", ID: q.ID, Asker: clitext.CleanName(q.SubscriberID), Text: text, Cut: cut, At: q.CreatedAt})
+			rows = append(rows, operatorAskRow{Board: p.Project, BoardLabel: clitext.CleanName(p.BoardLabel), Kind: "wait", ID: q.ID, Asker: clitext.CleanName(q.SubscriberID), Text: text, Cut: cut, At: q.CreatedAt})
 		}
 	}
 	sort.SliceStable(rows, func(i, j int) bool { return rows[i].At < rows[j].At })
