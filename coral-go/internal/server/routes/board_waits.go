@@ -77,11 +77,9 @@ func (h *BoardHandler) RegisterWait(w http.ResponseWriter, r *http.Request) {
 	}
 	// An agent waits on one thing per board, so a new wait replaces its old one. A question the Operator has not answered must not go with it (#11919: the second of two questions replaced the first in
 	// Needs you): the one being replaced is kept as an ordinary open question from the same agent, below.
-	var replaced *board.RegisteredWait
-	if body.WaitType == board.WaitOperator {
-		if prior, perr := h.bs.GetActiveWait(r.Context(), project, body.SubscriberID); perr == nil && prior != nil && prior.WaitType == board.WaitOperator && strings.TrimSpace(prior.Reason) != "" && strings.TrimSpace(prior.Reason) != body.Reason {
-			replaced = prior
-		}
+	replaced := h.activeOperatorQuestion(r.Context(), project, body.SubscriberID) // whatever the new wait's type: any new wait replaces the old one
+	if replaced != nil && body.WaitType == board.WaitOperator && strings.EqualFold(strings.TrimSpace(replaced.Reason), strings.TrimSpace(body.Reason)) {
+		replaced = nil // the same question asked again: the new wait is it, not a second one
 	}
 	wait, err := h.bs.RegisterWait(r.Context(), project, body.SubscriberID, body.SessionName, body.WaitType, body.TargetID, body.Reason, timeout)
 	if err == nil && replaced != nil {
@@ -265,15 +263,39 @@ func (h *BoardHandler) endOwnWaits(ctx context.Context, project, subscriberID st
 	if subscriberID == "" {
 		return
 	}
+	asked := h.activeOperatorQuestion(ctx, project, subscriberID) // an unanswered question to the Operator outlives the agent getting back to work (#11919)
 	if err := h.bs.CancelActiveWait(ctx, project, subscriberID); err != nil {
 		slog.Warn("could not end the waits of an agent that is working", "project", project, "subscriber", subscriberID, "error", err)
+		return
 	}
+	if asked != nil {
+		h.keepReplacedOperatorQuestion(ctx, project, asked)
+	}
+}
+
+// activeOperatorQuestion is the agent's active wait when it is a question to the Operator with its text, else nil: the one thing a wait that ends for any reason but the Operator's answer or the agent's own
+// `wait --cancel` must not take out of Needs you (#11919).
+func (h *BoardHandler) activeOperatorQuestion(ctx context.Context, project, subscriberID string) *board.RegisteredWait {
+	w, err := h.bs.GetActiveWait(ctx, project, subscriberID)
+	if err != nil || w == nil || w.WaitType != board.WaitOperator || strings.TrimSpace(w.Reason) == "" {
+		return nil
+	}
+	return w
 }
 
 // keepReplacedOperatorQuestion makes the question of a wait that a newer wait replaced an ordinary open question (an ask of the Operator, from the same agent) so it stays in Needs you until it is answered or
 // closed like any other (#11919). A failure is logged and does not fail the new wait: the agent's new question stands either way.
 func (h *BoardHandler) keepReplacedOperatorQuestion(ctx context.Context, project string, old *board.RegisteredWait) {
-	msg, err := h.bs.PostMessage(ctx, project, old.SubscriberID, "@Operator (an earlier question, still open) "+strings.TrimSpace(old.Reason), nil)
+	reason := strings.TrimSpace(old.Reason)
+	// The same question is not kept twice: the agent asked it with post --ask too, a re-issued wait carried it already, or the new wait is the same question (a trailing space is not a new question).
+	if asks, err := h.bs.OpenAsksOf(ctx, project, board.OperatorName, time.Now()); err == nil {
+		for _, a := range asks {
+			if strings.EqualFold(a.Asker, old.SubscriberID) && strings.Contains(strings.ToLower(a.Content), strings.ToLower(reason)) {
+				return
+			}
+		}
+	}
+	msg, err := h.bs.PostMessage(ctx, project, old.SubscriberID, "@Operator (an earlier question, still open) "+reason, nil)
 	if err == nil {
 		err = h.bs.RecordAsk(ctx, project, msg, []string{board.OperatorName})
 	}
