@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/subgentic/coral/internal/board"
+	"github.com/subgentic/coral/internal/httputil"
 )
 
 // checkAskButtons validates the buttons an agent declares on a question (#11643) before anything is posted, and writes the refusal itself. Buttons go only on an ask to @Operator alone, from a verified agent of
@@ -52,7 +53,7 @@ func (h *BoardHandler) checkAskButtons(w http.ResponseWriter, r *http.Request, p
 		}
 	}
 	if n, err := h.bs.OpenButtonAsks(ctx, project, poster); err == nil && n >= board.AskButtonsOpenMax {
-		writeError(w, http.StatusTooManyRequests, "too_many_button_asks", board.ErrTooManyButtonAsks.Error())
+		httputil.WriteActionLimit(w, 0, "too_many_button_asks", board.ErrTooManyButtonAsks.Error()) // a per-action limit, marked as one (no Retry-After: it clears when a question is answered, not at a time)
 		return nil, false
 	}
 	return buttons, true
