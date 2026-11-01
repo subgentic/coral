@@ -5,7 +5,7 @@ import { serverFetch } from './server_base.js';
 import { importOnce } from './import_once.js';
 
 const ROUTE = '/api/custom-models';
-const FAMILIES = { claude: 'claude', codex: 'codex', agy: 'agy', antigravity: 'agy', gemini: 'agy', pi: 'pi' };
+const FAMILIES = { claude: 'claude', codex: 'codex', agy: 'agy', antigravity: 'agy', gemini: 'agy', pi: 'pi', opencode: 'opencode' }; // opencode (#11727): a family the server stores custom models for, and merges into its list
 
 // #5996: through Coral Hub a non-owner's read of the list is refused (403): one read a minute per server tells it; only a refusal says no.
 const _canAdd = new Map();

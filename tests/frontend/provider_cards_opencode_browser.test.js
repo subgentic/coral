@@ -37,13 +37,13 @@ const GROUPED = `(() => { const R = window.fetch; window.fetch = (u, o = {}) => 
                 assert.deepEqual(cards.radios, ['claude', 'codex', 'agy', 'pi', 'opencode'], 'five radios, OpenCode last');
                 assert.equal(oc.missing, false); assert.match(oc.status || '', /^Installed( · default |$)/, 'the status line says installed and the default model: ' + oc.status);
                 await ev(`document.querySelector('#launch-agent-pick input[value="opencode"]').click(); true`);
-                await waitFor(`document.querySelector('.acf-agent-type').value === 'opencode' && document.querySelector('.provider-card.is-open[data-type="opencode"] .acf-model-select optgroup')`, 'the OpenCode models grouped', 8000);
-                const g = await ev(`[...document.querySelectorAll('.provider-card.is-open .acf-model-select optgroup')].map(o => ({ label: o.label, values: [...o.querySelectorAll('option')].map(x => x.value) }))`);
+                await waitFor(`document.querySelector('.acf-agent-type').value === 'opencode' && document.querySelector('.provider-card-body[data-type="opencode"]:not([hidden]) .acf-model-select optgroup')`, 'the OpenCode models grouped', 8000);
+                const g = await ev(`[...document.querySelectorAll('.provider-card-body:not([hidden]) .acf-model-select optgroup')].map(o => ({ label: o.label, values: [...o.querySelectorAll('option')].map(x => x.value) }))`);
                 assert.deepEqual(g.map(x => x.label), ['openai · signed in', 'anthropic'], 'the signed-in provider is listed first and says so: ' + JSON.stringify(g));
                 assert.deepEqual(g[0].values, ['openai/gpt-6', 'openai/gpt-6-mini'], 'a model\'s value is provider/model');
                 // a card with no thinking levels says so BELOW the Model row, not above it (#11364, the Orchestrator's decision)
-                await waitFor(`(() => { const p = document.querySelector('.provider-card.is-open .provider-no-thinking'); return !!p && !p.hidden; })()`, 'the no-levels sentence', 6000);
-                const order = await ev(`(() => { const c = document.querySelector('.provider-card.is-open'), m = c.querySelector('.sv-row[data-key="model"]'), p = c.querySelector('.provider-no-thinking'); return { after: !!(m.compareDocumentPosition(p) & Node.DOCUMENT_POSITION_FOLLOWING), text: p.textContent }; })()`);
+                await waitFor(`(() => { const p = document.querySelector('.provider-card-body:not([hidden]) .provider-no-thinking'); return !!p && !p.hidden; })()`, 'the no-levels sentence', 6000);
+                const order = await ev(`(() => { const c = document.querySelector('.provider-card-body:not([hidden])'), m = c.querySelector('.sv-row[data-key="model"]'), p = c.querySelector('.provider-no-thinking'); return { after: !!(m.compareDocumentPosition(p) & Node.DOCUMENT_POSITION_FOLLOWING), text: p.textContent }; })()`);
                 assert.equal(order.after, true, 'the sentence is below the Model row: ' + JSON.stringify(order));
             } else {
                 assert.equal(oc.missing, true, 'a CLI that is not found is under Not installed'); assert.equal(oc.status, null);
@@ -60,7 +60,7 @@ const GROUPED = `(() => { const R = window.fetch; window.fetch = (u, o = {}) => 
         await ev(`localStorage.setItem('coral-recent-dirs', JSON.stringify(['/tmp'])); true`);
         await openNewAgent(ev, waitFor); await toAgentStep();
         await ev(`document.querySelector('#launch-agent-pick input[value="opencode"]').click(); true`);
-        const box = `document.querySelector('.provider-card.is-open[data-type="opencode"] .provider-signin')`;
+        const box = `document.querySelector('.provider-card-body[data-type="opencode"]:not([hidden]) .provider-signin')`;
         await waitFor(`!!${box} && !${box}.hidden && ${box}.getClientRects().length > 0`, 'the sign-in block in the open OpenCode card', 8000);
         const sb = await ev(`(() => { const b = ${box}; return { lead: b.querySelector('.provider-signin-lead').textContent, cmd: b.querySelector('.provider-signin-cmd').textContent, markup: !!b.querySelector('.provider-signin-cmd b'), buttons: [...b.querySelectorAll('button')].map(x => x.textContent), elsewhereShown: !b.querySelector('.provider-signin-elsewhere').hidden }; })()`);
         assert.equal(sb.lead, "OpenCode isn't signed in to any provider on this computer.");
@@ -88,7 +88,7 @@ const GROUPED = `(() => { const R = window.fetch; window.fetch = (u, o = {}) => 
             if (remote) await ev(`import((window.__coralStatic || '/static/') + 'launch_provider_cards.js').then(m => { m.buildProviderCards({ group: document.getElementById('launch-agent-pick'), form: document.getElementById('launch-agent-acf'), server: 'box-b', implicitDefault: false }); return true; })`);
             await waitFor(`document.getElementById('launch-agent-pick').dataset.probed === '1'`, 'the cards heard from the CLI checks', 8000);
             await ev(`document.querySelector('#launch-agent-pick input[value="opencode"]').click(); true`);
-            const blk = `document.querySelector('.provider-card.is-open[data-type="opencode"] .provider-signin')`;
+            const blk = `document.querySelector('.provider-card-body[data-type="opencode"]:not([hidden]) .provider-signin')`;
             await waitFor(`!!${blk} && !${blk}.hidden`, `${what}: the sign-in block`, 8000);
             const r = await ev(`(() => { const b = ${blk}; const vis = sel => { const e = b.querySelector(sel); return !!e && !e.hidden && e.getClientRects().length > 0; }; return { lead: b.querySelector('.provider-signin-lead').textContent, elsewhere: vis('.provider-signin-elsewhere'), cmd: vis('.provider-signin-cmd'), copy: vis('.provider-signin-copy'), text: b.textContent }; })()`);
             assert.equal(r.elsewhere, true, `${what}: the sentence is shown`); assert.equal(r.cmd || r.copy, false, `${what}: no command and no Copy`);

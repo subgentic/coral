@@ -21,16 +21,16 @@ const { coralReady } = require('./helpers/wait');
             await ev(`(() => { const b = [...document.querySelectorAll('[role=dialog] button')].find(x => /^Next$/.test(x.textContent.trim()) && x.getClientRects().length); const f = document.getElementById('launch-dir'); if (f && !f.value) { f.value = '/tmp'; f.dispatchEvent(new Event('input', { bubbles: true })); } if (b) b.click(); return true; })()`);
             await waitFor(`/Step ${i + 2} of 3|Step 3 of 3/.test(document.querySelector('[role=dialog]')?.textContent || '')`, 'the next step', 4000).catch(() => {});
         }
-        await waitFor(`!!document.querySelector('#launch-step-agent .provider-card.is-open .acf-model-select') && document.querySelector('#launch-step-agent .provider-card.is-open .acf-model-select').getClientRects().length > 0`, 'the Model field in the open card', 8000);
+        await waitFor(`!!document.querySelector('#launch-step-agent .provider-card-body:not([hidden]) .acf-model-select') && document.querySelector('#launch-step-agent .provider-card-body:not([hidden]) .acf-model-select').getClientRects().length > 0`, 'the Model field in the open card', 8000);
         // the cards are built again now (as when the dialog opens), so their 1.5 s wait starts at this moment, however long the steps took to reach
         await ev(`(() => { import((window.__coralStatic || '/static/') + 'launch_provider_cards.js').then(m => m.buildProviderCards({ group: document.getElementById('launch-agent-pick'), form: document.getElementById('launch-agent-acf'), server: 'local', implicitDefault: false })); return true; })()`);
-        await waitFor(`!!document.querySelector('#launch-step-agent .provider-card.is-open .acf-model-select')`, 'the Model field in the rebuilt open card', 4000);
+        await waitFor(`!!document.querySelector('#launch-step-agent .provider-card-body:not([hidden]) .acf-model-select')`, 'the Model field in the rebuilt open card', 4000);
         const probed = `document.getElementById('launch-agent-pick').dataset.probed === '1'`;
         assert.equal(await ev(probed), false, 'the cards have not heard from the CLI checks yet');
-        await ev(`document.querySelector('#launch-step-agent .provider-card.is-open .acf-model-select').focus(); true`);
+        await ev(`document.querySelector('#launch-step-agent .provider-card-body:not([hidden]) .acf-model-select').focus(); true`);
         assert.equal(await ev(`document.activeElement.classList.contains('acf-model-select')`), true, 'the person is in the Model field');
         await waitFor(probed, 'the cards drawn again after the wait', 9000);
-        const after = await ev(`({ cls: document.activeElement.className, inCard: !!document.activeElement.closest('.provider-card.is-open'), connected: document.activeElement.isConnected })`);
+        const after = await ev(`({ cls: document.activeElement.className, inCard: !!document.activeElement.closest('.provider-card-body:not([hidden])'), connected: document.activeElement.isConnected })`);
         assert.ok(/acf-model-select/.test(after.cls) && after.inCard && after.connected, `the focus is still in the Model field after the redraw: ${JSON.stringify(after)}`);
         console.log('PASS the provider cards keep a person in the Model row when they are drawn again');
     } finally { await client.close(); }
