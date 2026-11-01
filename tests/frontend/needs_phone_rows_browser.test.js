@@ -59,6 +59,9 @@ const { coralReady } = require('./helpers/wait');
             let b = await bar();
             assert.ok(b && b.count === '1 selected', at + 'the bar says 1 selected: ' + JSON.stringify(b));
             assert.deepEqual(b.actions.map(a => a.label), ['Cancel', 'Approve', 'Ignore', 'Save for later', 'More actions', 'Changes', 'Mark read', 'Mark unread'], at + 'Cancel (X), the icon buttons, then More with Changes, Mark read, Mark unread: ' + JSON.stringify(b.actions));
+            // the bar is the top row of the screen and stays there while the list scrolls (the operator, comment 28)
+            const stay = await ev(`(() => { const bar = document.querySelector('.dt-bar'), sc = (() => { for (let e = bar; e; e = e.parentElement) { const o = getComputedStyle(e).overflowY; if ((o === 'auto' || o === 'scroll') && e.scrollHeight > e.clientHeight + 5) return e; } return document.scrollingElement; })(); sc.scrollTop = sc.scrollTop + 500; const r = bar.getBoundingClientRect(), s = sc === document.scrollingElement ? { top: 0 } : sc.getBoundingClientRect(); return { top: Math.round(r.top - s.top), shown: r.height > 0 }; })()`);
+            assert.ok(stay.shown && stay.top >= -1 && stay.top <= 40, at + 'after the list scrolls the bar is still at the top of the screen (within 40 px of the list top): ' + JSON.stringify(stay));
             assert.ok(b.oneLine && b.h <= 64 && b.small.length === 0, at + 'the bar is one line, every target 44 px, each named (Gmail, #11707): ' + JSON.stringify({ h: b.h, oneLine: b.oneLine, small: b.small }));
             assert.ok(!b.actions.find(a => a.label === 'Approve').off && !b.actions.find(a => a.label === 'Changes').off, at + 'a file can be approved or sent back');
             // the three dots hold Changes, Mark read and Mark unread, and open on a tap
