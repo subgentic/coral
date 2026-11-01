@@ -152,7 +152,7 @@ async function startDashboard() {
 
     // Initialize nav tabs — hide history section on load (Agents tab is default)
     if (!popout) {
-        switchNavTab('agents');
+        switchNavTab('agents', { initial: true }); // sets the page's default state; the start route marks its own tab (nav.js markStartTab, #11612)
     } else {
         initPopout();
     }

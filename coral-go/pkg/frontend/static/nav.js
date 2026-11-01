@@ -97,6 +97,14 @@ export function startRoute(loc = location) {
     return parse(loc.pathname, loc.search) || { view: 'agents' };
 }
 
+const START_TAB = { chats: 'history', analytics: 'tokens', automations: 'automations', workflows: 'automations', docs: 'docs', servers: 'servers', board: 'board' };
+/** The nav marks no tab current in the markup (the start is not known until here, #11612): the start route's tab is marked in this same turn, before its view's modules load, and switchNavTab moves it from then on. */
+function markStartTab(r) {
+    if (typeof document === 'undefined') return;
+    const tab = document.getElementById(`nav-tab-${/^inbox-/.test(r.view) ? 'hub-inbox' : START_TAB[r.view] || 'agents'}`);
+    if (tab && !document.querySelector('.top-nav-tab[aria-current]')) { tab.classList.add('active'); tab.setAttribute('aria-current', 'page'); }
+}
+
 /** Start: write the start route as the current entry (history.state set even when the page was
  *  opened with a hash), listen for Back and Forward, and show it. Returns the route. */
 export function startNav() {
@@ -110,6 +118,7 @@ export function startNav() {
     }
     const kept = lastPlace();
     write(route, true);
+    markStartTab(route);
     if (kept && isHome(route)) lastPlace(kept); // the start itself is not the person choosing Home: a phone's Home start (or a link's) leaves the place for the next wide start
     window.addEventListener('popstate', () => {
         // The URL is the truth: the route is parsed from the location every time, never taken
