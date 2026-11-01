@@ -78,3 +78,47 @@ func (s *Store) UnparkTask(ctx context.Context, project string, id int64) (*Task
 	}
 	return s.GetTask(ctx, project, id)
 }
+
+// lapsedParkSQL is true for a task whose parking has an end that has passed: it is parked no more (parkedSQL), so it holds its owner's slot again without anything having run.
+const lapsedParkSQL = `(parked_reason IS NOT NULL AND parked_until IS NOT NULL AND parked_until <= strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))`
+
+// ReleaseLapsedParks gives a task in progress whose timed park has ended its owner's slot back, as UnparkTask does for a park lifted by hand (#11659): the parking is cleared, and when the owner holds
+// another task meanwhile the task goes back to pending (the owner is kept) instead, so a member never has two tasks in progress. Several lapsed parks of one owner keep the oldest claim and requeue
+// the rest. project "" releases every board. It returns how many tasks were requeued.
+func (s *Store) ReleaseLapsedParks(ctx context.Context, project string) (int, error) {
+	q := `SELECT id, board_id FROM board_tasks WHERE status = 'in_progress' AND assigned_to IS NOT NULL AND assigned_to != '' AND ` + lapsedParkSQL
+	var args []any
+	if project != "" {
+		q += ` AND board_id = ?`
+		args = append(args, project)
+	}
+	q += ` ORDER BY claimed_at, id`
+	type lapsed struct {
+		ID    int64  `db:"id"`
+		Board string `db:"board_id"`
+	}
+	var rows []lapsed
+	if err := s.reader().SelectContext(ctx, &rows, q, args...); err != nil || len(rows) == 0 {
+		return 0, err
+	}
+	tx, err := s.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback()
+	requeued := 0
+	for _, r := range rows {
+		if _, err := tx.ExecContext(ctx, `UPDATE board_tasks SET parked_reason = NULL, parked_until = NULL WHERE board_id = ? AND id = ? AND `+lapsedParkSQL, r.Board, r.ID); err != nil {
+			return 0, err
+		}
+		res, err := tx.ExecContext(ctx, `UPDATE board_tasks SET status = 'pending' WHERE board_id = ? AND id = ? AND status = 'in_progress'
+			AND EXISTS (SELECT 1 FROM board_tasks o WHERE o.board_id = board_tasks.board_id AND o.assigned_to = board_tasks.assigned_to AND o.id != board_tasks.id AND o.`+holdsSlotSQL+`)`, r.Board, r.ID)
+		if err != nil {
+			return 0, err
+		}
+		if n, _ := res.RowsAffected(); n > 0 {
+			requeued += int(n)
+		}
+	}
+	return requeued, tx.Commit()
+}

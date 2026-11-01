@@ -234,6 +234,9 @@ func (s *Store) ListTasks(ctx context.Context, project string) ([]Task, error) {
 // ListTasksCapped is ListTasks limited to max rows (max <= 0: every row). more says there were rows past the cap, so a caller
 // that must bound a reply (the full=1 list a viewer or an agent can ask for, #4602) can say it was cut.
 func (s *Store) ListTasksCapped(ctx context.Context, project string, max int) (tasks []Task, more bool, err error) {
+	if _, err = s.ReleaseLapsedParks(ctx, project); err != nil { // a park whose end passed: one task in progress per owner before the list says so (#11659)
+		return nil, false, err
+	}
 	q := `SELECT id, revision, board_id, title, body, status, priority, created_by, assigned_to, completed_by, completion_message, created_at, claimed_at, completed_at, session_id, cost_usd, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, parked_reason, parked_until, remind_at, goal_id, ` + updatedAtSQL + ` AS updated_at FROM board_tasks WHERE board_id = ?
 		 ORDER BY CASE priority WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 END, id ASC`
 	args := []any{project}
@@ -665,6 +668,9 @@ const holdsSlotSQL = `status = 'in_progress' AND NOT ` + parkedSQL
 // An agent cannot claim a new task while they have an in-progress task. A parked task is never offered or claimed until it is unparked (#5183).
 func (s *Store) ClaimTask(ctx context.Context, project, subscriberID string, requestedID ...int64) (*Task, error) {
 	now := nowUTC()
+	if _, err := s.ReleaseLapsedParks(ctx, project); err != nil { // a park whose end passed holds its owner's slot again: settle that before the slot is judged (#11659)
+		return nil, err
+	}
 	if err := s.refuseWhileSlotHeld(ctx, project, subscriberID); err != nil {
 		return nil, err
 	}

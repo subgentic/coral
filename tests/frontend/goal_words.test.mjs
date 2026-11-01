@@ -60,3 +60,17 @@ assert.ok(longLine.includes('\u2026') && longLine.length < 130, 'a long title is
 assert.ok(longLine.endsWith(': run coral-board goal brief 9'), 'the command is never cut');
 console.log('goal_words: ok');
 assert.equal(W.noGoalRowText(1), '1 task has no goal'); assert.equal(W.noGoalRowText(4), '4 tasks have no goal');
+
+// #11659 (the operator): an agent with several parked tasks showed several 'In progress'. A parked task (a reason, no end or an end ahead) holds no slot, so it reads 'Waiting'; only the live one reads 'In progress'.
+const ago = new Date(Date.now() - 3600e3).toISOString(), ahead = new Date(Date.now() + 3600e3).toISOString();
+assert.equal(W.isParked({ parked_reason: 'waiting on the operator' }), true, 'a reason and no end is parked');
+assert.equal(W.isParked({ parked_reason: 'later', parked_until: ahead }), true, 'an end still ahead is parked');
+assert.equal(W.isParked({ parked_reason: 'later', parked_until: ago }), false, 'an end in the past is not parked any more');
+assert.equal(W.isParked({ parked_reason: '' }), false); assert.equal(W.isParked({}), false); assert.equal(W.isParked(null), false);
+assert.equal(W.taskStatusWord('in_progress', false, W.isParked({ parked_reason: 'x' })), 'Waiting', 'a parked task in progress is Waiting');
+assert.equal(W.taskStatusWord('pending', false, true), 'Waiting', 'a parked queued task too');
+assert.equal(W.taskStatusWord('in_progress', false, false), 'In progress', 'the live task is In progress');
+assert.equal(W.taskStatusWord('in_progress', false), 'In progress', 'no third argument: as before');
+assert.equal(W.taskStatusWord('completed', false, true), 'Done', 'a finished task is Done even if it was parked');
+assert.equal(W.taskStatusWord('review_pending', false, true), 'In review', 'a task in review is In review');
+console.log('goal_words: parked tasks read Waiting');

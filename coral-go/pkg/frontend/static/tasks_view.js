@@ -5,14 +5,14 @@ import { serverField, syncServerField } from './inbox_servers.js';
  *   tasksTable('team', rows, { ctx: { openGoal(goalId), goalTitleOf(goalId), noGoal, teamOf(task) }, open, state, ...dataTable options }) -> { el, bar, selectButton, ... } (a data_table)
  *   taskColumns(ctx, ['state', 'task', 'who', 'goal', 'priority', 'updated']) -> Column[] (the columns alone, for a surface that adds its own) */
 import { boardFetch } from './server_base.js';
-import { taskStatusWord, statusClass } from './goal_words.js';
+import { taskStatusWord, statusClass, isParked } from './goal_words.js';
 import * as DT from './data_table.js'; // static: a top-level await on a lazy import here would hold up every module that imports this one (the shape that froze startup in #7844 and #7904)
 import { buildListBar } from './list_bar.js';
 import { isCloud } from './server_base.js';
 import { openTask } from './task_navigation.js';
 import { EMPTY, STATUSES, PRIORITIES, SORTS, STATUS_LABEL, PRIORITY_LABEL, SORT_LABEL, clean, chips, isFiltered, without } from './task_filters.js';
 
-export const taskWord = (t) => taskStatusWord(t.status, t.review_requested);
+export const taskWord = (t) => taskStatusWord(t.status, t.review_requested, isParked(t));
 export const taskKey = (t) => `t${t.id}`;
 const isDone = (t) => t.status === 'completed';
 /** Who did the work (the server's worked_by: the author of a reviewed task, not the orchestrator it was handed to); an older server has no worked_by: who completed a done task, else its assignee. */
@@ -23,7 +23,7 @@ const reviewersOf = (t) => (Array.isArray(t.reviewers) ? t.reviewers.map(r => St
 /** Who a row's Assigned to cell says, in words: the doer ("Done by Dev", "Dev"), then the reviewers ("reviewed by QA" once done, "review by QA" before). It is the circles' accessible name and hover text (#8492). */
 const whoWords = (t) => { const rv = reviewersOf(t); return rv.length ? `${whoText(t)}, ${isDone(t) ? 'reviewed by' : 'review by'} ${rv.join(', ')}` : whoText(t); };
 export const priorityWord = (p) => { const s = String(p || '').trim(); return s ? s[0].toUpperCase() + s.slice(1).toLowerCase() : ''; };
-const STATE_RANK = { 'In progress': 0, 'In review': 1, 'Blocked': 2, 'Queued': 3, 'Done': 4 };
+const STATE_RANK = { 'In progress': 0, 'In review': 1, 'Blocked': 2, 'Waiting': 3, 'Queued': 4, 'Done': 5 };
 const PRIORITY_RANK = { high: 0, medium: 1, low: 2 };
 
 /** The Who cell: the person as circles named in words (DT.avatars), or "Nobody yet" in words when no one has the task. The dock's list draws the same one (#8507). */
