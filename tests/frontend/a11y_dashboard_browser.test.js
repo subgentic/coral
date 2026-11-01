@@ -55,6 +55,7 @@ const contrast = (a, b) => {
         await Page.loadEventFired();
         await waitFor(`typeof window.switchNavTab === 'function' && !!document.getElementById('nav-tab-agents')`, 'the nav', 10000);
 
+        await waitFor(`document.getElementById('nav-tab-hub-inbox')?.getAttribute('aria-current') === 'page'`, 'the Inbox tab marked current (the start place is drawn after the nav, #11594)', 10000);
         console.log('1. Top nav: page navigation with aria-current');
         const nav = () => ev(`(() => {
             const n = document.querySelector('.top-nav-tabs'), btns = [...n.querySelectorAll('.top-nav-tab')];
