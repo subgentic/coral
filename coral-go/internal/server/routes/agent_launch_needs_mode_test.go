@@ -17,6 +17,7 @@ import (
 
 	"github.com/subgentic/coral/internal/agent"
 	at "github.com/subgentic/coral/internal/agenttypes"
+	"github.com/subgentic/coral/internal/board/boardtest"
 	"github.com/subgentic/coral/internal/store"
 )
 
@@ -227,4 +228,98 @@ func TestAnAgentsCodexLaunchByBoardIDNeedsAMode(t *testing.T) {
 	rig.h.Launch(rec, req)
 	assert.Equal(t, http.StatusForbidden, rec.Code, rec.Body.String())
 	assert.Contains(t, rec.Body.String(), agentLaunchNeedsModeCode)
+}
+
+// #11713 (the Operator's request): an Orchestrator can launch agents for the person. Its launch used to be refused when the Operator's saved default skips the prompts; it now starts in the ask-first mode (never less
+// restricted than itself) and the Operator raises it later. Any other agent is refused as before, a Codex stays refused (asking first, it cannot reach Coral), and the Operator's launch is unchanged.
+func TestAnOrchestratorsLaunchStartsAskFirstWhereAnotherAgentIsRefused(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the fake CLI is a shell script")
+	}
+	rig := setupAgyTestRig(t)
+	ctx := context.Background()
+	fake := filepath.Join(t.TempDir(), "cli")
+	require.NoError(t, os.WriteFile(fake, []byte("#!/bin/sh\nexit 0\n"), 0o755))
+	require.NoError(t, rig.ss.SetSetting(ctx, agent.CLIPathSettingKey(at.Codex), fake))
+	require.NoError(t, rig.ss.SetSetting(ctx, agent.CLIPathSettingKey(at.Claude), fake))
+	bs, err := boardtest.Open(filepath.Join(t.TempDir(), "board.db"))
+	require.NoError(t, err)
+	t.Cleanup(func() { bs.Close() })
+	rig.h.bs = bs
+	const orch, worker = "11111111-2222-4333-8444-555555555555", "22222222-3333-4444-8555-666666666666"
+	for _, s := range []struct{ id, name, title string }{{orch, "orch", "Orchestrator"}, {worker, "worker", "Backend Dev"}} {
+		require.NoError(t, rig.ss.RegisterLiveSession(ctx, &store.LiveSession{SessionID: s.id, AgentType: "claude", AgentName: s.name, WorkingDir: rig.workdir}))
+		_, err := bs.Subscribe(ctx, "launch-board", s.name, s.title, "claude-"+s.id, nil, "mentions")
+		require.NoError(t, err)
+	}
+	as := func(id string) func(*http.Request) *http.Request {
+		return func(r *http.Request) *http.Request {
+			return r.WithContext(context.WithValue(r.Context(), verifiedSessionKey{}, &store.SessionTokenOwner{SessionID: id, SessionName: "claude-" + id}))
+		}
+	}
+	launch := func(from func(*http.Request) *http.Request, agentType string) (*httptest.ResponseRecorder, string) {
+		t.Helper()
+		b, _ := json.Marshal(map[string]any{"agent_type": agentType, "working_dir": rig.workdir})
+		req := httptest.NewRequest(http.MethodPost, "/api/sessions/launch", bytes.NewReader(b))
+		if from != nil {
+			req = from(req)
+		}
+		rec := httptest.NewRecorder()
+		rig.h.Launch(rec, req)
+		cmd := ""
+		if rec.Code == http.StatusOK {
+			var res map[string]any
+			require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &res))
+			rig.term.mu.Lock()
+			for name, cmds := range rig.term.sent {
+				if strings.Contains(name, res["session_id"].(string)) && len(cmds) > 0 {
+					cmd = cmds[len(cmds)-1]
+				}
+			}
+			rig.term.mu.Unlock()
+		}
+		return rec, cmd
+	}
+	for _, mode := range []string{"auto", "bypassPermissions", "dontAsk", "acceptEdits", "plan"} {
+		require.NoError(t, rig.ss.SetSetting(ctx, "default_permission_mode", mode))
+		// the Orchestrator: started, ask first, none of the saved default's words on the command line
+		rec, cmd := launch(as(orch), at.Claude)
+		require.Equal(t, http.StatusOK, rec.Code, "orchestrator, saved %s: %s", mode, rec.Body.String())
+		assert.NotContains(t, strings.ToLower(cmd), "skip-permissions", "saved %s", mode)
+		assert.NotContains(t, cmd, "bypassPermissions", "saved %s", mode)
+		assert.NotContains(t, cmd, "--permission-mode "+mode, "saved %s: the saved default is not inherited", mode)
+		// another agent: refused as before
+		rec, _ = launch(as(worker), at.Claude)
+		assert.Equal(t, http.StatusForbidden, rec.Code, "worker, saved %s", mode)
+		// the Operator: unchanged
+		rec, _ = launch(nil, at.Claude)
+		assert.Equal(t, http.StatusOK, rec.Code, "operator, saved %s", mode)
+		// a Codex asks first and cannot reach Coral: the Orchestrator's Codex stays refused
+		if mode == "auto" || mode == "bypassPermissions" || mode == "dontAsk" || mode == "acceptEdits" {
+			rec, _ = launch(as(orch), at.Codex)
+			assert.Equal(t, http.StatusForbidden, rec.Code, "orchestrator's codex, saved %s", mode)
+		}
+	}
+	// no saved default: as before
+	require.NoError(t, rig.ss.SetSetting(ctx, "default_permission_mode", ""))
+	rec, _ := launch(as(orch), at.Claude)
+	assert.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	// As a team member: the Orchestrator's member starts (ask first), another agent's member is not started.
+	require.NoError(t, rig.ss.SetSetting(ctx, "default_permission_mode", "auto"))
+	team := func(from func(*http.Request) *http.Request, board string) []map[string]any {
+		b, _ := json.Marshal(map[string]any{"board_name": board, "new_board": true, "working_dir": rig.workdir, "agent_type": at.Claude, "agents": []map[string]any{{"name": "Member"}}})
+		rec := httptest.NewRecorder()
+		rig.h.LaunchTeam(rec, from(httptest.NewRequest(http.MethodPost, "/api/sessions/launch-team", bytes.NewReader(b))))
+		var out struct {
+			Agents []map[string]any `json:"agents"`
+		}
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &out), rec.Body.String())
+		return out.Agents
+	}
+	orchTeam := team(as(orch), "orch-team")
+	require.Len(t, orchTeam, 1)
+	assert.Empty(t, orchTeam[0]["error"], "the Orchestrator's member starts: %v", orchTeam[0])
+	workerTeam := team(as(worker), "worker-team")
+	require.Len(t, workerTeam, 1)
+	assert.Equal(t, agentLaunchNeedsModeCode, workerTeam[0]["code"], "another agent's member is refused: %v", workerTeam[0])
 }

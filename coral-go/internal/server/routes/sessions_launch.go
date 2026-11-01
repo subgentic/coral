@@ -147,9 +147,13 @@ func (h *SessionsHandler) Launch(w http.ResponseWriter, r *http.Request) {
 		// would ask first and could not reach Coral (#7552). Both are refused before anything is made.
 		if userSettings, err := h.launchSettings(r.Context()); err == nil {
 			if mode, inherits := agentLaunchInheritsSkippingDefault(body.AgentType, body.Flags, userSettings); inherits {
-				attempt.Finish(tracking.OutcomeFailure, tracking.FailInvalidRequest, 0, 1)
-				writeError(w, http.StatusForbidden, agentLaunchNeedsModeCode, agentLaunchInheritsSkippingDefaultMessage(body.AgentType, mode))
-				return
+				if h.orchestratorLaunchAsksFirst(r, body.AgentType) {
+					body.PermissionMode = "default" // an Orchestrator's launch starts ask-first, never less restricted than itself; the Operator raises it later (#11713)
+				} else {
+					attempt.Finish(tracking.OutcomeFailure, tracking.FailInvalidRequest, 0, 1)
+					writeError(w, http.StatusForbidden, agentLaunchNeedsModeCode, agentLaunchInheritsSkippingDefaultMessage(body.AgentType, mode))
+					return
+				}
 			}
 			if (body.BoardName != "" || body.BoardID != "") && agentLaunchNeedsMode(body.AgentType, body.Flags, true, userSettings) {
 				attempt.Finish(tracking.OutcomeFailure, tracking.FailInvalidRequest, 0, 1)
