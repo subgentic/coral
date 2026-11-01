@@ -72,6 +72,10 @@ const { coralReady } = require('./helpers/wait');
                 const facts = await ev(`(document.querySelector('.artifact-viewer .detail-details') || {}).textContent || ''`);
                 assert.ok(/Goal/.test(facts) && /Ship the installer/.test(facts) && /Task/.test(facts) && /Build the installer/.test(facts), 'the opened file\'s Details say its goal and its task: ' + JSON.stringify(facts.slice(0, 200)));
                 if (dir) { fs.writeFileSync(path.join(dir, `review-details-${width}.png`), Buffer.from((await Page.captureScreenshot({ format: 'png' })).data, 'base64')); }
+                // a goal or task title with a right-to-left override is written out, not drawn (it is an agent's text, like the rest of the row)
+                await ev(`(async () => { const v = await import((window.__coralStatic || '/static/') + 'artifact_viewer.js'); v.openArtifactViewer('${'0'.repeat(63)}1', { filename: 'hidden.txt', goal: 'Ship\\u202e it', task: 'Build\\u200b it' }); return true; })()`);
+                await waitFor(`/<U\\+202E>/.test((document.querySelector('.artifact-viewer .detail-details') || {}).textContent || '')`, 'the Details write a hidden character out', 8000);
+                assert.ok(await ev(`(() => { const t = document.querySelector('.artifact-viewer .detail-details').textContent; return t.includes('Ship<U+202E> it') && t.includes('Build<U+200B> it') && !/[\\u202e\\u200b]/.test(t); })()`), 'the goal and task titles are written out, not stripped or drawn');
                 await ev(`document.querySelector('.artifact-viewer-close').click(); true`);
                 console.log('PASS review goal ' + width);
                 console.log('PASS review goal ' + width);
