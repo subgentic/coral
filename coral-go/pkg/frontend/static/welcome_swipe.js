@@ -23,14 +23,17 @@ export function attachWelcomeSwipe(host) {
     host._welcomeSwipe = true;
     let drag = null;
     const back = (row, strip) => { row.style.transition = calm() ? 'none' : 'transform .15s ease-out'; row.style.transform = ''; strip.remove(); };
-    host.addEventListener('pointerdown', e => {
-        const row = e.pointerType === 'touch' && e.target.closest('tr[data-welcome-id], tr[data-key]');
+    const scope = host.closest('#group-table-view') || host; // the list's own box and the gutter around it
+    scope.addEventListener('pointerdown', e => {
+        // a finger that starts in the list's side gutter (a 360 px phone has 16 px of it right of the row, and a driver drags from the edge) is on the row at that height (#11765)
+        const rowAt = y => [...host.querySelectorAll('tr[data-welcome-id], tr[data-key]')].find(r => { const b = r.getBoundingClientRect(); return y >= b.top && y <= b.bottom; });
+        const row = e.pointerType === 'touch' && (e.target.closest('tr[data-welcome-id], tr[data-key]') || (scope.contains(e.target) && !e.target.closest('button, a, input, select, textarea, .dt-bar, .gt-toolbar') ? rowAt(e.clientY) : null));
         if (row && !row.dataset.welcomeId && !row.querySelector('.inbox-review-actions')?._ignore) return; // a row with nothing to ignore is not swiped (#11642)
         if (!row || drag) return;
         drag = { row, id: row.dataset.welcomeId, box: row.querySelector('.inbox-review-actions'), x: e.clientX, y: e.clientY, t: e.timeStamp, dx: 0, on: false, strip: document.createElement('div') };
         drag.strip.className = 'inbox-swipe-strip'; drag.strip.setAttribute('aria-hidden', 'true'); drag.strip.textContent = 'Ignore';
     });
-    host.addEventListener('pointermove', e => {
+    scope.addEventListener('pointermove', e => {
         if (!drag || e.pointerType !== 'touch') return;
         const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
         if (!drag.on) {
@@ -59,6 +62,6 @@ export function attachWelcomeSwipe(host) {
             announceNotice(`Ignored: ${title}. Undo is in the notice.`); // read out politely: the toast is not a live region of its own
         } else back(d.row, d.strip);
     };
-    host.addEventListener('pointerup', end);
-    host.addEventListener('pointercancel', end);
+    scope.addEventListener('pointerup', end);
+    scope.addEventListener('pointercancel', end);
 }

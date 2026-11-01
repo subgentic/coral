@@ -792,7 +792,7 @@ registerGroupSource('hub-inbox', {
                         p.append(DT.link('See them', () => go({ view: 'automations', folder: 'recent' })));
                         wrap.append(p);
                     }
-                    if (rows.some(r => (r.welcome && r.welcome.dismiss) || r.review || (r.operatorAsk && r.operatorAsk.kind === 'ask') || r.autorun) && matchMedia('(pointer: coarse)').matches) importOnce('./welcome_swipe.js').then(m => m.attachWelcomeSwipe(wrap)).catch(() => {}); // a touch screen swipes a welcome row away (#11542); lazy
+                    if (rows.some(r => (r.welcome && r.welcome.dismiss) || r.review || (r.operatorAsk && r.operatorAsk.kind === 'ask') || r.autorun) && (isPhoneLayout() || matchMedia('(pointer: coarse)').matches)) importOnce('./welcome_swipe.js').then(m => m.attachWelcomeSwipe(wrap)).catch(() => {}); // a touch screen, or a phone-sized window whatever its pointer says (#11765), swipes a row away (#11542); lazy
                     return wrap; } };
         }
         if (key === 'tasks') {
