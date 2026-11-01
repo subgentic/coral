@@ -270,14 +270,14 @@ export function attachComments(dialog, body, host, opts = {}) {
         if (c.can.edit) row.append(act('Edit', `Edit the comment by ${who}`, () => { st.composing = { editId: c.id }; st.error = ''; render(); panel.querySelector('.ac-input')?.focus(); }));
         if (c.can.delete) row.append(act('Delete', `Delete the comment by ${who}`, () => confirmThen('Delete this comment?', () => run(() => api.deleteComment(ownHex(c), st.server, c.id), 'Comment deleted'))));
         // Send to agent (#6357, #6456): the owner, on this computer, for a thread of this board that is open; never through Coral Hub
-        if (top && canAsk(c)) { const b = act('Send to agent', () => openAsk(c)); b.classList.add('ac-ask-open'); b.setAttribute('aria-label', `Send the comment by ${c.authorName || c.authorId || 'unknown'} to an agent`); b.setAttribute('aria-expanded', String(!!st.ask && st.ask.id === c.id)); row.append(b); }
+        if (top && canAsk(c)) { const b = act('Send to agent', () => openAsk(c)); b.classList.add('ac-ask-open'); b.setAttribute('aria-label', `Send the comment by ${c.authorName || c.authorId || 'unknown'} to an agent`); b.setAttribute('aria-expanded', String(!!st.ask && st.ask.id === c.id)); row.append(b); const asked = [...askedNow(c.id)]; row.append(el('span', 'ac-ask-status', asked.length ? 'Sent to ' + asked.map(([role, words]) => `${role} (${words.toLowerCase()})`).join(', ') : 'Not sent to an agent yet')); } // does the agent have it? said beside the link
         // not an .ac-act: it writes nothing, so a read-only viewer has it too
         if (top && st.ranges.has(c.id)) { const j = btn('ac-jump', 'Show in text', `Show the text of the comment by ${who} in the document`); j.addEventListener('click', () => jumpTo(c.id)); row.append(j); }
         return row;
     }
     const act = (text, label, fn) => { if (typeof label === 'function') { fn = label; label = ''; } const b = btn('ac-act', text, label); b.addEventListener('click', fn); return b; };
 
-    const { canAsk, openAsk, askBlock } = createAsk({ st, panel, render, announce, refresh, ownHex });
+    const { canAsk, openAsk, askBlock, askedNow } = createAsk({ st, panel, render, announce, refresh, ownHex });
     function confirmThen(msg, fn) { if (window.showConfirmModal) window.showConfirmModal('Delete comment', msg, fn, undefined, { label: 'Delete comment', danger: true }); else fn(); }
     async function run(fn, said) {
         if (st.busy) return;
