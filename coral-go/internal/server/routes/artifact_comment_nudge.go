@@ -42,11 +42,7 @@ func (h *SessionsHandler) RunCommentReplyNudges(ctx context.Context) {
 
 // nudgeUnansweredComments is one pass: each ask still waiting for a reply in its thread that is due (ten minutes, or the agent posted about the file on the board) gets the reply command typed into it, once.
 func (h *SessionsHandler) nudgeUnansweredComments(ctx context.Context, now time.Time) {
-	send := h.replyNudgeSend // a test's recorder; the real one types into the agent
-	if send == nil && h.boardHandler != nil {
-		send = h.boardHandler.sendAutomated
-	}
-	if h.ss == nil || h.bs == nil || send == nil {
+	if h.ss == nil || h.bs == nil || (h.replyNudgeSend == nil && h.boardHandler == nil) {
 		return
 	}
 	asks, err := h.ss.AwaitingAsks(ctx, now, replyNudgeBatch)
@@ -70,7 +66,7 @@ func (h *SessionsHandler) nudgeUnansweredComments(ctx context.Context, now time.
 		if !due || (h.boardHandler != nil && h.boardHandler.IsPaused(a.Board)) {
 			continue
 		}
-		if err := send(ctx, a.Board, sessionName, typedReplyNudge(a.ArtifactID, a.CommentID)); err != nil {
+		if err := h.typeReplyNudge(ctx, a.Board, sessionName, typedReplyNudge(a.ArtifactID, a.CommentID)); err != nil {
 			slog.Warn("[artifact comments] a reminder to answer in the thread was not typed", "artifact", a.ArtifactID, "comment", a.CommentID, "error", err)
 			continue
 		}
@@ -92,4 +88,12 @@ func (h *SessionsHandler) postedAboutArtifact(ctx context.Context, a store.Artif
 	}
 	low := strings.ToLower(content)
 	return strings.Contains(low, a.ArtifactID) || strings.Contains(low, a.ArtifactID[:12])
+}
+
+// typeReplyNudge types the reminder into the agent (a test's recorder when one is set). The text is always typedReplyNudge's (the census, goal #7).
+func (h *SessionsHandler) typeReplyNudge(ctx context.Context, project, sessionName, text string) error {
+	if h.replyNudgeSend != nil {
+		return h.replyNudgeSend(ctx, project, sessionName, text)
+	}
+	return h.boardHandler.sendAutomated(ctx, project, sessionName, text)
 }

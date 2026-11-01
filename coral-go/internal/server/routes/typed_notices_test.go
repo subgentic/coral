@@ -66,7 +66,7 @@ func TestEveryTypedSenderIsInTheCensus(t *testing.T) {
 		typedcensus.S("board_notifications.go", `typedPeriodicReminder(`, 1, "census"),
 		typedcensus.S("board_reminders.go", `typedBoardReminder(`, 1, "census"),
 		typedcensus.S("board_goals.go", `typedGoalDriverNudge(id)`, 1, "census: goal driver"),
-		typedcensus.S("artifact_comment_nudge.go", `typedReplyNudge(a.ArtifactID`, 1, "census: comment reply reminder"),
+		typedcensus.S("artifact_comment_nudge.go", `h.boardHandler.sendAutomated(`, 1, "typedReplyNudge (census: comment reply reminder)"),
 		typedcensus.S("board_task_create.go", `taskClaimNudge(`, 1, "census"),
 		typedcensus.S("board_task_create.go", `taskNudge)`, 1, "census: tasks available"),
 		typedcensus.S("board_task_edit.go", `taskClaimNudge(`, 4, "census"),
