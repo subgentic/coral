@@ -16,7 +16,7 @@ const { removeBoards } = require('./helpers/board_cleanup');
             const real = window.fetch; const json = (b, status = 200) => Promise.resolve(new Response(JSON.stringify(b), { status, headers: { 'content-type': 'application/json' } }));
             window.fetch = (u, o = {}) => { const p = new URL(String(u), location.href), m = o.method || 'GET';
                 if (p.pathname === '/api/sessions/launch-team' && m === 'POST') { window.__teamLaunches.push(JSON.parse(o.body)); return json({ agents: [{ name: 'A', session_id: 's' }] }); }
-                if (p.pathname === '/api/filesystem/list') { window.__listed = (window.__listed || 0) + 1; return p.searchParams.get('path') === '/home/p/Coral/exists' ? json({ entries: [] }) : json({ error: 'not found' }, 404); }
+                if (p.pathname === '/api/filesystem/list') { window.__listed = (window.__listed || 0) + 1; return p.searchParams.get('path') === '/home/p/Coral/exists' && !window.__hideExists ? json({ entries: [] }) : json({ error: 'not found' }, 404); }
                 if (p.pathname === '/api/board/projects') return json([]);
                 return real(u, o); };
             await window.showLaunchModal(); window.hideLaunchModal(); })(); true`);
@@ -88,6 +88,32 @@ const { removeBoards } = require('./helpers/board_cleanup');
         sent = await go();
         assert.equal(sent.trust_folder, undefined, 'and nothing is trusted');
         await ev(`window.hideLaunchModal(); true`);
+
+        console.log('A switch that is on without the person having ticked it for this folder, or that is hidden, sends nothing');
+        await open(); await setDir('/home/p/Code/app', false);
+        await ev(`document.getElementById('launch-team-trust').checked = true; true`); // on, with no change event: not the person's tick for this folder
+        sent = await go();
+        assert.equal(sent.trust_folder, undefined, 'a switch no tick put on is not a request');
+        await ev(`window.hideLaunchModal(); true`);
+        await open(); await setDir('/home/p/Coral/fresh', true);
+        await ev(`document.getElementById('launch-team-trust').checked = true; true`); // hidden for a folder Coral makes
+        sent = await go();
+        assert.equal(sent.trust_folder, undefined, 'a hidden switch is not a request');
+        await ev(`window.hideLaunchModal(); true`);
+
+        console.log('A tick that was made while the switch showed is not sent once the switch is hidden for the same folder');
+        await open(); await setDir('/home/p/Coral/exists', true);
+        await ev(`document.getElementById('launch-team-trust').click(); true`);
+        await ev(`window.__hideExists = true; true`); // the folder is gone: Coral would make it now, and the row goes
+        const calls = await ev(`window.__listed`);
+        await ev(`document.getElementById('launch-team-dir').dispatchEvent(new Event('input', { bubbles: true })); true`);
+        await waitFor(`window.__listed > ${calls}`, 'the folder was looked up again');
+        await ev(`new Promise(r => setTimeout(r, 120))`); // sleep-ok: the answer is applied in the next task
+        assert.equal(await visible('launch-team-trust'), false, 'the switch is hidden again');
+        assert.equal(await ev(`document.getElementById('launch-team-trust').checked`), true, 'still on underneath');
+        sent = await go();
+        assert.equal(sent.trust_folder, undefined, 'a hidden switch sends nothing, even on for this folder');
+        await ev(`window.__hideExists = false; window.hideLaunchModal(); true`);
 
         console.log('Changing the folder to one Coral makes takes the switch away and does not send a stale tick');
         await open(); await setDir('/home/p/Code/app', false);

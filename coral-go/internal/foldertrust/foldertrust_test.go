@@ -287,8 +287,7 @@ func TestAnOutsideFolderThatOthersCanWriteIsRefused(t *testing.T) {
 		t.Skip("modes")
 	}
 	r := newRig(t)
-	outside, err := filepath.EvalSymlinks(t.TempDir())
-	require.NoError(t, err)
+	outside := outsideBase(t)
 	mine := filepath.Join(outside, "a", "b", "proj")
 	require.NoError(t, os.MkdirAll(mine, 0o755))
 	got, err := Check(mine, r.home, Ticked)
@@ -299,4 +298,32 @@ func TestAnOutsideFolderThatOthersCanWriteIsRefused(t *testing.T) {
 		_, err := Check(mine, r.home, Ticked)
 		assert.Error(t, err, "mode %o: group or other can plant files in it", mode)
 	}
+}
+
+// outsideBase is a folder outside the rig's home that is not itself under a shared root, whatever TMPDIR is (a Linux runner's temp is /tmp, which Check refuses): the temp folder, else the package's own folder, else
+// the user's cache folder; the test is skipped when every one of them is a shared place.
+func outsideBase(t *testing.T) string {
+	t.Helper()
+	var candidates []string
+	candidates = append(candidates, t.TempDir())
+	if wd, err := os.Getwd(); err == nil {
+		candidates = append(candidates, wd)
+	}
+	if c, err := os.UserCacheDir(); err == nil {
+		candidates = append(candidates, c)
+	}
+	for _, c := range candidates {
+		real, err := filepath.EvalSymlinks(c)
+		if err != nil || sharedOrShallow(real) != "" {
+			continue
+		}
+		dir, err := os.MkdirTemp(real, "foldertrust-outside-")
+		if err != nil {
+			continue
+		}
+		t.Cleanup(func() { os.RemoveAll(dir) })
+		return dir
+	}
+	t.Skip("every place a test folder can be made is a shared place on this machine")
+	return ""
 }
