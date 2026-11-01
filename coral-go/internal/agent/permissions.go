@@ -357,6 +357,12 @@ func PermissionFlagsForAgent(agentType, mode string) []string {
 		default:
 			return nil
 		}
+	case at.Hermes:
+		// Hermes asks before a dangerous command (its 4-choice menu) unless --yolo; only Bypass permissions is that (a person's own flag is stripped before, SplitPermissionFlags).
+		if mode == "bypassPermissions" {
+			return []string{"--yolo"}
+		}
+		return nil
 	case at.Codex:
 		switch mode {
 		case "bypassPermissions":
