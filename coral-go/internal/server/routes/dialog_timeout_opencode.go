@@ -71,7 +71,7 @@ func (h *SessionsHandler) opencodeDialogTimeout(ctx context.Context, a liveAgent
 	outcome := timeoutNoBox
 	if h.waitOpencodeGone(ctx, a.sid, req.ID) {
 		time.Sleep(promptSettle)
-		delivery, err := deliverAutomatedOutcome(ctx, h.terminal, pane, a.agentType, a.sid, dialogTimeoutNotice, "dialog timeout notice", nil)
+		delivery, err := deliverNoticeRetrying(ctx, h.terminal, pane, a.agentType, a.sid, dialogTimeoutNotice, "dialog timeout notice")
 		outcome = timeoutNotTyped
 		if err == nil && delivery == ptymanager.Sent {
 			outcome = timeoutDone

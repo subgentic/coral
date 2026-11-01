@@ -8,12 +8,14 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/subgentic/coral/internal/board"
 	"github.com/subgentic/coral/internal/logparse"
 	"github.com/subgentic/coral/internal/naming"
 	"github.com/subgentic/coral/internal/ptymanager"
 	"github.com/subgentic/coral/internal/terminalinput"
+	"github.com/subgentic/coral/internal/tmux"
 )
 
 // errAgentExited is returned for automated input to an agent whose CLI has
@@ -196,6 +198,50 @@ func (h *SessionsHandler) sendAutomatedHTTP(w http.ResponseWriter, r *http.Reque
 		writeJSON(w, http.StatusAccepted, map[string]any{"ok": true, "skipped": true,
 			"note": "nothing was typed: " + skippedWhy(name)})
 		return true
+	}
+	return false
+}
+
+// Retrying a notice that must follow a key Coral sent (the dialog timeout's close, the recommended pick): the gate held it for a passing reason, so the gate is asked again every
+// noticeRetryEvery for up to noticeRetryFor. A lasting reason (a cmd shell, notices paused, unsent text, a draft) ends it at once. It never types outside the gate: each try is a whole
+// deliverAutomatedOutcome. The caller says "not told" only after the tries end.
+var (
+	noticeRetryEvery = 1500 * time.Millisecond // a test shortens it
+	noticeRetryFor   = 20 * time.Second
+)
+
+// passingHoldReasons are the gate's reasons that pass by themselves: a program the agent started is reading the terminal (a hook, a short tool), or the agent is not in the foreground yet.
+var passingHoldReasons = []string{tmux.ReasonChildReads, tmux.ReasonForeground, tmux.ReasonBackground}
+
+// deliverNoticeRetrying is deliverAutomatedOutcome, asked again while the gate holds the text for a passing reason (Security's #6911).
+func deliverNoticeRetrying(ctx context.Context, term ptymanager.SessionTerminal, name, agentType, sessionID, text, what string) (ptymanager.Delivery, error) {
+	deadline := time.Now().Add(noticeRetryFor)
+	for {
+		d, err := deliverAutomatedOutcome(ctx, term, name, agentType, sessionID, text, what, nil)
+		if err == nil && d == ptymanager.Sent {
+			return d, nil
+		}
+		if !heldForAPassingReason(name) || time.Now().Add(noticeRetryEvery).After(deadline) {
+			return d, err
+		}
+		select {
+		case <-ctx.Done():
+			return d, ctx.Err()
+		case <-time.After(noticeRetryEvery):
+		}
+	}
+}
+
+// heldForAPassingReason says the gate's last hold of the session's text was for a passing reason.
+func heldForAPassingReason(name string) bool {
+	s, ok := ptymanager.SkippedOf(name)
+	if !ok {
+		return false
+	}
+	for _, r := range passingHoldReasons {
+		if strings.Contains(s.Why, r) {
+			return true
+		}
 	}
 	return false
 }

@@ -277,7 +277,7 @@ func (h *SessionsHandler) dialogTimeout(ctx context.Context, a liveAgent, after 
 	outcome := timeoutNoBox
 	if h.waitInputBox(ctx, pane, a, screen) {
 		time.Sleep(promptSettle)
-		delivery, err := deliverAutomatedOutcome(ctx, h.terminal, pane, a.agentType, a.sid, dialogTimeoutNotice, "dialog timeout notice", nil)
+		delivery, err := deliverNoticeRetrying(ctx, h.terminal, pane, a.agentType, a.sid, dialogTimeoutNotice, "dialog timeout notice")
 		outcome = timeoutNotTyped
 		if err == nil && delivery == ptymanager.Sent {
 			outcome = timeoutDone
