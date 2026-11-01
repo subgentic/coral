@@ -251,6 +251,10 @@ func (l *AgentLauncher) launchAgent(ctx context.Context, workingDir, agentType, 
 		}
 	}
 
+	if !isTerminal {
+		l.startHermesTelemetryAnswer(l.runtime, sessionName, agentType, sessionID, hermesTelemetryWait, 500*time.Millisecond)
+	}
+
 	l.logger.Info("launched agent",
 		"session_id", sessionID[:8],
 		"agent_type", agentType,
@@ -430,4 +434,22 @@ func recordCLIVersion(ss *store.SessionStore, sessionID, agentType string) {
 // jobLaunchFlags are a scheduled job's flags for its agent: its configured ones, and for Pi --no-approve (a job asks nobody to trust the repository's Pi files, #11105) with an --approve dropped.
 func jobLaunchFlags(job store.ScheduledJob) []string {
 	return agent.UnattendedFlags(job.AgentType, strings.Fields(job.Flags))
+}
+
+// hermesTelemetryWait is how long a launched Hermes agent's screen is watched for its first-run telemetry question (Hermes takes 10 to 25 s to draw it, #11715).
+const hermesTelemetryWait = 90 * time.Second
+
+// startHermesTelemetryAnswer, for a Hermes agent only, watches its screen in the background and answers the first-run telemetry question with "No thanks" when it shows (ptymanager.AnswerHermesTelemetry: only with
+// that choice selected), so the question does not hold the agent's first prompt. It runs beside the prompt's own delivery, which holds while the question is open.
+func (l *AgentLauncher) startHermesTelemetryAnswer(rt AgentRuntime, name, agentType, sessionID string, wait, every time.Duration) {
+	if agentType != at.Hermes {
+		return
+	}
+	l.bg.Add(1)
+	safego.Go("background/launcher:hermesTelemetry", func() {
+		defer l.bg.Done()
+		ctx, cancel := context.WithTimeout(context.Background(), wait+5*time.Second)
+		defer cancel()
+		ptymanager.AnswerHermesTelemetry(ctx, rt, name, agentType, sessionID, wait, every)
+	})
 }
