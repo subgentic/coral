@@ -38,12 +38,13 @@ type BoardHealthMonitor struct {
 	// paused says whether a board is paused: nothing is nudged on it, and the check says so (#11182); nil: not said.
 	paused func(project string) bool
 
-	mu        sync.Mutex
-	lastCheck map[string]time.Time       // per board: when a check last went out
-	lastEval  map[string]time.Time       // per board: when the check was last looked at (it goes out only when something changed or the heartbeat is due, #11431)
-	lastPrint map[string]map[string]bool // per board: the facts the last look found, so the same findings are not said again until the heartbeat
-	landing   *LandingWatch              // the landing alert's view of the repositories (git_poller.go feeds it); nil: the alert has nothing to read
-	offShown  map[string][]offBooksShown // per board: the off-the-books occurrences the check composed last, said once it is delivered (board_health_offbooks.go)
+	mu         sync.Mutex
+	lastCheck  map[string]time.Time       // per board: when a check last went out
+	lastEval   map[string]time.Time       // per board: when the check was last looked at (it goes out only when something changed or the heartbeat is due, #11431)
+	lastPrint  map[string]map[string]bool // per board: the facts the last look found, so the same findings are not said again until the heartbeat
+	landing    *LandingWatch              // the landing alert's view of the repositories (git_poller.go feeds it); nil: the alert has nothing to read
+	devPending map[string][]deviationSaid // per board: the deviation findings the check composed last, said once it is delivered (board_health_deviation.go)
+	offShown   map[string][]offBooksShown // per board: the off-the-books occurrences the check composed last, said once it is delivered (board_health_offbooks.go)
 }
 
 func NewBoardHealthMonitor(store *board.Store, interval time.Duration) *BoardHealthMonitor {
@@ -185,6 +186,7 @@ func (m *BoardHealthMonitor) checkProject(ctx context.Context, project string, b
 	m.lastPrint[project] = facts
 	m.mu.Unlock()
 	m.markOffBooksShown(ctx, project, text, m.now())
+	m.markDeviationsShown(ctx, project, text, m.now())
 }
 
 // composeCheck gathers a board's items and writes its check: what Coral's own rules escalated, idle agents with no
@@ -216,7 +218,8 @@ func (m *BoardHealthMonitor) composeCheck(ctx context.Context, project, orch str
 	items = append(items, idle...)
 	items = append(items, m.offBooksItems(ctx, project, orch, subs, bySession, tasks, now)...) // work done off the books (#7793)
 	items = append(items, reviewItems(reviews, reviewers, parked, idleNoWork)...)
-	items = append(items, m.poolReviewItems(ctx, project, now)...) // a review that has waited in the pool (#8957)
+	items = append(items, m.poolReviewItems(ctx, project, now)...)                                  // a review that has waited in the pool (#8957)
+	items = append(items, m.deviationItems(ctx, project, rcpt, tasks, parked, waits, subs, now)...) // far past their own usual (#11729)
 	items = append(items, m.askItems(ctx, project, now)...)
 	// 4. Queue problems (task numbers only).
 	issues, _, _ := taskQueueIssues(tasks)

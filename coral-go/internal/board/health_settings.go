@@ -37,6 +37,8 @@ type HealthSettings struct {
 	// AskReminder reminds a member, once, of a question (post --ask, asks.go) that @mentions them and that they have not answered for AfterMin (#7794). It runs for a team whether or not the
 	// orchestrator's check is on: a reminder to one agent costs the team nothing.
 	AskReminder HealthMentionNudge `json:"ask_reminder"`
+	// Deviations flags, in the orchestrator's check, a task, a silence or a wait far past its own history (#11729): once at the crossing, again at each doubling.
+	Deviations HealthRuleOn `json:"deviations"`
 	// ActionList holds the thresholds of the check's action list (#11729): a zero field is its default.
 	ActionList HealthActionList `json:"action_list"`
 	// Landing puts a line in the health check (off by default, #8942, goal #80) when the branch work lands on (Branch, "main" by default) has not moved for WaitMin although tasks were approved or completed
@@ -236,6 +238,7 @@ func DefaultHealthSettings() HealthSettings {
 		UploadNoTask:   HealthRuleOn{On: true},
 		GoalSize:       HealthGoalSize{On: true, Limit: 15},
 		AskReminder:    HealthMentionNudge{On: true, AfterMin: 15},
+		Deviations:     HealthRuleOn{On: true},
 		ActionList:     HealthActionList{StuckWaitMin: 10, OverloadedTasks: 5, OverloadedSleeping: 1, StaleReviewHours: 24, MentionMin: 30},
 		Landing:        HealthLanding{On: false, Branch: "main", WaitMin: 120},
 		Release:        HealthRelease{On: false, Branch: "main", TagPattern: "v*", WaitMin: 1440},

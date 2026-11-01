@@ -16,3 +16,8 @@ func TestHealthActionListSettingsDefaultAndClamp(t *testing.T) {
 	assert.Equal(t, 7, HealthActionList{StuckWaitMin: 7}.clamp().StuckWaitMin)
 	assert.Equal(t, d, DefaultHealthSettings().Clamp().ActionList)
 }
+
+// The deviation rules (#11729 slice 3) are on by default.
+func TestHealthDeviationsAreOnByDefault(t *testing.T) {
+	assert.True(t, DefaultHealthSettings().Deviations.On)
+}
