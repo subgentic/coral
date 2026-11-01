@@ -56,7 +56,8 @@ type GitPoller struct {
 	// change takes effect without a restart. A non-positive result pauses
 	// polling entirely, for repositories where scanning is too expensive to
 	// do on a timer at all.
-	intervalFn func() time.Duration
+	currentDirFn func(ctx context.Context, a AgentInfo) string // where an agent is now, when that is not where it was launched (#11704)
+	intervalFn   func() time.Duration
 
 	// diffModeFn, when set, names the comparison the Files panel is in (git_diff_mode),
 	// re-read every pass: the poller caches the changed-files list for that mode. Nil
@@ -406,11 +407,27 @@ func (p *GitPoller) writeChangedFiles(ctx context.Context, key, agentName, workd
 }
 
 func (p *GitPoller) discoverAgents(ctx context.Context) ([]AgentInfo, error) {
+	var agents []AgentInfo
+	var err error
 	if p.discoverFn != nil {
-		return p.discoverFn(ctx)
+		agents, err = p.discoverFn(ctx)
+	} else {
+		agents, err = p.runtime.ListAgents(ctx) // default: discover from runtime
 	}
-	// Default: discover from runtime
-	return p.runtime.ListAgents(ctx)
+	if err != nil || p.currentDirFn == nil {
+		return agents, err
+	}
+	for i := range agents { // where an agent is NOW, when it is somewhere else in its repository (#11704): its branch, commit and changed files are that folder's, not the launch folder's
+		if dir := p.currentDirFn(ctx, agents[i]); dir != "" {
+			agents[i].WorkingDirectory = dir
+		}
+	}
+	return agents, nil
+}
+
+// SetCurrentDirFn sets how the poller finds the folder an agent has moved to (nil: every agent is read where it was launched).
+func (p *GitPoller) SetCurrentDirFn(fn func(ctx context.Context, a AgentInfo) string) {
+	p.currentDirFn = fn
 }
 
 // gitInfo holds parsed git query results.
