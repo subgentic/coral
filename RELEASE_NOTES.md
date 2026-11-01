@@ -1,5 +1,41 @@
 # Release Notes
 
+## v2.0.24 — the Agent step as folder tabs, a picture box that fills its pane, the health check as an action list, and an Orchestrator seat that holds
+
+### Changes
+
+#### What you will notice first
+
+- **New agent: the Agent step is folder tabs**: one tab per agent this computer has, across the top like browser tabs; the open tab joins its panel and holds that agent's Model and Thinking (the panel's first line is the agent's status). The chosen tab is the radio, so the arrow keys move and choose.
+- **OpenCode gets "Add a model..." in the Model dropdown** (Pi already had it); a model you add is saved, offered again, and shown in an "Added by you" group at the top of a grouped list (Pi's and OpenCode's). The Add a model form keeps the keyboard when New agent draws again (it lost focus in about half the runs).
+- **A picture fills its box in every pane**: in the artifact viewer a wide picture is no longer drawn small inside a short box; the box takes all of the viewer, the picture sits in its middle at its own size (a small one is not blown up), the keyboard zooms (+, -, 0) and moves (arrows) it, and a two-finger pinch zooms. A picture in a pane with no box (the Inbox's detail pane, a goal's list) gets a centred box as high as most of the screen allows (a Before/After pair gets less).
+- **Approval presets in Team settings**: Operator approves tasks, Operator approves goals, or Fully autonomous. They are three names for the team's existing planning-approval flags, never a stored setting; a file for review or a question to the Operator still reaches Needs you.
+- **Team settings > Messaging says "On (default)" or "On"** under each cross-team switch, with a "Set on" button that stores the explicit on (a switch that is only on by default does not count between teams on one computer).
+- **Phone swipe to ignore works the way a thumb uses it**: a drag on a review file or a welcome item did nothing when the phone layout's pointer was not reported as touch, or when the finger started in the list's side gutter (a drag from 350 px on a 360 px phone starts right of the row); it now works from both, and one swipe ignores a file once (after several folder switches it ignored it many times). On a phone the Inbox list's toasts sit at the bottom, above the bottom bar, instead of covering the first rows.
+- **In the folder tabs, Thinking is reachable**: its select was hidden from a screen reader and out of the Tab order; a keyboard user can now Tab to it and a screen reader reads it.
+- **The phone selection bar's ⋯ menu opens on the first tap**: the menu's code loads as the bar is drawn, and a tap while the bar redraws opens the menu in the new bar (it opened nothing).
+- **A Needs you row on a phone keeps the "N earlier versions" note, does not cut the sender, and says a short question once.**
+- **A question that came from another computer shows only the plain Send reply and Close**: the buttons an agent offered are claimed through routes Coral Hub does not serve, so a click there only ended in an error.
+
+#### Agents and the chat
+
+- **The health check is an action list**: "Orchestrator, act on these (oldest first):" with one line per rule: waits on the recipient first, stuck waits, overloaded agents while others sleep, stale reviews in hours, mentions that do not reach a member (a name may end with a closing `)` or `]`; a colon, comma, dot, @, quote or an invisible character at an end makes a name unreachable), and a "Needs the Operator" section; no line is cut ("and N more: coral-board status"). The 10-minute wait nudge and the check say what the wait is for (the task number, or the reason given, cleaned and quoted). Deviations from a member's own history are reported once at the crossing and again at each doubling: a task in progress much longer than its owner's usual time, silence on a task, a wait longer than that pair's usual answer. Thresholds are the `health.action_list` and `health.deviations` settings.
+- **The Orchestrator is the one the team was launched with**, not whoever joins with the title: a join that claims the Orchestrator's name or title while the team has a holder of it (active or away) is refused (409 `orchestrator_taken`: "join with another role, or remove the old Orchestrator from the team first"). The launched Orchestrator can always join again, and a re-join keeps its launch record.
+- **A cross-team switch that is on only by default** says so in the refusal, and the sentence now names the Team settings > Messaging page.
+
+#### Known issues
+
+- **Windows: in-app update does not work from 2.0.0 through 2.0.6.** If you're on one of those, download and install the MSI by hand; from 2.0.7 on, in-app update works.
+- **macOS: a Coral of 2.0.5 or earlier cannot install updates in-app; install 2.0.6 or later by hand once.**
+- **OpenCode agents are tested on macOS and Linux; OpenCode on Windows is not yet tested end to end.**
+- Setting up a computer over SSH is supported from a macOS or Linux hub, and is not yet tested from a Windows hub.
+
+#### For developers and releases
+
+- The static tree is 5,905,923 bytes of the 5,906,432-byte budget, after the budget work cut about 12.5 KB: the 78 identical icon opening tags are written once, 23 copies of the element builder are one export, and exactly repeated markup chunks are module constants (each a mechanical rewrite that undoes to the original byte for byte). Goal pictures wait for room.
+- Suites follow the new Thinking select and the settings page's rows (`new_agent_independence`, `new_agent_keyboard`, `team_approval_presets` waits for the save to answer), and two goldens (`html_builders_golden`, `settings_html_pin`) carry the picture box and the Messaging rows.
+- The health history's newest-first read has a tie-break (`ORDER BY completed_at DESC, id DESC`); the Add a model suite waits for the keyboard to be in the form before it presses Escape.
+
 ## v2.0.23 — Needs you in three lines, a one-line phone bar, and parked tasks that say Waiting
 
 ### Changes
