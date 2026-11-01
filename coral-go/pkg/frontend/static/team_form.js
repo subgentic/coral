@@ -12,7 +12,6 @@ let _view = null;
 
 let _trustFor = ''; // the folder the person ticked "Trust this folder" for: a tick names its path, and is of no use for another
 
-document.addEventListener('change', e => { if (e.target && e.target.id === 'launch-team-trust') _trustFor = e.target.checked ? (document.getElementById('launch-team-dir')?.value.trim() || '') : ''; });
 
 /** A tick for one folder does not carry to another: when the folder is no longer the ticked one the switch goes back to off. */
 export function dropStaleTrustTick() {
@@ -107,6 +106,8 @@ function mount(modal) {
         { key: 'base', type: 'text', id: 'launch-team-base-branch', label: 'Base branch', placeholder: "the repo's current branch", visibleWhen: v => !!v.worktree },
     ];
     _view = mountSettingsView(host, { mode: 'form', fields });
+    // The folder the person ticked "Trust this folder" for: registered here, when the form is built, not at load (a page-wide listener at start shows in the startup golden, #11889).
+    modal.addEventListener('change', e => { if (e.target && e.target.id === 'launch-team-trust') _trustFor = e.target.checked ? (document.getElementById('launch-team-dir')?.value.trim() || '') : ''; });
     joinBrowse('launch-team-dir', 'btn-browse-team'); // Browse at the input's right, as Open folder has it (#9489)
     const server = document.getElementById('team-board-server'); if (server) server.disabled = true; // the machine's own entry reveals it (launch_dialog.js _syncTeamAddress)
     showTeamAddress(false);
